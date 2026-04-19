@@ -46,9 +46,9 @@ variable "ebs_volume_size" {
 }
 
 variable "lobby_version_string" {
-  description = "Required client version. Must match CMakeLists.txt. Empty string to accept any version."
+  description = "Required client version. Empty string (default) accepts any version — lets Release workflow tags drive client versions without needing an infrastructure rebuild. Set to a specific string like \"00024\" to enforce a pinned version (requires instance rebuild to take effect)."
   type        = string
-  default     = "00022"
+  default     = ""
 }
 
 variable "tailscale_auth_key" {

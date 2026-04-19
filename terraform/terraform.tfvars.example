@@ -19,4 +19,4 @@ deploy_ssh_public_key = "ssh-ed25519 AAAA... gh-actions-deploy"
 # Optional overrides:
 # instance_type        = "t4g.small"
 # ebs_volume_size      = 8
-# lobby_version_string = "00022"
+# lobby_version_string = "00024"  # default "" accepts any client version
