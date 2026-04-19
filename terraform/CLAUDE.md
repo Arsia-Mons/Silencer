@@ -5,6 +5,10 @@ server and spawns `zsilencer -s` dedicated-server subprocesses per
 game. Elastic IP, optional Route 53 A record, dedicated EBS data
 volume mounted at `/var/lib/zsilencer`.
 
+> For the stand-up-from-scratch walkthrough and day-2 ops, see
+> `docs/production.md`. This file covers the *why* of the Terraform
+> code; `docs/production.md` covers the *how* of running it.
+
 ## Two-module split
 
 - `bootstrap/` — creates the S3 bucket + DynamoDB lock table that hold

@@ -31,6 +31,8 @@ Runtime deps (client): SDL2, SDL2_mixer, zlib.
 - `build/` — out-of-tree CMake build dir (contains `zsilencer` binary).
 - `terraform/` — AWS infra (EC2 + EBS + cloud-init + Tailscale). See
   `terraform/CLAUDE.md`.
+- `docs/production.md` — production setup guide: stand up your own
+  lobby from scratch, CI wiring, day-2 ops, failure modes.
 - `scripts/fastdeploy.sh` — bypass CI: rsync → build on the box → swap
   binary → restart `zsilencer-lobby`. Debug-only; prod goes through
   `.github/workflows/deploy.yml`.
