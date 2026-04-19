@@ -10,6 +10,24 @@ std::string GetResDir(void){
 		}
 	}
 	return "";
+#elif defined(_WIN32)
+	static std::string cached;
+	if(!cached.empty()) return cached;
+	char exepath[MAX_PATH];
+	DWORD len = GetModuleFileNameA(NULL, exepath, MAX_PATH);
+	if(len == 0 || len >= MAX_PATH) return "";
+	// strip executable name to get directory
+	char *lastslash = strrchr(exepath, '\\');
+	if(!lastslash) lastslash = strrchr(exepath, '/');
+	if(lastslash) *lastslash = 0;
+	// check for data/ subdirectory next to the exe
+	std::string candidate = std::string(exepath) + "\\data\\";
+	struct stat dirinfo;
+	if(stat(candidate.c_str(), &dirinfo) == 0){
+		cached = candidate;
+		return cached;
+	}
+	return "";
 #else
 	return "";
 #endif
