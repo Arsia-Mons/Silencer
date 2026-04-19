@@ -12,6 +12,13 @@ file(GLOB_RECURSE sources src/*.cpp src/*.h src/*.mm)
 add_executable(${PROJECT} ${sources})
 target_compile_options(${PROJECT} PUBLIC -std=c++1y)
 
+set(ZSILENCER_LOBBY_HOST "127.0.0.1" CACHE STRING "Lobby host the client connects to at startup")
+set(ZSILENCER_LOBBY_PORT "517" CACHE STRING "Lobby TCP port")
+target_compile_definitions(${PROJECT} PRIVATE
+	ZSILENCER_LOBBY_HOST="${ZSILENCER_LOBBY_HOST}"
+	ZSILENCER_LOBBY_PORT=${ZSILENCER_LOBBY_PORT}
+)
+
 find_package(ZLIB REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2_mixer REQUIRED)

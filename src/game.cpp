@@ -18,6 +18,14 @@
 #include "cocoawrapper.h"
 #include "sha1.h"
 #include <algorithm>
+#include <stdio.h>
+
+#ifndef ZSILENCER_LOBBY_HOST
+#define ZSILENCER_LOBBY_HOST "127.0.0.1"
+#endif
+#ifndef ZSILENCER_LOBBY_PORT
+#define ZSILENCER_LOBBY_PORT 517
+#endif
 
 Game::Game() : renderer(world), screenbuffer(640, 480){
 	world.SetVersion("00022");
@@ -4003,11 +4011,13 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 					case Lobby::IDLE:
 						
 					break;
-					case Lobby::WAITING:
-						textbox->AddLine("Connecting to 127.0.0.1:517");
-						world.lobby.Connect("127.0.0.1", 517);
+					case Lobby::WAITING:{
+						char line[128];
+						snprintf(line, sizeof(line), "Connecting to %s:%d", ZSILENCER_LOBBY_HOST, ZSILENCER_LOBBY_PORT);
+						textbox->AddLine(line);
+						world.lobby.Connect(ZSILENCER_LOBBY_HOST, ZSILENCER_LOBBY_PORT);
 						//world.lobby.state = Lobby::AUTHENTICATED;
-					break;
+					}break;
 					case Lobby::RESOLVING:
 						textbox->AddLine("Resolving hostname...");
 						world.lobby.state = Lobby::WAITINGFORRESOLVER;
@@ -4019,7 +4029,7 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 					break;
 					case Lobby::RESOLVED:
 						textbox->AddLine("Hostname resolved");
-						world.lobby.Connect("127.0.0.1", 517);
+						world.lobby.Connect(ZSILENCER_LOBBY_HOST, ZSILENCER_LOBBY_PORT);
 					break;
 					case Lobby::CONNECTED:
 						textbox->AddLine("Connected");
