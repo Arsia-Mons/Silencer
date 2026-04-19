@@ -24,11 +24,19 @@ Runtime deps (client): SDL2, SDL2_mixer, zlib.
 
 ## Layout
 
-- `src/` — C++ client (~158 files, CMake, C++14). Entry: `src/main.cpp`.
+- `src/` — C++ client (~159 files, CMake, C++14). Entry: `src/main.cpp`.
 - `server/` — Go lobby server. Entry: `server/main.go`.
 - `data/` — runtime assets (sprites, tiles, sounds, palette).
 - `res/` — app icons.
 - `build/` — out-of-tree CMake build dir (contains `zsilencer` binary).
+- `terraform/` — AWS infra (EC2 + EBS + cloud-init + Tailscale). See
+  `terraform/CLAUDE.md`.
+- `scripts/fastdeploy.sh` — bypass CI: rsync → build on the box → swap
+  binary → restart `zsilencer-lobby`. Debug-only; prod goes through
+  `.github/workflows/deploy.yml`.
+- `.github/workflows/` — `deploy.yml` (tag `v*` → ARM64 lobby build →
+  scp over Tailscale → symlink swap); `release.yml` (macOS + Windows
+  client zips).
 
 Protocol constants and lobby wire format are in `src/lobby.cpp`,
 `src/lobbygame.cpp`, and `server/protocol.go`.
@@ -42,7 +50,7 @@ The same `zsilencer` binary runs the client and, when launched with
 zsilencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
 ```
 
-- Parsed in `src/main.cpp:160` → `src/game.cpp:122`.
+- Parsed in `src/main.cpp:160` → `src/game.cpp:132`.
 - Spawned by the Go lobby in `server/proc.go` on each `MSG_NEWGAME`.
 - Dedicated mode skips `SDL_Init(VIDEO)` and audio; RSS ~12 MB.
 - Heartbeats UDP to the lobby: `[0x00][gameid u32][port u16][state u8]`.
@@ -50,14 +58,18 @@ zsilencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
 
 ## Gotchas
 
-- **Lobby host is hardcoded.** `src/game.cpp:4008` and `:4022` connect
-  to `127.0.0.1:517`. To point the client at a remote lobby (or a
-  non-privileged port), edit both call sites.
-- **Version string must match.** `CMakeLists.txt:76` sets `00023`; the
-  lobby's `-version` flag defaults to the same. Bump both together or
-  pass `-version ""` on the server to accept any client.
-- **Port 517 needs root on macOS/Linux.** For local dev, run the lobby
-  on `:15170` and patch the two call sites above.
+- **Lobby host is a compile-time constant.** Baked in via
+  `-DZSILENCER_LOBBY_HOST=<host> -DZSILENCER_LOBBY_PORT=<port>` (see
+  `CMakeLists.txt:48`, used at `src/game.cpp:4018`/`:4032`). Default is
+  `127.0.0.1:517`. CI sets it to `silencer.hventura.com`; rebuild the
+  client to point at a different lobby.
+- **Version string must match.** Client sets it at `src/game.cpp:31`
+  (`world.SetVersion("00023")`); the lobby's `-version` flag defaults
+  to the same. Bump both together, or pass `-version ""` on the server
+  to accept any client. `CMakeLists.txt` `CPACK_PACKAGE_VERSION` is
+  installer metadata only — unrelated to the wire handshake.
+- **Port 517 needs root on macOS/Linux.** For local dev, rebuild with
+  `-DZSILENCER_LOBBY_PORT=15170` and run the lobby on `:15170`.
 - **Data dir on macOS.** Client `chdir`s to
   `~/Library/Application Support/zSILENCER` at startup
   (`src/main.cpp` `CDDataDir`) — copy `data/` there or run from the

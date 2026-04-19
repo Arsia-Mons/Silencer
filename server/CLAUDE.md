@@ -29,6 +29,6 @@ storage notes) are in `README.md`; this file is for editing the code.
 - **Heartbeat timeout: 30 s** (`hub.go:28`). Miss → pending create
   fails with `status=2`.
 - **`status=2` on `opNewGame` is reserved** for the client's "Could
-  not create game" dialog (`src/game.cpp:798`). Don't reuse.
+  not create game" dialog (`src/game.cpp:824`). Don't reuse.
 - **Don't hold `h.mu` across network I/O.** Copy state under lock,
   send outside.
