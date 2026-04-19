@@ -87,6 +87,7 @@ jobs:
             sudo mv $STAGING $RELEASE
             sudo chmod +x $RELEASE/zsilencer-lobby $RELEASE/zsilencer
             sudo ln -sfn $RELEASE /opt/zsilencer/current
+            sudo ln -sfn /opt/zsilencer/current/data /usr/local/share/zsilencer
             sudo systemctl restart zsilencer-lobby
             sleep 2
             sudo systemctl is-active zsilencer-lobby
