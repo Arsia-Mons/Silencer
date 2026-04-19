@@ -5,7 +5,7 @@
 #include <math.h>
 
 Audio::Audio(){
-	enabled = true;
+	enabled = false;
 	effectvolume = 1;
 	musicvolume = MIX_MAX_VOLUME;
 }
@@ -26,6 +26,7 @@ bool Audio::Init(Game * game){
 		Mix_AllocateChannels(maxchannels);
 		Mix_ChannelFinished(ChannelFinished);
 		Mix_SetPostMix(MixingFunction, game);
+		enabled = true;
 		return true;
 	}
 }
@@ -59,6 +60,7 @@ int Audio::Play(Mix_Chunk * chunk, int volume, bool loop){
 }
 
 void Audio::Stop(int channel, int fadeoutms){
+	if(!enabled) return;
 	if(fadeoutms){
 		Mix_FadeOutChannel(channel, fadeoutms);
 		Mix_ExpireChannel(channel, fadeoutms);
@@ -68,18 +70,22 @@ void Audio::Stop(int channel, int fadeoutms){
 }
 
 void Audio::StopAll(int fadeoutms){
+	if(!enabled) return;
 	Stop(-1, fadeoutms);
 }
 
 void Audio::Pause(int channel){
+	if(!enabled) return;
 	Mix_Pause(channel);
 }
 
 void Audio::Resume(int channel){
+	if(!enabled) return;
 	Mix_Resume(channel);
 }
 
 bool Audio::Paused(int channel){
+	if(!enabled) return false;
 	return Mix_Paused(channel);
 }
 
@@ -124,10 +130,12 @@ void Audio::UpdateAllVolumes(World & world, Sint16 x, Sint16 y, int radius){
 }
 
 void Audio::SetVolume(int channel, int volume){
+	if(!enabled) return;
 	Mix_Volume(channel, volume * effectvolume);
 }
 
 void Audio::Mute(int volume){
+	if(!enabled) return;
 	float percent = volume / 128.0;
 	effectvolume = percent;
 	for(int i = 0; i < maxchannels; i++){
@@ -138,6 +146,7 @@ void Audio::Mute(int volume){
 }
 
 void Audio::Unmute(void){
+	if(!enabled) return;
 	effectvolume = 1;
 	for(int i = 0; i < maxchannels; i++){
 		int oldvolume = channelvolume[i];
@@ -147,6 +156,7 @@ void Audio::Unmute(void){
 }
 
 bool Audio::PlayMusic(Mix_Music * music){
+	if(!enabled) return false;
 	if(!Config::GetInstance().music){
 		return false;
 	}
@@ -161,22 +171,30 @@ bool Audio::PlayMusic(Mix_Music * music){
 }
 
 void Audio::StopMusic(void){
+	if(!enabled) return;
 	Mix_FadeOutMusic(700);
 }
 
 void Audio::PauseMusic(void){
+	if(!enabled) return;
 	Mix_PauseMusic();
 }
 
 void Audio::ResumeMusic(void){
+	if(!enabled) return;
 	Mix_ResumeMusic();
 }
 
 bool Audio::MusicPaused(void){
+	if(!enabled) return false;
 	return Mix_PausedMusic();
 }
 
 void Audio::SetMusicVolume(int volume){
+	if(!enabled){
+		musicvolume = volume;
+		return;
+	}
 	Mix_VolumeMusic(volume);
 	musicvolume = volume;
 }

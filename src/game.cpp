@@ -122,6 +122,8 @@ bool Game::Load(char * cmdline){
 	if((cmdline = strtok(cmdline, " "))){
 		do{
 			if(strncmp(cmdline, "-s", 2) == 0){ // dedicated server
+				setbuf(stdout, NULL);
+				setbuf(stderr, NULL);
 				char * lobbyaddress = strtok(NULL, " ");
 				char * lobbyport = strtok(NULL, " ");
 				char * gameid = strtok(NULL, " ");
@@ -166,43 +168,52 @@ bool Game::Load(char * cmdline){
 		}while((cmdline = strtok(0, " ")));
 	}
 	Config::GetInstance().Load();
-	if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) == -1){
-		printf("Could not initialize SDL %s\n", SDL_GetError());
-		return false;
+	if(world.dedicatedserver.active){
+		// Minimal init for dedicated-server mode: timer for SDL_GetTicks pacing.
+		if(SDL_Init(SDL_INIT_TIMER) == -1){
+			printf("Could not initialize SDL timer %s\n", SDL_GetError());
+			return false;
+		}
 	}
-	int mixinitted;
-	if((mixinitted = Mix_Init(MIX_INIT_MP3 | MIX_INIT_MOD | MIX_INIT_MODPLUG)) == -1){
-		printf("Could not initialize SDL_mixer %s\n", Mix_GetError());
-		return false;
+	if(!world.dedicatedserver.active){
+		if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) == -1){
+			printf("Could not initialize SDL %s\n", SDL_GetError());
+			return false;
+		}
+		int mixinitted;
+		if((mixinitted = Mix_Init(MIX_INIT_MP3 | MIX_INIT_MOD)) == -1){
+			printf("Could not initialize SDL_mixer %s\n", Mix_GetError());
+			return false;
+		}
+		if(!(mixinitted & MIX_INIT_MOD)){
+			printf("Could not initialize MOD support %s\n", Mix_GetError());
+		}
+		if(!(mixinitted & MIX_INIT_MP3)){
+			printf("Could not initialize MP3 support %s\n", Mix_GetError());
+		}
+		if(!Audio::GetInstance().Init(this)){
+			printf("Could not initialize audio\n");
+		}
+		Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
+		printf("Loading palette...\n");
+		if(!renderer.palette.SetPalette(0)){
+			return false;
+		}
+		SDL_AddTimer(1000, TimerCallback, this);
+		SDL_EventState(SDL_TEXTINPUT, SDL_TRUE); //SDL_EnableUNICODE(true);
+		//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
+		//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
+		window = SDL_CreateWindow("zSilencer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+		if(!SetupOpenGL()){
+			//printf("Unable to setup OpenGL shaders, using SDL Renderer\n");
+			usingopengl = false;
+			CreateRenderer();
+			sdlscreenbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, screenbuffer.w, screenbuffer.h, 8, 0, 0, 0, 0);
+			CreateStreamingTexture();
+		}
+		SetColors(renderer.palette.GetColors());
+		//SDL_Flip(screen);
 	}
-	if(!(mixinitted & MIX_INIT_MOD) && !(mixinitted & MIX_INIT_MODPLUG)){
-		printf("Could not initialize MOD support %s\n", Mix_GetError());
-	}
-	if(!(mixinitted & MIX_INIT_MP3)){
-		printf("Could not initialize MP3 support %s\n", Mix_GetError());
-	}
-	if(!Audio::GetInstance().Init(this)){
-		printf("Could not initialize audio\n");
-	}
-	Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
-	printf("Loading palette...\n");
-	if(!renderer.palette.SetPalette(0)){
-		return false;
-	}
-	SDL_AddTimer(1000, TimerCallback, this);
-	SDL_EventState(SDL_TEXTINPUT, SDL_TRUE); //SDL_EnableUNICODE(true);
-	//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
-	//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-	window = SDL_CreateWindow("zSilencer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
-	if(!SetupOpenGL()){
-		//printf("Unable to setup OpenGL shaders, using SDL Renderer\n");
-		usingopengl = false;
-		CreateRenderer();
-		sdlscreenbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, screenbuffer.w, screenbuffer.h, 8, 0, 0, 0, 0);
-		CreateStreamingTexture();
-	}
-	SetColors(renderer.palette.GetColors());
-	//SDL_Flip(screen);
 	printf("Loading resources...\n");
 	if(!world.resources.Load(*this, world.dedicatedserver.active)){
 		printf("Could not load resources\n");
@@ -454,6 +465,9 @@ void Game::Present(void){
 }
 
 void Game::LoadProgressCallback(int progress, int totalprogressitems){
+	if(world.dedicatedserver.active){
+		return;
+	}
 	HandleSDLEvents();
 	if(SDL_GetTicks() - lasttick >= 100){
 		int width = 500;
@@ -529,7 +543,9 @@ bool Game::Loop(void){
 		if(!world.replay.IsPlaying() || (world.replay.IsPlaying() && world.gameplaystate == World::INGAME)){
 			world.Tick();
 		}
-		renderer.Tick();
+		if(!world.dedicatedserver.active){
+			renderer.Tick();
+		}
 		if(world.gameplaystate == World::INGAME){
 			Uint8 newambiencelevel = renderer.GetAmbienceLevel();
 			if(newambiencelevel != oldambiencelevel || fade_i <= 15){
@@ -2167,8 +2183,10 @@ bool Game::LoadMap(const char * name){
 	if(!world.map.Load(name, world)){
 		return false;
 	}
-	CreateAmbienceChannels();
-	renderer.palette.SetParallaxColors(world.map.parallax);
+	if(!world.dedicatedserver.active){
+		CreateAmbienceChannels();
+		renderer.palette.SetParallaxColors(world.map.parallax);
+	}
 	return true;
 }
 
@@ -3986,8 +4004,8 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 						
 					break;
 					case Lobby::WAITING:
-						textbox->AddLine("Connecting to lobby.zsilencer.com:517");
-						world.lobby.Connect("lobby.zsilencer.com", 517);
+						textbox->AddLine("Connecting to 127.0.0.1:517");
+						world.lobby.Connect("127.0.0.1", 517);
 						//world.lobby.state = Lobby::AUTHENTICATED;
 					break;
 					case Lobby::RESOLVING:
@@ -4001,7 +4019,7 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 					break;
 					case Lobby::RESOLVED:
 						textbox->AddLine("Hostname resolved");
-						world.lobby.Connect("lobby.zsilencer.com", 517);
+						world.lobby.Connect("127.0.0.1", 517);
 					break;
 					case Lobby::CONNECTED:
 						textbox->AddLine("Connected");
@@ -5513,9 +5531,12 @@ std::string Game::SaveMap(const char * name, unsigned char * data, int size){
 
 bool Game::CalculateMapHash(const char * filename, unsigned char (*hash)[20]){
 	std::vector<Uint8> mapdata(65535);
-	//char mapfilename[256];
-	//sprintf(mapfilename, "level/%s", mapname);
+	CDDataDir();
 	SDL_RWops * file = SDL_RWFromFile(filename, "rb");
+	if(!file){
+		CDResDir();
+		file = SDL_RWFromFile(filename, "rb");
+	}
 	if(file){
 		int mapdatasize = SDL_RWread(file, mapdata.data(), 1, mapdata.size());
 		SDL_RWclose(file);
@@ -5590,6 +5611,9 @@ void Game::ProcessMapDownload(void){
 }
 
 bool Game::HandleSDLEvents(void){
+	if(world.dedicatedserver.active){
+		return true;
+	}
 	SDL_Event event;
 	while(SDL_PollEvent(&event) > 0){
 		switch(event.type){

@@ -1,0 +1,6 @@
+build/
+lobby.json
+server/zsilencer-lobby
+server/*.tmp
+*.o
+*.obj

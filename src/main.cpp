@@ -3,6 +3,20 @@
 #include "cocoawrapper.h"
 #ifdef __APPLE__
 #include "CoreFoundation/CoreFoundation.h"
+#include <mach-o/dyld.h>
+#endif
+#ifdef POSIX
+#include <execinfo.h>
+#include <signal.h>
+static void crash_handler(int sig){
+	void * frames[64];
+	int n = backtrace(frames, 64);
+	fprintf(stderr, "[ds] SIGNAL %d — backtrace (%d frames):\n", sig, n);
+	backtrace_symbols_fd(frames, n, 2);
+	fflush(stderr);
+	signal(sig, SIG_DFL);
+	raise(sig);
+}
 #endif
 
 #ifdef __ANDROID__
@@ -64,24 +78,67 @@ void CDDataDir(void){
 #endif
 }
 
+static char resdir[PATH_MAX] = {0};
+
 void CDResDir(void){
 #ifdef __APPLE__
-	CFBundleRef mainBundle = CFBundleGetMainBundle();
-    CFURLRef resourcesURL = CFBundleCopyResourcesDirectoryURL(mainBundle);
-    char path[PATH_MAX];
-    if(!CFURLGetFileSystemRepresentation(resourcesURL, TRUE, (UInt8 *)path, PATH_MAX)){
-        // error!
+	if(resdir[0]){
+		chdir(resdir);
 		return;
-    }
-    CFRelease(resourcesURL);
-	
-    chdir(path);
+	}
+	// Try bundle resources first
+	CFBundleRef mainBundle = CFBundleGetMainBundle();
+	if(mainBundle){
+		CFURLRef resourcesURL = CFBundleCopyResourcesDirectoryURL(mainBundle);
+		if(resourcesURL){
+			char path[PATH_MAX];
+			if(CFURLGetFileSystemRepresentation(resourcesURL, TRUE, (UInt8 *)path, PATH_MAX)){
+				CFRelease(resourcesURL);
+				// Check if data files exist in the bundle resource dir
+				char testpath[PATH_MAX];
+				snprintf(testpath, PATH_MAX, "%s/PALETTE.BIN", path);
+				FILE *f = fopen(testpath, "r");
+				if(f){
+					fclose(f);
+					strcpy(resdir, path);
+					chdir(resdir);
+					return;
+				}
+			}else{
+				CFRelease(resourcesURL);
+			}
+		}
+	}
+	// Fallback: look for data/ relative to the executable
+	char exepath[PATH_MAX];
+	uint32_t exesize = PATH_MAX;
+	if(_NSGetExecutablePath(exepath, &exesize) == 0){
+		char *lastslash = strrchr(exepath, '/');
+		if(lastslash) *lastslash = 0;
+		char testpath[PATH_MAX];
+		// Check ../data (build/zsilencer -> data/)
+		snprintf(testpath, PATH_MAX, "%s/../data/PALETTE.BIN", exepath);
+		FILE *f = fopen(testpath, "r");
+		if(f){
+			fclose(f);
+			snprintf(resdir, PATH_MAX, "%s/../data", exepath);
+			chdir(resdir);
+			return;
+		}
+		// Check ./data
+		snprintf(testpath, PATH_MAX, "%s/data/PALETTE.BIN", exepath);
+		f = fopen(testpath, "r");
+		if(f){
+			fclose(f);
+			snprintf(resdir, PATH_MAX, "%s/data", exepath);
+			chdir(resdir);
+			return;
+		}
+	}
 #endif
 }
 
-#ifdef __APPLE__
-int SDL_main(int argc, char * argv[]){
-#elif defined(POSIX)
+#ifdef POSIX
 int main(int argc, char * argv[]){
 #endif
 	
@@ -98,6 +155,15 @@ int main(int argc, char * argv[]){
 #else
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
 	char * cmdline = lpCmdLine;
+#endif
+
+	bool dedicatedmode = (cmdline && strncmp(cmdline, "-s", 2) == 0);
+#ifdef POSIX
+	if(dedicatedmode){
+		signal(SIGSEGV, crash_handler);
+		signal(SIGABRT, crash_handler);
+		signal(SIGBUS, crash_handler);
+	}
 #endif
     	
 #ifndef POSIX
@@ -132,9 +198,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return -1;
 	}
 
-	int x, y;
-	SDL_GetMouseState(&x, &y);
-	srand(x + y + SDL_GetTicks());
+	int x = 0, y = 0;
+	if(!dedicatedmode){
+		SDL_GetMouseState(&x, &y);
+	}
+	srand(x + y + (int)time(NULL));
 	while(1){
 		if(!game.HandleSDLEvents()){
 #ifdef __ANDROID__
