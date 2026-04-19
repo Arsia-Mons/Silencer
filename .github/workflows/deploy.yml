@@ -54,7 +54,7 @@ jobs:
           sudo tailscale up \
             --authkey='${{ secrets.TS_AUTHKEY }}' \
             --hostname=gh-runner-${{ github.run_id }} \
-            --advertise-tags=tag:ci
+            --advertise-tags=tag:server
 
       - name: Configure SSH
         run: |
