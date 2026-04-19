@@ -116,6 +116,27 @@ jobs:
           name: ${{ steps.meta.outputs.name }}
           prerelease: ${{ steps.meta.outputs.prerelease }}
           target_commitish: ${{ github.sha }}
+          generate_release_notes: true
           files: |
             artifacts/macos-arm64/*
             artifacts/windows-x64/*
+          body: |
+            ## Downloads
+
+            - **macOS (Apple Silicon):** `zsilencer-macos-arm64.zip`
+            - **Windows (x64):** `zsilencer-windows-x64.zip`
+
+            ## First-run warnings
+
+            These builds aren't code-signed, so your OS will warn you the first time you run them. They're safe — you just need to tell the OS to trust them.
+
+            ### macOS
+            If you see *"zsilencer.app is damaged and can't be opened"*:
+
+            - **Easy way:** right-click the app → **Open** → click **Open** in the dialog. Only needed the first time.
+            - **From Terminal:** `xattr -cr /path/to/zsilencer.app`
+
+            ### Windows
+            If SmartScreen shows *"Windows protected your PC"*:
+
+            - Click **More info** → **Run anyway**.
