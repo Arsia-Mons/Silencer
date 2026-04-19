@@ -62,5 +62,11 @@ runcmd:
   # /opt is ubuntu-owned so GH Actions can scp releases; the service reads via world-exec.
   - chown -R ubuntu:ubuntu /opt/${project_name}
   - chown -R ${project_name}:${project_name} /var/lib/${project_name}
+  # Tailscale: joins tailnet as tag:server so GitHub Actions (tag:ci) can reach us
+  # over WireGuard without exposing port 22. --accept-dns=false keeps the box's own
+  # resolver (don't let MagicDNS interfere with AWS internal DNS).
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  - systemctl enable --now tailscaled
+  - tailscale up --authkey=${tailscale_auth_key} --hostname=${tailscale_hostname} --advertise-tags=tag:server --accept-dns=false --ssh=false
   - systemctl daemon-reload
   - systemctl enable --now ${project_name}-lobby.service || true

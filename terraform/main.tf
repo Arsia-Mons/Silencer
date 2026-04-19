@@ -113,9 +113,11 @@ resource "aws_instance" "lobby" {
   vpc_security_group_ids = [aws_security_group.lobby.id]
 
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    project_name    = var.project_name
-    lobby_version   = var.lobby_version_string
-    public_hostname = var.domain_name != "" ? var.domain_name : aws_eip.lobby.public_ip
+    project_name       = var.project_name
+    lobby_version      = var.lobby_version_string
+    public_hostname    = var.domain_name != "" ? var.domain_name : aws_eip.lobby.public_ip
+    tailscale_auth_key = var.tailscale_auth_key
+    tailscale_hostname = var.tailscale_hostname
   })
 
   root_block_device {

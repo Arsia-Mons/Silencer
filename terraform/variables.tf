@@ -50,3 +50,15 @@ variable "lobby_version_string" {
   type        = string
   default     = "00022"
 }
+
+variable "tailscale_auth_key" {
+  description = "One-time pre-authorized Tailscale auth key tagged tag:server. Generate at https://login.tailscale.com/admin/settings/keys (reusable=no, ephemeral=no, pre-approved, tag:server). Needed only on instance create/replace; cloud-init consumes it once."
+  type        = string
+  sensitive   = true
+}
+
+variable "tailscale_hostname" {
+  description = "Tailscale MagicDNS hostname for the lobby. GitHub Actions connects to ubuntu@<this>."
+  type        = string
+  default     = "silencer"
+}

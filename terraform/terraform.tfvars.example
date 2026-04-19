@@ -4,6 +4,11 @@ aws_region       = "us-west-1"
 ssh_public_key   = "ssh-ed25519 AAAAC3... you@host"
 ssh_allowed_cidr = "1.2.3.4/32" # your public IP — check with: curl ifconfig.me
 
+# Tailscale machine auth key — one-time, tag:server, pre-approved.
+# Generate at: https://login.tailscale.com/admin/settings/keys
+tailscale_auth_key = "tskey-auth-..."
+tailscale_hostname = "silencer"
+
 # Optional DNS (omit if managing DNS at another registrar):
 # domain_name     = "lobby.example.com"
 # route53_zone_id = "Z0123456789ABCDEFGHIJ"
