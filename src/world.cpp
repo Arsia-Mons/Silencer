@@ -229,7 +229,8 @@ void World::DoNetwork_Authority(void){
 		data.Get(code);
 		switch(code){
 			case MSG_CONNECT:{
-				//printf("MSG_CONNECT received\n");
+				fprintf(stderr, "[authority] MSG_CONNECT received from %s:%d (gameplaystate=%d, dedicatedserver.active=%d, dedicatedserver.accountid=%u)\n",
+					inet_ntoa(senderaddr.sin_addr), ntohs(senderaddr.sin_port), gameplaystate, dedicatedserver.active, dedicatedserver.accountid);
 				Serializer response;
 				Uint8 code = MSG_CONNECT;
 				response.Put(code);
@@ -262,11 +263,16 @@ void World::DoNetwork_Authority(void){
 					}
 					if(canjoin){
 						Peer * newpeer = AddPeer(host, port, agency, accountid);
+						fprintf(stderr, "[authority] AddPeer -> %s (id=%d, accountid=%u vs dsaccountid=%u)\n",
+							newpeer ? "OK" : "NULL",
+							newpeer ? newpeer->id : -1,
+							accountid,
+							dedicatedserver.accountid);
 						if(newpeer){
 							if(dedicatedserver.active){
 								lobby.GetUserInfo(newpeer->accountid);
 								if(newpeer->accountid == dedicatedserver.accountid){
-									//printf("host connected\n");
+									fprintf(stderr, "[authority] host connected (peerid=%d)\n", newpeer->id);
 									newpeer->ishost = true;
 									newpeer->gameinfoloaded = true;
 									newpeer->mapdownloaded = true;
@@ -299,6 +305,9 @@ void World::DoNetwork_Authority(void){
 				Peer temppeer;
 				temppeer.ip = ntohl(senderaddr.sin_addr.s_addr);
 				temppeer.port = ntohs(senderaddr.sin_port);
+				fprintf(stderr, "[authority] sending MSG_CONNECT response to %s:%d (bytes=%d)\n",
+					inet_ntoa(senderaddr.sin_addr), ntohs(senderaddr.sin_port),
+					response.BitsToBytes(response.offset));
 				SendPacket(&temppeer, response.data, response.BitsToBytes(response.offset));
 			}break;
 			case MSG_INPUT:{ // client sending input
@@ -578,7 +587,7 @@ void World::DoNetwork_Replica(void){
 	Peer * peer = 0;
 	int received;
 	while((received = recvfrom(sockethandle, data.data, data.size, 0, (sockaddr *)&senderaddr, &senderaddrsize)) > 0){
-		//printf("received data from %s:%d\n", inet_ntoa(senderaddr.sin_addr), ntohs(senderaddr.sin_port));
+		peer = 0;
 		if(peerlist[authoritypeer]->ip == ntohl(senderaddr.sin_addr.s_addr) && peerlist[authoritypeer]->port == ntohs(senderaddr.sin_port)){
 			peer = peerlist[authoritypeer];
 			peer->lastpacket = SDL_GetTicks();
@@ -588,16 +597,31 @@ void World::DoNetwork_Replica(void){
 		totalbytesread += received;
 		char code;
 		data.Get(code);
+		{
+			struct in_addr expected;
+			expected.s_addr = htonl(peerlist[authoritypeer] ? peerlist[authoritypeer]->ip : 0);
+			char expstr[64];
+			strncpy(expstr, inet_ntoa(expected), sizeof(expstr));
+			expstr[sizeof(expstr)-1] = 0;
+			fprintf(stderr, "[client] recv %d bytes from %s:%d code=%d peerMatched=%d (expected %s:%d)\n",
+				received,
+				inet_ntoa(senderaddr.sin_addr),
+				ntohs(senderaddr.sin_port),
+				(int)(unsigned char)code,
+				peer ? 1 : 0,
+				expstr,
+				peerlist[authoritypeer] ? peerlist[authoritypeer]->port : 0);
+		}
 		switch(code){
 			case MSG_CONNECT:{ // connect response
-				//printf("MSG_CONNECT response received from %s:%d\n", inet_ntoa(senderaddr.sin_addr), ntohs(senderaddr.sin_port));
+				fprintf(stderr, "[client] MSG_CONNECT response received from %s:%d\n", inet_ntoa(senderaddr.sin_addr), ntohs(senderaddr.sin_port));
 				if(peer){
 					if(data.GetBit()){
 						data.Get(localpeerid);
-						//printf("we are connected, our peer id is %d\n", localpeerid);
+						fprintf(stderr, "[client] we are connected, our peer id is %d\n", localpeerid);
 						RequestPeerList();
 					}else{
-						//printf("failed to connect to game\n");
+						fprintf(stderr, "[client] failed to connect to game (rejected by authority)\n");
 						// host not accepting connection, password is wrong, or teams are full, etc
 						Disconnect();
 					}
@@ -619,11 +643,17 @@ void World::DoNetwork_Replica(void){
 					Peer * localpeer = peerlist[localpeerid];
 					if(localpeer && localpeer->ishost && !GetAuthorityPeer()->gameinfoloaded && gameinfo.loaded){
 						SendGameInfo(GetAuthorityPeer()->id);
-						//printf("We are host, sending game info\n");
+						fprintf(stderr, "[client] we are host, sending game info\n");
 					}
 					if(state == CONNECTING && localpeer){
 						state = CONNECTED;
+						fprintf(stderr, "[client] state=CONNECTED (peerid=%d, ishost=%d)\n", localpeerid, localpeer ? localpeer->ishost : -1);
 					}
+					fprintf(stderr, "[client] peerlist update (peercount=%d, localpeer.isready=%d, localpeer.gameinfoloaded=%d, localpeer.mapdownloaded=%d)\n",
+						peercount,
+						localpeer ? localpeer->isready : -1,
+						localpeer ? localpeer->gameinfoloaded : -1,
+						localpeer ? localpeer->mapdownloaded : -1);
 				}
 			}break;
 			case MSG_DISCONNECT:{ // disconnect
@@ -1514,7 +1544,7 @@ void World::Connect(Uint8 agency, Uint32 accountid, const char * password){
 	AllocateMapData(65535);
 	sockaddr_in addr;
 	addr.sin_addr.s_addr = htonl(GetAuthorityPeer()->ip);
-	//printf("sending connect request with agency %d, accountid %d to %s:%d\n", agency, accountid, inet_ntoa(addr.sin_addr), GetAuthorityPeer()->port);
+	fprintf(stderr, "[client] sending MSG_CONNECT with agency=%u, accountid=%u to %s:%d\n", agency, accountid, inet_ntoa(addr.sin_addr), GetAuthorityPeer()->port);
 	SwitchToMode(REPLICA);
 	state = CONNECTING;
 	messagetype = 0;
@@ -1727,10 +1757,12 @@ void World::SendGameInfoLoaded(void){
 }
 
 void World::SendReady(void){
+	Peer * auth = GetAuthorityPeer();
+	fprintf(stderr, "[client] SendReady() (state=%d, authorityset=%d)\n", state, auth ? 1 : 0);
 	Serializer data;
 	Uint8 code = MSG_READY;
 	data.Put(code);
-	SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
+	SendPacket(auth, data.data, data.BitsToBytes(data.offset));
 }
 
 bool World::AllPeersReady(Uint8 except){
