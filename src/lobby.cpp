@@ -413,7 +413,7 @@ void Lobby::SendChat(const char * channel, const char * message){
 	msg[0] = MSG_CHAT;
 	strcpy((char *)&msg[1], channel);
 	strcpy((char *)&msg[1 + strlen(channel) + 1], message);
-	Uint8 size = sizeof(msg[0]) + strlen(channel) + 1 + strlen(message);
+	Uint8 size = sizeof(msg[0]) + strlen(channel) + 1 + strlen(message) + 1;
 	SendMessage(msg, size);
 }
 

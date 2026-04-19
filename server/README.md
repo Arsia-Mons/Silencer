@@ -32,7 +32,7 @@ by default. On macOS that requires `sudo`; use any unprivileged port
 | `-addr` | `:517` | TCP + UDP listen address |
 | `-db` | `lobby.json` | JSON user/stats database path |
 | `-motd` | *(built-in)* | path to a plain-text MOTD file |
-| `-version` | `00022` | required client version string (empty = accept any) |
+| `-version` | `00023` | required client version string (empty = accept any) |
 | `-game-binary` | `../build/zsilencer` | path to the `zsilencer` binary to spawn per game |
 | `-public-addr` | `127.0.0.1` | host or IP clients should use to reach the dedicated servers |
 

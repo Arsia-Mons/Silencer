@@ -53,7 +53,7 @@ zsilencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
 - **Lobby host is hardcoded.** `src/game.cpp:4008` and `:4022` connect
   to `127.0.0.1:517`. To point the client at a remote lobby (or a
   non-privileged port), edit both call sites.
-- **Version string must match.** `CMakeLists.txt:36` sets `00022`; the
+- **Version string must match.** `CMakeLists.txt:76` sets `00023`; the
   lobby's `-version` flag defaults to the same. Bump both together or
   pass `-version ""` on the server to accept any client.
 - **Port 517 needs root on macOS/Linux.** For local dev, run the lobby

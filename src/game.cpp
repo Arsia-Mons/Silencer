@@ -28,7 +28,7 @@
 #endif
 
 Game::Game() : renderer(world), screenbuffer(640, 480){
-	world.SetVersion("00022");
+	world.SetVersion("00023");
 	frames = 0;
 	fps = 0;
 	state = MAINMENU;
