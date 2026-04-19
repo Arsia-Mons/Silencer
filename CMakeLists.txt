@@ -55,7 +55,7 @@ target_compile_definitions(${PROJECT} PRIVATE
 find_package(ZLIB REQUIRED)
 find_package(SDL2 REQUIRED)
 find_package(SDL2_mixer REQUIRED)
-include_directories(${SDL2_INCLUDE_DIR} ${SDL2_MIXER_INCLUDE_DIRS})
+include_directories(${SDL2_INCLUDE_DIR} ${SDL2_MIXER_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
 
 if(APPLE)
 	find_library(COCOA_FRAMEWORK Cocoa)
