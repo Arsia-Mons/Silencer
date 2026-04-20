@@ -2,6 +2,17 @@
 #include "sha1.h"
 #include "world.h"
 
+// MSG_VERSION request now carries a trailing platform byte so the lobby
+// can pick the right download URL when it rejects us. Values mirror
+// server/protocol.go::Platform.
+#if defined(__APPLE__)
+static const uint8_t kUpdaterPlatform = 1; // macos_arm64
+#elif defined(_WIN32)
+static const uint8_t kUpdaterPlatform = 2; // windows_x64
+#else
+static const uint8_t kUpdaterPlatform = 0; // unknown — lobby will send bare reject
+#endif
+
 Lobby::Lobby(World * world){
 	Lobby::world = world;
 	msgsize = 0;
@@ -380,7 +391,13 @@ void Lobby::SendVersion(void){
 	memset(msg, 0, sizeof(msg));
 	msg[0] = MSG_VERSION;
 	strcpy((char *)&msg[1], world->version);
-	SendMessage(msg, sizeof(msg[0]) + strlen(world->version) + 1);
+	size_t version_len = strlen(world->version);
+	size_t platform_off = 1 + version_len + 1; // opcode + cstring + null
+	msg[platform_off] = kUpdaterPlatform;
+	Uint8 size = sizeof(msg[0]) + version_len + 1 + 1;
+	fprintf(stderr, "[updater] sending MSG_VERSION version=%s platform=%u\n",
+		world->version, (unsigned)kUpdaterPlatform);
+	SendMessage(msg, size);
 }
 
 void Lobby::SendCredentials(const char * username, const char * password){
