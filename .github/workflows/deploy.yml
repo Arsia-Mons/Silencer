@@ -1,9 +1,17 @@
 name: Deploy
 
 on:
-  push:
-    tags: ['v*']
+  workflow_run:
+    workflows: ['Release']
+    types: [completed]
   workflow_dispatch:
+    inputs:
+      update_manifest:
+        description: >-
+          Also refresh update.json on the lobby. Requires dispatching this
+          workflow on a v* tag ref whose release has macOS + Windows zips.
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy
@@ -11,10 +19,51 @@ concurrency:
 
 jobs:
   build-and-deploy:
+    # Cascade only when upstream Release was a successful v* tag push.
+    # Manual dispatch always runs.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
     steps:
+      - name: Resolve deploy context
+        id: ctx
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_REF: ${{ github.ref }}
+          DISPATCH_SHA: ${{ github.sha }}
+          DISPATCH_MANIFEST: ${{ inputs.update_manifest }}
+          WF_RUN_TAG: ${{ github.event.workflow_run.head_branch }}
+          WF_RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "workflow_run" ]]; then
+            # Cascade from Release: head_branch is the pushed tag (e.g. v1.2.3).
+            echo "tag=$WF_RUN_TAG"             >> "$GITHUB_OUTPUT"
+            echo "checkout_ref=$WF_RUN_SHA"    >> "$GITHUB_OUTPUT"
+            echo "update_manifest=true"        >> "$GITHUB_OUTPUT"
+          else
+            # Manual dispatch: honor the ref the user selected in the UI.
+            TAG=""
+            if [[ "$DISPATCH_REF" =~ ^refs/tags/(.+)$ ]]; then
+              TAG="${BASH_REMATCH[1]}"
+            fi
+            if [[ "$DISPATCH_MANIFEST" == "true" && -z "$TAG" ]]; then
+              echo "update_manifest=true requires dispatching on a v* tag ref" >&2
+              exit 1
+            fi
+            echo "tag=$TAG"                              >> "$GITHUB_OUTPUT"
+            echo "checkout_ref=$DISPATCH_SHA"            >> "$GITHUB_OUTPUT"
+            echo "update_manifest=$DISPATCH_MANIFEST"    >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.ctx.outputs.checkout_ref }}
 
       - uses: actions/setup-go@v5
         with:
@@ -48,73 +97,13 @@ jobs:
             -DZSILENCER_LOBBY_HOST="${LOBBY_HOST:-silencer.hventura.com}" ..
           make -j"$(nproc)"
 
-      - name: Tailscale
-        run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo tailscale up \
-            --authkey='${{ secrets.TS_AUTHKEY }}' \
-            --hostname=gh-runner-${{ github.run_id }} \
-            --advertise-tags=tag:server
-
-      - name: Configure SSH
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy
-          chmod 600 ~/.ssh/deploy
-
-      - name: Deploy
-        env:
-          HOST: ${{ vars.DEPLOY_HOST }}
-          SHA: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          SHORT=${SHA:0:8}
-          STAGING=/tmp/zsilencer-$SHORT
-          RELEASE=/opt/zsilencer/releases/$SHORT
-          SSH_OPTS="-i ~/.ssh/deploy -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=~/.ssh/known_hosts"
-          SSH="ssh $SSH_OPTS ubuntu@$HOST"
-          SCP="scp $SSH_OPTS"
-
-          $SSH "mkdir -p $STAGING"
-          $SCP server/zsilencer-lobby ubuntu@$HOST:$STAGING/
-          $SCP build/zsilencer        ubuntu@$HOST:$STAGING/
-          $SCP -r data                ubuntu@$HOST:$STAGING/
-
-          $SSH "
-            set -e
-            sudo mkdir -p /opt/zsilencer/releases
-            sudo rm -rf $RELEASE
-            sudo mv $STAGING $RELEASE
-            sudo chmod +x $RELEASE/zsilencer-lobby $RELEASE/zsilencer
-            sudo ln -sfn $RELEASE /opt/zsilencer/current
-            sudo ln -sfn /opt/zsilencer/current/data /usr/local/share/zsilencer
-            sudo systemctl restart zsilencer-lobby
-            sleep 2
-            sudo systemctl is-active zsilencer-lobby
-          "
-
       - name: Build update.json from release artifacts
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.ctx.outputs.update_manifest == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG:      ${{ github.ref_name }}
+          TAG: ${{ steps.ctx.outputs.tag }}
         run: |
           set -euo pipefail
-
-          # release.yml runs in parallel on the same tag. Wait for both zips
-          # to appear on the release before building the manifest.
-          for i in 1 2 3 4 5 6 7 8 9 10; do
-            if gh release view "$TAG" --json assets --jq '.assets[].name' \
-              | grep -q "zsilencer-macos-arm64.zip" \
-              && gh release view "$TAG" --json assets --jq '.assets[].name' \
-              | grep -q "zsilencer-windows-x64.zip"; then
-              echo "Assets ready on $TAG"
-              break
-            fi
-            echo "Assets not ready, retrying in 30s (attempt $i/10)"
-            sleep 30
-          done
-
           mkdir -p manifest-staging
           cd manifest-staging
           gh release download "$TAG" \
@@ -136,17 +125,62 @@ jobs:
           }
           EOF
           cat update.json
+          rm zsilencer-macos-arm64.zip zsilencer-windows-x64.zip
 
-      - name: Upload update.json to lobby
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up \
+            --authkey='${{ secrets.TS_AUTHKEY }}' \
+            --hostname=gh-runner-${{ github.run_id }} \
+            --advertise-tags=tag:server
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+
+      - name: Deploy
         env:
           HOST: ${{ vars.DEPLOY_HOST }}
+          SHA: ${{ steps.ctx.outputs.checkout_ref }}
+          UPDATE_MANIFEST: ${{ steps.ctx.outputs.update_manifest }}
         run: |
-          scp -i ~/.ssh/deploy -o StrictHostKeyChecking=accept-new \
-            manifest-staging/update.json "ubuntu@${HOST}:/tmp/update.json"
-          ssh -i ~/.ssh/deploy ubuntu@$HOST "
-            sudo mv /tmp/update.json /opt/zsilencer/update.json
+          set -euo pipefail
+          SHORT=${SHA:0:8}
+          STAGING=/tmp/zsilencer-$SHORT
+          RELEASE=/opt/zsilencer/releases/$SHORT
+          SSH_OPTS="-i ~/.ssh/deploy -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=~/.ssh/known_hosts"
+          SSH="ssh $SSH_OPTS ubuntu@$HOST"
+          SCP="scp $SSH_OPTS"
+
+          $SSH "mkdir -p $STAGING"
+          $SCP server/zsilencer-lobby ubuntu@$HOST:$STAGING/
+          $SCP build/zsilencer        ubuntu@$HOST:$STAGING/
+          $SCP -r data                ubuntu@$HOST:$STAGING/
+
+          if [[ "$UPDATE_MANIFEST" == "true" ]]; then
+            $SCP manifest-staging/update.json ubuntu@$HOST:$STAGING/update.json
+          fi
+
+          # Atomic swap: move manifest into place, flip symlink, restart —
+          # all in one SSH session so clients never see a new lobby version
+          # without a matching update.json.
+          $SSH "
+            set -e
+            sudo mkdir -p /opt/zsilencer/releases
+            sudo rm -rf $RELEASE
+            sudo mv $STAGING $RELEASE
+            sudo chmod +x $RELEASE/zsilencer-lobby $RELEASE/zsilencer
+            if [ -f $RELEASE/update.json ]; then
+              sudo mv $RELEASE/update.json /opt/zsilencer/update.json
+            fi
+            sudo ln -sfn $RELEASE /opt/zsilencer/current
+            sudo ln -sfn /opt/zsilencer/current/data /usr/local/share/zsilencer
             sudo systemctl restart zsilencer-lobby
+            sleep 2
+            sudo systemctl is-active zsilencer-lobby
           "
 
       - name: Prune old releases (keep last 3)
