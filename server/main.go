@@ -15,7 +15,7 @@ func main() {
 	addr := flag.String("addr", ":517", "listen address for TCP and UDP")
 	dbPath := flag.String("db", "lobby.json", "path to JSON user database")
 	motdPath := flag.String("motd", "", "path to MOTD file; empty = built-in default")
-	version := flag.String("version", "00023", "required client version; empty = accept any")
+	version := flag.String("version", "00024", "required client version; empty = accept any")
 	gameBinary := flag.String("game-binary", "../build/zsilencer", "path to the zsilencer binary (spawned per created game)")
 	publicAddr := flag.String("public-addr", "127.0.0.1", "host or IP clients (and dedicated servers) should use to reach this lobby")
 	flag.Parse()
