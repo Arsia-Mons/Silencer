@@ -24,6 +24,7 @@ purposes:
 | 08 | [NPCs & Security](08-npcs-and-security.md) | Guards, robots, civilians, AI behavior |
 | 09 | [Map & Environment](09-map-and-environment.md) | Map structure, platforms, bases, power-ups, warpers |
 | 10 | [Progression & Stats](10-progression-and-stats.md) | User accounts, agency upgrades, leveling, statistics |
+| 11 | [Animation System](11-animation-system.md) | Sprite banks, frame timing, per-state animation tables |
 
 ## Conventions
 
