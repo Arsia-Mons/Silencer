@@ -78,6 +78,10 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	agencychanged = true;
 	currentinterface = 0;
 	lastchannel[0] = 0;
+	activechattab = "Lobby";
+	gamechattab.clear();
+	lobbytabbutton = 0;
+	gametabbutton = 0;
 	minimized = false;
 	modaldialoghasok = false;
 	window = 0;
@@ -799,6 +803,10 @@ bool Game::Tick(void){
 				lobbyinterface = 0;
 				characterinterface = 0;
 				chatinterface = 0;
+				lobbytabbutton = 0;
+				gametabbutton = 0;
+				activechattab = "Lobby";
+				gamechattab.clear();
 				gameselectinterface = 0;
 				gamecreateinterface = 0;
 				gamejoininterface = 0;
@@ -925,6 +933,21 @@ bool Game::Tick(void){
 								GetGameChannelName(*lobbygame, temp);
 								strcpy(lastchannel, world.lobby.channel);
 								world.lobby.JoinChannel(temp);
+								gamechattab = temp;
+								// Add game tab overlay to chat interface
+								Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
+								if(chatiface){
+									Overlay * gametab = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+									gametab->uid = 56;
+									gametab->textbank = 134;
+									gametab->textwidth = 8;
+									gametab->x = 60;
+									gametab->y = 200;
+									gametab->text = "Game";
+									gametabbutton = gametab->id;
+									chatiface->AddObject(gametab->id);
+								}
+								SwitchChatTab(gamechattab);
 								UpdateLobbyMapName(lobbygame->mapname);
 								/*if(FindMap(lobbygame->mapname, &lobbygame->maphash).size() > 0){
 									world.SendMapDownloaded();
@@ -993,6 +1016,10 @@ bool Game::Tick(void){
 					}
 					world.Disconnect();
 					if(world.lobby.state == Lobby::AUTHENTICATED){
+						if(!gamechattab.empty()){
+							world.lobby.LeaveChannel(gamechattab.c_str());
+							gamechattab.clear();
+						}
 						world.lobby.JoinChannel(lastchannel);
 						GoToState(LOBBY);
 					}else{
@@ -1168,6 +1195,10 @@ bool Game::Tick(void){
 					world.Disconnect();
 					if(world.lobby.state == Lobby::AUTHENTICATED){
 						GoToState(LOBBY);
+						if(!gamechattab.empty()){
+							world.lobby.LeaveChannel(gamechattab.c_str());
+							gamechattab.clear();
+						}
 						world.lobby.JoinChannel(lastchannel);
 					}else{
 						if(world.replay.IsPlaying()){
@@ -1189,6 +1220,10 @@ bool Game::Tick(void){
 				if(CheckForConnectionLost()){
 					if(world.lobby.state == Lobby::AUTHENTICATED){
 						GoToState(LOBBY);
+						if(!gamechattab.empty()){
+							world.lobby.LeaveChannel(gamechattab.c_str());
+							gamechattab.clear();
+						}
 						world.lobby.JoinChannel(lastchannel);
 					}else{
 						GoToState(MAINMENU);
@@ -3172,12 +3207,14 @@ Interface * Game::CreateChatInterface(void){
 	Overlay * chatinputborder = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	chatinputborder->res_bank = 7;
 	chatinputborder->res_index = 14;
-	Overlay * channeltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	channeltext->uid = 1;
-	channeltext->textbank = 134;
-	channeltext->textwidth = 8;
-	channeltext->x = 15;
-	channeltext->y = 200;
+	Overlay * lobbytab = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	lobbytab->uid = 55;
+	lobbytab->textbank = 134;
+	lobbytab->textwidth = 8;
+	lobbytab->x = 15;
+	lobbytab->y = 200;
+	lobbytab->text = "Lobby";
+	lobbytabbutton = lobbytab->id;
 	TextBox * textbox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
 	textbox->x = 19;
 	textbox->y = 220;
@@ -3197,11 +3234,6 @@ Interface * Game::CreateChatInterface(void){
 	presencebox->fontwidth = 6;
 	presencebox->bottomtotop = false;
 	presencebox->uid = 9;
-	/*for(int i = 0; i < 0; i++){
-		char line[256];
-		sprintf(line, "line %d", i);
-		textbox->AddLine(line);
-	}*/
 	TextInput * chatinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
 	chatinput->x = 18;
 	chatinput->y = 437;
@@ -3219,14 +3251,13 @@ Interface * Game::CreateChatInterface(void){
 	chatscrollbar->scrollposition = textbox->scrolled;
 	chatinterface->AddObject(chatborder->id);
 	chatinterface->AddObject(chatinputborder->id);
-	chatinterface->AddObject(channeltext->id);
+	chatinterface->AddObject(lobbytab->id);
 	chatinterface->AddObject(textbox->id);
 	chatinterface->AddObject(presencebox->id);
 	chatinterface->AddObject(chatinput->id);
 	chatinterface->AddObject(chatscrollbar->id);
 	chatinterface->AddTabObject(chatinput->id);
 	chatinterface->scrollbar = chatscrollbar->id;
-	//chatinterface->ActiveChanged(&world, chatinterface, false);
 	return chatinterface;
 }
 
@@ -4222,6 +4253,18 @@ bool Game::GoBack(void){
 		}
 		gameselectinterface = CreateGameSelectInterface()->id;
 		world.lobby.JoinChannel(lastchannel);
+		// Remove game tab and leave game channel
+		if(!gamechattab.empty()){
+			world.lobby.LeaveChannel(gamechattab.c_str());
+			Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
+			if(chatiface && gametabbutton){
+				chatiface->RemoveObject(gametabbutton);
+				world.MarkDestroyObject(gametabbutton);
+			}
+			gametabbutton = 0;
+			gamechattab.clear();
+		}
+		SwitchChatTab("Lobby");
 		iface->AddObject(gameselectinterface);
 		currentinterface = iface->id;
 		return true;
@@ -4460,7 +4503,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 						Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
 						if(chatiface && iface->activeobject == chatiface->activeobject){
 							if(textinput->enterpressed && strlen(textinput->text) > 0){
-								world.lobby.SendChat(world.lobby.channel, textinput->text);
+								world.lobby.SendChat(activechattab.c_str(), textinput->text);
 								textinput->Clear();
 							}
 						}
@@ -4693,7 +4736,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 					if(textbox){
 						Object * object = world.GetObjectFromId(iface->scrollbar);
 						ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-						if(minimized && world.lobby.chatmessages.size() > chatlinesprinted){
+						if(minimized && !world.lobby.chatmessages.empty()){
 							SDL_SysWMinfo info;
 							SDL_VERSION(&info.version);
 							if(SDL_GetWindowWMInfo(window, &info)){
@@ -4717,17 +4760,24 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							}
 						}
 						bool scroll = false;
-						while(world.lobby.chatmessages.size() > chatlinesprinted){
-							auto message = world.lobby.chatmessages.front();
-							Uint8 color = message[strlen(message.data()) + 1];
-							Uint8 brightness = message[strlen(message.data()) + 2];
-							if(scrollbar && scrollbar->scrollposition == scrollbar->scrollmax){
-								scroll = true;
-							}
-							textbox->AddText(message.data(), color, brightness, 2, scroll);
+						while(!world.lobby.chatmessages.empty()){
+							auto chatmsg = world.lobby.chatmessages.front();
 							world.lobby.chatmessages.pop_front();
-							if(scrollbar){
-								scrollbar->scrollposition = textbox->scrolled;
+							auto & log = world.lobby.chatlogs[chatmsg.channel];
+							log.push_back(chatmsg.data);
+							if(log.size() > Lobby::maxchatloglines){
+								log.pop_front();
+							}
+							if(chatmsg.channel == activechattab){
+								Uint8 color = chatmsg.data[strlen(chatmsg.data.data()) + 1];
+								Uint8 brightness = chatmsg.data[strlen(chatmsg.data.data()) + 2];
+								if(scrollbar && scrollbar->scrollposition == scrollbar->scrollmax){
+									scroll = true;
+								}
+								textbox->AddText(chatmsg.data.data(), color, brightness, 2, scroll);
+								if(scrollbar){
+									scrollbar->scrollposition = textbox->scrolled;
+								}
 							}
 						}
 						if(scrollbar){
@@ -4744,16 +4794,24 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 				case ObjectTypes::OVERLAY:{
 					Overlay * overlay = static_cast<Overlay *>(object);
 					if(overlay){
-						switch(overlay->uid){
-							case 1:{
-								if(world.lobby.channelchanged){
-									if(strlen(lastchannel) == 0){
-										strcpy(lastchannel, world.lobby.channel);
+						if(overlay->clicked){
+							overlay->clicked = false;
+							switch(overlay->uid){
+								case 55:{ // Lobby chat tab
+									SwitchChatTab("Lobby");
+								}break;
+								case 56:{ // Game chat tab
+									if(!gamechattab.empty()){
+										SwitchChatTab(gamechattab);
 									}
-									overlay->text = world.lobby.channel;
-									world.lobby.channelchanged = false;
-								}
-							}break;
+								}break;
+							}
+						}
+						if(world.lobby.channelchanged){
+							if(strlen(lastchannel) == 0){
+								strcpy(lastchannel, world.lobby.channel);
+							}
+							world.lobby.channelchanged = false;
 						}
 						if(agencychanged && iface->id == characterinterface){
 							//printf("agency changed\n");
@@ -5078,6 +5136,10 @@ void Game::ProcessGameSummaryInterface(Interface * iface){
 							case 0:{ // continue
 								if(world.lobby.state == Lobby::AUTHENTICATED){
 									GoToState(LOBBY);
+									if(!gamechattab.empty()){
+										world.lobby.LeaveChannel(gamechattab.c_str());
+										gamechattab.clear();
+									}
 									world.lobby.JoinChannel(lastchannel);
 								}else{
 									GoToState(MAINMENU);
@@ -5664,6 +5726,54 @@ const char * Game::GetKeyName(SDL_Scancode sym){
 
 void Game::GetGameChannelName(LobbyGame & lobbygame, char * name){
 	sprintf(name, "#%s-%d", lobbygame.name, lobbygame.id);
+}
+
+void Game::SwitchChatTab(const std::string & channel){
+	activechattab = channel;
+	Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
+	if(!chatiface){
+		return;
+	}
+	// Find the chat textbox (uid=0, not presencebox which is uid=9) and scrollbar
+	TextBox * textbox = 0;
+	ScrollBar * scrollbar = static_cast<ScrollBar *>(world.GetObjectFromId(chatiface->scrollbar));
+	for(std::vector<Uint16>::iterator it = chatiface->objects.begin(); it != chatiface->objects.end(); it++){
+		Object * obj = world.GetObjectFromId(*it);
+		if(obj && obj->type == ObjectTypes::TEXTBOX){
+			TextBox * tb = static_cast<TextBox *>(obj);
+			if(tb->uid == 0){
+				textbox = tb;
+				break;
+			}
+		}
+	}
+	if(!textbox){
+		return;
+	}
+	// Clear and repopulate from chatlogs
+	textbox->text.clear();
+	textbox->scrolled = 0;
+	auto it = world.lobby.chatlogs.find(channel);
+	if(it != world.lobby.chatlogs.end()){
+		for(auto & msg : it->second){
+			Uint8 color = msg[strlen(msg.data()) + 1];
+			Uint8 brightness = msg[strlen(msg.data()) + 2];
+			textbox->AddText(msg.data(), color, brightness, 2, false);
+		}
+	}
+	// Scroll to bottom
+	if(textbox->lineheight > 0 && textbox->text.size() > (unsigned int)(textbox->height / textbox->lineheight)){
+		textbox->scrolled = textbox->text.size() - (textbox->height / textbox->lineheight);
+	}
+	if(scrollbar){
+		scrollbar->scrollposition = textbox->scrolled;
+		if(textbox->lineheight > 0 && textbox->text.size() > ceil(float(textbox->height) / textbox->lineheight)){
+			scrollbar->draw = true;
+			scrollbar->scrollmax = textbox->text.size() - ceil(float(textbox->height) / textbox->lineheight);
+		}else{
+			scrollbar->draw = false;
+		}
+	}
 }
 
 void Game::CreateAmbienceChannels(void){

@@ -198,7 +198,10 @@ void Lobby::DoNetwork(void){
 									std::vector<char> newmessage(strlen(message) + 1 + 2);
 									newmessage[0] = 0;
 									memcpy(newmessage.data(), message, strlen(message) + 1 + 2);
-									chatmessages.push_back(newmessage);
+									ChatMessage chatmsg;
+									chatmsg.channel = channel;
+									chatmsg.data = newmessage;
+									chatmessages.push_back(chatmsg);
 								}break;
 								case MSG_NEWGAME:{
 									Uint8 creategamestatus;
@@ -523,6 +526,21 @@ void Lobby::JoinChannel(const char * channel){
 	strcpy((char *)&msg[1 + strlen(Lobby::channel) + 1], joinstr);
 	strcpy((char *)&msg[1 + strlen(Lobby::channel) + 1 + strlen(joinstr)], channel);
 	Uint8 size = 1 + strlen(Lobby::channel) + 1 + strlen(joinstr) + strlen(channel) + 1;
+	SendMessage(msg, size);
+}
+
+void Lobby::LeaveChannel(const char * channel){
+	if(strlen(channel) > 32){
+		return;
+	}
+	char msg[256];
+	memset(msg, 0, sizeof(msg));
+	msg[0] = MSG_CHAT;
+	const char * leavestr = "/leave ";
+	strcpy((char *)&msg[1], Lobby::channel);
+	strcpy((char *)&msg[1 + strlen(Lobby::channel) + 1], leavestr);
+	strcpy((char *)&msg[1 + strlen(Lobby::channel) + 1 + strlen(leavestr)], channel);
+	Uint8 size = 1 + strlen(Lobby::channel) + 1 + strlen(leavestr) + strlen(channel) + 1;
 	SendMessage(msg, size);
 }
 

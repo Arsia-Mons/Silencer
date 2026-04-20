@@ -18,8 +18,8 @@ type Client struct {
 	mu        sync.Mutex
 	accountID uint32
 	user      *User
-	channel   string
-	gameID    uint32 // 0 = main lobby; protected by Hub.mu once authed
+	channels  map[string]bool // set of subscribed channels
+	gameID    uint32          // 0 = main lobby; protected by Hub.mu once authed
 	// gameStatus: 0 = main lobby (gameID must be 0), 1 = pregame
 	// (game-specific lobby, connected to dedicated but match not started),
 	// 2 = playing. Protected by Hub.mu once authed.
@@ -37,10 +37,10 @@ func (c *Client) displayName() string {
 func serveClient(conn net.Conn, hub *Hub, version string, manifest *UpdateManifest) {
 	defer conn.Close()
 	c := &Client{
-		conn:    conn,
-		br:      bufio.NewReader(conn),
-		hub:     hub,
-		channel: "Lobby",
+		conn:     conn,
+		br:       bufio.NewReader(conn),
+		hub:      hub,
+		channels: map[string]bool{"Lobby": true},
 	}
 	log.Printf("[conn] %s connected", conn.RemoteAddr())
 
@@ -189,7 +189,7 @@ func (c *Client) handleAuth(r *reader) error {
 	c.send(w.b)
 
 	c.sendMOTD()
-	c.sendChannel(c.channel)
+	c.sendChannel("Lobby")
 	c.hub.Join(c)
 	return nil
 }
@@ -271,9 +271,18 @@ func (c *Client) handleChat(r *reader) error {
 			newChan = "Lobby"
 		}
 		c.mu.Lock()
-		c.channel = newChan
+		c.channels[newChan] = true
 		c.mu.Unlock()
 		c.sendChannel(newChan)
+		return nil
+	}
+	if strings.HasPrefix(msg, "/leave ") {
+		leaveChan := strings.TrimSpace(msg[len("/leave "):])
+		if leaveChan != "" && leaveChan != "Lobby" {
+			c.mu.Lock()
+			delete(c.channels, leaveChan)
+			c.mu.Unlock()
+		}
 		return nil
 	}
 	c.hub.Chat(c, channel, msg)

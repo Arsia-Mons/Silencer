@@ -262,12 +262,15 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 	}
 }
 
-// Chat scopes messages to clients in the same channel.
+// Chat scopes messages to clients subscribed to the given channel.
 func (h *Hub) Chat(from *Client, channel, msg string) {
 	h.mu.Lock()
 	peers := make([]*Client, 0, len(h.clients))
 	for c := range h.clients {
-		if c.channel == channel {
+		c.mu.Lock()
+		subscribed := c.channels[channel]
+		c.mu.Unlock()
+		if subscribed {
 			peers = append(peers, c)
 		}
 	}

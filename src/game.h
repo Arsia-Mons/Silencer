@@ -12,6 +12,8 @@
 #include "overlay.h"
 #include "textbox.h"
 #include "updater.h"
+#include <string>
+#include <vector>
 
 class Game
 {
@@ -70,6 +72,10 @@ private:
 	Uint16 lobbyinterface;
 	Uint16 characterinterface;
 	Uint16 chatinterface;
+	std::string activechattab;
+	std::string gamechattab;
+	Uint16 lobbytabbutton;
+	Uint16 gametabbutton;
 	Uint16 gameselectinterface;
 	Uint16 gamecreateinterface;
 	Uint16 gamejoininterface;
@@ -97,6 +103,7 @@ private:
 	void IndexToConfigKey(int index, SDL_Scancode ** key1, SDL_Scancode ** key2, bool ** keyop);
 	const char * GetKeyName(SDL_Scancode sym);
 	void GetGameChannelName(LobbyGame & lobbygame, char * name);
+	void SwitchChatTab(const std::string & channel);
 	void CreateAmbienceChannels(void);
 	void UpdateAmbienceChannels(void);
 	bool FadedIn(void);

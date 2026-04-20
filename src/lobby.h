@@ -5,6 +5,7 @@
 #include "lobbygame.h"
 #include "peer.h"
 #include "user.h"
+#include <deque>
 #include <list>
 #include <map>
 #include <memory>
@@ -13,6 +14,10 @@
 class Lobby
 {
 public:
+	struct ChatMessage {
+		std::string channel;
+		std::vector<char> data; // [text\0][color_byte][brightness_byte]
+	};
 	Lobby(class World * world);
 	~Lobby();
 	void Connect(const char * host, unsigned short port);
@@ -32,6 +37,7 @@ public:
 	void SendCredentials(const char * username, const char * password);
 	void SendChat(const char * channel, const char * message);
 	void JoinChannel(const char * channel);
+	void LeaveChannel(const char * channel);
 	void CreateGame(const char * name, const char * map, const unsigned char maphash[20], const char * password = 0, Uint8 securitylevel = LobbyGame::SECMEDIUM, Uint8 minlevel = 0, Uint8 maxlevel = 99, Uint8 maxplayers = 24, Uint8 maxteams = 6);
 	//void ConnectToGame(LobbyGame & lobbygame, Uint8 agency);
 	void ClearGames(void);
@@ -49,7 +55,9 @@ public:
 	Uint8 creategamestatus;
 	Uint32 createdgameid;
 	Uint8 connectgamestatus;
-	std::list<std::vector<char>> chatmessages;
+	std::list<ChatMessage> chatmessages;
+	std::map<std::string, std::deque<std::vector<char>>> chatlogs;
+	static const unsigned int maxchatloglines = 256;
 	std::list<LobbyGame *> games;
 	bool gamesprocessed;
 	std::map<Uint32, PresenceEntry> presence;
