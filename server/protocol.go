@@ -22,6 +22,7 @@ const (
 )
 
 const maxFrame = 255
+const maxUpdateURL = 200 // leaves room for [framelen][op][success][urllen u16][sha256] in a 255-byte frame
 
 func readFrame(r io.Reader) ([]byte, error) {
 	var sz [1]byte
@@ -309,6 +310,11 @@ func encodeVersionReply(rep VersionReply) []byte {
 	}
 	w.u8(0)
 	if rep.URL != "" {
+		if len(rep.URL) > maxUpdateURL {
+			// This is a manifest misconfiguration, not a runtime condition —
+			// fail loudly so the operator catches it.
+			panic("encodeVersionReply: URL exceeds maxUpdateURL")
+		}
 		w.u16(uint16(len(rep.URL)))
 		w.raw([]byte(rep.URL))
 		w.raw(rep.SHA256[:])

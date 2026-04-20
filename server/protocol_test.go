@@ -74,3 +74,16 @@ func TestVersionReply_EncodeAccept(t *testing.T) {
 		t.Errorf("got %v want %v", buf, want)
 	}
 }
+
+func TestVersionReply_EncodeAccept_IgnoresFields(t *testing.T) {
+	// When OK=true, URL and SHA256 must be ignored — the reply is always just [1].
+	buf := encodeVersionReply(VersionReply{
+		OK:     true,
+		URL:    "https://example.com/ignored.zip",
+		SHA256: [32]byte{0xaa},
+	})
+	want := []byte{1}
+	if !bytes.Equal(buf, want) {
+		t.Errorf("got %v want %v", buf, want)
+	}
+}
