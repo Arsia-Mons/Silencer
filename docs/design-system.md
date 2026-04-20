@@ -170,7 +170,7 @@ Defined in `button.h` / `button.cpp`. Seven types:
 | `B196x33` | 196 × 33 | 6 | 135 | 11 | 8 |
 | `B220x33` | 220 × 33 | 6 | 135 | 11 | 8 |
 | `B236x27` | 236 × 27 | 6 | 135 | 11 | 8 |
-| `B52x21` | 52 × 21 | — | 133 | 7 | 8 (+1 x) |
+| `B52x21`       | 52 × 21       | —        | 133       | 7          | y=8, x+=1     |
 | `B156x21` | 156 × 21 | 7 | 134 | 8 | 4 |
 | `BCHECKBOX` | 13 × 13 | 7 | — | — | — |
 
@@ -235,7 +235,8 @@ Defined in `textbox.h` / `textbox.cpp`. Scrollable multi-line text area.
 | `maxlines` | 256 | Max buffered lines |
 | `bottomtotop` | false | Render direction |
 
-Lines auto-scroll when content exceeds `height / lineheight` visible lines.
+Auto-scrolls to the bottom whenever a new line is added and the content exceeds
+`height / lineheight` visible lines. Scroll offset: `lines.size() - visibleLines`.
 
 ### SelectBox
 
