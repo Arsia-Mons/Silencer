@@ -17,6 +17,7 @@
 #include "config.h"
 #include "cocoawrapper.h"
 #include "sha1.h"
+#include "updaterstage2.h"
 #include <algorithm>
 #include <stdio.h>
 
@@ -3980,8 +3981,20 @@ void Game::ProcessUpdateInterface(Interface * iface){
 }
 
 void Game::LaunchStage2(void){
-	fprintf(stderr, "[updater] LaunchStage2 stub - Task 15 will implement the exec handoff\n");
-	// For now, go back to the main menu so the game stays usable during dev.
+	// SDL is torn down via process exit — UpdaterStage2::Launch forks the
+	// stage-2 child and exit(0)s the parent, so SDL state doesn't leak.
+	std::string zippath =
+#ifdef _WIN32
+		std::string(getenv("TEMP") ? getenv("TEMP") : ".") + "\\zsilencer-update.zip";
+#else
+		"/tmp/zsilencer-update.zip";
+#endif
+	fprintf(stderr, "[updater] Game::LaunchStage2 invoking UpdaterStage2::Launch with zip=%s\n",
+		zippath.c_str());
+	UpdaterStage2::Launch(zippath);
+	// Launch calls exit(0) on success. If we got here, something failed; fall
+	// back to the main menu so the user isn't stranded in a dead state.
+	fprintf(stderr, "[updater] UpdaterStage2::Launch returned unexpectedly\n");
 	GoToState(MAINMENU);
 }
 

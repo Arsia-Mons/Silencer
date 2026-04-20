@@ -1,6 +1,8 @@
 #include "shared.h"
 #include "game.h"
 #include "cocoawrapper.h"
+#include "updaterstage2.h"
+#include <vector>
 #ifdef __APPLE__
 #include "CoreFoundation/CoreFoundation.h"
 #include <mach-o/dyld.h>
@@ -141,7 +143,15 @@ void CDResDir(void){
 #ifdef POSIX
 int main(int argc, char * argv[]){
 #endif
-	
+
+#ifdef POSIX
+	for(int i = 1; i < argc; i++){
+		if(strcmp(argv[i], "--self-update-stage2") == 0){
+			return UpdaterStage2::Run(argc, argv);
+		}
+	}
+#endif
+
 #ifdef POSIX
 	char cmdlinestr[1024];
 	cmdlinestr[0] = 0;
@@ -155,6 +165,21 @@ int main(int argc, char * argv[]){
 #else
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
 	char * cmdline = lpCmdLine;
+#endif
+
+#ifndef POSIX
+	if(lpCmdLine && strstr(lpCmdLine, "--self-update-stage2")){
+		// Simple split-on-space tokenizer — good enough since we control the invocation.
+		std::vector<char*> tokens;
+		static char exe[] = "zsilencer-stage2";
+		tokens.push_back(exe);
+		char *cmd = _strdup(lpCmdLine);
+		char *tok = strtok(cmd, " ");
+		while(tok){ tokens.push_back(tok); tok = strtok(NULL, " "); }
+		int r = UpdaterStage2::Run((int)tokens.size(), tokens.data());
+		free(cmd);
+		return r;
+	}
 #endif
 
 	bool dedicatedmode = (cmdline && strncmp(cmdline, "-s", 2) == 0);
