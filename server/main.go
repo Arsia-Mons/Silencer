@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net"
@@ -19,6 +20,9 @@ func main() {
 	updateManifestPath := flag.String("update-manifest", "update.json", "path to update manifest JSON; missing = no auto-update hints")
 	gameBinary := flag.String("game-binary", "../build/zsilencer", "path to the zsilencer binary (spawned per created game)")
 	publicAddr := flag.String("public-addr", "127.0.0.1", "host or IP clients (and dedicated servers) should use to reach this lobby")
+	discordWebhook := flag.String("discord-webhook-url", "", "Discord webhook URL for sending lobby chat to Discord")
+	discordToken := flag.String("discord-bot-token", "", "Discord bot token for reading messages from Discord")
+	discordChannel := flag.String("discord-channel-id", "", "Discord channel ID to bridge with lobby chat")
 	flag.Parse()
 
 	var manifest *UpdateManifest
@@ -54,6 +58,23 @@ func main() {
 	proc := newProcManager(*gameBinary, *publicAddr, port)
 	hub := NewHub(store, motd, *publicAddr, proc)
 
+	var discordCancel context.CancelFunc
+	if *discordWebhook != "" || *discordToken != "" {
+		bridge := NewDiscordBridge(*discordWebhook, *discordToken, *discordChannel,
+			func(author, content string) {
+				hub.ChatFromDiscord(author, content)
+			})
+		hub.discord = bridge
+		if bridge.Enabled() {
+			var ctx context.Context
+			ctx, discordCancel = context.WithCancel(context.Background())
+			go bridge.Run(ctx)
+			log.Printf("[discord] bridge enabled (channel=%s)", *discordChannel)
+		} else {
+			log.Printf("[discord] bridge partially configured; need webhook-url, bot-token, and channel-id for full operation")
+		}
+	}
+
 	tcpAddr, err := net.ResolveTCPAddr("tcp", *addr)
 	if err != nil {
 		log.Fatalf("resolve tcp: %v", err)
@@ -81,6 +102,9 @@ func main() {
 	go func() {
 		<-sigs
 		log.Printf("shutting down, killing %d dedicated servers", 0)
+		if discordCancel != nil {
+			discordCancel()
+		}
 		proc.StopAll()
 		_ = tcpLn.Close()
 		_ = udpLn.Close()
