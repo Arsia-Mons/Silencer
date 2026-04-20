@@ -66,7 +66,7 @@ zsilencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
   `127.0.0.1:517`. CI sets it to `silencer.hventura.com`; rebuild the
   client to point at a different lobby.
 - **Version string must match.** Client sets it at `src/game.cpp:31`
-  (`world.SetVersion("00023")`); the lobby's `-version` flag defaults
+  (`world.SetVersion("00024")`); the lobby's `-version` flag defaults
   to the same. Bump both together, or pass `-version ""` on the server
   to accept any client. `CMakeLists.txt` `CPACK_PACKAGE_VERSION` is
   installer metadata only — unrelated to the wire handshake.
