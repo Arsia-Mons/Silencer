@@ -1,9 +1,15 @@
 build/
 lobby.json
 server/zsilencer-lobby
+server/zsilencer-lobby.exe
 server/*.tmp
 *.o
 *.obj
+*~
+
+# Local-run artifacts produced by the client
+config.cfg
+PALETTECALC*.BIN
 
 # Terraform
 terraform/**/.terraform/
