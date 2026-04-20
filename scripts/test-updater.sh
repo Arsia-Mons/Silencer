@@ -11,10 +11,10 @@ NEW_VER=${NEW_VER:-00024}
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
-PLATFORM_ZIP=zsilencer-macos-arm64.zip
 case "$(uname)" in
     Darwin) PLATFORM_ZIP=zsilencer-macos-arm64.zip ;;
     Linux)  PLATFORM_ZIP=zsilencer-linux-x64.zip ;;
+    *) echo "unsupported uname: $(uname)"; exit 1 ;;
 esac
 
 echo "=== Building NEW version ($NEW_VER) ==="
@@ -26,7 +26,22 @@ cmake --build build-new -j
 
 mkdir -p test-update-host
 rm -f "test-update-host/$PLATFORM_ZIP"
-(cd build-new && zip -r "../test-update-host/$PLATFORM_ZIP" zsilencer)
+
+# Package to match production release.yml's zip layout so stage-2's
+# extract + wrapper-unwrap + atomic-rename path runs against the real
+# zip shape (not a dev-only variant that hides bugs).
+case "$(uname)" in
+    Darwin)
+        # release.yml line ~111 uses `ditto -ck --sequesterRsrc --keepParent zsilencer.app <zip>`.
+        # --keepParent puts `zsilencer.app/` at the zip root. Stage-2 detects
+        # this single-top-dir wrapper and hoists it into place.
+        (cd build-new && ditto -ck --sequesterRsrc --keepParent zsilencer.app "../test-update-host/$PLATFORM_ZIP")
+        ;;
+    Linux)
+        # Linux isn't a shipped platform; bare binary at zip root is fine.
+        (cd build-new && zip -r "../test-update-host/$PLATFORM_ZIP" zsilencer)
+        ;;
+esac
 
 SHA=$(shasum -a 256 "test-update-host/$PLATFORM_ZIP" | awk '{print $1}')
 echo "NEW zip sha256=$SHA"
@@ -65,4 +80,14 @@ trap cleanup EXIT
 sleep 1
 echo
 echo "=== Launching OLD client — expect update modal ==="
-./build-old/zsilencer
+case "$(uname)" in
+    Darwin)
+        # MACOSX_BUNDLE target produces build-old/zsilencer.app, not a bare binary.
+        # Invoke the binary directly so stderr/stdout stream into this terminal
+        # (`open` detaches and hides logs).
+        ./build-old/zsilencer.app/Contents/MacOS/zsilencer
+        ;;
+    Linux)
+        ./build-old/zsilencer
+        ;;
+esac

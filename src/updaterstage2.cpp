@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <dirent.h>
 #endif
 
 #ifdef __APPLE__
@@ -136,6 +137,57 @@ bool RenameDir(const std::string &src, const std::string &dst) {
 #endif
 }
 
+// Production release zips wrap their contents in a single top-level
+// directory: on macOS ditto --keepParent produces `zsilencer.app/`, on
+// Windows Compress-Archive of `build/package/zsilencer` produces
+// `zsilencer/`. After extracting to staging/, we need to hoist that
+// inner dir into place — otherwise the atomic rename puts the install
+// one level too deep and breaks the bundle / relaunch path.
+//
+// Returns the wrapper entry name if `dir` contains exactly one entry
+// and that entry is a directory, else "".
+std::string FindSingleTopDir(const std::string &dir) {
+#ifdef _WIN32
+    WIN32_FIND_DATAA fd;
+    std::string pattern = dir + "\\*";
+    HANDLE h = FindFirstFileA(pattern.c_str(), &fd);
+    if (h == INVALID_HANDLE_VALUE) return "";
+    int count = 0;
+    std::string name;
+    bool is_dir = false;
+    do {
+        std::string n = fd.cFileName;
+        if (n == "." || n == "..") continue;
+        count++;
+        if (count > 1) { FindClose(h); return ""; }
+        name = n;
+        is_dir = (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    return (count == 1 && is_dir) ? name : std::string();
+#else
+    DIR *d = opendir(dir.c_str());
+    if (!d) return "";
+    int count = 0;
+    std::string name;
+    bool is_dir = false;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        std::string n = e->d_name;
+        if (n == "." || n == "..") continue;
+        count++;
+        if (count > 1) { closedir(d); return ""; }
+        name = n;
+        struct stat st;
+        if (stat((dir + "/" + n).c_str(), &st) == 0) {
+            is_dir = S_ISDIR(st.st_mode);
+        }
+    }
+    closedir(d);
+    return (count == 1 && is_dir) ? name : std::string();
+#endif
+}
+
 } // namespace
 
 namespace UpdaterStage2 {
@@ -189,6 +241,18 @@ int Run(int argc, char **argv) {
         return 2;
     }
 
+    // Unwrap single-top-dir zips (ditto --keepParent on macOS,
+    // Compress-Archive of a staging dir on Windows). If the zip had a
+    // single top-level directory, the "new install" is that inner dir,
+    // not the staging container.
+    std::string wrapper = FindSingleTopDir(staging);
+    std::string effective_new = wrapper.empty()
+        ? staging
+        : staging + "/" + wrapper;
+    if (!wrapper.empty()) {
+        Logf("detected zip wrapper dir '%s'; hoisting contents", wrapper.c_str());
+    }
+
     std::string old_path = install_dir + ".old";
 #ifdef _WIN32
     RemoveDirectoryA(old_path.c_str());
@@ -197,10 +261,18 @@ int Run(int argc, char **argv) {
         Logf("rename install→old failed");
         return 3;
     }
-    if (!RenameDir(staging, install_dir)) {
+    if (!RenameDir(effective_new, install_dir)) {
         Logf("rename new→install failed; rolling back");
         RenameDir(old_path, install_dir);
         return 4;
+    }
+    // If we unwrapped, the staging container is now empty; best-effort remove.
+    if (!wrapper.empty()) {
+#ifdef _WIN32
+        RemoveDirectoryA(staging.c_str());
+#else
+        rmdir(staging.c_str());
+#endif
     }
 
     std::string new_exe = exe_to_relaunch;
