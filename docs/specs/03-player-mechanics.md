@@ -192,7 +192,7 @@ weapon stats.
 - Players enter a base by pressing `activate` near a discovered BaseDoor.
 - Inside their own base, players can interact with:
   - **HealMachine** — restore health and shield to maximum (cooldown: 240
-    ticks / 10 seconds).
+    ticks ≈ 10 seconds at 24 ticks/sec).
   - **CreditMachine** — convert carried files to credits. Credits awarded =
     `files × (1 + credits_bonus)`.
   - **SecretReturn** — deliver a carried secret to score.

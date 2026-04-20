@@ -62,10 +62,13 @@ Guards can be configured as:
 
 ### Weapons
 
-Guards carry a weapon type (0 = blaster, 2 = rocket). On death, they drop
-ammo as a PickUp:
-- Weapon 2 (Rocket): drops 3 Rocket ammo.
-- Weapon 1 (Laser): drops 5 Laser ammo.
+Guards carry a weapon type:
+
+| Weapon ID | Type | Ammo Dropped on Death |
+|-----------|------|----------------------|
+| 0 | Blaster | (none) |
+| 1 | Laser | 5 Laser ammo |
+| 2 | Rocket | 3 Rocket ammo |
 
 ### Respawn
 
