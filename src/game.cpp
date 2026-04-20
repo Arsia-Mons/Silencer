@@ -4678,14 +4678,25 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								if(a.group != b.group) return a.group < b.group;
 								return a.label < b.label;
 							});
+							int groupCounts[3] = {0, 0, 0};
+							for(auto & r : rows){
+								if(r.group <= 2) groupCounts[r.group]++;
+							}
 							Uint8 lastgroup = 255;
 							for(auto & r : rows){
 								if(r.group != lastgroup){
-									const char * header = (r.group == 0) ? "In Lobby" : (r.group == 1) ? "Pregame" : "Playing";
-									textbox->AddText(header, 0, 128 + 32, 0, false);
+									if(lastgroup != 255){
+										textbox->AddLine("", 0, 128, false);
+									}
+									char header[32];
+									const char * groupName = (r.group == 0) ? "In Lobby" : (r.group == 1) ? "Pregame" : "Playing";
+									sprintf(header, "%s (%d)", groupName, groupCounts[r.group]);
+									textbox->AddText(header, 189, 128 + 48, 0, false);
 									lastgroup = r.group;
 								}
-								textbox->AddText(r.label.c_str(), 0, 128, 2, false);
+								Uint8 nameColor = (r.group == 0) ? 0 : (r.group == 1) ? 208 : 153;
+								Uint8 nameBright = (r.group == 0) ? 128 + 16 : (r.group == 1) ? 128 : 128 - 16;
+								textbox->AddText(r.label.c_str(), nameColor, nameBright, 1, false);
 							}
 							world.lobby.presencechanged = false;
 						}
