@@ -40,16 +40,16 @@ void Updater::PresentUpdate(const std::string &u, const uint8_t s[32]) {
 }
 
 void Updater::Consent() {
+    if (worker.joinable()) worker.join();  // drain any previous run
     {
         std::lock_guard<std::mutex> lk(mu);
         if (state != PROMPTING && state != FAILED) return;
         state = DOWNLOADING;
         bytes_got = 0;
         bytes_total = 0;
+        cancel_flag = false;  // reset under the lock, before worker starts
         error.clear();
     }
-    cancel_flag = false;
-    if (worker.joinable()) worker.join();
     worker = std::thread(&Updater::Run, this);
 }
 
@@ -59,12 +59,14 @@ void Updater::Cancel() {
 }
 
 void Updater::Retry() {
+    int n;
     {
         std::lock_guard<std::mutex> lk(mu);
         if (state != FAILED) return;
-        retries++;
+        n = ++retries;
     }
-    fprintf(stderr, "[updater] Retry #%d\n", retries);
+    // Note: the retry cap (plan says 3) is enforced by the UI layer.
+    fprintf(stderr, "[updater] Retry #%d\n", n);
     Consent();
 }
 
@@ -76,7 +78,10 @@ Updater::State Updater::GetState() {
 float Updater::GetProgress() {
     uint64_t tot = bytes_total.load();
     if (tot == 0) return 0.0f;
-    return float(double(bytes_got.load()) / double(tot));
+    double p = double(bytes_got.load()) / double(tot);
+    if (p < 0.0) p = 0.0;
+    if (p > 1.0) p = 1.0;
+    return float(p);
 }
 
 std::string Updater::GetErrorMessage() {
