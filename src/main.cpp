@@ -140,6 +140,40 @@ void CDResDir(void){
 #endif
 }
 
+static void CleanupPreviousUpdate(void) {
+#ifdef __APPLE__
+	// .app install: sibling foo.app.old. We don't know our exact install dir
+	// here without mach-o/dyld logic; skip cleanup on macOS and rely on the
+	// user trashing .app.old manually. A future tweak could mirror
+	// UpdaterStage2::ResolveInstallDir but that's not worth the coupling yet.
+#else
+	char buf[1024];
+	ssize_t n = 0;
+#ifdef _WIN32
+	GetModuleFileNameA(NULL, buf, sizeof(buf));
+	n = (ssize_t)strlen(buf);
+#else
+	n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+#endif
+	if (n <= 0) return;
+	buf[n] = 0;
+	std::string exe = buf;
+	size_t slash = exe.find_last_of("/\\");
+	if (slash == std::string::npos) return;
+	std::string old_dir = exe.substr(0, slash) + ".old";
+	struct stat st;
+	if (stat(old_dir.c_str(), &st) == 0) {
+		fprintf(stderr, "[updater] cleaning up prior install: %s\n", old_dir.c_str());
+#ifdef _WIN32
+		std::string cmd = "rd /s /q \"" + old_dir + "\"";
+#else
+		std::string cmd = "rm -rf '" + old_dir + "'";
+#endif
+		system(cmd.c_str());
+	}
+#endif
+}
+
 #ifdef POSIX
 int main(int argc, char * argv[]){
 #endif
@@ -190,7 +224,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		signal(SIGBUS, crash_handler);
 	}
 #endif
-    	
+
+	CleanupPreviousUpdate();
+
 #ifndef POSIX
 	WSADATA wsaData;
 	WSAStartup(MAKEWORD(2, 2), &wsaData);
