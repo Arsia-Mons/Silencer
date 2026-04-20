@@ -47,6 +47,9 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	updateinterface = 0;
 	modalinterface = 0;
 	sharedstate = 0;
+	currentlobbygameid = 0;
+	lastannouncedgameid = 0;
+	lastannouncedstatus = 0;
 	joininggame = false;
 	keynames[0] = "Move Up";
 	keynames[1] = "Move Down";
@@ -627,6 +630,26 @@ bool Game::Loop(void){
 
 bool Game::Tick(void){
 	ProcessInGameInterfaces();
+	if(!world.dedicatedserver.active){
+		if(world.lobby.state == Lobby::AUTHENTICATED){
+			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for
+			// match start), 2 = playing (gameplaystate == INGAME).
+			Uint32 targetgid = 0;
+			Uint8 targetstatus = 0;
+			if(currentlobbygameid != 0 && world.state == World::CONNECTED){
+				targetgid = currentlobbygameid;
+				targetstatus = (world.gameplaystate == World::INGAME) ? 2 : 1;
+			}
+			if(targetgid != lastannouncedgameid || targetstatus != lastannouncedstatus){
+				world.lobby.SendSetGame(targetgid, targetstatus);
+				lastannouncedgameid = targetgid;
+				lastannouncedstatus = targetstatus;
+			}
+		}else{
+			lastannouncedgameid = 0;
+			lastannouncedstatus = 0;
+		}
+	}
 	if(world.dedicatedserver.active && state != HOSTGAME){
 		if(world.dedicatedserver.nopeerstime >= 10 * 24){
 			world.dedicatedserver.SendHeartBeat(world, 2);
@@ -2231,6 +2254,7 @@ bool Game::LoadMap(const char * name){
 
 void Game::UnloadGame(void){
 	Audio::GetInstance().StopAll(200);
+	currentlobbygameid = 0;
 	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
 		bgchannel[i] = -1;
 	}
@@ -3157,12 +3181,22 @@ Interface * Game::CreateChatInterface(void){
 	TextBox * textbox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
 	textbox->x = 19;
 	textbox->y = 220;
-	textbox->width = 342;
+	textbox->width = 242;
 	textbox->height = 207;
 	textbox->res_bank = 133;
 	textbox->lineheight = 11;
 	textbox->fontwidth = 6;
 	textbox->bottomtotop = true;
+	TextBox * presencebox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
+	presencebox->x = 267;
+	presencebox->y = 220;
+	presencebox->width = 110;
+	presencebox->height = 207;
+	presencebox->res_bank = 133;
+	presencebox->lineheight = 11;
+	presencebox->fontwidth = 6;
+	presencebox->bottomtotop = false;
+	presencebox->uid = 9;
 	/*for(int i = 0; i < 0; i++){
 		char line[256];
 		sprintf(line, "line %d", i);
@@ -3187,6 +3221,7 @@ Interface * Game::CreateChatInterface(void){
 	chatinterface->AddObject(chatinputborder->id);
 	chatinterface->AddObject(channeltext->id);
 	chatinterface->AddObject(textbox->id);
+	chatinterface->AddObject(presencebox->id);
 	chatinterface->AddObject(chatinput->id);
 	chatinterface->AddObject(chatscrollbar->id);
 	chatinterface->AddTabObject(chatinput->id);
@@ -4618,6 +4653,43 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 				}break;
 				case ObjectTypes::TEXTBOX:{
 					TextBox * textbox = static_cast<TextBox *>(object);
+					if(textbox && textbox->uid == 9){
+						if(world.lobby.presencechanged || !world.lobby.gamesprocessed){
+							textbox->text.clear();
+							textbox->scrolled = 0;
+							struct Row { Uint8 group; std::string label; };
+							std::vector<Row> rows;
+							for(auto & kv : world.lobby.presence){
+								Lobby::PresenceEntry & e = kv.second;
+								Row r;
+								r.label = e.name;
+								r.group = (e.status <= 2) ? e.status : 0;
+								if(e.gameid != 0){
+									LobbyGame * g = world.lobby.GetGameById(e.gameid);
+									if(g){
+										r.label += " [";
+										r.label += g->name;
+										r.label += "]";
+									}
+								}
+								rows.push_back(r);
+							}
+							std::sort(rows.begin(), rows.end(), [](const Row & a, const Row & b){
+								if(a.group != b.group) return a.group < b.group;
+								return a.label < b.label;
+							});
+							Uint8 lastgroup = 255;
+							for(auto & r : rows){
+								if(r.group != lastgroup){
+									const char * header = (r.group == 0) ? "In Lobby" : (r.group == 1) ? "Pregame" : "Playing";
+									textbox->AddText(header, 0, 128 + 32, 0, false);
+									lastgroup = r.group;
+								}
+								textbox->AddText(r.label.c_str(), 0, 128, 2, false);
+							}
+							world.lobby.presencechanged = false;
+						}
+					}else
 					if(textbox){
 						Object * object = world.GetObjectFromId(iface->scrollbar);
 						ScrollBar * scrollbar = static_cast<ScrollBar *>(object);

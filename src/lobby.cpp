@@ -26,6 +26,7 @@ Lobby::Lobby(World * world){
 	connectgamestatus = 0;
 	sendbufferoffset = 0;
 	gamesprocessed = false;
+	presencechanged = false;
 	channelchanged = false;
 	channel[0] = 0;
 	serverip[0] = 0;
@@ -83,6 +84,8 @@ void Lobby::Disconnect(void){
 	}
 	sendbuffersize = 0;
 	sendbufferoffset = 0;
+	presence.clear();
+	presencechanged = true;
     shutdown(sockethandle, SHUT_RDWR);
     closesocket(sockethandle);
 	sockethandle = -1;
@@ -205,8 +208,17 @@ void Lobby::DoNetwork(void){
 									lobbygame->createdtime = SDL_GetTicks();
 									lobbygame->Serialize(Serializer::READ, data);
 									//printf("password: %s\n", lobbygame->password);
+									for(std::list<LobbyGame *>::iterator dit = games.begin(); dit != games.end(); ){
+										if((*dit)->id == lobbygame->id){
+											delete *dit;
+											dit = games.erase(dit);
+										}else{
+											++dit;
+										}
+									}
 									games.push_back(lobbygame);
 									gamesprocessed = false;
+									presencechanged = true;
 									if(lobbygame->accountid == Lobby::accountid){ // CreateGame response
 										Lobby::creategamestatus = creategamestatus;
 										if(creategamestatus == 1){ // success
@@ -229,6 +241,7 @@ void Lobby::DoNetwork(void){
 											delete lobbygame;
 											games.erase(it);
 											gamesprocessed = false;
+											presencechanged = true;
 											break;
 										}
 									}
@@ -382,6 +395,36 @@ void Lobby::DoNetwork(void){
 									GetUserInfo(accountid)->statsagency = oldstatsagency;
 									statupgraded = true;
 								}break;
+								case MSG_PRESENCE:{
+									Uint8 action;
+									data.Get(action);
+									Uint32 acct;
+									data.Get(acct);
+									Uint32 gid;
+									data.Get(gid);
+									Uint8 status;
+									data.Get(status);
+									Uint8 namelen;
+									data.Get(namelen);
+									if(namelen > 16){
+										namelen = 16;
+									}
+									char name[17];
+									for(Uint8 i = 0; i < namelen; i++){
+										data.Get(name[i]);
+									}
+									name[namelen] = 0;
+									if(action == 0){
+										PresenceEntry & e = presence[acct];
+										e.accountid = acct;
+										e.gameid = gid;
+										e.status = status;
+										strcpy(e.name, name);
+									}else{
+										presence.erase(acct);
+									}
+									presencechanged = true;
+								}break;
 							}
 							msgsize = 0;
 						}
@@ -521,6 +564,15 @@ void Lobby::CreateGame(const char * name, const char * map, const unsigned char 
 	SendMessage(data.data, data.BitsToBytes(data.offset));
 	printf("requested thru lobby server to connect to game id %d, (ports %d,%d) agency %d\n", lobbygame.accountid, port, publicport, agency);
 }*/
+
+void Lobby::SendSetGame(Uint32 gameid, Uint8 status){
+	Serializer data;
+	Uint8 code = MSG_SETGAME;
+	data.Put(code);
+	data.Put(gameid);
+	data.Put(status);
+	SendMessage(data.data, data.BitsToBytes(data.offset));
+}
 
 void Lobby::ClearGames(void){
 	for(std::list<LobbyGame *>::iterator it = games.begin(); it != games.end(); it++){

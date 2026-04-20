@@ -21,7 +21,13 @@ public:
 	void LockMutex(void);
 	void UnlockMutex(void);
 	enum {IDLE, WAITING, CONNECTING, RESOLVING, WAITINGFORRESOLVER, RESOLVED, RESOLVEFAILED, CONNECTIONFAILED, CONNECTED, CHECKINGVERSION, AUTHENTICATING, AUTHSENT, AUTHENTICATED, AUTHFAILED, DISCONNECTED} state;
-	enum {MSG_AUTH, MSG_MOTD, MSG_CHAT, MSG_NEWGAME, MSG_DELGAME, MSG_CHANNEL, MSG_CONNECT, MSG_VERSION, MSG_USERINFO, MSG_PING, MSG_UPGRADESTAT, MSG_REGISTERSTATS};
+	enum {MSG_AUTH, MSG_MOTD, MSG_CHAT, MSG_NEWGAME, MSG_DELGAME, MSG_CHANNEL, MSG_CONNECT, MSG_VERSION, MSG_USERINFO, MSG_PING, MSG_UPGRADESTAT, MSG_REGISTERSTATS, MSG_PRESENCE, MSG_SETGAME};
+	struct PresenceEntry {
+		Uint32 accountid;
+		Uint32 gameid; // 0 = main lobby
+		Uint8 status;  // 0 = lobby, 1 = pregame, 2 = playing
+		char name[17]; // matches server-side max username (16) + null
+	};
 	void SendVersion(void);
 	void SendCredentials(const char * username, const char * password);
 	void SendChat(const char * channel, const char * message);
@@ -35,6 +41,7 @@ public:
 	void ForgetAllUserInfo(void);
 	void UpgradeStat(Uint8 agency, Uint8 stat);
 	void RegisterStats(User & user, Uint8 won, Uint32 gameid);
+	void SendSetGame(Uint32 gameid, Uint8 status);
 	char failmessage[256];
 	Uint32 accountid;
 	char motd[2048];
@@ -45,6 +52,8 @@ public:
 	std::list<std::vector<char>> chatmessages;
 	std::list<LobbyGame *> games;
 	bool gamesprocessed;
+	std::map<Uint32, PresenceEntry> presence;
+	bool presencechanged;
 	char channel[64];
 	bool channelchanged;
 	char serverip[256];

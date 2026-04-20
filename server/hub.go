@@ -47,10 +47,37 @@ func (h *Hub) Join(c *Client) {
 	for _, g := range h.games {
 		games = append(games, g)
 	}
+	type snap struct {
+		acct   uint32
+		gameID uint32
+		status uint8
+		name   string
+	}
+	others := make([]snap, 0, len(h.clients))
+	peers := make([]*Client, 0, len(h.clients))
+	for other := range h.clients {
+		if other == c || other.accountID == 0 {
+			continue
+		}
+		others = append(others, snap{other.accountID, other.gameID, other.gameStatus, other.displayName()})
+		peers = append(peers, other)
+	}
+	selfSnap := snap{c.accountID, c.gameID, c.gameStatus, c.displayName()}
 	h.mu.Unlock()
+
 	for _, g := range games {
 		c.sendNewGame(1, g)
 	}
+	if c.accountID == 0 {
+		return
+	}
+	for _, o := range others {
+		c.sendPresence(0, o.acct, o.gameID, o.status, o.name)
+	}
+	for _, p := range peers {
+		p.sendPresence(0, selfSnap.acct, selfSnap.gameID, selfSnap.status, selfSnap.name)
+	}
+	c.sendPresence(0, selfSnap.acct, selfSnap.gameID, selfSnap.status, selfSnap.name)
 }
 
 func (h *Hub) Leave(c *Client) {
@@ -84,6 +111,7 @@ func (h *Hub) Leave(c *Client) {
 	for other := range h.clients {
 		others = append(others, other)
 	}
+	leavingAcct := c.accountID
 	h.mu.Unlock()
 
 	for _, id := range append(dropReady, dropPending...) {
@@ -93,6 +121,49 @@ func (h *Hub) Leave(c *Client) {
 		for _, other := range others {
 			other.sendDelGame(id)
 		}
+	}
+	if leavingAcct != 0 {
+		for _, other := range others {
+			other.sendPresence(1, leavingAcct, 0, 0, "")
+		}
+	}
+}
+
+// SetClientGame updates a client's gameID+status and announces the change.
+// status: 0 = main lobby, 1 = pregame (game-specific lobby), 2 = playing.
+// gameID=0 requires status=0. Unknown non-zero IDs are rejected.
+func (h *Hub) SetClientGame(c *Client, gameID uint32, status uint8) {
+	h.mu.Lock()
+	if c.accountID == 0 {
+		h.mu.Unlock()
+		return
+	}
+	if gameID == 0 {
+		status = 0
+	} else {
+		_, inGames := h.games[gameID]
+		_, inPending := h.pending[gameID]
+		if !inGames && !inPending {
+			h.mu.Unlock()
+			log.Printf("[hub] client %d set-game for unknown game %d; ignoring", c.accountID, gameID)
+			return
+		}
+		if status != 1 && status != 2 {
+			status = 1
+		}
+	}
+	c.gameID = gameID
+	c.gameStatus = status
+	acct := c.accountID
+	name := c.displayName()
+	peers := make([]*Client, 0, len(h.clients))
+	for other := range h.clients {
+		peers = append(peers, other)
+	}
+	h.mu.Unlock()
+
+	for _, p := range peers {
+		p.sendPresence(0, acct, gameID, status, name)
 	}
 }
 

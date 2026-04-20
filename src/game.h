@@ -145,6 +145,8 @@ private:
 	Uint8 singleplayermessage;
 	bool updatetitle;
 	Uint32 currentlobbygameid;
+	Uint32 lastannouncedgameid;
+	Uint8 lastannouncedstatus;
 	char lastchannel[64];
 	Uint8 oldselectedagency;
 	Uint8 oldambiencelevel;

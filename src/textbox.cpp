@@ -2,6 +2,7 @@
 #include "interface.h"
 
 TextBox::TextBox() : Object(ObjectTypes::TEXTBOX){
+	uid = 0;
 	res_bank = 133;
 	res_index = 0xFF;
 	lineheight = 11;

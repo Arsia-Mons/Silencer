@@ -19,7 +19,12 @@ type Client struct {
 	accountID uint32
 	user      *User
 	channel   string
-	closed    bool
+	gameID    uint32 // 0 = main lobby; protected by Hub.mu once authed
+	// gameStatus: 0 = main lobby (gameID must be 0), 1 = pregame
+	// (game-specific lobby, connected to dedicated but match not started),
+	// 2 = playing. Protected by Hub.mu once authed.
+	gameStatus uint8
+	closed     bool
 }
 
 func (c *Client) displayName() string {
@@ -115,6 +120,8 @@ func (c *Client) handleFrame(frame []byte, expectedVersion string, manifest *Upd
 		return c.handleUpgradeStat(r)
 	case opRegisterStats:
 		return c.handleRegisterStats(r)
+	case opSetGame:
+		return c.handleSetGame(r)
 	default:
 		log.Printf("[op] %s unknown opcode %d", c.conn.RemoteAddr(), op)
 	}
@@ -236,6 +243,19 @@ func (c *Client) sendDelGame(id uint32) {
 	c.send(w.b)
 }
 
+// action: 0 = add/upsert, 1 = remove.
+// status: 0 = lobby, 1 = pregame, 2 = playing.
+func (c *Client) sendPresence(action uint8, accountID, gameID uint32, status uint8, name string) {
+	w := &writer{}
+	w.u8(opPresence)
+	w.u8(action)
+	w.u32(accountID)
+	w.u32(gameID)
+	w.u8(status)
+	w.lenStr(name)
+	c.send(w.b)
+}
+
 func (c *Client) handleChat(r *reader) error {
 	channel, err := r.cstr(64)
 	if err != nil {
@@ -311,6 +331,22 @@ func (c *Client) handleUpgradeStat(r *reader) error {
 	if c.hub.store.UpgradeStat(c.accountID, agency, stat) {
 		c.send([]byte{opUpgradeStat})
 	}
+	return nil
+}
+
+func (c *Client) handleSetGame(r *reader) error {
+	if c.accountID == 0 {
+		return nil
+	}
+	gameID, err := r.u32()
+	if err != nil {
+		return err
+	}
+	status, err := r.u8()
+	if err != nil {
+		return err
+	}
+	c.hub.SetClientGame(c, gameID, status)
 	return nil
 }
 

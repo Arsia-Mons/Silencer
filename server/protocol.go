@@ -19,6 +19,8 @@ const (
 	opPing          = 9
 	opUpgradeStat   = 10
 	opRegisterStats = 11
+	opPresence      = 12
+	opSetGame       = 13
 )
 
 const maxFrame = 255
