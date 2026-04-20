@@ -472,15 +472,16 @@ This means all hit-testing, button bounds, and UI coordinates operate entirely i
 | Fullscreen | `SDL_WINDOW_FULLSCREEN_DESKTOP` | Uses desktop resolution; 640×480 stretched to fit |
 | Toggle | `RAlt + Enter` at runtime | Switches between the above two modes |
 
-**Effective font sizes on common displays** (approximate, assuming fullscreen):
+**Effective font sizes on common displays** (approximate, assuming fullscreen;
+fractional pixels rounded to nearest integer):
 
 | Display | Resolution | Logical 1 px ≈ | 11 px glyph ≈ | 19 px glyph ≈ |
 | ------------ | ---------- | --------------- | ------------- | ------------- |
 | SD / CRT | 640 × 480 | 1.0 px | 11 px | 19 px |
-| 720p | 1280 × 720 | 2 × 1.5 px | 22 × 17 px | 38 × 29 px |
-| 1080p | 1920 × 1080 | 3 × 2.25 px | 33 × 25 px | 57 × 43 px |
-| 1440p | 2560 × 1440 | 4 × 3 px | 44 × 33 px | 76 × 57 px |
-| 4K | 3840 × 2160 | 6 × 4.5 px | 66 × 50 px | 114 × 86 px |
+| 720p | 1280 × 720 | 2.0 × 1.5 px | 22 × 17 px | 38 × 29 px |
+| 1080p | 1920 × 1080 | 3.0 × 2.25 px | 33 × 25 px | 57 × 43 px |
+| 1440p | 2560 × 1440 | 4.0 × 3.0 px | 44 × 33 px | 76 × 57 px |
+| 4K | 3840 × 2160 | 6.0 × 4.5 px | 66 × 50 px | 114 × 86 px |
 
 ### Screen Coordinates
 
