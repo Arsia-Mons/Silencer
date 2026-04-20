@@ -501,14 +501,19 @@ number-only restriction.
 
 #### Common Field Instances (set in `game.cpp`)
 
-| Field | Width × Height | Font Bank | Font Width | Max Chars | Password | Numbers Only |
-| --------------- | -------------- | --------- | ---------- | --------- | -------- | ------------ |
-| Username | 180 × 14 | 135 | 6 | 256 | no | no |
-| Password | 180 × 14 | 135 | 6 | 256 | yes | no |
+| Field | Width × Height | Font Bank | Font Width | Buffer Size | Password | Numbers Only |
+| --------------- | -------------- | --------- | ---------- | ----------- | -------- | ------------ |
+| Username | 180 × 14 | 135 | 6 | 256 (buffer) | no | no |
+| Password | 180 × 14 | 135 | 6 | 256 (buffer) | yes | no |
 | Chat (lobby) | 360 × 14 | 135 | 6 | 60 | no | no |
 | Chat (in-game) | varies | 133 | 6 | 60 | no | no |
-| Game Name | 210 × 14 | 135 | 6 | 256 | no | no |
-| Small (numeric) | 20 × 20 | 135 | 8 | 256 | no | yes |
+| Game Name | 210 × 14 | 135 | 6 | 256 (buffer) | no | no |
+| Small (numeric) | 20 × 20 | 135 | 8 | 256 (buffer) | no | yes |
+
+> **Note:** "Buffer Size" is the `maxchars` allocation — the raw character buffer limit.
+> The effective visible length is constrained by `maxwidth` (visible character slots)
+> and the field's pixel width. The network protocol may impose additional limits on
+> transmitted string lengths.
 
 #### Rendering Pipeline
 
@@ -564,9 +569,10 @@ function processKeyPress(key):
 Simple rectangular bounds (no sprite offset):
 
 ```
-function mouseInside(mousex, mousey):
-    return mousex > x AND mousex < x + width AND mousey > y AND mousey < y + height
-    // Returns character index: (mousex - x) / fontwidth
+function mouseInside(mousex, mousey) → int:
+    if mousex > x AND mousex < x + width AND mousey > y AND mousey < y + height:
+        return (mousex - x) / fontwidth            // character index at click position
+    return -1                                      // outside bounds
 ```
 
 When clicked, the Interface sets this TextInput as the active object and
@@ -1058,6 +1064,8 @@ for each character i in message:
     brightness = 128
 
     // Fade-out after display time expires (types < 10)
+    // Note: brightness is a uint8 in the engine; underflow wraps.
+    // A clean reimplementation should clamp: brightness = max(0, brightness - delta)
     if message_i - messagetime + 8 >= 0:
         brightness -= (message_i - messagetime + 8) * 8
 
@@ -1215,7 +1223,7 @@ and file progress bars, and bank **94** for the frame/border.
 sprite: bank 95, index 0
 fill direction: bottom-up (crop from top based on HP percentage)
 
-srcRect.y = spriteHeight - (health / maxHealth) * spriteHeight
+srcRect.y = spriteHeight - (float(health) / float(maxHealth)) * spriteHeight
 srcRect.h = spriteHeight
 dstRect.y = spriteOffsetY + srcRect.y
 
