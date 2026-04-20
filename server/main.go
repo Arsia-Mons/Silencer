@@ -16,9 +16,22 @@ func main() {
 	dbPath := flag.String("db", "lobby.json", "path to JSON user database")
 	motdPath := flag.String("motd", "", "path to MOTD file; empty = built-in default")
 	version := flag.String("version", "00024", "required client version; empty = accept any")
+	updateManifestPath := flag.String("update-manifest", "update.json", "path to update manifest JSON; missing = no auto-update hints")
 	gameBinary := flag.String("game-binary", "../build/zsilencer", "path to the zsilencer binary (spawned per created game)")
 	publicAddr := flag.String("public-addr", "127.0.0.1", "host or IP clients (and dedicated servers) should use to reach this lobby")
 	flag.Parse()
+
+	var manifest *UpdateManifest
+	if *updateManifestPath != "" {
+		m, err := LoadManifest(*updateManifestPath)
+		if err != nil {
+			log.Printf("[lobby-update] manifest load failed (%v); clients will receive bare reject on version mismatch", err)
+		} else {
+			log.Printf("[lobby-update] manifest loaded: version=%q macos=%s windows=%s",
+				m.Version, m.MacOSURL, m.WindowsURL)
+			manifest = m
+		}
+	}
 
 	motd := "Welcome to zSILENCER lobby.\n"
 	if *motdPath != "" {
@@ -74,14 +87,14 @@ func main() {
 		os.Exit(0)
 	}()
 
-	log.Printf("zSILENCER lobby on %s (public=%s, binary=%s, version=%q)", *addr, *publicAddr, *gameBinary, *version)
+	log.Printf("zSILENCER lobby on %s (public=%s, binary=%s, version=%q, manifest=%q)", *addr, *publicAddr, *gameBinary, *version, *updateManifestPath)
 	for {
 		conn, err := tcpLn.Accept()
 		if err != nil {
 			log.Printf("accept: %v", err)
 			continue
 		}
-		go serveClient(conn, hub, *version)
+		go serveClient(conn, hub, *version, manifest)
 	}
 }
 

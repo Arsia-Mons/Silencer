@@ -29,7 +29,7 @@ func (c *Client) displayName() string {
 	return "Player"
 }
 
-func serveClient(conn net.Conn, hub *Hub, version string) {
+func serveClient(conn net.Conn, hub *Hub, version string, manifest *UpdateManifest) {
 	defer conn.Close()
 	c := &Client{
 		conn:    conn,
@@ -52,7 +52,7 @@ func serveClient(conn net.Conn, hub *Hub, version string) {
 			}
 			break
 		}
-		if err := c.handleFrame(frame, version); err != nil {
+		if err := c.handleFrame(frame, version, manifest); err != nil {
 			log.Printf("[conn] %s handle: %v", conn.RemoteAddr(), err)
 			break
 		}
@@ -87,7 +87,7 @@ func (c *Client) send(payload []byte) {
 	}
 }
 
-func (c *Client) handleFrame(frame []byte, expectedVersion string) error {
+func (c *Client) handleFrame(frame []byte, expectedVersion string, manifest *UpdateManifest) error {
 	r := newReader(frame)
 	op, err := r.u8()
 	if err != nil {
@@ -95,9 +95,12 @@ func (c *Client) handleFrame(frame []byte, expectedVersion string) error {
 	}
 	switch op {
 	case opVersion:
-		ver, _ := r.cstr(64)
-		ok := expectedVersion == "" || ver == expectedVersion
-		c.send([]byte{opVersion, boolU8(ok)})
+		// Everything after the opcode is the payload for decodeVersionRequest.
+		req, err := decodeVersionRequest(frame[1:])
+		if err != nil {
+			return err
+		}
+		c.handleVersion(req, expectedVersion, manifest)
 	case opAuth:
 		return c.handleAuth(r)
 	case opChat:
@@ -116,6 +119,36 @@ func (c *Client) handleFrame(frame []byte, expectedVersion string) error {
 		log.Printf("[op] %s unknown opcode %d", c.conn.RemoteAddr(), op)
 	}
 	return nil
+}
+
+func (c *Client) handleVersion(req VersionRequest, expectedVersion string, manifest *UpdateManifest) {
+	ok := expectedVersion == "" || req.Version == expectedVersion
+
+	rep := VersionReply{OK: ok}
+	if !ok && manifest != nil {
+		if manifest.Version != expectedVersion {
+			log.Printf("[lobby-update] manifest stale: manifest version %q != lobby version %q; sending bare reject",
+				manifest.Version, expectedVersion)
+		} else {
+			switch req.Platform {
+			case PlatformMacOSARM64:
+				rep.URL = manifest.MacOSURL
+				rep.SHA256 = manifest.MacOSSHA256
+			case PlatformWindowsX64:
+				rep.URL = manifest.WindowsURL
+				rep.SHA256 = manifest.WindowsSHA256
+			default:
+				log.Printf("[lobby-update] client %s sent unknown platform %d; sending bare reject",
+					c.conn.RemoteAddr(), req.Platform)
+			}
+		}
+	}
+
+	log.Printf("[lobby-update] version check %s: client=%q expected=%q ok=%v update_url_len=%d",
+		c.conn.RemoteAddr(), req.Version, expectedVersion, ok, len(rep.URL))
+
+	payload := append([]byte{opVersion}, encodeVersionReply(rep)...)
+	c.send(payload)
 }
 
 func (c *Client) handleAuth(r *reader) error {
