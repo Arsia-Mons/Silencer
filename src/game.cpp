@@ -5755,12 +5755,12 @@ void Game::SwitchChatTab(const std::string & channel){
 		}
 	}
 	// Scroll to bottom
-	if(textbox->text.size() > (unsigned int)(textbox->height / textbox->lineheight)){
+	if(textbox->lineheight > 0 && textbox->text.size() > (unsigned int)(textbox->height / textbox->lineheight)){
 		textbox->scrolled = textbox->text.size() - (textbox->height / textbox->lineheight);
 	}
 	if(scrollbar){
 		scrollbar->scrollposition = textbox->scrolled;
-		if(textbox->text.size() > ceil(float(textbox->height) / textbox->lineheight)){
+		if(textbox->lineheight > 0 && textbox->text.size() > ceil(float(textbox->height) / textbox->lineheight)){
 			scrollbar->draw = true;
 			scrollbar->scrollmax = textbox->text.size() - ceil(float(textbox->height) / textbox->lineheight);
 		}else{

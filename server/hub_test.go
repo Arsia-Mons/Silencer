@@ -38,6 +38,12 @@ func (tc *testConn) frames() [][]byte {
 	return tc.written
 }
 
+func (tc *testConn) clearFrames() {
+	tc.mu.Lock()
+	defer tc.mu.Unlock()
+	tc.written = nil
+}
+
 func newTestClient(channels map[string]bool) (*Client, *testConn) {
 	tc := &testConn{}
 	c := &Client{
@@ -84,9 +90,9 @@ func TestChat_MultiChannel_DeliveredToSubscribers(t *testing.T) {
 	}
 
 	// Clear written
-	connA.written = nil
-	connB.written = nil
-	connC.written = nil
+	connA.clearFrames()
+	connB.clearFrames()
+	connC.clearFrames()
 
 	// Send chat to #game-1 channel
 	hub.Chat(clientA, "#game-1", "hello game")
