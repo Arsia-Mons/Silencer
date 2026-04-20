@@ -12,9 +12,16 @@ bool UpdaterDownload::IsAllowed(const std::string &url) {
 
     // Loopback hosts only.
     std::string rest = url.substr(http.size());
-    // Strip anything after the host (port, path).
-    size_t end = rest.find_first_of(":/");
-    std::string host = (end == std::string::npos) ? rest : rest.substr(0, end);
+    std::string host;
+    if (!rest.empty() && rest[0] == '[') {
+        // IPv6 literal: [::1] or [::1]:port
+        size_t close = rest.find(']');
+        host = (close == std::string::npos) ? rest : rest.substr(0, close + 1);
+    } else {
+        // Strip port or path: take everything up to ':' or '/'.
+        size_t end = rest.find_first_of(":/");
+        host = (end == std::string::npos) ? rest : rest.substr(0, end);
+    }
     if (host == "localhost") return true;
     if (host == "127.0.0.1") return true;
     if (host == "[::1]") return true;
