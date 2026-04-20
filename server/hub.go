@@ -11,6 +11,7 @@ type Hub struct {
 	motd       string
 	publicAddr string
 	proc       *procManager
+	discord    *DiscordBridge
 
 	mu      sync.Mutex
 	nextGID uint32
@@ -277,4 +278,27 @@ func (h *Hub) Chat(from *Client, channel, msg string) {
 		c.sendChat(channel, line)
 	}
 	log.Printf("[chat #%s] %s", channel, line)
+
+	// Forward to Discord if the bridge is wired up and this is the Lobby channel.
+	if h.discord != nil && channel == "Lobby" {
+		h.discord.SendToDiscord(from.displayName(), msg)
+	}
+}
+
+// ChatFromDiscord injects a message from Discord into the lobby chat.
+func (h *Hub) ChatFromDiscord(author, content string) {
+	channel := "Lobby"
+	h.mu.Lock()
+	peers := make([]*Client, 0, len(h.clients))
+	for c := range h.clients {
+		if c.channel == channel {
+			peers = append(peers, c)
+		}
+	}
+	h.mu.Unlock()
+	line := "[D] " + author + ": " + content
+	for _, c := range peers {
+		c.sendChat(channel, line)
+	}
+	log.Printf("[chat #%s] (discord) %s: %s", channel, author, content)
 }
