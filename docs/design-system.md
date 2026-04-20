@@ -79,9 +79,9 @@ exactly `width` pixels horizontally, regardless of glyph shape. This is a monosp
 
 ### Palette Architecture
 
-- **File:** `data/PALETTE.BIN` (8,436 bytes)
+- **File:** `data/PALETTE.BIN` (8,448 bytes)
 - **Format:** 11 sub-palettes × (4-byte header + 256 × 3 bytes RGB), 6-bit color depth
-  (values `<< 2` to expand to 8-bit)
+  (raw values 0–63, shifted `<< 2` to 8-bit, giving an effective max of 252 per channel)
 - **Lookup tables** (`PALETTECALC{n}.BIN`): pre-computed 256 × 256 tables for brightness,
   color-tint, and alpha-blend transformations; auto-calculated and cached if missing
 
@@ -89,14 +89,15 @@ exactly `width` pixels horizontally, regardless of glyph shape. This is a monosp
 
 | Range | Purpose |
 | --------- | ------------------------------------------------------------------- |
-| 0–1 | Transparent / black (protected — never transformed) |
+| 0–1 | Transparent / black — protected, never transformed |
 | 2–113 | Main color ramps: 7 groups × 16 brightness levels each |
-| 114–225 | Upper palette (secondary / effect colors) |
-| 226–255 | Parallax sky colors (dynamic — swapped from palettes 5–9 per map) |
+| 114–225 | Upper palette — mirrors ramp structure for effect/tint rendering |
+| 226–255 | Parallax sky colors — dynamic, swapped from palettes 5–9 per map |
 
-### Color Ramp Formula
+### Color Ramp Groups (indices 2–113)
 
-Within indices 2–113 the layout is:
+Each group is 16 consecutive palette entries forming a brightness ramp from
+darkest (level 0) to brightest (level 15).
 
 ```
 index = (colorGroup * 16) + brightnessLevel + 2
@@ -105,56 +106,174 @@ index = (colorGroup * 16) + brightnessLevel + 2
 - `colorGroup` = `(index - 2) / 16` (0–6)
 - `brightnessLevel` = `(index - 2) % 16` (0 = darkest, 15 = brightest)
 
+**Group 0 — Gray (indices 2–17)**
+
+| Index | Level | R | G | B | Hex |
+| ----- | ----- | --- | --- | --- | ------- |
+| 2 | 0 | 0 | 0 | 0 | `#000000` |
+| 5 | 3 | 48 | 48 | 48 | `#303030` |
+| 10 | 8 | 132 | 132 | 132 | `#848484` |
+| 14 | 12 | 200 | 200 | 200 | `#C8C8C8` |
+| 17 | 15 | 252 | 252 | 252 | `#FCFCFC` |
+
+**Group 1 — Fire/Yellow (indices 18–33)**
+
+| Index | Level | R | G | B | Hex |
+| ----- | ----- | --- | --- | --- | ------- |
+| 18 | 0 | 252 | 0 | 0 | `#FC0000` |
+| 22 | 4 | 252 | 96 | 0 | `#FC6000` |
+| 26 | 8 | 252 | 200 | 0 | `#FCC800` |
+| 28 | 10 | 252 | 252 | 0 | `#FCFC00` |
+| 33 | 15 | 252 | 252 | 212 | `#FCFCD4` |
+
+**Group 2 — Red (indices 34–49)**
+
+| Index | Level | R | G | B | Hex |
+| ----- | ----- | --- | --- | --- | ------- |
+| 34 | 0 | 12 | 4 | 4 | `#0C0404` |
+| 38 | 4 | 92 | 28 | 28 | `#5C1C1C` |
+| 42 | 8 | 172 | 24 | 24 | `#AC1818` |
+| 46 | 12 | 252 | 0 | 0 | `#FC0000` |
+| 49 | 15 | 252 | 80 | 80 | `#FC5050` |
+
+**Group 3 — Brown/Tan (indices 50–65)**
+
+| Index | Level | R | G | B | Hex |
+| ----- | ----- | --- | --- | --- | ------- |
+| 50 | 0 | 40 | 12 | 0 | `#280C00` |
+| 54 | 4 | 96 | 48 | 16 | `#603010` |
+| 58 | 8 | 152 | 100 | 60 | `#98643C` |
+| 62 | 12 | 208 | 164 | 132 | `#D0A484` |
+| 65 | 15 | 252 | 224 | 200 | `#FCE0C8` |
+
+**Group 4 — Orange (indices 66–81)**
+
+| Index | Level | R | G | B | Hex |
+| ----- | ----- | --- | --- | --- | ------- |
+| 66 | 0 | 40 | 4 | 0 | `#280400` |
+| 70 | 4 | 104 | 36 | 4 | `#682404` |
+| 74 | 8 | 168 | 84 | 28 | `#A8541C` |
+| 77 | 11 | 216 | 136 | 52 | `#D88834` |
+| 81 | 15 | 252 | 220 | 180 | `#FCDCB4` |
+
+**Group 5 — Blue (indices 82–97)**
+
+| Index | Level | R | G | B | Hex |
+| ----- | ----- | --- | --- | --- | ------- |
+| 82 | 0 | 0 | 0 | 24 | `#000018` |
+| 86 | 4 | 0 | 12 | 88 | `#000C58` |
+| 90 | 8 | 0 | 52 | 152 | `#003498` |
+| 94 | 12 | 44 | 112 | 184 | `#2C70B8` |
+| 97 | 15 | 92 | 164 | 212 | `#5CA4D4` |
+
+**Group 6 — Green (indices 98–113)**
+
+| Index | Level | R | G | B | Hex |
+| ----- | ----- | --- | --- | --- | ------- |
+| 98 | 0 | 0 | 24 | 0 | `#001800` |
+| 102 | 4 | 4 | 64 | 0 | `#044000` |
+| 106 | 8 | 20 | 108 | 0 | `#146C00` |
+| 110 | 12 | 48 | 140 | 60 | `#308C3C` |
+| 113 | 15 | 104 | 164 | 128 | `#68A480` |
+
+### Upper Palette (indices 114–225)
+
+The upper palette mirrors the same 7-group × 16-level structure, offset by 112.
+`upper[i] = lower[i - 112]` for groups 0–6. This duplicated range is used for
+tinting effects where the EffectColor transform needs separate upper/lower lookups.
+
 ### Semantic UI Colors
 
 These `effectcolor` values are used on text and overlays to tint sprites via the
-palette's color-lookup table.
+palette's color-lookup table. RGB values are from Palette 0.
 
-| Index | Semantic Name | Used For |
-| ----- | ---------------------- | ------------------------------------------------ |
-| 112 | Toggle Active | Agency toggles (selected/deselected via brightness) |
-| 114 | Hack Incomplete | Hacking progress lines, secret-carrier indicator |
-| 126 | Neutral Light | Object labels (ramp-color mode) |
-| 128 | Deploy Message | Deploy/spawn announcement text |
-| 129 | Info Tint | Map name, level, wins, losses, stats labels |
-| 140 | Caret | Text-input cursor color |
-| 146 | Health Damage | Damage-flash on health-only hits |
-| 150 | Minimap Tint | Minimap icon brightness |
-| 152 | Title Text | "zSilencer" title in lobby |
-| 153 | Red Alert | Neutron activated, game lost, connection lost |
-| 161 | Health Value | Health number on HUD |
-| 189 | Version Label | Version string in lobby |
-| 192 | Secret Dropped | Secret-dropped message |
-| 194 | Shield Damage | Damage-flash on shield-only hits |
-| 200 | User Info | User info text |
-| 202 | Warm / Orange | Credits display, shield value text |
-| 205 | Shield Stencil | Shield-damage visual overlay |
-| 208 | Standard Message | Default in-game announcement color |
-| 210 | Poison / Base Entry | Poison-damage flash, player-in-base indicator |
-| 224 | Highlight / Beacon | Win message, secret-beacon indicator, flare plume |
+| Index | Semantic Name | R | G | B | Hex | Used For |
+| ----- | ---------------------- | --- | --- | --- | ------- | ------------------------------------------------ |
+| 112 | Toggle Active | 84 | 156 | 104 | `#549C68` | Agency toggles (selected/deselected via brightness) |
+| 114 | Hack Incomplete | 0 | 0 | 0 | `#000000` | Hacking progress lines, secret-carrier indicator |
+| 123 | Loading Bar | 148 | 148 | 148 | `#949494` | Loading progress bar fill |
+| 126 | Neutral Light | 200 | 200 | 200 | `#C8C8C8` | Object labels (ramp-color mode) |
+| 128 | Deploy Message | 232 | 232 | 232 | `#E8E8E8` | Deploy/spawn announcement text |
+| 129 | Info Tint | 252 | 252 | 252 | `#FCFCFC` | Map name, level, wins, losses, stats labels |
+| 140 | Caret | 252 | 252 | 0 | `#FCFC00` | Text-input cursor — yellow |
+| 146 | Health Damage | 12 | 4 | 4 | `#0C0404` | Damage-flash on health-only hits |
+| 150 | Minimap Tint | 92 | 28 | 28 | `#5C1C1C` | Minimap icon brightness |
+| 152 | Title Text | 132 | 28 | 28 | `#841C1C` | "zSilencer" title in lobby — dark red |
+| 153 | Red Alert | 152 | 28 | 28 | `#981C1C` | Neutron activated, game lost, connection lost |
+| 161 | Health Value | 252 | 80 | 80 | `#FC5050` | Health number on HUD — bright red |
+| 189 | Version Label | 216 | 136 | 52 | `#D88834` | Version string in lobby — orange |
+| 192 | Secret Dropped | 252 | 196 | 128 | `#FCC480` | Secret-dropped message — light orange |
+| 194 | Shield Damage | 0 | 0 | 24 | `#000018` | Damage-flash on shield-only hits |
+| 200 | User Info | 0 | 28 | 120 | `#001C78` | User info text — dark blue |
+| 202 | Warm / Orange | 0 | 52 | 152 | `#003498` | Credits display, shield value text — blue |
+| 204 | Team Color Base | 16 | 80 | 168 | `#1050A8` | Base index for team color decoding |
+| 205 | Shield Stencil | 28 | 96 | 176 | `#1C60B0` | Shield-damage visual overlay |
+| 208 | Standard Message | 72 | 148 | 200 | `#4894C8` | Default in-game announcement — sky blue |
+| 210 | Poison / Base Entry | 0 | 24 | 0 | `#001800` | Poison-damage flash, player-in-base indicator |
+| 224 | Highlight / Beacon | 84 | 156 | 104 | `#549C68` | Win message, secret-beacon indicator — green |
 
-### Brightness Levels
+### Brightness Transform
 
-Brightness is an 8-bit value passed to `EffectBrightness()`:
+Brightness is an 8-bit value (0–255) passed to `EffectBrightness()`. The transform
+is a linear interpolation per channel (`palette.cpp:399`):
 
-| Value | Effect |
-| ----- | -------------------------------- |
-| 0 | Full black |
-| 32 | Very dark (inactive toggle) |
-| 64 | Dark (inactive text input) |
-| 96 | Dim (incomplete hack text) |
-| 128 | **Neutral** — no change |
-| 136 | Slightly bright (chat, HUD text) |
-| 144 | Bright (tech description) |
-| 160 | Brighter (info labels) |
-| 192 | Very bright |
-| 255 | Full white |
+```
+if brightness > 128:           // lighten toward white
+    percent   = (brightness - 127) / 128
+    output.ch = (input.ch * (1 - percent)) + (255 * percent)
+
+if brightness < 128:           // darken toward black
+    percent   = brightness / 128
+    output.ch = input.ch * percent
+
+if brightness == 128:          // no change (neutral)
+    output = input
+```
+
+**Common brightness values used in the UI:**
+
+| Value | Calculated Effect | Where Used |
+| ----- | -------------------------------- | --------------------------------------------- |
+| 0 | `ch * 0.0` → all black | — |
+| 8 | `ch * 0.0625` → near-black | Text shadow minimum floor |
+| 32 | `ch * 0.25` → very dark | Inactive/deselected toggle |
+| 64 | `ch * 0.5` → half-dark | Inactive text-input text; shadow offset |
+| 96 | `ch * 0.75` → dimmed | Incomplete hack-progress text |
+| 128 | No change (neutral) | Default for all text and sprites |
+| 136 | `ch*0.9375 + 255*0.0625` → slight boost | Chat text, HUD labels, button hover start |
+| 144 | `ch*0.875 + 255*0.125` → bright | Tech description text |
+| 160 | `ch*0.75 + 255*0.25` → brighter | Info labels, stat displays |
+| 192 | `ch*0.5 + 255*0.5` → very bright | Highly emphasized elements |
+| 255 | `ch*0.0 + 255*1.0` → all white | Full white |
+
+### Color Tint Transform
+
+`EffectColor()` (`palette.cpp:427`) performs a luminance-preserving tint:
+
+```
+luma_a = 0.30*a.r + 0.59*a.g + 0.11*a.b    // luma of source pixel
+luma_b = 0.30*b.r + 0.59*b.g + 0.11*b.b    // luma of tint color
+diff   = luma_a - luma_b
+output = clamp(tint + diff, 0, 255)          // per channel
+```
+
+The result is then mapped to the nearest palette index via Euclidean-distance matching.
+
+### Alpha Blend Transform
+
+`Alpha()` (`palette.cpp:442`) performs standard linear alpha blending:
+
+```
+alpha  = ((pixelIndex - 2) % 16) / 16.0     // derived from ramp position
+if alpha > 0.5: alpha = 1.0                  // binary threshold
+output.ch = (a.ch * alpha) + (b.ch * (1 - alpha))
+```
 
 ### Team Colors
 
 Encoded in a single byte: upper 4 bits = brightness, lower 4 bits = hue.
 Decoded via `TeamColorToIndex()` using the palette color + brightness lookups against
-a base index of 204.
+a base index of 204 (`#1050A8`, a mid-blue).
 
 ---
 
@@ -292,14 +411,86 @@ Rendered by `DrawMessageBackground()` using sprite bank **188** (9-slice panel):
 
 ## Layout & Spacing
 
-### Screen
+### Screen & Display Scaling
+
+The game renders everything to a fixed **640 × 480** internal surface (8-bit indexed
+color). This surface is then scaled to fill the window or display at presentation time.
+
+**Rendering pipeline:**
+
+1. All game and UI rendering draws to `screenbuffer` (a `Surface` of 640 × 480 × 8bpp)
+2. Each 8-bit palette index is expanded to the display's native pixel format using a
+   pre-built `streamingtexturepalette[256]` lookup (maps palette index → RGB/RGBA)
+3. The expanded pixels are written to an SDL streaming texture at 640 × 480
+4. `SDL_RenderCopy()` scales that texture to fill the window (preserving nothing —
+   the full window rect is used, so the aspect ratio stretches if the window is not 4:3)
+
+**Scale filter** (`config.cfg: scalefilter`):
+
+| Setting | SDL Hint | Effect |
+| ------- | ----------------------------- | ---------------------------------------------- |
+| `0` | `SDL_HINT_RENDER_SCALE_QUALITY = "nearest"` | Pixel-perfect / blocky — sharp edges at any size |
+| `1` (default) | `SDL_HINT_RENDER_SCALE_QUALITY = "linear"` | Bilinear filter — smoothed/blurred at large sizes |
+
+**Mouse input scaling** (`game.cpp:6155`):
+
+All mouse coordinates are converted from window space to the 640 × 480 logical space
+at the event handler level, before any game logic sees them:
+
+```cpp
+int w, h;
+SDL_GetWindowSize(window, &w, &h);
+logicalX = (float(event.button.x) / w) * 640;
+logicalY = (float(event.button.y) / h) * 480;
+```
+
+This means all hit-testing, button bounds, and UI coordinates operate entirely in
+640 × 480 logical pixels regardless of the actual window or display resolution.
+
+**Font / UI scaling implications:**
+
+- Fonts are bitmap sprites at fixed pixel sizes — they do **not** scale independently
+  of the world. A glyph that is 11 px tall in the 640 × 480 buffer stays 11 logical
+  px and is stretched along with everything else when presented to the window.
+- On a 1920 × 1080 display, each logical pixel becomes roughly 3 × 2.25 physical pixels.
+  With `scalefilter=0` (nearest), text appears blocky but sharp. With `scalefilter=1`
+  (linear), text appears slightly blurred.
+- On a 3840 × 2160 (4K) display at fullscreen, each logical pixel is ~6 × 4.5 physical
+  pixels. The bitmap fonts are visibly pixelated at this scale.
+- There is **no HiDPI/Retina awareness** — no `SDL_WINDOW_ALLOW_HIGHDPI` flag is set.
+  The window size is in screen coordinates, not physical pixels, so on macOS Retina
+  displays the game renders at the logical (point) resolution, not the backing-store
+  resolution.
+- There is **no aspect-ratio correction** — the 640 × 480 buffer stretches to fill the
+  entire window rect. Non-4:3 windows will distort the image.
+
+**Window modes:**
+
+| Mode | Flag | Behavior |
+| ---------- | ----------------------------------- | ------------------------------------------------ |
+| Windowed | `0` | Opens at 640 × 480; user can resize freely |
+| Fullscreen | `SDL_WINDOW_FULLSCREEN_DESKTOP` | Uses desktop resolution; 640×480 stretched to fit |
+| Toggle | `RAlt + Enter` at runtime | Switches between the above two modes |
+
+**Effective font sizes on common displays** (approximate, assuming fullscreen):
+
+| Display | Resolution | Logical 1 px ≈ | 11 px glyph ≈ | 19 px glyph ≈ |
+| ------------ | ---------- | --------------- | ------------- | ------------- |
+| SD / CRT | 640 × 480 | 1.0 px | 11 px | 19 px |
+| 720p | 1280 × 720 | 2 × 1.5 px | 22 × 17 px | 38 × 29 px |
+| 1080p | 1920 × 1080 | 3 × 2.25 px | 33 × 25 px | 57 × 43 px |
+| 1440p | 2560 × 1440 | 4 × 3 px | 44 × 33 px | 76 × 57 px |
+| 4K | 3840 × 2160 | 6 × 4.5 px | 66 × 50 px | 114 × 86 px |
+
+### Screen Coordinates
+
+All coordinates below are in the 640 × 480 logical pixel space.
 
 | Property | Value |
 | --------------- | --------- |
 | Internal buffer | 640 × 480 |
 | Color depth | 8-bit (indexed) |
 | Origin | Top-left (0, 0) |
-| Mouse scaling | `(event.x / window.w) * 640` |
 
 ### Lobby Screen Panels
 
@@ -380,14 +571,21 @@ Rendered by `DrawMessageBackground()` using sprite bank **188** (9-slice panel):
 
 ```
 State:       INACTIVE → ACTIVATING (0-4) → ACTIVE → DEACTIVATING (0-4) → INACTIVE
-Brightness:  128        128 + (i*2)         136      136 - (i*2)          128
-Sound:       —          "whoom.wav" @i=0    —        —                    —
+Brightness:  128        128,130,132,134,136  136     136,134,132,130,128  128
+Sound:       —          "whoom.wav" @i=0     —       —                    —
 ```
+
+Each frame increments brightness by 2: `effectbrightness = 128 + (state_i * 2)`.
+At brightness 128, RGB output is unchanged. At 136, output is
+`ch * 0.9375 + 255 * 0.0625` — a subtle lightening (roughly +16 to each channel
+for mid-tones).
 
 ### Text Shadow (DrawMessage)
 
-Announcement text draws twice: once at `(x+1, y+1)` with `brightness - 64` (min 8),
-then at `(x, y)` at full brightness. This produces a 1 px drop shadow.
+Announcement text draws twice: once at `(x+1, y+1)` as a shadow with
+`brightness = max(original_brightness - 64, 8)`, then at `(x, y)` at the original
+brightness. This produces a 1 px drop shadow. For text at the default brightness
+of 128, the shadow renders at brightness 64 (`ch * 0.5` — half-dark).
 
 ### Caret Blink
 
