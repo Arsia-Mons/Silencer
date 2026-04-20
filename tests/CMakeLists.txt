@@ -3,6 +3,8 @@
 # doctest v2.4.11 vendored verbatim from https://github.com/doctest/doctest
 set(TEST_SRC
     smoke_test.cpp
+    updater_sha256_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/updatersha256.cpp
 )
 
 add_executable(zsilencer_tests ${TEST_SRC})
