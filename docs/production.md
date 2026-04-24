@@ -231,19 +231,19 @@ real server. Don't use it for real releases — it bypasses CI.
 
 ## State and backups
 
-The only persistent data is a single file:
+### Primary store — lobby.json
+
+The authoritative player store is a single file:
 `/var/lib/zsilencer/lobby.json`. It holds user accounts (username +
 SHA-1-hashed password) and per-agency stats. No chat logs, no game
-history, nothing else.
+history, nothing else. All reads and writes go through the lobby's
+in-memory store, which is flushed here atomically on every change.
 
 That file lives on a separate EBS volume from the VM itself, so you
 can rebuild the VM (e.g. `terraform taint aws_instance.lobby &&
 terraform apply`) without losing account data.
 
-There's no automatic backup configured. The easiest way to add one
-is an AWS Data Lifecycle Manager policy against the data volume —
-free to set up, pennies per month for snapshots of an 8 GB disk.
-Restoring from a copy of `lobby.json` is just a file replace:
+Restoring from a copy of `lobby.json` is still a simple file replace:
 
 ```bash
 sudo systemctl stop zsilencer-lobby
@@ -251,6 +251,36 @@ sudo cp lobby-<date>.json /var/lib/zsilencer/lobby.json
 sudo chown zsilencer:zsilencer /var/lib/zsilencer/lobby.json
 sudo systemctl start zsilencer-lobby
 ```
+
+### MongoDB mirror
+
+MongoDB is a **read mirror** of `lobby.json`, not the primary store.
+`mongosync.go` asynchronously upserts every player mutation (register,
+ban, upgrade, delete) to the `players` collection. `SyncAll()` runs at
+lobby startup to bring the mirror up to date. This lets the admin
+dashboard query rich player data without touching `lobby.json` directly.
+Password hashes are never written to MongoDB.
+
+If the MongoDB container is unavailable, the lobby continues to serve
+clients normally — sync failures are logged and discarded.
+
+### MongoDB backups
+
+Automated database backups are managed through the admin dashboard at
+`/health`. No manual configuration is required beyond setting
+`GITHUB_TOKEN` and `GITHUB_BACKUP_REPO` in your `.env`.
+
+- **Auto-backup**: runs every 6 hours (configurable via `BACKUP_CRON`).
+  Keeps the last 10 local archives in the `backup-data` Docker volume.
+- **Manual backup**: click **BACKUP NOW** on the `/health` page; the
+  panel polls status and shows the result when done.
+- **GitHub backup**: each backup commits `zsilencer.archive.gz` to
+  `Arsia-Mons/silencer-mongo-backup`. Git history acts as version history —
+  browse or restore any past snapshot from `github.com/<repo>/commits`.
+  No GitHub Releases needed.
+
+The AWS Data Lifecycle Manager snapshot approach still works as a
+belt-and-suspenders backup for the EBS data volume itself.
 
 If you ever outgrow a hobby-scale player count, swap
 `server/store.go` to SQLite or Postgres before worrying about

@@ -35,6 +35,13 @@ by default. On macOS that requires `sudo`; use any unprivileged port
 | `-version` | `00023` | required client version string (empty = accept any) |
 | `-game-binary` | `../build/zsilencer` | path to the `zsilencer` binary to spawn per game |
 | `-public-addr` | `127.0.0.1` | host or IP clients should use to reach the dedicated servers |
+| `-player-auth-addr` | `:15171` | internal HTTP server address (Docker-internal, not publicly exposed) |
+
+### Environment variables
+
+| variable | meaning |
+|---|---|
+| `MONGO_URL` | MongoDB connection string for async player sync (e.g. `mongodb://mongo:27017/zsilencer`). Leave empty to disable MongoDB sync entirely. |
 
 ## How it works
 
@@ -49,12 +56,34 @@ by default. On macOS that requires `sudo`; use any unprivileged port
   the `LobbyGame.hostname` field returned to all clients).
 - If no heartbeat arrives within 30 s, the create request fails.
 - Accounts are auto-created on first login (password is SHA-1 hashed).
+- **Ban enforcement**: `Login()` returns `(*User, bool, bool)` — the third bool
+  indicates a banned account. Banned users receive `"Account suspended: <name>"`
+  rather than `"Incorrect password"`. The `User` struct carries a `Banned bool` field.
+- **Case-insensitive names**: `ByName` map keys are always `strings.ToLower(name)`;
+  the display name (`User.Name`) preserves the original case. `NewStore()` deduplicates
+  mixed-case keys on first load for backwards compatibility.
+- **Internal HTTP server** on `:15171` (Docker-internal only, never exposed publicly):
+  - `POST /player-auth` — validates game credentials (SHA-1 protocol, same as in-game login)
+  - `POST /ban` — sets or clears the ban flag on a player account in real time
+  - `POST /delete-player` — removes a player from the in-memory store and persists the change
+- **MongoDB async sync** (`mongosync.go`): `MongoSync` upserts player records to the
+  MongoDB `players` collection on every store mutation (register, ban, upgrade, delete).
+  All upserts are fire-and-forget goroutines so they never block the lobby. Password
+  hashes are **never** synced. `SyncAll()` runs on startup to mirror the full
+  `lobby.json` to MongoDB. Set `MONGO_URL` to enable; leave it empty to disable.
 
 ## Storage
 
 Users and per-agency stats live in a flat JSON file (`lobby.json` by
-default), written atomically on each change. For low-traffic servers
-this is fine; swap in SQLite or Postgres later if you need it.
+default), written atomically on each change. This file is the **primary
+source of truth** — all reads and writes go through the in-memory store,
+which is persisted here.
+
+When `MONGO_URL` is set, `mongosync.go` maintains a **MongoDB mirror**:
+every mutation (register, ban, upgrade, delete) is asynchronously upserted
+to the `players` collection so the admin dashboard always has up-to-date
+data. The sync is strictly additive — `lobby.json` always wins. Password
+hashes are never written to MongoDB.
 
 ## Deployment notes
 

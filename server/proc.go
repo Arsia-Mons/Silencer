@@ -14,16 +14,21 @@ type procManager struct {
 	lobbyHost string
 	lobbyPort int
 
+	gamePortBase  int
+	gamePortCount int
+
 	mu    sync.Mutex
 	procs map[uint32]*exec.Cmd
 }
 
-func newProcManager(binary, lobbyHost string, lobbyPort int) *procManager {
+func newProcManager(binary, lobbyHost string, lobbyPort, gamePortBase, gamePortCount int) *procManager {
 	return &procManager{
-		binary:    binary,
-		lobbyHost: lobbyHost,
-		lobbyPort: lobbyPort,
-		procs:     map[uint32]*exec.Cmd{},
+		binary:        binary,
+		lobbyHost:     lobbyHost,
+		lobbyPort:     lobbyPort,
+		gamePortBase:  gamePortBase,
+		gamePortCount: gamePortCount,
+		procs:         map[uint32]*exec.Cmd{},
 	}
 }
 
@@ -31,13 +36,18 @@ func (p *procManager) Start(gameID, accountID uint32) error {
 	if p.binary == "" {
 		return errors.New("-game-binary not configured")
 	}
-	cmd := exec.Command(p.binary,
+	args := []string{
 		"-s",
 		p.lobbyHost,
 		strconv.Itoa(p.lobbyPort),
 		strconv.FormatUint(uint64(gameID), 10),
 		strconv.FormatUint(uint64(accountID), 10),
-	)
+	}
+	if p.gamePortBase > 0 {
+		gamePort := p.gamePortBase + int(gameID)%p.gamePortCount
+		args = append(args, strconv.Itoa(gamePort))
+	}
+	cmd := exec.Command(p.binary, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {

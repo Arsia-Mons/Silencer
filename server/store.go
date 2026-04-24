@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -28,6 +29,7 @@ type User struct {
 	Name      string    `json:"name"`
 	PassHash  string    `json:"pw"` // hex of sha1
 	Agency    [5]Agency `json:"a"`
+	Banned    bool      `json:"banned,omitempty"`
 }
 
 type Store struct {
@@ -37,6 +39,7 @@ type Store struct {
 	ByName  map[string]*User `json:"users"`
 	dirty   bool
 	saveErr error
+	mongo   *MongoSync
 }
 
 func NewStore(path string) (*Store, error) {
@@ -61,7 +64,28 @@ func NewStore(path string) (*Store, error) {
 	if s.NextID == 0 {
 		s.NextID = 1
 	}
-	return s, nil
+	// Migrate any mixed-case keys to lowercase (one-time fix for existing data)
+	for key, u := range s.ByName {
+		lower := strings.ToLower(key)
+		if lower != key {
+			// Duplicate: lowercase key already exists — keep higher accountId (newer)
+			if existing, ok := s.ByName[lower]; ok {
+				if u.AccountID > existing.AccountID {
+					s.ByName[lower] = u
+				}
+			} else {
+				s.ByName[lower] = u
+			}
+			delete(s.ByName, key)
+		}
+	}
+	return s, s.save() // persist migrated keys
+}
+
+// SetMongo attaches a MongoSync and triggers a full startup sync.
+func (s *Store) SetMongo(m *MongoSync) {
+	s.mongo = m
+	s.mongo.SyncAll(s.ByName)
 }
 
 func (s *Store) save() error {
@@ -79,14 +103,27 @@ func (s *Store) save() error {
 	return os.Rename(tmp, s.path)
 }
 
-// Login returns the user, creating it on first auth.
-// Returns (user, true) on success, (nil, false) on password mismatch.
-func (s *Store) Login(name string, sha1sum []byte) (*User, bool) {
+// Authenticate validates an existing player's credentials.
+// Unlike Login(), it never creates a new account — returns nil, false if not found.
+func (s *Store) Authenticate(name string, sha1sum []byte) (*User, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	hash := hex.EncodeToString(sha1sum)
-	u, ok := s.ByName[name]
-	if !ok {
+	u, ok := s.ByName[strings.ToLower(name)]
+	if !ok || u.PassHash != hash || u.Banned {
+		return nil, false
+	}
+	return u, true
+}
+
+
+func (s *Store) Login(name string, sha1sum []byte) (user *User, ok bool, banned bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key  := strings.ToLower(name)
+	hash := hex.EncodeToString(sha1sum)
+	u, exists := s.ByName[key]
+	if !exists {
 		u = &User{
 			AccountID: s.NextID,
 			Name:      name,
@@ -95,15 +132,19 @@ func (s *Store) Login(name string, sha1sum []byte) (*User, bool) {
 		for i := range u.Agency {
 			u.Agency[i] = defaultAgency()
 		}
-		s.ByName[name] = u
+		s.ByName[key] = u
 		s.NextID++
 		_ = s.save()
-		return u, true
+		s.mongo.SyncPlayer(u)
+		return u, true, false
 	}
 	if u.PassHash != hash {
-		return nil, false
+		return nil, false, false
 	}
-	return u, true
+	if u.Banned {
+		return nil, false, true
+	}
+	return u, true, false
 }
 
 func (s *Store) ByAccountID(id uint32) *User {
@@ -117,11 +158,13 @@ func (s *Store) ByAccountID(id uint32) *User {
 	return nil
 }
 
-func (s *Store) UpdateStats(accountID uint32, agencyIdx uint8, won bool, xpGained uint32) {
+// UpdateStats records a match result and XP gain for one agency slot.
+// Returns the updated Agency and true if the player was found.
+func (s *Store) UpdateStats(accountID uint32, agencyIdx uint8, won bool, xpGained uint32) (Agency, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if agencyIdx >= 5 {
-		return
+		return Agency{}, false
 	}
 	for _, u := range s.ByName {
 		if u.AccountID != accountID {
@@ -145,15 +188,19 @@ func (s *Store) UpdateStats(accountID uint32, agencyIdx uint8, won bool, xpGaine
 		}
 		a.XPToNextLevel = uint16(x)
 		_ = s.save()
-		return
+		s.mongo.SyncPlayer(u)
+		return *a, true
 	}
+	return Agency{}, false
 }
 
-func (s *Store) UpgradeStat(accountID uint32, agencyIdx uint8, stat uint8) bool {
+// UpgradeStat increments a single stat for one agency slot.
+// Returns the updated Agency and true if the upgrade was applied.
+func (s *Store) UpgradeStat(accountID uint32, agencyIdx uint8, stat uint8) (Agency, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if agencyIdx >= 5 {
-		return false
+		return Agency{}, false
 	}
 	for _, u := range s.ByName {
 		if u.AccountID != accountID {
@@ -197,8 +244,42 @@ func (s *Store) UpgradeStat(accountID uint32, agencyIdx uint8, stat uint8) bool 
 		}
 		if ok {
 			_ = s.save()
+			s.mongo.SyncPlayer(u)
+			return *a, true
 		}
-		return ok
+		return *a, false
+	}
+	return Agency{}, false
+}
+
+// SetBan sets the banned flag for a player by accountId.
+// Returns false if the player was not found.
+func (s *Store) SetBan(accountID uint32, banned bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, u := range s.ByName {
+		if u.AccountID == accountID {
+			u.Banned = banned
+			_ = s.save()
+			s.mongo.SyncPlayer(u)
+			return true
+		}
+	}
+	return false
+}
+
+// DeletePlayer removes a player from the store by accountId.
+// Returns false if the player was not found.
+func (s *Store) DeletePlayer(accountID uint32) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for key, u := range s.ByName {
+		if u.AccountID == accountID {
+			delete(s.ByName, key)
+			_ = s.save()
+			s.mongo.DeletePlayer(accountID)
+			return true
+		}
 	}
 	return false
 }

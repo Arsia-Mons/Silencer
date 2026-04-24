@@ -19,6 +19,10 @@ func main() {
 	updateManifestPath := flag.String("update-manifest", "update.json", "path to update manifest JSON; missing = no auto-update hints")
 	gameBinary := flag.String("game-binary", "../build/zsilencer", "path to the zsilencer binary (spawned per created game)")
 	publicAddr := flag.String("public-addr", "127.0.0.1", "host or IP clients (and dedicated servers) should use to reach this lobby")
+	gamePortBase := flag.Int("game-port-base", 0, "base UDP port for dedicated servers (0 = OS-assigned random). Game N uses base+(gameID%game-port-count)")
+	gamePortCount := flag.Int("game-port-count", 10, "number of ports in the dedicated-server range")
+	rabbitmqURL := flag.String("rabbitmq-url", "", "AMQP URL for RabbitMQ event publishing (empty = disabled)")
+	playerAuthAddr := flag.String("player-auth-addr", ":15171", "internal HTTP address for player credential validation (admin-api use only)")
 	flag.Parse()
 
 	var manifest *UpdateManifest
@@ -47,12 +51,27 @@ func main() {
 		log.Fatalf("store: %v", err)
 	}
 
+	mongoURI := os.Getenv("MONGO_URL")
+	mongoSync := NewMongoSync(mongoURI, "zsilencer")
+	store.SetMongo(mongoSync)
+
 	port, err := parsePort(*addr)
 	if err != nil {
 		log.Fatalf("parse addr: %v", err)
 	}
-	proc := newProcManager(*gameBinary, *publicAddr, port)
-	hub := NewHub(store, motd, *publicAddr, proc)
+
+	var events *EventPublisher
+	if url := *rabbitmqURL; url == "" {
+		url = os.Getenv("RABBITMQ_URL")
+		if url != "" {
+			events = NewEventPublisher(url)
+		}
+	} else {
+		events = NewEventPublisher(url)
+	}
+
+	proc := newProcManager(*gameBinary, *publicAddr, port, *gamePortBase, *gamePortCount)
+	hub := NewHub(store, motd, *publicAddr, proc, events)
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", *addr)
 	if err != nil {
@@ -73,6 +92,8 @@ func main() {
 		log.Fatalf("listen udp: %v", err)
 	}
 	defer udpLn.Close()
+
+	go StartPlayerAuthServer(*playerAuthAddr, store)
 
 	go serveUDP(udpLn, hub)
 
