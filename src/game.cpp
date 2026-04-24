@@ -145,8 +145,10 @@ bool Game::Load(char * cmdline){
 				char * lobbyport = strtok(NULL, " ");
 				char * gameid = strtok(NULL, " ");
 				char * accountid = strtok(NULL, " ");
+				char * gameport = strtok(NULL, " "); // optional: explicit UDP bind port (for Docker port mapping)
 				if(gameid && accountid && lobbyaddress && lobbyport){
-					world.Listen();
+					unsigned short bindport = (gameport && atoi(gameport) > 0) ? (unsigned short)atoi(gameport) : 0;
+					world.Listen(bindport);
 					world.lobby.Connect(lobbyaddress, atoi(lobbyport));
 					do{
 						world.lobby.DoNetwork();
