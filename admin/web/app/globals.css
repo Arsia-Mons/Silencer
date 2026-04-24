@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #050a05;
+  background-image: url('/menu-bg.png');
+  background-size: cover;
+  background-position: center right;
+  background-attachment: fixed;
+  color: #d1fad7;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Dark overlay so text stays readable over the planet */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 6, 3, 0.72);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* CRT scanline effect on top of everything */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 163, 40, 0.018) 2px,
+    rgba(0, 163, 40, 0.018) 4px
+  );
+  pointer-events: none;
+  z-index: 10000;
+}
+
+/* Ensure all page content sits above the dark overlay */
+#__next > * {
+  position: relative;
+  z-index: 1;
+}
+
+::-webkit-scrollbar        { width: 6px; }
+::-webkit-scrollbar-track  { background: #0a120a; }
+::-webkit-scrollbar-thumb  { background: #005b1c; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #00a328; }

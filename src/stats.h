@@ -42,6 +42,9 @@ public:
 	Uint32 virusesused;
 	Uint32 fileshacked;
 	Uint32 filesreturned;
+	Uint32 creditsmade;
+	Uint32 creditsspent;
+	Uint32 healsdone;
 };
 
 #endif
