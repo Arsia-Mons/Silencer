@@ -79,8 +79,20 @@ func (s *Store) save() error {
 	return os.Rename(tmp, s.path)
 }
 
-// Login returns the user, creating it on first auth.
-// Returns (user, true) on success, (nil, false) on password mismatch.
+// Authenticate validates an existing player's credentials.
+// Unlike Login(), it never creates a new account — returns nil, false if not found.
+func (s *Store) Authenticate(name string, sha1sum []byte) (*User, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	hash := hex.EncodeToString(sha1sum)
+	u, ok := s.ByName[name]
+	if !ok || u.PassHash != hash {
+		return nil, false
+	}
+	return u, true
+}
+
+
 func (s *Store) Login(name string, sha1sum []byte) (*User, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -117,11 +129,13 @@ func (s *Store) ByAccountID(id uint32) *User {
 	return nil
 }
 
-func (s *Store) UpdateStats(accountID uint32, agencyIdx uint8, won bool, xpGained uint32) {
+// UpdateStats records a match result and XP gain for one agency slot.
+// Returns the updated Agency and true if the player was found.
+func (s *Store) UpdateStats(accountID uint32, agencyIdx uint8, won bool, xpGained uint32) (Agency, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if agencyIdx >= 5 {
-		return
+		return Agency{}, false
 	}
 	for _, u := range s.ByName {
 		if u.AccountID != accountID {
@@ -145,15 +159,18 @@ func (s *Store) UpdateStats(accountID uint32, agencyIdx uint8, won bool, xpGaine
 		}
 		a.XPToNextLevel = uint16(x)
 		_ = s.save()
-		return
+		return *a, true
 	}
+	return Agency{}, false
 }
 
-func (s *Store) UpgradeStat(accountID uint32, agencyIdx uint8, stat uint8) bool {
+// UpgradeStat increments a single stat for one agency slot.
+// Returns the updated Agency and true if the upgrade was applied.
+func (s *Store) UpgradeStat(accountID uint32, agencyIdx uint8, stat uint8) (Agency, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if agencyIdx >= 5 {
-		return false
+		return Agency{}, false
 	}
 	for _, u := range s.ByName {
 		if u.AccountID != accountID {
@@ -197,10 +214,11 @@ func (s *Store) UpgradeStat(accountID uint32, agencyIdx uint8, stat uint8) bool 
 		}
 		if ok {
 			_ = s.save()
+			return *a, true
 		}
-		return ok
+		return *a, false
 	}
-	return false
+	return Agency{}, false
 }
 
 // wireUser converts a store User to the wire-format User for encoding.

@@ -1155,6 +1155,19 @@ void World::HandleDisconnect(Uint8 peerid){
 		}
 	}else
 	if(mode == AUTHORITY){
+		// If a player disconnects mid-game, record their partial stats immediately
+		// so their progress isn't lost (won=0 since they left before the game ended).
+		if(gameplaystate == INGAME && peerlist[peerid]->accountid != 0){
+			Peer * leavingPeer = peerlist[peerid];
+			User * user = lobby.GetUserInfo(leavingPeer->accountid);
+			Team * team = GetPeerTeam(peerid);
+			if(user && team){
+				user->statscopy = leavingPeer->stats;
+				user->statsagency = team->agency;
+				user->teamnumber = team->number;
+				lobby.RegisterStats(*user, 0, gameinfo.id);
+			}
+		}
 		delete peerlist[peerid];
 		peerlist[peerid] = 0;
 		peercount--;

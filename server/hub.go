@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"sync"
 	"time"
 )
@@ -11,6 +12,7 @@ type Hub struct {
 	motd       string
 	publicAddr string
 	proc       *procManager
+	events     *EventPublisher // nil if RabbitMQ not configured
 
 	mu      sync.Mutex
 	nextGID uint32
@@ -27,12 +29,13 @@ type pendingGame struct {
 
 const pendingTimeout = 30 * time.Second
 
-func NewHub(store *Store, motd, publicAddr string, proc *procManager) *Hub {
+func NewHub(store *Store, motd, publicAddr string, proc *procManager, events *EventPublisher) *Hub {
 	return &Hub{
 		store:      store,
 		motd:       motd,
 		publicAddr: publicAddr,
 		proc:       proc,
+		events:     events,
 		nextGID:    1,
 		games:      map[uint32]*LobbyGame{},
 		pending:    map[uint32]*pendingGame{},
@@ -78,6 +81,20 @@ func (h *Hub) Join(c *Client) {
 		p.sendPresence(0, selfSnap.acct, selfSnap.gameID, selfSnap.status, selfSnap.name)
 	}
 	c.sendPresence(0, selfSnap.acct, selfSnap.gameID, selfSnap.status, selfSnap.name)
+
+	if h.events != nil && c.accountID != 0 {
+		ip, _, _ := net.SplitHostPort(c.conn.RemoteAddr().String())
+		var agencies [5]AgencyEvent
+		if c.user != nil {
+			for i, a := range c.user.Agency {
+				agencies[i] = agencyToEvent(a)
+			}
+		}
+		h.events.Publish("player.login", playerLoginEvent{
+			AccountID: c.accountID, Name: c.displayName(),
+			IP: ip, Agencies: agencies, Timestamp: time.Now().UnixMilli(),
+		})
+	}
 }
 
 func (h *Hub) Leave(c *Client) {
@@ -127,6 +144,16 @@ func (h *Hub) Leave(c *Client) {
 			other.sendPresence(1, leavingAcct, 0, 0, "")
 		}
 	}
+
+	if h.events != nil && leavingAcct != 0 {
+		now := time.Now().UnixMilli()
+		for _, id := range append(dropReady, dropPending...) {
+			h.events.Publish("game.ended", gameEndedEvent{GameID: id, Timestamp: now})
+		}
+		h.events.Publish("player.logout", playerLogoutEvent{
+			AccountID: leavingAcct, Name: c.displayName(), Timestamp: now,
+		})
+	}
 }
 
 // SetClientGame updates a client's gameID+status and announces the change.
@@ -165,12 +192,47 @@ func (h *Hub) SetClientGame(c *Client, gameID uint32, status uint8) {
 	for _, p := range peers {
 		p.sendPresence(0, acct, gameID, status, name)
 	}
+
+	if h.events != nil {
+		h.events.Publish("player.presence", playerPresenceEvent{
+			AccountID: acct, Name: name, GameID: gameID, GameStatus: status,
+			Online: true, Timestamp: time.Now().UnixMilli(),
+		})
+	}
 }
 
 // RequestCreateGame spawns a dedicated server and defers the reply to the
 // owner until the first UDP heartbeat lands.
 func (h *Hub) RequestCreateGame(owner *Client, g *LobbyGame) {
 	h.mu.Lock()
+
+	// Drop any existing game already owned by this player
+	var dropExisting []uint32
+	for id, eg := range h.games {
+		if owner.accountID != 0 && eg.AccountID == owner.accountID {
+			dropExisting = append(dropExisting, id)
+		}
+	}
+	for _, id := range dropExisting {
+		delete(h.games, id)
+	}
+	var dropPendingExisting []uint32
+	for id, pg := range h.pending {
+		if pg.owner == owner {
+			dropPendingExisting = append(dropPendingExisting, id)
+			if pg.timer != nil {
+				pg.timer.Stop()
+			}
+		}
+	}
+	for _, id := range dropPendingExisting {
+		delete(h.pending, id)
+	}
+	others := make([]*Client, 0, len(h.clients))
+	for other := range h.clients {
+		others = append(others, other)
+	}
+
 	gid := h.nextGID
 	h.nextGID++
 	g.ID = gid
@@ -178,10 +240,31 @@ func (h *Hub) RequestCreateGame(owner *Client, g *LobbyGame) {
 	h.pending[gid] = pg
 	h.mu.Unlock()
 
+	// Notify other clients of removed games and stop their processes
+	allDrop := append(dropExisting, dropPendingExisting...)
+	for _, id := range allDrop {
+		h.proc.Stop(id)
+		for _, other := range others {
+			other.sendDelGame(id)
+		}
+	}
+	if h.events != nil && len(allDrop) > 0 {
+		now := time.Now().UnixMilli()
+		for _, id := range allDrop {
+			h.events.Publish("game.ended", gameEndedEvent{GameID: id, Timestamp: now})
+		}
+	}
+
 	if err := h.proc.Start(gid, owner.accountID); err != nil {
 		log.Printf("[hub] spawn failed for game %d: %v", gid, err)
 		h.failPending(gid, "Could not spawn dedicated server: "+err.Error())
 		return
+	}
+	if h.events != nil {
+		h.events.Publish("game.created", gameCreatedEvent{
+			GameID: gid, AccountID: owner.accountID, Name: g.Name, MapName: g.MapName,
+			Timestamp: time.Now().UnixMilli(),
+		})
 	}
 	pg.timer = time.AfterFunc(pendingTimeout, func() {
 		h.failPending(gid, "Dedicated server did not start in time")
@@ -238,6 +321,13 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 			c.sendNewGame(1, pg.game)
 		}
 		log.Printf("[hub] game %d ready at %s:%d", gameID, host, port)
+		if h.events != nil {
+			h.events.Publish("game.ready", gameReadyEvent{
+				GameID: gameID, AccountID: pg.game.AccountID, Name: pg.game.Name,
+				MapName: pg.game.MapName, Hostname: host, Port: port,
+				Timestamp: time.Now().UnixMilli(),
+			})
+		}
 		return
 	}
 

@@ -25,3 +25,6 @@ terraform/**/*.tfvars
 !terraform/**/*.tfvars.example
 terraform/**/backend.hcl
 !terraform/**/backend.hcl.example
+node_modules/
+.next/
+*.env.local

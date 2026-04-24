@@ -1,0 +1,61 @@
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import { io } from 'socket.io-client';
+
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:24080';
+
+let singleton = null;
+
+export function getSocket() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('zs_token') : null;
+
+  // If socket exists but was created with a different (or missing) token, destroy and recreate
+  if (singleton) {
+    const currentToken = singleton.auth?.token;
+    if (currentToken !== token) {
+      singleton.disconnect();
+      singleton = null;
+    } else {
+      return singleton;
+    }
+  }
+
+  singleton = io(WS_URL, {
+    auth: { token },
+    transports: ['websocket'],
+    autoConnect: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 2000,
+  });
+  return singleton;
+}
+
+export function useSocket(events) {
+  const [connected, setConnected] = useState(false);
+  const cbRef = useRef(events);
+  cbRef.current = events;
+
+  useEffect(() => {
+    const s = getSocket();
+    const onConnect    = () => { setConnected(true); s.emit('getSnapshot'); };
+    const onDisconnect = () => setConnected(false);
+    s.on('connect', onConnect);
+    s.on('disconnect', onDisconnect);
+
+    // Already connected — request snapshot immediately
+    if (s.connected) {
+      setConnected(true);
+      s.emit('getSnapshot');
+    }
+
+    const handlers = Object.entries(cbRef.current || {});
+    handlers.forEach(([ev, fn]) => s.on(ev, fn));
+    return () => {
+      s.off('connect', onConnect);
+      s.off('disconnect', onDisconnect);
+      handlers.forEach(([ev, fn]) => s.off(ev, fn));
+    };
+  }, []);
+
+  return connected;
+}
