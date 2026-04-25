@@ -1,7 +1,7 @@
-# zSILENCER Game Specifications
+# SILENCER Game Specifications
 
 Implementation-agnostic specifications of the rules and mechanics that define
-zSILENCER. These documents capture the game design in a way that is independent
+SILENCER. These documents capture the game design in a way that is independent
 of any particular framework, engine, or programming language. They serve two
 purposes:
 
