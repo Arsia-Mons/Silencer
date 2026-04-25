@@ -70,6 +70,120 @@ admin-web are stateless apps with frequent deploys. Co-locating
 them on one host keeps cost low (~$5/mo extra); separating them
 from the lobby keeps the gameplay path's blast radius small.
 
+## Resource Profile
+
+Activity tiers are concrete game-state rather than abstract RPS —
+Silencer is a niche multiplayer 2D action game and "scale" should
+be calibrated to that, not generic web-app heuristics:
+
+| Tier | Concurrent players | Active games | Lobby events/min | Note |
+| ---- | ------------------ | ------------ | ---------------- | ---- |
+| Idle   | 0       | 0     | 0     | box up, nothing happening |
+| Light  | 5–10    | 1–2   | ~50   | typical evening |
+| Active | 30–50   | 5–10  | ~500  | busy weekend |
+| Peak   | 100–200 | 20+   | ~2000 | hobby ceiling — zSILENCER's all-time-high range |
+
+Numbers below mix grounded baselines (distro defaults, daemon
+idle RSS, MongoDB cache config) and estimates for application
+memory and per-tier growth. Where labeled "estimated", the
+number deserves re-checking against live traffic.
+
+### Lobby box
+
+Processes:
+
+| Process | Role |
+| ------- | ---- |
+| `silencer-lobby` (Go) | TCP lobby, UDP heartbeats, player-auth HTTP on `:15171` (`server/main.go`) |
+| `tailscaled` | Admin-plane SSH only |
+| OS + systemd + sshd + journald | base |
+
+RAM profile:
+
+| Process        | Idle    | Light   | Active  | Peak    |
+| -------------- | ------- | ------- | ------- | ------- |
+| silencer-lobby | 15MB    | 25MB    | 50MB    | 120MB   |
+| tailscaled     | 30MB    | 30MB    | 30MB    | 40MB    |
+| OS + base      | 150MB   | 150MB   | 150MB   | 150MB   |
+| **Total**      | **~195MB** | **~205MB** | **~230MB** | **~310MB** |
+
+CPU peaks well under 10% of 1 vCPU. Disk: ~3GB OS root +
+`lobby.json` (~1KB per player) + uploaded maps directory.
+
+**Sizing:** t4g.nano (512MB) is sufficient at peak. The current
+instance is over-provisioned relative to the lobby's actual
+footprint; no action needed.
+
+### Admin/data box
+
+Processes:
+
+| Process | Role |
+| ------- | ---- |
+| `mongod` | Player/Session/MatchStat/Event collections (apt install, `/etc/mongod.conf`) |
+| `rabbitmq-server` | `zsilencer.events` topic exchange + `admin-dashboard` durable queue (Erlang BEAM) |
+| `silencer-admin-api` (container) | Rabbit consumer → Mongo upserts → WS push to dashboard (`admin/api/`) |
+| `silencer-admin-web` (container) | Next.js dashboard (`admin/web/`) |
+| `dockerd` + `containerd` | Container runtime |
+| `tailscaled` | Admin-plane SSH only |
+| OS + systemd + sshd + journald | base |
+
+RAM profile:
+
+| Process                            | Idle   | Light   | Active  | Peak    | Source |
+| ---------------------------------- | ------ | ------- | ------- | ------- | ------ |
+| OS + base                          | 150MB  | 150MB   | 150MB   | 150MB   | grounded |
+| tailscaled                         | 30MB   | 30MB    | 30MB    | 40MB    | grounded |
+| dockerd + containerd               | 100MB  | 100MB   | 100MB   | 110MB   | grounded |
+| mongod (with `cacheSizeGB: 0.25`)  | 250MB  | 400MB   | 600MB   | 800MB   | cache floor grounded; growth estimated |
+| rabbitmq-server                    | 200MB  | 230MB   | 300MB   | 400MB   | BEAM idle ~80–130MB grounded; rest estimated |
+| admin-api container                | 60MB   | 100MB   | 150MB   | 220MB   | estimated |
+| admin-web container                | 100MB  | 150MB   | 200MB   | 300MB   | estimated |
+| **Total**                          | **~890MB** | **~1.16GB** | **~1.53GB** | **~2.02GB** | |
+
+CPU is not the binding constraint at any tier on 2 vCPU.
+Estimates: <2% idle, ~3–5% light, ~10–20% active, ~30–50% peak.
+Hot paths under load are `admin-api` (per-event upserts + WS
+fanout) and `mongod` index touches.
+
+Disk (per the plan's three EBS volumes):
+
+| Volume | Initial | +1 month at Active | +1 year at Active | Recommended size |
+| ------ | ------- | ------------------ | ----------------- | ---------------- |
+| Root (OS + docker engine + container images + binaries + logs) | ~5.5GB | ~6.5GB | ~10GB | **16GB gp3** |
+| `/var/lib/mongodb` | ~100MB | ~500MB | ~3–5GB | **10GB gp3** |
+| `/var/lib/rabbitmq` | ~50MB | ~80MB | ~150MB | **5GB gp3** |
+
+Total ~31GB gp3 ≈ $2.50/month storage. Dominant growth driver
+is the `Event` collection (audit log of every Rabbit message);
+a TTL index on `Event.ts` caps it without code changes.
+
+### Sizing decisions
+
+- **t4g.micro (1GB)** is a non-starter for the admin/data box —
+  Idle alone exceeds it.
+- **t4g.small (2GB, ~$12/mo)** survives Idle/Light/Active and
+  **OOMs at Peak** (~2.0GB usage on ~1.85GB usable after kernel
+  reservations). Acceptable only if "100+ concurrent players"
+  is treated as an event that triggers a manual vertical
+  scale-up.
+- **t4g.medium (4GB, ~$24/mo)** is the conservative right-size:
+  ~50% headroom at peak, room for the Event collection to grow,
+  room for log spikes. **Recommended default for Phase 1.**
+
+Future re-sizing is cheap: stop the instance, change the type
+in Terraform, `apply`. EBS volumes for Mongo and Rabbit detach
+and reattach untouched (per Data Persistence).
+
+### Confidence level and follow-up
+
+Application-memory numbers (admin-api, admin-web) are estimates;
+the rest are grounded in distro/daemon defaults. Cheapest way to
+sharpen them is to run `docker stats` against the existing
+`docker-compose.yml` setup for an evening — same process set,
+real workload. Worth doing before Phase 1 lands so the
+instance-type choice is data-backed rather than estimated.
+
 ## Deployment Model Per Component
 
 | Component   | Artifact                  | Deploy verb                                    | Trigger                        |
@@ -178,13 +292,16 @@ with the deploy verbs as they land.
 
 ### Phase 1 — Provision the admin/data box
 
-Terraform delta only. New EC2 instance in the lobby's VPC and AZ,
-two EBS volumes, a security group with ingress rules sourced from
-the lobby SG (27017/tcp, 5672/tcp), the private Route 53 hosted
-zone with A records for both boxes, Tailscale enrollment for
-GitHub Actions SSH access, and cloud-init that installs Mongo +
-RabbitMQ bound to the private interface with auth enabled. GitHub
-Actions does not yet deploy app workloads to this box.
+Terraform delta only. New EC2 instance in the lobby's VPC and AZ
+(default `t4g.medium` per Resource Profile), two EBS volumes
+sized per Resource Profile (10GB Mongo, 5GB Rabbit, 16GB root),
+a security group with ingress rules sourced from the lobby SG
+(27017/tcp, 5672/tcp), the private Route 53 hosted zone with A
+records for both boxes, Tailscale enrollment for GitHub Actions
+SSH access, and cloud-init that installs Mongo + RabbitMQ bound
+to the private interface with auth enabled (Mongo configured
+with `cacheSizeGB: 0.25` per Resource Profile). GitHub Actions
+does not yet deploy app workloads to this box.
 
 Includes an `infra/terraform/CLAUDE.md` update describing the new
 admin/data box module, the EBS-volume-per-stateful-service
