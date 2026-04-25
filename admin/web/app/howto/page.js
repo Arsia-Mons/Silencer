@@ -49,6 +49,16 @@ function Note({ children }) {
   );
 }
 
+function ScreenShot({ src, alt, className = '' }) {
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={`border border-game-border/40 rounded bg-black ${className}`}
+    />
+  );
+}
+
 function ItemRow({ name, cost, desc, agency }) {
   return (
     <tr className="border-b border-game-border/30 hover:bg-game-bgHover">
@@ -59,9 +69,12 @@ function ItemRow({ name, cost, desc, agency }) {
   );
 }
 
-function AgencyCard({ name, color, bonus }) {
+function AgencyCard({ name, color, bonus, img }) {
   return (
     <div className={`border rounded p-3 ${color}`}>
+      {img && (
+        <img src={img} alt={name} className="h-8 mb-2 border border-game-border/30 rounded bg-black" />
+      )}
       <div className="font-mono text-sm font-bold mb-1">{name}</div>
       <div className="text-xs text-game-textDim leading-relaxed">{bonus}</div>
     </div>
@@ -155,22 +168,71 @@ export default function HowToPage() {
 
           <Section id="hud" icon="◧" title="The HUD">
             <P>The HUD wraps around the play area. Key elements, clockwise:</P>
-            <div className="space-y-2 mt-2">
+            <a href="/silencer/hud.jpg" target="_blank" rel="noopener noreferrer" className="block mt-2 mb-4">
+              <ScreenShot src="/silencer/hud.jpg" alt="Full HUD overview" className="max-w-sm w-full opacity-90 hover:opacity-100 transition-opacity" />
+              <span className="text-game-muted text-xs mt-1 block">↑ Full screen overview (click to enlarge)</span>
+            </a>
+            <div className="space-y-4 mt-2">
               {[
-                ['Agent List', 'Life-sign monitors for all players. White = carrying a secret. Flat red = dead. Three dots per agent track secrets collected. First team to 3 wins.'],
-                ['Inventory', 'Your carried items with counts. Brightest icon = currently selected item.'],
-                ['Files Bar', 'How full you are with hacked data. More files = bigger payout when you hit the regenerator in your base.'],
-                ['Credit Balance', 'Credits available to spend on ammo and tech items.'],
-                ['Shield Level', 'Your energy shield. Once depleted your body takes raw damage — keep it topped up.'],
-                ['Fuel Gauge', 'Jetpack fuel. Drains continuously while used; must fully recharge before reuse. LOW FUEL light = not ready.'],
-                ['Mini-map', 'Your most powerful tool. Shows: your position, enemies (red dots), enemy bases (colored rectangles), hackable terminals (white crosses — large cross = large terminal worth 2-4x data), secrets (blue = yours, red = theirs, flashing circle = being carried), and firefights (orange blips).'],
-                ['Health Meter', 'Your HP. Hits 0 = you die and respawn at your base.'],
-                ['Weapon Area', 'Current weapon icon and remaining ammo.'],
-                ['Information List', 'Your progress toward locating the next secret. Green = done, flashing = in progress.'],
-              ].map(([name, desc]) => (
-                <div key={name} className="flex gap-3">
-                  <span className="text-game-primary shrink-0 w-32">{name}</span>
-                  <span className="text-game-textDim">{desc}</span>
+                {
+                  name: 'Agent List',
+                  desc: 'Life-sign monitors for all players. White = carrying a secret. Flat red = dead. Three dots per agent track secrets collected. First team to 3 wins.',
+                  img: '/silencer/agentlist_closeup.gif',
+                },
+                {
+                  name: 'Inventory',
+                  desc: 'Your carried items with counts. Brightest icon = currently selected item.',
+                  img: '/silencer/inventory_closeup.gif',
+                },
+                {
+                  name: 'Files Bar',
+                  desc: 'How full you are with hacked data. More files = bigger payout when you hit the regenerator in your base.',
+                  img: '/silencer/filesbar_closeup.gif',
+                },
+                {
+                  name: 'Credit Balance',
+                  desc: 'Credits available to spend on ammo and tech items.',
+                  img: '/silencer/credits_closeup.gif',
+                },
+                {
+                  name: 'Shield Level',
+                  desc: 'Your energy shield. Once depleted your body takes raw damage — keep it topped up.',
+                  img: '/silencer/shieldlevel_closeup.gif',
+                },
+                {
+                  name: 'Fuel Gauge',
+                  desc: 'Jetpack fuel. Drains continuously while used; must fully recharge before reuse. LOW FUEL light = not ready.',
+                  img: '/silencer/fuelgauge_closeup.gif',
+                },
+                {
+                  name: 'Mini-map',
+                  desc: 'Your most powerful tool. Shows: your position, enemies (red dots), enemy bases (colored rectangles), hackable terminals (white crosses — large cross = large terminal worth 2-4x data), secrets (blue = yours, red = theirs, flashing circle = being carried), and firefights (orange blips).',
+                  img: '/silencer/minimap_closeup.gif',
+                },
+                {
+                  name: 'Health Meter',
+                  desc: 'Your HP. Hits 0 = you die and respawn at your base.',
+                  img: '/silencer/healthmeter_closeup.gif',
+                },
+                {
+                  name: 'Weapon Area',
+                  desc: 'Current weapon icon and remaining ammo.',
+                  img: '/silencer/weapsinfo_closeup.gif',
+                },
+                {
+                  name: 'Information List',
+                  desc: 'Your progress toward locating the next secret. Green = done, flashing = in progress.',
+                  img: '/silencer/infolist_closeup.gif',
+                },
+              ].map(({ name, desc, img }) => (
+                <div key={name} className="flex gap-4 items-start">
+                  {img && (
+                    <ScreenShot src={img} alt={name} className="shrink-0 max-h-16 w-auto" />
+                  )}
+                  <div>
+                    <span className="text-game-primary block mb-0.5">{name}</span>
+                    <span className="text-game-textDim">{desc}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -185,18 +247,44 @@ export default function HowToPage() {
               <li>Close enough to deliver secrets quickly</li>
             </ul>
             <P>To enter your base, walk in front of it and press <Key>Space</Key>. Inside, left to right:</P>
-            <div className="space-y-2 mt-2">
+            <div className="space-y-4 mt-2">
               {[
-                ['Regenerator', 'Heals you as you run through it and pays credits for any files you are carrying. Also your default respawn point.'],
-                ['Tech Terminal', 'Buy items from your assigned tech slots here. Also repair damaged basement machinery.'],
-                ['Ladder down', 'Leads to the basement where your tech slot machines live. Enemies can sabotage these — a destroyed machine disables that slot until repaired.'],
-                ['Secrets Terminal', 'Deliver secrets here to score. It is at the far right — do not let enemies camp it.'],
-              ].map(([name, desc]) => (
-                <div key={name} className="flex gap-3">
-                  <span className="text-game-primary shrink-0 w-36">{name}</span>
-                  <span className="text-game-textDim">{desc}</span>
+                {
+                  name: 'Regenerator',
+                  desc: 'Heals you as you run through it and pays credits for any files you are carrying. Also your default respawn point.',
+                  img: '/silencer/regenerator.jpg',
+                },
+                {
+                  name: 'Tech Terminal',
+                  desc: 'Buy items from your assigned tech slots here. Also repair damaged basement machinery.',
+                  img: '/silencer/techterminal.jpg',
+                },
+                {
+                  name: 'Ladder down',
+                  desc: 'Leads to the basement where your tech slot machines live. Enemies can sabotage these — a destroyed machine disables that slot until repaired.',
+                  img: '/silencer/ladder2basement.jpg',
+                },
+                {
+                  name: 'Secrets Terminal',
+                  desc: 'Deliver secrets here to score. It is at the far right — do not let enemies camp it.',
+                  img: '/silencer/secretsterminal.jpg',
+                },
+              ].map(({ name, desc, img }) => (
+                <div key={name} className="flex gap-4 items-start">
+                  <ScreenShot src={img} alt={name} className="shrink-0 max-h-24 w-auto" />
+                  <div>
+                    <span className="text-game-primary block mb-0.5">{name}</span>
+                    <span className="text-game-textDim">{desc}</span>
+                  </div>
                 </div>
               ))}
+            </div>
+            <div className="mt-4">
+              <div className="text-game-primary mb-1">The Basement</div>
+              <div className="flex gap-4 items-start">
+                <ScreenShot src="/silencer/basebasement.jpg" alt="Base basement" className="shrink-0 max-h-24 w-auto" />
+                <P>At the bottom of the ladder is the lower level of your base. Each machine here controls a tech slot. If an enemy destroys one, that slot is unavailable until you repair it at the Tech Terminal.</P>
+              </div>
             </div>
             <Note>Enemies can sneak into your base just as easily as you can sneak into theirs. Balance hacking runs with base defense.</Note>
           </Section>
@@ -216,14 +304,37 @@ export default function HowToPage() {
             <P>Fire with <Key>Ctrl</Key>. Cycle weapons with <Key>Numpad 0</Key>. You auto-switch when ammo runs out. You start with blaster (infinite), laser, and rockets.</P>
             <div className="space-y-4 mt-2">
               {[
-                { name: 'Blaster', detail: 'Infinite ammo. Fires red projectiles quickly at short range. Weak but always available — good for suppressing fire.' },
-                { name: 'Laser', detail: 'Limited ammo. Fires slower but deals heavy shield damage at long range. Your primary weapon for duels.' },
-                { name: 'Rocket Launcher', detail: 'Slow fire rate, limited ammo. One or two hits kill most enemies, especially with depleted shields. You get a rocket-cam view to track the shot in flight.' },
-                { name: 'Flamer', detail: 'Must be purchased via tech slots. Very short range, stationary fire, long wind-up. Bypasses shields entirely — damages health directly. Best against cornered or slow targets.' },
+                {
+                  name: 'Blaster',
+                  detail: 'Infinite ammo. Fires red projectiles quickly at short range. Weak but always available — good for suppressing fire.',
+                  img: null,
+                },
+                {
+                  name: 'Laser',
+                  detail: 'Limited ammo. Fires slower but deals heavy shield damage at long range. Your primary weapon for duels.',
+                  img: '/silencer/lasershot.jpg',
+                },
+                {
+                  name: 'Rocket Launcher',
+                  detail: 'Slow fire rate, limited ammo. One or two hits kill most enemies, especially with depleted shields. You get a rocket-cam view to track the shot in flight.',
+                  img: '/silencer/rocketshot.jpg',
+                },
+                {
+                  name: 'Flamer',
+                  detail: 'Must be purchased via tech slots. Very short range, stationary fire, long wind-up. Bypasses shields entirely — damages health directly. Best against cornered or slow targets.',
+                  img: '/silencer/flamershot.jpg',
+                },
               ].map(w => (
-                <div key={w.name}>
-                  <div className="text-game-primary font-bold mb-0.5">{w.name}</div>
-                  <P>{w.detail}</P>
+                <div key={w.name} className="flex gap-4 items-start">
+                  {w.img ? (
+                    <ScreenShot src={w.img} alt={w.name} className="shrink-0 max-h-10 w-auto" />
+                  ) : (
+                    <div className="shrink-0 w-12" />
+                  )}
+                  <div>
+                    <div className="text-game-primary font-bold mb-0.5">{w.name}</div>
+                    <P>{w.detail}</P>
+                  </div>
                 </div>
               ))}
             </div>
@@ -291,6 +402,7 @@ export default function HowToPage() {
                 name="STATIC"
                 color="border-blue-400/50 text-blue-400"
                 bonus="+3 Hacking, Satellite ability (occasionally see all enemies on mini-map). Best hackers — gather intelligence faster than any other agency."
+                img="/silencer/static.jpg"
               />
               <AgencyCard
                 name="BLACKROSE"
