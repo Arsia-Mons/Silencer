@@ -4,6 +4,7 @@
 #include "os.h"
 #include <SDL.h>
 #include <curl/curl.h>
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <vector>
@@ -13,8 +14,6 @@ namespace {
 
 struct MemBuf {
     std::vector<unsigned char> data;
-    // Refuse to buffer more than the engine's hard limit to avoid a giant
-    // allocation on a malicious or misconfigured server.
     static const size_t kLimit = 65535;
 };
 
@@ -22,13 +21,21 @@ size_t WriteCallback(void * ptr, size_t sz, size_t nmemb, void * userdata) {
     MemBuf * buf = static_cast<MemBuf *>(userdata);
     size_t incoming = sz * nmemb;
     if (buf->data.size() + incoming > MemBuf::kLimit) {
-        // Signal abort by returning a value != incoming.
         fprintf(stderr, "[mapfetch] response too large\n");
         return 0;
     }
     const unsigned char * p = static_cast<const unsigned char *>(ptr);
     buf->data.insert(buf->data.end(), p, p + incoming);
     return incoming;
+}
+
+static int XferProgressCb(void * userp, curl_off_t dltotal, curl_off_t dlnow,
+                           curl_off_t /*ult*/, curl_off_t /*uln*/) {
+    if (userp && dltotal > 0) {
+        auto * pct = static_cast<std::atomic<int> *>(userp);
+        pct->store((int)(dlnow * 100 / dltotal));
+    }
+    return 0;
 }
 
 struct StringBuf {
@@ -78,7 +85,8 @@ bool HexDecode20(const std::string & hex, unsigned char out[20]) {
 
 std::string FetchMapFromServer(const char * mapname,
                                const unsigned char * sha1hash,
-                               const char * apiURL)
+                               const char * apiURL,
+                               std::atomic<int> * progress)
 {
     // Build URL: {apiURL}/api/maps/by-sha1/{sha1hex}
     char sha1hex[41];
@@ -105,6 +113,12 @@ std::string FetchMapFromServer(const char * mapname,
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "zsilencer/" ZSILENCER_VERSION);
+    if (progress) {
+        progress->store(0);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, XferProgressCb);
+        curl_easy_setopt(curl, CURLOPT_XFERINFODATA, progress);
+    }
 
     CURLcode rc = curl_easy_perform(curl);
     long httpStatus = 0;

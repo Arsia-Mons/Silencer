@@ -4500,9 +4500,31 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								scrollbar->draw = false;
 							}
 							if(selectbox->uid == 4){ // map select
+								// Poll async download completion each frame
+								if(!dlitemname.empty()){
+									int res = dlresult.load();
+									if(res == 1){ // success
+										selectbox->downloadprogress = -1;
+										selectbox->downloaditem[0] = '\0';
+										servermaps.erase(dlitemname);
+										dlitemname.clear();
+										Interface * old_create = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
+										if(old_create) old_create->DestroyInterface(world);
+										gamecreateinterface = CreateGameCreateInterface()->id;
+										return false;
+									}else if(res == -1){ // failed
+										selectbox->downloadprogress = -1;
+										selectbox->downloaditem[0] = '\0';
+										dlitemname.clear();
+										CreateModalDialog("Download failed");
+									}else{ // still in progress — update progress bar
+										selectbox->downloadprogress = dlprogress.load();
+									}
+								}
 								int index = selectbox->MouseInside(world, iface->mousex, iface->mousey);
 								// DL badge click: raw coord check (badge lives in the 16px right margin MouseInside excludes)
-								if(iface->mousedown && iface->mousex >= selectbox->x + selectbox->width - 16 &&
+								if(iface->mousedown && dlitemname.empty() &&
+								   iface->mousex >= selectbox->x + selectbox->width - 16 &&
 								   iface->mousey >= selectbox->y && iface->mousey < selectbox->y + selectbox->height){
 									int row = (iface->mousey - selectbox->y) / selectbox->lineheight + selectbox->scrolled;
 									if(row >= 0 && row < (int)selectbox->items.size()){
@@ -4525,16 +4547,17 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 											}
 											if(ok){
 												std::string dlname = clickeditem.substr(5);
-												std::string result = FetchMapFromServer(dlname.c_str(), sha1bytes, ZSILENCER_MAP_API_URL);
-												if(!result.empty()){
-													servermaps.erase(clickeditem);
-													Interface * old_create = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-													if(old_create) old_create->DestroyInterface(world);
-													gamecreateinterface = CreateGameCreateInterface()->id;
-													return false;
-												}else{
-													CreateModalDialog("Download failed");
-												}
+												dlitemname = clickeditem;
+												dlresult.store(0);
+												dlprogress.store(0);
+												snprintf(selectbox->downloaditem, sizeof(selectbox->downloaditem), "%s", dlname.c_str());
+												selectbox->downloadprogress = 0;
+												if(dlthread.joinable()) dlthread.join();
+												std::string apiURL = ZSILENCER_MAP_API_URL;
+												dlthread = std::thread([this, dlname, sha1bytes, apiURL]() mutable {
+													std::string res = FetchMapFromServer(dlname.c_str(), sha1bytes, apiURL.c_str(), &dlprogress);
+													dlresult.store(res.empty() ? -1 : 1);
+												});
 											}
 										}
 									}

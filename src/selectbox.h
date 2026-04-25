@@ -28,6 +28,8 @@ public:
 	int selecteditem;
 	Uint8 uid;
 	bool enterpressed;
+	int downloadprogress;      // 0-100 while downloading, -1 = idle
+	char downloaditem[256];    // filename (no [DL] prefix) currently downloading
 };
 
 #endif

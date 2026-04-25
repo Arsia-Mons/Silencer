@@ -9,6 +9,8 @@ SelectBox::SelectBox() : Object(ObjectTypes::SELECTBOX){
 	requiresmaptobeloaded = false;
 	uid = 0;
 	enterpressed = false;
+	downloadprogress = -1;
+	downloaditem[0] = '\0';
 }
 
 SelectBox::~SelectBox(){

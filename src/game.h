@@ -13,6 +13,8 @@
 #include "textbox.h"
 #include "updater.h"
 #include <map>
+#include <atomic>
+#include <thread>
 
 class Game
 {
@@ -165,6 +167,10 @@ private:
 	bool mapexistchecked;
 	int selectedmap;
 	std::map<std::string, std::string> servermaps; // "[↓] NAME.SIL" → sha1hex
+	std::atomic<int> dlprogress{0};    // 0-100 while downloading
+	std::atomic<int> dlresult{0};      // 0=idle, 1=success, -1=fail
+	std::string dlitemname;            // key in servermaps being downloaded
+	std::thread dlthread;
 	Uint32 lastmusicplaytime;
 	char currentmusictrack[256];
 	bool fullscreentoggled;

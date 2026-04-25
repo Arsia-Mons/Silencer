@@ -755,10 +755,21 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 									DrawFilledRectangle(surface, dstrect.x, dstrect.y, dstrect.x + dstrect.w, dstrect.y + dstrect.h, 180);
 								}
 								if(isdl){
-									DrawText(surface, selectbox->x, row_y, text + 5, 133, 6);
-									int bx = selectbox->x + selectbox->width - 16;
-									DrawFilledRectangle(surface, bx - 1, row_y, bx + 13, row_y + 11, 0);
-									DrawText(surface, bx, row_y, "DL", 133, 6);
+									bool downloading = (selectbox->downloadprogress >= 0 &&
+									                    strcmp(text + 5, selectbox->downloaditem) == 0);
+									if(downloading){
+										int pct = selectbox->downloadprogress;
+										int barw = ((selectbox->width - 2) * pct) / 100;
+										DrawFilledRectangle(surface, selectbox->x, row_y, selectbox->x + selectbox->width - 2, row_y + 11, 0);
+										if(barw > 0) DrawFilledRectangle(surface, selectbox->x, row_y, selectbox->x + barw, row_y + 11, 34);
+										char pctstr[8]; snprintf(pctstr, sizeof(pctstr), "%d%%", pct);
+										DrawText(surface, selectbox->x + 2, row_y, pctstr, 133, 6);
+									}else{
+										DrawText(surface, selectbox->x, row_y, text + 5, 133, 6);
+										int bx = selectbox->x + selectbox->width - 16;
+										DrawFilledRectangle(surface, bx - 1, row_y, bx + 13, row_y + 11, 0);
+										DrawText(surface, bx, row_y, "DL", 34, 6);
+									}
 								}else{
 									DrawText(surface, selectbox->x, row_y, text, 133, 6);
 								}
