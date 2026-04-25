@@ -55,7 +55,7 @@ func main() {
 	}
 
 	mongoURI := os.Getenv("MONGO_URL")
-	mongoSync := NewMongoSync(mongoURI, "zsilencer")
+	mongoSync := NewMongoSync(mongoURI, "silencer")
 	store.SetMongo(mongoSync)
 
 	port, err := parsePort(*addr)

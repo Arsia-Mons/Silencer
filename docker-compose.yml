@@ -46,7 +46,7 @@ services:
       - rabbitmq
     environment:
       RABBITMQ_URL: "amqp://zsilencer:zsilencer@rabbitmq:5672/"
-      MONGO_URL: "mongodb://mongo:27017/zsilencer"
+      MONGO_URL: "mongodb://mongo:27017/silencer"
     command:
       - "-addr"
       - ":15170"
@@ -78,7 +78,7 @@ services:
       - rabbitmq
     environment:
       PORT: "24080"
-      MONGO_URL: "mongodb://mongo:27017/zsilencer"
+      MONGO_URL: "mongodb://mongo:27017/silencer"
       RABBITMQ_URL: "amqp://zsilencer:zsilencer@rabbitmq:5672/"
       JWT_SECRET: "${JWT_SECRET:-changeme-in-production}"
       LOBBY_PLAYER_AUTH_URL: "http://lobby:15171"

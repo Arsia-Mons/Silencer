@@ -4,7 +4,7 @@ import path from 'path';
 import { uploadToGitHub, isGitHubConfigured } from './github.js';
 
 const BACKUP_DIR     = process.env.BACKUP_DIR || '/backups';
-const MONGO_URI      = process.env.MONGO_URL   || 'mongodb://mongo:27017/zsilencer';
+const MONGO_URI      = process.env.MONGO_URL   || 'mongodb://mongo:27017/silencer';
 const MAX_BACKUPS    = parseInt(process.env.BACKUP_KEEP || '10', 10);
 const MONGODUMP_BIN  = process.env.MONGODUMP_BIN || 'mongodump';
 
