@@ -91,9 +91,9 @@ Reasons we are explicitly **not** using:
 | Component   | Artifact                  | Deploy verb                                    | Trigger                        |
 | ----------- | ------------------------- | ---------------------------------------------- | ------------------------------ |
 | Lobby       | ARM64 binary              | scp + symlink swap + `systemctl restart`       | Git tag `v*`                   |
-| Admin API   | OCI image on GHCR         | `docker pull` + symlink swap + `systemctl restart` | Path filter on its source dir  |
-| Admin Web   | OCI image on GHCR         | `docker pull` + symlink swap + `systemctl restart` | Path filter on its source dir  |
-| Data tier   | Terraform-managed EC2 + EBS | `terraform apply`                            | Path filter on `terraform/`    |
+| Admin API   | OCI image on GHCR         | `docker pull` + symlink swap + `systemctl restart` | Path filter on `services/admin-api/` |
+| Admin Web   | OCI image on GHCR         | `docker pull` + symlink swap + `systemctl restart` | Path filter on `web/admin/`    |
+| Data tier   | Terraform-managed EC2 + EBS | `terraform apply`                            | Path filter on `infra/terraform/` |
 
 Each lives in its own GitHub Actions workflow file. None imports
 or calls another. A separate "provision-environment" workflow
@@ -170,7 +170,9 @@ the instance preserves data on both EBS volumes.
 
 GitHub Actions workflow that builds an ARM64 OCI image, pushes to
 GHCR, and updates the systemd unit on the admin/data box via SSH.
-Workflow is path-filtered to the admin-api source directory.
+Workflow is path-filtered to `services/admin-api/`. Per the
+monorepo restructure's Bun+TS rule, the image entrypoint is `bun`,
+not `node`.
 
 Done when: a touch-only commit under that directory triggers a
 new image, the box pulls it, and the unit restarts without
@@ -178,8 +180,9 @@ affecting any other service.
 
 ### Phase 3 — Admin Web deploy workflow
 
-Same shape as Phase 2 for the Next.js app. Path-filtered to the
-admin-web source directory.
+Same shape as Phase 2 for the Next.js app. Path-filtered to
+`web/admin/`. Image entrypoint is `bun` (Next.js under Bun), per
+the monorepo restructure's Bun+TS rule.
 
 Done when: same as Phase 2 for the web service.
 
