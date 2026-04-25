@@ -9,7 +9,7 @@ Docker and bring up the lobby, admin API, and admin dashboard:
 ```bash
 git clone https://github.com/Arsia-Mons/Silencer.git
 cd Silencer
-sudo bash scripts/install-linux-server.sh [PUBLIC_IP]
+sudo bash infra/scripts/install-linux-server.sh [PUBLIC_IP]
 ```
 
 If `PUBLIC_IP` is omitted it is auto-detected. Once complete:
@@ -74,6 +74,6 @@ Documentation
 - [Changelog](CHANGELOG.md) — release notes and feature history
 - [Developer Guide](CLAUDE.md) — project layout, build commands, dedicated-server contract, gotchas
 - [Production Setup](docs/production.md) — stand up your own lobby on AWS: Terraform, CI wiring, day-2 ops, failure modes
-- [Lobby Server](server/README.md) — self-hosted lobby server (Go): build, run, protocol, deployment
+- [Lobby Server](services/lobby/README.md) — self-hosted lobby server (Go): build, run, protocol, deployment
 - [Admin API](admin/api/README.md) — Express.js REST + WebSocket API powering the admin dashboard
 - [Admin Web](admin/web/README.md) — Next.js admin dashboard and player self-service portal

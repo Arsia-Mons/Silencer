@@ -68,8 +68,8 @@ echo "=== Starting HTTP server on :8000 ==="
 HTTP_PID=$!
 
 echo "=== Starting lobby on :15170 ==="
-( cd server && go build )
-./server/zsilencer-lobby -addr :15170 -version "$NEW_VER" -update-manifest "$REPO_ROOT/update.json" &
+( cd services/lobby && go build )
+./services/lobby/silencer-lobby -addr :15170 -version "$NEW_VER" -update-manifest "$REPO_ROOT/update.json" &
 LOBBY_PID=$!
 
 cleanup() {

@@ -283,7 +283,7 @@ The AWS Data Lifecycle Manager snapshot approach still works as a
 belt-and-suspenders backup for the EBS data volume itself.
 
 If you ever outgrow a hobby-scale player count, swap
-`server/store.go` to SQLite or Postgres before worrying about
+`services/lobby/store.go` to SQLite or Postgres before worrying about
 snapshot frequency.
 
 ## Forcing old clients to upgrade
