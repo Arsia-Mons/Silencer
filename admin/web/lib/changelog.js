@@ -3,6 +3,34 @@
 
 export const CHANGELOG = [
   {
+    version: 'v1.8.0',
+    date: '2026-04-25',
+    title: 'Community Map Downloads & Designer Cross-Stitch Fix',
+    entries: [
+      {
+        category: 'CLIENT',
+        changes: [
+          'Community maps: server-published maps appear in the Create Game map list with an inline [DL] badge — no separate dialog needed',
+          'Async map download: clicking [DL] launches a background thread so the UI stays fully responsive during transfer',
+          'Progress bar: the map row fills with a progress bar (0–100%) driven by a curl XFERINFO callback while downloading',
+          'Auto-refresh: after download completes the Create Game interface rebuilds itself so the map preview renders immediately',
+          'Concurrent download guard: [DL] clicks are ignored while a download is already in flight',
+          'Create button blocked when an undownloaded ([DL]) server map is selected — prompts download first',
+          'Maps saved to <DataDir>/level/download/<name>.sil with SHA-1 verification before write',
+        ],
+      },
+      {
+        category: 'DASHBOARD',
+        changes: [
+          'Community map API: POST /api/maps publishes a map (multipart/form-data, SHA-1 indexed)',
+          'GET /api/maps returns the full community map list with name, sha1, size, author, uploaded_at',
+          'GET /api/maps/by-sha1/:sha1 serves the raw .sil file for client download',
+          'Map designer: diagonal cross-stitch collision overlay now restricted to RECTANGLE, STAIRSUP, and STAIRSDOWN platform types only — RAIN, ROOM, LADDER and others are no longer cross-stitched',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v1.7.0',
     date: '2026-04-24',
     title: 'Ban Enforcement, MongoDB Sync, Backups & Player Management',

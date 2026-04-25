@@ -6,6 +6,14 @@ All notable changes to zSILENCER are documented here.
 
 ### Game client / dedicated server
 
+- **Community map downloads** — server-published maps now appear in the
+  Create Game map list with an inline `[DL]` badge. Clicking the badge
+  starts an async background download (no UI freeze). A progress bar fills
+  the row (0–100%) while the file transfers via curl XFERINFO callback. On
+  completion the interface rebuilds automatically so the map preview renders
+  immediately. The Create button is blocked while a not-yet-downloaded map
+  is selected.
+
 - **Agency switch in pregame lobby** — switching agencies now broadcasts
   `MSG_SETAGENCY` to the dedicated server, which reassigns the peer to the
   correct team immediately. Previously the server only recorded agency at
@@ -23,6 +31,21 @@ All notable changes to zSILENCER are documented here.
   the X axis in the designer.
 
 ### Map designer (admin web)
+
+#### Community map publishing
+
+- **Publish maps from the designer** — maps can be uploaded to the lobby's
+  community map API (`POST /api/maps`, multipart/form-data, SHA-1 indexed).
+  `GET /api/maps` lists all published maps; `GET /api/maps/by-sha1/:sha1`
+  serves the raw `.sil` for client download with hash verification.
+
+#### Platform collision rendering
+
+- **Diagonal cross-stitch restricted to stairs/ground** — the collision
+  overlay cross-stitch pattern now only renders on `RECTANGLE`,
+  `STAIRSUP`, and `STAIRSDOWN` platforms. `RAIN`, `ROOM`, ladders, and
+  other volume types are no longer cross-stitched, matching their
+  semantic meaning in the engine.
 
 #### Platform tools
 
