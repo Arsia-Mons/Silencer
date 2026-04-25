@@ -377,7 +377,7 @@ export default function MapCanvas({
       }
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom,
-      onTilePaint, onPlatformRemove, onActorPlace, onActorRemove, onDragPlatformChange, onBeginPaint]);
+      onTilePaint, onPlatformRemove, onActorPlace, onActorRemove, onActorRightClick, onDragPlatformChange, onBeginPaint]);
 
   const handleMouseMove = useCallback((e) => {
     const { cx, cy } = getCanvasPos(e);
