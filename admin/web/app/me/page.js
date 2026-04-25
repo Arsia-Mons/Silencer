@@ -66,6 +66,10 @@ export default function MePage() {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-game-text font-mono text-sm">◈ {playerName}</span>
+          <Link href="/gamestats"
+            className="px-3 py-1.5 text-xs font-mono text-game-textDim border border-game-border rounded hover:border-game-primary hover:text-game-primary transition-colors">
+            [ GAME STATS ]
+          </Link>
           <Link href="/howto"
             className="px-3 py-1.5 text-xs font-mono text-game-textDim border border-game-border rounded hover:border-game-primary hover:text-game-primary transition-colors">
             [ HOW TO PLAY ]

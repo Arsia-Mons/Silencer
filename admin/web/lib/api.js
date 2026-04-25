@@ -58,3 +58,6 @@ export const triggerBackup  = ()  => apiFetch('/backup/trigger', { method: 'POST
 export const getBackupStatus = () => apiFetch('/backup/status');
 export const listBackups    = ()  => apiFetch('/backup/list');
 
+export const getGameStatsRecent      = (limit = 20) => playerFetch(`/gamestats/recent-games?limit=${limit}`);
+export const getGameStatsLeaderboard = (limit = 50) => playerFetch(`/gamestats/leaderboard?limit=${limit}`);
+

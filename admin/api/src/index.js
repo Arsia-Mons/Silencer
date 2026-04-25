@@ -11,7 +11,8 @@ import sessionRoutes from './routes/sessions.js';
 import eventRoutes   from './routes/events.js';
 import statsRoutes   from './routes/stats.js';
 import meRoutes      from './routes/me.js';
-import backupRoutes  from './routes/backup.js';
+import backupRoutes     from './routes/backup.js';
+import gameStatsRoutes from './routes/gamestats.js';
 import { startBackupScheduler } from './backup/scheduler.js';
 import AdminUser from './db/models/AdminUser.js';
 
@@ -27,7 +28,8 @@ app.use('/sessions', sessionRoutes);
 app.use('/events',   eventRoutes);
 app.use('/stats',    statsRoutes);
 app.use('/me',       meRoutes);
-app.use('/backup',   backupRoutes);
+app.use('/backup',     backupRoutes);
+app.use('/gamestats', gameStatsRoutes);
 
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
