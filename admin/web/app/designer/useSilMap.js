@@ -382,9 +382,28 @@ export function useSilMap() {
     });
   }, [pushHistory]);
 
+  const patchTile = useCallback((layerType, layerIdx, x, y, patch) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      const { width, height, layers } = prev;
+      if (x < 0 || x >= width || y < 0 || y >= height) return prev;
+      pushHistory(prev);
+      const idx = y * width + x;
+      const layerArr = layerType === 'fg' ? layers.fg : layers.bg;
+      const existing = layerArr[layerIdx][idx] ?? { tile_id: 0, flip: 0, lum: 0 };
+      const newLayer = layerArr[layerIdx].slice();
+      newLayer[idx] = { ...existing, ...patch };
+      const newLayers = {
+        bg: layerType === 'bg' ? layers.bg.map((l, i) => i === layerIdx ? newLayer : l) : layers.bg,
+        fg: layerType === 'fg' ? layers.fg.map((l, i) => i === layerIdx ? newLayer : l) : layers.fg,
+      };
+      return { ...prev, layers: newLayers };
+    });
+  }, [pushHistory]);
+
   return {
     map: mapData, openMap, saveMap,
-    updateTile, beginPaint, commitPaint,
+    updateTile, patchTile, beginPaint, commitPaint,
     addPlatform, removePlatform,
     addActor, removeActor, updateActor,
     undo, redo, canUndo, canRedo,

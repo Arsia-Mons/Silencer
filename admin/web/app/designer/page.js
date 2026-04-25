@@ -9,13 +9,14 @@ import Toolbar, { ACTOR_DEFS, PLATFORM_TOOL_TYPES } from './Toolbar.js';
 import MapCanvas from './MapCanvas.js';
 import TilePicker from './TilePicker.js';
 import ActorContextMenu from './ActorContextMenu.js';
+import TileContextMenu from './TileContextMenu.js';
 
 export default function DesignerPage() {
   useAuth();
   const wsConnected = useSocket({});
 
   const { loaded, error, tileImages, spriteImages, tileBankCounts, progress, loadFiles } = useGameData();
-  const { map, openMap, saveMap, updateTile, beginPaint, commitPaint,
+  const { map, openMap, saveMap, updateTile, patchTile, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor, updateActor,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
@@ -31,7 +32,8 @@ export default function DesignerPage() {
   const [resizeW, setResizeW] = useState('');
   const [resizeH, setResizeH] = useState('');
   const [showResize, setShowResize] = useState(false);
-  const [actorMenu, setActorMenu] = useState(null); // { idx, screenX, screenY }
+  const [actorMenu, setActorMenu] = useState(null);
+  const [tileMenu, setTileMenu] = useState(null);
   const [vis, setVis] = useState({
     bg: [true, true, true, true],
     fg: [true, true, true, true],
@@ -347,6 +349,7 @@ export default function DesignerPage() {
               onActorPlace={handleActorPlace}
               onActorRemove={removeActor}
               onActorRightClick={(idx, sx, sy) => setActorMenu({ idx, screenX: sx, screenY: sy })}
+              onTileRightClick={(info) => { setActorMenu(null); setTileMenu(info); }}
               selectedActorId={selectedActorId}
               dragPlatform={dragPlatform}
               onDragPlatformChange={handleDragPlatform}
@@ -387,6 +390,16 @@ export default function DesignerPage() {
           </span>
         </div>
       </div>
+
+      {/* Tile context menu (right-click on tile) */}
+      {tileMenu && (
+        <TileContextMenu
+          menu={tileMenu}
+          onPatch={(patch) => patchTile(tileMenu.layerType, tileMenu.layerIdx, tileMenu.tx, tileMenu.ty, patch)}
+          onClear={() => updateTile(tileMenu.layerType, tileMenu.layerIdx, tileMenu.tx, tileMenu.ty, 0, 0, 0)}
+          onClose={() => setTileMenu(null)}
+        />
+      )}
 
       {/* Actor context menu (right-click) */}
       {actorMenu && map?.actors[actorMenu.idx] && (

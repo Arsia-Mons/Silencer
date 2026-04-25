@@ -32,6 +32,7 @@ export default function MapCanvas({
   map, tileImages, spriteImages, vis, activeTool, activeLayer, selectedTileId,
   zoom, pan, onZoomChange, onPanChange,
   onTilePaint, onPlatformDraw, onPlatformRemove, onActorPlace, onActorRemove, onActorRightClick,
+  onTileRightClick,
   onBeginPaint, onCommitPaint,
   selectedActorId, dragPlatform, onDragPlatformChange,
   onCursorChange,
@@ -388,13 +389,14 @@ export default function MapCanvas({
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom,
       onTilePaint, onPlatformRemove, onActorPlace, onActorRemove, onDragPlatformChange, onBeginPaint]);
 
-  // Right-click on actor: use onContextMenu (more reliable than mousedown button=2)
+  // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e) => {
     e.preventDefault();
-    if (!map || !onActorRightClick) return;
+    if (!map) return;
     const { cx, cy } = getCanvasPos(e);
     const { wx, wy } = canvasToWorld(cx, cy);
-    // Use generous radius (96 world px) — sprites are offset from actor position
+
+    // Check actors first
     const HIT_RADIUS = 96 / zoom;
     let best = null, bestDist = HIT_RADIUS;
     for (let i = map.actors.length - 1; i >= 0; i--) {
@@ -402,8 +404,23 @@ export default function MapCanvas({
       const dist = Math.hypot(a.x - wx, a.y - wy);
       if (dist < bestDist) { bestDist = dist; best = i; }
     }
-    if (best !== null) onActorRightClick(best, e.clientX, e.clientY);
-  }, [map, canvasToWorld, zoom, onActorRightClick]);
+    if (best !== null && onActorRightClick) {
+      onActorRightClick(best, e.clientX, e.clientY);
+      return;
+    }
+
+    // Fall through to tile
+    if (onTileRightClick) {
+      const { tx, ty } = canvasToTile(cx, cy);
+      if (tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
+        const layerType = activeTool === 'TILE_FG' ? 'fg' : 'bg';
+        const layerIdx = activeLayer;
+        const layerArr = map.layers[layerType][layerIdx];
+        const cell = layerArr[ty * map.width + tx] ?? null;
+        onTileRightClick({ tx, ty, layerType, layerIdx, cell, x: e.clientX, y: e.clientY });
+      }
+    }
+  }, [map, canvasToWorld, canvasToTile, zoom, activeTool, activeLayer, onActorRightClick, onTileRightClick]);
 
   const handleMouseMove = useCallback((e) => {
     const { cx, cy } = getCanvasPos(e);
