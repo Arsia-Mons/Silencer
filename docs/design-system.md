@@ -8,6 +8,39 @@ future rendering migrations.
 > fixed **640 × 480** internal surface. The window is resizable and supports fullscreen,
 > but all UI coordinates and measurements below are in logical pixels at 640 × 480.
 
+## Scope: what this doc covers, what it doesn't
+
+This doc specifies **layout, behavior, animation, and the binary asset
+formats**. It is sufficient to:
+
+- describe what every widget looks like and does in any language;
+- recreate every screen at the same coordinates with the same fonts, hit-tests,
+  and state machines;
+- decode the existing binary assets (`BIN_SPR.DAT`, `SPR_NNN.BIN`, `PALETTE.BIN`,
+  etc.) on any platform with little-endian or byte-swap support.
+
+This doc does **not** redefine the pixel content of the assets. It does not
+embed glyph bitmaps, agency icons, HUD frame art, or the literal RGB triples of
+the palette. For pixel-matching parity a port must consume the original
+`data/` directory as the source of truth. The doc tells you *how to read* the
+assets; the assets themselves remain authoritative.
+
+In particular:
+
+- The font tables list bank, advance, ASCII offset, and per-glyph offset
+  semantics. They do **not** specify glyph shapes — those live in the sprite
+  banks 132–136.
+- The palette tables list semantic UI colors and ramp structure with
+  illustrative RGB values. The authoritative RGB triples live in `PALETTE.BIN`.
+- The sprite-bank references (e.g. "Buy menu uses bank 102 indices 0–3") name
+  the bank and indices a port must allocate to the same assets, but do not
+  describe the visual.
+
+A port that wants different pixel content (e.g. a higher-resolution glyph set,
+recolored agency icons) must either re-author the asset files in the same
+binary format or replace the asset-loading layer wholesale. Either way, the
+behavioral specs in this doc remain unchanged.
+
 ---
 
 ## Table of Contents
@@ -27,7 +60,7 @@ future rendering migrations.
    - [ScrollBar](#scrollbar) — up/down arrows, scroll track
    - [Overlay](#overlay) — sprite/text label, animations, custom pixel buffer
    - [Interface](#interface-container--focus-manager) — container, focus/tab, keyboard/mouse routing, focus visuals
-   - [9-Slice Panel](#9-slice-panel-chat-message-background) — horizontal-stretch chat header/footer
+   - [Horizontal-Stretch Panel](#horizontal-stretch-panel-chat-message-background) — chat background, top/bottom rows only
    - [Modal Dialog](#modal-dialog) — centered alert/confirm with optional OK button
    - [Loading Bar](#loading-bar) — progress indicator
    - [In-Game Chat Overlay](#in-game-chat-overlay) — messages + input
@@ -44,6 +77,8 @@ future rendering migrations.
 7. [Visual Effects](#visual-effects)
 8. [UI Sounds](#ui-sounds)
 9. [Effect-Color Reference](#effect-color-reference)
+10. [Appendix A — Sprite Bank Manifest](#appendix-a--sprite-bank-manifest)
+11. [Appendix B — Interface Manifest](#appendix-b--interface-manifest)
 
 ---
 
@@ -504,6 +539,21 @@ from a fixed-rate timer at 23.8 Hz (or 24 Hz with negligible drift), not from
 the render loop. Driving `state_i` from render frames would make a button
 animation finish in ~67 ms on a 60 Hz display instead of the intended 168 ms.
 
+### Two `state_i` counters
+
+Two separate `state_i` counters appear throughout this document. Both tick at
+the same 23.8 Hz fixed rate but have different scopes; ports must keep them
+distinct.
+
+| Counter | Owner | Scope | Used for |
+| ----------------- | ----------------- | ------------------------------- | --------------------------------------------- |
+| `Renderer::state_i` | One per renderer  | Global UI animation clock        | Caret blink (`state_i % 32 < 16`); buy-menu pulse; sprite-bank auto-animations (banks 54, 57, 58, 171, 208, 222) |
+| `Object::state_i`   | One per Object/Sprite | Per-instance state-machine progress | Button activation/deactivation phase; healmachine animation; per-message announcement timer |
+
+Where this doc says e.g. `state_i % 32 < 16` for the caret, it always means
+the renderer's counter. Where it says `state_i = 0` on a state transition
+(buttons), it means the per-instance counter.
+
 ---
 
 ## Components
@@ -522,7 +572,7 @@ treat them differently:
 
 **Reusable widgets** (build a library of these — they appear on multiple screens
 and accept arbitrary configuration): Button, Toggle, TextInput, TextBox,
-SelectBox, ScrollBar, Overlay, 9-slice / horizontal-stretch panel, Modal Dialog,
+SelectBox, ScrollBar, Overlay, Horizontal-Stretch Panel, Modal Dialog,
 Loading Bar, Drawing Primitives.
 
 **Screen-specific compositions** (build these *out of* the widgets above; their
@@ -742,21 +792,32 @@ number-only restriction.
 | `showcaret` | bool | false | Whether the caret is visible (set by Interface focus logic) |
 | `scrolled` | uint | 0 | Number of characters scrolled off the left edge |
 
-#### Common Field Instances (set in `game.cpp`)
+#### Configured Field Instances
 
-| Field | Width × Height | Font Bank | Font Width | Buffer Size | Password | Numbers Only |
-| --------------- | -------------- | --------- | ---------- | ----------- | -------- | ------------ |
-| Username | 180 × 14 | 135 | 6 | 256 (buffer) | no | no |
-| Password | 180 × 14 | 135 | 6 | 256 (buffer) | yes | no |
-| Chat (lobby) | 360 × 14 | 135 | 6 | 60 | no | no |
-| Chat (in-game) | varies | 133 | 6 | 60 | no | no |
-| Game Name | 210 × 14 | 135 | 6 | 256 (buffer) | no | no |
-| Small (numeric) | 20 × 20 | 135 | 8 | 256 (buffer) | no | yes |
+The `TextInput` constructor defaults are `res_bank = 135`, `fontwidth = 9`,
+`maxchars = 256`, `maxwidth = 10`. Every concrete field overrides those
+defaults in `game.cpp`. The values below are the actual configured values, not
+the constructor defaults — a port matching the original UI must use these.
 
-> **Note:** "Buffer Size" is the `maxchars` allocation — the raw character buffer limit.
-> The effective visible length is constrained by `maxwidth` (visible character slots)
-> and the field's pixel width. The network protocol may impose additional limits on
-> transmitted string lengths.
+| Field | Source (`game.cpp`) | W × H | Bank | Width | maxchars | maxwidth | Password | Numbers |
+| ------------------------- | ------------------- | -------- | ---- | ----- | -------- | -------- | -------- | ------- |
+| Login: Username           | `:2858`             | 180 × 14 | 133  | 6     | 16       | 16       | no       | no      |
+| Login: Password           | `:2868`             | 180 × 14 | 133  | 6     | 28       | 28       | yes      | no      |
+| Lobby: Chat               | `:3205`             | 360 × 14 | 133  | 6     | 200      | 60       | no       | no      |
+| In-game: Chat             | `player.cpp:191`    | (overlay-positioned, see [In-Game Chat Overlay](#in-game-chat-overlay)) | 133 | 6 | 100 | 28 | no | no |
+| Game Create: Name         | `:3404`             | 210 × 14 | 133  | 6     | 35       | 35       | no       | no      |
+| Game Create: Password     | `:3421`             | 210 × 14 | 133  | 6     | 20       | 20       | yes      | no      |
+| Game Create: Min Level    | `:3279`             | 20 × 20  | 134  | 8     | 2        | 50       | no       | yes     |
+| Game Create: Max Level    | `:3299`             | 20 × 20  | 134  | 8     | 2        | 50       | no       | yes     |
+| Game Create: Max Players  | `:3319`             | 20 × 20  | 134  | 8     | 2        | 50       | no       | yes     |
+| Game Create: Max Teams    | `:3339`             | 20 × 20  | 134  | 8     | 2        | 50       | no       | yes     |
+
+> **Definitions:** `maxchars` is the raw buffer limit (typing past it is rejected
+> entirely). `maxwidth` is the number of character slots visible before the field
+> auto-scrolls horizontally — when the caret advances past it, `scrolled` increments
+> and the leftmost characters scroll off. Numeric fields set `maxwidth` larger than
+> `maxchars` so the value never scrolls. The network protocol may impose its own
+> length limit on transmitted strings.
 
 #### Rendering Pipeline
 
@@ -1208,12 +1269,20 @@ is focused" chrome on top of the widget's existing states.
 
 ---
 
-### 9-Slice Panel (Chat Message Background)
+### Horizontal-Stretch Panel (Chat Message Background)
 
 **Source:** `renderer.cpp:3013` — `DrawMessageBackground()`
 
-A stretchable panel built from 9 sprite pieces in bank **188**. Used for the
+A horizontally stretchable panel built from sprite bank **188**. Used for the
 in-game chat overlay background.
+
+> **Naming note:** This is sometimes called a "9-slice" because bank 188
+> reserves nine sprite indices in the canonical 9-slice layout (corners +
+> edges + center). The renderer only ever draws the **top and bottom rows**
+> (indices 0–2 and 6–8) — the left edge, center fill, and right edge (indices
+> 3–5) are unused. In effect this is a two-row horizontal-stretch panel; its
+> height is fixed by the spacing between the rows. Don't implement vertical
+> stretching from this section.
 
 #### Sprite Map
 
@@ -1254,13 +1323,6 @@ function drawMessageBackground(surface, rect):
 
 The corner offset of **36 px** is hardcoded — the right-side corners are always
 placed at `rect.x + rect.w - 36`.
-
-> **Note on the "9-slice" name:** The sprite bank reserves indices 3–5 for left
-> edge, center fill, and right edge, but the renderer never draws them. In
-> practice this is a **two-row horizontal-stretch panel** — only the top and
-> bottom edges (with corners) are drawn, and they tile horizontally only. The
-> panel does not stretch vertically; its height is fixed by the spacing between
-> the top and bottom rows.
 
 ---
 
@@ -1350,7 +1412,7 @@ recent messages.
 
 ```
 background rect: x=400, y=280, w=231, h=30
-9-slice panel rendered via DrawMessageBackground()
+horizontal-stretch panel rendered via DrawMessageBackground()
 ```
 
 #### Rendering
@@ -1826,19 +1888,59 @@ All coordinates below are in the 640 × 480 logical pixel space.
 ### Lobby Screen Panels
 
 The lobby is laid out in three regions on the left column plus a Game List on
-the right, with header and footer text spanning the full width.
+the right, with the title and version label in the top header. All values
+below are absolute coordinates in 640 × 480 space; child positions are *not*
+relative to the parent Interface origin.
 
-| Region | Position `(x, y)` | Size `W × H` | Contents |
-| ----------------- | ----------------- | ------------ | --------- |
-| Title             | `(15, 32)`        | text         | `"zSilencer"`, font bank 135 / advance 11, color **152** (dark red) |
-| Version label     | `(115, 39)`       | text         | `"v.00024"`, font bank 133 / advance 6, color **189** (orange) |
-| Character panel   | `(10, 64)`        | `217 × 120`  | Username text at `(20, 71)` 133/6; agency toggles starting at `y=90` with `+42 px` horizontal spacing; level / wins / etc. at `y=130..169` |
-| Chat panel        | `(15, 216)`       | `368 × 234`  | Messages TextBox `(19, 220) 242 × 207`, lineheight 11, fontwidth 6; Presence TextBox `(267, 220) 110 × 207`; Chat TextInput `(19, 437) 360 × 14` |
-| Game List         | `(403, 87)`       | `222 × 267`  | SelectBox `(407, 89) 214 × 265` lineheight 13; Join button at `(405, 361)` `B112x33`; Create button at `(518, 361)` `B112x33` |
-| Footer            | `(10, 463)`       | text         | Version, font bank 133 / advance 6 |
+**Header (`CreateLobbyInterface`, `game.cpp:2905`):**
+
+| Element | Position `(x, y)` | Font | Color | Notes |
+| ----------------- | ----------------- | ---------- | ----- | --------------------------- |
+| Title             | `(15, 32)`        | bank 135 / width 11 | **152** (dark red) | `"zSilencer"` |
+| Version label     | `(115, 39)`       | bank 133 / width 6  | **189** (orange)   | `"v." + world.version` |
+| Map name          | `(180, 32)`       | bank 135 / width 11 | **129** ramp + brightness 160 | Currently selected map name |
+| Go Back button    | `(473, 29)`       | `B156x21` | — | Returns to main menu |
+
+**Character panel (`CreateCharacterInterface`, `game.cpp:2960`)** — Interface bounds `(10, 64) 217 × 120`:
+
+| Element | Position `(x, y)` | Font | Color | Notes |
+| ----------------- | ----------------- | -------------------- | ----- | --------------------------- |
+| Username display  | `(20, 71)`        | bank 134 / width 8   | **200** (`#001C78`, dark blue) | Local user's name |
+| Agency toggles    | `(20, 90)`, +42 px each | sprite bank 181 | — | 5 toggles, `set = 1` (radio); see [Toggle](#toggle) |
+| Level / Wins / Losses / Stats | `(17, 130)` / `(17, 143)` / `(17, 156)` / `(17, 169)` | bank 133 / width 7 | **129** ramp + brightness 160 | One Overlay per stat row |
+
+**Chat panel (`CreateChatInterface`, `game.cpp:2905`)** — Interface bounds `(15, 216) 368 × 234`:
+
+| Element | Position `(x, y)` | Size | Properties |
+| ----------------- | ----------------- | ---------- | --------------------------- |
+| Channel label     | `(15, 200)`       | text       | bank 134 / width 8, sets channel name (e.g. "All", "Team") |
+| Messages TextBox  | `(19, 220)`       | 242 × 207  | bank 133, lineheight 11, fontwidth 6, `bottomtotop = true` |
+| Presence TextBox  | `(267, 220)`      | 110 × 207  | bank 133, lineheight 11, fontwidth 6 |
+| Chat TextInput    | `(18, 437)`       | 360 × 14   | bank 133, fontwidth 6, maxchars 200, maxwidth 60 |
+
+**Game List panel (`CreateGameSelectInterface`, `game.cpp:3078`)** — Interface bounds `(403, 87) 222 × 267`:
+
+| Element | Position `(x, y)` | Size | Properties |
+| ----------------- | ----------------- | ---------- | --------------------------- |
+| "Active Games" label | `(405, 70)`    | text       | bank 134 / width 8 |
+| Create Game button | `(242, 68)`      | `B156x21`  | uid 30 — **anchored above the character panel, not in this region**, but added to this Interface |
+| SelectBox          | `(407, 89)`      | 214 × 265  | lineheight 14 |
+| ScrollBar          | (paired with SelectBox) | — | sprite bank 7 index 9 |
+| Game info rows     | `(405, 358..406)` | text (5 rows, 12 px apart) | bank 133 / width 6: name, map, players, creator, info |
+| Join Game button   | `(436, 430)`     | `B156x21`  | uid 20 |
+
+> **Note:** The Create-Game and Join-Game buttons are both members of the Game
+> List Interface but render at non-adjacent positions; the Create button sits at
+> the top of the right column, the Join button at the bottom. Don't infer "two
+> buttons side by side at the bottom" from the layout name.
 
 Origin is top-left `(0, 0)`. All measurements are in the 640 × 480 logical
 pixel space.
+
+**Background plate.** The lobby's background art is a single Overlay using
+sprite bank 7 index 1, drawn first via the renderpass-0 layer. Region borders
+shown above are part of that pre-painted background — there is no per-region
+panel widget in code.
 
 ### In-Game HUD
 
@@ -1849,7 +1951,7 @@ pixel space.
 | Shield bar | Sprite-offset-based | Fills bottom-up proportional to shield |
 | Fuel bar | Sprite-offset-based | Fills left-to-right proportional to fuel |
 | Team panel | (5, 5+) | 20 px per team row |
-| Chat overlay | (400, 280) 231×30 | 9-slice background, 10 px line spacing |
+| Chat overlay | (400, 280) 231×30 | Horizontal-stretch background (bank 188), 10 px line spacing |
 | Buy menu | Sprite bank 102 | 5 visible items, 25 px per row |
 | Status messages | centered, y=370 | Stack upward (y -= 10 per line) |
 | Top message | (200, 10) | 133/7, max 35 chars |
@@ -1860,7 +1962,7 @@ pixel space.
 | -------------------- | ------- | ---------------------------------------- |
 | Chat line height | 10 px | In-game chat overlay |
 | TextBox line height | 11 px | Lobby chat, text boxes |
-| SelectBox line height | 13 px | Game/map lists |
+| SelectBox line height | 13 px (default) / 14 px (overridden) | Constructor default is 13 (Buy Menu, Tech list); Game List and Map List override to 14 |
 | Buy-menu row height | 25 px | In-game buy interface |
 | Player-list row | 12 px | Player list per player |
 | Team row height | 58 px | Player list per team block |
@@ -1889,7 +1991,7 @@ onto the destination surface.
 | Color Tint | `EffectColor()` | Luminance-preserving recolor. See [Color Tint Transform](#color-tint-transform). |
 | Alpha Blend | `Alpha()` / `DrawAlphaed()` | Per-pixel alpha blend with destination. See [Alpha Blend Transform](#alpha-blend-transform). |
 | Team Color | `EffectTeamColor()` | Decodes packed `(brightness<<4) \| hue` byte; recolors palette ranges 81–92 and 195–208 (or ≥130 for robots) via `EffectColor` then `EffectBrightness`. |
-| Ramp Color | `EffectRampColor()` | For each non-zero pixel, computes a new palette index by combining the source pixel's brightness level (its position within its 16-color ramp) with the target color's group: `output = ((src - 2) % 16) + (((tgt - 2) / 16) * 16) + 2`. Snaps to the same ramp brightness in a different color group. |
+| Ramp Color | `EffectRampColor()` | For each non-zero pixel, computes a new palette index by combining the source pixel's brightness level (its position within its 16-color ramp) with the target color's group: `output = ((src - 2) % 16) + (((tgt - 2) / 16) * 16) + 2`. Snaps to the same ramp brightness in a different color group. **Precondition:** the formula assumes both `src` and `tgt` lie inside the ramp range 2–113 (group/level structure described above). Indices 0, 1, and ≥114 fall outside the ramp grid; the engine applies the formula unconditionally, but ports should guard the call sites so invalid inputs aren't passed in. |
 | Ramp Color Plus | `EffectRampColorPlus()` | Same as Ramp Color but adds a minimum-brightness floor: if the resulting brightness level would be below `min`, it is bumped up to `min` (clamped to 15). Used for "highlighted" ramp tints. |
 | Checkered | `DrawCheckered()` | Every-other-pixel transparency. Effective 50% transparency without true alpha. |
 | Hit Flash | `EffectHit()` | Plays sprite bank **153** (8-frame ping-pong hit-flash animation) at impact location, applies `EffectRampColor` with a damage-type code: 146 (health-only damage), 194 (shield-only damage), 210 (poison damage). If shield was hit, also runs `EffectShieldDamage` on the same surface. |
@@ -1919,8 +2021,10 @@ of 128, the shadow renders at brightness 64 (`ch * 0.5` — half-dark).
 
 ### Caret Blink
 
-Text-input caret blinks on a 32-tick cycle: visible for ticks 0–15,
-hidden for ticks 16–31 (`state_i % 32 < 16`).
+Text-input caret blinks on a 32-tick cycle driven by the renderer's global
+`state_i` (not the TextInput's own counter): visible for ticks 0–15, hidden
+for ticks 16–31 (`Renderer::state_i % 32 < 16`). All visible carets blink in
+sync because they share the same source counter.
 
 ### Message Brightness Animation
 
@@ -2004,3 +2108,126 @@ overlays, not palette indices — they appear here for cross-referencing with th
 | `src/game.cpp` | UI construction (lobby, menus, options screens), loading bar, modal dialog factory, main loop / tick rate |
 | `src/world.cpp` | Per-tick simulation entry point (`World::Tick`) |
 | `src/team.cpp` | Team overlays, player name labels |
+
+---
+
+## Appendix A — Sprite Bank Manifest
+
+Every sprite bank referenced anywhere in this document, with its semantic role
+and the indices the UI relies on. A port that re-authors assets must keep
+this allocation; a port that consumes the original `data/` directory only
+needs this table to know which banks contain what.
+
+| Bank | Role | Indices used | Where consumed |
+| ---- | --------------------------- | --------------------------- | --------------------------------------------------- |
+| 6    | Large buttons (sprite back) | 2 (B236x27), 7 (B196x33), 23 (B220x33), 28 (B112x33), each + 0..4 for activation frames | [Button](#button) |
+| 7    | UI chrome / small buttons   | 1 (lobby background plate), 2 (login background), 8/11/14 (panel borders), 9/12 (scrollbar tracks), 10/13 (scrollbar thumbs), 18 (checkbox checked), 19 (checkbox unchecked), 24+0..4 (B156x21 frames) | Lobby chrome, [Button](#button) `B156x21` & `BCHECKBOX`, [ScrollBar](#scrollbar), [Toggle](#toggle) checkbox mode |
+| 40   | Modal dialog background plate | 4 | [Modal Dialog](#modal-dialog) |
+| 54   | Decorative sprite (10-frame) | 0..9 (auto loop) | [Overlay](#overlay) sprite animations |
+| 56   | Static decorative sprite     | 0 | [Overlay](#overlay) |
+| 57   | Decorative sprite (slow anim) | 0..16 + idle holds | [Overlay](#overlay) |
+| 58   | Decorative sprite (slow anim) | same shape as 57 | [Overlay](#overlay) |
+| 94   | HUD frame border             | 0 (minimap frame), other indices for HUD chrome | [HUD Bars](#hud-bars), [Minimap](#minimap) |
+| 95   | HUD bar fills                | 0 (health), 1 (shield), 3 (low-HP flash), 4 (low-shield flash), 5 (fuel frame), 6 (fuel fill), 7 (file fill), 8 (low-fuel flash) | [HUD Bars](#hud-bars) |
+| 102  | Buy menu frame               | 0 (background), 1 (selected-row highlight), 2 (up arrow), 3 (down arrow) | [Buy Menu](#buy-menu) |
+| 103  | Team HUD indicators          | 2 (secret collected), 3 (secret slot empty), 4..7 (player alive states), 8..11 (player dead states) | [Team HUD](#team-hud) |
+| 132  | Font: Tiny (~5 px)           | glyph N = `(asciiCode - 34)` | [Typography](#typography) |
+| 133  | Font: Small (~11 px)         | glyph N = `(asciiCode - 33)` | [Typography](#typography) |
+| 134  | Font: Medium (~15 px)        | glyph N = `(asciiCode - 33)` | [Typography](#typography) |
+| 135  | Font: Large (~19 px)         | glyph N = `(asciiCode - 33)` | [Typography](#typography) |
+| 136  | Font: Extra-Large (~23 px)   | glyph N = `(asciiCode - 33)` | [Typography](#typography) |
+| 153  | Hit-flash animation overlay  | 0..7 (8-frame ping-pong); frame 7 also drives EffectWarp displacement | [`EffectHit`, `EffectWarp`](#sprite-transformations) |
+| 171  | 4-frame loop sprite          | 0..3 (driven by `(state_i / 2) % 4`) | [Overlay](#overlay) |
+| 177  | Shield-damage stencil        | 0..7 (8-frame cycle, advances every 8 ticks) | [`EffectShieldDamage`](#sprite-transformations) |
+| 178  | Hacking glitch overlay       | 0..7 (8 frames, advances every tick) | [`EffectHacking`](#sprite-transformations) |
+| 181  | Agency icons                 | 0..4 (one per agency: Noxis, Lazarus, Caliber, Static, Blackrose) | [Toggle](#toggle) agency mode, [Player List](#player-list-drawplayerlist), [Team HUD](#team-hud) |
+| 188  | Horizontal-stretch chat panel | 0 (top-left), 1 (top edge, tiled), 2 (top-right), 6 (bottom-left), 7 (bottom edge, tiled), 8 (bottom-right). Indices 3, 4, 5 are reserved but **never drawn**. | [Horizontal-Stretch Panel](#horizontal-stretch-panel-chat-message-background) |
+| 208  | Agency intro animation        | 0..N (complex ramp up / hold / ramp down over 120+ ticks) | [Overlay](#overlay) |
+| 222  | 4-frame one-shot effect      | 0..3, then self-destruct | [Overlay](#overlay) |
+
+**Sprite-as-palette-tinting.** Indices 153, 177, 178, and 222 also appear in
+the [Effect-Color Reference](#effect-color-reference) — that's because effect
+code uses the same numeric value to mean "sprite bank" in some sites and
+"palette index" in others. Context disambiguates: bank numbers are used by
+`BlitSurface(spritebank[N][i], ...)`, palette indices by
+`EffectColor(surface, palette[N])`. Don't conflate them in a port.
+
+**Banks reserved for non-UI use** (not in this manifest): tile banks
+(`BIN_TIL.DAT` / `TIL_NNN.BIN`) for level rendering; player/civilian/projectile
+sprite banks for in-world entities; weapon, station, and pickup sprite banks.
+A port that only reimplements the UI can ignore these — but any bank not in
+the table above is, by convention, *not part of the design system*.
+
+---
+
+## Appendix B — Interface Manifest
+
+Every screen, dialog, and modal in the lobby and game flow, with its
+construction site and bounding box. A port should reproduce one Interface
+container per row.
+
+The first column of factory functions all live in `game.cpp`.
+
+### Top-level screens
+
+| Factory | Bounds `(x, y, w, h)` | Purpose | Background sprite |
+| ------------------------------ | --------------------- | ------------------------------------ | ----------------- |
+| `CreateMainMenuInterface :2497` | full-screen           | Logo + version + main menu buttons   | bank 7, idx varies |
+| `CreateLobbyConnectInterface :2822` | full-screen       | Login / username + password entry    | bank 7, idx 2 |
+| `CreateLobbyInterface :2905`   | full-screen           | Lobby header (title, version, map name, Go Back); hosts character + chat + game-list child Interfaces | bank 7, idx 1 |
+| `CreateGameSummaryInterface :3625` | full-screen       | Post-match stats and XP             | own background plate |
+
+### Options screens
+
+| Factory | Bounds | Purpose |
+| -------------------------------------- | ----------- | ----------------------------- |
+| `CreateOptionsInterface :2575`         | full-screen | Top-level options menu |
+| `CreateOptionsControlsInterface :2613` | full-screen | Key-binding configuration |
+| `CreateOptionsDisplayInterface :2700`  | full-screen | Resolution, fullscreen, scale filter |
+| `CreateOptionsAudioInterface :2761`    | full-screen | Volume sliders |
+
+### Lobby child Interfaces (added to the parent lobby)
+
+| Factory | Bounds `(x, y, w, h)` | Purpose |
+| -------------------------------- | ----------------------- | ----------------------------------- |
+| `CreateCharacterInterface :2960` | `(10, 64, 217, 120)`    | Local user info + agency toggles |
+| `CreateChatInterface :3163`      | `(15, 216, 368, 234)`   | Lobby chat: messages, presence, input, scrollbar |
+| `CreateGameSelectInterface :3078`| `(403, 87, 222, 267)`   | Active games list + Join/Create buttons |
+| `CreateGameCreateInterface :3233`| `(403, 87, 222, 390)`   | New-game form (replaces Game Select panel; same tall bounds as Tech panel) |
+| `CreateGameJoinInterface :3472`  | `(403, 87, 222, 267)`   | Game-info preview before joining |
+| `CreateGameTechInterface :3507`  | `(403, 87, 222, 390)`   | Tech selection (replaces Game Select panel; taller — extends below the normal panel area) |
+
+> The Game Select / Create / Join / Tech panels all share the same `(403, 87)`
+> origin and replace each other in the right-hand column based on lobby
+> sub-state. A port can model these as four states of one panel or as four
+> separate Interfaces swapped in.
+
+### In-game Interfaces (created on demand)
+
+| Factory | Source | Trigger | Notes |
+| -------------------------- | --------------------- | ----------------------------------- | ------------------------------------ |
+| Buy Menu Interface         | `player.cpp:459`      | Player at credit station            | Holds a `SelectBox` with `draw=false`; rendered by `DrawHUD()` at fixed coords. 5 visible items, 25 px row height. |
+| Tech Menu Interface        | `player.cpp:488`      | Player at tech station              | Same shape as Buy Menu, different item list. |
+| In-game Chat Interface     | `player.cpp:189`      | Player presses chat key             | Holds a `TextInput` with `draw=false`; rendered inside the [In-Game Chat Overlay](#in-game-chat-overlay) at runtime-assigned coords. |
+
+### Modals / dialogs (pushed on top of `currentinterface`)
+
+| Factory | Source | Use cases |
+| ------------------------------- | ------ | ---------------------------------------------- |
+| `CreateModalDialog :3776`       | sprite bank 40 idx 4, message text, optional OK button (`B156x21` at `(242, 230)`) | All blocking errors and async-status messages — see [Modal Dialog → Use Sites](#modal-dialog) |
+| `CreateUpdateInterface :3818`   | reuses bank 40 idx 4 background | Update-available prompt at startup |
+| `CreatePasswordDialog :4120`    | own composition | Prompts for game password before joining a private game |
+| `CreateMapPreview :4044`        | preview Interface only — not a modal | Renders a thumbnail of the selected map; lives inside Game Create / Game Join |
+
+### Modal stack semantics
+
+- A non-modal Interface is set into `currentinterface` (game-wide single slot).
+- Calling `CreateModalDialog()` saves `currentinterface` into
+  `aftermodalinterface`, marks the dialog as `modal = true`, and replaces
+  `currentinterface` with the dialog's id.
+- `DestroyModalDialog()` restores `aftermodalinterface`. Escape is **not**
+  bound to dismissal; only OK click, Enter (when `buttonenter` is set), or
+  programmatic destroy will close a dialog.
+- Only one dialog is ever active. There is no nested-modal stack. If a port
+  needs nested modals, model them as a stack of Interface ids and walk it on
+  destroy.
