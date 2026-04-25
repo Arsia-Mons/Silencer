@@ -4,7 +4,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // zSILENCER game palette (extracted from game icon)
+        // Silencer game palette (extracted from game icon)
         game: {
           bg:       '#050a05',
           bgCard:   'rgba(10,18,10,0.88)',

@@ -24,8 +24,8 @@ services:
       - "25672:5672"     # AMQP
       - "25673:15672"    # Management UI
     environment:
-      RABBITMQ_DEFAULT_USER: zsilencer
-      RABBITMQ_DEFAULT_PASS: zsilencer
+      RABBITMQ_DEFAULT_USER: silencer
+      RABBITMQ_DEFAULT_PASS: silencer
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     restart: unless-stopped
@@ -45,8 +45,8 @@ services:
       - mongo
       - rabbitmq
     environment:
-      RABBITMQ_URL: "amqp://zsilencer:zsilencer@rabbitmq:5672/"
-      MONGO_URL: "mongodb://mongo:27017/zsilencer"
+      RABBITMQ_URL: "amqp://silencer:silencer@rabbitmq:5672/"
+      MONGO_URL: "mongodb://mongo:27017/silencer"
     command:
       - "-addr"
       - ":15170"
@@ -61,7 +61,7 @@ services:
       - "-game-port-count"
       - "200"
       - "-rabbitmq-url"
-      - "amqp://zsilencer:zsilencer@rabbitmq:5672/"
+      - "amqp://silencer:silencer@rabbitmq:5672/"
       - "-map-api-addr"
       - ":15172"
       - "-maps-dir"
@@ -70,7 +70,7 @@ services:
 
   admin-api:
     build:
-      context: ./admin/api
+      context: ./services/admin-api
     ports:
       - "24080:24080"
     depends_on:
@@ -78,8 +78,8 @@ services:
       - rabbitmq
     environment:
       PORT: "24080"
-      MONGO_URL: "mongodb://mongo:27017/zsilencer"
-      RABBITMQ_URL: "amqp://zsilencer:zsilencer@rabbitmq:5672/"
+      MONGO_URL: "mongodb://mongo:27017/silencer"
+      RABBITMQ_URL: "amqp://silencer:silencer@rabbitmq:5672/"
       JWT_SECRET: "${JWT_SECRET:-changeme-in-production}"
       LOBBY_PLAYER_AUTH_URL: "http://lobby:15171"
       BACKUP_DIR: "/backups"
@@ -93,7 +93,7 @@ services:
 
   admin-web:
     build:
-      context: ./admin/web
+      context: ./web/admin
       args:
         NEXT_PUBLIC_API_URL: "http://${PUBLIC_ADDR:-localhost}:24080"
         NEXT_PUBLIC_WS_URL: "ws://${PUBLIC_ADDR:-localhost}:24080"

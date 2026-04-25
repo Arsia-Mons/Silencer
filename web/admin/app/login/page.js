@@ -41,7 +41,7 @@ function LoginForm() {
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-8">
-          <img src="/logo.png" alt="zSILENCER" className="h-20 w-auto" />
+          <img src="/logo.png" alt="Silencer" className="h-20 w-auto" />
         </div>
 
         {/* Mode tabs */}

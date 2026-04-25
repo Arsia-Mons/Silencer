@@ -48,7 +48,7 @@ async function start() {
   startBackupScheduler();
   initWS(server);
   await startConsumer();
-  server.listen(PORT, () => console.log(`[api] zSILENCER admin API on :${PORT}`));
+  server.listen(PORT, () => console.log(`[api] Silencer admin API on :${PORT}`));
 }
 
 start().catch((e) => { console.error(e); process.exit(1); });

@@ -77,7 +77,7 @@ export default function ChangelogPage() {
         ))}
 
         <p className="text-game-muted text-[10px] font-mono text-center mt-4 pb-2">
-          zSILENCER ADMIN CONSOLE — ALL TIMES UTC
+          SILENCER ADMIN CONSOLE — ALL TIMES UTC
         </p>
       </main>
     </div>

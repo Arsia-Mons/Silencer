@@ -1,6 +1,6 @@
 import './globals.css';
 
-export const metadata = { title: 'zSILENCER Admin', description: 'Game server dashboard' };
+export const metadata = { title: 'Silencer Admin', description: 'Game server dashboard' };
 
 export default function RootLayout({ children }) {
   return (

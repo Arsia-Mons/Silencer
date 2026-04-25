@@ -41,7 +41,7 @@ by default. On macOS that requires `sudo`; use any unprivileged port
 
 | variable | meaning |
 |---|---|
-| `MONGO_URL` | MongoDB connection string for async player sync (e.g. `mongodb://mongo:27017/zsilencer`). Leave empty to disable MongoDB sync entirely. |
+| `MONGO_URL` | MongoDB connection string for async player sync (e.g. `mongodb://mongo:27017/silencer`). Leave empty to disable MongoDB sync entirely. |
 
 ## How it works
 

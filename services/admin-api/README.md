@@ -1,4 +1,4 @@
-# zSILENCER Admin API
+# Silencer Admin API
 
 Express.js REST + WebSocket API that powers the admin dashboard and player portal.
 
@@ -28,8 +28,8 @@ Environment variables (set in `.env` beside `docker-compose.yml`):
 | Variable              | Default                               | Description                        |
 |-----------------------|---------------------------------------|------------------------------------|
 | `PORT`                | `24080`                               | HTTP listen port                   |
-| `MONGO_URL`           | `mongodb://mongo:27017/zsilencer`     | MongoDB connection string          |
-| `RABBITMQ_URL`        | `amqp://zsilencer:zsilencer@...`      | RabbitMQ AMQP URL                  |
+| `MONGO_URL`           | `mongodb://mongo:27017/silencer`      | MongoDB connection string          |
+| `RABBITMQ_URL`        | `amqp://silencer:silencer@...`        | RabbitMQ AMQP URL                  |
 | `JWT_SECRET`          | `changeme-in-production`              | Secret for signing JWTs            |
 | `LOBBY_PLAYER_AUTH_URL` | `http://lobby:15171`               | Lobby HTTP auth endpoint           |
 | `BACKUP_DIR`          | `/backups`                            | Directory for mongodump archives   |
@@ -131,9 +131,13 @@ Backups run via `mongodump` inside the admin-api container (MongoDB tools instal
 
 **Restore**:
 ```bash
-# On the VM host (mongo exposed on 28017)
+# On the VM host (mongo exposed on 28017).
+# NOTE: container/volume names like `zsilencer-mongo-1` /
+# `zsilencer_*` come from the docker-compose project name (the
+# repo dir is still `zSilencer/`); they're decoupled from the
+# `silencer` Mongo DB name and are renamed in a later phase.
 docker exec -i zsilencer-mongo-1 mongorestore \
-  --uri=mongodb://localhost:27017/zsilencer \
+  --uri=mongodb://localhost:27017/silencer \
   --archive --gzip < /path/to/backup.gz
 
 # Or from inside the backup volume
@@ -141,7 +145,7 @@ docker run --rm \
   -v zsilencer_backup-data:/backups \
   -v zsilencer_mongo-data:/data/db \
   mongo:7 mongorestore \
-  --uri=mongodb://mongo:27017/zsilencer \
+  --uri=mongodb://mongo:27017/silencer \
   --archive=/backups/zsilencer-<timestamp>.archive.gz --gzip
 ```
 

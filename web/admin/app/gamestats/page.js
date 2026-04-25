@@ -228,7 +228,7 @@ export default function GameStatsPage() {
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-game-border bg-game-bgCard">
         <div>
-          <img src="/logo.png" alt="zSILENCER" className="h-10 w-auto" />
+          <img src="/logo.png" alt="Silencer" className="h-10 w-auto" />
           <div className="text-game-textDim text-xs font-mono tracking-widest">PLAYER PORTAL</div>
         </div>
         <div className="flex items-center gap-3">

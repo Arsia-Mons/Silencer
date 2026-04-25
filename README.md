@@ -75,5 +75,5 @@ Documentation
 - [Developer Guide](CLAUDE.md) — project layout, build commands, dedicated-server contract, gotchas
 - [Production Setup](docs/production.md) — stand up your own lobby on AWS: Terraform, CI wiring, day-2 ops, failure modes
 - [Lobby Server](services/lobby/README.md) — self-hosted lobby server (Go): build, run, protocol, deployment
-- [Admin API](admin/api/README.md) — Express.js REST + WebSocket API powering the admin dashboard
-- [Admin Web](admin/web/README.md) — Next.js admin dashboard and player self-service portal
+- [Admin API](services/admin-api/README.md) — Express.js REST + WebSocket API powering the admin dashboard
+- [Admin Web](web/admin/README.md) — Next.js admin dashboard and player self-service portal

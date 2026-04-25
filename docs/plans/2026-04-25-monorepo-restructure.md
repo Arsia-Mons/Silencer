@@ -165,8 +165,8 @@ These are deliberate non-goals; each gets its own follow-up if pursued:
 
 - The actual `git mv` operations and ref updates to make this layout
   real. That's the implementation PR.
-- Migrating `admin/web` and `admin/api` from JS to TS — a separate
-  effort tracked under the Bun+TS rule.
+- Migrating `web/admin` and `services/admin-api` from JS to TS — a
+  separate effort tracked under the Bun+TS rule.
 - Building the `website/` content. The directory exists; the site
   doesn't.
 - Building `clients/cli/`. Slot only.
