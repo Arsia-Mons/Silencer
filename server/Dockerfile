@@ -23,7 +23,7 @@ COPY CMakeLists.txt .
 COPY cmake/ cmake/
 COPY src/ src/
 COPY shared/assets/ shared/assets/
-COPY res/ res/
+COPY shared/icons/ shared/icons/
 
 RUN cmake -B build -S . \
         -DCMAKE_BUILD_TYPE=Release \

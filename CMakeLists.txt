@@ -16,7 +16,7 @@ endif()
 # Extra files that get bundled into the .app on macOS (icon + shared/assets/).
 set(bundle_extras "")
 if(APPLE)
-	set(bundle_icon "${CMAKE_CURRENT_SOURCE_DIR}/res/icon.icns")
+	set(bundle_icon "${CMAKE_CURRENT_SOURCE_DIR}/shared/icons/icon.icns")
 	set_source_files_properties("${bundle_icon}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 	list(APPEND bundle_extras "${bundle_icon}")
 
@@ -120,10 +120,10 @@ target_link_libraries(${PROJECT} minizip_dep)
 
 install(TARGETS "${PROJECT}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(DIRECTORY "shared/assets/" DESTINATION "${CMAKE_INSTALL_DATADIR}/${PROJECT}")
-install(FILES "res/icon_16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "zsilencer.png")
-install(FILES "res/icon_32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "zsilencer.png")
-install(FILES "res/icon_64.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME "zsilencer.png")
-install(FILES "res/icon_128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "zsilencer.png")
+install(FILES "shared/icons/icon_16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "zsilencer.png")
+install(FILES "shared/icons/icon_32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "zsilencer.png")
+install(FILES "shared/icons/icon_64.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME "zsilencer.png")
+install(FILES "shared/icons/icon_128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "zsilencer.png")
 install(FILES "zsilencer.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
 
 set(CPACK_PACKAGE_NAME "zSilencer")
