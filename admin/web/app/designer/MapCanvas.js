@@ -98,12 +98,10 @@ export default function MapCanvas({
     // Ambient darkness from map header: ambiencelevel = 128 + ambience*4.5
     const ambience = map.header?.ambience ?? 0;
     const ambiencelevel = Math.max(0, Math.min(255, 128 + ambience * 4.5));
-    // brightness % to pass to ctx.filter — affects RGB only, leaves alpha intact
-    const brightnessPct = (ambiencelevel / 128 * 100).toFixed(1);
-    const ambientFilter = `brightness(${brightnessPct}%)`;
+    const darkAlpha = Math.max(0, 1 - ambiencelevel / 128); // e.g. ~0.42-0.55
 
-    // Helper to draw a tile with LUM-aware lighting
-    function drawTile(tile_id, flip, isLum, col, row) {
+    // Draw a single tile (no filter — fast)
+    function blitTile(tile_id, flip, col, row) {
       if (!tile_id) return;
       const bank = (tile_id >> 8) & 0xFF;
       const idx  = tile_id & 0xFF;
@@ -113,10 +111,6 @@ export default function MapCanvas({
       const dx = col * tileSize + pan.x;
       const dy = row * tileSize + pan.y;
       if (dx + tileSize < 0 || dx > W || dy + tileSize < 0 || dy > H) return;
-
-      // Apply brightness filter before draw — transparent pixels stay transparent
-      ctx.filter = isLum ? 'brightness(130%)' : ambientFilter;
-
       if (flip) {
         ctx.save();
         ctx.translate(dx + tileSize, dy);
@@ -126,31 +120,49 @@ export default function MapCanvas({
       } else {
         ctx.drawImage(bmp, dx, dy, tileSize, tileSize);
       }
-      ctx.filter = 'none';
     }
 
-    // BG layers 0-3
+    // Pass 1: draw ALL tiles at full brightness (no filter per tile)
     for (let l = 0; l < 4; l++) {
       for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
           const cell = layers.bg[l][row * width + col];
-          if (cell) drawTile(cell.tile_id, cell.flip, cell.lum !== 0, col, row);
+          if (cell) blitTile(cell.tile_id, cell.flip, col, row);
         }
       }
     }
-
-    // FG layers 0-3
     for (let l = 0; l < 4; l++) {
       for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
           const cell = layers.fg[l][row * width + col];
-          if (cell) drawTile(cell.tile_id, cell.flip, cell.lum !== 0, col, row);
+          if (cell) blitTile(cell.tile_id, cell.flip, col, row);
         }
       }
     }
 
-    // Ensure filter is cleared before drawing overlays
-    ctx.filter = 'none';
+    // Pass 2: one dark overlay over the entire map area (darkens non-LUM tiles)
+    if (darkAlpha > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${darkAlpha.toFixed(3)})`;
+      ctx.fillRect(pan.x, pan.y, width * tileSize, height * tileSize);
+    }
+
+    // Pass 3: redraw LUM tiles on top of the overlay (they appear bright)
+    for (let l = 0; l < 4; l++) {
+      for (let row = 0; row < height; row++) {
+        for (let col = 0; col < width; col++) {
+          const cell = layers.bg[l][row * width + col];
+          if (cell?.lum) blitTile(cell.tile_id, cell.flip, col, row);
+        }
+      }
+    }
+    for (let l = 0; l < 4; l++) {
+      for (let row = 0; row < height; row++) {
+        for (let col = 0; col < width; col++) {
+          const cell = layers.fg[l][row * width + col];
+          if (cell?.lum) blitTile(cell.tile_id, cell.flip, col, row);
+        }
+      }
+    }
 
     // Grid overlay when zoomed in enough
     if (zoom >= 0.25) {
