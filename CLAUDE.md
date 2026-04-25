@@ -31,7 +31,9 @@ Each component owns its own `CLAUDE.md` with build/run/test/gotchas:
 
 1. **JavaScript = Bun + TypeScript + oxfmt.** No `node`,
    `npm`/`pnpm`/`yarn`, `.js` source, or alternative formatters.
-   Migrate as you touch.
+   Migrate as you touch. **Exception:** `services/admin-api/` and
+   `web/admin/` keep Node + npm + JS until their dedicated
+   Bun-migration phase — see those components' `CLAUDE.md`.
 2. **Every component dir has a `CLAUDE.md`** with an `AGENTS.md`
    symlink alongside (one-line stub on Windows). Keep them
    identical.

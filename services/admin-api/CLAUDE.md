@@ -50,8 +50,11 @@ here for now.
   upload. **`mongodump` is a runtime dependency**: the Dockerfile
   installs `mongodb-tools`; local dev needs it on PATH.
 - `src/backup/github.js` — Commits the latest archive to
-  `silencer.archive.gz` in the configured repo (default
-  `Arsia-Mons/silencer-mongo-backup`). Uses contents API + base64
+  `zsilencer.archive.gz` (filename intentionally preserved across
+  the rebrand — it's a stable identifier in the external backup
+  repo) in the repo named by `GITHUB_BACKUP_REPO`. Disabled if
+  `GITHUB_BACKUP_REPO` or `GITHUB_TOKEN` is unset. (Compose default:
+  `Arsia-Mons/silencer-mongo-backup`.) Uses contents API + base64
   upload, no clone.
 - `src/backup/scheduler.js` — `node-cron` driver. Schedule from
   `BACKUP_CRON`.

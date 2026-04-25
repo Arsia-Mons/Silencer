@@ -8,8 +8,11 @@ now.
 
 ## Per-route
 
-- `app/page.js` — admin dashboard (live online players, active
-  games, recent events). Snapshot-driven via `useSocket`.
+- `app/page.js` — root entry; just `redirect('/dashboard')`.
+- `app/dashboard/page.js` — admin dashboard (live online players,
+  active games, in-game / in-room counts). Snapshot-driven via
+  `useSocket`; subscribes to `player.*` and `game.*` events to keep
+  the in-memory map in sync.
 - `app/login/page.js` — admin login + `?mode=player` toggle for the
   player portal login.
 - `app/players/page.js` + `app/players/[accountId]/page.js` — list
@@ -18,10 +21,10 @@ now.
   buttons that hit the API which proxies to the lobby in real time.
 - `app/me/page.js` — player self-service portal (own profile +
   match history). Player JWT only.
-- `app/sessions/`, `app/events/`, `app/audit/`, `app/health/`,
-  `app/changelog/`, `app/howto/`, `app/users/`,
-  `app/gamestats/` — read-only or settings pages. `health` also
-  hosts the MongoDB backup panel (trigger / status / list).
+- `app/audit/`, `app/health/`, `app/changelog/`, `app/howto/`,
+  `app/users/`, `app/gamestats/` — read-only or settings pages.
+  `health` also hosts the MongoDB backup panel (trigger / status /
+  list).
 - `app/designer/` — embedded level designer (folded in here, not
   the standalone `designer/` dir which is being retired in Phase 5).
   Hooks: `useSilMap.js` (parses `.SIL` map files via `pako`),
