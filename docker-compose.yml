@@ -37,7 +37,7 @@ services:
     ports:
       - "15170:15170/tcp"
       - "15170:15170/udp"
-      - "20000-20009:20000-20009/udp"
+      - "20000-20199:20000-20199/udp"
     volumes:
       - lobby-data:/data
     depends_on:
@@ -58,7 +58,7 @@ services:
       - "-game-port-base"
       - "20000"
       - "-game-port-count"
-      - "10"
+      - "200"
       - "-rabbitmq-url"
       - "amqp://zsilencer:zsilencer@rabbitmq:5672/"
     restart: unless-stopped
