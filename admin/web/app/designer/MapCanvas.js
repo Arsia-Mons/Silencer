@@ -311,20 +311,6 @@ export default function MapCanvas({
   const handleMouseDown = useCallback((e) => {
     const { cx, cy } = getCanvasPos(e);
 
-    // Right-click: show actor context menu
-    if (e.button === 2 && map) {
-      const { wx, wy } = canvasToWorld(cx, cy);
-      for (let i = map.actors.length - 1; i >= 0; i--) {
-        const a = map.actors[i];
-        const dist = Math.hypot(a.x - wx, a.y - wy);
-        if (dist < 48 / zoom) {
-          onActorRightClick?.(i, e.clientX, e.clientY);
-          return;
-        }
-      }
-      return;
-    }
-
     // Middle mouse or Space+left or Ctrl+left = pan
     if (e.button === 1 || (e.button === 0 && isSpacePanning.current) || (e.button === 0 && isCtrlPanning.current)) {
       isPanning.current = true;
@@ -377,7 +363,24 @@ export default function MapCanvas({
       }
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom,
-      onTilePaint, onPlatformRemove, onActorPlace, onActorRemove, onActorRightClick, onDragPlatformChange, onBeginPaint]);
+      onTilePaint, onPlatformRemove, onActorPlace, onActorRemove, onDragPlatformChange, onBeginPaint]);
+
+  // Right-click on actor: use onContextMenu (more reliable than mousedown button=2)
+  const handleContextMenu = useCallback((e) => {
+    e.preventDefault();
+    if (!map || !onActorRightClick) return;
+    const { cx, cy } = getCanvasPos(e);
+    const { wx, wy } = canvasToWorld(cx, cy);
+    // Use generous radius (96 world px) — sprites are offset from actor position
+    const HIT_RADIUS = 96 / zoom;
+    let best = null, bestDist = HIT_RADIUS;
+    for (let i = map.actors.length - 1; i >= 0; i--) {
+      const a = map.actors[i];
+      const dist = Math.hypot(a.x - wx, a.y - wy);
+      if (dist < bestDist) { bestDist = dist; best = i; }
+    }
+    if (best !== null) onActorRightClick(best, e.clientX, e.clientY);
+  }, [map, canvasToWorld, zoom, onActorRightClick]);
 
   const handleMouseMove = useCallback((e) => {
     const { cx, cy } = getCanvasPos(e);
@@ -468,7 +471,7 @@ export default function MapCanvas({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onContextMenu={e => e.preventDefault()}
+        onContextMenu={handleContextMenu}
       />
     </div>
   );
