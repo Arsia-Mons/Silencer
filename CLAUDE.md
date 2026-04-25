@@ -20,7 +20,8 @@ Each component owns its own `CLAUDE.md` with build/run/test/gotchas:
 - `services/lobby/` — Go lobby server
 - `services/admin-api/` — Express → Bun+TS admin backend
 - `web/admin/` — Next.js admin dashboard + level designer
-- `shared/data/` — runtime assets (sprites, tiles, sounds)
+- `shared/assets/` — runtime game assets (sprites, tiles, sounds, levels)
+- `shared/icons/` — app icons used by `clients/silencer` build
 - `infra/terraform/` — AWS infra
 
 > Layout migration in progress. See

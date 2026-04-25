@@ -35,6 +35,9 @@ left to the implementation PR.
   coding agents; today there is nowhere obvious to put it.
 - Shared runtime assets (`data/`, `res/`) are consumed by multiple
   components but live at the root with no signal that they're shared.
+  They're also misnamed — `data/` is game assets (sprites/tiles/sounds/
+  levels), `res/` is just app icons. Renaming them as we move:
+  `data/` → `shared/assets/`, `res/` → `shared/icons/`.
 
 ## Desired End State
 
@@ -60,9 +63,9 @@ silencer/                      # repo root (currently named zSilencer/
 │                              #   driven E2E testing of the game
 │
 ├── shared/                    # Consumed by 2+ of the above
-│   ├── data/                  # Runtime assets — sprite/tile/sound
-│   │                          #   banks, levels (was data/)
-│   └── res/                   # App icons used by clients/silencer
+│   ├── assets/                # Runtime game assets — sprite/tile/sound
+│   │                          #   banks, levels, palette (was data/)
+│   └── icons/                 # App icons used by clients/silencer
 │                              #   build (was res/)
 │
 ├── infra/                     # How we build, package, and deploy
@@ -104,7 +107,7 @@ The top-level `CLAUDE.md` will gain three repository-wide conventions:
 
 Every directory that represents a distinct component
 (`web/admin/`, `web/website/`, `services/lobby/`, `services/admin-api/`,
-`clients/silencer/`, `clients/cli/`, `shared/data/`, `infra/terraform/`,
+`clients/silencer/`, `clients/cli/`, `shared/assets/`, `infra/terraform/`,
 etc.) gets its own `CLAUDE.md` describing:
 
 - What this component is and what consumes it
