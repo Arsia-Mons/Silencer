@@ -80,12 +80,12 @@ Each phase below assumes the previous phase has merged.
 
 ### Phase 1 outcome notes (carry into next session)
 
-- **Runtime layout preserved.** The implementer chose to keep the literal `data/` directory at runtime (binaries on installed user machines still expect `data/` next to them) and rename `shared/assets/` → `data/` at install/copy time across every build target (Linux install, macOS bundle, Windows package, Docker image, deploy scp). Rationale: don't break installed users. This is a defensible interpretation of the plan but worth confirming before later phases assume it.
-- **Opportunistic rebrand applied:** `MACOSX_BUNDLE_BUNDLE_NAME` and a build-mac-local.sh comment. NOT touched: `ZSILENCER_*` CMake vars (would force renames in every C++ file referencing them), `zSILENCER-Info.plist`, `zSILENCER.xcodeproj/`, `zsilencer.desktop` filenames (Phase 2).
+- **Runtime layout: `assets/` everywhere.** First implementation attempt preserved the legacy runtime `data/` layout (rename `shared/assets/` → `data/` at install time) for installed-user compat. That violated the no-shim rule in `CLAUDE.md` and was reverted in commit `905c39c`. Final state: C++ source uses `"assets/..."` literals; CMake/Linux install lands at `/usr/local/share/zsilencer/` directly; macOS bundle uses `Contents/assets/`; Windows zip stages `assets/`; Docker runtime image lands at `/usr/local/share/zsilencer/`; deploy workflow already used `current/assets`. **Installed users will need a fresh install on next update** — accepted cost per the rule.
+- **Container-volume paths untouched** (`/data/db`, `/data/lobby.json`, `/data/maps`, `mongo-data:/data/db`). These are state storage, not the asset bank — different concept, intentionally left alone.
+- **Opportunistic rebrand applied:** `MACOSX_BUNDLE_BUNDLE_NAME` and a build-mac-local.sh comment. NOT touched: `ZSILENCER_*` CMake vars (would force renames in every C++ file referencing them), `zSILENCER-Info.plist`, `zSILENCER.xcodeproj/`, `zsilencer.desktop` filenames, `~/Library/Application Support/zSILENCER` literal (Phase 2).
 - **Concerns flagged but not addressed (verify in Phase 2):**
   - `resources.rc` — its `IDI_ICON1` was updated to `shared/icons/icon.ico`, but the file may not actually be wired into the CMake build (no `add_executable` reference, no `file(GLOB)` for `.rc`). Likely a leftover from a `.sln` workflow. Phase 2 should determine fate.
   - `zSILENCER.xcodeproj/project.pbxproj` references `icon.icns` by relative path; that path is now stale. Implementer did NOT edit pbxproj (risk of corrupting Xcode-managed format). Phase 2 plans to delete the Xcode project anyway.
-  - `admin/web/app/designer/*.js` UI strings reference `data/` folder — left alone (out of scope).
 
 ---
 
