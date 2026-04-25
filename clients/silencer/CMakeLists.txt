@@ -64,6 +64,15 @@ endif()
 
 target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_14)
 
+# /Z7 embeds debug info into .obj files instead of routing it through MSVC's
+# mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
+# Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock
+# solid and debuggers handle it identically. Linker still emits Silencer.pdb
+# for runtime debugging.
+if(MSVC)
+	target_compile_options(${SILENCER_TARGET} PRIVATE $<$<CONFIG:Debug>:/Z7>)
+endif()
+
 set(SILENCER_LOBBY_HOST "127.0.0.1" CACHE STRING "Lobby host the client connects to at startup")
 set(SILENCER_LOBBY_PORT "517" CACHE STRING "Lobby TCP port")
 set(SILENCER_VERSION "00025" CACHE STRING "Client version string sent to the lobby during MSG_VERSION")
