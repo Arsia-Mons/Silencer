@@ -1,86 +1,51 @@
-# zSILENCER
+# Silencer
 
-Multiplayer 2D action game (C++/SDL2) plus a self-hosted Go lobby server
-that replaces the defunct `lobby.zsilencer.com`.
+Multiplayer 2D action game (C++/SDL2) plus a self-hosted Go lobby
+server, an admin web app (Next.js), and an admin API (Bun+TS).
+Rebranded from zSILENCER — use "Silencer" in new content, rename
+old identifiers opportunistically when touching the file.
 
-## Commands
+## Tech stack
 
-```bash
-# Build the client (Linux/macOS)
-cd build && cmake .. && make
-
-# Build the lobby server (stdlib only, no deps)
-cd server && go build       # → ./zsilencer-lobby
-
-# Run a local lobby + game
-sudo ./server/zsilencer-lobby -addr :517 -game-binary ./build/zsilencer
-./build/zsilencer
-```
-
-Windows: open `zSILENCER.sln` in Visual Studio; SDL2 + SDL2_mixer dev
-libs must be on the VS include/lib path.
-
-Runtime deps (client): SDL2, SDL2_mixer, zlib.
+- Game client: C++14 / SDL2 / CMake
+- Lobby server: Go (stdlib + `mongo-driver`/`amqp091-go`, both optional)
+- Admin web + API: Bun + TypeScript + oxfmt
+- Infra: Docker Compose, Terraform (AWS)
 
 ## Layout
 
-- `src/` — C++ client (~159 files, CMake, C++14). Entry: `src/main.cpp`.
-- `server/` — Go lobby server. Entry: `server/main.go`.
-- `data/` — runtime assets (sprites, tiles, sounds, palette).
-- `res/` — app icons.
-- `build/` — out-of-tree CMake build dir (contains `zsilencer` binary).
-- `terraform/` — AWS infra (EC2 + EBS + cloud-init + Tailscale). See
-  `terraform/CLAUDE.md`.
-- `docs/production.md` — production setup guide: stand up your own
-  lobby from scratch, CI wiring, day-2 ops, failure modes.
-- `scripts/fastdeploy.sh` — bypass CI: rsync → build on the box → swap
-  binary → restart `zsilencer-lobby`. Debug-only; prod goes through
-  `.github/workflows/deploy.yml`.
-- `.github/workflows/` — `deploy.yml` (tag `v*` → ARM64 lobby build →
-  scp over Tailscale → symlink swap); `release.yml` (macOS + Windows
-  client zips).
+Each component owns its own `CLAUDE.md` with build/run/test/gotchas:
 
-Protocol constants and lobby wire format are in `src/lobby.cpp`,
-`src/lobbygame.cpp`, and `server/protocol.go`.
+- `clients/silencer/` — C++ game + dedicated server (same binary)
+- `services/lobby/` — Go lobby server
+- `services/admin-api/` — Express → Bun+TS admin backend
+- `web/admin/` — Next.js admin dashboard + level designer
+- `shared/assets/` — runtime game assets (sprites, tiles, sounds, levels)
+- `shared/icons/` — app icons used by `clients/silencer` build
+- `infra/terraform/` — AWS infra
 
-## Dedicated-server contract
+> Layout migration in progress. See
+> [docs/plans/2026-04-25-monorepo-restructure.md](docs/plans/2026-04-25-monorepo-restructure.md).
 
-The same `zsilencer` binary runs the client and, when launched with
-`-s`, a headless dedicated server:
+## Universal rules
 
-```
-zsilencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
-```
+1. **JavaScript = Bun + TypeScript + oxfmt.** No `node`,
+   `npm`/`pnpm`/`yarn`, `.js` source, or alternative formatters.
+   Migrate as you touch.
+2. **Every component dir has a `CLAUDE.md`** with an `AGENTS.md`
+   symlink alongside (one-line stub on Windows). Keep them
+   identical.
+3. **No backwards-compat shims during refactors** unless asked.
+   Update everything to the new design and delete the old.
+4. **Verify end-to-end before claiming done** for cross-service
+   features. Real request through the full stack.
+5. **Ask early when ambiguous.** Cheaper than redoing it.
 
-- Parsed in `src/main.cpp:160` → `src/game.cpp:132`.
-- Spawned by the Go lobby in `server/proc.go` on each `MSG_NEWGAME`.
-- Dedicated mode skips `SDL_Init(VIDEO)` and audio; RSS ~12 MB.
-- Heartbeats UDP to the lobby: `[0x00][gameid u32][port u16][state u8]`.
-  If no heartbeat in 30 s, the lobby aborts the create.
+## More
 
-## Gotchas
-
-- **Lobby host is a compile-time constant.** Baked in via
-  `-DZSILENCER_LOBBY_HOST=<host> -DZSILENCER_LOBBY_PORT=<port>` (see
-  `CMakeLists.txt:48`, used at `src/game.cpp:4018`/`:4032`). Default is
-  `127.0.0.1:517`. CI sets it to `silencer.hventura.com`; rebuild the
-  client to point at a different lobby.
-- **Version string must match.** Client sets it at `src/game.cpp:31`
-  (`world.SetVersion("00024")`); the lobby's `-version` flag defaults
-  to the same. Bump both together, or pass `-version ""` on the server
-  to accept any client. `CMakeLists.txt` `CPACK_PACKAGE_VERSION` is
-  installer metadata only — unrelated to the wire handshake.
-- **Port 517 needs root on macOS/Linux.** For local dev, rebuild with
-  `-DZSILENCER_LOBBY_PORT=15170` and run the lobby on `:15170`.
-- **Data dir on macOS.** Client `chdir`s to
-  `~/Library/Application Support/zSILENCER` at startup
-  (`src/main.cpp` `CDDataDir`) — copy `data/` there or run from the
-  repo with the binary in place.
-- **Android/Ouya code paths exist** in `src/main.cpp` but are not
-  actively maintained; don't rely on them.
-
-## Lobby storage
-
-Users and per-agency stats live in `lobby.json` (flat file, atomic
-writes, SHA-1 hashed passwords). Swap for SQLite/Postgres in
-`server/store.go` if traffic grows.
+- Writing CLAUDE.md well: [docs/writing-a-good-claude-md.md](docs/writing-a-good-claude-md.md)
+- Production setup: `docs/production.md`
+- UI design system + asset formats: `docs/design-system.md`
+- Intent docs: `docs/plans/`
+- TDD execution plans: `docs/superpowers/plans/`
+- Specs: `docs/superpowers/specs/`
