@@ -192,35 +192,51 @@ export default function MapCanvas({
     ctx.strokeRect(pan.x, pan.y, width * tileSize, height * tileSize);
 
     // Platform overlays
-    for (const p of platforms) {
-      const typeName = platformTypeName(p.type1, p.type2);
+    function drawPlatform(cx1, cy1, cx2, cy2, typeName, dashed) {
       const color = PLATFORM_COLORS[typeName] ?? 'rgba(80,130,255,0.3)';
       ctx.fillStyle = color;
       ctx.strokeStyle = color.replace(/[\d.]+\)$/, '0.9)');
       ctx.lineWidth = 1;
+      if (dashed) ctx.setLineDash([4, 4]);
+
+      ctx.beginPath();
+      if (typeName === 'STAIRSUP') {
+        // Ramp rising left→right: right-angle at bottom-right
+        ctx.moveTo(cx1, cy2); // bottom-left
+        ctx.lineTo(cx2, cy1); // top-right
+        ctx.lineTo(cx2, cy2); // bottom-right
+      } else if (typeName === 'STAIRSDOWN') {
+        // Ramp falling left→right: right-angle at bottom-left
+        ctx.moveTo(cx1, cy1); // top-left
+        ctx.lineTo(cx2, cy2); // bottom-right
+        ctx.lineTo(cx1, cy2); // bottom-left
+      } else {
+        ctx.rect(cx1, cy1, cx2 - cx1, cy2 - cy1);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      if (dashed) ctx.setLineDash([]);
+    }
+
+    for (const p of platforms) {
+      const typeName = platformTypeName(p.type1, p.type2);
       const cx1 = p.x1 * zoom + pan.x;
       const cy1 = p.y1 * zoom + pan.y;
       const cx2 = p.x2 * zoom + pan.x;
       const cy2 = p.y2 * zoom + pan.y;
-      ctx.fillRect(cx1, cy1, cx2 - cx1, cy2 - cy1);
-      ctx.strokeRect(cx1, cy1, cx2 - cx1, cy2 - cy1);
+      drawPlatform(cx1, cy1, cx2, cy2, typeName, false);
     }
 
     // Drag platform preview
     if (dragPlatform) {
       const { wx1, wy1, wx2, wy2, typeName } = dragPlatform;
-      const color = PLATFORM_COLORS[typeName] ?? 'rgba(80,130,255,0.3)';
-      ctx.fillStyle = color;
-      ctx.strokeStyle = color.replace(/[\d.]+\)$/, '0.9)');
-      ctx.setLineDash([4, 4]);
-      ctx.lineWidth = 1;
       const cx1 = wx1 * zoom + pan.x;
       const cy1 = wy1 * zoom + pan.y;
       const cx2 = wx2 * zoom + pan.x;
       const cy2 = wy2 * zoom + pan.y;
-      ctx.fillRect(cx1, cy1, cx2 - cx1, cy2 - cy1);
-      ctx.strokeRect(cx1, cy1, cx2 - cx1, cy2 - cy1);
-      ctx.setLineDash([]);
+      drawPlatform(cx1, cy1, cx2, cy2, typeName, true);
     }
 
     // Actor icons
