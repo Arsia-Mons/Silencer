@@ -93,7 +93,7 @@ exactly `width` pixels horizontally, regardless of glyph shape. This is a monosp
 
 | Function | Source | Notes |
 | ---------------------- | --------------------- | ----------------------------------------------- |
-| `DrawText()` | `renderer.cpp:1443` | Core glyph renderer (bank, width, color, alpha) |
+| `DrawText()` | `renderer.cpp:1443` | Core glyph renderer (bank, width, color, alpha). **Quirk:** if both `color == 0` *and* `brightness == 0`, the renderer skips all effect processing — color tinting included. Default `brightness = 128` avoids this; only matters if a port explicitly passes `brightness = 0`. |
 | `DrawTinyText()` | `renderer.cpp:1514` | Convenience — uses bank 132, width 4, centered |
 | `DrawTextInput()` | `renderer.cpp:1490` | Renders input field text with caret |
 
@@ -1104,7 +1104,7 @@ each frame and maps it to a `res_index` based on the bank:
 | 58 | Same as 57 | Different sprite set, same timing |
 | 171 | `res_index = (state_i / 2) % 4` | 4-frame loop, half-speed |
 | 208 | Complex ramp up/hold/ramp down over 120+ ticks | Agency intro animation |
-| 222 | `res_index = state_i`, destroys at 3 | 3-frame one-shot, then self-destruct |
+| 222 | `res_index = state_i`, destroys at 3 | 4-frame one-shot, then self-destruct (frames 0–3 all render; destroy is deferred to end-of-tick) |
 
 #### Hit-Testing
 
@@ -1559,10 +1559,11 @@ Available credits line:
 ```
 brightness = 128
 if state_i % 16 >= 8:
-    brightness += (state_i % 8)        // +0..+7
+    brightness += (state_i % 8)        // +0..+7  (state_i 8-15)
 else:
-    brightness += 8 - (state_i % 8)    // +8..+1
-// Results in a triangular pulse: 128→136→128 over 16 ticks
+    brightness += 8 - (state_i % 8)    // +8..+1  (state_i 0-7)
+// Triangular pulse: 136 → 128 → 135 → 136 over 16 ticks (starts HIGH at state_i=0,
+// dips to neutral at state_i=8, climbs back; period 16 ticks ≈ 672 ms)
 ```
 
 The selected item's sprite and text are drawn with this animated brightness.
