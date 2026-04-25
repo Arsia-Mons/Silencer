@@ -21,7 +21,7 @@ export default function DesignerPage() {
   const { loaded, error, tileImages, spriteImages, tileBankCounts, progress, loadFiles } = useGameData();
   const { map, openMap, saveMap, createMap, updateTile, patchTile, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
-          updateHeader,
+          updateHeader, updatePlatform,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   const [activeTool, setActiveTool]     = useState('TILE_BG');
@@ -29,6 +29,7 @@ export default function DesignerPage() {
   const [eraseLayerType, setEraseLayerType] = useState('bg');
   const [selectedTileId, setSelectedTile] = useState(0);
   const [selectedActorId, setSelectedActor] = useState(36); // player start default
+  const [selectedPlatformIdx, setSelectedPlatformIdx] = useState(null);
   const [zoom, setZoom]   = useState(0.5);
   const [pan, setPan]     = useState({ x: 32, y: 32 });
   const [cursor, setCursor] = useState({ tx: 0, ty: 0, wx: 0, wy: 0 });
@@ -65,6 +66,11 @@ export default function DesignerPage() {
   useEffect(() => {
     if (map) { setResizeW(String(map.width)); setResizeH(String(map.height)); }
   }, [map?.width, map?.height]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clear platform selection when switching away from SELECT tool
+  useEffect(() => {
+    if (activeTool !== 'SELECT') setSelectedPlatformIdx(null);
+  }, [activeTool]);
 
   const applyResize = () => {
     const w = parseInt(resizeW, 10);
@@ -491,6 +497,9 @@ export default function DesignerPage() {
               onCursorChange={setCursor}
               eraseLayerType={eraseLayerType}
               highlightActorIdx={highlightActorIdx}
+              selectedPlatformIdx={selectedPlatformIdx}
+              onPlatformSelect={setSelectedPlatformIdx}
+              onPlatformUpdate={updatePlatform}
             />
             <Minimap
               map={map}

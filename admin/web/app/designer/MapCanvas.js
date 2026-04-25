@@ -39,6 +39,7 @@ export default function MapCanvas({
   onActorMove,
   eraseLayerType,
   highlightActorIdx,
+  selectedPlatformIdx, onPlatformSelect, onPlatformUpdate,
 })  {
   const canvasRef = useRef(null);
   const overlayCanvasRef = useRef(null);
@@ -50,6 +51,10 @@ export default function MapCanvas({
   const lastPan = useRef({ x: 0, y: 0 });
   const draggingActorRef = useRef(null); // { idx, startWx, startWy, origX, origY, moved }
   const [dragActorPreview, setDragActorPreview] = useState(null); // { idx, wx, wy } | null
+  // Platform drag ref: { mode, handle, idx, origPlatform, startWx, startWy }
+  const platformDragRef = useRef(null);
+  // Current preview bounds during platform drag { wx1, wy1, wx2, wy2 }
+  const platformPreviewRef = useRef(null);
 
   // World → canvas coords
   const worldToCanvas = useCallback((wx, wy) => ({
@@ -350,16 +355,20 @@ export default function MapCanvas({
     if (!overlay) return;
     const ctx = overlay.getContext('2d');
 
-    if (highlightActorIdx == null || !map || !map.actors[highlightActorIdx]) {
+    const hasActorHighlight = highlightActorIdx != null && map?.actors[highlightActorIdx];
+    const hasPlatformHighlight = selectedPlatformIdx != null && map?.platforms[selectedPlatformIdx];
+
+    if (!hasActorHighlight && !hasPlatformHighlight) {
       ctx.clearRect(0, 0, overlay.width, overlay.height);
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
       return;
     }
 
-    const actor = map.actors[highlightActorIdx];
-    const def = getActorDef(actor.id);
+    const actor = hasActorHighlight ? map.actors[highlightActorIdx] : null;
+    const def = actor ? getActorDef(actor.id) : null;
 
     function getSpriteRect() {
+      if (!actor || !def) return null;
       let bankNum = def.bank;
       if (actor.id === 54) bankNum = actor.type === 0 ? 183 : 184;
       if (actor.id === 47) bankNum = 49 + Math.min(actor.type ?? 0, 9);
@@ -380,33 +389,82 @@ export default function MapCanvas({
     let dashOffset = 0;
     function draw() {
       ctx.clearRect(0, 0, overlay.width, overlay.height);
-      const rect = getSpriteRect();
-      ctx.save();
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      // White layer
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
-      ctx.lineDashOffset = -dashOffset;
-      if (rect.circle) {
-        ctx.beginPath(); ctx.arc(rect.cx, rect.cy, rect.r, 0, Math.PI * 2); ctx.stroke();
-      } else {
-        ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+
+      // Actor marching-ants highlight
+      if (hasActorHighlight) {
+        const rect = getSpriteRect();
+        if (rect) {
+          ctx.save();
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 4]);
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+          ctx.lineDashOffset = -dashOffset;
+          if (rect.circle) {
+            ctx.beginPath(); ctx.arc(rect.cx, rect.cy, rect.r, 0, Math.PI * 2); ctx.stroke();
+          } else {
+            ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+          }
+          ctx.strokeStyle = 'rgba(74,200,74,0.7)';
+          ctx.lineDashOffset = -dashOffset + 5;
+          if (rect.circle) {
+            ctx.beginPath(); ctx.arc(rect.cx, rect.cy, rect.r, 0, Math.PI * 2); ctx.stroke();
+          } else {
+            ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+          }
+          ctx.restore();
+        }
       }
-      // Green offset layer for depth
-      ctx.strokeStyle = 'rgba(74,200,74,0.7)';
-      ctx.lineDashOffset = -dashOffset + 5;
-      if (rect.circle) {
-        ctx.beginPath(); ctx.arc(rect.cx, rect.cy, rect.r, 0, Math.PI * 2); ctx.stroke();
-      } else {
-        ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+
+      // Platform marching-ants highlight + resize handles
+      if (hasPlatformHighlight) {
+        const p = map.platforms[selectedPlatformIdx];
+        const preview = platformDragRef.current ? platformPreviewRef.current : null;
+        const { x1, y1, x2, y2 } = preview
+          ? { x1: preview.wx1, y1: preview.wy1, x2: preview.wx2, y2: preview.wy2 }
+          : { x1: p.x1, y1: p.y1, x2: p.x2, y2: p.y2 };
+
+        const cx1 = x1 * zoom + pan.x;
+        const cy1 = y1 * zoom + pan.y;
+        const cx2 = x2 * zoom + pan.x;
+        const cy2 = y2 * zoom + pan.y;
+
+        ctx.save();
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+        ctx.lineDashOffset = -dashOffset;
+        ctx.strokeRect(cx1, cy1, cx2 - cx1, cy2 - cy1);
+        ctx.strokeStyle = 'rgba(74,200,74,0.7)';
+        ctx.lineDashOffset = -dashOffset + 5;
+        ctx.strokeRect(cx1, cy1, cx2 - cx1, cy2 - cy1);
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // 8 resize handles (8×8 px, white fill, dark stroke)
+        const HS = 8;
+        const hs = HS / 2;
+        const hmx = (cx1 + cx2) / 2;
+        const hmy = (cy1 + cy2) / 2;
+        const handlePoints = [
+          { hx: cx1, hy: cy1 }, { hx: hmx, hy: cy1 }, { hx: cx2, hy: cy1 },
+          { hx: cx1, hy: hmy },                         { hx: cx2, hy: hmy },
+          { hx: cx1, hy: cy2 }, { hx: hmx, hy: cy2 }, { hx: cx2, hy: cy2 },
+        ];
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.strokeStyle = 'rgba(30,30,30,0.9)';
+        ctx.lineWidth = 1;
+        for (const { hx, hy } of handlePoints) {
+          ctx.fillRect(hx - hs, hy - hs, HS, HS);
+          ctx.strokeRect(hx - hs, hy - hs, HS, HS);
+        }
       }
-      ctx.restore();
+
       dashOffset = (dashOffset + 0.5) % 10;
       rafRef.current = requestAnimationFrame(draw);
     }
     rafRef.current = requestAnimationFrame(draw);
     return () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
-  }, [highlightActorIdx, map, spriteImages, zoom, pan]);
+  }, [highlightActorIdx, selectedPlatformIdx, map, spriteImages, zoom, pan]);
 
   // Mouse event handlers
   const getCanvasPos = (e) => {
@@ -475,7 +533,42 @@ export default function MapCanvas({
     } else if (activeTool === 'ACTOR') {
       onActorPlace({ wx, wy });
     } else if (activeTool === 'SELECT') {
-      // Check if near an actor → start drag
+      const handleSize = 8 / zoom;
+      const hs = handleSize / 2;
+
+      // 1. If a platform is already selected, check its handles then body first
+      if (selectedPlatformIdx != null && map.platforms[selectedPlatformIdx]) {
+        const p = map.platforms[selectedPlatformIdx];
+        const { x1, y1, x2, y2 } = p;
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        const handles = [
+          { name: 'TL', hx: x1, hy: y1 }, { name: 'T',  hx: mx, hy: y1 }, { name: 'TR', hx: x2, hy: y1 },
+          { name: 'L',  hx: x1, hy: my },                                   { name: 'R',  hx: x2, hy: my },
+          { name: 'BL', hx: x1, hy: y2 }, { name: 'B',  hx: mx, hy: y2 }, { name: 'BR', hx: x2, hy: y2 },
+        ];
+        for (const { name, hx, hy } of handles) {
+          if (Math.abs(wx - hx) <= hs && Math.abs(wy - hy) <= hs) {
+            platformDragRef.current = { mode: 'handle', handle: name, idx: selectedPlatformIdx, origPlatform: { ...p }, startWx: wx, startWy: wy };
+            return;
+          }
+        }
+        if (wx >= x1 && wx <= x2 && wy >= y1 && wy <= y2) {
+          platformDragRef.current = { mode: 'body', handle: null, idx: selectedPlatformIdx, origPlatform: { ...p }, startWx: wx, startWy: wy };
+          return;
+        }
+      }
+
+      // 2. Hit-test all platforms for selection
+      for (let i = map.platforms.length - 1; i >= 0; i--) {
+        const p = map.platforms[i];
+        if (wx >= p.x1 && wx <= p.x2 && wy >= p.y1 && wy <= p.y2) {
+          onPlatformSelect(i);
+          return;
+        }
+      }
+
+      // 3. Hit-test actors (existing logic)
       const HIT = 48 / zoom;
       for (let i = map.actors.length - 1; i >= 0; i--) {
         const a = map.actors[i];
@@ -486,17 +579,13 @@ export default function MapCanvas({
           return;
         }
       }
-      // Remove platform on click
-      for (let i = map.platforms.length - 1; i >= 0; i--) {
-        const p = map.platforms[i];
-        if (wx >= p.x1 && wx <= p.x2 && wy >= p.y1 && wy <= p.y2) {
-          onPlatformRemove(i);
-          return;
-        }
-      }
+
+      // 4. Click on empty → deselect
+      onPlatformSelect(null);
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
-      onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint]);
+      onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
+      selectedPlatformIdx, onPlatformSelect]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e) => {
@@ -547,6 +636,45 @@ export default function MapCanvas({
     const { wx, wy } = canvasToWorld(cx, cy);
     onCursorChange({ tx, ty, wx, wy });
 
+    // Platform drag (SELECT tool — handle or body move)
+    if (platformDragRef.current) {
+      const { mode, handle, origPlatform, startWx, startWy } = platformDragRef.current;
+      const dx = wx - startWx;
+      const dy = wy - startWy;
+      const MIN_SIZE = 16;
+      let { x1, y1, x2, y2 } = origPlatform;
+
+      if (mode === 'body') {
+        x1 = origPlatform.x1 + dx;
+        y1 = origPlatform.y1 + dy;
+        x2 = origPlatform.x2 + dx;
+        y2 = origPlatform.y2 + dy;
+      } else {
+        switch (handle) {
+          case 'TL': x1 = origPlatform.x1 + dx; y1 = origPlatform.y1 + dy; break;
+          case 'TR': x2 = origPlatform.x2 + dx; y1 = origPlatform.y1 + dy; break;
+          case 'BL': x1 = origPlatform.x1 + dx; y2 = origPlatform.y2 + dy; break;
+          case 'BR': x2 = origPlatform.x2 + dx; y2 = origPlatform.y2 + dy; break;
+          case 'T':  y1 = origPlatform.y1 + dy; break;
+          case 'B':  y2 = origPlatform.y2 + dy; break;
+          case 'L':  x1 = origPlatform.x1 + dx; break;
+          case 'R':  x2 = origPlatform.x2 + dx; break;
+        }
+        if (x2 - x1 < MIN_SIZE) {
+          if (handle === 'TL' || handle === 'BL' || handle === 'L') x1 = x2 - MIN_SIZE;
+          else x2 = x1 + MIN_SIZE;
+        }
+        if (y2 - y1 < MIN_SIZE) {
+          if (handle === 'TL' || handle === 'TR' || handle === 'T') y1 = y2 - MIN_SIZE;
+          else y2 = y1 + MIN_SIZE;
+        }
+      }
+
+      platformPreviewRef.current = { wx1: x1, wy1: y1, wx2: x2, wy2: y2 };
+      onDragPlatformChange({ wx1: x1, wy1: y1, wx2: x2, wy2: y2, typeName: origPlatform.typeName });
+      return;
+    }
+
     // Actor drag (SELECT tool)
     if (draggingActorRef.current) {
       const { startWx, startWy, origX, origY } = draggingActorRef.current;
@@ -590,6 +718,23 @@ export default function MapCanvas({
       return;
     }
 
+    // Finish platform drag (SELECT tool)
+    if (platformDragRef.current) {
+      const { idx, origPlatform } = platformDragRef.current;
+      const preview = platformPreviewRef.current;
+      if (preview) {
+        const { wx1, wy1, wx2, wy2 } = preview;
+        if (wx1 !== origPlatform.x1 || wy1 !== origPlatform.y1 || wx2 !== origPlatform.x2 || wy2 !== origPlatform.y2) {
+          onPlatformUpdate(idx, Math.round(wx1), Math.round(wy1), Math.round(wx2), Math.round(wy2));
+        }
+      }
+      onDragPlatformChange(null);
+      onPlatformSelect(idx);
+      platformDragRef.current = null;
+      platformPreviewRef.current = null;
+      return;
+    }
+
     if (!map) { isPainting.current = false; return; }
     const { cx, cy } = getCanvasPos(e);
     const { wx, wy } = canvasToWorld(cx, cy);
@@ -616,7 +761,7 @@ export default function MapCanvas({
       }
     }
     isPainting.current = false;
-  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove]);
+  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.code === 'Space') { isSpacePanning.current = true; e.preventDefault(); }

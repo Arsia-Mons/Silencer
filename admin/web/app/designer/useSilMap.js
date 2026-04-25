@@ -437,6 +437,15 @@ export function useSilMap() {
     });
   }, [pushHistory]);
 
+  const updatePlatform = useCallback((idx, x1, y1, x2, y2) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const platforms = prev.platforms.map((p, i) => i === idx ? { ...p, x1, y1, x2, y2 } : p);
+      return { ...prev, platforms };
+    });
+  }, [pushHistory]);
+
   const patchTile = useCallback((layerType, layerIdx, x, y, patch) => {
     setMapData(prev => {
       if (!prev) return prev;
@@ -459,7 +468,7 @@ export function useSilMap() {
   return {
     map: mapData, openMap, saveMap, createMap,
     updateTile, patchTile, beginPaint, commitPaint,
-    addPlatform, removePlatform,
+    addPlatform, removePlatform, updatePlatform,
     addActor, removeActor, updateActor, moveActor,
     updateHeader,
     undo, redo, canUndo, canRedo,
