@@ -226,7 +226,7 @@ bool Game::Load(char * cmdline){
 		SDL_EventState(SDL_TEXTINPUT, SDL_TRUE); //SDL_EnableUNICODE(true);
 		//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 		//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-		window = SDL_CreateWindow("zSilencer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+		window = SDL_CreateWindow("Silencer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
 		if(!SetupOpenGL()){
 			//printf("Unable to setup OpenGL shaders, using SDL Renderer\n");
 			usingopengl = false;
@@ -535,7 +535,7 @@ bool Game::Loop(void){
 	unsigned int wait = 42; // 24 fps
 	if(updatetitle){
 		char title[128];
-		sprintf(title, "zSilencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
+		sprintf(title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
 		SDL_SetWindowTitle(window, title);
 		updatetitle = false;
 		frames = 1;
@@ -2507,7 +2507,7 @@ Interface * Game::CreateMainMenuInterface(void){
 	Overlay * logo = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	logo->res_bank = 208;
 	Overlay * version = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	version->text = "zSilencer v";
+	version->text = "Silencer v";
 	version->text += world.version;
 	version->textbank = 133;
 	version->textwidth = 11;
@@ -2914,7 +2914,7 @@ Interface * Game::CreateLobbyInterface(void){
 	background->res_bank = 7;
 	background->res_index = 1;
 	Overlay * toptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	toptext->text = "zSilencer";
+	toptext->text = "Silencer";
 	toptext->textbank = 135;
 	toptext->textwidth = 11;
 	toptext->effectcolor = 152;

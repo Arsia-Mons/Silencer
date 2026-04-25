@@ -272,7 +272,7 @@ palette's color-lookup table. RGB values are from Palette 0.
 | 140 | Caret | 252 | 252 | 0 | `#FCFC00` | Text-input cursor — yellow |
 | 146 | Health Damage | 12 | 4 | 4 | `#0C0404` | Damage-flash on health-only hits |
 | 150 | Minimap Tint | 92 | 28 | 28 | `#5C1C1C` | Minimap icon brightness |
-| 152 | Title Text | 132 | 28 | 28 | `#841C1C` | "zSilencer" title in lobby — dark red |
+| 152 | Title Text | 132 | 28 | 28 | `#841C1C` | "Silencer" title in lobby — dark red |
 | 153 | Red Alert | 152 | 28 | 28 | `#981C1C` | Neutron activated, game lost, connection lost |
 | 161 | Health Value | 252 | 80 | 80 | `#FC5050` | Health number on HUD — bright red |
 | 189 | Version Label | 216 | 136 | 52 | `#D88834` | Version string in lobby — orange |
@@ -1896,7 +1896,7 @@ relative to the parent Interface origin.
 
 | Element | Position `(x, y)` | Font | Color | Notes |
 | ----------------- | ----------------- | ---------- | ----- | --------------------------- |
-| Title             | `(15, 32)`        | bank 135 / width 11 | **152** (dark red) | `"zSilencer"` |
+| Title             | `(15, 32)`        | bank 135 / width 11 | **152** (dark red) | `"Silencer"` |
 | Version label     | `(115, 39)`       | bank 133 / width 6  | **189** (orange)   | `"v." + world.version` |
 | Map name          | `(180, 32)`       | bank 135 / width 11 | **129** ramp + brightness 160 | Currently selected map name |
 | Go Back button    | `(473, 29)`       | `B156x21` | — | Returns to main menu |
