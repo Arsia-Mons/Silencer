@@ -2,7 +2,7 @@
 import { useAuth } from '../../lib/auth.js';
 import { useSocket } from '../../lib/socket.js';
 import Sidebar from '../../components/Sidebar.js';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { getEvents } from '../../lib/api.js';
 
 const TYPE_COLORS = {
@@ -23,8 +23,6 @@ export default function Audit() {
   const [page,   setPage]   = useState(1);
   const [filter, setFilter] = useState({ type: '', accountId: '' });
   const [live,   setLive]   = useState(true);
-  const bottomRef = useRef(null);
-
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const load = async (p = page) => {
@@ -50,9 +48,6 @@ export default function Audit() {
     'game.ended':     (d) => { if (live && page === totalPages) setEvents(prev => [...prev, { type: 'game.ended',    ...d, ts: new Date() }]); },
   });
 
-  useEffect(() => {
-    if (live) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [events, live]);
 
   const btnClass = (disabled) =>
     `px-3 py-1 border font-mono text-xs rounded transition-colors ${
@@ -111,7 +106,7 @@ export default function Audit() {
               ))}
             </tbody>
           </table>
-          <div ref={bottomRef} />
+
         </div>
 
         {/* Pagination */}
