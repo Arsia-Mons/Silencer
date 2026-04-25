@@ -59,9 +59,12 @@ function ScreenShot({ src, alt, className = '' }) {
   );
 }
 
-function ItemRow({ name, cost, desc, agency }) {
+function ItemRow({ name, cost, desc, agency, icon }) {
   return (
     <tr className="border-b border-game-border/30 hover:bg-game-bgHover">
+      <td className="py-1.5 pr-2 w-8">
+        {icon && <img src={`/silencer/${icon}`} alt={name} className="w-7 h-7 bg-black border border-game-border/30 rounded" />}
+      </td>
       <td className="py-1.5 pr-3 text-game-primary whitespace-nowrap">{name}</td>
       <td className="py-1.5 pr-3 text-right text-game-text whitespace-nowrap">{cost ?? '—'}</td>
       <td className="py-1.5 text-game-textDim">{desc}{agency && <span className="ml-2 text-game-warning text-xs">[{agency} only]</span>}</td>
@@ -348,33 +351,34 @@ export default function HowToPage() {
               <table className="w-full text-xs font-mono">
                 <thead>
                   <tr className="text-game-muted border-b border-game-border text-left">
+                    <th className="py-2 pr-2 w-8"></th>
                     <th className="py-2 pr-3">Item</th>
                     <th className="py-2 pr-3 text-right">Cost</th>
                     <th className="py-2">Description</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <ItemRow name="Laser Ammo"       cost={100}  desc="Adds 5 laser shots." />
-                  <ItemRow name="Rocket Ammo"      cost={100}  desc="Adds 3 rockets." />
-                  <ItemRow name="Flamer Ammo"      cost={200}  desc="Adds 15 flamer fuel." />
-                  <ItemRow name="Base Defense"     cost={100}  desc="Activates laser turrets around your base. Multiple purchases increase turret durability. Does not detect BLACKROSE agents." />
-                  <ItemRow name="Base Door"        cost={300}  desc="Move your base door when not carrying or homing in on a secret." />
-                  <ItemRow name="Camera"           cost={100}  desc="Deployable camera for remote viewing." />
-                  <ItemRow name="Fixed Cannon"     cost={300}  desc="Automated laser turret, fires left or right at head or chest height." />
-                  <ItemRow name="Flare"            cost={200}  desc="Spouts flames for several seconds. Blocks corridors; effective against slow or cornered targets." />
-                  <ItemRow name="Health Pack"      cost={100}  desc="Restores health." agency="NOXIS" />
-                  <ItemRow name="Lazarus Tract"    cost={300}  desc="Converts a civilian into a walking bomb — explodes on contact with any agent." agency="LAZARUS" />
-                  <ItemRow name="Plasma Bomb"      cost={200}  desc="Explosive grenade, detonates ~3 seconds after throwing." />
-                  <ItemRow name="Shaped Bomb"      cost={100}  desc="Like a plasma bomb but explosion is directed upward." />
-                  <ItemRow name="Plasma Detonator" cost={150}  desc="Deployable explosive with a camera. Detonate remotely with the fire key." />
-                  <ItemRow name="EMP Bomb"         cost={1000} desc="Drains shields of all nearby enemies." />
-                  <ItemRow name="Neutron Bomb"     cost={4000} desc="Kills all guards and agents not inside a base." />
-                  <ItemRow name="Poison"           cost={100}  desc="Deployed on an enemy — drains their health until they die or heal at their base." agency="BLACKROSE" />
-                  <ItemRow name="Poison Flare"     cost={200}  desc="Like a flare but deploys poison on contact." agency="BLACKROSE" />
-                  <ItemRow name="Security Pass"    cost={1000} desc="Government guards ignore you even undisguised." agency="CALIBER" />
-                  <ItemRow name="Virus"            cost={400}  desc="On a robot: it attacks everyone but you. On an enemy base station: disables a tech slot until repaired." agency="STATIC" />
-                  <ItemRow name="Insider Info"     cost={500}  desc="Grants one piece of information toward the next secret. Cannot be used for the final piece." />
-                  <ItemRow name="Credit Transfer"  cost={null} desc="Team games only. Transfers 100 credits to a teammate." />
+                  <ItemRow name="Laser Ammo"       cost={100}  icon="laserammo.jpg"    desc="Adds 5 laser shots." />
+                  <ItemRow name="Rocket Ammo"      cost={100}  icon="rocketammo.jpg"   desc="Adds 3 rockets." />
+                  <ItemRow name="Flamer Ammo"      cost={200}                          desc="Adds 15 flamer fuel." />
+                  <ItemRow name="Base Defense"     cost={100}  icon="basedeficon.jpg"  desc="Activates laser turrets around your base. Multiple purchases increase turret durability. Does not detect BLACKROSE agents." />
+                  <ItemRow name="Base Door"        cost={300}  icon="basedooricon.jpg" desc="Move your base door when not carrying or homing in on a secret." />
+                  <ItemRow name="Camera"           cost={100}                          desc="Deployable camera for remote viewing." />
+                  <ItemRow name="Fixed Cannon"     cost={300}  icon="cannonicon.jpg"   desc="Automated laser turret, fires left or right at head or chest height." />
+                  <ItemRow name="Flare"            cost={200}  icon="flareicon.jpg"    desc="Spouts flames for several seconds. Blocks corridors; effective against slow or cornered targets." />
+                  <ItemRow name="Health Pack"      cost={100}  icon="healthicon.jpg"   desc="Restores health." agency="NOXIS" />
+                  <ItemRow name="Lazarus Tract"    cost={300}  icon="laztracticon.jpg" desc="Converts a civilian into a walking bomb — explodes on contact with any agent." agency="LAZARUS" />
+                  <ItemRow name="Plasma Bomb"      cost={200}  icon="bombicon.jpg"     desc="Explosive grenade, detonates ~3 seconds after throwing." />
+                  <ItemRow name="Shaped Bomb"      cost={100}  icon="bombicon.jpg"     desc="Like a plasma bomb but explosion is directed upward." />
+                  <ItemRow name="Plasma Detonator" cost={150}  icon="plasdeticon.jpg"  desc="Deployable explosive with a camera. Detonate remotely with the fire key." />
+                  <ItemRow name="EMP Bomb"         cost={1000} icon="bombicon.jpg"     desc="Drains shields of all nearby enemies." />
+                  <ItemRow name="Neutron Bomb"     cost={4000} icon="bombicon.jpg"     desc="Kills all guards and agents not inside a base." />
+                  <ItemRow name="Poison"           cost={100}  icon="poisonicon.jpg"   desc="Deployed on an enemy — drains their health until they die or heal at their base." agency="BLACKROSE" />
+                  <ItemRow name="Poison Flare"     cost={200}  icon="poisflareicon.jpg" desc="Like a flare but deploys poison on contact." agency="BLACKROSE" />
+                  <ItemRow name="Security Pass"    cost={1000} icon="secpassicon.jpg"  desc="Government guards ignore you even undisguised." agency="CALIBER" />
+                  <ItemRow name="Virus"            cost={400}                          desc="On a robot: it attacks everyone but you. On an enemy base station: disables a tech slot until repaired." agency="STATIC" />
+                  <ItemRow name="Insider Info"     cost={500}                          desc="Grants one piece of information toward the next secret. Cannot be used for the final piece." />
+                  <ItemRow name="Credit Transfer"  cost={null}                         desc="Team games only. Transfers 100 credits to a teammate." />
                 </tbody>
               </table>
             </div>
