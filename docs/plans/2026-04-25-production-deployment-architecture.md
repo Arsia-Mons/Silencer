@@ -1,4 +1,4 @@
-# Decoupled Admin/Data Tier Deployment
+# Production Deployment Architecture
 
 **Status:** Proposed
 **Date:** 2026-04-25
@@ -12,15 +12,20 @@
 
 ## Goal
 
-Stand up MongoDB, RabbitMQ, the admin API, and the admin web app on
-AWS infrastructure managed entirely by Terraform + GitHub Actions —
-without coupling their deploys to the lobby or to each other.
+Define how Silencer's services land in production: the lobby,
+MongoDB, RabbitMQ, the admin API, and the admin web app deployed to
+AWS via Terraform and GitHub Actions, with each service on its own
+deploy lifecycle.
 
-Today the admin/data services exist only in `docker-compose.yml`,
-which doesn't run anywhere in production. The lobby silently no-ops
-its MongoDB sync and RabbitMQ publishes because neither service is
-reachable. This plan closes that gap **without** putting the four
-services behind a single Compose stack in production.
+The lobby already has a production deploy; this plan tightens it
+slightly (env var wiring, version-string handshake) but does not
+overhaul it. MongoDB, RabbitMQ, admin-api, and admin-web do not
+run in production at all today — they exist only in
+`docker-compose.yml`, which is unused outside local dev. As a
+consequence, the lobby silently no-ops its MongoDB sync and
+RabbitMQ publishes because neither service is reachable. This plan
+closes that gap **without** putting any service behind a single
+Compose stack in production.
 
 ## Principle
 
