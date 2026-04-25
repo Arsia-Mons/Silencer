@@ -167,34 +167,70 @@ LavinMQ's disk-first message store pages out to `/var/lib/lavinmq`
 under load — sized at 5GB to absorb a multi-day admin-api outage
 backlog without filling the volume.
 
-### Sizing decisions
+### Sizing decisions (Phase 1)
 
-- **t4g.micro (1GB)** is a non-starter for the admin/data box —
-  Idle alone (~730MB) consumes most of it with no room for
-  Mongo cache growth.
-- **t4g.small (2GB, ~$12/mo)** now survives all tiers including
+- **t4g.micro (1GB)** is a non-starter for the Phase 1 stack —
+  Mongo's 250-800MB footprint plus admin-api/admin-web's current
+  Node-based runtimes leave no room.
+- **t4g.small (2GB, ~$12/mo)** survives all tiers including
   Peak (~1.7GB usage on ~1.85GB usable). Headroom at Peak is
-  ~150MB — workable, but tight enough that Event-collection
-  growth or log spikes could erode it. Defensible if observed
-  footprint matches estimates.
-- **t4g.medium (4GB, ~$24/mo)** is the conservative right-size:
-  ~57% headroom at peak. **Recommended default for Phase 1**;
-  plan to downsize to t4g.small after a month of observing real
-  footprint, especially of the application-memory estimates
-  flagged below.
+  ~150MB. **Recommended default for Phase 1.** Defensible
+  because LavinMQ's RAM savings vs RabbitMQ already gave us this
+  margin; the conservative t4g.medium would have been required
+  with RabbitMQ.
+- **t4g.medium (4GB, ~$24/mo)** would give ~57% headroom but
+  costs $12/mo more for safety we don't need at this stack's
+  measured profile.
 
 Future re-sizing is cheap: stop the instance, change the type
 in Terraform, `apply`. EBS volumes for Mongo and LavinMQ detach
 and reattach untouched (per Data Persistence).
 
+### Sizing projection (Phase 2)
+
+Phase 2 swaps Mongo → Postgres (~700MB peak savings) and rewrites
+admin-api on Bun + Hono with native WebSocket (~140MB peak
+savings vs the current Node + Express + socket.io + mongoose
+stack). Admin-web stays on Next.js standalone under Bun with an
+explicit V8 heap cap. Projected admin/data box profile:
+
+| Process | Idle | Peak | Source |
+| ---------------------------------- | ------ | ------- | ------ |
+| OS + base                          | 150MB  | 150MB   | grounded |
+| tailscaled                         | 30MB   | 40MB    | grounded |
+| dockerd + containerd               | 100MB  | 110MB   | grounded |
+| postgres (tuned tiny: shared_buffers=64MB, max_connections=10) | 30MB | 100MB | grounded; Postgres scales down well |
+| lavinmq                            | 40MB   | 80MB    | unchanged from Phase 1 |
+| admin-api (Bun + Hono, native WS, --max-old-space-size=96) | 30MB | 80MB | bounded by V8 heap cap + ~50MB native |
+| admin-web (Next.js standalone under Bun, --max-old-space-size=128) | 80MB | ~180MB | measured locally on Windows; Linux RSS ~30% lower; capped |
+| **Total**                          | **~460MB** | **~740MB** | |
+
+t4g.micro (1GB, ~850MB usable) fits with **~110MB headroom** at
+peak — ~13%. Tighter than Phase 1's t4g.small margin but
+enforced by per-process V8 heap caps + systemd `MemoryMax`
+limits, so OOMs are predictable application-level events
+(systemd restart in ~2s, LavinMQ absorbs any in-flight events)
+rather than mystery kernel OOM kills.
+
+**Phase 2 default: t4g.micro (~$6/mo).** Reach for t4g.small if
+a month of observed Phase 2 footprint consistently exceeds
+~700MB peak.
+
 ### Confidence level and follow-up
 
-Application-memory numbers (admin-api, admin-web) are estimates;
-the rest are grounded in distro/daemon defaults. Cheapest way to
-sharpen them is to run `docker stats` against the existing
+Phase 1 application-memory numbers (admin-api, admin-web) are
+estimates for the existing Node-based stack; the rest are
+grounded in distro/daemon defaults. Cheapest way to sharpen them
+is to run `docker stats` against the existing
 `docker-compose.yml` setup for an evening — same process set,
-real workload. Worth doing before Phase 1 lands so the
-instance-type choice is data-backed rather than estimated.
+real workload. Worth doing before 1.1 lands so the instance-type
+choice is data-backed rather than estimated.
+
+Phase 2's admin-web peak (~180MB) is measured: built locally and
+run with `bun .next/standalone/server.js`, peak working set ~265MB
+on Windows after warming all 14 routes; Linux RSS for the same
+workload typically ~30% lower, hence the ~180MB projection.
+Admin-api Phase 2 peak (~80MB) is bounded by the V8 heap cap.
 
 ## Deployment Model Per Component
 
@@ -297,18 +333,39 @@ ingress rules:
 
 ## Implementation Phases
 
-Phases are sequenced by risk: data tier first (slowest to fix
-if wrong, longest-lived), then per-service deploy plumbing, then
-wiring it all up.
+The plan ships in **two top-level phases**:
 
-Each phase's PR also refreshes the matching section of
-`docs/production.md` so the operational reference stays current
-with the deploy verbs as they land.
+- **Phase 1** productionizes the existing admin-api and admin-web
+  code (Node + Express + socket.io + mongoose, Next.js standalone
+  under Bun) on Mongo + LavinMQ on a t4g.small admin/data box.
+- **Phase 2** migrates Mongo → Postgres, rewrites admin-api on
+  Bun + Hono with native WebSocket, adds V8 heap caps, and
+  downsizes to t4g.micro.
 
-### Phase 1 — Provision the admin/data box
+The split de-risks by getting deploy infrastructure (Terraform,
+GitHub Actions workflows, cloud-init, security groups, backup
+cron) working with known-good code first, then migrating code on
+a stable deploy substrate. Each sub-phase is its own PR,
+sequenced by risk within its phase. Each PR also refreshes the
+matching section of `docs/production.md`.
+
+All sections above this one (Topology, Resource Profile's main
+table, Data Persistence, Cross-Service Configuration) describe
+the **Phase 1** state. Phase 2 deltas are described in their
+respective sub-phases below; the Resource Profile section
+includes a Phase 2 sizing projection.
+
+### Phase 1 — Productionize current admin tier (Mongo, t4g.small)
+
+Goal: the existing admin-api and admin-web code running in
+production on AWS, with each component independently deployable
+from GitHub Actions, on a t4g.small admin/data box with Mongo +
+LavinMQ.
+
+#### 1.1 — Provision the admin/data box
 
 Terraform delta only. New EC2 instance in the lobby's VPC and AZ
-(default `t4g.medium` per Resource Profile), two EBS volumes
+(default `t4g.small` per Resource Profile), two EBS volumes
 sized per Resource Profile (10GB Mongo, 5GB LavinMQ, 16GB root),
 a security group with ingress rules sourced from the lobby SG
 (27017/tcp, 5672/tcp), the private Route 53 hosted zone with A
@@ -328,16 +385,24 @@ Done when: SSH from a tailnet peer works, `mongod` and
 private IP, and `terraform taint && apply` the instance
 preserves data on both EBS volumes.
 
-### Phase 2 — Admin API deploy workflow
+#### 1.2 — Admin API deploy workflow
 
 GitHub Actions workflow that builds an ARM64 OCI image, pushes to
 GHCR, and updates the systemd unit on the admin/data box via SSH.
-Workflow is path-filtered to the admin-api source directory. Image
-base is `oven/bun` (per the repo-wide Bun+TS rule); the Dockerfile
-contains no `node` invocation. The systemd unit's `ExecStart` runs
-`docker run --rm --name silencer-admin-api …` against the
-currently-symlinked image tag, so a deploy is `docker pull` +
-symlink swap + `systemctl restart silencer-admin-api`.
+Workflow is path-filtered to the admin-api source directory.
+
+This sub-phase migrates the admin-api Dockerfile from
+`node:22-alpine` to `oven/bun:1-alpine` (per the repo-wide Bun+TS
+rule: "migrate as you touch") while keeping the existing source
+code unchanged — Bun runs Express + socket.io + mongoose code
+without rewrites. The deploy verb is `docker pull` + symlink
+swap + `systemctl restart silencer-admin-api`.
+
+**Risk to validate before this PR lands:** confirm the existing
+Express + socket.io + mongoose code runs cleanly under Bun.
+Express and mongoose are reliable; socket.io has had historical
+Bun friction. Quick check is to `bun run src/index.js` against
+the existing `docker-compose.yml` data services for an evening.
 
 Includes a `services/admin-api/CLAUDE.md` update covering the
 container build, the systemd unit shape, and the deploy verb (per
@@ -347,16 +412,19 @@ Done when: a touch-only commit under that directory triggers a
 new image, the box pulls it, and the unit restarts without
 affecting any other service.
 
-### Phase 3 — Admin Web deploy workflow
+#### 1.3 — Admin Web deploy workflow
 
-Same shape as Phase 2 for the Next.js app, also `oven/bun`-based
-(Next.js runs fine under Bun). Path-filtered to the admin-web
-source directory. Includes a `web/admin/CLAUDE.md` update mirroring
-Phase 2's documentation deliverable.
+Same shape as 1.2 for the Next.js app: Dockerfile migrates from
+`node:22-alpine` to `oven/bun:1-alpine`, Next.js standalone build
+unchanged. Validated locally — `bun .next/standalone/server.js`
+runs the standalone server without code changes (~1s startup,
+~180MB RSS at peak per measurement). Path-filtered to the
+admin-web source directory. Includes a `web/admin/CLAUDE.md`
+update mirroring 1.2's documentation deliverable.
 
-Done when: same as Phase 2 for the web service.
+Done when: same as 1.2 for the web service.
 
-### Phase 4 — Wire lobby ↔ data tier
+#### 1.4 — Wire lobby ↔ data tier
 
 Update the lobby's cloud-init to pass `MONGO_URL` and `AMQP_URL`
 pointing at `admin.silencer.internal` with the lobby's service
@@ -372,17 +440,17 @@ mutations and successful AMQP publishes on match end, and
 admin-api validates a player credential against the lobby over
 the private network.
 
-### Phase 5 — Snapshot policy
+#### 1.5 — Snapshot policy
 
 Add the DLM lifecycle policy that snapshots both EBS volumes on
 the admin/data box daily, with a rolling retention window.
 Independent of any ingress decision, so it can ship as soon as
-Phase 1 is in.
+1.1 is in.
 
 Done when: a fresh DLM-created snapshot exists for each volume,
 and the retention window prunes correctly after one cycle.
 
-### Phase 6 — Public ingress for admin-web and admin-api
+#### 1.6 — Public ingress for admin-web and admin-api
 
 Resolve the public-ingress Open Decision (Tailscale-only,
 Cloudflare, ALB+ACM, or admin-web-proxies-admin-api) and
@@ -394,9 +462,148 @@ non-developer browser (or, for the Tailscale-only path, the
 decision is recorded and the tailnet ACL grants the intended
 audience).
 
+### Phase 2 — Optimize: Postgres + Bun-native admin tier (t4g.micro)
+
+Goal: cut peak admin/data box RAM by ~60% and downsize to
+t4g.micro by replacing Mongo with Postgres, rewriting admin-api
+on Bun + Hono with native WebSocket, and adding V8 heap caps to
+both admin processes. Sub-phases sequenced so the storage swap
+lands first (largest wins, lowest cross-cutting), then the
+admin-api code rewrite, then the heap caps, then the downsize.
+
+#### 2.1 — Migrate admin storage Mongo → Postgres
+
+Replace `mongod` with a tuned-tiny `postgres` systemd unit on the
+admin/data box (apt-installed, `shared_buffers=64MB`,
+`max_connections=10`, `work_mem=2MB`,
+`effective_cache_size=128MB`; data on a new EBS volume mounted
+at `/var/lib/postgresql`).
+
+Rewrite admin-api's mongoose models (`Player`, `Session`,
+`MatchStat`, `Event`, `AdminUser`) as Drizzle schemas (chosen
+over Kysely for the migration tooling) against Postgres. Variable
+fields (`Event.data`, `lifetimeStats`, `agencies[]`) become
+`jsonb` columns. The `consumer.js` upsert paths translate
+near-line-for-line: `findOneAndUpdate({...}, {$set, $inc, $setOnInsert})`
+becomes `INSERT ... ON CONFLICT DO UPDATE`.
+
+Delete `server/mongosync.go` and its 4 call sites in
+`server/store.go`. The lobby becomes a pure AMQP publisher;
+admin-api becomes the sole writer to admin storage. This matches
+what the original plan asserted ("MongoDB is a read mirror") —
+`mongosync.go` was a parallel side-channel that bypassed the
+event log. The `player.login` AMQP event already does the upsert
+that `SyncPlayer()` was duplicating.
+
+Migrate the existing kristiandelay backup design: the same
+GitHub Actions cron, but `pg_dump` instead of `mongodump`,
+committing a compressed SQL dump (~5-10MB at year of data) every
+6h to the same backup repo. Identical rollback story; smaller
+dumps.
+
+One-time data migration: admin-api ships a one-shot
+`bun scripts/migrate-mongo-to-pg.ts` that reads from Mongo,
+writes to Postgres, verifies row counts. Cutover is run-script →
+swap admin-api connection string in
+`/etc/silencer/admin-api.env` → restart admin-api → confirm
+fresh-event flow lands in Postgres → stop `mongod`. Mongo EBS
+volume kept attached for 30 days as a fallback, then deleted with
+explicit confirmation.
+
+Remove the lobby's `MONGO_URL` env var/flag entirely (only
+`mongosync.go` used it; that's gone).
+
+Done when: admin-api reads/writes against Postgres, lobby
+publishes all state changes via AMQP, total Player / Session /
+MatchStat / Event row counts in Postgres match the Mongo snapshot
+at cutover ±the events that arrived during the cutover window
+(should be 0 if cutover is done during a quiet hour), `mongod`
+systemd unit is `disabled`, the daily DLM snapshot policy now
+covers `/var/lib/postgresql` instead of `/var/lib/mongodb`, and
+a `pg_dump`-based backup commits successfully on its first cron
+run.
+
+#### 2.2 — Rewrite admin-api on Bun + Hono with native WebSocket
+
+Replace Express → Hono (drop-in router + middleware), socket.io →
+`Bun.serve` native WebSocket, mongoose → Drizzle (already done
+in 2.1). Remove the deprecated dependencies: `express`, `cors`,
+`socket.io`, `mongoose`, `node-cron` (use `setInterval` + a
+process-internal scheduler), `bcryptjs` (Bun has `Bun.password`
+built in). Container image `ENTRYPOINT` switches from
+`bun src/index.js` (Bun running Node code) to native Bun TS.
+
+Source code migrates from `.js` to `.ts` per the universal Bun+TS
+rule. Each route file (~7 of them) becomes a Hono route module;
+auth middleware uses `hono/jwt`; rate limiting becomes a small
+in-process middleware (~30 LOC).
+
+WebSocket hand-off: the existing `admin-dashboard` socket.io
+namespace becomes a single `Bun.serve` upgrade handler. The
+admin-web client side (`admin/web/lib/socket.js`) drops
+`socket.io-client` and uses native `WebSocket` — small
+client-side change but it ships in the same PR as the server
+change.
+
+Done when: admin-api deploys, all routes return correct responses
+against an integration test suite (added if not present), WS
+clients reconnect through the native upgrade path, and resident
+memory under steady load is ≤80MB.
+
+#### 2.3 — Heap caps and OOM observability
+
+Update both admin services' systemd units with explicit V8 heap
+caps and systemd cgroup memory limits as belt-and-suspenders:
+
+```ini
+# silencer-admin-web.service
+Environment=NODE_OPTIONS=--max-old-space-size=128
+MemoryHigh=176M
+MemoryMax=192M
+Restart=always
+RestartSec=2s
+StartLimitInterval=60s
+StartLimitBurst=5
+```
+
+```ini
+# silencer-admin-api.service
+Environment=NODE_OPTIONS=--max-old-space-size=96
+MemoryHigh=128M
+MemoryMax=144M
+Restart=always
+RestartSec=2s
+StartLimitInterval=60s
+StartLimitBurst=5
+```
+
+Add the CloudWatch agent emitting per-process `mem_used_percent`
+and a log-pattern alarm on `JavaScript heap out of memory`. Add
+server-side pagination caps on admin-api routes that could return
+unbounded result sets (`/events`, `/matchstats`: max `limit=200`
+regardless of client request).
+
+Done when: an intentional load test that allocates beyond the cap
+crashes the offending process cleanly, systemd restarts it within
+~5s, no AMQP events are lost (LavinMQ holds them across the
+restart, admin-api drains on resume), and the alarm fires.
+
+#### 2.4 — Downsize to t4g.micro
+
+Change the instance type in Terraform from t4g.small to t4g.micro
+**after** observing at least two weeks of post-2.3 footprint at
+peak hours (busy weekend evening) and confirming memory usage
+tracks the Phase 2 sizing projection. Stop instance, change
+type, apply.
+
+Done when: admin/data box runs on t4g.micro, peak observed memory
+is ≤750MB (≥10% headroom on the 850MB usable), CPU credit balance
+remains positive across a full peak weekend, and any admin-api
+OOMs trigger predictable ~2s recoveries via systemd.
+
 ## Open Decisions
 
-Each of these is owned by a specific phase, not a Phase 1
+Each of these is owned by a specific sub-phase, not a 1.1
 prerequisite. Flagged here so they're visible early and don't
 get rediscovered mid-implementation:
 
@@ -408,12 +615,12 @@ get rediscovered mid-implementation:
   developers on the tailnet reach either; (b) Cloudflare in front
   of public SG rules on both ports — free TLS, hides the origin
   IP; (c) ALB + ACM with two listener rules — AWS-native,
-  ~$18/mo, cleanest separation. Default through Phases 2–5 is
-  (a); the choice is the substance of Phase 6. A fourth path is
-  to make admin-web proxy API calls server-side and drop
+  ~$18/mo, cleanest separation. Default through 1.2–1.5 is (a);
+  the choice is the substance of 1.6. A fourth path is to make
+  admin-web proxy API calls server-side and drop
   `NEXT_PUBLIC_API_URL`, leaving only admin-web to expose.
 
-- **Admin-API ↔ admin-web separation.** Phase 2/3 colocate them
+- **Admin-API ↔ admin-web separation.** 1.2 / 1.3 colocate them
   on the same box. If admin-web traffic ever competes with
   admin-api for resources, they can split onto separate boxes
   with no code change — the only coupling is the
