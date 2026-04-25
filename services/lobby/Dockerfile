@@ -2,8 +2,8 @@
 FROM golang:1.22-alpine AS go-builder
 
 WORKDIR /build
-COPY server/ .
-RUN go build -trimpath -ldflags="-s -w" -o zsilencer-lobby .
+COPY services/lobby/ .
+RUN go build -trimpath -ldflags="-s -w" -o silencer-lobby .
 
 # ── stage 2: C++ dedicated server (Linux) ─────────────────────────────────────
 FROM ubuntu:22.04 AS cpp-builder
@@ -46,8 +46,8 @@ RUN apt-get -o Acquire::Check-Valid-Until=false \
 COPY --from=cpp-builder /src/shared/assets/ /usr/local/share/silencer/
 
 # Binaries
-COPY --from=go-builder  /build/zsilencer-lobby      /usr/local/bin/zsilencer-lobby
-COPY --from=cpp-builder /src/build/silencer         /usr/local/bin/silencer
+COPY --from=go-builder  /build/silencer-lobby      /usr/local/bin/silencer-lobby
+COPY --from=cpp-builder /src/build/silencer        /usr/local/bin/silencer
 
 # lobby.json is persisted here via a named volume.
 WORKDIR /data
@@ -55,7 +55,7 @@ WORKDIR /data
 EXPOSE 15170/tcp
 EXPOSE 15170/udp
 
-ENTRYPOINT ["/usr/local/bin/zsilencer-lobby"]
+ENTRYPOINT ["/usr/local/bin/silencer-lobby"]
 CMD ["-addr", ":15170", "-public-addr", "127.0.0.1", \
      "-db", "/data/lobby.json", \
      "-game-binary", "/usr/local/bin/silencer"]

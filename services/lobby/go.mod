@@ -1,4 +1,4 @@
-module zsilencer-lobby
+module silencer-lobby
 
 go 1.22
 

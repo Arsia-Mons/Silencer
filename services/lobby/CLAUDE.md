@@ -1,4 +1,4 @@
-# server/ — Go lobby
+# services/lobby/ — Go lobby
 
 Go: stdlib + `mongo-driver` (used only when `MONGO_URL` set) + `amqp091-go`
 (used only when `RABBITMQ_URL` set). Build/run instructions, flags, and
@@ -25,7 +25,7 @@ the code.
   password hashes, per-agency stats keyed by user.
 - `mongosync.go` — async-mirrors store mutations to MongoDB when
   `MONGO_URL` is set (see Storage). Password hashes never synced.
-- `events.go` — fire-and-forget RabbitMQ event publisher (`zsilencer.events`
+- `events.go` — fire-and-forget RabbitMQ event publisher (`silencer.events`
   exchange) for the admin dashboard's live feed. No-op when
   `RABBITMQ_URL`/`-rabbitmqURL` unset.
 - `playerauth.go` — internal HTTP server (`-player-auth-addr`, default

@@ -1,23 +1,23 @@
-# zSILENCER lobby server
+# Silencer lobby server
 
 A self-hosted replacement for the defunct `lobby.zsilencer.com` service.
 Speaks the existing client wire protocol (reverse-engineered from
-`src/lobby.cpp` and `src/lobbygame.cpp`) and spawns `zsilencer -s`
+`src/lobby.cpp` and `src/lobbygame.cpp`) and spawns `silencer -s`
 subprocesses on demand to host individual games.
 
 ## Build
 
 ```
-cd server
+cd services/lobby
 go build
 ```
 
-No external dependencies — stdlib only. Produces `./zsilencer-lobby`.
+No external dependencies — stdlib only. Produces `./silencer-lobby`.
 
 ## Run
 
 ```
-sudo ./zsilencer-lobby -addr :517 -game-binary /path/to/build/zsilencer
+sudo ./silencer-lobby -addr :517 -game-binary /path/to/build/silencer
 ```
 
 Port 517 matches the original lobby and is what the client connects to
@@ -33,7 +33,7 @@ by default. On macOS that requires `sudo`; use any unprivileged port
 | `-db` | `lobby.json` | JSON user/stats database path |
 | `-motd` | *(built-in)* | path to a plain-text MOTD file |
 | `-version` | `00023` | required client version string (empty = accept any) |
-| `-game-binary` | `../build/zsilencer` | path to the `zsilencer` binary to spawn per game |
+| `-game-binary` | `../build/silencer` | path to the `silencer` binary to spawn per game |
 | `-public-addr` | `127.0.0.1` | host or IP clients should use to reach the dedicated servers |
 | `-player-auth-addr` | `:15171` | internal HTTP server address (Docker-internal, not publicly exposed) |
 
@@ -49,7 +49,7 @@ by default. On macOS that requires `sudo`; use any unprivileged port
   game-list browsing, create/join, user-info queries, stats.
 - **UDP** on the same port receives heartbeats (`[0x00][gameid u32][port u16][state u8]`)
   from spawned dedicated servers.
-- On each `MSG_NEWGAME`, the lobby spawns `zsilencer -s <public-addr> <port> <gameid> <accountid>`.
+- On each `MSG_NEWGAME`, the lobby spawns `silencer -s <public-addr> <port> <gameid> <accountid>`.
   That subprocess binds a UDP port for game traffic, heartbeats the
   lobby, and takes over as the game's AUTHORITY.
 - The creator's client connects directly to that UDP port (published in
