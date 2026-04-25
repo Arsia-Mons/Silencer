@@ -209,29 +209,59 @@ export default function MapCanvas({
     ctx.strokeRect(pan.x, pan.y, width * tileSize, height * tileSize);
 
     // Platform overlays
-    function drawPlatform(cx1, cy1, cx2, cy2, typeName, dashed) {
-      const color = PLATFORM_COLORS[typeName] ?? 'rgba(80,130,255,0.3)';
-      ctx.fillStyle = color;
-      ctx.strokeStyle = color.replace(/[\d.]+\)$/, '0.9)');
-      ctx.lineWidth = 1;
-      if (dashed) ctx.setLineDash([4, 4]);
-
+    function buildPlatformPath(cx1, cy1, cx2, cy2, typeName) {
       ctx.beginPath();
       if (typeName === 'STAIRSUP') {
-        // Ramp rising left→right: right-angle at bottom-right
-        ctx.moveTo(cx1, cy2); // bottom-left
-        ctx.lineTo(cx2, cy1); // top-right
-        ctx.lineTo(cx2, cy2); // bottom-right
+        ctx.moveTo(cx1, cy2);
+        ctx.lineTo(cx2, cy1);
+        ctx.lineTo(cx2, cy2);
       } else if (typeName === 'STAIRSDOWN') {
-        // Ramp falling left→right: right-angle at bottom-left
-        ctx.moveTo(cx1, cy1); // top-left
-        ctx.lineTo(cx2, cy2); // bottom-right
-        ctx.lineTo(cx1, cy2); // bottom-left
+        ctx.moveTo(cx1, cy1);
+        ctx.lineTo(cx2, cy2);
+        ctx.lineTo(cx1, cy2);
       } else {
         ctx.rect(cx1, cy1, cx2 - cx1, cy2 - cy1);
       }
       ctx.closePath();
+    }
+
+    function drawPlatform(cx1, cy1, cx2, cy2, typeName, dashed) {
+      const color = PLATFORM_COLORS[typeName] ?? 'rgba(80,130,255,0.3)';
+      const strokeColor = color.replace(/[\d.]+\)$/, '0.9)');
+
+      // Base fill
+      ctx.lineWidth = 1;
+      buildPlatformPath(cx1, cy1, cx2, cy2, typeName);
+      ctx.fillStyle = color;
       ctx.fill();
+
+      // Cross-grid hatch clipped to the platform shape
+      ctx.save();
+      buildPlatformPath(cx1, cy1, cx2, cy2, typeName);
+      ctx.clip();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([]);
+      const step = 8;
+      const xMin = Math.floor(Math.min(cx1, cx2) / step) * step;
+      const xMax = Math.ceil(Math.max(cx1, cx2) / step) * step;
+      const yMin = Math.floor(Math.min(cy1, cy2) / step) * step;
+      const yMax = Math.ceil(Math.max(cy1, cy2) / step) * step;
+      ctx.beginPath();
+      for (let y = yMin; y <= yMax; y += step) {
+        ctx.moveTo(xMin, y); ctx.lineTo(xMax, y);
+      }
+      for (let x = xMin; x <= xMax; x += step) {
+        ctx.moveTo(x, yMin); ctx.lineTo(x, yMax);
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      // Outline
+      ctx.lineWidth = 1;
+      if (dashed) ctx.setLineDash([4, 4]);
+      buildPlatformPath(cx1, cy1, cx2, cy2, typeName);
+      ctx.strokeStyle = strokeColor;
       ctx.stroke();
 
       if (dashed) ctx.setLineDash([]);
