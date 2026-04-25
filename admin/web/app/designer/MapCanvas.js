@@ -235,27 +235,31 @@ export default function MapCanvas({
       ctx.fillStyle = color;
       ctx.fill();
 
-      // Cross-grid hatch clipped to the platform shape
-      ctx.save();
-      buildPlatformPath(cx1, cy1, cx2, cy2, typeName);
-      ctx.clip();
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = 0.5;
-      ctx.setLineDash([]);
-      const step = 8;
-      const xMin = Math.floor(Math.min(cx1, cx2) / step) * step;
-      const xMax = Math.ceil(Math.max(cx1, cx2) / step) * step;
-      const yMin = Math.floor(Math.min(cy1, cy2) / step) * step;
-      const yMax = Math.ceil(Math.max(cy1, cy2) / step) * step;
-      ctx.beginPath();
-      for (let y = yMin; y <= yMax; y += step) {
-        ctx.moveTo(xMin, y); ctx.lineTo(xMax, y);
+      // Diagonal cross-stitch hatch — only for solid collision platforms
+      if (typeName === 'RECTANGLE' || typeName === 'STAIRSUP' || typeName === 'STAIRSDOWN') {
+        ctx.save();
+        buildPlatformPath(cx1, cy1, cx2, cy2, typeName);
+        ctx.clip();
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 0.5;
+        ctx.setLineDash([]);
+        const step = 8;
+        const px = Math.min(cx1, cx2), py = Math.min(cy1, cy2);
+        const pw = Math.abs(cx2 - cx1), ph = Math.abs(cy2 - cy1);
+        ctx.beginPath();
+        // \ diagonals
+        for (let d = -ph; d <= pw; d += step) {
+          ctx.moveTo(px + d,      py);
+          ctx.lineTo(px + d + ph, py + ph);
+        }
+        // / diagonals
+        for (let d = -ph; d <= pw; d += step) {
+          ctx.moveTo(px + d,      py + ph);
+          ctx.lineTo(px + d + ph, py);
+        }
+        ctx.stroke();
+        ctx.restore();
       }
-      for (let x = xMin; x <= xMax; x += step) {
-        ctx.moveTo(x, yMin); ctx.lineTo(x, yMax);
-      }
-      ctx.stroke();
-      ctx.restore();
 
       // Outline
       ctx.lineWidth = 1;
