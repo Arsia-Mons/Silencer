@@ -17,15 +17,11 @@ MongoDB, RabbitMQ, the admin API, and the admin web app deployed to
 AWS via Terraform and GitHub Actions, with each service on its own
 deploy lifecycle.
 
-The lobby already has a production deploy; this plan tightens it
-slightly (env var wiring, version-string handshake) but does not
-overhaul it. MongoDB, RabbitMQ, admin-api, and admin-web do not
-run in production at all today — they exist only in
-`docker-compose.yml`, which is unused outside local dev. As a
-consequence, the lobby silently no-ops its MongoDB sync and
-RabbitMQ publishes because neither service is reachable. This plan
-closes that gap **without** putting any service behind a single
-Compose stack in production.
+The lobby's existing production deploy keeps its shape (binary
+build → scp → symlink swap → restart) and gains data-tier
+connection settings via cloud-init. The four other services move
+into production for the first time on the same
+per-component-deploy footing.
 
 ## Principle
 
@@ -42,19 +38,17 @@ take gameplay down. A Mongo upgrade must not require a lobby
 restart. Each component's "deploy" verb is independently invocable
 from GitHub Actions.
 
-An umbrella workflow that *orchestrates* full-environment
-provisioning (e.g. spinning up a fresh staging environment) is
-fine. An umbrella workflow that *fuses* their day-to-day deploys
-into one job is the antipattern this plan exists to prevent.
+A standalone provisioning workflow orchestrates the per-service
+workflows when bootstrapping a fresh environment. Day-to-day
+deploys run one workflow per component.
 
 ## Topology
 
-Two AWS EC2 instances on the same Tailscale tailnet:
+Two AWS EC2 instances in the same region, VPC, subnet, and AZ:
 
 - **Lobby box** — existing instance. Runs the Go lobby as a
-  systemd service. Deploy model unchanged: GitHub Actions builds
-  the ARM64 binary, scps it over Tailscale, swaps a symlink,
-  restarts the unit.
+  systemd service. GitHub Actions builds the ARM64 binary, scps
+  it in over Tailscale, swaps a symlink, restarts the unit.
 
 - **Admin/data box** — new instance. Runs four independent
   systemd units:
@@ -63,28 +57,18 @@ Two AWS EC2 instances on the same Tailscale tailnet:
   - `silencer-admin-api` (container, image pulled from GHCR)
   - `silencer-admin-web` (container, image pulled from GHCR)
 
-  Mongo and RabbitMQ bind to localhost; the box's security group
-  exposes only SSH. All cross-service traffic — lobby ↔ admin
-  box, GitHub Actions ↔ either box — flows over Tailscale.
+Box-to-box traffic uses VPC private IPs, gated by security groups
+that reference the peer instance's SG as source. SSH to either
+box is reached over Tailscale by GitHub Actions; no SSH port is
+open to the public internet. Same-AZ placement keeps box-to-box
+latency in single-digit milliseconds and avoids inter-AZ data
+transfer charges.
 
 The split exists because Mongo and RabbitMQ are stateful
 infrastructure with rare upgrade cadences, while admin-api and
 admin-web are stateless apps with frequent deploys. Co-locating
 them on one host keeps cost low (~$5/mo extra); separating them
 from the lobby keeps the gameplay path's blast radius small.
-
-Reasons we are explicitly **not** using:
-
-- **Compose in production** — its unit of operation is the whole
-  stack, which violates the deployment-independence principle.
-  Compose remains the local-dev integration tool.
-- **DocumentDB / Amazon MQ** — managed-service pricing is
-  ~10–50× higher than self-hosted at hobby scale, with no real
-  reliability gain on a single-region single-box deployment.
-- **External managed services** (Atlas, CloudAMQP) — out of scope
-  per the AWS-only constraint.
-- **Kubernetes / Nomad** — orchestration overhead exceeds the
-  problem at this scale.
 
 ## Deployment Model Per Component
 
@@ -138,16 +122,38 @@ simultaneously.
 
 ## Cross-Service Configuration
 
-Hostnames between boxes resolve via Tailscale MagicDNS. Both
-sides hardcode the tailnet hostname in their systemd unit
-EnvironmentFile. No service discovery, no Consul, no
-load balancers — the tailnet is the network.
+A private Route 53 hosted zone (`silencer.internal`) holds A
+records for each box (`lobby.silencer.internal`,
+`admin.silencer.internal`), keeping cross-service hostnames stable
+across instance replacement.
 
-Secrets (JWT signing key, GitHub backup-repo PAT, RabbitMQ
-admin password) are written once by Terraform into a
-`/etc/silencer/*.env` file with mode 0600 and sourced by the
-relevant systemd unit. Rotation is a Terraform variable change
-+ apply, not a deploy.
+Each service reads its peers from Terraform-templated
+`/etc/silencer/<service>.env` files (mode 0600):
+
+- Lobby: `MONGO_URL` and `RABBITMQ_URL` pointing at
+  `admin.silencer.internal`
+- Admin-api: `MONGO_URL` at localhost,
+  `LOBBY_PLAYER_AUTH_URL` at `lobby.silencer.internal`
+- Admin-web: `NEXT_PUBLIC_API_URL` (see Open Decisions for the
+  externally-reachable form)
+
+`mongod` and `rabbitmq-server` configure through their distro
+locations (`/etc/mongod.conf`, `/etc/rabbitmq/`). Bind addresses
+are set to the instance's primary private IP. Application
+credentials — mongod SCRAM users, RabbitMQ users, the admin-api's
+JWT signing key, the GitHub backup-repo PAT — are managed by
+Terraform variables and provisioned by cloud-init from values in
+`/etc/silencer/*.env`. Rotation is a Terraform variable change
++ apply.
+
+Security groups gate access at the network layer; service-level
+credentials gate access at the application layer. Box-to-box
+ingress rules:
+
+- Lobby SG: 15171/tcp from admin/data SG (admin-api → lobby
+  playerauth)
+- Admin/data SG: 27017/tcp from lobby SG (lobby → MongoDB),
+  5672/tcp from lobby SG (lobby → RabbitMQ)
 
 ## Implementation Phases
 
@@ -157,14 +163,18 @@ wiring it all up.
 
 ### Phase 1 — Provision the admin/data box
 
-Terraform delta only. New EC2 instance, two EBS volumes, security
-group, Tailscale enrollment, cloud-init that installs and binds
-Mongo + RabbitMQ to localhost. GitHub Actions does not yet deploy
-to this box.
+Terraform delta only. New EC2 instance in the lobby's VPC and AZ,
+two EBS volumes, a security group with ingress rules sourced from
+the lobby SG (27017/tcp, 5672/tcp), the private Route 53 hosted
+zone with A records for both boxes, Tailscale enrollment for
+GitHub Actions SSH access, and cloud-init that installs Mongo +
+RabbitMQ bound to the private interface with auth enabled. GitHub
+Actions does not yet deploy app workloads to this box.
 
-Done when: SSH to the new box over Tailscale works, `mongod` and
-`rabbitmq-server` are running, and `terraform taint && apply`
-the instance preserves data on both EBS volumes.
+Done when: SSH from a tailnet peer works, `mongod` and
+`rabbitmq-server` accept authenticated connections from the
+lobby's private IP, and `terraform taint && apply` the instance
+preserves data on both EBS volumes.
 
 ### Phase 2 — Admin API deploy workflow
 
@@ -183,32 +193,42 @@ admin-web source directory.
 
 Done when: same as Phase 2 for the web service.
 
-### Phase 4 — Wire lobby to the data tier
+### Phase 4 — Wire lobby ↔ data tier
 
-Update the lobby's cloud-init to pass `MONGO_URL` and the
-RabbitMQ URL pointing at the admin/data box's tailnet hostname.
-Requires lobby instance replacement (cloud-init runs once).
+Update the lobby's cloud-init to pass `MONGO_URL` and `RABBITMQ_URL`
+pointing at `admin.silencer.internal` with the lobby's service
+credentials. Open 15171/tcp on the lobby's SG to the admin/data
+box's SG and set the admin-api's `LOBBY_PLAYER_AUTH_URL` to
+`lobby.silencer.internal`. Requires lobby instance replacement
+(cloud-init runs once).
 
 Done when: lobby logs show successful Mongo sync on player
-mutations and successful RabbitMQ publishes on match end.
+mutations and successful RabbitMQ publishes on match end, and
+admin-api validates a player credential against the lobby over
+the private network.
 
 ### Phase 5 — Snapshot policy + access decision
 
 Add the DLM lifecycle policy. Decide and implement public
-ingress for admin-web (see Open Decisions).
+ingress for admin-web and admin-api (see Open Decisions).
 
 ## Open Decisions
 
 These need answers before Phase 1 lands; flagging now so they
 don't block later phases:
 
-- **Public ingress for admin-web.** Three options, in increasing
-  cost/complexity: (a) Tailscale-only — only developers reach
-  the dashboard from devices on the tailnet; (b) Cloudflare
-  proxy in front of a public security-group rule — free TLS,
-  hides the origin IP; (c) ALB + ACM — AWS-native, ~$18/mo,
-  cleanest separation. Default for Phase 1 is (a). Revisit
-  before Phase 5 if non-developers need access.
+- **Public ingress for admin-web and admin-api.** Both need
+  externally-reachable URLs because `NEXT_PUBLIC_API_URL` bakes
+  the API origin into the browser bundle, so the browser — not
+  admin-web — calls admin-api directly. Three options for the
+  pair, in increasing cost/complexity: (a) Tailscale-only — only
+  developers on the tailnet reach either; (b) Cloudflare in front
+  of public SG rules on both ports — free TLS, hides the origin
+  IP; (c) ALB + ACM with two listener rules — AWS-native,
+  ~$18/mo, cleanest separation. Default for Phase 1 is (a).
+  Revisit before Phase 5 if non-developers need access. A fourth
+  path is to make admin-web proxy API calls server-side and drop
+  `NEXT_PUBLIC_API_URL`, leaving only admin-web to expose.
 
 - **Admin-API ↔ admin-web separation.** Phase 2/3 colocate them
   on the same box. If admin-web traffic ever competes with
@@ -225,16 +245,11 @@ don't block later phases:
 
 ## Out of Scope
 
-Explicitly **not** in this plan:
-
 - Multi-region or HA topology. Single AZ, single box per role.
 - Migrating account storage off `lobby.json`. The Go lobby's
   flat-file store remains primary; MongoDB stays a read mirror.
 - Horizontal scaling of admin-api or admin-web. Single instance
   of each is sufficient at hobby scale.
-- Replacing GHCR with ECR. GHCR is free, GitHub-native, and
-  authenticates via OIDC; ECR introduces an AWS dependency
-  and per-region-pull cost with no compensating benefit.
 - A separate staging environment. Production is the only
   environment until traffic justifies a second.
 - Observability stack (Prometheus, Loki, etc.). Adding a
