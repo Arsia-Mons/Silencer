@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { usePlayerAuth, playerLogout } from '../../lib/auth.js';
 import { getMyProfile, getMyMatches } from '../../lib/api.js';
 import { useState, useEffect } from 'react';
@@ -65,6 +66,10 @@ export default function MePage() {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-game-text font-mono text-sm">◈ {playerName}</span>
+          <Link href="/howto"
+            className="px-3 py-1.5 text-xs font-mono text-game-textDim border border-game-border rounded hover:border-game-primary hover:text-game-primary transition-colors">
+            [ HOW TO PLAY ]
+          </Link>
           <button onClick={playerLogout}
             className="px-3 py-1.5 text-xs font-mono text-game-muted border border-game-border rounded hover:border-game-danger hover:text-game-danger transition-colors">
             [ LOGOUT ]
