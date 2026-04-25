@@ -1,6 +1,31 @@
 zSilencer
 =========
 
+Quick Start (Linux server)
+--------------------------
+Clone the repo and run one script on a fresh Ubuntu 22.04+ VM to install
+Docker and bring up the lobby, admin API, and admin dashboard:
+
+```bash
+git clone https://github.com/Arsia-Mons/Silencer.git
+cd Silencer
+sudo bash scripts/install-linux-server.sh [PUBLIC_IP]
+```
+
+If `PUBLIC_IP` is omitted it is auto-detected. Once complete:
+
+| Service      | Address                          |
+|--------------|----------------------------------|
+| Lobby        | `<ip>:15170`                   |
+| Admin UI     | `http://<ip>:24000` (admin / admin) |
+| Admin API    | `http://<ip>:24080`            |
+| Game ports   | `<ip>:20000-20009` (UDP)       |
+
+```bash
+docker compose logs -f   # tail logs
+docker compose down      # stop everything
+```
+
 Compiling on Linux
 ------------------
 `mkdir build`
