@@ -28,7 +28,7 @@
 #define ZSILENCER_LOBBY_PORT 517
 #endif
 #ifndef ZSILENCER_VERSION
-#define ZSILENCER_VERSION "00024"
+#define ZSILENCER_VERSION "00025"
 #endif
 
 Game::Game() : renderer(world), screenbuffer(640, 480){
