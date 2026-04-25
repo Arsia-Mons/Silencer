@@ -114,6 +114,7 @@ router.get('/leaderboard', async (req, res) => {
 
     const agents = leaderboard.map((p, i) => ({
       rank: i + 1,
+      accountId: p.accountId,
       name: p.name,
       agencyIdx: Number(p.agencyIdx),
       agencyName: AGENCY_NAMES[Number(p.agencyIdx)] ?? `Agency ${p.agencyIdx}`,
