@@ -35,6 +35,3 @@ web/admin/.next/
 # Git worktrees (claude-code superpowers)
 .worktrees/
 
-# Git worktrees (claude-code superpowers)
-.worktrees/
-

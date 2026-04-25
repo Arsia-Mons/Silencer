@@ -428,13 +428,21 @@ Done when: same as 1.2 for the web service.
 
 Update the lobby's cloud-init to pass `MONGO_URL` and `AMQP_URL`
 pointing at `admin.silencer.internal` with the lobby's service
-credentials. Rename the lobby's `RABBITMQ_URL` env var and
-`-rabbitmq-url` flag to `AMQP_URL` / `-amqp-url` (one-line code
-change in `services/lobby/main.go`). Update `docker-compose.yml` to use
-`AMQP_URL` for both the `lobby` and `admin-api` services in the
-same PR so dev and prod env-var naming stay in sync. Open
-15171/tcp on the lobby's SG to the admin/data box's SG and set
-the admin-api's `LOBBY_PLAYER_AUTH_URL` to
+credentials.
+
+Rename `RABBITMQ_URL` → `AMQP_URL` and `-rabbitmq-url` →
+`-amqp-url` everywhere it's referenced; the rename ships in one
+PR so dev and prod env-var naming stay in sync. Touch sites:
+
+- `services/lobby/main.go` — flag and env var (one-line change each)
+- `services/lobby/CLAUDE.md` — two references in build/run docs
+- `services/admin-api/src/config.js` — exported constant + env read
+- `services/admin-api/src/amqp/consumer.js` — import + use site
+- `services/admin-api/CLAUDE.md` — env-var list
+- `docker-compose.yml` — both `lobby` and `admin-api` service env blocks
+
+Open 15171/tcp on the lobby's SG to the admin/data box's SG and
+set the admin-api's `LOBBY_PLAYER_AUTH_URL` to
 `lobby.silencer.internal`. Requires lobby instance replacement
 (cloud-init runs once).
 
