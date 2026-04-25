@@ -131,4 +131,78 @@ router.get('/leaderboard', async (req, res) => {
   }
 });
 
+// GET /gamestats/game/:gameId — full participant breakdown for one game
+router.get('/game/:gameId', async (req, res) => {
+  try {
+    const gameId = Number(req.params.gameId);
+    const [session, matchStats] = await Promise.all([
+      Session.findOne({ gameId }).lean(),
+      MatchStat.find({ gameId }).lean(),
+    ]);
+    if (!session) return res.status(404).json({ error: 'Game not found' });
+
+    const accountIds = [...new Set([session.accountId, ...matchStats.map(m => m.accountId)])];
+    const players = await Player.find({ accountId: { $in: accountIds } }, 'accountId name').lean();
+    const playerMap = Object.fromEntries(players.map(p => [p.accountId, p.name]));
+
+    const participants = matchStats.map(m => ({
+      name: playerMap[m.accountId] ?? 'Unknown',
+      agencyIdx: m.agencyIdx,
+      agencyName: AGENCY_NAMES[m.agencyIdx] ?? `Agency ${m.agencyIdx}`,
+      won: m.won,
+      kills: m.kills ?? 0,
+      deaths: m.deaths ?? 0,
+      xp: m.xp ?? 0,
+      secretsReturned: m.secretsReturned ?? 0,
+      filesHacked: m.filesHacked ?? 0,
+    })).sort((a, b) => (b.won - a.won) || (b.kills - a.kills));
+
+    res.json({
+      gameId: session.gameId,
+      mapName: session.mapName || '—',
+      creatorName: playerMap[session.accountId] ?? 'Unknown',
+      startedAt: session.startedAt,
+      endedAt: session.endedAt,
+      participants,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /gamestats/player/:accountId — public profile for leaderboard drill-in
+router.get('/player/:accountId', async (req, res) => {
+  try {
+    const player = await Player.findOne(
+      { accountId: Number(req.params.accountId) },
+      'accountId name agencies lifetimeStats firstSeen'
+    ).lean();
+    if (!player) return res.status(404).json({ error: 'Player not found' });
+
+    const xpAgg = await MatchStat.aggregate([
+      { $match: { accountId: player.accountId } },
+      { $group: { _id: null, totalXP: { $sum: '$xp' }, totalGames: { $sum: 1 } } },
+    ]);
+
+    res.json({
+      accountId: player.accountId,
+      name: player.name,
+      firstSeen: player.firstSeen,
+      agencies: (player.agencies || []).map((a, i) => ({
+        agencyIdx: i,
+        agencyName: AGENCY_NAMES[i] ?? `Agency ${i}`,
+        wins: a.wins ?? 0,
+        losses: a.losses ?? 0,
+        level: a.level ?? 0,
+      })),
+      kills: player.lifetimeStats?.kills ?? 0,
+      deaths: player.lifetimeStats?.deaths ?? 0,
+      totalXP: xpAgg[0]?.totalXP ?? 0,
+      totalGames: xpAgg[0]?.totalGames ?? 0,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 export default router;

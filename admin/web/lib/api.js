@@ -60,4 +60,6 @@ export const listBackups    = ()  => apiFetch('/backup/list');
 
 export const getGameStatsRecent      = (limit = 20) => playerFetch(`/gamestats/recent-games?limit=${limit}`);
 export const getGameStatsLeaderboard = (limit = 50) => playerFetch(`/gamestats/leaderboard?limit=${limit}`);
+export const getGameDetail           = (gameId)     => playerFetch(`/gamestats/game/${gameId}`);
+export const getAgentDetail          = (accountId)  => playerFetch(`/gamestats/player/${accountId}`);
 
