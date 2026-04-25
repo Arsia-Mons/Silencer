@@ -76,7 +76,7 @@ export default function HowToPage() {
       {/* Top bar */}
       <header className="flex items-center justify-between px-6 py-4 border-b border-game-border bg-game-bgCard sticky top-0 z-10">
         <div className="flex items-center gap-4">
-          <img src="/logo.png" alt="zSILENCER" className="h-10 w-auto" />
+          <img src="/logo.png" alt="Silencer" className="h-10 w-auto" />
           <div>
             <div className="text-game-primary text-sm font-mono font-bold tracking-widest">HOW TO PLAY</div>
             <div className="text-game-muted text-xs font-mono">AGENT FIELD MANUAL</div>
@@ -114,13 +114,13 @@ export default function HowToPage() {
         <main className="flex-1 min-w-0">
 
           <Section id="overview" icon="◈" title="Overview">
-            <P>zSILENCER is a top-secret espionage action game set in a near-future Mars colony. You play as an agent working for one of five rival intelligence agencies — NOXIS, LAZARUS, CALIBER, STATIC, or BLACKROSE — each with unique abilities and playstyles.</P>
+            <P>SILENCER is a top-secret espionage action game set in a near-future Mars colony. You play as an agent working for one of five rival intelligence agencies — NOXIS, LAZARUS, CALIBER, STATIC, or BLACKROSE — each with unique abilities and playstyles.</P>
             <P>The goal of each mission is simple: collect 3 secrets before the other teams do. Secrets are located by hacking data terminals scattered around the map. Once you have gathered enough intelligence, a secret location is revealed — go pick it up and return it to the secrets terminal in your base.</P>
             <P>Between hacking runs you will earn credits, buy tech gear, defend your base, and fight off rival agents. Balance offense, defense, and intelligence gathering — no single strategy wins every time.</P>
           </Section>
 
           <Section id="getting-in" icon="◉" title="Getting Into The Game">
-            <P>Launch zSILENCER and log in with your callsign and password. After logging in you will land in the lobby — a list of open games you can join, plus a chat area to coordinate with other players.</P>
+            <P>Launch SILENCER and log in with your callsign and password. After logging in you will land in the lobby — a list of open games you can join, plus a chat area to coordinate with other players.</P>
             <div className="space-y-2">
               <P>Joining a game: click a conflict in the list, then click JOIN CONFLICT. You will enter the game lobby where you wait for everyone to ready up.</P>
               <P>Game lobby: players from the same agency are on the same team by default. Use CHANGE TEAMS to split. Use the TECH button to assign your inventory slots before the game starts.</P>
