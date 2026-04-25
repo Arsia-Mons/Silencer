@@ -3,6 +3,13 @@
 **Status:** Proposed
 **Date:** 2026-04-25
 
+> **Naming note:** The product is being rebranded from **zSILENCER** to
+> **Silencer**. This plan uses the new name throughout. Renaming the
+> binary, the Windows solution (`zSILENCER.sln`), the macOS plist, the
+> CMake project, and the on-disk data directory
+> (`~/Library/Application Support/zSILENCER`) is a separate concern from
+> the directory restructure and is tracked in its own follow-up.
+
 ## Goal
 
 Reorganize the repository so its top-level layout reflects what each
@@ -30,7 +37,8 @@ left to the implementation PR.
 ## Desired End State
 
 ```
-zSilencer/
+silencer/                      # repo root (currently named zSilencer/
+                               #   on disk; rename tracked separately)
 ├── web/                       # Browser-shipped frontends
 │   ├── admin/                 # Next.js admin dashboard (now includes
 │   │                          #   the level designer route — designer
@@ -82,7 +90,9 @@ zSilencer/
 - Root-level `CMakeLists.txt`, `cmake/`, `resources.rc`,
   `vcpkg.json`, `.vcpkg/`, `zSILENCER.xcodeproj`, `zSILENCER-Info.plist`
   — these belong with the C++ client, so they move into
-  `clients/silencer/`.
+  `clients/silencer/`. (The `zSILENCER`-prefixed filenames are
+  rebranded to `Silencer` as part of the separate naming follow-up,
+  not this restructure.)
 
 ## Top-Level CLAUDE.md Rules to Add
 
