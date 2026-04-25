@@ -4,6 +4,7 @@ export const TOOLS = [
   { id: 'SELECT',         label: 'SELECT',     icon: '⊹' },
   { id: 'TILE_BG',        label: 'TILE (BG)',  icon: '▦' },
   { id: 'TILE_FG',        label: 'TILE (FG)',  icon: '▧' },
+  { id: 'ERASE_TILE',     label: 'ERASE',      icon: '⌫' },
   { id: 'RECT',           label: 'RECT',       icon: '▭' },
   { id: 'STAIRSUP',       label: 'STAIRS↑',   icon: '↗' },
   { id: 'STAIRSDOWN',     label: 'STAIRS↓',   icon: '↘' },
@@ -70,8 +71,8 @@ export const ACTOR_TYPE_HINTS = {
   67: { label: 'Type',   options: { 0:'Base Defense', 1:'Guard Defense (Laser)' } },
 };
 
-export default function Toolbar({ activeTool, onToolChange, activeLayer, onLayerChange, selectedActor, onActorChange, lumMode, onLumModeChange }) {
-  const tileTools = TOOLS.filter(t => t.id === 'TILE_BG' || t.id === 'TILE_FG');
+export default function Toolbar({ activeTool, onToolChange, activeLayer, onLayerChange, selectedActor, onActorChange, lumMode, onLumModeChange, eraseLayerType, onEraseLayerTypeChange }) {
+  const tileTools = TOOLS.filter(t => ['TILE_BG', 'TILE_FG', 'ERASE_TILE'].includes(t.id));
   const platformTools = TOOLS.filter(t => ['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','ERASE_PLATFORM'].includes(t.id));
   const otherTools = TOOLS.filter(t => ['SELECT','ACTOR'].includes(t.id));
 
@@ -133,6 +134,33 @@ export default function Toolbar({ activeTool, onToolChange, activeLayer, onLayer
           >
             💡 LUM
           </button>
+        </>
+      )}
+
+      {/* Erase tile controls */}
+      {activeTool === 'ERASE_TILE' && (
+        <>
+          <div className="w-px h-5 bg-game-border" />
+          <div className="flex gap-1 items-center">
+            <span className="text-xs text-game-textDim mr-1">TYPE:</span>
+            {['bg','fg'].map(t => (
+              <button key={t} onClick={() => onEraseLayerTypeChange?.(t)}
+                className={`px-2 py-1 text-xs font-mono border rounded transition-colors ${
+                  eraseLayerType === t
+                    ? 'border-game-primary text-game-primary bg-game-dark'
+                    : 'border-game-border text-game-textDim hover:border-game-primary'
+                }`}>
+                {t.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <div className="w-px h-5 bg-game-border" />
+          <div className="flex gap-1 items-center">
+            <span className="text-xs text-game-textDim mr-1">LAYER:</span>
+            {[0,1,2,3].map(l => (
+              <button key={l} onClick={() => onLayerChange(l)} className={layerCls(l)}>{l}</button>
+            ))}
+          </div>
         </>
       )}
 

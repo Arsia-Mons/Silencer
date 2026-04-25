@@ -42,6 +42,7 @@ function TileCell({ bitmap, selected, onClick }) {
 
 export default function TilePicker({ tileImages, tileBankCounts, selectedTileId, onSelectTile }) {
   const [bankNum, setBankNum] = useState(0);
+  const [filter, setFilter] = useState('');
 
   const sortedBanks = Array.from(tileBankCounts.keys()).sort((a, b) => a - b);
   const currentBankIdx = sortedBanks.indexOf(bankNum);
@@ -56,6 +57,18 @@ export default function TilePicker({ tileImages, tileBankCounts, selectedTileId,
     setBankNum(sortedBanks[idx] ?? 0);
   };
 
+  const handleFilterChange = (val) => {
+    setFilter(val);
+    if (!val.trim()) return;
+    if (/^\d+:\d+$/.test(val.trim())) {
+      const [b, t] = val.trim().split(':').map(Number);
+      setBankNum(b);
+      onSelectTile((b << 8) | t);
+    } else if (/^\d+$/.test(val.trim())) {
+      setBankNum(parseInt(val.trim(), 10));
+    }
+  };
+
   const bitmaps = tileImages.get(bankNum) ?? [];
   const count   = tileBankCounts.get(bankNum) ?? 0;
 
@@ -66,6 +79,13 @@ export default function TilePicker({ tileImages, tileBankCounts, selectedTileId,
     <div className="flex flex-col h-full overflow-hidden">
       <div className="px-3 py-2 border-b border-game-border">
         <div className="text-xs text-game-textDim mb-2 tracking-widest">TILE BANK</div>
+        <input
+          type="text"
+          placeholder="Filter: bank # or bank:tile"
+          value={filter}
+          onChange={e => handleFilterChange(e.target.value)}
+          className="w-full mb-2 px-2 py-1 text-xs font-mono bg-game-dark border border-game-border text-game-text rounded focus:outline-none focus:border-game-primary placeholder:text-game-muted"
+        />
         <div className="flex items-center gap-1 mb-2">
           <button onClick={prevBank} className="px-2 py-1 text-xs font-mono border border-game-border text-game-textDim rounded hover:border-game-primary hover:text-game-text">◀</button>
           <input

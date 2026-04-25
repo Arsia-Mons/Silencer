@@ -160,6 +160,27 @@ export function useSilMap() {
     });
   }, []);
 
+  const createMap = useCallback((width, height, description) => {
+    const numCells = width * height;
+    historyRef.current = [];
+    futureRef.current = [];
+    syncUndoRedo();
+    setMapData({
+      header: { firstbyte: 0, version: 0, maxplayers: 8, maxteams: 2, parallax: 0, ambience: 0, flags: 0, description: description || 'New Map' },
+      width, height,
+      fileName: 'new_map.SIL',
+      layers: {
+        bg: [new Array(numCells).fill(null), new Array(numCells).fill(null), new Array(numCells).fill(null), new Array(numCells).fill(null)],
+        fg: [new Array(numCells).fill(null), new Array(numCells).fill(null), new Array(numCells).fill(null), new Array(numCells).fill(null)],
+      },
+      actors: [],
+      platforms: [],
+      rawMinimap: new Uint8Array(0),
+      minimapCompressedSize: 0,
+    });
+  }, []);
+
+
   const openMap = useCallback(async (file) => {
     try {
       const buf = await file.arrayBuffer();
@@ -399,12 +420,25 @@ export function useSilMap() {
     });
   }, [pushHistory]);
 
-  const patchTile = useCallback((layerType, layerIdx, x, y, patch) => {
+  const updateHeader = useCallback((patch) => {
     setMapData(prev => {
       if (!prev) return prev;
-      const { width, height, layers } = prev;
-      if (x < 0 || x >= width || y < 0 || y >= height) return prev;
       pushHistory(prev);
+      return { ...prev, header: { ...prev.header, ...patch } };
+    });
+  }, [pushHistory]);
+
+  const moveActor = useCallback((idx, x, y) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const actors = prev.actors.map((a, i) => i === idx ? { ...a, x, y } : a);
+      return { ...prev, actors };
+    });
+  }, [pushHistory]);
+
+  const patchTile = useCallback((layerType, layerIdx, x, y, patch) => {
+    setMapData(prev => {
       const idx = y * width + x;
       const layerArr = layerType === 'fg' ? layers.fg : layers.bg;
       const existing = layerArr[layerIdx][idx] ?? { tile_id: 0, flip: 0, lum: 0 };
@@ -419,10 +453,11 @@ export function useSilMap() {
   }, [pushHistory]);
 
   return {
-    map: mapData, openMap, saveMap,
+    map: mapData, openMap, saveMap, createMap,
     updateTile, patchTile, beginPaint, commitPaint,
     addPlatform, removePlatform,
-    addActor, removeActor, updateActor,
+    addActor, removeActor, updateActor, moveActor,
+    updateHeader,
     undo, redo, canUndo, canRedo,
     resizeMap,
   };

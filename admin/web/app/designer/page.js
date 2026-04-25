@@ -10,18 +10,23 @@ import MapCanvas from './MapCanvas.js';
 import TilePicker from './TilePicker.js';
 import ActorContextMenu from './ActorContextMenu.js';
 import TileContextMenu from './TileContextMenu.js';
+import MapPropertiesPanel from './MapPropertiesPanel.js';
+import ActorListPanel from './ActorListPanel.js';
+import Minimap from './Minimap.js';
 
 export default function DesignerPage() {
   useAuth();
   const wsConnected = useSocket({});
 
   const { loaded, error, tileImages, spriteImages, tileBankCounts, progress, loadFiles } = useGameData();
-  const { map, openMap, saveMap, updateTile, patchTile, beginPaint, commitPaint,
-          addPlatform, removePlatform, addActor, removeActor, updateActor,
+  const { map, openMap, saveMap, createMap, updateTile, patchTile, beginPaint, commitPaint,
+          addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
+          updateHeader,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   const [activeTool, setActiveTool]     = useState('TILE_BG');
   const [activeLayer, setActiveLayer]   = useState(0);
+  const [eraseLayerType, setEraseLayerType] = useState('bg');
   const [selectedTileId, setSelectedTile] = useState(0);
   const [selectedActorId, setSelectedActor] = useState(36); // player start default
   const [zoom, setZoom]   = useState(0.5);
@@ -32,6 +37,12 @@ export default function DesignerPage() {
   const [resizeW, setResizeW] = useState('');
   const [resizeH, setResizeH] = useState('');
   const [showResize, setShowResize] = useState(false);
+  const [showNewMap, setShowNewMap] = useState(false);
+  const [newMapW, setNewMapW] = useState('40');
+  const [newMapH, setNewMapH] = useState('30');
+  const [newMapDesc, setNewMapDesc] = useState('New Map');
+  const [showProps, setShowProps] = useState(false);
+  const [showHotkeys, setShowHotkeys] = useState(false);
   const [actorMenu, setActorMenu] = useState(null);
   const [tileMenu, setTileMenu] = useState(null);
   const [vis, setVis] = useState({
@@ -66,11 +77,33 @@ export default function DesignerPage() {
   const dataDirRef   = useRef(null);
   const dataFilesRef = useRef(null);
 
-  // Global undo/redo keyboard shortcuts
+  // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+      // Undo/Redo always takes priority
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
+
+      // Skip tool shortcuts when typing in an input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      switch (e.key) {
+        case 'b': setActiveTool('TILE_BG');    break;
+        case 'f': setActiveTool('TILE_FG');    break;
+        case 'e': setActiveTool('ERASE_TILE'); break;
+        case 'p': setActiveTool('RECT');       break;
+        case 'a': setActiveTool('ACTOR');      break;
+        case 's': setActiveTool('SELECT');     break;
+        case '1': setActiveLayer(0); break;
+        case '2': setActiveLayer(1); break;
+        case '3': setActiveLayer(2); break;
+        case '4': setActiveLayer(3); break;
+        case 'g': setVis(v => ({ ...v, grid: !v.grid })); break;
+        case 'l': setVis(v => ({ ...v, lighting: !v.lighting })); break;
+        case '?': setShowHotkeys(h => !h); break;
+        default: break;
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -109,6 +142,26 @@ export default function DesignerPage() {
       securityid: 0,
     });
   }, [selectedActorId, addActor]);
+
+  const handleActorMove = useCallback((idx, x, y) => {
+    moveActor(idx, x, y);
+  }, [moveActor]);
+
+  const canvasContainerRef = useRef(null);
+
+  const handleCenterOnActor = useCallback((actor) => {
+    const container = canvasContainerRef.current;
+    if (!container) return;
+    const { width: cw, height: ch } = container.getBoundingClientRect();
+    setPan({ x: cw / 2 - actor.x * zoom, y: ch / 2 - actor.y * zoom });
+  }, [zoom]);
+
+  const handleMinimapPan = useCallback((wx, wy) => {
+    const container = canvasContainerRef.current;
+    if (!container) return;
+    const { width: cw, height: ch } = container.getBoundingClientRect();
+    setPan({ x: cw / 2 - wx * zoom, y: ch / 2 - wy * zoom });
+  }, [zoom]);
 
   const handleDragPlatform = useCallback((valOrFn) => {
     if (typeof valOrFn === 'function') {
@@ -187,6 +240,7 @@ export default function DesignerPage() {
             ↪ REDO
           </button>
           <div className="w-px h-4 bg-game-border" />
+          {/* Open */}
           <button
             onClick={() => silInputRef.current?.click()}
             className="px-3 py-1 text-xs font-mono border border-game-border text-game-textDim rounded hover:border-game-primary hover:text-game-text transition-colors"
@@ -195,6 +249,55 @@ export default function DesignerPage() {
           </button>
           <input ref={silInputRef} type="file" accept=".SIL,.sil"
             className="hidden" onChange={handleOpenSil} />
+
+          {/* New Map */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNewMap(n => !n)}
+              className={`px-3 py-1 text-xs font-mono border rounded transition-colors ${showNewMap ? 'border-game-primary text-game-primary' : 'border-game-border text-game-textDim hover:border-game-primary hover:text-game-text'}`}
+            >
+              + NEW
+            </button>
+            {showNewMap && (
+              <div className="absolute top-full left-0 mt-1 z-50 bg-game-bgCard border border-game-border rounded p-3 flex flex-col gap-2 shadow-xl min-w-[200px]">
+                <div className="text-xs text-game-textDim font-mono tracking-wider">NEW MAP</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-game-textDim font-mono w-8">W</span>
+                  <input type="number" min="1" max="512" value={newMapW}
+                    onChange={e => setNewMapW(e.target.value)}
+                    className="w-20 px-2 py-1 text-xs font-mono bg-game-dark border border-game-border text-game-text rounded focus:border-game-primary outline-none" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-game-textDim font-mono w-8">H</span>
+                  <input type="number" min="1" max="512" value={newMapH}
+                    onChange={e => setNewMapH(e.target.value)}
+                    className="w-20 px-2 py-1 text-xs font-mono bg-game-dark border border-game-border text-game-text rounded focus:border-game-primary outline-none" />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-game-textDim font-mono w-8 text-[10px]">DESC</span>
+                  <input type="text" value={newMapDesc}
+                    onChange={e => setNewMapDesc(e.target.value)}
+                    className="flex-1 px-2 py-1 text-xs font-mono bg-game-dark border border-game-border text-game-text rounded focus:border-game-primary outline-none" />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => {
+                    const w = parseInt(newMapW, 10);
+                    const h = parseInt(newMapH, 10);
+                    if (!w || !h || w < 1 || h < 1 || w > 512 || h > 512) return;
+                    createMap(w, h, newMapDesc);
+                    setShowNewMap(false);
+                  }}
+                    className="flex-1 py-1 text-xs font-mono border border-game-primary text-game-primary rounded hover:bg-game-dark transition-colors">
+                    CREATE
+                  </button>
+                  <button onClick={() => setShowNewMap(false)}
+                    className="px-2 py-1 text-xs font-mono border border-game-border text-game-textDim rounded hover:border-game-primary transition-colors">
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Save */}
           {map && (
@@ -205,6 +308,25 @@ export default function DesignerPage() {
               SAVE .SIL
             </button>
           )}
+
+          {/* Props */}
+          {map && (
+            <button
+              onClick={() => setShowProps(p => !p)}
+              className={`px-3 py-1 text-xs font-mono border rounded transition-colors ${showProps ? 'border-game-primary text-game-primary' : 'border-game-border text-game-textDim hover:border-game-primary hover:text-game-text'}`}
+            >
+              PROPS
+            </button>
+          )}
+
+          {/* Hotkeys help */}
+          <button
+            onClick={() => setShowHotkeys(h => !h)}
+            className="px-2 py-1 text-xs font-mono border border-game-border text-game-textDim rounded hover:border-game-primary hover:text-game-text transition-colors"
+            title="Keyboard shortcuts"
+          >
+            ?
+          </button>
 
           {/* Fit */}
           {map && (
@@ -296,12 +418,23 @@ export default function DesignerPage() {
           onActorChange={setSelectedActor}
           lumMode={lumMode}
           onLumModeChange={setLumMode}
+          eraseLayerType={eraseLayerType}
+          onEraseLayerTypeChange={setEraseLayerType}
         />
+
+        {/* Map Properties Panel */}
+        {map && showProps && (
+          <MapPropertiesPanel
+            header={map.header}
+            onUpdate={updateHeader}
+            onClose={() => setShowProps(false)}
+          />
+        )}
 
         {/* Main area: canvas + right panel */}
         <div className="flex flex-1 min-h-0">
           {/* Canvas area */}
-          <div id="canvas-container" className="flex-1 relative min-w-0 flex flex-col">
+          <div id="canvas-container" ref={canvasContainerRef} className="flex-1 relative min-w-0 flex flex-col">
 
             {/* Visibility toggles */}
             <div className="flex items-center gap-1 px-2 py-1 bg-[#080c08] border-b border-[#1a2e1a] flex-shrink-0 flex-wrap">
@@ -348,24 +481,43 @@ export default function DesignerPage() {
               onPlatformRemove={removePlatform}
               onActorPlace={handleActorPlace}
               onActorRemove={removeActor}
+              onActorMove={handleActorMove}
               onActorRightClick={(idx, sx, sy) => setActorMenu({ idx, screenX: sx, screenY: sy })}
               onTileRightClick={(info) => { setActorMenu(null); setTileMenu(info); }}
               selectedActorId={selectedActorId}
               dragPlatform={dragPlatform}
               onDragPlatformChange={handleDragPlatform}
               onCursorChange={setCursor}
+              eraseLayerType={eraseLayerType}
+            />
+            <Minimap
+              map={map}
+              tileImages={tileImages}
+              zoom={zoom}
+              pan={pan}
+              containerRef={canvasContainerRef}
+              onPanTo={handleMinimapPan}
             />
             </div>
           </div>
 
-          {/* Right panel: tile picker */}
+          {/* Right panel: tile picker + actor list */}
           <div className="w-72 flex-shrink-0 border-l border-game-border bg-game-bgCard overflow-hidden flex flex-col">
-            <TilePicker
-              tileImages={tileImages}
-              tileBankCounts={tileBankCounts}
-              selectedTileId={selectedTileId}
-              onSelectTile={setSelectedTile}
-            />
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+              <TilePicker
+                tileImages={tileImages}
+                tileBankCounts={tileBankCounts}
+                selectedTileId={selectedTileId}
+                onSelectTile={setSelectedTile}
+              />
+            </div>
+            {map && (
+              <ActorListPanel
+                actors={map.actors}
+                onCenter={handleCenterOnActor}
+                onActorRightClick={(idx, sx, sy) => setActorMenu({ idx, screenX: sx, screenY: sy })}
+              />
+            )}
           </div>
         </div>
 
@@ -412,6 +564,40 @@ export default function DesignerPage() {
           onDelete={removeActor}
           onClose={() => setActorMenu(null)}
         />
+      )}
+
+      {/* Keyboard shortcut cheatsheet overlay */}
+      {showHotkeys && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setShowHotkeys(false)}
+        >
+          <div
+            className="bg-game-bgCard border border-game-border rounded p-5 font-mono text-xs shadow-2xl min-w-[320px]"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-game-primary tracking-widest text-sm">KEYBOARD SHORTCUTS</span>
+              <button onClick={() => setShowHotkeys(false)} className="text-game-textDim hover:text-game-text ml-4">✕</button>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-game-textDim">
+              <span className="text-game-primary">B</span><span>Tile BG tool</span>
+              <span className="text-game-primary">F</span><span>Tile FG tool</span>
+              <span className="text-game-primary">E</span><span>Erase tile</span>
+              <span className="text-game-primary">P</span><span>Platform rect</span>
+              <span className="text-game-primary">A</span><span>Actor tool</span>
+              <span className="text-game-primary">S</span><span>Select / drag tool</span>
+              <span className="text-game-primary">1–4</span><span>Layer 0–3</span>
+              <span className="text-game-primary">G</span><span>Toggle grid</span>
+              <span className="text-game-primary">L</span><span>Toggle lighting</span>
+              <span className="text-game-primary">Ctrl+Z</span><span>Undo</span>
+              <span className="text-game-primary">Ctrl+Y / Ctrl+Shift+Z</span><span>Redo</span>
+              <span className="text-game-primary">Space + drag</span><span>Pan canvas</span>
+              <span className="text-game-primary">Scroll</span><span>Zoom in/out</span>
+              <span className="text-game-primary">?</span><span>Toggle this overlay</span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

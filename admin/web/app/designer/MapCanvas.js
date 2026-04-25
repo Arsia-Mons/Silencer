@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 
 // Platform overlay colors
 const PLATFORM_COLORS = {
@@ -36,6 +36,8 @@ export default function MapCanvas({
   onBeginPaint, onCommitPaint,
   selectedActorId, dragPlatform, onDragPlatformChange,
   onCursorChange,
+  onActorMove,
+  eraseLayerType,
 })  {
   const canvasRef = useRef(null);
   const isPainting = useRef(false);
@@ -43,6 +45,8 @@ export default function MapCanvas({
   const isCtrlPanning = useRef(false);
   const isPanning = useRef(false);
   const lastPan = useRef({ x: 0, y: 0 });
+  const draggingActorRef = useRef(null); // { idx, startWx, startWy, origX, origY, moved }
+  const [dragActorPreview, setDragActorPreview] = useState(null); // { idx, wx, wy } | null
 
   // World → canvas coords
   const worldToCanvas = useCallback((wx, wy) => ({
@@ -299,7 +303,28 @@ export default function MapCanvas({
         }
       }
     }
-  }, [map, tileImages, spriteImages, vis, zoom, pan, dragPlatform]);
+
+    // Ghost actor while dragging (SELECT tool)
+    if (dragActorPreview && actors[dragActorPreview.idx]) {
+      const a = actors[dragActorPreview.idx];
+      const def = getActorDef(a.id);
+      const cx = dragActorPreview.wx * zoom + pan.x;
+      const cy = dragActorPreview.wy * zoom + pan.y;
+      const r = Math.max(6, 10 * zoom);
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.fillStyle = def.color + '88';
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = def.color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+  }, [map, tileImages, spriteImages, vis, zoom, pan, dragPlatform, dragActorPreview]);
 
   // Resize canvas to fill container
   useEffect(() => {
@@ -360,6 +385,12 @@ export default function MapCanvas({
       if (selectedTileId && tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
         onTilePaint(activeTool === 'TILE_FG' ? 'fg' : 'bg', activeLayer, tx, ty, selectedTileId);
       }
+    } else if (activeTool === 'ERASE_TILE') {
+      isPainting.current = true;
+      onBeginPaint?.();
+      if (tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
+        onTilePaint(eraseLayerType ?? 'bg', activeLayer, tx, ty, 0);
+      }
     } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK'].includes(activeTool)) {
       isPainting.current = true;
       onDragPlatformChange({ wx1: wx, wy1: wy, wx2: wx, wy2: wy, tool: activeTool });
@@ -375,12 +406,14 @@ export default function MapCanvas({
     } else if (activeTool === 'ACTOR') {
       onActorPlace({ wx, wy });
     } else if (activeTool === 'SELECT') {
-      // Remove actor on click
+      // Check if near an actor → start drag
+      const HIT = 48 / zoom;
       for (let i = map.actors.length - 1; i >= 0; i--) {
         const a = map.actors[i];
         const dist = Math.hypot(a.x - wx, a.y - wy);
-        if (dist < 32 / zoom) {
-          onActorRemove(i);
+        if (dist < HIT) {
+          draggingActorRef.current = { idx: i, startWx: wx, startWy: wy, origX: a.x, origY: a.y, moved: false };
+          setDragActorPreview({ idx: i, wx: a.x, wy: a.y });
           return;
         }
       }
@@ -393,8 +426,8 @@ export default function MapCanvas({
         }
       }
     }
-  }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom,
-      onTilePaint, onPlatformRemove, onActorPlace, onActorRemove, onDragPlatformChange, onBeginPaint]);
+  }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
+      onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e) => {
@@ -445,16 +478,30 @@ export default function MapCanvas({
     const { wx, wy } = canvasToWorld(cx, cy);
     onCursorChange({ tx, ty, wx, wy });
 
+    // Actor drag (SELECT tool)
+    if (draggingActorRef.current) {
+      const { startWx, startWy, origX, origY } = draggingActorRef.current;
+      const newWx = origX + (wx - startWx);
+      const newWy = origY + (wy - startWy);
+      draggingActorRef.current.moved = Math.hypot(wx - startWx, wy - startWy) > 4;
+      setDragActorPreview({ idx: draggingActorRef.current.idx, wx: newWx, wy: newWy });
+      return;
+    }
+
     if (isPainting.current) {
       if (activeTool === 'TILE_BG' || activeTool === 'TILE_FG') {
         if (selectedTileId && tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
           onTilePaint(activeTool === 'TILE_FG' ? 'fg' : 'bg', activeLayer, tx, ty, selectedTileId);
         }
+      } else if (activeTool === 'ERASE_TILE') {
+        if (tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
+          onTilePaint(eraseLayerType ?? 'bg', activeLayer, tx, ty, 0);
+        }
       } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK'].includes(activeTool)) {
         onDragPlatformChange(prev => prev ? { ...prev, wx2: wx, wy2: wy } : null);
       }
     }
-  }, [map, isPanning, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld,
+  }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, eraseLayerType,
       onTilePaint, onPanChange, onCursorChange, onDragPlatformChange]);
 
   const handleMouseUp = useCallback((e) => {
@@ -463,12 +510,23 @@ export default function MapCanvas({
       return;
     }
 
+    // Finish actor drag
+    if (draggingActorRef.current) {
+      const { idx, moved } = draggingActorRef.current;
+      if (moved && dragActorPreview) {
+        onActorMove?.(idx, Math.round(dragActorPreview.wx), Math.round(dragActorPreview.wy));
+      }
+      draggingActorRef.current = null;
+      setDragActorPreview(null);
+      return;
+    }
+
     if (!map) { isPainting.current = false; return; }
     const { cx, cy } = getCanvasPos(e);
     const { wx, wy } = canvasToWorld(cx, cy);
 
     if (isPainting.current) {
-      if (['TILE_BG', 'TILE_FG'].includes(activeTool)) {
+      if (['TILE_BG', 'TILE_FG', 'ERASE_TILE'].includes(activeTool)) {
         onCommitPaint?.();
       } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK'].includes(activeTool) && dragPlatform) {
         const { wx1, wy1 } = dragPlatform;
@@ -487,7 +545,7 @@ export default function MapCanvas({
       }
     }
     isPainting.current = false;
-  }, [map, activeTool, dragPlatform, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint]);
+  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.code === 'Space') { isSpacePanning.current = true; e.preventDefault(); }
@@ -507,7 +565,14 @@ export default function MapCanvas({
     };
   }, [handleKeyDown, handleKeyUp]);
 
-  const cursorStyle = (isPanning.current || isSpacePanning.current || isCtrlPanning.current) ? 'grab' : (isPainting.current ? 'crosshair' : 'default');
+  const cursorStyle = dragActorPreview
+    ? 'grabbing'
+    : (isPanning.current || isSpacePanning.current || isCtrlPanning.current)
+      ? 'grab'
+      : activeTool === 'SELECT' ? 'pointer'
+      : activeTool === 'ERASE_TILE' ? 'crosshair'
+      : isPainting.current ? 'crosshair'
+      : 'default';
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-[#050a05]">

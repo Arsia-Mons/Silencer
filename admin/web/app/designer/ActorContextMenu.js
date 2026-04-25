@@ -16,6 +16,7 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
     securityid: String(actor.securityid ?? 0),
     subplane:   String(actor.subplane ?? 0),
   });
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Close on outside click or Escape
   useEffect(() => {
@@ -139,10 +140,24 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
           className="flex-1 bg-[#1a3a1a] hover:bg-[#2a5a2a] text-[#c0f0c0] text-xs px-2 py-1 rounded border border-[#2a5a2a]">
           ✓ Apply
         </button>
-        <button onClick={() => { onDelete(actorIdx); onClose(); }}
-          className="bg-[#3a1a1a] hover:bg-[#5a2a2a] text-[#f08080] text-xs px-2 py-1 rounded border border-[#5a2a2a]">
-          ✕ Del
-        </button>
+        {confirmDelete ? (
+          <>
+            <button onClick={() => { onDelete(actorIdx); onClose(); }}
+              className="flex-1 bg-[#5a1a1a] hover:bg-[#7a2a2a] text-[#f08080] text-xs px-2 py-1 rounded border border-[#7a2a2a]">
+              Yes
+            </button>
+            <button onClick={() => setConfirmDelete(false)}
+              className="bg-[#1a1a2a] hover:bg-[#2a2a3a] text-[#a0a0a0] text-xs px-2 py-1 rounded border border-[#2a2a3a]">
+              No
+            </button>
+          </>
+        ) : (
+          <button onClick={() => setConfirmDelete(true)}
+            className="bg-[#3a1a1a] hover:bg-[#5a2a2a] text-[#f08080] text-xs px-2 py-1 rounded border border-[#5a2a2a]"
+            title="Delete actor">
+            ✕ Del
+          </button>
+        )}
         <button onClick={onClose}
           className="bg-[#1a1a2a] hover:bg-[#2a2a3a] text-[#808080] text-xs px-2 py-1 rounded border border-[#2a2a3a]">
           ✗
