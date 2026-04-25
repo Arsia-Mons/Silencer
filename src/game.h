@@ -12,6 +12,7 @@
 #include "overlay.h"
 #include "textbox.h"
 #include "updater.h"
+#include <map>
 
 class Game
 {
@@ -163,6 +164,7 @@ private:
 	Uint32 lastmapchunkrequest;
 	bool mapexistchecked;
 	int selectedmap;
+	std::map<std::string, std::string> servermaps; // "[↓] NAME.SIL" → sha1hex
 	Uint32 lastmusicplaytime;
 	char currentmusictrack[256];
 	bool fullscreentoggled;

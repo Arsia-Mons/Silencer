@@ -39,6 +39,7 @@ public:
 	bool disabled;
 	SDL_Scancode lastsym;
 	bool modal;
+	bool mousedown;
 	
 private:
 	void TabPressed(World & world);
@@ -50,7 +51,6 @@ private:
 	void DownPressed(World & world);
 	void Prev(World & world);
 	void Next(World & world);
-	bool mousedown;
 	bool mousewheelup;
 	bool mousewheeldown;
 };

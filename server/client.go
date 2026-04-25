@@ -167,9 +167,12 @@ func (c *Client) handleAuth(r *reader) error {
 	if err != nil {
 		return err
 	}
-	u, ok := c.hub.store.Login(name, hash)
+	u, ok, banned := c.hub.store.Login(name, hash)
 	if !ok {
 		msg := "Incorrect password for " + name
+		if banned {
+			msg = "Account suspended: " + name
+		}
 		w := &writer{}
 		w.u8(opAuth)
 		w.u8(0)
@@ -225,6 +228,8 @@ func (c *Client) sendChat(channel, msg string) {
 	w.u8(opChat)
 	w.cstr(channel)
 	w.cstr(msg)
+	w.u8(0)   // color (palette index 0 = white)
+	w.u8(128) // brightness (matches other lobby text)
 	c.send(w.b)
 }
 
@@ -328,8 +333,14 @@ func (c *Client) handleUpgradeStat(r *reader) error {
 	if err != nil {
 		return err
 	}
-	if c.hub.store.UpgradeStat(c.accountID, agency, stat) {
+	if updatedAgency, ok := c.hub.store.UpgradeStat(c.accountID, agency, stat); ok {
 		c.send([]byte{opUpgradeStat})
+		if c.hub.events != nil {
+			c.hub.events.Publish("player.upgrade", playerUpgradeEvent{
+				AccountID: c.accountID, AgencyIdx: agency, StatID: stat,
+				Agency: agencyToEvent(updatedAgency), Timestamp: time.Now().UnixMilli(),
+			})
+		}
 	}
 	return nil
 }
@@ -351,7 +362,8 @@ func (c *Client) handleSetGame(r *reader) error {
 }
 
 func (c *Client) handleRegisterStats(r *reader) error {
-	if _, err := r.u32(); err != nil { // gameid
+	gameID, err := r.u32()
+	if err != nil {
 		return err
 	}
 	if _, err := r.u8(); err != nil { // teamnumber
@@ -373,8 +385,69 @@ func (c *Client) handleRegisterStats(r *reader) error {
 	if err != nil {
 		return err
 	}
-	// remaining bytes = Stats::Serialize blob, ignored.
-	c.hub.store.UpdateStats(acct, statsagency, won != 0, xp)
+
+	// Parse the Stats::Serialize blob (34 Uint32 LE values = 136 bytes).
+	// Order mirrors Stats::Serialize in stats.cpp: weapons arrays first,
+	// then the scalar counters in declaration order.
+	var ms MatchStats
+	readU32 := func() uint32 {
+		v, e := r.u32()
+		if e != nil {
+			return 0
+		}
+		return v
+	}
+	for i := 0; i < 4; i++ {
+		ms.Weapons[i].Fires = readU32()
+		ms.Weapons[i].Hits = readU32()
+		ms.Weapons[i].PlayerKills = readU32()
+	}
+	ms.CiviliansKilled = readU32()
+	ms.GuardsKilled = readU32()
+	ms.RobotsKilled = readU32()
+	ms.DefenseKilled = readU32()
+	ms.SecretsPickedUp = readU32()
+	ms.SecretsReturned = readU32()
+	ms.SecretsStolen = readU32()
+	ms.SecretsDropped = readU32()
+	ms.PowerupsPickedUp = readU32()
+	ms.Deaths = readU32()
+	ms.Kills = readU32()
+	ms.Suicides = readU32()
+	ms.Poisons = readU32()
+	ms.TractsPlanted = readU32()
+	ms.GrenadesThrown = readU32()
+	ms.NeutronsThrown = readU32()
+	ms.EMPsThrown = readU32()
+	ms.ShapedThrown = readU32()
+	ms.PlasmasThrown = readU32()
+	ms.FlaresThrown = readU32()
+	ms.PoisonFlaresThrown = readU32()
+	ms.HealthPacksUsed = readU32()
+	ms.FixedCannonsPlaced = readU32()
+	ms.FixedCannonsDestroyed = readU32()
+	ms.DetsPlanted = readU32()
+	ms.CamerasPlanted = readU32()
+	ms.VirusesUsed = readU32()
+	ms.FilesHacked = readU32()
+	ms.FilesReturned = readU32()
+	ms.CreditsEarned = readU32()
+	ms.CreditsSpent = readU32()
+	ms.HealsDone = readU32()
+
+	if updatedAgency, ok := c.hub.store.UpdateStats(acct, statsagency, won != 0, xp); ok {
+		if c.hub.events != nil {
+			now := time.Now().UnixMilli()
+			c.hub.events.Publish("player.stats_update", playerStatsUpdateEvent{
+				AccountID: acct, AgencyIdx: statsagency,
+				Agency: agencyToEvent(updatedAgency), Timestamp: now,
+			})
+			c.hub.events.Publish("player.match_stats", playerMatchStatsEvent{
+				AccountID: acct, GameID: gameID, AgencyIdx: statsagency,
+				Won: won != 0, XP: xp, Stats: ms, Timestamp: now,
+			})
+		}
+	}
 	return nil
 }
 

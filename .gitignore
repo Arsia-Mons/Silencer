@@ -25,3 +25,10 @@ terraform/**/*.tfvars
 !terraform/**/*.tfvars.example
 terraform/**/backend.hcl
 !terraform/**/backend.hcl.example
+
+# Node.js
+node_modules/
+admin/api/node_modules/
+admin/web/node_modules/
+admin/web/.next/
+

@@ -500,6 +500,19 @@ void World::DoNetwork_Authority(void){
 					}
 				}
 			}break;
+			case MSG_SETAGENCY:{
+				if(peer && gameplaystate == INLOBBY){
+					Uint8 newagency;
+					data.Get(newagency);
+					Team * peerteam = GetPeerTeam(peer->id);
+					if(peerteam && peerteam->agency != newagency){
+						peerteam->RemovePeer(peer->id);
+						peer->isready = false;
+						FindTeamForPeer(*peer, newagency);
+						SendPeerList();
+					}
+				}
+			}break;
 			case MSG_TECH:{
 				if(peer && gameplaystate == INLOBBY){
 					Uint32 techchoices;
@@ -548,6 +561,22 @@ void World::DoNetwork_Authority(void){
 								StoreMapChunk((unsigned char *)&data.data[data.BitsToBytes(data.readoffset)], offset, size);
 							}
 						}break;
+					}
+				}
+			}break;
+			case MSG_KICK:{
+				if(dedicatedserver.active && senderaddr.sin_addr.s_addr == inet_addr(dedicatedserver.lobbyaddress)){
+					Uint32 accountid;
+					data.Get(accountid);
+					for(int i = 0; i < maxpeers; i++){
+						Peer * p = peerlist[i];
+						if(p && p->accountid == accountid){
+							if(gameplaystate == World::INGAME){
+								KillByGovt(*p);
+							}
+							HandleDisconnect(p->id);
+							break;
+						}
 					}
 				}
 			}break;
@@ -1155,6 +1184,19 @@ void World::HandleDisconnect(Uint8 peerid){
 		}
 	}else
 	if(mode == AUTHORITY){
+		// If a player disconnects mid-game, record their partial stats immediately
+		// so their progress isn't lost (won=0 since they left before the game ended).
+		if(gameplaystate == INGAME && peerlist[peerid]->accountid != 0){
+			Peer * leavingPeer = peerlist[peerid];
+			User * user = lobby.GetUserInfo(leavingPeer->accountid);
+			Team * team = GetPeerTeam(peerid);
+			if(user && team){
+				user->statscopy = leavingPeer->stats;
+				user->statsagency = team->agency;
+				user->teamnumber = team->number;
+				lobby.RegisterStats(*user, 0, gameinfo.id);
+			}
+		}
 		delete peerlist[peerid];
 		peerlist[peerid] = 0;
 		peercount--;
@@ -1956,6 +1998,13 @@ void World::PushStatusString(char * statusstring){
 void World::ChangeTeam(void){
 	char msg[1];
 	msg[0] = MSG_CHANGETEAM;
+	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
+}
+
+void World::SetAgency(Uint8 agency){
+	char msg[2];
+	msg[0] = MSG_SETAGENCY;
+	msg[1] = agency;
 	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
 }
 

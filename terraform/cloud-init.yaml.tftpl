@@ -25,6 +25,14 @@ ssh_authorized_keys:
 mounts:
   - [ "LABEL=${project_name}-data", /var/lib/${project_name}, ext4, "defaults,nofail,x-systemd.device-timeout=30s", "0", "2" ]
 
+# Runtime shared libraries the dedicated-server subprocess dlopens. The base
+# Noble AMI already has SDL2 + zlib; these two were added when the auto-updater
+# PR made CURL + minizip unconditional dependencies of the unified binary.
+# Names carry the t64 suffix because of Ubuntu 24.04's time_t transition.
+packages:
+  - libcurl4t64
+  - libminizip1t64
+
 write_files:
   - path: /etc/systemd/system/${project_name}-lobby.service
     permissions: '0644'

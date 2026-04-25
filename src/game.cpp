@@ -18,6 +18,7 @@
 #include "cocoawrapper.h"
 #include "sha1.h"
 #include "updaterstage2.h"
+#include "mapfetch.h"
 #include <algorithm>
 #include <stdio.h>
 
@@ -28,7 +29,10 @@
 #define ZSILENCER_LOBBY_PORT 517
 #endif
 #ifndef ZSILENCER_VERSION
-#define ZSILENCER_VERSION "00024"
+#define ZSILENCER_VERSION "00025"
+#endif
+#ifndef ZSILENCER_MAP_API_URL
+#define ZSILENCER_MAP_API_URL "http://127.0.0.1:8080"
 #endif
 
 Game::Game() : renderer(world), screenbuffer(640, 480){
@@ -145,8 +149,10 @@ bool Game::Load(char * cmdline){
 				char * lobbyport = strtok(NULL, " ");
 				char * gameid = strtok(NULL, " ");
 				char * accountid = strtok(NULL, " ");
+				char * gameport = strtok(NULL, " "); // optional: explicit UDP bind port (for Docker port mapping)
 				if(gameid && accountid && lobbyaddress && lobbyport){
-					world.Listen();
+					unsigned short bindport = (gameport && atoi(gameport) > 0) ? (unsigned short)atoi(gameport) : 0;
+					world.Listen(bindport);
 					world.lobby.Connect(lobbyaddress, atoi(lobbyport));
 					do{
 						world.lobby.DoNetwork();
@@ -3387,6 +3393,17 @@ Interface * Game::CreateGameCreateInterface(void){
 	for(std::vector<std::string>::iterator it = maps.begin(); it != maps.end(); it++){
 		mapselect->AddItem((*it).c_str());
 	}
+	// Add server-only maps (not yet downloaded) with a download prefix
+	servermaps.clear();
+	auto serverlist = FetchServerMapList(ZSILENCER_MAP_API_URL);
+	for(auto & entry : serverlist){
+		bool alreadylocal = std::find(maps.begin(), maps.end(), entry.first) != maps.end();
+		if(!alreadylocal){
+			std::string label = "[DL] " + entry.first;
+			mapselect->AddItem(label.c_str());
+			servermaps[label] = entry.second;
+		}
+	}
 #endif
 	mapselect->scrolled = 0;
 	ScrollBar * mapscrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
@@ -4484,10 +4501,48 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							}
 							if(selectbox->uid == 4){ // map select
 								int index = selectbox->MouseInside(world, iface->mousex, iface->mousey);
+								// DL badge click: raw coord check (badge lives in the 16px right margin MouseInside excludes)
+								if(iface->mousedown && iface->mousex >= selectbox->x + selectbox->width - 16 &&
+								   iface->mousey >= selectbox->y && iface->mousey < selectbox->y + selectbox->height){
+									int row = (iface->mousey - selectbox->y) / selectbox->lineheight + selectbox->scrolled;
+									if(row >= 0 && row < (int)selectbox->items.size()){
+										std::string clickeditem = selectbox->GetItemName(row);
+										auto dlit = servermaps.find(clickeditem);
+										if(dlit != servermaps.end()){
+											const std::string & hex = dlit->second;
+											unsigned char sha1bytes[20] = {};
+											bool ok = hex.size() == 40;
+											for(int j = 0; ok && j < 20; j++){
+												auto hv = [](char c) -> int {
+													if(c >= '0' && c <= '9') return c - '0';
+													if(c >= 'a' && c <= 'f') return c - 'a' + 10;
+													if(c >= 'A' && c <= 'F') return c - 'A' + 10;
+													return -1;
+												};
+												int hi = hv(hex[2*j]), lo = hv(hex[2*j+1]);
+												if(hi < 0 || lo < 0){ ok = false; break; }
+												sha1bytes[j] = (unsigned char)((hi << 4) | lo);
+											}
+											if(ok){
+												std::string dlname = clickeditem.substr(5);
+												std::string result = FetchMapFromServer(dlname.c_str(), sha1bytes, ZSILENCER_MAP_API_URL);
+												if(!result.empty()){
+													servermaps.erase(clickeditem);
+													Interface * old_create = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
+													if(old_create) old_create->DestroyInterface(world);
+													gamecreateinterface = CreateGameCreateInterface()->id;
+													return false;
+												}else{
+													CreateModalDialog("Download failed");
+												}
+											}
+										}
+									}
+								}
 								if(index != -1){
+									std::string itemname = selectbox->GetItemName(index);
+									bool isserver = servermaps.count(itemname) > 0;
 									if(index != selectedmap){
-										Map::Header header;
-										std::string filename = FindMap(selectbox->GetItemName(index));
 										if(mappreviewinterface){
 											Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
 											if(mappreviewiface){
@@ -4495,10 +4550,13 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 											}
 											mappreviewinterface = 0;
 										}
-										mappreviewinterface = CreateMapPreview(filename.c_str())->id;
+										if(!isserver){
+											std::string filename = FindMap(itemname.c_str());
+											mappreviewinterface = CreateMapPreview(filename.c_str())->id;
+										}
 										selectedmap = index;
 									}
-									if(mappreviewinterface){
+									if(!isserver && mappreviewinterface){
 										Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
 										if(mappreviewiface){
 											for(std::vector<Uint16>::iterator it2 = mappreviewiface->objects.begin(); it2 != mappreviewiface->objects.end(); it2++){
@@ -4648,6 +4706,9 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							Config::GetInstance().Save();
 							oldselectedagency = selectedagency;
 							agencychanged = true;
+							if(world.state == World::CONNECTED){
+								world.SetAgency(selectedagency);
+							}
 						}
 					}
 				}break;
@@ -4984,6 +5045,9 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 												SelectBox * selectbox = static_cast<SelectBox *>(tobject);
 												if(selectbox->selecteditem >= 0){
 													mapname = selectbox->GetItemName(selectbox->selecteditem);
+												if(servermaps.count(mapname) > 0){
+													CreateModalDialog("Download the map first");
+												}else{
 													unsigned char maphash[20];
 													CalculateMapHash(FindMap(mapname).c_str(), &maphash);
 													world.lobby.CreateGame(gamename, mapname, maphash, password, securitylevel, minlevel, maxlevel, maxplayers, maxteams);
@@ -4991,6 +5055,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 													strcpy(Config::GetInstance().defaultgamename, gamename);
 													Config::GetInstance().Save();
 													CreateModalDialog("Creating game...", false);
+												}
 												}else{
 													CreateModalDialog("No map selected");
 												}
@@ -5018,7 +5083,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 									}
 								}
 							}break;
-							case 50: // modal ok button pressed
+						case 50: // modal ok button pressed
 								if(modalinterface){
 									Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
 									if(iface->id == passwordinterface && modaliface){
@@ -5929,6 +5994,14 @@ void Game::ProcessMapDownload(void){
 			if(!localpeer->mapdownloaded){
 				if(!mapexistchecked){
 					std::string mapfilename = FindMap(world.gameinfo.mapname, &world.gameinfo.maphash);
+					if(mapfilename.size() == 0){
+						// Map not available locally; try the community map server before
+						// falling back to peer-to-peer chunk transfer.
+						mapfilename = FetchMapFromServer(
+							world.gameinfo.mapname,
+							world.gameinfo.maphash,
+							ZSILENCER_MAP_API_URL);
+					}
 					if(mapfilename.size() > 0){
 						world.SendMapDownloaded();
 						LoadMapData(mapfilename.c_str());

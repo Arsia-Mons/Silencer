@@ -35,6 +35,9 @@ Stats::Stats(){
 	virusesused = 0;
 	fileshacked = 0;
 	filesreturned = 0;
+	creditsmade = 0;
+	creditsspent = 0;
+	healsdone = 0;
 }
 
 void Stats::Serialize(bool write, Serializer & data, Serializer * old){
@@ -72,6 +75,9 @@ void Stats::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, virusesused, old);
 	data.Serialize(write, fileshacked, old);
 	data.Serialize(write, filesreturned, old);
+	data.Serialize(write, creditsmade, old);
+	data.Serialize(write, creditsspent, old);
+	data.Serialize(write, healsdone, old);
 }
 
 Uint32 Stats::CalculateExperience(void){

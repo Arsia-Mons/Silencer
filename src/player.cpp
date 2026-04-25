@@ -2507,6 +2507,10 @@ void Player::Tick(World & world){
 									if(shield < maxshield){
 										shield = maxshield;
 									}
+									Peer * peer = GetPeer(world);
+									if(peer){
+										peer->stats.healsdone++;
+									}
 								}
 							}
 						}
@@ -2527,6 +2531,7 @@ void Player::Tick(World & world){
 								Peer * peer = GetPeer(world);
 								if(peer){
 									peer->stats.filesreturned += files;
+									peer->stats.creditsmade += creditamount;
 								}
 								files = 0;
 								oldfiles = 0;
@@ -3295,6 +3300,8 @@ bool Player::BuyItem(World & world, Uint8 id){
 		if(bought){
 			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
 			world.BuyItem(id);
+			Peer * peer = GetPeer(world);
+			if(peer) peer->stats.creditsspent += buyableitem->price;
 			credits -= buyableitem->price;
 			return true;
 		}
@@ -3324,6 +3331,8 @@ bool Player::RepairItem(World & world, Uint8 id){
 			team->disabledtech &= ~(buyableitem->techchoice);
 			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
 			world.RepairItem(id);
+			Peer * peer = GetPeer(world);
+			if(peer) peer->stats.creditsspent += buyableitem->repairprice;
 			credits -= buyableitem->repairprice;
 			return true;
 		}

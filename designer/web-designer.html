@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>zSILENCER Map Designer</title>
+<style>
+:root {
+  --bg: #0a0a0f; --panel: #0d0d18; --border: #1a1a2e;
+  --green: #00ff88; --muted: #445566; --text: #aabbcc;
+  --toolbar-h: 46px; --status-h: 26px; --picker-w: 276px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: monospace;
+  font-size: 12px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+#toolbar { height: var(--toolbar-h); background: var(--panel);
+  border-bottom: 2px solid var(--border); display: flex; align-items: center;
+  padding: 0 6px; gap: 3px; flex-shrink: 0; overflow-x: auto; }
+#main { flex: 1; display: flex; overflow: hidden; }
+#canvas-area { flex: 1; position: relative; overflow: hidden; background: #050508; }
+#map-canvas { position: absolute; top: 0; left: 0; display: block; }
+
+#picker-panel { width: var(--picker-w); background: var(--panel);
+  border-left: 2px solid var(--border); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+#picker-header { padding: 5px 6px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 4px; flex-shrink: 0; flex-wrap: wrap; }
+#picker-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; background: #08080f; }
+#picker-scroll::-webkit-scrollbar { width: 5px; }
+#picker-scroll::-webkit-scrollbar-track { background: var(--panel); }
+#picker-scroll::-webkit-scrollbar-thumb { background: var(--border); }
+#tile-canvas { display: block; }
+
+#actor-panel { padding: 5px 6px; border-top: 1px solid var(--border); flex-shrink: 0;
+  display: none; background: #0a0a14; }
+#actor-panel.visible { display: block; }
+#actor-panel label { color: var(--muted); }
+
+#status-bar { height: var(--status-h); background: var(--panel);
+  border-top: 2px solid var(--border); display: flex; align-items: center;
+  padding: 0 8px; gap: 14px; flex-shrink: 0; font-size: 11px; }
+.si { display: flex; gap: 3px; }
+.sl { color: var(--muted); }
+.sv { color: var(--green); }
+#status-msg { color: var(--green); margin-left: auto; }
+
+button { background: #14142a; color: var(--green); border: 1px solid var(--border);
+  padding: 3px 8px; font-family: monospace; font-size: 11px; cursor: pointer;
+  border-radius: 2px; white-space: nowrap; }
+button:hover { background: #1e1e3a; border-color: #334; }
+button.active { background: #0d2a1a; border-color: var(--green); color: #00ffaa; }
+button.primary { border-color: #00cc66; }
+.sep { width: 1px; height: 26px; background: var(--border); margin: 0 2px; flex-shrink: 0; }
+select, input[type="number"], input[type="text"] { background: #14142a; color: var(--text);
+  border: 1px solid var(--border); font-family: monospace; font-size: 11px; padding: 2px 4px; }
+input[type="file"] { display: none; }
+label.fbtn { background: #14142a; color: #88ddff; border: 1px solid var(--border);
+  padding: 3px 8px; font-family: monospace; font-size: 11px; cursor: pointer;
+  border-radius: 2px; white-space: nowrap; }
+label.fbtn:hover { background: #1e1e3a; }
+#zoom-val { color: var(--green); min-width: 38px; text-align: center; display: inline-block; }
+.tool-row { display: flex; gap: 3px; align-items: center; margin-bottom: 3px; }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <label class="fbtn" for="fi-data" title="Select PALETTE.BIN, BIN_TIL.DAT and TIL_XXX.BIN files">📁 Load Game Data</label>
+  <input type="file" id="fi-data" multiple>
+  <label class="fbtn" for="fi-map" title="Open a .SIL map file">🗺 Open Map</label>
+  <input type="file" id="fi-map" accept=".SIL,.sil">
+  <button class="primary" onclick="saveMap()" title="Save map (S)">💾 Save</button>
+  <button class="primary" onclick="showPublish()" title="Publish map to community server">⬆ Publish</button>
+  <div class="sep"></div>
+  <button id="tb-select"   class="tool-btn" onclick="setTool('select')"   title="Select/delete actors & platforms (V)">🖱 SEL</button>
+  <button id="tb-tile"     class="tool-btn active" onclick="setTool('tile')" title="Paint tiles (T) — L:place R:erase">🖌 TILE</button>
+  <button id="tb-rect"     class="tool-btn" onclick="setTool('rect')"     title="Draw RECTANGLE platform (drag)">▬ RECT</button>
+  <button id="tb-stairsup" class="tool-btn" onclick="setTool('stairsup')" title="Draw STAIRSUP platform (drag)">⌇↑ STAIR</button>
+  <button id="tb-stairsdown" class="tool-btn" onclick="setTool('stairsdown')" title="Draw STAIRSDOWN platform (drag)">⌇↓ STAIR</button>
+  <button id="tb-ladder"   class="tool-btn" onclick="setTool('ladder')"   title="Draw LADDER platform (drag)">⫸ LADR</button>
+  <button id="tb-track"    class="tool-btn" onclick="setTool('track')"    title="Draw TRACK platform (drag)">— TRK</button>
+  <button id="tb-erase_plat" class="tool-btn" onclick="setTool('erase_plat')" title="Erase platform under click">✕ EPLAT</button>
+  <button id="tb-actor"    class="tool-btn" onclick="setTool('actor')"    title="Place actor at click position">● ACT</button>
+  <div class="sep"></div>
+  <span class="sl">Layer:</span>
+  <select id="layer-sel" onchange="updateLayer()" style="width:62px">
+    <option value="bg0">BG 0</option><option value="bg1">BG 1</option>
+    <option value="bg2">BG 2</option><option value="bg3">BG 3</option>
+    <option value="fg0">FG 0</option><option value="fg1">FG 1</option>
+    <option value="fg2">FG 2</option><option value="fg3">FG 3</option>
+  </select>
+  <div class="sep"></div>
+  <button onclick="toggleGrid()" id="btn-grid" title="Toggle grid (G)">GRID</button>
+  <button onclick="togglePlat()" id="btn-plat" class="active" title="Toggle platforms">PLAT</button>
+  <button onclick="toggleAct()" id="btn-act"  class="active" title="Toggle actors">ACT</button>
+  <div class="sep"></div>
+  <button onclick="adjustZoom(-0.25)" title="Zoom out (-)">-</button>
+  <span id="zoom-val">100%</span>
+  <button onclick="adjustZoom(0.25)" title="Zoom in (+)">+</button>
+  <button onclick="resetView()" title="Reset view">⊙</button>
+</div>
+
+<div id="main">
+  <div id="canvas-area">
+    <canvas id="map-canvas"></canvas>
+  </div>
+  <div id="picker-panel">
+    <div id="picker-header">
+      <button onclick="prevBank()">◀</button>
+      <span class="sl">Bank:</span>
+      <input type="number" id="bank-inp" value="62" min="0" max="255" style="width:46px"
+             onchange="setBank(+this.value)">
+      <button onclick="nextBank()">▶</button>
+      <span id="bank-info" class="sl" style="font-size:10px"></span>
+    </div>
+    <div id="actor-panel">
+      <div class="tool-row">
+        <label>Actor ID:</label>
+        <select id="actor-id" onchange="state.actorId=+this.value" style="width:148px">
+          <option value="36">36: Player Start</option>
+          <option value="0">0: Guard (blaster)</option>
+          <option value="1">1: Civilian</option>
+          <option value="2">2: Captain (laser)</option>
+          <option value="3">3: Trooper (rocket)</option>
+          <option value="6">6: Robot</option>
+          <option value="37">37: Surveillance Cam</option>
+          <option value="54">54: Terminal</option>
+          <option value="56">56: Inventory Station</option>
+          <option value="57">57: Heal Machine</option>
+          <option value="58">58: Secret Return</option>
+          <option value="61">61: Warper</option>
+          <option value="63">63: Powerup</option>
+          <option value="64">64: Vent</option>
+          <option value="65">65: Base Exit</option>
+          <option value="66">66: Tech Station</option>
+          <option value="67">67: Wall Defense</option>
+          <option value="70">70: Credit Machine</option>
+        </select>
+      </div>
+      <div class="tool-row">
+        <label>Type:</label>
+        <input type="number" id="actor-type" value="0" min="0" style="width:40px"
+               onchange="state.actorType=+this.value">
+        <label style="margin-left:6px">Dir:</label>
+        <input type="number" id="actor-dir" value="0" min="0" max="1" style="width:34px"
+               onchange="state.actorDir=+this.value">
+      </div>
+    </div>
+    <div id="picker-scroll">
+      <canvas id="tile-canvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<div id="status-bar">
+  <div class="si"><span class="sl">Tile:</span><span class="sv" id="st-tile">—</span></div>
+  <div class="si"><span class="sl">World:</span><span class="sv" id="st-world">—</span></div>
+  <div class="si"><span class="sl">Cell:</span><span class="sv" id="st-cell">—</span></div>
+  <div class="si"><span class="sl">Map:</span><span class="sv" id="st-map">no map loaded</span></div>
+  <div class="si"><span class="sl">Data:</span><span class="sv" id="st-data">no data</span></div>
+  <span id="status-msg"></span>
+</div>
+
+<div id="publish-panel" style="display:none; position:fixed; top:56px; left:10px;
+  background:#0d0d18; border:2px solid #1a1a2e; padding:12px 14px; z-index:200;
+  font-family:monospace; font-size:12px; color:#aabbcc; min-width:340px;">
+  <div style="margin-bottom:8px; color:#00ff88; font-size:13px">⬆ Publish to Server</div>
+  <div style="margin-bottom:4px">
+    <span style="color:#445566">Server URL</span><br>
+    <input id="pub-url" type="text" style="width:100%; box-sizing:border-box"
+           placeholder="http://localhost:8080"
+           value="http://localhost:8080">
+  </div>
+  <div style="margin-bottom:4px">
+    <span style="color:#445566">API Key <span style="font-size:10px">(leave blank if none)</span></span><br>
+    <input id="pub-key" type="text" style="width:100%; box-sizing:border-box" placeholder="optional">
+  </div>
+  <div style="margin-bottom:8px">
+    <span style="color:#445566">Author</span><br>
+    <input id="pub-author" type="text" style="width:100%; box-sizing:border-box" placeholder="anonymous">
+  </div>
+  <div style="display:flex; gap:6px">
+    <button onclick="doPublish()" style="flex:1">Upload</button>
+    <button onclick="closePublish()">Cancel</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════
+const TS = 64; // tile size in world pixels
+const PICK_TS = 32; // tile size in picker
+const PICK_COLS = 8;
+const PICK_GAP = 2;
+const PICK_PAD = 4;
+const MIN_ZOOM = 0.1, MAX_ZOOM = 8;
+
+const PLAT_INFO = {
+  RECTANGLE:    { t1:0, t2:0, fill:'rgba(100,150,255,0.25)', stroke:'rgba(100,150,255,0.85)', lbl:'RECT'  },
+  LADDER:       { t1:1, t2:0, fill:'rgba(255,220,50,0.35)',  stroke:'rgba(255,220,50,0.9)',   lbl:'LADR'  },
+  STAIRSUP:     { t1:0, t2:1, fill:'rgba(50,220,100,0.35)',  stroke:'rgba(50,220,100,0.9)',   lbl:'SU'    },
+  STAIRSDOWN:   { t1:0, t2:2, fill:'rgba(255,140,50,0.35)',  stroke:'rgba(255,140,50,0.9)',   lbl:'SD'    },
+  TRACK:        { t1:2, t2:0, fill:'rgba(180,100,255,0.35)', stroke:'rgba(180,100,255,0.9)',  lbl:'TRK'   },
+  OUTSIDEROOM:  { t1:3, t2:0, fill:'rgba(255,80,80,0.25)',   stroke:'rgba(255,80,80,0.85)',   lbl:'OUT'   },
+  SPECIFICROOM: { t1:3, t2:1, fill:'rgba(255,80,200,0.25)',  stroke:'rgba(255,80,200,0.85)',  lbl:'SPEC'  },
+};
+const TOOL_TO_PLAT = {
+  rect:'RECTANGLE', stairsup:'STAIRSUP', stairsdown:'STAIRSDOWN',
+  ladder:'LADDER', track:'TRACK',
+};
+
+const ACTOR_INFO = {
+  0:  { lbl:'GUARD',  color:'#ff4444' }, 1:  { lbl:'CIVIL',  color:'#ffaa44' },
+  2:  { lbl:'CAPT',   color:'#ff0088' }, 3:  { lbl:'TROOP',  color:'#ff6600' },
+  6:  { lbl:'ROBOT',  color:'#aa44ff' }, 36: { lbl:'START',  color:'#00ff88' },
+  37: { lbl:'CAM',    color:'#ffff00' }, 54: { lbl:'TERM',   color:'#00aaff' },
+  56: { lbl:'INV',    color:'#00ff44' }, 57: { lbl:'HEAL',   color:'#44ffaa' },
+  58: { lbl:'SRET',   color:'#ff44ff' }, 61: { lbl:'WARP',   color:'#ffffff' },
+  63: { lbl:'PWR',    color:'#ffff44' }, 64: { lbl:'VENT',   color:'#666699' },
+  65: { lbl:'EXIT',   color:'#ff8844' }, 66: { lbl:'TECH',   color:'#44aaff' },
+  67: { lbl:'WDEF',   color:'#ff3333' }, 70: { lbl:'CRED',   color:'#aaffaa' },
+};
+
+function drawDiagonalCrossStitch(ctx, px, py, pw, ph, strokeColor, zoom) {
+  if (pw < 2 || ph < 2) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(px, py, pw, ph);
+  ctx.clip();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = Math.max(0.5, 0.75 / zoom);
+  const step = 16;
+  ctx.beginPath();
+  // \ diagonals
+  for (let d = -ph; d <= pw; d += step) {
+    ctx.moveTo(px + d,      py);
+    ctx.lineTo(px + d + ph, py + ph);
+  }
+  // / diagonals
+  for (let d = -ph; d <= pw; d += step) {
+    ctx.moveTo(px + d,      py + ph);
+    ctx.lineTo(px + d + ph, py);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+const state = {
+  palette: null,
+  tileBankCounts: new Uint8Array(256),
+  tileBanks: {},
+  dataLoaded: false,
+
+  mapData: null,
+  mapFilename: null,
+
+  cam: { x: 120, y: 60, zoom: 1 },
+
+  tool: 'tile',
+  layerType: 'bg', layerIdx: 0,
+  bank: 62, tileIdx: 0,
+  actorId: 36, actorType: 0, actorDir: 0,
+
+  mouse: { x:0, y:0, wx:0, wy:0, cx:-1, cy:-1 },
+  lmbDown: false, rmbDown: false,
+  spaceDown: false,
+  panning: false, panStart:null, camAtPan:null,
+  drawing: false, drawWX:0, drawWY:0,
+
+  selActor: null, selPlat: null,
+  showGrid: false, showPlat: true, showAct: true,
+  dirty: true,
+};
+
+// ═══════════════════════════════════════════════════════
+// BINARY HELPERS
+// ═══════════════════════════════════════════════════════
+const rd16be = (b,i) => ((b[i]<<8)|b[i+1]);
+const rd32be = (b,i) => (((b[i]<<24)|(b[i+1]<<16)|(b[i+2]<<8)|b[i+3])>>>0);
+const rd16le = (b,i) => (b[i]|(b[i+1]<<8));
+const rd32le = (b,i) => ((b[i]|(b[i+1]<<8)|(b[i+2]<<16)|(b[i+3]<<24))>>>0);
+const rdi32le = (b,i) => { const u=rd32le(b,i); return u>=0x80000000?u-0x100000000:u; };
+
+function wr16le(b,i,v){ b[i]=v&0xFF; b[i+1]=(v>>8)&0xFF; }
+function wr32le(b,i,v){ b[i]=v&0xFF; b[i+1]=(v>>>8)&0xFF; b[i+2]=(v>>>16)&0xFF; b[i+3]=(v>>>24)&0xFF; }
+function wi32le(b,i,v){ wr32le(b,i,v<0?v+0x100000000:v); }
+function wr16be(b,i,v){ b[i]=(v>>8)&0xFF; b[i+1]=v&0xFF; }
+function wr32be(b,i,v){ b[i]=(v>>>24)&0xFF; b[i+1]=(v>>>16)&0xFF; b[i+2]=(v>>>8)&0xFF; b[i+3]=v&0xFF; }
+
+// ═══════════════════════════════════════════════════════
+// TILE RLE DECOMPRESSION  (matches resources.cpp LoadTiles)
+// ═══════════════════════════════════════════════════════
+function decodeTileRLE(bytes, tileCount) {
+  const out = new Uint8Array(TS * TS * tileCount);
+  const sv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const srcLen = Math.floor(bytes.byteLength / 4);
+  const maxK = Math.floor(out.length / 4);
+  let k = 0;
+  for (let j = 0; j < srcLen && k < maxK; j++, k++) {
+    const val = sv.getUint32(j * 4, true);
+    if (val >= 0xFF000000) {
+      const color = (val >>> 16) & 0xFF;
+      let count = val & 0x0000FFFF;
+      while (count > 0 && k < maxK) {
+        out[k*4]=out[k*4+1]=out[k*4+2]=out[k*4+3]=color;
+        count -= 4; k++;
+      }
+      k--;
+    } else {
+      out[k*4]= val&0xFF; out[k*4+1]=(val>>>8)&0xFF;
+      out[k*4+2]=(val>>>16)&0xFF; out[k*4+3]=(val>>>24)&0xFF;
+    }
+  }
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════
+// PALETTE LOADING  (PALETTE.BIN)
+// ═══════════════════════════════════════════════════════
+function loadPalette(bytes) {
+  // Palette 0 at offset 4, 256 × 3 bytes, VGA 0-63 → multiply by 4
+  const pal = new Uint8Array(256 * 3);
+  const off = 4;
+  for (let i = 0; i < 256; i++) {
+    pal[i*3]   = Math.min(255, bytes[off + i*3]   * 4);
+    pal[i*3+1] = Math.min(255, bytes[off + i*3+1] * 4);
+    pal[i*3+2] = Math.min(255, bytes[off + i*3+2] * 4);
+  }
+  return pal;
+}
+
+// ═══════════════════════════════════════════════════════
+// TILE CANVAS CREATION
+// ═══════════════════════════════════════════════════════
+function pixelsToCanvas(pixels, flip) {
+  const c = document.createElement('canvas');
+  c.width = TS; c.height = TS;
+  const ctx = c.getContext('2d');
+  const id = ctx.createImageData(TS, TS);
+  const d = id.data;
+  const pal = state.palette;
+  for (let y = 0; y < TS; y++) {
+    for (let x = 0; x < TS; x++) {
+      const sx = flip ? (TS-1-x) : x;
+      const pi = pixels[y*TS + sx];
+      const di = (y*TS + x) * 4;
+      if (pi <= 1) { d[di+3]=0; }
+      else { d[di]=pal[pi*3]; d[di+1]=pal[pi*3+1]; d[di+2]=pal[pi*3+2]; d[di+3]=255; }
+    }
+  }
+  ctx.putImageData(id, 0, 0);
+  return c;
+}
+
+// ═══════════════════════════════════════════════════════
+// LOAD TILE BANK  (TIL_XXX.BIN)
+// ═══════════════════════════════════════════════════════
+function loadTileBank(bytes, bankIdx) {
+  if (!state.palette) return null;
+  const count = state.tileBankCounts[bankIdx];
+  if (!count) return null;
+  const headerSz = 12 * count + 4;
+  if (bytes.length <= headerSz) return null;
+  const pixelBytes = bytes.slice(headerSz);
+  const pixels = decodeTileRLE(pixelBytes, count);
+  const tiles = [];
+  for (let i = 0; i < count; i++) {
+    const px = pixels.subarray(i*TS*TS, (i+1)*TS*TS);
+    tiles.push({ n: pixelsToCanvas(px, false), f: pixelsToCanvas(px, true) });
+  }
+  return { count, tiles };
+}
+
+// ═══════════════════════════════════════════════════════
+// LOAD GAME DATA  (multi-file handler)
+// ═══════════════════════════════════════════════════════
+document.getElementById('fi-data').addEventListener('change', async function(e) {
+  const files = [...e.target.files];
+  if (!files.length) return;
+  showMsg('Loading game data…', '#88ddff');
+  const byName = {};
+  for (const f of files) byName[f.name.toUpperCase()] = f;
+
+  // 1. Palette
+  const palFile = byName['PALETTE.BIN'];
+  if (palFile) {
+    const buf = await readFile(palFile);
+    state.palette = loadPalette(new Uint8Array(buf));
+  }
+
+  // 2. BIN_TIL.DAT → bank counts
+  const datFile = byName['BIN_TIL.DAT'];
+  if (datFile) {
+    const buf = new Uint8Array(await readFile(datFile));
+    for (let i = 0; i < 256; i++) state.tileBankCounts[i] = buf[i*64+2];
+  }
+
+  // 3. TIL_XXX.BIN files
+  let tilesLoaded = 0;
+  for (const [name, f] of Object.entries(byName)) {
+    const m = name.match(/^TIL_(\d{3})\.BIN$/);
+    if (!m) continue;
+    const bankIdx = parseInt(m[1], 10);
+    const buf = new Uint8Array(await readFile(f));
+    const bank = loadTileBank(buf, bankIdx);
+    if (bank) { state.tileBanks[bankIdx] = bank; tilesLoaded++; }
+  }
+
+  const loaded = [];
+  if (state.palette) loaded.push('palette');
+  if (datFile) loaded.push('bank-counts');
+  if (tilesLoaded) loaded.push(`${tilesLoaded} tile banks`);
+
+  state.dataLoaded = !!(state.palette && datFile);
+  document.getElementById('st-data').textContent = loaded.join(', ') || 'partial';
+  showMsg(`Loaded: ${loaded.join(', ')}`, '#00ff88');
+  renderPicker();
+  state.dirty = true;
+  e.target.value = '';
+});
+
+function readFile(f) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsArrayBuffer(f);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+// SIL PARSING
+// ═══════════════════════════════════════════════════════
+function parseSIL(ab) {
+  const b = new Uint8Array(ab);
+  let i = 0;
+  const hdr = {};
+  hdr.firstbyte  = b[i++];
+  hdr.version    = b[i++];
+  hdr.maxplayers = b[i++];
+  hdr.maxteams   = b[i++];
+  hdr.width      = rd16be(b,i); i+=2;
+  hdr.height     = rd16be(b,i); i+=2;
+  i++;                           // padding
+  hdr.parallax   = b[i++];
+  const amb = b[i++]; hdr.ambience = amb>=128 ? amb-256 : amb;
+  i+=2;                          // 2 padding bytes
+  hdr.flags      = rd32be(b,i); i+=4;
+
+  // Description: 128 bytes null-terminated
+  hdr.desc = '';
+  for (let j=0;j<128;j++) { if(!b[i+j]) break; hdr.desc+=String.fromCharCode(b[i+j]); }
+  i+=128;
+
+  // Minimap
+  const mmSz = rd32le(b,i); i+=4;
+  const mmBytes = b.slice(i, i+mmSz); i+=mmSz;
+
+  // Level data
+  const lvlSz = rd32le(b,i); i+=4;
+  const lvlComp = b.slice(i, i+lvlSz);
+
+  let level;
+  try { level = pako.inflate(lvlComp); }
+  catch(e) { throw new Error('Decompress failed: '+e.message); }
+
+  const W=hdr.width, H=hdr.height;
+  const numCells = W*H;
+  const cells = [];
+  let li=0;
+
+  for (let c=0;c<numCells;c++) {
+    const cell = { bg:[], fg:[] };
+    for (let l=0;l<4;l++) {
+      const id=rd16le(level,li); li+=2;
+      cell.bg.push({ id, flip:level[li++]?1:0, lum:level[li++] });
+    }
+    li+=4; // 4 padding bytes
+    for (let l=0;l<4;l++) {
+      const id=rd16le(level,li); li+=2;
+      cell.fg.push({ id, flip:level[li++]?1:0, lum:level[li++] });
+    }
+    cells.push(cell);
+  }
+
+  // Actors
+  const numAct = rd32le(level,li); li+=4;
+  li+=4; // skip
+  const actors=[];
+  for (let a=0;a<numAct;a++) {
+    const ac={};
+    ac.id        = rd32le(level,li); li+=4;
+    ac.x         = rd32le(level,li); li+=4;
+    ac.y         = rd32le(level,li); li+=4;
+    ac.direction = rd32le(level,li); li+=4;
+    ac.type      = rdi32le(level,li); li+=4;
+    ac.matchid   = rd32le(level,li); li+=4;
+    ac.subplane  = rd32le(level,li); li+=4;
+    ac.unknown   = rd32le(level,li); li+=4;
+    ac.securityid= rd32le(level,li); li+=4;
+    actors.push(ac);
+  }
+
+  // Platforms
+  const numPlat = rd32le(level,li); li+=4;
+  li+=4; // skip
+  const platforms=[];
+  for (let p=0;p<numPlat;p++) {
+    const pl={};
+    pl.x1=rdi32le(level,li); li+=4;
+    pl.y1=rdi32le(level,li); li+=4;
+    pl.x2=rdi32le(level,li); li+=4;
+    pl.y2=rdi32le(level,li); li+=4;
+    const t1=rdi32le(level,li); li+=4;
+    const t2=rdi32le(level,li); li+=4;
+    pl.type = platType(t1,t2);
+    platforms.push(pl);
+  }
+
+  return { hdr, cells, actors, platforms, mmBytes, W, H };
+}
+
+function platType(t1,t2) {
+  if(t1===0&&t2===0) return 'RECTANGLE';
+  if(t1===1&&t2===0) return 'LADDER';
+  if(t1===0&&t2===1) return 'STAIRSUP';
+  if(t1===0&&t2===2) return 'STAIRSDOWN';
+  if(t1===2&&t2===0) return 'TRACK';
+  if(t1===3&&t2===0) return 'OUTSIDEROOM';
+  if(t1===3&&t2===1) return 'SPECIFICROOM';
+  return 'RECTANGLE';
+}
+
+// ═══════════════════════════════════════════════════════
+// OPEN MAP
+// ═══════════════════════════════════════════════════════
+document.getElementById('fi-map').addEventListener('change', async function(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  showMsg('Parsing map…', '#88ddff');
+  try {
+    const ab = await readFile(f);
+    state.mapData = parseSIL(ab);
+    state.mapFilename = f.name;
+    centerMap();
+    updateMapStatus();
+    showMsg(`Opened ${f.name}`, '#00ff88');
+  } catch(err) {
+    showMsg('Error: '+err.message, '#ff4444');
+    console.error(err);
+  }
+  state.dirty = true;
+  e.target.value = '';
+});
+
+function centerMap() {
+  if (!state.mapData) return;
+  const { W, H } = state.mapData;
+  const ca = document.getElementById('canvas-area');
+  const cw = ca.clientWidth, ch = ca.clientHeight;
+  const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM,
+    Math.min(cw / (W*TS), ch / (H*TS)) * 0.9));
+  state.cam.zoom = zoom;
+  state.cam.x = (cw - W*TS*zoom) / 2;
+  state.cam.y = (ch - H*TS*zoom) / 2;
+  document.getElementById('zoom-val').textContent = Math.round(zoom*100)+'%';
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER — MAIN CANVAS
+// ═══════════════════════════════════════════════════════
+const mapCanvas = document.getElementById('map-canvas');
+const mctx = mapCanvas.getContext('2d');
+
+function resizeCanvas() {
+  const ca = document.getElementById('canvas-area');
+  mapCanvas.width  = ca.clientWidth;
+  mapCanvas.height = ca.clientHeight;
+  state.dirty = true;
+}
+
+function render() {
+  const cw = mapCanvas.width, ch = mapCanvas.height;
+  mctx.fillStyle = '#050508';
+  mctx.fillRect(0, 0, cw, ch);
+
+  if (!state.mapData) {
+    mctx.fillStyle = '#334';
+    mctx.font = '14px monospace';
+    mctx.textAlign = 'center';
+    mctx.fillText('Load game data and open a .SIL map file.', cw/2, ch/2-10);
+    mctx.fillStyle = '#223';
+    mctx.fillText('Use toolbar: 📁 Load Game Data  →  🗺 Open Map', cw/2, ch/2+16);
+    return;
+  }
+
+  const { cam, mapData, showGrid, showPlat, showAct } = state;
+  const { zoom, x:cx, y:cy } = cam;
+  const { cells, actors, platforms, W, H } = mapData;
+
+  mctx.save();
+  mctx.translate(cx, cy);
+  mctx.scale(zoom, zoom);
+
+  // Map background
+  mctx.fillStyle = '#000010';
+  mctx.fillRect(0, 0, W*TS, H*TS);
+
+  // Visible tile range
+  const vx1 = Math.max(0, Math.floor(-cx/zoom/TS)-1);
+  const vy1 = Math.max(0, Math.floor(-cy/zoom/TS)-1);
+  const vx2 = Math.min(W-1, Math.ceil((-cx+cw)/zoom/TS)+1);
+  const vy2 = Math.min(H-1, Math.ceil((-cy+ch)/zoom/TS)+1);
+
+  // Tile layers: bg0 bg1 bg2 bg3 fg0 fg1 fg2 fg3
+  for (let pass=0; pass<2; pass++) {
+    for (let li=0; li<4; li++) {
+      for (let cy2=vy1; cy2<=vy2; cy2++) {
+        for (let cx2=vx1; cx2<=vx2; cx2++) {
+          const cell = cells[cy2*W+cx2];
+          const t = pass===0 ? cell.bg[li] : cell.fg[li];
+          if (!t.id) continue;
+          const bank = (t.id>>8)&0xFF;
+          const idx  = t.id&0xFF;
+          const bd = state.tileBanks[bank];
+          if (!bd || idx>=bd.count) continue;
+          const tc = t.flip ? bd.tiles[idx].f : bd.tiles[idx].n;
+          mctx.drawImage(tc, cx2*TS, cy2*TS);
+        }
+      }
+    }
+  }
+
+  // Grid
+  if (showGrid && zoom>=0.4) {
+    mctx.strokeStyle = 'rgba(40,40,80,0.7)';
+    mctx.lineWidth = 1/zoom;
+    for (let x=vx1; x<=vx2+1; x++) {
+      mctx.beginPath(); mctx.moveTo(x*TS,vy1*TS); mctx.lineTo(x*TS,(vy2+1)*TS); mctx.stroke();
+    }
+    for (let y=vy1; y<=vy2+1; y++) {
+      mctx.beginPath(); mctx.moveTo(vx1*TS,y*TS); mctx.lineTo((vx2+1)*TS,y*TS); mctx.stroke();
+    }
+  }
+
+  // Platforms
+  if (showPlat) {
+    mctx.lineWidth = Math.max(1, 1.5/zoom);
+    for (const pl of platforms) {
+      const info = PLAT_INFO[pl.type] || PLAT_INFO.RECTANGLE;
+      const px=Math.min(pl.x1,pl.x2), py=Math.min(pl.y1,pl.y2);
+      const pw=Math.abs(pl.x2-pl.x1), ph=Math.abs(pl.y2-pl.y1);
+      mctx.fillStyle=info.fill; mctx.fillRect(px,py,pw,ph);
+      mctx.strokeStyle= (pl===state.selPlat) ? '#fff' : info.stroke;
+      mctx.strokeRect(px,py,pw,ph);
+      if (pl.type === 'STAIRSUP' || pl.type === 'STAIRSDOWN') {
+        drawDiagonalCrossStitch(mctx, px, py, pw, ph, info.stroke, zoom);
+      }
+      if (zoom>=0.5 && pw>10/zoom && ph>6/zoom) {
+        mctx.fillStyle=info.stroke;
+        mctx.font = `${Math.max(7,9/zoom)}px monospace`;
+        mctx.textAlign='left'; mctx.textBaseline='top';
+        mctx.fillText(info.lbl, px+2/zoom, py+1/zoom);
+      }
+    }
+  }
+
+  // Platform drag preview
+  if (state.drawing && TOOL_TO_PLAT[state.tool]) {
+    const { wx, wy } = state.mouse;
+    const dsx=state.drawWX, dsy=state.drawWY;
+    const platType = TOOL_TO_PLAT[state.tool];
+    const info = PLAT_INFO[platType];
+    const px=Math.min(dsx,wx), py=Math.min(dsy,wy);
+    const pw=Math.abs(wx-dsx), ph=Math.abs(wy-dsy);
+    mctx.fillStyle=info.fill;   mctx.fillRect(px,py,pw,ph);
+    mctx.strokeStyle=info.stroke; mctx.lineWidth=2/zoom;
+    mctx.strokeRect(px,py,pw,ph);
+    if (platType === 'STAIRSUP' || platType === 'STAIRSDOWN') {
+      drawDiagonalCrossStitch(mctx, px, py, pw, ph, info.stroke, zoom);
+    }
+  }
+
+  // Actors
+  if (showAct) {
+    mctx.textAlign='center'; mctx.textBaseline='middle';
+    const r = Math.max(8, 16/zoom) * zoom;
+    for (const ac of actors) {
+      const info = ACTOR_INFO[ac.id] || { lbl:'?', color:'#888' };
+      const sx=ac.x*zoom, sy=ac.y*zoom; // already in transform
+      mctx.fillStyle=info.color+'55';
+      mctx.strokeStyle= (ac===state.selActor) ? '#fff' : info.color;
+      mctx.lineWidth = (ac===state.selActor) ? 2.5/zoom : 1.5/zoom;
+      mctx.beginPath();
+      mctx.arc(ac.x, ac.y, Math.max(8,16), 0, Math.PI*2);
+      mctx.fill(); mctx.stroke();
+      if (zoom>=0.35) {
+        mctx.fillStyle='#fff';
+        mctx.font=`bold ${Math.max(7,9/zoom)}px monospace`;
+        mctx.fillText(info.lbl, ac.x, ac.y);
+      }
+    }
+  }
+
+  // Hovered cell highlight (tile tool)
+  if (state.tool==='tile' && state.mouse.cx>=0 && state.mouse.cy>=0) {
+    mctx.strokeStyle='rgba(0,255,136,0.7)';
+    mctx.lineWidth=2/zoom;
+    mctx.strokeRect(state.mouse.cx*TS, state.mouse.cy*TS, TS, TS);
+  }
+
+  // Map border
+  mctx.strokeStyle='#334466';
+  mctx.lineWidth=2/zoom;
+  mctx.strokeRect(0,0,W*TS,H*TS);
+
+  mctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════
+// TILE PICKER
+// ═══════════════════════════════════════════════════════
+const tileCanvas = document.getElementById('tile-canvas');
+const tctx = tileCanvas.getContext('2d');
+
+function renderPicker() {
+  const bd = state.tileBanks[state.bank];
+  const count = bd ? bd.count : 0;
+  document.getElementById('bank-info').textContent =
+    count ? `${count} tile${count!==1?'s':''}` : 'empty';
+
+  if (!count || !bd) {
+    tileCanvas.width = 260; tileCanvas.height = 50;
+    tctx.fillStyle='#08080f'; tctx.fillRect(0,0,260,50);
+    tctx.fillStyle='#334'; tctx.font='11px monospace'; tctx.textAlign='center';
+    tctx.fillText('No tiles (bank '+state.bank+')', 130, 28);
+    return;
+  }
+
+  const cols=PICK_COLS, ts=PICK_TS, gap=PICK_GAP, pad=PICK_PAD;
+  const rows=Math.ceil(count/cols);
+  tileCanvas.width  = cols*(ts+gap)+pad*2;
+  tileCanvas.height = rows*(ts+gap)+pad*2;
+
+  tctx.fillStyle='#08080f'; tctx.fillRect(0,0,tileCanvas.width,tileCanvas.height);
+
+  for (let i=0;i<count;i++) {
+    const col=i%cols, row=Math.floor(i/cols);
+    const x=pad+col*(ts+gap), y=pad+row*(ts+gap);
+    // checkerboard bg for transparency
+    for (let cy=0;cy<ts;cy+=8) for (let cx=0;cx<ts;cx+=8) {
+      tctx.fillStyle=((cx+cy)/8)%2===0?'#111':'#191919';
+      tctx.fillRect(x+cx,y+cy,8,8);
+    }
+    tctx.drawImage(bd.tiles[i].n, 0,0,TS,TS, x,y,ts,ts);
+    if (i===state.tileIdx) {
+      tctx.strokeStyle='#00ff88'; tctx.lineWidth=2;
+      tctx.strokeRect(x+1,y+1,ts-2,ts-2);
+    }
+  }
+}
+
+tileCanvas.addEventListener('click', (e) => {
+  const r=tileCanvas.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  const ts=PICK_TS,gap=PICK_GAP,pad=PICK_PAD;
+  const col=Math.floor((mx-pad)/(ts+gap));
+  const row=Math.floor((my-pad)/(ts+gap));
+  if(col<0||col>=PICK_COLS||row<0) return;
+  const idx=row*PICK_COLS+col;
+  const bd=state.tileBanks[state.bank];
+  if(!bd||idx>=bd.count) return;
+  state.tileIdx=idx;
+  renderPicker();
+  updateStatusBar();
+});
+
+// ═══════════════════════════════════════════════════════
+// TOOL / LAYER HELPERS
+// ═══════════════════════════════════════════════════════
+function setTool(t) {
+  state.tool=t;
+  document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
+  const tb=document.getElementById('tb-'+t);
+  if(tb) tb.classList.add('active');
+  const ap=document.getElementById('actor-panel');
+  ap.classList.toggle('visible', t==='actor');
+  mapCanvas.style.cursor = t==='tile'?'crosshair':t==='select'?'default':'cell';
+}
+function updateLayer() {
+  const v=document.getElementById('layer-sel').value;
+  state.layerType=v.startsWith('b')?'bg':'fg';
+  state.layerIdx=parseInt(v[2]);
+}
+function setBank(b) {
+  b=Math.max(0,Math.min(255,b));
+  state.bank=b;
+  document.getElementById('bank-inp').value=b;
+  if(state.tileIdx>=(state.tileBankCounts[b]||0)) state.tileIdx=0;
+  renderPicker();
+}
+function prevBank() {
+  let b=state.bank-1;
+  while(b>=0 && !state.tileBankCounts[b]) b--;
+  if(b>=0) setBank(b);
+}
+function nextBank() {
+  let b=state.bank+1;
+  while(b<256 && !state.tileBankCounts[b]) b++;
+  if(b<256) setBank(b);
+}
+function toggleGrid() {
+  state.showGrid=!state.showGrid;
+  document.getElementById('btn-grid').classList.toggle('active',state.showGrid);
+  state.dirty=true;
+}
+function togglePlat() {
+  state.showPlat=!state.showPlat;
+  document.getElementById('btn-plat').classList.toggle('active',state.showPlat);
+  state.dirty=true;
+}
+function toggleAct() {
+  state.showAct=!state.showAct;
+  document.getElementById('btn-act').classList.toggle('active',state.showAct);
+  state.dirty=true;
+}
+function adjustZoom(delta) {
+  const newZoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM, state.cam.zoom+delta));
+  const cx=mapCanvas.width/2, cy=mapCanvas.height/2;
+  state.cam.x = cx - (cx-state.cam.x)*(newZoom/state.cam.zoom);
+  state.cam.y = cy - (cy-state.cam.y)*(newZoom/state.cam.zoom);
+  state.cam.zoom=newZoom;
+  document.getElementById('zoom-val').textContent=Math.round(newZoom*100)+'%';
+  state.dirty=true;
+}
+function resetView() { centerMap(); state.dirty=true; }
+
+// ═══════════════════════════════════════════════════════
+// CANVAS COORDINATE HELPERS
+// ═══════════════════════════════════════════════════════
+function screenToWorld(sx,sy) {
+  return { wx:(sx-state.cam.x)/state.cam.zoom, wy:(sy-state.cam.y)/state.cam.zoom };
+}
+function worldToCell(wx,wy) {
+  return { cx:Math.floor(wx/TS), cy:Math.floor(wy/TS) };
+}
+
+// ═══════════════════════════════════════════════════════
+// TOOL ACTIONS
+// ═══════════════════════════════════════════════════════
+function paintTile(cx,cy,erase) {
+  if(!state.mapData) return;
+  const {W,H,cells}=state.mapData;
+  if(cx<0||cy<0||cx>=W||cy>=H) return;
+  const cell=cells[cy*W+cx];
+  const arr=state.layerType==='bg'?cell.bg:cell.fg;
+  const li=state.layerIdx;
+  if(erase) {
+    arr[li]={id:0,flip:0,lum:0};
+  } else {
+    const id=(state.bank<<8)|state.tileIdx;
+    arr[li]={id,flip:0,lum:0};
+  }
+  state.dirty=true;
+}
+
+function addPlatform(wx1,wy1,wx2,wy2) {
+  if(!state.mapData) return;
+  if(Math.abs(wx2-wx1)<2 && Math.abs(wy2-wy1)<2) return;
+  const type=TOOL_TO_PLAT[state.tool]||'RECTANGLE';
+  state.mapData.platforms.push({
+    x1:Math.round(wx1), y1:Math.round(wy1),
+    x2:Math.round(wx2), y2:Math.round(wy2),
+    type
+  });
+  state.dirty=true;
+}
+
+function eraseplatAt(wx,wy) {
+  if(!state.mapData) return;
+  const plats=state.mapData.platforms;
+  for(let i=plats.length-1;i>=0;i--) {
+    const p=plats[i];
+    if(wx>=Math.min(p.x1,p.x2)&&wx<=Math.max(p.x1,p.x2)&&
+       wy>=Math.min(p.y1,p.y2)&&wy<=Math.max(p.y1,p.y2)) {
+      plats.splice(i,1); state.dirty=true; return;
+    }
+  }
+}
+
+function selectAt(wx,wy) {
+  if(!state.mapData) return;
+  state.selActor=null; state.selPlat=null;
+  // Check actors first
+  for(const ac of state.mapData.actors) {
+    const dx=ac.x-wx, dy=ac.y-wy;
+    if(Math.sqrt(dx*dx+dy*dy)<=20) { state.selActor=ac; state.dirty=true; return; }
+  }
+  // Then platforms
+  for(let i=state.mapData.platforms.length-1;i>=0;i--) {
+    const p=state.mapData.platforms[i];
+    if(wx>=Math.min(p.x1,p.x2)&&wx<=Math.max(p.x1,p.x2)&&
+       wy>=Math.min(p.y1,p.y2)&&wy<=Math.max(p.y1,p.y2)) {
+      state.selPlat=p; state.dirty=true; return;
+    }
+  }
+  state.dirty=true;
+}
+
+function deleteSelected() {
+  if(!state.mapData) return;
+  if(state.selActor) {
+    const i=state.mapData.actors.indexOf(state.selActor);
+    if(i>=0) state.mapData.actors.splice(i,1);
+    state.selActor=null; state.dirty=true;
+  }
+  if(state.selPlat) {
+    const i=state.mapData.platforms.indexOf(state.selPlat);
+    if(i>=0) state.mapData.platforms.splice(i,1);
+    state.selPlat=null; state.dirty=true;
+  }
+}
+
+function placeActor(wx,wy) {
+  if(!state.mapData) return;
+  state.mapData.actors.push({
+    id: state.actorId,
+    x: Math.round(wx), y: Math.round(wy),
+    direction: state.actorDir,
+    type: state.actorType,
+    matchid:0, subplane:0, unknown:0, securityid:0
+  });
+  state.dirty=true;
+}
+
+// ═══════════════════════════════════════════════════════
+// CANVAS EVENTS
+// ═══════════════════════════════════════════════════════
+mapCanvas.addEventListener('contextmenu', e=>e.preventDefault());
+
+mapCanvas.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  const r=mapCanvas.getBoundingClientRect();
+  const sx=e.clientX-r.left, sy=e.clientY-r.top;
+  const {wx,wy}=screenToWorld(sx,sy);
+  const {cx,cy}=worldToCell(wx,wy);
+
+  if(e.button===1 || (e.button===0&&state.spaceDown)) {
+    state.panning=true;
+    state.panStart={x:sx,y:sy};
+    state.camAtPan={x:state.cam.x,y:state.cam.y};
+    mapCanvas.style.cursor='grab';
+    return;
+  }
+
+  if(e.button===0) {
+    state.lmbDown=true;
+    switch(state.tool) {
+      case 'tile': paintTile(cx,cy,false); break;
+      case 'select': selectAt(wx,wy); break;
+      case 'actor': placeActor(wx,wy); break;
+      case 'erase_plat': eraseplatAt(wx,wy); break;
+      default:
+        if(TOOL_TO_PLAT[state.tool]) {
+          state.drawing=true;
+          state.drawWX=wx; state.drawWY=wy;
+          state.mouse.wx=wx; state.mouse.wy=wy;
+        }
+    }
+  } else if(e.button===2) {
+    state.rmbDown=true;
+    if(state.tool==='tile') paintTile(cx,cy,true);
+    if(state.tool==='select') { state.selActor=null; state.selPlat=null; state.dirty=true; }
+  }
+});
+
+mapCanvas.addEventListener('mousemove', (e) => {
+  const r=mapCanvas.getBoundingClientRect();
+  const sx=e.clientX-r.left, sy=e.clientY-r.top;
+  const {wx,wy}=screenToWorld(sx,sy);
+  const {cx,cy}=worldToCell(wx,wy);
+
+  state.mouse.x=sx; state.mouse.y=sy;
+  state.mouse.wx=wx; state.mouse.wy=wy;
+  state.mouse.cx=cx; state.mouse.cy=cy;
+  state.dirty=true;
+
+  if(state.panning) {
+    state.cam.x=state.camAtPan.x+(sx-state.panStart.x);
+    state.cam.y=state.camAtPan.y+(sy-state.panStart.y);
+    return;
+  }
+  if(state.lmbDown && state.tool==='tile') paintTile(cx,cy,false);
+  if(state.rmbDown && state.tool==='tile') paintTile(cx,cy,true);
+  updateStatusBar();
+});
+
+mapCanvas.addEventListener('mouseup', (e) => {
+  if(state.panning) {
+    state.panning=false;
+    mapCanvas.style.cursor = state.tool==='tile'?'crosshair':state.tool==='select'?'default':'cell';
+  }
+  if(e.button===0) {
+    state.lmbDown=false;
+    if(state.drawing && TOOL_TO_PLAT[state.tool]) {
+      const {wx,wy}=state.mouse;
+      addPlatform(state.drawWX,state.drawWY,wx,wy);
+      state.drawing=false;
+    }
+  }
+  if(e.button===2) state.rmbDown=false;
+});
+
+mapCanvas.addEventListener('mouseleave', () => {
+  state.lmbDown=false; state.rmbDown=false;
+  if(state.drawing) { state.drawing=false; state.dirty=true; }
+});
+
+mapCanvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const r=mapCanvas.getBoundingClientRect();
+  const sx=e.clientX-r.left, sy=e.clientY-r.top;
+  const factor = e.deltaY<0 ? 1.15 : 1/1.15;
+  const newZoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM, state.cam.zoom*factor));
+  state.cam.x = sx - (sx-state.cam.x)*(newZoom/state.cam.zoom);
+  state.cam.y = sy - (sy-state.cam.y)*(newZoom/state.cam.zoom);
+  state.cam.zoom=newZoom;
+  document.getElementById('zoom-val').textContent=Math.round(newZoom*100)+'%';
+  state.dirty=true;
+}, {passive:false});
+
+// Keyboard
+document.addEventListener('keydown', (e) => {
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT') return;
+  const key=e.key.toLowerCase();
+  if(key===' ') { state.spaceDown=true; e.preventDefault(); return; }
+  if((key==='s'||key==='ы')&&(e.ctrlKey||e.metaKey)) { e.preventDefault(); saveMap(); return; }
+  if(key==='s'||key==='ы') { saveMap(); return; }
+  if(key==='g') toggleGrid();
+  if(key==='v') setTool('select');
+  if(key==='t') setTool('tile');
+  if(key==='delete'||key==='backspace') deleteSelected();
+  if(key==='+' || key==='=') adjustZoom(0.25);
+  if(key==='-') adjustZoom(-0.25);
+  const PAN_STEP=40;
+  if(key==='arrowleft')  { state.cam.x+=PAN_STEP; state.dirty=true; }
+  if(key==='arrowright') { state.cam.x-=PAN_STEP; state.dirty=true; }
+  if(key==='arrowup')    { state.cam.y+=PAN_STEP; state.dirty=true; }
+  if(key==='arrowdown')  { state.cam.y-=PAN_STEP; state.dirty=true; }
+  // 1-8: select tile in picker
+  const n=parseInt(key);
+  if(n>=1&&n<=8) {
+    const idx=n-1;
+    const bd=state.tileBanks[state.bank];
+    if(bd&&idx<bd.count) { state.tileIdx=idx; renderPicker(); }
+  }
+});
+document.addEventListener('keyup', (e) => {
+  if(e.key===' ') { state.spaceDown=false;
+    if(!state.panning) mapCanvas.style.cursor=state.tool==='tile'?'crosshair':state.tool==='select'?'default':'cell';
+  }
+});
+
+// ═══════════════════════════════════════════════════════
+// SAVE / EXPORT
+// ═══════════════════════════════════════════════════════
+function buildLevelBytes(mapData) {
+  const {cells,actors,platforms,W,H}=mapData;
+  const numCells=W*H;
+  const cellBytes=numCells*36;
+  const actBytes=8+actors.length*36;
+  const platBytes=8+platforms.length*24;
+  const buf=new Uint8Array(cellBytes+actBytes+platBytes);
+  let i=0;
+
+  for(let c=0;c<numCells;c++) {
+    const cell=cells[c];
+    for(let l=0;l<4;l++) {
+      const t=cell.bg[l];
+      wr16le(buf,i,t.id); i+=2;
+      buf[i++]=t.flip; buf[i++]=t.lum;
+    }
+    i+=4; // 4 padding bytes
+    for(let l=0;l<4;l++) {
+      const t=cell.fg[l];
+      wr16le(buf,i,t.id); i+=2;
+      buf[i++]=t.flip; buf[i++]=t.lum;
+    }
+  }
+
+  wr32le(buf,i,actors.length); i+=4;
+  wr32le(buf,i,0); i+=4;
+  for(const ac of actors) {
+    wr32le(buf,i,ac.id);         i+=4;
+    wr32le(buf,i,ac.x);         i+=4;
+    wr32le(buf,i,ac.y);         i+=4;
+    wr32le(buf,i,ac.direction); i+=4;
+    wi32le(buf,i,ac.type);      i+=4;
+    wr32le(buf,i,ac.matchid);   i+=4;
+    wr32le(buf,i,ac.subplane);  i+=4;
+    wr32le(buf,i,ac.unknown);   i+=4;
+    wr32le(buf,i,ac.securityid);i+=4;
+  }
+
+  wr32le(buf,i,platforms.length); i+=4;
+  wr32le(buf,i,0); i+=4;
+  for(const pl of platforms) {
+    const info=PLAT_INFO[pl.type]||PLAT_INFO.RECTANGLE;
+    wi32le(buf,i,pl.x1); i+=4; wi32le(buf,i,pl.y1); i+=4;
+    wi32le(buf,i,pl.x2); i+=4; wi32le(buf,i,pl.y2); i+=4;
+    wi32le(buf,i,info.t1); i+=4; wi32le(buf,i,info.t2); i+=4;
+  }
+  return buf;
+}
+
+function buildSILBytes() {
+  if(!state.mapData) return null;
+  const {hdr,mmBytes}=state.mapData;
+  let lvlComp;
+  try { lvlComp=pako.deflate(buildLevelBytes(state.mapData)); }
+  catch(e) { showMsg('Compress failed: '+e.message,'#ff4444'); return null; }
+  const mm=mmBytes||new Uint8Array(0);
+  const totalSz=17+128+4+mm.length+4+lvlComp.length;
+  const buf=new Uint8Array(totalSz);
+  let i=0;
+  buf[i++]=hdr.firstbyte;
+  buf[i++]=hdr.version;
+  buf[i++]=hdr.maxplayers;
+  buf[i++]=hdr.maxteams;
+  wr16be(buf,i,hdr.width);  i+=2;
+  wr16be(buf,i,hdr.height); i+=2;
+  buf[i++]=0;
+  buf[i++]=hdr.parallax;
+  buf[i++]=hdr.ambience<0?hdr.ambience+256:hdr.ambience;
+  buf[i++]=0; buf[i++]=0;
+  wr32be(buf,i,hdr.flags); i+=4;
+  for(let j=0;j<128;j++) buf[i++]=j<hdr.desc.length?hdr.desc.charCodeAt(j):0;
+  wr32le(buf,i,mm.length); i+=4;
+  buf.set(mm,i); i+=mm.length;
+  wr32le(buf,i,lvlComp.length); i+=4;
+  buf.set(lvlComp,i);
+  return buf;
+}
+
+function saveMap() {
+  if(!state.mapData) { showMsg('No map loaded','#ff4444'); return; }
+  showMsg('Saving…','#88ddff');
+  const buf=buildSILBytes();
+  if(!buf) return;
+  const blob=new Blob([buf],{type:'application/octet-stream'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=state.mapFilename||'map.SIL';
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showMsg(`Saved ${a.download}  (${buf.length} bytes)`,'#00ff88');
+}
+
+// ═══════════════════════════════════════════════════════
+// PUBLISH
+// ═══════════════════════════════════════════════════════
+function showPublish() {
+  if(!state.mapData) { showMsg('No map loaded','#ff4444'); return; }
+  const panel = document.getElementById('publish-panel');
+  // Restore saved preferences.
+  const savedUrl = localStorage.getItem('pub-url');
+  const savedKey = localStorage.getItem('pub-key');
+  const savedAuthor = localStorage.getItem('pub-author');
+  if(savedUrl) document.getElementById('pub-url').value = savedUrl;
+  if(savedKey) document.getElementById('pub-key').value = savedKey;
+  if(savedAuthor) document.getElementById('pub-author').value = savedAuthor;
+  panel.style.display = 'block';
+}
+
+function closePublish() {
+  document.getElementById('publish-panel').style.display = 'none';
+}
+
+async function doPublish() {
+  const urlInput = document.getElementById('pub-url').value.trim();
+  const key = document.getElementById('pub-key').value.trim();
+  const author = document.getElementById('pub-author').value.trim() || 'anonymous';
+  const filename = state.mapFilename || 'map.SIL';
+
+  if(!urlInput) { showMsg('Server URL is required','#ff4444'); return; }
+
+  // Persist preferences for next time.
+  localStorage.setItem('pub-url', urlInput);
+  localStorage.setItem('pub-key', key);
+  localStorage.setItem('pub-author', author);
+
+  const buf = buildSILBytes();
+  if(!buf) return;
+
+  if(buf.length > 65535) {
+    showMsg(`Map too large (${buf.length} bytes, max 65535)`,'#ff4444');
+    return;
+  }
+
+  const headers = {
+    'Content-Type': 'application/octet-stream',
+    'X-Filename': filename,
+    'X-Author': author,
+  };
+  if(key) headers['X-Api-Key'] = key;
+
+  closePublish();
+  showMsg('Publishing…','#88ddff');
+
+  try {
+    const resp = await fetch(urlInput + '/api/maps', {
+      method: 'POST',
+      headers,
+      body: buf,
+    });
+    if(resp.ok) {
+      const data = await resp.json();
+      showMsg(`✓ Published ${filename}  sha1:${data.sha1.slice(0,8)}…  (${buf.length} bytes)`,'#00ff88');
+    } else {
+      const txt = await resp.text();
+      showMsg(`Upload failed (${resp.status}): ${txt.trim()}`,'#ff4444');
+    }
+  } catch(e) {
+    showMsg('Network error: ' + e.message,'#ff4444');
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// STATUS BAR
+// ═══════════════════════════════════════════════════════
+function updateStatusBar() {
+  const {cx,cy,wx,wy}=state.mouse;
+  const bd=state.tileBanks[state.bank];
+  const tileInfo=bd&&state.tileIdx<bd.count
+    ? `bank ${state.bank} idx ${state.tileIdx} → id 0x${((state.bank<<8)|state.tileIdx).toString(16).toUpperCase().padStart(4,'0')}`
+    : `bank ${state.bank} (no tile)`;
+  document.getElementById('st-tile').textContent=tileInfo;
+  document.getElementById('st-world').textContent=`${Math.round(wx)}, ${Math.round(wy)}`;
+  document.getElementById('st-cell').textContent=(cx>=0&&cy>=0)?`${cx}, ${cy}`:'—';
+}
+function updateMapStatus() {
+  if(!state.mapData) return;
+  const {W,H,actors,platforms,hdr}=state.mapData;
+  document.getElementById('st-map').textContent=
+    `${state.mapFilename} • ${W}×${H} • ${actors.length} actors • ${platforms.length} platforms`;
+}
+function showMsg(msg,color='#00ff88') {
+  const el=document.getElementById('status-msg');
+  el.style.color=color; el.textContent=msg;
+  clearTimeout(el._t);
+  el._t=setTimeout(()=>el.textContent='',4000);
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER LOOP
+// ═══════════════════════════════════════════════════════
+function loop() {
+  if(state.dirty||state.drawing||state.panning) { render(); state.dirty=false; }
+  requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════
+function init() {
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  setTool('tile');
+  renderPicker();
+  loop();
+}
+init();
+</script>
+</body>
+</html>

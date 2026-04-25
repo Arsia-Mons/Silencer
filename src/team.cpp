@@ -205,6 +205,11 @@ void Team::Tick(World & world){
 				overlay->draw = world.choosingtech ? false : true;
 				overlayid = overlay->id;
 			}
+		}else{
+			Overlay * overlay = static_cast<Overlay *>(world.GetObjectFromId(overlayid));
+			if(overlay && overlay->res_index != agency){
+				overlay->res_index = agency;
+			}
 		}
 		if(newpeerschecksum != peerschecksum){
 			for(int i = 0; i < 4; i++){
