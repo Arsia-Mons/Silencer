@@ -32,12 +32,14 @@ export default function MapCanvas({
   map, tileImages, activeTool, activeLayer, selectedTileId,
   zoom, pan, onZoomChange, onPanChange,
   onTilePaint, onPlatformDraw, onPlatformRemove, onActorPlace, onActorRemove,
+  onBeginPaint, onCommitPaint,
   selectedActorId, dragPlatform, onDragPlatformChange,
   onCursorChange,
 }) {
   const canvasRef = useRef(null);
   const isPainting = useRef(false);
   const isSpacePanning = useRef(false);
+  const isCtrlPanning = useRef(false);
   const isPanning = useRef(false);
   const lastPan = useRef({ x: 0, y: 0 });
 
@@ -258,8 +260,8 @@ export default function MapCanvas({
   const handleMouseDown = useCallback((e) => {
     const { cx, cy } = getCanvasPos(e);
 
-    // Middle mouse or Space+left = pan
-    if (e.button === 1 || (e.button === 0 && isSpacePanning.current)) {
+    // Middle mouse or Space+left or Ctrl+left = pan
+    if (e.button === 1 || (e.button === 0 && isSpacePanning.current) || (e.button === 0 && isCtrlPanning.current)) {
       isPanning.current = true;
       lastPan.current = { x: cx, y: cy };
       return;
@@ -272,6 +274,7 @@ export default function MapCanvas({
 
     if (activeTool === 'TILE_BG' || activeTool === 'TILE_FG') {
       isPainting.current = true;
+      onBeginPaint?.();
       if (selectedTileId && tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
         onTilePaint(activeTool === 'TILE_FG' ? 'fg' : 'bg', activeLayer, tx, ty, selectedTileId);
       }
@@ -309,7 +312,7 @@ export default function MapCanvas({
       }
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom,
-      onTilePaint, onPlatformRemove, onActorPlace, onActorRemove, onDragPlatformChange]);
+      onTilePaint, onPlatformRemove, onActorPlace, onActorRemove, onDragPlatformChange, onBeginPaint]);
 
   const handleMouseMove = useCallback((e) => {
     const { cx, cy } = getCanvasPos(e);
@@ -345,37 +348,39 @@ export default function MapCanvas({
       return;
     }
 
-    if (!map) return;
+    if (!map) { isPainting.current = false; return; }
     const { cx, cy } = getCanvasPos(e);
     const { wx, wy } = canvasToWorld(cx, cy);
 
-    if (isPainting.current && ['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK'].includes(activeTool) && dragPlatform) {
-      const { wx1, wy1 } = dragPlatform;
-      const TOOL_TYPE_MAP = {
-        RECT:       { type1: 0, type2: 0, typeName: 'RECTANGLE' },
-        STAIRSUP:   { type1: 0, type2: 1, typeName: 'STAIRSUP' },
-        STAIRSDOWN: { type1: 0, type2: 2, typeName: 'STAIRSDOWN' },
-        LADDER:     { type1: 1, type2: 0, typeName: 'LADDER' },
-        TRACK:      { type1: 2, type2: 0, typeName: 'TRACK' },
-      };
-      const t = TOOL_TYPE_MAP[activeTool];
-      const x1 = Math.min(wx1, wx);
-      const y1 = Math.min(wy1, wy);
-      const x2 = Math.max(wx1, wx);
-      const y2 = Math.max(wy1, wy);
-      if (x2 - x1 > 2 && y2 - y1 > 2) {
-        onPlatformDraw({ x1, y1, x2, y2, ...t });
+    if (isPainting.current) {
+      if (['TILE_BG', 'TILE_FG'].includes(activeTool)) {
+        onCommitPaint?.();
+      } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK'].includes(activeTool) && dragPlatform) {
+        const { wx1, wy1 } = dragPlatform;
+        const TOOL_TYPE_MAP = {
+          RECT:       { type1: 0, type2: 0, typeName: 'RECTANGLE' },
+          STAIRSUP:   { type1: 0, type2: 1, typeName: 'STAIRSUP' },
+          STAIRSDOWN: { type1: 0, type2: 2, typeName: 'STAIRSDOWN' },
+          LADDER:     { type1: 1, type2: 0, typeName: 'LADDER' },
+          TRACK:      { type1: 2, type2: 0, typeName: 'TRACK' },
+        };
+        const t = TOOL_TYPE_MAP[activeTool];
+        const x1 = Math.min(wx1, wx), y1 = Math.min(wy1, wy);
+        const x2 = Math.max(wx1, wx), y2 = Math.max(wy1, wy);
+        if (x2 - x1 > 2 && y2 - y1 > 2) onPlatformDraw({ x1, y1, x2, y2, ...t });
+        onDragPlatformChange(null);
       }
-      onDragPlatformChange(null);
     }
     isPainting.current = false;
-  }, [map, activeTool, dragPlatform, canvasToWorld, onPlatformDraw, onDragPlatformChange]);
+  }, [map, activeTool, dragPlatform, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.code === 'Space') { isSpacePanning.current = true; e.preventDefault(); }
+    if (e.code === 'ControlLeft' || e.code === 'ControlRight') isCtrlPanning.current = true;
   }, []);
   const handleKeyUp = useCallback((e) => {
-    if (e.code === 'Space') { isSpacePanning.current = false; }
+    if (e.code === 'Space') isSpacePanning.current = false;
+    if (e.code === 'ControlLeft' || e.code === 'ControlRight') isCtrlPanning.current = false;
   }, []);
 
   useEffect(() => {
@@ -387,7 +392,7 @@ export default function MapCanvas({
     };
   }, [handleKeyDown, handleKeyUp]);
 
-  const cursorStyle = isSpacePanning.current ? 'grab' : (isPainting.current ? 'crosshair' : 'default');
+  const cursorStyle = (isPanning.current || isSpacePanning.current || isCtrlPanning.current) ? 'grab' : (isPainting.current ? 'crosshair' : 'default');
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-[#050a05]">

@@ -1,8 +1,9 @@
 'use client';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import pako from 'pako';
 
 const CELL_SIZE = 36; // bytes per map cell
+const MAX_HISTORY = 50;
 
 function parseHeader(dv) {
   const firstbyte   = dv.getUint8(0);
@@ -11,30 +12,25 @@ function parseHeader(dv) {
   const maxteams    = dv.getUint8(3);
   const width       = dv.getUint16(4, false);   // big-endian
   const height      = dv.getUint16(6, false);   // big-endian
-  // byte 8: padding, skip
   const parallax    = dv.getUint8(9);
   const ambience    = dv.getInt8(10);
-  // bytes 11-12: padding, skip
   const flags       = dv.getUint32(13, false);  // big-endian
-  // bytes 17-144: description (128 bytes)
   const descBytes   = new Uint8Array(dv.buffer, dv.byteOffset + 17, 128);
   let descEnd = descBytes.indexOf(0);
   if (descEnd === -1) descEnd = 128;
   const description = new TextDecoder().decode(descBytes.slice(0, descEnd));
 
-  const minimapCompressedSize = dv.getUint32(145, true); // little-endian
+  const minimapCompressedSize = dv.getUint32(145, true);
   const minimapStart = 149;
   const minimapEnd   = minimapStart + minimapCompressedSize;
-
-  const rawMinimap = new Uint8Array(dv.buffer, dv.byteOffset + minimapStart, minimapCompressedSize);
-
-  const levelSize = dv.getUint32(minimapEnd, true); // little-endian
-  const levelStart = minimapEnd + 4;
+  const rawMinimap   = new Uint8Array(dv.buffer, dv.byteOffset + minimapStart, minimapCompressedSize);
+  const levelSize    = dv.getUint32(minimapEnd, true);
+  const levelStart   = minimapEnd + 4;
 
   return {
     header: { firstbyte, version, maxplayers, maxteams, parallax, ambience, flags, description },
     width, height,
-    rawMinimap: rawMinimap.slice(), // copy
+    rawMinimap: rawMinimap.slice(),
     levelDataOffset: levelStart,
     levelDataSize: levelSize,
     minimapCompressedSize,
@@ -42,46 +38,31 @@ function parseHeader(dv) {
 }
 
 function parseLevelData(raw, width, height) {
-  // 8 layers (4 bg + 4 fg), each cell 36 bytes
   const numCells = width * height;
-  // 4 bg layers + 4 fg layers, each: tile_id(u16 LE), flip(u8), lum(u8) = 4 bytes
   const layers = {
-    bg: [new Array(numCells).fill(null), new Array(numCells).fill(null), new Array(numCells).fill(null), new Array(numCells).fill(null)],
-    fg: [new Array(numCells).fill(null), new Array(numCells).fill(null), new Array(numCells).fill(null), new Array(numCells).fill(null)],
+    bg: [new Array(numCells).fill(null), new Array(numCells).fill(null),
+         new Array(numCells).fill(null), new Array(numCells).fill(null)],
+    fg: [new Array(numCells).fill(null), new Array(numCells).fill(null),
+         new Array(numCells).fill(null), new Array(numCells).fill(null)],
   };
-
   const dv = new DataView(raw.buffer, raw.byteOffset, raw.byteLength);
-
   for (let i = 0; i < numCells; i++) {
     const base = i * CELL_SIZE;
-    // BG layers 0-3: bytes 0-15
     for (let l = 0; l < 4; l++) {
       const off = base + l * 4;
-      layers.bg[l][i] = {
-        tile_id: dv.getUint16(off, true),
-        flip: dv.getUint8(off + 2),
-        lum:  dv.getUint8(off + 3),
-      };
+      layers.bg[l][i] = { tile_id: dv.getUint16(off, true), flip: dv.getUint8(off + 2), lum: dv.getUint8(off + 3) };
     }
-    // 4 padding bytes at offset 16-19, skip
-    // FG layers 0-3: bytes 20-35
     for (let l = 0; l < 4; l++) {
       const off = base + 20 + l * 4;
-      layers.fg[l][i] = {
-        tile_id: dv.getUint16(off, true),
-        flip: dv.getUint8(off + 2),
-        lum:  dv.getUint8(off + 3),
-      };
+      layers.fg[l][i] = { tile_id: dv.getUint16(off, true), flip: dv.getUint8(off + 2), lum: dv.getUint8(off + 3) };
     }
   }
-
   return layers;
 }
 
 function parseActors(dv, offset) {
   const numActors = dv.getUint32(offset, true);
-  offset += 4;
-  offset += 4; // skip u32
+  offset += 8;
   const actors = [];
   for (let i = 0; i < numActors; i++) {
     actors.push({
@@ -102,18 +83,13 @@ function parseActors(dv, offset) {
 
 function parsePlatforms(dv, offset) {
   const numPlatforms = dv.getUint32(offset, true);
-  offset += 4;
-  offset += 4; // skip u32
+  offset += 8;
   const platforms = [];
   for (let i = 0; i < numPlatforms; i++) {
-    const x1    = dv.getInt32(offset,      true);
-    const y1    = dv.getInt32(offset + 4,  true);
-    const x2    = dv.getInt32(offset + 8,  true);
-    const y2    = dv.getInt32(offset + 12, true);
-    const type1 = dv.getInt32(offset + 16, true);
-    const type2 = dv.getInt32(offset + 20, true);
-    const typeName = platformType(type1, type2);
-    platforms.push({ x1, y1, x2, y2, type1, type2, typeName });
+    const x1 = dv.getInt32(offset, true), y1 = dv.getInt32(offset + 4, true);
+    const x2 = dv.getInt32(offset + 8, true), y2 = dv.getInt32(offset + 12, true);
+    const type1 = dv.getInt32(offset + 16, true), type2 = dv.getInt32(offset + 20, true);
+    platforms.push({ x1, y1, x2, y2, type1, type2, typeName: platformType(type1, type2) });
     offset += 24;
   }
   return { platforms, offset };
@@ -132,45 +108,80 @@ function platformType(type1, type2) {
 
 export function platformTypeNums(typeName) {
   const map = {
-    RECTANGLE:    [0, 0],
-    LADDER:       [1, 0],
-    STAIRSUP:     [0, 1],
-    STAIRSDOWN:   [0, 2],
-    TRACK:        [2, 0],
-    OUTSIDEROOM:  [3, 0],
-    SPECIFICROOM: [3, 1],
+    RECTANGLE: [0,0], LADDER: [1,0], STAIRSUP: [0,1],
+    STAIRSDOWN: [0,2], TRACK: [2,0], OUTSIDEROOM: [3,0], SPECIFICROOM: [3,1],
   };
   return map[typeName] ?? [0, 0];
 }
 
 export function useSilMap() {
   const [mapData, setMapData] = useState(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  // History stacks stored in refs to avoid triggering re-renders on push/pop
+  const historyRef   = useRef([]); // past states
+  const futureRef    = useRef([]); // states after current (for redo)
+  const prePaintRef  = useRef(null); // snapshot before a paint stroke begins
+
+  const syncUndoRedo = () => {
+    setCanUndo(historyRef.current.length > 0);
+    setCanRedo(futureRef.current.length > 0);
+  };
+
+  const pushHistory = useCallback((snapshot) => {
+    if (!snapshot) return;
+    historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), snapshot];
+    futureRef.current = [];
+    syncUndoRedo();
+  }, []);
+
+  const undo = useCallback(() => {
+    setMapData(current => {
+      const history = historyRef.current;
+      if (history.length === 0) return current;
+      const prev = history[history.length - 1];
+      historyRef.current = history.slice(0, -1);
+      if (current) futureRef.current = [current, ...futureRef.current.slice(0, MAX_HISTORY - 1)];
+      syncUndoRedo();
+      return prev;
+    });
+  }, []);
+
+  const redo = useCallback(() => {
+    setMapData(current => {
+      const future = futureRef.current;
+      if (future.length === 0) return current;
+      const next = future[0];
+      futureRef.current = future.slice(1);
+      if (current) historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), current];
+      syncUndoRedo();
+      return next;
+    });
+  }, []);
 
   const openMap = useCallback(async (file) => {
     try {
       const buf = await file.arrayBuffer();
       const bytes = new Uint8Array(buf);
       const dv = new DataView(bytes.buffer);
-
       const parsed = parseHeader(dv);
       const { header, width, height, rawMinimap, levelDataOffset, minimapCompressedSize } = parsed;
 
-      // Decompress level data
       const compressedLevel = bytes.slice(levelDataOffset);
       const levelRaw = pako.inflate(compressedLevel);
       const levelDV = new DataView(levelRaw.buffer);
-
       const numCells = width * height;
       const tileSectionSize = numCells * CELL_SIZE;
-
-      // Parse tile layers
       const layers = parseLevelData(levelRaw.slice(0, tileSectionSize), width, height);
 
-      // Parse actors and platforms after tile section
       let offset = tileSectionSize;
       const { actors, offset: off2 } = parseActors(levelDV, offset);
       const { platforms } = parsePlatforms(levelDV, off2);
 
+      historyRef.current = [];
+      futureRef.current = [];
+      syncUndoRedo();
       setMapData({ header, width, height, layers, actors, platforms, rawMinimap, minimapCompressedSize });
     } catch (e) {
       console.error('Failed to open SIL map:', e);
@@ -180,18 +191,14 @@ export function useSilMap() {
 
   const saveMap = useCallback(() => {
     if (!mapData) return;
-    const { header, width, height, layers, actors, platforms, rawMinimap, minimapCompressedSize } = mapData;
-
+    const { header, width, height, layers, actors, platforms, rawMinimap } = mapData;
     const numCells = width * height;
-
-    // Build level data buffer
     const tileSectionSize = numCells * CELL_SIZE;
     const actorsSectionSize = 8 + actors.length * 36;
     const platformsSectionSize = 8 + platforms.length * 24;
     const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize);
     const ldv = new DataView(levelBuf);
 
-    // Write tile layers
     for (let i = 0; i < numCells; i++) {
       const base = i * CELL_SIZE;
       for (let l = 0; l < 4; l++) {
@@ -201,7 +208,6 @@ export function useSilMap() {
         ldv.setUint8(off + 2, cell.flip);
         ldv.setUint8(off + 3, cell.lum);
       }
-      // 4 padding bytes zeroed already
       for (let l = 0; l < 4; l++) {
         const off = base + 20 + l * 4;
         const cell = layers.fg[l][i] ?? { tile_id: 0, flip: 0, lum: 255 };
@@ -211,7 +217,6 @@ export function useSilMap() {
       }
     }
 
-    // Write actors
     let off = tileSectionSize;
     ldv.setUint32(off, actors.length, true); off += 4;
     ldv.setUint32(off, 0, true); off += 4;
@@ -227,8 +232,6 @@ export function useSilMap() {
       ldv.setUint32(off + 32, a.securityid, true);
       off += 36;
     }
-
-    // Write platforms
     ldv.setUint32(off, platforms.length, true); off += 4;
     ldv.setUint32(off, 0, true); off += 4;
     for (const p of platforms) {
@@ -242,13 +245,9 @@ export function useSilMap() {
     }
 
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
-
-    // Build full file
     const descBytes = new TextEncoder().encode(header.description);
     const descBuf = new Uint8Array(128);
     descBuf.set(descBytes.slice(0, 127));
-
-    // Total header size = 149 + minimapCompressedSize + 4 + levelCompressed.length
     const totalSize = 149 + rawMinimap.length + 4 + levelCompressed.length;
     const fileBuf = new ArrayBuffer(totalSize);
     const fdv = new DataView(fileBuf);
@@ -258,29 +257,37 @@ export function useSilMap() {
     fdv.setUint8(1, header.version);
     fdv.setUint8(2, header.maxplayers);
     fdv.setUint8(3, header.maxteams);
-    fdv.setUint16(4, width, false);   // big-endian
-    fdv.setUint16(6, height, false);  // big-endian
-    fdv.setUint8(8, 0);               // padding
+    fdv.setUint16(4, width, false);
+    fdv.setUint16(6, height, false);
     fdv.setUint8(9, header.parallax);
     fdv.setInt8(10, header.ambience);
-    fdv.setUint8(11, 0); fdv.setUint8(12, 0); // padding
-    fdv.setUint32(13, header.flags, false);    // big-endian
+    fdv.setUint32(13, header.flags, false);
     fBytes.set(descBuf, 17);
-    fdv.setUint32(145, rawMinimap.length, true); // little-endian
+    fdv.setUint32(145, rawMinimap.length, true);
     fBytes.set(rawMinimap, 149);
     const afterMinimap = 149 + rawMinimap.length;
-    fdv.setUint32(afterMinimap, levelCompressed.length, true); // little-endian
+    fdv.setUint32(afterMinimap, levelCompressed.length, true);
     fBytes.set(levelCompressed, afterMinimap + 4);
 
-    // Trigger download
     const blob = new Blob([fileBuf], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = 'map.SIL';
-    a.click();
+    a.href = url; a.download = 'map.SIL'; a.click();
     URL.revokeObjectURL(url);
   }, [mapData]);
+
+  // Called at the start of a paint stroke — saves snapshot for commit
+  const beginPaint = useCallback(() => {
+    setMapData(current => { prePaintRef.current = current; return current; });
+  }, []);
+
+  // Called at end of paint stroke — pushes pre-stroke snapshot to history
+  const commitPaint = useCallback(() => {
+    if (prePaintRef.current) {
+      pushHistory(prePaintRef.current);
+      prePaintRef.current = null;
+    }
+  }, [pushHistory]);
 
   const updateTile = useCallback((layerType, layerIdx, x, y, tile_id, flip = 0, lum = 255) => {
     setMapData(prev => {
@@ -302,32 +309,40 @@ export function useSilMap() {
   const addPlatform = useCallback((platform) => {
     setMapData(prev => {
       if (!prev) return prev;
+      pushHistory(prev);
       return { ...prev, platforms: [...prev.platforms, platform] };
     });
-  }, []);
+  }, [pushHistory]);
 
   const removePlatform = useCallback((idx) => {
     setMapData(prev => {
       if (!prev) return prev;
-      const platforms = prev.platforms.filter((_, i) => i !== idx);
-      return { ...prev, platforms };
+      pushHistory(prev);
+      return { ...prev, platforms: prev.platforms.filter((_, i) => i !== idx) };
     });
-  }, []);
+  }, [pushHistory]);
 
   const addActor = useCallback((actor) => {
     setMapData(prev => {
       if (!prev) return prev;
+      pushHistory(prev);
       return { ...prev, actors: [...prev.actors, actor] };
     });
-  }, []);
+  }, [pushHistory]);
 
   const removeActor = useCallback((idx) => {
     setMapData(prev => {
       if (!prev) return prev;
-      const actors = prev.actors.filter((_, i) => i !== idx);
-      return { ...prev, actors };
+      pushHistory(prev);
+      return { ...prev, actors: prev.actors.filter((_, i) => i !== idx) };
     });
-  }, []);
+  }, [pushHistory]);
 
-  return { map: mapData, openMap, saveMap, updateTile, addPlatform, removePlatform, addActor, removeActor };
+  return {
+    map: mapData, openMap, saveMap,
+    updateTile, beginPaint, commitPaint,
+    addPlatform, removePlatform,
+    addActor, removeActor,
+    undo, redo, canUndo, canRedo,
+  };
 }

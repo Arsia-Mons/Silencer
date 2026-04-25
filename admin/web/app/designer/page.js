@@ -2,7 +2,7 @@
 import { useAuth } from '../../lib/auth.js';
 import { useSocket } from '../../lib/socket.js';
 import Sidebar from '../../components/Sidebar.js';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useGameData } from './useGameData.js';
 import { useSilMap } from './useSilMap.js';
 import Toolbar, { ACTOR_DEFS, PLATFORM_TOOL_TYPES } from './Toolbar.js';
@@ -14,7 +14,9 @@ export default function DesignerPage() {
   const wsConnected = useSocket({});
 
   const { loaded, error, tileImages, tileBankCounts, progress, loadFiles } = useGameData();
-  const { map, openMap, saveMap, updateTile, addPlatform, removePlatform, addActor, removeActor } = useSilMap();
+  const { map, openMap, saveMap, updateTile, beginPaint, commitPaint,
+          addPlatform, removePlatform, addActor, removeActor,
+          undo, redo, canUndo, canRedo } = useSilMap();
 
   const [activeTool, setActiveTool]     = useState('TILE_BG');
   const [activeLayer, setActiveLayer]   = useState(0);
@@ -28,6 +30,16 @@ export default function DesignerPage() {
   const silInputRef  = useRef(null);
   const dataDirRef   = useRef(null);
   const dataFilesRef = useRef(null);
+
+  // Global undo/redo keyboard shortcuts
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [undo, redo]);
 
   const handleDataDir = (e) => {
     if (e.target.files?.length) loadFiles(e.target.files);
@@ -128,7 +140,18 @@ export default function DesignerPage() {
           <input ref={dataFilesRef} type="file" multiple accept=".bin,.dat,.BIN,.DAT"
             className="hidden" onChange={handleDataFiles} />
 
-          {/* Open SIL */}
+          {/* Undo / Redo */}
+          <button onClick={undo} disabled={!canUndo}
+            className="px-3 py-1 text-xs font-mono border border-game-border rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-game-textDim hover:border-game-primary hover:text-game-text"
+            title="Undo (Ctrl+Z)">
+            ↩ UNDO
+          </button>
+          <button onClick={redo} disabled={!canRedo}
+            className="px-3 py-1 text-xs font-mono border border-game-border rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed text-game-textDim hover:border-game-primary hover:text-game-text"
+            title="Redo (Ctrl+Y)">
+            ↪ REDO
+          </button>
+          <div className="w-px h-4 bg-game-border" />
           <button
             onClick={() => silInputRef.current?.click()}
             className="px-3 py-1 text-xs font-mono border border-game-border text-game-textDim rounded hover:border-game-primary hover:text-game-text transition-colors"
@@ -208,6 +231,8 @@ export default function DesignerPage() {
               onZoomChange={setZoom}
               onPanChange={setPan}
               onTilePaint={handleTilePaint}
+              onBeginPaint={beginPaint}
+              onCommitPaint={commitPaint}
               onPlatformDraw={handlePlatformDraw}
               onPlatformRemove={removePlatform}
               onActorPlace={handleActorPlace}
@@ -247,7 +272,7 @@ export default function DesignerPage() {
             </span>
           )}
           <span className="text-xs font-mono text-game-muted ml-auto">
-            SPACE+DRAG or MMB to pan · SCROLL to zoom
+            CTRL/SPACE+DRAG or MMB to pan · SCROLL to zoom · CTRL+Z/Y to undo/redo
           </span>
         </div>
       </div>
