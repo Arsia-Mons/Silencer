@@ -69,8 +69,8 @@ export default function Players() {
                   onClick={() => router.push(`/players/${p.accountId}`)}>
                   <td className="px-4 py-2 text-game-muted">{p.accountId}</td>
                   <td className="px-4 py-2 text-game-primary font-semibold">{p.name}</td>
-                  <td className="px-4 py-2 text-game-text">{p.agencies?.[0]?.level ?? 0}</td>
-                  <td className="px-4 py-2 text-game-textDim">{p.agencies?.[0]?.wins ?? 0} / {p.agencies?.[0]?.losses ?? 0}</td>
+                  <td className="px-4 py-2 text-game-text">{(p.agencies || []).reduce((b, a) => a.wins > b.wins || (a.wins === b.wins && a.level > b.level) ? a : b, p.agencies?.[0] || {}).level ?? 0}</td>
+                  <td className="px-4 py-2 text-game-textDim">{(p.agencies || []).reduce((t, a) => t + (a.wins || 0), 0)} / {(p.agencies || []).reduce((t, a) => t + (a.losses || 0), 0)}</td>
                   <td className="px-4 py-2 text-game-muted">{p.lastSeen ? new Date(p.lastSeen).toLocaleDateString() : '—'}</td>
                   <td className={`px-4 py-2 ${p.banned ? 'text-game-danger' : 'text-game-primary'}`}>{p.banned ? 'BANNED' : 'ACTIVE'}</td>
                   <td className="px-4 py-2">

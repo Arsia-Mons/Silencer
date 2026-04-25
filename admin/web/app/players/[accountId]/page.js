@@ -161,7 +161,7 @@ export default function PlayerDetail() {
               <div className="text-game-primary font-semibold mb-2">{AGENCY_NAMES[i] || `AGY ${i+1}`}</div>
               <StatRow label="LEVEL"  value={a.level} />
               <StatRow label="W / L"  value={`${a.wins} / ${a.losses}`} />
-              <StatRow label="XP"     value={a.xpToNextLevel} />
+              <StatRow label="XP TO NEXT" value={a.xpToNextLevel} />
             </div>
           ))}
         </div>
