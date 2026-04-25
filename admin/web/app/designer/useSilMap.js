@@ -182,16 +182,16 @@ export function useSilMap() {
       historyRef.current = [];
       futureRef.current = [];
       syncUndoRedo();
-      setMapData({ header, width, height, layers, actors, platforms, rawMinimap, minimapCompressedSize });
+      setMapData({ header, width, height, layers, actors, platforms, rawMinimap, minimapCompressedSize, fileName: file.name });
     } catch (e) {
       console.error('Failed to open SIL map:', e);
       alert('Failed to parse map: ' + e.message);
     }
   }, []);
 
-  const saveMap = useCallback(() => {
+  const saveMap = useCallback(async () => {
     if (!mapData) return;
-    const { header, width, height, layers, actors, platforms, rawMinimap } = mapData;
+    const { header, width, height, layers, actors, platforms, rawMinimap, fileName } = mapData;
     const numCells = width * height;
     const tileSectionSize = numCells * CELL_SIZE;
     const actorsSectionSize = 8 + actors.length * 36;
@@ -270,9 +270,26 @@ export function useSilMap() {
     fBytes.set(levelCompressed, afterMinimap + 4);
 
     const blob = new Blob([fileBuf], { type: 'application/octet-stream' });
+    const suggestedName = fileName || 'map.SIL';
+
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName,
+          types: [{ description: 'Silencer Map', accept: { 'application/octet-stream': ['.SIL'] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return; // user cancelled
+      }
+    }
+    // Fallback: trigger download
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'map.SIL'; a.click();
+    a.href = url; a.download = suggestedName; a.click();
     URL.revokeObjectURL(url);
   }, [mapData]);
 
