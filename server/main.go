@@ -93,7 +93,7 @@ func main() {
 	}
 	defer udpLn.Close()
 
-	go StartPlayerAuthServer(*playerAuthAddr, store)
+	go StartPlayerAuthServer(*playerAuthAddr, store, hub)
 
 	go serveUDP(udpLn, hub)
 

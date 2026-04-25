@@ -18,10 +18,10 @@ public:
 	Uint32 gameid;
 	Uint32 accountid;
 	int nopeerstime;
-	
-private:
 	char lobbyaddress[256];
 	unsigned short lobbyport;
+	
+private:
 	Uint8 state_i;
 	SOCKET sockethandle;
 	std::vector<Uint32> banlist;

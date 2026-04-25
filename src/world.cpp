@@ -564,6 +564,22 @@ void World::DoNetwork_Authority(void){
 					}
 				}
 			}break;
+			case MSG_KICK:{
+				if(dedicatedserver.active && senderaddr.sin_addr.s_addr == inet_addr(dedicatedserver.lobbyaddress)){
+					Uint32 accountid;
+					data.Get(accountid);
+					for(int i = 0; i < maxpeers; i++){
+						Peer * p = peerlist[i];
+						if(p && p->accountid == accountid){
+							if(gameplaystate == World::INGAME){
+								KillByGovt(*p);
+							}
+							HandleDisconnect(p->id);
+							break;
+						}
+					}
+				}
+			}break;
 		}
 	}
 	if(!replay.IsPlaying()){

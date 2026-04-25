@@ -368,3 +368,44 @@ func (h *Hub) Chat(from *Client, channel, msg string) {
 	}
 	log.Printf("[chat #%s] %s", channel, line)
 }
+
+// KickAccountID disconnects a player's lobby connection (if present) and
+// sends a UDP kick command to any dedicated game server they are currently in.
+func (h *Hub) KickAccountID(accountID uint32) {
+	h.mu.Lock()
+	var target *Client
+	for c := range h.clients {
+		if c.accountID == accountID {
+			target = c
+			break
+		}
+	}
+	var gamePort uint16
+	if target != nil && target.gameID != 0 {
+		if g, ok := h.games[target.gameID]; ok {
+			gamePort = g.Port
+		}
+	}
+	h.mu.Unlock()
+
+	if target != nil {
+		log.Printf("[hub] kicking banned account %d from lobby", accountID)
+		target.conn.Close()
+	}
+
+	if gamePort != 0 {
+		addr := net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: int(gamePort)}
+		conn, err := net.DialUDP("udp", nil, &addr)
+		if err == nil {
+			msg := make([]byte, 5)
+			msg[0] = 22 // MSG_KICK ordinal in C++ enum
+			msg[1] = byte(accountID)
+			msg[2] = byte(accountID >> 8)
+			msg[3] = byte(accountID >> 16)
+			msg[4] = byte(accountID >> 24)
+			_, _ = conn.Write(msg)
+			conn.Close()
+			log.Printf("[hub] sent UDP kick for account %d to game port %d", accountID, gamePort)
+		}
+	}
+}

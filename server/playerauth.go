@@ -12,7 +12,7 @@ import (
 // StartPlayerAuthServer starts a lightweight HTTP server on addr (e.g. ":15171")
 // that the admin-api can call to validate game player credentials.
 // The endpoint is not exposed externally — it is only reachable within the Docker network.
-func StartPlayerAuthServer(addr string, store *Store) {
+func StartPlayerAuthServer(addr string, store *Store, hub *Hub) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/player-auth", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -69,6 +69,9 @@ func StartPlayerAuthServer(addr string, store *Store) {
 			return
 		}
 		found := store.SetBan(req.AccountID, req.Banned)
+		if found && req.Banned {
+			hub.KickAccountID(req.AccountID)
+		}
 		writeJSON(w, map[string]any{"ok": found})
 	})
 
