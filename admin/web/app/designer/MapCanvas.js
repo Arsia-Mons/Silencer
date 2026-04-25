@@ -236,17 +236,17 @@ export default function MapCanvas({
       const sprBank = def.bank != null ? spriteImages?.get(def.bank) : null;
       const spr = sprBank?.[def.frame ?? 0];
       if (spr) {
-        const sx = cx + spr.offsetX * zoom;
-        const sy = cy + spr.offsetY * zoom;
+        const sx = cx - spr.offsetX * zoom;
+        const sy = cy - spr.offsetY * zoom;
         const sw = spr.width * zoom;
         const sh = spr.height * zoom;
         ctx.drawImage(spr.bitmap, sx, sy, sw, sh);
         // Label below sprite when zoomed in
         if (zoom > 0.3) {
           ctx.fillStyle = def.color + 'cc';
-          ctx.fillRect(cx - 12, sy + sh + 1, 24, 11);
+          ctx.fillRect(cx - 12, cy + 2, 24, 11);
           ctx.fillStyle = '#fff';
-          ctx.fillText(def.icon, cx, sy + sh + 6);
+          ctx.fillText(def.icon, cx, cy + 7);
         }
       } else {
         // Fallback: colored circle with icon
