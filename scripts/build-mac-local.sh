@@ -20,23 +20,23 @@ echo "==> Installing/updating dependencies via Homebrew"
 brew install cmake sdl2 sdl2_mixer minizip 2>/dev/null || brew upgrade sdl2 sdl2_mixer minizip 2>/dev/null || true
 
 echo "==> Configuring (lobby=${LOBBY_HOST}:${LOBBY_PORT})"
-cmake -B "$BUILD_DIR" -S "$REPO_ROOT" \
+cmake -B "$BUILD_DIR" -S "$REPO_ROOT/clients/silencer" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-  -DZSILENCER_LOBBY_HOST="$LOBBY_HOST" \
-  -DZSILENCER_LOBBY_PORT="$LOBBY_PORT"
+  -DSILENCER_LOBBY_HOST="$LOBBY_HOST" \
+  -DSILENCER_LOBBY_PORT="$LOBBY_PORT"
 
 echo "==> Building ($(sysctl -n hw.ncpu) cores)"
 cmake --build "$BUILD_DIR" --config Release -j"$(sysctl -n hw.ncpu)"
 
-APP="$BUILD_DIR/zsilencer.app"
+APP="$BUILD_DIR/Silencer.app"
 if [ -d "$APP" ]; then
   echo ""
-  echo "✅  Build complete."
+  echo "Build complete."
   echo "    App bundle : $APP"
   echo "    Launch with: open $APP"
-  echo "    Or run directly: $APP/Contents/MacOS/zsilencer"
+  echo "    Or run directly: $APP/Contents/MacOS/Silencer"
 else
   echo ""
-  echo "✅  Build complete: $BUILD_DIR/zsilencer"
+  echo "Build complete: $BUILD_DIR/silencer"
 fi

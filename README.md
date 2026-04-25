@@ -1,5 +1,5 @@
-zSilencer
-=========
+Silencer
+========
 
 Quick Start (Linux server)
 --------------------------
@@ -41,25 +41,29 @@ command:
 
 Compiling on Linux
 ------------------
-`mkdir build`
-
-`cd build`
-
-`cmake ..`
-
-`make`
-
-`sudo make install`
+```bash
+cmake -B build -S clients/silencer
+cmake --build build -j
+sudo cmake --install build
+```
 
 Compiling on Windows
 --------------------
-SDL2 and SDL2_mixer development libraries will have to be installed into the Visual Studio include and lib directories  
-Open zSILENCER.sln Visual Studio Project  
-Compile project using Visual Studio  
+SDL2 and SDL2_mixer development libraries will have to be installed (vcpkg
+manifest mode picks them up automatically when configured with the vcpkg
+toolchain — see `clients/silencer/vcpkg.json`). Configure with:
+
+```pwsh
+cmake -B build -S clients/silencer -A x64 `
+  -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+  -DVCPKG_TARGET_TRIPLET=x64-windows
+cmake --build build --config Release
+```
 
 Supported platforms
 -------------------
-The game is supported on Windows, Mac OS X, and Linux.  Other platforms, such as Android, work but are not fully tested.
+The game is supported on Windows, Mac OS X, and Linux. Other platforms,
+such as Android, work but are not fully tested.
 
 Running game
 ------------

@@ -112,7 +112,7 @@ std::string FetchMapFromServer(const char * mapname,
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 3L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 10L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "zsilencer/" ZSILENCER_VERSION);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "silencer/" SILENCER_VERSION);
     if (progress) {
         progress->store(0);
         curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
@@ -183,7 +183,7 @@ static StringBuf FetchMapListJSON(const char * apiURL) {
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 1L);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 2L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "zsilencer/" ZSILENCER_VERSION);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "silencer/" SILENCER_VERSION);
 
     CURLcode rc = curl_easy_perform(curl);
     curl_easy_cleanup(curl);

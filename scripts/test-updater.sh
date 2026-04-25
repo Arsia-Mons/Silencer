@@ -12,16 +12,16 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
 case "$(uname)" in
-    Darwin) PLATFORM_ZIP=zsilencer-macos-arm64.zip ;;
-    Linux)  PLATFORM_ZIP=zsilencer-linux-x64.zip ;;
+    Darwin) PLATFORM_ZIP=silencer-macos-arm64.zip ;;
+    Linux)  PLATFORM_ZIP=silencer-linux-x64.zip ;;
     *) echo "unsupported uname: $(uname)"; exit 1 ;;
 esac
 
 echo "=== Building NEW version ($NEW_VER) ==="
-cmake -B build-new -S . \
-    -DZSILENCER_VERSION="$NEW_VER" \
-    -DZSILENCER_LOBBY_HOST=127.0.0.1 \
-    -DZSILENCER_LOBBY_PORT=15170
+cmake -B build-new -S clients/silencer \
+    -DSILENCER_VERSION="$NEW_VER" \
+    -DSILENCER_LOBBY_HOST=127.0.0.1 \
+    -DSILENCER_LOBBY_PORT=15170
 cmake --build build-new -j
 
 mkdir -p test-update-host
@@ -32,14 +32,14 @@ rm -f "test-update-host/$PLATFORM_ZIP"
 # zip shape (not a dev-only variant that hides bugs).
 case "$(uname)" in
     Darwin)
-        # release.yml line ~111 uses `ditto -ck --sequesterRsrc --keepParent zsilencer.app <zip>`.
-        # --keepParent puts `zsilencer.app/` at the zip root. Stage-2 detects
+        # release.yml uses `ditto -ck --sequesterRsrc --keepParent Silencer.app <zip>`.
+        # --keepParent puts `Silencer.app/` at the zip root. Stage-2 detects
         # this single-top-dir wrapper and hoists it into place.
-        (cd build-new && ditto -ck --sequesterRsrc --keepParent zsilencer.app "../test-update-host/$PLATFORM_ZIP")
+        (cd build-new && ditto -ck --sequesterRsrc --keepParent Silencer.app "../test-update-host/$PLATFORM_ZIP")
         ;;
     Linux)
         # Linux isn't a shipped platform; bare binary at zip root is fine.
-        (cd build-new && zip -r "../test-update-host/$PLATFORM_ZIP" zsilencer)
+        (cd build-new && zip -r "../test-update-host/$PLATFORM_ZIP" silencer)
         ;;
 esac
 
@@ -47,10 +47,10 @@ SHA=$(shasum -a 256 "test-update-host/$PLATFORM_ZIP" | awk '{print $1}')
 echo "NEW zip sha256=$SHA"
 
 echo "=== Building OLD version ($OLD_VER) ==="
-cmake -B build-old -S . \
-    -DZSILENCER_VERSION="$OLD_VER" \
-    -DZSILENCER_LOBBY_HOST=127.0.0.1 \
-    -DZSILENCER_LOBBY_PORT=15170
+cmake -B build-old -S clients/silencer \
+    -DSILENCER_VERSION="$OLD_VER" \
+    -DSILENCER_LOBBY_HOST=127.0.0.1 \
+    -DSILENCER_LOBBY_PORT=15170
 cmake --build build-old -j
 
 cat > update.json <<EOF
@@ -82,12 +82,12 @@ echo
 echo "=== Launching OLD client — expect update modal ==="
 case "$(uname)" in
     Darwin)
-        # MACOSX_BUNDLE target produces build-old/zsilencer.app, not a bare binary.
+        # MACOSX_BUNDLE target produces build-old/Silencer.app, not a bare binary.
         # Invoke the binary directly so stderr/stdout stream into this terminal
         # (`open` detaches and hides logs).
-        ./build-old/zsilencer.app/Contents/MacOS/zsilencer
+        ./build-old/Silencer.app/Contents/MacOS/Silencer
         ;;
     Linux)
-        ./build-old/zsilencer
+        ./build-old/silencer
         ;;
 esac

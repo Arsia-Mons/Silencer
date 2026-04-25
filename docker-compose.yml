@@ -1,4 +1,4 @@
-# zSILENCER lobby server — Docker Compose
+# Silencer lobby server — Docker Compose
 #
 # Port 15170 is used instead of the canonical 517 to avoid requiring root
 # on the host.  Build the Mac client with the matching port:
@@ -55,7 +55,7 @@ services:
       - "-db"
       - "/data/lobby.json"
       - "-game-binary"
-      - "/usr/local/bin/zsilencer"
+      - "/usr/local/bin/silencer"
       - "-game-port-base"
       - "20000"
       - "-game-port-count"

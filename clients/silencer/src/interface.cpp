@@ -278,7 +278,7 @@ void Interface::ActiveChanged(World & world, Interface * callinginterface, bool 
 #ifdef __ANDROID__
 								JNIEnv * env;
 								jvm->GetEnv((void **)&env, JNI_VERSION_1_6);
-								jclass cls = env->FindClass("com/zSILENCER/game/zSILENCER");
+								jclass cls = env->FindClass("com/silencer/game/Silencer");
 								jmethodID show = env->GetStaticMethodID(cls, "showKeyboard", "()V");
 								env->CallStaticVoidMethod(cls, show);
 								env->DeleteLocalRef(cls);

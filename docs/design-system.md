@@ -355,7 +355,7 @@ a base index of 204 (`#1050A8`, a mid-blue).
 
 A reimplementation must read the same binary asset bundles, since every UI
 component references sprites by `(bank, index)` pairs and every glyph is a
-sprite in a font bank. Implementations in `src/resources.cpp`.
+sprite in a font bank. Implementations in `clients/silencer/src/resources.cpp`.
 
 ### Sprite Banks — `shared/assets/BIN_SPR.DAT` + `shared/assets/bin_spr/SPR_NNN.BIN`
 
@@ -2087,27 +2087,27 @@ overlays, not palette indices — they appear here for cross-referencing with th
 
 | File | Contents |
 | ------------------- | ------------------------------------------------- |
-| `src/renderer.cpp` | All Draw* functions, effects, HUD rendering, buy menu, chat overlay, player list, modal dialog rendering |
-| `src/renderer.h` | Renderer class, drawing API surface |
-| `src/resources.cpp` | Asset loading: BIN_SPR.DAT / SPR_NNN.BIN format, RLE codec, font bank loading, palette assignment |
-| `src/resources.h` | `spritewidth`, `spriteheight`, `spriteoffsetx`, `spriteoffsety` arrays referenced throughout |
-| `src/palette.cpp` | Palette loading (PALETTE.BIN), lookup-table calculation, brightness/color/alpha transforms |
-| `src/palette.h` | Palette class, inline color/brightness transforms |
-| `src/button.cpp` | Button types, sizing, animation state machine, sound trigger |
-| `src/overlay.cpp` | Overlay defaults, sprite animations, text hit-testing |
-| `src/textinput.cpp` | Text field defaults, caret, input handling, scrolling, intentionally limited editing |
-| `src/textbox.cpp` | Multi-line text area, word-wrap, line storage format |
-| `src/selectbox.cpp` | List selection, item management, file listing |
-| `src/scrollbar.cpp` | Scroll bar hit regions, up/down logic |
-| `src/toggle.cpp` | Toggle visual states, checkbox/agency modes |
-| `src/interface.cpp` | Container/focus manager, tab order, keyboard/mouse dispatch, radio groups, modal handling |
-| `src/sprite.h` | Base sprite properties: effectcolor, effectbrightness, draw flags |
-| `src/sprite.cpp` | Bounding box calculation, nudge interpolation |
-| `src/object.h` | Object base class (type, id, render flags) |
-| `src/minimap.h` | Minimap pixel buffer (172 × 62) |
-| `src/game.cpp` | UI construction (lobby, menus, options screens), loading bar, modal dialog factory, main loop / tick rate |
-| `src/world.cpp` | Per-tick simulation entry point (`World::Tick`) |
-| `src/team.cpp` | Team overlays, player name labels |
+| `clients/silencer/src/renderer.cpp` | All Draw* functions, effects, HUD rendering, buy menu, chat overlay, player list, modal dialog rendering |
+| `clients/silencer/src/renderer.h` | Renderer class, drawing API surface |
+| `clients/silencer/src/resources.cpp` | Asset loading: BIN_SPR.DAT / SPR_NNN.BIN format, RLE codec, font bank loading, palette assignment |
+| `clients/silencer/src/resources.h` | `spritewidth`, `spriteheight`, `spriteoffsetx`, `spriteoffsety` arrays referenced throughout |
+| `clients/silencer/src/palette.cpp` | Palette loading (PALETTE.BIN), lookup-table calculation, brightness/color/alpha transforms |
+| `clients/silencer/src/palette.h` | Palette class, inline color/brightness transforms |
+| `clients/silencer/src/button.cpp` | Button types, sizing, animation state machine, sound trigger |
+| `clients/silencer/src/overlay.cpp` | Overlay defaults, sprite animations, text hit-testing |
+| `clients/silencer/src/textinput.cpp` | Text field defaults, caret, input handling, scrolling, intentionally limited editing |
+| `clients/silencer/src/textbox.cpp` | Multi-line text area, word-wrap, line storage format |
+| `clients/silencer/src/selectbox.cpp` | List selection, item management, file listing |
+| `clients/silencer/src/scrollbar.cpp` | Scroll bar hit regions, up/down logic |
+| `clients/silencer/src/toggle.cpp` | Toggle visual states, checkbox/agency modes |
+| `clients/silencer/src/interface.cpp` | Container/focus manager, tab order, keyboard/mouse dispatch, radio groups, modal handling |
+| `clients/silencer/src/sprite.h` | Base sprite properties: effectcolor, effectbrightness, draw flags |
+| `clients/silencer/src/sprite.cpp` | Bounding box calculation, nudge interpolation |
+| `clients/silencer/src/object.h` | Object base class (type, id, render flags) |
+| `clients/silencer/src/minimap.h` | Minimap pixel buffer (172 × 62) |
+| `clients/silencer/src/game.cpp` | UI construction (lobby, menus, options screens), loading bar, modal dialog factory, main loop / tick rate |
+| `clients/silencer/src/world.cpp` | Per-tick simulation entry point (`World::Tick`) |
+| `clients/silencer/src/team.cpp` | Team overlays, player name labels |
 
 ---
 

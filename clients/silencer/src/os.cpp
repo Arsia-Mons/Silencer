@@ -2,7 +2,7 @@
 
 std::string GetResDir(void){
 #ifdef __linux
-	std::string d[2] = {"/usr/local/share/zsilencer", "/usr/share/zsilencer"};
+	std::string d[2] = {"/usr/local/share/silencer", "/usr/share/silencer"};
 	for(size_t i = 0; i < 2; i++){
 		struct stat dirinfo;
 		if(stat(d[i].c_str(), &dirinfo) == 0 && S_ISDIR(dirinfo.st_mode)){
@@ -40,7 +40,7 @@ std::string GetDataDir(void){
 	// to pw_dir for sessions where HOME isn't set.
 	const char * home = getenv("HOME");
 	std::string d = (home && *home) ? home : getpwuid(getuid())->pw_dir;
-	d += "/.config/zsilencer/";
+	d += "/.config/silencer/";
 	CreateDirectory(d.c_str());
 	return d;
 #else
