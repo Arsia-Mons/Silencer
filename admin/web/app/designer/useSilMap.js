@@ -465,8 +465,115 @@ export function useSilMap() {
     });
   }, [pushHistory]);
 
+  const publishMap = useCallback(async ({ author, apiUrl, apiKey }) => {
+    if (!mapData) return { ok: false, error: 'No map loaded' };
+    const { header, width, height, layers, actors, platforms, rawMinimap, fileName } = mapData;
+    const numCells = width * height;
+    const tileSectionSize = numCells * CELL_SIZE;
+    const actorsSectionSize = 8 + actors.length * 36;
+    const platformsSectionSize = 8 + platforms.length * 24;
+    const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize);
+    const ldv = new DataView(levelBuf);
+
+    for (let i = 0; i < numCells; i++) {
+      const base = i * CELL_SIZE;
+      for (let l = 0; l < 4; l++) {
+        const off = base + l * 4;
+        const cell = layers.bg[l][i] ?? { tile_id: 0, flip: 0, lum: 0 };
+        ldv.setUint16(off, cell.tile_id, true);
+        ldv.setUint8(off + 2, cell.flip);
+        ldv.setUint8(off + 3, cell.lum);
+      }
+      for (let l = 0; l < 4; l++) {
+        const off = base + 20 + l * 4;
+        const cell = layers.fg[l][i] ?? { tile_id: 0, flip: 0, lum: 0 };
+        ldv.setUint16(off, cell.tile_id, true);
+        ldv.setUint8(off + 2, cell.flip);
+        ldv.setUint8(off + 3, cell.lum);
+      }
+    }
+
+    let off = tileSectionSize;
+    ldv.setUint32(off, actors.length, true); off += 4;
+    ldv.setUint32(off, 0, true); off += 4;
+    for (const a of actors) {
+      ldv.setUint32(off,      a.id,         true);
+      ldv.setUint32(off + 4,  a.x,          true);
+      ldv.setUint32(off + 8,  a.y,          true);
+      ldv.setUint32(off + 12, a.direction,  true);
+      ldv.setInt32 (off + 16, a.type,       true);
+      ldv.setUint32(off + 20, a.matchid,    true);
+      ldv.setUint32(off + 24, a.subplane,   true);
+      ldv.setUint32(off + 28, a.unknown,    true);
+      ldv.setUint32(off + 32, a.securityid, true);
+      off += 36;
+    }
+    ldv.setUint32(off, platforms.length, true); off += 4;
+    ldv.setUint32(off, 0, true); off += 4;
+    for (const p of platforms) {
+      ldv.setInt32(off,      p.x1,    true);
+      ldv.setInt32(off + 4,  p.y1,    true);
+      ldv.setInt32(off + 8,  p.x2,    true);
+      ldv.setInt32(off + 12, p.y2,    true);
+      ldv.setInt32(off + 16, p.type1, true);
+      ldv.setInt32(off + 20, p.type2, true);
+      off += 24;
+    }
+
+    const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
+    const descBytes = new TextEncoder().encode(header.description);
+    const descBuf = new Uint8Array(128);
+    descBuf.set(descBytes.slice(0, 127));
+    const totalSize = 149 + rawMinimap.length + 4 + levelCompressed.length;
+    if (totalSize > 65535) return { ok: false, error: `Map too large: ${totalSize} bytes (max 65535)` };
+
+    const fileBuf = new ArrayBuffer(totalSize);
+    const fdv = new DataView(fileBuf);
+    const fBytes = new Uint8Array(fileBuf);
+
+    fdv.setUint8(0, header.firstbyte);
+    fdv.setUint8(1, header.version);
+    fdv.setUint8(2, header.maxplayers);
+    fdv.setUint8(3, header.maxteams);
+    fdv.setUint16(4, width, false);
+    fdv.setUint16(6, height, false);
+    fdv.setUint8(9, header.parallax);
+    fdv.setInt8(10, header.ambience);
+    fdv.setUint32(13, header.flags, false);
+    fBytes.set(descBuf, 17);
+    fdv.setUint32(145, rawMinimap.length, true);
+    fBytes.set(rawMinimap, 149);
+    const afterMinimap = 149 + rawMinimap.length;
+    fdv.setUint32(afterMinimap, levelCompressed.length, true);
+    fBytes.set(levelCompressed, afterMinimap + 4);
+
+    const name = fileName || 'map.SIL';
+    const headers = {
+      'Content-Type': 'application/octet-stream',
+      'X-Filename': name,
+      'X-Author': author || 'anonymous',
+    };
+    if (apiKey) headers['X-Api-Key'] = apiKey;
+
+    try {
+      const resp = await fetch(`${apiUrl}/api/maps`, {
+        method: 'POST',
+        headers,
+        body: fBytes,
+      });
+      if (!resp.ok) {
+        const txt = await resp.text();
+        return { ok: false, error: `Server error ${resp.status}: ${txt.trim()}` };
+      }
+      const data = await resp.json();
+      return { ok: true, meta: data };
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  }, [mapData]);
+
   return {
-    map: mapData, openMap, saveMap, createMap,
+    map: mapData, openMap, saveMap, publishMap, createMap,
     updateTile, patchTile, beginPaint, commitPaint,
     addPlatform, removePlatform, updatePlatform,
     addActor, removeActor, updateActor, moveActor,

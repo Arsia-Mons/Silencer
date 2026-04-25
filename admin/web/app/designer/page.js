@@ -19,7 +19,7 @@ export default function DesignerPage() {
   const wsConnected = useSocket({});
 
   const { loaded, error, tileImages, spriteImages, tileBankCounts, progress, loadFiles } = useGameData();
-  const { map, openMap, saveMap, createMap, updateTile, patchTile, beginPaint, commitPaint,
+  const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
           updateHeader, updatePlatform,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
@@ -61,6 +61,23 @@ export default function DesignerPage() {
     }
     return { ...v, [key]: !v[key] };
   });
+
+  const defaultMapApiUrl = process.env.NEXT_PUBLIC_MAP_API_URL || '';
+  const [showPublish, setShowPublish] = useState(false);
+  const [pubApiUrl, setPubApiUrl]     = useState(defaultMapApiUrl);
+  const [pubApiKey, setPubApiKey]     = useState('');
+  const [pubAuthor, setPubAuthor]     = useState('');
+  const [pubStatus, setPubStatus]     = useState(null); // { ok, msg }
+
+  const handlePublish = useCallback(async () => {
+    setPubStatus({ ok: null, msg: 'Publishing…' });
+    const result = await publishMap({ author: pubAuthor, apiUrl: pubApiUrl, apiKey: pubApiKey });
+    if (result.ok) {
+      setPubStatus({ ok: true, msg: `✓ Published  sha1: ${result.meta.sha1.slice(0, 8)}…` });
+    } else {
+      setPubStatus({ ok: false, msg: result.error });
+    }
+  }, [publishMap, pubAuthor, pubApiUrl, pubApiKey]);
 
   // Sync resize inputs when map changes
   useEffect(() => {
@@ -314,6 +331,71 @@ export default function DesignerPage() {
             >
               SAVE .SIL
             </button>
+          )}
+
+          {/* Publish */}
+          {map && (
+            <div className="relative">
+              <button
+                onClick={() => { setShowPublish(p => !p); setPubStatus(null); }}
+                className={`px-3 py-1 text-xs font-mono border rounded transition-colors ${showPublish ? 'border-game-primary text-game-primary bg-game-dark' : 'border-game-border text-game-textDim hover:border-game-primary hover:text-game-text'}`}
+              >
+                ⬆ PUBLISH
+              </button>
+              {showPublish && (
+                <div className="absolute top-8 left-0 z-50 bg-game-bgCard border border-game-border rounded p-3 w-72 shadow-lg">
+                  <div className="text-xs font-mono text-game-primary mb-2">Publish to Map Server</div>
+                  <div className="flex flex-col gap-2">
+                    <div>
+                      <label className="text-xs text-game-textDim">Server URL</label>
+                      <input
+                        value={pubApiUrl}
+                        onChange={e => setPubApiUrl(e.target.value)}
+                        placeholder="http://host:15172"
+                        className="w-full mt-1 px-2 py-1 text-xs font-mono bg-game-bg border border-game-border rounded text-game-text focus:outline-none focus:border-game-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-game-textDim">API Key <span className="text-game-textDim opacity-60">(leave blank if none)</span></label>
+                      <input
+                        type="password"
+                        value={pubApiKey}
+                        onChange={e => setPubApiKey(e.target.value)}
+                        className="w-full mt-1 px-2 py-1 text-xs font-mono bg-game-bg border border-game-border rounded text-game-text focus:outline-none focus:border-game-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-game-textDim">Author</label>
+                      <input
+                        value={pubAuthor}
+                        onChange={e => setPubAuthor(e.target.value)}
+                        placeholder="anonymous"
+                        className="w-full mt-1 px-2 py-1 text-xs font-mono bg-game-bg border border-game-border rounded text-game-text focus:outline-none focus:border-game-primary"
+                      />
+                    </div>
+                    {pubStatus && (
+                      <div className={`text-xs font-mono ${pubStatus.ok === true ? 'text-game-primary' : pubStatus.ok === false ? 'text-red-400' : 'text-game-textDim'}`}>
+                        {pubStatus.msg}
+                      </div>
+                    )}
+                    <div className="flex gap-2 mt-1">
+                      <button
+                        onClick={handlePublish}
+                        className="flex-1 px-2 py-1 text-xs font-mono border border-game-primary text-game-primary rounded hover:bg-game-dark transition-colors"
+                      >
+                        Upload
+                      </button>
+                      <button
+                        onClick={() => setShowPublish(false)}
+                        className="px-2 py-1 text-xs font-mono border border-game-border text-game-textDim rounded hover:border-game-primary transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Props */}
