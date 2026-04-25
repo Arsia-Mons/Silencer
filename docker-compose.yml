@@ -70,7 +70,7 @@ services:
 
   admin-api:
     build:
-      context: ./admin/api
+      context: ./services/admin-api
     ports:
       - "24080:24080"
     depends_on:
@@ -93,7 +93,7 @@ services:
 
   admin-web:
     build:
-      context: ./admin/web
+      context: ./web/admin
       args:
         NEXT_PUBLIC_API_URL: "http://${PUBLIC_ADDR:-localhost}:24080"
         NEXT_PUBLIC_WS_URL: "ws://${PUBLIC_ADDR:-localhost}:24080"

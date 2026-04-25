@@ -28,9 +28,9 @@ terraform/**/backend.hcl
 
 # Node.js
 node_modules/
-admin/api/node_modules/
-admin/web/node_modules/
-admin/web/.next/
+services/admin-api/node_modules/
+web/admin/node_modules/
+web/admin/.next/
 
 # Git worktrees (claude-code superpowers)
 .worktrees/
