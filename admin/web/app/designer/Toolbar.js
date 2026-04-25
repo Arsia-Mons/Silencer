@@ -50,7 +50,13 @@ export const ACTOR_TYPE_HINTS = {
   3:  { label: 'Weapon', options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma' } },
   36: { label: 'Agency', options: { 0:'Agency 0', 1:'Agency 1', 2:'Agency 2', 3:'Agency 3' } },
   54: { label: 'Size',   options: { 0:'Small', 1:'Big' } },
-  63: { label: 'Item',   options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma', 5:'Health', 6:'Credits' } },
+  63: { label: 'Item', options: {
+    0:'None', 1:'Secret', 2:'Files', 3:'Laser Ammo', 4:'Rocket Ammo',
+    5:'Flamer Ammo', 6:'EMP Bomb', 7:'Shaped Bomb', 8:'Plasma Bomb',
+    9:'Neutron Bomb', 10:'Fixed Cannon', 11:'Flare', 12:'Camera',
+    13:'Plasma Det', 14:'Health Pack', 15:'Super Shield', 16:'Jet Pack',
+    17:'Hacking', 18:'Radar', 19:'Invisible', 20:'Depositor',
+  } },
   65: { label: 'Side',   options: { 0:'Team A', 1:'Team B' } },
   67: { label: 'Variant', options: {} },
 };
