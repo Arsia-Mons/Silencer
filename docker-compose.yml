@@ -33,7 +33,7 @@ services:
   lobby:
     build:
       context: .
-      dockerfile: server/Dockerfile
+      dockerfile: services/lobby/Dockerfile
     ports:
       - "15170:15170/tcp"
       - "15170:15170/udp"

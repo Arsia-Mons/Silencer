@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 # install-linux-server.sh
 # Run from the repo root on a fresh Ubuntu 22.04+ VM.
-# Installs Docker (if needed) then builds and starts the zSILENCER lobby.
+# Installs Docker (if needed) then builds and starts the Silencer stack
+# (lobby + admin-api + admin-web).
 #
 # Usage:
-#   sudo bash scripts/install-linux-server.sh [PUBLIC_IP]
+#   sudo bash infra/scripts/install-linux-server.sh [PUBLIC_IP]
 #
 # PUBLIC_IP is the IP/hostname clients use to reach this server.
 # If omitted, it is auto-detected from the network interface.
 
 set -euo pipefail
 
-# Must be run from the repo root
-cd "$(dirname "$0")/.."
+# Must be run from the repo root (this script is two levels deep in
+# infra/scripts/, so step up twice)
+cd "$(dirname "$0")/../.."
 
 # Who actually invoked sudo (the real user, not root)
 REAL_USER="${SUDO_USER:-${USER}}"
@@ -24,7 +26,7 @@ if [[ -z "$PUBLIC_ADDR" ]]; then
   echo "==> Auto-detected IP: $PUBLIC_ADDR"
 fi
 
-echo "==> zSILENCER server setup (public addr: $PUBLIC_ADDR)"
+echo "==> Silencer server setup (public addr: $PUBLIC_ADDR)"
 
 # ── 2. Install Docker if missing ─────────────────────────────────────────────
 if ! command -v docker &>/dev/null; then
@@ -66,7 +68,7 @@ echo "==> Starting services..."
 sg docker -c "PUBLIC_ADDR='$PUBLIC_ADDR' docker compose up -d"
 
 echo ""
-echo "✅  zSILENCER is running!"
+echo "✅  Silencer is running!"
 echo "    Lobby:      $PUBLIC_ADDR:15170"
 echo "    Game ports: $PUBLIC_ADDR:20000-20009 (UDP)"
 echo "    Dashboard:  http://$PUBLIC_ADDR:24000  (admin / admin)"

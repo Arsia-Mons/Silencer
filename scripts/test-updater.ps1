@@ -121,7 +121,7 @@ $http = Start-Process -PassThru -NoNewWindow python `
     -ArgumentList "-m","http.server","8000" `
     -WorkingDirectory "$Repo/test-update-host"
 
-Push-Location server
+Push-Location services/lobby
 go build
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw "go build failed" }
 Pop-Location
@@ -132,7 +132,7 @@ Write-Host "=== Starting lobby on :15170 ==="
 # NOT auto-quote array elements, so the space in "Space Command" silently
 # truncates the path to "C:\Users\Space", LoadManifest fails, and the client
 # gets a bare reject + legacy "software is out of date" message.
-$lobby = Start-Process -PassThru -NoNewWindow .\server\zsilencer-lobby.exe `
+$lobby = Start-Process -PassThru -NoNewWindow .\services\lobby\silencer-lobby.exe `
     -ArgumentList "-addr",":15170","-version","$NewVer","-update-manifest","update.json" `
     -WorkingDirectory $Repo
 

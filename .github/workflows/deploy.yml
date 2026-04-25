@@ -68,7 +68,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          cache-dependency-path: server/go.sum
+          cache-dependency-path: services/lobby/go.sum
 
       - name: Install C++ build deps
         uses: awalsh128/cache-apt-pkgs-action@v1
@@ -83,8 +83,8 @@ jobs:
           max-size: 500M
 
       - name: Build lobby server
-        working-directory: server
-        run: go build -trimpath -ldflags '-s -w' -o zsilencer-lobby .
+        working-directory: services/lobby
+        run: go build -trimpath -ldflags '-s -w' -o silencer-lobby .
 
       - name: Build dedicated server (C++ / ARM64)
         env:
@@ -157,7 +157,7 @@ jobs:
           SCP="scp $SSH_OPTS"
 
           $SSH "mkdir -p $STAGING"
-          $SCP server/zsilencer-lobby ubuntu@$HOST:$STAGING/
+          $SCP services/lobby/silencer-lobby ubuntu@$HOST:$STAGING/
           $SCP build/silencer         ubuntu@$HOST:$STAGING/
           $SCP -r shared/assets       ubuntu@$HOST:$STAGING/
 
@@ -173,7 +173,7 @@ jobs:
             sudo mkdir -p /opt/zsilencer/releases
             sudo rm -rf $RELEASE
             sudo mv $STAGING $RELEASE
-            sudo chmod +x $RELEASE/zsilencer-lobby $RELEASE/silencer
+            sudo chmod +x $RELEASE/silencer-lobby $RELEASE/silencer
             if [ -f $RELEASE/update.json ]; then
               sudo mv $RELEASE/update.json /opt/zsilencer/update.json
             fi

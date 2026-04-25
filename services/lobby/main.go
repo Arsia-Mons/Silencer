@@ -17,7 +17,7 @@ func main() {
 	motdPath := flag.String("motd", "", "path to MOTD file; empty = built-in default")
 	version := flag.String("version", "00025", "required client version; empty = accept any")
 	updateManifestPath := flag.String("update-manifest", "update.json", "path to update manifest JSON; missing = no auto-update hints")
-	gameBinary := flag.String("game-binary", "../build/zsilencer", "path to the zsilencer binary (spawned per created game)")
+	gameBinary := flag.String("game-binary", "../build/silencer", "path to the silencer binary (spawned per created game)")
 	publicAddr := flag.String("public-addr", "127.0.0.1", "host or IP clients (and dedicated servers) should use to reach this lobby")
 	gamePortBase := flag.Int("game-port-base", 0, "base UDP port for dedicated servers (0 = OS-assigned random). Game N uses base+(gameID%game-port-count)")
 	gamePortCount := flag.Int("game-port-count", 10, "number of ports in the dedicated-server range")
@@ -40,7 +40,7 @@ func main() {
 		}
 	}
 
-	motd := "Welcome to zSILENCER lobby.\n"
+	motd := "Welcome to Silencer lobby.\n"
 	if *motdPath != "" {
 		b, err := os.ReadFile(*motdPath)
 		if err != nil {
@@ -117,7 +117,7 @@ func main() {
 		os.Exit(0)
 	}()
 
-	log.Printf("zSILENCER lobby on %s (public=%s, binary=%s, version=%q, manifest=%q)", *addr, *publicAddr, *gameBinary, *version, *updateManifestPath)
+	log.Printf("Silencer lobby on %s (public=%s, binary=%s, version=%q, manifest=%q)", *addr, *publicAddr, *gameBinary, *version, *updateManifestPath)
 	for {
 		conn, err := tcpLn.Accept()
 		if err != nil {

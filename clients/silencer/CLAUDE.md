@@ -2,8 +2,7 @@
 
 Multiplayer 2D action game (SDL2/C++14). The same binary runs as the
 local client and, when launched with `-s`, as a headless dedicated
-server spawned by the Go lobby (`services/lobby/`, currently still at
-`server/` until that phase lands).
+server spawned by the Go lobby in `services/lobby/`.
 
 Build with the local `CMakeLists.txt` (`cmake -B build && cmake --build build`)
 — see top-level `README.md` for platform notes and the
@@ -26,7 +25,7 @@ runs simulation; others send inputs and apply deltas. Dedicated mode
 (`-s`) = permanent AUTHORITY with no SDL video/audio. Snapshot ring
 in `oldsnapshots` / `totalsnapshots`. TCP lobby client is
 `lobby.cpp` + `lobbygame.cpp`; wire format is mirrored in
-`server/protocol.go` — changes must land on both sides.
+`services/lobby/protocol.go` — changes must land on both sides.
 
 ## Dedicated-server contract
 
@@ -38,7 +37,7 @@ silencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
 ```
 
 - Parsed in `src/main.cpp` → `src/game.cpp`.
-- Spawned by the Go lobby in `server/proc.go` on each `MSG_NEWGAME`.
+- Spawned by the Go lobby in `services/lobby/proc.go` on each `MSG_NEWGAME`.
 - Skips `SDL_Init(VIDEO)` and audio; RSS ~12 MB.
 - Heartbeats UDP to the lobby: `[0x00][gameid u32][port u16][state u8]`.
   No heartbeat in 30 s → lobby aborts the create.

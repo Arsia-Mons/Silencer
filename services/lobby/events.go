@@ -9,7 +9,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-const exchangeName = "zsilencer.events"
+const exchangeName = "silencer.events"
 
 // EventPublisher publishes lobby events to RabbitMQ.
 // All publishes are fire-and-forget; a dropped connection triggers async reconnect.

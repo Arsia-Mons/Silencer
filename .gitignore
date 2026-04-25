@@ -5,10 +5,10 @@ test-update-host/
 update.json
 .vcpkg/
 lobby.json
-server/zsilencer-lobby
-server/zsilencer-lobby.exe
-server/zsilencer-lobby.exe~
-server/*.tmp
+services/lobby/silencer-lobby
+services/lobby/silencer-lobby.exe
+services/lobby/silencer-lobby.exe~
+services/lobby/*.tmp
 *.o
 *.obj
 *~

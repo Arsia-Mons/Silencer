@@ -6,7 +6,7 @@ import Event from '../db/models/Event.js';
 import MatchStat from '../db/models/MatchStat.js';
 import { handleLobbyEvent, setRabbitMQStatus } from '../ws/index.js';
 
-const EXCHANGE = 'zsilencer.events';
+const EXCHANGE = 'silencer.events';
 const QUEUE    = 'admin-dashboard';
 
 export async function startConsumer() {
