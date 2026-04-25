@@ -15,4 +15,9 @@ std::string FetchMapFromServer(const char * mapname,
                                const unsigned char * sha1hash,
                                const char * apiURL);
 
+// FetchAndSyncServerMaps queries GET /api/maps from the community map server
+// and downloads any maps not already present in level/download/ on disk.
+// Called once when the Create Game screen opens to populate community maps.
+void FetchAndSyncServerMaps(const char * apiURL);
+
 #endif // MAPFETCH_H

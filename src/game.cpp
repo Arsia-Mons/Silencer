@@ -3378,6 +3378,7 @@ Interface * Game::CreateGameCreateInterface(void){
 #else
 	std::vector<std::string> maps;
 	std::vector<std::string> files;
+	FetchAndSyncServerMaps(ZSILENCER_MAP_API_URL);
 	CDResDir();
 	files = ListFiles((GetResDir() + "level").c_str());
 	maps.insert(maps.end(), files.begin(), files.end());

@@ -31,6 +31,49 @@ size_t WriteCallback(void * ptr, size_t sz, size_t nmemb, void * userdata) {
     return incoming;
 }
 
+struct StringBuf {
+    std::string data;
+    static const size_t kLimit = 1024 * 1024; // 1 MB cap for map list JSON
+};
+
+size_t StringWriteCallback(void * ptr, size_t sz, size_t nmemb, void * userdata) {
+    StringBuf * buf = static_cast<StringBuf *>(userdata);
+    size_t incoming = sz * nmemb;
+    if (buf->data.size() + incoming > StringBuf::kLimit) {
+        return 0;
+    }
+    buf->data.append(static_cast<const char *>(ptr), incoming);
+    return incoming;
+}
+
+// Extract the string value of a JSON key from a simple (non-nested) object body.
+std::string JsonStringField(const std::string & obj, const char * key) {
+    std::string pat = std::string("\"") + key + "\":\"";
+    size_t p = obj.find(pat);
+    if (p == std::string::npos) return "";
+    p += pat.size();
+    size_t end = obj.find('"', p);
+    if (end == std::string::npos) return "";
+    return obj.substr(p, end - p);
+}
+
+// Decode a 40-char lowercase/uppercase hex string into 20 bytes.
+bool HexDecode20(const std::string & hex, unsigned char out[20]) {
+    if (hex.size() != 40) return false;
+    for (int i = 0; i < 20; i++) {
+        auto fromHex = [](char c) -> int {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            return -1;
+        };
+        int hi = fromHex(hex[i * 2]), lo = fromHex(hex[i * 2 + 1]);
+        if (hi < 0 || lo < 0) return false;
+        out[i] = (unsigned char)((hi << 4) | lo);
+    }
+    return true;
+}
+
 } // namespace
 
 std::string FetchMapFromServer(const char * mapname,
@@ -109,4 +152,59 @@ std::string FetchMapFromServer(const char * mapname,
     fprintf(stderr, "[mapfetch] downloaded %s (%zu bytes) from %s\n",
             mapname, buf.data.size(), apiURL);
     return path;
+}
+
+void FetchAndSyncServerMaps(const char * apiURL) {
+    std::string url = apiURL;
+    url += "/api/maps";
+
+    StringBuf buf;
+    CURL * curl = curl_easy_init();
+    if (!curl) return;
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, StringWriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buf);
+    curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 3L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "zsilencer/" ZSILENCER_VERSION);
+
+    CURLcode rc = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+
+    if (rc != CURLE_OK) {
+        fprintf(stderr, "[mapfetch] failed to fetch map list from %s: curl=%d\n", apiURL, (int)rc);
+        return;
+    }
+
+    // Parse JSON array: walk each {...} object and extract "name" + "sha1".
+    const std::string & json = buf.data;
+    size_t pos = 0;
+    while (true) {
+        size_t start = json.find('{', pos);
+        if (start == std::string::npos) break;
+        size_t end = json.find('}', start);
+        if (end == std::string::npos) break;
+        pos = end + 1;
+
+        std::string obj    = json.substr(start, end - start + 1);
+        std::string name   = JsonStringField(obj, "name");
+        std::string sha1hex = JsonStringField(obj, "sha1");
+        if (name.empty() || sha1hex.size() != 40) continue;
+
+        // Skip if already present in level/download/.
+        std::string dlpath = GetDataDir() + "level/download/" + name;
+        SDL_RWops * existing = SDL_RWFromFile(dlpath.c_str(), "rb");
+        if (existing) {
+            SDL_RWclose(existing);
+            continue;
+        }
+
+        unsigned char sha1bytes[20];
+        if (!HexDecode20(sha1hex, sha1bytes)) continue;
+
+        FetchMapFromServer(name.c_str(), sha1bytes, apiURL);
+    }
 }
