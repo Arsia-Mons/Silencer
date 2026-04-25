@@ -154,13 +154,13 @@ std::string FetchMapFromServer(const char * mapname,
     return path;
 }
 
-void FetchAndSyncServerMaps(const char * apiURL) {
+static StringBuf FetchMapListJSON(const char * apiURL) {
     std::string url = apiURL;
     url += "/api/maps";
 
     StringBuf buf;
     CURL * curl = curl_easy_init();
-    if (!curl) return;
+    if (!curl) return buf;
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, StringWriteCallback);
@@ -176,10 +176,34 @@ void FetchAndSyncServerMaps(const char * apiURL) {
 
     if (rc != CURLE_OK) {
         fprintf(stderr, "[mapfetch] failed to fetch map list from %s: curl=%d\n", apiURL, (int)rc);
-        return;
+        buf.data.clear();
     }
+    return buf;
+}
 
-    // Parse JSON array: walk each {...} object and extract "name" + "sha1".
+std::vector<std::pair<std::string, std::string>> FetchServerMapList(const char * apiURL) {
+    std::vector<std::pair<std::string, std::string>> result;
+    StringBuf buf = FetchMapListJSON(apiURL);
+    const std::string & json = buf.data;
+    size_t pos = 0;
+    while (true) {
+        size_t start = json.find('{', pos);
+        if (start == std::string::npos) break;
+        size_t end = json.find('}', start);
+        if (end == std::string::npos) break;
+        pos = end + 1;
+        std::string obj     = json.substr(start, end - start + 1);
+        std::string name    = JsonStringField(obj, "name");
+        std::string sha1hex = JsonStringField(obj, "sha1");
+        if (!name.empty() && sha1hex.size() == 40) {
+            result.push_back({name, sha1hex});
+        }
+    }
+    return result;
+}
+
+void FetchAndSyncServerMaps(const char * apiURL) {
+    StringBuf buf = FetchMapListJSON(apiURL);
     const std::string & json = buf.data;
     size_t pos = 0;
     while (true) {

@@ -15,6 +15,10 @@ std::string FetchMapFromServer(const char * mapname,
                                const unsigned char * sha1hash,
                                const char * apiURL);
 
+// FetchServerMapList queries GET /api/maps and returns (name, sha1hex) pairs
+// for all community maps on the server. No files are written to disk.
+std::vector<std::pair<std::string, std::string>> FetchServerMapList(const char * apiURL);
+
 // FetchAndSyncServerMaps queries GET /api/maps from the community map server
 // and downloads any maps not already present in level/download/ on disk.
 // Called once when the Create Game screen opens to populate community maps.
