@@ -37,6 +37,7 @@ export const ACTOR_DEFS = [
   { id: 56, label: 'Inv. Station',    icon: 'IS', color: '#00a328', bank: 89,   frame: 0 },
   { id: 57, label: 'Heal Machine',    icon: 'HM', color: '#22d3ee', bank: 172,  frame: 0 },
   { id: 58, label: 'Secret Return',   icon: 'SR', color: '#a855f7', bank: 152,  frame: 0 },
+  { id: 60, label: 'Camera Focus',   icon: 'CF', color: '#22d3ee', bank: null, frame: 0 },
   { id: 61, label: 'Warper',          icon: 'WP', color: '#a855f7', bank: 85,   frame: 0 },
   { id: 63, label: 'Powerup',         icon: 'PU', color: '#f59e0b', bank: null, frame: 0 }, // dynamic per type
   { id: 64, label: 'Vent',            icon: 'VT', color: '#6b7280', bank: 179,  frame: 0 },
