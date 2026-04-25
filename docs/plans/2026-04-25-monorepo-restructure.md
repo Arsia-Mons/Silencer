@@ -4,11 +4,13 @@
 **Date:** 2026-04-25
 
 > **Naming note:** The product is being rebranded from **zSILENCER** to
-> **Silencer**. This plan uses the new name throughout. Renaming the
-> binary, the Windows solution (`zSILENCER.sln`), the macOS plist, the
-> CMake project, and the on-disk data directory
-> (`~/Library/Application Support/zSILENCER`) is a separate concern from
-> the directory restructure and is tracked in its own follow-up.
+> **Silencer**. This plan uses the new name throughout. Identifier
+> renames (binary, `zSILENCER.sln`, `zSILENCER.xcodeproj`,
+> `zSILENCER-Info.plist`, `CPACK_PACKAGE_NAME`, the macOS data dir
+> `~/Library/Application Support/zSILENCER`, etc.) happen
+> **opportunistically as files are touched** — there is no dedicated
+> rename PR. If a restructure step modifies a file that still says
+> `zSILENCER`, update it in the same change.
 
 ## Goal
 
@@ -90,9 +92,9 @@ silencer/                      # repo root (currently named zSilencer/
 - Root-level `CMakeLists.txt`, `cmake/`, `resources.rc`,
   `vcpkg.json`, `.vcpkg/`, `zSILENCER.xcodeproj`, `zSILENCER-Info.plist`
   — these belong with the C++ client, so they move into
-  `clients/silencer/`. (The `zSILENCER`-prefixed filenames are
-  rebranded to `Silencer` as part of the separate naming follow-up,
-  not this restructure.)
+  `clients/silencer/`. The `zSILENCER`-prefixed filenames get
+  rebranded to `Silencer` as part of the same move, since we're
+  already touching them.
 
 ## Top-Level CLAUDE.md Rules to Add
 
