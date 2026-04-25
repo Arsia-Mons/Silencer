@@ -225,6 +225,30 @@ const ACTOR_INFO = {
   67: { lbl:'WDEF',   color:'#ff3333' }, 70: { lbl:'CRED',   color:'#aaffaa' },
 };
 
+function drawDiagonalCrossStitch(ctx, px, py, pw, ph, strokeColor, zoom) {
+  if (pw < 2 || ph < 2) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(px, py, pw, ph);
+  ctx.clip();
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = Math.max(0.5, 0.75 / zoom);
+  const step = 16;
+  ctx.beginPath();
+  // \ diagonals
+  for (let d = -ph; d <= pw; d += step) {
+    ctx.moveTo(px + d,      py);
+    ctx.lineTo(px + d + ph, py + ph);
+  }
+  // / diagonals
+  for (let d = -ph; d <= pw; d += step) {
+    ctx.moveTo(px + d,      py + ph);
+    ctx.lineTo(px + d + ph, py);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
 // ═══════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════
@@ -636,6 +660,9 @@ function render() {
       mctx.fillStyle=info.fill; mctx.fillRect(px,py,pw,ph);
       mctx.strokeStyle= (pl===state.selPlat) ? '#fff' : info.stroke;
       mctx.strokeRect(px,py,pw,ph);
+      if (pl.type === 'STAIRSUP' || pl.type === 'STAIRSDOWN') {
+        drawDiagonalCrossStitch(mctx, px, py, pw, ph, info.stroke, zoom);
+      }
       if (zoom>=0.5 && pw>10/zoom && ph>6/zoom) {
         mctx.fillStyle=info.stroke;
         mctx.font = `${Math.max(7,9/zoom)}px monospace`;
@@ -649,12 +676,16 @@ function render() {
   if (state.drawing && TOOL_TO_PLAT[state.tool]) {
     const { wx, wy } = state.mouse;
     const dsx=state.drawWX, dsy=state.drawWY;
-    const info = PLAT_INFO[TOOL_TO_PLAT[state.tool]];
+    const platType = TOOL_TO_PLAT[state.tool];
+    const info = PLAT_INFO[platType];
     const px=Math.min(dsx,wx), py=Math.min(dsy,wy);
     const pw=Math.abs(wx-dsx), ph=Math.abs(wy-dsy);
     mctx.fillStyle=info.fill;   mctx.fillRect(px,py,pw,ph);
     mctx.strokeStyle=info.stroke; mctx.lineWidth=2/zoom;
     mctx.strokeRect(px,py,pw,ph);
+    if (platType === 'STAIRSUP' || platType === 'STAIRSDOWN') {
+      drawDiagonalCrossStitch(mctx, px, py, pw, ph, info.stroke, zoom);
+    }
   }
 
   // Actors
