@@ -17,7 +17,7 @@ the code.
 - `protocol.go` — wire format: `[len u8][payload]`, max 255 bytes.
   Reader/writer mirrors the client's `Serializer` (bit-aligned, but
   lobby fields happen to be byte-aligned).
-- `proc.go` — spawns `zsilencer -s <publicAddr> <port> <gameID>
+- `proc.go` — spawns `silencer -s <publicAddr> <port> <gameID>
   <accountID>` per `MSG_NEWGAME`; tracks PIDs; `StopAll()` on shutdown.
 - `udp.go` — decodes heartbeat `[0x00][gameid u32][port u16][state u8]`
   → `hub.OnHeartbeat`.
