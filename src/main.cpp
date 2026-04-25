@@ -111,28 +111,28 @@ void CDResDir(void){
 			}
 		}
 	}
-	// Fallback: look for data/ relative to the executable
+	// Fallback: look for assets/ relative to the executable
 	char exepath[PATH_MAX];
 	uint32_t exesize = PATH_MAX;
 	if(_NSGetExecutablePath(exepath, &exesize) == 0){
 		char *lastslash = strrchr(exepath, '/');
 		if(lastslash) *lastslash = 0;
 		char testpath[PATH_MAX];
-		// Check ../data (build/zsilencer -> data/)
-		snprintf(testpath, PATH_MAX, "%s/../data/PALETTE.BIN", exepath);
+		// Check ../assets (build/zsilencer -> assets/)
+		snprintf(testpath, PATH_MAX, "%s/../assets/PALETTE.BIN", exepath);
 		FILE *f = fopen(testpath, "r");
 		if(f){
 			fclose(f);
-			snprintf(resdir, PATH_MAX, "%s/../data", exepath);
+			snprintf(resdir, PATH_MAX, "%s/../assets", exepath);
 			chdir(resdir);
 			return;
 		}
-		// Check ./data
-		snprintf(testpath, PATH_MAX, "%s/data/PALETTE.BIN", exepath);
+		// Check ./assets
+		snprintf(testpath, PATH_MAX, "%s/assets/PALETTE.BIN", exepath);
 		f = fopen(testpath, "r");
 		if(f){
 			fclose(f);
-			snprintf(resdir, PATH_MAX, "%s/data", exepath);
+			snprintf(resdir, PATH_MAX, "%s/assets", exepath);
 			chdir(resdir);
 			return;
 		}

@@ -80,7 +80,7 @@ Copy-Item build-new/Release/zsilencer.exe $stage/ -Force
 # can actually launch without the system having vcpkg.
 $vcpkgBin = "build-new/vcpkg_installed/x64-windows/bin"
 if (Test-Path $vcpkgBin) { Copy-Item "$vcpkgBin/*.dll" $stage/ -Force }
-Copy-Item -Recurse -Force shared/assets  $stage/data
+Copy-Item -Recurse -Force shared/assets  $stage/assets
 
 New-Item -ItemType Directory -Force -Path test-update-host | Out-Null
 if (Test-Path "test-update-host/$PlatformZip") { Remove-Item "test-update-host/$PlatformZip" }
@@ -101,7 +101,7 @@ New-Item -ItemType Directory -Force -Path $oldInstall | Out-Null
 Copy-Item build-old/Release/zsilencer.exe $oldInstall/ -Force
 $vcpkgBinOld = "build-old/vcpkg_installed/x64-windows/bin"
 if (Test-Path $vcpkgBinOld) { Copy-Item "$vcpkgBinOld/*.dll" $oldInstall/ -Force }
-Copy-Item -Recurse -Force shared/assets  $oldInstall/data
+Copy-Item -Recurse -Force shared/assets  $oldInstall/assets
 
 $manifest = @"
 {

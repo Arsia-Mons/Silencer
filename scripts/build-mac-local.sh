@@ -31,11 +31,11 @@ cmake --build "$BUILD_DIR" --config Release -j"$(sysctl -n hw.ncpu)"
 
 APP="$BUILD_DIR/zsilencer.app"
 if [ -d "$APP" ]; then
-  # Copy game data into the app bundle so it runs without needing to chdir.
-  # Lands at Contents/data/ to match the runtime fallback in main.cpp's
-  # CDResDir (which looks for `../data/` from Contents/MacOS/).
-  echo "==> Copying shared/assets/ into app bundle as Contents/data/"
-  cp -r "$REPO_ROOT/shared/assets" "$APP/Contents/data"
+  # Copy game assets into the app bundle so it runs without needing to chdir.
+  # Lands at Contents/assets/ to match the runtime fallback in main.cpp's
+  # CDResDir (which looks for `../assets/` from Contents/MacOS/).
+  echo "==> Copying shared/assets/ into app bundle as Contents/assets/"
+  cp -r "$REPO_ROOT/shared/assets" "$APP/Contents/assets"
 
   echo ""
   echo "✅  Build complete."

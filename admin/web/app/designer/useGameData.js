@@ -271,7 +271,7 @@ export function useGameData() {
 
       if (!palFile)    throw new Error('PALETTE.BIN not found in selected folder');
       if (!binTilFile) throw new Error('BIN_TIL.DAT not found in selected folder');
-      if (tilFiles.length === 0) throw new Error('No TIL_*.BIN files found — make sure you selected the data/ folder');
+      if (tilFiles.length === 0) throw new Error('No TIL_*.BIN files found — make sure you selected the assets/ folder');
 
       const palBytes    = new Uint8Array(await palFile.arrayBuffer());
       const binTilBytes = new Uint8Array(await binTilFile.arrayBuffer());

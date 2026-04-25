@@ -20,17 +20,17 @@ if(APPLE)
 	set_source_files_properties("${bundle_icon}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 	list(APPEND bundle_extras "${bundle_icon}")
 
-	# Files land at Contents/data/* in the .app — the C++ runtime's
-	# fallback path (`main.cpp` `CDResDir`) looks for `../data/PALETTE.BIN`
+	# Files land at Contents/assets/* in the .app — the C++ runtime's
+	# fallback path (`main.cpp` `CDResDir`) looks for `../assets/PALETTE.BIN`
 	# next to the executable in `Contents/MacOS/`.
-	file(GLOB_RECURSE data_files "${CMAKE_CURRENT_SOURCE_DIR}/shared/assets/*")
-	foreach(f ${data_files})
+	file(GLOB_RECURSE asset_files "${CMAKE_CURRENT_SOURCE_DIR}/shared/assets/*")
+	foreach(f ${asset_files})
 		file(RELATIVE_PATH rel "${CMAKE_CURRENT_SOURCE_DIR}/shared/assets" "${f}")
 		get_filename_component(rel_dir "${rel}" DIRECTORY)
 		if(rel_dir)
-			set_source_files_properties("${f}" PROPERTIES MACOSX_PACKAGE_LOCATION "data/${rel_dir}")
+			set_source_files_properties("${f}" PROPERTIES MACOSX_PACKAGE_LOCATION "assets/${rel_dir}")
 		else()
-			set_source_files_properties("${f}" PROPERTIES MACOSX_PACKAGE_LOCATION "data")
+			set_source_files_properties("${f}" PROPERTIES MACOSX_PACKAGE_LOCATION "assets")
 		endif()
 		list(APPEND bundle_extras "${f}")
 	endforeach()
