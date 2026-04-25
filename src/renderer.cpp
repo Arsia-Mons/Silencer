@@ -744,15 +744,24 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 									break;
 								}
 								char * text = (*it);
+								int row_y = selectbox->y + (line * selectbox->lineheight);
+								bool isdl = (strncmp(text, "[DL] ", 5) == 0);
 								if(i == selectbox->selecteditem){
 									Rect dstrect;
 									dstrect.x = selectbox->x;
-									dstrect.y = selectbox->y + (line * selectbox->lineheight);
+									dstrect.y = row_y;
 									dstrect.w = selectbox->width;
 									dstrect.h = 11;
 									DrawFilledRectangle(surface, dstrect.x, dstrect.y, dstrect.x + dstrect.w, dstrect.y + dstrect.h, 180);
 								}
-								DrawText(surface, selectbox->x, selectbox->y + (line * selectbox->lineheight), text, 133, 6);
+								if(isdl){
+									DrawText(surface, selectbox->x, row_y, text + 5, 133, 6);
+									int bx = selectbox->x + selectbox->width - 18;
+									DrawFilledRectangle(surface, bx, row_y, bx + 16, row_y + 10, 175);
+									DrawText(surface, bx + 2, row_y, "DL", 133, 6);
+								}else{
+									DrawText(surface, selectbox->x, row_y, text, 133, 6);
+								}
 								line++;
 							}
 						}break;

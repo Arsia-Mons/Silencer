@@ -3452,14 +3452,6 @@ Interface * Game::CreateGameCreateInterface(void){
 	gamecreatebutton->SetType(Button::B156x21);
 	gamecreatebutton->uid = 35;
 	strcpy(gamecreatebutton->text, "Create");
-	// Download button — shown only when a server-only [DL] map is selected
-	Button * mapdownloadbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	mapdownloadbutton->SetType(Button::B156x21);
-	mapdownloadbutton->x = 436;
-	mapdownloadbutton->y = 357;
-	mapdownloadbutton->uid = 55;
-	mapdownloadbutton->draw = false;
-	strcpy(mapdownloadbutton->text, "Download Map");
 	gamecreateinterface->AddObject(rightborder->id);
 	gamecreateinterface->AddObject(optionstext->id);
 	gamecreateinterface->AddObject(securitytext->id);
@@ -3475,7 +3467,6 @@ Interface * Game::CreateGameCreateInterface(void){
 	gamecreateinterface->AddObject(selectmaptext->id);
 	gamecreateinterface->AddObject(mapselect->id);
 	gamecreateinterface->AddObject(mapscrollbar->id);
-	gamecreateinterface->AddObject(mapdownloadbutton->id);
 	gamecreateinterface->AddObject(nametext->id);
 	gamecreateinterface->AddObject(nametextinput->id);
 	gamecreateinterface->AddObject(passwordtext->id);
@@ -4510,15 +4501,38 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							}
 							if(selectbox->uid == 4){ // map select
 								int index = selectbox->MouseInside(world, iface->mousex, iface->mousey);
-								// Show/hide Download button based on whether selected item is a server-only map
-								Object * dlbtnobj = iface->GetObjectWithUid(world, 55);
-								if(dlbtnobj){
-									bool isserver = index != -1 && servermaps.count(selectbox->GetItemName(index)) > 0;
-									dlbtnobj->draw = isserver;
-								}
 								if(index != -1){
 									std::string itemname = selectbox->GetItemName(index);
 									bool isserver = servermaps.count(itemname) > 0;
+									if(iface->mousedown && isserver && iface->mousex >= selectbox->x + selectbox->width - 18){
+										const std::string & hex = servermaps[itemname];
+										unsigned char sha1bytes[20] = {};
+										bool ok = hex.size() == 40;
+										for(int j = 0; ok && j < 20; j++){
+											auto hv = [](char c) -> int {
+												if(c >= '0' && c <= '9') return c - '0';
+												if(c >= 'a' && c <= 'f') return c - 'a' + 10;
+												if(c >= 'A' && c <= 'F') return c - 'A' + 10;
+												return -1;
+											};
+											int hi = hv(hex[2*j]), lo = hv(hex[2*j+1]);
+											if(hi < 0 || lo < 0){ ok = false; break; }
+											sha1bytes[j] = (unsigned char)((hi << 4) | lo);
+										}
+										if(ok){
+											std::string dlname = itemname.substr(5);
+											std::string result = FetchMapFromServer(dlname.c_str(), sha1bytes, ZSILENCER_MAP_API_URL);
+											if(!result.empty()){
+												servermaps.erase(itemname);
+												Interface * old_create = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
+												if(old_create) old_create->DestroyInterface(world);
+												gamecreateinterface = CreateGameCreateInterface()->id;
+												return false;
+											}else{
+												CreateModalDialog("Download failed");
+											}
+										}
+									}
 									if(index != selectedmap){
 										if(mappreviewinterface){
 											Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
@@ -5060,51 +5074,6 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 									}
 								}
 							}break;
-							case 55:{ // download community map
-							if(gamecreateinterface){
-								Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-								if(gamecreateiface){
-									Object * tobject = gamecreateiface->GetObjectWithUid(world, 4);
-									if(tobject){
-										SelectBox * selectbox = static_cast<SelectBox *>(tobject);
-										if(selectbox->selecteditem >= 0){
-											std::string mapname = selectbox->GetItemName(selectbox->selecteditem);
-											auto it = servermaps.find(mapname);
-											if(it != servermaps.end()){
-												const std::string & hex = it->second;
-												unsigned char sha1bytes[20] = {};
-												bool ok = hex.size() == 40;
-												for(int i = 0; ok && i < 20; i++){
-													auto hv = [](char c) -> int {
-														if(c >= '0' && c <= '9') return c - '0';
-														if(c >= 'a' && c <= 'f') return c - 'a' + 10;
-														if(c >= 'A' && c <= 'F') return c - 'A' + 10;
-														return -1;
-													};
-													int hi = hv(hex[2*i]), lo = hv(hex[2*i+1]);
-													if(hi < 0 || lo < 0){ ok = false; break; }
-													sha1bytes[i] = (unsigned char)((hi << 4) | lo);
-												}
-												if(ok){
-													std::string result = FetchMapFromServer(mapname.c_str(), sha1bytes, ZSILENCER_MAP_API_URL);
-													if(!result.empty()){
-														servermaps.erase(mapname);
-														// Refresh the Create Game interface so the downloaded map appears locally
-														Interface * old_iface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-														if(old_iface) old_iface->DestroyInterface(world);
-														gamecreateinterface = CreateGameCreateInterface()->id;
-													}else{
-														CreateModalDialog("Download failed");
-													}
-												}else{
-													CreateModalDialog("Invalid map hash");
-												}
-											}
-										}
-									}
-								}
-							}
-						}break;
 						case 50: // modal ok button pressed
 								if(modalinterface){
 									Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
