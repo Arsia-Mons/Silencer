@@ -10,16 +10,20 @@ export const TOOLS = [
   { id: 'STAIRSDOWN',     label: 'STAIRS↓',   icon: '↘' },
   { id: 'LADDER',         label: 'LADDER',     icon: '⌇' },
   { id: 'TRACK',          label: 'TRACK',      icon: '⟺' },
+  { id: 'OUTSIDEROOM',    label: 'RAIN',       icon: '🌧' },
+  { id: 'SPECIFICROOM',   label: 'ROOM',       icon: '▣' },
   { id: 'ERASE_PLATFORM', label: 'ERASE PLT',  icon: '✕' },
   { id: 'ACTOR',          label: 'ACTOR',      icon: '☻' },
 ];
 
 export const PLATFORM_TOOL_TYPES = {
-  RECT:       { type1: 0, type2: 0, typeName: 'RECTANGLE' },
-  STAIRSUP:   { type1: 0, type2: 1, typeName: 'STAIRSUP' },
-  STAIRSDOWN: { type1: 0, type2: 2, typeName: 'STAIRSDOWN' },
-  LADDER:     { type1: 1, type2: 0, typeName: 'LADDER' },
-  TRACK:      { type1: 2, type2: 0, typeName: 'TRACK' },
+  RECT:         { type1: 0, type2: 0, typeName: 'RECTANGLE' },
+  STAIRSUP:     { type1: 0, type2: 1, typeName: 'STAIRSUP' },
+  STAIRSDOWN:   { type1: 0, type2: 2, typeName: 'STAIRSDOWN' },
+  LADDER:       { type1: 1, type2: 0, typeName: 'LADDER' },
+  TRACK:        { type1: 2, type2: 0, typeName: 'TRACK' },
+  OUTSIDEROOM:  { type1: 3, type2: 0, typeName: 'OUTSIDEROOM' },
+  SPECIFICROOM: { type1: 3, type2: 1, typeName: 'SPECIFICROOM' },
 };
 
 // bank: sprite bank number, frame: sprite frame index
@@ -73,7 +77,7 @@ export const ACTOR_TYPE_HINTS = {
 
 export default function Toolbar({ activeTool, onToolChange, activeLayer, onLayerChange, selectedActor, onActorChange, lumMode, onLumModeChange, eraseLayerType, onEraseLayerTypeChange }) {
   const tileTools = TOOLS.filter(t => ['TILE_BG', 'TILE_FG', 'ERASE_TILE'].includes(t.id));
-  const platformTools = TOOLS.filter(t => ['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','ERASE_PLATFORM'].includes(t.id));
+  const platformTools = TOOLS.filter(t => ['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM','ERASE_PLATFORM'].includes(t.id));
   const otherTools = TOOLS.filter(t => ['SELECT','ACTOR'].includes(t.id));
 
   const btnCls = (id) =>
