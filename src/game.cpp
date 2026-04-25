@@ -4503,14 +4503,20 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								// Poll async download completion each frame
 								if(!dlitemname.empty()){
 									int res = dlresult.load();
-									if(res == 1){ // success
+									if(res == 1){ // success — rebuild interface the same way the Create button does
 										selectbox->downloadprogress = -1;
 										selectbox->downloaditem[0] = '\0';
 										servermaps.erase(dlitemname);
 										dlitemname.clear();
+										Interface * parentIface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
 										Interface * old_create = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-										if(old_create) old_create->DestroyInterface(world);
+										if(old_create && parentIface) old_create->DestroyInterface(world, parentIface);
 										gamecreateinterface = CreateGameCreateInterface()->id;
+										if(parentIface){
+											parentIface->AddObject(gamecreateinterface);
+											parentIface->activeobject = gamecreateinterface;
+											parentIface->ActiveChanged(world, parentIface, false);
+										}
 										return false;
 									}else if(res == -1){ // failed
 										selectbox->downloadprogress = -1;
