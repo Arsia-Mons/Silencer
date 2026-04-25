@@ -67,6 +67,7 @@ SDL2, SDL2_mixer, and ZLIB are required to run the game.
 
 Documentation
 -------------
+- [Changelog](CHANGELOG.md) — release notes and feature history
 - [Developer Guide](CLAUDE.md) — project layout, build commands, dedicated-server contract, gotchas
 - [Production Setup](docs/production.md) — stand up your own lobby on AWS: Terraform, CI wiring, day-2 ops, failure modes
 - [Lobby Server](server/README.md) — self-hosted lobby server (Go): build, run, protocol, deployment
