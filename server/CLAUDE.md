@@ -32,3 +32,17 @@ storage notes) are in `README.md`; this file is for editing the code.
   not create game" dialog (`src/game.cpp:824`). Don't reuse.
 - **Don't hold `h.mu` across network I/O.** Copy state under lock,
   send outside.
+
+## Storage
+
+`lobby.json` is source of truth — flat file, atomic writes
+(temp + rename), SHA-1 password hashes. When `MONGO_URL` is set,
+`mongosync.go` async-mirrors every mutation to MongoDB so the admin
+dashboard sees up-to-date data. Password hashes are never synced.
+Mongo is a mirror, not a backup — if it diverges, `lobby.json` wins.
+
+## Gotchas
+
+- **Port 517 needs root on macOS/Linux.** For local dev, run on
+  `:15170` and rebuild the client with
+  `-DZSILENCER_LOBBY_PORT=15170` (see `src/CLAUDE.md` gotchas).
