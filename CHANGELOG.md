@@ -2,7 +2,7 @@
 
 All notable changes to zSILENCER are documented here.
 
-## [Unreleased] — post-v00024
+## [v00025] — 2026-04-25
 
 ### Game client / dedicated server
 
