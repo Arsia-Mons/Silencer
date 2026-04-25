@@ -5,10 +5,10 @@ test-update-host/
 update.json
 .vcpkg/
 lobby.json
-server/zsilencer-lobby
-server/zsilencer-lobby.exe
-server/zsilencer-lobby.exe~
-server/*.tmp
+services/lobby/silencer-lobby
+services/lobby/silencer-lobby.exe
+services/lobby/silencer-lobby.exe~
+services/lobby/*.tmp
 *.o
 *.obj
 *~
@@ -28,9 +28,12 @@ terraform/**/backend.hcl
 
 # Node.js
 node_modules/
-admin/api/node_modules/
-admin/web/node_modules/
-admin/web/.next/
+services/admin-api/node_modules/
+web/admin/node_modules/
+web/admin/.next/
+
+# Git worktrees (claude-code superpowers)
+.worktrees/
 
 # Git worktrees (claude-code superpowers)
 .worktrees/

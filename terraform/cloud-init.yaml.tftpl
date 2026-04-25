@@ -1,5 +1,5 @@
 #cloud-config
-# Bootstraps the zSILENCER lobby host:
+# Bootstraps the Silencer lobby host:
 #   - creates service user
 #   - formats + mounts the data EBS volume at /var/lib/<project>
 #   - installs a systemd unit that runs the lobby binary with CAP_NET_BIND_SERVICE
@@ -38,7 +38,7 @@ write_files:
     permissions: '0644'
     content: |
       [Unit]
-      Description=zSILENCER lobby server
+      Description=Silencer lobby server
       After=network-online.target var-lib-${project_name}.mount
       Wants=network-online.target
       Requires=var-lib-${project_name}.mount
@@ -52,11 +52,11 @@ write_files:
       # Point HOME at the data volume so writes land inside ReadWritePaths
       # instead of /home/${project_name} (blocked by ProtectHome=true).
       Environment=HOME=/var/lib/${project_name}
-      ExecStart=/opt/${project_name}/current/zsilencer-lobby \
+      ExecStart=/opt/${project_name}/current/silencer-lobby \
         -addr :517 \
         -db /var/lib/${project_name}/lobby.json \
         -public-addr ${public_hostname} \
-        -game-binary /opt/${project_name}/current/zsilencer \
+        -game-binary /opt/${project_name}/current/silencer \
         -version "${lobby_version}"
       Restart=always
       RestartSec=2

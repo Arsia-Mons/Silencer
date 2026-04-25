@@ -7,7 +7,7 @@ $ErrorActionPreference = "Stop"
 $Repo = (Resolve-Path "$PSScriptRoot\..").Path
 Set-Location $Repo
 
-$PlatformZip = "zsilencer-windows-x64.zip"
+$PlatformZip = "silencer-windows-x64.zip"
 
 # Resolve vcpkg toolchain. Prefer an existing install; bootstrap a repo-local
 # one into .vcpkg/ if the user has none. Mirrors release.yml so the test
@@ -53,13 +53,13 @@ function Invoke-CMakeConfigure {
     # Quote every -D value. PowerShell fragments unquoted `127.0.0.1` into
     # `-D...=127` plus a stray `.0.0.1` positional arg, which cmake then warns
     # about and silently drops — leaving LOBBY_HOST baked in as "127".
-    cmake -B $BuildDir -S . @fresh `
+    cmake -B $BuildDir -S clients/silencer @fresh `
         -A x64 `
         "-DCMAKE_TOOLCHAIN_FILE=$Toolchain" `
         "-DVCPKG_TARGET_TRIPLET=x64-windows" `
-        "-DZSILENCER_VERSION=$Version" `
-        "-DZSILENCER_LOBBY_HOST=127.0.0.1" `
-        "-DZSILENCER_LOBBY_PORT=15170"
+        "-DSILENCER_VERSION=$Version" `
+        "-DSILENCER_LOBBY_HOST=127.0.0.1" `
+        "-DSILENCER_LOBBY_PORT=15170"
     if ($LASTEXITCODE -ne 0) { throw "cmake configure ($BuildDir) failed" }
     cmake --build $BuildDir --config Release -j
     if ($LASTEXITCODE -ne 0) { throw "cmake build ($BuildDir) failed" }
@@ -68,19 +68,19 @@ function Invoke-CMakeConfigure {
 Write-Host "=== Building NEW version ($NewVer) ===" -ForegroundColor Cyan
 Invoke-CMakeConfigure -BuildDir "build-new" -Version $NewVer
 
-# Stage files under a `zsilencer/` wrapper dir and zip that dir, matching
-# release.yml's `Compress-Archive -Path "build/package/zsilencer"` layout.
+# Stage files under a `silencer/` wrapper dir and zip that dir, matching
+# release.yml's `Compress-Archive -Path "build/package/silencer"` layout.
 # Stage-2 detects the single-top-dir wrapper and hoists its contents into
 # the install path during the atomic swap.
-$stage = "build-new/package/zsilencer"
+$stage = "build-new/package/silencer"
 if (Test-Path "build-new/package") { Remove-Item -Recurse -Force "build-new/package" }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
-Copy-Item build-new/Release/zsilencer.exe $stage/ -Force
+Copy-Item build-new/Release/Silencer.exe $stage/ -Force
 # Ship the same vcpkg runtime DLLs production does, so the unzipped install
 # can actually launch without the system having vcpkg.
 $vcpkgBin = "build-new/vcpkg_installed/x64-windows/bin"
 if (Test-Path $vcpkgBin) { Copy-Item "$vcpkgBin/*.dll" $stage/ -Force }
-Copy-Item -Recurse -Force data           $stage/
+Copy-Item -Recurse -Force shared/assets  $stage/assets
 
 New-Item -ItemType Directory -Force -Path test-update-host | Out-Null
 if (Test-Path "test-update-host/$PlatformZip") { Remove-Item "test-update-host/$PlatformZip" }
@@ -93,15 +93,15 @@ Write-Host "=== Building OLD version ($OldVer) ===" -ForegroundColor Cyan
 Invoke-CMakeConfigure -BuildDir "build-old" -Version $OldVer
 
 # Stage the OLD install the same way production ships it, so the install
-# parent directory actually has a `zsilencer/` dir that stage-2 can
-# rename to `zsilencer.old` and replace atomically.
-$oldInstall = "build-old/install/zsilencer"
+# parent directory actually has a `silencer/` dir that stage-2 can
+# rename to `silencer.old` and replace atomically.
+$oldInstall = "build-old/install/silencer"
 if (Test-Path "build-old/install") { Remove-Item -Recurse -Force "build-old/install" }
 New-Item -ItemType Directory -Force -Path $oldInstall | Out-Null
-Copy-Item build-old/Release/zsilencer.exe $oldInstall/ -Force
+Copy-Item build-old/Release/Silencer.exe $oldInstall/ -Force
 $vcpkgBinOld = "build-old/vcpkg_installed/x64-windows/bin"
 if (Test-Path $vcpkgBinOld) { Copy-Item "$vcpkgBinOld/*.dll" $oldInstall/ -Force }
-Copy-Item -Recurse -Force data           $oldInstall/
+Copy-Item -Recurse -Force shared/assets  $oldInstall/assets
 
 $manifest = @"
 {
@@ -121,7 +121,7 @@ $http = Start-Process -PassThru -NoNewWindow python `
     -ArgumentList "-m","http.server","8000" `
     -WorkingDirectory "$Repo/test-update-host"
 
-Push-Location server
+Push-Location services/lobby
 go build
 if ($LASTEXITCODE -ne 0) { Pop-Location; throw "go build failed" }
 Pop-Location
@@ -132,18 +132,18 @@ Write-Host "=== Starting lobby on :15170 ==="
 # NOT auto-quote array elements, so the space in "Space Command" silently
 # truncates the path to "C:\Users\Space", LoadManifest fails, and the client
 # gets a bare reject + legacy "software is out of date" message.
-$lobby = Start-Process -PassThru -NoNewWindow .\server\zsilencer-lobby.exe `
+$lobby = Start-Process -PassThru -NoNewWindow .\services\lobby\silencer-lobby.exe `
     -ArgumentList "-addr",":15170","-version","$NewVer","-update-manifest","update.json" `
     -WorkingDirectory $Repo
 
 Start-Sleep -Seconds 1
 Write-Host "=== Launching OLD client — expect update modal ===" -ForegroundColor Cyan
 try {
-    # Start-Process -Wait because zsilencer.exe is built WIN32 subsystem;
+    # Start-Process -Wait because Silencer.exe is built WIN32 subsystem;
     # PowerShell's `&` call operator returns immediately for GUI apps,
     # which would drop us straight into `finally` and kill the servers
     # before the client even gets past the lobby handshake.
-    Start-Process -FilePath ".\$oldInstall\zsilencer.exe" -Wait
+    Start-Process -FilePath ".\$oldInstall\Silencer.exe" -Wait
 } finally {
     Stop-Process -Id $http.Id -ErrorAction SilentlyContinue
     Stop-Process -Id $lobby.Id -ErrorAction SilentlyContinue

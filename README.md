@@ -1,5 +1,5 @@
-zSilencer
-=========
+Silencer
+========
 
 Quick Start (Linux server)
 --------------------------
@@ -9,7 +9,7 @@ Docker and bring up the lobby, admin API, and admin dashboard:
 ```bash
 git clone https://github.com/Arsia-Mons/Silencer.git
 cd Silencer
-sudo bash scripts/install-linux-server.sh [PUBLIC_IP]
+sudo bash infra/scripts/install-linux-server.sh [PUBLIC_IP]
 ```
 
 If `PUBLIC_IP` is omitted it is auto-detected. Once complete:
@@ -41,25 +41,29 @@ command:
 
 Compiling on Linux
 ------------------
-`mkdir build`
-
-`cd build`
-
-`cmake ..`
-
-`make`
-
-`sudo make install`
+```bash
+cmake -B build -S clients/silencer
+cmake --build build -j
+sudo cmake --install build
+```
 
 Compiling on Windows
 --------------------
-SDL2 and SDL2_mixer development libraries will have to be installed into the Visual Studio include and lib directories  
-Open zSILENCER.sln Visual Studio Project  
-Compile project using Visual Studio  
+SDL2 and SDL2_mixer development libraries will have to be installed (vcpkg
+manifest mode picks them up automatically when configured with the vcpkg
+toolchain — see `clients/silencer/vcpkg.json`). Configure with:
+
+```pwsh
+cmake -B build -S clients/silencer -A x64 `
+  -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+  -DVCPKG_TARGET_TRIPLET=x64-windows
+cmake --build build --config Release
+```
 
 Supported platforms
 -------------------
-The game is supported on Windows, Mac OS X, and Linux.  Other platforms, such as Android, work but are not fully tested.
+The game is supported on Windows, Mac OS X, and Linux. Other platforms,
+such as Android, work but are not fully tested.
 
 Running game
 ------------
@@ -70,6 +74,6 @@ Documentation
 - [Changelog](CHANGELOG.md) — release notes and feature history
 - [Developer Guide](CLAUDE.md) — project layout, build commands, dedicated-server contract, gotchas
 - [Production Setup](docs/production.md) — stand up your own lobby on AWS: Terraform, CI wiring, day-2 ops, failure modes
-- [Lobby Server](server/README.md) — self-hosted lobby server (Go): build, run, protocol, deployment
-- [Admin API](admin/api/README.md) — Express.js REST + WebSocket API powering the admin dashboard
-- [Admin Web](admin/web/README.md) — Next.js admin dashboard and player self-service portal
+- [Lobby Server](services/lobby/README.md) — self-hosted lobby server (Go): build, run, protocol, deployment
+- [Admin API](services/admin-api/README.md) — Express.js REST + WebSocket API powering the admin dashboard
+- [Admin Web](web/admin/README.md) — Next.js admin dashboard and player self-service portal

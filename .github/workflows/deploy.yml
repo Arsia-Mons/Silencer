@@ -68,7 +68,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-          cache-dependency-path: server/go.sum
+          cache-dependency-path: services/lobby/go.sum
 
       - name: Install C++ build deps
         uses: awalsh128/cache-apt-pkgs-action@v1
@@ -83,8 +83,8 @@ jobs:
           max-size: 500M
 
       - name: Build lobby server
-        working-directory: server
-        run: go build -trimpath -ldflags '-s -w' -o zsilencer-lobby .
+        working-directory: services/lobby
+        run: go build -trimpath -ldflags '-s -w' -o silencer-lobby .
 
       - name: Build dedicated server (C++ / ARM64)
         env:
@@ -94,7 +94,8 @@ jobs:
           cmake \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DZSILENCER_LOBBY_HOST="${LOBBY_HOST:-silencer.hventura.com}" ..
+            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-silencer.hventura.com}" \
+            ../clients/silencer
           make -j"$(nproc)"
 
       - name: Build update.json from release artifacts
@@ -108,24 +109,24 @@ jobs:
           cd manifest-staging
           gh release download "$TAG" \
             -R "${{ github.repository }}" \
-            -p "zsilencer-macos-arm64.zip" \
-            -p "zsilencer-windows-x64.zip"
+            -p "silencer-macos-arm64.zip" \
+            -p "silencer-windows-x64.zip"
 
-          MAC_SHA=$(shasum -a 256 zsilencer-macos-arm64.zip | awk '{print $1}')
-          WIN_SHA=$(shasum -a 256 zsilencer-windows-x64.zip | awk '{print $1}')
+          MAC_SHA=$(shasum -a 256 silencer-macos-arm64.zip | awk '{print $1}')
+          WIN_SHA=$(shasum -a 256 silencer-windows-x64.zip | awk '{print $1}')
 
           BASE="https://github.com/${{ github.repository }}/releases/download/${TAG}"
           cat > update.json <<EOF
           {
             "version":        "${TAG#v}",
-            "macos_url":      "${BASE}/zsilencer-macos-arm64.zip",
+            "macos_url":      "${BASE}/silencer-macos-arm64.zip",
             "macos_sha256":   "${MAC_SHA}",
-            "windows_url":    "${BASE}/zsilencer-windows-x64.zip",
+            "windows_url":    "${BASE}/silencer-windows-x64.zip",
             "windows_sha256": "${WIN_SHA}"
           }
           EOF
           cat update.json
-          rm zsilencer-macos-arm64.zip zsilencer-windows-x64.zip
+          rm silencer-macos-arm64.zip silencer-windows-x64.zip
 
       - name: Tailscale
         run: |
@@ -156,9 +157,9 @@ jobs:
           SCP="scp $SSH_OPTS"
 
           $SSH "mkdir -p $STAGING"
-          $SCP server/zsilencer-lobby ubuntu@$HOST:$STAGING/
-          $SCP build/zsilencer        ubuntu@$HOST:$STAGING/
-          $SCP -r data                ubuntu@$HOST:$STAGING/
+          $SCP services/lobby/silencer-lobby ubuntu@$HOST:$STAGING/
+          $SCP build/silencer         ubuntu@$HOST:$STAGING/
+          $SCP -r shared/assets       ubuntu@$HOST:$STAGING/
 
           if [[ "$UPDATE_MANIFEST" == "true" ]]; then
             $SCP manifest-staging/update.json ubuntu@$HOST:$STAGING/update.json
@@ -172,12 +173,12 @@ jobs:
             sudo mkdir -p /opt/zsilencer/releases
             sudo rm -rf $RELEASE
             sudo mv $STAGING $RELEASE
-            sudo chmod +x $RELEASE/zsilencer-lobby $RELEASE/zsilencer
+            sudo chmod +x $RELEASE/silencer-lobby $RELEASE/silencer
             if [ -f $RELEASE/update.json ]; then
               sudo mv $RELEASE/update.json /opt/zsilencer/update.json
             fi
             sudo ln -sfn $RELEASE /opt/zsilencer/current
-            sudo ln -sfn /opt/zsilencer/current/data /usr/local/share/zsilencer
+            sudo ln -sfn /opt/zsilencer/current/assets /usr/local/share/silencer
             sudo systemctl restart zsilencer-lobby
             sleep 2
             sudo systemctl is-active zsilencer-lobby

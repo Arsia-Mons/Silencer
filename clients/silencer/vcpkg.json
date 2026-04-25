@@ -1,0 +1,15 @@
+{
+	"name": "silencer",
+	"version-string": "0.0.0",
+	"description": "Silencer multiplayer client build dependencies",
+	"dependencies": [
+		"sdl2",
+		{
+			"name": "sdl2-mixer",
+			"features": ["mpg123", "libmodplug"]
+		},
+		"zlib",
+		"curl",
+		"minizip"
+	]
+}
