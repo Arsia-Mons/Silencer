@@ -60,4 +60,4 @@ Mongo is a mirror, not a backup — if it diverges, `lobby.json` wins.
 
 - **Port 517 needs root on macOS/Linux.** For local dev, run on
   `:15170` and rebuild the client with
-  `-DZSILENCER_LOBBY_PORT=15170` (see `src/CLAUDE.md` gotchas).
+  `-DSILENCER_LOBBY_PORT=15170` (see `clients/silencer/CLAUDE.md` gotchas).
