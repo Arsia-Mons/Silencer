@@ -22,8 +22,10 @@ if(APPLE)
 
 	# Files land at Contents/assets/* in the .app — the C++ runtime's
 	# fallback path (`main.cpp` `CDResDir`) looks for `../assets/PALETTE.BIN`
-	# next to the executable in `Contents/MacOS/`.
+	# next to the executable in `Contents/MacOS/`. Engineer-facing docs
+	# (CLAUDE.md, AGENTS.md) live in shared/assets/ but don't ship.
 	file(GLOB_RECURSE asset_files "${CMAKE_CURRENT_SOURCE_DIR}/shared/assets/*")
+	list(FILTER asset_files EXCLUDE REGEX "/(CLAUDE|AGENTS)[.]md$")
 	foreach(f ${asset_files})
 		file(RELATIVE_PATH rel "${CMAKE_CURRENT_SOURCE_DIR}/shared/assets" "${f}")
 		get_filename_component(rel_dir "${rel}" DIRECTORY)
