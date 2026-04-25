@@ -14,16 +14,29 @@ sudo bash scripts/install-linux-server.sh [PUBLIC_IP]
 
 If `PUBLIC_IP` is omitted it is auto-detected. Once complete:
 
-| Service      | Address                          |
-|--------------|----------------------------------|
-| Lobby        | `<ip>:15170`                   |
-| Admin UI     | `http://<ip>:24000` (admin / admin) |
-| Admin API    | `http://<ip>:24080`            |
-| Game ports   | `<ip>:20000-20009` (UDP)       |
+| Service      | Address                                        |
+|--------------|------------------------------------------------|
+| Lobby        | `<ip>:15170`                                 |
+| Admin UI     | `http://<ip>:24000` (admin / admin)          |
+| Admin API    | `http://<ip>:24080`                          |
+| Game ports   | `<ip>:20000-20199` (UDP, up to 200 concurrent games) |
 
 ```bash
 docker compose logs -f   # tail logs
 docker compose down      # stop everything
+```
+
+To change the concurrent game limit, update two values in `docker-compose.yml`
+and restart:
+
+```yaml
+ports:
+  - "20000-20199:20000-20199/udp"   # match game-port-count
+command:
+  - "-game-port-base"
+  - "20000"
+  - "-game-port-count"
+  - "200"                           # one UDP port per concurrent game
 ```
 
 Compiling on Linux
