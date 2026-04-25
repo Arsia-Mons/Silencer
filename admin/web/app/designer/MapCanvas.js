@@ -29,7 +29,7 @@ function getActorDef(id) {
 }
 
 export default function MapCanvas({
-  map, tileImages, spriteImages, activeTool, activeLayer, selectedTileId,
+  map, tileImages, spriteImages, vis, activeTool, activeLayer, selectedTileId,
   zoom, pan, onZoomChange, onPanChange,
   onTilePaint, onPlatformDraw, onPlatformRemove, onActorPlace, onActorRemove, onActorRightClick,
   onBeginPaint, onCommitPaint,
@@ -98,7 +98,7 @@ export default function MapCanvas({
     // Ambient darkness from map header: ambiencelevel = 128 + ambience*4.5
     const ambience = map.header?.ambience ?? 0;
     const ambiencelevel = Math.max(0, Math.min(255, 128 + ambience * 4.5));
-    const darkAlpha = Math.max(0, 1 - ambiencelevel / 128); // e.g. ~0.42-0.55
+    const darkAlpha = vis?.lighting !== false ? Math.max(0, 1 - ambiencelevel / 128) : 0;
 
     // Draw a single tile (no filter — fast)
     function blitTile(tile_id, flip, col, row) {
@@ -124,6 +124,7 @@ export default function MapCanvas({
 
     // Pass 1: draw ALL tiles at full brightness (no filter per tile)
     for (let l = 0; l < 4; l++) {
+      if (vis?.bg?.[l] === false) continue;
       for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
           const cell = layers.bg[l][row * width + col];
@@ -132,6 +133,7 @@ export default function MapCanvas({
       }
     }
     for (let l = 0; l < 4; l++) {
+      if (vis?.fg?.[l] === false) continue;
       for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
           const cell = layers.fg[l][row * width + col];
@@ -148,6 +150,7 @@ export default function MapCanvas({
 
     // Pass 3: redraw LUM tiles on top of the overlay (they appear bright)
     for (let l = 0; l < 4; l++) {
+      if (vis?.bg?.[l] === false) continue;
       for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
           const cell = layers.bg[l][row * width + col];
@@ -156,6 +159,7 @@ export default function MapCanvas({
       }
     }
     for (let l = 0; l < 4; l++) {
+      if (vis?.fg?.[l] === false) continue;
       for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
           const cell = layers.fg[l][row * width + col];
@@ -165,7 +169,7 @@ export default function MapCanvas({
     }
 
     // Grid overlay when zoomed in enough
-    if (zoom >= 0.25) {
+    if (vis?.grid !== false && zoom >= 0.25) {
       ctx.strokeStyle = 'rgba(26,46,26,0.4)';
       ctx.lineWidth = 0.5;
       const startCol = Math.max(0, Math.floor(-pan.x / tileSize));
@@ -220,16 +224,18 @@ export default function MapCanvas({
       if (dashed) ctx.setLineDash([]);
     }
 
-    for (const p of platforms) {
-      const typeName = platformTypeName(p.type1, p.type2);
-      const cx1 = p.x1 * zoom + pan.x;
-      const cy1 = p.y1 * zoom + pan.y;
-      const cx2 = p.x2 * zoom + pan.x;
-      const cy2 = p.y2 * zoom + pan.y;
-      drawPlatform(cx1, cy1, cx2, cy2, typeName, false);
+    if (vis?.platforms !== false) {
+      for (const p of platforms) {
+        const typeName = platformTypeName(p.type1, p.type2);
+        const cx1 = p.x1 * zoom + pan.x;
+        const cy1 = p.y1 * zoom + pan.y;
+        const cx2 = p.x2 * zoom + pan.x;
+        const cy2 = p.y2 * zoom + pan.y;
+        drawPlatform(cx1, cy1, cx2, cy2, typeName, false);
+      }
     }
 
-    // Drag platform preview
+    // Drag platform preview (always show)
     if (dragPlatform) {
       const { wx1, wy1, wx2, wy2, typeName } = dragPlatform;
       const cx1 = wx1 * zoom + pan.x;
@@ -240,51 +246,52 @@ export default function MapCanvas({
     }
 
     // Actor icons
-    ctx.font = 'bold 9px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    for (const a of actors) {
-      const def = getActorDef(a.id);
-      const cx = a.x * zoom + pan.x;
-      const cy = a.y * zoom + pan.y;
+    if (vis?.actors !== false) {
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (const a of actors) {
+        const def = getActorDef(a.id);
+        const cx = a.x * zoom + pan.x;
+        const cy = a.y * zoom + pan.y;
 
-      // Dynamic bank for actors where it depends on actor.type (e.g., terminal)
-      let bankNum = def.bank;
-      if (a.id === 54) bankNum = a.type === 0 ? 183 : 184;
+        // Dynamic bank for actors where it depends on actor.type (e.g., terminal)
+        let bankNum = def.bank;
+        if (a.id === 54) bankNum = a.type === 0 ? 183 : 184;
 
-      // Try to draw actual sprite
-      const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
-      const spr = sprBank?.[def.frame ?? 0];
-      if (spr) {
-        const sx = cx - spr.offsetX * zoom;
-        const sy = cy - spr.offsetY * zoom;
-        const sw = spr.width * zoom;
-        const sh = spr.height * zoom;
-        ctx.drawImage(spr.bitmap, sx, sy, sw, sh);
-        // Label below sprite when zoomed in
-        if (zoom > 0.3) {
+        // Try to draw actual sprite
+        const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
+        const spr = sprBank?.[def.frame ?? 0];
+        if (spr) {
+          const sx = cx - spr.offsetX * zoom;
+          const sy = cy - spr.offsetY * zoom;
+          const sw = spr.width * zoom;
+          const sh = spr.height * zoom;
+          ctx.drawImage(spr.bitmap, sx, sy, sw, sh);
+          if (zoom > 0.3) {
+            ctx.fillStyle = def.color + 'cc';
+            ctx.fillRect(cx - 12, cy + 2, 24, 11);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(def.icon, cx, cy + 7);
+          }
+        } else {
+          // Fallback: colored circle with icon
+          const r = Math.max(6, 8 * zoom);
           ctx.fillStyle = def.color + 'cc';
-          ctx.fillRect(cx - 12, cy + 2, 24, 11);
-          ctx.fillStyle = '#fff';
-          ctx.fillText(def.icon, cx, cy + 7);
-        }
-      } else {
-        // Fallback: colored circle with icon
-        const r = Math.max(6, 8 * zoom);
-        ctx.fillStyle = def.color + 'cc';
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = def.color;
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        if (zoom > 0.15) {
-          ctx.fillStyle = '#fff';
-          ctx.fillText(def.icon, cx, cy);
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = def.color;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          if (zoom > 0.15) {
+            ctx.fillStyle = '#fff';
+            ctx.fillText(def.icon, cx, cy);
+          }
         }
       }
     }
-  }, [map, tileImages, spriteImages, zoom, pan, dragPlatform]);
+  }, [map, tileImages, spriteImages, vis, zoom, pan, dragPlatform]);
 
   // Resize canvas to fill container
   useEffect(() => {

@@ -32,6 +32,20 @@ export default function DesignerPage() {
   const [resizeH, setResizeH] = useState('');
   const [showResize, setShowResize] = useState(false);
   const [actorMenu, setActorMenu] = useState(null); // { idx, screenX, screenY }
+  const [vis, setVis] = useState({
+    bg: [true, true, true, true],
+    fg: [true, true, true, true],
+    platforms: true,
+    actors: true,
+    grid: true,
+    lighting: true,
+  });
+  const toggleVis = (key, idx = null) => setVis(v => {
+    if (idx !== null) {
+      const arr = [...v[key]]; arr[idx] = !arr[idx]; return { ...v, [key]: arr };
+    }
+    return { ...v, [key]: !v[key] };
+  });
 
   // Sync resize inputs when map changes
   useEffect(() => {
@@ -285,11 +299,39 @@ export default function DesignerPage() {
         {/* Main area: canvas + right panel */}
         <div className="flex flex-1 min-h-0">
           {/* Canvas area */}
-          <div id="canvas-container" className="flex-1 relative min-w-0">
+          <div id="canvas-container" className="flex-1 relative min-w-0 flex flex-col">
+
+            {/* Visibility toggles */}
+            <div className="flex items-center gap-1 px-2 py-1 bg-[#080c08] border-b border-[#1a2e1a] flex-shrink-0 flex-wrap">
+              <span className="text-[#3a5a3a] text-xs font-mono mr-1">👁</span>
+              {['BG0','BG1','BG2','BG3'].map((lbl, i) => (
+                <button key={lbl} onClick={() => toggleVis('bg', i)}
+                  className={`px-1.5 py-0.5 text-xs font-mono rounded border ${vis.bg[i] ? 'border-[#2a4a2a] text-[#80c080] bg-[#0d1a0d]' : 'border-[#1a1a1a] text-[#3a3a3a] bg-transparent line-through'}`}>
+                  {lbl}
+                </button>
+              ))}
+              <span className="text-[#1a3a1a] text-xs mx-0.5">|</span>
+              {['FG0','FG1','FG2','FG3'].map((lbl, i) => (
+                <button key={lbl} onClick={() => toggleVis('fg', i)}
+                  className={`px-1.5 py-0.5 text-xs font-mono rounded border ${vis.fg[i] ? 'border-[#2a4a4a] text-[#80c0c0] bg-[#0d1a1a]' : 'border-[#1a1a1a] text-[#3a3a3a] bg-transparent line-through'}`}>
+                  {lbl}
+                </button>
+              ))}
+              <span className="text-[#1a3a1a] text-xs mx-0.5">|</span>
+              {[['PLT','platforms'],['ACT','actors'],['GRID','grid'],['LIGHT','lighting']].map(([lbl, key]) => (
+                <button key={key} onClick={() => toggleVis(key)}
+                  className={`px-1.5 py-0.5 text-xs font-mono rounded border ${vis[key] ? 'border-[#3a3a2a] text-[#c0c080] bg-[#1a1a0d]' : 'border-[#1a1a1a] text-[#3a3a3a] bg-transparent line-through'}`}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 relative min-h-0">
             <MapCanvas
               map={map}
               tileImages={tileImages}
               spriteImages={spriteImages}
+              vis={vis}
               activeTool={activeTool}
               activeLayer={activeLayer}
               selectedTileId={selectedTileId}
@@ -310,6 +352,7 @@ export default function DesignerPage() {
               onDragPlatformChange={handleDragPlatform}
               onCursorChange={setCursor}
             />
+            </div>
           </div>
 
           {/* Right panel: tile picker */}
