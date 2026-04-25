@@ -3,12 +3,10 @@
 **Status:** Proposed
 **Date:** 2026-04-25
 
-> **Depends on:** Monorepo restructure
-> ([2026-04-25-monorepo-restructure.md](./2026-04-25-monorepo-restructure.md)).
-> Path references in this plan use the post-restructure layout
-> (`services/lobby/`, `services/admin-api/`, `web/admin/`). If this
-> plan is implemented before the restructure lands, mentally translate
-> back to today's paths.
+> **Built on:** Monorepo restructure
+> ([2026-04-25-monorepo-restructure.md](./2026-04-25-monorepo-restructure.md)),
+> Phases 1–4 merged. Path references use the post-restructure layout
+> (`services/lobby/`, `services/admin-api/`, `web/admin/`).
 
 ## Goal
 
@@ -100,7 +98,7 @@ Processes:
 
 | Process | Role |
 | ------- | ---- |
-| `silencer-lobby` (Go) | TCP lobby, UDP heartbeats, player-auth HTTP on `:15171` (`server/main.go`) |
+| `silencer-lobby` (Go) | TCP lobby, UDP heartbeats, player-auth HTTP on `:15171` (`services/lobby/main.go`) |
 | `tailscaled` | Admin-plane SSH only |
 | OS + systemd + sshd + journald | base |
 
@@ -127,9 +125,9 @@ Processes:
 | Process | Role |
 | ------- | ---- |
 | `mongod` | Player/Session/MatchStat/Event collections (apt install, `/etc/mongod.conf`) |
-| `lavinmq` | `zsilencer.events` topic exchange + `admin-dashboard` durable queue (AMQP 0.9.1, Crystal runtime, disk-first message store) |
-| `silencer-admin-api` (container) | AMQP consumer → Mongo upserts → WS push to dashboard (`admin/api/`) |
-| `silencer-admin-web` (container) | Next.js dashboard (`admin/web/`) |
+| `lavinmq` | `silencer.events` topic exchange + `admin-dashboard` durable queue (AMQP 0.9.1, Crystal runtime, disk-first message store) |
+| `silencer-admin-api` (container) | AMQP consumer → Mongo upserts → WS push to dashboard (`services/admin-api/`) |
+| `silencer-admin-web` (container) | Next.js dashboard (`web/admin/`) |
 | `dockerd` + `containerd` | Container runtime |
 | `tailscaled` | Admin-plane SSH only |
 | OS + systemd + sshd + journald | base |
@@ -432,7 +430,7 @@ Update the lobby's cloud-init to pass `MONGO_URL` and `AMQP_URL`
 pointing at `admin.silencer.internal` with the lobby's service
 credentials. Rename the lobby's `RABBITMQ_URL` env var and
 `-rabbitmq-url` flag to `AMQP_URL` / `-amqp-url` (one-line code
-change in `server/main.go`). Update `docker-compose.yml` to use
+change in `services/lobby/main.go`). Update `docker-compose.yml` to use
 `AMQP_URL` for both the `lobby` and `admin-api` services in the
 same PR so dev and prod env-var naming stay in sync. Open
 15171/tcp on the lobby's SG to the admin/data box's SG and set
@@ -492,8 +490,8 @@ fields (`Event.data`, `lifetimeStats`, `agencies[]`) become
 near-line-for-line: `findOneAndUpdate({...}, {$set, $inc, $setOnInsert})`
 becomes `INSERT ... ON CONFLICT DO UPDATE`.
 
-Delete `server/mongosync.go` and its 4 call sites in
-`server/store.go`. The lobby becomes a pure AMQP publisher;
+Delete `services/lobby/mongosync.go` and its 4 call sites in
+`services/lobby/store.go`. The lobby becomes a pure AMQP publisher;
 admin-api becomes the sole writer to admin storage. This matches
 what the original plan asserted ("MongoDB is a read mirror") —
 `mongosync.go` was a parallel side-channel that bypassed the
@@ -545,7 +543,7 @@ in-process middleware (~30 LOC).
 
 WebSocket hand-off: the existing `admin-dashboard` socket.io
 namespace becomes a single `Bun.serve` upgrade handler. The
-admin-web client side (`admin/web/lib/socket.js`) drops
+admin-web client side (`web/admin/lib/socket.js`) drops
 `socket.io-client` and uses native `WebSocket` — small
 client-side change but it ships in the same PR as the server
 change.
