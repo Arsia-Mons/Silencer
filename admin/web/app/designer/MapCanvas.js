@@ -460,7 +460,7 @@ export default function MapCanvas({
       if (tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
         onTilePaint(eraseLayerType ?? 'bg', activeLayer, tx, ty, 0);
       }
-    } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK'].includes(activeTool)) {
+    } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM'].includes(activeTool)) {
       isPainting.current = true;
       onDragPlatformChange({ wx1: wx, wy1: wy, wx2: wx, wy2: wy, tool: activeTool });
     } else if (activeTool === 'ERASE_PLATFORM') {
@@ -566,7 +566,7 @@ export default function MapCanvas({
         if (tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
           onTilePaint(eraseLayerType ?? 'bg', activeLayer, tx, ty, 0);
         }
-      } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK'].includes(activeTool)) {
+      } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM'].includes(activeTool)) {
         onDragPlatformChange(prev => prev ? { ...prev, wx2: wx, wy2: wy } : null);
       }
     }
@@ -597,14 +597,16 @@ export default function MapCanvas({
     if (isPainting.current) {
       if (['TILE_BG', 'TILE_FG', 'ERASE_TILE'].includes(activeTool)) {
         onCommitPaint?.();
-      } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK'].includes(activeTool) && dragPlatform) {
+      } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM'].includes(activeTool) && dragPlatform) {
         const { wx1, wy1 } = dragPlatform;
         const TOOL_TYPE_MAP = {
-          RECT:       { type1: 0, type2: 0, typeName: 'RECTANGLE' },
-          STAIRSUP:   { type1: 0, type2: 1, typeName: 'STAIRSUP' },
-          STAIRSDOWN: { type1: 0, type2: 2, typeName: 'STAIRSDOWN' },
-          LADDER:     { type1: 1, type2: 0, typeName: 'LADDER' },
-          TRACK:      { type1: 2, type2: 0, typeName: 'TRACK' },
+          RECT:         { type1: 0, type2: 0, typeName: 'RECTANGLE' },
+          STAIRSUP:     { type1: 0, type2: 1, typeName: 'STAIRSUP' },
+          STAIRSDOWN:   { type1: 0, type2: 2, typeName: 'STAIRSDOWN' },
+          LADDER:       { type1: 1, type2: 0, typeName: 'LADDER' },
+          TRACK:        { type1: 2, type2: 0, typeName: 'TRACK' },
+          OUTSIDEROOM:  { type1: 3, type2: 0, typeName: 'OUTSIDEROOM' },
+          SPECIFICROOM: { type1: 3, type2: 1, typeName: 'SPECIFICROOM' },
         };
         const t = TOOL_TYPE_MAP[activeTool];
         const x1 = Math.min(wx1, wx), y1 = Math.min(wy1, wy);
