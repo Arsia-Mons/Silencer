@@ -48,10 +48,12 @@ target_compile_features(${PROJECT} PUBLIC cxx_std_14)
 set(ZSILENCER_LOBBY_HOST "127.0.0.1" CACHE STRING "Lobby host the client connects to at startup")
 set(ZSILENCER_LOBBY_PORT "517" CACHE STRING "Lobby TCP port")
 set(ZSILENCER_VERSION "00025" CACHE STRING "Client version string sent to the lobby during MSG_VERSION")
+set(ZSILENCER_MAP_API_URL "http://127.0.0.1:15172" CACHE STRING "Base URL for the community map HTTP API (used when fetching a missing map before falling back to P2P)")
 target_compile_definitions(${PROJECT} PRIVATE
 	ZSILENCER_LOBBY_HOST="${ZSILENCER_LOBBY_HOST}"
 	ZSILENCER_LOBBY_PORT=${ZSILENCER_LOBBY_PORT}
 	ZSILENCER_VERSION="${ZSILENCER_VERSION}"
+	ZSILENCER_MAP_API_URL="${ZSILENCER_MAP_API_URL}"
 )
 
 find_package(ZLIB REQUIRED)

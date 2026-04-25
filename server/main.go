@@ -15,7 +15,7 @@ func main() {
 	addr := flag.String("addr", ":517", "listen address for TCP and UDP")
 	dbPath := flag.String("db", "lobby.json", "path to JSON user database")
 	motdPath := flag.String("motd", "", "path to MOTD file; empty = built-in default")
-	version := flag.String("version", "00024", "required client version; empty = accept any")
+	version := flag.String("version", "00025", "required client version; empty = accept any")
 	updateManifestPath := flag.String("update-manifest", "update.json", "path to update manifest JSON; missing = no auto-update hints")
 	gameBinary := flag.String("game-binary", "../build/zsilencer", "path to the zsilencer binary (spawned per created game)")
 	publicAddr := flag.String("public-addr", "127.0.0.1", "host or IP clients (and dedicated servers) should use to reach this lobby")
@@ -23,6 +23,9 @@ func main() {
 	gamePortCount := flag.Int("game-port-count", 10, "number of ports in the dedicated-server range")
 	rabbitmqURL := flag.String("rabbitmq-url", "", "AMQP URL for RabbitMQ event publishing (empty = disabled)")
 	playerAuthAddr := flag.String("player-auth-addr", ":15171", "internal HTTP address for player credential validation (admin-api use only)")
+	mapAPIAddr := flag.String("map-api-addr", ":8080", "public HTTP address for the community map API (upload/download)")
+	mapsDir := flag.String("maps-dir", "maps", "directory for community map storage")
+	mapUploadKey := flag.String("map-upload-key", "", "API key required for map uploads (empty = unauthenticated, dev only)")
 	flag.Parse()
 
 	var manifest *UpdateManifest
@@ -94,6 +97,12 @@ func main() {
 	defer udpLn.Close()
 
 	go StartPlayerAuthServer(*playerAuthAddr, store, hub)
+
+	mapStore, err := NewMapStore(*mapsDir, *mapUploadKey)
+	if err != nil {
+		log.Fatalf("map store: %v", err)
+	}
+	go StartMapAPIServer(*mapAPIAddr, mapStore)
 
 	go serveUDP(udpLn, hub)
 

@@ -37,6 +37,7 @@ services:
     ports:
       - "15170:15170/tcp"
       - "15170:15170/udp"
+      - "15172:15172/tcp"
       - "20000-20199:20000-20199/udp"
     volumes:
       - lobby-data:/data
@@ -61,6 +62,10 @@ services:
       - "200"
       - "-rabbitmq-url"
       - "amqp://zsilencer:zsilencer@rabbitmq:5672/"
+      - "-map-api-addr"
+      - ":15172"
+      - "-maps-dir"
+      - "/data/maps"
     restart: unless-stopped
 
   admin-api:

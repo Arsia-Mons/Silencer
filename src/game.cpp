@@ -18,6 +18,7 @@
 #include "cocoawrapper.h"
 #include "sha1.h"
 #include "updaterstage2.h"
+#include "mapfetch.h"
 #include <algorithm>
 #include <stdio.h>
 
@@ -29,6 +30,9 @@
 #endif
 #ifndef ZSILENCER_VERSION
 #define ZSILENCER_VERSION "00025"
+#endif
+#ifndef ZSILENCER_MAP_API_URL
+#define ZSILENCER_MAP_API_URL "http://127.0.0.1:8080"
 #endif
 
 Game::Game() : renderer(world), screenbuffer(640, 480){
@@ -5934,6 +5938,14 @@ void Game::ProcessMapDownload(void){
 			if(!localpeer->mapdownloaded){
 				if(!mapexistchecked){
 					std::string mapfilename = FindMap(world.gameinfo.mapname, &world.gameinfo.maphash);
+					if(mapfilename.size() == 0){
+						// Map not available locally; try the community map server before
+						// falling back to peer-to-peer chunk transfer.
+						mapfilename = FetchMapFromServer(
+							world.gameinfo.mapname,
+							world.gameinfo.maphash,
+							ZSILENCER_MAP_API_URL);
+					}
 					if(mapfilename.size() > 0){
 						world.SendMapDownloaded();
 						LoadMapData(mapfilename.c_str());

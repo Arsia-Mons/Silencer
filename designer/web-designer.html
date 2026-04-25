@@ -70,6 +70,7 @@ label.fbtn:hover { background: #1e1e3a; }
   <label class="fbtn" for="fi-map" title="Open a .SIL map file">🗺 Open Map</label>
   <input type="file" id="fi-map" accept=".SIL,.sil">
   <button class="primary" onclick="saveMap()" title="Save map (S)">💾 Save</button>
+  <button class="primary" onclick="showPublish()" title="Publish map to community server">⬆ Publish</button>
   <div class="sep"></div>
   <button id="tb-select"   class="tool-btn" onclick="setTool('select')"   title="Select/delete actors & platforms (V)">🖱 SEL</button>
   <button id="tb-tile"     class="tool-btn active" onclick="setTool('tile')" title="Paint tiles (T) — L:place R:erase">🖌 TILE</button>
@@ -158,6 +159,30 @@ label.fbtn:hover { background: #1e1e3a; }
   <div class="si"><span class="sl">Map:</span><span class="sv" id="st-map">no map loaded</span></div>
   <div class="si"><span class="sl">Data:</span><span class="sv" id="st-data">no data</span></div>
   <span id="status-msg"></span>
+</div>
+
+<div id="publish-panel" style="display:none; position:fixed; top:56px; left:10px;
+  background:#0d0d18; border:2px solid #1a1a2e; padding:12px 14px; z-index:200;
+  font-family:monospace; font-size:12px; color:#aabbcc; min-width:340px;">
+  <div style="margin-bottom:8px; color:#00ff88; font-size:13px">⬆ Publish to Server</div>
+  <div style="margin-bottom:4px">
+    <span style="color:#445566">Server URL</span><br>
+    <input id="pub-url" type="text" style="width:100%; box-sizing:border-box"
+           placeholder="http://localhost:8080"
+           value="http://localhost:8080">
+  </div>
+  <div style="margin-bottom:4px">
+    <span style="color:#445566">API Key <span style="font-size:10px">(leave blank if none)</span></span><br>
+    <input id="pub-key" type="text" style="width:100%; box-sizing:border-box" placeholder="optional">
+  </div>
+  <div style="margin-bottom:8px">
+    <span style="color:#445566">Author</span><br>
+    <input id="pub-author" type="text" style="width:100%; box-sizing:border-box" placeholder="anonymous">
+  </div>
+  <div style="display:flex; gap:6px">
+    <button onclick="doPublish()" style="flex:1">Upload</button>
+    <button onclick="closePublish()">Cancel</button>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
@@ -1064,39 +1089,40 @@ function buildLevelBytes(mapData) {
   return buf;
 }
 
-function saveMap() {
-  if(!state.mapData) { showMsg('No map loaded','#ff4444'); return; }
+function buildSILBytes() {
+  if(!state.mapData) return null;
   const {hdr,mmBytes}=state.mapData;
-  showMsg('Saving…','#88ddff');
-
   let lvlComp;
   try { lvlComp=pako.deflate(buildLevelBytes(state.mapData)); }
-  catch(e) { showMsg('Compress failed: '+e.message,'#ff4444'); return; }
-
+  catch(e) { showMsg('Compress failed: '+e.message,'#ff4444'); return null; }
   const mm=mmBytes||new Uint8Array(0);
   const totalSz=17+128+4+mm.length+4+lvlComp.length;
   const buf=new Uint8Array(totalSz);
   let i=0;
-
   buf[i++]=hdr.firstbyte;
   buf[i++]=hdr.version;
   buf[i++]=hdr.maxplayers;
   buf[i++]=hdr.maxteams;
   wr16be(buf,i,hdr.width);  i+=2;
   wr16be(buf,i,hdr.height); i+=2;
-  buf[i++]=0; // padding
+  buf[i++]=0;
   buf[i++]=hdr.parallax;
   buf[i++]=hdr.ambience<0?hdr.ambience+256:hdr.ambience;
-  buf[i++]=0; buf[i++]=0; // 2 padding bytes
+  buf[i++]=0; buf[i++]=0;
   wr32be(buf,i,hdr.flags); i+=4;
-
   for(let j=0;j<128;j++) buf[i++]=j<hdr.desc.length?hdr.desc.charCodeAt(j):0;
-
   wr32le(buf,i,mm.length); i+=4;
   buf.set(mm,i); i+=mm.length;
   wr32le(buf,i,lvlComp.length); i+=4;
   buf.set(lvlComp,i);
+  return buf;
+}
 
+function saveMap() {
+  if(!state.mapData) { showMsg('No map loaded','#ff4444'); return; }
+  showMsg('Saving…','#88ddff');
+  const buf=buildSILBytes();
+  if(!buf) return;
   const blob=new Blob([buf],{type:'application/octet-stream'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
@@ -1104,6 +1130,75 @@ function saveMap() {
   a.click();
   URL.revokeObjectURL(a.href);
   showMsg(`Saved ${a.download}  (${buf.length} bytes)`,'#00ff88');
+}
+
+// ═══════════════════════════════════════════════════════
+// PUBLISH
+// ═══════════════════════════════════════════════════════
+function showPublish() {
+  if(!state.mapData) { showMsg('No map loaded','#ff4444'); return; }
+  const panel = document.getElementById('publish-panel');
+  // Restore saved preferences.
+  const savedUrl = localStorage.getItem('pub-url');
+  const savedKey = localStorage.getItem('pub-key');
+  const savedAuthor = localStorage.getItem('pub-author');
+  if(savedUrl) document.getElementById('pub-url').value = savedUrl;
+  if(savedKey) document.getElementById('pub-key').value = savedKey;
+  if(savedAuthor) document.getElementById('pub-author').value = savedAuthor;
+  panel.style.display = 'block';
+}
+
+function closePublish() {
+  document.getElementById('publish-panel').style.display = 'none';
+}
+
+async function doPublish() {
+  const urlInput = document.getElementById('pub-url').value.trim();
+  const key = document.getElementById('pub-key').value.trim();
+  const author = document.getElementById('pub-author').value.trim() || 'anonymous';
+  const filename = state.mapFilename || 'map.SIL';
+
+  if(!urlInput) { showMsg('Server URL is required','#ff4444'); return; }
+
+  // Persist preferences for next time.
+  localStorage.setItem('pub-url', urlInput);
+  localStorage.setItem('pub-key', key);
+  localStorage.setItem('pub-author', author);
+
+  const buf = buildSILBytes();
+  if(!buf) return;
+
+  if(buf.length > 65535) {
+    showMsg(`Map too large (${buf.length} bytes, max 65535)`,'#ff4444');
+    return;
+  }
+
+  const headers = {
+    'Content-Type': 'application/octet-stream',
+    'X-Filename': filename,
+    'X-Author': author,
+  };
+  if(key) headers['X-Api-Key'] = key;
+
+  closePublish();
+  showMsg('Publishing…','#88ddff');
+
+  try {
+    const resp = await fetch(urlInput + '/api/maps', {
+      method: 'POST',
+      headers,
+      body: buf,
+    });
+    if(resp.ok) {
+      const data = await resp.json();
+      showMsg(`✓ Published ${filename}  sha1:${data.sha1.slice(0,8)}…  (${buf.length} bytes)`,'#00ff88');
+    } else {
+      const txt = await resp.text();
+      showMsg(`Upload failed (${resp.status}): ${txt.trim()}`,'#ff4444');
+    }
+  } catch(e) {
+    showMsg('Network error: ' + e.message,'#ff4444');
+  }
 }
 
 // ═══════════════════════════════════════════════════════
