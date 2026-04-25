@@ -95,8 +95,13 @@ export default function MapCanvas({
       }
     }
 
-    // Helper to draw a tile with luminance applied
-    function drawTile(tile_id, flip, lum, col, row) {
+    // Ambient darkness from map header: ambiencelevel = 128 + ambience*4.5
+    const ambience = map.header?.ambience ?? 0;
+    const ambiencelevel = Math.max(0, Math.min(255, 128 + ambience * 4.5));
+    const darkAlpha = Math.max(0, 1 - ambiencelevel / 128); // ~0.42-0.55 for typical maps
+
+    // Helper to draw a tile with LUM-aware lighting
+    function drawTile(tile_id, flip, isLum, col, row) {
       if (!tile_id) return;
       const bank = (tile_id >> 8) & 0xFF;
       const idx  = tile_id & 0xFF;
@@ -115,9 +120,13 @@ export default function MapCanvas({
       } else {
         ctx.drawImage(bmp, dx, dy, tileSize, tileSize);
       }
-      // Apply luminance: overlay black at (1 - lum/255) opacity
-      if (lum < 255) {
-        ctx.fillStyle = `rgba(0,0,0,${((255 - lum) / 255).toFixed(3)})`;
+      if (isLum) {
+        // LUM tile: add warm glow to indicate it's a light source
+        ctx.fillStyle = 'rgba(255,220,120,0.18)';
+        ctx.fillRect(dx, dy, tileSize, tileSize);
+      } else if (darkAlpha > 0) {
+        // Non-LUM tile: apply ambient darkness
+        ctx.fillStyle = `rgba(0,0,0,${darkAlpha.toFixed(3)})`;
         ctx.fillRect(dx, dy, tileSize, tileSize);
       }
     }
@@ -127,7 +136,7 @@ export default function MapCanvas({
       for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
           const cell = layers.bg[l][row * width + col];
-          if (cell) drawTile(cell.tile_id, cell.flip, cell.lum ?? 255, col, row);
+          if (cell) drawTile(cell.tile_id, cell.flip, cell.lum !== 0, col, row);
         }
       }
     }
@@ -137,7 +146,7 @@ export default function MapCanvas({
       for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
           const cell = layers.fg[l][row * width + col];
-          if (cell) drawTile(cell.tile_id, cell.flip, cell.lum ?? 255, col, row);
+          if (cell) drawTile(cell.tile_id, cell.flip, cell.lum !== 0, col, row);
         }
       }
     }
