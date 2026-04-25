@@ -13,7 +13,7 @@
 ## Goal
 
 Define how Silencer's services land in production: the lobby,
-MongoDB, RabbitMQ, the admin API, and the admin web app deployed to
+MongoDB, LavinMQ, the admin API, and the admin web app deployed to
 AWS via Terraform and GitHub Actions, with each service on its own
 deploy lifecycle.
 
@@ -30,7 +30,7 @@ Each of the four components has its own deployment lifecycle:
 1. **Lobby** — game-critical, deploys per gameplay PR
 2. **Admin API** — deploys per dashboard feature
 3. **Admin Web** — deploys per UI change
-4. **Data tier** (MongoDB + RabbitMQ) — provisioned once, upgraded rarely
+4. **Data tier** (MongoDB + LavinMQ) — provisioned once, upgraded rarely
 
 Day-to-day deploys must be able to update one component without
 touching the others. A bad admin-web rebuild must not be able to
@@ -53,7 +53,11 @@ Two AWS EC2 instances in the same region, VPC, subnet, and AZ:
 - **Admin/data box** — new instance. Runs four independent
   systemd units:
   - `mongod` (apt-installed, data on dedicated EBS)
-  - `rabbitmq-server` (apt-installed, data on dedicated EBS)
+  - `lavinmq` (apt-installed, data on dedicated EBS) — AMQP 0.9.1
+    broker, drop-in for RabbitMQ at the wire-protocol level. Chosen
+    over RabbitMQ because its idle/peak RAM is ~5x lower (~40MB vs
+    ~200MB+ BEAM idle), and existing `amqp091-go`/`amqplib` clients
+    connect with no code changes. See Resource Profile.
   - `silencer-admin-api` (container, image pulled from GHCR)
   - `silencer-admin-web` (container, image pulled from GHCR)
 
@@ -64,7 +68,7 @@ open to the public internet. Same-AZ placement keeps box-to-box
 latency in single-digit milliseconds and avoids inter-AZ data
 transfer charges.
 
-The split exists because Mongo and RabbitMQ are stateful
+The split exists because Mongo and LavinMQ are stateful
 infrastructure with rare upgrade cadences, while admin-api and
 admin-web are stateless apps with frequent deploys. Co-locating
 them on one host keeps cost low (~$5/mo extra); separating them
@@ -121,8 +125,8 @@ Processes:
 | Process | Role |
 | ------- | ---- |
 | `mongod` | Player/Session/MatchStat/Event collections (apt install, `/etc/mongod.conf`) |
-| `rabbitmq-server` | `zsilencer.events` topic exchange + `admin-dashboard` durable queue (Erlang BEAM) |
-| `silencer-admin-api` (container) | Rabbit consumer → Mongo upserts → WS push to dashboard (`admin/api/`) |
+| `lavinmq` | `zsilencer.events` topic exchange + `admin-dashboard` durable queue (AMQP 0.9.1, Crystal runtime, disk-first message store) |
+| `silencer-admin-api` (container) | AMQP consumer → Mongo upserts → WS push to dashboard (`admin/api/`) |
 | `silencer-admin-web` (container) | Next.js dashboard (`admin/web/`) |
 | `dockerd` + `containerd` | Container runtime |
 | `tailscaled` | Admin-plane SSH only |
@@ -136,15 +140,17 @@ RAM profile:
 | tailscaled                         | 30MB   | 30MB    | 30MB    | 40MB    | grounded |
 | dockerd + containerd               | 100MB  | 100MB   | 100MB   | 110MB   | grounded |
 | mongod (with `cacheSizeGB: 0.25`)  | 250MB  | 400MB   | 600MB   | 800MB   | cache floor grounded; growth estimated |
-| rabbitmq-server                    | 200MB  | 230MB   | 300MB   | 400MB   | BEAM idle ~80–130MB grounded; rest estimated |
+| lavinmq                            | 40MB   | 50MB    | 60MB    | 80MB    | CloudAMQP-published numbers: 8K conns ≈ 400MB, 10M enqueued msgs ≈ 80MB; our workload is 2-3 conns and a near-empty queue |
 | admin-api container                | 60MB   | 100MB   | 150MB   | 220MB   | estimated |
 | admin-web container                | 100MB  | 150MB   | 200MB   | 300MB   | estimated |
-| **Total**                          | **~890MB** | **~1.16GB** | **~1.53GB** | **~2.02GB** | |
+| **Total**                          | **~730MB** | **~980MB** | **~1.29GB** | **~1.70GB** | |
 
 CPU is not the binding constraint at any tier on 2 vCPU.
 Estimates: <2% idle, ~3–5% light, ~10–20% active, ~30–50% peak.
 Hot paths under load are `admin-api` (per-event upserts + WS
-fanout) and `mongod` index touches.
+fanout) and `mongod` index touches. LavinMQ's CPU is negligible
+at our event rate (peak workload is ~33 events/sec; LavinMQ
+benchmarks at 578K msgs/sec on a t4g.micro).
 
 Disk (per the plan's three EBS volumes):
 
@@ -152,27 +158,33 @@ Disk (per the plan's three EBS volumes):
 | ------ | ------- | ------------------ | ----------------- | ---------------- |
 | Root (OS + docker engine + container images + binaries + logs) | ~5.5GB | ~6.5GB | ~10GB | **16GB gp3** |
 | `/var/lib/mongodb` | ~100MB | ~500MB | ~3–5GB | **10GB gp3** |
-| `/var/lib/rabbitmq` | ~50MB | ~80MB | ~150MB | **5GB gp3** |
+| `/var/lib/lavinmq` | ~50MB | ~100MB | ~500MB | **5GB gp3** |
 
 Total ~31GB gp3 ≈ $2.50/month storage. Dominant growth driver
-is the `Event` collection (audit log of every Rabbit message);
+is the `Event` collection (audit log of every AMQP message);
 a TTL index on `Event.ts` caps it without code changes.
+LavinMQ's disk-first message store pages out to `/var/lib/lavinmq`
+under load — sized at 5GB to absorb a multi-day admin-api outage
+backlog without filling the volume.
 
 ### Sizing decisions
 
 - **t4g.micro (1GB)** is a non-starter for the admin/data box —
-  Idle alone exceeds it.
-- **t4g.small (2GB, ~$12/mo)** survives Idle/Light/Active and
-  **OOMs at Peak** (~2.0GB usage on ~1.85GB usable after kernel
-  reservations). Acceptable only if "100+ concurrent players"
-  is treated as an event that triggers a manual vertical
-  scale-up.
+  Idle alone (~730MB) consumes most of it with no room for
+  Mongo cache growth.
+- **t4g.small (2GB, ~$12/mo)** now survives all tiers including
+  Peak (~1.7GB usage on ~1.85GB usable). Headroom at Peak is
+  ~150MB — workable, but tight enough that Event-collection
+  growth or log spikes could erode it. Defensible if observed
+  footprint matches estimates.
 - **t4g.medium (4GB, ~$24/mo)** is the conservative right-size:
-  ~50% headroom at peak, room for the Event collection to grow,
-  room for log spikes. **Recommended default for Phase 1.**
+  ~57% headroom at peak. **Recommended default for Phase 1**;
+  plan to downsize to t4g.small after a month of observing real
+  footprint, especially of the application-memory estimates
+  flagged below.
 
 Future re-sizing is cheap: stop the instance, change the type
-in Terraform, `apply`. EBS volumes for Mongo and Rabbit detach
+in Terraform, `apply`. EBS volumes for Mongo and LavinMQ detach
 and reattach untouched (per Data Persistence).
 
 ### Confidence level and follow-up
@@ -223,10 +235,10 @@ volume — the admin/data box replicates the pattern, one volume
 per stateful service:
 
 - `/var/lib/mongodb` on its own EBS volume
-- `/var/lib/rabbitmq` on its own EBS volume
+- `/var/lib/lavinmq` on its own EBS volume
 
 Cloud-init must mount these volumes **before** apt-installing
-MongoDB or RabbitMQ. If the install runs first, the package
+MongoDB or LavinMQ. If the install runs first, the package
 postinst writes its initial state into the root volume; the later
 mount hides it and the service won't start. Mount → install →
 chown is the correct order.
@@ -255,21 +267,24 @@ across instance replacement.
 Each service reads its peers from Terraform-templated
 `/etc/silencer/<service>.env` files (mode 0600):
 
-- Lobby: `MONGO_URL` and `RABBITMQ_URL` pointing at
-  `admin.silencer.internal`
+- Lobby: `MONGO_URL` and `AMQP_URL` pointing at
+  `admin.silencer.internal`. The lobby's existing
+  `RABBITMQ_URL`/`-rabbitmq-url` env var and flag are renamed
+  to `AMQP_URL`/`-amqp-url` to match the protocol rather than
+  the implementation; the `amqp091-go` client is unchanged.
 - Admin-api: `MONGO_URL` at localhost,
   `LOBBY_PLAYER_AUTH_URL` at `lobby.silencer.internal`
 - Admin-web: `NEXT_PUBLIC_API_URL` (see Open Decisions for the
   externally-reachable form)
 
-`mongod` and `rabbitmq-server` configure through their distro
-locations (`/etc/mongod.conf`, `/etc/rabbitmq/`). Bind addresses
-are set to the instance's primary private IP. Application
-credentials — mongod SCRAM users, RabbitMQ users, the admin-api's
-JWT signing key, the GitHub backup-repo PAT — are managed by
-Terraform variables and provisioned by cloud-init from values in
-`/etc/silencer/*.env`. Rotation is a Terraform variable change
-+ apply.
+`mongod` and `lavinmq` configure through their distro
+locations (`/etc/mongod.conf`, `/etc/lavinmq/lavinmq.ini`).
+Bind addresses are set to the instance's primary private IP.
+Application credentials — mongod SCRAM users, LavinMQ users,
+the admin-api's JWT signing key, the GitHub backup-repo PAT —
+are managed by Terraform variables and provisioned by
+cloud-init from values in `/etc/silencer/*.env`. Rotation is
+a Terraform variable change + apply.
 
 Security groups gate access at the network layer; service-level
 credentials gate access at the application layer. Box-to-box
@@ -278,7 +293,7 @@ ingress rules:
 - Lobby SG: 15171/tcp from admin/data SG (admin-api → lobby
   playerauth)
 - Admin/data SG: 27017/tcp from lobby SG (lobby → MongoDB),
-  5672/tcp from lobby SG (lobby → RabbitMQ)
+  5672/tcp from lobby SG (lobby → LavinMQ AMQP)
 
 ## Implementation Phases
 
@@ -294,22 +309,23 @@ with the deploy verbs as they land.
 
 Terraform delta only. New EC2 instance in the lobby's VPC and AZ
 (default `t4g.medium` per Resource Profile), two EBS volumes
-sized per Resource Profile (10GB Mongo, 5GB Rabbit, 16GB root),
+sized per Resource Profile (10GB Mongo, 5GB LavinMQ, 16GB root),
 a security group with ingress rules sourced from the lobby SG
 (27017/tcp, 5672/tcp), the private Route 53 hosted zone with A
 records for both boxes, Tailscale enrollment for GitHub Actions
-SSH access, and cloud-init that installs Mongo + RabbitMQ bound
+SSH access, and cloud-init that installs Mongo + LavinMQ bound
 to the private interface with auth enabled (Mongo configured
-with `cacheSizeGB: 0.25` per Resource Profile). GitHub Actions
-does not yet deploy app workloads to this box.
+with `cacheSizeGB: 0.25` per Resource Profile; LavinMQ from the
+CloudAMQP apt repository). GitHub Actions does not yet deploy
+app workloads to this box.
 
 Includes an `infra/terraform/CLAUDE.md` update describing the new
 admin/data box module, the EBS-volume-per-stateful-service
 pattern, and the cloud-init mount-before-install ordering gotcha.
 
 Done when: SSH from a tailnet peer works, `mongod` and
-`rabbitmq-server` accept authenticated connections from the
-lobby's private IP, and `terraform taint && apply` the instance
+`lavinmq` accept authenticated connections from the lobby's
+private IP, and `terraform taint && apply` the instance
 preserves data on both EBS volumes.
 
 ### Phase 2 — Admin API deploy workflow
@@ -342,15 +358,17 @@ Done when: same as Phase 2 for the web service.
 
 ### Phase 4 — Wire lobby ↔ data tier
 
-Update the lobby's cloud-init to pass `MONGO_URL` and `RABBITMQ_URL`
+Update the lobby's cloud-init to pass `MONGO_URL` and `AMQP_URL`
 pointing at `admin.silencer.internal` with the lobby's service
-credentials. Open 15171/tcp on the lobby's SG to the admin/data
-box's SG and set the admin-api's `LOBBY_PLAYER_AUTH_URL` to
-`lobby.silencer.internal`. Requires lobby instance replacement
-(cloud-init runs once).
+credentials. Rename the lobby's `RABBITMQ_URL` env var and
+`-rabbitmq-url` flag to `AMQP_URL` / `-amqp-url` (one-line code
+change in `server/main.go`). Open 15171/tcp on the lobby's SG to
+the admin/data box's SG and set the admin-api's
+`LOBBY_PLAYER_AUTH_URL` to `lobby.silencer.internal`. Requires
+lobby instance replacement (cloud-init runs once).
 
 Done when: lobby logs show successful Mongo sync on player
-mutations and successful RabbitMQ publishes on match end, and
+mutations and successful AMQP publishes on match end, and
 admin-api validates a player credential against the lobby over
 the private network.
 
@@ -418,7 +436,7 @@ get rediscovered mid-implementation:
 - A separate staging environment. Production is the only
   environment until traffic justifies a second.
 - Observability stack (Prometheus, Loki, etc.). Adding a
-  consumer for the existing RabbitMQ event stream is a
+  consumer for the existing LavinMQ event stream is a
   follow-up, not part of this work.
 
 ## Success Criteria
@@ -427,13 +445,13 @@ The plan is done when all of the following hold simultaneously:
 
 1. Re-deploying the lobby does not touch the admin/data box.
 2. Re-deploying admin-api does not restart admin-web, Mongo,
-   RabbitMQ, or the lobby.
+   LavinMQ, or the lobby.
 3. Re-deploying admin-web does not restart admin-api, Mongo,
-   RabbitMQ, or the lobby.
+   LavinMQ, or the lobby.
 4. `terraform taint aws_instance.<admin>` followed by
    `terraform apply` rebuilds the admin/data instance with zero
-   loss of MongoDB or RabbitMQ state.
-5. The lobby's MongoDB mirror and RabbitMQ event stream are
+   loss of MongoDB or LavinMQ state.
+5. The lobby's MongoDB mirror and AMQP event stream are
    live in production — no `[mongosync] connect failed` or
    `[events] amqp connect failed` log lines under steady state.
 6. Each of the four components is deployable from GitHub Actions
