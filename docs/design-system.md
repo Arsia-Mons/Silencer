@@ -1909,7 +1909,7 @@ relative to the parent Interface origin.
 | Agency toggles    | `(20, 90)`, +42 px each | sprite bank 181 | — | 5 toggles, `set = 1` (radio); see [Toggle](#toggle) |
 | Level / Wins / Losses / Stats | `(17, 130)` / `(17, 143)` / `(17, 156)` / `(17, 169)` | bank 133 / width 7 | **129** ramp + brightness 160 | One Overlay per stat row |
 
-**Chat panel (`CreateChatInterface`, `game.cpp:2905`)** — Interface bounds `(15, 216) 368 × 234`:
+**Chat panel (`CreateChatInterface`, `game.cpp:3163`)** — Interface bounds `(15, 216) 368 × 234`:
 
 | Element | Position `(x, y)` | Size | Properties |
 | ----------------- | ----------------- | ---------- | --------------------------- |
