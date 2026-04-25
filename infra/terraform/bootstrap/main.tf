@@ -17,7 +17,7 @@ provider "aws" {
   region = var.aws_region
   default_tags {
     tags = {
-      Project   = "zsilencer"
+      Project   = "silencer"
       ManagedBy = "terraform-bootstrap"
       Purpose   = "remote-state"
     }
@@ -67,7 +67,7 @@ output "backend_hcl" {
   description = "Paste into ../backend.hcl (gitignored)"
   value       = <<-EOT
     bucket         = "${aws_s3_bucket.tfstate.bucket}"
-    key            = "zsilencer/terraform.tfstate"
+    key            = "silencer/terraform.tfstate"
     region         = "${var.aws_region}"
     dynamodb_table = "${aws_dynamodb_table.tfstate_lock.name}"
   EOT
