@@ -4650,6 +4650,9 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							Config::GetInstance().Save();
 							oldselectedagency = selectedagency;
 							agencychanged = true;
+							if(world.state == World::CONNECTED){
+								world.SetAgency(selectedagency);
+							}
 						}
 					}
 				}break;

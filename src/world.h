@@ -54,6 +54,7 @@ public:
 	void SendChat(bool toteam, char * message);
 	void SendSound(const char * name, Peer * peer = 0, Uint8 volume = 128);
 	void ChangeTeam(void);
+	void SetAgency(Uint8 agency);
 	void KillByGovt(Peer & peer);
 	void Explode(Object & object, Uint8 suitcolor, float hitx);
 	bool IsSecurity(Object & object);
@@ -194,7 +195,7 @@ private:
 	enum {NONE, INLOBBY, INGAME} gameplaystate;
 	enum {MSG_CONNECT, MSG_SNAPSHOT, MSG_INPUT, MSG_PEERLIST, MSG_DISCONNECT, MSG_PING, MSG_PONG,
 		MSG_GAMEINFO, MSG_READY, MSG_CHAT, MSG_STATION, MSG_CHANGETEAM, MSG_STATUS,
-		MSG_MESSAGE, MSG_GOVTKILL, MSG_SOUND, MSG_TECH, MSG_STATS, MSG_EXISTS, MSG_REMOVE, MSG_MAP};
+		MSG_MESSAGE, MSG_GOVTKILL, MSG_SOUND, MSG_TECH, MSG_STATS, MSG_EXISTS, MSG_REMOVE, MSG_MAP, MSG_SETAGENCY};
 	enum {STA_BUY, STA_REPAIR, STA_VIRUS};
 	enum {MAP_DOWNLOADED, MAP_GETCHUNK, MAP_PUTCHUNK};
 	Serializer * oldsnapshots[maxpeers][maxoldsnapshots];

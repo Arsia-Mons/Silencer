@@ -500,6 +500,19 @@ void World::DoNetwork_Authority(void){
 					}
 				}
 			}break;
+			case MSG_SETAGENCY:{
+				if(peer && gameplaystate == INLOBBY){
+					Uint8 newagency;
+					data.Get(newagency);
+					Team * peerteam = GetPeerTeam(peer->id);
+					if(peerteam && peerteam->agency != newagency){
+						peerteam->RemovePeer(peer->id);
+						peer->isready = false;
+						FindTeamForPeer(*peer, newagency);
+						SendPeerList();
+					}
+				}
+			}break;
 			case MSG_TECH:{
 				if(peer && gameplaystate == INLOBBY){
 					Uint32 techchoices;
@@ -1969,6 +1982,13 @@ void World::PushStatusString(char * statusstring){
 void World::ChangeTeam(void){
 	char msg[1];
 	msg[0] = MSG_CHANGETEAM;
+	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
+}
+
+void World::SetAgency(Uint8 agency){
+	char msg[2];
+	msg[0] = MSG_SETAGENCY;
+	msg[1] = agency;
 	SendPacket(GetAuthorityPeer(), msg, sizeof(msg));
 }
 
