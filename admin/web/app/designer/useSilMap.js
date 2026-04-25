@@ -439,6 +439,10 @@ export function useSilMap() {
 
   const patchTile = useCallback((layerType, layerIdx, x, y, patch) => {
     setMapData(prev => {
+      if (!prev) return prev;
+      const { width, height, layers } = prev;
+      if (x < 0 || x >= width || y < 0 || y >= height) return prev;
+      pushHistory(prev);
       const idx = y * width + x;
       const layerArr = layerType === 'fg' ? layers.fg : layers.bg;
       const existing = layerArr[layerIdx][idx] ?? { tile_id: 0, flip: 0, lum: 0 };
