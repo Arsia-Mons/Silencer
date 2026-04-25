@@ -40,7 +40,7 @@ export const ACTOR_DEFS = [
   { id: 70, label: 'Credit Machine',    icon: 'CR', color: '#f59e0b' },
 ];
 
-export default function Toolbar({ activeTool, onToolChange, activeLayer, onLayerChange, selectedActor, onActorChange }) {
+export default function Toolbar({ activeTool, onToolChange, activeLayer, onLayerChange, selectedActor, onActorChange, lumMode, onLumModeChange }) {
   const tileTools = TOOLS.filter(t => t.id === 'TILE_BG' || t.id === 'TILE_FG');
   const platformTools = TOOLS.filter(t => ['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','ERASE_PLATFORM'].includes(t.id));
   const otherTools = TOOLS.filter(t => ['SELECT','ACTOR'].includes(t.id));
@@ -81,7 +81,7 @@ export default function Toolbar({ activeTool, onToolChange, activeLayer, onLayer
         ))}
       </div>
 
-      {/* Layer selector (shown when tile tool active) */}
+      {/* Layer selector + LUM toggle (shown when tile tool active) */}
       {(activeTool === 'TILE_BG' || activeTool === 'TILE_FG') && (
         <>
           <div className="w-px h-5 bg-game-border" />
@@ -91,6 +91,18 @@ export default function Toolbar({ activeTool, onToolChange, activeLayer, onLayer
               <button key={l} onClick={() => onLayerChange(l)} className={layerCls(l)}>{l}</button>
             ))}
           </div>
+          <div className="w-px h-5 bg-game-border" />
+          <button
+            onClick={() => onLumModeChange(!lumMode)}
+            className={`px-2 py-1 text-xs font-mono border rounded transition-colors ${
+              lumMode
+                ? 'border-yellow-400 text-yellow-300 bg-game-dark'
+                : 'border-game-border text-game-textDim hover:border-game-primary'
+            }`}
+            title="Toggle LUM flag — lit tiles (light sources) ignore ambient darkness"
+          >
+            💡 LUM
+          </button>
         </>
       )}
 

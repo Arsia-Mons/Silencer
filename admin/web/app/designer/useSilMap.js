@@ -203,14 +203,14 @@ export function useSilMap() {
       const base = i * CELL_SIZE;
       for (let l = 0; l < 4; l++) {
         const off = base + l * 4;
-        const cell = layers.bg[l][i] ?? { tile_id: 0, flip: 0, lum: 255 };
+        const cell = layers.bg[l][i] ?? { tile_id: 0, flip: 0, lum: 0 };
         ldv.setUint16(off, cell.tile_id, true);
         ldv.setUint8(off + 2, cell.flip);
         ldv.setUint8(off + 3, cell.lum);
       }
       for (let l = 0; l < 4; l++) {
         const off = base + 20 + l * 4;
-        const cell = layers.fg[l][i] ?? { tile_id: 0, flip: 0, lum: 255 };
+        const cell = layers.fg[l][i] ?? { tile_id: 0, flip: 0, lum: 0 };
         ldv.setUint16(off, cell.tile_id, true);
         ldv.setUint8(off + 2, cell.flip);
         ldv.setUint8(off + 3, cell.lum);

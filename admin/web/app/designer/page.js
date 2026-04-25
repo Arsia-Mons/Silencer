@@ -26,6 +26,7 @@ export default function DesignerPage() {
   const [pan, setPan]     = useState({ x: 32, y: 32 });
   const [cursor, setCursor] = useState({ tx: 0, ty: 0, wx: 0, wy: 0 });
   const [dragPlatform, setDragPlatform] = useState(null);
+  const [lumMode, setLumMode] = useState(false);
 
   const silInputRef  = useRef(null);
   const dataDirRef   = useRef(null);
@@ -53,8 +54,8 @@ export default function DesignerPage() {
   };
 
   const handleTilePaint = useCallback((layerType, layerIdx, tx, ty, tileId) => {
-    updateTile(layerType, layerIdx, tx, ty, tileId, 0, 255);
-  }, [updateTile]);
+    updateTile(layerType, layerIdx, tx, ty, tileId, 0, lumMode ? 1 : 0);
+  }, [updateTile, lumMode]);
 
   const handlePlatformDraw = useCallback((platform) => {
     addPlatform(platform);
@@ -214,6 +215,8 @@ export default function DesignerPage() {
           onLayerChange={setActiveLayer}
           selectedActor={selectedActorId}
           onActorChange={setSelectedActor}
+          lumMode={lumMode}
+          onLumModeChange={setLumMode}
         />
 
         {/* Main area: canvas + right panel */}
