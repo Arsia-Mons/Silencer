@@ -4501,38 +4501,47 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							}
 							if(selectbox->uid == 4){ // map select
 								int index = selectbox->MouseInside(world, iface->mousex, iface->mousey);
-								if(index != -1){
-									std::string itemname = selectbox->GetItemName(index);
-									bool isserver = servermaps.count(itemname) > 0;
-									if(iface->mousedown && isserver && iface->mousex >= selectbox->x + selectbox->width - 18){
-										const std::string & hex = servermaps[itemname];
-										unsigned char sha1bytes[20] = {};
-										bool ok = hex.size() == 40;
-										for(int j = 0; ok && j < 20; j++){
-											auto hv = [](char c) -> int {
-												if(c >= '0' && c <= '9') return c - '0';
-												if(c >= 'a' && c <= 'f') return c - 'a' + 10;
-												if(c >= 'A' && c <= 'F') return c - 'A' + 10;
-												return -1;
-											};
-											int hi = hv(hex[2*j]), lo = hv(hex[2*j+1]);
-											if(hi < 0 || lo < 0){ ok = false; break; }
-											sha1bytes[j] = (unsigned char)((hi << 4) | lo);
-										}
-										if(ok){
-											std::string dlname = itemname.substr(5);
-											std::string result = FetchMapFromServer(dlname.c_str(), sha1bytes, ZSILENCER_MAP_API_URL);
-											if(!result.empty()){
-												servermaps.erase(itemname);
-												Interface * old_create = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-												if(old_create) old_create->DestroyInterface(world);
-												gamecreateinterface = CreateGameCreateInterface()->id;
-												return false;
-											}else{
-												CreateModalDialog("Download failed");
+								// DL badge click: raw coord check (badge lives in the 16px right margin MouseInside excludes)
+								if(iface->mousedown && iface->mousex >= selectbox->x + selectbox->width - 16 &&
+								   iface->mousey >= selectbox->y && iface->mousey < selectbox->y + selectbox->height){
+									int row = (iface->mousey - selectbox->y) / selectbox->lineheight + selectbox->scrolled;
+									if(row >= 0 && row < (int)selectbox->items.size()){
+										std::string clickeditem = selectbox->GetItemName(row);
+										auto dlit = servermaps.find(clickeditem);
+										if(dlit != servermaps.end()){
+											const std::string & hex = dlit->second;
+											unsigned char sha1bytes[20] = {};
+											bool ok = hex.size() == 40;
+											for(int j = 0; ok && j < 20; j++){
+												auto hv = [](char c) -> int {
+													if(c >= '0' && c <= '9') return c - '0';
+													if(c >= 'a' && c <= 'f') return c - 'a' + 10;
+													if(c >= 'A' && c <= 'F') return c - 'A' + 10;
+													return -1;
+												};
+												int hi = hv(hex[2*j]), lo = hv(hex[2*j+1]);
+												if(hi < 0 || lo < 0){ ok = false; break; }
+												sha1bytes[j] = (unsigned char)((hi << 4) | lo);
+											}
+											if(ok){
+												std::string dlname = clickeditem.substr(5);
+												std::string result = FetchMapFromServer(dlname.c_str(), sha1bytes, ZSILENCER_MAP_API_URL);
+												if(!result.empty()){
+													servermaps.erase(clickeditem);
+													Interface * old_create = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
+													if(old_create) old_create->DestroyInterface(world);
+													gamecreateinterface = CreateGameCreateInterface()->id;
+													return false;
+												}else{
+													CreateModalDialog("Download failed");
+												}
 											}
 										}
 									}
+								}
+								if(index != -1){
+									std::string itemname = selectbox->GetItemName(index);
+									bool isserver = servermaps.count(itemname) > 0;
 									if(index != selectedmap){
 										if(mappreviewinterface){
 											Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));

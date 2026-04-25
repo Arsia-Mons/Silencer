@@ -756,9 +756,9 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								}
 								if(isdl){
 									DrawText(surface, selectbox->x, row_y, text + 5, 133, 6);
-									int bx = selectbox->x + selectbox->width - 18;
-									DrawFilledRectangle(surface, bx, row_y, bx + 16, row_y + 10, 175);
-									DrawText(surface, bx + 2, row_y, "DL", 133, 6);
+									int bx = selectbox->x + selectbox->width - 16;
+									DrawFilledRectangle(surface, bx - 1, row_y, bx + 13, row_y + 11, 0);
+									DrawText(surface, bx, row_y, "DL", 133, 6);
 								}else{
 									DrawText(surface, selectbox->x, row_y, text, 133, 6);
 								}
