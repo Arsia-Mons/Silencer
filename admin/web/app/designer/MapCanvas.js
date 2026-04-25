@@ -31,11 +31,11 @@ function getActorDef(id) {
 export default function MapCanvas({
   map, tileImages, spriteImages, activeTool, activeLayer, selectedTileId,
   zoom, pan, onZoomChange, onPanChange,
-  onTilePaint, onPlatformDraw, onPlatformRemove, onActorPlace, onActorRemove,
+  onTilePaint, onPlatformDraw, onPlatformRemove, onActorPlace, onActorRemove, onActorRightClick,
   onBeginPaint, onCommitPaint,
   selectedActorId, dragPlatform, onDragPlatformChange,
   onCursorChange,
-}) {
+})  {
   const canvasRef = useRef(null);
   const isPainting = useRef(false);
   const isSpacePanning = useRef(false);
@@ -232,8 +232,12 @@ export default function MapCanvas({
       const cx = a.x * zoom + pan.x;
       const cy = a.y * zoom + pan.y;
 
+      // Dynamic bank for actors where it depends on actor.type (e.g., terminal)
+      let bankNum = def.bank;
+      if (a.id === 54) bankNum = a.type === 0 ? 183 : 184;
+
       // Try to draw actual sprite
-      const sprBank = def.bank != null ? spriteImages?.get(def.bank) : null;
+      const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
       const spr = sprBank?.[def.frame ?? 0];
       if (spr) {
         const sx = cx - spr.offsetX * zoom;
@@ -306,6 +310,20 @@ export default function MapCanvas({
 
   const handleMouseDown = useCallback((e) => {
     const { cx, cy } = getCanvasPos(e);
+
+    // Right-click: show actor context menu
+    if (e.button === 2 && map) {
+      const { wx, wy } = canvasToWorld(cx, cy);
+      for (let i = map.actors.length - 1; i >= 0; i--) {
+        const a = map.actors[i];
+        const dist = Math.hypot(a.x - wx, a.y - wy);
+        if (dist < 48 / zoom) {
+          onActorRightClick?.(i, e.clientX, e.clientY);
+          return;
+        }
+      }
+      return;
+    }
 
     // Middle mouse or Space+left or Ctrl+left = pan
     if (e.button === 1 || (e.button === 0 && isSpacePanning.current) || (e.button === 0 && isCtrlPanning.current)) {

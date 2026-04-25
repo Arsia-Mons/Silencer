@@ -8,6 +8,7 @@ import { useSilMap } from './useSilMap.js';
 import Toolbar, { ACTOR_DEFS, PLATFORM_TOOL_TYPES } from './Toolbar.js';
 import MapCanvas from './MapCanvas.js';
 import TilePicker from './TilePicker.js';
+import ActorContextMenu from './ActorContextMenu.js';
 
 export default function DesignerPage() {
   useAuth();
@@ -15,7 +16,7 @@ export default function DesignerPage() {
 
   const { loaded, error, tileImages, spriteImages, tileBankCounts, progress, loadFiles } = useGameData();
   const { map, openMap, saveMap, updateTile, beginPaint, commitPaint,
-          addPlatform, removePlatform, addActor, removeActor,
+          addPlatform, removePlatform, addActor, removeActor, updateActor,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   const [activeTool, setActiveTool]     = useState('TILE_BG');
@@ -30,6 +31,7 @@ export default function DesignerPage() {
   const [resizeW, setResizeW] = useState('');
   const [resizeH, setResizeH] = useState('');
   const [showResize, setShowResize] = useState(false);
+  const [actorMenu, setActorMenu] = useState(null); // { idx, screenX, screenY }
 
   // Sync resize inputs when map changes
   useEffect(() => {
@@ -302,6 +304,7 @@ export default function DesignerPage() {
               onPlatformRemove={removePlatform}
               onActorPlace={handleActorPlace}
               onActorRemove={removeActor}
+              onActorRightClick={(idx, sx, sy) => setActorMenu({ idx, screenX: sx, screenY: sy })}
               selectedActorId={selectedActorId}
               dragPlatform={dragPlatform}
               onDragPlatformChange={handleDragPlatform}
@@ -341,6 +344,19 @@ export default function DesignerPage() {
           </span>
         </div>
       </div>
+
+      {/* Actor context menu (right-click) */}
+      {actorMenu && map?.actors[actorMenu.idx] && (
+        <ActorContextMenu
+          actor={map.actors[actorMenu.idx]}
+          actorIdx={actorMenu.idx}
+          screenX={actorMenu.screenX}
+          screenY={actorMenu.screenY}
+          onUpdate={updateActor}
+          onDelete={removeActor}
+          onClose={() => setActorMenu(null)}
+        />
+      )}
     </div>
   );
 }

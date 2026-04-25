@@ -21,7 +21,8 @@ export const PLATFORM_TOOL_TYPES = {
   TRACK:      { type1: 2, type2: 0, typeName: 'TRACK' },
 };
 
-// bank: sprite bank number (null = no sprite), frame: sprite frame index
+// bank: sprite bank number, frame: sprite frame index
+// For terminals: type field selects bank (0→183 small, 1→184 big)
 export const ACTOR_DEFS = [
   { id: 0,  label: 'Guard Blaster',  icon: 'GB', color: '#ef4444', bank: 59,  frame: 0 },
   { id: 1,  label: 'Civilian',       icon: 'CV', color: '#f59e0b', bank: 121, frame: 0 },
@@ -30,7 +31,7 @@ export const ACTOR_DEFS = [
   { id: 6,  label: 'Robot',          icon: 'RB', color: '#a855f7', bank: 47,  frame: 0 },
   { id: 36, label: 'Player Start',   icon: 'PS', color: '#22d3ee', bank: 9,   frame: 0 },
   { id: 37, label: 'Camera',         icon: 'CM', color: '#f59e0b', bank: 65,  frame: 0 },
-  { id: 54, label: 'Terminal',       icon: 'TM', color: '#00a328', bank: null, frame: 0 },
+  { id: 54, label: 'Terminal',       icon: 'TM', color: '#00a328', bank: 183, frame: 0 }, // type 0=small(183), 1=big(184)
   { id: 56, label: 'Inv. Station',   icon: 'IS', color: '#00a328', bank: 89,  frame: 0 },
   { id: 57, label: 'Heal Machine',   icon: 'HM', color: '#22d3ee', bank: 172, frame: 0 },
   { id: 58, label: 'Secret Return',  icon: 'SR', color: '#a855f7', bank: 152, frame: 0 },
@@ -40,6 +41,19 @@ export const ACTOR_DEFS = [
   { id: 66, label: 'Tech Station',   icon: 'TS', color: '#00a328', bank: 106, frame: 0 },
   { id: 70, label: 'Credit Machine', icon: 'CR', color: '#f59e0b', bank: 80,  frame: 0 },
 ];
+
+// Human-readable hints for the 'type' field per actor ID
+export const ACTOR_TYPE_HINTS = {
+  0:  { label: 'Weapon', options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma' } },
+  1:  { label: 'Variant', options: { 0:'Civilian A', 1:'Civilian B' } },
+  2:  { label: 'Weapon', options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma' } },
+  3:  { label: 'Weapon', options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma' } },
+  36: { label: 'Agency', options: { 0:'Agency 0', 1:'Agency 1', 2:'Agency 2', 3:'Agency 3' } },
+  54: { label: 'Size',   options: { 0:'Small', 1:'Big' } },
+  63: { label: 'Item',   options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma', 5:'Health', 6:'Credits' } },
+  65: { label: 'Side',   options: { 0:'Team A', 1:'Team B' } },
+  67: { label: 'Variant', options: {} },
+};
 
 export default function Toolbar({ activeTool, onToolChange, activeLayer, onLayerChange, selectedActor, onActorChange, lumMode, onLumModeChange }) {
   const tileTools = TOOLS.filter(t => t.id === 'TILE_BG' || t.id === 'TILE_FG');

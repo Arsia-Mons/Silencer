@@ -2,10 +2,11 @@
 import { useState, useCallback } from 'react';
 import { ACTOR_DEFS } from './Toolbar.js';
 
-// Sprite banks needed for actor rendering (from ACTOR_DEFS)
-const NEEDED_SPRITE_BANKS = new Set(
-  ACTOR_DEFS.map(a => a.bank).filter(b => b != null)
-);
+// Sprite banks needed for actor rendering (from ACTOR_DEFS, plus terminal big variant)
+const NEEDED_SPRITE_BANKS = new Set([
+  ...ACTOR_DEFS.map(a => a.bank).filter(b => b != null),
+  184, // big terminal (type=1 variant of actor 54)
+]);
 
 // Palette stride: 772 bytes per palette (768 color bytes + 4 padding), header 4 bytes
 // Colors are VGA 0-63 range, scaled <<2 to 0-252
