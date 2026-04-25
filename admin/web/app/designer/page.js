@@ -45,6 +45,7 @@ export default function DesignerPage() {
   const [showHotkeys, setShowHotkeys] = useState(false);
   const [actorMenu, setActorMenu] = useState(null);
   const [tileMenu, setTileMenu] = useState(null);
+  const [highlightActorIdx, setHighlightActorIdx] = useState(null);
   const [vis, setVis] = useState({
     bg: [true, true, true, true],
     fg: [true, true, true, true],
@@ -482,13 +483,14 @@ export default function DesignerPage() {
               onActorPlace={handleActorPlace}
               onActorRemove={removeActor}
               onActorMove={handleActorMove}
-              onActorRightClick={(idx, sx, sy) => setActorMenu({ idx, screenX: sx, screenY: sy })}
+              onActorRightClick={(idx, sx, sy) => { setActorMenu({ idx, screenX: sx, screenY: sy }); setHighlightActorIdx(idx); }}
               onTileRightClick={(info) => { setActorMenu(null); setTileMenu(info); }}
               selectedActorId={selectedActorId}
               dragPlatform={dragPlatform}
               onDragPlatformChange={handleDragPlatform}
               onCursorChange={setCursor}
               eraseLayerType={eraseLayerType}
+              highlightActorIdx={highlightActorIdx}
             />
             <Minimap
               map={map}
@@ -514,8 +516,9 @@ export default function DesignerPage() {
             {map && (
               <ActorListPanel
                 actors={map.actors}
-                onCenter={handleCenterOnActor}
-                onActorRightClick={(idx, sx, sy) => setActorMenu({ idx, screenX: sx, screenY: sy })}
+                highlightIdx={highlightActorIdx}
+                onCenter={(actor) => { handleCenterOnActor(actor); setHighlightActorIdx(map.actors.indexOf(actor)); }}
+                onActorRightClick={(idx, sx, sy) => { setActorMenu({ idx, screenX: sx, screenY: sy }); setHighlightActorIdx(idx); }}
               />
             )}
           </div>
@@ -562,7 +565,7 @@ export default function DesignerPage() {
           screenY={actorMenu.screenY}
           onUpdate={updateActor}
           onDelete={removeActor}
-          onClose={() => setActorMenu(null)}
+          onClose={() => { setActorMenu(null); setHighlightActorIdx(null); }}
         />
       )}
 

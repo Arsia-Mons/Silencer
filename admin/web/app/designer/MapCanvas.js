@@ -38,8 +38,11 @@ export default function MapCanvas({
   onCursorChange,
   onActorMove,
   eraseLayerType,
+  highlightActorIdx,
 })  {
   const canvasRef = useRef(null);
+  const overlayCanvasRef = useRef(null);
+  const rafRef = useRef(null);
   const isPainting = useRef(false);
   const isSpacePanning = useRef(false);
   const isCtrlPanning = useRef(false);
@@ -329,15 +332,81 @@ export default function MapCanvas({
   // Resize canvas to fill container
   useEffect(() => {
     const canvas = canvasRef.current;
+    const overlay = overlayCanvasRef.current;
     if (!canvas) return;
     const resizer = new ResizeObserver(() => {
       const rect = canvas.parentElement.getBoundingClientRect();
       canvas.width  = rect.width;
       canvas.height = rect.height;
+      if (overlay) { overlay.width = rect.width; overlay.height = rect.height; }
     });
     resizer.observe(canvas.parentElement);
     return () => resizer.disconnect();
   }, []);
+
+  // Animated marching-ants selection highlight on overlay canvas
+  useEffect(() => {
+    const overlay = overlayCanvasRef.current;
+    if (!overlay) return;
+    const ctx = overlay.getContext('2d');
+
+    if (highlightActorIdx == null || !map || !map.actors[highlightActorIdx]) {
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      return;
+    }
+
+    const actor = map.actors[highlightActorIdx];
+    const def = getActorDef(actor.id);
+
+    function getSpriteRect() {
+      let bankNum = def.bank;
+      if (actor.id === 54) bankNum = actor.type === 0 ? 183 : 184;
+      if (actor.id === 47) bankNum = 49 + Math.min(actor.type ?? 0, 9);
+      if (actor.id === 63) bankNum = actor.type === 0 ? 200 : actor.type === 2 ? 201 : 205;
+      const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
+      const spr = sprBank?.[def.frame ?? 0];
+      const cx = actor.x * zoom + pan.x;
+      const cy = actor.y * zoom + pan.y;
+      if (spr) {
+        const pad = 3;
+        return { x: cx - spr.offsetX * zoom - pad, y: cy - spr.offsetY * zoom - pad,
+                 w: spr.width * zoom + pad * 2, h: spr.height * zoom + pad * 2 };
+      }
+      const r = Math.max(8, 10 * zoom);
+      return { circle: true, cx, cy, r: r + 3 };
+    }
+
+    let dashOffset = 0;
+    function draw() {
+      ctx.clearRect(0, 0, overlay.width, overlay.height);
+      const rect = getSpriteRect();
+      ctx.save();
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      // White layer
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.lineDashOffset = -dashOffset;
+      if (rect.circle) {
+        ctx.beginPath(); ctx.arc(rect.cx, rect.cy, rect.r, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+      }
+      // Green offset layer for depth
+      ctx.strokeStyle = 'rgba(74,200,74,0.7)';
+      ctx.lineDashOffset = -dashOffset + 5;
+      if (rect.circle) {
+        ctx.beginPath(); ctx.arc(rect.cx, rect.cy, rect.r, 0, Math.PI * 2); ctx.stroke();
+      } else {
+        ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+      }
+      ctx.restore();
+      dashOffset = (dashOffset + 0.5) % 10;
+      rafRef.current = requestAnimationFrame(draw);
+    }
+    rafRef.current = requestAnimationFrame(draw);
+    return () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
+  }, [highlightActorIdx, map, spriteImages, zoom, pan]);
 
   // Mouse event handlers
   const getCanvasPos = (e) => {
@@ -584,6 +653,10 @@ export default function MapCanvas({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onContextMenu={handleContextMenu}
+      />
+      <canvas
+        ref={overlayCanvasRef}
+        style={{ position: 'absolute', inset: 0, pointerEvents: 'none', width: '100%', height: '100%' }}
       />
     </div>
   );
