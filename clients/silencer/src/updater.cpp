@@ -125,7 +125,7 @@ void Updater::Run() {
         "/tmp";
 #endif
     if (!tmpdir) tmpdir = ".";
-    std::string zippath = std::string(tmpdir) + "/zsilencer-update.zip";
+    std::string zippath = std::string(tmpdir) + "/silencer-update.zip";
 
     UpdaterDownload dl;
     int http = 0;

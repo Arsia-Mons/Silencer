@@ -34,13 +34,13 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM * vm, void * pvt){
 	return JNI_VERSION_1_6;
 }
 
-extern "C" void Java_com_zSILENCER_game_zSILENCER_SetPath(JNIEnv * env, jclass cls, jobject path){
+extern "C" void Java_com_silencer_game_Silencer_SetPath(JNIEnv * env, jclass cls, jobject path){
 	const char * pathstring = env->GetStringUTFChars((jstring)path, NULL);
 	chdir(pathstring);
 }
 
 #ifdef OUYA
-extern "C" void Java_com_zSILENCER_game_zSILENCER_OuyaControllerKeyEvent(JNIEnv * env, jclass cls, jint player, jint type, jint keycode){
+extern "C" void Java_com_silencer_game_Silencer_OuyaControllerKeyEvent(JNIEnv * env, jclass cls, jint player, jint type, jint keycode){
 	static SDL_Event pushedevent;
 	if(type == 1){
 		pushedevent.type = SDL_KEYDOWN;
@@ -74,7 +74,7 @@ extern "C" void Java_com_zSILENCER_game_zSILENCER_OuyaControllerKeyEvent(JNIEnv 
 void CDDataDir(void){
 #ifdef __APPLE__
 	char path[PATH_MAX];
-	sprintf(path, "%s/zSILENCER", GetAppSupportDirectory());
+	sprintf(path, "%s/Silencer", GetAppSupportDirectory());
 	mkdir(path, 0777);
 	chdir(path);
 #endif
@@ -118,7 +118,7 @@ void CDResDir(void){
 		char *lastslash = strrchr(exepath, '/');
 		if(lastslash) *lastslash = 0;
 		char testpath[PATH_MAX];
-		// Check ../assets (build/zsilencer -> assets/)
+		// Check ../assets (build/silencer -> assets/)
 		snprintf(testpath, PATH_MAX, "%s/../assets/PALETTE.BIN", exepath);
 		FILE *f = fopen(testpath, "r");
 		if(f){

@@ -38,14 +38,14 @@ std::string TempDir() {
 
 std::string LogPath() {
 #ifdef _WIN32
-    return TempDir() + "\\zsilencer-update.log";
+    return TempDir() + "\\silencer-update.log";
 #elif defined(__APPLE__)
     const char *home = getenv("HOME");
-    std::string dir = std::string(home ? home : "/tmp") + "/Library/Logs/zSILENCER";
+    std::string dir = std::string(home ? home : "/tmp") + "/Library/Logs/Silencer";
     mkdir(dir.c_str(), 0755);
     return dir + "/update.log";
 #else
-    return "/tmp/zsilencer-update.log";
+    return "/tmp/silencer-update.log";
 #endif
 }
 
@@ -187,9 +187,9 @@ void RemoveDirRecursive(const std::string &path) {
 }
 
 // Production release zips wrap their contents in a single top-level
-// directory: on macOS ditto --keepParent produces `zsilencer.app/`, on
-// Windows Compress-Archive of `build/package/zsilencer` produces
-// `zsilencer/`. After extracting to staging/, we need to hoist that
+// directory: on macOS ditto --keepParent produces `Silencer.app/`, on
+// Windows Compress-Archive of `build/package/silencer` produces
+// `silencer/`. After extracting to staging/, we need to hoist that
 // inner dir into place — otherwise the atomic rename puts the install
 // one level too deep and breaks the bundle / relaunch path.
 //
@@ -361,9 +361,9 @@ bool Launch(const std::string &zippath) {
     std::string tempdir = TempDir();
     std::string temp = tempdir +
 #ifdef _WIN32
-        "\\zsilencer-stage2.exe";
+        "\\silencer-stage2.exe";
 #else
-        "/zsilencer-stage2";
+        "/silencer-stage2";
 #endif
 
     if (!CopyFile_(self, temp)) {
@@ -376,7 +376,7 @@ bool Launch(const std::string &zippath) {
     // directory before our code runs. Since stage-2 lives in %TEMP% but
     // its DLLs (zlib1, SDL2, libcurl, etc.) live in the install dir, the
     // loader fails with "zlib1.dll was not found". Copy every *.dll from
-    // the install dir next to zsilencer-stage2.exe so imports resolve.
+    // the install dir next to silencer-stage2.exe so imports resolve.
     {
         std::string pattern = install + "\\*.dll";
         WIN32_FIND_DATAA fd{};

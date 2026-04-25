@@ -91,7 +91,7 @@ UpdaterDownload::Result UpdaterDownload::Fetch(
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(curl, CURLOPT_FAILONERROR, 1L);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 15L);
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "zsilencer-updater/1.0");
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "silencer-updater/1.0");
 
     CURLcode rc = curl_easy_perform(curl);
     long http = 0;

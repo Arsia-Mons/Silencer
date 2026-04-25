@@ -22,21 +22,21 @@
 #include <algorithm>
 #include <stdio.h>
 
-#ifndef ZSILENCER_LOBBY_HOST
-#define ZSILENCER_LOBBY_HOST "127.0.0.1"
+#ifndef SILENCER_LOBBY_HOST
+#define SILENCER_LOBBY_HOST "127.0.0.1"
 #endif
-#ifndef ZSILENCER_LOBBY_PORT
-#define ZSILENCER_LOBBY_PORT 517
+#ifndef SILENCER_LOBBY_PORT
+#define SILENCER_LOBBY_PORT 517
 #endif
-#ifndef ZSILENCER_VERSION
-#define ZSILENCER_VERSION "00025"
+#ifndef SILENCER_VERSION
+#define SILENCER_VERSION "00025"
 #endif
-#ifndef ZSILENCER_MAP_API_URL
-#define ZSILENCER_MAP_API_URL "http://127.0.0.1:8080"
+#ifndef SILENCER_MAP_API_URL
+#define SILENCER_MAP_API_URL "http://127.0.0.1:8080"
 #endif
 
 Game::Game() : renderer(world), screenbuffer(640, 480){
-	world.SetVersion(ZSILENCER_VERSION);
+	world.SetVersion(SILENCER_VERSION);
 	frames = 0;
 	fps = 0;
 	state = MAINMENU;
@@ -226,7 +226,7 @@ bool Game::Load(char * cmdline){
 		SDL_EventState(SDL_TEXTINPUT, SDL_TRUE); //SDL_EnableUNICODE(true);
 		//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 		//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-		window = SDL_CreateWindow("zSilencer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+		window = SDL_CreateWindow("Silencer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
 		if(!SetupOpenGL()){
 			//printf("Unable to setup OpenGL shaders, using SDL Renderer\n");
 			usingopengl = false;
@@ -535,7 +535,7 @@ bool Game::Loop(void){
 	unsigned int wait = 42; // 24 fps
 	if(updatetitle){
 		char title[128];
-		sprintf(title, "zSilencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
+		sprintf(title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
 		SDL_SetWindowTitle(window, title);
 		updatetitle = false;
 		frames = 1;
@@ -2507,7 +2507,7 @@ Interface * Game::CreateMainMenuInterface(void){
 	Overlay * logo = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	logo->res_bank = 208;
 	Overlay * version = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	version->text = "zSilencer v";
+	version->text = "Silencer v";
 	version->text += world.version;
 	version->textbank = 133;
 	version->textwidth = 11;
@@ -2914,7 +2914,7 @@ Interface * Game::CreateLobbyInterface(void){
 	background->res_bank = 7;
 	background->res_index = 1;
 	Overlay * toptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	toptext->text = "zSilencer";
+	toptext->text = "Silencer";
 	toptext->textbank = 135;
 	toptext->textwidth = 11;
 	toptext->effectcolor = 152;
@@ -3395,7 +3395,7 @@ Interface * Game::CreateGameCreateInterface(void){
 	}
 	// Add server-only maps (not yet downloaded) with a download prefix
 	servermaps.clear();
-	auto serverlist = FetchServerMapList(ZSILENCER_MAP_API_URL);
+	auto serverlist = FetchServerMapList(SILENCER_MAP_API_URL);
 	for(auto & entry : serverlist){
 		bool alreadylocal = std::find(maps.begin(), maps.end(), entry.first) != maps.end();
 		if(!alreadylocal){
@@ -4039,9 +4039,9 @@ void Game::ProcessUpdateInterface(Interface * iface){
 void Game::LaunchStage2(void){
 	std::string zippath =
 #ifdef _WIN32
-		std::string(getenv("TEMP") ? getenv("TEMP") : ".") + "\\zsilencer-update.zip";
+		std::string(getenv("TEMP") ? getenv("TEMP") : ".") + "\\silencer-update.zip";
 #else
-		"/tmp/zsilencer-update.zip";
+		"/tmp/silencer-update.zip";
 #endif
 	fprintf(stderr, "[updater] Game::LaunchStage2 invoking UpdaterStage2::Launch with zip=%s\n",
 		zippath.c_str());
@@ -4322,9 +4322,9 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 					break;
 					case Lobby::WAITING:{
 						char line[128];
-						snprintf(line, sizeof(line), "Connecting to %s:%d", ZSILENCER_LOBBY_HOST, ZSILENCER_LOBBY_PORT);
+						snprintf(line, sizeof(line), "Connecting to %s:%d", SILENCER_LOBBY_HOST, SILENCER_LOBBY_PORT);
 						textbox->AddLine(line);
-						world.lobby.Connect(ZSILENCER_LOBBY_HOST, ZSILENCER_LOBBY_PORT);
+						world.lobby.Connect(SILENCER_LOBBY_HOST, SILENCER_LOBBY_PORT);
 						//world.lobby.state = Lobby::AUTHENTICATED;
 					}break;
 					case Lobby::RESOLVING:
@@ -4338,7 +4338,7 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 					break;
 					case Lobby::RESOLVED:
 						textbox->AddLine("Hostname resolved");
-						world.lobby.Connect(ZSILENCER_LOBBY_HOST, ZSILENCER_LOBBY_PORT);
+						world.lobby.Connect(SILENCER_LOBBY_HOST, SILENCER_LOBBY_PORT);
 					break;
 					case Lobby::CONNECTED:
 						textbox->AddLine("Connected");
@@ -4363,7 +4363,7 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 								}else{
 									textbox->AddLine("Software is out of date");
 									textbox->AddLine("Get latest version at:");
-									textbox->AddLine("http://zsilencer.com");
+									textbox->AddLine("https://github.com/Arsia-Mons/Silencer");
 									world.lobby.Disconnect();
 									world.lobby.state = Lobby::IDLE;
 								}
@@ -4559,7 +4559,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 												snprintf(selectbox->downloaditem, sizeof(selectbox->downloaditem), "%s", dlname.c_str());
 												selectbox->downloadprogress = 0;
 												if(dlthread.joinable()) dlthread.join();
-												std::string apiURL = ZSILENCER_MAP_API_URL;
+												std::string apiURL = SILENCER_MAP_API_URL;
 												dlthread = std::thread([this, dlname, sha1bytes, apiURL]() mutable {
 													std::string res = FetchMapFromServer(dlname.c_str(), sha1bytes, apiURL.c_str(), &dlprogress);
 													dlresult.store(res.empty() ? -1 : 1);
@@ -6029,7 +6029,7 @@ void Game::ProcessMapDownload(void){
 						mapfilename = FetchMapFromServer(
 							world.gameinfo.mapname,
 							world.gameinfo.maphash,
-							ZSILENCER_MAP_API_URL);
+							SILENCER_MAP_API_URL);
 					}
 					if(mapfilename.size() > 0){
 						world.SendMapDownloaded();

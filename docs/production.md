@@ -297,7 +297,7 @@ builds without having to rebuild the VM every time.
 
 To actually lock out old clients, bump both:
 
-1. `world.SetVersion("...")` in `src/game.cpp:31` (client side).
+1. `world.SetVersion("...")` in `clients/silencer/src/game.cpp:31` (client side).
 2. `lobby_version_string` in `terraform.tfvars` (server side).
 
 Then `terraform apply` and tag a release. The server-side change
@@ -339,7 +339,7 @@ game writes to `$HOME` at startup, and the systemd unit sets
 (which is writable) rather than inside `/home` (which is locked down
 by `ProtectHome=true`). If someone edited `cloud-init.yaml.tftpl`
 and dropped the `HOME` line, this is what it looks like. For actual
-segfaults in game code, `git log -- src/game.cpp src/lobbygame.cpp`
+segfaults in game code, `git log -- clients/silencer/src/game.cpp clients/silencer/src/lobbygame.cpp`
 has the history of prior fixes to refer to.
 
 **Clients stop being able to connect after a while.** A few things

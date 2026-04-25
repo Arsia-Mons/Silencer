@@ -1,7 +1,7 @@
 {
-	"name": "zsilencer",
+	"name": "silencer",
 	"version-string": "0.0.0",
-	"description": "zSILENCER multiplayer client build dependencies",
+	"description": "Silencer multiplayer client build dependencies",
 	"dependencies": [
 		"sdl2",
 		{

@@ -272,7 +272,7 @@ palette's color-lookup table. RGB values are from Palette 0.
 | 140 | Caret | 252 | 252 | 0 | `#FCFC00` | Text-input cursor — yellow |
 | 146 | Health Damage | 12 | 4 | 4 | `#0C0404` | Damage-flash on health-only hits |
 | 150 | Minimap Tint | 92 | 28 | 28 | `#5C1C1C` | Minimap icon brightness |
-| 152 | Title Text | 132 | 28 | 28 | `#841C1C` | "zSilencer" title in lobby — dark red |
+| 152 | Title Text | 132 | 28 | 28 | `#841C1C` | "Silencer" title in lobby — dark red |
 | 153 | Red Alert | 152 | 28 | 28 | `#981C1C` | Neutron activated, game lost, connection lost |
 | 161 | Health Value | 252 | 80 | 80 | `#FC5050` | Health number on HUD — bright red |
 | 189 | Version Label | 216 | 136 | 52 | `#D88834` | Version string in lobby — orange |
@@ -355,7 +355,7 @@ a base index of 204 (`#1050A8`, a mid-blue).
 
 A reimplementation must read the same binary asset bundles, since every UI
 component references sprites by `(bank, index)` pairs and every glyph is a
-sprite in a font bank. Implementations in `src/resources.cpp`.
+sprite in a font bank. Implementations in `clients/silencer/src/resources.cpp`.
 
 ### Sprite Banks — `shared/assets/BIN_SPR.DAT` + `shared/assets/bin_spr/SPR_NNN.BIN`
 
@@ -1896,7 +1896,7 @@ relative to the parent Interface origin.
 
 | Element | Position `(x, y)` | Font | Color | Notes |
 | ----------------- | ----------------- | ---------- | ----- | --------------------------- |
-| Title             | `(15, 32)`        | bank 135 / width 11 | **152** (dark red) | `"zSilencer"` |
+| Title             | `(15, 32)`        | bank 135 / width 11 | **152** (dark red) | `"Silencer"` |
 | Version label     | `(115, 39)`       | bank 133 / width 6  | **189** (orange)   | `"v." + world.version` |
 | Map name          | `(180, 32)`       | bank 135 / width 11 | **129** ramp + brightness 160 | Currently selected map name |
 | Go Back button    | `(473, 29)`       | `B156x21` | — | Returns to main menu |
@@ -2087,27 +2087,27 @@ overlays, not palette indices — they appear here for cross-referencing with th
 
 | File | Contents |
 | ------------------- | ------------------------------------------------- |
-| `src/renderer.cpp` | All Draw* functions, effects, HUD rendering, buy menu, chat overlay, player list, modal dialog rendering |
-| `src/renderer.h` | Renderer class, drawing API surface |
-| `src/resources.cpp` | Asset loading: BIN_SPR.DAT / SPR_NNN.BIN format, RLE codec, font bank loading, palette assignment |
-| `src/resources.h` | `spritewidth`, `spriteheight`, `spriteoffsetx`, `spriteoffsety` arrays referenced throughout |
-| `src/palette.cpp` | Palette loading (PALETTE.BIN), lookup-table calculation, brightness/color/alpha transforms |
-| `src/palette.h` | Palette class, inline color/brightness transforms |
-| `src/button.cpp` | Button types, sizing, animation state machine, sound trigger |
-| `src/overlay.cpp` | Overlay defaults, sprite animations, text hit-testing |
-| `src/textinput.cpp` | Text field defaults, caret, input handling, scrolling, intentionally limited editing |
-| `src/textbox.cpp` | Multi-line text area, word-wrap, line storage format |
-| `src/selectbox.cpp` | List selection, item management, file listing |
-| `src/scrollbar.cpp` | Scroll bar hit regions, up/down logic |
-| `src/toggle.cpp` | Toggle visual states, checkbox/agency modes |
-| `src/interface.cpp` | Container/focus manager, tab order, keyboard/mouse dispatch, radio groups, modal handling |
-| `src/sprite.h` | Base sprite properties: effectcolor, effectbrightness, draw flags |
-| `src/sprite.cpp` | Bounding box calculation, nudge interpolation |
-| `src/object.h` | Object base class (type, id, render flags) |
-| `src/minimap.h` | Minimap pixel buffer (172 × 62) |
-| `src/game.cpp` | UI construction (lobby, menus, options screens), loading bar, modal dialog factory, main loop / tick rate |
-| `src/world.cpp` | Per-tick simulation entry point (`World::Tick`) |
-| `src/team.cpp` | Team overlays, player name labels |
+| `clients/silencer/src/renderer.cpp` | All Draw* functions, effects, HUD rendering, buy menu, chat overlay, player list, modal dialog rendering |
+| `clients/silencer/src/renderer.h` | Renderer class, drawing API surface |
+| `clients/silencer/src/resources.cpp` | Asset loading: BIN_SPR.DAT / SPR_NNN.BIN format, RLE codec, font bank loading, palette assignment |
+| `clients/silencer/src/resources.h` | `spritewidth`, `spriteheight`, `spriteoffsetx`, `spriteoffsety` arrays referenced throughout |
+| `clients/silencer/src/palette.cpp` | Palette loading (PALETTE.BIN), lookup-table calculation, brightness/color/alpha transforms |
+| `clients/silencer/src/palette.h` | Palette class, inline color/brightness transforms |
+| `clients/silencer/src/button.cpp` | Button types, sizing, animation state machine, sound trigger |
+| `clients/silencer/src/overlay.cpp` | Overlay defaults, sprite animations, text hit-testing |
+| `clients/silencer/src/textinput.cpp` | Text field defaults, caret, input handling, scrolling, intentionally limited editing |
+| `clients/silencer/src/textbox.cpp` | Multi-line text area, word-wrap, line storage format |
+| `clients/silencer/src/selectbox.cpp` | List selection, item management, file listing |
+| `clients/silencer/src/scrollbar.cpp` | Scroll bar hit regions, up/down logic |
+| `clients/silencer/src/toggle.cpp` | Toggle visual states, checkbox/agency modes |
+| `clients/silencer/src/interface.cpp` | Container/focus manager, tab order, keyboard/mouse dispatch, radio groups, modal handling |
+| `clients/silencer/src/sprite.h` | Base sprite properties: effectcolor, effectbrightness, draw flags |
+| `clients/silencer/src/sprite.cpp` | Bounding box calculation, nudge interpolation |
+| `clients/silencer/src/object.h` | Object base class (type, id, render flags) |
+| `clients/silencer/src/minimap.h` | Minimap pixel buffer (172 × 62) |
+| `clients/silencer/src/game.cpp` | UI construction (lobby, menus, options screens), loading bar, modal dialog factory, main loop / tick rate |
+| `clients/silencer/src/world.cpp` | Per-tick simulation entry point (`World::Tick`) |
+| `clients/silencer/src/team.cpp` | Team overlays, player name labels |
 
 ---
 

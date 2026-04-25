@@ -23,10 +23,10 @@ jobs:
         env:
           LOBBY_HOST: ${{ vars.LOBBY_HOST }}
         run: |
-          cmake -B build -S . \
+          cmake -B build -S clients/silencer \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DZSILENCER_LOBBY_HOST="${LOBBY_HOST:-silencer.hventura.com}"
+            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-silencer.hventura.com}"
 
       - name: Build
         run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
@@ -34,20 +34,20 @@ jobs:
       - name: Bundle dylibs
         working-directory: build
         run: |
-          mkdir -p zsilencer.app/Contents/Frameworks
+          mkdir -p Silencer.app/Contents/Frameworks
           dylibbundler \
             --overwrite-dir \
             --bundle-deps \
             --create-dir \
-            --fix-file zsilencer.app/Contents/MacOS/zsilencer \
-            --dest-dir zsilencer.app/Contents/Frameworks/ \
+            --fix-file Silencer.app/Contents/MacOS/Silencer \
+            --dest-dir Silencer.app/Contents/Frameworks/ \
             --install-path @rpath/
           install_name_tool -add_rpath @executable_path/../Frameworks \
-            zsilencer.app/Contents/MacOS/zsilencer 2>/dev/null || true
+            Silencer.app/Contents/MacOS/Silencer 2>/dev/null || true
           echo "--- bundled dylibs ---"
-          ls zsilencer.app/Contents/Frameworks/
+          ls Silencer.app/Contents/Frameworks/
           echo "--- main binary linkage ---"
-          otool -L zsilencer.app/Contents/MacOS/zsilencer
+          otool -L Silencer.app/Contents/MacOS/Silencer
 
       - name: Import Developer ID cert
         env:
@@ -78,14 +78,14 @@ jobs:
           # Sign inside-out: dylibs first, then main binary, then bundle.
           # --options runtime (Hardened Runtime) + --timestamp are required
           # by notarytool.
-          find zsilencer.app/Contents/Frameworks -name "*.dylib" -print0 \
+          find Silencer.app/Contents/Frameworks -name "*.dylib" -print0 \
             | xargs -0 -n1 codesign --force --timestamp --options runtime \
               --sign "$IDENTITY"
           codesign --force --timestamp --options runtime \
-            --sign "$IDENTITY" zsilencer.app/Contents/MacOS/zsilencer
+            --sign "$IDENTITY" Silencer.app/Contents/MacOS/Silencer
           codesign --force --timestamp --options runtime \
-            --sign "$IDENTITY" zsilencer.app
-          codesign --verify --deep --strict --verbose=2 zsilencer.app
+            --sign "$IDENTITY" Silencer.app
+          codesign --verify --deep --strict --verbose=2 Silencer.app
 
       - name: Notarize and staple
         working-directory: build
@@ -94,21 +94,21 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          ditto -ck --keepParent zsilencer.app /tmp/notarize.zip
+          ditto -ck --keepParent Silencer.app /tmp/notarize.zip
           xcrun notarytool submit /tmp/notarize.zip \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait
           rm /tmp/notarize.zip
-          xcrun stapler staple zsilencer.app
-          xcrun stapler validate zsilencer.app
-          spctl -a -vv -t execute zsilencer.app
+          xcrun stapler staple Silencer.app
+          xcrun stapler validate Silencer.app
+          spctl -a -vv -t execute Silencer.app
 
       - name: Package .app
         working-directory: build
         run: |
-          ditto -ck --sequesterRsrc --keepParent zsilencer.app zsilencer-macos-arm64.zip
+          ditto -ck --sequesterRsrc --keepParent Silencer.app silencer-macos-arm64.zip
 
       - name: Clean up keychain
         if: always()
@@ -118,7 +118,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: macos-arm64
-          path: build/zsilencer-macos-arm64.zip
+          path: build/silencer-macos-arm64.zip
           if-no-files-found: error
 
   build-windows:
@@ -141,11 +141,11 @@ jobs:
           VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
         run: |
           $lobby = if ($env:LOBBY_HOST) { $env:LOBBY_HOST } else { "silencer.hventura.com" }
-          cmake -B build -S . `
+          cmake -B build -S clients/silencer `
             -A x64 `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
-            -DZSILENCER_LOBBY_HOST="$lobby"
+            -DSILENCER_LOBBY_HOST="$lobby"
 
       - name: Build
         run: cmake --build build --config Release -- -maxcpucount
@@ -153,12 +153,12 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $stage = "build/package/zsilencer"
+          $stage = "build/package/silencer"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          Copy-Item build/Release/zsilencer.exe $stage/
+          Copy-Item build/Release/Silencer.exe $stage/
           # SDL2 / SDL2_mixer / zlib + transitive audio codec DLLs live in
           # the vcpkg manifest-mode install dir. Bulk-copy them so the zip
-          # is self-contained — without these, zsilencer.exe fails to start
+          # is self-contained — without these, Silencer.exe fails to start
           # with a missing SDL2.dll error on machines without vcpkg.
           $vcpkgBin = "build/vcpkg_installed/x64-windows/bin"
           Copy-Item "$vcpkgBin/*.dll" $stage/
@@ -167,12 +167,12 @@ jobs:
           Copy-Item -Recurse shared/assets $stage/assets
           Write-Host "--- packaged files ---"
           Get-ChildItem $stage
-          Compress-Archive -Path "build/package/zsilencer" -DestinationPath build/zsilencer-windows-x64.zip -Force
+          Compress-Archive -Path "build/package/silencer" -DestinationPath build/silencer-windows-x64.zip -Force
 
       - uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: build/zsilencer-windows-x64.zip
+          path: build/silencer-windows-x64.zip
           if-no-files-found: error
 
   release:
@@ -211,8 +211,8 @@ jobs:
           body: |
             ## Downloads
 
-            - **macOS (Apple Silicon):** `zsilencer-macos-arm64.zip`
-            - **Windows (x64):** `zsilencer-windows-x64.zip`
+            - **macOS (Apple Silicon):** `silencer-macos-arm64.zip`
+            - **Windows (x64):** `silencer-windows-x64.zip`
 
             ## First-run warnings
 
