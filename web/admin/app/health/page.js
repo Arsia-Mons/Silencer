@@ -174,7 +174,7 @@ export default function Health() {
 
         <div className="text-xs font-mono text-game-muted">
           Backups stored in Docker volume <code className="text-game-primary">backup-data</code>.
-          To restore: <code className="text-game-primary">mongorestore --uri=mongodb://localhost:28017/zsilencer --archive=&lt;file&gt; --gzip</code>
+          To restore: <code className="text-game-primary">mongorestore --uri=mongodb://localhost:28017/silencer --archive=&lt;file&gt; --gzip</code>
         </div>
       </main>
     </div>

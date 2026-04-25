@@ -1,4 +1,4 @@
-# zSILENCER Admin API
+# Silencer Admin API
 
 Express.js REST + WebSocket API that powers the admin dashboard and player portal.
 

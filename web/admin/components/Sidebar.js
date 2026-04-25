@@ -33,7 +33,7 @@ export default function Sidebar({ wsConnected }) {
     <aside className="w-56 min-h-screen bg-game-bgCard border-r border-game-border flex flex-col">
       {/* Logo */}
       <div className="px-4 py-5 border-b border-game-border">
-        <img src="/logo.png" alt="zSILENCER" className="h-10 w-auto mb-1" />
+        <img src="/logo.png" alt="Silencer" className="h-10 w-auto mb-1" />
         <div className="text-game-textDim text-xs tracking-widest mt-0.5">ADMIN CONSOLE</div>
       </div>
 

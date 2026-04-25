@@ -1,4 +1,4 @@
-// Changelog entries for zSILENCER — server, client, and admin dashboard.
+// Changelog entries for Silencer — server, client, and admin dashboard.
 // Categories: SERVER | CLIENT | DASHBOARD | INFRASTRUCTURE
 
 export const CHANGELOG = [

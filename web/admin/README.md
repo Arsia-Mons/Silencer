@@ -1,6 +1,6 @@
-# zSILENCER Admin Web
+# Silencer Admin Web
 
-Next.js 14 admin dashboard and player self-service portal for zSILENCER.
+Next.js 14 admin dashboard and player self-service portal for Silencer.
 
 ## Stack
 
