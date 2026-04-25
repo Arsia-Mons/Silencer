@@ -19,9 +19,11 @@ deploy lifecycle.
 
 The lobby's existing production deploy keeps its shape (binary
 build → scp → symlink swap → restart) and gains data-tier
-connection settings via cloud-init. The four other services move
-into production for the first time on the same
-per-component-deploy footing.
+connection settings via cloud-init. The new admin-tier workloads
+(admin-api, admin-web, plus the data tier they depend on) move
+into production for the first time, each on the same
+per-component-deploy footing as the lobby — see Principle below
+for the four-component grouping.
 
 ## Principle
 
@@ -85,7 +87,7 @@ be calibrated to that, not generic web-app heuristics:
 | Idle   | 0       | 0     | 0     | box up, nothing happening |
 | Light  | 5–10    | 1–2   | ~50   | typical evening |
 | Active | 30–50   | 5–10  | ~500  | busy weekend |
-| Peak   | 100–200 | 20+   | ~2000 | hobby ceiling — zSILENCER's all-time-high range |
+| Peak   | 100–200 | 20+   | ~2000 | hobby ceiling — Silencer's all-time-high range |
 
 Numbers below mix grounded baselines (distro defaults, daemon
 idle RSS, MongoDB cache config) and estimates for application
@@ -430,10 +432,13 @@ Update the lobby's cloud-init to pass `MONGO_URL` and `AMQP_URL`
 pointing at `admin.silencer.internal` with the lobby's service
 credentials. Rename the lobby's `RABBITMQ_URL` env var and
 `-rabbitmq-url` flag to `AMQP_URL` / `-amqp-url` (one-line code
-change in `server/main.go`). Open 15171/tcp on the lobby's SG to
-the admin/data box's SG and set the admin-api's
-`LOBBY_PLAYER_AUTH_URL` to `lobby.silencer.internal`. Requires
-lobby instance replacement (cloud-init runs once).
+change in `server/main.go`). Update `docker-compose.yml` to use
+`AMQP_URL` for both the `lobby` and `admin-api` services in the
+same PR so dev and prod env-var naming stay in sync. Open
+15171/tcp on the lobby's SG to the admin/data box's SG and set
+the admin-api's `LOBBY_PLAYER_AUTH_URL` to
+`lobby.silencer.internal`. Requires lobby instance replacement
+(cloud-init runs once).
 
 Done when: lobby logs show successful Mongo sync on player
 mutations and successful AMQP publishes on match end, and
