@@ -338,11 +338,47 @@ export function useSilMap() {
     });
   }, [pushHistory]);
 
+  const resizeMap = useCallback((newWidth, newHeight) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const { width, height, layers } = prev;
+      const newSize = newWidth * newHeight;
+      const empty = { tile_id: 0, flip: 0, lum: 0 };
+
+      const resizeLayer = (layer) => {
+        const next = new Array(newSize).fill(null);
+        const copyW = Math.min(width, newWidth);
+        const copyH = Math.min(height, newHeight);
+        for (let row = 0; row < copyH; row++) {
+          for (let col = 0; col < copyW; col++) {
+            next[row * newWidth + col] = layer[row * width + col];
+          }
+        }
+        return next;
+      };
+
+      const newLayers = {
+        bg: layers.bg.map(resizeLayer),
+        fg: layers.fg.map(resizeLayer),
+      };
+
+      // Clamp actors and platforms to new bounds (in world pixels)
+      const maxX = newWidth * 64;
+      const maxY = newHeight * 64;
+      const actors    = prev.actors.filter(a => a.x < maxX && a.y < maxY);
+      const platforms = prev.platforms.filter(p => p.x1 < maxX && p.y1 < maxY);
+
+      return { ...prev, width: newWidth, height: newHeight, layers: newLayers, actors, platforms };
+    });
+  }, [pushHistory]);
+
   return {
     map: mapData, openMap, saveMap,
     updateTile, beginPaint, commitPaint,
     addPlatform, removePlatform,
     addActor, removeActor,
     undo, redo, canUndo, canRedo,
+    resizeMap,
   };
 }

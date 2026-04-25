@@ -16,7 +16,7 @@ export default function DesignerPage() {
   const { loaded, error, tileImages, tileBankCounts, progress, loadFiles } = useGameData();
   const { map, openMap, saveMap, updateTile, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor,
-          undo, redo, canUndo, canRedo } = useSilMap();
+          undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   const [activeTool, setActiveTool]     = useState('TILE_BG');
   const [activeLayer, setActiveLayer]   = useState(0);
@@ -27,6 +27,22 @@ export default function DesignerPage() {
   const [cursor, setCursor] = useState({ tx: 0, ty: 0, wx: 0, wy: 0 });
   const [dragPlatform, setDragPlatform] = useState(null);
   const [lumMode, setLumMode] = useState(false);
+  const [resizeW, setResizeW] = useState('');
+  const [resizeH, setResizeH] = useState('');
+  const [showResize, setShowResize] = useState(false);
+
+  // Sync resize inputs when map changes
+  useEffect(() => {
+    if (map) { setResizeW(String(map.width)); setResizeH(String(map.height)); }
+  }, [map?.width, map?.height]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const applyResize = () => {
+    const w = parseInt(resizeW, 10);
+    const h = parseInt(resizeH, 10);
+    if (!w || !h || w < 1 || h < 1 || w > 512 || h > 512) return;
+    resizeMap(w, h);
+    setShowResize(false);
+  };
 
   const silInputRef  = useRef(null);
   const dataDirRef   = useRef(null);
@@ -180,6 +196,51 @@ export default function DesignerPage() {
             >
               FIT
             </button>
+          )}
+
+          {/* Resize */}
+          {map && (
+            <div className="relative">
+              <button
+                onClick={() => setShowResize(r => !r)}
+                className={`px-3 py-1 text-xs font-mono border rounded transition-colors ${showResize ? 'border-game-primary text-game-primary' : 'border-game-border text-game-textDim hover:border-game-primary hover:text-game-text'}`}
+              >
+                ⊞ RESIZE
+              </button>
+              {showResize && (
+                <div className="absolute top-full left-0 mt-1 z-50 bg-game-bgCard border border-game-border rounded p-3 flex flex-col gap-2 shadow-xl min-w-[160px]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-game-textDim font-mono w-8">W</span>
+                    <input
+                      type="number" min="1" max="512" value={resizeW}
+                      onChange={e => setResizeW(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && applyResize()}
+                      className="w-20 px-2 py-1 text-xs font-mono bg-game-dark border border-game-border text-game-text rounded focus:border-game-primary outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-game-textDim font-mono w-8">H</span>
+                    <input
+                      type="number" min="1" max="512" value={resizeH}
+                      onChange={e => setResizeH(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && applyResize()}
+                      className="w-20 px-2 py-1 text-xs font-mono bg-game-dark border border-game-border text-game-text rounded focus:border-game-primary outline-none"
+                    />
+                  </div>
+                  <div className="text-xs text-game-muted font-mono">Tiles outside bounds are removed</div>
+                  <div className="flex gap-2">
+                    <button onClick={applyResize}
+                      className="flex-1 py-1 text-xs font-mono border border-game-primary text-game-primary rounded hover:bg-game-dark transition-colors">
+                      APPLY
+                    </button>
+                    <button onClick={() => setShowResize(false)}
+                      className="px-2 py-1 text-xs font-mono border border-game-border text-game-textDim rounded hover:border-game-primary transition-colors">
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Status badges */}
