@@ -29,7 +29,7 @@ Environment variables (set in `.env` beside `docker-compose.yml`):
 |-----------------------|---------------------------------------|------------------------------------|
 | `PORT`                | `24080`                               | HTTP listen port                   |
 | `MONGO_URL`           | `mongodb://mongo:27017/silencer`      | MongoDB connection string          |
-| `RABBITMQ_URL`        | `amqp://zsilencer:zsilencer@...`      | RabbitMQ AMQP URL                  |
+| `RABBITMQ_URL`        | `amqp://silencer:silencer@...`        | RabbitMQ AMQP URL                  |
 | `JWT_SECRET`          | `changeme-in-production`              | Secret for signing JWTs            |
 | `LOBBY_PLAYER_AUTH_URL` | `http://lobby:15171`               | Lobby HTTP auth endpoint           |
 | `BACKUP_DIR`          | `/backups`                            | Directory for mongodump archives   |
