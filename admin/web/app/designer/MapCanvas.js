@@ -98,7 +98,9 @@ export default function MapCanvas({
     // Ambient darkness from map header: ambiencelevel = 128 + ambience*4.5
     const ambience = map.header?.ambience ?? 0;
     const ambiencelevel = Math.max(0, Math.min(255, 128 + ambience * 4.5));
-    const darkAlpha = Math.max(0, 1 - ambiencelevel / 128); // ~0.42-0.55 for typical maps
+    // brightness % to pass to ctx.filter — affects RGB only, leaves alpha intact
+    const brightnessPct = (ambiencelevel / 128 * 100).toFixed(1);
+    const ambientFilter = `brightness(${brightnessPct}%)`;
 
     // Helper to draw a tile with LUM-aware lighting
     function drawTile(tile_id, flip, isLum, col, row) {
@@ -111,6 +113,10 @@ export default function MapCanvas({
       const dx = col * tileSize + pan.x;
       const dy = row * tileSize + pan.y;
       if (dx + tileSize < 0 || dx > W || dy + tileSize < 0 || dy > H) return;
+
+      // Apply brightness filter before draw — transparent pixels stay transparent
+      ctx.filter = isLum ? 'brightness(130%)' : ambientFilter;
+
       if (flip) {
         ctx.save();
         ctx.translate(dx + tileSize, dy);
@@ -120,15 +126,7 @@ export default function MapCanvas({
       } else {
         ctx.drawImage(bmp, dx, dy, tileSize, tileSize);
       }
-      if (isLum) {
-        // LUM tile: add warm glow to indicate it's a light source
-        ctx.fillStyle = 'rgba(255,220,120,0.18)';
-        ctx.fillRect(dx, dy, tileSize, tileSize);
-      } else if (darkAlpha > 0) {
-        // Non-LUM tile: apply ambient darkness
-        ctx.fillStyle = `rgba(0,0,0,${darkAlpha.toFixed(3)})`;
-        ctx.fillRect(dx, dy, tileSize, tileSize);
-      }
+      ctx.filter = 'none';
     }
 
     // BG layers 0-3
@@ -150,6 +148,9 @@ export default function MapCanvas({
         }
       }
     }
+
+    // Ensure filter is cleared before drawing overlays
+    ctx.filter = 'none';
 
     // Grid overlay when zoomed in enough
     if (zoom >= 0.25) {
