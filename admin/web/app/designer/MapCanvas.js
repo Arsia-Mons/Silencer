@@ -29,7 +29,7 @@ function getActorDef(id) {
 }
 
 export default function MapCanvas({
-  map, tileImages, activeTool, activeLayer, selectedTileId,
+  map, tileImages, spriteImages, activeTool, activeLayer, selectedTileId,
   zoom, pan, onZoomChange, onPanChange,
   onTilePaint, onPlatformDraw, onPlatformRemove, onActorPlace, onActorRemove,
   onBeginPaint, onCommitPaint,
@@ -231,20 +231,40 @@ export default function MapCanvas({
       const def = getActorDef(a.id);
       const cx = a.x * zoom + pan.x;
       const cy = a.y * zoom + pan.y;
-      const r = Math.max(6, 8 * zoom);
-      ctx.fillStyle = def.color + 'cc';
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = def.color;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      if (zoom > 0.15) {
-        ctx.fillStyle = '#fff';
-        ctx.fillText(def.icon, cx, cy);
+
+      // Try to draw actual sprite
+      const sprBank = def.bank != null ? spriteImages?.get(def.bank) : null;
+      const spr = sprBank?.[def.frame ?? 0];
+      if (spr) {
+        const sx = cx + spr.offsetX * zoom;
+        const sy = cy + spr.offsetY * zoom;
+        const sw = spr.width * zoom;
+        const sh = spr.height * zoom;
+        ctx.drawImage(spr.bitmap, sx, sy, sw, sh);
+        // Label below sprite when zoomed in
+        if (zoom > 0.3) {
+          ctx.fillStyle = def.color + 'cc';
+          ctx.fillRect(cx - 12, sy + sh + 1, 24, 11);
+          ctx.fillStyle = '#fff';
+          ctx.fillText(def.icon, cx, sy + sh + 6);
+        }
+      } else {
+        // Fallback: colored circle with icon
+        const r = Math.max(6, 8 * zoom);
+        ctx.fillStyle = def.color + 'cc';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = def.color;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        if (zoom > 0.15) {
+          ctx.fillStyle = '#fff';
+          ctx.fillText(def.icon, cx, cy);
+        }
       }
     }
-  }, [map, tileImages, zoom, pan, dragPlatform]);
+  }, [map, tileImages, spriteImages, zoom, pan, dragPlatform]);
 
   // Resize canvas to fill container
   useEffect(() => {

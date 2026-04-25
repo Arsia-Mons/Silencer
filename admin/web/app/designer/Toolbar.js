@@ -21,23 +21,24 @@ export const PLATFORM_TOOL_TYPES = {
   TRACK:      { type1: 2, type2: 0, typeName: 'TRACK' },
 };
 
+// bank: sprite bank number (null = no sprite), frame: sprite frame index
 export const ACTOR_DEFS = [
-  { id: 0,  label: 'Guard Blaster',     icon: 'GB', color: '#ef4444' },
-  { id: 1,  label: 'Civilian',          icon: 'CV', color: '#f59e0b' },
-  { id: 2,  label: 'Captain Laser',     icon: 'CL', color: '#ef4444' },
-  { id: 3,  label: 'Trooper Rocket',    icon: 'TR', color: '#ef4444' },
-  { id: 6,  label: 'Robot',             icon: 'RB', color: '#a855f7' },
-  { id: 36, label: 'Player Start',      icon: 'PS', color: '#22d3ee' },
-  { id: 37, label: 'Camera',            icon: 'CM', color: '#f59e0b' },
-  { id: 54, label: 'Terminal',          icon: 'TM', color: '#00a328' },
-  { id: 56, label: 'Inv. Station',      icon: 'IS', color: '#00a328' },
-  { id: 57, label: 'Heal Machine',      icon: 'HM', color: '#22d3ee' },
-  { id: 58, label: 'Secret Return',     icon: 'SR', color: '#a855f7' },
-  { id: 63, label: 'Powerup',           icon: 'PU', color: '#f59e0b' },
-  { id: 64, label: 'Vent',              icon: 'VT', color: '#6b7280' },
-  { id: 65, label: 'Base Exit',         icon: 'BE', color: '#22d3ee' },
-  { id: 66, label: 'Tech Station',      icon: 'TS', color: '#00a328' },
-  { id: 70, label: 'Credit Machine',    icon: 'CR', color: '#f59e0b' },
+  { id: 0,  label: 'Guard Blaster',  icon: 'GB', color: '#ef4444', bank: 59,  frame: 0 },
+  { id: 1,  label: 'Civilian',       icon: 'CV', color: '#f59e0b', bank: 121, frame: 0 },
+  { id: 2,  label: 'Captain Laser',  icon: 'CL', color: '#ef4444', bank: 59,  frame: 0 },
+  { id: 3,  label: 'Trooper Rocket', icon: 'TR', color: '#ef4444', bank: 59,  frame: 0 },
+  { id: 6,  label: 'Robot',          icon: 'RB', color: '#a855f7', bank: 47,  frame: 0 },
+  { id: 36, label: 'Player Start',   icon: 'PS', color: '#22d3ee', bank: 9,   frame: 0 },
+  { id: 37, label: 'Camera',         icon: 'CM', color: '#f59e0b', bank: 65,  frame: 0 },
+  { id: 54, label: 'Terminal',       icon: 'TM', color: '#00a328', bank: null, frame: 0 },
+  { id: 56, label: 'Inv. Station',   icon: 'IS', color: '#00a328', bank: 89,  frame: 0 },
+  { id: 57, label: 'Heal Machine',   icon: 'HM', color: '#22d3ee', bank: 172, frame: 0 },
+  { id: 58, label: 'Secret Return',  icon: 'SR', color: '#a855f7', bank: 152, frame: 0 },
+  { id: 63, label: 'Powerup',        icon: 'PU', color: '#f59e0b', bank: 85,  frame: 0 },
+  { id: 64, label: 'Vent',           icon: 'VT', color: '#6b7280', bank: 179, frame: 0 },
+  { id: 65, label: 'Base Exit',      icon: 'BE', color: '#22d3ee', bank: 101, frame: 0 },
+  { id: 66, label: 'Tech Station',   icon: 'TS', color: '#00a328', bank: 106, frame: 0 },
+  { id: 70, label: 'Credit Machine', icon: 'CR', color: '#f59e0b', bank: 80,  frame: 0 },
 ];
 
 export default function Toolbar({ activeTool, onToolChange, activeLayer, onLayerChange, selectedActor, onActorChange, lumMode, onLumModeChange }) {

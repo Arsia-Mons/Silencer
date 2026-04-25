@@ -13,7 +13,7 @@ export default function DesignerPage() {
   useAuth();
   const wsConnected = useSocket({});
 
-  const { loaded, error, tileImages, tileBankCounts, progress, loadFiles } = useGameData();
+  const { loaded, error, tileImages, spriteImages, tileBankCounts, progress, loadFiles } = useGameData();
   const { map, openMap, saveMap, updateTile, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
@@ -287,6 +287,7 @@ export default function DesignerPage() {
             <MapCanvas
               map={map}
               tileImages={tileImages}
+              spriteImages={spriteImages}
               activeTool={activeTool}
               activeLayer={activeLayer}
               selectedTileId={selectedTileId}
