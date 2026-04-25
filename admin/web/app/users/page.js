@@ -5,7 +5,7 @@ import Sidebar from '../../components/Sidebar.js';
 import { useState, useEffect, useCallback } from 'react';
 import {
   getAdminUsers, createAdminUser, updateAdminUser,
-  resetAdminPassword, deleteAdminUser,
+  resetAdminPassword, deleteAdminUser, changeOwnPassword,
 } from '../../lib/api.js';
 
 // Role hierarchy — must match api/src/auth/jwt.js
@@ -58,6 +58,13 @@ export default function Users() {
   const [pwTarget, setPwTarget] = useState(null);
   const [newPw, setNewPw]       = useState('');
   const [pwErr, setPwErr]       = useState('');
+  // Change own password
+  const [showMyPw, setShowMyPw]     = useState(false);
+  const [myCurrentPw, setMyCurrentPw] = useState('');
+  const [myNewPw, setMyNewPw]         = useState('');
+  const [myConfirmPw, setMyConfirmPw] = useState('');
+  const [myPwErr, setMyPwErr]         = useState('');
+  const [myPwOk, setMyPwOk]           = useState(false);
 
   const rank = myRank();
 
@@ -112,6 +119,22 @@ export default function Users() {
     finally { setSaving(false); }
   }
 
+  // Change own password
+  async function handleChangeMyPw(e) {
+    e.preventDefault();
+    setMyPwErr('');
+    setMyPwOk(false);
+    if (myNewPw.length < 6) return setMyPwErr('Password must be ≥ 6 characters');
+    if (myNewPw !== myConfirmPw) return setMyPwErr('Passwords do not match');
+    setSaving(true);
+    try {
+      await changeOwnPassword(myCurrentPw, myNewPw);
+      setMyPwOk(true);
+      setMyCurrentPw(''); setMyNewPw(''); setMyConfirmPw('');
+    } catch (e) { setMyPwErr(e.message); }
+    finally { setSaving(false); }
+  }
+
   // Delete
   async function handleDelete(user) {
     if (!window.confirm(`Delete user "${user.username}"?`)) return;
@@ -136,6 +159,10 @@ export default function Users() {
               + CREATE USER
             </button>
           )}
+          <button onClick={() => { setShowMyPw(true); setMyCurrentPw(''); setMyNewPw(''); setMyConfirmPw(''); setMyPwErr(''); setMyPwOk(false); }}
+            className="px-4 py-2 text-xs font-mono border border-game-border text-game-textDim hover:border-game-warning hover:text-game-warning rounded transition-colors">
+            🔑 MY PASSWORD
+          </button>
         </div>
 
         {error && <div className="text-game-danger text-xs font-mono mb-4">{error}</div>}
@@ -321,6 +348,51 @@ export default function Users() {
                   CANCEL
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        {/* CHANGE MY PASSWORD MODAL */}
+        {showMyPw && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50"
+            onClick={() => setShowMyPw(false)}>
+            <div className="bg-game-bgCard border border-game-warning rounded p-6 w-full max-w-sm"
+              onClick={e => e.stopPropagation()}>
+              <div className="flex justify-between items-center mb-5">
+                <h2 className="text-game-warning font-mono text-base tracking-widest">// CHANGE MY PASSWORD</h2>
+                <button onClick={() => setShowMyPw(false)} className="text-game-muted hover:text-game-text">✕</button>
+              </div>
+              <form onSubmit={handleChangeMyPw} className="flex flex-col gap-3">
+                <div>
+                  <label className="block text-xs text-game-textDim mb-1">CURRENT PASSWORD</label>
+                  <input type="password" value={myCurrentPw} onChange={e => setMyCurrentPw(e.target.value)}
+                    className="w-full bg-game-bg border border-game-border text-game-text font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-game-warning"
+                    autoComplete="current-password" />
+                </div>
+                <div>
+                  <label className="block text-xs text-game-textDim mb-1">NEW PASSWORD</label>
+                  <input type="password" value={myNewPw} onChange={e => setMyNewPw(e.target.value)}
+                    className="w-full bg-game-bg border border-game-border text-game-text font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-game-warning"
+                    autoComplete="new-password" />
+                </div>
+                <div>
+                  <label className="block text-xs text-game-textDim mb-1">CONFIRM NEW PASSWORD</label>
+                  <input type="password" value={myConfirmPw} onChange={e => setMyConfirmPw(e.target.value)}
+                    className="w-full bg-game-bg border border-game-border text-game-text font-mono text-sm px-3 py-2 rounded focus:outline-none focus:border-game-warning"
+                    autoComplete="new-password" />
+                </div>
+                {myPwErr && <div className="text-game-danger text-xs">{myPwErr}</div>}
+                {myPwOk  && <div className="text-game-primary text-xs">✓ Password changed successfully</div>}
+                <div className="flex gap-3 mt-2">
+                  <button type="submit" disabled={saving}
+                    className="flex-1 py-2 text-xs font-mono border border-game-warning text-game-warning hover:bg-yellow-900/20 rounded transition-colors disabled:opacity-50">
+                    {saving ? 'SAVING...' : 'CHANGE PASSWORD'}
+                  </button>
+                  <button type="button" onClick={() => setShowMyPw(false)}
+                    className="flex-1 py-2 text-xs font-mono border border-game-border text-game-textDim hover:border-game-danger hover:text-game-danger rounded transition-colors">
+                    CANCEL
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
