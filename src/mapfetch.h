@@ -2,6 +2,7 @@
 #define MAPFETCH_H
 
 #include <string>
+#include <vector>
 
 // FetchMapFromServer downloads map `mapname` from the community map API at
 // `apiURL` using SHA-1 hash verification.  The file is saved to
