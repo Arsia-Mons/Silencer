@@ -95,8 +95,8 @@ export default function MapCanvas({
       }
     }
 
-    // Helper to draw a tile
-    function drawTile(tile_id, flip, col, row) {
+    // Helper to draw a tile with luminance applied
+    function drawTile(tile_id, flip, lum, col, row) {
       if (!tile_id) return;
       const bank = (tile_id >> 8) & 0xFF;
       const idx  = tile_id & 0xFF;
@@ -105,7 +105,7 @@ export default function MapCanvas({
       const bmp = bitmaps[idx];
       const dx = col * tileSize + pan.x;
       const dy = row * tileSize + pan.y;
-      if (dx + tileSize < 0 || dx > W || dy + tileSize < 0 || dy > H) return; // culling
+      if (dx + tileSize < 0 || dx > W || dy + tileSize < 0 || dy > H) return;
       if (flip) {
         ctx.save();
         ctx.translate(dx + tileSize, dy);
@@ -115,6 +115,11 @@ export default function MapCanvas({
       } else {
         ctx.drawImage(bmp, dx, dy, tileSize, tileSize);
       }
+      // Apply luminance: overlay black at (1 - lum/255) opacity
+      if (lum < 255) {
+        ctx.fillStyle = `rgba(0,0,0,${((255 - lum) / 255).toFixed(3)})`;
+        ctx.fillRect(dx, dy, tileSize, tileSize);
+      }
     }
 
     // BG layers 0-3
@@ -122,7 +127,7 @@ export default function MapCanvas({
       for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
           const cell = layers.bg[l][row * width + col];
-          if (cell) drawTile(cell.tile_id, cell.flip, col, row);
+          if (cell) drawTile(cell.tile_id, cell.flip, cell.lum ?? 255, col, row);
         }
       }
     }
@@ -132,7 +137,7 @@ export default function MapCanvas({
       for (let row = 0; row < height; row++) {
         for (let col = 0; col < width; col++) {
           const cell = layers.fg[l][row * width + col];
-          if (cell) drawTile(cell.tile_id, cell.flip, col, row);
+          if (cell) drawTile(cell.tile_id, cell.flip, cell.lum ?? 255, col, row);
         }
       }
     }
