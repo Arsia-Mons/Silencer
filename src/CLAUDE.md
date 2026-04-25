@@ -1,6 +1,9 @@
 # src/ — C++ client
 
 Flat layout: ~158 files, `.cpp` paired with `.h`, no subdirectories.
+Build with the root `CMakeLists.txt` (`mkdir build && cd build && cmake ..
+&& make`) — see top-level `README.md` for platform notes and the
+`-DZSILENCER_LOBBY_*` knobs in *Gotchas* below.
 
 ## Object hierarchy
 

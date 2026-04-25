@@ -1,7 +1,9 @@
 # server/ — Go lobby
 
-Stdlib-only Go. Deployment docs (flags, how-it-works narrative,
-storage notes) are in `README.md`; this file is for editing the code.
+Go: stdlib + `mongo-driver` (used only when `MONGO_URL` set) + `amqp091-go`
+(used only when `RABBITMQ_URL` set). Build/run instructions, flags, and
+the how-it-works narrative are in `README.md`; this file is for editing
+the code.
 
 ## Per-file
 
@@ -21,6 +23,19 @@ storage notes) are in `README.md`; this file is for editing the code.
   → `hub.OnHeartbeat`.
 - `store.go` — `lobby.json` atomic writes (temp + rename), SHA-1
   password hashes, per-agency stats keyed by user.
+- `mongosync.go` — async-mirrors store mutations to MongoDB when
+  `MONGO_URL` is set (see Storage). Password hashes never synced.
+- `events.go` — fire-and-forget RabbitMQ event publisher (`zsilencer.events`
+  exchange) for the admin dashboard's live feed. No-op when
+  `RABBITMQ_URL`/`-rabbitmqURL` unset.
+- `playerauth.go` — internal HTTP server (`-player-auth-addr`, default
+  `:15171`) the admin-api calls to validate player credentials. Not
+  exposed outside the Docker network.
+- `maps.go` — uploaded user maps: SHA-1-keyed storage on disk + JSON
+  metadata. Filename whitelist + 64 KiB cap mirrors the engine's
+  `world.cpp AllocateMapData` buffer.
+- `update.go` — loads/serves the auto-update manifest (per-platform
+  download URL + SHA-256) the client polls on launch.
 
 ## Invariants
 

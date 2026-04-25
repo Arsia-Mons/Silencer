@@ -8,7 +8,7 @@ old identifiers opportunistically when touching the file.
 ## Tech stack
 
 - Game client: C++14 / SDL2 / CMake
-- Lobby server: Go (stdlib only)
+- Lobby server: Go (stdlib + `mongo-driver`/`amqp091-go`, both optional)
 - Admin web + API: Bun + TypeScript + oxfmt
 - Infra: Docker Compose, Terraform (AWS)
 
