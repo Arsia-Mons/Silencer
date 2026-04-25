@@ -22,7 +22,6 @@ WORKDIR /src
 COPY clients/silencer/CMakeLists.txt clients/silencer/
 COPY clients/silencer/cmake/         clients/silencer/cmake/
 COPY clients/silencer/src/           clients/silencer/src/
-COPY clients/silencer/resources.rc   clients/silencer/
 COPY shared/assets/ shared/assets/
 
 RUN cmake -B build -S clients/silencer \
