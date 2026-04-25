@@ -64,7 +64,7 @@ zsilencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
   is installer metadata only — unrelated to the wire handshake.
 - **macOS data dir.** Client `chdir`s to
   `~/Library/Application Support/zSILENCER` at startup
-  (`main.cpp` `CDDataDir`) — copy `data/` there or run from the
-  repo with the binary in place.
+  (`main.cpp` `CDDataDir`) — copy `shared/assets/` contents there
+  or run from the repo with the binary in place.
 - **Android/Ouya code paths exist** in `main.cpp` but are not
   actively maintained; don't rely on them.

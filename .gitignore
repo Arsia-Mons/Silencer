@@ -32,3 +32,6 @@ admin/api/node_modules/
 admin/web/node_modules/
 admin/web/.next/
 
+# Git worktrees (claude-code superpowers)
+.worktrees/
+

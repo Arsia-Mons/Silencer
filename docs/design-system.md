@@ -22,7 +22,7 @@ formats**. It is sufficient to:
 This doc does **not** redefine the pixel content of the assets. It does not
 embed glyph bitmaps, agency icons, HUD frame art, or the literal RGB triples of
 the palette. For pixel-matching parity a port must consume the original
-`data/` directory as the source of truth. The doc tells you *how to read* the
+`shared/assets/` directory as the source of truth. The doc tells you *how to read* the
 assets; the assets themselves remain authoritative.
 
 In particular:
@@ -144,7 +144,7 @@ exactly `width` pixels horizontally, regardless of glyph shape. This is a monosp
 
 ### Palette Architecture
 
-- **File:** `data/PALETTE.BIN` (8,448 bytes)
+- **File:** `shared/assets/PALETTE.BIN` (8,448 bytes)
 - **Format:** 4-byte file-level header (reserved, all zeros) followed by 11 sub-palettes
   of 768 bytes each. Each sub-palette is 256 colors × 3 bytes (R, G, B). Total =
   `4 + 11 × 768 = 8,448 bytes`. Sub-palette N starts at offset `4 + N × 768`.
@@ -357,7 +357,7 @@ A reimplementation must read the same binary asset bundles, since every UI
 component references sprites by `(bank, index)` pairs and every glyph is a
 sprite in a font bank. Implementations in `src/resources.cpp`.
 
-### Sprite Banks — `data/BIN_SPR.DAT` + `data/bin_spr/SPR_NNN.BIN`
+### Sprite Banks — `shared/assets/BIN_SPR.DAT` + `shared/assets/bin_spr/SPR_NNN.BIN`
 
 **`BIN_SPR.DAT`** is the metadata index. Fixed size **16,384 bytes** = 256 banks ×
 64 bytes per bank. Only one byte per bank is consulted:
@@ -367,7 +367,7 @@ sprite in a font bank. Implementations in `src/resources.cpp`.
 | `+2`   | 1    | uint8 | Sprite count in this bank (0 = bank unused, skip) |
 
 The other 63 bytes per entry are unused. If `header[bank][2] > 0`, load the
-matching `data/bin_spr/SPR_NNN.BIN` (NNN = bank, zero-padded to 3 digits, e.g.
+matching `shared/assets/bin_spr/SPR_NNN.BIN` (NNN = bank, zero-padded to 3 digits, e.g.
 `SPR_007.BIN`, `SPR_132.BIN`).
 
 **`SPR_NNN.BIN`** layout:
@@ -459,7 +459,7 @@ So the glyph for `'A'` (ASCII 65) in bank 135 is sprite index `65 - 33 = 32`.
 - **`'1'` special case:** `DrawTinyText()` (bank 132) shifts `'1'` by -1 px to
   visually center it; no other character has special handling.
 
-### Tile Banks — `data/BIN_TIL.DAT` + `data/bin_til/TIL_NNN.BIN`
+### Tile Banks — `shared/assets/BIN_TIL.DAT` + `shared/assets/bin_til/TIL_NNN.BIN`
 
 (Used for level/map rendering, not UI; documented for completeness.)
 
@@ -2115,7 +2115,7 @@ overlays, not palette indices — they appear here for cross-referencing with th
 
 Every sprite bank referenced anywhere in this document, with its semantic role
 and the indices the UI relies on. A port that re-authors assets must keep
-this allocation; a port that consumes the original `data/` directory only
+this allocation; a port that consumes the original `shared/assets/` directory only
 needs this table to know which banks contain what.
 
 | Bank | Role | Indices used | Where consumed |

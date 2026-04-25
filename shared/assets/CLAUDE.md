@@ -1,8 +1,10 @@
-# shared/assets — placeholder
+# shared/assets/ — runtime assets
 
-Will house runtime assets (sprite/tile/sound banks, levels) consumed
-by `clients/silencer` and the dedicated server after the monorepo
-restructure. Code currently at `/data` (with its own CLAUDE.md
-covering binary formats).
+Binary, little-endian, 8-bit indexed. Don't try to read these as text.
 
-See [../../docs/plans/2026-04-25-monorepo-restructure.md](../../docs/plans/2026-04-25-monorepo-restructure.md).
+- `BIN_SPR.DAT` + `bin_spr/SPR_NNN.BIN` — sprite banks (incl. font banks 132–136)
+- `BIN_TIL.DAT` + `bin_til/TIL_NNN.BIN` — tile banks (level rendering)
+- `PALETTE.BIN` — 11 sub-palettes, 256 colors × 6-bit RGB
+
+Format spec, RLE codec, and per-bank usage: `docs/design-system.md`
+(§ Asset Formats, Appendix A — Sprite Bank Manifest). Loader: `src/resources.cpp`.

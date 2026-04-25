@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the zSILENCER client on macOS, pointed at a local lobby server.
+# Build the Silencer client on macOS, pointed at a local lobby server.
 #
 # Usage:
 #   ./scripts/build-mac-local.sh               # lobby at 127.0.0.1:15170
@@ -31,10 +31,6 @@ cmake --build "$BUILD_DIR" --config Release -j"$(sysctl -n hw.ncpu)"
 
 APP="$BUILD_DIR/zsilencer.app"
 if [ -d "$APP" ]; then
-  # Copy game data into the app bundle so it runs without needing to chdir.
-  echo "==> Copying data/ into app bundle"
-  cp -r "$REPO_ROOT/data" "$APP/Contents/"
-
   echo ""
   echo "✅  Build complete."
   echo "    App bundle : $APP"

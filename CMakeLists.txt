@@ -13,18 +13,27 @@ else()
 	file(GLOB_RECURSE sources src/*.cpp src/*.h)
 endif()
 
-# Extra files that get bundled into the .app on macOS (icon + data/).
+# Extra files that get bundled into the .app on macOS (icon + shared/assets/).
 set(bundle_extras "")
 if(APPLE)
-	set(bundle_icon "${CMAKE_CURRENT_SOURCE_DIR}/res/icon.icns")
+	set(bundle_icon "${CMAKE_CURRENT_SOURCE_DIR}/shared/icons/icon.icns")
 	set_source_files_properties("${bundle_icon}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
 	list(APPEND bundle_extras "${bundle_icon}")
 
-	file(GLOB_RECURSE data_files "${CMAKE_CURRENT_SOURCE_DIR}/data/*")
-	foreach(f ${data_files})
-		file(RELATIVE_PATH rel "${CMAKE_CURRENT_SOURCE_DIR}" "${f}")
+	# Files land at Contents/assets/* in the .app — the C++ runtime's
+	# fallback path (`main.cpp` `CDResDir`) looks for `../assets/PALETTE.BIN`
+	# next to the executable in `Contents/MacOS/`. Engineer-facing docs
+	# (CLAUDE.md, AGENTS.md) live in shared/assets/ but don't ship.
+	file(GLOB_RECURSE asset_files "${CMAKE_CURRENT_SOURCE_DIR}/shared/assets/*")
+	list(FILTER asset_files EXCLUDE REGEX "/(CLAUDE|AGENTS)[.]md$")
+	foreach(f ${asset_files})
+		file(RELATIVE_PATH rel "${CMAKE_CURRENT_SOURCE_DIR}/shared/assets" "${f}")
 		get_filename_component(rel_dir "${rel}" DIRECTORY)
-		set_source_files_properties("${f}" PROPERTIES MACOSX_PACKAGE_LOCATION "${rel_dir}")
+		if(rel_dir)
+			set_source_files_properties("${f}" PROPERTIES MACOSX_PACKAGE_LOCATION "assets/${rel_dir}")
+		else()
+			set_source_files_properties("${f}" PROPERTIES MACOSX_PACKAGE_LOCATION "assets")
+		endif()
 		list(APPEND bundle_extras "${f}")
 	endforeach()
 endif()
@@ -33,7 +42,7 @@ if(APPLE)
 	add_executable(${PROJECT} MACOSX_BUNDLE ${sources} ${bundle_extras})
 	set_target_properties(${PROJECT} PROPERTIES
 		MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/zSILENCER-Info.plist"
-		MACOSX_BUNDLE_BUNDLE_NAME "zSILENCER"
+		MACOSX_BUNDLE_BUNDLE_NAME "Silencer"
 		MACOSX_BUNDLE_GUI_IDENTIFIER "com.zsilencer.app"
 		MACOSX_BUNDLE_ICON_FILE "icon.icns"
 	)
@@ -112,11 +121,11 @@ endif()
 target_link_libraries(${PROJECT} minizip_dep)
 
 install(TARGETS "${PROJECT}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(DIRECTORY "data/" DESTINATION "${CMAKE_INSTALL_DATADIR}/${PROJECT}")
-install(FILES "res/icon_16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "zsilencer.png")
-install(FILES "res/icon_32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "zsilencer.png")
-install(FILES "res/icon_64.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME "zsilencer.png")
-install(FILES "res/icon_128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "zsilencer.png")
+install(DIRECTORY "shared/assets/" DESTINATION "${CMAKE_INSTALL_DATADIR}/${PROJECT}")
+install(FILES "shared/icons/icon_16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "zsilencer.png")
+install(FILES "shared/icons/icon_32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "zsilencer.png")
+install(FILES "shared/icons/icon_64.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME "zsilencer.png")
+install(FILES "shared/icons/icon_128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "zsilencer.png")
 install(FILES "zsilencer.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
 
 set(CPACK_PACKAGE_NAME "zSilencer")

@@ -55,7 +55,8 @@ purpose: we don't want MagicDNS overriding AWS's internal resolver.
    runs on `ubuntu-24.04-arm`.
 2. Builds `server/zsilencer-lobby` (Go) and `build/zsilencer` (C++,
    ARM64, with `-DZSILENCER_LOBBY_HOST=<vars.LOBBY_HOST>`).
-3. Joins the tailnet, scps both binaries + `data/` to
+3. Joins the tailnet, scps both binaries + `shared/assets/` (landed
+   as `assets/` on the host) to
    `ubuntu@<vars.DEPLOY_HOST>:/opt/zsilencer/releases/<short-sha>/`.
 4. Swaps the `/opt/zsilencer/current` symlink, restarts
    `zsilencer-lobby` systemd unit, keeps last 3 releases.

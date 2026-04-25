@@ -158,7 +158,7 @@ jobs:
           $SSH "mkdir -p $STAGING"
           $SCP server/zsilencer-lobby ubuntu@$HOST:$STAGING/
           $SCP build/zsilencer        ubuntu@$HOST:$STAGING/
-          $SCP -r data                ubuntu@$HOST:$STAGING/
+          $SCP -r shared/assets       ubuntu@$HOST:$STAGING/
 
           if [[ "$UPDATE_MANIFEST" == "true" ]]; then
             $SCP manifest-staging/update.json ubuntu@$HOST:$STAGING/update.json
@@ -177,7 +177,7 @@ jobs:
               sudo mv $RELEASE/update.json /opt/zsilencer/update.json
             fi
             sudo ln -sfn $RELEASE /opt/zsilencer/current
-            sudo ln -sfn /opt/zsilencer/current/data /usr/local/share/zsilencer
+            sudo ln -sfn /opt/zsilencer/current/assets /usr/local/share/zsilencer
             sudo systemctl restart zsilencer-lobby
             sleep 2
             sudo systemctl is-active zsilencer-lobby

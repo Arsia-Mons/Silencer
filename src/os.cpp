@@ -20,8 +20,8 @@ std::string GetResDir(void){
 	char *lastslash = strrchr(exepath, '\\');
 	if(!lastslash) lastslash = strrchr(exepath, '/');
 	if(lastslash) *lastslash = 0;
-	// check for data/ subdirectory next to the exe
-	std::string candidate = std::string(exepath) + "\\data\\";
+	// check for assets/ subdirectory next to the exe
+	std::string candidate = std::string(exepath) + "\\assets\\";
 	struct stat dirinfo;
 	if(stat(candidate.c_str(), &dirinfo) == 0){
 		cached = candidate;

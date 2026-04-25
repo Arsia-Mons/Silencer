@@ -22,8 +22,7 @@ WORKDIR /src
 COPY CMakeLists.txt .
 COPY cmake/ cmake/
 COPY src/ src/
-COPY data/ data/
-COPY res/ res/
+COPY shared/assets/ shared/assets/
 
 RUN cmake -B build -S . \
         -DCMAKE_BUILD_TYPE=Release \
@@ -44,7 +43,7 @@ RUN apt-get -o Acquire::Check-Valid-Until=false \
     && rm -rf /var/lib/apt/lists/*
 
 # Game data — read by the dedicated server via GetResDir() → /usr/local/share/zsilencer
-COPY --from=cpp-builder /src/data/ /usr/local/share/zsilencer/
+COPY --from=cpp-builder /src/shared/assets/ /usr/local/share/zsilencer/
 
 # Binaries
 COPY --from=go-builder  /build/zsilencer-lobby      /usr/local/bin/zsilencer-lobby

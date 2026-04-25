@@ -236,7 +236,7 @@ export default function DesignerPage() {
           <button
             onClick={() => dataDirRef.current?.click()}
             className="px-3 py-1 text-xs font-mono border border-game-border text-game-textDim rounded hover:border-game-primary hover:text-game-text transition-colors"
-            title="Pick your game data/ folder"
+            title="Pick your game assets/ folder"
           >
             LOAD DATA DIR
           </button>
