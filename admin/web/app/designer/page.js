@@ -165,8 +165,8 @@ export default function DesignerPage() {
               </span>
             )}
             {error && (
-              <span className="text-xs text-game-danger font-mono" title={error}>
-                ✕ ERROR
+              <span className="text-xs text-game-danger font-mono max-w-xs truncate" title={error}>
+                ✕ {error}
               </span>
             )}
             {map && (

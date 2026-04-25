@@ -100,6 +100,10 @@ export function useGameData() {
   const reset = () => { setLoaded(false); setError(null); setProgress({ total: 0, done: 0 }); };
 
   const pickDirectory = useCallback(async () => {
+    if (typeof window.showDirectoryPicker !== 'function') {
+      setError('Directory picker requires HTTPS. Use the FILES… button instead: select PALETTE.BIN + BIN_TIL.DAT + all TIL_*.BIN files (copy them all into one folder first).');
+      return;
+    }
     reset();
     try {
       const dirHandle = await window.showDirectoryPicker({ mode: 'read' });
