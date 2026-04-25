@@ -24,22 +24,28 @@ export const PLATFORM_TOOL_TYPES = {
 // bank: sprite bank number, frame: sprite frame index
 // For terminals: type field selects bank (0→183 small, 1→184 big)
 export const ACTOR_DEFS = [
-  { id: 0,  label: 'Guard Blaster',  icon: 'GB', color: '#ef4444', bank: 59,  frame: 0 },
-  { id: 1,  label: 'Civilian',       icon: 'CV', color: '#f59e0b', bank: 121, frame: 0 },
-  { id: 2,  label: 'Captain Laser',  icon: 'CL', color: '#ef4444', bank: 59,  frame: 0 },
-  { id: 3,  label: 'Trooper Rocket', icon: 'TR', color: '#ef4444', bank: 59,  frame: 0 },
-  { id: 6,  label: 'Robot',          icon: 'RB', color: '#a855f7', bank: 47,  frame: 0 },
-  { id: 36, label: 'Player Start',   icon: 'PS', color: '#22d3ee', bank: 9,   frame: 0 },
-  { id: 37, label: 'Camera',         icon: 'CM', color: '#f59e0b', bank: 65,  frame: 0 },
-  { id: 54, label: 'Terminal',       icon: 'TM', color: '#00a328', bank: 183, frame: 0 }, // type 0=small(183), 1=big(184)
-  { id: 56, label: 'Inv. Station',   icon: 'IS', color: '#00a328', bank: 89,  frame: 0 },
-  { id: 57, label: 'Heal Machine',   icon: 'HM', color: '#22d3ee', bank: 172, frame: 0 },
-  { id: 58, label: 'Secret Return',  icon: 'SR', color: '#a855f7', bank: 152, frame: 0 },
-  { id: 63, label: 'Powerup',        icon: 'PU', color: '#f59e0b', bank: null, frame: 0 }, // dynamic per type
-  { id: 64, label: 'Vent',           icon: 'VT', color: '#6b7280', bank: 179, frame: 0 },
-  { id: 65, label: 'Base Exit',      icon: 'BE', color: '#22d3ee', bank: 101, frame: 0 },
-  { id: 66, label: 'Tech Station',   icon: 'TS', color: '#00a328', bank: 106, frame: 0 },
-  { id: 70, label: 'Credit Machine', icon: 'CR', color: '#f59e0b', bank: 80,  frame: 0 },
+  { id: 0,  label: 'Guard Blaster',   icon: 'GB', color: '#ef4444', bank: 59,   frame: 0 },
+  { id: 1,  label: 'Civilian',        icon: 'CV', color: '#f59e0b', bank: 121,  frame: 0 },
+  { id: 2,  label: 'Captain Laser',   icon: 'CL', color: '#ef4444', bank: 59,   frame: 0 },
+  { id: 3,  label: 'Trooper Rocket',  icon: 'TR', color: '#ef4444', bank: 59,   frame: 0 },
+  { id: 6,  label: 'Robot',           icon: 'RB', color: '#a855f7', bank: 47,   frame: 0 },
+  { id: 36, label: 'Player Start',    icon: 'PS', color: '#22d3ee', bank: 9,    frame: 0 },
+  { id: 37, label: 'Camera',          icon: 'CM', color: '#f59e0b', bank: 65,   frame: 0 },
+  { id: 47, label: 'Doodad',          icon: 'DD', color: '#6b7280', bank: null, frame: 0 }, // dynamic: type→bank 49-58
+  { id: 50, label: 'Surv. Monitor',   icon: 'SM', color: '#f59e0b', bank: 65,   frame: 0 },
+  { id: 54, label: 'Terminal',        icon: 'TM', color: '#00a328', bank: 183,  frame: 0 }, // type 0=small(183), 1=big(184)
+  { id: 56, label: 'Inv. Station',    icon: 'IS', color: '#00a328', bank: 89,   frame: 0 },
+  { id: 57, label: 'Heal Machine',    icon: 'HM', color: '#22d3ee', bank: 172,  frame: 0 },
+  { id: 58, label: 'Secret Return',   icon: 'SR', color: '#a855f7', bank: 152,  frame: 0 },
+  { id: 61, label: 'Warper',          icon: 'WP', color: '#a855f7', bank: 85,   frame: 0 },
+  { id: 63, label: 'Powerup',         icon: 'PU', color: '#f59e0b', bank: null, frame: 0 }, // dynamic per type
+  { id: 64, label: 'Vent',            icon: 'VT', color: '#6b7280', bank: 179,  frame: 0 },
+  { id: 65, label: 'Base Exit',       icon: 'BE', color: '#22d3ee', bank: 101,  frame: 0 },
+  { id: 66, label: 'Tech Station',    icon: 'TS', color: '#00a328', bank: 106,  frame: 0 },
+  { id: 67, label: 'Laser Defense',   icon: 'LD', color: '#ef4444', bank: 112,  frame: 0 },
+  { id: 68, label: 'Team Billboard',  icon: 'TB', color: '#22d3ee', bank: 151,  frame: 0 },
+  { id: 69, label: 'Computer',        icon: 'PC', color: '#6b7280', bank: 171,  frame: 0 },
+  { id: 70, label: 'Credit Machine',  icon: 'CR', color: '#f59e0b', bank: 80,   frame: 0 },
 ];
 
 // Human-readable hints for the 'type' field per actor ID
@@ -54,8 +60,13 @@ export const ACTOR_TYPE_HINTS = {
     0:'Super Shield', 1:'Neutron Bomb', 2:'Jet Pack',
     3:'Invisible', 4:'Hacking Bonus', 5:'Radar', 6:'Depositor',
   } },
+  47: { label: 'Doodad', options: {
+    0:'Small Candle', 1:'Large Candle', 2:'Small Canister', 3:'Large Canister',
+    4:'Arrow Poster', 5:'Man in Tank', 6:'Doodad 6', 7:'Doodad 7', 8:'Doodad 8', 9:'Doodad 9',
+  } },
+  50: { label: 'Size', options: { 4:'Small', 5:'Small Alt', 6:'Large', 7:'Default' } },
   65: { label: 'Side',   options: { 0:'Team A', 1:'Team B' } },
-  67: { label: 'Variant', options: {} },
+  67: { label: 'Type',   options: { 0:'Base Defense', 1:'Guard Defense (Laser)' } },
 };
 
 export default function Toolbar({ activeTool, onToolChange, activeLayer, onLayerChange, selectedActor, onActorChange, lumMode, onLumModeChange }) {

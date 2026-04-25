@@ -5,10 +5,9 @@ import { ACTOR_DEFS } from './Toolbar.js';
 // Sprite banks needed for actor rendering (from ACTOR_DEFS, plus terminal big variant)
 const NEEDED_SPRITE_BANKS = new Set([
   ...ACTOR_DEFS.map(a => a.bank).filter(b => b != null),
-  184, // big terminal (type=1 variant of actor 54)
-  200, // powerup: super shield
-  201, // powerup: jet pack
-  205, // powerup: default (neutron bomb, invisible, hacking, radar, depositor)
+  184,               // big terminal (type=1 variant of actor 54)
+  200, 201, 205,     // powerup variants (super shield, jet pack, default)
+  49, 50, 51, 52, 53, 54, 55, 56, 57, 58, // doodad variants (actor 47)
 ]);
 
 // Palette stride: 772 bytes per palette (768 color bytes + 4 padding), header 4 bytes

@@ -259,6 +259,7 @@ export default function MapCanvas({
         // Dynamic bank for actors where it depends on actor.type
         let bankNum = def.bank;
         if (a.id === 54) bankNum = a.type === 0 ? 183 : 184;
+        if (a.id === 47) bankNum = 49 + Math.min(a.type ?? 0, 9); // doodad type 0-9 → banks 49-58
         if (a.id === 63) {
           // Powerup: type 0=SuperShield→200, type 2=JetPack→201, rest→205
           if (a.type === 0) bankNum = 200;
