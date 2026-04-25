@@ -140,12 +140,14 @@ export function useGameData() {
     reset();
     try {
       const files = Array.from(fileList);
+      // Match by basename only — works for both flat file selection and webkitdirectory
       const palFile    = files.find(f => f.name.toUpperCase() === 'PALETTE.BIN');
       const binTilFile = files.find(f => f.name.toUpperCase() === 'BIN_TIL.DAT');
       const tilFiles   = files.filter(f => /^TIL_\d+\.BIN$/i.test(f.name));
 
-      if (!palFile)    throw new Error('PALETTE.BIN not found — select it with the TIL_XXX.BIN files');
-      if (!binTilFile) throw new Error('BIN_TIL.DAT not found — select it with the TIL_XXX.BIN files');
+      if (!palFile)    throw new Error('PALETTE.BIN not found in selected folder');
+      if (!binTilFile) throw new Error('BIN_TIL.DAT not found in selected folder');
+      if (tilFiles.length === 0) throw new Error('No TIL_*.BIN files found — make sure you selected the data/ folder');
 
       const palBytes    = new Uint8Array(await palFile.arrayBuffer());
       const binTilBytes = new Uint8Array(await binTilFile.arrayBuffer());
@@ -163,5 +165,5 @@ export function useGameData() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return { loaded, error, palette, tileImages, tileBankCounts, progress, loadFiles, pickDirectory };
+  return { loaded, error, palette, tileImages, tileBankCounts, progress, loadFiles };
 }

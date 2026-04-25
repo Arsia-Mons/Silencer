@@ -13,7 +13,7 @@ export default function DesignerPage() {
   useAuth();
   const wsConnected = useSocket({});
 
-  const { loaded, error, tileImages, tileBankCounts, progress, loadFiles, pickDirectory } = useGameData();
+  const { loaded, error, tileImages, tileBankCounts, progress, loadFiles } = useGameData();
   const { map, openMap, saveMap, updateTile, addPlatform, removePlatform, addActor, removeActor } = useSilMap();
 
   const [activeTool, setActiveTool]     = useState('TILE_BG');
@@ -26,8 +26,12 @@ export default function DesignerPage() {
   const [dragPlatform, setDragPlatform] = useState(null);
 
   const silInputRef  = useRef(null);
-  const dataInputRef = useRef(null);
+  const dataDirRef   = useRef(null);
+  const dataFilesRef = useRef(null);
 
+  const handleDataDir = (e) => {
+    if (e.target.files?.length) loadFiles(e.target.files);
+  };
   const handleDataFiles = (e) => {
     if (e.target.files?.length) loadFiles(e.target.files);
   };
@@ -104,22 +108,24 @@ export default function DesignerPage() {
           <h1 className="text-game-primary font-mono text-sm tracking-widest">◫ MAP DESIGNER</h1>
           <div className="w-px h-4 bg-game-border" />
 
-          {/* Load game data — directory picker (Chrome) or file fallback */}
+          {/* Load game data — directory input (works on HTTP) or individual files fallback */}
           <button
-            onClick={pickDirectory}
+            onClick={() => dataDirRef.current?.click()}
             className="px-3 py-1 text-xs font-mono border border-game-border text-game-textDim rounded hover:border-game-primary hover:text-game-text transition-colors"
-            title="Pick your game data/ folder (contains PALETTE.BIN, BIN_TIL.DAT, bin_til/)"
+            title="Pick your game data/ folder"
           >
             LOAD DATA DIR
           </button>
+          <input ref={dataDirRef} type="file" webkitdirectory=""
+            className="hidden" onChange={handleDataDir} />
           <button
-            onClick={() => dataInputRef.current?.click()}
+            onClick={() => dataFilesRef.current?.click()}
             className="px-3 py-1 text-xs font-mono border border-game-border text-game-muted rounded hover:border-game-border hover:text-game-textDim transition-colors"
             title="Fallback: manually select PALETTE.BIN + BIN_TIL.DAT + TIL_XXX.BIN files"
           >
             FILES…
           </button>
-          <input ref={dataInputRef} type="file" multiple accept=".bin,.dat,.BIN,.DAT"
+          <input ref={dataFilesRef} type="file" multiple accept=".bin,.dat,.BIN,.DAT"
             className="hidden" onChange={handleDataFiles} />
 
           {/* Open SIL */}
