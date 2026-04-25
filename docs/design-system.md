@@ -14,17 +14,21 @@ future rendering migrations.
 
 1. [Typography](#typography)
 2. [Color System](#color-system)
-3. [Components](#components)
+3. [Asset Formats](#asset-formats) — BIN_SPR.DAT, SPR_NNN.BIN, RLE codec, font banks, transparency
+4. [Animation Timing & Tick Rate](#animation-timing--tick-rate) — 1 tick = 42 ms, ~24 Hz simulation
+5. [Components](#components)
+   - [Reusable Widgets vs. Screen Compositions](#reusable-widgets-vs-screen-compositions)
    - [Shared Base: Sprite Properties](#shared-base-sprite-properties)
    - [Button](#button) — 7 variants, state machine, animation, hit-testing
-   - [Toggle](#toggle) — agency icon & checkbox modes, radio groups
-   - [TextInput](#textinput) — caret, scrolling, password, input handling
+   - [Toggle](#toggle) — agency icon & checkbox modes, radio groups, label
+   - [TextInput](#textinput) — caret, scrolling, password, intentionally limited editing
    - [TextBox](#textbox) — multi-line text, auto-scroll, word wrap
-   - [SelectBox](#selectbox) — single-selection list, item management
+   - [SelectBox](#selectbox) — single-selection list, palette-180 highlight
    - [ScrollBar](#scrollbar) — up/down arrows, scroll track
    - [Overlay](#overlay) — sprite/text label, animations, custom pixel buffer
-   - [Interface](#interface-container--focus-manager) — container, focus/tab, keyboard/mouse routing
-   - [9-Slice Panel](#9-slice-panel-chat-message-background) — stretchable chat background
+   - [Interface](#interface-container--focus-manager) — container, focus/tab, keyboard/mouse routing, focus visuals
+   - [9-Slice Panel](#9-slice-panel-chat-message-background) — horizontal-stretch chat header/footer
+   - [Modal Dialog](#modal-dialog) — centered alert/confirm with optional OK button
    - [Loading Bar](#loading-bar) — progress indicator
    - [In-Game Chat Overlay](#in-game-chat-overlay) — messages + input
    - [Announcement Message](#announcement-message-drawmessage) — per-character animation
@@ -36,16 +40,21 @@ future rendering migrations.
    - [Team HUD](#team-hud) — team icons and player status
    - [Minimap](#minimap) — 172 × 62 map overview
    - [Drawing Primitives](#drawing-primitives) — rectangle, line, circle, checkered
-4. [Layout & Spacing](#layout--spacing)
-5. [Visual Effects](#visual-effects)
+6. [Layout & Spacing](#layout--spacing)
+7. [Visual Effects](#visual-effects)
+8. [UI Sounds](#ui-sounds)
+9. [Effect-Color Reference](#effect-color-reference)
 
 ---
 
 ## Typography
 
 All text is rendered from bitmap glyph sprite banks. There are no TrueType or vector
-fonts — each "font" is a sprite bank containing one glyph per printable ASCII character
-(starting at ASCII 33 `!`, or 34 `"` for bank 132).
+fonts — each "font" is just a regular [sprite bank](#asset-formats) containing one
+glyph per printable ASCII character (starting at ASCII 33 `!`, or 34 `"` for bank 132).
+Glyph N in font bank B is sprite index `(asciiCode - asciiOffset)`. Space (`0x20`) is
+not stored; the renderer just advances the cursor by `fontwidth`. See
+[Asset Formats → Font Banks](#font-banks-132136) for the full encoding.
 
 ### Font Banks
 
@@ -101,8 +110,11 @@ exactly `width` pixels horizontally, regardless of glyph shape. This is a monosp
 ### Palette Architecture
 
 - **File:** `data/PALETTE.BIN` (8,448 bytes)
-- **Format:** 11 sub-palettes × (4-byte header + 256 × 3 bytes RGB), 6-bit color depth
-  (raw values 0–63, shifted `<< 2` to 8-bit, giving an effective max of 252 per channel)
+- **Format:** 4-byte file-level header (reserved, all zeros) followed by 11 sub-palettes
+  of 768 bytes each. Each sub-palette is 256 colors × 3 bytes (R, G, B). Total =
+  `4 + 11 × 768 = 8,448 bytes`. Sub-palette N starts at offset `4 + N × 768`.
+- **Color depth:** 6 bits per channel. Raw file values are 0–63; loader shifts each
+  byte left by 2 (`v << 2`) to expand to 8-bit (0–252 in steps of 4).
 - **Lookup tables** (`PALETTECALC{n}.BIN`): pre-computed 256 × 256 tables for brightness,
   color-tint, and alpha-blend transformations; auto-calculated and cached if missing
 
@@ -137,7 +149,13 @@ index = (colorGroup * 16) + brightnessLevel + 2
 | 14 | 12 | 200 | 200 | 200 | `#C8C8C8` |
 | 17 | 15 | 252 | 252 | 252 | `#FCFCFC` |
 
-**Group 1 — Fire/Yellow (indices 18–33)**
+**Group 1 — Yellow / Fire (indices 18–33)**
+
+Note: Group 1 starts at saturated red (`#FC0000`) and ramps up through orange
+to pure yellow (`#FCFC00`) and finally pale yellow (`#FCFCD4`). Group 4 below
+is a separate, darker orange ramp. Code referring to "fire" colors usually
+means the lower (red-orange) end of group 1; code referring to "yellow" means
+the upper end.
 
 | Index | Level | R | G | B | Hex |
 | ----- | ----- | --- | --- | --- | ------- |
@@ -298,19 +316,230 @@ a base index of 204 (`#1050A8`, a mid-blue).
 
 ---
 
+## Asset Formats
+
+A reimplementation must read the same binary asset bundles, since every UI
+component references sprites by `(bank, index)` pairs and every glyph is a
+sprite in a font bank. Implementations in `src/resources.cpp`.
+
+### Sprite Banks — `data/BIN_SPR.DAT` + `data/bin_spr/SPR_NNN.BIN`
+
+**`BIN_SPR.DAT`** is the metadata index. Fixed size **16,384 bytes** = 256 banks ×
+64 bytes per bank. Only one byte per bank is consulted:
+
+| Offset | Size | Type | Meaning |
+| ------ | ---- | ----- | ----------------------------------------------- |
+| `+2`   | 1    | uint8 | Sprite count in this bank (0 = bank unused, skip) |
+
+The other 63 bytes per entry are unused. If `header[bank][2] > 0`, load the
+matching `data/bin_spr/SPR_NNN.BIN` (NNN = bank, zero-padded to 3 digits, e.g.
+`SPR_007.BIN`, `SPR_132.BIN`).
+
+**`SPR_NNN.BIN`** layout:
+
+```
+[ per-sprite header[0] (344 bytes) ]
+[ per-sprite header[1] (344 bytes) ]
+...
+[ per-sprite header[N-1] (344 bytes) ]
+[ compressed pixel data — concatenated, in sprite order ]
+```
+
+**Per-sprite header (344 bytes, little-endian):**
+
+| Offset | Size | Type   | Field                                                  |
+| ------ | ---- | ------ | ------------------------------------------------------ |
+| `+0`   | 2    | uint16 | Width (pixels)                                         |
+| `+2`   | 2    | uint16 | Height (pixels)                                        |
+| `+4`   | 2    | int16  | OffsetX (signed; subtracted from `x` when blitting)    |
+| `+6`   | 2    | int16  | OffsetY (signed; subtracted from `y` when blitting)    |
+| `+12`  | 4    | uint32 | Compressed pixel-data size (bytes)                     |
+| `+20`  | 1    | uint8  | Compression mode: `0` = linear RLE, non-zero = tile-ordered RLE |
+
+(Other byte ranges within the 344-byte header are reserved/unused.)
+
+The renderer reads `width`, `height`, `offsetX`, `offsetY` into the
+`spriteWidth[bank][index]`, `spriteHeight[bank][index]`, `spriteOffsetX[bank][index]`,
+`spriteOffsetY[bank][index]` arrays referenced throughout this document.
+
+### RLE Codec (Sprites + Tiles)
+
+Pixel data is decoded as a stream of 32-bit little-endian dwords. For each dword
+read:
+
+```
+read dword D (uint32 LE)
+if (D & 0xFF000000) == 0xFF000000:
+    // Run-length sequence
+    runBytes = D & 0x0000FFFF             // total bytes to emit (always a multiple of 4)
+    pixel    = (D >> 16) & 0xFF           // the byte value to repeat
+    word     = pixel | (pixel << 8)
+    fill     = word  | (word  << 16)      // dword filled with 4 copies of pixel
+    emit `runBytes / 4` copies of `fill`
+else:
+    emit D as a literal dword
+```
+
+Decoding stops when `compressedSize` bytes (from header `+12`) have been consumed.
+
+**Linear mode** (`compression flag = 0`): emitted dwords fill the destination
+buffer left-to-right, top-to-bottom in row-major order over the sprite's
+`width × height` grid.
+
+**Tile-ordered mode** (`compression flag != 0`): the destination is divided into
+**64 × 64-pixel tiles** in row-major order. Within each tile, pixels are stored
+row-major. Tiles at the right/bottom edges are clipped to the sprite's
+dimensions. Use this layout for any sprite whose flag byte is non-zero.
+
+### Transparency
+
+**Palette index 0 is the transparent color key.** The runtime calls
+`SDL_SetColorKey(surface, SDL_TRUE, 0)` on every loaded sprite. A reimplementation
+should treat any pixel with palette index 0 as transparent during blit.
+
+### Font Banks (132–136)
+
+Font banks are **ordinary sprite banks** — same `BIN_SPR.DAT` entry, same
+`SPR_NNN.BIN` format, same RLE codec. Each glyph occupies one sprite slot.
+
+**Character → sprite-index mapping:**
+
+```
+asciiOffset = 34 if bank == 132 else 33
+spriteIndex = charCode - asciiOffset
+```
+
+So the glyph for `'A'` (ASCII 65) in bank 135 is sprite index `65 - 33 = 32`.
+
+- **Space (`0x20`) is never indexed.** The renderer skips it and just advances
+  the cursor by `fontwidth`.
+- **Glyphs above 0x80 are not supported.** Banks store glyphs for ASCII roughly
+  33–127 only. There is no extended-ASCII or Unicode coverage.
+- **Per-glyph `offsetY` is honored** — descenders (`g`, `p`, `y`) drop below the
+  baseline via the sprite's stored OffsetY. There is no separate baseline metric;
+  the sprite's offset *is* the baseline adjustment.
+- **`fontwidth` is a render-time advance**, not stored in the font. The same
+  font bank can be drawn with different advances at different call sites
+  (e.g., bank 133 used at width 6 for chat and width 7 for status messages).
+- **`'1'` special case:** `DrawTinyText()` (bank 132) shifts `'1'` by -1 px to
+  visually center it; no other character has special handling.
+
+### Tile Banks — `data/BIN_TIL.DAT` + `data/bin_til/TIL_NNN.BIN`
+
+(Used for level/map rendering, not UI; documented for completeness.)
+
+Identical metadata structure to sprites (256 banks × 64 bytes), but per-tile
+headers in `TIL_NNN.BIN` are only **12 bytes** each (no W/H/offset fields — all
+tiles are fixed at 64 × 64 pixels). The RLE codec is the same; the
+compression-mode flag is at offset `+8` of the 12-byte header.
+
+### Endianness
+
+All multi-byte integers in `BIN_SPR.DAT`, `SPR_NNN.BIN`, `BIN_TIL.DAT`,
+`TIL_NNN.BIN`, and `PALETTE.BIN` are **little-endian**. Big-endian ports must
+byte-swap on read.
+
+### Loading Strategy
+
+- **Eager:** all sprite banks declared in `BIN_SPR.DAT` are decoded into 8-bit
+  indexed `Surface` buffers at startup and cached in
+  `spritebank[bank][index]` (`shared_ptr<Surface>`). No memory mapping.
+- **Dedicated server (`-s`)** skips pixel decompression entirely; only the
+  width/height/offsets are loaded so server-side hit-testing still works.
+- **Lookup tables** (`PALETTECALC{n}.BIN`): if missing, the engine computes
+  them from the palette and caches to disk. Ports can compute on-demand.
+
+---
+
+## Animation Timing & Tick Rate
+
+Every animation timing in this document — caret blink (`% 32`), button activation
+(4 ticks), low-HP flash (every 4 ticks), agency intro (120+ ticks), status fade
+(16 ticks) — is measured in **simulation ticks**, not render frames.
+
+### One tick = 42 ms (~24 Hz simulation)
+
+`game.cpp:529` sets `wait = 42` ms in the main loop. The game uses a
+fixed-timestep simulation with variable-rate rendering:
+
+```
+loop:
+    now = SDL_GetTicks()
+    while now - lastTick > 42:
+        world.Tick()           // advances simulation, increments every state_i
+        renderer.Tick()        // advances UI animation state (button anims, blink, etc.)
+        lastTick += 42
+    alpha = 1 - (now - lastTick) / 42
+    renderer.Draw(alpha)       // interpolates between sim states for smooth rendering
+```
+
+So the **render frame rate is uncapped** (whatever the GPU/display delivers),
+while **simulation and UI animation tick at ~23.8 Hz** (1000/42).
+
+### Common timings in real time
+
+| Animation                           | Ticks | Real time |
+| ----------------------------------- | ----- | --------- |
+| Button activation/deactivation      | 4     | 168 ms    |
+| Caret blink full cycle (16 on / 16 off) | 32    | 1,344 ms  |
+| Caret on or off phase               | 16    | 672 ms    |
+| Low-HP / low-shield flash period    | 8     | 336 ms    |
+| Status message fade-out             | 16    | 672 ms    |
+| Buy-menu highlight pulse cycle      | 16    | 672 ms    |
+| Bank-171 sprite anim cycle          | 8     | 336 ms    |
+| Bank-54 10-frame sprite loop        | 10    | 420 ms    |
+| Agency intro animation              | 120+  | 5+ s      |
+| FPS counter / window-title refresh  | —     | 1,000 ms (uses real wall-clock timer, not ticks) |
+
+### Replay scaling
+
+When playing back a recorded match, `wait` is multiplied by `replay.speed`
+(`game.cpp:546`), so animations slow down or speed up proportionally. UI
+animations on top of an active replay inherit this scaling.
+
+### Implication for ports
+
+Any reimplementation that wants visual parity must drive UI animation state
+from a fixed-rate timer at 23.8 Hz (or 24 Hz with negligible drift), not from
+the render loop. Driving `state_i` from render frames would make a button
+animation finish in ~67 ms on a 60 Hz display instead of the intended 168 ms.
+
+---
+
 ## Components
 
 > Every component below is documented with enough detail to recreate it in any
 > language or framework. All coordinates are in the 640 × 480 logical pixel space.
 > All colors are 8-bit palette indices (see [Color System](#color-system) for
 > RGB/hex values). Sprite banks refer to pre-loaded bitmap sprite sheets — each
-> bank contains numbered sprites accessed by index.
+> bank contains numbered sprites accessed by index (see
+> [Asset Formats](#asset-formats) for the file layout).
+
+### Reusable Widgets vs. Screen Compositions
+
+The component sections below mix two categories. A component library should
+treat them differently:
+
+**Reusable widgets** (build a library of these — they appear on multiple screens
+and accept arbitrary configuration): Button, Toggle, TextInput, TextBox,
+SelectBox, ScrollBar, Overlay, 9-slice / horizontal-stretch panel, Modal Dialog,
+Loading Bar, Drawing Primitives.
+
+**Screen-specific compositions** (build these *out of* the widgets above; their
+positions and sprite banks are hardcoded for one screen): In-Game Chat Overlay,
+Announcement Message, Status Messages, Top Message, Player List, Buy Menu, HUD
+Bars, Team HUD, Minimap, Lobby Screen Panels.
+
+A reimplementation should expose the reusable widgets as a parameterized API
+and treat screen compositions as concrete layouts that wire those widgets
+together at fixed coordinates.
 
 ### Shared Base: Sprite Properties
 
-Every visible component inherits these base rendering properties
-(`sprite.h` / `sprite.cpp`). A component library should expose them on every
-widget:
+Every component is implemented as a subclass of the engine's `Object` /
+`Sprite` base, and so internally carries these rendering properties
+(`sprite.h` / `sprite.cpp`). A component library porting these to a different
+language should expose the visually relevant ones on every widget:
 
 | Property | Type | Default | Description |
 | ------------------- | ----- | ------- | ------------------------------------------------- |
@@ -325,7 +554,8 @@ widget:
 | `mirrored` | bool | false | Horizontally flip the sprite |
 | `renderpass` | uint8 | 0 | Draw order layer (0–3, lower draws first) |
 
-**Bounding box formula** (used for all sprite-based hit-testing):
+**Bounding box formula** (sprite-based hit-testing — used by Button, Toggle,
+SelectBox, Overlay-in-sprite-mode, ScrollBar):
 
 ```
 x1 = x - spriteOffsetX[res_bank][res_index]
@@ -333,6 +563,12 @@ y1 = y - spriteOffsetY[res_bank][res_index]
 x2 = x1 + spriteWidth[res_bank][res_index]
 y2 = y1 + spriteHeight[res_bank][res_index]
 ```
+
+> **Exceptions:** `TextInput` and `TextBox` use a **rectangular** hit area
+> defined by their explicit `x`, `y`, `width`, `height` properties (no sprite
+> offset adjustment). `Overlay` in text mode uses a text-bounds box (see Overlay
+> section). `Interface` containers use their own rectangular bounds for
+> click-containment.
 
 ### Button
 
@@ -441,7 +677,14 @@ only one toggle per `set` can be active.
 | `set` | uint8 | 0 | Mutual-exclusion group — if non-zero, selecting this deselects all other toggles with the same `set` in the same Interface |
 | `width` | uint8 | 0 | Read from sprite dimensions at runtime |
 | `height` | uint8 | 0 | Read from sprite dimensions at runtime |
-| `text` | char[64] | "" | Optional label (not rendered by the toggle itself) |
+| `text` | char[64] | "" | Optional label, rendered above/at the toggle's `(x, y)` |
+
+#### Label Rendering
+
+If `text[0] != '\0'`, the renderer draws the label at
+`(x - (strlen(text) * 9) / 2, y)` using **font bank 134, advance 9 px**
+(`renderer.cpp:790-792`). Centered horizontally on the toggle's `x`. No tint or
+brightness override is applied — the label uses default white text.
 
 #### Visual States
 
@@ -577,6 +820,27 @@ function mouseInside(mousex, mousey) → int:
 
 When clicked, the Interface sets this TextInput as the active object and
 `showcaret = true`. All other TextInputs get `showcaret = false`.
+
+#### Intentionally Unsupported Edges
+
+A reimplementation should *not* add the following — they are absent by design,
+and adding them would diverge from the original behavior:
+
+- **Cursor movement keys** (Left, Right, Home, End): not handled. The caret is
+  always at the end of the buffer. Editing means typing or backspacing.
+- **Mouse-click caret placement:** `MouseInside()` *returns* a character index,
+  but the Interface does not call `SetCaretPosition()` with it.
+  `SetCaretPosition()` itself is annotated `// this doesnt work` in
+  `textinput.cpp:85` and does not adjust scroll, so it is unsafe to wire up.
+- **Clipboard paste / Ctrl+V:** no SDL `TEXTINPUT` event handling for paste; no
+  `SDL_GetClipboardText()` call anywhere in the input path.
+- **IME / composition input:** no `TEXTEDITING` handling. Input is restricted
+  to ASCII `0x20..0x7F` (or `0x30..0x39` when `numbersonly`).
+- **Selection / shift-click:** no concept of a selection range.
+
+The hover-state has no rendering either (no border highlight on mouse-over).
+The only visual states are: focused (caret blinks), unfocused (no caret),
+inactive (rendered at brightness 64).
 
 ---
 
@@ -717,10 +981,31 @@ function mouseInside(mousex, mousey):
 
 #### Rendering
 
-The renderer iterates visible items (from `scrolled` to `scrolled + visibleItems`),
-drawing each item's text at the corresponding Y offset. The selected item is
-highlighted (see Buy Menu for the specific highlight rendering). Keyboard
-up/down changes `selecteditem`; Enter sets `enterpressed = true`.
+`renderer.cpp:735-757`. The renderer iterates visible items (from `scrolled` to
+`scrolled + visibleItems`), drawing each item's text at the corresponding Y offset:
+
+```
+for i = scrolled to min(scrolled + visibleItems, items.size()):
+    line = i - scrolled
+    if i == selecteditem:
+        // Highlight rectangle: full width, 11 px tall, drawn behind text
+        drawFilledRectangle(surface,
+            x, y + line * lineheight,
+            x + width, y + line * lineheight + 11,
+            color = 180)        // mid-gray ramp color
+    drawText(surface, x, y + line * lineheight, items[i],
+             bank = 133, fontwidth = 6)
+```
+
+- Selected item: filled rectangle of palette index **180** (mid-gray) underneath,
+  text drawn on top in font bank 133, width 6, default brightness.
+- Unselected items: text only, no background.
+- **Hover (mouse over but not selected) has no visual feedback.** Hover only
+  routes clicks; it does not change rendering.
+
+Keyboard up/down changes `selecteditem`; Enter sets `enterpressed = true`.
+Crossing the visible-window boundary triggers a `scrollUp`/`scrollDown` on the
+paired ScrollBar.
 
 #### File Listing
 
@@ -904,6 +1189,23 @@ On mouse move or click, the Interface iterates all `objects[]` and:
 Interfaces can be **nested**: a parent Interface contains child Interfaces as
 objects. The parent delegates focus and events to the active child.
 
+#### Focus Visual Indicator
+
+There is **no dedicated focus border, glow, or ring** on any widget. Focus is
+expressed entirely through each widget's existing visual states:
+
+| Widget    | Focus visual                                                                 |
+| --------- | ---------------------------------------------------------------------------- |
+| Button    | Same as hover — enters `ACTIVATING` → `ACTIVE` (brightness 128 → 136, sprite frame advances). Mouse hover and keyboard focus produce identical visuals. |
+| Toggle    | None separate from selected state. Click toggles `selected`; the visual changes only on the selection itself. |
+| TextInput | The blinking caret is the focus indicator. Unfocused inputs render with `showcaret = false` (no caret). Inactive inputs render at `effectbrightness = 64` regardless of focus. |
+| TextBox   | Read-only — never focusable. |
+| SelectBox | Focus enables keyboard up/down/Enter routing but does not change rendering. The selected-item highlight (palette index 180 background) is independent of focus. |
+| ScrollBar | Not directly focusable — it receives input via the focused SelectBox/TextBox or via mouse. |
+
+A reimplementation should reproduce this minimalist style: no extra "this widget
+is focused" chrome on top of the widget's existing states.
+
 ---
 
 ### 9-Slice Panel (Chat Message Background)
@@ -952,6 +1254,59 @@ function drawMessageBackground(surface, rect):
 
 The corner offset of **36 px** is hardcoded — the right-side corners are always
 placed at `rect.x + rect.w - 36`.
+
+> **Note on the "9-slice" name:** The sprite bank reserves indices 3–5 for left
+> edge, center fill, and right edge, but the renderer never draws them. In
+> practice this is a **two-row horizontal-stretch panel** — only the top and
+> bottom edges (with corners) are drawn, and they tile horizontally only. The
+> panel does not stretch vertically; its height is fixed by the spacing between
+> the top and bottom rows.
+
+---
+
+### Modal Dialog
+
+**Source:** `game.cpp:3776` — `Game::CreateModalDialog(message, ok)`
+
+A centered dialog overlay used for connection errors, validation failures, and
+async-operation status. Built from existing widgets (Overlay + optional Button +
+Interface container).
+
+#### Composition
+
+| Piece | Component | Properties |
+| ------------- | --------- | ----------------------------------------------------------- |
+| Background    | Overlay   | `res_bank = 40`, `res_index = 4`, `renderpass = 3`. Sprite is pre-centered via its baked-in offsets — no `(x, y)` is set. |
+| Message text  | Overlay   | `textbank = 134`, `textwidth = 8`, centered at `x = 320 - (len(text) * 8) / 2`, `y = 200` (with OK button) or `y = 218` (no button). |
+| OK button     | Button    | Type `B156x21`, `(x, y) = (242, 230)`, `text = "OK"`, `uid = 50`. Bound to the parent Interface's `buttonenter` so Enter triggers it. Omitted when `ok = false`. |
+| Container     | Interface | `modal = true`. Pushed onto the `currentinterface` stack so it receives all input. The previous interface ID is saved in `aftermodalinterface` and restored on `DestroyModalDialog()`. |
+
+#### Behavior
+
+- **Modal flag** prevents the underlying interface from receiving input. The
+  background sprite is opaque; there is no separate dimming/scrim layer.
+- **Dismissal:** click OK, press Enter (via `buttonenter`), or call
+  `DestroyModalDialog()` programmatically when an async operation completes.
+  **Escape is not handled** — there is no automatic cancel.
+- **Status-only dialogs** (`ok = false`) have no button at all and stay open
+  until code explicitly closes them. Used while waiting for the lobby server
+  to respond (e.g., "Creating game…").
+
+#### Use Sites
+
+| Trigger                                  | Message                            | OK |
+| ---------------------------------------- | ---------------------------------- | -- |
+| Game create failed                       | "Could not create game"            | yes |
+| Join failed (full / wrong password)      | "Unable to join game"              | yes |
+| Network loss during play                 | "Disconnected from game"           | yes |
+| Player level too low for game            | "Your player level is too low"     | yes |
+| Player level too high for game           | "Your player level is too high"    | yes |
+| Clicked Join with no game selected       | "No game selected"                 | yes |
+| Clicked Create with no game name         | "No game name"                     | yes |
+| Clicked Create with no map selected      | "No map selected"                  | yes |
+| Async create in progress                 | "Creating game…"                   | no  |
+
+(Source: `game.cpp:858, 868, 946, 4811, 4815, 4830, 4980, 4993, 4995`.)
 
 ---
 
@@ -1157,8 +1512,13 @@ background: checkered pattern (every-other-pixel black) over the bounds area
 Per team block (58 px tall):
     Agency icon: drawn at (60, 60 + yoffset + 10) using bank 181, scaled 2×, team-colored
     Player rows: 12 px per player, vertically centered in the 58 px block
-        Name:  drawn at (x=60+40, y=60+yoffset + vertCenter + i*12 + 1), bank 133, width 6
-        Stats: right-aligned at (x=580 - textWidth), same Y, bank 133, width 6
+
+        // Vertical centering: the team block reserves space for up to 4 players;
+        // when the team has fewer, leftover space is split evenly above and below.
+        vertCenter = ((4 - team.numpeers) * 12) / 2
+
+        Name:  drawn at (x = 60 + 40, y = 60 + yoffset + vertCenter + i*12 + 1), bank 133, width 6
+        Stats: right-aligned at (x = 580 - textWidth), same Y, bank 133, width 6
                format: "L:{level}    E:{endurance}  S:{shield}  J:{jetpack}  H:{hacking}  C:{contacts}"
 ```
 
@@ -1435,8 +1795,14 @@ This means all hit-testing, button bounds, and UI coordinates operate entirely i
 | Fullscreen | `SDL_WINDOW_FULLSCREEN_DESKTOP` | Uses desktop resolution; 640×480 stretched to fit |
 | Toggle | `RAlt + Enter` at runtime | Switches between the above two modes |
 
-**Effective font sizes on common displays** (approximate, assuming fullscreen;
-fractional pixels rounded to nearest integer):
+**Effective font sizes on common displays** (approximate, assuming fullscreen).
+Each logical-pixel column shows `physicalW × physicalH` per logical pixel,
+computed as `displayW / 640` and `displayH / 480`. The glyph columns multiply
+the base glyph dimension (e.g., `11 × textwidth`) by those ratios; values are
+rounded to the nearest integer. With `scalefilter = 0` (nearest), the actual
+on-screen pixels match these to within ±1 because rounding happens in the GPU
+at sample time; with `scalefilter = 1` (linear), the visible glyph is the same
+size but interpolated.
 
 | Display | Resolution | Logical 1 px ≈ | 11 px glyph ≈ | 19 px glyph ≈ |
 | ------------ | ---------- | --------------- | ------------- | ------------- |
@@ -1458,26 +1824,20 @@ All coordinates below are in the 640 × 480 logical pixel space.
 
 ### Lobby Screen Panels
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ "zSilencer" (135/11, color 152) @ (15, 32)                        │
-│ "v.00024"   (133/6,  color 189) @ (115, 39)                       │
-├──────────────────────────────────────┬──────────────────────────────┤
-│ Character Panel (10, 64) 217×120     │ Game List (403, 87) 222×267 │
-│ ┌─ user text (20, 71) 133/6         │ ┌─ SelectBox (407, 89)      │
-│ │  agency toggles @ y=90, x+=42     │ │  214×265, lineheight=13   │
-│ │  level/wins/etc @ y=130..169      │ ├─ Join (405, 361) B112x33  │
-│ └────────────────────────────────────│ └─ Create (518, 361) B112  │
-├──────────────────────────────────────┤                              │
-│ Chat Panel (15, 216) 368×234         │                              │
-│ ┌─ Messages (19, 220) 242×207       │                              │
-│ │  lineheight=11, fontwidth=6        │                              │
-│ ├─ Presence (267, 220) 110×207      │                              │
-│ └─ Input    (19, 437) 360×14        │                              │
-├──────────────────────────────────────┴──────────────────────────────┤
-│ Version: (10, 463) 133/6                                           │
-└─────────────────────────────────────────────────────────────────────┘
-```
+The lobby is laid out in three regions on the left column plus a Game List on
+the right, with header and footer text spanning the full width.
+
+| Region | Position `(x, y)` | Size `W × H` | Contents |
+| ----------------- | ----------------- | ------------ | --------- |
+| Title             | `(15, 32)`        | text         | `"zSilencer"`, font bank 135 / advance 11, color **152** (dark red) |
+| Version label     | `(115, 39)`       | text         | `"v.00024"`, font bank 133 / advance 6, color **189** (orange) |
+| Character panel   | `(10, 64)`        | `217 × 120`  | Username text at `(20, 71)` 133/6; agency toggles starting at `y=90` with `+42 px` horizontal spacing; level / wins / etc. at `y=130..169` |
+| Chat panel        | `(15, 216)`       | `368 × 234`  | Messages TextBox `(19, 220) 242 × 207`, lineheight 11, fontwidth 6; Presence TextBox `(267, 220) 110 × 207`; Chat TextInput `(19, 437) 360 × 14` |
+| Game List         | `(403, 87)`       | `222 × 267`  | SelectBox `(407, 89) 214 × 265` lineheight 13; Join button at `(405, 361)` `B112x33`; Create button at `(518, 361)` `B112x33` |
+| Footer            | `(10, 463)`       | text         | Version, font bank 133 / advance 6 |
+
+Origin is top-left `(0, 0)`. All measurements are in the 640 × 480 logical
+pixel space.
 
 ### In-Game HUD
 
@@ -1517,19 +1877,24 @@ All coordinates below are in the 640 × 480 logical pixel space.
 
 ### Sprite Transformations
 
+The first four effects are documented in detail under
+[Color System](#color-system) (brightness, color tint, alpha blend, team color
+decoding). The remaining effects are pixel-by-pixel sprite overlays composited
+onto the destination surface.
+
 | Effect | Function | Description |
 | --------------------- | ---------------------- | --------------------------------------------------- |
-| Brightness | `EffectBrightness()` | Shifts all pixels via brightness lookup table |
-| Color Tint | `EffectColor()` | Luminance-preserving color overlay |
-| Ramp Color | `EffectRampColor()` | Recolors within 16-color ramp bands |
-| Ramp Color Plus | `EffectRampColorPlus()` | Ramp with additive brightness offset |
-| Alpha Blend | `DrawAlphaed()` | Per-pixel alpha blend with destination |
-| Checkered | `DrawCheckered()` | Every-other-pixel transparency |
-| Team Color | `EffectTeamColor()` | Applies team hue + brightness |
-| Hit Flash | `EffectHit()` | Damage indicator (health/shield/poison) |
-| Shield Damage | `EffectShieldDamage()` | Shield-specific damage overlay (color 205) |
-| Warp | `EffectWarp()` | Warping visual distortion |
-| Hacking | `EffectHacking()` | Hacking-state visual overlay |
+| Brightness | `EffectBrightness()` | Linear lerp toward white (>128) or black (<128). See [Brightness Transform](#brightness-transform). |
+| Color Tint | `EffectColor()` | Luminance-preserving recolor. See [Color Tint Transform](#color-tint-transform). |
+| Alpha Blend | `Alpha()` / `DrawAlphaed()` | Per-pixel alpha blend with destination. See [Alpha Blend Transform](#alpha-blend-transform). |
+| Team Color | `EffectTeamColor()` | Decodes packed `(brightness<<4) \| hue` byte; recolors palette ranges 81–92 and 195–208 (or ≥130 for robots) via `EffectColor` then `EffectBrightness`. |
+| Ramp Color | `EffectRampColor()` | For each non-zero pixel, computes a new palette index by combining the source pixel's brightness level (its position within its 16-color ramp) with the target color's group: `output = ((src - 2) % 16) + (((tgt - 2) / 16) * 16) + 2`. Snaps to the same ramp brightness in a different color group. |
+| Ramp Color Plus | `EffectRampColorPlus()` | Same as Ramp Color but adds a minimum-brightness floor: if the resulting brightness level would be below `min`, it is bumped up to `min` (clamped to 15). Used for "highlighted" ramp tints. |
+| Checkered | `DrawCheckered()` | Every-other-pixel transparency. Effective 50% transparency without true alpha. |
+| Hit Flash | `EffectHit()` | Plays sprite bank **153** (8-frame ping-pong hit-flash animation) at impact location, applies `EffectRampColor` with a damage-type code: 146 (health-only damage), 194 (shield-only damage), 210 (poison damage). If shield was hit, also runs `EffectShieldDamage` on the same surface. |
+| Shield Damage | `EffectShieldDamage()` | Stencil overlay using sprite bank **177** (8 frames cycling every 8 ticks). Where the stencil is opaque AND the destination has a non-transparent pixel, applies `RampColorMin` with color 205 (`#1C60B0`). Visual: blue checkerboard flash on the silhouette. |
+| Warp | `EffectWarp()` | Vertical-displacement effect using sprite bank 153 frame 7 as the displacement envelope, offset by `(state_warp - 8) * 12` px (reversed for `state_warp >= 12`). Where source and offset overlap, output is forced to mid-gray (palette 128); non-overlapping transparent pixels are zeroed. |
+| Hacking | `EffectHacking()` | Glitch overlay using sprite bank **178** (8 animated glitch frames, one per tick). A random `(ex, ey)` offset regenerates every 8 ticks. Where the overlay is opaque AND the destination has a pixel, applies `RampColorMin` with color 190 (ally) or 124 (enemy). |
 
 ### Button Hover Animation
 
@@ -1566,25 +1931,75 @@ get an additional `+40 - (distance * 8)` brightness boost for a
 
 ---
 
+## UI Sounds
+
+There is only **one UI sound**: `whoom.wav`. It is played in three contexts,
+all by the Interface input dispatcher:
+
+| Trigger                                           | Source            |
+| ------------------------------------------------- | ----------------- |
+| Button enters `ACTIVATING` (mouse hover or focus) | `button.cpp:52`   |
+| Item selected via mouse click in a SelectBox      | `interface.cpp:608` |
+| Enter pressed in a focused TextInput              | `interface.cpp:651` |
+| Scrollbar nudge from keyboard nav past viewport   | (also `whoom.wav`) |
+
+No volume parameter is passed (default mix volume). There are no separate
+sounds for: error / modal-open, toggle change, scrollbar arrow click, focus
+change between fields, or text input keypresses. A reimplementation can match
+the original by playing the same one-shot on these four events.
+
+---
+
+## Effect-Color Reference
+
+The following palette indices appear in component pseudocode but warrant
+extra cross-referencing because they are reused across contexts or are
+specific to effect overlays. All RGB values come from Palette 0.
+
+| Index | RGB / Hex | Used in |
+| ----- | --------- | ------- |
+| 114 | `#000000` | Hack progress (incomplete); secret-carrier indicator. Also marks the boundary between the lower and upper palette ramps. |
+| 124 | (varies) | `EffectHacking` overlay color when hacking an enemy target. |
+| 140 | `#FCFC00` | TextInput caret. |
+| 146 | `#0C0404` | `EffectHit` damage flash for health-only damage. |
+| 153 | (sprite bank) | Hit-flash animation frames for `EffectHit`. |
+| 177 | (sprite bank) | Stencil frames for `EffectShieldDamage`. |
+| 178 | (sprite bank) | Glitch overlay frames for `EffectHacking`. |
+| 180 | mid-gray ramp | SelectBox selected-row background. |
+| 190 | (varies) | `EffectHacking` overlay color when hacking an ally target. |
+| 192 | `#FCC480` | Secret-dropped announcement; also minimap pickup marker. |
+| 194 | `#000018` | `EffectHit` damage flash for shield-only damage. |
+| 205 | `#1C60B0` | `EffectShieldDamage` stencil tint. |
+| 210 | `#001800` | `EffectHit` poison-damage flash; also "player in base" indicator on the Team HUD. |
+
+Indices 153, 177, and 178 are **sprite bank numbers** for animated effect
+overlays, not palette indices — they appear here for cross-referencing with the
+[Visual Effects](#visual-effects) table.
+
+---
+
 ## Source File Reference
 
 | File | Contents |
 | ------------------- | ------------------------------------------------- |
-| `src/renderer.cpp` | All Draw* functions, effects, HUD rendering, buy menu, chat overlay, player list |
+| `src/renderer.cpp` | All Draw* functions, effects, HUD rendering, buy menu, chat overlay, player list, modal dialog rendering |
 | `src/renderer.h` | Renderer class, drawing API surface |
-| `src/palette.cpp` | Palette loading, lookup-table calculation |
+| `src/resources.cpp` | Asset loading: BIN_SPR.DAT / SPR_NNN.BIN format, RLE codec, font bank loading, palette assignment |
+| `src/resources.h` | `spritewidth`, `spriteheight`, `spriteoffsetx`, `spriteoffsety` arrays referenced throughout |
+| `src/palette.cpp` | Palette loading (PALETTE.BIN), lookup-table calculation, brightness/color/alpha transforms |
 | `src/palette.h` | Palette class, inline color/brightness transforms |
-| `src/button.cpp` | Button types, sizing, animation state machine |
+| `src/button.cpp` | Button types, sizing, animation state machine, sound trigger |
 | `src/overlay.cpp` | Overlay defaults, sprite animations, text hit-testing |
-| `src/textinput.cpp` | Text field defaults, caret, input handling, scrolling |
+| `src/textinput.cpp` | Text field defaults, caret, input handling, scrolling, intentionally limited editing |
 | `src/textbox.cpp` | Multi-line text area, word-wrap, line storage format |
 | `src/selectbox.cpp` | List selection, item management, file listing |
 | `src/scrollbar.cpp` | Scroll bar hit regions, up/down logic |
 | `src/toggle.cpp` | Toggle visual states, checkbox/agency modes |
-| `src/interface.cpp` | Container/focus manager, tab order, keyboard/mouse dispatch, radio groups |
+| `src/interface.cpp` | Container/focus manager, tab order, keyboard/mouse dispatch, radio groups, modal handling |
 | `src/sprite.h` | Base sprite properties: effectcolor, effectbrightness, draw flags |
 | `src/sprite.cpp` | Bounding box calculation, nudge interpolation |
 | `src/object.h` | Object base class (type, id, render flags) |
 | `src/minimap.h` | Minimap pixel buffer (172 × 62) |
-| `src/game.cpp` | UI construction (lobby, menus, options screens), loading bar |
+| `src/game.cpp` | UI construction (lobby, menus, options screens), loading bar, modal dialog factory, main loop / tick rate |
+| `src/world.cpp` | Per-tick simulation entry point (`World::Tick`) |
 | `src/team.cpp` | Team overlays, player name labels |
