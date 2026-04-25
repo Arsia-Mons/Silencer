@@ -335,7 +335,7 @@ export default function DesignerPage() {
 
           {/* Publish */}
           {map && (
-            <div className="relative">
+            <div className="relative flex items-center">
               <button
                 onClick={() => { setShowPublish(p => !p); setPubStatus(null); }}
                 className={`px-3 py-1 text-xs font-mono border rounded transition-colors ${showPublish ? 'border-game-primary text-game-primary bg-game-dark' : 'border-game-border text-game-textDim hover:border-game-primary hover:text-game-text'}`}
