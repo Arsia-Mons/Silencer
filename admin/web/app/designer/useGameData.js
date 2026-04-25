@@ -6,6 +6,9 @@ import { ACTOR_DEFS } from './Toolbar.js';
 const NEEDED_SPRITE_BANKS = new Set([
   ...ACTOR_DEFS.map(a => a.bank).filter(b => b != null),
   184, // big terminal (type=1 variant of actor 54)
+  200, // powerup: super shield
+  201, // powerup: jet pack
+  205, // powerup: default (neutron bomb, invisible, hacking, radar, depositor)
 ]);
 
 // Palette stride: 772 bytes per palette (768 color bytes + 4 padding), header 4 bytes

@@ -256,9 +256,15 @@ export default function MapCanvas({
         const cx = a.x * zoom + pan.x;
         const cy = a.y * zoom + pan.y;
 
-        // Dynamic bank for actors where it depends on actor.type (e.g., terminal)
+        // Dynamic bank for actors where it depends on actor.type
         let bankNum = def.bank;
         if (a.id === 54) bankNum = a.type === 0 ? 183 : 184;
+        if (a.id === 63) {
+          // Powerup: type 0=SuperShield→200, type 2=JetPack→201, rest→205
+          if (a.type === 0) bankNum = 200;
+          else if (a.type === 2) bankNum = 201;
+          else bankNum = 205;
+        }
 
         // Try to draw actual sprite
         const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;

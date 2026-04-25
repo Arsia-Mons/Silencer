@@ -35,7 +35,7 @@ export const ACTOR_DEFS = [
   { id: 56, label: 'Inv. Station',   icon: 'IS', color: '#00a328', bank: 89,  frame: 0 },
   { id: 57, label: 'Heal Machine',   icon: 'HM', color: '#22d3ee', bank: 172, frame: 0 },
   { id: 58, label: 'Secret Return',  icon: 'SR', color: '#a855f7', bank: 152, frame: 0 },
-  { id: 63, label: 'Powerup',        icon: 'PU', color: '#f59e0b', bank: 85,  frame: 0 },
+  { id: 63, label: 'Powerup',        icon: 'PU', color: '#f59e0b', bank: null, frame: 0 }, // dynamic per type
   { id: 64, label: 'Vent',           icon: 'VT', color: '#6b7280', bank: 179, frame: 0 },
   { id: 65, label: 'Base Exit',      icon: 'BE', color: '#22d3ee', bank: 101, frame: 0 },
   { id: 66, label: 'Tech Station',   icon: 'TS', color: '#00a328', bank: 106, frame: 0 },
@@ -50,12 +50,9 @@ export const ACTOR_TYPE_HINTS = {
   3:  { label: 'Weapon', options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma' } },
   36: { label: 'Agency', options: { 0:'Agency 0', 1:'Agency 1', 2:'Agency 2', 3:'Agency 3' } },
   54: { label: 'Size',   options: { 0:'Small', 1:'Big' } },
-  63: { label: 'Item', options: {
-    0:'None', 1:'Secret', 2:'Files', 3:'Laser Ammo', 4:'Rocket Ammo',
-    5:'Flamer Ammo', 6:'EMP Bomb', 7:'Shaped Bomb', 8:'Plasma Bomb',
-    9:'Neutron Bomb', 10:'Fixed Cannon', 11:'Flare', 12:'Camera',
-    13:'Plasma Det', 14:'Health Pack', 15:'Super Shield', 16:'Jet Pack',
-    17:'Hacking', 18:'Radar', 19:'Invisible', 20:'Depositor',
+  63: { label: 'Powerup', options: {
+    0:'Super Shield', 1:'Neutron Bomb', 2:'Jet Pack',
+    3:'Invisible', 4:'Hacking Bonus', 5:'Radar', 6:'Depositor',
   } },
   65: { label: 'Side',   options: { 0:'Team A', 1:'Team B' } },
   67: { label: 'Variant', options: {} },
