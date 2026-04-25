@@ -96,7 +96,7 @@ void CDResDir(void){
 			char path[PATH_MAX];
 			if(CFURLGetFileSystemRepresentation(resourcesURL, TRUE, (UInt8 *)path, PATH_MAX)){
 				CFRelease(resourcesURL);
-				// Check if data files exist in the bundle resource dir
+				// Check if asset files exist in the bundle resource dir
 				char testpath[PATH_MAX];
 				snprintf(testpath, PATH_MAX, "%s/PALETTE.BIN", path);
 				FILE *f = fopen(testpath, "r");
