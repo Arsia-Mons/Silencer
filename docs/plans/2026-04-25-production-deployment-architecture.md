@@ -77,13 +77,24 @@ from the lobby keeps the gameplay path's blast radius small.
 | Lobby       | ARM64 binary              | scp + symlink swap + `systemctl restart`       | Git tag `v*`                   |
 | Admin API   | OCI image on GHCR         | `docker pull` + symlink swap + `systemctl restart` | Path filter on its source dir  |
 | Admin Web   | OCI image on GHCR         | `docker pull` + symlink swap + `systemctl restart` | Path filter on its source dir  |
-| Data tier   | Terraform-managed EC2 + EBS | `terraform apply`                            | Path filter on `terraform/`    |
+| Data tier   | Terraform-managed EC2 + EBS | `terraform apply`                            | Path filter on `infra/terraform/` |
 
 Each lives in its own GitHub Actions workflow file. None imports
 or calls another. A separate "provision-environment" workflow
 exists for fresh-environment bootstrap and calls the per-service
 workflows in dependency order; this is exercised quarterly, not
 per PR.
+
+The lobby's tag-based trigger is deliberate: clients pin to a
+specific lobby protocol version, so a lobby ship is a coordinated
+event. Admin-api and admin-web have no external pinners — nothing
+breaks if they ship continuously — so they trigger on path filter.
+
+New helper scripts these workflows call (deploy steps, health
+checks, secret-fetch helpers) live in `infra/scripts/` alongside
+the existing `install-linux-server.sh` and `fastdeploy.sh`. Per
+the repo-wide Bun+TS rule, any new JS-based helpers are `.ts`
+files invoked under `bun`.
 
 ## Data Persistence
 
@@ -117,7 +128,7 @@ Three independent backup layers stack on top:
    account data; MongoDB is a read mirror. A total data-tier
    loss does not lose account state.
 
-Ban data loss only if all three layers and `lobby.json` fail
+Data is lost only if all three layers and `lobby.json` fail
 simultaneously.
 
 ## Cross-Service Configuration
@@ -161,6 +172,10 @@ Phases are sequenced by risk: data tier first (slowest to fix
 if wrong, longest-lived), then per-service deploy plumbing, then
 wiring it all up.
 
+Each phase's PR also refreshes the matching section of
+`docs/production.md` so the operational reference stays current
+with the deploy verbs as they land.
+
 ### Phase 1 — Provision the admin/data box
 
 Terraform delta only. New EC2 instance in the lobby's VPC and AZ,
@@ -171,6 +186,10 @@ GitHub Actions SSH access, and cloud-init that installs Mongo +
 RabbitMQ bound to the private interface with auth enabled. GitHub
 Actions does not yet deploy app workloads to this box.
 
+Includes an `infra/terraform/CLAUDE.md` update describing the new
+admin/data box module, the EBS-volume-per-stateful-service
+pattern, and the cloud-init mount-before-install ordering gotcha.
+
 Done when: SSH from a tailnet peer works, `mongod` and
 `rabbitmq-server` accept authenticated connections from the
 lobby's private IP, and `terraform taint && apply` the instance
@@ -180,7 +199,16 @@ preserves data on both EBS volumes.
 
 GitHub Actions workflow that builds an ARM64 OCI image, pushes to
 GHCR, and updates the systemd unit on the admin/data box via SSH.
-Workflow is path-filtered to the admin-api source directory.
+Workflow is path-filtered to the admin-api source directory. Image
+base is `oven/bun` (per the repo-wide Bun+TS rule); the Dockerfile
+contains no `node` invocation. The systemd unit's `ExecStart` runs
+`docker run --rm --name silencer-admin-api …` against the
+currently-symlinked image tag, so a deploy is `docker pull` +
+symlink swap + `systemctl restart silencer-admin-api`.
+
+Includes a `services/admin-api/CLAUDE.md` update covering the
+container build, the systemd unit shape, and the deploy verb (per
+the monorepo restructure's per-component CLAUDE.md rule).
 
 Done when: a touch-only commit under that directory triggers a
 new image, the box pulls it, and the unit restarts without
@@ -188,8 +216,10 @@ affecting any other service.
 
 ### Phase 3 — Admin Web deploy workflow
 
-Same shape as Phase 2 for the Next.js app. Path-filtered to the
-admin-web source directory.
+Same shape as Phase 2 for the Next.js app, also `oven/bun`-based
+(Next.js runs fine under Bun). Path-filtered to the admin-web
+source directory. Includes a `web/admin/CLAUDE.md` update mirroring
+Phase 2's documentation deliverable.
 
 Done when: same as Phase 2 for the web service.
 
@@ -207,15 +237,33 @@ mutations and successful RabbitMQ publishes on match end, and
 admin-api validates a player credential against the lobby over
 the private network.
 
-### Phase 5 — Snapshot policy + access decision
+### Phase 5 — Snapshot policy
 
-Add the DLM lifecycle policy. Decide and implement public
-ingress for admin-web and admin-api (see Open Decisions).
+Add the DLM lifecycle policy that snapshots both EBS volumes on
+the admin/data box daily, with a rolling retention window.
+Independent of any ingress decision, so it can ship as soon as
+Phase 1 is in.
+
+Done when: a fresh DLM-created snapshot exists for each volume,
+and the retention window prunes correctly after one cycle.
+
+### Phase 6 — Public ingress for admin-web and admin-api
+
+Resolve the public-ingress Open Decision (Tailscale-only,
+Cloudflare, ALB+ACM, or admin-web-proxies-admin-api) and
+implement the chosen option. Until this lands, both services are
+reachable only over the tailnet.
+
+Done when: the chosen URL pattern resolves end-to-end from a
+non-developer browser (or, for the Tailscale-only path, the
+decision is recorded and the tailnet ACL grants the intended
+audience).
 
 ## Open Decisions
 
-These need answers before Phase 1 lands; flagging now so they
-don't block later phases:
+Each of these is owned by a specific phase, not a Phase 1
+prerequisite. Flagged here so they're visible early and don't
+get rediscovered mid-implementation:
 
 - **Public ingress for admin-web and admin-api.** Both need
   externally-reachable URLs because `NEXT_PUBLIC_API_URL` bakes
@@ -225,9 +273,9 @@ don't block later phases:
   developers on the tailnet reach either; (b) Cloudflare in front
   of public SG rules on both ports — free TLS, hides the origin
   IP; (c) ALB + ACM with two listener rules — AWS-native,
-  ~$18/mo, cleanest separation. Default for Phase 1 is (a).
-  Revisit before Phase 5 if non-developers need access. A fourth
-  path is to make admin-web proxy API calls server-side and drop
+  ~$18/mo, cleanest separation. Default through Phases 2–5 is
+  (a); the choice is the substance of Phase 6. A fourth path is
+  to make admin-web proxy API calls server-side and drop
   `NEXT_PUBLIC_API_URL`, leaving only admin-web to expose.
 
 - **Admin-API ↔ admin-web separation.** Phase 2/3 colocate them
