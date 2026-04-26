@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "id": "guard-patrol",
+  "blackboard": [
+    { "key": "player_visible", "type": "bool",  "default": false },
+    { "key": "player_above",   "type": "bool",  "default": false },
+    { "key": "player_below",   "type": "bool",  "default": false },
+    { "key": "alert_level",    "type": "int",   "default": 0 },
+    { "key": "health_pct",     "type": "float", "default": 1.0 },
+    { "key": "on_ladder",      "type": "bool",  "default": false }
+  ],
+  "rootId": "root",
+  "nodes": {
+    "root": {
+      "type": "Selector",
+      "label": "Guard AI",
+      "children": ["combat", "patrol"],
+      "props": {}
+    },
+    "combat": {
+      "type": "Sequence",
+      "label": "Combat",
+      "children": ["cond_visible", "sel_shoot"],
+      "props": {}
+    },
+    "cond_visible": {
+      "type": "Condition",
+      "label": "player_visible?",
+      "children": [],
+      "props": { "key": "player_visible", "op": "==", "value": true }
+    },
+    "sel_shoot": {
+      "type": "Selector",
+      "label": "Choose Shot",
+      "children": ["seq_shoot_up", "seq_shoot_down", "leaf_shoot"],
+      "props": {}
+    },
+    "seq_shoot_up": {
+      "type": "Sequence",
+      "label": "Shoot Up",
+      "children": ["cond_above", "leaf_shoot_up"],
+      "props": {}
+    },
+    "cond_above": {
+      "type": "Condition",
+      "label": "player_above?",
+      "children": [],
+      "props": { "key": "player_above", "op": "==", "value": true }
+    },
+    "leaf_shoot_up": {
+      "type": "Leaf",
+      "label": "ShootUp",
+      "children": [],
+      "props": { "action": "ShootUp" }
+    },
+    "seq_shoot_down": {
+      "type": "Sequence",
+      "label": "Shoot Down",
+      "children": ["cond_below", "leaf_shoot_down"],
+      "props": {}
+    },
+    "cond_below": {
+      "type": "Condition",
+      "label": "player_below?",
+      "children": [],
+      "props": { "key": "player_below", "op": "==", "value": true }
+    },
+    "leaf_shoot_down": {
+      "type": "Leaf",
+      "label": "ShootDown",
+      "children": [],
+      "props": { "action": "ShootDown" }
+    },
+    "leaf_shoot": {
+      "type": "Leaf",
+      "label": "Shoot",
+      "children": [],
+      "props": { "action": "Shoot" }
+    },
+    "patrol": {
+      "type": "Sequence",
+      "label": "Patrol",
+      "children": ["cool_look", "leaf_patrol"],
+      "props": {}
+    },
+    "cool_look": {
+      "type": "Cooldown",
+      "label": "Look (3s)",
+      "children": ["leaf_look"],
+      "props": { "duration": 3.0 }
+    },
+    "leaf_look": {
+      "type": "Leaf",
+      "label": "Look",
+      "children": [],
+      "props": { "action": "Look" }
+    },
+    "leaf_patrol": {
+      "type": "Leaf",
+      "label": "Patrol",
+      "children": [],
+      "props": { "action": "Patrol" }
+    }
+  },
+  "positions": {}
+}
