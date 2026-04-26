@@ -155,7 +155,7 @@ const PALETTE: { group: string; types: BTNodeType[] }[] = [
 
 const LEAF_ACTIONS = [
   'Patrol', 'Stand', 'Look',
-  'Shoot', 'ShootUp', 'ShootDown',
+  'ShootStanding', 'ShootCrouched', 'ShootUp', 'ShootDown', 'ShootUpAngle', 'ShootDownAngle',
   'Crouch', 'Uncrouch',
   'ClimbLadder', 'Alert', 'Melee',
   'Run', 'Wander', 'Sleep', 'Idle',

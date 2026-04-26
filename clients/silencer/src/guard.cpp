@@ -37,23 +37,76 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 void Guard::InitBT(){
 	bt_ = BehaviorTreeLibrary::instance().get("guard-patrol");
 	if(!bt_) return;
+	btctx_.actions["ShootStanding"] = [this](BTContext&) -> BTResult {
+		if(state == STANDING || state == WALKING || state == LOOKING){
+			state = SHOOTSTANDING; state_i = 0;
+			return BTResult::Success;
+		}
+		return BTResult::Failure;
+	};
+	btctx_.actions["ShootCrouched"] = [this](BTContext&) -> BTResult {
+		if(state == CROUCHED && (state_hit == 0 || state_hit % 32 >= 10)){
+			state = SHOOTCROUCHED; state_i = 0;
+			return BTResult::Success;
+		}
+		return BTResult::Failure;
+	};
+	btctx_.actions["Crouch"] = [this](BTContext&) -> BTResult {
+		if(state == STANDING || state == WALKING || state == LOOKING){
+			state = CROUCHING; state_i = 0;
+			return BTResult::Success;
+		}
+		return BTResult::Failure;
+	};
+	btctx_.actions["Uncrouch"] = [this](BTContext&) -> BTResult {
+		if(state == CROUCHED){
+			state = UNCROUCHING; state_i = 0;
+			return BTResult::Success;
+		}
+		return BTResult::Failure;
+	};
+	btctx_.actions["ShootUp"] = [this](BTContext&) -> BTResult {
+		if(state == STANDING || state == WALKING || state == LOOKING){
+			state = SHOOTUP; state_i = 0;
+			return BTResult::Success;
+		}
+		return BTResult::Failure;
+	};
+	btctx_.actions["ShootDown"] = [this](BTContext&) -> BTResult {
+		if(state == STANDING || state == WALKING || state == LOOKING){
+			state = SHOOTDOWN; state_i = 0;
+			return BTResult::Success;
+		}
+		return BTResult::Failure;
+	};
+	btctx_.actions["ShootUpAngle"] = [this](BTContext&) -> BTResult {
+		if(state == STANDING || state == WALKING || state == LOOKING){
+			state = SHOOTUPANGLE; state_i = 0;
+			return BTResult::Success;
+		}
+		return BTResult::Failure;
+	};
+	btctx_.actions["ShootDownAngle"] = [this](BTContext&) -> BTResult {
+		if(state == STANDING || state == WALKING || state == LOOKING){
+			state = SHOOTDOWNANGLE; state_i = 0;
+			return BTResult::Success;
+		}
+		return BTResult::Failure;
+	};
 	btctx_.actions["Patrol"] = [this](BTContext&) -> BTResult {
-		state = WALKING; state_i = (Uint8)-1;
+		if(state != WALKING && state != LOOKING){
+			state = WALKING; state_i = 0;
+		}
 		return BTResult::Success;
 	};
 	btctx_.actions["Look"] = [this](BTContext&) -> BTResult {
-		state = LOOKING; state_i = (Uint8)-1;
+		state = LOOKING; state_i = 0;
 		return BTResult::Success;
 	};
 	btctx_.actions["Stand"] = [this](BTContext&) -> BTResult {
-		state_i = 0; // reset standing timer, stay standing
+		if(state == WALKING){ state = STANDING; state_i = 0; }
 		return BTResult::Success;
 	};
-	// Combat actions are handled by the interrupt layer; register as no-ops
-	// so the BT combat branch doesn't fail if player_visible happens to be true
-	btctx_.actions["Shoot"]     = [](BTContext&) -> BTResult { return BTResult::Success; };
-	btctx_.actions["ShootUp"]   = [](BTContext&) -> BTResult { return BTResult::Success; };
-	btctx_.actions["ShootDown"] = [](BTContext&) -> BTResult { return BTResult::Success; };
 }
 
 void Guard::Serialize(bool write, Serializer & data, Serializer * old){
@@ -78,92 +131,55 @@ void Guard::Tick(World & world){
 	// 197:0-8 ladder shoot down
 	Hittable::Tick(*this, world);
 	Bipedal::Tick(*this, world);
-	Object * found = 0;
-	if(state != DYING && state != DEAD && state != DYINGEXPLODE){
-		do{
-			if((found = Look(world, 0))){
-				if(state == WALKING || state == STANDING || state == LOOKING){
-					if(CooledDown(world)){
-						state = SHOOTSTANDING;
-						state_i = 0;
-					}
-				}else
-				if(state == CROUCHED){
-					state = UNCROUCHING;
-					state_i = 0;
-				}
-				break;
+
+	// BT drives all decisions when guard is in an interruptible state
+	Object* btFound = nullptr;
+	bool interruptible = (
+		(state == STANDING && state_i >= 24) ||
+		state == WALKING ||
+		state == LOOKING ||
+		state == CROUCHED);
+	if(state != DYING && state != DEAD && state != DYINGEXPLODE && interruptible){
+		if(!bt_) InitBT();
+		if(bt_){
+			Object* fwd        = Look(world, 0);
+			Object* crouchray  = Look(world, 1);
+			Object* above      = Look(world, 2);
+			Object* below      = Look(world, 3);
+			Object* aboveangle = Look(world, 4);
+			// direction 5 (down-angle): ignore if player is within 60px
+			Object* belowangle = Look(world, 5);
+			if(belowangle && belowangle->type == ObjectTypes::PLAYER){
+				Player* p = static_cast<Player*>(belowangle);
+				if(abs(p->x - x) < 60) belowangle = nullptr;
 			}
-			if((found = Look(world, 1))){
-				if(state == CROUCHED){
-					if(CooledDown(world) && (state_hit == 0 || state_hit % 32 >= 10)){
-						state = SHOOTCROUCHED;
-						state_i = 0;
-					}
-				}else
-				if(state == WALKING || state == STANDING || state == LOOKING){
-					state = CROUCHING;
-					state_i = 0;
-				}
-				break;
-			}
-			if((found = Look(world, 2))){
-				if(state == WALKING || state == STANDING || state == LOOKING){
-					if(CooledDown(world)){
-						state = SHOOTUP;
-						state_i = 0;
-					}
-				}
-				break;
-			}
-			if((found = Look(world, 3))){
-				if(state == WALKING || state == STANDING || state == LOOKING){
-					if(CooledDown(world)){
-						state = SHOOTDOWN;
-						state_i = 0;
-					}
-				}
-				break;
-			}
-			if((found = Look(world, 4))){
-				if(state == WALKING || state == STANDING || state == LOOKING){
-					if(CooledDown(world)){
-						state = SHOOTUPANGLE;
-						state_i = 0;
-					}
-				}
-				break;
-			}
-			if((found = Look(world, 5))){
-				Player * player = static_cast<Player *>(found);
-				if(player){
-					if(abs(player->x - x) < 60){
-						break;
-					}
-				}
-				if(state == WALKING || state == STANDING || state == LOOKING){
-					if(CooledDown(world)){
-						state = SHOOTDOWNANGLE;
-						state_i = 0;
-					}
-				}
-				break;
-			}
-		}while(0);
-		if(found){
-			if(!chasing){
-				chasing = found->id;
+
+			btFound = fwd ? fwd : crouchray ? crouchray : above ? above :
+			          below ? below : aboveangle ? aboveangle : belowangle;
+
+			if(btFound && !chasing){
+				chasing = btFound->id;
 				if(world.tickcount - lastspoke > 24 * 10){
 					lastspoke = world.tickcount;
 					const char * sounds[5] = {"theres3.wav", "stop4.wav", "freeze3.wav", "freezrt1.wav", "drop4.wav"};
 					EmitSound(world, world.resources.soundbank[sounds[rand() % 5]], 128);
 				}
 			}
-		}else{
-			if(state == CROUCHED){
-				state = UNCROUCHING;
-				state_i = 0;
-			}
+
+			btctx_.dt = 1.0f / 24.0f;
+			btctx_.bbSet("player_visible",       fwd        != nullptr);
+			btctx_.bbSet("player_crouched_shot", crouchray  != nullptr);
+			btctx_.bbSet("player_above",         above      != nullptr);
+			btctx_.bbSet("player_below",         below      != nullptr);
+			btctx_.bbSet("player_above_angle",   aboveangle != nullptr);
+			btctx_.bbSet("player_below_angle",   belowangle != nullptr);
+			btctx_.bbSet("any_target",           btFound    != nullptr);
+			btctx_.bbSet("cooled_down",          CooledDown(world));
+			btctx_.bbSet("crouched",             state == CROUCHED);
+			btctx_.bbSet("patrol",               patrol);
+			btctx_.bbSet("health_pct",           maxhealth > 0 ? (float)health / (float)maxhealth : 0.0f);
+
+			bt_->tick(btctx_);
 		}
 	}
 	switch(state){
@@ -180,32 +196,7 @@ void Guard::Tick(World & world){
 			yv = 0;
 			res_bank = 59;
 			res_index = 0;
-			if(state_i >= 48 && !chasing){
-				if(!bt_) InitBT();
-				if(bt_){
-					btctx_.dt = 1.0f / 24.0f;
-					btctx_.bbSet("player_visible", found != nullptr);
-					btctx_.bbSet("health_pct", maxhealth > 0 ? (float)health / (float)maxhealth : 0.0f);
-					BTResult r = bt_->tick(btctx_);
-					// On Running: stay standing; cap state_i to prevent Uint8 overflow
-					if(r == BTResult::Running && state == STANDING){
-						if(state_i >= 200) state_i = 48;
-					}
-					// On Failure: default to looking around
-					if(r == BTResult::Failure){
-						state = LOOKING;
-						state_i = (Uint8)-1;
-					}
-					// On Success: action handler already set new state
-				}else{
-					if(patrol && world.Random() % 3 == 0){
-						state = WALKING;
-					}else{
-						state = LOOKING;
-					}
-					state_i = (Uint8)-1;
-				}
-			}
+			if(state_i > 200) state_i = 24; // cap to prevent Uint8 overflow past BT gate
 		}break;
 		case CROUCHING:{
 			res_bank = 158;
@@ -249,7 +240,7 @@ void Guard::Tick(World & world){
 			}
 		}break;
 		case LOOKING:{
-			if(!found){
+			if(!btFound){
 				chasing = 0;
 			}
 			if(state_i == 0 && Look(world, 10)){
