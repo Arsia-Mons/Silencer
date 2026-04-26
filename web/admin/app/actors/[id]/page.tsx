@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth';
 import { useWsConnected } from '../../../lib/socket';
 import Sidebar from '../../../components/Sidebar';
@@ -20,16 +20,27 @@ import StateMachineTab from './StateMachineTab';
 import type { StateMachine } from '../../../lib/api';
 
 type Tab = 'animation' | 'hitbox' | 'statemachine' | 'props';
+const VALID_TABS: Tab[] = ['animation', 'hitbox', 'statemachine', 'props'];
 
 export default function ActorEditorPage() {
   useAuth();
   const wsConnected = useWsConnected();
   const { id } = useParams() as { id: string };
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [def, setDef]       = useState<ActorDef | null>(null);
   const [dirty, setDirty]   = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
-  const [tab, setTab]       = useState<Tab>('animation');
+
+  const rawTab = searchParams.get('tab') as Tab | null;
+  const tab: Tab = rawTab && VALID_TABS.includes(rawTab) ? rawTab : 'animation';
+
+  function setTab(t: Tab) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', t);
+    router.replace(`?${params.toString()}`);
+  }
 
   useEffect(() => {
     getActor(id)
