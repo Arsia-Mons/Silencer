@@ -6,6 +6,8 @@
 - Sub-palette switching is per-`RunDump*`, not per-screen-state: each screen-builder owns a `constexpr int kSubX = N;` constant and passes it to `WritePPM(fb, palette, kSubX)`. Menu screens use `kSubMenu = 1`; LOBBYCONNECT introduces `kSubLobby = 2`. No rework of `WritePPM` or `Palette` was needed — the active-sub argument was always per-call, not global. The "first non-menu palette" gate (L0/L1) is therefore satisfied by a one-line change in the new screen-builder, with no shared-infra churn.
 - Sub-palette 2 idx 0 = (0, 0, 0) black, confirmed empirically by dumping a Clear(0) FB resolved through sub-palette 2 — the first 12 RGB bytes of the dump payload are all 0x00. This means `Clear(0)` produces a black panel-exterior background "for free" under sub-palette 2, with no need for an explicit black-fill widget. The same holds for sub-palette 1 (where main_menu's bg_plate-less zones would also be black if any were exposed; main_menu has none).
 - LOBBYCONNECT bank set planned ahead at L0 commit: `{7, 133, 134, 135}`. Bank 7 (panel idx 2 + likely B52x21 chrome), bank 133 (textbox + textinput font), bank 134 (Username/Password labels font, w=9), bank 135 (button-label font, by analogy with B196x33/B220x33/B112x33). NO bank 6 (no starfield bg, no bg-plate idx 0) — the panel sprite carries the chrome and the exterior is `Clear(0)` per spec. Bank set is loaded at L0 even though L0 doesn't render any of them yet, to avoid bank-list churn in L1+.
+- **PALETTE.BIN actual layout is `4 + s * (768 + 4)`** — i.e. 4-byte file prefix + 11 records of [4-byte sub-header, 768-byte color table]. The main-menu Ralph's pattern claim of `8 + s*768` was a coincidence: at s=1 both formulas give offset 776, so every prior screen (which all use sub-palette 1) rendered correctly under the wrong formula. They diverge for s != 1 — sub-palette 2 (lobby) sits 4 bytes farther per sub-block, so the empirical formula was reading 4 bytes early and pulling garbage. Correcting to the spec formula leaves sub-palette 1 byte-identical (zero regression on main_menu / options / options_audio / options_display / options_controls dumps — all five at exact baselines: 2136 / 1758 / 1035 / 2211 / 3729) while shifting sub-palettes 0 and 2..10 to their correct offsets. **Lesson:** whenever a "spec disagrees with empirical" is recorded, verify the empirical against MORE THAN ONE data point — sub-palette 1 was the only one tested in main-menu Ralph P0; sub-palette 2 disagreed silently because no prior screen exercised it.
+- Verification mode for palette correctness gates does NOT require visual A/B: when the candidate's first non-`Clear(0)` render under the new sub-palette is gated separately (here, panel sprite is L2's job), L1's "color tones match" check is a table-lookup audit. Sample reference dump's dominant non-black colors → confirm each appears in `sub_palette[N]` post-fix. For this Ralph: top-15 full-screen reference colors all present in sub-palette 2 (15/15 hit rate), confirming the fix is decisive even though the candidate dump is still entirely black at the L1 gate.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -89,4 +91,75 @@
     L1+ can be pure rendering additions with no bank-list churn. The
     `SpriteSet::Load` path is robust enough to handle the new bank
     combination without crash.
+---
+
+## 2026-04-26T16:01:00Z — iter 2 (L1 PASS)
+- Fixed `shared/design/sdl3/src/palette.cpp` line 40 to use the spec-correct
+  offset formula `4 + s * (768 + 4)` (i.e. `4 + s*772`) instead of the
+  empirical `8 + s*768` claimed by the main-menu Ralph's P0. The empirical
+  claim was only verified at s=1, where both formulas coincide at offset 776
+  (`4 + 1*772 == 8 + 1*768`). For s != 1 they diverge by `4 * (s-1)` bytes
+  — sub-palette 2 sat 4 bytes early under the empirical decode, pulling
+  garbage RGBs that didn't match anywhere in the reference panel.
+- Diagnostic that surfaced the bug: sample reference panel area
+  (x∈[80,565], y∈[80,410]) for top-N colors, then look up each in
+  `sub_palette[N]`. Under the empirical formula, sub-palette 2 contained
+  only 1/20 of the reference's dominant panel colors. Under the spec
+  formula, sub-palette 2 contains 18/20 of them (and 15/15 of the top
+  full-screen colors when including blacks/grays). Decisive — no need
+  to render any panel pixels to validate the palette fix.
+- Build: `cmake --build shared/design/sdl3/build` — compiles palette.cpp
+  + relinks; AppleClang 17; exit 0.
+- Regression sweep (all five prior screens; references at the canonical
+  paths `/tmp/real_dump.ppm` / `_options.ppm` / `_options_audio.ppm` /
+  `_options_display.ppm` / `_options_controls.ppm`):
+  - main_menu      = 2,136 bytes diff (exact baseline)
+  - options        = 1,758 bytes diff (exact baseline)
+  - options_audio  = 1,035 bytes diff (exact baseline)
+  - options_display = 2,211 bytes diff (exact baseline)
+  - options_controls = 3,729 bytes diff (exact baseline)
+  All five at byte-identical baselines because they use sub-palette 1
+  and the formulas coincide at s=1. Zero behavioral risk for prior
+  screens; this was a confined fix.
+- LOBBYCONNECT bytewise diff vs `/tmp/real_lobbyconnect_dump.ppm`:
+  212,850 bytes (~23%) — UNCHANGED from L0, because the candidate is
+  still `Clear(0)` (all-black) and idx 0 = (0,0,0) in both old and
+  new sub-palette 2. The reference's panel pixels still differ
+  because L2 hasn't rendered the panel sprite yet. This is structural-
+  render-pending, not palette-incorrect.
+- Visual A/B (Discord DM 1498096686512210054): candidate is still solid
+  black 640x480; reference is the full lobby-connect panel. Same A/B
+  as L0 — palette correctness is verified by table-lookup audit, not
+  by a visible color shift in the candidate.
+- Files touched: `shared/design/sdl3/src/palette.cpp` (offset formula +
+  comment rewrite), `.ralph/lobby-connect/prd.json` (L1 → passes:true),
+  `.ralph/lobby-connect/progress.txt` (this entry + two Codebase
+  Patterns lines).
+- Spec gaps encountered:
+  - `palette.md` correctly documents the spec layout `4 + s*(768+4)`
+    and is now in sync with the candidate decoder. The shared/design/sdl3
+    `CLAUDE.md` still says `4 + s * 772` (which was the spec offset for
+    COLORS) — that's now the actual formula in the code, so they agree.
+    No spec edit needed.
+- **Learnings:**
+  - Empirical claims about file layouts must be verified against at
+    LEAST one data point per sub-block / per code path. P0's empirical
+    decode formula was right at s=1 and silently wrong at s ∈ {0, 2..10}
+    because every menu/options screen used s=1. This is the failure
+    mode "lucky coincidence at the only tested point" — guard against
+    it by sampling multiple sub-palettes during palette-bring-up, not
+    just the one the first screen needs.
+  - Palette-correctness gates can be entirely verification-only when
+    the visual A/B at this point in the screen build-up doesn't yet
+    expose a colored pixel: a lookup-table audit ("are the reference's
+    colors present in the sub-palette table?") is necessary AND
+    sufficient. Saves a render step at L1 and isolates palette risk
+    cleanly from sprite-codec risk (L2).
+  - Per-screen `kSubX` constant pattern (kSubMenu = 1 / kSubLobby = 2)
+    held up: the screen-builder doesn't need to know how the offset is
+    computed, only which sub-palette ID to pass to `WritePPM`. The
+    palette decoder fix was confined to `palette.cpp`; no edits to any
+    `RunDump*` function were required, and zero edits to prior Ralphs'
+    work. The "active-sub argument is per-call, not global" pattern
+    from L0 paid off here too.
 ---

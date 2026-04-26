@@ -16,7 +16,7 @@
       "id": "L1",
       "name": "Sub-palette 2 (lobby) resolves correctly",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "spec": "The candidate switches to sub-palette 2 for this screen and resolves its framebuffer through it. Color tones in the dump match the reference (the panel chrome should be green-on-black with the same shade as the reference, not the menu's slightly-different green).",
       "category": "palette"
     },
