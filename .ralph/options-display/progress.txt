@@ -15,3 +15,23 @@
 - Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
 - **Learnings:** none yet.
 ---
+
+## 2026-04-26T15:04:00Z — iter 1 (D0 PASS)
+- Added `RunDumpOptionsDisplay()` mirroring `RunDumpOptionsAudio` shape:
+  same banks {6, 135}, same kSubMenu=1, same Framebuffer/PPM path. For
+  D0 the body is bg-plate-only — D1 will fill in title + 2 rows + Save/Cancel.
+- Wired `if (screen_str == "options_display")` into the dispatch in main()
+  *before* the default `RunDump` fallback (placement matches options/options_audio).
+- Verified: `SILENCER_DUMP_SCREEN=options_display` emits 921615-byte P6 PPM;
+  `SILENCER_DUMP_SCREEN=options`, `=options_audio`, and unset (main_menu)
+  pathways are untouched (no edits to their Run* functions).
+- **Pattern:** new screens are pure additions to main.cpp — one Run* function
+  + one dispatch entry. No header changes, no CMakeLists changes. Build is
+  `cmake --build build` from `shared/design/sdl3/`; rebuilds incrementally.
+- **Pattern:** Bash tool `cd` into `shared/design/sdl3` persists for the rest
+  of the session — subsequent commands need `./build/silencer_design` (relative
+  to that subdir), not `./shared/design/sdl3/build/silencer_design`.
+- A/B vs reference: candidate has the correct fullscreen bank-6 idx-0 plate
+  (Mars + starfield) in the right place; missing widgets (title, 2 rows,
+  pills, Save/Cancel) are expected at D0 — that's the D1 scope.
+---

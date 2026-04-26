@@ -370,6 +370,61 @@ static int RunDumpOptionsAudio(const std::string &assets_dir,
   return ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// Compose the OPTIONSDISPLAY screen and write the PPM. Per
+// docs/design/screen-options-display.md:
+//   - sub-palette 1
+//   - bank-6 idx-0 fullscreen background plate
+//   - title "Display Options" at y=14, bank 135 advance 12, centered
+//   - two B220x33 toggle buttons at anchors (100, 50) and (100, 103)
+//     (row stride +53), labels "Fullscreen" and "Smooth Scaling"
+//   - per row: off pill (bank 6 idx 12) @ (420, 137+i*53), on pill
+//     (bank 6 idx 15) @ (450, 137+i*53)
+//   - Save B196x33 at anchor (-200, 117), Cancel at (20, 117)
+//   - all buttons INACTIVE (chrome res_index = base, brightness = 128)
+//   - NO logo, NO version text
+// ---------------------------------------------------------------------------
+static int RunDumpOptionsDisplay(const std::string &assets_dir,
+                                 const std::string &dump_dir) {
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // Banks the OPTIONSDISPLAY screen touches: 6 (bg, B196x33 idx 7,
+  // B220x33 idx 23, off/on pills idx 12/15) and 135 (title + label font).
+  SpriteSet sprites;
+  std::vector<int> banks = {6, 135};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  constexpr int kSubMenu = 1;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  // 1) Background plate.
+  if (sprites.Has(6, 0)) {
+    BlitSprite(fb, sprites.Get(6, 0), 0, 0, nullptr);
+  }
+
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubMenu);
+  std::fprintf(stderr, "wrote %s (options_display)\n", out.c_str());
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   std::string assets_dir;
   if (argc >= 2) {
@@ -393,6 +448,9 @@ int main(int argc, char **argv) {
     }
     if (screen_str == "options_audio") {
       return RunDumpOptionsAudio(assets_dir, dump);
+    }
+    if (screen_str == "options_display") {
+      return RunDumpOptionsDisplay(assets_dir, dump);
     }
     return RunDump(assets_dir, dump);
   }
