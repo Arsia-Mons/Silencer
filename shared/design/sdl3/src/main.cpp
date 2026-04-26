@@ -1,0 +1,207 @@
+#include <SDL3/SDL.h>
+
+#include <array>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <string>
+#include <vector>
+
+#include "font.h"
+#include "palette.h"
+#include "sprite.h"
+
+using namespace silencer;
+
+// ---------------------------------------------------------------------------
+// Logo overlay tick simulation. We just need to reach res_index = 60 (the
+// steady-state hold frame) per tick.md / widget-overlay.md.
+//
+// Per spec:
+//   state_i < 60   -> res_index = state_i / 2 + 29  (fade in 29..60)
+//   60 <= state_i < 120 -> res_index = 60           (hold)
+//
+// We drive enough ticks to land in the "hold" branch.
+// ---------------------------------------------------------------------------
+static int LogoTickToHold() {
+  // Run 90 ticks to be comfortably inside the hold window.
+  int state_i = 0;
+  int res_index = 29;
+  while (state_i < 90) {
+    if (state_i < 60) {
+      res_index = state_i / 2 + 29;
+    } else if (state_i < 120) {
+      res_index = 60;
+    } else {
+      // shouldn't happen at 90
+      res_index = 60;
+    }
+    if (res_index > 60) res_index = 60;
+    if (res_index < 29) res_index = 29;
+    ++state_i;
+  }
+  return res_index;
+}
+
+// ---------------------------------------------------------------------------
+// Resolve indexed framebuffer to RGB via the active sub-palette and write
+// a binary P6 PPM.
+// ---------------------------------------------------------------------------
+static bool WritePPM(const std::string &path, const Framebuffer &fb,
+                     const Palette &palette, int active_sub) {
+  std::FILE *f = std::fopen(path.c_str(), "wb");
+  if (!f) {
+    std::fprintf(stderr, "ppm: cannot open %s for writing\n", path.c_str());
+    return false;
+  }
+  std::fprintf(f, "P6\n%d %d\n255\n", Framebuffer::W, Framebuffer::H);
+  std::vector<uint8_t> rgb(Framebuffer::W * Framebuffer::H * 3);
+  const auto &pal = palette.palettes[active_sub];
+  for (int i = 0; i < Framebuffer::W * Framebuffer::H; ++i) {
+    uint8_t idx = fb.px[i];
+    rgb[i * 3 + 0] = pal[idx][0];
+    rgb[i * 3 + 1] = pal[idx][1];
+    rgb[i * 3 + 2] = pal[idx][2];
+  }
+  std::fwrite(rgb.data(), 1, rgb.size(), f);
+  std::fclose(f);
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Compose the main menu and write the PPM.
+// ---------------------------------------------------------------------------
+static int RunDump(const std::string &assets_dir,
+                   const std::string &dump_dir) {
+  // Init SDL just enough to satisfy "init SDL". We don't open a window in
+  // dump mode; the PPM is the deliverable.
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // Banks the main menu touches (per sprite-banks.md "Banks the main menu
+  // touches" table). Bank 132 / 134 / 136 are not needed by the menu but
+  // can be co-loaded — for menu-only we just need 6, 133, 135, 208.
+  SpriteSet sprites;
+  std::vector<int> banks = {6, 133, 135, 208};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // MAINMENU sub-palette is 1 (palette.md).
+  constexpr int kSubMenu = 1;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  // Camera at (320, 240) on a 640x480 surface => GetXOffset = GetYOffset = 0.
+  // (See widget-interface.md.) Object coords map straight to screen coords.
+
+  // 1) Background plate: bank 6 idx 0, position (0, 0), no effects.
+  if (sprites.Has(6, 0)) {
+    BlitSprite(fb, sprites.Get(6, 0), 0, 0, nullptr);
+  }
+
+  // 2) Logo: bank 208, animated. Tick to the hold frame (idx 60).
+  int logo_idx = LogoTickToHold();
+  if (sprites.Has(208, logo_idx)) {
+    BlitSprite(fb, sprites.Get(208, logo_idx), 0, 0, nullptr);
+  }
+
+  // 3) Buttons: B196x33, bank 6, base idx 7. INACTIVE state initially
+  //    (activeobject = 0 sentinel "nothing focused"). All buttons render
+  //    at res_index = 7 with effectbrightness = 128.
+  struct ButtonSpec {
+    const char *text;
+    int x;
+    int y;
+  };
+  const std::array<ButtonSpec, 4> buttons = {{
+      {"Tutorial", 40, -134},
+      {"Connect To Lobby", 80, -67},
+      {"Options", 40, 0},
+      {"Exit", 0, 67},
+  }};
+
+  for (const auto &b : buttons) {
+    // Sprite chrome.
+    const Sprite &chrome = sprites.Get(6, 7);
+    BlitSprite(fb, chrome, b.x, b.y, nullptr);
+
+    // Text label, centered. Per widget-button.md / font.md:
+    //   xoff = (196 - strlen(text) * 11) / 2
+    //   yoff = 8
+    //   textX = b.x - chrome.offset_x + xoff = (b.x + 310) + xoff
+    //   textY = b.y - chrome.offset_y + 8    = (b.y + 288) + 8
+    int len = static_cast<int>(std::strlen(b.text));
+    int xoff = (196 - len * 11) / 2;
+    int textX = b.x - chrome.offset_x + xoff;
+    int textY = b.y - chrome.offset_y + 8;
+    DrawText(fb, textX, textY, b.text, /*bank=*/135, /*advance=*/11, sprites,
+             palette, kSubMenu, /*brightness=*/128);
+  }
+
+  // 4) Version overlay: text mode, bank 133, advance 11 at (10, 463).
+  //    Default version 00028 per screen-main-menu.md.
+  std::string version_text = "Silencer v00028";
+  DrawText(fb, 10, 463, version_text, /*bank=*/133, /*advance=*/11, sprites,
+           palette, kSubMenu, /*brightness=*/128);
+
+  // Resolve & write.
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubMenu);
+  std::fprintf(stderr, "wrote %s (logo idx=%d)\n", out.c_str(), logo_idx);
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
+int main(int argc, char **argv) {
+  std::string assets_dir;
+  if (argc >= 2) {
+    assets_dir = argv[1];
+  } else {
+    // Default: ../../../assets relative to the binary.
+    const char *base = SDL_GetBasePath();
+    if (base) {
+      assets_dir = std::string(base) + "../../../assets";
+    } else {
+      assets_dir = "../../../assets";
+    }
+  }
+
+  const char *dump = std::getenv("SILENCER_DUMP_DIR");
+  if (dump && *dump) {
+    return RunDump(assets_dir, dump);
+  }
+
+  // No dump dir — open a window and render once, then poll for quit.
+  // (Not strictly required, but keeps the binary useful interactively.)
+  if (!SDL_Init(SDL_INIT_VIDEO)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+  SDL_Window *win =
+      SDL_CreateWindow("Silencer Design", 640, 480, SDL_WINDOW_RESIZABLE);
+  if (!win) {
+    std::fprintf(stderr, "no window: %s\n", SDL_GetError());
+    SDL_Quit();
+    return 1;
+  }
+  // Just clear the window and exit immediately; the meaningful path is
+  // dump mode.
+  SDL_DestroyWindow(win);
+  SDL_Quit();
+  return 0;
+}
