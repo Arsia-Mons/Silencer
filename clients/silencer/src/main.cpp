@@ -43,10 +43,10 @@ extern "C" void Java_com_silencer_game_Silencer_SetPath(JNIEnv * env, jclass cls
 extern "C" void Java_com_silencer_game_Silencer_OuyaControllerKeyEvent(JNIEnv * env, jclass cls, jint player, jint type, jint keycode){
 	static SDL_Event pushedevent;
 	if(type == 1){
-		pushedevent.type = SDL_KEYDOWN;
+		pushedevent.type = SDL_EVENT_KEY_DOWN;
 		//printf("native ouya key down %d\n", keycode);
 	}else{
-		pushedevent.type = SDL_KEYUP;
+		pushedevent.type = SDL_EVENT_KEY_UP;
 	}
 	int keycode2 = keycode;
 	switch(keycode){
@@ -64,7 +64,7 @@ extern "C" void Java_com_silencer_game_Silencer_OuyaControllerKeyEvent(JNIEnv * 
 		case 202: keycode2 = SDL_SCANCODE_KP_6; break; // RRight
 		case 203: keycode2 = SDL_SCANCODE_KP_8; break; // RDown
 	}
-	pushedevent.key.keysym.scancode = (SDL_Scancode)keycode2;
+	pushedevent.key.scancode = (SDL_Scancode)keycode2;
 	SDL_PushEvent(&pushedevent);
 }
 #endif
@@ -255,11 +255,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return -1;
 	}
 
-	int x = 0, y = 0;
+	float x = 0, y = 0;
 	if(!dedicatedmode){
 		SDL_GetMouseState(&x, &y);
 	}
-	srand(x + y + (int)time(NULL));
+	srand((int)x + (int)y + (int)time(NULL));
 	while(1){
 		if(!game.HandleSDLEvents()){
 #ifdef __ANDROID__

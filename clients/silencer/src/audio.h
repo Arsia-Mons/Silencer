@@ -33,12 +33,17 @@ public:
 	void SetMusicVolume(int volume);
 	
 	bool enabled;
-	
+	MIX_Mixer *GetMixer(void) { return mixer; }
+
 private:
-	static void ChannelFinished(int channel);
+	static void TrackStoppedCallback(void *userdata, MIX_Track *track);
 	static void MixingFunction(void * udata, Uint8 * stream, int len);
-	
+
 	static const int maxchannels = 128;
+	MIX_Mixer *mixer;
+	MIX_Track *tracks[maxchannels];
+	MIX_Track *musictrack;
+	SDL_AudioSpec mixerspec;
 	int channelobject[maxchannels];
 	int channelvolume[maxchannels];
 	float effectvolume;

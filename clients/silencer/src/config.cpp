@@ -16,7 +16,7 @@ Config & Config::GetInstance(void){
 
 void Config::Save(void){
 	CDDataDir();
-	SDL_RWops * file = SDL_RWFromFile((GetDataDir() + "config.cfg").c_str(), "w");
+	SDL_IOStream * file = SDL_IOFromFile((GetDataDir() + "config.cfg").c_str(), "w");
 	if(file){
 		char temp[256];
 		WriteString(file, "fullscreen", fullscreen ? "1" : "0");
@@ -51,13 +51,13 @@ void Config::Save(void){
 		WriteKey(file, "keychat", keychatbinding, keychatoperator);
 		WriteKey(file, "keydisguise", keydisguisebinding, keydisguiseoperator);
 		WriteKey(file, "keynextweapon", keynextweaponbinding, keynextweaponoperator);
-		SDL_RWclose(file);
+		SDL_CloseIO(file);
 	}
 }
 
 bool Config::Load(void){
 	CDDataDir();
-	SDL_RWops * file = SDL_RWFromFile((GetDataDir() + "config.cfg").c_str(), "r");
+	SDL_IOStream * file = SDL_IOFromFile((GetDataDir() + "config.cfg").c_str(), "r");
 	if(file){
 		char line[256];
 		while(RWgets(file, line, sizeof(line))){
@@ -99,7 +99,7 @@ bool Config::Load(void){
 				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "keynextweapon")){ ReadKey(data, &keynextweaponbinding, &keynextweaponoperator); }
 			}
 		}
-		SDL_RWclose(file);
+		SDL_CloseIO(file);
 		return true;
 	}
 	return false;
@@ -186,10 +186,10 @@ bool Config::CompareString(const char * str1, const char * str2){
 	return false;
 }
 
-void Config::WriteKey(SDL_RWops * file, const char * variable, SDL_Scancode keybindings[2], bool keyoperator){
+void Config::WriteKey(SDL_IOStream * file, const char * variable, SDL_Scancode keybindings[2], bool keyoperator){
 	char line[256];
 	sprintf(line, "%s = %d %d %d\r\n", variable, keybindings[0], keyoperator, keybindings[1]);
-	SDL_RWwrite(file, line, strlen(line), 1);
+	SDL_WriteIO(file, line, strlen(line));
 }
 
 void Config::ReadKey(char * data, SDL_Scancode (*keybindings)[2], bool * keyoperator){
@@ -212,10 +212,10 @@ void Config::ReadKey(char * data, SDL_Scancode (*keybindings)[2], bool * keyoper
 	(*keybindings)[1] = (SDL_Scancode)key2;
 }
 
-void Config::WriteString(SDL_RWops * file, const char * variable, const char * string){
+void Config::WriteString(SDL_IOStream * file, const char * variable, const char * string){
 	char line[256];
 	sprintf(line, "%s = %s\r\n", variable, string);
-	SDL_RWwrite(file, line, strlen(line), 1);
+	SDL_WriteIO(file, line, strlen(line));
 }
 
 void Config::ReadString(const char * data, char * variable, int length){
@@ -244,11 +244,11 @@ void Config::ReadString(const char * data, char * variable, int length){
 	}
 }
 
-char * Config::RWgets(SDL_RWops * file, char * buffer, int count){
+char * Config::RWgets(SDL_IOStream * file, char * buffer, int count){
 	int i;
 	buffer[count - 1] = '\0';
 	for(i = 0; i < count - 1; i++){
-		if(SDL_RWread(file, buffer + i, 1, 1) != 1){
+		if(SDL_ReadIO(file, buffer + i, 1) != 1){
 			if(i == 0){
 				return NULL;
 			}

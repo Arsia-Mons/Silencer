@@ -1,5 +1,6 @@
 #include "resources.h"
 #include <vector>
+#include "audio.h"
 #include "game.h"
 #include "os.h"
 
@@ -33,27 +34,27 @@ bool Resources::Load(Game & game, bool dedicatedserver){
 
 bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 	char FileName[256];
-	SDL_RWops * file = SDL_RWFromFile((GetResDir() + "BIN_SPR.DAT").c_str(), "rb");
+	SDL_IOStream * file = SDL_IOFromFile((GetResDir() + "BIN_SPR.DAT").c_str(), "rb");
 	if(!file){
 		printf("Could not open BIN_SPR.DAT\n");
 		return false;
 	}
 	Uint8 headers[256][64];
-	SDL_RWread(file, headers, 64, 256);
+	SDL_ReadIO(file, headers, 64 * 256);
 	for(unsigned int i = 0; i < 256; i++){
 		progress++;
 		game.LoadProgressCallback(progress, totalprogressitems);
 		if(headers[i][2]){
 			sprintf(FileName, "bin_spr/SPR_%.3d.BIN", i);
-			SDL_RWops * file2 = SDL_RWFromFile((GetResDir() + FileName).c_str(), "rb");
+			SDL_IOStream * file2 = SDL_IOFromFile((GetResDir() + FileName).c_str(), "rb");
 			if(file2){
 				Uint8 header2[(344 * 256) + 4];
-				SDL_RWread(file2, header2, (344 * headers[i][2]) + 4, 1);
+				SDL_ReadIO(file2, header2, (344 * headers[i][2]) + 4);
 				for(unsigned int j = 0; j < headers[i][2]; j++){
-					Uint16 width = SDL_SwapLE16(((Uint16 *)header2)[(j * 172)]);
-					Uint16 height = SDL_SwapLE16(((Uint16 *)header2)[(j * 172) + 1]);
-					Sint16 offsetx = SDL_SwapLE16(((Sint16 *)header2)[(j * 172) + 2]);
-					Sint16 offsety = SDL_SwapLE16(((Sint16 *)header2)[(j * 172) + 3]);
+					Uint16 width = SDL_Swap16LE(((Uint16 *)header2)[(j * 172)]);
+					Uint16 height = SDL_Swap16LE(((Uint16 *)header2)[(j * 172) + 1]);
+					Sint16 offsetx = SDL_Swap16LE(((Sint16 *)header2)[(j * 172) + 2]);
+					Sint16 offsety = SDL_Swap16LE(((Sint16 *)header2)[(j * 172) + 3]);
 					spriteoffsetx[i][j] = offsetx;
 					spriteoffsety[i][j] = offsety;
 					spritewidth[i][j] = width;
@@ -62,7 +63,7 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 						spritebank[i][j] = std::make_shared<Surface>(0, 0);;
 						continue;
 					}
-					Uint32 size = SDL_SwapLE32(((Uint32 *)header2)[(j * 86) + 3]);
+					Uint32 size = SDL_Swap32LE(((Uint32 *)header2)[(j * 86) + 3]);
 					Uint8 offsets = ((Uint8 *)header2)[(j * 344) + 20];
 					std::vector<Uint8> data(size);
 					std::vector<Uint8> decompressed(width * height);
@@ -82,10 +83,10 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 								for(unsigned int y = y2 * 64; y < ymax; y++){
 									for(unsigned int x = x2 * 64; x < xmax; x += 4){
 										if(count){
-											((Uint32 *)decompressed.data())[((y * width) / 4) + (x / 4)] = SDL_SwapLE32(tempvalue);
+											((Uint32 *)decompressed.data())[((y * width) / 4) + (x / 4)] = SDL_Swap32LE(tempvalue);
 											count -= 4;
 										}else{
-											SDL_RWread(file2, &tempvalue, sizeof(Uint32), 1);
+											SDL_ReadIO(file2, &tempvalue, sizeof(Uint32));
 											if(tempvalue >= 0xFF000000){
 												count = tempvalue & 0x0000FFFF;
 												tempvalue &= 0x00FF0000;
@@ -93,29 +94,29 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 												tempvalue |= tempvalue >> 16;
 												count -= 4;
 											}
-											((Uint32 *)decompressed.data())[((y * width) / 4) + (x / 4)] = SDL_SwapLE32(tempvalue);
+											((Uint32 *)decompressed.data())[((y * width) / 4) + (x / 4)] = SDL_Swap32LE(tempvalue);
 										}
 									}
 								}
 							}
 						}
 					}else{
-						SDL_RWread(file2, data.data(), size, 1);
+						SDL_ReadIO(file2, data.data(), size);
 						for(unsigned int j = 0, k = 0; j < size / 4; j++, k++){
-							Uint32 tempvalue = SDL_SwapLE32(((Uint32 *)data.data())[j]);
+							Uint32 tempvalue = SDL_Swap32LE(((Uint32 *)data.data())[j]);
 							if(tempvalue >= 0xFF000000){
 								Uint32 count = tempvalue & 0x0000FFFF;
 								tempvalue &= 0x00FF0000;
 								tempvalue |= tempvalue << 8;
 								tempvalue |= tempvalue >> 16;
 								while(count){
-									((Uint32 *)decompressed.data())[k] = SDL_SwapLE32(tempvalue);
+									((Uint32 *)decompressed.data())[k] = SDL_Swap32LE(tempvalue);
 									count -= 4;
 									k++;
 								}
 								k--;
 							}else{
-								((Uint32 *)decompressed.data())[k] = SDL_SwapLE32(tempvalue);
+								((Uint32 *)decompressed.data())[k] = SDL_Swap32LE(tempvalue);
 							}
 						}
 					}
@@ -147,15 +148,15 @@ bool Resources::LoadSprites(Game & game, bool dedicatedserver){
 					memcpy(surface->pixels.data() , sprite.data(), width * height);
 					RLESurface(surface);
 				}
-				SDL_RWclose(file2);
+				SDL_CloseIO(file2);
 			}else{
 				printf("Could not open %s\n", FileName);
-				SDL_RWclose(file);
+				SDL_CloseIO(file);
 				return false;
 			}
 		}
 	}
-	SDL_RWclose(file);
+	SDL_CloseIO(file);
 	return true;
 }
 
@@ -165,40 +166,40 @@ bool Resources::LoadTiles(Game & game, bool dedicatedserver){
 		return true;
 	}
 	char filename[256];
-	SDL_RWops * file = SDL_RWFromFile((GetResDir() + "BIN_TIL.DAT").c_str(), "rb");
+	SDL_IOStream * file = SDL_IOFromFile((GetResDir() + "BIN_TIL.DAT").c_str(), "rb");
 	if(!file){
 		printf("Could not open BIN_TIL.DAT\n");
 		return false;
 	}
 	Uint8 headers[256][64];
-	SDL_RWread(file, headers, 64, 256);
+	SDL_ReadIO(file, headers, 64 * 256);
 	for(unsigned int i = 0; i < 256; i++){
 		progress++;
 		game.LoadProgressCallback(progress, totalprogressitems);
 		if(headers[i][2]){
 			sprintf(filename, "bin_til/TIL_%.3d.BIN", i);
-			SDL_RWops * file2 = SDL_RWFromFile((GetResDir() + filename).c_str(), "rb");
+			SDL_IOStream * file2 = SDL_IOFromFile((GetResDir() + filename).c_str(), "rb");
 			if(file2){
 				Uint8 header2[(12 * 256) + 4];
-				SDL_RWread(file2, header2, (12 * headers[i][2]) + 4, 1);
+				SDL_ReadIO(file2, header2, (12 * headers[i][2]) + 4);
 				std::vector<Uint8> data(64 * 64 * 256);
-				size_t datasize = SDL_RWread(file2, data.data(), 1, data.size());
+				size_t datasize = SDL_ReadIO(file2, data.data(), data.size());
 				std::vector<Uint8> decompressed(64 * 64 * 256);
 				for(unsigned int j = 0, k = 0; j < datasize / 4; j++, k++){
-					Uint32 tempvalue = SDL_SwapLE32(((Uint32 *)data.data())[j]);
+					Uint32 tempvalue = SDL_Swap32LE(((Uint32 *)data.data())[j]);
 					if(tempvalue >= 0xFF000000){
 						Uint32 count = tempvalue & 0x0000FFFF;
 						tempvalue &= 0x00FF0000;
 						tempvalue |= tempvalue << 8;
 						tempvalue |= tempvalue >> 16;
 						while(count){
-							((Uint32 *)decompressed.data())[k] = SDL_SwapLE32(tempvalue);
+							((Uint32 *)decompressed.data())[k] = SDL_Swap32LE(tempvalue);
 							count -= 4;
 							k++;
 						}
 						k--;
 					}else{
-						((Uint32 *)decompressed.data())[k] = SDL_SwapLE32(tempvalue);
+						((Uint32 *)decompressed.data())[k] = SDL_Swap32LE(tempvalue);
 					}
 				}
 				for(unsigned int j = 0; j < headers[i][2]; j++){
@@ -213,14 +214,14 @@ bool Resources::LoadTiles(Game & game, bool dedicatedserver){
 					MirrorY(tileflippedbank[i][j].get());
 					RLESurface(tileflippedbank[i][j].get());
 				}
-				SDL_RWclose(file2);
+				SDL_CloseIO(file2);
 			}else{
 				printf("Could not open %s %d\n", filename, errno);
 				return false;
 			}
 		}
 	}
-	SDL_RWclose(file);
+	SDL_CloseIO(file);
 	return true;
 }
 
@@ -229,7 +230,7 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 		progress += 101;
 		return true;
 	}
-	SDL_RWops * file = SDL_RWFromFile((GetResDir() + "sound.bin").c_str(), "rb");
+	SDL_IOStream * file = SDL_IOFromFile((GetResDir() + "sound.bin").c_str(), "rb");
 	if(!file){
 		printf("Could not open sound.bin\n");
 		return false;
@@ -242,13 +243,13 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 	Uint32 offset;
 	Uint32 length;
 	Uint32 wavinfo;
-	SDL_RWread(file, &numsounds, sizeof(numsounds), 1);
-	SDL_RWread(file, &soundssize, sizeof(soundssize), 1);
+	SDL_ReadIO(file, &numsounds, sizeof(numsounds));
+	SDL_ReadIO(file, &soundssize, sizeof(soundssize));
 	for(unsigned int i = 0; i < numsounds; i++){
 		progress++;
 		game.LoadProgressCallback(progress, totalprogressitems);
-		SDL_RWseek(file, sizeof(numsounds) + sizeof(soundssize) + (i * sizeof(soundheader)), RW_SEEK_SET);
-		SDL_RWread(file, &soundheader, sizeof(soundheader), 1);
+		SDL_SeekIO(file, sizeof(numsounds) + sizeof(soundssize) + (i * sizeof(soundheader)), SDL_IO_SEEK_SET);
+		SDL_ReadIO(file, &soundheader, sizeof(soundheader));
 		memcpy(&name, &soundheader[4], 0x10);
 		memcpy(&offset, &soundheader[4 + 0x10], sizeof(offset));
 		memcpy(&length, &soundheader[4 + 0x10 + 4], sizeof(length));
@@ -299,56 +300,65 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 		memset(mem.data(), 0, memsize);
 		memcpy(mem.data(), header, sizeof(header));
 		
-		SDL_RWseek(file, sizeof(numsounds) + sizeof(soundssize) + (numsounds * sizeof(soundheader)) + offset, RW_SEEK_SET);
-		SDL_RWread(file, &mem[sizeof(header)], length, 1);
+		SDL_SeekIO(file, sizeof(numsounds) + sizeof(soundssize) + (numsounds * sizeof(soundheader)) + offset, SDL_IO_SEEK_SET);
+		SDL_ReadIO(file, &mem[sizeof(header)], length);
 		memset(&mem[sizeof(header) + length - 24], 0, 24);
 		
 		/*FILE * file2 = fopen(name, "w");
 		fwrite(&mem[sizeof(header)], 1, length, file2);
 		fclose(file2);*/
 		
-		Mix_Chunk * chunk = Mix_LoadWAV_RW(SDL_RWFromConstMem(mem.data(), mem.size()), true);
+		// Decode WAV (may be IMA ADPCM) to raw PCM via SDL3, then load into MIX_Audio
+		SDL_AudioSpec wavspec;
+		Uint8 *wavbuf = nullptr;
+		Uint32 wavlen = 0;
+		if(!SDL_LoadWAV_IO(SDL_IOFromConstMem(mem.data(), mem.size()), true, &wavspec, &wavbuf, &wavlen)){
+			printf("Could not decode WAV %s - %s\n", name, SDL_GetError());
+			SDL_CloseIO(file);
+			return false;
+		}
+
+		// Apply a short PCM fade-in/fade-out to the hover sound to eliminate click artifacts
+		// from abrupt waveform onset/cutoff after ADPCM decode.
+		if(strcmp(name, "whoom.wav") == 0 && wavspec.format == SDL_AUDIO_S16LE){
+			int fade_samples = (wavspec.freq * 20) / 1000; // 20ms
+			Sint16 *pcm = (Sint16 *)wavbuf;
+			int total_samples = wavlen / sizeof(Sint16);
+			int ramp = SDL_min(fade_samples, total_samples / 2);
+			for(int s = 0; s < ramp; s++){
+				pcm[s] = (Sint16)(pcm[s] * s / ramp);
+				pcm[total_samples - 1 - s] = (Sint16)(pcm[total_samples - 1 - s] * s / ramp);
+			}
+		}
+
+		// MIX_LoadRawAudioNoCopy takes ownership of wavbuf and will free it
+		MIX_Audio * chunk = MIX_LoadRawAudioNoCopy(Audio::GetInstance().GetMixer(), wavbuf, wavlen, &wavspec, true);
 		if(!chunk){
-			printf("Could not load sound %s - %s\n", name, Mix_GetError());
-			SDL_RWclose(file);
+			printf("Could not load sound %s - %s\n", name, SDL_GetError());
+			SDL_free(wavbuf);
+			SDL_CloseIO(file);
 			return false;
 		}else{
 			soundbank[name] = chunk;
-			// fix pop at end of sounds
-			int v = 0;
-			int length = (chunk->alen / sizeof(Sint16));
-			for(int i = length - 1; i > length - 100; i--, v++){
-				if(i >= 0){
-					((Sint16 *)chunk->abuf)[i] *= v / float(100);
-				}
-			}
-			v = 0;
-			for(int i = 0; i < 100; i++, v++){
-				if(i < length - 1){
-					((Sint16 *)chunk->abuf)[i] *= v / float(100);
-				}
-			}
-			//
 		}
 	}
-	SDL_RWclose(file);
-	menumusic = Mix_LoadMUS((GetResDir() + "CLOSER2.mp3").c_str());
+	SDL_CloseIO(file);
+	menumusic = MIX_LoadAudio(Audio::GetInstance().GetMixer(), (GetResDir() + "CLOSER2.mp3").c_str(), false);
 	return true;
 }
 
 void Resources::UnloadSounds(void){
 	for(std::map<std::string, Mix_Chunk *>::iterator it = soundbank.begin(); it != soundbank.end(); it++){
-		Mix_FreeChunk((*it).second);
+		MIX_DestroyAudio((*it).second);
 	}
 	soundbank.clear();
-	Mix_FadeOutMusic(0);
-	Mix_ResumeMusic();
+	Audio::GetInstance().StopMusic();
 	if(menumusic){
-		Mix_FreeMusic(menumusic);
+		MIX_DestroyAudio(menumusic);
 		menumusic = 0;
 	}
 	if(gamemusic){
-		Mix_FreeMusic(gamemusic);
+		MIX_DestroyAudio(gamemusic);
 		gamemusic = 0;
 	}
 }

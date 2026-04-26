@@ -45,7 +45,7 @@ public:
 	
 private:
 	int GetInputSize(void);
-	SDL_RWops * file;
+	SDL_IOStream * file;
 	bool isrecording;
 	bool isplaying;
 	bool gamestarted;

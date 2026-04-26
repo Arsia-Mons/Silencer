@@ -34,7 +34,7 @@ private:
 	bool SetupOpenGL(void);
 	void CreateRenderer(void);
 	void CreateStreamingTexture(void);
-	static Uint32 TimerCallback(Uint32 interval, void * param);
+	static Uint32 TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval);
 	void SetColors(SDL_Color * colors);
 	void UpdateInputState(Input & input);
 	bool LoadMap(const char * name);
@@ -113,7 +113,7 @@ private:
 	void ProcessMapDownload(void);
 	static const int numkeys = 20;
 	const char * keynames[numkeys];
-	Uint8 keystate[SDL_NUM_SCANCODES];
+	Uint8 keystate[SDL_SCANCODE_COUNT];
 	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, UPDATING, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, OPTIONSDISPLAY, OPTIONSAUDIO, HOSTGAME, JOINGAME, REPLAYGAME, TESTGAME};
 	Uint8 state;
 	Uint8 nextstate;
@@ -131,11 +131,11 @@ private:
 	Surface screenbuffer;
 	SDL_Surface * sdlscreenbuffer;
 	SDL_Texture * streamingtexture;
-	SDL_PixelFormat * streamingtexturepixelformat;
+	SDL_PixelFormat streamingtexturepixelformat;
 	Uint32 streamingtexturepalette[256];
 	int frames;
 	int fps;
-	Uint32 lasttick;
+	Uint64 lasttick;
 	Uint16 currentinterface;
 	Uint16 aftermodalinterface;
 	bool motdprinted;

@@ -76,7 +76,7 @@ private:
 	char msg[0xFF];
 	Uint32 lasttime;
 	SDL_Thread * resolvethread;
-	SDL_mutex * mutex;
+	SDL_Mutex * mutex;
 	hostent * he;
 	bool resolvethreadrunning;
 	char resolvehost[256];
