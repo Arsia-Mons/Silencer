@@ -53,7 +53,7 @@ export default function ActorsPage() {
 
   return (
     <div className="flex min-h-screen bg-game-bg text-game-text">
-      <Sidebar wsConnected={false} />
+      <Sidebar />
       <main className="flex-1 p-8">
         <div className="flex items-center justify-between mb-6">
           <div>

@@ -32,10 +32,10 @@ function getSequences(def: ActorDef): Sequences {
 }
 
 const SCALE = 4;
-const CANVAS_W = 256;
-const CANVAS_H = 256;
+const CANVAS_W = 280;
+const CANVAS_H = 350;
 const ORIGIN_X = CANVAS_W / 2;
-const ORIGIN_Y = CANVAS_H * 0.75; // foot anchor
+const ORIGIN_Y = CANVAS_H - 50; // foot anchor: 50px gap at bottom
 
 function drawFrame(
   ctx: CanvasRenderingContext2D,
