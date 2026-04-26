@@ -44,7 +44,19 @@ jobs:
         working-directory: build
         run: |
           mkdir -p Silencer.app/Contents/Frameworks
+          # setup-sdl installs SDL3 + SDL3_mixer to a non-standard prefix
+          # (typically under ~/.cache or /Users/runner/...), so dylibbundler
+          # can't find the satellite dylibs by walking @rpath alone. Locate
+          # every libSDL3*.dylib on the runner and add each containing dir
+          # as a dylibbundler search path with -s.
+          SDL_SEARCH_FLAGS=()
+          while IFS= read -r d; do
+            SDL_SEARCH_FLAGS+=(-s "$d")
+          done < <(find / -name 'libSDL3*.dylib' 2>/dev/null | xargs -n1 dirname | sort -u)
+          echo "--- SDL3 search dirs ---"
+          printf '  %s\n' "${SDL_SEARCH_FLAGS[@]}"
           dylibbundler \
+            "${SDL_SEARCH_FLAGS[@]}" \
             --overwrite-dir \
             --bundle-deps \
             --create-dir \
