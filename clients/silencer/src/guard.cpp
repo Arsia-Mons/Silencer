@@ -85,8 +85,10 @@ void Guard::InitBT(){
 		} else if(state == WALKING || state == STANDING || state == LOOKING){
 			int tsx1, tsy1, tsx2, tsy2;
 			f->GetAABB(world.resources, &tsx1, &tsy1, &tsx2, &tsy2);
-			if(tsy1 <= (int)y - 55){
-				// Target is tall enough — shoot from standing.
+			// Use hurtbox height to distinguish standing (≥50px) from crouched (<50px).
+			// Absolute y comparison fails on sloped terrain.
+			if((tsy2 - tsy1) >= 50){
+				// Target is standing height — shoot from standing.
 				if(CooledDown(world)){
 					state = SHOOTSTANDING; state_i = 0;
 				} else if(state == WALKING || state == LOOKING){
@@ -169,10 +171,11 @@ void Guard::InitBT(){
 		return BTResult::Failure;
 	};
 
-	// Chase: walk toward the chasing target.
+	// Chase: walk toward the chasing target. Only when patrol=true.
 	btctx_.actions["Chase"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
 		if(!chasing) return BTResult::Failure;
+		if(!patrol) return BTResult::Failure; // stay at post
 		Object* obj = world.GetObjectFromId(chasing);
 		if(!obj){ chasing = 0; return BTResult::Failure; }
 		if(obj->type == ObjectTypes::PLAYER){
@@ -282,13 +285,10 @@ void Guard::Tick(World & world){
 					}
 				}else
 				if(state == WALKING || state == STANDING || state == LOOKING){
-					// Check whether the target is actually crouched (short) or just
-					// a standing player on lower ground where Look(0) couldn't reach.
-					// If the target extends above the guard's standing eye level (y-55),
-					// treat it as a standing target and shoot from standing.
+					// Use hurtbox height to distinguish standing (≥50px) from crouched (<50px).
 					int tsx1, tsy1, tsx2, tsy2;
 					found->GetAABB(world.resources, &tsx1, &tsy1, &tsx2, &tsy2);
-					if(tsy1 <= (int)y - 55){
+					if((tsy2 - tsy1) >= 50){
 						// Standing-height target: shoot from standing position
 						if(CooledDown(world)){
 							state = SHOOTSTANDING;
