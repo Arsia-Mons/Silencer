@@ -222,7 +222,7 @@ void Guard::InitBT(){
 		if (bt_walk_ticks_ < 600 && chasing) {
 			// Search phase: maintain shooting distance from last known target
 			Object* obj = world.GetObjectFromId(chasing);
-			if (obj) {
+			if (obj && obj->IsAlive()) {
 				int dist = abs(signed(obj->x) - signed(x));
 				if (dist < 80) {
 					// Too close — back away to get in shooting range
@@ -231,7 +231,7 @@ void Guard::InitBT(){
 					mirrored = (obj->x < x);
 				}
 			} else {
-				chasing = 0;
+				chasing = 0; // target gone or dead — stop searching
 			}
 			return BTResult::Running;
 		}
