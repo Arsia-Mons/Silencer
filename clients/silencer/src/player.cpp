@@ -2702,7 +2702,7 @@ void Player::Tick(World & world){
 				auto sit = it->second.sequences.find(seqname);
 				if(sit != it->second.sequences.end()) {
 					const FrameDef * fd = sit->second.Resolve(state_i);
-					if(fd) {
+					if(fd && (fd->hurtbox.x1 || fd->hurtbox.y1 || fd->hurtbox.x2 || fd->hurtbox.y2)) {
 						currenthurtbox = fd->hurtbox;
 						hurtboxvalid = true;
 					}
