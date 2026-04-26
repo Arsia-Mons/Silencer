@@ -186,6 +186,87 @@ nc -vz <your-lobby-host> 517
 Download the client from the GitHub Release, launch it, register an
 account — you should be looking at the lobby.
 
+## Step 7: Admin tier (optional but recommended)
+
+Phase 1 of the production-deployment plan adds a second EC2 box that
+runs MongoDB, LavinMQ, the admin REST/WS API, and the admin web
+dashboard. The lobby keeps working without it (Mongo + LavinMQ are
+both optional in the lobby's code), so you can defer this until you
+want the dashboard.
+
+If you've followed steps 1–6, you already have most of what's needed.
+To enable the admin tier:
+
+### 7a. Set up Cloudflare for `admin.<your-domain>`
+
+The admin dashboard is reached via Cloudflare Tunnel — no public
+ports are opened on the admin box. Steps:
+
+1. Add `<your-domain>` to a free Cloudflare account if you haven't
+   already (transfer NS or use as DNS-only).
+2. **Zero Trust → Networks → Tunnels → Create a tunnel → Cloudflared.**
+   Give it a name (e.g. `silencer-admin`). Copy the **token** it
+   shows — that goes into `terraform.tfvars` next.
+3. Under the same tunnel's **Public Hostname** tab, add three rules
+   for `admin.<your-domain>` (most-specific first):
+
+   | Path           | Service                   |
+   |----------------|---------------------------|
+   | `/api/*`       | `http://localhost:24080`  |
+   | `/socket.io/*` | `http://localhost:24080`  |
+   | (catch-all)    | `http://localhost:24000`  |
+
+### 7b. Add admin-tier values to `terraform.tfvars`
+
+Append to the file from step 4 (see `terraform.tfvars.example` for
+the full set):
+
+```hcl
+admin_tailscale_auth_key  = "tskey-auth-..."   # second TS auth key, tag:server
+mongo_silencer_password   = "..."              # openssl rand -base64 32
+lavinmq_silencer_password = "..."              # openssl rand -base64 32
+jwt_secret                = "..."              # openssl rand -base64 32
+cloudflare_tunnel_token   = "eyJh..."          # from 7a
+# Optional — enables 6-hourly Mongo backup commits to a separate repo:
+# github_backup_token = "ghp_..."
+```
+
+Then `terraform apply`. This creates the admin/data box (`t4g.small`),
+two EBS volumes, a private Route 53 zone (`silencer.internal`) with A
+records for both boxes, and DLM daily snapshots of the Mongo + LavinMQ
+volumes. Cloud-init takes ~5 minutes to install Mongo, LavinMQ,
+cloudflared, and write the systemd units.
+
+### 7c. Add admin-deploy GH variables
+
+In your fork's repo settings, add:
+
+| Variable            | Value                                                  |
+|---------------------|--------------------------------------------------------|
+| `ADMIN_DEPLOY_HOST` | Tailscale hostname of the admin box (default `silencer-admin`) |
+
+The existing `DEPLOY_SSH_KEY` and `TS_AUTHKEY` secrets are reused.
+
+### 7d. Trigger the first admin deploys
+
+Two new path-filtered workflows fire on any push that touches their
+component:
+
+- `.github/workflows/deploy-admin-api.yml` — `services/admin-api/**`
+- `.github/workflows/deploy-admin-web.yml` — `web/admin/**`
+
+To force the first deploy without code changes, run them via
+**Actions → Deploy admin-api / admin-web → Run workflow.** Each builds
+an ARM64 OCI image, pushes to `ghcr.io/<owner>/silencer-admin-{api,web}`,
+SSHes to the admin box over Tailscale, and updates
+`/etc/silencer/<svc>.image` followed by `systemctl restart`. The
+units crash-loop quietly (`Restart=always`) until that first deploy
+writes a real image ref.
+
+Once both succeed, `https://admin.<your-domain>` should serve the
+dashboard's login page — default seed credentials are `admin` /
+`admin` (change on first login).
+
 ## Day-to-day
 
 **Logging into the server.** Over Tailscale if you have it installed
@@ -261,8 +342,12 @@ lobby startup to bring the mirror up to date. This lets the admin
 dashboard query rich player data without touching `lobby.json` directly.
 Password hashes are never written to MongoDB.
 
-If the MongoDB container is unavailable, the lobby continues to serve
-clients normally — sync failures are logged and discarded.
+In production (Phase 1+), `mongod` runs as a systemd unit on the admin/
+data box with its data dir on a dedicated EBS volume
+(`/var/lib/mongodb`). The lobby reaches it over the VPC private
+network at `admin.silencer.internal:27017`. In local dev (`docker
+compose up`), it runs as the `mongo:7` container. Either way, sync
+failures are logged and discarded — the lobby never blocks on Mongo.
 
 ### MongoDB backups
 
