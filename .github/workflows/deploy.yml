@@ -73,8 +73,18 @@ jobs:
       - name: Install C++ build deps
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: cmake build-essential libsdl2-dev libsdl2-mixer-dev zlib1g-dev libcurl4-openssl-dev libminizip-dev
+          packages: cmake build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev
           version: 1.0
+
+      # SDL3 + SDL3_mixer aren't in Ubuntu Noble's apt repos. Install via
+      # the official upstream action — handles caching, build-from-source,
+      # and the SDL3_mixer satellite project.
+      - name: Install SDL3 + SDL3_mixer
+        uses: libsdl-org/setup-sdl@main
+        with:
+          install-linux-dependencies: true
+          version: 3-latest
+          version-sdl-mixer: 3-latest
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1
