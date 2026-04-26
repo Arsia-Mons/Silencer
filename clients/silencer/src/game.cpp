@@ -215,7 +215,7 @@ bool Game::Load(char * cmdline){
 	}
 	printf("Resources loaded\n");
 	// Sync actordefs from server if an admin API URL is configured.
-	const char* apiBase = Config::GetInstance().mapapiurl;
+	const char* apiBase = Config::GetInstance().adminapiurl;
 	if (apiBase && apiBase[0] != '\0' && !world.dedicatedserver.active) {
 		printf("Syncing actordefs from server...\n");
 		int n = FetchActorDefs(apiBase, world.resources.actordefs);
