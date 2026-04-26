@@ -31,11 +31,21 @@ function getSequences(def: ActorDef): Sequences {
   return (def.sequences as Sequences) ?? {};
 }
 
-const SCALE = 4;
-const CANVAS_W = 280;
-const CANVAS_H = 350;
+const CANVAS_W = 320;
+const CANVAS_H = 420;
 const ORIGIN_X = CANVAS_W / 2;
 const ORIGIN_Y = CANVAS_H - 50; // foot anchor: 50px gap at bottom
+
+/** Compute largest integer scale that fits the sprite in the canvas with margin. */
+function fitScale(img: HTMLImageElement): number {
+  const maxScale = 4;
+  const marginX = 20;
+  const marginY = 60; // top + bottom gap
+  for (let s = maxScale; s >= 1; s--) {
+    if (img.width * s <= CANVAS_W - marginX && img.height * s <= CANVAS_H - marginY) return s;
+  }
+  return 1;
+}
 
 function drawFrame(
   ctx: CanvasRenderingContext2D,
@@ -57,20 +67,22 @@ function drawFrame(
   ctx.beginPath(); ctx.moveTo(ORIGIN_X, 0); ctx.lineTo(ORIGIN_X, CANVAS_H); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(0, ORIGIN_Y); ctx.lineTo(CANVAS_W, ORIGIN_Y); ctx.stroke();
 
+  const scale = img ? fitScale(img) : 4;
+
   if (img) {
     (ctx as CanvasRenderingContext2D & { imageSmoothingEnabled: boolean }).imageSmoothingEnabled = false;
-    const dx = ORIGIN_X - img.width * SCALE / 2;
-    const dy = ORIGIN_Y - img.height * SCALE;
-    ctx.drawImage(img, dx, dy, img.width * SCALE, img.height * SCALE);
+    const dx = ORIGIN_X - img.width * scale / 2;
+    const dy = ORIGIN_Y - img.height * scale;
+    ctx.drawImage(img, dx, dy, img.width * scale, img.height * scale);
   }
 
-  // Draw dragging box or saved hurtbox
+  // Draw dragging box or saved hurtbox (coordinates in game-units, convert using current scale)
   const boxObj = dragging ?? (hurtbox ? hbToObj(hurtbox) : null);
   if (boxObj) {
-    const cx1 = ORIGIN_X + boxObj.x1 * SCALE;
-    const cy1 = ORIGIN_Y + boxObj.y1 * SCALE;
-    const cx2 = ORIGIN_X + boxObj.x2 * SCALE;
-    const cy2 = ORIGIN_Y + boxObj.y2 * SCALE;
+    const cx1 = ORIGIN_X + boxObj.x1 * scale;
+    const cy1 = ORIGIN_Y + boxObj.y1 * scale;
+    const cx2 = ORIGIN_X + boxObj.x2 * scale;
+    const cy2 = ORIGIN_Y + boxObj.y2 * scale;
     ctx.strokeStyle = dragging ? '#ff0' : '#0f0';
     ctx.lineWidth = 1;
     ctx.strokeRect(Math.min(cx1, cx2), Math.min(cy1, cy2), Math.abs(cx2 - cx1), Math.abs(cy2 - cy1));
@@ -93,6 +105,7 @@ export default function HitboxTab({
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef    = useRef<HTMLImageElement | null>(null);
+  const scaleRef  = useRef<number>(4); // tracks current fitScale for coordinate conversion
   const dragRef   = useRef<{ startX: number; startY: number; cur: { x1: number; y1: number; x2: number; y2: number } | null }>({ startX: 0, startY: 0, cur: null });
 
   const seq = sequences[selectedSeq];
@@ -107,6 +120,7 @@ export default function HitboxTab({
     img.src = `/api/sprites/${frame.bank}/${frame.index}?_t=${token.slice(-8)}`;
     img.onload = () => {
       imgRef.current = img;
+      scaleRef.current = fitScale(img);
       redraw(null);
     };
   }, [frame?.bank, frame?.index]);
@@ -121,9 +135,10 @@ export default function HitboxTab({
   useEffect(() => { redraw(null); }, [frame?.hurtbox, selectedSeq, frameIdx]);
 
   function canvasToGame(cx: number, cy: number) {
+    const s = scaleRef.current;
     return {
-      x: Math.round((cx - ORIGIN_X) / SCALE),
-      y: Math.round((cy - ORIGIN_Y) / SCALE),
+      x: Math.round((cx - ORIGIN_X) / s),
+      y: Math.round((cy - ORIGIN_Y) / s),
     };
   }
 
