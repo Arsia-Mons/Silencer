@@ -1,0 +1,24 @@
+{
+  "id": "grenade",
+  "props": { "hp": 0, "shield": 0, "speed": 0, "faction": "neutral", "spawnWeight": 0 },
+  "sequences": {
+    "ROLLING": { "loop": true, "frames": [
+      { "bank": 79, "index":  0, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index":  1, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index":  2, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index":  3, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index":  4, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index":  5, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index":  6, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index":  7, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index":  8, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index":  9, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index": 10, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index": 11, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index": 12, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index": 13, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index": 14, "duration": 2, "hurtbox": [-6, -12, 6, 0] },
+      { "bank": 79, "index": 15, "duration": 2, "hurtbox": [-6, -12, 6, 0] }
+    ]}
+  }
+}

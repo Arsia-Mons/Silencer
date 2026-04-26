@@ -1,0 +1,492 @@
+{
+  "id": "rocket-projectile",
+  "props": {
+    "hp": 0,
+    "shield": 0,
+    "speed": 0,
+    "faction": "neutral",
+    "spawnWeight": 0
+  },
+  "sequences": {
+    "RIGHT": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 87,
+          "index": 0,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 1,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 2,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 3,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 4,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    },
+    "RIGHTUP": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 87,
+          "index": 0,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 1,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 2,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 3,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 4,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    },
+    "UP": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 87,
+          "index": 0,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 1,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 2,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 3,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 4,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    },
+    "LEFTUP": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 87,
+          "index": 0,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 1,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 2,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 3,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 4,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    },
+    "LEFT": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 87,
+          "index": 0,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 1,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 2,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 3,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 4,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    },
+    "LEFTDOWN": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 87,
+          "index": 0,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 1,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 2,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 3,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 4,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    },
+    "DOWN": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 87,
+          "index": 0,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 1,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 2,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 3,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 4,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    },
+    "RIGHTDOWN": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 87,
+          "index": 0,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 1,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 2,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 3,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 87,
+          "index": 4,
+          "duration": 1,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    }
+  }
+}

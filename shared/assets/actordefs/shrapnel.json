@@ -1,0 +1,318 @@
+{
+  "id": "shrapnel",
+  "props": {
+    "hp": 0,
+    "shield": 0,
+    "speed": 0,
+    "faction": "neutral",
+    "spawnWeight": 0
+  },
+  "sequences": {
+    "NORMAL": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 107,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 107,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 107,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 107,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 107,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 107,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    },
+    "SPARK": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 108,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 108,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 108,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 108,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 108,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 108,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    },
+    "BLOOD": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 109,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 109,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 109,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 109,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 109,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 109,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    },
+    "LARGE": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 110,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 110,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 110,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 110,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 110,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 110,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 110,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        },
+        {
+          "bank": 110,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -6,
+            -6,
+            6,
+            6
+          ]
+        }
+      ]
+    }
+  }
+}
