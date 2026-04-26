@@ -326,11 +326,17 @@ static int RunDumpOptionsAudio(const std::string &assets_dir,
 
   // 4) Off / On half-pill indicators. Sprite overlays at literal screen
   //    coords (no anchor offset on overlays-with-explicit-position).
+  //    Bank 6 indices 12..15 are a 2x2 grid: 12=off-left-half (dim
+  //    outline), 13=on-left-half (filled), 14=off-right-half (dim
+  //    outline), 15=on-right-half (filled). The screen-options-audio
+  //    spec lists the "on" pill as idx 14 — that is wrong (idx 14 is
+  //    the unlit right half); the canonical reference dump uses
+  //    idx 15 (lit right half) for the on indicator at x=450.
   if (sprites.Has(6, 12)) {
     BlitSprite(fb, sprites.Get(6, 12), 420, 137, nullptr);
   }
-  if (sprites.Has(6, 14)) {
-    BlitSprite(fb, sprites.Get(6, 14), 450, 137, nullptr);
+  if (sprites.Has(6, 15)) {
+    BlitSprite(fb, sprites.Get(6, 15), 450, 137, nullptr);
   }
 
   // 5) Save / Cancel: two B196x33 buttons at the bottom.

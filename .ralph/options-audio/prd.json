@@ -32,7 +32,7 @@
       "id": "A3",
       "name": "New widgets render (B220x33 button + off/on pill indicators)",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "spec": "The B220x33 button widget paints its 220-px-wide pill with the same anchor convention as B196x33 (top_left = anchor - sprite.offset). The off (bank 6 idx 12) and on (bank 6 idx 14) overlays render at literal coords (420, 137) and (450, 137) respectively. Bank 6 indices 12/14 are added to the candidate's loaded sprite set.",
       "category": "sprite_codec"
     },
