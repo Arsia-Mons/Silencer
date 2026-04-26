@@ -16,7 +16,7 @@
       "id": "A1",
       "name": "Composition complete (bg + title + Music row + Save/Cancel)",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "spec": "The dump shows: bank-6 idx-0 fullscreen background; title overlay 'Audio Options' near top; one Music B220x33 button + off (bank 6 idx 12) + on (bank 6 idx 14) pill indicators; Save and Cancel B196x33 buttons at bottom. Per docs/design/screen-options-audio.md.",
       "category": "composition"
     },
