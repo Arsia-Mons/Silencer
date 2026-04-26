@@ -10,7 +10,7 @@
     "root": {
       "type": "Selector",
       "label": "Guard AI",
-      "children": ["sel_combat", "leaf_uncrouch", "leaf_chase", "seq_patrol", "leaf_stand"],
+      "children": ["sel_combat", "leaf_uncrouch", "leaf_chase", "leaf_searchreturn", "seq_patrol", "leaf_stand"],
       "props": {}
     },
 
@@ -27,8 +27,9 @@
     "leaf_look4": { "type": "Leaf", "label": "Look(4) up-angle",   "children": [], "props": { "action": "Look4" } },
     "leaf_look5": { "type": "Leaf", "label": "Look(5) down-angle", "children": [], "props": { "action": "Look5" } },
 
-    "leaf_uncrouch": { "type": "Leaf", "label": "Uncrouch if idle", "children": [], "props": { "action": "UncrouchIdle" } },
-    "leaf_chase":    { "type": "Leaf", "label": "Chase target",     "children": [], "props": { "action": "Chase"        } },
+    "leaf_uncrouch":     { "type": "Leaf", "label": "Uncrouch if idle",      "children": [], "props": { "action": "UncrouchIdle"   } },
+    "leaf_chase":        { "type": "Leaf", "label": "Chase target (patrol)", "children": [], "props": { "action": "Chase"           } },
+    "leaf_searchreturn": { "type": "Leaf", "label": "Search then return",    "children": [], "props": { "action": "SearchAndReturn" } },
 
     "seq_patrol": {
       "type": "Sequence",

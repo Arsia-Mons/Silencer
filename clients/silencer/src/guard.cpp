@@ -212,6 +212,36 @@ void Guard::InitBT(){
 		return BTResult::Success;
 	};
 
+	// SearchAndReturn: non-patrol guard that was alerted (chasing set or bt_walk_ticks_ > 0).
+	// Searches for 600 ticks (10s) oriented toward last known target, then walks back to post.
+	btctx_.actions["SearchAndReturn"] = [this](BTContext& ctx) -> BTResult {
+		if (patrol) return BTResult::Failure;
+		if (bt_walk_ticks_ == 0 && !chasing) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
+		if (bt_walk_ticks_ < 600 && chasing) {
+			// Search phase: orient toward last known target
+			Object* obj = world.GetObjectFromId(chasing);
+			if (obj) {
+				mirrored = (obj->x < x);
+			} else {
+				chasing = 0;
+			}
+			return BTResult::Running;
+		}
+		// Return-to-post phase
+		if (abs(signed(x) - signed(originalx)) <= 20) {
+			chasing = 0;
+			bt_walk_ticks_ = 0;
+			state = STANDING;
+			state_i = -1;
+			mirrored = originalmirrored;
+			return BTResult::Success;
+		}
+		mirrored = (signed(originalx) < signed(x));
+		return BTResult::Running;
+	};
+
 	btctx_.actions["Stand"] = [this](BTContext&) -> BTResult {
 		return BTResult::Success;
 	};
@@ -241,6 +271,12 @@ void Guard::Tick(World & world){
 	Bipedal::Tick(*this, world);
 
 	if(!bt_) InitBT();
+
+	// BT alert timer: counts up while WALKING and chasing, resets when calm
+	if (bt_) {
+		if (state == WALKING) bt_walk_ticks_++;
+		else if (!chasing) bt_walk_ticks_ = 0;
+	}
 
 	// Original priority interrupt for combat — runs every tick, exact semantics preserved
 	Object* found = nullptr;
@@ -664,7 +700,12 @@ void Guard::Tick(World & world){
 			res_bank = 63;
 			res_index = state_i;
 			if(state_i >= 3){
-				state = STANDING;
+				// Non-patrol guard that was alerted: go to WALKING to start SearchAndReturn
+				if(bt_ && !patrol && chasing){
+					state = WALKING;
+				} else {
+					state = STANDING;
+				}
 				state_i = -1;
 				break;
 			}
@@ -755,6 +796,13 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	if(state == WALKING || state == STANDING || state == SHOOTSTANDING || state == SHOOTUP || state == SHOOTUPANGLE || state == SHOOTDOWN || state == SHOOTDOWNANGLE){
 		state = HIT;
 		state_i = 0;
+	}
+	// Non-patrol guard hit by player: alert so SearchAndReturn activates
+	if(bt_ && !patrol && health > 0 && !chasing){
+		Object* owner = world.GetObjectFromId(projectile.ownerid);
+		if(owner && owner->type == ObjectTypes::PLAYER){
+			chasing = owner->id;
+		}
 	}
 	if(health == 0 && state != DYING && state != DYINGEXPLODE && state != DEAD){
 		state = DYING;
