@@ -1,10 +1,21 @@
 #include "sdl3gpubackend.h"
 #include <string.h>
 
+// DXIL bytecode generated from the HLSL sources in clients/silencer/shaders/
+// at build time by dxc. The headers define `static const unsigned char
+// k<Name>DXIL[]`; size comes from `sizeof()` — dxc -Fh doesn't emit one.
+#include "vert_screen.dxil.h"
+#include "frag_remap.dxil.h"
+#include "frag_upscale.dxil.h"
+#include "frag_light.dxil.h"
+#include "vert_particle.dxil.h"
+#include "frag_particle.dxil.h"
+#include "comp_particle.dxil.h"
+
 // ---------------------------------------------------------------------------
 // MSL Shaders (Metal Shading Language — macOS/Metal backend).
-// Each string is compiled independently; structs are redefined per-shader.
-// For Vulkan/D3D12: select SPIR-V/DXIL paths via SDL_GetGPUShaderFormats().
+// HLSL counterparts live in clients/silencer/shaders/*.hlsl and produce DXIL
+// for Windows/D3D12. Keep these two in sync — they share entry-point names.
 // ---------------------------------------------------------------------------
 
 // Shared fullscreen-triangle vertex shader — generates 3 vertices from vertex_id
@@ -136,17 +147,44 @@ kernel void update_particles(
 )msl";
 
 // ---------------------------------------------------------------------------
+// Per-shader bundles: every Init/CreatePipeline call picks msl_src vs dxil
+// based on `chosen_format` set at backend Init.
+// ---------------------------------------------------------------------------
+static const ShaderBundle kVertScreen   = { kVertScreenMSL,   kVertScreenDXIL,   sizeof(kVertScreenDXIL),   "vert_screen"      };
+static const ShaderBundle kFragRemap    = { kFragRemapMSL,    kFragRemapDXIL,    sizeof(kFragRemapDXIL),    "frag_remap"       };
+static const ShaderBundle kFragUpscale  = { kFragUpscaleMSL,  kFragUpscaleDXIL,  sizeof(kFragUpscaleDXIL),  "frag_upscale"     };
+static const ShaderBundle kFragLight    = { kFragLightMSL,    kFragLightDXIL,    sizeof(kFragLightDXIL),    "frag_light"       };
+static const ShaderBundle kVertParticle = { kVertParticleMSL, kVertParticleDXIL, sizeof(kVertParticleDXIL), "vert_particle"    };
+static const ShaderBundle kFragParticle = { kFragParticleMSL, kFragParticleDXIL, sizeof(kFragParticleDXIL), "frag_particle"    };
+static const ShaderBundle kCompParticle = { kComputeParticleMSL, kCompParticleDXIL, sizeof(kCompParticleDXIL), "update_particles" };
+
+// ---------------------------------------------------------------------------
 SDL3GPUBackend::SDL3GPUBackend() = default;
 SDL3GPUBackend::~SDL3GPUBackend() { Shutdown(); }
 
 bool SDL3GPUBackend::Init(SDL_Window *win) {
 	window = win;
 
-	device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_MSL, false, NULL);
+	const SDL_GPUShaderFormat formats =
+	    SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL;
+	device = SDL_CreateGPUDevice(formats, false, NULL);
 	if (!device) {
 		SDL_Log("SDL3GPUBackend: SDL_CreateGPUDevice failed: %s", SDL_GetError());
 		return false;
 	}
+
+	// Reduce the device's reported format set to the one we actually feed
+	// shaders in. Prefer DXIL on Windows/D3D12, MSL on Apple/Metal.
+	const SDL_GPUShaderFormat avail = SDL_GetGPUShaderFormats(device);
+	if (avail & SDL_GPU_SHADERFORMAT_DXIL)      chosen_format = SDL_GPU_SHADERFORMAT_DXIL;
+	else if (avail & SDL_GPU_SHADERFORMAT_MSL)  chosen_format = SDL_GPU_SHADERFORMAT_MSL;
+	else {
+		SDL_Log("SDL3GPUBackend: no compatible shader format (driver reports 0x%x)",
+		        (unsigned)avail);
+		return false;
+	}
+	SDL_Log("SDL3GPUBackend: chosen shader format=%s",
+	        chosen_format == SDL_GPU_SHADERFORMAT_DXIL ? "DXIL" : "MSL");
 
 	if (!SDL_ClaimWindowForGPUDevice(device, window)) {
 		SDL_Log("SDL3GPUBackend: SDL_ClaimWindowForGPUDevice failed: %s", SDL_GetError());
@@ -208,17 +246,22 @@ void SDL3GPUBackend::Shutdown() {
 }
 
 SDL_GPUShader *SDL3GPUBackend::LoadShader(SDL_GPUShaderStage stage,
-                                           const char *msl_source,
-                                           const char *entrypoint,
+                                           const ShaderBundle &b,
                                            Uint32 num_samplers,
                                            Uint32 num_uniform_buffers,
                                            Uint32 num_storage_buffers) {
 	SDL_GPUShaderCreateInfo info = {};
-	info.code                = (const Uint8 *)msl_source;
-	info.code_size           = strlen(msl_source);
-	info.format              = SDL_GPU_SHADERFORMAT_MSL;
+	if (chosen_format == SDL_GPU_SHADERFORMAT_DXIL) {
+		info.code      = b.dxil;
+		info.code_size = b.dxil_size;
+		info.format    = SDL_GPU_SHADERFORMAT_DXIL;
+	} else {
+		info.code      = (const Uint8 *)b.msl_src;
+		info.code_size = strlen(b.msl_src);
+		info.format    = SDL_GPU_SHADERFORMAT_MSL;
+	}
 	info.stage               = stage;
-	info.entrypoint          = entrypoint;
+	info.entrypoint          = b.entrypoint;
 	info.num_samplers        = num_samplers;
 	info.num_uniform_buffers = num_uniform_buffers;
 	info.num_storage_buffers = num_storage_buffers;
@@ -228,8 +271,8 @@ SDL_GPUShader *SDL3GPUBackend::LoadShader(SDL_GPUShaderStage stage,
 bool SDL3GPUBackend::CreatePipelines() {
 	// --- Remap pipeline: R8 indexed frame → scene_tex (RGBA8) ---
 	{
-		SDL_GPUShader *vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX,   kVertScreenMSL, "vert_screen", 0);
-		SDL_GPUShader *fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT, kFragRemapMSL,  "frag_remap",  2);
+		SDL_GPUShader *vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX,   kVertScreen, 0);
+		SDL_GPUShader *fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT, kFragRemap,  2);
 		if (!vs || !fs) {
 			SDL_Log("SDL3GPUBackend: remap shaders failed: %s", SDL_GetError());
 			if (vs) SDL_ReleaseGPUShader(device, vs);
@@ -258,8 +301,8 @@ bool SDL3GPUBackend::CreatePipelines() {
 
 	// --- Upscale pipeline: scene_tex → swapchain (swapchain format) ---
 	{
-		SDL_GPUShader *vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX,   kVertScreenMSL,  "vert_screen", 0);
-		SDL_GPUShader *fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT, kFragUpscaleMSL, "frag_upscale", 1);
+		SDL_GPUShader *vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX,   kVertScreen,  0);
+		SDL_GPUShader *fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT, kFragUpscale, 1);
 		if (!vs || !fs) {
 			SDL_Log("SDL3GPUBackend: upscale shaders failed: %s", SDL_GetError());
 			if (vs) SDL_ReleaseGPUShader(device, vs);
@@ -300,8 +343,8 @@ bool SDL3GPUBackend::CreateLightPipeline() {
 	blend.dst_alpha_blendfactor    = SDL_GPU_BLENDFACTOR_ONE;
 	blend.alpha_blend_op           = SDL_GPU_BLENDOP_ADD;
 
-	SDL_GPUShader *vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX,   kVertScreenMSL, "vert_screen", 0);
-	SDL_GPUShader *fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT, kFragLightMSL,  "frag_light",
+	SDL_GPUShader *vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX,   kVertScreen, 0);
+	SDL_GPUShader *fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT, kFragLight,
 	                               /*num_samplers=*/0, /*num_uniform_buffers=*/1);
 	if (!vs || !fs) {
 		SDL_Log("SDL3GPUBackend: light shaders failed: %s", SDL_GetError());
@@ -335,15 +378,21 @@ bool SDL3GPUBackend::CreateParticlePipelines() {
 	// Compute pipeline: advance particle positions.
 	{
 		SDL_GPUComputePipelineCreateInfo ci = {};
-		ci.code                        = (const Uint8 *)kComputeParticleMSL;
-		ci.code_size                   = strlen(kComputeParticleMSL);
-		ci.format                      = SDL_GPU_SHADERFORMAT_MSL;
-		ci.entrypoint                  = "update_particles";
+		if (chosen_format == SDL_GPU_SHADERFORMAT_DXIL) {
+			ci.code      = kCompParticle.dxil;
+			ci.code_size = kCompParticle.dxil_size;
+			ci.format    = SDL_GPU_SHADERFORMAT_DXIL;
+		} else {
+			ci.code      = (const Uint8 *)kCompParticle.msl_src;
+			ci.code_size = strlen(kCompParticle.msl_src);
+			ci.format    = SDL_GPU_SHADERFORMAT_MSL;
+		}
+		ci.entrypoint                    = kCompParticle.entrypoint;
 		ci.num_readwrite_storage_buffers = 1;
-		ci.num_uniform_buffers         = 1;
-		ci.threadcount_x               = 64;
-		ci.threadcount_y               = 1;
-		ci.threadcount_z               = 1;
+		ci.num_uniform_buffers           = 1;
+		ci.threadcount_x                 = 64;
+		ci.threadcount_y                 = 1;
+		ci.threadcount_z                 = 1;
 		particle_compute = SDL_CreateGPUComputePipeline(device, &ci);
 		if (!particle_compute) {
 			SDL_Log("SDL3GPUBackend: particle compute pipeline failed: %s", SDL_GetError());
@@ -355,12 +404,12 @@ bool SDL3GPUBackend::CreateParticlePipelines() {
 	{
 		// Vertex reads from storage buffer (particles) + uniform (frame_info).
 		SDL_GPUShader *vs = LoadShader(SDL_GPU_SHADERSTAGE_VERTEX,
-		                               kVertParticleMSL, "vert_particle",
+		                               kVertParticle,
 		                               /*num_samplers=*/0,
 		                               /*num_uniform_buffers=*/1,
 		                               /*num_storage_buffers=*/1);
 		SDL_GPUShader *fs = LoadShader(SDL_GPU_SHADERSTAGE_FRAGMENT,
-		                               kFragParticleMSL, "frag_particle",
+		                               kFragParticle,
 		                               /*num_samplers=*/1);
 		if (!vs || !fs) {
 			SDL_Log("SDL3GPUBackend: particle shaders failed: %s", SDL_GetError());
