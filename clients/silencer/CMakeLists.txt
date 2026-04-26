@@ -77,6 +77,24 @@ endif()
 
 target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_14)
 
+# Compile HLSL → DXIL bytecode headers for the SDL3 GPU backend. macOS keeps
+# the existing MSL source strings; SPIRV/Linux is a separate change.
+include(CompileShaders)
+silencer_compile_shader(vert_screen   vertex  vert_screen)
+silencer_compile_shader(frag_remap    pixel   frag_remap)
+silencer_compile_shader(frag_upscale  pixel   frag_upscale)
+silencer_compile_shader(frag_light    pixel   frag_light)
+silencer_compile_shader(vert_particle vertex  vert_particle)
+silencer_compile_shader(frag_particle pixel   frag_particle)
+silencer_compile_shader(comp_particle compute update_particles)
+silencer_finalize_shaders(
+    vert_screen frag_remap frag_upscale frag_light
+    vert_particle frag_particle comp_particle
+)
+add_dependencies(${SILENCER_TARGET} silencer_shaders)
+target_include_directories(${SILENCER_TARGET} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated")
+
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
 # Windows installs. /Zi (the default) is faster but unreliable; /Z7 is rock

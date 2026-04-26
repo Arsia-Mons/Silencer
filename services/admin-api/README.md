@@ -29,7 +29,7 @@ Environment variables (set in `.env` beside `docker-compose.yml`):
 |-----------------------|---------------------------------------|------------------------------------|
 | `PORT`                | `24080`                               | HTTP listen port                   |
 | `MONGO_URL`           | `mongodb://mongo:27017/silencer`      | MongoDB connection string          |
-| `RABBITMQ_URL`        | `amqp://silencer:silencer@...`        | RabbitMQ AMQP URL                  |
+| `AMQP_URL`            | `amqp://silencer:silencer@...`        | AMQP broker URL (LavinMQ in prod, RabbitMQ in compose) |
 | `JWT_SECRET`          | `changeme-in-production`              | Secret for signing JWTs            |
 | `LOBBY_PLAYER_AUTH_URL` | `http://lobby:15171`               | Lobby HTTP auth endpoint           |
 | `BACKUP_DIR`          | `/backups`                            | Directory for mongodump archives   |
@@ -40,7 +40,14 @@ Environment variables (set in `.env` beside `docker-compose.yml`):
 
 ## API Routes
 
-All routes except `/health` and `/auth/login` require a valid JWT in `Authorization: Bearer <token>`.
+All routes are mounted under `/api` (e.g. `/api/auth/login`, `/api/players`,
+`/api/health`). The tables below show the path *inside* that prefix —
+prepend `/api` to every entry when calling from outside. The `/api` mount
+lets a single Cloudflare Tunnel hostname host both admin-web and admin-api
+without page/route collisions.
+
+All routes except `/api/health` and `/api/auth/login` require a valid JWT
+in `Authorization: Bearer <token>`.
 
 ### Auth — `/auth`
 

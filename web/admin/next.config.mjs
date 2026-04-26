@@ -1,10 +1,11 @@
 /** @type {import('next').NextConfig} */
+//
+// NEXT_PUBLIC_* are inlined into the client bundle at build time. We don't
+// bake defaults here — see lib/api.js and lib/socket.js for the runtime
+// fallbacks (production: empty → relative URLs; dev: docker-compose build
+// args supply the values).
 const nextConfig = {
   output: 'standalone',
-  env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:24080',
-    NEXT_PUBLIC_WS_URL:  process.env.NEXT_PUBLIC_WS_URL  || 'ws://localhost:24080',
-  },
 };
 
 export default nextConfig;

@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.6.0"
+  required_version = ">= 1.14.0"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -50,7 +50,7 @@ data "aws_ami" "ubuntu_arm64" {
 
 resource "aws_key_pair" "admin" {
   key_name   = "${var.project_name}-admin"
-  public_key = var.ssh_public_key
+  public_key = data.aws_ssm_parameter.ssh_admin_pubkey.value
 }
 
 resource "aws_security_group" "lobby" {
@@ -111,14 +111,17 @@ resource "aws_instance" "lobby" {
   subnet_id              = data.aws_subnets.default.ids[0]
   key_name               = aws_key_pair.admin.key_name
   vpc_security_group_ids = [aws_security_group.lobby.id]
+  iam_instance_profile   = aws_iam_instance_profile.lobby.name
 
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
     project_name          = var.project_name
+    aws_region            = var.aws_region
     lobby_version         = var.lobby_version_string
     public_hostname       = var.domain_name != "" ? var.domain_name : aws_eip.lobby.public_ip
-    tailscale_auth_key    = var.tailscale_auth_key
+    tailscale_auth_key    = data.aws_ssm_parameter.lobby_tailscale_auth_key.value
     tailscale_hostname    = var.tailscale_hostname
-    deploy_ssh_public_key = var.deploy_ssh_public_key
+    deploy_ssh_public_key = data.aws_ssm_parameter.deploy_ssh_pubkey.value
+    internal_zone_name    = var.internal_zone_name
   })
 
   root_block_device {
@@ -131,8 +134,12 @@ resource "aws_instance" "lobby" {
     Name = "${var.project_name}-lobby"
   }
 
+  # Re-running terraform apply must not pick up a newer AMI or notice
+  # credential changes in user_data — both would force-replace the lobby
+  # instance and kill active games. Explicit `terraform taint` is the
+  # only path to a re-bootstrap. Same posture as the admin instance.
   lifecycle {
-    ignore_changes = [ami]
+    ignore_changes = [ami, user_data]
   }
 }
 

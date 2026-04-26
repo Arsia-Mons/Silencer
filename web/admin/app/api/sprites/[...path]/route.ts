@@ -1,5 +1,5 @@
 /**
- * Next.js API proxy: /api/sprites/[...path] → admin-api /sprites/[...path]
+ * Next.js API proxy: /api/sprites/[...path] → admin-api /api/sprites/[...path]
  * Forwards the Authorization header so <img> tags can load sprite PNGs.
  */
 import { type NextRequest, NextResponse } from 'next/server';
@@ -12,7 +12,7 @@ export async function GET(
 ) {
   const path = params.path.join('/');
   const url = new URL(req.url);
-  const upstream = `${API}/sprites/${path}${url.search}`;
+  const upstream = `${API}/api/sprites/${path}${url.search}`;
 
   const headers: Record<string, string> = {};
   const auth = req.headers.get('authorization');

@@ -1,7 +1,12 @@
-// Thin wrapper around fetch with auth header injection
+// Thin wrapper around fetch with auth header injection.
+//
+// Production: NEXT_PUBLIC_API_URL is unset → API is "/api" (relative).
+//   Cloudflare Tunnel routes /api/* on admin.arsiamons.com to admin-api:24080.
+// Local dev: NEXT_PUBLIC_API_URL=http://localhost:24080 (compose build arg)
+//   → API is "http://localhost:24080/api"; admin-api still serves under /api.
 import type { Player, MatchStat, AdminUser, AuditEvent, BackupStatus, BackupInfo, StatsSnapshot } from './types';
 
-export const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:24080';
+export const API = (process.env.NEXT_PUBLIC_API_URL || '') + '/api';
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;

@@ -1,5 +1,5 @@
 /**
- * Next.js API proxy: /api/actors/[...path] → admin-api /actors/[...path]
+ * Next.js API proxy: /api/actors/[...path] → admin-api /api/actors/[...path]
  */
 import { type NextRequest, NextResponse } from 'next/server';
 
@@ -13,7 +13,7 @@ function fwdHeaders(req: NextRequest): Record<string, string> {
 }
 
 async function proxy(req: NextRequest, path: string, method: string, body?: BodyInit) {
-  const upstream = `${API}/actors/${path}`;
+  const upstream = `${API}/api/actors/${path}`;
   const res = await fetch(upstream, { method, headers: fwdHeaders(req), body });
   const data = await res.json();
   return NextResponse.json(data, { status: res.status });

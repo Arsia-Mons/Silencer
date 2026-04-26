@@ -10,6 +10,11 @@ because this directory is two levels deep.
 - `install-linux-server.sh` — one-shot bootstrap for a fresh Ubuntu
   22.04+ VM. Installs Docker, then `docker compose -f infra/docker-compose.yml up -d`.
   Used by self-hosters following the README quick-start.
+- `seed-ssm.sh` — interactive one-shot that puts every Silencer secret
+  into AWS SSM Parameter Store under `/silencer/*`. Run once per AWS
+  account before `terraform apply`; teammates with IAM read access
+  pull from the same source. Idempotent — skips existing params
+  unless `--overwrite` is passed (rotation flow).
 - `fastdeploy.sh` — bypass CI: rsync the working tree to the AWS lobby
   host, build the C++ dedicated-server binary on the box (ARM64), swap
   it into `/opt/silencer/current/`, restart `silencer-lobby`. Debug-only;

@@ -1,22 +1,38 @@
-# Copy to terraform.tfvars and fill in. terraform.tfvars is gitignored.
+# Copy to terraform.tfvars and override only the non-secret tuning
+# knobs you care about. terraform.tfvars is gitignored.
+#
+# All secrets live in AWS SSM Parameter Store under /silencer/* — seed
+# them once with:
+#
+#     ./infra/scripts/seed-ssm.sh
+#
+# See infra/terraform/CLAUDE.md for the parameter list, and
+# docs/production.md for the full setup walkthrough.
 
-aws_region       = "us-west-1"
-ssh_public_key   = "ssh-ed25519 AAAAC3... you@host"
-ssh_allowed_cidr = "1.2.3.4/32" # your public IP — check with: curl ifconfig.me
+# Restricts public-internet SSH (break-glass only — day-to-day SSH
+# goes through Tailscale). Set to your laptop's /32:
+ssh_allowed_cidr = "1.2.3.4/32"  # check with: curl ifconfig.me
 
-# Tailscale machine auth key — one-time, tag:server, pre-approved.
-# Generate at: https://login.tailscale.com/admin/settings/keys
-tailscale_auth_key = "tskey-auth-..."
-tailscale_hostname = "silencer"
-
-# Public half of the deploy keypair. Private half is the DEPLOY_SSH_KEY GH secret.
-deploy_ssh_public_key = "ssh-ed25519 AAAA... gh-actions-deploy"
-
-# Optional DNS (omit if managing DNS at another registrar):
+# Optional DNS for the lobby (omit if managing DNS at another registrar):
 # domain_name     = "lobby.example.com"
 # route53_zone_id = "Z0123456789ABCDEFGHIJ"
 
 # Optional overrides:
-# instance_type        = "t4g.small"
-# ebs_volume_size      = 8
-# lobby_version_string = "00024"  # default "" accepts any client version
+# aws_region                = "us-west-1"
+# instance_type             = "t4g.small"
+# ebs_volume_size           = 8
+# lobby_version_string      = "00024"  # default "" accepts any client version
+# tailscale_hostname        = "silencer"
+#
+# admin_instance_type       = "t4g.small"
+# admin_root_volume_size    = 16
+# admin_mongo_volume_size   = 10
+# admin_lavinmq_volume_size = 5
+# admin_tailscale_hostname  = "silencer-admin"
+# internal_zone_name        = "silencer.internal"
+# github_backup_repo        = "Arsia-Mons/silencer-mongo-backup"
+#
+# Initial OCI image refs — leave empty for first apply; the deploy
+# workflow updates /etc/silencer/<svc>.image at run time.
+# admin_image_admin_api = ""
+# admin_image_admin_web = ""

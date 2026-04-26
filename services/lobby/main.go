@@ -21,7 +21,7 @@ func main() {
 	publicAddr := flag.String("public-addr", "127.0.0.1", "host or IP clients (and dedicated servers) should use to reach this lobby")
 	gamePortBase := flag.Int("game-port-base", 0, "base UDP port for dedicated servers (0 = OS-assigned random). Game N uses base+(gameID%game-port-count)")
 	gamePortCount := flag.Int("game-port-count", 10, "number of ports in the dedicated-server range")
-	rabbitmqURL := flag.String("rabbitmq-url", "", "AMQP URL for RabbitMQ event publishing (empty = disabled)")
+	amqpURL := flag.String("amqp-url", "", "AMQP URL for event publishing (LavinMQ in prod, RabbitMQ in compose; empty = disabled)")
 	playerAuthAddr := flag.String("player-auth-addr", ":15171", "internal HTTP address for player credential validation (admin-api use only)")
 	mapAPIAddr := flag.String("map-api-addr", ":8080", "public HTTP address for the community map API (upload/download)")
 	mapsDir := flag.String("maps-dir", "maps", "directory for community map storage")
@@ -64,8 +64,8 @@ func main() {
 	}
 
 	var events *EventPublisher
-	if url := *rabbitmqURL; url == "" {
-		url = os.Getenv("RABBITMQ_URL")
+	if url := *amqpURL; url == "" {
+		url = os.Getenv("AMQP_URL")
 		if url != "" {
 			events = NewEventPublisher(url)
 		}
