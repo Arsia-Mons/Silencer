@@ -2,16 +2,14 @@
   "version": 1,
   "id": "civilian-flee",
   "blackboard": [
-    { "key": "threat_nearby", "type": "bool",  "default": false },
-    { "key": "health_pct",    "type": "float", "default": 1.0 },
-    { "key": "hacking",       "type": "bool",  "default": false }
+    { "key": "threat_nearby", "type": "bool",  "default": false }
   ],
   "rootId": "root",
   "nodes": {
     "root": {
       "type": "Selector",
       "label": "Civilian AI",
-      "children": ["seq_flee", "seq_hack", "leaf_wander"],
+      "children": ["seq_flee", "leaf_wander"],
       "props": {}
     },
     "seq_flee": {
@@ -31,24 +29,6 @@
       "label": "Run",
       "children": [],
       "props": { "action": "Run" }
-    },
-    "seq_hack": {
-      "type": "Sequence",
-      "label": "Hack Terminal",
-      "children": ["cond_hacking", "leaf_hack"],
-      "props": {}
-    },
-    "cond_hacking": {
-      "type": "Condition",
-      "label": "hacking?",
-      "children": [],
-      "props": { "key": "hacking", "op": "==", "value": true }
-    },
-    "leaf_hack": {
-      "type": "Leaf",
-      "label": "Hack",
-      "children": [],
-      "props": { "action": "Hack" }
     },
     "leaf_wander": {
       "type": "Leaf",
