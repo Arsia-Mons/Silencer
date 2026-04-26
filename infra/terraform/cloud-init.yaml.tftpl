@@ -86,6 +86,7 @@ write_files:
         -addr :517 \
         -db /var/lib/${project_name}/lobby.json \
         -maps-dir /var/lib/${project_name}/maps \
+        -update-manifest /opt/${project_name}/update.json \
         -public-addr ${public_hostname} \
         -game-binary /opt/${project_name}/current/silencer \
         -version "${lobby_version}"
