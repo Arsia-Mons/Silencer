@@ -5,7 +5,7 @@
 - Screen-switch extension recipe carries forward unchanged from D0 / A0 / O0 / C0: one new `if (screen_str == "lobby_connect")` branch in `main()` plus a sibling `RunDumpLobbyConnect(...)` function. Zero edits to prior Run*; bytewise diffs vs all five prior reference dumps stay at exact baseline (main 2136 / options 1758 / audio 1035 / display 2211 / controls 3729). The "additive screen" pattern continues to hold across the menu→lobby palette boundary.
 - Sub-palette switching is per-`RunDump*`, not per-screen-state: each screen-builder owns a `constexpr int kSubX = N;` constant and passes it to `WritePPM(fb, palette, kSubX)`. Menu screens use `kSubMenu = 1`; LOBBYCONNECT introduces `kSubLobby = 2`. No rework of `WritePPM` or `Palette` was needed — the active-sub argument was always per-call, not global. The "first non-menu palette" gate (L0/L1) is therefore satisfied by a one-line change in the new screen-builder, with no shared-infra churn.
 - Sub-palette 2 idx 0 = (0, 0, 0) black, confirmed empirically by dumping a Clear(0) FB resolved through sub-palette 2 — the first 12 RGB bytes of the dump payload are all 0x00. This means `Clear(0)` produces a black panel-exterior background "for free" under sub-palette 2, with no need for an explicit black-fill widget. The same holds for sub-palette 1 (where main_menu's bg_plate-less zones would also be black if any were exposed; main_menu has none).
-- LOBBYCONNECT bank set planned ahead at L0 commit: `{7, 133, 134, 135}`. Bank 7 (panel idx 2 + likely B52x21 chrome), bank 133 (textbox + textinput font), bank 134 (Username/Password labels font, w=9), bank 135 (button-label font, by analogy with B196x33/B220x33/B112x33). NO bank 6 (no starfield bg, no bg-plate idx 0) — the panel sprite carries the chrome and the exterior is `Clear(0)` per spec. Bank set is loaded at L0 even though L0 doesn't render any of them yet, to avoid bank-list churn in L1+.
+- LOBBYCONNECT bank set planned ahead at L0 commit: `{7, 133, 134, 135}`. Bank 7 (panel idx 2 + likely B52x21 chrome), bank 133 (textbox + textinput font), bank 134 (Username/Password labels font, w=9), bank 135 (button-label font, by analogy with B196x33/B220x33/B112x33). NO bank 6 (no starfield bg, no bg-plate idx 0) — the panel sprite carries the chrome and the exterior is `Clear(0)` per spec. Bank set is loaded at L0 even though L0 doesn't render any of them yet, to avoid bank-list churn in L1+. **Confirmed at L2:** the bank-7 idx-2 sprite carries ALL panel chrome — outer bordered rectangle, inner textbox border (with right-side scrollbar lane baked in), horizontal divider, Username/Password input-field wells, AND the bottom button-row well outlines for Login/Cancel. Same single-blit pattern as CONTROLS' bank-7 idx-7 frame: one `BlitSprite(fb, sprites.Get(7, 2), 0, 0, nullptr)` produces the entire form scaffold.
 - **PALETTE.BIN actual layout is `4 + s * (768 + 4)`** — i.e. 4-byte file prefix + 11 records of [4-byte sub-header, 768-byte color table]. The main-menu Ralph's pattern claim of `8 + s*768` was a coincidence: at s=1 both formulas give offset 776, so every prior screen (which all use sub-palette 1) rendered correctly under the wrong formula. They diverge for s != 1 — sub-palette 2 (lobby) sits 4 bytes farther per sub-block, so the empirical formula was reading 4 bytes early and pulling garbage. Correcting to the spec formula leaves sub-palette 1 byte-identical (zero regression on main_menu / options / options_audio / options_display / options_controls dumps — all five at exact baselines: 2136 / 1758 / 1035 / 2211 / 3729) while shifting sub-palettes 0 and 2..10 to their correct offsets. **Lesson:** whenever a "spec disagrees with empirical" is recorded, verify the empirical against MORE THAN ONE data point — sub-palette 1 was the only one tested in main-menu Ralph P0; sub-palette 2 disagreed silently because no prior screen exercised it.
 - Verification mode for palette correctness gates does NOT require visual A/B: when the candidate's first non-`Clear(0)` render under the new sub-palette is gated separately (here, panel sprite is L2's job), L1's "color tones match" check is a table-lookup audit. Sample reference dump's dominant non-black colors → confirm each appears in `sub_palette[N]` post-fix. For this Ralph: top-15 full-screen reference colors all present in sub-palette 2 (15/15 hit rate), confirming the fix is decisive even though the candidate dump is still entirely black at the L1 gate.
 
@@ -162,4 +162,62 @@
     `RunDump*` function were required, and zero edits to prior Ralphs'
     work. The "active-sub argument is per-call, not global" pattern
     from L0 paid off here too.
+---
+
+## 2026-04-26T16:08:00Z — iter 3 (L2 PASS)
+- Added one `BlitSprite(fb, sprites.Get(7, 2), 0, 0, nullptr)` call to
+  `RunDumpLobbyConnect` after the `Clear(0)` and before the PPM write,
+  guarded by `sprites.Has(7, 2)`. Mirrors the CONTROLS L1 pattern of
+  blitting bank-7 idx-7 at (0, 0) — same anchor convention, same
+  single-call composition. No new codec branch needed: bank-7 RLE
+  (linear / tile) was already validated at CONTROLS time.
+- Build: `cmake --build shared/design/sdl3/build` exits 0 (only
+  main.cpp recompiled + relink).
+- Dump: `SILENCER_DUMP_SCREEN=lobby_connect` writes the canonical
+  P6 921615-byte PPM. Sprite is found and blitted (no Has-guard miss).
+- Bytewise diff vs `/tmp/real_lobbyconnect_dump.ppm`: 7,544 bytes
+  (~0.82%) — down from L1's 212,850 (~23%). The remaining residue
+  is entirely structural-pending text content: textbox connection-log
+  glyphs, "Username" / "Password" labels, TextInput cursor, and the
+  Login / Cancel button labels. All are L3's gate (form composition).
+  Categorically zero chrome diff in the panel-frame zone.
+- Visual A/B (Discord DM 1498097381273506015): candidate now shows
+  the full panel frame with outer bordered rectangle (~80,80 to
+  ~560,400), inner textbox border + right-side scrollbar lane, the
+  horizontal divider below the textbox, two side-by-side input-field
+  wells (Username row, Password row), and the bottom button-row well
+  with two small button outlines (Login, Cancel positions). Reference
+  shows the same chrome PLUS rendered text content — the chrome
+  layouts are pixel-aligned. The bank-7 idx-2 sprite's offset is
+  effectively (0, 0) since the panel is screen-aligned, so the
+  anchor convention places it correctly with no offset arithmetic.
+- Files touched: `shared/design/sdl3/src/main.cpp` (one BlitSprite +
+  guard + comment), `.ralph/lobby-connect/prd.json` (L2 →
+  passes:true), `.ralph/lobby-connect/progress.txt` (this entry +
+  one Codebase Patterns line append).
+- Spec gaps encountered (no new ones at L2):
+  - All previously flagged gaps still apply (B52x21 in
+    widget-button.md, widget-textbox.md, widget-textinput.md, palette
+    sub-2 callout, sprite-banks bank-7 idx-2 vs idx-7 distinction).
+- **Learnings:**
+  - The "single sprite = full panel chrome" pattern from CONTROLS L1
+    transfers cleanly to LOBBYCONNECT L2: the engine's panel sprites
+    in bank 7 are intentionally pre-composed (border + dividers +
+    field wells + scrollbar lane all baked into one indexed bitmap).
+    A renderer doesn't need to draw any chrome separately — find the
+    right idx, blit at (0, 0), done. This is why the L2 commit is a
+    one-liner and the residue collapses from 23% to <1% in a single
+    iteration.
+  - The biggest risk for a "first non-menu screen using bank 7" was
+    that bank 7's RLE codec might have idx-specific decode paths
+    (e.g. some sprites use linear, others use tile-mode). Empirically
+    bank-7 idx-2 decodes correctly on the same code path as bank-7
+    idx-7, with no codec edits needed. The codec already handles the
+    full set of bank-7 sprites — confirmed via successful blit + zero
+    chrome diff vs reference. No SpriteSet::Load extension needed.
+  - L2's diff residue (0.82%) is a useful upper bound on what L3's
+    form-composition pass needs to fix: textbox text + 2 labels +
+    2 input-field cursors/text + 2 button labels. If L3 lands all
+    of those structurally, the L4 final gate should be at <0.2%
+    (cursor blink phase + textbox content variance only).
 ---

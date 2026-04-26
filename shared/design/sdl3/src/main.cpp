@@ -758,9 +758,15 @@ static int RunDumpLobbyConnect(const std::string &assets_dir,
   Framebuffer fb;
   fb.Clear();
 
-  // L0: nothing rendered. The PPM is a black 640x480 resolved through
-  // sub-palette 2. L1 verifies the palette resolution color tone; L2
-  // adds the bank-7 idx-2 panel sprite; L3 adds form composition.
+  // L2: Bank 7 idx 2 panel sprite at (0, 0). Different idx from CONTROLS'
+  // idx 7. Same blit convention (top_left = anchor - sprite.offset; the
+  // sprite is screen-aligned so its offset is (0,0)). Codec branch is
+  // already validated for bank-7 sprites (linear/tile RLE) — no new
+  // codec risk. Includes outer border, inner textbox border + scrollbar
+  // lane, horizontal divider, input-field wells, button-row well.
+  if (sprites.Has(7, 2)) {
+    BlitSprite(fb, sprites.Get(7, 2), 0, 0, nullptr);
+  }
 
   std::filesystem::create_directories(dump_dir);
   std::string out = dump_dir + "/screen_00.ppm";

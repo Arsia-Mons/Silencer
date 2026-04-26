@@ -24,7 +24,7 @@
       "id": "L2",
       "name": "Bank 7 idx 2 panel sprite renders correctly",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "spec": "The bank-7 idx-2 panel sprite (different from CONTROLS' idx 7) renders at (0,0) covering the form area. Outer border, inner textbox border + scrollbar lane, horizontal divider, input-field wells, and button-row well all visible and structurally matching the reference.",
       "category": "sprite_codec"
     },
