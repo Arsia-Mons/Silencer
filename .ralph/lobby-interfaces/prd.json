@@ -1,0 +1,41 @@
+{
+  "screen": "lobby-interfaces",
+  "scope": "structural — empty-data sub-interface contents per spec; gates on widget chrome / positions / borders",
+  "reference_dump": "/tmp/real_lobby_dump.ppm",
+  "candidate_dump": "/tmp/sdl3_dump/screen_00.ppm",
+  "candidate_root": "shared/design/sdl3",
+  "items": [
+    {
+      "id": "I0",
+      "name": "CharacterInterface composition (left panel)",
+      "priority": 0,
+      "passes": false,
+      "spec": "Per docs/design/screen-lobby-character.md: render the username overlay at (20,71) bank 134 advance 8; four stat overlays at (17, 130/143/156/169) bank 133 advance 7 (empty content OK); five Toggle widgets (bank 181 idx 0..4) at y=90, x=20+i*42 for the five agencies. Selected-state highlight is non-gated. Region: bbox (10,64,217,120) of the LOBBY dump.",
+      "category": "composition"
+    },
+    {
+      "id": "I1",
+      "name": "GameSelectInterface composition (right panel)",
+      "priority": 1,
+      "passes": false,
+      "spec": "Per docs/design/screen-lobby-gameselect.md: render bank 7 idx 8 right-border chrome; 'Active Games' label at (405,70) bank 134 advance 8; SelectBox bbox (407,89,214,265) lineheight=14 (empty); Scrollbar (bank 7 idx 9, scrollposition=0); five selected-game info overlays at (405, 358/370/382/394/406) bank 133 advance 6 (empty); Join Game B156x21 at (436,430); Create Game B156x21 at (242,68). Region: outside bbox but the GameSelectInterface bbox is (403,87,222,267).",
+      "category": "composition"
+    },
+    {
+      "id": "I2",
+      "name": "ChatInterface composition (bottom-left panel)",
+      "priority": 2,
+      "passes": false,
+      "spec": "Per docs/design/screen-lobby-chat.md: render bank 7 idx 11 chat border; bank 7 idx 14 chat input border; channel name overlay at (15,200) bank 134 advance 8 (empty content OK); chat TextBox at (19,220,242,207) bottom-to-top (empty); presence TextBox at (267,220,110,207) (empty); chat TextInput at (18,437,360,14) (empty); chat Scrollbar bank 7 idx 12 + thumb idx 13. Region: bbox (15,216,368,234).",
+      "category": "composition"
+    },
+    {
+      "id": "I3",
+      "name": "Visual equivalence (full LOBBY with sub-interfaces)",
+      "priority": 3,
+      "passes": false,
+      "spec": "Final gate. Candidate PPM is visually equivalent to /tmp/real_lobby_dump.ppm with all three sub-interface regions structurally rendered (chrome borders, widget outlines, scrollbar thumbs, action buttons positioned correctly). Empty-data interiors (chat messages, game list rows, runtime stat numbers, non-localusername text) are non-gated. Diff budget: ~3-5% acceptable for the structural pass; deeper visual fidelity requires populated server data and is out of scope.",
+      "category": "final"
+    }
+  ]
+}

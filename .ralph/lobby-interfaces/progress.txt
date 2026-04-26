@@ -1,0 +1,26 @@
+## Codebase Patterns
+<!-- Patterns this Ralph discovers. Patterns from all seven prior Ralphs:
+.ralph/{main-menu,options,options-audio,options-display,options-controls,
+lobby-connect,lobby}/progress.txt — read those first. -->
+
+## 2026-04-26T00:00:00Z — INIT
+- Ralph scaffolded by setup conversation.
+- Baseline: shared/design/sdl3/ already renders seven screens (main_menu,
+  OPTIONS hub, OPTIONSAUDIO, OPTIONSDISPLAY, OPTIONSCONTROLS, LOBBYCONNECT,
+  LOBBY chrome) equivalent to references. The LOBBY dump's chrome (panel
+  + header + Go Back) is validated; this Ralph fills in the three
+  sub-interfaces inside that chrome.
+- Reference dump: /tmp/real_lobby_dump.ppm (do not regenerate; was
+  captured with the engine's auth-bypass harness and no Go lobby
+  server running).
+- Spec inputs: docs/design/screen-lobby-{character,gameselect,chat}.md
+  authoritative for each sub-interface region.
+- New widget surface: Toggle widget (bank 181, agency icons), SelectBox
+  widget (multi-row list, currently empty), TextBox bottom-to-top vs
+  top-to-bottom flags. TextInput, Scrollbar, B156x21, TextBox already
+  validated by prior Ralphs.
+- Empty-data scope: most overlay/textbox content is server-driven and
+  empty without a running Go lobby. Gate on structural chrome only.
+- Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
+- **Learnings:** none yet.
+---
