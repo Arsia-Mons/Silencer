@@ -1,4 +1,8 @@
-// Palette loader & color transforms (per docs/design-system.md §Color System).
+// Palette loader & color transforms — see docs/design/palette.md.
+//
+// The 11 sub-palettes in PALETTE.BIN drive different game states; e.g. the
+// main menu uses sub-palette 1. Set the active sub-palette via SetActive()
+// before any IndexedToRgba conversion or `Color(index)` lookup.
 #pragma once
 
 #include <array>
@@ -13,7 +17,6 @@ struct Rgb {
     std::uint8_t b{0};
 };
 
-// 11 sub-palettes of 256 RGB triples (per spec). Sub-palette 0 is the UI default.
 class Palette {
    public:
     static constexpr std::size_t kSubPaletteCount = 11;
@@ -21,26 +24,31 @@ class Palette {
 
     bool Load(const std::string& palette_bin_path);
 
+    // Set the active sub-palette. Used by IndexedToRgba and the (sub-less)
+    // overload of Color(index). Defaults to 0 (in-game default per spec).
+    void SetActive(std::size_t sub) { active_ = sub < kSubPaletteCount ? sub : 0; }
+    std::size_t Active() const { return active_; }
+
     const Rgb& Color(std::size_t sub, std::size_t index) const {
         return palettes_[sub][index];
     }
-    const Rgb& Color(std::size_t index) const { return palettes_[0][index]; }
+    const Rgb& Color(std::size_t index) const { return palettes_[active_][index]; }
 
-    // Convert a 640x480 8-bit indexed buffer to RGBA8888 using sub-palette 0.
+    // Convert an 8-bit indexed buffer to RGBA8888 using the active sub-palette.
     // Index 0 is treated as transparent (alpha 0).
     void IndexedToRgba(const std::uint8_t* src, std::uint32_t* dst, std::size_t pixel_count) const;
 
-    // EffectBrightness — see §Color System / Brightness Transform.
-    // Returns the *RGB color* after a brightness transform; index lookup
-    // (nearest-neighbor in palette) is left to callers when needed.
+    // EffectBrightness — see docs/design/palette.md.
     static Rgb ApplyBrightness(Rgb in, std::uint8_t brightness);
 
-    // EffectColor — luminance-preserving tint.
+    // EffectColor — luminance-preserving tint. Not used by the main menu;
+    // kept here so the API is stable when more screens are added.
     static Rgb ApplyColorTint(Rgb in, Rgb tint);
 
    private:
     using SubPalette = std::array<Rgb, kColorsPerPalette>;
     std::array<SubPalette, kSubPaletteCount> palettes_{};
+    std::size_t active_{0};
 };
 
 }  // namespace silencer

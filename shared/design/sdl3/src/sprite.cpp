@@ -46,27 +46,33 @@ bool SpriteBanks::LoadIndex(const std::string& assets_dir) {
     return true;
 }
 
-bool SpriteBanks::DecodeRle(const std::uint8_t* src, std::size_t src_size,
-                            std::uint8_t mode, std::uint16_t w, std::uint16_t h,
-                            std::vector<std::uint8_t>& out) const {
+std::size_t SpriteBanks::DecodeRle(const std::uint8_t* src, std::size_t src_size,
+                                   std::uint8_t mode, std::uint16_t w, std::uint16_t h,
+                                   std::vector<std::uint8_t>& out) const {
     const std::size_t total_pixels = static_cast<std::size_t>(w) * h;
     if (total_pixels == 0) {
         out.clear();
-        return true;
+        return 0;
     }
 
-    // Decode dword stream into a linear byte buffer first.
+    // Decompress the dword stream into a linear byte buffer of exactly
+    // total_pixels bytes. The real client reads dwords inline during tile
+    // traversal until all pixels are filled; we materialize that as a
+    // pre-pass so the spatial redistribution below can remain simple.
+    //
+    // Tile-mode sprites' `comp_size` overstates the consumed stride in some
+    // banks (e.g. bank 6 idx 0 — the 640x480 menu plate). Treat src_size as
+    // an upper bound only; stop as soon as we have enough decoded pixels.
     std::vector<std::uint8_t> linear;
     linear.reserve(total_pixels);
 
     std::size_t pos = 0;
-    while (pos + 4 <= src_size && linear.size() < total_pixels + 4) {
+    while (pos + 4 <= src_size && linear.size() < total_pixels) {
         std::uint32_t d = ReadU32LE(src + pos);
         pos += 4;
         if ((d & 0xFF000000u) == 0xFF000000u) {
-            std::uint32_t run_bytes = d & 0x0000FFFFu;
+            std::uint32_t run_bytes = d & 0x0000FFFFu;  // always a multiple of 4
             std::uint8_t pixel = static_cast<std::uint8_t>((d >> 16) & 0xFFu);
-            // run_bytes is always a multiple of 4.
             for (std::uint32_t i = 0; i < run_bytes; ++i) {
                 linear.push_back(pixel);
             }
@@ -77,20 +83,19 @@ bool SpriteBanks::DecodeRle(const std::uint8_t* src, std::size_t src_size,
             linear.push_back(static_cast<std::uint8_t>((d >> 24) & 0xFFu));
         }
     }
-    if (linear.size() < total_pixels) {
-        // pad if asset is malformed.
-        linear.resize(total_pixels, 0);
-    }
+    if (linear.size() < total_pixels) linear.resize(total_pixels, 0);
+    if (linear.size() > total_pixels) linear.resize(total_pixels);
 
     out.assign(total_pixels, 0);
 
     if (mode == 0) {
-        // Linear: row-major over WxH.
+        // Linear: byte stream is already row-major.
         std::memcpy(out.data(), linear.data(), total_pixels);
-        return true;
+        return pos;
     }
 
-    // Tile-ordered: 64x64 tiles, row-major; each tile row-major; clipped at edges.
+    // Tile-ordered: 64x64 tiles, row-major over the tile grid; each tile is
+    // also row-major within its own pixels; partial edge tiles are clipped.
     constexpr int kTile = 64;
     std::size_t lin_pos = 0;
     for (int ty = 0; ty < h; ty += kTile) {
@@ -98,14 +103,14 @@ bool SpriteBanks::DecodeRle(const std::uint8_t* src, std::size_t src_size,
         for (int tx = 0; tx < w; tx += kTile) {
             int tw = std::min(kTile, w - tx);
             for (int row = 0; row < th; ++row) {
-                if (lin_pos + tw > linear.size()) return true;
+                if (lin_pos + tw > linear.size()) return pos;
                 std::memcpy(out.data() + (ty + row) * w + tx,
                             linear.data() + lin_pos, tw);
                 lin_pos += tw;
             }
         }
     }
-    return true;
+    return pos;
 }
 
 bool SpriteBanks::LoadBank(unsigned bank) {
@@ -130,7 +135,10 @@ bool SpriteBanks::LoadBank(unsigned bank) {
     std::fclose(f);
 
     constexpr std::size_t kHeader = 344;
-    std::size_t pixel_off = static_cast<std::size_t>(count) * kHeader;
+    // Real client reads `(344 * count) + 4` bytes of header data before any
+    // pixel data — the trailing 4 bytes are filler we skip but they shift
+    // pixel offsets by 4. See clients/silencer/src/resources.cpp:56.
+    std::size_t pixel_off = static_cast<std::size_t>(count) * kHeader + 4;
     banks_[bank].resize(count);
     for (unsigned i = 0; i < count; ++i) {
         const std::uint8_t* h = data.data() + i * kHeader;
@@ -141,10 +149,17 @@ bool SpriteBanks::LoadBank(unsigned bank) {
         sp->offset_y = ReadI16LE(h + 6);
         std::uint32_t comp_size = ReadU32LE(h + 12);
         std::uint8_t mode = h[20];
-        if (pixel_off + comp_size <= data.size() && sp->w > 0 && sp->h > 0) {
-            DecodeRle(data.data() + pixel_off, comp_size, mode, sp->w, sp->h, sp->pixels);
+        // Tile-mode sprites' `comp_size` overstates the actual byte stride
+        // in some banks. DecodeRle returns the actual bytes consumed; use
+        // that to advance to the next sprite. For mode 0, consumed == comp_size.
+        std::size_t available = data.size() > pixel_off ? data.size() - pixel_off : 0;
+        std::size_t budget = std::min<std::size_t>(comp_size, available);
+        if (mode != 0) budget = available;  // tile mode: scan to fill output
+        std::size_t consumed = 0;
+        if (sp->w > 0 && sp->h > 0 && budget > 0) {
+            consumed = DecodeRle(data.data() + pixel_off, budget, mode, sp->w, sp->h, sp->pixels);
         }
-        pixel_off += comp_size;
+        pixel_off += (mode == 0) ? comp_size : consumed;
         banks_[bank][i] = std::move(sp);
     }
     return true;

@@ -6,5 +6,7 @@ Binary, little-endian, 8-bit indexed. Don't try to read these as text.
 - `BIN_TIL.DAT` + `bin_til/TIL_NNN.BIN` — tile banks (level rendering)
 - `PALETTE.BIN` — 11 sub-palettes, 256 colors × 6-bit RGB
 
-Format spec, RLE codec, and per-bank usage: `docs/design-system.md`
-(§ Asset Formats, Appendix A — Sprite Bank Manifest). Loader: `src/resources.cpp`.
+Format spec, RLE codec, and per-bank usage: `docs/design/sprite-banks.md`
+and `docs/design/palette.md` (currently main-menu subset; legacy
+monolithic spec preserved at `docs/design-system.md.archive`).
+Loader: `clients/silencer/src/resources.cpp`.

@@ -1,4 +1,8 @@
-// Button — see §Components → Button (7 variants, state machine).
+// Button widget — see docs/design/widget-button.md.
+//
+// Currently scoped to B196x33 only (the one variant the main menu uses).
+// Adding more variants later means adding rows to kVariants in button.cpp
+// and entries to ButtonType.
 #pragma once
 
 #include "widget.h"
@@ -6,26 +10,17 @@
 namespace silencer {
 
 enum class ButtonType {
-    B112x33,
     B196x33,
-    B220x33,
-    B236x27,
-    B52x21,
-    B156x21,
-    BCheckbox,
 };
 
 struct ButtonVariant {
     int width;
     int height;
-    int sprite_bank;       // 0 = no sprite (B52x21)
-    int base_index;
-    unsigned text_bank;
-    int text_advance;
-    int text_yoff;
-    int text_xoff_extra;   // +1 px for B52x21
-    bool brightness_only;  // true for B156x21 (sprite frame doesn't change)
-    bool no_anim;          // true for BCheckbox (no animation)
+    int sprite_bank;     // sprite bank for the chrome (frames base..base+4)
+    int base_index;      // INACTIVE frame index in the bank
+    unsigned text_bank;  // font bank for the label
+    int text_advance;    // px between glyph origins
+    int text_yoff;       // px down from sprite top-left to label top-left
 };
 
 const ButtonVariant& GetButtonVariant(ButtonType t);
@@ -41,12 +36,9 @@ class Button : public Widget {
     bool HitTest(int mx, int my) const override;
     void OnMouse(const MouseState& m, const DrawCtx& ctx) override;
 
-    bool clicked = false;  // edge-triggered, consume each frame
+    bool clicked = false;  // edge-triggered; caller resets each frame
     std::string text;
     ButtonType type;
-
-    // For BCheckbox.
-    bool checked = false;
 
    private:
     State state_ = kInactive;

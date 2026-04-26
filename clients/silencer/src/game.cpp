@@ -233,6 +233,38 @@ void Game::Present(void){
 		renderdevice->UploadFrame(screenbuffer.pixels.data(), screenbuffer.w, screenbuffer.h);
 		renderdevice->Present();
 	}
+	// QA dump: when SILENCER_DUMP_PATH env is set, save the indexed framebuffer
+	// as a PPM once the bank-208 logo overlay has reached its steady-state
+	// frame (idx 60), then exit. Lets design QA capture the canonical menu
+	// without macOS Screen-Recording / Spaces friction. Tied to the logo's
+	// own state_i so it doesn't drift with render rate.
+	const char * dumppath = getenv("SILENCER_DUMP_PATH");
+	if(dumppath && state == MAINMENU && !stateisnew){
+		bool logo_is_steady = false;
+		for(auto * obj : world.objectlist){
+			if(!obj) continue;
+			if(obj->type != ObjectTypes::OVERLAY) continue;
+			Overlay * ov = static_cast<Overlay *>(obj);
+			if(ov->res_bank == 208 && ov->res_index == 60){
+				logo_is_steady = true;
+				break;
+			}
+		}
+		if(logo_is_steady){
+			FILE * f = fopen(dumppath, "wb");
+			if(f){
+				fprintf(f, "P6\n%d %d\n255\n", screenbuffer.w, screenbuffer.h);
+				for(int p = 0; p < screenbuffer.w * screenbuffer.h; ++p){
+					Uint8 ix = screenbuffer.pixels[p];
+					unsigned char rgb[3] = { palettecolors[ix].r, palettecolors[ix].g, palettecolors[ix].b };
+					fwrite(rgb, 1, 3, f);
+				}
+				fclose(f);
+				fprintf(stderr, "[silencer] dumped main menu PPM to %s\n", dumppath);
+			}
+			exit(0);
+		}
+	}
 }
 
 void Game::LoadProgressCallback(int progress, int totalprogressitems){

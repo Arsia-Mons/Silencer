@@ -13,27 +13,35 @@ bool Palette::Load(const std::string& path) {
         std::fprintf(stderr, "Palette: cannot open %s\n", path.c_str());
         return false;
     }
-    // The PALETTE.BIN file is exactly 11 * 768 = 8448 bytes. The §Color System
-    // doc mentions a 4-byte header, but the asset on disk is 8448 with no
-    // leading header — 11 sub-palettes packed back to back.
-    constexpr std::size_t kSubBytes = kColorsPerPalette * 3;  // 768
-    constexpr std::size_t kTotal = kSubPaletteCount * kSubBytes;  // 8448
-
-    std::vector<std::uint8_t> buf(kTotal);
-    std::size_t got = std::fread(buf.data(), 1, kTotal, f);
+    std::fseek(f, 0, SEEK_END);
+    long file_bytes = std::ftell(f);
+    std::fseek(f, 0, SEEK_SET);
+    std::vector<std::uint8_t> buf(static_cast<std::size_t>(file_bytes));
+    std::size_t got = std::fread(buf.data(), 1, buf.size(), f);
     std::fclose(f);
-    if (got != kTotal) {
-        std::fprintf(stderr, "Palette: short read (%zu / %zu)\n", got, kTotal);
+    if (got != buf.size()) {
+        std::fprintf(stderr, "Palette: short read (%zu / %zu)\n", got, buf.size());
         return false;
     }
 
+    // Layout per clients/silencer/src/palette.cpp:43..54 — sub-palette `s`
+    // begins at `4 + s * (768 + 4)`. The first 4 bytes of the file (and the
+    // 4 between each sub-palette) are skipped. NB: the on-disk file is 8448
+    // bytes, smaller than `4 + 11*(768+4) = 8496`, so the last sub-palette
+    // reads fall partially past EOF in the real client too — we simply leave
+    // those tail bytes as zero, matching what the engine ends up with.
+    constexpr std::size_t kSubBytes = kColorsPerPalette * 3;  // 768
     for (std::size_t s = 0; s < kSubPaletteCount; ++s) {
-        const std::uint8_t* p = buf.data() + s * kSubBytes;
+        std::size_t off = 4 + s * (kSubBytes + 4);
         for (std::size_t i = 0; i < kColorsPerPalette; ++i) {
+            std::size_t base = off + i * 3;
+            std::uint8_t r = (base + 0 < buf.size()) ? buf[base + 0] : 0;
+            std::uint8_t g = (base + 1 < buf.size()) ? buf[base + 1] : 0;
+            std::uint8_t b = (base + 2 < buf.size()) ? buf[base + 2] : 0;
             // 6-bit channels (0..63) expanded to 8-bit via `v << 2`.
-            palettes_[s][i].r = static_cast<std::uint8_t>(p[i * 3 + 0] << 2);
-            palettes_[s][i].g = static_cast<std::uint8_t>(p[i * 3 + 1] << 2);
-            palettes_[s][i].b = static_cast<std::uint8_t>(p[i * 3 + 2] << 2);
+            palettes_[s][i].r = static_cast<std::uint8_t>(r << 2);
+            palettes_[s][i].g = static_cast<std::uint8_t>(g << 2);
+            palettes_[s][i].b = static_cast<std::uint8_t>(b << 2);
         }
     }
     return true;
@@ -41,7 +49,7 @@ bool Palette::Load(const std::string& path) {
 
 void Palette::IndexedToRgba(const std::uint8_t* src, std::uint32_t* dst,
                             std::size_t pixel_count) const {
-    const auto& pal = palettes_[0];
+    const auto& pal = palettes_[active_];
     for (std::size_t i = 0; i < pixel_count; ++i) {
         std::uint8_t idx = src[i];
         if (idx == 0) {

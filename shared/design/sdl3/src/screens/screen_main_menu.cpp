@@ -1,9 +1,17 @@
+// Main Menu — faithful hydration of clients/silencer/src/game.cpp::CreateMainMenuInterface.
+// See docs/design/screen-main-menu.md.
+
 #include "screen.h"
 
 #include "../font.h"
+#include "../palette.h"
 #include "../widgets/button.h"
 #include "../widgets/interface.h"
+#include "../widgets/overlay.h"
 #include "../widgets/primitives.h"
+#include "../widgets/widget.h"
+
+#include <memory>
 
 namespace silencer {
 
@@ -11,16 +19,46 @@ namespace {
 
 class MainMenuScreen : public Screen {
    public:
-    std::string Title() const override { return "Main menu (composition)"; }
+    std::string Title() const override { return "Main menu"; }
 
     void Init(const DrawCtx&) override {
-        // Vertical stack of B196x33 buttons centered.
-        int x = (640 - 196) / 2;
-        const char* labels[] = {"Play Online", "Single Player", "Options", "Quit"};
-        for (int i = 0; i < 4; ++i) {
-            iface_.Add(std::make_unique<Button>(ButtonType::B196x33, x, 200 + i * 50,
-                                                 labels[i]),
-                       true);
+        // Object 1: full-screen background plate (bank 6 idx 0, 640x480 at top-left).
+        auto bg = std::make_unique<Overlay>();
+        bg->res_bank = 6;
+        bg->res_index = 0;
+        bg->x = 0;
+        bg->y = 0;
+        iface_.Add(std::move(bg), false);
+
+        // Object 2: animated game-title logo (bank 208, idx 29..60). Position
+        // (0, 0) — sprite anchor offset places it on the upper-left half.
+        auto logo = std::make_unique<Overlay>();
+        logo->res_bank = 208;
+        logo->res_index = 29;  // initial frame; Tick() advances per docs/design/widget-overlay.md
+        logo->x = 0;
+        logo->y = 0;
+        iface_.Add(std::move(logo), false);
+
+        // Object 3: version overlay (text mode, bottom-left). Bank 133, advance 11.
+        auto ver = std::make_unique<Overlay>();
+        ver->text = "Silencer v00026";
+        ver->text_bank = 133;
+        ver->text_width = 11;
+        ver->x = 10;
+        ver->y = 480 - 10 - 7;  // matches game.cpp:2278
+        iface_.Add(std::move(ver), false);
+
+        // Objects 4..7: B196x33 buttons. Anchor coords; sprite offset
+        // (-310, -288) lands them on the right side of the framebuffer.
+        struct Btn { const char* text; int x; int y; };
+        const Btn buttons[] = {
+            {"Tutorial",         40, -134},
+            {"Connect To Lobby", 80, -67},
+            {"Options",          40, 0},
+            {"Exit",             0,  67},
+        };
+        for (const auto& b : buttons) {
+            iface_.Add(std::make_unique<Button>(ButtonType::B196x33, b.x, b.y, b.text), true);
         }
     }
 
@@ -29,25 +67,8 @@ class MainMenuScreen : public Screen {
     void OnKey(int kc) override { iface_.OnKey(kc); }
 
     void Draw(const DrawCtx& ctx) override {
-        Clear(ctx.dst, ctx.dst_w, ctx.dst_h, 2);
-        // Title
-        DrawTextOpts title;
-        title.bank = 136;
-        title.width = 25;
-        title.color = 152;  // dark red
-        title.brightness = 160;
-        title.shadow = true;
-        DrawText(ctx.dst, ctx.dst_w, ctx.dst_h, (640 - 8 * 25) / 2, 60, "SILENCER", title,
-                 *ctx.banks, *ctx.palette);
-
-        DrawTextOpts ver;
-        ver.bank = 133;
-        ver.width = 6;
-        ver.color = 189;  // orange version
-        ver.brightness = 144;
-        DrawText(ctx.dst, ctx.dst_w, ctx.dst_h, 280, 130, "v.SDL3 demo", ver, *ctx.banks,
-                 *ctx.palette);
-
+        // Black framebuffer; the bank-6 plate paints over it as the first object.
+        Clear(ctx.dst, ctx.dst_w, ctx.dst_h, 0);
         iface_.Draw(ctx);
     }
 

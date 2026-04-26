@@ -8,9 +8,29 @@
 namespace silencer {
 
 void Overlay::Tick() {
-    state_i_anim++;
-    // Apply per-bank animation rules from §Overlay.
+    // Bump first, then resolve per-bank animation rules
+    // (matches clients/silencer/src/overlay.cpp:18..79).
     switch (res_bank) {
+        case 208: {
+            // Main-menu logo: fade in 29→60 over 60 ticks, hold for 60 ticks,
+            // fade back out, loop. See docs/design/widget-overlay.md.
+            std::uint32_t s = state_i_anim;
+            int idx;
+            if (s < 60u) {
+                idx = static_cast<int>(s / 2) + 29;
+            } else if (s < 120u) {
+                idx = 60;
+            } else {
+                idx = (120 - static_cast<int>(s / 2)) + 29;
+                if (idx <= 29) {
+                    state_i_anim = static_cast<std::uint32_t>(-1);  // ++ below loops to 0
+                    idx = 29;
+                }
+            }
+            if (idx > 60) idx = 60;
+            res_index = static_cast<std::uint8_t>(idx);
+            break;
+        }
         case 54:
             res_index = static_cast<std::uint8_t>(state_i_anim % 10);
             break;
@@ -19,9 +39,8 @@ void Overlay::Tick() {
             break;
         case 57:
         case 58: {
-            std::uint32_t t = state_i_anim;
-            std::uint32_t f = t / 4;
-            if (f >= 16 && (std::rand() % 100 == 0)) state_i_anim = 0;
+            std::uint32_t f = state_i_anim / 4;
+            if (f >= 16 && (std::rand() % 100 == 0)) state_i_anim = static_cast<std::uint32_t>(-1);
             res_index = static_cast<std::uint8_t>(f > 16 ? 16 : f);
             break;
         }
@@ -34,6 +53,7 @@ void Overlay::Tick() {
             break;
         default: break;
     }
+    state_i_anim++;
 }
 
 bool Overlay::HitTest(int mx, int my) const {

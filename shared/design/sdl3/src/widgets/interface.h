@@ -1,5 +1,6 @@
-// Interface — container that owns a list of widgets, handles tab focus,
-// keyboard routing, mouse dispatch, and modal stacking.
+// Interface — container of widgets with tab focus, keyboard, and mouse
+// dispatch. Currently scoped to the main menu (no Toggle, TextInput, etc.).
+// See docs/design/widget-interface.md.
 #pragma once
 
 #include "widget.h"
@@ -10,7 +11,6 @@
 namespace silencer {
 
 class Button;
-class Toggle;
 
 class Interface {
    public:
@@ -25,13 +25,17 @@ class Interface {
         if (focusable) tab_objects_.push_back(raw);
         objects_.push_back(std::move(w));
         if (focusable && active_ == nullptr) {
+            // Per docs/design/widget-interface.md the *first* tab object is
+            // the seed for the focus pointer; the menu sets activeobject = 0
+            // afterward, but we leave it lit here so a hydration without
+            // mouse input still shows a visible focus state.
             active_ = raw;
             raw->focused = true;
         }
         return raw;
     }
 
-    // Wired buttons.
+    // Wired buttons (Enter / Escape shortcuts).
     Button* button_enter = nullptr;
     Button* button_escape = nullptr;
 
@@ -40,9 +44,6 @@ class Interface {
     void OnMouse(const MouseState& m, const DrawCtx& ctx);
     void OnKey(int sdl_keycode);
     void OnTextInput(const char* utf8);
-
-    // For radio toggle exclusion.
-    void NotifyToggleSelected(Toggle* who);
 
    private:
     std::vector<std::unique_ptr<Widget>> objects_;

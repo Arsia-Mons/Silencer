@@ -65,8 +65,11 @@ class SpriteBanks {
     std::string assets_dir_;
     bool index_loaded_{false};
 
-    bool DecodeRle(const std::uint8_t* src, std::size_t src_size, std::uint8_t mode,
-                   std::uint16_t w, std::uint16_t h, std::vector<std::uint8_t>& out) const;
+    // Returns the number of source bytes consumed (some sprite headers
+    // overstate `comp_size` for tile-mode sprites; the actual stride is
+    // however many dwords were needed to fill w*h pixels).
+    std::size_t DecodeRle(const std::uint8_t* src, std::size_t src_size, std::uint8_t mode,
+                          std::uint16_t w, std::uint16_t h, std::vector<std::uint8_t>& out) const;
 };
 
 }  // namespace silencer

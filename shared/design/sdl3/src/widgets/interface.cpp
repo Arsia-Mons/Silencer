@@ -3,8 +3,6 @@
 #include <SDL3/SDL.h>
 
 #include "button.h"
-#include "textinput.h"
-#include "toggle.h"
 
 namespace silencer {
 
@@ -19,37 +17,6 @@ void Interface::Draw(const DrawCtx& ctx) {
 void Interface::OnMouse(const MouseState& m, const DrawCtx& ctx) {
     if (disabled) return;
     for (auto& w : objects_) w->OnMouse(m, ctx);
-
-    // Toggle radio behavior: any toggle selected with set_id != 0 deselects siblings.
-    for (auto& w : objects_) {
-        Toggle* t = dynamic_cast<Toggle*>(w.get());
-        if (!t || !t->selected || t->set_id == 0) continue;
-        // We don't know who selected it this frame — easier: every frame, ensure
-        // only one toggle per set is selected (last-clicked wins via mouse loop).
-    }
-    // Defer to NotifyToggleSelected pattern; keep simple here.
-
-    // Click on a TextInput grants focus / shows caret; defocus others.
-    if (m.clicked) {
-        TextInput* clicked_input = nullptr;
-        for (auto& w : objects_) {
-            TextInput* ti = dynamic_cast<TextInput*>(w.get());
-            if (ti && ti->HitTest(m.x, m.y)) {
-                clicked_input = ti;
-                break;
-            }
-        }
-        if (clicked_input) {
-            for (auto& w : objects_) {
-                TextInput* ti = dynamic_cast<TextInput*>(w.get());
-                if (ti) {
-                    ti->show_caret = (ti == clicked_input);
-                    ti->focused = (ti == clicked_input);
-                }
-            }
-            active_ = clicked_input;
-        }
-    }
 }
 
 void Interface::OnKey(int kc) {
@@ -72,16 +39,6 @@ void Interface::OnKey(int kc) {
 void Interface::OnTextInput(const char* utf8) {
     if (disabled) return;
     if (active_) active_->OnTextInput(utf8);
-}
-
-void Interface::NotifyToggleSelected(Toggle* who) {
-    if (!who || who->set_id == 0) return;
-    for (auto& w : objects_) {
-        Toggle* t = dynamic_cast<Toggle*>(w.get());
-        if (t && t != who && t->set_id == who->set_id) {
-            t->selected = false;
-        }
-    }
 }
 
 void Interface::FocusNext(int dir) {

@@ -1,11 +1,18 @@
-// Silencer design-system SDL3 hydration — entry point + demo navigator.
+// Silencer design-system SDL3 hydration — entry point.
+//
+// Currently scoped to the main menu (see docs/design/screen-main-menu.md).
+// Adding more screens means registering more factories below.
 //
 // Controls:
-//   Left / Right arrow  — previous / next demo screen
-//   1..9, 0             — jump to numbered screen (0 = 10th)
-//   Tab / Enter / Esc   — forwarded to the active screen's Interface
-//   F                   — toggle fullscreen
-//   Q / Esc-twice       — quit
+//   Tab / Enter / Esc   forwarded to the active screen's Interface
+//   F                   toggle fullscreen
+//   Q                   quit
+//
+// Capture mode:
+//   SILENCER_DUMP_DIR=<dir> ./silencer_design <assets>
+//     Renders each screen once and writes a PPM into <dir>, then exits.
+//     Bypasses macOS Screen-Recording / Spaces friction so QA can compare
+//     against the real client's framebuffer dump.
 
 #include <SDL3/SDL.h>
 
@@ -25,14 +32,17 @@ namespace {
 constexpr int kLogicalW = 640;
 constexpr int kLogicalH = 480;
 
+// Sub-palette used by the main menu (clients/silencer/src/game.cpp:494).
+constexpr std::size_t kMenuSubPalette = 1;
+
 }  // namespace
 
 int main(int argc, char** argv) {
     using namespace silencer;
 
     // Default: walk up from build/ to repo's shared/assets/. When running from
-    // shared/design/sdl3/build/, this resolves to shared/design/assets — pass
-    // the real path on the command line if the binary is elsewhere.
+    // shared/design/sdl3/build/, this resolves to ../../assets — pass the real
+    // path on the command line if the binary is elsewhere.
     std::string assets_dir = "../../../assets/";
     if (argc >= 2) assets_dir = argv[1];
     if (!assets_dir.empty() && assets_dir.back() != '/') assets_dir += '/';
@@ -56,7 +66,6 @@ int main(int argc, char** argv) {
         SDL_Quit();
         return 1;
     }
-    // Logical 640x480 letterboxed.
     SDL_SetRenderLogicalPresentation(renderer, kLogicalW, kLogicalH,
                                      SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
@@ -70,43 +79,67 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Load assets.
     Palette palette;
     if (!palette.Load(assets_dir + "PALETTE.BIN")) {
         std::fprintf(stderr, "Failed to load palette from %s\n", assets_dir.c_str());
     }
+    palette.SetActive(kMenuSubPalette);  // main menu uses sub-palette 1
+
     SpriteBanks banks;
     if (!banks.LoadIndex(assets_dir)) {
         std::fprintf(stderr, "Failed to load BIN_SPR.DAT from %s\n", assets_dir.c_str());
     }
-    // Eagerly load the banks the demo touches.
-    const unsigned wanted_banks[] = {
-        6, 7, 40, 54, 56, 57, 58, 94, 95, 102, 103, 132, 133, 134, 135, 136,
-        153, 171, 177, 178, 181, 188, 208, 222};
+    // Banks the main menu touches (see docs/design/sprite-banks.md).
+    const unsigned wanted_banks[] = {6, 132, 133, 134, 135, 136, 208};
     for (unsigned b : wanted_banks) banks.LoadBank(b);
 
     SDL_StartTextInput(window);
 
-    // Build screens.
     std::vector<std::unique_ptr<Screen>> screens;
-    screens.push_back(MakePaletteScreen());
-    screens.push_back(MakeTypographyScreen());
-    screens.push_back(MakeButtonsScreen());
-    screens.push_back(MakeInputsScreen());
-    screens.push_back(MakeSelectBoxScreen());
-    screens.push_back(MakeOverlayScreen());
-    screens.push_back(MakePanelScreen());
-    screens.push_back(MakeModalScreen());
-    screens.push_back(MakeLoadingScreen());
-    screens.push_back(MakeHudScreen());
-    screens.push_back(MakeMinimapScreen());
     screens.push_back(MakeMainMenuScreen());
-    screens.push_back(MakeLobbyScreen());
-    screens.push_back(MakeBuyMenuScreen());
 
     int current = 0;
 
-    // 8-bit indexed framebuffer + RGBA scratch.
+    if (const char* dump_dir = std::getenv("SILENCER_DUMP_DIR")) {
+        std::vector<std::uint8_t> dfb(kLogicalW * kLogicalH, 0);
+        std::vector<std::uint32_t> drgba(kLogicalW * kLogicalH, 0);
+        DrawCtx dctx{dfb.data(), kLogicalW, kLogicalH, &banks, &palette, 0};
+        for (auto& s : screens) s->Init(dctx);
+        for (std::size_t i = 0; i < screens.size(); ++i) {
+            // Tick 120 times so the bank-208 logo reaches its steady-state
+            // frame (idx 60). The real client's dump fires after 8 frames in
+            // MAINMENU which is mid-fade-in; we bias the hydration toward the
+            // hold frame so QA compares like-for-like at the visually
+            // canonical logo. Mismatches in animation timing aren't part of
+            // the component-fidelity gate.
+            for (int t = 0; t < 120; ++t) screens[i]->Tick();
+            dctx.state_i = 120;
+            Clear(dfb.data(), kLogicalW, kLogicalH, 0);
+            screens[i]->Draw(dctx);
+            palette.IndexedToRgba(dfb.data(), drgba.data(), dfb.size());
+            char path[1024];
+            std::snprintf(path, sizeof(path), "%s/screen_%02zu.ppm", dump_dir, i);
+            if (FILE* f = std::fopen(path, "wb")) {
+                std::fprintf(f, "P6\n%d %d\n255\n", kLogicalW, kLogicalH);
+                for (int p = 0; p < kLogicalW * kLogicalH; ++p) {
+                    std::uint32_t px = drgba[p];
+                    unsigned char rgb[3] = {
+                        static_cast<unsigned char>(px & 0xff),
+                        static_cast<unsigned char>((px >> 8) & 0xff),
+                        static_cast<unsigned char>((px >> 16) & 0xff)};
+                    std::fwrite(rgb, 1, 3, f);
+                }
+                std::fclose(f);
+                std::printf("dumped %s (%s)\n", path, screens[i]->Title().c_str());
+            }
+        }
+        SDL_DestroyTexture(tex);
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 0;
+    }
+
     std::vector<std::uint8_t> fb(kLogicalW * kLogicalH, 0);
     std::vector<std::uint32_t> rgba(kLogicalW * kLogicalH, 0);
 
@@ -123,7 +156,6 @@ int main(int argc, char** argv) {
     bool mouse_was_down = false;
 
     while (running) {
-        // Drain events.
         SDL_Event e;
         mouse.clicked = false;
         mouse.wheel = 0;
@@ -134,25 +166,13 @@ int main(int argc, char** argv) {
                     break;
                 case SDL_EVENT_KEY_DOWN: {
                     int kc = e.key.key;
-                    if (kc == SDLK_LEFT) {
-                        current = (current - 1 + (int)screens.size()) % (int)screens.size();
-                    } else if (kc == SDLK_RIGHT) {
-                        current = (current + 1) % (int)screens.size();
-                    } else if (kc == SDLK_F) {
+                    if (kc == SDLK_F) {
                         fullscreen = !fullscreen;
                         SDL_SetWindowFullscreen(window, fullscreen);
                     } else if (kc == SDLK_Q) {
                         running = false;
                     } else {
-                        // Forward number keys 1..9, 0
-                        if (kc >= SDLK_1 && kc <= SDLK_9) {
-                            int n = kc - SDLK_1;
-                            if (n < (int)screens.size()) current = n;
-                        } else if (kc == SDLK_0) {
-                            if (10 <= (int)screens.size()) current = 9;
-                        } else {
-                            screens[current]->OnKey(kc);
-                        }
+                        screens[current]->OnKey(kc);
                     }
                     break;
                 }
@@ -188,7 +208,6 @@ int main(int argc, char** argv) {
             }
         }
 
-        // Tick the simulation at ~24 Hz.
         Uint64 now = SDL_GetTicks();
         while (now - last_tick_ms >= kTickMs) {
             state_i++;
@@ -197,27 +216,13 @@ int main(int argc, char** argv) {
         }
         ctx.state_i = state_i;
 
-        // Forward mouse input each frame to current screen.
         screens[current]->OnMouse(mouse, ctx);
 
-        // Render.
         Clear(fb.data(), kLogicalW, kLogicalH, 0);
         screens[current]->Draw(ctx);
 
-        // Footer / navigator label.
-        char footer[128];
-        std::snprintf(footer, sizeof(footer), "[%d/%zu] %s   <-/-> change   F=fullscreen   Q=quit",
-                      current + 1, screens.size(), screens[current]->Title().c_str());
-        DrawTextOpts fopt;
-        fopt.bank = 133;
-        fopt.width = 6;
-        fopt.brightness = 144;
-        DrawText(fb.data(), kLogicalW, kLogicalH, 4, kLogicalH - 12, footer, fopt, banks, palette);
-
-        // Indexed -> RGBA.
         palette.IndexedToRgba(fb.data(), rgba.data(), fb.size());
 
-        // Push to texture and present.
         SDL_UpdateTexture(tex, nullptr, rgba.data(), kLogicalW * 4);
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
