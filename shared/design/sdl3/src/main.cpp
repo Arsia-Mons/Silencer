@@ -848,12 +848,14 @@ static int RunDumpLobby(const std::string &assets_dir,
     return 1;
   }
 
-  // Bank set planned ahead: 7 (panel idx 1 + B156x21 chrome — TBD),
-  // 133 (small version-text font), 135 (header / button-label font).
-  // Y0 doesn't render any of these yet; loading them now locks in the
-  // bank set so subsequent iterations are pure rendering additions.
+  // Bank set: 7 (panel idx 1 + B156x21 chrome at idx 24),
+  // 133 ("v.<version>" header text, advance 6),
+  // 134 (B156x21 "Go Back" button label, advance 8 per widget-button.md
+  //      archive — different from prior screens which used 135/advance 11
+  //      for B196x33/B112x33/B220x33),
+  // 135 ("Silencer" header text, advance 11).
   SpriteSet sprites;
-  std::vector<int> banks = {7, 133, 135};
+  std::vector<int> banks = {7, 133, 134, 135};
   if (!sprites.Load(assets_dir, banks)) {
     SDL_Quit();
     return 1;
@@ -876,6 +878,49 @@ static int RunDumpLobby(const std::string &assets_dir,
   // (0,0)). Codec branch already validated for bank-7 frames.
   if (sprites.Has(7, 1)) {
     BlitSprite(fb, sprites.Get(7, 1), 0, 0, nullptr);
+  }
+
+  // Y2: Header bar overlays (drawn over the panel chrome).
+  //
+  //   "Silencer" overlay at literal (15, 32) — text-mode, bank 135 advance 11.
+  //   "v.<world.version>" overlay at literal (115, 39) — bank 133 advance 6.
+  //   Map name overlay at (180, 32) is empty on the canonical dump (no map
+  //     selected pre-Join Game) — skip.
+  //   B156x21 "Go Back" button at anchor (473, 29) — sprite chrome at
+  //     bank 7 idx 24, label bank 134 advance 8, text yoff=4. INACTIVE:
+  //     res_index=24, brightness=128 (per docs/design-system.md.archive).
+  //
+  // The spec lists `effectcolor` values (152 / 189 / 129) for the header
+  // overlays, but DrawText() in this hydration doesn't yet model
+  // effectcolor — every prior screen has rendered with brightness=128 only
+  // and matched the reference. The font glyphs in banks 133/134/135 carry
+  // their canonical palette indices baked in, and the lobby reference dump
+  // is gated structurally — if a residual color drift shows up at Y3, the
+  // fix is to extend DrawText, not to patch Y2.
+  DrawText(fb, 15, 32, "Silencer", /*bank=*/135, /*advance=*/11, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 115, 39, "v.00028", /*bank=*/133, /*advance=*/6, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+
+  // B156x21 Go Back button. Bank 7 idx 24 chrome + bank 134 advance 8 label.
+  {
+    constexpr int kGoBackX = 473;
+    constexpr int kGoBackY = 29;
+    constexpr int kB156Base = 24;
+    constexpr int kB156Width = 156;
+    constexpr int kB156Advance = 8;
+    constexpr int kB156Yoff = 4;
+    if (sprites.Has(7, kB156Base)) {
+      const Sprite &chrome = sprites.Get(7, kB156Base);
+      BlitSprite(fb, chrome, kGoBackX, kGoBackY, nullptr);
+      const char *text = "Go Back";
+      int len = static_cast<int>(std::strlen(text));
+      int xoff = (kB156Width - len * kB156Advance) / 2;
+      int textX = kGoBackX - chrome.offset_x + xoff;
+      int textY = kGoBackY - chrome.offset_y + kB156Yoff;
+      DrawText(fb, textX, textY, text, /*bank=*/134, /*advance=*/kB156Advance,
+               sprites, palette, kSubLobby, /*brightness=*/128);
+    }
   }
 
   std::filesystem::create_directories(dump_dir);

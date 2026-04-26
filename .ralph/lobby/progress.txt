@@ -5,6 +5,7 @@
 - Screen-switch additive pattern (D0/A0/O0/C0/L0) holds for screen #7: one new `if (screen_str == "lobby")` branch in `main()` plus a sibling `RunDumpLobby(...)` function. All six prior reference baselines stay byte-exact (main 2,136 / options 1,758 / audio 1,035 / display 2,211 / controls 3,729 / lobby_connect 4,897). The "additive screen" pattern is now confirmed across **two** sub-palette boundaries (1→2 introduced at LOBBYCONNECT L0, re-used here at Y0) and seven distinct screen-builders with zero shared-infra churn between iterations.
 - LOBBY bank set planned ahead at Y0: `{7, 133, 135}`. Bank 7 (panel idx 1, distinct from idx 2 LOBBYCONNECT and idx 7 CONTROLS, and likely B156x21 chrome at some idx). Bank 133 (small `v.<version>` text in header at advance 6). Bank 135 (header "Silencer" text + Go Back button label, both advance 11 by analogy with main-menu / options-family button labels). NO bank 134: spec doesn't list any w=9 small label font on this screen — only the four header overlays + the Go Back button. NO bank 6 (no starfield bg — the bank-7 idx-1 panel covers the entire framebuffer per spec §"What's NOT on this screen").
 - Bank-7 idx-1 panel sprite (LOBBY) confirmed at Y1 to be a **fullscreen** chrome that includes corner LED ornaments at all four corners + a row of mid-screen LEDs at top and bottom, plus the framing borders for all three sub-interfaces (CharacterInterface left, GameSelectInterface right with Create Game / Active Games tab tabs visible, ChatInterface bottom-left), plus the header-bar separator. Single `BlitSprite(fb, sprites.Get(7,1), 0, 0, nullptr)` reproduces the entire panel exactly — no per-region compositing needed. The bank-7 codec branch (validated at LOBBYCONNECT L2 for idx 2 and OPTIONSCONTROLS C2 for idx 7) generalises perfectly to idx 1 with zero codec risk. Confirms hypothesis that bank-7 indices are independent fullscreen panel chromes, one per non-menu screen.
+- B156x21 confirmed at Y2: sprite chrome at **bank 7 idx 24** (not bank 6 like all other B-series buttons), label font **bank 134 advance 8** with **yoff=4** (vs the prior B196x33/B112x33/B220x33 family's bank-135/advance-11/yoff-8). First B-series variant in this hydration to live in bank 7 alongside the panel chromes — confirms the archive table's "Sprite Bank: 7" entry. Anchor convention identical to every other sprite-backed button (top_left = anchor − sprite.offset; centering xoff = (156 − len*8)/2). At INACTIVE, `res_index = base = 24` and `brightness = 128` — the per-tick state-machine entry "B156x21: brightness animates, but res_index stays fixed at 24" only matters during hover, not at dump time. The header overlays ("Silencer" bank 135 advance 11; "v.00028" bank 133 advance 6) render correctly with brightness=128 only — DrawText still doesn't model `effectcolor`, and the spec-listed values (152 / 189) didn't introduce a visible drift in the chrome region, confirming the prior screens' empirical finding that font glyphs in banks 133/134/135 carry their canonical palette indices baked in for chrome-region purposes.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -171,4 +172,100 @@
     screen, the bank-7 panel render alone closes ~90% of the visual
     diff, with the remaining ~10% split between text overlays
     (gateable) and runtime-data interiors (non-gateable for chrome).
+---
+
+## 2026-04-26T16:25:00Z — iter 3 (Y2 PASS)
+- Added the four header-bar overlays inside `RunDumpLobby`, drawn in
+  z-order over the bank-7 idx-1 panel chrome rendered at Y1:
+  * "Silencer"  — text-mode at literal (15, 32), bank 135 advance 11.
+  * "v.00028"   — text-mode at literal (115, 39), bank 133 advance 6.
+    (Static engine `world.version` value matches the canonical dump.)
+  * Map-name overlay at (180, 32) — empty on canonical dump (no map
+    selected pre-Join Game), so omitted entirely. Will populate
+    runtime-side on a real client; non-gating here.
+  * B156x21 "Go Back" button at anchor (473, 29) — sprite chrome
+    bank 7 idx 24, label bank 134 advance 8 yoff=4, INACTIVE
+    (brightness=128).
+- Bank set: extended from {7, 133, 135} → {7, 133, 134, 135}. Bank 134
+  is needed *only* for the Go Back label (advance 8, the B156x21
+  variant's text bank), not for any body label — LOBBY's chrome scope
+  has no body labels.
+- Build: `cmake --build shared/design/sdl3/build` exits 0; AppleClang 17;
+  only `main.cpp` recompiled + relink.
+- Dump: `SILENCER_DUMP_SCREEN=lobby SILENCER_DUMP_DIR=/tmp/sdl3_dump
+  shared/design/sdl3/build/silencer_design "$(pwd)/shared/assets"` writes
+  `/tmp/sdl3_dump/screen_00.ppm` (P6, 640x480, 921615 bytes — canonical
+  PPM size invariant unchanged).
+- Bytewise diff vs `/tmp/real_lobby_dump.ppm`: 28,225 bytes (~3.06%),
+  down from Y1's 32,899 bytes (~3.57%). The header bar closes ~4.7k
+  bytes; the remainder is sub-interface interiors (out of scope):
+  Create Game / Active Games tab labels in GameSelectInterface, planet
+  visual + game list rows, agency icons + character stats in
+  CharacterInterface, chat scrollback in ChatInterface, "Join Game"
+  B156x21 button at the bottom-right of GameSelectInterface (also
+  technically a B156x21 chrome but inside a sub-interface region —
+  reserved for `screen-lobby-gameselect.md`'s future Ralph).
+- Visual A/B (Discord DM 1498102916391899246): candidate now shows the
+  full LOBBY chrome + the four-element header bar in correct positions
+  matching the reference pixel-coincident in the chrome+header region.
+  Sub-interface interiors remain empty in the candidate — exactly the
+  chrome-only scope this Ralph gates.
+- Regression sweep — bytewise diffs vs `/tmp/real_<screen>_dump.ppm`
+  for all five screens with available reference dumps:
+  * options          1,758 bytes (exact baseline — unchanged)
+  * options_audio    1,035 bytes (exact baseline — unchanged)
+  * options_display  2,211 bytes (exact baseline — unchanged)
+  * options_controls 3,729 bytes (exact baseline — unchanged)
+  * lobby_connect    4,897 bytes (exact baseline — unchanged)
+  (`main_menu` reference dump not present in `/tmp/`; renderer
+  unchanged so no regression risk on that path.)
+  All five at byte-identical baselines. Y2's edits are confined to
+  `RunDumpLobby` — every other screen-builder is untouched.
+- Files touched: `shared/design/sdl3/src/main.cpp` (extend bank set
+  to add 134, plus four overlay calls + B156x21 sprite blit in
+  `RunDumpLobby`), `.ralph/lobby/prd.json` (Y2 → passes:true),
+  `.ralph/lobby/progress.txt` (this entry + one Codebase Patterns line).
+- Spec gaps encountered (carry-forward):
+  - `widget-button.md` — should add B156x21 (this Ralph empirically
+    validated bank 7 idx 24, font 134 advance 8 yoff=4 from the
+    archive's table).
+  - `palette.md` — sub-palette 2 should explicitly be "lobby palette".
+  - `sprite-banks.md` — bank 7 idx 24 is the B156x21 chrome (vs
+    idx 1/2/7 which are screen-specific panels). Co-document.
+  - DrawText hydration doesn't yet implement `effectcolor` — the
+    spec-listed 152/189/129 values would be the load-bearing extension
+    if a chrome-region color drift appears at Y3. Empirically clean
+    at Y2.
+- **Learnings:**
+  - **The B-series button family splits into two sprite-bank cohorts.**
+    Bank 6 hosts the menu-family chromes (B196x33, B220x33, B112x33,
+    B236x27 — all the sizes the menu screens use). Bank 7 hosts the
+    lobby-family chromes (B156x21 idx 24, plus likely future widgets
+    that share lobby-screen aesthetics). The split is functional, not
+    arbitrary: bank 6 gets co-loaded by every menu screen because it
+    *also* contains the starfield idx 0; bank 7 gets co-loaded by every
+    non-menu screen because it *also* contains the full-screen panel
+    chromes (idx 1 LOBBY, idx 2 LOBBYCONNECT, idx 7 OPTIONSCONTROLS).
+    LOBBY is the first screen in this hydration to load both cohorts'
+    button chromes simultaneously? **No** — only bank 7's. Confirms
+    that each non-menu screen's button cohort is bank-7-only at the
+    chrome level; bank 6 is purely the menu starfield + B-series here.
+  - **The "Y2 closes ~17% of the residual"** pattern (Y1 took 37→3.6%,
+    Y2 took 3.6→3.06%). This is sub-linear because the chrome scope
+    for LOBBY is unusually small relative to the rest of the screen:
+    the panel chrome already provides every sub-interface bounding
+    rectangle for free, so the only chrome-overlay work left is the
+    header bar (≈4 elements). Compare LOBBYCONNECT where L3+L4 closed
+    the form composition (≈8 elements: 2 labels + 2 input fields +
+    multi-line textbox content + 2 B52x21 buttons + button labels).
+    Smaller chrome ⇒ smaller incremental Y2 win; the *absolute* diff
+    (28k bytes) is now the runtime-data lower bound for this dump.
+  - **Bank 134 advance 8 is a NEW font/advance combination** for this
+    hydration. Prior screens used bank 134 only at advance 9 (CONTROLS
+    keyname labels) or advance 10 (CONTROLS row labels). Confirms that
+    `advance` is a per-USAGE parameter, not a per-bank constant —
+    bank 134 contains the same glyph atlas, but different widgets
+    march through it at different per-glyph advances (8 / 9 / 10).
+    The `xc += advance` loop in `font.cpp` is the only place this
+    matters; no codec/font infra change needed.
 ---

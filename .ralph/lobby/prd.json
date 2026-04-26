@@ -25,7 +25,7 @@
       "id": "Y2",
       "name": "Header bar correct (Silencer + version + map name + Go Back)",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "spec": "Header at top of screen: 'Silencer' overlay at (15, 32) using textbank 135 / textwidth 11 / effectcolor 152; 'v.<version>' overlay at (115, 39) using textbank 133 / textwidth 6 / effectcolor 189; map name overlay at (180, 32) (empty on dump); B156x21 'Go Back' button at (473, 29). Per docs/design/screen-lobby.md.",
       "category": "composition"
     },
