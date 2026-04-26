@@ -40,7 +40,7 @@
       "id": "S0",
       "name": "Sprite codec correct (shapes recognizable)",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "spec": "Logo and button pill shapes are recognizable, not garbled. RLE decode (linear and tile mode) matches docs/design/sprite-banks.md including the +4 filler and per-tile traversal.",
       "category": "sprite_codec"
     },

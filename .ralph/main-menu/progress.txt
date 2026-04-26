@@ -9,6 +9,7 @@
 - Run dump as `SILENCER_DUMP_DIR=/tmp/sdl3_dump ./shared/design/sdl3/build/silencer_design "$(pwd)/shared/assets"` from the worktree root.
 - PALETTE.BIN actual layout is `color_offset(s) = 8 + s * 768` (NOT spec's `8 + s*772`); 8-byte file prefix, 11 contiguous 768-byte color blocks, last sub-palette over-reads file by 8 bytes (zero-fill).
 - DrawText with brightness == 128 doesn't read the palette at all — it skips the brightness-LUT path and blits sprite indices verbatim. Useful diagnostic: render the same FB through multiple sub-palettes by calling WritePPM repeatedly with different `active_sub` arguments.
+- Sprite RLE codec (linear + tile mode + `+4` filler) and `Get(bank, idx)` dispatch in shared/design/sdl3/src/sprite.cpp render bank-6 (background plate, tile mode), bank-208 (logo, with idx-60 hold animation), bank-196 (B196x33 button pills, RLE), and font banks 132–136 — all four shape classes — without garble at the post-P0 candidate. No codec rework needed for main-menu.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -76,4 +77,20 @@
   - Best diagnostic for "palette layout is wrong" is dumping the *same* indexed framebuffer through ALL 11 sub-palettes (and under multiple offset hypotheses) and visually picking the right combination. Cheap to build (one extra loop in main.cpp), turns a multi-day debugging spiral into a 10-minute eyeball.
   - File-size-divides-cleanly is a strong but NOT decisive signal: 8448 = 11×768 exactly suggests stride 768, but that doesn't pin down whether there's a 0/4/8/12-byte prefix — three of those four prefix sizes give plausible-looking palettes for sub-palette 0 (a smooth grayscale ramp). Empirical color verification at a known sub-palette index against the reference is the disambiguator.
   - The actual file prefix is **8 bytes**, not 4 — the spec's "4-byte file prefix + 4-byte sub-0 header" is more accurately read as "8-byte file prefix" since there are no further per-sub headers. Same bytes in the file, different interpretation.
+---
+
+## 2026-04-26T14:10:00Z — S0
+- No code changes required: P0's palette-loader fix already revealed that the underlying sprite codec (linear RLE + tile-mode RLE + per-sprite `+4` filler) was decoding cleanly all along; the previous "garbled" appearance was entirely a palette-resolution artifact masking otherwise-correct pixel indices. S0 is a verification-only flip post-P0.
+- Visual A/B (`/tmp/sdl3_dump/screen_00.png` vs `/tmp/real_dump.png`):
+  - Bank-6 idx-0 background plate (tile-mode RLE): smooth starfield + planet gradient, no per-tile boundary seams, no scrambled internals.
+  - Bank-208 logo (linear RLE, idx-60 hold): SILENCER glyphs are clean, terminal circles + "+" connectors at the ends are intact, no row drift, no RLE-run overruns.
+  - Bank-196 B196x33 button pills (linear RLE, four instances): all four pills have continuous outlines with the dot ornaments at their poles + crossbar through the body; no torn or repeated regions.
+  - Font banks 132–136 ("Silencer v0002A" + four button labels): glyph internals readable, no `+4 filler` mis-skip, no partial-edge tile-width math errors.
+- Files touched: `.ralph/main-menu/prd.json` (S0 → passes:true), `.ralph/main-menu/progress.txt` (this entry + one Codebase Patterns line).
+- Visual diff summary: **none** in the sprite_codec layer per the visual-regression-testing skill's diff table. Remaining cosmetic differences between candidate and reference are at most subpixel / star-field-RNG / animation-phase nits and belong to A0 / F0's gates if anywhere.
+- Spec gaps encountered: none for S0. `docs/design/sprite-banks.md` is sufficient to drive a correct decoder; the implementation in shared/design/sdl3/src/sprite.cpp matches its description and produces clean output across all four shape classes the main menu uses.
+- **Learnings:**
+  - When the layer-1 palette is wrong, EVERY higher layer's bug-or-correctness is unobservable. Once palette is fixed, downstream items frequently flip "free" — both C0 and S0 in this Ralph took zero code changes once their respective upstream gates (B1, P0) cleared. Order of priorities in the prd matters: B → C → P → S keeps invisibility-cascades minimal.
+  - `palette wrong` and `codec wrong` look superficially identical in a side-by-side: in both cases shapes are recognizable but tinted oddly, with internal "stripes" that could be either RLE artifacts or a wrong sub-palette. The disambiguator is whether the **stripes follow object boundaries** (codec issue, e.g. RLE row-stride mismatch) or **whole regions are uniformly wrong** (palette issue). The candidate's pre-P0 dump had whole-region wrongness → palette, not codec.
+  - `B0 → B1 → C0 → P0 → S0` is the canonical Silencer rebuild order: build, run, see-everything, color-correct, codec-correct. Future hydrations of other screens (lobby, buy menu, in-game HUD) can follow the same pipeline; only T0 / A0 / F0 are screen-specific.
 ---

@@ -11,3 +11,8 @@ Remaining open items: C0, P0, S0, T0, A0, F0.
 --- Iteration 3 2026-04-26 13:49:36 ---
 C0 flipped. Remaining: P0, S0, T0, A0, F0. Next iteration picks up at P0 (palette / sub-palette 1).
 
+--- Iteration 4 2026-04-26 14:06:04 ---
+P0 done. Stop check: prd.json still has S0/T0/A0/F0 at `passes: false`, so the loop continues.
+
+**Iteration summary:** PALETTE.BIN offset formula was wrong in the candidate (and in `docs/design/palette.md`). Fixed `palette.cpp` from `8 + s*772` → `8 + s*768` (8-byte prefix, 11 × 768-byte contiguous blocks, no per-sub headers). Sub-palette 1 now resolves to the reference's green-on-black main-menu look exactly. Spec gap documented in code + progress.txt. Discord DM sent. One commit, P0 flipped.
+
