@@ -3134,7 +3134,7 @@ Interface * Game::CreateGameCreateInterface(void){
 	}
 	// Add server-only maps (not yet downloaded) with a download prefix
 	servermaps.clear();
-	auto serverlist = FetchServerMapList(SILENCER_MAP_API_URL);
+	auto serverlist = FetchServerMapList(Config::GetInstance().mapapiurl);
 	for(auto & entry : serverlist){
 		bool alreadylocal = std::find(maps.begin(), maps.end(), entry.first) != maps.end();
 		if(!alreadylocal){
@@ -4298,7 +4298,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 												snprintf(selectbox->downloaditem, sizeof(selectbox->downloaditem), "%s", dlname.c_str());
 												selectbox->downloadprogress = 0;
 												if(dlthread.joinable()) dlthread.join();
-												std::string apiURL = SILENCER_MAP_API_URL;
+												std::string apiURL = Config::GetInstance().mapapiurl;
 												dlthread = std::thread([this, dlname, sha1bytes, apiURL]() mutable {
 													std::string res = FetchMapFromServer(dlname.c_str(), sha1bytes, apiURL.c_str(), &dlprogress);
 													dlresult.store(res.empty() ? -1 : 1);
@@ -5761,7 +5761,7 @@ void Game::ProcessMapDownload(void){
 						mapfilename = FetchMapFromServer(
 							world.gameinfo.mapname,
 							world.gameinfo.maphash,
-							SILENCER_MAP_API_URL);
+							Config::GetInstance().mapapiurl);
 					}
 					if(mapfilename.size() > 0){
 						world.SendMapDownloaded();

@@ -21,6 +21,7 @@ public:
 	Uint8 defaultagency;
 	char lobbyhost[256];
 	int lobbyport;
+	char mapapiurl[512];
 	char defaultgamename[64];
 	Uint32 defaulttechchoices[5];
 	SDL_Scancode keymoveupbinding[2]; bool keymoveupoperator;
