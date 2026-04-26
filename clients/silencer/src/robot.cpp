@@ -115,11 +115,13 @@ void Robot::InitBT() {
 		return BTResult::Success;
 	};
 
-	// Sleep: from WALKING when non-patrol and walk timer expired.
+	// Sleep: from WALKING when non-patrol, walk timer expired, and no target visible.
 	btctx_.actions["Sleep"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		if (patrol) return BTResult::Failure;
 		if (state_i < 100) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		if (Look(world, 1) || Look(world, 2)) return BTResult::Failure;
 		state = SLEEPING;
 		state_i = -1;
 		return BTResult::Success;
