@@ -32,7 +32,7 @@
       "id": "C3",
       "name": "Key labels populated correctly (rows 0..5: Move Up..Aim Up/Right)",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "spec": "Row labels and key contents match the reference per docs/design/screen-options-controls.md table: rows 0..3 Move Up/Down/Left/Right with Up/Down/Left/Right key1 + OR connector + empty key2; rows 4..5 Aim Up/Left + Aim Up/Right with Up key1 + AND connector + Left/Right key2.",
       "category": "tile_arithmetic"
     },

@@ -576,15 +576,17 @@ static int RunDumpOptionsControls(const std::string &assets_dir,
   //    Per-row content (button labels Up/Down/.../Left/Right) is C3's gate.
   struct ControlsRow {
     const char *label;
+    const char *key1;
     const char *connector;
+    const char *key2;
   };
   const std::array<ControlsRow, 6> rows = {{
-      {"Move Up:", "OR"},
-      {"Move Down:", "OR"},
-      {"Move Left:", "OR"},
-      {"Move Right:", "OR"},
-      {"Aim Up/Left:", "AND"},
-      {"Aim Up/Right:", "AND"},
+      {"Move Up:", "Up", "OR", ""},
+      {"Move Down:", "Down", "OR", ""},
+      {"Move Left:", "Left", "OR", ""},
+      {"Move Right:", "Right", "OR", ""},
+      {"Aim Up/Left:", "Up", "AND", "Left"},
+      {"Aim Up/Right:", "Up", "AND", "Right"},
   }};
 
   constexpr int kRowStride = 53;
@@ -596,6 +598,9 @@ static int RunDumpOptionsControls(const std::string &assets_dir,
   constexpr int kConnectorX = 383;
   constexpr int kConnectorW = 40;
   constexpr int kB112Base = 28;
+  constexpr int kB112Width = 112;
+  constexpr int kButtonAdvance = 11;
+  constexpr int kButtonYoff = 8;
   constexpr int kSmallAdvance = 10;
   constexpr int kConnectorAdvance = 9;
 
@@ -609,9 +614,20 @@ static int RunDumpOptionsControls(const std::string &assets_dir,
              /*advance=*/kSmallAdvance, sprites, palette, kSubMenu,
              /*brightness=*/128);
 
-    // Key1 button chrome (no text — that's C3).
+    // Key1 button chrome + label.
     if (sprites.Has(6, kB112Base)) {
-      BlitSprite(fb, sprites.Get(6, kB112Base), kKey1X, by, nullptr);
+      const Sprite &chrome = sprites.Get(6, kB112Base);
+      BlitSprite(fb, chrome, kKey1X, by, nullptr);
+      const char *text = rows[i].key1;
+      int klen = static_cast<int>(std::strlen(text));
+      if (klen > 0) {
+        int xoff = (kB112Width - klen * kButtonAdvance) / 2;
+        int textX = kKey1X - chrome.offset_x + xoff;
+        int textY = by - chrome.offset_y + kButtonYoff;
+        DrawText(fb, textX, textY, text, /*bank=*/135,
+                 /*advance=*/kButtonAdvance, sprites, palette, kSubMenu,
+                 /*brightness=*/128);
+      }
     }
 
     // BNONE connector text, centered within (kConnectorX, ty, w=40, h=30).
@@ -623,9 +639,20 @@ static int RunDumpOptionsControls(const std::string &assets_dir,
                kSubMenu, /*brightness=*/128);
     }
 
-    // Key2 button chrome (no text — that's C3).
+    // Key2 button chrome + label (key2 may be empty for OR rows).
     if (sprites.Has(6, kB112Base)) {
-      BlitSprite(fb, sprites.Get(6, kB112Base), kKey2X, by, nullptr);
+      const Sprite &chrome = sprites.Get(6, kB112Base);
+      BlitSprite(fb, chrome, kKey2X, by, nullptr);
+      const char *text = rows[i].key2;
+      int klen = static_cast<int>(std::strlen(text));
+      if (klen > 0) {
+        int xoff = (kB112Width - klen * kButtonAdvance) / 2;
+        int textX = kKey2X - chrome.offset_x + xoff;
+        int textY = by - chrome.offset_y + kButtonYoff;
+        DrawText(fb, textX, textY, text, /*bank=*/135,
+                 /*advance=*/kButtonAdvance, sprites, palette, kSubMenu,
+                 /*brightness=*/128);
+      }
     }
   }
 

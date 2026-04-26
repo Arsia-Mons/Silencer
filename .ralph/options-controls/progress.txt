@@ -8,6 +8,7 @@
 - Bank 7 idx 7 frame panel sprite is FULL-SCREEN composite: it bakes in (a) outer green-bevel border with corner caps, (b) the centered "Configure Controls" title-plate cutout at top, (c) inner-frame divider, AND (d) the **scrollbar track + both chevron caps** at the right edge. Only the moveable scrollbar **thumb** needs a separate render in C4. This means C4's payload is a single bank-7 idx-10 thumb blit at the track's top — meaningfully smaller than the spec's "track + thumb + chevrons" framing implied. Codec branch: tile-mode RLE; decodes correctly with no codec changes.
 - BNONE connector text is centered horizontally inside its w=40 bbox via `xoff = (40 - len*advance)/2` with advance=9 (font 134), but Y-anchored at the spec's literal `y = 95+i*53` (text TOP, not vertical-centered in the 30px box). Same Y-baseline as the row label at (80, 95+i*53), which is what makes the row label and the OR/AND connector appear on the same visual baseline in the reference. Treating the BNONE bbox y as text-top (not center) matched the reference exactly.
 - Six-row form pattern (C2) reuses the OPTIONSAUDIO/OPTIONSDISPLAY rows-array idiom: one `std::array<ControlsRow, 6>` of `{label, connector}` pairs + a single `for` loop that draws label + key1 chrome + connector + key2 chrome per iteration. Total composition payload: 6 row-label DrawTexts + 12 B112x33 BlitSprites + 6 connector DrawTexts + 1 title DrawText = 25 calls, written as 1 hard-coded block. Free-flip cascade pattern (one builder pass enumerating all spec objects → downstream gates audit by visual A/B) applies as expected.
+- B112x33 button-label rendering follows the same convention as B196x33 / B220x33 with only the width changing: `xoff = (112 - len*11)/2`, `yoff = 8`, font bank 135 advance 11, brightness 128 (INACTIVE). Empty key2 (rendered as zero-length string on Move rows) draws chrome only — guarded by `if (klen > 0) DrawText(...)`. Per-archive:633 row, B112x33 lives at bank 6 idx 28; the row's text-bank is 135 not 134 (134 is for keyname overlay labels and OR/AND connectors only — the **inside** of the B112x33 chrome uses the standard large button font, same as Save / Cancel / Music etc.).
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -203,4 +204,68 @@
     every diffed pixel is in a region intentionally blank at this iter.
     Pattern: "diff size ≠ correctness when missing widgets account for
     the diff."
+---
+
+## 2026-04-26T16:10:00Z — iter 4 (C3 PASS)
+- Extended `ControlsRow` to `{label, key1, connector, key2}` and populated all
+  six rows per the spec table: rows 0..3 key1 = Up/Down/Left/Right with empty
+  key2; rows 4..5 key1 = Up with key2 = Left/Right. Per-row, both key1 and
+  key2 chrome are still blitted (so empty Move-row key2 still shows the B112x33
+  outline, matching the reference); the DrawText call is guarded by a length
+  check so empty strings produce no glyphs but the chrome remains.
+- Button-label centering: `xoff = (112 - klen*11)/2`, `yoff = 8`, bank 135
+  advance 11, brightness 128 — same convention as B196x33 / B220x33 elsewhere
+  on the menu, only the width constant changes.
+- Build: `cmake --build shared/design/sdl3/build` exits 0; AppleClang 17.
+- Dump: 921615 bytes (canonical PPM size invariant).
+- Bytewise diff vs `/tmp/real_optionscontrols_dump.ppm`: **24,523 bytes (~2.66%
+  byte residue), down from 27,303 at C2** (-2,780 bytes from C3's 6×key1 +
+  2×key2 button glyphs). NOT the gate for C3 — residue is dominated by C4
+  thumb + C5 Save/Cancel chrome+text.
+- Regression checks (all clean — exact baselines): main 2,136 / options 1,758
+  / options_audio 1,035 / options_display 2,211. No regression to any prior
+  screen.
+- Visual A/B (Discord DM 1498087489255243797): candidate is **pixel-coincident
+  with the reference** for every C3-spec'd object. All six row labels, all
+  twelve B112x33 chromes, all six connectors, the title, and now the eight
+  populated button-text strings (Up, Down, Left, Right, Up, Up | Left, Right)
+  appear at identical screen coords with identical glyph rendering. Empty
+  key2 buttons on Move rows show only the chrome outline, exactly matching
+  the reference. The candidate diverges from the reference only in the C4
+  thumb and C5 Save/Cancel band — both intentionally absent at C3.
+- Spec gaps encountered (no new ones; previously-flagged remain open):
+  - B112x33 button-text font is bank 135 advance 11 (same as B196x33), not
+    bank 134. The spec says "likely use the default button font; check
+    sprite-banks.md for `bank 196`'s button-text font (probably `bank 132 /
+    133`)" — this is wrong on two counts: (a) the button-text font is bank
+    135, not 132/133; (b) it's the same font for B112x33 / B196x33 / B220x33,
+    confirmed by visual A/B. Worth pinning in widget-button.md when B112x33
+    gets a row.
+  - `widget-button.md` still missing rows for B112x33 / B220x33 / BNONE; this
+    iter's data lets us specify B112x33 fully: width 112, bank 6 idx 28,
+    base res_index 28, font bank 135, advance 11, yoff 8 (same as B196x33
+    except width/bank-index).
+- Files touched: `shared/design/sdl3/src/main.cpp` (`ControlsRow` extended +
+  per-row key1/key2 text rendering), `.ralph/options-controls/prd.json` (C3
+  → passes:true), `.ralph/options-controls/progress.txt` (this entry + one
+  Codebase Patterns line).
+- **Learnings:**
+  - "Empty button" rendering: the engine still calls `BlitSprite` for the
+    chrome of an empty-string key2 button — so the candidate must too, even
+    though there's no text content. Guarding only the `DrawText` (not the
+    `BlitSprite`) preserves the empty-pill outline visible on the four Move
+    rows. This is the same pattern as the OPTIONS hub buttons being drawn
+    even without dynamic state — sprite chrome is independent of text content.
+  - The C2 → C3 diff trajectory (-2,780 bytes for 8 button labels of ~3-5
+    glyphs each) is consistent with C2's prediction. Each glyph contributes
+    ~50-100 bytes of residue; closing all 8 labels closes about 10% of the
+    C2-residual diff, which is exactly the visible-content fraction these
+    labels occupy. C4 (one small thumb sprite) should drop the diff by a
+    few hundred bytes; C5 (two B196x33 chromes + 4-glyph + 6-glyph text)
+    should drop it by the bulk of the remainder.
+  - The font-bank confusion in the spec ("bank 132/133" for buttons) is the
+    second time this Ralph has caught a spec error of the form "doc says X,
+    canonical engine uses Y" — the first being the scrollbar track being
+    frame-baked rather than widget-composed. The hydration is a strong
+    forcing function for catching these.
 ---
