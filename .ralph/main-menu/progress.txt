@@ -1,5 +1,6 @@
 ## Codebase Patterns
 <!-- One-line patterns the Ralph has discovered. Append as you find them. -->
+- Font banks 132–136 (the only banks main-menu text uses) decode through the same RLE+tile codec as bank-208 logo; once S0 (codec) + P0 (palette) clear, T0 (text legibility) flips with no new code.
 - Sprite-loader path buffer is `char fname[64]` in sprite.cpp Load(); worktree paths exceed it and snprintf silently truncates → fopen fails, downstream `sprites.Get(...)` on empty bank segfaults.
 - `SpriteSet::Load` returns `true` even when individual bank loads fail (only the BIN_SPR.DAT index gates the bool); main.cpp must `Has()`-check before every `Get()`.
 - Build verification: `cmake -B build` then `cmake --build build` from `shared/design/sdl3/`; current source set (palette.cpp, sprite.cpp, font.cpp, main.cpp) compiles + links exit 0 with AppleClang 17.
@@ -93,4 +94,19 @@
   - When the layer-1 palette is wrong, EVERY higher layer's bug-or-correctness is unobservable. Once palette is fixed, downstream items frequently flip "free" — both C0 and S0 in this Ralph took zero code changes once their respective upstream gates (B1, P0) cleared. Order of priorities in the prd matters: B → C → P → S keeps invisibility-cascades minimal.
   - `palette wrong` and `codec wrong` look superficially identical in a side-by-side: in both cases shapes are recognizable but tinted oddly, with internal "stripes" that could be either RLE artifacts or a wrong sub-palette. The disambiguator is whether the **stripes follow object boundaries** (codec issue, e.g. RLE row-stride mismatch) or **whole regions are uniformly wrong** (palette issue). The candidate's pre-P0 dump had whole-region wrongness → palette, not codec.
   - `B0 → B1 → C0 → P0 → S0` is the canonical Silencer rebuild order: build, run, see-everything, color-correct, codec-correct. Future hydrations of other screens (lobby, buy menu, in-game HUD) can follow the same pipeline; only T0 / A0 / F0 are screen-specific.
+---
+
+## 2026-04-26T14:30:00Z — T0
+- No code changes required. P0 (palette) + S0 (sprite codec) already cleared the entire decode pipeline, including font banks 132–136 which use the same RLE+tile codec as bank-208 / bank-196. The font path was structurally correct from B1; it just couldn't be evaluated until palette resolved.
+- Visual A/B (`/tmp/sdl3_dump/screen_00.png` vs `/tmp/real_dump.png`):
+  - Version overlay bottom-left: `Silencer v0002A` — every glyph readable, identical kerning to reference.
+  - Button labels: `Tutorial`, `Connect To Lobby`, `Options`, `Exit` — all legible, no scrambled internals, no partial-edge tile-width math errors, no `+4 filler` mis-skips, no per-glyph row drift.
+  - Logo glyphs (bank-208, treated as font-like sprites): clean SILENCER characters with terminal-circle / `+` connectors intact at both ends.
+- Files touched: `.ralph/main-menu/prd.json` (T0 → passes:true), `.ralph/main-menu/progress.txt` (this entry + one Codebase Patterns line).
+- Visual diff summary: **none** in the tile_arithmetic layer per the visual-regression-testing skill's diff table. Candidate and reference are visually equivalent for text content.
+- Spec gaps encountered: none for T0. `docs/design/font.md` adequately specifies the per-glyph dispatch + width math; the implementation in shared/design/sdl3/src/font.cpp produces text indistinguishable from the reference at this scale.
+- **Learnings:**
+  - The "free flip after upstream gate" pattern continues: C0 was free post-B1, S0 was free post-P0, T0 is free post-S0. The Ralph's initial decoder was already correct — the iteration loop primarily uncovered loader/path/palette bugs *masking* otherwise-correct code. Every "is this layer right?" gate has so far been answerable by re-eyeballing the existing dump after fixing the upstream layer.
+  - `B0 → B1 → C0 → P0 → S0 → T0` has now collapsed all layers below "anchor" into a unified visual match. Remaining gates A0 (anchors, ±5px) and F0 (final equivalence) are the only structural items left.
+  - When `font.md` and `sprite-banks.md` share the same RLE codec, the font layer and sprite-codec layer pass or fail together — there is no plausible failure mode where font bytes decode wrong but bank-196 button pills decode right (or vice versa), absent a per-bank dispatch bug. Worth keeping in mind for future hydrations.
 ---

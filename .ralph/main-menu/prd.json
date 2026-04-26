@@ -48,7 +48,7 @@
       "id": "T0",
       "name": "Text legible (font tile arithmetic correct)",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "spec": "Version string and button labels are readable as text — no scrambled glyph internals. Implies font-bank tile arithmetic matches docs/design/font.md and the partial-edge tile width math is correct.",
       "category": "tile_arithmetic"
     },
