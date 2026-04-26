@@ -6,7 +6,7 @@
 		"sdl3",
 		{
 			"name": "sdl3-mixer",
-			"features": ["mpg123", "libmodplug"]
+			"features": ["mpg123"]
 		},
 		"zlib",
 		"curl",
