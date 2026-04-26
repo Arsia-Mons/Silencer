@@ -33,7 +33,7 @@
       "id": "I3",
       "name": "Visual equivalence (full LOBBY with sub-interfaces)",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "spec": "Final gate. Candidate PPM is visually equivalent to /tmp/real_lobby_dump.ppm with all three sub-interface regions structurally rendered (chrome borders, widget outlines, scrollbar thumbs, action buttons positioned correctly). Empty-data interiors (chat messages, game list rows, runtime stat numbers, non-localusername text) are non-gated. Diff budget: ~3-5% acceptable for the structural pass; deeper visual fidelity requires populated server data and is out of scope.",
       "category": "final"
     }

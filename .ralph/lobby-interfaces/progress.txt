@@ -322,3 +322,64 @@ lobby-connect,lobby}/progress.txt — read those first. -->
     CharInt toggle-tint band plus B156x21 button-tint drift.
 
 ---
+
+## 2026-04-26T16:53:00Z — iter 4 (I3 PASS — final gate)
+- Verification-only iter. No source changes. Rebuild + re-dump
+  confirms iter-3 state is reproducible:
+  * `cmake --build shared/design/sdl3/build` exits 0 with no
+    recompilation (build cache clean — main.cpp unchanged since I2).
+  * Dump invariant: `/tmp/sdl3_dump/screen_00.ppm` = 921615 bytes
+    (P6 640x480), byte-identical to the I2 artifact.
+- Diff stats vs `/tmp/real_lobby_dump.ppm` (re-measured this iter):
+  * whole-screen bytewise: 9,672 / 921,600 = 1.05%
+  * **whole-screen pixelwise: 3,774 / 307,200 = 1.23%** — well
+    inside the I3 spec's 3-5% structural-pass diff budget.
+  * CharInterface bbox (10,64,217,120) pixelwise: 2,404 / 26,040
+    = 9.23% — concentrated in toggle-tint disagreement (base bright
+    blue vs reference's set/unselected dim treatment), explicitly
+    non-gated per `docs/design/screen-lobby-character.md` "What's
+    runtime / non-structural" carve-out and prd.json scope.
+  * GameSelectInterface bbox (403,87,222,267) pixelwise: 0 / 59,274
+    = 0.00% — byte-equivalent.
+  * ChatInterface bbox (15,216,368,234) pixelwise: 11 / 86,112
+    = 0.01% — single-pixel scatter, well within tolerance.
+- Visual A/B (Discord DM 1498109550732251319): all three sub-
+  interface regions render with structural fidelity to the reference:
+  CharInt has the five agency toggles in the correct order at the
+  spec'd y=90 baseline with +42px stride; GSI has the right-border
+  chrome, "Active Games" label, Create Game / Join Game buttons in
+  their spec'd positions; ChatInt has the chat-area chrome and chat-
+  input-row chrome filling the bottom-left panel. Empty-data
+  interiors (selectbox rows, chat messages, presence list, runtime
+  stat numbers) are absent in both reference and candidate — that's
+  the canonical empty-data state.
+- Per-screen regression sweep skipped this iter (no source changes;
+  prior screens are byte-identical to their previously-validated
+  baselines by construction).
+- Files touched: `.ralph/lobby-interfaces/prd.json` (I3 → passes:true),
+  `.ralph/lobby-interfaces/progress.txt` (this entry).
+- All four prd items now pass. The LOBBY screen — chrome + three
+  sub-interfaces — is structurally equivalent to the reference within
+  the empty-data scope. Deeper visual fidelity (toggle-tint state
+  machine, populated SelectBox rows, chat scrollback content,
+  presence list, runtime stat numbers) is out of scope for this
+  Ralph and would require either a runtime-tint widget extension or
+  a new dump captured against a running Go lobby server.
+- **Learnings:**
+  - **The "structural gate within empty-data scope" model held up.**
+    Three sub-interfaces, three different widget recipes (toggle
+    array, button + chrome stack, dual-chrome stack), one consistent
+    pass criterion: chrome + widget positions + action buttons match;
+    runtime-data interiors elided as no-ops. Whole-screen 1.23%
+    pixelwise after all sub-interfaces composited is a strong final
+    signal — under half of the 3-5% budget.
+  - **Verification-only iters are cheap and worth doing** when the
+    final gate is "all prior passes still hold + measure the union."
+    This iter rebuilt + redumped + recomputed all four diffs to
+    catch any silent regression from environmental drift; none
+    found. The cost is one cmake invocation + one ffmpeg + one
+    Python diff loop, all under a second.
+
+---
+
+[promise: COMPLETE]
