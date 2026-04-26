@@ -40,7 +40,14 @@ Environment variables (set in `.env` beside `docker-compose.yml`):
 
 ## API Routes
 
-All routes except `/health` and `/auth/login` require a valid JWT in `Authorization: Bearer <token>`.
+All routes are mounted under `/api` (e.g. `/api/auth/login`, `/api/players`,
+`/api/health`). The tables below show the path *inside* that prefix —
+prepend `/api` to every entry when calling from outside. The `/api` mount
+lets a single Cloudflare Tunnel hostname host both admin-web and admin-api
+without page/route collisions.
+
+All routes except `/api/health` and `/api/auth/login` require a valid JWT
+in `Authorization: Bearer <token>`.
 
 ### Auth — `/auth`
 

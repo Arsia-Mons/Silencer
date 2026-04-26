@@ -82,29 +82,19 @@ write_files:
     content: |
       IMAGE=${admin_image_admin_web}
 
-  # MongoDB config overrides. Appended to /etc/mongod.conf in runcmd
-  # AFTER apt installs the package (the postinst writes the default
-  # config, then we layer our settings on top).
+  # MongoDB config override — appended to /etc/mongod.conf in runcmd.
+  # Only contains TRULY-NEW top-level keys (security:); any setting that
+  # collides with the apt-installed default (storage:, net:) is layered
+  # in via targeted sed/awk in runcmd to avoid duplicate top-level YAML
+  # keys (which mongod's parser resolves last-wins, silently shadowing
+  # storage.dbPath and net.bindIp).
   - path: /etc/silencer/mongod-overrides.conf
     permissions: '0644'
     owner: root:root
     content: |
-      # cacheSizeGB: 0.25 caps WiredTiger to a known floor — the budget
-      # in docs/plans/2026-04-25-production-deployment-architecture.md
-      # is built around this number.
-      storage:
-        wiredTiger:
-          engineConfig:
-            cacheSizeGB: 0.25
-      # bindIp set to 127.0.0.1,<private-ip> so the lobby box can reach
-      # us over VPC private IP. The literal substitution happens in
-      # runcmd below (not via templatefile, since we don't know the
-      # private IP at terraform-apply time — it's allocated on instance
-      # boot).
-      net:
-        port: 27017
       # security.authorization: enabled — silencer Mongo user is created
-      # in runcmd with readWrite on the silencer DB.
+      # in runcmd with readWrite on the silencer DB (auth temporarily
+      # disabled for the bootstrap mongosh run, then re-enabled).
       security:
         authorization: enabled
 
@@ -222,14 +212,26 @@ runcmd:
   - apt-get update
   - DEBIAN_FRONTEND=noninteractive apt-get install -y mongodb-org lavinmq
 
-  # 5. Configure mongod: bind to private IP, layer our overrides on top of
-  #    the apt-installed default config. PRIVATE_IP comes from instance
-  #    metadata (IMDSv2).
+  # 5. Configure mongod: layer our settings onto the apt-installed
+  #    default. PRIVATE_IP comes from instance metadata (IMDSv2).
+  #
+  #    Why three different mechanisms (sed / awk / cat-append)?
+  #    Mongo's YAML parser is last-wins on duplicate top-level keys, so
+  #    a single  cat overrides >> mongod.conf  with  storage:  and  net:
+  #    sections would silently shadow the default's  storage.dbPath  and
+  #    net.bindIp. We instead:
+  #      - sed: overwrite the existing  bindIp:  line in net:
+  #      - awk: inject  wiredTiger.engineConfig.cacheSizeGB  as a child
+  #        of the existing  storage:  section (one budget-of-record;
+  #        cap floor in docs/plans/2026-04-25-production-deployment-architecture.md)
+  #      - cat: append the security: block (a new top-level key, safe)
   - |
     TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
     PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
-    cat /etc/silencer/mongod-overrides.conf >> /etc/mongod.conf
     sed -i "s|^  bindIp:.*|  bindIp: 127.0.0.1,$PRIVATE_IP|" /etc/mongod.conf
+    awk '/^storage:$/{print; print "  wiredTiger:"; print "    engineConfig:"; print "      cacheSizeGB: 0.25"; next} {print}' /etc/mongod.conf > /etc/mongod.conf.new
+    mv /etc/mongod.conf.new /etc/mongod.conf
+    cat /etc/silencer/mongod-overrides.conf >> /etc/mongod.conf
 
   # 6. Start mongod WITH auth disabled to bootstrap the silencer user, then
   #    re-enable auth + restart. The order is: enable security in the

@@ -134,8 +134,12 @@ resource "aws_instance" "lobby" {
     Name = "${var.project_name}-lobby"
   }
 
+  # Re-running terraform apply must not pick up a newer AMI or notice
+  # credential changes in user_data — both would force-replace the lobby
+  # instance and kill active games. Explicit `terraform taint` is the
+  # only path to a re-bootstrap. Same posture as the admin instance.
   lifecycle {
-    ignore_changes = [ami]
+    ignore_changes = [ami, user_data]
   }
 }
 
