@@ -3,12 +3,24 @@ package main
 import (
 	"context"
 	"log"
+	"net/url"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+// redactURI strips the password from a mongodb:// URI for logging.
+// Falls back to "<unparseable URI>" if the input is malformed (rather
+// than ever risking a raw uri leak through a fallback path).
+func redactURI(uri string) string {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return "<unparseable URI>"
+	}
+	return u.Redacted()
+}
 
 // MongoSync asynchronously mirrors lobby store mutations to MongoDB.
 // MongoDB is a read mirror only — lobby.json remains the source of truth.
@@ -34,7 +46,7 @@ func NewMongoSync(uri, dbname string) *MongoSync {
 		log.Printf("[mongosync] ping failed: %v (sync disabled)", err)
 		return nil
 	}
-	log.Printf("[mongosync] connected to %s", uri)
+	log.Printf("[mongosync] connected to %s", redactURI(uri))
 	return &MongoSync{col: client.Database(dbname).Collection("players")}
 }
 
