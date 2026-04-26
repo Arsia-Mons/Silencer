@@ -18,7 +18,9 @@ dispatches mouse/keyboard input. The main menu uses exactly one
 | `activeobject` | Currently focused child (the one whose chrome is `ACTIVATING`/`ACTIVE`). The sentinel "nothing focused" is the integer `0` — Silencer object IDs start at `1`, so `id == 0` is never a valid object. A port that uses pointers instead of IDs should use `nullptr` for the same role. |
 | `buttonenter` | Optional button id triggered by Enter. `0` = no Enter binding. |
 | `buttonescape` | Optional button id triggered by Escape. |
-| `disabled`, `modal`, `scrollbar`, `width/height/x/y` | Used by other screens (lobby, modals); main menu leaves them at defaults. |
+| `scrollbar` | Optional id of a child `ScrollBar` (see [widget-scrollbar.md](widget-scrollbar.md)). When set, mouse-wheel events on this Interface call `ScrollUp` / `ScrollDown` on the bar. The bar's `scrollposition` is the logical scroll offset; the host screen reads it to decide which slice of items to render. |
+| `objectupscroll`, `objectdownscroll` | Optional ids that act as virtual top/bottom anchors for keyboard scroll wrapping. Tab/arrow navigation past the last tab object (or before the first) routes through `ScrollUp` / `ScrollDown` on the scrollbar instead of wrapping focus. The options-controls screen uses these to make the keybinding list scrollable via Up/Down arrows from the first c1 button (`objectupscroll`) and the last c2 button (`objectdownscroll`). |
+| `disabled`, `modal`, `width/height/x/y` | Used by other screens (modals, lobby panels); the menu screens leave them at defaults. |
 
 `AddObject(id)` appends to `objects`. `AddTabObject(id)` appends to
 `tabobjects`; if `activeobject` is unset, the first call also seeds

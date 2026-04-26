@@ -162,14 +162,28 @@ A naive "consume `comp_size` bytes per sprite" approach
 miscalculates the start of subsequent sprites in the same bank
 once a tile-mode sprite is encountered.
 
-## Banks the main menu touches
+## Banks the menu screens touch
 
-| Bank | Why |
-| ---- | --- |
-| 6    | Menu background plate (`idx 0`) and `B196x33` button frames (`idx 7..11`) |
-| 7    | (Not used by main menu, but commonly co-loaded; safe to skip for menu-only hydrations) |
-| 132–136 | Font banks — see [font.md](font.md). The version text overlay uses bank 133 |
-| 208  | Animated game-title logo (`idx 29..60`) |
+| Bank | Why | First used by |
+| ---- | --- | ------------- |
+| 6    | Menu background plate (`idx 0`); `B196x33` button frames (`idx 7..11`); `B112x33` button frames (`idx 28..32`) | main menu |
+| 7    | Configure-controls inner panel (`idx 7`); `ScrollBar` track (`idx 9`) and thumb (`idx 10`) | options-controls |
+| 132–136 | Font banks — see [font.md](font.md) | main menu uses 133, 135 |
+| 208  | Animated game-title logo (`idx 29..60`) | main menu |
 
-A hydration can stop after loading these four (132+133 plus 6 and
-208) and still render the entire main menu.
+Concrete sprite headers worth pinning:
+
+| Bank | Idx | w × h     | offset (x, y) | Notes |
+| ---- | --- | --------- | ------------- | ----- |
+| 6    | 0   | 640 × 480 | (0, 0)         | Full-screen menu background plate |
+| 6    | 7   | 196 × 33  | (-310, -288)   | `B196x33` base frame |
+| 6    | 28  | 112 × 33  | (-302, -86)    | `B112x33` base frame |
+| 7    | 7   | 628 × 454 | (-5, -6)       | Options inner panel — overlays the bg plate, framing the configuration area |
+| 7    | 9   | 16 × 267  | (-609, -87)    | ScrollBar track (drawn only when `ScrollBar.draw == true`) |
+| 7    | 10  | 16 × 235  | (-610, -103)   | ScrollBar thumb (only when drawing) |
+| 208  | 60  | 348 × 31  | (-7, -222)     | Main-menu logo, steady-state frame |
+
+A hydration covering main-menu + options + options-controls needs
+banks 6, 7, 132, 133, 134, 135, 208 loaded (134 because the
+options-controls screen uses bank 134 for the action-name overlays
+and the OR/AND op-button text).

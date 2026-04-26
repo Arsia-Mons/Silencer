@@ -249,7 +249,8 @@ void Game::Present(void){
 		const char * dumpstate_env = getenv("SILENCER_DUMP_STATE");
 		Uint8 target_state = MAINMENU;
 		if(dumpstate_env){
-			if(strcmp(dumpstate_env, "OPTIONS") == 0) target_state = OPTIONS;
+			if(strcmp(dumpstate_env, "OPTIONSCONTROLS") == 0) target_state = OPTIONSCONTROLS;
+			else if(strcmp(dumpstate_env, "OPTIONS") == 0) target_state = OPTIONS;
 			else if(strcmp(dumpstate_env, "MAINMENU") == 0) target_state = MAINMENU;
 		}
 
@@ -263,17 +264,27 @@ void Game::Present(void){
 			return false;
 		};
 
-		// Phase 1: navigate toward target_state by clicking through menus.
+		// Helper: synthesize a click on a button by uid in the current interface.
+		auto click_uid = [&](int uid){
+			Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+			if(!iface) return;
+			Object * btn = iface->GetObjectWithUid(world, uid);
+			if(btn && btn->type == ObjectTypes::BUTTON){
+				static_cast<Button *>(btn)->clicked = true;
+			}
+		};
+
+		// Phase 1: navigate toward target_state by chaining clicks through menus.
+		// MAINMENU.Options (uid 2) → OPTIONS.Controls (uid 1) → OPTIONSCONTROLS.
 		if(state == MAINMENU && !stateisnew && target_state != MAINMENU){
 			if(mainmenu_steady()){
-				// MAINMENU's options button has uid 2 (game.cpp:2295). Click it.
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					Object * btn = iface->GetObjectWithUid(world, 2);
-					if(btn && btn->type == ObjectTypes::BUTTON){
-						static_cast<Button *>(btn)->clicked = true;
-					}
-				}
+				click_uid(2);  // Options
+			}
+			return;
+		}
+		if(state == OPTIONS && !stateisnew && target_state != OPTIONS && target_state != MAINMENU){
+			if(FadedIn()){
+				if(target_state == OPTIONSCONTROLS) click_uid(1);  // Controls
 			}
 			return;
 		}
@@ -290,6 +301,12 @@ void Game::Present(void){
 				// state isn't fresh, the screen is visually static.
 				ready = FadedIn();
 				label = "options";
+			} else if(target_state == OPTIONSCONTROLS){
+				// OPTIONSCONTROLS populates dynamic button text on each Tick;
+				// FadedIn implies we've ticked at least once with the
+				// state-machine logic that fills c1/c2 button text.
+				ready = FadedIn();
+				label = "options controls";
 			}
 			if(ready){
 				FILE * f = fopen(dumppath, "wb");

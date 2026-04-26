@@ -390,11 +390,23 @@ struct Overlay {
     }
 };
 
+// Button "variant" descriptor — captures the per-variant constants from
+// docs/design/widget-button.md so render_button can stay generic.
+enum class ButtonVariant { B196x33, B112x33, BNONE };
+
 struct Button {
     int x = 0, y = 0;
     std::string text;
+    ButtonVariant variant = ButtonVariant::B196x33;
+    // res_index is the base frame for the variant (7 for B196x33, 28 for
+    // B112x33, ignored for BNONE since res_bank == 0xFF).
     int res_index = 7;
     int effectbrightness = 128;
+    // For BNONE only — caller-set hot-rect, font, advance.
+    int width = 0;
+    int height = 0;
+    int textbank = 135;
+    int textwidth = 11;
     // For dump mode we always render in INACTIVE state — no hover.
 };
 
@@ -422,23 +434,35 @@ static void render_overlay(Framebuffer& fb, const Resources& res,
 
 static void render_button(Framebuffer& fb, const Resources& res,
                           const Button& b, int active_sub) {
-    const Sprite* sp = res.get(6, b.res_index);
-    if (!sp) return;
     std::array<uint8_t, 256> lut{};
     const std::array<uint8_t, 256>* lutp = nullptr;
     if (b.effectbrightness != 128) {
         lut = build_brightness_lut(res.palette, active_sub, b.effectbrightness);
         lutp = &lut;
     }
+
+    if (b.variant == ButtonVariant::BNONE) {
+        // BNONE: no sprite chrome. Text top-left = (b.x + xoff, b.y) —
+        // top-anchored within the caller-set hot-rect.
+        int xoff = (b.width - (int)b.text.size() * b.textwidth) / 2;
+        draw_text(fb, res, b.x + xoff, b.y, b.text,
+                  b.textbank, b.textwidth, lutp);
+        return;
+    }
+
+    const Sprite* sp = res.get(6, b.res_index);
+    if (!sp) return;
     blit_object(fb, *sp, b.x, b.y, lutp);
 
-    // text label
+    // text label — centered against the rendered sprite top-left.
     int dst_x = b.x - sp->offset_x;
     int dst_y = b.y - sp->offset_y;
-    int xoff = (196 - (int)b.text.size() * 11) / 2;
+    int pill_w = (b.variant == ButtonVariant::B196x33) ? 196 : 112;
+    int advance = b.textwidth ? b.textwidth : 11;
+    int xoff = (pill_w - (int)b.text.size() * advance) / 2;
     int yoff = 8;
     draw_text(fb, res, dst_x + xoff, dst_y + yoff, b.text,
-              /*bank*/ 135, /*advance*/ 11, lutp);
+              b.textbank, advance, lutp);
 }
 
 // ---------- PPM writer ----------
@@ -485,10 +509,10 @@ static int render_main_menu(Framebuffer& fb, const Resources& res) {
     version.textbank = 133;
     version.textwidth = 11;
 
-    Button btn_tut   { 40,  -134, "Tutorial",         7, 128 };
-    Button btn_conn  { 80,  -67,  "Connect To Lobby", 7, 128 };
-    Button btn_opts  { 40,   0,   "Options",          7, 128 };
-    Button btn_exit  { 0,    67,  "Exit",             7, 128 };
+    Button btn_tut;   btn_tut.x  = 40; btn_tut.y  = -134; btn_tut.text  = "Tutorial";
+    Button btn_conn;  btn_conn.x = 80; btn_conn.y = -67;  btn_conn.text = "Connect To Lobby";
+    Button btn_opts;  btn_opts.x = 40; btn_opts.y =  0;   btn_opts.text = "Options";
+    Button btn_exit;  btn_exit.x =  0; btn_exit.y =  67;  btn_exit.text = "Exit";
 
     // Tick simulation to pinned scene state: bank-208 logo at hold
     // (res_index = 60). 120 iterations land state_i=120 with the most
@@ -523,10 +547,10 @@ static int render_options(Framebuffer& fb, const Resources& res) {
     bg.res_bank = 6; bg.res_index = 0;
 
     // Four B196x33 buttons, anchor x=-89, y spaced 52 px apart.
-    Button btn_controls { -89, -142, "Controls", 7, 128 };
-    Button btn_display  { -89, -90,  "Display",  7, 128 };
-    Button btn_audio    { -89, -38,  "Audio",    7, 128 };
-    Button btn_goback   { -89,  15,  "Go Back",  7, 128 };
+    Button btn_controls; btn_controls.x = -89; btn_controls.y = -142; btn_controls.text = "Controls";
+    Button btn_display;  btn_display.x  = -89; btn_display.y  = -90;  btn_display.text  = "Display";
+    Button btn_audio;    btn_audio.x    = -89; btn_audio.y    = -38;  btn_audio.text    = "Audio";
+    Button btn_goback;   btn_goback.x   = -89; btn_goback.y   =  15;  btn_goback.text   = "Go Back";
 
     // No animated overlays, but we still tick "to steady state".
     // Nothing on this screen mutates per-tick (background plate is
@@ -540,6 +564,109 @@ static int render_options(Framebuffer& fb, const Resources& res) {
     render_button(fb,  res, btn_display,  active_sub);
     render_button(fb,  res, btn_audio,    active_sub);
     render_button(fb,  res, btn_goback,   active_sub);
+
+    return active_sub;
+}
+
+// Render the OPTIONSCONTROLS screen into `fb`. Returns active sub-palette.
+//
+// Per screen-options-controls.md: OPTIONSCONTROLS does NOT call SetPalette
+// — it inherits sub-palette 1 through MAINMENU → OPTIONS → OPTIONSCONTROLS.
+// Six rows of (label + B112x33 c1 + BNONE op + B112x33 c2). Save/Cancel at
+// the bottom. ScrollBar widget is state-only (draw == false) — the visible
+// "scrollbar" pixels are baked into bank 7 idx 7.
+static int render_options_controls(Framebuffer& fb, const Resources& res) {
+    constexpr int active_sub = 1;
+
+    // Backgrounds: bank 6 idx 0 (full plate) then bank 7 idx 7 (inner panel).
+    Overlay bg;
+    bg.x = 0; bg.y = 0;
+    bg.res_bank = 6; bg.res_index = 0;
+
+    Overlay panel;
+    panel.x = 0; panel.y = 0;
+    panel.res_bank = 7; panel.res_index = 7;
+
+    // Title overlay: text mode, bank 135 advance 12.
+    //   x = 320 - (text.length() * 12) / 2 = 212 for "Configure Controls" (18 chars).
+    Overlay title;
+    title.text = "Configure Controls";
+    title.textbank = 135;
+    title.textwidth = 12;
+    title.x = 320 - (int)title.text.size() * title.textwidth / 2;
+    title.y = 14;
+
+    // Default visible content for scrollposition = 0 (per spec table).
+    struct Row {
+        const char* name;
+        const char* key1;
+        const char* op;     // "OR" or "AND"
+        const char* key2;   // "" if none
+    };
+    const Row rows[6] = {
+        { "Move Up:",      "Up",    "OR",  ""      },
+        { "Move Down:",    "Down",  "OR",  ""      },
+        { "Move Left:",    "Left",  "OR",  ""      },
+        { "Move Right:",   "Right", "OR",  ""      },
+        { "Aim Up/Left:",  "Up",    "AND", "Left"  },
+        { "Aim Up/Right:", "Up",    "AND", "Right" },
+    };
+
+    fb.clear();
+    render_overlay(fb, res, bg,    active_sub);
+    render_overlay(fb, res, panel, active_sub);
+    render_overlay(fb, res, title, active_sub);
+
+    // Six rows of (label overlay + c1 button + op button + c2 button).
+    //   y0 = 95 + i * 53   (overlays / op-button)
+    //   y1 = 0  + i * 53   (c1/c2 buttons; B112x33 sprite offset_y = -86
+    //                       brings the rendered top to y0 - 9)
+    for (int i = 0; i < 6; ++i) {
+        int y0 = 95 + i * 53;
+        int y1 = 0  + i * 53;
+
+        // Action-name label: bank 134 advance 10, x = 80, y = y0.
+        Overlay label;
+        label.text = rows[i].name;
+        label.textbank = 134;
+        label.textwidth = 10;
+        label.x = 80;
+        label.y = y0;
+        render_overlay(fb, res, label, active_sub);
+
+        // c1 key binding — B112x33 at (-30, y1).
+        Button c1;
+        c1.variant = ButtonVariant::B112x33;
+        c1.res_index = 28;
+        c1.x = -30; c1.y = y1;
+        c1.text = rows[i].key1;
+        render_button(fb, res, c1, active_sub);
+
+        // OR/AND op button — BNONE at (383, y0), 40x30, bank 134 advance 9.
+        Button op;
+        op.variant = ButtonVariant::BNONE;
+        op.x = 383; op.y = y0;
+        op.width = 40; op.height = 30;
+        op.textbank = 134;
+        op.textwidth = 9;
+        op.text = rows[i].op;
+        render_button(fb, res, op, active_sub);
+
+        // c2 key binding — B112x33 at (120, y1). Empty text → no glyphs;
+        // the chrome still renders.
+        Button c2;
+        c2.variant = ButtonVariant::B112x33;
+        c2.res_index = 28;
+        c2.x = 120; c2.y = y1;
+        c2.text = rows[i].key2;
+        render_button(fb, res, c2, active_sub);
+    }
+
+    // Bottom Save / Cancel — B196x33.
+    Button save;   save.x   = -200; save.y   = 117; save.text   = "Save";
+    Button cancel; cancel.x =   20; cancel.y = 117; cancel.text = "Cancel";
+    render_button(fb, res, save,   active_sub);
+    render_button(fb, res, cancel, active_sub);
 
     return active_sub;
 }
@@ -580,11 +707,25 @@ int main(int argc, char** argv) {
     //   sub 1 idx 0: (0,0,0)        idx 1: (8,156,0)      idx 2: (64,8,16)
     //   sub 2 idx 0: (0,0,0)        idx 1: (0,0,0)        idx 2: (8,8,8)
 
-    // Load banks shared by main menu + options.
-    res.load_bank_idx(6,   asset_root); // background plate + button frames
+    // Load banks shared by main menu + options + options-controls.
+    res.load_bank_idx(6,   asset_root); // background plate + button frames (B196x33, B112x33)
+    res.load_bank_idx(7,   asset_root); // options-controls inner panel
     res.load_bank_idx(133, asset_root); // version-text font (main menu only)
-    res.load_bank_idx(135, asset_root); // button-label font
+    res.load_bank_idx(134, asset_root); // action-name + OR/AND op-button font
+    res.load_bank_idx(135, asset_root); // button-label / title font
     res.load_bank_idx(208, asset_root); // animated logo (main menu only)
+
+    // Self-check (BIN_SPR / sprite header) per docs/design/sprite-banks.md.
+    std::printf("=== BIN_SPR self-check ===\n");
+    std::printf("BIN_SPR.DAT[7*64+2] = %d (expected 28)\n",
+                res.sprite_count[7]);
+    if (const Sprite* sp = res.get(7, 7)) {
+        std::printf("bank 7 idx 7 header: w=%u h=%u offset=(%d, %d) "
+                    "(expected w=628 h=454 offset=(-5, -6))\n",
+                    sp->w, sp->h, sp->offset_x, sp->offset_y);
+    } else {
+        std::printf("bank 7 idx 7: NOT LOADED\n");
+    }
 
     // Screen registry — each entry is (filename, render-fn).
     struct ScreenEntry {
@@ -592,8 +733,9 @@ int main(int argc, char** argv) {
         int (*render)(Framebuffer&, const Resources&);
     };
     const ScreenEntry screens[] = {
-        { "main_menu.ppm", &render_main_menu },
-        { "options.ppm",   &render_options   },
+        { "main_menu.ppm",        &render_main_menu        },
+        { "options.ppm",          &render_options          },
+        { "options_controls.ppm", &render_options_controls },
     };
 
     // Always render every registered screen (cheap; visual content

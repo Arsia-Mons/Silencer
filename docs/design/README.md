@@ -33,10 +33,12 @@ substrate, two different compositions:
 | [font.md](font.md) | Font sprite banks 132–136, advance widths, `DrawText` |
 | [tick.md](tick.md) | 24 Hz simulation tick, `state_i` |
 | [widget-overlay.md](widget-overlay.md) | Sprite-mode and text-mode `Overlay` (used for bg, logo, version) |
-| [widget-button.md](widget-button.md) | `Button` widget — `B196x33` only (the menu uses no other variant) |
-| [widget-interface.md](widget-interface.md) | `Interface` container, focus, mouse/keyboard dispatch |
+| [widget-button.md](widget-button.md) | `Button` widget — `B196x33`, `B112x33`, `BNONE` variants (extends as more are needed) |
+| [widget-scrollbar.md](widget-scrollbar.md) | `ScrollBar` — state holder for scroll position, optionally renders track + thumb |
+| [widget-interface.md](widget-interface.md) | `Interface` container, focus, mouse/keyboard dispatch, scroll wiring |
 | [screen-main-menu.md](screen-main-menu.md) | Composition: main menu (logo, buttons, version) |
 | [screen-options.md](screen-options.md) | Composition: options sub-screen (four B196x33 buttons over the main-menu plate; inherits sub-palette 1 from MAINMENU without setting it) |
+| [screen-options-controls.md](screen-options-controls.md) | Composition: configure-controls (six rows of keybinding triplets, scrollbar state, Save/Cancel) |
 
 ## QA dump
 
@@ -46,7 +48,7 @@ exposes a framebuffer dump path gated by env vars:
 | Env | Values | Effect |
 | --- | ------ | ------ |
 | `SILENCER_DUMP_PATH` | absolute file path | When set, write a 640×480 binary P6 PPM to this path once the target screen has reached steady state, then `exit(0)` |
-| `SILENCER_DUMP_STATE` | `MAINMENU` (default), `OPTIONS` | Selects which screen to dump. The binary navigates to the requested state by synthesizing a click on the main menu's Options button (uid 2). Future states will extend this list. |
+| `SILENCER_DUMP_STATE` | `MAINMENU` (default), `OPTIONS`, `OPTIONSCONTROLS` | Selects which screen to dump. The binary navigates to the requested state by chaining clicks: MAINMENU.Options (uid 2) → OPTIONS.Controls (uid 1) → OPTIONSCONTROLS, etc. |
 
 Hydrations should accept `SILENCER_DUMP_DIR` (writes one PPM per
 registered screen) for parity. Visual A/B between the real and
@@ -55,8 +57,8 @@ hydration PPMs is the validation gate; see
 
 ## Out of scope (for now)
 
-- Other button variants (`B112x33`, `B220x33`, `B236x27`, `B52x21`,
-  `B156x21`, `BCHECKBOX`) — covered later.
+- Other button variants (`B220x33`, `B236x27`, `B52x21`, `B156x21`,
+  `BCHECKBOX`) — covered when a screen needs them.
 - Other widgets: TextInput, TextBox, SelectBox, ScrollBar, Toggle,
   Modal, Loading bar, HUD bars, Minimap, Buy menu, Chat overlay, etc.
 - Effect transforms beyond what the menu uses (`EffectBrightness`

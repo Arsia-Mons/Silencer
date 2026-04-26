@@ -1,12 +1,19 @@
-# `Button` widget — `B196x33` (the only variant the main menu uses)
+# `Button` widget — variants
 
 **Source:** `clients/silencer/src/button.h`,
 `clients/silencer/src/button.cpp`,
 render dispatch in `clients/silencer/src/renderer.cpp:699..705`.
 
-The real engine has 7 button variants. The main menu only uses
-**`B196x33`**. This doc covers that variant fully and notes where
-the other variants will plug in when we extend the spec.
+The engine has 7 button variants. This doc covers the ones the
+hydrated screens actually use. New variants will be added below
+as more screens come online.
+
+| Variant | Used by | Has sprite chrome? |
+| ------- | ------- | ------------------ |
+| `B196x33` | main menu, options menu (default), options-controls Save/Cancel | yes |
+| `B112x33` | options-controls c1/c2 key buttons | yes |
+| `BNONE` | options-controls "OR/AND" op buttons (text-only, custom width/height) | no |
+| `B220x33`, `B236x27`, `B52x21`, `B156x21`, `BCHECKBOX` | not yet exercised | TBD when a screen needs them |
 
 ## `B196x33` constants
 
@@ -119,10 +126,87 @@ which button is `buttonenter` (Enter triggers it) and `buttonescape`
 "Tutorial" and "Exit" buttons respectively (see
 [screen-main-menu.md](screen-main-menu.md)).
 
-## Other variants — placeholder
+## `B112x33` constants
 
-`B112x33`, `B220x33`, `B236x27`, `B52x21`, `B156x21`, `BCHECKBOX`
-are out of scope until a screen we hydrate uses them. See
+| Field | Value |
+| ----- | ----- |
+| Width × height | 112 × 33 |
+| Sprite bank | 6 |
+| Base `res_index` | 28 |
+| Hover frames | `res_index` 28..32 (`base + state_i`) |
+| Text font bank | 135 |
+| Text advance | 11 |
+| Text `yoff` | 8 |
+| Hover sound | `whoom.wav` |
+
+Sprite header (`shared/assets/bin_spr/SPR_006.BIN` idx 28):
+`offset_x = -302, offset_y = -86`. So a `B112x33` placed at
+`object.x = -30, object.y = 0` renders with its top-left at
+`(-30 + 302, 0 + 86) = (272, 86)` and footprint `112 × 33`.
+
+State machine, hit-testing, rendering, and label centering are
+identical to `B196x33` above; only the dimensions, base index, and
+anchor offset change. The label-position math becomes:
+
+```
+xoff = (112 - strlen(text) * 11) / 2
+yoff = 8
+```
+
+## `BNONE` constants
+
+| Field | Value |
+| ----- | ----- |
+| Sprite bank | `0xFF` (none) |
+| Base `res_index` | n/a |
+| Width × height | **caller-set** (e.g. `40 × 30` for the option-controls "OR/AND" buttons) |
+| Text font bank | **caller-set** (e.g. `134`) |
+| Text advance | **caller-set** (e.g. `9`) |
+| Text `yoff` | not in the table — see below |
+
+`BNONE` is a text-only button: there's no sprite chrome at all, just
+a hot-rect (defined by the caller-set `width × height` at
+`object.x, object.y` raw — no anchor offset because there's no
+sprite to derive offsets from) and centered text inside it.
+
+In `Button::SetType(BNONE)` only `res_bank = 0xFF` is set; the
+caller assigns `width`, `height`, `textbank`, `textwidth`, and
+`text` directly on the object after construction. Hover animation
+(state machine, brightness ramp) still runs but has no visual
+effect because there's no sprite frame to advance.
+
+Label position (from `Button::GetTextOffset`, `button.cpp:178`):
+
+```
+xoff = (width - strlen(text) * textwidth) / 2
+yoff = 0    # the BNONE branch in GetTextOffset doesn't set yoff
+textX = button.x + xoff           # no sprite offset to subtract
+textY = button.y + 0              # ditto
+```
+
+So the text top-left lands at `(button.x + xoff, button.y)` —
+**vertically anchored at the top** of the hot-rect, not centered.
+Callers compensate by choosing a `button.y` that already places the
+text where they want it (e.g. the options-controls OR/AND buttons
+are placed at `y = 95 + i*53`, which happens to align text with the
+neighboring `B112x33` row).
+
+Hit-testing uses the raw bounds:
+
+```
+inside =
+    button.x < mx < button.x + width
+    AND
+    button.y < my < button.y + height
+```
+
+(no anchor-offset shift, since `res_bank == 0xFF` means there's no
+sprite to read offsets from).
+
+## Other variants
+
+`B220x33`, `B236x27`, `B52x21`, `B156x21`, `BCHECKBOX` are still
+out of scope until a screen we hydrate uses them. See
 `docs/design-system.md.archive` (`### Button` section) for the
 legacy table; we will re-derive each row against `button.cpp` when
 we add it.
