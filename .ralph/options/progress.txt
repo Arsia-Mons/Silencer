@@ -4,6 +4,7 @@ are also relevant — read .ralph/main-menu/progress.txt's Patterns header. -->
 - Screen switch: env var `SILENCER_DUMP_SCREEN` ("main_menu" default, "options" → OPTIONS hub) keeps the main-menu pathway untouched and adds zero CLI surface; one extra branch in `main()` + a sibling `RunDumpOptions` mirroring `RunDump`.
 - OPTIONS bank set is a strict subset of main-menu's: only banks 6 (bg + B196x33 chrome) and 135 (button-label font). No bank 133 (no version) and no bank 208 (no logo) — load-bearing per docs/design/screen-options.md "What's NOT on this screen".
 - Bytewise `cmp -l | wc -l` from the very first OPTIONS dump (post-main-menu hydration) was 1,758 / 921,600 ≈ 0.19% — well under the F0 ≤0.25% threshold inherited from main-menu — strongly hinting that O1/O2/O3/O4 will all be "free flips" same as the main-menu cascade.
+- Free-flip cascade confirmed for O1: composition gate (bg + 4 buttons, no logo, no version) passed with zero code change post-O0 — the O0 implementation was already complete-by-construction since `RunDumpOptions` only loads banks {6, 135} and emits exactly four button compositions.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -33,4 +34,16 @@ are also relevant — read .ralph/main-menu/progress.txt's Patterns header. -->
   - The seed harness was already structured as "single `RunDump`"; the cleanest screen-switch is one `if (screen == "options") return RunDumpOptions(...);` in `main()` — no harness rewrite, no shared-state branching inside the dump path. Scales to N screens by adding sibling `RunDumpFoo` functions, each owning its own bank set + composition list.
   - The OPTIONS hub composition is a near-strict subset of main-menu: same bg, same button widget. The "free flip" cascade observed in the main-menu Ralph (B0→C0→S0→T0 each took zero code changes once their upstream gate cleared) appears to extend straight into OPTIONS — the ~0.19% diff at O0 commit is already the eventual F0-style residue, not a structural mismatch. Expect O1/O2/O3/O4 to flip without further code changes.
   - Loading banks {6, 135} but not {133, 208} is a load-bearing fidelity choice: a candidate that lazily loaded the same {6, 133, 135, 208} set as main-menu would still work (unused banks don't render), but documenting the actual bank dependency surfaces the screen's true asset footprint and would catch any spec drift where, e.g., OPTIONS later starts using bank 133 for a sub-screen heading.
+---
+
+## 2026-04-26T15:35:00Z — O1
+- Verified composition gate: rebuilt + re-dumped OPTIONS via `SILENCER_DUMP_SCREEN=options SILENCER_DUMP_DIR=/tmp/sdl3_dump ./build/silencer_design $(pwd)/shared/assets`. Bytewise diff vs `/tmp/real_options_dump.ppm` is 1,758 bytes ≈ 0.19% — unchanged from O0 baseline.
+- Visual A/B (`/tmp/sdl3_dump/screen_00.png` vs `/tmp/real_options_dump.png`): indistinguishable to a casual reader. Both show the bank-6 idx-0 starfield+planet background, four B196x33 buttons (Controls / Display / Audio / Go Back) at engine anchors, no bank-208 logo overlay, no version-string overlay, uniform brightness across all four buttons.
+- O0's `RunDumpOptions` already loads exactly banks {6, 135} (skipping bank 133 and bank 208) and composes exactly four button entries, so the composition gate was complete-by-construction — zero-code-change pass, as the patterns line predicted.
+- Files touched: `.ralph/options/prd.json` (O1 → passes:true), `.ralph/options/progress.txt` (this entry + one Codebase Patterns line).
+- Visual diff summary: aliasing/blend-noise residue only — uniform sub-pixel scatter in starfield + glyph-anti-alias edges. No structural mismatch (no missing/extra objects, no positional drift visible).
+- Spec gaps: none new. The screen-options.md vs widget-overlay.md anchor-formula reconciliation flagged in the O0 entry remains outstanding — empirically the widget-overlay rule (`top_left = anchor - sprite.offset`) is the load-bearing one; the screen-options.md "+ screen_center" addition is over-specified and produces wrong placement if applied literally on top of the widget-button.md offsets.
+- **Learnings:**
+  - "Free flip" cascade pattern from the main-menu Ralph reproduces in OPTIONS: when the structural decisions (bank set, composition list, state defaults) all live inside a single screen-builder function, downstream gates that audit those same decisions (composition / anchors / state) flip to PASS without further code edits — they are post-hoc verifications of the O0 commit, not separate work units.
+  - The "Composition correct, no logo, no version" gate is best evidenced by *what's loaded*, not just *what's drawn*: a candidate that loaded bank 208 but didn't draw it would still pass a pixel-level check, but would silently regress the bank-dependency footprint and fail any future test that gates on the loaded-bank set. Loading exactly {6, 135} makes the absence load-bearing in code, not just visually.
 ---

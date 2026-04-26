@@ -16,7 +16,7 @@
       "id": "O1",
       "name": "Composition correct (background + 4 buttons, no logo, no version)",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "spec": "The dump shows: bank-6 idx-0 fullscreen background; four B196x33 buttons with text Controls / Display / Audio / Go Back; no bank-208 logo overlay; no version overlay. Per docs/design/screen-options.md.",
       "category": "composition"
     },
