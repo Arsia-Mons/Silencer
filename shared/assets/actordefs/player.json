@@ -1226,43 +1226,6 @@
         "condition": "sequence_complete"
       }
     ],
-    "positions": {
-      "WALKIN": {
-        "x": 400,
-        "y": 100
-      },
-      "WALKOUT": {
-        "x": 700,
-        "y": 100
-      },
-      "CROUCHING": {
-        "x": 400,
-        "y": 300
-      },
-      "CROUCHED": {
-        "x": 700,
-        "y": 300
-      },
-      "UNCROUCHING": {
-        "x": 1000,
-        "y": 300
-      },
-      "CROUCHEDTHROWING": {
-        "x": 1000,
-        "y": 500
-      },
-      "ROLLING": {
-        "x": 700,
-        "y": 500
-      },
-      "DEPLOYING": {
-        "x": 100,
-        "y": 100
-      },
-      "UNDEPLOYING": {
-        "x": 100,
-        "y": 300
-      }
-    }
+    "positions": {}
   }
 }

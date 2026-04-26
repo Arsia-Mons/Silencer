@@ -2,10 +2,11 @@
 /**
  * C6 – State machine editor (ReactFlow)
  * Nodes  = animation sequences
- * Edges  = transitions between states
+ * Edges  = transitions between states (smoothstep routing, dagre layout)
  * Right panel = inspector for selected edge / node
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import dagre from 'dagre';
 import ReactFlow, {
   ReactFlowProvider,
   Background,
@@ -42,8 +43,8 @@ const KNOWN_CONDITIONS = [
   'spawn',
 ];
 
-const GRID_COL = 220;
-const GRID_ROW = 140;
+const NODE_W = 160;
+const NODE_H = 90;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -66,13 +67,21 @@ function normalizeSM(sm: StateMachine, seqNames: string[]): StateMachine {
 }
 
 function defaultSM(seqNames: string[]): StateMachine {
-  const positions: StateMachine['positions'] = {};
-  seqNames.forEach((name, i) => {
-    const col = i % 4;
-    const row = Math.floor(i / 4);
-    positions[name] = { x: col * GRID_COL, y: row * GRID_ROW };
+  return { initial: seqNames[0] ?? null, transitions: [], positions: {} };
+}
+
+/** dagre left-to-right layout. Returns updated node positions. */
+function dagreLayout(nodes: Node[], edges: Edge[]): Node[] {
+  const g = new dagre.graphlib.Graph();
+  g.setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: 'LR', nodesep: 60, ranksep: 100, marginx: 40, marginy: 40 });
+  for (const n of nodes) g.setNode(n.id, { width: NODE_W, height: NODE_H });
+  for (const e of edges) g.setEdge(e.source, e.target);
+  dagre.layout(g);
+  return nodes.map(n => {
+    const pos = g.node(n.id);
+    return { ...n, position: { x: pos.x - NODE_W / 2, y: pos.y - NODE_H / 2 } };
   });
-  return { initial: seqNames[0] ?? null, transitions: [], positions };
 }
 
 function smToFlow(
@@ -80,6 +89,7 @@ function smToFlow(
   seqNames: string[],
   sequences: NonNullable<ActorDef['sequences']>,
 ): { nodes: Node[]; edges: Edge[] } {
+  // Build nodes; if no saved position use (0,0) — dagre will fix on first layout
   const nodes: Node[] = seqNames.map(name => ({
     id: name,
     type: 'stateNode',
@@ -94,19 +104,27 @@ function smToFlow(
     },
   }));
 
-  const edges: Edge[] = sm.transitions.map(t => ({
+  const edges: Edge[] = sm.transitions.map(t => makeEdge(t));
+
+  // Auto-layout if no positions saved
+  const hasPositions = seqNames.some(n => sm.positions[n]);
+  return { nodes: hasPositions ? nodes : dagreLayout(nodes, edges), edges };
+}
+
+function makeEdge(t: StateMachineTransition): Edge {
+  return {
     id: t.id,
     source: t.from,
     target: t.to,
+    type: 'smoothstep',
     label: t.condition || '—',
-    labelStyle: { fill: '#8aff80', fontSize: 10, fontFamily: 'monospace' },
-    labelBgStyle: { fill: '#0d1a0d', fillOpacity: 0.85 },
-    style: { stroke: '#4a8a4a' },
-    markerEnd: { type: MarkerType.ArrowClosed, color: '#4a8a4a' },
-    animated: false,
-  }));
-
-  return { nodes, edges };
+    labelStyle: { fill: '#8aff80', fontSize: 10, fontFamily: 'monospace', fontWeight: 600 },
+    labelBgStyle: { fill: '#0a150a', fillOpacity: 0.95 },
+    labelBgPadding: [4, 3] as [number, number],
+    labelBgBorderRadius: 2,
+    style: { stroke: '#3a7a3a', strokeWidth: 1.5 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: '#3a7a3a', width: 16, height: 16 },
+  };
 }
 
 // ─── Custom Node ──────────────────────────────────────────────────────────────
@@ -119,7 +137,7 @@ function StateNode({ data }: NodeProps) {
           ? 'border-game-primary bg-game-primary/20 text-game-primary'
           : 'border-game-border bg-game-bgCard text-game-text'
       }`}
-      style={{ minWidth: 140, minHeight: 70 }}
+      style={{ width: NODE_W, minHeight: NODE_H }}
     >
       <Handle type="target" position={Position.Left} style={{ background: '#4a8a4a', borderColor: '#4a8a4a' }} />
       <Handle type="source" position={Position.Right} style={{ background: '#4a8a4a', borderColor: '#4a8a4a' }} />
@@ -225,19 +243,14 @@ function StateMachineInner({ def, onChange }: Props) {
 
   const onConnect = useCallback(
     (connection: Connection) => {
-      const newEdge: Edge = {
-        ...connection,
+      const t: StateMachineTransition = {
         id: uid(),
-        source: connection.source!,
-        target: connection.target!,
-        label: '—',
-        labelStyle: { fill: '#8aff80', fontSize: 10, fontFamily: 'monospace' },
-        labelBgStyle: { fill: '#0d1a0d', fillOpacity: 0.85 },
-        style: { stroke: '#4a8a4a' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: '#4a8a4a' },
+        from: connection.source!,
+        to: connection.target!,
+        condition: '',
       };
       setEdges(es => {
-        const next = addEdge(newEdge, es);
+        const next = addEdge(makeEdge(t), es);
         emitChange(nodes, next);
         return next;
       });
@@ -264,11 +277,16 @@ function StateMachineInner({ def, onChange }: Props) {
 
   function saveEdgeCondition() {
     setEdges(es => {
-      const next = es.map(e =>
-        e.id === selectedEdgeId
-          ? { ...e, label: conditionEdit.trim() || '—' }
-          : e,
-      );
+      const next = es.map(e => {
+        if (e.id !== selectedEdgeId) return e;
+        const condition = conditionEdit.trim();
+        return makeEdge({
+          id: e.id,
+          from: e.source,
+          to: e.target,
+          condition,
+        });
+      });
       emitChange(nodes, next);
       return next;
     });
@@ -286,18 +304,14 @@ function StateMachineInner({ def, onChange }: Props) {
 
   function addTransition() {
     if (!addFrom || !addTo || addFrom === addTo) return;
-    const newEdge: Edge = {
+    const t: StateMachineTransition = {
       id: uid(),
-      source: addFrom,
-      target: addTo,
-      label: addCondition.trim() || '—',
-      labelStyle: { fill: '#8aff80', fontSize: 10, fontFamily: 'monospace' },
-      labelBgStyle: { fill: '#0d1a0d', fillOpacity: 0.85 },
-      style: { stroke: '#4a8a4a' },
-      markerEnd: { type: MarkerType.ArrowClosed, color: '#4a8a4a' },
+      from: addFrom,
+      to: addTo,
+      condition: addCondition.trim(),
     };
     setEdges(es => {
-      const next = [...es, newEdge];
+      const next = [...es, makeEdge(t)];
       emitChange(nodes, next);
       return next;
     });
@@ -314,12 +328,9 @@ function StateMachineInner({ def, onChange }: Props) {
 
   function autoLayout() {
     setNodes(ns => {
-      const next = ns.map((n, i) => ({
-        ...n,
-        position: { x: (i % 4) * GRID_COL, y: Math.floor(i / 4) * GRID_ROW },
-      }));
-      emitChange(next, edges);
-      return next;
+      const laid = dagreLayout(ns, edges);
+      emitChange(laid, edges);
+      return laid;
     });
   }
 
