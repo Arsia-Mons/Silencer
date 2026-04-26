@@ -16,7 +16,7 @@
       "id": "C1",
       "name": "Frame panel rendered (bank 7 idx 7, fullscreen bordered overlay)",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "spec": "Bank 7 idx 7 fullscreen bordered panel renders correctly on top of the bank-6 idx-0 starfield+planet bg. May require extending the candidate's sprite-bank loader to include bank 7. Pattern fidelity matches reference (same green-bevel border decoration, same interior treatment).",
       "category": "sprite_codec"
     },

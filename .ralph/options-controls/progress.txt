@@ -5,6 +5,7 @@
 - Screen-switch extension recipe (carryover from D0/A0/O0): one new `if (screen_str == "options_controls")` branch in `main()` plus a sibling `RunDumpOptionsControls(...)` function. Zero edits to prior Run*; bytewise diffs vs all four prior reference dumps stay at exact baseline (main 2136, options 1758, audio 1035, display 2211).
 - OPTIONSCONTROLS bank set is `{6, 7, 134, 135}` — strictly larger than every prior screen. Bank 7 (panel borders idx 7..14, scrollbar track idx 9, scrollbar thumb idx 10 per `docs/design-system.md.archive:2124`) and bank 134 (small body font, w=10 for keyname labels and w=9 for OR/AND connectors) are NEW load surface. B112x33 lives at bank 6 idx 28 (archive:633), so no new bank needed for the half-width key buttons.
 - Scrollbar widget specs (NOT in widget-button.md, found in `docs/design-system.md.archive:1080-1130`): bank 7, track `res_index = 9`, thumb `barres_index = 10`, scrollposition+scrollmax engine state. The reference dump for OPTIONSCONTROLS has `scrollposition = 0` so the thumb is at the top of the track. No `widget-scrollbar.md` exists yet — flagged as orchestrator's call.
+- Bank 7 idx 7 frame panel sprite is FULL-SCREEN composite: it bakes in (a) outer green-bevel border with corner caps, (b) the centered "Configure Controls" title-plate cutout at top, (c) inner-frame divider, AND (d) the **scrollbar track + both chevron caps** at the right edge. Only the moveable scrollbar **thumb** needs a separate render in C4. This means C4's payload is a single bank-7 idx-10 thumb blit at the track's top — meaningfully smaller than the spec's "track + thumb + chevrons" framing implied. Codec branch: tile-mode RLE; decodes correctly with no codec changes.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -78,4 +79,59 @@
     pattern used for OPTIONS / OPTIONSAUDIO, motivated by the spec's explicit
     flag that bank 7 idx 7 may use tile-mode RLE and may be a new visual element
     not yet tested. Splitting C0/C1 isolates the bank 7 risk from the screen-switch.
+---
+
+## 2026-04-26T15:30:00Z — iter 2 (C1 PASS)
+- Added a single `BlitSprite(fb, sprites.Get(7, 7), 0, 0, nullptr)` after the
+  bg-plate blit in `RunDumpOptionsControls`. Bank 7 was already in the load
+  list at C0, so this iteration is a pure rendering addition (3 lines of code).
+- Build: `cmake --build shared/design/sdl3/build` exits 0.
+- Dump: 921615 bytes (canonical PPM size invariant).
+- Regression checks (all clean, exact baselines): main 2136, options 1758,
+  audio 1035, display 2211.
+- Bytewise diff vs `/tmp/real_optionscontrols_dump.ppm`: 107,666 bytes
+  (~11.7% pixel-channel diff). NOT the gate for C1 — the title, 6 form rows,
+  scrollbar thumb, and Save/Cancel buttons are intentionally absent at C1
+  and account for all of the residue.
+- Visual A/B (Discord DM 1498085872732471338): C1 candidate renders the
+  outer green-bevel border, the title-plate cutout at top, the inner frame,
+  the scrollbar track + both chevron caps, and the bottom corners — all
+  pixel-coincident with the reference frame panel. Mars + starfield show
+  through the empty interior, exactly matching the reference's interior
+  starfield bleed where no widgets occlude it.
+- Spec gaps encountered (CONFIRMED + NEW):
+  - **Bank 7 idx 7 is a single full-screen tile-mode RLE sprite**, not a
+    composite of corner sprites. The spec's "may use tile-mode RLE codec"
+    speculation is confirmed; no new codec work needed.
+  - **The scrollbar TRACK is part of the frame-panel sprite**, not a
+    separate widget. This contradicts the strict reading of the spec /
+    archive:1080-1130 / `prd.json` C4 ("res_index=9 in the scrollbar bank
+    is the track"). For OPTIONSCONTROLS rendering purposes, idx 9 is
+    redundant — the only widget-rendered scrollbar element is the thumb
+    (idx 10). The C4 spec should be updated to reflect: "thumb (idx 10)
+    only — track is baked into the frame panel."
+  - **`widget-frame.md` should be authored** documenting bank 7 idx 7 as
+    a full-screen composite frame with baked title-plate cutout and
+    scrollbar-track decoration. This is more useful framing than treating
+    it as a generic "bordered panel" since the title-plate cutout
+    constrains where the title overlay can go.
+- **Learnings:**
+  - The spec's framing (frame panel + separate scrollbar widget) was
+    structurally correct but compositionally wrong — at the sprite level,
+    the engine packs the "frame chrome" (border + title plate + scrollbar
+    track) into one composite asset and renders only the dynamic parts
+    (title text, form widgets, scrollbar thumb) on top. This is a useful
+    pattern: when in doubt about whether decorative geometry is
+    sprite-baked vs. widget-composed, blit the candidate sprite alone
+    and inspect — the answer is usually visible at first sight.
+  - Bank 7 was loaded at C0 but not visually exercised; C1's payload is
+    therefore "do nothing new with assets, just blit the already-loaded
+    sprite." The decoupling of bank-loading (C0) from bank-rendering
+    (C1) caught no codec issues — but DID reveal the scrollbar-track
+    pattern above, which is a downstream simplification for C4.
+  - The visual gate (eyeballing the PNG) is decisive at C1, not the
+    bytewise diff — 107K bytes of diff still represented a PASS because
+    every diffed pixel is in a region intentionally blank at this iter.
+    Pattern: "diff size ≠ correctness when missing widgets account for
+    the diff."
 ---

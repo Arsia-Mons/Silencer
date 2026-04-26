@@ -549,7 +549,15 @@ static int RunDumpOptionsControls(const std::string &assets_dir,
     BlitSprite(fb, sprites.Get(6, 0), 0, 0, nullptr);
   }
 
-  // C0 gate stops here: bg plate only. C1+ will compose frame panel,
+  // 2) Frame panel: bank 7 idx 7, fullscreen bordered overlay at (0, 0).
+  //    The sprite's own offset (likely 0, 0 since the frame is screen-aligned)
+  //    plus the anchor convention top_left = anchor - sprite.offset places it
+  //    correctly. May decode via tile-mode RLE — the codec already handles it.
+  if (sprites.Has(7, 7)) {
+    BlitSprite(fb, sprites.Get(7, 7), 0, 0, nullptr);
+  }
+
+  // C1 gate stops here: bg plate + frame panel. C2+ will compose
   // title, 6-row form, scrollbar, Save/Cancel.
 
   std::filesystem::create_directories(dump_dir);
