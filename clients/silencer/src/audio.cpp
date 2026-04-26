@@ -20,7 +20,7 @@ Audio & Audio::GetInstance(void){
 }
 
 bool Audio::Init(Game * game){
-	if(Mix_OpenAudio(44100, AUDIO_S16, 1, 1024) == -1){
+	if(Mix_OpenAudio(SDL_AUDIO_DEVICE_DEFAULT_OUTPUT, NULL) == false){
 		return false;
 	}else{
 		Mix_AllocateChannels(maxchannels);

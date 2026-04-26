@@ -9,9 +9,9 @@
 #endif
 
 #define SDL_MAIN_HANDLED
-#include <SDL.h>
-#include <SDL_mixer.h>
-#include <SDL_syswm.h>
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_mixer.h>
+#include <SDL3/SDL_syswm.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -63,7 +63,6 @@ typedef int socklen_t;
 #ifdef __ANDROID__
 #include <android/log.h>
 #include <jni.h>
-#include <SDL_opengles2.h>
 #define printf(...) __android_log_print(ANDROID_LOG_DEBUG, "TAG", __VA_ARGS__);
 extern JNIEnv * jenv;
 extern JavaVM * jvm;

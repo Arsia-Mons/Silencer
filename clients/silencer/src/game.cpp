@@ -116,7 +116,7 @@ Game::~Game(){
 		SDL_GL_DeleteContext(glcontext);
 	}
 	if(sdlscreenbuffer){
-		SDL_FreeSurface(sdlscreenbuffer);
+		SDL_DestroySurface(sdlscreenbuffer);
 	}
 	if(usingopengl){
 		SDL_GL_UnloadLibrary();
@@ -126,9 +126,6 @@ Game::~Game(){
 	}
 	if(streamingtexture){
 		SDL_DestroyTexture(streamingtexture);
-	}
-	if(streamingtexturepixelformat){
-		SDL_FreeFormat(streamingtexturepixelformat);
 	}
 	if(window){
 		SDL_DestroyWindow(window);
@@ -193,13 +190,13 @@ bool Game::Load(char * cmdline){
 	Config::GetInstance().Load();
 	if(world.dedicatedserver.active){
 		// Minimal init for dedicated-server mode: timer for SDL_GetTicks pacing.
-		if(SDL_Init(SDL_INIT_TIMER) == -1){
+		if(!SDL_Init(SDL_INIT_TIMER)){
 			printf("Could not initialize SDL timer %s\n", SDL_GetError());
 			return false;
 		}
 	}
 	if(!world.dedicatedserver.active){
-		if(SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER) == -1){
+		if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_TIMER)){
 			printf("Could not initialize SDL %s\n", SDL_GetError());
 			return false;
 		}
@@ -223,15 +220,16 @@ bool Game::Load(char * cmdline){
 			return false;
 		}
 		SDL_AddTimer(1000, TimerCallback, this);
-		SDL_EventState(SDL_TEXTINPUT, SDL_TRUE); //SDL_EnableUNICODE(true);
+		//SDL_EnableUNICODE(true);
 		//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 		//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-		window = SDL_CreateWindow("Silencer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
+		window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+		SDL_StartTextInput(window);
 		if(!SetupOpenGL()){
 			//printf("Unable to setup OpenGL shaders, using SDL Renderer\n");
 			usingopengl = false;
 			CreateRenderer();
-			sdlscreenbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, screenbuffer.w, screenbuffer.h, 8, 0, 0, 0, 0);
+			sdlscreenbuffer = SDL_CreateSurface(screenbuffer.w, screenbuffer.h, SDL_PIXELFORMAT_INDEX8);
 			CreateStreamingTexture();
 		}
 		SetColors(renderer.palette.GetColors());
@@ -384,7 +382,7 @@ void Game::CreateRenderer(void){
 		SDL_DestroyRenderer(windowrenderer);
 		windowrenderer = 0;
 	}
-	windowrenderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	windowrenderer = SDL_CreateRenderer(window, NULL);
 }
 
 void Game::CreateStreamingTexture(void){
@@ -397,25 +395,10 @@ void Game::CreateStreamingTexture(void){
 		SDL_DestroyTexture(streamingtexture);
 		streamingtexture = 0;
 	}
-	if(streamingtexturepixelformat){
-		SDL_FreeFormat(streamingtexturepixelformat);
-		streamingtexturepixelformat = 0;
-	}
-	SDL_RendererInfo rendererinfo;
-	SDL_GetRendererInfo(windowrenderer, &rendererinfo);
-	Uint32 pixelformat = 0;
-	for(int i = 0; i < rendererinfo.num_texture_formats; i++){
-		Uint32 format = rendererinfo.texture_formats[i];
-		if(!SDL_ISPIXELFORMAT_FOURCC(format) && !SDL_ISPIXELFORMAT_INDEXED(format) && (!pixelformat || SDL_BYTESPERPIXEL(format) < SDL_BYTESPERPIXEL(pixelformat))){
-			pixelformat = format;
-		}
-	}
-	if(pixelformat){
-		streamingtexture = SDL_CreateTexture(windowrenderer, pixelformat, SDL_TEXTUREACCESS_STREAMING, screenbuffer.w, screenbuffer.h);
-		Uint32 format;
-		SDL_QueryTexture(streamingtexture, &format, 0, 0, 0);
-		streamingtexturepixelformat = SDL_AllocFormat(format);
-	}
+	// SDL3: pick a reliable non-indexed, non-FOURCC format
+	Uint32 pixelformat = SDL_PIXELFORMAT_XRGB8888;
+	streamingtexture = SDL_CreateTexture(windowrenderer, pixelformat, SDL_TEXTUREACCESS_STREAMING, screenbuffer.w, screenbuffer.h);
+	streamingtexturepixelformat = pixelformat;
 }
 
 void Game::Present(void){
@@ -472,7 +455,7 @@ void Game::Present(void){
 					}
 				}
 				SDL_UnlockTexture(streamingtexture);
-				SDL_RenderCopy(windowrenderer, streamingtexture, 0, 0);
+				SDL_RenderTexture(windowrenderer, streamingtexture, NULL, NULL);
 				SDL_RenderPresent(windowrenderer);
 			}
 		}else{
@@ -480,7 +463,7 @@ void Game::Present(void){
 			sdlscreenbuffer->pixels = screenbuffer.pixels.data();
 			SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, sdlscreenbuffer);
 			sdlscreenbuffer->pixels = oldpixels;
-			SDL_RenderCopy(windowrenderer, texture, 0, 0);
+			SDL_RenderTexture(windowrenderer, texture, NULL, NULL);
 			SDL_DestroyTexture(texture);
 			SDL_RenderPresent(windowrenderer);
 		}
@@ -510,17 +493,17 @@ void Game::SetColors(SDL_Color * colors){
 		glPixelStorei(GL_PACK_ALIGNMENT, 4);
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, colors);*/
 	}else{
-		SDL_SetPaletteColors(sdlscreenbuffer->format->palette, colors, 0, 256);
+		SDL_SetPaletteColors(sdlscreenbuffer->palette, colors, 0, 256);
 		if(streamingtexture){
 			for(int i = 0; i < 256; i++){
-				streamingtexturepalette[i] = SDL_MapRGB(streamingtexturepixelformat, colors[i].r, colors[i].g, colors[i].b);
+				streamingtexturepalette[i] = SDL_MapRGB(SDL_GetPixelFormatDetails(streamingtexturepixelformat), NULL, colors[i].r, colors[i].g, colors[i].b);
 			}
 		}
 	}
 }
 
-Uint32 Game::TimerCallback(Uint32 interval, void * param){
-	Game * game = static_cast<Game *>(param);
+Uint32 Game::TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval){
+	Game * game = static_cast<Game *>(userdata);
 	game->updatetitle = true;
 	game->fps = game->frames;
 	return 1000;
@@ -547,7 +530,7 @@ bool Game::Loop(void){
 		world.DoNetwork();
 	}*/
 	world.DoNetwork();
-	Uint32 tickcheck = SDL_GetTicks();
+	Uint64 tickcheck = SDL_GetTicks();
 	if(world.replay.IsPlaying()){
 		wait = 42 * world.replay.speed;
 		if(world.replay.ffmpeg && world.replay.ffmpegvideo){
@@ -605,9 +588,9 @@ bool Game::Loop(void){
 			int j = 0;
 			for(int y = screenbuffer.h; y > 0; y--){
 				for(int x = screenbuffer.w; x > 0; x--){
-					buffer[i++] = sdlscreenbuffer->format->palette->colors[screenbuffer.pixels[j]].r;
-					buffer[i++] = sdlscreenbuffer->format->palette->colors[screenbuffer.pixels[j]].g;
-					buffer[i++] = sdlscreenbuffer->format->palette->colors[screenbuffer.pixels[j]].b;
+					buffer[i++] = sdlscreenbuffer->palette->colors[screenbuffer.pixels[j]].r;
+					buffer[i++] = sdlscreenbuffer->palette->colors[screenbuffer.pixels[j]].g;
+					buffer[i++] = sdlscreenbuffer->palette->colors[screenbuffer.pixels[j]].b;
 					j++;
 				}
 			}
@@ -713,17 +696,17 @@ bool Game::Tick(void){
 	
 	if(world.gameplaystate == World::INGAME && (state == INGAME || state == SINGLEPLAYERGAME || state == TESTGAME)){
 		UpdateAmbienceChannels();
-		SDL_ShowCursor(SDL_DISABLE);
+		SDL_HideCursor();
 	}else{
-		SDL_ShowCursor(SDL_ENABLE);
+		SDL_ShowCursor();
 	}
 	
 	if(keystate[SDL_SCANCODE_RALT] && keystate[SDL_SCANCODE_RETURN]){
 		if(!fullscreentoggled){
-			if(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN_DESKTOP){
-				SDL_SetWindowFullscreen(window, 0);
+			if(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN){
+				SDL_SetWindowFullscreen(window, false);
 			}else{
-				SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+				SDL_SetWindowFullscreen(window, true);
 			}
 			fullscreentoggled = true;
 		}
@@ -1828,9 +1811,9 @@ bool Game::Tick(void){
 									case 0:{ // fullscreen
 										Config::GetInstance().fullscreen = Config::GetInstance().fullscreen ? false : true;
 										if(Config::GetInstance().fullscreen){
-											SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+											SDL_SetWindowFullscreen(window, true);
 										}else{
-											SDL_SetWindowFullscreen(window, 0);
+											SDL_SetWindowFullscreen(window, false);
 										}
 									}break;
 									case 1:{ // smooth scaling
@@ -1845,9 +1828,9 @@ bool Game::Tick(void){
 										Config::GetInstance().Load();
 										CreateStreamingTexture();
 										if(Config::GetInstance().fullscreen){
-											SDL_SetWindowFullscreen(window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+											SDL_SetWindowFullscreen(window, true);
 										}else{
-											SDL_SetWindowFullscreen(window, 0);
+											SDL_SetWindowFullscreen(window, false);
 										}
 										GoToState(OPTIONS);
 									}break;
@@ -2154,9 +2137,9 @@ bool Game::Tick(void){
 }
 
 void Game::UpdateInputState(Input & input){
-	int mousex;
-	int mousey;
-	Uint8 mousestate = SDL_GetMouseState(&mousex, &mousey);
+	float mousex;
+	float mousey;
+	Uint32 mousestate = SDL_GetMouseState(&mousex, &mousey);
 	input.keymoveup = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keymoveupbinding, Config::GetInstance().keymoveupoperator);
 	input.keymovedown = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keymovedownbinding, Config::GetInstance().keymovedownoperator);
 	input.keymoveleft = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keymoveleftbinding, Config::GetInstance().keymoveleftoperator);
@@ -4785,8 +4768,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 						ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
 						if(minimized && world.lobby.chatmessages.size() > chatlinesprinted){
 							SDL_SysWMinfo info;
-							SDL_VERSION(&info.version);
-							if(SDL_GetWindowWMInfo(window, &info)){
+						if(SDL_GetWindowWMInfo(window, &info, SDL_SYSWM_CURRENT_VERSION)){
 #ifdef _WIN32
 								if(info.subsystem == SDL_SYSWM_WINDOWS){
 									FLASHWINFO flashinfo;
@@ -6068,39 +6050,35 @@ bool Game::HandleSDLEvents(void){
 	SDL_Event event;
 	while(SDL_PollEvent(&event) > 0){
 		switch(event.type){
-			case SDL_WINDOWEVENT:{
-				switch(event.window.event){
-					case SDL_WINDOWEVENT_RESIZED:{
-						if(usingopengl){
-							//glViewport(0, 0, event.window.data1, event.window.data2);
-						}
-					}break;
-					case SDL_WINDOWEVENT_FOCUS_GAINED:{
-						// fix for Windows sdl bug where viewport is changed when another app goes fullscreen, causing render to go black
-						SDL_RenderSetViewport(windowrenderer, 0);
-						if(!world.replay.IsPlaying()){
-							Audio::GetInstance().Unmute();
-						}
-						minimized = false;
-					}break;
-					case SDL_WINDOWEVENT_FOCUS_LOST:{
-						if(!world.replay.IsPlaying()){
-							Audio::GetInstance().Mute(25);
-						}
-						minimized = true;
-					}break;
-					case SDL_WINDOWEVENT_MINIMIZED:{
-						minimized = true;
-					}break;
-					case SDL_WINDOWEVENT_MAXIMIZED:{
-						minimized = false;
-					}break;
-					case SDL_WINDOWEVENT_RESTORED:{
-						minimized = false;
-					}break;
+			case SDL_EVENT_WINDOW_RESIZED:{
+				if(usingopengl){
+					//glViewport(0, 0, event.window.data1, event.window.data2);
 				}
 			}break;
-			case SDL_TEXTINPUT:{
+			case SDL_EVENT_WINDOW_FOCUS_GAINED:{
+				// fix for Windows sdl bug where viewport is changed when another app goes fullscreen, causing render to go black
+				SDL_SetRenderViewport(windowrenderer, NULL);
+				if(!world.replay.IsPlaying()){
+					Audio::GetInstance().Unmute();
+				}
+				minimized = false;
+			}break;
+			case SDL_EVENT_WINDOW_FOCUS_LOST:{
+				if(!world.replay.IsPlaying()){
+					Audio::GetInstance().Mute(25);
+				}
+				minimized = true;
+			}break;
+			case SDL_EVENT_WINDOW_MINIMIZED:{
+				minimized = true;
+			}break;
+			case SDL_EVENT_WINDOW_MAXIMIZED:{
+				minimized = false;
+			}break;
+			case SDL_EVENT_WINDOW_RESTORED:{
+				minimized = false;
+			}break;
+			case SDL_EVENT_TEXT_INPUT:{
 				char ascii = event.text.text[0] & 0x7F;
 				bool skip = true;
 				if(ascii >= 0x20 && ascii <= 0x7F){
@@ -6128,8 +6106,8 @@ bool Game::HandleSDLEvents(void){
 					}
 				}
 			}break;
-			case SDL_KEYDOWN:{
-				if(event.key.keysym.scancode == quitscancode){
+			case SDL_EVENT_KEY_DOWN:{
+				if(event.key.scancode == quitscancode){
 					Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 					if(localplayer && !localplayer->chatinterfaceid && !localplayer->buyinterfaceid){
 						if(world.quitstate == 0){
@@ -6140,23 +6118,23 @@ bool Game::HandleSDLEvents(void){
 						}
 					}
 				}
-				if(event.key.keysym.scancode == SDL_SCANCODE_F1){
+				if(event.key.scancode == SDL_SCANCODE_F1){
 					world.showplayerlist = true;
 				}
-				if(event.key.keysym.scancode == SDL_SCANCODE_F2){
+				if(event.key.scancode == SDL_SCANCODE_F2){
 					if(world.showteamcolors){
 						world.showteamcolors = false;
 					}else{
 						world.showteamcolors = true;
 					}
 				}
-				if(event.key.keysym.scancode == SDL_SCANCODE_F5){
+				if(event.key.scancode == SDL_SCANCODE_F5){
 					// play new music track
 					LoadRandomGameMusic();
 					//Audio::GetInstance().PlayMusic(world.resources.gamemusic);
 					PlayMusic(world.resources.gamemusic);
 				}
-				if(event.key.keysym.scancode == SDL_SCANCODE_F4){
+				if(event.key.scancode == SDL_SCANCODE_F4){
 					// toggle music playing
 					if(Config::GetInstance().music){
 						if(Audio::GetInstance().MusicPaused()){
@@ -6168,10 +6146,10 @@ bool Game::HandleSDLEvents(void){
 						}
 					}
 				}
-				keystate[event.key.keysym.scancode] = true;
-				bool skip = true;
-				Uint8 ascii;
-				switch(event.key.keysym.scancode){
+				keystate[event.key.scancode] = true;
+			bool skip = true;
+			Uint8 ascii;
+			switch(event.key.scancode){
 					case SDL_SCANCODE_LEFT:
 						ascii = 1;
 						skip = false;
@@ -6217,14 +6195,14 @@ bool Game::HandleSDLEvents(void){
 				}
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 				if(iface){
-					iface->lastsym = event.key.keysym.scancode;
+					iface->lastsym = event.key.scancode;
 					if(!skip){
 						iface->ProcessKeyPress(world, ascii);
 					}
 				}
 			}break;
-			case SDL_KEYUP:{
-				if(event.key.keysym.scancode == quitscancode){
+			case SDL_EVENT_KEY_UP:{
+				if(event.key.scancode == quitscancode){
 					if(world.quitstate == 1){
 						world.quitstate = 2;
 					}
@@ -6232,12 +6210,12 @@ bool Game::HandleSDLEvents(void){
 						world.quitstate = 0;
 					}
 				}
-				if(event.key.keysym.scancode == SDL_SCANCODE_F1){
+				if(event.key.scancode == SDL_SCANCODE_F1){
 					world.showplayerlist = false;
 				}
-				keystate[event.key.keysym.scancode] = false;
+				keystate[event.key.scancode] = false;
 			}break;
-			case SDL_MOUSEWHEEL:{
+			case SDL_EVENT_MOUSE_WHEEL:{
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 				if(iface){
 					if(event.wheel.y > 0){
@@ -6248,7 +6226,7 @@ bool Game::HandleSDLEvents(void){
 					}
 				}
 			}break;
-			case SDL_MOUSEBUTTONDOWN:{
+			case SDL_EVENT_MOUSE_BUTTON_DOWN:{
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 				if(iface){
 					if(event.button.button == SDL_BUTTON_LEFT){
@@ -6258,7 +6236,7 @@ bool Game::HandleSDLEvents(void){
 					}
 				}
 			}break;
-			case SDL_MOUSEBUTTONUP:{
+			case SDL_EVENT_MOUSE_BUTTON_UP:{
 				if(event.button.button == SDL_BUTTON_LEFT){
 					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 					if(iface){
@@ -6268,7 +6246,7 @@ bool Game::HandleSDLEvents(void){
 					}
 				}
 			}break;
-			case SDL_MOUSEMOTION:{
+			case SDL_EVENT_MOUSE_MOTION:{
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 				if(iface){
 					int w, h;
@@ -6276,7 +6254,7 @@ bool Game::HandleSDLEvents(void){
 					iface->ProcessMouseMove(world, (float(event.button.x) / w) * 640, (float(event.button.y) / h) * 480);
 				}
 			}break;
-			case SDL_QUIT:
+			case SDL_EVENT_QUIT:
 				return false;
 			break;
 		}

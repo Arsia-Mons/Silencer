@@ -455,11 +455,11 @@ void Lobby::ResolveHostname(const char * host){
 }
 
 void Lobby::LockMutex(void){
-	SDL_mutexP(mutex);
+	SDL_LockMutex(mutex);
 }
 
 void Lobby::UnlockMutex(void){
-	SDL_mutexV(mutex);
+	SDL_UnlockMutex(mutex);
 }
 
 void Lobby::SendMessage(const char msg[256], Uint8 size){
@@ -679,7 +679,8 @@ int Lobby::ResolveThreadFunc(void * param){
 	strcpy(host, ((Lobby *)param)->resolvehost);
 	((Lobby *)param)->resolvethreadrunning = true;
 	hostent * he = gethostbyname(host);
-	if(SDL_mutexP(mutex) == 0){
+	SDL_LockMutex(mutex);
+	{
 		((Lobby *)param)->he = he;
 		if(he && he->h_addr){
 			((Lobby *)param)->state = RESOLVED;
@@ -689,7 +690,7 @@ int Lobby::ResolveThreadFunc(void * param){
 			((Lobby *)param)->state = RESOLVEFAILED;
 		}
 		((Lobby *)param)->resolvethreadrunning = false;
-		SDL_mutexV(mutex);
+		SDL_UnlockMutex(mutex);
 	}
 	return 0;
 }

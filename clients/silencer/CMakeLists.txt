@@ -85,8 +85,8 @@ target_compile_definitions(${SILENCER_TARGET} PRIVATE
 )
 
 find_package(ZLIB REQUIRED)
-find_package(SDL2 REQUIRED)
-find_package(SDL2_mixer REQUIRED)
+find_package(SDL3 REQUIRED)
+find_package(SDL3_mixer REQUIRED)
 find_package(CURL REQUIRED)
 
 # Minizip: prefer vcpkg's CMake CONFIG packages (Windows CI), then fall back
@@ -119,21 +119,21 @@ else()
 	target_link_libraries(minizip_dep INTERFACE PkgConfig::MINIZIP)
 endif()
 
-include_directories(${SDL2_INCLUDE_DIR} ${SDL2_MIXER_INCLUDE_DIRS} ${ZLIB_INCLUDE_DIRS})
+include_directories(${ZLIB_INCLUDE_DIRS})
 
 if(APPLE)
 	find_library(COCOA_FRAMEWORK Cocoa)
 	target_link_libraries(${SILENCER_TARGET}
-		${SDL2_LIBRARY} ${SDL2_MIXER_LIBRARY} ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
 		CURL::libcurl
 		${COCOA_FRAMEWORK})
 elseif(WIN32)
 	target_link_libraries(${SILENCER_TARGET}
-		${SDL2_LIBRARY} ${SDL2_MIXER_LIBRARY} ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
 		CURL::libcurl ws2_32)
 else()
 	target_link_libraries(${SILENCER_TARGET}
-		${SDL2_LIBRARY} ${SDL2_MIXER_LIBRARY} ${ZLIB_LIBRARY}
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
 		CURL::libcurl)
 endif()
 
