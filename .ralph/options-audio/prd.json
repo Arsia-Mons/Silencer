@@ -24,7 +24,7 @@
       "id": "A2",
       "name": "Title overlay rendered correctly (textbank 135, centered, y=14)",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "spec": "Title text 'Audio Options' renders via the font path in widget-overlay.md text-mode (literal x,y, no offset), with textbank=135, textwidth=12, x = 320 - len*12/2, y = 14. Glyphs legible, kerning matches reference.",
       "category": "tile_arithmetic"
     },
