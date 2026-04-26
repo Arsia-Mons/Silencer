@@ -191,6 +191,108 @@ export default function HitboxTab({
     onChange({ sequences: { ...sequences, [selectedSeq]: { ...seq, frames: nextFrames } } });
   }
 
+  function autoFitHurtbox() {
+    const img = imgRef.current;
+    if (!img || !seq || !frame) return;
+    const scale = scaleRef.current;
+
+    // Draw sprite to offscreen canvas to read pixel data
+    const off = document.createElement('canvas');
+    off.width = img.width;
+    off.height = img.height;
+    const ctx = off.getContext('2d')!;
+    ctx.drawImage(img, 0, 0);
+
+    const data = ctx.getImageData(0, 0, img.width, img.height).data;
+    let minX = img.width, maxX = -1, minY = img.height, maxY = -1;
+    for (let y = 0; y < img.height; y++) {
+      for (let x = 0; x < img.width; x++) {
+        const a = data[(y * img.width + x) * 4 + 3];
+        if (a > 8) { // non-transparent (threshold to skip semi-transparent edges)
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    if (maxX < 0) return; // fully transparent — skip
+
+    // Convert sprite-local pixel coords → canvas coords → game coords
+    // Sprite is drawn at: dx = ORIGIN_X - img.width*scale/2, dy = ORIGIN_Y - img.height*scale
+    const spriteLeft = ORIGIN_X - (img.width * scale) / 2;
+    const spriteTop  = ORIGIN_Y - img.height * scale;
+
+    const cx1 = spriteLeft + minX * scale;
+    const cy1 = spriteTop  + minY * scale;
+    const cx2 = spriteLeft + (maxX + 1) * scale;
+    const cy2 = spriteTop  + (maxY + 1) * scale;
+
+    const gx1 = Math.round((cx1 - ORIGIN_X) / scale);
+    const gy1 = Math.round((cy1 - ORIGIN_Y) / scale);
+    const gx2 = Math.round((cx2 - ORIGIN_X) / scale);
+    const gy2 = Math.round((cy2 - ORIGIN_Y) / scale);
+
+    const finalHb: Hurtbox = [
+      Math.min(gx1, gx2), Math.min(gy1, gy2),
+      Math.max(gx1, gx2), Math.max(gy1, gy2),
+    ];
+    const nextFrames = seq.frames.map((f, i) =>
+      i === frameIdx ? { ...f, hurtbox: finalHb } : f
+    );
+    onChange({ sequences: { ...sequences, [selectedSeq]: { ...seq, frames: nextFrames } } });
+  }
+
+  function autoFitAll() {
+    if (!seq) return;
+    // Run autoFit for every frame in the sequence by temporarily loading each sprite
+    const token = localStorage.getItem('zs_token') ?? '';
+    let pending = seq.frames.length;
+    const nextFrames = [...seq.frames];
+
+    seq.frames.forEach((f, i) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = `/api/sprites/${f.bank}/${f.index}?_t=${token.slice(-8)}&_cb=${i}`;
+      img.onload = () => {
+        const s = fitScale(img);
+        const off = document.createElement('canvas');
+        off.width = img.width;
+        off.height = img.height;
+        const ctx = off.getContext('2d')!;
+        ctx.drawImage(img, 0, 0);
+        const data = ctx.getImageData(0, 0, img.width, img.height).data;
+        let minX = img.width, maxX = -1, minY = img.height, maxY = -1;
+        for (let y = 0; y < img.height; y++) {
+          for (let x = 0; x < img.width; x++) {
+            if (data[(y * img.width + x) * 4 + 3] > 8) {
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+        if (maxX >= 0) {
+          const spriteLeft = ORIGIN_X - (img.width * s) / 2;
+          const spriteTop  = ORIGIN_Y - img.height * s;
+          const hb: Hurtbox = [
+            Math.round(((spriteLeft + minX * s) - ORIGIN_X) / s),
+            Math.round(((spriteTop  + minY * s) - ORIGIN_Y) / s),
+            Math.round(((spriteLeft + (maxX + 1) * s) - ORIGIN_X) / s),
+            Math.round(((spriteTop  + (maxY + 1) * s) - ORIGIN_Y) / s),
+          ];
+          nextFrames[i] = { ...nextFrames[i], hurtbox: hb };
+        }
+        pending--;
+        if (pending === 0) {
+          onChange({ sequences: { ...sequences, [selectedSeq]: { ...seq, frames: nextFrames } } });
+        }
+      };
+      img.onerror = () => { pending--; if (pending === 0) onChange({ sequences: { ...sequences, [selectedSeq]: { ...seq, frames: nextFrames } } }); };
+    });
+  }
+
   return (
     <div className="flex h-full">
       {/* Sequence + frame selector */}
@@ -243,6 +345,20 @@ export default function HitboxTab({
             className="text-xs text-game-danger border border-game-danger px-3 py-1 hover:bg-game-danger/10 self-start"
           >
             CLEAR HURTBOX
+          </button>
+          <button
+            onClick={autoFitHurtbox}
+            disabled={!imgRef.current}
+            className="text-xs text-game-primary border border-game-primary px-3 py-1 hover:bg-game-primary/10 self-start disabled:opacity-40"
+          >
+            AUTO-FIT THIS FRAME
+          </button>
+          <button
+            onClick={autoFitAll}
+            disabled={!seq}
+            className="text-xs text-game-info border border-game-info px-3 py-1 hover:bg-game-info/10 self-start disabled:opacity-40"
+          >
+            AUTO-FIT ALL FRAMES
           </button>
         </div>
 
