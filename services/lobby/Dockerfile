@@ -13,6 +13,7 @@ RUN git clone --depth=1 https://github.com/libsdl-org/SDL.git /sdl && \
     cmake -B /sdl/build -S /sdl \
         -DCMAKE_BUILD_TYPE=Release \
         -DSDL_SHARED=ON -DSDL_STATIC=OFF \
+        -DSDL_UNIX_CONSOLE_BUILD=ON \
         -DCMAKE_INSTALL_PREFIX=/opt/sdl3 && \
     cmake --build /sdl/build -j"$(nproc)" && \
     cmake --install /sdl/build && \
