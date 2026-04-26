@@ -234,35 +234,77 @@ void Game::Present(void){
 		renderdevice->Present();
 	}
 	// QA dump: when SILENCER_DUMP_PATH env is set, save the indexed framebuffer
-	// as a PPM once the bank-208 logo overlay has reached its steady-state
-	// frame (idx 60), then exit. Lets design QA capture the canonical menu
-	// without macOS Screen-Recording / Spaces friction. Tied to the logo's
-	// own state_i so it doesn't drift with render rate.
+	// as a PPM once the target state has reached its steady-state, then exit.
+	// Lets design QA capture canonical screens without macOS Screen-Recording /
+	// Spaces friction. Steady-state is per-screen and tied to the screen's own
+	// scene state, not render-frame count, so dumps match across renderers
+	// regardless of run-loop scheduling.
+	//
+	// SILENCER_DUMP_STATE selects the target screen (default MAINMENU). When
+	// the target state is reached from MAINMENU we drive the navigation by
+	// synthesizing a click on the appropriate menu button — same path as a
+	// real user would take.
 	const char * dumppath = getenv("SILENCER_DUMP_PATH");
-	if(dumppath && state == MAINMENU && !stateisnew){
-		bool logo_is_steady = false;
-		for(auto * obj : world.objectlist){
-			if(!obj) continue;
-			if(obj->type != ObjectTypes::OVERLAY) continue;
-			Overlay * ov = static_cast<Overlay *>(obj);
-			if(ov->res_bank == 208 && ov->res_index == 60){
-				logo_is_steady = true;
-				break;
-			}
+	if(dumppath){
+		const char * dumpstate_env = getenv("SILENCER_DUMP_STATE");
+		Uint8 target_state = MAINMENU;
+		if(dumpstate_env){
+			if(strcmp(dumpstate_env, "OPTIONS") == 0) target_state = OPTIONS;
+			else if(strcmp(dumpstate_env, "MAINMENU") == 0) target_state = MAINMENU;
 		}
-		if(logo_is_steady){
-			FILE * f = fopen(dumppath, "wb");
-			if(f){
-				fprintf(f, "P6\n%d %d\n255\n", screenbuffer.w, screenbuffer.h);
-				for(int p = 0; p < screenbuffer.w * screenbuffer.h; ++p){
-					Uint8 ix = screenbuffer.pixels[p];
-					unsigned char rgb[3] = { palettecolors[ix].r, palettecolors[ix].g, palettecolors[ix].b };
-					fwrite(rgb, 1, 3, f);
-				}
-				fclose(f);
-				fprintf(stderr, "[silencer] dumped main menu PPM to %s\n", dumppath);
+
+		// Helper: are we visually steady on the main menu (logo at idx 60)?
+		auto mainmenu_steady = [&]() -> bool {
+			for(auto * obj : world.objectlist){
+				if(!obj || obj->type != ObjectTypes::OVERLAY) continue;
+				Overlay * ov = static_cast<Overlay *>(obj);
+				if(ov->res_bank == 208 && ov->res_index == 60) return true;
 			}
-			exit(0);
+			return false;
+		};
+
+		// Phase 1: navigate toward target_state by clicking through menus.
+		if(state == MAINMENU && !stateisnew && target_state != MAINMENU){
+			if(mainmenu_steady()){
+				// MAINMENU's options button has uid 2 (game.cpp:2295). Click it.
+				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+				if(iface){
+					Object * btn = iface->GetObjectWithUid(world, 2);
+					if(btn && btn->type == ObjectTypes::BUTTON){
+						static_cast<Button *>(btn)->clicked = true;
+					}
+				}
+			}
+			return;
+		}
+
+		// Phase 2: dump when steady on target_state.
+		if(state == target_state && !stateisnew){
+			bool ready = false;
+			const char * label = "screen";
+			if(target_state == MAINMENU){
+				ready = mainmenu_steady();
+				label = "main menu";
+			} else if(target_state == OPTIONS){
+				// Options has no animated overlay; once we've faded in and the
+				// state isn't fresh, the screen is visually static.
+				ready = FadedIn();
+				label = "options";
+			}
+			if(ready){
+				FILE * f = fopen(dumppath, "wb");
+				if(f){
+					fprintf(f, "P6\n%d %d\n255\n", screenbuffer.w, screenbuffer.h);
+					for(int p = 0; p < screenbuffer.w * screenbuffer.h; ++p){
+						Uint8 ix = screenbuffer.pixels[p];
+						unsigned char rgb[3] = { palettecolors[ix].r, palettecolors[ix].g, palettecolors[ix].b };
+						fwrite(rgb, 1, 3, f);
+					}
+					fclose(f);
+					fprintf(stderr, "[silencer] dumped %s PPM to %s\n", label, dumppath);
+				}
+				exit(0);
+			}
 		}
 	}
 }

@@ -1,10 +1,11 @@
 # shared/design/sdl3
 
-C++17 + SDL3 hydration of the Silencer main menu, built only from
-[`docs/design/`](../../../docs/design/) plus the binary assets in
-[`shared/assets/`](../../assets/). Reference renderer for the
-design-system spec — produces a 640×480 indexed framebuffer dump
-(PPM) that should match the real client's `Game::Present` output.
+C++17 + SDL3 hydration of the Silencer main menu and options screen,
+built only from [`docs/design/`](../../../docs/design/) plus the
+binary assets in [`shared/assets/`](../../assets/). Reference
+renderer for the design-system spec — produces a 640×480 indexed
+framebuffer dump (PPM) per registered screen that should match the
+real client's `Game::Present` output.
 
 This tree was authored by a spec-only subagent that did not have
 access to `clients/silencer/`, so its existence is the falsifiability
@@ -29,9 +30,20 @@ SILENCER_DUMP_DIR=/tmp/sdl3_dump \
   ./build/silencer_design /Users/hv/repos/Silencer/shared/assets
 ```
 
-Writes `${SILENCER_DUMP_DIR}/screen_00.ppm` (binary P6, 640×480).
-Compare against the real client's dump via the env-gated
-`SILENCER_DUMP_PATH` path in `Game::Present`. See
+Writes one PPM per registered screen — currently:
+
+- `${SILENCER_DUMP_DIR}/main_menu.ppm`
+- `${SILENCER_DUMP_DIR}/options.ppm`
+
+Compare against the real client's dumps:
+
+```
+SILENCER_DUMP_PATH=/tmp/real_main.ppm    Silencer  # main menu by default
+SILENCER_DUMP_STATE=OPTIONS \
+SILENCER_DUMP_PATH=/tmp/real_options.ppm Silencer  # navigates from main → options
+```
+
+See
 [`.claude/skills/visual-regression-testing/SKILL.md`](../../../.claude/skills/visual-regression-testing/SKILL.md)
 for the full A/B workflow.
 
@@ -45,11 +57,14 @@ for the full A/B workflow.
 - `BIN_SPR.DAT` 16,384-byte index, count at byte offset 2 of each
   64-byte record.
 - Anchor convention: `top_left = object - sprite.offset`.
-- Main-menu sub-palette = 1.
+- Main-menu sub-palette = 1; options inherits the same palette
+  (per `docs/design/screen-options.md`, the OPTIONS branch never
+  calls `SetPalette` — the hydration sets sub-palette 1 explicitly
+  for both screens since they're rendered standalone here).
 - Logo (bank 208) ticked to the hold frame (`res_index = 60`).
 - Buttons in INACTIVE state (no hover) — `res_index = 7`,
   `effectbrightness = 128`.
-- Version overlay at `(10, 463)` via bank 133 advance 11.
+- Main-menu version overlay at `(10, 463)` via bank 133 advance 11.
 
 ## Faked / skipped
 

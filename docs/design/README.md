@@ -12,17 +12,19 @@ rebuilding it one screen at a time, starting here.
 
 Produce a per-component spec faithful enough that an
 implementation built **only from these docs + the binary assets in
-`shared/assets/`** can render a main menu pixel-close to the real
-client (`clients/silencer`).
+`shared/assets/`** can render the covered screens pixel-close to the
+real client (`clients/silencer`).
 
-When this subset is solid, we'll add the next screen (likely Lobby)
-by extending these component docs and adding a new screen-composition
-doc.
+Each new screen extends the component docs only as much as it
+needs. Screens that don't introduce new widgets just add a
+composition doc plus a row in the [QA dump](#qa-dump) table.
 
 ## Scope
 
-Only the components used by the real client's
-`Game::CreateMainMenuInterface` (`clients/silencer/src/game.cpp:2266`):
+The components needed by the real client's
+`Game::CreateMainMenuInterface` (`clients/silencer/src/game.cpp:2266`)
+and `Game::CreateOptionsInterface` (`game.cpp:2352`) — the same
+substrate, two different compositions:
 
 | Doc | Covers |
 | --- | ------ |
@@ -33,7 +35,23 @@ Only the components used by the real client's
 | [widget-overlay.md](widget-overlay.md) | Sprite-mode and text-mode `Overlay` (used for bg, logo, version) |
 | [widget-button.md](widget-button.md) | `Button` widget — `B196x33` only (the menu uses no other variant) |
 | [widget-interface.md](widget-interface.md) | `Interface` container, focus, mouse/keyboard dispatch |
-| [screen-main-menu.md](screen-main-menu.md) | Composition: how the above wire together |
+| [screen-main-menu.md](screen-main-menu.md) | Composition: main menu (logo, buttons, version) |
+| [screen-options.md](screen-options.md) | Composition: options sub-screen (four B196x33 buttons over the main-menu plate; inherits sub-palette 1 from MAINMENU without setting it) |
+
+## QA dump
+
+The real client (`clients/silencer/src/game.cpp::Game::Present`)
+exposes a framebuffer dump path gated by env vars:
+
+| Env | Values | Effect |
+| --- | ------ | ------ |
+| `SILENCER_DUMP_PATH` | absolute file path | When set, write a 640×480 binary P6 PPM to this path once the target screen has reached steady state, then `exit(0)` |
+| `SILENCER_DUMP_STATE` | `MAINMENU` (default), `OPTIONS` | Selects which screen to dump. The binary navigates to the requested state by synthesizing a click on the main menu's Options button (uid 2). Future states will extend this list. |
+
+Hydrations should accept `SILENCER_DUMP_DIR` (writes one PPM per
+registered screen) for parity. Visual A/B between the real and
+hydration PPMs is the validation gate; see
+[`.claude/skills/visual-regression-testing/SKILL.md`](../../.claude/skills/visual-regression-testing/SKILL.md).
 
 ## Out of scope (for now)
 

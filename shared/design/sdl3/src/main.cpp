@@ -463,6 +463,87 @@ static bool write_ppm_p6(const fs::path& path, const Framebuffer& fb,
     return (bool)f;
 }
 
+// ---------- screen renderers ----------
+
+// Render the main menu screen into `fb`. Returns active sub-palette.
+static int render_main_menu(Framebuffer& fb, const Resources& res) {
+    // Per screen-main-menu.md: MAINMENU sets sub-palette 1.
+    constexpr int active_sub = 1;
+
+    Overlay bg;
+    bg.x = 0; bg.y = 0;
+    bg.res_bank = 6; bg.res_index = 0;
+
+    Overlay logo;
+    logo.x = 0; logo.y = 0;
+    logo.res_bank = 208; logo.res_index = 29; // initial; will tick.
+
+    Overlay version;
+    version.x = 10;
+    version.y = 480 - 10 - 7; // = 463
+    version.text = "Silencer v00028";
+    version.textbank = 133;
+    version.textwidth = 11;
+
+    Button btn_tut   { 40,  -134, "Tutorial",         7, 128 };
+    Button btn_conn  { 80,  -67,  "Connect To Lobby", 7, 128 };
+    Button btn_opts  { 40,   0,   "Options",          7, 128 };
+    Button btn_exit  { 0,    67,  "Exit",             7, 128 };
+
+    // Tick simulation to pinned scene state: bank-208 logo at hold
+    // (res_index = 60). 120 iterations land state_i=120 with the most
+    // recent tick computing res_index = 60.
+    for (int t = 0; t < 120; ++t) {
+        logo.tick();
+    }
+
+    fb.clear();
+    render_overlay(fb, res, bg,      active_sub);
+    render_overlay(fb, res, logo,    active_sub);
+    render_overlay(fb, res, version, active_sub);
+    render_button(fb,  res, btn_tut,  active_sub);
+    render_button(fb,  res, btn_conn, active_sub);
+    render_button(fb,  res, btn_opts, active_sub);
+    render_button(fb,  res, btn_exit, active_sub);
+
+    return active_sub;
+}
+
+// Render the OPTIONS screen into `fb`. Returns active sub-palette.
+//
+// Per screen-options.md: OPTIONS does NOT call SetPalette — it
+// inherits the sub-palette from MAINMENU (always sub 1 in practice).
+// A hydration capturing this screen standalone must explicitly use
+// sub-palette 1.
+static int render_options(Framebuffer& fb, const Resources& res) {
+    constexpr int active_sub = 1;
+
+    Overlay bg;
+    bg.x = 0; bg.y = 0;
+    bg.res_bank = 6; bg.res_index = 0;
+
+    // Four B196x33 buttons, anchor x=-89, y spaced 52 px apart.
+    Button btn_controls { -89, -142, "Controls", 7, 128 };
+    Button btn_display  { -89, -90,  "Display",  7, 128 };
+    Button btn_audio    { -89, -38,  "Audio",    7, 128 };
+    Button btn_goback   { -89,  15,  "Go Back",  7, 128 };
+
+    // No animated overlays, but we still tick "to steady state".
+    // Nothing on this screen mutates per-tick (background plate is
+    // static; buttons are INACTIVE / un-hovered). Per tick.md the
+    // pinned scene state is "FadedIn() == true"; ticking is a no-op
+    // for visual content here.
+
+    fb.clear();
+    render_overlay(fb, res, bg, active_sub);
+    render_button(fb,  res, btn_controls, active_sub);
+    render_button(fb,  res, btn_display,  active_sub);
+    render_button(fb,  res, btn_audio,    active_sub);
+    render_button(fb,  res, btn_goback,   active_sub);
+
+    return active_sub;
+}
+
 // ---------- entry ----------
 
 int main(int argc, char** argv) {
@@ -499,90 +580,42 @@ int main(int argc, char** argv) {
     //   sub 1 idx 0: (0,0,0)        idx 1: (8,156,0)      idx 2: (64,8,16)
     //   sub 2 idx 0: (0,0,0)        idx 1: (0,0,0)        idx 2: (8,8,8)
 
-    // Load banks needed for the main menu.
+    // Load banks shared by main menu + options.
     res.load_bank_idx(6,   asset_root); // background plate + button frames
-    res.load_bank_idx(133, asset_root); // version-text font
+    res.load_bank_idx(133, asset_root); // version-text font (main menu only)
     res.load_bank_idx(135, asset_root); // button-label font
-    res.load_bank_idx(208, asset_root); // animated logo
+    res.load_bank_idx(208, asset_root); // animated logo (main menu only)
 
-    // Build menu overlays + buttons per screen-main-menu.md.
-    Overlay bg;
-    bg.x = 0; bg.y = 0;
-    bg.res_bank = 6; bg.res_index = 0;
+    // Screen registry — each entry is (filename, render-fn).
+    struct ScreenEntry {
+        const char* filename;
+        int (*render)(Framebuffer&, const Resources&);
+    };
+    const ScreenEntry screens[] = {
+        { "main_menu.ppm", &render_main_menu },
+        { "options.ppm",   &render_options   },
+    };
 
-    Overlay logo;
-    logo.x = 0; logo.y = 0;
-    logo.res_bank = 208; logo.res_index = 29; // initial; will tick.
-
-    Overlay version;
-    version.x = 10;
-    version.y = 480 - 10 - 7; // = 463
-    version.text = "Silencer v00028";
-    version.textbank = 133;
-    version.textwidth = 11;
-
-    Button btn_tut   { 40,  -134, "Tutorial",         7, 128 };
-    Button btn_conn  { 80,  -67,  "Connect To Lobby", 7, 128 };
-    Button btn_opts  { 40,   0,   "Options",          7, 128 };
-    Button btn_exit  { 0,    67,  "Exit",             7, 128 };
-
-    // Tick simulation to the pinned scene state: bank-208 logo at
-    // res_index = 60 (steady-state hold). Per tick.md, at least 120
-    // ticks. We tick 120 — first 60 are fade-in, next 60 hold.
-    // After 120 ticks of state_i++, state_i = 120; the next tick()
-    // would fall into the fade-out branch. We *don't* call that
-    // last tick; we render at the state where the most recent tick
-    // landed res_index at 60.
-    for (int t = 0; t < 120; ++t) {
-        logo.tick();
-        // Buttons in INACTIVE state — no per-tick state change since
-        // none are focused/hovered.
-    }
-    // After 120 ticks, logo.state_i == 120 and logo.res_index == 60.
-    // (At the start of tick 120, state_i was 119 → res_index =
-    // 119/2+29 = 88 — wait, that's > 60. Let me reread.) ...
-    //
-    // Re-reading widget-overlay.md: "state_i < 60: res_index =
-    // state_i/2 + 29 (fade in 29→60)". With state_i in [0..59],
-    // state_i/2 in [0..29], +29 → res_index in [29..58]. Hmm —
-    // doesn't reach 60 in fade-in. Then "60 ≤ state_i < 120:
-    // res_index = 60 (hold)". OK so at state_i==60..119 we hold at
-    // 60. Then state_i >= 120 → fade out.
-    //
-    // Our loop runs 120 iterations. Iteration i: tick() reads
-    // state_i, computes res_index, then state_i++. So:
-    //   it=0:  state_i=0 → 0/2+29=29; state_i becomes 1
-    //   it=59: state_i=59 → 59/2+29=58; state_i becomes 60
-    //   it=60: state_i=60 → hold branch, res_index=60; state_i=61
-    //   it=119: state_i=119 → hold, res_index=60; state_i=120
-    // Render now: res_index = 60. ✓
-
-    // Render frame.
-    Framebuffer fb;
-    fb.clear();
-
-    constexpr int active_sub = 1;
-
-    render_overlay(fb, res, bg,      active_sub);
-    render_overlay(fb, res, logo,    active_sub);
-    render_overlay(fb, res, version, active_sub);
-    render_button(fb,  res, btn_tut,  active_sub);
-    render_button(fb,  res, btn_conn, active_sub);
-    render_button(fb,  res, btn_opts, active_sub);
-    render_button(fb,  res, btn_exit, active_sub);
-
-    // Dump if requested.
+    // Always render every registered screen (cheap; visual content
+    // only emitted when SILENCER_DUMP_DIR is set).
     const char* dump_dir = std::getenv("SILENCER_DUMP_DIR");
-    if (dump_dir && *dump_dir) {
-        fs::create_directories(dump_dir);
-        fs::path out = fs::path(dump_dir) / "screen_00.ppm";
-        if (!write_ppm_p6(out, fb, res.palette, active_sub)) {
-            std::fprintf(stderr, "ERROR: writing PPM %s failed\n",
-                         out.string().c_str());
-            SDL_Quit();
-            return 1;
+
+    for (const auto& s : screens) {
+        Framebuffer fb;
+        int active_sub = s.render(fb, res);
+
+        if (dump_dir && *dump_dir) {
+            fs::create_directories(dump_dir);
+            fs::path out = fs::path(dump_dir) / s.filename;
+            if (!write_ppm_p6(out, fb, res.palette, active_sub)) {
+                std::fprintf(stderr, "ERROR: writing PPM %s failed\n",
+                             out.string().c_str());
+                SDL_Quit();
+                return 1;
+            }
+            std::printf("Wrote %s (sub-palette %d)\n",
+                        out.string().c_str(), active_sub);
         }
-        std::printf("Wrote %s\n", out.string().c_str());
     }
 
     SDL_Quit();
