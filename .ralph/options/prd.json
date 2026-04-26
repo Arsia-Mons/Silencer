@@ -32,7 +32,7 @@
       "id": "O3",
       "name": "Buttons rendered in INACTIVE state on dump (no Controls pulse)",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "spec": "All four buttons render with `state=INACTIVE`, `effectbrightness=128`, `res_index=7`. The reference shows uniform brightness across all four buttons (no pulse on Controls despite engine `activeobject=0`); the candidate must match.",
       "category": "palette"
     },
