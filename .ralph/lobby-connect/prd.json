@@ -32,7 +32,7 @@
       "id": "L3",
       "name": "Form composition (textbox + 2 input rows + 2 buttons)",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "spec": "Per docs/design/screen-lobby-connect.md object inventory: textbox at (185,101) 250x170; Username/Password labels at (190, 291/318); two TextInput fields at (275, 293/320) 180x14; Login B52x21 at (264,339); Cancel B52x21 at (321,339). All present and visible. Cursor blink and textbox content are non-structural and don't gate this item.",
       "category": "composition"
     },

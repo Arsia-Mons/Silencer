@@ -768,6 +768,41 @@ static int RunDumpLobbyConnect(const std::string &assets_dir,
     BlitSprite(fb, sprites.Get(7, 2), 0, 0, nullptr);
   }
 
+  // L3: Form composition.
+  // Username / Password labels — text-mode overlays at literal screen coords,
+  // font bank 134 advance 9 (per docs/design/screen-lobby-connect.md object
+  // inventory).
+  DrawText(fb, 190, 291, "Username", /*bank=*/134, /*advance=*/9, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 190, 318, "Password", /*bank=*/134, /*advance=*/9, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+
+  // Login / Cancel buttons — B52x21 variant. Per docs/design-system.md.archive
+  // (Button table) B52x21 is **text-only with no sprite chrome** (sprite bank
+  // is "—"); label uses font bank 133 advance 7, yoff=8, and centering xoff
+  // adds +1 px after the standard center. Sprite-offset is (0,0) since there
+  // is no sprite, so textX = anchor.x + xoff, textY = anchor.y + 8.
+  struct B52Spec {
+    const char *text;
+    int x;
+    int y;
+  };
+  const std::array<B52Spec, 2> b52_buttons = {{
+      {"Login", 264, 339},
+      {"Cancel", 321, 339},
+  }};
+  constexpr int kB52Width = 52;
+  constexpr int kB52Advance = 7;
+  for (const auto &b : b52_buttons) {
+    int len = static_cast<int>(std::strlen(b.text));
+    int xoff = (kB52Width - len * kB52Advance) / 2 + 1;
+    int textX = b.x + xoff;
+    int textY = b.y + 8;
+    DrawText(fb, textX, textY, b.text, /*bank=*/133,
+             /*advance=*/kB52Advance, sprites, palette, kSubLobby,
+             /*brightness=*/128);
+  }
+
   std::filesystem::create_directories(dump_dir);
   std::string out = dump_dir + "/screen_00.ppm";
   bool ok = WritePPM(out, fb, palette, kSubLobby);

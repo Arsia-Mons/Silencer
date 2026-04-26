@@ -8,6 +8,7 @@
 - LOBBYCONNECT bank set planned ahead at L0 commit: `{7, 133, 134, 135}`. Bank 7 (panel idx 2 + likely B52x21 chrome), bank 133 (textbox + textinput font), bank 134 (Username/Password labels font, w=9), bank 135 (button-label font, by analogy with B196x33/B220x33/B112x33). NO bank 6 (no starfield bg, no bg-plate idx 0) — the panel sprite carries the chrome and the exterior is `Clear(0)` per spec. Bank set is loaded at L0 even though L0 doesn't render any of them yet, to avoid bank-list churn in L1+. **Confirmed at L2:** the bank-7 idx-2 sprite carries ALL panel chrome — outer bordered rectangle, inner textbox border (with right-side scrollbar lane baked in), horizontal divider, Username/Password input-field wells, AND the bottom button-row well outlines for Login/Cancel. Same single-blit pattern as CONTROLS' bank-7 idx-7 frame: one `BlitSprite(fb, sprites.Get(7, 2), 0, 0, nullptr)` produces the entire form scaffold.
 - **PALETTE.BIN actual layout is `4 + s * (768 + 4)`** — i.e. 4-byte file prefix + 11 records of [4-byte sub-header, 768-byte color table]. The main-menu Ralph's pattern claim of `8 + s*768` was a coincidence: at s=1 both formulas give offset 776, so every prior screen (which all use sub-palette 1) rendered correctly under the wrong formula. They diverge for s != 1 — sub-palette 2 (lobby) sits 4 bytes farther per sub-block, so the empirical formula was reading 4 bytes early and pulling garbage. Correcting to the spec formula leaves sub-palette 1 byte-identical (zero regression on main_menu / options / options_audio / options_display / options_controls dumps — all five at exact baselines: 2136 / 1758 / 1035 / 2211 / 3729) while shifting sub-palettes 0 and 2..10 to their correct offsets. **Lesson:** whenever a "spec disagrees with empirical" is recorded, verify the empirical against MORE THAN ONE data point — sub-palette 1 was the only one tested in main-menu Ralph P0; sub-palette 2 disagreed silently because no prior screen exercised it.
 - Verification mode for palette correctness gates does NOT require visual A/B: when the candidate's first non-`Clear(0)` render under the new sub-palette is gated separately (here, panel sprite is L2's job), L1's "color tones match" check is a table-lookup audit. Sample reference dump's dominant non-black colors → confirm each appears in `sub_palette[N]` post-fix. For this Ralph: top-15 full-screen reference colors all present in sub-palette 2 (15/15 hit rate), confirming the fix is decisive even though the candidate dump is still entirely black at the L1 gate.
+- **B52x21 is the FIRST text-only button variant in the hydration** — per `docs/design-system.md.archive` line 637, B52x21 has sprite bank "—" (none) and renders pure text label only, with font 133 advance 7, yoff=8, and centering xoff += 1. No `BlitSprite` call needed for the chrome (the bank-7 idx-2 panel sprite already includes the well outline). Total per-button cost is one `DrawText` call. This breaks the implicit "every button has a chrome sprite" pattern from B196x33 / B220x33 / B112x33 — the panel sprite carries the well, and B52x21 contributes only the glyph payload. Anchor convention in the absence of a sprite: textX = button.x + xoff (no sprite-offset subtraction), textY = button.y + yoff. Verified at L3: Login (264, 339) and Cancel (321, 339) labels land pixel-correct on top of the panel sprite's button-row wells.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -220,4 +221,93 @@
     2 input-field cursors/text + 2 button labels. If L3 lands all
     of those structurally, the L4 final gate should be at <0.2%
     (cursor blink phase + textbox content variance only).
+---
+
+## 2026-04-26T16:14:00Z — iter 4 (L3 PASS)
+- Added form-composition rendering to `RunDumpLobbyConnect` after the L2
+  panel-sprite blit and before the PPM write:
+  1. Two text-mode label `DrawText` calls for "Username" at (190, 291) and
+     "Password" at (190, 318), font bank 134 advance 9, brightness 128.
+  2. A `std::array<B52Spec, 2>` loop rendering Login (264, 339) and Cancel
+     (321, 339) labels via font bank 133 advance 7, yoff=8, with the
+     B52x21 centering quirk (`xoff = (52 - len*7)/2 + 1`) per
+     `docs/design-system.md.archive:651`. NO chrome `BlitSprite` calls —
+     B52x21 has no sprite background; the panel sprite (bank 7 idx 2)
+     already provides the button-row well outline.
+- Build: `cmake --build shared/design/sdl3/build` exits 0; only main.cpp
+  recompiled + relink.
+- Dump: `SILENCER_DUMP_SCREEN=lobby_connect` writes the canonical P6
+  921615-byte PPM. All four label positions render pixel-aligned with
+  the bank-7 idx-2 panel sprite's input-field wells and button-row wells.
+- Bytewise diff vs `/tmp/real_lobbyconnect_dump.ppm`: 4,897 bytes
+  (~0.53%) — down from L2's 7,544 (~0.82%). Residue is structural-
+  irrelevant per spec:
+  * Textbox content (3 lines of "Connecting to 127.0.0.1: 517 /
+    Hostname resolved / Connection failed") — runtime data, the
+    canonical dump captured a failed lobby connection because no Go
+    lobby server was running. Spec: "exact text content is not gated."
+  * Username TextInput's blinking cursor (a single ~1-px-wide vertical
+    bar at the left edge of the Username field on the reference). Spec:
+    "Cursor blink phase is not deterministic ... Treat cursor presence/
+    absence as non-structural; gate only on the input-field outline /
+    position."
+  Categorically zero structural-pixel diff in panel chrome, label
+  placement, or button-label glyphs.
+- Visual A/B (Discord DM 1498098140576743555): candidate now shows
+  the full LOBBYCONNECT layout — green-bevel panel border, empty
+  textbox area, Username/Password labels centered in their rows,
+  Login/Cancel button labels in the bottom button-row well.
+  Reference shows the same layout PLUS the connection-log textbox
+  content and a cursor in the Username field — both non-structural
+  per spec. The two screens are visually equivalent for the gate.
+- Regression sweep — bytewise diffs vs canonical menu/options
+  references (sub-palette 1 path, untouched by this iteration):
+  - main_menu        2,136 bytes (exact baseline)
+  - options          1,758 bytes (exact baseline)
+  - options_audio    1,035 bytes (exact baseline)
+  - options_display  2,211 bytes (exact baseline)
+  - options_controls 3,729 bytes (exact baseline)
+  All five at byte-identical baselines — this iteration only touched
+  `RunDumpLobbyConnect` (no shared-infra edits).
+- Files touched: `shared/design/sdl3/src/main.cpp` (form-composition
+  block), `.ralph/lobby-connect/prd.json` (L3 → passes:true),
+  `.ralph/lobby-connect/progress.txt` (this entry + one Codebase
+  Patterns line on B52x21 text-only convention).
+- Spec gaps encountered (none new):
+  - `widget-button.md` still doesn't mention B52x21 (still load-bearing
+    as a future spec edit, but not a Ralph gate). The full B52x21
+    convention is documented at `docs/design-system.md.archive:637`
+    + line 651 (the +1 px X offset quirk).
+  - `widget-textbox.md` and `widget-textinput.md` still do not exist;
+    however L3's gate exempts textbox content and cursor blink, so
+    these don't actually need authoring before the L4 final gate.
+- **Learnings:**
+  - The "panel sprite already has the chrome" pattern from CONTROLS L1 /
+    LOBBY L2 generalizes one step further at L3: when a button variant
+    is itself text-only (B52x21 here), the panel sprite + button text
+    render is a SINGLE `DrawText` call per button. There is literally no
+    sprite blit for the button — the panel's button-row well IS the
+    "button chrome". This is the maximum compression of the chrome /
+    glyph split: {chrome → panel sprite, glyph → DrawText}, with no
+    per-button chrome at all. Compare to B196x33 (CONTROLS Save/Cancel)
+    which still needs a per-button `BlitSprite(6, 7, ...)` because its
+    chrome sits OUTSIDE any panel sprite.
+  - Non-structural diff categorization is the load-bearing call at L3.
+    The 4,897-byte residue could LOOK like a fail at first glance, but
+    the spec explicitly carves out (a) textbox content (runtime-
+    dependent — the canonical dump has the connection log; a pristine
+    candidate has empty textbox) and (b) cursor blink phase
+    (non-deterministic). Both consume nearly the entire 4,897-byte
+    budget. Lesson: when the spec carves out "non-structural variation",
+    the diff number alone isn't the gate — read the residue's spatial
+    distribution and verify it lives entirely in the carved-out zones.
+    For LOBBYCONNECT, the diff is concentrated in (a) the textbox
+    interior (185, 101, 250, 170) and (b) ~5 px around the Username
+    cursor — exactly the carved-out zones. Confirms gate as PASS.
+  - At <1% diff with the entire residue confined to non-structural
+    runtime/cursor variation, L4 (final visual equivalence) is now
+    effectively pre-passed: there is no structural pixel left to fix.
+    The L4 iteration's job will be to formalize the structural-vs-
+    non-structural categorization and confirm the gate; no new render
+    code should be required.
 ---
