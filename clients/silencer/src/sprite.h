@@ -9,7 +9,7 @@ class Sprite
 public:
 	Sprite();
 	void Serialize(bool write, Serializer & data, Serializer * old = 0);
-	void GetAABB(Resources & resources, int * x1, int * y1, int * x2, int * y2);
+	virtual void GetAABB(Resources & resources, int * x1, int * y1, int * x2, int * y2);
 	void UpdateNudge(class World & world, float frametime);
 	Sint16 x, y;
 	Sint16 oldx, oldy;

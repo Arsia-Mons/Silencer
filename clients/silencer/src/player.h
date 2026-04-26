@@ -9,6 +9,7 @@
 #include "peer.h"
 #include "pickup.h"
 #include "playerai.h"
+#include "actordef.h"
 
 class Player : public Object
 {
@@ -16,6 +17,7 @@ public:
 	Player();
 	void Serialize(bool write, Serializer & data, Serializer * old = 0);
 	void Tick(class World & world);
+	void GetAABB(Resources & resources, int * x1, int * y1, int * x2, int * y2);
 	void HandleHit(class World & world, Uint8 x, Uint8 y, Object & projectile);
 	void HandleInput(Input & input);
 	void HandleDisconnect(World & world, Uint8 peerid);
@@ -110,6 +112,7 @@ private:
 	bool OnGround(void);
 	void Warp(World & world, Sint16 x, Sint16 y);
 	bool PickUpItem(World & world, PickUp & pickup);
+	static const char * StateSeqName(Uint8 state);
 	enum {STANDING, RUNNING, WALKIN, WALKOUT, FALLING, LADDER, CROUCHING, UNCROUCHING, CROUCHED,
 		CROUCHEDSHOOT, CROUCHEDTHROWING, ROLLING, JUMPING, CLIMBINGLEDGE, JETPACK, HACKING, STANDINGSHOOT,
 		FALLINGSHOOT, LADDERSHOOT, JETPACKSHOOT, DYING, DEAD, RESPAWNING, THROWING, DEPLOYING, UNDEPLOYING,
@@ -153,6 +156,10 @@ private:
 	Uint32 lastweaponchangesound;
 	Uint16 teamid;
 	bool invisible;
+	// Per-frame hurtbox from actor def; set to {0,0,0,0} when not available.
+	// Updated each Tick so GetAABB can access it without needing World.
+	FrameHurtbox currenthurtbox;
+	bool hurtboxvalid;
 };
 
 #endif

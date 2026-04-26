@@ -143,6 +143,8 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	lastweaponchangesound = 0;
 	ai = 0;
 	invisible = false;
+	currenthurtbox = {0, 0, 0, 0};
+	hurtboxvalid = false;
 };
 
 void Player::Serialize(bool write, Serializer & data, Serializer * old){
@@ -190,6 +192,34 @@ void Player::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, poisonedamount, old);
 	data.Serialize(write, poisoned_i, old);
 	data.Serialize(write, invisible, old);
+}
+
+const char * Player::StateSeqName(Uint8 state) {
+	switch(state) {
+		case CROUCHING:        return "CROUCHING";
+		case UNCROUCHING:      return "UNCROUCHING";
+		case CROUCHED:         return "CROUCHED";
+		case WALKIN:           return "WALKIN";
+		case WALKOUT:          return "WALKOUT";
+		case DEPLOYING:        return "DEPLOYING";
+		case UNDEPLOYING:      return "UNDEPLOYING";
+		case CROUCHEDTHROWING: return "CROUCHEDTHROWING";
+		case ROLLING:          return "ROLLING";
+		default: return nullptr;
+	}
+}
+
+void Player::GetAABB(Resources & resources, int * x1, int * y1, int * x2, int * y2) {
+	if(hurtboxvalid) {
+		FrameHurtbox hb = currenthurtbox;
+		if(mirrored) hb = MirrorHurtbox(hb);
+		*x1 = this->x + hb.x1;
+		*y1 = this->y + hb.y1;
+		*x2 = this->x + hb.x2;
+		*y2 = this->y + hb.y2;
+	} else {
+		Sprite::GetAABB(resources, x1, y1, x2, y2);
+	}
 }
 
 void Player::Tick(World & world){
@@ -2648,6 +2678,24 @@ void Player::Tick(World & world){
 		}
 	}*/
 	//oldinput = input;
+	// Update cached hurtbox for the current state/frame.
+	{
+		hurtboxvalid = false;
+		const char * seqname = StateSeqName(state);
+		if(seqname) {
+			auto it = world.resources.actordefs.find("player");
+			if(it != world.resources.actordefs.end()) {
+				auto sit = it->second.sequences.find(seqname);
+				if(sit != it->second.sequences.end()) {
+					const FrameDef * fd = sit->second.Resolve(state_i);
+					if(fd) {
+						currenthurtbox = fd->hurtbox;
+						hurtboxvalid = true;
+					}
+				}
+			}
+		}
+	}
 	state_i++;
 }
 
