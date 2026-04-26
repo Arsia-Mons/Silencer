@@ -220,22 +220,24 @@ void Guard::InitBT(){
 		World& world = *static_cast<World*>(ctx.userData);
 		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
 		if (bt_walk_ticks_ < 600 && chasing) {
-			// Search phase: maintain shooting distance from last known target
+			// Search phase: maintain shooting distance with hysteresis to avoid oscillation.
+			// Only change direction when clearly outside the neutral zone (80-100px).
 			Object* obj = world.GetObjectFromId(chasing);
 			if (obj && obj->IsAlive()) {
 				int dist = abs(signed(obj->x) - signed(x));
 				if (dist < 80) {
-					// Too close — back away to get in shooting range
-					mirrored = (obj->x > x);
-				} else {
-					mirrored = (obj->x < x);
+					mirrored = (obj->x > x); // too close — back away
+				} else if (dist > 100) {
+					mirrored = (obj->x < x); // far enough — move toward
 				}
+				// 80-100px: keep current direction (hysteresis dead-band)
 			} else {
 				chasing = 0; // target gone or dead — stop searching
 			}
 			return BTResult::Running;
 		}
-		// Return-to-post phase
+		// Return-to-post phase: ensure WALKING and face toward spawn
+		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
 		if (abs(signed(x) - signed(originalx)) <= 20) {
 			chasing = 0;
 			bt_walk_ticks_ = 0;
