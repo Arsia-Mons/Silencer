@@ -366,6 +366,30 @@ terraform apply
 Note that `terraform taint aws_instance.lobby` kills active games.
 The data EBS volume re-attaches so account state survives.
 
+**Migrating an already-running lobby to runtime SSM fetch (one-time).**
+If your lobby instance was created before SSM-based runtime secrets
+existed, its `/etc/silencer/lobby.env` was rendered into `user_data`
+at first boot and `lifecycle.ignore_changes = [user_data]` prevents
+Terraform from updating it. Applying the SSM migration:
+
+- ✅ attaches the new IAM instance profile in-place (no replacement)
+- ❌ does **not** install `/usr/local/sbin/silencer-fetch-secrets`
+  (cloud-init only runs on first boot)
+- ❌ does **not** rewrite `/etc/silencer/lobby.env`
+
+So the lobby keeps working with its already-templated env file — no
+breakage, but also no benefit. To fully cut over, replace the
+instance:
+
+```bash
+cd infra/terraform
+terraform taint aws_instance.lobby
+terraform apply   # kills active games; data EBS re-attaches
+```
+
+The admin/data box is greenfield in this migration, so no equivalent
+step is needed there.
+
 ## State and backups
 
 ### Primary store — lobby.json
