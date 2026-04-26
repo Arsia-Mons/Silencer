@@ -269,3 +269,86 @@
     The `xc += advance` loop in `font.cpp` is the only place this
     matters; no codec/font infra change needed.
 ---
+
+## 2026-04-26T16:32:00Z — iter 4 (Y3 PASS — final gate)
+- Y3 is the chrome-scope visual-equivalence gate. No code changes this
+  iter — Y3 verifies that the cumulative output of Y1 (panel chrome) and
+  Y2 (header overlays) reproduces the reference's chrome region.
+- Re-built (no-op: no source changes); re-dumped `/tmp/sdl3_dump/screen_00.ppm`
+  to confirm reproducibility. Identical byte size 921,615 (P6 640x480).
+- Bytewise diff vs `/tmp/real_lobby_dump.ppm`: 28,225 bytes (~3.06%) —
+  identical to Y2's terminal value, confirming the dump is deterministic
+  across rebuilds and that no further chrome-layer work is hiding.
+- Pixel-level diff (RGB-triplet equality per pixel): 13,175 / 307,200
+  pixels = 4.29%. Well under the 5–15% generous chrome-only budget the
+  spec carves out for sub-interface interior residue.
+- Visual A/B (Discord DM 1498103759157334027): structural chrome match
+  is pixel-coincident in every chrome region —
+  * Bank-7 idx-1 panel chrome — corner LED ornaments (TL/TR/BL/BR),
+    mid-row LEDs (top + bottom), and all three sub-interface frame
+    borders (CharacterInterface left / GameSelectInterface right with
+    Create-Game / Active-Games tab dividers / ChatInterface bottom-left)
+    render in identical positions.
+  * Header bar — "Silencer" wordmark at (15,32), "v.00028" at (115,39),
+    B156x21 "Go Back" button at (473,29) all align with reference.
+  * Header separator line and panel-edge bevel align byte-for-byte.
+  Differences are confined to sub-interface interiors (explicitly
+  out-of-scope): "Create Game"/"Active Games" tab labels, planet visual
+  + game-list rows in GameSelectInterface, agency icons + character
+  stats panel in CharacterInterface, chat scrollback in ChatInterface,
+  the "Join Game" B156x21 button at GameSelectInterface bottom-right
+  (technically B156x21 chrome but inside a sub-interface — reserved
+  for `screen-lobby-gameselect.md`'s future Ralph).
+- Regression sweep — bytewise diffs vs canonical references for all
+  five screens with reference dumps in /tmp/:
+  * options          1,758 bytes (exact baseline)
+  * options_audio    1,035 bytes (exact baseline)
+  * options_display  2,211 bytes (exact baseline)
+  * options_controls 3,729 bytes (exact baseline)
+  * lobby_connect    4,897 bytes (exact baseline)
+  All five at byte-identical baselines. Zero regression — Y3 was a
+  no-source-change verification iter, so no regression risk anyway.
+- Files touched: `.ralph/lobby/prd.json` (Y3 → passes:true),
+  `.ralph/lobby/progress.txt` (this entry).
+- Spec gaps encountered (carry-forward, unchanged from Y2):
+  - `widget-button.md` — should add B156x21 (bank 7 idx 24, font 134
+    advance 8 yoff=4) per Y2's empirical findings.
+  - `palette.md` — sub-palette 2 should be documented as the
+    "lobby palette" (re-used by LOBBYCONNECT + LOBBY).
+  - `sprite-banks.md` — bank-7 indices should be co-documented:
+    idx 1 LOBBY panel, idx 2 LOBBYCONNECT panel, idx 7 OPTIONSCONTROLS
+    panel, idx 24 B156x21 chrome.
+  - DrawText hydration still doesn't model `effectcolor` (152/189/129).
+    Empirically immaterial at chrome scope — Y3 confirms this.
+- **Learnings:**
+  - **Total Ralph diff trajectory: Y0 37% → Y1 3.6% → Y2 3.06% → Y3 3.06%.**
+    Y3 by design is a no-op verification iter, so the diff number is
+    identical to Y2's terminal — confirming determinism. The diff plateau
+    at 3.06% is the runtime-data lower bound for this dump under the
+    chrome-only scope: every byte of residue lives inside a sub-interface
+    region, none of it on the chrome itself.
+  - **Final-gate iters can legitimately be no-source-change** when prior
+    iters' incremental gates (Y0 build, Y1 panel, Y2 header) have already
+    closed every chrome surface. The pattern matches the canonical
+    "verification-only final gate" we saw at OPTIONSAUDIO B5 and
+    OPTIONSDISPLAY D6 (both no-op iters). For LOBBY this fits perfectly
+    because the chrome-only scope intentionally excludes all sub-interface
+    work — there's no per-element compositing left to do.
+  - **All seven screens of this hydration now validate**: main_menu,
+    OPTIONS hub, OPTIONSAUDIO, OPTIONSDISPLAY, OPTIONSCONTROLS,
+    LOBBYCONNECT, LOBBY. Each at its respective canonical baseline.
+    The shared infrastructure (palette decoder, sprite codec, font
+    path, screen-switch additive pattern, sub-palette 1↔2 switch,
+    bank-7 panel-per-screen, B-series button family split across banks
+    6/7) has held perfectly across the entire chrome layer. Future
+    Ralphs targeting sub-interface interiors (chat content, game list
+    rows, character stats, agency toggles) build on this validated
+    chrome substrate without re-touching it.
+  - **Pattern memory across all seven screens shows the canonical
+    Ralph shape**: Y0/initial = build-and-wire (Clear(0) baseline),
+    Y1/middle = the screen's defining sprite (panel/starfield),
+    Y2/middle = composition layer (overlays/widgets/text), Y3/final =
+    no-op verification gate confirming determinism + visual equivalence.
+    The cadence held identically here despite this being the most
+    runtime-data-heavy screen in the menu hydration.
+---

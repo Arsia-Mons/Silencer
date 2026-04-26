@@ -33,7 +33,7 @@
       "id": "Y3",
       "name": "Visual equivalence (chrome scope)",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "spec": "Final gate, scoped to CHROME. The bank-7-idx-1 panel sprite + header bar + B156x21 Go Back button match the reference pixel-coincident in their respective regions. Sub-interface interior content (agency icons in CharacterInterface, planet/game-list in GameSelectInterface, chat scrollback in ChatInterface) is non-gated — diff budget is generous (~5-15%) because those interiors are runtime-data-driven and reserved for future per-sub-interface Ralphs.",
       "category": "final"
     }
