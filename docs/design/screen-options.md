@@ -25,10 +25,13 @@ In z-order (background first):
 | 4 | Go Back  button | B196x33 | — | — | -89 |   15 | Text: `Go Back`,  uid=0, INACTIVE on dump |
 
 Coordinates are object-anchor (engine convention). Apply
-`top_left = anchor + screen_center - sprite.offset` per
-[`widget-overlay.md`](widget-overlay.md), with screen-center
-`(320, 240)` and the B196x33 sprite anchor offset from
-[`widget-button.md`](widget-button.md).
+`top_left = anchor - sprite.offset` per
+[`widget-overlay.md`](widget-overlay.md). Screen-centring is
+**already baked into the sprite's negative `offset_x`/`offset_y`**;
+do not add a screen-center term again. For the B196x33 sprite the
+empirical offset is `(-310, -288)` (see
+[`widget-button.md`](widget-button.md)), giving e.g. the
+`Controls` button (`anchor = (-89, -142)`) a `top_left ≈ (221, 146)`.
 
 ## What's NOT on this screen (vs main menu)
 

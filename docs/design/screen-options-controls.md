@@ -78,8 +78,10 @@ validated for `bank 196` button pills, same codec branch.
 ## B112x33 button widget
 
 Half-width button used for individual key labels. Same construction as
-`B196x33` but narrower (~112 px). Sprite anchor identical convention
-(`top_left = anchor + screen_center - sprite.offset`).
+`B196x33` but narrower (~112 px). Sprite-anchor convention is the
+canonical one from [`widget-overlay.md`](widget-overlay.md):
+`top_left = anchor - sprite.offset` (screen-centring is already in
+the sprite's negative offset; do not add a screen-center term).
 
 If a candidate has only the B196x33 sprite loaded, this screen will
 fail to render the key buttons — extend the candidate's sprite-load

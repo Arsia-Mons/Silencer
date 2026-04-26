@@ -33,18 +33,22 @@ indicators `y = 137 + i*53`.
 
 ## Layout note: indicator-y is overlay-relative
 
-The toggle-row buttons (B220x33, button widget) use the
-`center+anchor` coord origin convention from
-[`widget-button.md`](widget-button.md), so on-screen
-`top_left = button.{x,y} + screen_center - sprite.offset`. The Off /
-On indicators are **overlay** widgets — different anchor convention.
-They render at literal screen coordinates `(x, y)` (top-left), not
-center-relative. That's why their numeric `y` (137, 190) looks much
-larger than the button's (50, 103) for the same visual row.
+All sprite widgets use the same canonical formula
+`top_left = anchor - sprite.offset` per
+[`widget-overlay.md`](widget-overlay.md). Screen-centring is baked
+into each sprite's negative `offset_x`/`offset_y`. The numeric `y`
+on the indicators (137, 190) appears much larger than the buttons'
+(50, 103) for the same visual row because the **indicator sprites
+have small / near-zero offsets** (they are positioned near the
+top-left of the framebuffer in spec-coords) while the button sprites
+have large negative offsets (~ −300) that translate the button
+column into the screen interior. Different sprite-offset magnitudes
+— same anchor formula.
 
-If a candidate naively reuses the button-anchor formula on the
-indicator overlays, the indicators will render in the wrong half of
-the screen.
+If a candidate forgets to apply the sprite offset for the indicator
+overlays, they render in the same logical position as their numeric
+`(x, y)` but using the *button's* offsets — wrong half of the
+screen.
 
 ## Activation / state
 
