@@ -705,6 +705,72 @@ static int RunDumpOptionsControls(const std::string &assets_dir,
   return ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// Compose the LOBBYCONNECT screen and write the PPM. Per
+// docs/design/screen-lobby-connect.md:
+//   - sub-palette 2 (the LOBBY palette — distinct from menu sub-palette 1
+//     used by main_menu / options-family screens). First non-menu palette
+//     this hydration uses.
+//   - NO bank-6 idx-0 starfield. Panel exterior is Clear(0) (black).
+//   - NO logo, NO version, NO title overlay (panel sprite includes its own
+//     chrome).
+//   - Bank 7 idx 2 panel sprite at (0, 0) — different idx from CONTROLS' 7.
+//   - Multi-line TextBox at (185, 101) 250x170, font bank 133.
+//   - "Username" / "Password" labels at (190, 291/318), font bank 134 w=9.
+//   - Two TextInput fields at (275, 293/320) 180x14, font bank 133.
+//   - Login B52x21 at (264, 339), Cancel B52x21 at (321, 339). Spec gap:
+//     widget-button.md doesn't list B52x21 yet.
+//
+// L0's gate is build/run + sub-palette 2 resolution only — rendering of
+// the panel sprite (L2), composition (L3), and final visual equivalence
+// (L4) are downstream. Bank set planned ahead: {7, 133, 134, 135}.
+// ---------------------------------------------------------------------------
+static int RunDumpLobbyConnect(const std::string &assets_dir,
+                               const std::string &dump_dir) {
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // Bank set planned ahead: 7 (panel idx 2 + B52x21 chrome — TBD),
+  // 133 (textbox/textinput font), 134 (Username/Password label font),
+  // 135 (button-label font, by analogy with other B-series buttons).
+  // L0 doesn't render any of these yet; they're loaded so subsequent
+  // iterations can add rendering without churn to the bank list.
+  SpriteSet sprites;
+  std::vector<int> banks = {7, 133, 134, 135};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // LOBBYCONNECT sub-palette is 2 per palette.md / screen-lobby-connect.md
+  // §Sub-palette. This is the first screen in the hydration that uses a
+  // non-menu sub-palette.
+  constexpr int kSubLobby = 2;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  // L0: nothing rendered. The PPM is a black 640x480 resolved through
+  // sub-palette 2. L1 verifies the palette resolution color tone; L2
+  // adds the bank-7 idx-2 panel sprite; L3 adds form composition.
+
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubLobby);
+  std::fprintf(stderr, "wrote %s (lobby_connect)\n", out.c_str());
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   std::string assets_dir;
   if (argc >= 2) {
@@ -734,6 +800,9 @@ int main(int argc, char **argv) {
     }
     if (screen_str == "options_controls") {
       return RunDumpOptionsControls(assets_dir, dump);
+    }
+    if (screen_str == "lobby_connect") {
+      return RunDumpLobbyConnect(assets_dir, dump);
     }
     return RunDump(assets_dir, dump);
   }

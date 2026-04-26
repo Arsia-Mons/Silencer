@@ -2,6 +2,10 @@
 <!-- Patterns this Ralph discovers. Patterns from prior Ralphs:
 .ralph/{main-menu,options,options-audio,options-display,options-controls}/progress.txt
 — read those first. -->
+- Screen-switch extension recipe carries forward unchanged from D0 / A0 / O0 / C0: one new `if (screen_str == "lobby_connect")` branch in `main()` plus a sibling `RunDumpLobbyConnect(...)` function. Zero edits to prior Run*; bytewise diffs vs all five prior reference dumps stay at exact baseline (main 2136 / options 1758 / audio 1035 / display 2211 / controls 3729). The "additive screen" pattern continues to hold across the menu→lobby palette boundary.
+- Sub-palette switching is per-`RunDump*`, not per-screen-state: each screen-builder owns a `constexpr int kSubX = N;` constant and passes it to `WritePPM(fb, palette, kSubX)`. Menu screens use `kSubMenu = 1`; LOBBYCONNECT introduces `kSubLobby = 2`. No rework of `WritePPM` or `Palette` was needed — the active-sub argument was always per-call, not global. The "first non-menu palette" gate (L0/L1) is therefore satisfied by a one-line change in the new screen-builder, with no shared-infra churn.
+- Sub-palette 2 idx 0 = (0, 0, 0) black, confirmed empirically by dumping a Clear(0) FB resolved through sub-palette 2 — the first 12 RGB bytes of the dump payload are all 0x00. This means `Clear(0)` produces a black panel-exterior background "for free" under sub-palette 2, with no need for an explicit black-fill widget. The same holds for sub-palette 1 (where main_menu's bg_plate-less zones would also be black if any were exposed; main_menu has none).
+- LOBBYCONNECT bank set planned ahead at L0 commit: `{7, 133, 134, 135}`. Bank 7 (panel idx 2 + likely B52x21 chrome), bank 133 (textbox + textinput font), bank 134 (Username/Password labels font, w=9), bank 135 (button-label font, by analogy with B196x33/B220x33/B112x33). NO bank 6 (no starfield bg, no bg-plate idx 0) — the panel sprite carries the chrome and the exterior is `Clear(0)` per spec. Bank set is loaded at L0 even though L0 doesn't render any of them yet, to avoid bank-list churn in L1+.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -16,4 +20,73 @@
   sub-palette 2 (lobby palette — first non-menu palette this hydration uses).
 - Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
 - **Learnings:** none yet.
+---
+
+## 2026-04-26T15:55:00Z — iter 1 (L0 PASS)
+- Added `RunDumpLobbyConnect(...)` in `shared/design/sdl3/src/main.cpp` and wired
+  the `screen_str == "lobby_connect"` dispatch branch in `main()` immediately
+  after the `"options_controls"` branch (placement matches the chronological
+  add order: options → options_audio → options_display → options_controls →
+  lobby_connect). L0's body is intentionally minimal: load the planned bank
+  set `{7, 133, 134, 135}`, `Clear(0)` the framebuffer, resolve through the
+  newly-introduced `kSubLobby = 2` constant, write the PPM. Panel sprite
+  (L2), composition (L3), and final visual equivalence (L4) are deferred.
+- Bank choices: NO bank 6 (no starfield bg per spec — the panel exterior is
+  `Clear(0)` black). Bank 7 is needed for the panel chrome at idx 2 (and
+  almost certainly the B52x21 button chrome at some idx). Bank 133 is the
+  textbox/textinput font. Bank 134 is the small label font (Username /
+  Password at w=9 per spec). Bank 135 is the standard button-label font by
+  analogy with every prior B-series widget.
+- Build: `cmake --build shared/design/sdl3/build` exits 0; AppleClang 17.
+- Dump: `SILENCER_DUMP_SCREEN=lobby_connect SILENCER_DUMP_DIR=/tmp/sdl3_dump
+  shared/design/sdl3/build/silencer_design "$(pwd)/shared/assets"` writes
+  `/tmp/sdl3_dump/screen_00.ppm` (P6, 640×480, **921615 bytes** — canonical
+  PPM size invariant: header 15 + payload 640*480*3).
+- Sub-palette 2 verification: first 12 RGB bytes of dump payload are all
+  0x00, confirming sub-palette 2 idx 0 = (0, 0, 0) — the panel-exterior
+  black tone the spec calls for. The active-sub plumbing through `WritePPM`
+  is correct for sub-palette ≠ 1; the per-screen `kSubX` constant pattern
+  generalizes cleanly to new palette IDs without infra changes.
+- Regression checks (all clean — exact baselines): main 2,136 / options 1,758
+  / options_audio 1,035 / options_display 2,211 / options_controls 3,729.
+  No regression to any prior screen.
+- Bytewise diff vs `/tmp/real_lobbyconnect_dump.ppm`: ~212,850 bytes (~23%
+  pixel-channel diff). NOT the gate for L0 — the residue is dominated by
+  the entire panel + textbox + form + buttons that L1+ will render. The
+  reference is full-content; the candidate at L0 is intentionally black.
+- Visual A/B (Discord DM 1498095072548360213): candidate is solid black
+  640×480; reference shows the full lobby-connect panel (green-bevel
+  border, "Connecting / Hostname resolved / Connection failed" textbox
+  text, Username/Password input rows, Login/Cancel buttons) on black.
+  Matching panel-exterior tone (black) is the only equivalence at L0.
+- Files touched: `shared/design/sdl3/src/main.cpp` (`RunDumpLobbyConnect` +
+  dispatch branch), `.ralph/lobby-connect/prd.json` (L0 → passes:true),
+  `.ralph/lobby-connect/progress.txt` (this entry + four Codebase Patterns
+  lines).
+- Spec gaps encountered (carry-forward; none new at L0):
+  - `widget-button.md` doesn't list B52x21 yet (will become load-bearing
+    at L3 when Login/Cancel render).
+  - `widget-textbox.md` and `widget-textinput.md` do not exist (load-bearing
+    at L3).
+  - `palette.md` doesn't yet pin sub-palette 2 as the lobby palette;
+    empirically sub-palette 2 idx 0 = black, consistent with the spec's
+    "panel exterior is `Clear(0)` (black)" framing.
+- **Learnings:**
+  - The "minimal L0 commit" pattern (only screen-switch + Clear(0)) is the
+    right cut for a screen whose first novel widget is the panel sprite
+    itself: separating the screen-switch (zero new asset risk) from the
+    panel-sprite blit (new bank-7 idx-2 codec audit) isolates risk and
+    keeps each iteration's gate cleanly auditable. Mirrors the C0/C1 split
+    on OPTIONSCONTROLS where bank-7 idx-7 was the new-asset risk.
+  - `kSubLobby = 2` is the first sub-palette ≠ 1 the hydration has used.
+    The infra (`Palette::palettes[]`, `WritePPM`'s `active_sub` arg) was
+    already general — the prior `8 + s*768` offset fix (main-menu P0)
+    correctly indexes any `s ∈ [0..10]`. So adding a new palette is a
+    pure consumer-side change in the screen-builder, no loader edits.
+  - Loading banks at L0 even though they don't render yet is the right
+    call: it locks in the bank set early, surfaces any sprite-loader
+    failures (path/size/index issues) at the cheapest gate, and means
+    L1+ can be pure rendering additions with no bank-list churn. The
+    `SpriteSet::Load` path is robust enough to handle the new bank
+    combination without crash.
 ---
