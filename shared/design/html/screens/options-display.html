@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Options — Display</title>
+<link rel="stylesheet" href="../styles.css"></head>
+<body><main class="page">
+<p><a href="../index.html">&larr; Back to index</a></p>
+<h1>Options &gt; Display</h1>
+<p>Factory: <code>CreateOptionsDisplayInterface :2700</code>.</p>
+
+<div class="canvas">
+  <div class="t-135" style="left:50%;top:30px;transform:translateX(-50%);color:var(--sem-title-text)">DISPLAY</div>
+
+  <!-- Resolution -->
+  <div class="t-134" style="left:80px;top:100px;color:#fff">Resolution</div>
+  <div class="selectbox" style="left:300px;top:100px;width:200px;height:78px;line-height:14px" id="res">
+    <div class="row">640 × 480</div>
+    <div class="row">1280 × 720</div>
+    <div class="row is-selected">1920 × 1080</div>
+    <div class="row">2560 × 1440</div>
+    <div class="row">3840 × 2160</div>
+  </div>
+
+  <!-- Fullscreen toggle -->
+  <div class="t-134" style="left:80px;top:200px;color:#fff">Fullscreen</div>
+  <button class="btn btn-checkbox is-checked" style="left:300px;top:204px"></button>
+
+  <!-- Scale filter -->
+  <div class="t-134" style="left:80px;top:240px;color:#fff">Scale Filter</div>
+  <button class="btn btn-checkbox" style="left:300px;top:244px"></button>
+  <div class="t-133" style="left:330px;top:244px;color:#888">0=nearest, 1=linear (default)</div>
+
+  <!-- Show FPS -->
+  <div class="t-134" style="left:80px;top:280px;color:#fff">Show FPS</div>
+  <button class="btn btn-checkbox" style="left:300px;top:284px"></button>
+
+  <button class="btn btn-B156x21" style="left:50%;top:420px;transform:translateX(-50%)" data-escape-button>BACK</button>
+</div>
+
+<script>
+document.querySelectorAll('#res .row').forEach(r => {
+  r.addEventListener('click', () => {
+    document.querySelectorAll('#res .row').forEach(x => x.classList.remove('is-selected'));
+    r.classList.add('is-selected');
+  });
+});
+</script>
+<script src="../silencer.js"></script>
+</main></body></html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Overlay — Silencer</title>
+<link rel="stylesheet" href="../styles.css"></head>
+<body><main class="page">
+<p><a href="../index.html">&larr; Back to index</a></p>
+<h1>Overlay</h1>
+<p>Generic sprite-or-text label component. Two hit-test modes: text-mode
+uses <code>(text.length * textwidth)</code> × <code>glyphHeight[textbank]</code>;
+sprite-mode uses the sprite-offset bounding box. Optional animation profiles
+per bank.</p>
+
+<h2>Text-mode overlays</h2>
+<div class="canvas" style="height:160px">
+  <div class="t-135" style="left:20px;top:20px;color:var(--c-fcfcfc);cursor:pointer" onclick="alert('Overlay clicked')">Clickable text overlay</div>
+  <div class="t-134" style="left:20px;top:60px;color:var(--sem-info-tint)">Map: industrial-3</div>
+  <div class="t-133" style="left:20px;top:90px;color:var(--sem-version-label)">v.00028</div>
+  <div class="t-133" style="left:20px;top:115px;color:var(--sem-toggle-active)">Linked: Static</div>
+</div>
+
+<h2>Sprite-mode placeholders</h2>
+<p>Sprite content cannot be decoded from .BIN files in pure HTML — placeholders
+shown with the bank/index label.</p>
+<div class="canvas" style="height:160px">
+  <div class="spr" style="left:20px;top:20px;width:48px;height:48px">SPR 54#0</div>
+  <div class="spr" style="left:80px;top:20px;width:48px;height:48px">SPR 56#0</div>
+  <div class="spr" style="left:140px;top:20px;width:48px;height:48px">SPR 57#0</div>
+  <div class="spr" style="left:200px;top:20px;width:48px;height:48px">SPR 58#0</div>
+  <div class="spr" style="left:260px;top:20px;width:48px;height:48px">SPR 171#0</div>
+  <div class="spr" style="left:320px;top:20px;width:48px;height:48px">SPR 208#0</div>
+  <div class="spr" style="left:380px;top:20px;width:48px;height:48px">SPR 222#0</div>
+
+  <div class="t-133" style="left:20px;top:80px;color:#888">Bank 54: res_index = state_i, wraps at 9 (10-frame loop)</div>
+  <div class="t-133" style="left:20px;top:96px;color:#888">Bank 171: res_index = (state_i / 2) % 4 (4-frame, half-speed)</div>
+  <div class="t-133" style="left:20px;top:112px;color:#888">Bank 208: agency intro — complex 120+ tick ramp</div>
+  <div class="t-133" style="left:20px;top:128px;color:#888">Bank 222: 4-frame one-shot then self-destruct</div>
+</div>
+
+<script src="../silencer.js"></script>
+</main></body></html>

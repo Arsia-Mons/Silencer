@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>TextBox — Silencer</title>
+<link rel="stylesheet" href="../styles.css"></head>
+<body><main class="page">
+<p><a href="../index.html">&larr; Back to index</a></p>
+<h1>TextBox</h1>
+<p>Multi-line auto-scrolling text display. Read-only. Each line stores its own
+color and brightness bytes after the null terminator. Default: bank 133,
+lineheight 11, fontwidth 6.</p>
+
+<h2>Lobby chat messages (242 × 207, bottomtotop = true)</h2>
+<div class="canvas" style="height:240px">
+  <div class="textbox" style="left:20px;top:10px;width:242px;height:207px">[Sys]    Welcome to Silencer
+[Bob]    hey, gn for a match?
+[Alice]  ready when you are
+[Sys]    Game "Pickup" created
+[Carol]  brb afk 2 min
+[Bob]    GG
+[Alice]  rematch?
+[Sys]    User Dave joined
+[Dave]   sup
+[Bob]    rdy
+[Sys]    Map rotated to "Industrial 3"
+[Alice]  GG
+[Carol]  back</div>
+
+  <div class="t-133" style="left:280px;top:10px;color:#888">
+    bank 133, lineheight 11, width 6.
+  </div>
+  <div class="t-133" style="left:280px;top:30px;color:#888">
+    Word-wrap via Interface::WordWrap() — break at spaces or
+  </div>
+  <div class="t-133" style="left:280px;top:48px;color:#888">
+    force-break at width / fontwidth chars.
+  </div>
+  <div class="t-133" style="left:280px;top:80px;color:#888">
+    bottomtotop = true → newest line at the bottom.
+  </div>
+</div>
+
+<h2>Presence list (110 × 207)</h2>
+<div class="canvas" style="height:240px">
+  <div class="textbox" style="left:20px;top:10px;width:110px;height:207px">silencer
+Bob
+Alice
+Carol
+Dave
+Eve
+Frank
+Grace
+Heidi
+Ivan</div>
+</div>
+
+<h2>Per-line color &amp; brightness</h2>
+<div class="canvas" style="height:140px">
+  <div class="textbox" style="left:20px;top:10px;width:400px;height:120px;color:var(--c-fcfcfc)"><span style="color:var(--sem-toggle-active)">[Team]</span>   nice push
+<span style="color:var(--sem-standard-message)">[Sys]</span>    Round 2
+<span style="color:var(--sem-red-alert)">[Alert]</span>  Connection unstable
+<span style="color:var(--sem-version-label)">[Sys]</span>    Server v00028
+<span style="color:var(--sem-secret-dropped)">[All]</span>    secret dropped at A</div>
+</div>
+
+<script src="../silencer.js"></script>
+</main></body></html>

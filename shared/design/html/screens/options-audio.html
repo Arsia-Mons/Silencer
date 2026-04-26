@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Options — Audio</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+.slider {
+  width: 200px; height: 14px;
+  background: var(--c-000000);
+  border: 1px solid var(--c-848484);
+  position: relative;
+}
+.slider .knob {
+  position: absolute; top: -2px;
+  width: 6px; height: 18px;
+  background: var(--c-fcc800);
+}
+</style>
+</head>
+<body><main class="page">
+<p><a href="../index.html">&larr; Back to index</a></p>
+<h1>Options &gt; Audio</h1>
+<p>Factory: <code>CreateOptionsAudioInterface :2761</code>. Volume sliders.
+The original game uses fixed-position drag handles (the &quot;slider&quot; is a
+TextInput-style hit zone with a knob overlay) — modelled here with a simple
+filled-rectangle + knob.</p>
+
+<div class="canvas">
+  <div class="t-135" style="left:50%;top:30px;transform:translateX(-50%);color:var(--sem-title-text)">AUDIO</div>
+
+  <div class="t-134" style="left:80px;top:120px;color:#fff">Master</div>
+  <div class="slider" style="left:240px;top:120px"><div class="knob" style="left:160px"></div></div>
+  <div class="t-134" style="left:460px;top:120px;color:var(--c-fcc800)">80%</div>
+
+  <div class="t-134" style="left:80px;top:160px;color:#fff">SFX</div>
+  <div class="slider" style="left:240px;top:160px"><div class="knob" style="left:140px"></div></div>
+  <div class="t-134" style="left:460px;top:160px;color:var(--c-fcc800)">70%</div>
+
+  <div class="t-134" style="left:80px;top:200px;color:#fff">Music</div>
+  <div class="slider" style="left:240px;top:200px"><div class="knob" style="left:80px"></div></div>
+  <div class="t-134" style="left:460px;top:200px;color:var(--c-fcc800)">40%</div>
+
+  <div class="t-133" style="left:80px;top:260px;color:#888">UI sound is a single one-shot (whoom.wav) — no separate slider.</div>
+
+  <button class="btn btn-B156x21" style="left:50%;top:420px;transform:translateX(-50%)" data-escape-button>BACK</button>
+</div>
+
+<script src="../silencer.js"></script>
+</main></body></html>

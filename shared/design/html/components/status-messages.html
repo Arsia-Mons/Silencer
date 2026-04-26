@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Status Messages — Silencer</title>
+<link rel="stylesheet" href="../styles.css"></head>
+<body><main class="page">
+<p><a href="../index.html">&larr; Back to index</a></p>
+<h1>Status Messages (DrawStatus)</h1>
+<p>Stack of short event messages near bottom-center (kills, pickups). Each
+message centered at <code>x = (640 - strlen*7)/2</code>, base Y = 370.
+Messages stack <strong>upward</strong> (yoffset −= 10 per line). Newest at
+the bottom. Last 16 ticks fade brightness 128 → 0.</p>
+
+<div class="canvas">
+  <!-- Top-most (oldest) at y = 370 - 30 -->
+  <div class="t-133 text-shadow" style="left:50%;top:340px;transform:translateX(-50%);color:#fff;filter:brightness(0.5)">silencer fragged Bob</div>
+  <div class="t-133 text-shadow" style="left:50%;top:350px;transform:translateX(-50%);color:#fff;filter:brightness(0.7)">Alice picked up the secret</div>
+  <div class="t-133 text-shadow" style="left:50%;top:360px;transform:translateX(-50%);color:#fff">Carol joined Team Lazarus</div>
+  <div class="t-133 text-shadow" style="left:50%;top:370px;transform:translateX(-50%);color:var(--sem-secret-dropped)">Eve dropped the secret</div>
+</div>
+
+<h2>Pseudocode</h2>
+<pre><code>baseY = 370
+font: bank 133, width 7
+yoffset = 0
+for each message (newest first):
+    color = stored per-message
+    time  = stored per-message
+    brightness = 128
+    if time &lt;= 16:
+        brightness -= (16 - time) * 8
+    brightness2 = max(brightness - 64, 8)
+    drawText(s, x+1, baseY+yoffset+1, text, 133, 7, color, brightness2)
+    drawText(s, x,   baseY+yoffset,   text, 133, 7, color, brightness)
+    yoffset -= 10</code></pre>
+
+<script src="../silencer.js"></script>
+</main></body></html>

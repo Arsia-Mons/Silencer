@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Player List — Silencer</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+.checkered-bg {
+  background-image:
+    linear-gradient(45deg, rgba(0,0,0,0.5) 25%, transparent 25%, transparent 75%, rgba(0,0,0,0.5) 75%);
+  background-size: 2px 2px;
+}
+.team-block { background: rgba(0,0,0,0); }
+.agency-icon-2x {
+  width: 56px; height: 56px;
+  background: var(--c-303030);
+  border: 1px solid var(--c-848484);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--pixel-font);
+  font-size: 11px; color: var(--sem-toggle-active);
+}
+</style>
+</head>
+<body><main class="page">
+<p><a href="../index.html">&larr; Back to index</a></p>
+<h1>Player List (DrawPlayerList)</h1>
+<p>Scoreboard overlay. Bounds: <code>(50, 50)</code> to
+<code>(590, 50 + 10 + numTeams*58)</code>. Background is checkered (every-other-pixel
+black) over the bounds — 50% effective transparency. Each team block is
+58 px tall. Agency icon at 2× scale (bank 181, team-colored). Player rows
+12 px each, vertically centered when team has &lt; 4 players.</p>
+
+<div class="canvas">
+  <!-- Background checkered region -->
+  <div class="checkered-bg" style="left:50px;top:50px;width:540px;height:186px"></div>
+
+  <!-- Team 1 block (Noxis) -->
+  <div class="team-block" style="left:50px;top:60px;width:540px;height:58px">
+    <div class="agency-icon-2x" style="left:10px;top:10px">SPR<br>181#0</div>
+    <!-- 4 player rows, 12px each, vertically centered -->
+    <div class="t-133" style="left:90px;top:13px;color:#fff">silencer</div>
+    <div class="t-133" style="left:530px;top:13px;color:#fff;transform:translateX(-100%)">L:7  E:5  S:3  J:2  H:4  C:1</div>
+
+    <div class="t-133" style="left:90px;top:25px;color:#fff">Bob</div>
+    <div class="t-133" style="left:530px;top:25px;color:#fff;transform:translateX(-100%)">L:5  E:4  S:2  J:1  H:2  C:0</div>
+
+    <div class="t-133" style="left:90px;top:37px;color:#fff">Alice</div>
+    <div class="t-133" style="left:530px;top:37px;color:#fff;transform:translateX(-100%)">L:9  E:6  S:4  J:3  H:5  C:2</div>
+
+    <div class="t-133" style="left:90px;top:49px;color:#fff">Carol</div>
+    <div class="t-133" style="left:530px;top:49px;color:#fff;transform:translateX(-100%)">L:3  E:2  S:1  J:0  H:0  C:0</div>
+  </div>
+
+  <!-- Team 2 block (Static) - 2 players, vertically centered -->
+  <div class="team-block" style="left:50px;top:118px;width:540px;height:58px">
+    <div class="agency-icon-2x" style="left:10px;top:10px">SPR<br>181#3</div>
+    <div class="t-133" style="left:90px;top:25px;color:#fff">Eve</div>
+    <div class="t-133" style="left:530px;top:25px;color:#fff;transform:translateX(-100%)">L:8  E:5  S:4  J:2  H:3  C:1</div>
+
+    <div class="t-133" style="left:90px;top:37px;color:#fff">Dave</div>
+    <div class="t-133" style="left:530px;top:37px;color:#fff;transform:translateX(-100%)">L:4  E:3  S:2  J:1  H:1  C:0</div>
+  </div>
+
+  <!-- Team 3 block (Blackrose) - 1 player -->
+  <div class="team-block" style="left:50px;top:176px;width:540px;height:58px">
+    <div class="agency-icon-2x" style="left:10px;top:10px">SPR<br>181#4</div>
+    <div class="t-133" style="left:90px;top:31px;color:#fff">Frank</div>
+    <div class="t-133" style="left:530px;top:31px;color:#fff;transform:translateX(-100%)">L:6  E:4  S:3  J:2  H:2  C:0</div>
+  </div>
+</div>
+
+<h2>Vertical centering pseudocode</h2>
+<pre><code>// Per team block:
+vertCenter = ((4 - team.numpeers) * 12) / 2
+// Name:  (60 + 40, 60 + yoffset + vertCenter + i*12 + 1)
+// Stats: right-aligned at (580 - textWidth, sameY)
+// Format: "L:{lvl}  E:{end}  S:{shd}  J:{jet}  H:{hck}  C:{con}"</code></pre>
+
+<script src="../silencer.js"></script>
+</main></body></html>

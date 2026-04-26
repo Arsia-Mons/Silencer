@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>TextInput — Silencer</title>
+<link rel="stylesheet" href="../styles.css"></head>
+<body><main class="page">
+<p><a href="../index.html">&larr; Back to index</a></p>
+<h1>TextInput</h1>
+
+<p>Single-line text field. Caret blinks on a 32-tick (~1344 ms) cycle —
+visible 0–15, hidden 16–31. Caret is always at the end of the buffer (no
+arrow-key cursor movement is implemented in the original). Inactive fields
+render at <code>brightness = 64</code> (half-dark).</p>
+
+<h2>Configured field instances (from §TextInput table)</h2>
+<div class="canvas" style="height:380px">
+  <div class="t-133" style="left:20px;top:10px">Login: Username — 180 × 14, bank 133, w 6, max 16</div>
+  <input class="textinput t-133" style="left:20px;top:30px;width:180px;height:14px" maxlength="16" value="silencer">
+
+  <div class="t-133" style="left:20px;top:60px">Login: Password — 180 × 14, password mask</div>
+  <input class="textinput t-133" type="password" style="left:20px;top:80px;width:180px;height:14px" maxlength="28" value="hunter2">
+
+  <div class="t-133" style="left:20px;top:110px">Lobby Chat — 360 × 14, max 200 / scroll at 60</div>
+  <input class="textinput t-133" style="left:20px;top:130px;width:360px;height:14px" maxlength="200">
+
+  <div class="t-133" style="left:20px;top:160px">Game Create: Name — 210 × 14</div>
+  <input class="textinput t-133" style="left:20px;top:180px;width:210px;height:14px" maxlength="35" value="Quick Match">
+
+  <div class="t-133" style="left:20px;top:210px">Game Create: Min/Max Level / Players / Teams — 20 × 20, numbers only</div>
+  <input class="textinput t-134" style="left:20px;top:230px;width:20px;height:20px" maxlength="2" inputmode="numeric" pattern="[0-9]*" value="1">
+  <input class="textinput t-134" style="left:50px;top:230px;width:20px;height:20px" maxlength="2" inputmode="numeric" pattern="[0-9]*" value="9">
+  <input class="textinput t-134" style="left:80px;top:230px;width:20px;height:20px" maxlength="2" inputmode="numeric" pattern="[0-9]*" value="8">
+  <input class="textinput t-134" style="left:110px;top:230px;width:20px;height:20px" maxlength="2" inputmode="numeric" pattern="[0-9]*" value="2">
+
+  <div class="t-133" style="left:20px;top:270px">Inactive (brightness 64)</div>
+  <input class="textinput t-133 inactive" style="left:20px;top:290px;width:180px;height:14px" value="disabled" disabled>
+</div>
+
+<h2>Caret behavior</h2>
+<ul>
+  <li>Caret color: <code>#FCFC00</code> (palette index 140 — semantic "Caret").</li>
+  <li>Caret height: <code>floor(input.height * 0.8)</code>.</li>
+  <li>Caret X: <code>input.x + strlen(visibleText) * fontwidth</code> — always at the trailing edge.</li>
+  <li>Browser <code>caret-color</code> simulates this; the blink cadence is
+  whatever the browser ships (close to 1 Hz, so visually similar).</li>
+</ul>
+
+<h2>Intentionally unsupported (do not add)</h2>
+<ul>
+  <li>Cursor movement keys (Left, Right, Home, End)</li>
+  <li>Mouse-click caret placement (<code>SetCaretPosition()</code> is broken)</li>
+  <li>Clipboard paste / Ctrl+V</li>
+  <li>IME / composition input</li>
+  <li>Selection / shift-click</li>
+</ul>
+<p>Browsers do most of these; in a faithful reimplementation those would all
+be no-ops.</p>
+
+<script src="../silencer.js"></script>
+</main></body></html>

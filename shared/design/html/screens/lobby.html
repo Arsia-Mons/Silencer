@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Lobby — Silencer</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+.agency-toggle {
+  width: 36px; height: 36px;
+  background: var(--c-303030);
+  border: 1px solid var(--c-848484);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--pixel-font);
+  font-size: 11px; color: var(--sem-toggle-active);
+  filter: brightness(0.25);
+  cursor: pointer;
+}
+.agency-toggle.is-selected { filter: brightness(1); }
+</style>
+</head>
+<body><main class="page">
+<p><a href="../index.html">&larr; Back to index</a></p>
+<h1>Lobby Screen</h1>
+<p>Factory: <code>CreateLobbyInterface :2905</code>. Hosts the Character,
+Chat, and Game-Select child Interfaces. Background plate: bank 7, idx 1.
+All coordinates below are absolute in 640 × 480 space (children are
+<em>not</em> relative to parent Interface origins).</p>
+
+<div class="canvas">
+  <!-- ====== HEADER ====== -->
+  <div class="t-135" style="left:15px;top:32px;color:var(--sem-title-text)">Silencer</div>
+  <div class="t-133" style="left:115px;top:39px;color:var(--sem-version-label)">v.00028</div>
+  <div class="t-135" style="left:180px;top:32px;color:var(--sem-info-tint);filter:brightness(1.25)">industrial-3</div>
+  <button class="btn btn-B156x21" style="left:473px;top:29px" tabindex="1" data-escape-button>GO BACK</button>
+
+  <!-- ====== CHARACTER PANEL (10, 64, 217, 120) ====== -->
+  <div style="left:10px;top:64px;width:217px;height:120px;background:rgba(0,0,0,0.3);border:1px solid var(--c-303030)"></div>
+  <div class="t-134" style="left:20px;top:71px;color:var(--sem-user-info)">silencer</div>
+
+  <!-- 5 agency toggles starting (20, 90), 42 px apart -->
+  <button class="agency-toggle is-selected" data-toggle-set="lobby-agency" style="left:20px;top:90px">SPR<br>181#0</button>
+  <button class="agency-toggle"             data-toggle-set="lobby-agency" style="left:62px;top:90px">SPR<br>181#1</button>
+  <button class="agency-toggle"             data-toggle-set="lobby-agency" style="left:104px;top:90px">SPR<br>181#2</button>
+  <button class="agency-toggle"             data-toggle-set="lobby-agency" style="left:146px;top:90px">SPR<br>181#3</button>
+  <button class="agency-toggle"             data-toggle-set="lobby-agency" style="left:188px;top:90px">SPR<br>181#4</button>
+
+  <!-- Stat rows (17, 130/143/156/169) bank 133 / w 7 -->
+  <div class="t-133" style="left:17px;top:130px;color:var(--sem-info-tint);filter:brightness(1.25)">Level: 7</div>
+  <div class="t-133" style="left:17px;top:143px;color:var(--sem-info-tint);filter:brightness(1.25)">Wins: 23</div>
+  <div class="t-133" style="left:17px;top:156px;color:var(--sem-info-tint);filter:brightness(1.25)">Losses: 17</div>
+  <div class="t-133" style="left:17px;top:169px;color:var(--sem-info-tint);filter:brightness(1.25)">E:5  S:3  J:2  H:4  C:1</div>
+
+  <!-- ====== CHAT PANEL (15, 216, 368, 234) ====== -->
+  <div class="t-134" style="left:15px;top:200px;color:var(--c-fcfcfc)">All</div>
+
+  <div class="textbox" style="left:19px;top:220px;width:242px;height:207px">[Sys]    Welcome to lobby
+[Bob]    gn for a match?
+[Alice]  ready
+[Sys]    Game "Pickup #2" up
+[Carol]  brb
+[Bob]    GG
+[Alice]  rematch?
+[Sys]    Dave joined
+[Dave]   sup
+[Bob]    rdy
+[Sys]    Map → industrial-3
+[Alice]  GG
+[Carol]  back</div>
+
+  <div class="textbox" style="left:267px;top:220px;width:110px;height:207px">silencer
+Bob
+Alice
+Carol
+Dave
+Eve
+Frank
+Grace</div>
+
+  <input class="textinput t-133" style="left:18px;top:437px;width:360px;height:14px" maxlength="200" tabindex="2" placeholder="say something...">
+
+  <!-- ====== GAME LIST PANEL (403, 87, 222, 267) ====== -->
+  <div class="t-134" style="left:405px;top:70px;color:var(--c-fcfcfc)">Active Games</div>
+  <button class="btn btn-B156x21" style="left:242px;top:68px" tabindex="3">CREATE GAME</button>
+
+  <div class="selectbox" style="left:407px;top:89px;width:214px;height:265px;line-height:14px" id="lobbyGames">
+    <div class="row is-selected">Pickup #2 (5/8)</div>
+    <div class="row">Industrial Lockdown</div>
+    <div class="row">Open EU 1</div>
+    <div class="row">Open EU 2</div>
+    <div class="row">Newbies Only</div>
+    <div class="row">Veterans Only</div>
+    <div class="row">Practice Bots</div>
+    <div class="row">Tournament Heat 3</div>
+    <div class="row">Casual</div>
+    <div class="row">3v3 Scrim</div>
+  </div>
+
+  <!-- Paired scrollbar -->
+  <div class="scrollbar" style="left:605px;top:89px;width:16px;height:265px">
+    <div class="arrow">▲</div>
+    <div class="track"><div class="thumb" style="top:30px"></div></div>
+    <div class="arrow">▼</div>
+  </div>
+
+  <!-- Game info rows (405, 358..406) 5 rows 12 px apart bank 133 / w 6 -->
+  <div class="t-133" style="left:405px;top:358px;color:#fff">Name: Pickup #2</div>
+  <div class="t-133" style="left:405px;top:370px;color:#fff">Map: industrial-3</div>
+  <div class="t-133" style="left:405px;top:382px;color:#fff">Players: 5/8</div>
+  <div class="t-133" style="left:405px;top:394px;color:#fff">Creator: Bob</div>
+  <div class="t-133" style="left:405px;top:406px;color:#fff">Info: Open</div>
+
+  <button class="btn btn-B156x21" style="left:436px;top:430px" tabindex="4">JOIN GAME</button>
+</div>
+
+<script>
+document.querySelectorAll('#lobbyGames .row').forEach(r => {
+  r.addEventListener('click', () => {
+    document.querySelectorAll('#lobbyGames .row').forEach(x => x.classList.remove('is-selected'));
+    r.classList.add('is-selected');
+  });
+});
+</script>
+<script src="../silencer.js"></script>
+</main></body></html>

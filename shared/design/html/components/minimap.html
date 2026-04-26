@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Minimap — Silencer</title>
+<link rel="stylesheet" href="../styles.css">
+<style>
+.minimap-frame {
+  background: var(--c-000000);
+  border: 2px solid var(--c-848484);
+  box-shadow: inset 0 0 0 1px var(--c-303030);
+}
+</style>
+</head>
+<body><main class="page">
+<p><a href="../index.html">&larr; Back to index</a></p>
+<h1>Minimap</h1>
+<p>Position <code>(235, 419)</code>, size <code>172 × 62</code>. The minimap is
+a pre-rendered pixel buffer (172 × 62 bytes, palette-indexed) generated
+from the map; entity markers are drawn on top via
+<code>MiniMapBlit()</code> and <code>MiniMapCircle()</code>. Frame is
+sprite bank 94 / index 0.</p>
+
+<div class="canvas">
+  <div class="minimap-frame" style="left:235px;top:419px;width:172px;height:62px">
+    <!-- Faked map terrain -->
+    <svg width="172" height="62" style="position:absolute;left:0;top:0;image-rendering:pixelated">
+      <rect x="10"  y="10"  width="40" height="20" fill="#5C1C1C"/>
+      <rect x="60"  y="10"  width="60" height="40" fill="#603010"/>
+      <rect x="130" y="20"  width="30" height="30" fill="#5C1C1C"/>
+      <line x1="50" y1="20" x2="60" y2="20" stroke="#848484"/>
+      <line x1="120" y1="30" x2="130" y2="30" stroke="#848484"/>
+      <!-- Entity markers (MiniMapCircle) -->
+      <circle cx="30"  cy="20" r="2" fill="#FCFC00"/>
+      <circle cx="80"  cy="40" r="2" fill="#549C68"/>
+      <circle cx="140" cy="35" r="2" fill="#FC0000"/>
+      <!-- Pickup marker -->
+      <circle cx="100" cy="20" r="2" fill="#FCC480"/>
+    </svg>
+  </div>
+
+  <div class="t-133" style="left:20px;top:30px;color:#888">Frame at (235, 419). Tinted by EffectColor 150 (#5C1C1C).</div>
+</div>
+
+<script src="../silencer.js"></script>
+</main></body></html>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>ScrollBar — Silencer</title>
+<link rel="stylesheet" href="../styles.css"></head>
+<body><main class="page">
+<p><a href="../index.html">&larr; Back to index</a></p>
+<h1>ScrollBar</h1>
+<p>Vertical only. Three hit zones: top 16 px = up arrow, middle = track,
+bottom 16 px = down arrow. Always paired with a SelectBox or TextBox.</p>
+
+<h2>Geometry</h2>
+<div class="canvas" style="height:300px">
+  <div class="scrollbar" id="sb" style="left:20px;top:20px;width:16px;height:200px">
+    <div class="arrow" id="up">▲</div>
+    <div class="track"><div class="thumb" id="thumb" style="top:20px"></div></div>
+    <div class="arrow" id="down">▼</div>
+  </div>
+
+  <div class="t-133" style="left:60px;top:20px;color:#888">scrollposition: <span id="pos">2</span> / scrollmax: 10</div>
+  <div class="t-133" style="left:60px;top:40px;color:#888">Up arrow: 16 px tall, click → scrollUp().</div>
+  <div class="t-133" style="left:60px;top:60px;color:#888">Track: drag thumb (or wheel forwarded).</div>
+  <div class="t-133" style="left:60px;top:80px;color:#888">Down arrow: 16 px tall, click → scrollDown().</div>
+
+  <div class="t-133" style="left:60px;top:120px;color:#888">draw = false until content overflows.</div>
+  <div class="t-133" style="left:60px;top:140px;color:#888">Mouse wheel events forwarded by Interface.</div>
+  <div class="t-133" style="left:60px;top:160px;color:#888">Keyboard nav past viewport plays whoom.wav.</div>
+</div>
+
+<script>
+let pos = 2, max = 10;
+const thumb = document.getElementById('thumb');
+const posSpan = document.getElementById('pos');
+function update() {
+  posSpan.textContent = pos;
+  // Track region inside .track: 200 - 32 = 168 px tall, thumb is 24 px tall.
+  // Available travel = 168 - 24 = 144 px.
+  thumb.style.top = (pos / max * 144) + 'px';
+}
+document.getElementById('up').onclick   = () => { if (pos > 0) { pos--; update(); }};
+document.getElementById('down').onclick = () => { if (pos < max) { pos++; update(); }};
+update();
+</script>
+<script src="../silencer.js"></script>
+</main></body></html>

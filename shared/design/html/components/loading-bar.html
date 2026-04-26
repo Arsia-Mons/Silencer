@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Loading Bar — Silencer</title>
+<link rel="stylesheet" href="../styles.css"></head>
+<body><main class="page">
+<p><a href="../index.html">&larr; Back to index</a></p>
+<h1>Loading Bar</h1>
+<p>The simplest possible progress indicator. No border, no text, no
+background — just a 500 × 20 px filled rectangle in palette index
+<strong>123</strong> (<code>#949494</code>, mid-gray) that grows as
+<code>progress / totalItems</code> increases. Centered on (320, 240)
+of the 640 × 480 buffer. Update rate throttled to every 100 ms.</p>
+
+<h2>30%</h2>
+<div class="canvas">
+  <div style="left:70px;top:230px;width:150px;height:20px;background:var(--sem-loading-bar)"></div>
+</div>
+
+<h2>75%</h2>
+<div class="canvas">
+  <div style="left:70px;top:230px;width:375px;height:20px;background:var(--sem-loading-bar)"></div>
+</div>
+
+<h2>100%</h2>
+<div class="canvas">
+  <div style="left:70px;top:230px;width:500px;height:20px;background:var(--sem-loading-bar)"></div>
+</div>
+
+<h2>Pseudocode</h2>
+<pre><code>totalWidth   = 500
+filledWidth  = (progress / totalItems) * totalWidth
+color        = 123    // #949494
+x1 = (640 - totalWidth) / 2     // 70
+y1 = (480 - 20) / 2             // 230
+x2 = (640 + filledWidth) / 2
+y2 = (480 + 20) / 2             // 250
+drawFilledRectangle(surface, x1, y1, x2, y2, color)</code></pre>
+
+<script src="../silencer.js"></script>
+</main></body></html>

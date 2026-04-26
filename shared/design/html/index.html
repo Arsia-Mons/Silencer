@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Silencer Design System — HTML Hydration</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="../../icons/icon_32.png">
+</head>
+<body>
+<main class="page">
+  <h1>Silencer Design System</h1>
+  <p>Static HTML/CSS hydration of the components and screens described in
+  <code>docs/design-system.md</code>. All canvases render at the
+  640&times;480 logical resolution the game uses internally; behaviors that
+  depend on JS (button activation animation, caret blink, focus tab order)
+  are wired up with vanilla JS.</p>
+
+  <p><strong>What is faked:</strong> bitmap glyphs (.BIN sprite banks aren't
+  decodable in pure HTML, so we use the <code>VT323</code> Google web font as
+  a near-pixel monospace substitute) and sprite art (agency icons, HUD frame
+  art, button backplates etc. are rendered as colored rectangles labelled
+  <code>SPR &lt;bank&gt;#&lt;idx&gt;</code>).</p>
+
+  <p><strong>What is faithful:</strong> palette hex values from §Color
+  System, all coordinates and dimensions in 640&times;480 logical pixels,
+  font advances, line heights, hit-test boxes, the button state machine,
+  the caret blink rate, the modal-dialog stacking model, focus tab order.</p>
+
+  <h2>Foundations</h2>
+  <ul>
+    <li><a href="components/palette.html">Color palette</a> — all 7 ramps and the semantic colors.</li>
+    <li><a href="components/typography.html">Typography</a> — font banks 132–136 with their documented advances.</li>
+  </ul>
+
+  <h2>Reusable widgets</h2>
+  <ul>
+    <li><a href="components/button.html">Button</a> — all 7 variants with hover state machine.</li>
+    <li><a href="components/toggle.html">Toggle</a> — agency-icon and checkbox modes, radio groups.</li>
+    <li><a href="components/textinput.html">TextInput</a> — caret blink, scrolling, password mask.</li>
+    <li><a href="components/textbox.html">TextBox</a> — multi-line auto-scrolling read-only text.</li>
+    <li><a href="components/selectbox.html">SelectBox</a> — single-select list with palette-180 highlight.</li>
+    <li><a href="components/scrollbar.html">ScrollBar</a> — up/down arrows with 16px hit zones.</li>
+    <li><a href="components/overlay.html">Overlay</a> — sprite/text label, animated banks.</li>
+    <li><a href="components/interface.html">Interface</a> — focus/tab manager, no separate ring.</li>
+    <li><a href="components/horizontal-stretch-panel.html">Horizontal-Stretch Panel</a> — chat-message background (bank 188).</li>
+    <li><a href="components/modal.html">Modal Dialog</a> — alert / confirm with optional OK button.</li>
+    <li><a href="components/loading-bar.html">Loading Bar</a> — 500&times;20 px filled rectangle.</li>
+    <li><a href="components/primitives.html">Drawing Primitives</a> — rect, line, circle, checkered.</li>
+  </ul>
+
+  <h2>Screen compositions</h2>
+  <ul>
+    <li><a href="components/chat-overlay.html">In-Game Chat Overlay</a></li>
+    <li><a href="components/announcement.html">Announcement Message</a></li>
+    <li><a href="components/status-messages.html">Status Messages</a></li>
+    <li><a href="components/top-message.html">Top Message</a></li>
+    <li><a href="components/player-list.html">Player List (scoreboard)</a></li>
+    <li><a href="components/buy-menu.html">Buy Menu</a></li>
+    <li><a href="components/hud-bars.html">HUD Bars</a></li>
+    <li><a href="components/team-hud.html">Team HUD</a></li>
+    <li><a href="components/minimap.html">Minimap</a></li>
+  </ul>
+
+  <h2>Screens (Appendix B — Interface Manifest)</h2>
+  <ul>
+    <li><a href="screens/main-menu.html">Main Menu</a></li>
+    <li><a href="screens/lobby-connect.html">Lobby Connect (Login)</a></li>
+    <li><a href="screens/lobby.html">Lobby</a> — header + character + chat + game list</li>
+    <li><a href="screens/game-create.html">Game Create</a></li>
+    <li><a href="screens/game-summary.html">Game Summary (post-match)</a></li>
+    <li><a href="screens/options.html">Options</a></li>
+    <li><a href="screens/options-controls.html">Options &gt; Controls</a></li>
+    <li><a href="screens/options-display.html">Options &gt; Display</a></li>
+    <li><a href="screens/options-audio.html">Options &gt; Audio</a></li>
+    <li><a href="screens/in-game-hud.html">In-Game HUD (full composition)</a></li>
+    <li><a href="screens/loading.html">Loading screen</a></li>
+  </ul>
+
+  <p style="margin-top:48px;color:#666;font-size:12px;">
+    Open this directory in a browser:
+    <code>open /Users/hv/repos/Silencer/shared/design/html/index.html</code>
+  </p>
+</main>
+</body>
+</html>
