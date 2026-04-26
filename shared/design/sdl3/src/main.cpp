@@ -656,9 +656,24 @@ static int RunDumpOptionsControls(const std::string &assets_dir,
     }
   }
 
-  // C2 gate stops here: bg + frame panel + title + 6-row form structure.
-  // C3 will populate key1/key2 button text; C4 the scrollbar thumb;
-  // C5 the Save/Cancel buttons.
+  // 5) Scrollbar widget (bank 7, track idx 9, thumb idx 10).
+  //    The scrollbar track + both chevron caps are baked into the bank 7 idx 7
+  //    frame panel sprite (see C1's discovery). Only the moveable thumb (idx 10)
+  //    is in principle rendered as a separate widget. At scrollposition=0 with
+  //    this dump's six-entry keynames array, scrollmax = numkeys - 6 = 0, so
+  //    `ScrollBar.draw = false` (per docs/design-system.md.archive:1093) and the
+  //    thumb is not drawn. Pixel-level comparison confirms this: the candidate
+  //    matches the reference exactly in the scrollbar zone (x>=540) with no
+  //    thumb blit needed. Probe sprite dims for the orchestrator's spec audit.
+  if (sprites.Has(7, 10)) {
+    const Sprite &thumb = sprites.Get(7, 10);
+    std::fprintf(stderr,
+                 "scrollbar thumb sprite (7,10): w=%d h=%d offset=(%d,%d)\n",
+                 thumb.w, thumb.h, thumb.offset_x, thumb.offset_y);
+  }
+
+  // C4 gate stops here: scrollbar zone visually matches reference via bake-in.
+  // C5 will populate the Save/Cancel buttons at the bottom of the frame.
 
   std::filesystem::create_directories(dump_dir);
   std::string out = dump_dir + "/screen_00.ppm";

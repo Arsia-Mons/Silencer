@@ -40,7 +40,7 @@
       "id": "C4",
       "name": "Scrollbar widget rendered (right edge, scrollposition=0, thumb at top)",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "spec": "Vertical scrollbar at the right edge of the frame interior. Thumb at top (scrollposition=0). May require introducing a scrollbar widget module in the candidate. res_index=9 in the scrollbar bank (per spec).",
       "category": "composition"
     },

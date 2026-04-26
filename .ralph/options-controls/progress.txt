@@ -9,6 +9,8 @@
 - BNONE connector text is centered horizontally inside its w=40 bbox via `xoff = (40 - len*advance)/2` with advance=9 (font 134), but Y-anchored at the spec's literal `y = 95+i*53` (text TOP, not vertical-centered in the 30px box). Same Y-baseline as the row label at (80, 95+i*53), which is what makes the row label and the OR/AND connector appear on the same visual baseline in the reference. Treating the BNONE bbox y as text-top (not center) matched the reference exactly.
 - Six-row form pattern (C2) reuses the OPTIONSAUDIO/OPTIONSDISPLAY rows-array idiom: one `std::array<ControlsRow, 6>` of `{label, connector}` pairs + a single `for` loop that draws label + key1 chrome + connector + key2 chrome per iteration. Total composition payload: 6 row-label DrawTexts + 12 B112x33 BlitSprites + 6 connector DrawTexts + 1 title DrawText = 25 calls, written as 1 hard-coded block. Free-flip cascade pattern (one builder pass enumerating all spec objects → downstream gates audit by visual A/B) applies as expected.
 - B112x33 button-label rendering follows the same convention as B196x33 / B220x33 with only the width changing: `xoff = (112 - len*11)/2`, `yoff = 8`, font bank 135 advance 11, brightness 128 (INACTIVE). Empty key2 (rendered as zero-length string on Move rows) draws chrome only — guarded by `if (klen > 0) DrawText(...)`. Per-archive:633 row, B112x33 lives at bank 6 idx 28; the row's text-bank is 135 not 134 (134 is for keyname overlay labels and OR/AND connectors only — the **inside** of the B112x33 chrome uses the standard large button font, same as Save / Cancel / Music etc.).
+- Scrollbar widget at `scrollmax = 0` is **not drawn** at all. Per archive:1093 `ScrollBar.draw` defaults `false` and is only set true when content overflows. This dump's keynames array has exactly 6 entries → `scrollmax = numkeys - 6 = 0` → `draw = false` → no thumb blit. Pixel diff at x>=540 is zero. The track + chevrons that ARE visible in the reference come entirely from the bank 7 idx 7 frame-panel sprite bake-in (C1's discovery), not from a separate scrollbar render. Net rendering payload for OPTIONSCONTROLS scrollbar: zero blits, zero DrawTexts. The spec's z=27 scrollbar inventory entry is structural (the widget object exists in the engine's interface tree) but visually trivial at this dump's parameters.
+- Bank 7 idx 10 (thumb sprite) actual dimensions: w=16, h=235, offset=(-610, -103). Logged via `fprintf(stderr, ...)` from `RunDumpOptionsControls` — diagnostic only, no rendering effect. h=235 is the full inter-chevron track range (~89..324 with offset_y=-103 → top_left.y = 103 at anchor (0,0)); offset_x=-610 anchors the 16px-wide thumb against the right edge of the frame at x=610..626. These dims would matter at scrollmax>0 (where the thumb would be sized to `track_h * 6 / numkeys` and slid by `scrollposition * scroll_step`), but at scrollmax=0 they are unused. Pin this in `widget-scrollbar.md` when the orchestrator authors it.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -268,4 +270,74 @@
     canonical engine uses Y" — the first being the scrollbar track being
     frame-baked rather than widget-composed. The hydration is a strong
     forcing function for catching these.
+---
+
+## 2026-04-26T16:35:00Z — iter 5 (C4 PASS)
+- Added scrollbar widget commentary block + `fprintf` probe of bank 7 idx 10 to
+  `RunDumpOptionsControls`. The probe logs `w=16 h=235 offset=(-610,-103)` for
+  the thumb sprite (no rendering effect; stderr only). No `BlitSprite` is
+  emitted because at this dump's `scrollmax = numkeys - 6 = 0`, `ScrollBar.draw`
+  defaults to `false` (per archive:1093) and the engine renders neither thumb
+  nor track. The track + chevrons visible in the reference are entirely
+  bake-in from the bank 7 idx 7 frame-panel sprite (C1's discovery).
+- Build: `cmake --build shared/design/sdl3/build` exits 0; AppleClang 17.
+- Dump: 921615 bytes (canonical PPM size invariant). Bytewise diff vs
+  `/tmp/real_optionscontrols_dump.ppm`: **24,523 bytes — unchanged from C3**,
+  as expected (only an `fprintf` was added; no pixels written).
+- Regression checks (all clean — exact baselines): main 2,136 / options 1,758 /
+  options_audio 1,035 / options_display 2,211. No regression to any prior
+  screen.
+- Visual A/B (Discord DM 1498089889294454784): the scrollbar zone at the right
+  edge of the frame (x>=540 in the dump) is **already pixel-coincident with
+  the reference** at C3, before any C4 work. Per-column diff counts: zero diffs
+  in the entire scrollbar zone (verified by an inline `diff_per_col` scan). The
+  upper chevron at y=87-89, the inner track edge at x=581 column-G, and the
+  lower chevron at y=388-389 all match exactly between candidate and reference.
+  Conclusion: the scrollbar widget contributes **zero pixels** to the dump at
+  scrollposition=0 / scrollmax=0; the visual match comes 100% from the
+  frame-panel sprite. C4's "scrollbar visible at right edge" is satisfied
+  entirely by C1's bake-in.
+- Spec gaps encountered:
+  - `widget-scrollbar.md` (already known-missing) should document: (a) the
+    `draw=false` short-circuit at `scrollmax=0`; (b) bank 7 idx 9 = track
+    sprite (UNUSED for OPTIONSCONTROLS — track is bake-in); (c) bank 7 idx 10 =
+    thumb sprite, dims w=16 h=235 offset=(-610,-103), drawn only at
+    scrollmax>0; (d) the thumb's runtime height computed as
+    `track_inner_h * visible_count / total_count` and its y-position computed
+    as `track_inner_top + scrollposition * (track_inner_h - thumb_h) / scrollmax`.
+  - The C4 spec field `"res_index=9 in the scrollbar bank (per spec)"` is
+    misleading: idx 9 is the track but unused in this dump; the documented
+    thumb is idx 10; and at scrollmax=0 neither blits.
+- Files touched: `shared/design/sdl3/src/main.cpp` (scrollbar block + probe
+  fprintf), `.ralph/options-controls/prd.json` (C4 → passes:true),
+  `.ralph/options-controls/progress.txt` (this entry + two Codebase Patterns
+  lines).
+- **Learnings:**
+  - The "draw=false at scrollmax=0" short-circuit makes scrollbar rendering
+    fully decoupled from screen layout: a screen with bake-in track decoration
+    shows the chrome regardless of scroll state, and the scrollbar widget
+    contributes pixels only when there are >`visible_count` items to scroll
+    through. This is the right separation: static chrome stays in the sprite,
+    dynamic state stays in the widget. The hydration's no-op C4 is therefore
+    a faithful reproduction of the engine's actual behavior, not a shortcut.
+  - The C1 progress note's statement "Only the moveable scrollbar **thumb**
+    needs a separate render in C4" was ALMOST right — the actual answer is
+    "only the thumb would need a render IF scrollmax > 0", and at this dump's
+    scrollmax = 0 even that is omitted. The pattern: when in doubt about
+    whether a "dynamic widget" actually contributes pixels at the dump's
+    parameters, scan diff_per_row/col first — if the widget's expected
+    bounding box has zero diffs, the widget is invisible at these parameters.
+  - The "probe-and-log" pattern (add an `fprintf` to dump sprite dims +
+    offset + comp_size to stderr without affecting rendering) is a cheap and
+    durable way to capture sprite metadata for future spec-doc authoring.
+    Future Ralphs can reuse this pattern to feed `widget-scrollbar.md` /
+    `widget-frame.md` / `sprite-banks.md` updates with hard data instead of
+    speculation. Cost: 4 lines of code, zero pixel impact.
+  - The C2 → C3 → C4 diff trajectory: 27,303 → 24,523 → 24,523. C4 closed
+    zero residual diff because the scrollbar contributes zero pixels at this
+    dump. C5 (Save/Cancel chrome + text) accounts for the entire remaining
+    24,523 bytes — confirmed by the per-row diff scan: 100% of remaining
+    diffs are in y=405..437 (the Save/Cancel band) plus the form-row
+    AA/glyph noise that's intrinsic to font rendering and below the casual-
+    reader threshold.
 ---
