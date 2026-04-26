@@ -1,0 +1,107 @@
+{
+  "id": "robot",
+  "props": {
+    "hp": 80,
+    "shield": 20,
+    "speed": 90,
+    "faction": "enemy",
+    "spawnWeight": 2
+  },
+  "sequences": {
+    "SLEEPING": {
+      "loop": true,
+      "frames": [
+        { "bank": 47, "index": 0, "duration": 6, "hurtbox": [-36, -100, 36, 0] }
+      ]
+    },
+    "AWAKENING": {
+      "loop": false,
+      "frames": [
+        { "bank": 47, "index":  0, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index":  1, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index":  2, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index":  3, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index":  4, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index":  5, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index":  6, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index":  7, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index":  8, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index":  9, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index": 10, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index": 11, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index": 12, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index": 13, "duration": 4, "hurtbox": [-36, -100, 36, 0] },
+        { "bank": 47, "index": 14, "duration": 4, "hurtbox": [-36, -100, 36, 0] }
+      ]
+    },
+    "WALKING": {
+      "loop": true,
+      "frames": [
+        { "bank": 45, "index":  0, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index":  1, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index":  2, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index":  3, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index":  4, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index":  5, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index":  6, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index":  7, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index":  8, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index":  9, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index": 10, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index": 11, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index": 12, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index": 13, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index": 14, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index": 15, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index": 16, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index": 17, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index": 18, "duration": 2, "hurtbox": [-38, -98, 38, 0] },
+        { "bank": 45, "index": 19, "duration": 2, "hurtbox": [-38, -98, 38, 0] }
+      ]
+    },
+    "SHOOTING": {
+      "loop": false,
+      "frames": [
+        { "bank": 46, "index":  0, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index":  1, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index":  2, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index":  3, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index":  4, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index":  5, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index":  6, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index":  7, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index":  8, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index":  9, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index": 10, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index": 11, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index": 12, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index": 13, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index": 14, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index": 15, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index": 16, "duration": 2, "hurtbox": [-40, -97, 40, 0] },
+        { "bank": 46, "index": 17, "duration": 2, "hurtbox": [-40, -97, 40, 0] }
+      ]
+    },
+    "DYING": {
+      "loop": false,
+      "frames": [
+        { "bank": 48, "index":  0, "duration": 2, "hurtbox": [-22, -101, 22, 0] },
+        { "bank": 48, "index":  1, "duration": 2, "hurtbox": [-22,  -90, 22, 0] },
+        { "bank": 48, "index":  2, "duration": 2, "hurtbox": [-22,  -80, 22, 0] },
+        { "bank": 48, "index":  3, "duration": 2, "hurtbox": [-22,  -70, 22, 0] },
+        { "bank": 48, "index":  4, "duration": 2, "hurtbox": [-22,  -60, 22, 0] },
+        { "bank": 48, "index":  5, "duration": 2, "hurtbox": [-22,  -50, 22, 0] },
+        { "bank": 48, "index":  6, "duration": 2, "hurtbox": [-22,  -40, 22, 0] },
+        { "bank": 48, "index":  7, "duration": 2, "hurtbox": [-22,  -30, 22, 0] },
+        { "bank": 48, "index":  8, "duration": 2, "hurtbox": [-22,  -20, 22, 0] },
+        { "bank": 48, "index":  9, "duration": 2, "hurtbox": [-22,  -15, 22, 0] },
+        { "bank": 48, "index": 10, "duration": 2, "hurtbox": [-22,  -12, 22, 0] },
+        { "bank": 48, "index": 11, "duration": 2, "hurtbox": [-22,  -10, 22, 0] },
+        { "bank": 48, "index": 12, "duration": 2, "hurtbox": [-22,  -10, 22, 0] },
+        { "bank": 48, "index": 13, "duration": 2, "hurtbox": [-22,  -10, 22, 0] },
+        { "bank": 48, "index": 14, "duration": 2, "hurtbox": [-22,  -10, 22, 0] },
+        { "bank": 48, "index": 15, "duration": 6, "hurtbox": [-22,  -10, 22, 0] }
+      ]
+    }
+  }
+}

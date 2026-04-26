@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../lib/auth';
+import { useWsConnected } from '../../../lib/socket';
 import Sidebar from '../../../components/Sidebar';
 import { getSpriteBanks, getSpriteFrames, type BankInfo, type FrameMeta } from '../../../lib/api';
 
@@ -57,6 +58,7 @@ function SpriteThumb({
 
 export default function SpriteBrowserPage() {
   useAuth();
+  const wsConnected = useWsConnected();
 
   const [banks, setBanks]           = useState<BankInfo[]>([]);
   const [selectedBank, setSelectedBank] = useState<number>(9);
@@ -97,7 +99,7 @@ export default function SpriteBrowserPage() {
 
   return (
     <div className="flex min-h-screen bg-game-bg text-game-text">
-      <Sidebar />
+      <Sidebar wsConnected={wsConnected} />
       <main className="flex-1 p-8 flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">

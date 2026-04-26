@@ -3,11 +3,13 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth';
+import { useWsConnected } from '../../lib/socket';
 import Sidebar from '../../components/Sidebar';
 import { listActors, deleteActor } from '../../lib/api';
 
 export default function ActorsPage() {
   useAuth();
+  const wsConnected = useWsConnected();
   const router = useRouter();
   const [actors, setActors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +55,7 @@ export default function ActorsPage() {
 
   return (
     <div className="flex min-h-screen bg-game-bg text-game-text">
-      <Sidebar />
+      <Sidebar wsConnected={wsConnected} />
       <main className="flex-1 p-8">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -64,8 +66,6 @@ export default function ActorsPage() {
             [ SPRITE BROWSER ]
           </Link>
         </div>
-
-        {error && <div className="mb-4 p-3 bg-game-danger/20 border border-game-danger text-game-danger text-sm">{error}</div>}
 
         {/* Create new actor */}
         <div className="bg-game-bgCard border border-game-border p-4 mb-6 flex gap-3 items-center">
