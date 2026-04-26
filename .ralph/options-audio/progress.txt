@@ -1,0 +1,16 @@
+## Codebase Patterns
+<!-- One-line patterns this Ralph discovers. Patterns from prior Ralphs:
+.ralph/main-menu/progress.txt and .ralph/options/progress.txt — read those first. -->
+
+## 2026-04-26T00:00:00Z — INIT
+- Ralph scaffolded by setup conversation.
+- Baseline: shared/design/sdl3/ already renders main-menu (HEAD: F0) and OPTIONS hub (HEAD: O4)
+  equivalent to their references. Lower layers fully validated. Screen-switch via
+  SILENCER_DUMP_SCREEN already established by the OPTIONS Ralph.
+- Reference dump: /tmp/real_optionsaudio_dump.ppm (do not regenerate).
+- Spec input: docs/design/screen-options-audio.md (authoritative).
+- New work surface: title overlay (textbank 135, centered formula), B220x33 button
+  variant, on/off pill indicators (bank 6 idx 12 + 14). Save/Cancel reuse B196x33.
+- Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
+- **Learnings:** none yet.
+---

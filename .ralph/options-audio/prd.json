@@ -1,0 +1,48 @@
+{
+  "screen": "options-audio",
+  "reference_dump": "/tmp/real_optionsaudio_dump.ppm",
+  "candidate_dump": "/tmp/sdl3_dump/screen_00.ppm",
+  "candidate_root": "shared/design/sdl3",
+  "items": [
+    {
+      "id": "A0",
+      "name": "Candidate dumps an OPTIONSAUDIO PPM via screen-switch",
+      "priority": 0,
+      "passes": false,
+      "spec": "Extend the candidate's SILENCER_DUMP_SCREEN switch (or whatever clean mechanism the OPTIONS Ralph established) to compose+render the Audio Options screen and write a 640x480 P6 PPM at /tmp/sdl3_dump/screen_00.ppm. main_menu and options screen-switch values must still work unchanged.",
+      "category": "build"
+    },
+    {
+      "id": "A1",
+      "name": "Composition complete (bg + title + Music row + Save/Cancel)",
+      "priority": 1,
+      "passes": false,
+      "spec": "The dump shows: bank-6 idx-0 fullscreen background; title overlay 'Audio Options' near top; one Music B220x33 button + off (bank 6 idx 12) + on (bank 6 idx 14) pill indicators; Save and Cancel B196x33 buttons at bottom. Per docs/design/screen-options-audio.md.",
+      "category": "composition"
+    },
+    {
+      "id": "A2",
+      "name": "Title overlay rendered correctly (textbank 135, centered, y=14)",
+      "priority": 2,
+      "passes": false,
+      "spec": "Title text 'Audio Options' renders via the font path in widget-overlay.md text-mode (literal x,y, no offset), with textbank=135, textwidth=12, x = 320 - len*12/2, y = 14. Glyphs legible, kerning matches reference.",
+      "category": "tile_arithmetic"
+    },
+    {
+      "id": "A3",
+      "name": "New widgets render (B220x33 button + off/on pill indicators)",
+      "priority": 3,
+      "passes": false,
+      "spec": "The B220x33 button widget paints its 220-px-wide pill with the same anchor convention as B196x33 (top_left = anchor - sprite.offset). The off (bank 6 idx 12) and on (bank 6 idx 14) overlays render at literal coords (420, 137) and (450, 137) respectively. Bank 6 indices 12/14 are added to the candidate's loaded sprite set.",
+      "category": "sprite_codec"
+    },
+    {
+      "id": "A4",
+      "name": "Visual equivalence to /tmp/real_optionsaudio_dump.ppm",
+      "priority": 4,
+      "passes": false,
+      "spec": "Final gate. Candidate PPM is visually equivalent to /tmp/real_optionsaudio_dump.ppm to a casual reader, modulo aliasing / blend-noise / star-RNG / animation-phase nits (<1% pixel difference acceptable).",
+      "category": "final"
+    }
+  ]
+}
