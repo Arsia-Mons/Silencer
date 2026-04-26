@@ -44,6 +44,9 @@ struct BTContext {
     // Delta-time for this tick (seconds)
     float dt = 0.0f;
 
+    // Opaque pointer for passing host-side context (e.g. World*) to leaf lambdas.
+    void* userData = nullptr;
+
     // Debug: when set, called on every leaf/condition result
     std::function<void(const std::string& nodeId, const std::string& nodeType, BTResult)> logFn;
 
