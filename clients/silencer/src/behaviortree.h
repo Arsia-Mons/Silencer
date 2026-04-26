@@ -46,7 +46,6 @@ struct BTContext {
 
     // Opaque pointer for passing host-side context (e.g. World*) to leaf lambdas.
     void* userData = nullptr;
-
     // Debug: when set, called on every leaf/condition result
     std::function<void(const std::string& nodeId, const std::string& nodeType, BTResult)> logFn;
 
@@ -110,6 +109,14 @@ public:
     void loadDir(const std::string& dir);
     const BehaviorTree* get(const std::string& id) const;
 
+    // Upsert a tree from parsed JSON (used by FetchBehaviorTrees).
+    void update(const std::string& id, const json& j);
+
 private:
     std::unordered_map<std::string, BehaviorTree> trees_;
 };
+
+// Fetch all behavior trees from the admin API and merge into the library.
+// URL format: {apiBase}/api/behaviortrees  (unauthenticated public endpoint)
+// Returns the number successfully fetched. Falls back gracefully on error.
+int FetchBehaviorTrees(const char* apiBase, BehaviorTreeLibrary& lib);

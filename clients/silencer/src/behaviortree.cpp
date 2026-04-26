@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#include <curl/curl.h>
 
 #if defined(_WIN32)
 #  include <windows.h>
@@ -263,6 +264,92 @@ BehaviorTreeLibrary& BehaviorTreeLibrary::instance() {
 const BehaviorTree* BehaviorTreeLibrary::get(const std::string& id) const {
     auto it = trees_.find(id);
     return it == trees_.end() ? nullptr : &it->second;
+}
+
+void BehaviorTreeLibrary::update(const std::string& id, const json& j) {
+    try {
+        trees_[id] = BehaviorTree::fromJson(j);
+    } catch (...) {
+        fprintf(stderr, "[behaviortree] update: parse error for \"%s\"\n", id.c_str());
+    }
+}
+
+// ── HTTP fetch helpers (shared curl write callback) ───────────────────────────
+
+namespace {
+
+struct BTStrBuf {
+    std::string data;
+    static size_t Write(void* ptr, size_t sz, size_t n, void* ud) {
+        auto* buf = static_cast<BTStrBuf*>(ud);
+        size_t incoming = sz * n;
+        if (buf->data.size() + incoming > 4 * 1024 * 1024) return 0; // 4 MB cap
+        buf->data.append(static_cast<const char*>(ptr), incoming);
+        return incoming;
+    }
+};
+
+static std::string BTCurlGet(const std::string& url) {
+    BTStrBuf buf;
+    CURL* c = curl_easy_init();
+    if (!c) return "";
+    curl_easy_setopt(c, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, BTStrBuf::Write);
+    curl_easy_setopt(c, CURLOPT_WRITEDATA, &buf);
+    curl_easy_setopt(c, CURLOPT_FAILONERROR, 1L);
+    curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, 3L);
+    curl_easy_setopt(c, CURLOPT_TIMEOUT, 5L);
+    curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(c, CURLOPT_USERAGENT, "silencer-behaviortree/1");
+    CURLcode rc = curl_easy_perform(c);
+    curl_easy_cleanup(c);
+    if (rc != CURLE_OK) return "";
+    return buf.data;
+}
+
+} // namespace
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+int FetchBehaviorTrees(const char* apiBase, BehaviorTreeLibrary& lib) {
+    if (!apiBase || apiBase[0] == '\0') return 0;
+
+    // GET /api/behaviortrees → JSON array of id strings
+    std::string listBody = BTCurlGet(std::string(apiBase) + "/api/behaviortrees");
+    if (listBody.empty()) {
+        fprintf(stderr, "[behaviortree] fetch: could not reach %s/api/behaviortrees\n", apiBase);
+        return 0;
+    }
+
+    json ids;
+    try { ids = json::parse(listBody); } catch (...) {
+        fprintf(stderr, "[behaviortree] fetch: bad JSON from tree list\n");
+        return 0;
+    }
+    if (!ids.is_array()) return 0;
+
+    int loaded = 0;
+    for (const auto& idj : ids) {
+        if (!idj.is_string()) continue;
+        std::string id = idj.get<std::string>();
+
+        std::string body = BTCurlGet(std::string(apiBase) + "/api/behaviortrees/" + id);
+        if (body.empty()) {
+            fprintf(stderr, "[behaviortree] fetch: failed to get tree \"%s\"\n", id.c_str());
+            continue;
+        }
+        try {
+            json j = json::parse(body);
+            lib.update(id, j);
+            ++loaded;
+            fprintf(stderr, "[behaviortree] fetched \"%s\" from server\n", id.c_str());
+        } catch (const std::exception& e) {
+            fprintf(stderr, "[behaviortree] fetch: parse error for \"%s\": %s\n", id.c_str(), e.what());
+        }
+    }
+    return loaded;
 }
 
 void BehaviorTreeLibrary::loadDir(const std::string& dir) {
