@@ -1,9 +1,7 @@
 #ifndef GAME_H
 #define GAME_H
 
-#include "shared.h"
-#include "palette.h"
-#include "world.h"
+#include "renderdevice.h"
 #include "renderer.h"
 #include "input.h"
 #include "state.h"
@@ -31,9 +29,7 @@ public:
 private:
 	bool Tick(void);
 	void Present(void);
-	bool SetupOpenGL(void);
-	void CreateRenderer(void);
-	void CreateStreamingTexture(void);
+	bool SetupRenderDevice(void);
 	static Uint32 TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval);
 	void SetColors(SDL_Color * colors);
 	void UpdateInputState(Input & input);
@@ -123,16 +119,9 @@ private:
 	class World world;
 	Renderer renderer;
 	SDL_Window * window;
-	SDL_GLContext glcontext;
-	GLuint gltextures[2];
-	GLuint fbo;
-	bool usingopengl;
-	SDL_Renderer * windowrenderer;
+	RenderDevice * renderdevice;
+	SDL_Color palettecolors[256]; // CPU copy — for ffmpeg replay pixel export
 	Surface screenbuffer;
-	SDL_Surface * sdlscreenbuffer;
-	SDL_Texture * streamingtexture;
-	SDL_PixelFormat streamingtexturepixelformat;
-	Uint32 streamingtexturepalette[256];
 	int frames;
 	int fps;
 	Uint64 lasttick;

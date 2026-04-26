@@ -1,4 +1,5 @@
 #include "game.h"
+#include "sdl3gpubackend.h"
 #include <math.h>
 #include "overlay.h"
 #include "interface.h"
@@ -85,16 +86,8 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	minimized = false;
 	modaldialoghasok = false;
 	window = 0;
-	windowrenderer = 0;
-	streamingtexture = 0;
-	streamingtexturepixelformat = SDL_PIXELFORMAT_UNKNOWN;
-	glcontext = 0;
-	fbo = 0;
-	gltextures[0] = 0;
-	gltextures[1] = 0;
-	lasttick = 0;
-	usingopengl = true;
-	sdlscreenbuffer = 0;
+	renderdevice = nullptr;
+	memset(palettecolors, 0, sizeof(palettecolors));
 	oldambiencelevel = 0;
 	nextstateprocessed = false;
 	lastmapchunkrequest = 0;
@@ -112,20 +105,10 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 }
 
 Game::~Game(){
-	if(glcontext){
-		SDL_GL_DestroyContext(glcontext);
-	}
-	if(sdlscreenbuffer){
-		SDL_DestroySurface(sdlscreenbuffer);
-	}
-	if(usingopengl){
-		SDL_GL_UnloadLibrary();
-	}
-	if(windowrenderer){
-		SDL_DestroyRenderer(windowrenderer);
-	}
-	if(streamingtexture){
-		SDL_DestroyTexture(streamingtexture);
+	if(renderdevice){
+		renderdevice->Shutdown();
+		delete renderdevice;
+		renderdevice = nullptr;
 	}
 	if(window){
 		SDL_DestroyWindow(window);
@@ -215,14 +198,11 @@ bool Game::Load(char * cmdline){
 		//SDL_EnableUNICODE(true);
 		//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 		//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-		window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+		window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
 		SDL_StartTextInput(window);
-		if(!SetupOpenGL()){
-			//printf("Unable to setup OpenGL shaders, using SDL Renderer\n");
-			usingopengl = false;
-			CreateRenderer();
-			sdlscreenbuffer = SDL_CreateSurface(screenbuffer.w, screenbuffer.h, SDL_PIXELFORMAT_INDEX8);
-			CreateStreamingTexture();
+		if(!SetupRenderDevice()){
+			printf("Could not initialize GPU render device\n");
+			return false;
 		}
 		SetColors(renderer.palette.GetColors());
 		//SDL_Flip(screen);
@@ -237,224 +217,21 @@ bool Game::Load(char * cmdline){
 	return true;
 }
 
-bool Game::SetupOpenGL(void){
-	return false;
-	/*if(SDL_GL_LoadLibrary(0) == -1){
+bool Game::SetupRenderDevice(void){
+	SDL3GPUBackend *backend = new SDL3GPUBackend();
+	if(!backend->Init(window)){
+		delete backend;
 		return false;
 	}
-	glcontext = SDL_GL_CreateContext(window);
-	if(!glcontext){
-		return false;
-	}
-	glViewport(0, 0, screenbuffer.w, screenbuffer.h);
-	//glGenFramebuffers(1, &fbo);
-	if(!glCreateProgram){
-		return false;
-	}
-	GLuint program = glCreateProgram();
-	if(!program){
-		return false;
-	}
-	
-	GLuint vertshader = glCreateShader(GL_VERTEX_SHADER);
-	if(!vertshader){
-		return false;
-	}
-	const GLchar * vertshadercode = "#version 110\n"
-	"varying vec2 texture_coordinate;"
-	"void main(){"
-	"	gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;"
-	"	texture_coordinate = vec2(gl_MultiTexCoord0);"
-	"}";
-	GLint shadercodelength = strlen(vertshadercode);
-	if(!glShaderSource){
-		return false;
-	}
-	glShaderSource(vertshader, 1, &vertshadercode, &shadercodelength);
-	if(!glCompileShader){
-		return false;
-	}
-	glCompileShader(vertshader);
-	char buffer[1024];
-	GLsizei length;
-	if(!glGetShaderiv){
-		return false;
-	}
-	glGetShaderiv(vertshader, GL_INFO_LOG_LENGTH, &length);
-	if(length > 0){
-		if(!glGetShaderInfoLog){
-			return false;
-		}
-		glGetShaderInfoLog(vertshader, sizeof(buffer), &length, buffer);
-		if(length > 0){
-			printf("vert ShaderInfo: %s\n", buffer);
-			return false;
-		}
-	}
-	if(!glAttachShader){
-		return false;
-	}
-	glAttachShader(program, vertshader);
-	
-	GLuint fragshader = glCreateShader(GL_FRAGMENT_SHADER);
-	const GLchar * fragshadercode = "#version 110\n"
-	"uniform sampler2D Palette;"
-	"uniform sampler2D IndexedColorTexture;"
-	"varying vec2 texture_coordinate;"
-	"void main(){"
-	"	vec4 index = texture2D(IndexedColorTexture, texture_coordinate);"
-	"	vec4 texel = texture2D(Palette, vec2(index.r, 0));"
-	"	gl_FragColor = texel;"
-	"}";
-	shadercodelength = strlen(fragshadercode);
-	glShaderSource(fragshader, 1, &fragshadercode, &shadercodelength);
-	glCompileShader(fragshader);
-	glGetShaderiv(fragshader, GL_INFO_LOG_LENGTH, &length);
-	if(length > 0){
-		glGetShaderInfoLog(fragshader, sizeof(buffer), &length, buffer);
-		if(length > 0){
-			printf("frag ShaderInfo: %s\n", buffer);
-			return false;
-		}
-	}
-	glAttachShader(program, fragshader);
-	if(!glLinkProgram){
-		return false;
-	}
-	glLinkProgram(program);
-	if(!glGetProgramiv){
-		return false;
-	}
-	glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
-	if(length > 0){
-		if(!glGetProgramInfoLog){
-			return false;
-		}
-		glGetProgramInfoLog(program, sizeof(buffer), &length, buffer);
-		if(length > 0){
-			printf("ProgramInfo: %s\n", buffer);
-			return false;
-		}
-	}
-	if(!glUseProgram){
-		return false;
-	}
-	glUseProgram(program);
-	
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	glEnable(GL_TEXTURE_2D);
-	glGenTextures(2, gltextures);
-	
-	glBindTexture(GL_TEXTURE_2D, gltextures[0]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, renderer.palette.GetColors());
-	glBindTexture(GL_TEXTURE_2D, gltextures[1]);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexImage2D(GL_TEXTURE_2D, 0, 1, screenbuffer.w, screenbuffer.h, 0, GL_RED, GL_UNSIGNED_BYTE, screenbuffer.pixels);
-	
-	int palettesampler = glGetUniformLocation(program, "Palette");
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, gltextures[0]);
-	if(!glUniform1i){
-		return false;
-	}
-	glUniform1i(palettesampler, 0);
-	
-	int indexedtexturesampler = glGetUniformLocation(program, "IndexedColorTexture");
-	glActiveTexture(GL_TEXTURE0 + 1);
-	glBindTexture(GL_TEXTURE_2D, gltextures[1]);
-	glUniform1i(indexedtexturesampler, 1);
-	return true;*/
-}
-
-void Game::CreateRenderer(void){
-	if(windowrenderer){
-		SDL_DestroyRenderer(windowrenderer);
-		windowrenderer = 0;
-	}
-	windowrenderer = SDL_CreateRenderer(window, NULL);
-}
-
-void Game::CreateStreamingTexture(void){
-	if(streamingtexture){
-		SDL_DestroyTexture(streamingtexture);
-		streamingtexture = 0;
-	}
-	streamingtexture = SDL_CreateTexture(windowrenderer, SDL_PIXELFORMAT_XRGB8888, SDL_TEXTUREACCESS_STREAMING, screenbuffer.w, screenbuffer.h);
-	streamingtexturepixelformat = SDL_PIXELFORMAT_XRGB8888;
-	if(streamingtexture){
-		SDL_SetTextureScaleMode(streamingtexture, Config::GetInstance().scalefilter ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
-	}
+	renderdevice = backend;
+	renderdevice->SetScaleFilter(Config::GetInstance().scalefilter);
+	return true;
 }
 
 void Game::Present(void){
-	if(usingopengl){
-/*
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glBindTexture(GL_TEXTURE_2D, gltextures[1]);
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-		glPixelStorei(GL_PACK_ALIGNMENT, 1);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, screenbuffer.w, screenbuffer.h, GL_RED, GL_UNSIGNED_BYTE, screenbuffer.pixels);
-		glLoadIdentity();
-		glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 1.0f);
-		glVertex3f( -1.0f, -1.0f, 0.0f);
-		glTexCoord2f(1.0f, 1.0f);
-		glVertex3f(1.0f,-1.0f, 0.0f);
-		glTexCoord2f(1.0f, 0.0f);
-		glVertex3f( 1.0f,1.0f, 0.0f);
-		glTexCoord2f(0.0f, 0.0f);
-		glVertex3f( -1.0f,1.0f, 0.0f);
-		glEnd();
-		SDL_GL_SwapWindow(window);
-*/
-	}else{
-		if(streamingtexture){
-			void * pixels;
-			int pitch;
-			if(SDL_LockTexture(streamingtexture, 0, &pixels, &pitch) == 0){
-				if(pitch == screenbuffer.w * 1){
-					Uint8 * src = screenbuffer.pixels.data();
-					Uint8 * dst = (Uint8 *)pixels;
-					for(int y = screenbuffer.h; y > 0; y--){
-						for(int x = screenbuffer.w; x > 0; x--){
-							*(dst++) = *(Uint8 *)(&streamingtexturepalette[*src++]);
-						}
-					}
-				}else
-				if(pitch == screenbuffer.w * 2){
-					Uint8 * src = screenbuffer.pixels.data();
-					Uint16 * dst = (Uint16 *)pixels;
-					for(int y = screenbuffer.h; y > 0; y--){
-						for(int x = screenbuffer.w; x > 0; x--){
-							*(dst++) = *(Uint16 *)(&streamingtexturepalette[*src++]);
-						}
-					}
-				}else
-				if(pitch == screenbuffer.w * 4){
-					Uint8 * src = screenbuffer.pixels.data();
-					Uint32 * dst = (Uint32 *)pixels;
-					for(int y = screenbuffer.h; y > 0; y--){
-						for(int x = screenbuffer.w; x > 0; x--){
-							*(dst++) = *(Uint32 *)(&streamingtexturepalette[*src++]);
-						}
-					}
-				}
-				SDL_UnlockTexture(streamingtexture);
-				SDL_RenderTexture(windowrenderer, streamingtexture, NULL, NULL);
-				SDL_RenderPresent(windowrenderer);
-			}
-		}else{
-			void * oldpixels = sdlscreenbuffer->pixels;
-			sdlscreenbuffer->pixels = screenbuffer.pixels.data();
-			SDL_Texture * texture = SDL_CreateTextureFromSurface(windowrenderer, sdlscreenbuffer);
-			sdlscreenbuffer->pixels = oldpixels;
-			SDL_RenderTexture(windowrenderer, texture, NULL, NULL);
-			SDL_DestroyTexture(texture);
-			SDL_RenderPresent(windowrenderer);
-		}
+	if(renderdevice){
+		renderdevice->UploadFrame(screenbuffer.pixels.data(), screenbuffer.w, screenbuffer.h);
+		renderdevice->Present();
 	}
 }
 
@@ -475,18 +252,9 @@ void Game::LoadProgressCallback(int progress, int totalprogressitems){
 }
 
 void Game::SetColors(SDL_Color * colors){
-	if(usingopengl){
-		/*glBindTexture(GL_TEXTURE_2D, gltextures[0]);
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-		glPixelStorei(GL_PACK_ALIGNMENT, 4);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, colors);*/
-	}else{
-		SDL_SetPaletteColors(SDL_GetSurfacePalette(sdlscreenbuffer), colors, 0, 256);
-		if(streamingtexture){
-			for(int i = 0; i < 256; i++){
-				streamingtexturepalette[i] = SDL_MapRGB(SDL_GetPixelFormatDetails(streamingtexturepixelformat), NULL, colors[i].r, colors[i].g, colors[i].b);
-			}
-		}
+	memcpy(palettecolors, colors, 256 * sizeof(SDL_Color));
+	if(renderdevice){
+		renderdevice->SetPalette(colors, 256);
 	}
 }
 
@@ -576,9 +344,9 @@ bool Game::Loop(void){
 			int j = 0;
 			for(int y = screenbuffer.h; y > 0; y--){
 				for(int x = screenbuffer.w; x > 0; x--){
-					buffer[i++] = SDL_GetSurfacePalette(sdlscreenbuffer)->colors[screenbuffer.pixels[j]].r;
-					buffer[i++] = SDL_GetSurfacePalette(sdlscreenbuffer)->colors[screenbuffer.pixels[j]].g;
-					buffer[i++] = SDL_GetSurfacePalette(sdlscreenbuffer)->colors[screenbuffer.pixels[j]].b;
+					buffer[i++] = palettecolors[screenbuffer.pixels[j]].r;
+					buffer[i++] = palettecolors[screenbuffer.pixels[j]].g;
+					buffer[i++] = palettecolors[screenbuffer.pixels[j]].b;
 					j++;
 				}
 			}
@@ -1806,7 +1574,7 @@ bool Game::Tick(void){
 									}break;
 									case 1:{ // smooth scaling
 										Config::GetInstance().scalefilter = Config::GetInstance().scalefilter ? false : true;
-										CreateStreamingTexture();
+										if(renderdevice) renderdevice->SetScaleFilter(Config::GetInstance().scalefilter);
 									}break;
 									case 200:{
 										Config::GetInstance().Save();
@@ -1814,7 +1582,7 @@ bool Game::Tick(void){
 									}break;
 									case 201:{
 										Config::GetInstance().Load();
-										CreateStreamingTexture();
+										if(renderdevice) renderdevice->SetScaleFilter(Config::GetInstance().scalefilter);
 										if(Config::GetInstance().fullscreen){
 											SDL_SetWindowFullscreen(window, true);
 										}else{
@@ -6033,13 +5801,9 @@ bool Game::HandleSDLEvents(void){
 	while(SDL_PollEvent(&event) > 0){
 		switch(event.type){
 			case SDL_EVENT_WINDOW_RESIZED:{
-				if(usingopengl){
-					//glViewport(0, 0, event.window.data1, event.window.data2);
-				}
+				// SDL3 GPU swapchain resizes automatically.
 			}break;
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:{
-				// fix for Windows sdl bug where viewport is changed when another app goes fullscreen, causing render to go black
-				SDL_SetRenderViewport(windowrenderer, NULL);
 				if(!world.replay.IsPlaying()){
 					Audio::GetInstance().Unmute();
 				}
