@@ -66,3 +66,34 @@ export const getGameStatsRecent      = (limit = 20): Promise<unknown> => playerF
 export const getGameStatsLeaderboard = (limit = 50): Promise<unknown> => playerFetch(`/gamestats/leaderboard?limit=${limit}`);
 export const getGameDetail           = (gameId: string): Promise<unknown> => playerFetch(`/gamestats/game/${gameId}`);
 export const getAgentDetail          = (accountId: string): Promise<unknown> => playerFetch(`/gamestats/player/${accountId}`);
+
+// Sprite endpoints
+export type BankInfo = { bank: number; frames: number };
+export type FrameMeta = { frame: number; width: number; height: number; offsetX: number; offsetY: number };
+
+export const getSpriteBanks   = (): Promise<BankInfo[]>    => apiFetch('/sprites') as Promise<BankInfo[]>;
+export const getSpriteFrames  = (bank: number): Promise<FrameMeta[]> => apiFetch(`/sprites/${bank}/frames`) as Promise<FrameMeta[]>;
+/** Returns a URL usable in <img src=…> that goes through the Next.js proxy with auth injected by the browser. */
+export function spriteUrl(bank: number, frame: number): string {
+  const token = getToken();
+  return `/api/sprites/${bank}/${frame}?_t=${token ? token.slice(-8) : ''}`;
+}
+/** Fetch sprite PNG as a blob URL (use when img tag proxy isn't available). */
+export async function fetchSpriteBlob(bank: number, frame: number): Promise<string> {
+  const token = getToken();
+  const res = await fetch(`${API}/sprites/${bank}/${frame}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(`${res.status}`);
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+// Actor CRUD endpoints
+export type ActorDef = Record<string, unknown>;
+
+export const listActors   = (): Promise<string[]>               => apiFetch('/actors') as Promise<string[]>;
+export const getActor     = (id: string): Promise<ActorDef>     => apiFetch(`/actors/${id}`) as Promise<ActorDef>;
+export const saveActor    = (id: string, def: ActorDef): Promise<unknown> =>
+  apiFetch(`/actors/${id}`, { method: 'PUT', body: JSON.stringify(def) });
+export const deleteActor  = (id: string): Promise<unknown>      => apiFetch(`/actors/${id}`, { method: 'DELETE' });

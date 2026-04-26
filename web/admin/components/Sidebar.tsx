@@ -23,6 +23,7 @@ const NAV = [
   { href: '/players',   label: '[ PLAYERS ]',         icon: '◈', minRank: 0 },
   { href: '/audit',     label: '[ AUDIT LOG ]',        icon: '◧', minRank: 0 },
   { href: '/users',      label: '[ USER MGMT ]',        icon: '⬡', minRank: 3 }, // admin+
+  { href: '/actors',    label: '[ ACTOR EDITOR ]',     icon: '◉', minRank: 3 }, // admin+
   { href: '/designer',  label: '[ MAP DESIGNER ]',     icon: '◫', minRank: 3 }, // admin+
   { href: '/health',    label: '[ SERVER HEALTH ]',    icon: '◎', minRank: 0 },
   { href: '/changelog', label: '[ CHANGELOG ]',        icon: '◑', minRank: 0 },
