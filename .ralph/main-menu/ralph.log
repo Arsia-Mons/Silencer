@@ -19,3 +19,6 @@ P0 done. Stop check: prd.json still has S0/T0/A0/F0 at `passes: false`, so the l
 --- Iteration 5 2026-04-26 14:07:49 ---
 S0 flipped to pass. Sprite codec produces clean, ungarbled shapes across all four bank classes (bg plate, logo, button pills, font glyphs). Remaining items: T0, A0, F0.
 
+--- Iteration 6 2026-04-26 14:09:21 ---
+T0 flipped and committed. Remaining: A0 (anchors), F0 (final). Next iteration picks up A0.
+

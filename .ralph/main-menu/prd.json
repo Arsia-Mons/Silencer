@@ -56,7 +56,7 @@
       "id": "A0",
       "name": "Anchors correct (positions per spec)",
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "spec": "Logo, version overlay, and the four buttons are positioned per docs/design/screen-main-menu.md, within ~5px of the reference. Sprite anchor math `top_left = object - sprite.offset` correctly applied per docs/design/widget-overlay.md and widget-button.md.",
       "category": "sprite_anchor"
     },

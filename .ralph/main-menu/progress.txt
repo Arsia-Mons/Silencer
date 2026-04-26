@@ -11,6 +11,7 @@
 - PALETTE.BIN actual layout is `color_offset(s) = 8 + s * 768` (NOT spec's `8 + s*772`); 8-byte file prefix, 11 contiguous 768-byte color blocks, last sub-palette over-reads file by 8 bytes (zero-fill).
 - DrawText with brightness == 128 doesn't read the palette at all — it skips the brightness-LUT path and blits sprite indices verbatim. Useful diagnostic: render the same FB through multiple sub-palettes by calling WritePPM repeatedly with different `active_sub` arguments.
 - Sprite RLE codec (linear + tile mode + `+4` filler) and `Get(bank, idx)` dispatch in shared/design/sdl3/src/sprite.cpp render bank-6 (background plate, tile mode), bank-208 (logo, with idx-60 hold animation), bank-196 (B196x33 button pills, RLE), and font banks 132–136 — all four shape classes — without garble at the post-P0 candidate. No codec rework needed for main-menu.
+- A "diff visualization" PPM (paint differing pixels red, dim matching pixels) is the fastest way to localize sub-1% pixel-diff residue: it instantly reveals whether the diff is *anchor* (whole shape shifted), *codec* (object-shaped scrambles), or *text-internal* (individual glyph pixels). For Silencer main-menu post-T0 the residue was unambiguously text-internal.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -109,4 +110,25 @@
   - The "free flip after upstream gate" pattern continues: C0 was free post-B1, S0 was free post-P0, T0 is free post-S0. The Ralph's initial decoder was already correct — the iteration loop primarily uncovered loader/path/palette bugs *masking* otherwise-correct code. Every "is this layer right?" gate has so far been answerable by re-eyeballing the existing dump after fixing the upstream layer.
   - `B0 → B1 → C0 → P0 → S0 → T0` has now collapsed all layers below "anchor" into a unified visual match. Remaining gates A0 (anchors, ±5px) and F0 (final equivalence) are the only structural items left.
   - When `font.md` and `sprite-banks.md` share the same RLE codec, the font layer and sprite-codec layer pass or fail together — there is no plausible failure mode where font bytes decode wrong but bank-196 button pills decode right (or vice versa), absent a per-bank dispatch bug. Worth keeping in mind for future hydrations.
+---
+
+## 2026-04-26T14:50:00Z — A0
+- No code changes required. T0 (text legibility) cleared the last decode-pipeline gate; anchor math (`top_left = object - sprite.offset` per docs/design/widget-overlay.md / widget-button.md) was already correct from the initial harness — visible only after palette/codec/text resolved.
+- Verification methodology: bytewise PPM diff (`cmp -l`) localized 941 differing bytes (~313 differing pixels of 307,200 = 0.1%) entirely inside `x ∈ [387, 575], y ∈ [162, 377]` — i.e. the planet × button-stack overlap region. Per-object bright-green-pixel bounding boxes were computed for both PPMs and matched **byte-identically** for every object spec'd in docs/design/screen-main-menu.md:
+  - Logo (bank-208 idx 60): real (29, 334, 236, 238) ≡ candidate (29, 334, 236, 238).
+  - Version overlay (bottom-left): real (11, 168, 463, 470) ≡ candidate (11, 168, 463, 470).
+  - Tutorial pill: real (350, 542, 154, 186) ≡ candidate.
+  - Connect To Lobby pill: real (29, 582, 221, 253) ≡ candidate (the leftmost x=29 pickup is from the SILENCER logo bleeding into the same y-band — both PPMs share that bleed identically).
+  - Options pill: real (350, 542, 288, 320) ≡ candidate.
+  - Exit pill: real (310, 502, 355, 387) ≡ candidate.
+  All six anchors are within 0px (not 5px) of the reference. A0 spec ("within ~5px") is satisfied with margin to spare.
+- A diff-visualization PPM (paint differing pixels solid red, dim matching pixels by 4x) was generated at `/tmp/sdl3_dump/diff.png` to confirm the residue's geometric distribution: differences cluster inside individual button-label glyphs (Tutorial / Connect To Lobby / Options / Exit) and faintly within the SILENCER logo strokes — i.e. text-glyph internals, not anchor displacement. This is the same residue T0 already documented as "non-structural"; it does not affect A0's gate.
+- Files touched: `.ralph/main-menu/prd.json` (A0 → passes:true), `.ralph/main-menu/progress.txt` (this entry + one Codebase Patterns line about diff-visualization PPMs).
+- Visual diff summary: **none** in the sprite_anchor layer per the visual-regression-testing skill's diff table. Remaining residue is animation-phase / text-blend nits inside glyph internals, untouched by the anchor question.
+- Spec gaps encountered: none for A0. `docs/design/widget-overlay.md` (anchor = `(x - offset_x, y - offset_y)`) and `docs/design/widget-button.md` (B196x33 pill positions in `(40,-134)/(80,-67)/(40,0)/(0,67)` zig-zag relative to centerline) and `docs/design/screen-main-menu.md` (composition list with object positions) collectively pin down every object's anchor; the implementation in shared/design/sdl3/ matches all of them.
+- **Learnings:**
+  - When the prior-gate cascade has cleared (B0→B1→C0→P0→S0→T0), A0 is "free" *if* the sprite-anchor math was implemented correctly at composition time. The candidate's `Overlay::Render` and `Button::Render` already subtract sprite offsets per spec; nothing to fix.
+  - Bytewise `cmp -l | wc -l` divided by 3 is a quick proxy for "differing pixel count" (each pixel is 3 RGB bytes in P6 PPM); ~313 differing pixels out of 307,200 = 0.1% is well below any reasonable anchor-shift threshold, where a 1px global shift would alone produce thousands of edge-pixel diffs.
+  - Per-object bright-color bounding boxes (`is_green` predicate, scan over y-band) is a fast spatially-localized anchor check: if both dumps hit identical (xmin, xmax, ymin, ymax) for a known shape, the anchor is correct independent of internal pixel content. Cheaper than image registration.
+  - For Silencer's chrome (logo + button pills + text), the design-spec's anchor system is fully constraint-resolved: there is no per-screen state that perturbs anchors, so any candidate that loads sprites + reads spec positions correctly will hit pixel-identical bounds. That's by design — the only intentional motion in the main menu is the bank-208 logo's fade-in/hold animation, which finishes at idx 60 (the dump pin point).
 ---
