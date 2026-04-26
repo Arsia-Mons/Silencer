@@ -17,12 +17,34 @@ LOBBY_PORT="${LOBBY_PORT:-15170}"
 BUILD_DIR="$REPO_ROOT/build"
 
 echo "==> Installing/updating dependencies via Homebrew"
-brew install cmake sdl2 sdl2_mixer minizip 2>/dev/null || brew upgrade sdl2 sdl2_mixer minizip 2>/dev/null || true
+brew install cmake sdl3 minizip 2>/dev/null || brew upgrade sdl3 minizip 2>/dev/null || true
+
+# Homebrew has no sdl3_mixer formula. Build it from source into a local
+# prefix the cmake configure step picks up via CMAKE_PREFIX_PATH. MP3-only
+# (drmp3) matches the audio formats the game ships. Cached so subsequent
+# runs skip the build.
+SDL3_MIXER_PREFIX="$HOME/.cache/silencer/sdl3-mixer"
+if [ ! -f "$SDL3_MIXER_PREFIX/lib/libSDL3_mixer.dylib" ]; then
+  echo "==> Building SDL3_mixer (one-time, cached at $SDL3_MIXER_PREFIX)"
+  SRC_DIR="$(mktemp -d)/SDL_mixer"
+  git clone --depth 1 --branch release-3.2.0 https://github.com/libsdl-org/SDL_mixer.git "$SRC_DIR"
+  cmake -S "$SRC_DIR" -B "$SRC_DIR/build" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+    -DCMAKE_INSTALL_PREFIX="$SDL3_MIXER_PREFIX" \
+    -DBUILD_SHARED_LIBS=ON -DSDLMIXER_VENDORED=OFF \
+    -DSDLMIXER_SAMPLES=OFF -DSDLMIXER_OPUS=OFF -DSDLMIXER_FLAC=OFF \
+    -DSDLMIXER_MOD=OFF -DSDLMIXER_MIDI=OFF -DSDLMIXER_VORBIS=OFF \
+    -DSDLMIXER_GME=OFF -DSDLMIXER_WAVPACK=OFF \
+    -DSDLMIXER_MP3_DRMP3=ON -DSDLMIXER_MP3_MPG123=OFF
+  cmake --build "$SRC_DIR/build" -j"$(sysctl -n hw.ncpu)" --target install
+fi
 
 echo "==> Configuring (lobby=${LOBBY_HOST}:${LOBBY_PORT})"
 cmake -B "$BUILD_DIR" -S "$REPO_ROOT/clients/silencer" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+  -DCMAKE_PREFIX_PATH="$SDL3_MIXER_PREFIX;/opt/homebrew" \
   -DSILENCER_LOBBY_HOST="$LOBBY_HOST" \
   -DSILENCER_LOBBY_PORT="$LOBBY_PORT"
 
