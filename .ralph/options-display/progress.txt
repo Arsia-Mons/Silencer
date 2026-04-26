@@ -79,3 +79,49 @@
   Anti-aliasing palette-index drift on glyph edges is the irreducible
   floor — quoted "Smooth Scaling" alone has 14 glyphs vs Music's 5.
 ---
+
+## 2026-04-26T15:12:00Z — iter 3 (D2 PASS)
+- Free-flip verification of the +53 row stride. D1's `RunDumpOptionsDisplay`
+  already enumerates rows via `rows[i]` with `kToggleY0=50`, `kPillY0=137`,
+  and `kRowStride=53`, so both the toggle-button anchors `(100, 50+i*53)`
+  and the indicator pill literal coords `(420, 137+i*53)` / `(450, 137+i*53)`
+  are stride-correct by construction. D2 is a verification-only flip.
+- Build clean, dump 921615 bytes. Bytewise diff vs reference: **2,211 bytes
+  ≈ 0.24%** — identical to D1 baseline (RNG-free determinism preserved).
+- Decisive per-region pixel diff (sips-converted candidate PNG vs
+  `/tmp/real_optionsdisplay_dump.png`):
+  - row1 pill off (x∈[420,440] y∈[137,170], 660 px): **0 diff** (525==525 nz)
+  - row1 pill on  (x∈[450,470] y∈[137,170], 660 px): **0 diff** (660==660 nz)
+  - row2 pill off (x∈[420,440] y∈[190,223], 660 px): **0 diff** (659==659 nz)
+  - row2 pill on  (x∈[450,470] y∈[190,223], 660 px): **0 diff** (660==660 nz)
+  - both rows pill bbox (x∈[420,470] y∈[137,223], 4300 px): **0 diff** (4082==4082 nz)
+  Pixel-equality across the full row1+row2 pill bounding box pins the
+  +53 stride exactly — drift in either anchor or stride would scatter
+  diff pixels into the inter-row gap, so a stride-of-anything-else
+  cannot produce 0 diff over 4300 px.
+- B220 button bands per row (x∈[0,640]):
+  - row1 (y∈[136,170], 21760 px): 263 diff = 1.21% — nz_c=15847 == nz_r=15847
+  - row2 (y∈[189,223], 21760 px): 412 diff = 1.89% — nz_c=16898 == nz_r=16898
+  Identical opacity counts on both rows confirms glyph chrome and label
+  text are pixel-coincident at the +53 stride; the diff is the same
+  palette-index anti-aliasing nit shared with main-menu, options,
+  options-audio (same shape: equal nz, palette drift on glyph edges).
+- Regression checks (all clean): main_menu 2,136 (matches F0), options
+  1,758 (matches O4), options_audio 1,035 (matches A4). No regression.
+- Visual A/B (`/tmp/sdl3_dump/screen_00.png` vs reference): both rows
+  fully coincident — Fullscreen and Smooth Scaling labels at correct
+  vertical offsets, both off/on pill pairs at correct y, inter-row gap
+  identical to reference. Indistinguishable to a casual reader.
+- Files touched: `.ralph/options-display/prd.json` (D2 → passes:true),
+  `.ralph/options-display/progress.txt` (this entry + one Codebase
+  Patterns line). No source code changes.
+- **Pattern:** for multi-row toggle screens, the decisive stride
+  evidence is per-region pixel-equality on the *combined* row1+row2
+  bbox of an unambiguous fixed-content element (here: the pills, which
+  are pure sprite blits with no glyph aliasing). Pill bboxes are tiny
+  (660 px each), nz-saturated, and palette-stable — 0 diff across the
+  combined bbox is a stride-correctness proof that doesn't require
+  arithmetic on per-row offsets. Future toggle-screen Ralphs (controls
+  6-row, etc.) should reuse this pill-bbox technique as the stride
+  gate, not button-band diffs (which carry glyph-aliasing residue).
+---
