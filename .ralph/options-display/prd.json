@@ -32,7 +32,7 @@
       "id": "D3",
       "name": "Visual equivalence to /tmp/real_optionsdisplay_dump.ppm",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "spec": "Final gate. Candidate PPM is visually equivalent to /tmp/real_optionsdisplay_dump.ppm to a casual reader, modulo aliasing / blend-noise / star-RNG / animation-phase nits (<1% pixel difference acceptable).",
       "category": "final"
     }
