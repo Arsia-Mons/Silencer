@@ -2,7 +2,7 @@
 #include "sha1.h"
 #include "shared.h"
 #include "os.h"
-#include <SDL.h>
+#include <SDL3/SDL.h>
 #include <curl/curl.h>
 #include <atomic>
 #include <cstdio>
@@ -155,13 +155,13 @@ std::string FetchMapFromServer(const char * mapname,
     CreateDirectory(dir.c_str());
     std::string path = dir + "/" + mapname;
 
-    SDL_RWops * file = SDL_RWFromFile(path.c_str(), "wb");
+    SDL_IOStream * file = SDL_IOFromFile(path.c_str(), "wb");
     if (!file) {
         fprintf(stderr, "[mapfetch] cannot write %s\n", path.c_str());
         return "";
     }
-    SDL_RWwrite(file, buf.data.data(), 1, buf.data.size());
-    SDL_RWclose(file);
+    SDL_WriteIO(file, buf.data.data(), buf.data.size());
+    SDL_CloseIO(file);
 
     fprintf(stderr, "[mapfetch] downloaded %s (%zu bytes) from %s\n",
             mapname, buf.data.size(), apiURL);
@@ -234,9 +234,9 @@ void FetchAndSyncServerMaps(const char * apiURL) {
 
         // Skip if already present in level/download/.
         std::string dlpath = GetDataDir() + "level/download/" + name;
-        SDL_RWops * existing = SDL_RWFromFile(dlpath.c_str(), "rb");
+        SDL_IOStream * existing = SDL_IOFromFile(dlpath.c_str(), "rb");
         if (existing) {
-            SDL_RWclose(existing);
+            SDL_CloseIO(existing);
             continue;
         }
 

@@ -34,7 +34,7 @@ public:
 	bool Load(const char * filename, class World & world);
 	bool LoadBase(class Team & team, class World & world);
 	bool LoadFile(const char * filename, class World & world, Team * team = 0);
-	static bool LoadHeader(SDL_RWops * file, Map::Header & header);
+	static bool LoadHeader(SDL_IOStream * file, Map::Header & header);
 	static bool UncompressMinimap(Uint8 (*pixels)[172 * 62], const Uint8 * compressed, int compressedsize);
 	void Unload(void);
 	void MiniMapCoords(int & x, int & y);

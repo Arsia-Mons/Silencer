@@ -87,31 +87,31 @@ bool Map::LoadBase(Team & team, World & world){
 	return LoadFile((GetResDir() + "XBASE15A.SIL").c_str(), world, &team);
 }
 
-bool Map::LoadHeader(SDL_RWops * file, Map::Header & header){
+bool Map::LoadHeader(SDL_IOStream * file, Map::Header & header){
 	Uint8 padding = 0;
-	if(!SDL_RWread(file, &header.firstbyte, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &header.version, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &header.maxplayers, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &header.maxteams, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &header.width, 2, 1)){ return false; }
-	if(!SDL_RWread(file, &header.height, 2, 1)){ return false; }
-	header.width = SDL_SwapBE16(header.width);
-	header.height = SDL_SwapBE16(header.height);
-	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &header.parallax, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &header.ambience, 1, 1)){ return false; }
+	if(!SDL_ReadIO(file, &header.firstbyte, 1)){ return false; }
+	if(!SDL_ReadIO(file, &header.version, 1)){ return false; }
+	if(!SDL_ReadIO(file, &header.maxplayers, 1)){ return false; }
+	if(!SDL_ReadIO(file, &header.maxteams, 1)){ return false; }
+	if(!SDL_ReadIO(file, &header.width, 2)){ return false; }
+	if(!SDL_ReadIO(file, &header.height, 2)){ return false; }
+	header.width = SDL_Swap16BE(header.width);
+	header.height = SDL_Swap16BE(header.height);
+	if(!SDL_ReadIO(file, &padding, 1)){ return false; }
+	if(!SDL_ReadIO(file, &header.parallax, 1)){ return false; }
+	if(!SDL_ReadIO(file, &header.ambience, 1)){ return false; }
 	//ambience -= 128;
-	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &padding, 1, 1)){ return false; }
-	if(!SDL_RWread(file, &header.flags, 4, 1)){ return false; }
-	header.flags = SDL_SwapBE32(header.flags);
-	if(!SDL_RWread(file, &header.description, 1, 0x80)){ return false; }
+	if(!SDL_ReadIO(file, &padding, 1)){ return false; }
+	if(!SDL_ReadIO(file, &padding, 1)){ return false; }
+	if(!SDL_ReadIO(file, &header.flags, 4)){ return false; }
+	header.flags = SDL_Swap32BE(header.flags);
+	if(!SDL_ReadIO(file, &header.description, 0x80)){ return false; }
 	header.description[0x80 - 1] = 0;
-	if(!SDL_RWread(file, &header.minimapcompressedsize, 4, 1)){ return false; }
-	header.minimapcompressedsize = SDL_SwapLE32(header.minimapcompressedsize);
-	if(!SDL_RWread(file, header.minimapcompressed, 1, header.minimapcompressedsize)){ return false; }
-	if(!SDL_RWread(file, &header.levelsize, 4, 1)){ return false; }
-	header.levelsize = SDL_SwapLE32(header.levelsize);
+	if(!SDL_ReadIO(file, &header.minimapcompressedsize, 4)){ return false; }
+	header.minimapcompressedsize = SDL_Swap32LE(header.minimapcompressedsize);
+	if(!SDL_ReadIO(file, header.minimapcompressed, header.minimapcompressedsize)){ return false; }
+	if(!SDL_ReadIO(file, &header.levelsize, 4)){ return false; }
+	header.levelsize = SDL_Swap32LE(header.levelsize);
 	return true;
 }
 
@@ -125,10 +125,10 @@ bool Map::UncompressMinimap(Uint8 (*pixels)[172 * 62], const Uint8 * compressed,
 
 bool Map::LoadFile(const char * filename, World & world, Team * team){
 	CDDataDir();
-	SDL_RWops * file = SDL_RWFromFile(filename, "rb");
+	SDL_IOStream * file = SDL_IOFromFile(filename, "rb");
 	if(!file){
 		CDResDir();
-		file = SDL_RWFromFile(filename, "rb");
+		file = SDL_IOFromFile(filename, "rb");
 	}
 	if(!file){
 		return false;
@@ -142,8 +142,8 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 	if(!LoadHeader(file, header)){
 		return false;
 	}
-	if(!SDL_RWread(file, levelcompressed, 1, header.levelsize)){ return false; }
-	SDL_RWclose(file);
+	if(!SDL_ReadIO(file, levelcompressed, header.levelsize)){ return false; }
+	SDL_CloseIO(file);
 	
 	if(header.width > 256 || header.height > 256){
 		return false;
@@ -213,7 +213,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 	}
 	i = header.width * header.height * 36;
 	memcpy(&numactors, &level[i], sizeof(numactors));
-	numactors = SDL_SwapLE32(numactors);
+	numactors = SDL_Swap32LE(numactors);
 	i += sizeof(Uint32) + sizeof(Uint32);
 	for(unsigned int a = 0; a < numactors; a++){
 		Uint32 actorid;
@@ -226,31 +226,31 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		Uint32 actorunknown;
 		Uint32 actorsecurityid;
 		memcpy(&actorid, &level[i], sizeof(actorid));
-		actorid = SDL_SwapLE32(actorid);
+		actorid = SDL_Swap32LE(actorid);
 		i += sizeof(actorid);
 		memcpy(&actorx, &level[i], sizeof(actorx));
-		actorx = SDL_SwapLE32(actorx);
+		actorx = SDL_Swap32LE(actorx);
 		i += sizeof(actorx);
 		memcpy(&actory, &level[i], sizeof(actory));
-		actory = SDL_SwapLE32(actory);
+		actory = SDL_Swap32LE(actory);
 		i += sizeof(actory);
 		memcpy(&actordirection, &level[i], sizeof(actordirection));
-		actordirection = SDL_SwapLE32(actordirection);
+		actordirection = SDL_Swap32LE(actordirection);
 		i += sizeof(actordirection);
 		memcpy(&actortype, &level[i], sizeof(actortype));
-		actortype = SDL_SwapLE32(actortype);
+		actortype = SDL_Swap32LE(actortype);
 		i += sizeof(actortype);
 		memcpy(&actormatchid, &level[i], sizeof(actormatchid));
-		actormatchid = SDL_SwapLE32(actormatchid);
+		actormatchid = SDL_Swap32LE(actormatchid);
 		i += sizeof(actormatchid);
 		memcpy(&actorsubplane, &level[i], sizeof(actorsubplane));
-		actorsubplane = SDL_SwapLE32(actorsubplane);
+		actorsubplane = SDL_Swap32LE(actorsubplane);
 		i += sizeof(actorsubplane);
 		memcpy(&actorunknown, &level[i], sizeof(actorunknown));
-		actorunknown = SDL_SwapLE32(actorunknown);
+		actorunknown = SDL_Swap32LE(actorunknown);
 		i += sizeof(actorunknown);
 		memcpy(&actorsecurityid, &level[i], sizeof(actorsecurityid));
-		actorsecurityid = SDL_SwapLE32(actorsecurityid);
+		actorsecurityid = SDL_Swap32LE(actorsecurityid);
 		i += sizeof(actorsecurityid);
 		actory += yoffset * 64;
 		//printf("(%u, %u) %d id:%u type:%d match:%u subp:%u unk:%x secid:%d\n", actorx, actory, actordirection, actorid, actortype, actormatchid, actorsubplane, actorunknown, actorsecurityid);
@@ -669,30 +669,30 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		}
 	}
 	memcpy(&numplatforms, &level[i], sizeof(numplatforms));
-	numplatforms = SDL_SwapLE32(numplatforms);
+	numplatforms = SDL_Swap32LE(numplatforms);
 	i += sizeof(Uint32) + sizeof(Uint32);
 	
 	//FILE * fileo = fopen("platforms.txt", "w");
 	for(unsigned int j = 0; j < numplatforms; j++){
 		memcpy(&x1, &level[i], sizeof(x1));
-		x1 = SDL_SwapLE32(x1);
+		x1 = SDL_Swap32LE(x1);
 		i += sizeof(Uint32);
 		memcpy(&y1, &level[i], sizeof(y1));
-		y1 = SDL_SwapLE32(y1);
+		y1 = SDL_Swap32LE(y1);
 		y1 += (yoffset * 64);
 		i += sizeof(Uint32);
 		memcpy(&x2, &level[i], sizeof(x2));
-		x2 = SDL_SwapLE32(x2);
+		x2 = SDL_Swap32LE(x2);
 		i += sizeof(Uint32);
 		memcpy(&y2, &level[i], sizeof(y2));
-		y2 = SDL_SwapLE32(y2);
+		y2 = SDL_Swap32LE(y2);
 		y2 += (yoffset * 64);
 		i += sizeof(Uint32);
 		memcpy(&type1, &level[i], sizeof(type1));
-		type1 = SDL_SwapLE32(type1);
+		type1 = SDL_Swap32LE(type1);
 		i += sizeof(Uint32);
 		memcpy(&type2, &level[i], sizeof(type2));
-		type2 = SDL_SwapLE32(type2);
+		type2 = SDL_Swap32LE(type2);
 		i += sizeof(Uint32);
 		
 		Uint8 type = 255;

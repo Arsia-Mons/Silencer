@@ -113,7 +113,7 @@ private:
 	void ProcessMapDownload(void);
 	static const int numkeys = 20;
 	const char * keynames[numkeys];
-	Uint8 keystate[SDL_NUM_SCANCODES];
+	Uint8 keystate[SDL_SCANCODE_COUNT];
 	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, UPDATING, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, OPTIONSDISPLAY, OPTIONSAUDIO, HOSTGAME, JOINGAME, REPLAYGAME, TESTGAME};
 	Uint8 state;
 	Uint8 nextstate;

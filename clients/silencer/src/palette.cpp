@@ -36,30 +36,30 @@ bool Palette::Load(void){
 	system("rm PALETTECALC1.BIN");
 	system("rm PALETTECALC2.BIN");*/
 	CDResDir();
-	SDL_RWops * file = SDL_RWFromFile((GetResDir() + "PALETTE.BIN").c_str(), "rb");
+	SDL_IOStream * file = SDL_IOFromFile((GetResDir() + "PALETTE.BIN").c_str(), "rb");
 	CDDataDir();
-	SDL_RWops * filec = SDL_RWFromFile((GetDataDir() + filename).c_str(), "rb");
+	SDL_IOStream * filec = SDL_IOFromFile((GetDataDir() + filename).c_str(), "rb");
 	if(file){
 		for(int offset = 0; offset < 11; offset++){
-			SDL_RWseek(file, (offset * (768 + 4)) + 4, RW_SEEK_SET);
+			SDL_SeekIO(file, (offset * (768 + 4)) + 4, SDL_IO_SEEK_SET);
 			for(unsigned int i = 0; i < 256; i++){
 				Uint8 b, g, r;
-				SDL_RWread(file, &r, 1, 1);
-				SDL_RWread(file, &g, 1, 1);
-				SDL_RWread(file, &b, 1, 1);
+				SDL_ReadIO(file, &r, 1);
+				SDL_ReadIO(file, &g, 1);
+				SDL_ReadIO(file, &b, 1);
 				colors[offset][i].b = b << 2;
 				colors[offset][i].g = g << 2;
 				colors[offset][i].r = r << 2;
 			}
 		}
-		SDL_RWclose(file);
+		SDL_CloseIO(file);
 		if(filec){
 			for(unsigned int i = 0; i < 256; i++){
-				SDL_RWread(filec, &brightness[currentpalette][(i * 256)], 256, 1);
-				SDL_RWread(filec, &colored[currentpalette][(i * 256)], 256, 1);
-				SDL_RWread(filec, &alphaed[currentpalette][(i * 256)], 256, 1);
+				SDL_ReadIO(filec, &brightness[currentpalette][(i * 256)], 256);
+				SDL_ReadIO(filec, &colored[currentpalette][(i * 256)], 256);
+				SDL_ReadIO(filec, &alphaed[currentpalette][(i * 256)], 256);
 			}
-			SDL_RWclose(filec);
+			SDL_CloseIO(filec);
 		}else{
 			printf("%s not found, calculating lookup tables...\n", filename);
 			Calculate(2, 256 - 30);
@@ -116,17 +116,17 @@ void Palette::Save(void){
 	char filename[256];
 	sprintf(filename, "PALETTECALC%d.BIN", currentpalette);
 	CDDataDir();
-	SDL_RWops * file = SDL_RWFromFile((GetDataDir() + filename).c_str(), "wb");
+	SDL_IOStream * file = SDL_IOFromFile((GetDataDir() + filename).c_str(), "wb");
 	if(!file){
 		printf("Could not open %s for writing: %s\n", filename, SDL_GetError());
 		return;
 	}
 	for(unsigned int i = 0; i < 256; i++){
-		SDL_RWwrite(file, &brightness[currentpalette][(i * 256)], 256, 1);
-		SDL_RWwrite(file, &colored[currentpalette][(i * 256)], 256, 1);
-		SDL_RWwrite(file, &alphaed[currentpalette][(i * 256)], 256, 1);
+		SDL_WriteIO(file, &brightness[currentpalette][(i * 256)], 256);
+		SDL_WriteIO(file, &colored[currentpalette][(i * 256)], 256);
+		SDL_WriteIO(file, &alphaed[currentpalette][(i * 256)], 256);
 	}
-	SDL_RWclose(file);
+	SDL_CloseIO(file);
 }
 
 Uint8 Palette::ClosestMatch(SDL_Color color, bool upperonly){

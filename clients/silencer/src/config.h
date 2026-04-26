@@ -48,11 +48,11 @@ public:
 	
 private:
 	bool CompareString(const char * str1, const char * str2);
-	void WriteKey(SDL_RWops * file, const char * variable, SDL_Scancode keybindings[2], bool keyoperator);
+	void WriteKey(SDL_IOStream * file, const char * variable, SDL_Scancode keybindings[2], bool keyoperator);
 	void ReadKey(char * data, SDL_Scancode (*keybindings)[2], bool * keyoperator);
-	void WriteString(SDL_RWops * file, const char * variable, const char * string);
+	void WriteString(SDL_IOStream * file, const char * variable, const char * string);
 	void ReadString(const char * data, char * variable, int length);
-	char * RWgets(SDL_RWops * file, char * buffer, int count);
+	char * RWgets(SDL_IOStream * file, char * buffer, int count);
 };
 
 #endif

@@ -674,7 +674,7 @@ bool Lobby::Send(const char * data, unsigned int size){
 }
 
 int Lobby::ResolveThreadFunc(void * param){
-	SDL_mutex * mutex = ((Lobby *)param)->mutex;
+	SDL_Mutex * mutex = ((Lobby *)param)->mutex;
 	char host[256];
 	strcpy(host, ((Lobby *)param)->resolvehost);
 	((Lobby *)param)->resolvethreadrunning = true;

@@ -120,6 +120,13 @@ else()
 endif()
 
 include_directories(${ZLIB_INCLUDE_DIRS})
+find_package(SDL3_mixer REQUIRED CONFIG)
+if(TARGET SDL3_mixer::SDL3_mixer)
+  get_target_property(_sdl3mixer_inc SDL3_mixer::SDL3_mixer INTERFACE_INCLUDE_DIRECTORIES)
+  if(_sdl3mixer_inc)
+    include_directories(${_sdl3mixer_inc})
+  endif()
+endif()
 
 if(APPLE)
 	find_library(COCOA_FRAMEWORK Cocoa)

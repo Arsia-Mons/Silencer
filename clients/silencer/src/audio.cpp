@@ -8,6 +8,14 @@ Audio::Audio(){
 	enabled = false;
 	effectvolume = 1;
 	musicvolume = MIX_MAX_VOLUME;
+	mixer = nullptr;
+	musictrack = nullptr;
+	SDL_zero(mixerspec);
+	for(int i = 0; i < maxchannels; i++){
+		tracks[i] = nullptr;
+		channelobject[i] = 0;
+		channelvolume[i] = 128;
+	}
 }
 
 Audio::~Audio(){
@@ -20,79 +28,80 @@ Audio & Audio::GetInstance(void){
 }
 
 bool Audio::Init(Game * game){
-	if(Mix_OpenAudio(SDL_AUDIO_DEVICE_DEFAULT_OUTPUT, NULL) == false){
-		return false;
-	}else{
-		Mix_AllocateChannels(maxchannels);
-		Mix_ChannelFinished(ChannelFinished);
-		Mix_SetPostMix(MixingFunction, game);
-		enabled = true;
-		return true;
+	mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL);
+	if(!mixer) return false;
+
+	for(int i = 0; i < maxchannels; i++){
+		tracks[i] = MIX_CreateTrack(mixer);
+		if(tracks[i]){
+			MIX_SetTrackStoppedCallback(tracks[i], TrackStoppedCallback, (void*)(intptr_t)i);
+		}
 	}
+	musictrack = MIX_CreateTrack(mixer);
+	MIX_GetMixerFormat(mixer, &mixerspec);
+	// TODO: Post-mix callback for ffmpeg replay audio export was removed in SDL3_mixer 3.x
+	enabled = true;
+	return true;
 }
 
 void Audio::Close(void){
 	enabled = false;
-	int freq;
-	Uint16 format;
-	int channels;
-	while(Mix_QuerySpec(&freq, &format, &channels)){
-		Mix_CloseAudio();
+	if(mixer){
+		for(int i = 0; i < maxchannels; i++){
+			if(tracks[i]){ MIX_DestroyTrack(tracks[i]); tracks[i] = nullptr; }
+		}
+		if(musictrack){ MIX_DestroyTrack(musictrack); musictrack = nullptr; }
+		MIX_DestroyMixer(mixer);
+		mixer = nullptr;
 	}
 }
 
-int Audio::Play(Mix_Chunk * chunk, int volume, bool loop){
+int Audio::Play(MIX_Audio * chunk, int volume, bool loop){
 	if(enabled && chunk){
-		int loops = 0;
-		if(loop){
-			loops = -1;
+		for(int i = 0; i < maxchannels; i++){
+			if(!MIX_TrackPlaying(tracks[i]) && !MIX_TrackPaused(tracks[i])){
+				MIX_SetTrackAudio(tracks[i], chunk);
+				MIX_SetTrackLoops(tracks[i], loop ? -1 : 0);
+				MIX_SetTrackGain(tracks[i], (volume / 128.0f) * effectvolume);
+				MIX_PlayTrack(tracks[i], 0);
+				channelobject[i] = 0;
+				channelvolume[i] = volume;
+				return i;
+			}
 		}
-		int channel = Mix_PlayChannel(-1, chunk, loops);
-		if(channel >= 0){
-			Mix_Volume(channel, volume * effectvolume);
-			channelobject[channel] = 0;
-			channelvolume[channel] = volume;
-		}
-		return channel;
-	}else{
-		return -1;
 	}
+	return -1;
 }
 
 void Audio::Stop(int channel, int fadeoutms){
-	if(!enabled) return;
-	if(fadeoutms){
-		Mix_FadeOutChannel(channel, fadeoutms);
-		Mix_ExpireChannel(channel, fadeoutms);
-	}else{
-		Mix_HaltChannel(channel);
-	}
+	if(!enabled || channel < 0 || channel >= maxchannels) return;
+	Sint64 fade_frames = fadeoutms ? MIX_MSToFrames(mixerspec.freq, fadeoutms) : 0;
+	MIX_StopTrack(tracks[channel], fade_frames);
 }
 
 void Audio::StopAll(int fadeoutms){
 	if(!enabled) return;
-	Stop(-1, fadeoutms);
+	MIX_StopAllTracks(mixer, fadeoutms);
 }
 
 void Audio::Pause(int channel){
-	if(!enabled) return;
-	Mix_Pause(channel);
+	if(!enabled || channel < 0 || channel >= maxchannels) return;
+	MIX_PauseTrack(tracks[channel]);
 }
 
 void Audio::Resume(int channel){
-	if(!enabled) return;
-	Mix_Resume(channel);
+	if(!enabled || channel < 0 || channel >= maxchannels) return;
+	MIX_ResumeTrack(tracks[channel]);
 }
 
 bool Audio::Paused(int channel){
-	if(!enabled) return false;
-	return Mix_Paused(channel);
+	if(!enabled || channel < 0 || channel >= maxchannels) return false;
+	return MIX_TrackPaused(tracks[channel]);
 }
 
-int Audio::EmitSound(World & world, Uint16 objectid, Mix_Chunk * chunk, int volume, bool loop){
+int Audio::EmitSound(World & world, Uint16 objectid, MIX_Audio * chunk, int volume, bool loop){
 	int channel = Play(chunk, volume * effectvolume, loop);
 	if(channel != -1){
-		//Mix_Volume(channel, 0);
 		channelobject[channel] = objectid;
 		UpdateVolume(world, channel, lastx, lasty, 500);
 	}
@@ -108,14 +117,10 @@ void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int rad
 			int diffy = abs(signed(y) - object->y);
 			float distance = abs(sqrt(float((diffx * diffx) + (diffy * diffy))));
 			float volume = 1 - (distance / radius);
-			if(volume < 0){
-				volume = 0;
-			}
-			if(volume > 1){
-				volume = 1;
-			}
+			if(volume < 0) volume = 0;
+			if(volume > 1) volume = 1;
 			int oldvolume = channelvolume[channel];
-			Mix_Volume(channel, (oldvolume * volume) * effectvolume);
+			MIX_SetTrackGain(tracks[channel], ((oldvolume * volume) / 128.0f) * effectvolume);
 			lastx = x;
 			lasty = y;
 		}
@@ -124,25 +129,24 @@ void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int rad
 
 void Audio::UpdateAllVolumes(World & world, Sint16 x, Sint16 y, int radius){
 	for(int i = 0; i < maxchannels; i++){
-		int channel = i;
-		UpdateVolume(world, channel, x, y, radius);
+		UpdateVolume(world, i, x, y, radius);
 	}
 }
 
 void Audio::SetVolume(int channel, int volume){
-	if(!enabled) return;
-	Mix_Volume(channel, volume * effectvolume);
+	if(!enabled || channel < 0 || channel >= maxchannels) return;
+	MIX_SetTrackGain(tracks[channel], (volume / 128.0f) * effectvolume);
 }
 
 void Audio::Mute(int volume){
 	if(!enabled) return;
-	float percent = volume / 128.0;
+	float percent = volume / 128.0f;
 	effectvolume = percent;
 	for(int i = 0; i < maxchannels; i++){
 		int oldvolume = channelvolume[i];
-		Mix_Volume(i, oldvolume * percent);
+		MIX_SetTrackGain(tracks[i], (oldvolume / 128.0f) * percent);
 	}
-	Mix_VolumeMusic(musicvolume * percent);
+	MIX_SetTrackGain(musictrack, (musicvolume / 128.0f) * percent);
 }
 
 void Audio::Unmute(void){
@@ -150,20 +154,20 @@ void Audio::Unmute(void){
 	effectvolume = 1;
 	for(int i = 0; i < maxchannels; i++){
 		int oldvolume = channelvolume[i];
-		Mix_Volume(i, oldvolume);
+		MIX_SetTrackGain(tracks[i], oldvolume / 128.0f);
 	}
-	Mix_VolumeMusic(musicvolume);
+	MIX_SetTrackGain(musictrack, musicvolume / 128.0f);
 }
 
-bool Audio::PlayMusic(Mix_Music * music){
+bool Audio::PlayMusic(MIX_Audio * music){
 	if(!enabled) return false;
-	if(!Config::GetInstance().music){
-		return false;
-	}
-	if(!Mix_PlayingMusic() || Mix_FadingMusic() == MIX_FADING_OUT){
+	if(!Config::GetInstance().music) return false;
+	if(!MIX_TrackPlaying(musictrack) || !MIX_TrackPaused(musictrack)){
 		if(!MusicPaused()){
-			Mix_PlayMusic(music, -1);
-			SetMusicVolume(musicvolume);
+			MIX_SetTrackAudio(musictrack, music);
+			MIX_SetTrackLoops(musictrack, -1);
+			MIX_SetTrackGain(musictrack, musicvolume / 128.0f);
+			MIX_PlayTrack(musictrack, 0);
 			return true;
 		}
 	}
@@ -172,22 +176,22 @@ bool Audio::PlayMusic(Mix_Music * music){
 
 void Audio::StopMusic(void){
 	if(!enabled) return;
-	Mix_FadeOutMusic(700);
+	MIX_StopTrack(musictrack, MIX_MSToFrames(mixerspec.freq, 700));
 }
 
 void Audio::PauseMusic(void){
 	if(!enabled) return;
-	Mix_PauseMusic();
+	MIX_PauseTrack(musictrack);
 }
 
 void Audio::ResumeMusic(void){
 	if(!enabled) return;
-	Mix_ResumeMusic();
+	MIX_ResumeTrack(musictrack);
 }
 
 bool Audio::MusicPaused(void){
 	if(!enabled) return false;
-	return Mix_PausedMusic();
+	return MIX_TrackPaused(musictrack);
 }
 
 void Audio::SetMusicVolume(int volume){
@@ -195,19 +199,15 @@ void Audio::SetMusicVolume(int volume){
 		musicvolume = volume;
 		return;
 	}
-	Mix_VolumeMusic(volume);
+	MIX_SetTrackGain(musictrack, volume / 128.0f);
 	musicvolume = volume;
 }
 
-void Audio::ChannelFinished(int channel){
+void Audio::TrackStoppedCallback(void *userdata, MIX_Track *track){
+	int channel = (int)(intptr_t)userdata;
 	Audio::GetInstance().channelobject[channel] = 0;
 }
 
 void Audio::MixingFunction(void * udata, Uint8 * stream, int len){
-#ifdef POSIX
-	Game * game = (Game *)udata;
-	if(game && game->world.replay.IsPlaying() && game->world.replay.ffmpeg && !game->world.replay.ffmpegvideo && game->deploymessageshown){
-		fwrite(stream, len, 1, game->world.replay.ffmpeg);
-	}
-#endif
+	// TODO: Post-mix ffmpeg callback not available in SDL3_mixer 3.x; replay audio export disabled
 }
