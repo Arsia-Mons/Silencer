@@ -9,15 +9,15 @@
     "root": {
       "type": "Selector",
       "label": "Robot AI",
-      "children": ["leaf_wakeup", "leaf_lookforward", "leaf_melee", "leaf_looksides", "leaf_sleep", "leaf_patrol"],
+      "children": ["leaf_wakeup", "leaf_lookforward", "leaf_melee", "leaf_looksides", "leaf_returntospawn", "leaf_patrol"],
       "props": {}
     },
-    "leaf_wakeup":      { "type": "Leaf", "label": "Wake up",         "children": [], "props": { "action": "WakeUp"      } },
-    "leaf_lookforward": { "type": "Leaf", "label": "Shoot if seen",   "children": [], "props": { "action": "LookForward" } },
-    "leaf_melee":       { "type": "Leaf", "label": "Melee adjacent",  "children": [], "props": { "action": "MeleeCheck"  } },
-    "leaf_looksides":   { "type": "Leaf", "label": "Orient to target","children": [], "props": { "action": "LookSides"   } },
-    "leaf_sleep":       { "type": "Leaf", "label": "Go to sleep",     "children": [], "props": { "action": "Sleep"       } },
-    "leaf_patrol":      { "type": "Leaf", "label": "Patrol walk",     "children": [], "props": { "action": "Patrol"      } }
+    "leaf_wakeup":        { "type": "Leaf", "label": "Wake up",              "children": [], "props": { "action": "WakeUp"         } },
+    "leaf_lookforward":   { "type": "Leaf", "label": "Shoot if seen",        "children": [], "props": { "action": "LookForward"    } },
+    "leaf_melee":         { "type": "Leaf", "label": "Melee adjacent",       "children": [], "props": { "action": "MeleeCheck"     } },
+    "leaf_looksides":     { "type": "Leaf", "label": "Orient to target",     "children": [], "props": { "action": "LookSides"      } },
+    "leaf_returntospawn": { "type": "Leaf", "label": "Return to spawn/sleep","children": [], "props": { "action": "ReturnToSpawn"  } },
+    "leaf_patrol":        { "type": "Leaf", "label": "Patrol walk",          "children": [], "props": { "action": "Patrol"         } }
   },
   "positions": {}
 }

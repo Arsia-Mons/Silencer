@@ -53,10 +53,11 @@ void Robot::InitBT() {
 		return BTResult::Success;
 	};
 
-	// LookSides: only from WALKING — short side rays to orient toward target.
+	// LookSides: only from WALKING during search phase (state_i < 100) — orient toward target.
 	// Always returns Failure so the Selector continues to Patrol (orient + move each tick).
 	btctx_.actions["LookSides"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
+		if (state_i >= 100) return BTResult::Failure; // ReturnToSpawn handles orientation after search
 		World& world = *static_cast<World*>(ctx.userData);
 		if (Look(world, 2)) { mirrored = true; }
 		else if (Look(world, 1)) { mirrored = false; }
@@ -115,16 +116,25 @@ void Robot::InitBT() {
 		return BTResult::Success;
 	};
 
-	// Sleep: from WALKING when non-patrol, walk timer expired, and no target visible.
-	btctx_.actions["Sleep"] = [this](BTContext& ctx) -> BTResult {
+	// ReturnToSpawn: after search phase (!patrol, state_i >= 100), walk back to spawn and sleep.
+	// If a target is spotted en-route, reset the search timer and resume hunting.
+	btctx_.actions["ReturnToSpawn"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		if (patrol) return BTResult::Failure;
 		if (state_i < 100) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
-		if (Look(world, 1) || Look(world, 2)) return BTResult::Failure;
-		state = SLEEPING;
-		state_i = -1;
-		return BTResult::Success;
+		if (Look(world, 1) || Look(world, 2)) {
+			state_i = 0; // target spotted — reset and keep hunting
+			return BTResult::Failure;
+		}
+		// Orient toward spawn and let Patrol move us there
+		mirrored = (signed(originalx) < signed(x));
+		if (abs(signed(x) - signed(originalx)) <= 20) {
+			state = SLEEPING;
+			state_i = -1;
+			return BTResult::Success;
+		}
+		return BTResult::Failure; // not at spawn yet — Patrol will move us
 	};
 }
 
