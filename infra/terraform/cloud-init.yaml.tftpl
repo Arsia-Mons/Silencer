@@ -31,11 +31,11 @@ mounts:
 # Noble AMI already has SDL2 + zlib; these two were added when the auto-updater
 # PR made CURL + minizip unconditional dependencies of the unified binary.
 # Names carry the t64 suffix because of Ubuntu 24.04's time_t transition.
-# awscli is needed for fetching SSM-managed runtime secrets.
+# awscli is installed in runcmd (not here) to avoid races with first-boot
+# unattended-upgrades holding the apt lock.
 packages:
   - libcurl4t64
   - libminizip1t64
-  - awscli
 
 write_files:
   # Pulls Mongo + LavinMQ creds from SSM and writes /etc/silencer/lobby.env.
@@ -121,6 +121,16 @@ runcmd:
   # /opt is ubuntu-owned so GH Actions can scp releases; the service reads via world-exec.
   - chown -R ubuntu:ubuntu /opt/${project_name}
   - chown -R ${project_name}:${project_name} /var/lib/${project_name}
+  # Install awscli with retries. `packages:` runs early enough that
+  # unattended-upgrades on a fresh Noble cloud image can be holding the
+  # apt lock, silently failing the install (observed: only the first
+  # package or two land, the rest get reported as a batch failure).
+  # Doing it here gives apt time to settle.
+  - |
+    for i in 1 2 3 4 5; do
+      DEBIAN_FRONTEND=noninteractive apt-get install -y awscli && break
+      sleep 10
+    done
   # Fetch runtime secrets from SSM and write /etc/silencer/lobby.env. MUST
   # happen before silencer-lobby starts; the unit's EnvironmentFile= is
   # marked optional (-prefix), so a missing file would just leave Mongo /
