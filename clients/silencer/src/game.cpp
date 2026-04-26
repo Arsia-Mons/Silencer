@@ -2002,6 +2002,13 @@ bool Game::LoadMap(const char * name){
 	if(!world.dedicatedserver.active){
 		CreateAmbienceChannels();
 		renderer.palette.SetParallaxColors(world.map.parallax);
+		// Refresh actordefs from server so changes made in the admin editor
+		// during a session are live by the next map/round.
+		const char* apiBase = Config::GetInstance().adminapiurl;
+		if (apiBase && apiBase[0] != '\0') {
+			int n = FetchActorDefs(apiBase, world.resources.actordefs);
+			if (n > 0) printf("[actordef] refreshed %d actordef(s) from server\n", n);
+		}
 	}
 	return true;
 }
