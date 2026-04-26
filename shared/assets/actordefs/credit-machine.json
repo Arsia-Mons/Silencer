@@ -1,0 +1,30 @@
+{
+  "id": "credit-machine",
+  "props": { "hp": 0, "shield": 0, "speed": 0, "faction": "neutral", "spawnWeight": 0 },
+  "sequences": {
+    "IDLE": {
+      "loop": true,
+      "frames": [
+        { "bank": 80, "index":  0, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index":  1, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index":  2, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index":  3, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index":  4, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index":  5, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index":  6, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index":  7, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index":  8, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index":  9, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index": 10, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index": 11, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index": 12, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index": 13, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index": 14, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index": 15, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index": 16, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index": 17, "duration": 3, "hurtbox": [-54, -57, 54, 0] },
+        { "bank": 80, "index": 18, "duration": 3, "hurtbox": [-54, -57, 54, 0] }
+      ]
+    }
+  }
+}

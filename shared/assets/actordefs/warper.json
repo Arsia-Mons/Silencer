@@ -1,0 +1,13 @@
+{
+  "id": "warper",
+  "props": { "hp": 0, "shield": 0, "speed": 0, "faction": "neutral", "spawnWeight": 0 },
+  "sequences": {
+    "IDLE": {
+      "loop": true,
+      "frames": [
+        { "bank": 85, "index": 0, "duration": 24, "hurtbox": [-32, -82, 32, 0] },
+        { "bank": 85, "index": 1, "duration": 24, "hurtbox": [-32, -82, 32, 0] }
+      ]
+    }
+  }
+}

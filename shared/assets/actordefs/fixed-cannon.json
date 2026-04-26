@@ -1,0 +1,54 @@
+{
+  "id": "fixed-cannon",
+  "props": { "hp": 120, "shield": 0, "speed": 0, "faction": "enemy", "spawnWeight": 1 },
+  "sequences": {
+    "IDLE": {
+      "loop": true,
+      "frames": [
+        { "bank": 90, "index": 0, "duration": 6, "hurtbox": [-30, -62, 30, 0] }
+      ]
+    },
+    "SHOOTRIGHT": {
+      "loop": false,
+      "frames": [
+        { "bank": 91, "index": 0, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 91, "index": 1, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 91, "index": 2, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 91, "index": 3, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 91, "index": 4, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 91, "index": 5, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 91, "index": 6, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 91, "index": 7, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 91, "index": 8, "duration": 2, "hurtbox": [-30, -62, 30, 0] }
+      ]
+    },
+    "SHOOTUP": {
+      "loop": false,
+      "frames": [
+        { "bank": 92, "index": 0, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 92, "index": 1, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 92, "index": 2, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 92, "index": 3, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 92, "index": 4, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 92, "index": 5, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 92, "index": 6, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 92, "index": 7, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 92, "index": 8, "duration": 2, "hurtbox": [-30, -62, 30, 0] }
+      ]
+    },
+    "SHOOTDOWN": {
+      "loop": false,
+      "frames": [
+        { "bank": 93, "index": 0, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 93, "index": 1, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 93, "index": 2, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 93, "index": 3, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 93, "index": 4, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 93, "index": 5, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 93, "index": 6, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 93, "index": 7, "duration": 2, "hurtbox": [-30, -62, 30, 0] },
+        { "bank": 93, "index": 8, "duration": 2, "hurtbox": [-30, -62, 30, 0] }
+      ]
+    }
+  }
+}
