@@ -6,7 +6,7 @@
  * C5: Hitbox editor (per-frame AABB drawing)
  * C7: Actor properties + export/save
  */
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth';
@@ -16,11 +16,9 @@ import { getActor, saveActor, type ActorDef } from '../../../lib/api';
 import AnimationTab from './AnimationTab';
 import HitboxTab from './HitboxTab';
 import PropsTab from './PropsTab';
-import StateMachineTab from './StateMachineTab';
-import type { StateMachine } from '../../../lib/api';
 
-type Tab = 'animation' | 'hitbox' | 'statemachine' | 'props';
-const VALID_TABS: Tab[] = ['animation', 'hitbox', 'statemachine', 'props'];
+type Tab = 'animation' | 'hitbox' | 'props';
+const VALID_TABS: Tab[] = ['animation', 'hitbox', 'props'];
 
 export default function ActorEditorPage() {
   useAuth();
@@ -67,10 +65,9 @@ export default function ActorEditorPage() {
   }
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: 'animation',    label: '[ ANIMATION ]' },
-    { key: 'hitbox',       label: '[ HITBOXES ]' },
-    { key: 'statemachine', label: '[ STATE MACHINE ]' },
-    { key: 'props',        label: '[ PROPERTIES ]' },
+    { key: 'animation', label: '[ ANIMATION ]' },
+    { key: 'hitbox',    label: '[ HITBOXES ]' },
+    { key: 'props',     label: '[ PROPERTIES ]' },
   ];
 
   return (
@@ -109,19 +106,13 @@ export default function ActorEditorPage() {
           ))}
         </div>
 
-        {/* Tab content */}
-        <div className="flex flex-1 min-h-0" style={{ overflow: tab === 'statemachine' ? 'hidden' : 'auto' }}>
+        <div className="flex flex-1 min-h-0 overflow-auto">
           {!def ? (
             <div className="p-8 text-game-textDim text-sm">Loading…</div>
           ) : tab === 'animation' ? (
             <AnimationTab actorId={id} def={def} onChange={updateDef} />
           ) : tab === 'hitbox' ? (
             <HitboxTab actorId={id} def={def} onChange={updateDef} />
-          ) : tab === 'statemachine' ? (
-            <StateMachineTab
-              def={def}
-              onChange={(sm: StateMachine) => updateDef({ stateMachine: sm })}
-            />
           ) : (
             <PropsTab def={def} onChange={updateDef} />
           )}
