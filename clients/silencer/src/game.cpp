@@ -4061,9 +4061,9 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 					break;
 					case Lobby::WAITING:{
 						char line[128];
-						snprintf(line, sizeof(line), "Connecting to %s:%d", SILENCER_LOBBY_HOST, SILENCER_LOBBY_PORT);
+						snprintf(line, sizeof(line), "Connecting to %s:%d", Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
 						textbox->AddLine(line);
-						world.lobby.Connect(SILENCER_LOBBY_HOST, SILENCER_LOBBY_PORT);
+						world.lobby.Connect(Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
 						//world.lobby.state = Lobby::AUTHENTICATED;
 					}break;
 					case Lobby::RESOLVING:
@@ -4077,7 +4077,7 @@ void Game::ProcessLobbyConnectInterface(Interface * iface){
 					break;
 					case Lobby::RESOLVED:
 						textbox->AddLine("Hostname resolved");
-						world.lobby.Connect(SILENCER_LOBBY_HOST, SILENCER_LOBBY_PORT);
+						world.lobby.Connect(Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
 					break;
 					case Lobby::CONNECTED:
 						textbox->AddLine("Connected");

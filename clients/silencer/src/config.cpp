@@ -25,6 +25,8 @@ void Config::Save(void){
 		WriteString(file, "music", music ? "1" : "0");
 		sprintf(temp, "%d", musicvolume); WriteString(file, "musicvolume", temp);
 		sprintf(temp, "%d", defaultagency); WriteString(file, "defaultagency", temp);
+		WriteString(file, "lobbyhost", lobbyhost);
+		sprintf(temp, "%d", lobbyport); WriteString(file, "lobbyport", temp);
 		WriteString(file, "defaultgamename", defaultgamename);
 		sprintf(temp, "%d", defaulttechchoices[0]); WriteString(file, "defaulttechchoices0", temp);
 		sprintf(temp, "%d", defaulttechchoices[1]); WriteString(file, "defaulttechchoices1", temp);
@@ -71,6 +73,8 @@ bool Config::Load(void){
 				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "music")){ if(atoi(data) == 0){ music = false; }else{ music = true; } }
 				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "musicvolume")){ musicvolume = atoi(data); }
 				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaultagency")){ defaultagency = atoi(data); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "lobbyhost")){ ReadString(data, lobbyhost, sizeof(lobbyhost)); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "lobbyport")){ lobbyport = atoi(data); }
 				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaultgamename")){ ReadString(data, defaultgamename, sizeof(defaultgamename)); }
 				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaulttechchoices0")){ defaulttechchoices[0] = atoi(data); }
 				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaulttechchoices1")){ defaulttechchoices[1] = atoi(data); }
@@ -112,6 +116,9 @@ void Config::LoadDefaults(void){
 	music = true;
 	musicvolume = 48;
 	defaultagency = Team::NOXIS;
+	strncpy(lobbyhost, SILENCER_LOBBY_HOST, sizeof(lobbyhost) - 1);
+	lobbyhost[sizeof(lobbyhost) - 1] = '\0';
+	lobbyport = SILENCER_LOBBY_PORT;
 	strcpy(defaultgamename, "New Game");
 	defaulttechchoices[0] = World::BUY_LASER | World::BUY_ROCKET;
 	defaulttechchoices[1] = World::BUY_LASER | World::BUY_ROCKET;
