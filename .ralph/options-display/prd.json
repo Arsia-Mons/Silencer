@@ -16,7 +16,7 @@
       "id": "D1",
       "name": "Composition complete (bg + title + 2 toggle rows + Save/Cancel)",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "spec": "The dump shows: bank-6 idx-0 fullscreen bg; 'Display Options' title at top; two B220x33 buttons (Fullscreen, Smooth Scaling) at y=50, y=103; off pill (bank 6 idx 12) + on pill (bank 6 idx 15) for each row at literal coords (420, 137+i*53) and (450, 137+i*53); Save and Cancel at y=117. Per docs/design/screen-options-display.md.",
       "category": "composition"
     },

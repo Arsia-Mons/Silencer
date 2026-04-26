@@ -35,3 +35,47 @@
   (Mars + starfield) in the right place; missing widgets (title, 2 rows,
   pills, Save/Cancel) are expected at D0 — that's the D1 scope.
 ---
+
+## 2026-04-26T15:08:00Z — iter 2 (D1 PASS)
+- Filled in `RunDumpOptionsDisplay`'s composition body in
+  `shared/design/sdl3/src/main.cpp` with all 7 spec objects from
+  docs/design/screen-options-display.md: title `DrawText` ("Display
+  Options", bank 135 advance 12, centered y=14); two B220x33 toggle
+  buttons via a `rows` array indexed `i ∈ {0,1}` with anchors
+  `(100, 50 + i*53)` and labels Fullscreen / Smooth Scaling; per-row
+  off+on half-pills (bank 6 idx 12 at x=420, idx 15 at x=450) at
+  literal y=137+i*53; Save/Cancel B196x33 at `(-200, 117)/(20, 117)`.
+  Reused B220x33 width=220 / advance=11 / yoff=8 from `RunDumpOptionsAudio`,
+  the validated audio-screen template.
+- Build clean, dump 921615 bytes (canonical PPM size).
+- Bytewise diff vs `/tmp/real_optionsdisplay_dump.ppm`: **2,211 bytes
+  ≈ 0.24%** — under the empirically-calibrated 0.25% F0 threshold and
+  within the same envelope as main-menu (0.23%) / options (0.19%) /
+  options-audio (0.11%) baselines. Higher than audio's 0.11% because
+  the screen has 2 toggle rows + 4 indicator pills + 2 longer button
+  labels (Fullscreen, Smooth Scaling) — more glyph-aliased surface.
+- Regression checks (all clean): main 2136, options 1758, audio 1035
+  — exact matches to F0/O4/A4 baselines.
+- Visual A/B (`/tmp/sdl3_dump/screen_00.png` vs
+  `/tmp/real_optionsdisplay_dump.png`): indistinguishable to the
+  casual reader. Title centered at top, both toggle rows at coincident
+  y, both rows show dim-left-half + bright-right-half pills (Mars
+  visible behind/below them), Save and Cancel at the bottom.
+- **Pattern:** the OPTIONSAUDIO template is a near-perfect base for
+  any "title + N toggle rows + Save/Cancel" screen — only the row
+  count, row stride, label texts, and indicator y-base change. Future
+  toggle screens (controls 6-row, etc.) should clone-and-loop the
+  same body rather than refactor the audio version.
+- **Pattern:** for indicator pills the spec's literal y=137 is engine-
+  raw and adds the row stride (+53) on top, NOT relative to button
+  anchor y. The button anchor (50+i*53) and indicator y (137+i*53)
+  drift apart by sprite-offset arithmetic per the spec's "indicator-y
+  is overlay-relative" note — both render at the visually-same row
+  because B220 chrome offset_y is large negative.
+- **Pattern:** the residue grows roughly linearly in glyph-aliased
+  pixel count — main menu (4 short labels) ≈ 0.23%, options (4 short
+  labels) 0.19%, audio (1 short label "Music" + 1 title) 0.11%, display
+  (2 longer labels Fullscreen/Smooth Scaling + title + Save/Cancel) 0.24%.
+  Anti-aliasing palette-index drift on glyph edges is the irreducible
+  floor — quoted "Smooth Scaling" alone has 14 glyphs vs Music's 5.
+---

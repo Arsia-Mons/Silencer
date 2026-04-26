@@ -416,6 +416,80 @@ static int RunDumpOptionsDisplay(const std::string &assets_dir,
     BlitSprite(fb, sprites.Get(6, 0), 0, 0, nullptr);
   }
 
+  // 2) Title overlay: "Display Options", bank 135 advance 12, centered, y=14.
+  {
+    const std::string title = "Display Options";
+    constexpr int kTitleAdvance = 12;
+    int title_x = 320 - static_cast<int>(title.size()) * kTitleAdvance / 2;
+    int title_y = 14;
+    DrawText(fb, title_x, title_y, title, /*bank=*/135,
+             /*advance=*/kTitleAdvance, sprites, palette, kSubMenu,
+             /*brightness=*/128);
+  }
+
+  // 3) Two B220x33 toggle buttons: Fullscreen at (100, 50), Smooth Scaling
+  //    at (100, 103). Row stride +53.
+  struct ToggleRow {
+    const char *text;
+  };
+  const std::array<ToggleRow, 2> rows = {{
+      {"Fullscreen"},
+      {"Smooth Scaling"},
+  }};
+  constexpr int kToggleX = 100;
+  constexpr int kToggleY0 = 50;
+  constexpr int kRowStride = 53;
+  constexpr int kB220Base = 23;
+  constexpr int kB220Width = 220;
+  for (size_t i = 0; i < rows.size(); ++i) {
+    int by = kToggleY0 + static_cast<int>(i) * kRowStride;
+    const Sprite &chrome = sprites.Get(6, kB220Base);
+    BlitSprite(fb, chrome, kToggleX, by, nullptr);
+
+    int len = static_cast<int>(std::strlen(rows[i].text));
+    int xoff = (kB220Width - len * 11) / 2;
+    int textX = kToggleX - chrome.offset_x + xoff;
+    int textY = by - chrome.offset_y + 8;
+    DrawText(fb, textX, textY, rows[i].text, /*bank=*/135, /*advance=*/11,
+             sprites, palette, kSubMenu, /*brightness=*/128);
+  }
+
+  // 4) Off / on half-pill indicators per row at literal screen coords.
+  //    Bank 6 idx 12 = off-left (dim outline), idx 15 = on-right (bright
+  //    filled). Indicator y = 137 + i*53 per spec.
+  constexpr int kPillY0 = 137;
+  for (size_t i = 0; i < rows.size(); ++i) {
+    int py = kPillY0 + static_cast<int>(i) * kRowStride;
+    if (sprites.Has(6, 12)) {
+      BlitSprite(fb, sprites.Get(6, 12), 420, py, nullptr);
+    }
+    if (sprites.Has(6, 15)) {
+      BlitSprite(fb, sprites.Get(6, 15), 450, py, nullptr);
+    }
+  }
+
+  // 5) Save / Cancel: two B196x33 buttons at the bottom (y=117).
+  struct ButtonSpec {
+    const char *text;
+    int x;
+    int y;
+  };
+  const std::array<ButtonSpec, 2> buttons = {{
+      {"Save", -200, 117},
+      {"Cancel", 20, 117},
+  }};
+  for (const auto &b : buttons) {
+    const Sprite &chrome = sprites.Get(6, 7);
+    BlitSprite(fb, chrome, b.x, b.y, nullptr);
+
+    int len = static_cast<int>(std::strlen(b.text));
+    int xoff = (196 - len * 11) / 2;
+    int textX = b.x - chrome.offset_x + xoff;
+    int textY = b.y - chrome.offset_y + 8;
+    DrawText(fb, textX, textY, b.text, /*bank=*/135, /*advance=*/11, sprites,
+             palette, kSubMenu, /*brightness=*/128);
+  }
+
   std::filesystem::create_directories(dump_dir);
   std::string out = dump_dir + "/screen_00.ppm";
   bool ok = WritePPM(out, fb, palette, kSubMenu);
