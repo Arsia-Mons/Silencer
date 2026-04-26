@@ -254,7 +254,36 @@ void Game::Present(void){
 			else if(strcmp(dumpstate_env, "OPTIONSAUDIO") == 0) target_state = OPTIONSAUDIO;
 			else if(strcmp(dumpstate_env, "OPTIONS") == 0) target_state = OPTIONS;
 			else if(strcmp(dumpstate_env, "LOBBYCONNECT") == 0) target_state = LOBBYCONNECT;
+			else if(strcmp(dumpstate_env, "LOBBY") == 0) target_state = LOBBY;
 			else if(strcmp(dumpstate_env, "MAINMENU") == 0) target_state = MAINMENU;
+		}
+
+		// LOBBY: drive a real auth flow against a locally running lobby
+		// (the Go server in services/lobby; auto-creates accounts on first
+		// connect). When the screen lands in LOBBYCONNECT we inject
+		// credentials and click Login. If no lobby is reachable, the
+		// natural Lobby::IDLE pin would fire below — operator should run
+		// `services/lobby/silencer-lobby -addr :15170 ...` and write the
+		// matching port into ~/Library/Application Support/Silencer/config.cfg.
+		if(target_state == LOBBY && state == LOBBYCONNECT && !stateisnew && FadedIn()){
+			Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+			if(iface){
+				static bool creds_injected = false;
+				if(!creds_injected && world.lobby.state == Lobby::AUTHENTICATING){
+					Object * uin = iface->GetObjectWithUid(world, 1);
+					Object * pin = iface->GetObjectWithUid(world, 2);
+					if(uin && uin->type == ObjectTypes::TEXTINPUT &&
+					   pin && pin->type == ObjectTypes::TEXTINPUT){
+						static_cast<TextInput *>(uin)->SetText("dump");
+						static_cast<TextInput *>(pin)->SetText("dump");
+						Object * loginbtn = iface->GetObjectWithUid(world, 0);
+						if(loginbtn && loginbtn->type == ObjectTypes::BUTTON){
+							static_cast<Button *>(loginbtn)->clicked = true;
+							creds_injected = true;
+						}
+					}
+				}
+			}
 		}
 
 		// Helper: are we visually steady on the main menu (logo at idx 60)?
@@ -281,8 +310,11 @@ void Game::Present(void){
 		// MAINMENU.{Options=uid 2, ConnectToLobby=uid 1} → OPTIONS.{...} → ...
 		if(state == MAINMENU && !stateisnew && target_state != MAINMENU){
 			if(mainmenu_steady()){
-				if(target_state == LOBBYCONNECT) click_uid(1);  // Connect To Lobby
-				else click_uid(2);                               // Options (default path)
+				if(target_state == LOBBYCONNECT || target_state == LOBBY){
+					click_uid(1);  // Connect To Lobby
+				} else {
+					click_uid(2);  // Options (parent of OPTIONSCONTROLS/DISPLAY/AUDIO)
+				}
 			}
 			return;
 		}
@@ -328,6 +360,10 @@ void Game::Present(void){
 				// is deterministic.
 				ready = FadedIn() && world.lobby.state == Lobby::IDLE;
 				label = "lobby connect";
+			} else if(target_state == LOBBY){
+				// LOBBY: with the auth bypass above, we end up here naturally.
+				ready = FadedIn();
+				label = "lobby";
 			}
 			if(ready){
 				FILE * f = fopen(dumppath, "wb");

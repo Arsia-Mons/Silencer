@@ -183,12 +183,22 @@ Concrete sprite headers worth pinning:
 | 6    | 15  | 20 × 33   | (0, 0)         | "On" toggle label, bright (option is ON) |
 | 6    | 23  | 220 × 33  | (-76, -86)     | `B220x33` base frame |
 | 6    | 28  | 112 × 33  | (-302, -86)    | `B112x33` base frame |
+| 7    | 1   | 640 × 480 | (0, 0)         | Lobby main background plate (full-screen) |
 | 7    | 2   | 284 × 277 | (-178, -93)    | Lobby-connect background panel — full screen behind the login form |
 | 7    | 7   | 628 × 454 | (-5, -6)       | Options inner panel — overlays the bg plate, framing the configuration area |
+| 7    | 8   | 224 × 267 | (-403, -87)    | Lobby game-select right border / panel chrome |
 | 7    | 9   | 16 × 267  | (-609, -87)    | ScrollBar track (drawn only when `ScrollBar.draw == true`) |
 | 7    | 10  | 16 × 235  | (-610, -103)   | ScrollBar thumb (only when drawing) |
+| 7    | 11  | 368 × 213 | (-15, -216)    | Lobby chat-overlay border / panel chrome |
+| 7    | 14  | 368 × 17  | (-15, -433)    | Lobby chat-input border (the field at the bottom of the chat panel) |
+| 7    | 24  | 156 × 21  | (0, 0)         | `B156x21` button base (and only) frame |
+| 181  | 0   | 32 × 27   | (0, -2)        | Agency icon — Noxis |
+| 181  | 1   | 32 × 27   | (0, -1)        | Agency icon — Lazarus |
+| 181  | 2   | 28 × 27   | (-1, -1)       | Agency icon — Caliber |
+| 181  | 3   | 28 × 25   | (-1, -2)       | Agency icon — Static |
+| 181  | 4   | 28 × 30   | (-1, 0)        | Agency icon — Black Rose |
 | 208  | 60  | 348 × 31  | (-7, -222)     | Main-menu logo, steady-state frame |
 
 A hydration covering main-menu + options + options-controls +
-options-display + options-audio + lobby-connect needs banks 6, 7,
-132, 133, 134, 135, 208 loaded.
+options-display + options-audio + lobby-connect + lobby needs
+banks 6, 7, 132, 133, 134, 135, 181 (lobby agency icons), 208.

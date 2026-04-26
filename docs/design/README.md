@@ -33,17 +33,20 @@ substrate, two different compositions:
 | [font.md](font.md) | Font sprite banks 132–136, advance widths, `DrawText` |
 | [tick.md](tick.md) | 24 Hz simulation tick, `state_i` |
 | [widget-overlay.md](widget-overlay.md) | Sprite-mode and text-mode `Overlay` (used for bg, logo, version) |
-| [widget-button.md](widget-button.md) | `Button` widget — `B196x33`, `B112x33`, `B220x33`, `B52x21`, `BNONE` variants |
+| [widget-button.md](widget-button.md) | `Button` widget — `B196x33`, `B112x33`, `B220x33`, `B52x21`, `B156x21`, `BNONE` variants |
+| [widget-toggle.md](widget-toggle.md) | `Toggle` — radio-group sprite icon (lobby agency picker) |
+| [widget-selectbox.md](widget-selectbox.md) | `SelectBox` — scrollable single-selection list with palette-180 row highlight |
 | [widget-textbox.md](widget-textbox.md) | `TextBox` — multi-line text display (chat / status log shape) |
 | [widget-textinput.md](widget-textinput.md) | `TextInput` — single-line editor with blinking caret, optional password mode |
 | [widget-scrollbar.md](widget-scrollbar.md) | `ScrollBar` — state holder for scroll position, optionally renders track + thumb |
-| [widget-interface.md](widget-interface.md) | `Interface` container, focus, mouse/keyboard dispatch, scroll wiring |
+| [widget-interface.md](widget-interface.md) | `Interface` container, focus, mouse/keyboard dispatch, scroll wiring, sub-interfaces |
 | [screen-main-menu.md](screen-main-menu.md) | Composition: main menu (logo, buttons, version) |
 | [screen-options.md](screen-options.md) | Composition: options sub-screen (four B196x33 buttons over the main-menu plate; inherits sub-palette 1 from MAINMENU without setting it) |
 | [screen-options-controls.md](screen-options-controls.md) | Composition: configure-controls (six rows of keybinding triplets, scrollbar state, Save/Cancel) |
 | [screen-options-display.md](screen-options-display.md) | Composition: display-options (Fullscreen + Smooth Scaling toggles, Save/Cancel) |
 | [screen-options-audio.md](screen-options-audio.md) | Composition: audio-options (single Music toggle, Save/Cancel) |
 | [screen-lobby-connect.md](screen-lobby-connect.md) | Composition: lobby login (TextBox status log, two TextInputs, Login/Cancel B52x21 buttons; first sub-palette-2 screen) |
+| [screen-lobby.md](screen-lobby.md) | Composition: full lobby — top brand bar + three sub-Interfaces (character, chat, game-select). Biggest screen so far. |
 
 ## QA dump
 
@@ -53,7 +56,7 @@ exposes a framebuffer dump path gated by env vars:
 | Env | Values | Effect |
 | --- | ------ | ------ |
 | `SILENCER_DUMP_PATH` | absolute file path | When set, write a 640×480 binary P6 PPM to this path once the target screen has reached steady state, then `exit(0)` |
-| `SILENCER_DUMP_STATE` | `MAINMENU` (default), `OPTIONS`, `OPTIONSCONTROLS`, `OPTIONSDISPLAY`, `OPTIONSAUDIO`, `LOBBYCONNECT` | Selects which screen to dump. The binary navigates by chaining clicks: MAINMENU.{Options=uid 2, ConnectToLobby=uid 1}; OPTIONS.{Controls=uid 1, Display=uid 2, Audio=uid 3}. LOBBYCONNECT also waits for `Lobby::state == IDLE` before dumping so the TextBox content is deterministic. |
+| `SILENCER_DUMP_STATE` | `MAINMENU` (default), `OPTIONS`, `OPTIONSCONTROLS`, `OPTIONSDISPLAY`, `OPTIONSAUDIO`, `LOBBYCONNECT`, `LOBBY` | Selects which screen to dump. The binary navigates by chaining clicks: MAINMENU.{Options=uid 2, ConnectToLobby=uid 1}; OPTIONS.{Controls=uid 1, Display=uid 2, Audio=uid 3}. `LOBBYCONNECT` waits for `Lobby::state == IDLE` (deterministic TextBox content). `LOBBY` injects `dump`/`dump` credentials and clicks Login — needs a local lobby running on the configured port (`services/lobby/silencer-lobby -addr :15170 -version 00028`; `~/Library/Application Support/Silencer/config.cfg` `lobbyport = 15170`). |
 
 Hydrations should accept `SILENCER_DUMP_DIR` (writes one PPM per
 registered screen) for parity. Visual A/B between the real and

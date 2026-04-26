@@ -1,8 +1,8 @@
 # shared/design/sdl3
 
 C++17 + SDL3 hydration of the Silencer main menu, options menu,
-configure-controls, options-display, options-audio, and
-lobby-connect screens, built only from
+configure-controls, options-display, options-audio,
+lobby-connect, and lobby screens, built only from
 [`docs/design/`](../../../docs/design/) plus the binary assets in
 [`shared/assets/`](../../assets/). Reference
 renderer for the design-system spec — produces a 640×480 indexed
@@ -40,6 +40,7 @@ Writes one PPM per registered screen — currently:
 - `${SILENCER_DUMP_DIR}/options_display.ppm`
 - `${SILENCER_DUMP_DIR}/options_audio.ppm`
 - `${SILENCER_DUMP_DIR}/lobby_connect.ppm`
+- `${SILENCER_DUMP_DIR}/lobby.ppm`
 
 Compare against the real client's dumps:
 

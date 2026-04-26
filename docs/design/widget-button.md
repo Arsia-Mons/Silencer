@@ -14,8 +14,9 @@ as more screens come online.
 | `B112x33` | options-controls c1/c2 key buttons | yes |
 | `B220x33` | options-display "Fullscreen"/"Smooth Scaling" rows; options-audio "Music" row | yes |
 | `B52x21` | lobby-connect Login/Cancel buttons | no (text-only, fixed dimensions) |
+| `B156x21` | lobby Go Back / Create Game / Join Game buttons | yes (sprite-backed; brightness-only animation) |
 | `BNONE` | options-controls "OR/AND" op buttons (text-only, custom width/height) | no |
-| `B236x27`, `B156x21`, `BCHECKBOX` | not yet exercised | TBD when a screen needs them |
+| `B236x27`, `BCHECKBOX` | not yet exercised | TBD when a screen needs them |
 
 ## `B196x33` constants
 
@@ -219,6 +220,43 @@ inside =
 
 State machine still runs (so brightness ramps 128 → 136 on hover);
 the ramp brightens the label glyphs but no chrome.
+
+## `B156x21` constants
+
+| Field | Value |
+| ----- | ----- |
+| Width × height | 156 × 21 |
+| Sprite bank | 7 |
+| `res_index` | 24 (fixed — does **not** advance per state) |
+| Hover animation | **brightness-only** — sprite frame stays at idx 24, only `effectbrightness` ramps |
+| Text font bank | 134 |
+| Text advance | 8 |
+| Text `yoff` | 4 (different from the 8 used by the larger sprite-backed variants) |
+| Hover sound | `whoom.wav` |
+
+Sprite header (`shared/assets/bin_spr/SPR_007.BIN` idx 24):
+`offset_x = 0, offset_y = 0`. So a `B156x21` placed at
+`object.x = 473, object.y = 29` renders with its top-left at
+`(473, 29)` and footprint `156 × 21`. Anchor offsets are zero, so
+the logical position **is** the rendered top-left for this variant.
+
+Different from the bigger sprite-backed variants in two ways:
+
+1. The hover ramp does not advance `res_index` — `Button::Tick`
+   special-cases `B156x21` and only mutates `effectbrightness`
+   (128 → 136). The chrome stays at idx 24 throughout.
+2. Text vertical-offset is `yoff = 4` (vs `8` for the bigger
+   variants), which centers the smaller label inside the 21-px
+   tall button.
+
+Label-position math:
+
+```
+xoff = (156 - strlen(text) * 8) / 2
+yoff = 4
+textX = button.x - 0 + xoff   = button.x + xoff
+textY = button.y - 0 + 4      = button.y + 4
+```
 
 ## `BNONE` constants
 

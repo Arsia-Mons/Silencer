@@ -302,6 +302,32 @@ build_brightness_lut(const Palette& pal, int active_sub, int brightness) {
     return lut;
 }
 
+// EffectColor LUT — remap each non-zero palette index to the target
+// color's 16-wide ramp band, preserving brightness step within the band.
+// Per docs/design/screen-lobby.md "EffectColor + textcolorramp combination":
+//     output = ((src - 2) % 16) + ((tgt - 2) / 16) * 16 + 2
+// Plain EffectColor (without ramp) uses the same band-mapping; rampcolor
+// then composes with EffectBrightness on top. For the lobby brand bar
+// these overlays use effectbrightness == 128 (default), so the ramp
+// formula collapses to plain EffectColor and either path produces the
+// same pixels.
+static std::array<uint8_t, 256>
+build_effect_color_lut(int target_color) {
+    std::array<uint8_t, 256> lut{};
+    lut[0] = 0;
+    lut[1] = 1;
+    int tg = (target_color - 2);
+    int tband_base = (tg / 16) * 16;
+    for (int s = 2; s < 256; ++s) {
+        int step = (s - 2) % 16;
+        int out = step + tband_base + 2;
+        if (out < 0) out = 0;
+        if (out > 255) out = 255;
+        lut[s] = (uint8_t)out;
+    }
+    return lut;
+}
+
 // ---------- blit ----------
 
 static void blit_sprite(Framebuffer& fb, const Sprite& sp,
@@ -368,6 +394,7 @@ struct Overlay {
     int textbank = 135;
     int textwidth = 8;
     int effectbrightness = 128;
+    int effectcolor = 0;
 
     void tick() {
         // Only the bank-208 logo path matters for the menu.
@@ -392,7 +419,7 @@ struct Overlay {
 
 // Button "variant" descriptor — captures the per-variant constants from
 // docs/design/widget-button.md so render_button can stay generic.
-enum class ButtonVariant { B196x33, B112x33, B220x33, B52x21, BNONE };
+enum class ButtonVariant { B196x33, B112x33, B220x33, B52x21, B156x21, BNONE };
 
 struct Button {
     int x = 0, y = 0;
@@ -414,11 +441,27 @@ static void render_overlay(Framebuffer& fb, const Resources& res,
                            const Overlay& o, int active_sub) {
     if (!o.text.empty()) {
         // text mode: draw at raw (x, y), no camera offset.
-        std::array<uint8_t, 256> identity{};
-        for (int i = 0; i < 256; ++i) identity[i] = (uint8_t)i;
-        // brightness 128 → identity LUT.
+        // Effect pipeline: optionally EffectColor → EffectBrightness.
+        std::array<uint8_t, 256> lut{};
+        const std::array<uint8_t, 256>* lutp = nullptr;
+        if (o.effectcolor != 0) {
+            lut = build_effect_color_lut(o.effectcolor);
+            lutp = &lut;
+            if (o.effectbrightness != 128) {
+                // Compose: brightness LUT applied after color LUT.
+                auto blut = build_brightness_lut(res.palette, active_sub,
+                                                 o.effectbrightness);
+                for (int i = 0; i < 256; ++i) {
+                    lut[i] = blut[lut[i]];
+                }
+            }
+        } else if (o.effectbrightness != 128) {
+            lut = build_brightness_lut(res.palette, active_sub,
+                                       o.effectbrightness);
+            lutp = &lut;
+        }
         draw_text(fb, res, o.x, o.y, o.text, o.textbank, o.textwidth,
-                  /*tint_lut*/ nullptr);
+                  lutp);
         return;
     }
     const Sprite* sp = res.get(o.res_bank, o.res_index);
@@ -461,6 +504,21 @@ static void render_button(Framebuffer& fb, const Resources& res,
         return;
     }
 
+    if (b.variant == ButtonVariant::B156x21) {
+        // B156x21: bank 7 idx 24, offset (0, 0). Brightness-only ramp
+        // (sprite frame fixed). Text font bank 134, advance 8, yoff = 4.
+        const Sprite* sp = res.get(7, 24);
+        if (!sp) return;
+        blit_object(fb, *sp, b.x, b.y, lutp);
+        int advance = 8;
+        int xoff = (156 - (int)b.text.size() * advance) / 2;
+        int yoff = 4;
+        // Sprite anchor is (0,0) so dst top-left == (b.x, b.y).
+        draw_text(fb, res, b.x + xoff, b.y + yoff, b.text,
+                  /*bank*/ 134, advance, lutp);
+        return;
+    }
+
     const Sprite* sp = res.get(6, b.res_index);
     if (!sp) return;
     blit_object(fb, *sp, b.x, b.y, lutp);
@@ -476,6 +534,46 @@ static void render_button(Framebuffer& fb, const Resources& res,
     int yoff = 8;
     draw_text(fb, res, dst_x + xoff, dst_y + yoff, b.text,
               b.textbank, advance, lutp);
+}
+
+// ---------- Toggle ----------
+//
+// Per widget-toggle.md: state-only renderer. For bank 181 (agency
+// icons) Tick rewrites effectcolor=112 always; effectbrightness=128
+// when selected, 32 when not. Then standard sprite blit through the
+// anchor offset.
+struct Toggle {
+    int x = 0, y = 0;
+    int res_bank = 181;
+    int res_index = 0;
+    bool selected = false;
+};
+
+static void render_toggle(Framebuffer& fb, const Resources& res,
+                          const Toggle& t, int active_sub) {
+    int eff_color = 0;
+    int eff_brightness = 128;
+    if (t.res_bank == 181) {
+        eff_color = 112;
+        eff_brightness = t.selected ? 128 : 32;
+    }
+    const Sprite* sp = res.get(t.res_bank, t.res_index);
+    if (!sp) return;
+    std::array<uint8_t, 256> lut{};
+    const std::array<uint8_t, 256>* lutp = nullptr;
+    if (eff_color != 0) {
+        lut = build_effect_color_lut(eff_color);
+        lutp = &lut;
+        if (eff_brightness != 128) {
+            auto blut = build_brightness_lut(res.palette, active_sub,
+                                             eff_brightness);
+            for (int i = 0; i < 256; ++i) lut[i] = blut[lut[i]];
+        }
+    } else if (eff_brightness != 128) {
+        lut = build_brightness_lut(res.palette, active_sub, eff_brightness);
+        lutp = &lut;
+    }
+    blit_object(fb, *sp, t.x, t.y, lutp);
 }
 
 // ---------- filled rect (for TextInput caret) ----------
@@ -909,6 +1007,151 @@ static int render_lobby_connect(Framebuffer& fb, const Resources& res) {
     return active_sub;
 }
 
+// Render the LOBBY screen into `fb`. Returns active sub-palette.
+//
+// Per screen-lobby.md: LOBBY uses sub-palette 2 (set on entry). Three
+// sub-Interfaces nested inside a top-level: character (left), game-
+// select (right), chat (bottom). For a default-config dump everything
+// dynamic is empty — we render only the static chrome plus the selected
+// agency Toggle (Noxis, idx 0) and the focused chat-input caret.
+static int render_lobby(Framebuffer& fb, const Resources& res) {
+    constexpr int active_sub = 2;
+
+    fb.clear();
+
+    // 1. Full-screen lobby background plate (bank 7 idx 1).
+    {
+        Overlay bg;
+        bg.x = 0; bg.y = 0;
+        bg.res_bank = 7; bg.res_index = 1;
+        render_overlay(fb, res, bg, active_sub);
+    }
+
+    // 2. Top brand bar — "Silencer" red text (bank 135, advance 11,
+    //    effectcolor 152).
+    {
+        Overlay brand;
+        brand.text = "Silencer";
+        brand.textbank = 135;
+        brand.textwidth = 11;
+        brand.effectcolor = 152;
+        brand.x = 15; brand.y = 32;
+        render_overlay(fb, res, brand, active_sub);
+    }
+
+    // 3. "v.<version>" orange text (bank 133, advance 6, effectcolor 189).
+    {
+        Overlay version;
+        version.text = "v.00028";
+        version.textbank = 133;
+        version.textwidth = 6;
+        version.effectcolor = 189;
+        version.x = 115; version.y = 39;
+        render_overlay(fb, res, version, active_sub);
+    }
+
+    // 4. Map name overlay — empty in default config. (uid=8, bank 135
+    //    advance 11, effectcolor=129, effectbrightness=160, ramp=true,
+    //    at (180, 32).) Skipped because text is empty.
+
+    // 5. Go Back B156x21 button at (473, 29).
+    {
+        Button b;
+        b.variant = ButtonVariant::B156x21;
+        b.x = 473; b.y = 29;
+        b.text = "Go Back";
+        render_button(fb, res, b, active_sub);
+    }
+
+    // ---- Character sub-interface (left) ----
+    // Local username overlay — empty by default. Skipped.
+    // Stat overlays (Level/Wins/Losses/Etc) — all empty. Skipped.
+    // Five agency Toggles at (20 + i*42, 90) with bank 181 idx 0..4.
+    {
+        int defaultagency = 0; // Config::Team::NOXIS == 0
+        for (int i = 0; i < 5; ++i) {
+            Toggle t;
+            t.x = 20 + i * 42;
+            t.y = 90;
+            t.res_bank = 181;
+            t.res_index = i;
+            t.selected = (i == defaultagency);
+            render_toggle(fb, res, t, active_sub);
+        }
+    }
+
+    // ---- Game-select sub-interface (right) ----
+    // Right-border panel chrome — bank 7 idx 8 with anchor (-403, -87).
+    // Object position (0, 0) ⇒ top-left = (0 - (-403), 0 - (-87)) = (403, 87).
+    {
+        Overlay panel;
+        panel.x = 0; panel.y = 0;
+        panel.res_bank = 7; panel.res_index = 8;
+        render_overlay(fb, res, panel, active_sub);
+    }
+    // "Active Games" label — bank 134 advance 8 at (405, 70).
+    {
+        Overlay lbl;
+        lbl.text = "Active Games";
+        lbl.textbank = 134;
+        lbl.textwidth = 8;
+        lbl.x = 405; lbl.y = 70;
+        render_overlay(fb, res, lbl, active_sub);
+    }
+    // Create Game button — B156x21 at (242, 68). Per spec table for
+    // game-select sub-interface this is the Create Game button (uid 30).
+    {
+        Button b;
+        b.variant = ButtonVariant::B156x21;
+        b.x = 242; b.y = 68;
+        b.text = "Create Game";
+        render_button(fb, res, b, active_sub);
+    }
+    // Join Game button — B156x21 at (436, 430), uid 20.
+    {
+        Button b;
+        b.variant = ButtonVariant::B156x21;
+        b.x = 436; b.y = 430;
+        b.text = "Join Game";
+        render_button(fb, res, b, active_sub);
+    }
+    // SelectBox — empty in default; nothing to render. ScrollBar
+    // draw=false → no chrome.
+
+    // ---- Chat sub-interface (bottom) ----
+    // Chat panel border — bank 7 idx 11 anchor (-15, -216).
+    {
+        Overlay panel;
+        panel.x = 0; panel.y = 0;
+        panel.res_bank = 7; panel.res_index = 11;
+        render_overlay(fb, res, panel, active_sub);
+    }
+    // Chat-input border — bank 7 idx 14 anchor (-15, -433).
+    {
+        Overlay panel;
+        panel.x = 0; panel.y = 0;
+        panel.res_bank = 7; panel.res_index = 14;
+        render_overlay(fb, res, panel, active_sub);
+    }
+    // Channel name overlay (uid=1, bank 134 advance 8) at (15, 200) —
+    // empty in default. Skipped.
+    // Chat / presence TextBoxes — empty. Skipped.
+    // Chat input caret — focused, empty text, caret at (18, 437) per
+    // widget-textinput.md: caret_x = x + strlen(text)*fontwidth = 18,
+    // caret_y = y - 1 = 436, w = 1, h = round(14 * 0.8) = 11.
+    {
+        uint8_t caret = brightest_index(res.palette, active_sub);
+        int caret_x = 18;
+        int caret_y = 437 - 1;
+        int caret_w = 1;
+        int caret_h = 11;
+        draw_filled_rect(fb, caret_x, caret_y,
+                         caret_x + caret_w, caret_y + caret_h, caret);
+    }
+
+    return active_sub;
+}
+
 // ---------- entry ----------
 
 int main(int argc, char** argv) {
@@ -951,6 +1194,7 @@ int main(int argc, char** argv) {
     res.load_bank_idx(133, asset_root); // version-text font (main menu only)
     res.load_bank_idx(134, asset_root); // action-name + OR/AND op-button font
     res.load_bank_idx(135, asset_root); // button-label / title font
+    res.load_bank_idx(181, asset_root); // lobby agency icons
     res.load_bank_idx(208, asset_root); // animated logo (main menu only)
 
     // Self-check (BIN_SPR / sprite header) per docs/design/sprite-banks.md.
@@ -985,6 +1229,27 @@ int main(int argc, char** argv) {
     } else {
         std::printf("bank 7 idx 2: NOT LOADED\n");
     }
+    if (const Sprite* sp = res.get(7, 1)) {
+        std::printf("bank 7 idx 1 (lobby bg plate) header: w=%u h=%u offset=(%d, %d) "
+                    "(expected w=640 h=480 offset=(0, 0))\n",
+                    sp->w, sp->h, sp->offset_x, sp->offset_y);
+    } else {
+        std::printf("bank 7 idx 1: NOT LOADED\n");
+    }
+    if (const Sprite* sp = res.get(7, 24)) {
+        std::printf("bank 7 idx 24 (B156x21 frame) header: w=%u h=%u offset=(%d, %d) "
+                    "(expected w=156 h=21 offset=(0, 0))\n",
+                    sp->w, sp->h, sp->offset_x, sp->offset_y);
+    } else {
+        std::printf("bank 7 idx 24: NOT LOADED\n");
+    }
+    if (const Sprite* sp = res.get(181, 0)) {
+        std::printf("bank 181 idx 0 (Noxis icon) header: w=%u h=%u offset=(%d, %d) "
+                    "(expected w=32 h=27 offset=(0, -2))\n",
+                    sp->w, sp->h, sp->offset_x, sp->offset_y);
+    } else {
+        std::printf("bank 181 idx 0: NOT LOADED\n");
+    }
 
     // Screen registry — each entry is (filename, render-fn).
     struct ScreenEntry {
@@ -998,6 +1263,7 @@ int main(int argc, char** argv) {
         { "options_display.ppm",  &render_options_display  },
         { "options_audio.ppm",    &render_options_audio    },
         { "lobby_connect.ppm",    &render_lobby_connect    },
+        { "lobby.ppm",            &render_lobby            },
     };
 
     // Always render every registered screen (cheap; visual content

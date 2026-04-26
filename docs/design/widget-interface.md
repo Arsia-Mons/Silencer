@@ -20,7 +20,7 @@ dispatches mouse/keyboard input. The main menu uses exactly one
 | `buttonescape` | Optional button id triggered by Escape. |
 | `scrollbar` | Optional id of a child `ScrollBar` (see [widget-scrollbar.md](widget-scrollbar.md)). When set, mouse-wheel events on this Interface call `ScrollUp` / `ScrollDown` on the bar. The bar's `scrollposition` is the logical scroll offset; the host screen reads it to decide which slice of items to render. |
 | `objectupscroll`, `objectdownscroll` | Optional ids that act as virtual top/bottom anchors for keyboard scroll wrapping. Tab/arrow navigation past the last tab object (or before the first) routes through `ScrollUp` / `ScrollDown` on the scrollbar instead of wrapping focus. The options-controls screen uses these to make the keybinding list scrollable via Up/Down arrows from the first c1 button (`objectupscroll`) and the last c2 button (`objectdownscroll`). |
-| `disabled`, `modal`, `width/height/x/y` | Used by other screens (modals, lobby panels); the menu screens leave them at defaults. |
+| `disabled`, `modal`, `width/height/x/y` | Used by other screens (modals, lobby panels); the menu screens leave them at defaults. The lobby's sub-interfaces use `width/height/x/y` to define their hit-rect when nested under another Interface (see "Sub-interfaces" below). |
 
 `AddObject(id)` appends to `objects`. `AddTabObject(id)` appends to
 `tabobjects`; if `activeobject` is unset, the first call also seeds
@@ -107,6 +107,38 @@ unchanged.
 and draws each child via the standard Object→sprite path
 (see [sprite-banks.md](sprite-banks.md)) and
 the Overlay/Button/etc. specifics covered in their own docs.
+
+## Sub-interfaces (Interface as a child of another Interface)
+
+An `Interface` can hold another `Interface` as one of its
+`objects` entries. The lobby uses this — its top-level Interface
+contains three sub-Interfaces (character, chat, game-select), each
+managing its own focus, scroll, and tab order. Sub-interfaces:
+
+- **Have their own `x, y, width, height`** that define their
+  spatial extent within the parent. The parent's mouse dispatch
+  routes hits inside `(sub.x, sub.y, sub.x+sub.w, sub.y+sub.h)`
+  to the sub-interface's own `ProcessMouseMove` /
+  `ProcessMousePress`. (See `clients/silencer/src/interface.cpp`
+  `ActiveChanged`.)
+- **Have their own `tabobjects`, `scrollbar`, `buttonenter`,
+  `buttonescape`** — independent of the parent's.
+- **Render via the same iteration pass** — when the engine's
+  per-frame draw loop encounters an Interface object inside
+  another's `objects` list, it recursively iterates the inner
+  one's `objects` and draws each. So child object positions are
+  in absolute screen coords, not local to the parent.
+
+The lobby's `activeobject = chatinterface.id` (i.e. the chat sub-
+interface starts as the focused child); its own `activeobject =
+chatinput.id` so the chat input has the caret. Tab inside the
+chat sub-interface cycles its tab objects; arrow keys can hand
+focus back up to the parent if needed (not exercised on the lobby
+in normal flow).
+
+Hydrations targeting only static-frame visual output don't need
+to implement the dispatch tree — they just iterate every
+Interface's `objects` list recursively, drawing each.
 
 ## How the main menu wires it
 
