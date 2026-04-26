@@ -8,3 +8,6 @@ B1 PASS committed. Dump mode writes a valid 640×480 P6 PPM (921,615 bytes) with
 
 Remaining open items: C0, P0, S0, T0, A0, F0.
 
+--- Iteration 3 2026-04-26 13:49:36 ---
+C0 flipped. Remaining: P0, S0, T0, A0, F0. Next iteration picks up at P0 (palette / sub-palette 1).
+

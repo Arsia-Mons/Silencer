@@ -7,6 +7,8 @@
 - PPM header sanity: `P6\n640 480\n255\n` is exactly 15 bytes, so a clean 640x480 dump is `15 + 640*480*3 = 921615` bytes.
 - `sips -s format png IN.ppm --out OUT.png` is the canonical PPM→PNG step (writes "/private/tmp/..." path back; that's just macOS firmlink, the file is at /tmp/...).
 - Run dump as `SILENCER_DUMP_DIR=/tmp/sdl3_dump ./shared/design/sdl3/build/silencer_design "$(pwd)/shared/assets"` from the worktree root.
+- PALETTE.BIN actual layout is `color_offset(s) = 8 + s * 768` (NOT spec's `8 + s*772`); 8-byte file prefix, 11 contiguous 768-byte color blocks, last sub-palette over-reads file by 8 bytes (zero-fill).
+- DrawText with brightness == 128 doesn't read the palette at all — it skips the brightness-LUT path and blits sprite indices verbatim. Useful diagnostic: render the same FB through multiple sub-palettes by calling WritePPM repeatedly with different `active_sub` arguments.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -59,4 +61,19 @@
   - C0 is cheaply "free" once B1's bank-load fix lands, because the harness already iterates the screen's object list and dispatches widget blits — the composition layer is structurally sound, only color/palette is wrong.
   - Rough-position confirmation is sufficient for C0; don't pixel-measure anchors here, that's A0's gate.
   - When palette is wrong but everything else looks right, suspect `SetPalette(N)` not being applied at screen entry. Sub-palette 1 is the main menu's; the candidate is currently resolving through whatever palette is active at boot.
+---
+
+## 2026-04-26T14:05:00Z — P0
+- Fixed `Palette::LoadFromFile` offset arithmetic in `shared/design/sdl3/src/palette.cpp`. Spec (docs/design/palette.md) says the layout is `[4-byte file prefix] + 11 × [4-byte sub-header + 768-byte colors]` → colors at `8 + s*772`. That formula yielded purple/blue tints under sub-palette 1 (button chrome → purple, planet → blue). Empirically the actual layout is `[8-byte file prefix] + 11 × 768-byte color blocks` → colors at `8 + s*768`. Under that formula sub-palette 1 produces the reference's green logo / green chrome / green text / red planet / black starfield exactly.
+- Methodology: temporarily added a `SILENCER_DUMP_ALL_SUBS` diagnostic that resolved the same framebuffer through every sub-palette under each candidate offset formula. Visual A/B over 11 sub-palettes per formula identified `8 + s*768` sub-palette 1 as the only one matching the reference. Diagnostic was removed before commit.
+- Files touched: `shared/design/sdl3/src/palette.cpp` (offset formula + spec-gap comment), `.ralph/main-menu/prd.json` (P0 → passes:true), `.ralph/main-menu/progress.txt` (this entry + two new patterns at the top).
+- Visual diff summary: **palette** layer fixed. Candidate now visually equivalent to `/tmp/real_dump.png` for P0's gate — black starfield bg, red planet, green logo + green button pills + green text + green version overlay all present and correctly tinted. Remaining sub-pixel differences are non-palette-layer (likely sprite-codec idx-0 transparency edge handling, or animation-phase nits) and belong to S0 / T0 / A0 / F0.
+- Spec gaps encountered:
+  - **`docs/design/palette.md` offset formula is wrong.** Doc claims `offset(s) = 4 + s * (768 + 4)` (which yields colors at `8 + s*772`). Real layout: 8-byte prefix + 11 × 768-byte contiguous color blocks (no per-sub headers), `color_offset(s) = 8 + s * 768`. The "doesn't fit" arithmetic in the spec is also off — under the correct formula total = 8 + 11*768 = 8456, file is 8448, last sub-palette over-reads file by 8 bytes (matches the spec's own note about engine over-reading, just with a different short count). Spec needs an edit.
+  - The spec's claim that "the 4-byte prefix and per-sub headers are treated as filler (all zeros)" is also half-wrong under its own layout: the byte at file offset 779 (where a per-sub-1 header would be in the spec's layout) is `0x02`, not zero. Under the correct layout, that byte is just within the 8-byte prefix area and never sampled.
+- **Learnings:**
+  - When a diff is a palette mismatch *but the dump's `active_sub` argument is already correct*, suspect the palette **loader** (offset / stride / channel order), not the dispatch. The spec was emphatic that MAINMENU = sub-palette 1, but no value of `active_sub` could rescue a wrong offset formula because EVERY sub-palette was reading shifted bytes uniformly.
+  - Best diagnostic for "palette layout is wrong" is dumping the *same* indexed framebuffer through ALL 11 sub-palettes (and under multiple offset hypotheses) and visually picking the right combination. Cheap to build (one extra loop in main.cpp), turns a multi-day debugging spiral into a 10-minute eyeball.
+  - File-size-divides-cleanly is a strong but NOT decisive signal: 8448 = 11×768 exactly suggests stride 768, but that doesn't pin down whether there's a 0/4/8/12-byte prefix — three of those four prefix sizes give plausible-looking palettes for sub-palette 0 (a smooth grayscale ramp). Empirical color verification at a known sub-palette index against the reference is the disambiguator.
+  - The actual file prefix is **8 bytes**, not 4 — the spec's "4-byte file prefix + 4-byte sub-0 header" is more accurately read as "8-byte file prefix" since there are no further per-sub headers. Same bytes in the file, different interpretation.
 ---

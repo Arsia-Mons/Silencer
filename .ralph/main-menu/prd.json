@@ -32,7 +32,7 @@
       "id": "P0",
       "name": "Palette correct (active sub-palette = 1)",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "spec": "Dump's dominant colors qualitatively match the reference: dark navy/teal background, teal-ish button pills, light text. Confirms the dump resolves through sub-palette 1 (main menu) per docs/design/palette.md, not 0 or another.",
       "category": "palette"
     },

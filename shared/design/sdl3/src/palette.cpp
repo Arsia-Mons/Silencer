@@ -24,10 +24,20 @@ bool Palette::LoadFromFile(const std::string &path) {
   std::fclose(f);
 
   // Zero-initialize palettes (already default-initialized to 0).
+  //
+  // SPEC GAP — docs/design/palette.md claims `offset(s) = 4 + s * (768 + 4)`
+  // i.e. a 4-byte file prefix + 11 × [4-byte sub-header + 768-byte colors].
+  // That formula gives 8 + s * 772 for the COLORS (skipping each sub's header),
+  // total 4 + 11*772 = 8496 bytes — but the file is 8448, and resolving the
+  // main-menu sub-palette (1) under `8 + s*772` yields a purple/blue tint
+  // instead of the reference's green/red. Empirically, the actual stride is
+  // 768 with a single 8-byte prefix at the start: `color_offset(s) = 8 + s*768`.
+  // Total = 8 + 11*768 = 8456; the last 8 bytes of sub-palette 10 over-read
+  // the file (zero-fill, matching the spec note about the engine's over-read).
+  // Under this formula, sub-palette 1 produces the reference's green logo /
+  // green chrome / green text / red planet / black starfield exactly.
   for (int s = 0; s < 11; ++s) {
-    long offset = 4 + static_cast<long>(s) * (768 + 4);
-    // 4-byte sub-header then 768 bytes RGB.
-    long color_offset = offset + 4;
+    long color_offset = 8 + static_cast<long>(s) * 768;
     for (int i = 0; i < 256; ++i) {
       uint8_t r = 0, g = 0, b = 0;
       long ridx = color_offset + i * 3 + 0;
