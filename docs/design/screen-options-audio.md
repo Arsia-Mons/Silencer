@@ -21,7 +21,7 @@ In z-order:
 | 1 | Title text | overlay | bank 135 (font), `textwidth=12` | — | screen | `320 - len("Audio Options") * 12 / 2` | 14 | text=`Audio Options` |
 | 2 | Music button | B220x33 | — | — | center+anchor | 100 | 50 | text=`Music`, uid=0 |
 | 3 | "Off" half-pill | overlay | 6 | 12 | center+anchor | 420 | 137 | uid=20 |
-| 4 | "On" half-pill | overlay | 6 | 14 | center+anchor | 450 | 137 | uid=40, lit |
+| 4 | "On" half-pill | overlay | 6 | 15 | center+anchor | 450 | 137 | uid=40, lit |
 | 5 | Save button   | B196x33 | — | — | center+anchor | -200 | 117 | text=`Save`, uid=200 |
 | 6 | Cancel button | B196x33 | — | — | center+anchor | 20 | 117 | text=`Cancel`, uid=201 |
 
@@ -69,11 +69,15 @@ convention.
   needs a row in [`widget-button.md`](widget-button.md): same overall
   pill geometry, 220 px wide, 33 px tall, sprite anchor identical
   to B196x33 modulo the width delta.
-- The "On" indicator's bank-6 idx-14 sprite is brighter than idx-12
-  by virtue of the sprite contents themselves (different RLE payload),
-  not via a brightness LUT. If a candidate tries to render both as
-  the same sprite and apply a brightness shader, the dump will not
-  match.
+- The "On" indicator: the engine source sets `res_index = 14`, but
+  the canonical reference dump shows the lit-right pill at
+  `res_index = 15`. The OPTIONSAUDIO Ralph established empirically
+  (commit `bc449d6`) that idx 15 is what the candidate must use for a
+  pixel-equivalent dump. Whether the engine has an off-by-one in its
+  source line, a per-bank index-offset elsewhere in its sprite path,
+  or the discrepancy comes from somewhere else is **unresolved** — but
+  the canonical dump's authority is final, so the spec table reflects
+  idx 15.
 
 ## Cross-references
 

@@ -20,10 +20,10 @@ In z-order:
 | 1 | Title text | overlay (font 135, w=12) | — | — | `320 - len("Display Options")*12/2` | 14 | text=`Display Options` |
 | 2 | Fullscreen button | B220x33 | — | — | 100 | 50 | text=`Fullscreen`, uid=0 |
 | 3 | Fullscreen Off pill | overlay | 6 | 12 | 420 | 137 | uid=20 |
-| 4 | Fullscreen On pill  | overlay | 6 | 14 | 450 | 137 | uid=40 |
+| 4 | Fullscreen On pill  | overlay | 6 | 15 | 450 | 137 | uid=40 |
 | 5 | Smooth Scaling button | B220x33 | — | — | 100 | 103 | text=`Smooth Scaling`, uid=1 |
 | 6 | Smooth Scaling Off pill | overlay | 6 | 12 | 420 | 190 | uid=21 |
-| 7 | Smooth Scaling On pill  | overlay | 6 | 14 | 450 | 190 | uid=41 |
+| 7 | Smooth Scaling On pill  | overlay | 6 | 15 | 450 | 190 | uid=41 |
 | 8 | Save button   | B196x33 | — | — | -200 | 117 | text=`Save`, uid=200 |
 | 9 | Cancel button | B196x33 | — | — | 20 | 117 | text=`Cancel`, uid=201 |
 
