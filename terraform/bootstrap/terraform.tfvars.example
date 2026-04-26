@@ -1,2 +1,0 @@
-# Copy to terraform.tfvars, fill in a globally unique bucket name, apply once.
-state_bucket_name = "zsilencer-tfstate-CHANGEME"

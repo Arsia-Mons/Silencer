@@ -1,9 +1,9 @@
-# Running your own zSILENCER lobby
+# Running your own Silencer lobby
 
-This guide walks through setting up a zSILENCER lobby server — the
+This guide walks through setting up a Silencer lobby server — the
 matchmaking service that lets players find each other and start
 games. The original `lobby.zsilencer.com` is gone, so if you want to
-play zSILENCER with other people today, you (or someone) has to run
+play Silencer with other people today, you (or someone) has to run
 one of these.
 
 When you're done you'll have:
@@ -14,11 +14,11 @@ When you're done you'll have:
 
 ## Before you start: clients are tied to one lobby
 
-This is the one non-obvious thing about zSILENCER's setup, and it
+This is the one non-obvious thing about Silencer's setup, and it
 shapes everything else. Worth reading before you commit 30 minutes to
 the Terraform part.
 
-A zSILENCER client has its lobby's address **hardcoded into the
+A Silencer client has its lobby's address **hardcoded into the
 binary at build time**. There's no setting or config file to point an
 existing client at a different server. That means:
 
@@ -66,7 +66,7 @@ There's a small `bootstrap/` module that creates those — run it once
 per AWS account, then forget about it.
 
 ```bash
-cd terraform/bootstrap
+cd infra/terraform/bootstrap
 cp terraform.tfvars.example terraform.tfvars
 # edit: pick a globally unique S3 bucket name
 terraform init && terraform apply
@@ -82,8 +82,8 @@ terraform init -backend-config=backend.hcl
 One for you, one for GitHub Actions. Ed25519 is fine.
 
 ```bash
-ssh-keygen -t ed25519 -f ~/.ssh/zsilencer-admin   # yours
-ssh-keygen -t ed25519 -f ~/.ssh/zsilencer-deploy  # GH Actions
+ssh-keygen -t ed25519 -f ~/.ssh/silencer-admin   # yours
+ssh-keygen -t ed25519 -f ~/.ssh/silencer-deploy  # GH Actions
 ```
 
 ### 3. Get a Tailscale auth key
@@ -121,8 +121,8 @@ cp terraform.tfvars.example terraform.tfvars
 
 Fill in `terraform.tfvars`. The ones you must set:
 
-- `ssh_public_key` — contents of `~/.ssh/zsilencer-admin.pub`.
-- `deploy_ssh_public_key` — contents of `~/.ssh/zsilencer-deploy.pub`.
+- `ssh_public_key` — contents of `~/.ssh/silencer-admin.pub`.
+- `deploy_ssh_public_key` — contents of `~/.ssh/silencer-deploy.pub`.
 - `ssh_allowed_cidr` — your laptop's IP, as a `/32`. This is just for
   emergency access; normal admin goes through Tailscale.
 - `tailscale_auth_key` — from step 3.
@@ -158,7 +158,7 @@ Secrets:
 
 | Name             | Value                                                                       |
 |------------------|-----------------------------------------------------------------------------|
-| `DEPLOY_SSH_KEY` | Private half of `~/.ssh/zsilencer-deploy` (entire file, including headers). |
+| `DEPLOY_SSH_KEY` | Private half of `~/.ssh/silencer-deploy` (entire file, including headers). |
 | `TS_AUTHKEY`     | A **second** Tailscale auth key, generated the same way as step 3 except set reusable=yes and ephemeral=yes. Actions runners are short-lived, so they need their own throwaway keys. |
 
 ### 6. Deploy
@@ -281,9 +281,9 @@ ssh ubuntu@<static-ip>
 **Checking the service.**
 
 ```bash
-sudo systemctl status zsilencer-lobby
-sudo journalctl -u zsilencer-lobby -f           # tail the logs
-sudo journalctl -u zsilencer-lobby --since "1 hour ago"
+sudo systemctl status silencer-lobby
+sudo journalctl -u silencer-lobby -f           # tail the logs
+sudo journalctl -u silencer-lobby --since "1 hour ago"
 ```
 
 **Restarting.** Note that this kills any games in progress — their
@@ -291,21 +291,21 @@ dedicated-server subprocesses are children of the lobby, so they die
 with it.
 
 ```bash
-sudo systemctl restart zsilencer-lobby
+sudo systemctl restart silencer-lobby
 ```
 
 **Rolling back a bad deploy.** Every release is kept in
-`/opt/zsilencer/releases/<sha>/`, and `current` is a symlink to the
+`/opt/silencer/releases/<sha>/`, and `current` is a symlink to the
 one that's running. The last three releases stay on disk. To roll
 back, point the symlink at an older one and restart:
 
 ```bash
-ls -lt /opt/zsilencer/releases
-sudo ln -sfn /opt/zsilencer/releases/<older-sha> /opt/zsilencer/current
-sudo systemctl restart zsilencer-lobby
+ls -lt /opt/silencer/releases
+sudo ln -sfn /opt/silencer/releases/<older-sha> /opt/silencer/current
+sudo systemctl restart silencer-lobby
 ```
 
-**Iterating fast while debugging.** `scripts/fastdeploy.sh` rsyncs
+**Iterating fast while debugging.** `infra/scripts/fastdeploy.sh` rsyncs
 your working tree onto the server, compiles there, swaps the binary,
 restarts. Useful when chasing something that only reproduces on the
 real server. Don't use it for real releases — it bypasses CI.
@@ -315,7 +315,7 @@ real server. Don't use it for real releases — it bypasses CI.
 ### Primary store — lobby.json
 
 The authoritative player store is a single file:
-`/var/lib/zsilencer/lobby.json`. It holds user accounts (username +
+`/var/lib/silencer/lobby.json`. It holds user accounts (username +
 SHA-1-hashed password) and per-agency stats. No chat logs, no game
 history, nothing else. All reads and writes go through the lobby's
 in-memory store, which is flushed here atomically on every change.
@@ -327,10 +327,10 @@ terraform apply`) without losing account data.
 Restoring from a copy of `lobby.json` is still a simple file replace:
 
 ```bash
-sudo systemctl stop zsilencer-lobby
-sudo cp lobby-<date>.json /var/lib/zsilencer/lobby.json
-sudo chown zsilencer:zsilencer /var/lib/zsilencer/lobby.json
-sudo systemctl start zsilencer-lobby
+sudo systemctl stop silencer-lobby
+sudo cp lobby-<date>.json /var/lib/silencer/lobby.json
+sudo chown silencer:silencer /var/lib/silencer/lobby.json
+sudo systemctl start silencer-lobby
 ```
 
 ### MongoDB mirror
@@ -397,17 +397,17 @@ tried to spawn a dedicated-server subprocess for the match, and it
 didn't phone home within 30 seconds. Check the logs:
 
 ```bash
-sudo journalctl -u zsilencer-lobby | grep -i spawn
+sudo journalctl -u silencer-lobby | grep -i spawn
 ```
 
-Usual suspects: the `zsilencer` binary is missing or broken after a
+Usual suspects: the `silencer` binary is missing or broken after a
 bad deploy (roll back), or UDP ports 30000–61000 aren't open in the
-security group (check `terraform/main.tf`).
+security group (check `infra/terraform/main.tf`).
 
 **The VM is up, but clients can't reach the lobby.** First:
 
 ```bash
-sudo systemctl status zsilencer-lobby
+sudo systemctl status silencer-lobby
 ```
 
 If it's crash-looping right after `terraform apply`, remember that
@@ -415,12 +415,12 @@ Terraform only creates infrastructure — it doesn't deploy binaries.
 You still need to push a tag so the Deploy workflow runs. If the
 binary is there but the service fails to bind to port 517, the unit
 file is missing `CAP_NET_BIND_SERVICE`; check
-`terraform/cloud-init.yaml.tftpl`.
+`infra/terraform/cloud-init.yaml.tftpl`.
 
 **Dedicated-server subprocess crashes the instant it spawns.**
 Almost always because it can't write its palette-cache file. The
 game writes to `$HOME` at startup, and the systemd unit sets
-`HOME=/var/lib/zsilencer` so the write lands on the data volume
+`HOME=/var/lib/silencer` so the write lands on the data volume
 (which is writable) rather than inside `/home` (which is locked down
 by `ProtectHome=true`). If someone edited `cloud-init.yaml.tftpl`
 and dropped the `HOME` line, this is what it looks like. For actual
@@ -440,8 +440,8 @@ this can be:
 **User accounts vanished after a VM rebuild.** The data volume
 didn't re-attach. The Terraform config keeps the volume as a
 separate resource specifically so this doesn't happen, and the
-systemd unit has `Requires=var-lib-zsilencer.mount` so the service
+systemd unit has `Requires=var-lib-silencer.mount` so the service
 won't start until the volume is mounted. If state really looks
 empty, check that `aws_volume_attachment` still exists in
-`terraform/main.tf` — it's the thing keeping the disk bound across
+`infra/terraform/main.tf` — it's the thing keeping the disk bound across
 instance replacements.

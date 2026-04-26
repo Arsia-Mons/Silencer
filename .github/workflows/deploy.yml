@@ -150,8 +150,8 @@ jobs:
         run: |
           set -euo pipefail
           SHORT=${SHA:0:8}
-          STAGING=/tmp/zsilencer-$SHORT
-          RELEASE=/opt/zsilencer/releases/$SHORT
+          STAGING=/tmp/silencer-$SHORT
+          RELEASE=/opt/silencer/releases/$SHORT
           SSH_OPTS="-i ~/.ssh/deploy -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=~/.ssh/known_hosts"
           SSH="ssh $SSH_OPTS ubuntu@$HOST"
           SCP="scp $SSH_OPTS"
@@ -170,18 +170,18 @@ jobs:
           # without a matching update.json.
           $SSH "
             set -e
-            sudo mkdir -p /opt/zsilencer/releases
+            sudo mkdir -p /opt/silencer/releases
             sudo rm -rf $RELEASE
             sudo mv $STAGING $RELEASE
             sudo chmod +x $RELEASE/silencer-lobby $RELEASE/silencer
             if [ -f $RELEASE/update.json ]; then
-              sudo mv $RELEASE/update.json /opt/zsilencer/update.json
+              sudo mv $RELEASE/update.json /opt/silencer/update.json
             fi
-            sudo ln -sfn $RELEASE /opt/zsilencer/current
-            sudo ln -sfn /opt/zsilencer/current/assets /usr/local/share/silencer
-            sudo systemctl restart zsilencer-lobby
+            sudo ln -sfn $RELEASE /opt/silencer/current
+            sudo ln -sfn /opt/silencer/current/assets /usr/local/share/silencer
+            sudo systemctl restart silencer-lobby
             sleep 2
-            sudo systemctl is-active zsilencer-lobby
+            sudo systemctl is-active silencer-lobby
           "
 
       - name: Prune old releases (keep last 3)
@@ -189,6 +189,6 @@ jobs:
           HOST: ${{ vars.DEPLOY_HOST }}
         run: |
           ssh -i ~/.ssh/deploy ubuntu@$HOST "
-            cd /opt/zsilencer/releases
+            cd /opt/silencer/releases
             ls -1t | tail -n +4 | xargs -r sudo rm -rf
           "
