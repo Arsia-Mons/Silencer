@@ -15,7 +15,7 @@ func main() {
 	addr := flag.String("addr", ":517", "listen address for TCP and UDP")
 	dbPath := flag.String("db", "lobby.json", "path to JSON user database")
 	motdPath := flag.String("motd", "", "path to MOTD file; empty = built-in default")
-	version := flag.String("version", "00025", "required client version; empty = accept any")
+	version := flag.String("version", "00025", "required client version; empty = use manifest version (or accept any if no manifest is loaded)")
 	updateManifestPath := flag.String("update-manifest", "update.json", "path to update manifest JSON; missing = no auto-update hints")
 	gameBinary := flag.String("game-binary", "../build/silencer", "path to the silencer binary (spawned per created game)")
 	publicAddr := flag.String("public-addr", "127.0.0.1", "host or IP clients (and dedicated servers) should use to reach this lobby")
@@ -38,6 +38,19 @@ func main() {
 				m.Version, m.MacOSURL, m.WindowsURL)
 			manifest = m
 		}
+	}
+
+	// Resolve the version we'll compare incoming clients against. If the
+	// operator left -version empty (the production default — see
+	// infra/terraform comment on lobby_version_string), fall back to the
+	// manifest's version so every successful deploy automatically advertises
+	// the new version without an instance replace. Without this, an empty
+	// -version makes handleVersion always reply ok=true and never attach the
+	// manifest URL — clients see "version is current" forever.
+	expectedVersion := *version
+	if expectedVersion == "" && manifest != nil {
+		expectedVersion = manifest.Version
+		log.Printf("[lobby-update] -version flag empty; using manifest version %q as expected", expectedVersion)
 	}
 
 	motd := "Welcome to Silencer lobby.\n"
@@ -117,14 +130,14 @@ func main() {
 		os.Exit(0)
 	}()
 
-	log.Printf("Silencer lobby on %s (public=%s, binary=%s, version=%q, manifest=%q)", *addr, *publicAddr, *gameBinary, *version, *updateManifestPath)
+	log.Printf("Silencer lobby on %s (public=%s, binary=%s, version=%q, manifest=%q)", *addr, *publicAddr, *gameBinary, expectedVersion, *updateManifestPath)
 	for {
 		conn, err := tcpLn.Accept()
 		if err != nil {
 			log.Printf("accept: %v", err)
 			continue
 		}
-		go serveClient(conn, hub, *version, manifest)
+		go serveClient(conn, hub, expectedVersion, manifest)
 	}
 }
 
