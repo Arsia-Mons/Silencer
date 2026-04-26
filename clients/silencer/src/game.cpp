@@ -234,35 +234,94 @@ void Game::Present(void){
 		renderdevice->Present();
 	}
 	// QA dump: when SILENCER_DUMP_PATH env is set, save the indexed framebuffer
-	// as a PPM once the bank-208 logo overlay has reached its steady-state
-	// frame (idx 60), then exit. Lets design QA capture the canonical menu
-	// without macOS Screen-Recording / Spaces friction. Tied to the logo's
-	// own state_i so it doesn't drift with render rate.
+	// as a PPM once the target screen has reached a deterministic steady state,
+	// then exit. SILENCER_DUMP_STATE selects the target screen
+	// (MAINMENU [default] / OPTIONS / OPTIONSCONTROLS / OPTIONSDISPLAY /
+	// OPTIONSAUDIO). For non-MAINMENU targets, the harness auto-transitions
+	// from MAINMENU once the logo settles, then waits 60 ticks for the target
+	// screen to stabilise before dumping.
 	const char * dumppath = getenv("SILENCER_DUMP_PATH");
-	if(dumppath && state == MAINMENU && !stateisnew){
-		bool logo_is_steady = false;
-		for(auto * obj : world.objectlist){
-			if(!obj) continue;
-			if(obj->type != ObjectTypes::OVERLAY) continue;
-			Overlay * ov = static_cast<Overlay *>(obj);
-			if(ov->res_bank == 208 && ov->res_index == 60){
-				logo_is_steady = true;
-				break;
+	if(dumppath){
+		const char * dumpstate = getenv("SILENCER_DUMP_STATE");
+		int target_state = MAINMENU;
+		if(dumpstate){
+			if(strcmp(dumpstate, "OPTIONS") == 0) target_state = OPTIONS;
+			else if(strcmp(dumpstate, "OPTIONSCONTROLS") == 0) target_state = OPTIONSCONTROLS;
+			else if(strcmp(dumpstate, "OPTIONSDISPLAY") == 0) target_state = OPTIONSDISPLAY;
+			else if(strcmp(dumpstate, "OPTIONSAUDIO") == 0) target_state = OPTIONSAUDIO;
+		}
+
+		// Auto-jump from MAINMENU to the target state once the logo settles.
+		// Done once per process — guarded so the engine's normal MAINMENU
+		// transitions later (e.g., user clicks Back) don't re-trigger.
+		if(target_state != MAINMENU && state == MAINMENU && !stateisnew){
+			static bool jumped = false;
+			if(!jumped){
+				bool logo_is_steady = false;
+				for(auto * obj : world.objectlist){
+					if(!obj) continue;
+					if(obj->type != ObjectTypes::OVERLAY) continue;
+					Overlay * ov = static_cast<Overlay *>(obj);
+					if(ov->res_bank == 208 && ov->res_index == 60){
+						logo_is_steady = true;
+						break;
+					}
+				}
+				if(logo_is_steady){
+					jumped = true;
+					GoToState(target_state);
+				}
 			}
 		}
-		if(logo_is_steady){
-			FILE * f = fopen(dumppath, "wb");
-			if(f){
-				fprintf(f, "P6\n%d %d\n255\n", screenbuffer.w, screenbuffer.h);
-				for(int p = 0; p < screenbuffer.w * screenbuffer.h; ++p){
-					Uint8 ix = screenbuffer.pixels[p];
-					unsigned char rgb[3] = { palettecolors[ix].r, palettecolors[ix].g, palettecolors[ix].b };
-					fwrite(rgb, 1, 3, f);
+
+		// MAINMENU dump: pin to bank-208 logo at idx 60 (the hold frame).
+		if(target_state == MAINMENU && state == MAINMENU && !stateisnew){
+			bool logo_is_steady = false;
+			for(auto * obj : world.objectlist){
+				if(!obj) continue;
+				if(obj->type != ObjectTypes::OVERLAY) continue;
+				Overlay * ov = static_cast<Overlay *>(obj);
+				if(ov->res_bank == 208 && ov->res_index == 60){
+					logo_is_steady = true;
+					break;
 				}
-				fclose(f);
-				fprintf(stderr, "[silencer] dumped main menu PPM to %s\n", dumppath);
 			}
-			exit(0);
+			if(logo_is_steady){
+				FILE * f = fopen(dumppath, "wb");
+				if(f){
+					fprintf(f, "P6\n%d %d\n255\n", screenbuffer.w, screenbuffer.h);
+					for(int p = 0; p < screenbuffer.w * screenbuffer.h; ++p){
+						Uint8 ix = screenbuffer.pixels[p];
+						unsigned char rgb[3] = { palettecolors[ix].r, palettecolors[ix].g, palettecolors[ix].b };
+						fwrite(rgb, 1, 3, f);
+					}
+					fclose(f);
+					fprintf(stderr, "[silencer] dumped main menu PPM to %s\n", dumppath);
+				}
+				exit(0);
+			}
+		}
+
+		// Options-family dump: static menus, no animation pin available.
+		// Wait 60 settled ticks (Present calls) in the target state, then dump.
+		// 60 is conservative — covers any button selection-pulse phase.
+		if(target_state != MAINMENU && state == target_state && !stateisnew){
+			static int settled_ticks = 0;
+			settled_ticks++;
+			if(settled_ticks >= 60){
+				FILE * f = fopen(dumppath, "wb");
+				if(f){
+					fprintf(f, "P6\n%d %d\n255\n", screenbuffer.w, screenbuffer.h);
+					for(int p = 0; p < screenbuffer.w * screenbuffer.h; ++p){
+						Uint8 ix = screenbuffer.pixels[p];
+						unsigned char rgb[3] = { palettecolors[ix].r, palettecolors[ix].g, palettecolors[ix].b };
+						fwrite(rgb, 1, 3, f);
+					}
+					fclose(f);
+					fprintf(stderr, "[silencer] dumped %s PPM to %s\n", dumpstate, dumppath);
+				}
+				exit(0);
+			}
 		}
 	}
 }

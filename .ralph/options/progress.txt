@@ -1,0 +1,17 @@
+## Codebase Patterns
+<!-- One-line patterns this Ralph discovers. The main-menu Ralph's patterns
+are also relevant — read .ralph/main-menu/progress.txt's Patterns header. -->
+
+## 2026-04-26T00:00:00Z — INIT
+- Ralph scaffolded by setup conversation.
+- Baseline: shared/design/sdl3/ already renders main-menu equivalent to /tmp/real_dump.ppm
+  (per .ralph/main-menu/progress.txt and the F0 commit at hv/design-ralph HEAD).
+  Lower layers (palette, sprite codec, font, tick, widget-{overlay,button,interface})
+  are validated. Only the OPTIONS screen composition + candidate harness screen-switch
+  are new.
+- Reference dump: /tmp/real_options_dump.ppm (do not regenerate; captured via the
+  client's SILENCER_DUMP_PATH+SILENCER_DUMP_STATE harness extension).
+- Spec input: docs/design/screen-options.md (authoritative for this Ralph).
+- Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph (same as main-menu Ralph).
+- **Learnings:** none yet.
+---
