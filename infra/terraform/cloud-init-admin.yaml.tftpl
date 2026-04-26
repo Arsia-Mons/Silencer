@@ -215,7 +215,12 @@ runcmd:
   - |
     echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/mongodb-server-8.0.gpg] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" \
       > /etc/apt/sources.list.d/mongodb-org-8.0.list
-  - curl -1sLf 'https://repo.lavinmq.com/setup.deb.sh' | bash
+  # LavinMQ is published on packagecloud.io (repo.lavinmq.com is dead).
+  - curl -fsSL https://packagecloud.io/cloudamqp/lavinmq/gpgkey | gpg --dearmor -o /etc/apt/keyrings/lavinmq.gpg
+  - |
+    . /etc/os-release
+    echo "deb [signed-by=/etc/apt/keyrings/lavinmq.gpg] https://packagecloud.io/cloudamqp/lavinmq/$ID $VERSION_CODENAME main" \
+      > /etc/apt/sources.list.d/lavinmq.list
   - apt-get update
   - DEBIAN_FRONTEND=noninteractive apt-get install -y mongodb-org lavinmq
 
@@ -240,16 +245,20 @@ runcmd:
     mv /etc/mongod.conf.new /etc/mongod.conf
     cat /etc/silencer/mongod-overrides.conf >> /etc/mongod.conf
 
-  # 6a. Install awscli with retries. `packages:` runs early enough that
-  #     unattended-upgrades on a fresh Noble cloud image can be holding
-  #     the apt lock, silently failing the install (observed: only the
-  #     first package or two land, the rest get reported as a batch
-  #     failure). Doing it here gives apt time to settle.
+  # 6a. Install AWS CLI v2 from the official installer. The `awscli`
+  #     apt package is gone from Ubuntu Noble (`Package 'awscli' has no
+  #     installation candidate`), so the apt path is dead. The official
+  #     installer is small, current, and arch-correct.
   - |
+    set -e
     for i in 1 2 3 4 5; do
-      DEBIAN_FRONTEND=noninteractive apt-get install -y awscli && break
+      DEBIAN_FRONTEND=noninteractive apt-get install -y unzip && break
       sleep 10
     done
+    curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+    unzip -q /tmp/awscliv2.zip -d /tmp
+    /tmp/aws/install
+    rm -rf /tmp/aws /tmp/awscliv2.zip
   # 6. Render /etc/silencer/admin-api.env from SSM. Done now (before mongod
   #    starts) so the file is ready for the admin-api unit later, and so
   #    a failure here aborts cloud-init early rather than silently leaving

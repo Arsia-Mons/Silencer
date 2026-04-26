@@ -121,16 +121,20 @@ runcmd:
   # /opt is ubuntu-owned so GH Actions can scp releases; the service reads via world-exec.
   - chown -R ubuntu:ubuntu /opt/${project_name}
   - chown -R ${project_name}:${project_name} /var/lib/${project_name}
-  # Install awscli with retries. `packages:` runs early enough that
-  # unattended-upgrades on a fresh Noble cloud image can be holding the
-  # apt lock, silently failing the install (observed: only the first
-  # package or two land, the rest get reported as a batch failure).
-  # Doing it here gives apt time to settle.
+  # Install AWS CLI v2 from the official installer. The `awscli` apt
+  # package is gone from Ubuntu Noble (`Package 'awscli' has no
+  # installation candidate`), so the apt path is dead. The official
+  # installer is small, current, and arch-correct.
   - |
+    set -e
     for i in 1 2 3 4 5; do
-      DEBIAN_FRONTEND=noninteractive apt-get install -y awscli && break
+      DEBIAN_FRONTEND=noninteractive apt-get install -y unzip && break
       sleep 10
     done
+    curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+    unzip -q /tmp/awscliv2.zip -d /tmp
+    /tmp/aws/install
+    rm -rf /tmp/aws /tmp/awscliv2.zip
   # Fetch runtime secrets from SSM and write /etc/silencer/lobby.env. MUST
   # happen before silencer-lobby starts; the unit's EnvironmentFile= is
   # marked optional (-prefix), so a missing file would just leave Mongo /
