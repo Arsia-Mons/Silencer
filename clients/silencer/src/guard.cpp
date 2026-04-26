@@ -31,6 +31,29 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	lastspoke = 0;
 	lastshot = 0;
 	cooldowntime = 48;
+	bt_ = nullptr;
+}
+
+void Guard::InitBT(){
+	bt_ = BehaviorTreeLibrary::instance().get("guard-patrol");
+	if(!bt_) return;
+	btctx_.actions["Patrol"] = [this](BTContext&) -> BTResult {
+		state = WALKING; state_i = (Uint8)-1;
+		return BTResult::Success;
+	};
+	btctx_.actions["Look"] = [this](BTContext&) -> BTResult {
+		state = LOOKING; state_i = (Uint8)-1;
+		return BTResult::Success;
+	};
+	btctx_.actions["Stand"] = [this](BTContext&) -> BTResult {
+		state_i = 0; // reset standing timer, stay standing
+		return BTResult::Success;
+	};
+	// Combat actions are handled by the interrupt layer; register as no-ops
+	// so the BT combat branch doesn't fail if player_visible happens to be true
+	btctx_.actions["Shoot"]     = [](BTContext&) -> BTResult { return BTResult::Success; };
+	btctx_.actions["ShootUp"]   = [](BTContext&) -> BTResult { return BTResult::Success; };
+	btctx_.actions["ShootDown"] = [](BTContext&) -> BTResult { return BTResult::Success; };
 }
 
 void Guard::Serialize(bool write, Serializer & data, Serializer * old){
@@ -157,13 +180,31 @@ void Guard::Tick(World & world){
 			yv = 0;
 			res_bank = 59;
 			res_index = 0;
-			if(state_i >= 48){
-				if(patrol && world.Random() % 3 == 0){
-					state = WALKING;
+			if(state_i >= 48 && !chasing){
+				if(!bt_) InitBT();
+				if(bt_){
+					btctx_.dt = 1.0f / 24.0f;
+					btctx_.bbSet("player_visible", found != nullptr);
+					btctx_.bbSet("health_pct", maxhealth > 0 ? (float)health / (float)maxhealth : 0.0f);
+					BTResult r = bt_->tick(btctx_);
+					// On Running: stay standing; cap state_i to prevent Uint8 overflow
+					if(r == BTResult::Running && state == STANDING){
+						if(state_i >= 200) state_i = 48;
+					}
+					// On Failure: default to looking around
+					if(r == BTResult::Failure){
+						state = LOOKING;
+						state_i = (Uint8)-1;
+					}
+					// On Success: action handler already set new state
 				}else{
-					state = LOOKING;
+					if(patrol && world.Random() % 3 == 0){
+						state = WALKING;
+					}else{
+						state = LOOKING;
+					}
+					state_i = (Uint8)-1;
 				}
-				state_i = -1;
 			}
 		}break;
 		case CROUCHING:{

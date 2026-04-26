@@ -18,6 +18,19 @@ Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	isphysical = true;
 	snapshotinterval = 72;
 	tractteamid = 0;
+	bt_ = nullptr;
+}
+
+void Civilian::InitBT(){
+	bt_ = BehaviorTreeLibrary::instance().get("civilian-flee");
+	if(!bt_) return;
+	btctx_.actions["Run"] = [this](BTContext&) -> BTResult {
+		if(state != RUNNING){ state = RUNNING; state_i = (Uint8)-1; }
+		return BTResult::Success;
+	};
+	btctx_.actions["Wander"] = [](BTContext&) -> BTResult {
+		return BTResult::Success;
+	};
 }
 
 void Civilian::Serialize(bool write, Serializer & data, Serializer * old){
@@ -84,8 +97,15 @@ void Civilian::Tick(World & world){
 			}
 			xv = mirrored ? -speed : speed;
 			FollowGround(*this, world, xv);
-			if(state_i % 5 == 0){
-				Look(world);
+			if(state_i % 10 == 0){
+				if(!bt_) InitBT();
+				if(bt_){
+					btctx_.dt = 10.0f / 24.0f;
+					btctx_.bbSet("threat_nearby", Look(world));
+					bt_->tick(btctx_);
+				}else{
+					Look(world);
+				}
 			}
 		}break;
 		case RUNNING:{

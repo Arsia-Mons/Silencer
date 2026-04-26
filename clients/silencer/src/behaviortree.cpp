@@ -40,15 +40,83 @@ BTResult BehaviorTree::tickNode(const std::string& id, BTContext& ctx) const {
     if (it == nodes_.end()) return BTResult::Failure;
     const Node& n = it->second;
 
-    if (n.type == "Selector")  return tickSelector(n, ctx);
-    if (n.type == "Sequence")  return tickSequence(n, ctx);
-    if (n.type == "Parallel")  return tickParallel(n, ctx);
-    if (n.type == "Inverter")  return tickInverter(n, ctx);
-    if (n.type == "Cooldown")  return tickCooldown(n, ctx);
-    if (n.type == "Repeat")    return tickRepeat(n, ctx);
-    if (n.type == "Leaf")      return tickLeaf(n, ctx);
-    if (n.type == "Condition") return tickCondition(n, ctx);
+    if (n.type == "Selector")       return tickSelector(n, ctx);
+    if (n.type == "Sequence")       return tickSequence(n, ctx);
+    if (n.type == "Parallel")       return tickParallel(n, ctx);
+    if (n.type == "RandomSelector") return tickRandomSelector(n, ctx);
+    if (n.type == "Inverter")       return tickInverter(n, ctx);
+    if (n.type == "Cooldown")       return tickCooldown(n, ctx);
+    if (n.type == "Repeat")         return tickRepeat(n, ctx);
+    if (n.type == "Timeout")        return tickTimeout(n, ctx);
+    if (n.type == "ForceSuccess")   return tickForceSuccess(n, ctx);
+    if (n.type == "Wait")           return tickWait(n, ctx);
+    if (n.type == "Leaf")           return tickLeaf(n, ctx);
+    if (n.type == "Condition")      return tickCondition(n, ctx);
     return BTResult::Failure;
+}
+
+// RandomSelector: shuffle children each tick, then behave like Selector
+BTResult BehaviorTree::tickRandomSelector(const Node& n, BTContext& ctx) const {
+    std::vector<size_t> order(n.children.size());
+    for (size_t i = 0; i < order.size(); ++i) order[i] = i;
+    for (size_t i = order.size(); i > 1; --i) {
+        size_t j = (size_t)rand() % i;
+        std::swap(order[i - 1], order[j]);
+    }
+    for (size_t i : order) {
+        BTResult r = tickNode(n.children[i], ctx);
+        if (r == BTResult::Success || r == BTResult::Running) return r;
+    }
+    return BTResult::Failure;
+}
+
+// Timeout: fail child after `duration` seconds
+BTResult BehaviorTree::tickTimeout(const Node& n, BTContext& ctx) const {
+    if (n.children.empty()) return BTResult::Failure;
+    float duration = n.props.value("duration", 5.0f);
+    std::string key = n.id + "_to";
+
+    float elapsed = 0.0f;
+    auto it = ctx.state.find(key);
+    if (it != ctx.state.end()) elapsed = it->second.get<float>();
+
+    elapsed += ctx.dt;
+    if (elapsed >= duration) {
+        ctx.state.erase(key);
+        return BTResult::Failure;
+    }
+
+    BTResult r = tickNode(n.children[0], ctx);
+    if (r == BTResult::Running) {
+        ctx.state[key] = elapsed;
+        return BTResult::Running;
+    }
+    ctx.state.erase(key);
+    return r;
+}
+
+// ForceSuccess: run child, always return Success
+BTResult BehaviorTree::tickForceSuccess(const Node& n, BTContext& ctx) const {
+    if (!n.children.empty()) tickNode(n.children[0], ctx);
+    return BTResult::Success;
+}
+
+// Wait: return Running for `duration` seconds, then Success
+BTResult BehaviorTree::tickWait(const Node& n, BTContext& ctx) const {
+    float duration = n.props.value("duration", 1.0f);
+    std::string key = n.id + "_wait";
+
+    float elapsed = 0.0f;
+    auto it = ctx.state.find(key);
+    if (it != ctx.state.end()) elapsed = it->second.get<float>();
+
+    elapsed += ctx.dt;
+    if (elapsed >= duration) {
+        ctx.state.erase(key);
+        return BTResult::Success;
+    }
+    ctx.state[key] = elapsed;
+    return BTResult::Running;
 }
 
 // Selector: return Success on first child that succeeds; Failure if all fail

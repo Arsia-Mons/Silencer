@@ -145,9 +145,9 @@ export const deleteActor  = (id: string): Promise<unknown>      => apiFetch(`/ac
 
 // Behavior Tree types + CRUD
 export type BTNodeType =
-  | 'Selector' | 'Sequence' | 'Parallel'
-  | 'Inverter' | 'Cooldown' | 'Repeat'
-  | 'Leaf' | 'Condition';
+  | 'Selector' | 'Sequence' | 'Parallel' | 'RandomSelector'
+  | 'Inverter' | 'Cooldown' | 'Repeat' | 'Timeout' | 'ForceSuccess'
+  | 'Wait' | 'Leaf' | 'Condition';
 
 export interface BTNode {
   type: BTNodeType;

@@ -19,9 +19,9 @@ const router = Router();
 const BT_DIR = join(ASSETS_DIR, 'behaviortrees');
 
 const VALID_NODE_TYPES = new Set([
-  'Selector', 'Sequence', 'Parallel',
-  'Inverter', 'Cooldown', 'Repeat',
-  'Leaf', 'Condition',
+  'Selector', 'Sequence', 'Parallel', 'RandomSelector',
+  'Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess',
+  'Wait', 'Leaf', 'Condition',
 ]);
 
 function btPath(id) {
@@ -42,9 +42,9 @@ function validate(bt) {
   for (const [id, node] of Object.entries(bt.nodes)) {
     if (!VALID_NODE_TYPES.has(node.type)) return `Node "${id}" has invalid type "${node.type}"`;
     if (!Array.isArray(node.children)) return `Node "${id}" missing children array`;
-    const isDecorator = ['Inverter', 'Cooldown', 'Repeat'].includes(node.type);
+    const isDecorator = ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'].includes(node.type);
     if (isDecorator && node.children.length !== 1) return `Decorator "${id}" must have exactly 1 child`;
-    const isLeafOrCond = ['Leaf', 'Condition'].includes(node.type);
+    const isLeafOrCond = ['Leaf', 'Condition', 'Wait'].includes(node.type);
     if (isLeafOrCond && node.children.length !== 0) return `${node.type} "${id}" must have 0 children`;
     for (const cid of node.children) {
       if (!bt.nodes[cid]) return `Node "${id}" references unknown child "${cid}"`;

@@ -3,8 +3,9 @@
  * behaviortree.h — Tick-based behavior tree interpreter (C++14)
  *
  * Return values: Success, Failure, Running
- * Node types:   Selector, Sequence, Parallel, Inverter, Cooldown, Repeat,
- *               Leaf (action dispatch), Condition (blackboard compare)
+ * Node types:   Selector, Sequence, Parallel, RandomSelector,
+ *               Inverter, Cooldown, Repeat, Timeout, ForceSuccess,
+ *               Wait, Leaf (action dispatch), Condition (blackboard compare)
  *
  * Blackboard values use nlohmann::json (already a project dep via actordef).
  * Per-actor-instance state lives in BTContext so trees are stateless/shared.
@@ -70,7 +71,7 @@ public:
 private:
     struct Node {
         std::string id;
-        std::string type;    // Selector|Sequence|Parallel|Inverter|Cooldown|Repeat|Leaf|Condition
+        std::string type;    // Selector|Sequence|Parallel|RandomSelector|Inverter|Cooldown|Repeat|Timeout|ForceSuccess|Wait|Leaf|Condition
         std::string label;
         std::vector<std::string> children;
         json props;
@@ -83,9 +84,13 @@ private:
     BTResult tickSelector(const Node& n, BTContext& ctx) const;
     BTResult tickSequence(const Node& n, BTContext& ctx) const;
     BTResult tickParallel(const Node& n, BTContext& ctx) const;
+    BTResult tickRandomSelector(const Node& n, BTContext& ctx) const;
     BTResult tickInverter(const Node& n, BTContext& ctx) const;
     BTResult tickCooldown(const Node& n, BTContext& ctx) const;
     BTResult tickRepeat(const Node& n, BTContext& ctx) const;
+    BTResult tickTimeout(const Node& n, BTContext& ctx) const;
+    BTResult tickForceSuccess(const Node& n, BTContext& ctx) const;
+    BTResult tickWait(const Node& n, BTContext& ctx) const;
     BTResult tickLeaf(const Node& n, BTContext& ctx) const;
     BTResult tickCondition(const Node& n, BTContext& ctx) const;
 };

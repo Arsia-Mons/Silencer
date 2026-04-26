@@ -18,25 +18,33 @@ import type { BehaviorTree, BTNode, BTNodeType, BBKey } from '../../../lib/api';
 
 // ── Node colours by type ──────────────────────────────────────────────────────
 const TYPE_COLOR: Record<string, string> = {
-  Selector:  '#f59e0b', // amber
-  Sequence:  '#3b82f6', // blue
-  Parallel:  '#8b5cf6', // purple
-  Inverter:  '#ec4899', // pink
-  Cooldown:  '#06b6d4', // cyan
-  Repeat:    '#10b981', // emerald
-  Leaf:      '#22c55e', // green
-  Condition: '#f97316', // orange
+  Selector:       '#f59e0b', // amber
+  Sequence:       '#3b82f6', // blue
+  Parallel:       '#8b5cf6', // purple
+  RandomSelector: '#f59e0b', // amber (lighter)
+  Inverter:       '#ec4899', // pink
+  Cooldown:       '#06b6d4', // cyan
+  Repeat:         '#10b981', // emerald
+  Timeout:        '#ef4444', // red
+  ForceSuccess:   '#84cc16', // lime
+  Wait:           '#94a3b8', // slate
+  Leaf:           '#22c55e', // green
+  Condition:      '#f97316', // orange
 };
 
 const TYPE_SYMBOL: Record<string, string> = {
-  Selector:  '?',
-  Sequence:  '→',
-  Parallel:  '⇉',
-  Inverter:  '¬',
-  Cooldown:  '⏱',
-  Repeat:    '↻',
-  Leaf:      '▶',
-  Condition: '◆',
+  Selector:       '?',
+  Sequence:       '→',
+  Parallel:       '⇉',
+  RandomSelector: '⁈',
+  Inverter:       '¬',
+  Cooldown:       '⏱',
+  Repeat:         '↻',
+  Timeout:        '⏰',
+  ForceSuccess:   '✓',
+  Wait:           '◷',
+  Leaf:           '▶',
+  Condition:      '◆',
 };
 
 // ── Custom node ───────────────────────────────────────────────────────────────
@@ -104,6 +112,8 @@ function nodeSubtitle(node: BTNode): string {
   if (node.type === 'Leaf') return String(node.props.action ?? '');
   if (node.type === 'Cooldown') return `${node.props.duration ?? '?'}s`;
   if (node.type === 'Repeat') return `×${node.props.count ?? '∞'}`;
+  if (node.type === 'Timeout') return `timeout ${node.props.duration ?? '?'}s`;
+  if (node.type === 'Wait') return `wait ${node.props.duration ?? '?'}s`;
   return '';
 }
 
@@ -138,12 +148,18 @@ function btToFlow(bt: BehaviorTree): { nodes: Node[]; edges: Edge[] } {
 
 // ── Node palette config ───────────────────────────────────────────────────────
 const PALETTE: { group: string; types: BTNodeType[] }[] = [
-  { group: 'COMPOSITE', types: ['Selector', 'Sequence', 'Parallel'] },
-  { group: 'DECORATOR', types: ['Inverter', 'Cooldown', 'Repeat'] },
-  { group: 'LEAF',      types: ['Leaf', 'Condition'] },
+  { group: 'COMPOSITE', types: ['Selector', 'Sequence', 'Parallel', 'RandomSelector'] },
+  { group: 'DECORATOR', types: ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'] },
+  { group: 'LEAF',      types: ['Leaf', 'Condition', 'Wait'] },
 ];
 
-const LEAF_ACTIONS = ['Patrol', 'Shoot', 'ShootUp', 'ShootDown', 'Look', 'Run', 'Wander', 'Hack', 'Alert', 'Idle', 'PlayAnim'];
+const LEAF_ACTIONS = [
+  'Patrol', 'Stand', 'Look',
+  'Shoot', 'ShootUp', 'ShootDown',
+  'Crouch', 'Uncrouch',
+  'ClimbLadder', 'Alert', 'Melee',
+  'Run', 'Wander', 'Sleep', 'Idle',
+];
 
 // ── Main editor ───────────────────────────────────────────────────────────────
 interface Props { bt: BehaviorTree; onChange: (bt: BehaviorTree) => void; }
@@ -170,7 +186,7 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     if (!parentNode) return;
     if (parentNode.children.includes(params.target)) return; // already connected
 
-    const isDecorator = ['Inverter', 'Cooldown', 'Repeat'].includes(parentNode.type);
+    const isDecorator = ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'].includes(parentNode.type);
     if (isDecorator && parentNode.children.length >= 1) return;
 
     const updated: BehaviorTree = {
@@ -197,9 +213,9 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     if (!cur.nodes[cur.rootId]) return `Root node "${cur.rootId}" missing`;
     const parentCount: Record<string, number> = {};
     for (const [pid, node] of Object.entries(cur.nodes)) {
-      const isDecorator = ['Inverter', 'Cooldown', 'Repeat'].includes(node.type);
+      const isDecorator = ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'].includes(node.type);
       if (isDecorator && node.children.length !== 1) return `Decorator "${pid}" must have exactly 1 child`;
-      const isLeaf = ['Leaf', 'Condition'].includes(node.type);
+      const isLeaf = ['Leaf', 'Condition', 'Wait'].includes(node.type);
       if (isLeaf && node.children.length > 0) return `${node.type} "${pid}" must have 0 children`;
       for (const cid of node.children) {
         parentCount[cid] = (parentCount[cid] ?? 0) + 1;
@@ -399,6 +415,15 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
             )}
 
             {selectedNode.type === 'Cooldown' && (
+              <>
+                <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>DURATION (s)</label>
+                <input type="number" value={Number(selectedNode.props.duration ?? 1)} min={0.1} step={0.1}
+                  onChange={e => updateProp('duration', parseFloat(e.target.value))}
+                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+              </>
+            )}
+
+            {(selectedNode.type === 'Timeout' || selectedNode.type === 'Wait') && (
               <>
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>DURATION (s)</label>
                 <input type="number" value={Number(selectedNode.props.duration ?? 1)} min={0.1} step={0.1}
