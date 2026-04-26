@@ -229,16 +229,17 @@ void Guard::InitBT(){
 						mirrored = (obj->x < x); // orient toward target
 					}
 					// <=80px: keep current direction to avoid oscillation
-					// Climb ladder if target is on a different level
-					Platform* ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
-					if(ladder){
+					// Climb ladder toward target if on a different level
+					Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
+					if(ladder && state == WALKING){
 						Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-						if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
-							if(ladder->y2 == obj->y && y != obj->y && ladder->y2 > y){
-								x = center; yv = 5; state = LADDER; state_i = 0;
-							}
-							if(ladder->y1 == obj->y && y != obj->y && ladder->y1 < y){
+						if(abs(signed(center) - signed(x)) <= 8){
+							if(signed(obj->y) < signed(y) && signed(ladder->y1) < signed(y)){
+								// player above, ladder goes up
 								x = center; yv = -5; state = LADDER; state_i = 0;
+							} else if(signed(obj->y) > signed(y) && signed(ladder->y2) > signed(y)){
+								// player below, ladder goes down
+								x = center; yv = 5; state = LADDER; state_i = 0;
 							}
 						}
 					}
