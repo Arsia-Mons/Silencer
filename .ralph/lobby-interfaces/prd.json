@@ -17,7 +17,7 @@
       "id": "I1",
       "name": "GameSelectInterface composition (right panel)",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "spec": "Per docs/design/screen-lobby-gameselect.md: render bank 7 idx 8 right-border chrome; 'Active Games' label at (405,70) bank 134 advance 8; SelectBox bbox (407,89,214,265) lineheight=14 (empty); Scrollbar (bank 7 idx 9, scrollposition=0); five selected-game info overlays at (405, 358/370/382/394/406) bank 133 advance 6 (empty); Join Game B156x21 at (436,430); Create Game B156x21 at (242,68). Region: outside bbox but the GameSelectInterface bbox is (403,87,222,267).",
       "category": "composition"
     },

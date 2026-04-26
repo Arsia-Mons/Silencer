@@ -3,6 +3,7 @@
 .ralph/{main-menu,options,options-audio,options-display,options-controls,
 lobby-connect,lobby}/progress.txt — read those first. -->
 - Sub-interface composition layers cleanly on top of the validated LOBBY chrome (Y0-Y3) without touching `RunDumpLobby`'s prologue: extend `banks` list and append per-sub-interface render blocks after the Y2 Go Back button slot. Bank 181 (agency toggles, 5 sprites idx 0..4) follows the established codec path with no new infra. Toggle widget = single `BlitSprite(fb, sprites.Get(181, i), x, y, nullptr)` per agency at y=90 with +42px x-stride from x0=20 — anchor convention `top_left = anchor - sprite.offset` applies identically to widget sprites. Empty-data overlay slots (server-driven content) can be omitted entirely from DrawText calls — empty string is a no-op and the structural gate is overlay position only, not glyph rendering. Toggle base-sprite tint (bright blue) vs reference's "set/unselected" dim treatment is non-gating per the spec's selected-highlight carve-out; future runtime-tint widget extension would close the visual gap but isn't load-bearing for this Ralph.
+- GameSelectInterface chrome stacks bank 7 idx 8 (right-border chrome) at literal (0,0) on top of the panel idx 1 — same screen-aligned offset (0,0) anchor convention as every other panel-class chrome on this hydration. Empty SelectBox + scrollmax=0 scrollbar render as no-ops; the bank-7 idx-1 + idx-8 chrome pair already supplies the empty bbox borders that the gate cares about. B156x21 is now reusable as a (chrome=bank 7 idx 24, label=bank 134 advance 8 yoff=4, width=156) constants block driving an N-button array — three confirmed sites on this screen (Go Back / Create Game / Join Game). Bbox-local pixelwise diff is the canonical gate; whole-screen diff is dominated by toggle-tint + button-effectcolor drift and is uninformative for sub-interface progress.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -115,5 +116,104 @@ lobby-connect,lobby}/progress.txt — read those first. -->
     treatment pending. Sub-interface Ralphs should always report
     bbox-local diffs alongside whole-screen, since whole-screen
     metrics dilute per-bbox progress.
+
+---
+
+## 2026-04-26T16:46:00Z — iter 2 (I1 PASS)
+- Implemented GameSelectInterface composition (right panel) inside
+  `RunDumpLobby` per `docs/design/screen-lobby-gameselect.md`. Added,
+  in order, after the I0 toggle loop:
+  * `BlitSprite(7, 8) at (0,0)` — additional right-border chrome on
+    top of the bank-7 idx-1 panel. Same anchor convention as the
+    panel; sprite is screen-aligned with offset (0,0).
+  * `DrawText "Active Games" at (405, 70)` bank 134 advance 8.
+  * Two B156x21 buttons via the validated chrome at bank 7 idx 24 +
+    label bank 134 advance 8 yoff=4: "Create Game" anchor (242, 68)
+    above the SelectBox, "Join Game" anchor (436, 430) below the
+    selected-game info zone.
+- Empty-data slots (SelectBox rows, scrollbar thumb, five
+  selected-game info overlays) intentionally omitted: per the
+  empty-data scope, the bbox borders are supplied by bank 7 idx 1 +
+  idx 8, scrollmax=0 ⇒ ScrollBar.draw=false (options-controls
+  precedent), and DrawText with empty text is a no-op anyway. Slots
+  are documented inline in the source.
+- Build: `cmake --build shared/design/sdl3/build` exits 0. Only
+  `main.cpp` recompiled + relink.
+- Dump: PPM size invariant (640x480, 921615 bytes).
+- Diff stats vs `/tmp/real_lobby_dump.ppm`:
+  * whole screen pixelwise: 5,698 / 307,200 = 1.86% (was 4.29% at
+    end of I0 — adding the bank 7 idx 8 chrome + matching the two
+    B156x21 button locations dropped the diff substantially because
+    those areas were previously black/empty in the candidate but
+    populated in the reference).
+  * **GameSelectInterface bbox (403,87,222,267) pixelwise: 0 / 59,274
+    = 0.00%** — the gated region is byte-equivalent to the reference.
+    The bank-7 idx-8 chrome's contribution to the GSI region matches
+    perfectly; the empty SelectBox interior + missing scrollbar
+    thumb both produce zero pixel difference because the reference's
+    same emptiness fills those pixels with the same panel-chrome
+    background.
+  * "Active Games" label region (400..510, 68..85): 0 / 1,870 — the
+    label glyphs match the reference exactly at the spec'd anchor.
+  * Create Game button region (230..410, 60..100): 239 / 7,200 = 3.3%
+    — small residual tint drift on the chrome/label, same pattern as
+    the LOBBY Y2 Go Back button. DrawText doesn't model
+    effectcolor / per-state brightness ramp; structural placement
+    confirmed by the order-of-magnitude match.
+  * Join Game button region (420..600, 420..460): 200 / 7,200 = 2.8%
+    — same characteristic small tint drift.
+- Visual A/B (Discord DM 1498108124245131435): right border chrome
+  is present in the candidate matching the reference; "Active
+  Games" label visible at top of game-list area; Create Game button
+  visible in the header-bar zone (above SelectBox); Join Game button
+  visible at the bottom-right corner of the game-list area. All
+  four new objects align with reference placement to within
+  glyph/sprite-tint tolerance.
+- Regression: edits confined to `RunDumpLobby` body. Bank list
+  unchanged from I0 (added 181 then; 7/133/134/135 sufficient for
+  this iter's bank 7 idx 8/24 + bank 134 label content). Other
+  screen-builders untouched.
+- Files touched: `shared/design/sdl3/src/main.cpp` (append I1 block
+  after I0 toggle loop in `RunDumpLobby`), `.ralph/lobby-interfaces/
+  prd.json` (I1 → passes:true), `.ralph/lobby-interfaces/progress.txt`
+  (this entry).
+- Spec gaps encountered (carry-forward):
+  - `widget-button.md` still doesn't list B156x21; we now have three
+    instances on this screen (Go Back, Create Game, Join Game) all
+    using bank 7 idx 24 + bank 134 advance 8 yoff=4 — strong
+    empirical signal for promoting the variant to spec.
+  - `widget-selectbox.md` still doesn't exist. This iter's empty-
+    SelectBox rendering is a no-op (just relies on the surrounding
+    bank-7 chrome borders); a populated SelectBox will need a real
+    spec for row layout, selected-row highlight, scrollbar
+    coupling, and uid → field mapping for the five selected-game
+    info overlays.
+  - `widget-scrollbar.md` (if it existed) would benefit from a
+    "draw=false when scrollmax=0" callout — empirically validated
+    here and in options-controls.
+- **Learnings:**
+  - **Bbox-local diff is a much sharper gate than whole-screen.**
+    GSI bbox = 0% diff is a concrete pass signal even though
+    whole-screen has ~1.86% drift from CharInt's tint differences
+    plus B156x21 brightness drift. Whole-screen would have been
+    misleading either direction.
+  - **B156x21 is now a stable pattern** in this hydration: same
+    chrome + label parameters across three sites, all rendered with
+    a single `B156Spec` array driven by `(text, anchor.x, anchor.y)`.
+    Future sub-interfaces with B156x21 buttons can reuse the same
+    constants block.
+  - **Engine-positioned widgets at empty data ⇒ no render.** When
+    the spec lists a widget but its draw flag is false at the
+    reference's data state (scrollbar with scrollmax=0; SelectBox
+    with no rows), omitting the render is structurally equivalent
+    and produces zero diff in the gated bbox. The empty-data scope
+    treats this as the canonical pass.
+  - **Adding chrome can REDUCE whole-screen diff faster than
+    populating data.** Bank 7 idx 8 + the two B156x21 buttons are
+    chrome/label content that was completely absent from the I0
+    candidate; their addition flipped many pixels from the
+    panel-background black into the same pill/border colors as the
+    reference. The 4.29% → 1.86% drop is mostly attributable to
+    these three sprite blits.
 
 ---

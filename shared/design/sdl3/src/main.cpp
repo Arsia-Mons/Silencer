@@ -952,6 +952,67 @@ static int RunDumpLobby(const std::string &assets_dir,
     }
   }
 
+  // I1: GameSelectInterface composition (right panel). Per
+  // docs/design/screen-lobby-gameselect.md — bbox (403, 87, 222, 267).
+  //   - Bank 7 idx 8 right-border chrome at literal (0, 0) — additional
+  //     chrome supplying the game-list area's inner edges/divider on top
+  //     of the LOBBY panel idx 1. Same anchor convention as the panel
+  //     (top_left = anchor − sprite.offset; sprite is screen-aligned).
+  //   - "Active Games" label at literal (405, 70), font 134 advance 8.
+  //   - SelectBox bbox (407, 89, 214, 265), lineheight 14 — empty without
+  //     a running Go lobby; outline already supplied by idx 8 chrome.
+  //   - Scrollbar (bank 7 idx 9): engine-positioned widget; with empty
+  //     data scrollmax=0 ⇒ ScrollBar.draw=false (per options-controls
+  //     precedent at idx 9/10), so the thumb is NOT drawn. We don't
+  //     emit the track sprite here either: in this hydration's
+  //     other scrollbar instance the track was baked into the panel
+  //     chrome, and structural scrollbar pixels in the empty-data
+  //     reference dump live entirely in bank 7 idx 1's borders.
+  //   - Five selected-game info overlays at (405, 358/370/382/394/406),
+  //     font 133 advance 6 — empty without a selection. Skip the
+  //     DrawText calls (empty string is a no-op anyway); recorded
+  //     here as the spec's structural slots.
+  //   - Create Game B156x21 at anchor (242, 68) — note this is OUTSIDE
+  //     the GameSelectInterface bbox, sitting above the SelectBox.
+  //   - Join Game B156x21 at anchor (436, 430).
+  if (sprites.Has(7, 8)) {
+    BlitSprite(fb, sprites.Get(7, 8), 0, 0, nullptr);
+  }
+  DrawText(fb, 405, 70, "Active Games", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+
+  // Two B156x21 action buttons. Same chrome (bank 7 idx 24) + label
+  // (bank 134 advance 8, yoff=4) as the Go Back button above. Width=156,
+  // centering xoff = (156 − len*8) / 2.
+  {
+    constexpr int kB156Base = 24;
+    constexpr int kB156Width = 156;
+    constexpr int kB156Advance = 8;
+    constexpr int kB156Yoff = 4;
+    struct B156Spec {
+      const char *text;
+      int x;
+      int y;
+    };
+    const std::array<B156Spec, 2> b156_buttons = {{
+        {"Create Game", 242, 68},
+        {"Join Game", 436, 430},
+    }};
+    if (sprites.Has(7, kB156Base)) {
+      const Sprite &chrome = sprites.Get(7, kB156Base);
+      for (const auto &b : b156_buttons) {
+        BlitSprite(fb, chrome, b.x, b.y, nullptr);
+        int len = static_cast<int>(std::strlen(b.text));
+        int xoff = (kB156Width - len * kB156Advance) / 2;
+        int textX = b.x - chrome.offset_x + xoff;
+        int textY = b.y - chrome.offset_y + kB156Yoff;
+        DrawText(fb, textX, textY, b.text, /*bank=*/134,
+                 /*advance=*/kB156Advance, sprites, palette, kSubLobby,
+                 /*brightness=*/128);
+      }
+    }
+  }
+
   std::filesystem::create_directories(dump_dir);
   std::string out = dump_dir + "/screen_00.ppm";
   bool ok = WritePPM(out, fb, palette, kSubLobby);
