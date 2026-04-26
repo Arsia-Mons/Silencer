@@ -1,7 +1,7 @@
 # services/lobby/ — Go lobby
 
 Go: stdlib + `mongo-driver` (used only when `MONGO_URL` set) + `amqp091-go`
-(used only when `RABBITMQ_URL` set). Build/run instructions, flags, and
+(used only when `AMQP_URL` set). Build/run instructions, flags, and
 the how-it-works narrative are in `README.md`; this file is for editing
 the code.
 
@@ -25,9 +25,10 @@ the code.
   password hashes, per-agency stats keyed by user.
 - `mongosync.go` — async-mirrors store mutations to MongoDB when
   `MONGO_URL` is set (see Storage). Password hashes never synced.
-- `events.go` — fire-and-forget RabbitMQ event publisher (`silencer.events`
-  exchange) for the admin dashboard's live feed. No-op when
-  `RABBITMQ_URL`/`-rabbitmqURL` unset.
+- `events.go` — fire-and-forget AMQP event publisher (`silencer.events`
+  exchange) for the admin dashboard's live feed. Speaks AMQP 0.9.1 — works
+  against LavinMQ (prod) and RabbitMQ (compose) interchangeably. No-op when
+  `AMQP_URL`/`-amqp-url` unset.
 - `playerauth.go` — internal HTTP server (`-player-auth-addr`, default
   `:15171`) the admin-api calls to validate player credentials. Not
   exposed outside the Docker network.

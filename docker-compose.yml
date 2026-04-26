@@ -45,7 +45,7 @@ services:
       - mongo
       - rabbitmq
     environment:
-      RABBITMQ_URL: "amqp://silencer:silencer@rabbitmq:5672/"
+      AMQP_URL: "amqp://silencer:silencer@rabbitmq:5672/"
       MONGO_URL: "mongodb://mongo:27017/silencer"
     command:
       - "-addr"
@@ -60,7 +60,7 @@ services:
       - "20000"
       - "-game-port-count"
       - "200"
-      - "-rabbitmq-url"
+      - "-amqp-url"
       - "amqp://silencer:silencer@rabbitmq:5672/"
       - "-map-api-addr"
       - ":15172"
@@ -79,7 +79,7 @@ services:
     environment:
       PORT: "24080"
       MONGO_URL: "mongodb://mongo:27017/silencer"
-      RABBITMQ_URL: "amqp://silencer:silencer@rabbitmq:5672/"
+      AMQP_URL: "amqp://silencer:silencer@rabbitmq:5672/"
       JWT_SECRET: "${JWT_SECRET:-changeme-in-production}"
       LOBBY_PLAYER_AUTH_URL: "http://lobby:15171"
       BACKUP_DIR: "/backups"

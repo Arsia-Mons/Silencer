@@ -1,5 +1,5 @@
 import amqplib from 'amqplib';
-import { RABBITMQ_URL } from '../config.js';
+import { AMQP_URL } from '../config.js';
 import Player from '../db/models/Player.js';
 import Session from '../db/models/Session.js';
 import Event from '../db/models/Event.js';
@@ -12,7 +12,7 @@ const QUEUE    = 'admin-dashboard';
 export async function startConsumer() {
   const connect = async () => {
     try {
-      const conn = await amqplib.connect(RABBITMQ_URL);
+      const conn = await amqplib.connect(AMQP_URL);
       conn.on('error', (e) => { console.error('[amqp] error:', e.message); setTimeout(connect, 5000); });
       conn.on('close', ()  => { console.log('[amqp] connection closed — reconnecting'); setRabbitMQStatus(false); setTimeout(connect, 5000); });
 
