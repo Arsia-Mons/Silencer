@@ -16,11 +16,6 @@ variable "instance_type" {
   default     = "t4g.small"
 }
 
-variable "ssh_public_key" {
-  description = "SSH public key granted admin access. Also used by GitHub Actions for deploys."
-  type        = string
-}
-
 variable "ssh_allowed_cidr" {
   description = "CIDR block allowed to SSH. Set to your IP (e.g. 1.2.3.4/32), not 0.0.0.0/0."
   type        = string
@@ -51,19 +46,75 @@ variable "lobby_version_string" {
   default     = ""
 }
 
-variable "tailscale_auth_key" {
-  description = "One-time pre-authorized Tailscale auth key tagged tag:server. Generate at https://login.tailscale.com/admin/settings/keys (reusable=no, ephemeral=no, pre-approved, tag:server). Needed only on instance create/replace; cloud-init consumes it once."
-  type        = string
-  sensitive   = true
-}
-
 variable "tailscale_hostname" {
   description = "Tailscale MagicDNS hostname for the lobby. GitHub Actions connects to ubuntu@<this>."
   type        = string
   default     = "silencer"
 }
 
-variable "deploy_ssh_public_key" {
-  description = "Public half of the SSH keypair GitHub Actions uses to deploy. The private half lives in the DEPLOY_SSH_KEY repo secret. Appended to ubuntu's authorized_keys on top of ssh_public_key."
+# -------------------------------------------------------------------
+# Admin / data box (Phase 1 — production deployment architecture)
+# -------------------------------------------------------------------
+
+variable "admin_instance_type" {
+  description = "EC2 type for the admin/data box. Sizing rationale in docs/plans/2026-04-25-production-deployment-architecture.md (Phase 1 default t4g.small, ~1.7GB peak on ~1.85GB usable)."
   type        = string
+  default     = "t4g.small"
 }
+
+variable "admin_root_volume_size" {
+  description = "Root volume size in GB. Holds OS, docker engine, container images, app binaries, journald logs."
+  type        = number
+  default     = 16
+}
+
+variable "admin_mongo_volume_size" {
+  description = "EBS volume size in GB for /var/lib/mongodb. Sized to absorb ~3-5GB of Event-collection growth at one year of Active traffic."
+  type        = number
+  default     = 10
+}
+
+variable "admin_lavinmq_volume_size" {
+  description = "EBS volume size in GB for /var/lib/lavinmq. Sized to absorb a multi-day admin-api outage backlog without filling the volume."
+  type        = number
+  default     = 5
+}
+
+variable "admin_tailscale_hostname" {
+  description = "Tailscale MagicDNS hostname for the admin/data box. GitHub Actions connects to ubuntu@<this> for deploys."
+  type        = string
+  default     = "silencer-admin"
+}
+
+variable "internal_zone_name" {
+  description = "Private Route 53 zone shared by both boxes. Holds A records like lobby.<zone> and admin.<zone> so cross-service hostnames stay stable across instance replacement."
+  type        = string
+  default     = "silencer.internal"
+}
+
+variable "github_backup_repo" {
+  description = "owner/repo for the Mongo backup commits. Default matches the existing kristiandelay design. Empty PAT (in SSM) disables commits, keeping local archives only."
+  type        = string
+  default     = "Arsia-Mons/silencer-mongo-backup"
+}
+
+variable "admin_image_admin_api" {
+  description = "Initial OCI image ref for silencer-admin-api on first boot. Empty = unit crash-loops quietly until the deploy workflow writes /etc/silencer/admin-api.image. Subsequent deploys do NOT touch this variable; they update the file directly."
+  type        = string
+  default     = ""
+}
+
+variable "admin_image_admin_web" {
+  description = "Initial OCI image ref for silencer-admin-web on first boot. See admin_image_admin_api."
+  type        = string
+  default     = ""
+}
+
+# -------------------------------------------------------------------
+# Secrets — sourced from SSM Parameter Store, NOT this file.
+# -------------------------------------------------------------------
+# All values that used to live in terraform.tfvars now live under
+# /silencer/* in SSM. Seed them once per AWS account with
+# infra/scripts/seed-ssm.sh; teammates with IAM read access fetch from
+# the same source. See infra/terraform/CLAUDE.md and docs/production.md
+# for the full parameter list and rotation flow.

@@ -2,7 +2,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:24080';
+// Production: NEXT_PUBLIC_WS_URL is unset → io() connects to the current
+//   origin (admin.arsiamons.com), and Cloudflare Tunnel routes /socket.io/*
+//   to admin-api:24080.
+// Local dev: NEXT_PUBLIC_WS_URL=ws://localhost:24080 (compose build arg).
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || '';
 
 let singleton: ReturnType<typeof io> | null = null;
 
@@ -20,13 +24,14 @@ export function getSocket(): ReturnType<typeof io> {
     }
   }
 
-  singleton = io(WS_URL, {
+  const opts = {
     auth: { token },
     transports: ['websocket'],
     autoConnect: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 2000,
-  });
+  };
+  singleton = WS_URL ? io(WS_URL, opts) : io(opts);
   return singleton;
 }
 

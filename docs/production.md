@@ -55,9 +55,9 @@ binaries.
 
 ## Setup
 
-Six steps, about half an hour end-to-end. High level: set up
-Terraform, build the server, hand GitHub Actions the credentials it
-needs, then push a tag to deploy.
+Seven steps, about half an hour end-to-end. High level: set up
+Terraform, seed your secrets into SSM, build the server, hand GitHub
+Actions the credentials it needs, then push a tag to deploy.
 
 ### 1. Set up Terraform's state storage (one-time)
 
@@ -112,38 +112,44 @@ to each other over Tailscale:
 Copy the key. It's single-use — cloud-init consumes it when the
 server first boots.
 
-### 4. Create the server
+### 4. Seed your secrets into SSM Parameter Store
+
+Every secret the Terraform module needs lives in AWS SSM Parameter
+Store under `/silencer/*`. They're encrypted with AWS-managed KMS,
+durable in your AWS account (not on your laptop), and shareable with
+teammates via IAM. Seed them once:
 
 ```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
+./infra/scripts/seed-ssm.sh
 ```
 
-Fill in `terraform.tfvars`. The ones you must set:
+The script prompts for the values it can't generate itself (the two
+SSH pubkeys from step 2, your Tailscale auth key from step 3, plus
+the Cloudflare tunnel token + admin Tailscale key in step 7 below)
+and rolls strong random values for the password-shaped ones (Mongo,
+LavinMQ, JWT). It's idempotent — safe to re-run, skips params that
+already exist. Pass `--overwrite` to rotate.
 
-- `ssh_public_key` — contents of `~/.ssh/silencer-admin.pub`.
-- `deploy_ssh_public_key` — contents of `~/.ssh/silencer-deploy.pub`.
-- `ssh_allowed_cidr` — your laptop's IP, as a `/32`. This is just for
-  emergency access; normal admin goes through Tailscale.
-- `tailscale_auth_key` — from step 3.
-- `tailscale_hostname` — whatever name you want on the tailnet (e.g.
-  `silencer`).
-- `domain_name` and `route53_zone_id` — if you have a domain.
-
-Then:
+### 5. Create the server
 
 ```bash
+cd infra/terraform
+cp terraform.tfvars.example terraform.tfvars
+# Edit only the non-secret tuning knobs you want to override (e.g.
+# ssh_allowed_cidr, domain_name, route53_zone_id). All secrets come
+# from SSM, not this file.
 terraform apply
 ```
 
 This takes a few minutes and creates the VM, a static IP, a separate
-data disk for user accounts, and (optionally) a DNS record. The VM
+data disk for user accounts, an IAM role granting the VM SSM read
+access to its own secrets, and (optionally) a DNS record. The VM
 installs and configures itself using cloud-init — give it another
 2–3 minutes after Terraform finishes before expecting the lobby
 service to come up. It won't actually work yet because there are no
-binaries on it; that's what step 6 fixes.
+binaries on it; that's what step 7 fixes.
 
-### 5. Hand credentials to GitHub Actions
+### 6. Hand credentials to GitHub Actions
 
 In your fork: **Settings → Secrets and variables → Actions.**
 
@@ -152,7 +158,7 @@ Variables (these are visible, not secret):
 | Name          | Value                                                            |
 |---------------|------------------------------------------------------------------|
 | `LOBBY_HOST`  | The address clients connect to. **Gets baked into every client binary.** Use your domain if you have one, otherwise the static IP Terraform printed. |
-| `DEPLOY_HOST` | The Tailscale hostname you picked in step 4 (e.g. `silencer`).   |
+| `DEPLOY_HOST` | The Tailscale hostname you picked in step 5 (e.g. `silencer`).   |
 
 Secrets:
 
@@ -161,7 +167,7 @@ Secrets:
 | `DEPLOY_SSH_KEY` | Private half of `~/.ssh/silencer-deploy` (entire file, including headers). |
 | `TS_AUTHKEY`     | A **second** Tailscale auth key, generated the same way as step 3 except set reusable=yes and ephemeral=yes. Actions runners are short-lived, so they need their own throwaway keys. |
 
-### 6. Deploy
+### 7. Deploy
 
 ```bash
 git tag v0.0.1
@@ -185,6 +191,103 @@ nc -vz <your-lobby-host> 517
 
 Download the client from the GitHub Release, launch it, register an
 account — you should be looking at the lobby.
+
+## Step 8: Admin tier (optional but recommended)
+
+Phase 1 of the production-deployment plan adds a second EC2 box that
+runs MongoDB, LavinMQ, the admin REST/WS API, and the admin web
+dashboard. The lobby keeps working without it (Mongo + LavinMQ are
+both optional in the lobby's code), so you can defer this until you
+want the dashboard.
+
+If you've followed steps 1–7, you already have most of what's needed.
+To enable the admin tier:
+
+### 8a. Set up Cloudflare for `admin.<your-domain>`
+
+The admin dashboard is reached via Cloudflare Tunnel — no public
+ports are opened on the admin box. Steps:
+
+1. Add `<your-domain>` to a free Cloudflare account if you haven't
+   already (transfer NS or use as DNS-only).
+2. **Zero Trust → Networks → Tunnels → Create a tunnel → Cloudflared.**
+   Give it a name (e.g. `silencer-admin`). Copy the **token** it
+   shows — you'll paste it into SSM in the next step.
+3. Under the same tunnel's **Public Hostname** tab, add three rules
+   for `admin.<your-domain>` (most-specific first):
+
+   | Path           | Service                   |
+   |----------------|---------------------------|
+   | `/api/*`       | `http://localhost:24080`  |
+   | `/socket.io/*` | `http://localhost:24080`  |
+   | (catch-all)    | `http://localhost:24000`  |
+
+### 8b. Seed the admin-tier secrets
+
+If you skipped the admin-tier prompts the first time you ran
+`seed-ssm.sh` (e.g. you didn't have the Cloudflare token yet), re-run
+it with `--overwrite` to fill them in:
+
+```bash
+./infra/scripts/seed-ssm.sh --overwrite
+```
+
+The script will skip params that already have values and prompt for:
+
+- `/silencer/admin/tailscale_auth_key` — a **second** Tailscale auth
+  key generated like step 3, separate from the lobby's.
+- `/silencer/admin/cloudflare_tunnel_token` — from 8a.
+- `/silencer/admin/github_backup_token` — optional PAT (`repo` scope)
+  enabling 6-hourly Mongo backup commits. Leave blank to disable;
+  local archives still get written.
+
+`mongo_silencer_password`, `lavinmq_silencer_password`, and
+`jwt_secret` were rolled randomly the first time and don't need any
+input.
+
+Then:
+
+```bash
+cd infra/terraform
+terraform apply
+```
+
+This creates the admin/data box (`t4g.small`), two EBS volumes, a
+private Route 53 zone (`silencer.internal`) with A records for both
+boxes, an IAM role granting the box SSM read access to its own
+secrets, and DLM daily snapshots of the Mongo + LavinMQ volumes.
+Cloud-init takes ~5 minutes to install Mongo, LavinMQ, cloudflared,
+fetch the runtime secrets from SSM, and write the systemd units.
+
+### 8c. Add admin-deploy GH variables
+
+In your fork's repo settings, add:
+
+| Variable            | Value                                                  |
+|---------------------|--------------------------------------------------------|
+| `ADMIN_DEPLOY_HOST` | Tailscale hostname of the admin box (default `silencer-admin`) |
+
+The existing `DEPLOY_SSH_KEY` and `TS_AUTHKEY` secrets are reused.
+
+### 8d. Trigger the first admin deploys
+
+Two new path-filtered workflows fire on any push that touches their
+component:
+
+- `.github/workflows/deploy-admin-api.yml` — `services/admin-api/**`
+- `.github/workflows/deploy-admin-web.yml` — `web/admin/**`
+
+To force the first deploy without code changes, run them via
+**Actions → Deploy admin-api / admin-web → Run workflow.** Each builds
+an ARM64 OCI image, pushes to `ghcr.io/<owner>/silencer-admin-{api,web}`,
+SSHes to the admin box over Tailscale, and updates
+`/etc/silencer/<svc>.image` followed by `systemctl restart`. The
+units crash-loop quietly (`Restart=always`) until that first deploy
+writes a real image ref.
+
+Once both succeed, `https://admin.<your-domain>` should serve the
+dashboard's login page — default seed credentials are `admin` /
+`admin` (change on first login).
 
 ## Day-to-day
 
@@ -229,6 +332,64 @@ your working tree onto the server, compiles there, swaps the binary,
 restarts. Useful when chasing something that only reproduces on the
 real server. Don't use it for real releases — it bypasses CI.
 
+**Rotating secrets.** The Mongo/LavinMQ passwords, JWT signing key,
+and GitHub backup PAT are fetched from SSM at runtime by the EC2
+boxes — rotation doesn't need a `terraform apply`:
+
+```bash
+# Roll a new value (random) or set a specific one:
+aws ssm put-parameter --name /silencer/admin/jwt_secret --overwrite \
+  --type SecureString --value "$(openssl rand -base64 32)"
+
+# Re-render the env file from SSM and restart the unit:
+ssh ubuntu@silencer-admin
+sudo /usr/local/sbin/silencer-fetch-secrets
+sudo systemctl restart silencer-admin-api
+```
+
+For Mongo/LavinMQ password rotations, you also have to update the
+user inside the database (`mongosh` / `rabbitmqctl`) and refresh
+*both* boxes' env files in order — see
+`infra/terraform/CLAUDE.md` for the full ritual.
+
+For one-shot apply-time secrets (Tailscale keys, the Cloudflare
+tunnel token), rotation requires re-running cloud-init:
+
+```bash
+aws ssm put-parameter --name /silencer/lobby/tailscale_auth_key \
+  --overwrite --type SecureString --value "tskey-auth-..."
+cd infra/terraform
+terraform taint aws_instance.lobby
+terraform apply
+```
+
+Note that `terraform taint aws_instance.lobby` kills active games.
+The data EBS volume re-attaches so account state survives.
+
+**Migrating an already-running lobby to runtime SSM fetch (one-time).**
+If your lobby instance was created before SSM-based runtime secrets
+existed, its `/etc/silencer/lobby.env` was rendered into `user_data`
+at first boot and `lifecycle.ignore_changes = [user_data]` prevents
+Terraform from updating it. Applying the SSM migration:
+
+- ✅ attaches the new IAM instance profile in-place (no replacement)
+- ❌ does **not** install `/usr/local/sbin/silencer-fetch-secrets`
+  (cloud-init only runs on first boot)
+- ❌ does **not** rewrite `/etc/silencer/lobby.env`
+
+So the lobby keeps working with its already-templated env file — no
+breakage, but also no benefit. To fully cut over, replace the
+instance:
+
+```bash
+cd infra/terraform
+terraform taint aws_instance.lobby
+terraform apply   # kills active games; data EBS re-attaches
+```
+
+The admin/data box is greenfield in this migration, so no equivalent
+step is needed there.
+
 ## State and backups
 
 ### Primary store — lobby.json
@@ -261,8 +422,12 @@ lobby startup to bring the mirror up to date. This lets the admin
 dashboard query rich player data without touching `lobby.json` directly.
 Password hashes are never written to MongoDB.
 
-If the MongoDB container is unavailable, the lobby continues to serve
-clients normally — sync failures are logged and discarded.
+In production (Phase 1+), `mongod` runs as a systemd unit on the admin/
+data box with its data dir on a dedicated EBS volume
+(`/var/lib/mongodb`). The lobby reaches it over the VPC private
+network at `admin.silencer.internal:27017`. In local dev (`docker
+compose up`), it runs as the `mongo:7` container. Either way, sync
+failures are logged and discarded — the lobby never blocks on Mongo.
 
 ### MongoDB backups
 

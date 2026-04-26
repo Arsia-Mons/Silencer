@@ -1,0 +1,306 @@
+#cloud-config
+# Bootstraps the Silencer admin/data box:
+#   1. Mounts the two EBS data volumes BEFORE apt installs Mongo + LavinMQ
+#      (postinst writes initial state to the data dirs, so they MUST exist
+#      and MUST be on the data volumes when the package installs — otherwise
+#      the later mount hides the postinst output and the service won't start).
+#   2. Installs MongoDB 8.0 (cacheSizeGB: 0.25) and LavinMQ from their
+#      respective apt repos.
+#   3. Fetches Mongo + LavinMQ creds from SSM (via the instance IAM role)
+#      and creates the silencer users on the local Mongo + LavinMQ.
+#   4. Writes systemd units for silencer-admin-api / silencer-admin-web
+#      that run from OCI images. Both crash-loop quietly until the deploy
+#      workflow writes a real IMAGE= into /etc/silencer/<svc>.image.
+#   5. Joins the tailnet (admin-plane SSH only).
+#   6. Installs cloudflared as a service with the supplied tunnel token.
+#      No public ingress on the SG — cloudflared establishes outbound-only
+#      connections to Cloudflare. The tunnel's public-hostname routing
+#      (admin.arsiamons.com → /api/* + /socket.io/* → :24080, else :24000)
+#      is configured in the Cloudflare dashboard, not here.
+
+users:
+  - default
+  - name: silencer-admin
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/silencer-admin
+
+# Append GitHub Actions deploy key to ubuntu's authorized_keys.
+ssh_authorized_keys:
+  - ${deploy_ssh_public_key}
+
+# These mounts populate /etc/fstab. The actual mount happens later via
+# `mount -a` in runcmd, AFTER mkfs (idempotent format-only-if-missing).
+mounts:
+  - [ "LABEL=silencer-mongo",   /var/lib/mongodb, ext4, "defaults,nofail,x-systemd.device-timeout=30s", "0", "2" ]
+  - [ "LABEL=silencer-lavinmq", /var/lib/lavinmq, ext4, "defaults,nofail,x-systemd.device-timeout=30s", "0", "2" ]
+
+# Base packages installed inline (Mongo + LavinMQ are added via runcmd
+# because they require third-party apt repos to be set up first).
+# awscli is required for fetching SSM-managed runtime secrets.
+packages:
+  - docker.io
+  - jq
+  - curl
+  - gnupg
+  - awscli
+
+write_files:
+  # Pulls runtime secrets from SSM (via the instance IAM role) and renders
+  # /etc/silencer/admin-api.env. Idempotent — overwrites the file on every
+  # run, so this is also the rotation tool: update the SSM param, ssh in,
+  # run this script, then `systemctl restart silencer-admin-api`.
+  - path: /usr/local/sbin/silencer-fetch-secrets
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      REGION=${aws_region}
+      get() {
+        aws ssm get-parameter --region "$REGION" --name "$1" \
+          --with-decryption --query Parameter.Value --output text
+      }
+      MONGO_PWD=$(get /silencer/shared/mongo_silencer_password)
+      LAVINMQ_PWD=$(get /silencer/shared/lavinmq_silencer_password)
+      JWT=$(get /silencer/admin/jwt_secret)
+      GITHUB_TOKEN=$(get /silencer/admin/github_backup_token)
+      umask 077
+      mkdir -p /etc/silencer
+      cat > /etc/silencer/admin-api.env <<EOF
+      PORT=24080
+      MONGO_URL=mongodb://silencer:$MONGO_PWD@127.0.0.1:27017/silencer?authSource=silencer
+      AMQP_URL=amqp://silencer:$LAVINMQ_PWD@127.0.0.1:5672/
+      JWT_SECRET=$JWT
+      LOBBY_PLAYER_AUTH_URL=http://lobby.${internal_zone_name}:15171
+      BACKUP_DIR=/var/lib/silencer-backups
+      BACKUP_CRON=0 */6 * * *
+      BACKUP_KEEP=10
+      GITHUB_TOKEN=$GITHUB_TOKEN
+      GITHUB_BACKUP_REPO=${github_backup_repo}
+      EOF
+      chmod 0600 /etc/silencer/admin-api.env
+
+  - path: /etc/silencer/admin-web.env
+    permissions: '0600'
+    owner: root:root
+    content: |
+      PORT=24000
+      NODE_ENV=production
+      NEXT_TELEMETRY_DISABLED=1
+
+  # Image refs updated by the deploy workflow. EnvironmentFile-shape so
+  # systemd $${IMAGE} substitution works in ExecStart.
+  - path: /etc/silencer/admin-api.image
+    permissions: '0644'
+    owner: root:root
+    content: |
+      IMAGE=${admin_image_admin_api}
+
+  - path: /etc/silencer/admin-web.image
+    permissions: '0644'
+    owner: root:root
+    content: |
+      IMAGE=${admin_image_admin_web}
+
+  # MongoDB config override — appended to /etc/mongod.conf in runcmd.
+  # Only contains TRULY-NEW top-level keys (security:); any setting that
+  # collides with the apt-installed default (storage:, net:) is layered
+  # in via targeted sed/awk in runcmd to avoid duplicate top-level YAML
+  # keys (which mongod's parser resolves last-wins, silently shadowing
+  # storage.dbPath and net.bindIp).
+  - path: /etc/silencer/mongod-overrides.conf
+    permissions: '0644'
+    owner: root:root
+    content: |
+      # security.authorization: enabled — silencer Mongo user is created
+      # in runcmd with readWrite on the silencer DB (auth temporarily
+      # disabled for the bootstrap mongosh run, then re-enabled).
+      security:
+        authorization: enabled
+
+  # systemd unit: admin API (containerised). Image ref comes from
+  # /etc/silencer/admin-api.image; the deploy workflow writes that file
+  # then `systemctl restart silencer-admin-api`. Until the first deploy
+  # succeeds the unit crash-loops quietly (Restart=always) — same pattern
+  # the lobby uses for its binary.
+  - path: /etc/systemd/system/silencer-admin-api.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Silencer admin API
+      Documentation=https://github.com/Arsia-Mons/silencer/tree/main/services/admin-api
+      After=docker.service network-online.target var-lib-mongodb.mount var-lib-lavinmq.mount mongod.service lavinmq.service
+      Wants=docker.service network-online.target
+      Requires=docker.service
+
+      [Service]
+      Type=simple
+      EnvironmentFile=/etc/silencer/admin-api.image
+      ExecStartPre=-/usr/bin/docker rm -f silencer-admin-api
+      ExecStartPre=/bin/sh -c '[ -n "$${IMAGE}" ] && /usr/bin/docker pull "$${IMAGE}"'
+      ExecStart=/usr/bin/docker run --rm --name silencer-admin-api \
+        --network host \
+        --env-file /etc/silencer/admin-api.env \
+        -v /var/lib/silencer-backups:/backups \
+        $${IMAGE}
+      ExecStop=/usr/bin/docker stop silencer-admin-api
+      Restart=always
+      RestartSec=5
+      LimitNOFILE=65535
+
+      [Install]
+      WantedBy=multi-user.target
+
+  # systemd unit: admin web (containerised).
+  - path: /etc/systemd/system/silencer-admin-web.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Silencer admin web
+      Documentation=https://github.com/Arsia-Mons/silencer/tree/main/web/admin
+      After=docker.service network-online.target
+      Wants=docker.service network-online.target
+      Requires=docker.service
+
+      [Service]
+      Type=simple
+      EnvironmentFile=/etc/silencer/admin-web.image
+      ExecStartPre=-/usr/bin/docker rm -f silencer-admin-web
+      ExecStartPre=/bin/sh -c '[ -n "$${IMAGE}" ] && /usr/bin/docker pull "$${IMAGE}"'
+      ExecStart=/usr/bin/docker run --rm --name silencer-admin-web \
+        --network host \
+        --env-file /etc/silencer/admin-web.env \
+        $${IMAGE}
+      ExecStop=/usr/bin/docker stop silencer-admin-web
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # 1. Wait for both EBS data volumes to attach. aws_volume_attachment
+  #    fires after instance boot, so bootcmd would race; that's why this
+  #    polling loop lives in runcmd. Same pattern as the lobby's cloud-init.
+  - mkdir -p /var/lib/mongodb /var/lib/lavinmq /var/lib/silencer-backups
+  - |
+    for i in $(seq 1 60); do
+      [ -b /dev/nvme1n1 ] && [ -b /dev/nvme2n1 ] && break
+      sleep 2
+    done
+
+  # 2. Format the volumes ONLY if their labels are missing (idempotent
+  #    across reboots and instance replaces that re-attach existing volumes).
+  - |
+    if ! blkid -L silencer-mongo >/dev/null 2>&1; then
+      mkfs.ext4 -L silencer-mongo /dev/nvme1n1
+    fi
+  - |
+    if ! blkid -L silencer-lavinmq >/dev/null 2>&1; then
+      mkfs.ext4 -L silencer-lavinmq /dev/nvme2n1
+    fi
+
+  # 3. Mount via /etc/fstab populated by `mounts:` above. MUST happen
+  #    BEFORE we apt-install mongod / lavinmq, so the postinst writes
+  #    initial state onto the data volumes (not the root volume which
+  #    would later be hidden by the mount).
+  - mount -a
+
+  # 4. Add MongoDB 8.0 + LavinMQ apt repos.
+  - install -d -m 0755 /etc/apt/keyrings
+  - curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | gpg --dearmor -o /etc/apt/keyrings/mongodb-server-8.0.gpg
+  - |
+    echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/mongodb-server-8.0.gpg] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" \
+      > /etc/apt/sources.list.d/mongodb-org-8.0.list
+  - curl -1sLf 'https://repo.lavinmq.com/setup.deb.sh' | bash
+  - apt-get update
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y mongodb-org lavinmq
+
+  # 5. Configure mongod: layer our settings onto the apt-installed
+  #    default. PRIVATE_IP comes from instance metadata (IMDSv2).
+  #
+  #    Why three different mechanisms (sed / awk / cat-append)?
+  #    Mongo's YAML parser is last-wins on duplicate top-level keys, so
+  #    a single  cat overrides >> mongod.conf  with  storage:  and  net:
+  #    sections would silently shadow the default's  storage.dbPath  and
+  #    net.bindIp. We instead:
+  #      - sed: overwrite the existing  bindIp:  line in net:
+  #      - awk: inject  wiredTiger.engineConfig.cacheSizeGB  as a child
+  #        of the existing  storage:  section (one budget-of-record;
+  #        cap floor in docs/plans/2026-04-25-production-deployment-architecture.md)
+  #      - cat: append the security: block (a new top-level key, safe)
+  - |
+    TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 60")
+    PRIVATE_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/local-ipv4)
+    sed -i "s|^  bindIp:.*|  bindIp: 127.0.0.1,$PRIVATE_IP|" /etc/mongod.conf
+    awk '/^storage:$/{print; print "  wiredTiger:"; print "    engineConfig:"; print "      cacheSizeGB: 0.25"; next} {print}' /etc/mongod.conf > /etc/mongod.conf.new
+    mv /etc/mongod.conf.new /etc/mongod.conf
+    cat /etc/silencer/mongod-overrides.conf >> /etc/mongod.conf
+
+  # 6. Render /etc/silencer/admin-api.env from SSM. Done now (before mongod
+  #    starts) so the file is ready for the admin-api unit later, and so
+  #    a failure here aborts cloud-init early rather than silently leaving
+  #    admin-api crash-looping with empty creds.
+  - /usr/local/sbin/silencer-fetch-secrets
+
+  # 7. Start mongod WITH auth disabled to bootstrap the silencer user, then
+  #    re-enable auth + restart. The mongo password is fetched fresh from
+  #    SSM rather than parsed out of admin-api.env — keeps shell quoting
+  #    simple and avoids leaking the value through env files.
+  - sed -i 's|^  authorization: enabled|  authorization: disabled|' /etc/mongod.conf
+  - chown -R mongodb:mongodb /var/lib/mongodb
+  - systemctl daemon-reload
+  - systemctl enable --now mongod
+  - sleep 5
+  - |
+    MONGO_PWD=$(aws ssm get-parameter --region ${aws_region} \
+      --name /silencer/shared/mongo_silencer_password \
+      --with-decryption --query Parameter.Value --output text)
+    TMPF=$(mktemp); chmod 0600 "$TMPF"
+    cat > "$TMPF" <<EOF
+    use silencer;
+    db.createUser({user: "silencer", pwd: "$MONGO_PWD", roles: [ { role: "readWrite", db: "silencer" } ]});
+    EOF
+    mongosh --quiet --file "$TMPF"
+    rm -f "$TMPF"
+    unset MONGO_PWD
+  - sed -i 's|^  authorization: disabled|  authorization: enabled|' /etc/mongod.conf
+  - systemctl restart mongod
+
+  # 8. Configure LavinMQ: create silencer user with the SSM-supplied
+  #    password, grant full perms on the / vhost. lavinmqctl talks to
+  #    the local HTTP management API. Password passed via env to keep
+  #    it out of `ps` argv (lavinmqctl reads $LAVINMQ_PWD via shell).
+  - chown -R lavinmq:lavinmq /var/lib/lavinmq
+  - systemctl enable --now lavinmq
+  - sleep 3
+  - |
+    LAVINMQ_PWD=$(aws ssm get-parameter --region ${aws_region} \
+      --name /silencer/shared/lavinmq_silencer_password \
+      --with-decryption --query Parameter.Value --output text)
+    lavinmqctl add_user silencer "$LAVINMQ_PWD"
+    lavinmqctl set_permissions -p / silencer '.*' '.*' '.*'
+    unset LAVINMQ_PWD
+
+  # 9. Tailscale (mirrors the lobby's pattern: tag:server, --accept-dns=false).
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  - systemctl enable --now tailscaled
+  - tailscale up --authkey=${admin_tailscale_auth_key} --hostname=${admin_tailscale_hostname} --advertise-tags=tag:server --accept-dns=false --ssh=false
+
+  # 10. cloudflared as a tunnel client. The token alone is enough — the
+  #     public-hostname routing (admin.arsiamons.com → :24000 / :24080) is
+  #     configured in the Cloudflare dashboard. `service install` writes
+  #     /etc/systemd/system/cloudflared.service and starts it.
+  - curl -L --output /tmp/cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb
+  - dpkg -i /tmp/cloudflared.deb
+  - cloudflared service install ${cloudflare_tunnel_token}
+
+  # 11. Enable docker + the two app units. The app units crash-loop until
+  #     the deploy workflow writes real image refs to /etc/silencer/*.image.
+  - systemctl enable --now docker
+  - usermod -aG docker ubuntu
+  - systemctl enable silencer-admin-api silencer-admin-web
+  - systemctl start silencer-admin-api silencer-admin-web || true

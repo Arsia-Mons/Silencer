@@ -4,6 +4,8 @@
 #   - formats + mounts the data EBS volume at /var/lib/<project>
 #   - installs a systemd unit that runs the lobby binary with CAP_NET_BIND_SERVICE
 #     (so it can bind port 517 without running as root)
+#   - fetches Mongo + LavinMQ creds from SSM via the instance IAM role
+#     (see iam.tf) and writes /etc/silencer/lobby.env at first boot
 #
 # The binaries themselves are NOT deployed here — GitHub Actions scps them into
 # /opt/<project>/current/ post-boot. Until they land, the service will crash-loop
@@ -29,11 +31,38 @@ mounts:
 # Noble AMI already has SDL2 + zlib; these two were added when the auto-updater
 # PR made CURL + minizip unconditional dependencies of the unified binary.
 # Names carry the t64 suffix because of Ubuntu 24.04's time_t transition.
+# awscli is needed for fetching SSM-managed runtime secrets.
 packages:
   - libcurl4t64
   - libminizip1t64
+  - awscli
 
 write_files:
+  # Pulls Mongo + LavinMQ creds from SSM and writes /etc/silencer/lobby.env.
+  # Idempotent — overwrites the file on every run, so this is also the
+  # rotation tool: update the SSM param, ssh in, run this script, then
+  # `systemctl restart silencer-lobby`.
+  - path: /usr/local/sbin/silencer-fetch-secrets
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      REGION=${aws_region}
+      get() {
+        aws ssm get-parameter --region "$REGION" --name "$1" \
+          --with-decryption --query Parameter.Value --output text
+      }
+      MONGO_PWD=$(get /silencer/shared/mongo_silencer_password)
+      LAVINMQ_PWD=$(get /silencer/shared/lavinmq_silencer_password)
+      umask 077
+      mkdir -p /etc/silencer
+      cat > /etc/silencer/lobby.env <<EOF
+      MONGO_URL=mongodb://silencer:$MONGO_PWD@admin.${internal_zone_name}:27017/silencer?authSource=silencer
+      AMQP_URL=amqp://silencer:$LAVINMQ_PWD@admin.${internal_zone_name}:5672/
+      EOF
+      chmod 0600 /etc/silencer/lobby.env
+
   - path: /etc/systemd/system/${project_name}-lobby.service
     permissions: '0644'
     content: |
@@ -52,6 +81,7 @@ write_files:
       # Point HOME at the data volume so writes land inside ReadWritePaths
       # instead of /home/${project_name} (blocked by ProtectHome=true).
       Environment=HOME=/var/lib/${project_name}
+      EnvironmentFile=-/etc/silencer/lobby.env
       ExecStart=/opt/${project_name}/current/silencer-lobby \
         -addr :517 \
         -db /var/lib/${project_name}/lobby.json \
@@ -91,6 +121,13 @@ runcmd:
   # /opt is ubuntu-owned so GH Actions can scp releases; the service reads via world-exec.
   - chown -R ubuntu:ubuntu /opt/${project_name}
   - chown -R ${project_name}:${project_name} /var/lib/${project_name}
+  # Fetch runtime secrets from SSM and write /etc/silencer/lobby.env. MUST
+  # happen before silencer-lobby starts; the unit's EnvironmentFile= is
+  # marked optional (-prefix), so a missing file would just leave Mongo /
+  # AMQP unconfigured — code paths no-op gracefully but mongosync etc.
+  # would silently never run. Fetch failures here halt cloud-init via
+  # `set -euo pipefail` inside the script.
+  - /usr/local/sbin/silencer-fetch-secrets
   # Tailscale: joins tailnet as tag:server so GitHub Actions (tag:ci) can reach us
   # over WireGuard without exposing port 22. --accept-dns=false keeps the box's own
   # resolver (don't let MagicDNS interfere with AWS internal DNS).

@@ -22,16 +22,21 @@ const server = http.createServer(app);
 app.use(cors());
 app.use(express.json());
 
-app.use('/auth',     authRoutes);
-app.use('/players',  playerRoutes);
-app.use('/sessions', sessionRoutes);
-app.use('/events',   eventRoutes);
-app.use('/stats',    statsRoutes);
-app.use('/me',       meRoutes);
-app.use('/backup',     backupRoutes);
-app.use('/gamestats', gameStatsRoutes);
-
-app.get('/health', (_req, res) => res.json({ ok: true }));
+// Mount under /api so a single public hostname (admin.arsiamons.com) can host
+// both admin-web (the dashboard) and admin-api (this service) without path
+// collisions — admin-web has page routes at /players, /me, /health, /gamestats
+// that would otherwise shadow these endpoints.
+const api = express.Router();
+api.use('/auth',     authRoutes);
+api.use('/players',  playerRoutes);
+api.use('/sessions', sessionRoutes);
+api.use('/events',   eventRoutes);
+api.use('/stats',    statsRoutes);
+api.use('/me',       meRoutes);
+api.use('/backup',   backupRoutes);
+api.use('/gamestats', gameStatsRoutes);
+api.get('/health',   (_req, res) => res.json({ ok: true }));
+app.use('/api', api);
 
 async function seed() {
   const count = await AdminUser.countDocuments();

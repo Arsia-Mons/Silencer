@@ -1,22 +1,54 @@
 # infra/terraform — AWS infra
 
-Single EC2 host (ARM64 Graviton, `t4g.small`) that runs the Go lobby
-server and spawns `silencer -s` dedicated-server subprocesses per
-game. Elastic IP, optional Route 53 A record, dedicated EBS data
-volume mounted at `/var/lib/silencer`.
+Two EC2 hosts (ARM64 Graviton) in the default VPC, same subnet/AZ:
+
+- **Lobby box** (`aws_instance.lobby`, `t4g.small`) — runs the Go lobby
+  server and spawns `silencer -s` dedicated-server subprocesses per
+  game. Elastic IP, optional Route 53 A record, dedicated EBS data
+  volume mounted at `/var/lib/silencer`.
+- **Admin/data box** (`aws_instance.admin`, `t4g.small`) — runs
+  MongoDB + LavinMQ (apt-installed, each on its own EBS volume),
+  containerised admin-api + admin-web pulled from GHCR, and a
+  Cloudflare Tunnel daemon for public ingress to `admin.arsiamons.com`
+  with no public ports open on the SG.
+
+The two boxes talk over VPC private IPs via a shared private Route 53
+zone (`silencer.internal`), so cross-service hostnames stay stable
+across instance replacement.
 
 > For the stand-up-from-scratch walkthrough and day-2 ops, see
 > `docs/production.md`. This file covers the *why* of the Terraform
 > code; `docs/production.md` covers the *how* of running it.
 
-## Two-module split
+## File layout
 
 - `bootstrap/` — creates the S3 bucket + DynamoDB lock table that hold
   the main module's remote state. **Uses LOCAL state itself**
   (chicken-and-egg). Apply once per AWS account, then paste the
   `backend_hcl` output into `../backend.hcl` (gitignored).
-- `.` (root) — everything else: VPC lookup, security group, EC2, EIP,
-  EBS data volume, Route 53, cloud-init. Uses the S3 backend.
+- `main.tf` — provider, shared data sources (VPC, subnet, AMI, key
+  pair), lobby SG + EC2 + EIP + EBS + lobby Route 53.
+- `admin.tf` — admin/data box SG + EC2 + EIP + Mongo & LavinMQ EBS
+  volumes + cross-SG ingress rules to/from the lobby SG.
+- `dns.tf` — private `silencer.internal` Route 53 zone with A records
+  for both boxes. Resolves only inside the VPC.
+- `dlm.tf` — Data Lifecycle Manager: daily snapshots of the admin/data
+  box's two stateful EBS volumes (Mongo + LavinMQ), 7-day retention.
+- `cloud-init.yaml.tftpl` — lobby's bootstrap.
+- `cloud-init-admin.yaml.tftpl` — admin/data box's bootstrap. The
+  substantive one: mounts EBS, installs Mongo + LavinMQ, writes
+  systemd units for the containerised app workloads, joins Tailscale,
+  installs cloudflared.
+- `iam.tf` — instance IAM roles + profiles. Each box gets read access
+  to its own subset of `/silencer/*` SSM parameters; cloud-init shells
+  out to `aws ssm get-parameter --with-decryption` to materialise
+  runtime secrets into `/etc/silencer/*.env`.
+- `ssm.tf` — `data "aws_ssm_parameter"` blocks for *apply-time*
+  values (SSH pubkeys, Tailscale auth keys, Cloudflare tunnel token)
+  that have to be templated into resources at plan time. Their values
+  end up in tfstate; rotation is `aws ssm put-parameter` + `terraform
+  taint <instance>`. Anything that rotates more often is fetched at
+  runtime via the IAM role instead.
 
 Day-to-day you only touch the root module. `bootstrap/` is fire-and-forget.
 
@@ -30,6 +62,25 @@ there for emergency break-glass access from the admin's IP.
 
 `cloud-init.yaml.tftpl` runs `tailscale up --accept-dns=false` on
 purpose: we don't want MagicDNS overriding AWS's internal resolver.
+
+## Cross-SG inline rule cycles
+
+Lobby SG and admin SG reference each other (lobby allows :15171 from
+admin; admin allows :27017 + :5672 from lobby). Inline `ingress`
+blocks in both SGs would create a circular terraform dependency.
+**Always declare cross-SG rules as `aws_vpc_security_group_ingress_rule`
+resources** (see `admin.tf`) — not inline. Inline rules are reserved
+for CIDR-based ingress (SSH break-glass, public lobby ports).
+
+## cloud-init mount-before-install (admin box)
+
+`cloud-init-admin.yaml.tftpl` MUST mount `/var/lib/mongodb` and
+`/var/lib/lavinmq` from their EBS volumes BEFORE apt installs
+`mongodb-org` / `lavinmq`. The package postinst writes initial state
+into those paths; if it runs before the mount, the postinst output
+lands on the root volume and the later mount hides it — service won't
+start. Order in runcmd: wait-for-device → mkfs-if-missing → mount -a
+→ apt install → chown to package user → start service.
 
 ## cloud-init quirks (`cloud-init.yaml.tftpl`)
 
@@ -73,12 +124,102 @@ string (e.g. `"00024"`) only if you need to lock out older clients —
 and note that takes effect via cloud-init, which requires an instance
 replace.
 
-## Required secrets / vars
+## Admin app systemd units
 
-- `var.ssh_public_key` — admin key (also lives in AWS key pair)
-- `var.deploy_ssh_public_key` — paired private half lives in
-  `DEPLOY_SSH_KEY` repo secret; used by GH Actions only
-- `var.tailscale_auth_key` — one-time key tagged `tag:server`,
-  consumed once by cloud-init; rotate by replacing the instance
-- GH repo vars: `LOBBY_HOST`, `DEPLOY_HOST`
-- GH repo secrets: `TS_AUTHKEY` (runner's tailnet auth), `DEPLOY_SSH_KEY`
+`silencer-admin-api.service` and `silencer-admin-web.service` (cloud-init
+write_files) are containerised: each reads its image ref from
+`/etc/silencer/<svc>.image` (an `EnvironmentFile`-shape file with
+`IMAGE=ghcr.io/...:<sha>`) and `docker run`s with
+`--env-file /etc/silencer/<svc>.env`. The deploy workflows update the
+`.image` file then `systemctl restart`. Until the first deploy succeeds
+the units crash-loop quietly (`Restart=always`, same pattern as the
+lobby's binary). `--network host` so admin-api can reach the
+host-installed mongod and lavinmq on `127.0.0.1`.
+
+## Cloudflare Tunnel (no public ingress on admin SG)
+
+The admin/data box's SG opens NO public HTTP/S ports. `cloudflared` is
+installed via `cloudflared service install $TOKEN` and dials out to
+Cloudflare. Public-hostname routing for `admin.arsiamons.com` is
+configured in the Cloudflare dashboard, not here:
+
+| Path           | Origin                  |
+|----------------|-------------------------|
+| `/api/*`       | `http://localhost:24080` |
+| `/socket.io/*` | `http://localhost:24080` |
+| catch-all      | `http://localhost:24000` |
+
+This routing is what lets a single hostname host both admin-web (the
+dashboard) and admin-api (the REST + WS backend) without path
+collisions — admin-api mounts under `/api` so its endpoints never
+shadow admin-web's pages (`/players`, `/me`, `/health`, `/gamestats`).
+
+## Secrets — all in SSM Parameter Store
+
+Nothing sensitive lives in `terraform.tfvars` anymore. Every secret is
+an SSM `SecureString` (or plain `String` for SSH pubkeys) under
+`/silencer/*`. Seed them once with `infra/scripts/seed-ssm.sh`;
+teammates with IAM read access pull from the same source.
+
+### Param inventory
+
+| Param                                          | Type         | Consumer                                     | Mechanism                       |
+|------------------------------------------------|--------------|----------------------------------------------|---------------------------------|
+| `/silencer/shared/ssh_admin_pubkey`            | String       | `aws_key_pair.admin`                         | TF data → resource              |
+| `/silencer/shared/deploy_ssh_pubkey`           | String       | both boxes' `ssh_authorized_keys`            | TF data → user_data             |
+| `/silencer/shared/mongo_silencer_password`     | SecureString | mongod user create + admin-api + lobby       | **Runtime fetch (IAM role)**    |
+| `/silencer/shared/lavinmq_silencer_password`   | SecureString | lavinmq user create + admin-api + lobby      | **Runtime fetch (IAM role)**    |
+| `/silencer/lobby/tailscale_auth_key`           | SecureString | lobby cloud-init (one-shot)                  | TF data → user_data             |
+| `/silencer/admin/tailscale_auth_key`           | SecureString | admin cloud-init (one-shot)                  | TF data → user_data             |
+| `/silencer/admin/jwt_secret`                   | SecureString | admin-api                                    | **Runtime fetch (IAM role)**    |
+| `/silencer/admin/cloudflare_tunnel_token`      | SecureString | `cloudflared service install` (one-shot)     | TF data → user_data             |
+| `/silencer/admin/github_backup_token`          | SecureString | admin-api (optional; empty = backups off)    | **Runtime fetch (IAM role)**    |
+
+**Two mechanisms because of two different needs**:
+*TF data* values get baked into resources at apply time and end up in
+tfstate (encrypted at rest in the S3 backend). That's fine for one-shot
+values which are inert post-boot anyway. *Runtime fetch* values are
+read by the EC2 instance itself via its IAM role — they never enter
+tfstate, and rotation is `put-parameter` + ssh in + `silencer-fetch-secrets`
++ `systemctl restart`, no `terraform apply` needed.
+
+### Adding a new secret
+
+1. Add a `put_param` line to `infra/scripts/seed-ssm.sh`.
+2. **Runtime-fetched?** Add the ARN to `local.lobby_runtime_param_arns`
+   or `local.admin_runtime_param_arns` in `iam.tf`, then add a `get`
+   call in the relevant `silencer-fetch-secrets` block in cloud-init.
+3. **Apply-time?** Add a `data "aws_ssm_parameter"` to `ssm.tf`, then
+   reference `.value` in the `templatefile()` map.
+
+### Rotation flow (runtime-fetched secrets)
+
+```bash
+aws ssm put-parameter --name /silencer/.../foo --overwrite \
+  --type SecureString --value "$(openssl rand -base64 32)"
+
+# on the affected box:
+sudo /usr/local/sbin/silencer-fetch-secrets
+sudo systemctl restart silencer-admin-api  # or silencer-lobby
+```
+
+Rotating Mongo or LavinMQ passwords also requires a `mongosh` /
+`rabbitmqctl` user-update step and restarting *both* boxes' app units
+in order — SSM doesn't make that one-click, just removes
+`terraform apply` from the loop.
+
+### Rotation flow (apply-time secrets)
+
+```bash
+aws ssm put-parameter --name /silencer/lobby/tailscale_auth_key \
+  --overwrite --type SecureString --value "tskey-auth-..."
+terraform taint aws_instance.lobby
+terraform apply  # re-runs cloud-init with the new value
+```
+
+### GitHub Actions
+
+Repo vars (non-secret): `LOBBY_HOST`, `DEPLOY_HOST`, `ADMIN_DEPLOY_HOST`.
+Repo secrets: `DEPLOY_SSH_KEY` (paired with `/silencer/shared/deploy_ssh_pubkey`),
+`TS_AUTHKEY` (Tailscale auth for the GH Actions runner — separate from
+the box auth keys, reusable+ephemeral).

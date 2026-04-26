@@ -1,10 +1,52 @@
 # web/admin/ — Next.js 14 admin dashboard + player portal + designer
 
-App Router, Tailwind, Socket.IO client, JWT-in-localStorage auth.
-Routes, env vars, and the auth flow are in `README.md`; this file
-is for editing the code. Bun + TS migration is a separate future
-phase — the universal "JS = Bun + TS" rule is **deferred** here for
-now.
+Bun (1.x) + Next.js 14 (standalone), App Router, Tailwind, Socket.IO
+client, JWT-in-localStorage auth. Source is `.js` — Bun runs Next's
+build + standalone server.js unchanged. Routes, env vars, and the
+auth flow are in `README.md`; this file is for editing the code.
+
+The runtime + lockfile (`bun.lock`) moved to Bun in Phase 1 of the
+production deployment plan. Source-level migration to TS is deferred.
+
+## Production runtime (Phase 1)
+
+Containerised on the admin/data box. The systemd unit
+(`silencer-admin-web.service`) reads its image ref from
+`/etc/silencer/admin-web.image` and runs:
+
+```
+docker run --rm --network host --env-file /etc/silencer/admin-web.env $IMAGE
+```
+
+Public ingress is via Cloudflare Tunnel (`cloudflared` running on the
+same box, no ports open on the SG). The tunnel's public-hostname
+config in the Cloudflare dashboard routes:
+
+- `admin.arsiamons.com/api/*`       → `localhost:24080` (admin-api)
+- `admin.arsiamons.com/socket.io/*` → `localhost:24080` (admin-api)
+- `admin.arsiamons.com` catch-all   → `localhost:24000` (admin-web)
+
+That single hostname is what makes `lib/api.js` and `lib/socket.js`
+work with relative URLs in production.
+
+Deploy: `.github/workflows/deploy-admin-web.yml` is path-filtered to
+this directory. Builds ARM64 OCI image → GHCR → SSH → image-ref
+swap → systemctl restart. Same shape as admin-api's workflow.
+
+## NEXT_PUBLIC_* are empty in production
+
+The build args `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`,
+`NEXT_PUBLIC_MAP_API_URL` are intentionally **unset** in the prod
+Dockerfile build. That makes `lib/api.js` resolve `API` to `/api`
+(relative — Cloudflare Tunnel routes it) and `lib/socket.js` connect
+to the page origin (tunnel routes `/socket.io/*`). docker-compose
+passes them with `localhost:*` values for dev because the dev browser
+talks to admin-api on its own port directly.
+
+If you ever need to bake an explicit URL in (e.g. a separate
+`NEXT_PUBLIC_MAP_API_URL` for the lobby's map API), pass it as a
+`--build-arg` in the deploy workflow's `docker/build-push-action`
+step — don't put a default back in `next.config.mjs`.
 
 ## Per-route
 
@@ -63,10 +105,11 @@ now.
 - **Two distinct localStorage keys.** `zs_token` for admins,
   `zs_player_token` for players. Don't unify them — the player
   portal must never see admin-scope data on accident.
-- **All API URLs from env.** `NEXT_PUBLIC_API_URL` and
-  `NEXT_PUBLIC_WS_URL` are baked in at build time (Docker build
-  args). Don't hardcode `http://localhost:...` outside the
-  fallback in `next.config.mjs` / `lib/socket.js`.
+- **API URLs are relative in prod, absolute in dev.** `lib/api.js`
+  resolves to `${NEXT_PUBLIC_API_URL || ''}/api` and `lib/socket.js`
+  uses `NEXT_PUBLIC_WS_URL || ''` (which makes Socket.IO connect to
+  the page origin). Don't reintroduce a `'http://localhost:...'`
+  fallback — it'd ship in prod bundles and break the tunnel routing.
 - **`getSocket()` is a singleton** — don't create per-component
   sockets, you'll fan out duplicate `snapshot` events and waste a
   connection per mount.

@@ -1,8 +1,8 @@
-FROM node:22-alpine
+FROM oven/bun:1-alpine
 RUN apk add --no-cache mongodb-tools
 WORKDIR /app
-COPY package.json .
-RUN npm install --omit=dev
+COPY package.json bun.lock ./
+RUN bun install --production --frozen-lockfile
 COPY src/ src/
 EXPOSE 24080
-CMD ["node", "src/index.js"]
+CMD ["bun", "src/index.js"]

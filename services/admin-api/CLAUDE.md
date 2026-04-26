@@ -1,10 +1,50 @@
 # services/admin-api/ — Express admin REST + WebSocket API
 
-Node.js 22 (ESM) + Express 4 + Socket.IO 4 + Mongoose 8 + amqplib.
+Bun (1.x) + Express 4 + Socket.IO 4 + Mongoose 8 + amqplib. Source
+is `.js` (ESM) — Bun runs the existing Node-style code unchanged.
 Build/run, env vars, and the full route table are in `README.md`;
-this file is for editing the code. Bun + TS migration is a separate
-future phase — the universal "JS = Bun + TS" rule is **deferred**
-here for now.
+this file is for editing the code.
+
+The runtime + lockfile (`bun.lock`) moved to Bun in Phase 1 of the
+production deployment plan. The source-level migration to Bun + TS +
+Hono + native WebSocket + Drizzle is Phase 2 — defer wholesale
+rewrites until then.
+
+## Routes mount under `/api`
+
+`src/index.js` mounts every router under `/api/*` (e.g.
+`/api/auth/login`, `/api/players`, `/api/health`). This lets a single
+Cloudflare Tunnel hostname (`admin.arsiamons.com`) serve both
+admin-web and admin-api without path collisions — admin-web has
+page routes at `/players`, `/me`, `/health`, `/gamestats` that would
+otherwise shadow the API. The `/socket.io/*` upgrade is a peer
+endpoint Socket.IO mounts directly on the HTTP server (not under
+`/api`); the tunnel routes both `/api/*` and `/socket.io/*` to
+`localhost:24080`. **Don't add an `app.use(...)` outside the `/api`
+router** unless you also add a tunnel ingress rule for it.
+
+## Production runtime (Phase 1)
+
+Containerised on the admin/data box. The systemd unit
+(`silencer-admin-api.service`) reads its image ref from
+`/etc/silencer/admin-api.image` (an `EnvironmentFile`-shape file
+with `IMAGE=ghcr.io/...:<sha>`) and runs:
+
+```
+docker run --rm --network host --env-file /etc/silencer/admin-api.env $IMAGE
+```
+
+Env file (`/etc/silencer/admin-api.env`, mode 0600) is provisioned by
+cloud-init from terraform variables. `MONGO_URL` and `AMQP_URL`
+point at `127.0.0.1` (Mongo + LavinMQ run as systemd on the same box,
+host-networked).
+
+Deploy: `.github/workflows/deploy-admin-api.yml` is path-filtered to
+this directory. It builds an ARM64 OCI image, pushes to GHCR, SSHes
+to the admin/data box, overwrites `/etc/silencer/admin-api.image`,
+and `systemctl restart silencer-admin-api`. The unit crash-loops
+quietly (`Restart=always`) until the first deploy writes a real image
+ref.
 
 ## Per-file
 
@@ -12,7 +52,7 @@ here for now.
   routes, runs `seed()` (creates `admin/admin` superadmin on first
   boot), starts AMQP consumer + backup scheduler.
 - `src/config.js` — Single source of truth for `PORT`, `MONGO_URL`,
-  `RABBITMQ_URL`, `JWT_SECRET`, `LOBBY_PLAYER_AUTH_URL`. Defaults
+  `AMQP_URL`, `JWT_SECRET`, `LOBBY_PLAYER_AUTH_URL`. Defaults
   target local-dev (`localhost:28017`, `localhost:25672`).
 - `src/auth/jwt.js` — `signToken` / `verifyToken` + Express
   middlewares: `requireAuth` (any valid JWT), `requirePlayer`
@@ -87,14 +127,18 @@ here for now.
   and `25672` respectively (defaults in `config.js`) so local-dev
   outside Docker just works. Inside compose, the URLs become
   `mongodb://mongo:27017/silencer` and
-  `amqp://silencer:silencer@rabbitmq:5672/`.
+  `amqp://silencer:silencer@rabbitmq:5672/`. In production they're
+  both `127.0.0.1` (host-networked Mongo + LavinMQ on the admin/data
+  box).
 - **Default seed `admin/admin`** runs only if the `AdminUser`
   collection is empty. Don't ship to prod without changing it.
-- **`fetch` is global** (Node 22) — no `node-fetch` import needed.
-- **No `package-lock.json` -> `npm ci`** in the Dockerfile — uses
-  `npm install --omit=dev`. If you change dependencies, regenerate
-  the lockfile so future tooling has it pinned.
+- **`fetch` is global** in Bun (and was in Node 22) — no `node-fetch`
+  import needed.
+- **`bun install --frozen-lockfile`** is what the Dockerfile uses,
+  reading `bun.lock`. If you change dependencies, run `bun install`
+  locally so the lockfile updates before commit.
 - **Single AMQP queue, durable.** Restarting the API doesn't lose
-  events as long as RabbitMQ is up; restarting RabbitMQ without
-  durable storage will. The compose volume `rabbitmq-data` covers
-  that.
+  events as long as the broker is up; restarting LavinMQ/RabbitMQ
+  without durable storage will. The compose volume `rabbitmq-data`
+  covers that for dev; in prod the LavinMQ data dir is on its own
+  EBS volume (`/var/lib/lavinmq`).

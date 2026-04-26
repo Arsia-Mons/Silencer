@@ -42,6 +42,7 @@ by default. On macOS that requires `sudo`; use any unprivileged port
 | variable | meaning |
 |---|---|
 | `MONGO_URL` | MongoDB connection string for async player sync (e.g. `mongodb://mongo:27017/silencer`). Leave empty to disable MongoDB sync entirely. |
+| `AMQP_URL` | AMQP broker URL for event publishing (e.g. `amqp://silencer:silencer@rabbitmq:5672/` in compose, LavinMQ in prod). Equivalent to `-amqp-url`. Leave empty to disable. |
 
 ## How it works
 

@@ -18,13 +18,13 @@ config.cfg
 PALETTECALC*.BIN
 
 # Terraform
-terraform/**/.terraform/
-terraform/**/*.tfstate
-terraform/**/*.tfstate.*
-terraform/**/*.tfvars
-!terraform/**/*.tfvars.example
-terraform/**/backend.hcl
-!terraform/**/backend.hcl.example
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+!**/*.tfvars.example
+**/backend.hcl
+!**/backend.hcl.example
 
 # Node.js
 node_modules/
