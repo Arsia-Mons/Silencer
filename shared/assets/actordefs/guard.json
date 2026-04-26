@@ -1771,5 +1771,215 @@
         }
       ]
     }
+  },
+  "stateMachine": {
+    "initial": "STANDING",
+    "positions": {},
+    "transitions": [
+      {
+        "id": "i91hzl4",
+        "from": "STANDING",
+        "to": "WALKING",
+        "condition": "velocity_nonzero"
+      },
+      {
+        "id": "orw3c33",
+        "from": "WALKING",
+        "to": "STANDING",
+        "condition": "velocity_zero"
+      },
+      {
+        "id": "k8hgflr",
+        "from": "STANDING",
+        "to": "LOOKING",
+        "condition": "look_timer"
+      },
+      {
+        "id": "9xhx1wv",
+        "from": "LOOKING",
+        "to": "STANDING",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "ktvt034",
+        "from": "STANDING",
+        "to": "CROUCHING",
+        "condition": "crouch_pressed"
+      },
+      {
+        "id": "yp71mtn",
+        "from": "WALKING",
+        "to": "CROUCHING",
+        "condition": "crouch_pressed"
+      },
+      {
+        "id": "g4sta27",
+        "from": "CROUCHING",
+        "to": "CROUCHED",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "ztsz2iw",
+        "from": "CROUCHED",
+        "to": "UNCROUCHING",
+        "condition": "crouch_released"
+      },
+      {
+        "id": "myuw2z2",
+        "from": "UNCROUCHING",
+        "to": "STANDING",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "kkvuxxy",
+        "from": "STANDING",
+        "to": "SHOOTSTANDING",
+        "condition": "player_visible"
+      },
+      {
+        "id": "oxdcsar",
+        "from": "WALKING",
+        "to": "SHOOTSTANDING",
+        "condition": "player_visible"
+      },
+      {
+        "id": "gmiv67k",
+        "from": "SHOOTSTANDING",
+        "to": "STANDING",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "ok1vl7c",
+        "from": "STANDING",
+        "to": "SHOOTUP",
+        "condition": "player_above"
+      },
+      {
+        "id": "c1cs89u",
+        "from": "SHOOTUP",
+        "to": "STANDING",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "e6jc0fj",
+        "from": "STANDING",
+        "to": "SHOOTDOWN",
+        "condition": "player_below"
+      },
+      {
+        "id": "l6qhccx",
+        "from": "SHOOTDOWN",
+        "to": "STANDING",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "2hxvq5o",
+        "from": "STANDING",
+        "to": "SHOOTUPANGLE",
+        "condition": "player_above_angle"
+      },
+      {
+        "id": "14jp7tk",
+        "from": "SHOOTUPANGLE",
+        "to": "STANDING",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "x9r1d7y",
+        "from": "STANDING",
+        "to": "SHOOTDOWNANGLE",
+        "condition": "player_below_angle"
+      },
+      {
+        "id": "jpg1jh1",
+        "from": "SHOOTDOWNANGLE",
+        "to": "STANDING",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "gougi00",
+        "from": "CROUCHED",
+        "to": "SHOOTCROUCHED",
+        "condition": "player_visible"
+      },
+      {
+        "id": "2b2n74i",
+        "from": "SHOOTCROUCHED",
+        "to": "CROUCHED",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "oh2ncr9",
+        "from": "STANDING",
+        "to": "LADDER",
+        "condition": "on_ladder"
+      },
+      {
+        "id": "2ipdshp",
+        "from": "LADDER",
+        "to": "STANDING",
+        "condition": "off_ladder"
+      },
+      {
+        "id": "e0en62m",
+        "from": "LADDER",
+        "to": "SHOOTLADDERUP",
+        "condition": "player_above"
+      },
+      {
+        "id": "wz1wqdq",
+        "from": "SHOOTLADDERUP",
+        "to": "LADDER",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "jarmupo",
+        "from": "LADDER",
+        "to": "SHOOTLADDERDOWN",
+        "condition": "player_below"
+      },
+      {
+        "id": "ikwky5o",
+        "from": "SHOOTLADDERDOWN",
+        "to": "LADDER",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "awriaq2",
+        "from": "STANDING",
+        "to": "HIT",
+        "condition": "damage_received"
+      },
+      {
+        "id": "umqjlxn",
+        "from": "WALKING",
+        "to": "HIT",
+        "condition": "damage_received"
+      },
+      {
+        "id": "82yit09",
+        "from": "HIT",
+        "to": "STANDING",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "88un6k3",
+        "from": "STANDING",
+        "to": "DYING",
+        "condition": "hp_zero"
+      },
+      {
+        "id": "3yw8rvp",
+        "from": "WALKING",
+        "to": "DYING",
+        "condition": "hp_zero"
+      },
+      {
+        "id": "mgnb5ei",
+        "from": "CROUCHED",
+        "to": "DYING",
+        "condition": "hp_zero"
+      }
+    ]
   }
 }
