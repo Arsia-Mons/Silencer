@@ -13,6 +13,8 @@ import statsRoutes   from './routes/stats.js';
 import meRoutes      from './routes/me.js';
 import backupRoutes     from './routes/backup.js';
 import gameStatsRoutes from './routes/gamestats.js';
+import spritesRoutes   from './routes/sprites.js';
+import actorsRoutes    from './routes/actors.js';
 import { startBackupScheduler } from './backup/scheduler.js';
 import AdminUser from './db/models/AdminUser.js';
 
@@ -35,6 +37,8 @@ api.use('/stats',    statsRoutes);
 api.use('/me',       meRoutes);
 api.use('/backup',   backupRoutes);
 api.use('/gamestats', gameStatsRoutes);
+api.use('/sprites',   spritesRoutes);
+api.use('/actors',    actorsRoutes);
 api.get('/health',   (_req, res) => res.json({ ok: true }));
 app.use('/api', api);
 

@@ -4,9 +4,11 @@
 #include "shared.h"
 #include "palette.h"
 #include "surface.h"
+#include "actordef.h"
 #include <map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 class Resources
@@ -28,6 +30,7 @@ public:
 	std::map<std::string, Mix_Chunk *> soundbank;
 	Mix_Music * menumusic;
 	Mix_Music * gamemusic;
+	std::unordered_map<std::string, ActorDef> actordefs;
 
 private:
 	void MirrorY(Surface * surface);

@@ -35,3 +35,4 @@ web/admin/.next/
 # Git worktrees (claude-code superpowers)
 .worktrees/
 
+clients/silencer/build_test/

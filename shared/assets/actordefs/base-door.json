@@ -1,0 +1,29 @@
+{
+  "id": "base-door",
+  "props": { "hp": 0, "shield": 0, "speed": 0, "faction": "neutral", "spawnWeight": 0 },
+  "sequences": {
+    "CLOSED": { "loop": true, "frames": [
+      { "bank": 101, "index": 0, "duration": 4, "hurtbox": [-20, -80, 20, 0] }
+    ]},
+    "OPENING": { "loop": false, "frames": [
+      { "bank": 101, "index":  0, "duration": 2, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 101, "index":  2, "duration": 2, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 101, "index":  4, "duration": 2, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 101, "index":  6, "duration": 2, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 101, "index":  8, "duration": 2, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 101, "index": 10, "duration": 2, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 101, "index": 12, "duration": 2, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 101, "index": 14, "duration": 2, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 101, "index": 16, "duration": 2, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 101, "index": 18, "duration": 2, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 101, "index": 20, "duration": 2, "hurtbox": [-20, -80, 20, 0] }
+    ]},
+    "OPEN": { "loop": true, "frames": [
+      { "bank": 100, "index": 0, "duration": 4, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 100, "index": 1, "duration": 4, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 100, "index": 2, "duration": 4, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 100, "index": 3, "duration": 4, "hurtbox": [-20, -80, 20, 0] },
+      { "bank": 100, "index": 4, "duration": 4, "hurtbox": [-20, -80, 20, 0] }
+    ]}
+  }
+}

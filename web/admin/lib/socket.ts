@@ -64,3 +64,8 @@ export function useSocket(events: Record<string, (...args: unknown[]) => void>):
 
   return connected;
 }
+
+/** Lightweight hook — just the connection status, no event subscriptions. */
+export function useWsConnected(): boolean {
+  return useSocket({});
+}

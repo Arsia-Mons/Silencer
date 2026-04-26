@@ -1,0 +1,382 @@
+{
+  "id": "fixed-cannon",
+  "props": {
+    "hp": 120,
+    "shield": 0,
+    "speed": 0,
+    "faction": "enemy",
+    "spawnWeight": 1
+  },
+  "sequences": {
+    "IDLE": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 90,
+          "index": 0,
+          "duration": 6,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        }
+      ]
+    },
+    "SHOOTRIGHT": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 91,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 91,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 91,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 91,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 91,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 91,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 91,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 91,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 91,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        }
+      ]
+    },
+    "SHOOTUP": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 92,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 92,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 92,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 92,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 92,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 92,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 92,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 92,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 92,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        }
+      ]
+    },
+    "SHOOTDOWN": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 93,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 93,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 93,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 93,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 93,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 93,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 93,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 93,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        },
+        {
+          "bank": 93,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -30,
+            -62,
+            30,
+            0
+          ]
+        }
+      ]
+    }
+  },
+  "stateMachine": {
+    "initial": "IDLE",
+    "positions": {},
+    "transitions": [
+      {
+        "id": "z2kmyt5",
+        "from": "IDLE",
+        "to": "SHOOTRIGHT",
+        "condition": "player_right"
+      },
+      {
+        "id": "j8z0fz4",
+        "from": "IDLE",
+        "to": "SHOOTUP",
+        "condition": "player_above"
+      },
+      {
+        "id": "j65gw89",
+        "from": "IDLE",
+        "to": "SHOOTDOWN",
+        "condition": "player_below"
+      },
+      {
+        "id": "vze7i72",
+        "from": "SHOOTRIGHT",
+        "to": "IDLE",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "yd4boda",
+        "from": "SHOOTUP",
+        "to": "IDLE",
+        "condition": "sequence_complete"
+      },
+      {
+        "id": "8gmkei1",
+        "from": "SHOOTDOWN",
+        "to": "IDLE",
+        "condition": "sequence_complete"
+      }
+    ]
+  }
+}

@@ -89,8 +89,10 @@ services:
       BACKUP_KEEP: "10"
       GITHUB_TOKEN: "${GITHUB_TOKEN:-}"
       GITHUB_BACKUP_REPO: "${GITHUB_BACKUP_REPO:-Arsia-Mons/silencer-mongo-backup}"
+      ASSETS_DIR: "/assets"
     volumes:
       - backup-data:/backups
+      - ../shared/assets:/assets:ro
     restart: unless-stopped
 
   admin-web:

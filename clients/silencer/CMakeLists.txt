@@ -2,6 +2,19 @@ cmake_minimum_required(VERSION 3.15)
 
 project(Silencer)
 
+include(FetchContent)
+
+# nlohmann/json — header-only, C++14 compatible
+FetchContent_Declare(
+	nlohmann_json
+	URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp
+	URL_HASH SHA256=9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6
+	DOWNLOAD_NO_EXTRACT TRUE
+)
+FetchContent_MakeAvailable(nlohmann_json)
+# Expose a simple include dir so we can do #include "nlohmann/json.hpp"
+set(NLOHMANN_JSON_INCLUDE_DIR "${nlohmann_json_SOURCE_DIR}")
+
 # Linux GNU lowercase convention; macOS/Windows pick up mixed-case via
 # bundle/output-name overrides below.
 set(SILENCER_TARGET silencer)
@@ -138,6 +151,7 @@ else()
 endif()
 
 include_directories(${ZLIB_INCLUDE_DIRS})
+include_directories(${NLOHMANN_JSON_INCLUDE_DIR})
 find_package(SDL3_mixer REQUIRED CONFIG)
 if(TARGET SDL3_mixer::SDL3_mixer)
   get_target_property(_sdl3mixer_inc SDL3_mixer::SDL3_mixer INTERFACE_INCLUDE_DIRECTORIES)

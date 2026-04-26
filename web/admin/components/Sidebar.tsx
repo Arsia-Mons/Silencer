@@ -5,7 +5,7 @@ import { logout } from '../lib/auth';
 import { useMemo } from 'react';
 
 interface Props {
-  wsConnected: boolean;
+  wsConnected?: boolean;
 }
 
 const ROLE_RANK: Record<string, number> = { viewer: 0, moderator: 1, manager: 2, admin: 3, superadmin: 4 };
@@ -23,6 +23,7 @@ const NAV = [
   { href: '/players',   label: '[ PLAYERS ]',         icon: '◈', minRank: 0 },
   { href: '/audit',     label: '[ AUDIT LOG ]',        icon: '◧', minRank: 0 },
   { href: '/users',      label: '[ USER MGMT ]',        icon: '⬡', minRank: 3 }, // admin+
+  { href: '/actors',    label: '[ ACTOR EDITOR ]',     icon: '◉', minRank: 3 }, // admin+
   { href: '/designer',  label: '[ MAP DESIGNER ]',     icon: '◫', minRank: 3 }, // admin+
   { href: '/health',    label: '[ SERVER HEALTH ]',    icon: '◎', minRank: 0 },
   { href: '/changelog', label: '[ CHANGELOG ]',        icon: '◑', minRank: 0 },
@@ -41,11 +42,13 @@ export default function Sidebar({ wsConnected }: Props) {
         <div className="text-game-textDim text-xs tracking-widest mt-0.5">ADMIN CONSOLE</div>
       </div>
 
-      {/* Live indicator */}
-      <div className="px-4 py-2 border-b border-game-border flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-game-primary animate-pulse' : 'bg-game-danger'}`} />
-        <span className="text-xs text-game-textDim">{wsConnected ? 'LIVE' : 'OFFLINE'}</span>
-      </div>
+      {/* Live indicator — only shown on pages that use WebSocket */}
+      {wsConnected !== undefined && (
+        <div className="px-4 py-2 border-b border-game-border flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-game-primary animate-pulse' : 'bg-game-danger'}`} />
+          <span className="text-xs text-game-textDim">{wsConnected ? 'LIVE' : 'OFFLINE'}</span>
+        </div>
+      )}
 
       {/* Nav */}
       <nav className="flex-1 py-4">
