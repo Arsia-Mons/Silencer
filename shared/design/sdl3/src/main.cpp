@@ -672,8 +672,29 @@ static int RunDumpOptionsControls(const std::string &assets_dir,
                  thumb.w, thumb.h, thumb.offset_x, thumb.offset_y);
   }
 
-  // C4 gate stops here: scrollbar zone visually matches reference via bake-in.
-  // C5 will populate the Save/Cancel buttons at the bottom of the frame.
+  // 6) Save / Cancel: two B196x33 buttons at the bottom (y=117). Same chrome
+  //    sprite (bank 6 idx 7) and font (bank 135 advance 11, brightness 128) as
+  //    OPTIONS / OPTIONSAUDIO / OPTIONSDISPLAY.
+  struct ButtonSpec {
+    const char *text;
+    int x;
+    int y;
+  };
+  const std::array<ButtonSpec, 2> buttons = {{
+      {"Save", -200, 117},
+      {"Cancel", 20, 117},
+  }};
+  for (const auto &b : buttons) {
+    const Sprite &chrome = sprites.Get(6, 7);
+    BlitSprite(fb, chrome, b.x, b.y, nullptr);
+
+    int len = static_cast<int>(std::strlen(b.text));
+    int xoff = (196 - len * 11) / 2;
+    int textX = b.x - chrome.offset_x + xoff;
+    int textY = b.y - chrome.offset_y + 8;
+    DrawText(fb, textX, textY, b.text, /*bank=*/135, /*advance=*/11, sprites,
+             palette, kSubMenu, /*brightness=*/128);
+  }
 
   std::filesystem::create_directories(dump_dir);
   std::string out = dump_dir + "/screen_00.ppm";

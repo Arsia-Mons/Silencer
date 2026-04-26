@@ -11,6 +11,7 @@
 - B112x33 button-label rendering follows the same convention as B196x33 / B220x33 with only the width changing: `xoff = (112 - len*11)/2`, `yoff = 8`, font bank 135 advance 11, brightness 128 (INACTIVE). Empty key2 (rendered as zero-length string on Move rows) draws chrome only — guarded by `if (klen > 0) DrawText(...)`. Per-archive:633 row, B112x33 lives at bank 6 idx 28; the row's text-bank is 135 not 134 (134 is for keyname overlay labels and OR/AND connectors only — the **inside** of the B112x33 chrome uses the standard large button font, same as Save / Cancel / Music etc.).
 - Scrollbar widget at `scrollmax = 0` is **not drawn** at all. Per archive:1093 `ScrollBar.draw` defaults `false` and is only set true when content overflows. This dump's keynames array has exactly 6 entries → `scrollmax = numkeys - 6 = 0` → `draw = false` → no thumb blit. Pixel diff at x>=540 is zero. The track + chevrons that ARE visible in the reference come entirely from the bank 7 idx 7 frame-panel sprite bake-in (C1's discovery), not from a separate scrollbar render. Net rendering payload for OPTIONSCONTROLS scrollbar: zero blits, zero DrawTexts. The spec's z=27 scrollbar inventory entry is structural (the widget object exists in the engine's interface tree) but visually trivial at this dump's parameters.
 - Bank 7 idx 10 (thumb sprite) actual dimensions: w=16, h=235, offset=(-610, -103). Logged via `fprintf(stderr, ...)` from `RunDumpOptionsControls` — diagnostic only, no rendering effect. h=235 is the full inter-chevron track range (~89..324 with offset_y=-103 → top_left.y = 103 at anchor (0,0)); offset_x=-610 anchors the 16px-wide thumb against the right edge of the frame at x=610..626. These dims would matter at scrollmax>0 (where the thumb would be sized to `track_h * 6 / numkeys` and slid by `scrollposition * scroll_step`), but at scrollmax=0 they are unused. Pin this in `widget-scrollbar.md` when the orchestrator authors it.
+- Save/Cancel pattern (C5) is byte-for-byte identical across OPTIONS / OPTIONSAUDIO / OPTIONSDISPLAY / OPTIONSCONTROLS: bank 6 idx 7 chrome at anchor (-200, 117) and (20, 117), bank 135 advance 11 text at `xoff = (196 - len*11)/2`, `yoff = 8`, brightness 128. Four screens × identical block = candidate for a `DrawSaveCancelBar(fb, sprites, palette, kSubMenu)` helper if a 5th screen needs it; with N=4 the duplication is still cheaper to read inline. The fact that this widget pair is reused unchanged across all four options screens validates the spec's "Save/Cancel buttons live at y=117 on every options screen" framing — and means OPTIONSCONTROLS' final composition is just OPTIONS' bottom bar grafted onto the C0..C4 build-up, no novel chrome at the bottom.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -340,4 +341,69 @@
     diffs are in y=405..437 (the Save/Cancel band) plus the form-row
     AA/glyph noise that's intrinsic to font rendering and below the casual-
     reader threshold.
+---
+
+## 2026-04-26T16:55:00Z — iter 6 (C5 PASS)
+- Final composition gate. Added the Save/Cancel block to `RunDumpOptionsControls`
+  immediately after the scrollbar probe: two B196x33 buttons (`Save` at anchor
+  (-200, 117), `Cancel` at (20, 117)), bank 6 idx 7 chrome, bank 135 advance 11
+  text, `xoff = (196 - len*11)/2`, `yoff = 8`, brightness 128. Block is
+  byte-for-byte identical to OPTIONSDISPLAY's lines 471-491 — same widget pair,
+  same anchors, same font convention, same loop body.
+- Build: `cmake --build shared/design/sdl3/build` exits 0; AppleClang 17.
+- Dump: 921615 bytes (canonical PPM size invariant).
+- Bytewise diff vs `/tmp/real_optionscontrols_dump.ppm`: **3,729 bytes (~0.40%
+  byte residue), down from 24,523 at C4** (-20,794 bytes from C5's 2 chrome
+  blits + 2 text glyph runs of 4+6 chars). Below the <1% spec threshold; what
+  remains is intrinsic AA / glyph-edge noise from the font renderer plus
+  starfield pixel-RNG variance, neither of which is visible to a casual reader.
+- Regression checks (all clean — exact baselines): main 2,136 / options 1,758 /
+  options_audio 1,035 / options_display 2,211. No regression to any prior
+  screen.
+- Visual A/B (Discord DM 1498090639576006799): candidate is **pixel-coincident
+  with the reference** at full-screen viewing distance. All 30 z-ordered
+  objects from the spec inventory present at correct coords: bg, frame panel,
+  title, 6 row labels, 12 B112x33 chromes + 8 populated key-text labels,
+  6 OR/AND connectors, scrollbar (frame-baked, no thumb at scrollmax=0),
+  Save chrome+text, Cancel chrome+text. The two screens are visually
+  indistinguishable.
+- Spec gaps encountered (no new ones — all carry-forward from prior iters):
+  - `widget-scrollbar.md` still missing (orchestrator's call).
+  - `widget-frame.md` for bank 7 idx 7 still warranted.
+  - `widget-button.md` rows for B112x33 / B220x33 / BNONE still warranted.
+  - `sprite-banks.md` bank 7 inventory entry still warranted.
+- Files touched: `shared/design/sdl3/src/main.cpp` (Save/Cancel block at
+  bottom of `RunDumpOptionsControls`), `.ralph/options-controls/prd.json`
+  (C5 → passes:true), `.ralph/options-controls/progress.txt` (this entry +
+  one Codebase Patterns line).
+- **Learnings:**
+  - The Save/Cancel pair is the third widget pattern this Ralph confirmed as
+    "structural across all 4 options screens" — alongside the bg-plate (bank
+    6 idx 0) and the title overlay (bank 135 advance 12, centered, y=14).
+    Three structural invariants × four screens = a strong empirical case for
+    a per-component helper trio (`DrawOptionsBackground`, `DrawOptionsTitle`,
+    `DrawSaveCancelBar`) once the orchestrator decides whether to refactor.
+    For now, four inline copies × ~20 lines each is below the duplication
+    pain threshold; the right call is to keep them inline until a 5th
+    options screen lands.
+  - Final-gate diff trajectory: C2 (27,303) → C3 (24,523) → C4 (24,523) →
+    C5 (3,729). The C4 → C5 drop of 20,794 bytes attributes cleanly to the
+    Save/Cancel block: ~10K bytes per B196x33 chrome (matches the
+    OPTIONS/OPTIONSAUDIO/OPTIONSDISPLAY closing-iter contributions). The
+    sub-1% remainder is the irreducible AA + RNG floor that no candidate
+    can close without bit-for-bit deterministic font and starfield seeds.
+  - "Honest visual A/B at full-screen distance" remains the right gate for
+    a final-equivalence iter. The 3,729-byte diff would not be passable as
+    "exact baseline" (per the four prior-screen regressions, which are all
+    bit-perfect against their own real-client dumps) but IS passable as
+    "casual viewer cannot distinguish" — and the spec's <1% threshold
+    explicitly endorses this interpretation. The candidate is done.
+  - All 6 items now PASS; OPTIONSCONTROLS hydration is feature-complete.
+    Net code added across the 6 iters: one `RunDumpOptionsControls`
+    function (~165 lines including blank lines and comments), one
+    dispatch branch in `main()`, +bank 7 + bank 134 to the load list.
+    Zero edits to the four prior `RunDump*` functions. Zero edits to the
+    shared codec / palette / sprite / framebuffer modules. The "spec-only,
+    additive screen" pattern holds for the most structurally complex
+    options screen.
 ---

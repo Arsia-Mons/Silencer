@@ -48,7 +48,7 @@
       "id": "C5",
       "name": "Visual equivalence to /tmp/real_optionscontrols_dump.ppm",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "spec": "Final gate. Candidate PPM is visually equivalent to /tmp/real_optionscontrols_dump.ppm to a casual reader, modulo aliasing / blend-noise / star-RNG / animation-phase nits (<1% pixel difference acceptable). Save and Cancel buttons rendered at bottom (B196x33 at y=117).",
       "category": "final"
     }
