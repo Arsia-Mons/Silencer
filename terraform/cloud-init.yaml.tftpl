@@ -34,6 +34,18 @@ packages:
   - libminizip1t64
 
 write_files:
+  # Lobby talks to the admin/data box (Mongo + LavinMQ) over the VPC
+  # private network using internal DNS. Connection failures are logged
+  # and retried (mongosync + events publisher are both graceful when
+  # their target is down), so this file is harmless if the admin box
+  # isn't up yet — the lobby just no-ops those code paths until it is.
+  - path: /etc/silencer/lobby.env
+    permissions: '0600'
+    owner: root:root
+    content: |
+      MONGO_URL=mongodb://silencer:${mongo_silencer_password}@admin.${internal_zone_name}:27017/silencer?authSource=silencer
+      AMQP_URL=amqp://silencer:${lavinmq_silencer_password}@admin.${internal_zone_name}:5672/
+
   - path: /etc/systemd/system/${project_name}-lobby.service
     permissions: '0644'
     content: |
@@ -52,6 +64,7 @@ write_files:
       # Point HOME at the data volume so writes land inside ReadWritePaths
       # instead of /home/${project_name} (blocked by ProtectHome=true).
       Environment=HOME=/var/lib/${project_name}
+      EnvironmentFile=-/etc/silencer/lobby.env
       ExecStart=/opt/${project_name}/current/silencer-lobby \
         -addr :517 \
         -db /var/lib/${project_name}/lobby.json \

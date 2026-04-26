@@ -20,3 +20,47 @@ deploy_ssh_public_key = "ssh-ed25519 AAAA... gh-actions-deploy"
 # instance_type        = "t4g.small"
 # ebs_volume_size      = 8
 # lobby_version_string = "00024"  # default "" accepts any client version
+
+# -------------------------------------------------------------------
+# Admin / data box (Phase 1 — production deployment architecture)
+# -------------------------------------------------------------------
+
+# Required application credentials — sensitive; cloud-init writes them
+# into /etc/silencer/*.env (mode 0600). Generate strong values with e.g.
+# `openssl rand -base64 32`. Rotation = change here, taint the affected
+# instance, apply.
+mongo_silencer_password   = "REPLACE_ME"
+lavinmq_silencer_password = "REPLACE_ME"
+jwt_secret                = "REPLACE_ME"
+
+# One-time pre-authorized Tailscale auth key for the admin box. Separate
+# from the lobby's. Generate at https://login.tailscale.com/admin/settings/keys
+# (reusable=no, ephemeral=no, pre-approved, tag:server).
+admin_tailscale_auth_key = "tskey-auth-..."
+
+# Cloudflare Tunnel token. Create the tunnel in the Cloudflare dashboard
+# (Zero Trust → Networks → Tunnels → Create a tunnel → Cloudflared) — the
+# token shown after creation goes here. Configure the tunnel's
+# Public Hostname routing in the dashboard:
+#   admin.arsiamons.com  /api/*       → http://localhost:24080
+#   admin.arsiamons.com  /socket.io/* → http://localhost:24080
+#   admin.arsiamons.com  (catch-all)  → http://localhost:24000
+cloudflare_tunnel_token = "eyJhI..."
+
+# Optional — enables admin-api's Mongo backup commits to a separate repo.
+# PAT needs `repo` scope.
+# github_backup_token = "ghp_..."
+# github_backup_repo  = "Arsia-Mons/silencer-mongo-backup"
+
+# Optional sizing overrides:
+# admin_instance_type       = "t4g.small"
+# admin_root_volume_size    = 16
+# admin_mongo_volume_size   = 10
+# admin_lavinmq_volume_size = 5
+# admin_tailscale_hostname  = "silencer-admin"
+# internal_zone_name        = "silencer.internal"
+
+# Optional initial image refs (deploy workflow updates these at run time
+# via /etc/silencer/<svc>.image — leave empty for first apply).
+# admin_image_admin_api = ""
+# admin_image_admin_web = ""
