@@ -1,0 +1,20 @@
+## Codebase Patterns
+<!-- Patterns this Ralph discovers. Patterns from prior Ralphs:
+.ralph/{main-menu,options,options-audio,options-display}/progress.txt
+— read those first. -->
+
+## 2026-04-26T00:00:00Z — INIT
+- Ralph scaffolded by setup conversation.
+- Baseline: shared/design/sdl3/ already renders main_menu, OPTIONS hub,
+  OPTIONSAUDIO, OPTIONSDISPLAY equivalent to references. Title overlay,
+  B196x33 + B220x33 buttons, on/off pill indicators, screen-switch
+  pattern all validated.
+- Reference dump: /tmp/real_optionscontrols_dump.ppm (do not regenerate).
+- Spec input: docs/design/screen-options-controls.md (authoritative, but
+  acknowledges several spec gaps to flag back here).
+- New widget surface: bank 7 idx 7 frame panel; B112x33 button; BNONE
+  text-container button; scrollbar (no widget-scrollbar.md exists yet).
+- 6-row form pattern is structurally new (prior screens have 0..2 rows).
+- Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
+- **Learnings:** none yet.
+---
