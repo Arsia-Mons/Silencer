@@ -40,7 +40,7 @@
       "id": "A4",
       "name": "Visual equivalence to /tmp/real_optionsaudio_dump.ppm",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "spec": "Final gate. Candidate PPM is visually equivalent to /tmp/real_optionsaudio_dump.ppm to a casual reader, modulo aliasing / blend-noise / star-RNG / animation-phase nits (<1% pixel difference acceptable).",
       "category": "final"
     }
