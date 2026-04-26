@@ -118,6 +118,8 @@ void Robot::InitBT() {
 
 	// ReturnToSpawn: after search phase (!patrol, state_i >= 100), walk back to spawn and sleep.
 	// If a target is spotted en-route, reset the search timer and resume hunting.
+	// Only sleeps after state_i >= 140 to ensure the robot has spent time walking back
+	// (prevents instant sleep when robot is already near spawn).
 	btctx_.actions["ReturnToSpawn"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		if (patrol) return BTResult::Failure;
@@ -129,7 +131,7 @@ void Robot::InitBT() {
 		}
 		// Orient toward spawn and let Patrol move us there
 		mirrored = (signed(originalx) < signed(x));
-		if (abs(signed(x) - signed(originalx)) <= 20) {
+		if (state_i >= 140 && abs(signed(x) - signed(originalx)) <= 20) {
 			state = SLEEPING;
 			state_i = -1;
 			return BTResult::Success;
@@ -425,6 +427,11 @@ void Robot::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 				peer->stats.robotskilled++;
 			}
 		}
+	} else if (health > 0 && (state == ASLEEP || state == SLEEPING)) {
+		StopAmbience();
+		EmitSound(world, world.resources.soundbank["robotarm.wav"], 128);
+		state = AWAKENING;
+		state_i = -1;
 	}
 }
 
