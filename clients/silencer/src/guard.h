@@ -39,7 +39,8 @@ private:
 	Uint32 lastshot;
 	const BehaviorTree* bt_;
 	BTContext btctx_;
-	int bt_walk_ticks_ = 0; // non-serialized alert/search timer for BT
+	int bt_walk_ticks_ = 0;      // non-serialized alert/search timer for BT
+	int bt_ladder_cooldown_ = 0; // ticks to wait before attempting another ladder climb
 };
 
 #endif

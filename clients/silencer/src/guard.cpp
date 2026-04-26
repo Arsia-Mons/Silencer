@@ -231,7 +231,7 @@ void Guard::InitBT(){
 					// <=80px: keep current direction to avoid oscillation
 					// Climb ladder toward target if on a meaningfully different level
 					int ydiff = signed(obj->y) - signed(y);
-					if(abs(ydiff) > 48){
+					if(abs(ydiff) > 48 && bt_ladder_cooldown_ == 0){
 						Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
 						if(ladder && state == WALKING){
 							Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
@@ -239,9 +239,11 @@ void Guard::InitBT(){
 								if(ydiff < 0 && signed(ladder->y1) < signed(y)){
 									// player above, ladder goes up
 									x = center; yv = -5; state = LADDER; state_i = 0;
+									bt_ladder_cooldown_ = 120; // 2s cooldown before re-climbing
 								} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
 									// player below, ladder goes down
 									x = center; yv = 5; state = LADDER; state_i = 0;
+									bt_ladder_cooldown_ = 120;
 								}
 							}
 						}
@@ -266,15 +268,17 @@ void Guard::InitBT(){
 			mirrored = (signed(originalx) < signed(x));
 			// Climb ladders back to original level
 			int ydiff = signed(originaly) - signed(y);
-			if(abs(ydiff) > 48){
+			if(abs(ydiff) > 48 && bt_ladder_cooldown_ == 0){
 				Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
 				if(ladder && state == WALKING){
 					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
 					if(abs(signed(center) - signed(x)) <= 8){
 						if(ydiff < 0 && signed(ladder->y1) < signed(y)){
 							x = center; yv = -5; state = LADDER; state_i = 0;
+							bt_ladder_cooldown_ = 120;
 						} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
 							x = center; yv = 5; state = LADDER; state_i = 0;
+							bt_ladder_cooldown_ = 120;
 						}
 					}
 				}
@@ -317,6 +321,7 @@ void Guard::Tick(World & world){
 	if (bt_) {
 		if (state == WALKING) bt_walk_ticks_++;
 		else if (!chasing) bt_walk_ticks_ = 0;
+		if (bt_ladder_cooldown_ > 0) bt_ladder_cooldown_--;
 	}
 
 	// Original priority interrupt for combat — runs every tick, exact semantics preserved
