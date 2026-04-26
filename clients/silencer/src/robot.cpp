@@ -54,11 +54,12 @@ void Robot::InitBT() {
 	};
 
 	// LookSides: only from WALKING — short side rays to orient toward target.
+	// Always returns Failure so the Selector continues to Patrol (orient + move each tick).
 	btctx_.actions["LookSides"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
-		if (Look(world, 2)) { mirrored = true;  return BTResult::Success; }
-		if (Look(world, 1)) { mirrored = false; return BTResult::Success; }
+		if (Look(world, 2)) { mirrored = true; }
+		else if (Look(world, 1)) { mirrored = false; }
 		return BTResult::Failure;
 	};
 
