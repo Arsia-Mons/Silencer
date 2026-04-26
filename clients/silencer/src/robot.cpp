@@ -28,6 +28,103 @@ Robot::Robot() : Object(ObjectTypes::ROBOT){
 	shootcooldown = 0;
 }
 
+void Robot::InitBT() {
+	bt_ = BehaviorTreeLibrary::instance().get("robot");
+	if (!bt_) return;
+
+	// WakeUp: only fires from ASLEEP — look both sides, awaken if target found.
+	btctx_.actions["WakeUp"] = [this](BTContext& ctx) -> BTResult {
+		if (state != ASLEEP) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		bool found = Look(world, 1) || Look(world, 2);
+		if (!found) return BTResult::Failure;
+		state = AWAKENING;
+		state_i = -1;
+		return BTResult::Success;
+	};
+
+	// LookForward: only from WALKING — long-range forward shoot ray.
+	btctx_.actions["LookForward"] = [this](BTContext& ctx) -> BTResult {
+		if (state != WALKING) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		if (!Look(world, 0)) return BTResult::Failure;
+		state = SHOOTING;
+		state_i = -1;
+		return BTResult::Success;
+	};
+
+	// LookSides: only from WALKING — short side rays to orient toward target.
+	btctx_.actions["LookSides"] = [this](BTContext& ctx) -> BTResult {
+		if (state != WALKING) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		if (Look(world, 2)) { mirrored = true;  return BTResult::Success; }
+		if (Look(world, 1)) { mirrored = false; return BTResult::Success; }
+		return BTResult::Failure;
+	};
+
+	// MeleeCheck: only from WALKING, throttled to every 40 ticks.
+	btctx_.actions["MeleeCheck"] = [this](BTContext& ctx) -> BTResult {
+		if (state != WALKING) return BTResult::Failure;
+		if (state_i % 40 != 0) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		int x1, y1, x2, y2;
+		GetAABB(world.resources, &x1, &y1, &x2, &y2);
+		std::vector<Uint8> types;
+		types.push_back(ObjectTypes::PLAYER);
+		types.push_back(ObjectTypes::FIXEDCANNON);
+		types.push_back(ObjectTypes::GUARD);
+		std::vector<Object*> objects = world.TestAABB(x1, y1, x2, y2, types);
+		bool meleed = false;
+		for (auto* obj : objects) {
+			switch (obj->type) {
+				case ObjectTypes::PLAYER: {
+					Player* player = static_cast<Player*>(obj);
+					Team* team = player->GetTeam(world);
+					if (!player->IsDisguised() && !player->IsInvisible(world)
+					    && (team && team->id != virusplanter) && !player->HasSecurityPass()) {
+						Melee(*obj, world); meleed = true;
+					}
+				} break;
+				case ObjectTypes::FIXEDCANNON: {
+					FixedCannon* fc = static_cast<FixedCannon*>(obj);
+					if (fc->teamid != virusplanter) { Melee(*obj, world); meleed = true; }
+				} break;
+				case ObjectTypes::GUARD: {
+					if (world.IsSecurity(*obj) && !world.IsSecurity(*this)) {
+						Melee(*obj, world); meleed = true;
+					}
+				} break;
+			}
+		}
+		if (meleed) {
+			StopAmbience();
+			EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
+			return BTResult::Success;
+		}
+		return BTResult::Failure;
+	};
+
+	// Patrol: only from WALKING — move, follow ground, flip at wall.
+	btctx_.actions["Patrol"] = [this](BTContext& ctx) -> BTResult {
+		if (state != WALKING) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		xv = mirrored ? -4 : 4;
+		FollowGround(*this, world, xv);
+		if (DistanceToEnd(*this, world) <= world.minwalldistance) mirrored = !mirrored;
+		return BTResult::Success;
+	};
+
+	// Sleep: from WALKING when non-patrol and walk timer expired.
+	btctx_.actions["Sleep"] = [this](BTContext& ctx) -> BTResult {
+		if (state != WALKING) return BTResult::Failure;
+		if (patrol) return BTResult::Failure;
+		if (state_i < 100) return BTResult::Failure;
+		state = SLEEPING;
+		state_i = -1;
+		return BTResult::Success;
+	};
+}
+
 void Robot::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
 	data.Serialize(write, state, old);
@@ -59,20 +156,6 @@ void Robot::Tick(World & world){
 					state = ASLEEP;
 				}
 			}
-			/*yv += world.gravity;
-			if(yv > world.maxyvelocity){
-				yv = world.maxyvelocity;
-			}
-			Uint32 xe = x + xv;
-			Uint32 ye = y + yv;
-			Platform * platform = world.map.TestLine(x, y, xe, ye, &xe, &ye, Platform::RECTANGLE | Platform::STAIRSDOWN | Platform::STAIRSDOWN);
-			if(platform){
-				currentplatformid = platform->id;
-				state = WALKING;
-				state_i = 0;
-			}
-			x = xe;
-			y = ye;*/
 		}break;
 		case SLEEPING:{
 			if(state_i >= 15){
@@ -89,10 +172,13 @@ void Robot::Tick(World & world){
 			}
 			res_bank = 47;
 			res_index = 0;
-			if(Look(world, 1) || Look(world, 2)){
-				state = AWAKENING;
-				state_i = -1;
-				break;
+			if (bt_) {
+				// BT handles wakeup
+			} else {
+				if(Look(world, 1) || Look(world, 2)){
+					state = AWAKENING;
+					state_i = -1;
+				}
 			}
 		}break;
 		case AWAKENING:{
@@ -120,67 +206,65 @@ void Robot::Tick(World & world){
 				StopAmbience();
 				EmitSound(world, world.resources.soundbank["robot3l.wav"], 48);
 			}
-			if(state_i >= 100 && !patrol){
-				state = SLEEPING;
-				state_i = -1;
-				break;
-			}
-			if(Look(world, 0)){
-				state = SHOOTING;
-				state_i = -1;
-				break;
-			}
-			if(Look(world, 2)){
-				mirrored = true;
-			}
-			if(Look(world, 1)){
-				mirrored = false;
-			}
-			if(state_i % 40 == 0){
-				int x1, y1, x2, y2;
-				GetAABB(world.resources, &x1, &y1, &x2, &y2);
-				std::vector<Uint8> types;
-				types.push_back(ObjectTypes::PLAYER);
-				types.push_back(ObjectTypes::FIXEDCANNON);
-				types.push_back(ObjectTypes::GUARD);
-				std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types);
-				bool meleed = false;
-				for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
-					switch((*it)->type){
-						case ObjectTypes::PLAYER:{
-							Player * player = static_cast<Player *>(*it);
-							Team * team = player->GetTeam(world);
-							if(!player->IsDisguised() && !player->IsInvisible(world) && (team && team->id != virusplanter) && !player->HasSecurityPass()){
-								Melee(*(*it), world);
-								meleed = true;
-							}
-						}break;
-						case ObjectTypes::FIXEDCANNON:{
-							FixedCannon * fixedcannon = static_cast<FixedCannon *>(*it);
-							if(fixedcannon->teamid != virusplanter){
-								Melee(*(*it), world);
-								meleed = true;
-							}
-						}break;
-						case ObjectTypes::GUARD:{
-							if(world.IsSecurity(*(*it)) && !world.IsSecurity(*this)){
-								Melee(*(*it), world);
-								meleed = true;
-							}
-						}break;
-					}
-				}
-				if(meleed){
-					StopAmbience();
-					EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
-				}
-			}
 			res_bank = 45;
 			res_index = state_i % 20;
-			xv = mirrored ? -4 : 4;
-			FollowGround(*this, world, xv);
-			if(DistanceToEnd(*this, world) <= world.minwalldistance){
-				mirrored = mirrored ? false : true;
+			if (!bt_) {
+				if(state_i >= 100 && !patrol){
+					state = SLEEPING;
+					state_i = -1;
+					break;
+				}
+				if(Look(world, 0)){
+					state = SHOOTING;
+					state_i = -1;
+					break;
+				}
+				if(Look(world, 2)){ mirrored = true; }
+				if(Look(world, 1)){ mirrored = false; }
+				if(state_i % 40 == 0){
+					int x1, y1, x2, y2;
+					GetAABB(world.resources, &x1, &y1, &x2, &y2);
+					std::vector<Uint8> types;
+					types.push_back(ObjectTypes::PLAYER);
+					types.push_back(ObjectTypes::FIXEDCANNON);
+					types.push_back(ObjectTypes::GUARD);
+					std::vector<Object *> objects = world.TestAABB(x1, y1, x2, y2, types);
+					bool meleed = false;
+					for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
+						switch((*it)->type){
+							case ObjectTypes::PLAYER:{
+								Player * player = static_cast<Player *>(*it);
+								Team * team = player->GetTeam(world);
+								if(!player->IsDisguised() && !player->IsInvisible(world) && (team && team->id != virusplanter) && !player->HasSecurityPass()){
+									Melee(*(*it), world);
+									meleed = true;
+								}
+							}break;
+							case ObjectTypes::FIXEDCANNON:{
+								FixedCannon * fixedcannon = static_cast<FixedCannon *>(*it);
+								if(fixedcannon->teamid != virusplanter){
+									Melee(*(*it), world);
+									meleed = true;
+								}
+							}break;
+							case ObjectTypes::GUARD:{
+								if(world.IsSecurity(*(*it)) && !world.IsSecurity(*this)){
+									Melee(*(*it), world);
+									meleed = true;
+								}
+							}break;
+						}
+					}
+					if(meleed){
+						StopAmbience();
+						EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
+					}
+				}
+				xv = mirrored ? -4 : 4;
+				FollowGround(*this, world, xv);
+				if(DistanceToEnd(*this, world) <= world.minwalldistance){
+					mirrored = mirrored ? false : true;
+				}
 			}
 		}break;
 		case SHOOTING:{
@@ -218,9 +302,6 @@ void Robot::Tick(World & world){
 				}
 				shootcooldown = 1;
 			}
-			/*if(state_i == 18){
-				Audio::GetInstance().EmitSound(id, world.resources.soundbank["rocket4.wav"], 128);
-			}*/
 		}break;
 		case DYING:{
 			if(state_i == 0){
@@ -276,22 +357,6 @@ void Robot::Tick(World & world){
 			}
 		}break;
 		case DEAD:{
-			/*collidable = false;
-			res_bank = 48;
-			res_index = 15;
-			if(state_i >= 24){
-				draw = false;
-				if(state_i == 240){
-					state = ASLEEP;
-					state_i = -1;
-					state_warp = 12;
-					draw = true;
-					//collidable = true;
-					health = maxhealth;
-					shield = maxshield;
-					break;
-				}
-			}*/
 			StopAmbience();
 			collidable = false;
 			virusplanter = 0;
@@ -315,6 +380,15 @@ void Robot::Tick(World & world){
 			}
 		}break;
 	}
+
+	// BT drives decisions in ASLEEP and WALKING only.
+	if (!bt_) InitBT();
+	if (bt_ && (state == ASLEEP || state == WALKING)) {
+		btctx_.userData = &world;
+		btctx_.bbSet("patrol", (bool)patrol);
+		bt_->tick(btctx_);
+	}
+
 	if(damaging){
 		damaging++;
 		if(damaging > 24){

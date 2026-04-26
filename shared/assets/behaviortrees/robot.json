@@ -2,78 +2,22 @@
   "version": 1,
   "id": "robot",
   "blackboard": [
-    { "key": "target_adjacent", "type": "bool", "default": false },
-    { "key": "target_nearby",   "type": "bool", "default": false },
-    { "key": "patrol",          "type": "bool", "default": false }
+    { "key": "patrol", "type": "bool", "default": false }
   ],
   "rootId": "root",
   "nodes": {
     "root": {
       "type": "Selector",
       "label": "Robot AI",
-      "children": ["seq_melee", "seq_shoot", "seq_patrol", "leaf_sleep"],
+      "children": ["leaf_wakeup", "leaf_lookforward", "leaf_melee", "leaf_looksides", "leaf_sleep", "leaf_patrol"],
       "props": {}
     },
-    "seq_melee": {
-      "type": "Sequence",
-      "label": "Melee if adjacent",
-      "children": ["cond_adjacent", "leaf_melee"],
-      "props": {}
-    },
-    "cond_adjacent": {
-      "type": "Condition",
-      "label": "target_adjacent?",
-      "children": [],
-      "props": { "key": "target_adjacent", "op": "==", "value": true }
-    },
-    "leaf_melee": {
-      "type": "Leaf",
-      "label": "Melee",
-      "children": [],
-      "props": { "action": "Melee" }
-    },
-    "seq_shoot": {
-      "type": "Sequence",
-      "label": "Shoot if in sight",
-      "children": ["cond_nearby", "leaf_shoot"],
-      "props": {}
-    },
-    "cond_nearby": {
-      "type": "Condition",
-      "label": "target_nearby?",
-      "children": [],
-      "props": { "key": "target_nearby", "op": "==", "value": true }
-    },
-    "leaf_shoot": {
-      "type": "Leaf",
-      "label": "Shoot",
-      "children": [],
-      "props": { "action": "Shoot" }
-    },
-    "seq_patrol": {
-      "type": "Sequence",
-      "label": "Patrol if set",
-      "children": ["cond_patrol", "leaf_patrol"],
-      "props": {}
-    },
-    "cond_patrol": {
-      "type": "Condition",
-      "label": "patrol?",
-      "children": [],
-      "props": { "key": "patrol", "op": "==", "value": true }
-    },
-    "leaf_patrol": {
-      "type": "Leaf",
-      "label": "Patrol",
-      "children": [],
-      "props": { "action": "Patrol" }
-    },
-    "leaf_sleep": {
-      "type": "Leaf",
-      "label": "Sleep",
-      "children": [],
-      "props": { "action": "Sleep" }
-    }
+    "leaf_wakeup":      { "type": "Leaf", "label": "Wake up",         "children": [], "props": { "action": "WakeUp"      } },
+    "leaf_lookforward": { "type": "Leaf", "label": "Shoot if seen",   "children": [], "props": { "action": "LookForward" } },
+    "leaf_melee":       { "type": "Leaf", "label": "Melee adjacent",  "children": [], "props": { "action": "MeleeCheck"  } },
+    "leaf_looksides":   { "type": "Leaf", "label": "Orient to target","children": [], "props": { "action": "LookSides"   } },
+    "leaf_sleep":       { "type": "Leaf", "label": "Go to sleep",     "children": [], "props": { "action": "Sleep"       } },
+    "leaf_patrol":      { "type": "Leaf", "label": "Patrol walk",     "children": [], "props": { "action": "Patrol"      } }
   },
   "positions": {}
 }
