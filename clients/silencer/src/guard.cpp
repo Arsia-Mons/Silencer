@@ -229,17 +229,20 @@ void Guard::InitBT(){
 						mirrored = (obj->x < x); // orient toward target
 					}
 					// <=80px: keep current direction to avoid oscillation
-					// Climb ladder toward target if on a different level
-					Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
-					if(ladder && state == WALKING){
-						Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-						if(abs(signed(center) - signed(x)) <= 8){
-							if(signed(obj->y) < signed(y) && signed(ladder->y1) < signed(y)){
-								// player above, ladder goes up
-								x = center; yv = -5; state = LADDER; state_i = 0;
-							} else if(signed(obj->y) > signed(y) && signed(ladder->y2) > signed(y)){
-								// player below, ladder goes down
-								x = center; yv = 5; state = LADDER; state_i = 0;
+					// Climb ladder toward target if on a meaningfully different level
+					int ydiff = signed(obj->y) - signed(y);
+					if(abs(ydiff) > 48){
+						Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
+						if(ladder && state == WALKING){
+							Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+							if(abs(signed(center) - signed(x)) <= 8){
+								if(ydiff < 0 && signed(ladder->y1) < signed(y)){
+									// player above, ladder goes up
+									x = center; yv = -5; state = LADDER; state_i = 0;
+								} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
+									// player below, ladder goes down
+									x = center; yv = 5; state = LADDER; state_i = 0;
+								}
 							}
 						}
 					}
@@ -249,7 +252,7 @@ void Guard::InitBT(){
 			}
 			return BTResult::Running;
 		}
-		// Return-to-post phase: ensure WALKING and face toward spawn
+		// Return-to-post phase: face toward spawn, climb ladders back if needed
 		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
 		if (abs(signed(x) - signed(originalx)) <= 20) {
 			chasing = 0;
@@ -261,6 +264,21 @@ void Guard::InitBT(){
 		}
 		if (state != LADDER) {
 			mirrored = (signed(originalx) < signed(x));
+			// Climb ladders back to original level
+			int ydiff = signed(originaly) - signed(y);
+			if(abs(ydiff) > 48){
+				Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
+				if(ladder && state == WALKING){
+					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+					if(abs(signed(center) - signed(x)) <= 8){
+						if(ydiff < 0 && signed(ladder->y1) < signed(y)){
+							x = center; yv = -5; state = LADDER; state_i = 0;
+						} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
+							x = center; yv = 5; state = LADDER; state_i = 0;
+						}
+					}
+				}
+			}
 		}
 		return BTResult::Running;
 	};
