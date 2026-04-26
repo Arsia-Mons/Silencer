@@ -27,7 +27,27 @@
 #include "grenade.h"
 #include "bodypart.h"
 #include "walldefense.h"
+#include "actordef.h"
 #include <math.h>
+
+// Apply a data-driven animation sequence to res_bank/res_index.
+// Returns true if the sequence was found and applied; false → caller keeps its hardcoded fallback.
+static bool ApplyActorSeq(World & world,
+                           const char * actor_id,
+                           const char * seq_name,
+                           int state_i,
+                           Uint8 & res_bank,
+                           Uint8 & res_index) {
+	auto it = world.resources.actordefs.find(actor_id);
+	if (it == world.resources.actordefs.end()) return false;
+	auto sit = it->second.sequences.find(seq_name);
+	if (sit == it->second.sequences.end()) return false;
+	const FrameDef * fd = sit->second.Resolve(state_i);
+	if (!fd) return false;
+	res_bank  = fd->bank;
+	res_index = fd->index;
+	return true;
+}
 
 Player::Player() : Object(ObjectTypes::PLAYER){
 	hassecret = false;
@@ -1078,12 +1098,12 @@ void Player::Tick(World & world){
 		case DEPLOYING:{
 			Uint8 deploywait = 60;
 			if(state_i >= deploywait){
-				//if(state_i == deploywait){
-				//	Audio::GetInstance().EmitSound(id, world.resources.soundbank["transrev.wav"], 96);
-				//}
 				draw = true;
-				res_bank = 68;
-				res_index = (state_i - deploywait);
+				int anim_i = state_i - deploywait;
+				if(!ApplyActorSeq(world, "player", "DEPLOYING", anim_i, res_bank, res_index)){
+					res_bank  = 68;
+					res_index = anim_i;
+				}
 				if(state_i >= deploywait + 8){
 					state = STANDING;
 					state_i = -1;
@@ -1099,8 +1119,10 @@ void Player::Tick(World & world){
 			if(state_i == 0 && !world.winningteamid){
 				EmitSound(world, world.resources.soundbank["transrev.wav"], 96);
 			}
-			res_bank = 68;
-			res_index = (8 - state_i);
+			if(!ApplyActorSeq(world, "player", "UNDEPLOYING", state_i, res_bank, res_index)){
+				res_bank  = 68;
+				res_index = (8 - state_i);
+			}
 			if(state_i > 8){
 				draw = false;
 				if(!GetPeer(world)){
@@ -1516,8 +1538,10 @@ void Player::Tick(World & world){
 			}
 			collidable = false;
 			xv = 0;
-			res_bank = 19;
-			res_index = state_i;
+			if(!ApplyActorSeq(world, "player", "WALKIN", state_i, res_bank, res_index)){
+				res_bank  = 19;
+				res_index = state_i;
+			}
 			if(state_i == 1){
 				EmitSound(world, world.resources.soundbank["portpas2.wav"], 32);
 			}
@@ -1555,8 +1579,10 @@ void Player::Tick(World & world){
 			if(state_i == 0){
 				EmitSound(world, world.resources.soundbank["portpas2.wav"], 32);
 			}
-			res_bank = 19;
-			res_index = 15 - state_i;
+			if(!ApplyActorSeq(world, "player", "WALKOUT", state_i, res_bank, res_index)){
+				res_bank  = 19;
+				res_index = 15 - state_i;
+			}
 			if(state_i >= 15){
 				collidable = true;
 				currentplatformid = 0;
@@ -1585,6 +1611,10 @@ void Player::Tick(World & world){
 			}
 			res_bank = 17;
 			res_index = state_i;
+			if(!ApplyActorSeq(world, "player", "CROUCHING", state_i, res_bank, res_index)){
+				res_bank  = 17;
+				res_index = state_i;
+			}
 			if(state_i >= 4){
 				if(input.keymoveleft || input.keymoveright){
 					if(input.keymoveleft){
@@ -1603,8 +1633,10 @@ void Player::Tick(World & world){
 		}break;
 		case UNCROUCHING:{
 			xv = 0;
-			res_bank = 17;
-			res_index = 4 - state_i;
+			if(!ApplyActorSeq(world, "player", "UNCROUCHING", state_i, res_bank, res_index)){
+				res_bank  = 17;
+				res_index = 4 - state_i;
+			}
 			if(state_i >= 4){
 				if(input.keymoveright || input.keymoveleft){
 					state = RUNNING;
@@ -1628,8 +1660,10 @@ void Player::Tick(World & world){
 				}
 			}
 			xv = 0;
-			res_bank = 18;
-			res_index = state_i / 3;
+			if(!ApplyActorSeq(world, "player", "CROUCHED", state_i, res_bank, res_index)){
+				res_bank  = 18;
+				res_index = state_i / 3;
+			}
 			if(!input.keymovedown){
 				state = UNCROUCHING;
 				state_i = -1;
@@ -1713,8 +1747,10 @@ void Player::Tick(World & world){
 		}break;
 		case CROUCHEDTHROWING:{
 			xv = 0;
-			res_bank = 114;
-			res_index = state_i;
+			if(!ApplyActorSeq(world, "player", "CROUCHEDTHROWING", state_i, res_bank, res_index)){
+				res_bank  = 114;
+				res_index = state_i;
+			}
 			if(!input.keymovedown){
 				state = UNCROUCHING;
 				state_i = -1;
@@ -1738,9 +1774,11 @@ void Player::Tick(World & world){
 		}break;
 		case ROLLING:{
 			xv = mirrored ? -12 : 12;
-			res_bank = 88;
-			res_index = state_i;
-			if(res_index == 0){
+			if(!ApplyActorSeq(world, "player", "ROLLING", state_i, res_bank, res_index)){
+				res_bank  = 88;
+				res_index = state_i;
+			}
+			if(res_index == 0 && res_bank == 88){
 				EmitSound(world, world.resources.soundbank["roll2.wav"], 32);
 			}
 			if(state_i >= 8){
@@ -1753,8 +1791,12 @@ void Player::Tick(World & world){
 					}
 				}
 				xv = 0;
-				res_bank = 18;
-				res_index = (state_i - 8) / 2;
+				// Only apply hardcoded bank-18 fallback if actor def didn't handle this tick
+				auto it = world.resources.actordefs.find("player");
+				if(it == world.resources.actordefs.end() || !it->second.sequences.count("ROLLING")){
+					res_bank  = 18;
+					res_index = (state_i - 8) / 2;
+				}
 				if((input.keymoveright || input.keymoveleft) && !input.keymovedown){
 					state = RUNNING;
 					state_i = -1;

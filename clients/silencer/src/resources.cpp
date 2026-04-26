@@ -29,6 +29,10 @@ bool Resources::Load(Game & game, bool dedicatedserver){
 	if(!LoadSounds(game, dedicatedserver)){
 		//return false;
 	}
+	int ndefs = LoadActorDefs(GetResDir() + "actordefs", actordefs);
+	if(ndefs > 0){
+		fprintf(stderr, "[actordef] loaded %d actor definition(s)\n", ndefs);
+	}
 	return true;
 }
 
