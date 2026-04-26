@@ -281,16 +281,21 @@ runcmd:
   - systemctl daemon-reload
   - systemctl enable --now mongod
   - sleep 5
+  # `use silencer;` is a mongosh shell helper, not real JS — it silently
+  # no-ops in --file/--eval mode. Connect directly to the silencer DB
+  # via the URL instead. dropUser-first makes the block idempotent
+  # across instance replacements (the Mongo EBS volume is preserved, so
+  # the silencer user can already exist from a previous bootstrap).
   - |
     MONGO_PWD=$(aws ssm get-parameter --region ${aws_region} \
       --name /silencer/shared/mongo_silencer_password \
       --with-decryption --query Parameter.Value --output text)
     TMPF=$(mktemp); chmod 0600 "$TMPF"
     cat > "$TMPF" <<EOF
-    use silencer;
+    try { db.dropUser("silencer"); } catch (e) {}
     db.createUser({user: "silencer", pwd: "$MONGO_PWD", roles: [ { role: "readWrite", db: "silencer" } ]});
     EOF
-    mongosh --quiet --file "$TMPF"
+    mongosh "mongodb://127.0.0.1:27017/silencer" --quiet --file "$TMPF"
     rm -f "$TMPF"
     unset MONGO_PWD
   - "sed -i 's|^  authorization: disabled|  authorization: enabled|' /etc/mongod.conf"
