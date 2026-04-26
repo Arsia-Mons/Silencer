@@ -392,14 +392,14 @@ struct Overlay {
 
 // Button "variant" descriptor — captures the per-variant constants from
 // docs/design/widget-button.md so render_button can stay generic.
-enum class ButtonVariant { B196x33, B112x33, BNONE };
+enum class ButtonVariant { B196x33, B112x33, B220x33, BNONE };
 
 struct Button {
     int x = 0, y = 0;
     std::string text;
     ButtonVariant variant = ButtonVariant::B196x33;
     // res_index is the base frame for the variant (7 for B196x33, 28 for
-    // B112x33, ignored for BNONE since res_bank == 0xFF).
+    // B112x33, 23 for B220x33, ignored for BNONE since res_bank == 0xFF).
     int res_index = 7;
     int effectbrightness = 128;
     // For BNONE only — caller-set hot-rect, font, advance.
@@ -457,7 +457,9 @@ static void render_button(Framebuffer& fb, const Resources& res,
     // text label — centered against the rendered sprite top-left.
     int dst_x = b.x - sp->offset_x;
     int dst_y = b.y - sp->offset_y;
-    int pill_w = (b.variant == ButtonVariant::B196x33) ? 196 : 112;
+    int pill_w = 196;
+    if (b.variant == ButtonVariant::B112x33) pill_w = 112;
+    else if (b.variant == ButtonVariant::B220x33) pill_w = 220;
     int advance = b.textwidth ? b.textwidth : 11;
     int xoff = (pill_w - (int)b.text.size() * advance) / 2;
     int yoff = 8;
@@ -671,6 +673,115 @@ static int render_options_controls(Framebuffer& fb, const Resources& res) {
     return active_sub;
 }
 
+// Render the OPTIONSDISPLAY screen into `fb`. Returns active sub-palette.
+//
+// Per screen-options-display.md: OPTIONSDISPLAY does NOT call SetPalette
+// — it inherits sub-palette 1 through MAINMENU → OPTIONS → OPTIONSDISPLAY.
+// Two B220x33 toggle rows (Fullscreen, Smooth Scaling), each paired with a
+// side-by-side Off/On overlay (bank 6 idx 12..15). Save/Cancel below.
+// No inner panel sprite (bank 7 idx 7) — rows render directly on the plate.
+static int render_options_display(Framebuffer& fb, const Resources& res) {
+    constexpr int active_sub = 1;
+
+    Overlay bg;
+    bg.x = 0; bg.y = 0;
+    bg.res_bank = 6; bg.res_index = 0;
+
+    // Title overlay: text mode, bank 135 advance 12.
+    //   x = 320 - (15 * 12) / 2 = 230 for "Display Options" (15 chars).
+    Overlay title;
+    title.text = "Display Options";
+    title.textbank = 135;
+    title.textwidth = 12;
+    title.x = 320 - (int)title.text.size() * title.textwidth / 2;
+    title.y = 14;
+
+    fb.clear();
+    render_overlay(fb, res, bg,    active_sub);
+    render_overlay(fb, res, title, active_sub);
+
+    const char* row_labels[2] = { "Fullscreen", "Smooth Scaling" };
+
+    // Default config has both toggles ON: off-overlay at idx 12 (dim),
+    // on-overlay at idx 15 (bright). Each toggle sprite is 20x33 with
+    // offset (0, 0), so its rendered top-left is the raw (x, y).
+    for (int i = 0; i < 2; ++i) {
+        Button row;
+        row.variant = ButtonVariant::B220x33;
+        row.res_index = 23;
+        row.x = 100; row.y = 50 + i * 53;
+        row.text = row_labels[i];
+        render_button(fb, res, row, active_sub);
+
+        Overlay off_half;
+        off_half.x = 420; off_half.y = 137 + i * 53;
+        off_half.res_bank = 6; off_half.res_index = 12;
+        render_overlay(fb, res, off_half, active_sub);
+
+        Overlay on_half;
+        on_half.x = 450; on_half.y = 137 + i * 53;
+        on_half.res_bank = 6; on_half.res_index = 15;
+        render_overlay(fb, res, on_half, active_sub);
+    }
+
+    // Bottom Save / Cancel — B196x33.
+    Button save;   save.x   = -200; save.y   = 117; save.text   = "Save";
+    Button cancel; cancel.x =   20; cancel.y = 117; cancel.text = "Cancel";
+    render_button(fb, res, save,   active_sub);
+    render_button(fb, res, cancel, active_sub);
+
+    return active_sub;
+}
+
+// Render the OPTIONSAUDIO screen into `fb`. Returns active sub-palette.
+//
+// Per screen-options-audio.md: identical structure to options-display but
+// with a single "Music" toggle row (default ON).
+static int render_options_audio(Framebuffer& fb, const Resources& res) {
+    constexpr int active_sub = 1;
+
+    Overlay bg;
+    bg.x = 0; bg.y = 0;
+    bg.res_bank = 6; bg.res_index = 0;
+
+    // Title overlay: text mode, bank 135 advance 12.
+    //   x = 320 - (13 * 12) / 2 = 242 for "Audio Options" (13 chars).
+    Overlay title;
+    title.text = "Audio Options";
+    title.textbank = 135;
+    title.textwidth = 12;
+    title.x = 320 - (int)title.text.size() * title.textwidth / 2;
+    title.y = 14;
+
+    fb.clear();
+    render_overlay(fb, res, bg,    active_sub);
+    render_overlay(fb, res, title, active_sub);
+
+    Button row;
+    row.variant = ButtonVariant::B220x33;
+    row.res_index = 23;
+    row.x = 100; row.y = 50;
+    row.text = "Music";
+    render_button(fb, res, row, active_sub);
+
+    Overlay off_half;
+    off_half.x = 420; off_half.y = 137;
+    off_half.res_bank = 6; off_half.res_index = 12;
+    render_overlay(fb, res, off_half, active_sub);
+
+    Overlay on_half;
+    on_half.x = 450; on_half.y = 137;
+    on_half.res_bank = 6; on_half.res_index = 15;
+    render_overlay(fb, res, on_half, active_sub);
+
+    Button save;   save.x   = -200; save.y   = 117; save.text   = "Save";
+    Button cancel; cancel.x =   20; cancel.y = 117; cancel.text = "Cancel";
+    render_button(fb, res, save,   active_sub);
+    render_button(fb, res, cancel, active_sub);
+
+    return active_sub;
+}
+
 // ---------- entry ----------
 
 int main(int argc, char** argv) {
@@ -726,6 +837,20 @@ int main(int argc, char** argv) {
     } else {
         std::printf("bank 7 idx 7: NOT LOADED\n");
     }
+    if (const Sprite* sp = res.get(6, 23)) {
+        std::printf("bank 6 idx 23 (B220x33 base) header: w=%u h=%u offset=(%d, %d) "
+                    "(expected w=220 h=33 offset=(-76, -86))\n",
+                    sp->w, sp->h, sp->offset_x, sp->offset_y);
+    } else {
+        std::printf("bank 6 idx 23: NOT LOADED\n");
+    }
+    if (const Sprite* sp = res.get(6, 15)) {
+        std::printf("bank 6 idx 15 (on-toggle bright) header: w=%u h=%u offset=(%d, %d) "
+                    "(expected w=20 h=33 offset=(0, 0))\n",
+                    sp->w, sp->h, sp->offset_x, sp->offset_y);
+    } else {
+        std::printf("bank 6 idx 15: NOT LOADED\n");
+    }
 
     // Screen registry — each entry is (filename, render-fn).
     struct ScreenEntry {
@@ -736,6 +861,8 @@ int main(int argc, char** argv) {
         { "main_menu.ppm",        &render_main_menu        },
         { "options.ppm",          &render_options          },
         { "options_controls.ppm", &render_options_controls },
+        { "options_display.ppm",  &render_options_display  },
+        { "options_audio.ppm",    &render_options_audio    },
     };
 
     // Always render every registered screen (cheap; visual content

@@ -39,6 +39,8 @@ substrate, two different compositions:
 | [screen-main-menu.md](screen-main-menu.md) | Composition: main menu (logo, buttons, version) |
 | [screen-options.md](screen-options.md) | Composition: options sub-screen (four B196x33 buttons over the main-menu plate; inherits sub-palette 1 from MAINMENU without setting it) |
 | [screen-options-controls.md](screen-options-controls.md) | Composition: configure-controls (six rows of keybinding triplets, scrollbar state, Save/Cancel) |
+| [screen-options-display.md](screen-options-display.md) | Composition: display-options (Fullscreen + Smooth Scaling toggles, Save/Cancel) |
+| [screen-options-audio.md](screen-options-audio.md) | Composition: audio-options (single Music toggle, Save/Cancel) |
 
 ## QA dump
 
@@ -48,7 +50,7 @@ exposes a framebuffer dump path gated by env vars:
 | Env | Values | Effect |
 | --- | ------ | ------ |
 | `SILENCER_DUMP_PATH` | absolute file path | When set, write a 640×480 binary P6 PPM to this path once the target screen has reached steady state, then `exit(0)` |
-| `SILENCER_DUMP_STATE` | `MAINMENU` (default), `OPTIONS`, `OPTIONSCONTROLS` | Selects which screen to dump. The binary navigates to the requested state by chaining clicks: MAINMENU.Options (uid 2) → OPTIONS.Controls (uid 1) → OPTIONSCONTROLS, etc. |
+| `SILENCER_DUMP_STATE` | `MAINMENU` (default), `OPTIONS`, `OPTIONSCONTROLS`, `OPTIONSDISPLAY`, `OPTIONSAUDIO` | Selects which screen to dump. The binary navigates to the requested state by chaining clicks: MAINMENU.Options (uid 2), then OPTIONS.{Controls=uid 1, Display=uid 2, Audio=uid 3}. |
 
 Hydrations should accept `SILENCER_DUMP_DIR` (writes one PPM per
 registered screen) for parity. Visual A/B between the real and
@@ -57,7 +59,7 @@ hydration PPMs is the validation gate; see
 
 ## Out of scope (for now)
 
-- Other button variants (`B220x33`, `B236x27`, `B52x21`, `B156x21`,
+- Other button variants (`B236x27`, `B52x21`, `B156x21`,
   `BCHECKBOX`) — covered when a screen needs them.
 - Other widgets: TextInput, TextBox, SelectBox, ScrollBar, Toggle,
   Modal, Loading bar, HUD bars, Minimap, Buy menu, Chat overlay, etc.

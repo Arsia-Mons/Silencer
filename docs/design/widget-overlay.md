@@ -95,6 +95,40 @@ else:
 
 See [font.md](font.md) for `DrawText` semantics.
 
+## On/off toggle pattern (used by options-display and options-audio)
+
+These two screens express boolean settings as a *pair* of small
+overlays placed side-by-side, with the active state shown by which
+overlay renders the "bright" sprite vs the "dim" one. There's no
+dedicated `Toggle` widget for this — it's two `Overlay` objects
+that the screen's Tick code re-points at different sprite indices
+each frame.
+
+The shared sprite layout is bank 6, indices 12..15 (each `20 × 33`,
+offset `(0, 0)`):
+
+| Index | Meaning |
+| ----- | ------- |
+| `12`  | "Off" label, dim (option is currently ON) |
+| `13`  | "Off" label, bright (option is currently OFF — the OFF state is selected) |
+| `14`  | "On" label, dim (option is currently OFF) |
+| `15`  | "On" label, bright (option is currently ON — the ON state is selected) |
+
+A row hosts two overlays: one tagged with `uid` in `[20..39]` (the
+"Off" half) sitting at `(420, 137 + i*53)` next to its row, and a
+sibling with `uid` in `[40..59]` (the "On" half) at `(450, 137 + i*53)`.
+The screen's Tick code reads the corresponding `Config` flag and
+sets each overlay's `res_index` per the table above.
+
+Default config has every covered toggle in the **ON** state
+(`fullscreen = true`, `scalefilter = true`, `music = true`), so
+default-config dumps render every off-overlay at idx 12 and every
+on-overlay at idx 15.
+
+A static-frame hydration that hardcodes default config can just set
+the `res_index`es at construction time (`12` and `15` for ON; or
+`13` and `14` for OFF) and skip the dynamic Tick step entirely.
+
 ## How the main menu uses it
 
 | Instance  | Mode    | Bank | Index/Text | Position | Notes |

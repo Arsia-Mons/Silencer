@@ -10,10 +10,11 @@ as more screens come online.
 
 | Variant | Used by | Has sprite chrome? |
 | ------- | ------- | ------------------ |
-| `B196x33` | main menu, options menu (default), options-controls Save/Cancel | yes |
+| `B196x33` | main menu, options menu (default), Save/Cancel on every options sub-screen | yes |
 | `B112x33` | options-controls c1/c2 key buttons | yes |
+| `B220x33` | options-display "Fullscreen"/"Smooth Scaling" rows; options-audio "Music" row | yes |
 | `BNONE` | options-controls "OR/AND" op buttons (text-only, custom width/height) | no |
-| `B220x33`, `B236x27`, `B52x21`, `B156x21`, `BCHECKBOX` | not yet exercised | TBD when a screen needs them |
+| `B236x27`, `B52x21`, `B156x21`, `BCHECKBOX` | not yet exercised | TBD when a screen needs them |
 
 ## `B196x33` constants
 
@@ -150,6 +151,33 @@ anchor offset change. The label-position math becomes:
 
 ```
 xoff = (112 - strlen(text) * 11) / 2
+yoff = 8
+```
+
+## `B220x33` constants
+
+| Field | Value |
+| ----- | ----- |
+| Width × height | 220 × 33 |
+| Sprite bank | 6 |
+| Base `res_index` | 23 |
+| Hover frames | `res_index` 23..27 (`base + state_i`) |
+| Text font bank | 135 |
+| Text advance | 11 |
+| Text `yoff` | 8 |
+| Hover sound | `whoom.wav` |
+
+Sprite header (`shared/assets/bin_spr/SPR_006.BIN` idx 23):
+`offset_x = -76, offset_y = -86`. So a `B220x33` placed at
+`object.x = 100, object.y = 50` renders with its top-left at
+`(100 + 76, 50 + 86) = (176, 136)` and footprint `220 × 33`.
+
+State machine, hit-testing, rendering, and label centering are
+identical to `B196x33` and `B112x33`; only dimensions, base index,
+and anchor offset change. Label-position math:
+
+```
+xoff = (220 - strlen(text) * 11) / 2
 yoff = 8
 ```
 

@@ -177,6 +177,11 @@ Concrete sprite headers worth pinning:
 | ---- | --- | --------- | ------------- | ----- |
 | 6    | 0   | 640 × 480 | (0, 0)         | Full-screen menu background plate |
 | 6    | 7   | 196 × 33  | (-310, -288)   | `B196x33` base frame |
+| 6    | 12  | 20 × 33   | (0, 0)         | "Off" toggle label, dim (option is ON) — see [widget-overlay.md](widget-overlay.md) "On/off toggle pattern" |
+| 6    | 13  | 20 × 33   | (0, 0)         | "Off" toggle label, bright (option is OFF) |
+| 6    | 14  | 20 × 33   | (0, 0)         | "On" toggle label, dim (option is OFF) |
+| 6    | 15  | 20 × 33   | (0, 0)         | "On" toggle label, bright (option is ON) |
+| 6    | 23  | 220 × 33  | (-76, -86)     | `B220x33` base frame |
 | 6    | 28  | 112 × 33  | (-302, -86)    | `B112x33` base frame |
 | 7    | 7   | 628 × 454 | (-5, -6)       | Options inner panel — overlays the bg plate, framing the configuration area |
 | 7    | 9   | 16 × 267  | (-609, -87)    | ScrollBar track (drawn only when `ScrollBar.draw == true`) |

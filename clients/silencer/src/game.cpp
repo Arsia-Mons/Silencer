@@ -250,6 +250,8 @@ void Game::Present(void){
 		Uint8 target_state = MAINMENU;
 		if(dumpstate_env){
 			if(strcmp(dumpstate_env, "OPTIONSCONTROLS") == 0) target_state = OPTIONSCONTROLS;
+			else if(strcmp(dumpstate_env, "OPTIONSDISPLAY") == 0) target_state = OPTIONSDISPLAY;
+			else if(strcmp(dumpstate_env, "OPTIONSAUDIO") == 0) target_state = OPTIONSAUDIO;
 			else if(strcmp(dumpstate_env, "OPTIONS") == 0) target_state = OPTIONS;
 			else if(strcmp(dumpstate_env, "MAINMENU") == 0) target_state = MAINMENU;
 		}
@@ -284,7 +286,9 @@ void Game::Present(void){
 		}
 		if(state == OPTIONS && !stateisnew && target_state != OPTIONS && target_state != MAINMENU){
 			if(FadedIn()){
-				if(target_state == OPTIONSCONTROLS) click_uid(1);  // Controls
+				if(target_state == OPTIONSCONTROLS) click_uid(1);     // Controls
+				else if(target_state == OPTIONSDISPLAY) click_uid(2); // Display
+				else if(target_state == OPTIONSAUDIO) click_uid(3);   // Audio
 			}
 			return;
 		}
@@ -307,6 +311,12 @@ void Game::Present(void){
 				// state-machine logic that fills c1/c2 button text.
 				ready = FadedIn();
 				label = "options controls";
+			} else if(target_state == OPTIONSDISPLAY){
+				ready = FadedIn();
+				label = "options display";
+			} else if(target_state == OPTIONSAUDIO){
+				ready = FadedIn();
+				label = "options audio";
 			}
 			if(ready){
 				FILE * f = fopen(dumppath, "wb");
