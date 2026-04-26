@@ -4,3 +4,9 @@ export const RABBITMQ_URL = process.env.RABBITMQ_URL || 'amqp://silencer:silence
 export const JWT_SECRET = process.env.JWT_SECRET || 'changeme-in-production';
 export const JWT_EXPIRES_IN = '8h';
 export const LOBBY_PLAYER_AUTH_URL = process.env.LOBBY_PLAYER_AUTH_URL || 'http://localhost:15171';
+// Path to shared/assets directory (game binary assets).  Set via ASSETS_DIR env var in production.
+// Defaults to the shared/assets directory relative to the repo root for local dev.
+import { fileURLToPath } from 'url';
+import { join, dirname } from 'path';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+export const ASSETS_DIR = process.env.ASSETS_DIR || join(__dirname, '..', '..', '..', 'shared', 'assets');
