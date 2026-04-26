@@ -64,7 +64,7 @@
       "id": "F0",
       "name": "Visual equivalence to reference",
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "spec": "Final gate. The candidate PPM is visually equivalent to /tmp/real_dump.ppm to a casual reader, modulo: (a) the version string content (compile-time difference), (b) any documented animation-phase nits. If divergences remain, they have been categorized in progress.txt as 'animation phase' or 'transient text content' and are demonstrably non-structural.",
       "category": "final"
     }

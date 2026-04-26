@@ -22,3 +22,8 @@ S0 flipped to pass. Sprite codec produces clean, ungarbled shapes across all fou
 --- Iteration 6 2026-04-26 14:09:21 ---
 T0 flipped and committed. Remaining: A0 (anchors), F0 (final). Next iteration picks up A0.
 
+--- Iteration 7 2026-04-26 14:12:04 ---
+A0 flipped to passes:true and committed. Logo, version, and all four button bounding boxes are byte-identical to the reference (0px offset, well within the ~5px gate). Residue is glyph-internal blend noise, not anchor.
+
+F0 (final visual equivalence) remains for the next iteration.
+
