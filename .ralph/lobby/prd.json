@@ -1,0 +1,41 @@
+{
+  "screen": "lobby",
+  "scope": "chrome-only — sub-interface internals out of scope",
+  "reference_dump": "/tmp/real_lobby_dump.ppm",
+  "candidate_dump": "/tmp/sdl3_dump/screen_00.ppm",
+  "candidate_root": "shared/design/sdl3",
+  "items": [
+    {
+      "id": "Y0",
+      "name": "Candidate dumps a LOBBY PPM via screen-switch (sub-palette 2)",
+      "priority": 0,
+      "passes": false,
+      "spec": "Extend SILENCER_DUMP_SCREEN to handle 'lobby' and write a 640x480 P6 PPM at /tmp/sdl3_dump/screen_00.ppm under sub-palette 2. All six prior screen pathways unchanged.",
+      "category": "build"
+    },
+    {
+      "id": "Y1",
+      "name": "Bank 7 idx 1 panel chrome renders correctly",
+      "priority": 1,
+      "passes": false,
+      "spec": "The bank-7 idx-1 lobby panel sprite renders fullscreen at (0,0). All chrome elements (corner LED ornaments, sub-interface frame borders, header bar separator) visible and structurally matching the reference. Distinct from CONTROLS' bank-7 idx-7 and LOBBYCONNECT's bank-7 idx-2.",
+      "category": "sprite_codec"
+    },
+    {
+      "id": "Y2",
+      "name": "Header bar correct (Silencer + version + map name + Go Back)",
+      "priority": 2,
+      "passes": false,
+      "spec": "Header at top of screen: 'Silencer' overlay at (15, 32) using textbank 135 / textwidth 11 / effectcolor 152; 'v.<version>' overlay at (115, 39) using textbank 133 / textwidth 6 / effectcolor 189; map name overlay at (180, 32) (empty on dump); B156x21 'Go Back' button at (473, 29). Per docs/design/screen-lobby.md.",
+      "category": "composition"
+    },
+    {
+      "id": "Y3",
+      "name": "Visual equivalence (chrome scope)",
+      "priority": 3,
+      "passes": false,
+      "spec": "Final gate, scoped to CHROME. The bank-7-idx-1 panel sprite + header bar + B156x21 Go Back button match the reference pixel-coincident in their respective regions. Sub-interface interior content (agency icons in CharacterInterface, planet/game-list in GameSelectInterface, chat scrollback in ChatInterface) is non-gated — diff budget is generous (~5-15%) because those interiors are runtime-data-driven and reserved for future per-sub-interface Ralphs.",
+      "category": "final"
+    }
+  ]
+}

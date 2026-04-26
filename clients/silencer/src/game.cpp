@@ -304,6 +304,16 @@ void Game::Present(void){
 			}
 		}
 
+		// LOBBY auth-bypass: the engine's LOBBY case bounces back to
+		// LOBBYCONNECT every frame the lobby state is DISCONNECTED, which
+		// prevents the screen from settling for a dump when no real lobby
+		// server is running. Force the state to AUTHENTICATED on every
+		// frame in LOBBY-target dump mode so the engine treats us as a
+		// connected, logged-in client and the LOBBY screen renders normally.
+		if(target_state == LOBBY && state == LOBBY){
+			world.lobby.state = Lobby::AUTHENTICATED;
+		}
+
 		// Options-family dump: static menus, no animation pin available.
 		// Wait 60 settled ticks (Present calls) in the target state, then dump.
 		// 60 is conservative — covers any button selection-pulse phase.

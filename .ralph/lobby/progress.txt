@@ -1,0 +1,23 @@
+## Codebase Patterns
+<!-- Patterns this Ralph discovers. Patterns from prior Ralphs:
+.ralph/{main-menu,options,options-audio,options-display,options-controls,lobby-connect}/progress.txt
+— read those first. -->
+
+## 2026-04-26T00:00:00Z — INIT
+- Ralph scaffolded by setup conversation.
+- Baseline: shared/design/sdl3/ already renders six screens (main_menu,
+  OPTIONS hub, OPTIONSAUDIO, OPTIONSDISPLAY, OPTIONSCONTROLS,
+  LOBBYCONNECT) equivalent to references. Palette decoder, sprite codec,
+  font path, screen-switch, sub-palette switching all validated.
+- Reference dump: /tmp/real_lobby_dump.ppm (do not regenerate; captured
+  via the engine's auth-bypass dump-mode harness).
+- Spec input: docs/design/screen-lobby.md (authoritative; chrome-only
+  scope).
+- New widget surface: B156x21 button (Go Back); bank 7 idx 1 panel
+  sprite (different from prior bank-7 frames).
+- **Out of scope:** sub-interface internals (CharacterInterface,
+  GameSelectInterface, ChatInterface contents). Diff residue from
+  missing interiors is acceptable — gated only on chrome.
+- Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
+- **Learnings:** none yet.
+---
