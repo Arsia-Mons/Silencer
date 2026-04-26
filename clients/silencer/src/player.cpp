@@ -205,6 +205,24 @@ const char * Player::StateSeqName(Uint8 state) {
 		case UNDEPLOYING:      return "UNDEPLOYING";
 		case CROUCHEDTHROWING: return "CROUCHEDTHROWING";
 		case ROLLING:          return "ROLLING";
+		case STANDING:         return "STANDING";
+		case RUNNING:          return "RUNNING";
+		case JUMPING:          return "JUMPING";
+		case FALLING:          return "FALLING";
+		case JETPACK:          return "JETPACK";
+		case JETPACKSHOOT:     return "JETPACKSHOOT";
+		case DYING:            return "DYING";
+		case DEAD:             return "DEAD";
+		case RESPAWNING:       return "RESPAWNING";
+		case RESURRECTING:     return "RESURRECTING";
+		case THROWING:         return "THROWING";
+		case CLIMBINGLEDGE:    return "CLIMBINGLEDGE";
+		case LADDER:           return "LADDER";
+		case HACKING:          return "HACKING";
+		case STANDINGSHOOT:    return "STANDINGSHOOT";
+		case CROUCHEDSHOOT:    return "CROUCHEDSHOOT";
+		case FALLINGSHOOT:     return "FALLINGSHOOT";
+		case LADDERSHOOT:      return "LADDERSHOOT";
 		default: return nullptr;
 	}
 }
@@ -1187,15 +1205,11 @@ void Player::Tick(World & world){
 					break;
 				}
 			}else{
-				if(state_i / 3 >= 12){
-					state_i = 3;
-				}
-				if(state_i <= 1){
-					res_bank = 10;
-					res_index = state_i;
-				}else{
-					res_bank = 9;
-					res_index = state_i / 3;
+				if(!ApplyActorSeq(world, "player", "STANDING", state_i, res_bank, res_index)){
+					// fallback if actordef missing
+					if(state_i / 3 >= 12){ state_i = 3; }
+					if(state_i <= 1){ res_bank = 10; res_index = state_i; }
+					else{ res_bank = 9; res_index = state_i / 3; }
 				}
 				if(currentdetonator){
 					Detonator * detonator = static_cast<Detonator *>(world.GetObjectFromId(currentdetonator));
