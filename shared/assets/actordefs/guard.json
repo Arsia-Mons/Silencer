@@ -11,143 +11,1764 @@
     "STANDING": {
       "loop": true,
       "frames": [
-        { "bank": 59, "index": 0, "duration": 6, "hurtbox": [-14, -74, 14, 0] }
+        {
+          "bank": 59,
+          "index": 0,
+          "duration": 6,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
       ]
     },
     "WALKING": {
       "loop": true,
       "frames": [
-        { "bank": 60, "index":  0, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index":  1, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index":  2, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index":  3, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index":  4, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index":  5, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index":  6, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index":  7, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index":  8, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index":  9, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index": 10, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index": 11, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index": 12, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index": 13, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index": 14, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index": 15, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index": 16, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index": 17, "duration": 2, "hurtbox": [-18, -70, 18, 0] },
-        { "bank": 60, "index": 18, "duration": 2, "hurtbox": [-18, -70, 18, 0] }
+        {
+          "bank": 60,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 9,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 10,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 11,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 12,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 13,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 14,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 15,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 16,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 17,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        },
+        {
+          "bank": 60,
+          "index": 18,
+          "duration": 2,
+          "hurtbox": [
+            -18,
+            -70,
+            18,
+            0
+          ]
+        }
       ]
     },
     "CROUCHING": {
       "loop": false,
       "frames": [
-        { "bank": 158, "index": 0, "duration": 2, "hurtbox": [-14, -73, 14, 0] },
-        { "bank": 158, "index": 1, "duration": 2, "hurtbox": [-14, -65, 14, 0] },
-        { "bank": 158, "index": 2, "duration": 2, "hurtbox": [-14, -57, 14, 0] },
-        { "bank": 158, "index": 3, "duration": 2, "hurtbox": [-14, -50, 14, 0] },
-        { "bank": 158, "index": 4, "duration": 2, "hurtbox": [-14, -45, 14, 0] },
-        { "bank": 158, "index": 5, "duration": 2, "hurtbox": [-14, -40, 14, 0] },
-        { "bank": 158, "index": 6, "duration": 2, "hurtbox": [-14, -38, 14, 0] },
-        { "bank": 158, "index": 7, "duration": 2, "hurtbox": [-14, -36, 14, 0] },
-        { "bank": 158, "index": 8, "duration": 2, "hurtbox": [-14, -36, 14, 0] },
-        { "bank": 158, "index": 9, "duration": 2, "hurtbox": [-14, -36, 14, 0] }
+        {
+          "bank": 158,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -73,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 158,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -65,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 158,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -57,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 158,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -50,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 158,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -45,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 158,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -40,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 158,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -38,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 158,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -36,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 158,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -36,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 158,
+          "index": 9,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -36,
+            14,
+            0
+          ]
+        }
       ]
     },
     "CROUCHED": {
       "loop": true,
       "frames": [
-        { "bank": 159, "index": 0, "duration": 4, "hurtbox": [-26, -55, 26, 0] },
-        { "bank": 159, "index": 1, "duration": 4, "hurtbox": [-26, -55, 26, 0] },
-        { "bank": 159, "index": 2, "duration": 4, "hurtbox": [-26, -55, 26, 0] },
-        { "bank": 159, "index": 3, "duration": 4, "hurtbox": [-26, -55, 26, 0] },
-        { "bank": 159, "index": 4, "duration": 4, "hurtbox": [-26, -55, 26, 0] },
-        { "bank": 159, "index": 5, "duration": 4, "hurtbox": [-26, -55, 26, 0] },
-        { "bank": 159, "index": 6, "duration": 4, "hurtbox": [-26, -55, 26, 0] },
-        { "bank": 159, "index": 7, "duration": 4, "hurtbox": [-26, -55, 26, 0] },
-        { "bank": 159, "index": 8, "duration": 4, "hurtbox": [-26, -55, 26, 0] }
+        {
+          "bank": 159,
+          "index": 0,
+          "duration": 4,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 1,
+          "duration": 4,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 2,
+          "duration": 4,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 3,
+          "duration": 4,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 4,
+          "duration": 4,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 5,
+          "duration": 4,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 6,
+          "duration": 4,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 7,
+          "duration": 4,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 8,
+          "duration": 4,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        }
       ]
     },
     "SHOOTSTANDING": {
       "loop": false,
       "frames": [
-        { "bank": 61, "index": 0, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 61, "index": 1, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 61, "index": 2, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 61, "index": 3, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 61, "index": 4, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 61, "index": 5, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 61, "index": 6, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 61, "index": 7, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 61, "index": 8, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 61, "index": 9, "duration": 3, "hurtbox": [-14, -74, 14, 0] }
+        {
+          "bank": 61,
+          "index": 0,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 61,
+          "index": 1,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 61,
+          "index": 2,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 61,
+          "index": 3,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 61,
+          "index": 4,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 61,
+          "index": 5,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 61,
+          "index": 6,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 61,
+          "index": 7,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 61,
+          "index": 8,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 61,
+          "index": 9,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
       ]
     },
     "SHOOTUP": {
       "loop": false,
       "frames": [
-        { "bank": 154, "index": 0, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 154, "index": 1, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 154, "index": 2, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 154, "index": 3, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 154, "index": 4, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 154, "index": 5, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 154, "index": 6, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 154, "index": 7, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 154, "index": 8, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 154, "index": 9, "duration": 3, "hurtbox": [-14, -74, 14, 0] }
+        {
+          "bank": 154,
+          "index": 0,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 154,
+          "index": 1,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 154,
+          "index": 2,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 154,
+          "index": 3,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 154,
+          "index": 4,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 154,
+          "index": 5,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 154,
+          "index": 6,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 154,
+          "index": 7,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 154,
+          "index": 8,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 154,
+          "index": 9,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
       ]
     },
     "SHOOTDOWN": {
       "loop": false,
       "frames": [
-        { "bank": 155, "index": 0, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 155, "index": 1, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 155, "index": 2, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 155, "index": 3, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 155, "index": 4, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 155, "index": 5, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 155, "index": 6, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 155, "index": 7, "duration": 3, "hurtbox": [-14, -74, 14, 0] },
-        { "bank": 155, "index": 8, "duration": 3, "hurtbox": [-14, -74, 14, 0] }
+        {
+          "bank": 155,
+          "index": 0,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 155,
+          "index": 1,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 155,
+          "index": 2,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 155,
+          "index": 3,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 155,
+          "index": 4,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 155,
+          "index": 5,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 155,
+          "index": 6,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 155,
+          "index": 7,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 155,
+          "index": 8,
+          "duration": 3,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
       ]
     },
     "SHOOTCROUCHED": {
       "loop": false,
       "frames": [
-        { "bank": 196, "index": 0, "duration": 3, "hurtbox": [-14, -78, 14, 0] },
-        { "bank": 196, "index": 1, "duration": 3, "hurtbox": [-14, -78, 14, 0] },
-        { "bank": 196, "index": 2, "duration": 3, "hurtbox": [-14, -78, 14, 0] },
-        { "bank": 196, "index": 3, "duration": 3, "hurtbox": [-14, -78, 14, 0] },
-        { "bank": 196, "index": 4, "duration": 3, "hurtbox": [-14, -78, 14, 0] },
-        { "bank": 196, "index": 5, "duration": 3, "hurtbox": [-14, -78, 14, 0] },
-        { "bank": 196, "index": 6, "duration": 3, "hurtbox": [-14, -78, 14, 0] },
-        { "bank": 196, "index": 7, "duration": 3, "hurtbox": [-14, -78, 14, 0] },
-        { "bank": 196, "index": 8, "duration": 3, "hurtbox": [-14, -78, 14, 0] }
+        {
+          "bank": 159,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        },
+        {
+          "bank": 159,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -26,
+            -55,
+            26,
+            0
+          ]
+        }
       ]
     },
     "DYING": {
       "loop": false,
       "frames": [
-        { "bank": 62, "index":  0, "duration": 2, "hurtbox": [-14, -78, 14, 0] },
-        { "bank": 62, "index":  1, "duration": 2, "hurtbox": [-14, -70, 14, 0] },
-        { "bank": 62, "index":  2, "duration": 2, "hurtbox": [-14, -60, 14, 0] },
-        { "bank": 62, "index":  3, "duration": 2, "hurtbox": [-14, -50, 14, 0] },
-        { "bank": 62, "index":  4, "duration": 2, "hurtbox": [-14, -40, 14, 0] },
-        { "bank": 62, "index":  5, "duration": 2, "hurtbox": [-14, -30, 14, 0] },
-        { "bank": 62, "index":  6, "duration": 2, "hurtbox": [-14, -20, 14, 0] },
-        { "bank": 62, "index":  7, "duration": 2, "hurtbox": [-14, -12, 14, 0] },
-        { "bank": 62, "index":  8, "duration": 2, "hurtbox": [-14, -10, 14, 0] },
-        { "bank": 62, "index":  9, "duration": 2, "hurtbox": [-14, -10, 14, 0] },
-        { "bank": 62, "index": 10, "duration": 2, "hurtbox": [-14, -10, 14, 0] },
-        { "bank": 62, "index": 11, "duration": 2, "hurtbox": [-14, -10, 14, 0] },
-        { "bank": 62, "index": 12, "duration": 2, "hurtbox": [-14, -10, 14, 0] },
-        { "bank": 62, "index": 13, "duration": 2, "hurtbox": [-14, -10, 14, 0] },
-        { "bank": 62, "index": 14, "duration": 2, "hurtbox": [-14, -10, 14, 0] },
-        { "bank": 62, "index": 15, "duration": 2, "hurtbox": [-14, -10, 14, 0] },
-        { "bank": 62, "index": 16, "duration": 2, "hurtbox": [-14, -10, 14, 0] },
-        { "bank": 62, "index": 17, "duration": 2, "hurtbox": [-14, -10, 14, 0] },
-        { "bank": 62, "index": 18, "duration": 2, "hurtbox": [-14, -10, 14, 0] },
-        { "bank": 62, "index": 19, "duration": 4, "hurtbox": [-14, -10, 14, 0] }
+        {
+          "bank": 64,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 64,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 64,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 64,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 64,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 64,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 64,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 64,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 64,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 64,
+          "index": 9,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
+      ]
+    },
+    "SHOOTUPANGLE": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 156,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 156,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 156,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 156,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 156,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 156,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 156,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 156,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 156,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
+      ]
+    },
+    "SHOOTDOWNANGLE": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 157,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 157,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 157,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 157,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 157,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 157,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 157,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 157,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 157,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
+      ]
+    },
+    "LOOKING": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 69,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 69,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 69,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 69,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 69,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 69,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
+      ]
+    },
+    "LADDER": {
+      "loop": true,
+      "frames": [
+        {
+          "bank": 62,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 9,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 10,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 11,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 12,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 13,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 14,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 15,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 16,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 17,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 18,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 62,
+          "index": 19,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
+      ]
+    },
+    "SHOOTLADDERUP": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 196,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 196,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 196,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 196,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 196,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 196,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 196,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 196,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 196,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
+      ]
+    },
+    "SHOOTLADDERDOWN": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 197,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 197,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 197,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 197,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 197,
+          "index": 4,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 197,
+          "index": 5,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 197,
+          "index": 6,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 197,
+          "index": 7,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 197,
+          "index": 8,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
+      ]
+    },
+    "HIT": {
+      "loop": false,
+      "frames": [
+        {
+          "bank": 63,
+          "index": 0,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 63,
+          "index": 1,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 63,
+          "index": 2,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        },
+        {
+          "bank": 63,
+          "index": 3,
+          "duration": 2,
+          "hurtbox": [
+            -14,
+            -74,
+            14,
+            0
+          ]
+        }
       ]
     }
   }
