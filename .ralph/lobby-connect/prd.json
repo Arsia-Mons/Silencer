@@ -40,7 +40,7 @@
       "id": "L4",
       "name": "Visual equivalence to /tmp/real_lobbyconnect_dump.ppm",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "spec": "Final gate. Candidate PPM is visually equivalent to /tmp/real_lobbyconnect_dump.ppm to a casual reader, modulo non-structural variations (cursor-blink phase in Username input, exact textbox text content). <1% pixel difference acceptable for structural pixels (chrome, labels, button outlines, label glyphs).",
       "category": "final"
     }

@@ -311,3 +311,94 @@
     non-structural categorization and confirm the gate; no new render
     code should be required.
 ---
+
+## 2026-04-26T16:10:00Z — iter 5 (L4 PASS)
+- Verification-only iteration; zero source edits to `shared/design/sdl3/`.
+  Re-built (no-op, already up to date), re-dumped LOBBYCONNECT, and ran
+  formal structural-vs-non-structural categorization on the 4,897-byte
+  bytewise residue.
+- Diff decomposition (1,700 differing PIXELS; 4,897 differing bytes):
+  * Textbox interior (185, 101, 250x170): **1,538 px** — non-structural
+    per spec ("exact text content is not gated"). Reference shows the
+    runtime connection log ("Connecting to 127.0.0.1: 517 / Hostname
+    resolved / Connection failed"); candidate textbox is empty. Both
+    are valid renderings; the canonical dump captured a failed lobby
+    connection because no Go lobby server was running.
+  * Username TextInput cursor bar at x=275, y=292..302 (11 px tall):
+    **11 px** — non-structural per spec ("cursor blink phase is not
+    deterministic ... treat cursor presence/absence as non-structural").
+    Reference shows the cursor mid-blink (color (116,156,104)); candidate
+    rendered between blinks (color (12,4,4) — input-field interior).
+    The 1-pixel-wide bar at x=275 lies one pixel left of the formal
+    user-input-zone box (the bar's top y=292 is one row above the input
+    field's y=293), but it is still cursor and still non-structural.
+  * Login + Cancel button label glyph edges at y=347..356: **151 px** —
+    structural (button labels) but accounts for only 0.016% of the
+    921,600-pixel screen. Visual A/B confirms both labels render as
+    "Login" and "Cancel" at correct positions (264,339 and 321,339);
+    the diff is 1-px anti-aliasing edge variation in the bank-133 font
+    glyph rendering. Same color palette (greens (4,64,0), (20,108,0),
+    (8,84,0), (24,124,20), (0,44,0)) in both. Spec budget for
+    "structural pixels (chrome, labels, button outlines, label glyphs)"
+    is <1%; we are at 0.016%. PASS.
+- Total non-structural residue: 1,549 px (1,538 textbox + 11 cursor).
+- Total structural residue: 151 px = 0.016% of screen. <1% gate satisfied.
+- Visual A/B (Discord DM 1498099000111923320): candidate and reference
+  show identical chrome (green-bevel panel border, inner textbox
+  border + scrollbar lane, horizontal divider, two input-field wells,
+  button-row well), identical labels (Username at 190,291; Password
+  at 190,318; Login at 264,339; Cancel at 321,339), identical input-
+  field wells. Reference adds the connection-log textbox content and
+  a cursor bar in the Username field — both spec-carved-out as
+  non-structural. To a casual reader, the two screens are visually
+  equivalent.
+- Regression sweep — bytewise diffs vs canonical menu/options
+  references (sub-palette 1 path, this iteration touched no source):
+  - main_menu        2,136 bytes (exact baseline)
+  - options          1,758 bytes (exact baseline)
+  - options_audio    1,035 bytes (exact baseline)
+  - options_display  2,211 bytes (exact baseline)
+  - options_controls 3,729 bytes (exact baseline)
+  All five at byte-identical baselines. No regression.
+- Files touched: `.ralph/lobby-connect/prd.json` (L4 → passes:true),
+  `.ralph/lobby-connect/progress.txt` (this entry).
+- Spec gaps encountered (carry-forward summary; none required for the
+  gate to pass, but worth flagging for future spec authoring):
+  - `widget-button.md` doesn't list B52x21 (advance 7, yoff 8, +1 px X
+    centering offset, no sprite chrome — provided by enclosing panel).
+  - `widget-textbox.md` and `widget-textinput.md` do not exist; the
+    panel sprite carries the textbox/input wells and the spec exempts
+    runtime content + cursor from the gate, so these specs are not
+    load-bearing for the rebuild but would be needed for a runtime
+    renderer. Carry forward to a future spec-authoring Ralph.
+  - `palette.md` should explicitly note sub-palette 2 = "lobby palette",
+    used by LOBBYCONNECT (and presumably future lobby-family screens).
+  - `sprite-banks.md` should distinguish bank-7 idx-2 (LOBBYCONNECT
+    panel) from bank-7 idx-7 (OPTIONSCONTROLS panel); both are
+    composed-chrome panels but have different layouts.
+- **Learnings:**
+  - L3's prediction was correct: at L3 commit, the entire residue was
+    confined to non-structural carve-outs (textbox content + cursor
+    blink) plus minor 1-px font-edge variation in button labels. L4
+    became a pure verification step, which is the cleanest possible
+    final-gate posture: "the structural work was done at L2/L3; L4
+    confirms the categorization holds."
+  - The "structural <1% / non-structural unbounded" budget split is the
+    right gate shape for screens with runtime-dependent content. A naive
+    bytewise-diff gate would fail on textbox content (1,538 px) even
+    though every structural pixel matches. Categorizing residue by
+    spatial zone (in-textbox / in-cursor-zone / elsewhere) and
+    cross-referencing to the spec's carve-outs converts a "fail by
+    diff number" into a verified pass. Future Ralphs targeting screens
+    with runtime content (chat panels, server lists, score readouts)
+    should adopt this categorization template at the final-gate iter.
+  - Five-screen LOBBYCONNECT Ralph completes the menu-family hydration
+    plus the first lobby-family screen, exercising: sub-palette
+    switching (1→2), bank-7 multi-idx panel sprites (idx-7 + idx-2),
+    text-only B52x21 buttons (no chrome blit), and a TextBox/TextInput
+    surface at structural-only fidelity. The screen-builder pattern
+    (`RunDumpFoo` + `kSubX` constant + bank set + Clear + sprites +
+    text + WritePPM) has now scaled to six screens with zero shared-
+    infra churn between iterations 2..end. The pattern is at
+    architectural steady-state.
+---
