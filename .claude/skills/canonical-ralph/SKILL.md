@@ -204,7 +204,27 @@ This works because:
 
 - The agent decides locally whether all flags are true. Cheap check.
 - The driver's grep is dumb and reliable — no JSON parsing, no log scraping.
-- The angle-bracket sentinel never appears in normal commit messages, code, or chatter, so false positives don't happen.
+- The angle-bracket sentinel almost never appears in normal commit messages, code, or chatter, so false positives are rare.
+
+**But there's one false-positive failure mode you must handle:** the agent referencing the sentinel inside its iteration narrative — e.g., "I will not emit `<promise>COMPLETE</promise>` yet because two items remain." `grep` matches that literal string and the loop exits early, mid-backlog.
+
+Two defenses (apply both):
+
+1. **In `RALPH.md`, instruct the agent never to reference the sentinel except when emitting it.** Concretely: `"Do not write the literal string '<promise>COMPLETE</promise>' anywhere in your iteration output unless you are actually emitting the stop signal because every item passes. If you need to talk about the stop condition, use a paraphrase like 'the COMPLETE signal'."`
+
+2. **Belt-and-braces the driver:** grep the LAST line of output, not the whole output. The agent emits the sentinel as a final standalone line; quoted references happen mid-narrative.
+
+   ```bash
+   if [ "$(echo "$OUTPUT" | tail -n 1 | tr -d '[:space:]')" = "<promise>COMPLETE</promise>" ]; then ...
+   ```
+
+   Or even safer: re-validate against `prd.json` itself before exiting:
+
+   ```bash
+   if jq -e '.items | all(.passes == true)' "$PRD" >/dev/null; then ...
+   ```
+
+   The jq form is the most robust — it can't be tricked by output-stream content at all. The grep stays as a *secondary* fast-path so the loop can exit on the same iteration the last flag flipped (without waiting for the next iteration's banner to redraw).
 
 If you need a different sentinel for a specific Ralph (e.g., parallel Ralphs), pick a different unique string, but keep the shape: `<X>VERB</X>` where `X` is unique.
 

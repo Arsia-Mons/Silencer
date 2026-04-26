@@ -1,0 +1,32 @@
+--- Iteration 1 2026-04-26 15:17:11 ---
+C0 PASS committed (`2a3e9c8`). Iteration 1 complete:
+
+- **Code**: `RunDumpOptionsControls` added with banks `{6, 7, 134, 135}`; screen-switch wired.
+- **PPM**: canonical 921,615 bytes; bg plate (Mars + starfield) coincident with reference's lower z-layer.
+- **Regressions**: all four prior screens at exact bytewise baseline (main 2136 / options 1758 / audio 1035 / display 2211).
+- **Spec gaps flagged**: sprite-banks.md needs bank 7 inventory for OPTIONSCONTROLS; widget-scrollbar.md still missing.
+- Progress appended (3 new pattern lines + iter 1 entry); prd.json C0 → passes:true.
+
+Next iteration will pick up C1 (frame panel, bank 7 idx 7) — the highest-priority remaining TODO.
+
+--- Iteration 2 2026-04-26 15:19:34 ---
+C1 PASS. The bank-7-idx-7 frame panel renders correctly via the existing tile-mode RLE codec — no codec changes needed. Key finding for downstream: the scrollbar **track + chevron caps are baked into the frame-panel sprite**, so C4's payload reduces to a single thumb blit (bank 7 idx 10). Regressions clean across all four prior screens. Committed `e0f7b82`.
+
+--- Iteration 3 2026-04-26 15:23:23 ---
+C2 PASS committed (a69bd46). Iter 3 done — 1 of 4 remaining items (C3/C4/C5) closed. Next iteration would tackle C3 (key labels). Three items remaining before COMPLETE.
+
+--- Iteration 4 2026-04-26 15:26:17 ---
+C3 PASS — committed as 0ca7c60. The six-row form's key1/key2 button text is now populated and visually pixel-coincident with the reference. Three TODO items remain: C4 (scrollbar thumb), C5 (Save/Cancel band) — not emitting `<promise>COMPLETE</promise>` yet.
+
+Iteration summary:
+- C3: passes:true. Diff vs reference 27,303 → 24,523 bytes; all four prior screens remain at exact baseline.
+- Next iteration target: C4 (bank 7 idx 10 thumb at top of the frame-baked scrollbar track).
+
+--- Iteration 1 2026-04-26 15:35:54 ---
+C4 PASS committed. The scrollbar widget contributes zero pixels at this dump's `scrollmax=0` because `ScrollBar.draw=false` per archive:1093 — the visible track + chevrons come entirely from the bank-7-idx-7 frame-panel sprite bake-in (C1's discovery). Added a thumb-sprite probe `fprintf` that logged dims `w=16 h=235 offset=(-610,-103)` for future `widget-scrollbar.md` authoring. Bytewise diff stays at 24,523 (unchanged from C3 — only stderr added). All four prior screens at exact baseline. C5 (Save/Cancel band at y=405..437) is the only remaining item.
+
+--- Iteration 2 2026-04-26 15:38:55 ---
+All 6 items now PASS. OPTIONSCONTROLS hydration complete: bg → frame panel → title → 6-row form → scrollbar (frame-baked) → Save/Cancel. Final diff 3,729 bytes (~0.40%), prior screens at exact baseline.
+
+<promise>COMPLETE</promise>
+
