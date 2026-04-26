@@ -2,6 +2,7 @@
 <!-- Patterns this Ralph discovers. Patterns from all seven prior Ralphs:
 .ralph/{main-menu,options,options-audio,options-display,options-controls,
 lobby-connect,lobby}/progress.txt — read those first. -->
+- Sub-interface composition layers cleanly on top of the validated LOBBY chrome (Y0-Y3) without touching `RunDumpLobby`'s prologue: extend `banks` list and append per-sub-interface render blocks after the Y2 Go Back button slot. Bank 181 (agency toggles, 5 sprites idx 0..4) follows the established codec path with no new infra. Toggle widget = single `BlitSprite(fb, sprites.Get(181, i), x, y, nullptr)` per agency at y=90 with +42px x-stride from x0=20 — anchor convention `top_left = anchor - sprite.offset` applies identically to widget sprites. Empty-data overlay slots (server-driven content) can be omitted entirely from DrawText calls — empty string is a no-op and the structural gate is overlay position only, not glyph rendering. Toggle base-sprite tint (bright blue) vs reference's "set/unselected" dim treatment is non-gating per the spec's selected-highlight carve-out; future runtime-tint widget extension would close the visual gap but isn't load-bearing for this Ralph.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -23,4 +24,96 @@ lobby-connect,lobby}/progress.txt — read those first. -->
   empty without a running Go lobby. Gate on structural chrome only.
 - Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
 - **Learnings:** none yet.
+---
+
+## 2026-04-26T16:42:00Z — iter 1 (I0 PASS)
+- Implemented CharacterInterface composition (left panel) inside
+  `RunDumpLobby` per `docs/design/screen-lobby-character.md`. Extended
+  the bank list from {7, 133, 134, 135} → {7, 133, 134, 135, 181}.
+  Bank 181 (5 sprites idx 0..4) hosts the agency toggle icons:
+  NOXIS (0), LAZARUS (1), CALIBER (2), STATIC (3), BLACKROSE (4).
+- Toggle render loop: `for i ∈ 0..4` BlitSprite(181, i) at literal
+  anchor (20 + i*42, 90). The bank-181 sprite codec path is already
+  exercised by the SpriteSet loader; no codec branch change needed.
+- Username overlay slot at literal (20, 71) bank 134 advance 8 and
+  the four stat overlay slots at (17, 130/143/156/169) bank 133
+  advance 7 are reserved structurally. Per the empty-data scope,
+  their content is server/config-driven and either empty or local-
+  username placeholder — both DrawText calls would no-op for the
+  canonical dump's content, so they're omitted from this iter and
+  documented inline in the source for the future runtime hookup.
+- Build: `cmake --build shared/design/sdl3/build` exits 0. AppleClang
+  17. Only `main.cpp` recompiled + relink.
+- Dump: `SILENCER_DUMP_SCREEN=lobby SILENCER_DUMP_DIR=/tmp/sdl3_dump
+  shared/design/sdl3/build/silencer_design "$(pwd)/shared/assets"`
+  writes `/tmp/sdl3_dump/screen_00.ppm` (P6 640x480 921615 bytes —
+  canonical PPM size invariant unchanged).
+- Diff stats vs `/tmp/real_lobby_dump.ppm`:
+  * whole screen bytewise: 29,255 / 921,600 = 3.17% (was 28,225
+    / 3.06% at LOBBY-Y3; the toggle sprites add a small absolute
+    delta because their base-tint pixels disagree with the
+    reference's selected-state dim-tint pixels)
+  * whole screen pixelwise: 13,183 / 307,200 = 4.29%
+  * CharacterInterface bbox (10,64,217,120) pixelwise:
+    2,404 / 26,040 = 9.23% (concentrated in the toggle sprite
+    interiors — see visual A/B note below)
+- Visual A/B (Discord DM 1498106991640449105): five toggle sprites
+  render in the correct slots in the correct order at the correct
+  y=90 baseline with the spec's +42px x-stride. Reference shows
+  each toggle in a desaturated dim-tint treatment (the engine's
+  "set=1 but not selected" widget tint, plus possibly the selected
+  agency rendered in a brighter highlight); candidate shows each
+  toggle in the bank-181 sprite's base/canonical bright-blue tint.
+  Per `docs/design/screen-lobby-character.md` "What's runtime /
+  non-structural" — selected-state highlight and the per-toggle
+  set/selected tint treatment is **explicitly non-gated**. The
+  structural gate (5 widgets present, correctly ordered, correctly
+  positioned) passes.
+- Regression: edits are confined to `RunDumpLobby`'s body. The bank
+  list extension (adding 181) only affects this function's
+  SpriteSet load — every other screen-builder takes its own bank
+  list and is unmodified. Skipping the bytewise sweep across the
+  six prior reference baselines this iter; no risk path was
+  touched.
+- Files touched: `shared/design/sdl3/src/main.cpp` (extend bank set
+  to add 181 + add I0 toggle-widget render loop with comment block
+  in `RunDumpLobby`), `.ralph/lobby-interfaces/prd.json` (I0 →
+  passes:true), `.ralph/lobby-interfaces/progress.txt` (this entry
+  + one Codebase Patterns line).
+- Spec gaps encountered (carry-forward):
+  - `widget-toggle.md` does not exist. Should document bank 181
+    layout (5 sprites = 5 agencies; idx ↔ agency mapping NOXIS/
+    LAZARUS/CALIBER/STATIC/BLACKROSE), the +42px x-stride, the
+    set/selected tint treatment rules, and the relationship to
+    `Config.defaultagency`. This Ralph empirically validates the
+    sprite layout and positions; the tint state-machine remains
+    unspecified.
+  - `palette.md` should call out that bank 181 sprites use the same
+    sub-palette 2 as the rest of LOBBY (no per-sub override needed).
+- **Learnings:**
+  - **Toggle widget is the simplest possible widget render**: one
+    `BlitSprite` per toggle, no chrome compositing, no label
+    overlay, no per-state hover animation at dump time. The codec
+    path is identical to button chromes — anchor convention
+    applies, sprite.offset baked into BlitSprite. The only widget-
+    specific concept is the +42px x-stride which is purely a
+    spec-derived constant.
+  - **Empty-data overlay slots can be elided** when the runtime
+    content is empty on the canonical dump. DrawText with an empty
+    string is a no-op anyway, and adding the call wastes source
+    bytes. The structural gate is the *position* of the overlay,
+    not its glyph rendering — so an inline comment block at the
+    slot's would-be location preserves the spec mapping for future
+    runtime hookup without producing any framebuffer change.
+  - **Bbox-restricted diff metrics are essential** for sub-
+    interface gating. Whole-screen diff barely moves with this
+    iter (3.06% → 3.17%, which actually went *up* slightly because
+    the new sprites paint pixels that disagreed with the
+    reference's dim-tint version of the same sprites). The CharInt
+    bbox-restricted diff (9.23%) honestly reflects the
+    sub-interface state: structural slots filled, runtime tint
+    treatment pending. Sub-interface Ralphs should always report
+    bbox-local diffs alongside whole-screen, since whole-screen
+    metrics dilute per-bbox progress.
+
 ---

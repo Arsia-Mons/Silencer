@@ -9,7 +9,7 @@
       "id": "I0",
       "name": "CharacterInterface composition (left panel)",
       "priority": 0,
-      "passes": false,
+      "passes": true,
       "spec": "Per docs/design/screen-lobby-character.md: render the username overlay at (20,71) bank 134 advance 8; four stat overlays at (17, 130/143/156/169) bank 133 advance 7 (empty content OK); five Toggle widgets (bank 181 idx 0..4) at y=90, x=20+i*42 for the five agencies. Selected-state highlight is non-gated. Region: bbox (10,64,217,120) of the LOBBY dump.",
       "category": "composition"
     },

@@ -849,13 +849,18 @@ static int RunDumpLobby(const std::string &assets_dir,
   }
 
   // Bank set: 7 (panel idx 1 + B156x21 chrome at idx 24),
-  // 133 ("v.<version>" header text, advance 6),
+  // 133 ("v.<version>" header text, advance 6; CharacterInterface stat
+  //      overlays Level/Wins/Losses/Etc, advance 7),
   // 134 (B156x21 "Go Back" button label, advance 8 per widget-button.md
   //      archive — different from prior screens which used 135/advance 11
-  //      for B196x33/B112x33/B220x33),
-  // 135 ("Silencer" header text, advance 11).
+  //      for B196x33/B112x33/B220x33; CharacterInterface username overlay
+  //      at advance 8),
+  // 135 ("Silencer" header text, advance 11),
+  // 181 (CharacterInterface five agency toggle widgets, idx 0..4 =
+  //      NOXIS/LAZARUS/CALIBER/STATIC/BLACKROSE per
+  //      docs/design/screen-lobby-character.md).
   SpriteSet sprites;
-  std::vector<int> banks = {7, 133, 134, 135};
+  std::vector<int> banks = {7, 133, 134, 135, 181};
   if (!sprites.Load(assets_dir, banks)) {
     SDL_Quit();
     return 1;
@@ -920,6 +925,30 @@ static int RunDumpLobby(const std::string &assets_dir,
       int textY = kGoBackY - chrome.offset_y + kB156Yoff;
       DrawText(fb, textX, textY, text, /*bank=*/134, /*advance=*/kB156Advance,
                sprites, palette, kSubLobby, /*brightness=*/128);
+    }
+  }
+
+  // I0: CharacterInterface composition (left panel). Per
+  // docs/design/screen-lobby-character.md — bbox (10, 64, 217, 120).
+  //   - Username overlay at literal (20, 71), font 134 advance 8. Content
+  //     is local-config-derived; on the empty-data canonical dump it's
+  //     whatever the bypass harness wrote. Render empty: structural gate
+  //     is overlay position, not text content.
+  //   - Four stat overlays (Level / Wins / Losses / Etc) at literal x=17,
+  //     y in {130, 143, 156, 169}, font 133 advance 7. Server-driven —
+  //     empty without a running Go lobby. Skip the DrawText calls
+  //     entirely (empty string is a no-op anyway); recorded here as the
+  //     spec's structural slots.
+  //   - Five Toggle widgets at y=90, x = 20 + i*42 for i ∈ 0..4
+  //     (NOXIS / LAZARUS / CALIBER / STATIC / BLACKROSE), bank 181
+  //     idx 0..4. Selected-state highlight is non-gated — render the
+  //     base sprite for each. Anchor convention top_left = anchor -
+  //     sprite.offset is applied by BlitSprite.
+  for (int i = 0; i < 5; ++i) {
+    int tx = 20 + i * 42;
+    int ty = 90;
+    if (sprites.Has(181, i)) {
+      BlitSprite(fb, sprites.Get(181, i), tx, ty, nullptr);
     }
   }
 
