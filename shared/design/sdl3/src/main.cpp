@@ -557,8 +557,81 @@ static int RunDumpOptionsControls(const std::string &assets_dir,
     BlitSprite(fb, sprites.Get(7, 7), 0, 0, nullptr);
   }
 
-  // C1 gate stops here: bg plate + frame panel. C2+ will compose
-  // title, 6-row form, scrollbar, Save/Cancel.
+  // 3) Title overlay: "Configure Controls", bank 135 advance 12, centered, y=14.
+  {
+    const std::string title = "Configure Controls";
+    constexpr int kTitleAdvance = 12;
+    int title_x = 320 - static_cast<int>(title.size()) * kTitleAdvance / 2;
+    DrawText(fb, title_x, 14, title, /*bank=*/135, /*advance=*/kTitleAdvance,
+             sprites, palette, kSubMenu, /*brightness=*/128);
+  }
+
+  // 4) Six-row form. Each row i ∈ 0..5:
+  //    - row label   "Move Up:" etc.    at (80, 95+i*53), font 134 advance 10
+  //    - key1 button B112x33 chrome     at anchor (-30, 0+i*53)
+  //    - BNONE connector "OR" or "AND"  at (383, 95+i*53), w=40 h=30, font 134
+  //                                     advance 9, centered horizontally
+  //    - key2 button B112x33 chrome     at anchor (120, 0+i*53)
+  //    Per docs/design/screen-options-controls.md "Object inventory" table.
+  //    Per-row content (button labels Up/Down/.../Left/Right) is C3's gate.
+  struct ControlsRow {
+    const char *label;
+    const char *connector;
+  };
+  const std::array<ControlsRow, 6> rows = {{
+      {"Move Up:", "OR"},
+      {"Move Down:", "OR"},
+      {"Move Left:", "OR"},
+      {"Move Right:", "OR"},
+      {"Aim Up/Left:", "AND"},
+      {"Aim Up/Right:", "AND"},
+  }};
+
+  constexpr int kRowStride = 53;
+  constexpr int kLabelX = 80;
+  constexpr int kLabelYBase = 95;
+  constexpr int kKey1X = -30;
+  constexpr int kKey2X = 120;
+  constexpr int kButtonYBase = 0;
+  constexpr int kConnectorX = 383;
+  constexpr int kConnectorW = 40;
+  constexpr int kB112Base = 28;
+  constexpr int kSmallAdvance = 10;
+  constexpr int kConnectorAdvance = 9;
+
+  for (size_t i = 0; i < rows.size(); ++i) {
+    int yi = static_cast<int>(i) * kRowStride;
+    int by = kButtonYBase + yi;
+    int ty = kLabelYBase + yi;
+
+    // Row label.
+    DrawText(fb, kLabelX, ty, rows[i].label, /*bank=*/134,
+             /*advance=*/kSmallAdvance, sprites, palette, kSubMenu,
+             /*brightness=*/128);
+
+    // Key1 button chrome (no text — that's C3).
+    if (sprites.Has(6, kB112Base)) {
+      BlitSprite(fb, sprites.Get(6, kB112Base), kKey1X, by, nullptr);
+    }
+
+    // BNONE connector text, centered within (kConnectorX, ty, w=40, h=30).
+    {
+      int conn_len = static_cast<int>(std::strlen(rows[i].connector));
+      int conn_xoff = (kConnectorW - conn_len * kConnectorAdvance) / 2;
+      DrawText(fb, kConnectorX + conn_xoff, ty, rows[i].connector,
+               /*bank=*/134, /*advance=*/kConnectorAdvance, sprites, palette,
+               kSubMenu, /*brightness=*/128);
+    }
+
+    // Key2 button chrome (no text — that's C3).
+    if (sprites.Has(6, kB112Base)) {
+      BlitSprite(fb, sprites.Get(6, kB112Base), kKey2X, by, nullptr);
+    }
+  }
+
+  // C2 gate stops here: bg + frame panel + title + 6-row form structure.
+  // C3 will populate key1/key2 button text; C4 the scrollbar thumb;
+  // C5 the Save/Cancel buttons.
 
   std::filesystem::create_directories(dump_dir);
   std::string out = dump_dir + "/screen_00.ppm";

@@ -6,6 +6,8 @@
 - OPTIONSCONTROLS bank set is `{6, 7, 134, 135}` — strictly larger than every prior screen. Bank 7 (panel borders idx 7..14, scrollbar track idx 9, scrollbar thumb idx 10 per `docs/design-system.md.archive:2124`) and bank 134 (small body font, w=10 for keyname labels and w=9 for OR/AND connectors) are NEW load surface. B112x33 lives at bank 6 idx 28 (archive:633), so no new bank needed for the half-width key buttons.
 - Scrollbar widget specs (NOT in widget-button.md, found in `docs/design-system.md.archive:1080-1130`): bank 7, track `res_index = 9`, thumb `barres_index = 10`, scrollposition+scrollmax engine state. The reference dump for OPTIONSCONTROLS has `scrollposition = 0` so the thumb is at the top of the track. No `widget-scrollbar.md` exists yet — flagged as orchestrator's call.
 - Bank 7 idx 7 frame panel sprite is FULL-SCREEN composite: it bakes in (a) outer green-bevel border with corner caps, (b) the centered "Configure Controls" title-plate cutout at top, (c) inner-frame divider, AND (d) the **scrollbar track + both chevron caps** at the right edge. Only the moveable scrollbar **thumb** needs a separate render in C4. This means C4's payload is a single bank-7 idx-10 thumb blit at the track's top — meaningfully smaller than the spec's "track + thumb + chevrons" framing implied. Codec branch: tile-mode RLE; decodes correctly with no codec changes.
+- BNONE connector text is centered horizontally inside its w=40 bbox via `xoff = (40 - len*advance)/2` with advance=9 (font 134), but Y-anchored at the spec's literal `y = 95+i*53` (text TOP, not vertical-centered in the 30px box). Same Y-baseline as the row label at (80, 95+i*53), which is what makes the row label and the OR/AND connector appear on the same visual baseline in the reference. Treating the BNONE bbox y as text-top (not center) matched the reference exactly.
+- Six-row form pattern (C2) reuses the OPTIONSAUDIO/OPTIONSDISPLAY rows-array idiom: one `std::array<ControlsRow, 6>` of `{label, connector}` pairs + a single `for` loop that draws label + key1 chrome + connector + key2 chrome per iteration. Total composition payload: 6 row-label DrawTexts + 12 B112x33 BlitSprites + 6 connector DrawTexts + 1 title DrawText = 25 calls, written as 1 hard-coded block. Free-flip cascade pattern (one builder pass enumerating all spec objects → downstream gates audit by visual A/B) applies as expected.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -79,6 +81,73 @@
     pattern used for OPTIONS / OPTIONSAUDIO, motivated by the spec's explicit
     flag that bank 7 idx 7 may use tile-mode RLE and may be a new visual element
     not yet tested. Splitting C0/C1 isolates the bank 7 risk from the screen-switch.
+---
+
+## 2026-04-26T15:50:00Z — iter 3 (C2 PASS)
+- Composed all C2 structural objects in one `RunDumpOptionsControls` body extension
+  (after the C1 frame-panel blit): title overlay "Configure Controls" via `DrawText`
+  (bank 135, advance 12, centered y=14); 6 form rows via a `std::array<ControlsRow, 6>`
+  iterated with a single for-loop that emits per-iteration: row label `DrawText` at
+  (80, 95+i*53) bank 134 advance 10; key1 B112x33 chrome `BlitSprite` at anchor
+  (-30, 0+i*53) using bank 6 idx 28; BNONE OR/AND connector `DrawText` at
+  (383+xoff, 95+i*53) bank 134 advance 9 with `xoff = (40 - len*9)/2`; key2 B112x33
+  chrome `BlitSprite` at anchor (120, 0+i*53). Button text content (Up/Down/.../Left/Right)
+  intentionally deferred to C3; scrollbar thumb to C4; Save/Cancel to C5.
+- Build: `cmake --build shared/design/sdl3/build` exits 0; AppleClang 17.
+- Dump: 921615 bytes (canonical PPM size invariant).
+- Bytewise diff vs `/tmp/real_optionscontrols_dump.ppm`: 27,303 bytes (~2.96% byte
+  residue). NOT the gate for C2 — the residue is dominated by the four missing
+  classes of content: 6×key1 button text + 2×key2 button text (Aim rows) + 1
+  scrollbar thumb + 2 Save/Cancel buttons (chrome + text). All four classes
+  intentionally absent at C2 and tracked by downstream items.
+- Regression checks (all clean — exact baselines): main 2,136 / options 1,758 /
+  options_audio 1,035 / options_display 2,211. No regression to any prior screen.
+- Visual A/B (Discord DM 1498086817184878776): candidate matches reference for
+  every C2 spec'd object: title centered at top y=14; 6 row labels at coincident
+  y positions ("Move Up:" through "Aim Up/Right:"); 12 B112x33 button-pill chromes
+  visible at coincident x/y positions across both columns; OR/AND connector text
+  at correct x=383 with content (4×OR + 2×AND) matching the spec's connector
+  column. Scrollbar track + chevrons (frame-panel-baked, from C1) coincident.
+  The candidate is missing only the C3/C4/C5 deferred elements.
+- Spec gaps encountered:
+  - The OR/AND connector y-anchor: the spec gives `y = 95+i*53` for both the
+    keyname overlay (bank 134 w=10) AND the BNONE connector (bank 134 w=9). I
+    treated both as text-TOP y (not bbox-center) and they came out on the same
+    visual baseline in the candidate, matching the reference. This pins down a
+    potentially-ambiguous spec point: the BNONE bbox `(383, 95+i*53, w=40, h=30)`
+    treats `y` as the text-top, not the bbox-center. Worth noting in
+    `widget-button.md` when documenting BNONE.
+  - widget-button.md still missing rows for B112x33, B220x33, BNONE (carryover
+    from prior Ralphs and the C0 spec gap). C2 confirms B112x33 lives at bank 6
+    idx 28 with the standard `top_left = anchor - sprite.offset` placement and
+    sprite-supplied negative offset for screen-centering — same convention as
+    B196x33 / B220x33 with only the width changing.
+- Files touched: `shared/design/sdl3/src/main.cpp` (`RunDumpOptionsControls` body
+  extension), `.ralph/options-controls/prd.json` (C2 → passes:true),
+  `.ralph/options-controls/progress.txt` (this entry + two Codebase Patterns lines).
+- **Learnings:**
+  - The OPTIONSAUDIO/OPTIONSDISPLAY rows-array idiom (a `std::array` of small
+    PODs iterated with a single for-loop) generalizes cleanly to 6 rows × 4
+    objects-per-row. The composition body grows linearly in object count without
+    any structural change — no helpers, no refactor, just one for-loop and four
+    `BlitSprite`/`DrawText` calls per iteration. The right granularity is "list
+    all rows in one array, draw each row in one loop body" — same pattern that
+    held at 2 rows (display) and 1 row (audio), now confirmed at 6 rows.
+  - For the C2 gate, the bytewise diff (~3%) is far above the F0/F0-style
+    threshold (~0.25%) but that doesn't matter — the residue is *fully accounted
+    for* by the deferred items (C3 button text, C4 thumb, C5 Save/Cancel). The
+    pattern from main-menu / OPTIONSAUDIO / OPTIONSDISPLAY persists: at the
+    structural-completeness gate, "diff size" is dominated by what's *not yet
+    composed*, and the only honest test is a per-object visual A/B verifying
+    every object that *should* be present is present at coincident coords. C2
+    passes that test cleanly.
+  - The 27303-byte residue at C2 will partition cleanly across C3/C4/C5: each
+    item's contribution to the diff is a known content class. This is the
+    inverse of the OPTIONSAUDIO A0→A3 trajectory (where the diff dropped from
+    2019 → 1035 by fixing one sprite-identity bug). For C3, expect the diff to
+    drop substantially as 8 button labels are populated (Up/Down/Left/Right
+    each ~3 glyphs, plus Aim rows' Left/Right key2). C4 will further drop by
+    ~1 small sprite. C5 will close out with Save/Cancel chrome+text.
 ---
 
 ## 2026-04-26T15:30:00Z — iter 2 (C1 PASS)
