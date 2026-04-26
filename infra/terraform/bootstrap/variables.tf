@@ -10,5 +10,5 @@ variable "state_bucket_name" {
 
 variable "state_lock_table_name" {
   type    = string
-  default = "zsilencer-tfstate-lock"
+  default = "silencer-tfstate-lock"
 }
