@@ -65,6 +65,7 @@ write_files:
       LAVINMQ_PWD=$(get /silencer/shared/lavinmq_silencer_password)
       JWT=$(get /silencer/admin/jwt_secret)
       GITHUB_TOKEN=$(get /silencer/admin/github_backup_token)
+      GHCR_TOKEN=$(get /silencer/admin/ghcr_pull_token)
       umask 077
       mkdir -p /etc/silencer
       cat > /etc/silencer/admin-api.env <<EOF
@@ -80,6 +81,12 @@ write_files:
       GITHUB_BACKUP_REPO=${github_backup_repo}
       EOF
       chmod 0600 /etc/silencer/admin-api.env
+      # docker login to ghcr.io so the silencer-admin-{api,web} units can
+      # pull their private images. Username can be any non-empty string
+      # when using a classic PAT — using the literal "silencer" for
+      # clarity (no relation to a real GH user). Auth persists in
+      # /root/.docker/config.json across reboots.
+      echo "$GHCR_TOKEN" | docker login ghcr.io -u silencer --password-stdin
 
   - path: /etc/silencer/admin-web.env
     permissions: '0600'

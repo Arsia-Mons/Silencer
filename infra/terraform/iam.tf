@@ -33,6 +33,7 @@ locals {
     "${local.ssm_arn_prefix}/silencer/shared/lavinmq_silencer_password",
     "${local.ssm_arn_prefix}/silencer/admin/jwt_secret",
     "${local.ssm_arn_prefix}/silencer/admin/github_backup_token",
+    "${local.ssm_arn_prefix}/silencer/admin/ghcr_pull_token",
   ]
 }
 
