@@ -185,11 +185,12 @@ bool SpriteSet::Load(const std::string &assets_dir,
   if (!LoadIndex(idx)) return false;
 
   for (int b : banks) {
-    char fname[64];
-    std::snprintf(fname, sizeof(fname), "%s/bin_spr/SPR_%03d.BIN",
-                  assets_dir.c_str(), b);
+    char suffix[32];
+    std::snprintf(suffix, sizeof(suffix), "/bin_spr/SPR_%03d.BIN", b);
+    std::string fname = assets_dir + suffix;
     if (!LoadBank(b, fname)) {
-      std::fprintf(stderr, "sprite: failed loading bank %d (%s)\n", b, fname);
+      std::fprintf(stderr, "sprite: failed loading bank %d (%s)\n", b,
+                   fname.c_str());
       // Continue — font banks 134/136 are not needed by the menu.
     }
   }

@@ -4,6 +4,9 @@
 - `SpriteSet::Load` returns `true` even when individual bank loads fail (only the BIN_SPR.DAT index gates the bool); main.cpp must `Has()`-check before every `Get()`.
 - Build verification: `cmake -B build` then `cmake --build build` from `shared/design/sdl3/`; current source set (palette.cpp, sprite.cpp, font.cpp, main.cpp) compiles + links exit 0 with AppleClang 17.
 - Discord DM: `bun /Users/hv/.claude/skills/discord-dm/send.ts "<msg>" <png>...` returns "sent <id>" on success.
+- PPM header sanity: `P6\n640 480\n255\n` is exactly 15 bytes, so a clean 640x480 dump is `15 + 640*480*3 = 921615` bytes.
+- `sips -s format png IN.ppm --out OUT.png` is the canonical PPM→PNG step (writes "/private/tmp/..." path back; that's just macOS firmlink, the file is at /tmp/...).
+- Run dump as `SILENCER_DUMP_DIR=/tmp/sdl3_dump ./shared/design/sdl3/build/silencer_design "$(pwd)/shared/assets"` from the worktree root.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -26,4 +29,18 @@
   - The "build cleanly" gate is decoupled from the "dump runs cleanly" gate — keep the discipline; do not roll the runtime fix into B0.
   - `sprite.cpp:189` uses `char fname[64]` for the SPR path; with the worktree at `/Users/hv/.config/superpowers/worktrees/Silencer/hv-design-ralph/shared/assets/bin_spr/SPR_006.BIN` (≈95 chars) snprintf truncates → fopen fails for every bank → `SpriteSet::Load` still returns true → button-rendering path calls `sprites.Get(6, 7)` on an empty bank → OOB → SIGSEGV. This is the next iteration's payload (B1).
   - Reference dump `/tmp/real_dump.png` matches the spec composition at idx-60 hold (Silencer logo centered, four B196x33 buttons, version overlay bottom-left over a starry red-planet background); use it as the visual ground truth.
+---
+
+## 2026-04-26T13:46:00Z — B1
+- Replaced the truncating `char fname[64]` SPR path build in `sprite.cpp::SpriteSet::Load` with a `std::string` concatenation (`assets_dir + suffix`), where the suffix is the short `/bin_spr/SPR_NNN.BIN` segment. This unblocks bank loads under deep worktree paths.
+- Verified end-to-end: `cmake --build build` exits 0; `SILENCER_DUMP_DIR=/tmp/sdl3_dump ./build/silencer_design <assets>` exits 0 and writes `/tmp/sdl3_dump/screen_00.ppm`.
+- PPM gate: magic bytes `P6\n`, header `640 480\n255\n` (15 bytes), payload `640*480*3 = 921600`, total file size `921615` ✓. Harness reports `logo idx=60` (the bank-208 hold frame per widget-overlay.md / tick.md).
+- Files touched: `shared/design/sdl3/src/sprite.cpp` (path buffer fix), `.ralph/main-menu/prd.json` (B1 → passes:true), `.ralph/main-menu/progress.txt` (this entry).
+- Visual diff summary: composition correct (starfield+planet bg, Silencer logo centered, four B196x33 buttons stacked, version bottom-left). Categorical mismatch is **palette** — candidate renders the planet blue/purple and the logo+buttons in red/orange, while the reference uses red/orange planet + green logo+buttons. Same shapes, wrong tints — classic active-sub-palette divergence. Belongs to P0 next iteration, not B1.
+- Spec gaps encountered:
+  - `docs/design/tick.md` says the canonical reference dump uses **8 ticks** (mid-fade-in, idx ~33), but `prd.json` B1 / `.claude/skills/visual-regression-testing` skill / `widget-overlay.md` all say `res_index == 60` (steady-state hold). The candidate now matches the latter; the existing `/tmp/real_dump.png` likewise shows the logo at full hold, so tick.md's "8 ticks" line is stale and should be updated to "60+ ticks (idx 60 hold)" once the spec edits are unlocked.
+- **Learnings:**
+  - The path-truncation symptom (silent snprintf truncation → fopen fails → empty bank → `sprites.Get(6,7)` UB → SIGSEGV) was the entire B1 blocker; once the path is correct, both the bg plate (bank 6 idx 0) and the logo (bank 208 idx 60) decode and blit cleanly, so the harness composition path is fundamentally sound.
+  - For B1's gate it is sufficient that the file appears + has the right magic / dims / size; correctness of *what* is in the file is gated by P0/S0/T0/A0/F0 downstream.
+  - Use `std::string + suffix` (or `std::filesystem::path`) for any path built from a user-supplied `assets_dir`. Bank counts are bounded (256), so heap traffic from the std::string concat is irrelevant compared to robustness.
 ---

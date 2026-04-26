@@ -1,0 +1,5 @@
+--- Iteration 1 2026-04-26 13:45:23 ---
+Iteration 1 complete. **B0 PASS** — `cmake -B build && cmake --build build` exits 0 against the current `shared/design/sdl3/` source set. Flipped `prd.json` `B0.passes → true`, appended progress entry, committed as `b126125`. Discord DM sent (ref dump only; candidate runtime segfaults due to a `char fname[64]` truncation in `sprite.cpp:189` — that's the B1 payload).
+
+Backlog: B1, C0, P0, S0, T0, A0, F0 still TODO.
+

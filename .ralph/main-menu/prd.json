@@ -16,7 +16,7 @@
       "id": "B1",
       "name": "Dump mode produces a 640x480 P6 PPM",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "spec": "`SILENCER_DUMP_DIR=/tmp/sdl3_dump ./build/silencer_design <worktree-root>/shared/assets` writes `/tmp/sdl3_dump/screen_00.ppm`, magic bytes `P6`, header reports 640 480, file size matches header. The harness ticks until the bank-208 logo settles at `res_index == 60` per docs/design/tick.md and docs/design/screen-main-menu.md.",
       "category": "build"
     },
