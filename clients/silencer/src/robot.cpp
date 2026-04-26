@@ -53,11 +53,11 @@ void Robot::InitBT() {
 		return BTResult::Success;
 	};
 
-	// LookSides: only from WALKING during search phase (state_i < 100) — orient toward target.
+	// LookSides: only from WALKING during search phase (bt_walk_ticks_ < 600) — orient toward target.
 	// Always returns Failure so the Selector continues to Patrol (orient + move each tick).
 	btctx_.actions["LookSides"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
-		if (state_i >= 100) return BTResult::Failure; // ReturnToSpawn handles orientation after search
+		if (bt_walk_ticks_ >= 600) return BTResult::Failure; // ReturnToSpawn handles orientation
 		World& world = *static_cast<World*>(ctx.userData);
 		if (Look(world, 2)) { mirrored = true; }
 		else if (Look(world, 1)) { mirrored = false; }
@@ -116,22 +116,20 @@ void Robot::InitBT() {
 		return BTResult::Success;
 	};
 
-	// ReturnToSpawn: after search phase (!patrol, state_i >= 100), walk back to spawn and sleep.
+	// ReturnToSpawn: after 10s search phase (!patrol, bt_walk_ticks_ >= 600), walk back to spawn and sleep.
 	// If a target is spotted en-route, reset the search timer and resume hunting.
-	// Only sleeps after state_i >= 140 to ensure the robot has spent time walking back
-	// (prevents instant sleep when robot is already near spawn).
 	btctx_.actions["ReturnToSpawn"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		if (patrol) return BTResult::Failure;
-		if (state_i < 100) return BTResult::Failure;
+		if (bt_walk_ticks_ < 600) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
 		if (Look(world, 1) || Look(world, 2)) {
-			state_i = 0; // target spotted — reset and keep hunting
+			bt_walk_ticks_ = 0; // target spotted — reset and keep hunting
 			return BTResult::Failure;
 		}
 		// Orient toward spawn and let Patrol move us there
 		mirrored = (signed(originalx) < signed(x));
-		if (state_i >= 140 && abs(signed(x) - signed(originalx)) <= 20) {
+		if (abs(signed(x) - signed(originalx)) <= 20) {
 			state = SLEEPING;
 			state_i = -1;
 			return BTResult::Success;
@@ -159,6 +157,11 @@ void Robot::Tick(World & world){
 	if(state != DEAD && rand() % (24 * 15) == 0){
 		StopAmbience();
 		EmitSound(world, world.resources.soundbank["airlokj.wav"], 64);
+	}
+	// BT patrol timer: counts up while WALKING, resets in any other state
+	if (bt_) {
+		if (state == WALKING) bt_walk_ticks_++;
+		else bt_walk_ticks_ = 0;
 	}
 	switch(state){
 		case NEW:{
