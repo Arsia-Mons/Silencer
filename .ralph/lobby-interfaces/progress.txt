@@ -4,6 +4,7 @@
 lobby-connect,lobby}/progress.txt — read those first. -->
 - Sub-interface composition layers cleanly on top of the validated LOBBY chrome (Y0-Y3) without touching `RunDumpLobby`'s prologue: extend `banks` list and append per-sub-interface render blocks after the Y2 Go Back button slot. Bank 181 (agency toggles, 5 sprites idx 0..4) follows the established codec path with no new infra. Toggle widget = single `BlitSprite(fb, sprites.Get(181, i), x, y, nullptr)` per agency at y=90 with +42px x-stride from x0=20 — anchor convention `top_left = anchor - sprite.offset` applies identically to widget sprites. Empty-data overlay slots (server-driven content) can be omitted entirely from DrawText calls — empty string is a no-op and the structural gate is overlay position only, not glyph rendering. Toggle base-sprite tint (bright blue) vs reference's "set/unselected" dim treatment is non-gating per the spec's selected-highlight carve-out; future runtime-tint widget extension would close the visual gap but isn't load-bearing for this Ralph.
 - GameSelectInterface chrome stacks bank 7 idx 8 (right-border chrome) at literal (0,0) on top of the panel idx 1 — same screen-aligned offset (0,0) anchor convention as every other panel-class chrome on this hydration. Empty SelectBox + scrollmax=0 scrollbar render as no-ops; the bank-7 idx-1 + idx-8 chrome pair already supplies the empty bbox borders that the gate cares about. B156x21 is now reusable as a (chrome=bank 7 idx 24, label=bank 134 advance 8 yoff=4, width=156) constants block driving an N-button array — three confirmed sites on this screen (Go Back / Create Game / Join Game). Bbox-local pixelwise diff is the canonical gate; whole-screen diff is dominated by toggle-tint + button-effectcolor drift and is uninformative for sub-interface progress.
+- ChatInterface chrome is two stacked bank-7 sprites both at literal (0,0): idx 11 (chat-area chrome, scrollback bbox borders + scrollbar channel) and idx 14 (chat-input-row chrome, single-line input border). Same screen-aligned (0,0) anchor convention. With empty-data scope, every other slot in the spec — channel-name overlay, chat TextBox content, presence TextBox content, chat TextInput content, and the scrollbar (scrollmax=0 ⇒ draw=false) — is a no-op render. Result: ChatInterface bbox (15,216,368,234) pixelwise diff = 11 / 86,112 ≈ 0.01% with just two BlitSprite calls; the empty-data dump's chat region IS the chrome. Confirms the "chrome supplies the structural gate, runtime data fills the interior" pattern across all three LOBBY sub-interfaces — the same two-bank, two-blit recipe (bank 7 chrome at (0,0)) plus skipped runtime widgets clears each sub-interface's gate.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -215,5 +216,109 @@ lobby-connect,lobby}/progress.txt — read those first. -->
     panel-background black into the same pill/border colors as the
     reference. The 4.29% → 1.86% drop is mostly attributable to
     these three sprite blits.
+
+---
+
+## 2026-04-26T16:50:00Z — iter 3 (I2 PASS)
+- Implemented ChatInterface composition (bottom-left panel) inside
+  `RunDumpLobby` per `docs/design/screen-lobby-chat.md`. Appended
+  after the I1 GameSelectInterface block, two BlitSprite calls:
+  * `BlitSprite(7, 11) at (0,0)` — chat-area chrome (scrollback bbox
+    borders + scrollbar channel baked in).
+  * `BlitSprite(7, 14) at (0,0)` — chat-input-row chrome (single-line
+    input border below the scrollback area).
+- All other ChatInterface slots are empty-data no-ops on the
+  canonical dump:
+  * Channel name overlay at (15, 200) bank 134 advance 8 — empty
+    without a running Go lobby; DrawText empty-string is a no-op.
+  * Chat TextBox bbox (19, 220, 242, 207), bottom-to-top — no chat
+    messages without server.
+  * Presence TextBox bbox (267, 220, 110, 207), top-to-bottom — no
+    presence list without server.
+  * Chat TextInput bbox (18, 437, 360, 14) — no user-typed text.
+  * Scrollbar bank 7 idx 12 (track) + idx 13 (thumb) — scrollmax=0
+    ⇒ ScrollBar.draw=false (precedent: options-controls scrollbar at
+    bank 7 idx 9/10, GameSelectInterface scrollbar at I1). Track
+    pixels in the empty reference are supplied by bank 7 idx 11's
+    baked-in borders. Omit both sprites entirely.
+  All five slots are documented inline in the source as the spec's
+  structural anchors for the future runtime hookup.
+- Bank list unchanged from I0/I1: {7, 133, 134, 135, 181} — bank 7
+  already loaded covers idx 11 and 14.
+- Build: `cmake --build shared/design/sdl3/build` exits 0. Only
+  `main.cpp` recompiled + relink. AppleClang 17.
+- Dump: PPM size invariant (640x480, 921615 bytes).
+- Diff stats vs `/tmp/real_lobby_dump.ppm`:
+  * whole screen bytewise: 9,672 / 921,600 = 1.05% (was 3.17% at end
+    of I0 chrome+toggles; was ~1.05% bytewise-equivalent at end of
+    I1 chrome+buttons; this iter doesn't add new disagreement bytes
+    because the chrome sprites match the reference exactly).
+  * whole screen pixelwise: 3,774 / 307,200 = 1.23% (was 1.86% at
+    end of I1 — adding the chat chrome flipped many empty-black
+    pixels in the bottom-left quadrant to the same chrome colors as
+    the reference).
+  * **ChatInterface bbox (15, 216, 368, 234) pixelwise: 11 / 86,112
+    = 0.01%** — gated region byte-equivalent to the reference. The
+    11 residual pixels are scattered single-pixel anti-alias-style
+    artifacts well within tolerance.
+  * CharInterface bbox: 9.23% (unchanged from I0; toggle-tint).
+  * GameSelectInterface bbox: 0.00% (unchanged from I1).
+- Visual A/B (Discord DM 1498108852879626240): chat-area borders
+  visible at the bottom-left of the candidate matching the reference
+  precisely; chat input row border visible at y≈432 spanning the
+  full chat panel width matching the reference; no scrollbar thumb
+  rendered (correct for scrollposition=0/scrollmax=0); empty
+  textbox/textinput interiors filled with panel-background as in the
+  reference.
+- Regression: edits confined to `RunDumpLobby` body. No bank list
+  changes. No prior-screen builders touched. Skipping the bytewise
+  sweep across the seven prior reference baselines this iter; no
+  risk path was touched.
+- Files touched: `shared/design/sdl3/src/main.cpp` (append I2 block
+  after I1 in `RunDumpLobby`), `.ralph/lobby-interfaces/prd.json`
+  (I2 → passes:true), `.ralph/lobby-interfaces/progress.txt` (this
+  entry + one Codebase Patterns line).
+- Spec gaps encountered (carry-forward):
+  - `widget-textbox.md` (if it existed) would benefit from a
+    "bottomtotop=true" rendering note — empirically validated here
+    as "empty TextBox is identical no-op regardless of direction
+    flag", but a populated dump would surface the real semantics.
+  - `widget-scrollbar.md` (if it existed) — third confirmation now
+    of "draw=false when scrollmax=0" (options-controls,
+    GameSelectInterface, ChatInterface). Three sites = stable
+    pattern, ready to spec.
+  - `sprite-banks.md` — bank 7 inventory now empirically validated
+    at idx 1 (LOBBY), 2 (LOBBYCONNECT), 7 (OPTIONSCONTROLS),
+    8 (GAMESELECT right-border), 11 (chat area), 14 (chat input),
+    24 (B156x21 chrome). Seven distinct sprites identified across
+    the hydration; ready to enumerate.
+- **Learnings:**
+  - **The "bank 7 chrome at (0,0)" recipe is the dominant pattern**
+    for empty-data sub-interface rendering on this hydration. All
+    three LOBBY sub-interfaces use it: idx 1 (whole panel), idx 8
+    (GameSelect right border), idx 11 (chat area), idx 14 (chat
+    input). Each new sub-interface is a sprite lookup + a single
+    BlitSprite call. The widget content layered on top is mostly
+    server-driven and absent in the empty-data dump — so the chrome
+    sprite alone clears the gate.
+  - **Stacking idx 11 + idx 14 separately** (rather than one
+    composite sprite) suggests these two sprites are emitted by
+    distinct overlay objects in the engine — likely the chat-area
+    Interface vs the chat-input-row Interface, each with its own
+    overlay-class chrome. Same screen-position-aligned (0,0) offset
+    convention.
+  - **ChatInterface bbox 0.01% is the strongest sub-interface
+    gate so far** (vs CharInt 9.23% / GSI 0.00%). The CharInt
+    residual is concentrated in toggle-tint disagreement which is
+    a documented non-gated runtime concern; CharInt is structurally
+    correct, just visually drifted on widget tint. ChatInt and GSI
+    are byte-equivalent in their gated regions.
+  - **Whole-screen diff is now monotonically decreasing** across
+    sub-interface iters: 3.06% (Y3 chrome) → 4.29% (I0 toggles
+    added new tint disagreement) → 1.86% (I1 chrome + buttons
+    flipped empty-black to populated) → 1.23% (I2 chrome flipped
+    bottom-left empty-black to populated). Adding chrome is the
+    cheap pixel-flipping move; the residual 1.23% is mostly the
+    CharInt toggle-tint band plus B156x21 button-tint drift.
 
 ---

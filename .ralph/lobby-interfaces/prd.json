@@ -25,7 +25,7 @@
       "id": "I2",
       "name": "ChatInterface composition (bottom-left panel)",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "spec": "Per docs/design/screen-lobby-chat.md: render bank 7 idx 11 chat border; bank 7 idx 14 chat input border; channel name overlay at (15,200) bank 134 advance 8 (empty content OK); chat TextBox at (19,220,242,207) bottom-to-top (empty); presence TextBox at (267,220,110,207) (empty); chat TextInput at (18,437,360,14) (empty); chat Scrollbar bank 7 idx 12 + thumb idx 13. Region: bbox (15,216,368,234).",
       "category": "composition"
     },

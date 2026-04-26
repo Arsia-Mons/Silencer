@@ -1013,6 +1013,41 @@ static int RunDumpLobby(const std::string &assets_dir,
     }
   }
 
+  // I2: ChatInterface composition (bottom-left panel). Per
+  // docs/design/screen-lobby-chat.md — bbox (15, 216, 368, 234).
+  //   - Bank 7 idx 11 chat-area chrome at literal (0, 0). Same anchor
+  //     convention as bank 7 idx 1 / idx 8 — sprite is screen-aligned with
+  //     offset (0, 0); BlitSprite applies the offset normalization.
+  //   - Bank 7 idx 14 chat-input-row chrome at literal (0, 0). Distinct
+  //     index from idx 11; supplies the input-row borders below the
+  //     scrollback area.
+  //   - Channel name overlay at literal (15, 200), font 134 advance 8 —
+  //     uid=1, runtime content (e.g., "#general"). Empty without a
+  //     running Go lobby; DrawText with empty string is a no-op.
+  //     Documented here as the structural slot.
+  //   - Chat TextBox bbox (19, 220, 242, 207), font 133 lineheight=11,
+  //     fontwidth=6, bottom-to-top. Empty without server messages; the
+  //     bordered region is supplied by the idx 11 chrome above.
+  //   - Presence TextBox bbox (267, 220, 110, 207), uid=9, top-to-bottom.
+  //     Empty without server presence list; bordered region likewise
+  //     supplied by idx 11.
+  //   - Chat TextInput bbox (18, 437, 360, 14), uid=1, font 133
+  //     fontwidth=6, maxchars=200. Empty until the user types; the
+  //     bordered input region is supplied by idx 14.
+  //   - Chat Scrollbar bank 7 idx 12 (track) + idx 13 (thumb),
+  //     scrollpixels=11, scrollposition=0. Engine-positioned widget;
+  //     with empty messages scrollmax=0 ⇒ ScrollBar.draw=false (same
+  //     precedent as options-controls and the GameSelectInterface
+  //     scrollbar at I1). Omit the render entirely; the scrollbar
+  //     channel pixels in the empty-data reference dump are supplied
+  //     by bank 7 idx 11's baked-in borders.
+  if (sprites.Has(7, 11)) {
+    BlitSprite(fb, sprites.Get(7, 11), 0, 0, nullptr);
+  }
+  if (sprites.Has(7, 14)) {
+    BlitSprite(fb, sprites.Get(7, 14), 0, 0, nullptr);
+  }
+
   std::filesystem::create_directories(dump_dir);
   std::string out = dump_dir + "/screen_00.ppm";
   bool ok = WritePPM(out, fb, palette, kSubLobby);
