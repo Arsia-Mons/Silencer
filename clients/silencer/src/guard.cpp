@@ -229,6 +229,19 @@ void Guard::InitBT(){
 						mirrored = (obj->x < x); // orient toward target
 					}
 					// <=80px: keep current direction to avoid oscillation
+					// Climb ladder if target is on a different level
+					Platform* ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
+					if(ladder){
+						Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+						if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
+							if(ladder->y2 == obj->y && y != obj->y && ladder->y2 > y){
+								x = center; yv = 5; state = LADDER; state_i = 0;
+							}
+							if(ladder->y1 == obj->y && y != obj->y && ladder->y1 < y){
+								x = center; yv = -5; state = LADDER; state_i = 0;
+							}
+						}
+					}
 				} else {
 					chasing = 0; // target gone or dead
 				}
