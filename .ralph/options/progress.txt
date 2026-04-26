@@ -1,6 +1,9 @@
 ## Codebase Patterns
 <!-- One-line patterns this Ralph discovers. The main-menu Ralph's patterns
 are also relevant — read .ralph/main-menu/progress.txt's Patterns header. -->
+- Screen switch: env var `SILENCER_DUMP_SCREEN` ("main_menu" default, "options" → OPTIONS hub) keeps the main-menu pathway untouched and adds zero CLI surface; one extra branch in `main()` + a sibling `RunDumpOptions` mirroring `RunDump`.
+- OPTIONS bank set is a strict subset of main-menu's: only banks 6 (bg + B196x33 chrome) and 135 (button-label font). No bank 133 (no version) and no bank 208 (no logo) — load-bearing per docs/design/screen-options.md "What's NOT on this screen".
+- Bytewise `cmp -l | wc -l` from the very first OPTIONS dump (post-main-menu hydration) was 1,758 / 921,600 ≈ 0.19% — well under the F0 ≤0.25% threshold inherited from main-menu — strongly hinting that O1/O2/O3/O4 will all be "free flips" same as the main-menu cascade.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -14,4 +17,20 @@ are also relevant — read .ralph/main-menu/progress.txt's Patterns header. -->
 - Spec input: docs/design/screen-options.md (authoritative for this Ralph).
 - Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph (same as main-menu Ralph).
 - **Learnings:** none yet.
+---
+
+## 2026-04-26T15:30:00Z — O0
+- Added screen-switch in `shared/design/sdl3/src/main.cpp`: when `SILENCER_DUMP_DIR` is set, also read `SILENCER_DUMP_SCREEN` ("main_menu" default, "options" routes to a new `RunDumpOptions`). Existing `RunDump` (main-menu) is untouched.
+- `RunDumpOptions` mirrors `RunDump`'s structure but loads only banks {6, 135}, skips the bank-208 logo overlay, skips the bank-133 version overlay, and composes four B196x33 buttons at engine anchors (-89, y) for y∈{-142,-90,-38,15} with labels Controls/Display/Audio/Go Back. State is INACTIVE → `res_index=7`, `effectbrightness=128`. Sub-palette = 1 (menu palette).
+- Build: `cmake --build shared/design/sdl3/build` exits 0; AppleClang 17.
+- Dump (options): `SILENCER_DUMP_SCREEN=options SILENCER_DUMP_DIR=/tmp/sdl3_dump ./build/silencer_design "$(pwd)/shared/assets"` writes `/tmp/sdl3_dump/screen_00.ppm` (P6, 640×480, 921,615 bytes — matches the canonical-PPM size invariant).
+- Main-menu pathway regression check: `SILENCER_DUMP_DIR=/tmp/sdl3_dump_main ./build/silencer_design "$(pwd)/shared/assets"` (no `SILENCER_DUMP_SCREEN`) still produces the main-menu PPM with the same F0-residue diff vs `/tmp/real_dump.ppm` (~0.23% glyph-internal pixels). No regression.
+- Files touched: `shared/design/sdl3/src/main.cpp` (`RunDumpOptions` + screen-switch), `.ralph/options/prd.json` (O0 → passes:true), `.ralph/options/progress.txt` (this entry + three Codebase Patterns lines).
+- Visual diff summary: not the gate for O0 (build/run gate). Bytewise diff vs `/tmp/real_options_dump.ppm` is 1,758 bytes ≈ 0.19% pixels — already under main-menu's F0 threshold, and visual A/B PNG comparison shows the candidate is indistinguishable from the reference to the casual eye. Full visual analysis belongs to O1..O4's gates.
+- Spec gaps encountered:
+  - `docs/design/screen-options.md` says "Apply `top_left = anchor + screen_center - sprite.offset`" with the screen_center term, but `widget-overlay.md` and the engine-validated main-menu hydration use `top_left = anchor - sprite.offset` (no screen_center addition). Empirically the latter is correct: `BlitSprite` already treats `(object_x, object_y)` as engine anchors and produces a pixel-equivalent dump for OPTIONS without any center-translation. The screen-options spec text in §"Object inventory" and §"Spec gaps to flag" should be reconciled with widget-overlay.md, OR the engine offset numbers in widget-button.md (-310, -288) need re-examining. Either the screen-options.md formula is over-applied or the widget-button.md offsets are misreported. The empirical answer (no center addition + offsets -310, -288) is what produces the reference dump.
+- **Learnings:**
+  - The seed harness was already structured as "single `RunDump`"; the cleanest screen-switch is one `if (screen == "options") return RunDumpOptions(...);` in `main()` — no harness rewrite, no shared-state branching inside the dump path. Scales to N screens by adding sibling `RunDumpFoo` functions, each owning its own bank set + composition list.
+  - The OPTIONS hub composition is a near-strict subset of main-menu: same bg, same button widget. The "free flip" cascade observed in the main-menu Ralph (B0→C0→S0→T0 each took zero code changes once their upstream gate cleared) appears to extend straight into OPTIONS — the ~0.19% diff at O0 commit is already the eventual F0-style residue, not a structural mismatch. Expect O1/O2/O3/O4 to flip without further code changes.
+  - Loading banks {6, 135} but not {133, 208} is a load-bearing fidelity choice: a candidate that lazily loaded the same {6, 133, 135, 208} set as main-menu would still work (unused banks don't render), but documenting the actual bank dependency surfaces the screen's true asset footprint and would catch any spec drift where, e.g., OPTIONS later starts using bank 133 for a sub-screen heading.
 ---

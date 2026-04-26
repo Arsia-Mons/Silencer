@@ -167,6 +167,85 @@ static int RunDump(const std::string &assets_dir,
   return ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// Compose the OPTIONS hub and write the PPM. Per docs/design/screen-options.md:
+//   - sub-palette 1 (same menu palette)
+//   - bank-6 idx-0 fullscreen background
+//   - four B196x33 buttons at anchor x=-89, y in {-142, -90, -38, 15}
+//     with labels Controls / Display / Audio / Go Back
+//   - NO bank-208 logo overlay
+//   - NO version overlay
+//   - all buttons INACTIVE (res_index=7, effectbrightness=128)
+// ---------------------------------------------------------------------------
+static int RunDumpOptions(const std::string &assets_dir,
+                          const std::string &dump_dir) {
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // Banks the OPTIONS hub touches: 6 (bg plate + B196x33 button chrome) and
+  // 135 (button-label font). Bank 133 (version font) and 208 (logo) are
+  // unused on this screen — see "What's NOT on this screen" in
+  // docs/design/screen-options.md.
+  SpriteSet sprites;
+  std::vector<int> banks = {6, 135};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  constexpr int kSubMenu = 1;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  // 1) Background plate.
+  if (sprites.Has(6, 0)) {
+    BlitSprite(fb, sprites.Get(6, 0), 0, 0, nullptr);
+  }
+
+  // 2) Four buttons. Anchors per docs/design/screen-options.md object
+  //    inventory. INACTIVE state -> res_index=7, effectbrightness=128.
+  struct ButtonSpec {
+    const char *text;
+    int x;
+    int y;
+  };
+  const std::array<ButtonSpec, 4> buttons = {{
+      {"Controls", -89, -142},
+      {"Display", -89, -90},
+      {"Audio", -89, -38},
+      {"Go Back", -89, 15},
+  }};
+
+  for (const auto &b : buttons) {
+    const Sprite &chrome = sprites.Get(6, 7);
+    BlitSprite(fb, chrome, b.x, b.y, nullptr);
+
+    int len = static_cast<int>(std::strlen(b.text));
+    int xoff = (196 - len * 11) / 2;
+    int textX = b.x - chrome.offset_x + xoff;
+    int textY = b.y - chrome.offset_y + 8;
+    DrawText(fb, textX, textY, b.text, /*bank=*/135, /*advance=*/11, sprites,
+             palette, kSubMenu, /*brightness=*/128);
+  }
+
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubMenu);
+  std::fprintf(stderr, "wrote %s (options)\n", out.c_str());
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   std::string assets_dir;
   if (argc >= 2) {
@@ -183,6 +262,11 @@ int main(int argc, char **argv) {
 
   const char *dump = std::getenv("SILENCER_DUMP_DIR");
   if (dump && *dump) {
+    const char *screen = std::getenv("SILENCER_DUMP_SCREEN");
+    std::string screen_str = (screen && *screen) ? screen : "main_menu";
+    if (screen_str == "options") {
+      return RunDumpOptions(assets_dir, dump);
+    }
     return RunDump(assets_dir, dump);
   }
 

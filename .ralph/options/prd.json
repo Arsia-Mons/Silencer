@@ -8,7 +8,7 @@
       "id": "O0",
       "name": "Candidate dumps an OPTIONS PPM via env var",
       "priority": 0,
-      "passes": false,
+      "passes": true,
       "spec": "Some clean mechanism (env var, CLI arg, etc.) makes the candidate harness compose+render the OPTIONS screen and write a 640x480 P6 PPM at /tmp/sdl3_dump/screen_00.ppm. Main-menu pathway must still work unchanged.",
       "category": "build"
     },
