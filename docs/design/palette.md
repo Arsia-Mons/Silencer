@@ -5,32 +5,69 @@
 
 ## File layout
 
-`shared/assets/PALETTE.BIN` is **8,448 bytes** on disk. The real client
-(`clients/silencer/src/palette.cpp:43..54`) reads each sub-palette `s`
-starting at file offset:
+`shared/assets/PALETTE.BIN` is **8,448 bytes** on disk.
+
+Authoritative seek formula — the **first byte of sub-palette `s`'s
+color table** is at file offset:
 
 ```
-offset(s) = 4 + s * (768 + 4)
+color_offset(s) = 4 + s * (768 + 4)
 ```
 
-i.e. a 4-byte file prefix, then 11 records of `[4-byte sub-header,
-768-byte color table]`. The 4-byte prefix and per-sub headers are
-treated as filler (all zeros). The color table is 256 entries × 3
-bytes `(R, G, B)`.
+That offset already points directly at the first R byte. **Do not
+add another `+ 4` on top of this.** The `+ 4` term in the formula
+is the file-level prefix; the `* 4` term is the trailing filler that
+sits *after* each sub-palette's color table, not before. Iterating
+the loader looks like:
 
-The arithmetic doesn't actually fit: `4 + 11 × 772 = 8,496`, and the
-file is 8,448 bytes. The real client over-reads off the end of the
-file for the last few sub-palettes; the `SDL_ReadIO` calls just
-return shorter and the unread bytes stay zero. Match this behavior
-in a port — don't compress the layout to 11 × 768 contiguous, even
-though *that* arithmetic would fit cleanly. The differing offsets
-mean both schemes produce different palette indices for the same
-sprite art.
+```
+seek to color_offset(s)
+read 256 × (R, G, B) bytes
+# the next 4 bytes (positions [color_offset(s) + 768 .. + 771])
+# are filler; the next sub-palette's color table starts at
+# color_offset(s+1) = color_offset(s) + 772
+```
+
+Concrete byte addresses for sub 0..2 (raw 6-bit values from the file,
+before the `<< 2` expansion):
+
+| s | color_offset | idx 0 (R G B) | idx 1 (R G B) | idx 2 (R G B) |
+| - | ------------ | ------------- | ------------- | ------------- |
+| 0 | 4            | `00 00 00`    | `00 00 00`    | `00 00 00`    |
+| 1 | 776          | `00 00 00`    | `02 27 00`    | `10 02 04`    |
+| 2 | 1548         | `00 00 00`    | `00 00 00`    | `02 02 02`    |
+
+A hydration reading 4 bytes too deep will produce a recognizable-but-
+wrong main menu (the black bg becomes blue, the teal buttons become
+coral/red — the colors shift by one slot). Use the table above as a
+sanity check before rendering anything.
+
+The arithmetic doesn't fit: `4 + 11 × 772 = 8,496`, and the file is
+8,448 bytes. The real client over-reads off the end of the file for
+the last sub-palettes; the `SDL_ReadIO` calls return shorter and the
+unread bytes stay zero. Match this behavior in a port — don't
+"correct" the layout to 11 × 768 contiguous, even though that
+arithmetic fits cleanly; the differing offsets mean the two schemes
+produce different palette indices for the same sprite art.
 
 Channels are 6-bit (0..63 in the file). On load, each byte is
 shifted left by 2 (`v << 2`) to expand to 8-bit. Index 0 is
 treated as transparent at the blit layer (see
 [sprite-banks.md](sprite-banks.md)).
+
+### Reference loader pseudocode
+
+```
+buf = read entire PALETTE.BIN
+for s in 0..10:
+    co = 4 + s * 772
+    for i in 0..255:
+        # bounds-check: writes past EOF (~last sub-palette) stay zero
+        r = (co + i*3 + 0 < |buf|) ? buf[co + i*3 + 0] : 0
+        g = (co + i*3 + 1 < |buf|) ? buf[co + i*3 + 1] : 0
+        b = (co + i*3 + 2 < |buf|) ? buf[co + i*3 + 2] : 0
+        palettes[s][i] = (r << 2, g << 2, b << 2)
+```
 
 ## The active sub-palette is state-driven (this is the part the old spec missed)
 
