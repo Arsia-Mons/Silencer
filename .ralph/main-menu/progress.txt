@@ -1,0 +1,14 @@
+## Codebase Patterns
+<!-- One-line patterns the Ralph has discovered. Append as you find them. -->
+
+## 2026-04-26T00:00:00Z — INIT
+- Ralph scaffolded by setup conversation.
+- Baseline: shared/design/sdl3/ snapshot at commit 5bc40d1 contains
+  CMakeLists.txt, CLAUDE.md, src/{palette,sprite,font}.{cpp,h}, src/main.cpp.
+  No widgets/, no screens/. Composition layer must be built from spec.
+- Reference dump: /tmp/real_dump.ppm (pre-existing, do not regenerate).
+- Spec inputs: docs/design/{README,palette,sprite-banks,font,tick,
+  widget-overlay,widget-button,widget-interface,screen-main-menu}.md.
+- Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
+- **Learnings:** none yet.
+---

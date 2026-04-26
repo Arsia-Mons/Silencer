@@ -1,0 +1,72 @@
+{
+  "screen": "main-menu",
+  "reference_dump": "/tmp/real_dump.ppm",
+  "candidate_dump": "/tmp/sdl3_dump/screen_00.ppm",
+  "candidate_root": "shared/design/sdl3",
+  "items": [
+    {
+      "id": "B0",
+      "name": "Hydration builds cleanly",
+      "priority": 0,
+      "passes": false,
+      "spec": "`cmake -B shared/design/sdl3/build && cmake --build shared/design/sdl3/build` exits 0. Resolves any missing-source / missing-screen / missing-widget link errors by adding the necessary spec-derived files.",
+      "category": "build"
+    },
+    {
+      "id": "B1",
+      "name": "Dump mode produces a 640x480 P6 PPM",
+      "priority": 1,
+      "passes": false,
+      "spec": "`SILENCER_DUMP_DIR=/tmp/sdl3_dump ./build/silencer_design <worktree-root>/shared/assets` writes `/tmp/sdl3_dump/screen_00.ppm`, magic bytes `P6`, header reports 640 480, file size matches header. The harness ticks until the bank-208 logo settles at `res_index == 60` per docs/design/tick.md and docs/design/screen-main-menu.md.",
+      "category": "build"
+    },
+    {
+      "id": "C0",
+      "name": "Composition complete (every spec object present)",
+      "priority": 2,
+      "passes": false,
+      "spec": "The dump shows every object listed in docs/design/screen-main-menu.md: dark background, bank-208 logo overlay (centered upper), version overlay (bottom-left), and four B196x33 buttons (centered, stacked). 'Present' here means recognizable in the right rough region — palette / shape / position can still be wrong; this item is composition only.",
+      "category": "composition"
+    },
+    {
+      "id": "P0",
+      "name": "Palette correct (active sub-palette = 1)",
+      "priority": 3,
+      "passes": false,
+      "spec": "Dump's dominant colors qualitatively match the reference: dark navy/teal background, teal-ish button pills, light text. Confirms the dump resolves through sub-palette 1 (main menu) per docs/design/palette.md, not 0 or another.",
+      "category": "palette"
+    },
+    {
+      "id": "S0",
+      "name": "Sprite codec correct (shapes recognizable)",
+      "priority": 4,
+      "passes": false,
+      "spec": "Logo and button pill shapes are recognizable, not garbled. RLE decode (linear and tile mode) matches docs/design/sprite-banks.md including the +4 filler and per-tile traversal.",
+      "category": "sprite_codec"
+    },
+    {
+      "id": "T0",
+      "name": "Text legible (font tile arithmetic correct)",
+      "priority": 5,
+      "passes": false,
+      "spec": "Version string and button labels are readable as text — no scrambled glyph internals. Implies font-bank tile arithmetic matches docs/design/font.md and the partial-edge tile width math is correct.",
+      "category": "tile_arithmetic"
+    },
+    {
+      "id": "A0",
+      "name": "Anchors correct (positions per spec)",
+      "priority": 6,
+      "passes": false,
+      "spec": "Logo, version overlay, and the four buttons are positioned per docs/design/screen-main-menu.md, within ~5px of the reference. Sprite anchor math `top_left = object - sprite.offset` correctly applied per docs/design/widget-overlay.md and widget-button.md.",
+      "category": "sprite_anchor"
+    },
+    {
+      "id": "F0",
+      "name": "Visual equivalence to reference",
+      "priority": 7,
+      "passes": false,
+      "spec": "Final gate. The candidate PPM is visually equivalent to /tmp/real_dump.ppm to a casual reader, modulo: (a) the version string content (compile-time difference), (b) any documented animation-phase nits. If divergences remain, they have been categorized in progress.txt as 'animation phase' or 'transient text content' and are demonstrably non-structural.",
+      "category": "final"
+    }
+  ]
+}
