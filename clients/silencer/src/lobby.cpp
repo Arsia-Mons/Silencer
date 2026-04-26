@@ -19,6 +19,8 @@ Lobby::Lobby(World * world){
 	he = 0;
 	resolvehost[0] = 0;
 	mutex = SDL_CreateMutex();
+	resolvethread = nullptr;
+	resolvethreadrunning = false;
 	state = WAITING;
 	accountid = 0;
 	sendbuffersize = 0;
@@ -42,6 +44,11 @@ Lobby::~Lobby(){
 	Disconnect();
 	ClearGames();
 	userinfos.clear();
+	UnlockMutex();
+	if(resolvethread){
+		SDL_WaitThread(resolvethread, nullptr);
+		resolvethread = nullptr;
+	}
 	SDL_DestroyMutex(mutex);
 }
 
