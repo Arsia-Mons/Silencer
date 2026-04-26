@@ -160,6 +160,7 @@ private:
 	std::atomic<int> dlresult{0};      // 0=idle, 1=success, -1=fail
 	std::string dlitemname;            // key in servermaps being downloaded
 	std::thread dlthread;
+	std::thread actordefthread;
 	Uint32 lastmusicplaytime;
 	char currentmusictrack[256];
 	bool fullscreentoggled;
