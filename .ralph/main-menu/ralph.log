@@ -27,3 +27,8 @@ A0 flipped to passes:true and committed. Logo, version, and all four button boun
 
 F0 (final visual equivalence) remains for the next iteration.
 
+--- Iteration 8 2026-04-26 14:13:39 ---
+All items in `prd.json` now have `passes: true`.
+
+<promise>COMPLETE</promise>
+
