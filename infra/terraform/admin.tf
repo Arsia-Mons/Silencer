@@ -75,20 +75,18 @@ resource "aws_instance" "admin" {
   subnet_id              = data.aws_subnets.default.ids[0]
   key_name               = aws_key_pair.admin.key_name
   vpc_security_group_ids = [aws_security_group.admin.id]
+  iam_instance_profile   = aws_iam_instance_profile.admin.name
 
   user_data = templatefile("${path.module}/cloud-init-admin.yaml.tftpl", {
-    deploy_ssh_public_key     = var.deploy_ssh_public_key
-    admin_tailscale_auth_key  = var.admin_tailscale_auth_key
-    admin_tailscale_hostname  = var.admin_tailscale_hostname
-    internal_zone_name        = var.internal_zone_name
-    mongo_silencer_password   = var.mongo_silencer_password
-    lavinmq_silencer_password = var.lavinmq_silencer_password
-    jwt_secret                = var.jwt_secret
-    github_backup_token       = var.github_backup_token
-    github_backup_repo        = var.github_backup_repo
-    cloudflare_tunnel_token   = var.cloudflare_tunnel_token
-    admin_image_admin_api     = var.admin_image_admin_api
-    admin_image_admin_web     = var.admin_image_admin_web
+    aws_region               = var.aws_region
+    deploy_ssh_public_key    = data.aws_ssm_parameter.deploy_ssh_pubkey.value
+    admin_tailscale_auth_key = data.aws_ssm_parameter.admin_tailscale_auth_key.value
+    admin_tailscale_hostname = var.admin_tailscale_hostname
+    internal_zone_name       = var.internal_zone_name
+    github_backup_repo       = var.github_backup_repo
+    cloudflare_tunnel_token  = data.aws_ssm_parameter.cloudflare_tunnel_token.value
+    admin_image_admin_api    = var.admin_image_admin_api
+    admin_image_admin_web    = var.admin_image_admin_web
   })
 
   root_block_device {

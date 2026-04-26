@@ -39,6 +39,16 @@ across instance replacement.
   substantive one: mounts EBS, installs Mongo + LavinMQ, writes
   systemd units for the containerised app workloads, joins Tailscale,
   installs cloudflared.
+- `iam.tf` — instance IAM roles + profiles. Each box gets read access
+  to its own subset of `/silencer/*` SSM parameters; cloud-init shells
+  out to `aws ssm get-parameter --with-decryption` to materialise
+  runtime secrets into `/etc/silencer/*.env`.
+- `ssm.tf` — `data "aws_ssm_parameter"` blocks for *apply-time*
+  values (SSH pubkeys, Tailscale auth keys, Cloudflare tunnel token)
+  that have to be templated into resources at plan time. Their values
+  end up in tfstate; rotation is `aws ssm put-parameter` + `terraform
+  taint <instance>`. Anything that rotates more often is fetched at
+  runtime via the IAM role instead.
 
 Day-to-day you only touch the root module. `bootstrap/` is fire-and-forget.
 
@@ -144,32 +154,72 @@ dashboard) and admin-api (the REST + WS backend) without path
 collisions — admin-api mounts under `/api` so its endpoints never
 shadow admin-web's pages (`/players`, `/me`, `/health`, `/gamestats`).
 
-## Required secrets / vars
+## Secrets — all in SSM Parameter Store
 
-Required for both boxes:
+Nothing sensitive lives in `terraform.tfvars` anymore. Every secret is
+an SSM `SecureString` (or plain `String` for SSH pubkeys) under
+`/silencer/*`. Seed them once with `infra/scripts/seed-ssm.sh`;
+teammates with IAM read access pull from the same source.
 
-- `var.ssh_public_key` — admin key (also lives in AWS key pair)
-- `var.deploy_ssh_public_key` — paired private half lives in
-  `DEPLOY_SSH_KEY` repo secret; used by GH Actions only
-- `var.tailscale_auth_key` — one-time key tagged `tag:server`,
-  consumed once by lobby cloud-init; rotate by replacing the instance
+### Param inventory
 
-Required for admin box:
+| Param                                          | Type         | Consumer                                     | Mechanism                       |
+|------------------------------------------------|--------------|----------------------------------------------|---------------------------------|
+| `/silencer/shared/ssh_admin_pubkey`            | String       | `aws_key_pair.admin`                         | TF data → resource              |
+| `/silencer/shared/deploy_ssh_pubkey`           | String       | both boxes' `ssh_authorized_keys`            | TF data → user_data             |
+| `/silencer/shared/mongo_silencer_password`     | SecureString | mongod user create + admin-api + lobby       | **Runtime fetch (IAM role)**    |
+| `/silencer/shared/lavinmq_silencer_password`   | SecureString | lavinmq user create + admin-api + lobby      | **Runtime fetch (IAM role)**    |
+| `/silencer/lobby/tailscale_auth_key`           | SecureString | lobby cloud-init (one-shot)                  | TF data → user_data             |
+| `/silencer/admin/tailscale_auth_key`           | SecureString | admin cloud-init (one-shot)                  | TF data → user_data             |
+| `/silencer/admin/jwt_secret`                   | SecureString | admin-api                                    | **Runtime fetch (IAM role)**    |
+| `/silencer/admin/cloudflare_tunnel_token`      | SecureString | `cloudflared service install` (one-shot)     | TF data → user_data             |
+| `/silencer/admin/github_backup_token`          | SecureString | admin-api (optional; empty = backups off)    | **Runtime fetch (IAM role)**    |
 
-- `var.admin_tailscale_auth_key` — one-time `tag:server` key, separate
-  from the lobby's; consumed once by admin cloud-init
-- `var.mongo_silencer_password`, `var.lavinmq_silencer_password` —
-  app-tier credentials provisioned into `/etc/silencer/*.env` (mode
-  0600) and used by both lobby and admin-api
-- `var.jwt_secret` — admin-api JWT signing key
-- `var.cloudflare_tunnel_token` — Cloudflare Tunnel auth token
+**Two mechanisms because of two different needs**:
+*TF data* values get baked into resources at apply time and end up in
+tfstate (encrypted at rest in the S3 backend). That's fine for one-shot
+values which are inert post-boot anyway. *Runtime fetch* values are
+read by the EC2 instance itself via its IAM role — they never enter
+tfstate, and rotation is `put-parameter` + ssh in + `silencer-fetch-secrets`
++ `systemctl restart`, no `terraform apply` needed.
 
-Optional:
+### Adding a new secret
 
-- `var.github_backup_token` — PAT for admin-api's Mongo backup commits
-- `var.admin_image_admin_api`, `var.admin_image_admin_web` — initial
-  image refs (deploy workflow overwrites these via `/etc/silencer/*.image`)
+1. Add a `put_param` line to `infra/scripts/seed-ssm.sh`.
+2. **Runtime-fetched?** Add the ARN to `local.lobby_runtime_param_arns`
+   or `local.admin_runtime_param_arns` in `iam.tf`, then add a `get`
+   call in the relevant `silencer-fetch-secrets` block in cloud-init.
+3. **Apply-time?** Add a `data "aws_ssm_parameter"` to `ssm.tf`, then
+   reference `.value` in the `templatefile()` map.
 
-GH repo vars: `LOBBY_HOST`, `DEPLOY_HOST`, `ADMIN_DEPLOY_HOST` (Tailscale
-hostname of admin/data box).
-GH repo secrets: `TS_AUTHKEY` (runner tailnet auth), `DEPLOY_SSH_KEY`.
+### Rotation flow (runtime-fetched secrets)
+
+```bash
+aws ssm put-parameter --name /silencer/.../foo --overwrite \
+  --type SecureString --value "$(openssl rand -base64 32)"
+
+# on the affected box:
+sudo /usr/local/sbin/silencer-fetch-secrets
+sudo systemctl restart silencer-admin-api  # or silencer-lobby
+```
+
+Rotating Mongo or LavinMQ passwords also requires a `mongosh` /
+`rabbitmqctl` user-update step and restarting *both* boxes' app units
+in order — SSM doesn't make that one-click, just removes
+`terraform apply` from the loop.
+
+### Rotation flow (apply-time secrets)
+
+```bash
+aws ssm put-parameter --name /silencer/lobby/tailscale_auth_key \
+  --overwrite --type SecureString --value "tskey-auth-..."
+terraform taint aws_instance.lobby
+terraform apply  # re-runs cloud-init with the new value
+```
+
+### GitHub Actions
+
+Repo vars (non-secret): `LOBBY_HOST`, `DEPLOY_HOST`, `ADMIN_DEPLOY_HOST`.
+Repo secrets: `DEPLOY_SSH_KEY` (paired with `/silencer/shared/deploy_ssh_pubkey`),
+`TS_AUTHKEY` (Tailscale auth for the GH Actions runner — separate from
+the box auth keys, reusable+ephemeral).
