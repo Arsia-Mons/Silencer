@@ -8,7 +8,7 @@
       "id": "B0",
       "name": "Hydration builds cleanly",
       "priority": 0,
-      "passes": false,
+      "passes": true,
       "spec": "`cmake -B shared/design/sdl3/build && cmake --build shared/design/sdl3/build` exits 0. Resolves any missing-source / missing-screen / missing-widget link errors by adding the necessary spec-derived files.",
       "category": "build"
     },

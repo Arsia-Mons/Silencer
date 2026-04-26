@@ -1,5 +1,9 @@
 ## Codebase Patterns
 <!-- One-line patterns the Ralph has discovered. Append as you find them. -->
+- Sprite-loader path buffer is `char fname[64]` in sprite.cpp Load(); worktree paths exceed it and snprintf silently truncates → fopen fails, downstream `sprites.Get(...)` on empty bank segfaults.
+- `SpriteSet::Load` returns `true` even when individual bank loads fail (only the BIN_SPR.DAT index gates the bool); main.cpp must `Has()`-check before every `Get()`.
+- Build verification: `cmake -B build` then `cmake --build build` from `shared/design/sdl3/`; current source set (palette.cpp, sprite.cpp, font.cpp, main.cpp) compiles + links exit 0 with AppleClang 17.
+- Discord DM: `bun /Users/hv/.claude/skills/discord-dm/send.ts "<msg>" <png>...` returns "sent <id>" on success.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -11,4 +15,15 @@
   widget-overlay,widget-button,widget-interface,screen-main-menu}.md.
 - Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
 - **Learnings:** none yet.
+---
+
+## 2026-04-26T13:45:00Z — B0
+- Verified `cmake -B build && cmake --build build` from `shared/design/sdl3/` exits 0 against the current source set (palette.cpp, sprite.cpp, font.cpp, main.cpp); no missing-source / missing-screen / missing-widget link errors.
+- Files touched: `.ralph/main-menu/prd.json` (B0 → passes:true), `.ralph/main-menu/progress.txt` (this entry + Codebase Patterns header).
+- Visual diff summary: not applicable for B0 (build-only gate). Runtime dump fails to write screen_00.ppm — exit code 139 segfault. Root cause categorized below for B1.
+- Spec gaps encountered: none for B0. The build itself does not exercise spec coverage.
+- **Learnings:**
+  - The "build cleanly" gate is decoupled from the "dump runs cleanly" gate — keep the discipline; do not roll the runtime fix into B0.
+  - `sprite.cpp:189` uses `char fname[64]` for the SPR path; with the worktree at `/Users/hv/.config/superpowers/worktrees/Silencer/hv-design-ralph/shared/assets/bin_spr/SPR_006.BIN` (≈95 chars) snprintf truncates → fopen fails for every bank → `SpriteSet::Load` still returns true → button-rendering path calls `sprites.Get(6, 7)` on an empty bank → OOB → SIGSEGV. This is the next iteration's payload (B1).
+  - Reference dump `/tmp/real_dump.png` matches the spec composition at idx-60 hold (Silencer logo centered, four B196x33 buttons, version overlay bottom-left over a starry red-planet background); use it as the visual ground truth.
 ---
