@@ -52,7 +52,7 @@ jobs:
           SDL_SEARCH_FLAGS=()
           while IFS= read -r d; do
             SDL_SEARCH_FLAGS+=(-s "$d")
-          done < <(find / -name 'libSDL3*.dylib' 2>/dev/null | xargs -n1 dirname | sort -u)
+          done < <(find "$HOME/.cache" /usr/local /opt /Users/runner -name 'libSDL3*.dylib' 2>/dev/null | xargs -n1 dirname | sort -u)
           echo "--- SDL3 search dirs ---"
           printf '  %s\n' "${SDL_SEARCH_FLAGS[@]}"
           dylibbundler \
