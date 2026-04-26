@@ -1,0 +1,17 @@
+## Codebase Patterns
+<!-- One-line patterns this Ralph discovers. Patterns from prior Ralphs:
+.ralph/main-menu/progress.txt, .ralph/options/progress.txt,
+.ralph/options-audio/progress.txt — read those first. -->
+
+## 2026-04-26T00:00:00Z — INIT
+- Ralph scaffolded by setup conversation.
+- Baseline: shared/design/sdl3/ already renders main-menu, OPTIONS hub, and
+  OPTIONSAUDIO screens equivalent to their references. Title overlay, B220x33
+  button widget, and on/off pill indicators (bank 6 idx 12 + 15) are
+  validated. Only adding a second toggle row + the OPTIONSDISPLAY
+  screen-switch entry are new.
+- Reference dump: /tmp/real_optionsdisplay_dump.ppm (do not regenerate).
+- Spec input: docs/design/screen-options-display.md (authoritative).
+- Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
+- **Learnings:** none yet.
+---
