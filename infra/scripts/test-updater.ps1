@@ -4,7 +4,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$Repo = (Resolve-Path "$PSScriptRoot\..").Path
+$Repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 Set-Location $Repo
 
 $PlatformZip = "silencer-windows-x64.zip"

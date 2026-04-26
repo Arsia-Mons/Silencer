@@ -3,11 +3,13 @@
 # Port 15170 is used instead of the canonical 517 to avoid requiring root
 # on the host.  Build the Mac client with the matching port:
 #
-#   LOBBY_PORT=15170 ./scripts/build-mac-local.sh
+#   LOBBY_PORT=15170 ./infra/scripts/build-mac-local.sh
 #
 # To expose the lobby at a real IP (e.g. a cloud VM), set PUBLIC_ADDR:
 #
-#   PUBLIC_ADDR=1.2.3.4 docker compose up -d
+#   PUBLIC_ADDR=1.2.3.4 docker compose -f infra/docker-compose.yml up -d
+
+name: silencer
 
 services:
   mongo:
@@ -32,7 +34,7 @@ services:
 
   lobby:
     build:
-      context: .
+      context: ..
       dockerfile: services/lobby/Dockerfile
     ports:
       - "15170:15170/tcp"
@@ -70,7 +72,7 @@ services:
 
   admin-api:
     build:
-      context: ./services/admin-api
+      context: ../services/admin-api
     ports:
       - "24080:24080"
     depends_on:
@@ -93,7 +95,7 @@ services:
 
   admin-web:
     build:
-      context: ./web/admin
+      context: ../web/admin
       args:
         NEXT_PUBLIC_API_URL: "http://${PUBLIC_ADDR:-localhost}:24080"
         NEXT_PUBLIC_WS_URL: "ws://${PUBLIC_ADDR:-localhost}:24080"

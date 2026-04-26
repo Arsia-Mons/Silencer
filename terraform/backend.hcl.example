@@ -1,4 +1,0 @@
-bucket         = "zsilencer-tfstate-CHANGEME"
-key            = "zsilencer/terraform.tfstate"
-region         = "us-west-1"
-dynamodb_table = "zsilencer-tfstate-lock"

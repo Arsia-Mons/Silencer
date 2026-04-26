@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Used for naming and tagging"
   type        = string
-  default     = "zsilencer"
+  default     = "silencer"
 }
 
 variable "instance_type" {

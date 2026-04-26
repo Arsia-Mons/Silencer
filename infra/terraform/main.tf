@@ -55,7 +55,7 @@ resource "aws_key_pair" "admin" {
 
 resource "aws_security_group" "lobby" {
   name        = "${var.project_name}-lobby"
-  description = "zSILENCER lobby + dedicated servers"
+  description = "Silencer lobby + dedicated servers"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {

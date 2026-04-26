@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Failure-case testing:
-#   corrupt sha:       edit update.json → flip a hex digit → ./scripts/test-updater.sh
+#   corrupt sha:       edit update.json → flip a hex digit → ./infra/scripts/test-updater.sh
 #   network drop:      kill the python server mid-download (ps ax | grep http.server)
 #   http 404:          rm test-update-host/*.zip before launching client
 #   read-only install: chmod -w build-old/ before launching client
@@ -8,7 +8,7 @@ set -euo pipefail
 
 OLD_VER=${OLD_VER:-00023}
 NEW_VER=${NEW_VER:-00024}
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 case "$(uname)" in
