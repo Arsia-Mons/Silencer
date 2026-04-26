@@ -14,7 +14,7 @@ import meRoutes      from './routes/me.js';
 import backupRoutes     from './routes/backup.js';
 import gameStatsRoutes from './routes/gamestats.js';
 import spritesRoutes        from './routes/sprites.js';
-import actorsRoutes         from './routes/actors.js';
+import actorsRoutes, { seedActorDefs } from './routes/actors.js';
 import behaviortreesRoutes  from './routes/behaviortrees.js';
 import { startBackupScheduler } from './backup/scheduler.js';
 import AdminUser from './db/models/AdminUser.js';
@@ -56,6 +56,7 @@ async function seed() {
 async function start() {
   await connectDB();
   await seed();
+  await seedActorDefs();
   startBackupScheduler();
   initWS(server);
   await startConsumer();
