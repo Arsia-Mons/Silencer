@@ -5,7 +5,7 @@
  * Edges  = transitions between states (smoothstep routing, dagre layout)
  * Right panel = inspector for selected edge / node
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import dagre from 'dagre';
 import ReactFlow, {
   ReactFlowProvider,
@@ -111,34 +111,67 @@ function smToFlow(
   return { nodes: hasPositions ? nodes : dagreLayout(nodes, edges), edges };
 }
 
-function makeEdge(t: StateMachineTransition): Edge {
+function makeEdge(t: StateMachineTransition, selected = false): Edge {
   return {
     id: t.id,
     source: t.from,
     target: t.to,
     type: 'smoothstep',
     label: t.condition || '—',
-    labelStyle: { fill: '#8aff80', fontSize: 10, fontFamily: 'monospace', fontWeight: 600 },
-    labelBgStyle: { fill: '#0a150a', fillOpacity: 0.95 },
+    animated: selected,
+    labelStyle: {
+      fill: selected ? '#ffffff' : '#8aff80',
+      fontSize: 10,
+      fontFamily: 'monospace',
+      fontWeight: 600,
+    },
+    labelBgStyle: { fill: selected ? '#1a4a1a' : '#0a150a', fillOpacity: 0.97 },
     labelBgPadding: [4, 3] as [number, number],
     labelBgBorderRadius: 2,
-    style: { stroke: '#3a7a3a', strokeWidth: 1.5 },
-    markerEnd: { type: MarkerType.ArrowClosed, color: '#3a7a3a', width: 16, height: 16 },
+    style: {
+      stroke: selected ? '#8aff80' : '#3a7a3a',
+      strokeWidth: selected ? 2.5 : 1.5,
+    },
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+      color: selected ? '#8aff80' : '#3a7a3a',
+      width: 16,
+      height: 16,
+    },
   };
 }
 
 // ─── Custom Node ──────────────────────────────────────────────────────────────
 
-function StateNode({ data }: NodeProps) {
+function StateNode({ data, selected }: NodeProps) {
   return (
     <div
-      className={`border font-mono text-xs select-none ${
-        data.isInitial
-          ? 'border-game-primary bg-game-primary/20 text-game-primary'
+      className={`border font-mono text-xs select-none transition-all ${
+        selected
+          ? 'border-game-primary text-game-primary'
+          : data.isInitial
+          ? 'border-game-primary/60 bg-game-primary/10 text-game-primary'
           : 'border-game-border bg-game-bgCard text-game-text'
       }`}
-      style={{ width: NODE_W, minHeight: NODE_H }}
+      style={{
+        width: NODE_W,
+        minHeight: NODE_H,
+        background: selected ? 'rgba(138,255,128,0.12)' : undefined,
+        boxShadow: selected
+          ? '0 0 0 2px #8aff80, 0 0 16px 4px rgba(138,255,128,0.35)'
+          : data.isInitial
+          ? '0 0 8px 2px rgba(138,255,128,0.15)'
+          : undefined,
+        animation: selected ? 'smNodePulse 1.4s ease-in-out infinite' : undefined,
+      }}
     >
+      <style>{`
+        @keyframes smNodePulse {
+          0%, 100% { box-shadow: 0 0 0 2px #8aff80, 0 0 16px 4px rgba(138,255,128,0.35); }
+          50%       { box-shadow: 0 0 0 2px #8aff80, 0 0 28px 8px rgba(138,255,128,0.55); }
+        }
+      `}</style>
+
       <Handle type="target" position={Position.Left} style={{ background: '#4a8a4a', borderColor: '#4a8a4a' }} />
       <Handle type="source" position={Position.Right} style={{ background: '#4a8a4a', borderColor: '#4a8a4a' }} />
 
@@ -267,12 +300,23 @@ function StateMachineInner({ def, onChange }: Props) {
   }
 
   function handleEdgeClick(_: unknown, edge: Edge) {
-    setSelectedEdgeId(edge.id);
+    const newId = edge.id;
+    setSelectedEdgeId(newId);
     setConditionEdit((edge.label as string) === '—' ? '' : String(edge.label ?? ''));
+    // Highlight selected edge, dim others
+    setEdges(es => es.map(e => {
+      const t: StateMachineTransition = { id: e.id, from: e.source, to: e.target, condition: String(e.label ?? '') };
+      return makeEdge(t, e.id === newId);
+    }));
   }
 
   function handlePaneClick() {
     setSelectedEdgeId(null);
+    // Restore all edges to default style
+    setEdges(es => es.map(e => {
+      const t: StateMachineTransition = { id: e.id, from: e.source, to: e.target, condition: String(e.label ?? '') };
+      return makeEdge(t, false);
+    }));
   }
 
   function saveEdgeCondition() {
@@ -359,6 +403,8 @@ function StateMachineInner({ def, onChange }: Props) {
           fitView
           deleteKeyCode={['Backspace', 'Delete']}
           proOptions={{ hideAttribution: true }}
+          // Suppress ReactFlow's own blue selection outline — our custom node handles it
+          style={{ '--xy-node-border-radius': '0' } as React.CSSProperties}
         >
           <Background variant={BackgroundVariant.Dots} color="#1a2e1a" gap={20} />
           <Controls style={{ background: '#0d1a0d', border: '1px solid #2a4a2a' }} />

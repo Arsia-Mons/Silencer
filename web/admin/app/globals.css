@@ -3,6 +3,16 @@
 @tailwind utilities;
 @import 'reactflow/dist/style.css';
 
+/* Override ReactFlow's default blue selected-node outline */
+.react-flow__node.selected > div,
+.react-flow__node:focus > div {
+  outline: none !important;
+  box-shadow: none !important;
+}
+.react-flow__node.selected {
+  outline: none !important;
+}
+
 body {
   background-color: #050a05;
   background-image: url('/menu-bg.png');
