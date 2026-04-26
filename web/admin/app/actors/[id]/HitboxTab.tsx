@@ -347,6 +347,16 @@ export default function HitboxTab({
             CLEAR HURTBOX
           </button>
           <button
+            onClick={() => {
+              if (!seq) return;
+              onChange({ sequences: { ...sequences, [selectedSeq]: { ...seq, frames: seq.frames.map(f => { const { hurtbox: _, ...rest } = f; return rest as FrameDef; }) } } });
+            }}
+            disabled={!seq}
+            className="text-xs text-game-danger border border-game-danger px-3 py-1 hover:bg-game-danger/10 self-start disabled:opacity-40"
+          >
+            CLEAR ALL HURTBOXES
+          </button>
+          <button
             onClick={autoFitHurtbox}
             disabled={!imgRef.current}
             className="text-xs text-game-primary border border-game-primary px-3 py-1 hover:bg-game-primary/10 self-start disabled:opacity-40"
