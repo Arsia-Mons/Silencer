@@ -71,7 +71,7 @@ silencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
 
 - **Lobby host is a compile-time constant.** Baked in via
   `-DSILENCER_LOBBY_HOST=<host> -DSILENCER_LOBBY_PORT=<port>`. Default is
-  `127.0.0.1:517`. CI sets it to `silencer.hventura.com`. Rebuild
+  `127.0.0.1:517`. CI sets it to `lobby.arsiamons.com`. Rebuild
   the client to point at a different lobby.
 - **Version string must match the lobby.** Set via
   `-DSILENCER_VERSION=...` (default in `CMakeLists.txt`); the lobby's

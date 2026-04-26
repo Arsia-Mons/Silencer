@@ -16,7 +16,7 @@ rsync -az --delete \
 
 echo "==> build on $HOST"
 ssh "ubuntu@$HOST" "cd $REMOTE && mkdir -p build && cd build && \
-  cmake -DCMAKE_BUILD_TYPE=Release -DSILENCER_LOBBY_HOST=silencer.hventura.com ../clients/silencer > /tmp/cmake.log 2>&1 && \
+  cmake -DCMAKE_BUILD_TYPE=Release -DSILENCER_LOBBY_HOST=lobby.arsiamons.com ../clients/silencer > /tmp/cmake.log 2>&1 && \
   make -j\$(nproc) silencer 2>&1 | tail -3"
 
 echo "==> swap binary and restart lobby"
