@@ -102,19 +102,11 @@ start. Order in runcmd: wait-for-device → mkfs-if-missing → mount -a
 
 ## Deploy flow
 
-1. `git tag v0.x && git push --tags` → `.github/workflows/deploy.yml`
-   runs on `ubuntu-24.04-arm`.
-2. Builds `services/lobby/silencer-lobby` (Go) and `build/silencer`
-   (C++, ARM64, with `-DSILENCER_LOBBY_HOST=<vars.LOBBY_HOST>`).
-3. Joins the tailnet, scps both binaries + `shared/assets/` (landed
-   as `assets/` on the host) to
-   `ubuntu@<vars.DEPLOY_HOST>:/opt/silencer/releases/<short-sha>/`.
-4. Swaps the `/opt/silencer/current` symlink, restarts
-   `silencer-lobby` systemd unit, keeps last 3 releases.
-
-For ad-hoc debug iterations, `infra/scripts/fastdeploy.sh` rsyncs the
-working tree, builds on the box, and swaps the binary — skipping the
-CI round trip.
+Tag-driven release via `.github/workflows/deploy.yml` (ARM64): builds
+the Go lobby + C++ dedicated server, scps to
+`/opt/silencer/releases/<sha>/`, swaps the `current` symlink, restarts
+`silencer-lobby`, keeps last 3 releases. Debug shortcut:
+`infra/scripts/fastdeploy.sh`.
 
 ## `lobby_version_string = ""` is intentional
 
@@ -126,33 +118,21 @@ replace.
 
 ## Admin app systemd units
 
-`silencer-admin-api.service` and `silencer-admin-web.service` (cloud-init
-write_files) are containerised: each reads its image ref from
-`/etc/silencer/<svc>.image` (an `EnvironmentFile`-shape file with
-`IMAGE=ghcr.io/...:<sha>`) and `docker run`s with
-`--env-file /etc/silencer/<svc>.env`. The deploy workflows update the
-`.image` file then `systemctl restart`. Until the first deploy succeeds
-the units crash-loop quietly (`Restart=always`, same pattern as the
-lobby's binary). `--network host` so admin-api can reach the
-host-installed mongod and lavinmq on `127.0.0.1`.
+`silencer-admin-api.service` and `silencer-admin-web.service` are
+written by cloud-init: each reads its image ref from
+`/etc/silencer/<svc>.image` and `docker run`s `--network host
+--env-file /etc/silencer/<svc>.env`. Deploy workflows update the
+`.image` file then `systemctl restart`. Pre-first-deploy units
+crash-loop quietly (`Restart=always`).
 
 ## Cloudflare Tunnel (no public ingress on admin SG)
 
-The admin/data box's SG opens NO public HTTP/S ports. `cloudflared` is
-installed via `cloudflared service install $TOKEN` and dials out to
-Cloudflare. Public-hostname routing for `admin.arsiamons.com` is
-configured in the Cloudflare dashboard, not here:
-
-| Path           | Origin                  |
-|----------------|-------------------------|
-| `/api/*`       | `http://localhost:24080` |
-| `/socket.io/*` | `http://localhost:24080` |
-| catch-all      | `http://localhost:24000` |
-
-This routing is what lets a single hostname host both admin-web (the
-dashboard) and admin-api (the REST + WS backend) without path
-collisions — admin-api mounts under `/api` so its endpoints never
-shadow admin-web's pages (`/players`, `/me`, `/health`, `/gamestats`).
+The admin SG opens NO public HTTP/S ports. `cloudflared` dials out to
+Cloudflare; public-hostname routing for `admin.arsiamons.com` is
+configured in the Cloudflare dashboard, not here. The path-based
+routing rules (`/api/*` and `/socket.io/*` → admin-api, catch-all →
+admin-web) are documented in `services/admin-api/CLAUDE.md` and
+`web/admin/CLAUDE.md`.
 
 ## Secrets — all in SSM Parameter Store
 
@@ -192,34 +172,16 @@ tfstate, and rotation is `put-parameter` + ssh in + `silencer-fetch-secrets`
 3. **Apply-time?** Add a `data "aws_ssm_parameter"` to `ssm.tf`, then
    reference `.value` in the `templatefile()` map.
 
-### Rotation flow (runtime-fetched secrets)
+### Rotation
 
-```bash
-aws ssm put-parameter --name /silencer/.../foo --overwrite \
-  --type SecureString --value "$(openssl rand -base64 32)"
-
-# on the affected box:
-sudo /usr/local/sbin/silencer-fetch-secrets
-sudo systemctl restart silencer-admin-api  # or silencer-lobby
-```
-
-Rotating Mongo or LavinMQ passwords also requires a `mongosh` /
-`rabbitmqctl` user-update step and restarting *both* boxes' app units
-in order — SSM doesn't make that one-click, just removes
-`terraform apply` from the loop.
-
-### Rotation flow (apply-time secrets)
-
-```bash
-aws ssm put-parameter --name /silencer/lobby/tailscale_auth_key \
-  --overwrite --type SecureString --value "tskey-auth-..."
-terraform taint aws_instance.lobby
-terraform apply  # re-runs cloud-init with the new value
-```
+See `docs/production.md` § *Day-to-day → Rotating secrets* for the
+end-to-end flow. The mechanism column above tells you which path
+applies: runtime-fetched values rotate without `terraform apply`;
+apply-time values need `terraform taint <instance>` + apply.
 
 ### GitHub Actions
 
-Repo vars (non-secret): `LOBBY_HOST`, `DEPLOY_HOST`, `ADMIN_DEPLOY_HOST`.
+Repo vars: `LOBBY_HOST`, `DEPLOY_HOST`, `ADMIN_DEPLOY_HOST`.
 Repo secrets: `DEPLOY_SSH_KEY` (paired with `/silencer/shared/deploy_ssh_pubkey`),
-`TS_AUTHKEY` (Tailscale auth for the GH Actions runner — separate from
-the box auth keys, reusable+ephemeral).
+`TS_AUTHKEY` (Tailscale auth for the GH Actions runner — separate
+from the box auth keys, reusable+ephemeral).

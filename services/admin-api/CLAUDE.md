@@ -23,81 +23,46 @@ endpoint Socket.IO mounts directly on the HTTP server (not under
 `localhost:24080`. **Don't add an `app.use(...)` outside the `/api`
 router** unless you also add a tunnel ingress rule for it.
 
-## Production runtime (Phase 1)
+## Production runtime
 
-Containerised on the admin/data box. The systemd unit
-(`silencer-admin-api.service`) reads its image ref from
-`/etc/silencer/admin-api.image` (an `EnvironmentFile`-shape file
-with `IMAGE=ghcr.io/...:<sha>`) and runs:
-
-```
-docker run --rm --network host --env-file /etc/silencer/admin-api.env $IMAGE
-```
-
-Env file (`/etc/silencer/admin-api.env`, mode 0600) is provisioned by
-cloud-init from terraform variables. `MONGO_URL` and `AMQP_URL`
-point at `127.0.0.1` (Mongo + LavinMQ run as systemd on the same box,
-host-networked).
-
-Deploy: `.github/workflows/deploy-admin-api.yml` is path-filtered to
-this directory. It builds an ARM64 OCI image, pushes to GHCR, SSHes
-to the admin/data box, overwrites `/etc/silencer/admin-api.image`,
-and `systemctl restart silencer-admin-api`. The unit crash-loops
-quietly (`Restart=always`) until the first deploy writes a real image
-ref.
+Containerised on the admin/data box: ARM64 image → GHCR → SSH →
+image-ref swap → `systemctl restart`. Workflow is
+`.github/workflows/deploy-admin-api.yml`, path-filtered. Systemd
+unit + env file + Mongo/LavinMQ co-location are described in
+`infra/terraform/CLAUDE.md`.
 
 ## Per-file
 
-- `src/index.js` — Express bootstrap + Socket.IO server. Wires
-  routes, runs `seed()` (creates `admin/admin` superadmin on first
-  boot), starts AMQP consumer + backup scheduler.
-- `src/config.js` — Single source of truth for `PORT`, `MONGO_URL`,
-  `AMQP_URL`, `JWT_SECRET`, `LOBBY_PLAYER_AUTH_URL`. Defaults
-  target local-dev (`localhost:28017`, `localhost:25672`).
-- `src/auth/jwt.js` — `signToken` / `verifyToken` + Express
-  middlewares: `requireAuth` (any valid JWT), `requirePlayer`
-  (type === 'player'), `requireRole(minRole)` (admin role hierarchy).
-- `src/db/connection.js` — single `mongoose.connect(MONGO_URL)`.
-- `src/db/models/` — Mongoose schemas: `Player`, `Session`, `Event`,
-  `MatchStat`, `AdminUser`. The lobby's Go `mongosync.go` writes the
-  same `players` collection — schema changes here that affect
-  read fields are fine; schema changes that affect write semantics
-  must be coordinated with `services/lobby/mongosync.go`.
-- `src/routes/` — REST endpoints (one file per top-level path).
-  - `auth.js` — admin login, player-login (proxies to lobby
-    `/player-auth`), admin-user CRUD.
-  - `players.js` — list/detail/match-history; **`PATCH /:id/ban`
-    and `DELETE /:id` proxy to the Go lobby's internal HTTP
-    (`LOBBY_PLAYER_AUTH_URL` `/ban`, `/delete-player`)** so live
-    clients are kicked immediately. Failure to reach the lobby is
-    logged but not fatal — the DB write still wins.
-  - `me.js` — player self-service (player JWT only).
-  - `backup.js` — manual trigger / status / list (admin role).
-  - `gamestats.js`, `events.js`, `sessions.js`, `stats.js` — read
-    endpoints over the AMQP-persisted models.
-- `src/ws/index.js` — Socket.IO server. Handshake auth via JWT in
-  `socket.handshake.auth.token`. `liveState` + two `Map`s
-  (`onlinePlayers`, `activeGames`) are the in-memory snapshot
-  fanned to clients via `snapshot` / per-event broadcasts.
-- `src/amqp/consumer.js` — Single AMQP topic queue
-  (`admin-dashboard`) bound to exchange `silencer.events` with
-  `#`. Each message `persistEvent(type, data)` writes to MongoDB
-  **then** calls `handleLobbyEvent(type, data)` to update the live
-  WebSocket snapshot. Auto-reconnects every 5 s on connection
-  loss.
-- `src/backup/manager.js` — `mongodump --archive --gzip` invocation,
-  in-progress state guard, prune to `BACKUP_KEEP`, optional GitHub
-  upload. **`mongodump` is a runtime dependency**: the Dockerfile
-  installs `mongodb-tools`; local dev needs it on PATH.
-- `src/backup/github.js` — Commits the latest archive to
+- `src/index.js` — Express bootstrap + Socket.IO. Runs `seed()`
+  (creates `admin/admin` superadmin on first boot), starts AMQP
+  consumer + backup scheduler.
+- `src/config.js` — single source of truth for env defaults
+  (`localhost:28017`, `localhost:25672` for local-dev outside Docker).
+- `src/auth/jwt.js` — middlewares: `requireAuth`, `requirePlayer`
+  (type === 'player'), `requireRole(minRole)`.
+- `src/db/models/` — Mongoose schemas. The lobby's
+  `services/lobby/mongosync.go` writes the same `players`
+  collection — coordinate any schema change that affects write
+  semantics.
+- `src/routes/players.js` — `PATCH /:id/ban` and `DELETE /:id`
+  proxy to the lobby's internal HTTP (`LOBBY_PLAYER_AUTH_URL`)
+  so live clients are kicked. Lobby unreachable is logged but
+  not fatal — DB write wins.
+- `src/ws/index.js` — Socket.IO server. JWT in
+  `socket.handshake.auth.token`. `liveState` +
+  `onlinePlayers` / `activeGames` `Map`s are the in-memory
+  snapshot fanned via `snapshot` / per-event broadcasts.
+- `src/amqp/consumer.js` — single durable topic queue
+  `admin-dashboard` bound to `silencer.events` with `#`.
+  Each message: `persistEvent` (Mongo write) **then**
+  `handleLobbyEvent` (live snapshot update). Auto-reconnects.
+- `src/backup/manager.js` — `mongodump --archive --gzip`.
+  **`mongodump` is a runtime dependency**: Dockerfile installs
+  `mongodb-tools`; local dev needs it on PATH.
+- `src/backup/github.js` — commits the archive as
   `zsilencer.archive.gz` (filename intentionally preserved across
-  the rebrand — it's a stable identifier in the external backup
-  repo) in the repo named by `GITHUB_BACKUP_REPO`. Disabled if
-  `GITHUB_BACKUP_REPO` or `GITHUB_TOKEN` is unset. (Compose default:
-  `Arsia-Mons/silencer-mongo-backup`.) Uses contents API + base64
-  upload, no clone.
-- `src/backup/scheduler.js` — `node-cron` driver. Schedule from
-  `BACKUP_CRON`.
+  the rebrand — stable identifier in the external backup repo).
+  Disabled if `GITHUB_BACKUP_REPO` or `GITHUB_TOKEN` is unset.
 
 ## Invariants
 

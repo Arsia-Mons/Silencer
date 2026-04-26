@@ -1,1 +1,1 @@
-See CLAUDE.md in this directory.
+CLAUDE.md

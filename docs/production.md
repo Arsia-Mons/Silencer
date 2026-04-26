@@ -349,8 +349,7 @@ sudo systemctl restart silencer-admin-api
 
 For Mongo/LavinMQ password rotations, you also have to update the
 user inside the database (`mongosh` / `rabbitmqctl`) and refresh
-*both* boxes' env files in order — see
-`infra/terraform/CLAUDE.md` for the full ritual.
+*both* boxes' env files in order.
 
 For one-shot apply-time secrets (Tailscale keys, the Cloudflare
 tunnel token), rotation requires re-running cloud-init:

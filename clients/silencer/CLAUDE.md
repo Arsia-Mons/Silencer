@@ -44,7 +44,7 @@ silencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
 
 ## Where to look
 
-- Top-level state machine (menus, lobby, in-game): `src/game.cpp` (5800+ lines).
+- Top-level state machine (menus, lobby, in-game): `src/game.cpp`.
 - Simulation loop, socket, peer list, replay: `src/world.cpp`.
 - Rendering: `src/renderer.cpp`, `src/surface.cpp`, `src/sprite.cpp`, `src/palette.cpp`.
 - Audio (skipped in `-s`): `src/audio.cpp`.
