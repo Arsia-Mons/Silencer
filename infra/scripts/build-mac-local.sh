@@ -2,16 +2,16 @@
 # Build the Silencer client on macOS, pointed at a local lobby server.
 #
 # Usage:
-#   ./scripts/build-mac-local.sh               # lobby at 127.0.0.1:15170
-#   LOBBY_HOST=1.2.3.4 ./scripts/build-mac-local.sh
-#   LOBBY_PORT=517      ./scripts/build-mac-local.sh
+#   ./infra/scripts/build-mac-local.sh               # lobby at 127.0.0.1:15170
+#   LOBBY_HOST=1.2.3.4 ./infra/scripts/build-mac-local.sh
+#   LOBBY_PORT=517      ./infra/scripts/build-mac-local.sh
 #
 # The lobby host and port are baked into the binary at compile time.
-# Run `docker compose up -d` first so the lobby is ready before launching.
+# Run `docker compose -f infra/docker-compose.yml up -d` first so the lobby is ready before launching.
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LOBBY_HOST="${LOBBY_HOST:-127.0.0.1}"
 LOBBY_PORT="${LOBBY_PORT:-15170}"
 BUILD_DIR="$REPO_ROOT/build"

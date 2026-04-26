@@ -62,10 +62,10 @@ fi
 # ── 4. Build image and start ─────────────────────────────────────────────────
 echo "==> Building Docker image (first run takes a few minutes)..."
 # Use sg to activate the docker group in this shell session without re-login
-sg docker -c "PUBLIC_ADDR='$PUBLIC_ADDR' docker compose build"
+sg docker -c "PUBLIC_ADDR='$PUBLIC_ADDR' docker compose -f infra/docker-compose.yml build"
 
 echo "==> Starting services..."
-sg docker -c "PUBLIC_ADDR='$PUBLIC_ADDR' docker compose up -d"
+sg docker -c "PUBLIC_ADDR='$PUBLIC_ADDR' docker compose -f infra/docker-compose.yml up -d"
 
 echo ""
 echo "✅  Silencer is running!"
@@ -74,7 +74,7 @@ echo "    Game ports: $PUBLIC_ADDR:20000-20009 (UDP)"
 echo "    Dashboard:  http://$PUBLIC_ADDR:24000  (admin / admin)"
 echo "    Admin API:  http://$PUBLIC_ADDR:24080"
 echo ""
-echo "    Logs:  docker compose logs -f"
-echo "    Stop:  docker compose down"
+echo "    Logs:  docker compose -f infra/docker-compose.yml logs -f"
+echo "    Stop:  docker compose -f infra/docker-compose.yml down"
 echo ""
 echo "    NOTE: Log out and back in for docker group to apply permanently."

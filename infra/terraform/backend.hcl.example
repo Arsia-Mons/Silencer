@@ -1,0 +1,4 @@
+bucket         = "silencer-tfstate-CHANGEME"
+key            = "silencer/terraform.tfstate"
+region         = "us-west-1"
+dynamodb_table = "silencer-tfstate-lock"

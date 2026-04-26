@@ -22,11 +22,11 @@ If `PUBLIC_IP` is omitted it is auto-detected. Once complete:
 | Game ports   | `<ip>:20000-20199` (UDP, up to 200 concurrent games) |
 
 ```bash
-docker compose logs -f   # tail logs
-docker compose down      # stop everything
+docker compose -f infra/docker-compose.yml logs -f   # tail logs
+docker compose -f infra/docker-compose.yml down      # stop everything
 ```
 
-To change the concurrent game limit, update two values in `docker-compose.yml`
+To change the concurrent game limit, update two values in `infra/docker-compose.yml`
 and restart:
 
 ```yaml
