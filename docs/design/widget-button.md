@@ -13,8 +13,9 @@ as more screens come online.
 | `B196x33` | main menu, options menu (default), Save/Cancel on every options sub-screen | yes |
 | `B112x33` | options-controls c1/c2 key buttons | yes |
 | `B220x33` | options-display "Fullscreen"/"Smooth Scaling" rows; options-audio "Music" row | yes |
+| `B52x21` | lobby-connect Login/Cancel buttons | no (text-only, fixed dimensions) |
 | `BNONE` | options-controls "OR/AND" op buttons (text-only, custom width/height) | no |
-| `B236x27`, `B52x21`, `B156x21`, `BCHECKBOX` | not yet exercised | TBD when a screen needs them |
+| `B236x27`, `B156x21`, `BCHECKBOX` | not yet exercised | TBD when a screen needs them |
 
 ## `B196x33` constants
 
@@ -180,6 +181,44 @@ and anchor offset change. Label-position math:
 xoff = (220 - strlen(text) * 11) / 2
 yoff = 8
 ```
+
+## `B52x21` constants
+
+| Field | Value |
+| ----- | ----- |
+| Width × height | **fixed** 52 × 21 |
+| Sprite bank | `0xFF` (none — text-only) |
+| Text font bank | 133 |
+| Text advance | 7 |
+| Text `yoff` | 8 |
+| Text `xoff` extra | **+1 px after centering** |
+
+Text-only button with fixed dimensions. Like `BNONE`, there's no
+sprite chrome to render and no anchor offset to subtract; unlike
+`BNONE`, the dimensions are baked into the variant and `yoff = 8`
+gives proper vertical centering inside the 21-px tall hit-rect.
+
+Label-position math (from `Button::GetTextOffset`, `button.cpp:188`):
+
+```
+xoff = (52 - strlen(text) * 7) / 2 + 1     // +1 px nudge after centering
+yoff = 8
+textX = button.x + xoff                    # no anchor offset to subtract
+textY = button.y + 8                       # ditto
+```
+
+Hit-rect (since `res_bank == 0xFF`, `spriteoffsetx[0xFF][...]` reads
+as zero in a faithful port — match this in the hydration):
+
+```
+inside =
+    button.x < mx < button.x + 52
+    AND
+    button.y < my < button.y + 21
+```
+
+State machine still runs (so brightness ramps 128 → 136 on hover);
+the ramp brightens the label glyphs but no chrome.
 
 ## `BNONE` constants
 

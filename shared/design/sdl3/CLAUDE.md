@@ -1,9 +1,10 @@
 # shared/design/sdl3
 
 C++17 + SDL3 hydration of the Silencer main menu, options menu,
-configure-controls, options-display, and options-audio screens,
-built only from [`docs/design/`](../../../docs/design/) plus the
-binary assets in [`shared/assets/`](../../assets/). Reference
+configure-controls, options-display, options-audio, and
+lobby-connect screens, built only from
+[`docs/design/`](../../../docs/design/) plus the binary assets in
+[`shared/assets/`](../../assets/). Reference
 renderer for the design-system spec — produces a 640×480 indexed
 framebuffer dump (PPM) per registered screen that should match the
 real client's `Game::Present` output.
@@ -38,6 +39,7 @@ Writes one PPM per registered screen — currently:
 - `${SILENCER_DUMP_DIR}/options_controls.ppm`
 - `${SILENCER_DUMP_DIR}/options_display.ppm`
 - `${SILENCER_DUMP_DIR}/options_audio.ppm`
+- `${SILENCER_DUMP_DIR}/lobby_connect.ppm`
 
 Compare against the real client's dumps:
 
@@ -65,6 +67,8 @@ for the full A/B workflow.
   (per `docs/design/screen-options.md`, the OPTIONS branch never
   calls `SetPalette` — the hydration sets sub-palette 1 explicitly
   for both screens since they're rendered standalone here).
+  Lobby-connect uses sub-palette 2 (per `screen-lobby-connect.md`,
+  `LOBBYCONNECT` calls `palette.SetPalette(2)` on entry).
 - Logo (bank 208) ticked to the hold frame (`res_index = 60`).
 - Buttons in INACTIVE state (no hover) — `res_index = 7`,
   `effectbrightness = 128`.

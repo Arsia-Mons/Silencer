@@ -183,12 +183,12 @@ Concrete sprite headers worth pinning:
 | 6    | 15  | 20 × 33   | (0, 0)         | "On" toggle label, bright (option is ON) |
 | 6    | 23  | 220 × 33  | (-76, -86)     | `B220x33` base frame |
 | 6    | 28  | 112 × 33  | (-302, -86)    | `B112x33` base frame |
+| 7    | 2   | 284 × 277 | (-178, -93)    | Lobby-connect background panel — full screen behind the login form |
 | 7    | 7   | 628 × 454 | (-5, -6)       | Options inner panel — overlays the bg plate, framing the configuration area |
 | 7    | 9   | 16 × 267  | (-609, -87)    | ScrollBar track (drawn only when `ScrollBar.draw == true`) |
 | 7    | 10  | 16 × 235  | (-610, -103)   | ScrollBar thumb (only when drawing) |
 | 208  | 60  | 348 × 31  | (-7, -222)     | Main-menu logo, steady-state frame |
 
-A hydration covering main-menu + options + options-controls needs
-banks 6, 7, 132, 133, 134, 135, 208 loaded (134 because the
-options-controls screen uses bank 134 for the action-name overlays
-and the OR/AND op-button text).
+A hydration covering main-menu + options + options-controls +
+options-display + options-audio + lobby-connect needs banks 6, 7,
+132, 133, 134, 135, 208 loaded.

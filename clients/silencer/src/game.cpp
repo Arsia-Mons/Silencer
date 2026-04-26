@@ -253,6 +253,7 @@ void Game::Present(void){
 			else if(strcmp(dumpstate_env, "OPTIONSDISPLAY") == 0) target_state = OPTIONSDISPLAY;
 			else if(strcmp(dumpstate_env, "OPTIONSAUDIO") == 0) target_state = OPTIONSAUDIO;
 			else if(strcmp(dumpstate_env, "OPTIONS") == 0) target_state = OPTIONS;
+			else if(strcmp(dumpstate_env, "LOBBYCONNECT") == 0) target_state = LOBBYCONNECT;
 			else if(strcmp(dumpstate_env, "MAINMENU") == 0) target_state = MAINMENU;
 		}
 
@@ -277,10 +278,11 @@ void Game::Present(void){
 		};
 
 		// Phase 1: navigate toward target_state by chaining clicks through menus.
-		// MAINMENU.Options (uid 2) → OPTIONS.Controls (uid 1) → OPTIONSCONTROLS.
+		// MAINMENU.{Options=uid 2, ConnectToLobby=uid 1} → OPTIONS.{...} → ...
 		if(state == MAINMENU && !stateisnew && target_state != MAINMENU){
 			if(mainmenu_steady()){
-				click_uid(2);  // Options
+				if(target_state == LOBBYCONNECT) click_uid(1);  // Connect To Lobby
+				else click_uid(2);                               // Options (default path)
 			}
 			return;
 		}
@@ -317,6 +319,15 @@ void Game::Present(void){
 			} else if(target_state == OPTIONSAUDIO){
 				ready = FadedIn();
 				label = "options audio";
+			} else if(target_state == LOBBYCONNECT){
+				// Lobby connect's TextBox content depends on async network
+				// state. Pin the dump to Lobby::IDLE — the terminal state
+				// reached after a connection failure (or successful auth,
+				// which we don't expect for default host:port). At that
+				// point the TextBox stops accumulating lines and the dump
+				// is deterministic.
+				ready = FadedIn() && world.lobby.state == Lobby::IDLE;
+				label = "lobby connect";
 			}
 			if(ready){
 				FILE * f = fopen(dumppath, "wb");

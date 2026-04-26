@@ -392,7 +392,7 @@ struct Overlay {
 
 // Button "variant" descriptor — captures the per-variant constants from
 // docs/design/widget-button.md so render_button can stay generic.
-enum class ButtonVariant { B196x33, B112x33, B220x33, BNONE };
+enum class ButtonVariant { B196x33, B112x33, B220x33, B52x21, BNONE };
 
 struct Button {
     int x = 0, y = 0;
@@ -450,6 +450,17 @@ static void render_button(Framebuffer& fb, const Resources& res,
         return;
     }
 
+    if (b.variant == ButtonVariant::B52x21) {
+        // B52x21: text-only, fixed 52x21, font bank 133, advance 7,
+        // yoff = 8, xoff = centered + 1 (per widget-button.md).
+        int advance = 7;
+        int xoff = (52 - (int)b.text.size() * advance) / 2 + 1;
+        int yoff = 8;
+        draw_text(fb, res, b.x + xoff, b.y + yoff, b.text,
+                  /*bank*/ 133, advance, lutp);
+        return;
+    }
+
     const Sprite* sp = res.get(6, b.res_index);
     if (!sp) return;
     blit_object(fb, *sp, b.x, b.y, lutp);
@@ -465,6 +476,31 @@ static void render_button(Framebuffer& fb, const Resources& res,
     int yoff = 8;
     draw_text(fb, res, dst_x + xoff, dst_y + yoff, b.text,
               b.textbank, advance, lutp);
+}
+
+// ---------- filled rect (for TextInput caret) ----------
+
+static void draw_filled_rect(Framebuffer& fb, int x0, int y0, int x1, int y1,
+                             uint8_t color) {
+    for (int y = y0; y < y1; ++y) {
+        for (int x = x0; x < x1; ++x) {
+            fb.set(x, y, color);
+        }
+    }
+}
+
+// Find the brightest (max R+G+B) palette index in 2..255 for the
+// active sub-palette. Used as a sane caret color since the spec
+// describes the caret as a "near-white stroke" on lobby-connect.
+static uint8_t brightest_index(const Palette& pal, int active_sub) {
+    int best_i = 1;
+    int best_sum = -1;
+    for (int i = 2; i < 256; ++i) {
+        const auto& c = pal.sub[active_sub][i];
+        int sum = (int)c[0] + (int)c[1] + (int)c[2];
+        if (sum > best_sum) { best_sum = sum; best_i = i; }
+    }
+    return (uint8_t)best_i;
 }
 
 // ---------- PPM writer ----------
@@ -782,6 +818,97 @@ static int render_options_audio(Framebuffer& fb, const Resources& res) {
     return active_sub;
 }
 
+// Render the LOBBYCONNECT screen into `fb`. Returns active sub-palette.
+//
+// Per screen-lobby-connect.md: LOBBYCONNECT explicitly calls
+// SetPalette(2) on entry — first screen that uses sub-palette 2.
+//
+// Composition (in any order — panel sprite occludes nothing transparent):
+//   1. Overlay sprite: bank 7 idx 2 at (0,0) — green-bordered panel
+//      spanning (178,93)..(462,370) via offset (-178,-93).
+//   2. TextBox at (185,101), w=250, h=170, bank 133, advance 6,
+//      lineheight 11, pre-populated with three deterministic lines
+//      at color=0, brightness=128.
+//   3. TextInput username at (275,293), w=180, h=14 — empty, focused,
+//      caret rendered as 1-px-wide vertical bar at (275, 292), height 11.
+//   4. TextInput password at (275,320) — empty, not focused → invisible.
+//   5/6. Two B52x21 buttons "Login" (264,339) and "Cancel" (321,339).
+//   L1/L2. Two text-mode Overlays "Username" (190,291) and "Password"
+//      (190,318), bank 134, advance 9.
+static int render_lobby_connect(Framebuffer& fb, const Resources& res) {
+    constexpr int active_sub = 2;
+
+    fb.clear();
+
+    // Background panel — bank 7 idx 2.
+    Overlay panel;
+    panel.x = 0; panel.y = 0;
+    panel.res_bank = 7; panel.res_index = 2;
+    render_overlay(fb, res, panel, active_sub);
+
+    // TextBox: three pre-populated lines, color=0, brightness=128.
+    // Per widget-textbox.md rendering: lines render flush-left at
+    // textbox.x, vertically stacked at textbox.y + i * lineheight.
+    const int tb_x = 185, tb_y = 101;
+    const int lineheight = 11;
+    const int fontwidth_tb = 6;
+    const int tb_bank = 133;
+    const char* tb_lines[3] = {
+        "Connecting to 127.0.0.1:517",
+        "Hostname resolved",
+        "Connection failed",
+    };
+    for (int i = 0; i < 3; ++i) {
+        // brightness == 128 → identity LUT (no LUT).
+        draw_text(fb, res, tb_x, tb_y + i * lineheight, tb_lines[i],
+                  tb_bank, fontwidth_tb, /*tint_lut*/ nullptr);
+    }
+
+    // Username / Password labels (text-mode Overlays, bank 134 advance 9).
+    Overlay user_label;
+    user_label.text = "Username";
+    user_label.textbank = 134;
+    user_label.textwidth = 9;
+    user_label.x = 190; user_label.y = 291;
+    render_overlay(fb, res, user_label, active_sub);
+
+    Overlay pass_label;
+    pass_label.text = "Password";
+    pass_label.textbank = 134;
+    pass_label.textwidth = 9;
+    pass_label.x = 190; pass_label.y = 318;
+    render_overlay(fb, res, pass_label, active_sub);
+
+    // TextInputs are empty; password (320) draws nothing because
+    // text is empty and showcaret is false. Username (293) draws
+    // nothing for text but renders a visible caret at (275, 292),
+    // width 1, height round(14*0.8)=11. Color = "near-white" —
+    // caretcolor isn't pinned by the spec, so use the brightest
+    // palette index in the active sub-palette.
+    {
+        uint8_t caret = brightest_index(res.palette, active_sub);
+        int caret_x = 275 + 0;          // strlen(text) * fontwidth = 0
+        int caret_y = 293 - 1;          // = 292
+        int caret_w = 1;
+        int caret_h = 11;               // round(14 * 0.8)
+        draw_filled_rect(fb, caret_x, caret_y,
+                         caret_x + caret_w, caret_y + caret_h, caret);
+    }
+
+    // Login + Cancel — B52x21 buttons (text-only).
+    Button login;
+    login.variant = ButtonVariant::B52x21;
+    login.x = 264; login.y = 339; login.text = "Login";
+    render_button(fb, res, login, active_sub);
+
+    Button cancel;
+    cancel.variant = ButtonVariant::B52x21;
+    cancel.x = 321; cancel.y = 339; cancel.text = "Cancel";
+    render_button(fb, res, cancel, active_sub);
+
+    return active_sub;
+}
+
 // ---------- entry ----------
 
 int main(int argc, char** argv) {
@@ -851,6 +978,13 @@ int main(int argc, char** argv) {
     } else {
         std::printf("bank 6 idx 15: NOT LOADED\n");
     }
+    if (const Sprite* sp = res.get(7, 2)) {
+        std::printf("bank 7 idx 2 (lobby-connect panel) header: w=%u h=%u offset=(%d, %d) "
+                    "(expected w=284 h=277 offset=(-178, -93))\n",
+                    sp->w, sp->h, sp->offset_x, sp->offset_y);
+    } else {
+        std::printf("bank 7 idx 2: NOT LOADED\n");
+    }
 
     // Screen registry — each entry is (filename, render-fn).
     struct ScreenEntry {
@@ -863,6 +997,7 @@ int main(int argc, char** argv) {
         { "options_controls.ppm", &render_options_controls },
         { "options_display.ppm",  &render_options_display  },
         { "options_audio.ppm",    &render_options_audio    },
+        { "lobby_connect.ppm",    &render_lobby_connect    },
     };
 
     // Always render every registered screen (cheap; visual content

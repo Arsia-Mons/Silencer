@@ -33,7 +33,9 @@ substrate, two different compositions:
 | [font.md](font.md) | Font sprite banks 132–136, advance widths, `DrawText` |
 | [tick.md](tick.md) | 24 Hz simulation tick, `state_i` |
 | [widget-overlay.md](widget-overlay.md) | Sprite-mode and text-mode `Overlay` (used for bg, logo, version) |
-| [widget-button.md](widget-button.md) | `Button` widget — `B196x33`, `B112x33`, `BNONE` variants (extends as more are needed) |
+| [widget-button.md](widget-button.md) | `Button` widget — `B196x33`, `B112x33`, `B220x33`, `B52x21`, `BNONE` variants |
+| [widget-textbox.md](widget-textbox.md) | `TextBox` — multi-line text display (chat / status log shape) |
+| [widget-textinput.md](widget-textinput.md) | `TextInput` — single-line editor with blinking caret, optional password mode |
 | [widget-scrollbar.md](widget-scrollbar.md) | `ScrollBar` — state holder for scroll position, optionally renders track + thumb |
 | [widget-interface.md](widget-interface.md) | `Interface` container, focus, mouse/keyboard dispatch, scroll wiring |
 | [screen-main-menu.md](screen-main-menu.md) | Composition: main menu (logo, buttons, version) |
@@ -41,6 +43,7 @@ substrate, two different compositions:
 | [screen-options-controls.md](screen-options-controls.md) | Composition: configure-controls (six rows of keybinding triplets, scrollbar state, Save/Cancel) |
 | [screen-options-display.md](screen-options-display.md) | Composition: display-options (Fullscreen + Smooth Scaling toggles, Save/Cancel) |
 | [screen-options-audio.md](screen-options-audio.md) | Composition: audio-options (single Music toggle, Save/Cancel) |
+| [screen-lobby-connect.md](screen-lobby-connect.md) | Composition: lobby login (TextBox status log, two TextInputs, Login/Cancel B52x21 buttons; first sub-palette-2 screen) |
 
 ## QA dump
 
@@ -50,7 +53,7 @@ exposes a framebuffer dump path gated by env vars:
 | Env | Values | Effect |
 | --- | ------ | ------ |
 | `SILENCER_DUMP_PATH` | absolute file path | When set, write a 640×480 binary P6 PPM to this path once the target screen has reached steady state, then `exit(0)` |
-| `SILENCER_DUMP_STATE` | `MAINMENU` (default), `OPTIONS`, `OPTIONSCONTROLS`, `OPTIONSDISPLAY`, `OPTIONSAUDIO` | Selects which screen to dump. The binary navigates to the requested state by chaining clicks: MAINMENU.Options (uid 2), then OPTIONS.{Controls=uid 1, Display=uid 2, Audio=uid 3}. |
+| `SILENCER_DUMP_STATE` | `MAINMENU` (default), `OPTIONS`, `OPTIONSCONTROLS`, `OPTIONSDISPLAY`, `OPTIONSAUDIO`, `LOBBYCONNECT` | Selects which screen to dump. The binary navigates by chaining clicks: MAINMENU.{Options=uid 2, ConnectToLobby=uid 1}; OPTIONS.{Controls=uid 1, Display=uid 2, Audio=uid 3}. LOBBYCONNECT also waits for `Lobby::state == IDLE` before dumping so the TextBox content is deterministic. |
 
 Hydrations should accept `SILENCER_DUMP_DIR` (writes one PPM per
 registered screen) for parity. Visual A/B between the real and
@@ -59,8 +62,8 @@ hydration PPMs is the validation gate; see
 
 ## Out of scope (for now)
 
-- Other button variants (`B236x27`, `B52x21`, `B156x21`,
-  `BCHECKBOX`) — covered when a screen needs them.
+- Other button variants (`B236x27`, `B156x21`, `BCHECKBOX`) —
+  covered when a screen needs them.
 - Other widgets: TextInput, TextBox, SelectBox, ScrollBar, Toggle,
   Modal, Loading bar, HUD bars, Minimap, Buy menu, Chat overlay, etc.
 - Effect transforms beyond what the menu uses (`EffectBrightness`
