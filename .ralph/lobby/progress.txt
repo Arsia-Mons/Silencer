@@ -4,6 +4,7 @@
 — read those first. -->
 - Screen-switch additive pattern (D0/A0/O0/C0/L0) holds for screen #7: one new `if (screen_str == "lobby")` branch in `main()` plus a sibling `RunDumpLobby(...)` function. All six prior reference baselines stay byte-exact (main 2,136 / options 1,758 / audio 1,035 / display 2,211 / controls 3,729 / lobby_connect 4,897). The "additive screen" pattern is now confirmed across **two** sub-palette boundaries (1→2 introduced at LOBBYCONNECT L0, re-used here at Y0) and seven distinct screen-builders with zero shared-infra churn between iterations.
 - LOBBY bank set planned ahead at Y0: `{7, 133, 135}`. Bank 7 (panel idx 1, distinct from idx 2 LOBBYCONNECT and idx 7 CONTROLS, and likely B156x21 chrome at some idx). Bank 133 (small `v.<version>` text in header at advance 6). Bank 135 (header "Silencer" text + Go Back button label, both advance 11 by analogy with main-menu / options-family button labels). NO bank 134: spec doesn't list any w=9 small label font on this screen — only the four header overlays + the Go Back button. NO bank 6 (no starfield bg — the bank-7 idx-1 panel covers the entire framebuffer per spec §"What's NOT on this screen").
+- Bank-7 idx-1 panel sprite (LOBBY) confirmed at Y1 to be a **fullscreen** chrome that includes corner LED ornaments at all four corners + a row of mid-screen LEDs at top and bottom, plus the framing borders for all three sub-interfaces (CharacterInterface left, GameSelectInterface right with Create Game / Active Games tab tabs visible, ChatInterface bottom-left), plus the header-bar separator. Single `BlitSprite(fb, sprites.Get(7,1), 0, 0, nullptr)` reproduces the entire panel exactly — no per-region compositing needed. The bank-7 codec branch (validated at LOBBYCONNECT L2 for idx 2 and OPTIONSCONTROLS C2 for idx 7) generalises perfectly to idx 1 with zero codec risk. Confirms hypothesis that bank-7 indices are independent fullscreen panel chromes, one per non-menu screen.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -101,4 +102,73 @@
     the textbox connection-log was overlaid). Same structural gate
     posture: candidate is intentionally all-black; downstream items
     will close the gap.
+---
+
+## 2026-04-26T16:30:00Z — iter 2 (Y1 PASS)
+- Added a single `BlitSprite(fb, sprites.Get(7, 1), 0, 0, nullptr)` call
+  inside `RunDumpLobby` (guarded by `sprites.Has(7, 1)` for parity with
+  every prior Ralph's panel render). Located between `fb.Clear()` and
+  `WritePPM(...)` at the canonical "panel-first" z-order slot. No other
+  changes to the function.
+- Build: `cmake --build shared/design/sdl3/build` exits 0; AppleClang 17;
+  only `main.cpp` recompiled + relink.
+- Dump: `SILENCER_DUMP_SCREEN=lobby SILENCER_DUMP_DIR=/tmp/sdl3_dump
+  shared/design/sdl3/build/silencer_design "$(pwd)/shared/assets"` writes
+  `/tmp/sdl3_dump/screen_00.ppm` (P6, 640x480, 921615 bytes — canonical
+  PPM size invariant unchanged).
+- Bytewise diff vs `/tmp/real_lobby_dump.ppm`: 32,899 bytes (~3.6%),
+  down from Y0's 340,192 bytes (~37%). The remaining residue is the
+  expected non-chrome surfaces: header text overlays (Y2 — "Silencer"
+  / version / map-name / Go Back button label) and sub-interface
+  internal contents (out-of-scope: planet visual + tab labels in
+  GameSelectInterface, agency icons + character stats in
+  CharacterInterface, chat scrollback in ChatInterface, "Join Game"
+  button label).
+- Visual A/B (Discord DM 1498102052180721758): candidate now shows
+  the full LOBBY chrome — corner LEDs (TL/TR/BL/BR/mid-row), all
+  three sub-interface frame borders, header bar separator. Matches
+  reference's chrome pixel-coincident in every chrome region. The
+  three chrome elements gated by Y1 (corner ornaments, sub-interface
+  borders, header separator) are all visible and correctly positioned.
+- Regression sweep — all six prior screen baselines:
+  * main_menu        2,136 bytes (exact baseline)
+  * options          1,758 bytes (exact baseline)
+  * options_audio    1,035 bytes (exact baseline)
+  * options_display  2,211 bytes (exact baseline)
+  * options_controls 3,729 bytes (exact baseline)
+  * lobby_connect    4,897 bytes (exact baseline)
+  All six byte-identical to recorded canonical baselines. Zero
+  regression — the only added work was inside `RunDumpLobby` which
+  is on a sibling code path none of the prior screens exercise.
+- Files touched: `shared/design/sdl3/src/main.cpp` (one new BlitSprite
+  call + comment block in `RunDumpLobby`), `.ralph/lobby/prd.json`
+  (Y1 → passes:true), `.ralph/lobby/progress.txt` (this entry +
+  one Codebase Patterns line).
+- Spec gaps encountered (carry-forward):
+  - `widget-button.md` doesn't list B156x21 (load-bearing at Y2).
+  - `sprite-banks.md` should distinguish bank-7 idx-1 (LOBBY) from
+    idx-2 (LOBBYCONNECT) and idx-7 (OPTIONSCONTROLS). Y1 empirically
+    confirms idx-1 is a fullscreen panel chrome distinct from the
+    other two.
+- **Learnings:**
+  - The bank-7 panel sprite family is now empirically confirmed as
+    a "one fullscreen chrome per non-menu screen" pattern: idx 1 →
+    LOBBY (this iter), idx 2 → LOBBYCONNECT (L2), idx 7 →
+    OPTIONSCONTROLS (C2). Each has its own compositional structure
+    (LOBBYCONNECT: textbox-centric form; OPTIONSCONTROLS: scrollable
+    keybinding table; LOBBY: tri-pane sub-interface frame). Single
+    `BlitSprite(fb, sprite, 0, 0, nullptr)` resolves them all — the
+    codec is identical, only the content differs.
+  - The "panel sprite includes the sub-interface chrome" insight is
+    load-bearing for this Ralph's chrome-only scope: we get *every*
+    sub-interface bounding region rendered for free without writing
+    any sub-interface compositing code. The remaining work for Y2 is
+    purely overlays drawn *over* the panel chrome (header text +
+    button label).
+  - The diff drop from 37% → 3.6% in a single iter is the largest
+    single-iter gain across all seven screens (LOBBYCONNECT was a
+    similar drop with the L2 panel). Confirms that for any non-menu
+    screen, the bank-7 panel render alone closes ~90% of the visual
+    diff, with the remaining ~10% split between text overlays
+    (gateable) and runtime-data interiors (non-gateable for chrome).
 ---

@@ -17,7 +17,7 @@
       "id": "Y1",
       "name": "Bank 7 idx 1 panel chrome renders correctly",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "spec": "The bank-7 idx-1 lobby panel sprite renders fullscreen at (0,0). All chrome elements (corner LED ornaments, sub-interface frame borders, header bar separator) visible and structurally matching the reference. Distinct from CONTROLS' bank-7 idx-7 and LOBBYCONNECT's bank-7 idx-2.",
       "category": "sprite_codec"
     },

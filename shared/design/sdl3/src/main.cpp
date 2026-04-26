@@ -866,6 +866,18 @@ static int RunDumpLobby(const std::string &assets_dir,
   Framebuffer fb;
   fb.Clear();
 
+  // Y1: Bank 7 idx 1 fullscreen lobby panel chrome at (0, 0). Distinct
+  // from LOBBYCONNECT's bank-7 idx-2 and CONTROLS' bank-7 idx-7. The
+  // sprite contains the corner LED ornaments, the framing borders for
+  // all three sub-interfaces (CharacterInterface left, GameSelectInterface
+  // right, ChatInterface bottom-left), and the header-bar separator.
+  // Same anchor convention as every other panel sprite (top_left =
+  // anchor - sprite.offset; the sprite is screen-aligned with offset
+  // (0,0)). Codec branch already validated for bank-7 frames.
+  if (sprites.Has(7, 1)) {
+    BlitSprite(fb, sprites.Get(7, 1), 0, 0, nullptr);
+  }
+
   std::filesystem::create_directories(dump_dir);
   std::string out = dump_dir + "/screen_00.ppm";
   bool ok = WritePPM(out, fb, palette, kSubLobby);
