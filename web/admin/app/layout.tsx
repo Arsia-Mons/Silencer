@@ -1,0 +1,17 @@
+import './globals.css';
+import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
+
+export const metadata: Metadata = { title: 'Silencer Admin', description: 'Game server dashboard' };
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <div id="app-root" style={{ position: 'relative', zIndex: 1, minHeight: '100vh' }}>
+          {children}
+        </div>
+      </body>
+    </html>
+  );
+}
