@@ -220,19 +220,18 @@ void Guard::InitBT(){
 		World& world = *static_cast<World*>(ctx.userData);
 		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
 		if (bt_walk_ticks_ < 600 && chasing) {
-			// Search phase: maintain shooting distance with hysteresis to avoid oscillation.
-			// Only change direction when clearly outside the neutral zone (80-100px).
-			Object* obj = world.GetObjectFromId(chasing);
-			if (obj && obj->IsAlive()) {
-				int dist = abs(signed(obj->x) - signed(x));
-				if (dist < 80) {
-					mirrored = (obj->x > x); // too close — back away
-				} else if (dist > 100) {
-					mirrored = (obj->x < x); // far enough — move toward
+			// Search phase: orient toward target when not on a ladder and not too close.
+			if (state != LADDER) {
+				Object* obj = world.GetObjectFromId(chasing);
+				if (obj && obj->IsAlive()) {
+					int dist = abs(signed(obj->x) - signed(x));
+					if (dist > 80) {
+						mirrored = (obj->x < x); // orient toward target
+					}
+					// <=80px: keep current direction to avoid oscillation
+				} else {
+					chasing = 0; // target gone or dead
 				}
-				// 80-100px: keep current direction (hysteresis dead-band)
-			} else {
-				chasing = 0; // target gone or dead — stop searching
 			}
 			return BTResult::Running;
 		}
@@ -246,7 +245,9 @@ void Guard::InitBT(){
 			mirrored = originalmirrored;
 			return BTResult::Success;
 		}
-		mirrored = (signed(originalx) < signed(x));
+		if (state != LADDER) {
+			mirrored = (signed(originalx) < signed(x));
+		}
 		return BTResult::Running;
 	};
 
