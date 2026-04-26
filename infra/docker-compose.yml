@@ -92,7 +92,7 @@ services:
       ASSETS_DIR: "/assets"
     volumes:
       - backup-data:/backups
-      - ../shared/assets:/assets:ro
+      - ../shared/assets:/assets
     restart: unless-stopped
 
   admin-web:
