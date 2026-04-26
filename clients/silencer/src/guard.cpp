@@ -112,8 +112,28 @@ void Guard::Tick(World & world){
 					}
 				}else
 				if(state == WALKING || state == STANDING || state == LOOKING){
-					state = CROUCHING;
-					state_i = 0;
+					// Check whether the target is actually crouched (short) or just
+					// a standing player on lower ground where Look(0) couldn't reach.
+					// If the target extends above the guard's standing eye level (y-55),
+					// treat it as a standing target and shoot from standing.
+					int tsx1, tsy1, tsx2, tsy2;
+					found->GetAABB(world.resources, &tsx1, &tsy1, &tsx2, &tsy2);
+					if(tsy1 <= (int)y - 55){
+						// Standing-height target: shoot from standing position
+						if(CooledDown(world)){
+							state = SHOOTSTANDING;
+							state_i = 0;
+						} else {
+							if(state == WALKING || state == LOOKING){
+								state = STANDING;
+								state_i = 0;
+							}
+						}
+					} else {
+						// Short/crouched target: crouch to shoot
+						state = CROUCHING;
+						state_i = 0;
+					}
 				}
 				break;
 			}
@@ -201,6 +221,7 @@ void Guard::Tick(World & world){
 			}
 		}break;
 		case CROUCHING:{
+			xv = 0;
 			res_bank = 158;
 			res_index = state_i;
 			if(state_i >= 9){
@@ -210,10 +231,12 @@ void Guard::Tick(World & world){
 			}
 		}break;
 		case CROUCHED:{
+			xv = 0;
 			res_bank = 158;
 			res_index = 9;
 		}break;
 		case SHOOTCROUCHED:{
+			xv = 0;
 			if(state_i == 6){
 				Fire(world, 1);
 			}
@@ -233,8 +256,8 @@ void Guard::Tick(World & world){
 			}
 		}break;
 		case UNCROUCHING:{
+			xv = 0;
 			res_bank = 158;
-			res_index = 9 - state_i;
 			if(state_i >= 9){
 				state = STANDING;
 				state_i = -1;
