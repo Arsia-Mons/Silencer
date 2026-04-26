@@ -2,6 +2,8 @@
 <!-- Patterns this Ralph discovers. Patterns from prior Ralphs:
 .ralph/{main-menu,options,options-audio,options-display,options-controls,lobby-connect}/progress.txt
 — read those first. -->
+- Screen-switch additive pattern (D0/A0/O0/C0/L0) holds for screen #7: one new `if (screen_str == "lobby")` branch in `main()` plus a sibling `RunDumpLobby(...)` function. All six prior reference baselines stay byte-exact (main 2,136 / options 1,758 / audio 1,035 / display 2,211 / controls 3,729 / lobby_connect 4,897). The "additive screen" pattern is now confirmed across **two** sub-palette boundaries (1→2 introduced at LOBBYCONNECT L0, re-used here at Y0) and seven distinct screen-builders with zero shared-infra churn between iterations.
+- LOBBY bank set planned ahead at Y0: `{7, 133, 135}`. Bank 7 (panel idx 1, distinct from idx 2 LOBBYCONNECT and idx 7 CONTROLS, and likely B156x21 chrome at some idx). Bank 133 (small `v.<version>` text in header at advance 6). Bank 135 (header "Silencer" text + Go Back button label, both advance 11 by analogy with main-menu / options-family button labels). NO bank 134: spec doesn't list any w=9 small label font on this screen — only the four header overlays + the Go Back button. NO bank 6 (no starfield bg — the bank-7 idx-1 panel covers the entire framebuffer per spec §"What's NOT on this screen").
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -20,4 +22,83 @@
   missing interiors is acceptable — gated only on chrome.
 - Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
 - **Learnings:** none yet.
+---
+
+## 2026-04-26T16:18:00Z — iter 1 (Y0 PASS)
+- Added `RunDumpLobby(...)` in `shared/design/sdl3/src/main.cpp` and wired
+  the `screen_str == "lobby"` dispatch branch in `main()` immediately
+  after the `"lobby_connect"` branch (placement matches the chronological
+  add order: options → options_audio → options_display → options_controls →
+  lobby_connect → lobby). Y0's body is intentionally minimal: load the
+  planned bank set `{7, 133, 135}`, `Clear(0)` the framebuffer, resolve
+  through `kSubLobby = 2`, write the PPM. Panel sprite (Y1), header
+  composition (Y2), and final visual equivalence (Y3) are deferred.
+- Bank choices: NO bank 6 (panel sprite covers the full framebuffer per
+  spec). Bank 7 needed for the panel chrome at idx 1 (and very likely
+  the B156x21 Go Back button chrome at some idx). Bank 133 needed for
+  the small `v.<version>` text at header advance 6. Bank 135 needed
+  for the "Silencer" header text and Go Back button label (advance 11
+  by analogy with prior B-series button labels).
+- Build: `cmake --build shared/design/sdl3/build` exits 0; AppleClang 17;
+  only `main.cpp` recompiled + relink.
+- Dump: `SILENCER_DUMP_SCREEN=lobby SILENCER_DUMP_DIR=/tmp/sdl3_dump
+  shared/design/sdl3/build/silencer_design "$(pwd)/shared/assets"` writes
+  `/tmp/sdl3_dump/screen_00.ppm` (P6, 640x480, **921615 bytes** —
+  canonical PPM size invariant: header 15 + payload 640*480*3).
+- Sub-palette 2 verification: first 12 RGB bytes of dump payload are all
+  0x00, confirming sub-palette 2 idx 0 = (0, 0, 0) (consistent with
+  LOBBYCONNECT L0/L1 finding). The active-sub plumbing through `WritePPM`
+  generalises cleanly to a re-used non-menu palette without infra changes.
+- Regression sweep — bytewise diffs vs canonical references (all six
+  prior screens, sub-palettes 1 and 2):
+  * main_menu        2,136 bytes (exact baseline)
+  * options          1,758 bytes (exact baseline)
+  * options_audio    1,035 bytes (exact baseline)
+  * options_display  2,211 bytes (exact baseline)
+  * options_controls 3,729 bytes (exact baseline)
+  * lobby_connect    4,897 bytes (exact baseline)
+  All six at byte-identical baselines. No regression to any prior screen.
+- LOBBY bytewise diff vs `/tmp/real_lobby_dump.ppm`: 340,192 bytes
+  (~37%). NOT the gate for Y0 — the residue is dominated by the entire
+  bank-7 idx-1 panel chrome + header bar that Y1+ will render. The
+  reference is full-content; the candidate at Y0 is intentionally
+  Clear(0) black.
+- Visual A/B (Discord DM 1498101201336537149): candidate is solid black
+  640x480; reference shows the full LOBBY panel chrome (corner LED
+  ornaments, sub-interface frame borders, header bar separator) plus
+  the "Silencer v.00028" header text and a "Go Back" button.
+  Matching panel-exterior tone (black) is the only equivalence at Y0.
+- Files touched: `shared/design/sdl3/src/main.cpp` (`RunDumpLobby` +
+  dispatch branch), `.ralph/lobby/prd.json` (Y0 → passes:true),
+  `.ralph/lobby/progress.txt` (this entry + one Codebase Patterns line).
+- Spec gaps encountered (carry-forward; none new at Y0 beyond what
+  screen-lobby.md §"Spec gaps to flag" already lists):
+  - `widget-button.md` doesn't list B156x21 (will become load-bearing
+    at Y2 when the Go Back button renders).
+  - `sprite-banks.md` should distinguish bank-7 idx-1 (LOBBY) from
+    idx-2 (LOBBYCONNECT) and idx-7 (OPTIONSCONTROLS).
+  - `palette.md` should explicitly note sub-palette 2 = "lobby palette",
+    used by both LOBBYCONNECT and LOBBY (and presumably future
+    lobby-family screens).
+- **Learnings:**
+  - The "minimal Y0 commit" pattern (only screen-switch + Clear(0))
+    held perfectly for a re-used sub-palette: zero new asset risk,
+    zero codec risk, zero palette risk. The only non-trivial decision
+    at Y0 was the bank-set composition, and that was decidable from
+    the spec table alone (header overlays + panel + button → 7/133/135;
+    no body labels → no 134; no starfield → no 6). When all infra
+    risks have already been retired by prior Ralphs, Y0 collapses to
+    "wire it in and prove the framebuffer round-trips".
+  - The "kSubLobby = 2" constant is now re-used between two screen-
+    builders (LobbyConnect + Lobby). Each screen-builder still owns
+    its own `constexpr int kSubX` instance — no global is introduced,
+    keeping the per-screen palette ID explicit and discoverable. The
+    pattern stays at architectural steady-state.
+  - At Y0 the diff number alone (~37%) looks worse than LOBBYCONNECT
+    L0's ~23%, but that's purely because the LOBBY reference contains
+    the full panel chrome + header text + Go Back button (much more
+    non-black content than LOBBYCONNECT's mostly-empty panel before
+    the textbox connection-log was overlaid). Same structural gate
+    posture: candidate is intentionally all-black; downstream items
+    will close the gap.
 ---

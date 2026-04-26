@@ -812,6 +812,69 @@ static int RunDumpLobbyConnect(const std::string &assets_dir,
   return ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// Compose the LOBBY screen and write the PPM. Per
+// docs/design/screen-lobby.md:
+//   - sub-palette 2 (lobby palette — same as LOBBYCONNECT).
+//   - Bank 7 idx 1 fullscreen panel chrome at (0, 0). Distinct from
+//     LOBBYCONNECT's idx 2 and CONTROLS' idx 7.
+//   - Header bar: "Silencer" (font 135 w=11 color=152) at (15, 32),
+//     "v.<world.version>" (font 133 w=6 color=189) at (115, 39),
+//     map name (font 135 w=11 color=129 brightness 128+32) at (180, 32)
+//     (empty on canonical dump), B156x21 "Go Back" button at (473, 29).
+//   - NO bank-6 starfield, NO logo, NO version-style overlay (the
+//     header bar carries the version).
+//   - Sub-interfaces (CharacterInterface, GameSelectInterface,
+//     ChatInterface) are runtime-driven and out of scope; their bounding
+//     regions show through the panel-7-idx-1 chrome as empty.
+//
+// Y0's gate is build/run + sub-palette 2 resolution only — rendering of
+// the panel sprite (Y1), header composition (Y2), and final visual
+// equivalence (Y3) are downstream. Bank set planned ahead per spec:
+// {7, 133, 135}. (No bank 134: spec doesn't list any w=9 small label
+// font on this screen — only the header text and the Go Back button
+// label, which both use bank 135 advance 11 / bank 133 advance 6.)
+// ---------------------------------------------------------------------------
+static int RunDumpLobby(const std::string &assets_dir,
+                        const std::string &dump_dir) {
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // Bank set planned ahead: 7 (panel idx 1 + B156x21 chrome — TBD),
+  // 133 (small version-text font), 135 (header / button-label font).
+  // Y0 doesn't render any of these yet; loading them now locks in the
+  // bank set so subsequent iterations are pure rendering additions.
+  SpriteSet sprites;
+  std::vector<int> banks = {7, 133, 135};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // LOBBY sub-palette is 2 (same as LOBBYCONNECT) per palette.md /
+  // screen-lobby.md §Sub-palette.
+  constexpr int kSubLobby = 2;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubLobby);
+  std::fprintf(stderr, "wrote %s (lobby)\n", out.c_str());
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   std::string assets_dir;
   if (argc >= 2) {
@@ -844,6 +907,9 @@ int main(int argc, char **argv) {
     }
     if (screen_str == "lobby_connect") {
       return RunDumpLobbyConnect(assets_dir, dump);
+    }
+    if (screen_str == "lobby") {
+      return RunDumpLobby(assets_dir, dump);
     }
     return RunDump(assets_dir, dump);
   }

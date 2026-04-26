@@ -9,7 +9,7 @@
       "id": "Y0",
       "name": "Candidate dumps a LOBBY PPM via screen-switch (sub-palette 2)",
       "priority": 0,
-      "passes": false,
+      "passes": true,
       "spec": "Extend SILENCER_DUMP_SCREEN to handle 'lobby' and write a 640x480 P6 PPM at /tmp/sdl3_dump/screen_00.ppm under sub-palette 2. All six prior screen pathways unchanged.",
       "category": "build"
     },
