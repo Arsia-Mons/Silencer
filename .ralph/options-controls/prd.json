@@ -8,7 +8,7 @@
       "id": "C0",
       "name": "Candidate dumps an OPTIONSCONTROLS PPM via screen-switch",
       "priority": 0,
-      "passes": false,
+      "passes": true,
       "spec": "Extend SILENCER_DUMP_SCREEN to handle 'options_controls' and write a 640x480 P6 PPM at /tmp/sdl3_dump/screen_00.ppm. main_menu / options / options_audio / options_display pathways must remain unchanged.",
       "category": "build"
     },

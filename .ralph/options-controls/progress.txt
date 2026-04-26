@@ -2,6 +2,9 @@
 <!-- Patterns this Ralph discovers. Patterns from prior Ralphs:
 .ralph/{main-menu,options,options-audio,options-display}/progress.txt
 — read those first. -->
+- Screen-switch extension recipe (carryover from D0/A0/O0): one new `if (screen_str == "options_controls")` branch in `main()` plus a sibling `RunDumpOptionsControls(...)` function. Zero edits to prior Run*; bytewise diffs vs all four prior reference dumps stay at exact baseline (main 2136, options 1758, audio 1035, display 2211).
+- OPTIONSCONTROLS bank set is `{6, 7, 134, 135}` — strictly larger than every prior screen. Bank 7 (panel borders idx 7..14, scrollbar track idx 9, scrollbar thumb idx 10 per `docs/design-system.md.archive:2124`) and bank 134 (small body font, w=10 for keyname labels and w=9 for OR/AND connectors) are NEW load surface. B112x33 lives at bank 6 idx 28 (archive:633), so no new bank needed for the half-width key buttons.
+- Scrollbar widget specs (NOT in widget-button.md, found in `docs/design-system.md.archive:1080-1130`): bank 7, track `res_index = 9`, thumb `barres_index = 10`, scrollposition+scrollmax engine state. The reference dump for OPTIONSCONTROLS has `scrollposition = 0` so the thumb is at the top of the track. No `widget-scrollbar.md` exists yet — flagged as orchestrator's call.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -17,4 +20,62 @@
 - 6-row form pattern is structurally new (prior screens have 0..2 rows).
 - Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
 - **Learnings:** none yet.
+---
+
+## 2026-04-26T15:20:00Z — iter 1 (C0 PASS)
+- Added `RunDumpOptionsControls(...)` in `shared/design/sdl3/src/main.cpp` and wired
+  the `screen_str == "options_controls"` dispatch branch in `main()` ahead of the
+  `RunDump` fallback (placement matches options/options_audio/options_display).
+  C0's body is bg-plate-only (bank 6 idx 0); C1+ will compose the frame panel,
+  title, 6-row form, scrollbar, and Save/Cancel.
+- Bank set: `{6, 7, 134, 135}`. Bank 7 is needed for the frame panel (idx 7) and
+  the scrollbar (idx 9 track + idx 10 thumb). Bank 134 is needed for the small
+  body fonts on keyname labels (w=10) and OR/AND connectors (w=9). Banks 6 and
+  135 are inherited from prior screens. No bank 133 (no version) and no bank 208
+  (no logo) — same load-bearing absences as the OPTIONS hub / audio / display.
+- Build: `cmake --build shared/design/sdl3/build` exits 0; AppleClang 17.
+- Dump: `SILENCER_DUMP_SCREEN=options_controls SILENCER_DUMP_DIR=/tmp/sdl3_dump
+  shared/design/sdl3/build/silencer_design "$(pwd)/shared/assets"` writes
+  `/tmp/sdl3_dump/screen_00.ppm` (P6, 640×480, **921615 bytes** — canonical PPM
+  size invariant, header 15 + payload 640*480*3).
+- Regression checks (all clean — exact baseline matches):
+  - main_menu: 2,136 bytes vs `/tmp/real_dump.ppm` (matches F0).
+  - options:   1,758 bytes vs `/tmp/real_options_dump.ppm` (matches O4).
+  - options_audio:   1,035 bytes vs `/tmp/real_optionsaudio_dump.ppm` (matches A4).
+  - options_display: 2,211 bytes vs `/tmp/real_optionsdisplay_dump.ppm` (matches D3).
+- Files touched: `shared/design/sdl3/src/main.cpp` (`RunDumpOptionsControls` +
+  dispatch branch), `.ralph/options-controls/prd.json` (C0 → passes:true),
+  `.ralph/options-controls/progress.txt` (this entry + three Codebase Patterns lines).
+- Visual A/B summary: not the gate for C0 (build/run gate). Candidate PNG shows
+  the bank-6 idx-0 plate (Mars + starfield) coincident with the lower z-layer of
+  `/tmp/real_optionscontrols_dump.png`; everything above z=0 (frame panel, title,
+  form, scrollbar, Save/Cancel) is intentionally absent at C0 and lives in C1+.
+- Spec gaps encountered:
+  - `docs/design/sprite-banks.md` "Banks the main menu touches" lists bank 7 as
+    "not used by main menu, but commonly co-loaded". For OPTIONSCONTROLS bank 7
+    IS load-bearing (frame panel + scrollbar). The bank-7 sprite inventory
+    (idx 7 frame panel, idx 9 scrollbar track, idx 10 scrollbar thumb, plus the
+    other indices documented at archive:2124) belongs in `sprite-banks.md` once
+    this hydration validates it.
+  - `widget-scrollbar.md` does not exist (already known per the spec). Bank 7
+    idx 9 (track) + idx 10 (thumb) numbers carried from
+    `docs/design-system.md.archive:1080-1130`. Flag stays open until C4 needs
+    placement coordinates.
+  - The frame panel "may use tile-mode RLE" per spec — sprite codec already
+    validated against bank 6 (tile mode) and bank 196 (linear mode), so either
+    branch should decode without new code. C1 will verify by visual A/B.
+- **Learnings:**
+  - Adding bank 7 + bank 134 to a screen-builder's load list is a pure additive
+    change with zero impact on prior screens — `SpriteSet::Load` is per-screen,
+    so even though the OPTIONS hub doesn't load bank 7, OPTIONSCONTROLS' load of
+    bank 7 doesn't perturb anything. This is the right granularity: each screen
+    declares its own load list, no shared "all banks" path that grows monotonically.
+  - The "minimal C0/D0 commit" pattern (only bg plate at the build/run gate)
+    deliberately defers the structural composition to C1+, on the theory that
+    the Frame panel is the most distinct new widget on this screen and deserves
+    its own iteration to verify (codec, anchor convention, transparency mask).
+    This is a small departure from the "structurally complete on first commit"
+    pattern used for OPTIONS / OPTIONSAUDIO, motivated by the spec's explicit
+    flag that bank 7 idx 7 may use tile-mode RLE and may be a new visual element
+    not yet tested. Splitting C0/C1 isolates the bank 7 risk from the screen-switch.
 ---

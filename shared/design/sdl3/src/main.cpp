@@ -499,6 +499,68 @@ static int RunDumpOptionsDisplay(const std::string &assets_dir,
   return ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// Compose the OPTIONSCONTROLS screen and write the PPM. Per
+// docs/design/screen-options-controls.md:
+//   - sub-palette 1
+//   - bank-6 idx-0 fullscreen background plate
+//   - bank-7 idx-7 frame panel (bordered green-bevel overlay)
+//   - title "Configure Controls" at y=14, bank 135 advance 12, centered
+//   - 6 form rows: keyname label (bank 134, w=10) at (80, 95+i*53),
+//     B112x33 key1 button (bank 6 idx 28) at anchor (-30, 0+i*53),
+//     OR/AND BNONE connector text (bank 134, w=9) at (383, 95+i*53),
+//     B112x33 key2 button (bank 6 idx 28) at anchor (120, 0+i*53)
+//   - vertical scrollbar (bank 7, res_index 9 track + idx 10 thumb)
+//     at right edge, scrollposition=0
+//   - Save B196x33 at anchor (-200, 117), Cancel at (20, 117)
+//   - all buttons INACTIVE, brightness=128
+//
+// Bank dependencies: 6 (bg + B196x33 idx 7 + B112x33 idx 28),
+// 7 (frame panel idx 7 + scrollbar idx 9/10), 134 (small body font),
+// 135 (title font).
+// ---------------------------------------------------------------------------
+static int RunDumpOptionsControls(const std::string &assets_dir,
+                                  const std::string &dump_dir) {
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  SpriteSet sprites;
+  std::vector<int> banks = {6, 7, 134, 135};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  constexpr int kSubMenu = 1;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  // 1) Background plate.
+  if (sprites.Has(6, 0)) {
+    BlitSprite(fb, sprites.Get(6, 0), 0, 0, nullptr);
+  }
+
+  // C0 gate stops here: bg plate only. C1+ will compose frame panel,
+  // title, 6-row form, scrollbar, Save/Cancel.
+
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubMenu);
+  std::fprintf(stderr, "wrote %s (options_controls)\n", out.c_str());
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   std::string assets_dir;
   if (argc >= 2) {
@@ -525,6 +587,9 @@ int main(int argc, char **argv) {
     }
     if (screen_str == "options_display") {
       return RunDumpOptionsDisplay(assets_dir, dump);
+    }
+    if (screen_str == "options_controls") {
+      return RunDumpOptionsControls(assets_dir, dump);
     }
     return RunDump(assets_dir, dump);
   }
