@@ -3,3 +3,8 @@ Iteration 1 complete. **B0 PASS** — `cmake -B build && cmake --build build` ex
 
 Backlog: B1, C0, P0, S0, T0, A0, F0 still TODO.
 
+--- Iteration 2 2026-04-26 13:48:19 ---
+B1 PASS committed. Dump mode writes a valid 640×480 P6 PPM (921,615 bytes) with logo at hold frame idx 60. Composition is correct; the next iteration targets **P0** (palette divergence — candidate renders planet blue/logo red, reference is planet red/logo green; same shapes, wrong tints — active sub-palette layer per the diff table).
+
+Remaining open items: C0, P0, S0, T0, A0, F0.
+

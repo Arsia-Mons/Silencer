@@ -24,7 +24,7 @@
       "id": "C0",
       "name": "Composition complete (every spec object present)",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "spec": "The dump shows every object listed in docs/design/screen-main-menu.md: dark background, bank-208 logo overlay (centered upper), version overlay (bottom-left), and four B196x33 buttons (centered, stacked). 'Present' here means recognizable in the right rough region — palette / shape / position can still be wrong; this item is composition only.",
       "category": "composition"
     },

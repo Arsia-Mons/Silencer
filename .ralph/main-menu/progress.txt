@@ -44,3 +44,19 @@
   - For B1's gate it is sufficient that the file appears + has the right magic / dims / size; correctness of *what* is in the file is gated by P0/S0/T0/A0/F0 downstream.
   - Use `std::string + suffix` (or `std::filesystem::path`) for any path built from a user-supplied `assets_dir`. Bank counts are bounded (256), so heap traffic from the std::string concat is irrelevant compared to robustness.
 ---
+
+## 2026-04-26T13:48:00Z — C0
+- No code changes required: B1's path-buffer fix already unblocked the full composition pipeline (background plate + logo overlay + version text + four buttons all decode and blit). C0 is a verification-only flip.
+- Visual A/B (`/tmp/sdl3_dump/screen_00.png` vs `/tmp/real_dump.png`): every object listed in docs/design/screen-main-menu.md is present in the correct rough region of the candidate dump:
+  1. bank-6 idx-0 fullscreen background plate ✓ (starfield + planetary body filling the frame)
+  2. bank-208 logo overlay ✓ (`SILENCER` glyph centered around y≈215, full hold frame at idx 60 — the reference also shows hold)
+  3. version overlay bottom-left ✓ (`Silencer v0002A` at x≈10, y≈463)
+  4. four B196x33 buttons stacked on the right, in spec order ✓ (Tutorial / Connect To Lobby / Options / Exit at the (40,-134)/(80,-67)/(40,0)/(0,67) zig-zag → on-screen tops 154/221/288/355 ± a row)
+- Files touched: `.ralph/main-menu/prd.json` (C0 → passes:true), `.ralph/main-menu/progress.txt` (this entry).
+- Visual diff summary: **palette** (per the visual-regression-testing skill diff table) — candidate logo+buttons render in red/orange and the planet in blue/purple; the reference has green logo+buttons and a red/orange planet. Same shapes, same anchors, swapped tints. Strongly suggests `Palette::SetPalette(1)` (the menu sub-palette per docs/design/palette.md screen-main-menu.md §Activation) is not being called by the harness — the dump is rendering through sub-palette 0 (or another) instead of 1. That is exactly the P0 payload, not C0.
+- Spec gaps encountered: none for C0. Composition list in docs/design/screen-main-menu.md is complete and unambiguous; every entry was located in the dump.
+- **Learnings:**
+  - C0 is cheaply "free" once B1's bank-load fix lands, because the harness already iterates the screen's object list and dispatches widget blits — the composition layer is structurally sound, only color/palette is wrong.
+  - Rough-position confirmation is sufficient for C0; don't pixel-measure anchors here, that's A0's gate.
+  - When palette is wrong but everything else looks right, suspect `SetPalette(N)` not being applied at screen entry. Sub-palette 1 is the main menu's; the candidate is currently resolving through whatever palette is active at boot.
+---
