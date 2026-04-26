@@ -308,14 +308,38 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 		fwrite(&mem[sizeof(header)], 1, length, file2);
 		fclose(file2);*/
 		
-		MIX_Audio * chunk = MIX_LoadAudio_IO(Audio::GetInstance().GetMixer(), SDL_IOFromConstMem(mem.data(), mem.size()), true, true);
+		// Decode WAV (may be IMA ADPCM) to raw PCM via SDL3, then load into MIX_Audio
+		SDL_AudioSpec wavspec;
+		Uint8 *wavbuf = nullptr;
+		Uint32 wavlen = 0;
+		if(!SDL_LoadWAV_IO(SDL_IOFromConstMem(mem.data(), mem.size()), true, &wavspec, &wavbuf, &wavlen)){
+			printf("Could not decode WAV %s - %s\n", name, SDL_GetError());
+			SDL_CloseIO(file);
+			return false;
+		}
+
+		// Apply a short PCM fade-in/fade-out to the hover sound to eliminate click artifacts
+		// from abrupt waveform onset/cutoff after ADPCM decode.
+		if(strcmp(name, "whoom.wav") == 0 && wavspec.format == SDL_AUDIO_S16LE){
+			int fade_samples = (wavspec.freq * 20) / 1000; // 20ms
+			Sint16 *pcm = (Sint16 *)wavbuf;
+			int total_samples = wavlen / sizeof(Sint16);
+			int ramp = SDL_min(fade_samples, total_samples / 2);
+			for(int s = 0; s < ramp; s++){
+				pcm[s] = (Sint16)(pcm[s] * s / ramp);
+				pcm[total_samples - 1 - s] = (Sint16)(pcm[total_samples - 1 - s] * s / ramp);
+			}
+		}
+
+		// MIX_LoadRawAudioNoCopy takes ownership of wavbuf and will free it
+		MIX_Audio * chunk = MIX_LoadRawAudioNoCopy(Audio::GetInstance().GetMixer(), wavbuf, wavlen, &wavspec, true);
 		if(!chunk){
 			printf("Could not load sound %s - %s\n", name, SDL_GetError());
+			SDL_free(wavbuf);
 			SDL_CloseIO(file);
 			return false;
 		}else{
 			soundbank[name] = chunk;
-			// Note: SDL3_mixer 3.x audio is opaque; pop-fix via raw buffer access is no longer possible
 		}
 	}
 	SDL_CloseIO(file);

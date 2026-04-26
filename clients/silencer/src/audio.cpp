@@ -39,7 +39,6 @@ bool Audio::Init(Game * game){
 	}
 	musictrack = MIX_CreateTrack(mixer);
 	MIX_GetMixerFormat(mixer, &mixerspec);
-	// TODO: Post-mix callback for ffmpeg replay audio export was removed in SDL3_mixer 3.x
 	enabled = true;
 	return true;
 }
@@ -61,9 +60,14 @@ int Audio::Play(MIX_Audio * chunk, int volume, bool loop){
 		for(int i = 0; i < maxchannels; i++){
 			if(!MIX_TrackPlaying(tracks[i]) && !MIX_TrackPaused(tracks[i])){
 				MIX_SetTrackAudio(tracks[i], chunk);
-				MIX_SetTrackLoops(tracks[i], loop ? -1 : 0);
 				MIX_SetTrackGain(tracks[i], (volume / 128.0f) * effectvolume);
-				MIX_PlayTrack(tracks[i], 0);
+				SDL_PropertiesID options = 0;
+				if(loop){
+					options = SDL_CreateProperties();
+					SDL_SetNumberProperty(options, MIX_PROP_PLAY_LOOPS_NUMBER, -1);
+				}
+				MIX_PlayTrack(tracks[i], options);
+				if(options) SDL_DestroyProperties(options);
 				channelobject[i] = 0;
 				channelvolume[i] = volume;
 				return i;
@@ -162,14 +166,14 @@ void Audio::Unmute(void){
 bool Audio::PlayMusic(MIX_Audio * music){
 	if(!enabled) return false;
 	if(!Config::GetInstance().music) return false;
-	if(!MIX_TrackPlaying(musictrack) || !MIX_TrackPaused(musictrack)){
-		if(!MusicPaused()){
-			MIX_SetTrackAudio(musictrack, music);
-			MIX_SetTrackLoops(musictrack, -1);
-			MIX_SetTrackGain(musictrack, musicvolume / 128.0f);
-			MIX_PlayTrack(musictrack, 0);
-			return true;
-		}
+	if(!MIX_TrackPlaying(musictrack) && !MIX_TrackPaused(musictrack)){
+		SDL_PropertiesID options = SDL_CreateProperties();
+		SDL_SetNumberProperty(options, MIX_PROP_PLAY_LOOPS_NUMBER, -1);
+		MIX_SetTrackAudio(musictrack, music);
+		MIX_SetTrackGain(musictrack, musicvolume / 128.0f);
+		MIX_PlayTrack(musictrack, options);
+		SDL_DestroyProperties(options);
+		return true;
 	}
 	return false;
 }
