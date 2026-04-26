@@ -8,7 +8,7 @@
       "id": "A0",
       "name": "Candidate dumps an OPTIONSAUDIO PPM via screen-switch",
       "priority": 0,
-      "passes": false,
+      "passes": true,
       "spec": "Extend the candidate's SILENCER_DUMP_SCREEN switch (or whatever clean mechanism the OPTIONS Ralph established) to compose+render the Audio Options screen and write a 640x480 P6 PPM at /tmp/sdl3_dump/screen_00.ppm. main_menu and options screen-switch values must still work unchanged.",
       "category": "build"
     },

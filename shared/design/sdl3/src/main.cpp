@@ -246,6 +246,124 @@ static int RunDumpOptions(const std::string &assets_dir,
   return ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// Compose the OPTIONSAUDIO screen and write the PPM. Per
+// docs/design/screen-options-audio.md:
+//   - sub-palette 1 (same menu palette)
+//   - bank-6 idx-0 fullscreen background plate
+//   - title "Audio Options" at y=14, x = 320 - len*12/2, bank 135 advance 12
+//   - one B220x33 button (bank 6 idx 23, "Music") at anchor (100, 50)
+//   - off pill (bank 6 idx 12) at literal screen (420, 137)
+//   - on  pill (bank 6 idx 14) at literal screen (450, 137)
+//   - Save B196x33 (bank 6 idx 7, "Save")   at anchor (-200, 117)
+//   - Cancel B196x33 (bank 6 idx 7, "Cancel") at anchor ( 20, 117)
+//   - all buttons INACTIVE: chrome res_index = base, brightness = 128
+//   - NO bank-208 logo overlay, NO version-text overlay
+// ---------------------------------------------------------------------------
+static int RunDumpOptionsAudio(const std::string &assets_dir,
+                               const std::string &dump_dir) {
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // Banks the OPTIONSAUDIO screen touches: 6 (bg plate, B196x33 idx 7,
+  // B220x33 idx 23, off/on half-pills idx 12/14) and 135 (title + label
+  // font). No 133, no 208.
+  SpriteSet sprites;
+  std::vector<int> banks = {6, 135};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  constexpr int kSubMenu = 1;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  // 1) Background plate.
+  if (sprites.Has(6, 0)) {
+    BlitSprite(fb, sprites.Get(6, 0), 0, 0, nullptr);
+  }
+
+  // 2) Title overlay: "Audio Options", bank 135 advance 12, centered,
+  //    y = 14. (widget-overlay text-mode: literal x,y, no anchor offset.)
+  {
+    const std::string title = "Audio Options";
+    constexpr int kTitleAdvance = 12;
+    int title_x = 320 - static_cast<int>(title.size()) * kTitleAdvance / 2;
+    int title_y = 14;
+    DrawText(fb, title_x, title_y, title, /*bank=*/135,
+             /*advance=*/kTitleAdvance, sprites, palette, kSubMenu,
+             /*brightness=*/128);
+  }
+
+  // 3) Music button: B220x33 at anchor (100, 50). Bank 6 base idx 23,
+  //    INACTIVE -> res_index = 23, brightness = 128.
+  {
+    constexpr int kMusicX = 100;
+    constexpr int kMusicY = 50;
+    constexpr int kB220Base = 23;
+    constexpr int kB220Width = 220;
+    const Sprite &chrome = sprites.Get(6, kB220Base);
+    BlitSprite(fb, chrome, kMusicX, kMusicY, nullptr);
+
+    const char *text = "Music";
+    int len = static_cast<int>(std::strlen(text));
+    int xoff = (kB220Width - len * 11) / 2;
+    int textX = kMusicX - chrome.offset_x + xoff;
+    int textY = kMusicY - chrome.offset_y + 8;
+    DrawText(fb, textX, textY, text, /*bank=*/135, /*advance=*/11, sprites,
+             palette, kSubMenu, /*brightness=*/128);
+  }
+
+  // 4) Off / On half-pill indicators. Sprite overlays at literal screen
+  //    coords (no anchor offset on overlays-with-explicit-position).
+  if (sprites.Has(6, 12)) {
+    BlitSprite(fb, sprites.Get(6, 12), 420, 137, nullptr);
+  }
+  if (sprites.Has(6, 14)) {
+    BlitSprite(fb, sprites.Get(6, 14), 450, 137, nullptr);
+  }
+
+  // 5) Save / Cancel: two B196x33 buttons at the bottom.
+  struct ButtonSpec {
+    const char *text;
+    int x;
+    int y;
+  };
+  const std::array<ButtonSpec, 2> buttons = {{
+      {"Save", -200, 117},
+      {"Cancel", 20, 117},
+  }};
+  for (const auto &b : buttons) {
+    const Sprite &chrome = sprites.Get(6, 7);
+    BlitSprite(fb, chrome, b.x, b.y, nullptr);
+
+    int len = static_cast<int>(std::strlen(b.text));
+    int xoff = (196 - len * 11) / 2;
+    int textX = b.x - chrome.offset_x + xoff;
+    int textY = b.y - chrome.offset_y + 8;
+    DrawText(fb, textX, textY, b.text, /*bank=*/135, /*advance=*/11, sprites,
+             palette, kSubMenu, /*brightness=*/128);
+  }
+
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubMenu);
+  std::fprintf(stderr, "wrote %s (options_audio)\n", out.c_str());
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   std::string assets_dir;
   if (argc >= 2) {
@@ -266,6 +384,9 @@ int main(int argc, char **argv) {
     std::string screen_str = (screen && *screen) ? screen : "main_menu";
     if (screen_str == "options") {
       return RunDumpOptions(assets_dir, dump);
+    }
+    if (screen_str == "options_audio") {
+      return RunDumpOptionsAudio(assets_dir, dump);
     }
     return RunDump(assets_dir, dump);
   }
