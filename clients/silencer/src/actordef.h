@@ -55,6 +55,12 @@ struct ActorDef {
 int LoadActorDefs(const std::string& dir,
                   std::unordered_map<std::string, ActorDef>& out);
 
+// Fetch all actor definitions from the admin API and merge into `out`.
+// URL format: {apiBase}/api/actors  (unauthenticated public endpoint)
+// Returns the number successfully fetched. Falls back gracefully on error.
+int FetchActorDefs(const char* apiBase,
+                   std::unordered_map<std::string, ActorDef>& out);
+
 // Mirror a hurtbox: negate and swap x components.
 inline FrameHurtbox MirrorHurtbox(const FrameHurtbox& hb) {
 	return { -hb.x2, hb.y1, -hb.x1, hb.y2 };

@@ -44,6 +44,9 @@ struct BTContext {
     // Delta-time for this tick (seconds)
     float dt = 0.0f;
 
+    // Debug: when set, called on every leaf/condition result
+    std::function<void(const std::string& nodeId, const std::string& nodeType, BTResult)> logFn;
+
     // Helper to read a blackboard value with a typed default
     template<typename T>
     T bb(const std::string& key, T def = T{}) const {

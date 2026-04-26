@@ -43,6 +43,12 @@ std::string GetDataDir(void){
 	d += "/.config/silencer/";
 	CreateDirectory(d.c_str());
 	return d;
+#elif defined(__APPLE__)
+	const char * home = getenv("HOME");
+	if(!home || !*home) return "";
+	std::string d = std::string(home) + "/Library/Application Support/Silencer/";
+	CreateDirectory(d.c_str());
+	return d;
 #else
 	return "";
 #endif

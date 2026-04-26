@@ -39,24 +39,26 @@ function writeToDisk(id, data) {
 }
 
 /**
- * Seed MongoDB from disk files on first run. Skips any actor already in Mongo.
+ * Seed MongoDB from disk files on first run. Always upserts so that
+ * re-deploying with updated JSON files keeps Mongo in sync.
  */
 export async function seedActorDefs() {
   ensureActorsDir();
   const files = readdirSync(ACTORS_DIR).filter(f => f.endsWith('.json'));
   for (const file of files) {
     const id = file.slice(0, -5);
-    const exists = await ActorDef.exists({ _id: id });
-    if (!exists) {
-      const data = JSON.parse(readFileSync(diskPath(id), 'utf8'));
-      await ActorDef.create({ _id: id, data });
-      console.log(`[actordefs] seeded "${id}" from disk`);
-    }
+    const data = JSON.parse(readFileSync(diskPath(id), 'utf8'));
+    await ActorDef.findByIdAndUpdate(
+      id,
+      { data },
+      { upsert: true, new: true },
+    );
+    console.log(`[actordefs] seeded/updated "${id}" from disk`);
   }
 }
 
-// GET /actors
-router.get('/', requireAuth, async (_req, res) => {
+// GET /actors  — public (no auth required, game client reads this)
+router.get('/', async (_req, res) => {
   try {
     const docs = await ActorDef.find({}, '_id').lean();
     res.json(docs.map(d => d._id));
@@ -65,8 +67,8 @@ router.get('/', requireAuth, async (_req, res) => {
   }
 });
 
-// GET /actors/:id
-router.get('/:id', requireAuth, async (req, res) => {
+// GET /actors/:id  — public (no auth required, game client reads this)
+router.get('/:id', async (req, res) => {
   try {
     validateId(req.params.id);
     const doc = await ActorDef.findById(req.params.id).lean();

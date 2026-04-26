@@ -223,7 +223,9 @@ BTResult BehaviorTree::tickLeaf(const Node& n, BTContext& ctx) const {
     std::string action = n.props.value("action", std::string{});
     auto it = ctx.actions.find(action);
     if (it == ctx.actions.end()) return BTResult::Failure;
-    return it->second(ctx);
+    BTResult r = it->second(ctx);
+    if (ctx.logFn) ctx.logFn(n.id, "Leaf[" + action + "]", r);
+    return r;
 }
 
 // Condition: compare blackboard value
@@ -247,7 +249,9 @@ BTResult BehaviorTree::tickCondition(const Node& n, BTContext& ctx) const {
     } catch (...) {
         return BTResult::Failure;
     }
-    return result ? BTResult::Success : BTResult::Failure;
+    BTResult r = result ? BTResult::Success : BTResult::Failure;
+    if (ctx.logFn) ctx.logFn(n.id, "Cond[" + key + op + val.dump() + "]", r);
+    return r;
 }
 
 // ── BehaviorTreeLibrary ───────────────────────────────────────────────────────

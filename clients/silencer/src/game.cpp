@@ -20,6 +20,7 @@
 #include "sha1.h"
 #include "updaterstage2.h"
 #include "mapfetch.h"
+#include "actordef.h"
 #include <algorithm>
 #include <stdio.h>
 
@@ -213,6 +214,14 @@ bool Game::Load(char * cmdline){
 		return false;
 	}
 	printf("Resources loaded\n");
+	// Sync actordefs from server if an admin API URL is configured.
+	const char* apiBase = Config::GetInstance().mapapiurl;
+	if (apiBase && apiBase[0] != '\0' && !world.dedicatedserver.active) {
+		printf("Syncing actordefs from server...\n");
+		int n = FetchActorDefs(apiBase, world.resources.actordefs);
+		if (n > 0) printf("Synced %d actordef(s) from server\n", n);
+		else printf("Actordef sync failed or server unavailable, using local definitions\n");
+	}
 	lasttick = SDL_GetTicks();
 	return true;
 }
@@ -5891,6 +5900,10 @@ bool Game::HandleSDLEvents(void){
 							world.ShowTopMessage("          *MUSIC PAUSED*");
 						}
 					}
+				}
+				if(event.key.scancode == SDL_SCANCODE_F9){
+					world.debugoverlay = !world.debugoverlay;
+					world.ShowTopMessage(world.debugoverlay ? "        DEBUG OVERLAY ON" : "       DEBUG OVERLAY OFF");
 				}
 				keystate[event.key.scancode] = true;
 			bool skip = true;
