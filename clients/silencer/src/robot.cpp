@@ -83,7 +83,7 @@ void Robot::InitBT() {
 					Player* player = static_cast<Player*>(obj);
 					Team* team = player->GetTeam(world);
 					if (!player->IsDisguised() && !player->IsInvisible(world)
-					    && (team && team->id != virusplanter) && !player->HasSecurityPass()) {
+					    && (team && team->id != virusplanter) && !player->HasSecurityPass() && player->IsAlive()) {
 						Melee(*obj, world); meleed = true;
 					}
 				} break;
@@ -497,7 +497,7 @@ bool Robot::Look(World & world, Uint8 direction){
 			case ObjectTypes::PLAYER:{
 				Player * player = static_cast<Player *>(*it);
 				Team * team = player->GetTeam(world);
-				if(!player->IsDisguised() && !player->IsInvisible(world) && !player->HasSecurityPass() && (team && team->id != virusplanter)){
+				if(!player->IsDisguised() && !player->IsInvisible(world) && !player->HasSecurityPass() && player->IsAlive() && (team && team->id != virusplanter)){
 					target = true;
 				}
 			}break;
