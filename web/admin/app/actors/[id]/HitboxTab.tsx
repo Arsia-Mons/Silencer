@@ -7,17 +7,25 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { type ActorDef } from '../../../lib/api';
 
+// Hurtbox stored as [x1, y1, x2, y2] array (matching C++ loader format)
+type Hurtbox = [number, number, number, number];
+
 interface FrameDef {
   bank: number;
   index: number;
   duration: number;
-  hurtbox?: { x1: number; y1: number; x2: number; y2: number };
+  hurtbox?: Hurtbox;
 }
 interface AnimSequence {
   loop: boolean;
   frames: FrameDef[];
 }
 type Sequences = Record<string, AnimSequence>;
+
+function hbToObj(hb: Hurtbox) { return { x1: hb[0], y1: hb[1], x2: hb[2], y2: hb[3] }; }
+function objToHb(o: { x1: number; y1: number; x2: number; y2: number }): Hurtbox {
+  return [o.x1, o.y1, o.x2, o.y2];
+}
 
 function getSequences(def: ActorDef): Sequences {
   return (def.sequences as Sequences) ?? {};
@@ -32,7 +40,7 @@ const ORIGIN_Y = CANVAS_H * 0.75; // foot anchor
 function drawFrame(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement | null,
-  hurtbox: FrameDef['hurtbox'] | undefined,
+  hurtbox: Hurtbox | undefined,
   dragging: { x1: number; y1: number; x2: number; y2: number } | null
 ) {
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
@@ -56,13 +64,13 @@ function drawFrame(
     ctx.drawImage(img, dx, dy, img.width * SCALE, img.height * SCALE);
   }
 
-  const box = dragging ?? hurtbox;
-  if (box) {
-    // Convert game coords (relative to anchor) → canvas coords
-    const cx1 = ORIGIN_X + box.x1 * SCALE;
-    const cy1 = ORIGIN_Y + box.y1 * SCALE;
-    const cx2 = ORIGIN_X + box.x2 * SCALE;
-    const cy2 = ORIGIN_Y + box.y2 * SCALE;
+  // Draw dragging box or saved hurtbox
+  const boxObj = dragging ?? (hurtbox ? hbToObj(hurtbox) : null);
+  if (boxObj) {
+    const cx1 = ORIGIN_X + boxObj.x1 * SCALE;
+    const cy1 = ORIGIN_Y + boxObj.y1 * SCALE;
+    const cx2 = ORIGIN_X + boxObj.x2 * SCALE;
+    const cy2 = ORIGIN_Y + boxObj.y2 * SCALE;
     ctx.strokeStyle = dragging ? '#ff0' : '#0f0';
     ctx.lineWidth = 1;
     ctx.strokeRect(Math.min(cx1, cx2), Math.min(cy1, cy2), Math.abs(cx2 - cx1), Math.abs(cy2 - cy1));
@@ -139,17 +147,17 @@ export default function HitboxTab({
     redraw(box);
   }
 
-  function onMouseUp(e: React.MouseEvent<HTMLCanvasElement>) {
+  function onMouseUp(_e: React.MouseEvent<HTMLCanvasElement>) {
     const box = dragRef.current.cur;
     if (!box || !seq || !frame) return;
-    const finalBox = {
-      x1: Math.min(box.x1, box.x2),
-      y1: Math.min(box.y1, box.y2),
-      x2: Math.max(box.x1, box.x2),
-      y2: Math.max(box.y1, box.y2),
-    };
+    const finalHb: Hurtbox = [
+      Math.min(box.x1, box.x2),
+      Math.min(box.y1, box.y2),
+      Math.max(box.x1, box.x2),
+      Math.max(box.y1, box.y2),
+    ];
     const nextFrames = seq.frames.map((f, i) =>
-      i === frameIdx ? { ...f, hurtbox: finalBox } : f
+      i === frameIdx ? { ...f, hurtbox: finalHb } : f
     );
     onChange({
       sequences: {
@@ -228,18 +236,21 @@ export default function HitboxTab({
           <div className="text-xs text-game-textDim tracking-widest">HURTBOX VALUES</div>
           {frame?.hurtbox ? (
             <div className="bg-game-bgCard border border-game-border p-4 font-mono text-sm space-y-2">
-              {(['x1','y1','x2','y2'] as const).map(k => (
+              {(['x1','y1','x2','y2'] as const).map((k, ki) => (
                 <div key={k} className="flex items-center gap-3">
                   <span className="text-game-textDim w-4">{k}</span>
                   <input
                     type="number"
                     className="w-20 bg-game-bg border border-game-border px-2 py-1 text-xs text-center"
-                    value={frame.hurtbox![k]}
+                    value={frame.hurtbox![ki]}
                     onChange={e => {
                       if (!seq) return;
-                      const nextFrames = seq.frames.map((f, i) =>
-                        i === frameIdx ? { ...f, hurtbox: { ...f.hurtbox!, [k]: +e.target.value } } : f
-                      );
+                      const nextFrames = seq.frames.map((f, i) => {
+                        if (i !== frameIdx) return f;
+                        const hb: Hurtbox = [...(f.hurtbox ?? [0,0,0,0])] as Hurtbox;
+                        hb[ki] = +e.target.value;
+                        return { ...f, hurtbox: hb };
+                      });
                       onChange({ sequences: { ...sequences, [selectedSeq]: { ...seq, frames: nextFrames } } });
                     }}
                   />

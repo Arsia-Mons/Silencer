@@ -1,5 +1,12 @@
 {
   "id": "player",
+  "props": {
+    "hp": 100,
+    "shield": 50,
+    "speed": 180,
+    "faction": "human",
+    "spawnWeight": 0
+  },
   "sequences": {
     "CROUCHING": {
       "loop": false,
