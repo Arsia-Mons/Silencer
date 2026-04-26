@@ -249,6 +249,8 @@ void Game::Present(void){
 			else if(strcmp(dumpstate, "OPTIONSCONTROLS") == 0) target_state = OPTIONSCONTROLS;
 			else if(strcmp(dumpstate, "OPTIONSDISPLAY") == 0) target_state = OPTIONSDISPLAY;
 			else if(strcmp(dumpstate, "OPTIONSAUDIO") == 0) target_state = OPTIONSAUDIO;
+			else if(strcmp(dumpstate, "LOBBYCONNECT") == 0) target_state = LOBBYCONNECT;
+			else if(strcmp(dumpstate, "LOBBY") == 0) target_state = LOBBY;
 		}
 
 		// Auto-jump from MAINMENU to the target state once the logo settles.

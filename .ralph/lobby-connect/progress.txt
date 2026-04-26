@@ -1,0 +1,19 @@
+## Codebase Patterns
+<!-- Patterns this Ralph discovers. Patterns from prior Ralphs:
+.ralph/{main-menu,options,options-audio,options-display,options-controls}/progress.txt
+— read those first. -->
+
+## 2026-04-26T00:00:00Z — INIT
+- Ralph scaffolded by setup conversation.
+- Baseline: shared/design/sdl3/ already renders main_menu, OPTIONS hub,
+  OPTIONSAUDIO, OPTIONSDISPLAY, OPTIONSCONTROLS equivalent to references.
+  Five-stage screen-switch already validated; sub-palette 1 path validated.
+- Reference dump: /tmp/real_lobbyconnect_dump.ppm (do not regenerate;
+  textbox content reflects runtime "Connection failed" since no Go lobby
+  server was running — that text is non-structural runtime data).
+- Spec input: docs/design/screen-lobby-connect.md (authoritative).
+- New widget surface: B52x21 button; TextBox widget; TextInput widget;
+  sub-palette 2 (lobby palette — first non-menu palette this hydration uses).
+- Hard rule: clients/silencer/src/ is OFF-LIMITS for this Ralph.
+- **Learnings:** none yet.
+---
