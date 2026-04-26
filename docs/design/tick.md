@@ -37,12 +37,21 @@ A "render one frame" QA capture (like the dump modes added to
 `shared/design/sdl3` and `clients/silencer`) must:
 
 1. Run `Init` once.
-2. Call `Tick()` enough times to reach the desired animation frame.
-   The repo's reference dump uses **8 ticks** for the menu so the
-   logo is mid-fade-in (matches what the real client shows on a
-   normal session entrance).
+2. Call `Tick()` until the menu's pinned scene state is reached —
+   for the main menu, that's the bank-208 logo overlay reaching
+   `res_index = 60` (the steady-state hold frame). This requires
+   **at least 120 simulation ticks**: the fade-in increments
+   `res_index = state_i / 2 + 29` from idx 29 to idx 60 over the
+   first 60 ticks, after which idx stays at 60 for the next 60.
 3. Call `Draw` once.
 4. Snapshot the framebuffer.
+
+Pinning to the *scene state* (not the tick count) is what makes the
+hydration's dump and the real client's dump comparable, because
+the real client's render loop schedules ticks against wallclock
+(42 ms `wait`), not at a known cadence. See
+[`.claude/skills/visual-regression-testing/SKILL.md`](../../.claude/skills/visual-regression-testing/SKILL.md)
+for the full pattern.
 
 Hydrations that draw without ticking will catch the logo at
 `state_i = 0` (idx 29 — first fade-in frame, dim and partial),

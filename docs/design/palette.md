@@ -61,9 +61,32 @@ Computed on first launch from `Palette::Calculate(2, 256-30)`.
 
 For the main-menu subset, only the **brightness LUT** is exercised
 (button hover ramps `effectbrightness` from 128 → 136). A hydration
-can compute the brightness LUT on the fly via nearest-match against
-the active sub-palette; see `widget-button.md` and the SDL3
-hydration's `widgets/button.cpp` for the inline form.
+computes the brightness LUT on the fly as follows:
+
+```
+for each src palette index i in 2..255:
+    rgb = palette[active][i]
+    if brightness > 128:
+        t   = (brightness - 127) / 128.0          # 0..1
+        rgb = lerp(rgb, white, t)                 # toward (255,255,255)
+    elif brightness < 128:
+        t   = brightness / 128.0                  # 0..1
+        rgb = scale(rgb, t)                       # toward (0,0,0)
+    # else: identity
+    lut[i] = nearest palette index j in 2..255 of palette[active]
+             by squared-Euclidean RGB distance
+             (∑ (rgb[c] - palette[active][j][c])²)
+```
+
+Indices `0` and `1` skip the LUT (they're protected — transparent
+and black). For `brightness == 128` the LUT is the identity map and
+should fast-path; the inner loop costs ~256² distance computes per
+non-identity LUT and is acceptable to recompute every frame on the
+menu (called once per active button hover-ramp tick).
+
+There is no luminance weighting; the engine uses plain Euclidean
+RGB distance. The pre-computed `brightness` table inside
+`PALETTECALC{N}.BIN` is the same mapping serialized.
 
 ## Indexed → RGBA
 

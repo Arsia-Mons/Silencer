@@ -43,7 +43,7 @@ care about.
 | `56`  | `res_index = 0` (static) |
 | `57`, `58`  | `res_index = state_i / 4`; holds at frame 16 with random escape |
 | `171` | `res_index = (state_i / 2) % 4` |
-| **`208`** (main-menu logo) | `state_i < 60`: `res_index = state_i/2 + 29` (fade in 29→60). `60 ≤ state_i < 120`: `res_index = 60` (hold). `state_i ≥ 120`: `res_index = (120 - state_i/2) + 29` (fade out, then loops). Capped: `res_index ≥ 60` clamps to 60. |
+| **`208`** (main-menu logo) | Three-phase loop. `state_i < 60`: `res_index = state_i/2 + 29` (fade in 29→60). `60 ≤ state_i < 120`: `res_index = 60` (hold). `state_i ≥ 120`: `res_index = (120 - state_i/2) + 29` (fade out). When the fade-out formula produces `res_index ≤ 29`, **reset `state_i` to `-1`** so the unconditional `state_i++` at the end of `Tick` lands it back at `0` for the next cycle, restarting the fade-in. As a safety clamp, every Tick that hits the `state_i ≥ 120` branch should also cap `res_index` so it never exceeds 60 or drops below 29 even if `state_i` overflows. |
 | `222` | One-shot animation; destroys self at `state_i >= 3` |
 | anything else | `res_index` left as caller assigned |
 

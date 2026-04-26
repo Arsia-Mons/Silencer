@@ -15,7 +15,7 @@ dispatches mouse/keyboard input. The main menu uses exactly one
 | ----- | ------- |
 | `objects` (vector) | Every child id; the renderer iterates them in order to draw. |
 | `tabobjects` (vector) | Subset of `objects` that participate in Tab focus order. |
-| `activeobject` | Currently focused child (the one whose chrome is `ACTIVATING`/`ACTIVE`). |
+| `activeobject` | Currently focused child (the one whose chrome is `ACTIVATING`/`ACTIVE`). The sentinel "nothing focused" is the integer `0` — Silencer object IDs start at `1`, so `id == 0` is never a valid object. A port that uses pointers instead of IDs should use `nullptr` for the same role. |
 | `buttonenter` | Optional button id triggered by Enter. `0` = no Enter binding. |
 | `buttonescape` | Optional button id triggered by Escape. |
 | `disabled`, `modal`, `scrollbar`, `width/height/x/y` | Used by other screens (lobby, modals); main menu leaves them at defaults. |
@@ -120,7 +120,7 @@ Interface (the menu container):
         Button   "Exit"              → uid 3
     tabobjects (focus order):
         Tutorial → Connect To Lobby → Options → Exit
-    activeobject = 0          # nothing focused initially
+    activeobject = 0          # sentinel = nothing focused (object IDs start at 1)
     buttonenter  = 0          # Enter unbound
     buttonescape = exit.id    # Esc triggers Exit
 ```

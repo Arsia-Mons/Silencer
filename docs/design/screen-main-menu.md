@@ -38,7 +38,7 @@ Logical surface is **640 × 480 8-bit indexed**. Camera at
 |                                                           |
 |                                       [B196x33 Exit]      |
 |                                                           |
-|  Silencer v00026                                          |   text bank 133, bottom-left
+|  Silencer v<VERSION>                                      |   text bank 133, bottom-left
 +-----------------------------------------------------------+   y=479
 ```
 
@@ -48,7 +48,7 @@ Logical surface is **640 × 480 8-bit indexed**. Camera at
 | - | ------- | ---------- |
 | 1 | Overlay | `res_bank=6, res_index=0` (full-screen background plate). `x=0, y=0`. No effects. |
 | 2 | Overlay | `res_bank=208`, `res_index` ticked (animation; see [widget-overlay.md](widget-overlay.md)). `x=0, y=0`. |
-| 3 | Overlay | text mode — `text = "Silencer v" + world.version`, `textbank=133`, `textwidth=11`, `x=10`, `y = 480 - 10 - 7 = 463`. |
+| 3 | Overlay | text mode — `text = "Silencer v" + version_string`, `textbank=133`, `textwidth=11`, `x=10`, `y = 480 - 10 - 7 = 463`. The `version_string` is whatever the build was tagged with (real client passes `-DSILENCER_VERSION=...` at compile time and reads `world.version`); for hydrations producing a comparison dump, hardcode the same value the real client was built with so the bottom-left text matches character-for-character. The current default is `00028`. |
 | 4 | Button  | `B196x33`, `text="Tutorial"`, `x=40, y=-134`, `uid=0`. |
 | 5 | Button  | `B196x33`, `text="Connect To Lobby"`, `x=80, y=-67`, `uid=1`. |
 | 6 | Button  | `B196x33`, `text="Options"`, `x=40, y=0`, `uid=2`. |
@@ -74,7 +74,7 @@ Each button's footprint is `196 × 33`.
 
 - `tabobjects = [Tutorial, Connect To Lobby, Options, Exit]`
   (Tab cycles in this order).
-- `activeobject = 0` initially (nothing focused on entry).
+- `activeobject = 0` initially — `0` is the "nothing focused" sentinel (object IDs start at `1`); the menu opens with no button highlighted. See [widget-interface.md](widget-interface.md).
 - `buttonenter = 0` — Enter has no menu-level binding. Pressing
   Enter while a button is the `activeobject` clicks that button
   via the generic `Interface::EnterPressed` fallback.

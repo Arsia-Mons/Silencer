@@ -47,7 +47,7 @@ DrawText(surface, x, y, text, bank, advance,
 | `text`       | Null-terminated ASCII |
 | `bank`       | One of 132..136 |
 | `advance`    | Pixels to advance per character (regardless of glyph width) |
-| `alpha`      | If true, glyphs blit through the alpha-blend LUT instead of opaque blit. Button labels pass `alpha = true`; the version overlay passes `alpha = false` |
+| `alpha`      | If true, glyphs blit through the alpha-blend LUT instead of opaque blit. Button labels pass `alpha = true`; the version overlay passes `alpha = false`. The LUT is the `alphaed` table from `PALETTECALC{N}.BIN` (256×256 — input dst index along one axis, src index along the other; the table value is the resulting blended palette index). Building the LUT on the fly: for each `(src, dst)` pair, mix the RGB triples 50/50 (`(src.rgb + dst.rgb) / 2`) and find the nearest palette index in the active sub-palette by squared-Euclidean distance. **For the main menu specifically, alpha and opaque produce visually equivalent results** because the button-pill interiors are mostly transparent (palette idx 0) — there's no underlying pixel to blend with — and the label glyphs land on transparent. A first-pass hydration can implement opaque only and revisit when a screen actually needs alpha (e.g. chat overlay over the HUD). |
 | `color`      | Palette index for `EffectColor` tint. `0` = no tint. The menu doesn't tint text |
 | `brightness` | `EffectBrightness` parameter, `128` = neutral. Button labels use the button's current `effectbrightness` (128..136 during hover ramp); other menu text passes 128 |
 | `rampcolor`  | Switches the tint pipeline to `EffectRampColor`. Always false on the menu |
@@ -69,6 +69,17 @@ for ch in text:
     blit(g) onto surface at (x + xc, y), alpha=alpha
     xc += advance
 ```
+
+`blit` here means the **full sprite blit pipeline** from
+[sprite-banks.md](sprite-banks.md), including the anchor-offset
+shift `top_left = (x + xc - g.offset_x, y - g.offset_y)`. In
+practice every glyph in banks 132..136 has `offset_x == offset_y
+== 0` (verified by inspection of `bin_spr/SPR_133.BIN` etc.), so
+the offsets are no-ops on the menu and a hydration that ignores
+them produces identical output. Don't *rely* on the offsets being
+zero in code — call the same blit path the rest of the renderer
+uses. Just don't be surprised that simplified glyph blitters that
+treat `(x + xc, y)` as the top-left also work.
 
 The blit honors the sprite's transparency (index 0 → skip), so
 glyph anti-aliasing is just per-pixel palette indices the artist

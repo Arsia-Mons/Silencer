@@ -7,13 +7,23 @@
 
 ## Index file: `BIN_SPR.DAT`
 
-A single byte per bank, 256 banks total → file is exactly **256
-bytes**. Byte `N` is the number of sprites (frames) in bank `N`.
-A zero byte means the bank is unused; no `SPR_NNN.BIN` exists for it.
+The file is **16,384 bytes**: 256 records × 64 bytes each. Record `N`
+describes bank `N`. Within a record, the **sprite count** for that
+bank lives at byte offset `2`; the rest of the 64-byte record is
+reserved (currently zero for all banks the menu touches).
 
 ```
-sprite_count[bank]  =  BIN_SPR.DAT[bank]
+sprite_count[bank]  =  BIN_SPR.DAT[bank * 64 + 2]
 ```
+
+A zero count means the bank is unused; no `SPR_NNN.BIN` exists for
+it. Concretely: bank 6 → 33 sprites, bank 132 → 89, bank 133–136 →
+154 each, bank 208 → 61.
+
+The "one byte per bank" framing the previous monolithic spec used
+is wrong. The loader (`clients/silencer/src/resources.cpp:46..51`)
+reads `headers[256][64]` — a 16,384-byte block — then takes
+`headers[i][2]` as the count.
 
 ## Per-bank file: `bin_spr/SPR_NNN.BIN`
 
