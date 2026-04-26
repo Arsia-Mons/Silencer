@@ -220,10 +220,16 @@ void Guard::InitBT(){
 		World& world = *static_cast<World*>(ctx.userData);
 		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
 		if (bt_walk_ticks_ < 600 && chasing) {
-			// Search phase: orient toward last known target
+			// Search phase: maintain shooting distance from last known target
 			Object* obj = world.GetObjectFromId(chasing);
 			if (obj) {
-				mirrored = (obj->x < x);
+				int dist = abs(signed(obj->x) - signed(x));
+				if (dist < 80) {
+					// Too close — back away to get in shooting range
+					mirrored = (obj->x > x);
+				} else {
+					mirrored = (obj->x < x);
+				}
 			} else {
 				chasing = 0;
 			}
