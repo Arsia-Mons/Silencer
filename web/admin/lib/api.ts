@@ -90,7 +90,46 @@ export async function fetchSpriteBlob(bank: number, frame: number): Promise<stri
 }
 
 // Actor CRUD endpoints
-export type ActorDef = Record<string, unknown>;
+export interface StateMachineTransition {
+  id: string;
+  from: string;
+  to: string;
+  condition: string;
+}
+
+export interface StateMachine {
+  initial: string | null;
+  transitions: StateMachineTransition[];
+  positions: Record<string, { x: number; y: number }>;
+}
+
+export interface FrameDef {
+  bank: number;
+  index: number;
+  duration: number;
+  hurtbox?: [number, number, number, number];
+}
+
+export interface AnimSequence {
+  loop: boolean;
+  frames: FrameDef[];
+}
+
+export interface ActorProps {
+  hp: number;
+  shield: number;
+  speed: number;
+  faction: string;
+  spawnWeight: number;
+}
+
+export interface ActorDef {
+  id?: string;
+  props?: ActorProps;
+  sequences?: Record<string, AnimSequence>;
+  stateMachine?: StateMachine;
+  [key: string]: unknown;
+}
 
 export const listActors   = (): Promise<string[]>               => apiFetch('/actors') as Promise<string[]>;
 export const getActor     = (id: string): Promise<ActorDef>     => apiFetch(`/actors/${id}`) as Promise<ActorDef>;

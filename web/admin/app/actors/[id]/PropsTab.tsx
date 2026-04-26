@@ -64,7 +64,7 @@ export default function PropsTab({
   const props = getProps(def);
 
   function update(patch: Partial<ActorProps>) {
-    onChange({ props: { ...props, ...patch } });
+    onChange({ props: { ...props, ...patch } as import('../../../lib/api').ActorProps });
   }
 
   const seqCount = Object.keys((def.sequences as Record<string, unknown>) ?? {}).length;

@@ -1,6 +1,7 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@import 'reactflow/dist/style.css';
 
 body {
   background-color: #050a05;
