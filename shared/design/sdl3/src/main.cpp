@@ -1145,6 +1145,248 @@ static int RunDumpLobby(const std::string &assets_dir,
   return ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// E1: lobby-game-create modal. Per docs/design/screen-lobby-game-create.md.
+// Reuses LOBBY chrome + populated CharacterInterface + populated ChatInterface
+// (E0 work). Replaces the GameSelectInterface region with the GameCreate
+// form: Game Options header + 5 label/value rows + Select Maps section + Game
+// Name + Password inputs + Create button.
+// ---------------------------------------------------------------------------
+static int RunDumpLobbyGameCreate(const std::string &assets_dir,
+                                  const std::string &dump_dir) {
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // Same banks as RunDumpLobby — no new sprite banks introduced for the
+  // GameCreate modal. Form labels are font 134 advance 8; map rows / Game
+  // Name / Password use font 133 advance 6.
+  SpriteSet sprites;
+  std::vector<int> banks = {7, 133, 134, 135, 181};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  constexpr int kSubLobby = 2;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  // Y1: Lobby panel chrome.
+  if (sprites.Has(7, 1)) {
+    BlitSprite(fb, sprites.Get(7, 1), 0, 0, nullptr);
+  }
+
+  // Y2: Header overlays + Go Back B156x21 (identical to LOBBY).
+  DrawText(fb, 15, 32, "Silencer", /*bank=*/135, /*advance=*/11, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 115, 39, "v.00028", /*bank=*/133, /*advance=*/6, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  {
+    constexpr int kGoBackX = 473;
+    constexpr int kGoBackY = 29;
+    constexpr int kB156Base = 24;
+    constexpr int kB156Width = 156;
+    constexpr int kB156Advance = 8;
+    constexpr int kB156Yoff = 4;
+    if (sprites.Has(7, kB156Base)) {
+      const Sprite &chrome = sprites.Get(7, kB156Base);
+      BlitSprite(fb, chrome, kGoBackX, kGoBackY, nullptr);
+      const char *text = "Go Back";
+      int len = static_cast<int>(std::strlen(text));
+      int xoff = (kB156Width - len * kB156Advance) / 2;
+      int textX = kGoBackX - chrome.offset_x + xoff;
+      int textY = kGoBackY - chrome.offset_y + kB156Yoff;
+      DrawText(fb, textX, textY, text, /*bank=*/134, /*advance=*/kB156Advance,
+               sprites, palette, kSubLobby, /*brightness=*/128);
+    }
+  }
+
+  // I0/E0: CharacterInterface populated (identical to LOBBY).
+  DrawText(fb, 20, 71, "demo", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+  for (int i = 0; i < 5; ++i) {
+    int tx = 20 + i * 42;
+    int ty = 90;
+    if (sprites.Has(181, i)) {
+      BlitSprite(fb, sprites.Get(181, i), tx, ty, nullptr);
+    }
+  }
+  DrawText(fb, 17, 130, "LEVEL: 8", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 143, "WINS: 47", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 156, "LOSSES: 12", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 169, "XP TO NEXT LEVEL: 220", /*bank=*/133, /*advance=*/7,
+           sprites, palette, kSubLobby, /*brightness=*/128);
+
+  // I1-replaced: GameCreate form. Right-border chrome (bank 7 idx 8) reused
+  // — supplies the same outer borders that GameSelectInterface uses, since
+  // the GameCreate modal occupies the same right-side region (extended down
+  // for the Game Name + Password rows).
+  if (sprites.Has(7, 8)) {
+    BlitSprite(fb, sprites.Get(7, 8), 0, 0, nullptr);
+  }
+
+  // E1: Form labels + values (font 134 advance 8 for labels; values use the
+  // same font as the input would render, font 134 advance 8 for the
+  // Security button label and Min/Max/Players/Teams TextInputs).
+  // Anchors per docs/design/screen-lobby-game-create.md "Object inventory":
+  //   "Game Options" — (272, 70)
+  //   "Security:"    — (245, 93)   value "Medium" — Security button BNONE at (323, 93)
+  //   "Min Level:"   — (245, 111)  value "0"      — TextInput at (350, 111)
+  //   "Max Level:"   — (245, 129)  value "99"     — TextInput at (350, 129)
+  //   "Max Players:" — (245, 147)  value "24"     — TextInput at (350, 147)
+  //   "Max Teams:"   — (245, 165)  value "6"      — TextInput at (350, 165)
+  DrawText(fb, 272, 70, "Game Options", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 245, 93, "Security:", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 323, 93, "Medium", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 245, 111, "Min Level:", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 350, 111, "0", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+  DrawText(fb, 245, 129, "Max Level:", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 350, 129, "99", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+  DrawText(fb, 245, 147, "Max Players:", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 350, 147, "24", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+  DrawText(fb, 245, 165, "Max Teams:", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 350, 165, "6", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+
+  // "Select Maps:" label sits at the top of the right column above the
+  // map SelectBox. Spec places it "(right column) (~190)"; reference dump
+  // shows the label above the map list near y=88 in the right column at
+  // x=510. Map list rows render top-to-bottom, font 133 advance 6,
+  // lineheight 14 — same SelectBox machinery as GameSelectInterface E0.
+  DrawText(fb, 510, 88, "Select Maps:", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  {
+    constexpr int kMapX = 510;
+    constexpr int kMapY0 = 105;
+    constexpr int kMapDy = 14;
+    const std::array<const char *, 4> maps = {{
+        "ALLY10c",
+        "CRAN01h",
+        "EASY05c",
+        "PIT16d",
+    }};
+    for (size_t i = 0; i < maps.size(); ++i) {
+      DrawText(fb, kMapX, kMapY0 + static_cast<int>(i) * kMapDy, maps[i],
+               /*bank=*/133, /*advance=*/6, sprites, palette, kSubLobby,
+               /*brightness=*/128);
+    }
+  }
+
+  // "Game Name:" + Game Name TextInput; "Password (optional):" + Password
+  // TextInput. Labels font 134 advance 8 per spec; input default text font
+  // 133 advance 6. Game Name default = Config::defaultgamename runtime
+  // value; render as a placeholder string for visual parity.
+  DrawText(fb, 405, 360, "Game Name:", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 410, 375, "demo's game", /*bank=*/133, /*advance=*/6, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 405, 390, "Password (optional):", /*bank=*/134, /*advance=*/8,
+           sprites, palette, kSubLobby, /*brightness=*/128);
+
+  // Create B156x21 at (436, 430) — bottom-right action button. Same chrome
+  // (bank 7 idx 24) + label (bank 134 advance 8, yoff=4) machinery as the
+  // Go Back / Create Game / Join Game buttons.
+  {
+    constexpr int kB156Base = 24;
+    constexpr int kB156Width = 156;
+    constexpr int kB156Advance = 8;
+    constexpr int kB156Yoff = 4;
+    constexpr int kCreateX = 436;
+    constexpr int kCreateY = 430;
+    if (sprites.Has(7, kB156Base)) {
+      const Sprite &chrome = sprites.Get(7, kB156Base);
+      BlitSprite(fb, chrome, kCreateX, kCreateY, nullptr);
+      const char *text = "Create";
+      int len = static_cast<int>(std::strlen(text));
+      int xoff = (kB156Width - len * kB156Advance) / 2;
+      int textX = kCreateX - chrome.offset_x + xoff;
+      int textY = kCreateY - chrome.offset_y + kB156Yoff;
+      DrawText(fb, textX, textY, text, /*bank=*/134, /*advance=*/kB156Advance,
+               sprites, palette, kSubLobby, /*brightness=*/128);
+    }
+  }
+
+  // I2: ChatInterface chrome + populated content (identical to LOBBY E0).
+  if (sprites.Has(7, 11)) {
+    BlitSprite(fb, sprites.Get(7, 11), 0, 0, nullptr);
+  }
+  if (sprites.Has(7, 14)) {
+    BlitSprite(fb, sprites.Get(7, 14), 0, 0, nullptr);
+  }
+  DrawText(fb, 15, 200, "Lobby", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+  {
+    constexpr int kChatX = 19;
+    constexpr int kChatYBottom = 416;
+    constexpr int kChatDy = 11;
+    const std::array<const char *, 5> chat = {{
+        "Vector: anyone up for a round?",
+        "Solace: still waiting on Krieg's match to finish",
+        "Ember: we got 4 in casual #1",
+        "Vector: joining",
+        "Halcyon: gg everyone",
+    }};
+    for (size_t i = 0; i < chat.size(); ++i) {
+      int y = kChatYBottom -
+              static_cast<int>(chat.size() - 1 - i) * kChatDy;
+      DrawText(fb, kChatX, y, chat[i], /*bank=*/133, /*advance=*/6, sprites,
+               palette, kSubLobby, /*brightness=*/128);
+    }
+  }
+  {
+    constexpr int kPresX = 267;
+    constexpr int kPresY0 = 220;
+    constexpr int kPresDy = 11;
+    const std::array<const char *, 10> presence = {{
+        "In Lobby",
+        "Ember",
+        "Halcyon",
+        "Solace",
+        "Vector",
+        "demo",
+        "Pregame",
+        "Quill -Capture the Tag-",
+        "Playing",
+        "Krieg -Casual Match #1-",
+    }};
+    for (size_t i = 0; i < presence.size(); ++i) {
+      DrawText(fb, kPresX, kPresY0 + static_cast<int>(i) * kPresDy,
+               presence[i], /*bank=*/133, /*advance=*/6, sprites, palette,
+               kSubLobby, /*brightness=*/128);
+    }
+  }
+
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubLobby);
+  std::fprintf(stderr, "wrote %s (lobby_gamecreate)\n", out.c_str());
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   std::string assets_dir;
   if (argc >= 2) {
@@ -1180,6 +1422,9 @@ int main(int argc, char **argv) {
     }
     if (screen_str == "lobby") {
       return RunDumpLobby(assets_dir, dump);
+    }
+    if (screen_str == "lobby_gamecreate") {
+      return RunDumpLobbyGameCreate(assets_dir, dump);
     }
     return RunDump(assets_dir, dump);
   }

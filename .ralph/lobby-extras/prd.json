@@ -18,7 +18,7 @@
       "id": "E1",
       "name": "lobby-game-create modal (form + map list + Create button)",
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "spec": "Per docs/design/screen-lobby-game-create.md: dispatch SILENCER_DUMP_SCREEN=lobby_gamecreate to a new RunDumpLobbyGameCreate. Render LOBBY chrome + populated content (reuse E0's machinery) + replace GameSelectInterface with the GameCreate form: 'Game Options' header, Security/Min Level/Max Level/Max Players/Max Teams labels + values, 'Select Maps:' label + map list (4 demo maps), Game Name input, Password input, Create button.",
       "category": "composition",
       "reference_dump": "/tmp/real_lobby-gamecreate_dump.ppm",

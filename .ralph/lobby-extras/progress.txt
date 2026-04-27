@@ -3,6 +3,7 @@
 .ralph/{main-menu,options,options-audio,options-display,options-controls,
 lobby-connect,lobby,lobby-interfaces}/progress.txt — read those first. -->
 - Empty-data → populated-data is purely additive DrawText: every populated content slot is already a "spec'd structural anchor" comment from the empty-data Ralph, so filling them in is mechanical (bank + advance + literal anchor coords from the spec table; no new banks, no new sprites, no new codec branches). RunDumpLobby's E0 delta is six contiguous DrawText blocks layered on top of validated chrome. Three concrete textbox-content patterns confirmed: bottom-to-top textbox = `for i ∈ 0..N-1: DrawText(x, y_bottom - (N-1-i)*lineheight)` (chat scrollback at lineheight=11, fontwidth=6); top-to-bottom textbox = `for i: DrawText(x, y_top + i*lineheight)` (presence at lineheight=11); SelectBox rows = same as top-to-bottom textbox but with lineheight=14 and a small ~3px left padding from the bbox x to clear the chrome inner edge. Reference dump ordering is authoritative when prompt-prose ordering disagrees (presence list shows Ember-above-Halcyon despite RALPH.md listing Halcyon first) — always visually check the reference before trusting prose. Whole-screen pixelwise diff RISES when populating interiors (1.23% empty → 3.89% populated) because effectcolor-disagreeing colored glyphs replace mostly-matching black-empty interiors; this is expected and the structural metric (named objects at named anchors) is the actual gate, not whole-screen %. Reference's TextBox widget word-wraps long lines (Quill/Krieg in presence; Solace's chat); candidate doesn't model word-wrap and renders single-line — non-gating since names/messages are structurally present at correct anchors.
+- LOBBY-derivative modal pattern (E1..E3): the modal screens that "replace GameSelectInterface" are RunDumpLobby with a single bbox-scoped substitution. Take RunDumpLobby's body verbatim, drop the I1 region (Active Games label + SelectBox rows + Create Game button + Join Game button), keep everything else (panel idx 1 chrome, header + Go Back, idx 8 right-border chrome, full CharacterInterface populated, full ChatInterface populated, presence). Add the modal-specific labels/buttons in place of I1. The bank list is unchanged (7/133/134/135/181 covers every glyph and sprite for the modal forms too). New form widgets (BNONE Security button, TextInputs, SelectBox for maps) are non-structural — render labels + values as DrawText only; the input/button outlines are runtime widget chrome that the candidate doesn't model and the spec gates only on label/value position. Spec coordinates with vague placeholders like "(right column) (~190)" require visual interpretation against the reference: Select Maps label is actually at y~88 (top of right column above the list), not y=190.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -111,3 +112,81 @@ lobby-connect,lobby,lobby-interfaces}/progress.txt — read those first. -->
     word-wrap disagreement pixels. The structural metric (named
     objects present at named anchors) is the right gate; whole-screen
     pixel diff is dominated by effectcolor-modeling gaps.
+
+## 2026-04-26T18:30:00Z — iter 2 (E1 PASS)
+- Added `RunDumpLobbyGameCreate` after `RunDumpLobby`, plus a
+  `lobby_gamecreate` dispatch branch in `main()`. Function body
+  follows the LOBBY-derivative-modal pattern: copy RunDumpLobby
+  verbatim, drop the I1 GameSelectInterface bits (Active Games
+  label, 4 SelectBox rows, Create Game B156x21, Join Game B156x21),
+  keep everything else (panel chrome, header overlays, Go Back,
+  CharacterInterface populated, idx 8 right border, ChatInterface
+  populated). Substitute the GameCreate form in I1's place:
+  * "Game Options" header at (272, 70), bank 134 advance 8.
+  * Five label/value rows at (245, 93/111/129/147/165) for
+    Security/Min Level/Max Level/Max Players/Max Teams; values
+    "Medium" / "0" / "99" / "24" / "6" at x=323 (Security button)
+    / x=350 (TextInputs), all bank 134 advance 8.
+  * "Select Maps:" at (510, 88) — spec said "(right column) (~190)"
+    but the reference shows the label at the top of the right column
+    above the SelectBox, not below. Visual interpretation overrode
+    the spec's y coord.
+  * 4 map rows at x=510, y starting 105, +14 lineheight, bank 133
+    advance 6. Map names ALLY10c/CRAN01h/EASY05c/PIT16d sourced
+    from `shared/assets/level/`. Spec says "(4 demo maps)" — content
+    non-structural.
+  * "Game Name:" + "Password (optional):" labels at (405, 360/390),
+    bank 134 advance 8. Game Name default "demo's game" rendered at
+    (410, 375), bank 133 advance 6 (placeholder for runtime
+    Config::defaultgamename).
+  * Create B156x21 at (436, 430) — same chrome+label pattern as
+    Go Back / Create Game / Join Game.
+- No new banks, no new sprites. Same bank list (7/133/134/135/181)
+  as RunDumpLobby. Only main.cpp recompiled + relink.
+- Build: `cmake --build shared/design/sdl3/build` exits 0.
+- Dump: `SILENCER_DUMP_SCREEN=lobby_gamecreate ... silencer_design`
+  writes /tmp/sdl3_dump/screen_00.ppm (640x480 P6, 921615 bytes).
+- Visual A/B (Discord DM 1498120138858172568): every spec'd
+  structural slot present and at the right position. Non-gating
+  residuals (per spec carve-outs):
+  * Reference draws BNONE / TextInput rectangles around the values;
+    candidate doesn't model widget chrome (only labels + values).
+    Spec: "position is the gate" — values render as DrawText.
+  * Reference shows ~8 visible map rows; candidate shows 4. Spec
+    says "(4 demo maps)" — runtime list, non-structural.
+  * Effectcolor variations and word-wrap residuals carry over from
+    E0; documented and non-gating.
+- Regression sweep: `lobby` dump regenerated and bytewise-identical
+  to a second build of the same — function is deterministic. Code
+  added is a new function + 3-line dispatch branch; no existing
+  function bodies, bank lists, or sprite codec paths touched, so
+  the prior 7 screens cannot have regressed.
+- Files touched: `shared/design/sdl3/src/main.cpp` (new
+  RunDumpLobbyGameCreate function + dispatch branch),
+  `.ralph/lobby-extras/prd.json` (E1 → passes:true),
+  `.ralph/lobby-extras/progress.txt` (this entry).
+- **Learnings:**
+  - **The "modal replaces I1" pattern is mechanical**: the
+    RunDumpLobby function body splits cleanly into Y1 (panel)
+    + Y2 (header) + I0 (CharacterInterface) + I1 (GameSelectInterface)
+    + I2 (ChatInterface). For lobby modal derivatives, copy the
+    whole function and substitute *only* the I1 block. The bank
+    list is unchanged because the modal forms reuse the existing
+    label fonts (133/134/135) and the existing B156x21 chrome
+    (bank 7 idx 24); no new bank loads needed.
+  - **Spec coordinates can be vague placeholders that require
+    visual interpretation**. The Select Maps label spec says
+    "(right column) (~190)" — taken literally that puts the label
+    BELOW the map list at y=190. The reference dump shows the
+    label at the TOP of the right column at y~88. Always cross-
+    check vague spec coords against the reference dump before
+    trusting them. The pattern of "(~ approximate)" parens-prefix
+    is a signal that the spec author was estimating; the dump is
+    the source of truth.
+  - **TextInput/BNONE/SelectBox widgets are non-structural in the
+    candidate.** Their visible chrome (border rectangles, scrollbar
+    rails) is engine widget rendering that this hydration doesn't
+    model. The candidate gate is "label + value text at correct
+    anchor". The reference shows the widget chrome; the candidate
+    shows only the text. Both are accepted as "structurally
+    equivalent" per the spec's "position is the gate" carve-out.
