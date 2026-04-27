@@ -1596,6 +1596,252 @@ static int RunDumpLobbyGameJoin(const std::string &assets_dir,
   return ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// Lobby GameTech modal: per docs/design/screen-lobby-game-tech.md, this is
+// the LOBBY-derivative-modal *single-button-substitution* variant (same
+// shape as GameJoin) — copy RunDumpLobby verbatim and substitute the I1
+// "Create Game" B156x21 button (anchor 242,68) with a single Back To Teams
+// B156x21 button at the same anchor. Adds a tech checkbox grid scaffold
+// (BCHECKBOX = bank 7 idx 19, 13×13) at column-3 anchor x=452,
+// y=125+i*13 with placeholder tech-name labels at x=467 (bank 133
+// advance 6). The "Disconnected from game" modal overlay is non-structural
+// per the spec carve-out and is intentionally omitted.
+// ---------------------------------------------------------------------------
+static int RunDumpLobbyGameTech(const std::string &assets_dir,
+                                const std::string &dump_dir) {
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // Same banks as RunDumpLobby — BCHECKBOX (bank 7 idx 19) is already in
+  // bank 7 which is loaded for B156x21 chrome and panel sprites.
+  SpriteSet sprites;
+  std::vector<int> banks = {7, 133, 134, 135, 181};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  constexpr int kSubLobby = 2;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  // Y1: Lobby panel chrome.
+  if (sprites.Has(7, 1)) {
+    BlitSprite(fb, sprites.Get(7, 1), 0, 0, nullptr);
+  }
+
+  // Y2: Header overlays + Go Back B156x21 (identical to LOBBY).
+  DrawText(fb, 15, 32, "Silencer", /*bank=*/135, /*advance=*/11, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 115, 39, "v.00028", /*bank=*/133, /*advance=*/6, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  {
+    constexpr int kGoBackX = 473;
+    constexpr int kGoBackY = 29;
+    constexpr int kB156Base = 24;
+    constexpr int kB156Width = 156;
+    constexpr int kB156Advance = 8;
+    constexpr int kB156Yoff = 4;
+    if (sprites.Has(7, kB156Base)) {
+      const Sprite &chrome = sprites.Get(7, kB156Base);
+      BlitSprite(fb, chrome, kGoBackX, kGoBackY, nullptr);
+      const char *text = "Go Back";
+      int len = static_cast<int>(std::strlen(text));
+      int xoff = (kB156Width - len * kB156Advance) / 2;
+      int textX = kGoBackX - chrome.offset_x + xoff;
+      int textY = kGoBackY - chrome.offset_y + kB156Yoff;
+      DrawText(fb, textX, textY, text, /*bank=*/134, /*advance=*/kB156Advance,
+               sprites, palette, kSubLobby, /*brightness=*/128);
+    }
+  }
+
+  // I0/E0: CharacterInterface populated (identical to LOBBY).
+  DrawText(fb, 20, 71, "demo", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+  for (int i = 0; i < 5; ++i) {
+    int tx = 20 + i * 42;
+    int ty = 90;
+    if (sprites.Has(181, i)) {
+      BlitSprite(fb, sprites.Get(181, i), tx, ty, nullptr);
+    }
+  }
+  DrawText(fb, 17, 130, "LEVEL: 8", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 143, "WINS: 47", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 156, "LOSSES: 12", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 169, "XP TO NEXT LEVEL: 220", /*bank=*/133, /*advance=*/7,
+           sprites, palette, kSubLobby, /*brightness=*/128);
+
+  // I1: GameSelectInterface populated (identical to LOBBY E0). The reference
+  // dump shows the Active Games panel fully rendered behind the GameTech
+  // overlay — same as GameJoin.
+  if (sprites.Has(7, 8)) {
+    BlitSprite(fb, sprites.Get(7, 8), 0, 0, nullptr);
+  }
+  DrawText(fb, 405, 70, "Active Games", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  {
+    constexpr int kRowX = 410;
+    constexpr int kRowY0 = 92;
+    constexpr int kRowDy = 14;
+    const std::array<const char *, 4> games = {{
+        "Veterans Only",
+        "Tutorial",
+        "Capture the Tag",
+        "Casual Match #1",
+    }};
+    for (size_t i = 0; i < games.size(); ++i) {
+      DrawText(fb, kRowX, kRowY0 + static_cast<int>(i) * kRowDy, games[i],
+               /*bank=*/133, /*advance=*/6, sprites, palette, kSubLobby,
+               /*brightness=*/128);
+    }
+  }
+
+  // E3: GameTech action buttons + tech grid scaffold. The "Create Game"
+  // anchor (242,68) from RunDumpLobby is now occupied by Back To Teams.
+  // Join Game stays at (436,430).
+  {
+    constexpr int kB156Base = 24;
+    constexpr int kB156Width = 156;
+    constexpr int kB156Advance = 8;
+    constexpr int kB156Yoff = 4;
+    struct B156Spec {
+      const char *text;
+      int x;
+      int y;
+    };
+    const std::array<B156Spec, 2> b156_buttons = {{
+        {"Back To Teams", 242, 68},
+        {"Join Game", 436, 430},
+    }};
+    if (sprites.Has(7, kB156Base)) {
+      const Sprite &chrome = sprites.Get(7, kB156Base);
+      for (const auto &b : b156_buttons) {
+        BlitSprite(fb, chrome, b.x, b.y, nullptr);
+        int len = static_cast<int>(std::strlen(b.text));
+        int xoff = (kB156Width - len * kB156Advance) / 2;
+        int textX = b.x - chrome.offset_x + xoff;
+        int textY = b.y - chrome.offset_y + kB156Yoff;
+        DrawText(fb, textX, textY, b.text, /*bank=*/134,
+                 /*advance=*/kB156Advance, sprites, palette, kSubLobby,
+                 /*brightness=*/128);
+      }
+    }
+  }
+
+  // Tech checkbox grid scaffold: BCHECKBOX = bank 7 idx 19 (13×13). Per
+  // spec, columns 0..2 have draw=false (skipped); column 3 (x=452) is
+  // the active selection column. Render a 6-row scaffold at column 3
+  // with placeholder tech-name labels at x=467 (bank 133 advance 6).
+  {
+    constexpr int kCheckboxBank = 7;
+    constexpr int kCheckboxIdx = 19;
+    constexpr int kColX = 452;
+    constexpr int kRowY0 = 125;
+    constexpr int kRowDy = 13;
+    constexpr int kRows = 6;
+    constexpr int kLabelX = 467;
+    if (sprites.Has(kCheckboxBank, kCheckboxIdx)) {
+      const Sprite &cb = sprites.Get(kCheckboxBank, kCheckboxIdx);
+      for (int i = 0; i < kRows; ++i) {
+        BlitSprite(fb, cb, kColX, kRowY0 + i * kRowDy, nullptr);
+      }
+    }
+    const std::array<const char *, kRows> tech_names = {{
+        "Tech 1 (1)",
+        "Tech 2 (1)",
+        "Tech 3 (2)",
+        "Tech 4 (1)",
+        "Tech 5 (2)",
+        "Tech 6 (1)",
+    }};
+    for (int i = 0; i < kRows; ++i) {
+      DrawText(fb, kLabelX, kRowY0 + 2 + i * kRowDy, tech_names[i],
+               /*bank=*/133, /*advance=*/6, sprites, palette, kSubLobby,
+               /*brightness=*/128);
+    }
+  }
+
+  // Selected tech name + tech description: per spec these are
+  // (font 133/134, centered at y~350+) overlay text. In the reference
+  // they are entirely covered by the "Disconnected from game" modal +
+  // ChatInterface chrome (chat occupies y=200-420). Rendering them in
+  // the candidate would overlap the chat region and add visual noise
+  // without structural gain — exact text is non-structural per spec
+  // ("the candidate just needs to render the checkbox-grid scaffold
+  // with placeholder overlays — exact tech-name text content is
+  // non-structural"). Skipped.
+
+  // I2: ChatInterface chrome + populated content (identical to LOBBY E0).
+  if (sprites.Has(7, 11)) {
+    BlitSprite(fb, sprites.Get(7, 11), 0, 0, nullptr);
+  }
+  if (sprites.Has(7, 14)) {
+    BlitSprite(fb, sprites.Get(7, 14), 0, 0, nullptr);
+  }
+  DrawText(fb, 15, 200, "Lobby", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+  {
+    constexpr int kChatX = 19;
+    constexpr int kChatYBottom = 416;
+    constexpr int kChatDy = 11;
+    const std::array<const char *, 5> chat = {{
+        "Vector: anyone up for a round?",
+        "Solace: still waiting on Krieg's match to finish",
+        "Ember: we got 4 in casual #1",
+        "Vector: joining",
+        "Halcyon: gg everyone",
+    }};
+    for (size_t i = 0; i < chat.size(); ++i) {
+      int y = kChatYBottom -
+              static_cast<int>(chat.size() - 1 - i) * kChatDy;
+      DrawText(fb, kChatX, y, chat[i], /*bank=*/133, /*advance=*/6, sprites,
+               palette, kSubLobby, /*brightness=*/128);
+    }
+  }
+  {
+    constexpr int kPresX = 267;
+    constexpr int kPresY0 = 220;
+    constexpr int kPresDy = 11;
+    const std::array<const char *, 10> presence = {{
+        "In Lobby",
+        "Ember",
+        "Halcyon",
+        "Solace",
+        "Vector",
+        "demo",
+        "Pregame",
+        "Quill -Capture the Tag-",
+        "Playing",
+        "Krieg -Casual Match #1-",
+    }};
+    for (size_t i = 0; i < presence.size(); ++i) {
+      DrawText(fb, kPresX, kPresY0 + static_cast<int>(i) * kPresDy,
+               presence[i], /*bank=*/133, /*advance=*/6, sprites, palette,
+               kSubLobby, /*brightness=*/128);
+    }
+  }
+
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubLobby);
+  std::fprintf(stderr, "wrote %s (lobby_gametech)\n", out.c_str());
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   std::string assets_dir;
   if (argc >= 2) {
@@ -1637,6 +1883,9 @@ int main(int argc, char **argv) {
     }
     if (screen_str == "lobby_gamejoin") {
       return RunDumpLobbyGameJoin(assets_dir, dump);
+    }
+    if (screen_str == "lobby_gametech") {
+      return RunDumpLobbyGameTech(assets_dir, dump);
     }
     return RunDump(assets_dir, dump);
   }

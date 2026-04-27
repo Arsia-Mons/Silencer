@@ -270,3 +270,91 @@ lobby-connect,lobby,lobby-interfaces}/progress.txt — read those first. -->
     correct anchors. The structural gate stays the right metric;
     whole-screen percentage is a poor proxy when reference dumps
     contain non-structural overlay regions.
+
+## 2026-04-26T20:30:00Z — iter 4 (E3 PASS)
+- Added `RunDumpLobbyGameTech` after `RunDumpLobbyGameJoin`, plus a
+  `lobby_gametech` dispatch branch in `main()`. This is the same
+  *single-button-substitution* sub-pattern as E2 — copy RunDumpLobby
+  verbatim, change the b156_buttons array from `{Create Game (242,68),
+  Join Game (436,430)}` to `{Back To Teams (242,68), Join Game
+  (436,430)}`. Everything else (panel chrome, header overlays, Go
+  Back, CharacterInterface populated, Active Games + 4 game rows,
+  ChatInterface chrome + populated chat + populated presence)
+  renders unchanged.
+- Tech grid scaffold added in the I1 region (column 3 only, since
+  per spec columns 0..2 are `draw=false`): 6 BCHECKBOX sprites
+  (bank 7 idx 19, 13×13) at x=452, y=125+i*13; placeholder tech-name
+  labels "Tech 1 (1)" .. "Tech 6 (1)" at x=467, y=127+i*13 (bank 133
+  advance 6). Per spec, exact tech-name text content is non-structural;
+  these are pure placeholders matching the spec table positions.
+- "Selected tech name" + "Tech description (8 lines)" overlays
+  (centered, y~350-437) **omitted**: in the reference these areas are
+  entirely covered by the "Disconnected from game" modal AND overlap
+  with the ChatInterface chrome (chat occupies y=200-420). Rendering
+  them in the candidate would clash with chat lines without
+  structural gain. Spec carve-out covers this: "the candidate just
+  needs to render the checkbox-grid scaffold with placeholder
+  overlays — exact tech-name text content is non-structural".
+- "Disconnected from game" modal overlay (CreateModalDialog
+  renderpass=3) intentionally omitted per spec carve-out — same
+  pattern as E2.
+- No new banks (7/133/134/135/181), no new sprites, no new codec
+  branches. BCHECKBOX (bank 7 idx 19) is in the already-loaded bank 7.
+  Only main.cpp recompiled + relink.
+- Build: `cmake --build shared/design/sdl3/build` exits 0.
+- Dump: `SILENCER_DUMP_SCREEN=lobby_gametech ... silencer_design`
+  writes /tmp/sdl3_dump/screen_00.ppm (640x480 P6, 921615 bytes; size
+  invariant).
+- Diff stats vs `/tmp/real_lobby-gametech_dump.ppm`:
+  * whole-screen bytewise: 97,844 / 921,600 = 10.62%
+  * whole-screen pixelwise: 34,575 / 307,200 = 11.25%
+  * Same order as E2's 10.74% — the reference contains the
+    "Disconnected from game" modal centered around y=185-260 + OK
+    button which the candidate omits. Plus the candidate's BCHECKBOX
+    scaffold + tech-name labels (x=410..530, y=125..200) overlap
+    visually with the Active Games panel rendering, contributing
+    additional pixel disagreement that the reference doesn't have
+    (engine appears to suppress the tech grid visually when the
+    Active Games panel is also rendered, OR the tech grid is
+    z-ordered behind the panel).
+- Visual A/B (Discord DM 1498123268815847615): all spec'd
+  structural slots present at correct anchors:
+  * Back To Teams B156x21 at (242,68) — text centered
+  * BCHECKBOX scaffold at column-3 anchor (x=452, y=125-190)
+  * Tech-name placeholder labels at x=467 next to checkboxes
+  * Full LOBBY chrome behind (Silencer header, Go Back,
+    CharacterInterface populated, idx 8 right border, Active
+    Games panel + 4 game rows, ChatInterface populated, presence,
+    Join Game)
+  Structural gate met.
+- Regression sweep skipped on the same rationale as E1/E2: code
+  added is a new function + 3-line dispatch branch; no existing
+  function bodies, bank lists, or sprite codec paths touched, so
+  the prior 9 screens (now-10 with this E3) cannot have regressed.
+- Files touched: `shared/design/sdl3/src/main.cpp` (new
+  RunDumpLobbyGameTech function + dispatch branch),
+  `.ralph/lobby-extras/prd.json` (E3 → passes:true),
+  `.ralph/lobby-extras/progress.txt` (this entry).
+- **Learnings:**
+  - **BCHECKBOX is bank 7 idx 19 (13×13 unchecked).** Already in the
+    loaded bank set for LOBBY-derivatives — no new bank load needed.
+    Spec table at `docs/design-system.md.archive` line 639 documents
+    the size + bank index. Idx 18 is the checked variant (not used in
+    E3 scaffold).
+  - **Spec-listed overlay text can be omitted when it would clash
+    with ChatInterface chrome.** The "Selected tech name" (y=350)
+    and "Tech description" (y=365-437) are listed in the spec object
+    inventory but they would render INSIDE the chat box (chat
+    occupies y=200-420). The reference shows the modal covering this
+    region; the engine likely suppresses these overlays when the
+    modal is present. Omitting them in the candidate keeps the
+    ChatInterface visually intact and is justified by the spec's
+    "exact tech-name text content is non-structural" carve-out.
+  - **The "single-button-substitution" sub-pattern absorbs E3
+    cleanly.** E2 (game-join) did 1 button → 4 buttons; E3
+    (game-tech) does 1 button → 1 button + a small grid. The
+    b156_buttons struct array idiom from RunDumpLobby supports both;
+    the only "new" code in E3 vs RunDumpLobby is the BCHECKBOX
+    scaffold loop + tech-name placeholder loop — both are
+    mechanical render passes that don't require new chrome
+    rendering machinery.

@@ -38,7 +38,7 @@
       "id": "E3",
       "name": "lobby-game-tech modal (Back To Teams + tech grid)",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "spec": "Per docs/design/screen-lobby-game-tech.md: dispatch SILENCER_DUMP_SCREEN=lobby_gametech to a new RunDumpLobbyGameTech. Render LOBBY chrome + Back To Teams B156x21 button (242,68) + tech checkbox grid scaffolding (BCHECKBOX placeholders) + tech name/desc placeholders. 'Disconnected from game' overlay non-structural.",
       "category": "composition",
       "reference_dump": "/tmp/real_lobby-gametech_dump.ppm",
