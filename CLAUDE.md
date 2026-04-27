@@ -24,6 +24,7 @@ Each component owns its own `CLAUDE.md` with build/run/test/gotchas:
 - `web/admin/` — Next.js admin dashboard + level designer
 - `shared/assets/` — runtime game assets (sprites, tiles, sounds, levels)
 - `shared/icons/` — app icons used by `clients/silencer` build
+- `shared/skills/` — Claude Code skills surfaced to agents via `.claude/skills/` symlinks
 - `infra/terraform/` — AWS infra
 
 > Layout migration in progress. See

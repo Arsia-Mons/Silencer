@@ -35,4 +35,9 @@ web/admin/.next/
 # Git worktrees (claude-code superpowers)
 .worktrees/
 
+# Per-developer Claude Code harness state. Skills live in shared/skills/
+# and are wired in via symlink (e.g. .claude/skills/using-silencer-cli ->
+# ../../shared/skills/cli).
+.claude/
+
 clients/silencer/build_test/

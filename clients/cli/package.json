@@ -1,0 +1,15 @@
+{
+  "name": "silencer-cli",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "silencer-cli": "./index.ts"
+  },
+  "scripts": {
+    "fmt": "oxfmt --write ."
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.13",
+    "typescript": "^5.4.0"
+  }
+}

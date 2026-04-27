@@ -681,3 +681,57 @@ void Interface::Next(World & world){
 		ActiveChanged(world, this, false);
 	}
 }
+#include "textbox.h"
+#include <cctype>
+#include <cstdlib>
+#include <cstring>
+
+static bool IEq(const char* a, const char* b){
+	if(!a || !b) return false;
+	while(*a && *b){
+		if(std::tolower((unsigned char)*a) != std::tolower((unsigned char)*b)) return false;
+		++a; ++b;
+	}
+	return *a == 0 && *b == 0;
+}
+
+static const char* LabelOf(Object* o){
+	if(!o) return nullptr;
+	switch(o->type){
+		case ObjectTypes::BUTTON: return ((Button*)o)->text;
+		case ObjectTypes::TOGGLE: return ((Toggle*)o)->text;
+		default: return nullptr;
+	}
+}
+
+Interface::WidgetMatch Interface::FindWidgetByLabel(World& world,
+	const char* labelOrId, Uint64 wantedTypes, Uint16* outId) const {
+	if(!labelOrId || !*labelOrId) return MATCH_NOT_FOUND;
+	// Numeric ID path: caller passed a literal Uint16.
+	char* endp = nullptr;
+	long asnum = std::strtol(labelOrId, &endp, 10);
+	if(endp && *endp == 0 && asnum > 0 && asnum <= 0xFFFF){
+		Object* o = world.GetObjectFromId((Uint16)asnum);
+		if(o && (wantedTypes == 0 || (wantedTypes & (1ULL << o->type)))){
+			*outId = (Uint16)asnum;
+			return MATCH_OK;
+		}
+		return MATCH_NOT_FOUND;
+	}
+	int hits = 0;
+	Uint16 firstHit = 0;
+	for(Uint16 oid : objects){
+		Object* o = world.GetObjectFromId(oid);
+		if(!o) continue;
+		if(wantedTypes != 0 && !(wantedTypes & (1ULL << o->type))) continue;
+		const char* label = LabelOf(o);
+		if(label && IEq(label, labelOrId)){
+			if(hits == 0) firstHit = oid;
+			++hits;
+		}
+	}
+	if(hits == 0) return MATCH_NOT_FOUND;
+	if(hits > 1)  return MATCH_AMBIGUOUS;
+	*outId = firstHit;
+	return MATCH_OK;
+}

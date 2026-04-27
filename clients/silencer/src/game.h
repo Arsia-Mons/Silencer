@@ -10,6 +10,7 @@
 #include "overlay.h"
 #include "textbox.h"
 #include "updater.h"
+#include "controlserver.h"
 #include <map>
 #include <atomic>
 #include <thread>
@@ -23,8 +24,35 @@ public:
 	bool Loop(void);
 	bool HandleSDLEvents(void);
 	void LoadProgressCallback(int progress, int totalprogressitems);
-	
+
 	friend class Audio;
+
+public:
+	// Exposed for ControlDispatch (game-thread only).
+	int GetFrameCount() const { return frames; }
+	static const char* StateName(Uint8 s);
+	Uint8 GetState() const { return state; }
+	Uint16 GetCurrentInterfaceId() const { return currentinterface; }
+	class World& GetWorld() { return world; }
+	nlohmann::json GetWorldSummary();
+	const Surface& GetScreenBuffer() const { return screenbuffer; }
+	const SDL_Color* GetPaletteColors() const { return palettecolors; }
+	Renderer& GetRenderer() { return renderer; }
+	bool IsLiveMultiplayer() const;
+	bool GoBack(void);
+	struct PendingWait {
+		ControlCommand cmd;
+		Uint64 deadline_ms = 0;   // 0 = no wallclock deadline
+		int frames_left = -1;     // <0 = no frame deadline
+		std::string wait_state;   // for wait_for_state
+	};
+	std::vector<PendingWait> pendingWaits;
+	bool quitRequested = false;
+	bool paused;
+	int stepFramesRemaining;
+	Uint64 stepWallclockDeadlineMs;
+	int controlPort;
+	bool headless;
 
 private:
 	bool Tick(void);
@@ -65,7 +93,6 @@ private:
 	void PlayMusic(Mix_Music * music);
 	void DestroyModalDialog(void);
 	Interface * CreatePasswordDialog(void);
-	bool GoBack(void);
 	Uint16 lobbyinterface;
 	Uint16 characterinterface;
 	Uint16 chatinterface;
@@ -169,6 +196,9 @@ private:
 	// client process opens the device. Skipping this teardown produces an
 	// audible pop on the restarted client.
 	bool stage2spawned;
+	ControlServer controlserver;
+	void DrainControlQueue();
+	void PostFrameReplies();
 };
 
 #endif

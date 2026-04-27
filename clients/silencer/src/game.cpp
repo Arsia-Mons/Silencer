@@ -1,4 +1,5 @@
 #include "game.h"
+#include "controldispatch.h"
 #include "sdl3gpubackend.h"
 #include <math.h>
 #include "overlay.h"
@@ -103,10 +104,21 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	mapexistchecked = false;
 	fullscreentoggled = false;
 	replayfile = 0;
+	controlPort = 0;
+	headless = false;
+	paused = false;
+	stepFramesRemaining = 0;
+	stepWallclockDeadlineMs = 0;
 	stage2spawned = false;
 }
 
 Game::~Game(){
+	// Bring the control server down first. Stop() runs the shutdown drain we
+	// registered at Load() time, fulfilling promises for both queued and
+	// pendingWaits commands so handler threads can unblock from fut.get() before
+	// we join them. Doing this before tearing down anything else keeps members
+	// pendingWaits/etc alive while the drain runs.
+	controlserver.Stop();
 	if(renderdevice){
 		renderdevice->Shutdown();
 		delete renderdevice;
@@ -170,6 +182,15 @@ bool Game::Load(char * cmdline){
 				replayfile = strtok(NULL, " ");
 				GoToState(REPLAYGAME);
 			}
+			else if(strcmp(cmdline, "--control-port") == 0){
+				char * portstr = strtok(NULL, " ");
+				if(portstr){
+					controlPort = atoi(portstr);
+				}
+			}
+			else if(strcmp(cmdline, "--headless") == 0){
+				headless = true;
+			}
 		}while((cmdline = strtok(0, " ")));
 	}
 	Config::GetInstance().Load();
@@ -181,33 +202,40 @@ bool Game::Load(char * cmdline){
 		}
 	}
 	if(!world.dedicatedserver.active){
-		if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)){
+		Uint32 sdlflags = headless ? 0 : (SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+		if(!SDL_Init(sdlflags)){
 			printf("Could not initialize SDL %s\n", SDL_GetError());
 			return false;
 		}
-		if(!MIX_Init()){
-			printf("Could not initialize SDL_mixer: %s\n", SDL_GetError());
-		}
-		if(!Audio::GetInstance().Init(this)){
-			printf("Could not initialize audio\n");
-		}
-		Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
 		printf("Loading palette...\n");
 		if(!renderer.palette.SetPalette(0)){
 			return false;
 		}
-		SDL_AddTimer(1000, TimerCallback, this);
-		//SDL_EnableUNICODE(true);
-		//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
-		//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-		window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
-		SDL_StartTextInput(window);
-		if(!SetupRenderDevice()){
-			printf("Could not initialize GPU render device\n");
-			return false;
+		if(!headless){
+			if(!MIX_Init()){
+				printf("Could not initialize SDL_mixer: %s\n", SDL_GetError());
+			}
+			if(!Audio::GetInstance().Init(this)){
+				printf("Could not initialize audio\n");
+			}
+			Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
+			SDL_AddTimer(1000, TimerCallback, this);
+			//SDL_EnableUNICODE(true);
+			//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
+			//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
+			window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+			SDL_StartTextInput(window);
+			if(!SetupRenderDevice()){
+				printf("Could not initialize GPU render device\n");
+				return false;
+			}
+			SetColors(renderer.palette.GetColors());
+			//SDL_Flip(screen);
 		}
-		SetColors(renderer.palette.GetColors());
-		//SDL_Flip(screen);
+		// Headless mode skips SetColors() above, so palettecolors[] starts zeroed.
+		// It is first populated by SetColors() in the MAINMENU state handler in
+		// Loop(). Screenshot ops route to PostFrameReplies() AFTER Tick() runs,
+		// so the palette is always populated by the time a screenshot is captured.
 	}
 	printf("Loading resources...\n");
 	if(!world.resources.Load(*this, world.dedicatedserver.active)){
@@ -216,6 +244,23 @@ bool Game::Load(char * cmdline){
 	}
 	printf("Resources loaded\n");
 	lasttick = SDL_GetTicks();
+	if(controlPort > 0){
+		auto drainPendingWaits = [this](){
+			for(auto& w : pendingWaits){
+				if(!w.cmd.reply) continue;
+				ControlReply rpl;
+				rpl.id = w.cmd.id;
+				rpl.ok = false;
+				rpl.code = "INTERNAL";
+				rpl.error = "server stopping";
+				w.cmd.reply->set_value(rpl);
+			}
+			pendingWaits.clear();
+		};
+		if(!controlserver.Start(controlPort, drainPendingWaits)){
+			fprintf(stderr, "[control] failed to start; continuing without\n");
+		}
+	}
 	return true;
 }
 
@@ -273,11 +318,15 @@ bool Game::Loop(void){
 		// Tell main to unwind so ~Game() tears down SDL/audio cleanly.
 		return false;
 	}
+	if(quitRequested) return false;
+	DrainControlQueue();
 	unsigned int wait = 42; // 24 fps
 	if(updatetitle){
-		char title[128];
-		sprintf(title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
-		SDL_SetWindowTitle(window, title);
+		if(!headless && window){
+			char title[128];
+			sprintf(title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
+			SDL_SetWindowTitle(window, title);
+		}
 		updatetitle = false;
 		frames = 1;
 		world.totalbytesread = 0;
@@ -301,6 +350,18 @@ bool Game::Loop(void){
 	}
 	while(lasttick <= tickcheck && tickcheck - lasttick > wait){
 		//printf("%d\n", tickcheck - lasttick);
+		if(paused){
+			bool budgetFrames = stepFramesRemaining > 0;
+			bool budgetMs = stepWallclockDeadlineMs > 0 && SDL_GetTicks() < stepWallclockDeadlineMs;
+			if(!budgetFrames && !budgetMs){
+				lasttick = tickcheck; // freeze the catch-up clock
+				break;
+			}
+			if(stepFramesRemaining > 0) --stepFramesRemaining;
+			if(stepWallclockDeadlineMs > 0 && SDL_GetTicks() >= stepWallclockDeadlineMs){
+				stepWallclockDeadlineMs = 0;
+			}
+		}
 		world.systemcameraactive[0] = false;
 		world.systemcameraactive[1] = false;
 		world.DoNetwork();
@@ -334,6 +395,11 @@ bool Game::Loop(void){
 		}
 		lasttick += wait;
 	}
+	// Tick multi-frame waits AFTER the sim loop so wait_frames --n 1 and
+	// step --frames 1 see at least one sim tick before resolving. Putting this
+	// inside DrainControlQueue (which runs before the sim loop) made the
+	// counter race the enqueue and resolve with zero ticks.
+	ControlDispatch::TickWaits(*this);
 	world.DoNetwork();
 	if(!world.dedicatedserver.active){
 		screenbuffer.Clear(0);
@@ -363,7 +429,8 @@ bool Game::Loop(void){
 		}
 		world.DoNetwork();
 		//Uint32 drawtick = SDL_GetTicks();
-		Present();
+		if(!headless) Present();
+		PostFrameReplies();
 		//Uint32 afterdrawtick = SDL_GetTicks();
 		/*if(1 || afterdrawtick - drawtick > wait){
 			printf("frame took %d ms to present\n", afterdrawtick - drawtick);
@@ -454,22 +521,24 @@ bool Game::Tick(void){
 	
 	if(world.gameplaystate == World::INGAME && (state == INGAME || state == SINGLEPLAYERGAME || state == TESTGAME)){
 		UpdateAmbienceChannels();
-		SDL_HideCursor();
+		if(!headless) SDL_HideCursor();
 	}else{
-		SDL_ShowCursor();
+		if(!headless) SDL_ShowCursor();
 	}
-	
-	if(keystate[SDL_SCANCODE_RALT] && keystate[SDL_SCANCODE_RETURN]){
-		if(!fullscreentoggled){
-			if(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN){
-				SDL_SetWindowFullscreen(window, false);
-			}else{
-				SDL_SetWindowFullscreen(window, true);
+
+	if(!headless && window){
+		if(keystate[SDL_SCANCODE_RALT] && keystate[SDL_SCANCODE_RETURN]){
+			if(!fullscreentoggled){
+				if(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN){
+					SDL_SetWindowFullscreen(window, false);
+				}else{
+					SDL_SetWindowFullscreen(window, true);
+				}
+				fullscreentoggled = true;
 			}
-			fullscreentoggled = true;
+		}else{
+			fullscreentoggled = false;
 		}
-	}else{
-		fullscreentoggled = false;
 	}
 	
 	switch(state){
@@ -5799,6 +5868,11 @@ bool Game::HandleSDLEvents(void){
 	if(world.dedicatedserver.active){
 		return true;
 	}
+	if(headless){
+		// SDL_INIT_VIDEO was skipped, so `window` is NULL; event handlers below
+		// would deref it via SDL_GetWindowSize. Bail before SDL_PollEvent.
+		return true;
+	}
 	SDL_Event event;
 	while(SDL_PollEvent(&event) > 0){
 		switch(event.type){
@@ -6012,4 +6086,91 @@ bool Game::HandleSDLEvents(void){
 		}
 	}
 	return true;
+}
+
+void Game::DrainControlQueue(){
+	if(controlPort <= 0) return;
+	auto cmds = controlserver.DrainImmediate();
+	for(auto& c : cmds){
+		if(c.phase == ControlCommand::MULTI_FRAME){
+			ControlDispatch::EnqueueWait(*this, std::move(c));
+		} else {
+			ControlDispatch::HandleImmediate(*this, c);
+		}
+	}
+	// TickWaits intentionally NOT called here — it runs after the sim while-loop
+	// in Loop() so the very first tick after enqueue counts.
+	// Dedicated server has no rendering and never calls PostFrameReplies(), so
+	// any POST_RENDER op (e.g. screenshot) would block its handler thread
+	// forever. Fail them at receive time.
+	if(world.dedicatedserver.active){
+		auto pr = controlserver.DrainPostRender();
+		for(auto& c : pr){
+			if(!c.reply) continue;
+			ControlReply rpl;
+			rpl.id = c.id;
+			rpl.ok = false;
+			rpl.code = "WRONG_STATE";
+			rpl.error = "post-render ops not supported in dedicated server mode";
+			c.reply->set_value(rpl);
+		}
+	}
+}
+
+void Game::PostFrameReplies(){
+	if(controlPort <= 0) return;
+	auto cmds = controlserver.DrainPostRender();
+	for(auto& c : cmds){
+		ControlDispatch::HandlePostRender(*this, c);
+	}
+}
+
+const char* Game::StateName(Uint8 s){
+	switch(s){
+		case NONE: return "NONE";
+		case FADEOUT: return "FADEOUT";
+		case MAINMENU: return "MAINMENU";
+		case LOBBYCONNECT: return "LOBBYCONNECT";
+		case LOBBY: return "LOBBY";
+		case UPDATING: return "UPDATING";
+		case INGAME: return "INGAME";
+		case MISSIONSUMMARY: return "MISSIONSUMMARY";
+		case SINGLEPLAYERGAME: return "SINGLEPLAYERGAME";
+		case OPTIONS: return "OPTIONS";
+		case OPTIONSCONTROLS: return "OPTIONSCONTROLS";
+		case OPTIONSDISPLAY: return "OPTIONSDISPLAY";
+		case OPTIONSAUDIO: return "OPTIONSAUDIO";
+		case HOSTGAME: return "HOSTGAME";
+		case JOINGAME: return "JOINGAME";
+		case REPLAYGAME: return "REPLAYGAME";
+		case TESTGAME: return "TESTGAME";
+		default: return "UNKNOWN";
+	}
+}
+
+nlohmann::json Game::GetWorldSummary(){
+	nlohmann::json r;
+	r["map"] = world.gameinfo.mapname;
+	r["peers"] = (int)world.peercount;
+	nlohmann::json players = nlohmann::json::array();
+	int objcount = 0;
+	for(auto* o : world.objectlist){
+		++objcount;
+		if(o && o->type == ObjectTypes::PLAYER){
+			Player* p = (Player*)o;
+			nlohmann::json pj;
+			pj["id"] = p->id;
+			pj["hp"] = (int)p->health;
+			pj["x"] = (int)p->x;
+			pj["y"] = (int)p->y;
+			players.push_back(std::move(pj));
+		}
+	}
+	r["players"] = players;
+	r["objects_count"] = objcount;
+	return r;
+}
+
+bool Game::IsLiveMultiplayer() const {
+	return (world.peercount > 1) && (world.gameplaystate == World::INGAME);
 }

@@ -1,3 +1,5 @@
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 #include "renderer.h"
 #include "sprite.h"
 #include "resources.h"
@@ -3320,4 +3322,16 @@ const char * Renderer::InvIdToLetter(Uint8 id){
 			return "";
 		break;
 	}
+}
+
+bool Renderer::CapturePNG(const Surface& buf, const SDL_Color* palette, const char* path){
+	std::vector<unsigned char> rgb(buf.w * buf.h * 3);
+	for(int i = 0; i < buf.w * buf.h; ++i){
+		Uint8 idx = buf.pixels[i];
+		rgb[i*3+0] = palette[idx].r;
+		rgb[i*3+1] = palette[idx].g;
+		rgb[i*3+2] = palette[idx].b;
+	}
+	int rc = stbi_write_png(path, buf.w, buf.h, 3, rgb.data(), buf.w * 3);
+	return rc != 0;
 }

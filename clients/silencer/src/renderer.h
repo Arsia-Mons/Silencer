@@ -75,6 +75,7 @@ public:
 	void DrawPlayerList(Surface * surface);
 	void DrawMessageBackground(Surface * surface, Rect * dstrect);
 	Uint8 GetAmbienceLevel(void);
+	bool CapturePNG(const class Surface & buf, const SDL_Color * palette, const char * path);
 	Camera camera;
 	Palette palette;
 

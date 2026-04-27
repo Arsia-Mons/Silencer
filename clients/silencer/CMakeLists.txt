@@ -13,8 +13,17 @@ FetchContent_Declare(
 	DOWNLOAD_NO_EXTRACT TRUE
 )
 FetchContent_MakeAvailable(nlohmann_json)
-# Expose a simple include dir so we can do #include "nlohmann/json.hpp"
-set(NLOHMANN_JSON_INCLUDE_DIR "${nlohmann_json_SOURCE_DIR}")
+# Expose a simple include dir so we can do #include "nlohmann/json.hpp".
+# FetchContent downloads json.hpp directly into nlohmann_json_SOURCE_DIR,
+# so we create a nlohmann/ subdirectory wrapper and copy the header there.
+set(_nlohmann_wrapper "${CMAKE_BINARY_DIR}/nlohmann_include")
+file(MAKE_DIRECTORY "${_nlohmann_wrapper}/nlohmann")
+configure_file(
+	"${nlohmann_json_SOURCE_DIR}/json.hpp"
+	"${_nlohmann_wrapper}/nlohmann/json.hpp"
+	COPYONLY
+)
+set(NLOHMANN_JSON_INCLUDE_DIR "${_nlohmann_wrapper}")
 
 # Linux GNU lowercase convention; macOS/Windows pick up mixed-case via
 # bundle/output-name overrides below.
@@ -95,6 +104,8 @@ silencer_finalize_shaders(
 add_dependencies(${SILENCER_TARGET} silencer_shaders)
 target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated")
+target_include_directories(${SILENCER_TARGET} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
@@ -159,6 +170,8 @@ endif()
 
 include_directories(${ZLIB_INCLUDE_DIRS})
 include_directories(${NLOHMANN_JSON_INCLUDE_DIR})
+# Also expose the raw json.hpp dir for existing includes that use #include "json.hpp"
+include_directories(${nlohmann_json_SOURCE_DIR})
 find_package(SDL3_mixer REQUIRED CONFIG)
 if(TARGET SDL3_mixer::SDL3_mixer)
   get_target_property(_sdl3mixer_inc SDL3_mixer::SDL3_mixer INTERFACE_INCLUDE_DIRECTORIES)
