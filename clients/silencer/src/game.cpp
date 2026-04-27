@@ -222,10 +222,6 @@ bool Game::Load(char * cmdline){
 		int n = FetchActorDefs(apiBase, world.resources.actordefs);
 		if (n > 0) printf("Synced %d actordef(s) from server\n", n);
 		else printf("Actordef sync failed or server unavailable, using local definitions\n");
-		printf("Syncing behavior trees from server...\n");
-		int bt = FetchBehaviorTrees(apiBase, BehaviorTreeLibrary::instance());
-		if (bt > 0) printf("Synced %d behavior tree(s) from server\n", bt);
-		else printf("Behavior tree sync failed or server unavailable, using local trees\n");
 	}
 	lasttick = SDL_GetTicks();
 	return true;
@@ -2015,8 +2011,6 @@ bool Game::LoadMap(const char * name){
 			actordefthread = std::thread([this, url]() {
 				int n = FetchActorDefs(url.c_str(), world.resources.actordefs);
 				if (n > 0) printf("[actordef] refreshed %d actordef(s) from server\n", n);
-				int bt = FetchBehaviorTrees(url.c_str(), BehaviorTreeLibrary::instance());
-				if (bt > 0) printf("[behaviortree] refreshed %d tree(s) from server\n", bt);
 			});
 		}
 	}

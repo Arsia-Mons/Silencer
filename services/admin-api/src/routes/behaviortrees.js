@@ -1,13 +1,15 @@
 /**
- * Behavior tree CRUD endpoints.
+ * Behavior tree endpoints.
  *
- * MongoDB is the source of truth. Every write also syncs to disk so the C++
- * game server can load behavior trees from the filesystem without any changes.
+ * The filesystem is the source of truth. Behavior trees are stored as JSON
+ * files in shared/assets/behaviortrees/ and committed to git. The admin UI
+ * reads them from disk for visualization; writes go to disk only so that
+ * changes flow back through version control.
  *
- * GET    /behaviortrees         — list all behavior tree IDs  (public, game client reads this)
- * GET    /behaviortrees/:id     — return behavior tree JSON   (public, game client reads this)
- * PUT    /behaviortrees/:id     — upsert behavior tree        (admin only)
- * DELETE /behaviortrees/:id     — delete behavior tree        (admin only)
+ * GET    /behaviortrees         — list all behavior tree IDs  (public)
+ * GET    /behaviortrees/:id     — return behavior tree JSON   (public)
+ * PUT    /behaviortrees/:id     — write behavior tree to disk (admin only)
+ * DELETE /behaviortrees/:id     — delete behavior tree file   (admin only)
  */
 
 import { Router } from 'express';
@@ -16,7 +18,6 @@ import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { requireAuth, requireRole } from '../auth/jwt.js';
 import { ASSETS_DIR } from '../config.js';
-import BehaviorTree from '../db/models/BehaviorTree.js';
 
 const router = Router();
 const BT_DIR = join(ASSETS_DIR, 'behaviortrees');
@@ -76,48 +77,40 @@ function validate(bt) {
 }
 
 /**
- * Seed MongoDB from disk files on first run. Always upserts so that
- * re-deploying with updated JSON files keeps Mongo in sync.
+ * Seed behavior trees — no-op. Files in shared/assets/behaviortrees/ are
+ * the canonical source of truth and are committed to git. No DB seeding needed.
+ * @deprecated kept for call-site compatibility during transition; remove callers.
  */
-export async function seedBehaviorTrees() {
-  ensureDir();
-  const files = readdirSync(BT_DIR).filter(f => f.endsWith('.json'));
-  for (const file of files) {
-    const id = file.slice(0, -5);
-    const data = JSON.parse(readFileSync(diskPath(id), 'utf8'));
-    await BehaviorTree.findByIdAndUpdate(
-      id,
-      { data },
-      { upsert: true, new: true },
-    );
-    console.log(`[behaviortrees] seeded/updated "${id}" from disk`);
-  }
-}
+export async function seedBehaviorTrees() {}
 
-// GET /behaviortrees  — public (no auth required, game client reads this)
-router.get('/', async (_req, res) => {
+// GET /behaviortrees  — public
+router.get('/', (_req, res) => {
   try {
-    const docs = await BehaviorTree.find({}, '_id').lean();
-    res.json(docs.map(d => d._id));
+    ensureDir();
+    const ids = readdirSync(BT_DIR)
+      .filter(f => f.endsWith('.json'))
+      .map(f => f.slice(0, -5));
+    res.json(ids);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /behaviortrees/:id  — public (no auth required, game client reads this)
-router.get('/:id', async (req, res) => {
+// GET /behaviortrees/:id  — public
+router.get('/:id', (req, res) => {
   try {
     validateId(req.params.id);
-    const doc = await BehaviorTree.findById(req.params.id).lean();
-    if (!doc) return res.status(404).json({ error: 'Not found' });
-    res.json(doc.data);
+    const path = diskPath(req.params.id);
+    if (!existsSync(path)) return res.status(404).json({ error: 'Not found' });
+    const data = JSON.parse(readFileSync(path, 'utf8'));
+    res.json(data);
   } catch (err) {
     res.status(err.message.includes('Invalid') ? 400 : 500).json({ error: err.message });
   }
 });
 
-// PUT /behaviortrees/:id  (admin only)
-router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
+// PUT /behaviortrees/:id  (admin only) — writes to disk only; commit to git to ship
+router.put('/:id', requireAuth, requireRole('admin'), (req, res) => {
   try {
     validateId(req.params.id);
     const body = req.body;
@@ -127,11 +120,6 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
     const err = validate(body);
     if (err) return res.status(400).json({ error: err });
     body.id = req.params.id;
-    await BehaviorTree.findByIdAndUpdate(
-      req.params.id,
-      { data: body },
-      { upsert: true, new: true },
-    );
     writeToDisk(req.params.id, body);
     res.json({ ok: true });
   } catch (err) {
@@ -140,13 +128,12 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
 });
 
 // DELETE /behaviortrees/:id  (admin only)
-router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
+router.delete('/:id', requireAuth, requireRole('admin'), (req, res) => {
   try {
     validateId(req.params.id);
-    const deleted = await BehaviorTree.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Not found' });
     const path = diskPath(req.params.id);
-    if (existsSync(path)) unlinkSync(path);
+    if (!existsSync(path)) return res.status(404).json({ error: 'Not found' });
+    unlinkSync(path);
     res.json({ ok: true });
   } catch (err) {
     res.status(err.message.includes('Invalid') ? 400 : 500).json({ error: err.message });
