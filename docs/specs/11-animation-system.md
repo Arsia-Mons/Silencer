@@ -24,6 +24,39 @@ Every sprite frame carries per-frame metadata:
 The entity's bounding box for rendering and collision is derived from the
 current frame's dimensions and offsets.
 
+## Actor Definition System
+
+Per-NPC animation sequences, hurtboxes, and sounds are configured in
+`shared/assets/actordefs/<id>.json` rather than being hardcoded in C++.
+The C++ client loads these on each map start by fetching from the admin API.
+
+### Per-frame hurtboxes
+
+Each `FrameDef` in a sequence carries an optional `hurtbox` (x1, y1, x2, y2)
+relative to the entity's feet position (`y=0` = feet, positive down). Guards
+use `mirrored` flag — the engine negates and swaps x1/x2 automatically.
+
+### Per-frame sounds
+
+Each `FrameDef` can specify a `sound` filename and `soundVolume` (0–128,
+default 128). Two lookup methods exist:
+- `GetFrameSound(state_i)` — correct when the state machine accumulates ticks
+  (tick-duration-based states).
+- `GetFrameSoundByIndex(frameIdx)` — correct when `res_index = state_i % N`
+  (direct sprite frame index). Guards and civilians use this path.
+
+Sounds reference filenames in `sound.bin` (e.g. `stostep1.wav`).
+All sounds can be previewed in the admin actor editor's Animation tab.
+
+### Editing
+
+Open the admin actor editor at `/actors/<id>` and use the **Hitbox** tab to
+edit hurtboxes and the **Animation** tab to assign per-frame sounds. Changes
+are written back to `shared/assets/actordefs/<id>.json` via the admin API and
+committed to git.
+
+---
+
 ## Sprite Rendering
 
 | Property | Default | Description |
