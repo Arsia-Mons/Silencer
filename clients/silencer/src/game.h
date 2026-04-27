@@ -10,6 +10,7 @@
 #include "overlay.h"
 #include "textbox.h"
 #include "updater.h"
+#include "controlserver.h"
 #include <map>
 #include <atomic>
 #include <thread>
@@ -178,6 +179,9 @@ private:
 	// client process opens the device. Skipping this teardown produces an
 	// audible pop on the restarted client.
 	bool stage2spawned;
+	ControlServer controlserver;
+	void DrainControlQueue();
+	void PostFrameReplies();
 };
 
 #endif

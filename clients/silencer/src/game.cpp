@@ -1,4 +1,5 @@
 #include "game.h"
+#include "controldispatch.h"
 #include "sdl3gpubackend.h"
 #include <math.h>
 #include "overlay.h"
@@ -228,6 +229,11 @@ bool Game::Load(char * cmdline){
 	}
 	printf("Resources loaded\n");
 	lasttick = SDL_GetTicks();
+	if(controlPort > 0){
+		if(!controlserver.Start(controlPort)){
+			fprintf(stderr, "[control] failed to start; continuing without\n");
+		}
+	}
 	return true;
 }
 
@@ -285,6 +291,7 @@ bool Game::Loop(void){
 		// Tell main to unwind so ~Game() tears down SDL/audio cleanly.
 		return false;
 	}
+	DrainControlQueue();
 	unsigned int wait = 42; // 24 fps
 	if(updatetitle){
 		char title[128];
@@ -376,6 +383,7 @@ bool Game::Loop(void){
 		world.DoNetwork();
 		//Uint32 drawtick = SDL_GetTicks();
 		Present();
+		PostFrameReplies();
 		//Uint32 afterdrawtick = SDL_GetTicks();
 		/*if(1 || afterdrawtick - drawtick > wait){
 			printf("frame took %d ms to present\n", afterdrawtick - drawtick);
@@ -6020,4 +6028,20 @@ bool Game::HandleSDLEvents(void){
 		}
 	}
 	return true;
+}
+
+void Game::DrainControlQueue(){
+	if(controlPort <= 0) return;
+	auto cmds = controlserver.DrainImmediate();
+	for(auto& c : cmds){
+		ControlDispatch::HandleImmediate(*this, c);
+	}
+}
+
+void Game::PostFrameReplies(){
+	if(controlPort <= 0) return;
+	auto cmds = controlserver.DrainPostRender();
+	for(auto& c : cmds){
+		ControlDispatch::HandlePostRender(*this, c);
+	}
 }
