@@ -1,0 +1,38 @@
+name: CI Build (admin-api Docker)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'services/admin-api/**'
+      - '.github/workflows/ci-build-admin-api.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/admin-api/**'
+      - '.github/workflows/ci-build-admin-api.yml'
+
+concurrency:
+  group: ci-build-admin-api-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    # Match the deploy workflow's runner so a CI pass implies a deploy build will succeed.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: services/admin-api
+          file: services/admin-api/Dockerfile
+          push: false
+          platforms: linux/arm64
+          cache-from: type=gha,scope=admin-api
+          cache-to: type=gha,scope=admin-api,mode=max

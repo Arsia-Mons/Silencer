@@ -1,0 +1,37 @@
+name: CI Build (admin-web Docker)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'web/admin/**'
+      - '.github/workflows/ci-build-admin-web.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'web/admin/**'
+      - '.github/workflows/ci-build-admin-web.yml'
+
+concurrency:
+  group: ci-build-admin-web-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: web/admin
+          file: web/admin/Dockerfile
+          push: false
+          platforms: linux/arm64
+          cache-from: type=gha,scope=admin-web
+          cache-to: type=gha,scope=admin-web,mode=max
