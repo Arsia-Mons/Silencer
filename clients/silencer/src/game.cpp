@@ -371,6 +371,30 @@ void Game::Present(void){
 			static bool summary_reseeded = false;
 			if(!summary_reseeded){
 				summary_reseeded = true;
+				// Force user.retrieving=false so UpdateGameSummaryInterface
+				// (called from CreateGameSummaryInterface) takes the
+				// upgrade-availability branch and creates the +1 buttons.
+				// world.Disconnect() in MISSIONSUMMARY's stateisnew sets
+				// retrieving=true to await fresh user info from the
+				// lobby; in dump mode the static demo data is sufficient,
+				// so we tell the UI it's already loaded.
+				User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+				if(user){
+					user->retrieving = false;
+					// Force the upgrade-available branch in
+					// UpdateGameSummaryInterface (line ~5499) by ensuring
+					// the user's level is comfortably above the sum of
+					// current bonuses so the +1 upgrade buttons are
+					// created (totalbonusupgrades - defaultbonuses <
+					// min(level, TotalUpgradePointsPossible)).
+					user->agency[user->statsagency].level = 20;
+					user->agency[user->statsagency].maxendurance = 5;
+					user->agency[user->statsagency].maxshield = 5;
+					user->agency[user->statsagency].maxjetpack = 5;
+					user->agency[user->statsagency].maxtechslots = 5;
+					user->agency[user->statsagency].maxhacking = 5;
+					user->agency[user->statsagency].maxcontacts = 5;
+				}
 				// Replace the engine's zero-Stats summary with one
 				// populated from canned demo values. Built-in agency
 				// upgrade values (Endurance/Shield/Jetpack/TechSlots/
