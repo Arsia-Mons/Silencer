@@ -105,6 +105,7 @@ jobs:
           cmake \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DSILENCER_UNITY_BUILD=ON \
             -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}" \
             ../clients/silencer
           make -j"$(nproc)"

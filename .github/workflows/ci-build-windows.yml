@@ -15,6 +15,13 @@ jobs:
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: windows-latest
     timeout-minutes: 30
+    env:
+      # mozilla-actions/sccache-action exposes ACTIONS_CACHE_URL +
+      # ACTIONS_RUNTIME_TOKEN, but sccache only routes through the GHA
+      # backend when this is set — otherwise it writes to the runner's
+      # local disk and every fresh runner starts with an empty cache
+      # (100% miss rate).
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
 
@@ -33,7 +40,7 @@ jobs:
           key: vcpkg-tools-${{ runner.os }}-v1
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.4
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Setup MSVC dev environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -51,7 +58,8 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
             -DCMAKE_C_COMPILER_LAUNCHER=sccache `
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+            -DSILENCER_UNITY_BUILD=ON
 
       - name: Build
         run: cmake --build build

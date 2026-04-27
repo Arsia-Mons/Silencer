@@ -15,6 +15,13 @@ jobs:
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: macos-latest
     timeout-minutes: 20
+    env:
+      # mozilla-actions/sccache-action exposes ACTIONS_CACHE_URL +
+      # ACTIONS_RUNTIME_TOKEN, but sccache only routes through the GHA
+      # backend when this is set — otherwise it writes to the runner's
+      # local disk and every fresh runner starts with an empty cache
+      # (100% miss rate).
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
 
@@ -28,7 +35,7 @@ jobs:
           version-sdl-mixer: 3-latest
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.4
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Configure
         run: |
@@ -36,7 +43,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
             -DCMAKE_C_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DSILENCER_UNITY_BUILD=ON
 
       - name: Build
         run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"

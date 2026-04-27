@@ -36,6 +36,7 @@ jobs:
           cmake -B build -S clients/silencer \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DSILENCER_UNITY_BUILD=ON \
             -DSILENCER_LOBBY_HOST="$lobby" \
             -DSILENCER_MAP_API_URL="https://admin.arsiamons.com/api/maps" \
             -DSILENCER_VERSION="${GITHUB_REF_NAME#v}"
@@ -182,6 +183,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DSILENCER_UNITY_BUILD=ON `
             -DSILENCER_LOBBY_HOST="$lobby" `
             -DSILENCER_MAP_API_URL="https://admin.arsiamons.com/api/maps" `
             -DSILENCER_VERSION="$ver"
