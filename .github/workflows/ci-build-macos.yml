@@ -27,14 +27,23 @@ jobs:
           version: 3-latest
           version-sdl-mixer: 3-latest
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.4
+
       - name: Configure
         run: |
           cmake -B build -S clients/silencer \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
       - name: Build
         run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
+
+      - name: sccache stats
+        if: always()
+        run: sccache --show-stats
 
       - name: Bundle dylibs
         working-directory: build

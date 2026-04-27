@@ -25,6 +25,9 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.4
+
       - name: Configure
         shell: pwsh
         env:
@@ -33,10 +36,17 @@ jobs:
           cmake -B build -S clients/silencer `
             -A x64 `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=x64-windows
+            -DVCPKG_TARGET_TRIPLET=x64-windows `
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
       - name: Build
         run: cmake --build build --config Release -- -maxcpucount
+
+      - name: sccache stats
+        if: always()
+        shell: pwsh
+        run: sccache --show-stats
 
       - name: Package
         shell: pwsh
