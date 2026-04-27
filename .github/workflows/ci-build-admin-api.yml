@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  build-admin-api:
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     # Match the deploy workflow's runner so a CI pass implies a deploy build will succeed.
     runs-on: ubuntu-24.04-arm
