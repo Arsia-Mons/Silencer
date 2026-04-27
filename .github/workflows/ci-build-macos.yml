@@ -35,7 +35,7 @@ jobs:
           version-sdl-mixer: 3-latest
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.4
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Configure
         run: |

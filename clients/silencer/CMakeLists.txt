@@ -85,6 +85,15 @@ target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_14)
 option(SILENCER_UNITY_BUILD "Combine .cpp files into jumbo TUs for faster clean builds" OFF)
 if(SILENCER_UNITY_BUILD)
 	set_target_properties(${SILENCER_TARGET} PROPERTIES UNITY_BUILD ON)
+	if(APPLE)
+		# CMake batches Objective-C++ .mm files into the CXX jumbo TU on
+		# macOS rather than separating by language, so #import <Cocoa/Cocoa.h>
+		# from cocoawrapper.mm leaks Objective-C types (NSString, etc.) into
+		# a C++ translation unit and breaks compilation. We have only one .mm
+		# file — unity savings from including it are nil — so skip it.
+		file(GLOB_RECURSE _mm_sources src/*.mm)
+		set_source_files_properties(${_mm_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+	endif()
 endif()
 
 # Compile HLSL → DXIL bytecode headers for the SDL3 GPU backend. macOS keeps

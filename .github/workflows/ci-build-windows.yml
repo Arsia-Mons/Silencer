@@ -40,7 +40,7 @@ jobs:
           key: vcpkg-tools-${{ runner.os }}-v1
 
       - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.4
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Setup MSVC dev environment
         uses: ilammy/msvc-dev-cmd@v1
