@@ -11,6 +11,7 @@ class BodyPart : public Object
 public:
 	BodyPart();
 	void Tick(World & world);
+	void Serialize(bool write, Serializer & data, Serializer * old = 0) override;
 	Uint8 type;
 	Uint8 suitcolor;
 	

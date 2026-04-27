@@ -2,7 +2,7 @@
 
 BodyPart::BodyPart() : Object(ObjectTypes::BODYPART){
 	res_bank = 0xFF;
-	requiresauthority = false;
+	requiresauthority = true;  // replicate to clients via snapshots
 	renderpass = 1;
 	state_i = 0;
 	type = 0;
@@ -10,6 +10,13 @@ BodyPart::BodyPart() : Object(ObjectTypes::BODYPART){
 	xv = (rand() % 33) - 16;
 	yv = (rand() % 33) - 16;
 	isphysical = true;
+}
+
+void BodyPart::Serialize(bool write, Serializer & data, Serializer * old){
+	Object::Serialize(write, data, old);  // handles x,y,xv,yv,res_bank,res_index,draw,...
+	data.Serialize(write, type, old);
+	data.Serialize(write, suitcolor, old);
+	data.Serialize(write, state_i, old);
 }
 
 void BodyPart::Tick(World & world){
