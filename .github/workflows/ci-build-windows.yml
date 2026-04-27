@@ -35,20 +35,26 @@ jobs:
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.4
 
+      - name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Configure
         shell: pwsh
         env:
           VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite"
         run: |
           cmake -B build -S clients/silencer `
-            -A x64 `
+            -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
             -DCMAKE_C_COMPILER_LAUNCHER=sccache `
             -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
 
       - name: Build
-        run: cmake --build build --config Release -- -maxcpucount
+        run: cmake --build build
 
       - name: sccache stats
         if: always()
@@ -60,7 +66,7 @@ jobs:
         run: |
           $stage = "build/package/silencer"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          Copy-Item build/Release/Silencer.exe $stage/
+          Copy-Item build/Silencer.exe $stage/
           $vcpkgBin = "build/vcpkg_installed/x64-windows/bin"
           Copy-Item "$vcpkgBin/*.dll" $stage/
           Copy-Item -Recurse shared/assets $stage/assets
