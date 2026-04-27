@@ -52,4 +52,25 @@ router.get('/*', async (req, res) => {
   }
 });
 
+// DELETE /api/maps/:name — delete a published map
+router.delete('/:name', async (req, res) => {
+  try {
+    const fwd = {};
+    if (req.headers['x-api-key']) fwd['X-Api-Key'] = req.headers['x-api-key'];
+    const r = await fetch(`${LOBBY_MAP_API_URL}/api/maps/${encodeURIComponent(req.params.name)}`, {
+      method: 'DELETE',
+      headers: fwd,
+    });
+    const ct = r.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      res.status(r.status).json(await r.json());
+    } else {
+      const text = (await r.text()).trim();
+      res.status(r.status).json({ error: text || r.statusText });
+    }
+  } catch {
+    res.status(502).json({ error: 'map API unreachable' });
+  }
+});
+
 export default router;

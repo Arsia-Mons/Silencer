@@ -16,6 +16,7 @@ import MapPropertiesPanel from './MapPropertiesPanel';
 import ActorListPanel from './ActorListPanel';
 import Minimap from './Minimap';
 import type { MapActor } from '../../lib/types';
+import { API } from '../../lib/api';
 
 interface VisState {
   bg: boolean[];
@@ -92,16 +93,67 @@ export default function DesignerPage() {
   const [pubAuthor, setPubAuthor]     = useState('');
   const [pubStatus, setPubStatus]     = useState<PubStatus | null>(null);
 
+  // Published maps panel
+  const [showMaps, setShowMaps]             = useState(false);
+  const [mapList, setMapList]               = useState<Array<{ sha1: string; name: string; size: number; author: string; uploaded_at: string }>>([]);
+  const [mapListLoading, setMapListLoading] = useState(false);
+  const [mapListError, setMapListError]     = useState<string | null>(null);
+  const [deleteStatus, setDeleteStatus]     = useState<Record<string, string>>({});
+  const [lastPublishedSha1, setLastPublishedSha1] = useState<string | null>(null);
+
+  const fetchMapList = useCallback(async () => {
+    setMapListLoading(true);
+    setMapListError(null);
+    try {
+      const r = await fetch(`${API}/maps`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      const sorted = [...data].sort((a: { uploaded_at: string }, b: { uploaded_at: string }) =>
+        new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+      );
+      setMapList(sorted);
+    } catch (e) {
+      setMapListError(e instanceof Error ? e.message : 'Failed to load');
+    } finally {
+      setMapListLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showMaps) fetchMapList();
+  }, [showMaps, fetchMapList]);
+
+  const handleDeleteMap = useCallback(async (name: string) => {
+    if (!confirm(`Delete "${name}" from the server?`)) return;
+    setDeleteStatus(s => ({ ...s, [name]: 'deleting…' }));
+    try {
+      const headers: Record<string, string> = {};
+      if (pubApiKey) headers['X-Api-Key'] = pubApiKey;
+      const r = await fetch(`${API}/maps/${encodeURIComponent(name)}`, { method: 'DELETE', headers });
+      if (r.ok) {
+        setDeleteStatus(s => ({ ...s, [name]: '✓ deleted' }));
+        fetchMapList();
+      } else {
+        const body = await r.json().catch(() => ({ error: r.statusText }));
+        setDeleteStatus(s => ({ ...s, [name]: `✗ ${body.error ?? r.statusText}` }));
+      }
+    } catch {
+      setDeleteStatus(s => ({ ...s, [name]: '✗ network error' }));
+    }
+  }, [pubApiKey, fetchMapList]);
+
   const handlePublish = useCallback(async () => {
     setPubStatus({ ok: null, msg: 'Publishing…' });
     const result = await publishMap({ author: pubAuthor, apiUrl: pubApiUrl, apiKey: pubApiKey });
     if (result.ok) {
       const sha1 = String((result.meta as Record<string, unknown>)?.sha1 ?? '');
       setPubStatus({ ok: true, msg: `✓ Published  sha1: ${sha1.slice(0, 8)}…` });
+      setLastPublishedSha1(sha1);
+      fetchMapList();
     } else {
       setPubStatus({ ok: false, msg: result.error ?? 'Unknown error' });
     }
-  }, [publishMap, pubAuthor, pubApiUrl, pubApiKey]);
+  }, [publishMap, pubAuthor, pubApiUrl, pubApiKey, fetchMapList]);
 
   // Sync resize inputs when map changes
   useEffect(() => {
@@ -422,6 +474,76 @@ export default function DesignerPage() {
               )}
             </div>
           )}
+
+          {/* Manage published maps */}
+          <div className="relative flex items-center">
+            <button
+              onClick={() => setShowMaps(p => !p)}
+              className={`px-3 py-1 text-xs font-mono border rounded transition-colors ${showMaps ? 'border-game-primary text-game-primary bg-game-dark' : 'border-game-border text-game-textDim hover:border-game-primary hover:text-game-text'}`}
+            >
+              📋 MAPS
+            </button>
+            {showMaps && (
+              <div className="absolute top-8 left-0 z-50 bg-game-bgCard border border-game-border rounded p-3 w-96 shadow-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-mono text-game-primary">Published Maps</div>
+                  <button
+                    onClick={fetchMapList}
+                    className="text-xs font-mono text-game-textDim hover:text-game-text border border-game-border rounded px-2 py-0.5 transition-colors"
+                    title="Refresh"
+                  >↻ refresh</button>
+                </div>
+                {pubApiKey === '' && (
+                  <div className="mb-2">
+                    <input
+                      type="password"
+                      placeholder="API key for delete (optional)"
+                      onChange={e => setPubApiKey(e.target.value)}
+                      className="w-full px-2 py-1 text-xs font-mono bg-game-bg border border-game-border rounded text-game-text focus:outline-none focus:border-game-primary"
+                    />
+                  </div>
+                )}
+                {mapListLoading && <div className="text-xs font-mono text-game-textDim">Loading…</div>}
+                {mapListError  && <div className="text-xs font-mono text-red-400">{mapListError}</div>}
+                {!mapListLoading && !mapListError && mapList.length === 0 && (
+                  <div className="text-xs font-mono text-game-textDim">No maps published yet.</div>
+                )}
+                {!mapListLoading && mapList.length > 0 && (
+                  <div className="flex flex-col gap-1 max-h-72 overflow-y-auto">
+                    {mapList.map(m => (
+                      <div
+                        key={m.sha1}
+                        className={`flex items-center gap-2 px-2 py-1 rounded text-xs font-mono ${lastPublishedSha1 === m.sha1 ? 'bg-game-primary bg-opacity-10 border border-game-primary' : 'bg-game-bg'}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-game-text truncate">{m.name}</div>
+                          <div className="text-game-textDim text-[10px]">{m.author} · {(m.size / 1024).toFixed(1)}KB · {new Date(m.uploaded_at).toLocaleDateString()}</div>
+                        </div>
+                        {deleteStatus[m.name] ? (
+                          <span className={`text-[10px] ${deleteStatus[m.name].startsWith('✓') ? 'text-game-primary' : 'text-red-400'}`}>
+                            {deleteStatus[m.name]}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleDeleteMap(m.name)}
+                            className="text-[10px] text-red-400 hover:text-red-300 border border-red-800 hover:border-red-500 rounded px-1.5 py-0.5 transition-colors flex-shrink-0"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowMaps(false)}
+                  className="mt-2 w-full px-2 py-1 text-xs font-mono border border-game-border text-game-textDim rounded hover:border-game-primary transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Props */}
           {map && (
