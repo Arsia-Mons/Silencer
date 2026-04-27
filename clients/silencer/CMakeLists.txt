@@ -103,6 +103,8 @@ silencer_finalize_shaders(
 add_dependencies(${SILENCER_TARGET} silencer_shaders)
 target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated")
+target_include_directories(${SILENCER_TARGET} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
