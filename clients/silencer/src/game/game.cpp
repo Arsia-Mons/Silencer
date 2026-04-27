@@ -113,6 +113,12 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 }
 
 Game::~Game(){
+	// Join background download threads before tearing down SDL so they don't
+	// reference freed resources. Increment generation first so any in-flight
+	// result is discarded after the join returns.
+	mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
+	if(mapjointhread.joinable()) mapjointhread.join();
+	if(dlthread.joinable()) dlthread.join();
 	// Bring the control server down first. Stop() runs the shutdown drain we
 	// registered at Load() time, fulfilling promises for both queued and
 	// pendingWaits commands so handler threads can unblock from fut.get() before
@@ -478,6 +484,17 @@ bool Game::Tick(void){
 		}
 		if(world.gameplaystate == World::INLOBBY){
 			ProcessMapDownload();
+			if(gamejoininterface){
+				Interface * gamejoiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
+				if(gamejoiniface){
+					Button * readybtn = static_cast<Button *>(gamejoiniface->GetObjectWithUid(world, 25));
+					if(readybtn){
+						Peer * localpeer = world.peerlist[world.localpeerid];
+						bool blocked = localpeer && localpeer->ishost && !world.AllPeersDownloadedMap();
+						strcpy(readybtn->text, blocked ? "Waiting..." : "Ready");
+					}
+				}
+			}
 		}
 		/*Peer * localpeer = world.peerlist[world.localpeerid];
 		if(localpeer){
@@ -733,6 +750,12 @@ bool Game::Tick(void){
 								gamecreateinterface = 0;
 							}
 							mapexistchecked = false;
+						// Invalidate any in-flight server map fetch for the previous
+						// game; the thread will see the stale generation and discard
+						// its result. Detach so we don't block here.
+						mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
+						mapjoinstate.store(0, std::memory_order_relaxed);
+						if(mapjointhread.joinable()) mapjointhread.detach();
 							world.SetTech(Config::GetInstance().defaulttechchoices[GetSelectedAgency()]);
 							gamejoininterface = CreateGameJoinInterface()->id;
 							LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
@@ -4730,7 +4753,11 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							}break;
 							case 25:{ // start game/ready
 								if(gamejoininterface){
-									world.SendReady();
+									Peer * localpeer = world.peerlist[world.localpeerid];
+									bool ishost = localpeer && localpeer->ishost;
+									if(!ishost || world.AllPeersDownloadedMap()){
+										world.SendReady();
+									}
 								}
 							}break;
 							case 26:{ // change team
@@ -5826,19 +5853,43 @@ void Game::ProcessMapDownload(void){
 			if(!localpeer->mapdownloaded){
 				if(!mapexistchecked){
 					std::string mapfilename = FindMap(world.gameinfo.mapname, &world.gameinfo.maphash);
-					if(mapfilename.size() == 0){
-						// Map not available locally; try the community map server before
-						// falling back to peer-to-peer chunk transfer.
-						mapfilename = FetchMapFromServer(
-							world.gameinfo.mapname,
-							world.gameinfo.maphash,
-							Config::GetInstance().mapapiurl);
-					}
 					if(mapfilename.size() > 0){
 						world.SendMapDownloaded();
 						LoadMapData(mapfilename.c_str());
+						mapexistchecked = true;
+					} else {
+						// Map not available locally. Try the community map server
+						// asynchronously so the game loop (and UDP keepalives) stay
+						// responsive during the fetch. Falling back to peer-to-peer
+						// chunk transfer happens once the async result is known.
+						int js = mapjoinstate.load(std::memory_order_acquire);
+						if(js == 0){
+							mapjoinstate.store(1, std::memory_order_relaxed);
+							uint32_t gen = mapjoingeneration.load(std::memory_order_relaxed);
+							std::string dlname = world.gameinfo.mapname;
+							std::array<unsigned char, 20> sha1;
+							memcpy(sha1.data(), world.gameinfo.maphash, 20);
+							std::string apiURL = Config::GetInstance().mapapiurl;
+							mapjointhread = std::thread([this, dlname, sha1, apiURL, gen]() mutable {
+								std::string path = FetchMapFromServer(dlname.c_str(), sha1.data(), apiURL.c_str());
+								if(mapjoingeneration.load(std::memory_order_relaxed) != gen) return;
+								std::lock_guard<std::mutex> lk(mapjoinmutex);
+								mapjoinpath = path;
+								mapjoinstate.store(path.empty() ? 3 : 2, std::memory_order_release);
+							});
+						} else if(js == 2){
+							// Server had the map; hand it to the engine.
+							std::string path;
+							{ std::lock_guard<std::mutex> lk(mapjoinmutex); path = mapjoinpath; }
+							world.SendMapDownloaded();
+							LoadMapData(path.c_str());
+							mapexistchecked = true;
+						} else if(js == 3){
+							// Server doesn't have it; fall through to P2P chunk transfer.
+							mapexistchecked = true;
+						}
+						// js == 1: fetch in progress; come back next tick.
 					}
-					mapexistchecked = true;
 				}else{
 					if(!world.currentmapdataprocessed || world.tickcount - lastmapchunkrequest > 24){
 						// request map chunks after received, or if last request was a while ago

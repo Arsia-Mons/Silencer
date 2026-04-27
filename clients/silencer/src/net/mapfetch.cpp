@@ -150,7 +150,9 @@ std::string FetchMapFromServer(const char * mapname,
     }
 
     // Save to <DataDir>/level/download/<mapname>.
-    CDDataDir();
+    // Use the absolute path returned by GetDataDir(); do NOT call CDDataDir()
+    // here because this function may run on a background thread and chdir(2)
+    // is process-wide.
     std::string dir = GetDataDir() + "level/download";
     CreateDirectory(dir.c_str());
     std::string path = dir + "/" + mapname;

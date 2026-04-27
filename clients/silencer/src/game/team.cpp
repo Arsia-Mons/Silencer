@@ -21,6 +21,7 @@ Team::Team() : Object(ObjectTypes::TEAM){
 		peeroverlayids[i] = 0;
 		peerreadyoverlayids[i] = 0;
 		peerleveloverlayids[i] = 0;
+		peermapoverlayids[i] = 0;
 	}
 	peerschecksum = 0;
 	oldsecretprogress = 0;
@@ -225,6 +226,10 @@ void Team::Tick(World & world){
 					world.MarkDestroyObject(peerreadyoverlayids[i]);
 					peerreadyoverlayids[i] = 0;
 				}
+				if(peermapoverlayids[i]){
+					world.MarkDestroyObject(peermapoverlayids[i]);
+					peermapoverlayids[i] = 0;
+				}
 			}
 		}
 		for(int i = 0; i < numpeers; i++){
@@ -274,6 +279,27 @@ void Team::Tick(World & world){
 						}else{
 							overlay->res_index = 19;
 						}
+					}
+				}
+				if(!peermapoverlayids[i]){
+					if(peeroverlayids[i]){
+						User * user = world.lobby.GetUserInfo(peer->accountid);
+						Overlay * mapoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+						if(mapoverlay){
+							mapoverlay->text = "(dl)";
+							mapoverlay->textbank = 132;
+							mapoverlay->textwidth = 4;
+							mapoverlay->effectcolor = 170;
+							mapoverlay->x = 473 + (strlen(user->name) * 6) + 3 + 20;
+							mapoverlay->y = 72 + (number * 55) + (i * 13);
+							mapoverlay->draw = !peer->mapdownloaded && !world.choosingtech;
+							peermapoverlayids[i] = mapoverlay->id;
+						}
+					}
+				}else{
+					Overlay * mapoverlay = static_cast<Overlay *>(world.GetObjectFromId(peermapoverlayids[i]));
+					if(mapoverlay){
+						mapoverlay->draw = !peer->mapdownloaded && !world.choosingtech;
 					}
 				}
 			}
@@ -332,6 +358,10 @@ void Team::DestroyOverlays(World & world){
 		if(peerleveloverlayids[i]){
 			world.MarkDestroyObject(peerleveloverlayids[i]);
 			peerleveloverlayids[i] = 0;
+		}
+		if(peermapoverlayids[i]){
+			world.MarkDestroyObject(peermapoverlayids[i]);
+			peermapoverlayids[i] = 0;
 		}
 	}
 	if(overlayid){

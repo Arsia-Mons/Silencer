@@ -27,6 +27,7 @@ public:
 	Uint16 peeroverlayids[4];
 	Uint16 peerreadyoverlayids[4];
 	Uint16 peerleveloverlayids[4];
+	Uint16 peermapoverlayids[4];
 	Uint8 number;
 	Uint8 secrets;
 	Uint16 secretdelivered;
