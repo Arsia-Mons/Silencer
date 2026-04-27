@@ -367,19 +367,29 @@ void Game::Present(void){
 			if(modalinterface){
 				DestroyModalDialog();
 			}
-			if(target_modal_tech){
-				static bool team_created = false;
-				if(!team_created){
-					Team * team = world.GetPeerTeam(world.localpeerid);
-					if(!team){
-						team = (Team *)world.CreateObject(ObjectTypes::TEAM);
+			// For GameJoin: late-seed bots (other peers) so the world has
+			// multiple players visible. The engine's auto-flow at
+			// game.cpp:885+ recreates peerlist[0] each frame world.state
+			// is CONNECTED, so we late-seed at the modal-injection point
+			// instead. We also create a Team for the local peer.
+			if(target_modal_join){
+				static int join_seed_tick = 0;
+				join_seed_tick++;
+				// Seed once near the end of the settle window so the
+				// engine's auto-recreate of peerlist[0] doesn't undo it.
+				if(join_seed_tick == 28){
+					if(!world.GetPeerTeam(world.localpeerid)){
+						Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
 						if(team){
 							team->AddPeer(world.GetAuthorityPeer()->id);
 							team->agency = Team::NOXIS;
 							team->number = 0;
 						}
 					}
-					team_created = true;
+					for(int agency_i = 1; agency_i <= 4; agency_i++){
+						if(agency_i == Team::BLACKROSE) continue;
+						world.AddBot(agency_i);
+					}
 				}
 			}
 		}
@@ -401,9 +411,10 @@ void Game::Present(void){
 				// once world.state == CONNECTED (line ~910). We don't
 				// double-create.
 				if(target_modal_tech && !gametechinterface){
-					// Mimic the engine's Choose-Tech button-click handler:
-					// destroy any existing gamejoininterface, then create
-					// the GameTech interface in its place.
+					// Mimic the engine's Choose-Tech button-click handler
+					// (game.cpp:4925-4926): zero gamejoininterface +
+					// destroy it from lobbyiface, then create the
+					// GameTech interface in its place.
 					if(gamejoininterface){
 						Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
 						Interface * joiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
@@ -412,6 +423,22 @@ void Game::Present(void){
 						}
 						gamejoininterface = 0;
 					}
+					// Late-seed local peer's Team here — the engine's
+					// CONNECTED auto-flow at game.cpp:885+ recreates
+					// peerlist[0] each frame world.state == CONNECTED, so
+					// any Team created at first-frame gets stranded by the
+					// time CreateGameTechInterface reads
+					// GetPeerTeam(localpeerid). Seeding right before the
+					// read ensures the team is current.
+					if(!world.GetPeerTeam(world.localpeerid)){
+						Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
+						if(team){
+							team->AddPeer(world.GetAuthorityPeer()->id);
+							team->agency = Team::NOXIS;
+							team->number = 0;
+						}
+					}
+					world.GetAuthorityPeer()->techchoices = 0xffffffff;
 					gametechinterface = CreateGameTechInterface()->id;
 					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
 					if(lobbyiface){
