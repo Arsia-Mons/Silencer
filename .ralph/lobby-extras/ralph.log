@@ -35,3 +35,14 @@ All items E0-E6 now PASS. Emitting the all-pass marker.
 
 <promise>COMPLETE</promise>
 
+--- Iteration 1 2026-04-26 19:05:45 ---
+All 7 items in `.ralph/lobby-extras/prd.json` already pass (verified `jq '.items | all(.passes == true)'`). A prior iteration (iter 9, commit `70c0dd2`) closed E6 with the same validation methodology I just re-ran independently:
+
+- lobby 3.91% / gamecreate 5.70% / gamejoin 6.18% / gametech 7.46% / gamesummary 40.10% / updating 4.51%
+- 12-screen regression sweep clean at invariant 921615 bytes
+- Visual A/B confirms structural equivalence per documented spec carve-outs
+
+My independent re-run reproduced the exact same per-screen pixel diffs and produced fresh A/B composites (Discord DM `1498142864666923068`) that match iter 9's findings. No further work needed.
+
+<promise>COMPLETE</promise>
+
