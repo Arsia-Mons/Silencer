@@ -114,7 +114,13 @@ function PreviewCanvas({ sequence, scale }: { sequence: AnimSequence | null; sca
             const canvas = canvasRef.current;
             if (canvas) {
               const ctx = canvas.getContext('2d')!;
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
+              // Grid background (matches hitbox tab)
+              ctx.fillStyle = '#111';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.strokeStyle = '#222';
+              ctx.lineWidth = 1;
+              for (let gx = 0; gx < canvas.width; gx += 16) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, canvas.height); ctx.stroke(); }
+              for (let gy = 0; gy < canvas.height; gy += 16) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(canvas.width, gy); ctx.stroke(); }
               const x = Math.floor((canvas.width  - img.width  * scale) / 2);
               const y = Math.floor((canvas.height - img.height * scale) / 2);
               (ctx as CanvasRenderingContext2D & { imageSmoothingEnabled: boolean }).imageSmoothingEnabled = false;
@@ -136,7 +142,7 @@ function PreviewCanvas({ sequence, scale }: { sequence: AnimSequence | null; sca
       ref={canvasRef}
       width={canvasSize.w}
       height={canvasSize.h}
-      className="border border-game-border bg-black"
+      className="border border-game-border"
       style={{ imageRendering: 'pixelated' }}
     />
   );
