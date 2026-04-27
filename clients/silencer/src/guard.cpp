@@ -224,6 +224,15 @@ void Guard::InitBT(){
 			if (state != LADDER) {
 				Object* obj = world.GetObjectFromId(chasing);
 				if (obj && obj->IsAlive()) {
+					// If target slipped into base or is now untargetable (disguised, invisible),
+					// forget them — guard searches blindly then returns to post.
+					if (obj->type == ObjectTypes::PLAYER) {
+						Player* p = static_cast<Player*>(obj);
+						if (p->InBase(world) || p->IsInvisible(world) || !ShouldTarget(*obj, world)) {
+							chasing = 0;
+							return BTResult::Running;
+						}
+					}
 					int dist = abs(signed(obj->x) - signed(x));
 					if (dist > 80) {
 						mirrored = (obj->x < x); // orient toward target
