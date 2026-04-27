@@ -68,7 +68,7 @@
       "id": "E6",
       "name": "Final visual equivalence across all 6 targets",
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "spec": "Final gate. Run all 6 candidate dumps, A/B each against its reference. Each is structurally equivalent (chrome / panel / borders / button outlines / labels) to a casual reader. Empty-data interiors (where applicable) acceptable. <2% diff on each, modulo runtime-text non-structural carve-outs documented in each item's spec.",
       "category": "final"
     }

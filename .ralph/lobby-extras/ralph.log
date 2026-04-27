@@ -27,3 +27,6 @@ All 7 items pass. Emitting the all-pass marker.
 
 <promise>COMPLETE</promise>
 
+--- Iteration 1 2026-04-26 18:53:51 ---
+Iter 8 done — E4 re-passed after the harness fix. Pixel diff dropped 68.64% → 40.10%; residual is panel-chrome / planet / runtime values (all spec-carved-out). Committed as a4fd2de. Scheduled next iter to gate E6 (all-pass marker).
+
