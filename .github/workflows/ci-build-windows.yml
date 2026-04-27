@@ -26,6 +26,12 @@ jobs:
           restore-keys: |
             vcpkg-${{ runner.os }}-
 
+      - name: Cache vcpkg tool downloads
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\downloads\tools
+          key: vcpkg-tools-${{ runner.os }}-v1
+
       - name: Setup sccache
         uses: mozilla-actions/sccache-action@v0.0.4
 
