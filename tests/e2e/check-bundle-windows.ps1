@@ -37,6 +37,9 @@ if (-not $dumpbin) {
 function Get-ImportedDlls {
     param([string] $Path)
     $output = & $dumpbin /nologo /dependents $Path 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "dumpbin failed (exit $LASTEXITCODE) for ${Path}:`n$($output -join "`n")"
+    }
     return $output |
         Where-Object { $_ -match '^\s+\S+\.dll\s*$' } |
         ForEach-Object { $_.Trim() }
