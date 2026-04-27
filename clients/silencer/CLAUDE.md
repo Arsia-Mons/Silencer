@@ -13,7 +13,7 @@ Build with the local `CMakeLists.txt` (`cmake -B build && cmake --build build`)
 
 `Object` is mixin multiple inheritance of five bases — `Sprite`,
 `Physical`, `Hittable`, `Bipedal`, `Projectile` (`object.h:14`).
-~42 leaf classes inherit directly from `Object` (actors,
+41 leaf classes inherit directly from `Object` (actors,
 projectiles, stations, UI widgets); two-deep tree, no further
 subclassing. Full breakdown in
 [`../../docs/silencer-client-architecture.md`](../../docs/silencer-client-architecture.md).

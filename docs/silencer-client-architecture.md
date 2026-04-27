@@ -2,9 +2,8 @@
 
 Reference for `clients/silencer/src/` (currently a flat ~180-file
 directory). Captures the actual class hierarchy and functional
-groupings; intended as the starting point for a folder
-reorganization and as the on-ramp for new contributors trying to
-locate code.
+groupings as an on-ramp for locating code. Class edges and counts
+are validated against the libclang AST of `src/*.h`.
 
 ## Class hierarchy
 
@@ -29,7 +28,7 @@ Each base contributes one slice of state/behavior:
 | `Projectile` | projectile motion / lifetime fields |
 
 Every gameplay or UI thing in the world is then a single-level
-subclass of `Object` — **42 leaf classes, no deeper subclassing
+subclass of `Object` — **41 leaf classes, no deeper subclassing
 anywhere**. Grouped by role:
 
 ### Actors (4)
@@ -57,10 +56,31 @@ gameplay entities even though conceptually they're separate.
 ### Misc gameplay state (4)
 `PickUp`, `Plume`, `State`, `Team`
 
+## `Object` subclass contract
+
+Virtual methods on `Object` (`object.h:14`) that subclasses
+override — this is what a new entity has to implement:
+
+| Method | When called |
+|--------|-------------|
+| `Tick(World&)` | once per simulation frame |
+| `Serialize(write, data, old)` | network replication (delta vs `old`) |
+| `OnDestroy(World&)` | when the object is removed |
+| `HandleHit(World&, x, y, projectile)` | when hit by a projectile |
+| `HandleInput(Input&)` | controllable objects only |
+| `HandleDisconnect(World&, peerid)` | when a peer drops |
+
+Per-instance `is*` flags (`issprite`, `isphysical`, `ishittable`,
+`isbipedal`, `isprojectile`, `iscontrollable`) gate which mixin
+behaviors actually run, since every `Object` carries all five
+mixins by inheritance regardless of whether the subclass uses
+them.
+
 ## Subsystems (non-`Object` classes)
 
-These are the engine pieces that run the entities above. Each is
-a standalone class — no inheritance into the `Object` tree.
+These are the engine pieces that run the entities above. All are
+standalone classes except `SDL3GPUBackend : RenderDevice` (the
+only non-`Object` inheritance edge in the codebase).
 
 | Group | Files |
 |-------|-------|
@@ -76,38 +96,3 @@ a standalone class — no inheritance into the `Object` tree.
 | Top-level | `game.{h,cpp}`, `main.cpp` |
 | Third-party (vendored) | `zlib/` |
 
-## Implications for restructuring
-
-Observations that should inform any folder reorganization:
-
-1. **Entities vs subsystems is the cleanest split.** Every
-   `Object` subclass lives in the world (or pretends to);
-   everything else runs them.
-2. **The five mixins belong with `Object`.** `Sprite`,
-   `Physical`, `Hittable`, `Bipedal`, and `Projectile` exist only
-   as parts of `Object` — they should live next to it, not
-   scattered across rendering / physics / etc.
-3. **The four `Object`-subclass clusters** (actors, projectiles,
-   stations, ui) are the obvious folder candidates inside an
-   `entities/` (or similar) parent.
-4. **UI widgets crossing the gameplay/UI boundary via `Object`
-   inheritance** is real coupling — folder layout will not hide
-   it. Worth deciding whether that's a refactor target or a fixed
-   constraint.
-5. **Updater is self-contained** (5 files, no cross-deps into
-   gameplay) — easy folder candidate.
-6. **Platform shims** (`os`, `cocoawrapper`, `SDLMain`) are a
-   small, clear group.
-
-## How this was generated
-
-Class edges grepped from `clients/silencer/src/*.h`:
-
-```bash
-grep -EHn 'class [A-Za-z_]+ ?: ?(public|private|protected) ?[A-Za-z_]+' \
-  clients/silencer/src/*.h
-```
-
-Standalone classes (no inheritance) found by inverting that grep
-on `^class [A-Za-z_]+`. Counts and groupings reflect the
-repository state on 2026-04-27.
