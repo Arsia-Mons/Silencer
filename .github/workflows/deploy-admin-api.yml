@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'services/admin-api/**'
+      - 'shared/assets/**'
       - '.github/workflows/deploy-admin-api.yml'
   workflow_dispatch:
 
@@ -71,19 +72,69 @@ jobs:
           printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy
           chmod 600 ~/.ssh/deploy
 
+      - name: Sync assets to admin box
+        env:
+          HOST: ${{ vars.ADMIN_DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          # tar → pipe → SSH: no rsync dependency needed on either end.
+          # --strip-components=1 drops the leading `assets/` prefix so
+          # files land directly in /var/lib/silencer/assets/.
+          tar -czf - -C shared assets | \
+            ssh -i ~/.ssh/deploy \
+                -o StrictHostKeyChecking=accept-new \
+                -o UserKnownHostsFile=~/.ssh/known_hosts \
+                "ubuntu@$HOST" \
+                'sudo mkdir -p /var/lib/silencer/assets && sudo tar -xzf - --strip-components=1 -C /var/lib/silencer/assets'
+
       - name: Deploy via SSH
         env:
           HOST: ${{ vars.ADMIN_DEPLOY_HOST }}
           IMAGE_REF: ${{ steps.img.outputs.ref }}
         run: |
           set -euo pipefail
+          # Pass IMAGE_REF as $1 so <<'REMOTE' can suppress local expansion
+          # while still injecting the image ref into the remote script.
           ssh -i ~/.ssh/deploy \
               -o StrictHostKeyChecking=accept-new \
               -o UserKnownHostsFile=~/.ssh/known_hosts \
-              "ubuntu@$HOST" "
-            set -e
-            echo 'IMAGE=$IMAGE_REF' | sudo tee /etc/silencer/admin-api.image > /dev/null
-            sudo systemctl restart silencer-admin-api
-            sleep 5
-            sudo systemctl is-active silencer-admin-api
-          "
+              "ubuntu@$HOST" bash -s "$IMAGE_REF" << 'REMOTE'
+          set -euo pipefail
+          IMAGE_REF="$1"
+
+          # 1. Update image ref
+          echo "IMAGE=$IMAGE_REF" | sudo tee /etc/silencer/admin-api.image > /dev/null
+
+          # 2. Idempotently add ASSETS_DIR to the secret-fetch script so it
+          #    survives future secret rotations (the script overwrites the env
+          #    file on every run, so appending to the env file alone isn't durable).
+          grep -q 'ASSETS_DIR=/assets' /usr/local/sbin/silencer-fetch-secrets || \
+            sudo sed -i '/^GITHUB_BACKUP_REPO/a ASSETS_DIR=/assets' /usr/local/sbin/silencer-fetch-secrets
+
+          # 3. Regenerate env file to pick up ASSETS_DIR immediately
+          sudo /usr/local/sbin/silencer-fetch-secrets
+
+          # 4. Write a systemd drop-in that adds the assets volume mount.
+          #    Drop-ins survive package updates and are idempotent (overwritten
+          #    on every deploy so changes here always take effect).
+          sudo mkdir -p /etc/systemd/system/silencer-admin-api.service.d
+          sudo tee /etc/systemd/system/silencer-admin-api.service.d/assets.conf > /dev/null << 'EOF'
+          [Service]
+          ExecStart=
+          ExecStart=/usr/bin/docker run --rm --name silencer-admin-api \
+            --network host \
+            --env-file /etc/silencer/admin-api.env \
+            -v /var/lib/silencer-backups:/backups \
+            -v /var/lib/silencer/assets:/assets \
+            ${IMAGE}
+          EOF
+
+          # 5. Apply unit changes and restart
+          sudo systemctl daemon-reload
+          sudo systemctl restart silencer-admin-api
+          sleep 5
+          sudo systemctl is-active silencer-admin-api
+
+          # 6. Smoke-test the sprite endpoint
+          curl -sf http://127.0.0.1:24080/api/sprites/121/0 > /dev/null
+          REMOTE
