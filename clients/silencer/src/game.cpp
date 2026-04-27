@@ -101,6 +101,11 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	mapexistchecked = false;
 	fullscreentoggled = false;
 	replayfile = 0;
+	controlPort = 0;
+	headless = false;
+	paused = false;
+	stepFramesRemaining = 0;
+	stepWallclockDeadlineMs = 0;
 	stage2spawned = false;
 }
 
@@ -167,6 +172,15 @@ bool Game::Load(char * cmdline){
 			if(strncmp(cmdline, "-r", 2) == 0){ // play replay
 				replayfile = strtok(NULL, " ");
 				GoToState(REPLAYGAME);
+			}
+			else if(strncmp(cmdline, "--control-port", 14) == 0){
+				char * portstr = strtok(NULL, " ");
+				if(portstr){
+					controlPort = atoi(portstr);
+				}
+			}
+			else if(strcmp(cmdline, "--headless") == 0){
+				headless = true;
 			}
 		}while((cmdline = strtok(0, " ")));
 	}
