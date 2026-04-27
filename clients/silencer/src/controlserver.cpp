@@ -1,5 +1,6 @@
 #include "controlserver.h"
 #include "controldispatch.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <chrono>
@@ -24,12 +25,13 @@ ControlServer::~ControlServer() {
 	Stop();
 }
 
-bool ControlServer::Start(int p) {
+bool ControlServer::Start(int p, std::function<void()> onShutdownDrain) {
 	if(p <= 0){
 		return false;
 	}
 	if(running.load()) return false;
 	port = p;
+	shutdownDrain = std::move(onShutdownDrain);
 	listenfd = (int)::socket(AF_INET, SOCK_STREAM, 0);
 	if(listenfd < 0){
 		fprintf(stderr, "[control] socket() failed\n");
@@ -66,8 +68,22 @@ void ControlServer::Stop() {
 		listenfd = -1;
 	}
 	if(acceptthread.joinable()) acceptthread.join();
-	// Drain pending commands and fulfill their promises so the per-connection
-	// threads can exit. They're detached, so we don't need to join them.
+
+	// Force any handler blocked in recv() (inside ReadLine) to return. We mark
+	// each entry -1 under the lock so the handler's own cleanup won't race-close
+	// a recycled fd.
+	{
+		std::lock_guard<std::mutex> lk(conn_mu);
+		for(int& fd : clientfds){
+			if(fd >= 0){
+				CLOSE_SOCK(fd);
+				fd = -1;
+			}
+		}
+	}
+
+	// Drain queued commands and fulfill their promises so handlers blocked on
+	// fut.get() can return.
 	std::vector<ControlCommand> stragglers;
 	{
 		std::lock_guard<std::mutex> lk(queue_mu);
@@ -89,6 +105,22 @@ void ControlServer::Stop() {
 			c.reply->set_value(rpl);
 		}
 	}
+
+	// Fulfill replies for commands held outside us (e.g. Game::pendingWaits).
+	if(shutdownDrain) shutdownDrain();
+
+	// Now safe to join: every handler can exit recv() (socket closed) or fut.get()
+	// (promise fulfilled).
+	std::vector<std::thread> threads_to_join;
+	{
+		std::lock_guard<std::mutex> lk(conn_mu);
+		threads_to_join = std::move(connthreads);
+		connthreads.clear();
+		clientfds.clear();
+	}
+	for(auto& t : threads_to_join){
+		if(t.joinable()) t.join();
+	}
 }
 
 void ControlServer::AcceptLoop() {
@@ -100,7 +132,11 @@ void ControlServer::AcceptLoop() {
 			if(!running.load()) break;
 			continue;
 		}
-		std::thread(&ControlServer::HandleConnection, this, cfd).detach();
+		// Register cfd before launching the handler so Stop() will see it.
+		// The handler removes its entry on exit.
+		std::lock_guard<std::mutex> lk(conn_mu);
+		clientfds.push_back(cfd);
+		connthreads.emplace_back(&ControlServer::HandleConnection, this, cfd);
 	}
 }
 
@@ -177,7 +213,18 @@ void ControlServer::HandleConnection(int cfd) {
 		ControlReply got = fut.get();
 		if(!WriteAll(cfd, ReplyToLine(got))) break;
 	}
-	CLOSE_SOCK(cfd);
+	// Take ownership of the close: Stop() may have already closed and -1'd our
+	// entry; only close if the entry still names our fd.
+	int my_cfd = -1;
+	{
+		std::lock_guard<std::mutex> lk(conn_mu);
+		auto it = std::find(clientfds.begin(), clientfds.end(), cfd);
+		if(it != clientfds.end()){
+			my_cfd = *it;
+			*it = -1;
+		}
+	}
+	if(my_cfd >= 0) CLOSE_SOCK(my_cfd);
 }
 
 std::vector<ControlCommand> ControlServer::DrainImmediate() {

@@ -111,6 +111,12 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 }
 
 Game::~Game(){
+	// Bring the control server down first. Stop() runs the shutdown drain we
+	// registered at Load() time, fulfilling promises for both queued and
+	// pendingWaits commands so handler threads can unblock from fut.get() before
+	// we join them. Doing this before tearing down anything else keeps members
+	// pendingWaits/etc alive while the drain runs.
+	controlserver.Stop();
 	if(renderdevice){
 		renderdevice->Shutdown();
 		delete renderdevice;
@@ -224,6 +230,10 @@ bool Game::Load(char * cmdline){
 			SetColors(renderer.palette.GetColors());
 			//SDL_Flip(screen);
 		}
+		// Headless mode skips SetColors() above, so palettecolors[] starts zeroed.
+		// It is first populated by SetColors() in the MAINMENU state handler in
+		// Loop(). Screenshot ops route to PostFrameReplies() AFTER Tick() runs,
+		// so the palette is always populated by the time a screenshot is captured.
 	}
 	printf("Loading resources...\n");
 	if(!world.resources.Load(*this, world.dedicatedserver.active)){
@@ -233,7 +243,19 @@ bool Game::Load(char * cmdline){
 	printf("Resources loaded\n");
 	lasttick = SDL_GetTicks();
 	if(controlPort > 0){
-		if(!controlserver.Start(controlPort)){
+		auto drainPendingWaits = [this](){
+			for(auto& w : pendingWaits){
+				if(!w.cmd.reply) continue;
+				ControlReply rpl;
+				rpl.id = w.cmd.id;
+				rpl.ok = false;
+				rpl.code = "INTERNAL";
+				rpl.error = "server stopping";
+				w.cmd.reply->set_value(rpl);
+			}
+			pendingWaits.clear();
+		};
+		if(!controlserver.Start(controlPort, drainPendingWaits)){
 			fprintf(stderr, "[control] failed to start; continuing without\n");
 		}
 	}
@@ -327,7 +349,7 @@ bool Game::Loop(void){
 	while(lasttick <= tickcheck && tickcheck - lasttick > wait){
 		//printf("%d\n", tickcheck - lasttick);
 		if(paused){
-			bool budgetFrames = stepFramesRemaining > 0 || stepFramesRemaining < 0;
+			bool budgetFrames = stepFramesRemaining > 0;
 			bool budgetMs = stepWallclockDeadlineMs > 0 && SDL_GetTicks() < stepWallclockDeadlineMs;
 			if(!budgetFrames && !budgetMs){
 				lasttick = tickcheck; // freeze the catch-up clock
@@ -5839,6 +5861,11 @@ bool Game::HandleSDLEvents(void){
 	if(world.dedicatedserver.active){
 		return true;
 	}
+	if(headless){
+		// SDL_INIT_VIDEO was skipped, so `window` is NULL; event handlers below
+		// would deref it via SDL_GetWindowSize. Bail before SDL_PollEvent.
+		return true;
+	}
 	SDL_Event event;
 	while(SDL_PollEvent(&event) > 0){
 		switch(event.type){
@@ -6061,6 +6088,21 @@ void Game::DrainControlQueue(){
 		}
 	}
 	ControlDispatch::TickWaits(*this);
+	// Dedicated server has no rendering and never calls PostFrameReplies(), so
+	// any POST_RENDER op (e.g. screenshot) would block its handler thread
+	// forever. Fail them at receive time.
+	if(world.dedicatedserver.active){
+		auto pr = controlserver.DrainPostRender();
+		for(auto& c : pr){
+			if(!c.reply) continue;
+			ControlReply rpl;
+			rpl.id = c.id;
+			rpl.ok = false;
+			rpl.code = "WRONG_STATE";
+			rpl.error = "post-render ops not supported in dedicated server mode";
+			c.reply->set_value(rpl);
+		}
+	}
 }
 
 void Game::PostFrameReplies(){

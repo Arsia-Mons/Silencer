@@ -705,14 +705,14 @@ static const char* LabelOf(Object* o){
 }
 
 Interface::WidgetMatch Interface::FindWidgetByLabel(World& world,
-	const char* labelOrId, Uint32 wantedTypes, Uint16* outId) const {
+	const char* labelOrId, Uint64 wantedTypes, Uint16* outId) const {
 	if(!labelOrId || !*labelOrId) return MATCH_NOT_FOUND;
 	// Numeric ID path: caller passed a literal Uint16.
 	char* endp = nullptr;
 	long asnum = std::strtol(labelOrId, &endp, 10);
 	if(endp && *endp == 0 && asnum > 0 && asnum <= 0xFFFF){
 		Object* o = world.GetObjectFromId((Uint16)asnum);
-		if(o && (wantedTypes == 0 || (wantedTypes & (1u << o->type)))){
+		if(o && (wantedTypes == 0 || (wantedTypes & (1ULL << o->type)))){
 			*outId = (Uint16)asnum;
 			return MATCH_OK;
 		}
@@ -723,7 +723,7 @@ Interface::WidgetMatch Interface::FindWidgetByLabel(World& world,
 	for(Uint16 oid : objects){
 		Object* o = world.GetObjectFromId(oid);
 		if(!o) continue;
-		if(wantedTypes != 0 && !(wantedTypes & (1u << o->type))) continue;
+		if(wantedTypes != 0 && !(wantedTypes & (1ULL << o->type))) continue;
 		const char* label = LabelOf(o);
 		if(label && IEq(label, labelOrId)){
 			if(hits == 0) firstHit = oid;

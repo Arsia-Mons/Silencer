@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <functional>
 #include <future>
 #include <mutex>
 #include <string>
@@ -35,7 +36,11 @@ public:
 	ControlServer();
 	~ControlServer();
 	// Returns false if the listen socket can't bind. Logs and continues.
-	bool Start(int port);
+	// `onShutdownDrain` runs from Stop() between fulfilling the IMMEDIATE/POST_RENDER
+	// queues and joining the per-connection threads. Use it to fulfill replies for
+	// commands held outside this class (e.g. Game::pendingWaits) so handler threads
+	// blocked on fut.get() can unblock before we join them.
+	bool Start(int port, std::function<void()> onShutdownDrain = {});
 	void Stop();
 
 	// Game-thread: pop all queued IMMEDIATE commands.
@@ -55,6 +60,14 @@ private:
 	std::mutex queue_mu;
 	std::vector<ControlCommand> immediate;
 	std::vector<ControlCommand> postrender;
+
+	// Per-connection threads + their sockets. Stop() closes the sockets to unblock
+	// recv() and then joins the threads — no detach, no UAF on members.
+	std::mutex conn_mu;
+	std::vector<std::thread> connthreads;
+	std::vector<int> clientfds;
+
+	std::function<void()> shutdownDrain;
 };
 
 #endif

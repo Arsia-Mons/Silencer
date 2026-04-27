@@ -22,10 +22,11 @@ public:
 	void DestroyInterface(World & world, Interface * parentinterface = 0);
 	enum WidgetMatch { MATCH_OK, MATCH_NOT_FOUND, MATCH_AMBIGUOUS };
 	// Walks `objects`. Compares case-insensitively against widget label/text.
-	// `wantedTypes` is a bitmask of (1 << ObjectTypes::BUTTON) etc; 0 = any.
+	// `wantedTypes` is a bitmask of (1ULL << ObjectTypes::BUTTON) etc; 0 = any.
+	// Uint64 because some object types are >= 32 (e.g. WALLPROJECTILE, BASEEXIT).
 	// Returns the matched object id in `*outId` on MATCH_OK.
 	WidgetMatch FindWidgetByLabel(class World& world, const char* labelOrId,
-		Uint32 wantedTypes, Uint16* outId) const;
+		Uint64 wantedTypes, Uint16* outId) const;
 	static char * WordWrap(const char * string, unsigned int maxlength, const char * breakchar = "\n");
 	std::vector<Uint16> objects;
 	std::vector<Uint16> tabobjects;

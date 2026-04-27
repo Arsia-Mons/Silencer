@@ -148,7 +148,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
 			return;
 		}
-		Uint32 mask = (1u << ObjectTypes::BUTTON) | (1u << ObjectTypes::TOGGLE);
+		Uint64 mask = (1ULL << ObjectTypes::BUTTON) | (1ULL << ObjectTypes::TOGGLE);
 		Uint16 wid = 0;
 		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
 		if(m == Interface::MATCH_NOT_FOUND){
@@ -181,7 +181,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		Uint16 ifid = game.GetCurrentInterfaceId();
 		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
 		if(!iface){ cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface")); return; }
-		Uint32 mask = (1u << ObjectTypes::TEXTBOX);
+		Uint64 mask = (1ULL << ObjectTypes::TEXTBOX);
 		Uint16 wid = 0;
 		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
 		if(m != Interface::MATCH_OK){
@@ -203,11 +203,17 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		Uint16 ifid = game.GetCurrentInterfaceId();
 		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
 		if(!iface){ cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface")); return; }
-		Uint32 mask = (1u << ObjectTypes::SELECTBOX);
+		Uint64 mask = (1ULL << ObjectTypes::SELECTBOX);
 		Uint16 wid = 0;
 		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
-		if(m != Interface::MATCH_OK){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", target));
+		if(m == Interface::MATCH_NOT_FOUND){
+			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
+				"no selectbox matches \"" + target + "\""));
+			return;
+		}
+		if(m == Interface::MATCH_AMBIGUOUS){
+			cmd.reply->set_value(Err(cmd.id, "WIDGET_AMBIGUOUS",
+				"multiple selectboxes match \"" + target + "\""));
 			return;
 		}
 		SelectBox* sb = (SelectBox*)game.GetWorld().GetObjectFromId(wid);
