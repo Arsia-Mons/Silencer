@@ -35,6 +35,9 @@ public:
 	Uint16 GetCurrentInterfaceId() const { return currentinterface; }
 	class World& GetWorld() { return world; }
 	nlohmann::json GetWorldSummary();
+	const Surface& GetScreenBuffer() const { return screenbuffer; }
+	const SDL_Color* GetPaletteColors() const { return palettecolors; }
+	Renderer& GetRenderer() { return renderer; }
 	bool GoBack(void);
 	bool paused;
 	int stepFramesRemaining;

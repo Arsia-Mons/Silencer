@@ -8,6 +8,14 @@
 #include "selectbox.h"
 #include "objecttypes.h"
 #include <cstring>
+#include <cstdio>
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR(p) _mkdir(p)
+#else
+#include <sys/stat.h>
+#define MKDIR(p) mkdir((p), 0755)
+#endif
 
 namespace ControlDispatch {
 
@@ -227,6 +235,28 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 }
 
 void HandlePostRender(Game& game, ControlCommand& cmd) {
+	if(cmd.op == "screenshot"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			char buf[256];
+		#ifdef _WIN32
+			const char* tmp = getenv("TEMP"); if(!tmp) tmp = ".";
+			snprintf(buf, sizeof(buf), "%s\\silencer-%d.png", tmp, game.GetFrameCount());
+		#else
+			snprintf(buf, sizeof(buf), "/tmp/silencer-%d.png", game.GetFrameCount());
+		#endif
+			out = buf;
+		}
+		bool ok = game.GetRenderer().CapturePNG(game.GetScreenBuffer(),
+			game.GetPaletteColors(), out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "stbi_write_png failed: " + out));
+			return;
+		}
+		nlohmann::json r; r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown post-render op: " + cmd.op));
 }
 
