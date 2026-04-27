@@ -44,6 +44,11 @@ function Get-ImportedDlls {
 
 function Resolve-Dll {
     param([string] $Dll)
+    # API Set DLLs (api-ms-win-*, ext-ms-*) are virtual — the OS loader
+    # redirects them to the real implementation (ucrtbase.dll etc.) at
+    # runtime, so they don't appear as files under System32. Guaranteed
+    # present on Windows 10+; treat as system-resolved.
+    if ($Dll -match '^(api|ext)-ms-') { return $true }
     $candidates = @(
         Join-Path $PackageDir $Dll
         Join-Path "$env:WINDIR\System32" $Dll
@@ -72,7 +77,7 @@ while ($queue.Count -gt 0) {
             $missing += "$dll (referenced by $current)"
             continue
         }
-        if ($resolved.StartsWith($PackageDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+        if ($resolved -is [string] -and $resolved.StartsWith($PackageDir, [System.StringComparison]::OrdinalIgnoreCase)) {
             $queue.Enqueue($resolved)
         }
     }
