@@ -261,7 +261,8 @@ void Game::Present(void){
 			else if(strcmp(dumpstate, "LOBBY_GAMECREATE") == 0)  { target_state = LOBBY; target_modal_create  = true; }
 			else if(strcmp(dumpstate, "LOBBY_GAMEJOIN") == 0)    { target_state = LOBBY; target_modal_join    = true; }
 			else if(strcmp(dumpstate, "LOBBY_GAMETECH") == 0)    { target_state = LOBBY; target_modal_tech    = true; }
-			else if(strcmp(dumpstate, "LOBBY_GAMESUMMARY") == 0) { target_state = LOBBY; target_modal_summary = true; }
+			else if(strcmp(dumpstate, "LOBBY_GAMESUMMARY") == 0) { target_state = MISSIONSUMMARY; target_modal_summary = true; }
+			else if(strcmp(dumpstate, "MISSIONSUMMARY") == 0)    { target_state = MISSIONSUMMARY; target_modal_summary = true; }
 			else if(strcmp(dumpstate, "UPDATING") == 0) target_state = UPDATING;
 		}
 
@@ -353,6 +354,63 @@ void Game::Present(void){
 		// no real game session, so we lie and force world.state =
 		// CONNECTED. Also defensively destroy any modal dialog that
 		// already snuck in.
+		// MISSIONSUMMARY: jump from LOBBY once settled. The engine's
+		// stateisnew block runs Clear(0) + SetPalette(1) + creates
+		// gamesummaryinterface from `user.statscopy` (which is zero
+		// without a real played match). After stateisnew, we
+		// destroy+recreate the interface with stub_stats so the
+		// captured reference shows realistic non-zero numbers.
+		if(target_modal_summary && state == LOBBY && !stateisnew){
+			static bool jumped_to_summary = false;
+			if(!jumped_to_summary){
+				jumped_to_summary = true;
+				GoToState(MISSIONSUMMARY);
+			}
+		}
+		if(target_modal_summary && state == MISSIONSUMMARY && !stateisnew){
+			static bool summary_reseeded = false;
+			if(!summary_reseeded){
+				summary_reseeded = true;
+				// Replace the engine's zero-Stats summary with one
+				// populated from canned demo values. Built-in agency
+				// upgrade values (Endurance/Shield/Jetpack/TechSlots/
+				// Hacking/Contacts) come from the demo lobby's
+				// SeedDemoUser and are already populated correctly —
+				// only the post-match Stats need our fill-in.
+				Stats stub;
+				stub.kills = 12;
+				stub.deaths = 4;
+				stub.suicides = 1;
+				stub.secretsreturned = 3;
+				stub.secretsstolen = 5;
+				stub.secretsdropped = 1;
+				stub.civilianskilled = 0;
+				stub.guardskilled = 7;
+				stub.robotskilled = 2;
+				stub.defensekilled = 4;
+				stub.fixedcannonsdestroyed = 1;
+				stub.fileshacked = 6;
+				stub.filesreturned = 4;
+				stub.powerupspickedup = 8;
+				stub.healthpacksused = 3;
+				stub.camerasplanted = 5;
+				stub.detsplanted = 2;
+				stub.fixedcannonsplaced = 1;
+				stub.virusesused = 3;
+				stub.poisons = 2;
+				stub.tractsplanted = 0;
+				if(gamesummaryinterface){
+					Interface * iface = static_cast<Interface *>(world.GetObjectFromId(gamesummaryinterface));
+					if(iface){
+						iface->DestroyInterface(world, 0);
+					}
+					gamesummaryinterface = 0;
+				}
+				gamesummaryinterface = CreateGameSummaryInterface(stub, Team::NOXIS)->id;
+				currentinterface = gamesummaryinterface;
+			}
+		}
+
 		// GameJoin / GameTech setup. `world.state = CONNECTED` triggers
 		// the engine's own gamejoininterface auto-create (line ~885) plus
 		// suppresses the "Disconnected from game" modal. We let that
@@ -481,37 +539,9 @@ void Game::Present(void){
 						lobbyiface->AddObject(gametechinterface);
 					}
 				}
-				if(target_modal_summary && !gamesummaryinterface){
-					// Seed sample non-zero values so the captured reference
-					// shows realistic numbers rather than 0 across the board.
-					Stats stub_stats;
-					stub_stats.kills = 12;
-					stub_stats.deaths = 4;
-					stub_stats.suicides = 1;
-					stub_stats.secretsreturned = 3;
-					stub_stats.secretsstolen = 5;
-					stub_stats.secretsdropped = 1;
-					stub_stats.civilianskilled = 0;
-					stub_stats.guardskilled = 7;
-					stub_stats.robotskilled = 2;
-					stub_stats.defensekilled = 4;
-					stub_stats.fixedcannonsdestroyed = 1;
-					stub_stats.fileshacked = 6;
-					stub_stats.filesreturned = 4;
-					stub_stats.powerupspickedup = 8;
-					stub_stats.healthpacksused = 3;
-					stub_stats.camerasplanted = 5;
-					stub_stats.detsplanted = 2;
-					stub_stats.fixedcannonsplaced = 1;
-					stub_stats.virusesused = 3;
-					stub_stats.poisons = 2;
-					stub_stats.tractsplanted = 0;
-					gamesummaryinterface = CreateGameSummaryInterface(stub_stats, Team::NOXIS)->id;
-					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-					if(lobbyiface){
-						lobbyiface->AddObject(gamesummaryinterface);
-					}
-				}
+				// (GameSummary moved out — uses real MISSIONSUMMARY state
+				// instead of force-create-inside-LOBBY. See
+				// `summary_pre_seeded` block above.)
 			}
 		}
 
