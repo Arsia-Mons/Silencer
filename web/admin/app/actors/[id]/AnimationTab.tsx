@@ -39,17 +39,45 @@ function useImageCache() {
   }, []);
 }
 
-/** Live preview canvas that plays a sequence at 60fps. */
+const SCALE = 3;
+const CANVAS_PAD = 24; // px padding around the scaled sprite
+const CANVAS_MIN = 120;
+
+/** Live preview canvas that plays a sequence at 60fps, auto-sized to the sprite. */
 function PreviewCanvas({ sequence }: { sequence: AnimSequence | null }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
   const loadImg   = useImageCache();
   const stateRef  = useRef({ tick: 0, frameIdx: 0 });
+  const [canvasSize, setCanvasSize] = useState({ w: CANVAS_MIN, h: CANVAS_MIN });
+
+  // Measure max natural sprite size across all frames in the sequence
+  useEffect(() => {
+    if (!sequence || sequence.frames.length === 0) {
+      setCanvasSize({ w: CANVAS_MIN, h: CANVAS_MIN });
+      return;
+    }
+    // Deduplicate bank:index pairs
+    const unique = [...new Map(sequence.frames.map(f => [`${f.bank}:${f.index}`, f])).values()];
+    Promise.all(unique.map(f => loadImg(f.bank, f.index).catch(() => null)))
+      .then(imgs => {
+        let maxW = 0, maxH = 0;
+        for (const img of imgs) {
+          if (!img) continue;
+          if (img.naturalWidth  > maxW) maxW = img.naturalWidth;
+          if (img.naturalHeight > maxH) maxH = img.naturalHeight;
+        }
+        setCanvasSize({
+          w: Math.max(maxW * SCALE + CANVAS_PAD * 2, CANVAS_MIN),
+          h: Math.max(maxH * SCALE + CANVAS_PAD * 2, CANVAS_MIN),
+        });
+      });
+  }, [sequence, loadImg]);
 
   useEffect(() => {
     if (!sequence || sequence.frames.length === 0) {
       const ctx = canvasRef.current?.getContext('2d');
-      if (ctx) { ctx.clearRect(0, 0, 200, 200); }
+      if (ctx) ctx.clearRect(0, 0, canvasSize.w, canvasSize.h);
       return;
     }
 
@@ -79,11 +107,10 @@ function PreviewCanvas({ sequence }: { sequence: AnimSequence | null }) {
               const ctx = canvas.getContext('2d')!;
               ctx.clearRect(0, 0, canvas.width, canvas.height);
               // Centered, pixelated, 3x scale
-              const scale = 3;
-              const x = Math.floor((canvas.width - img.width * scale) / 2);
-              const y = Math.floor((canvas.height - img.height * scale) / 2);
+              const x = Math.floor((canvas.width  - img.width  * SCALE) / 2);
+              const y = Math.floor((canvas.height - img.height * SCALE) / 2);
               (ctx as CanvasRenderingContext2D & { imageSmoothingEnabled: boolean }).imageSmoothingEnabled = false;
-              ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+              ctx.drawImage(img, x, y, img.width * SCALE, img.height * SCALE);
             }
           } catch { /* skip frame */ }
         }
@@ -94,13 +121,13 @@ function PreviewCanvas({ sequence }: { sequence: AnimSequence | null }) {
     stateRef.current = { tick: 0, frameIdx: 0 };
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [sequence, loadImg]);
+  }, [sequence, loadImg, canvasSize]);
 
   return (
     <canvas
       ref={canvasRef}
-      width={200}
-      height={200}
+      width={canvasSize.w}
+      height={canvasSize.h}
       className="border border-game-border bg-black"
       style={{ imageRendering: 'pixelated' }}
     />
@@ -310,7 +337,7 @@ export default function AnimationTab({
 
               {/* Preview canvas */}
               <div className="flex flex-col items-center gap-2">
-                <div className="text-xs text-game-textDim tracking-widest">PREVIEW (3x)</div>
+                <div className="text-xs text-game-textDim tracking-widest">PREVIEW (3×)</div>
                 <PreviewCanvas sequence={seq} />
               </div>
             </div>
