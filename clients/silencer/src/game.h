@@ -39,6 +39,7 @@ public:
 	const SDL_Color* GetPaletteColors() const { return palettecolors; }
 	Renderer& GetRenderer() { return renderer; }
 	bool GoBack(void);
+	bool quitRequested = false;
 	bool paused;
 	int stepFramesRemaining;
 	Uint64 stepWallclockDeadlineMs;

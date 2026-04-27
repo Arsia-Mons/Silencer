@@ -291,6 +291,7 @@ bool Game::Loop(void){
 		// Tell main to unwind so ~Game() tears down SDL/audio cleanly.
 		return false;
 	}
+	if(quitRequested) return false;
 	DrainControlQueue();
 	unsigned int wait = 42; // 24 fps
 	if(updatetitle){

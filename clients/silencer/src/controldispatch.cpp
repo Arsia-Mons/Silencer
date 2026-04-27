@@ -231,6 +231,11 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
+	if(cmd.op == "quit"){
+		game.quitRequested = true;
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));
 }
 
