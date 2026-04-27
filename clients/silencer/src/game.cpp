@@ -194,33 +194,36 @@ bool Game::Load(char * cmdline){
 		}
 	}
 	if(!world.dedicatedserver.active){
-		if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)){
+		Uint32 sdlflags = headless ? 0 : (SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+		if(!SDL_Init(sdlflags)){
 			printf("Could not initialize SDL %s\n", SDL_GetError());
 			return false;
 		}
-		if(!MIX_Init()){
-			printf("Could not initialize SDL_mixer: %s\n", SDL_GetError());
-		}
-		if(!Audio::GetInstance().Init(this)){
-			printf("Could not initialize audio\n");
-		}
-		Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
 		printf("Loading palette...\n");
 		if(!renderer.palette.SetPalette(0)){
 			return false;
 		}
-		SDL_AddTimer(1000, TimerCallback, this);
-		//SDL_EnableUNICODE(true);
-		//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
-		//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-		window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
-		SDL_StartTextInput(window);
-		if(!SetupRenderDevice()){
-			printf("Could not initialize GPU render device\n");
-			return false;
+		if(!headless){
+			if(!MIX_Init()){
+				printf("Could not initialize SDL_mixer: %s\n", SDL_GetError());
+			}
+			if(!Audio::GetInstance().Init(this)){
+				printf("Could not initialize audio\n");
+			}
+			Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
+			SDL_AddTimer(1000, TimerCallback, this);
+			//SDL_EnableUNICODE(true);
+			//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
+			//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
+			window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+			SDL_StartTextInput(window);
+			if(!SetupRenderDevice()){
+				printf("Could not initialize GPU render device\n");
+				return false;
+			}
+			SetColors(renderer.palette.GetColors());
+			//SDL_Flip(screen);
 		}
-		SetColors(renderer.palette.GetColors());
-		//SDL_Flip(screen);
 	}
 	printf("Loading resources...\n");
 	if(!world.resources.Load(*this, world.dedicatedserver.active)){
@@ -295,9 +298,11 @@ bool Game::Loop(void){
 	DrainControlQueue();
 	unsigned int wait = 42; // 24 fps
 	if(updatetitle){
-		char title[128];
-		sprintf(title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
-		SDL_SetWindowTitle(window, title);
+		if(!headless && window){
+			char title[128];
+			sprintf(title, "Silencer - %d FPS  Latency: %d ms [%d]  B/s: D:%d U:%d", fps, world.GetPingTime(), (int)world.snapshotqueue.size(), world.totalbytesread, world.totalbytessent);
+			SDL_SetWindowTitle(window, title);
+		}
 		updatetitle = false;
 		frames = 1;
 		world.totalbytesread = 0;
@@ -395,7 +400,7 @@ bool Game::Loop(void){
 		}
 		world.DoNetwork();
 		//Uint32 drawtick = SDL_GetTicks();
-		Present();
+		if(!headless) Present();
 		PostFrameReplies();
 		//Uint32 afterdrawtick = SDL_GetTicks();
 		/*if(1 || afterdrawtick - drawtick > wait){
@@ -487,22 +492,24 @@ bool Game::Tick(void){
 	
 	if(world.gameplaystate == World::INGAME && (state == INGAME || state == SINGLEPLAYERGAME || state == TESTGAME)){
 		UpdateAmbienceChannels();
-		SDL_HideCursor();
+		if(!headless) SDL_HideCursor();
 	}else{
-		SDL_ShowCursor();
+		if(!headless) SDL_ShowCursor();
 	}
-	
-	if(keystate[SDL_SCANCODE_RALT] && keystate[SDL_SCANCODE_RETURN]){
-		if(!fullscreentoggled){
-			if(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN){
-				SDL_SetWindowFullscreen(window, false);
-			}else{
-				SDL_SetWindowFullscreen(window, true);
+
+	if(!headless && window){
+		if(keystate[SDL_SCANCODE_RALT] && keystate[SDL_SCANCODE_RETURN]){
+			if(!fullscreentoggled){
+				if(SDL_GetWindowFlags(window) & SDL_WINDOW_FULLSCREEN){
+					SDL_SetWindowFullscreen(window, false);
+				}else{
+					SDL_SetWindowFullscreen(window, true);
+				}
+				fullscreentoggled = true;
 			}
-			fullscreentoggled = true;
+		}else{
+			fullscreentoggled = false;
 		}
-	}else{
-		fullscreentoggled = false;
 	}
 	
 	switch(state){
