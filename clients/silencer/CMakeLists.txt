@@ -103,6 +103,10 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
 # for runtime debugging.
 if(MSVC)
 	target_compile_options(${SILENCER_TARGET} PRIVATE $<$<CONFIG:Debug>:/Z7>)
+	# MSVC 14.44+ removed _snprintf from std::; nlohmann/json uses it internally.
+	# Force-include the shim before every TU to re-expose it.
+	target_compile_options(${SILENCER_TARGET} PRIVATE
+		"/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/msvc_snprintf_compat.h")
 endif()
 
 set(SILENCER_LOBBY_HOST "127.0.0.1" CACHE STRING "Lobby host the client connects to at startup")
