@@ -38,6 +38,7 @@ public:
 	const Surface& GetScreenBuffer() const { return screenbuffer; }
 	const SDL_Color* GetPaletteColors() const { return palettecolors; }
 	Renderer& GetRenderer() { return renderer; }
+	bool IsLiveMultiplayer() const;
 	bool GoBack(void);
 	bool quitRequested = false;
 	bool paused;

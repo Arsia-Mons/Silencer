@@ -321,6 +321,18 @@ bool Game::Loop(void){
 	}
 	while(lasttick <= tickcheck && tickcheck - lasttick > wait){
 		//printf("%d\n", tickcheck - lasttick);
+		if(paused){
+			bool budgetFrames = stepFramesRemaining > 0 || stepFramesRemaining < 0;
+			bool budgetMs = stepWallclockDeadlineMs > 0 && SDL_GetTicks() < stepWallclockDeadlineMs;
+			if(!budgetFrames && !budgetMs){
+				lasttick = tickcheck; // freeze the catch-up clock
+				break;
+			}
+			if(stepFramesRemaining > 0) --stepFramesRemaining;
+			if(stepWallclockDeadlineMs > 0 && SDL_GetTicks() >= stepWallclockDeadlineMs){
+				stepWallclockDeadlineMs = 0;
+			}
+		}
 		world.systemcameraactive[0] = false;
 		world.systemcameraactive[1] = false;
 		world.DoNetwork();
@@ -6091,4 +6103,8 @@ nlohmann::json Game::GetWorldSummary(){
 	r["players"] = players;
 	r["objects_count"] = objcount;
 	return r;
+}
+
+bool Game::IsLiveMultiplayer() const {
+	return (world.peercount > 1) && (world.gameplaystate == World::INGAME);
 }

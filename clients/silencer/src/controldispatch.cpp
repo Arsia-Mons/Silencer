@@ -236,6 +236,22 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
+	if(cmd.op == "pause"){
+		if(game.IsLiveMultiplayer()){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "pause not supported in live multiplayer"));
+			return;
+		}
+		game.paused = true;
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+	if(cmd.op == "resume"){
+		game.paused = false;
+		game.stepFramesRemaining = 0;
+		game.stepWallclockDeadlineMs = 0;
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));
 }
 
