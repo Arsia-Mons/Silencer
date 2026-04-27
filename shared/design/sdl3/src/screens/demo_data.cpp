@@ -26,23 +26,6 @@ const std::vector<std::string> &ChatLines() {
   return kLines;
 }
 
-const std::vector<std::string> &PresenceLines() {
-  // Section headers + member rows in the order the lobby server emits them.
-  static const std::vector<std::string> kLines = {
-      "In Lobby",
-      "Ember",
-      "Halcyon",
-      "Solace",
-      "Vector",
-      "demo",
-      "Pregame",
-      "Quill -Capture the Tag-",
-      "Playing",
-      "Krieg -Casual Match #1-",
-  };
-  return kLines;
-}
-
 const std::vector<std::string> &GameRows() {
   static const std::vector<std::string> kRows = {
       "Veterans Only",

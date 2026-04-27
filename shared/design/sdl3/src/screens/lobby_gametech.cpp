@@ -22,8 +22,7 @@ void ComposeLobbyGameTech(Framebuffer &fb, const SpriteSet &sprites,
   RenderGameTechModal(fb, sprites, palette, active_sub);
   RenderChat(fb, sprites, palette, active_sub,
              {.channel = demo::ChannelName(),
-              .chat_lines = demo::ChatLines(),
-              .presence_lines = demo::PresenceLines()});
+              .chat_lines = demo::ChatLines()});
 }
 
 }  // namespace silencer

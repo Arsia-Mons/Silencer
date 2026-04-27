@@ -30,16 +30,6 @@ void RenderChat(Framebuffer &fb, const SpriteSet &sprites,
     DrawText(fb, kChatX, y, view.chat_lines[i], /*bank=*/133, /*advance=*/6,
              sprites, palette, active_sub, /*brightness=*/128);
   }
-
-  // Presence textbox top-to-bottom: bbox (267, 220, 110, 207), lineheight=11.
-  constexpr int kPresX = 267;
-  constexpr int kPresY0 = 220;
-  constexpr int kPresDy = 11;
-  for (size_t i = 0; i < view.presence_lines.size(); ++i) {
-    DrawText(fb, kPresX, kPresY0 + static_cast<int>(i) * kPresDy,
-             view.presence_lines[i], /*bank=*/133, /*advance=*/6, sprites,
-             palette, active_sub, /*brightness=*/128);
-  }
 }
 
 }  // namespace silencer

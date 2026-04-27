@@ -21,8 +21,7 @@ void ComposeLobbyGameCreate(Framebuffer &fb, const SpriteSet &sprites,
                          .maps = demo::MapRows()});
   RenderChat(fb, sprites, palette, active_sub,
              {.channel = demo::ChannelName(),
-              .chat_lines = demo::ChatLines(),
-              .presence_lines = demo::PresenceLines()});
+              .chat_lines = demo::ChatLines()});
 }
 
 }  // namespace silencer

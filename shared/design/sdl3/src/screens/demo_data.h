@@ -15,7 +15,6 @@ namespace silencer::demo {
 CharacterView Character();
 const char *ChannelName();
 const std::vector<std::string> &ChatLines();
-const std::vector<std::string> &PresenceLines();
 const std::vector<std::string> &GameRows();
 const std::vector<std::string> &MapRows();
 
