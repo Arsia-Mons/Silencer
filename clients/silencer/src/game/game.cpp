@@ -484,6 +484,17 @@ bool Game::Tick(void){
 		}
 		if(world.gameplaystate == World::INLOBBY){
 			ProcessMapDownload();
+			if(gamejoininterface){
+				Interface * gamejoiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
+				if(gamejoiniface){
+					Button * readybtn = static_cast<Button *>(gamejoiniface->GetObjectWithUid(world, 25));
+					if(readybtn){
+						Peer * localpeer = world.peerlist[world.localpeerid];
+						bool blocked = localpeer && localpeer->ishost && !world.AllPeersDownloadedMap();
+						strcpy(readybtn->text, blocked ? "Waiting..." : "Ready");
+					}
+				}
+			}
 		}
 		/*Peer * localpeer = world.peerlist[world.localpeerid];
 		if(localpeer){
@@ -4742,7 +4753,11 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							}break;
 							case 25:{ // start game/ready
 								if(gamejoininterface){
-									world.SendReady();
+									Peer * localpeer = world.peerlist[world.localpeerid];
+									bool ishost = localpeer && localpeer->ishost;
+									if(!ishost || world.AllPeersDownloadedMap()){
+										world.SendReady();
+									}
 								}
 							}break;
 							case 26:{ // change team
