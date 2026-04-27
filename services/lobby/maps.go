@@ -160,6 +160,35 @@ func (s *MapStore) List() []*MapMeta {
 	return out
 }
 
+// Delete removes a map by name. If no other name references the same SHA-1
+// blob, the file is also deleted from disk.
+func (s *MapStore) Delete(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	meta := s.byName[strings.ToUpper(name)]
+	if meta == nil {
+		return false
+	}
+	delete(s.byName, strings.ToUpper(name))
+
+	// Check whether any remaining byName entry still references this SHA-1.
+	stillReferenced := false
+	for _, m := range s.byName {
+		if m.SHA1 == meta.SHA1 {
+			stillReferenced = true
+			break
+		}
+	}
+	if !stillReferenced {
+		delete(s.bySHA1, strings.ToLower(meta.SHA1))
+		_ = os.Remove(s.mapPath(meta.SHA1))
+	}
+	s.saveIndex()
+	log.Printf("[map-api] deleted map: %s (sha1=%s, blob_removed=%v)", name, meta.SHA1[:8], !stillReferenced)
+	return true
+}
+
 func setCORSHeaders(w http.ResponseWriter, origin string) {
 	if origin == "" {
 		return
@@ -170,7 +199,7 @@ func setCORSHeaders(w http.ResponseWriter, origin string) {
 		allow = "*"
 	}
 	w.Header().Set("Access-Control-Allow-Origin", allow)
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Filename, X-Author, X-Api-Key")
 	w.Header().Set("Access-Control-Max-Age", "86400")
 }
@@ -233,19 +262,42 @@ func StartMapAPIServer(addr string, ms *MapStore) {
 		}
 	})
 
-	// /api/maps/ — download by SHA-1 or by name
+	// /api/maps/ — download by SHA-1 or by name, or DELETE by name
 	mux.HandleFunc("/api/maps/", func(w http.ResponseWriter, r *http.Request) {
 		setCORSHeaders(w, r.Header.Get("Origin"))
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+
+		sub := strings.TrimPrefix(r.URL.Path, "/api/maps/")
+
+		// DELETE /api/maps/{name}
+		if r.Method == http.MethodDelete {
+			if ms.apiKey != "" {
+				key := r.Header.Get("X-Api-Key")
+				if key == "" {
+					key = r.URL.Query().Get("key")
+				}
+				if key != ms.apiKey {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+					return
+				}
+			}
+			name := filepath.Base(sub)
+			if !ms.Delete(name) {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]string{"deleted": name})
+			return
+		}
+
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-
-		sub := strings.TrimPrefix(r.URL.Path, "/api/maps/")
 
 		// /api/maps/by-sha1/{sha1hex}
 		if strings.HasPrefix(sub, "by-sha1/") {
