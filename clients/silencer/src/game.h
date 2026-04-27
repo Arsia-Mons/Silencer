@@ -40,6 +40,13 @@ public:
 	Renderer& GetRenderer() { return renderer; }
 	bool IsLiveMultiplayer() const;
 	bool GoBack(void);
+	struct PendingWait {
+		ControlCommand cmd;
+		Uint64 deadline_ms = 0;   // 0 = no wallclock deadline
+		int frames_left = -1;     // <0 = no frame deadline
+		std::string wait_state;   // for wait_for_state
+	};
+	std::vector<PendingWait> pendingWaits;
 	bool quitRequested = false;
 	bool paused;
 	int stepFramesRemaining;

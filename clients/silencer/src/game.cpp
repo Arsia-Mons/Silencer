@@ -6047,8 +6047,13 @@ void Game::DrainControlQueue(){
 	if(controlPort <= 0) return;
 	auto cmds = controlserver.DrainImmediate();
 	for(auto& c : cmds){
-		ControlDispatch::HandleImmediate(*this, c);
+		if(c.phase == ControlCommand::MULTI_FRAME){
+			ControlDispatch::EnqueueWait(*this, std::move(c));
+		} else {
+			ControlDispatch::HandleImmediate(*this, c);
+		}
 	}
+	ControlDispatch::TickWaits(*this);
 }
 
 void Game::PostFrameReplies(){

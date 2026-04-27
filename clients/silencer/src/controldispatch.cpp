@@ -255,6 +255,74 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));
 }
 
+void EnqueueWait(Game& game, ControlCommand cmd){
+	Game::PendingWait w;
+	w.cmd = std::move(cmd);
+	if(w.cmd.op == "wait_frames"){
+		w.frames_left = w.cmd.args.value("n", 1);
+	} else if(w.cmd.op == "wait_ms"){
+		int ms = w.cmd.args.value("n", 0);
+		w.deadline_ms = SDL_GetTicks() + (Uint64)ms;
+	} else if(w.cmd.op == "wait_for_state"){
+		w.wait_state = w.cmd.args.value("state", std::string());
+		int t = w.cmd.args.value("timeout_ms", 5000);
+		w.deadline_ms = SDL_GetTicks() + (Uint64)t;
+	} else if(w.cmd.op == "step"){
+		int frames = w.cmd.args.value("frames", 0);
+		int ms     = w.cmd.args.value("ms", 0);
+		if(frames > 0){
+			game.stepFramesRemaining = frames;
+			w.frames_left = frames;
+		} else if(ms > 0){
+			game.stepWallclockDeadlineMs = SDL_GetTicks() + (Uint64)ms;
+			w.deadline_ms = game.stepWallclockDeadlineMs;
+		} else {
+			w.cmd.reply->set_value(Err(w.cmd.id, "BAD_REQUEST", "step needs frames>0 or ms>0"));
+			return;
+		}
+		// step assumes the caller wanted the sim to advance and re-pause.
+		game.paused = true;
+	}
+	game.pendingWaits.push_back(std::move(w));
+}
+
+void TickWaits(Game& game){
+	Uint64 now = SDL_GetTicks();
+	auto& v = game.pendingWaits;
+	for(auto it = v.begin(); it != v.end();){
+		bool done = false;
+		auto& w = *it;
+		if(w.cmd.op == "wait_frames" || w.cmd.op == "step"){
+			if(w.frames_left > 0) --w.frames_left;
+			if(w.frames_left == 0) done = true;
+			if(w.deadline_ms > 0 && now >= w.deadline_ms) done = true;
+		} else if(w.cmd.op == "wait_ms"){
+			if(now >= w.deadline_ms) done = true;
+		} else if(w.cmd.op == "wait_for_state"){
+			if(w.wait_state == Game::StateName(game.GetState())){
+				w.cmd.reply->set_value(OkResult(w.cmd.id, nlohmann::json::object()));
+				it = v.erase(it); continue;
+			}
+			if(now >= w.deadline_ms){
+				w.cmd.reply->set_value(Err(w.cmd.id, "TIMEOUT",
+					"state did not become " + w.wait_state));
+				it = v.erase(it); continue;
+			}
+		}
+		if(done){
+			if(w.cmd.op == "step"){
+				game.paused = true;  // step span ended; re-pause
+				game.stepFramesRemaining = 0;
+				game.stepWallclockDeadlineMs = 0;
+			}
+			w.cmd.reply->set_value(OkResult(w.cmd.id, nlohmann::json::object()));
+			it = v.erase(it);
+		} else {
+			++it;
+		}
+	}
+}
+
 void HandlePostRender(Game& game, ControlCommand& cmd) {
 	if(cmd.op == "screenshot"){
 		std::string out = cmd.args.value("out", std::string());
