@@ -49,12 +49,11 @@ function useImageCache() {
   }, []);
 }
 
-const SCALE = 3;
 const CANVAS_PAD = 24; // px padding around the scaled sprite
 const CANVAS_MIN = 120;
 
 /** Live preview canvas that plays a sequence at 60fps, auto-sized to the sprite. */
-function PreviewCanvas({ sequence }: { sequence: AnimSequence | null }) {
+function PreviewCanvas({ sequence, scale }: { sequence: AnimSequence | null; scale: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
   const loadImg   = useImageCache();
@@ -78,11 +77,11 @@ function PreviewCanvas({ sequence }: { sequence: AnimSequence | null }) {
           if (img.naturalHeight > maxH) maxH = img.naturalHeight;
         }
         setCanvasSize({
-          w: Math.max(maxW * SCALE + CANVAS_PAD * 2, CANVAS_MIN),
-          h: Math.max(maxH * SCALE + CANVAS_PAD * 2, CANVAS_MIN),
+          w: Math.max(maxW * scale + CANVAS_PAD * 2, CANVAS_MIN),
+          h: Math.max(maxH * scale + CANVAS_PAD * 2, CANVAS_MIN),
         });
       });
-  }, [sequence, loadImg]);
+  }, [sequence, loadImg, scale]);
 
   useEffect(() => {
     if (!sequence || sequence.frames.length === 0) {
@@ -116,11 +115,10 @@ function PreviewCanvas({ sequence }: { sequence: AnimSequence | null }) {
             if (canvas) {
               const ctx = canvas.getContext('2d')!;
               ctx.clearRect(0, 0, canvas.width, canvas.height);
-              // Centered, pixelated, 3x scale
-              const x = Math.floor((canvas.width  - img.width  * SCALE) / 2);
-              const y = Math.floor((canvas.height - img.height * SCALE) / 2);
+              const x = Math.floor((canvas.width  - img.width  * scale) / 2);
+              const y = Math.floor((canvas.height - img.height * scale) / 2);
               (ctx as CanvasRenderingContext2D & { imageSmoothingEnabled: boolean }).imageSmoothingEnabled = false;
-              ctx.drawImage(img, x, y, img.width * SCALE, img.height * SCALE);
+              ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
             }
           } catch { /* skip frame */ }
         }
@@ -131,7 +129,7 @@ function PreviewCanvas({ sequence }: { sequence: AnimSequence | null }) {
     stateRef.current = { tick: 0, frameIdx: 0 };
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [sequence, loadImg, canvasSize]);
+  }, [sequence, loadImg, canvasSize, scale]);
 
   return (
     <canvas
@@ -166,7 +164,7 @@ function SoundPicker({ value, sounds, onChange }: {
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative flex items-center gap-1" ref={ref}>
       <button
         type="button"
         className="w-32 bg-game-bg border border-game-border px-2 py-1 text-xs font-mono text-left truncate hover:border-game-text"
@@ -175,6 +173,14 @@ function SoundPicker({ value, sounds, onChange }: {
       >
         {value ?? <span className="text-game-textDim">— none —</span>}
       </button>
+      {value && (
+        <button
+          type="button"
+          title="Preview sound"
+          className="text-game-textDim hover:text-game-primary text-xs px-1"
+          onClick={() => { new Audio(`/sounds/${value}`).play().catch(() => {}); }}
+        >▶</button>
+      )}
       {open && (
         <div className="absolute z-50 top-full left-0 mt-0.5 w-48 bg-[#050a05] border border-game-border shadow-lg flex flex-col">
           <input
@@ -192,12 +198,19 @@ function SoundPicker({ value, sounds, onChange }: {
               onClick={() => { onChange(undefined); setOpen(false); }}
             >— none —</button>
             {filtered.map(s => (
-              <button
-                key={s}
-                type="button"
-                className={`w-full text-left px-2 py-1 text-xs font-mono hover:bg-game-border/30 ${s === value ? 'text-game-accent' : ''}`}
-                onClick={() => { onChange(s); setOpen(false); }}
-              >{s}</button>
+              <div key={s} className="flex items-center">
+                <button
+                  type="button"
+                  className={`flex-1 text-left px-2 py-1 text-xs font-mono hover:bg-game-border/30 ${s === value ? 'text-game-primary' : ''}`}
+                  onClick={() => { onChange(s); setOpen(false); }}
+                >{s}</button>
+                <button
+                  type="button"
+                  title="Preview"
+                  className="px-2 text-game-textDim hover:text-game-primary text-xs"
+                  onClick={() => { new Audio(`/sounds/${s}`).play().catch(() => {}); }}
+                >▶</button>
+              </div>
             ))}
           </div>
         </div>
@@ -283,6 +296,7 @@ export default function AnimationTab({
     Object.keys(sequences)[0] ?? null
   );
   const [newSeqName, setNewSeqName] = useState('');
+  const [scale, setScale] = useState(1);
 
   const seq = selectedSeq ? sequences[selectedSeq] : null;
 
@@ -430,8 +444,18 @@ export default function AnimationTab({
 
               {/* Preview canvas */}
               <div className="flex flex-col items-center gap-2">
-                <div className="text-xs text-game-textDim tracking-widest">PREVIEW (3×)</div>
-                <PreviewCanvas sequence={seq} />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-game-textDim tracking-widest">PREVIEW</span>
+                  {[1, 2, 3, 4].map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setScale(s)}
+                      className={`text-xs px-1.5 py-0.5 border ${scale === s ? 'border-game-primary text-game-primary' : 'border-game-border text-game-textDim hover:border-game-text'}`}
+                    >{s}×</button>
+                  ))}
+                </div>
+                <PreviewCanvas sequence={seq} scale={scale} />
               </div>
             </div>
 
