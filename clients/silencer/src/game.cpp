@@ -6045,3 +6045,26 @@ void Game::PostFrameReplies(){
 		ControlDispatch::HandlePostRender(*this, c);
 	}
 }
+
+const char* Game::StateName(Uint8 s){
+	switch(s){
+		case NONE: return "NONE";
+		case FADEOUT: return "FADEOUT";
+		case MAINMENU: return "MAINMENU";
+		case LOBBYCONNECT: return "LOBBYCONNECT";
+		case LOBBY: return "LOBBY";
+		case UPDATING: return "UPDATING";
+		case INGAME: return "INGAME";
+		case MISSIONSUMMARY: return "MISSIONSUMMARY";
+		case SINGLEPLAYERGAME: return "SINGLEPLAYERGAME";
+		case OPTIONS: return "OPTIONS";
+		case OPTIONSCONTROLS: return "OPTIONSCONTROLS";
+		case OPTIONSDISPLAY: return "OPTIONSDISPLAY";
+		case OPTIONSAUDIO: return "OPTIONSAUDIO";
+		case HOSTGAME: return "HOSTGAME";
+		case JOINGAME: return "JOINGAME";
+		case REPLAYGAME: return "REPLAYGAME";
+		case TESTGAME: return "TESTGAME";
+		default: return "UNKNOWN";
+	}
+}

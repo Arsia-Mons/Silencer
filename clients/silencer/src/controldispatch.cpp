@@ -38,6 +38,15 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
+	if(cmd.op == "state"){
+		nlohmann::json r;
+		r["state"] = Game::StateName(game.GetState());
+		r["current_interface_id"] = game.GetCurrentInterfaceId();
+		r["frame"] = game.GetFrameCount();
+		r["paused"] = game.paused;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));
 }
 

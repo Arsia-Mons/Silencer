@@ -30,6 +30,9 @@ public:
 public:
 	// Exposed for ControlDispatch (game-thread only).
 	int GetFrameCount() const { return frames; }
+	static const char* StateName(Uint8 s);
+	Uint8 GetState() const { return state; }
+	Uint16 GetCurrentInterfaceId() const { return currentinterface; }
 	bool paused;
 	int stepFramesRemaining;
 	Uint64 stepWallclockDeadlineMs;
