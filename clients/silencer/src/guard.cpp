@@ -8,6 +8,14 @@
 #include "pickup.h"
 #include <math.h>
 
+static const char* ActorDefName(Uint8 weapon) {
+	switch (weapon) {
+		case 1:  return "guard-laser";
+		case 2:  return "guard-rocket";
+		default: return "guard-blaster";
+	}
+}
+
 Guard::Guard() : Object(ObjectTypes::GUARD){
 	requiresauthority = true;
 	state = NEW;
@@ -552,7 +560,7 @@ void Guard::Tick(World & world){
 			}
 			// play per-frame sounds defined in actordefs/guard.json
 			{
-				auto it = world.resources.actordefs.find("guard");
+				auto it = world.resources.actordefs.find(ActorDefName(weapon));
 				if(it != world.resources.actordefs.end()){
 					auto* seq = it->second.GetSequence("WALKING");
 					std::string snd; int vol;
