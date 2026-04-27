@@ -76,6 +76,60 @@ behaviors actually run, since every `Object` carries all five
 mixins by inheritance regardless of whether the subclass uses
 them.
 
+## `Object` lifecycle (gotchas)
+
+`World` owns every `Object` and four parallel indices: `objectlist`,
+`tobjectlist` (collidables only), `objectsbytype[type]`, and
+`objectidlookup[id]`. All four are kept in sync **only** by the
+`World` lifecycle methods — never push/erase them directly.
+
+**Creation** — `World::CreateObject(type, id=0)` (`world.cpp:2429`).
+Goes through the `ObjectTypes` factory. Returns `nullptr` if:
+- `objectlist.size() == maxobjects` (32000 cap)
+- `world.replaying` is true (replay rewinds via snapshot load, not
+  lifecycle calls)
+- caller is `REPLICA` and the type's `RequiresAuthority()` is true
+
+ID bit 15 distinguishes AUTHORITY-allocated IDs (low) from
+REPLICA-allocated IDs (`| 0x8000`) — both peers can mint IDs for
+locally-spawned objects without colliding.
+
+**Destruction is two-phase.** `MarkDestroyObject(id)`
+(`world.cpp:2475`) sets `wasdestroyed = true` and queues the id;
+`DestroyMarkedObjects()` drains the queue and calls
+`DestroyObject(id)` which calls `OnDestroy(world)`, removes from
+all four indices, and `delete`s. The drain runs at the end of
+`TickObjects` (AUTHORITY) and at the top of `Tick` (REPLICA).
+
+> Never call `DestroyObject` directly from inside a `Tick`,
+> `HandleHit`, or any iteration over `objectlist` — it mutates the
+> lists you're walking. Always `MarkDestroyObject`. The
+> `wasdestroyed` flag is checked in `TickObjects` so a
+> just-marked object is skipped for the rest of the frame.
+
+`OnDestroy` also runs from `DestroyAllObjects` during `~World` —
+make sure your override is safe with a half-torn-down `World`.
+
+## `World` lifecycle (gotchas)
+
+| Phase | What happens |
+|-------|--------------|
+| `World(mode)` | opens UDP socket, loads buyable items. **No map yet.** Mode is `AUTHORITY` or `REPLICA`. |
+| `Connect` / `Listen` | networking begins; map data flows in for replicas. |
+| `Tick()` | **AUTHORITY**: `SendSnapshots` → `TickObjects` (calls every `Object::Tick`) → process input queue. **REPLICA**: `ProcessSnapshotQueue` → `DestroyMarkedObjects` only. **Replicas never call `Object::Tick` from `World::Tick`** — state arrives as snapshot deltas. (`ClientSidePredict` is the one exception, used between snapshots for the local player.) |
+| `HandleDisconnect(peerid)` | calls `Object::HandleDisconnect` on every object the peer controlled, then removes the peer from teams. |
+| `SwitchToLocalAuthorityMode` | promotes a `REPLICA` to `AUTHORITY` when the authority peer drops mid-game (`world.cpp:1183`). `objectlist` survives intact — only the peer relationship changes. Code that branches on `IsAuthority()` must be safe across this transition at any tick boundary. |
+| `~World` | `Disconnect` → close socket → `DestroyAllObjects` (runs `OnDestroy` on each then `delete`s) → free peers + snapshots. |
+
+Implications:
+- **Gameplay logic in `Tick` only runs on `AUTHORITY`.** Visual /
+  audio side-effects that should fire on every peer belong in
+  `Serialize` (state-driven) or in render code, not `Tick`.
+- **`IsAuthority()` is not stable for the lifetime of a `World`** —
+  `SwitchToLocalAuthorityMode` can flip it mid-game.
+- **Always null-check `CreateObject`'s return value.** The cap and
+  the AUTHORITY check fail silently.
+
 ## Subsystems (non-`Object` classes)
 
 These are the engine pieces that run the entities above. All are
