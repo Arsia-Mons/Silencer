@@ -1,0 +1,27 @@
+## Codebase Patterns
+<!-- Patterns this Ralph discovers. Patterns from all 8 prior Ralphs:
+.ralph/{main-menu,options,options-audio,options-display,options-controls,
+lobby-connect,lobby,lobby-interfaces}/progress.txt — read those first. -->
+
+## 2026-04-26T00:00:00Z — INIT
+- Ralph scaffolded by setup conversation.
+- Baseline: 8 screens validated end-to-end. The lobby-interfaces Ralph
+  used the empty-data LOBBY reference; this Ralph upgrades to the
+  populated reference and adds 5 new screens.
+- Reference dumps (do not regenerate):
+  /tmp/real_lobby_populated_dump.ppm (LOBBY with chat/games/stats)
+  /tmp/real_lobby-gamecreate_dump.ppm
+  /tmp/real_lobby-gamejoin_dump.ppm
+  /tmp/real_lobby-gametech_dump.ppm
+  /tmp/real_lobby-gamesummary_dump.ppm
+  /tmp/real_updating_dump.ppm
+- Spec inputs: 5 new screen-* docs in docs/design/.
+- New widget surface: BCHECKBOX (small checkbox button — game-tech grid),
+  CreateModalDialog overlay (renderpass=3, bank 40 idx 4 — non-gated),
+  TextInput numbersonly flag (game-create level/players inputs).
+- Demo data hard-coded values (chat / presence / games / stats) listed
+  in RALPH.md — load-bearing for E0.
+- Hard rule: clients/silencer/src/ is OFF-LIMITS. services/lobby/hub_demo.go
+  IS readable as a spec-adjacent reference.
+- **Learnings:** none yet.
+---

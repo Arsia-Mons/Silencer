@@ -1,0 +1,76 @@
+{
+  "screen": "lobby-extras",
+  "scope": "Populated LOBBY content (chat/games/character) + 5 new screens (game-create, game-join, game-tech, game-summary, updating).",
+  "candidate_dump": "/tmp/sdl3_dump/screen_00.ppm",
+  "candidate_root": "shared/design/sdl3",
+  "items": [
+    {
+      "id": "E0",
+      "name": "Populated LOBBY content (chat lines + game list rows + character stats)",
+      "priority": 0,
+      "passes": false,
+      "spec": "Extend RunDumpLobby (env SILENCER_DUMP_SCREEN=lobby) so the dump matches /tmp/real_lobby_populated_dump.ppm. Render: 5 chat lines (Vector/Solace/Ember/Vector/Halcyon, exact text per RALPH.md); 4 game list rows (Veterans Only / Tutorial / Capture the Tag / Casual Match #1); presence list (In Lobby + Pregame + Playing sections); character stats overlays (LEVEL: 8, WINS: 47, LOSSES: 12, XP TO NEXT LEVEL: 220); username 'demo' in CharacterInterface. All other LOBBY chrome unchanged.",
+      "category": "composition",
+      "reference_dump": "/tmp/real_lobby_populated_dump.ppm",
+      "env": "SILENCER_DUMP_SCREEN=lobby"
+    },
+    {
+      "id": "E1",
+      "name": "lobby-game-create modal (form + map list + Create button)",
+      "priority": 1,
+      "passes": false,
+      "spec": "Per docs/design/screen-lobby-game-create.md: dispatch SILENCER_DUMP_SCREEN=lobby_gamecreate to a new RunDumpLobbyGameCreate. Render LOBBY chrome + populated content (reuse E0's machinery) + replace GameSelectInterface with the GameCreate form: 'Game Options' header, Security/Min Level/Max Level/Max Players/Max Teams labels + values, 'Select Maps:' label + map list (4 demo maps), Game Name input, Password input, Create button.",
+      "category": "composition",
+      "reference_dump": "/tmp/real_lobby-gamecreate_dump.ppm",
+      "env": "SILENCER_DUMP_SCREEN=lobby_gamecreate"
+    },
+    {
+      "id": "E2",
+      "name": "lobby-game-join modal (Choose Tech / Change Team / Ready)",
+      "priority": 2,
+      "passes": false,
+      "spec": "Per docs/design/screen-lobby-game-join.md: dispatch SILENCER_DUMP_SCREEN=lobby_gamejoin to a new RunDumpLobbyGameJoin. Render LOBBY chrome + populated content + 3 B156x21 buttons replacing GameSelectInterface region: Choose Tech (242,68), Change Team (242,100), Ready (242,160). 'Disconnected from game' overlay is non-structural — gate only on the 3 buttons + LOBBY behind.",
+      "category": "composition",
+      "reference_dump": "/tmp/real_lobby-gamejoin_dump.ppm",
+      "env": "SILENCER_DUMP_SCREEN=lobby_gamejoin"
+    },
+    {
+      "id": "E3",
+      "name": "lobby-game-tech modal (Back To Teams + tech grid)",
+      "priority": 3,
+      "passes": false,
+      "spec": "Per docs/design/screen-lobby-game-tech.md: dispatch SILENCER_DUMP_SCREEN=lobby_gametech to a new RunDumpLobbyGameTech. Render LOBBY chrome + Back To Teams B156x21 button (242,68) + tech checkbox grid scaffolding (BCHECKBOX placeholders) + tech name/desc placeholders. 'Disconnected from game' overlay non-structural.",
+      "category": "composition",
+      "reference_dump": "/tmp/real_lobby-gametech_dump.ppm",
+      "env": "SILENCER_DUMP_SCREEN=lobby_gametech"
+    },
+    {
+      "id": "E4",
+      "name": "lobby-game-summary (Mission Summary + Agency Upgrade panel)",
+      "priority": 4,
+      "passes": false,
+      "spec": "Per docs/design/screen-lobby-game-summary.md: dispatch SILENCER_DUMP_SCREEN=lobby_gamesummary to a new RunDumpLobbyGameSummary. Render starfield background + 'Mission Summary' title + ~22 stat row labels (left panel) + Agency Upgrade panel right (XP overlay + 6 +1-stat upgrade-row buttons + Done button). All numeric values can be empty/zero (runtime).",
+      "category": "composition",
+      "reference_dump": "/tmp/real_lobby-gamesummary_dump.ppm",
+      "env": "SILENCER_DUMP_SCREEN=lobby_gamesummary"
+    },
+    {
+      "id": "E5",
+      "name": "updating screen (bordered box + Cancel button)",
+      "priority": 5,
+      "passes": false,
+      "spec": "Per docs/design/screen-updating.md: dispatch SILENCER_DUMP_SCREEN=updating to a new RunDumpUpdating. Render dark/black background + bordered box centered around y=215 + Cancel B156x21 button right-aligned in the box. Text content runtime / non-structural.",
+      "category": "composition",
+      "reference_dump": "/tmp/real_updating_dump.ppm",
+      "env": "SILENCER_DUMP_SCREEN=updating"
+    },
+    {
+      "id": "E6",
+      "name": "Final visual equivalence across all 6 targets",
+      "priority": 6,
+      "passes": false,
+      "spec": "Final gate. Run all 6 candidate dumps, A/B each against its reference. Each is structurally equivalent (chrome / panel / borders / button outlines / labels) to a casual reader. Empty-data interiors (where applicable) acceptable. <2% diff on each, modulo runtime-text non-structural carve-outs documented in each item's spec.",
+      "category": "final"
+    }
+  ]
+}
