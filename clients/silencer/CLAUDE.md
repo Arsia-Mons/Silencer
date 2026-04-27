@@ -98,8 +98,10 @@ bun clients/silencer-cli/index.ts --port $PORT <op> [args...]
 ```
 
 See `clients/silencer-cli/` for the full wrapper and
-`.claude/skills/using-silencer-cli/SKILL.md` for the complete op
-reference and usage patterns.
+[`../../shared/skills/cli/SKILL.md`](../../shared/skills/cli/SKILL.md)
+(loaded by Claude Code via the `.claude/skills/using-silencer-cli` →
+`../../shared/skills/cli` symlink) for the complete op reference and
+usage patterns.
 
 **Relevant flags**
 
