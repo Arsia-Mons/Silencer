@@ -16,6 +16,7 @@ import MapPropertiesPanel from './MapPropertiesPanel';
 import ActorListPanel from './ActorListPanel';
 import Minimap from './Minimap';
 import type { MapActor } from '../../lib/types';
+import { API } from '../../lib/api';
 
 interface VisState {
   bg: boolean[];
@@ -104,7 +105,7 @@ export default function DesignerPage() {
     setMapListLoading(true);
     setMapListError(null);
     try {
-      const r = await fetch('/api/maps');
+      const r = await fetch(`${API}/maps`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const data = await r.json();
       const sorted = [...data].sort((a: { uploaded_at: string }, b: { uploaded_at: string }) =>
@@ -128,7 +129,7 @@ export default function DesignerPage() {
     try {
       const headers: Record<string, string> = {};
       if (pubApiKey) headers['X-Api-Key'] = pubApiKey;
-      const r = await fetch(`/api/maps/${encodeURIComponent(name)}`, { method: 'DELETE', headers });
+      const r = await fetch(`${API}/maps/${encodeURIComponent(name)}`, { method: 'DELETE', headers });
       if (r.ok) {
         setDeleteStatus(s => ({ ...s, [name]: '✓ deleted' }));
         fetchMapList();
