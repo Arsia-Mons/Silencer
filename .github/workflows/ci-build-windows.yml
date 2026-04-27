@@ -1,0 +1,55 @@
+name: CI Build (Windows)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-build-windows-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Export GitHub Actions cache variables for vcpkg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Configure
+        shell: pwsh
+        env:
+          VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
+        run: |
+          cmake -B build -S clients/silencer `
+            -A x64 `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows
+
+      - name: Build
+        run: cmake --build build --config Release -- -maxcpucount
+
+      - name: Package
+        shell: pwsh
+        run: |
+          $stage = "build/package/silencer"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          Copy-Item build/Release/Silencer.exe $stage/
+          $vcpkgBin = "build/vcpkg_installed/x64-windows/bin"
+          Copy-Item "$vcpkgBin/*.dll" $stage/
+          Copy-Item -Recurse shared/assets $stage/assets
+          Write-Host "--- packaged files ---"
+          Get-ChildItem $stage
+
+      - name: Verify bundled dependencies
+        shell: pwsh
+        run: pwsh tests/e2e/check-bundle-windows.ps1 -PackageDir build/package/silencer
