@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.16)
 
 project(Silencer)
 
@@ -77,6 +77,15 @@ else()
 endif()
 
 target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_14)
+
+# Unity (jumbo) build: combines src/*.cpp into batched TUs to dramatically
+# speed up clean builds. Off by default — incremental single-file edits are
+# slower under unity since changing one .cpp recompiles its whole batch.
+# CI release/deploy workflows pass -DSILENCER_UNITY_BUILD=ON.
+option(SILENCER_UNITY_BUILD "Combine .cpp files into jumbo TUs for faster clean builds" OFF)
+if(SILENCER_UNITY_BUILD)
+	set_target_properties(${SILENCER_TARGET} PROPERTIES UNITY_BUILD ON)
+endif()
 
 # Compile HLSL → DXIL bytecode headers for the SDL3 GPU backend. macOS keeps
 # the existing MSL source strings; SPIRV/Linux is a separate change.
