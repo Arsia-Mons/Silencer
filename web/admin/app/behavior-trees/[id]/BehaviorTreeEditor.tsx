@@ -287,11 +287,19 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
   }
 
   function addBBKey() {
-    onChange({ ...btRef.current, blackboard: [...bt.blackboard, { key: 'new_key', type: 'bool', default: false }] });
+    const cur = btRef.current;
+    // Auto-generate a unique key name
+    let n = cur.blackboard.length + 1;
+    while (cur.blackboard.some(k => k.key === `key_${n}`)) n++;
+    onChange({ ...cur, blackboard: [...cur.blackboard, { key: `key_${n}`, type: 'bool', default: false }] });
   }
 
   function updateBBKey(idx: number, patch: Partial<BBKey>) {
     const bb = [...bt.blackboard];
+    // When type changes, reset default to a sensible value
+    if (patch.type && patch.type !== bb[idx].type) {
+      patch.default = patch.type === 'bool' ? false : patch.type === 'string' ? '' : 0;
+    }
     bb[idx] = { ...bb[idx], ...patch };
     onChange({ ...bt, blackboard: bb });
   }
@@ -299,6 +307,22 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
   function removeBBKey(idx: number) {
     onChange({ ...bt, blackboard: bt.blackboard.filter((_, i) => i !== idx) });
   }
+
+  // How many Condition nodes reference a given blackboard key
+  function bbUsedBy(key: string): number {
+    return Object.values(bt.nodes).filter(n => n.type === 'Condition' && n.props.key === key).length;
+  }
+
+  const BB_TYPE_COLOR: Record<string, string> = {
+    bool:   '#22c55e',
+    int:    '#3b82f6',
+    float:  '#8b5cf6',
+    string: '#f59e0b',
+  };
+
+  // Duplicate key names
+  const bbKeyNames = bt.blackboard.map(k => k.key);
+  const bbDupes = new Set(bbKeyNames.filter((k, i) => bbKeyNames.indexOf(k) !== i));
 
   return (
     <div style={{ display: 'flex', height: '100%', background: '#0d1117' }}>
@@ -405,12 +429,42 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
                   {['==', '!=', '>', '<', '>=', '<='].map(op => <option key={op} value={op}>{op}</option>)}
                 </select>
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>VALUE</label>
-                <input value={String(selectedNode.props.value ?? '')} onChange={e => {
-                  const raw = e.target.value;
-                  const v = raw === 'true' ? true : raw === 'false' ? false : isNaN(Number(raw)) ? raw : Number(raw);
-                  updateProp('value', v);
-                }}
-                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                {(() => {
+                  const bbEntry = bt.blackboard.find(k => k.key === selectedNode.props.key);
+                  const kType = bbEntry?.type ?? 'string';
+                  if (kType === 'bool') {
+                    const cur = selectedNode.props.value;
+                    const isTrueish = cur === true || cur === 'true';
+                    return (
+                      <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                        {[true, false].map(v => (
+                          <button key={String(v)} onClick={() => updateProp('value', v)}
+                            style={{
+                              flex: 1, padding: '4px 0', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer',
+                              background: (v ? isTrueish : !isTrueish) ? (v ? '#14532d' : '#450a0a') : '#161b22',
+                              border: `1px solid ${(v ? isTrueish : !isTrueish) ? (v ? '#22c55e' : '#ef4444') : '#2d3748'}`,
+                              color: (v ? isTrueish : !isTrueish) ? (v ? '#22c55e' : '#ef4444') : '#4a5568',
+                            }}>
+                            {String(v)}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  }
+                  if (kType === 'int') {
+                    return <input type="number" step={1} value={Number(selectedNode.props.value ?? 0)}
+                      onChange={e => updateProp('value', parseInt(e.target.value))}
+                      style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />;
+                  }
+                  if (kType === 'float') {
+                    return <input type="number" step={0.1} value={Number(selectedNode.props.value ?? 0)}
+                      onChange={e => updateProp('value', parseFloat(e.target.value))}
+                      style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />;
+                  }
+                  return <input value={String(selectedNode.props.value ?? '')}
+                    onChange={e => updateProp('value', e.target.value)}
+                    style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />;
+                })()}
               </>
             )}
 
@@ -455,30 +509,107 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
         {/* Blackboard editor */}
         <div style={{ padding: '12px 10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <div style={{ color: '#718096', fontSize: 10, letterSpacing: 2 }}>BLACKBOARD</div>
+            <div style={{ color: '#718096', fontSize: 10, letterSpacing: 2 }}>
+              BLACKBOARD
+              {bt.blackboard.length > 0 && (
+                <span style={{ marginLeft: 6, color: '#4a5568' }}>({bt.blackboard.length})</span>
+              )}
+            </div>
             <button onClick={addBBKey}
-              style={{ background: 'none', border: '1px solid #2d3748', color: '#718096', fontSize: 10, padding: '2px 6px', cursor: 'pointer' }}>
+              style={{ background: 'none', border: '1px solid #2d3748', color: '#a0aec0', fontSize: 10, padding: '2px 8px', cursor: 'pointer', fontFamily: 'monospace', letterSpacing: 1 }}>
               + KEY
             </button>
           </div>
           {bt.blackboard.length === 0 && (
-            <div style={{ color: '#4a5568', fontSize: 10 }}>No keys defined</div>
+            <div style={{ color: '#4a5568', fontSize: 10, padding: '8px 0' }}>No keys — add one above</div>
           )}
-          {bt.blackboard.map((k, i) => (
-            <div key={i} style={{ marginBottom: 8, padding: '6px', background: '#161b22', border: '1px solid #2d3748' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                <input value={k.key} onChange={e => updateBBKey(i, { key: e.target.value })}
-                  placeholder="key_name"
-                  style={{ flex: 1, background: 'none', border: 'none', color: '#e2e8f0', fontSize: 11, fontFamily: 'monospace', minWidth: 0 }} />
-                <button onClick={() => removeBBKey(i)}
-                  style={{ background: 'none', border: 'none', color: '#4a5568', cursor: 'pointer', fontSize: 12, padding: '0 2px' }}>✕</button>
+          {bt.blackboard.map((k, i) => {
+            const typeColor = BB_TYPE_COLOR[k.type] ?? '#718096';
+            const isDupe = bbDupes.has(k.key);
+            const usedBy = bbUsedBy(k.key);
+            return (
+              <div key={i} style={{
+                marginBottom: 8, padding: '8px', background: '#0d1117',
+                border: `1px solid ${isDupe ? '#ef4444' : '#2d3748'}`,
+                borderLeft: `3px solid ${typeColor}`,
+              }}>
+                {/* Row 1: key name + delete */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+                  <input
+                    value={k.key}
+                    onChange={e => updateBBKey(i, { key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })}
+                    placeholder="key_name"
+                    style={{
+                      flex: 1, background: 'none', border: 'none', borderBottom: `1px solid ${isDupe ? '#ef4444' : '#2d3748'}`,
+                      color: isDupe ? '#ef4444' : '#e2e8f0', fontSize: 12, fontFamily: 'monospace',
+                      padding: '1px 0', minWidth: 0, outline: 'none',
+                    }}
+                  />
+                  <button onClick={() => removeBBKey(i)}
+                    style={{ background: 'none', border: 'none', color: '#4a5568', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
+                    title="Remove key">✕</button>
+                </div>
+                {isDupe && (
+                  <div style={{ color: '#ef4444', fontSize: 9, marginBottom: 4 }}>⚠ duplicate key name</div>
+                )}
+                {/* Row 2: type select */}
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 6 }}>
+                  <span style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, flexShrink: 0 }}>TYPE</span>
+                  <div style={{ display: 'flex', gap: 2, flex: 1 }}>
+                    {(['bool', 'int', 'float', 'string'] as BBKey['type'][]).map(t => (
+                      <button key={t} onClick={() => updateBBKey(i, { type: t })}
+                        style={{
+                          flex: 1, padding: '2px 0', fontSize: 9, fontFamily: 'monospace', cursor: 'pointer',
+                          background: k.type === t ? `${BB_TYPE_COLOR[t]}22` : 'transparent',
+                          border: `1px solid ${k.type === t ? BB_TYPE_COLOR[t] : '#2d3748'}`,
+                          color: k.type === t ? BB_TYPE_COLOR[t] : '#4a5568',
+                          letterSpacing: 0,
+                        }}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Row 3: default value */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, flexShrink: 0 }}>DEFAULT</span>
+                  {k.type === 'bool' ? (
+                    <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+                      {[true, false].map(v => (
+                        <button key={String(v)} onClick={() => updateBBKey(i, { default: v })}
+                          style={{
+                            flex: 1, padding: '2px 0', fontSize: 9, fontFamily: 'monospace', cursor: 'pointer',
+                            background: k.default === v ? (v ? '#14532d' : '#450a0a') : 'transparent',
+                            border: `1px solid ${k.default === v ? (v ? '#22c55e' : '#ef4444') : '#2d3748'}`,
+                            color: k.default === v ? (v ? '#22c55e' : '#f87171') : '#4a5568',
+                          }}>
+                          {String(v)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : k.type === 'int' ? (
+                    <input type="number" step={1} value={Number(k.default ?? 0)}
+                      onChange={e => updateBBKey(i, { default: parseInt(e.target.value) })}
+                      style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
+                  ) : k.type === 'float' ? (
+                    <input type="number" step={0.1} value={Number(k.default ?? 0)}
+                      onChange={e => updateBBKey(i, { default: parseFloat(e.target.value) })}
+                      style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
+                  ) : (
+                    <input value={String(k.default ?? '')}
+                      onChange={e => updateBBKey(i, { default: e.target.value })}
+                      style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
+                  )}
+                </div>
+                {/* Row 4: usage */}
+                {usedBy > 0 && (
+                  <div style={{ marginTop: 5, fontSize: 9, color: typeColor, letterSpacing: 0.5 }}>
+                    ↳ used by {usedBy} condition{usedBy > 1 ? 's' : ''}
+                  </div>
+                )}
               </div>
-              <select value={k.type} onChange={e => updateBBKey(i, { type: e.target.value as BBKey['type'] })}
-                style={{ width: '100%', background: '#0d1117', border: '1px solid #2d3748', color: '#a0aec0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }}>
-                {['bool', 'int', 'float', 'string'].map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
