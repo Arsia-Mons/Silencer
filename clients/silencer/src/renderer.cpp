@@ -124,6 +124,44 @@ void Renderer::Draw(Surface * surface, float frametime){
 	
 	//memset(lightmap, ambiencelevel, surface->w * surface->h);
 	DrawWorld(surface, camera, true, true, 3, frametime);
+
+	// Debug overlay: raycasts, hitboxes (toggle with F9)
+	if(world.debugoverlay && world.map.loaded){
+		// Draw accumulated debug lines (raycasts from guard Look())
+		for(const World::DebugLine& dl : world.debuglines){
+			DrawLine(surface,
+				dl.x1 + camera.GetXOffset(), dl.y1 + camera.GetYOffset(),
+				dl.x2 + camera.GetXOffset(), dl.y2 + camera.GetYOffset(),
+				dl.color, 1);
+		}
+		world.debuglines.clear();
+
+		// Draw hitboxes for all hittable objects
+		std::vector<Uint8> debugtypes = {
+			ObjectTypes::PLAYER, ObjectTypes::GUARD,
+			ObjectTypes::ROBOT,  ObjectTypes::CIVILIAN
+		};
+		for(Uint8 t : debugtypes){
+			for(Uint16 id : world.objectsbytype[t]){
+				Object* obj = world.GetObjectFromId(id);
+				if(!obj || !obj->draw) continue;
+				Sprite* spr = dynamic_cast<Sprite*>(obj);
+				if(!spr) continue;
+				int bx1, by1, bx2, by2;
+				spr->GetAABB(world.resources, &bx1, &by1, &bx2, &by2);
+				Uint8 col = (t == ObjectTypes::PLAYER) ? 68  // bright green
+				          : (t == ObjectTypes::GUARD)  ? 40  // red
+				          : 203;                             // white
+				int ox = camera.GetXOffset(), oy = camera.GetYOffset();
+				DrawLine(surface, bx1+ox, by1+oy, bx2+ox, by1+oy, col, 1); // top
+				DrawLine(surface, bx2+ox, by1+oy, bx2+ox, by2+oy, col, 1); // right
+				DrawLine(surface, bx2+ox, by2+oy, bx1+ox, by2+oy, col, 1); // bottom
+				DrawLine(surface, bx1+ox, by2+oy, bx1+ox, by1+oy, col, 1); // left
+			}
+		}
+	}else{
+		world.debuglines.clear();
+	}
 	//}
 
 	if(world.map.loaded){

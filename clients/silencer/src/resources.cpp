@@ -3,6 +3,7 @@
 #include "audio.h"
 #include "game.h"
 #include "os.h"
+#include "behaviortree.h"
 
 Resources::Resources(){
 	spritebank.assign(256, std::vector<std::shared_ptr<Surface>>(256, std::make_shared<Surface>(0, 0)));
@@ -33,6 +34,7 @@ bool Resources::Load(Game & game, bool dedicatedserver){
 	if(ndefs > 0){
 		fprintf(stderr, "[actordef] loaded %d actor definition(s)\n", ndefs);
 	}
+	BehaviorTreeLibrary::instance().loadDir(GetResDir() + "behaviortrees");
 	return true;
 }
 

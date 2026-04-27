@@ -42,8 +42,61 @@ silencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
 - Heartbeats UDP to the lobby: `[0x00][gameid u32][port u16][state u8]`.
   No heartbeat in 30 s → lobby aborts the create.
 
+## Actor definition system (`actordef.h` / `actordef.cpp`)
+
+Actordefs are JSON files in `shared/assets/actordefs/<id>.json`. They
+define per-NPC animation sequences, per-frame hurtboxes, and per-frame
+sounds — everything that used to be hardcoded in the NPC `.cpp` files.
+
+**Key types:**
+- `FrameDef` — one sprite frame: `bank`, `index`, `duration` (ticks),
+  `hurtbox` (`x1/y1/x2/y2` relative to feet), `sound` (filename), `soundVolume`
+  (0 = default 128).
+- `AnimSequence` — ordered list of `FrameDef`s + `loop` flag.
+- `ActorDef` — keyed map of sequence name → `AnimSequence`.
+
+**Playing sounds from actordefs** — two helpers on `AnimSequence`:
+- `GetFrameSound(state_i, …)` — use when the state machine accumulates
+  ticks (correct for tick-duration-based states).
+- `GetFrameSoundByIndex(frameIdx, …)` — use when `res_index = state_i % N`
+  (sprite frame index driven, not tick-accumulated). Guards and civilians use
+  this path.
+
+**Client reload** — `LoadActorDefs()` in `actordef.cpp` reads all `*.json`
+files via `GLOB_RECURSE`. It is called on each map load (async fetch from the
+admin API via `adminapiurl`). Adding or removing actordef files requires
+`cmake -B build -S .` to regenerate the file list.
+
+**Per-weapon guard actordefs** — `guard-blaster.json`, `guard-laser.json`,
+`guard-rocket.json` replace the old single `guard.json`. `ActorDefName(weapon)`
+in `guard.cpp` maps weapon integer (0/1/2/3) to the correct file name.
+
+## Behavior tree system (`behaviortree.h` / `behaviortree.cpp`)
+
+Tick-based interpreter. Trees are loaded from
+`shared/assets/behaviortrees/<id>.json` and shared across all instances of
+a given NPC type. Per-instance state lives in `BTContext`.
+
+**Node types:** `Selector`, `Sequence`, `Parallel`, `RandomSelector`,
+`Inverter`, `Cooldown`, `Repeat`, `Timeout`, `ForceSuccess`, `Wait`,
+`Leaf` (dispatches to a named C++ lambda), `Condition` (compares a
+blackboard key to a literal value).
+
+**Blackboard** — `unordered_map<string, json>` on `BTContext`. Leaf
+lambdas read/write it via `ctx.bb<T>(key, default)` / `ctx.bbSet(key, val)`.
+
+**Wiring an NPC:**
+1. Create `shared/assets/behaviortrees/<npc>.json` (edit in the admin BT editor).
+2. In the NPC's `.cpp` constructor, call `bt_.Load("npc_id")` and register
+   action lambdas with `bt_.Register("ActionName", [](BTContext& ctx) { … })`.
+3. In the tick function, call `bt_.Tick(ctx_)` once per frame.
+
+**Currently wired:** `guard.cpp`, `robot.cpp`, `civilian.cpp`.
+
 ## Where to look
 
+- `src/actordef.h` / `src/actordef.cpp` — actor definition system (see above).
+- `src/behaviortree.h` / `src/behaviortree.cpp` — BT interpreter (see above).
 - Top-level state machine (menus, lobby, in-game): `src/game.cpp`.
 - Simulation loop, socket, peer list, replay: `src/world.cpp`.
 - Rendering: `src/renderer.cpp`, `src/surface.cpp`, `src/sprite.cpp`, `src/palette.cpp`.
@@ -88,3 +141,11 @@ silencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
 - **Android/Ouya code paths exist** in `src/main.cpp` but are not
   actively maintained; don't rely on them. JNI symbols use the
   `com.silencer.game.Silencer` package convention.
+- **`libmodplug` removed from vcpkg.json.** `sdl3-mixer` no longer
+  builds with the MOD/XM/IT music plugin — the game uses IMA ADPCM
+  (`sound.bin`) and MP3 (`CLOSER2.mp3`) only. This cuts build time and
+  removes an unused dependency.
+- **`adminapiurl` config key** (`src/config.h`) — URL the client fetches
+  actordefs and behavior trees from on each map load. Defaults to
+  `http://localhost:24000/api` for local dev; set it to the production
+  admin API URL when deploying. Does not affect lobby traffic.

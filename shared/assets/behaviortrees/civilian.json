@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "id": "civilian-flee",
+  "blackboard": [
+    { "key": "threat_nearby", "type": "bool",  "default": false }
+  ],
+  "rootId": "root",
+  "nodes": {
+    "root": {
+      "type": "Selector",
+      "label": "Civilian AI",
+      "children": ["seq_flee", "leaf_wander"],
+      "props": {}
+    },
+    "seq_flee": {
+      "type": "Sequence",
+      "label": "Flee on Threat",
+      "children": ["cond_threat", "leaf_run"],
+      "props": {}
+    },
+    "cond_threat": {
+      "type": "Condition",
+      "label": "threat_nearby?",
+      "children": [],
+      "props": { "key": "threat_nearby", "op": "==", "value": true }
+    },
+    "leaf_run": {
+      "type": "Leaf",
+      "label": "Run",
+      "children": [],
+      "props": { "action": "Run" }
+    },
+    "leaf_wander": {
+      "type": "Leaf",
+      "label": "Wander",
+      "children": [],
+      "props": { "action": "Wander" }
+    }
+  },
+  "positions": {}
+}

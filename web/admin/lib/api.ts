@@ -113,6 +113,8 @@ export interface FrameDef {
   index: number;
   duration: number;
   hurtbox?: [number, number, number, number];
+  sound?: string;
+  soundVolume?: number;
 }
 
 export interface AnimSequence {
@@ -133,6 +135,7 @@ export interface ActorDef {
   props?: ActorProps;
   sequences?: Record<string, AnimSequence>;
   stateMachine?: StateMachine;
+  behaviortreeId?: string;
   [key: string]: unknown;
 }
 
@@ -141,3 +144,40 @@ export const getActor     = (id: string): Promise<ActorDef>     => apiFetch(`/ac
 export const saveActor    = (id: string, def: ActorDef): Promise<unknown> =>
   apiFetch(`/actors/${id}`, { method: 'PUT', body: JSON.stringify(def) });
 export const deleteActor  = (id: string): Promise<unknown>      => apiFetch(`/actors/${id}`, { method: 'DELETE' });
+
+// Behavior Tree types + CRUD
+export type BTNodeType =
+  | 'Selector' | 'Sequence' | 'Parallel' | 'RandomSelector'
+  | 'Inverter' | 'Cooldown' | 'Repeat' | 'Timeout' | 'ForceSuccess'
+  | 'Wait' | 'Leaf' | 'Condition';
+
+export interface BTNode {
+  type: BTNodeType;
+  label: string;
+  children: string[];
+  props: Record<string, unknown>;
+}
+
+export interface BBKey {
+  key: string;
+  type: 'bool' | 'int' | 'float' | 'string';
+  default: unknown;
+}
+
+export interface BehaviorTree {
+  version: number;
+  id: string;
+  blackboard: BBKey[];
+  rootId: string;
+  nodes: Record<string, BTNode>;
+  positions: Record<string, { x: number; y: number }>;
+}
+
+export const listBehaviorTrees = (): Promise<string[]> =>
+  apiFetch('/behaviortrees') as Promise<string[]>;
+export const getBehaviorTree = (id: string): Promise<BehaviorTree> =>
+  apiFetch(`/behaviortrees/${id}`) as Promise<BehaviorTree>;
+export const saveBehaviorTree = (id: string, bt: BehaviorTree): Promise<unknown> =>
+  apiFetch(`/behaviortrees/${id}`, { method: 'PUT', body: JSON.stringify(bt) });
+export const deleteBehaviorTree = (id: string): Promise<unknown> =>
+  apiFetch(`/behaviortrees/${id}`, { method: 'DELETE' });

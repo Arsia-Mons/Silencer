@@ -13,7 +13,9 @@ public:
 	void HandleHit(class Object & object, class World & world, Uint8 x, Uint8 y, class Object & projectile);
 	
 	friend class Renderer;
-	
+
+	bool IsAlive() const { return health > 0; }
+
 protected:
 	Uint16 health;
 	Uint16 shield;
