@@ -44,6 +44,18 @@ export default function BehaviorTreePage() {
     }
   }
 
+  function handleDownload() {
+    if (!bt || !id) return;
+    const json = JSON.stringify(bt, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${id}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="flex min-h-screen bg-game-bg text-game-text">
       <Sidebar wsConnected={wsConnected} />
@@ -56,6 +68,18 @@ export default function BehaviorTreePage() {
           <div style={{ flex: 1 }} />
           {error && <span style={{ color: '#f87171', fontSize: 11 }}>{error}</span>}
           {dirty && <span style={{ color: '#f59e0b', fontSize: 11 }}>● unsaved</span>}
+          <button
+            onClick={handleDownload}
+            disabled={!bt}
+            title="Download JSON to commit to git (shared/assets/behaviortrees/)"
+            style={{
+              padding: '6px 14px', background: 'transparent', border: '1px solid #4a5568',
+              color: bt ? '#a0aec0' : '#4a5568', fontFamily: 'monospace', fontSize: 12, fontWeight: 700,
+              letterSpacing: 2, cursor: bt ? 'pointer' : 'default', transition: 'all 0.15s',
+            }}
+          >
+            ↓ DOWNLOAD
+          </button>
           <button
             onClick={handleSave}
             disabled={saving || !dirty}
