@@ -5,10 +5,11 @@ project(Silencer)
 include(FetchContent)
 
 # nlohmann/json — header-only, C++14 compatible
+# v3.12.0: fixes std::_snprintf removed from MSVC 14.44 (VS 2022 17.13+)
 FetchContent_Declare(
 	nlohmann_json
-	URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp
-	URL_HASH SHA256=9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6
+	URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.hpp
+	URL_HASH SHA256=aaf127c04cb31c406e5b04a63f1ae89369fccde6d8fa7cdda1ed4f32dfc5de63
 	DOWNLOAD_NO_EXTRACT TRUE
 )
 FetchContent_MakeAvailable(nlohmann_json)
