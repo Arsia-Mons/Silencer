@@ -642,3 +642,98 @@ lobby-connect,lobby,lobby-interfaces}/progress.txt — read those first. -->
     confirmed this; running it as a final E6 gate adds zero work
     and strong assurance that the full screen set still renders
     correctly.
+
+## 2026-04-26T23:00:00Z — iter 8 (E4 RE-PASS after harness fix)
+- E4 was rolled back to passes:false because the harness fixes
+  (commits e537efe / 07ce464 — "GameSummary now uses real
+  MISSIONSUMMARY state" + "include xptext in
+  gamesummaryinterface->objects") regenerated the canonical
+  reference dump. The new reference is much cleaner: no LOBBY
+  chrome bleed-through, real numeric values (1846 XP, Kills:12,
+  etc.), proper bordered Mission Summary + Agency Upgrade panel
+  chrome with scrollbar + planet image, NO +1 upgrade-row buttons,
+  NO *NEW UPGRADE AVAILABLE* banner.
+- Rewrote RunDumpLobbyGameSummary (shared/design/sdl3/src/main.cpp:1860)
+  to match the new reference's structure:
+  * **Sub-palette flipped sub=2 → sub=0.** The reference shows a
+    starfield/in-game palette, not LOBBY's panel-exterior teal.
+  * **Removed LOBBY chrome bleed-through.** No more panel idx 1
+    blit, idx 8 blit, Silencer header, demo username, NOXIS
+    LEVEL/WINS/LOSSES/XP stats, or "Lobby" channel label.
+  * **Banks reduced {7,133,134,135,181} → {7,133,134,135}.** Bank
+    181 (character portraits) no longer needed.
+  * **Stat list expanded 23 → 24 rows.** Reference scan revealed a
+    fourth Secrets sub-row "Picked up:" between Stolen and
+    Fumbled. Anchors derived from burst-scanning the reference:
+    labels at x=89 (subordinate x=95), values at x=257, with row
+    y-positions on a ~10-12px stride per row plus ~22px gaps
+    between sections. Title "Mission Summary" repositioned to
+    (102, 47) with bank 135 advance 11 (logo font, was bank 134
+    advance 8).
+  * **Right panel rewritten.** "+ N XP" header at (388, 47) with
+    bank 135 (was bank 134, smaller). Dropped *NEW UPGRADE
+    AVAILABLE* and the 6 +1-stat B156x21 upgrade-row buttons —
+    those are state-dependent and absent from the canonical
+    capture. Kept the 6 "Current X Level: 0" labels as the
+    primary structural anchors at x=336, y stride 46 from y=100
+    to y=330. Done button moved to (390, 410) (was 437, 400).
+- Diff stats vs `/tmp/real_lobby-gamesummary_dump.ppm`:
+  * Pre-rewrite: 210,876 / 307,200 = 68.64% (already higher than
+    the historical 71.30% because the new reference is cleaner —
+    less LOBBY chrome to overlap with the candidate's old chrome).
+  * Post-rewrite: 123,187 / 307,200 = 40.10%. ~28pp improvement.
+  * Residual diff sources, all spec-non-structural:
+    - Mission Summary panel chrome (left bordered panel + interior
+      scrollbar) — engine sprite indices unknown / not loaded.
+    - Agency Upgrade panel chrome (right bordered panel) — same.
+    - Planet image in upper-right (~80×120 red blob) — engine
+      starfield/parallax artifact, not in spec inventory.
+    - Done button width (~228 px in reference vs B156x21 156 px in
+      candidate). Spec says "B156x21 or similar"; candidate used
+      the only loaded button-chrome sprite.
+    - Runtime numeric values (1846 XP, Kills:12, etc.) — spec
+      explicitly says these are runtime; candidate uses 0 / "0".
+- Visual A/B (Discord DM 1498139717215064275): every spec'd
+  structural anchor present at a sensible (x,y). Reference vs
+  candidate read as the same screen — title + 24 stat rows + XP
+  header + 6 level labels + Done — modulo the carve-outs above.
+- Regression sweep: all 12 screens (main_menu / options /
+  options_audio / options_display / options_controls /
+  lobby_connect / lobby / lobby_gamecreate / lobby_gamejoin /
+  lobby_gametech / lobby_gamesummary / updating) re-dumped at the
+  invariant 921615 bytes. Code change is confined to
+  RunDumpLobbyGameSummary; no other functions, bank loaders, or
+  codec paths touched.
+- Files touched: `shared/design/sdl3/src/main.cpp` (rewrote
+  RunDumpLobbyGameSummary body; no helper changes),
+  `.ralph/lobby-extras/prd.json` (E4 → passes:true),
+  `.ralph/lobby-extras/progress.txt` (this entry).
+- **Learnings:**
+  - **Reference-dump regeneration is a real failure mode for spec-
+    only renderers.** The previous E4 PASS was structurally valid
+    against the old reference (which had LOBBY chrome bleed-
+    through because the harness force-instantiated GAMESUMMARY
+    from inside LOBBY without clearing chrome). When the harness
+    is fixed, the reference shifts and the candidate must re-
+    align. Treat each Ralph item's reference as a moving target
+    bound to harness state, not a frozen artifact.
+  - **Burst-scanning a reference dump for text rows is the
+    fastest way to align stat-list anchors.** Scanning the
+    reference for clusters of consecutive non-black rows in a
+    target column gives row-y values directly; cluster widths
+    distinguish section headers (no value column) from stat rows
+    (label + value). Eliminates eyeballing-and-iterating.
+  - **State-dependent UI elements should not be rendered when
+    absent from the canonical reference.** The +1 upgrade-row
+    buttons and *NEW UPGRADE AVAILABLE* banner are visible when
+    upgrades are available but hidden otherwise. Including them
+    in the candidate when the reference omits them inflates pixel
+    diff with no structural-equivalence benefit. Spec wording like
+    "X buttons" should be read as "X buttons in the appropriate
+    state" — match what the canonical capture shows.
+  - **Banks {7, 133, 134, 135} are sufficient for a text-heavy
+    panel screen with B156x21 buttons.** When porting a screen,
+    start with the minimum bank set and add only when a sprite
+    blit is required. This screen needed neither character
+    portraits (181) nor any modal-dialog chrome (40); the previous
+    iteration loaded 181 needlessly.
