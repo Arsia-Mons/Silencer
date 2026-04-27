@@ -550,6 +550,13 @@ void Guard::Tick(World & world){
 			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = !mirrored;
 			}
+			// footstep sounds — frames 4 and 13 of the 19-frame walk cycle
+			if(state_i % 19 == 4){
+				EmitSound(world, world.resources.soundbank["stostep1.wav"], 16);
+			}
+			if(state_i % 19 == 13){
+				EmitSound(world, world.resources.soundbank["stostepr.wav"], 16);
+			}
 			if(state_i == 240){
 				state = LOOKING;
 				state_i = -1;
