@@ -8,7 +8,7 @@
       "id": "E0",
       "name": "Populated LOBBY content (chat lines + game list rows + character stats)",
       "priority": 0,
-      "passes": false,
+      "passes": true,
       "spec": "Extend RunDumpLobby (env SILENCER_DUMP_SCREEN=lobby) so the dump matches /tmp/real_lobby_populated_dump.ppm. Render: 5 chat lines (Vector/Solace/Ember/Vector/Halcyon, exact text per RALPH.md); 4 game list rows (Veterans Only / Tutorial / Capture the Tag / Casual Match #1); presence list (In Lobby + Pregame + Playing sections); character stats overlays (LEVEL: 8, WINS: 47, LOSSES: 12, XP TO NEXT LEVEL: 220); username 'demo' in CharacterInterface. All other LOBBY chrome unchanged.",
       "category": "composition",
       "reference_dump": "/tmp/real_lobby_populated_dump.ppm",

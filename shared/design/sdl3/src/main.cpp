@@ -928,22 +928,18 @@ static int RunDumpLobby(const std::string &assets_dir,
     }
   }
 
-  // I0: CharacterInterface composition (left panel). Per
+  // I0/E0: CharacterInterface composition (left panel). Per
   // docs/design/screen-lobby-character.md — bbox (10, 64, 217, 120).
-  //   - Username overlay at literal (20, 71), font 134 advance 8. Content
-  //     is local-config-derived; on the empty-data canonical dump it's
-  //     whatever the bypass harness wrote. Render empty: structural gate
-  //     is overlay position, not text content.
-  //   - Four stat overlays (Level / Wins / Losses / Etc) at literal x=17,
-  //     y in {130, 143, 156, 169}, font 133 advance 7. Server-driven —
-  //     empty without a running Go lobby. Skip the DrawText calls
-  //     entirely (empty string is a no-op anyway); recorded here as the
-  //     spec's structural slots.
+  //   - Username overlay "demo" at literal (20, 71), font 134 advance 8.
+  //   - Four stat overlays at literal x=17, y in {130, 143, 156, 169},
+  //     font 133 advance 7. Demo data per RALPH.md: NOXIS agency
+  //     stats — Level: 8, Wins: 47, Losses: 12, XP To Next Level: 220.
   //   - Five Toggle widgets at y=90, x = 20 + i*42 for i ∈ 0..4
   //     (NOXIS / LAZARUS / CALIBER / STATIC / BLACKROSE), bank 181
   //     idx 0..4. Selected-state highlight is non-gated — render the
-  //     base sprite for each. Anchor convention top_left = anchor -
-  //     sprite.offset is applied by BlitSprite.
+  //     base sprite for each.
+  DrawText(fb, 20, 71, "demo", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
   for (int i = 0; i < 5; ++i) {
     int tx = 20 + i * 42;
     int ty = 90;
@@ -951,6 +947,14 @@ static int RunDumpLobby(const std::string &assets_dir,
       BlitSprite(fb, sprites.Get(181, i), tx, ty, nullptr);
     }
   }
+  DrawText(fb, 17, 130, "LEVEL: 8", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 143, "WINS: 47", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 156, "LOSSES: 12", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 169, "XP TO NEXT LEVEL: 220", /*bank=*/133, /*advance=*/7,
+           sprites, palette, kSubLobby, /*brightness=*/128);
 
   // I1: GameSelectInterface composition (right panel). Per
   // docs/design/screen-lobby-gameselect.md — bbox (403, 87, 222, 267).
@@ -980,6 +984,31 @@ static int RunDumpLobby(const std::string &assets_dir,
   }
   DrawText(fb, 405, 70, "Active Games", /*bank=*/134, /*advance=*/8, sprites,
            palette, kSubLobby, /*brightness=*/128);
+
+  // E0: SelectBox content (4 game rows). Demo data per RALPH.md, in
+  // reference-dump display order:
+  //   Veterans Only / Tutorial / Capture the Tag / Casual Match #1.
+  // SelectBox bbox is (407, 89, 214, 265), lineheight=14. Rows render
+  // top-to-bottom, font 133 advance 6 (selectbox row font matches the
+  // game-info textbox font). x=407 with a small left padding so the row
+  // text doesn't sit on the chrome edge; y starts at 89 + half the
+  // line spacing offset to vertically center each row in its slot.
+  {
+    constexpr int kRowX = 410;
+    constexpr int kRowY0 = 92;
+    constexpr int kRowDy = 14;
+    const std::array<const char *, 4> games = {{
+        "Veterans Only",
+        "Tutorial",
+        "Capture the Tag",
+        "Casual Match #1",
+    }};
+    for (size_t i = 0; i < games.size(); ++i) {
+      DrawText(fb, kRowX, kRowY0 + static_cast<int>(i) * kRowDy, games[i],
+               /*bank=*/133, /*advance=*/6, sprites, palette, kSubLobby,
+               /*brightness=*/128);
+    }
+  }
 
   // Two B156x21 action buttons. Same chrome (bank 7 idx 24) + label
   // (bank 134 advance 8, yoff=4) as the Go Back button above. Width=156,
@@ -1046,6 +1075,65 @@ static int RunDumpLobby(const std::string &assets_dir,
   }
   if (sprites.Has(7, 14)) {
     BlitSprite(fb, sprites.Get(7, 14), 0, 0, nullptr);
+  }
+
+  // E0: ChatInterface populated content per RALPH.md demo data.
+  //   Channel name "Lobby" at literal (15, 200), font 134 advance 8.
+  DrawText(fb, 15, 200, "Lobby", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+
+  // Chat textbox bottom-to-top, bbox (19, 220, 242, 207), lineheight=11,
+  // font 133 advance 6. With 5 messages, the newest sits at the bottom
+  // of the bbox and older messages stack upward. Bottom y = 220+207-11 =
+  // 416 for the newest line; oldest at 416 - 4*11 = 372.
+  {
+    constexpr int kChatX = 19;
+    constexpr int kChatYBottom = 416;
+    constexpr int kChatDy = 11;
+    const std::array<const char *, 5> chat = {{
+        // oldest first (top)
+        "Vector: anyone up for a round?",
+        "Solace: still waiting on Krieg's match to finish",
+        "Ember: we got 4 in casual #1",
+        "Vector: joining",
+        // newest last (bottom)
+        "Halcyon: gg everyone",
+    }};
+    for (size_t i = 0; i < chat.size(); ++i) {
+      int y = kChatYBottom -
+              static_cast<int>(chat.size() - 1 - i) * kChatDy;
+      DrawText(fb, kChatX, y, chat[i], /*bank=*/133, /*advance=*/6, sprites,
+               palette, kSubLobby, /*brightness=*/128);
+    }
+  }
+
+  // Presence textbox top-to-bottom, bbox (267, 220, 110, 207),
+  // lineheight=11, font 133 advance 6. Three sections:
+  //   In Lobby: Halcyon, Ember, Solace, Vector, demo
+  //   Pregame: Quill -Capture the Tag-
+  //   Playing: Krieg -Casual Match #1-
+  {
+    constexpr int kPresX = 267;
+    constexpr int kPresY0 = 220;
+    constexpr int kPresDy = 11;
+    // Section order and member order match the reference dump.
+    const std::array<const char *, 10> presence = {{
+        "In Lobby",
+        "Ember",
+        "Halcyon",
+        "Solace",
+        "Vector",
+        "demo",
+        "Pregame",
+        "Quill -Capture the Tag-",
+        "Playing",
+        "Krieg -Casual Match #1-",
+    }};
+    for (size_t i = 0; i < presence.size(); ++i) {
+      DrawText(fb, kPresX, kPresY0 + static_cast<int>(i) * kPresDy,
+               presence[i], /*bank=*/133, /*advance=*/6, sprites, palette,
+               kSubLobby, /*brightness=*/128);
+    }
   }
 
   std::filesystem::create_directories(dump_dir);

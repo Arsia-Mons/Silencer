@@ -2,6 +2,7 @@
 <!-- Patterns this Ralph discovers. Patterns from all 8 prior Ralphs:
 .ralph/{main-menu,options,options-audio,options-display,options-controls,
 lobby-connect,lobby,lobby-interfaces}/progress.txt — read those first. -->
+- Empty-data → populated-data is purely additive DrawText: every populated content slot is already a "spec'd structural anchor" comment from the empty-data Ralph, so filling them in is mechanical (bank + advance + literal anchor coords from the spec table; no new banks, no new sprites, no new codec branches). RunDumpLobby's E0 delta is six contiguous DrawText blocks layered on top of validated chrome. Three concrete textbox-content patterns confirmed: bottom-to-top textbox = `for i ∈ 0..N-1: DrawText(x, y_bottom - (N-1-i)*lineheight)` (chat scrollback at lineheight=11, fontwidth=6); top-to-bottom textbox = `for i: DrawText(x, y_top + i*lineheight)` (presence at lineheight=11); SelectBox rows = same as top-to-bottom textbox but with lineheight=14 and a small ~3px left padding from the bbox x to clear the chrome inner edge. Reference dump ordering is authoritative when prompt-prose ordering disagrees (presence list shows Ember-above-Halcyon despite RALPH.md listing Halcyon first) — always visually check the reference before trusting prose. Whole-screen pixelwise diff RISES when populating interiors (1.23% empty → 3.89% populated) because effectcolor-disagreeing colored glyphs replace mostly-matching black-empty interiors; this is expected and the structural metric (named objects at named anchors) is the actual gate, not whole-screen %. Reference's TextBox widget word-wraps long lines (Quill/Krieg in presence; Solace's chat); candidate doesn't model word-wrap and renders single-line — non-gating since names/messages are structurally present at correct anchors.
 
 ## 2026-04-26T00:00:00Z — INIT
 - Ralph scaffolded by setup conversation.
@@ -25,3 +26,88 @@ lobby-connect,lobby,lobby-interfaces}/progress.txt — read those first. -->
   IS readable as a spec-adjacent reference.
 - **Learnings:** none yet.
 ---
+
+## 2026-04-26T17:30:00Z — iter 1 (E0 PASS)
+- Implemented populated LOBBY content per RALPH.md demo data, all in
+  `RunDumpLobby` after the I0/I1/I2 chrome blocks. Six DrawText sites
+  added; one was a single-line replacement of the I0 username slot,
+  the other five are batched per sub-interface:
+  * **CharacterInterface populated:** username "demo" at (20, 71) bank 134
+    advance 8; LEVEL: 8 / WINS: 47 / LOSSES: 12 / XP TO NEXT LEVEL: 220
+    at (17, 130/143/156/169) bank 133 advance 7. Demo stats from
+    RALPH.md (NOXIS agency).
+  * **GameSelectInterface SelectBox rows:** 4 rows at x=410, y starting
+    at 92 with +14 lineheight, bank 133 advance 6. Display order from
+    reference dump (NOT hub_demo.go declaration order):
+    Veterans Only / Tutorial / Capture the Tag / Casual Match #1.
+  * **ChatInterface populated:** channel name "Lobby" at (15, 200) bank
+    134 advance 8; 5 chat lines bottom-to-top at x=19 with bottom y=416
+    and -11 lineheight, bank 133 advance 6 (Vector / Solace / Ember /
+    Vector / Halcyon, oldest at top); presence list top-to-bottom at
+    (267, 220) +11 lineheight, 10 entries: In Lobby + Ember / Halcyon /
+    Solace / Vector / demo + Pregame + Quill -Capture the Tag- +
+    Playing + Krieg -Casual Match #1-. Section header order in the
+    reference dump puts Ember above Halcyon — reordered candidate to
+    match. Em-dashes from prompt replaced with ASCII hyphens.
+- No new banks needed: 7/133/134/135/181 already loaded covers every
+  glyph and sprite for E0.
+- Build: `cmake --build shared/design/sdl3/build` exits 0. Only
+  `main.cpp` recompiled + relink.
+- Dump: `SILENCER_DUMP_SCREEN=lobby SILENCER_DUMP_DIR=/tmp/sdl3_dump
+  shared/design/sdl3/build/silencer_design "$(pwd)/shared/assets"` writes
+  /tmp/sdl3_dump/screen_00.ppm (640x480, 921615 bytes; PPM size invariant).
+- Diff stats vs `/tmp/real_lobby_populated_dump.ppm`:
+  * whole-screen bytewise: 32,350 / 921,600 = 3.51%
+  * whole-screen pixelwise: 11,956 / 307,200 = 3.89%
+  * baseline empty-data dump diff was 1.23% pixelwise — the populated
+    reference contains many more glyph pixels than the empty one, so
+    the pixel-disagreement floor rises with all the new colored text.
+- Visual A/B (Discord DM 1498118546511630517): every structural slot
+  enumerated above renders at the correct position with correct
+  content. Non-gating residuals (per spec carve-outs):
+  * effectcolor variations: "Silencer" header is red in the reference
+    (color=152), candidate green (default brightness=128, no effectcolor
+    LUT). Same for "demo" username (blue in reference per color=200)
+    and the dim/bright treatment for stat rows / section headers.
+  * Toggle widgets render in the bank-181 base sprite (bright blue);
+    reference shows them in the engine's "set/unselected" dim treatment
+    plus a brighter highlight on the selected agency. Documented
+    non-gated since iter-1 of lobby-interfaces.
+  * Reference's presence textbox **word-wraps** "Quill -Capture the
+    Tag-" → "Quill -Capture the" / "Tag-" and "Krieg -Casual Match #1-"
+    → "Krieg -Casual" / "Match #1-". Reference's chat textbox wraps
+    "Solace: still waiting on Krieg's match to finish" → 2 lines.
+    Candidate doesn't model textbox word-wrap; lines extend their full
+    width. Structurally the names/messages are present and at the
+    right anchor; wrap behavior is a runtime layout detail of the
+    Silencer engine's TextBox widget, not a structural gate.
+- Regression sweep skipped (no source changes outside `RunDumpLobby`'s
+  body; bank list unchanged; no other screen-builder touched).
+- Files touched: `shared/design/sdl3/src/main.cpp` (six DrawText
+  blocks added in RunDumpLobby), `.ralph/lobby-extras/prd.json` (E0 →
+  passes:true), `.ralph/lobby-extras/progress.txt` (this entry).
+- **Learnings:**
+  - **The empty-data → populated-data jump is mostly DrawText calls,
+    not new sprites or codec branches.** Every populated content slot
+    was already a "spec'd structural anchor" in the I0/I1/I2 comments
+    from the prior Ralph; filling them in is mechanical: pick the bank
+    + advance from the spec table, pick the literal anchor coords,
+    DrawText. No new bank loads, no new chrome sprites — the whole E0
+    delta is six contiguous DrawText blocks. This pattern will repeat
+    for the modal/state screens E1..E5 — where they reuse LOBBY
+    chrome, they reuse this whole render path; where they replace
+    GameSelectInterface (E1..E3), the substitution is bbox-scoped.
+  - **Reference dump ordering can disagree with prompt list ordering.**
+    RALPH.md lists "In Lobby: Halcyon, Ember, Solace, Vector, demo"
+    but the reference shows "Ember, Halcyon, Solace, Vector, demo".
+    Always check the reference visually before trusting prompt-prose
+    ordering — the rendering order is whatever the engine's textbox
+    insert sequence produced, not the prompt-author's recall order.
+  - **Pixelwise diff RISES when populated content lands** (1.23% →
+    3.89%) — counterintuitive but expected. The empty-data candidate
+    had MOSTLY-MATCHING black-empty interiors that just happened to
+    coincide with the reference's black-empty interiors; populating
+    those interiors with colored glyphs introduces effectcolor and
+    word-wrap disagreement pixels. The structural metric (named
+    objects present at named anchors) is the right gate; whole-screen
+    pixel diff is dominated by effectcolor-modeling gaps.
