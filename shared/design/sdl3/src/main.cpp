@@ -2032,6 +2032,134 @@ static int RunDumpLobbyGameSummary(const std::string &assets_dir,
   return ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// UPDATING state (env SILENCER_DUMP_SCREEN=updating). Per
+// docs/design/screen-updating.md the captured reference is intentionally
+// minimal — black background + bordered box centered around y=215 + Cancel
+// B156x21 button right-aligned in the box. The reference also shows the
+// Update B156x21 button at (161,230) sharing the same row (per the spec
+// object inventory: Update uid=250, Cancel uid=251 both at y=230, 156 wide
+// each — they sit side-by-side filling the box interior horizontally).
+//
+// Spec gaps: precise sprite index for the box border is unknown (likely
+// CreateModalDialog bank 40 idx 4 per the spec table, but bank 40 isn't in
+// this candidate's loaded set). We draw the bordered box manually by poking
+// palette indices into the framebuffer — simple rectangle with a bright-
+// green palette index that matches the reference border color under the
+// menu sub-palette. Spec gates only on: dark background, bordered box,
+// Cancel button inside.
+// ---------------------------------------------------------------------------
+static int RunDumpUpdating(const std::string &assets_dir,
+                           const std::string &dump_dir) {
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // Minimal bank set: bank 7 for B156x21 button chrome (idx 24), 133/134
+  // for the small/medium fonts (status text + button labels). No sprite
+  // for the box border — drawn manually below.
+  SpriteSet sprites;
+  std::vector<int> banks = {7, 133, 134};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // UPDATING is entered from LOBBYCONNECT — same menu sub-palette. The
+  // observed reference greens (24,125,20) etc. match sub-palette 1's idx
+  // 212..222 range exactly.
+  constexpr int kSubUpdating = 1;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  // Bordered box at (159..478) x (193..258). The border is bright green
+  // (palette idx 220 in sub=1 -> RGB (24,125,20)). Top border thick (3
+  // rows), bottom border 2 rows, vertical sides 6 cols thick.
+  constexpr uint8_t kBorderIdx = 220;
+  constexpr int kBoxLeft = 159;
+  constexpr int kBoxRight = 478;
+  constexpr int kBoxTop = 193;
+  constexpr int kBoxBottom = 258;
+  auto plot = [&](int x, int y, uint8_t idx) {
+    if (x < 0 || x >= Framebuffer::W || y < 0 || y >= Framebuffer::H) return;
+    fb.px[y * Framebuffer::W + x] = idx;
+  };
+  // Top border (y=193..195).
+  for (int y = kBoxTop; y <= kBoxTop + 2; ++y) {
+    for (int x = kBoxLeft; x <= kBoxRight; ++x) plot(x, y, kBorderIdx);
+  }
+  // Bottom border (y=257..258).
+  for (int y = kBoxBottom - 1; y <= kBoxBottom; ++y) {
+    for (int x = kBoxLeft; x <= kBoxRight; ++x) plot(x, y, kBorderIdx);
+  }
+  // Left vertical (x=159..164).
+  for (int y = kBoxTop; y <= kBoxBottom; ++y) {
+    for (int x = kBoxLeft; x <= kBoxLeft + 5; ++x) plot(x, y, kBorderIdx);
+  }
+  // Right vertical (x=473..478).
+  for (int y = kBoxTop; y <= kBoxBottom; ++y) {
+    for (int x = kBoxRight - 5; x <= kBoxRight; ++x) plot(x, y, kBorderIdx);
+  }
+
+  // Status text at (centered ~320, y=200): "An update is required to play
+  // online." per spec. Center horizontally on the box — bank 134 advance 8.
+  {
+    const char *text = "An update is required to play online.";
+    int len = static_cast<int>(std::strlen(text));
+    int textX = (kBoxLeft + kBoxRight) / 2 - (len * 8) / 2;
+    DrawText(fb, textX, 200, text, /*bank=*/134, /*advance=*/8, sprites,
+             palette, kSubUpdating, /*brightness=*/128);
+  }
+
+  // Update + Cancel B156x21 buttons at (161,230) and (322,230). The
+  // reference shows both filling the box interior side-by-side. Per spec
+  // PROMPTING state shows Update; Cancel is the dismiss action.
+  {
+    constexpr int kB156Base = 24;
+    constexpr int kB156Width = 156;
+    constexpr int kB156Advance = 8;
+    constexpr int kB156Yoff = 4;
+    struct Btn {
+      const char *label;
+      int x;
+      int y;
+    };
+    const std::array<Btn, 2> buttons = {{
+        {"Update", 161, 230},
+        {"Cancel", 322, 230},
+    }};
+    if (sprites.Has(7, kB156Base)) {
+      const Sprite &chrome = sprites.Get(7, kB156Base);
+      for (const auto &b : buttons) {
+        BlitSprite(fb, chrome, b.x, b.y, nullptr);
+        int len = static_cast<int>(std::strlen(b.label));
+        int xoff = (kB156Width - len * kB156Advance) / 2;
+        int textX = b.x - chrome.offset_x + xoff;
+        int textY = b.y - chrome.offset_y + kB156Yoff;
+        DrawText(fb, textX, textY, b.label, /*bank=*/134,
+                 /*advance=*/kB156Advance, sprites, palette, kSubUpdating,
+                 /*brightness=*/128);
+      }
+    }
+  }
+
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubUpdating);
+  std::fprintf(stderr, "wrote %s (updating)\n", out.c_str());
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   std::string assets_dir;
   if (argc >= 2) {
@@ -2079,6 +2207,9 @@ int main(int argc, char **argv) {
     }
     if (screen_str == "lobby_gamesummary") {
       return RunDumpLobbyGameSummary(assets_dir, dump);
+    }
+    if (screen_str == "updating") {
+      return RunDumpUpdating(assets_dir, dump);
     }
     return RunDump(assets_dir, dump);
   }

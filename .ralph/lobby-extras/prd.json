@@ -58,7 +58,7 @@
       "id": "E5",
       "name": "updating screen (bordered box + Cancel button)",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "spec": "Per docs/design/screen-updating.md: dispatch SILENCER_DUMP_SCREEN=updating to a new RunDumpUpdating. Render dark/black background + bordered box centered around y=215 + Cancel B156x21 button right-aligned in the box. Text content runtime / non-structural.",
       "category": "composition",
       "reference_dump": "/tmp/real_updating_dump.ppm",

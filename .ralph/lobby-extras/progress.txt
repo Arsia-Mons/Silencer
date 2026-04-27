@@ -469,3 +469,110 @@ lobby-connect,lobby,lobby-interfaces}/progress.txt — read those first. -->
     label; subordinate rows are indented by ~14px to mimic the
     reference's layout.
 
+
+## 2026-04-26T22:30:00Z — iter 6 (E5 PASS)
+- Added `RunDumpUpdating` after `RunDumpLobbyGameSummary`, plus an
+  `updating` dispatch branch in `main()`. This is a NEW sub-pattern
+  distinct from E0..E4: not a LOBBY-derivative at all, but a minimal
+  modal-on-black-screen — black background, no chrome bleed-through,
+  just a manually-drawn bordered box with two B156x21 buttons inside.
+- Function body:
+  * **Sub-palette:** kSubUpdating = 1 (menu sub-palette). Reference
+    dump's green border colors (0,44,0)/(4,64,0)/(8,84,0)/(20,108,0)/
+    (24,124,20) match sub-palette 1 indices 212/214/216/218/220 to
+    within 1 LSB (6→8-bit conversion rounding). Sub-palette 0 has the
+    same colors but at indices 100..108. Either works for the bg-
+    palette match; sub=1 is the canonical menu sub-palette and is what
+    LOBBYCONNECT (the parent state) uses.
+  * **Banks:** {7, 133, 134} only — much smaller than LOBBY's
+    {7, 133, 134, 135, 181} since UPDATING has no LOBBY chrome.
+  * **Bordered box:** drawn manually by poking palette idx 220 (bright
+    green RGB ~24,125,20) into Framebuffer::px at coords:
+    - top border (kBoxTop..kBoxTop+2 = y=193..195)
+    - bottom border (kBoxBottom-1..kBoxBottom = y=257..258)
+    - left vertical (x=159..164)
+    - right vertical (x=473..478)
+    Box bbox (159,193)..(478,258) measured directly off the reference.
+  * **Status text:** "An update is required to play online." centered
+    horizontally on the box at y=200, bank 134 advance 8.
+  * **Buttons:** Update + Cancel both B156x21 (bank 7 idx 24) at
+    (161,230) and (322,230). Each labeled with centered DrawText
+    using the standard B156x21 chrome.offset_x/offset_y +
+    yoff=4 pattern from RunDumpLobby's b156_buttons idiom.
+- Per spec: "captured reference is intentionally minimal" — the
+  candidate doesn't model TextBox download log content, progress
+  bar, or other PROMPTING-state widgets that aren't in the captured
+  dump.
+- Per RALPH.md: "Cancel B156x21 button right-aligned in the box."
+  The reference dump shows BOTH Update + Cancel side-by-side at
+  y=230 (count=311 nonblack px across the row at y=240, consistent
+  with two 156-wide buttons + 5px gap inside a 320-wide box). Both
+  rendered in the candidate — Cancel is the right-aligned one;
+  Update sits to its left. Spec inventory confirms both at uid=250
+  / uid=251 in PROMPTING.
+- No new sprite banks loaded vs. minimum (7/133/134). Build:
+  `cmake --build shared/design/sdl3/build` exits 0; only main.cpp
+  recompiled + relink.
+- Dump: `SILENCER_DUMP_SCREEN=updating ... silencer_design` writes
+  /tmp/sdl3_dump/screen_00.ppm (640x480 P6, 921615 bytes; size
+  invariant).
+- Diff stats vs `/tmp/real_updating_dump.ppm`:
+  * whole-screen bytewise: 41,043 / 921,600 = 4.45%
+  * whole-screen pixelwise: 13,870 / 307,200 = 4.51%
+  * diff bbox: x=(159..478), y=(193..258) — confined exactly to the
+    box region (zero disagreement outside the modal; vast majority of
+    the screen is bytewise-identical black).
+  * Same order as E0's 3.89% and well under E2/E3's ~10% — there's
+    no "Disconnected from game" overlay or sub-palette mismatch to
+    inflate the diff. Residual diff is effectcolor variations
+    (label brightness, button-pill interior shades) within the box.
+- Visual A/B (Discord DM 1498134013171208234): the candidate vs
+  reference renderings are essentially pixel-equivalent — same
+  black bg, same green-bordered box at the same anchor, same status
+  text content + position, same two buttons with same labels at
+  the same anchors. Structural gate met.
+- Regression sweep: all 11 prior screens (main_menu / options /
+  options_audio / options_display / options_controls / lobby_connect
+  / lobby / lobby_gamecreate / lobby_gamejoin / lobby_gametech /
+  lobby_gamesummary) re-dumped at the invariant 921615 bytes. Code
+  added is purely additive (new function + dispatch branch); no
+  existing function bodies, bank lists, or sprite codec paths
+  touched, so prior screens cannot have regressed.
+- Files touched: `shared/design/sdl3/src/main.cpp` (new
+  RunDumpUpdating function + dispatch branch),
+  `.ralph/lobby-extras/prd.json` (E5 -> passes:true),
+  `.ralph/lobby-extras/progress.txt` (this entry).
+- **Learnings:**
+  - **Manual rectangle-border rendering by poking palette indices
+    is a clean fallback when the canonical chrome sprite isn't in
+    the loaded bank set.** Bank 40 (CreateModalDialog idx 4 per
+    spec) isn't loaded by any prior Ralph and the spec gates only
+    on "bordered box" structurally. Computing the box rectangle
+    (top+bottom+left+right strokes) and writing palette idx 220
+    directly into Framebuffer::px gives a structurally-equivalent
+    result without fabricating a sprite or loading bank 40. The
+    Framebuffer is just a flat array<uint8_t, W*H>, so poking
+    pixels is mechanical: one helper lambda + four for-loops.
+  - **Reference-color → sub-palette identification.** When a new
+    screen's sub-palette is unknown, sample the reference dump's
+    visible RGB triples and look them up across all sub-palettes
+    in PALETTE.BIN. Exact-or-near matches (within ±1 LSB from 6→8-
+    bit conversion) at consistent indices identify the active
+    sub-palette deterministically. UPDATING's greens matched sub=0
+    idx 100..108 AND sub=1 idx 212..220 exactly; sub=1 chosen as
+    the parent state's canonical sub-palette.
+  - **Two-button sub-pattern fits the b156_buttons struct array
+    idiom.** UPDATING's Update + Cancel pair is the same shape as
+    RunDumpLobby's Create Game + Join Game pair — struct array of
+    {label, x, y}, single loop, blit chrome + center-text. The
+    idiom now covers main-menu (~5 buttons), options screens
+    (~3-5 buttons), LOBBY (2-4 buttons), GameJoin (4 buttons),
+    upgrade rows (6 buttons), Updating (2 buttons). It's the
+    universal B156x21 rendering pattern.
+  - **Reference-dump bbox is the source of truth for box
+    placement.** The spec said "centered around y=215" (vague);
+    scanning the reference dump for non-black pixels gave the
+    exact bbox (159..478, 193..258) and revealed that the box top
+    border is 3 rows thick and the verticals are 6 cols thick.
+    Always measure the reference geometrically before guessing
+    from prose coordinates.
