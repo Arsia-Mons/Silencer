@@ -106,12 +106,12 @@ resource "aws_security_group" "lobby" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "lobby_map_api" {
-  security_group_id = aws_security_group.lobby.id
-  ip_protocol       = "tcp"
-  from_port         = 15172
-  to_port           = 15172
-  cidr_ipv4         = "0.0.0.0/0"
-  description       = "Community map API (HTTP)"
+  security_group_id            = aws_security_group.lobby.id
+  referenced_security_group_id = aws_security_group.admin.id
+  ip_protocol                  = "tcp"
+  from_port                    = 15172
+  to_port                      = 15172
+  description                  = "Community map API from admin-api proxy only"
 }
 
 resource "aws_eip" "lobby" {
