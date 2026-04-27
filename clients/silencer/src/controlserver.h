@@ -51,8 +51,6 @@ private:
 	int port;
 	std::atomic<bool> running;
 	std::thread acceptthread;
-	std::vector<std::thread> connthreads;
-	std::mutex connthreads_mu;
 
 	std::mutex queue_mu;
 	std::vector<ControlCommand> immediate;

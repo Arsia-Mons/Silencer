@@ -28,6 +28,7 @@ bool ControlServer::Start(int p) {
 	if(p <= 0){
 		return false;
 	}
+	if(running.load()) return false;
 	port = p;
 	listenfd = (int)::socket(AF_INET, SOCK_STREAM, 0);
 	if(listenfd < 0){
@@ -65,12 +66,28 @@ void ControlServer::Stop() {
 		listenfd = -1;
 	}
 	if(acceptthread.joinable()) acceptthread.join();
+	// Drain pending commands and fulfill their promises so the per-connection
+	// threads can exit. They're detached, so we don't need to join them.
+	std::vector<ControlCommand> stragglers;
 	{
-		std::lock_guard<std::mutex> lk(connthreads_mu);
-		for(auto& t : connthreads){
-			if(t.joinable()) t.join();
+		std::lock_guard<std::mutex> lk(queue_mu);
+		stragglers = std::move(immediate);
+		auto pr = std::move(postrender);
+		stragglers.insert(stragglers.end(),
+			std::make_move_iterator(pr.begin()),
+			std::make_move_iterator(pr.end()));
+		immediate.clear();
+		postrender.clear();
+	}
+	for(auto& c : stragglers){
+		if(c.reply){
+			ControlReply rpl;
+			rpl.id = c.id;
+			rpl.ok = false;
+			rpl.code = "INTERNAL";
+			rpl.error = "server stopping";
+			c.reply->set_value(rpl);
 		}
-		connthreads.clear();
 	}
 }
 
@@ -83,8 +100,7 @@ void ControlServer::AcceptLoop() {
 			if(!running.load()) break;
 			continue;
 		}
-		std::lock_guard<std::mutex> lk(connthreads_mu);
-		connthreads.emplace_back(&ControlServer::HandleConnection, this, cfd);
+		std::thread(&ControlServer::HandleConnection, this, cfd).detach();
 	}
 }
 
@@ -93,7 +109,7 @@ static bool ReadLine(int fd, std::string& out) {
 	char buf[1];
 	while(true){
 		int n = (int)::recv(fd, buf, 1, 0);
-		if(n <= 0) return !out.empty();
+		if(n <= 0) return false;
 		if(buf[0] == '\n') return true;
 		if(buf[0] != '\r') out.push_back(buf[0]);
 		if(out.size() > (1 << 20)) return false; // 1 MiB line cap
