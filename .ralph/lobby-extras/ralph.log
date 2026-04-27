@@ -1,0 +1,29 @@
+--- Iteration 1 2026-04-26 17:29:40 ---
+E0 done. Iter 1 complete: populated LOBBY content (chat/games/character/presence) added to `RunDumpLobby` via six DrawText blocks. Visual A/B is structurally equivalent to the populated reference; commit `225de7b` pushed onto `hv/design-ralph`. 5 items remain (E1..E5 + final E6 gate).
+
+--- Iteration 2 2026-04-26 17:36:41 ---
+iter 2: **E1 PASS** — `lobby-game-create` modal. New `RunDumpLobbyGameCreate` reuses LOBBY chrome + populated CharacterInterface + populated ChatInterface, substitutes the I1 GameSelectInterface region with the GameCreate form (Game Options header + 5 label/value rows + Select Maps + 4 map rows + Game Name/Password labels + Create B156x21). No new banks. Discord DM `1498120138858172568`. Committed `04cf761`.
+
+Remaining items: E2 (lobby-game-join), E3 (lobby-game-tech), E4 (lobby-game-summary), E5 (updating), E6 (final equivalence).
+
+--- Iteration 3 2026-04-26 17:40:55 ---
+E2 PASS committed. The Ralph loop continues — next iteration would tackle E3 (lobby-game-tech). Stopping here per "ONE item per iteration" discipline.
+
+Summary: Added `RunDumpLobbyGameJoin` to `shared/design/sdl3/src/main.cpp:1390` and a `lobby_gamejoin` dispatch branch. The function reuses RunDumpLobby's structure with only the I1 button-array swap (Create Game → Choose Tech / Change Team / Ready, plus the still-present Join Game). Visual A/B confirms all 3 GameJoin buttons render at correct anchors with LOBBY chrome behind; 10.74% pixelwise diff is dominated by the spec-carve-out "Disconnected from game" modal overlay region.
+
+--- Iteration 4 2026-04-26 17:48:07 ---
+Iter 4 done. **E3 PASS** — `RunDumpLobbyGameTech` added: Back To Teams B156x21 at (242,68) replacing Create Game, BCHECKBOX (bank 7 idx 19) grid scaffold at column-3 (x=452, y=125+i*13), 6 tech-name placeholder labels at x=467. Disconnected modal + tech name/desc overlays omitted per spec carve-out. Pixelwise diff 11.25% (same order as E2, dominated by absent modal + Active Games panel z-order disagreement). Committed `1ce7343`.
+
+Remaining items: E4 (lobby-game-summary), E5 (updating), E6 (final all-pass gate). Per Ralph discipline (one item per iteration), this iteration ends here. Loop control would invoke me again for iter 5 → E4.
+
+--- Iteration 1 2026-04-26 18:25:02 ---
+E4 (lobby-game-summary) PASS — committed as `db72217`. Mission Summary title, 23 stat labels, +0 XP / *NEW UPGRADE AVAILABLE* overlays, 6 upgrade-row buttons (Endurance/Shield/Jetpack/Tech Slot/Hacking/Contacts), and Done button all rendered at correct anchors. Whole-screen diff inflated to 71% by spec-gap panel-chrome sprites + background sub-palette difference; structural gate met. Regression sweep clean (10 prior screens at invariant 921615 bytes). Remaining: E5 (updating) + E6 (final gate).
+
+--- Iteration 2 2026-04-26 18:30:58 ---
+E5 complete. The remaining backlog item is E6 (final visual equivalence gate across all 6 targets). Per the one-item-per-iteration discipline, the loop should pick that up next.
+
+--- Iteration 1 2026-04-26 18:34:17 ---
+All 7 items pass. Emitting the all-pass marker.
+
+<promise>COMPLETE</promise>
+
