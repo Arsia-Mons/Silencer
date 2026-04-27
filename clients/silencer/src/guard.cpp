@@ -520,6 +520,7 @@ void Guard::Tick(World & world){
 		case UNCROUCHING:{
 			xv = 0;
 			res_bank = 158;
+			res_index = 9 - state_i;  // reverse of CROUCHING: animate from crouched back to standing
 			if(state_i >= 9){
 				state = STANDING;
 				state_i = -1;
