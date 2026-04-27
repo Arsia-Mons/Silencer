@@ -86,7 +86,7 @@ func main() {
 		events = NewEventPublisher(url)
 	}
 
-	proc := newProcManager(*gameBinary, *publicAddr, port, *gamePortBase, *gamePortCount)
+	proc := newProcManager(*gameBinary, port, *gamePortBase, *gamePortCount)
 	hub := NewHub(store, motd, *publicAddr, proc, events)
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", *addr)

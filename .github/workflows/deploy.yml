@@ -218,8 +218,12 @@ jobs:
             sudo ln -sfn /opt/silencer/current/assets /usr/local/share/silencer
 
             # Ensure map API listens on :15172 (idempotent drop-in).
+            # NOTE: -public-addr must be a dotted-decimal IP, not a hostname —
+            # the C++ joining-client path resolves the game host with
+            # inet_addr() (game.cpp / world.cpp), which silently fails on
+            # hostnames. Until that's replaced with getaddrinfo, use the EIP.
             sudo mkdir -p /etc/systemd/system/silencer-lobby.service.d
-            printf '[Service]\nExecStart=\nExecStart=/opt/silencer/current/silencer-lobby -addr :517 -db /var/lib/silencer/lobby.json -maps-dir /var/lib/silencer/maps -map-api-addr :15172 -update-manifest /opt/silencer/update.json -public-addr lobby.arsiamons.com -game-binary /opt/silencer/current/silencer\n' | sudo tee /etc/systemd/system/silencer-lobby.service.d/map-api.conf > /dev/null
+            printf '[Service]\nExecStart=\nExecStart=/opt/silencer/current/silencer-lobby -addr :517 -db /var/lib/silencer/lobby.json -maps-dir /var/lib/silencer/maps -map-api-addr :15172 -update-manifest /opt/silencer/update.json -public-addr 54.241.183.70 -game-binary /opt/silencer/current/silencer\n' | sudo tee /etc/systemd/system/silencer-lobby.service.d/map-api.conf > /dev/null
             sudo systemctl daemon-reload
             sudo systemctl restart silencer-lobby
             sleep 2
