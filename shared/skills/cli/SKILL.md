@@ -40,8 +40,8 @@ wait_alive "$PORT"
 # ... do work (see ops below) ...
 ```
 
-`lib.sh` exports `$CLI="bun .../clients/cli/index.ts"` for you. Pass
-`--port "$PORT"` on every invocation.
+`lib.sh` defines a `cli` shell function (`bun .../clients/cli/index.ts`) so
+paths with spaces don't word-split. Pass `--port "$PORT"` on every invocation.
 
 ## Supported ops
 
@@ -88,38 +88,38 @@ PORT=$(pick_port); PID=$(start_silencer "$PORT")
 trap "stop_silencer $PID $PORT" EXIT
 wait_alive "$PORT"
 
-$CLI --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
-$CLI --port "$PORT" click --label OPTIONS
-$CLI --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000
-$CLI --port "$PORT" back
-$CLI --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000
+cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+cli --port "$PORT" click --label OPTIONS
+cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000
+cli --port "$PORT" back
+cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000
 ```
 
 ### Screenshot a screen
 
 ```bash
-$CLI --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
-$CLI --port "$PORT" screenshot --out /tmp/main.png
+cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+cli --port "$PORT" screenshot --out /tmp/main.png
 ```
 
 ### Discover what's on screen
 
 ```bash
-$CLI --port "$PORT" inspect | jq '.widgets[] | {id,kind,label}'
+cli --port "$PORT" inspect | jq '.widgets[] | {id,kind,label}'
 ```
 
 ### Read live world state
 
 ```bash
-$CLI --port "$PORT" world_state | jq '.players[] | {id,hp,x,y}'
+cli --port "$PORT" world_state | jq '.players[] | {id,hp,x,y}'
 ```
 
 ### Pause + step + resume (single-player only)
 
 ```bash
-$CLI --port "$PORT" pause
-$CLI --port "$PORT" step --frames 30   # advances 30 frames, re-pauses
-$CLI --port "$PORT" resume
+cli --port "$PORT" pause
+cli --port "$PORT" step --frames 30   # advances 30 frames, re-pauses
+cli --port "$PORT" resume
 ```
 
 ## Wire protocol

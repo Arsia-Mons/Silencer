@@ -18,11 +18,16 @@ if [ -z "${SILENCER_BIN:-}" ]; then
   fi
 fi
 
-CLI="bun $REPO_ROOT/clients/cli/index.ts"
+# Function (not a variable) so $REPO_ROOT can contain spaces — assigning
+# `CLI="bun $REPO_ROOT/.../index.ts"` and then unquoted `$CLI` word-splits the
+# path on whitespace. With a function, "$@" carries args verbatim.
+cli() {
+  bun "$REPO_ROOT/clients/cli/index.ts" "$@"
+}
 
 pick_port() {
-  # Random ephemeral.
-  python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()'
+  # Random ephemeral. Bun (already required by cli()) avoids a python3 dep.
+  bun -e 'const s = Bun.listen({hostname:"127.0.0.1",port:0,socket:{data(){}}}); console.log(s.port); s.stop();'
 }
 
 start_silencer() {
@@ -34,7 +39,7 @@ start_silencer() {
 wait_alive() {
   local port="$1"
   for i in $(seq 1 60); do
-    if $CLI --port "$port" ping >/dev/null 2>&1; then return 0; fi
+    if cli --port "$port" ping >/dev/null 2>&1; then return 0; fi
     sleep 0.5
   done
   echo "silencer on $port never came up" >&2
@@ -44,7 +49,7 @@ wait_alive() {
 stop_silencer() {
   local pid="$1" port="${2:-}"
   if [ -n "$port" ]; then
-    $CLI --port "$port" quit >/dev/null 2>&1 || true
+    cli --port "$port" quit >/dev/null 2>&1 || true
   fi
   sleep 0.3
   kill "$pid" 2>/dev/null || true
