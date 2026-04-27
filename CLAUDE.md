@@ -50,7 +50,7 @@ Each component owns its own `CLAUDE.md` with build/run/test/gotchas:
 
 - Writing CLAUDE.md well: [docs/writing-a-good-claude-md.md](docs/writing-a-good-claude-md.md)
 - Production setup: `docs/production.md`
-- UI design system + asset formats: [`docs/design/`](docs/design/) (currently main-menu subset; previous monolithic spec preserved at `docs/design-system.md.archive`)
+- UI design system + asset formats: `docs/design-system.md`
 - Intent docs: `docs/plans/`
 - TDD execution plans: `docs/superpowers/plans/`
 - Specs: `docs/superpowers/specs/`

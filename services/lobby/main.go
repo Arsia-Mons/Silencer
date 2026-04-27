@@ -26,7 +26,6 @@ func main() {
 	mapAPIAddr := flag.String("map-api-addr", ":8080", "public HTTP address for the community map API (upload/download)")
 	mapsDir := flag.String("maps-dir", "maps", "directory for community map storage")
 	mapUploadKey := flag.String("map-upload-key", "", "API key required for map uploads (empty = unauthenticated, dev only)")
-	demo := flag.Bool("demo", false, "seed the hub with fake games / presence / chat / agency stats; used for design-system QA dumps so the LOBBY screen has visible content. don't enable in production.")
 	flag.Parse()
 
 	var manifest *UpdateManifest
@@ -89,10 +88,6 @@ func main() {
 
 	proc := newProcManager(*gameBinary, port, *gamePortBase, *gamePortCount)
 	hub := NewHub(store, motd, *publicAddr, proc, events)
-	if *demo {
-		hub.SeedDemoData()
-		log.Printf("[demo] seeded fake games/presence/chat — DO NOT use this build in production")
-	}
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", *addr)
 	if err != nil {
