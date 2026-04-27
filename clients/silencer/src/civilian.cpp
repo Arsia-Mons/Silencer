@@ -22,7 +22,7 @@ Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 }
 
 void Civilian::InitBT(){
-	bt_ = BehaviorTreeLibrary::instance().get("civilian-flee");
+	bt_ = BehaviorTreeLibrary::instance().get("civilian");
 	if(!bt_) return;
 	btctx_.actions["Run"] = [this](BTContext&) -> BTResult {
 		if(state != RUNNING){ state = RUNNING; state_i = (Uint8)-1; }
