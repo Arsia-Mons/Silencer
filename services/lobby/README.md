@@ -32,7 +32,7 @@ by default. On macOS that requires `sudo`; use any unprivileged port
 | `-addr` | `:517` | TCP + UDP listen address |
 | `-db` | `lobby.json` | JSON user/stats database path |
 | `-motd` | *(built-in)* | path to a plain-text MOTD file |
-| `-version` | `00023` | required client version string (empty = accept any) |
+| `-version` | *(empty)* | required client version string. Empty (default) = use the version from `-update-manifest`; if no manifest, accept any. |
 | `-game-binary` | `../build/silencer` | path to the `silencer` binary to spawn per game |
 | `-public-addr` | `127.0.0.1` | host or IP clients should use to reach the dedicated servers |
 | `-player-auth-addr` | `:15171` | internal HTTP server address (Docker-internal, not publicly exposed) |
