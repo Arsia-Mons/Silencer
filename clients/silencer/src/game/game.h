@@ -12,7 +12,9 @@
 #include "updater.h"
 #include "controlserver.h"
 #include <map>
+#include <array>
 #include <atomic>
+#include <mutex>
 #include <thread>
 
 class Game
@@ -187,6 +189,13 @@ private:
 	std::atomic<int> dlresult{0};      // 0=idle, 1=success, -1=fail
 	std::string dlitemname;            // key in servermaps being downloaded
 	std::thread dlthread;
+	// Pre-game map fetch (join path): async server download before P2P fallback.
+	// State: 0=idle 1=in-flight 2=downloaded 3=not-on-server.
+	std::atomic<int>      mapjoinstate{0};
+	std::atomic<uint32_t> mapjoingeneration{0}; // incremented on reset to discard stale results
+	std::string           mapjoinpath;           // absolute path set by thread when state→2
+	std::mutex            mapjoinmutex;          // guards mapjoinpath
+	std::thread           mapjointhread;
 	Uint32 lastmusicplaytime;
 	char currentmusictrack[256];
 	bool fullscreentoggled;
