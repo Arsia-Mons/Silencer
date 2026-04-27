@@ -244,6 +244,13 @@ void Game::Present(void){
 	if(dumppath){
 		const char * dumpstate = getenv("SILENCER_DUMP_STATE");
 		int target_state = MAINMENU;
+		// LOBBY-modal sub-targets: in dump mode, after the engine settles
+		// in LOBBY, force-create one of the modal sub-interfaces and dump.
+		// The base state stays LOBBY; only the modal pointer is injected.
+		bool target_modal_create  = false;
+		bool target_modal_join    = false;
+		bool target_modal_tech    = false;
+		bool target_modal_summary = false;
 		if(dumpstate){
 			if(strcmp(dumpstate, "OPTIONS") == 0) target_state = OPTIONS;
 			else if(strcmp(dumpstate, "OPTIONSCONTROLS") == 0) target_state = OPTIONSCONTROLS;
@@ -251,6 +258,11 @@ void Game::Present(void){
 			else if(strcmp(dumpstate, "OPTIONSAUDIO") == 0) target_state = OPTIONSAUDIO;
 			else if(strcmp(dumpstate, "LOBBYCONNECT") == 0) target_state = LOBBYCONNECT;
 			else if(strcmp(dumpstate, "LOBBY") == 0) target_state = LOBBY;
+			else if(strcmp(dumpstate, "LOBBY_GAMECREATE") == 0)  { target_state = LOBBY; target_modal_create  = true; }
+			else if(strcmp(dumpstate, "LOBBY_GAMEJOIN") == 0)    { target_state = LOBBY; target_modal_join    = true; }
+			else if(strcmp(dumpstate, "LOBBY_GAMETECH") == 0)    { target_state = LOBBY; target_modal_tech    = true; }
+			else if(strcmp(dumpstate, "LOBBY_GAMESUMMARY") == 0) { target_state = LOBBY; target_modal_summary = true; }
+			else if(strcmp(dumpstate, "UPDATING") == 0) target_state = UPDATING;
 		}
 
 		// Auto-jump from MAINMENU to the target state once the logo settles.
@@ -304,14 +316,72 @@ void Game::Present(void){
 			}
 		}
 
-		// LOBBY auth-bypass: the engine's LOBBY case bounces back to
-		// LOBBYCONNECT every frame the lobby state is DISCONNECTED, which
-		// prevents the screen from settling for a dump when no real lobby
-		// server is running. Force the state to AUTHENTICATED on every
-		// frame in LOBBY-target dump mode so the engine treats us as a
-		// connected, logged-in client and the LOBBY screen renders normally.
-		if(target_state == LOBBY && state == LOBBY){
-			world.lobby.state = Lobby::AUTHENTICATED;
+		// LOBBY auto-auth for populated-data dumps: when target is LOBBY or
+		// any LOBBY-modal variant AND the engine is in LOBBYCONNECT with
+		// state AUTHENTICATING, push hard-coded "demo"/"demo" credentials so
+		// the engine progresses LOBBYCONNECT → AUTHENTICATING → AUTHSENT →
+		// AUTHENTICATED → GoToState(LOBBY). The lobby (run with `-demo`) auto-
+		// registers unknown users on first auth, so this works against a
+		// fresh demo lobby. Demo-mode lobby seeds chat / presence / games and
+		// per-agency stats — so the LOBBY dump renders with real visible
+		// content instead of empty panels.
+		if((target_state == LOBBY) && state == LOBBYCONNECT){
+			world.lobby.LockMutex();
+			if(world.lobby.state == Lobby::AUTHENTICATING){
+				static bool sent_demo_creds = false;
+				if(!sent_demo_creds){
+					sent_demo_creds = true;
+					strcpy(localusername, "demo");
+					world.lobby.SendCredentials("demo", "demo");
+					world.lobby.state = Lobby::AUTHSENT;
+				}
+			}
+			world.lobby.UnlockMutex();
+		}
+
+		// LOBBY-modal injection: once we're settled in LOBBY for at least a
+		// few ticks (so chat/presence/games have streamed in), force-create
+		// the requested modal sub-interface. Each modal is gated by its
+		// own pointer field (gamecreateinterface / gamejoininterface /
+		// gametechinterface / gamesummaryinterface). Setting the pointer
+		// causes the engine's LOBBY render path to compose it on top.
+		if(target_state == LOBBY && state == LOBBY && !stateisnew){
+			static int lobby_settled_for_modal = 0;
+			lobby_settled_for_modal++;
+			// Wait a few ticks for AUTHENTICATED data flow to populate
+			// before opening the modal — otherwise CreateGameJoinInterface
+			// etc. may render with empty player lists.
+			if(lobby_settled_for_modal == 30){
+				if(target_modal_create && !gamecreateinterface){
+					gamecreateinterface = CreateGameCreateInterface()->id;
+					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+					if(lobbyiface){
+						lobbyiface->AddObject(gamecreateinterface);
+					}
+				}
+				if(target_modal_join && !gamejoininterface){
+					gamejoininterface = CreateGameJoinInterface()->id;
+					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+					if(lobbyiface){
+						lobbyiface->AddObject(gamejoininterface);
+					}
+				}
+				if(target_modal_tech && !gametechinterface){
+					gametechinterface = CreateGameTechInterface()->id;
+					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+					if(lobbyiface){
+						lobbyiface->AddObject(gametechinterface);
+					}
+				}
+				if(target_modal_summary && !gamesummaryinterface){
+					Stats stub_stats;
+					gamesummaryinterface = CreateGameSummaryInterface(stub_stats, /*agency=*/0)->id;
+					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+					if(lobbyiface){
+						lobbyiface->AddObject(gamesummaryinterface);
+					}
+				}
+			}
 		}
 
 		// Options-family dump: static menus, no animation pin available.
