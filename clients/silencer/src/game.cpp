@@ -215,14 +215,6 @@ bool Game::Load(char * cmdline){
 		return false;
 	}
 	printf("Resources loaded\n");
-	// Sync actordefs from server if an admin API URL is configured.
-	const char* apiBase = Config::GetInstance().adminapiurl;
-	if (apiBase && apiBase[0] != '\0' && !world.dedicatedserver.active) {
-		printf("Syncing actordefs from server...\n");
-		int n = FetchActorDefs(apiBase, world.resources.actordefs);
-		if (n > 0) printf("Synced %d actordef(s) from server\n", n);
-		else printf("Actordef sync failed or server unavailable, using local definitions\n");
-	}
 	lasttick = SDL_GetTicks();
 	return true;
 }
@@ -2003,16 +1995,6 @@ bool Game::LoadMap(const char * name){
 	if(!world.dedicatedserver.active){
 		CreateAmbienceChannels();
 		renderer.palette.SetParallaxColors(world.map.parallax);
-		// Refresh actordefs and behavior trees in the background — don't block the main thread.
-		const char* apiBase = Config::GetInstance().adminapiurl;
-		if (apiBase && apiBase[0] != '\0') {
-			if (actordefthread.joinable()) actordefthread.join();
-			std::string url(apiBase);
-			actordefthread = std::thread([this, url]() {
-				int n = FetchActorDefs(url.c_str(), world.resources.actordefs);
-				if (n > 0) printf("[actordef] refreshed %d actordef(s) from server\n", n);
-			});
-		}
 	}
 	return true;
 }

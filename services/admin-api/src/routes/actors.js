@@ -1,13 +1,15 @@
 /**
- * Actor definition CRUD endpoints.
+ * Actor definition endpoints.
  *
- * MongoDB is the source of truth. Every write also syncs to disk so the C++
- * game server can load actordefs from the filesystem without any changes.
+ * The filesystem is the source of truth. Actor defs are stored as JSON
+ * files in shared/assets/actordefs/ and committed to git. The admin UI
+ * reads them from disk for visualization; writes go to disk only so that
+ * changes flow back through version control.
  *
- * GET    /actors         — list all actor defs
- * GET    /actors/:id     — return parsed actor def JSON
- * PUT    /actors/:id     — upsert actor def (admin only)
- * DELETE /actors/:id     — delete actor def (admin only)
+ * GET    /actors         — list all actor def IDs (public)
+ * GET    /actors/:id     — return actor def JSON  (public)
+ * PUT    /actors/:id     — write actor def to disk (admin only)
+ * DELETE /actors/:id     — delete actor def file   (admin only)
  */
 
 import { Router } from 'express';
@@ -16,7 +18,6 @@ import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { requireAuth, requireRole } from '../auth/jwt.js';
 import { ASSETS_DIR } from '../config.js';
-import ActorDef from '../db/models/ActorDef.js';
 
 const router = Router();
 const ACTORS_DIR = join(ASSETS_DIR, 'actordefs');
@@ -39,59 +40,46 @@ function writeToDisk(id, data) {
 }
 
 /**
- * Seed MongoDB from disk files on first run. Always upserts so that
- * re-deploying with updated JSON files keeps Mongo in sync.
+ * Seed actor defs — no-op. Files in shared/assets/actordefs/ are
+ * the canonical source of truth and are committed to git. No DB seeding needed.
+ * @deprecated kept for call-site compatibility during transition; remove callers.
  */
-export async function seedActorDefs() {
-  ensureActorsDir();
-  const files = readdirSync(ACTORS_DIR).filter(f => f.endsWith('.json'));
-  for (const file of files) {
-    const id = file.slice(0, -5);
-    const data = JSON.parse(readFileSync(diskPath(id), 'utf8'));
-    await ActorDef.findByIdAndUpdate(
-      id,
-      { data },
-      { upsert: true, new: true },
-    );
-    console.log(`[actordefs] seeded/updated "${id}" from disk`);
-  }
-}
+export async function seedActorDefs() {}
 
-// GET /actors  — public (no auth required, game client reads this)
-router.get('/', async (_req, res) => {
+// GET /actors  — public
+router.get('/', (_req, res) => {
   try {
-    const docs = await ActorDef.find({}, '_id').lean();
-    res.json(docs.map(d => d._id));
+    ensureActorsDir();
+    const ids = readdirSync(ACTORS_DIR)
+      .filter(f => f.endsWith('.json'))
+      .map(f => f.slice(0, -5));
+    res.json(ids);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /actors/:id  — public (no auth required, game client reads this)
-router.get('/:id', async (req, res) => {
+// GET /actors/:id  — public
+router.get('/:id', (req, res) => {
   try {
     validateId(req.params.id);
-    const doc = await ActorDef.findById(req.params.id).lean();
-    if (!doc) return res.status(404).json({ error: 'Not found' });
-    res.json(doc.data);
+    const path = diskPath(req.params.id);
+    if (!existsSync(path)) return res.status(404).json({ error: 'Not found' });
+    const data = JSON.parse(readFileSync(path, 'utf8'));
+    res.json(data);
   } catch (err) {
     res.status(err.message.includes('Invalid') ? 400 : 500).json({ error: err.message });
   }
 });
 
-// PUT /actors/:id  (admin only)
-router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
+// PUT /actors/:id  (admin only) — writes to disk only; commit to git to ship
+router.put('/:id', requireAuth, requireRole('admin'), (req, res) => {
   try {
     validateId(req.params.id);
     const body = req.body;
     if (!body || typeof body !== 'object') {
       return res.status(400).json({ error: 'Body must be a JSON object' });
     }
-    await ActorDef.findByIdAndUpdate(
-      req.params.id,
-      { data: body },
-      { upsert: true, new: true },
-    );
     writeToDisk(req.params.id, body);
     res.json({ ok: true });
   } catch (err) {
@@ -100,13 +88,12 @@ router.put('/:id', requireAuth, requireRole('admin'), async (req, res) => {
 });
 
 // DELETE /actors/:id  (admin only)
-router.delete('/:id', requireAuth, requireRole('admin'), async (req, res) => {
+router.delete('/:id', requireAuth, requireRole('admin'), (req, res) => {
   try {
     validateId(req.params.id);
-    const deleted = await ActorDef.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ error: 'Not found' });
     const path = diskPath(req.params.id);
-    if (existsSync(path)) unlinkSync(path);
+    if (!existsSync(path)) return res.status(404).json({ error: 'Not found' });
+    unlinkSync(path);
     res.json({ ok: true });
   } catch (err) {
     res.status(err.message.includes('Invalid') ? 400 : 500).json({ error: err.message });
