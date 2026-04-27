@@ -28,7 +28,7 @@
       "id": "E2",
       "name": "lobby-game-join modal (Choose Tech / Change Team / Ready)",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "spec": "Per docs/design/screen-lobby-game-join.md: dispatch SILENCER_DUMP_SCREEN=lobby_gamejoin to a new RunDumpLobbyGameJoin. Render LOBBY chrome + populated content + 3 B156x21 buttons replacing GameSelectInterface region: Choose Tech (242,68), Change Team (242,100), Ready (242,160). 'Disconnected from game' overlay is non-structural — gate only on the 3 buttons + LOBBY behind.",
       "category": "composition",
       "reference_dump": "/tmp/real_lobby-gamejoin_dump.ppm",

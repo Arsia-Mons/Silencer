@@ -1387,6 +1387,215 @@ static int RunDumpLobbyGameCreate(const std::string &assets_dir,
   return ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// E2: lobby-game-join modal. Per docs/design/screen-lobby-game-join.md.
+// LOBBY-derivative-modal pattern (single-button substitution variant): copy
+// RunDumpLobby verbatim and substitute the I1 "Create Game" B156x21 button
+// (anchor 242,68) with three stacked B156x21 buttons in the same column —
+// Choose Tech (242,68), Change Team (242,100), Ready (242,160). Everything
+// else (panel chrome, CharacterInterface populated, full GameSelectInterface
+// content, ChatInterface populated, Join Game) renders unchanged. The
+// "Disconnected from game" modal overlay (CreateModalDialog renderpass=3)
+// is non-structural per the spec carve-out and is intentionally omitted.
+// ---------------------------------------------------------------------------
+static int RunDumpLobbyGameJoin(const std::string &assets_dir,
+                                const std::string &dump_dir) {
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // Same banks as RunDumpLobby — the GameJoin substitution introduces no
+  // new sprites or fonts (3 B156x21 buttons reuse bank 7 idx 24 + label
+  // font bank 134 advance 8).
+  SpriteSet sprites;
+  std::vector<int> banks = {7, 133, 134, 135, 181};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  constexpr int kSubLobby = 2;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  // Y1: Lobby panel chrome.
+  if (sprites.Has(7, 1)) {
+    BlitSprite(fb, sprites.Get(7, 1), 0, 0, nullptr);
+  }
+
+  // Y2: Header overlays + Go Back B156x21 (identical to LOBBY).
+  DrawText(fb, 15, 32, "Silencer", /*bank=*/135, /*advance=*/11, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 115, 39, "v.00028", /*bank=*/133, /*advance=*/6, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  {
+    constexpr int kGoBackX = 473;
+    constexpr int kGoBackY = 29;
+    constexpr int kB156Base = 24;
+    constexpr int kB156Width = 156;
+    constexpr int kB156Advance = 8;
+    constexpr int kB156Yoff = 4;
+    if (sprites.Has(7, kB156Base)) {
+      const Sprite &chrome = sprites.Get(7, kB156Base);
+      BlitSprite(fb, chrome, kGoBackX, kGoBackY, nullptr);
+      const char *text = "Go Back";
+      int len = static_cast<int>(std::strlen(text));
+      int xoff = (kB156Width - len * kB156Advance) / 2;
+      int textX = kGoBackX - chrome.offset_x + xoff;
+      int textY = kGoBackY - chrome.offset_y + kB156Yoff;
+      DrawText(fb, textX, textY, text, /*bank=*/134, /*advance=*/kB156Advance,
+               sprites, palette, kSubLobby, /*brightness=*/128);
+    }
+  }
+
+  // I0/E0: CharacterInterface populated (identical to LOBBY).
+  DrawText(fb, 20, 71, "demo", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+  for (int i = 0; i < 5; ++i) {
+    int tx = 20 + i * 42;
+    int ty = 90;
+    if (sprites.Has(181, i)) {
+      BlitSprite(fb, sprites.Get(181, i), tx, ty, nullptr);
+    }
+  }
+  DrawText(fb, 17, 130, "LEVEL: 8", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 143, "WINS: 47", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 156, "LOSSES: 12", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 169, "XP TO NEXT LEVEL: 220", /*bank=*/133, /*advance=*/7,
+           sprites, palette, kSubLobby, /*brightness=*/128);
+
+  // I1: GameSelectInterface populated (identical to LOBBY E0). The reference
+  // dump shows the Active Games panel fully rendered behind the GameJoin
+  // buttons — the spec's "replaces GameSelectInterface region" wording is
+  // about the Create Game button slot only; the rest of the panel remains.
+  if (sprites.Has(7, 8)) {
+    BlitSprite(fb, sprites.Get(7, 8), 0, 0, nullptr);
+  }
+  DrawText(fb, 405, 70, "Active Games", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  {
+    constexpr int kRowX = 410;
+    constexpr int kRowY0 = 92;
+    constexpr int kRowDy = 14;
+    const std::array<const char *, 4> games = {{
+        "Veterans Only",
+        "Tutorial",
+        "Capture the Tag",
+        "Casual Match #1",
+    }};
+    for (size_t i = 0; i < games.size(); ++i) {
+      DrawText(fb, kRowX, kRowY0 + static_cast<int>(i) * kRowDy, games[i],
+               /*bank=*/133, /*advance=*/6, sprites, palette, kSubLobby,
+               /*brightness=*/128);
+    }
+  }
+
+  // E2: GameJoin action buttons. The "Create Game" anchor (242,68) from
+  // RunDumpLobby is now occupied by Choose Tech; Change Team and Ready
+  // stack below at y=100 and y=160. Join Game stays at (436,430). All
+  // four buttons share the bank 7 idx 24 chrome + bank 134 advance 8
+  // label machinery (yoff=4, centered xoff = (156 − len*8) / 2).
+  {
+    constexpr int kB156Base = 24;
+    constexpr int kB156Width = 156;
+    constexpr int kB156Advance = 8;
+    constexpr int kB156Yoff = 4;
+    struct B156Spec {
+      const char *text;
+      int x;
+      int y;
+    };
+    const std::array<B156Spec, 4> b156_buttons = {{
+        {"Choose Tech", 242, 68},
+        {"Change Team", 242, 100},
+        {"Ready", 242, 160},
+        {"Join Game", 436, 430},
+    }};
+    if (sprites.Has(7, kB156Base)) {
+      const Sprite &chrome = sprites.Get(7, kB156Base);
+      for (const auto &b : b156_buttons) {
+        BlitSprite(fb, chrome, b.x, b.y, nullptr);
+        int len = static_cast<int>(std::strlen(b.text));
+        int xoff = (kB156Width - len * kB156Advance) / 2;
+        int textX = b.x - chrome.offset_x + xoff;
+        int textY = b.y - chrome.offset_y + kB156Yoff;
+        DrawText(fb, textX, textY, b.text, /*bank=*/134,
+                 /*advance=*/kB156Advance, sprites, palette, kSubLobby,
+                 /*brightness=*/128);
+      }
+    }
+  }
+
+  // I2: ChatInterface chrome + populated content (identical to LOBBY E0).
+  if (sprites.Has(7, 11)) {
+    BlitSprite(fb, sprites.Get(7, 11), 0, 0, nullptr);
+  }
+  if (sprites.Has(7, 14)) {
+    BlitSprite(fb, sprites.Get(7, 14), 0, 0, nullptr);
+  }
+  DrawText(fb, 15, 200, "Lobby", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+  {
+    constexpr int kChatX = 19;
+    constexpr int kChatYBottom = 416;
+    constexpr int kChatDy = 11;
+    const std::array<const char *, 5> chat = {{
+        "Vector: anyone up for a round?",
+        "Solace: still waiting on Krieg's match to finish",
+        "Ember: we got 4 in casual #1",
+        "Vector: joining",
+        "Halcyon: gg everyone",
+    }};
+    for (size_t i = 0; i < chat.size(); ++i) {
+      int y = kChatYBottom -
+              static_cast<int>(chat.size() - 1 - i) * kChatDy;
+      DrawText(fb, kChatX, y, chat[i], /*bank=*/133, /*advance=*/6, sprites,
+               palette, kSubLobby, /*brightness=*/128);
+    }
+  }
+  {
+    constexpr int kPresX = 267;
+    constexpr int kPresY0 = 220;
+    constexpr int kPresDy = 11;
+    const std::array<const char *, 10> presence = {{
+        "In Lobby",
+        "Ember",
+        "Halcyon",
+        "Solace",
+        "Vector",
+        "demo",
+        "Pregame",
+        "Quill -Capture the Tag-",
+        "Playing",
+        "Krieg -Casual Match #1-",
+    }};
+    for (size_t i = 0; i < presence.size(); ++i) {
+      DrawText(fb, kPresX, kPresY0 + static_cast<int>(i) * kPresDy,
+               presence[i], /*bank=*/133, /*advance=*/6, sprites, palette,
+               kSubLobby, /*brightness=*/128);
+    }
+  }
+
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubLobby);
+  std::fprintf(stderr, "wrote %s (lobby_gamejoin)\n", out.c_str());
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   std::string assets_dir;
   if (argc >= 2) {
@@ -1425,6 +1634,9 @@ int main(int argc, char **argv) {
     }
     if (screen_str == "lobby_gamecreate") {
       return RunDumpLobbyGameCreate(assets_dir, dump);
+    }
+    if (screen_str == "lobby_gamejoin") {
+      return RunDumpLobbyGameJoin(assets_dir, dump);
     }
     return RunDump(assets_dir, dump);
   }
