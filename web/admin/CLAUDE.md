@@ -30,6 +30,16 @@ directly). If you need to bake an explicit URL in, pass it as a
 
 ## Per-route
 
+- `app/actors/[id]/` — actor definition editor. Loads/saves `*.json`
+  actordefs from a local folder (`webkitdirectory` picker). Three tabs:
+  - **Hitbox** — per-frame hurtbox editor with auto-fit and clear-all.
+  - **Animation** — per-frame sound picker (searches all 98 in-game sounds),
+    `soundVolume` field (0–128), live preview canvas with 1×/2×/3×/4× scale.
+  - Actor list at `/actors` enumerates files from the local folder.
+- `app/behavior-trees/[id]/` — behavior tree editor. Loads/saves BT `.json`
+  files from a local folder. Visual drag-and-drop node editor, JSON preview,
+  blackboard key list, full undo/redo. Download button exports the current
+  tree. Node types match `clients/silencer/src/behaviortree.h`.
 - `app/dashboard/page.js` — snapshot-driven via `useSocket`;
   subscribes to `player.*` and `game.*` events to keep the in-memory
   map in sync.
@@ -56,8 +66,8 @@ directly). If you need to bake an explicit URL in, pass it as a
   (2 s back-off). Sends `getSnapshot` on every (re)connect.
   **Recreates the socket if the JWT changes** — matters when a user
   logs out and re-logs as a different role.
-- `lib/changelog.js` — static structured changelog data. Add entries
-  here when shipping features.
+- `lib/changelog.ts` — static structured changelog data. Add entries
+  here when shipping features. Also update `CHANGELOG.md` at the repo root.
 
 ## Invariants
 
