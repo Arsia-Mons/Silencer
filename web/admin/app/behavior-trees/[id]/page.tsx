@@ -6,6 +6,7 @@ import { useAuth } from '../../../lib/auth';
 import { useWsConnected } from '../../../lib/socket';
 import Sidebar from '../../../components/Sidebar';
 import { getBehaviorTree, saveBehaviorTree, type BehaviorTree } from '../../../lib/api';
+import { getFolderHandle, readJson, writeJson } from '../../../lib/folder-store';
 
 // ReactFlow must be client-only
 const BehaviorTreeEditor = dynamic(() => import('./BehaviorTreeEditor'), { ssr: false });
@@ -18,12 +19,21 @@ export default function BehaviorTreePage() {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [localFolder, setLocalFolder] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
-    getBehaviorTree(id)
-      .then(data => setBt(data))
-      .catch(e => setError(e instanceof Error ? e.message : String(e)));
+    const h = getFolderHandle();
+    if (h) {
+      setLocalFolder(h.name);
+      readJson<BehaviorTree>(h, id)
+        .then(data => setBt(data))
+        .catch(e => setError(e instanceof Error ? e.message : String(e)));
+    } else {
+      getBehaviorTree(id)
+        .then(data => setBt(data))
+        .catch(e => setError(e instanceof Error ? e.message : String(e)));
+    }
   }, [id]);
 
   function handleChange(updated: BehaviorTree) {
@@ -35,7 +45,12 @@ export default function BehaviorTreePage() {
     if (!bt || !id) return;
     setSaving(true);
     try {
-      await saveBehaviorTree(id, bt);
+      const h = getFolderHandle();
+      if (h) {
+        await writeJson(h, id, bt);
+      } else {
+        await saveBehaviorTree(id, bt);
+      }
       setDirty(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -65,21 +80,28 @@ export default function BehaviorTreePage() {
           <h1 style={{ color: '#22c55e', fontFamily: 'monospace', fontSize: 14, letterSpacing: 3, fontWeight: 700, margin: 0 }}>
             BEHAVIOR TREE: {id}
           </h1>
+          {localFolder && (
+            <span style={{ fontFamily: 'monospace', fontSize: 10, color: '#22c55e', border: '1px solid #22c55e44', padding: '2px 8px', letterSpacing: 1 }}>
+              📁 {localFolder}
+            </span>
+          )}
           <div style={{ flex: 1 }} />
           {error && <span style={{ color: '#f87171', fontSize: 11 }}>{error}</span>}
           {dirty && <span style={{ color: '#f59e0b', fontSize: 11 }}>● unsaved</span>}
-          <button
-            onClick={handleDownload}
-            disabled={!bt}
-            title="Download JSON to commit to git (shared/assets/behaviortrees/)"
-            style={{
-              padding: '6px 14px', background: 'transparent', border: '1px solid #4a5568',
-              color: bt ? '#a0aec0' : '#4a5568', fontFamily: 'monospace', fontSize: 12, fontWeight: 700,
-              letterSpacing: 2, cursor: bt ? 'pointer' : 'default', transition: 'all 0.15s',
-            }}
-          >
-            ↓ DOWNLOAD
-          </button>
+          {!localFolder && (
+            <button
+              onClick={handleDownload}
+              disabled={!bt}
+              title="Download JSON to commit to git (shared/assets/behaviortrees/)"
+              style={{
+                padding: '6px 14px', background: 'transparent', border: '1px solid #4a5568',
+                color: bt ? '#a0aec0' : '#4a5568', fontFamily: 'monospace', fontSize: 12, fontWeight: 700,
+                letterSpacing: 2, cursor: bt ? 'pointer' : 'default', transition: 'all 0.15s',
+              }}
+            >
+              ↓ DOWNLOAD
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={saving || !dirty}
