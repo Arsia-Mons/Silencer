@@ -49,7 +49,7 @@ export default function BehaviorTreePage() {
     try {
       if (isFolderLoaded()) {
         writeToStore(id, bt);
-        downloadJson(id, bt);
+        await downloadJson(id, bt);
       } else {
         await saveBehaviorTree(id, bt);
       }
@@ -61,9 +61,9 @@ export default function BehaviorTreePage() {
     }
   }
 
-  function handleDownload() {
+  async function handleDownload() {
     if (!bt || !id) return;
-    downloadJson(id, bt);
+    await downloadJson(id, bt);
   }
 
   return (

@@ -61,8 +61,35 @@ export function deleteFromStore(id: string): void {
   store.delete(id);
 }
 
-export function downloadJson(id: string, data: unknown): void {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+/**
+ * Save JSON to disk. On HTTPS (admin.arsiamons.com) uses showSaveFilePicker
+ * so the user can choose the exact location (e.g. straight into the repo).
+ * Falls back to a plain <a download> on plain HTTP.
+ */
+export async function downloadJson(id: string, data: unknown): Promise<void> {
+  const json = JSON.stringify(data, null, 2);
+  if (
+    typeof window !== 'undefined' &&
+    'showSaveFilePicker' in window
+  ) {
+    try {
+      const handle = await (window as unknown as {
+        showSaveFilePicker(opts: unknown): Promise<FileSystemFileHandle>;
+      }).showSaveFilePicker({
+        suggestedName: `${id}.json`,
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(json);
+      await writable.close();
+      return;
+    } catch {
+      // User cancelled — don't fall through to auto-download
+      return;
+    }
+  }
+  // HTTP fallback — goes to default downloads folder
+  const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

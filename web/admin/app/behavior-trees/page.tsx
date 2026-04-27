@@ -70,7 +70,7 @@ export default function BehaviorTreesPage() {
     try {
       if (isFolderLoaded()) {
         writeToStore(id, emptyTree);
-        downloadJson(id, emptyTree);
+        await downloadJson(id, emptyTree);
         setTrees(listIds());
         setNewId('');
         setCreating(false);
