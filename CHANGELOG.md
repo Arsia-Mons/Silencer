@@ -2,7 +2,7 @@
 
 All notable changes to zSILENCER are documented here.
 
-## [v00029] — 2026-04-26
+## [v1.9.0 / v00029] — 2026-04-26
 
 ### Game client / dedicated server
 

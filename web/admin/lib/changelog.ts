@@ -15,7 +15,7 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
-    version: 'v2.0.0',
+    version: 'v1.9.0',
     date: '2026-04-26',
     title: 'Behavior Trees, Actor Editor & Data-Driven Sounds',
     entries: [
