@@ -26,6 +26,15 @@ static ControlReply OkResult(int id, nlohmann::json r){
 	return rpl;
 }
 
+static bool IEq(const char* a, const char* b){
+	if(!a || !b) return false;
+	while(*a && *b){
+		if(std::tolower((unsigned char)*a) != std::tolower((unsigned char)*b)) return false;
+		++a; ++b;
+	}
+	return *a == 0 && *b == 0;
+}
+
 static ControlReply Err(int id, const char* code, const std::string& msg){
 	ControlReply rpl;
 	rpl.id = id;
@@ -155,6 +164,62 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}
 		nlohmann::json r;
 		r["widget_id"] = wid;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "set_text"){
+		std::string target = cmd.args.value("label", std::string());
+		std::string text   = cmd.args.value("text", std::string());
+		Uint16 ifid = game.GetCurrentInterfaceId();
+		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
+		if(!iface){ cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface")); return; }
+		Uint32 mask = (1u << ObjectTypes::TEXTBOX);
+		Uint16 wid = 0;
+		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
+		if(m != Interface::MATCH_OK){
+			cmd.reply->set_value(Err(cmd.id, m == Interface::MATCH_NOT_FOUND
+				? "WIDGET_NOT_FOUND" : "WIDGET_AMBIGUOUS", target));
+			return;
+		}
+		TextBox* tb = (TextBox*)game.GetWorld().GetObjectFromId(wid);
+		tb->text.clear();
+		tb->AddText(text.c_str());
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+
+	if(cmd.op == "select"){
+		std::string target = cmd.args.value("label", std::string());
+		int idx = cmd.args.value("index", -1);
+		std::string text = cmd.args.value("text", std::string());
+		Uint16 ifid = game.GetCurrentInterfaceId();
+		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
+		if(!iface){ cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface")); return; }
+		Uint32 mask = (1u << ObjectTypes::SELECTBOX);
+		Uint16 wid = 0;
+		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
+		if(m != Interface::MATCH_OK){
+			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", target));
+			return;
+		}
+		SelectBox* sb = (SelectBox*)game.GetWorld().GetObjectFromId(wid);
+		if(idx < 0 && !text.empty()){
+			for(unsigned int i = 0; i < sb->items.size(); ++i){
+				if(sb->items[i] && IEq(sb->items[i], text.c_str())){ idx = (int)i; break; }
+			}
+		}
+		if(idx < 0 || (unsigned)idx >= sb->items.size()){
+			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", "no such item"));
+			return;
+		}
+		sb->selecteditem = idx;
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+
+	if(cmd.op == "back"){
+		bool went = game.GoBack();
+		nlohmann::json r; r["went_back"] = went;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}

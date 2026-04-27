@@ -35,6 +35,7 @@ public:
 	Uint16 GetCurrentInterfaceId() const { return currentinterface; }
 	class World& GetWorld() { return world; }
 	nlohmann::json GetWorldSummary();
+	bool GoBack(void);
 	bool paused;
 	int stepFramesRemaining;
 	Uint64 stepWallclockDeadlineMs;
@@ -80,7 +81,6 @@ private:
 	void PlayMusic(Mix_Music * music);
 	void DestroyModalDialog(void);
 	Interface * CreatePasswordDialog(void);
-	bool GoBack(void);
 	Uint16 lobbyinterface;
 	Uint16 characterinterface;
 	Uint16 chatinterface;
