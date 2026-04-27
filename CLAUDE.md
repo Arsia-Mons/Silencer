@@ -1,13 +1,15 @@
 # Silencer
 
-Multiplayer 2D action game (C++/SDL2) plus a self-hosted Go lobby
+Multiplayer 2D action game (C++/SDL3) plus a self-hosted Go lobby
 server, an admin web app (Next.js), and an admin API (Bun+TS).
 Rebranded from zSILENCER — use "Silencer" in new content, rename
-old identifiers opportunistically when touching the file.
+old identifiers opportunistically when touching the file. Same
+applies to SDL: we migrated SDL2 → SDL3, so rename stale SDL2
+references opportunistically when you touch surrounding code/docs.
 
 ## Tech stack
 
-- Game client: C++14 / SDL2 / CMake
+- Game client: C++14 / SDL3 / CMake
 - Lobby server: Go (stdlib + `mongo-driver`/`amqp091-go`, both optional)
 - Admin web + API: Bun + TypeScript + oxfmt
 - Infra: Docker Compose, Terraform (AWS)

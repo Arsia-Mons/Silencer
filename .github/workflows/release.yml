@@ -179,10 +179,10 @@ jobs:
           $stage = "build/package/silencer"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item build/Release/Silencer.exe $stage/
-          # SDL2 / SDL2_mixer / zlib + transitive audio codec DLLs live in
+          # SDL3 / SDL3_mixer / zlib + transitive audio codec DLLs live in
           # the vcpkg manifest-mode install dir. Bulk-copy them so the zip
           # is self-contained — without these, Silencer.exe fails to start
-          # with a missing SDL2.dll error on machines without vcpkg.
+          # with a missing SDL3.dll error on machines without vcpkg.
           $vcpkgBin = "build/vcpkg_installed/x64-windows/bin"
           Copy-Item "$vcpkgBin/*.dll" $stage/
           # Ship assets next to the .exe as `assets/` — Windows runtime

@@ -49,7 +49,7 @@ sudo cmake --install build
 
 Compiling on Windows
 --------------------
-SDL2 and SDL2_mixer development libraries will have to be installed (vcpkg
+SDL3 and SDL3_mixer development libraries will have to be installed (vcpkg
 manifest mode picks them up automatically when configured with the vcpkg
 toolchain — see `clients/silencer/vcpkg.json`). Configure with:
 
@@ -67,7 +67,7 @@ such as Android, work but are not fully tested.
 
 Running game
 ------------
-SDL2, SDL2_mixer, and ZLIB are required to run the game.
+SDL3, SDL3_mixer, and ZLIB are required to run the game.
 
 Documentation
 -------------

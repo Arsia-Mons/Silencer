@@ -11,7 +11,7 @@ $PlatformZip = "silencer-windows-x64.zip"
 
 # Resolve vcpkg toolchain. Prefer an existing install; bootstrap a repo-local
 # one into .vcpkg/ if the user has none. Mirrors release.yml so the test
-# harness and CI resolve SDL2/zlib/curl/minizip the same way.
+# harness and CI resolve SDL3/zlib/curl/minizip the same way.
 #
 # Inlined (not a function) because PowerShell functions capture native-command
 # stdout into their output pipeline — bootstrap-vcpkg.bat's lines would get
