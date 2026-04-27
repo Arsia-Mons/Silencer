@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth';
 import { useWsConnected } from '../../lib/socket';
 import Sidebar from '../../components/Sidebar';
-import { listBehaviorTrees, deleteBehaviorTree, saveBehaviorTree } from '../../lib/api';
+import { listBehaviorTrees, deleteBehaviorTree, saveBehaviorTree, type BehaviorTree } from '../../lib/api';
 import {
   openFolder, clearFolder, getFolderHandle,
   listJsonFiles, writeJson, deleteJson,
@@ -53,7 +53,7 @@ export default function BehaviorTreesPage() {
     const id = newId.trim().toLowerCase().replace(/\s+/g, '-');
     if (!id || !/^[a-z0-9-]+$/.test(id)) return;
     setCreating(true);
-    const emptyTree = {
+    const emptyTree: BehaviorTree = {
       version: 1, id,
       blackboard: [],
       rootId: 'root',
