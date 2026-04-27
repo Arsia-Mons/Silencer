@@ -353,14 +353,20 @@ void Game::Present(void){
 		// no real game session, so we lie and force world.state =
 		// CONNECTED. Also defensively destroy any modal dialog that
 		// already snuck in.
+		// GameJoin / GameTech setup. `world.state = CONNECTED` triggers
+		// the engine's own gamejoininterface auto-create (line ~885) plus
+		// suppresses the "Disconnected from game" modal. We let that
+		// auto-create stand for GameJoin and DON'T also force-create one
+		// (would duplicate). For GameTech we mimic the engine's
+		// Choose-Tech button-click effect (lines 4925-4926):
+		//   gamejoininterface = 0; gametechinterface = CreateGameTechInterface()->id;
+		// — so only the GameTech UI renders and we don't get GameJoin's
+		// Change Team / Ready buttons stacking under Back To Teams.
 		if((target_modal_join || target_modal_tech) && state == LOBBY){
 			world.state = World::CONNECTED;
 			if(modalinterface){
 				DestroyModalDialog();
 			}
-			// GameTech's checkbox grid only populates when the local peer
-			// has a Team — create one (NOXIS, team 0) on first frame so
-			// the tech grid renders with content.
 			if(target_modal_tech){
 				static bool team_created = false;
 				if(!team_created){
@@ -377,22 +383,6 @@ void Game::Present(void){
 				}
 			}
 		}
-		// GameSummary stat injection: pre-populate a non-zero Stats so the
-		// captured reference shows realistic values instead of all zeros.
-		// Done before the modal injection block runs — Stats is read by
-		// CreateGameSummaryInterface and UpdateGameSummaryInterface.
-		if(target_modal_summary && state == LOBBY && !stateisnew){
-			static bool summary_stats_seeded = false;
-			if(!summary_stats_seeded){
-				summary_stats_seeded = true;
-				// `stats` here would be a pre-existing Game member or
-				// passed in. CreateGameSummaryInterface(stats, agency) is
-				// invoked in the modal-injection block below with a
-				// stub_stats local; the seed therefore lives in that
-				// block, not here. Comment kept as documentation of the
-				// gap.
-			}
-		}
 		if(target_state == LOBBY && state == LOBBY && !stateisnew){
 			static int lobby_settled_for_modal = 0;
 			lobby_settled_for_modal++;
@@ -407,14 +397,21 @@ void Game::Present(void){
 						lobbyiface->AddObject(gamecreateinterface);
 					}
 				}
-				if(target_modal_join && !gamejoininterface){
-					gamejoininterface = CreateGameJoinInterface()->id;
-					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-					if(lobbyiface){
-						lobbyiface->AddObject(gamejoininterface);
-					}
-				}
+				// GameJoin: engine already auto-creates gamejoininterface
+				// once world.state == CONNECTED (line ~910). We don't
+				// double-create.
 				if(target_modal_tech && !gametechinterface){
+					// Mimic the engine's Choose-Tech button-click handler:
+					// destroy any existing gamejoininterface, then create
+					// the GameTech interface in its place.
+					if(gamejoininterface){
+						Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+						Interface * joiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
+						if(lobbyiface && joiniface){
+							joiniface->DestroyInterface(world, lobbyiface);
+						}
+						gamejoininterface = 0;
+					}
 					gametechinterface = CreateGameTechInterface()->id;
 					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
 					if(lobbyiface){
@@ -452,6 +449,19 @@ void Game::Present(void){
 						lobbyiface->AddObject(gamesummaryinterface);
 					}
 				}
+			}
+		}
+
+		// UPDATING populate: PresentUpdate(url, sha) transitions Updater
+		// from IDLE → PROMPTING which makes ProcessUpdateInterface populate
+		// the status overlay with "An update is required to play online."
+		// instead of leaving it empty.
+		if(target_state == UPDATING && state == UPDATING && !stateisnew){
+			static bool update_seeded = false;
+			if(!update_seeded){
+				update_seeded = true;
+				uint8_t sha[32] = {0};
+				updater.PresentUpdate("https://example.invalid/silencer-update.zip", sha);
 			}
 		}
 

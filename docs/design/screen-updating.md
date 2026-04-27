@@ -15,17 +15,23 @@ match the reference by trial.)`
 
 ## Object inventory
 
-Minimal — the captured reference shows:
+The PROMPTING-state reference shows:
 
-| z | Object | Notes |
-| - | --- | --- |
-| 0 | Empty bordered box (~318x60, centered around y=215) | The progress / message area, empty in the canonical dump because the engine never actually started a download |
-| 1 | Cancel button (B156x21-style) | text=`Cancel`, right-aligned within the box |
+| z | Object | Type | Bank | Index | x | y | Notes |
+| - | --- | --- | --- | --- | --- | --- | --- |
+| 0 | Modal background | overlay (renderpass=3) | 40 | 4 | (sprite-centered, ~150,180) | — | Reuses the standard CreateModalDialog sprite |
+| 1 | Status text | overlay (font 134, w=8, renderpass=3) | — | — | (centered around 320) | 200 | text=`An update is required to play online.` (set by `ProcessUpdateInterface` when Updater state is PROMPTING) |
+| 2 | Update button | B156x21 (renderpass=3) | — | — | 161 | 230 | text=`Update`, uid=250 |
+| 3 | Cancel button | B156x21 (renderpass=3) | — | — | 322 | 230 | text=`Cancel`, uid=251 |
 
-In normal flow `CreateUpdateInterface` likely creates a TextBox for
-log lines and a progress indicator alongside the Cancel button — but
-the captured reference is minimal because dump mode entered UPDATING
-without a real update to fetch.
+The Retry (uid=252) and Download (uid=253) buttons exist at the
+same `(161, 230)` slot but are inactive in PROMPTING — only Update
+shows. `ProcessUpdateInterface` swaps which button is visible based
+on `Updater::GetState()`.
+
+The captured reference was produced by harness-injecting
+`updater.PresentUpdate(url, sha)` after the screen entered, which
+transitions IDLE → PROMPTING.
 
 ## What's runtime / non-structural
 

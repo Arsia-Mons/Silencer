@@ -9,13 +9,19 @@ sub-palette 2, captured via `SILENCER_DUMP_STATE=LOBBY_GAMEJOIN`
 which auto-jumps to LOBBY then injects `gamejoininterface =
 CreateGameJoinInterface()->id`).
 
-**Important — non-structural runtime artifact:** the canonical dump
-shows a **"Disconnected from game"** modal overlay (bank 40 idx 4
-background + text + OK button) because the dump-mode harness
-force-creates the GameJoin modal without actually joining a real
-game. The "Disconnected" dialog is engine-emitted and is
-non-structural — gate only on the underlying GameJoin buttons +
-LOBBY chrome behind.
+**Faux-state caveat:** the captured reference shows only the 3
+action buttons (Choose Tech / Change Team / Ready) plus the LOBBY
+chrome and presence list behind. The engine's
+`CreateGameJoinInterface` itself only adds those 3 buttons — there
+is no separate "player roster" UI element here. In a real game
+session, the player list / team rosters render as in-world Player
+objects (with sprites + name overlays) populated from `world.peerlist`
+and the Team objects set up at game-load time, not as part of
+GameJoinInterface. Capturing those would require an actual
+multi-peer game session, which is beyond what the dump-mode harness
+fakes. The "Disconnected from game" engine modal that would
+otherwise overlay is suppressed by the harness via
+`world.state = World::CONNECTED`.
 
 ## Sub-palette
 
