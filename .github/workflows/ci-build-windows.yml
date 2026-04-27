@@ -3,8 +3,18 @@ name: CI Build (Windows)
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'clients/silencer/**'
+      - 'shared/assets/**'
+      - 'tests/e2e/**'
+      - '.github/workflows/ci-build-windows.yml'
   push:
     branches: [main]
+    paths:
+      - 'clients/silencer/**'
+      - 'shared/assets/**'
+      - 'tests/e2e/**'
+      - '.github/workflows/ci-build-windows.yml'
 
 concurrency:
   group: ci-build-windows-${{ github.event.pull_request.number || github.ref }}

@@ -3,8 +3,18 @@ name: CI Build (macOS)
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'clients/silencer/**'
+      - 'shared/assets/**'
+      - 'tests/e2e/**'
+      - '.github/workflows/ci-build-macos.yml'
   push:
     branches: [main]
+    paths:
+      - 'clients/silencer/**'
+      - 'shared/assets/**'
+      - 'tests/e2e/**'
+      - '.github/workflows/ci-build-macos.yml'
 
 concurrency:
   group: ci-build-macos-${{ github.event.pull_request.number || github.ref }}
