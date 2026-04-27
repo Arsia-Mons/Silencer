@@ -7,9 +7,21 @@ text + Back To Teams button.
 Reference dump: `/tmp/real_lobby-gametech_dump.ppm` (640×480 P6,
 sub-palette 2, captured via `SILENCER_DUMP_STATE=LOBBY_GAMETECH`).
 
-**Same non-structural caveat as GameJoin:** "Disconnected from game"
-modal is overlaid because we force-created the modal without an
-active game. Gate only on the underlying GameTech UI.
+**Faux-state caveat:** the dump-mode harness creates GameTech
+*alongside* a synthetic Team object so the "Disconnected from game"
+overlay is suppressed. However, the **tech checkbox grid is empty**
+in the captured reference because populating it requires
+`world.buyableitems` (loaded at actual-game-start time from item
+config) — which the dump-mode harness does not stage. The Ralph
+therefore gates only on:
+- The 3 button column (replaces GameJoin's Choose Tech with
+  Back To Teams; Change Team and Ready are still present from the
+  underlying GameJoinInterface).
+- The tech-name + tech-desc overlay slots **with empty content**.
+
+A future refinement could populate `world.buyableitems` synthetically
+to capture a real tech grid; for now the structural Back To Teams
+substitution is the gate.
 
 ## Sub-palette
 

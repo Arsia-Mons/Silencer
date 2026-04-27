@@ -39,9 +39,16 @@ The candidate dump should show:
 - A black/dark background.
 - A bordered box with a Cancel button inside.
 
-That's it for this minimal capture. If the user later wants
-populated UPDATING with progress text, the dump-mode harness would
-need to inject mock download state.
+**Faux-state caveat:** the captured reference is *intentionally
+minimal*. UPDATING normally entered from a version-mismatch detected
+during LOBBYCONNECT auth, with a real download progress bar /
+manifest URL / log lines streaming in. The dump-mode harness force-
+enters UPDATING without any of that, so only the empty bordered
+box + Cancel button render. Populating UPDATING fully would require
+either pointing the lobby at a real `update.json` manifest (the
+lobby logs warn it's missing) and triggering a fake-version mismatch,
+or extending the harness to inject mock download state. For now the
+structural skeleton is the gate.
 
 ## Spec gaps
 

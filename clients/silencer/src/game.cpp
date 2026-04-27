@@ -345,6 +345,54 @@ void Game::Present(void){
 		// own pointer field (gamecreateinterface / gamejoininterface /
 		// gametechinterface / gamesummaryinterface). Setting the pointer
 		// causes the engine's LOBBY render path to compose it on top.
+		//
+		// SUPPRESS "Disconnected from game" modal-dialog: the engine fires
+		// CreateModalDialog("Disconnected from game") whenever a
+		// gamejoininterface or gametechinterface is open AND world.state
+		// != CONNECTED (line ~862 in this file). In dump mode we have
+		// no real game session, so we lie and force world.state =
+		// CONNECTED. Also defensively destroy any modal dialog that
+		// already snuck in.
+		if((target_modal_join || target_modal_tech) && state == LOBBY){
+			world.state = World::CONNECTED;
+			if(modalinterface){
+				DestroyModalDialog();
+			}
+			// GameTech's checkbox grid only populates when the local peer
+			// has a Team — create one (NOXIS, team 0) on first frame so
+			// the tech grid renders with content.
+			if(target_modal_tech){
+				static bool team_created = false;
+				if(!team_created){
+					Team * team = world.GetPeerTeam(world.localpeerid);
+					if(!team){
+						team = (Team *)world.CreateObject(ObjectTypes::TEAM);
+						if(team){
+							team->AddPeer(world.GetAuthorityPeer()->id);
+							team->agency = Team::NOXIS;
+							team->number = 0;
+						}
+					}
+					team_created = true;
+				}
+			}
+		}
+		// GameSummary stat injection: pre-populate a non-zero Stats so the
+		// captured reference shows realistic values instead of all zeros.
+		// Done before the modal injection block runs — Stats is read by
+		// CreateGameSummaryInterface and UpdateGameSummaryInterface.
+		if(target_modal_summary && state == LOBBY && !stateisnew){
+			static bool summary_stats_seeded = false;
+			if(!summary_stats_seeded){
+				summary_stats_seeded = true;
+				// `stats` here would be a pre-existing Game member or
+				// passed in. CreateGameSummaryInterface(stats, agency) is
+				// invoked in the modal-injection block below with a
+				// stub_stats local; the seed therefore lives in that
+				// block, not here. Comment kept as documentation of the
+				// gap.
+			}
+		}
 		if(target_state == LOBBY && state == LOBBY && !stateisnew){
 			static int lobby_settled_for_modal = 0;
 			lobby_settled_for_modal++;
@@ -374,8 +422,31 @@ void Game::Present(void){
 					}
 				}
 				if(target_modal_summary && !gamesummaryinterface){
+					// Seed sample non-zero values so the captured reference
+					// shows realistic numbers rather than 0 across the board.
 					Stats stub_stats;
-					gamesummaryinterface = CreateGameSummaryInterface(stub_stats, /*agency=*/0)->id;
+					stub_stats.kills = 12;
+					stub_stats.deaths = 4;
+					stub_stats.suicides = 1;
+					stub_stats.secretsreturned = 3;
+					stub_stats.secretsstolen = 5;
+					stub_stats.secretsdropped = 1;
+					stub_stats.civilianskilled = 0;
+					stub_stats.guardskilled = 7;
+					stub_stats.robotskilled = 2;
+					stub_stats.defensekilled = 4;
+					stub_stats.fixedcannonsdestroyed = 1;
+					stub_stats.fileshacked = 6;
+					stub_stats.filesreturned = 4;
+					stub_stats.powerupspickedup = 8;
+					stub_stats.healthpacksused = 3;
+					stub_stats.camerasplanted = 5;
+					stub_stats.detsplanted = 2;
+					stub_stats.fixedcannonsplaced = 1;
+					stub_stats.virusesused = 3;
+					stub_stats.poisons = 2;
+					stub_stats.tractsplanted = 0;
+					gamesummaryinterface = CreateGameSummaryInterface(stub_stats, Team::NOXIS)->id;
 					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
 					if(lobbyiface){
 						lobbyiface->AddObject(gamesummaryinterface);

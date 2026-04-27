@@ -167,6 +167,7 @@ func (c *Client) handleAuth(r *reader) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("[auth] %s name=%q", c.conn.RemoteAddr(), name)
 	u, ok, banned := c.hub.store.Login(name, hash)
 	if !ok {
 		msg := "Incorrect password for " + name
@@ -180,6 +181,7 @@ func (c *Client) handleAuth(r *reader) error {
 		c.send(w.b)
 		return nil
 	}
+	c.hub.SeedDemoUser(u)
 	c.mu.Lock()
 	c.user = u
 	c.accountID = u.AccountID

@@ -19,6 +19,11 @@ type Hub struct {
 	games   map[uint32]*LobbyGame
 	pending map[uint32]*pendingGame
 	clients map[*Client]struct{}
+
+	// Demo mode (`-demo` flag) seed data, populated by SeedDemoData.
+	demoMode      bool
+	demoPresences []demoPresence
+	demoChatLines []demoChatLine
 }
 
 type pendingGame struct {
@@ -81,6 +86,8 @@ func (h *Hub) Join(c *Client) {
 		p.sendPresence(0, selfSnap.acct, selfSnap.gameID, selfSnap.status, selfSnap.name)
 	}
 	c.sendPresence(0, selfSnap.acct, selfSnap.gameID, selfSnap.status, selfSnap.name)
+
+	h.SendDemoExtras(c)
 
 	if h.events != nil && c.accountID != 0 {
 		ip, _, _ := net.SplitHostPort(c.conn.RemoteAddr().String())
