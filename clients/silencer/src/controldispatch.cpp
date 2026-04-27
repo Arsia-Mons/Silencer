@@ -117,6 +117,47 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, game.GetWorldSummary()));
 		return;
 	}
+	if(cmd.op == "click"){
+		std::string target;
+		if(cmd.args.contains("label")) target = cmd.args["label"].get<std::string>();
+		else if(cmd.args.contains("id")) target = std::to_string(cmd.args["id"].get<int>());
+		if(target.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "click needs label or id"));
+			return;
+		}
+		Uint16 ifid = game.GetCurrentInterfaceId();
+		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
+		if(!iface){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
+			return;
+		}
+		Uint32 mask = (1u << ObjectTypes::BUTTON) | (1u << ObjectTypes::TOGGLE);
+		Uint16 wid = 0;
+		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
+		if(m == Interface::MATCH_NOT_FOUND){
+			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
+				"no widget matches \"" + target + "\""));
+			return;
+		}
+		if(m == Interface::MATCH_AMBIGUOUS){
+			cmd.reply->set_value(Err(cmd.id, "WIDGET_AMBIGUOUS",
+				"multiple widgets match \"" + target + "\""));
+			return;
+		}
+		Object* o = game.GetWorld().GetObjectFromId(wid);
+		if(o->type == ObjectTypes::BUTTON){
+			Button* b = (Button*)o;
+			b->Activate(); // existing behavior used by the main menu
+			b->clicked = true;
+		} else if(o->type == ObjectTypes::TOGGLE){
+			Toggle* t = (Toggle*)o;
+			t->selected = !t->selected;
+		}
+		nlohmann::json r;
+		r["widget_id"] = wid;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));
 }
 
