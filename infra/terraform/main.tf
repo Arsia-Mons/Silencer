@@ -90,20 +90,28 @@ resource "aws_security_group" "lobby" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  ingress {
-    description = "Community map API (HTTP)"
-    from_port   = 15172
-    to_port     = 15172
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  # Inline ingress is authoritative only for the rules defined above.
+  # Cross-SG and additional per-port rules are in separate
+  # aws_vpc_security_group_ingress_rule resources; ignore drift from those.
+  lifecycle {
+    ignore_changes = [ingress]
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "lobby_map_api" {
+  security_group_id = aws_security_group.lobby.id
+  ip_protocol       = "tcp"
+  from_port         = 15172
+  to_port           = 15172
+  cidr_ipv4         = "0.0.0.0/0"
+  description       = "Community map API (HTTP)"
 }
 
 resource "aws_eip" "lobby" {
