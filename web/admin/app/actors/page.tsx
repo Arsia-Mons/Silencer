@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth';
 import { useWsConnected } from '../../lib/socket';
 import Sidebar from '../../components/Sidebar';
-import { listActors, deleteActor } from '../../lib/api';
 import {
   loadFilesIntoStore, clearStore, listIds, deleteFromStore,
   writeToStore, getFolderName, isFolderLoaded,
@@ -17,23 +16,15 @@ export default function ActorsPage() {
   const router = useRouter();
   const folderInputRef = useRef<HTMLInputElement>(null);
   const [actors, setActors] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newId, setNewId] = useState('');
   const [creating, setCreating] = useState(false);
   const [localFolder, setLocalFolder] = useState<string | null>(null);
 
-  // On mount: if a folder was already loaded (e.g. back-navigation), show it
   useEffect(() => {
     if (isFolderLoaded()) {
       setActors(listIds());
       setLocalFolder(getFolderName());
-      setLoading(false);
-    } else {
-      listActors()
-        .then(ids => setActors(ids))
-        .catch(e => setError(e instanceof Error ? e.message : String(e)))
-        .finally(() => setLoading(false));
     }
   }, []);
 
@@ -43,60 +34,39 @@ export default function ActorsPage() {
     await loadFilesIntoStore(files);
     setLocalFolder(getFolderName());
     setActors(listIds());
-    setLoading(false);
-    // reset input so re-picking same folder fires onChange again
     e.target.value = '';
   }
 
   function handleCloseFolder() {
     clearStore();
     setLocalFolder(null);
-    setLoading(true);
-    listActors()
-      .then(ids => setActors(ids))
-      .catch(e => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
+    setActors([]);
   }
 
   async function handleCreate() {
     const id = newId.trim().toLowerCase().replace(/\s+/g, '-');
     if (!id || !/^[a-z0-9-]+$/.test(id)) return;
+    if (!isFolderLoaded()) { setError('Open a folder first.'); return; }
     setCreating(true);
     try {
-      if (isFolderLoaded()) {
-        writeToStore(id, { id, sequences: {} });
-        setActors(listIds());
-        router.push(`/actors/${id}`);
-      } else {
-        const { saveActor } = await import('../../lib/api');
-        await saveActor(id, { id, sequences: {} });
-        router.push(`/actors/${id}`);
-      }
+      writeToStore(id, { id, sequences: {} });
+      setActors(listIds());
+      router.push(`/actors/${id}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
       setCreating(false);
     }
   }
 
-  async function handleDelete(id: string) {
+  function handleDelete(id: string) {
     if (!confirm(`Delete actor "${id}"? This cannot be undone.`)) return;
-    try {
-      if (isFolderLoaded()) {
-        deleteFromStore(id);
-        setActors(listIds());
-      } else {
-        await deleteActor(id);
-        setActors(prev => prev.filter(a => a !== id));
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
+    deleteFromStore(id);
+    setActors(listIds());
   }
 
   return (
     <div className="flex min-h-screen bg-game-bg text-game-text">
       <Sidebar wsConnected={wsConnected} />
-      {/* hidden folder input */}
       <input
         ref={folderInputRef}
         type="file"
@@ -128,7 +98,7 @@ export default function ActorsPage() {
             ) : (
               <button
                 onClick={() => folderInputRef.current?.click()}
-                className="px-4 py-2 border border-game-border text-game-textDim hover:text-game-text text-sm tracking-wider"
+                className="px-4 py-2 border border-game-primary text-game-primary hover:bg-game-primary/10 text-sm tracking-wider font-bold"
               >
                 📁 OPEN FOLDER
               </button>
@@ -150,7 +120,7 @@ export default function ActorsPage() {
           />
           <button
             onClick={handleCreate}
-            disabled={creating || !newId.trim()}
+            disabled={creating || !newId.trim() || !localFolder}
             className="px-4 py-2 bg-game-primary text-black text-sm font-bold tracking-wider disabled:opacity-40"
           >
             {creating ? 'CREATING…' : '+ NEW ACTOR'}
@@ -159,14 +129,20 @@ export default function ActorsPage() {
 
         {error && <div className="text-game-danger text-sm mb-4">{error}</div>}
 
-        {loading ? (
-          <div className="text-game-textDim text-sm">Loading…</div>
+        {!localFolder ? (
+          <div className="text-game-textDim text-sm border border-game-border p-12 text-center flex flex-col items-center gap-4">
+            <div className="text-4xl">📁</div>
+            <div>Open the <code>shared/assets/actordefs/</code> folder to start editing.</div>
+            <button
+              onClick={() => folderInputRef.current?.click()}
+              className="px-6 py-3 border border-game-primary text-game-primary hover:bg-game-primary/10 text-sm tracking-wider font-bold"
+            >
+              OPEN FOLDER
+            </button>
+          </div>
         ) : actors.length === 0 ? (
           <div className="text-game-textDim text-sm border border-game-border p-8 text-center">
-            {localFolder
-              ? 'No .json files found in the selected folder.'
-              : <>No actor definitions found. Create one above or place <code>.json</code> files in <code>shared/assets/actordefs/</code>.</>
-            }
+            No .json files found in <strong>{localFolder}</strong>.
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
