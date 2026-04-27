@@ -378,7 +378,7 @@ bool Launch(const std::string &zippath) {
     }
     // Windows resolves the main exe's import table from the exe's own
     // directory before our code runs. Since stage-2 lives in %TEMP% but
-    // its DLLs (zlib1, SDL2, libcurl, etc.) live in the install dir, the
+    // its DLLs (zlib1, SDL3, libcurl, etc.) live in the install dir, the
     // loader fails with "zlib1.dll was not found". Copy every *.dll from
     // the install dir next to silencer-stage2.exe so imports resolve.
     {

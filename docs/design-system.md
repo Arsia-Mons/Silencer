@@ -1,6 +1,6 @@
 # zSILENCER Design System
 
-A reference of the existing UI design specifications extracted from the C++/SDL2 source code.
+A reference of the existing UI design specifications extracted from the C++/SDL3 source code.
 This document serves as the foundation for building a component library and evaluating
 future rendering migrations.
 

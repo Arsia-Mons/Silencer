@@ -1,6 +1,6 @@
 # clients/silencer — C++ client
 
-Multiplayer 2D action game (SDL2/C++14). The same binary runs as the
+Multiplayer 2D action game (SDL3/C++14). The same binary runs as the
 local client and, when launched with `-s`, as a headless dedicated
 server spawned by the Go lobby in `services/lobby/`.
 
