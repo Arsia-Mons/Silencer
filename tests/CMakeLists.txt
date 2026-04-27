@@ -7,6 +7,7 @@ set(TEST_SRC
     updater_download_test.cpp
     updater_zip_test.cpp
     updater_sm_test.cpp
+    control_widget_test.cpp
     ${CMAKE_SOURCE_DIR}/src/updatersha256.cpp
     ${CMAKE_SOURCE_DIR}/src/updaterdownload.cpp
     ${CMAKE_SOURCE_DIR}/src/updaterzip.cpp
