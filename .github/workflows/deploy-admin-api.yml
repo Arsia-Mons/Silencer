@@ -111,7 +111,7 @@ jobs:
           grep -q 'ASSETS_DIR=/assets' /usr/local/sbin/silencer-fetch-secrets || \
             sudo sed -i '/^GITHUB_BACKUP_REPO/a ASSETS_DIR=/assets' /usr/local/sbin/silencer-fetch-secrets
           grep -q 'LOBBY_MAP_API_URL=' /usr/local/sbin/silencer-fetch-secrets || \
-            sudo sed -i '/^ASSETS_DIR/a LOBBY_MAP_API_URL=http://lobby.arsiamons.com:15172' /usr/local/sbin/silencer-fetch-secrets
+            sudo sed -i '/^ASSETS_DIR/a LOBBY_MAP_API_URL=http://lobby.silencer.internal:15172' /usr/local/sbin/silencer-fetch-secrets
 
           # 3. Regenerate env file to pick up ASSETS_DIR immediately
           sudo /usr/local/sbin/silencer-fetch-secrets
