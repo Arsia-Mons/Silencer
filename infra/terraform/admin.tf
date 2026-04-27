@@ -30,6 +30,12 @@ resource "aws_security_group" "admin" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  # Mongo and LavinMQ ingress from lobby are managed by separate
+  # aws_vpc_security_group_ingress_rule resources to avoid circular deps.
+  lifecycle {
+    ignore_changes = [ingress]
+  }
 }
 
 # Cross-SG rules. Defined as separate resources because admin SG <-> lobby

@@ -105,11 +105,14 @@ jobs:
           # 1. Update image ref
           echo "IMAGE=$IMAGE_REF" | sudo tee /etc/silencer/admin-api.image > /dev/null
 
-          # 2. Idempotently add ASSETS_DIR to the secret-fetch script so it
-          #    survives future secret rotations (the script overwrites the env
+          # 2. Idempotently add non-secret env vars to the secret-fetch script so
+          #    they survive future secret rotations (the script overwrites the env
           #    file on every run, so appending to the env file alone isn't durable).
           grep -q 'ASSETS_DIR=/assets' /usr/local/sbin/silencer-fetch-secrets || \
             sudo sed -i '/^GITHUB_BACKUP_REPO/a ASSETS_DIR=/assets' /usr/local/sbin/silencer-fetch-secrets
+          grep -q 'LOBBY_MAP_API_URL=' /usr/local/sbin/silencer-fetch-secrets \
+            && sudo sed -i 's|LOBBY_MAP_API_URL=.*|LOBBY_MAP_API_URL=http://lobby.silencer.internal:15172|' /usr/local/sbin/silencer-fetch-secrets \
+            || sudo sed -i '/^ASSETS_DIR/a LOBBY_MAP_API_URL=http://lobby.silencer.internal:15172' /usr/local/sbin/silencer-fetch-secrets
 
           # 3. Regenerate env file to pick up ASSETS_DIR immediately
           sudo /usr/local/sbin/silencer-fetch-secrets
