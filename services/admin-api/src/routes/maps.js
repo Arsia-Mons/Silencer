@@ -26,7 +26,13 @@ router.post('/', express.raw({ type: 'application/octet-stream', limit: '10mb' }
       body: req.body,
       headers: { 'Content-Type': 'application/octet-stream', ...fwd },
     });
-    res.status(r.status).json(await r.json());
+    const ct = r.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      res.status(r.status).json(await r.json());
+    } else {
+      const text = (await r.text()).trim();
+      res.status(r.status).json({ error: text || r.statusText });
+    }
   } catch {
     res.status(502).json({ error: 'map API unreachable' });
   }
