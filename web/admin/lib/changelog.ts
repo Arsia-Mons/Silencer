@@ -15,6 +15,67 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: 'v2.0.0',
+    date: '2026-04-26',
+    title: 'Behavior Trees, Actor Editor & Data-Driven Sounds',
+    entries: [
+      {
+        category: 'CLIENT',
+        changes: [
+          'C++ behavior tree interpreter: loads JSON BT files from assets and evaluates them each tick (Sequence, Selector, Inverter, game-specific Condition/Action leaves)',
+          'Guard AI fully wired to behavior tree: combat (Look/Aim/Shoot/Crouch), patrol stay-at-post, SearchAndReturn, ladder climbing with 2s cooldown and 48px gap guard',
+          'Guard fixes: crouch-shoot, stop gliding during crouch, back-away-when-too-close, clear chasing on target death/base-entry/untargetable',
+          'Robot AI fully wired to behavior tree: patrol, ReturnToSpawn (replaces Sleep), damage wakeup, LookSides failure propagation',
+          'Civilian flee behavior wired to BT',
+          'Client syncs actordefs from server on each map load (async, non-blocking) via separate adminapiurl config key',
+          'Per-frame sounds: FrameDef gains sound + soundVolume fields; GetFrameSoundByIndex() looks up sound by sprite frame index for state_i % N state machines',
+          'Guard WALKING footsteps: plays stostep1.wav / stostepr.wav at frames 4/13 per actordef — fully configurable in actor editor',
+          'Civilian WALKING and RUNNING footsteps driven by civilian.json actordef',
+          'guard.json split into guard-blaster.json, guard-laser.json, guard-rocket.json — each independently editable',
+          'Body parts replicated to clients via snapshot packets',
+          'Player hurtboxes added to all animation sequences — fixes bullet collision regression',
+          'Guard kneel loop fixed; Look() origin restored to y=−55',
+          'Version bumped to 00028',
+        ],
+      },
+      {
+        category: 'DASHBOARD',
+        changes: [
+          'Behavior tree editor: visual drag-and-drop editor with node palette, JSON preview, full undo/redo',
+          'BT editor local-file mode: reads/writes .json files from a user-selected folder; webkitdirectory on HTTP, showSaveFilePicker on HTTPS',
+          'BT editor: Download button, improved blackboard key editor (sortable, type badges, one-click delete)',
+          'State machine tab removed from actor editor — superseded by behavior trees',
+          'Actor editor local-file mode: load/save actordefs from local folder via browser file picker',
+          'Actor editor: auto-size preview canvas to largest sprite in sequence; ?tab= URL persistence',
+          'Hitbox editor: auto-fit hurtbox to sprite pixel bounds, clear all hurtboxes, all player sequences available',
+          'Animation tab: sound picker with searchable dropdown of all 98 in-game sounds + per-row ▶ preview',
+          'Sound preview respects soundVolume (0–128) field — plays WAV at scaled amplitude',
+          'Animation preview: 1×/2×/3×/4× scale toggle (default 1×)',
+          'Animation preview: dark grid background matching hitbox tab — transparent sprites visible',
+        ],
+      },
+      {
+        category: 'SERVER',
+        changes: [
+          'Behavior trees stored in MongoDB and synced to game client on startup',
+          'Actordefs and BTs migrated to filesystem-first (MongoDB write-through removed from read path)',
+          '–version 00028 passed to lobby process in docker-compose.yml',
+          'MongoDB password redacted from mongosync log lines',
+          'Empty –version flag now falls back to manifest version instead of crashing',
+        ],
+      },
+      {
+        category: 'INFRASTRUCTURE',
+        changes: [
+          'Assets volume mounted read-write in docker-compose.yml so admin-api can write actordefs from actor editor',
+          'Dedicated server: SDL3 and SDL3_mixer .so files bundled with install-linux-server.sh — fixes missing-library crash on fresh ARM64 hosts',
+          'Lobby flags pinned: –maps-dir /var/lib/silencer/maps, –update-manifest /opt/silencer/update.json',
+          'CI (macOS): SDL3_ROOT env vars passed to dylibbundler; search dirs narrowed to avoid full FS scan during release builds',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v1.8.0',
     date: '2026-04-25',
     title: 'Community Map Downloads & Designer Cross-Stitch Fix',
