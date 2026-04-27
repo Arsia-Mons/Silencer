@@ -8,6 +8,14 @@
 #include "pickup.h"
 #include <math.h>
 
+static const char* ActorDefName(Uint8 weapon) {
+	switch (weapon) {
+		case 1:  return "guard-laser";
+		case 2:  return "guard-rocket";
+		default: return "guard-blaster";
+	}
+}
+
 Guard::Guard() : Object(ObjectTypes::GUARD){
 	requiresauthority = true;
 	state = NEW;
@@ -31,6 +39,274 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	lastspoke = 0;
 	lastshot = 0;
 	cooldowntime = 48;
+	bt_ = nullptr;
+}
+
+void Guard::InitBT(){
+	bt_ = BehaviorTreeLibrary::instance().get("guard");
+	if(!bt_) return;
+
+	// Shared helper: update chasing id + play alert sound on first detection.
+	auto updateChasing = [this](Object* f, World& world){
+		if(!chasing){
+			chasing = f->id;
+			if(world.tickcount - lastspoke > 24 * 10){
+				lastspoke = world.tickcount;
+				const char* sounds[5] = {"theres3.wav","stop4.wav","freeze3.wav","freezrt1.wav","drop4.wav"};
+				EmitSound(world, world.resources.soundbank[sounds[rand() % 5]], 128);
+			}
+		} else {
+			chasing = f->id;
+		}
+	};
+
+	// Look(0): standing eye-level forward. Shoots standing or uncrouches.
+	btctx_.actions["Look0"] = [this, updateChasing](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		Object* f = Look(world, 0);
+		if(!f) return BTResult::Failure;
+		ctx.bbSet("target_seen", true);
+		updateChasing(f, world);
+		if(state == WALKING || state == STANDING || state == LOOKING){
+			if(CooledDown(world)){
+				state = SHOOTSTANDING; state_i = 0;
+			} else if(state == WALKING || state == LOOKING){
+				state = STANDING; state_i = 0;
+			}
+		} else if(state == CROUCHED){
+			state = UNCROUCHING; state_i = 0;
+		}
+		return BTResult::Success;
+	};
+
+	// Look(1): low forward ray. Crouch-shoots crouched targets; stand-shoots tall targets.
+	btctx_.actions["Look1"] = [this, updateChasing](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		Object* f = Look(world, 1);
+		if(!f) return BTResult::Failure;
+		ctx.bbSet("target_seen", true);
+		updateChasing(f, world);
+		if(state == CROUCHED){
+			if(CooledDown(world) && (state_hit == 0 || state_hit % 32 >= 10)){
+				state = SHOOTCROUCHED; state_i = 0;
+			}
+		} else if(state == WALKING || state == STANDING || state == LOOKING){
+			int tsx1, tsy1, tsx2, tsy2;
+			f->GetAABB(world.resources, &tsx1, &tsy1, &tsx2, &tsy2);
+			// Use hurtbox height to distinguish standing (≥50px) from crouched (<50px).
+			// Absolute y comparison fails on sloped terrain.
+			if((tsy2 - tsy1) >= 50){
+				// Target is standing height — shoot from standing.
+				if(CooledDown(world)){
+					state = SHOOTSTANDING; state_i = 0;
+				} else if(state == WALKING || state == LOOKING){
+					state = STANDING; state_i = 0;
+				}
+			} else {
+				// Short/crouched target — crouch to shoot.
+				state = CROUCHING; state_i = 0;
+			}
+		}
+		return BTResult::Success;
+	};
+
+	// Look(2): upward ray.
+	btctx_.actions["Look2"] = [this, updateChasing](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		Object* f = Look(world, 2);
+		if(!f) return BTResult::Failure;
+		ctx.bbSet("target_seen", true);
+		updateChasing(f, world);
+		if(state == WALKING || state == STANDING || state == LOOKING){
+			if(CooledDown(world)){ state = SHOOTUP; state_i = 0; }
+		}
+		return BTResult::Success;
+	};
+
+	// Look(3): downward ray.
+	btctx_.actions["Look3"] = [this, updateChasing](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		Object* f = Look(world, 3);
+		if(!f) return BTResult::Failure;
+		ctx.bbSet("target_seen", true);
+		updateChasing(f, world);
+		if(state == WALKING || state == STANDING || state == LOOKING){
+			if(CooledDown(world)){ state = SHOOTDOWN; state_i = 0; }
+		}
+		return BTResult::Success;
+	};
+
+	// Look(4): up-angle ray.
+	btctx_.actions["Look4"] = [this, updateChasing](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		Object* f = Look(world, 4);
+		if(!f) return BTResult::Failure;
+		ctx.bbSet("target_seen", true);
+		updateChasing(f, world);
+		if(state == WALKING || state == STANDING || state == LOOKING){
+			if(CooledDown(world)){ state = SHOOTUPANGLE; state_i = 0; }
+		}
+		return BTResult::Success;
+	};
+
+	// Look(5): down-angle ray. Too-close targets: mark seen + Failure so Chase runs.
+	btctx_.actions["Look5"] = [this, updateChasing](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		Object* f = Look(world, 5);
+		if(!f) return BTResult::Failure;
+		if(f->type == ObjectTypes::PLAYER){
+			Player* p = static_cast<Player*>(f);
+			if(p && abs(p->x - x) < 60){
+				// Too close for this angle — mark seen so leaf_uncrouch won't fire, then chase.
+				ctx.bbSet("target_seen", true);
+				updateChasing(f, world);
+				return BTResult::Failure;
+			}
+		}
+		ctx.bbSet("target_seen", true);
+		updateChasing(f, world);
+		if(state == WALKING || state == STANDING || state == LOOKING){
+			if(CooledDown(world)){ state = SHOOTDOWNANGLE; state_i = 0; }
+		}
+		return BTResult::Success;
+	};
+
+	// UncrouchIdle: uncrouch when guard has lost sight of target while crouched.
+	btctx_.actions["UncrouchIdle"] = [this](BTContext& ctx) -> BTResult {
+		if(ctx.bb<bool>("target_seen")) return BTResult::Failure;
+		if(state == CROUCHED){ state = UNCROUCHING; state_i = 0; return BTResult::Running; }
+		if(state == UNCROUCHING) return BTResult::Running;
+		return BTResult::Failure;
+	};
+
+	// Chase: walk toward the chasing target. Only when patrol=true.
+	btctx_.actions["Chase"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!chasing) return BTResult::Failure;
+		if(!patrol) return BTResult::Failure; // stay at post
+		Object* obj = world.GetObjectFromId(chasing);
+		if(!obj){ chasing = 0; return BTResult::Failure; }
+		if(obj->type == ObjectTypes::PLAYER){
+			Player* p = static_cast<Player*>(obj);
+			if(p->InBase(world) || p->IsInvisible(world)){ chasing = 0; return BTResult::Failure; }
+		}
+		if(state == STANDING || state == WALKING){
+			if(abs(obj->x - x) <= 90 && abs(obj->x - x) > 80){
+				mirrored = (obj->x < x);
+			} else if(abs(obj->x - x) > 90){
+				state = WALKING;
+				mirrored = (obj->x < x);
+			} else {
+				state = WALKING;
+			}
+			Platform* ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
+			if(ladder){
+				Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+				if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
+					if(ladder->y2 == obj->y && y != obj->y && ladder->y2 > y){
+						x = center; yv = 5; state = LADDER; state_i = 0;
+					}
+					if(ladder->y1 == obj->y && y != obj->y && ladder->y1 < y){
+						x = center; yv = -5; state = LADDER; state_i = 0;
+					}
+				}
+			}
+		}
+		return BTResult::Running;
+	};
+
+	btctx_.actions["Patrol"] = [this](BTContext&) -> BTResult {
+		if(state == STANDING || state == LOOKING){ state = WALKING; state_i = 0; }
+		return BTResult::Success;
+	};
+
+	// SearchAndReturn: non-patrol guard that was alerted (chasing set or bt_walk_ticks_ > 0).
+	// Searches for 600 ticks (10s) oriented toward last known target, then walks back to post.
+	btctx_.actions["SearchAndReturn"] = [this](BTContext& ctx) -> BTResult {
+		if (patrol) return BTResult::Failure;
+		if (bt_walk_ticks_ == 0 && !chasing) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
+		if (bt_walk_ticks_ < 600 && chasing) {
+			// Search phase: orient toward target when not on a ladder and not too close.
+			if (state != LADDER) {
+				Object* obj = world.GetObjectFromId(chasing);
+				if (obj && obj->IsAlive()) {
+					// If target slipped into base or is now untargetable (disguised, invisible),
+					// forget them — guard searches blindly then returns to post.
+					if (obj->type == ObjectTypes::PLAYER) {
+						Player* p = static_cast<Player*>(obj);
+						if (p->InBase(world) || p->IsInvisible(world) || !ShouldTarget(*obj, world)) {
+							chasing = 0;
+							return BTResult::Running;
+						}
+					}
+					int dist = abs(signed(obj->x) - signed(x));
+					if (dist > 80) {
+						mirrored = (obj->x < x); // orient toward target
+					}
+					// <=80px: keep current direction to avoid oscillation
+					// Climb ladder toward target if on a meaningfully different level
+					int ydiff = signed(obj->y) - signed(y);
+					if(abs(ydiff) > 48 && bt_ladder_cooldown_ == 0){
+						Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
+						if(ladder && state == WALKING){
+							Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+							if(abs(signed(center) - signed(x)) <= 8){
+								if(ydiff < 0 && signed(ladder->y1) < signed(y)){
+									// player above, ladder goes up
+									x = center; yv = -5; state = LADDER; state_i = 0;
+									bt_ladder_cooldown_ = 120; // 2s cooldown before re-climbing
+								} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
+									// player below, ladder goes down
+									x = center; yv = 5; state = LADDER; state_i = 0;
+									bt_ladder_cooldown_ = 120;
+								}
+							}
+						}
+					}
+				} else {
+					chasing = 0; // target gone or dead
+				}
+			}
+			return BTResult::Running;
+		}
+		// Return-to-post phase: face toward spawn, climb ladders back if needed
+		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
+		if (abs(signed(x) - signed(originalx)) <= 20) {
+			chasing = 0;
+			bt_walk_ticks_ = 0;
+			state = STANDING;
+			state_i = -1;
+			mirrored = originalmirrored;
+			return BTResult::Success;
+		}
+		if (state != LADDER) {
+			mirrored = (signed(originalx) < signed(x));
+			// Climb ladders back to original level
+			int ydiff = signed(originaly) - signed(y);
+			if(abs(ydiff) > 48 && bt_ladder_cooldown_ == 0){
+				Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
+				if(ladder && state == WALKING){
+					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+					if(abs(signed(center) - signed(x)) <= 8){
+						if(ydiff < 0 && signed(ladder->y1) < signed(y)){
+							x = center; yv = -5; state = LADDER; state_i = 0;
+							bt_ladder_cooldown_ = 120;
+						} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
+							x = center; yv = 5; state = LADDER; state_i = 0;
+							bt_ladder_cooldown_ = 120;
+						}
+					}
+				}
+			}
+		}
+		return BTResult::Running;
+	};
+
+	btctx_.actions["Stand"] = [this](BTContext&) -> BTResult {
+		return BTResult::Success;
+	};
 }
 
 void Guard::Serialize(bool write, Serializer & data, Serializer * old){
@@ -55,23 +331,52 @@ void Guard::Tick(World & world){
 	// 197:0-8 ladder shoot down
 	Hittable::Tick(*this, world);
 	Bipedal::Tick(*this, world);
-	Object * found = 0;
+
+	if(!bt_) InitBT();
+
+	// BT alert timer: counts up while WALKING and chasing, resets when calm
+	if (bt_) {
+		if (state == WALKING) bt_walk_ticks_++;
+		else if (!chasing) bt_walk_ticks_ = 0;
+		if (bt_ladder_cooldown_ > 0) bt_ladder_cooldown_--;
+	}
+
+	// Original priority interrupt for combat — runs every tick, exact semantics preserved
+	Object* found = nullptr;
 	if(state != DYING && state != DEAD && state != DYINGEXPLODE){
+		if(bt_){
+			btctx_.userData = &world;
+			btctx_.bbSet("patrol", (bool)patrol);
+			btctx_.bbSet("target_seen", false);
+			bt_->tick(btctx_);
+		} else {
 		do{
 			if((found = Look(world, 0))){
-				if(state == WALKING || state == STANDING || state == LOOKING){
-					if(CooledDown(world)){
-						state = SHOOTSTANDING;
+			if(world.debugoverlay) fprintf(stderr, "[guard#%u] Look(0) HIT  state=%d state_i=%d\n", id, state, state_i);
+			if(state == WALKING || state == STANDING || state == LOOKING){
+				if(CooledDown(world)){
+					if(world.debugoverlay) fprintf(stderr, "[guard#%u] -> SHOOTSTANDING\n", id);
+					state = SHOOTSTANDING;
+					state_i = 0;
+				}else{
+					// Can see player but on cooldown — stop moving so LOS is maintained
+					if(state == WALKING || state == LOOKING){
+						state = STANDING;
 						state_i = 0;
 					}
-				}else
-				if(state == CROUCHED){
-					state = UNCROUCHING;
-					state_i = 0;
+					if(world.debugoverlay) fprintf(stderr, "[guard#%u] Look(0) HIT cooldown state=%d\n", id, state);
 				}
-				break;
+			}else
+			if(state == CROUCHED){
+				if(world.debugoverlay) fprintf(stderr, "[guard#%u] -> UNCROUCHING\n", id);
+				state = UNCROUCHING;
+				state_i = 0;
 			}
+			break;
+		}
+			if(world.debugoverlay) fprintf(stderr, "[guard#%u] Look(0) MISS state=%d state_i=%d\n", id, state, state_i);
 			if((found = Look(world, 1))){
+				if(world.debugoverlay) fprintf(stderr, "[guard#%u] Look(1) HIT  state=%d state_i=%d\n", id, state, state_i);
 				if(state == CROUCHED){
 					if(CooledDown(world) && (state_hit == 0 || state_hit % 32 >= 10)){
 						state = SHOOTCROUCHED;
@@ -79,8 +384,25 @@ void Guard::Tick(World & world){
 					}
 				}else
 				if(state == WALKING || state == STANDING || state == LOOKING){
-					state = CROUCHING;
-					state_i = 0;
+					// Use hurtbox height to distinguish standing (≥50px) from crouched (<50px).
+					int tsx1, tsy1, tsx2, tsy2;
+					found->GetAABB(world.resources, &tsx1, &tsy1, &tsx2, &tsy2);
+					if((tsy2 - tsy1) >= 50){
+						// Standing-height target: shoot from standing position
+						if(CooledDown(world)){
+							state = SHOOTSTANDING;
+							state_i = 0;
+						} else {
+							if(state == WALKING || state == LOOKING){
+								state = STANDING;
+								state_i = 0;
+							}
+						}
+					} else {
+						// Short/crouched target: crouch to shoot
+						state = CROUCHING;
+						state_i = 0;
+					}
 				}
 				break;
 			}
@@ -112,7 +434,7 @@ void Guard::Tick(World & world){
 				break;
 			}
 			if((found = Look(world, 5))){
-				Player * player = static_cast<Player *>(found);
+				Player* player = static_cast<Player*>(found);
 				if(player){
 					if(abs(player->x - x) < 60){
 						break;
@@ -142,7 +464,9 @@ void Guard::Tick(World & world){
 				state_i = 0;
 			}
 		}
+		} // end else (!bt_)
 	}
+
 	switch(state){
 		case NEW:{
 			draw = true;
@@ -167,6 +491,7 @@ void Guard::Tick(World & world){
 			}
 		}break;
 		case CROUCHING:{
+			xv = 0;
 			res_bank = 158;
 			res_index = state_i;
 			if(state_i >= 9){
@@ -176,10 +501,12 @@ void Guard::Tick(World & world){
 			}
 		}break;
 		case CROUCHED:{
+			xv = 0;
 			res_bank = 158;
 			res_index = 9;
 		}break;
 		case SHOOTCROUCHED:{
+			xv = 0;
 			if(state_i == 6){
 				Fire(world, 1);
 			}
@@ -199,8 +526,9 @@ void Guard::Tick(World & world){
 			}
 		}break;
 		case UNCROUCHING:{
+			xv = 0;
 			res_bank = 158;
-			res_index = 9 - state_i;
+			res_index = 9 - state_i;  // reverse of CROUCHING: animate from crouched back to standing
 			if(state_i >= 9){
 				state = STANDING;
 				state_i = -1;
@@ -208,7 +536,7 @@ void Guard::Tick(World & world){
 			}
 		}break;
 		case LOOKING:{
-			if(!found){
+			if(!bt_ && !found){
 				chasing = 0;
 			}
 			if(state_i == 0 && Look(world, 10)){
@@ -229,6 +557,17 @@ void Guard::Tick(World & world){
 			FollowGround(*this, world, xv);
 			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = !mirrored;
+			}
+			// play per-frame sounds defined in actordefs/guard.json
+			{
+				auto it = world.resources.actordefs.find(ActorDefName(weapon));
+				if(it != world.resources.actordefs.end()){
+					auto* seq = it->second.GetSequence("WALKING");
+					std::string snd; int vol;
+					if(seq && seq->GetFrameSoundByIndex(state_i % 19, snd, vol)){
+						EmitSound(world, world.resources.soundbank[snd], vol);
+					}
+				}
 			}
 			if(state_i == 240){
 				state = LOOKING;
@@ -436,7 +775,12 @@ void Guard::Tick(World & world){
 			res_bank = 63;
 			res_index = state_i;
 			if(state_i >= 3){
-				state = STANDING;
+				// Non-patrol guard that was alerted: go to WALKING to start SearchAndReturn
+				if(bt_ && !patrol && chasing){
+					state = WALKING;
+				} else {
+					state = STANDING;
+				}
 				state_i = -1;
 				break;
 			}
@@ -470,7 +814,7 @@ void Guard::Tick(World & world){
 			}
 		}break;
 	}
-	if(chasing){
+	if(!bt_ && chasing){
 		Object * object = world.GetObjectFromId(chasing);
 		if(object){
 			if(object->type == ObjectTypes::PLAYER){
@@ -527,6 +871,13 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	if(state == WALKING || state == STANDING || state == SHOOTSTANDING || state == SHOOTUP || state == SHOOTUPANGLE || state == SHOOTDOWN || state == SHOOTDOWNANGLE){
 		state = HIT;
 		state_i = 0;
+	}
+	// Non-patrol guard hit by player: alert so SearchAndReturn activates
+	if(bt_ && !patrol && health > 0 && !chasing){
+		Object* owner = world.GetObjectFromId(projectile.ownerid);
+		if(owner && owner->type == ObjectTypes::PLAYER){
+			chasing = owner->id;
+		}
 	}
 	if(health == 0 && state != DYING && state != DYINGEXPLODE && state != DEAD){
 		state = DYING;
@@ -679,19 +1030,23 @@ Object * Guard::Look(World & world, Uint8 direction){
 			Object * object = world.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, types);
 			if(object){
 				if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
+					if(world.debugoverlay) world.debuglines.push_back({x+x1, y+y1, x+x2, y+y2, 68}); // green = hit
 					return object;
 				}
 			}
 		}
+		if(world.debugoverlay) world.debuglines.push_back({x+x1, y+y1, x+x2, y+y2, 40}); // red = miss
 	}else{
 		int xv2 = x2 - x1;
 		int yv2 = y2 - y1;
 		Object * object = world.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, types);
 		if(object && ShouldTarget(*object, world)){
 			if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
+				if(world.debugoverlay) world.debuglines.push_back({x+x1, y+y1, x+x2, y+y2, 68}); // green = hit
 				return object;
 			}
 		}
+		if(world.debugoverlay) world.debuglines.push_back({x+x1, y+y1, x+x2, y+y2, 40}); // red = miss
 	}
 	return 0;
 }

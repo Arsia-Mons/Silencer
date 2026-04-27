@@ -1,0 +1,76 @@
+name: CI Build (macOS)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-build-macos-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-macos:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: macos-latest
+    timeout-minutes: 20
+    env:
+      # mozilla-actions/sccache-action exposes ACTIONS_CACHE_URL +
+      # ACTIONS_RUNTIME_TOKEN, but sccache only routes through the GHA
+      # backend when this is set — otherwise it writes to the runner's
+      # local disk and every fresh runner starts with an empty cache
+      # (100% miss rate).
+      SCCACHE_GHA_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps (Homebrew)
+        run: brew install minizip dylibbundler
+
+      - name: Install SDL3 + SDL3_mixer
+        uses: libsdl-org/setup-sdl@main
+        with:
+          version: 3-latest
+          version-sdl-mixer: 3-latest
+
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Configure
+        run: |
+          cmake -B build -S clients/silencer \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DSILENCER_UNITY_BUILD=ON
+
+      - name: Build
+        run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
+
+      - name: sccache stats
+        if: always()
+        run: sccache --show-stats
+
+      - name: Bundle dylibs
+        working-directory: build
+        run: |
+          mkdir -p Silencer.app/Contents/Frameworks
+          dylibbundler \
+            -s "$SDL3_ROOT/lib" \
+            -s "$SDL3_mixer_ROOT/lib" \
+            --overwrite-dir \
+            --bundle-deps \
+            --create-dir \
+            --fix-file Silencer.app/Contents/MacOS/Silencer \
+            --dest-dir Silencer.app/Contents/Frameworks/ \
+            --install-path @rpath/ \
+            </dev/null
+          install_name_tool -add_rpath @executable_path/../Frameworks \
+            Silencer.app/Contents/MacOS/Silencer 2>/dev/null || true
+          echo "--- bundled dylibs ---"
+          ls Silencer.app/Contents/Frameworks/
+
+      - name: Verify bundled dependencies
+        run: tests/e2e/check-bundle-macos.sh build/Silencer.app

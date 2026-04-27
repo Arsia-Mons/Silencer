@@ -3,6 +3,8 @@
 #include <fstream>
 #include <stdexcept>
 #include <cstdio>
+#include <curl/curl.h>
+#include <string>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -38,10 +40,41 @@ const FrameDef* AnimSequence::Resolve(int state_i) const {
 	return nullptr; // past end of non-looping sequence
 }
 
+bool AnimSequence::GetFrameSound(int state_i, std::string& outFile, int& outVolume) const {
+	if (frames.empty() || state_i < 0) return false;
+	int total = TotalDuration();
+	int effective = (loop && total > 0) ? (state_i % total) : state_i;
+	int acc = 0;
+	for (const auto& f : frames) {
+		if (effective == acc && !f.sound.empty()) {
+			outFile   = f.sound;
+			outVolume = f.soundVolume > 0 ? f.soundVolume : 128;
+			return true;
+		}
+		acc += f.duration;
+		if (!loop && effective < acc) break;
+	}
+	return false;
+}
+
+
+
+bool AnimSequence::GetFrameSoundByIndex(int frameIdx, std::string& outFile, int& outVolume) const {
+	if (frames.empty()) return false;
+	int total = (int)frames.size();
+	int idx = (loop && total > 0) ? (frameIdx % total) : frameIdx;
+	if (idx < 0 || idx >= total) return false;
+	const auto& f = frames[idx];
+	if (f.sound.empty()) return false;
+	outFile   = f.sound;
+	outVolume = f.soundVolume > 0 ? f.soundVolume : 128;
+	return true;
+}
+
+
 // ---------------------------------------------------------------------------
 // JSON parsing helpers
 // ---------------------------------------------------------------------------
-
 static FrameHurtbox ParseHurtbox(const json& j) {
 	FrameHurtbox hb = {0, 0, 0, 0};
 	if (j.is_array() && j.size() == 4) {
@@ -64,6 +97,8 @@ static AnimSequence ParseSequence(const json& j) {
 		fd.duration = fj.value("duration", 1);
 		if (fd.duration < 1) fd.duration = 1;
 		fd.hurtbox  = ParseHurtbox(fj.value("hurtbox", json::array()));
+		fd.sound       = fj.value("sound", std::string{});
+		fd.soundVolume = fj.value("soundVolume", 0);
 		seq.frames.push_back(fd);
 	}
 	return seq;
@@ -133,6 +168,94 @@ int LoadActorDefs(const std::string& dir,
 		if (ParseActorDef(path, def) && !def.id.empty()) {
 			out[def.id] = std::move(def);
 			++loaded;
+		}
+	}
+	return loaded;
+}
+
+// ---------------------------------------------------------------------------
+// HTTP fetch helpers (curl)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+struct StrBuf {
+	std::string data;
+	static size_t Write(void* ptr, size_t sz, size_t n, void* ud) {
+		auto* buf = static_cast<StrBuf*>(ud);
+		size_t incoming = sz * n;
+		if (buf->data.size() + incoming > 4 * 1024 * 1024) return 0; // 4 MB cap
+		buf->data.append(static_cast<const char*>(ptr), incoming);
+		return incoming;
+	}
+};
+
+static std::string CurlGet(const std::string& url) {
+	StrBuf buf;
+	CURL* c = curl_easy_init();
+	if (!c) return "";
+	curl_easy_setopt(c, CURLOPT_URL, url.c_str());
+	curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, StrBuf::Write);
+	curl_easy_setopt(c, CURLOPT_WRITEDATA, &buf);
+	curl_easy_setopt(c, CURLOPT_FAILONERROR, 1L);
+	curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, 3L);
+	curl_easy_setopt(c, CURLOPT_TIMEOUT, 5L);
+	curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
+	curl_easy_setopt(c, CURLOPT_USERAGENT, "silencer-actordef/1");
+	CURLcode rc = curl_easy_perform(c);
+	curl_easy_cleanup(c);
+	if (rc != CURLE_OK) return "";
+	return buf.data;
+}
+
+} // namespace
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+int FetchActorDefs(const char* apiBase,
+                   std::unordered_map<std::string, ActorDef>& out) {
+	if (!apiBase || apiBase[0] == '\0') return 0;
+
+	// GET /api/actors → JSON array of id strings, e.g. ["player","guard"]
+	std::string listBody = CurlGet(std::string(apiBase) + "/api/actors");
+	if (listBody.empty()) {
+		fprintf(stderr, "[actordef] fetch: could not reach %s/api/actors\n", apiBase);
+		return 0;
+	}
+
+	json ids;
+	try { ids = json::parse(listBody); } catch (...) {
+		fprintf(stderr, "[actordef] fetch: bad JSON from actor list\n");
+		return 0;
+	}
+	if (!ids.is_array()) return 0;
+
+	int loaded = 0;
+	for (const auto& idj : ids) {
+		if (!idj.is_string()) continue;
+		std::string id = idj.get<std::string>();
+
+		std::string body = CurlGet(std::string(apiBase) + "/api/actors/" + id);
+		if (body.empty()) {
+			fprintf(stderr, "[actordef] fetch: failed to get actor %s\n", id.c_str());
+			continue;
+		}
+		try {
+			json j = json::parse(body);
+			ActorDef def;
+			def.id = id;
+			if (j.contains("sequences")) {
+				for (auto it = j["sequences"].begin(); it != j["sequences"].end(); ++it) {
+					def.sequences[it.key()] = ParseSequence(it.value());
+				}
+			}
+			out[id] = std::move(def);
+			++loaded;
+			fprintf(stderr, "[actordef] fetched \"%s\" from server\n", id.c_str());
+		} catch (const std::exception& e) {
+			fprintf(stderr, "[actordef] fetch: parse error for %s: %s\n", id.c_str(), e.what());
 		}
 	}
 	return loaded;

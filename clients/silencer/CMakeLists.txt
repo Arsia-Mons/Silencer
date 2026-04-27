@@ -1,19 +1,29 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.16)
 
 project(Silencer)
 
 include(FetchContent)
 
 # nlohmann/json — header-only, C++14 compatible
+# v3.12.0: fixes std::_snprintf removed from MSVC 14.44 (VS 2022 17.13+)
 FetchContent_Declare(
 	nlohmann_json
-	URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp
-	URL_HASH SHA256=9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6
+	URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.hpp
+	URL_HASH SHA256=aaf127c04cb31c406e5b04a63f1ae89369fccde6d8fa7cdda1ed4f32dfc5de63
 	DOWNLOAD_NO_EXTRACT TRUE
 )
 FetchContent_MakeAvailable(nlohmann_json)
-# Expose a simple include dir so we can do #include "nlohmann/json.hpp"
-set(NLOHMANN_JSON_INCLUDE_DIR "${nlohmann_json_SOURCE_DIR}")
+# Expose a simple include dir so we can do #include "nlohmann/json.hpp".
+# FetchContent downloads json.hpp directly into nlohmann_json_SOURCE_DIR,
+# so we create a nlohmann/ subdirectory wrapper and copy the header there.
+set(_nlohmann_wrapper "${CMAKE_BINARY_DIR}/nlohmann_include")
+file(MAKE_DIRECTORY "${_nlohmann_wrapper}/nlohmann")
+configure_file(
+	"${nlohmann_json_SOURCE_DIR}/json.hpp"
+	"${_nlohmann_wrapper}/nlohmann/json.hpp"
+	COPYONLY
+)
+set(NLOHMANN_JSON_INCLUDE_DIR "${_nlohmann_wrapper}")
 
 # Linux GNU lowercase convention; macOS/Windows pick up mixed-case via
 # bundle/output-name overrides below.
@@ -77,6 +87,24 @@ endif()
 
 target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_14)
 
+# Unity (jumbo) build: combines src/*.cpp into batched TUs to dramatically
+# speed up clean builds. Off by default — incremental single-file edits are
+# slower under unity since changing one .cpp recompiles its whole batch.
+# CI release/deploy workflows pass -DSILENCER_UNITY_BUILD=ON.
+option(SILENCER_UNITY_BUILD "Combine .cpp files into jumbo TUs for faster clean builds" OFF)
+if(SILENCER_UNITY_BUILD)
+	set_target_properties(${SILENCER_TARGET} PROPERTIES UNITY_BUILD ON)
+	if(APPLE)
+		# CMake batches Objective-C++ .mm files into the CXX jumbo TU on
+		# macOS rather than separating by language, so #import <Cocoa/Cocoa.h>
+		# from cocoawrapper.mm leaks Objective-C types (NSString, etc.) into
+		# a C++ translation unit and breaks compilation. We have only one .mm
+		# file — unity savings from including it are nil — so skip it.
+		file(GLOB_RECURSE _mm_sources src/*.mm)
+		set_source_files_properties(${_mm_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
+	endif()
+endif()
+
 # Compile HLSL → DXIL bytecode headers for the SDL3 GPU backend. macOS keeps
 # the existing MSL source strings; SPIRV/Linux is a separate change.
 include(CompileShaders)
@@ -94,6 +122,8 @@ silencer_finalize_shaders(
 add_dependencies(${SILENCER_TARGET} silencer_shaders)
 target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated")
+target_include_directories(${SILENCER_TARGET} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
@@ -102,17 +132,23 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
 # for runtime debugging.
 if(MSVC)
 	target_compile_options(${SILENCER_TARGET} PRIVATE $<$<CONFIG:Debug>:/Z7>)
+	# MSVC 14.44+ removed _snprintf from std::; nlohmann/json uses it internally.
+	# Force-include the shim before every TU to re-expose it.
+	target_compile_options(${SILENCER_TARGET} PRIVATE
+		"/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/msvc_snprintf_compat.h")
 endif()
 
 set(SILENCER_LOBBY_HOST "127.0.0.1" CACHE STRING "Lobby host the client connects to at startup")
 set(SILENCER_LOBBY_PORT "517" CACHE STRING "Lobby TCP port")
-set(SILENCER_VERSION "00028" CACHE STRING "Client version string sent to the lobby during MSG_VERSION")
+set(SILENCER_VERSION "00000" CACHE STRING "Client version string sent to the lobby during MSG_VERSION; overridden by release.yml from git tag")
 set(SILENCER_MAP_API_URL "http://127.0.0.1:15172" CACHE STRING "Base URL for the community map HTTP API (used when fetching a missing map before falling back to P2P)")
+set(SILENCER_ADMIN_API_URL "http://127.0.0.1:24080" CACHE STRING "Base URL for the admin API (actordefs sync, etc.)")
 target_compile_definitions(${SILENCER_TARGET} PRIVATE
 	SILENCER_LOBBY_HOST="${SILENCER_LOBBY_HOST}"
 	SILENCER_LOBBY_PORT=${SILENCER_LOBBY_PORT}
 	SILENCER_VERSION="${SILENCER_VERSION}"
 	SILENCER_MAP_API_URL="${SILENCER_MAP_API_URL}"
+	SILENCER_ADMIN_API_URL="${SILENCER_ADMIN_API_URL}"
 )
 
 find_package(ZLIB REQUIRED)
@@ -152,6 +188,8 @@ endif()
 
 include_directories(${ZLIB_INCLUDE_DIRS})
 include_directories(${NLOHMANN_JSON_INCLUDE_DIR})
+# Also expose the raw json.hpp dir for existing includes that use #include "json.hpp"
+include_directories(${nlohmann_json_SOURCE_DIR})
 find_package(SDL3_mixer REQUIRED CONFIG)
 if(TARGET SDL3_mixer::SDL3_mixer)
   get_target_property(_sdl3mixer_inc SDL3_mixer::SDL3_mixer INTERFACE_INCLUDE_DIRECTORIES)

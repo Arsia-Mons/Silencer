@@ -1,0 +1,44 @@
+name: CI Build (lobby Docker)
+
+# The lobby image is dev-only (infra/docker-compose.yml); production builds the
+# Go binary + dedicated server natively in deploy.yml. This job exists to keep
+# the compose dev path from rotting — exactly the failure mode of PR #71.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'services/lobby/**'
+      - 'clients/silencer/**'
+      - 'shared/assets/**'
+      - '.github/workflows/ci-build-lobby-docker.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/lobby/**'
+      - 'clients/silencer/**'
+      - 'shared/assets/**'
+      - '.github/workflows/ci-build-lobby-docker.yml'
+
+concurrency:
+  group: ci-build-lobby-docker-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-lobby-docker:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/lobby/Dockerfile
+          push: false
+          cache-from: type=gha,scope=lobby
+          cache-to: type=gha,scope=lobby,mode=max

@@ -61,7 +61,9 @@ typedef int mode_t;
 #endif
 typedef int socklen_t;
 #define ioctl ioctlsocket
-#define snprintf _snprintf
+// (Legacy MSVC < 2015 needed `#define snprintf _snprintf`; removed because
+// modern MSVC has standard snprintf and the macro mangles std::snprintf
+// inside vendored libraries — e.g. nlohmann/json's `(std::snprintf)`.)
 #endif
 #ifdef __ANDROID__
 #include <android/log.h>

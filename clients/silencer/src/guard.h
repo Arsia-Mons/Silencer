@@ -3,6 +3,7 @@
 
 #include "shared.h"
 #include "object.h"
+#include "behaviortree.h"
 
 class Guard : public Object
 {
@@ -23,6 +24,7 @@ private:
 	void Fire(World & world, Uint8 direction);
 	bool CooledDown(World & world);
 	bool ShouldTarget(Object & object, World & world);
+	void InitBT();
 	enum {NEW, STANDING, CROUCHING, CROUCHED, SHOOTCROUCHED, UNCROUCHING, LOOKING, WALKING, SHOOTSTANDING,
 		SHOOTUP, SHOOTDOWN, SHOOTUPANGLE, SHOOTDOWNANGLE, SHOOTLADDERUP, SHOOTLADDERDOWN, LADDER, HIT, DYING,
 		DYINGEXPLODE, DEAD};
@@ -35,6 +37,10 @@ private:
 	Uint8 respawnseconds;
 	Uint32 lastspoke;
 	Uint32 lastshot;
+	const BehaviorTree* bt_;
+	BTContext btctx_;
+	int bt_walk_ticks_ = 0;      // non-serialized alert/search timer for BT
+	int bt_ladder_cooldown_ = 0; // ticks to wait before attempting another ladder climb
 };
 
 #endif

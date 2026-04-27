@@ -11,7 +11,6 @@ import (
 
 type procManager struct {
 	binary    string
-	lobbyHost string
 	lobbyPort int
 
 	gamePortBase  int
@@ -21,10 +20,9 @@ type procManager struct {
 	procs map[uint32]*exec.Cmd
 }
 
-func newProcManager(binary, lobbyHost string, lobbyPort, gamePortBase, gamePortCount int) *procManager {
+func newProcManager(binary string, lobbyPort, gamePortBase, gamePortCount int) *procManager {
 	return &procManager{
 		binary:        binary,
-		lobbyHost:     lobbyHost,
 		lobbyPort:     lobbyPort,
 		gamePortBase:  gamePortBase,
 		gamePortCount: gamePortCount,
@@ -36,9 +34,15 @@ func (p *procManager) Start(gameID, accountID uint32) error {
 	if p.binary == "" {
 		return errors.New("-game-binary not configured")
 	}
+	// Spawned dedicated servers always reach the lobby over loopback —
+	// they're the same process tree on the same box. The dedicated-server
+	// UDP heartbeat path in the C++ binary uses inet_addr() which only
+	// parses dotted-decimal, so passing a hostname (e.g. -public-addr) here
+	// would silently misroute heartbeats and the lobby would time out the
+	// pending create.
 	args := []string{
 		"-s",
-		p.lobbyHost,
+		"127.0.0.1",
 		strconv.Itoa(p.lobbyPort),
 		strconv.FormatUint(uint64(gameID), 10),
 		strconv.FormatUint(uint64(accountID), 10),

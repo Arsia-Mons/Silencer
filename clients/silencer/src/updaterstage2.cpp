@@ -337,9 +337,19 @@ int Run(int argc, char **argv) {
     std::string new_exe = exe_to_relaunch;
     Logf("relaunching: %s", new_exe.c_str());
 #ifdef _WIN32
+    // Use lpCommandLine (not lpApplicationName) with a quoted path so
+    // Windows correctly parses the command line even for paths with spaces.
+    // Set lpCurrentDirectory to the install dir so the relaunched process
+    // finds its assets relative to itself.
+    // DETACHED_PROCESS detaches from the stage-2 console so the new
+    // process is fully independent.
+    std::string install_dir_for_relaunch = new_exe.substr(0, new_exe.find_last_of("/\\"));
+    std::string cmdline = "\"" + new_exe + "\"";
     STARTUPINFOA si{}; si.cb = sizeof(si);
     PROCESS_INFORMATION pi{};
-    if (!CreateProcessA(new_exe.c_str(), NULL, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+    if (!CreateProcessA(NULL, const_cast<LPSTR>(cmdline.c_str()),
+                        NULL, NULL, FALSE, DETACHED_PROCESS,
+                        NULL, install_dir_for_relaunch.c_str(), &si, &pi)) {
         Logf("CreateProcess failed: %lu", GetLastError());
         return 5;
     }
@@ -368,7 +378,7 @@ bool Launch(const std::string &zippath) {
     }
     // Windows resolves the main exe's import table from the exe's own
     // directory before our code runs. Since stage-2 lives in %TEMP% but
-    // its DLLs (zlib1, SDL2, libcurl, etc.) live in the install dir, the
+    // its DLLs (zlib1, SDL3, libcurl, etc.) live in the install dir, the
     // loader fails with "zlib1.dll was not found". Copy every *.dll from
     // the install dir next to silencer-stage2.exe so imports resolve.
     {

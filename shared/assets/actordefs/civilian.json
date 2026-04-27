@@ -190,7 +190,9 @@
             -72,
             14,
             0
-          ]
+          ],
+          "sound": "stostep1.wav",
+          "soundVolume": 16
         },
         {
           "bank": 122,
@@ -300,7 +302,9 @@
             -72,
             14,
             0
-          ]
+          ],
+          "sound": "stostepr.wav",
+          "soundVolume": 16
         },
         {
           "bank": 122,
@@ -426,7 +430,9 @@
             -68,
             18,
             0
-          ]
+          ],
+          "sound": "futstonl.wav",
+          "soundVolume": 16
         },
         {
           "bank": 123,
@@ -514,7 +520,9 @@
             -68,
             18,
             0
-          ]
+          ],
+          "sound": "futstonr.wav",
+          "soundVolume": 16
         }
       ]
     },

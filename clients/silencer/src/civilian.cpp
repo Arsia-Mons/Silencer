@@ -18,6 +18,19 @@ Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	isphysical = true;
 	snapshotinterval = 72;
 	tractteamid = 0;
+	bt_ = nullptr;
+}
+
+void Civilian::InitBT(){
+	bt_ = BehaviorTreeLibrary::instance().get("civilian");
+	if(!bt_) return;
+	btctx_.actions["Run"] = [this](BTContext&) -> BTResult {
+		if(state != RUNNING){ state = RUNNING; state_i = (Uint8)-1; }
+		return BTResult::Success;
+	};
+	btctx_.actions["Wander"] = [](BTContext&) -> BTResult {
+		return BTResult::Success;
+	};
 }
 
 void Civilian::Serialize(bool write, Serializer & data, Serializer * old){
@@ -73,19 +86,31 @@ void Civilian::Tick(World & world){
 			}
 			res_bank = 122;
 			res_index = state_i;
-			if(res_index == 5){
-				EmitSound(world, world.resources.soundbank["stostep1.wav"], 16);
-			}
-			if(res_index == 15){
-				EmitSound(world, world.resources.soundbank["stostepr.wav"], 16);
+			// play per-frame sounds defined in actordefs/civilian.json
+			{
+				auto it = world.resources.actordefs.find("civilian");
+				if(it != world.resources.actordefs.end()){
+					auto* seq = it->second.GetSequence("WALKING");
+					std::string snd; int vol;
+					if(seq && seq->GetFrameSoundByIndex(state_i, snd, vol)){
+						EmitSound(world, world.resources.soundbank[snd], vol);
+					}
+				}
 			}
 			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = mirrored ? false : true;
 			}
 			xv = mirrored ? -speed : speed;
 			FollowGround(*this, world, xv);
-			if(state_i % 5 == 0){
-				Look(world);
+			if(state_i % 10 == 0){
+				if(!bt_) InitBT();
+				if(bt_){
+					btctx_.dt = 10.0f / 24.0f;
+					btctx_.bbSet("threat_nearby", Look(world));
+					bt_->tick(btctx_);
+				}else{
+					Look(world);
+				}
 			}
 		}break;
 		case RUNNING:{
@@ -100,11 +125,16 @@ void Civilian::Tick(World & world){
 			xv = (mirrored ? -1 : 1) * (5 + speed);
 			res_bank = 123;
 			res_index = state_i % 15;
-			if(res_index == 6){
-				EmitSound(world, world.resources.soundbank["futstonl.wav"], 16);
-			}
-			if(res_index == 14){
-				EmitSound(world, world.resources.soundbank["futstonr.wav"], 16);
+			// play per-frame sounds defined in actordefs/civilian.json
+			{
+				auto it = world.resources.actordefs.find("civilian");
+				if(it != world.resources.actordefs.end()){
+					auto* seq = it->second.GetSequence("RUNNING");
+					std::string snd; int vol;
+					if(seq && seq->GetFrameSoundByIndex(state_i % 15, snd, vol)){
+						EmitSound(world, world.resources.soundbank[snd], vol);
+					}
+				}
 			}
 			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = mirrored ? false : true;

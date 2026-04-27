@@ -62,6 +62,7 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	ClearMapData();
 	showteamcolors = false;
 	showplayerlist = false;
+	debugoverlay = false;
 	memset(topmessage, 0, sizeof(topmessage));
 	topmessage_i = 0;
 }

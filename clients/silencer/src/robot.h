@@ -3,6 +3,7 @@
 
 #include "shared.h"
 #include "object.h"
+#include "behaviortree.h"
 
 class Robot : public Object
 {
@@ -22,6 +23,7 @@ private:
 	bool Look(World & world, Uint8 direction = 0);
 	void StopAmbience(void);
 	void Melee(Object & object, World & world);
+	void InitBT();
 	enum {NEW, SLEEPING, ASLEEP, AWAKENING, WALKING, SHOOTING, DYING, DEAD};
 	Uint8 state;
 	Uint8 state_i;
@@ -30,6 +32,9 @@ private:
 	Uint8 respawnseconds;
 	Uint8 shootcooldown;
 	int soundchannel;
+	const BehaviorTree* bt_ = nullptr;
+	BTContext btctx_;
+	int bt_walk_ticks_ = 0; // non-serialized patrol timer for BT (state_i is Uint8, too small)
 };
 
 #endif

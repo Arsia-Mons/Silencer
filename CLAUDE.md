@@ -1,13 +1,15 @@
 # Silencer
 
-Multiplayer 2D action game (C++/SDL2) plus a self-hosted Go lobby
+Multiplayer 2D action game (C++/SDL3) plus a self-hosted Go lobby
 server, an admin web app (Next.js), and an admin API (Bun+TS).
 Rebranded from zSILENCER — use "Silencer" in new content, rename
-old identifiers opportunistically when touching the file.
+old identifiers opportunistically when touching the file. Same
+applies to SDL: we migrated SDL2 → SDL3, so rename stale SDL2
+references opportunistically when you touch surrounding code/docs.
 
 ## Tech stack
 
-- Game client: C++14 / SDL2 / CMake
+- Game client: C++14 / SDL3 / CMake
 - Lobby server: Go (stdlib + `mongo-driver`/`amqp091-go`, both optional)
 - Admin web + API: Bun + TypeScript + oxfmt
 - Infra: Docker Compose, Terraform (AWS)
@@ -22,6 +24,7 @@ Each component owns its own `CLAUDE.md` with build/run/test/gotchas:
 - `web/admin/` — Next.js admin dashboard + level designer
 - `shared/assets/` — runtime game assets (sprites, tiles, sounds, levels)
 - `shared/icons/` — app icons used by `clients/silencer` build
+- `shared/skills/` — Claude Code skills surfaced to agents via `.claude/skills/` symlinks
 - `infra/terraform/` — AWS infra
 
 > Layout migration in progress. See

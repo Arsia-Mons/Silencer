@@ -79,6 +79,7 @@ write_files:
       BACKUP_KEEP=10
       GITHUB_TOKEN=$GITHUB_TOKEN
       GITHUB_BACKUP_REPO=${github_backup_repo}
+      ASSETS_DIR=/assets
       EOF
       chmod 0600 /etc/silencer/admin-api.env
       # docker login to ghcr.io so the silencer-admin-{api,web} units can
@@ -152,6 +153,7 @@ write_files:
         --network host \
         --env-file /etc/silencer/admin-api.env \
         -v /var/lib/silencer-backups:/backups \
+        -v /var/lib/silencer/assets:/assets \
         $${IMAGE}
       ExecStop=/usr/bin/docker stop silencer-admin-api
       Restart=always
@@ -193,7 +195,7 @@ runcmd:
   # 1. Wait for both EBS data volumes to attach. aws_volume_attachment
   #    fires after instance boot, so bootcmd would race; that's why this
   #    polling loop lives in runcmd. Same pattern as the lobby's cloud-init.
-  - mkdir -p /var/lib/mongodb /var/lib/lavinmq /var/lib/silencer-backups
+  - mkdir -p /var/lib/mongodb /var/lib/lavinmq /var/lib/silencer-backups /var/lib/silencer/assets
   - |
     for i in $(seq 1 60); do
       [ -b /dev/nvme1n1 ] && [ -b /dev/nvme2n1 ] && break

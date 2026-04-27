@@ -376,7 +376,7 @@ export default function DesignerPage() {
                       <input
                         value={pubApiUrl}
                         onChange={e => setPubApiUrl(e.target.value)}
-                        placeholder="http://host:15172"
+                        placeholder="(leave blank to use this server's /api/maps)"
                         className="w-full mt-1 px-2 py-1 text-xs font-mono bg-game-bg border border-game-border rounded text-game-text focus:outline-none focus:border-game-primary"
                       />
                     </div>
