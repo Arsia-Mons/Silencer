@@ -11,157 +11,160 @@ This skill teaches agents how to drive the Silencer game client via the
 
 ## What it is
 
-`clients/silencer-cli/index.ts` — a thin command-line client over the
-game's TCP control socket (`--control-port`). Each invocation sends one
-JSON command and prints the JSON response.
+`clients/cli/index.ts` — a thin command-line client over the game's TCP
+control socket. Each invocation sends one JSON command, prints the JSON
+result, and exits.
 
 ```
-bun clients/silencer-cli/index.ts --port <PORT> <op> [args...]
+bun clients/cli/index.ts --port <PORT> <op> [--key value ...]
 ```
 
-The daemon is the normal Silencer binary launched with `--headless
---control-port <PORT>`. On macOS it is the `.app` bundle binary; on Linux
-it is the lowercase `silencer` binary.
+Exit codes: `0` on success (JSON `result` to stdout), `1` on op error
+(`[CODE] message` to stderr), `2` on transport failure.
+
+The daemon is the normal Silencer binary launched with
+`--headless --control-port <PORT>`.
 
 ## Quickstart
 
-Use the E2E harness helpers so binary detection and port allocation are
-handled for you:
+Use the E2E harness helpers — they handle binary detection across
+macOS/Linux/Windows, pick a free port, and manage the daemon PID.
 
 ```bash
 . tests/cli-agent/e2e/lib.sh
 PORT=$(pick_port)
 PID=$(start_silencer "$PORT")
+trap "stop_silencer $PID $PORT" EXIT
 wait_alive "$PORT"
 
 # ... do work (see ops below) ...
-
-stop_silencer "$PID" "$PORT"
 ```
 
-`lib.sh` auto-detects the binary across macOS/Linux/Windows, picks a free
-port, and manages the daemon PID. Prefer this over rolling your own
-start/stop logic.
-
-If you need a one-shot manual start outside the harness:
-
-```bash
-PORT=5170
-. tests/cli-agent/e2e/lib.sh
-PID=$(start_silencer "$PORT")
-wait_alive "$PORT"
-```
-
-## CLI alias
-
-```bash
-CLI="bun clients/silencer-cli/index.ts --port $PORT"
-```
+`lib.sh` exports `$CLI="bun .../clients/cli/index.ts"` for you. Pass
+`--port "$PORT"` on every invocation.
 
 ## Supported ops
 
-| Op | Args | What it does |
-|----|------|--------------|
-| `ping` | — | Health check — returns `{"op":"pong"}` |
-| `state` | — | Current game-state name (e.g. `MainMenu`, `Lobby`) |
-| `inspect` | `<label>` | Dump a widget tree rooted at the named widget |
-| `world_state` | — | Live snapshot: players, positions, health, … |
-| `click` | `<label>` | Simulate a click on a widget by label |
-| `set_text` | `<label> <text>` | Type into a text box |
-| `select` | `<label> <value>` | Choose a drop-down option |
-| `back` | — | Simulate Escape / back button |
-| `screenshot` | `[path]` | Save a PNG to *path* (default `/tmp/silencer-screenshot.png`) |
-| `pause` | — | Pause simulation (single-player only) |
-| `resume` | — | Resume simulation |
-| `step` | `[n]` | Advance *n* frames while paused |
-| `wait_state` | `<state> [timeout_s]` | Block until game reaches *state* |
-| `wait_widget` | `<label> [timeout_s]` | Block until widget appears |
-| `quit` | — | Ask the daemon to exit cleanly |
+All ops accept flags as `--key value`. Where noted, a few accept a
+positional shorthand (`click LABEL`, `set_text LABEL TEXT`,
+`select LABEL N_OR_TEXT`).
+
+| Op | Flags | Result |
+|----|-------|--------|
+| `ping` | — | `{version, build, frame, paused}` |
+| `state` | — | `{state, current_interface_id, frame, paused}` |
+| `inspect` | `[--interface-id N]` | `{widgets:[{id,x,y,kind,label,w,h,enabled,...}], interface_id}` — defaults to current interface |
+| `world_state` | — | `{map, peers, players:[{id,hp,x,y}], objects_count}` |
+| `click` | `--label X` or `--id N` | `{widget_id}`. Matches BUTTON or TOGGLE; toggles flip `selected`. |
+| `set_text` | `--label X --text Y` | `{}` — clears textbox then types |
+| `select` | `--label X --index N` or `--text Y` | `{}` — sets selectbox index |
+| `back` | — | `{went_back: bool}` |
+| `screenshot` | `[--out PATH]` | `{path}`. If `--out` omitted, daemon writes `$TEMP/silencer-<frame>.png` (or `/tmp/...` on Unix). |
+| `pause` | — | `{}` — errors `WRONG_STATE` in live multiplayer |
+| `resume` | — | `{}` |
+| `step` | `--frames N` *or* `--ms N` | `{}` — advances sim then re-pauses; one of the two flags is required |
+| `wait_frames` | `--n N` | `{}` — replies after N rendered frames |
+| `wait_ms` | `--n N` | `{}` — replies after N wallclock ms |
+| `wait_for_state` | `--state X [--timeout-ms 5000]` | `{}` or `TIMEOUT` error. **Timeouts are milliseconds.** |
+| `quit` | — | `{}` — sets `quitRequested`; daemon exits cleanly |
+
+### State names
+
+`state` and `wait_for_state --state` use the daemon's uppercase state
+names (defined in `Game::StateName`):
+
+`NONE`, `FADEOUT`, `MAINMENU`, `LOBBYCONNECT`, `LOBBY`, `UPDATING`,
+`INGAME`, `MISSIONSUMMARY`, `SINGLEPLAYERGAME`, `OPTIONS`,
+`OPTIONSCONTROLS`, `OPTIONSDISPLAY`, `OPTIONSAUDIO`, `HOSTGAME`,
+`JOINGAME`, `REPLAYGAME`, `TESTGAME`.
 
 ## Common patterns
 
-### Navigate to a menu and verify a widget
+### Navigate menus
 
 ```bash
 . tests/cli-agent/e2e/lib.sh
-PORT=$(pick_port); PID=$(start_silencer "$PORT"); wait_alive "$PORT"
-CLI="bun clients/silencer-cli/index.ts --port $PORT"
+PORT=$(pick_port); PID=$(start_silencer "$PORT")
+trap "stop_silencer $PID $PORT" EXIT
+wait_alive "$PORT"
 
-# Wait for main menu
-$CLI wait_state MainMenu
-
-# Click Play
-$CLI click Play
-
-# Confirm we reached lobby
-$CLI wait_state Lobby
-
-stop_silencer "$PID" "$PORT"
+$CLI --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+$CLI --port "$PORT" click --label OPTIONS
+$CLI --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000
+$CLI --port "$PORT" back
+$CLI --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 5000
 ```
 
-### Take a screenshot for visual verification
+### Screenshot a screen
 
 ```bash
-$CLI screenshot /tmp/my-screen.png
-# Opens or inspects /tmp/my-screen.png to check rendering
+$CLI --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+$CLI --port "$PORT" screenshot --out /tmp/main.png
 ```
 
-### Read widget tree for a screen
+### Discover what's on screen
 
 ```bash
-$CLI inspect Root | jq .
+$CLI --port "$PORT" inspect | jq '.widgets[] | {id,kind,label}'
 ```
 
-### Inspect world state mid-game
+### Read live world state
 
 ```bash
-$CLI world_state | jq '.players[] | {name,health,pos}'
+$CLI --port "$PORT" world_state | jq '.players[] | {id,hp,x,y}'
 ```
 
-### Set text in a field
+### Pause + step + resume (single-player only)
 
 ```bash
-$CLI set_text "Username" "testuser42"
-$CLI click "Connect"
+$CLI --port "$PORT" pause
+$CLI --port "$PORT" step --frames 30   # advances 30 frames, re-pauses
+$CLI --port "$PORT" resume
 ```
 
-## JSON protocol (low-level)
+## Wire protocol
 
-Every message is a single JSON object terminated by `\n`. The daemon
-reads from the TCP socket opened at `--control-port` and writes one
-response per request.
+One JSON object per line, both directions.
 
 Request:
 ```json
-{"op": "click", "label": "Play"}
+{"id": 1, "op": "click", "args": {"label": "OPTIONS"}}
 ```
 
-Success response:
+Success:
 ```json
-{"op": "click", "ok": true}
+{"id": 1, "ok": true, "result": {"widget_id": 17}}
 ```
 
-Error response:
+Error:
 ```json
-{"op": "click", "error": "widget not found: Play"}
+{"id": 1, "ok": false, "code": "WIDGET_NOT_FOUND", "error": "no widget matches \"X\""}
 ```
+
+Common error codes: `BAD_REQUEST`, `UNKNOWN_OP`, `WRONG_STATE`,
+`WIDGET_NOT_FOUND`, `WIDGET_AMBIGUOUS`, `TIMEOUT`, `INTERNAL`. The CLI
+exits 1 on any `ok:false` and prints `[CODE] error` to stderr.
 
 You rarely need to speak the protocol directly — use the CLI wrapper.
 
 ## Gotchas
 
-- **macOS binary path.** The binary lives at
+- **macOS binary path.** Lives at
   `clients/silencer/build/Silencer.app/Contents/MacOS/Silencer`, not
-  `clients/silencer/build/silencer`. `lib.sh` handles this automatically.
-- **--headless required.** Without `--headless`, the game opens SDL
-  video/audio and the control socket still works, but you'll get a window.
-  In CI always pass `--headless`.
-- **Single-player only for pause/step.** `pause`, `resume`, and `step`
-  error if the game is in multiplayer mode.
-- **One connection at a time.** The control socket accepts one client;
-  don't open parallel CLI invocations against the same port.
-- **wait_* timeout.** Default timeout is 10 s. Pass a second arg to extend:
-  `$CLI wait_state Lobby 30`.
-- **Logs.** `start_silencer` redirects stdout+stderr to
-  `/tmp/silencer-e2e-<PORT>.log`. Check that file when the daemon
-  misbehaves.
+  `build/silencer`. `lib.sh` handles this automatically.
+- **`--headless` required in CI.** Without it, the daemon opens an SDL
+  window. The control socket still works either way.
+- **Single-player only for `pause`/`step`.** `pause` errors with
+  `WRONG_STATE` in live multiplayer (`peercount > 1` and INGAME).
+  `step` always sets `paused = true` after the span ends.
+- **One connection at a time.** The control socket accepts one client
+  per session — don't run parallel CLI invocations against the same
+  port.
+- **Timeouts are in milliseconds**, not seconds (`--timeout-ms`,
+  default `5000`).
+- **Label matching is case-insensitive** and must be unambiguous —
+  multiple matches return `WIDGET_AMBIGUOUS`.
+- **`click` only matches BUTTON or TOGGLE.** Use `set_text` for
+  textboxes, `select` for selectboxes.
+- **Logs.** `start_silencer` redirects daemon stdout+stderr to
+  `/tmp/silencer-e2e-<PORT>.log`. Check it when the daemon misbehaves.

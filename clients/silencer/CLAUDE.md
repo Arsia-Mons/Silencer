@@ -94,10 +94,10 @@ The binary paths per platform:
 **CLI wrapper**
 
 ```bash
-bun clients/silencer-cli/index.ts --port $PORT <op> [args...]
+bun clients/cli/index.ts --port $PORT <op> [args...]
 ```
 
-See `clients/silencer-cli/` for the full wrapper and
+See `clients/cli/` for the full wrapper and
 [`../../shared/skills/cli/SKILL.md`](../../shared/skills/cli/SKILL.md)
 (loaded by Claude Code via the `.claude/skills/using-silencer-cli` →
 `../../shared/skills/cli` symlink) for the complete op reference and

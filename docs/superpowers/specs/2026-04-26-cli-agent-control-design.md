@@ -193,7 +193,7 @@ command for simplicity.
   `RenderDevice` abstraction or needs a new path.
 - `CMakeLists.txt` — new sources, stb include.
 
-**`clients/silencer-cli/`** (new component, Bun + TypeScript per
+**`clients/cli/`** (new component, Bun + TypeScript per
 universal rules):
 
 - `index.ts` — argv parsing, TCP socket, one JSON line in/out,

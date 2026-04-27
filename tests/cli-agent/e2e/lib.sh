@@ -18,7 +18,7 @@ if [ -z "${SILENCER_BIN:-}" ]; then
   fi
 fi
 
-CLI="bun $REPO_ROOT/clients/silencer-cli/index.ts"
+CLI="bun $REPO_ROOT/clients/cli/index.ts"
 
 pick_port() {
   # Random ephemeral.
