@@ -124,6 +124,25 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated")
 target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
+# Expose src/ and every first-level subdomain so that bare-name includes
+# (#include "lobby.h") continue to resolve after the src/ reorganisation.
+target_include_directories(${SILENCER_TARGET} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/render"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/audio"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/input"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/actors"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/projectiles"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/objects"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/stations"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/net"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/updater"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
+)
 
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some

@@ -8,10 +8,10 @@ set(TEST_SRC
     updater_zip_test.cpp
     updater_sm_test.cpp
     control_widget_test.cpp
-    ${CMAKE_SOURCE_DIR}/src/updatersha256.cpp
-    ${CMAKE_SOURCE_DIR}/src/updaterdownload.cpp
-    ${CMAKE_SOURCE_DIR}/src/updaterzip.cpp
-    ${CMAKE_SOURCE_DIR}/src/updater.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/updatersha256.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/updaterdownload.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/updaterzip.cpp
+    ${CMAKE_SOURCE_DIR}/src/updater/updater.cpp
 )
 
 add_executable(silencer_tests ${TEST_SRC})
@@ -19,6 +19,7 @@ target_compile_features(silencer_tests PUBLIC cxx_std_14)
 target_include_directories(silencer_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/updater
 )
 
 add_test(NAME silencer_tests COMMAND silencer_tests)
