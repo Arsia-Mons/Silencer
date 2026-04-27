@@ -32,10 +32,12 @@ jobs:
         env:
           LOBBY_HOST: ${{ vars.LOBBY_HOST }}
         run: |
+          lobby="${LOBBY_HOST:-lobby.arsiamons.com}"
           cmake -B build -S clients/silencer \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}" \
+            -DSILENCER_LOBBY_HOST="$lobby" \
+            -DSILENCER_MAP_API_URL="http://$lobby:15172" \
             -DSILENCER_VERSION="${GITHUB_REF_NAME#v}"
 
       - name: Build
@@ -168,6 +170,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
             -DSILENCER_LOBBY_HOST="$lobby" `
+            -DSILENCER_MAP_API_URL="http://$lobby`:15172" `
             -DSILENCER_VERSION="$ver"
 
       - name: Build
