@@ -33,6 +33,7 @@ public:
 	static const char* StateName(Uint8 s);
 	Uint8 GetState() const { return state; }
 	Uint16 GetCurrentInterfaceId() const { return currentinterface; }
+	class World& GetWorld() { return world; }
 	bool paused;
 	int stepFramesRemaining;
 	Uint64 stepWallclockDeadlineMs;
