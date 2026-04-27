@@ -361,8 +361,12 @@ void Game::Present(void){
 				ready = FadedIn() && world.lobby.state == Lobby::IDLE;
 				label = "lobby connect";
 			} else if(target_state == LOBBY){
-				// LOBBY: with the auth bypass above, we end up here naturally.
-				ready = FadedIn();
+				// Wait for FadedIn AND a brief settle period after entering
+				// LOBBY so async lobby messages (presence/chat/games) drain
+				// into the rendered widgets before snapshotting.
+				static int settle = 0;
+				if(FadedIn()) settle++;
+				ready = settle >= 60;  // ~2.5 s of LOBBY ticks
 				label = "lobby";
 			}
 			if(ready){

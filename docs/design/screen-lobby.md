@@ -146,24 +146,126 @@ Sub-interface fields: `scrollbar = gamescrollbar.id`,
 Sub-interface fields: `scrollbar = chatscrollbar.id`,
 `tabobjects = [chatinput]`.
 
-## Default visible content (nothing chat / no games)
+## Visible content under `-demo` (populated lobby)
 
-For the default-config QA dump (auth via the local Go lobby with
-fresh credentials), every dynamic field is empty:
+For visual A/B against a real lobby, run
+`services/lobby/silencer-lobby` with the `-demo` flag (see that
+file's `hub_demo.go` for the seed data). After the dump path
+authenticates as `dump`/`dump`, the lobby pushes pre-seeded games,
+chat, and presence to the client; the user record's agency stats
+also get force-set to non-trivial values. This drives every
+populated-state code path the LOBBY has, so hydrations can stress-
+test full rendering.
 
-- `localusername`, channel name, map name overlay text — empty.
-- All four character stat overlays (level/wins/losses/etc) — empty.
-- All five game-info overlays — empty.
-- Chat TextBox, presence TextBox — empty.
-- SelectBox — empty.
-- All five agency Toggles render — Noxis (idx 0) at
-  `effectbrightness=128`, the other four at `effectbrightness=32`.
-- Chat input has caret blinking at its `(x, y) = (18, 437)` origin
-  (since text is empty, caret renders at `(18, 436)`).
+The seed values, in the order they're observed in the dump:
 
-So a hydration only needs to render the static chrome (background,
-borders, brand text, version, button labels, agency icons) plus the
-single visible caret. No dynamic-content simulation required.
+### Character panel (left)
+
+- **Username overlay** (the user's display name): `text = "dump"`,
+  rendered at the position spec'd above (`(20, 71)`, bank 134,
+  advance 8, `effectcolor=200`).
+- **Selected agency**: NOXIS (uid 1) — stats drawn from
+  `user.agency[0]`.
+- **Stat overlays** (all `effectcolor=129, effectbrightness=160,
+  textcolorramp=true`):
+  - `text = "LEVEL: 8"` at `(17, 130)`
+  - `text = "WINS: 47"` at `(17, 143)`
+  - `text = "LOSSES: 12"` at `(17, 156)`
+  - `text = "XP TO NEXT LEVEL: 220"` at `(17, 169)`
+
+  The text format is `"<LABEL>: <number>"` — the prefix label is
+  hardcoded per uid, the value comes from the user's agency record.
+  See `Game::ProcessLobbyInterface` `case 2..5` for the exact
+  string templates.
+
+### Game-select SelectBox (right)
+
+Four rows, in lobby insertion order (no client-side sort):
+
+| `selecteditem` | text |
+| -------------- | ---- |
+| (none — `-1`) | `Casual Match #1` |
+|               | `Veterans Only` |
+|               | `Tutorial` |
+|               | `Capture the Tag` |
+
+Bank 133, advance 6, `lineheight = 14`. No row highlighted (no
+selection); ScrollBar `draw = false` because 4 rows ≤ 19 visible
+(`265 / 14 ≈ 18.9`).
+
+### Chat sub-interface
+
+- **Channel-name overlay**: `text = "Lobby"` (the client-side
+  `world.lobby.channel`, set by `MSG_CHANNEL` immediately after
+  auth). Bank 134, advance 8, position `(15, 200)`.
+- **Chat TextBox** (the bottom-up scrollback, `bottomtotop = true`):
+  five lines, in order pushed (rendered bottom-to-top so the
+  newest sits at the bottom):
+
+  | order | line |
+  | ----- | ---- |
+  | 1 (oldest, top of visible block when ≥ 5 lines fit) | `Vector: anyone up for a round?` |
+  | 2 | `Solace: still waiting on Krieg's match to finish` |
+  | 3 | `Ember: we got 4 in casual #1` |
+  | 4 | `Vector: joining` |
+  | 5 (newest, bottom-most) | `Halcyon: gg everyone` |
+
+  Lines come in via `MSG_CHAT` (TextBox `AddText` with
+  word-wrap on `width / fontwidth = 250 / 6 = 41` chars and
+  `indent = 2`). All `color = 0`, `brightness = 128`.
+
+- **Presence TextBox** (right side, `bottomtotop = false`,
+  `uid = 9`): rebuilt on every Tick when `presencechanged` is set.
+  Rows are grouped by `PresenceEntry.status` (0 = In Lobby,
+  1 = Pregame, 2 = Playing), sorted alphabetically within group.
+  Each group prefixed with a header line at `brightness = 128 + 32 = 160`,
+  individual rows at the standard `brightness = 128`. Names of
+  players in a non-zero `gameID` get their game's name appended
+  in brackets — `"Krieg [Casual Match #1]"`.
+
+  For the `-demo` seed plus the local user (`dump`):
+
+  ```
+  In Lobby                  ← header, brightness 160
+  Ember                     ← brightness 128
+  Halcyon
+  Solace
+  Vector
+  dump                      ← self
+  Pregame                   ← header
+  Quill [Capture the Tag]
+  Playing                   ← header
+  Krieg [Casual Match #1]
+  ```
+
+  (Sort order is alphabetical within each group;
+  `dump` lands after Vector because lowercase 'd' (0x64) > 'V' (0x56).)
+
+- **Chat TextInput**: empty `text`, **focused**. Caret visible at
+  `(18, 437)` blinking on the standard `state_i % 32 < 16` cycle.
+
+### Top bar (top-level Interface)
+
+- **Brand text**: `"Silencer"` at `(15, 32)`, bank 135 advance 11,
+  `effectcolor = 152` (red).
+- **Version text**: `"v.<world.version>"` (default build:
+  `"v.00028"`) at `(115, 39)`, bank 133 advance 6,
+  `effectcolor = 189` (orange).
+- **Map name overlay**: empty. (Only set when joining a game.)
+
+### Empty / not-shown elements
+
+- Five game-info overlays (uid 1..5 in the game-select sub-interface):
+  empty unless a SelectBox row is selected. Default `selecteditem = -1`.
+- ScrollBar chrome on both sub-interfaces: `draw = false`.
+
+## Empty-state dump (no `-demo`)
+
+Without the `-demo` flag, every dynamic overlay/textbox is empty —
+the screen renders just the chrome (background, borders, brand bar,
+buttons, agency icons, caret). See git commit `d431611` for an
+empty-state subagent run that converged in one shot. Useful as a
+"chrome-only" sanity check; not exercised by default.
 
 ## EffectColor + textcolorramp combination
 

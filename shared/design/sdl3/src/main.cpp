@@ -1007,13 +1007,133 @@ static int render_lobby_connect(Framebuffer& fb, const Resources& res) {
     return active_sub;
 }
 
+// Word-wrap helper (mirrors `Interface::WordWrap` semantics used by
+// TextBox::AddText). Splits `text` into lines whose visible char count
+// is <= `cols`, breaking on word boundaries when possible. Each
+// continuation line is prefixed with `indent` spaces.
+//
+// Algorithm: greedy word fit. Whitespace ' ' is the only delimiter we
+// need for the chat content. If a single word exceeds `cols`, hard-cut
+// it.
+static std::vector<std::string> word_wrap(const std::string& text,
+                                          int cols, int indent) {
+    std::vector<std::string> out;
+    if (cols <= 0) {
+        out.push_back(text);
+        return out;
+    }
+    std::string indent_str(indent, ' ');
+    std::string current;
+    bool first_line = true;
+    size_t i = 0;
+    while (i < text.size()) {
+        // Find next word.
+        size_t ws = i;
+        while (ws < text.size() && text[ws] == ' ') ws++;
+        size_t we = ws;
+        while (we < text.size() && text[we] != ' ') we++;
+        if (ws == we) break;
+        std::string word = text.substr(ws, we - ws);
+
+        // Determine prefix for this line if `current` is empty.
+        if (current.empty() && !first_line) {
+            current = indent_str;
+        }
+
+        int avail = cols - (int)current.size();
+        // If word fits on current line (with a leading space if line is
+        // non-empty and not just indent), append.
+        bool need_space = !current.empty() &&
+                          (first_line ? !current.empty()
+                                      : (int)current.size() > indent);
+        int needed = (int)word.size() + (need_space ? 1 : 0);
+        if (needed <= avail) {
+            if (need_space) current += ' ';
+            current += word;
+        } else {
+            // Flush current line, start a new one.
+            if (!current.empty()) {
+                out.push_back(current);
+                first_line = false;
+                current = indent_str;
+            }
+            // If word still too long, hard-cut.
+            while ((int)word.size() > cols - (int)current.size()) {
+                int take = cols - (int)current.size();
+                if (take <= 0) {
+                    out.push_back(current);
+                    current = indent_str;
+                    take = cols - (int)current.size();
+                    if (take <= 0) break;
+                }
+                current += word.substr(0, take);
+                word = word.substr(take);
+                out.push_back(current);
+                first_line = false;
+                current = indent_str;
+            }
+            current += word;
+        }
+        i = we;
+    }
+    if (!current.empty()) out.push_back(current);
+    return out;
+}
+
+// Render a TextBox: list of (text, color, brightness) lines.
+// Mirrors widget-textbox.md rendering loop. `bottomtotop` shifts the
+// visible block toward the bottom of the box.
+struct TbLine {
+    std::string text;
+    int color;       // effectcolor (0 = none)
+    int brightness;  // 128 = neutral
+};
+static void render_textbox(Framebuffer& fb, const Resources& res,
+                           int x, int y, int width, int height,
+                           int bank, int lineheight, int fontwidth,
+                           bool bottomtotop, int active_sub,
+                           const std::vector<TbLine>& lines) {
+    int max_rows = height / lineheight;
+    int line_idx = 0;
+    int n = (int)lines.size();
+    int y_offset = 0;
+    if (bottomtotop) {
+        // size = min(n * lineheight, ceil(height/lineheight) * lineheight)
+        int rows_ceil = (height + lineheight - 1) / lineheight;
+        int size = std::min(n * lineheight, rows_ceil * lineheight);
+        y_offset = height - size;
+    }
+    for (int i = 0; i < n; ++i) {
+        if (line_idx >= max_rows) break;
+        int ly = y + line_idx * lineheight + y_offset;
+        const auto& L = lines[i];
+        std::array<uint8_t, 256> lut{};
+        const std::array<uint8_t, 256>* lutp = nullptr;
+        if (L.color != 0) {
+            lut = build_effect_color_lut(L.color);
+            lutp = &lut;
+            if (L.brightness != 128) {
+                auto blut = build_brightness_lut(res.palette, active_sub,
+                                                 L.brightness);
+                for (int k = 0; k < 256; ++k) lut[k] = blut[lut[k]];
+            }
+        } else if (L.brightness != 128) {
+            lut = build_brightness_lut(res.palette, active_sub, L.brightness);
+            lutp = &lut;
+        }
+        (void)fontwidth; // advance comes through draw_text
+        draw_text(fb, res, x, ly, L.text, bank, fontwidth, lutp);
+        line_idx++;
+    }
+    (void)width;
+}
+
 // Render the LOBBY screen into `fb`. Returns active sub-palette.
 //
-// Per screen-lobby.md: LOBBY uses sub-palette 2 (set on entry). Three
-// sub-Interfaces nested inside a top-level: character (left), game-
-// select (right), chat (bottom). For a default-config dump everything
-// dynamic is empty — we render only the static chrome plus the selected
-// agency Toggle (Noxis, idx 0) and the focused chat-input caret.
+// Per screen-lobby.md "Visible content under -demo": the lobby is
+// populated by `services/lobby/silencer-lobby -demo` with seed games,
+// chat history, presence, and stat values. We hardcode those here to
+// produce the populated A/B target.
 static int render_lobby(Framebuffer& fb, const Resources& res) {
     constexpr int active_sub = 2;
 
@@ -1050,9 +1170,9 @@ static int render_lobby(Framebuffer& fb, const Resources& res) {
         render_overlay(fb, res, version, active_sub);
     }
 
-    // 4. Map name overlay — empty in default config. (uid=8, bank 135
-    //    advance 11, effectcolor=129, effectbrightness=160, ramp=true,
-    //    at (180, 32).) Skipped because text is empty.
+    // 4. Map name overlay — empty under -demo (only set on join).
+    //    Skipped (uid=8, would be at (180, 32) bank 135 advance 11
+    //    effectcolor=129 brightness=160 ramp=true).
 
     // 5. Go Back B156x21 button at (473, 29).
     {
@@ -1064,8 +1184,39 @@ static int render_lobby(Framebuffer& fb, const Resources& res) {
     }
 
     // ---- Character sub-interface (left) ----
-    // Local username overlay — empty by default. Skipped.
-    // Stat overlays (Level/Wins/Losses/Etc) — all empty. Skipped.
+    // Local username overlay — "dump" under -demo, bank 134 advance 8,
+    // effectcolor=200, at (20, 71).
+    {
+        Overlay un;
+        un.text = "dump";
+        un.textbank = 134;
+        un.textwidth = 8;
+        un.effectcolor = 200;
+        un.x = 20; un.y = 71;
+        render_overlay(fb, res, un, active_sub);
+    }
+    // Stat overlays (Level/Wins/Losses/XP) — all populated under -demo.
+    // bank 133 advance 7, effectcolor=129, effectbrightness=160,
+    // textcolorramp=true.
+    {
+        struct Stat { int y; const char* text; };
+        const Stat stats[4] = {
+            { 130, "LEVEL: 8" },
+            { 143, "WINS: 47" },
+            { 156, "LOSSES: 12" },
+            { 169, "XP TO NEXT LEVEL: 220" },
+        };
+        for (int i = 0; i < 4; ++i) {
+            Overlay s;
+            s.text = stats[i].text;
+            s.textbank = 133;
+            s.textwidth = 7;
+            s.effectcolor = 129;
+            s.effectbrightness = 160;
+            s.x = 17; s.y = stats[i].y;
+            render_overlay(fb, res, s, active_sub);
+        }
+    }
     // Five agency Toggles at (20 + i*42, 90) with bank 181 idx 0..4.
     {
         int defaultagency = 0; // Config::Team::NOXIS == 0
@@ -1115,8 +1266,26 @@ static int render_lobby(Framebuffer& fb, const Resources& res) {
         b.text = "Join Game";
         render_button(fb, res, b, active_sub);
     }
-    // SelectBox — empty in default; nothing to render. ScrollBar
-    // draw=false → no chrome.
+    // SelectBox — populated under -demo with 4 game rows in insertion
+    // order, no selection (selecteditem=-1), bank 133 advance 6,
+    // lineheight=14, at (407, 89), width=214, height=265. Per
+    // widget-selectbox.md: each row draws as DrawText at
+    // (selectbox.x, selectbox.y + row * lineheight). No highlight rect
+    // because selecteditem == -1.
+    {
+        const char* games[4] = {
+            "Casual Match #1",
+            "Veterans Only",
+            "Tutorial",
+            "Capture the Tag",
+        };
+        const int sb_x = 407, sb_y = 89, lineh = 14;
+        for (int i = 0; i < 4; ++i) {
+            draw_text(fb, res, sb_x, sb_y + i * lineh, games[i],
+                      /*bank*/ 133, /*advance*/ 6, /*tint*/ nullptr);
+        }
+    }
+    // ScrollBar draw=false (4 rows ≤ 19 visible) → no chrome.
 
     // ---- Chat sub-interface (bottom) ----
     // Chat panel border — bank 7 idx 11 anchor (-15, -216).
@@ -1133,9 +1302,74 @@ static int render_lobby(Framebuffer& fb, const Resources& res) {
         panel.res_bank = 7; panel.res_index = 14;
         render_overlay(fb, res, panel, active_sub);
     }
-    // Channel name overlay (uid=1, bank 134 advance 8) at (15, 200) —
-    // empty in default. Skipped.
-    // Chat / presence TextBoxes — empty. Skipped.
+    // Channel name overlay (uid=1, bank 134 advance 8) at (15, 200).
+    // Under -demo `world.lobby.channel = "Lobby"`.
+    {
+        Overlay ch;
+        ch.text = "Lobby";
+        ch.textbank = 134;
+        ch.textwidth = 8;
+        ch.x = 15; ch.y = 200;
+        render_overlay(fb, res, ch, active_sub);
+    }
+    // Chat TextBox: bank 133, lineheight=11, fontwidth=6, bottomtotop,
+    // at (19, 220), width=242, height=207. Five lines wrapped at
+    // width/fontwidth = 250/6 = 41 chars (per spec) with indent=2.
+    // (The textbox width is 242 but the spec pins the wrap width at
+    // 41 chars from the canonical 250/6 division — matching the live
+    // client.)
+    {
+        const char* raw_lines[5] = {
+            "Vector: anyone up for a round?",
+            "Solace: still waiting on Krieg's match to finish",
+            "Ember: we got 4 in casual #1",
+            "Vector: joining",
+            "Halcyon: gg everyone",
+        };
+        std::vector<TbLine> tb;
+        const int wrap_cols = 41;
+        const int indent = 2;
+        for (int i = 0; i < 5; ++i) {
+            auto wrapped = word_wrap(raw_lines[i], wrap_cols, indent);
+            for (const auto& w : wrapped) {
+                tb.push_back({ w, /*color*/ 0, /*brightness*/ 128 });
+            }
+        }
+        render_textbox(fb, res,
+                       /*x*/ 19, /*y*/ 220,
+                       /*w*/ 242, /*h*/ 207,
+                       /*bank*/ 133, /*lineheight*/ 11, /*fontwidth*/ 6,
+                       /*bottomtotop*/ true, active_sub, tb);
+    }
+    // Presence TextBox (uid=9): bank 133, lineheight=11, fontwidth=6,
+    // top-down, at (267, 220), width=110, height=207. Headers at
+    // brightness=160, members at brightness=128. Sort alphabetical
+    // within each group; "dump" (lowercase 'd' = 0x64) sorts after
+    // "Vector" ('V' = 0x56).
+    {
+        std::vector<TbLine> pres;
+        auto hdr = [&](const char* s) {
+            pres.push_back({ s, 0, 160 });
+        };
+        auto row = [&](const char* s) {
+            pres.push_back({ s, 0, 128 });
+        };
+        hdr("In Lobby");
+        row("Ember");
+        row("Halcyon");
+        row("Solace");
+        row("Vector");
+        row("dump");
+        hdr("Pregame");
+        row("Quill [Capture the Tag]");
+        hdr("Playing");
+        row("Krieg [Casual Match #1]");
+        render_textbox(fb, res,
+                       /*x*/ 267, /*y*/ 220,
+                       /*w*/ 110, /*h*/ 207,
+                       /*bank*/ 133, /*lineheight*/ 11, /*fontwidth*/ 6,
+                       /*bottomtotop*/ false, active_sub, pres);
+    }
     // Chat input caret — focused, empty text, caret at (18, 437) per
     // widget-textinput.md: caret_x = x + strlen(text)*fontwidth = 18,
     // caret_y = y - 1 = 436, w = 1, h = round(14 * 0.8) = 11.
