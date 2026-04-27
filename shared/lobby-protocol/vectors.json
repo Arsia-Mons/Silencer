@@ -1,0 +1,299 @@
+{
+  "_doc": [
+    "Golden wire-format vectors. Both the C++ and TS test suites load",
+    "this file and verify decode(hex) == decoded AND encode(decoded) == hex.",
+    "If you change the wire protocol, update services/lobby/protocol.go,",
+    "./protocol.md, AND this file. Hex strings are the full frame",
+    "including the leading length byte."
+  ],
+  "vectors": [
+    {
+      "name": "auth_request",
+      "kind": "AuthRequest",
+      "hex": "1b00616c69636500000102030405060708090a0b0c0d0e0f10111213",
+      "value": {
+        "username": "alice",
+        "password_sha1_hex": "000102030405060708090a0b0c0d0e0f10111213"
+      }
+    },
+    {
+      "name": "auth_reply_success",
+      "kind": "AuthReply",
+      "hex": "06000100000080",
+      "value": {
+        "ok": true,
+        "account_id": 2147483648,
+        "error": ""
+      }
+    },
+    {
+      "name": "auth_reply_failure",
+      "kind": "AuthReply",
+      "hex": "1d0000496e636f72726563742070617373776f726420666f7220626f6200",
+      "value": {
+        "ok": false,
+        "account_id": 0,
+        "error": "Incorrect password for bob"
+      }
+    },
+    {
+      "name": "version_request",
+      "kind": "VersionRequest",
+      "hex": "0807312e322e330001",
+      "value": {
+        "version": "1.2.3",
+        "platform": 1
+      }
+    },
+    {
+      "name": "version_reply_ok",
+      "kind": "VersionReply",
+      "hex": "020701",
+      "value": {
+        "ok": true,
+        "url": "",
+        "sha256_hex": ""
+      }
+    },
+    {
+      "name": "version_reply_reject_with_update",
+      "kind": "VersionReply",
+      "hex": "440700200068747470733a2f2f6578616d706c652e636f6d2f73696c656e6365722e646d67aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "value": {
+        "ok": false,
+        "url": "https://example.com/silencer.dmg",
+        "sha256_hex": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    {
+      "name": "version_reply_reject_bare",
+      "kind": "VersionReply",
+      "hex": "020700",
+      "value": {
+        "ok": false,
+        "url": "",
+        "sha256_hex": ""
+      }
+    },
+    {
+      "name": "motd_chunk",
+      "kind": "MOTD",
+      "hex": "070148656c6c6f00",
+      "value": {
+        "text": "Hello",
+        "terminator": false
+      }
+    },
+    {
+      "name": "motd_terminator",
+      "kind": "MOTD",
+      "hex": "020100",
+      "value": {
+        "text": "",
+        "terminator": true
+      }
+    },
+    {
+      "name": "chat_request",
+      "kind": "ChatRequest",
+      "hex": "0a024c6f62627900686921",
+      "_skip_encode": "C client doesn't null-terminate the message field; SDK encodes the canonical null-terminated form (test decode-only).",
+      "value": {
+        "channel": "Lobby",
+        "message": "hi!"
+      }
+    },
+    {
+      "name": "chat_push",
+      "kind": "ChatPush",
+      "hex": "1302726f6f6d310068692074686572652100ff7f",
+      "value": {
+        "channel": "room1",
+        "message": "hi there!",
+        "color": 255,
+        "brightness": 127
+      }
+    },
+    {
+      "name": "newgame_push",
+      "kind": "NewGame",
+      "hex": "4a0301640000000a000000045465737400123132332e3435362e3738392e302c35303030085465737453657276deadbeefdeadbeefdeadbeefdeadbeefdeadbeef02000200631806008813",
+      "value": {
+        "status": 1,
+        "game": {
+          "id": 100,
+          "account_id": 10,
+          "name": "Test",
+          "password": "",
+          "hostname": "123.456.789.0,5000",
+          "map_name": "TestServ",
+          "map_hash_hex": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+          "players": 2,
+          "state": 0,
+          "security_level": 2,
+          "min_level": 0,
+          "max_level": 99,
+          "max_players": 24,
+          "max_teams": 6,
+          "extra": 0,
+          "port": 5000
+        }
+      }
+    },
+    {
+      "name": "delgame_push",
+      "kind": "DelGame",
+      "hex": "050464000000",
+      "value": {
+        "game_id": 100
+      }
+    },
+    {
+      "name": "channel_push",
+      "kind": "Channel",
+      "hex": "0605486f6d6500",
+      "value": {
+        "channel": "Home"
+      }
+    },
+    {
+      "name": "userinfo_request",
+      "kind": "UserInfoRequest",
+      "hex": "0508c8000000",
+      "value": {
+        "account_id": 200
+      }
+    },
+    {
+      "name": "userinfo_reply",
+      "kind": "UserInfoReply",
+      "hex": "4c08c80000000a0001000200030405060708090a000b000c000d0e0f101112131400150000000000160017180019000000000000000000000000000000000000000000000000000561646d696e",
+      "value": {
+        "account_id": 200,
+        "agencies": [
+          {
+            "wins": 10,
+            "losses": 1,
+            "xp_to_next_level": 2,
+            "level": 3,
+            "endurance": 4,
+            "shield": 5,
+            "jetpack": 6,
+            "tech_slots": 7,
+            "hacking": 8,
+            "contacts": 9
+          },
+          {
+            "wins": 10,
+            "losses": 11,
+            "xp_to_next_level": 12,
+            "level": 13,
+            "endurance": 14,
+            "shield": 15,
+            "jetpack": 16,
+            "tech_slots": 17,
+            "hacking": 18,
+            "contacts": 19
+          },
+          {
+            "wins": 20,
+            "losses": 21,
+            "xp_to_next_level": 0,
+            "level": 0,
+            "endurance": 0,
+            "shield": 22,
+            "jetpack": 0,
+            "tech_slots": 23,
+            "hacking": 24,
+            "contacts": 0
+          },
+          {
+            "wins": 25,
+            "losses": 0,
+            "xp_to_next_level": 0,
+            "level": 0,
+            "endurance": 0,
+            "shield": 0,
+            "jetpack": 0,
+            "tech_slots": 0,
+            "hacking": 0,
+            "contacts": 0
+          },
+          {
+            "wins": 0,
+            "losses": 0,
+            "xp_to_next_level": 0,
+            "level": 0,
+            "endurance": 0,
+            "shield": 0,
+            "jetpack": 0,
+            "tech_slots": 0,
+            "hacking": 0,
+            "contacts": 0
+          }
+        ],
+        "name": "admin"
+      }
+    },
+    {
+      "name": "ping_push",
+      "kind": "Ping",
+      "hex": "0109",
+      "value": {}
+    },
+    {
+      "name": "ping_ack",
+      "kind": "PingAck",
+      "hex": "020901",
+      "value": {}
+    },
+    {
+      "name": "upgradestat_request",
+      "kind": "UpgradeStatRequest",
+      "hex": "030a0203",
+      "value": {
+        "agency_idx": 2,
+        "stat_id": 3
+      }
+    },
+    {
+      "name": "upgradestat_reply",
+      "kind": "UpgradeStatReply",
+      "hex": "010a",
+      "value": {}
+    },
+    {
+      "name": "presence_add",
+      "kind": "Presence",
+      "hex": "110c002a000000000000000005616c696365",
+      "value": {
+        "action": 0,
+        "account_id": 42,
+        "game_id": 0,
+        "status": 0,
+        "name": "alice"
+      }
+    },
+    {
+      "name": "presence_remove",
+      "kind": "Presence",
+      "hex": "0f0c012a0000006400000002036b696d",
+      "value": {
+        "action": 1,
+        "account_id": 42,
+        "game_id": 100,
+        "status": 2,
+        "name": "kim"
+      }
+    },
+    {
+      "name": "setgame_request",
+      "kind": "SetGameRequest",
+      "hex": "060d6400000001",
+      "value": {
+        "game_id": 100,
+        "status": 1
+      }
+    }
+  ]
+}
