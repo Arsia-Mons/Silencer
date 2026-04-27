@@ -219,11 +219,7 @@ jobs:
 
             # Ensure map API listens on :15172 (idempotent drop-in).
             sudo mkdir -p /etc/systemd/system/silencer-lobby.service.d
-            sudo tee /etc/systemd/system/silencer-lobby.service.d/map-api.conf > /dev/null <<'EOF'
-[Service]
-ExecStart=
-ExecStart=/opt/silencer/current/silencer-lobby -addr :517 -db /var/lib/silencer/lobby.json -maps-dir /var/lib/silencer/maps -map-api-addr :15172 -update-manifest /opt/silencer/update.json -public-addr lobby.arsiamons.com -game-binary /opt/silencer/current/silencer
-EOF
+            printf '[Service]\nExecStart=\nExecStart=/opt/silencer/current/silencer-lobby -addr :517 -db /var/lib/silencer/lobby.json -maps-dir /var/lib/silencer/maps -map-api-addr :15172 -update-manifest /opt/silencer/update.json -public-addr lobby.arsiamons.com -game-binary /opt/silencer/current/silencer\n' | sudo tee /etc/systemd/system/silencer-lobby.service.d/map-api.conf > /dev/null
             sudo systemctl daemon-reload
             sudo systemctl restart silencer-lobby
             sleep 2
