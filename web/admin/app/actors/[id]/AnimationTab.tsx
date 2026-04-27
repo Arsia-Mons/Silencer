@@ -10,6 +10,8 @@ interface FrameDef {
   bank: number;
   index: number;
   duration: number; // ticks at 60fps
+  sound?: string;
+  soundVolume?: number;
 }
 
 interface AnimSequence {
@@ -172,6 +174,27 @@ function FrameRow({
         className="w-8 h-8 object-contain border border-game-border bg-black"
         style={{ imageRendering: 'pixelated' }}
       />
+      <input
+        type="text"
+        placeholder="sound.wav"
+        className="w-28 bg-game-bg border border-game-border px-2 py-1 text-xs font-mono"
+        value={f.sound ?? ''}
+        onChange={e => {
+          const v = e.target.value;
+          onChange({ ...f, sound: v || undefined });
+        }}
+      />
+      <input
+        type="number" min={0} max={128}
+        title="Volume (0-128)"
+        className="w-14 bg-game-bg border border-game-border px-2 py-1 text-xs font-mono text-center"
+        value={f.soundVolume ?? ''}
+        placeholder="vol"
+        onChange={e => {
+          const v = e.target.value === '' ? undefined : +e.target.value;
+          onChange({ ...f, soundVolume: v });
+        }}
+      />
       <div className="flex gap-1 ml-auto">
         <button onClick={onMoveUp} className="text-game-textDim hover:text-game-text text-xs px-1">↑</button>
         <button onClick={onMoveDown} className="text-game-textDim hover:text-game-text text-xs px-1">↓</button>
@@ -315,6 +338,8 @@ export default function AnimationTab({
                   <span className="w-16 text-center">FRAME</span>
                   <span className="w-16 text-center">TICKS</span>
                   <span className="w-8" />
+                  <span className="w-28 text-center">SOUND</span>
+                  <span className="w-14 text-center">VOL</span>
                 </div>
                 {timelineFrames.map((f, i) => (
                   <FrameRow

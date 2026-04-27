@@ -40,10 +40,41 @@ const FrameDef* AnimSequence::Resolve(int state_i) const {
 	return nullptr; // past end of non-looping sequence
 }
 
+bool AnimSequence::GetFrameSound(int state_i, std::string& outFile, int& outVolume) const {
+	if (frames.empty() || state_i < 0) return false;
+	int total = TotalDuration();
+	int effective = (loop && total > 0) ? (state_i % total) : state_i;
+	int acc = 0;
+	for (const auto& f : frames) {
+		if (effective == acc && !f.sound.empty()) {
+			outFile   = f.sound;
+			outVolume = f.soundVolume > 0 ? f.soundVolume : 128;
+			return true;
+		}
+		acc += f.duration;
+		if (!loop && effective < acc) break;
+	}
+	return false;
+}
+
+
+
+bool AnimSequence::GetFrameSoundByIndex(int frameIdx, std::string& outFile, int& outVolume) const {
+	if (frames.empty()) return false;
+	int total = (int)frames.size();
+	int idx = (loop && total > 0) ? (frameIdx % total) : frameIdx;
+	if (idx < 0 || idx >= total) return false;
+	const auto& f = frames[idx];
+	if (f.sound.empty()) return false;
+	outFile   = f.sound;
+	outVolume = f.soundVolume > 0 ? f.soundVolume : 128;
+	return true;
+}
+
+
 // ---------------------------------------------------------------------------
 // JSON parsing helpers
 // ---------------------------------------------------------------------------
-
 static FrameHurtbox ParseHurtbox(const json& j) {
 	FrameHurtbox hb = {0, 0, 0, 0};
 	if (j.is_array() && j.size() == 4) {
@@ -66,6 +97,8 @@ static AnimSequence ParseSequence(const json& j) {
 		fd.duration = fj.value("duration", 1);
 		if (fd.duration < 1) fd.duration = 1;
 		fd.hurtbox  = ParseHurtbox(fj.value("hurtbox", json::array()));
+		fd.sound       = fj.value("sound", std::string{});
+		fd.soundVolume = fj.value("soundVolume", 0);
 		seq.frames.push_back(fd);
 	}
 	return seq;

@@ -550,12 +550,16 @@ void Guard::Tick(World & world){
 			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = !mirrored;
 			}
-			// footstep sounds — frames 4 and 13 of the 19-frame walk cycle
-			if(state_i % 19 == 4){
-				EmitSound(world, world.resources.soundbank["stostep1.wav"], 16);
-			}
-			if(state_i % 19 == 13){
-				EmitSound(world, world.resources.soundbank["stostepr.wav"], 16);
+			// play per-frame sounds defined in actordefs/guard.json
+			{
+				auto it = world.resources.actordefs.find("guard");
+				if(it != world.resources.actordefs.end()){
+					auto* seq = it->second.GetSequence("WALKING");
+					std::string snd; int vol;
+					if(seq && seq->GetFrameSoundByIndex(state_i % 19, snd, vol)){
+						EmitSound(world, world.resources.soundbank[snd], vol);
+					}
+				}
 			}
 			if(state_i == 240){
 				state = LOOKING;

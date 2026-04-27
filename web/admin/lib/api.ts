@@ -113,6 +113,8 @@ export interface FrameDef {
   index: number;
   duration: number;
   hurtbox?: [number, number, number, number];
+  sound?: string;
+  soundVolume?: number;
 }
 
 export interface AnimSequence {

@@ -86,11 +86,16 @@ void Civilian::Tick(World & world){
 			}
 			res_bank = 122;
 			res_index = state_i;
-			if(res_index == 5){
-				EmitSound(world, world.resources.soundbank["stostep1.wav"], 16);
-			}
-			if(res_index == 15){
-				EmitSound(world, world.resources.soundbank["stostepr.wav"], 16);
+			// play per-frame sounds defined in actordefs/civilian.json
+			{
+				auto it = world.resources.actordefs.find("civilian");
+				if(it != world.resources.actordefs.end()){
+					auto* seq = it->second.GetSequence("WALKING");
+					std::string snd; int vol;
+					if(seq && seq->GetFrameSoundByIndex(state_i, snd, vol)){
+						EmitSound(world, world.resources.soundbank[snd], vol);
+					}
+				}
 			}
 			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = mirrored ? false : true;
@@ -120,11 +125,16 @@ void Civilian::Tick(World & world){
 			xv = (mirrored ? -1 : 1) * (5 + speed);
 			res_bank = 123;
 			res_index = state_i % 15;
-			if(res_index == 6){
-				EmitSound(world, world.resources.soundbank["futstonl.wav"], 16);
-			}
-			if(res_index == 14){
-				EmitSound(world, world.resources.soundbank["futstonr.wav"], 16);
+			// play per-frame sounds defined in actordefs/civilian.json
+			{
+				auto it = world.resources.actordefs.find("civilian");
+				if(it != world.resources.actordefs.end()){
+					auto* seq = it->second.GetSequence("RUNNING");
+					std::string snd; int vol;
+					if(seq && seq->GetFrameSoundByIndex(state_i % 15, snd, vol)){
+						EmitSound(world, world.resources.soundbank[snd], vol);
+					}
+				}
 			}
 			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = mirrored ? false : true;
