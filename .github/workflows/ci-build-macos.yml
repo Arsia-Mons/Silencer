@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  build-macos:
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: macos-latest
     timeout-minutes: 20
