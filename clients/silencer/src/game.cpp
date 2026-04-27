@@ -3868,6 +3868,7 @@ Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
 	iface->AddObject(textbox->id);
 	iface->AddObject(scrollbar->id);
 	iface->AddObject(okbutton->id);
+	iface->AddObject(xptext->id); // was never added — orphan overlay if interface is destroyed
 	iface->buttonenter = okbutton->id;
 	iface->buttonescape = okbutton->id;
 	iface->scrollbar = scrollbar->id;
