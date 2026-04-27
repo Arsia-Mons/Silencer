@@ -143,8 +143,9 @@ function PreviewCanvas({ sequence, scale }: { sequence: AnimSequence | null; sca
 }
 
 /** Inline sound picker — shows current value; click to open a searchable dropdown. */
-function SoundPicker({ value, sounds, onChange }: {
+function SoundPicker({ value, volume, sounds, onChange }: {
   value: string | undefined;
+  volume: number | undefined;
   sounds: string[];
   onChange: (v: string | undefined) => void;
 }) {
@@ -178,7 +179,7 @@ function SoundPicker({ value, sounds, onChange }: {
           type="button"
           title="Preview sound"
           className="text-game-textDim hover:text-game-primary text-xs px-1"
-          onClick={() => { new Audio(`/sounds/${value}`).play().catch(() => {}); }}
+          onClick={() => { const a = new Audio(`/sounds/${value}`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
         >▶</button>
       )}
       {open && (
@@ -208,7 +209,7 @@ function SoundPicker({ value, sounds, onChange }: {
                   type="button"
                   title="Preview"
                   className="px-2 text-game-textDim hover:text-game-primary text-xs"
-                  onClick={() => { new Audio(`/sounds/${s}`).play().catch(() => {}); }}
+                  onClick={() => { const a = new Audio(`/sounds/${s}`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
                 >▶</button>
               </div>
             ))}
@@ -260,6 +261,7 @@ function FrameRow({
       />
       <SoundPicker
         value={f.sound}
+        volume={f.soundVolume}
         sounds={sounds}
         onChange={v => onChange({ ...f, sound: v })}
       />
