@@ -21,6 +21,7 @@ import {
     decodeVersionReply,
     encodeAuthReply,
     encodeAuthRequest,
+    encodeChat,
     encodeChatPush,
     encodeLobbyGame,
     encodeMotdChunk,
@@ -228,14 +229,14 @@ describe("golden vectors", () => {
         expect(framedHex(w.bytes())).toBe(v.hex);
     });
 
-    test("chat_request decode-only", () => {
+    test("chat_request", () => {
         const v = need("chat_request");
         const r = new Reader(unframe(v.hex));
         expect(r.u8()).toBe(Op.Chat);
         expect(r.cstr(64)).toBe("Lobby");
-        // Remaining bytes are the un-terminated message.
-        const tail = r.bytes.slice(r.offset);
-        expect(new TextDecoder().decode(tail)).toBe("hi!");
+        expect(r.cstr(255)).toBe("hi!");
+
+        expect(framedHex(encodeChat("Lobby", "hi!"))).toBe(v.hex);
     });
 
     test("chat_push", () => {

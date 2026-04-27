@@ -96,8 +96,7 @@
     {
       "name": "chat_request",
       "kind": "ChatRequest",
-      "hex": "0a024c6f62627900686921",
-      "_skip_encode": "C client doesn't null-terminate the message field; SDK encodes the canonical null-terminated form (test decode-only).",
+      "hex": "0b024c6f6262790068692100",
       "value": {
         "channel": "Lobby",
         "message": "hi!"

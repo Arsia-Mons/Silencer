@@ -11,9 +11,10 @@ Cross-component spec for the lobby's binary TCP protocol.
 - [`clients/lobby-sdk/ts/`](../../clients/lobby-sdk/ts/) — TS SDK
   test suite, same.
 - [`services/lobby/`](../../services/lobby/) — authoritative
-  implementation in `protocol.go`. Not currently driven from the
-  vectors here, but should be: a future `protocol_test.go` can read
-  this file to verify Go encode/decode against the same bytes.
+  implementation in `protocol.go`. The contract tests in
+  `services/lobby/vectors_test.go` round-trip these vectors through
+  the existing reader/writer; drift fails CI. The production code
+  itself is **not** modified by these tests.
 
 ## Authority
 
@@ -29,8 +30,9 @@ the source of truth for the wire format. This directory is a
 2. When you change `protocol.go`:
    - Update [`protocol.md`](./protocol.md).
    - Update or add an entry in [`vectors.json`](./vectors.json).
-   - Re-run both SDK test suites (`bun test` under
+   - Re-run all three test suites (`bun test` under
      `clients/lobby-sdk/ts/`, `ctest` under
-     `clients/lobby-sdk/cpp/build/`).
+     `clients/lobby-sdk/cpp/build/`, `go test ./...` under
+     `services/lobby/`).
 3. Hex strings in `vectors.json` are full frames including the
    leading length byte.

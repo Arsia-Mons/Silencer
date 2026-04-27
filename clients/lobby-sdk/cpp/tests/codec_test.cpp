@@ -19,7 +19,6 @@
 #include <cstring>
 #include <fstream>
 #include <map>
-#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -131,14 +130,6 @@ static std::vector<uint8_t> frame(const std::vector<uint8_t>& payload) {
 
 // ---- per-vector tests --------------------------------------------------
 
-// Vectors where we test decode but skip the encode equality (the wire
-// shape sent by the reference C client is technically valid but the
-// SDK encodes a canonical form that differs by a trailing byte).
-static const std::set<std::string> kSkipEncode = {
-    "chat_request",     // C client doesn't null-terminate the message field
-    "setgame_request",  // C client appends a stray padding byte
-};
-
 static void test_auth_request(const std::string& hex) {
     auto wire = from_hex(hex);
     auto payload = unframe(wire);
@@ -149,12 +140,10 @@ static void test_auth_request(const std::string& hex) {
     std::array<uint8_t, 20> hash{};
     r.read_into(hash.data(), 20);
     for (int i = 0; i < 20; ++i) CHECK_EQ(hash[i], i);
-    if (!kSkipEncode.count("auth_request")) {
-        std::array<uint8_t, 20> h{};
-        for (int i = 0; i < 20; ++i) h[i] = static_cast<uint8_t>(i);
-        auto enc = frame(encode_auth_request("alice", h));
-        CHECK_EQ(to_hex(enc), hex);
-    }
+    std::array<uint8_t, 20> h{};
+    for (int i = 0; i < 20; ++i) h[i] = static_cast<uint8_t>(i);
+    auto enc = frame(encode_auth_request("alice", h));
+    CHECK_EQ(to_hex(enc), hex);
 }
 
 static void test_auth_reply_success(const std::string& hex) {
@@ -395,25 +384,19 @@ static void test_presence_remove(const std::string& hex) {
 }
 
 static void test_chat_request(const std::string& hex) {
-    // Decode-only: see kSkipEncode comment.
     auto payload = unframe(from_hex(hex));
     Reader r(payload.data(), payload.size());
     CHECK_EQ(r.u8(), OpChat);
-    auto channel = r.cstr(64);
-    CHECK_EQ(channel, std::string("Lobby"));
-    // Remainder is the (un-terminated) message bytes.
-    std::string msg(reinterpret_cast<const char*>(payload.data() + r.offset()),
-                    payload.size() - r.offset());
-    CHECK_EQ(msg, std::string("hi!"));
+    CHECK_EQ(r.cstr(64), std::string("Lobby"));
+    CHECK_EQ(r.cstr(kMaxFramePayload), std::string("hi!"));
+
+    auto enc = frame(encode_chat("Lobby", "hi!"));
+    CHECK_EQ(to_hex(enc), hex);
 }
 
 static void test_setgame_request(const std::string& hex) {
-    // Decode-only: trailing padding byte. SDK encodes 6 bytes.
-    auto wire = from_hex(hex);
-    Reader r(wire.data() + 1, wire.size() - 1); // skip length byte
-    CHECK_EQ(r.u8(), OpSetGame);
-    CHECK_EQ(r.u32_le(), 100u);
-    CHECK_EQ(r.u8(), 1);
+    auto enc = frame(encode_set_game(100, GameStatus::Pregame));
+    CHECK_EQ(to_hex(enc), hex);
 }
 
 // ---- driver ------------------------------------------------------------
