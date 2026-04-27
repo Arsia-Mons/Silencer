@@ -176,7 +176,7 @@ function SoundPicker({ value, sounds, onChange }: {
         {value ?? <span className="text-game-textDim">— none —</span>}
       </button>
       {open && (
-        <div className="absolute z-50 top-full left-0 mt-0.5 w-48 bg-game-surface border border-game-border shadow-lg flex flex-col">
+        <div className="absolute z-50 top-full left-0 mt-0.5 w-48 bg-[#050a05] border border-game-border shadow-lg flex flex-col">
           <input
             autoFocus
             type="text"
