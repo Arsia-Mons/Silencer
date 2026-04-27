@@ -23,8 +23,17 @@ public:
 	bool Loop(void);
 	bool HandleSDLEvents(void);
 	void LoadProgressCallback(int progress, int totalprogressitems);
-	
+
 	friend class Audio;
+
+public:
+	// Exposed for ControlDispatch (game-thread only).
+	int GetFrameCount() const { return frames; }
+	bool paused;
+	int stepFramesRemaining;
+	Uint64 stepWallclockDeadlineMs;
+	int controlPort;
+	bool headless;
 
 private:
 	bool Tick(void);
@@ -164,12 +173,6 @@ private:
 	char currentmusictrack[256];
 	bool fullscreentoggled;
 	char * replayfile;
-	// CLI agent control (v1).
-	int controlPort;          // 0 = disabled
-	bool headless;            // skip SDL_INIT_VIDEO + window
-	bool paused;              // simulation gated; ticks resume during step budget
-	int stepFramesRemaining;  // frames left in active step budget; -1 unbounded
-	Uint64 stepWallclockDeadlineMs; // SDL_GetTicks deadline; 0 if no wallclock cap
 	// Set when UpdaterStage2 has been spawned; next Loop() returns false so
 	// main unwinds and ~Game tears down SDL/audio cleanly before the new
 	// client process opens the device. Skipping this teardown produces an

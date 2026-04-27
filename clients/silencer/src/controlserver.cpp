@@ -1,5 +1,5 @@
 #include "controlserver.h"
-// #include "controldispatch.h"
+#include "controldispatch.h"
 #include <cstdio>
 #include <cstring>
 #include <chrono>
@@ -162,7 +162,7 @@ void ControlServer::HandleConnection(int cfd) {
 			WriteAll(cfd, ReplyToLine(rpl));
 			break;
 		}
-		cmd.phase = ControlCommand::IMMEDIATE; // restored in Task 3
+		cmd.phase = ControlDispatch::PhaseFor(cmd.op);
 		auto promise = std::make_shared<std::promise<ControlReply>>();
 		auto fut = promise->get_future();
 		cmd.reply = promise;
