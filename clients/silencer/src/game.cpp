@@ -393,6 +393,11 @@ bool Game::Loop(void){
 		}
 		lasttick += wait;
 	}
+	// Tick multi-frame waits AFTER the sim loop so wait_frames --n 1 and
+	// step --frames 1 see at least one sim tick before resolving. Putting this
+	// inside DrainControlQueue (which runs before the sim loop) made the
+	// counter race the enqueue and resolve with zero ticks.
+	ControlDispatch::TickWaits(*this);
 	world.DoNetwork();
 	if(!world.dedicatedserver.active){
 		screenbuffer.Clear(0);
@@ -6087,7 +6092,8 @@ void Game::DrainControlQueue(){
 			ControlDispatch::HandleImmediate(*this, c);
 		}
 	}
-	ControlDispatch::TickWaits(*this);
+	// TickWaits intentionally NOT called here — it runs after the sim while-loop
+	// in Loop() so the very first tick after enqueue counts.
 	// Dedicated server has no rendering and never calls PostFrameReplies(), so
 	// any POST_RENDER op (e.g. screenshot) would block its handler thread
 	// forever. Fail them at receive time.

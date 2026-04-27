@@ -14,7 +14,10 @@ namespace ControlDispatch {
 	void HandleImmediate(Game& game, ControlCommand& cmd);
 	void HandlePostRender(Game& game, ControlCommand& cmd);
 
-	// Multi-frame wait management (called from DrainControlQueue).
+	// Multi-frame wait management. EnqueueWait is called from DrainControlQueue
+	// (before the sim loop). TickWaits MUST be called AFTER the sim while-loop
+	// in Game::Loop so wait_frames --n 1 / step --frames 1 see ≥1 sim tick before
+	// resolving.
 	void EnqueueWait(Game& game, ControlCommand cmd);
 	void TickWaits(Game& game);
 }

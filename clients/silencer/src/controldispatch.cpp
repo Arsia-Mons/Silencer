@@ -108,6 +108,9 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 					TextBox* tb = (TextBox*)o;
 					w["kind"] = "textbox";
 					w["w"] = tb->width; w["h"] = tb->height;
+					// uid is the developer-assigned identifier; expose it so
+					// agents can disambiguate textboxes (which have no label).
+					w["uid"] = tb->uid;
 					break;
 				}
 				case ObjectTypes::SELECTBOX: {
@@ -115,6 +118,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 					w["kind"] = "selectbox";
 					w["w"] = sb->width; w["h"] = sb->height;
 					w["selected_index"] = sb->selecteditem;
+					w["uid"] = sb->uid;
 					break;
 				}
 				default:
@@ -298,9 +302,17 @@ void TickWaits(Game& game){
 	for(auto it = v.begin(); it != v.end();){
 		bool done = false;
 		auto& w = *it;
-		if(w.cmd.op == "wait_frames" || w.cmd.op == "step"){
+		if(w.cmd.op == "wait_frames"){
 			if(w.frames_left > 0) --w.frames_left;
 			if(w.frames_left == 0) done = true;
+			if(w.deadline_ms > 0 && now >= w.deadline_ms) done = true;
+		} else if(w.cmd.op == "step"){
+			// Frame-based step: completion is when the sim has consumed all step
+			// ticks. stepFramesRemaining is decremented per sim tick (which can
+			// fire multiple times per Loop during catch-up), so it's the canonical
+			// signal — using w.frames_left here would drift when catch-up runs.
+			// w.frames_left > 0 just marks "this step is frame-based".
+			if(w.frames_left > 0 && game.stepFramesRemaining == 0) done = true;
 			if(w.deadline_ms > 0 && now >= w.deadline_ms) done = true;
 		} else if(w.cmd.op == "wait_ms"){
 			if(now >= w.deadline_ms) done = true;
