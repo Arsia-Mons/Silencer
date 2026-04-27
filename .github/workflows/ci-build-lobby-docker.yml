@@ -8,14 +8,14 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
-      - 'services/lobby/Dockerfile'
+      - 'services/lobby/**'
       - 'clients/silencer/**'
       - 'shared/assets/**'
       - '.github/workflows/ci-build-lobby-docker.yml'
   push:
     branches: [main]
     paths:
-      - 'services/lobby/Dockerfile'
+      - 'services/lobby/**'
       - 'clients/silencer/**'
       - 'shared/assets/**'
       - '.github/workflows/ci-build-lobby-docker.yml'
