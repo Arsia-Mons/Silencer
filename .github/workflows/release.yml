@@ -35,7 +35,8 @@ jobs:
           cmake -B build -S clients/silencer \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}"
+            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}" \
+            -DSILENCER_VERSION="${GITHUB_REF_NAME#v}"
 
       - name: Build
         run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
@@ -161,11 +162,13 @@ jobs:
           VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
         run: |
           $lobby = if ($env:LOBBY_HOST) { $env:LOBBY_HOST } else { "lobby.arsiamons.com" }
+          $ver = $env:GITHUB_REF_NAME -replace '^v', ''
           cmake -B build -S clients/silencer `
             -A x64 `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
-            -DSILENCER_LOBBY_HOST="$lobby"
+            -DSILENCER_LOBBY_HOST="$lobby" `
+            -DSILENCER_VERSION="$ver"
 
       - name: Build
         run: cmake --build build --config Release -- -maxcpucount
