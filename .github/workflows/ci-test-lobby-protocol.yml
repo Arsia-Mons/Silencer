@@ -1,0 +1,82 @@
+name: CI Test (lobby protocol)
+
+# Runs the three test suites that all consume shared/lobby-protocol/vectors.json:
+# the Go server's contract tests, the C++ SDK codec tests, and the TS SDK
+# codec tests. Drift in any one implementation against the shared spec
+# fails this workflow.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'services/lobby/**'
+      - 'clients/lobby-sdk/**'
+      - 'shared/lobby-protocol/**'
+      - '.github/workflows/ci-test-lobby-protocol.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/lobby/**'
+      - 'clients/lobby-sdk/**'
+      - 'shared/lobby-protocol/**'
+      - '.github/workflows/ci-test-lobby-protocol.yml'
+
+concurrency:
+  group: ci-test-lobby-protocol-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  go:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: services/lobby/go.sum
+      - name: go vet
+        working-directory: services/lobby
+        run: go vet ./...
+      - name: go build
+        working-directory: services/lobby
+        run: go build ./...
+      - name: go test
+        working-directory: services/lobby
+        run: go test ./... -count=1
+
+  cpp:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        working-directory: clients/lobby-sdk/cpp
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        working-directory: clients/lobby-sdk/cpp
+        run: cmake --build build --parallel
+      - name: Test
+        working-directory: clients/lobby-sdk/cpp
+        run: ctest --test-dir build --output-on-failure
+
+  ts:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.11'
+      - name: Install
+        working-directory: clients/lobby-sdk/ts
+        run: bun install --frozen-lockfile
+      - name: Typecheck
+        working-directory: clients/lobby-sdk/ts
+        run: bun tsc --noEmit
+      - name: Test
+        working-directory: clients/lobby-sdk/ts
+        run: bun test
