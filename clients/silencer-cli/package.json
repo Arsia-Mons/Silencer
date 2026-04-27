@@ -9,6 +9,7 @@
     "fmt": "oxfmt --write ."
   },
   "devDependencies": {
+    "@types/bun": "^1.3.13",
     "typescript": "^5.4.0"
   }
 }
