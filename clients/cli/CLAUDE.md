@@ -1,7 +1,5 @@
-# clients/cli — placeholder
+# clients/cli — superseded
 
-Reserved slot for a hypothetical headless CLI client used by coding
-agents to drive E2E tests of the game without SDL video/audio. Nothing
-here yet.
-
-See [../../docs/plans/2026-04-25-monorepo-restructure.md](../../docs/plans/2026-04-25-monorepo-restructure.md).
+The agent-driving CLI lives at `../silencer-cli/`. This directory is
+preserved as a redirect for older docs that linked here. Safe to
+delete in a follow-up sweep.

@@ -67,6 +67,47 @@ silencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
   exe (`src/os.cpp` `GetResDir`). Resources / icon are wired through
   `resources.rc` (auto-included on Windows builds).
 
+## CLI agent control
+
+The game binary exposes a JSON-lines TCP control socket for headless
+automation by coding agents (UI verification, screenshot testing, menu
+navigation without a human).
+
+**Start the daemon**
+
+Use the E2E harness helpers — they handle binary detection across platforms:
+
+```bash
+. tests/cli-agent/e2e/lib.sh
+PORT=$(pick_port)
+PID=$(start_silencer "$PORT")
+wait_alive "$PORT"
+# ... do work ...
+stop_silencer "$PID" "$PORT"
+```
+
+The binary paths per platform:
+- macOS: `build/Silencer.app/Contents/MacOS/Silencer`
+- Linux: `build/silencer`
+- Windows: `build/Silencer.exe`
+
+**CLI wrapper**
+
+```bash
+bun clients/silencer-cli/index.ts --port $PORT <op> [args...]
+```
+
+See `clients/silencer-cli/` for the full wrapper and
+`.claude/skills/using-silencer-cli/SKILL.md` for the complete op
+reference and usage patterns.
+
+**Relevant flags**
+
+| Flag | Purpose |
+|------|---------|
+| `--headless` | Skip SDL video/audio init (required in CI) |
+| `--control-port <n>` | Open JSON-lines TCP control socket on port *n* |
+
 ## Gotchas
 
 - **Lobby host is a compile-time constant.** Baked in via
