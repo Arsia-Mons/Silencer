@@ -20,5 +20,7 @@ Binary, little-endian, 8-bit indexed. Don't try to read these as text.
   C++ audio system; also pre-extracted to `web/admin/public/sounds/*.wav`
   for browser preview in the actor editor.
 
-Format spec, RLE codec, and per-bank usage: `docs/design-system.md`
-(§ Asset Formats, Appendix A — Sprite Bank Manifest). Loader: `src/resources.cpp`.
+Format spec, RLE codec, and per-bank usage: `docs/design/sprite-banks.md`
+and `docs/design/palette.md` (currently main-menu subset; legacy
+monolithic spec preserved at `docs/design-system.md.archive`).
+Loader: `clients/silencer/src/resources.cpp`.

@@ -11,12 +11,17 @@ Build with the local `CMakeLists.txt` (`cmake -B build && cmake --build build`)
 
 ## Object hierarchy
 
-`Object` → `Hittable` → `Physical` → `Bipedal` → {`Player`,
-`Civilian`, `Guard`, `Robot`}. Type registry / factory:
-`objecttypes.cpp`. Live objects replicate over the wire via
-`serializer.cpp` (bit-aligned little-endian). Adding a replicated
-field means updating `Serialize()` and bumping the version so old
-clients don't desync.
+`Object` is mixin multiple inheritance of five bases — `Sprite`,
+`Physical`, `Hittable`, `Bipedal`, `Projectile` (`object.h:14`).
+41 leaf classes inherit directly from `Object` (actors,
+projectiles, stations, UI widgets); two-deep tree, no further
+subclassing. Full breakdown in
+[`../../docs/silencer-client-architecture.md`](../../docs/silencer-client-architecture.md).
+
+Type registry / factory: `objecttypes.cpp`. Live objects replicate
+over the wire via `serializer.cpp` (bit-aligned little-endian).
+Adding a replicated field means updating `Serialize()` and bumping
+the version so old clients don't desync.
 
 ## Networking model
 
