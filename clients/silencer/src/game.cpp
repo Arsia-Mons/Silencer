@@ -173,7 +173,7 @@ bool Game::Load(char * cmdline){
 				replayfile = strtok(NULL, " ");
 				GoToState(REPLAYGAME);
 			}
-			else if(strncmp(cmdline, "--control-port", 14) == 0){
+			else if(strcmp(cmdline, "--control-port") == 0){
 				char * portstr = strtok(NULL, " ");
 				if(portstr){
 					controlPort = atoi(portstr);
