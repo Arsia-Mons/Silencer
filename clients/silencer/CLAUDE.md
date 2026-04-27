@@ -141,3 +141,11 @@ lambdas read/write it via `ctx.bb<T>(key, default)` / `ctx.bbSet(key, val)`.
 - **Android/Ouya code paths exist** in `src/main.cpp` but are not
   actively maintained; don't rely on them. JNI symbols use the
   `com.silencer.game.Silencer` package convention.
+- **`libmodplug` removed from vcpkg.json.** `sdl3-mixer` no longer
+  builds with the MOD/XM/IT music plugin — the game uses IMA ADPCM
+  (`sound.bin`) and MP3 (`CLOSER2.mp3`) only. This cuts build time and
+  removes an unused dependency.
+- **`adminapiurl` config key** (`src/config.h`) — URL the client fetches
+  actordefs and behavior trees from on each map load. Defaults to
+  `http://localhost:24000/api` for local dev; set it to the production
+  admin API URL when deploying. Does not affect lobby traffic.

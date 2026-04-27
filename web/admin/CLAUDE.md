@@ -40,6 +40,9 @@ directly). If you need to bake an explicit URL in, pass it as a
   files from a local folder. Visual drag-and-drop node editor, JSON preview,
   blackboard key list, full undo/redo. Download button exports the current
   tree. Node types match `clients/silencer/src/behaviortree.h`.
+- `app/api/behaviortrees/[...path]/route.ts` — Next.js proxy that forwards
+  `GET/PUT/DELETE /api/behaviortrees/*` to admin-api. Required because the
+  browser can't hit admin-api directly on HTTPS in prod.
 - `app/dashboard/page.js` — snapshot-driven via `useSocket`;
   subscribes to `player.*` and `game.*` events to keep the in-memory
   map in sync.
