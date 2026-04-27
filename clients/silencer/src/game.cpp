@@ -410,11 +410,10 @@ void Game::Present(void){
 				// GameJoin: engine already auto-creates gamejoininterface
 				// once world.state == CONNECTED (line ~910). We don't
 				// double-create.
+				// (debug fprintfs removed — see git history for the
+				// diagnostic version that found the local-peer
+				// accountid=0 vs demo accountid=1 mismatch.)
 				if(target_modal_tech && !gametechinterface){
-					// Mimic the engine's Choose-Tech button-click handler
-					// (game.cpp:4925-4926): zero gamejoininterface +
-					// destroy it from lobbyiface, then create the
-					// GameTech interface in its place.
 					if(gamejoininterface){
 						Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
 						Interface * joiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
@@ -438,8 +437,45 @@ void Game::Present(void){
 							team->number = 0;
 						}
 					}
-					world.GetAuthorityPeer()->techchoices = 0xffffffff;
+					// Set techchoices to a partial selection so the
+					// captured reference shows ALL THREE checkbox states:
+					//   - SELECTED (res_index=18, brightness=128)
+					//   - SELECTABLE (res_index=19, brightness=128)
+					//   - DISABLED (res_index=19, brightness=64)
+					// Bits chosen: 1<<0 (Laser) + 1<<5 (Shaped Bomb).
+					// Demo user's NOXIS agency has TechSlots=2, so with
+					// 2 selected the leftover is 0; items with cost > 0
+					// would all become disabled. Bump TechSlots to 4 so
+					// 1-cost items are selectable but 4+ cost items
+					// (E.M.P. Bomb=4, Neutron Bomb=8) end up disabled.
+					Peer * lpeer = world.peerlist[world.localpeerid];
+					if(lpeer){
+						// Demo user is account 1 in /tmp/silencer-lobby-data/
+						// lobby.json. The synthetic local peer recreated by
+						// the CONNECTED auto-flow has accountid=0; force it
+						// to 1 so GetUserInfo finds the real demo User
+						// (with the SeedDemoUser-populated stats).
+						lpeer->accountid = 1;
+						lpeer->techchoices = (1 << 0) | (1 << 5);
+						User * lu = world.lobby.GetUserInfo(lpeer->accountid);
+						if(lu){
+							// Bump techslots so we get all THREE checkbox
+							// states visible (selected + selectable +
+							// disabled). With 2 selected (Laser idx 0,
+							// ShapedBomb idx 5) and techslots=4, leftover=2:
+							//   - 1-cost items not selected: SELECTABLE
+							//     (brightness 128, res_index 19)
+							//   - >2-cost items (E.M.P. Bomb=4, Plasma
+							//     Bomb=2 borderline, Neutron Bomb=8,
+							//     Plasma Detonator=2 borderline): DISABLED
+							//     (brightness 64, res_index 19)
+							//   - Already selected (Laser, ShapedBomb):
+							//     SELECTED (brightness 128, res_index 18)
+							lu->agency[Team::NOXIS].techslots = 4;
+						}
+					}
 					gametechinterface = CreateGameTechInterface()->id;
+					UpdateTechInterface();
 					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
 					if(lobbyiface){
 						lobbyiface->AddObject(gametechinterface);
