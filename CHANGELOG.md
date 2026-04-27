@@ -2,6 +2,117 @@
 
 All notable changes to zSILENCER are documented here.
 
+## [v1.9.0 / v00029] — 2026-04-26
+
+### Game client / dedicated server
+
+#### Behavior tree AI
+
+- **C++ behavior tree interpreter** — loads `.json` BT files from the assets
+  directory and evaluates them each tick. Supports Sequence, Selector,
+  Inverter, and a full set of game-specific Condition/Action leaf nodes.
+- **Guard AI wired to behavior tree** — full combat pipeline (Look, Aim, Shoot,
+  Crouch, Patrol) now driven by the BT. `guard.cpp` state machine replaced by
+  BT tick calls.
+  - `SearchAndReturn` — non-patrol guards search the last known target position
+    then walk back to spawn.
+  - Ladder climbing in SearchAndReturn — guards climb/descend ladders during
+    search phase with 2 s cooldown and 48 px vertical gap requirement to
+    prevent stuck loops.
+  - Fixed: crouch-shoot, stay-at-post patrol, stop gliding during crouch
+    states, back-away-when-too-close, clear chasing on player death / base
+    entry / untargetable.
+- **Robot AI wired to behavior tree** — `robot.cpp` uses BT for patrol,
+  `ReturnToSpawn` (replaces old Sleep), damage wakeup, `LookSides` returning
+  Failure so Patrol runs every tick.
+- **Civilian flee BT wired** — `civilian.cpp` flee logic driven by
+  `civilian.json` behavior tree.
+
+#### Actor definition system
+
+- **Client syncs actordefs from server on startup** — fetched async on each
+  map load so the admin tool changes are picked up without a client rebuild.
+  Uses a separate `adminapiurl` config key to avoid affecting lobby traffic.
+- **Per-frame sounds — data-driven** — `FrameDef` gains `sound` + `soundVolume`
+  fields. `AnimSequence::GetFrameSoundByIndex(frameIdx)` looks up sound by
+  sprite frame index (correct for `state_i % N` state machines).
+- **Guard WALKING footsteps** — `guard.cpp` calls `GetFrameSoundByIndex` with
+  `state_i % 19` to play `stostep1.wav` / `stostepr.wav` at frames 4/13,
+  driven by `guard-*.json` actordefs — fully configurable in the actor editor.
+- **Civilian footsteps** — `civilian.cpp` WALKING and RUNNING use
+  `GetFrameSoundByIndex` to play footstep sounds from `civilian.json`.
+- **Per-weapon guard actordefs** — `guard.json` split into
+  `guard-blaster.json`, `guard-laser.json`, `guard-rocket.json`. Each can now
+  have independently tuned animations, hurtboxes, and sounds. `ActorDefName(weapon)`
+  helper maps weapon integer to the correct file name.
+- **Body parts replicated to clients** via snapshot packets — previously only
+  simulated on the server.
+- **Player hurtboxes** — all player animation sequences (WALK, RUN, JUMP,
+  CROUCH, etc.) now have default hurtboxes in the actordef; fixes bullet
+  collision regression.
+- **Guard kneel loop fixed** — CROUCHED uncrouch guard no longer loops endlessly.
+- **`Look()` origin restored** to y=−55 for reliable target detection.
+- **Version bumped to `00028`**.
+
+### Admin dashboard
+
+#### Behavior tree editor
+
+- Visual drag-and-drop BT editor with node palette, JSON preview, and full
+  undo/redo.
+- **Local-file mode** — editor reads/writes `.json` files directly from a
+  user-selected folder (no database required). `webkitdirectory` input on HTTP,
+  `showSaveFilePicker` on HTTPS.
+- Download button exports the current tree as a `.json` file.
+- Blackboard key editor improved: sortable key list, type badges, one-click
+  delete.
+- State machine tab removed from actor editor — superseded by behavior trees.
+
+#### Actor editor
+
+- **Local-file mode** — load/save actordefs from a local folder via browser
+  file picker; no MongoDB write path in production.
+- **Auto-size preview canvas** — canvas resizes to the largest sprite in the
+  selected sequence.
+- **Tab URL persistence** — `?tab=` query param keeps selected tab across
+  navigation.
+- **Hitbox editor**:
+  - Auto-fit hurtbox button snaps the box to the non-transparent pixel bounds
+    of the current sprite frame.
+  - Clear all hurtboxes button.
+  - All player animation sequences (WALK, RUN, CROUCH, etc.) available for
+    editing.
+- **Animation tab**:
+  - Sound picker — searchable dropdown of all 98 in-game sounds, plus a ▶
+    preview button per row that plays the WAV at the configured volume.
+  - `soundVolume` field (0–128) per frame; preview respects it.
+  - Scale toggle: 1×/2×/3×/4× preview size (defaults to 1×).
+  - Grid background — matches the hitbox tab dark grid so transparent sprites
+    are visible.
+
+#### Lobby server (Go)
+
+- Behavior trees stored in MongoDB and synced to the game client on startup.
+- Actordefs and BTs migrated to filesystem-first (MongoDB write-through
+  removed from the read path).
+- `–version 00028` passed to lobby process in `docker-compose.yml`.
+- MongoDB password redacted from `mongosync` log lines.
+- Empty `–version` flag now falls back to manifest version (not crash).
+
+### Infrastructure
+
+- **Assets volume mounted read-write** in `docker-compose.yml` so `admin-api`
+  can write actordefs back to disk from the actor editor.
+- **Dedicated server bundle** — `SDL3` and `SDL3_mixer` `.so` files copied into
+  the server package by `install-linux-server.sh`; fixes missing-library crash
+  on fresh ARM64 hosts.
+- **Lobby flags pinned**: `–maps-dir /var/lib/silencer/maps`,
+  `–update-manifest /opt/silencer/update.json`.
+- **CI (macOS)**: `SDL3_ROOT` env vars passed to `dylibbundler`; search dirs
+  narrowed to avoid scanning the full filesystem during macOS release builds.
+
+---
+
 ## [v00025] — 2026-04-25
 
 ### Game client / dedicated server

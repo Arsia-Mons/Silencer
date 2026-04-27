@@ -32,10 +32,13 @@ jobs:
         env:
           LOBBY_HOST: ${{ vars.LOBBY_HOST }}
         run: |
+          lobby="${LOBBY_HOST:-lobby.arsiamons.com}"
           cmake -B build -S clients/silencer \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}"
+            -DSILENCER_LOBBY_HOST="$lobby" \
+            -DSILENCER_MAP_API_URL="https://admin.arsiamons.com/api/maps" \
+            -DSILENCER_VERSION="${GITHUB_REF_NAME#v}"
 
       - name: Build
         run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
@@ -147,39 +150,55 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Export GitHub Actions cache variables for vcpkg
-        uses: actions/github-script@v7
+      - name: Cache vcpkg binaries
+        uses: actions/cache@v4
         with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+          path: ${{ github.workspace }}/.vcpkg-cache
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('clients/silencer/vcpkg.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
+      - name: Cache vcpkg tool downloads
+        uses: actions/cache@v4
+        with:
+          path: C:\vcpkg\downloads\tools
+          key: vcpkg-tools-${{ runner.os }}-v1
+
+      - name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
       - name: Configure
         shell: pwsh
         env:
           LOBBY_HOST: ${{ vars.LOBBY_HOST }}
-          VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
+          VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite"
         run: |
           $lobby = if ($env:LOBBY_HOST) { $env:LOBBY_HOST } else { "lobby.arsiamons.com" }
+          $ver = $env:GITHUB_REF_NAME -replace '^v', ''
           cmake -B build -S clients/silencer `
-            -A x64 `
+            -G Ninja `
+            -DCMAKE_BUILD_TYPE=Release `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=x64-windows `
-            -DSILENCER_LOBBY_HOST="$lobby"
+            -DSILENCER_LOBBY_HOST="$lobby" `
+            -DSILENCER_MAP_API_URL="https://admin.arsiamons.com/api/maps" `
+            -DSILENCER_VERSION="$ver"
 
       - name: Build
-        run: cmake --build build --config Release -- -maxcpucount
+        run: cmake --build build
 
       - name: Package
         shell: pwsh
         run: |
           $stage = "build/package/silencer"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
-          Copy-Item build/Release/Silencer.exe $stage/
-          # SDL2 / SDL2_mixer / zlib + transitive audio codec DLLs live in
+          Copy-Item build/Silencer.exe $stage/
+          # SDL3 / SDL3_mixer / zlib + transitive audio codec DLLs live in
           # the vcpkg manifest-mode install dir. Bulk-copy them so the zip
           # is self-contained — without these, Silencer.exe fails to start
-          # with a missing SDL2.dll error on machines without vcpkg.
+          # with a missing SDL3.dll error on machines without vcpkg.
           $vcpkgBin = "build/vcpkg_installed/x64-windows/bin"
           Copy-Item "$vcpkgBin/*.dll" $stage/
           # Ship assets next to the .exe as `assets/` — Windows runtime

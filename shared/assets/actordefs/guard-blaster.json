@@ -80,7 +80,9 @@
             -70,
             18,
             0
-          ]
+          ],
+          "sound": "stostep1.wav",
+          "soundVolume": 16
         },
         {
           "bank": 60,
@@ -179,7 +181,9 @@
             -70,
             18,
             0
-          ]
+          ],
+          "sound": "stostepr.wav",
+          "soundVolume": 16
         },
         {
           "bank": 60,

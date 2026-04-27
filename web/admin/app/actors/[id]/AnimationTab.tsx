@@ -3,13 +3,23 @@
  * C3: Animation sequence builder + timeline
  * C4: Live preview canvas at game speed (60fps rAF loop)
  */
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { getSpriteFrames, type FrameMeta, type ActorDef } from '../../../lib/api';
+
+function useSounds(): string[] {
+  const [sounds, setSounds] = useState<string[]>([]);
+  useEffect(() => {
+    fetch('/api/sounds').then(r => r.json()).then(setSounds).catch(() => {});
+  }, []);
+  return sounds;
+}
 
 interface FrameDef {
   bank: number;
   index: number;
   duration: number; // ticks at 60fps
+  sound?: string;
+  soundVolume?: number;
 }
 
 interface AnimSequence {
@@ -39,17 +49,44 @@ function useImageCache() {
   }, []);
 }
 
-/** Live preview canvas that plays a sequence at 60fps. */
-function PreviewCanvas({ sequence }: { sequence: AnimSequence | null }) {
+const CANVAS_PAD = 24; // px padding around the scaled sprite
+const CANVAS_MIN = 120;
+
+/** Live preview canvas that plays a sequence at 60fps, auto-sized to the sprite. */
+function PreviewCanvas({ sequence, scale }: { sequence: AnimSequence | null; scale: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
   const loadImg   = useImageCache();
   const stateRef  = useRef({ tick: 0, frameIdx: 0 });
+  const [canvasSize, setCanvasSize] = useState({ w: CANVAS_MIN, h: CANVAS_MIN });
+
+  // Measure max natural sprite size across all frames in the sequence
+  useEffect(() => {
+    if (!sequence || sequence.frames.length === 0) {
+      setCanvasSize({ w: CANVAS_MIN, h: CANVAS_MIN });
+      return;
+    }
+    // Deduplicate bank:index pairs
+    const unique = [...new Map(sequence.frames.map(f => [`${f.bank}:${f.index}`, f])).values()];
+    Promise.all(unique.map(f => loadImg(f.bank, f.index).catch(() => null)))
+      .then(imgs => {
+        let maxW = 0, maxH = 0;
+        for (const img of imgs) {
+          if (!img) continue;
+          if (img.naturalWidth  > maxW) maxW = img.naturalWidth;
+          if (img.naturalHeight > maxH) maxH = img.naturalHeight;
+        }
+        setCanvasSize({
+          w: Math.max(maxW * scale + CANVAS_PAD * 2, CANVAS_MIN),
+          h: Math.max(maxH * scale + CANVAS_PAD * 2, CANVAS_MIN),
+        });
+      });
+  }, [sequence, loadImg, scale]);
 
   useEffect(() => {
     if (!sequence || sequence.frames.length === 0) {
       const ctx = canvasRef.current?.getContext('2d');
-      if (ctx) { ctx.clearRect(0, 0, 200, 200); }
+      if (ctx) ctx.clearRect(0, 0, canvasSize.w, canvasSize.h);
       return;
     }
 
@@ -77,10 +114,14 @@ function PreviewCanvas({ sequence }: { sequence: AnimSequence | null }) {
             const canvas = canvasRef.current;
             if (canvas) {
               const ctx = canvas.getContext('2d')!;
-              ctx.clearRect(0, 0, canvas.width, canvas.height);
-              // Centered, pixelated, 3x scale
-              const scale = 3;
-              const x = Math.floor((canvas.width - img.width * scale) / 2);
+              // Grid background (matches hitbox tab)
+              ctx.fillStyle = '#111';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.strokeStyle = '#222';
+              ctx.lineWidth = 1;
+              for (let gx = 0; gx < canvas.width; gx += 16) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, canvas.height); ctx.stroke(); }
+              for (let gy = 0; gy < canvas.height; gy += 16) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(canvas.width, gy); ctx.stroke(); }
+              const x = Math.floor((canvas.width  - img.width  * scale) / 2);
               const y = Math.floor((canvas.height - img.height * scale) / 2);
               (ctx as CanvasRenderingContext2D & { imageSmoothingEnabled: boolean }).imageSmoothingEnabled = false;
               ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
@@ -94,25 +135,104 @@ function PreviewCanvas({ sequence }: { sequence: AnimSequence | null }) {
     stateRef.current = { tick: 0, frameIdx: 0 };
     rafRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [sequence, loadImg]);
+  }, [sequence, loadImg, canvasSize, scale]);
 
   return (
     <canvas
       ref={canvasRef}
-      width={200}
-      height={200}
-      className="border border-game-border bg-black"
+      width={canvasSize.w}
+      height={canvasSize.h}
+      className="border border-game-border"
       style={{ imageRendering: 'pixelated' }}
     />
   );
 }
 
+/** Inline sound picker — shows current value; click to open a searchable dropdown. */
+function SoundPicker({ value, volume, sounds, onChange }: {
+  value: string | undefined;
+  volume: number | undefined;
+  sounds: string[];
+  onChange: (v: string | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const filtered = useMemo(
+    () => sounds.filter(s => s.toLowerCase().includes(filter.toLowerCase())),
+    [sounds, filter]
+  );
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+  return (
+    <div className="relative flex items-center gap-1" ref={ref}>
+      <button
+        type="button"
+        className="w-32 bg-game-bg border border-game-border px-2 py-1 text-xs font-mono text-left truncate hover:border-game-text"
+        onClick={() => { setOpen(o => !o); setFilter(''); }}
+        title={value}
+      >
+        {value ?? <span className="text-game-textDim">— none —</span>}
+      </button>
+      {value && (
+        <button
+          type="button"
+          title="Preview sound"
+          className="text-game-textDim hover:text-game-primary text-xs px-1"
+          onClick={() => { const a = new Audio(`/sounds/${value}`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
+        >▶</button>
+      )}
+      {open && (
+        <div className="absolute z-50 top-full left-0 mt-0.5 w-48 bg-[#050a05] border border-game-border shadow-lg flex flex-col">
+          <input
+            autoFocus
+            type="text"
+            placeholder="filter..."
+            className="bg-game-bg border-b border-game-border px-2 py-1 text-xs font-mono"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+          />
+          <div className="overflow-y-auto max-h-48">
+            <button
+              type="button"
+              className="w-full text-left px-2 py-1 text-xs text-game-textDim hover:bg-game-border/30"
+              onClick={() => { onChange(undefined); setOpen(false); }}
+            >— none —</button>
+            {filtered.map(s => (
+              <div key={s} className="flex items-center">
+                <button
+                  type="button"
+                  className={`flex-1 text-left px-2 py-1 text-xs font-mono hover:bg-game-border/30 ${s === value ? 'text-game-primary' : ''}`}
+                  onClick={() => { onChange(s); setOpen(false); }}
+                >{s}</button>
+                <button
+                  type="button"
+                  title="Preview"
+                  className="px-2 text-game-textDim hover:text-game-primary text-xs"
+                  onClick={() => { const a = new Audio(`/sounds/${s}`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
+                >▶</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Frame row in the sequence editor. */
 function FrameRow({
-  f, idx, onChange, onDelete, onMoveUp, onMoveDown,
+  f, idx, sounds, onChange, onDelete, onMoveUp, onMoveDown,
 }: {
   f: FrameDef;
   idx: number;
+  sounds: string[];
   onChange: (f: FrameDef) => void;
   onDelete: () => void;
   onMoveUp: () => void;
@@ -145,6 +265,23 @@ function FrameRow({
         className="w-8 h-8 object-contain border border-game-border bg-black"
         style={{ imageRendering: 'pixelated' }}
       />
+      <SoundPicker
+        value={f.sound}
+        volume={f.soundVolume}
+        sounds={sounds}
+        onChange={v => onChange({ ...f, sound: v })}
+      />
+      <input
+        type="number" min={0} max={128}
+        title="Volume (0-128)"
+        className="w-14 bg-game-bg border border-game-border px-2 py-1 text-xs font-mono text-center"
+        value={f.soundVolume ?? ''}
+        placeholder="vol"
+        onChange={e => {
+          const v = e.target.value === '' ? undefined : +e.target.value;
+          onChange({ ...f, soundVolume: v });
+        }}
+      />
       <div className="flex gap-1 ml-auto">
         <button onClick={onMoveUp} className="text-game-textDim hover:text-game-text text-xs px-1">↑</button>
         <button onClick={onMoveDown} className="text-game-textDim hover:text-game-text text-xs px-1">↓</button>
@@ -161,11 +298,13 @@ export default function AnimationTab({
   def: ActorDef;
   onChange: (patch: Partial<ActorDef>) => void;
 }) {
+  const sounds = useSounds();
   const sequences = getSequences(def);
   const [selectedSeq, setSelectedSeq] = useState<string | null>(
     Object.keys(sequences)[0] ?? null
   );
   const [newSeqName, setNewSeqName] = useState('');
+  const [scale, setScale] = useState(1);
 
   const seq = selectedSeq ? sequences[selectedSeq] : null;
 
@@ -288,12 +427,15 @@ export default function AnimationTab({
                   <span className="w-16 text-center">FRAME</span>
                   <span className="w-16 text-center">TICKS</span>
                   <span className="w-8" />
+                  <span className="w-28 text-center">SOUND</span>
+                  <span className="w-14 text-center">VOL</span>
                 </div>
                 {timelineFrames.map((f, i) => (
                   <FrameRow
                     key={i}
                     f={f}
                     idx={i}
+                    sounds={sounds}
                     onChange={nf => updateFrame(i, nf)}
                     onDelete={() => deleteFrame(i)}
                     onMoveUp={() => moveFrame(i, -1)}
@@ -310,8 +452,18 @@ export default function AnimationTab({
 
               {/* Preview canvas */}
               <div className="flex flex-col items-center gap-2">
-                <div className="text-xs text-game-textDim tracking-widest">PREVIEW (3x)</div>
-                <PreviewCanvas sequence={seq} />
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-game-textDim tracking-widest">PREVIEW</span>
+                  {[1, 2, 3, 4].map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setScale(s)}
+                      className={`text-xs px-1.5 py-0.5 border ${scale === s ? 'border-game-primary text-game-primary' : 'border-game-border text-game-textDim hover:border-game-text'}`}
+                    >{s}×</button>
+                  ))}
+                </div>
+                <PreviewCanvas sequence={seq} scale={scale} />
               </div>
             </div>
 

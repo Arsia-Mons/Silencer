@@ -58,7 +58,22 @@ Guards will target an entity if:
 Guards can be configured as:
 - **Patrol** — walks back and forth along their platform, reversing at edges.
 - **Stationary** — stays in place, only attacking if a target enters line of
-  sight.
+  sight. Non-patrol guards also use `SearchAndReturn`: after losing a target
+  they walk to the last known position, then return to spawn.
+
+### Behavior Tree
+
+Guard AI is driven by a **behavior tree** loaded from
+`shared/assets/behaviortrees/guard.json`. The BT is ticked once per game
+tick by `guard.cpp`. Combat decisions (Look, Aim, Shoot, Crouch), patrol
+logic, ladder climbing, and SearchAndReturn are all implemented as BT leaf
+actions registered in `guard.cpp`. Edit the tree in the admin BT editor —
+changes take effect on the next map load without a client rebuild.
+
+### Ladder Climbing
+
+During SearchAndReturn, guards climb/descend ladders. A 2-second cooldown
+and 48 px vertical gap requirement prevent stuck loops.
 
 ### Weapons
 
@@ -128,6 +143,12 @@ virus-implanted robot:
 
 Like guards, robots can be set to patrol or stationary mode.
 
+### Behavior Tree
+
+Robot AI is driven by `shared/assets/behaviortrees/robot.json`. Combat,
+`ReturnToSpawn` (replaces the old Sleep state), damage wakeup, and patrol
+are all BT leaf actions registered in `robot.cpp`.
+
 ## Civilians
 
 Civilians are neutral NPCs that walk along platforms.
@@ -158,6 +179,10 @@ Civilians are neutral NPCs that walk along platforms.
 Civilians periodically scan for nearby threats (every 5–10 ticks). If they see
 combat or a threatening entity, they switch to RUNNING and flee in the opposite
 direction. They reverse direction when reaching a platform edge.
+
+### Behavior Tree
+
+Civilian AI is driven by `shared/assets/behaviortrees/civilian.json`.
 
 ### Lazarus Tract Conversion
 

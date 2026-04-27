@@ -6,35 +6,51 @@
  * C5: Hitbox editor (per-frame AABB drawing)
  * C7: Actor properties + export/save
  */
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth';
 import { useWsConnected } from '../../../lib/socket';
 import Sidebar from '../../../components/Sidebar';
-import { getActor, saveActor, type ActorDef } from '../../../lib/api';
+import { type ActorDef } from '../../../lib/api';
+import {
+  readFromStore, writeToStore, downloadJson, getFolderName,
+} from '../../../lib/actor-store';
 import AnimationTab from './AnimationTab';
 import HitboxTab from './HitboxTab';
 import PropsTab from './PropsTab';
-import StateMachineTab from './StateMachineTab';
-import type { StateMachine } from '../../../lib/api';
 
-type Tab = 'animation' | 'hitbox' | 'statemachine' | 'props';
+type Tab = 'animation' | 'hitbox' | 'props';
+const VALID_TABS: Tab[] = ['animation', 'hitbox', 'props'];
 
 export default function ActorEditorPage() {
   useAuth();
   const wsConnected = useWsConnected();
   const { id } = useParams() as { id: string };
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [def, setDef]       = useState<ActorDef | null>(null);
   const [dirty, setDirty]   = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
-  const [tab, setTab]       = useState<Tab>('animation');
+  const folderName = getFolderName();
+
+  const rawTab = searchParams.get('tab') as Tab | null;
+  const tab: Tab = rawTab && VALID_TABS.includes(rawTab) ? rawTab : 'animation';
+
+  function setTab(t: Tab) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', t);
+    router.replace(`?${params.toString()}`);
+  }
 
   useEffect(() => {
-    getActor(id)
-      .then(d => setDef(d))
-      .catch(e => setError(e.message));
+    const stored = readFromStore(id);
+    if (stored) {
+      setDef(stored);
+    } else {
+      setError('Actor not found in loaded folder. Go back and open the actordefs folder first.');
+    }
   }, [id]);
 
   function updateDef(patch: Partial<ActorDef>) {
@@ -46,7 +62,8 @@ export default function ActorEditorPage() {
     if (!def) return;
     setSaving(true);
     try {
-      await saveActor(id, def);
+      writeToStore(id, def);
+      await downloadJson(id, def);
       setDirty(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -56,10 +73,9 @@ export default function ActorEditorPage() {
   }
 
   const TABS: { key: Tab; label: string }[] = [
-    { key: 'animation',    label: '[ ANIMATION ]' },
-    { key: 'hitbox',       label: '[ HITBOXES ]' },
-    { key: 'statemachine', label: '[ STATE MACHINE ]' },
-    { key: 'props',        label: '[ PROPERTIES ]' },
+    { key: 'animation', label: '[ ANIMATION ]' },
+    { key: 'hitbox',    label: '[ HITBOXES ]' },
+    { key: 'props',     label: '[ PROPERTIES ]' },
   ];
 
   return (
@@ -70,6 +86,11 @@ export default function ActorEditorPage() {
         <div className="flex items-center gap-4 px-8 py-4 border-b border-game-border">
           <Link href="/actors" className="text-game-textDim hover:text-game-text text-sm">← ACTORS</Link>
           <h1 className="text-xl font-bold tracking-widest text-game-primary font-mono flex-1">{id}</h1>
+          {folderName && (
+            <span className="text-xs text-game-warning tracking-wider border border-game-warning/40 px-2 py-1">
+              📁 {folderName}
+            </span>
+          )}
           {dirty && <span className="text-game-warning text-xs tracking-widest">UNSAVED CHANGES</span>}
           {error && <span className="text-game-danger text-xs">{error}</span>}
           <button
@@ -98,19 +119,13 @@ export default function ActorEditorPage() {
           ))}
         </div>
 
-        {/* Tab content */}
-        <div className="flex flex-1 min-h-0" style={{ overflow: tab === 'statemachine' ? 'hidden' : 'auto' }}>
+        <div className="flex flex-1 min-h-0 overflow-auto">
           {!def ? (
             <div className="p-8 text-game-textDim text-sm">Loading…</div>
           ) : tab === 'animation' ? (
             <AnimationTab actorId={id} def={def} onChange={updateDef} />
           ) : tab === 'hitbox' ? (
             <HitboxTab actorId={id} def={def} onChange={updateDef} />
-          ) : tab === 'statemachine' ? (
-            <StateMachineTab
-              def={def}
-              onChange={(sm: StateMachine) => updateDef({ stateMachine: sm })}
-            />
           ) : (
             <PropsTab def={def} onChange={updateDef} />
           )}

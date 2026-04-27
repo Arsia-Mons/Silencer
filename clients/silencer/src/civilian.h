@@ -3,6 +3,7 @@
 
 #include "shared.h"
 #include "object.h"
+#include "behaviortree.h"
 
 class Civilian : public Object
 {
@@ -20,9 +21,12 @@ public:
 private:
 	bool Look(World & world);
 	bool CheckTractVictim(World & world);
+	void InitBT();
 	enum {NEW, STANDING, WALKING, RUNNING, DYINGFORWARD, DYINGBACKWARD, DYINGEXPLODE, DEAD};
 	Uint8 state;
 	Uint8 state_i;
+	const BehaviorTree* bt_;
+	BTContext btctx_;
 };
 
 #endif

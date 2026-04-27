@@ -21,6 +21,8 @@
 #include "sha1.h"
 #include "updaterstage2.h"
 #include "mapfetch.h"
+#include "actordef.h"
+#include "behaviortree.h"
 #include <algorithm>
 #include <stdio.h>
 
@@ -5965,6 +5967,10 @@ bool Game::HandleSDLEvents(void){
 							world.ShowTopMessage("          *MUSIC PAUSED*");
 						}
 					}
+				}
+				if(event.key.scancode == SDL_SCANCODE_F9){
+					world.debugoverlay = !world.debugoverlay;
+					world.ShowTopMessage(world.debugoverlay ? "        DEBUG OVERLAY ON" : "       DEBUG OVERLAY OFF");
 				}
 				keystate[event.key.scancode] = true;
 			bool skip = true;

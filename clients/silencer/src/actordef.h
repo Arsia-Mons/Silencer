@@ -18,6 +18,10 @@ struct FrameDef {
 	int index;
 	int duration; // ticks this frame holds (must be >= 1)
 	FrameHurtbox hurtbox;
+	std::string sound;  // optional: sound file to play on first tick of this frame
+	int soundVolume;    // 0 = use default (128)
+
+	FrameDef() : bank(0), index(0), duration(1), hurtbox{}, soundVolume(0) {}
 };
 
 struct AnimSequence {
@@ -31,6 +35,15 @@ struct AnimSequence {
 
 	// Total tick-duration of one complete cycle.
 	int TotalDuration() const;
+
+	// Returns true (and fills outFile/outVolume) if state_i is the FIRST tick
+	// of a frame that has a sound attached. Call once per tick.
+	bool GetFrameSound(int state_i, std::string& outFile, int& outVolume) const;
+
+	// Returns true if the Nth sprite frame (0-based index into frames[]) has
+	// a sound. Use when the state machine drives sprite index directly (e.g.
+	// res_index = state_i % N) rather than by tick-accumulated durations.
+	bool GetFrameSoundByIndex(int frameIdx, std::string& outFile, int& outVolume) const;
 };
 
 struct ActorDef {
@@ -54,6 +67,12 @@ struct ActorDef {
 // Returns the number successfully loaded. Logs warnings for invalid files.
 int LoadActorDefs(const std::string& dir,
                   std::unordered_map<std::string, ActorDef>& out);
+
+// Fetch all actor definitions from the admin API and merge into `out`.
+// URL format: {apiBase}/api/actors  (unauthenticated public endpoint)
+// Returns the number successfully fetched. Falls back gracefully on error.
+int FetchActorDefs(const char* apiBase,
+                   std::unordered_map<std::string, ActorDef>& out);
 
 // Mirror a hurtbox: negate and swap x components.
 inline FrameHurtbox MirrorHurtbox(const FrameHurtbox& hb) {

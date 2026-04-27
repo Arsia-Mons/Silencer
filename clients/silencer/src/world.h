@@ -99,6 +99,10 @@ public:
 	static const int maxstatusmessages = 4;
 	Uint32 tickcount;
 	bool choosingtech;
+
+	bool debugoverlay;
+	struct DebugLine { int x1, y1, x2, y2; Uint8 color; };
+	std::vector<DebugLine> debuglines;
 	
 	friend class Renderer;
 	friend class Game;

@@ -54,6 +54,8 @@ services:
       - ":15170"
       - "-public-addr"
       - "${PUBLIC_ADDR:-127.0.0.1}"
+      - "-version"
+      - "00028"
       - "-db"
       - "/data/lobby.json"
       - "-game-binary"
@@ -92,7 +94,7 @@ services:
       ASSETS_DIR: "/assets"
     volumes:
       - backup-data:/backups
-      - ../shared/assets:/assets:ro
+      - ../shared/assets:/assets
     restart: unless-stopped
 
   admin-web:

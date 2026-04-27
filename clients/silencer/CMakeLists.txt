@@ -5,10 +5,11 @@ project(Silencer)
 include(FetchContent)
 
 # nlohmann/json — header-only, C++14 compatible
+# v3.12.0: fixes std::_snprintf removed from MSVC 14.44 (VS 2022 17.13+)
 FetchContent_Declare(
 	nlohmann_json
-	URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.hpp
-	URL_HASH SHA256=9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6
+	URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.hpp
+	URL_HASH SHA256=aaf127c04cb31c406e5b04a63f1ae89369fccde6d8fa7cdda1ed4f32dfc5de63
 	DOWNLOAD_NO_EXTRACT TRUE
 )
 FetchContent_MakeAvailable(nlohmann_json)
@@ -113,17 +114,23 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
 # for runtime debugging.
 if(MSVC)
 	target_compile_options(${SILENCER_TARGET} PRIVATE $<$<CONFIG:Debug>:/Z7>)
+	# MSVC 14.44+ removed _snprintf from std::; nlohmann/json uses it internally.
+	# Force-include the shim before every TU to re-expose it.
+	target_compile_options(${SILENCER_TARGET} PRIVATE
+		"/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/msvc_snprintf_compat.h")
 endif()
 
 set(SILENCER_LOBBY_HOST "127.0.0.1" CACHE STRING "Lobby host the client connects to at startup")
 set(SILENCER_LOBBY_PORT "517" CACHE STRING "Lobby TCP port")
-set(SILENCER_VERSION "00028" CACHE STRING "Client version string sent to the lobby during MSG_VERSION")
+set(SILENCER_VERSION "00000" CACHE STRING "Client version string sent to the lobby during MSG_VERSION; overridden by release.yml from git tag")
 set(SILENCER_MAP_API_URL "http://127.0.0.1:15172" CACHE STRING "Base URL for the community map HTTP API (used when fetching a missing map before falling back to P2P)")
+set(SILENCER_ADMIN_API_URL "http://127.0.0.1:24080" CACHE STRING "Base URL for the admin API (actordefs sync, etc.)")
 target_compile_definitions(${SILENCER_TARGET} PRIVATE
 	SILENCER_LOBBY_HOST="${SILENCER_LOBBY_HOST}"
 	SILENCER_LOBBY_PORT=${SILENCER_LOBBY_PORT}
 	SILENCER_VERSION="${SILENCER_VERSION}"
 	SILENCER_MAP_API_URL="${SILENCER_MAP_API_URL}"
+	SILENCER_ADMIN_API_URL="${SILENCER_ADMIN_API_URL}"
 )
 
 find_package(ZLIB REQUIRED)

@@ -44,6 +44,15 @@ unit + env file + Mongo/LavinMQ co-location are described in
   `services/lobby/mongosync.go` writes the same `players`
   collection — coordinate any schema change that affects write
   semantics.
+- `src/routes/actors.js` — actor definition endpoints (filesystem-based).
+  `GET /actors` lists IDs; `GET /actors/:id` returns JSON; `PUT /actors/:id`
+  writes to `shared/assets/actordefs/<id>.json` (admin only); `DELETE` removes
+  the file. The game client fetches these via the `adminapiurl` config key on
+  each map load — no client rebuild needed after editing in the actor editor.
+- `src/routes/behaviortrees.js` — behavior tree endpoints, same shape as
+  actors. Reads/writes `shared/assets/behaviortrees/<id>.json`. Node type
+  whitelist enforced server-side (`Selector`, `Sequence`, `Leaf`, etc.).
+  The game client fetches these at startup for the BT interpreter.
 - `src/routes/players.js` — `PATCH /:id/ban` and `DELETE /:id`
   proxy to the lobby's internal HTTP (`LOBBY_PLAYER_AUTH_URL`)
   so live clients are kicked. Lobby unreachable is logged but
