@@ -34,6 +34,7 @@ public:
 	Uint8 GetState() const { return state; }
 	Uint16 GetCurrentInterfaceId() const { return currentinterface; }
 	class World& GetWorld() { return world; }
+	nlohmann::json GetWorldSummary();
 	bool paused;
 	int stepFramesRemaining;
 	Uint64 stepWallclockDeadlineMs;

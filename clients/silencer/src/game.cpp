@@ -6068,3 +6068,26 @@ const char* Game::StateName(Uint8 s){
 		default: return "UNKNOWN";
 	}
 }
+
+nlohmann::json Game::GetWorldSummary(){
+	nlohmann::json r;
+	r["map"] = world.gameinfo.mapname;
+	r["peers"] = (int)world.peercount;
+	nlohmann::json players = nlohmann::json::array();
+	int objcount = 0;
+	for(auto* o : world.objectlist){
+		++objcount;
+		if(o && o->type == ObjectTypes::PLAYER){
+			Player* p = (Player*)o;
+			nlohmann::json pj;
+			pj["id"] = p->id;
+			pj["hp"] = (int)p->health;
+			pj["x"] = (int)p->x;
+			pj["y"] = (int)p->y;
+			players.push_back(std::move(pj));
+		}
+	}
+	r["players"] = players;
+	r["objects_count"] = objcount;
+	return r;
+}
