@@ -13,6 +13,9 @@ import { useAuth } from '../../../lib/auth';
 import { useWsConnected } from '../../../lib/socket';
 import Sidebar from '../../../components/Sidebar';
 import { getActor, saveActor, type ActorDef } from '../../../lib/api';
+import {
+  isFolderLoaded, readFromStore, writeToStore, downloadJson, getFolderName,
+} from '../../../lib/actor-store';
 import AnimationTab from './AnimationTab';
 import HitboxTab from './HitboxTab';
 import PropsTab from './PropsTab';
@@ -30,6 +33,7 @@ export default function ActorEditorPage() {
   const [dirty, setDirty]   = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
+  const localFolder = isFolderLoaded() ? getFolderName() : null;
 
   const rawTab = searchParams.get('tab') as Tab | null;
   const tab: Tab = rawTab && VALID_TABS.includes(rawTab) ? rawTab : 'animation';
@@ -41,9 +45,18 @@ export default function ActorEditorPage() {
   }
 
   useEffect(() => {
-    getActor(id)
-      .then(d => setDef(d))
-      .catch(e => setError(e.message));
+    if (isFolderLoaded()) {
+      const stored = readFromStore(id);
+      if (stored) {
+        setDef(stored);
+      } else {
+        setError(`"${id}" not found in loaded folder`);
+      }
+    } else {
+      getActor(id)
+        .then(d => setDef(d))
+        .catch(e => setError(e.message));
+    }
   }, [id]);
 
   function updateDef(patch: Partial<ActorDef>) {
@@ -55,7 +68,12 @@ export default function ActorEditorPage() {
     if (!def) return;
     setSaving(true);
     try {
-      await saveActor(id, def);
+      if (isFolderLoaded()) {
+        writeToStore(id, def);
+        await downloadJson(id, def);
+      } else {
+        await saveActor(id, def);
+      }
       setDirty(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -78,6 +96,11 @@ export default function ActorEditorPage() {
         <div className="flex items-center gap-4 px-8 py-4 border-b border-game-border">
           <Link href="/actors" className="text-game-textDim hover:text-game-text text-sm">← ACTORS</Link>
           <h1 className="text-xl font-bold tracking-widest text-game-primary font-mono flex-1">{id}</h1>
+          {localFolder && (
+            <span className="text-xs text-game-warning tracking-wider border border-game-warning/40 px-2 py-1">
+              📁 {localFolder}
+            </span>
+          )}
           {dirty && <span className="text-game-warning text-xs tracking-widest">UNSAVED CHANGES</span>}
           {error && <span className="text-game-danger text-xs">{error}</span>}
           <button
