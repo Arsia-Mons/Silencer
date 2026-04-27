@@ -44,7 +44,7 @@ silencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
 
 ## Where to look
 
-- Top-level state machine (menus, lobby, in-game): `src/game.cpp` (5800+ lines).
+- Top-level state machine (menus, lobby, in-game): `src/game.cpp`.
 - Simulation loop, socket, peer list, replay: `src/world.cpp`.
 - Rendering: `src/renderer.cpp`, `src/surface.cpp`, `src/sprite.cpp`, `src/palette.cpp`.
 - Audio (skipped in `-s`): `src/audio.cpp`.
@@ -71,7 +71,7 @@ silencer -s <lobbyaddr> <lobbyport> <gameid> <accountid>
 
 - **Lobby host is a compile-time constant.** Baked in via
   `-DSILENCER_LOBBY_HOST=<host> -DSILENCER_LOBBY_PORT=<port>`. Default is
-  `127.0.0.1:517`. CI sets it to `silencer.hventura.com`. Rebuild
+  `127.0.0.1:517`. CI sets it to `lobby.arsiamons.com`. Rebuild
   the client to point at a different lobby.
 - **Version string must match the lobby.** Set via
   `-DSILENCER_VERSION=...` (default in `CMakeLists.txt`); the lobby's

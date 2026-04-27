@@ -359,19 +359,13 @@ bool Launch(const std::string &zippath) {
     std::string self = MySelfPath();
     std::string install = ResolveInstallDir(self);
     std::string tempdir = TempDir();
-    std::string temp = tempdir +
-#ifdef _WIN32
-        "\\silencer-stage2.exe";
-#else
-        "/silencer-stage2";
-#endif
 
+#ifdef _WIN32
+    std::string temp = tempdir + "\\silencer-stage2.exe";
     if (!CopyFile_(self, temp)) {
         Logf("copy self → %s failed", temp.c_str());
         return false;
     }
-
-#ifdef _WIN32
     // Windows resolves the main exe's import table from the exe's own
     // directory before our code runs. Since stage-2 lives in %TEMP% but
     // its DLLs (zlib1, SDL2, libcurl, etc.) live in the install dir, the
@@ -395,6 +389,65 @@ bool Launch(const std::string &zippath) {
             Logf("no DLLs found at %s (FindFirstFile err=%lu); stage-2 may fail to load",
                 pattern.c_str(), GetLastError());
         }
+    }
+#elif defined(__APPLE__)
+    // The shipped binary is signed with hardened runtime + library
+    // validation and references its dylibs via @rpath, with LC_RPATH set
+    // to @executable_path/../Frameworks. A flat copy at /tmp/silencer-stage2
+    // resolves @executable_path to /tmp, so dyld looks in /Frameworks/ and
+    // bails before main() runs — silently, because hardened runtime
+    // suppresses dyld errors when no TTY is attached. Mirror just enough
+    // bundle structure under /tmp that Frameworks/ sits next to the binary.
+    std::string stage2_bundle = tempdir + "/silencer-stage2.app";
+    std::string stage2_contents = stage2_bundle + "/Contents";
+    std::string stage2_macos = stage2_contents + "/MacOS";
+    std::string stage2_fw = stage2_contents + "/Frameworks";
+    RemoveDirRecursive(stage2_bundle);
+    mkdir(stage2_bundle.c_str(), 0755);
+    mkdir(stage2_contents.c_str(), 0755);
+    mkdir(stage2_macos.c_str(), 0755);
+    mkdir(stage2_fw.c_str(), 0755);
+
+    std::string temp = stage2_macos + "/silencer-stage2";
+    if (!CopyFile_(self, temp)) {
+        Logf("copy self → %s failed", temp.c_str());
+        return false;
+    }
+
+    // Mirror Frameworks/ from the source bundle so @rpath dylib refs
+    // (libSDL3, libSDL3_mixer, libminizip, …) resolve. Local dev builds
+    // link against absolute /opt/homebrew paths and have an empty (or
+    // missing) Frameworks/ — that's fine, the absolute paths resolve
+    // straight from /tmp without help.
+    std::string src_fw = install + "/Contents/Frameworks";
+    DIR *fwd = opendir(src_fw.c_str());
+    if (fwd) {
+        struct dirent *e;
+        while ((e = readdir(fwd)) != NULL) {
+            std::string n = e->d_name;
+            if (n == "." || n == "..") continue;
+            std::string from = src_fw + "/" + n;
+            struct stat st;
+            if (lstat(from.c_str(), &st) != 0) continue;
+            if (S_ISDIR(st.st_mode)) {
+                Logf("skipping framework dir %s (flat-dylib layout expected)", n.c_str());
+                continue;
+            }
+            std::string to = stage2_fw + "/" + n;
+            if (!CopyFile_(from, to)) {
+                Logf("copy framework %s -> %s failed", from.c_str(), to.c_str());
+            }
+        }
+        closedir(fwd);
+    } else {
+        Logf("no Frameworks/ at %s; assuming dev build with absolute dylib paths",
+            src_fw.c_str());
+    }
+#else
+    std::string temp = tempdir + "/silencer-stage2";
+    if (!CopyFile_(self, temp)) {
+        Logf("copy self → %s failed", temp.c_str());
+        return false;
     }
 #endif
 

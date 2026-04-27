@@ -17,7 +17,16 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install deps (Homebrew)
-        run: brew install sdl2 sdl2_mixer minizip dylibbundler
+        # SDL3 and especially SDL3_mixer aren't reliably in homebrew-core
+        # on the macos-latest runner image — install via setup-sdl below
+        # (same approach as deploy.yml's Linux build).
+        run: brew install minizip dylibbundler
+
+      - name: Install SDL3 + SDL3_mixer
+        uses: libsdl-org/setup-sdl@main
+        with:
+          version: 3-latest
+          version-sdl-mixer: 3-latest
 
       - name: Configure
         env:
@@ -26,7 +35,7 @@ jobs:
           cmake -B build -S clients/silencer \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-silencer.hventura.com}"
+            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}"
 
       - name: Build
         run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
@@ -35,13 +44,24 @@ jobs:
         working-directory: build
         run: |
           mkdir -p Silencer.app/Contents/Frameworks
+          # setup-sdl exports SDL3_ROOT + SDL3_mixer_ROOT env vars pointing
+          # at the per-runner install dirs (/var/folders/.../setupsdl/...).
+          # Pass them to dylibbundler as -s search paths so it can resolve
+          # @rpath/libSDL3*.dylib references in the binary. Without these,
+          # dylibbundler drops into an interactive prompt loop and hangs.
+          echo "--- SDL3 install roots ---"
+          echo "  SDL3_ROOT=$SDL3_ROOT"
+          echo "  SDL3_mixer_ROOT=$SDL3_mixer_ROOT"
           dylibbundler \
+            -s "$SDL3_ROOT/lib" \
+            -s "$SDL3_mixer_ROOT/lib" \
             --overwrite-dir \
             --bundle-deps \
             --create-dir \
             --fix-file Silencer.app/Contents/MacOS/Silencer \
             --dest-dir Silencer.app/Contents/Frameworks/ \
-            --install-path @rpath/
+            --install-path @rpath/ \
+            </dev/null
           install_name_tool -add_rpath @executable_path/../Frameworks \
             Silencer.app/Contents/MacOS/Silencer 2>/dev/null || true
           echo "--- bundled dylibs ---"
@@ -140,7 +160,7 @@ jobs:
           LOBBY_HOST: ${{ vars.LOBBY_HOST }}
           VCPKG_BINARY_SOURCES: clear;x-gha,readwrite
         run: |
-          $lobby = if ($env:LOBBY_HOST) { $env:LOBBY_HOST } else { "silencer.hventura.com" }
+          $lobby = if ($env:LOBBY_HOST) { $env:LOBBY_HOST } else { "lobby.arsiamons.com" }
           cmake -B build -S clients/silencer `
             -A x64 `
             -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `

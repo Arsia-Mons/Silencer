@@ -73,8 +73,19 @@ jobs:
       - name: Install C++ build deps
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: cmake build-essential libsdl2-dev libsdl2-mixer-dev zlib1g-dev libcurl4-openssl-dev libminizip-dev
-          version: 1.0
+          packages: cmake build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf
+          version: 2.0
+
+      # SDL3 + SDL3_mixer aren't in Ubuntu Noble's apt repos. Install via
+      # the official upstream action — handles caching, build-from-source,
+      # and the SDL3_mixer satellite project.
+      - name: Install SDL3 + SDL3_mixer
+        id: setup-sdl
+        uses: libsdl-org/setup-sdl@main
+        with:
+          install-linux-dependencies: true
+          version: 3-latest
+          version-sdl-mixer: 3-latest
 
       - name: Setup ccache
         uses: hendrikmuhs/ccache-action@v1
@@ -94,9 +105,34 @@ jobs:
           cmake \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-silencer.hventura.com}" \
+            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}" \
             ../clients/silencer
           make -j"$(nproc)"
+
+      # Ship SDL3 + SDL3_mixer .so files in lib/ next to the binary, with
+      # rpath = $ORIGIN/lib, so the dedicated server runs on the lobby box
+      # without anything SDL-related installed system-wide. Otherwise a
+      # fresh instance (or any box where setup-sdl's per-runner install
+      # never landed) gets "libSDL3_mixer.so.0: cannot open shared object
+      # file" when the lobby spawns a dedicated server, exit status 127,
+      # and games never start. Resolve the .so files via the env vars
+      # setup-sdl exports (SDL3_ROOT / SDL3_mixer_ROOT).
+      - name: Bundle SDL3 libs with binary
+        env:
+          SDL3_ROOT: ${{ env.SDL3_ROOT }}
+          SDL3_MIXER_ROOT: ${{ env.SDL3_mixer_ROOT }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/lib
+          cp -L "$SDL3_ROOT/lib/libSDL3.so.0" build/lib/
+          cp -L "$SDL3_MIXER_ROOT/lib/libSDL3_mixer.so.0" build/lib/
+          patchelf --set-rpath '$ORIGIN/lib' build/silencer
+          echo "--- bundled libs ---"
+          ls -la build/lib/
+          echo "--- binary linkage ---"
+          # Use LD_LIBRARY_PATH for the diag print since rpath only resolves
+          # relative to the binary's actual on-disk location.
+          (cd build && LD_LIBRARY_PATH=lib ldd silencer | grep -E "SDL3|not found")
 
       - name: Build update.json from release artifacts
         if: steps.ctx.outputs.update_manifest == 'true'
@@ -159,6 +195,7 @@ jobs:
           $SSH "mkdir -p $STAGING"
           $SCP services/lobby/silencer-lobby ubuntu@$HOST:$STAGING/
           $SCP build/silencer         ubuntu@$HOST:$STAGING/
+          $SCP -r build/lib           ubuntu@$HOST:$STAGING/
           $SCP -r shared/assets       ubuntu@$HOST:$STAGING/
 
           if [[ "$UPDATE_MANIFEST" == "true" ]]; then

@@ -8,97 +8,56 @@ auth flow are in `README.md`; this file is for editing the code.
 The runtime + lockfile (`bun.lock`) moved to Bun in Phase 1 of the
 production deployment plan. Source-level migration to TS is deferred.
 
-## Production runtime (Phase 1)
+## Production runtime
 
-Containerised on the admin/data box. The systemd unit
-(`silencer-admin-web.service`) reads its image ref from
-`/etc/silencer/admin-web.image` and runs:
-
-```
-docker run --rm --network host --env-file /etc/silencer/admin-web.env $IMAGE
-```
-
-Public ingress is via Cloudflare Tunnel (`cloudflared` running on the
-same box, no ports open on the SG). The tunnel's public-hostname
-config in the Cloudflare dashboard routes:
-
-- `admin.arsiamons.com/api/*`       → `localhost:24080` (admin-api)
-- `admin.arsiamons.com/socket.io/*` → `localhost:24080` (admin-api)
-- `admin.arsiamons.com` catch-all   → `localhost:24000` (admin-web)
-
-That single hostname is what makes `lib/api.js` and `lib/socket.js`
-work with relative URLs in production.
-
-Deploy: `.github/workflows/deploy-admin-web.yml` is path-filtered to
-this directory. Builds ARM64 OCI image → GHCR → SSH → image-ref
-swap → systemctl restart. Same shape as admin-api's workflow.
+Containerised on the admin/data box, same shape as admin-api:
+ARM64 image → GHCR → SSH → image-ref swap → `systemctl restart`.
+Workflow is `.github/workflows/deploy-admin-web.yml`. Public ingress
+is Cloudflare Tunnel; the path-routing rules that share
+`admin.arsiamons.com` between admin-web and admin-api live in
+`infra/terraform/CLAUDE.md`.
 
 ## NEXT_PUBLIC_* are empty in production
 
-The build args `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`,
-`NEXT_PUBLIC_MAP_API_URL` are intentionally **unset** in the prod
-Dockerfile build. That makes `lib/api.js` resolve `API` to `/api`
-(relative — Cloudflare Tunnel routes it) and `lib/socket.js` connect
-to the page origin (tunnel routes `/socket.io/*`). docker-compose
-passes them with `localhost:*` values for dev because the dev browser
-talks to admin-api on its own port directly.
-
-If you ever need to bake an explicit URL in (e.g. a separate
-`NEXT_PUBLIC_MAP_API_URL` for the lobby's map API), pass it as a
-`--build-arg` in the deploy workflow's `docker/build-push-action`
-step — don't put a default back in `next.config.mjs`.
+`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WS_URL`, `NEXT_PUBLIC_MAP_API_URL`
+are intentionally **unset** in the prod Dockerfile build. That makes
+`lib/api.js` resolve to `/api` (relative — Cloudflare Tunnel routes
+it) and `lib/socket.js` connect to the page origin. docker-compose
+sets them to `localhost:*` for dev (browser talks to admin-api
+directly). If you need to bake an explicit URL in, pass it as a
+`--build-arg` in the deploy workflow — don't add a default to
+`next.config.mjs`.
 
 ## Per-route
 
-- `app/page.js` — root entry; just `redirect('/dashboard')`.
-- `app/dashboard/page.js` — admin dashboard (live online players,
-  active games, in-game / in-room counts). Snapshot-driven via
-  `useSocket`; subscribes to `player.*` and `game.*` events to keep
-  the in-memory map in sync.
-- `app/login/page.js` — admin login + `?mode=player` toggle for the
-  player portal login.
-- `app/players/page.js` + `app/players/[accountId]/page.js` — list
-  + detail (full lifetime stats, weapon accuracy, paginated match
-  history). Detail has Ban/Unban (admin) and Delete (superadmin)
-  buttons that hit the API which proxies to the lobby in real time.
-- `app/me/page.js` — player self-service portal (own profile +
-  match history). Player JWT only.
-- `app/audit/`, `app/health/`, `app/changelog/`, `app/howto/`,
-  `app/users/`, `app/gamestats/` — read-only or settings pages.
-  `health` also hosts the MongoDB backup panel (trigger / status /
-  list).
+- `app/dashboard/page.js` — snapshot-driven via `useSocket`;
+  subscribes to `player.*` and `game.*` events to keep the in-memory
+  map in sync.
+- `app/players/[accountId]/page.js` — Ban/Unban (admin) and Delete
+  (superadmin) buttons hit the API which proxies to the lobby in
+  real time.
+- `app/me/page.js` — player self-service portal. Player JWT only.
+- `app/health/page.js` — also hosts the MongoDB backup panel
+  (trigger / status / list).
 - `app/designer/` — embedded level designer (folded in here, not
-  the standalone `designer/` dir which is being retired in Phase 5).
-  Hooks: `useSilMap.js` (parses `.SIL` map files via `pako`),
-  `useGameData.js` (fetches the actor/tile catalogues from the
-  lobby's map API). `MapCanvas.js` is the core editor surface;
-  the panels and context menus are siblings.
+  the standalone `designer/` dir being retired in Phase 5).
+  `useSilMap.js` parses `.SIL` map files via `pako`; `useGameData.js`
+  fetches actor/tile catalogues from the lobby's map API.
+  `MapCanvas.js` is the core editor surface.
 
 ## Per-library
 
-- `lib/api.js` — Thin `fetch` wrapper. Reads `zs_token` (admin)
-  from localStorage and injects `Authorization: Bearer <token>`.
-  All admin RPCs live here as named exports.
-- `lib/auth.js` — `useAuth()` / `usePlayerAuth()` hooks redirect
-  to the right login page when the matching localStorage key is
-  missing. Two storage keys: `zs_token` (admin) and
-  `zs_player_token` (player) — they don't overlap; logging out of
+- `lib/api.js` — `fetch` wrapper, injects `Authorization: Bearer`
+  from `zs_token` (admin) localStorage key.
+- `lib/auth.js` — two storage keys: `zs_token` (admin) and
+  `zs_player_token` (player). They don't overlap; logging out of
   one leaves the other alone.
-- `lib/socket.js` — Singleton Socket.IO client over
-  `NEXT_PUBLIC_WS_URL`. Reconnects forever (2 s back-off). Sends
-  `getSnapshot` on every (re)connect so a freshly-mounted page
-  always shows current state, not the cached state from before
-  navigation. **Recreates the socket if the JWT changes** — this
-  matters when the user logs out and re-logs as a different role.
-- `lib/changelog.js` — Static structured changelog data consumed
-  by `/changelog`. Add new entries here when shipping features.
-
-## Components
-
-- `components/Sidebar.js` — Nav + WebSocket connection dot. Logo
-  src is `/logo.png`.
-- `components/StatCard.js` — Single metric tile (`game-*` Tailwind
-  tokens defined in `tailwind.config.js`).
+- `lib/socket.js` — singleton Socket.IO client. Reconnects forever
+  (2 s back-off). Sends `getSnapshot` on every (re)connect.
+  **Recreates the socket if the JWT changes** — matters when a user
+  logs out and re-logs as a different role.
+- `lib/changelog.js` — static structured changelog data. Add entries
+  here when shipping features.
 
 ## Invariants
 
