@@ -3,8 +3,16 @@
  * C3: Animation sequence builder + timeline
  * C4: Live preview canvas at game speed (60fps rAF loop)
  */
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { getSpriteFrames, type FrameMeta, type ActorDef } from '../../../lib/api';
+
+function useSounds(): string[] {
+  const [sounds, setSounds] = useState<string[]>([]);
+  useEffect(() => {
+    fetch('/api/sounds').then(r => r.json()).then(setSounds).catch(() => {});
+  }, []);
+  return sounds;
+}
 
 interface FrameDef {
   bank: number;
@@ -136,12 +144,75 @@ function PreviewCanvas({ sequence }: { sequence: AnimSequence | null }) {
   );
 }
 
+/** Inline sound picker — shows current value; click to open a searchable dropdown. */
+function SoundPicker({ value, sounds, onChange }: {
+  value: string | undefined;
+  sounds: string[];
+  onChange: (v: string | undefined) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const filtered = useMemo(
+    () => sounds.filter(s => s.toLowerCase().includes(filter.toLowerCase())),
+    [sounds, filter]
+  );
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        className="w-32 bg-game-bg border border-game-border px-2 py-1 text-xs font-mono text-left truncate hover:border-game-text"
+        onClick={() => { setOpen(o => !o); setFilter(''); }}
+        title={value}
+      >
+        {value ?? <span className="text-game-textDim">— none —</span>}
+      </button>
+      {open && (
+        <div className="absolute z-50 top-full left-0 mt-0.5 w-48 bg-game-surface border border-game-border shadow-lg flex flex-col">
+          <input
+            autoFocus
+            type="text"
+            placeholder="filter..."
+            className="bg-game-bg border-b border-game-border px-2 py-1 text-xs font-mono"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+          />
+          <div className="overflow-y-auto max-h-48">
+            <button
+              type="button"
+              className="w-full text-left px-2 py-1 text-xs text-game-textDim hover:bg-game-border/30"
+              onClick={() => { onChange(undefined); setOpen(false); }}
+            >— none —</button>
+            {filtered.map(s => (
+              <button
+                key={s}
+                type="button"
+                className={`w-full text-left px-2 py-1 text-xs font-mono hover:bg-game-border/30 ${s === value ? 'text-game-accent' : ''}`}
+                onClick={() => { onChange(s); setOpen(false); }}
+              >{s}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Frame row in the sequence editor. */
 function FrameRow({
-  f, idx, onChange, onDelete, onMoveUp, onMoveDown,
+  f, idx, sounds, onChange, onDelete, onMoveUp, onMoveDown,
 }: {
   f: FrameDef;
   idx: number;
+  sounds: string[];
   onChange: (f: FrameDef) => void;
   onDelete: () => void;
   onMoveUp: () => void;
@@ -174,15 +245,10 @@ function FrameRow({
         className="w-8 h-8 object-contain border border-game-border bg-black"
         style={{ imageRendering: 'pixelated' }}
       />
-      <input
-        type="text"
-        placeholder="sound.wav"
-        className="w-28 bg-game-bg border border-game-border px-2 py-1 text-xs font-mono"
-        value={f.sound ?? ''}
-        onChange={e => {
-          const v = e.target.value;
-          onChange({ ...f, sound: v || undefined });
-        }}
+      <SoundPicker
+        value={f.sound}
+        sounds={sounds}
+        onChange={v => onChange({ ...f, sound: v })}
       />
       <input
         type="number" min={0} max={128}
@@ -211,6 +277,7 @@ export default function AnimationTab({
   def: ActorDef;
   onChange: (patch: Partial<ActorDef>) => void;
 }) {
+  const sounds = useSounds();
   const sequences = getSequences(def);
   const [selectedSeq, setSelectedSeq] = useState<string | null>(
     Object.keys(sequences)[0] ?? null
@@ -346,6 +413,7 @@ export default function AnimationTab({
                     key={i}
                     f={f}
                     idx={i}
+                    sounds={sounds}
                     onChange={nf => updateFrame(i, nf)}
                     onDelete={() => deleteFrame(i)}
                     onMoveUp={() => moveFrame(i, -1)}
