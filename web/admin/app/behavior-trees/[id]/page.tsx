@@ -6,7 +6,7 @@ import { useAuth } from '../../../lib/auth';
 import { useWsConnected } from '../../../lib/socket';
 import Sidebar from '../../../components/Sidebar';
 import { getBehaviorTree, saveBehaviorTree, type BehaviorTree } from '../../../lib/api';
-import { getFolderHandle, readJson, writeJson } from '../../../lib/folder-store';
+import { isFolderLoaded, getFolderName, readFromStore, writeToStore, downloadJson } from '../../../lib/folder-store';
 
 // ReactFlow must be client-only
 const BehaviorTreeEditor = dynamic(() => import('./BehaviorTreeEditor'), { ssr: false });
@@ -23,12 +23,14 @@ export default function BehaviorTreePage() {
 
   useEffect(() => {
     if (!id) return;
-    const h = getFolderHandle();
-    if (h) {
-      setLocalFolder(h.name);
-      readJson<BehaviorTree>(h, id)
-        .then(data => setBt(data))
-        .catch(e => setError(e instanceof Error ? e.message : String(e)));
+    if (isFolderLoaded()) {
+      setLocalFolder(getFolderName());
+      const data = readFromStore(id);
+      if (data) {
+        setBt(data);
+      } else {
+        setError(`"${id}" not found in loaded folder`);
+      }
     } else {
       getBehaviorTree(id)
         .then(data => setBt(data))
@@ -45,9 +47,9 @@ export default function BehaviorTreePage() {
     if (!bt || !id) return;
     setSaving(true);
     try {
-      const h = getFolderHandle();
-      if (h) {
-        await writeJson(h, id, bt);
+      if (isFolderLoaded()) {
+        writeToStore(id, bt);
+        downloadJson(id, bt);
       } else {
         await saveBehaviorTree(id, bt);
       }
@@ -61,14 +63,7 @@ export default function BehaviorTreePage() {
 
   function handleDownload() {
     if (!bt || !id) return;
-    const json = JSON.stringify(bt, null, 2);
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${id}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    downloadJson(id, bt);
   }
 
   return (

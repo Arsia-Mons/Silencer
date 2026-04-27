@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../lib/auth';
@@ -7,46 +7,53 @@ import { useWsConnected } from '../../lib/socket';
 import Sidebar from '../../components/Sidebar';
 import { listBehaviorTrees, deleteBehaviorTree, saveBehaviorTree, type BehaviorTree } from '../../lib/api';
 import {
-  openFolder, clearFolder, getFolderHandle,
-  listJsonFiles, writeJson, deleteJson,
+  isFolderLoaded, getFolderName, clearStore,
+  loadFilesIntoStore, listIds, writeToStore, deleteFromStore, downloadJson,
 } from '../../lib/folder-store';
 
 export default function BehaviorTreesPage() {
   useAuth();
   const wsConnected = useWsConnected();
   const router = useRouter();
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [trees, setTrees] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [newId, setNewId] = useState('');
   const [creating, setCreating] = useState(false);
-  const [folderName, setFolderName] = useState<string | null>(null);
+  const [folderName, setFolderName] = useState<string | null>(() =>
+    typeof window !== 'undefined' && isFolderLoaded() ? getFolderName() : null
+  );
 
-  async function load(dir?: FileSystemDirectoryHandle | null) {
+  async function loadFromServer() {
     setLoading(true);
-    const h = dir !== undefined ? dir : getFolderHandle();
-    try {
-      setTrees(h ? await listJsonFiles(h) : await listBehaviorTrees());
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
+    try { setTrees(await listBehaviorTrees()); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
+    finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (isFolderLoaded()) {
+      setTrees(listIds());
+      setLoading(false);
+    } else {
+      loadFromServer();
+    }
+  }, []);
 
-  async function handleOpenFolder() {
-    const h = await openFolder();
-    if (!h) return;
-    setFolderName(h.name);
-    await load(h);
+  async function handleFolderInput(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!e.target.files?.length) return;
+    await loadFilesIntoStore(e.target.files);
+    setFolderName(getFolderName());
+    setTrees(listIds());
+    setLoading(false);
+    e.target.value = '';
   }
 
   function handleCloseFolder() {
-    clearFolder();
+    clearStore();
     setFolderName(null);
-    load(null);
+    loadFromServer();
   }
 
   async function handleCreate() {
@@ -61,13 +68,17 @@ export default function BehaviorTreesPage() {
       positions: {},
     };
     try {
-      const h = getFolderHandle();
-      if (h) {
-        await writeJson(h, id, emptyTree);
+      if (isFolderLoaded()) {
+        writeToStore(id, emptyTree);
+        downloadJson(id, emptyTree);
+        setTrees(listIds());
+        setNewId('');
+        setCreating(false);
+        router.push(`/behavior-trees/${id}`);
       } else {
         await saveBehaviorTree(id, emptyTree);
+        router.push(`/behavior-trees/${id}`);
       }
-      router.push(`/behavior-trees/${id}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
       setCreating(false);
@@ -77,19 +88,28 @@ export default function BehaviorTreesPage() {
   async function handleDelete(id: string) {
     if (!confirm(`Delete behavior tree "${id}"?`)) return;
     try {
-      const h = getFolderHandle();
-      if (h) {
-        await deleteJson(h, id);
+      if (isFolderLoaded()) {
+        deleteFromStore(id);
+        setTrees(prev => prev.filter(t => t !== id));
       } else {
         await deleteBehaviorTree(id);
+        setTrees(prev => prev.filter(t => t !== id));
       }
-      setTrees(prev => prev.filter(t => t !== id));
     } catch (e: unknown) { setError(e instanceof Error ? e.message : String(e)); }
   }
 
   return (
     <div className="flex min-h-screen bg-game-bg text-game-text">
       <Sidebar wsConnected={wsConnected} />
+      {/* Hidden folder input — webkitdirectory works over plain HTTP */}
+      <input
+        ref={folderInputRef}
+        type="file"
+        {...({ webkitdirectory: '' } as unknown as React.InputHTMLAttributes<HTMLInputElement>)}
+        accept=".json"
+        className="hidden"
+        onChange={handleFolderInput}
+      />
       <main className="flex-1 p-8">
         <div className="mb-6 flex items-start justify-between">
           <div>
@@ -106,13 +126,13 @@ export default function BehaviorTreesPage() {
                   onClick={handleCloseFolder}
                   className="text-xs text-game-textDim border border-game-border px-2 py-1 hover:text-game-text hover:border-game-text transition-colors"
                 >
-                  × CLOSE FOLDER
+                  × CLOSE
                 </button>
               </>
             ) : (
               <button
-                onClick={handleOpenFolder}
-                title="Open local shared/assets/behaviortrees/ folder — edits write directly to disk"
+                onClick={() => folderInputRef.current?.click()}
+                title="Open shared/assets/behaviortrees/ — edits download back to disk"
                 className="text-xs font-bold tracking-wider border border-game-border px-3 py-1.5 text-game-textDim hover:text-game-primary hover:border-game-primary transition-colors"
               >
                 📁 OPEN FOLDER
@@ -144,7 +164,7 @@ export default function BehaviorTreesPage() {
           <div className="text-game-textDim text-sm">Loading…</div>
         ) : trees.length === 0 ? (
           <div className="text-game-textDim text-sm border border-game-border p-8 text-center">
-            No behavior trees found. {folderName ? 'No .json files in this folder.' : 'Create one above.'}
+            {folderName ? 'No .json files found in selected folder.' : 'No behavior trees found. Create one above.'}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

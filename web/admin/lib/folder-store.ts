@@ -1,54 +1,72 @@
 /**
- * Module-level singleton holding the user's locally-opened behavior tree
- * directory handle (File System Access API). Persists for the lifetime of
- * the browser tab; survives client-side navigation between list and editor.
+ * In-memory store for behavior tree JSON files loaded via
+ * <input webkitdirectory> — works over plain HTTP (unlike the
+ * File System Access API which requires HTTPS/localhost).
  *
- * When a handle is set the editor reads/writes local files directly,
- * bypassing the admin-api entirely — changes land straight in the git repo.
+ * Workflow:
+ *   1. User clicks OPEN FOLDER → hidden input triggers directory picker
+ *   2. All .json files are read into `store`
+ *   3. Editor loads/saves from `store`
+ *   4. SAVE also downloads the file so the user can drop it into the
+ *      repo and commit
  */
 
-let handle: FileSystemDirectoryHandle | null = null;
+import type { BehaviorTree } from './api';
 
-export function getFolderHandle(): FileSystemDirectoryHandle | null {
-  return handle;
-}
+const store = new Map<string, BehaviorTree>();
+let _folderName: string | null = null;
 
-export async function openFolder(): Promise<FileSystemDirectoryHandle | null> {
-  if (typeof window === 'undefined' || !('showDirectoryPicker' in window)) return null;
-  try {
-    handle = await (window as unknown as { showDirectoryPicker(): Promise<FileSystemDirectoryHandle> }).showDirectoryPicker();
-    return handle;
-  } catch {
-    // User cancelled
-    return null;
+export function getFolderName(): string | null { return _folderName; }
+export function isFolderLoaded(): boolean { return store.size > 0; }
+
+export async function loadFilesIntoStore(files: FileList): Promise<void> {
+  store.clear();
+  const first = files[0] as { webkitRelativePath?: string } & File | undefined;
+  if (first?.webkitRelativePath) {
+    _folderName = first.webkitRelativePath.split('/')[0];
+  } else if (first) {
+    _folderName = 'local';
   }
+
+  await Promise.all(
+    Array.from(files)
+      .filter(f => f.name.endsWith('.json'))
+      .map(f =>
+        f.text().then(text => {
+          try { store.set(f.name.slice(0, -5), JSON.parse(text) as BehaviorTree); }
+          catch { /* skip invalid JSON */ }
+        })
+      )
+  );
 }
 
-export function clearFolder(): void {
-  handle = null;
+export function clearStore(): void {
+  store.clear();
+  _folderName = null;
 }
 
-export async function listJsonFiles(dir: FileSystemDirectoryHandle): Promise<string[]> {
-  const ids: string[] = [];
-  for await (const [name] of dir.entries()) {
-    if (name.endsWith('.json')) ids.push(name.slice(0, -5));
-  }
-  return ids.sort();
+export function listIds(): string[] {
+  return [...store.keys()].sort();
 }
 
-export async function readJson<T>(dir: FileSystemDirectoryHandle, id: string): Promise<T> {
-  const file = await dir.getFileHandle(`${id}.json`);
-  const f = await file.getFile();
-  return JSON.parse(await f.text()) as T;
+export function readFromStore(id: string): BehaviorTree | null {
+  return store.get(id) ?? null;
 }
 
-export async function writeJson(dir: FileSystemDirectoryHandle, id: string, data: unknown): Promise<void> {
-  const file = await dir.getFileHandle(`${id}.json`, { create: true });
-  const writable = await file.createWritable();
-  await writable.write(JSON.stringify(data, null, 2));
-  await writable.close();
+export function writeToStore(id: string, data: BehaviorTree): void {
+  store.set(id, data);
 }
 
-export async function deleteJson(dir: FileSystemDirectoryHandle, id: string): Promise<void> {
-  await dir.removeEntry(`${id}.json`);
+export function deleteFromStore(id: string): void {
+  store.delete(id);
+}
+
+export function downloadJson(id: string, data: unknown): void {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${id}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
