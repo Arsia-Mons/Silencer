@@ -40,9 +40,7 @@ unit + env file + Mongo/LavinMQ co-location are described in
   (`localhost:28017`, `localhost:25672` for local-dev outside Docker).
 - `src/auth/jwt.js` — middlewares: `requireAuth`, `requirePlayer`
   (type === 'player'), `requireRole(minRole)`.
-- `src/db/models/` — Mongoose schemas. `ActorDef.js` and `BehaviorTree.js`
-  are present but **not used by current routes** — actordefs and BTs are
-  filesystem-only. They remain as legacy stubs. The lobby's
+- `src/db/models/` — Mongoose schemas. The lobby's
   `services/lobby/mongosync.go` writes the same `players`
   collection — coordinate any schema change that affects write
   semantics.

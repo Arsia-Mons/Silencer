@@ -76,13 +76,6 @@ function validate(bt) {
   return dfs(bt.rootId);
 }
 
-/**
- * Seed behavior trees — no-op. Files in shared/assets/behaviortrees/ are
- * the canonical source of truth and are committed to git. No DB seeding needed.
- * @deprecated kept for call-site compatibility during transition; remove callers.
- */
-export async function seedBehaviorTrees() {}
-
 // GET /behaviortrees  — public
 router.get('/', (_req, res) => {
   try {

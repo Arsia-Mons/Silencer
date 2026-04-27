@@ -39,13 +39,6 @@ function writeToDisk(id, data) {
   writeFileSync(diskPath(id), JSON.stringify(data, null, 2), 'utf8');
 }
 
-/**
- * Seed actor defs — no-op. Files in shared/assets/actordefs/ are
- * the canonical source of truth and are committed to git. No DB seeding needed.
- * @deprecated kept for call-site compatibility during transition; remove callers.
- */
-export async function seedActorDefs() {}
-
 // GET /actors  — public
 router.get('/', (_req, res) => {
   try {
