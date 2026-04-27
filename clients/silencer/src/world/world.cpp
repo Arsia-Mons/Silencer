@@ -1820,6 +1820,7 @@ bool World::AllPeersLoadedGameInfo(void){
 bool World::AllPeersDownloadedMap(void){
 	bool allloaded = true;
 	for(int i = 0; i < maxpeers; i++){
+		if(i == authoritypeer) continue; // dedicated server doesn't download maps
 		Peer * peer = peerlist[i];
 		if(peer){
 			if(!peer->mapdownloaded){
