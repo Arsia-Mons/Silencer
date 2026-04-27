@@ -1842,6 +1842,196 @@ static int RunDumpLobbyGameTech(const std::string &assets_dir,
   return ok ? 0 : 1;
 }
 
+// ---------------------------------------------------------------------------
+// LOBBY-derivative — GameSummary modal (post-match Mission Summary +
+// Agency Upgrade panel, env SILENCER_DUMP_SCREEN=lobby_gamesummary). Per
+// docs/design/screen-lobby-game-summary.md the modal sits over the LOBBY
+// chrome — left panel area shows Mission Summary, right panel area shows
+// Agency Upgrade (XP overlay + 6 upgrade-row buttons + Done). Numeric
+// values are runtime-zero in the canonical dump.
+//
+// Spec gaps: precise panel-chrome sprite indices for Mission Summary +
+// Agency Upgrade panels are unconfirmed; upgrade-row buttons are
+// "B156x33-style" but the bank index isn't documented. We reuse the
+// loaded LOBBY chrome (panel idx 1, right border idx 8) as the visual
+// scaffold and B156x21 (idx 24) as the upgrade-row + Done button chrome.
+// Spec gates only on title + label list + 6 row labels + Done text.
+// ---------------------------------------------------------------------------
+static int RunDumpLobbyGameSummary(const std::string &assets_dir,
+                                   const std::string &dump_dir) {
+  if (!SDL_Init(0)) {
+    std::fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
+    return 1;
+  }
+
+  Palette palette;
+  if (!palette.LoadFromFile(assets_dir + "/PALETTE.BIN")) {
+    SDL_Quit();
+    return 1;
+  }
+
+  // Same banks as RunDumpLobby — no new bank loads required because the
+  // modal reuses the LOBBY chrome scaffold and the standard B156x21
+  // button chrome for upgrade rows + Done.
+  SpriteSet sprites;
+  std::vector<int> banks = {7, 133, 134, 135, 181};
+  if (!sprites.Load(assets_dir, banks)) {
+    SDL_Quit();
+    return 1;
+  }
+
+  constexpr int kSubLobby = 2;
+
+  Framebuffer fb;
+  fb.Clear();
+
+  // LOBBY chrome bleed-through (visible on the left of the reference dump):
+  // panel idx 1, "Silencer" header, "demo" username, NOXIS character stats,
+  // "Lobby" channel label. No GameSelectInterface, no ChatInterface body —
+  // the Mission Summary + Agency Upgrade panels cover those regions.
+  if (sprites.Has(7, 1)) {
+    BlitSprite(fb, sprites.Get(7, 1), 0, 0, nullptr);
+  }
+  DrawText(fb, 15, 32, "Silencer", /*bank=*/135, /*advance=*/11, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 115, 39, "v.00028", /*bank=*/133, /*advance=*/6, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 20, 71, "demo", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 130, "LEVEL: 8", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 143, "WINS: 47", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 156, "LOSSES: 12", /*bank=*/133, /*advance=*/7, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 17, 169, "XP TO NEXT LEVEL: 220", /*bank=*/133, /*advance=*/7,
+           sprites, palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 15, 200, "Lobby", /*bank=*/134, /*advance=*/8, sprites, palette,
+           kSubLobby, /*brightness=*/128);
+
+  // Right border chrome (idx 8) — anchors the Agency Upgrade panel area.
+  if (sprites.Has(7, 8)) {
+    BlitSprite(fb, sprites.Get(7, 8), 0, 0, nullptr);
+  }
+
+  // Mission Summary title (left panel top).
+  DrawText(fb, 175, 50, "Mission Summary", /*bank=*/134, /*advance=*/8,
+           sprites, palette, kSubLobby, /*brightness=*/128);
+
+  // Mission Summary stat label list. 23 rows derived from the spec's
+  // CreateGameSummaryInterface inventory, grouped by section. Values
+  // are runtime — rendered as "0" placeholders right-aligned to ~x=290.
+  {
+    constexpr int kLabelXMain = 130;
+    constexpr int kLabelXSub = 144;
+    constexpr int kValueX = 290;
+    struct Row {
+      const char *label;
+      int x;
+      int y;
+    };
+    const std::array<Row, 23> rows = {{
+        {"Kills:",                    kLabelXMain, 90},
+        {"Deaths:",                   kLabelXMain, 100},
+        {"Suicides:",                 kLabelXMain, 110},
+        {"Secrets",                   kLabelXMain, 124},
+        {"Returned:",                 kLabelXSub,  134},
+        {"Stolen:",                   kLabelXSub,  144},
+        {"Fumbled:",                  kLabelXSub,  154},
+        {"Civilians killed:",         kLabelXMain, 168},
+        {"Guards killed:",            kLabelXMain, 178},
+        {"Robots killed:",            kLabelXMain, 188},
+        {"Defenses destroyed:",       kLabelXMain, 198},
+        {"Fixed Cannons destroyed:",  kLabelXMain, 208},
+        {"Files",                     kLabelXMain, 222},
+        {"Hacked:",                   kLabelXSub,  232},
+        {"Returned:",                 kLabelXSub,  242},
+        {"Powerups picked up:",       kLabelXMain, 256},
+        {"Health packs used:",        kLabelXMain, 266},
+        {"Cameras placed:",           kLabelXMain, 276},
+        {"Detonators planted:",       kLabelXMain, 286},
+        {"Fixed Cannons placed:",     kLabelXMain, 296},
+        {"Viruses used:",             kLabelXMain, 310},
+        {"Poisons:",                  kLabelXMain, 320},
+        {"Lazarus Tracts planted:",   kLabelXMain, 330},
+    }};
+    for (const auto &r : rows) {
+      DrawText(fb, r.x, r.y, r.label, /*bank=*/133, /*advance=*/6, sprites,
+               palette, kSubLobby, /*brightness=*/128);
+      // Skip value column for the Secrets / Files section headers.
+      if (std::strchr(r.label, ':') != nullptr) {
+        DrawText(fb, kValueX, r.y, "0", /*bank=*/133, /*advance=*/6, sprites,
+                 palette, kSubLobby, /*brightness=*/128);
+      }
+    }
+  }
+
+  // Agency Upgrade panel header overlays (right panel top).
+  DrawText(fb, 478, 50, "+ 0 XP", /*bank=*/134, /*advance=*/8, sprites,
+           palette, kSubLobby, /*brightness=*/128);
+  DrawText(fb, 462, 75, "*NEW UPGRADE AVAILABLE*", /*bank=*/133, /*advance=*/6,
+           sprites, palette, kSubLobby, /*brightness=*/128);
+
+  // 6 upgrade rows + Done button. Each upgrade row is a "Current X
+  // Level: 0" overlay above a B156x21 "+1 X" button. Done at the
+  // bottom right.
+  {
+    constexpr int kB156Base = 24;
+    constexpr int kB156Width = 156;
+    constexpr int kB156Advance = 8;
+    constexpr int kB156Yoff = 4;
+    constexpr int kRowX = 437;
+    struct Upgrade {
+      const char *current_label;
+      const char *button_label;
+      int y;
+    };
+    const std::array<Upgrade, 6> upgrades = {{
+        {"Current Endurance Level: 0", "+1 Endurance", 110},
+        {"Current Shield Level: 0",    "+1 Shield",    155},
+        {"Current Jetpack Level: 0",   "+1 Jetpack",   200},
+        {"Current Tech Slot Level: 0", "+1 Tech Slot", 245},
+        {"Current Hacking Level: 0",   "+1 Hacking",   290},
+        {"Current Contacts Level: 0",  "+1 Contacts",  335},
+    }};
+    if (sprites.Has(7, kB156Base)) {
+      const Sprite &chrome = sprites.Get(7, kB156Base);
+      for (const auto &u : upgrades) {
+        DrawText(fb, kRowX + 5, u.y - 12, u.current_label, /*bank=*/133,
+                 /*advance=*/6, sprites, palette, kSubLobby,
+                 /*brightness=*/128);
+        BlitSprite(fb, chrome, kRowX, u.y, nullptr);
+        int len = static_cast<int>(std::strlen(u.button_label));
+        int xoff = (kB156Width - len * kB156Advance) / 2;
+        int textX = kRowX - chrome.offset_x + xoff;
+        int textY = u.y - chrome.offset_y + kB156Yoff;
+        DrawText(fb, textX, textY, u.button_label, /*bank=*/134,
+                 /*advance=*/kB156Advance, sprites, palette, kSubLobby,
+                 /*brightness=*/128);
+      }
+      // Done button at the bottom.
+      constexpr int kDoneY = 400;
+      BlitSprite(fb, chrome, kRowX, kDoneY, nullptr);
+      const char *text = "Done";
+      int len = static_cast<int>(std::strlen(text));
+      int xoff = (kB156Width - len * kB156Advance) / 2;
+      int textX = kRowX - chrome.offset_x + xoff;
+      int textY = kDoneY - chrome.offset_y + kB156Yoff;
+      DrawText(fb, textX, textY, text, /*bank=*/134,
+               /*advance=*/kB156Advance, sprites, palette, kSubLobby,
+               /*brightness=*/128);
+    }
+  }
+
+  std::filesystem::create_directories(dump_dir);
+  std::string out = dump_dir + "/screen_00.ppm";
+  bool ok = WritePPM(out, fb, palette, kSubLobby);
+  std::fprintf(stderr, "wrote %s (lobby_gamesummary)\n", out.c_str());
+
+  SDL_Quit();
+  return ok ? 0 : 1;
+}
+
 int main(int argc, char **argv) {
   std::string assets_dir;
   if (argc >= 2) {
@@ -1886,6 +2076,9 @@ int main(int argc, char **argv) {
     }
     if (screen_str == "lobby_gametech") {
       return RunDumpLobbyGameTech(assets_dir, dump);
+    }
+    if (screen_str == "lobby_gamesummary") {
+      return RunDumpLobbyGameSummary(assets_dir, dump);
     }
     return RunDump(assets_dir, dump);
   }

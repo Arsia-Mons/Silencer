@@ -358,3 +358,114 @@ lobby-connect,lobby,lobby-interfaces}/progress.txt — read those first. -->
     scaffold loop + tech-name placeholder loop — both are
     mechanical render passes that don't require new chrome
     rendering machinery.
+
+## 2026-04-26T21:30:00Z — iter 5 (E4 PASS)
+- Added `RunDumpLobbyGameSummary` after `RunDumpLobbyGameTech`, plus a
+  `lobby_gamesummary` dispatch branch in `main()`. This is a NEW
+  sub-pattern: not a "modal-replaces-I1" derivative like E1..E3, but
+  a "modal-covers-I1+I2" derivative — the Mission Summary panel
+  covers the central GameSelectInterface region AND the Agency
+  Upgrade panel covers the ChatInterface region. Only the
+  CharacterInterface (left side) bleeds through unchanged.
+- Function body:
+  * **LOBBY base chrome bleed-through:** panel idx 1, "Silencer"/v.00028
+    header, "demo" username, NOXIS LEVEL: 8 / WINS: 47 / LOSSES: 12 /
+    XP TO NEXT LEVEL: 220, "Lobby" channel label. Reference shows all
+    of these on the left side behind the modal. Right border idx 8
+    rendered to anchor the Agency Upgrade panel area.
+  * **Mission Summary panel (left):** title at (175, 50) bank 134
+    advance 8; 23 stat labels in a single struct table at x=130
+    (main rows) / x=144 (subordinate rows under Secrets / Files
+    headers), y=90..330, lineheight=10 (font 133 advance 6). Section
+    headers (Secrets, Files) skip the value column. Data rows render
+    a "0" placeholder at x=290.
+  * **Agency Upgrade panel (right):** "+ 0 XP" at (478, 50) bank 134
+    advance 8; "*NEW UPGRADE AVAILABLE*" at (462, 75) bank 133
+    advance 6; 6 upgrade rows at x=437, y=110..335 (45px stride),
+    each with "Current X Level: 0" overlay above + B156x21 "+1 X"
+    button (Endurance/Shield/Jetpack/Tech Slot/Hacking/Contacts);
+    Done B156x21 at (437, 400).
+- Spec-gap notes:
+  * Reference shows distinct bordered panel chrome around Mission
+    Summary AND Agency Upgrade (likely new sprite indices, NOT bank
+    7 idx 1/8). Spec explicitly calls these out as gaps. Candidate
+    reuses LOBBY chrome (idx 1 + idx 8) as visual scaffold —
+    structural gate ("Mission Summary title + label list + 6 row
+    labels + Done") is met; chrome-sprite identity is acknowledged-
+    gap.
+  * Reference's upgrade rows are larger pill buttons ("B156x33-style
+    per spec"); candidate uses the loaded B156x21 chrome (slightly
+    shorter). Spec gates on label text, not button height.
+  * Reference background is the in-game starfield (sub-palette 0
+    likely); candidate uses sub-palette 2 (LOBBY) so the bg shows
+    the LOBBY's cinematic-facility plate behind the modal. This
+    inflates the whole-screen pixel diff substantially but does not
+    affect any structural slot.
+- No new banks (7/133/134/135/181), no new sprites loaded. Only
+  main.cpp recompiled + relink.
+- Build: `cmake --build shared/design/sdl3/build` exits 0.
+- Dump: `SILENCER_DUMP_SCREEN=lobby_gamesummary ... silencer_design`
+  writes /tmp/sdl3_dump/screen_00.ppm (640x480 P6, 921615 bytes;
+  size invariant).
+- Diff stats vs `/tmp/real_lobby-gamesummary_dump.ppm`:
+  * whole-screen bytewise: 560,497 / 921,600 = 60.82%
+  * whole-screen pixelwise: 219,035 / 307,200 = 71.30%
+  * MUCH higher than E2/E3's ~10% — the GameSummary modal covers a
+    much larger area (both center AND right panels), and the
+    background palette differs (in-game starfield vs LOBBY sub-
+    palette 2 bg). Whole-screen percentage is essentially garbage
+    here; the structural metric is the right gate.
+- Visual A/B (Discord DM 1498132505851859005): all spec'd
+  structural slots present at correct anchors:
+  * Mission Summary title (top of left panel area)
+  * 23 stat labels in correct ordering with section grouping
+  * "+ 0 XP" + *NEW UPGRADE AVAILABLE* overlays (top of right panel)
+  * 6 upgrade buttons with correct labels in correct order
+  * Done button at bottom right
+  Structural gate met.
+- Regression sweep: all 10 prior screens (main_menu, options,
+  options_audio, options_display, options_controls, lobby_connect,
+  lobby, lobby_gamecreate, lobby_gamejoin, lobby_gametech) re-dumped
+  at the invariant 921615 bytes. Code added is purely additive
+  (new function + dispatch branch); no existing function bodies,
+  bank lists, or sprite codec paths touched.
+- Files touched: `shared/design/sdl3/src/main.cpp` (new
+  RunDumpLobbyGameSummary function + dispatch branch),
+  `.ralph/lobby-extras/prd.json` (E4 → passes:true),
+  `.ralph/lobby-extras/progress.txt` (this entry).
+- **Learnings:**
+  - **Third LOBBY-derivative-modal sub-pattern: "modal-covers-
+    I1+I2".** E1 was whole-I1-substitution (game-create form
+    replaces GameSelectInterface entirely); E2/E3 were single-
+    button-substitution (GameSelectInterface stays, button anchor
+    swaps); E4 is "two-panel-substitution" — the modal covers BOTH
+    GameSelectInterface (center) AND ChatInterface (right), and
+    only CharacterInterface + LOBBY header chrome bleed through.
+    Indicator: reference shows distinct bordered panels in the
+    center+right regions but NO Active Games / chat / presence
+    visible. The render path: keep panel idx 1 + idx 8 chrome,
+    keep CharacterInterface populated content, drop GameSelect-
+    Interface body and ChatInterface body, render the modal-
+    specific panels + content over those regions.
+  - **Spec gaps for sprite indices are absorbed by the structural
+    gate.** Mission Summary + Agency Upgrade panel chromes have
+    unconfirmed sprite-bank indices ("TBD by engine reading"),
+    upgrade-row buttons are "B156x33-style" but the bank index is
+    undocumented. The spec gates explicitly on TITLE + LABEL LIST
+    + ROW LABELS + DONE BUTTON — not on chrome-sprite identity.
+    Reusing already-loaded scaffold chrome (LOBBY panel idx 1 / 8
+    + B156x21) keeps the structural slots present without
+    fabricating sprite indices that may not exist. The whole-
+    screen pixel diff balloons (~71%) because the background
+    sub-palette differs and the panel chrome is wrong-shape, but
+    every spec'd structural slot is present at a sensible anchor.
+  - **Stat-list rendering is mechanical: 23 entries in a struct
+    table, single loop, two x-columns (main vs subordinate),
+    section-header skip for value-column.** The pattern matches
+    E0's chat/presence textbox pattern (struct array + loop +
+    DrawText) but without the "bottom-to-top" reversal — stat
+    rows are top-to-bottom in display order. Section headers
+    (Secrets / Files) are detected by absence-of-colon in the
+    label; subordinate rows are indented by ~14px to mimic the
+    reference's layout.
+

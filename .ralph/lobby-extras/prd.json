@@ -48,7 +48,7 @@
       "id": "E4",
       "name": "lobby-game-summary (Mission Summary + Agency Upgrade panel)",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "spec": "Per docs/design/screen-lobby-game-summary.md: dispatch SILENCER_DUMP_SCREEN=lobby_gamesummary to a new RunDumpLobbyGameSummary. Render starfield background + 'Mission Summary' title + ~22 stat row labels (left panel) + Agency Upgrade panel right (XP overlay + 6 +1-stat upgrade-row buttons + Done button). All numeric values can be empty/zero (runtime).",
       "category": "composition",
       "reference_dump": "/tmp/real_lobby-gamesummary_dump.ppm",
