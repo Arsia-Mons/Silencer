@@ -35,13 +35,6 @@ the code.
 - `maps.go` — uploaded user maps: SHA-1-keyed storage on disk + JSON
   metadata. Filename whitelist + 64 KiB cap mirrors the engine's
   `world.cpp AllocateMapData` buffer.
-- `behaviortrees.go` — serves `shared/assets/behaviortrees/*.json` to the
-  game client on startup. Client fetches these on each map load so BT changes
-  in the admin editor take effect without a client rebuild.
-- `actordefs.go` — serves `shared/assets/actordefs/*.json` to the game
-  client on each map load via the admin API URL (`adminapiurl` config key
-  in the client). Write-through to disk from the actor editor; MongoDB
-  is no longer the primary store for actordefs.
 - `update.go` — loads/serves the auto-update manifest (per-platform
   download URL + SHA-256) the client polls on launch.
 

@@ -57,7 +57,13 @@ directly). If you need to bake an explicit URL in, pass it as a
 
 ## Per-library
 
-- `lib/api.js` — `fetch` wrapper, injects `Authorization: Bearer`
+- `lib/actor-store.ts` — in-memory store for actordef JSON files loaded via
+  `<input webkitdirectory>`. Hydrated when the user opens a local folder;
+  actor editor reads/writes from this map rather than hitting the API.
+- `lib/folder-store.ts` — same pattern for behavior tree JSON files. Both
+  stores fall back to saving via `showSaveFilePicker` (HTTPS) or a download
+  trigger (HTTP) so edits can be committed to git.
+- `lib/api.ts` — `fetch` wrapper, injects `Authorization: Bearer`
   from `zs_token` (admin) localStorage key.
 - `lib/auth.js` — two storage keys: `zs_token` (admin) and
   `zs_player_token` (player). They don't overlap; logging out of
