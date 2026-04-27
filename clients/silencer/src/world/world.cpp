@@ -1165,6 +1165,9 @@ void World::HandleDisconnect(Uint8 peerid){
 		}
 	}
 	ClearSnapshotQueue();
+	// Capture team before RemovePeer strips the peer from all teams.
+	// GetPeerTeam searches team membership lists, so it must run first.
+	Team * leavingTeam = (mode == AUTHORITY) ? GetPeerTeam(peerid) : 0;
 	for(std::list<Object *>::iterator it = objectlist.begin(); it != objectlist.end(); it++){
 		Object * object = *it;
 		if(object->type == ObjectTypes::TEAM){
@@ -1190,11 +1193,10 @@ void World::HandleDisconnect(Uint8 peerid){
 		if(gameplaystate == INGAME && peerlist[peerid]->accountid != 0){
 			Peer * leavingPeer = peerlist[peerid];
 			User * user = lobby.GetUserInfo(leavingPeer->accountid);
-			Team * team = GetPeerTeam(peerid);
-			if(user && team){
+			if(user && leavingTeam){
 				user->statscopy = leavingPeer->stats;
-				user->statsagency = team->agency;
-				user->teamnumber = team->number;
+				user->statsagency = leavingTeam->agency;
+				user->teamnumber = leavingTeam->number;
 				lobby.RegisterStats(*user, 0, gameinfo.id);
 			}
 		}
