@@ -118,6 +118,7 @@ interface Props {
   selectedPlatformIdx: number | null;
   onPlatformSelect: (idx: number | null) => void;
   onPlatformUpdate: (idx: number, x1: number, y1: number, x2: number, y2: number) => void;
+  gridSize: number;
 }
 
 export default function MapCanvas({
@@ -132,6 +133,7 @@ export default function MapCanvas({
   eraseLayerType,
   highlightActorIdx,
   selectedPlatformIdx, onPlatformSelect, onPlatformUpdate,
+  gridSize,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -165,6 +167,12 @@ export default function MapCanvas({
     wx: (cx - pan.x) / zoom,
     wy: (cy - pan.y) / zoom,
   }), [zoom, pan]);
+
+  // Snap a world coordinate to the grid (no-op when grid is off or gridSize is 0)
+  const snap = useCallback((v: number) => {
+    if (!vis?.grid || gridSize <= 0) return v;
+    return Math.round(v / gridSize) * gridSize;
+  }, [vis?.grid, gridSize]);
 
   // Draw the map
   useEffect(() => {
@@ -647,7 +655,7 @@ export default function MapCanvas({
       }
     } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM'].includes(activeTool)) {
       isPainting.current = true;
-      onDragPlatformChange({ wx1: wx, wy1: wy, wx2: wx, wy2: wy, tool: activeTool });
+      onDragPlatformChange({ wx1: snap(wx), wy1: snap(wy), wx2: snap(wx), wy2: snap(wy), tool: activeTool });
     } else if (activeTool === 'ERASE_PLATFORM') {
       // Find platform under cursor and remove
       for (let i = map.platforms.length - 1; i >= 0; i--) {
@@ -658,7 +666,7 @@ export default function MapCanvas({
         }
       }
     } else if (activeTool === 'ACTOR') {
-      onActorPlace({ wx, wy });
+      onActorPlace({ wx: snap(wx), wy: snap(wy) });
     } else if (activeTool === 'SELECT') {
       const handleSize = 8 / zoom;
       const hs = handleSize / 2;
@@ -712,7 +720,7 @@ export default function MapCanvas({
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
       onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
-      selectedPlatformIdx, onPlatformSelect]);
+      selectedPlatformIdx, onPlatformSelect, snap]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -772,20 +780,22 @@ export default function MapCanvas({
       let { x1, y1, x2, y2 } = origPlatform;
 
       if (mode === 'body') {
-        x1 = origPlatform.x1 + dx;
-        y1 = origPlatform.y1 + dy;
-        x2 = origPlatform.x2 + dx;
-        y2 = origPlatform.y2 + dy;
+        const rawX1 = origPlatform.x1 + dx;
+        const rawY1 = origPlatform.y1 + dy;
+        x1 = snap(rawX1);
+        y1 = snap(rawY1);
+        x2 = x1 + (origPlatform.x2 - origPlatform.x1);
+        y2 = y1 + (origPlatform.y2 - origPlatform.y1);
       } else {
         switch (handle) {
-          case 'TL': x1 = origPlatform.x1 + dx; y1 = origPlatform.y1 + dy; break;
-          case 'TR': x2 = origPlatform.x2 + dx; y1 = origPlatform.y1 + dy; break;
-          case 'BL': x1 = origPlatform.x1 + dx; y2 = origPlatform.y2 + dy; break;
-          case 'BR': x2 = origPlatform.x2 + dx; y2 = origPlatform.y2 + dy; break;
-          case 'T':  y1 = origPlatform.y1 + dy; break;
-          case 'B':  y2 = origPlatform.y2 + dy; break;
-          case 'L':  x1 = origPlatform.x1 + dx; break;
-          case 'R':  x2 = origPlatform.x2 + dx; break;
+          case 'TL': x1 = snap(origPlatform.x1 + dx); y1 = snap(origPlatform.y1 + dy); break;
+          case 'TR': x2 = snap(origPlatform.x2 + dx); y1 = snap(origPlatform.y1 + dy); break;
+          case 'BL': x1 = snap(origPlatform.x1 + dx); y2 = snap(origPlatform.y2 + dy); break;
+          case 'BR': x2 = snap(origPlatform.x2 + dx); y2 = snap(origPlatform.y2 + dy); break;
+          case 'T':  y1 = snap(origPlatform.y1 + dy); break;
+          case 'B':  y2 = snap(origPlatform.y2 + dy); break;
+          case 'L':  x1 = snap(origPlatform.x1 + dx); break;
+          case 'R':  x2 = snap(origPlatform.x2 + dx); break;
         }
         if (x2 - x1 < MIN_SIZE) {
           if (handle === 'TL' || handle === 'BL' || handle === 'L') x1 = x2 - MIN_SIZE;
@@ -805,8 +815,8 @@ export default function MapCanvas({
     // Actor drag (SELECT tool)
     if (draggingActorRef.current) {
       const { startWx, startWy, origX, origY } = draggingActorRef.current;
-      const newWx = origX + (wx - startWx);
-      const newWy = origY + (wy - startWy);
+      const newWx = snap(origX + (wx - startWx));
+      const newWy = snap(origY + (wy - startWy));
       draggingActorRef.current.moved = Math.hypot(wx - startWx, wy - startWy) > 4;
       setDragActorPreview({ idx: draggingActorRef.current.idx, wx: newWx, wy: newWy });
       return;
@@ -822,11 +832,11 @@ export default function MapCanvas({
           onTilePaint((eraseLayerType ?? 'bg') as 'bg' | 'fg', activeLayer, tx, ty, 0);
         }
       } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM'].includes(activeTool)) {
-        onDragPlatformChange(prev => prev ? { ...prev, wx2: wx, wy2: wy } : null);
+        onDragPlatformChange(prev => prev ? { ...prev, wx2: snap(wx), wy2: snap(wy) } : null);
       }
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, eraseLayerType,
-      onTilePaint, onPanChange, onCursorChange, onDragPlatformChange]);
+      onTilePaint, onPanChange, onCursorChange, onDragPlatformChange, snap]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isPanning.current) {
@@ -871,15 +881,16 @@ export default function MapCanvas({
         onCommitPaint?.();
       } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM'].includes(activeTool) && dragPlatform) {
         const { wx1, wy1 } = dragPlatform;
+        const snWx = snap(wx), snWy = snap(wy);
         const t = PLATFORM_TOOL_TYPES[activeTool];
-        const x1 = Math.min(wx1, wx), y1 = Math.min(wy1, wy);
-        const x2 = Math.max(wx1, wx), y2 = Math.max(wy1, wy);
+        const x1 = Math.min(wx1, snWx), y1 = Math.min(wy1, snWy);
+        const x2 = Math.max(wx1, snWx), y2 = Math.max(wy1, snWy);
         if (x2 - x1 > 2 && y2 - y1 > 2 && t) onPlatformDraw({ x1, y1, x2, y2, ...t });
         onDragPlatformChange(null);
       }
     }
     isPainting.current = false;
-  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect]);
+  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.code === 'Space') { isSpacePanning.current = true; e.preventDefault(); }

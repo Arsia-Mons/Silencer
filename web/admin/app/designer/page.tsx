@@ -79,6 +79,7 @@ export default function DesignerPage() {
     grid: true,
     lighting: true,
   });
+  const [gridSize, setGridSize] = useState(16);
   const toggleVis = (key: keyof VisState, idx: number | null = null) => setVis(v => {
     if (idx !== null) {
       const arr = [...(v[key] as boolean[])]; arr[idx] = !arr[idx]; return { ...v, [key]: arr };
@@ -695,6 +696,17 @@ export default function DesignerPage() {
                   {lbl}
                 </button>
               ))}
+              {vis.grid && (
+                <>
+                  <span className="text-[#1a3a1a] text-xs mx-0.5">⊞</span>
+                  {([8, 16, 32, 64] as const).map(sz => (
+                    <button key={sz} onClick={() => setGridSize(sz)}
+                      className={`px-1.5 py-0.5 text-xs font-mono rounded border ${gridSize === sz ? 'border-[#3a3a2a] text-[#c0c080] bg-[#1a1a0d]' : 'border-[#1a1a1a] text-[#3a3a3a] bg-transparent'}`}>
+                      {sz}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
 
             <div className="flex-1 relative min-h-0">
@@ -729,6 +741,7 @@ export default function DesignerPage() {
               selectedPlatformIdx={selectedPlatformIdx}
               onPlatformSelect={setSelectedPlatformIdx}
               onPlatformUpdate={updatePlatform}
+              gridSize={gridSize}
             />
             <Minimap
               map={map}
@@ -829,7 +842,7 @@ export default function DesignerPage() {
               <span className="text-game-primary">A</span><span>Actor tool</span>
               <span className="text-game-primary">S</span><span>Select / drag tool</span>
               <span className="text-game-primary">1–4</span><span>Layer 0–3</span>
-              <span className="text-game-primary">G</span><span>Toggle grid</span>
+              <span className="text-game-primary">G</span><span>Toggle grid snap</span>
               <span className="text-game-primary">L</span><span>Toggle lighting</span>
               <span className="text-game-primary">Ctrl+Z</span><span>Undo</span>
               <span className="text-game-primary">Ctrl+Y / Ctrl+Shift+Z</span><span>Redo</span>
