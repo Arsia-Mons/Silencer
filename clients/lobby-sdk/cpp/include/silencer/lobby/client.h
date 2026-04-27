@@ -109,7 +109,13 @@ public:
 private:
     void send_raw(const std::vector<uint8_t>& payload);
     void dispatch_frame(const std::vector<uint8_t>& payload);
-    void close_with_error(const std::string& msg);
+    // Closes the socket and emits an error. Transitions to `target`
+    // unless the connection is already in a terminal state — in
+    // particular, never downgrades Failed to Disconnected, so that a
+    // post-rejection socket close doesn't overwrite the more
+    // informative Failed state.
+    void close_with_error(const std::string& msg,
+                          ConnectionState target = ConnectionState::Disconnected);
     void set_state(ConnectionState s);
 
     ClientConfig    cfg_;

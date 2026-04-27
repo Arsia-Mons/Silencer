@@ -58,25 +58,28 @@ void Client::set_state(ConnectionState s) {
     if (state_cb_) state_cb_(s);
 }
 
-void Client::close_with_error(const std::string& msg) {
+void Client::close_with_error(const std::string& msg, ConnectionState target) {
     last_error_ = msg;
     if (error_cb_) error_cb_(msg);
     close_sock(sock_);
-    set_state(ConnectionState::Disconnected);
+    // Don't downgrade Failed to Disconnected. If the dispatch path
+    // already set Failed (e.g. version/auth rejection), a follow-up
+    // socket close from the server should preserve that signal.
+    if (state_ == ConnectionState::Failed) return;
+    set_state(target);
 }
 
 void Client::connect() {
     disconnect();
     sockaddr_in addr{};
     if (!resolve(cfg_.host, cfg_.port, addr)) {
-        close_with_error("dns: cannot resolve " + cfg_.host);
-        set_state(ConnectionState::Failed);
+        close_with_error("dns: cannot resolve " + cfg_.host, ConnectionState::Failed);
         return;
     }
     int s = ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (s < 0) {
-        close_with_error(std::string("socket: ") + std::strerror(errno));
-        set_state(ConnectionState::Failed);
+        close_with_error(std::string("socket: ") + std::strerror(errno),
+                         ConnectionState::Failed);
         return;
     }
     int one = 1;
@@ -86,8 +89,8 @@ void Client::connect() {
     int rc = ::connect(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
     if (rc < 0 && errno != EINPROGRESS) {
         ::close(s);
-        close_with_error(std::string("connect: ") + std::strerror(errno));
-        set_state(ConnectionState::Failed);
+        close_with_error(std::string("connect: ") + std::strerror(errno),
+                         ConnectionState::Failed);
         return;
     }
     sock_    = s;
@@ -130,8 +133,8 @@ bool Client::poll(std::chrono::milliseconds max_wait) {
         socklen_t errlen = sizeof(err);
         ::getsockopt(sock_, SOL_SOCKET, SO_ERROR, &err, &errlen);
         if (err != 0) {
-            close_with_error(std::string("connect: ") + std::strerror(err));
-            set_state(ConnectionState::Failed);
+            close_with_error(std::string("connect: ") + std::strerror(err),
+                             ConnectionState::Failed);
             return false;
         }
         set_state(cfg_.version.empty() ? ConnectionState::AwaitingAuth

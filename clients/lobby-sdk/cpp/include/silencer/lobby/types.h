@@ -92,7 +92,7 @@ struct WeaponStats {
 };
 
 // Mirrors the wire layout of services/lobby/client.go:handleRegisterStats.
-// 34 × u32 LE = 136 bytes.
+// 44 × u32 LE = 176 bytes (12 weapon fields + 32 scalar counters).
 struct MatchStats {
     std::array<WeaponStats, 4> weapons             = {};
     uint32_t civilians_killed                       = 0;

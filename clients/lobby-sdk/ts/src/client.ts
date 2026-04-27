@@ -171,7 +171,15 @@ export class LobbyClient {
     }
 
     private handleClose(msg: string): void {
-        if (this._state === "disconnected") return;
+        // Both 'failed' and 'disconnected' are terminal — when the dispatch
+        // path already set 'failed' (version/auth rejection), a follow-up
+        // socket close from the server should preserve that signal rather
+        // than emit a spurious 'failed → disconnected' transition.
+        if (this._state === "disconnected" || this._state === "failed") {
+            this.stopTimeoutWatch();
+            this.socket = null;
+            return;
+        }
         this._lastError = msg;
         this.emit("error", msg);
         this.stopTimeoutWatch();
