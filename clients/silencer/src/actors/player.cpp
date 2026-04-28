@@ -284,8 +284,7 @@ void Player::Tick(World & world){
 		if(state_warp == 2){
 			//draw = false;
 		}
-		if(state_warp == 12){
-			//draw = true;
+		if(state_warp == GASLoader::Get().player.warpTeleportTick){
 			x = warpx;
 			y = warpy;
 			currentplatformid = 0;
@@ -2471,7 +2470,7 @@ void Player::Tick(World & world){
 			}
 			x += xe;
 			y += ye;
-			if(((input.keyactivate && !oldinput.keyactivate) || state_i > 48) && !state_warp && !world.winningteamid){
+			if(((input.keyactivate && !oldinput.keyactivate) || state_i > GASLoader::Get().player.deadAutoRespawnTick) && !state_warp && !world.winningteamid){
 				state_hit = 0;
 				Team * team = GetTeam(world);
 				if(team && team->agency == Team::LAZARUS && canresurrect && !world.winningteamid){
@@ -4426,13 +4425,13 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				}break;
 				case PickUp::JETPACK:{
 					powerupname = "Extra Jetpack propellant!";
-					jetpackbonustime = world.tickcount + (20 * 24);
+					jetpackbonustime = world.tickcount + GASLoader::Get().player.jetpackBonusDurationTicks;
 					fuel = maxfuel;
 					fuellow = false;
 				}break;
 				case PickUp::HACKING:{
 					powerupname = "Double hacking until codes changed!";
-					hackingbonustime = world.tickcount + (30 * 24);
+					hackingbonustime = world.tickcount + GASLoader::Get().player.hackingBonusDurationTicks;
 				}break;
 				case PickUp::INVISIBLE:{
 					powerupname = "Shielding will render you invisible for 30 seconds!";
@@ -4441,7 +4440,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				}break;
 				case PickUp::RADAR:{
 					powerupname = "You can see your enemies on radar!";
-					radarbonustime = world.tickcount + (30 * 24);
+					radarbonustime = world.tickcount + GASLoader::Get().player.radarBonusDurationTicks;
 				}break;
 				case PickUp::DEPOSITOR:{
 					powerupname = "You are now protected from a Neutron Bomb!";

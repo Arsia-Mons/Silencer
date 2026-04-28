@@ -91,6 +91,15 @@ struct PlayerDef {
     int secretsNeededToWin          = 3;    // secrets a team must deliver to win the round
     int secretProgressBeamThresh    = 180;  // secretprogress value that triggers secret-beaming sequence
     int secretProgressSoundThresh   = 20;   // min progress delta to trigger team progress sound
+    // Powerup pickup durations (ticks = seconds * 24)
+    int jetpackBonusDurationTicks   = 480;  // extra jetpack propellant powerup duration (20s)
+    int hackingBonusDurationTicks   = 720;  // double-hacking bonus duration (30s)
+    int radarBonusDurationTicks     = 720;  // radar powerup duration (30s)
+    // Warp / respawn timing
+    int warpDurationTicks           = 40;   // total ticks for one warp animation cycle
+    int warpNonCollidableTicks      = 24;   // state_warp <= this → entity non-collidable
+    int warpTeleportTick            = 12;   // state_warp == this → player x/y set to destination
+    int deadAutoRespawnTick         = 48;   // ticks in DEAD state before auto-respawn triggers
 };
 
 // ---- Weapon ----------------------------------------------------------------

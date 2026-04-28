@@ -1,6 +1,7 @@
 #include "bipedal.h"
 #include "object.h"
 #include "projectile.h"
+#include "gasloader.h"
 
 Bipedal::Bipedal(){
 	height = 30;
@@ -15,7 +16,7 @@ void Bipedal::Serialize(bool write, Serializer & data, Serializer * old){
 
 void Bipedal::Tick(Object & object, World & world){
 	if(state_warp){
-		if(state_warp <= 24){
+		if(state_warp <= GASLoader::Get().player.warpNonCollidableTicks){
 			object.collidable = false;
 		}else{
 			object.collidable = true;
@@ -26,10 +27,11 @@ void Bipedal::Tick(Object & object, World & world){
 
 void Bipedal::WarpTick(void){
 	if(state_warp){
-		if(state_warp < 40){
+		const int dur = GASLoader::Get().player.warpDurationTicks;
+		if(state_warp < dur){
 			state_warp++;
 		}
-		if(state_warp == 40){
+		if(state_warp == dur){
 			state_warp = 0;
 		}
 	}

@@ -40,5 +40,12 @@
   "weaponFireCooldownPad": 3,
   "secretsNeededToWin": 3,
   "secretProgressBeamThresh": 180,
-  "secretProgressSoundThresh": 20
+  "secretProgressSoundThresh": 20,
+  "jetpackBonusDurationTicks": 480,
+  "hackingBonusDurationTicks": 720,
+  "radarBonusDurationTicks": 720,
+  "warpDurationTicks": 40,
+  "warpNonCollidableTicks": 24,
+  "warpTeleportTick": 12,
+  "deadAutoRespawnTick": 48
 }

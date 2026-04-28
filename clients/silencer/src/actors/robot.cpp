@@ -391,7 +391,7 @@ void Robot::Tick(World & world){
 				x = originalx;
 				y = originaly;
 				state_i = -1;
-				state_warp = 12;
+				state_warp = GASLoader::Get().player.warpTeleportTick;
 				health = maxhealth;
 				shield = maxshield;
 				break;
