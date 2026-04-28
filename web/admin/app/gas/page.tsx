@@ -63,6 +63,48 @@ function validateBaseline(current: string, original: string): string[] {
   } catch { return []; }
 }
 
+// Restore a single violation back into currObj using the origObj as source.
+// Violation formats: '"key" removed', '"[id=X].key" removed', '[id=X] entry removed'
+function applyRestore(curr: unknown, orig: unknown, violation: string): void {
+  const entryMatch = violation.match(/^\[id=(.+?)\] entry removed$/);
+  if (entryMatch) {
+    const id = entryMatch[1];
+    if (!Array.isArray(curr) || !Array.isArray(orig)) return;
+    const origItem = orig.find(
+      (i: unknown) => typeof i === 'object' && i !== null && String((i as Record<string, unknown>).id) === String(id),
+    );
+    const already = curr.some(
+      (i: unknown) => typeof i === 'object' && i !== null && String((i as Record<string, unknown>).id) === String(id),
+    );
+    if (origItem && !already) curr.push(origItem);
+    return;
+  }
+  const fieldMatch = violation.match(/^"(.+)" removed$/);
+  if (!fieldMatch) return;
+  const path = fieldMatch[1];
+  if (path.startsWith('[id=')) {
+    const idMatch = path.match(/^\[id=(.+?)\]\.(.+)$/);
+    if (!idMatch) return;
+    const [, id, subpath] = idMatch;
+    if (!Array.isArray(curr) || !Array.isArray(orig)) return;
+    const currItem = curr.find((i: unknown) => typeof i === 'object' && i !== null && String((i as Record<string, unknown>).id) === String(id)) as Record<string, unknown> | undefined;
+    const origItem = orig.find((i: unknown) => typeof i === 'object' && i !== null && String((i as Record<string, unknown>).id) === String(id)) as Record<string, unknown> | undefined;
+    if (!currItem || !origItem) return;
+    restoreAtPath(currItem, origItem, subpath.split('.'));
+  } else {
+    if (typeof curr !== 'object' || curr === null || typeof orig !== 'object' || orig === null) return;
+    restoreAtPath(curr as Record<string, unknown>, orig as Record<string, unknown>, path.split('.'));
+  }
+}
+
+function restoreAtPath(curr: Record<string, unknown>, orig: Record<string, unknown>, parts: string[]): void {
+  if (parts.length === 1) { curr[parts[0]] = orig[parts[0]]; return; }
+  const [head, ...rest] = parts;
+  if (typeof curr[head] === 'object' && curr[head] !== null && typeof orig[head] === 'object' && orig[head] !== null) {
+    restoreAtPath(curr[head] as Record<string, unknown>, orig[head] as Record<string, unknown>, rest);
+  }
+}
+
 function GasPageInner() {
   useAuth();
   const wsConnected = useSocket({});
@@ -142,6 +184,18 @@ function GasPageInner() {
     setFiles(prev => ({ ...prev, [activeTab]: value }));
     setSaveErr('');
     setSaveMsg('');
+  }
+
+  function handleRestoreField(fileKey: FileKey, violation: string) {
+    const orig = originalFiles[fileKey];
+    const curr = files[fileKey];
+    if (!orig || !curr) return;
+    try {
+      const origObj = JSON.parse(orig);
+      const currObj = JSON.parse(curr);
+      applyRestore(currObj, origObj, violation);
+      setFiles(prev => ({ ...prev, [fileKey]: JSON.stringify(currObj, null, 2) }));
+    } catch { /* silent — bad JSON in editor, user must fix manually */ }
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -455,24 +509,40 @@ function GasPageInner() {
                       return (
                         <div key={file} className="border-b border-game-border/40 last:border-0">
                           {/* Tab header row */}
-                          <button
-                            onClick={() => switchTab(file as FileKey)}
-                            className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-game-bgCard transition-colors"
-                          >
+                          <div className="flex items-center gap-2 px-4 py-2 border-b border-game-border/20">
                             <span className="text-sm shrink-0">{icon}</span>
-                            <span className="text-xs font-mono font-bold text-game-danger tracking-wider">{label}</span>
-                            <span className="text-xs font-mono text-game-textDim ml-1">
+                            <button
+                              onClick={() => switchTab(file as FileKey)}
+                              className="text-xs font-mono font-bold text-game-danger tracking-wider hover:underline"
+                            >
+                              {label}
+                            </button>
+                            <span className="text-xs font-mono text-game-textDim">
                               {violations.length > 0 && `${violations.length} removed field${violations.length !== 1 ? 's' : ''}`}
                               {violations.length > 0 && monacoErr > 0 && '  ·  '}
                               {monacoErr > 0 && `${monacoErr} schema error${monacoErr !== 1 ? 's' : ''}`}
                             </span>
-                            <span className="ml-auto text-[10px] text-game-textDim font-mono">click to jump →</span>
-                          </button>
+                            {violations.length > 1 && (
+                              <button
+                                onClick={() => violations.forEach(v => handleRestoreField(file as FileKey, v))}
+                                className="ml-auto text-[10px] font-mono border border-game-primary text-game-primary hover:bg-game-primary/10 px-2 py-0.5 transition-colors"
+                              >
+                                ↩ RE-ADD ALL ({violations.length})
+                              </button>
+                            )}
+                          </div>
                           {/* Violation rows */}
                           {violations.map((v, i) => (
-                            <div key={i} className="flex items-start gap-3 px-8 py-1 text-xs font-mono text-game-danger hover:bg-game-bgCard/50">
+                            <div key={i} className="flex items-center gap-3 px-8 py-1 text-xs font-mono text-game-danger hover:bg-game-bgCard/50 group">
                               <span className="text-game-danger/60 shrink-0 select-none">⊗</span>
-                              <span className="break-all">{v}</span>
+                              <span className="flex-1 break-all">{v}</span>
+                              <button
+                                onClick={() => handleRestoreField(file as FileKey, v)}
+                                className="shrink-0 opacity-0 group-hover:opacity-100 px-2 py-0.5 text-[10px] font-mono border border-game-primary text-game-primary hover:bg-game-primary/10 transition-all"
+                                title="Restore this field from the original baseline"
+                              >
+                                ↩ RE-ADD
+                              </button>
                             </div>
                           ))}
                           {monacoErr > 0 && (
