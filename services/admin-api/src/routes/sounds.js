@@ -95,6 +95,58 @@ const LOOP_SOUNDS = new Set([
   'rocket9.wav',   // seeking rocket
 ]);
 
+// Fadeout duration (ms) when Audio::Stop() is called for each loop sound.
+// Derived from grepping Stop(channel, ms) in game source.
+const FADEOUT_MAP = {
+  'ambloop4.wav': 1000, // terminal.cpp: Stop(soundchannel, 1000)
+  'ambloop5.wav': 700,  // player.cpp: Stop(hacksoundchannel, 700)
+  'wndloope.wav': 800,  // robot.cpp: Stop(soundchannel, 800)
+  'flamebg2.wav': 200,  // player.cpp: Stop(flamersoundchannel, 200)
+  'jetpak1.wav':  200,  // player.cpp: Stop(jetpacksoundchannel, 200)
+  'rocket4.wav':  100,  // rocketprojectile.cpp: Stop(soundchannel, 100)
+  'rocket9.wav':  100,  // rocketprojectile.cpp: Stop(soundchannel, 100)
+};
+
+// Sound sets — groups of interchangeable variants chosen randomly by the game.
+// Replacing individual members without updating the whole set breaks uniformity.
+const SOUND_SETS = {
+  'type1.wav':    'terminal-typing',
+  'type2.wav':    'terminal-typing',
+  'type3.wav':    'terminal-typing',
+  'type4.wav':    'terminal-typing',
+  'type5.wav':    'terminal-typing',
+  'typerev6.wav': 'terminal-typing',
+  'ammo01.wav':   'ammo-pickup',
+  'ammo02.wav':   'ammo-pickup',
+  'ammo03.wav':   'ammo-pickup',
+  'ammo05.wav':   'ammo-pickup',
+  'groan2.wav':   'npc-pain',
+  'groan2a.wav':  'npc-pain',
+  'grunt2a.wav':  'npc-pain',
+  'strike01.wav': 'wall-impact',
+  'strike02.wav': 'wall-impact',
+  'strike03.wav': 'wall-impact',
+  'strike04.wav': 'wall-impact',
+  'rico1.wav':    'ricochet',
+  'rico2.wav':    'ricochet',
+  'stostep1.wav': 'guard-steps',
+  'stostepr.wav': 'guard-steps',
+  'futstonl.wav': 'player-steps',
+  'futstonr.wav': 'player-steps',
+  'robot3l.wav':  'robot-steps',
+  'robot3r.wav':  'robot-steps',
+  'theres3.wav':  'guard-speech',
+  'stop4.wav':    'guard-speech',
+  'freeze3.wav':  'guard-speech',
+  'freezrt1.wav': 'guard-speech',
+  'drop4.wav':    'guard-speech',
+  'wndloopb.wav': 'bg-channels',
+  'cphum11.wav':  'bg-channels',
+  'wndloop1.wav': 'bg-channels',
+  'land1.wav':    'landing',
+  'land11.wav':   'landing',
+};
+
 // Sound category assignments derived from C++ call sites
 const SOUND_CATEGORIES = {
   // Player movement & actions
@@ -359,13 +411,19 @@ router.get('/', requireAuth, (req, res) => {
 
   const binSounds = sounds
     .filter(s => !stagedNames.has(s.name)) // staged overrides bin
-    .map(s => ({
-      name: s.name,
-      storedLength: s.storedLength,
-      adpcmBytes: s.storedLength - 36,
-      source: 'bin',
-      pendingDelete: deletions.has(s.name),
-    }));
+    .map(s => {
+      const adpcmBytes = s.storedLength - 36;
+      const numBlocks = Math.ceil(adpcmBytes / 256);
+      const durationSec = Math.round((numBlocks * 505 / 11025) * 100) / 100;
+      return {
+        name: s.name,
+        storedLength: s.storedLength,
+        adpcmBytes,
+        durationSec,
+        source: 'bin',
+        pendingDelete: deletions.has(s.name),
+      };
+    });
 
   const stagedSounds = staged.map(s => {
     const p = join(STAGING_DIR, s.name);
@@ -489,6 +547,8 @@ router.get('/refs', requireAuth, (req, res) => {
       loop: LOOP_SOUNDS.has(name),
       category: SOUND_CATEGORIES[name] || null,
       volumeCalls: CPP_VOLUME_MAP[name] || [],
+      fadeoutMs: FADEOUT_MAP[name] || null,
+      soundSet: SOUND_SETS[name] || null,
     };
   }
 
@@ -503,6 +563,8 @@ router.get('/refs', requireAuth, (req, res) => {
         loop: LOOP_SOUNDS.has(name),
         category: SOUND_CATEGORIES[name] || null,
         volumeCalls: CPP_VOLUME_MAP[name] || [],
+        fadeoutMs: FADEOUT_MAP[name] || null,
+        soundSet: SOUND_SETS[name] || null,
       };
     }
   }

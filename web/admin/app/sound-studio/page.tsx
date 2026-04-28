@@ -9,6 +9,7 @@ interface SoundEntry {
   name: string;
   storedLength: number | null;
   adpcmBytes: number | null;
+  durationSec?: number;
   size?: number;
   source: 'bin' | 'staged';
   pendingDelete: boolean;
@@ -22,6 +23,8 @@ interface SoundRef {
   loop: boolean;
   category: string | null;
   volumeCalls: { ctx: string; vol: number | string }[];
+  fadeoutMs: number | null;
+  soundSet: string | null;
 }
 
 interface LevelInfo {
@@ -37,6 +40,7 @@ interface MusicFile {
 
 type FilterMode = 'all' | 'cpp' | 'actordef' | 'orphaned' | 'missing' | 'ambient';
 type TabMode = 'sounds' | 'music';
+type SortKey = 'name' | 'size' | 'duration' | 'level';
 
 const CATEGORY_LABELS: Record<string, string> = {
   player: 'Player', npc: 'NPCs / Enemies', weapon: 'Weapons',
@@ -49,6 +53,12 @@ function formatBytes(n: number | null | undefined): string {
   if (n < 1024) return `${n} B`;
   if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`;
   return `${(n / 1048576).toFixed(1)} MB`;
+}
+
+function formatDuration(sec: number | undefined | null): string {
+  if (sec == null) return '—';
+  if (sec < 1) return `${Math.round(sec * 1000)}ms`;
+  return `${sec.toFixed(2)}s`;
 }
 
 function volColor(v: number | string): string {
@@ -100,6 +110,9 @@ export default function SoundStudioPage() {
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
   const [normalize, setNormalize] = useState(false);
   const [distance, setDistance] = useState(0);
+  const [inGameVol, setInGameVol] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   // Rename dialog
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
@@ -122,6 +135,7 @@ export default function SoundStudioPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
   const soundsRef = useRef<SoundEntry[]>([]);
+  const visibleNonDeletedRef = useRef<(SoundEntry & { missing?: boolean })[]>([]);
   const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('zs_token') : '';
@@ -155,10 +169,15 @@ export default function SoundStudioPage() {
 
   // ── Distance gain update ────────────────────────────────────────────────────
   useEffect(() => {
-    if (gainNodeRef.current) {
-      gainNodeRef.current.gain.value = Math.max(0, 1 - distance / 500);
+    if (!gainNodeRef.current) return;
+    const activeName = playing || looping;
+    let base = 1.0;
+    if (inGameVol && activeName) {
+      const vol = refs[activeName]?.volumeCalls?.[0]?.vol;
+      if (typeof vol === 'number') base = vol / 128;
     }
-  }, [distance]);
+    gainNodeRef.current.gain.value = Math.max(0, 1 - distance / 500) * base;
+  }, [distance, inGameVol, playing, looping, refs]);
 
   // ── Waveform canvas ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -196,7 +215,7 @@ export default function SoundStudioPage() {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SELECT') return;
       e.preventDefault();
-      const list = soundsRef.current.filter(s => !s.pendingDelete);
+      const list = visibleNonDeletedRef.current;
       if (!list.length) return;
       setSelectedIdx(prev => {
         const next = e.key === 'ArrowDown'
@@ -246,7 +265,9 @@ export default function SoundStudioPage() {
       setLevels(prev => ({ ...prev, [name]: computeLevel(decoded) }));
       const audioCtx = getAudioCtx();
       const gain = audioCtx.createGain();
-      gain.gain.value = Math.max(0, 1 - distance / 500);
+      const vol = refs[name]?.volumeCalls?.[0]?.vol;
+      const base = inGameVol && typeof vol === 'number' ? vol / 128 : 1.0;
+      gain.gain.value = Math.max(0, 1 - distance / 500) * base;
       gainNodeRef.current = gain;
       const source = audioCtx.createBufferSource();
       source.buffer = decoded;
@@ -269,7 +290,9 @@ export default function SoundStudioPage() {
       setLevels(prev => ({ ...prev, [name]: computeLevel(decoded) }));
       const audioCtx = getAudioCtx();
       const gain = audioCtx.createGain();
-      gain.gain.value = Math.max(0, 1 - distance / 500);
+      const vol = refs[name]?.volumeCalls?.[0]?.vol;
+      const base = inGameVol && typeof vol === 'number' ? vol / 128 : 1.0;
+      gain.gain.value = Math.max(0, 1 - distance / 500) * base;
       gainNodeRef.current = gain;
       const source = audioCtx.createBufferSource();
       source.buffer = decoded; source.loop = true;
@@ -379,6 +402,46 @@ export default function SoundStudioPage() {
     });
   }
 
+  // ── Sort ────────────────────────────────────────────────────────────────────
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+    setSelectedIdx(-1);
+  }
+
+  // ── Export decoded WAV ──────────────────────────────────────────────────────
+  async function exportWav(name: string) {
+    setStatus(`Exporting ${name}…`);
+    try {
+      const decoded = await fetchAndDecode(name);
+      const samples = decoded.getChannelData(0);
+      const int16 = new Int16Array(samples.length);
+      for (let i = 0; i < samples.length; i++) {
+        int16[i] = Math.max(-32768, Math.min(32767, Math.round(samples[i] * 32767)));
+      }
+      const dataBytes = int16.length * 2;
+      const header = new ArrayBuffer(44);
+      const v = new DataView(header);
+      const ws = (off: number, s: string) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+      ws(0, 'RIFF'); v.setUint32(4, 36 + dataBytes, true);
+      ws(8, 'WAVE'); ws(12, 'fmt '); v.setUint32(16, 16, true);
+      v.setUint16(20, 1, true);     // PCM
+      v.setUint16(22, 1, true);     // mono
+      v.setUint32(24, 11025, true); // sample rate
+      v.setUint32(28, 22050, true); // byte rate = 11025 * 2
+      v.setUint16(32, 2, true);     // block align
+      v.setUint16(34, 16, true);    // bits per sample
+      ws(36, 'data'); v.setUint32(40, dataBytes, true);
+      const blob = new Blob([header, int16.buffer], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = name.replace(/\.wav$/i, '_decoded.wav');
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      setStatus(`Exported ${name}`);
+    } catch (e: any) { setError(`Export failed: ${e.message}`); setStatus(''); }
+  }
+
   // ── Derived ─────────────────────────────────────────────────────────────────
   const staged = sounds.filter(s => s.source === 'staged');
   const pendingDels = sounds.filter(s => s.pendingDelete);
@@ -409,12 +472,43 @@ export default function SoundStudioPage() {
     return true;
   }
 
-  const visibleEntries = allEntries.filter(matchesFilter);
-  const visibleNonDeleted = visibleEntries.filter(s => !s.pendingDelete);
+  const filteredEntries = allEntries.filter(matchesFilter);
+  const visibleEntries = sortKey ? [...filteredEntries].sort((a, b) => {
+    let va: number | string = 0, vb: number | string = 0;
+    if (sortKey === 'name')     { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
+    else if (sortKey === 'size')     { va = a.source === 'bin' ? (a.adpcmBytes ?? 0) : (a.size ?? 0); vb = b.source === 'bin' ? (b.adpcmBytes ?? 0) : (b.size ?? 0); }
+    else if (sortKey === 'duration') { va = a.durationSec ?? 0; vb = b.durationSec ?? 0; }
+    else if (sortKey === 'level')    { va = levels[a.name]?.peak ?? -1; vb = levels[b.name]?.peak ?? -1; }
+    if (va < vb) return sortDir === 'asc' ? -1 : 1;
+    if (va > vb) return sortDir === 'asc' ? 1 : -1;
+    return 0;
+  }) : filteredEntries;
+
+  const visibleNonDeleted = visibleEntries.filter(s => !s.pendingDelete && !s.missing);
+  // Keep ref in sync for arrow key handler (updated during render, safe for event callbacks)
+  visibleNonDeletedRef.current = visibleNonDeleted;
+
   const selectedSound = visibleNonDeleted[selectedIdx];
   const selectedRef = selectedSound ? refs[selectedSound.name] : null;
   const selectedLevel = selectedSound ? levels[selectedSound.name] : null;
 
+  // Derive set members from refs (for inspector)
+  const setMembers: Record<string, string[]> = {};
+  for (const [name, ref] of Object.entries(refs)) {
+    if (ref.soundSet) {
+      if (!setMembers[ref.soundSet]) setMembers[ref.soundSet] = [];
+      setMembers[ref.soundSet].push(name);
+    }
+  }
+
+  // Effective gain for distance preview panel
+  const distAttenuation = Math.max(0, 1 - distance / 500);
+  const inGameBaseGain = (() => {
+    if (!inGameVol || !selectedRef) return 1.0;
+    const vol = selectedRef.volumeCalls?.[0]?.vol;
+    return typeof vol === 'number' ? vol / 128 : 1.0;
+  })();
+  const effectiveGain = distAttenuation * inGameBaseGain;
   // Build grouped entries for category view
   type GroupRow = { type: 'header'; cat: string } | { type: 'sound'; entry: SoundEntry & { missing?: boolean } };
   function buildGroupedRows(): GroupRow[] {
@@ -442,9 +536,6 @@ export default function SoundStudioPage() {
     }
     return rows;
   }
-
-  // Computed volume at current distance
-  const distanceGain = Math.max(0, 1 - distance / 500);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -562,11 +653,21 @@ export default function SoundStudioPage() {
                   <thead>
                     <tr style={{ color: '#444', borderBottom: '1px solid #2a2a2a', position: 'sticky', top: 0, background: '#131313' }}>
                       <th style={{ textAlign: 'left', padding: '4px 5px', width: 20 }}></th>
-                      <th style={{ textAlign: 'left', padding: '4px 5px' }}>Name</th>
-                      <th style={{ textAlign: 'left', padding: '4px 5px', width: 72 }}>Refs</th>
-                      <th style={{ textAlign: 'left', padding: '4px 5px', width: 110 }}>Level</th>
-                      <th style={{ textAlign: 'right', padding: '4px 5px', width: 62 }}>Size</th>
-                      <th style={{ textAlign: 'right', padding: '4px 5px', width: 98 }}></th>
+                      {(['name','duration','size','level'] as const).map(col => {
+                        const labels: Record<string, string> = { name: 'Name', duration: 'Dur', size: 'Size', level: 'Peak' };
+                        const aligns: Record<string, 'left' | 'right'> = { name: 'left', duration: 'right', size: 'right', level: 'left' };
+                        const widths: Record<string, number> = { duration: 54, size: 62, level: 90 };
+                        const active = sortKey === col;
+                        return (
+                          <th key={col} onClick={() => toggleSort(col as SortKey)}
+                            style={{ textAlign: aligns[col] || 'left', padding: '4px 5px', width: widths[col], cursor: 'pointer',
+                              color: active ? '#8cf' : '#444', userSelect: 'none' }}>
+                            {labels[col]}{active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+                          </th>
+                        );
+                      })}
+                      <th style={{ textAlign: 'left', padding: '4px 5px', width: 64 }}>Refs</th>
+                      <th style={{ textAlign: 'right', padding: '4px 5px', width: 110 }}></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -625,6 +726,21 @@ export default function SoundStudioPage() {
                               {isMissing && <span style={{ marginLeft: 5, color: '#f90', fontSize: 9 }}>[missing]</span>}
                               {ref?.role && <span style={{ marginLeft: 5, color: '#8af', fontSize: 9 }}>[{ref.role}]</span>}
                               {!ref?.role && isLoop && <span style={{ marginLeft: 5, color: '#68a', fontSize: 9 }}>[loop]</span>}
+                              {ref?.soundSet && <span style={{ marginLeft: 5, color: '#a86', fontSize: 9 }}>[{ref.soundSet}]</span>}
+                            </td>
+                            <td style={{ padding: '3px 5px', textAlign: 'right', color: '#383838', fontVariantNumeric: 'tabular-nums', fontSize: 10 }}>
+                              {formatDuration((s as any).durationSec)}
+                            </td>
+                            <td style={{ padding: '3px 5px', textAlign: 'right', color: '#444', fontVariantNumeric: 'tabular-nums' }}>{formatBytes(size)}</td>
+                            <td style={{ padding: '3px 5px' }}>
+                              {lvl ? (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                  <div style={{ width: 50, height: 5, background: '#222', borderRadius: 2, overflow: 'hidden' }}>
+                                    <div style={{ width: `${Math.round(lvl.peak * 100)}%`, height: '100%', background: lvl.peak > 0.9 ? '#f44' : lvl.peak > 0.6 ? '#fa4' : '#4a8', borderRadius: 2 }} />
+                                  </div>
+                                  <span style={{ color: '#444', fontSize: 9 }}>{Math.round(lvl.peak * 100)}%</span>
+                                </div>
+                              ) : <span style={{ color: '#2a2a2a', fontSize: 9 }}>—</span>}
                             </td>
                             <td style={{ padding: '3px 5px' }}>
                               <span style={{ display: 'inline-flex', gap: 2 }}>
@@ -633,17 +749,6 @@ export default function SoundStudioPage() {
                                 {!ref?.cpp && !ref?.actordefs?.length && !isMissing && <span style={{ color: '#333', fontSize: 9 }}>—</span>}
                               </span>
                             </td>
-                            <td style={{ padding: '3px 5px' }}>
-                              {lvl ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                  <div style={{ width: 70, height: 5, background: '#222', borderRadius: 2, overflow: 'hidden' }}>
-                                    <div style={{ width: `${Math.round(lvl.peak * 100)}%`, height: '100%', background: lvl.peak > 0.9 ? '#f44' : lvl.peak > 0.6 ? '#fa4' : '#4a8', borderRadius: 2 }} />
-                                  </div>
-                                  <span style={{ color: '#444', fontSize: 9 }}>{Math.round(lvl.peak * 100)}%</span>
-                                </div>
-                              ) : <span style={{ color: '#2a2a2a', fontSize: 9 }}>—</span>}
-                            </td>
-                            <td style={{ padding: '3px 5px', textAlign: 'right', color: '#444', fontVariantNumeric: 'tabular-nums' }}>{formatBytes(size)}</td>
                             <td style={{ padding: '3px 5px', textAlign: 'right' }}>
                               <span style={{ display: 'inline-flex', gap: 3 }}>
                                 {isLoop && !isMissing && (
@@ -652,6 +757,11 @@ export default function SoundStudioPage() {
                                     style={{ background: isLooping ? '#1a2a3a' : 'none', border: `1px solid ${isLooping ? '#4af' : '#2a2a2a'}`, color: isLooping ? '#8cf' : '#556', borderRadius: 3, padding: '0 4px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>
                                     {isLooping ? '⏹↺' : '↺'}
                                   </button>
+                                )}
+                                {!isMissing && !s.pendingDelete && (
+                                  <button onClick={e => { e.stopPropagation(); exportWav(s.name); }}
+                                    title="Export as decoded WAV"
+                                    style={{ background: 'none', border: '1px solid #2a2a2a', color: '#556', borderRadius: 3, padding: '0 4px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>↓</button>
                                 )}
                                 {!isMissing && !s.pendingDelete && (
                                   <button onClick={e => { e.stopPropagation(); openRename(s.name); }}
@@ -687,13 +797,21 @@ export default function SoundStudioPage() {
                   <div style={{ fontSize: 11, color: '#aaa', fontWeight: 'bold', wordBreak: 'break-all' }}>{selectedSound.name}</div>
                   {selectedRef?.role && <div style={{ marginTop: 3, fontSize: 10, color: '#8af' }}>🌐 {selectedRef.role === 'BG_BASE' ? 'Base ambient (indoor)' : selectedRef.role === 'BG_AMBIENT' ? 'Ambient hum' : 'Outside wind'}</div>}
                   {!selectedRef?.role && selectedRef?.loop && <div style={{ marginTop: 3, fontSize: 10, color: '#68a' }}>↺ Looping sound in game</div>}
+                  {selectedRef?.fadeoutMs && <div style={{ marginTop: 2, fontSize: 10, color: '#787' }}>↘ Fades out over {selectedRef.fadeoutMs}ms on stop</div>}
                   {selectedRef?.category && <div style={{ marginTop: 2, fontSize: 10, color: '#666' }}>Category: {CATEGORY_LABELS[selectedRef.category] || selectedRef.category}</div>}
+                  {selectedSound.durationSec != null && <div style={{ marginTop: 2, fontSize: 10, color: '#555' }}>Duration: {formatDuration(selectedSound.durationSec)}</div>}
                   {selectedLevel && (
                     <div style={{ marginTop: 4, fontSize: 10, color: '#555', display: 'flex', gap: 10 }}>
                       <span>Peak <span style={{ color: selectedLevel.peak > 0.9 ? '#f44' : '#9a9' }}>{(selectedLevel.peak * 100).toFixed(0)}%</span></span>
                       <span>RMS <span style={{ color: '#9a9' }}>{(selectedLevel.rms * 100).toFixed(0)}%</span></span>
                     </div>
                   )}
+                  <div style={{ marginTop: 6 }}>
+                    <button onClick={() => exportWav(selectedSound.name)}
+                      style={{ padding: '2px 8px', background: '#1a1a2a', border: '1px solid #334', color: '#66a', borderRadius: 3, cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>
+                      ↓ Export decoded WAV
+                    </button>
+                  </div>
                 </div>
 
                 {/* Waveform */}
@@ -704,13 +822,22 @@ export default function SoundStudioPage() {
 
                 {/* Distance / volume preview */}
                 <div style={{ padding: '7px 10px', borderBottom: '1px solid #1e1e1e' }}>
-                  <div style={{ fontSize: 10, color: '#555', marginBottom: 4 }}>DISTANCE PREVIEW</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                    <div style={{ fontSize: 10, color: '#555' }}>DISTANCE PREVIEW</div>
+                    <label style={{ fontSize: 9, color: inGameVol ? '#8a8' : '#555', display: 'flex', alignItems: 'center', gap: 3, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={inGameVol} onChange={e => setInGameVol(e.target.checked)} style={{ accentColor: '#4a8' }} />
+                      in-game vol
+                    </label>
+                  </div>
                   <input type="range" min={0} max={500} value={distance} onChange={e => setDistance(Number(e.target.value))}
                     style={{ width: '100%', accentColor: '#4a8' }} />
                   <div style={{ fontSize: 10, color: '#666', display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
-                    <span>{distance}px from source</span>
-                    <span style={{ color: distanceGain > 0 ? '#9a9' : '#f66' }}>
-                      {distanceGain > 0 ? `${(distanceGain * 100).toFixed(0)}% vol` : 'inaudible'}
+                    <span>{distance}px</span>
+                    {inGameVol && selectedRef?.volumeCalls?.[0] && typeof selectedRef.volumeCalls[0].vol === 'number' && (
+                      <span style={{ color: '#787' }}>{Math.round(selectedRef.volumeCalls[0].vol / 128 * 100)}% × {Math.round(distAttenuation * 100)}% =</span>
+                    )}
+                    <span style={{ color: effectiveGain > 0 ? '#9a9' : '#f66' }}>
+                      {effectiveGain > 0 ? `${Math.round(effectiveGain * 100)}%` : 'silent'}
                     </span>
                   </div>
                 </div>
@@ -725,6 +852,27 @@ export default function SoundStudioPage() {
                         <span style={{ color: volColor(vc.vol), marginLeft: 6, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{vc.vol}/128</span>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Sound set */}
+                {selectedRef?.soundSet && setMembers[selectedRef.soundSet] && (
+                  <div style={{ padding: '7px 10px', borderBottom: '1px solid #1e1e1e', overflow: 'auto', maxHeight: 180 }}>
+                    <div style={{ fontSize: 10, color: '#555', marginBottom: 2 }}>SOUND SET — {selectedRef.soundSet}</div>
+                    <div style={{ fontSize: 9, color: '#555', marginBottom: 6 }}>
+                      {setMembers[selectedRef.soundSet].length} variants chosen randomly — replace together for consistency
+                    </div>
+                    {setMembers[selectedRef.soundSet].map(m => {
+                      const exists = sounds.some(s => s.name === m);
+                      return (
+                        <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '1px 0' }}>
+                          <button onClick={() => play(m)} disabled={!exists}
+                            style={{ background: 'none', border: 'none', color: exists ? '#556' : '#333', cursor: exists ? 'pointer' : 'default', fontSize: 10, padding: 0, fontFamily: 'monospace' }}>▶</button>
+                          <span style={{ fontSize: 10, color: m === selectedSound.name ? '#ddd' : exists ? '#669' : '#444', flex: 1 }}>{m}</span>
+                          {!exists && <span style={{ fontSize: 8, color: '#f90' }}>✗</span>}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
 
