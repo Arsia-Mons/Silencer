@@ -34,7 +34,10 @@ export default function SoundStudioPage() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number>(-1);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
+  const soundsRef = useRef<SoundEntry[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,6 +53,35 @@ export default function SoundStudioPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Keep soundsRef in sync so keydown handler can read latest sounds
+  useEffect(() => { soundsRef.current = sounds; }, [sounds]);
+
+  // Arrow key navigation: up/down moves selection and plays the sound
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      // Ignore if focus is inside an input/button
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SELECT') return;
+      e.preventDefault();
+      const list = soundsRef.current.filter(s => !s.pendingDelete);
+      if (!list.length) return;
+      setSelectedIdx(prev => {
+        const next = e.key === 'ArrowDown'
+          ? Math.min(prev + 1, list.length - 1)
+          : Math.max(prev - 1, 0);
+        // Scroll selected row into view
+        rowRefs.current[next]?.scrollIntoView({ block: 'nearest' });
+        // Play the selected sound
+        play(list[next].name);
+        return next;
+      });
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Playback via Web Audio API (handles IMA ADPCM WAV natively) ─────────────
 
@@ -261,21 +293,33 @@ export default function SoundStudioPage() {
                 </tr>
               </thead>
               <tbody>
-                {sounds.map(s => {
+                {sounds.filter(s => !s.pendingDelete || true).map((s, i) => {
+                  const visibleIdx = sounds.filter(x => !x.pendingDelete).indexOf(s);
                   const isPlaying = playing === s.name;
+                  const isSelected = !s.pendingDelete && visibleIdx === selectedIdx;
                   const size = s.source === 'bin' ? s.adpcmBytes : s.size;
                   return (
                     <tr
                       key={s.name}
+                      ref={el => { if (!s.pendingDelete) rowRefs.current[visibleIdx] = el; }}
+                      onClick={() => {
+                        if (!s.pendingDelete) { setSelectedIdx(visibleIdx); play(s.name); }
+                      }}
                       style={{
                         borderBottom: '1px solid #222',
                         opacity: s.pendingDelete ? 0.4 : 1,
-                        background: isPlaying ? '#1a2a1a' : s.source === 'staged' ? '#1a1a2a' : 'transparent',
+                        cursor: s.pendingDelete ? 'default' : 'pointer',
+                        background: isPlaying
+                          ? '#1a2a1a'
+                          : isSelected
+                          ? '#1e1e28'
+                          : s.source === 'staged' ? '#1a1a2a' : 'transparent',
+                        outline: isSelected ? '1px solid #445' : 'none',
                       }}
                     >
                       <td style={{ padding: '4px 8px', textAlign: 'center' }}>
                         <button
-                          onClick={() => play(s.name)}
+                          onClick={e => { e.stopPropagation(); if (!s.pendingDelete) { setSelectedIdx(visibleIdx); play(s.name); } }}
                           disabled={s.pendingDelete}
                           title={isPlaying ? 'Stop' : 'Play'}
                           style={{
@@ -336,6 +380,7 @@ export default function SoundStudioPage() {
           {staged.length > 0 && <span style={{ color: '#88f' }}>{staged.length} staged</span>}
           {pendingDels.length > 0 && <span style={{ color: '#f66' }}>{pendingDels.length} pending deletion</span>}
           <span>drag &amp; drop WAV files anywhere to stage</span>
+          <span style={{ marginLeft: 'auto', color: '#333' }}>↑↓ navigate &amp; play</span>
         </div>
       </div>
     </div>
