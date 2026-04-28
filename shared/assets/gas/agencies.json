@@ -1,11 +1,20 @@
 {
-  "_comment": "Agency definitions — upgradeCaps are 1:1 from user.h:37-42 static consts. All agencies share the same global caps. Do not change during GAS migration.",
+  "_comment": "Agency definitions — upgradeCaps are per-agency final values (bonuses baked in). defaultUpgrades are the free starting points each agency receives. defaultBonuses = total free points subtracted in TotalUpgradePointsPossible. All values are 1:1 from user.cpp constructor. Do not rebalance during GAS migration.",
   "agencies": [
     {
       "id": 0,
       "name": "Noxis",
+      "defaultBonuses": 6,
+      "defaultUpgrades": {
+        "endurance": 3,
+        "shield": 0,
+        "jetpack": 0,
+        "techslots": 3,
+        "hacking": 0,
+        "contacts": 0
+      },
       "upgradeCaps": {
-        "endurance": 5,
+        "endurance": 8,
         "shield": 5,
         "jetpack": 5,
         "techslots": 8,
@@ -16,6 +25,15 @@
     {
       "id": 1,
       "name": "Lazarus",
+      "defaultBonuses": 3,
+      "defaultUpgrades": {
+        "endurance": 0,
+        "shield": 0,
+        "jetpack": 0,
+        "techslots": 3,
+        "hacking": 0,
+        "contacts": 0
+      },
       "upgradeCaps": {
         "endurance": 5,
         "shield": 5,
@@ -28,33 +46,60 @@
     {
       "id": 2,
       "name": "Caliber",
+      "defaultBonuses": 6,
+      "defaultUpgrades": {
+        "endurance": 0,
+        "shield": 0,
+        "jetpack": 0,
+        "techslots": 3,
+        "hacking": 0,
+        "contacts": 3
+      },
       "upgradeCaps": {
         "endurance": 5,
         "shield": 5,
         "jetpack": 5,
         "techslots": 8,
         "hacking": 5,
-        "contacts": 5
+        "contacts": 8
       }
     },
     {
       "id": 3,
       "name": "Static",
+      "defaultBonuses": 6,
+      "defaultUpgrades": {
+        "endurance": 0,
+        "shield": 0,
+        "jetpack": 0,
+        "techslots": 3,
+        "hacking": 3,
+        "contacts": 0
+      },
       "upgradeCaps": {
         "endurance": 5,
         "shield": 5,
         "jetpack": 5,
         "techslots": 8,
-        "hacking": 5,
+        "hacking": 8,
         "contacts": 5
       }
     },
     {
       "id": 4,
       "name": "Blackrose",
+      "defaultBonuses": 5,
+      "defaultUpgrades": {
+        "endurance": 0,
+        "shield": 2,
+        "jetpack": 0,
+        "techslots": 3,
+        "hacking": 0,
+        "contacts": 0
+      },
       "upgradeCaps": {
         "endurance": 5,
-        "shield": 5,
+        "shield": 7,
         "jetpack": 5,
         "techslots": 8,
         "hacking": 5,

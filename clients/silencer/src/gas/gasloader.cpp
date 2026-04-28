@@ -63,8 +63,18 @@ static void LoadAgencies(const std::string& dir, std::vector<AgencyDef>& out) {
         out.clear();
         for (const auto& aj : j.at("agencies")) {
             AgencyDef a;
-            a.id   = aj.value("id", 0);
-            a.name = aj.value("name", std::string{});
+            a.id             = aj.value("id", 0);
+            a.name           = aj.value("name", std::string{});
+            a.defaultBonuses = aj.value("defaultBonuses", a.defaultBonuses);
+            if (aj.contains("defaultUpgrades")) {
+                const auto& du = aj["defaultUpgrades"];
+                a.defaultUpgrades.endurance = du.value("endurance", a.defaultUpgrades.endurance);
+                a.defaultUpgrades.shield    = du.value("shield",    a.defaultUpgrades.shield);
+                a.defaultUpgrades.jetpack   = du.value("jetpack",   a.defaultUpgrades.jetpack);
+                a.defaultUpgrades.techslots = du.value("techslots", a.defaultUpgrades.techslots);
+                a.defaultUpgrades.hacking   = du.value("hacking",   a.defaultUpgrades.hacking);
+                a.defaultUpgrades.contacts  = du.value("contacts",  a.defaultUpgrades.contacts);
+            }
             if (aj.contains("upgradeCaps")) {
                 const auto& caps = aj["upgradeCaps"];
                 a.upgradeCaps.endurance  = caps.value("endurance",  a.upgradeCaps.endurance);

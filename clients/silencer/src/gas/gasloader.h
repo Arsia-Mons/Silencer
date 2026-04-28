@@ -26,10 +26,22 @@ struct AgencyUpgradeCaps {
     uint8_t contacts   = 5;
 };
 
+// Starting upgrade values granted for free at account creation.
+struct AgencyDefaultUpgrades {
+    uint8_t endurance = 0;
+    uint8_t shield    = 0;
+    uint8_t jetpack   = 0;
+    uint8_t techslots = 3;  // all agencies start with 3 tech slots
+    uint8_t hacking   = 0;
+    uint8_t contacts  = 0;
+};
+
 struct AgencyDef {
-    int         id   = 0;
-    std::string name;
-    AgencyUpgradeCaps upgradeCaps;
+    int                  id             = 0;
+    std::string          name;
+    uint8_t              defaultBonuses = 3;  // free points subtracted in TotalUpgradePointsPossible
+    AgencyDefaultUpgrades defaultUpgrades;
+    AgencyUpgradeCaps    upgradeCaps;
 };
 
 // ---- Player ----------------------------------------------------------------
