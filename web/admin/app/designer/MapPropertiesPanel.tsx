@@ -2,8 +2,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { MapHeader, SpriteEntry } from '../../lib/types';
 
-const BG_NAMES = ['Forest', 'Desert', 'Snow', 'Night', 'Cave'];
-
 function BgThumb({ idx, spriteImages, selected, onSelect }: {
   idx: number;
   spriteImages: Map<number, (SpriteEntry | null)[]> | null | undefined;
@@ -38,7 +36,7 @@ function BgThumb({ idx, spriteImages, selected, onSelect }: {
   return (
     <button
       onClick={onSelect}
-      title={`Background ${idx}: ${BG_NAMES[idx] ?? 'Unknown'}`}
+      title={`Background ${idx}`}
       className={`flex flex-col items-center gap-1 rounded border-2 p-1 transition-colors flex-shrink-0 ${
         selected
           ? 'border-game-primary bg-[#0d1a0d]'
@@ -47,7 +45,7 @@ function BgThumb({ idx, spriteImages, selected, onSelect }: {
     >
       <canvas ref={canvasRef} width={100} height={60} className="rounded-sm block" />
       <span className={`text-[10px] font-mono ${selected ? 'text-game-primary' : 'text-game-textDim'}`}>
-        BG {idx} · {BG_NAMES[idx] ?? ''}
+        BG {idx}
       </span>
     </button>
   );
