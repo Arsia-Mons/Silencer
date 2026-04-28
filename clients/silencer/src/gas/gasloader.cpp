@@ -104,7 +104,8 @@ static void LoadAgencies(const std::string& dir, std::vector<AgencyDef>& out) {
             AgencyDef a;
             a.id             = aj.value("id", 0);
             a.name           = aj.value("name", std::string{});
-            a.defaultBonuses = aj.value("defaultBonuses", a.defaultBonuses);
+            a.defaultBonuses      = aj.value("defaultBonuses",      a.defaultBonuses);
+            a.maxPlayersPerTeam   = aj.value("maxPlayersPerTeam",   a.maxPlayersPerTeam);
             if (aj.contains("defaultUpgrades")) {
                 const auto& du = aj["defaultUpgrades"];
                 a.defaultUpgrades.endurance = du.value("endurance", a.defaultUpgrades.endurance);

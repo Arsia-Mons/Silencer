@@ -88,6 +88,7 @@
     {
       "id": 4,
       "name": "Blackrose",
+      "maxPlayersPerTeam": 1,
       "defaultBonuses": 5,
       "defaultUpgrades": {
         "endurance": 0,

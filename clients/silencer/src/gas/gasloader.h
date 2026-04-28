@@ -40,6 +40,7 @@ struct AgencyDef {
     int                  id             = 0;
     std::string          name;
     uint8_t              defaultBonuses = 3;  // free points subtracted in TotalUpgradePointsPossible
+    uint8_t              maxPlayersPerTeam = 4; // max peers that can join this team
     AgencyDefaultUpgrades defaultUpgrades;
     AgencyUpgradeCaps    upgradeCaps;
 };

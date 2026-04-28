@@ -318,10 +318,8 @@ void Team::OnDestroy(World & world){
 }
 
 bool Team::AddPeer(Uint8 id){
-	Uint8 maxplayers = 4;
-	if(agency == BLACKROSE){
-		maxplayers = 1;
-	}
+	const AgencyDef* ad = GASLoader::Get().GetAgencyDef(agency);
+	Uint8 maxplayers = ad ? ad->maxPlayersPerTeam : 4;
 	for(int i = 0; i < numpeers; i++){
 		if(peers[i] == id){
 			return false;
