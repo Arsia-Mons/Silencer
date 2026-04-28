@@ -23,22 +23,44 @@ const TABS = [
 type FileKey = (typeof TABS)[number]['file'];
 
 // Required top-level keys per file (what the game loader expects).
-const REQUIRED_KEYS: Partial<Record<FileKey, string[]>> = {
-  weapons:     ['weapons'],
-  enemies:     ['enemies'],
-  agencies:    ['agencies'],
-  items:       ['items'],
-};
-
-function getMissingKeys(file: FileKey, content: string): string[] {
-  const required = REQUIRED_KEYS[file];
-  if (!required) return [];
-  try {
-    const parsed = JSON.parse(content);
-    return required.filter(k => !(k in parsed));
-  } catch {
-    return [];
+// Deep comparison: every key/field present in `orig` must exist in `curr`.
+// Array items are matched by their `id` property.
+function collectViolations(curr: unknown, orig: unknown, path: string): string[] {
+  if (typeof orig !== 'object' || orig === null) return [];
+  if (typeof curr !== 'object' || curr === null) return [path ? `"${path}" removed` : 'root removed'];
+  const v: string[] = [];
+  if (Array.isArray(orig)) {
+    if (!Array.isArray(curr)) return [path ? `"${path}" changed from array` : 'root changed from array'];
+    for (const origItem of orig) {
+      if (typeof origItem !== 'object' || origItem === null) continue;
+      const id = (origItem as Record<string, unknown>).id;
+      if (id === undefined) continue;
+      const currItem = (curr as unknown[]).find(
+        i => typeof i === 'object' && i !== null && (i as Record<string, unknown>).id === id,
+      );
+      if (!currItem) { v.push(`[id=${id}] entry removed`); continue; }
+      v.push(...collectViolations(currItem, origItem, `[id=${id}]`));
+    }
+  } else {
+    const o = orig as Record<string, unknown>;
+    const c = curr as Record<string, unknown>;
+    for (const key of Object.keys(o)) {
+      const label = path ? `${path}.${key}` : key;
+      if (!(key in c)) {
+        v.push(`"${label}" removed`);
+      } else if (typeof o[key] === 'object' && o[key] !== null) {
+        v.push(...collectViolations(c[key], o[key], label));
+      }
+    }
   }
+  return v;
+}
+
+function validateBaseline(current: string, original: string): string[] {
+  if (!original) return [];
+  try {
+    return collectViolations(JSON.parse(current), JSON.parse(original), '');
+  } catch { return []; }
 }
 
 function GasPageInner() {
@@ -51,8 +73,9 @@ function GasPageInner() {
   const editorApiRef      = useRef<EditorAPI | null>(null);
 
   const [localFolder, setLocalFolder] = useState<string | null>(null);
-  const [files,       setFiles]       = useState<Partial<Record<FileKey, string>>>({});
-  const [savedFiles,  setSavedFiles]  = useState<Partial<Record<FileKey, string>>>({});
+  const [files,         setFiles]         = useState<Partial<Record<FileKey, string>>>({});
+  const [savedFiles,    setSavedFiles]    = useState<Partial<Record<FileKey, string>>>({});
+  const [originalFiles, setOriginalFiles] = useState<Partial<Record<FileKey, string>>>({});
   const [errors,      setErrors]      = useState<Partial<Record<FileKey, number>>>({});
   const [saveMsg,     setSaveMsg]     = useState('');
   const [saveErr,     setSaveErr]     = useState('');
@@ -97,7 +120,7 @@ function GasPageInner() {
     );
     setFiles(data);
     setSavedFiles(data);
-    setLocalFolder(folderName);
+    setOriginalFiles(data);
     setSaveErr('');
     setSaveMsg('');
     setErrors({});
@@ -108,7 +131,7 @@ function GasPageInner() {
     setLocalFolder(null);
     setFiles({});
     setSavedFiles({});
-    setSaveErr('');
+    setOriginalFiles({});
     setSaveMsg('');
     setErrors({});
     setShowValidate(false);
@@ -128,16 +151,16 @@ function GasPageInner() {
       setSaveErr('Invalid JSON — fix syntax before saving.');
       return;
     }
-    // 2. Monaco schema error check (catches missing required keys, wrong types, etc.)
+    // 2. Monaco schema error check
     const monacoErrors = errors[activeTab] ?? 0;
     if (monacoErrors > 0) {
       setSaveErr(`Fix ${monacoErrors} schema error${monacoErrors !== 1 ? 's' : ''} before saving.`);
       return;
     }
-    // 3. Required-key check (belt-and-suspenders; Monaco should already catch these)
-    const missing = getMissingKeys(activeTab, content);
-    if (missing.length > 0) {
-      setSaveErr(`Missing required key${missing.length !== 1 ? 's' : ''}: ${missing.map(k => `"${k}"`).join(', ')}`);
+    // 3. Baseline integrity check — every key/field from the original file must still be present
+    const violations = validateBaseline(content, originalFiles[activeTab] ?? '');
+    if (violations.length > 0) {
+      setSaveErr(`${violations.length} baseline violation${violations.length !== 1 ? 's' : ''}: ${violations.slice(0, 2).join('; ')}${violations.length > 2 ? ` (+${violations.length - 2} more — open Validate All)` : ''}`);
       return;
     }
     const filename = activeTab;
@@ -166,7 +189,7 @@ function GasPageInner() {
     setSaveErr('');
     setSaveMsg(`✓ Saved ${filename}.json`);
     setTimeout(() => setSaveMsg(''), 2500);
-  }, [files, activeTab, errors]);
+  }, [files, activeTab, errors, originalFiles]);
 
   // ── Format ────────────────────────────────────────────────────────────────
   function handleFormat() {
@@ -223,11 +246,11 @@ function GasPageInner() {
   const validateSummary = TABS.map(({ label, file, icon }) => {
     const content = files[file] ?? '';
     const monacoErr = errors[file] ?? 0;
-    const missing = getMissingKeys(file, content);
+    const violations = validateBaseline(content, originalFiles[file] ?? '');
     const absent = !(file in files);
-    return { file, label, icon, monacoErr, missing, absent };
+    return { file, label, icon, monacoErr, violations, absent };
   });
-  const allValid = !localFolder || validateSummary.every(r => r.absent || (r.monacoErr === 0 && r.missing.length === 0));
+  const allValid = !localFolder || validateSummary.every(r => r.absent || (r.monacoErr === 0 && r.violations.length === 0));
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -278,11 +301,15 @@ function GasPageInner() {
                   <div className="absolute right-0 top-9 z-50 bg-game-bgCard border border-game-border rounded shadow-lg w-80 p-3">
                     <div className="text-xs font-mono text-game-primary mb-2">Required Key Check</div>
                     <div className="flex flex-col gap-1">
-                      {validateSummary.map(({ file, label, icon, monacoErr, missing, absent }) => {
-                        const ok = !absent && monacoErr === 0 && missing.length === 0;
+                      {validateSummary.map(({ file, label, icon, monacoErr, violations, absent }) => {
+                        const ok = !absent && monacoErr === 0 && violations.length === 0;
                         const issues = absent
                           ? ['file not loaded']
-                          : [...missing.map(k => `missing "${k}"`), ...(monacoErr > 0 ? [`${monacoErr} schema error${monacoErr !== 1 ? 's' : ''}`] : [])];
+                          : [
+                              ...(violations.length > 0 ? [`${violations.length} removed field${violations.length !== 1 ? 's' : ''}`] : []),
+                              ...(monacoErr > 0 ? [`${monacoErr} schema error${monacoErr !== 1 ? 's' : ''}`] : []),
+                            ];
+                        const detail = violations.slice(0, 3).join(', ') + (violations.length > 3 ? ` +${violations.length - 3} more` : '');
                         return (
                           <button
                             key={file}
@@ -296,6 +323,9 @@ function GasPageInner() {
                               </span>
                               {issues.length > 0 && (
                                 <div className="text-[10px] text-game-danger mt-0.5">{issues.join(' · ')}</div>
+                              )}
+                              {detail && (
+                                <div className="text-[10px] text-game-textDim mt-0.5 truncate">{detail}</div>
                               )}
                             </div>
                             <span className="text-[10px] text-game-textDim font-mono shrink-0">↗</span>
@@ -382,12 +412,12 @@ function GasPageInner() {
             {/* Tab bar */}
             <div className="flex items-center border-b border-game-border bg-game-bgCard shrink-0 px-2 pt-1">
               {TABS.map(({ label, file, icon }) => {
-                const tabErrors  = errors[file as FileKey] ?? 0;
-                const tabMissing = getMissingKeys(file as FileKey, files[file as FileKey] ?? '');
-                const tabDirty   = files[file as FileKey] !== savedFiles[file as FileKey];
-                const missing    = !(file as FileKey in files);
-                const isActive   = activeTab === file;
-                const hasIssue   = tabErrors > 0 || tabMissing.length > 0;
+                const tabErrors     = errors[file as FileKey] ?? 0;
+                const tabViolations = validateBaseline(files[file as FileKey] ?? '', originalFiles[file as FileKey] ?? '');
+                const tabDirty      = files[file as FileKey] !== savedFiles[file as FileKey];
+                const missing       = !(file as FileKey in files);
+                const isActive      = activeTab === file;
+                const hasIssue      = tabErrors > 0 || tabViolations.length > 0;
                 return (
                   <a
                     key={file}
@@ -403,7 +433,7 @@ function GasPageInner() {
                     <span className="text-sm leading-none">{icon}</span>
                     {label}
                     {hasIssue && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-game-danger shrink-0" title={`${tabErrors > 0 ? `${tabErrors} error(s)` : ''}${tabMissing.length > 0 ? ` missing: ${tabMissing.join(', ')}` : ''}`} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-game-danger shrink-0" title={`${tabErrors > 0 ? `${tabErrors} error(s)` : ''}${tabViolations.length > 0 ? ` ${tabViolations.length} removed field(s)` : ''}`} />
                     )}
                     {tabDirty && !hasIssue && (
                       <span className="w-1.5 h-1.5 rounded-full bg-game-warning shrink-0" title="Unsaved changes" />
