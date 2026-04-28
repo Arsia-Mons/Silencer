@@ -4,6 +4,7 @@ import { ACTOR_DEFS } from './Toolbar';
 import type { SpriteEntry } from '../../lib/types';
 
 const NEEDED_SPRITE_BANKS = new Set([
+  0, 1, 2, 3, 4, // parallax backgrounds
   ...ACTOR_DEFS.map(a => a.bank).filter((b): b is number => b != null),
   184,
   200, 201, 205,
@@ -27,6 +28,7 @@ function spritePaletteIndex(bankNum: number): number {
     case 1: return 6;
     case 2: return 7;
     case 3: return 8;
+    case 4: return 9;
     case 6: return 1;
     case 7: return 2;
     default: return 0;
