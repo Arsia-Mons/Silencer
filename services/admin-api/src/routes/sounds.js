@@ -647,6 +647,17 @@ router.post('/:name/rename', requireAuth, requireRole('admin'), (req, res) => {
   res.json({ ok: true, newName: finalName, updatedActors, cppWarning: CPP_REFS.has(name) });
 });
 
+// POST /sounds/upload — upload a sound.bin from the developer's local machine
+router.post('/upload', requireAuth, requireRole('admin'), async (req, res) => {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const buf = Buffer.concat(chunks);
+  if (!buf.length) return res.status(400).json({ error: 'empty body' });
+  mkdirSync(ASSETS_DIR, { recursive: true });
+  writeFileSync(SOUND_BIN, buf);
+  res.json({ ok: true, size: buf.length });
+});
+
 // POST /sounds/repack — rebuild sound.bin
 router.post('/repack', requireAuth, requireRole('admin'), async (req, res) => {
   const { sounds, dataBase, buf } = parseSoundBin();

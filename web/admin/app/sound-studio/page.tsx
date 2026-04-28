@@ -166,6 +166,7 @@ export default function SoundStudioPage() {
   const [looping, setLooping] = useState<string | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number>(-1);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const binInputRef = useRef<HTMLInputElement | null>(null);
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
   const soundsRef = useRef<SoundEntry[]>([]);
   const visibleNonDeletedRef = useRef<(SoundEntry & { missing?: boolean })[]>([]);
@@ -193,7 +194,26 @@ export default function SoundStudioPage() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { soundsRef.current = sounds; }, [sounds]);
+  const handleBinFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true); setError('');
+    try {
+      const buf = await file.arrayBuffer();
+      const token = getToken();
+      const res = await fetch(`${(process.env.NEXT_PUBLIC_API_URL || '') + '/api'}/sounds/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: buf,
+      });
+      if (!res.ok) throw new Error(`Upload failed: ${res.status} ${res.statusText}`);
+      await load();
+    } catch (e: any) { setError(e.message); setLoading(false); }
+    if (e.target) e.target.value = '';
+  }, [load]);
 
   const loadMusic = useCallback(async () => {
     setMusicLoading(true);
@@ -861,15 +881,15 @@ export default function SoundStudioPage() {
             <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 48, border: '1px solid #2a2a2a', borderRadius: 4 }}>
               <div style={{ fontSize: 32 }}>📦</div>
               <div style={{ fontSize: 13, color: '#666' }}>
-                Place <code style={{ color: '#88a' }}>sound.bin</code> in{' '}
-                <code style={{ color: '#88a' }}>shared/assets/</code> then load it to start editing.
+                Select your local <code style={{ color: '#88a' }}>sound.bin</code> to upload and start editing.
               </div>
               <button
-                onClick={load}
-                disabled={loading}
-                style={{ padding: '10px 28px', border: '1px solid #66a', color: '#aaf', background: 'none', cursor: loading ? 'default' : 'pointer', fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, opacity: loading ? 0.5 : 1 }}>
-                {loading ? 'LOADING…' : '[ LOAD SOUND.BIN ]'}
+                    onClick={() => binInputRef.current?.click()}
+                    disabled={loading}
+                    style={{ padding: '10px 28px', border: '1px solid #66a', color: '#aaf', background: 'none', cursor: loading ? 'default' : 'pointer', fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, opacity: loading ? 0.5 : 1 }}>
+                {loading ? 'LOADING…' : '[ OPEN SOUND.BIN ]'}
               </button>
+              <input ref={binInputRef} type="file" accept=".bin" style={{ display: 'none' }} onChange={handleBinFile} />
               {error && <div style={{ fontSize: 11, color: '#f66' }}>{error}</div>}
             </div>
           </div>
