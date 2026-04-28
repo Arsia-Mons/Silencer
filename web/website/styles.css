@@ -11,7 +11,7 @@ body {
   color: #d1fad7;
   font-family: 'Courier New', Courier, monospace;
   font-size: 16px;
-  line-height: 1.6;
+  line-height: 1.4;
 }
 
 body::after {
@@ -41,109 +41,52 @@ body::before {
 main {
   position: relative;
   z-index: 1;
-  max-width: 540px;
-  margin: 0 auto;
-  padding: 4rem 1.5rem 2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1.5rem;
+  max-width: 80ch;
+  margin: 0;
+  padding: 2lh 2ch;
 }
 
-header { text-align: center; }
+main > * + * { margin-top: 1lh; }
 
 .logo {
-  width: 540px;
+  display: block;
+  width: 60ch;
   max-width: 100%;
   height: auto;
-  filter: drop-shadow(0 0 12px rgba(0, 163, 40, 0.35));
+  margin: 0;
 }
 
 blockquote {
-  margin: 0 auto;
-  padding: 1rem 1.2rem;
-  max-width: 480px;
-  background: rgba(0, 0, 0, 0.4);
-  font-size: 0.95rem;
-  line-height: 1.55;
+  margin: 0;
+  padding: 0;
+  max-width: 72ch;
 }
 
-blockquote p { margin: 0 0 0.8rem; }
+blockquote p { margin: 0 0 1lh; }
+blockquote p:last-of-type { margin-bottom: 0; }
 
 blockquote footer {
-  font-size: 0.8rem;
   color: #88c194;
-  text-align: right;
+  margin-top: 1lh;
 }
 
-.cta {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.1rem;
-  margin-top: 0.25rem;
-  font-size: 1.05rem;
+.links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-.social {
-  display: flex;
-  gap: 2rem;
-  margin-top: 1rem;
-}
+.links li { margin: 0; }
 
-.social a {
+.links a {
   color: #88c194;
-  transition: color 0.12s, transform 0.12s;
-  display: flex;
-  align-items: center;
+  text-decoration: underline;
 }
 
-.social a:hover {
-  color: #e8ffea;
-  transform: translateY(-2px);
-  filter: drop-shadow(0 0 8px rgba(0, 163, 40, 0.5));
-}
+.links a.primary { color: #e8ffea; }
 
-.social svg {
-  width: 32px;
-  height: 32px;
-  fill: currentColor;
-}
-
-.cta a {
-  color: #88c194;
-  text-decoration: none;
-  letter-spacing: 0.04em;
-  padding: 0.4rem 0;
-  transition: color 0.12s;
-}
-
-.cta a::before {
-  content: '> ';
-  color: #00a328;
-}
-
-.cta a.primary {
-  color: #e8ffea;
-  font-weight: bold;
-  font-size: 1.35rem;
-}
-
-.cta a.primary::before {
-  color: #00ff32;
-}
-
-.cta a:hover, .cta a:focus-visible {
+.links a:hover,
+.links a:focus-visible {
   color: #e8ffea;
   outline: none;
-}
-
-.cta a:hover::before,
-.cta a:focus-visible::before {
-  color: #00ff32;
-}
-
-@media (max-width: 600px) {
-  body { background-attachment: scroll; }
-  main { padding: 2rem 1rem; gap: 2rem; }
 }
