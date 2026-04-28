@@ -3,36 +3,8 @@ name: CI Build (macOS)
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore:
-      - 'services/**'
-      - 'web/**'
-      - 'infra/**'
-      - 'docs/**'
-      - 'designer/**'
-      - 'shared/design/**'
-      - 'shared/skills/**'
-      - '*.md'
-      - '.gitignore'
-      - '.github/workflows/ci-build-admin-*.yml'
-      - '.github/workflows/ci-build-lobby-docker.yml'
-      - '.github/workflows/deploy*.yml'
-      - '.github/workflows/release.yml'
   push:
     branches: [main]
-    paths-ignore:
-      - 'services/**'
-      - 'web/**'
-      - 'infra/**'
-      - 'docs/**'
-      - 'designer/**'
-      - 'shared/design/**'
-      - 'shared/skills/**'
-      - '*.md'
-      - '.gitignore'
-      - '.github/workflows/ci-build-admin-*.yml'
-      - '.github/workflows/ci-build-lobby-docker.yml'
-      - '.github/workflows/deploy*.yml'
-      - '.github/workflows/release.yml'
 
 concurrency:
   group: ci-build-macos-${{ github.event.pull_request.number || github.ref }}
@@ -52,20 +24,56 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Need history back to the PR base / push-before SHA so the diff
+          # step below can see what actually changed.
+          fetch-depth: 0
+
+      # Path filter is gated inside the job (not on:) so the required
+      # build-macos check context always reports — branch protection treats
+      # a never-run workflow as "Expected" and blocks merge, but a job whose
+      # steps are skipped via if: still reports the job as success.
+      #
+      # Inverse of the previous on: paths-ignore list: relevant=true unless
+      # every changed file lives under one of the ignored prefixes.
+      - id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base='${{ github.event.pull_request.base.sha }}'
+          else
+            base='${{ github.event.before }}'
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$base" HEAD | grep -Ev \
+               '^(services/|web/|infra/|docs/|designer/|shared/(design|skills)/|[^/]+\.md$|\.gitignore$|\.github/workflows/(ci-build-admin-[^/]*|ci-build-lobby-docker|deploy[^/]*|release)\.yml$)' \
+               | grep -q .; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install deps (Homebrew)
+        if: steps.changes.outputs.relevant == 'true'
         run: brew install minizip dylibbundler
 
       - name: Install SDL3 + SDL3_mixer
+        if: steps.changes.outputs.relevant == 'true'
         uses: libsdl-org/setup-sdl@main
         with:
           version: 3-latest
           version-sdl-mixer: 3-latest
 
       - name: Setup sccache
+        if: steps.changes.outputs.relevant == 'true'
         uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Configure
+        if: steps.changes.outputs.relevant == 'true'
         run: |
           cmake -B build -S clients/silencer \
             -DCMAKE_BUILD_TYPE=Release \
@@ -75,13 +83,15 @@ jobs:
             -DSILENCER_UNITY_BUILD=ON
 
       - name: Build
+        if: steps.changes.outputs.relevant == 'true'
         run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
 
       - name: sccache stats
-        if: always()
+        if: always() && steps.changes.outputs.relevant == 'true'
         run: sccache --show-stats
 
       - name: Bundle dylibs
+        if: steps.changes.outputs.relevant == 'true'
         working-directory: build
         run: |
           mkdir -p Silencer.app/Contents/Frameworks
@@ -101,4 +111,8 @@ jobs:
           ls Silencer.app/Contents/Frameworks/
 
       - name: Verify bundled dependencies
+        if: steps.changes.outputs.relevant == 'true'
         run: tests/e2e/check-bundle-macos.sh build/Silencer.app
+
+      - if: steps.changes.outputs.relevant != 'true'
+        run: echo "No client/asset/test changes; skipping macOS build."

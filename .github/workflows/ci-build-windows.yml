@@ -3,36 +3,8 @@ name: CI Build (Windows)
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths-ignore:
-      - 'services/**'
-      - 'web/**'
-      - 'infra/**'
-      - 'docs/**'
-      - 'designer/**'
-      - 'shared/design/**'
-      - 'shared/skills/**'
-      - '*.md'
-      - '.gitignore'
-      - '.github/workflows/ci-build-admin-*.yml'
-      - '.github/workflows/ci-build-lobby-docker.yml'
-      - '.github/workflows/deploy*.yml'
-      - '.github/workflows/release.yml'
   push:
     branches: [main]
-    paths-ignore:
-      - 'services/**'
-      - 'web/**'
-      - 'infra/**'
-      - 'docs/**'
-      - 'designer/**'
-      - 'shared/design/**'
-      - 'shared/skills/**'
-      - '*.md'
-      - '.gitignore'
-      - '.github/workflows/ci-build-admin-*.yml'
-      - '.github/workflows/ci-build-lobby-docker.yml'
-      - '.github/workflows/deploy*.yml'
-      - '.github/workflows/release.yml'
 
 concurrency:
   group: ci-build-windows-${{ github.event.pull_request.number || github.ref }}
@@ -52,8 +24,37 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Need history back to the PR base / push-before SHA so the diff
+          # step below can see what actually changed.
+          fetch-depth: 0
+
+      # See ci-build-macos.yml for why path filtering happens inside the job
+      # rather than via on: paths-ignore. Inverse of the previous ignore list:
+      # relevant=true unless every changed file is under an ignored prefix.
+      - id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base='${{ github.event.pull_request.base.sha }}'
+          else
+            base='${{ github.event.before }}'
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$base" HEAD | grep -Ev \
+               '^(services/|web/|infra/|docs/|designer/|shared/(design|skills)/|[^/]+\.md$|\.gitignore$|\.github/workflows/(ci-build-admin-[^/]*|ci-build-lobby-docker|deploy[^/]*|release)\.yml$)' \
+               | grep -q .; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Cache vcpkg binaries
+        if: steps.changes.outputs.relevant == 'true'
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.vcpkg-cache
@@ -62,20 +63,24 @@ jobs:
             vcpkg-${{ runner.os }}-
 
       - name: Cache vcpkg tool downloads
+        if: steps.changes.outputs.relevant == 'true'
         uses: actions/cache@v4
         with:
           path: C:\vcpkg\downloads\tools
           key: vcpkg-tools-${{ runner.os }}-v1
 
       - name: Setup sccache
+        if: steps.changes.outputs.relevant == 'true'
         uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Setup MSVC dev environment
+        if: steps.changes.outputs.relevant == 'true'
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
 
       - name: Configure
+        if: steps.changes.outputs.relevant == 'true'
         shell: pwsh
         env:
           VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite"
@@ -90,14 +95,16 @@ jobs:
             -DSILENCER_UNITY_BUILD=ON
 
       - name: Build
+        if: steps.changes.outputs.relevant == 'true'
         run: cmake --build build
 
       - name: sccache stats
-        if: always()
+        if: always() && steps.changes.outputs.relevant == 'true'
         shell: pwsh
         run: sccache --show-stats
 
       - name: Package
+        if: steps.changes.outputs.relevant == 'true'
         shell: pwsh
         run: |
           $stage = "build/package/silencer"
@@ -110,5 +117,10 @@ jobs:
           Get-ChildItem $stage
 
       - name: Verify bundled dependencies
+        if: steps.changes.outputs.relevant == 'true'
         shell: pwsh
         run: pwsh tests/e2e/check-bundle-windows.ps1 -PackageDir build/package/silencer
+
+      - if: steps.changes.outputs.relevant != 'true'
+        shell: bash
+        run: echo "No client/asset/test changes; skipping Windows build."
