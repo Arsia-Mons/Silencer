@@ -30,5 +30,8 @@
   "deployWaitTicks": 60,
   "startingCredits": 500,
   "creditFloor": 250,
-  "creditCap": 65535
+  "creditCap": 65535,
+  "neutronWarnTick": 8,
+  "superShieldMultiplier": 2,
+  "powerupRespawnTicks": 60
 }

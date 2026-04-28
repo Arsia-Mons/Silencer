@@ -41,7 +41,8 @@ void WallDefense::Tick(World & world){
 			}
 		}break;
 		case WAITING:{
-			if(state_i >= 12){
+			{ const GameObjectDef* _wd = GASLoader::Get().GetGameObjectDef("wallDefense");
+			if(state_i >= (_wd ? _wd->refireReadyTick : 12)){
 				state_i = 11;
 				Object * object = Look(world);
 				if(object){
@@ -64,11 +65,13 @@ void WallDefense::Tick(World & world){
 					state_i = -1;
 				}
 			}
+			} // _wd scope
 		}break;
 		case DEAD:{
 			collidable = false;
 			res_index = 0;
-			if(state_i >= 60){
+			{ const GameObjectDef* _wd = GASLoader::Get().GetGameObjectDef("wallDefense");
+			if(state_i >= (_wd ? _wd->reloadTick : 60)){
 				if(teamid == 0){
 					state = ACTIVATING;
 					state_i = -1;
@@ -77,6 +80,7 @@ void WallDefense::Tick(World & world){
 					state_i = -1;
 				}
 			}
+			} // _wd scope
 			if(world.tickcount % 24 != 0){
 				state_i--;
 			}

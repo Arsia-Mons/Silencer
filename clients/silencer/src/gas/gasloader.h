@@ -81,6 +81,9 @@ struct PlayerDef {
     int startingCredits             = 500;  // credits on spawn
     int creditFloor                 = 250;  // min credits after event
     int creditCap                   = 65535; // max credits
+    int neutronWarnTick             = 8;    // tracetime value that triggers detonation warning sound
+    int superShieldMultiplier       = 2;    // super shield powerup: shield = maxshield * N
+    int powerupRespawnTicks         = 60;   // ticks before a dropped powerup respawns
 };
 
 // ---- Weapon ----------------------------------------------------------------
@@ -162,6 +165,15 @@ struct EnemyDef {
     int meleeDamageShield = 60;   // robot: melee shield damage
     int returnProximity   = 20;   // robot: px distance to spawn to consider "returned"
     int sleepTicks        = 100;  // robot: ticks idle at spawn before resuming patrol
+    // Guard AI thresholds
+    int meleeCycleTicks       = 32;  // melee attack state_hit modulus
+    int meleeDelayTicks       = 10;  // minimum state_hit within cycle to allow attack
+    int targetStandingHeight  = 50;  // target AABB height >= this => standing (else crouched)
+    int ladderYThreshold      = 48;  // abs(ydiff) > this to attempt ladder climb
+    int ladderXTolerance      = 8;   // abs(center-x) <= this to align with ladder
+    int patrolReturnProximity = 20;  // abs(x-originalx) <= this to consider returned to post
+    // Civilian variant speeds
+    int speedAlt              = 0;   // actortype=1 civilian speed override
 };
 
 // ---- Ability ---------------------------------------------------------------
@@ -187,6 +199,8 @@ struct GameObjectDef {
     // TechStation
     int techHealth    = 0;
     int techShield    = 0;
+    int refireReadyTick = 12;  // wall defense: state_i to trigger shot
+    int reloadTick      = 60;  // wall defense: state_i to reset from DEAD state
 };
 
 // ---- Terminal ---------------------------------------------------------------

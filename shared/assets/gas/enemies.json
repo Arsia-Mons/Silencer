@@ -12,7 +12,13 @@
       "chaseRangeStop": 80,
       "chaseRangeMax": 90,
       "respawnSeconds": 30,
-      "ladderCooldown": 120
+      "ladderCooldown": 120,
+      "meleeCycleTicks": 32,
+      "meleeDelayTicks": 10,
+      "targetStandingHeight": 50,
+      "ladderYThreshold": 48,
+      "ladderXTolerance": 8,
+      "patrolReturnProximity": 20
     },
     {
       "id": "guard-laser",
@@ -25,7 +31,13 @@
       "chaseRangeStop": 80,
       "chaseRangeMax": 90,
       "respawnSeconds": 30,
-      "ladderCooldown": 120
+      "ladderCooldown": 120,
+      "meleeCycleTicks": 32,
+      "meleeDelayTicks": 10,
+      "targetStandingHeight": 50,
+      "ladderYThreshold": 48,
+      "ladderXTolerance": 8,
+      "patrolReturnProximity": 20
     },
     {
       "id": "guard-rocket",
@@ -38,7 +50,13 @@
       "chaseRangeStop": 80,
       "chaseRangeMax": 90,
       "respawnSeconds": 30,
-      "ladderCooldown": 120
+      "ladderCooldown": 120,
+      "meleeCycleTicks": 32,
+      "meleeDelayTicks": 10,
+      "targetStandingHeight": 50,
+      "ladderYThreshold": 48,
+      "ladderXTolerance": 8,
+      "patrolReturnProximity": 20
     },
     {
       "id": "robot",
@@ -58,6 +76,7 @@
       "health": 0,
       "shield": 0,
       "speed": 4,
+      "speedAlt": 5,
       "tractHealthDamage": 80,
       "tractShieldDamage": 80,
       "_note": "Civilian health is not set in constructor — Object base default applies."

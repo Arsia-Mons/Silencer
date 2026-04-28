@@ -351,7 +351,7 @@ void Player::Tick(World & world){
 	}
 	if(tracetime > 0 && secondcounter == 0 && !world.replaying){
 		tracetime--;
-		if(tracetime == 8){
+		if(tracetime == GASLoader::Get().player.neutronWarnTick){
 			world.SendSound("vModDeto.wav");
 		}
 		if(tracetime == 0){
@@ -4407,7 +4407,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			switch(pickup.type){
 				case PickUp::SUPERSHIELD:{
 					powerupname = "You've gained the Super Shield!";
-					shield = maxshield * 2;
+					shield = maxshield * GASLoader::Get().player.superShieldMultiplier;
 				}break;
 				case PickUp::NEUTRONBOMB:{
 					powerupname = "Neutron Bomb activation in 15 seconds!";

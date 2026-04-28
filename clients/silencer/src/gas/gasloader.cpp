@@ -73,6 +73,9 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.startingCredits            = j.value("startingCredits",            out.startingCredits);
         out.creditFloor                = j.value("creditFloor",                out.creditFloor);
         out.creditCap                  = j.value("creditCap",                  out.creditCap);
+        out.neutronWarnTick            = j.value("neutronWarnTick",            out.neutronWarnTick);
+        out.superShieldMultiplier      = j.value("superShieldMultiplier",      out.superShieldMultiplier);
+        out.powerupRespawnTicks        = j.value("powerupRespawnTicks",        out.powerupRespawnTicks);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
     }
@@ -206,6 +209,13 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.meleeDamageShield  = ej.value("meleeDamageShield",  e.meleeDamageShield);
             e.returnProximity    = ej.value("returnProximity",    e.returnProximity);
             e.sleepTicks         = ej.value("sleepTicks",         e.sleepTicks);
+            e.meleeCycleTicks       = ej.value("meleeCycleTicks",       e.meleeCycleTicks);
+            e.meleeDelayTicks       = ej.value("meleeDelayTicks",       e.meleeDelayTicks);
+            e.targetStandingHeight  = ej.value("targetStandingHeight",  e.targetStandingHeight);
+            e.ladderYThreshold      = ej.value("ladderYThreshold",      e.ladderYThreshold);
+            e.ladderXTolerance      = ej.value("ladderXTolerance",      e.ladderXTolerance);
+            e.patrolReturnProximity = ej.value("patrolReturnProximity", e.patrolReturnProximity);
+            e.speedAlt              = ej.value("speedAlt",              e.speedAlt);
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {
@@ -249,6 +259,8 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             g.healthRegen   = gj.value("healthRegen",    0);
             g.techHealth    = gj.value("techHealth",     0);
             g.techShield    = gj.value("techShield",     0);
+            g.refireReadyTick = gj.value("refireReadyTick", g.refireReadyTick);
+            g.reloadTick      = gj.value("reloadTick",      g.reloadTick);
             out.push_back(std::move(g));
         }
     } catch (const std::exception& e) {
