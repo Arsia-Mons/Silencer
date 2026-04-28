@@ -22,13 +22,25 @@ function getPalette(palBytes: Uint8Array, palIndex: number): Uint8Array {
   return pal;
 }
 
+// Parallax palette index for banks 0-4 (matches C++ SetParallaxColors)
+const PARALLAX_PALETTE_IDX: Record<number, number> = { 0: 5, 1: 6, 2: 7, 3: 8, 4: 9 };
+
+// C++ SetParallaxColors only overrides the last 30 entries (226-255) of palette 0.
+// Replicate that: base = palette 0, override 226-255 with the parallax palette.
+function getParallaxHybridPalette(palBytes: Uint8Array, parallaxBank: number): Uint8Array {
+  const pal = getPalette(palBytes, 0);
+  const parallaxPalIdx = PARALLAX_PALETTE_IDX[parallaxBank];
+  const src = getPalette(palBytes, parallaxPalIdx);
+  for (let i = 226; i < 256; i++) {
+    pal[i * 3]     = src[i * 3];
+    pal[i * 3 + 1] = src[i * 3 + 1];
+    pal[i * 3 + 2] = src[i * 3 + 2];
+  }
+  return pal;
+}
+
 function spritePaletteIndex(bankNum: number): number {
   switch (bankNum) {
-    case 0: return 5;
-    case 1: return 6;
-    case 2: return 7;
-    case 3: return 8;
-    case 4: return 9;
     case 6: return 1;
     case 7: return 2;
     default: return 0;
@@ -247,8 +259,9 @@ async function processData(
     const spriteCount = binSprBytes![bankNum * 64 + 2];
     const handle = sprFileMap.get(bankNum)!;
     const bankData = await readFn(handle);
-    const palIdx = spritePaletteIndex(bankNum);
-    const pal = getPalette(palBytes, palIdx);
+    const pal = (bankNum in PARALLAX_PALETTE_IDX)
+      ? getParallaxHybridPalette(palBytes, bankNum)
+      : getPalette(palBytes, spritePaletteIndex(bankNum));
     const sprites = await loadSpriteBank(bankData, bankNum, spriteCount, pal);
     spriteImages.set(bankNum, sprites);
     setProgress({ total: totalSteps, done: tileBankNums.length + fi + 1 });
