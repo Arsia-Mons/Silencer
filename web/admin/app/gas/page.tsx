@@ -285,64 +285,18 @@ function GasPageInner() {
           <div className="flex items-center gap-2">
             {/* Validate All button */}
             {localFolder && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowValidate(v => !v)}
-                  className={`px-3 py-1.5 text-xs font-mono border rounded transition-colors ${
-                    showValidate
-                      ? 'border-game-primary text-game-primary'
-                      : allValid
-                      ? 'border-game-border text-game-textDim hover:border-game-primary hover:text-game-text'
-                      : 'border-game-danger text-game-danger hover:border-game-danger/60'
-                  }`}
-                >
-                  {allValid ? '✓ VALIDATE ALL' : '⊗ VALIDATE ALL'}
-                </button>
-                {showValidate && (
-                  <div className="absolute right-0 top-9 z-50 bg-game-bgCard border border-game-border rounded shadow-lg w-80 p-3">
-                    <div className="text-xs font-mono text-game-primary mb-2">Required Key Check</div>
-                    <div className="flex flex-col gap-1">
-                      {validateSummary.map(({ file, label, icon, monacoErr, violations, absent }) => {
-                        const ok = !absent && monacoErr === 0 && violations.length === 0;
-                        const issues = absent
-                          ? ['file not loaded']
-                          : [
-                              ...(violations.length > 0 ? [`${violations.length} removed field${violations.length !== 1 ? 's' : ''}`] : []),
-                              ...(monacoErr > 0 ? [`${monacoErr} schema error${monacoErr !== 1 ? 's' : ''}`] : []),
-                            ];
-                        const detail = violations.slice(0, 3).join(', ') + (violations.length > 3 ? ` +${violations.length - 3} more` : '');
-                        return (
-                          <button
-                            key={file}
-                            onClick={() => { switchTab(file as FileKey); setShowValidate(false); }}
-                            className="flex items-start gap-2 text-left px-2 py-1.5 rounded hover:bg-game-bg transition-colors"
-                          >
-                            <span className="text-sm shrink-0">{icon}</span>
-                            <div className="flex-1 min-w-0">
-                              <span className={`text-xs font-mono ${ok ? 'text-game-primary' : absent ? 'text-game-textDim' : 'text-game-danger'}`}>
-                                {ok ? '✓' : absent ? '–' : '⊗'} {label}
-                              </span>
-                              {issues.length > 0 && (
-                                <div className="text-[10px] text-game-danger mt-0.5">{issues.join(' · ')}</div>
-                              )}
-                              {detail && (
-                                <div className="text-[10px] text-game-textDim mt-0.5 truncate">{detail}</div>
-                              )}
-                            </div>
-                            <span className="text-[10px] text-game-textDim font-mono shrink-0">↗</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <button
-                      onClick={() => setShowValidate(false)}
-                      className="mt-2 w-full text-xs font-mono text-game-textDim hover:text-game-text border border-game-border rounded px-2 py-1 transition-colors"
-                    >
-                      Close
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => setShowValidate(v => !v)}
+                className={`px-3 py-1.5 text-xs font-mono border transition-colors ${
+                  showValidate
+                    ? 'border-game-primary text-game-primary'
+                    : allValid
+                    ? 'border-game-border text-game-textDim hover:border-game-primary hover:text-game-text'
+                    : 'border-game-danger text-game-danger hover:border-game-danger/60'
+                }`}
+              >
+                {allValid ? '✓ VALIDATE ALL' : `⊗ VALIDATE ALL`}
+              </button>
             )}
 
             {localFolder ? (
@@ -476,6 +430,64 @@ function GasPageInner() {
                 </button>
               </div>
             </div>
+
+            {/* ── Validation tray (Problems panel) ── */}
+            {showValidate && (
+              <div className="border-b border-game-border bg-game-bg shrink-0 flex flex-col" style={{ maxHeight: '40%' }}>
+                <div className="flex items-center justify-between px-4 py-2 border-b border-game-border bg-game-bgCard shrink-0">
+                  <span className="text-xs font-mono text-game-primary tracking-wider">
+                    PROBLEMS — baseline integrity check (files as loaded = required)
+                  </span>
+                  <button
+                    onClick={() => setShowValidate(false)}
+                    className="text-xs font-mono text-game-textDim hover:text-game-text px-2 py-0.5 border border-game-border hover:border-game-primary transition-colors"
+                  >
+                    ✕ CLOSE
+                  </button>
+                </div>
+                <div className="overflow-y-auto">
+                  {validateSummary.every(r => r.absent || (r.monacoErr === 0 && r.violations.length === 0)) ? (
+                    <div className="px-6 py-4 text-xs font-mono text-game-primary">✓ All files pass baseline check</div>
+                  ) : (
+                    validateSummary.map(({ file, label, icon, monacoErr, violations, absent }) => {
+                      const ok = !absent && monacoErr === 0 && violations.length === 0;
+                      if (ok || absent) return null;
+                      return (
+                        <div key={file} className="border-b border-game-border/40 last:border-0">
+                          {/* Tab header row */}
+                          <button
+                            onClick={() => switchTab(file as FileKey)}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-game-bgCard transition-colors"
+                          >
+                            <span className="text-sm shrink-0">{icon}</span>
+                            <span className="text-xs font-mono font-bold text-game-danger tracking-wider">{label}</span>
+                            <span className="text-xs font-mono text-game-textDim ml-1">
+                              {violations.length > 0 && `${violations.length} removed field${violations.length !== 1 ? 's' : ''}`}
+                              {violations.length > 0 && monacoErr > 0 && '  ·  '}
+                              {monacoErr > 0 && `${monacoErr} schema error${monacoErr !== 1 ? 's' : ''}`}
+                            </span>
+                            <span className="ml-auto text-[10px] text-game-textDim font-mono">click to jump →</span>
+                          </button>
+                          {/* Violation rows */}
+                          {violations.map((v, i) => (
+                            <div key={i} className="flex items-start gap-3 px-8 py-1 text-xs font-mono text-game-danger hover:bg-game-bgCard/50">
+                              <span className="text-game-danger/60 shrink-0 select-none">⊗</span>
+                              <span className="break-all">{v}</span>
+                            </div>
+                          ))}
+                          {monacoErr > 0 && (
+                            <div className="flex items-start gap-3 px-8 py-1 text-xs font-mono text-game-warning">
+                              <span className="shrink-0 select-none">⚠</span>
+                              <span>{monacoErr} JSON schema error{monacoErr !== 1 ? 's' : ''} — check Monaco editor for details</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Monaco editor — fills remaining space */}
             <div className="flex-1 overflow-hidden">
