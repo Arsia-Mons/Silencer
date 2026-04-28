@@ -188,14 +188,30 @@ function GasPageInner() {
 
   function handleRestoreField(fileKey: FileKey, violation: string) {
     const orig = originalFiles[fileKey];
-    const curr = files[fileKey];
-    if (!orig || !curr) return;
-    try {
-      const origObj = JSON.parse(orig);
-      const currObj = JSON.parse(curr);
-      applyRestore(currObj, origObj, violation);
-      setFiles(prev => ({ ...prev, [fileKey]: JSON.stringify(currObj, null, 2) }));
-    } catch { /* silent — bad JSON in editor, user must fix manually */ }
+    setFiles(prev => {
+      const curr = prev[fileKey];
+      if (!orig || !curr) return prev;
+      try {
+        const origObj = JSON.parse(orig);
+        const currObj = JSON.parse(curr);
+        applyRestore(currObj, origObj, violation);
+        return { ...prev, [fileKey]: JSON.stringify(currObj, null, 2) };
+      } catch { return prev; }
+    });
+  }
+
+  function handleRestoreAllFields(fileKey: FileKey, violations: string[]) {
+    const orig = originalFiles[fileKey];
+    setFiles(prev => {
+      const curr = prev[fileKey];
+      if (!orig || !curr) return prev;
+      try {
+        const origObj = JSON.parse(orig);
+        const currObj = JSON.parse(curr);
+        violations.forEach(v => applyRestore(currObj, origObj, v));
+        return { ...prev, [fileKey]: JSON.stringify(currObj, null, 2) };
+      } catch { return prev; }
+    });
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────
@@ -524,7 +540,7 @@ function GasPageInner() {
                             </span>
                             {violations.length > 1 && (
                               <button
-                                onClick={() => violations.forEach(v => handleRestoreField(file as FileKey, v))}
+                                onClick={() => handleRestoreAllFields(file as FileKey, violations)}
                                 className="ml-auto text-[10px] font-mono border border-game-primary text-game-primary hover:bg-game-primary/10 px-2 py-0.5 transition-colors"
                               >
                                 ↩ RE-ADD ALL ({violations.length})
