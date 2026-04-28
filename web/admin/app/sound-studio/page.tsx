@@ -47,7 +47,7 @@ interface PendingDiff {
   renamed: { from: string; to: string }[];
 }
 
-type FilterMode = 'all' | 'cpp' | 'actordef' | 'orphaned' | 'missing' | 'ambient' | 'headroom';
+type FilterMode = 'all' | 'cpp' | 'actordef' | 'orphaned' | 'missing' | 'ambient' | 'headroom' | 'loop' | 'attenuated';
 type TabMode = 'sounds' | 'music' | 'ambient';
 type SortKey = 'name' | 'size' | 'duration' | 'level' | 'refs';
 
@@ -121,7 +121,7 @@ export default function SoundStudioPage() {
   const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
   const [normalize, setNormalize] = useState(false);
   const [distance, setDistance] = useState(0);
-  const [inGameVol, setInGameVol] = useState(false);
+  const [inGameVol, setInGameVol] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
@@ -165,6 +165,7 @@ export default function SoundStudioPage() {
   const [playing, setPlaying] = useState<string | null>(null);
   const [looping, setLooping] = useState<string | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number>(-1);
+  const [multiSel, setMultiSel] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const binInputRef = useRef<HTMLInputElement | null>(null);
   const rowRefs = useRef<(HTMLTableRowElement | null)[]>([]);
@@ -280,6 +281,27 @@ export default function SoundStudioPage() {
       ctx.moveTo(x, mid - amp); ctx.lineTo(x, mid + amp);
     }
     ctx.stroke();
+
+    // Time axis ticks (every 500ms)
+    const dur = (sel as any).durationSec ?? 0;
+    if (dur > 0) {
+      ctx.strokeStyle = '#2a3a2a'; ctx.lineWidth = 1; ctx.setLineDash([]);
+      ctx.fillStyle = '#3a5a3a'; ctx.font = '8px monospace';
+      for (let t = 0.5; t < dur; t += 0.5) {
+        const x = Math.round((t / dur) * w);
+        ctx.beginPath(); ctx.moveTo(x, h - 6); ctx.lineTo(x, h); ctx.stroke();
+        if (x > 12) ctx.fillText(`${t.toFixed(1)}`, x + 2, h - 1);
+      }
+    }
+
+    // Loop indicator
+    const isLoop = refs[sel.name]?.loop;
+    if (isLoop) {
+      ctx.fillStyle = '#1a3a4a';
+      ctx.fillRect(w - 34, 1, 33, 11);
+      ctx.fillStyle = '#4a9a9a'; ctx.font = '8px monospace';
+      ctx.fillText('↻ LOOP', w - 32, 10);
+    }
   }, [levels, selectedIdx, sounds, refs]);
 
   // ── Arrow key navigation + Space to play ──────────────────────────────────
@@ -725,6 +747,8 @@ export default function SoundStudioPage() {
     if (filter === 'actordef') return !!(ref?.actordefs?.length);
     if (filter === 'orphaned') return !!ref && !ref.cpp && !ref.actordefs?.length;
     if (filter === 'ambient') return !!(ref?.role) || !!(ref?.loop);
+    if (filter === 'loop') return !!(ref?.loop);
+    if (filter === 'attenuated') return !!(ref?.volumeCalls?.some((vc: { vol: number | string }) => typeof vc.vol === 'number' && vc.vol < 128));
     return true;
   }
 
@@ -752,7 +776,11 @@ export default function SoundStudioPage() {
     if (sortKey === 'name')     { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
     else if (sortKey === 'size')     { va = a.source === 'bin' ? (a.adpcmBytes ?? 0) : (a.size ?? 0); vb = b.source === 'bin' ? (b.adpcmBytes ?? 0) : (b.size ?? 0); }
     else if (sortKey === 'duration') { va = a.durationSec ?? 0; vb = b.durationSec ?? 0; }
-    else if (sortKey === 'level')    { va = levels[a.name]?.peak ?? -1; vb = levels[b.name]?.peak ?? -1; }
+    else if (sortKey === 'level')    {
+      const gva = refs[a.name]?.volumeCalls?.[0]?.vol; const gvb = refs[b.name]?.volumeCalls?.[0]?.vol;
+      va = (levels[a.name]?.peak ?? -1) * (typeof gva === 'number' ? gva / 128 : 1);
+      vb = (levels[b.name]?.peak ?? -1) * (typeof gvb === 'number' ? gvb / 128 : 1);
+    }
     else if (sortKey === 'refs')     { va = refCount(a.name); vb = refCount(b.name); }
     if (va < vb) return sortDir === 'asc' ? -1 : 1;
     if (va > vb) return sortDir === 'asc' ? 1 : -1;
@@ -991,7 +1019,7 @@ export default function SoundStudioPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderBottom: '1px solid #222', background: '#131313', flexWrap: 'wrap' }}>
             <input type="text" placeholder="search…" value={search} onChange={e => setSearch(e.target.value)}
               style={{ padding: '2px 7px', background: '#222', border: '1px solid #444', borderRadius: 3, color: '#ccc', fontFamily: 'monospace', fontSize: 11, width: 140 }} />
-            {(['all','cpp','actordef','ambient','orphaned','missing','headroom'] as FilterMode[]).map(f => (
+            {(['all','cpp','actordef','loop','ambient','attenuated','orphaned','missing','headroom'] as FilterMode[]).map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 style={{ padding: '1px 7px', fontSize: 10, fontFamily: 'monospace',
                   background: filter === f ? '#2a3a4a' : 'transparent',
@@ -1009,6 +1037,25 @@ export default function SoundStudioPage() {
             </button>
             <span style={{ marginLeft: 'auto', color: '#333', fontSize: 10 }}>{visibleEntries.length} shown</span>
           </div>
+
+          {/* Multi-select bulk ops bar */}
+          {multiSel.size > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 14px', background: '#0e1e0e', borderBottom: '1px solid #2a4a2a', fontSize: 11 }}>
+              <span style={{ color: '#4a8', fontFamily: 'monospace' }}>{multiSel.size} selected</span>
+              <button onClick={() => setMultiSel(new Set())}
+                style={{ background: 'none', border: '1px solid #333', color: '#555', borderRadius: 3, padding: '0 6px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>✕ clear</button>
+              <button onClick={async () => {
+                for (const name of multiSel) {
+                  const s = sounds.find(x => x.name === name);
+                  if (s && !s.pendingDelete) { try { await apiFetch(`/sounds/${encodeURIComponent(name)}`, { method: 'DELETE' }); } catch {} }
+                }
+                setMultiSel(new Set()); load();
+              }} style={{ background: 'none', border: '1px solid #4a2a2a', color: '#f66', borderRadius: 3, padding: '0 8px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>
+                ✕ stage delete ({multiSel.size})
+              </button>
+              <span style={{ color: '#333', fontSize: 9, marginLeft: 4 }}>Ctrl+click to toggle · Shift+click to range-select</span>
+            </div>
+          )}
 
           {/* Main: list + inspector */}
           <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -1072,16 +1119,28 @@ export default function SoundStudioPage() {
                         return (
                           <tr key={s.name}
                             ref={el => { if (!s.pendingDelete && visIdx >= 0) rowRefs.current[visIdx] = el; }}
-                            onClick={() => {
-                              if (!s.pendingDelete && !isMissing) { setSelectedIdx(visIdx); setSelectedVolCtx(0); play(s.name); }
-                              else if (!s.pendingDelete) { setSelectedIdx(visIdx); setSelectedVolCtx(0); }
+                            onClick={(e) => {
+                              if (s.pendingDelete) return;
+                              if (e.ctrlKey || e.metaKey) {
+                                setMultiSel(prev => { const n = new Set(prev); n.has(s.name) ? n.delete(s.name) : n.add(s.name); return n; });
+                                return;
+                              }
+                              if (e.shiftKey && selectedIdx >= 0) {
+                                const list = visibleNonDeletedRef.current;
+                                const lo = Math.min(selectedIdx, visIdx), hi = Math.max(selectedIdx, visIdx);
+                                setMultiSel(new Set(list.slice(lo, hi + 1).map(x => x.name)));
+                                return;
+                              }
+                              setMultiSel(new Set());
+                              if (!isMissing) { setSelectedIdx(visIdx); setSelectedVolCtx(0); play(s.name); }
+                              else { setSelectedIdx(visIdx); setSelectedVolCtx(0); }
                             }}
                             style={{
                               borderBottom: '1px solid #1a1a1a',
                               opacity: s.pendingDelete ? 0.4 : isMissing ? 0.7 : 1,
                               cursor: s.pendingDelete ? 'default' : 'pointer',
-                              background: isMissing ? '#1e1000' : isPlaying ? '#1a2a1a' : isSelected ? '#1e1e28' : s.source === 'staged' ? '#1a1a2a' : 'transparent',
-                              outline: isSelected ? '1px solid #445' : 'none',
+                              background: multiSel.has(s.name) ? '#1e2a1e' : isMissing ? '#1e1000' : isPlaying ? '#1a2a1a' : isSelected ? '#1e1e28' : s.source === 'staged' ? '#1a1a2a' : 'transparent',
+                              outline: multiSel.has(s.name) ? '1px solid #4a6' : isSelected ? '1px solid #445' : 'none',
                             }}>
                             <td style={{ padding: '3px 5px', textAlign: 'center' }}>
                               {!isMissing ? (
