@@ -2,6 +2,7 @@
 #include "plasmaprojectile.h"
 #include "plume.h"
 #include "grenade.h"
+#include "gasloader.h"
 
 Detonator::Detonator() : Object(ObjectTypes::DETONATOR){
 	requiresauthority = true;
@@ -41,7 +42,8 @@ void Detonator::Tick(World & world){
 	}
 	if(state_i > 4 * 4){
 		if(state_i == (4 * 4) + 1){
-			yv = -15;
+			const WeaponDef* gd = GASLoader::Get().GetWeaponDef("grenade");
+			yv = -(gd ? gd->detonatorLaunchYv : 15);
 		}
 		if(state_i >= (4 * 4) + 6){
 			if(state_i == (4 * 4) + 6){

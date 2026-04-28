@@ -14,8 +14,8 @@ RocketProjectile::RocketProjectile() : Object(ObjectTypes::ROCKETPROJECTILE){
 	const WeaponDef* w = GASLoader::Get().GetWeaponDef("rocket");
 	healthdamage = w ? w->healthDamage : 75;
 	shielddamage = w ? w->shieldDamage : 25;
-	moveamount = 15;
-	velocity = 35;
+	moveamount = w ? w->moveAmount : 15;
+	velocity = w ? w->velocity : 35;
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;

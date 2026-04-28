@@ -11,9 +11,9 @@ WallProjectile::WallProjectile() : Object(ObjectTypes::WALLPROJECTILE){
 	const WeaponDef* w = GASLoader::Get().GetWeaponDef("wall");
 	healthdamage = w ? w->healthDamage : 10;
 	shielddamage = w ? w->shieldDamage : 60;
-	velocity = 35;
+	velocity = w ? w->velocity : 35;
 	emitoffset = 0;
-	moveamount = 6;
+	moveamount = w ? w->moveAmount : 6;
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;

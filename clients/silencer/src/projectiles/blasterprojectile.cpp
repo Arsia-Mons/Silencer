@@ -11,7 +11,7 @@ BlasterProjectile::BlasterProjectile() : Object(ObjectTypes::BLASTERPROJECTILE){
 	const WeaponDef* w = GASLoader::Get().GetWeaponDef("blaster");
 	healthdamage = w ? w->healthDamage : 40;
 	shielddamage = w ? w->shieldDamage : 4;
-	moveamount = 10;
+	moveamount = w ? w->moveAmount : 10;
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;

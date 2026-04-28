@@ -10,12 +10,12 @@ FlareProjectile::FlareProjectile() : Object(ObjectTypes::FLAREPROJECTILE){
 	const WeaponDef* w = GASLoader::Get().GetWeaponDef("flare");
 	healthdamage = w ? w->healthDamage : 1;
 	shielddamage = w ? w->shieldDamage : 1;
-	velocity = 5;
+	velocity = w ? w->velocity : 5;
 	drawcheckered = true;
 	for(int i = 0; i < plumecount; i++){
 		plumeids[i] = 0;
 	}
-	moveamount = 1;
+	moveamount = w ? w->moveAmount : 1;
 	soundplaying = 0;
 	renderpass = 2;
 	stopatobjectcollision = false;

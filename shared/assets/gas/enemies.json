@@ -10,7 +10,9 @@
       "shotCooldown": 48,
       "chaseRangeClose": 60,
       "chaseRangeStop": 80,
-      "chaseRangeMax": 90
+      "chaseRangeMax": 90,
+      "respawnSeconds": 30,
+      "ladderCooldown": 120
     },
     {
       "id": "guard-laser",
@@ -21,7 +23,9 @@
       "shotCooldown": 48,
       "chaseRangeClose": 60,
       "chaseRangeStop": 80,
-      "chaseRangeMax": 90
+      "chaseRangeMax": 90,
+      "respawnSeconds": 30,
+      "ladderCooldown": 120
     },
     {
       "id": "guard-rocket",
@@ -32,7 +36,9 @@
       "shotCooldown": 48,
       "chaseRangeClose": 60,
       "chaseRangeStop": 80,
-      "chaseRangeMax": 90
+      "chaseRangeMax": 90,
+      "respawnSeconds": 30,
+      "ladderCooldown": 120
     },
     {
       "id": "robot",
@@ -40,7 +46,12 @@
       "shield": 400,
       "speed": 0,
       "searchTicks": 600,
-      "meleeCheckInterval": 40
+      "meleeCheckInterval": 40,
+      "respawnSeconds": 45,
+      "meleeDamageHealth": 60,
+      "meleeDamageShield": 60,
+      "returnProximity": 20,
+      "sleepTicks": 100
     },
     {
       "id": "civilian",

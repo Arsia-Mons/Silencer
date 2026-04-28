@@ -16,6 +16,9 @@
       "spawnAmmo": 5,
       "pickupAmmo": 5,
       "maxAmmo": 30
+    },
+    {
+      "id": "rocket",
       "enumId": 2,
       "name": "Rocket",
       "price": 250,
@@ -29,6 +32,9 @@
       "spawnAmmo": 3,
       "pickupAmmo": 3,
       "maxAmmo": 30
+    },
+    {
+      "id": "flamer",
       "enumId": 3,
       "name": "Flamer Ammo",
       "price": 200,
@@ -42,6 +48,9 @@
       "spawnAmmo": 15,
       "pickupAmmo": 15,
       "maxAmmo": 75
+    },
+    {
+      "id": "healthpack",
       "enumId": 4,
       "name": "Health Pack",
       "price": 200,
@@ -54,6 +63,9 @@
       "description": "A small portable boost for Noxis\nagents in the field.\n \nRestores lost health, but must be\nmanually applied.",
       "spawnInventoryCount": 1,
       "healAmount": 100
+    },
+    {
+      "id": "lazarustract",
       "enumId": 5,
       "name": "Lazarus Tract",
       "price": 250,
@@ -65,6 +77,9 @@
       "agencyRestriction": 1,
       "description": "The definitive and unquestionable\ntruth about Mars' oddest and most\npowerful religious organization.\n \nHelpful in converting disbelieving\ncitizens to your cause.",
       "spawnInventoryCount": 1
+    },
+    {
+      "id": "securitypass",
       "enumId": 6,
       "name": "Security Pass",
       "price": 1000,
@@ -89,6 +104,9 @@
       "agencyRestriction": 3,
       "description": "A portable virus whipped up by the\nsnotty underage hackers of Static.\n \nGives you immediate control over\ncannons and robots in the field.\n \nMay harm enemy in-base weapon\nstations.",
       "spawnInventoryCount": 1
+    },
+    {
+      "id": "poison",
       "enumId": 8,
       "name": "Poison",
       "price": 100,
@@ -101,6 +119,9 @@
       "description": "Hollowhead poisons are pernicious\nbio-rad toxins, administered via\ninjection.\n \nCauses the victim to lose health\nuntil cured, multiple doses\nrecommended.",
       "spawnInventoryCount": 2,
       "poisonDose": 3
+    },
+    {
+      "id": "empbomb",
       "enumId": 9,
       "name": "E.M.P. Bomb",
       "price": 1000,

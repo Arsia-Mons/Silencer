@@ -1156,7 +1156,7 @@ void Player::Tick(World & world){
 	
 	switch(state){
 		case DEPLOYING:{
-			Uint8 deploywait = 60;
+			int deploywait = GASLoader::Get().player.deployWaitTicks;
 			if(state_i >= deploywait){
 				draw = true;
 				int anim_i = state_i - deploywait;

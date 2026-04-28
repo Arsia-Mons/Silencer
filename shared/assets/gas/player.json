@@ -26,5 +26,9 @@
   "poisonTickCycle": 24,
   "hackingEffectTicks": 5,
   "hackingCompleteThreshold": 15,
-  "hackingExitThreshold": 17
+  "hackingExitThreshold": 17,
+  "deployWaitTicks": 60,
+  "startingCredits": 500,
+  "creditFloor": 250,
+  "creditCap": 65535
 }

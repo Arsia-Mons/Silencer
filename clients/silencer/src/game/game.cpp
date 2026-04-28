@@ -1076,8 +1076,7 @@ bool Game::Tick(void){
 				Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 				player->suitcolor = team->color;
 				player->laserammo = 0;
-				player->credits = 500;
-				player->RemoveInventoryItem(Player::INV_BASEDOOR);
+				player->credits = GASLoader::Get().player.startingCredits;
 				ShowDeployMessage();
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
 				world.gameinfo.securitylevel = LobbyGame::SECNONE;
@@ -1273,7 +1272,7 @@ bool Game::Tick(void){
 							world.message_i = 0;
 						}
 						if(player->credits < 250){
-							player->credits = 250;
+						player->credits = GASLoader::Get().player.creditFloor;
 						}
 						if(player->rocketammo > 0){
 							singleplayermessage++;
@@ -1878,7 +1877,7 @@ bool Game::Tick(void){
 				Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 				player->suitcolor = team->GetColor();
 				player->laserammo = 0;
-				player->credits = 0xffff;
+				player->credits = GASLoader::Get().player.creditCap;
 				player->oldx = player->x;
 				player->oldy = player->y;
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
@@ -1896,7 +1895,7 @@ bool Game::Tick(void){
 						Player * botplayer = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 						botplayer->suitcolor = botteam->GetColor();
 						botplayer->laserammo = 0;
-						botplayer->credits = 500;
+						botplayer->credits = GASLoader::Get().player.startingCredits;
 						botplayer->ai = new PlayerAI(*botplayer);
 						botpeer->controlledlist.push_back(botplayer->id);
 						world.map.RandomPlayerStartLocation(world, botplayer->x, botplayer->y);

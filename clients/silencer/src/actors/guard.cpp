@@ -36,7 +36,7 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	isbipedal = true;
 	isphysical = true;
 	snapshotinterval = 48;
-	respawnseconds   = 30;
+	respawnseconds   = g ? g->respawnSeconds : 30;
 	patrol = false;
 	lastspoke = 0;
 	lastshot = 0;
@@ -258,11 +258,11 @@ void Guard::InitBT(){
 								if(ydiff < 0 && signed(ladder->y1) < signed(y)){
 									// player above, ladder goes up
 									x = center; yv = -5; state = LADDER; state_i = 0;
-									bt_ladder_cooldown_ = 120; // 2s cooldown before re-climbing
+									{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
 								} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
 									// player below, ladder goes down
 									x = center; yv = 5; state = LADDER; state_i = 0;
-									bt_ladder_cooldown_ = 120;
+									{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
 								}
 							}
 						}
@@ -294,10 +294,10 @@ void Guard::InitBT(){
 					if(abs(signed(center) - signed(x)) <= 8){
 						if(ydiff < 0 && signed(ladder->y1) < signed(y)){
 							x = center; yv = -5; state = LADDER; state_i = 0;
-							bt_ladder_cooldown_ = 120;
+							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
 						} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
 							x = center; yv = 5; state = LADDER; state_i = 0;
-							bt_ladder_cooldown_ = 120;
+							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
 						}
 					}
 				}

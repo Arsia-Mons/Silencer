@@ -11,9 +11,9 @@ LaserProjectile::LaserProjectile() : Object(ObjectTypes::LASERPROJECTILE){
 	const WeaponDef* w = GASLoader::Get().GetWeaponDef("laser");
 	healthdamage = w ? w->healthDamage : 10;
 	shielddamage = w ? w->shieldDamage : 60;
-	velocity = 30;
+	velocity = w ? w->velocity : 30;
 	emitoffset = 24;
-	moveamount = 12;
+	moveamount = w ? w->moveAmount : 12;
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;

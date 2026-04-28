@@ -69,6 +69,10 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.hackingEffectTicks         = j.value("hackingEffectTicks",         out.hackingEffectTicks);
         out.hackingCompleteThreshold   = j.value("hackingCompleteThreshold",   out.hackingCompleteThreshold);
         out.hackingExitThreshold       = j.value("hackingExitThreshold",       out.hackingExitThreshold);
+        out.deployWaitTicks            = j.value("deployWaitTicks",            out.deployWaitTicks);
+        out.startingCredits            = j.value("startingCredits",            out.startingCredits);
+        out.creditFloor                = j.value("creditFloor",                out.creditFloor);
+        out.creditCap                  = j.value("creditCap",                  out.creditCap);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
     }
@@ -131,6 +135,11 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.destroyTick         = wj.value("destroyTick",         0);
             w.neutronDestroyTick  = wj.value("neutronDestroyTick",  0);
             w.flareDuration       = wj.value("flareDuration",       0);
+            w.velocity            = wj.value("velocity",            0);
+            w.moveAmount          = wj.value("moveAmount",          0);
+            w.radius              = wj.value("radius",              0);
+            w.detonatorLaunchYv   = wj.value("detonatorLaunchYv",  0);
+            w.neutronTraceTime    = wj.value("neutronTraceTime",    0);
             out.push_back(std::move(w));
         }
     } catch (const std::exception& e) {
@@ -191,6 +200,12 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.meleeCheckInterval = ej.value("meleeCheckInterval", e.meleeCheckInterval);
             e.tractHealthDamage  = ej.value("tractHealthDamage",  e.tractHealthDamage);
             e.tractShieldDamage  = ej.value("tractShieldDamage",  e.tractShieldDamage);
+            e.respawnSeconds     = ej.value("respawnSeconds",     e.respawnSeconds);
+            e.ladderCooldown     = ej.value("ladderCooldown",     e.ladderCooldown);
+            e.meleeDamageHealth  = ej.value("meleeDamageHealth",  e.meleeDamageHealth);
+            e.meleeDamageShield  = ej.value("meleeDamageShield",  e.meleeDamageShield);
+            e.returnProximity    = ej.value("returnProximity",    e.returnProximity);
+            e.sleepTicks         = ej.value("sleepTicks",         e.sleepTicks);
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {
@@ -219,8 +234,7 @@ static void LoadAbilities(const std::string& dir, std::vector<AbilityDef>& out) 
     }
 }
 
-static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& out) {
-    json j;
+static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& out) {    json j;
     if (!OpenJson(dir + "/gameobjects.json", j)) return;
     try {
         out.clear();
@@ -233,6 +247,8 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             g.shieldMax     = gj.value("shieldMax",      0);
             g.healthMax     = gj.value("healthMax",      0);
             g.healthRegen   = gj.value("healthRegen",    0);
+            g.techHealth    = gj.value("techHealth",     0);
+            g.techShield    = gj.value("techShield",     0);
             out.push_back(std::move(g));
         }
     } catch (const std::exception& e) {
@@ -245,6 +261,31 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
 // Public API
 // ---------------------------------------------------------------------------
 
+static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out) {
+    json j;
+    if (!OpenJson(dir + "/gameobjects.json", j)) return;
+    if (!j.contains("terminals")) return;
+    try {
+        out.clear();
+        for (const auto& tj : j.at("terminals")) {
+            TerminalDef t;
+            t.id              = tj.value("id",              std::string{});
+            t.juice           = tj.value("juice",           0);
+            t.files           = tj.value("files",           0);
+            t.secretInfo      = tj.value("secretInfo",      0);
+            t.traceTimeBase      = tj.value("traceTimeBase",      t.traceTimeBase);
+            t.traceTimeMedium    = tj.value("traceTimeMedium",    t.traceTimeMedium);
+            t.traceTimeExtended  = tj.value("traceTimeExtended",  t.traceTimeExtended);
+            out.push_back(std::move(t));
+        }
+    } catch (const std::exception& e) {
+        fprintf(stderr, "[gas] gameobjects.json terminals error: %s\n", e.what());
+        out.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+
 bool GASLoader::Load(const std::string& gasDir) {
     LoadPlayer(gasDir, player);
     LoadAgencies(gasDir, agencies);
@@ -253,10 +294,11 @@ bool GASLoader::Load(const std::string& gasDir) {
     LoadEnemies(gasDir, enemies);
     LoadAbilities(gasDir, abilities);
     LoadGameObjects(gasDir, gameObjects);
+    LoadTerminals(gasDir, terminals);
     loaded = true;
-    fprintf(stderr, "[gas] loaded: %zu agencies, %zu weapons, %zu items, %zu enemies, %zu abilities, %zu gameObjects\n",
+    fprintf(stderr, "[gas] loaded: %zu agencies, %zu weapons, %zu items, %zu enemies, %zu abilities, %zu gameObjects, %zu terminals\n",
             agencies.size(), weapons.size(), items.size(),
-            enemies.size(), abilities.size(), gameObjects.size());
+            enemies.size(), abilities.size(), gameObjects.size(), terminals.size());
     return true;
 }
 
@@ -267,6 +309,7 @@ void GASLoader::Reload(const std::string& gasDir) {
     enemies.clear();
     abilities.clear();
     gameObjects.clear();
+    terminals.clear();
     loaded = false;
     Load(gasDir);
 }
@@ -308,5 +351,11 @@ const AbilityDef* GASLoader::GetAbilityDef(const std::string& id) const {
 const GameObjectDef* GASLoader::GetGameObjectDef(const std::string& id) const {
     for (const auto& g : gameObjects)
         if (g.id == id) return &g;
+    return nullptr;
+}
+
+const TerminalDef* GASLoader::GetTerminalDef(const std::string& id) const {
+    for (const auto& t : terminals)
+        if (t.id == id) return &t;
     return nullptr;
 }

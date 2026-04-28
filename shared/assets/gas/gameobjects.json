@@ -21,6 +21,23 @@
       "healthRegen": 15,
       "shieldMax": 4,
       "_note": "health=neutral state (teamid=0). Each upgrade adds healthRegen up to healthMax. shieldMax applied when health reaches healthMax."
+    },
+    {
+      "id": "techStation",
+      "techHealth": 240,
+      "techShield": 240
+    }
+  ],
+  "terminals": [
+    {
+      "id": "big",
+      "juice": 150, "files": 400, "secretInfo": 45,
+      "traceTimeBase": 90, "traceTimeMedium": 120, "traceTimeExtended": 150
+    },
+    {
+      "id": "small",
+      "juice": 80, "files": 100, "secretInfo": 15,
+      "traceTimeBase": 90, "traceTimeMedium": 120, "traceTimeExtended": 150
     }
   ]
 }

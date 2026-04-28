@@ -77,6 +77,10 @@ struct PlayerDef {
     int hackingEffectTicks          = 5;    // ticks for hacking visual/audio effect
     int hackingCompleteThreshold    = 15;   // state_i value when hack completes
     int hackingExitThreshold        = 17;   // state_i value when player regains movement
+    int deployWaitTicks             = 60;   // ticks before deployed item becomes active
+    int startingCredits             = 500;  // credits on spawn
+    int creditFloor                 = 250;  // min credits after event
+    int creditCap                   = 65535; // max credits
 };
 
 // ---- Weapon ----------------------------------------------------------------
@@ -99,6 +103,13 @@ struct WeaponDef {
     int destroyTick         = 0;  // state_i when non-special grenade is destroyed
     int neutronDestroyTick  = 0;  // state_i when neutron bomb is destroyed
     int flareDuration       = 0;  // state_i when flare/poisonflare is destroyed (30 + 168)
+    // Projectile physics
+    int velocity            = 0;  // travel speed (px per move step)
+    int moveAmount          = 0;  // collision steps per tick
+    int radius              = 0;  // hit detection radius
+    // Detonator / neutron bomb
+    int detonatorLaunchYv   = 0;  // yv=−15 on deploy (stored positive, applied negative)
+    int neutronTraceTime    = 0;  // tracetime set when neutron bomb arm completes
 };
 
 // ---- Item ------------------------------------------------------------------
@@ -145,6 +156,12 @@ struct EnemyDef {
     // Civilian tract weapon
     int tractHealthDamage = 0;  // tract projectile health damage (civilian only)
     int tractShieldDamage = 0;  // tract projectile shield damage (civilian only)
+    int respawnSeconds    = 0;    // seconds before enemy respawns after death
+    int ladderCooldown    = 120;  // guard: ticks between ladder re-climbs
+    int meleeDamageHealth = 60;   // robot: melee health damage
+    int meleeDamageShield = 60;   // robot: melee shield damage
+    int returnProximity   = 20;   // robot: px distance to spawn to consider "returned"
+    int sleepTicks        = 100;  // robot: ticks idle at spawn before resuming patrol
 };
 
 // ---- Ability ---------------------------------------------------------------
@@ -167,6 +184,21 @@ struct GameObjectDef {
     int shieldMax     = 0;
     int healthMax     = 0;
     int healthRegen   = 0;
+    // TechStation
+    int techHealth    = 0;
+    int techShield    = 0;
+};
+
+// ---- Terminal ---------------------------------------------------------------
+
+struct TerminalDef {
+    std::string id;          // "big" or "small"
+    int juice        = 0;    // ticks to complete hack
+    int files        = 0;    // files awarded on completion
+    int secretInfo   = 0;    // secret info awarded on completion
+    int traceTimeBase     = 90;   // trace timer when 0 secrets hacked
+    int traceTimeMedium   = 120;  // trace timer when 1 secret hacked
+    int traceTimeExtended = 150;  // trace timer when 2+ secrets hacked
 };
 
 // ---------------------------------------------------------------------------
@@ -193,6 +225,7 @@ public:
     const EnemyDef*      GetEnemyDef(const std::string& id) const;
     const AbilityDef*    GetAbilityDef(const std::string& id) const;
     const GameObjectDef* GetGameObjectDef(const std::string& id) const;
+    const TerminalDef*   GetTerminalDef(const std::string& id) const;
 
     PlayerDef                player;
     std::vector<AgencyDef>   agencies;
@@ -201,6 +234,7 @@ public:
     std::vector<EnemyDef>    enemies;
     std::vector<AbilityDef>  abilities;
     std::vector<GameObjectDef> gameObjects;
+    std::vector<TerminalDef>   terminals;
 
     bool loaded = false;
 

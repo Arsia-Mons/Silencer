@@ -22,7 +22,7 @@ Robot::Robot() : Object(ObjectTypes::ROBOT){
 	isbipedal = true;
 	isphysical = true;
 	snapshotinterval = 48;
-	respawnseconds = 45;
+	respawnseconds = r ? r->respawnSeconds : 45;
 	virusplanter = 0;
 	damaging = 0;
 	soundchannel = -1;
@@ -131,7 +131,7 @@ void Robot::InitBT() {
 		}
 		// Orient toward spawn and let Patrol move us there
 		mirrored = (signed(originalx) < signed(x));
-		if (abs(signed(x) - signed(originalx)) <= 20) {
+		if (abs(signed(x) - signed(originalx)) <= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->returnProximity : 20)) {
 			state = SLEEPING;
 			state_i = -1;
 			return BTResult::Success;
@@ -229,7 +229,8 @@ void Robot::Tick(World & world){
 			res_bank = 45;
 			res_index = state_i % 20;
 			if (!bt_) {
-				if(state_i >= 100 && !patrol){
+				const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+				if(state_i >= (rd ? rd->sleepTicks : 100) && !patrol){
 					state = SLEEPING;
 					state_i = -1;
 					break;
@@ -549,9 +550,10 @@ void Robot::StopAmbience(void){
 
 void Robot::Melee(Object & object, World & world){
 	damaging = 1;
+	const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
 	Object damageprojectile(ObjectTypes::FLAREPROJECTILE);
-	damageprojectile.healthdamage = 60;
-	damageprojectile.shielddamage = 60;
+	damageprojectile.healthdamage = rd ? rd->meleeDamageHealth : 60;
+	damageprojectile.shielddamage = rd ? rd->meleeDamageShield : 60;
 	damageprojectile.ownerid = id;
 	object.HandleHit(world, 50, 50, damageprojectile);
 }

@@ -10,12 +10,12 @@ PlasmaProjectile::PlasmaProjectile() : Object(ObjectTypes::PLASMAPROJECTILE){
 	const WeaponDef* w = GASLoader::Get().GetWeaponDef("plasma");
 	healthdamage = w ? w->healthDamage : 4;
 	shielddamage = w ? w->shieldDamage : 5;
-	velocity = 5;
+	velocity = w ? w->velocity : 5;
 	drawcheckered = true;
 	renderpass = 3;
 	large = false;
-	moveamount = 4;
-	radius = 5;
+	moveamount = w ? w->moveAmount : 4;
+	radius = w ? w->radius : 5;
 	renderpass = 2;
 	stopatobjectcollision = false;
 	isprojectile = true;
