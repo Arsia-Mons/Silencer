@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback, DragEvent } from 'react';
 import { useAuth } from '../../lib/auth';
 import Sidebar from '../../components/Sidebar';
 import { apiFetch } from '../../lib/api';
+import { decodeAdpcmWav } from './adpcm';
 
 interface SoundEntry {
   name: string;
@@ -75,7 +76,8 @@ export default function SoundStudioPage() {
       }
       const audioCtx = audioCtxRef.current;
       if (audioCtx.state === 'suspended') await audioCtx.resume();
-      const decoded = await audioCtx.decodeAudioData(arrayBuf);
+      // Use our JS IMA ADPCM decoder — browsers don't support decodeAudioData for ADPCM WAV
+      const decoded = await decodeAdpcmWav(arrayBuf, audioCtx);
       const source = audioCtx.createBufferSource();
       source.buffer = decoded;
       source.connect(audioCtx.destination);
