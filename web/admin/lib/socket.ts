@@ -69,3 +69,23 @@ export function useSocket(events: Record<string, (...args: unknown[]) => void>):
 export function useWsConnected(): boolean {
   return useSocket({});
 }
+
+/** Polls GET /api/health every 10 s. Returns undefined until first response. */
+export function useServerReachable(): boolean | undefined {
+  const [reachable, setReachable] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      try {
+        const res = await fetch('/api/health', { credentials: 'include' });
+        if (alive) setReachable(res.ok);
+      } catch {
+        if (alive) setReachable(false);
+      }
+    };
+    check();
+    const id = setInterval(check, 10_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+  return reachable;
+}

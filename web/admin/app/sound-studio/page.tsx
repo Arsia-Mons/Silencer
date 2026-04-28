@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback, DragEvent } from 'react';
 import { useAuth } from '../../lib/auth';
 import Sidebar from '../../components/Sidebar';
 import { apiFetch } from '../../lib/api';
+import { useServerReachable } from '../../lib/socket';
 import { decodeAdpcmWav } from './adpcm';
 
 interface SoundEntry {
@@ -101,6 +102,7 @@ function computeLevel(audioBuffer: AudioBuffer): LevelInfo {
 
 export default function SoundStudioPage() {
   useAuth();
+  const serverReachable = useServerReachable();
 
   // ── State ───────────────────────────────────────────────────────────────────
   const [tab, setTab] = useState<TabMode>('sounds');
@@ -778,7 +780,7 @@ export default function SoundStudioPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: 'monospace', background: '#111', color: '#ccc' }}>
-      <Sidebar />
+      <Sidebar wsConnected={serverReachable} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
