@@ -1,0 +1,12 @@
+{
+  "_comment": "Weapon damage values — 1:1 from *projectile.cpp constructors. Do not change during GAS migration.",
+  "weapons": [
+    { "id": "blaster", "healthDamage": 40, "shieldDamage": 4  },
+    { "id": "laser",   "healthDamage": 10, "shieldDamage": 60 },
+    { "id": "flamer",  "healthDamage": 2,  "shieldDamage": 1  },
+    { "id": "rocket",  "healthDamage": 75, "shieldDamage": 25 },
+    { "id": "plasma",  "healthDamage": 4,  "shieldDamage": 5  },
+    { "id": "flare",   "healthDamage": 1,  "shieldDamage": 1  },
+    { "id": "wall",    "healthDamage": 10, "shieldDamage": 60 }
+  ]
+}

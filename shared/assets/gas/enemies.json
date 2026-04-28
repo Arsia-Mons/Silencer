@@ -1,0 +1,8 @@
+{
+  "_comment": "Enemy NPC base stats — 1:1 from guard.cpp:25-26, robot.cpp:14, civilian.cpp:11. Do not change during GAS migration.",
+  "enemies": [
+    { "id": "guard",    "health": 25,  "speed": 5 },
+    { "id": "robot",    "health": 200, "speed": 0 },
+    { "id": "civilian", "health": 0,   "speed": 4 }
+  ]
+}

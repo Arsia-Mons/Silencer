@@ -1,0 +1,65 @@
+{
+  "_comment": "Agency definitions — upgradeCaps are 1:1 from user.h:37-42 static consts. All agencies share the same global caps. Do not change during GAS migration.",
+  "agencies": [
+    {
+      "id": 0,
+      "name": "Noxis",
+      "upgradeCaps": {
+        "endurance": 5,
+        "shield": 5,
+        "jetpack": 5,
+        "techslots": 8,
+        "hacking": 5,
+        "contacts": 5
+      }
+    },
+    {
+      "id": 1,
+      "name": "Lazarus",
+      "upgradeCaps": {
+        "endurance": 5,
+        "shield": 5,
+        "jetpack": 5,
+        "techslots": 8,
+        "hacking": 5,
+        "contacts": 5
+      }
+    },
+    {
+      "id": 2,
+      "name": "Caliber",
+      "upgradeCaps": {
+        "endurance": 5,
+        "shield": 5,
+        "jetpack": 5,
+        "techslots": 8,
+        "hacking": 5,
+        "contacts": 5
+      }
+    },
+    {
+      "id": 3,
+      "name": "Static",
+      "upgradeCaps": {
+        "endurance": 5,
+        "shield": 5,
+        "jetpack": 5,
+        "techslots": 8,
+        "hacking": 5,
+        "contacts": 5
+      }
+    },
+    {
+      "id": 4,
+      "name": "Blackrose",
+      "upgradeCaps": {
+        "endurance": 5,
+        "shield": 5,
+        "jetpack": 5,
+        "techslots": 8,
+        "hacking": 5,
+        "contacts": 5
+      }
+    }
+  ]
+}

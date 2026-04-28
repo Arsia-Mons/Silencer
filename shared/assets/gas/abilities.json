@@ -1,0 +1,4 @@
+{
+  "_comment": "Active ability definitions — placeholder for Phase 5. Abilities are currently implemented as switch cases in game.cpp. This file will be populated in Phase 5 with exact 1:1 parity values.",
+  "abilities": []
+}

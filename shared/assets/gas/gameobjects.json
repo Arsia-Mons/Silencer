@@ -1,0 +1,13 @@
+{
+  "_comment": "Game object parameters — 1:1 from station constructors. Upgrade costs live server-side in the lobby. Do not change during GAS migration.",
+  "gameObjects": [
+    {
+      "id": "healMachine",
+      "cooldownTicks": 240
+    },
+    {
+      "id": "creditMachine",
+      "cooldownTicks": 0
+    }
+  ]
+}
