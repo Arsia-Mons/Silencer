@@ -1077,6 +1077,7 @@ bool Game::Tick(void){
 				player->suitcolor = team->color;
 				player->laserammo = 0;
 				player->credits = GASLoader::Get().player.startingCredits;
+				player->RemoveInventoryItem(Player::INV_BASEDOOR);
 				ShowDeployMessage();
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
 				world.gameinfo.securitylevel = LobbyGame::SECNONE;
