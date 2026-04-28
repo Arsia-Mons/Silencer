@@ -238,21 +238,16 @@ export default function MapCanvas({
       }
     }
 
-    // Draw parallax background tiled across the viewport
+    // Draw parallax background — exactly 20×12 tiles once at world origin
+    // (matches C++ DrawParallax which renders one screen-sized grid, no tiling)
     if (vis?.parallax !== false) {
       const parallaxIdx = map.header?.parallax ?? 0;
       const bgBank = spriteImages?.get(parallaxIdx);
       if (bgBank) {
         const BG_COLS = 20, BG_ROWS = 12;
-        const startCol = Math.floor(-pan.x / tileSize) - 1;
-        const endCol   = Math.ceil((W - pan.x) / tileSize) + 1;
-        const startRow = Math.floor(-pan.y / tileSize) - 1;
-        const endRow   = Math.ceil((H - pan.y) / tileSize) + 1;
-        for (let row = startRow; row < endRow; row++) {
-          for (let col = startCol; col < endCol; col++) {
-            const bgCol = ((col % BG_COLS) + BG_COLS) % BG_COLS;
-            const bgRow = ((row % BG_ROWS) + BG_ROWS) % BG_ROWS;
-            const spr = bgBank[bgRow * BG_COLS + bgCol];
+        for (let row = 0; row < BG_ROWS; row++) {
+          for (let col = 0; col < BG_COLS; col++) {
+            const spr = bgBank[row * BG_COLS + col];
             if (!spr) continue;
             const dx = col * tileSize + pan.x;
             const dy = row * tileSize + pan.y;
