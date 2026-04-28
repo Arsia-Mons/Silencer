@@ -176,6 +176,15 @@ export default function GasMonacoEditor({
     });
   }, [onCursorChange, onEditorReady, onMarkersChange]);
 
+  // ── Clear stale model refs on unmount ────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      modelCache.clear();
+      editorRef.current = null;
+      monacoRef.current = null;
+    };
+  }, []);
+
   // ── Swap model when URI changes (tab switch) ──────────────────────────────
   useEffect(() => {
     const monaco = monacoRef.current;
@@ -184,6 +193,12 @@ export default function GasMonacoEditor({
 
     const monacoUri = monaco.Uri.parse(uri);
     let model = modelCache.get(uri) ?? monaco.editor.getModel(monacoUri);
+
+    // Discard stale models from a previous Monaco instance
+    if (model?.isDisposed()) {
+      modelCache.delete(uri);
+      model = null;
+    }
 
     if (!model) {
       model = monaco.editor.createModel(value, 'json', monacoUri);

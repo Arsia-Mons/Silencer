@@ -2,6 +2,9 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../../lib/auth';
+import { useSocket } from '../../lib/socket';
+import { getStats } from '../../lib/api';
+import type { StatsSnapshot } from '../../lib/types';
 import Sidebar from '../../components/Sidebar';
 import type { EditorAPI, CursorInfo } from '../../components/GasMonacoEditor';
 import { GAS_SCHEMAS } from '../../lib/gas-schemas';
@@ -22,6 +25,15 @@ type FileKey = (typeof TABS)[number]['file'];
 
 export default function GasPage() {
   useAuth();
+  const wsConnected = useSocket({});
+
+  const [stats, setStats] = useState<StatsSnapshot | null>(null);
+  useEffect(() => {
+    const load = () => getStats().then(setStats).catch(() => {});
+    load();
+    const t = setInterval(load, 10_000);
+    return () => clearInterval(t);
+  }, []);
 
   const folderInputRef    = useRef<HTMLInputElement>(null);
   const editorApiRef      = useRef<EditorAPI | null>(null);
@@ -164,7 +176,7 @@ export default function GasPage() {
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-screen overflow-hidden bg-game-bg text-game-text">
-      <Sidebar />
+      <Sidebar wsConnected={wsConnected} />
       <input
         ref={folderInputRef}
         type="file"
@@ -188,6 +200,22 @@ export default function GasPage() {
                 {totalErrors} error{totalErrors !== 1 ? 's' : ''} across files
               </span>
             )}
+          </div>
+
+          {/* ── Service status pills ── */}
+          <div className="flex items-center gap-3">
+            {[
+              { label: 'LOBBY',    ok: !!stats },
+              { label: 'MONGODB',  ok: stats?.db.status === 'connected' },
+              { label: 'RABBITMQ', ok: stats?.rabbitmq.status === 'connected' },
+              { label: 'WS',       ok: wsConnected },
+            ].map(({ label, ok }) => (
+              <div key={label} className="flex items-center gap-1.5 font-mono text-xs">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${ok ? 'bg-game-primary' : stats === null && label !== 'WS' ? 'bg-game-border animate-pulse' : 'bg-game-danger'}`} />
+                <span className={ok ? 'text-game-textDim' : 'text-game-danger'}>{label}</span>
+              </div>
+            ))}
+            <span className="w-px h-5 bg-game-border mx-1" />
           </div>
 
           <div className="flex items-center gap-2">
