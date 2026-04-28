@@ -408,6 +408,7 @@ router.get('/', requireAuth, (req, res) => {
   const deletions = new Set(getDeletions());
   const staged = getStagedFiles();
   const stagedNames = new Set(staged.map(s => s.name));
+  const renames = new Map(getRenames().map(r => [r.from, r.to]));
 
   const binSounds = sounds
     .filter(s => !stagedNames.has(s.name)) // staged overrides bin
@@ -422,13 +423,14 @@ router.get('/', requireAuth, (req, res) => {
         durationSec,
         source: 'bin',
         pendingDelete: deletions.has(s.name),
+        pendingRenameTo: renames.get(s.name) || null,
       };
     });
 
   const stagedSounds = staged.map(s => {
     const p = join(STAGING_DIR, s.name);
     const size = existsSync(p) ? readFileSync(p).length : 0;
-    return { name: s.name, storedLength: null, adpcmBytes: null, size, source: 'staged', pendingDelete: false };
+    return { name: s.name, storedLength: null, adpcmBytes: null, size, source: 'staged', pendingDelete: false, pendingRenameTo: null };
   });
 
   res.json([...binSounds, ...stagedSounds]);
@@ -524,6 +526,20 @@ router.post('/:name/restore', requireAuth, requireRole('admin'), (req, res) => {
   const name = req.params.name;
   saveDeletions(getDeletions().filter(n => n !== name));
   res.json({ ok: true });
+});
+
+// GET /sounds/pending — summary of all pending changes (for diff modal)
+router.get('/pending', requireAuth, (req, res) => {
+  const { sounds } = parseSoundBin();
+  const binNames = new Set(sounds.map(s => s.name));
+  const staged = getStagedFiles();
+  const deletions = getDeletions();
+  const renames = getRenames();
+
+  const added = staged.filter(s => !binNames.has(s.name)).map(s => s.name);
+  const modified = staged.filter(s => binNames.has(s.name)).map(s => s.name);
+
+  res.json({ added, modified, deleted: deletions, renamed: renames });
 });
 
 // GET /sounds/refs — per-sound reference map (C++ + actordefs + missing)

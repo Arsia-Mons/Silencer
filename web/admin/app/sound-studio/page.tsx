@@ -13,6 +13,7 @@ interface SoundEntry {
   size?: number;
   source: 'bin' | 'staged';
   pendingDelete: boolean;
+  pendingRenameTo: string | null;
 }
 
 interface SoundRef {
@@ -38,8 +39,15 @@ interface MusicFile {
   size: number;
 }
 
-type FilterMode = 'all' | 'cpp' | 'actordef' | 'orphaned' | 'missing' | 'ambient';
-type TabMode = 'sounds' | 'music';
+interface PendingDiff {
+  added: string[];
+  modified: string[];
+  deleted: string[];
+  renamed: { from: string; to: string }[];
+}
+
+type FilterMode = 'all' | 'cpp' | 'actordef' | 'orphaned' | 'missing' | 'ambient' | 'headroom';
+type TabMode = 'sounds' | 'music' | 'ambient';
 type SortKey = 'name' | 'size' | 'duration' | 'level';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -114,6 +122,23 @@ export default function SoundStudioPage() {
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
+  // A→B compare
+  const [compareA, setCompareA] = useState<string | null>(null);
+  const [compareB, setCompareB] = useState<string | null>(null);
+  const [comparePlaying, setComparePlaying] = useState<'A' | 'B' | null>(null);
+  const compareSeqRef = useRef(0);
+
+  // Repack diff
+  const [diffData, setDiffData] = useState<PendingDiff | null>(null);
+  const [showDiff, setShowDiff] = useState(false);
+  const [diffLoading, setDiffLoading] = useState(false);
+
+  // BG channel mixer (ambient tab)
+  const [bgRunning, setBgRunning] = useState(false);
+  const [bgIndoor, setBgIndoor] = useState(true);
+  const [bgRatio, setBgRatio] = useState(0);
+  const [bgMutes, setBgMutes] = useState([false, false, false]);
+
   // Rename dialog
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -137,6 +162,10 @@ export default function SoundStudioPage() {
   const soundsRef = useRef<SoundEntry[]>([]);
   const visibleNonDeletedRef = useRef<(SoundEntry & { missing?: boolean })[]>([]);
   const waveformCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const compareSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const bgSourcesRef = useRef<(AudioBufferSourceNode | null)[]>([null, null, null]);
+  const bgGainsRef = useRef<(GainNode | null)[]>([null, null, null]);
+  const decodedCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
 
   const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('zs_token') : '';
 
@@ -240,6 +269,7 @@ export default function SoundStudioPage() {
   }
 
   async function fetchAndDecode(name: string): Promise<AudioBuffer> {
+    if (decodedCacheRef.current.has(name)) return decodedCacheRef.current.get(name)!;
     const r = await fetch(`/api/sounds/${encodeURIComponent(name)}/play`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
@@ -250,7 +280,9 @@ export default function SoundStudioPage() {
     const arrayBuf = await r.arrayBuffer();
     const audioCtx = getAudioCtx();
     if (audioCtx.state === 'suspended') await audioCtx.resume();
-    return decodeAdpcmWav(arrayBuf, audioCtx);
+    const decoded = await decodeAdpcmWav(arrayBuf, audioCtx);
+    decodedCacheRef.current.set(name, decoded);
+    return decoded;
   }
 
   // ── Playback (with distance gain) ───────────────────────────────────────────
@@ -402,6 +434,141 @@ export default function SoundStudioPage() {
     });
   }
 
+  // ── BG Channel Mixer ────────────────────────────────────────────────────────
+  const BG_CHANNELS = ['wndloopb.wav', 'cphum11.wav', 'wndloop1.wav'] as const;
+
+  function computeBgGains(indoor: boolean, ratio: number, mutes: boolean[]): number[] {
+    const raw = indoor
+      ? [32 / 128, 0, 0]
+      : [0, (8 / 128) * (1 - ratio), (8 / 128) * ratio];
+    return raw.map((g, i) => mutes[i] ? 0 : g);
+  }
+
+  function applyBgGains(gains: number[]) {
+    bgGainsRef.current.forEach((g, i) => { if (g) g.gain.value = gains[i]; });
+  }
+
+  useEffect(() => {
+    if (bgRunning) applyBgGains(computeBgGains(bgIndoor, bgRatio, bgMutes));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bgIndoor, bgRatio, bgMutes, bgRunning]);
+
+  async function startBgMixer() {
+    const audioCtx = getAudioCtx();
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    try {
+      const buffers = await Promise.all(BG_CHANNELS.map(n => fetchAndDecode(n)));
+      const gains = computeBgGains(bgIndoor, bgRatio, bgMutes);
+      const startAt = audioCtx.currentTime + 0.1;
+      BG_CHANNELS.forEach((_, i) => {
+        const gain = audioCtx.createGain();
+        gain.gain.value = gains[i];
+        bgGainsRef.current[i] = gain;
+        const src = audioCtx.createBufferSource();
+        src.buffer = buffers[i]; src.loop = true;
+        src.connect(gain); gain.connect(audioCtx.destination);
+        src.start(startAt);
+        bgSourcesRef.current[i] = src;
+      });
+      setBgRunning(true);
+    } catch (e: any) { setError(`BG mixer: ${e.message}`); }
+  }
+
+  function stopBgMixer() {
+    bgSourcesRef.current.forEach(s => { try { s?.stop(); } catch {} });
+    bgSourcesRef.current = [null, null, null];
+    bgGainsRef.current = [null, null, null];
+    setBgRunning(false);
+  }
+
+  // Stop BG mixer when leaving ambient tab
+  useEffect(() => {
+    if (tab !== 'ambient' && bgRunning) stopBgMixer();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
+  // ── A→B Compare ─────────────────────────────────────────────────────────────
+  function stopCompare() {
+    try { compareSourceRef.current?.stop(); } catch {}
+    compareSourceRef.current = null;
+    setComparePlaying(null);
+    compareSeqRef.current++;
+  }
+
+  async function playCompareSlot(slot: 'A' | 'B') {
+    const name = slot === 'A' ? compareA : compareB;
+    if (!name) return;
+    stopCompare();
+    const seq = ++compareSeqRef.current;
+    try {
+      const decoded = await fetchAndDecode(name);
+      if (compareSeqRef.current !== seq) return;
+      const audioCtx = getAudioCtx();
+      const gain = audioCtx.createGain();
+      gain.gain.value = 1;
+      const src = audioCtx.createBufferSource();
+      src.buffer = decoded;
+      src.connect(gain); gain.connect(audioCtx.destination);
+      src.start();
+      compareSourceRef.current = src;
+      setComparePlaying(slot);
+      src.onended = () => {
+        if (compareSeqRef.current === seq) { setComparePlaying(null); compareSourceRef.current = null; }
+      };
+    } catch (e: any) { setError(`Compare: ${e.message}`); }
+  }
+
+  async function playAtoB() {
+    if (!compareA || !compareB) return;
+    stopCompare();
+    const seq = ++compareSeqRef.current;
+    try {
+      const decodedA = await fetchAndDecode(compareA);
+      if (compareSeqRef.current !== seq) return;
+      const audioCtx = getAudioCtx();
+      const gain = audioCtx.createGain();
+      gain.gain.value = 1;
+      const srcA = audioCtx.createBufferSource();
+      srcA.buffer = decodedA;
+      srcA.connect(gain); gain.connect(audioCtx.destination);
+      srcA.start();
+      compareSourceRef.current = srcA;
+      setComparePlaying('A');
+      srcA.onended = async () => {
+        if (compareSeqRef.current !== seq) return;
+        try {
+          const decodedB = await fetchAndDecode(compareB!);
+          if (compareSeqRef.current !== seq) return;
+          const srcB = audioCtx.createBufferSource();
+          srcB.buffer = decodedB;
+          srcB.connect(gain); gain.connect(audioCtx.destination);
+          srcB.start();
+          compareSourceRef.current = srcB;
+          setComparePlaying('B');
+          srcB.onended = () => {
+            if (compareSeqRef.current === seq) { setComparePlaying(null); compareSourceRef.current = null; }
+          };
+        } catch {}
+      };
+    } catch (e: any) { setError(`Compare: ${e.message}`); }
+  }
+
+  // ── Repack Diff ──────────────────────────────────────────────────────────────
+  async function fetchDiff() {
+    setDiffLoading(true);
+    try {
+      const data = await apiFetch('/sounds/pending') as PendingDiff;
+      setDiffData(data);
+      setShowDiff(true);
+    } catch (e: any) { setError(e.message); }
+    finally { setDiffLoading(false); }
+  }
+
+  async function repackFromDiff() {
+    setShowDiff(false);
+    await repack();
+  }
+
   // ── Sort ────────────────────────────────────────────────────────────────────
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -445,7 +612,8 @@ export default function SoundStudioPage() {
   // ── Derived ─────────────────────────────────────────────────────────────────
   const staged = sounds.filter(s => s.source === 'staged');
   const pendingDels = sounds.filter(s => s.pendingDelete);
-  const hasPending = staged.length > 0 || pendingDels.length > 0;
+  const pendingRenames = sounds.filter(s => s.pendingRenameTo);
+  const hasPending = staged.length > 0 || pendingDels.length > 0 || pendingRenames.length > 0;
 
   const missingNames = Object.entries(refs)
     .filter(([, r]) => !r.inBin && (r.cpp || r.actordefs.length > 0))
@@ -455,7 +623,7 @@ export default function SoundStudioPage() {
     ...sounds,
     ...missingNames.map(name => ({
       name, storedLength: null, adpcmBytes: null, source: 'bin' as const,
-      pendingDelete: false, missing: true,
+      pendingDelete: false, pendingRenameTo: null, missing: true,
     })),
   ];
 
@@ -464,6 +632,7 @@ export default function SoundStudioPage() {
     if (search && !s.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (s.missing) return filter === 'missing';
     if (filter === 'missing') return false;
+    if (filter === 'headroom') return !!(levels[s.name]?.peak > 0.97 && ref?.volumeCalls?.some(vc => vc.vol === 128));
     if (filter === 'all') return true;
     if (filter === 'cpp') return !!(ref?.cpp);
     if (filter === 'actordef') return !!(ref?.actordefs?.length);
@@ -471,6 +640,14 @@ export default function SoundStudioPage() {
     if (filter === 'ambient') return !!(ref?.role) || !!(ref?.loop);
     return true;
   }
+
+  function willLowHeadroom(name: string): boolean {
+    const lvl = levels[name];
+    if (!lvl || lvl.peak <= 0.97) return false;
+    return !!(refs[name]?.volumeCalls?.some(vc => vc.vol === 128));
+  }
+
+  const headroomCount = sounds.filter(s => willLowHeadroom(s.name)).length;
 
   const filteredEntries = allEntries.filter(matchesFilter);
   const visibleEntries = sortKey ? [...filteredEntries].sort((a, b) => {
@@ -550,7 +727,7 @@ export default function SoundStudioPage() {
 
           {/* Tab switcher */}
           <div style={{ display: 'flex', gap: 2, marginLeft: 6 }}>
-            {(['sounds','music'] as TabMode[]).map(t => (
+            {(['sounds','music','ambient'] as TabMode[]).map(t => (
               <button key={t} onClick={() => setTab(t)}
                 style={{ padding: '2px 10px', fontSize: 11, fontFamily: 'monospace',
                   background: tab === t ? '#2a2a3a' : 'transparent',
@@ -563,7 +740,9 @@ export default function SoundStudioPage() {
 
           {tab === 'sounds' && hasPending && (
             <span style={{ background: '#f90', color: '#000', padding: '1px 7px', borderRadius: 4, fontSize: 10 }}>
-              {staged.length > 0 && `+${staged.length}`}{staged.length > 0 && pendingDels.length > 0 && ' '}{pendingDels.length > 0 && `-${pendingDels.length}`}
+              {staged.length > 0 && `+${staged.length}`}
+              {pendingDels.length > 0 && ` -${pendingDels.length}`}
+              {pendingRenames.length > 0 && ` ~${pendingRenames.length}`}
             </span>
           )}
 
@@ -574,6 +753,12 @@ export default function SoundStudioPage() {
               <input type="checkbox" checked={normalize} onChange={e => setNormalize(e.target.checked)} />
               normalize
             </label>
+            {hasPending && (
+              <button onClick={fetchDiff} disabled={diffLoading}
+                style={{ padding: '3px 9px', background: '#1a1a2a', color: '#88f', border: '1px solid #446', borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace', fontSize: 11 }}>
+                {diffLoading ? '…' : 'Diff'}
+              </button>
+            )}
             <button onClick={() => fileInputRef.current?.click()}
               style={{ padding: '3px 9px', background: '#333', color: '#ccc', border: '1px solid #555', borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace', fontSize: 11 }}>
               + Upload WAV
@@ -613,17 +798,67 @@ export default function SoundStudioPage() {
             </div>
           )}
 
+          {/* Low headroom banner */}
+          {headroomCount > 0 && filter !== 'headroom' && (
+            <div style={{ padding: '4px 14px', fontSize: 11, background: '#1e0a0a', color: '#f44', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span>⚠ {headroomCount} decoded sound{headroomCount > 1 ? 's' : ''} near full scale with vol=128 call sites</span>
+              <button onClick={() => setFilter('headroom')}
+                style={{ background: 'none', border: '1px solid #f44', color: '#f44', borderRadius: 3, padding: '0 5px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>
+                show
+              </button>
+            </div>
+          )}
+
+          {/* A→B compare bar */}
+          {(compareA || compareB) && (
+            <div style={{ padding: '4px 14px', fontSize: 11, background: '#0e1422', borderBottom: '1px solid #2a2a3a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ color: '#446', fontSize: 10 }}>A→B</span>
+              {(['A','B'] as const).map(slot => {
+                const name = slot === 'A' ? compareA : compareB;
+                const active = comparePlaying === slot;
+                return (
+                  <span key={slot} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ color: '#556', fontSize: 9 }}>{slot}:</span>
+                    {name ? (
+                      <>
+                        <span style={{ color: active ? '#8cf' : '#88a', fontFamily: 'monospace' }}>{name}</span>
+                        <button onClick={() => playCompareSlot(slot)}
+                          style={{ background: active ? '#1a2a3a' : 'none', border: `1px solid ${active ? '#4af' : '#334'}`, color: active ? '#8cf' : '#668', borderRadius: 3, padding: '0 5px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>
+                          {active ? '⏹' : '▶'}
+                        </button>
+                        <button onClick={() => slot === 'A' ? setCompareA(null) : setCompareB(null)}
+                          style={{ background: 'none', border: 'none', color: '#334', cursor: 'pointer', fontSize: 10 }}>×</button>
+                      </>
+                    ) : <span style={{ color: '#333', fontSize: 9 }}>—</span>}
+                  </span>
+                );
+              })}
+              {compareA && compareB && (
+                <button onClick={playAtoB}
+                  style={{ padding: '1px 8px', background: '#1a1a2e', border: '1px solid #446', color: '#88f', borderRadius: 3, cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>
+                  A→B
+                </button>
+              )}
+              {comparePlaying && (
+                <button onClick={stopCompare}
+                  style={{ padding: '1px 6px', background: 'none', border: '1px solid #446', color: '#668', borderRadius: 3, cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>
+                  Stop
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Filter / search / group bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderBottom: '1px solid #222', background: '#131313', flexWrap: 'wrap' }}>
             <input type="text" placeholder="search…" value={search} onChange={e => setSearch(e.target.value)}
               style={{ padding: '2px 7px', background: '#222', border: '1px solid #444', borderRadius: 3, color: '#ccc', fontFamily: 'monospace', fontSize: 11, width: 140 }} />
-            {(['all','cpp','actordef','ambient','orphaned','missing'] as FilterMode[]).map(f => (
+            {(['all','cpp','actordef','ambient','orphaned','missing','headroom'] as FilterMode[]).map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 style={{ padding: '1px 7px', fontSize: 10, fontFamily: 'monospace',
                   background: filter === f ? '#2a3a4a' : 'transparent',
                   border: `1px solid ${filter === f ? '#4af' : '#2a2a2a'}`,
                   color: filter === f ? '#8cf' : '#555', borderRadius: 3, cursor: 'pointer' }}>
-                {f}{f === 'missing' && missingNames.length > 0 ? ` (${missingNames.length})` : ''}
+                {f}{f === 'missing' && missingNames.length > 0 ? ` (${missingNames.length})` : ''}{f === 'headroom' && headroomCount > 0 ? ` (${headroomCount})` : ''}
               </button>
             ))}
             <button onClick={() => setGroupByCategory(g => !g)}
@@ -723,6 +958,7 @@ export default function SoundStudioPage() {
                               {s.name}
                               {s.pendingDelete && <span style={{ marginLeft: 5, color: '#f66', fontSize: 9 }}>[del]</span>}
                               {s.source === 'staged' && <span style={{ marginLeft: 5, color: '#88f', fontSize: 9 }}>[staged]</span>}
+                              {s.pendingRenameTo && <span style={{ marginLeft: 5, color: '#fa8', fontSize: 9 }}>[→{s.pendingRenameTo}]</span>}
                               {isMissing && <span style={{ marginLeft: 5, color: '#f90', fontSize: 9 }}>[missing]</span>}
                               {ref?.role && <span style={{ marginLeft: 5, color: '#8af', fontSize: 9 }}>[{ref.role}]</span>}
                               {!ref?.role && isLoop && <span style={{ marginLeft: 5, color: '#68a', fontSize: 9 }}>[loop]</span>}
@@ -739,6 +975,7 @@ export default function SoundStudioPage() {
                                     <div style={{ width: `${Math.round(lvl.peak * 100)}%`, height: '100%', background: lvl.peak > 0.9 ? '#f44' : lvl.peak > 0.6 ? '#fa4' : '#4a8', borderRadius: 2 }} />
                                   </div>
                                   <span style={{ color: '#444', fontSize: 9 }}>{Math.round(lvl.peak * 100)}%</span>
+                                  {willLowHeadroom(s.name) && <span title="Low headroom at vol=128" style={{ color: '#f44', fontSize: 8, fontWeight: 'bold' }}>HDR</span>}
                                 </div>
                               ) : <span style={{ color: '#2a2a2a', fontSize: 9 }}>—</span>}
                             </td>
@@ -751,6 +988,16 @@ export default function SoundStudioPage() {
                             </td>
                             <td style={{ padding: '3px 5px', textAlign: 'right' }}>
                               <span style={{ display: 'inline-flex', gap: 3 }}>
+                                {!isMissing && (
+                                  <>
+                                    <button onClick={e => { e.stopPropagation(); setCompareA(s.name); }}
+                                      title="Set as compare A"
+                                      style={{ background: compareA === s.name ? '#1a2a1a' : 'none', border: `1px solid ${compareA === s.name ? '#4a8' : '#222'}`, color: compareA === s.name ? '#8c8' : '#445', borderRadius: 3, padding: '0 3px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 9 }}>A</button>
+                                    <button onClick={e => { e.stopPropagation(); setCompareB(s.name); }}
+                                      title="Set as compare B"
+                                      style={{ background: compareB === s.name ? '#1a1a2a' : 'none', border: `1px solid ${compareB === s.name ? '#66a' : '#222'}`, color: compareB === s.name ? '#88f' : '#445', borderRadius: 3, padding: '0 3px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 9 }}>B</button>
+                                  </>
+                                )}
                                 {isLoop && !isMissing && (
                                   <button onClick={e => { e.stopPropagation(); toggleLoop(s.name); }}
                                     title={isLooping ? 'Stop loop' : 'Loop test'}
@@ -804,6 +1051,11 @@ export default function SoundStudioPage() {
                     <div style={{ marginTop: 4, fontSize: 10, color: '#555', display: 'flex', gap: 10 }}>
                       <span>Peak <span style={{ color: selectedLevel.peak > 0.9 ? '#f44' : '#9a9' }}>{(selectedLevel.peak * 100).toFixed(0)}%</span></span>
                       <span>RMS <span style={{ color: '#9a9' }}>{(selectedLevel.rms * 100).toFixed(0)}%</span></span>
+                    </div>
+                  )}
+                  {willLowHeadroom(selectedSound.name) && (
+                    <div style={{ marginTop: 4, fontSize: 10, color: '#f44', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      ⚠ Low headroom at vol=128 call sites
                     </div>
                   )}
                   <div style={{ marginTop: 6 }}>
@@ -961,7 +1213,120 @@ export default function SoundStudioPage() {
             )}
           </div>
         )}
+        {tab === 'ambient' && (
+          <div style={{ flex: 1, overflow: 'auto', padding: 16, fontFamily: 'monospace' }}>
+            <div style={{ fontSize: 11, color: '#555', marginBottom: 12 }}>
+              BG Channel Mixer — simulates how the game blends background ambient sounds based on outdoor tile coverage.
+            </div>
+
+            {/* Indoor/Outdoor toggle */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10, color: '#666', marginBottom: 5 }}>ENVIRONMENT</div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => setBgIndoor(true)}
+                  style={{ padding: '4px 12px', background: bgIndoor ? '#1e2a1e' : 'none', border: `1px solid ${bgIndoor ? '#4a8' : '#333'}`, color: bgIndoor ? '#8c8' : '#555', borderRadius: 3, cursor: 'pointer', fontSize: 11 }}>
+                  🏠 Indoor
+                </button>
+                <button onClick={() => setBgIndoor(false)}
+                  style={{ padding: '4px 12px', background: !bgIndoor ? '#1e2a1e' : 'none', border: `1px solid ${!bgIndoor ? '#4a8' : '#333'}`, color: !bgIndoor ? '#8c8' : '#555', borderRadius: 3, cursor: 'pointer', fontSize: 11 }}>
+                  🌤 Outdoor
+                </button>
+              </div>
+            </div>
+
+            {/* Outdoor ratio slider */}
+            {!bgIndoor && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: '#666', marginBottom: 4 }}>OUTDOOR RATIO (outside tiles / max)</div>
+                <input type="range" min={0} max={100} value={Math.round(bgRatio * 100)} onChange={e => setBgRatio(Number(e.target.value) / 100)}
+                  style={{ width: 200, accentColor: '#4a8' }} />
+                <span style={{ marginLeft: 8, fontSize: 10, color: '#8a8' }}>{Math.round(bgRatio * 100)}%</span>
+              </div>
+            )}
+
+            {/* Channel status */}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 10, color: '#666', marginBottom: 6 }}>CHANNELS</div>
+              {(['wndloopb.wav','cphum11.wav','wndloop1.wav'] as const).map((ch, i) => {
+                const roles = ['BG_BASE','BG_AMBIENT','BG_OUTSIDE'] as const;
+                const gains = computeBgGains(bgIndoor, bgRatio, bgMutes);
+                const gain = gains[i];
+                return (
+                  <div key={ch} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, padding: '5px 10px', background: '#161616', borderRadius: 3, border: '1px solid #222' }}>
+                    <button onClick={() => setBgMutes(m => { const n = [...m]; n[i] = !n[i]; return n; })}
+                      style={{ background: bgMutes[i] ? '#2a1a1a' : 'none', border: `1px solid ${bgMutes[i] ? '#844' : '#333'}`, color: bgMutes[i] ? '#f66' : '#668', borderRadius: 3, padding: '0 6px', cursor: 'pointer', fontSize: 10 }}>
+                      {bgMutes[i] ? '🔇' : '🔊'}
+                    </button>
+                    <span style={{ color: '#88a', width: 90, fontSize: 10 }}>{ch}</span>
+                    <span style={{ color: '#446', fontSize: 9, width: 70 }}>{roles[i]}</span>
+                    <div style={{ flex: 1, height: 4, background: '#222', borderRadius: 2, overflow: 'hidden' }}>
+                      <div style={{ width: `${Math.round(gain * 100 / (32/128) * 100)}%`, height: '100%', background: bgMutes[i] ? '#444' : '#4a8', maxWidth: '100%' }} />
+                    </div>
+                    <span style={{ color: bgMutes[i] ? '#444' : '#6a6', fontSize: 9, width: 36, textAlign: 'right' }}>{Math.round(gain * 128)}/128</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Start/Stop */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button onClick={bgRunning ? stopBgMixer : startBgMixer}
+                style={{ padding: '5px 16px', background: bgRunning ? '#2a1e1e' : '#1a2a1e', border: `1px solid ${bgRunning ? '#844' : '#4a8'}`, color: bgRunning ? '#f88' : '#8c8', borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace', fontSize: 12 }}>
+                {bgRunning ? '⏹ Stop' : '▶ Start'}
+              </button>
+              {bgRunning && <span style={{ fontSize: 10, color: '#4a8' }}>● playing</span>}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Diff modal */}
+      {showDiff && diffData && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
+          onClick={() => setShowDiff(false)}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: '#141414', border: '1px solid #333', borderRadius: 6, padding: 20, width: 440, maxHeight: '80vh', overflow: 'auto', fontFamily: 'monospace' }}>
+            <div style={{ fontSize: 13, color: '#aaa', marginBottom: 14 }}>Pending changes</div>
+
+            {diffData.added.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: '#4a8', marginBottom: 4 }}>+ ADDED ({diffData.added.length})</div>
+                {diffData.added.map(n => <div key={n} style={{ fontSize: 11, color: '#8c8', paddingLeft: 8 }}>{n}</div>)}
+              </div>
+            )}
+            {diffData.modified.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: '#fa4', marginBottom: 4 }}>~ MODIFIED ({diffData.modified.length})</div>
+                {diffData.modified.map(n => <div key={n} style={{ fontSize: 11, color: '#da8', paddingLeft: 8 }}>{n}</div>)}
+              </div>
+            )}
+            {diffData.deleted.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: '#f44', marginBottom: 4 }}>- DELETED ({diffData.deleted.length})</div>
+                {diffData.deleted.map(n => <div key={n} style={{ fontSize: 11, color: '#f88', paddingLeft: 8 }}>{n}</div>)}
+              </div>
+            )}
+            {diffData.renamed.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, color: '#88f', marginBottom: 4 }}>→ RENAMED ({diffData.renamed.length})</div>
+                {diffData.renamed.map(r => <div key={r.from} style={{ fontSize: 11, color: '#aaf', paddingLeft: 8 }}>{r.from} → {r.to}</div>)}
+              </div>
+            )}
+            {diffData.added.length === 0 && diffData.modified.length === 0 && diffData.deleted.length === 0 && diffData.renamed.length === 0 && (
+              <div style={{ color: '#555', fontSize: 11 }}>No pending changes.</div>
+            )}
+
+            <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowDiff(false)}
+                style={{ padding: '4px 10px', background: 'none', border: '1px solid #444', color: '#888', borderRadius: 3, cursor: 'pointer', fontSize: 11 }}>Cancel</button>
+              <button onClick={repackFromDiff} disabled={repacking}
+                style={{ padding: '4px 12px', background: '#2a4a2a', border: '1px solid #4a8', color: '#8c8', borderRadius: 3, cursor: 'pointer', fontWeight: 'bold', fontSize: 11 }}>
+                {repacking ? 'Repacking…' : '⚡ Repack now'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Rename dialog */}
       {renameTarget && (
