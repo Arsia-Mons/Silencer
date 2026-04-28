@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { apiFetch } from './api';
 
 // Production: NEXT_PUBLIC_WS_URL is unset → io() connects to the current
 //   origin (admin.arsiamons.com), and Cloudflare Tunnel routes /socket.io/*
@@ -77,8 +78,8 @@ export function useServerReachable(): boolean | undefined {
     let alive = true;
     const check = async () => {
       try {
-        const res = await fetch('/api/health', { credentials: 'include' });
-        if (alive) setReachable(res.ok);
+        await apiFetch('/health');
+        if (alive) setReachable(true);
       } catch {
         if (alive) setReachable(false);
       }
