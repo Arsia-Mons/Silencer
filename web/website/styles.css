@@ -1,0 +1,136 @@
+@font-face {
+  font-family: "Silencer Title";
+  src: url("/assets/silencer-title.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Silencer UI";
+  src: url("/assets/silencer-ui.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; min-height: 100%; }
+
+body {
+  background-color: #050a05;
+  background-image: url('/assets/menu-bg.png');
+  background-size: cover;
+  background-position: center right;
+  background-attachment: fixed;
+  color: #d1fad7;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 6, 3, 0.55);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 163, 40, 0.018) 2px,
+    rgba(0, 163, 40, 0.018) 4px
+  );
+  pointer-events: none;
+  z-index: 10000;
+}
+
+main {
+  position: relative;
+  z-index: 1;
+  max-width: 80ch;
+  margin: 0;
+  padding: 1lh 2ch;
+}
+
+main > * + * { margin-top: 1lh; }
+
+.logo {
+  display: block;
+  width: 60ch;
+  max-width: 100%;
+  height: auto;
+  margin: 0 0 2lh 0;
+}
+
+blockquote {
+  margin: 2lh 0 2lh 6ch;
+  padding: 0;
+  max-width: 64ch;
+  position: relative;
+  color: #a0c4a0;
+}
+
+blockquote p { margin: 0 0 1lh; }
+blockquote p:last-of-type { margin-bottom: 0; }
+
+blockquote p:first-of-type::before {
+  content: '"';
+  position: absolute;
+  left: -2ch;
+}
+
+blockquote p:last-of-type::after {
+  content: '"';
+}
+
+blockquote footer {
+  color: #88c194;
+  margin-top: 1lh;
+  display: block;
+  text-align: right;
+}
+
+blockquote footer::before {
+  content: "-- ";
+}
+
+.links {
+  list-style: none;
+  margin: 2lh 0 0 0;
+  padding: 0;
+  font-family: "Silencer Title", 'Courier New', Courier, monospace;
+  font-size: 24px;
+}
+
+.links li {
+  margin: 0;
+  padding: 0;
+}
+
+.links li::before {
+  content: "> ";
+  color: #187C14;
+}
+
+.links a {
+  color: #187C14;
+  text-decoration: none;
+}
+
+.links a.primary {
+  color: #187C14;
+}
+
+.links a:hover,
+.links a:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}

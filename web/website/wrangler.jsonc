@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "silencer-website",
+  "compatibility_date": "2026-04-28",
+  "assets": {
+    "directory": "./"
+  }
+}

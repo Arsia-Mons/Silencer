@@ -7,18 +7,8 @@ name: CI Build (lobby Docker)
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'services/lobby/**'
-      - 'clients/silencer/**'
-      - 'shared/assets/**'
-      - '.github/workflows/ci-build-lobby-docker.yml'
   push:
     branches: [main]
-    paths:
-      - 'services/lobby/**'
-      - 'clients/silencer/**'
-      - 'shared/assets/**'
-      - '.github/workflows/ci-build-lobby-docker.yml'
 
 concurrency:
   group: ci-build-lobby-docker-${{ github.event.pull_request.number || github.ref }}
@@ -32,9 +22,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
+      # See ci-build-admin-api.yml for why path filtering happens inside the
+      # job rather than via on: paths.
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            relevant:
+              - 'services/lobby/**'
+              - 'clients/silencer/**'
+              - 'shared/assets/**'
+              - '.github/workflows/ci-build-lobby-docker.yml'
+
+      - if: steps.changes.outputs.relevant == 'true'
+        uses: docker/setup-buildx-action@v3
 
       - name: Build image (no push)
+        if: steps.changes.outputs.relevant == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -42,3 +46,6 @@ jobs:
           push: false
           cache-from: type=gha,scope=lobby
           cache-to: type=gha,scope=lobby,mode=max
+
+      - if: steps.changes.outputs.relevant != 'true'
+        run: echo "No lobby/client/asset changes; skipping build."

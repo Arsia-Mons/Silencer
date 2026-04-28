@@ -1,0 +1,180 @@
+:root {
+  --fg: #187c14;
+  --bg: #000000;
+  --scale: 2;
+  --page-bg: #1a1a1a;
+  --panel-bg: #262626;
+  --text: #e5e5e5;
+  --muted: #888;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  background: var(--panel-bg);
+  border-bottom: 1px solid #333;
+}
+
+.bar h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.controls {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.controls code {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text);
+  min-width: 5ch;
+}
+
+.controls input[type="color"] {
+  width: 32px;
+  height: 24px;
+  border: 1px solid #444;
+  border-radius: 3px;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.controls input[type="range"] {
+  width: 120px;
+}
+
+.controls .checkbox {
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.sample {
+  background: var(--panel-bg);
+  border: 1px solid #333;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.sample-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 16px;
+  border-bottom: 1px solid #333;
+  background: #1f1f1f;
+}
+
+.sample-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sample-head .meta {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sample-row {
+  padding: 16px;
+  background: var(--bg);
+  color: var(--fg);
+  border-bottom: 1px solid #333;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.sample-row:last-child {
+  border-bottom: none;
+}
+
+.sample-row[data-label]::before {
+  content: attr(data-label);
+  display: block;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
+
+/* Each font's sample text uses its native em for crisp pixel rendering,
+ * scaled with --scale. The font-family is set inline per sample. */
+.text-tiny       { font-family: "Silencer Tiny";     font-size: calc(5px  * var(--scale)); }
+.text-ui         { font-family: "Silencer UI";       font-size: calc(11px * var(--scale)); }
+.text-ui-large   { font-family: "Silencer UI Large"; font-size: calc(13px * var(--scale)); }
+.text-title      { font-family: "Silencer Title";    font-size: calc(24px * var(--scale)); }
+
+.glyph-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(48px, 1fr));
+  gap: 4px;
+  padding: 16px;
+  background: var(--bg);
+}
+
+.glyph-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  border: 1px solid #2a2a2a;
+  border-radius: 3px;
+  background: rgba(0,0,0,0.2);
+  color: var(--fg);
+}
+
+.glyph-cell .glyph {
+  line-height: 1;
+}
+
+.glyph-cell .cp {
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 4px;
+}

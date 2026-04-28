@@ -1,0 +1,6 @@
+[project]
+name = "silencer-extract-font"
+version = "0.1.0"
+description = "Extract Silencer bitmap fonts from sprite banks into OpenType."
+requires-python = ">=3.9"
+dependencies = ["fonttools>=4.50"]
