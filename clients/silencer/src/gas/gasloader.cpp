@@ -227,6 +227,8 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.threatDetectY         = ej.value("threatDetectY",         e.threatDetectY);
             e.shootCooldownCap      = ej.value("shootCooldownCap",      e.shootCooldownCap);
             e.deathDropFiles        = ej.value("deathDropFiles",        e.deathDropFiles);
+            e.ladderClimbSpeed      = ej.value("ladderClimbSpeed",      e.ladderClimbSpeed);
+            e.rocketLaunchXv        = ej.value("rocketLaunchXv",        e.rocketLaunchXv);
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {

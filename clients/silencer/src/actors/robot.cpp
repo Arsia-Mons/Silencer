@@ -315,10 +315,10 @@ void Robot::Tick(World & world){
 					rocketprojectile->y = y - 60;
 					if(mirrored){
 						rocketprojectile->x = x - 70;
-						rocketprojectile->xv = -25;
+						{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("robot"); rocketprojectile->xv = -(_grd ? _grd->rocketLaunchXv : 25); }
 					}else{
 						rocketprojectile->x = x + 70;
-						rocketprojectile->xv = 25;
+						{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("robot"); rocketprojectile->xv = (_grd ? _grd->rocketLaunchXv : 25); }
 					}
 				}
 				shootcooldown = 1;

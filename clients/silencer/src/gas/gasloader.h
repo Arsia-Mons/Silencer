@@ -185,6 +185,8 @@ struct EnemyDef {
     int threatDetectY         = 100; // civilian: threat detection AABB half-height
     int shootCooldownCap      = 50;  // robot: shootcooldown threshold for attack loop check
     int deathDropFiles        = 0;   // robot: quantity of FILES pickup spawned on death
+    int ladderClimbSpeed      = 5;   // guard/robot: abs(yv) when climbing a ladder
+    int rocketLaunchXv        = 25;  // robot: horizontal velocity of fired rocket projectile
 };
 
 // ---- Ability ---------------------------------------------------------------

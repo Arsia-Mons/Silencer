@@ -206,10 +206,10 @@ void Guard::InitBT(){
 				Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
 				if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
 					if(ladder->y2 == obj->y && y != obj->y && ladder->y2 > y){
-						x = center; yv = 5; state = LADDER; state_i = 0;
+						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = _gls ? _gls->ladderClimbSpeed : 5; state = LADDER; state_i = 0; }
 					}
 					if(ladder->y1 == obj->y && y != obj->y && ladder->y1 < y){
-						x = center; yv = -5; state = LADDER; state_i = 0;
+						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = -(_gls ? _gls->ladderClimbSpeed : 5); state = LADDER; state_i = 0; }
 					}
 				}
 			}
@@ -244,7 +244,7 @@ void Guard::InitBT(){
 						}
 					}
 					int dist = abs(signed(obj->x) - signed(x));
-					if (dist > 80) {
+					if (dist > ([]{ const EnemyDef* _g = GASLoader::Get().GetEnemyDef("guard-blaster"); return _g ? _g->chaseRangeStop : 80; }())) {
 						mirrored = (obj->x < x); // orient toward target
 					}
 					// <=80px: keep current direction to avoid oscillation
@@ -258,11 +258,11 @@ void Guard::InitBT(){
 							if(abs(signed(center) - signed(x)) <= (_gg?_gg->ladderXTolerance:8)){
 								if(ydiff < 0 && signed(ladder->y1) < signed(y)){
 									// player above, ladder goes up
-									x = center; yv = -5; state = LADDER; state_i = 0;
+									x = center; yv = -(_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
 									{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
 								} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
 									// player below, ladder goes down
-									x = center; yv = 5; state = LADDER; state_i = 0;
+									x = center; yv = (_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
 									{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
 								}
 							}
@@ -296,10 +296,10 @@ void Guard::InitBT(){
 					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
 					if(abs(signed(center) - signed(x)) <= (_ggr?_ggr->ladderXTolerance:8)){
 						if(ydiff < 0 && signed(ladder->y1) < signed(y)){
-							x = center; yv = -5; state = LADDER; state_i = 0;
+							x = center; yv = -(_ggr ? _ggr->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
 							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
 						} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
-							x = center; yv = 5; state = LADDER; state_i = 0;
+							x = center; yv = (_ggr ? _ggr->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
 							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
 						}
 					}
@@ -722,7 +722,7 @@ void Guard::Tick(World & world){
 			}
 			if(state_i >= 16){
 				state = LADDER;
-				yv = -5;
+				{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); yv = -(_gls ? _gls->ladderClimbSpeed : 5); }
 				state_i = -1;
 				break;
 			}
@@ -743,7 +743,7 @@ void Guard::Tick(World & world){
 			}
 			if(state_i >= 16){
 				state = LADDER;
-				yv = 5;
+				{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); yv = (_gls ? _gls->ladderClimbSpeed : 5); }
 				state_i = -1;
 				break;
 			}
@@ -853,13 +853,13 @@ void Guard::Tick(World & world){
 					if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
 						if(ladder->y2 == object->y && y != object->y && ladder->y2 > y){
 							x = center;
-							yv = 5;
+							{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); yv = _gls ? _gls->ladderClimbSpeed : 5; }
 							state = LADDER;
 							state_i = 0;
 						}
 						if(ladder->y1 == object->y && y != object->y && ladder->y1 < y){
 							x = center;
-							yv = -5;
+							{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); yv = -(_gls ? _gls->ladderClimbSpeed : 5); }
 							state = LADDER;
 							state_i = 0;
 						}
