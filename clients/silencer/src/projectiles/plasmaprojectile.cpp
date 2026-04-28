@@ -66,11 +66,12 @@ void PlasmaProjectile::Tick(World & world){
 		}
 		//world->MarkDestroyObject(id);
 	}
-	yv += 2;
+	{ const WeaponDef* _gd = GASLoader::Get().GetWeaponDef("plasma"); yv += _gd ? _gd->plasmaGravity : 2; }
 	res_index = state_i;
-	Uint8 life = 20;
+	const WeaponDef* _pgd = GASLoader::Get().GetWeaponDef("plasma");
+	Uint8 life = _pgd ? _pgd->plasmaLifeNormal : 20;
 	if(large){
-		life = 7;
+		life = _pgd ? _pgd->plasmaLifeLarge : 7;
 	}
 	if(state_i >= life){
 		world.MarkDestroyObject(id);

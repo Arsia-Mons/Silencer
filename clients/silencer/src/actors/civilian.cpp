@@ -125,7 +125,7 @@ void Civilian::Tick(World & world){
 				state_i = -1;
 				break;
 			}
-			xv = (mirrored ? -1 : 1) * (5 + speed);
+			{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("civilian"); int _bonus = _gd ? _gd->runSpeedBonus : 5; xv = (mirrored ? -1 : 1) * (_bonus + speed); }
 			res_bank = 123;
 			res_index = state_i % 15;
 			// play per-frame sounds defined in actordefs/civilian.json
@@ -262,7 +262,10 @@ bool Civilian::Look(World & world){
 	types.push_back(ObjectTypes::PLASMAPROJECTILE);
 	types.push_back(ObjectTypes::WALLPROJECTILE);
 	types.push_back(ObjectTypes::FLAREPROJECTILE);
-	std::vector<Object *> objects = world.TestAABB(x - 200, y - 100, x + 200, y + 100, types);
+	const EnemyDef* _civgd = GASLoader::Get().GetEnemyDef("civilian");
+	int _tdx = _civgd ? _civgd->threatDetectX : 200;
+	int _tdy = _civgd ? _civgd->threatDetectY : 100;
+	std::vector<Object *> objects = world.TestAABB(x - _tdx, y - _tdy, x + _tdx, y + _tdy, types);
 	if(objects.size() > 0){
 		if(objects[0]->x > x){
 			mirrored = true;

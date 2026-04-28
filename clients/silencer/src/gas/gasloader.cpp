@@ -143,6 +143,12 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.radius              = wj.value("radius",              0);
             w.detonatorLaunchYv   = wj.value("detonatorLaunchYv",  0);
             w.neutronTraceTime    = wj.value("neutronTraceTime",    0);
+            w.rocketSlowInitial   = wj.value("rocketSlowInitial",   w.rocketSlowInitial);
+            w.rocketHoverTick     = wj.value("rocketHoverTick",     w.rocketHoverTick);
+            w.rocketSlowHover     = wj.value("rocketSlowHover",     w.rocketSlowHover);
+            w.plasmaGravity       = wj.value("plasmaGravity",       w.plasmaGravity);
+            w.plasmaLifeNormal    = wj.value("plasmaLifeNormal",    w.plasmaLifeNormal);
+            w.plasmaLifeLarge     = wj.value("plasmaLifeLarge",     w.plasmaLifeLarge);
             out.push_back(std::move(w));
         }
     } catch (const std::exception& e) {
@@ -216,6 +222,11 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.ladderXTolerance      = ej.value("ladderXTolerance",      e.ladderXTolerance);
             e.patrolReturnProximity = ej.value("patrolReturnProximity", e.patrolReturnProximity);
             e.speedAlt              = ej.value("speedAlt",              e.speedAlt);
+            e.runSpeedBonus         = ej.value("runSpeedBonus",         e.runSpeedBonus);
+            e.threatDetectX         = ej.value("threatDetectX",         e.threatDetectX);
+            e.threatDetectY         = ej.value("threatDetectY",         e.threatDetectY);
+            e.shootCooldownCap      = ej.value("shootCooldownCap",      e.shootCooldownCap);
+            e.deathDropFiles        = ej.value("deathDropFiles",        e.deathDropFiles);
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {
@@ -261,6 +272,8 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             g.techShield    = gj.value("techShield",     0);
             g.refireReadyTick = gj.value("refireReadyTick", g.refireReadyTick);
             g.reloadTick      = gj.value("reloadTick",      g.reloadTick);
+            g.innerRange      = gj.value("innerRange",      g.innerRange);
+            g.outerRange      = gj.value("outerRange",      g.outerRange);
             out.push_back(std::move(g));
         }
     } catch (const std::exception& e) {

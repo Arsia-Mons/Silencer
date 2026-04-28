@@ -112,7 +112,7 @@ void Robot::InitBT() {
 	btctx_.actions["Patrol"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
-		xv = mirrored ? -4 : 4;
+		{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); xv = mirrored ? -(_gd ? _gd->speed : 4) : (_gd ? _gd->speed : 4); }
 		FollowGround(*this, world, xv);
 		if (DistanceToEnd(*this, world) <= world.minwalldistance) mirrored = !mirrored;
 		return BTResult::Success;
@@ -281,7 +281,7 @@ void Robot::Tick(World & world){
 						EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
 					}
 				}
-				xv = mirrored ? -4 : 4;
+				{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); xv = mirrored ? -(_gd ? _gd->speed : 4) : (_gd ? _gd->speed : 4); }
 				FollowGround(*this, world, xv);
 				if(DistanceToEnd(*this, world) <= world.minwalldistance){
 					mirrored = mirrored ? false : true;
@@ -302,7 +302,7 @@ void Robot::Tick(World & world){
 			}
 			if(state_i == 0){
 				if(Look(world, 0)){
-					if(shootcooldown < 50 && shootcooldown){
+					if(shootcooldown < ([](){ const EnemyDef* _g = GASLoader::Get().GetEnemyDef("robot"); return _g ? _g->shootCooldownCap : 50; }()) && shootcooldown){
 						state_i--;
 					}
 				}
@@ -329,7 +329,7 @@ void Robot::Tick(World & world){
 				PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
 				if(pickup){
 					pickup->type = PickUp::FILES;
-					pickup->quantity = 250;
+					{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); pickup->quantity = _gd ? _gd->deathDropFiles : 250; }
 					pickup->x = x;
 					pickup->y = y - 1;
 					pickup->xv = (world.Random() % 9) - 4;

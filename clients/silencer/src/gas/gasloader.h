@@ -113,6 +113,12 @@ struct WeaponDef {
     // Detonator / neutron bomb
     int detonatorLaunchYv   = 0;  // yv=−15 on deploy (stored positive, applied negative)
     int neutronTraceTime    = 0;  // tracetime set when neutron bomb arm completes
+    float rocketSlowInitial = 0.2f; // rocket: velocity multiplier on launch (tick 0)
+    int   rocketHoverTick   = 100;  // rocket: state_i value that triggers hover mode
+    float rocketSlowHover   = 0.3f; // rocket: velocity multiplier when entering hover
+    int   plasmaGravity     = 2;    // plasma: yv increment per tick
+    int   plasmaLifeNormal  = 20;   // plasma: ticks before small plasma is destroyed
+    int   plasmaLifeLarge   = 7;    // plasma: ticks before large plasma is destroyed
 };
 
 // ---- Item ------------------------------------------------------------------
@@ -174,6 +180,11 @@ struct EnemyDef {
     int patrolReturnProximity = 20;  // abs(x-originalx) <= this to consider returned to post
     // Civilian variant speeds
     int speedAlt              = 0;   // actortype=1 civilian speed override
+    int runSpeedBonus         = 0;   // civilian: xv = speed + runSpeedBonus when fleeing
+    int threatDetectX         = 200; // civilian: threat detection AABB half-width
+    int threatDetectY         = 100; // civilian: threat detection AABB half-height
+    int shootCooldownCap      = 50;  // robot: shootcooldown threshold for attack loop check
+    int deathDropFiles        = 0;   // robot: quantity of FILES pickup spawned on death
 };
 
 // ---- Ability ---------------------------------------------------------------
@@ -201,6 +212,8 @@ struct GameObjectDef {
     int techShield    = 0;
     int refireReadyTick = 12;  // wall defense: state_i to trigger shot
     int reloadTick      = 60;  // wall defense: state_i to reset from DEAD state
+    int innerRange      = 70;  // fixed cannon: near edge of detection box (x offset)
+    int outerRange      = 300; // fixed cannon: far edge of detection box (x offset)
 };
 
 // ---- Terminal ---------------------------------------------------------------

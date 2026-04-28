@@ -62,14 +62,16 @@
       "id": "robot",
       "health": 200,
       "shield": 400,
-      "speed": 0,
+      "speed": 4,
       "searchTicks": 600,
       "meleeCheckInterval": 40,
       "respawnSeconds": 45,
       "meleeDamageHealth": 60,
       "meleeDamageShield": 60,
       "returnProximity": 20,
-      "sleepTicks": 100
+      "sleepTicks": 100,
+      "shootCooldownCap": 50,
+      "deathDropFiles": 250
     },
     {
       "id": "civilian",
@@ -79,6 +81,9 @@
       "speedAlt": 5,
       "tractHealthDamage": 80,
       "tractShieldDamage": 80,
+      "runSpeedBonus": 5,
+      "threatDetectX": 200,
+      "threatDetectY": 100,
       "_note": "Civilian health is not set in constructor — Object base default applies."
     }
   ]

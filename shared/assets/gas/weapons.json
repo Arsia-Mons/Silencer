@@ -4,8 +4,8 @@
     { "id": "blaster", "healthDamage": 40, "shieldDamage": 4,  "fireDelay": 7,  "moveAmount": 10 },
     { "id": "laser",   "healthDamage": 10, "shieldDamage": 60, "fireDelay": 11, "velocity": 30, "moveAmount": 12 },
     { "id": "flamer",  "healthDamage": 2,  "shieldDamage": 1,  "fireDelay": 2,  "velocity": 7,  "moveAmount": 6, "radius": 10 },
-    { "id": "rocket",  "healthDamage": 75, "shieldDamage": 25, "fireDelay": 21, "velocity": 35, "moveAmount": 15 },
-    { "id": "plasma",  "healthDamage": 4,  "shieldDamage": 5,  "healthDamageLarge": 5, "shieldDamageLarge": 6, "velocity": 5, "moveAmount": 4, "radius": 5 },
+    { "id": "rocket",  "healthDamage": 75, "shieldDamage": 25, "fireDelay": 21, "velocity": 35, "moveAmount": 15, "radius": 30, "rocketSlowInitial": 0.2, "rocketHoverTick": 100, "rocketSlowHover": 0.3 },
+    { "id": "plasma",  "healthDamage": 4,  "shieldDamage": 5,  "healthDamageLarge": 5, "shieldDamageLarge": 6, "velocity": 5, "moveAmount": 4, "radius": 5, "plasmaGravity": 2, "plasmaLifeNormal": 20, "plasmaLifeLarge": 7 },
     { "id": "flare",   "healthDamage": 1,  "shieldDamage": 1,  "velocity": 5,  "moveAmount": 1 },
     { "id": "wall",    "healthDamage": 10, "shieldDamage": 60, "velocity": 35, "moveAmount": 6 },
     {
