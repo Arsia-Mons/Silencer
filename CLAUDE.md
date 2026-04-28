@@ -45,6 +45,10 @@ Each component owns its own `CLAUDE.md` with build/run/test/gotchas:
 4. **Verify end-to-end before claiming done** for cross-service
    features. Real request through the full stack.
 5. **Ask early when ambiguous.** Cheaper than redoing it.
+6. **Combat overengineering.** No features beyond what was asked.
+   No abstractions for single-use code. No "flexibility" or
+   "configurability" that wasn't requested. No error handling for
+   impossible scenarios. If 200 lines could be 50, rewrite it.
 
 ## More
 
