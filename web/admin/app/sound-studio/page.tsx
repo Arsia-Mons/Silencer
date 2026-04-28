@@ -48,7 +48,7 @@ interface PendingDiff {
 
 type FilterMode = 'all' | 'cpp' | 'actordef' | 'orphaned' | 'missing' | 'ambient' | 'headroom';
 type TabMode = 'sounds' | 'music' | 'ambient';
-type SortKey = 'name' | 'size' | 'duration' | 'level';
+type SortKey = 'name' | 'size' | 'duration' | 'level' | 'refs';
 
 const CATEGORY_LABELS: Record<string, string> = {
   player: 'Player', npc: 'NPCs / Enemies', weapon: 'Weapons',
@@ -157,6 +157,7 @@ export default function SoundStudioPage() {
   const gainNodeRef = useRef<GainNode | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const loopingSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const loopingGainRef = useRef<GainNode | null>(null);
   const musicSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const [looping, setLooping] = useState<string | null>(null);
@@ -328,8 +329,20 @@ export default function SoundStudioPage() {
 
   async function toggleLoop(name: string) {
     if (loopingSourceRef.current) {
-      try { loopingSourceRef.current.stop(); } catch {}
-      loopingSourceRef.current = null; setLooping(null);
+      // Simulate game fadeout on stop if this sound has a fadeoutMs
+      const fadeMs = refs[looping ?? '']?.fadeoutMs ?? 0;
+      const src = loopingSourceRef.current;
+      const gain = loopingGainRef.current;
+      if (fadeMs && gain) {
+        const audioCtx = getAudioCtx();
+        const now = audioCtx.currentTime;
+        gain.gain.setValueAtTime(gain.gain.value, now);
+        gain.gain.linearRampToValueAtTime(0, now + fadeMs / 1000);
+        setTimeout(() => { try { src.stop(); } catch {} }, fadeMs + 50);
+      } else {
+        try { src.stop(); } catch {}
+      }
+      loopingSourceRef.current = null; loopingGainRef.current = null; setLooping(null);
       if (looping === name) return;
     }
     try {
@@ -337,10 +350,11 @@ export default function SoundStudioPage() {
       setLevels(prev => ({ ...prev, [name]: computeLevel(decoded) }));
       const audioCtx = getAudioCtx();
       const gain = audioCtx.createGain();
-      const vol = refs[name]?.volumeCalls?.[0]?.vol;
+      const calls = refs[name]?.volumeCalls;
+      const vol = calls?.[selectedVolCtxRef.current]?.vol ?? calls?.[0]?.vol;
       const base = inGameVol && typeof vol === 'number' ? vol / 128 : 1.0;
       gain.gain.value = Math.max(0, 1 - distance / 500) * base;
-      gainNodeRef.current = gain;
+      gainNodeRef.current = gain; loopingGainRef.current = gain;
       const source = audioCtx.createBufferSource();
       source.buffer = decoded; source.loop = true;
       source.connect(gain); gain.connect(audioCtx.destination);
@@ -437,15 +451,24 @@ export default function SoundStudioPage() {
   }
 
   async function repack() {
-    if (!confirm('Rebuild sound.bin now?')) return;
+    if (!confirm('Rebuild sound.bin now? The new file will download automatically.')) return;
     setRepacking(true); setStatus('Repacking…'); setError('');
     try {
-      const result = await apiFetch('/sounds/repack', {
+      const r = await fetch('/api/sounds/repack', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ normalize }),
-      }) as { numsounds: number; totalSize: number };
-      setStatus(`Repacked — ${result.numsounds} sounds, ${formatBytes(result.totalSize)}${normalize ? ' (normalized)' : ''}`);
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: r.statusText })) as { error?: string };
+        throw new Error(err.error || r.statusText);
+      }
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'sound.bin'; a.click();
+      URL.revokeObjectURL(url);
+      setStatus(`Repacked — downloaded sound.bin${normalize ? ' (normalized)' : ''}`);
       load();
     } catch (e: any) { setError(e.message); setStatus(''); }
     finally { setRepacking(false); }
@@ -675,6 +698,16 @@ export default function SoundStudioPage() {
 
   const headroomCount = sounds.filter(s => willLowHeadroom(s.name)).length;
 
+  function refCount(name: string): number {
+    const r = refs[name];
+    if (!r) return 0;
+    return (r.cpp ? 1 : 0) + (r.actordefs?.length ?? 0);
+  }
+  const orphanedCount = sounds.filter(s => {
+    const r = refs[s.name];
+    return !!r && !r.cpp && !r.actordefs?.length;
+  }).length;
+
   const filteredEntries = allEntries.filter(matchesFilter);
   const visibleEntries = sortKey ? [...filteredEntries].sort((a, b) => {
     let va: number | string = 0, vb: number | string = 0;
@@ -682,6 +715,7 @@ export default function SoundStudioPage() {
     else if (sortKey === 'size')     { va = a.source === 'bin' ? (a.adpcmBytes ?? 0) : (a.size ?? 0); vb = b.source === 'bin' ? (b.adpcmBytes ?? 0) : (b.size ?? 0); }
     else if (sortKey === 'duration') { va = a.durationSec ?? 0; vb = b.durationSec ?? 0; }
     else if (sortKey === 'level')    { va = levels[a.name]?.peak ?? -1; vb = levels[b.name]?.peak ?? -1; }
+    else if (sortKey === 'refs')     { va = refCount(a.name); vb = refCount(b.name); }
     if (va < vb) return sortDir === 'asc' ? -1 : 1;
     if (va > vb) return sortDir === 'asc' ? 1 : -1;
     return 0;
@@ -843,6 +877,22 @@ export default function SoundStudioPage() {
             </div>
           )}
 
+          {/* Orphaned bulk-delete banner */}
+          {filter === 'orphaned' && orphanedCount > 0 && (
+            <div style={{ padding: '4px 14px', fontSize: 11, background: '#1a1a1a', color: '#666', borderBottom: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span>{orphanedCount} orphaned sounds not referenced by game</span>
+              <button onClick={async () => {
+                const toDelete = sounds.filter(s => { const r = refs[s.name]; return !!r && !r.cpp && !r.actordefs?.length && !s.pendingDelete; });
+                if (!toDelete.length) return;
+                if (!confirm(`Stage ${toDelete.length} orphaned sound${toDelete.length > 1 ? 's' : ''} for deletion?`)) return;
+                for (const s of toDelete) { try { await apiFetch(`/sounds/${encodeURIComponent(s.name)}`, { method: 'DELETE' }); } catch {} }
+                setStatus(`Staged ${toDelete.length} orphaned sounds for deletion`); load();
+              }} style={{ background: 'none', border: '1px solid #444', color: '#888', borderRadius: 3, padding: '0 7px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 10 }}>
+                delete all orphaned
+              </button>
+            </div>
+          )}
+
           {/* A→B compare bar */}
           {(compareA || compareB) && (
             <div style={{ padding: '4px 14px', fontSize: 11, background: '#0e1422', borderBottom: '1px solid #2a2a3a', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -922,10 +972,10 @@ export default function SoundStudioPage() {
                   <thead>
                     <tr style={{ color: '#444', borderBottom: '1px solid #2a2a2a', position: 'sticky', top: 0, background: '#131313' }}>
                       <th style={{ textAlign: 'left', padding: '4px 5px', width: 20 }}></th>
-                      {(['name','duration','size','level'] as const).map(col => {
-                        const labels: Record<string, string> = { name: 'Name', duration: 'Dur', size: 'Size', level: 'Peak' };
-                        const aligns: Record<string, 'left' | 'right'> = { name: 'left', duration: 'right', size: 'right', level: 'left' };
-                        const widths: Record<string, number> = { duration: 54, size: 62, level: 90 };
+                      {(['name','duration','size','level','refs'] as const).map(col => {
+                        const labels: Record<string, string> = { name: 'Name', duration: 'Dur', size: 'Size', level: 'Peak', refs: 'Refs' };
+                        const aligns: Record<string, 'left' | 'right'> = { name: 'left', duration: 'right', size: 'right', level: 'left', refs: 'right' };
+                        const widths: Record<string, number> = { duration: 54, size: 62, level: 90, refs: 40 };
                         const active = sortKey === col;
                         return (
                           <th key={col} onClick={() => toggleSort(col as SortKey)}
@@ -935,7 +985,6 @@ export default function SoundStudioPage() {
                           </th>
                         );
                       })}
-                      <th style={{ textAlign: 'left', padding: '4px 5px', width: 64 }}>Refs</th>
                       <th style={{ textAlign: 'right', padding: '4px 5px', width: 110 }}></th>
                     </tr>
                   </thead>
@@ -1013,11 +1062,11 @@ export default function SoundStudioPage() {
                                 </div>
                               ) : <span style={{ color: '#2a2a2a', fontSize: 9 }}>—</span>}
                             </td>
-                            <td style={{ padding: '3px 5px' }}>
-                              <span style={{ display: 'inline-flex', gap: 2 }}>
+                            <td style={{ padding: '3px 5px', textAlign: 'right' }}>
+                              <span style={{ display: 'inline-flex', gap: 2, alignItems: 'center' }}>
                                 {ref?.cpp && <span title="Referenced in C++" style={{ background: '#2a3a2a', border: '1px solid #3a5a3a', color: '#8c8', borderRadius: 2, padding: '0 3px', fontSize: 9 }}>C++</span>}
-                                {ref?.actordefs?.length > 0 && <span title={ref.actordefs.join(', ')} style={{ background: '#1a2a3a', border: '1px solid #2a4a6a', color: '#68a', borderRadius: 2, padding: '0 3px', fontSize: 9 }}>ADef</span>}
-                                {!ref?.cpp && !ref?.actordefs?.length && !isMissing && <span style={{ color: '#333', fontSize: 9 }}>—</span>}
+                                {ref?.actordefs?.length > 0 && <span title={ref.actordefs.join(', ')} style={{ background: '#1a2a3a', border: '1px solid #2a4a6a', color: '#68a', borderRadius: 2, padding: '0 3px', fontSize: 9 }}>ADef×{ref.actordefs.length}</span>}
+                                {!ref?.cpp && !ref?.actordefs?.length && !isMissing && <span style={{ color: '#2a2a2a', fontSize: 9 }}>—</span>}
                               </span>
                             </td>
                             <td style={{ padding: '3px 5px', textAlign: 'right' }}>
@@ -1090,6 +1139,12 @@ export default function SoundStudioPage() {
                   {willLowHeadroom(selectedSound.name) && (
                     <div style={{ marginTop: 4, fontSize: 10, color: '#f44', display: 'flex', alignItems: 'center', gap: 4 }}>
                       ⚠ Low headroom at vol=128 call sites
+                    </div>
+                  )}
+                  {normalize && selectedLevel && selectedLevel.peak > 0 && (
+                    <div style={{ marginTop: 4, fontSize: 10, color: '#8af', display: 'flex', gap: 6 }}>
+                      <span>Normalize: ×{(1 / selectedLevel.peak).toFixed(2)}</span>
+                      <span style={{ color: '#556' }}>→ peak 100%</span>
                     </div>
                   )}
                   <div style={{ marginTop: 6 }}>

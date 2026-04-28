@@ -91,8 +91,7 @@ const LOOP_SOUNDS = new Set([
   'wndloope.wav',  // robot fly
   'flamebg2.wav',  // player flamethrower
   'jetpak1.wav',   // player jetpack
-  'rocket4.wav',   // rocket engine
-  'rocket9.wav',   // seeking rocket
+  // rocket4/rocket9 are one-shot sounds stopped with 100ms fadeout — NOT looped
 ]);
 
 // Fadeout duration (ms) when Audio::Stop() is called for each loop sound.
@@ -714,7 +713,19 @@ router.post('/repack', requireAuth, requireRole('admin'), async (req, res) => {
   if (existsSync(DELETIONS_FILE)) unlinkSync(DELETIONS_FILE);
   if (existsSync(RENAMES_FILE)) unlinkSync(RENAMES_FILE);
 
-  res.json({ ok: true, numsounds, soundssize, totalSize });
+  // Return the binary so the browser downloads it directly
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', 'attachment; filename="sound.bin"');
+  res.send(newBuf);
+});
+
+// GET /sounds/bin — serve sound.bin for download
+router.get('/bin', requireAuth, (req, res) => {
+  if (!existsSync(SOUND_BIN)) return res.status(404).json({ error: 'sound.bin not found' });
+  const buf = readFileSync(SOUND_BIN);
+  res.setHeader('Content-Type', 'application/octet-stream');
+  res.setHeader('Content-Disposition', 'attachment; filename="sound.bin"');
+  res.send(buf);
 });
 
 const MUSIC_EXTS = new Set(['.mp3', '.ogg', '.flac', '.wav']);
