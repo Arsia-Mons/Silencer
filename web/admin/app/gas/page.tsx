@@ -121,6 +121,7 @@ function GasPageInner() {
     setFiles(data);
     setSavedFiles(data);
     setOriginalFiles(data);
+    setLocalFolder(folderName);
     setSaveErr('');
     setSaveMsg('');
     setErrors({});
