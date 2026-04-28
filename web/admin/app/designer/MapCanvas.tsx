@@ -521,11 +521,58 @@ export default function MapCanvas({
       return { circle: true, cx, cy, r: r + 3, x: 0, y: 0, w: 0, h: 0 };
     }
 
+    // Draw X/Y axis gizmo at a canvas-space origin point
+    function drawAxis(ocx: number, ocy: number) {
+      const SHAFT = 56;
+      const HEAD  = 9;
+      const W     = overlay!.width;
+      const H     = overlay!.height;
+      ctx.save();
+      ctx.setLineDash([]);
+
+      // Faint full-canvas crosshair guides
+      ctx.lineWidth = 0.75;
+      ctx.strokeStyle = 'rgba(210,60,60,0.18)';
+      ctx.beginPath(); ctx.moveTo(0, ocy); ctx.lineTo(W, ocy); ctx.stroke();
+      ctx.strokeStyle = 'rgba(60,200,60,0.18)';
+      ctx.beginPath(); ctx.moveTo(ocx, 0); ctx.lineTo(ocx, H); ctx.stroke();
+
+      // X+ arrow (right, red)
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(230,60,60,0.95)';
+      ctx.fillStyle   = 'rgba(230,60,60,0.95)';
+      ctx.beginPath(); ctx.moveTo(ocx, ocy); ctx.lineTo(ocx + SHAFT, ocy); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ocx + SHAFT, ocy);
+      ctx.lineTo(ocx + SHAFT - HEAD, ocy - HEAD / 2);
+      ctx.lineTo(ocx + SHAFT - HEAD, ocy + HEAD / 2);
+      ctx.closePath(); ctx.fill();
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText('X', ocx + SHAFT + 4, ocy + 4);
+
+      // Y+ arrow (down — Y increases downward in game world coords, green)
+      ctx.strokeStyle = 'rgba(60,200,60,0.95)';
+      ctx.fillStyle   = 'rgba(60,200,60,0.95)';
+      ctx.beginPath(); ctx.moveTo(ocx, ocy); ctx.lineTo(ocx, ocy + SHAFT); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ocx, ocy + SHAFT);
+      ctx.lineTo(ocx - HEAD / 2, ocy + SHAFT - HEAD);
+      ctx.lineTo(ocx + HEAD / 2, ocy + SHAFT - HEAD);
+      ctx.closePath(); ctx.fill();
+      ctx.fillText('Y', ocx + 4, ocy + SHAFT + 12);
+
+      // Origin dot
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath(); ctx.arc(ocx, ocy, 3, 0, Math.PI * 2); ctx.fill();
+
+      ctx.restore();
+    }
+
     let dashOffset = 0;
     function draw() {
       ctx.clearRect(0, 0, overlay!.width, overlay!.height);
 
-      // Actor marching-ants highlight
+      // Actor marching-ants highlight + axis gizmo
       if (hasActorHighlight) {
         const rect = getSpriteRect();
         if (rect) {
@@ -548,6 +595,7 @@ export default function MapCanvas({
           }
           ctx.restore();
         }
+        if (actor) drawAxis(actor.x * zoom + pan.x, actor.y * zoom + pan.y);
       }
 
       // Platform marching-ants highlight + resize handles
@@ -592,6 +640,8 @@ export default function MapCanvas({
           ctx.fillRect(hx - hs, hy - hs, HS, HS);
           ctx.strokeRect(hx - hs, hy - hs, HS, HS);
         }
+
+        drawAxis((cx1 + cx2) / 2, (cy1 + cy2) / 2);
       }
 
       dashOffset = (dashOffset + 0.5) % 10;
