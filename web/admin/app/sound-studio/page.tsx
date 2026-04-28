@@ -109,7 +109,8 @@ export default function SoundStudioPage() {
   const [sounds, setSounds] = useState<SoundEntry[]>([]);
   const [refs, setRefs] = useState<Record<string, SoundRef>>({});
   const [levels, setLevels] = useState<Record<string, LevelInfo>>({});
-  const [loading, setLoading] = useState(true);
+  const [binLoaded, setBinLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
   const [repacking, setRepacking] = useState(false);
@@ -187,11 +188,11 @@ export default function SoundStudioPage() {
         apiFetch('/sounds/refs') as Promise<Record<string, SoundRef>>,
       ]);
       setSounds(soundsData); setRefs(refsData);
+      setBinLoaded(true);
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
   useEffect(() => { soundsRef.current = sounds; }, [sounds]);
 
   const loadMusic = useCallback(async () => {
@@ -855,7 +856,24 @@ export default function SoundStudioPage() {
         )}
 
         {/* ── SOUNDS TAB ───────────────────────────────────────────────────── */}
-        {tab === 'sounds' && <>
+        {!binLoaded ? (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 48, border: '1px solid #2a2a2a', borderRadius: 4 }}>
+              <div style={{ fontSize: 32 }}>📦</div>
+              <div style={{ fontSize: 13, color: '#666' }}>
+                Place <code style={{ color: '#88a' }}>sound.bin</code> in{' '}
+                <code style={{ color: '#88a' }}>shared/assets/</code> then load it to start editing.
+              </div>
+              <button
+                onClick={load}
+                disabled={loading}
+                style={{ padding: '10px 28px', border: '1px solid #66a', color: '#aaf', background: 'none', cursor: loading ? 'default' : 'pointer', fontFamily: 'monospace', fontSize: 13, letterSpacing: 2, opacity: loading ? 0.5 : 1 }}>
+                {loading ? 'LOADING…' : '[ LOAD SOUND.BIN ]'}
+              </button>
+              {error && <div style={{ fontSize: 11, color: '#f66' }}>{error}</div>}
+            </div>
+          </div>
+        ) : tab === 'sounds' && <>
 
           {/* Missing banner */}
           {missingNames.length > 0 && filter !== 'missing' && (
@@ -1272,7 +1290,7 @@ export default function SoundStudioPage() {
         </>}
 
         {/* ── MUSIC TAB ────────────────────────────────────────────────────── */}
-        {tab === 'music' && (
+        {tab === 'music' && binLoaded && (
           <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
             <div style={{ fontSize: 11, color: '#555', marginBottom: 10 }}>
               Music files in <code>shared/assets/</code> — loaded by the game separately from sound.bin.
@@ -1326,7 +1344,7 @@ export default function SoundStudioPage() {
             )}
           </div>
         )}
-        {tab === 'ambient' && (
+        {tab === 'ambient' && binLoaded && (
           <div style={{ flex: 1, overflow: 'auto', padding: 16, fontFamily: 'monospace' }}>
             <div style={{ fontSize: 11, color: '#555', marginBottom: 12 }}>
               BG Channel Mixer — simulates how the game blends background ambient sounds based on outdoor tile coverage.
