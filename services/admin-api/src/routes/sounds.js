@@ -1,154 +1,399 @@
 /**
- * Sound file endpoints.
+ * Sound Studio endpoints.
  *
- * Filesystem is the source of truth. Sound files (WAV/OGG/MP3) live in
- * shared/assets/sounds/. sound-events.json in the same directory maps
- * event names → sound filenames.
+ * Source of truth is shared/assets/sound.bin — an IMA ADPCM pack file.
  *
- * GET    /sounds                   — list sound files with metadata
- * GET    /sounds/:filename         — stream audio file for browser playback
- * POST   /sounds                   — upload a WAV/OGG/MP3 file (admin only)
- * DELETE /sounds/:filename         — delete a sound file (admin only)
- * GET    /sounds/events            — get sound-events.json mapping
- * PATCH  /sounds/events/:event     — update one event assignment (admin only)
+ * Binary layout of sound.bin:
+ *   [0..3]   numsounds    Uint32LE — number of header slots
+ *   [4..7]   soundssize   Uint32LE — total bytes in data section
+ *   [8..]    headers      numsounds × 96 bytes each:
+ *              [+0..+3]   flags/unknown
+ *              [+4..+19]  name (16 bytes, null-padded)
+ *              [+20..+23] offset into data section (Uint32LE)
+ *              [+24..+27] stored_length (Uint32LE)
+ *              [+28..+31] wavinfo (Uint32LE)
+ *              [+32..+95] extra (64 bytes, preserved as-is)
+ *   [8+numsounds*96..]  data section (soundssize bytes)
+ *
+ * Each sound's actual ADPCM data = stored_length - 36 bytes.
+ * The game reconstructs a WAV with a 60-byte header and data chunk size
+ * of stored_length - 36, reads stored_length + 24 bytes (overlapping next
+ * sound), and zeros the last 24 of those.
+ *
+ * Staging:
+ *   shared/assets/sounds/<name>.wav  — queued additions (raw WAV uploads)
+ *   shared/assets/sounds/.deletions.json — names to remove on repack
+ *
+ * GET    /sounds              list all sounds (bin + staged, minus pending deletions)
+ * GET    /sounds/:name/play   stream sound as browser-playable audio (decoded PCM)
+ * POST   /sounds              upload a WAV to staging (X-Filename header)
+ * DELETE /sounds/:name        remove staged file or mark bin sound for deletion
+ * POST   /sounds/repack       rebuild sound.bin from current state
+ * POST   /sounds/:name/restore remove a bin sound from the deletions list
  */
 
 import { Router } from 'express';
-import { existsSync, mkdirSync, readdirSync, statSync, unlinkSync, readFileSync, writeFileSync } from 'fs';
-import { createReadStream } from 'fs';
-import { join, extname, basename } from 'path';
-import { requireAuth, requireRole } from '../auth/jwt.js';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, readdirSync } from 'fs';
+import { createWriteStream } from 'fs';
+import { join } from 'path';
+import { spawn } from 'child_process';
 import { ASSETS_DIR } from '../config.js';
+import { requireAuth, requireRole } from '../auth/jwt.js';
 
 const router = Router();
-const SOUNDS_DIR = join(ASSETS_DIR, 'sounds');
-const EVENTS_FILE = join(SOUNDS_DIR, 'sound-events.json');
+const SOUND_BIN = join(ASSETS_DIR, 'sound.bin');
+const STAGING_DIR = join(ASSETS_DIR, 'sounds');
+const DELETIONS_FILE = join(STAGING_DIR, '.deletions.json');
+const HEADER_SIZE = 96;
+const WAV_HEADER_BYTES = 60;
+const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
 
-const ALLOWED_EXTS = new Set(['.wav', '.ogg', '.mp3']);
+mkdirSync(STAGING_DIR, { recursive: true });
 
-const MIME = { '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg' };
+// ── Binary helpers ────────────────────────────────────────────────────────────
 
-function ensureSoundsDir() {
-  if (!existsSync(SOUNDS_DIR)) mkdirSync(SOUNDS_DIR, { recursive: true });
+function parseSoundBin() {
+  if (!existsSync(SOUND_BIN)) return { sounds: [], dataBase: 8, buf: null };
+  const buf = readFileSync(SOUND_BIN);
+  const numsounds = buf.readUInt32LE(0);
+  const dataBase = 8 + numsounds * HEADER_SIZE;
+  const sounds = [];
+  for (let i = 0; i < numsounds; i++) {
+    const h = 8 + i * HEADER_SIZE;
+    const name = buf.slice(h + 4, h + 20).toString('utf8').replace(/\0.*/, '').trim();
+    const offset = buf.readUInt32LE(h + 20);
+    const storedLength = buf.readUInt32LE(h + 24);
+    const wavinfo = buf.readUInt32LE(h + 28);
+    const extra = buf.slice(h, h + 4);        // flags bytes 0-3
+    const extra2 = buf.slice(h + 28, h + 96); // bytes 28-95
+    if (!name || storedLength < 256) continue;
+    sounds.push({ name, offset, storedLength, wavinfo, extra, extra2 });
+  }
+  return { sounds, dataBase, buf };
 }
 
-function safeFilename(name) {
-  if (!name || /[/\\]/.test(name) || name.startsWith('.')) throw new Error('Invalid filename');
-  const ext = extname(name).toLowerCase();
-  if (!ALLOWED_EXTS.has(ext)) throw new Error('Unsupported file type');
-  return name;
+/**
+ * Build a valid IMA ADPCM WAV buffer matching what the game constructs.
+ * adpcmData must be (storedLength - 36) bytes of raw ADPCM.
+ */
+function buildWav(adpcmData) {
+  const D = adpcmData.length;          // data chunk bytes = stored_length - 36
+  const riffSize = D + 52;             // total_wav_size - 8 = (60+D) - 8
+  const out = Buffer.alloc(WAV_HEADER_BYTES + D);
+  let p = 0;
+  out.write('RIFF', p); p += 4;
+  out.writeUInt32LE(riffSize, p); p += 4;
+  out.write('WAVE', p); p += 4;
+  out.write('fmt ', p); p += 4;
+  out.writeUInt32LE(20, p); p += 4;        // fmt chunk size
+  out.writeUInt16LE(0x0011, p); p += 2;    // WAVE_FORMAT_DVI_ADPCM
+  out.writeUInt16LE(1, p); p += 2;         // mono
+  out.writeUInt32LE(11025, p); p += 4;     // sample rate
+  out.writeUInt32LE(5588, p); p += 4;      // avg bytes/sec
+  out.writeUInt16LE(256, p); p += 2;       // block align
+  out.writeUInt16LE(4, p); p += 2;         // bits per sample
+  out.writeUInt16LE(2, p); p += 2;         // extra format bytes
+  out.writeUInt16LE(505, p); p += 2;       // samples per block
+  out.write('fact', p); p += 4;
+  out.writeUInt32LE(4, p); p += 4;
+  out.writeUInt32LE(46399, p); p += 4;     // hardcoded (matches original packer)
+  out.write('data', p); p += 4;
+  out.writeUInt32LE(D, p); p += 4;
+  adpcmData.copy(out, p);
+  return out;
 }
 
-function readEvents() {
-  if (!existsSync(EVENTS_FILE)) return {};
-  try { return JSON.parse(readFileSync(EVENTS_FILE, 'utf8')); } catch { return {}; }
+/** Extract the WAV 'data' chunk bytes from a WAV buffer. */
+function extractWavDataChunk(wavBuf) {
+  let i = 12; // skip "RIFF xxxx WAVE"
+  while (i + 8 <= wavBuf.length) {
+    const tag = wavBuf.slice(i, i + 4).toString('ascii');
+    const sz = wavBuf.readUInt32LE(i + 4);
+    if (tag === 'data') return wavBuf.slice(i + 8, i + 8 + sz);
+    i += 8 + sz;
+  }
+  return null;
 }
 
-function writeEvents(events) {
-  ensureSoundsDir();
-  writeFileSync(EVENTS_FILE, JSON.stringify(events, null, 2), 'utf8');
-}
-
-// GET /sounds — list all sound files
-router.get('/', (_req, res) => {
-  try {
-    ensureSoundsDir();
-    const files = readdirSync(SOUNDS_DIR)
-      .filter(f => ALLOWED_EXTS.has(extname(f).toLowerCase()))
-      .map(f => {
-        const stat = statSync(join(SOUNDS_DIR, f));
-        return { filename: f, size: stat.size, mtime: stat.mtime };
-      })
-      .sort((a, b) => a.filename.localeCompare(b.filename));
-    res.json(files);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /sounds/events — get event mapping (before /:filename so it matches first)
-router.get('/events', (_req, res) => {
-  try {
-    res.json(readEvents());
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// PATCH /sounds/events/:event — assign a sound to an event
-router.patch('/events/:event', requireAuth, requireRole('admin'), (req, res) => {
-  try {
-    const { event } = req.params;
-    const { filename } = req.body;
-    if (!event) return res.status(400).json({ error: 'Missing event name' });
-    const events = readEvents();
-    if (filename === null || filename === '') {
-      delete events[event];
-    } else {
-      if (filename && !ALLOWED_EXTS.has(extname(filename).toLowerCase()))
-        return res.status(400).json({ error: 'Unsupported file type' });
-      events[event] = filename ?? null;
-    }
-    writeEvents(events);
-    res.json(events);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /sounds/:filename — stream audio file
-router.get('/:filename', (req, res) => {
-  try {
-    const filename = safeFilename(req.params.filename);
-    const filePath = join(SOUNDS_DIR, filename);
-    if (!existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
-    const ext = extname(filename).toLowerCase();
-    const stat = statSync(filePath);
-    res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
-    res.setHeader('Content-Length', stat.size);
-    res.setHeader('Accept-Ranges', 'bytes');
-    createReadStream(filePath).pipe(res);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// POST /sounds — upload a sound file
-router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
-  try {
-    ensureSoundsDir();
-    // Bun / Express: body is raw buffer when Content-Type is audio/*
-    // We use the X-Filename header to get the name
-    const filename = req.headers['x-filename'];
-    if (!filename) return res.status(400).json({ error: 'Missing X-Filename header' });
-    safeFilename(filename);
-    const filePath = join(SOUNDS_DIR, filename);
-
+/** Encode a WAV buffer to IMA ADPCM (256-byte blocks, 11025 Hz, mono) via ffmpeg. */
+function encodeToAdpcm(inputWavBuf) {
+  return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on('data', chunk => chunks.push(chunk));
-    req.on('end', () => {
-      const buf = Buffer.concat(chunks);
-      writeFileSync(filePath, buf);
-      const stat = statSync(filePath);
-      res.status(201).json({ filename, size: stat.size });
+    const ff = spawn(FFMPEG, [
+      '-hide_banner', '-loglevel', 'error',
+      '-f', 'wav', '-i', 'pipe:0',
+      '-c:a', 'adpcm_ima_wav',
+      '-ar', '11025',
+      '-ac', '1',
+      '-frame_size', '505',
+      '-f', 'wav', 'pipe:1',
+    ]);
+    ff.stdout.on('data', d => chunks.push(d));
+    ff.stderr.on('data', d => console.error('[ffmpeg]', d.toString()));
+    ff.on('close', code => {
+      if (code !== 0) return reject(new Error(`ffmpeg exited ${code}`));
+      const wavOut = Buffer.concat(chunks);
+      const adpcm = extractWavDataChunk(wavOut);
+      if (!adpcm) return reject(new Error('No data chunk in ffmpeg output'));
+      resolve(adpcm);
     });
-    req.on('error', err => res.status(500).json({ error: err.message }));
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+    ff.stdin.write(inputWavBuf);
+    ff.stdin.end();
+  });
+}
+
+/** Decode IMA ADPCM WAV to PCM WAV via ffmpeg (for browser playback). */
+function decodeAdpcmToPcm(adpcmWavBuf) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    const ff = spawn(FFMPEG, [
+      '-hide_banner', '-loglevel', 'error',
+      '-f', 'wav', '-i', 'pipe:0',
+      '-c:a', 'pcm_s16le',
+      '-f', 'wav', 'pipe:1',
+    ]);
+    ff.stdout.on('data', d => chunks.push(d));
+    ff.stderr.on('data', d => console.error('[ffmpeg]', d.toString()));
+    ff.on('close', code => {
+      if (code !== 0) return reject(new Error(`ffmpeg exited ${code}`));
+      resolve(Buffer.concat(chunks));
+    });
+    ff.stdin.write(adpcmWavBuf);
+    ff.stdin.end();
+  });
+}
+
+// ── Staging helpers ───────────────────────────────────────────────────────────
+
+function getDeletions() {
+  if (!existsSync(DELETIONS_FILE)) return [];
+  try { return JSON.parse(readFileSync(DELETIONS_FILE, 'utf8')); } catch { return []; }
+}
+
+function saveDeletions(list) {
+  writeFileSync(DELETIONS_FILE, JSON.stringify([...new Set(list)], null, 2));
+}
+
+function getStagedFiles() {
+  return readdirSync(STAGING_DIR)
+    .filter(f => !f.startsWith('.') && f.endsWith('.wav'))
+    .map(f => ({ name: f, staged: true, size: null }));
+}
+
+// ── Routes ────────────────────────────────────────────────────────────────────
+
+// GET /sounds — list all sounds
+router.get('/', requireAuth, (req, res) => {
+  const { sounds } = parseSoundBin();
+  const deletions = new Set(getDeletions());
+  const staged = getStagedFiles();
+  const stagedNames = new Set(staged.map(s => s.name));
+
+  const binSounds = sounds
+    .filter(s => !stagedNames.has(s.name)) // staged overrides bin
+    .map(s => ({
+      name: s.name,
+      storedLength: s.storedLength,
+      adpcmBytes: s.storedLength - 36,
+      source: 'bin',
+      pendingDelete: deletions.has(s.name),
+    }));
+
+  const stagedSounds = staged.map(s => {
+    const p = join(STAGING_DIR, s.name);
+    const size = existsSync(p) ? readFileSync(p).length : 0;
+    return { name: s.name, storedLength: null, adpcmBytes: null, size, source: 'staged', pendingDelete: false };
+  });
+
+  res.json([...binSounds, ...stagedSounds]);
+});
+
+// GET /sounds/:name/play — stream decoded PCM WAV for browser playback
+router.get('/:name/play', requireAuth, async (req, res) => {
+  const name = req.params.name;
+
+  // Check staging first
+  const stagedPath = join(STAGING_DIR, name);
+  if (existsSync(stagedPath)) {
+    try {
+      const wavBuf = readFileSync(stagedPath);
+      const pcm = await decodeAdpcmToPcm(wavBuf);
+      res.setHeader('Content-Type', 'audio/wav');
+      res.setHeader('Content-Length', pcm.length);
+      return res.send(pcm);
+    } catch (e) {
+      return res.status(500).json({ error: e.message });
+    }
+  }
+
+  // Fall back to bin
+  const { sounds, dataBase, buf } = parseSoundBin();
+  if (!buf) return res.status(404).json({ error: 'sound.bin not found' });
+  const sound = sounds.find(s => s.name === name);
+  if (!sound) return res.status(404).json({ error: 'Sound not found' });
+
+  try {
+    const adpcmBytes = sound.storedLength - 36;
+    const adpcmData = buf.slice(dataBase + sound.offset, dataBase + sound.offset + adpcmBytes);
+    const adpcmWav = buildWav(adpcmData);
+    const pcm = await decodeAdpcmToPcm(adpcmWav);
+    res.setHeader('Content-Type', 'audio/wav');
+    res.setHeader('Content-Length', pcm.length);
+    res.send(pcm);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
-// DELETE /sounds/:filename
-router.delete('/:filename', requireAuth, requireRole('admin'), (req, res) => {
-  try {
-    const filename = safeFilename(req.params.filename);
-    const filePath = join(SOUNDS_DIR, filename);
-    if (!existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
-    unlinkSync(filePath);
-    res.json({ ok: true });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+// POST /sounds — upload WAV to staging (X-Filename: <name.wav>)
+router.post('/', requireAuth, requireRole('admin'), async (req, res) => {
+  let filename = req.headers['x-filename'] || '';
+  filename = filename.replace(/[^a-zA-Z0-9!._-]/g, '_');
+  if (!filename.endsWith('.wav')) filename += '.wav';
+
+  const chunks = [];
+  req.on('data', d => chunks.push(d));
+  req.on('end', async () => {
+    const uploadBuf = Buffer.concat(chunks);
+    if (!uploadBuf.length) return res.status(400).json({ error: 'Empty body' });
+
+    try {
+      // Validate it's a WAV; if not, convert to WAV first via ffmpeg
+      const isWav = uploadBuf.slice(0, 4).toString('ascii') === 'RIFF';
+      const wavBuf = isWav ? uploadBuf : await (async () => {
+        return new Promise((resolve, reject) => {
+          const chunks2 = [];
+          const ff = spawn(FFMPEG, [
+            '-hide_banner', '-loglevel', 'error',
+            '-i', 'pipe:0', '-f', 'wav', 'pipe:1',
+          ]);
+          ff.stdout.on('data', d => chunks2.push(d));
+          ff.on('close', code => code ? reject(new Error(`ffmpeg ${code}`)) : resolve(Buffer.concat(chunks2)));
+          ff.stdin.write(uploadBuf);
+          ff.stdin.end();
+        });
+      })();
+
+      writeFileSync(join(STAGING_DIR, filename), wavBuf);
+      res.json({ ok: true, name: filename });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+});
+
+// DELETE /sounds/:name — remove staged file or mark bin sound for deletion
+router.delete('/:name', requireAuth, requireRole('admin'), (req, res) => {
+  const name = req.params.name;
+  const stagedPath = join(STAGING_DIR, name);
+  if (existsSync(stagedPath)) {
+    unlinkSync(stagedPath);
+    return res.json({ ok: true, removed: 'staged' });
   }
+  const { sounds } = parseSoundBin();
+  if (!sounds.find(s => s.name === name)) {
+    return res.status(404).json({ error: 'Sound not found' });
+  }
+  const dels = getDeletions();
+  if (!dels.includes(name)) dels.push(name);
+  saveDeletions(dels);
+  res.json({ ok: true, pendingDelete: true });
+});
+
+// POST /sounds/:name/restore — remove bin sound from deletions list
+router.post('/:name/restore', requireAuth, requireRole('admin'), (req, res) => {
+  const name = req.params.name;
+  saveDeletions(getDeletions().filter(n => n !== name));
+  res.json({ ok: true });
+});
+
+// POST /sounds/repack — rebuild sound.bin
+router.post('/repack', requireAuth, requireRole('admin'), async (req, res) => {
+  const { sounds, dataBase, buf } = parseSoundBin();
+  if (!buf && !existsSync(SOUND_BIN)) return res.status(404).json({ error: 'sound.bin not found' });
+
+  const deletions = new Set(getDeletions());
+  const staged = getStagedFiles();
+  const stagedNames = new Set(staged.map(s => s.name));
+
+  // Collect all sounds: existing bin (not deleted, not overridden) + staged
+  const entries = []; // { name, adpcmData: Buffer }
+
+  // Existing bin sounds
+  for (const s of (sounds || [])) {
+    if (deletions.has(s.name)) continue;
+    if (stagedNames.has(s.name)) continue; // staged version replaces bin version
+    const adpcmBytes = s.storedLength - 36;
+    const adpcmData = buf.slice(dataBase + s.offset, dataBase + s.offset + adpcmBytes);
+    entries.push({ name: s.name, adpcmData });
+  }
+
+  // Staged sounds (encode WAV → ADPCM)
+  for (const s of staged) {
+    try {
+      const wavBuf = readFileSync(join(STAGING_DIR, s.name));
+      const adpcmData = await encodeToAdpcm(wavBuf);
+      entries.push({ name: s.name, adpcmData });
+    } catch (e) {
+      return res.status(500).json({ error: `Failed to encode ${s.name}: ${e.message}` });
+    }
+  }
+
+  if (!entries.length) return res.status(400).json({ error: 'No sounds to pack' });
+
+  // Build new sound.bin
+  const numsounds = entries.length;
+  const newDataBase = 8 + numsounds * HEADER_SIZE;
+
+  // Calculate offsets
+  let offset = 0;
+  const offsets = entries.map(e => {
+    const o = offset;
+    offset += e.adpcmData.length; // each entry's space = adpcmData.length (= stored_length - 36)
+    return o;
+  });
+  const soundssize = offset;
+
+  const totalSize = newDataBase + soundssize;
+  const newBuf = Buffer.alloc(totalSize, 0);
+
+  // Write global header
+  newBuf.writeUInt32LE(numsounds, 0);
+  newBuf.writeUInt32LE(soundssize, 4);
+
+  // Write per-sound headers
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    const storedLength = e.adpcmData.length + 36;
+    const h = 8 + i * HEADER_SIZE;
+    newBuf.writeUInt32LE(1, h);                     // flags (matches original)
+    const nameBuf = Buffer.alloc(16, 0);
+    nameBuf.write(e.name.slice(0, 16));
+    nameBuf.copy(newBuf, h + 4);
+    newBuf.writeUInt32LE(offsets[i], h + 20);       // offset
+    newBuf.writeUInt32LE(storedLength, h + 24);     // stored_length
+    newBuf.writeUInt32LE(46399, h + 28);            // wavinfo (hardcoded)
+    // bytes h+32..h+95 remain zero
+  }
+
+  // Write data section
+  for (let i = 0; i < entries.length; i++) {
+    entries[i].adpcmData.copy(newBuf, newDataBase + offsets[i]);
+  }
+
+  // Atomic write (write to .new then rename)
+  const tmpPath = SOUND_BIN + '.new';
+  writeFileSync(tmpPath, newBuf);
+  const { renameSync } = await import('fs');
+  renameSync(tmpPath, SOUND_BIN);
+
+  // Clear staging on success
+  for (const s of staged) {
+    try { unlinkSync(join(STAGING_DIR, s.name)); } catch {}
+  }
+  if (existsSync(DELETIONS_FILE)) unlinkSync(DELETIONS_FILE);
+
+  res.json({ ok: true, numsounds, soundssize, totalSize });
 });
 
 export default router;

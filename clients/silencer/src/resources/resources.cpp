@@ -354,7 +354,7 @@ bool Resources::LoadSounds(Game & game, bool dedicatedserver){
 }
 
 void Resources::UnloadSounds(void){
-	for(std::map<std::string, Mix_Chunk *>::iterator it = soundbank.begin(); it != soundbank.end(); it++){
+	for(std::map<std::string, MIX_Audio *>::iterator it = soundbank.begin(); it != soundbank.end(); it++){
 		MIX_DestroyAudio((*it).second);
 	}
 	soundbank.clear();

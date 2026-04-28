@@ -1,350 +1,335 @@
 'use client';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, DragEvent } from 'react';
 import { useAuth } from '../../lib/auth';
-import { useWsConnected } from '../../lib/socket';
 import Sidebar from '../../components/Sidebar';
-import {
-  listSounds, soundUrl, uploadSound, deleteSound,
-  getSoundEvents, patchSoundEvent,
-  type SoundFile, type SoundEvents,
-} from '../../lib/api';
+import { apiFetch } from '../../lib/api';
 
-// Known game sound events — extend as new events are identified in C++ source
-const KNOWN_EVENTS = [
-  'WEAPON_FIRE_BLASTER',
-  'WEAPON_FIRE_LASER',
-  'WEAPON_FIRE_ROCKET',
-  'WEAPON_FIRE_GRENADE',
-  'WEAPON_FIRE_FLAME',
-  'WEAPON_RELOAD',
-  'WEAPON_EMPTY',
-  'FOOTSTEP_METAL',
-  'FOOTSTEP_STONE',
-  'JUMP',
-  'LAND',
-  'PLAYER_HURT',
-  'PLAYER_DEATH',
-  'ENEMY_HURT',
-  'ENEMY_DEATH',
-  'ENEMY_ALERT',
-  'PICKUP_WEAPON',
-  'PICKUP_HEALTH',
-  'PICKUP_AMMO',
-  'DOOR_OPEN',
-  'DOOR_CLOSE',
-  'EXPLOSION',
-  'UI_CLICK',
-  'UI_CONFIRM',
-  'AMBIENT_LOOP',
-  'MUSIC_MENU',
-  'MUSIC_GAME',
-];
+interface SoundEntry {
+  name: string;
+  storedLength: number | null;
+  adpcmBytes: number | null;
+  size?: number;
+  source: 'bin' | 'staged';
+  pendingDelete: boolean;
+}
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1048576).toFixed(1)} MB`;
+function formatBytes(n: number | null | undefined): string {
+  if (n == null) return '—';
+  if (n < 1024) return `${n} B`;
+  if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1048576).toFixed(1)} MB`;
 }
 
 export default function SoundStudioPage() {
   useAuth();
-  const wsConnected = useWsConnected();
 
-  const [sounds, setSounds] = useState<SoundFile[]>([]);
-  const [events, setEvents] = useState<SoundEvents>({});
+  const [sounds, setSounds] = useState<SoundEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Playback
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState<string | null>(null);
-
-  // Upload
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState('');
-
-  // Drag-over state for drop zone
+  const [status, setStatus] = useState('');
+  const [repacking, setRepacking] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
-  // Search/filter
-  const [search, setSearch] = useState('');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Event filter
-  const [eventSearch, setEventSearch] = useState('');
-
-  // Pending event patch
-  const [patchingEvent, setPatchingEvent] = useState<string | null>(null);
-
-  async function reload() {
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
     try {
-      const [s, e] = await Promise.all([listSounds(), getSoundEvents()]);
-      setSounds(s);
-      setEvents(e);
-    } catch (err) {
-      setError((err as Error).message);
+      const data = await apiFetch('/sounds') as SoundEntry[];
+      setSounds(data);
+    } catch (e: any) {
+      setError(e.message);
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
-  useEffect(() => { reload(); }, []);
+  useEffect(() => { load(); }, [load]);
 
-  function playSound(filename: string) {
-    if (playing === filename) {
-      audioRef.current?.pause();
+  // ── Playback ────────────────────────────────────────────────────────────────
+
+  function play(name: string) {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    if (playing === name) {
       setPlaying(null);
       return;
     }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = soundUrl(filename);
-      audioRef.current.play().catch(() => {});
-      setPlaying(filename);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
+    // We use a Blob URL so we can pass auth header
+    fetch(`/api/sounds/${encodeURIComponent(name)}/play`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.blob())
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.play();
+        setPlaying(name);
+        audio.onended = () => {
+          setPlaying(null);
+          URL.revokeObjectURL(url);
+        };
+        audio.onerror = () => {
+          setPlaying(null);
+          URL.revokeObjectURL(url);
+          setError(`Could not play ${name}`);
+        };
+      })
+      .catch(e => { setError(e.message); setPlaying(null); });
+  }
+
+  // ── Upload ──────────────────────────────────────────────────────────────────
+
+  async function uploadFile(file: File) {
+    const name = file.name.replace(/[^a-zA-Z0-9!._-]/g, '_');
+    setStatus(`Uploading ${name}…`);
+    try {
+      const buf = await file.arrayBuffer();
+      await apiFetch('/sounds', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'X-Filename': name,
+        },
+        body: buf,
+      });
+      setStatus(`Staged ${name}`);
+      load();
+    } catch (e: any) {
+      setError(e.message);
+      setStatus('');
     }
   }
 
-  useEffect(() => {
-    const audio = new Audio();
-    audio.onended = () => setPlaying(null);
-    audioRef.current = audio;
-    return () => { audio.pause(); audioRef.current = null; };
-  }, []);
+  function onFileInput(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    files.forEach(uploadFile);
+    e.target.value = '';
+  }
 
-  const handleFiles = useCallback(async (files: FileList | File[]) => {
-    const arr = Array.from(files).filter(f =>
-      /\.(wav|ogg|mp3)$/i.test(f.name)
-    );
-    if (!arr.length) { setUploadError('Only WAV, OGG, MP3 files are supported.'); return; }
-    setUploading(true);
-    setUploadError('');
+  function onDrop(e: DragEvent<HTMLDivElement>) {
+    e.preventDefault();
+    setDragOver(false);
+    Array.from(e.dataTransfer.files).forEach(uploadFile);
+  }
+
+  // ── Delete / Restore ────────────────────────────────────────────────────────
+
+  async function deleteSnd(name: string) {
     try {
-      await Promise.all(arr.map(f => uploadSound(f)));
-      await reload();
-    } catch (err) {
-      setUploadError((err as Error).message);
+      await apiFetch(`/sounds/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      setStatus(`${name} marked for deletion`);
+      load();
+    } catch (e: any) { setError(e.message); }
+  }
+
+  async function restoreSnd(name: string) {
+    try {
+      await apiFetch(`/sounds/${encodeURIComponent(name)}/restore`, { method: 'POST' });
+      setStatus(`${name} restored`);
+      load();
+    } catch (e: any) { setError(e.message); }
+  }
+
+  // ── Repack ──────────────────────────────────────────────────────────────────
+
+  async function repack() {
+    if (!confirm('Rebuild sound.bin now? The existing file will be replaced.')) return;
+    setRepacking(true);
+    setStatus('Repacking…');
+    setError('');
+    try {
+      const result = await apiFetch('/sounds/repack', { method: 'POST' }) as { numsounds: number; totalSize: number };
+      setStatus(`Repacked — ${result.numsounds} sounds, ${formatBytes(result.totalSize)}`);
+      load();
+    } catch (e: any) {
+      setError(e.message);
+      setStatus('');
     } finally {
-      setUploading(false);
-    }
-  }, []);
-
-  async function handleDelete(filename: string) {
-    if (!confirm(`Delete ${filename}?`)) return;
-    try {
-      await deleteSound(filename);
-      if (playing === filename) { audioRef.current?.pause(); setPlaying(null); }
-      await reload();
-    } catch (err) {
-      setError((err as Error).message);
+      setRepacking(false);
     }
   }
 
-  async function handleEventChange(event: string, filename: string) {
-    setPatchingEvent(event);
-    try {
-      const updated = await patchSoundEvent(event, filename || null);
-      setEvents(updated);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setPatchingEvent(null);
-    }
-  }
+  // ── Derived ─────────────────────────────────────────────────────────────────
 
-  const filteredSounds = sounds.filter(s =>
-    s.filename.toLowerCase().includes(search.toLowerCase())
-  );
-  const filteredEvents = KNOWN_EVENTS.filter(e =>
-    e.toLowerCase().includes(eventSearch.toLowerCase())
-  );
+  const staged = sounds.filter(s => s.source === 'staged');
+  const pendingDels = sounds.filter(s => s.pendingDelete);
+  const hasPending = staged.length > 0 || pendingDels.length > 0;
 
   return (
-    <div className="flex min-h-screen bg-game-bg text-game-text font-mono">
-      <Sidebar wsConnected={wsConnected} />
+    <div style={{ display: 'flex', height: '100vh', fontFamily: 'monospace', background: '#111', color: '#ccc' }}>
+      <Sidebar />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-game-border bg-game-bgCard flex-shrink-0">
-          <div>
-            <h1 className="text-lg font-bold tracking-widest text-game-primary">[ SOUND STUDIO ]</h1>
-            <p className="text-xs text-game-textDim mt-0.5">Browse, upload, and assign game sounds to events</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept=".wav,.ogg,.mp3"
-              multiple
-              className="hidden"
-              onChange={e => e.target.files && handleFiles(e.target.files)}
-            />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="px-3 py-1.5 text-xs border border-game-primary text-game-primary rounded hover:bg-game-primary hover:text-black transition-colors disabled:opacity-40"
-            >
-              {uploading ? 'UPLOADING…' : '↑ UPLOAD SOUND'}
-            </button>
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 20px', borderBottom: '1px solid #333', background: '#151515' }}>
+          <span style={{ fontSize: 18, color: '#aaa', fontWeight: 'bold' }}>[ SOUND STUDIO ]</span>
+          <span style={{ color: '#555', fontSize: 12 }}>sound.bin packer</span>
+
+          {hasPending && (
+            <span style={{ background: '#f90', color: '#000', padding: '2px 8px', borderRadius: 4, fontSize: 11 }}>
+              {staged.length > 0 && `+${staged.length} staged`}
+              {staged.length > 0 && pendingDels.length > 0 && '  '}
+              {pendingDels.length > 0 && `-${pendingDels.length} deletions`}
+            </span>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{ padding: '5px 12px', background: '#333', color: '#ccc', border: '1px solid #555', borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace' }}
+          >
+            + Upload WAV
+          </button>
+          <input ref={fileInputRef} type="file" accept=".wav,audio/*" multiple style={{ display: 'none' }} onChange={onFileInput} />
+
+          <button
+            onClick={repack}
+            disabled={repacking}
+            style={{
+              padding: '5px 16px',
+              background: hasPending ? '#4a8' : '#555',
+              color: hasPending ? '#fff' : '#999',
+              border: `1px solid ${hasPending ? '#6ca' : '#666'}`,
+              borderRadius: 4, cursor: repacking ? 'wait' : 'pointer', fontFamily: 'monospace',
+              fontWeight: 'bold',
+            }}
+          >
+            {repacking ? 'Repacking…' : '⚡ Save & Repack'}
+          </button>
         </div>
 
-        {error && (
-          <div className="mx-6 mt-4 px-3 py-2 bg-game-danger/10 border border-game-danger text-game-danger text-xs rounded">
-            {error}
-            <button className="ml-3 underline" onClick={() => setError('')}>dismiss</button>
+        {/* Status bar */}
+        {(status || error) && (
+          <div style={{
+            padding: '6px 20px', fontSize: 12,
+            background: error ? '#3a0' + '0' : '#1a1a1a',
+            color: error ? '#f66' : '#8c8',
+            borderBottom: '1px solid #222',
+          }}>
+            {error || status}
+            <button onClick={() => { setError(''); setStatus(''); }}
+              style={{ marginLeft: 12, background: 'none', border: 'none', color: '#555', cursor: 'pointer', fontFamily: 'monospace' }}>
+              ×
+            </button>
           </div>
         )}
 
-        <div className="flex-1 flex overflow-hidden">
-          {/* Left panel — Sound Library */}
-          <div className="w-80 flex flex-col border-r border-game-border overflow-hidden">
-            <div className="px-4 py-3 border-b border-game-border flex items-center gap-2">
-              <span className="text-xs text-game-textDim tracking-widest">LIBRARY</span>
-              <span className="ml-auto text-xs text-game-muted">{sounds.length} files</span>
+        {/* Drop zone + list */}
+        <div
+          style={{ flex: 1, overflow: 'auto', padding: 20, position: 'relative' }}
+          onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+        >
+          {dragOver && (
+            <div style={{
+              position: 'absolute', inset: 0, background: 'rgba(80,200,120,0.12)',
+              border: '2px dashed #4a8', zIndex: 10,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 20, color: '#4a8', pointerEvents: 'none',
+            }}>
+              Drop WAV files to stage
             </div>
+          )}
 
-            {/* Search */}
-            <div className="px-3 py-2 border-b border-game-border">
-              <input
-                className="w-full bg-game-dark border border-game-border rounded px-2 py-1 text-xs text-game-text placeholder:text-game-muted focus:outline-none focus:border-game-primary"
-                placeholder="filter sounds…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-
-            {/* Drop zone */}
-            <div
-              className={`mx-3 my-2 border-2 border-dashed rounded p-3 text-center text-xs transition-colors ${dragOver ? 'border-game-primary text-game-primary bg-game-primary/5' : 'border-game-border text-game-muted'}`}
-              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={e => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
-            >
-              {uploading ? 'UPLOADING…' : 'DROP WAV / OGG / MP3 HERE'}
-            </div>
-            {uploadError && <p className="px-3 text-xs text-game-danger">{uploadError}</p>}
-
-            {/* Sound list */}
-            <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <div className="px-4 py-6 text-xs text-game-muted">Loading…</div>
-              ) : filteredSounds.length === 0 ? (
-                <div className="px-4 py-6 text-xs text-game-muted">No sounds found.</div>
-              ) : filteredSounds.map(s => (
-                <div
-                  key={s.filename}
-                  className={`flex items-center gap-2 px-3 py-2 border-b border-game-border/50 hover:bg-game-bgHover transition-colors group ${playing === s.filename ? 'bg-game-dark' : ''}`}
-                >
-                  {/* Play button */}
-                  <button
-                    onClick={() => playSound(s.filename)}
-                    className="w-6 h-6 flex-shrink-0 flex items-center justify-center border border-game-border rounded text-xs hover:border-game-primary hover:text-game-primary transition-colors"
-                    title={playing === s.filename ? 'Stop' : 'Play'}
-                  >
-                    {playing === s.filename ? '■' : '▶'}
-                  </button>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs text-game-text truncate">{s.filename}</div>
-                    <div className="text-xs text-game-muted">{formatSize(s.size)}</div>
-                  </div>
-
-                  <button
-                    onClick={() => handleDelete(s.filename)}
-                    className="opacity-0 group-hover:opacity-100 text-xs text-game-muted hover:text-game-danger transition-all"
-                    title="Delete"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Right panel — Event Assignments */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="px-4 py-3 border-b border-game-border flex items-center gap-4">
-              <span className="text-xs text-game-textDim tracking-widest">SOUND EVENTS</span>
-              <input
-                className="ml-auto bg-game-dark border border-game-border rounded px-2 py-1 text-xs text-game-text placeholder:text-game-muted focus:outline-none focus:border-game-primary w-48"
-                placeholder="filter events…"
-                value={eventSearch}
-                onChange={e => setEventSearch(e.target.value)}
-              />
-            </div>
-
-            <div className="flex-1 overflow-y-auto">
-              <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-game-bgCard border-b border-game-border">
-                  <tr>
-                    <th className="text-left px-4 py-2 text-game-textDim font-normal tracking-widest">EVENT</th>
-                    <th className="text-left px-4 py-2 text-game-textDim font-normal tracking-widest">ASSIGNED SOUND</th>
-                    <th className="text-left px-4 py-2 text-game-textDim font-normal tracking-widest w-12">PREVIEW</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredEvents.map(event => {
-                    const assigned = events[event] ?? '';
-                    const isPatching = patchingEvent === event;
-                    return (
-                      <tr
-                        key={event}
-                        className="border-b border-game-border/50 hover:bg-game-bgHover transition-colors"
-                        onDragOver={e => e.preventDefault()}
-                        onDrop={e => {
-                          e.preventDefault();
-                          const fn = e.dataTransfer.getData('text/plain');
-                          if (fn) handleEventChange(event, fn);
-                        }}
-                      >
-                        <td className="px-4 py-2 text-game-primary font-mono">{event}</td>
-                        <td className="px-4 py-2">
-                          <select
-                            value={assigned}
-                            onChange={e => handleEventChange(event, e.target.value)}
-                            disabled={isPatching}
-                            className="bg-game-dark border border-game-border rounded px-2 py-0.5 text-xs text-game-text focus:outline-none focus:border-game-primary w-full max-w-xs disabled:opacity-50"
+          {loading ? (
+            <div style={{ color: '#555', padding: 40, textAlign: 'center' }}>Loading…</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ color: '#555', borderBottom: '1px solid #333' }}>
+                  <th style={{ textAlign: 'left', padding: '6px 8px', width: 24 }}></th>
+                  <th style={{ textAlign: 'left', padding: '6px 8px' }}>Name</th>
+                  <th style={{ textAlign: 'left', padding: '6px 8px' }}>Source</th>
+                  <th style={{ textAlign: 'right', padding: '6px 8px' }}>Size</th>
+                  <th style={{ textAlign: 'right', padding: '6px 8px' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sounds.map(s => {
+                  const isPlaying = playing === s.name;
+                  const size = s.source === 'bin' ? s.adpcmBytes : s.size;
+                  return (
+                    <tr
+                      key={s.name}
+                      style={{
+                        borderBottom: '1px solid #222',
+                        opacity: s.pendingDelete ? 0.4 : 1,
+                        background: isPlaying ? '#1a2a1a' : s.source === 'staged' ? '#1a1a2a' : 'transparent',
+                      }}
+                    >
+                      <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                        <button
+                          onClick={() => play(s.name)}
+                          disabled={s.pendingDelete}
+                          title={isPlaying ? 'Stop' : 'Play'}
+                          style={{
+                            background: 'none', border: 'none',
+                            color: isPlaying ? '#4a8' : '#777',
+                            cursor: 'pointer', fontSize: 14, padding: 0,
+                          }}
+                        >
+                          {isPlaying ? '⏹' : '▶'}
+                        </button>
+                      </td>
+                      <td style={{ padding: '4px 8px', color: s.pendingDelete ? '#555' : '#ddd' }}>
+                        {s.name}
+                        {s.pendingDelete && <span style={{ marginLeft: 8, color: '#f66', fontSize: 11 }}>[pending deletion]</span>}
+                        {s.source === 'staged' && <span style={{ marginLeft: 8, color: '#88f', fontSize: 11 }}>[staged]</span>}
+                      </td>
+                      <td style={{ padding: '4px 8px', color: '#555', fontSize: 11 }}>
+                        {s.source === 'bin' ? 'sound.bin' : 'staging'}
+                      </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'right', color: '#666', fontVariantNumeric: 'tabular-nums' }}>
+                        {formatBytes(size)}
+                      </td>
+                      <td style={{ padding: '4px 8px', textAlign: 'right' }}>
+                        {s.pendingDelete ? (
+                          <button
+                            onClick={() => restoreSnd(s.name)}
+                            style={{ background: 'none', border: '1px solid #555', color: '#8a8', borderRadius: 3, padding: '1px 8px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 11 }}
                           >
-                            <option value="">— unassigned —</option>
-                            {sounds.map(s => (
-                              <option key={s.filename} value={s.filename}>{s.filename}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="px-4 py-2">
-                          {assigned && (
-                            <button
-                              onClick={() => playSound(assigned)}
-                              className="w-6 h-6 flex items-center justify-center border border-game-border rounded text-xs hover:border-game-primary hover:text-game-primary transition-colors"
-                              title={`Preview ${assigned}`}
-                            >
-                              {playing === assigned ? '■' : '▶'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            Restore
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => deleteSnd(s.name)}
+                            style={{ background: 'none', border: '1px solid #444', color: '#a55', borderRadius: 3, padding: '1px 8px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 11 }}
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
 
-              {/* Export */}
-              <div className="px-4 py-4 border-t border-game-border">
-                <button
-                  onClick={() => {
-                    const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = 'sound-events.json';
-                    a.click();
-                  }}
-                  className="px-3 py-1.5 text-xs border border-game-border text-game-textDim rounded hover:border-game-primary hover:text-game-primary transition-colors"
-                >
-                  ↓ EXPORT sound-events.json
-                </button>
-              </div>
+          {!loading && sounds.length === 0 && (
+            <div style={{ color: '#444', textAlign: 'center', padding: 60 }}>
+              No sounds found in sound.bin<br />
+              <span style={{ fontSize: 12 }}>Upload WAV files and click Save & Repack to add them.</span>
             </div>
-          </div>
+          )}
+        </div>
+
+        {/* Footer: sound count summary */}
+        <div style={{ padding: '6px 20px', borderTop: '1px solid #222', background: '#151515', fontSize: 11, color: '#444', display: 'flex', gap: 16 }}>
+          <span>{sounds.filter(s => s.source === 'bin' && !s.pendingDelete).length} in bin</span>
+          {staged.length > 0 && <span style={{ color: '#88f' }}>{staged.length} staged</span>}
+          {pendingDels.length > 0 && <span style={{ color: '#f66' }}>{pendingDels.length} pending deletion</span>}
+          <span>drag &amp; drop WAV files anywhere to stage</span>
         </div>
       </div>
     </div>
