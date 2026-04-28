@@ -134,6 +134,7 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.id     = ej.value("id",     std::string{});
             e.health = ej.value("health", 0);
             e.speed  = ej.value("speed",  0);
+            e.weapon = ej.value("weapon", 0);
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {
@@ -171,6 +172,10 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             GameObjectDef g;
             g.id            = gj.value("id",            std::string{});
             g.cooldownTicks = gj.value("cooldownTicks",  0);
+            g.health        = gj.value("health",         0);
+            g.shield        = gj.value("shield",         0);
+            g.healthMax     = gj.value("healthMax",      0);
+            g.healthRegen   = gj.value("healthRegen",    0);
             out.push_back(std::move(g));
         }
     } catch (const std::exception& e) {

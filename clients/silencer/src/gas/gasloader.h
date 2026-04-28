@@ -74,6 +74,7 @@ struct EnemyDef {
     std::string id;
     int health = 0;
     int speed  = 0;
+    int weapon = 0;  // guard weapon variant: 0=blaster, 1=laser, 2=rocket
 };
 
 // ---- Ability ---------------------------------------------------------------
@@ -90,7 +91,11 @@ struct AbilityDef {
 
 struct GameObjectDef {
     std::string id;
-    int cooldownTicks = 0;  // e.g. heal machine cooldown
+    int cooldownTicks = 0;
+    int health        = 0;
+    int shield        = 0;
+    int healthMax     = 0;
+    int healthRegen   = 0;
 };
 
 // ---------------------------------------------------------------------------

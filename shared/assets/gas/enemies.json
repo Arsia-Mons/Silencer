@@ -1,8 +1,34 @@
 {
-  "_comment": "Enemy NPC base stats — 1:1 from guard.cpp:25-26, robot.cpp:14, civilian.cpp:11. Do not change during GAS migration.",
+  "_comment": "Enemy NPC base stats — 1:1 from guard.cpp:25-26, robot.cpp:14-15, civilian.cpp. Guards share the same base health/speed across all weapon variants (weapon=0 blaster, 1 laser, 2 rocket — distinguished by actordef id). Do not change during GAS migration.",
   "enemies": [
-    { "id": "guard",    "health": 25,  "speed": 5 },
-    { "id": "robot",    "health": 200, "speed": 0 },
-    { "id": "civilian", "health": 0,   "speed": 4 }
+    {
+      "id": "guard-blaster",
+      "health": 25,
+      "speed": 5,
+      "weapon": 0
+    },
+    {
+      "id": "guard-laser",
+      "health": 25,
+      "speed": 5,
+      "weapon": 1
+    },
+    {
+      "id": "guard-rocket",
+      "health": 25,
+      "speed": 5,
+      "weapon": 2
+    },
+    {
+      "id": "robot",
+      "health": 200,
+      "speed": 0
+    },
+    {
+      "id": "civilian",
+      "health": 0,
+      "speed": 4,
+      "_note": "Civilian health is not set in constructor — Object base default applies."
+    }
   ]
 }

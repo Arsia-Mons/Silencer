@@ -1,5 +1,5 @@
 {
-  "_comment": "Game object parameters — 1:1 from station constructors. Upgrade costs live server-side in the lobby. Do not change during GAS migration.",
+  "_comment": "Game object parameters — 1:1 from station/object constructors. Upgrade costs live server-side in the lobby. WallDefense health grows dynamically to 60 at +15/tick. Do not change during GAS migration.",
   "gameObjects": [
     {
       "id": "healMachine",
@@ -8,6 +8,16 @@
     {
       "id": "creditMachine",
       "cooldownTicks": 0
+    },
+    {
+      "id": "fixedCannon",
+      "health": 40,
+      "shield": 16
+    },
+    {
+      "id": "wallDefense",
+      "healthMax": 60,
+      "healthRegen": 15
     }
   ]
 }
