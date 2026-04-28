@@ -120,6 +120,7 @@ interface Props {
   onPlatformSelect: (idx: number | null) => void;
   onPlatformUpdate: (idx: number, x1: number, y1: number, x2: number, y2: number) => void;
   onActorSelect?: (idx: number | null) => void;
+  onActorFlip?: (idx: number) => void;
   gridSize: number;
 }
 
@@ -136,6 +137,7 @@ export default function MapCanvas({
   highlightActorIdx,
   selectedPlatformIdx, onPlatformSelect, onPlatformUpdate,
   onActorSelect,
+  onActorFlip,
   gridSize,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -439,11 +441,19 @@ export default function MapCanvas({
         const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
         const spr = sprBank?.[def.frame ?? 0];
         if (spr) {
-          const sx = cx - spr.offsetX * zoom;
+          const mirrored = a.direction !== 0;
+          const sx = cx - (mirrored ? spr.width - spr.offsetX : spr.offsetX) * zoom;
           const sy = cy - spr.offsetY * zoom;
           const sw = spr.width * zoom;
           const sh = spr.height * zoom;
-          ctx.drawImage(spr.bitmap, sx, sy, sw, sh);
+          if (mirrored) {
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.drawImage(spr.bitmap, -sx - sw, sy, sw, sh);
+            ctx.restore();
+          } else {
+            ctx.drawImage(spr.bitmap, sx, sy, sw, sh);
+          }
           if (zoom > 0.3) {
             ctx.fillStyle = def.color + 'cc';
             ctx.fillRect(cx - 12, cy + 2, 24, 11);
@@ -978,7 +988,11 @@ export default function MapCanvas({
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.code === 'Space') { isSpacePanning.current = true; e.preventDefault(); }
     if (e.code === 'ControlLeft' || e.code === 'ControlRight') isCtrlPanning.current = true;
-  }, []);
+    if (e.code === 'KeyF' && highlightActorIdx != null) {
+      onActorFlip?.(highlightActorIdx);
+      e.preventDefault();
+    }
+  }, [highlightActorIdx, onActorFlip]);
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     if (e.code === 'Space') isSpacePanning.current = false;
     if (e.code === 'ControlLeft' || e.code === 'ControlRight') isCtrlPanning.current = false;

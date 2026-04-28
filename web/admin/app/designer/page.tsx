@@ -250,6 +250,12 @@ export default function DesignerPage() {
     moveActor(idx, x, y);
   }, [moveActor]);
 
+  const handleActorFlip = useCallback((idx: number) => {
+    const actor = map?.actors[idx];
+    if (!actor) return;
+    updateActor(idx, { direction: actor.direction ? 0 : 1 });
+  }, [map, updateActor]);
+
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
   const handleCenterOnActor = useCallback((actor: MapActor) => {
@@ -733,6 +739,7 @@ export default function DesignerPage() {
               onActorPlace={handleActorPlace}
               onActorRemove={removeActor}
               onActorMove={handleActorMove}
+              onActorFlip={handleActorFlip}
               onActorRightClick={(idx, sx, sy) => { setActorMenu({ idx, screenX: sx, screenY: sy }); setHighlightActorIdx(idx); }}
               onActorSelect={setHighlightActorIdx}
               onTileRightClick={(info) => { setActorMenu(null); setTileMenu(info); }}
