@@ -731,6 +731,7 @@ export default function DesignerPage() {
               onActorRemove={removeActor}
               onActorMove={handleActorMove}
               onActorRightClick={(idx, sx, sy) => { setActorMenu({ idx, screenX: sx, screenY: sy }); setHighlightActorIdx(idx); }}
+              onActorSelect={setHighlightActorIdx}
               onTileRightClick={(info) => { setActorMenu(null); setTileMenu(info); }}
               selectedActorId={selectedActorId}
               dragPlatform={dragPlatform}

@@ -118,6 +118,7 @@ interface Props {
   selectedPlatformIdx: number | null;
   onPlatformSelect: (idx: number | null) => void;
   onPlatformUpdate: (idx: number, x1: number, y1: number, x2: number, y2: number) => void;
+  onActorSelect?: (idx: number | null) => void;
   gridSize: number;
 }
 
@@ -133,6 +134,7 @@ export default function MapCanvas({
   eraseLayerType,
   highlightActorIdx,
   selectedPlatformIdx, onPlatformSelect, onPlatformUpdate,
+  onActorSelect,
   gridSize,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -501,7 +503,7 @@ export default function MapCanvas({
     const actor = hasActorHighlight ? map!.actors[highlightActorIdx!] : null;
     const def = actor ? getActorDef(actor.id) : null;
 
-    function getSpriteRect() {
+    function getSpriteRect(overrideCx?: number, overrideCy?: number) {
       if (!actor || !def) return null;
       let bankNum = def.bank;
       if (actor.id === 54) bankNum = actor.type === 0 ? 183 : 184;
@@ -509,8 +511,8 @@ export default function MapCanvas({
       if (actor.id === 63) bankNum = actor.type === 0 ? 200 : actor.type === 2 ? 201 : 205;
       const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
       const spr = sprBank?.[def.frame ?? 0];
-      const cx = actor.x * zoom + pan.x;
-      const cy = actor.y * zoom + pan.y;
+      const cx = overrideCx ?? actor.x * zoom + pan.x;
+      const cy = overrideCy ?? actor.y * zoom + pan.y;
       if (spr) {
         const pad = 3;
         return { x: cx - spr.offsetX * zoom - pad, y: cy - spr.offsetY * zoom - pad,
@@ -574,7 +576,10 @@ export default function MapCanvas({
 
       // Actor marching-ants highlight + axis gizmo
       if (hasActorHighlight) {
-        const rect = getSpriteRect();
+        const isDragging = dragActorPreview?.idx === highlightActorIdx;
+        const liveCx = isDragging ? dragActorPreview!.wx * zoom + pan.x : actor!.x * zoom + pan.x;
+        const liveCy = isDragging ? dragActorPreview!.wy * zoom + pan.y : actor!.y * zoom + pan.y;
+        const rect = getSpriteRect(liveCx, liveCy);
         if (rect) {
           ctx.save();
           ctx.lineWidth = 2;
@@ -595,7 +600,7 @@ export default function MapCanvas({
           }
           ctx.restore();
         }
-        if (actor) drawAxis(actor.x * zoom + pan.x, actor.y * zoom + pan.y);
+        if (actor) drawAxis(liveCx, liveCy);
       }
 
       // Platform marching-ants highlight + resize handles
@@ -649,7 +654,7 @@ export default function MapCanvas({
     }
     rafRef.current = requestAnimationFrame(draw);
     return () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
-  }, [highlightActorIdx, selectedPlatformIdx, map, spriteImages, zoom, pan]);
+  }, [highlightActorIdx, selectedPlatformIdx, map, spriteImages, zoom, pan, dragActorPreview]);
 
   // Mouse event handlers
   const getCanvasPos = (e: { clientX: number; clientY: number }) => {
@@ -744,33 +749,37 @@ export default function MapCanvas({
         }
       }
 
-      // 2. Hit-test all platforms for selection
-      for (let i = map.platforms.length - 1; i >= 0; i--) {
-        const p = map.platforms[i];
-        if (wx >= p.x1 && wx <= p.x2 && wy >= p.y1 && wy <= p.y2) {
-          onPlatformSelect(i);
-          return;
-        }
-      }
-
-      // 3. Hit-test actors (existing logic)
+      // 2. Hit-test actors — priority over new platform selection
       const HIT = 48 / zoom;
       for (let i = map.actors.length - 1; i >= 0; i--) {
         const a = map.actors[i];
         const dist = Math.hypot(a.x - wx, a.y - wy);
         if (dist < HIT) {
+          onActorSelect?.(i);
+          onPlatformSelect(null);
           draggingActorRef.current = { idx: i, startWx: wx, startWy: wy, origX: a.x, origY: a.y, moved: false };
           setDragActorPreview({ idx: i, wx: a.x, wy: a.y });
           return;
         }
       }
 
-      // 4. Click on empty → deselect
+      // 3. Hit-test all platforms for selection
+      for (let i = map.platforms.length - 1; i >= 0; i--) {
+        const p = map.platforms[i];
+        if (wx >= p.x1 && wx <= p.x2 && wy >= p.y1 && wy <= p.y2) {
+          onPlatformSelect(i);
+          onActorSelect?.(null);
+          return;
+        }
+      }
+
+      // 4. Click on empty → deselect all
       onPlatformSelect(null);
+      onActorSelect?.(null);
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
       onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
-      selectedPlatformIdx, onPlatformSelect, snap]);
+      selectedPlatformIdx, onPlatformSelect, onActorSelect, snap]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
