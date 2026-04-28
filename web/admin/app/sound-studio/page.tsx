@@ -139,6 +139,10 @@ export default function SoundStudioPage() {
   const [bgRatio, setBgRatio] = useState(0);
   const [bgMutes, setBgMutes] = useState([false, false, false]);
 
+  // Volume call-site picker (which CPP_VOLUME_MAP entry to use for preview/play)
+  const [selectedVolCtx, setSelectedVolCtx] = useState(0);
+  const selectedVolCtxRef = useRef(0);
+
   // Rename dialog
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -166,6 +170,8 @@ export default function SoundStudioPage() {
   const bgSourcesRef = useRef<(AudioBufferSourceNode | null)[]>([null, null, null]);
   const bgGainsRef = useRef<(GainNode | null)[]>([null, null, null]);
   const decodedCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
+
+  useEffect(() => { selectedVolCtxRef.current = selectedVolCtx; }, [selectedVolCtx]);
 
   const getToken = () => typeof window !== 'undefined' ? localStorage.getItem('zs_token') : '';
 
@@ -237,23 +243,31 @@ export default function SoundStudioPage() {
     ctx.stroke();
   }, [levels, selectedIdx, sounds]);
 
-  // ── Arrow key navigation ────────────────────────────────────────────────────
+  // ── Arrow key navigation + Space to play ──────────────────────────────────
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'BUTTON' || tag === 'SELECT') return;
-      e.preventDefault();
       const list = visibleNonDeletedRef.current;
       if (!list.length) return;
-      setSelectedIdx(prev => {
-        const next = e.key === 'ArrowDown'
-          ? Math.min(prev + 1, list.length - 1)
-          : Math.max(prev - 1, 0);
-        rowRefs.current[next]?.scrollIntoView({ block: 'nearest' });
-        play(list[next].name);
-        return next;
-      });
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIdx(prev => {
+          const next = e.key === 'ArrowDown'
+            ? Math.min(prev + 1, list.length - 1)
+            : Math.max(prev - 1, 0);
+          rowRefs.current[next]?.scrollIntoView({ block: 'nearest' });
+          setSelectedVolCtx(0);
+          play(list[next].name);
+          return next;
+        });
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        setSelectedIdx(prev => {
+          if (prev >= 0 && prev < list.length) play(list[prev].name);
+          return prev;
+        });
+      }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -297,7 +311,8 @@ export default function SoundStudioPage() {
       setLevels(prev => ({ ...prev, [name]: computeLevel(decoded) }));
       const audioCtx = getAudioCtx();
       const gain = audioCtx.createGain();
-      const vol = refs[name]?.volumeCalls?.[0]?.vol;
+      const calls = refs[name]?.volumeCalls;
+      const vol = calls?.[selectedVolCtxRef.current]?.vol ?? calls?.[0]?.vol;
       const base = inGameVol && typeof vol === 'number' ? vol / 128 : 1.0;
       gain.gain.value = Math.max(0, 1 - distance / 500) * base;
       gainNodeRef.current = gain;
@@ -410,6 +425,17 @@ export default function SoundStudioPage() {
     } catch (e: any) { setError(e.message); }
     finally { setRenaming(false); }
   }
+  async function clearStaged() {
+    const toRemove = sounds.filter(s => s.source === 'staged');
+    if (!toRemove.length) return;
+    if (!confirm(`Remove ${toRemove.length} staged upload${toRemove.length > 1 ? 's' : ''}? Bin sounds are unaffected.`)) return;
+    for (const s of toRemove) {
+      try { await apiFetch(`/sounds/${encodeURIComponent(s.name)}`, { method: 'DELETE' }); } catch {}
+    }
+    setStatus(`Cleared ${toRemove.length} staged files`);
+    load();
+  }
+
   async function repack() {
     if (!confirm('Rebuild sound.bin now?')) return;
     setRepacking(true); setStatus('Repacking…'); setError('');
@@ -682,7 +708,8 @@ export default function SoundStudioPage() {
   const distAttenuation = Math.max(0, 1 - distance / 500);
   const inGameBaseGain = (() => {
     if (!inGameVol || !selectedRef) return 1.0;
-    const vol = selectedRef.volumeCalls?.[0]?.vol;
+    const calls = selectedRef.volumeCalls;
+    const vol = calls?.[selectedVolCtx]?.vol ?? calls?.[0]?.vol;
     return typeof vol === 'number' ? vol / 128 : 1.0;
   })();
   const effectiveGain = distAttenuation * inGameBaseGain;
@@ -764,6 +791,13 @@ export default function SoundStudioPage() {
               + Upload WAV
             </button>
             <input ref={fileInputRef} type="file" accept=".wav,audio/*" multiple style={{ display: 'none' }} onChange={onFileInput} />
+            {staged.length > 0 && (
+              <button onClick={clearStaged}
+                style={{ padding: '3px 9px', background: '#1a1a1a', color: '#866', border: '1px solid #422', borderRadius: 4, cursor: 'pointer', fontFamily: 'monospace', fontSize: 11 }}
+                title="Remove all staged uploads (bin sounds unaffected)">
+                clear staged ({staged.length})
+              </button>
+            )}
             <button onClick={repack} disabled={repacking}
               style={{ padding: '3px 12px', fontSize: 11,
                 background: hasPending ? '#4a8' : '#555',
@@ -935,8 +969,8 @@ export default function SoundStudioPage() {
                           <tr key={s.name}
                             ref={el => { if (!s.pendingDelete && visIdx >= 0) rowRefs.current[visIdx] = el; }}
                             onClick={() => {
-                              if (!s.pendingDelete && !isMissing) { setSelectedIdx(visIdx); play(s.name); }
-                              else if (!s.pendingDelete) setSelectedIdx(visIdx);
+                              if (!s.pendingDelete && !isMissing) { setSelectedIdx(visIdx); setSelectedVolCtx(0); play(s.name); }
+                              else if (!s.pendingDelete) { setSelectedIdx(visIdx); setSelectedVolCtx(0); }
                             }}
                             style={{
                               borderBottom: '1px solid #1a1a1a',
@@ -1067,9 +1101,14 @@ export default function SoundStudioPage() {
                 </div>
 
                 {/* Waveform */}
-                <div style={{ padding: '6px 10px', borderBottom: '1px solid #1e1e1e' }}>
+                <div style={{ padding: '6px 10px', borderBottom: '1px solid #1e1e1e', position: 'relative' }}>
                   <canvas ref={waveformCanvasRef} width={232} height={44}
                     style={{ width: '100%', height: 44, display: 'block', borderRadius: 2, background: '#1a2a1a' }} />
+                  {!levels[selectedSound.name] && (
+                    <div style={{ position: 'absolute', inset: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+                      <span style={{ fontSize: 9, color: '#334' }}>▶ play to decode waveform</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Distance / volume preview */}
@@ -1097,10 +1136,17 @@ export default function SoundStudioPage() {
                 {/* Volume map */}
                 {selectedRef?.volumeCalls && selectedRef.volumeCalls.length > 0 && (
                   <div style={{ padding: '7px 10px', borderBottom: '1px solid #1e1e1e', overflow: 'auto', maxHeight: 160 }}>
-                    <div style={{ fontSize: 10, color: '#555', marginBottom: 4 }}>VOLUME IN GAME</div>
+                    <div style={{ fontSize: 10, color: '#555', marginBottom: 4 }}>
+                      VOLUME IN GAME {selectedRef.volumeCalls.length > 1 && <span style={{ color: '#446', fontSize: 9 }}>— click to preview at that vol</span>}
+                    </div>
                     {selectedRef.volumeCalls.map((vc, i) => (
-                      <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '2px 0', borderBottom: '1px solid #1a1a1a' }}>
-                        <span style={{ color: '#888', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vc.ctx}</span>
+                      <div key={i} onClick={() => setSelectedVolCtx(i)}
+                        style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '2px 4px',
+                          borderBottom: '1px solid #1a1a1a',
+                          background: selectedVolCtx === i && selectedRef.volumeCalls.length > 1 ? '#1a2a1a' : 'transparent',
+                          borderLeft: `2px solid ${selectedVolCtx === i && selectedRef.volumeCalls.length > 1 ? '#4a8' : 'transparent'}`,
+                          cursor: selectedRef.volumeCalls.length > 1 ? 'pointer' : 'default' }}>
+                        <span style={{ color: selectedVolCtx === i && selectedRef.volumeCalls.length > 1 ? '#aaa' : '#666', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{vc.ctx}</span>
                         <span style={{ color: volColor(vc.vol), marginLeft: 6, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{vc.vol}/128</span>
                       </div>
                     ))}
@@ -1110,7 +1156,11 @@ export default function SoundStudioPage() {
                 {/* Sound set */}
                 {selectedRef?.soundSet && setMembers[selectedRef.soundSet] && (
                   <div style={{ padding: '7px 10px', borderBottom: '1px solid #1e1e1e', overflow: 'auto', maxHeight: 180 }}>
-                    <div style={{ fontSize: 10, color: '#555', marginBottom: 2 }}>SOUND SET — {selectedRef.soundSet}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <div style={{ fontSize: 10, color: '#555' }}>SOUND SET — {selectedRef.soundSet}</div>
+                      <button onClick={() => { const ms = setMembers[selectedRef.soundSet!]!.filter(m => sounds.some(s => s.name === m)); if (ms.length) play(ms[Math.floor(Math.random() * ms.length)]); }}
+                        style={{ background: 'none', border: '1px solid #2a3a2a', color: '#566', borderRadius: 3, padding: '0 5px', cursor: 'pointer', fontFamily: 'monospace', fontSize: 9 }}>▶ rnd</button>
+                    </div>
                     <div style={{ fontSize: 9, color: '#555', marginBottom: 6 }}>
                       {setMembers[selectedRef.soundSet].length} variants chosen randomly — replace together for consistency
                     </div>

@@ -234,7 +234,7 @@ const CPP_VOLUME_MAP = {
   'transrev.wav': [{ctx:'player teleport',vol:96},{ctx:'player warp ability',vol:64},{ctx:'player warp in',vol:96}],
   'breath2.wav':  [{ctx:'player breathing',vol:16}],
   'futstonl.wav': [{ctx:'civilian step L',vol:24},{ctx:'player step L',vol:24}],
-  'futstonr.wav': [{ctx:'player step R / land',vol:32},{ctx:'civilian step R',vol:24}],
+  'futstonr.wav': [{ctx:'player step R',vol:24},{ctx:'player land (hard)',vol:32},{ctx:'civilian step R',vol:24}],
   'stostep1.wav': [{ctx:'guard/NPC step',vol:16}],
   'stostepr.wav': [{ctx:'guard/NPC step R',vol:16}],
   'portpas2.wav': [{ctx:'portal passenger teleport',vol:32}],
