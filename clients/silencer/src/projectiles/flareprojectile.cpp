@@ -1,13 +1,15 @@
 #include "flareprojectile.h"
 #include "plume.h"
+#include "gasloader.h"
 
 FlareProjectile::FlareProjectile() : Object(ObjectTypes::FLAREPROJECTILE){
 	//requiresauthority = true;
 	res_bank = 0xFF;
 	res_index = 0;
 	state_i = 0;
-	healthdamage = 1;
-	shielddamage = 1;
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("flare");
+	healthdamage = w ? w->healthDamage : 1;
+	shielddamage = w ? w->shieldDamage : 1;
 	velocity = 5;
 	drawcheckered = true;
 	for(int i = 0; i < plumecount; i++){

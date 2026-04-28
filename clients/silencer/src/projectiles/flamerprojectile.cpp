@@ -1,5 +1,6 @@
 #include "flamerprojectile.h"
 #include "plume.h"
+#include "gasloader.h"
 
 FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 	requiresauthority = true;
@@ -7,8 +8,9 @@ FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 	res_index = 0;
 	state_i = 0;
 	bypassshield = true;
-	healthdamage = 2;
-	shielddamage = 1;
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("flamer");
+	healthdamage = w ? w->healthDamage : 2;
+	shielddamage = w ? w->shieldDamage : 1;
 	velocity = 7;
 	drawcheckered = true;
 	for(int i = 0; i < plumecount; i++){

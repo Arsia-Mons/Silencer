@@ -62,8 +62,11 @@ struct PlayerDef {
 
 struct WeaponDef {
     std::string id;
-    int healthDamage = 0;
-    int shieldDamage = 0;
+    int healthDamage      = 0;
+    int shieldDamage      = 0;
+    // Plasma only: secondary damage values when projectile is in "large" (attached) state.
+    int healthDamageLarge = 0;
+    int shieldDamageLarge = 0;
 };
 
 // ---- Item ------------------------------------------------------------------

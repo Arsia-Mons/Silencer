@@ -3,6 +3,7 @@
 #include "player.h"
 #include "robot.h"
 #include "guard.h"
+#include "gasloader.h"
 #include <math.h>
 
 RocketProjectile::RocketProjectile() : Object(ObjectTypes::ROCKETPROJECTILE){
@@ -10,8 +11,9 @@ RocketProjectile::RocketProjectile() : Object(ObjectTypes::ROCKETPROJECTILE){
 	res_bank = 0xFF;
 	res_index = 0;
 	state_i = 0;
-	healthdamage = 75;
-	shielddamage = 25;
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("rocket");
+	healthdamage = w ? w->healthDamage : 75;
+	shielddamage = w ? w->shieldDamage : 25;
 	moveamount = 15;
 	velocity = 35;
 	renderpass = 2;

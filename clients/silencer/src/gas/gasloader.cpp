@@ -99,9 +99,11 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
         out.clear();
         for (const auto& wj : j.at("weapons")) {
             WeaponDef w;
-            w.id           = wj.value("id",           std::string{});
-            w.healthDamage = wj.value("healthDamage",  0);
-            w.shieldDamage = wj.value("shieldDamage",  0);
+            w.id               = wj.value("id",                std::string{});
+            w.healthDamage     = wj.value("healthDamage",       0);
+            w.shieldDamage     = wj.value("shieldDamage",       0);
+            w.healthDamageLarge = wj.value("healthDamageLarge", 0);
+            w.shieldDamageLarge = wj.value("shieldDamageLarge", 0);
             out.push_back(std::move(w));
         }
     } catch (const std::exception& e) {

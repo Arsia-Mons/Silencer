@@ -1,13 +1,15 @@
 #include "plasmaprojectile.h"
 #include "plume.h"
+#include "gasloader.h"
 
 PlasmaProjectile::PlasmaProjectile() : Object(ObjectTypes::PLASMAPROJECTILE){
 	requiresauthority = false;
 	res_bank = 0xFF;
 	res_index = 0;
 	state_i = 0;
-	healthdamage = 4;
-	shielddamage = 5;
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("plasma");
+	healthdamage = w ? w->healthDamage : 4;
+	shielddamage = w ? w->shieldDamage : 5;
 	velocity = 5;
 	drawcheckered = true;
 	renderpass = 3;
@@ -29,8 +31,9 @@ void PlasmaProjectile::Serialize(bool write, Serializer & data, Serializer * old
 
 void PlasmaProjectile::Tick(World & world){
 	if(large){
-		healthdamage = 5;
-		shielddamage = 6;
+		const WeaponDef* w = GASLoader::Get().GetWeaponDef("plasma");
+		healthdamage = w ? w->healthDamageLarge : 5;
+		shielddamage = w ? w->shieldDamageLarge : 6;
 	}
 	Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 	if(plume){
