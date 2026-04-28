@@ -134,6 +134,7 @@ export interface UseSilMapReturn {
   updateTile: (layerType: 'bg' | 'fg', layerIdx: number, x: number, y: number, tile_id: number, flip?: number, lum?: number) => void;
   patchTile: (layerType: 'bg' | 'fg', layerIdx: number, x: number, y: number, patch: Partial<TileCell>) => void;
   applyTileBatch: (layerType: 'bg' | 'fg', layerIdx: number, updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }>) => void;
+  applyAllLayersBatch: (patches: Array<{ layerType: 'bg' | 'fg'; layerIdx: number; updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }> }>) => void;
   beginPaint: () => void;
   commitPaint: () => void;
   addPlatform: (platform: MapPlatform) => void;
@@ -510,6 +511,27 @@ export function useSilMap(): UseSilMapReturn {
     });
   }, [pushHistory]);
 
+  const applyAllLayersBatch = useCallback((
+    patches: Array<{ layerType: 'bg' | 'fg'; layerIdx: number; updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }> }>
+  ) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const { width, height } = prev;
+      let newBg = prev.layers.bg.map(l => l.slice());
+      let newFg = prev.layers.fg.map(l => l.slice());
+      for (const { layerType, layerIdx, updates } of patches) {
+        const arr = layerType === 'fg' ? newFg : newBg;
+        for (const { x, y, tile_id, flip, lum } of updates) {
+          if (x >= 0 && x < width && y >= 0 && y < height)
+            arr[layerIdx][y * width + x] = { tile_id, flip, lum };
+        }
+        if (layerType === 'fg') newFg = arr; else newBg = arr;
+      }
+      return { ...prev, layers: { bg: newBg as typeof prev.layers.bg, fg: newFg as typeof prev.layers.fg } };
+    });
+  }, [pushHistory]);
+
   const patchTile = useCallback((layerType: 'bg' | 'fg', layerIdx: number, x: number, y: number, patch: Partial<TileCell>) => {
     setMapData(prev => {
       if (!prev) return prev;
@@ -638,7 +660,7 @@ export function useSilMap(): UseSilMapReturn {
 
   return {
     map: mapData, openMap, saveMap, publishMap, createMap,
-    updateTile, patchTile, applyTileBatch, beginPaint, commitPaint,
+    updateTile, patchTile, applyTileBatch, applyAllLayersBatch, beginPaint, commitPaint,
     addPlatform, removePlatform, updatePlatform,
     addActor, removeActor, updateActor, moveActor,
     updateHeader,

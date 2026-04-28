@@ -44,13 +44,15 @@ export default function DesignerPage() {
   const wsConnected = useSocket({});
 
   const { loaded, error, tileImages, spriteImages, tileBankCounts, progress, loadFiles } = useGameData();
-  const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, applyTileBatch, beginPaint, commitPaint,
+  const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, applyTileBatch, applyAllLayersBatch, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
           updateHeader, updatePlatform,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   type TileSel = { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number };
-  type TileCopyBuf = { w: number; h: number; layerType: 'bg' | 'fg'; layerIdx: number; tiles: Array<{ tile_id: number; flip: number; lum: number }> };
+  type TileCell = { tile_id: number; flip: number; lum: number };
+  // All 4 layers stored: bg[0], bg[1], fg[0], fg[1] — each is a flat w*h array
+  type TileCopyBuf = { w: number; h: number; layers: [TileCell[], TileCell[], TileCell[], TileCell[]] };
 
   const [activeTool, setActiveTool]     = useState('TILE_BG');
   const [activeLayer, setActiveLayer]   = useState(0);
@@ -204,19 +206,27 @@ export default function DesignerPage() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-        const { tileSelection: sel, map: m, tileLayerType: lt, activeLayer: li } = clipCtxRef.current;
+        const { tileSelection: sel, map: m } = clipCtxRef.current;
         if (!sel || !m) return;
         e.preventDefault();
-        const { tx1, ty1, tx2, ty2, layerType, layerIdx } = sel;
+        const { tx1, ty1, tx2, ty2 } = sel;
         const w = tx2 - tx1 + 1; const h = ty2 - ty1 + 1;
-        const layerArr = layerType === 'fg' ? m.layers.fg : m.layers.bg;
-        const tiles: TileCopyBuf['tiles'] = [];
-        for (let dy = 0; dy < h; dy++)
-          for (let dx = 0; dx < w; dx++) {
-            const cell = layerArr[layerIdx][(ty1 + dy) * m.width + (tx1 + dx)];
-            tiles.push(cell ?? { tile_id: 0, flip: 0, lum: 0 });
-          }
-        setTileCopyBuffer({ w, h, layerType, layerIdx, tiles });
+        const extractLayer = (arr: Array<{ tile_id: number; flip: number; lum: number } | null>) => {
+          const out: TileCell[] = [];
+          for (let dy = 0; dy < h; dy++)
+            for (let dx = 0; dx < w; dx++)
+              out.push(arr[(ty1 + dy) * m.width + (tx1 + dx)] ?? { tile_id: 0, flip: 0, lum: 0 });
+          return out;
+        };
+        setTileCopyBuffer({
+          w, h,
+          layers: [
+            extractLayer(m.layers.bg[0]),
+            extractLayer(m.layers.bg[1]),
+            extractLayer(m.layers.fg[0]),
+            extractLayer(m.layers.fg[1]),
+          ],
+        });
         setPastePending(false);
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         if (!clipCtxRef.current.tileCopyBuffer) return;
@@ -310,10 +320,19 @@ export default function DesignerPage() {
 
   const handleTilePaste = useCallback((tx: number, ty: number) => {
     if (!tileCopyBuffer || !map) return;
-    const { w, h, layerType, layerIdx, tiles } = tileCopyBuffer;
-    const updates = tiles.map((t, i) => ({ x: tx + (i % w), y: ty + Math.floor(i / w), ...t }));
-    applyTileBatch(layerType, layerIdx, updates);
-  }, [tileCopyBuffer, map, applyTileBatch]);
+    const { w, h, layers } = tileCopyBuffer;
+    const layerDefs: Array<{ layerType: 'bg' | 'fg'; layerIdx: number }> = [
+      { layerType: 'bg', layerIdx: 0 },
+      { layerType: 'bg', layerIdx: 1 },
+      { layerType: 'fg', layerIdx: 0 },
+      { layerType: 'fg', layerIdx: 1 },
+    ];
+    const patches = layerDefs.map(({ layerType, layerIdx }, li) => ({
+      layerType, layerIdx,
+      updates: layers[li].map((t, i) => ({ x: tx + (i % w), y: ty + Math.floor(i / w), ...t })),
+    }));
+    applyAllLayersBatch(patches);
+  }, [tileCopyBuffer, map, applyAllLayersBatch]);
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
@@ -833,8 +852,6 @@ export default function DesignerPage() {
               tileCopyBuffer={tileCopyBuffer}
               pastePending={pastePending}
               onTilePaste={handleTilePaste}
-              copyLayerType={tileLayerType}
-              copyLayerIdx={activeLayer}
             />
             <Minimap
               map={map}
@@ -886,7 +903,7 @@ export default function DesignerPage() {
           )}
           {tileCopyBuffer && (
             <span className="text-xs font-mono text-[#c0c040]">
-              📋 {tileCopyBuffer.w}×{tileCopyBuffer.h} {tileCopyBuffer.layerType.toUpperCase()}
+              📋 {tileCopyBuffer.w}×{tileCopyBuffer.h} ALL LAYERS
               {pastePending ? ' — PASTE MODE (click to stamp · Esc to cancel)' : ' — Ctrl+V to paste'}
             </span>
           )}
