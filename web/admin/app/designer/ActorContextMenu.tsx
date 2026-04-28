@@ -127,8 +127,16 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
       </div>
 
       <div className="mb-1.5">
-        <div className={lbl}>Security ID</div>
-        <input type="number" value={fields.securityid} min={0} onChange={e => setFields(f => ({ ...f, securityid: e.target.value }))} className={inp} />
+        <div className={lbl}>Security ID — spawn condition</div>
+        <select value={fields.securityid} onChange={e => setFields(f => ({ ...f, securityid: e.target.value }))} className={inp + ' cursor-pointer'}>
+          <option value="0">0 — Always spawn</option>
+          <option value="1">1 — Low security only</option>
+          <option value="2">2 — Medium security only</option>
+          <option value="3">3 — Low or Medium</option>
+          <option value="4">4 — High security only</option>
+          <option value="5">5 — Low or High</option>
+          <option value="6">6 — Medium or High</option>
+        </select>
       </div>
 
       <div className="mb-3">

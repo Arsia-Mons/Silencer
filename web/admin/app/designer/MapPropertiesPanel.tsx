@@ -114,10 +114,17 @@ export default function MapPropertiesPanel({ header, onUpdate, onClose, spriteIm
           <input type="text" maxLength={127} value={fields.description}
             onChange={e => setFields(f => ({ ...f, description: e.target.value }))} className={inp} />
         </div>
-        <div className="w-28">
-          <div className={lbl}>Ambience (-128..127)</div>
-          <input type="number" min={-128} max={127} value={fields.ambience}
-            onChange={e => setFields(f => ({ ...f, ambience: e.target.value }))} className={inp} />
+        <div className="w-56">
+          <div className={lbl}>
+            Ambience — darkness&nbsp;
+            <span className="text-game-text">{fields.ambience}</span>
+            <span className="text-game-textDim text-[10px] ml-1">
+              ({Math.round(Math.max(0, Math.min(255, 128 + parseInt(fields.ambience||'0',10) * 4.5)))} brightness)
+            </span>
+          </div>
+          <input type="range" min={-128} max={127} value={fields.ambience}
+            onChange={e => setFields(f => ({ ...f, ambience: e.target.value }))}
+            className="w-full accent-game-primary" />
         </div>
         <div className="w-24">
           <div className={lbl}>Max Players</div>
