@@ -92,7 +92,7 @@ void Team::Tick(World & world){
 		for(int i = 0; i < numpeers; i++){
 			Player * player = world.GetPeerPlayer(peers[i]);
 			if(player){
-				player->AddCredits(1000);
+				player->AddCredits(GASLoader::Get().player.secretDeliveryCredits);
 			}
 		}
 		world.Illuminate();

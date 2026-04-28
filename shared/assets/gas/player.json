@@ -33,5 +33,9 @@
   "creditCap": 65535,
   "neutronWarnTick": 8,
   "superShieldMultiplier": 2,
-  "powerupRespawnTicks": 60
+  "powerupRespawnTicks": 60,
+  "fileConversionBase": 1,
+  "teamGiftCredits": 100,
+  "secretDeliveryCredits": 1000,
+  "weaponFireCooldownPad": 3
 }

@@ -76,6 +76,10 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.neutronWarnTick            = j.value("neutronWarnTick",            out.neutronWarnTick);
         out.superShieldMultiplier      = j.value("superShieldMultiplier",      out.superShieldMultiplier);
         out.powerupRespawnTicks        = j.value("powerupRespawnTicks",        out.powerupRespawnTicks);
+        out.fileConversionBase         = j.value("fileConversionBase",         out.fileConversionBase);
+        out.teamGiftCredits            = j.value("teamGiftCredits",            out.teamGiftCredits);
+        out.secretDeliveryCredits      = j.value("secretDeliveryCredits",      out.secretDeliveryCredits);
+        out.weaponFireCooldownPad      = j.value("weaponFireCooldownPad",      out.weaponFireCooldownPad);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
     }

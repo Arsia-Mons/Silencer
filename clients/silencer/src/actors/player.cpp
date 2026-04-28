@@ -2624,7 +2624,7 @@ void Player::Tick(World & world){
 								if(files > maxfiles){
 									files = maxfiles;
 								}
-								Uint16 creditamount = files * (1 + creditsbonus);
+								Uint16 creditamount = files * (GASLoader::Get().player.fileConversionBase + creditsbonus);
 								AddCredits(creditamount);
 								Peer * peer = GetPeer(world);
 								if(peer){
@@ -3374,7 +3374,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[0]){
 						Player * player = world.GetPeerPlayer(team->peers[0]);
 						if(player){
-							player->AddCredits(100);
+							player->AddCredits(GASLoader::Get().player.teamGiftCredits);
 							bought = true;
 						}
 					}
@@ -3386,7 +3386,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[1]){
 						Player * player = world.GetPeerPlayer(team->peers[1]);
 						if(player){
-							player->AddCredits(100);
+							player->AddCredits(GASLoader::Get().player.teamGiftCredits);
 							bought = true;
 						}
 					}
@@ -3398,7 +3398,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[2]){
 						Player * player = world.GetPeerPlayer(team->peers[2]);
 						if(player){
-							player->AddCredits(100);
+							player->AddCredits(GASLoader::Get().player.teamGiftCredits);
 							bought = true;
 						}
 					}
@@ -3410,7 +3410,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[3]){
 						Player * player = world.GetPeerPlayer(team->peers[3]);
 						if(player){
-							player->AddCredits(100);
+							player->AddCredits(GASLoader::Get().player.teamGiftCredits);
 							bought = true;
 						}
 					}
@@ -3577,7 +3577,7 @@ Projectile * Player::Fire(World & world, Uint8 direction){
 	Projectile * projectile = 0;
 	if(FireDelayPassed(world)){
 		Uint8 oldweaponfirecool = weaponfirecool;
-		weaponfirecool = weaponfiredelay[currentweapon] + 3;
+		weaponfirecool = weaponfiredelay[currentweapon] + GASLoader::Get().player.weaponFireCooldownPad;
 		// fire
 		Object * projectile = 0;
 		Uint8 oldlaserammo = laserammo;
