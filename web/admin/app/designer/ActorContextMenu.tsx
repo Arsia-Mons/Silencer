@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ACTOR_DEFS, ACTOR_TYPE_HINTS } from './Toolbar';
 import type { MapActor } from '../../lib/types';
 
+// Guards (0,2,3) and robot (6) use direction as a facing boolean only: 0=Right, 1=Left
+const FACING_ACTOR_IDS = new Set([0, 2, 3, 6]);
+const FACING_LABELS: Record<number, string> = { 0: 'Right', 1: 'Left' };
 const DIRECTION_LABELS: Record<number, string> = {
   0:'Right', 1:'Down-Right', 2:'Down', 3:'Down-Left',
   4:'Left', 5:'Up-Left', 6:'Up', 7:'Up-Right',
@@ -102,12 +105,20 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
       </div>
 
       <div className="mb-1.5">
-        <div className={lbl}>Direction</div>
-        <select value={fields.direction} onChange={e => setFields(f => ({ ...f, direction: e.target.value }))} className={inp + ' cursor-pointer'}>
-          {Object.entries(DIRECTION_LABELS).map(([v, l]) => (
-            <option key={v} value={v}>{v} — {l}</option>
-          ))}
-        </select>
+        <div className={lbl}>Direction / Facing</div>
+        {FACING_ACTOR_IDS.has(actor.id) ? (
+          <select value={fields.direction} onChange={e => setFields(f => ({ ...f, direction: e.target.value }))} className={inp + ' cursor-pointer'}>
+            {Object.entries(FACING_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>{v} — {l}</option>
+            ))}
+          </select>
+        ) : (
+          <select value={fields.direction} onChange={e => setFields(f => ({ ...f, direction: e.target.value }))} className={inp + ' cursor-pointer'}>
+            {Object.entries(DIRECTION_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>{v} — {l}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="mb-1.5">

@@ -79,23 +79,24 @@ export const ACTOR_DEFS: ActorDefEntry[] = [
 ];
 
 export const ACTOR_TYPE_HINTS: Record<number, ActorTypeHint> = {
-  0:  { label: 'Weapon',  options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma' } },
-  1:  { label: 'Variant', options: { 0:'Civilian A', 1:'Civilian B' } },
-  2:  { label: 'Weapon',  options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma' } },
-  3:  { label: 'Weapon',  options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma' } },
-  36: { label: 'Agency',  options: { 0:'Agency 0', 1:'Agency 1', 2:'Agency 2', 3:'Agency 3' } },
-  54: { label: 'Size',    options: { 0:'Small', 1:'Big' } },
-  63: { label: 'Powerup', options: {
+  0:  { label: 'Behavior', options: { 0:'Patrol', 1:'Guard (stationary)' } },
+  1:  { label: 'Variant',  options: { 0:'Civilian A', 1:'Civilian B' } },
+  2:  { label: 'Behavior', options: { 0:'Patrol', 1:'Guard (stationary)' } },
+  3:  { label: 'Behavior', options: { 0:'Patrol', 1:'Guard (stationary)', 2:"Magistrate's Laser", 3:"Magistrate's Rocket" } },
+  6:  { label: 'Behavior', options: { 0:'Patrol', 1:'Guard (stationary)' } },
+  36: { label: 'Agency',   options: { 0:'Agency 0', 1:'Agency 1', 2:'Agency 2', 3:'Agency 3' } },
+  54: { label: 'Size',     options: { 0:'Small', 1:'Big' } },
+  63: { label: 'Powerup',  options: {
     0:'Super Shield', 1:'Neutron Bomb', 2:'Jet Pack',
     3:'Invisible', 4:'Hacking Bonus', 5:'Radar', 6:'Depositor',
   } },
-  47: { label: 'Doodad',  options: {
+  47: { label: 'Doodad',   options: {
     0:'Small Candle', 1:'Large Candle', 2:'Small Canister', 3:'Large Canister',
     4:'Arrow Poster', 5:'Man in Tank', 6:'Doodad 6', 7:'Doodad 7', 8:'Doodad 8', 9:'Doodad 9',
   } },
-  50: { label: 'Size',    options: { 4:'Small', 5:'Small Alt', 6:'Large', 7:'Default' } },
-  65: { label: 'Side',    options: { 0:'Team A', 1:'Team B' } },
-  67: { label: 'Type',    options: { 0:'Base Defense', 1:'Guard Defense (Laser)' } },
+  50: { label: 'Size',     options: { 4:'Small', 5:'Small Alt', 6:'Large', 7:'Default' } },
+  65: { label: 'Side',     options: { 0:'Team A', 1:'Team B' } },
+  67: { label: 'Type',     options: { 0:'Base Defense', 1:'Guard Defense (Laser)' } },
 };
 
 interface ToolbarProps {
