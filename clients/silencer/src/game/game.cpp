@@ -249,6 +249,9 @@ bool Game::Load(char * cmdline){
 		printf("Could not load resources\n");
 		return false;
 	}
+	// GAS is loaded inside resources.Load() — rebuild buyable items now that
+	// GASLoader::Get().items is populated (World constructor ran too early).
+	world.LoadBuyableItems();
 	printf("Resources loaded\n");
 	lasttick = SDL_GetTicks();
 	if(controlPort > 0){

@@ -45,7 +45,7 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	message_i = 0;
 	showchat_i = 0;
 	gameplaystate = NONE;
-	LoadBuyableItems();
+	// LoadBuyableItems() is called from Game::Init() after GAS loads via resources.Load()
 	lastpingsent = 0;
 	pingtime = 0;
 	highlightsecrets = false;
