@@ -1,5 +1,6 @@
 'use client';
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useAuth } from '../../lib/auth';
 import { useSocket } from '../../lib/socket';
@@ -21,9 +22,30 @@ const TABS = [
 
 type FileKey = (typeof TABS)[number]['file'];
 
-export default function GasPage() {
+// Required top-level keys per file (what the game loader expects).
+const REQUIRED_KEYS: Partial<Record<FileKey, string[]>> = {
+  weapons:     ['weapons'],
+  enemies:     ['enemies'],
+  agencies:    ['agencies'],
+  items:       ['items'],
+};
+
+function getMissingKeys(file: FileKey, content: string): string[] {
+  const required = REQUIRED_KEYS[file];
+  if (!required) return [];
+  try {
+    const parsed = JSON.parse(content);
+    return required.filter(k => !(k in parsed));
+  } catch {
+    return [];
+  }
+}
+
+function GasPageInner() {
   useAuth();
   const wsConnected = useSocket({});
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   const folderInputRef    = useRef<HTMLInputElement>(null);
   const editorApiRef      = useRef<EditorAPI | null>(null);
@@ -31,12 +53,32 @@ export default function GasPage() {
   const [localFolder, setLocalFolder] = useState<string | null>(null);
   const [files,       setFiles]       = useState<Partial<Record<FileKey, string>>>({});
   const [savedFiles,  setSavedFiles]  = useState<Partial<Record<FileKey, string>>>({});
-  const [activeTab,   setActiveTab]   = useState<FileKey>('player');
   const [errors,      setErrors]      = useState<Partial<Record<FileKey, number>>>({});
   const [saveMsg,     setSaveMsg]     = useState('');
   const [saveErr,     setSaveErr]     = useState('');
   const [cursor,      setCursor]      = useState<CursorInfo>({ line: 1, col: 1, lines: 0, bytes: 0 });
   const [copyTick,    setCopyTick]    = useState(false);
+  const [showValidate, setShowValidate] = useState(false);
+
+  // URL-driven active tab — ?tab=weapons etc.
+  const tabParam = searchParams.get('tab') as FileKey | null;
+  const validTab = TABS.some(t => t.file === tabParam) ? tabParam! : 'player';
+  const [activeTab, setActiveTab] = useState<FileKey>(validTab);
+
+  // Keep local state in sync if URL param changes (e.g. back/forward).
+  useEffect(() => {
+    if (validTab !== activeTab) setActiveTab(validTab);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [validTab]);
+
+  function switchTab(file: FileKey) {
+    setActiveTab(file);
+    setSaveErr('');
+    setSaveMsg('');
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', file);
+    router.replace(`?${params.toString()}`, { scroll: false });
+  }
 
   // ── Folder picker ─────────────────────────────────────────────────────────
   async function handleFolderPicked(e: React.ChangeEvent<HTMLInputElement>) {
@@ -69,6 +111,7 @@ export default function GasPage() {
     setSaveErr('');
     setSaveMsg('');
     setErrors({});
+    setShowValidate(false);
   }
 
   function handleTextChange(value: string) {
@@ -80,8 +123,21 @@ export default function GasPage() {
   // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
     const content = files[activeTab] ?? '';
+    // 1. JSON parse check
     try { JSON.parse(content); } catch {
       setSaveErr('Invalid JSON — fix syntax before saving.');
+      return;
+    }
+    // 2. Monaco schema error check (catches missing required keys, wrong types, etc.)
+    const monacoErrors = errors[activeTab] ?? 0;
+    if (monacoErrors > 0) {
+      setSaveErr(`Fix ${monacoErrors} schema error${monacoErrors !== 1 ? 's' : ''} before saving.`);
+      return;
+    }
+    // 3. Required-key check (belt-and-suspenders; Monaco should already catch these)
+    const missing = getMissingKeys(activeTab, content);
+    if (missing.length > 0) {
+      setSaveErr(`Missing required key${missing.length !== 1 ? 's' : ''}: ${missing.map(k => `"${k}"`).join(', ')}`);
       return;
     }
     const filename = activeTab;
@@ -110,7 +166,7 @@ export default function GasPage() {
     setSaveErr('');
     setSaveMsg(`✓ Saved ${filename}.json`);
     setTimeout(() => setSaveMsg(''), 2500);
-  }, [files, activeTab]);
+  }, [files, activeTab, errors]);
 
   // ── Format ────────────────────────────────────────────────────────────────
   function handleFormat() {
@@ -163,6 +219,16 @@ export default function GasPage() {
   const sizeKB        = (cursor.bytes / 1024).toFixed(1);
   const totalErrors   = Object.values(errors).reduce((s, n) => s + (n ?? 0), 0);
 
+  // Per-tab validation summary (for the validate panel)
+  const validateSummary = TABS.map(({ label, file, icon }) => {
+    const content = files[file] ?? '';
+    const monacoErr = errors[file] ?? 0;
+    const missing = getMissingKeys(file, content);
+    const absent = !(file in files);
+    return { file, label, icon, monacoErr, missing, absent };
+  });
+  const allValid = !localFolder || validateSummary.every(r => r.absent || (r.monacoErr === 0 && r.missing.length === 0));
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex h-screen overflow-hidden bg-game-bg text-game-text">
@@ -192,8 +258,62 @@ export default function GasPage() {
             )}
           </div>
 
-          {/* ── Service status pills ── */}
           <div className="flex items-center gap-2">
+            {/* Validate All button */}
+            {localFolder && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowValidate(v => !v)}
+                  className={`px-3 py-1.5 text-xs font-mono border rounded transition-colors ${
+                    showValidate
+                      ? 'border-game-primary text-game-primary'
+                      : allValid
+                      ? 'border-game-border text-game-textDim hover:border-game-primary hover:text-game-text'
+                      : 'border-game-danger text-game-danger hover:border-game-danger/60'
+                  }`}
+                >
+                  {allValid ? '✓ VALIDATE ALL' : '⊗ VALIDATE ALL'}
+                </button>
+                {showValidate && (
+                  <div className="absolute right-0 top-9 z-50 bg-game-bgCard border border-game-border rounded shadow-lg w-80 p-3">
+                    <div className="text-xs font-mono text-game-primary mb-2">Required Key Check</div>
+                    <div className="flex flex-col gap-1">
+                      {validateSummary.map(({ file, label, icon, monacoErr, missing, absent }) => {
+                        const ok = !absent && monacoErr === 0 && missing.length === 0;
+                        const issues = absent
+                          ? ['file not loaded']
+                          : [...missing.map(k => `missing "${k}"`), ...(monacoErr > 0 ? [`${monacoErr} schema error${monacoErr !== 1 ? 's' : ''}`] : [])];
+                        return (
+                          <button
+                            key={file}
+                            onClick={() => { switchTab(file as FileKey); setShowValidate(false); }}
+                            className="flex items-start gap-2 text-left px-2 py-1.5 rounded hover:bg-game-bg transition-colors"
+                          >
+                            <span className="text-sm shrink-0">{icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className={`text-xs font-mono ${ok ? 'text-game-primary' : absent ? 'text-game-textDim' : 'text-game-danger'}`}>
+                                {ok ? '✓' : absent ? '–' : '⊗'} {label}
+                              </span>
+                              {issues.length > 0 && (
+                                <div className="text-[10px] text-game-danger mt-0.5">{issues.join(' · ')}</div>
+                              )}
+                            </div>
+                            <span className="text-[10px] text-game-textDim font-mono shrink-0">↗</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      onClick={() => setShowValidate(false)}
+                      className="mt-2 w-full text-xs font-mono text-game-textDim hover:text-game-text border border-game-border rounded px-2 py-1 transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {localFolder ? (
               <>
                 <span className="text-xs text-game-warning tracking-wider border border-game-warning/30 px-2 py-1 font-mono">
@@ -231,6 +351,20 @@ export default function GasPage() {
                 <p>✦ JSON schema validation with hover docs</p>
                 <p>✦ Format with Ctrl+Shift+F · Save with Ctrl+S</p>
                 <p>✦ Per-file error badges · dirty state tracking</p>
+                <p>✦ Validate All checks required keys before save</p>
+                <p>✦ Each tab has a direct URL link (?tab=weapons)</p>
+              </div>
+              {/* Quick tab links even before folder is open */}
+              <div className="flex flex-wrap gap-1 justify-center">
+                {TABS.map(({ label, file, icon }) => (
+                  <a
+                    key={file}
+                    href={`?tab=${file}`}
+                    className="px-2 py-1 text-[10px] font-mono border border-game-border text-game-textDim hover:border-game-primary hover:text-game-text rounded transition-colors"
+                  >
+                    {icon} {label}
+                  </a>
+                ))}
               </div>
               <button
                 onClick={() => folderInputRef.current?.click()}
@@ -249,28 +383,32 @@ export default function GasPage() {
             <div className="flex items-center border-b border-game-border bg-game-bgCard shrink-0 px-2 pt-1">
               {TABS.map(({ label, file, icon }) => {
                 const tabErrors  = errors[file as FileKey] ?? 0;
+                const tabMissing = getMissingKeys(file as FileKey, files[file as FileKey] ?? '');
                 const tabDirty   = files[file as FileKey] !== savedFiles[file as FileKey];
                 const missing    = !(file as FileKey in files);
                 const isActive   = activeTab === file;
+                const hasIssue   = tabErrors > 0 || tabMissing.length > 0;
                 return (
-                  <button
+                  <a
                     key={file}
-                    onClick={() => { setActiveTab(file as FileKey); setSaveErr(''); setSaveMsg(''); }}
+                    href={`?tab=${file}`}
+                    onClick={e => { e.preventDefault(); switchTab(file as FileKey); }}
                     className={`relative flex items-center gap-1.5 px-4 py-2 text-xs tracking-wider font-mono border-b-2 -mb-px transition-colors ${
                       isActive
                         ? 'border-game-primary text-game-primary bg-game-bg'
                         : 'border-transparent text-game-textDim hover:text-game-text'
                     } ${missing ? 'opacity-40' : ''}`}
+                    title={`/gas?tab=${file}`}
                   >
                     <span className="text-sm leading-none">{icon}</span>
                     {label}
-                    {tabErrors > 0 && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-game-danger shrink-0" title={`${tabErrors} error(s)`} />
+                    {hasIssue && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-game-danger shrink-0" title={`${tabErrors > 0 ? `${tabErrors} error(s)` : ''}${tabMissing.length > 0 ? ` missing: ${tabMissing.join(', ')}` : ''}`} />
                     )}
-                    {tabDirty && tabErrors === 0 && (
+                    {tabDirty && !hasIssue && (
                       <span className="w-1.5 h-1.5 rounded-full bg-game-warning shrink-0" title="Unsaved changes" />
                     )}
-                  </button>
+                  </a>
                 );
               })}
 
@@ -360,5 +498,13 @@ export default function GasPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function GasPage() {
+  return (
+    <Suspense>
+      <GasPageInner />
+    </Suspense>
   );
 }
