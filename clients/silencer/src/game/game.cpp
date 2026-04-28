@@ -4702,7 +4702,11 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 										overlay->text = "LOSSES: " + std::to_string(user->agency[selectedagency].losses);
 									}break;
 									case 5:{
-										overlay->text = "XP TO NEXT LEVEL: " + std::to_string(user->agency[selectedagency].xptonextlevel);
+										// xptonextlevel is accumulated XP toward current level;
+										// threshold is 100*(level+1). Display the remaining amount.
+										int lvl = user->agency[selectedagency].level;
+										int remaining = 100 * (lvl + 1) - (int)user->agency[selectedagency].xptonextlevel;
+										overlay->text = "XP TO NEXT LEVEL: " + std::to_string(remaining);
 										agencychanged = false;
 									}break;
 								}
