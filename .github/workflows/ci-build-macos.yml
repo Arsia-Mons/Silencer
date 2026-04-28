@@ -3,8 +3,36 @@ name: CI Build (macOS)
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+    paths-ignore:
+      - 'services/**'
+      - 'web/**'
+      - 'infra/**'
+      - 'docs/**'
+      - 'designer/**'
+      - 'shared/design/**'
+      - 'shared/skills/**'
+      - '*.md'
+      - '.gitignore'
+      - '.github/workflows/ci-build-admin-*.yml'
+      - '.github/workflows/ci-build-lobby-docker.yml'
+      - '.github/workflows/deploy*.yml'
+      - '.github/workflows/release.yml'
   push:
     branches: [main]
+    paths-ignore:
+      - 'services/**'
+      - 'web/**'
+      - 'infra/**'
+      - 'docs/**'
+      - 'designer/**'
+      - 'shared/design/**'
+      - 'shared/skills/**'
+      - '*.md'
+      - '.gitignore'
+      - '.github/workflows/ci-build-admin-*.yml'
+      - '.github/workflows/ci-build-lobby-docker.yml'
+      - '.github/workflows/deploy*.yml'
+      - '.github/workflows/release.yml'
 
 concurrency:
   group: ci-build-macos-${{ github.event.pull_request.number || github.ref }}
