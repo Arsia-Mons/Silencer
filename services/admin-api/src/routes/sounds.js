@@ -82,6 +82,132 @@ const AMBIENT_ROLES = {
   'wndloop1.wav': 'BG_OUTSIDE',
 };
 
+// Sounds called with loop=true anywhere in the game source
+const LOOP_SOUNDS = new Set([
+  'wndloopb.wav','cphum11.wav','wndloop1.wav', // BG channels
+  'ambloop4.wav',  // terminal hum
+  'ambloop5.wav',  // player hacking
+  'wndloopc.wav',  // base exit portal
+  'wndloope.wav',  // robot fly
+  'flamebg2.wav',  // player flamethrower
+  'jetpak1.wav',   // player jetpack
+  'rocket4.wav',   // rocket engine
+  'rocket9.wav',   // seeking rocket
+]);
+
+// Sound category assignments derived from C++ call sites
+const SOUND_CATEGORIES = {
+  // Player movement & actions
+  'breath2.wav':'player','fall2b.wav':'player','ladder1.wav':'player',
+  'ladder2.wav':'player','land1.wav':'player','land11.wav':'player',
+  'roll2.wav':'player','jetpak1.wav':'player','jetpak2a.wav':'player',
+  'reload2.wav':'player','disguise.wav':'player','jackin.wav':'player',
+  'jackout.wav':'player','repair.wav':'player','ambloop5.wav':'player',
+  'transrev.wav':'player','portpas2.wav':'player','juunewne.wav':'player',
+  'charged.wav':'player','flamebg2.wav':'player','power11.wav':'player',
+  's_hita01.wav':'player','s_hitb01.wav':'player','grunt2a.wav':'player',
+  // Guards, NPCs, robots
+  'stostep1.wav':'npc','stostepr.wav':'npc','futstonl.wav':'npc',
+  'futstonr.wav':'npc','groan2.wav':'npc','groan2a.wav':'npc',
+  'theres3.wav':'npc','stop4.wav':'npc','freeze3.wav':'npc',
+  'freezrt1.wav':'npc','drop4.wav':'npc','alinvest.wav':'npc',
+  'alwarn.wav':'npc','alarm3a.wav':'npc','intrude.wav':'npc',
+  'robot3l.wav':'npc','robot3r.wav':'npc','robotarm.wav':'npc',
+  'airlokj.wav':'npc','wndloope.wav':'npc',
+  // Weapons & projectiles & impacts
+  '!laserel.wav':'weapon','!laserew.wav':'weapon','!laserme.wav':'weapon',
+  'rocket1.wav':'weapon','rocket4.wav':'weapon','rocket9.wav':'weapon',
+  'grenthro.wav':'weapon','grndown.wav':'weapon','grenade1.wav':'weapon',
+  'seekexp1.wav':'weapon','q_expl02.wav':'weapon','rico1.wav':'weapon',
+  'rico2.wav':'weapon','ammo01.wav':'weapon','ammo02.wav':'weapon',
+  'ammo03.wav':'weapon','ammo05.wav':'weapon','s_flmc01.wav':'weapon',
+  'strike01.wav':'weapon','strike02.wav':'weapon','strike03.wav':'weapon',
+  'strike04.wav':'weapon','shield2.wav':'weapon','shlddn1.wav':'weapon',
+  'vModDeto.wav':'weapon',
+  // World objects & environment
+  'portal1.wav':'world','airvent2.wav':'world','cathdoor.wav':'world',
+  'wndloopc.wav':'world','pwrcon1.wav':'world','if15.wav':'world',
+  'ambloop4.wav':'world',
+  // UI
+  'whoom.wav':'ui','select2.wav':'ui','cliksel2.wav':'ui',
+  'typerev6.wav':'ui','type1.wav':'ui','type2.wav':'ui',
+  'type3.wav':'ui','type4.wav':'ui','type5.wav':'ui',
+  // Ambient background
+  'wndloopb.wav':'ambient','cphum11.wav':'ambient','wndloop1.wav':'ambient',
+};
+
+// Per-sound C++ call sites with volumes (0-128 scale).
+// Derived from grepping EmitSound / Audio::Play calls in game source.
+const CPP_VOLUME_MAP = {
+  '!laserel.wav': [{ctx:'laser projectile hit',vol:128},{ctx:'wall projectile hit',vol:64}],
+  '!laserew.wav': [{ctx:'wall defense fire',vol:64},{ctx:'fixed cannon fire',vol:64},{ctx:'robot fire',vol:64}],
+  '!laserme.wav': [{ctx:'blaster projectile',vol:128}],
+  'q_expl02.wav': [{ctx:'tech station explode',vol:96},{ctx:'wall defense explode',vol:96},{ctx:'fixed cannon explode',vol:96},{ctx:'detonator small explode',vol:64},{ctx:'grenade explode',vol:96}],
+  'ambloop4.wav': [{ctx:'terminal hum (small)',vol:32},{ctx:'terminal hum (big)',vol:45}],
+  'ambloop5.wav': [{ctx:'player hacking loop',vol:40}],
+  'wndloopc.wav': [{ctx:'base exit portal loop',vol:16}],
+  'wndloope.wav': [{ctx:'robot flight loop',vol:32}],
+  'flamebg2.wav': [{ctx:'player flamethrower loop',vol:128}],
+  'jetpak1.wav':  [{ctx:'player jetpack loop',vol:64}],
+  'rocket4.wav':  [{ctx:'rocket engine loop',vol:128}],
+  'rocket9.wav':  [{ctx:'seeking rocket loop',vol:128}],
+  'pwrcon1.wav':  [{ctx:'credit machine activate',vol:96}],
+  'if15.wav':     [{ctx:'heal machine use',vol:96},{ctx:'team respawn',vol:48}],
+  'whoom.wav':    [{ctx:'UI button click',vol:128}],
+  'airvent2.wav': [{ctx:'vent open',vol:96}],
+  'portal1.wav':  [{ctx:'base door open',vol:64}],
+  'shield2.wav':  [{ctx:'fixed cannon shield',vol:96},{ctx:'detonator arm',vol:96}],
+  'seekexp1.wav': [{ctx:'detonator detonate',vol:128},{ctx:'robot explode',vol:128},{ctx:'seeker grenade explode',vol:128}],
+  'strike01.wav': [{ctx:'wall hit (stone)',vol:96}],
+  'strike02.wav': [{ctx:'wall hit (metal)',vol:96}],
+  'strike03.wav': [{ctx:'wall hit (heavy)',vol:96}],
+  'strike04.wav': [{ctx:'wall hit (spark)',vol:96}],
+  's_flmc01.wav': [{ctx:'flamethrower hit',vol:128}],
+  'shlddn1.wav':  [{ctx:'shield destroyed',vol:128}],
+  'select2.wav':  [{ctx:'team select',vol:32}],
+  'grndown.wav':  [{ctx:'grenade bounce',vol:64}],
+  'grunt2a.wav':  [{ctx:'player hit',vol:128},{ctx:'guard pain',vol:128},{ctx:'civilian pain',vol:128}],
+  'groan2.wav':   [{ctx:'guard/civilian pain A',vol:128}],
+  'groan2a.wav':  [{ctx:'guard/civilian pain B',vol:128}],
+  'disguise.wav': [{ctx:'player disguise',vol:64}],
+  'jackout.wav':  [{ctx:'player jack out',vol:20}],
+  'jackin.wav':   [{ctx:'player jack in',vol:30}],
+  'jetpak2a.wav': [{ctx:'jetpack burst thrust',vol:64}],
+  'cliksel2.wav': [{ctx:'UI click',vol:96}],
+  'charged.wav':  [{ctx:'weapon fully charged',vol:96}],
+  'ammo01.wav':   [{ctx:'ammo pickup',vol:128}],
+  'ammo02.wav':   [{ctx:'ammo pickup',vol:128}],
+  'ammo03.wav':   [{ctx:'ammo pickup',vol:128}],
+  'ammo05.wav':   [{ctx:'ammo pickup',vol:128}],
+  'transrev.wav': [{ctx:'player teleport',vol:96},{ctx:'player warp ability',vol:64},{ctx:'player warp in',vol:96}],
+  'breath2.wav':  [{ctx:'player breathing',vol:16}],
+  'futstonl.wav': [{ctx:'civilian step L',vol:24},{ctx:'player step L',vol:24}],
+  'futstonr.wav': [{ctx:'player step R / land',vol:32},{ctx:'civilian step R',vol:24}],
+  'stostep1.wav': [{ctx:'guard/NPC step',vol:16}],
+  'stostepr.wav': [{ctx:'guard/NPC step R',vol:16}],
+  'portpas2.wav': [{ctx:'portal passenger teleport',vol:32}],
+  'roll2.wav':    [{ctx:'player roll',vol:32}],
+  'juunewne.wav': [{ctx:'player jump',vol:96}],
+  'repair.wav':   [{ctx:'player repair object',vol:128}],
+  's_hita01.wav': [{ctx:'player receive hit A',vol:128}],
+  's_hitb01.wav': [{ctx:'player receive hit B',vol:128}],
+  'reload2.wav':  [{ctx:'weapon reload',vol:96}],
+  'land1.wav':    [{ctx:'player land',vol:96},{ctx:'impact land',vol:'dyn'}],
+  'land11.wav':   [{ctx:'civilian land',vol:96}],
+  'fall2b.wav':   [{ctx:'player fall',vol:96}],
+  'ladder1.wav':  [{ctx:'ladder step up',vol:24}],
+  'ladder2.wav':  [{ctx:'ladder step down',vol:24}],
+  'power11.wav':  [{ctx:'inventory power activate',vol:64},{ctx:'power use',vol:96}],
+  'airlokj.wav':  [{ctx:'robot airlok gate',vol:64}],
+  'robotarm.wav': [{ctx:'robot arm extend',vol:128}],
+  'robot3l.wav':  [{ctx:'robot step L',vol:48}],
+  'robot3r.wav':  [{ctx:'robot step R',vol:48}],
+  'rocket1.wav':  [{ctx:'rocket launch',vol:128}],
+  'grenthro.wav': [{ctx:'grenade throw',vol:64}],
+  'rico1.wav':    [{ctx:'bullet ricochet A',vol:32}],
+  'rico2.wav':    [{ctx:'bullet ricochet B',vol:32}],
+};
+
 mkdirSync(STAGING_DIR, { recursive: true });
 
 // ── Binary helpers ────────────────────────────────────────────────────────────
@@ -360,6 +486,9 @@ router.get('/refs', requireAuth, (req, res) => {
       cpp: CPP_REFS.has(name),
       actordefs: actorRefs.get(name) || [],
       role: AMBIENT_ROLES[name] || null,
+      loop: LOOP_SOUNDS.has(name),
+      category: SOUND_CATEGORIES[name] || null,
+      volumeCalls: CPP_VOLUME_MAP[name] || [],
     };
   }
 
@@ -371,6 +500,9 @@ router.get('/refs', requireAuth, (req, res) => {
         cpp: CPP_REFS.has(name),
         actordefs: actorRefs.get(name) || [],
         role: AMBIENT_ROLES[name] || null,
+        loop: LOOP_SOUNDS.has(name),
+        category: SOUND_CATEGORIES[name] || null,
+        volumeCalls: CPP_VOLUME_MAP[name] || [],
       };
     }
   }
@@ -505,6 +637,41 @@ router.post('/repack', requireAuth, requireRole('admin'), async (req, res) => {
   if (existsSync(RENAMES_FILE)) unlinkSync(RENAMES_FILE);
 
   res.json({ ok: true, numsounds, soundssize, totalSize });
+});
+
+const MUSIC_EXTS = new Set(['.mp3', '.ogg', '.flac', '.wav']);
+
+// GET /sounds/music — list music files in ASSETS_DIR root
+router.get('/music', requireAuth, (req, res) => {
+  try {
+    const files = readdirSync(ASSETS_DIR)
+      .filter(f => {
+        const ext = f.slice(f.lastIndexOf('.')).toLowerCase();
+        return MUSIC_EXTS.has(ext) && f !== 'sound.bin';
+      })
+      .map(f => {
+        const p = join(ASSETS_DIR, f);
+        const size = existsSync(p) ? readFileSync(p).length : 0;
+        return { name: f, size };
+      });
+    res.json(files);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /sounds/music/:name — stream a music file
+router.get('/music/:name', requireAuth, (req, res) => {
+  const name = req.params.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const ext = name.slice(name.lastIndexOf('.')).toLowerCase();
+  if (!MUSIC_EXTS.has(ext)) return res.status(400).json({ error: 'Unsupported format' });
+  const p = join(ASSETS_DIR, name);
+  if (!existsSync(p)) return res.status(404).json({ error: 'Not found' });
+  const buf = readFileSync(p);
+  const mime = ext === '.mp3' ? 'audio/mpeg' : ext === '.ogg' ? 'audio/ogg' : ext === '.flac' ? 'audio/flac' : 'audio/wav';
+  res.setHeader('Content-Type', mime);
+  res.setHeader('Content-Length', buf.length);
+  res.send(buf);
 });
 
 export default router;
