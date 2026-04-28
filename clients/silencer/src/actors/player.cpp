@@ -8,6 +8,7 @@
 #include "vent.h"
 #include "basedoor.h"
 #include "projectile.h"
+#include "gasloader.h"
 #include "blasterprojectile.h"
 #include "laserprojectile.h"
 #include "rocketprojectile.h"
@@ -64,20 +65,20 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	y = 0;
 	currentplatformid = 0;
 	height = 50;
-	maxhealth = 100;
+	maxhealth = GASLoader::Get().player.baseHealth;
 	health = maxhealth;
-	maxshield = 100;
+	maxshield = GASLoader::Get().player.baseShield;
 	shield = maxshield;
 	laserammo = 0;
 	rocketammo = 0;
 	flamerammo = 0;
 	fuellow = false;
-	maxfuel = 80;
+	maxfuel = GASLoader::Get().player.baseFuel;
 	fuel = maxfuel;
 	currentweapon = 0;
 	oldweapon = 0;
 	files = 0;
-	maxfiles = 2800;
+	maxfiles = GASLoader::Get().player.maxFiles;
 	credits = 0;
 	effecthacking = false;
 	suitcolor = (7 << 4) + 13;
@@ -3482,14 +3483,14 @@ void Player::LoadAbilities(World & world){
 		Team * team = GetTeam(world);
 		User * user = world.lobby.GetUserInfo(peer->accountid);
 		if(team && user && !user->retrieving){
-			maxfuel += user->agency[team->agency].jetpack * 10;
+			maxfuel += user->agency[team->agency].jetpack * GASLoader::Get().player.upgradeMultiplierJetpack;
 			fuel = maxfuel;
-			maxshield += user->agency[team->agency].shield * 20;
+			maxshield += user->agency[team->agency].shield * GASLoader::Get().player.upgradeMultiplierShield;
 			shield = maxshield;
-			maxhealth += user->agency[team->agency].endurance * 20;
+			maxhealth += user->agency[team->agency].endurance * GASLoader::Get().player.upgradeMultiplierEndurance;
 			health = maxhealth;
-			hackingbonus = user->agency[team->agency].hacking * 0.10;
-			creditsbonus = user->agency[team->agency].contacts * 0.10;
+			hackingbonus = user->agency[team->agency].hacking * GASLoader::Get().player.upgradeMultiplierHacking;
+			creditsbonus = user->agency[team->agency].contacts * GASLoader::Get().player.upgradeMultiplierContacts;
 			if(team->agency == Team::NOXIS){
 				jumpimpulse = -3;
 			}

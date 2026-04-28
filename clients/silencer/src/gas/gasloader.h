@@ -39,9 +39,11 @@ struct PlayerDef {
     int baseShield                  = 100;
     int baseFuel                    = 80;
     int maxFiles                    = 2800;
-    int upgradeMultiplierEndurance  = 20;  // HP per endurance point
-    int upgradeMultiplierShield     = 20;  // shield per shield point
-    int upgradeMultiplierJetpack    = 10;  // fuel per jetpack point
+    int upgradeMultiplierEndurance  = 20;   // HP per endurance point
+    int upgradeMultiplierShield     = 20;   // shield per shield point
+    int upgradeMultiplierJetpack    = 10;   // fuel per jetpack point
+    double upgradeMultiplierHacking  = 0.10; // hacking speed bonus per point
+    double upgradeMultiplierContacts = 0.10; // credits bonus per point
 };
 
 // ---- Weapon ----------------------------------------------------------------

@@ -49,6 +49,8 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.upgradeMultiplierEndurance = j.value("upgradeMultiplierEndurance", out.upgradeMultiplierEndurance);
         out.upgradeMultiplierShield    = j.value("upgradeMultiplierShield",    out.upgradeMultiplierShield);
         out.upgradeMultiplierJetpack   = j.value("upgradeMultiplierJetpack",   out.upgradeMultiplierJetpack);
+        out.upgradeMultiplierHacking   = j.value("upgradeMultiplierHacking",   out.upgradeMultiplierHacking);
+        out.upgradeMultiplierContacts  = j.value("upgradeMultiplierContacts",  out.upgradeMultiplierContacts);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
     }
