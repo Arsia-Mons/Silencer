@@ -60,27 +60,26 @@ export default function SoundStudioPage() {
       setPlaying(null);
       return;
     }
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : '';
-    // We use a Blob URL so we can pass auth header
+    const token = typeof window !== 'undefined' ? localStorage.getItem('zs_token') : '';
+    // Use raw fetch + Blob URL to stream binary audio with auth header
     fetch(`/api/sounds/${encodeURIComponent(name)}/play`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(r => r.blob())
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ error: r.statusText })) as { error?: string };
+          throw new Error(err.error || r.statusText);
+        }
+        return r.blob();
+      })
       .then(blob => {
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         audioRef.current = audio;
-        audio.play();
         setPlaying(name);
-        audio.onended = () => {
-          setPlaying(null);
-          URL.revokeObjectURL(url);
-        };
-        audio.onerror = () => {
-          setPlaying(null);
-          URL.revokeObjectURL(url);
-          setError(`Could not play ${name}`);
-        };
+        audio.onended = () => { setPlaying(null); URL.revokeObjectURL(url); };
+        audio.onerror = () => { setPlaying(null); URL.revokeObjectURL(url); setError(`Could not play ${name}`); };
+        audio.play().catch(e => { setPlaying(null); setError(e.message); });
       })
       .catch(e => { setError(e.message); setPlaying(null); });
   }
