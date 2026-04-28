@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ACTOR_DEFS, ACTOR_TYPE_HINTS } from './Toolbar';
 import type { MapActor } from '../../lib/types';
 
+// Guards (0,2,3) use direction as a facing boolean only: 0=Right, 1=Left
+const FACING_ACTOR_IDS = new Set([0, 2, 3]);
+const FACING_LABELS: Record<number, string> = { 0: 'Right', 1: 'Left' };
 const DIRECTION_LABELS: Record<number, string> = {
   0:'Right', 1:'Down-Right', 2:'Down', 3:'Down-Left',
   4:'Left', 5:'Up-Left', 6:'Up', 7:'Up-Right',
@@ -13,7 +16,6 @@ interface FieldState {
   direction: string;
   matchid: string;
   securityid: string;
-  subplane: string;
 }
 
 interface Props {
@@ -36,7 +38,6 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
     direction:  String(actor.direction ?? 0),
     matchid:    String(actor.matchid ?? 0),
     securityid: String(actor.securityid ?? 0),
-    subplane:   String(actor.subplane ?? 0),
   });
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -61,7 +62,6 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
       direction:  parseInt(fields.direction,  10) || 0,
       matchid:    parseInt(fields.matchid,    10) || 0,
       securityid: parseInt(fields.securityid, 10) || 0,
-      subplane:   parseInt(fields.subplane,   10) || 0,
     });
     onClose();
   };
@@ -102,12 +102,20 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
       </div>
 
       <div className="mb-1.5">
-        <div className={lbl}>Direction</div>
-        <select value={fields.direction} onChange={e => setFields(f => ({ ...f, direction: e.target.value }))} className={inp + ' cursor-pointer'}>
-          {Object.entries(DIRECTION_LABELS).map(([v, l]) => (
-            <option key={v} value={v}>{v} — {l}</option>
-          ))}
-        </select>
+        <div className={lbl}>Direction / Facing</div>
+        {FACING_ACTOR_IDS.has(actor.id) ? (
+          <select value={fields.direction} onChange={e => setFields(f => ({ ...f, direction: e.target.value }))} className={inp + ' cursor-pointer'}>
+            {Object.entries(FACING_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>{v} — {l}</option>
+            ))}
+          </select>
+        ) : (
+          <select value={fields.direction} onChange={e => setFields(f => ({ ...f, direction: e.target.value }))} className={inp + ' cursor-pointer'}>
+            {Object.entries(DIRECTION_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>{v} — {l}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div className="mb-1.5">
@@ -116,13 +124,16 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
       </div>
 
       <div className="mb-1.5">
-        <div className={lbl}>Security ID</div>
-        <input type="number" value={fields.securityid} min={0} onChange={e => setFields(f => ({ ...f, securityid: e.target.value }))} className={inp} />
-      </div>
-
-      <div className="mb-3">
-        <div className={lbl}>Subplane</div>
-        <input type="number" value={fields.subplane} min={0} onChange={e => setFields(f => ({ ...f, subplane: e.target.value }))} className={inp} />
+        <div className={lbl}>Security ID — spawn condition</div>
+        <select value={fields.securityid} onChange={e => setFields(f => ({ ...f, securityid: e.target.value }))} className={inp + ' cursor-pointer'}>
+          <option value="0">0 — Always spawn</option>
+          <option value="1">1 — Low security only</option>
+          <option value="2">2 — Medium security only</option>
+          <option value="3">3 — Low or Medium</option>
+          <option value="4">4 — High security only</option>
+          <option value="5">5 — Low or High</option>
+          <option value="6">6 — Medium or High</option>
+        </select>
       </div>
 
       <div className="flex gap-2">

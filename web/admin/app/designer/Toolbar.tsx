@@ -31,6 +31,8 @@ export const TOOLS: ToolDef[] = [
   { id: 'TILE_BG',        label: 'TILE (BG)',  icon: '▦' },
   { id: 'TILE_FG',        label: 'TILE (FG)',  icon: '▧' },
   { id: 'ERASE_TILE',     label: 'ERASE',      icon: '⌫' },
+  { id: 'TILE_SELECT',    label: 'COPY SEL',   icon: '⬚' },
+  { id: 'FLOOD_FILL',    label: 'FILL',        icon: '🪣' },
   { id: 'RECT',           label: 'RECT',       icon: '▭' },
   { id: 'STAIRSUP',       label: 'STAIRS↑',   icon: '↗' },
   { id: 'STAIRSDOWN',     label: 'STAIRS↓',   icon: '↘' },
@@ -66,7 +68,6 @@ export const ACTOR_DEFS: ActorDefEntry[] = [
   { id: 56, label: 'Inv. Station',    icon: 'IS', color: '#00a328', bank: 89,   frame: 0 },
   { id: 57, label: 'Heal Machine',    icon: 'HM', color: '#22d3ee', bank: 172,  frame: 0 },
   { id: 58, label: 'Secret Return',   icon: 'SR', color: '#a855f7', bank: 152,  frame: 0 },
-  { id: 60, label: 'Camera Focus',    icon: 'CF', color: '#22d3ee', bank: null, frame: 0 },
   { id: 61, label: 'Warper',          icon: 'WP', color: '#a855f7', bank: 85,   frame: 0 },
   { id: 63, label: 'Powerup',         icon: 'PU', color: '#f59e0b', bank: null, frame: 0 },
   { id: 64, label: 'Vent',            icon: 'VT', color: '#6b7280', bank: 179,  frame: 0 },
@@ -79,23 +80,24 @@ export const ACTOR_DEFS: ActorDefEntry[] = [
 ];
 
 export const ACTOR_TYPE_HINTS: Record<number, ActorTypeHint> = {
-  0:  { label: 'Weapon',  options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma' } },
-  1:  { label: 'Variant', options: { 0:'Civilian A', 1:'Civilian B' } },
-  2:  { label: 'Weapon',  options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma' } },
-  3:  { label: 'Weapon',  options: { 0:'Blaster', 1:'Laser', 2:'Rocket', 3:'Flamer', 4:'Plasma' } },
-  36: { label: 'Agency',  options: { 0:'Agency 0', 1:'Agency 1', 2:'Agency 2', 3:'Agency 3' } },
-  54: { label: 'Size',    options: { 0:'Small', 1:'Big' } },
-  63: { label: 'Powerup', options: {
+  0:  { label: 'Behavior', options: { 0:'Patrol', 1:'Guard (stationary)' } },
+  1:  { label: 'Variant',  options: { 0:'Civilian A', 1:'Civilian B' } },
+  2:  { label: 'Behavior', options: { 0:'Patrol', 1:'Guard (stationary)' } },
+  3:  { label: 'Behavior', options: { 0:'Patrol', 1:'Guard (stationary)', 2:"Magistrate's Laser", 3:"Magistrate's Rocket" } },
+  6:  { label: 'Behavior', options: { 0:'Patrol', 1:'Guard (stationary)' } },
+  54: { label: 'Size',     options: { 0:'Small', 1:'Big' } },
+  66: { label: 'Variant',  options: { 0:'Type A', 1:'Type B', 2:'Type C (surveillance-linked)' } },
+  63: { label: 'Powerup',  options: {
     0:'Super Shield', 1:'Neutron Bomb', 2:'Jet Pack',
     3:'Invisible', 4:'Hacking Bonus', 5:'Radar', 6:'Depositor',
   } },
-  47: { label: 'Doodad',  options: {
+  47: { label: 'Doodad',   options: {
     0:'Small Candle', 1:'Large Candle', 2:'Small Canister', 3:'Large Canister',
     4:'Arrow Poster', 5:'Man in Tank', 6:'Doodad 6', 7:'Doodad 7', 8:'Doodad 8', 9:'Doodad 9',
   } },
-  50: { label: 'Size',    options: { 4:'Small', 5:'Small Alt', 6:'Large', 7:'Default' } },
-  65: { label: 'Side',    options: { 0:'Team A', 1:'Team B' } },
-  67: { label: 'Type',    options: { 0:'Base Defense', 1:'Guard Defense (Laser)' } },
+  50: { label: 'Size',     options: { 4:'Small', 5:'Small Alt', 6:'Large', 7:'Default' } },
+  65: { label: 'Side',     options: { 0:'Team A', 1:'Team B' } },
+  67: { label: 'Type',     options: { 0:'Base Defense', 1:'Guard Defense (Laser)' } },
 };
 
 interface ToolbarProps {
@@ -116,7 +118,7 @@ export default function Toolbar({
   selectedActor, onActorChange, lumMode, onLumModeChange,
   eraseLayerType, onEraseLayerTypeChange,
 }: ToolbarProps) {
-  const tileTools     = TOOLS.filter(t => ['TILE_BG', 'TILE_FG', 'ERASE_TILE'].includes(t.id));
+  const tileTools     = TOOLS.filter(t => ['TILE_BG', 'TILE_FG', 'ERASE_TILE', 'TILE_SELECT', 'FLOOD_FILL'].includes(t.id));
   const platformTools = TOOLS.filter(t => ['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM','ERASE_PLATFORM'].includes(t.id));
   const otherTools    = TOOLS.filter(t => ['SELECT','ACTOR'].includes(t.id));
 
