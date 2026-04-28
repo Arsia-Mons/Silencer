@@ -4,6 +4,7 @@
 #include "robot.h"
 #include "team.h"
 #include "plume.h"
+#include "gasloader.h"
 
 FixedCannon::FixedCannon() : Object(ObjectTypes::FIXEDCANNON){
 	requiresauthority = true;
@@ -17,8 +18,9 @@ FixedCannon::FixedCannon() : Object(ObjectTypes::FIXEDCANNON){
 	renderpass = 3;
 	state = NEW;
 	suitcolor = 0;
-	health = 40;
-	shield = 16;
+	const GameObjectDef* def = GASLoader::Get().GetGameObjectDef("fixedCannon");
+	health = def ? def->health : 40;
+	shield = def ? def->shield : 16;
 	renderpass = 2;
 	ishittable = true;
 	isphysical = true;

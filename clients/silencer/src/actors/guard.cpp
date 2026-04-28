@@ -6,6 +6,7 @@
 #include "laserprojectile.h"
 #include "rocketprojectile.h"
 #include "pickup.h"
+#include "gasloader.h"
 #include <math.h>
 
 static const char* ActorDefName(Uint8 weapon) {
@@ -22,11 +23,12 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	state_i = 0;
 	res_bank = 59;
 	res_index = 0;
-	speed = 5;
-	maxhealth = 25;
-	health = maxhealth;
-	maxshield = 15;
-	shield = maxshield;
+	const EnemyDef* g = GASLoader::Get().GetEnemyDef("guard-blaster");
+	speed     = g ? g->speed  : 5;
+	maxhealth = g ? g->health : 25;
+	health    = maxhealth;
+	maxshield = g ? g->shield : 15;
+	shield    = maxshield;
 	chasing = 0;
 	weapon = 0;
 	renderpass = 2;

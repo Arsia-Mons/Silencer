@@ -3,12 +3,14 @@
 #include "bodypart.h"
 #include "player.h"
 #include "plasmaprojectile.h"
+#include "gasloader.h"
 
 Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	requiresauthority = true;
 	state = NEW;
 	state_i = 0;
-	speed = 4;
+	const EnemyDef* c = GASLoader::Get().GetEnemyDef("civilian");
+	speed = c ? c->speed : 4;
 	res_bank = 121;
 	res_index = 0;
 	suitcolor = defaultsuitcolor;

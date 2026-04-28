@@ -4,6 +4,7 @@
 #include "player.h"
 #include "fixedcannon.h"
 #include "plume.h"
+#include "gasloader.h"
 
 Robot::Robot() : Object(ObjectTypes::ROBOT){
 	requiresauthority = true;
@@ -11,10 +12,11 @@ Robot::Robot() : Object(ObjectTypes::ROBOT){
 	state_i = 0;
 	res_bank = 47;
 	res_index = 0;
-	maxhealth = 200;
-	health = maxhealth;
-	maxshield = 400;
-	shield = maxshield;
+	const EnemyDef* r = GASLoader::Get().GetEnemyDef("robot");
+	maxhealth = r ? r->health : 200;
+	health    = maxhealth;
+	maxshield = r ? r->shield : 400;
+	shield    = maxshield;
 	renderpass = 2;
 	ishittable = true;
 	isbipedal = true;

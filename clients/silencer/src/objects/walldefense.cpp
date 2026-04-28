@@ -2,6 +2,7 @@
 #include "wallprojectile.h"
 #include "plume.h"
 #include "player.h"
+#include "gasloader.h"
 #include <math.h>
 
 WallDefense::WallDefense() : Object(ObjectTypes::WALLDEFENSE){
@@ -89,17 +90,22 @@ bool WallDefense::AddDefense(void){
 		state = ACTIVATING;
 		state_i = 0;
 	}
+	const GameObjectDef* def = GASLoader::Get().GetGameObjectDef("wallDefense");
+	const int neutralHealth = def ? def->health      : 40;
+	const int healthMax     = def ? def->healthMax   : 60;
+	const int healthRegen   = def ? def->healthRegen : 15;
+	const int shieldAtMax   = def ? def->shieldMax   :  4;
 	if(!teamid){
-		health = 40;
+		health = neutralHealth;
 		shield = 0;
 		return true;
 	}
-	if(health < 60){
-		health += 15;
+	if(health < healthMax){
+		health += healthRegen;
 		shield += 1;
-		if(health > 60){
-			health = 60;
-			shield = 4;
+		if(health > healthMax){
+			health = healthMax;
+			shield = shieldAtMax;
 		}
 		return true;
 	}
