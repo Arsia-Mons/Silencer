@@ -818,6 +818,23 @@ export default function DesignerPage() {
             </div>
 
             <div className="flex-1 relative min-h-0">
+            {!loaded && !isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 bg-game-bg">
+                <div className="flex flex-col items-center gap-4 p-12 border border-game-border rounded text-center">
+                  <div className="text-4xl">🗺</div>
+                  <div className="text-game-textDim text-xs font-mono leading-relaxed">
+                    Select your game <code className="text-game-primary">shared/assets/</code> folder<br />
+                    to load tile banks and sprite sheets.
+                  </div>
+                  <button
+                    onClick={() => dataDirRef.current?.click()}
+                    className="px-6 py-2 text-xs font-mono border border-game-primary text-game-primary rounded hover:bg-game-primary hover:text-game-bg transition-colors tracking-widest">
+                    [ OPEN ASSETS FOLDER ]
+                  </button>
+                  {error && <div className="text-game-danger text-xs font-mono">{error}</div>}
+                </div>
+              </div>
+            )}
             <MapCanvas
               map={map}
               tileImages={tileImages}

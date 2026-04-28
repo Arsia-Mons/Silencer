@@ -181,3 +181,5 @@ export const saveBehaviorTree = (id: string, bt: BehaviorTree): Promise<unknown>
   apiFetch(`/behaviortrees/${id}`, { method: 'PUT', body: JSON.stringify(bt) });
 export const deleteBehaviorTree = (id: string): Promise<unknown> =>
   apiFetch(`/behaviortrees/${id}`, { method: 'DELETE' });
+
+// Sound Studio — see web/admin/app/sound-studio/page.tsx for usage
