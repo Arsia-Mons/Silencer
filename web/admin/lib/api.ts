@@ -181,3 +181,44 @@ export const saveBehaviorTree = (id: string, bt: BehaviorTree): Promise<unknown>
   apiFetch(`/behaviortrees/${id}`, { method: 'PUT', body: JSON.stringify(bt) });
 export const deleteBehaviorTree = (id: string): Promise<unknown> =>
   apiFetch(`/behaviortrees/${id}`, { method: 'DELETE' });
+
+// Sound Studio endpoints
+export interface SoundFile {
+  filename: string;
+  size: number;
+  mtime: string;
+}
+
+export type SoundEvents = Record<string, string | null>;
+
+export const listSounds = (): Promise<SoundFile[]> =>
+  apiFetch('/sounds') as Promise<SoundFile[]>;
+
+export const soundUrl = (filename: string): string =>
+  `${API}/sounds/${encodeURIComponent(filename)}`;
+
+export const uploadSound = async (file: File): Promise<SoundFile> => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('zs_token') : null;
+  const res = await fetch(`${API}/sounds`, {
+    method: 'POST',
+    headers: {
+      'X-Filename': file.name,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: file,
+  });
+  if (!res.ok) throw new Error((await res.json() as { error: string }).error);
+  return res.json() as Promise<SoundFile>;
+};
+
+export const deleteSound = (filename: string): Promise<unknown> =>
+  apiFetch(`/sounds/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+
+export const getSoundEvents = (): Promise<SoundEvents> =>
+  apiFetch('/sounds/events') as Promise<SoundEvents>;
+
+export const patchSoundEvent = (event: string, filename: string | null): Promise<SoundEvents> =>
+  apiFetch(`/sounds/events/${encodeURIComponent(event)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ filename }),
+  }) as Promise<SoundEvents>;
