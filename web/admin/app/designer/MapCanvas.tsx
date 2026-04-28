@@ -732,8 +732,10 @@ export default function MapCanvas({
             for (let dx = 0; dx < w; dx++) {
               const tile = layerCells[dy * w + dx];
               if (!tile || tile.tile_id === 0) continue;
-              const imgs = tileImages?.get(tile.tile_id);
-              const img = imgs?.[0];
+              const bank = (tile.tile_id >> 8) & 0xFF;
+              const slot = tile.tile_id & 0xFF;
+              const bitmaps = tileImages?.get(bank);
+              const img = bitmaps?.[slot];
               if (!img) continue;
               ctx.drawImage(img, (hx + dx) * 64 * zoom + pan.x, (hy + dy) * 64 * zoom + pan.y, 64 * zoom, 64 * zoom);
             }
