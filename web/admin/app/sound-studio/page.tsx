@@ -1143,6 +1143,11 @@ export default function SoundStudioPage() {
                       ⚠ Low headroom at vol=128 call sites
                     </div>
                   )}
+                  {selectedSound.adpcmBytes != null && selectedSound.adpcmBytes < 256 && (
+                    <div style={{ marginTop: 4, fontSize: 10, color: '#f84', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      ⚠ &lt;256 ADPCM bytes — game skips this sound at load
+                    </div>
+                  )}
                   {normalize && selectedLevel && selectedLevel.peak > 0 && (
                     <div style={{ marginTop: 4, fontSize: 10, color: '#8af', display: 'flex', gap: 6 }}>
                       <span>Normalize: ×{(1 / selectedLevel.peak).toFixed(2)}</span>
@@ -1271,6 +1276,7 @@ export default function SoundStudioPage() {
           <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
             <div style={{ fontSize: 11, color: '#555', marginBottom: 10 }}>
               Music files in <code>shared/assets/</code> — loaded by the game separately from sound.bin.
+              Game default music volume: <span style={{ color: '#668' }}>48/128 (37.5%)</span> — set in <code>config.cpp</code>.
             </div>
             {musicLoading ? (
               <div style={{ color: '#555' }}>Loading…</div>
@@ -1367,7 +1373,7 @@ export default function SoundStudioPage() {
                     <span style={{ color: '#88a', width: 90, fontSize: 10 }}>{ch}</span>
                     <span style={{ color: '#446', fontSize: 9, width: 70 }}>{roles[i]}</span>
                     <div style={{ flex: 1, height: 4, background: '#222', borderRadius: 2, overflow: 'hidden' }}>
-                      <div style={{ width: `${Math.round(gain * 100 / (32/128) * 100)}%`, height: '100%', background: bgMutes[i] ? '#444' : '#4a8', maxWidth: '100%' }} />
+                      <div style={{ width: `${Math.round(gain / (32 / 128) * 100)}%`, height: '100%', background: bgMutes[i] ? '#444' : '#4a8', maxWidth: '100%' }} />
                     </div>
                     <span style={{ color: bgMutes[i] ? '#444' : '#6a6', fontSize: 9, width: 36, textAlign: 'right' }}>{Math.round(gain * 128)}/128</span>
                   </div>
