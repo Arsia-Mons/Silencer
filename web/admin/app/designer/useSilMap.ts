@@ -127,7 +127,7 @@ export function platformTypeNums(typeName: string): [number, number] {
 
 export interface UseSilMapReturn {
   map: SilMapData | null;
-  openMap: (file: File) => Promise<void>;
+  openMap: (file: File) => Promise<SilMapData | null>;
   saveMap: () => Promise<void>;
   publishMap: (opts: { author: string; apiUrl: string; apiKey: string }) => Promise<{ ok: boolean; meta?: Record<string, unknown>; error?: string }>;
   createMap: (width: number, height: number, description: string) => void;
@@ -217,7 +217,7 @@ export function useSilMap(): UseSilMapReturn {
   }, []);
 
 
-  const openMap = useCallback(async (file: File) => {
+  const openMap = useCallback(async (file: File): Promise<SilMapData | null> => {
     try {
       const buf = await file.arrayBuffer();
       const bytes = new Uint8Array(buf);
@@ -239,10 +239,13 @@ export function useSilMap(): UseSilMapReturn {
       historyRef.current = [];
       futureRef.current = [];
       syncUndoRedo();
-      setMapData({ header, width, height, layers, actors, platforms, rawMinimap, minimapCompressedSize, fileName: file.name });
+      const loaded: SilMapData = { header, width, height, layers, actors, platforms, rawMinimap, minimapCompressedSize, fileName: file.name };
+      setMapData(loaded);
+      return loaded;
     } catch (e) {
       console.error('Failed to open SIL map:', e);
       alert('Failed to parse map: ' + (e as Error).message);
+      return null;
     }
   }, []);
 

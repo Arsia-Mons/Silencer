@@ -219,8 +219,16 @@ export default function DesignerPage() {
     if (e.target.files?.length) loadFiles(e.target.files);
   };
 
-  const handleOpenSil = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) openMap(e.target.files[0]).then(() => requestAnimationFrame(fitToScreen));
+  const handleOpenSil = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0]) return;
+    const loaded = await openMap(e.target.files[0]);
+    if (!loaded) return;
+    const container = document.getElementById('canvas-container');
+    if (!container) return;
+    const { width: cw, height: ch } = container.getBoundingClientRect();
+    const newZoom = Math.min(cw / (loaded.width * 64), ch / (loaded.height * 64)) * 0.95;
+    setZoom(newZoom);
+    setPan({ x: (cw - loaded.width * 64 * newZoom) / 2, y: (ch - loaded.height * 64 * newZoom) / 2 });
   };
 
   const handleTilePaint = useCallback((layerType: 'bg' | 'fg', layerIdx: number, tx: number, ty: number, tileId: number) => {
