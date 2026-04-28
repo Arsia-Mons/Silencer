@@ -293,6 +293,28 @@
         "game_id": 100,
         "status": 1
       }
+    },
+    {
+      "_doc": [
+        "Largest payload in the protocol (192 bytes incl. opcode). Each",
+        "of the 44 MatchStats u32 fields gets a distinguishable value",
+        "(100..143 in declaration order) so any field-order regression",
+        "in any implementation surfaces immediately."
+      ],
+      "name": "register_stats_request",
+      "kind": "RegisterStatsRequest",
+      "hex": "c00b0700000001090000000201d20400006400000065000000660000006700000068000000690000006a0000006b0000006c0000006d0000006e0000006f000000700000007100000072000000730000007400000075000000760000007700000078000000790000007a0000007b0000007c0000007d0000007e0000007f000000800000008100000082000000830000008400000085000000860000008700000088000000890000008a0000008b0000008c0000008d0000008e0000008f000000",
+      "value": {
+        "game_id": 7,
+        "team_number": 1,
+        "account_id": 9,
+        "stats_agency": 2,
+        "won": true,
+        "xp": 1234,
+        "stats_first_value": 100,
+        "stats_last_value": 143,
+        "stats_note": "44 sequential u32 LE values 100..143 in declaration order: weapons[0..3]{fires,hits,player_kills}, then civilians_killed, guards_killed, robots_killed, defense_killed, secrets_picked_up, secrets_returned, secrets_stolen, secrets_dropped, powerups_picked_up, deaths, kills, suicides, poisons, tracts_planted, grenades_thrown, neutrons_thrown, emps_thrown, shaped_thrown, plasmas_thrown, flares_thrown, poison_flares_thrown, health_packs_used, fixed_cannons_placed, fixed_cannons_destroyed, dets_planted, cameras_planted, viruses_used, files_hacked, files_returned, credits_earned, credits_spent, heals_done"
+      }
     }
   ]
 }

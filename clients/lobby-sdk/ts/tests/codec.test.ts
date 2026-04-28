@@ -356,15 +356,58 @@ describe("golden vectors", () => {
     });
 });
 
-describe("register_stats roundtrip", () => {
-    test("encodes 192-byte payload + length prefix", () => {
-        const s: MatchStats = emptyMatchStats();
-        s.weapons[0]!.fires = 100;
-        s.kills = 3;
-        s.creditsEarned = 0xdeadbeef;
-        const enc = frameEncode(encodeRegisterStats(7, 1, 9, 2, true, 1234, s));
-        // 44 × u32 = 176 bytes stats. Payload = 1 + 4 + 1 + 4 + 1 + 1 + 4 + 176 = 192.
-        // Wire = 1 + 192 = 193.
+// Builds the MatchStats whose 44 u32 fields are 100..143 in declaration
+// order — the shape baked into the register_stats_request golden vector.
+function makeRegisterStatsFixture(): MatchStats {
+    const s = emptyMatchStats();
+    let v = 100;
+    for (let i = 0; i < 4; i++) {
+        s.weapons[i]!.fires = v++;
+        s.weapons[i]!.hits = v++;
+        s.weapons[i]!.playerKills = v++;
+    }
+    s.civiliansKilled = v++;
+    s.guardsKilled = v++;
+    s.robotsKilled = v++;
+    s.defenseKilled = v++;
+    s.secretsPickedUp = v++;
+    s.secretsReturned = v++;
+    s.secretsStolen = v++;
+    s.secretsDropped = v++;
+    s.powerupsPickedUp = v++;
+    s.deaths = v++;
+    s.kills = v++;
+    s.suicides = v++;
+    s.poisons = v++;
+    s.tractsPlanted = v++;
+    s.grenadesThrown = v++;
+    s.neutronsThrown = v++;
+    s.empsThrown = v++;
+    s.shapedThrown = v++;
+    s.plasmasThrown = v++;
+    s.flaresThrown = v++;
+    s.poisonFlaresThrown = v++;
+    s.healthPacksUsed = v++;
+    s.fixedCannonsPlaced = v++;
+    s.fixedCannonsDestroyed = v++;
+    s.detsPlanted = v++;
+    s.camerasPlanted = v++;
+    s.virusesUsed = v++;
+    s.filesHacked = v++;
+    s.filesReturned = v++;
+    s.creditsEarned = v++;
+    s.creditsSpent = v++;
+    s.healsDone = v++;
+    return s;
+}
+
+describe("register_stats", () => {
+    test("encodes the golden vector exactly", () => {
+        const v = need("register_stats_request");
+        const enc = frameEncode(
+            encodeRegisterStats(7, 1, 9, 2, true, 1234, makeRegisterStatsFixture()),
+        );
+        expect(toHex(enc)).toBe(v.hex);
         expect(enc.length).toBe(193);
         expect(enc[0]).toBe(192);
         expect(enc[1]).toBe(Op.RegisterStats);

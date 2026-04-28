@@ -430,25 +430,62 @@ static int test_sha1() {
     return 0;
 }
 
-static void test_register_stats_roundtrip() {
-    g_current = "register_stats_roundtrip";
+// Builds the MatchStats whose 44 u32 fields are 100..143 in declaration
+// order — the shape baked into the register_stats_request golden vector.
+static MatchStats make_register_stats_fixture() {
     MatchStats s;
-    s.weapons[0].fires        = 100;
-    s.weapons[0].player_kills = 5;
-    s.weapons[3].hits         = 7;
-    s.kills                   = 3;
-    s.heals_done              = 42;
-    s.credits_earned          = 0xDEADBEEFu;
+    uint32_t v = 100;
+    for (int i = 0; i < 4; ++i) {
+        s.weapons[i].fires        = v++;
+        s.weapons[i].hits         = v++;
+        s.weapons[i].player_kills = v++;
+    }
+    s.civilians_killed       = v++;
+    s.guards_killed          = v++;
+    s.robots_killed          = v++;
+    s.defense_killed         = v++;
+    s.secrets_picked_up      = v++;
+    s.secrets_returned       = v++;
+    s.secrets_stolen         = v++;
+    s.secrets_dropped        = v++;
+    s.powerups_picked_up     = v++;
+    s.deaths                 = v++;
+    s.kills                  = v++;
+    s.suicides               = v++;
+    s.poisons                = v++;
+    s.tracts_planted         = v++;
+    s.grenades_thrown        = v++;
+    s.neutrons_thrown        = v++;
+    s.emps_thrown            = v++;
+    s.shaped_thrown          = v++;
+    s.plasmas_thrown         = v++;
+    s.flares_thrown          = v++;
+    s.poison_flares_thrown   = v++;
+    s.health_packs_used      = v++;
+    s.fixed_cannons_placed   = v++;
+    s.fixed_cannons_destroyed= v++;
+    s.dets_planted           = v++;
+    s.cameras_planted        = v++;
+    s.viruses_used           = v++;
+    s.files_hacked           = v++;
+    s.files_returned         = v++;
+    s.credits_earned         = v++;
+    s.credits_spent          = v++;
+    s.heals_done             = v++;
+    return s;
+}
 
+static void test_register_stats_request(const std::string& hex) {
+    // Encode side: build the same fixture the vector encodes and check
+    // we reproduce the wire bytes exactly. Catches field-order swaps
+    // because every field has a distinguishable value.
+    auto s = make_register_stats_fixture();
     auto enc = frame(encode_register_stats(/*game_id*/ 7, /*team*/ 1, /*acct*/ 9,
                                            /*ag*/ 2, /*won*/ true, /*xp*/ 1234, s));
-    // 44 × u32 stats (12 weapon fields + 32 scalars) = 176 bytes.
-    // Payload = opcode + game_id u32 + team u8 + acct u32 + agency u8
-    //         + won u8 + xp u32 + 176 = 192. Wire = 1 (length byte) + 192 = 193.
-    static constexpr size_t kStatsBytes   = 4u * (4 * 3 + 32);
-    static constexpr size_t kPayloadBytes = 1 + 4 + 1 + 4 + 1 + 1 + 4 + kStatsBytes;
-    CHECK_EQ(enc.size(), 1 + kPayloadBytes);
-    CHECK_EQ(enc[0], static_cast<uint8_t>(kPayloadBytes));
+    CHECK_EQ(to_hex(enc), hex);
+    // Sanity: 44 × u32 = 176 stats bytes; full payload = 192; wire = 193.
+    CHECK_EQ(enc.size(), 193u);
+    CHECK_EQ(enc[0], static_cast<uint8_t>(192));
     CHECK_EQ(enc[1], OpRegisterStats);
 }
 
@@ -489,9 +526,9 @@ int main() {
     run("presence_add",                      test_presence_add);
     run("presence_remove",                   test_presence_remove);
     run("setgame_request",                   test_setgame_request);
+    run("register_stats_request",            test_register_stats_request);
 
     test_sha1();
-    test_register_stats_roundtrip();
 
     if (g_failures > 0) {
         std::fprintf(stderr, "\n%d failure(s)\n", g_failures);

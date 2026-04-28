@@ -214,6 +214,84 @@ func TestVector_UpgradeStatRequest_Decode(t *testing.T) {
 	}
 }
 
+func TestVector_RegisterStatsRequest_Decode(t *testing.T) {
+	v := mustGet(t, loadVectors(t), "register_stats_request")
+	op, body := unframe(t, unhex(t, v.Hex))
+	if op != opRegisterStats {
+		t.Fatalf("op: got %d want %d", op, opRegisterStats)
+	}
+	r := newReader(body)
+	gameID, _ := r.u32()
+	team, _ := r.u8()
+	acct, _ := r.u32()
+	agency, _ := r.u8()
+	won, _ := r.u8()
+	xp, _ := r.u32()
+	if gameID != 7 || team != 1 || acct != 9 || agency != 2 || won != 1 || xp != 1234 {
+		t.Errorf("header: game=%d team=%d acct=%d agency=%d won=%d xp=%d",
+			gameID, team, acct, agency, won, xp)
+	}
+	ms := readMatchStats(r)
+	// 44 fields, declaration order, values 100..143. A field-order
+	// regression in readMatchStats surfaces as a value mismatch on
+	// whichever field got swapped.
+	cases := []struct {
+		name string
+		got  uint32
+		want uint32
+	}{
+		{"weapons[0].fires", ms.Weapons[0].Fires, 100},
+		{"weapons[0].hits", ms.Weapons[0].Hits, 101},
+		{"weapons[0].playerKills", ms.Weapons[0].PlayerKills, 102},
+		{"weapons[1].fires", ms.Weapons[1].Fires, 103},
+		{"weapons[1].hits", ms.Weapons[1].Hits, 104},
+		{"weapons[1].playerKills", ms.Weapons[1].PlayerKills, 105},
+		{"weapons[2].fires", ms.Weapons[2].Fires, 106},
+		{"weapons[2].hits", ms.Weapons[2].Hits, 107},
+		{"weapons[2].playerKills", ms.Weapons[2].PlayerKills, 108},
+		{"weapons[3].fires", ms.Weapons[3].Fires, 109},
+		{"weapons[3].hits", ms.Weapons[3].Hits, 110},
+		{"weapons[3].playerKills", ms.Weapons[3].PlayerKills, 111},
+		{"civiliansKilled", ms.CiviliansKilled, 112},
+		{"guardsKilled", ms.GuardsKilled, 113},
+		{"robotsKilled", ms.RobotsKilled, 114},
+		{"defenseKilled", ms.DefenseKilled, 115},
+		{"secretsPickedUp", ms.SecretsPickedUp, 116},
+		{"secretsReturned", ms.SecretsReturned, 117},
+		{"secretsStolen", ms.SecretsStolen, 118},
+		{"secretsDropped", ms.SecretsDropped, 119},
+		{"powerupsPickedUp", ms.PowerupsPickedUp, 120},
+		{"deaths", ms.Deaths, 121},
+		{"kills", ms.Kills, 122},
+		{"suicides", ms.Suicides, 123},
+		{"poisons", ms.Poisons, 124},
+		{"tractsPlanted", ms.TractsPlanted, 125},
+		{"grenadesThrown", ms.GrenadesThrown, 126},
+		{"neutronsThrown", ms.NeutronsThrown, 127},
+		{"empsThrown", ms.EMPsThrown, 128},
+		{"shapedThrown", ms.ShapedThrown, 129},
+		{"plasmasThrown", ms.PlasmasThrown, 130},
+		{"flaresThrown", ms.FlaresThrown, 131},
+		{"poisonFlaresThrown", ms.PoisonFlaresThrown, 132},
+		{"healthPacksUsed", ms.HealthPacksUsed, 133},
+		{"fixedCannonsPlaced", ms.FixedCannonsPlaced, 134},
+		{"fixedCannonsDestroyed", ms.FixedCannonsDestroyed, 135},
+		{"detsPlanted", ms.DetsPlanted, 136},
+		{"camerasPlanted", ms.CamerasPlanted, 137},
+		{"virusesUsed", ms.VirusesUsed, 138},
+		{"filesHacked", ms.FilesHacked, 139},
+		{"filesReturned", ms.FilesReturned, 140},
+		{"creditsEarned", ms.CreditsEarned, 141},
+		{"creditsSpent", ms.CreditsSpent, 142},
+		{"healsDone", ms.HealsDone, 143},
+	}
+	for _, c := range cases {
+		if c.got != c.want {
+			t.Errorf("%s: got %d want %d", c.name, c.got, c.want)
+		}
+	}
+}
+
 func TestVector_SetGameRequest_Decode(t *testing.T) {
 	v := mustGet(t, loadVectors(t), "setgame_request")
 	op, body := unframe(t, unhex(t, v.Hex))
