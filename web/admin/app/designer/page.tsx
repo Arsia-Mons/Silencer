@@ -25,6 +25,7 @@ interface VisState {
   actors: boolean;
   grid: boolean;
   lighting: boolean;
+  parallax: boolean;
 }
 
 interface ActorMenu {
@@ -78,6 +79,7 @@ export default function DesignerPage() {
     actors: true,
     grid: true,
     lighting: true,
+    parallax: true,
   });
   const [gridSize, setGridSize] = useState(16);
   const toggleVis = (key: keyof VisState, idx: number | null = null) => setVis(v => {
@@ -665,6 +667,7 @@ export default function DesignerPage() {
             header={map.header}
             onUpdate={updateHeader}
             onClose={() => setShowProps(false)}
+            spriteImages={spriteImages}
           />
         )}
 
@@ -690,7 +693,7 @@ export default function DesignerPage() {
                 </button>
               ))}
               <span className="text-[#1a3a1a] text-xs mx-0.5">|</span>
-              {([['PLT','platforms'],['ACT','actors'],['GRID','grid'],['LIGHT','lighting']] as [string, keyof VisState][]).map(([lbl, key]) => (
+              {([['PLT','platforms'],['ACT','actors'],['PARA','parallax'],['GRID','grid'],['LIGHT','lighting']] as [string, keyof VisState][]).map(([lbl, key]) => (
                 <button key={key} onClick={() => toggleVis(key)}
                   className={`px-1.5 py-0.5 text-xs font-mono rounded border ${vis[key] ? 'border-[#3a3a2a] text-[#c0c080] bg-[#1a1a0d]' : 'border-[#1a1a1a] text-[#3a3a3a] bg-transparent line-through'}`}>
                   {lbl}

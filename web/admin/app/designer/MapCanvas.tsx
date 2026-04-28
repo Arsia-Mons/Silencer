@@ -75,6 +75,7 @@ interface VisState {
   actors: boolean;
   grid: boolean;
   lighting: boolean;
+  parallax: boolean;
 }
 
 interface TileRightClickInfo {
@@ -234,6 +235,30 @@ export default function MapCanvas({
         ctx.restore();
       } else {
         ctx.drawImage(bmp, dx, dy, tileSize, tileSize);
+      }
+    }
+
+    // Draw parallax background tiled across the viewport
+    if (vis?.parallax !== false) {
+      const parallaxIdx = map.header?.parallax ?? 0;
+      const bgBank = spriteImages?.get(parallaxIdx);
+      if (bgBank) {
+        const BG_COLS = 20, BG_ROWS = 12;
+        const startCol = Math.floor(-pan.x / tileSize) - 1;
+        const endCol   = Math.ceil((W - pan.x) / tileSize) + 1;
+        const startRow = Math.floor(-pan.y / tileSize) - 1;
+        const endRow   = Math.ceil((H - pan.y) / tileSize) + 1;
+        for (let row = startRow; row < endRow; row++) {
+          for (let col = startCol; col < endCol; col++) {
+            const bgCol = ((col % BG_COLS) + BG_COLS) % BG_COLS;
+            const bgRow = ((row % BG_ROWS) + BG_ROWS) % BG_ROWS;
+            const spr = bgBank[bgRow * BG_COLS + bgCol];
+            if (!spr) continue;
+            const dx = col * tileSize + pan.x;
+            const dy = row * tileSize + pan.y;
+            ctx.drawImage(spr.bitmap, dx, dy, tileSize, tileSize);
+          }
+        }
       }
     }
 
