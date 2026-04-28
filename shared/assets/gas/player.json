@@ -9,5 +9,22 @@
   "upgradeMultiplierJetpack": 10,
   "upgradeMultiplierHacking": 0.10,
   "upgradeMultiplierContacts": 0.10,
-  "maxPoisoned": 9
+  "maxPoisoned": 9,
+  "runSpeed": 14,
+  "runSpeedDisguised": 11,
+  "runSpeedSecret": 11,
+  "runSpeedSecretDisguised": 8,
+  "jetpackXvMax": 14,
+  "jetpackXvMaxDisguised": 12,
+  "jetpackYvMax": 9,
+  "jumpImpulse": 17,
+  "ladderJumpImpulse": 29,
+  "ladderActivateImpulse": 8,
+  "disguiseActivationTicks": 112,
+  "disguiseThreshold": 100,
+  "invisibilityDurationTicks": 720,
+  "poisonTickCycle": 24,
+  "hackingEffectTicks": 5,
+  "hackingCompleteThreshold": 15,
+  "hackingExitThreshold": 17
 }

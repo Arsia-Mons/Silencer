@@ -1,12 +1,24 @@
 {
   "_comment": "Weapon damage values — 1:1 from *projectile.cpp constructors. Do not change during GAS migration.",
   "weapons": [
-    { "id": "blaster", "healthDamage": 40, "shieldDamage": 4  },
-    { "id": "laser",   "healthDamage": 10, "shieldDamage": 60 },
-    { "id": "flamer",  "healthDamage": 2,  "shieldDamage": 1  },
-    { "id": "rocket",  "healthDamage": 75, "shieldDamage": 25 },
+    { "id": "blaster", "healthDamage": 40, "shieldDamage": 4,  "fireDelay": 7  },
+    { "id": "laser",   "healthDamage": 10, "shieldDamage": 60, "fireDelay": 11 },
+    { "id": "flamer",  "healthDamage": 2,  "shieldDamage": 1,  "fireDelay": 2  },
+    { "id": "rocket",  "healthDamage": 75, "shieldDamage": 25, "fireDelay": 21 },
     { "id": "plasma",  "healthDamage": 4,  "shieldDamage": 5,  "healthDamageLarge": 5, "shieldDamageLarge": 6 },
     { "id": "flare",   "healthDamage": 1,  "shieldDamage": 1  },
-    { "id": "wall",    "healthDamage": 10, "shieldDamage": 60 }
+    { "id": "wall",    "healthDamage": 10, "shieldDamage": 60 },
+    {
+      "id": "grenade",
+      "_comment": "Grenade/bomb throw speeds and explosion timings (all in ticks @ 24 ticks/sec).",
+      "throwSpeedStanding": 20,
+      "throwSpeedMoving": 30,
+      "throwSpeedRunning": 26,
+      "explosionTick": 30,
+      "secondaryTick": 33,
+      "destroyTick": 40,
+      "neutronDestroyTick": 120,
+      "flareDuration": 198
+    }
   ]
 }

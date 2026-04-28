@@ -52,6 +52,23 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.upgradeMultiplierHacking   = j.value("upgradeMultiplierHacking",   out.upgradeMultiplierHacking);
         out.upgradeMultiplierContacts  = j.value("upgradeMultiplierContacts",  out.upgradeMultiplierContacts);
         out.maxPoisoned                = j.value("maxPoisoned",                out.maxPoisoned);
+        out.runSpeed                   = j.value("runSpeed",                   out.runSpeed);
+        out.runSpeedDisguised          = j.value("runSpeedDisguised",          out.runSpeedDisguised);
+        out.runSpeedSecret             = j.value("runSpeedSecret",             out.runSpeedSecret);
+        out.runSpeedSecretDisguised    = j.value("runSpeedSecretDisguised",    out.runSpeedSecretDisguised);
+        out.jetpackXvMax               = j.value("jetpackXvMax",               out.jetpackXvMax);
+        out.jetpackXvMaxDisguised      = j.value("jetpackXvMaxDisguised",      out.jetpackXvMaxDisguised);
+        out.jetpackYvMax               = j.value("jetpackYvMax",               out.jetpackYvMax);
+        out.jumpImpulse                = j.value("jumpImpulse",                out.jumpImpulse);
+        out.ladderJumpImpulse          = j.value("ladderJumpImpulse",          out.ladderJumpImpulse);
+        out.ladderActivateImpulse      = j.value("ladderActivateImpulse",      out.ladderActivateImpulse);
+        out.disguiseActivationTicks    = j.value("disguiseActivationTicks",    out.disguiseActivationTicks);
+        out.disguiseThreshold          = j.value("disguiseThreshold",          out.disguiseThreshold);
+        out.invisibilityDurationTicks  = j.value("invisibilityDurationTicks",  out.invisibilityDurationTicks);
+        out.poisonTickCycle            = j.value("poisonTickCycle",            out.poisonTickCycle);
+        out.hackingEffectTicks         = j.value("hackingEffectTicks",         out.hackingEffectTicks);
+        out.hackingCompleteThreshold   = j.value("hackingCompleteThreshold",   out.hackingCompleteThreshold);
+        out.hackingExitThreshold       = j.value("hackingExitThreshold",       out.hackingExitThreshold);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
     }
@@ -105,6 +122,15 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.shieldDamage     = wj.value("shieldDamage",       0);
             w.healthDamageLarge = wj.value("healthDamageLarge", 0);
             w.shieldDamageLarge = wj.value("shieldDamageLarge", 0);
+            w.fireDelay           = wj.value("fireDelay",           0);
+            w.throwSpeedStanding  = wj.value("throwSpeedStanding",  0);
+            w.throwSpeedMoving    = wj.value("throwSpeedMoving",    0);
+            w.throwSpeedRunning   = wj.value("throwSpeedRunning",   0);
+            w.explosionTick       = wj.value("explosionTick",       0);
+            w.secondaryTick       = wj.value("secondaryTick",       0);
+            w.destroyTick         = wj.value("destroyTick",         0);
+            w.neutronDestroyTick  = wj.value("neutronDestroyTick",  0);
+            w.flareDuration       = wj.value("flareDuration",       0);
             out.push_back(std::move(w));
         }
     } catch (const std::exception& e) {
@@ -157,6 +183,14 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.shield = ej.value("shield", 0);
             e.speed  = ej.value("speed",  0);
             e.weapon = ej.value("weapon", 0);
+            e.shotCooldown       = ej.value("shotCooldown",       e.shotCooldown);
+            e.chaseRangeClose    = ej.value("chaseRangeClose",    e.chaseRangeClose);
+            e.chaseRangeStop     = ej.value("chaseRangeStop",     e.chaseRangeStop);
+            e.chaseRangeMax      = ej.value("chaseRangeMax",      e.chaseRangeMax);
+            e.searchTicks        = ej.value("searchTicks",        e.searchTicks);
+            e.meleeCheckInterval = ej.value("meleeCheckInterval", e.meleeCheckInterval);
+            e.tractHealthDamage  = ej.value("tractHealthDamage",  e.tractHealthDamage);
+            e.tractShieldDamage  = ej.value("tractShieldDamage",  e.tractShieldDamage);
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {

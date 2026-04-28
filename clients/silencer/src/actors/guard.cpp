@@ -24,11 +24,11 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	res_bank = 59;
 	res_index = 0;
 	const EnemyDef* g = GASLoader::Get().GetEnemyDef("guard-blaster");
-	speed     = g ? g->speed  : 5;
-	maxhealth = g ? g->health : 25;
-	health    = maxhealth;
-	maxshield = g ? g->shield : 15;
-	shield    = maxshield;
+	speed        = g ? g->speed       : 5;
+	maxhealth    = g ? g->health      : 25;
+	health       = maxhealth;
+	maxshield    = g ? g->shield      : 15;
+	shield       = maxshield;
 	chasing = 0;
 	weapon = 0;
 	renderpass = 2;
@@ -36,11 +36,11 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	isbipedal = true;
 	isphysical = true;
 	snapshotinterval = 48;
-	respawnseconds = 30;
+	respawnseconds   = 30;
 	patrol = false;
 	lastspoke = 0;
 	lastshot = 0;
-	cooldowntime = 48;
+	cooldowntime = g ? g->shotCooldown : 48;
 	bt_ = nullptr;
 }
 
@@ -158,7 +158,7 @@ void Guard::InitBT(){
 		if(!f) return BTResult::Failure;
 		if(f->type == ObjectTypes::PLAYER){
 			Player* p = static_cast<Player*>(f);
-			if(p && abs(p->x - x) < 60){
+			if(p && abs(p->x - x) < GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeClose){
 				// Too close for this angle — mark seen so leaf_uncrouch won't fire, then chase.
 				ctx.bbSet("target_seen", true);
 				updateChasing(f, world);
@@ -193,9 +193,9 @@ void Guard::InitBT(){
 			if(p->InBase(world) || p->IsInvisible(world)){ chasing = 0; return BTResult::Failure; }
 		}
 		if(state == STANDING || state == WALKING){
-			if(abs(obj->x - x) <= 90 && abs(obj->x - x) > 80){
+			if(abs(obj->x - x) <= GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax && abs(obj->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeStop){
 				mirrored = (obj->x < x);
-			} else if(abs(obj->x - x) > 90){
+			} else if(abs(obj->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax){
 				state = WALKING;
 				mirrored = (obj->x < x);
 			} else {
@@ -826,7 +826,7 @@ void Guard::Tick(World & world){
 				}
 			}
 			if(state == STANDING || state == WALKING){
-				if(abs(object->x - x) <= 90 && abs(object->x - x) > 80){
+				if(abs(object->x - x) <= GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax && abs(object->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeStop){
 					if(object->x > x){
 						mirrored = false;
 					}else{

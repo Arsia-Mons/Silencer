@@ -4,6 +4,7 @@
 #include "player.h"
 #include "plasmaprojectile.h"
 #include "gasloader.h"
+#include "gasloader.h"
 
 Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	requiresauthority = true;
@@ -294,8 +295,11 @@ bool Civilian::CheckTractVictim(World & world){
 			state = DYINGEXPLODE;
 			EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
 			Object tractprojectile(ObjectTypes::PLASMAPROJECTILE);
-			tractprojectile.healthdamage = 80;
-			tractprojectile.shielddamage = 80;
+		{
+			const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian");
+			tractprojectile.healthdamage = def ? def->tractHealthDamage : 80;
+			tractprojectile.shielddamage = def ? def->tractShieldDamage : 80;
+		}
 			tractprojectile.ownerid = id;
 			player->HandleHit(world, 50, 50, tractprojectile);
 			Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};

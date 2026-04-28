@@ -6,33 +6,49 @@
       "health": 25,
       "shield": 15,
       "speed": 5,
-      "weapon": 0
+      "weapon": 0,
+      "shotCooldown": 48,
+      "chaseRangeClose": 60,
+      "chaseRangeStop": 80,
+      "chaseRangeMax": 90
     },
     {
       "id": "guard-laser",
       "health": 25,
       "shield": 15,
       "speed": 5,
-      "weapon": 1
+      "weapon": 1,
+      "shotCooldown": 48,
+      "chaseRangeClose": 60,
+      "chaseRangeStop": 80,
+      "chaseRangeMax": 90
     },
     {
       "id": "guard-rocket",
       "health": 25,
       "shield": 15,
       "speed": 5,
-      "weapon": 2
+      "weapon": 2,
+      "shotCooldown": 48,
+      "chaseRangeClose": 60,
+      "chaseRangeStop": 80,
+      "chaseRangeMax": 90
     },
     {
       "id": "robot",
       "health": 200,
       "shield": 400,
-      "speed": 0
+      "speed": 0,
+      "searchTicks": 600,
+      "meleeCheckInterval": 40
     },
     {
       "id": "civilian",
       "health": 0,
       "shield": 0,
       "speed": 4,
+      "tractHealthDamage": 80,
+      "tractShieldDamage": 80,
       "_note": "Civilian health is not set in constructor — Object base default applies."
     }
   ]

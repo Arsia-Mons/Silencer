@@ -82,10 +82,14 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	credits = 0;
 	effecthacking = false;
 	suitcolor = (7 << 4) + 13;
-	weaponfiredelay[0] = 7;
-	weaponfiredelay[1] = 11;
-	weaponfiredelay[2] = 21;
-	weaponfiredelay[3] = 2;
+	// Wire fire delays from GAS
+	{
+		const WeaponDef* wd;
+		wd = GASLoader::Get().GetWeaponDef("blaster"); weaponfiredelay[0] = wd ? wd->fireDelay : 7;
+		wd = GASLoader::Get().GetWeaponDef("laser");   weaponfiredelay[1] = wd ? wd->fireDelay : 11;
+		wd = GASLoader::Get().GetWeaponDef("rocket");  weaponfiredelay[2] = wd ? wd->fireDelay : 21;
+		wd = GASLoader::Get().GetWeaponDef("flamer");  weaponfiredelay[3] = wd ? wd->fireDelay : 2;
+	}
 	weaponfirecool = 0;
 	teamid = 0;
 	hacksoundchannel = -1;
@@ -304,7 +308,8 @@ void Player::Tick(World & world){
 		}
 	}
 	if(poisonedby){
-		if(poisoned_i % (24 / poisonedamount) == 0){
+		int poisonCycle = GASLoader::Get().player.poisonTickCycle;
+		if(poisoned_i % (poisonCycle / poisonedamount) == 0){
 			if(health){
 				health--;
 			}
@@ -340,7 +345,7 @@ void Player::Tick(World & world){
 			}
 		}
 		poisoned_i++;
-		if(poisoned_i >= 24){
+		if(poisoned_i >= GASLoader::Get().player.poisonTickCycle){
 			poisoned_i = 0;
 		}
 	}
@@ -451,12 +456,13 @@ void Player::Tick(World & world){
 		justjumpedfromladder = false;
 	}
 	if(input.keydisguise && !oldinput.keydisguise){
-		if(disguised >= 100){
+		const auto& pd = GASLoader::Get().player;
+		if(disguised >= pd.disguiseThreshold){
 			UnDisguise(world);
 		}else{
 			if(state != JETPACK && state != DEPLOYING && state != DYING && state != DEAD){
 				if(currentplatformid || !OnGround()){
-					disguised = 112;
+					disguised = pd.disguiseActivationTicks;
 					EmitSound(world, world.resources.soundbank["disguise.wav"], 64);
 					if(OnGround()){
 						state = RUNNING;
@@ -474,7 +480,7 @@ void Player::Tick(World & world){
 			disguised--;
 		}
 	}
-	if(state != HACKING || state_i >= 17){
+	if(state != HACKING || state_i >= GASLoader::Get().player.hackingExitThreshold){
 		if(!world.replaying && hacksoundchannel != -1){
 			EmitSound(world, world.resources.soundbank["jackout.wav"], 20);
 			Audio::GetInstance().Stop(hacksoundchannel, 700);
@@ -1445,14 +1451,14 @@ void Player::Tick(World & world){
 					}
 				}
 			}
-			int xvmax = 14;
+			int xvmax = GASLoader::Get().player.runSpeed;
 			if(IsDisguised()){
-				xvmax = 11;
+				xvmax = GASLoader::Get().player.runSpeedDisguised;
 			}
 			if(hassecret){
-				xvmax = 11;
+				xvmax = GASLoader::Get().player.runSpeedSecret;
 				if(IsDisguised()){
-					xvmax = 8;
+					xvmax = GASLoader::Get().player.runSpeedSecretDisguised;
 				}
 			}
 			if(xv > xvmax){
@@ -1880,13 +1886,13 @@ void Player::Tick(World & world){
 				fallingnudge = 8;
 			}*/
 			//xv *= 1.2;
-			Uint32 impulse = -17 + jumpimpulse;
+			Uint32 impulse = -GASLoader::Get().player.jumpImpulse + jumpimpulse;
 			if(justjumpedfromladder){
 				if((!input.keymoveleft && !input.keymoveright) || (input.keymoveleft && input.keymoveright)){
-					impulse = -29 + jumpimpulse;
+					impulse = -GASLoader::Get().player.ladderJumpImpulse + jumpimpulse;
 				}else{
 					if(input.keyactivate){
-						impulse = -8 + jumpimpulse;
+						impulse = -GASLoader::Get().player.ladderActivateImpulse + jumpimpulse;
 					}
 				}
 			}
@@ -2197,12 +2203,12 @@ void Player::Tick(World & world){
 							EmitSound(world, world.resources.soundbank[sounds[rand() % (sizeof(sounds) / sizeof(const char *))]], 64);
 						}
 						effecthacking = true;
-						effecthackingcontinue = 5;
-						state_i = 15;
+						effecthackingcontinue = GASLoader::Get().player.hackingEffectTicks;
+						state_i = GASLoader::Get().player.hackingCompleteThreshold;
 					}
 				}
 			}
-			if(state_i >= 15 || !hackable){
+			if(state_i >= GASLoader::Get().player.hackingCompleteThreshold || !hackable){
 				if((input.keymoveleft && !oldinput.keymoveleft) || (input.keymoveright && !oldinput.keymoveright)){
 					state = RUNNING;
 					state_i = -1;
@@ -2232,11 +2238,11 @@ void Player::Tick(World & world){
 				// 127:0-18 civilian hacking
 				res_bank = 127;
 			}
-			if(state_i >= 17){
+			if(state_i >= GASLoader::Get().player.hackingExitThreshold){
 				effecthacking = false;
 				effecthackingcontinue = 0;
-				res_index = (17 - state_i) + 16;
-				if(state_i - 17 == 16){
+				res_index = (GASLoader::Get().player.hackingExitThreshold - state_i) + 16;
+				if(state_i - GASLoader::Get().player.hackingExitThreshold == 16){
 					state = STANDING;
 					state_i = -1;
 					break;
@@ -2918,7 +2924,7 @@ Team * Player::TeamOfCurrentBase(World & world){
 }
 
 bool Player::IsDisguised(void){
-	if(disguised >= 100){
+	if(disguised >= GASLoader::Get().player.disguiseThreshold){
 		return true;
 	}
 	return false;
@@ -3859,18 +3865,15 @@ bool Player::ProcessJetpackState(World & world){
 		//xv = xv / 2;
 		state_i = -1;
 	}
-	Uint8 xvmax = 14;
-	/*if(hassecret){
-		xvmax = 12;
-	}*/
+	Uint8 xvmax = GASLoader::Get().player.jetpackXvMax;
 	if(xv > xvmax){
 		xv = xvmax;
 	}
 	if(xv < -xvmax){
 		xv = -xvmax;
 	}
-	if(yv < -9){
-		yv = -9;
+	if(yv < -GASLoader::Get().player.jetpackYvMax){
+		yv = -GASLoader::Get().player.jetpackYvMax;
 	}
 	//if(yv > 0){
 	//	yv = 0;
@@ -4433,7 +4436,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				}break;
 				case PickUp::INVISIBLE:{
 					powerupname = "Shielding will render you invisible for 30 seconds!";
-					invisiblebonustime = world.tickcount + (30 * 24);
+					invisiblebonustime = world.tickcount + GASLoader::Get().player.invisibilityDurationTicks;
 					invisible = true;
 				}break;
 				case PickUp::RADAR:{

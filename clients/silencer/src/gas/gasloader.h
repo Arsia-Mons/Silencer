@@ -57,6 +57,26 @@ struct PlayerDef {
     double upgradeMultiplierHacking  = 0.10; // hacking speed bonus per point
     double upgradeMultiplierContacts = 0.10; // credits bonus per point
     int maxPoisoned                 = 9;    // max simultaneous poison doses
+    // Movement speeds (px/tick)
+    int runSpeed                    = 14;   // normal run xvmax
+    int runSpeedDisguised           = 11;   // while disguised
+    int runSpeedSecret              = 11;   // carrying secret
+    int runSpeedSecretDisguised     = 8;    // carrying secret + disguised
+    int jetpackXvMax                = 14;   // jetpack horizontal max
+    int jetpackXvMaxDisguised       = 12;   // jetpack horizontal max while disguised (unused currently)
+    int jetpackYvMax                = 9;    // jetpack upward velocity cap (stored positive, applied negative)
+    // Jump impulses (applied as negative yv; stored positive)
+    int jumpImpulse                 = 17;   // normal jump
+    int ladderJumpImpulse           = 29;   // jump from ladder (no directional input)
+    int ladderActivateImpulse       = 8;    // jump from ladder with activate held
+    // Ability timers (ticks)
+    int disguiseActivationTicks     = 112;  // ticks to reach fully-disguised state
+    int disguiseThreshold           = 100;  // value at which player is considered fully disguised
+    int invisibilityDurationTicks   = 720;  // duration of invisibility powerup (30 * 24)
+    int poisonTickCycle             = 24;   // ticks per poison damage cycle
+    int hackingEffectTicks          = 5;    // ticks for hacking visual/audio effect
+    int hackingCompleteThreshold    = 15;   // state_i value when hack completes
+    int hackingExitThreshold        = 17;   // state_i value when player regains movement
 };
 
 // ---- Weapon ----------------------------------------------------------------
@@ -68,6 +88,17 @@ struct WeaponDef {
     // Plasma only: secondary damage values when projectile is in "large" (attached) state.
     int healthDamageLarge = 0;
     int shieldDamageLarge = 0;
+    // Player weapon fire delay in ticks (blaster=7, laser=11, rocket=21, flamer=2).
+    int fireDelay         = 0;
+    // Grenade/bomb: throw speed and explosion timing (ticks).
+    int throwSpeedStanding  = 0;  // xv when player is standing
+    int throwSpeedMoving    = 0;  // xv when player is moving
+    int throwSpeedRunning   = 0;  // base xv when player is running (abs(player.xv) added)
+    int explosionTick       = 0;  // state_i when first explosion fires
+    int secondaryTick       = 0;  // state_i when secondary shrapnel fires
+    int destroyTick         = 0;  // state_i when non-special grenade is destroyed
+    int neutronDestroyTick  = 0;  // state_i when neutron bomb is destroyed
+    int flareDuration       = 0;  // state_i when flare/poisonflare is destroyed (30 + 168)
 };
 
 // ---- Item ------------------------------------------------------------------
@@ -103,6 +134,17 @@ struct EnemyDef {
     int shield = 0;
     int speed  = 0;
     int weapon = 0;  // guard weapon variant: 0=blaster, 1=laser, 2=rocket
+    // Guard AI
+    int shotCooldown    = 48;   // ticks between shots (cooldowntime)
+    int chaseRangeClose = 60;   // px — within this range Look5 skips shooting (too close)
+    int chaseRangeStop  = 80;   // px — within this distance guard stops chasing
+    int chaseRangeMax   = 90;   // px — beyond this guard actively walks toward target
+    // Robot AI
+    int searchTicks         = 600;  // ticks to search before returning to spawn
+    int meleeCheckInterval  = 40;   // check melee every N ticks
+    // Civilian tract weapon
+    int tractHealthDamage = 0;  // tract projectile health damage (civilian only)
+    int tractShieldDamage = 0;  // tract projectile shield damage (civilian only)
 };
 
 // ---- Ability ---------------------------------------------------------------

@@ -59,7 +59,7 @@ void Robot::InitBT() {
 	// Always returns Failure so the Selector continues to Patrol (orient + move each tick).
 	btctx_.actions["LookSides"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
-		if (bt_walk_ticks_ >= 600) return BTResult::Failure; // ReturnToSpawn handles orientation
+		if (bt_walk_ticks_ >= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->searchTicks : 600)) return BTResult::Failure; // ReturnToSpawn handles orientation
 		World& world = *static_cast<World*>(ctx.userData);
 		if (Look(world, 2)) { mirrored = true; }
 		else if (Look(world, 1)) { mirrored = false; }
@@ -69,7 +69,7 @@ void Robot::InitBT() {
 	// MeleeCheck: only from WALKING, throttled to every 40 ticks.
 	btctx_.actions["MeleeCheck"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
-		if (state_i % 40 != 0) return BTResult::Failure;
+		if (state_i % (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->meleeCheckInterval : 40) != 0) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
 		int x1, y1, x2, y2;
 		GetAABB(world.resources, &x1, &y1, &x2, &y2);
@@ -118,7 +118,7 @@ void Robot::InitBT() {
 		return BTResult::Success;
 	};
 
-	// ReturnToSpawn: after 10s search phase (!patrol, bt_walk_ticks_ >= 600), walk back to spawn and sleep.
+	// ReturnToSpawn: after search phase (!patrol, searchTicks from GAS), walk back to spawn and sleep.
 	// If a target is spotted en-route, reset the search timer and resume hunting.
 	btctx_.actions["ReturnToSpawn"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
@@ -241,7 +241,7 @@ void Robot::Tick(World & world){
 				}
 				if(Look(world, 2)){ mirrored = true; }
 				if(Look(world, 1)){ mirrored = false; }
-				if(state_i % 40 == 0){
+				if(state_i % (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->meleeCheckInterval : 40) == 0){
 					int x1, y1, x2, y2;
 					GetAABB(world.resources, &x1, &y1, &x2, &y2);
 					std::vector<Uint8> types;
