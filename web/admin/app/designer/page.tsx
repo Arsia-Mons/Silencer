@@ -220,7 +220,7 @@ export default function DesignerPage() {
   };
 
   const handleOpenSil = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) openMap(e.target.files[0]);
+    if (e.target.files?.[0]) openMap(e.target.files[0]).then(() => requestAnimationFrame(fitToScreen));
   };
 
   const handleTilePaint = useCallback((layerType: 'bg' | 'fg', layerIdx: number, tx: number, ty: number, tileId: number) => {
@@ -396,6 +396,7 @@ export default function DesignerPage() {
                     if (!w || !h || w < 1 || h < 1 || w > 512 || h > 512) return;
                     createMap(w, h, newMapDesc);
                     setShowNewMap(false);
+                    requestAnimationFrame(fitToScreen);
                   }}
                     className="flex-1 py-1 text-xs font-mono border border-game-primary text-game-primary rounded hover:bg-game-dark transition-colors">
                     CREATE
