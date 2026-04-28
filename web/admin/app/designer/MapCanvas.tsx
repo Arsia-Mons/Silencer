@@ -727,6 +727,7 @@ export default function MapCanvas({
         ctx.save();
         ctx.globalAlpha = 0.55;
         const allLayers = [...bg, ...fg];
+        const ts = 64 * zoom;
         for (const layerCells of allLayers) {
           for (let dy = 0; dy < h; dy++) {
             for (let dx = 0; dx < w; dx++) {
@@ -737,7 +738,17 @@ export default function MapCanvas({
               const bitmaps = tileImages?.get(bank);
               const img = bitmaps?.[slot];
               if (!img) continue;
-              ctx.drawImage(img, (hx + dx) * 64 * zoom + pan.x, (hy + dy) * 64 * zoom + pan.y, 64 * zoom, 64 * zoom);
+              const px = (hx + dx) * ts + pan.x;
+              const py = (hy + dy) * ts + pan.y;
+              if (tile.flip) {
+                ctx.save();
+                ctx.translate(px + ts, py);
+                ctx.scale(-1, 1);
+                ctx.drawImage(img, 0, 0, ts, ts);
+                ctx.restore();
+              } else {
+                ctx.drawImage(img, px, py, ts, ts);
+              }
             }
           }
         }
