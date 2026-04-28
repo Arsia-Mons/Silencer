@@ -44,10 +44,13 @@ export default function DesignerPage() {
   const wsConnected = useSocket({});
 
   const { loaded, error, tileImages, spriteImages, tileBankCounts, progress, loadFiles } = useGameData();
-  const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, beginPaint, commitPaint,
+  const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, applyTileBatch, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
           updateHeader, updatePlatform,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
+
+  type TileSel = { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number };
+  type TileCopyBuf = { w: number; h: number; layerType: 'bg' | 'fg'; layerIdx: number; tiles: Array<{ tile_id: number; flip: number; lum: number }> };
 
   const [activeTool, setActiveTool]     = useState('TILE_BG');
   const [activeLayer, setActiveLayer]   = useState(0);
@@ -55,6 +58,10 @@ export default function DesignerPage() {
   const [selectedTileId, setSelectedTile] = useState(0);
   const [selectedActorId, setSelectedActor] = useState(36); // player start default
   const [selectedPlatformIdx, setSelectedPlatformIdx] = useState<number | null>(null);
+  const [tileLayerType, setTileLayerType] = useState<'bg' | 'fg'>('bg');
+  const [tileSelection, setTileSelection] = useState<TileSel | null>(null);
+  const [tileCopyBuffer, setTileCopyBuffer] = useState<TileCopyBuf | null>(null);
+  const [pastePending, setPastePending] = useState(false);
   const [zoom, setZoom]   = useState(0.5);
   const [pan, setPan]     = useState({ x: 32, y: 32 });
   const fitPendingRef = useRef(false);
@@ -181,6 +188,48 @@ export default function DesignerPage() {
   const dataDirRef   = useRef<HTMLInputElement>(null);
   const dataFilesRef = useRef<HTMLInputElement>(null);
 
+  // Tool change: track tile layer type and clear selection/paste on tool switch
+  const handleToolChange = useCallback((tool: string) => {
+    if (tool === 'TILE_BG') setTileLayerType('bg');
+    else if (tool === 'TILE_FG') setTileLayerType('fg');
+    if (tool !== 'TILE_SELECT') { setTileSelection(null); setPastePending(false); }
+    setActiveTool(tool);
+  }, []);
+
+  // Ref to access latest copy/paste context from stable keyboard handler
+  const clipCtxRef = useRef({ tileSelection, tileCopyBuffer, map, activeLayer, tileLayerType, pastePending });
+  useEffect(() => { clipCtxRef.current = { tileSelection, tileCopyBuffer, map, activeLayer, tileLayerType, pastePending }; });
+
+  // Copy/paste keyboard shortcuts (Ctrl/Cmd+C, Ctrl/Cmd+V, Escape)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        const { tileSelection: sel, map: m, tileLayerType: lt, activeLayer: li } = clipCtxRef.current;
+        if (!sel || !m) return;
+        e.preventDefault();
+        const { tx1, ty1, tx2, ty2, layerType, layerIdx } = sel;
+        const w = tx2 - tx1 + 1; const h = ty2 - ty1 + 1;
+        const layerArr = layerType === 'fg' ? m.layers.fg : m.layers.bg;
+        const tiles: TileCopyBuf['tiles'] = [];
+        for (let dy = 0; dy < h; dy++)
+          for (let dx = 0; dx < w; dx++) {
+            const cell = layerArr[layerIdx][(ty1 + dy) * m.width + (tx1 + dx)];
+            tiles.push(cell ?? { tile_id: 0, flip: 0, lum: 0 });
+          }
+        setTileCopyBuffer({ w, h, layerType, layerIdx, tiles });
+        setPastePending(false);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        if (!clipCtxRef.current.tileCopyBuffer) return;
+        e.preventDefault();
+        setPastePending(p => !p);
+      } else if (e.key === 'Escape') {
+        setPastePending(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []); // stable — reads via ref
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -193,9 +242,9 @@ export default function DesignerPage() {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       switch (e.key) {
-        case 'b': setActiveTool('TILE_BG');    break;
-        case 'f': setActiveTool('TILE_FG');    break;
-        case 'e': setActiveTool('ERASE_TILE'); break;
+        case 'b': handleToolChange('TILE_BG');    break;
+        case 'f': handleToolChange('TILE_FG');    break;
+        case 'e': handleToolChange('ERASE_TILE'); break;
         case 'p': setActiveTool('RECT');       break;
         case 'a': setActiveTool('ACTOR');      break;
         case 's': setActiveTool('SELECT');     break;
@@ -211,7 +260,7 @@ export default function DesignerPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undo, redo]);
+  }, [undo, redo, handleToolChange]);
 
   const handleDataDir = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) loadFiles(e.target.files);
@@ -258,6 +307,13 @@ export default function DesignerPage() {
     if (!actor) return;
     updateActor(idx, { direction: actor.direction ? 0 : 1 });
   }, [map, updateActor]);
+
+  const handleTilePaste = useCallback((tx: number, ty: number) => {
+    if (!tileCopyBuffer || !map) return;
+    const { w, h, layerType, layerIdx, tiles } = tileCopyBuffer;
+    const updates = tiles.map((t, i) => ({ x: tx + (i % w), y: ty + Math.floor(i / w), ...t }));
+    applyTileBatch(layerType, layerIdx, updates);
+  }, [tileCopyBuffer, map, applyTileBatch]);
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
@@ -675,7 +731,7 @@ export default function DesignerPage() {
         {/* Toolbar */}
         <Toolbar
           activeTool={activeTool}
-          onToolChange={setActiveTool}
+          onToolChange={handleToolChange}
           activeLayer={activeLayer}
           onLayerChange={setActiveLayer}
           selectedActor={selectedActorId}
@@ -772,6 +828,13 @@ export default function DesignerPage() {
               onPlatformSelect={setSelectedPlatformIdx}
               onPlatformUpdate={updatePlatform}
               gridSize={gridSize}
+              tileSelection={tileSelection}
+              onTileSelection={setTileSelection}
+              tileCopyBuffer={tileCopyBuffer}
+              pastePending={pastePending}
+              onTilePaste={handleTilePaste}
+              copyLayerType={tileLayerType}
+              copyLayerIdx={activeLayer}
             />
             <Minimap
               map={map}
@@ -821,9 +884,17 @@ export default function DesignerPage() {
               MAP {map.width}×{map.height} | {map.actors.length} actors | {map.platforms.length} platforms
             </span>
           )}
-          <span className="text-xs font-mono text-game-muted ml-auto">
-            CTRL/SPACE+DRAG or MMB to pan · SCROLL to zoom · CTRL+Z/Y to undo/redo
-          </span>
+          {tileCopyBuffer && (
+            <span className="text-xs font-mono text-[#c0c040]">
+              📋 {tileCopyBuffer.w}×{tileCopyBuffer.h} {tileCopyBuffer.layerType.toUpperCase()}
+              {pastePending ? ' — PASTE MODE (click to stamp · Esc to cancel)' : ' — Ctrl+V to paste'}
+            </span>
+          )}
+          {tileSelection && !tileCopyBuffer && (
+            <span className="text-xs font-mono text-[#80b0ff]">
+              ⬚ {tileSelection.tx2 - tileSelection.tx1 + 1}×{tileSelection.ty2 - tileSelection.ty1 + 1} sel — Ctrl+C to copy
+            </span>
+          )}
         </div>
       </div>
 

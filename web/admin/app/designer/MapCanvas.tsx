@@ -122,6 +122,13 @@ interface Props {
   onActorSelect?: (idx: number | null) => void;
   onActorFlip?: (idx: number) => void;
   gridSize: number;
+  tileSelection?: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null;
+  onTileSelection?: (sel: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null) => void;
+  tileCopyBuffer?: { w: number; h: number; tiles: Array<{ tile_id: number; flip: number; lum: number }> } | null;
+  pastePending?: boolean;
+  onTilePaste?: (tx: number, ty: number) => void;
+  copyLayerType?: 'bg' | 'fg';
+  copyLayerIdx?: number;
 }
 
 export default function MapCanvas({
@@ -139,6 +146,13 @@ export default function MapCanvas({
   onActorSelect,
   onActorFlip,
   gridSize,
+  tileSelection,
+  onTileSelection,
+  tileCopyBuffer,
+  pastePending,
+  onTilePaste,
+  copyLayerType,
+  copyLayerIdx,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -154,6 +168,11 @@ export default function MapCanvas({
   const platformDragRef = useRef<PlatformDragState | null>(null);
   // Current preview bounds during platform drag { wx1, wy1, wx2, wy2 }
   const platformPreviewRef = useRef<PlatformPreview | null>(null);
+  // Tile selection drag
+  const isSelectingTile = useRef(false);
+  const tileSelStartRef = useRef<{ tx: number; ty: number } | null>(null);
+  // Current hover tile (for paste preview — updated every mousemove, no re-render)
+  const hoverTileRef = useRef<{ tx: number; ty: number }>({ tx: 0, ty: 0 });
 
   // World → canvas coords
   const worldToCanvas = useCallback((wx: number, wy: number) => ({
@@ -514,7 +533,7 @@ export default function MapCanvas({
     return () => resizer.disconnect();
   }, []);
 
-  // Animated marching-ants selection highlight on overlay canvas
+  // Animated marching-ants selection highlight + tile selection + paste preview on overlay canvas
   useEffect(() => {
     const overlay = overlayCanvasRef.current;
     if (!overlay) return;
@@ -522,8 +541,10 @@ export default function MapCanvas({
 
     const hasActorHighlight = highlightActorIdx != null && map?.actors[highlightActorIdx];
     const hasPlatformHighlight = selectedPlatformIdx != null && map?.platforms[selectedPlatformIdx];
+    const hasTileSelection = tileSelection != null;
+    const hasPastePreview = !!(pastePending && tileCopyBuffer);
 
-    if (!hasActorHighlight && !hasPlatformHighlight) {
+    if (!hasActorHighlight && !hasPlatformHighlight && !hasTileSelection && !hasPastePreview) {
       ctx.clearRect(0, 0, overlay.width, overlay.height);
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
       return;
@@ -678,12 +699,58 @@ export default function MapCanvas({
         drawAxis((cx1 + cx2) / 2, (cy1 + cy2) / 2);
       }
 
+      // Tile selection rect
+      if (hasTileSelection) {
+        const { tx1, ty1, tx2, ty2 } = tileSelection!;
+        const sx = tx1 * 64 * zoom + pan.x;
+        const sy = ty1 * 64 * zoom + pan.y;
+        const sw = (tx2 - tx1 + 1) * 64 * zoom;
+        const sh = (ty2 - ty1 + 1) * 64 * zoom;
+        ctx.save();
+        ctx.fillStyle = 'rgba(80,150,255,0.12)';
+        ctx.fillRect(sx, sy, sw, sh);
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = 'rgba(130,190,255,0.9)';
+        ctx.lineDashOffset = -dashOffset;
+        ctx.strokeRect(sx, sy, sw, sh);
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineDashOffset = -dashOffset + 5;
+        ctx.strokeRect(sx, sy, sw, sh);
+        ctx.restore();
+      }
+
+      // Paste preview at hover tile
+      if (hasPastePreview) {
+        const { tx: hx, ty: hy } = hoverTileRef.current;
+        const { w, h, tiles } = tileCopyBuffer!;
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        for (let dy = 0; dy < h; dy++) {
+          for (let dx = 0; dx < w; dx++) {
+            const tile = tiles[dy * w + dx];
+            if (!tile || tile.tile_id === 0) continue;
+            const imgs = tileImages?.get(tile.tile_id);
+            const img = imgs?.[0];
+            if (!img) continue;
+            ctx.drawImage(img, (hx + dx) * 64 * zoom + pan.x, (hy + dy) * 64 * zoom + pan.y, 64 * zoom, 64 * zoom);
+          }
+        }
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]);
+        ctx.strokeStyle = 'rgba(255,220,60,0.9)';
+        ctx.lineDashOffset = -dashOffset;
+        ctx.strokeRect(hx * 64 * zoom + pan.x, hy * 64 * zoom + pan.y, w * 64 * zoom, h * 64 * zoom);
+        ctx.restore();
+      }
+
       dashOffset = (dashOffset + 0.5) % 10;
       rafRef.current = requestAnimationFrame(draw);
     }
     rafRef.current = requestAnimationFrame(draw);
     return () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
-  }, [highlightActorIdx, selectedPlatformIdx, map, spriteImages, zoom, pan, dragActorPreview]);
+  }, [highlightActorIdx, selectedPlatformIdx, map, spriteImages, zoom, pan, dragActorPreview, tileSelection, tileCopyBuffer, pastePending, tileImages]);
 
   // Mouse event handlers
   const getCanvasPos = (e: { clientX: number; clientY: number }) => {
@@ -725,7 +792,19 @@ export default function MapCanvas({
     const { tx, ty } = canvasToTile(cx, cy);
     const { wx, wy } = canvasToWorld(cx, cy);
 
-    if (activeTool === 'TILE_BG' || activeTool === 'TILE_FG') {
+    // Paste intercept: left-click in bounds while paste is pending stamps the buffer
+    if (pastePending && tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
+      onTilePaste?.(tx, ty);
+      return;
+    }
+
+    if (activeTool === 'TILE_SELECT') {
+      if (tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
+        isSelectingTile.current = true;
+        tileSelStartRef.current = { tx, ty };
+        onTileSelection?.({ tx1: tx, ty1: ty, tx2: tx, ty2: ty, layerType: copyLayerType ?? 'bg', layerIdx: copyLayerIdx ?? activeLayer });
+      }
+    } else if (activeTool === 'TILE_BG' || activeTool === 'TILE_FG') {
       isPainting.current = true;
       onBeginPaint?.();
       if (selectedTileId && tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
@@ -812,7 +891,8 @@ export default function MapCanvas({
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
       onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
-      selectedPlatformIdx, onPlatformSelect, onActorSelect, highlightActorIdx, snap]);
+      selectedPlatformIdx, onPlatformSelect, onActorSelect, highlightActorIdx, snap,
+      pastePending, onTilePaste, onTileSelection, copyLayerType, copyLayerIdx]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -862,6 +942,20 @@ export default function MapCanvas({
     const { tx, ty } = canvasToTile(cx, cy);
     const { wx, wy } = canvasToWorld(cx, cy);
     onCursorChange({ tx, ty, wx, wy });
+
+    // Always update hover tile for paste preview (no re-render)
+    hoverTileRef.current = { tx, ty };
+
+    // Live tile selection drag
+    if (isSelectingTile.current && tileSelStartRef.current) {
+      const { tx: stx, ty: sty } = tileSelStartRef.current;
+      onTileSelection?.({
+        tx1: Math.min(stx, tx), ty1: Math.min(sty, ty),
+        tx2: Math.max(stx, tx), ty2: Math.max(sty, ty),
+        layerType: copyLayerType ?? 'bg', layerIdx: copyLayerIdx ?? activeLayer,
+      });
+      return;
+    }
 
     // Platform drag (SELECT tool — handle or body move)
     if (platformDragRef.current) {
@@ -928,11 +1022,19 @@ export default function MapCanvas({
       }
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, eraseLayerType,
-      onTilePaint, onPanChange, onCursorChange, onDragPlatformChange, snap]);
+      onTilePaint, onPanChange, onCursorChange, onDragPlatformChange, snap,
+      onTileSelection, copyLayerType, copyLayerIdx]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isPanning.current) {
       isPanning.current = false;
+      return;
+    }
+
+    // Finish tile selection drag
+    if (isSelectingTile.current) {
+      isSelectingTile.current = false;
+      tileSelStartRef.current = null;
       return;
     }
 
@@ -1010,7 +1112,9 @@ export default function MapCanvas({
     ? 'grabbing'
     : (isPanning.current || isSpacePanning.current || isCtrlPanning.current)
       ? 'grab'
+      : pastePending ? 'copy'
       : activeTool === 'SELECT' ? 'pointer'
+      : activeTool === 'TILE_SELECT' ? 'crosshair'
       : activeTool === 'ERASE_TILE' ? 'crosshair'
       : isPainting.current ? 'crosshair'
       : 'default';

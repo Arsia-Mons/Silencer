@@ -133,6 +133,7 @@ export interface UseSilMapReturn {
   createMap: (width: number, height: number, description: string) => void;
   updateTile: (layerType: 'bg' | 'fg', layerIdx: number, x: number, y: number, tile_id: number, flip?: number, lum?: number) => void;
   patchTile: (layerType: 'bg' | 'fg', layerIdx: number, x: number, y: number, patch: Partial<TileCell>) => void;
+  applyTileBatch: (layerType: 'bg' | 'fg', layerIdx: number, updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }>) => void;
   beginPaint: () => void;
   commitPaint: () => void;
   addPlatform: (platform: MapPlatform) => void;
@@ -489,6 +490,26 @@ export function useSilMap(): UseSilMapReturn {
     });
   }, [pushHistory]);
 
+  const applyTileBatch = useCallback((
+    layerType: 'bg' | 'fg', layerIdx: number,
+    updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }>
+  ) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const { width, height, layers } = prev;
+      const srcArr = layerType === 'fg' ? layers.fg : layers.bg;
+      const newArr = srcArr.map((l, i) => i === layerIdx ? l.slice() : l);
+      for (const { x, y, tile_id, flip, lum } of updates) {
+        if (x >= 0 && x < width && y >= 0 && y < height)
+          newArr[layerIdx][y * width + x] = { tile_id, flip, lum };
+      }
+      return { ...prev, layers: layerType === 'fg'
+        ? { bg: layers.bg, fg: newArr }
+        : { bg: newArr, fg: layers.fg } };
+    });
+  }, [pushHistory]);
+
   const patchTile = useCallback((layerType: 'bg' | 'fg', layerIdx: number, x: number, y: number, patch: Partial<TileCell>) => {
     setMapData(prev => {
       if (!prev) return prev;
@@ -617,7 +638,7 @@ export function useSilMap(): UseSilMapReturn {
 
   return {
     map: mapData, openMap, saveMap, publishMap, createMap,
-    updateTile, patchTile, beginPaint, commitPaint,
+    updateTile, patchTile, applyTileBatch, beginPaint, commitPaint,
     addPlatform, removePlatform, updatePlatform,
     addActor, removeActor, updateActor, moveActor,
     updateHeader,

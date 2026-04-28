@@ -31,6 +31,7 @@ export const TOOLS: ToolDef[] = [
   { id: 'TILE_BG',        label: 'TILE (BG)',  icon: '▦' },
   { id: 'TILE_FG',        label: 'TILE (FG)',  icon: '▧' },
   { id: 'ERASE_TILE',     label: 'ERASE',      icon: '⌫' },
+  { id: 'TILE_SELECT',    label: 'COPY SEL',   icon: '⬚' },
   { id: 'RECT',           label: 'RECT',       icon: '▭' },
   { id: 'STAIRSUP',       label: 'STAIRS↑',   icon: '↗' },
   { id: 'STAIRSDOWN',     label: 'STAIRS↓',   icon: '↘' },
@@ -116,7 +117,7 @@ export default function Toolbar({
   selectedActor, onActorChange, lumMode, onLumModeChange,
   eraseLayerType, onEraseLayerTypeChange,
 }: ToolbarProps) {
-  const tileTools     = TOOLS.filter(t => ['TILE_BG', 'TILE_FG', 'ERASE_TILE'].includes(t.id));
+  const tileTools     = TOOLS.filter(t => ['TILE_BG', 'TILE_FG', 'ERASE_TILE', 'TILE_SELECT'].includes(t.id));
   const platformTools = TOOLS.filter(t => ['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM','ERASE_PLATFORM'].includes(t.id));
   const otherTools    = TOOLS.filter(t => ['SELECT','ACTOR'].includes(t.id));
 
