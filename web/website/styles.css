@@ -1,3 +1,17 @@
+@font-face {
+  font-family: "Silencer Title";
+  src: url("/assets/silencer-title.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Silencer UI";
+  src: url("/assets/silencer-ui.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
 * { box-sizing: border-box; }
 
 html, body { margin: 0; padding: 0; min-height: 100%; }
@@ -92,6 +106,8 @@ blockquote footer::before {
   list-style: none;
   margin: 2lh 0 0 0;
   padding: 0;
+  font-family: "Silencer Title", 'Courier New', Courier, monospace;
+  font-size: 24px;
 }
 
 .links li {
@@ -101,21 +117,20 @@ blockquote footer::before {
 
 .links li::before {
   content: "> ";
-  color: #88c194;
+  color: #187C14;
 }
 
 .links a {
-  color: #88c194;
+  color: #187C14;
   text-decoration: none;
 }
 
 .links a.primary {
-  color: #e8ffea;
+  color: #187C14;
 }
 
 .links a:hover,
 .links a:focus-visible {
-  color: #050a05;
-  background-color: #88c194;
+  text-decoration: underline;
   outline: none;
 }
