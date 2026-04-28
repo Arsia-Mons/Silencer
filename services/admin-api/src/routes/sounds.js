@@ -109,12 +109,12 @@ const FADEOUT_MAP = {
 // Sound sets — groups of interchangeable variants chosen randomly by the game.
 // Replacing individual members without updating the whole set breaks uniformity.
 const SOUND_SETS = {
-  'type1.wav':    'terminal-typing',
-  'type2.wav':    'terminal-typing',
-  'type3.wav':    'terminal-typing',
-  'type4.wav':    'terminal-typing',
-  'type5.wav':    'terminal-typing',
-  'typerev6.wav': 'terminal-typing',
+  'type1.wav':    'hacking-typing',   // player.cpp: random during hacking bonus
+  'type2.wav':    'hacking-typing',
+  'type3.wav':    'hacking-typing',
+  'type4.wav':    'hacking-typing',
+  'type5.wav':    'hacking-typing',
+  // typerev6.wav is standalone (terminal delete key / objectives screen) — NOT in the random set
   'ammo01.wav':   'ammo-pickup',
   'ammo02.wav':   'ammo-pickup',
   'ammo03.wav':   'ammo-pickup',
@@ -243,7 +243,7 @@ const CPP_VOLUME_MAP = {
   's_hita01.wav': [{ctx:'player receive hit A',vol:128}],
   's_hitb01.wav': [{ctx:'player receive hit B',vol:128}],
   'reload2.wav':  [{ctx:'weapon reload',vol:96}],
-  'land1.wav':    [{ctx:'player land',vol:96},{ctx:'impact land',vol:'dyn'}],
+  'land1.wav':    [{ctx:'player land',vol:96},{ctx:'grenade bounce land',vol:'dyn'}],
   'land11.wav':   [{ctx:'civilian land',vol:96}],
   'fall2b.wav':   [{ctx:'player fall',vol:96}],
   'ladder1.wav':  [{ctx:'ladder step up',vol:24}],
@@ -257,6 +257,29 @@ const CPP_VOLUME_MAP = {
   'grenthro.wav': [{ctx:'grenade throw',vol:64}],
   'rico1.wav':    [{ctx:'bullet ricochet A',vol:32}],
   'rico2.wav':    [{ctx:'bullet ricochet B',vol:32}],
+  // Guard speech — random array in guard.cpp, EmitSound vol 128
+  'theres3.wav':  [{ctx:'guard speech "there he is"',vol:128}],
+  'stop4.wav':    [{ctx:'guard speech "stop"',vol:128}],
+  'freeze3.wav':  [{ctx:'guard speech "freeze"',vol:128}],
+  'freezrt1.wav': [{ctx:'guard speech "freeze right there"',vol:128}],
+  'drop4.wav':    [{ctx:'guard speech "drop it"',vol:128}],
+  // Alarms — world.SendSound (default vol 128 unless stated)
+  'alarm3a.wav':  [{ctx:'intrusion alarm (player triggers)',vol:96}],
+  'intrude.wav':  [{ctx:'intrusion alarm (per-peer)',vol:96}],
+  'alinvest.wav': [{ctx:'secret picked up – guard investigate',vol:128}],
+  'alwarn.wav':   [{ctx:'secret picked up – all secrets taken',vol:128}],
+  // Hacking typing — random array, player.cpp EmitSound vol 64
+  'type1.wav':    [{ctx:'player hacking typing (random)',vol:64}],
+  'type2.wav':    [{ctx:'player hacking typing (random)',vol:64}],
+  'type3.wav':    [{ctx:'player hacking typing (random)',vol:64}],
+  'type4.wav':    [{ctx:'player hacking typing (random)',vol:64}],
+  'type5.wav':    [{ctx:'player hacking typing (random)',vol:64}],
+  // Standalone terminal / objectives sounds via SendSound vol 128
+  'typerev6.wav': [{ctx:'terminal delete key / objectives type',vol:128}],
+  'cathdoor.wav': [{ctx:'team cathedral door open',vol:128}],
+  // Weapon / world events via SendSound vol 128
+  'grenade1.wav': [{ctx:'grenade pin pull',vol:128}],
+  'vModDeto.wav': [{ctx:'secret data trace countdown',vol:128}],
 };
 
 mkdirSync(STAGING_DIR, { recursive: true });
