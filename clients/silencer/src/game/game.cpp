@@ -59,27 +59,8 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	lastannouncedgameid = 0;
 	lastannouncedstatus = 0;
 	joininggame = false;
-	keynames[0] = "Move Up";
-	keynames[1] = "Move Down";
-	keynames[2] = "Move Left";
-	keynames[3] = "Move Right";
-	keynames[4] = "Aim Up/Left";
-	keynames[5] = "Aim Up/Right";
-	keynames[6] = "Aim Down/Left";
-	keynames[7] = "Aim Down/Right";
-	keynames[8] = "Jump";
-	keynames[9] = "Jetpack";
-	keynames[10] = "Activate/Hack";
-	keynames[11] = "Use Inventory";
-	keynames[12] = "Fire";
-	keynames[13] = "Chat";
-	keynames[14] = "Next Inventory";
-	keynames[15] = "Next Camera";
-	keynames[16] = "Previous Camera";
-	keynames[17] = "Detonate";
-	keynames[18] = "Disguise";
-	keynames[19] = "Next Weapon";
 	memset(keystate, 0, sizeof(keystate));
+	gamepad = nullptr;
 	singleplayermessage = 0;
 	updatetitle = true;
 	oldselectedagency = -1;
@@ -136,6 +117,7 @@ Game::~Game(){
 	world.resources.UnloadSounds();
 	Audio::GetInstance().Close();
 	MIX_Quit();
+	if(gamepad){ SDL_CloseGamepad(gamepad); gamepad = nullptr; }
 	SDL_Quit();
 }
 
@@ -200,6 +182,7 @@ bool Game::Load(char * cmdline){
 		}while((cmdline = strtok(0, " ")));
 	}
 	Config::GetInstance().Load();
+	LoadActiveKeymap();
 	if(world.dedicatedserver.active){
 		// Dedicated server: SDL3 always initialises the timer subsystem; no flags needed.
 		if(!SDL_Init(0)){
@@ -208,11 +191,15 @@ bool Game::Load(char * cmdline){
 		}
 	}
 	if(!world.dedicatedserver.active){
-		Uint32 sdlflags = headless ? 0 : (SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+		// SDL_INIT_GAMEPAD is opt-in; without it SDL_GetGamepads() returns
+		// nothing. Headless builds (CI / control-socket smoke tests) skip it
+		// since they don't need controller input.
+		Uint32 sdlflags = headless ? 0 : (SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD);
 		if(!SDL_Init(sdlflags)){
 			printf("Could not initialize SDL %s\n", SDL_GetError());
 			return false;
 		}
+		if(!headless) OpenFirstGamepad();
 		printf("Loading palette...\n");
 		if(!renderer.palette.SetPalette(0)){
 			return false;
@@ -1105,7 +1092,7 @@ bool Game::Tick(void){
 					case 0:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "Move your agent left and right\nBy tapping %s and %s.", GetKeyName(Config::GetInstance().keymoveleftbinding[0]), GetKeyName(Config::GetInstance().keymoverightbinding[0]));
+							sprintf(text, "Move your agent left and right\nBy tapping %s and %s.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
 							world.ShowMessage(text, 128);
 						}
 						if(player->state == Player::RUNNING){
@@ -1116,7 +1103,7 @@ bool Game::Tick(void){
 					case 1:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "Make your agent jump by striking %s.", GetKeyName(Config::GetInstance().keyjumpbinding[0]));
+							sprintf(text, "Make your agent jump by striking %s.", GetActionKeyDisplayName(Action::Jump));
 							world.ShowMessage(text, 128);
 						}
 						if(player->state == Player::JUMPING){
@@ -1127,7 +1114,7 @@ bool Game::Tick(void){
 					case 2:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "If you hold the %s key down, it will\nactivate your agent's jet-pack.", GetKeyName(Config::GetInstance().keyjetpackbinding[0]));
+							sprintf(text, "If you hold the %s key down, it will\nactivate your agent's jet-pack.", GetActionKeyDisplayName(Action::Jetpack));
 							world.ShowMessage(text, 128);
 						}
 						if(player->state == Player::JETPACK){
@@ -1138,7 +1125,7 @@ bool Game::Tick(void){
 					case 3:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "Make your agent kneel by holding %s.", GetKeyName(Config::GetInstance().keymovedownbinding[0]));
+							sprintf(text, "Make your agent kneel by holding %s.", GetActionKeyDisplayName(Action::MoveDown));
 							world.ShowMessage(text, 128);
 						}
 						if(player->state == Player::CROUCHED){
@@ -1149,7 +1136,7 @@ bool Game::Tick(void){
 					case 4:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "Make your agent roll by kneeling,\nthen striking %s or %s.", GetKeyName(Config::GetInstance().keymoveleftbinding[0]), GetKeyName(Config::GetInstance().keymoverightbinding[0]));
+							sprintf(text, "Make your agent roll by kneeling,\nthen striking %s or %s.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
 							world.ShowMessage(text, 128);
 						}
 						if(player->state == Player::ROLLING){
@@ -1160,7 +1147,7 @@ bool Game::Tick(void){
 					case 5:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "To disguise as a civilian, press the %s key.", GetKeyName(Config::GetInstance().keydisguisebinding[0]));
+							sprintf(text, "To disguise as a civilian, press the %s key.", GetActionKeyDisplayName(Action::Disguise));
 							world.ShowMessage(text, 128);
 						}
 						if(player->IsDisguised()){
@@ -1171,7 +1158,7 @@ bool Game::Tick(void){
 					case 6:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "To return to normal, press the %s key again.", GetKeyName(Config::GetInstance().keydisguisebinding[0]));
+							sprintf(text, "To return to normal, press the %s key again.", GetActionKeyDisplayName(Action::Disguise));
 							world.ShowMessage(text, 128);
 						}
 						if(!player->IsDisguised()){
@@ -1182,7 +1169,7 @@ bool Game::Tick(void){
 					case 7:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "The %s key fires your current weapon,\nthe Blaster.", GetKeyName(Config::GetInstance().keyfirebinding[0]));
+							sprintf(text, "The %s key fires your current weapon,\nthe Blaster.", GetActionKeyDisplayName(Action::Fire));
 							world.ShowMessage(text, 128);
 						}
 						if(player->state == Player::STANDINGSHOOT || player->state == Player::CROUCHEDSHOOT || player->state == Player::FALLINGSHOOT || player->state == Player::JETPACKSHOOT || player->state == Player::LADDERSHOOT){
@@ -1194,7 +1181,7 @@ bool Game::Tick(void){
 						if(!world.message_i){
 							char text[256];
 #ifdef OUYA
-							sprintf(text, "To change weapons, press %s", GetKeyName(Config::GetInstance().keynextweaponbinding[0]));
+							sprintf(text, "To change weapons, press %s", GetActionKeyDisplayName(Action::NextWeapon));
 #else
 							sprintf(text, "To change weapons, press the 1, 2, 3, or 4 keys");
 #endif
@@ -1221,7 +1208,7 @@ bool Game::Tick(void){
 					case 10:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "Hit %s to build your base.", GetKeyName(Config::GetInstance().keyusebinding[0]));
+							sprintf(text, "Hit %s to build your base.", GetActionKeyDisplayName(Action::Use));
 							world.ShowMessage(text, 128);
 						}
 						Team * team = player->GetTeam(world);
@@ -1233,7 +1220,7 @@ bool Game::Tick(void){
 					case 11:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "To enter your base, hit %s when your\nSilencer is at the base entrance.", GetKeyName(Config::GetInstance().keyactivatebinding[0]));
+							sprintf(text, "To enter your base, hit %s when your\nSilencer is at the base entrance.", GetActionKeyDisplayName(Action::Activate));
 							world.ShowMessage(text, 128);
 						}
 						if(player->InBase(world)){
@@ -1244,7 +1231,7 @@ bool Game::Tick(void){
 					case 12:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "You are now inside your agent's secret base.\nWalk right to the flashing green computer screen\nand hit %s to activate it.", GetKeyName(Config::GetInstance().keyactivatebinding[0]));
+							sprintf(text, "You are now inside your agent's secret base.\nWalk right to the flashing green computer screen\nand hit %s to activate it.", GetActionKeyDisplayName(Action::Activate));
 							world.ShowMessage(text, 255);
 						}
 						if(!player->InBase(world)){
@@ -1282,7 +1269,7 @@ bool Game::Tick(void){
 					case 14:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "Good, now hit %s or %s to exit the menu.", GetKeyName(Config::GetInstance().keymoveleftbinding[0]), GetKeyName(Config::GetInstance().keymoverightbinding[0]));
+							sprintf(text, "Good, now hit %s or %s to exit the menu.", GetActionKeyDisplayName(Action::MoveLeft), GetActionKeyDisplayName(Action::MoveRight));
 							world.ShowMessage(text, 128);
 						}
 						if(player->rocketammo > 0){
@@ -1315,7 +1302,7 @@ bool Game::Tick(void){
 					case 17:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "Walk around until you see a\nflashing green data port.\nStanding in front of the data port, hit %s\nto initiate hacking.", GetKeyName(Config::GetInstance().keyactivatebinding[0]));
+							sprintf(text, "Walk around until you see a\nflashing green data port.\nStanding in front of the data port, hit %s\nto initiate hacking.", GetActionKeyDisplayName(Action::Activate));
 							world.ShowMessage(text, 255);
 						}
 						if(player->state == Player::HACKING && player->files >= 100){
@@ -1326,7 +1313,7 @@ bool Game::Tick(void){
 					case 18:{
 						if(!world.message_i){
 							char text[256];
-							sprintf(text, "Return with the information to your base door,\nhitting %s to enter the base.", GetKeyName(Config::GetInstance().keyactivatebinding[0]));
+							sprintf(text, "Return with the information to your base door,\nhitting %s to enter the base.", GetActionKeyDisplayName(Action::Activate));
 							world.ShowMessage(text, 128);
 						}
 						if(player->InBase(world)){
@@ -1494,15 +1481,13 @@ bool Game::Tick(void){
 				ScrollBar * scrollbar = (ScrollBar *)world.GetObjectFromId(iface->scrollbar);
 				if(!iface->disabled){
 					for(int i = 0; i < 6; i++){
-						SDL_Scancode * key1 = 0;
-						SDL_Scancode * key2 = 0;
-						bool * keyop = 0;
-						IndexToConfigKey(i + scrollbar->scrollposition, &key1, &key2, &keyop);
-						keynameoverlay[i]->text = std::string(keynames[i + scrollbar->scrollposition]) + ":";
-						if(key1 && key2){
-							strcpy(c1button[i]->text, GetKeyName(*key1));
-							strcpy(c2button[i]->text, GetKeyName(*key2));
-						}
+						int row = i + scrollbar->scrollposition;
+						if(row < 0 || row >= (int)Action::Count) continue;
+						Action a = ACTION_TABLE[row].action;
+						LegacyView v = ViewLegacy(keymap, a);
+						keynameoverlay[i]->text = std::string(GetActionInfo(a).label) + ":";
+						strcpy(c1button[i]->text, GetKeyName(v.key1));
+						strcpy(c2button[i]->text, GetKeyName(v.key2));
 					}
 				}
 				iface->buttonenter = 200;
@@ -1517,29 +1502,17 @@ bool Game::Tick(void){
 								}
 							}
 							if(button->uid >= 150 && button->uid < 200){
-								int index = button->uid - 150 + scrollbar->scrollposition;
-								SDL_Scancode * key1 = 0;
-								SDL_Scancode * key2 = 0;
-								bool * keyop = 0;
-								IndexToConfigKey(index, &key1, &key2, &keyop);
-								if(keyop){
-									if(*keyop == Config::OR){
-										strcpy(button->text, "OR");
-									}else{
-										strcpy(button->text, "AND");
-									}
+								int row = button->uid - 150 + scrollbar->scrollposition;
+								if(row >= 0 && row < (int)Action::Count){
+									Action a = ACTION_TABLE[row].action;
+									strcpy(button->text, ViewLegacy(keymap, a).and_ ? "AND" : "OR");
 								}
 							}
 							if(button->uid >= 0 && button->uid < 150){
 								const int timeout = 72;
 								if(iface->disabled && button->state == Button::ACTIVE && (iface->lastsym != SDL_SCANCODE_UNKNOWN || world.tickcount - optionscontrolstick > timeout)){
-									int index = button->uid + scrollbar->scrollposition;
-									if(button->uid >= 150){
-										index -= 150;
-									}
-									if(button->uid >= 100){
-										index -= 100;
-									}
+									int slot = button->uid;     // 0..99 = primary; 100..149 = secondary
+									int row  = (slot < 100 ? slot : slot - 100) + scrollbar->scrollposition;
 									SDL_Scancode sym = iface->lastsym;
 									if(world.tickcount - optionscontrolstick > timeout){
 										sym = SDL_SCANCODE_UNKNOWN;
@@ -1550,16 +1523,11 @@ bool Game::Tick(void){
 									}
 #endif
 									strcpy(button->text, GetKeyName(sym));
-									SDL_Scancode * key1 = 0;
-									SDL_Scancode * key2 = 0;
-									bool * keyop = 0;
-									IndexToConfigKey(index, &key1, &key2, &keyop);
-									if(key1 && key2 && keyop){
-										if(button->uid < 100){
-											*key1 = sym;
-										}else{
-											*key2 = sym;
-										}
+									if(row >= 0 && row < (int)Action::Count){
+										Action a = ACTION_TABLE[row].action;
+										LegacyView v = ViewLegacy(keymap, a);
+										if(slot < 100) v.key1 = sym; else v.key2 = sym;
+										WriteLegacy(keymap, a, v.key1, v.key2, v.and_);
 									}
 									iface->disabled = false;
 								}
@@ -1572,25 +1540,28 @@ bool Game::Tick(void){
 									iface->lastsym = SDL_SCANCODE_UNKNOWN;
 								}
 								if(button->uid >= 150 && button->uid < 200){
-									int index = button->uid - 150 + scrollbar->scrollposition;
-									SDL_Scancode * key1 = 0;
-									SDL_Scancode * key2 = 0;
-									bool * keyop = 0;
-									IndexToConfigKey(index, &key1, &key2, &keyop);
-									if(keyop){
-										if(*keyop == Config::OR){
-											*keyop = Config::AND;
-										}else{
-											*keyop = Config::OR;
-										}
+									int row = button->uid - 150 + scrollbar->scrollposition;
+									if(row >= 0 && row < (int)Action::Count){
+										Action a = ACTION_TABLE[row].action;
+										LegacyView v = ViewLegacy(keymap, a);
+										v.and_ = !v.and_;
+										WriteLegacy(keymap, a, v.key1, v.key2, v.and_);
 									}
 								}
 								switch(button->uid){
 									case 200:{
+										// Persist the live keymap to the active profile's
+										// writable file, then save the rest of Config (which
+										// is now just the active_keybind_profile pointer plus
+										// graphics/audio/network).
+										keymap.SaveFile(WritableProfilePath(Config::GetInstance().active_keybind_profile));
 										Config::GetInstance().Save();
 										GoToState(OPTIONS);
 									}break;
 									case 201:{
+										// Cancel: reload the keymap from disk so any in-UI
+										// edits are discarded.
+										LoadActiveKeymap();
 										Config::GetInstance().Load();
 										GoToState(OPTIONS);
 									}break;
@@ -1986,38 +1957,53 @@ bool Game::Tick(void){
 	return true;
 }
 
+// Captureless lambdas decay to function pointers, so this table costs nothing
+// at runtime vs. the old hand-written cascade. New actions get one row here
+// (and one row in ACTION_TABLE) — that's the entire fan-out for adding one.
+typedef bool& (*InputField)(Input&);
+static const struct { Action a; InputField field; } INPUT_FIELDS[] = {
+	{ Action::MoveUp,        [](Input& i) -> bool& { return i.keymoveup;        } },
+	{ Action::MoveDown,      [](Input& i) -> bool& { return i.keymovedown;      } },
+	{ Action::MoveLeft,      [](Input& i) -> bool& { return i.keymoveleft;      } },
+	{ Action::MoveRight,     [](Input& i) -> bool& { return i.keymoveright;     } },
+	{ Action::LookUpLeft,    [](Input& i) -> bool& { return i.keylookupleft;    } },
+	{ Action::LookUpRight,   [](Input& i) -> bool& { return i.keylookupright;   } },
+	{ Action::LookDownLeft,  [](Input& i) -> bool& { return i.keylookdownleft;  } },
+	{ Action::LookDownRight, [](Input& i) -> bool& { return i.keylookdownright; } },
+	{ Action::Jump,          [](Input& i) -> bool& { return i.keyjump;          } },
+	{ Action::Jetpack,       [](Input& i) -> bool& { return i.keyjetpack;       } },
+	{ Action::Activate,      [](Input& i) -> bool& { return i.keyactivate;      } },
+	{ Action::Use,            [](Input& i) -> bool& { return i.keyuse;          } },
+	{ Action::Fire,          [](Input& i) -> bool& { return i.keyfire;          } },
+	{ Action::Chat,          [](Input& i) -> bool& { return i.keychat;          } },
+	{ Action::NextInv,       [](Input& i) -> bool& { return i.keynextinv;       } },
+	{ Action::NextCam,       [](Input& i) -> bool& { return i.keynextcam;       } },
+	{ Action::PrevCam,       [](Input& i) -> bool& { return i.keyprevcam;       } },
+	{ Action::Detonate,      [](Input& i) -> bool& { return i.keydetonate;      } },
+	{ Action::Disguise,      [](Input& i) -> bool& { return i.keydisguise;      } },
+	{ Action::NextWeapon,    [](Input& i) -> bool& { return i.keynextweapon;    } },
+	{ Action::Weapon1,       [](Input& i) -> bool& { return i.keyweapon[0];     } },
+	{ Action::Weapon2,       [](Input& i) -> bool& { return i.keyweapon[1];     } },
+	{ Action::Weapon3,       [](Input& i) -> bool& { return i.keyweapon[2];     } },
+	{ Action::Weapon4,       [](Input& i) -> bool& { return i.keyweapon[3];     } },
+	{ Action::UiUp,          [](Input& i) -> bool& { return i.keyup;            } },
+	{ Action::UiDown,        [](Input& i) -> bool& { return i.keydown;          } },
+	{ Action::UiLeft,        [](Input& i) -> bool& { return i.keyleft;          } },
+	{ Action::UiRight,       [](Input& i) -> bool& { return i.keyright;         } },
+};
+
 void Game::UpdateInputState(Input & input){
 	float mousex;
 	float mousey;
 	Uint32 mousestate = SDL_GetMouseState(&mousex, &mousey);
-	input.keymoveup = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keymoveupbinding, Config::GetInstance().keymoveupoperator);
-	input.keymovedown = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keymovedownbinding, Config::GetInstance().keymovedownoperator);
-	input.keymoveleft = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keymoveleftbinding, Config::GetInstance().keymoveleftoperator);
-	input.keymoveright = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keymoverightbinding, Config::GetInstance().keymoverightoperator);
-	input.keyup = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keyupbinding, Config::GetInstance().keyupoperator);
-	input.keydown = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keydownbinding, Config::GetInstance().keydownoperator);
-	input.keyleft = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keyleftbinding, Config::GetInstance().keyleftoperator);
-	input.keyright = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keyrightbinding, Config::GetInstance().keyrightoperator);
-	input.keylookupleft = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keylookupleftbinding, Config::GetInstance().keylookupleftoperator);
-	input.keylookupright = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keylookuprightbinding, Config::GetInstance().keylookuprightoperator);
-	input.keylookdownleft = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keylookdownleftbinding, Config::GetInstance().keylookdownleftoperator);
-	input.keylookdownright = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keylookdownrightbinding, Config::GetInstance().keylookdownrightoperator);
-	input.keynextinv = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keynextinvbinding, Config::GetInstance().keynextinvoperator);
-	input.keynextcam = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keynextcambinding, Config::GetInstance().keynextcamoperator);
-	input.keyprevcam = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keyprevcambinding, Config::GetInstance().keyprevcamoperator);
-	input.keydetonate = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keydetonatebinding, Config::GetInstance().keydetonateoperator);
-	input.keyjump = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keyjumpbinding, Config::GetInstance().keyjumpoperator);
-	input.keyjetpack = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keyjetpackbinding, Config::GetInstance().keyjetpackoperator);
-	input.keyactivate = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keyactivatebinding, Config::GetInstance().keyactivateoperator);
-	input.keyuse = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keyusebinding, Config::GetInstance().keyuseoperator);
-	input.keyfire = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keyfirebinding, Config::GetInstance().keyfireoperator);
-	input.keychat = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keychatbinding, Config::GetInstance().keychatoperator);
-	input.keydisguise = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keydisguisebinding, Config::GetInstance().keydisguiseoperator);
-	input.keyweapon[0] = keystate[SDL_SCANCODE_1] ? true : false;
-	input.keyweapon[1] = keystate[SDL_SCANCODE_2] ? true : false;
-	input.keyweapon[2] = keystate[SDL_SCANCODE_3] ? true : false;
-	input.keyweapon[3] = keystate[SDL_SCANCODE_4] ? true : false;
-	input.keynextweapon = Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keynextweaponbinding, Config::GetInstance().keynextweaponoperator);
+	PollGamepadState();
+	gamepadstate.mouseButtons = 0;
+	for(int b = 1; b <= 5; ++b){
+		if(mousestate & SDL_BUTTON_MASK(b)) gamepadstate.mouseButtons |= (1u << (b - 1));
+	}
+	for(const auto& f : INPUT_FIELDS){
+		f.field(input) = keymap.IsPressed(f.a, keystate, gamepadstate);
+	}
 	input.mousex = (Uint16)mousex;
 	input.mousey = (Uint16)mousey;
 	input.mousedown = SDL_BUTTON_LEFT & mousestate ? true : false;
@@ -2511,7 +2497,7 @@ Interface * Game::CreateOptionsControlsInterface(void){
 	scrollbar->res_index = 9;
 	scrollbar->scrollpixels = 53;
 	scrollbar->scrollposition = 0;
-	scrollbar->scrollmax = numkeys - 6;
+	scrollbar->scrollmax = (int)Action::Count - 6;
 	iface->AddObject(scrollbar->id);
 	iface->scrollbar = scrollbar->id;
 	
@@ -5352,109 +5338,128 @@ Uint8 Game::GetSelectedAgency(void){
 	return 0;
 }
 
-void Game::IndexToConfigKey(int index, SDL_Scancode ** key1, SDL_Scancode ** key2, bool ** keyop){
-	switch(index){
-		case 0:
-			*key1 = &Config::GetInstance().keymoveupbinding[0];
-			*key2 = &Config::GetInstance().keymoveupbinding[1];
-			*keyop = &Config::GetInstance().keymoveupoperator;
-		break;
-		case 1:
-			*key1 = &Config::GetInstance().keymovedownbinding[0];
-			*key2 = &Config::GetInstance().keymovedownbinding[1];
-			*keyop = &Config::GetInstance().keymovedownoperator;
-		break;
-		case 2:
-			*key1 = &Config::GetInstance().keymoveleftbinding[0];
-			*key2 = &Config::GetInstance().keymoveleftbinding[1];
-			*keyop = &Config::GetInstance().keymoveleftoperator;
-		break;
-		case 3:
-			*key1 = &Config::GetInstance().keymoverightbinding[0];
-			*key2 = &Config::GetInstance().keymoverightbinding[1];
-			*keyop = &Config::GetInstance().keymoverightoperator;
-		break;
-		case 4:
-			*key1 = &Config::GetInstance().keylookupleftbinding[0];
-			*key2 = &Config::GetInstance().keylookupleftbinding[1];
-			*keyop = &Config::GetInstance().keylookupleftoperator;
-		break;
-		case 5:
-			*key1 = &Config::GetInstance().keylookuprightbinding[0];
-			*key2 = &Config::GetInstance().keylookuprightbinding[1];
-			*keyop = &Config::GetInstance().keylookuprightoperator;
-		break;
-		case 6:
-			*key1 = &Config::GetInstance().keylookdownleftbinding[0];
-			*key2 = &Config::GetInstance().keylookdownleftbinding[1];
-			*keyop = &Config::GetInstance().keylookdownleftoperator;
-		break;
-		case 7:
-			*key1 = &Config::GetInstance().keylookdownrightbinding[0];
-			*key2 = &Config::GetInstance().keylookdownrightbinding[1];
-			*keyop = &Config::GetInstance().keylookdownrightoperator;
-		break;
-		case 8:
-			*key1 = &Config::GetInstance().keyjumpbinding[0];
-			*key2 = &Config::GetInstance().keyjumpbinding[1];
-			*keyop = &Config::GetInstance().keyjumpoperator;
-		break;
-		case 9:
-			*key1 = &Config::GetInstance().keyjetpackbinding[0];
-			*key2 = &Config::GetInstance().keyjetpackbinding[1];
-			*keyop = &Config::GetInstance().keyjetpackoperator;
-		break;
-		case 10:
-			*key1 = &Config::GetInstance().keyactivatebinding[0];
-			*key2 = &Config::GetInstance().keyactivatebinding[1];
-			*keyop = &Config::GetInstance().keyactivateoperator;
-		break;
-		case 11:
-			*key1 = &Config::GetInstance().keyusebinding[0];
-			*key2 = &Config::GetInstance().keyusebinding[1];
-			*keyop = &Config::GetInstance().keyuseoperator;
-		break;
-		case 12:
-			*key1 = &Config::GetInstance().keyfirebinding[0];
-			*key2 = &Config::GetInstance().keyfirebinding[1];
-			*keyop = &Config::GetInstance().keyfireoperator;
-		break;
-		case 13:
-			*key1 = &Config::GetInstance().keychatbinding[0];
-			*key2 = &Config::GetInstance().keychatbinding[1];
-			*keyop = &Config::GetInstance().keychatoperator;
-		break;
-		case 14:
-			*key1 = &Config::GetInstance().keynextinvbinding[0];
-			*key2 = &Config::GetInstance().keynextinvbinding[1];
-			*keyop = &Config::GetInstance().keynextinvoperator;
-		break;
-		case 15:
-			*key1 = &Config::GetInstance().keynextcambinding[0];
-			*key2 = &Config::GetInstance().keynextcambinding[1];
-			*keyop = &Config::GetInstance().keynextcamoperator;
-		break;
-		case 16:
-			*key1 = &Config::GetInstance().keyprevcambinding[0];
-			*key2 = &Config::GetInstance().keyprevcambinding[1];
-			*keyop = &Config::GetInstance().keyprevcamoperator;
-		break;
-		case 17:
-			*key1 = &Config::GetInstance().keydetonatebinding[0];
-			*key2 = &Config::GetInstance().keydetonatebinding[1];
-			*keyop = &Config::GetInstance().keydetonateoperator;
-		break;
-		case 18:
-			*key1 = &Config::GetInstance().keydisguisebinding[0];
-			*key2 = &Config::GetInstance().keydisguisebinding[1];
-			*keyop = &Config::GetInstance().keydisguiseoperator;
-		break;
-		case 19:
-			*key1 = &Config::GetInstance().keynextweaponbinding[0];
-			*key2 = &Config::GetInstance().keynextweaponbinding[1];
-			*keyop = &Config::GetInstance().keynextweaponoperator;
-		break;
+// Two-key view of an action's bindings used by the controls UI. The new
+// data model is OR-of-AND with arbitrary list size; the existing UI shows
+// fixed primary/secondary slots plus an OR/AND toggle. ViewLegacy/WriteLegacy
+// round-trip those two shapes losslessly:
+//
+//   bindings = []                            → key1=UNK, key2=UNK
+//   bindings = [[k1]]                        → key1=k1,  key2=UNK
+//   bindings = [[k1], [k2]]                  → key1=k1,  key2=k2,  AND=false
+//   bindings = [[k1, k2]]                    → key1=k1,  key2=k2,  AND=true
+//
+// CLI-set or JSON-edited bindings of other shapes (mouse, gamepad, more
+// than 2 keys) survive a UI render but get clobbered if the user touches
+// the row through the UI. By design — power-users use the CLI.
+Game::LegacyView Game::ViewLegacy(const KeyMap& km, Action a){
+	LegacyView v;
+	const auto& ab = km.Get(a);
+	if(ab.bindings.empty()) return v;
+	const auto& b0 = ab.bindings[0];
+	if(b0.keys.size() >= 2 &&
+	   b0.keys[0].device == BindingDevice::Keyboard &&
+	   b0.keys[1].device == BindingDevice::Keyboard){
+		v.key1 = (SDL_Scancode)b0.keys[0].code;
+		v.key2 = (SDL_Scancode)b0.keys[1].code;
+		v.and_ = true;
+		return v;
 	}
+	if(!b0.keys.empty() && b0.keys[0].device == BindingDevice::Keyboard){
+		v.key1 = (SDL_Scancode)b0.keys[0].code;
+	}
+	if(ab.bindings.size() >= 2){
+		const auto& b1 = ab.bindings[1];
+		if(!b1.keys.empty() && b1.keys[0].device == BindingDevice::Keyboard){
+			v.key2 = (SDL_Scancode)b1.keys[0].code;
+		}
+	}
+	return v;
+}
+
+void Game::WriteLegacy(KeyMap& km, Action a, SDL_Scancode key1, SDL_Scancode key2, bool and_){
+	auto& ab = km.Get(a);
+	ab.bindings.clear();
+	auto mk = [](SDL_Scancode sc){
+		BindingKey k;
+		k.device  = BindingDevice::Keyboard;
+		k.code    = (int)sc;
+		k.axisDir = 0;
+		return k;
+	};
+	if(key1 == SDL_SCANCODE_UNKNOWN && key2 == SDL_SCANCODE_UNKNOWN) return;
+	if(and_ && key1 != SDL_SCANCODE_UNKNOWN && key2 != SDL_SCANCODE_UNKNOWN){
+		Binding b; b.keys.push_back(mk(key1)); b.keys.push_back(mk(key2));
+		ab.bindings.push_back(std::move(b));
+		return;
+	}
+	if(key1 != SDL_SCANCODE_UNKNOWN){
+		Binding b; b.keys.push_back(mk(key1));
+		ab.bindings.push_back(std::move(b));
+	}
+	if(key2 != SDL_SCANCODE_UNKNOWN){
+		Binding b; b.keys.push_back(mk(key2));
+		ab.bindings.push_back(std::move(b));
+	}
+}
+
+void Game::LoadActiveKeymap(){
+	const char* name = Config::GetInstance().active_keybind_profile;
+	if(!name || !*name) name = "default";
+	std::string path = ResolveProfilePath(name);
+	if(path.empty()){
+		// No file by that name anywhere — fall back to the built-in default.
+		path = ResolveProfilePath("default");
+	}
+	keymap.Clear();
+	if(!path.empty()){
+		keymap.LoadFile(path);
+	}
+	if(keymap.name.empty()) keymap.name = name;
+}
+
+void Game::OpenFirstGamepad(){
+	if(gamepad){ SDL_CloseGamepad(gamepad); gamepad = nullptr; }
+	int count = 0;
+	SDL_JoystickID* ids = SDL_GetGamepads(&count);
+	if(ids){
+		if(count > 0) gamepad = SDL_OpenGamepad(ids[0]);
+		SDL_free(ids);
+	}
+	gamepadstate.connected = (gamepad != nullptr);
+}
+
+void Game::PollGamepadState(){
+	if(!gamepad){
+		// Try (cheaply) to pick up a pad plugged in mid-session.
+		OpenFirstGamepad();
+	}
+	gamepadstate.connected = (gamepad != nullptr);
+	gamepadstate.buttons   = 0;
+	for(auto& a : gamepadstate.axes) a = 0;
+	if(!gamepad) return;
+	for(int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT; ++b){
+		if(SDL_GetGamepadButton(gamepad, (SDL_GamepadButton)b)){
+			gamepadstate.buttons |= (1u << b);
+		}
+	}
+	for(int a = 0; a < SDL_GAMEPAD_AXIS_COUNT; ++a){
+		gamepadstate.axes[a] = SDL_GetGamepadAxis(gamepad, (SDL_GamepadAxis)a);
+	}
+}
+
+const char * Game::GetActionKeyDisplayName(Action a){
+	static thread_local char buf[32];
+	const auto& ab = keymap.Get(a);
+	for(const auto& b : ab.bindings){
+		if(b.keys.empty()) continue;
+		const auto& k = b.keys[0];
+		if(k.device == BindingDevice::Keyboard){
+			return GetKeyName((SDL_Scancode)k.code);
+		}
+	}
+	std::strncpy(buf, "(unbound)", sizeof(buf) - 1);
+	buf[sizeof(buf) - 1] = '\0';
+	return buf;
 }
 
 const char * Game::GetKeyName(SDL_Scancode sym){
@@ -6060,11 +6065,11 @@ bool Game::HandleSDLEvents(void){
 						skip = false;
 					break;
 					default:{
-						if(Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keymoveupbinding, Config::GetInstance().keymoveupoperator)){
+						if(keymap.IsPressed(Action::MoveUp, keystate, gamepadstate)){
 							ascii = 3;
 							skip = false;
 						}
-						if(Config::GetInstance().KeyIsPressed(keystate, Config::GetInstance().keymovedownbinding, Config::GetInstance().keymovedownoperator)){
+						if(keymap.IsPressed(Action::MoveDown, keystate, gamepadstate)){
 							ascii = 4;
 							skip = false;
 						}
