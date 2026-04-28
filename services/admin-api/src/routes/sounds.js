@@ -21,20 +21,22 @@
  * sound), and zeros the last 24 of those.
  *
  * Staging:
- *   shared/assets/sounds/<name>.wav  — queued additions (raw WAV uploads)
+ *   shared/assets/sounds/<name>.wav   — queued additions (raw WAV uploads)
  *   shared/assets/sounds/.deletions.json — names to remove on repack
+ *   shared/assets/sounds/.renames.json   — [{from, to}] renames to apply on repack
  *
  * GET    /sounds              list all sounds (bin + staged, minus pending deletions)
- * GET    /sounds/:name/play   stream sound as browser-playable audio (decoded PCM)
+ * GET    /sounds/refs         reference map: per-name C++ and actordef usage
+ * GET    /sounds/:name/play   stream sound as browser-playable audio
  * POST   /sounds              upload a WAV to staging (X-Filename header)
+ * POST   /sounds/:name/rename rename a sound and update actordefs
  * DELETE /sounds/:name        remove staged file or mark bin sound for deletion
  * POST   /sounds/repack       rebuild sound.bin from current state
  * POST   /sounds/:name/restore remove a bin sound from the deletions list
  */
 
 import { Router } from 'express';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, readdirSync } from 'fs';
-import { createWriteStream } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, readdirSync, renameSync } from 'fs';
 import { join } from 'path';
 import { spawn } from 'child_process';
 import { ASSETS_DIR } from '../config.js';
@@ -43,10 +45,42 @@ import { requireAuth, requireRole } from '../auth/jwt.js';
 const router = Router();
 const SOUND_BIN = join(ASSETS_DIR, 'sound.bin');
 const STAGING_DIR = join(ASSETS_DIR, 'sounds');
+const ACTORDEFS_DIR = join(ASSETS_DIR, 'actordefs');
 const DELETIONS_FILE = join(STAGING_DIR, '.deletions.json');
+const RENAMES_FILE = join(STAGING_DIR, '.renames.json');
 const HEADER_SIZE = 96;
 const WAV_HEADER_BYTES = 60;
 const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg';
+
+// Sounds hardcoded by name in C++ source (from grep "soundbank[\"") plus
+// string literals used in sounds[] arrays and bgchannelbanks.
+const CPP_REFS = new Set([
+  '!laserel.wav','!laserew.wav','!laserme.wav','airlokj.wav','airvent2.wav',
+  'alarm3a.wav','alinvest.wav','alwarn.wav','ambloop4.wav','ambloop5.wav',
+  'ammo01.wav','ammo02.wav','ammo03.wav','ammo05.wav','breath2.wav',
+  'cathdoor.wav','charged.wav','cliksel2.wav','cphum11.wav','disguise.wav',
+  'drop4.wav','fall2b.wav','flamebg2.wav','freeze3.wav','freezrt1.wav',
+  'futstonl.wav','futstonr.wav','grenade1.wav','grenthro.wav','grndown.wav',
+  'groan2.wav','groan2a.wav','grunt2a.wav','if15.wav','intrude.wav',
+  'jackin.wav','jackout.wav','jetpak1.wav','jetpak2a.wav','juunewne.wav',
+  'ladder1.wav','ladder2.wav','land1.wav','land11.wav','portal1.wav',
+  'portpas2.wav','power11.wav','pwrcon1.wav','q_expl02.wav','reload2.wav',
+  'repair.wav','rico1.wav','rico2.wav','robot3l.wav','robot3r.wav',
+  'robotarm.wav','rocket1.wav','rocket4.wav','rocket9.wav','roll2.wav',
+  's_flmc01.wav','s_hita01.wav','s_hitb01.wav','seekexp1.wav','select2.wav',
+  'shield2.wav','shlddn1.wav','stop4.wav','stostep1.wav','stostepr.wav',
+  'strike01.wav','strike02.wav','strike03.wav','strike04.wav','theres3.wav',
+  'transrev.wav','type1.wav','type2.wav','type3.wav','type4.wav','type5.wav',
+  'typerev6.wav','vModDeto.wav','whoom.wav','wndloop1.wav','wndloopb.wav',
+  'wndloopc.wav','wndloope.wav',
+]);
+
+// Background ambient channel roles (game/game.cpp bgchannelbanks)
+const AMBIENT_ROLES = {
+  'wndloopb.wav': 'BG_BASE',
+  'cphum11.wav':  'BG_AMBIENT',
+  'wndloop1.wav': 'BG_OUTSIDE',
+};
 
 mkdirSync(STAGING_DIR, { recursive: true });
 
@@ -116,12 +150,14 @@ function extractWavDataChunk(wavBuf) {
 }
 
 /** Encode a WAV buffer to IMA ADPCM (256-byte blocks, 11025 Hz, mono) via ffmpeg. */
-function encodeToAdpcm(inputWavBuf) {
+function encodeToAdpcm(inputWavBuf, normalize = false) {
   return new Promise((resolve, reject) => {
     const chunks = [];
+    const audioFilters = normalize ? ['-af', 'loudnorm'] : [];
     const ff = spawn(FFMPEG, [
       '-hide_banner', '-loglevel', 'error',
       '-f', 'wav', '-i', 'pipe:0',
+      ...audioFilters,
       '-c:a', 'adpcm_ima_wav',
       '-ar', '11025',
       '-ac', '1',
@@ -157,6 +193,33 @@ function getStagedFiles() {
   return readdirSync(STAGING_DIR)
     .filter(f => !f.startsWith('.') && f.endsWith('.wav'))
     .map(f => ({ name: f, staged: true, size: null }));
+}
+
+function getRenames() {
+  if (!existsSync(RENAMES_FILE)) return [];
+  try { return JSON.parse(readFileSync(RENAMES_FILE, 'utf8')); } catch { return []; }
+}
+
+function saveRenames(list) {
+  writeFileSync(RENAMES_FILE, JSON.stringify(list, null, 2));
+}
+
+/** Scan actordefs dir for per-sound actor references. Returns Map<soundName, string[]> */
+function getActordefRefs() {
+  const refs = new Map();
+  if (!existsSync(ACTORDEFS_DIR)) return refs;
+  try {
+    for (const f of readdirSync(ACTORDEFS_DIR).filter(f => f.endsWith('.json'))) {
+      const actor = f.replace('.json', '');
+      const text = readFileSync(join(ACTORDEFS_DIR, f), 'utf8');
+      for (const m of text.matchAll(/"sound"\s*:\s*"([^"]+\.wav)"/g)) {
+        const snd = m[1];
+        if (!refs.has(snd)) refs.set(snd, []);
+        if (!refs.get(snd).includes(actor)) refs.get(snd).push(actor);
+      }
+    }
+  } catch {}
+  return refs;
 }
 
 // ── Routes ────────────────────────────────────────────────────────────────────
@@ -279,6 +342,79 @@ router.post('/:name/restore', requireAuth, requireRole('admin'), (req, res) => {
   res.json({ ok: true });
 });
 
+// GET /sounds/refs — per-sound reference map (C++ + actordefs + missing)
+router.get('/refs', requireAuth, (req, res) => {
+  const actorRefs = getActordefRefs();
+  const { sounds } = parseSoundBin();
+  const binNames = new Set(sounds.map(s => s.name));
+  const stagedNames = new Set(getStagedFiles().map(s => s.name));
+  const allInStorage = new Set([...binNames, ...stagedNames]);
+  const allReferenced = new Set([...CPP_REFS, ...actorRefs.keys()]);
+
+  const result = {};
+
+  // Sounds that exist in storage
+  for (const name of allInStorage) {
+    result[name] = {
+      inBin: binNames.has(name),
+      cpp: CPP_REFS.has(name),
+      actordefs: actorRefs.get(name) || [],
+      role: AMBIENT_ROLES[name] || null,
+    };
+  }
+
+  // Sounds referenced in code but missing from storage
+  for (const name of allReferenced) {
+    if (!result[name]) {
+      result[name] = {
+        inBin: false,
+        cpp: CPP_REFS.has(name),
+        actordefs: actorRefs.get(name) || [],
+        role: AMBIENT_ROLES[name] || null,
+      };
+    }
+  }
+
+  res.json(result);
+});
+
+// POST /sounds/:name/rename — rename a sound, update actordefs, stage bin rename
+router.post('/:name/rename', requireAuth, requireRole('admin'), (req, res) => {
+  const { name } = req.params;
+  const { newName } = req.body || {};
+
+  if (!newName || typeof newName !== 'string') return res.status(400).json({ error: 'newName required' });
+  const cleaned = newName.trim().replace(/[^a-zA-Z0-9!._-]/g, '_');
+  const finalName = cleaned.endsWith('.wav') ? cleaned : cleaned + '.wav';
+  if (finalName === name) return res.status(400).json({ error: 'Name unchanged' });
+
+  // Update actordefs
+  const updatedActors = [];
+  if (existsSync(ACTORDEFS_DIR)) {
+    for (const f of readdirSync(ACTORDEFS_DIR).filter(f => f.endsWith('.json'))) {
+      const p = join(ACTORDEFS_DIR, f);
+      const text = readFileSync(p, 'utf8');
+      const updated = text.replaceAll(`"${name}"`, `"${finalName}"`);
+      if (updated !== text) {
+        writeFileSync(p, updated);
+        updatedActors.push(f.replace('.json', ''));
+      }
+    }
+  }
+
+  // Apply rename: staged file → rename it; bin sound → record in .renames.json
+  const stagedPath = join(STAGING_DIR, name);
+  if (existsSync(stagedPath)) {
+    renameSync(stagedPath, join(STAGING_DIR, finalName));
+  } else {
+    const renames = getRenames().filter(r => r.from !== name);
+    renames.push({ from: name, to: finalName });
+    saveRenames(renames);
+  }
+
+  res.json({ ok: true, newName: finalName, updatedActors, cppWarning: CPP_REFS.has(name) });
+});
+
 // POST /sounds/repack — rebuild sound.bin
 router.post('/repack', requireAuth, requireRole('admin'), async (req, res) => {
   const { sounds, dataBase, buf } = parseSoundBin();
@@ -287,6 +423,8 @@ router.post('/repack', requireAuth, requireRole('admin'), async (req, res) => {
   const deletions = new Set(getDeletions());
   const staged = getStagedFiles();
   const stagedNames = new Set(staged.map(s => s.name));
+  const renames = new Map(getRenames().map(r => [r.from, r.to]));
+  const normalize = req.body?.normalize === true;
 
   // Collect all sounds: existing bin (not deleted, not overridden) + staged
   const entries = []; // { name, adpcmData: Buffer }
@@ -297,14 +435,15 @@ router.post('/repack', requireAuth, requireRole('admin'), async (req, res) => {
     if (stagedNames.has(s.name)) continue; // staged version replaces bin version
     const adpcmBytes = s.storedLength - 36;
     const adpcmData = buf.slice(dataBase + s.offset, dataBase + s.offset + adpcmBytes);
-    entries.push({ name: s.name, adpcmData });
+    const finalName = renames.get(s.name) || s.name;
+    entries.push({ name: finalName, adpcmData });
   }
 
   // Staged sounds (encode WAV → ADPCM)
   for (const s of staged) {
     try {
       const wavBuf = readFileSync(join(STAGING_DIR, s.name));
-      const adpcmData = await encodeToAdpcm(wavBuf);
+      const adpcmData = await encodeToAdpcm(wavBuf, normalize);
       entries.push({ name: s.name, adpcmData });
     } catch (e) {
       return res.status(500).json({ error: `Failed to encode ${s.name}: ${e.message}` });
@@ -321,7 +460,7 @@ router.post('/repack', requireAuth, requireRole('admin'), async (req, res) => {
   let offset = 0;
   const offsets = entries.map(e => {
     const o = offset;
-    offset += e.adpcmData.length; // each entry's space = adpcmData.length (= stored_length - 36)
+    offset += e.adpcmData.length;
     return o;
   });
   const soundssize = offset;
@@ -353,10 +492,9 @@ router.post('/repack', requireAuth, requireRole('admin'), async (req, res) => {
     entries[i].adpcmData.copy(newBuf, newDataBase + offsets[i]);
   }
 
-  // Atomic write (write to .new then rename)
+  // Atomic write
   const tmpPath = SOUND_BIN + '.new';
   writeFileSync(tmpPath, newBuf);
-  const { renameSync } = await import('fs');
   renameSync(tmpPath, SOUND_BIN);
 
   // Clear staging on success
@@ -364,8 +502,10 @@ router.post('/repack', requireAuth, requireRole('admin'), async (req, res) => {
     try { unlinkSync(join(STAGING_DIR, s.name)); } catch {}
   }
   if (existsSync(DELETIONS_FILE)) unlinkSync(DELETIONS_FILE);
+  if (existsSync(RENAMES_FILE)) unlinkSync(RENAMES_FILE);
 
   res.json({ ok: true, numsounds, soundssize, totalSize });
 });
 
 export default router;
+
