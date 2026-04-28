@@ -51,9 +51,9 @@ language:
   little-endian on the wire.
 
 When a row says "C → S" it means the silencer client sent it to the
-Go lobby; "S → C" the other way. For the in-game UDP traffic in §2
+Go lobby; "S → C" the other way. For the in-game UDP traffic in section 2
 the directions are "R → A" (replica to authority) or "A → R"
-(authority to replica) — see the topology note in §2.
+(authority to replica) — see the topology note in section 2.
 
 ---
 
@@ -261,7 +261,7 @@ uses those names today.
 | 2.28 | `MSG_MAP` (20) — request chunk | usually R → A; A → R when authority lacks the map | u8 subcode `MAP_GETCHUNK=1`, u32 `offset` | "Send me bytes [offset … offset+1024] of the current map." | Common case: a replica that joined without the map asks the authority for chunks. Inverted case: if the dedicated server itself doesn't have a community map locally, it asks the host player (who already downloaded it from the lobby's map HTTP API) — see `world.cpp:2139-2150`. Either way, the authority is always one endpoint; replicas never request from each other. |
 | 2.29 | `MSG_MAP` (20) — chunk push | mirror of 2.28 | u8 subcode `MAP_PUTCHUNK=2`, u32 `offset`, u32 `size`, then `size` bytes | "Here are bytes [offset … offset+size] of the map." | Reply to 2.28 — direction is whichever side received the request. A → R when a replica asked, R → A when the authority asked the host player. From `World::PutMapChunk` (`world.cpp:2114-2130`). Max 1024 bytes per chunk. |
 | 2.30 | `MSG_SETAGENCY` (21) | R → A | u8 `agency` | "Move me to a team in this agency." | Sent in pregame from `World::SetAgency` (`world.cpp:2010`). |
-| 2.31 | `MSG_KICK` (22) — admin → dedicated | special: see **§4.4** below | u32 accountId | "Kick this player from the game." | The lobby itself injects this packet from a separate UDP socket when an admin bans a player who is currently in a game. The dedicated-server authority receives it on its own UDP game socket and disconnects the matching peer. |
+| 2.31 | `MSG_KICK` (22) — admin → dedicated | special: see **section 4.4** below | u32 accountId | "Kick this player from the game." | The lobby itself injects this packet from a separate UDP socket when an admin bans a player who is currently in a game. The dedicated-server authority receives it on its own UDP game socket and disconnects the matching peer. |
 
 A few sanity guards in the authority loop:
 
@@ -325,7 +325,7 @@ request. Bodies capped at 256 bytes.
 | # | Method + path | Request body | Response | Purpose | Lifecycle |
 |---|---|---|---|---|---|
 | 5.1 | `POST /player-auth` | `{name: string, sha1Hex: string}` (40-char hex of SHA-1(password)) | `{ok: true, accountId: u32, name: string}` on match, `{ok: false}` (or `{ok: false, error: "invalid sha1"}`) on miss | Validate a player's lobby credentials so the admin-api can let them log in to the admin web with the same username/password. | Admin web login flow. Once per attempted login. |
-| 5.2 | `POST /ban` | `{accountId: u32, banned: bool}` | `{ok: bool}` (true = account existed and was updated) | Set or clear an account's banned flag in the lobby's user store. As a **side effect** when `banned=true`, the lobby calls `hub.KickAccountID` which (a) closes the player's lobby TCP socket if open, and (b) fires the UDP kick packet in §4.4 below to any in-game dedicated server. | Admin clicks Ban / Unban on the dashboard. |
+| 5.2 | `POST /ban` | `{accountId: u32, banned: bool}` | `{ok: bool}` (true = account existed and was updated) | Set or clear an account's banned flag in the lobby's user store. As a **side effect** when `banned=true`, the lobby calls `hub.KickAccountID` which (a) closes the player's lobby TCP socket if open, and (b) fires the UDP kick packet in section 4.4 below to any in-game dedicated server. | Admin clicks Ban / Unban on the dashboard. |
 | 5.3 | `POST /delete-player` | `{accountId: u32}` | `{ok: bool}` | Remove an account from the lobby's user store. Triggers a Mongo delete (#7.2) via `store.DeletePlayer`. | Admin clicks Delete on the dashboard. |
 
 ---
@@ -405,12 +405,12 @@ All writes are async; errors logged, not retried.
 Four distinct call sites in the C++ client, hitting two different
 config keys.
 
-### 9.1 `mapapiurl` — community map server (= the lobby's HTTP API in §4)
+### 9.1 `mapapiurl` — community map server (= the lobby's HTTP API in section 4)
 
 | # | Method + URL | Source | Timing | Purpose | Lifecycle |
 |---|---|---|---|---|---|
 | 9.1.1 | `GET {mapapiurl}/api/maps/by-sha1/{sha1hex}` | `mapfetch.cpp:86-171` (`FetchMapFromServer`) | 3 s connect, 10 s total. Follows redirects. SHA-1 of body verified before saving. Response capped at 65 535 bytes. | Fetch a specific map by hash. | Called when the player opens a game whose `LobbyGame.mapHash` doesn't match a locally-known map. |
-| 9.1.2 | `GET {mapapiurl}/api/maps` | `mapfetch.cpp:200-219` (`FetchServerMapList`) — internal `FetchMapListJSON`. Same JSON body returned by §4.1. | 1 s connect, 2 s total. Response capped at 1 MB. | Browse remote maps. | Called when the user opens the Create Game screen. Gives the user a list of remote maps they could host. |
+| 9.1.2 | `GET {mapapiurl}/api/maps` | `mapfetch.cpp:200-219` (`FetchServerMapList`) — internal `FetchMapListJSON`. Same JSON body returned by section 4.1. | 1 s connect, 2 s total. Response capped at 1 MB. | Browse remote maps. | Called when the user opens the Create Game screen. Gives the user a list of remote maps they could host. |
 | 9.1.3 | `GET {mapapiurl}/api/maps` then per-entry `GET {mapapiurl}/api/maps/by-sha1/{hex}` | `mapfetch.cpp:221-250` (`FetchAndSyncServerMaps`) | Each download: 3 s connect, 10 s total. | "Mirror every server map I don't have." Downloads the list, then for every entry whose filename is not already in `level/download/`, calls 9.1.1 internally. | Called at level-picker open time to pre-cache community maps. |
 
 ### 9.2 `adminapiurl` — admin-api service (separate from the lobby)
@@ -482,12 +482,12 @@ in-flight ops are completed with `{ok:false, code:"INTERNAL", error:
 
 ---
 
-## 11. Process spawn (not a network call but it kicks off §3)
+## 11. Process spawn (not a network call but it kicks off section 3)
 
 | | |
 |---|---|
 | **Mechanism** | `os/exec` `fork`+`exec`, not network |
 | **Source** | `services/lobby/proc.go:33-78` (`procManager.Start`) |
 | **Command line** | `silencer -s 127.0.0.1 <lobbyPort> <gameId> <accountId> [<gamePort>]` |
-| **Why this is in a network audit** | The spawned child opens its own UDP socket, sends the heartbeats listed in §3, and accepts/sends every UDP message in §2 as the authority. Every one of those calls only exists because of this `exec`. |
+| **Why this is in a network audit** | The spawned child opens its own UDP socket, sends the heartbeats listed in section 3, and accepts/sends every UDP message in section 2 as the authority. Every one of those calls only exists because of this `exec`. |
 | **Lifecycle** | Per accepted `opNewGame` (#1.11). Killed when the lobby decides the game is over (owner disconnects, `Hub.Leave`/`RequestCreateGame` drop), if no heartbeat lands within 30 s (`pendingTimeout`), or on lobby shutdown (`StopAll`). |
