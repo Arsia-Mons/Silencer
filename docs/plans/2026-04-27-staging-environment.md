@@ -42,8 +42,15 @@ with one active game ≈ ~650 MB on ~850 MB usable; no special tuning
 required (analysis in `docs/plans/2026-04-25-production-deployment-architecture.md`
 § Sizing decisions, applied at staging traffic levels).
 
-Estimated monthly cost: **~$7** (t4g.micro $6 + ~16 GB gp3 root $1.30,
-no EIP, no snapshots, no second box).
+An EIP is **required** (not optional) — see Developer access below.
+The lobby's `-public-addr` flag, which it hands clients during the
+dedicated-server handoff, must be a dotted-decimal IP because the C++
+join path uses `inet_addr()` not `getaddrinfo()` (`deploy.yml:223-225`
+documents the constraint). Without a stable IP, every instance
+replacement re-bakes every client binary built against staging.
+
+Estimated monthly cost: **~$10.60** (t4g.micro $6 + ~16 GB gp3 root
+$1.30 + EIP $3.60, no snapshots, no second box).
 
 ## Deploy flow
 
@@ -131,6 +138,40 @@ Staging starts fresh on every instance replacement. `mongod`, `lavinmq`,
 and `lobby.json` all live on the root volume. Default admin seed
 (`admin/admin`) is recreated each rebuild. No backups.
 
+## Developer access
+
+`LOBBY_HOST` is baked into the client binary at build time
+(`clients/silencer` cmake variable `SILENCER_LOBBY_HOST`), so a stock
+prod client cannot reach staging. Two paths:
+
+**Default — local build.** Devs who already have the toolchain run:
+
+```sh
+cd clients/silencer
+cmake -B build-staging -DSILENCER_LOBBY_HOST=staging.<domain>
+cmake --build build-staging -j
+```
+
+The `staging.<domain>` form resolves to the EIP via Route 53. The
+dedicated-server handoff still flows through the EIP directly (per the
+`inet_addr()` constraint in Architecture above), so DNS only matters
+for the lobby connection itself.
+
+**Opt-in — CI-built artifacts.** `deploy-staging.yml` accepts a
+`build_clients: true` `workflow_dispatch` input that adds Mac + Windows
+build jobs (mirroring `release.yml`'s shape but with
+`LOBBY_HOST=staging.<domain>`) and uploads the zips via
+`actions/upload-artifact`. Useful when a non-builder needs to playtest
+staging — adds ~10–15 min to the run, so it's off by default. macOS
+zips are unsigned; users `xattr -d com.apple.quarantine` before
+launching.
+
+The day-to-day staging loop (push → "did the lobby boot, do admin
+routes still work") is covered by Tailscale-only access to the admin
+dashboard plus the deploy workflow's own health checks; rebuilding the
+client only matters when validating real protocol or game-logic
+changes.
+
 ## Required checks / branch protection
 
 `deploy-staging.yml` is **not** added to required status checks. The
@@ -139,11 +180,7 @@ existing five (`build-macos`, `build-windows`, `build-admin-api`,
 
 ## Open questions
 
-1. **Domain name?** `staging.<domain>` (Route 53 A record) requires an
-   EIP (~$3.60/mo) for stable DNS across instance replacement.
-   Alternative: no DNS, use the bare public IP; rotates on rebuild but
-   fine for a small dev team that connects via Tailscale anyway.
-2. **`lobby_version_string` for staging?** Setting a distinct value
+1. **`lobby_version_string` for staging?** Setting a distinct value
    (e.g. `"staging-<sha>"`) prevents a prod client from accidentally
    connecting to the staging lobby. Worth doing if the staging lobby
    is publicly reachable.
