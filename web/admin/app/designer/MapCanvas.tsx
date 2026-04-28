@@ -749,18 +749,22 @@ export default function MapCanvas({
         }
       }
 
-      // 2. Hit-test actors — priority over new platform selection
+      // 2. Hit-test actors — priority over new platform selection; cycle through stack on repeated clicks
       const HIT = 48 / zoom;
+      const hits: number[] = [];
       for (let i = map.actors.length - 1; i >= 0; i--) {
-        const a = map.actors[i];
-        const dist = Math.hypot(a.x - wx, a.y - wy);
-        if (dist < HIT) {
-          onActorSelect?.(i);
-          onPlatformSelect(null);
-          draggingActorRef.current = { idx: i, startWx: wx, startWy: wy, origX: a.x, origY: a.y, moved: false };
-          setDragActorPreview({ idx: i, wx: a.x, wy: a.y });
-          return;
-        }
+        if (Math.hypot(map.actors[i].x - wx, map.actors[i].y - wy) < HIT) hits.push(i);
+      }
+      if (hits.length > 0) {
+        // If the currently selected actor is already in this stack, cycle to the next
+        const stackPos = hits.indexOf(highlightActorIdx ?? -1);
+        const nextIdx = stackPos >= 0 ? hits[(stackPos + 1) % hits.length] : hits[0];
+        const a = map.actors[nextIdx];
+        onActorSelect?.(nextIdx);
+        onPlatformSelect(null);
+        draggingActorRef.current = { idx: nextIdx, startWx: wx, startWy: wy, origX: a.x, origY: a.y, moved: false };
+        setDragActorPreview({ idx: nextIdx, wx: a.x, wy: a.y });
+        return;
       }
 
       // 3. Hit-test all platforms for selection
@@ -779,7 +783,7 @@ export default function MapCanvas({
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
       onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
-      selectedPlatformIdx, onPlatformSelect, onActorSelect, snap]);
+      selectedPlatformIdx, onPlatformSelect, onActorSelect, highlightActorIdx, snap]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
