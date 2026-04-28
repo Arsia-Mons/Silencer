@@ -66,7 +66,6 @@ export const ACTOR_DEFS: ActorDefEntry[] = [
   { id: 56, label: 'Inv. Station',    icon: 'IS', color: '#00a328', bank: 89,   frame: 0 },
   { id: 57, label: 'Heal Machine',    icon: 'HM', color: '#22d3ee', bank: 172,  frame: 0 },
   { id: 58, label: 'Secret Return',   icon: 'SR', color: '#a855f7', bank: 152,  frame: 0 },
-  { id: 60, label: 'Camera Focus',    icon: 'CF', color: '#22d3ee', bank: null, frame: 0 },
   { id: 61, label: 'Warper',          icon: 'WP', color: '#a855f7', bank: 85,   frame: 0 },
   { id: 63, label: 'Powerup',         icon: 'PU', color: '#f59e0b', bank: null, frame: 0 },
   { id: 64, label: 'Vent',            icon: 'VT', color: '#6b7280', bank: 179,  frame: 0 },
@@ -84,8 +83,8 @@ export const ACTOR_TYPE_HINTS: Record<number, ActorTypeHint> = {
   2:  { label: 'Behavior', options: { 0:'Patrol', 1:'Guard (stationary)' } },
   3:  { label: 'Behavior', options: { 0:'Patrol', 1:'Guard (stationary)', 2:"Magistrate's Laser", 3:"Magistrate's Rocket" } },
   6:  { label: 'Behavior', options: { 0:'Patrol', 1:'Guard (stationary)' } },
-  36: { label: 'Agency',   options: { 0:'Agency 0', 1:'Agency 1', 2:'Agency 2', 3:'Agency 3' } },
   54: { label: 'Size',     options: { 0:'Small', 1:'Big' } },
+  66: { label: 'Variant',  options: { 0:'Type A', 1:'Type B', 2:'Type C (surveillance-linked)' } },
   63: { label: 'Powerup',  options: {
     0:'Super Shield', 1:'Neutron Bomb', 2:'Jet Pack',
     3:'Invisible', 4:'Hacking Bonus', 5:'Radar', 6:'Depositor',
