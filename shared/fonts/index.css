@@ -1,0 +1,46 @@
+/* Silencer pixel fonts.
+ *
+ * Extracted from clients/silencer sprite banks 132/133/134/136 by
+ * tools/extract-font/extract.py. Each glyph uses currentColor with
+ * per-pixel fill-opacity preserving the original anti-aliasing, so
+ * CSS `color:` recolors text the same way the game's
+ * Renderer::EffectRampColor re-tints it at runtime.
+ *
+ * For pixel-perfect rendering, use a font-size that's an integer
+ * multiple of the native em height:
+ *   Silencer Tiny       em = 5px   (HUD digits)
+ *   Silencer UI         em = 11px  (main UI text — most common)
+ *   Silencer UI Large   em = 13px  (toggles / headers)
+ *   Silencer Title      em = 24px  (announcement titles)
+ *
+ * In-game default tint is rgb(24, 124, 20) (#187C14) — palette index
+ * 220, the brightest pixel in the font's brightness ramp.
+ */
+
+@font-face {
+  font-family: "Silencer Tiny";
+  src: url("./silencer-tiny.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Silencer UI";
+  src: url("./silencer-ui.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Silencer UI Large";
+  src: url("./silencer-ui-large.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Silencer Title";
+  src: url("./silencer-title.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}

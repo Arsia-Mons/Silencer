@@ -1,0 +1,8 @@
+{
+  "name": "silencer-fonts-gallery",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun ./gallery/gallery.html"
+  }
+}
