@@ -124,7 +124,11 @@ interface Props {
   gridSize: number;
   tileSelection?: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null;
   onTileSelection?: (sel: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null) => void;
-  tileCopyBuffer?: { w: number; h: number; layers: [Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>] } | null;
+  tileCopyBuffer?: {
+    w: number; h: number;
+    bg: [Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>];
+    fg: [Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>];
+  } | null;
   pastePending?: boolean;
   onTilePaste?: (tx: number, ty: number) => void;
 }
@@ -716,14 +720,14 @@ export default function MapCanvas({
         ctx.restore();
       }
 
-      // Paste preview at hover tile — render all 4 layers composited
+      // Paste preview at hover tile — render all 8 layers (bg[0..3] then fg[0..3]) composited
       if (hasPastePreview) {
         const { tx: hx, ty: hy } = hoverTileRef.current;
-        const { w, h, layers } = tileCopyBuffer!;
+        const { w, h, bg, fg } = tileCopyBuffer!;
         ctx.save();
         ctx.globalAlpha = 0.55;
-        for (let li = 0; li < 4; li++) {
-          const layerCells = layers[li];
+        const allLayers = [...bg, ...fg];
+        for (const layerCells of allLayers) {
           for (let dy = 0; dy < h; dy++) {
             for (let dx = 0; dx < w; dx++) {
               const tile = layerCells[dy * w + dx];

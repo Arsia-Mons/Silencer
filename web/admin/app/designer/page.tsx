@@ -51,8 +51,12 @@ export default function DesignerPage() {
 
   type TileSel = { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number };
   type TileCell = { tile_id: number; flip: number; lum: number };
-  // All 4 layers stored: bg[0], bg[1], fg[0], fg[1] — each is a flat w*h array
-  type TileCopyBuf = { w: number; h: number; layers: [TileCell[], TileCell[], TileCell[], TileCell[]] };
+  // All 8 layers: bg[0..3] and fg[0..3], each a flat w*h array
+  type TileCopyBuf = {
+    w: number; h: number;
+    bg: [TileCell[], TileCell[], TileCell[], TileCell[]];
+    fg: [TileCell[], TileCell[], TileCell[], TileCell[]];
+  };
 
   const [activeTool, setActiveTool]     = useState('TILE_BG');
   const [activeLayer, setActiveLayer]   = useState(0);
@@ -220,11 +224,17 @@ export default function DesignerPage() {
         };
         setTileCopyBuffer({
           w, h,
-          layers: [
+          bg: [
             extractLayer(m.layers.bg[0]),
             extractLayer(m.layers.bg[1]),
+            extractLayer(m.layers.bg[2]),
+            extractLayer(m.layers.bg[3]),
+          ],
+          fg: [
             extractLayer(m.layers.fg[0]),
             extractLayer(m.layers.fg[1]),
+            extractLayer(m.layers.fg[2]),
+            extractLayer(m.layers.fg[3]),
           ],
         });
         setPastePending(false);
@@ -320,17 +330,11 @@ export default function DesignerPage() {
 
   const handleTilePaste = useCallback((tx: number, ty: number) => {
     if (!tileCopyBuffer || !map) return;
-    const { w, h, layers } = tileCopyBuffer;
-    const layerDefs: Array<{ layerType: 'bg' | 'fg'; layerIdx: number }> = [
-      { layerType: 'bg', layerIdx: 0 },
-      { layerType: 'bg', layerIdx: 1 },
-      { layerType: 'fg', layerIdx: 0 },
-      { layerType: 'fg', layerIdx: 1 },
+    const { w, bg, fg } = tileCopyBuffer;
+    const patches = [
+      ...bg.map((cells, li) => ({ layerType: 'bg' as const, layerIdx: li, updates: cells.map((t, i) => ({ x: tx + (i % w), y: ty + Math.floor(i / w), ...t })) })),
+      ...fg.map((cells, li) => ({ layerType: 'fg' as const, layerIdx: li, updates: cells.map((t, i) => ({ x: tx + (i % w), y: ty + Math.floor(i / w), ...t })) })),
     ];
-    const patches = layerDefs.map(({ layerType, layerIdx }, li) => ({
-      layerType, layerIdx,
-      updates: layers[li].map((t, i) => ({ x: tx + (i % w), y: ty + Math.floor(i / w), ...t })),
-    }));
     applyAllLayersBatch(patches);
   }, [tileCopyBuffer, map, applyAllLayersBatch]);
 
