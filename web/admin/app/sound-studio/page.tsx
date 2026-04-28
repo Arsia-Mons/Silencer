@@ -30,7 +30,8 @@ export default function SoundStudioPage() {
   const [repacking, setRepacking] = useState(false);
   const [dragOver, setDragOver] = useState(false);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -49,39 +50,43 @@ export default function SoundStudioPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // ── Playback ────────────────────────────────────────────────────────────────
+  // ── Playback via Web Audio API (handles IMA ADPCM WAV natively) ─────────────
 
-  function play(name: string) {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.src = '';
+  async function play(name: string) {
+    // Stop whatever is playing
+    if (audioSourceRef.current) {
+      try { audioSourceRef.current.stop(); } catch {}
+      audioSourceRef.current = null;
     }
-    if (playing === name) {
-      setPlaying(null);
-      return;
-    }
+    if (playing === name) { setPlaying(null); return; }
+
     const token = typeof window !== 'undefined' ? localStorage.getItem('zs_token') : '';
-    // Use raw fetch + Blob URL to stream binary audio with auth header
-    fetch(`/api/sounds/${encodeURIComponent(name)}/play`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(async r => {
-        if (!r.ok) {
-          const err = await r.json().catch(() => ({ error: r.statusText })) as { error?: string };
-          throw new Error(err.error || r.statusText);
-        }
-        return r.blob();
-      })
-      .then(blob => {
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audioRef.current = audio;
-        setPlaying(name);
-        audio.onended = () => { setPlaying(null); URL.revokeObjectURL(url); };
-        audio.onerror = () => { setPlaying(null); URL.revokeObjectURL(url); setError(`Could not play ${name}`); };
-        audio.play().catch(e => { setPlaying(null); setError(e.message); });
-      })
-      .catch(e => { setError(e.message); setPlaying(null); });
+    try {
+      const r = await fetch(`/api/sounds/${encodeURIComponent(name)}/play`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: r.statusText })) as { error?: string };
+        throw new Error(err.error || r.statusText);
+      }
+      const arrayBuf = await r.arrayBuffer();
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioContext();
+      }
+      const audioCtx = audioCtxRef.current;
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+      const decoded = await audioCtx.decodeAudioData(arrayBuf);
+      const source = audioCtx.createBufferSource();
+      source.buffer = decoded;
+      source.connect(audioCtx.destination);
+      source.start();
+      audioSourceRef.current = source;
+      setPlaying(name);
+      source.onended = () => { setPlaying(null); audioSourceRef.current = null; };
+    } catch (e: any) {
+      setPlaying(null);
+      setError(`Could not play ${name}: ${e.message}`);
+    }
   }
 
   // ── Upload ──────────────────────────────────────────────────────────────────

@@ -142,27 +142,6 @@ function encodeToAdpcm(inputWavBuf) {
   });
 }
 
-/** Decode IMA ADPCM WAV to PCM WAV via ffmpeg (for browser playback). */
-function decodeAdpcmToPcm(adpcmWavBuf) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    const ff = spawn(FFMPEG, [
-      '-hide_banner', '-loglevel', 'error',
-      '-f', 'wav', '-i', 'pipe:0',
-      '-c:a', 'pcm_s16le',
-      '-f', 'wav', 'pipe:1',
-    ]);
-    ff.stdout.on('data', d => chunks.push(d));
-    ff.stderr.on('data', d => console.error('[ffmpeg]', d.toString()));
-    ff.on('close', code => {
-      if (code !== 0) return reject(new Error(`ffmpeg exited ${code}`));
-      resolve(Buffer.concat(chunks));
-    });
-    ff.stdin.write(adpcmWavBuf);
-    ff.stdin.end();
-  });
-}
-
 // ── Staging helpers ───────────────────────────────────────────────────────────
 
 function getDeletions() {
@@ -208,41 +187,34 @@ router.get('/', requireAuth, (req, res) => {
   res.json([...binSounds, ...stagedSounds]);
 });
 
-// GET /sounds/:name/play — stream decoded PCM WAV for browser playback
-router.get('/:name/play', requireAuth, async (req, res) => {
+// GET /sounds/:name/play — serve IMA ADPCM WAV for browser playback
+// The client decodes via Web Audio API (AudioContext.decodeAudioData), no server-side ffmpeg needed.
+router.get('/:name/play', requireAuth, (req, res) => {
   const name = req.params.name;
 
-  // Check staging first
+  // Check staging first (staged files are already standard WAV)
   const stagedPath = join(STAGING_DIR, name);
   if (existsSync(stagedPath)) {
-    try {
-      const wavBuf = readFileSync(stagedPath);
-      const pcm = await decodeAdpcmToPcm(wavBuf);
-      res.setHeader('Content-Type', 'audio/wav');
-      res.setHeader('Content-Length', pcm.length);
-      return res.send(pcm);
-    } catch (e) {
-      return res.status(500).json({ error: e.message });
-    }
+    const wavBuf = readFileSync(stagedPath);
+    res.setHeader('Content-Type', 'audio/wav');
+    res.setHeader('Content-Length', wavBuf.length);
+    return res.send(wavBuf);
   }
 
-  // Fall back to bin
+  // Fall back to bin — reconstruct IMA ADPCM WAV
   const { sounds, dataBase, buf } = parseSoundBin();
   if (!buf) return res.status(404).json({ error: 'sound.bin not found' });
   const sound = sounds.find(s => s.name === name);
   if (!sound) return res.status(404).json({ error: 'Sound not found' });
 
-  try {
-    const adpcmBytes = sound.storedLength - 36;
-    const adpcmData = buf.slice(dataBase + sound.offset, dataBase + sound.offset + adpcmBytes);
-    const adpcmWav = buildWav(adpcmData);
-    const pcm = await decodeAdpcmToPcm(adpcmWav);
-    res.setHeader('Content-Type', 'audio/wav');
-    res.setHeader('Content-Length', pcm.length);
-    res.send(pcm);
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  const adpcmData = buf.slice(
+    dataBase + sound.offset,
+    dataBase + sound.offset + (sound.storedLength - 36),
+  );
+  const wavBuf = buildWav(adpcmData);
+  res.setHeader('Content-Type', 'audio/wav');
+  res.setHeader('Content-Length', wavBuf.length);
+  res.send(wavBuf);
 });
 
 // POST /sounds — upload WAV to staging (X-Filename: <name.wav>)
