@@ -51,8 +51,9 @@ language:
   little-endian on the wire.
 
 When a row says "C → S" it means the silencer client sent it to the
-Go lobby; "S → C" the other way; "P → P" peer-to-peer over UDP
-between game peers.
+Go lobby; "S → C" the other way. For the in-game UDP traffic in §2
+the directions are "R → A" (replica to authority) or "A → R"
+(authority to replica) — see the topology note in §2.
 
 ---
 
@@ -207,9 +208,18 @@ the local mode:
 - **Replica path** — `world.cpp:614-820`, `World::DoNetwork_Replica`.
   Handles inbound from the authority. Sends inputs / chat / etc.
 
-Direction in the table below is "R → A" (replica to authority) or
-"A → R" (authority to replica), or "A → A_other" / "R → A_other" for
-the rare cross-traffic.
+**Topology is hub-and-spoke, not a free mesh.** Every UDP packet is
+between the authority and one or more replicas. Replicas *never* send
+UDP directly to other replicas — when a replica needs to broadcast
+something (e.g. chat), it sends to the authority, which fans out.
+Confirmed by walking every `SendPacket()` call site in `world.cpp`:
+replica-originated sends always target `GetAuthorityPeer()`;
+multi-recipient sends only happen inside `if(mode == AUTHORITY)`
+branches.
+
+Direction in the table below is therefore either "R → A" (replica →
+authority) or "A → R" (authority → replica). A few message types
+flow both ways depending on who initiates — those are noted per row.
 
 23 message types in total (`world.h:200-202`). Their names below
 match the C++ enum (`MSG_*`). Two more, `MSG_VIRUS` and `MSG_REPAIR`,
@@ -248,8 +258,8 @@ uses those names today.
 | 2.25 | `MSG_EXISTS` (18) | A → R | A run of u16 `objectId`s (variable count). | "Tell me which of these objects you still have — I think they may be stale on your side." (Authority asks replica to confirm presence so it can reissue removes for ones that died while replica was offline.) | Sent periodically by `World::CheckExists` (`world.cpp:1033-1052`) for selected object types: pickups, fixed cannons, detonators. |
 | 2.26 | `MSG_REMOVE` (19) | R → A | A run of u16 `objectId`s | "I don't have these — please remove them from your authoritative state too." | Reply to 2.25 (`world.cpp:530-538`). Authority then marks those object ids destroyed (`world.cpp:782`). |
 | 2.27 | `MSG_MAP` (20) — replica reports done | R → A | u8 subcode `MAP_DOWNLOADED=0` | "I have the full map; you can mark me ready." | Sent by `World::SendMapDownloaded` (`world.cpp:2107-2109`). |
-| 2.28 | `MSG_MAP` (20) — request chunk | either side | u8 subcode `MAP_GETCHUNK=1`, u32 `offset` | "Send me bytes [offset … offset+1024] of the current map." | Replica fetches the map from authority by chunking. From `World::GetMapChunk` (`world.cpp:2134`). |
-| 2.29 | `MSG_MAP` (20) — chunk push | either side | u8 subcode `MAP_PUTCHUNK=2`, u32 `offset`, u32 `size`, then `size` bytes | "Here are bytes [offset … offset+size] of the map." | Reply to 2.28. From `World::PutMapChunk` (`world.cpp:2114-2130`). Max 1024 bytes per chunk. |
+| 2.28 | `MSG_MAP` (20) — request chunk | usually R → A; A → R when authority lacks the map | u8 subcode `MAP_GETCHUNK=1`, u32 `offset` | "Send me bytes [offset … offset+1024] of the current map." | Common case: a replica that joined without the map asks the authority for chunks. Inverted case: if the dedicated server itself doesn't have a community map locally, it asks the host player (who already downloaded it from the lobby's map HTTP API) — see `world.cpp:2139-2150`. Either way, the authority is always one endpoint; replicas never request from each other. |
+| 2.29 | `MSG_MAP` (20) — chunk push | mirror of 2.28 | u8 subcode `MAP_PUTCHUNK=2`, u32 `offset`, u32 `size`, then `size` bytes | "Here are bytes [offset … offset+size] of the map." | Reply to 2.28 — direction is whichever side received the request. A → R when a replica asked, R → A when the authority asked the host player. From `World::PutMapChunk` (`world.cpp:2114-2130`). Max 1024 bytes per chunk. |
 | 2.30 | `MSG_SETAGENCY` (21) | R → A | u8 `agency` | "Move me to a team in this agency." | Sent in pregame from `World::SetAgency` (`world.cpp:2010`). |
 | 2.31 | `MSG_KICK` (22) — admin → dedicated | special: see **§4.4** below | u32 accountId | "Kick this player from the game." | The lobby itself injects this packet from a separate UDP socket when an admin bans a player who is currently in a game. The dedicated-server authority receives it on its own UDP game socket and disconnects the matching peer. |
 
