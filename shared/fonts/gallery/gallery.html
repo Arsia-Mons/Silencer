@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Silencer fonts</title>
+  <link rel="stylesheet" href="../index.css" />
+  <link rel="stylesheet" href="./gallery.css" />
+</head>
+<body>
+  <header class="bar">
+    <h1>Silencer fonts</h1>
+    <div class="controls">
+      <label>fg
+        <input type="color" id="fg" value="#187c14" />
+        <code id="fg-hex">#187C14</code>
+      </label>
+      <label>bg
+        <input type="color" id="bg" value="#000000" />
+        <code id="bg-hex">#000000</code>
+      </label>
+      <label>scale
+        <input type="range" id="scale" min="1" max="6" step="1" value="2" />
+        <code id="scale-display">2x</code>
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="show-all" />
+        all glyphs
+      </label>
+    </div>
+  </header>
+  <main id="samples"></main>
+  <script type="module" src="./gallery.ts"></script>
+</body>
+</html>
