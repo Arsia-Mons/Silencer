@@ -187,6 +187,7 @@ struct EnemyDef {
     int deathDropFiles        = 0;   // robot: quantity of FILES pickup spawned on death
     int ladderClimbSpeed      = 5;   // guard/robot: abs(yv) when climbing a ladder
     int rocketLaunchXv        = 25;  // robot: horizontal velocity of fired rocket projectile
+    int ammoDropQuantity      = 0;   // guard: ammo quantity dropped on death (0 = no drop)
 };
 
 // ---- Ability ---------------------------------------------------------------
@@ -228,6 +229,7 @@ struct TerminalDef {
     int traceTimeBase     = 90;   // trace timer when 0 secrets hacked
     int traceTimeMedium   = 120;  // trace timer when 1 secret hacked
     int traceTimeExtended = 150;  // trace timer when 2+ secrets hacked
+    int beaconTimeSecs    = 65;   // team objective: seconds for beacon countdown when this terminal is selected
 };
 
 // ---------------------------------------------------------------------------

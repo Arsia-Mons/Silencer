@@ -229,6 +229,7 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.deathDropFiles        = ej.value("deathDropFiles",        e.deathDropFiles);
             e.ladderClimbSpeed      = ej.value("ladderClimbSpeed",      e.ladderClimbSpeed);
             e.rocketLaunchXv        = ej.value("rocketLaunchXv",        e.rocketLaunchXv);
+            e.ammoDropQuantity      = ej.value("ammoDropQuantity",      e.ammoDropQuantity);
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {
@@ -303,6 +304,7 @@ static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out)
             t.traceTimeBase      = tj.value("traceTimeBase",      t.traceTimeBase);
             t.traceTimeMedium    = tj.value("traceTimeMedium",    t.traceTimeMedium);
             t.traceTimeExtended  = tj.value("traceTimeExtended",  t.traceTimeExtended);
+            t.beaconTimeSecs     = tj.value("beaconTimeSecs",     t.beaconTimeSecs);
             out.push_back(std::move(t));
         }
     } catch (const std::exception& e) {

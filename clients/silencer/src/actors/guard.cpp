@@ -893,11 +893,11 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 			if(pickup){
 				if(weapon == 2){
 					pickup->type = PickUp::ROCKETAMMO;
-					pickup->quantity = 3;
+					{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("guard-rocket"); pickup->quantity = _grd ? _grd->ammoDropQuantity : 3; }
 				}else
 				if(weapon == 1){
 					pickup->type = PickUp::LASERAMMO;
-					pickup->quantity = 5;
+					{ const EnemyDef* _gld = GASLoader::Get().GetEnemyDef("guard-laser"); pickup->quantity = _gld ? _gld->ammoDropQuantity : 5; }
 				}
 				pickup->x = Guard::x;
 				pickup->y = Guard::y - 1;

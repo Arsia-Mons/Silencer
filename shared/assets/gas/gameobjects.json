@@ -36,7 +36,8 @@
     {
       "id": "big",
       "juice": 150, "files": 400, "secretInfo": 45,
-      "traceTimeBase": 90, "traceTimeMedium": 120, "traceTimeExtended": 150
+      "traceTimeBase": 90, "traceTimeMedium": 120, "traceTimeExtended": 150,
+      "beaconTimeSecs": 65
     },
     {
       "id": "small",

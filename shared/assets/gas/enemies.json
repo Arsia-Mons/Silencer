@@ -39,7 +39,8 @@
       "ladderYThreshold": 48,
       "ladderXTolerance": 8,
       "patrolReturnProximity": 20,
-      "ladderClimbSpeed": 5
+      "ladderClimbSpeed": 5,
+      "ammoDropQuantity": 5
     },
     {
       "id": "guard-rocket",
@@ -59,7 +60,8 @@
       "ladderYThreshold": 48,
       "ladderXTolerance": 8,
       "patrolReturnProximity": 20,
-      "ladderClimbSpeed": 5
+      "ladderClimbSpeed": 5,
+      "ammoDropQuantity": 3
     },
     {
       "id": "robot",

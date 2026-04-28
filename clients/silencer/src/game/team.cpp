@@ -2,6 +2,7 @@
 #include "overlay.h"
 #include "terminal.h"
 #include "player.h"
+#include "../gas/gasloader.h"
 
 Team::Team() : Object(ObjectTypes::TEAM){
 	agency = NOXIS;
@@ -175,7 +176,7 @@ void Team::Tick(World & world){
 				terminal->state = Terminal::SECRETBEAMING;
 				terminal->state_i = 0;
 				beamingterminalid = terminal->id;
-				terminal->beamingtime = 65;
+				{ const TerminalDef* _td = GASLoader::Get().GetTerminalDef("big"); terminal->beamingtime = _td ? _td->beaconTimeSecs : 65; }
 				char teamtext[256];
 				char enemytext[256];
 				sprintf(teamtext, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : %d seconds", terminal->beamingtime);
