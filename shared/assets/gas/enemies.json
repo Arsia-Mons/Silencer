@@ -78,7 +78,14 @@
       "shootCooldownCap": 50,
       "deathDropFiles": 250,
       "ladderClimbSpeed": 5,
-      "rocketLaunchXv": 25
+      "rocketLaunchXv": 25,
+      "lookDefaultMinX": 70,
+      "lookDefaultMaxX": 500,
+      "lookDefaultY": -60,
+      "lookDirMinX": 70,
+      "lookDirMaxX": 200,
+      "lookDirY1": -10,
+      "lookDirY2": -100
     },
     {
       "id": "civilian",

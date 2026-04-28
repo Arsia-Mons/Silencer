@@ -80,6 +80,9 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.teamGiftCredits            = j.value("teamGiftCredits",            out.teamGiftCredits);
         out.secretDeliveryCredits      = j.value("secretDeliveryCredits",      out.secretDeliveryCredits);
         out.weaponFireCooldownPad      = j.value("weaponFireCooldownPad",      out.weaponFireCooldownPad);
+        out.secretsNeededToWin         = j.value("secretsNeededToWin",         out.secretsNeededToWin);
+        out.secretProgressBeamThresh   = j.value("secretProgressBeamThresh",   out.secretProgressBeamThresh);
+        out.secretProgressSoundThresh  = j.value("secretProgressSoundThresh",  out.secretProgressSoundThresh);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
     }
@@ -234,6 +237,13 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.ladderClimbSpeed      = ej.value("ladderClimbSpeed",      e.ladderClimbSpeed);
             e.rocketLaunchXv        = ej.value("rocketLaunchXv",        e.rocketLaunchXv);
             e.ammoDropQuantity      = ej.value("ammoDropQuantity",      e.ammoDropQuantity);
+            e.lookDefaultMinX       = ej.value("lookDefaultMinX",       e.lookDefaultMinX);
+            e.lookDefaultMaxX       = ej.value("lookDefaultMaxX",       e.lookDefaultMaxX);
+            e.lookDefaultY          = ej.value("lookDefaultY",          e.lookDefaultY);
+            e.lookDirMinX           = ej.value("lookDirMinX",           e.lookDirMinX);
+            e.lookDirMaxX           = ej.value("lookDirMaxX",           e.lookDirMaxX);
+            e.lookDirY1             = ej.value("lookDirY1",             e.lookDirY1);
+            e.lookDirY2             = ej.value("lookDirY2",             e.lookDirY2);
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {
@@ -281,6 +291,7 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             g.reloadTick      = gj.value("reloadTick",      g.reloadTick);
             g.innerRange      = gj.value("innerRange",      g.innerRange);
             g.outerRange      = gj.value("outerRange",      g.outerRange);
+            g.detectionRange  = gj.value("detectionRange",  g.detectionRange);
             out.push_back(std::move(g));
         }
     } catch (const std::exception& e) {

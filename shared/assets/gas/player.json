@@ -37,5 +37,8 @@
   "fileConversionBase": 1,
   "teamGiftCredits": 100,
   "secretDeliveryCredits": 1000,
-  "weaponFireCooldownPad": 3
+  "weaponFireCooldownPad": 3,
+  "secretsNeededToWin": 3,
+  "secretProgressBeamThresh": 180,
+  "secretProgressSoundThresh": 20
 }

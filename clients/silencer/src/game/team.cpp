@@ -55,7 +55,7 @@ void Team::Tick(World & world){
 			newpeerschecksum += world.peerlist[peers[i]]->ip;
 		}
 	}
-	if(secretprogress - oldsecretprogress >= 20){
+	if(secretprogress - oldsecretprogress >= GASLoader::Get().player.secretProgressSoundThresh){
 		/*Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 		if(localplayer && this == localplayer->GetTeam(world)){
 			Audio::GetInstance().Play(world.resources.soundbank["select2.wav"], 32);
@@ -81,7 +81,7 @@ void Team::Tick(World & world){
 				if(player->secretteamid != id){
 					stolen = true;
 				}
-				int remaining = 3 - secrets;
+				int remaining = GASLoader::Get().player.secretsNeededToWin - secrets;
 				char text[128];
 				sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded 1000 credits", user->name, stolen ? "stolen secret" : "secret", remaining);
 				if(!world.intutorialmode){
@@ -96,7 +96,7 @@ void Team::Tick(World & world){
 			}
 		}
 		world.Illuminate();
-		if(secrets >= 3){
+		if(secrets >= GASLoader::Get().player.secretsNeededToWin){
 			// game won
 			if(!world.winningteamid){
 				world.winningteamid = id;
@@ -151,13 +151,13 @@ void Team::Tick(World & world){
 		}
 		secretdelivered = 0;
 	}
-	if(secrets >= 3){
+	if(secrets >= GASLoader::Get().player.secretsNeededToWin){
 		// bug fix for when secretdelivered packet is lost
 		if(!world.winningteamid){
 			world.winningteamid = id;
 		}
 	}
-	if(secretprogress >= 180 && oldsecretprogress > 0){
+	if(secretprogress >= GASLoader::Get().player.secretProgressBeamThresh && oldsecretprogress > 0){
 		secretprogress = 0;
 		oldsecretprogress = 0;
 		if(world.IsAuthority()){

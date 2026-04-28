@@ -24,6 +24,7 @@
       "shieldMax": 4,
       "refireReadyTick": 12,
       "reloadTick": 60,
+      "detectionRange": 600,
       "_note": "health=neutral state (teamid=0). Each upgrade adds healthRegen up to healthMax. shieldMax applied when health reaches healthMax."
     },
     {

@@ -148,7 +148,9 @@ void WallDefense::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 Object * WallDefense::Look(World & world){
 	std::vector<Uint8> types;
 	types.push_back(ObjectTypes::PLAYER);
-	std::vector<Object *> objects = world.TestAABB(x - 600, y - 600, x + 600, y + 600, types);
+	const GameObjectDef* gd = GASLoader::Get().GetGameObjectDef("wallDefense");
+	int dr = gd ? gd->detectionRange : 600;
+	std::vector<Object *> objects = world.TestAABB(x - dr, y - dr, x + dr, y + dr, types);
 	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 		Object * object = *it;
 		Player * player = static_cast<Player *>(object);

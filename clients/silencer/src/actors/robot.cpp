@@ -459,26 +459,27 @@ bool Robot::Look(World & world, Uint8 direction){
 	if(virusplanter){
 		types.push_back(ObjectTypes::GUARD);
 	}
-	int y1 = -60;
+	const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+	int y1 = rd ? rd->lookDefaultY : -60;
 	int y2 = y1;
-	int minx = 70;
-	int maxx = 500;
+	int minx = rd ? rd->lookDefaultMinX : 70;
+	int maxx = rd ? rd->lookDefaultMaxX : 500;
 	minx *= (mirrored ? -1 : 1);
 	maxx *= (mirrored ? -1 : 1);
 	switch(direction){
 		case 0:
 		break;
 		case 1:
-			minx = 70;
-			maxx = 200;
-			y1 = -10;
-			y2 = -100;
+			minx = rd ? rd->lookDirMinX : 70;
+			maxx = rd ? rd->lookDirMaxX : 200;
+			y1 = rd ? rd->lookDirY1 : -10;
+			y2 = rd ? rd->lookDirY2 : -100;
 		break;
 		case 2:
-			minx = -70;
-			maxx = -200;
-			y1 = -10;
-			y2 = -100;
+			minx = -(rd ? rd->lookDirMinX : 70);
+			maxx = -(rd ? rd->lookDirMaxX : 200);
+			y1 = rd ? rd->lookDirY1 : -10;
+			y2 = rd ? rd->lookDirY2 : -100;
 		break;
 	}
 	if(signed(x) + minx < 0){

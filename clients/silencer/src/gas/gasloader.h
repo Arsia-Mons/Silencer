@@ -84,6 +84,13 @@ struct PlayerDef {
     int neutronWarnTick             = 8;    // tracetime value that triggers detonation warning sound
     int superShieldMultiplier       = 2;    // super shield powerup: shield = maxshield * N
     int powerupRespawnTicks         = 60;   // ticks before a dropped powerup respawns
+    int fileConversionBase          = 1;    // base file-to-credit conversion factor (creditamount = files * (base + creditsbonus))
+    int teamGiftCredits             = 100;  // credits awarded to a teammate via BUY_GIVE actions
+    int secretDeliveryCredits       = 1000; // credits awarded to each team member on secret delivery
+    int weaponFireCooldownPad       = 3;    // extra ticks added to every weapon's fireDelay on each shot
+    int secretsNeededToWin          = 3;    // secrets a team must deliver to win the round
+    int secretProgressBeamThresh    = 180;  // secretprogress value that triggers secret-beaming sequence
+    int secretProgressSoundThresh   = 20;   // min progress delta to trigger team progress sound
 };
 
 // ---- Weapon ----------------------------------------------------------------
@@ -188,6 +195,14 @@ struct EnemyDef {
     int ladderClimbSpeed      = 5;   // guard/robot: abs(yv) when climbing a ladder
     int rocketLaunchXv        = 25;  // robot: horizontal velocity of fired rocket projectile
     int ammoDropQuantity      = 0;   // guard: ammo quantity dropped on death (0 = no drop)
+    // Robot look-range AABB (Look() detection box)
+    int lookDefaultMinX = 70;   // default detection box: near edge (x offset from robot)
+    int lookDefaultMaxX = 500;  // default detection box: far edge
+    int lookDefaultY    = -60;  // default detection box: y1=y2 (top/bottom of box)
+    int lookDirMinX     = 70;   // directional (dir 1/2): near edge (x offset, mirrored for dir 2)
+    int lookDirMaxX     = 200;  // directional: far edge
+    int lookDirY1       = -10;  // directional: top of box
+    int lookDirY2       = -100; // directional: bottom of box
 };
 
 // ---- Ability ---------------------------------------------------------------
@@ -217,6 +232,7 @@ struct GameObjectDef {
     int reloadTick      = 60;  // wall defense: state_i to reset from DEAD state
     int innerRange      = 70;  // fixed cannon: near edge of detection box (x offset)
     int outerRange      = 300; // fixed cannon: far edge of detection box (x offset)
+    int detectionRange  = 600; // wall defense: AABB half-extent for player detection
 };
 
 // ---- Terminal ---------------------------------------------------------------
