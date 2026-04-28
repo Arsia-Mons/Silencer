@@ -51,6 +51,7 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.upgradeMultiplierJetpack   = j.value("upgradeMultiplierJetpack",   out.upgradeMultiplierJetpack);
         out.upgradeMultiplierHacking   = j.value("upgradeMultiplierHacking",   out.upgradeMultiplierHacking);
         out.upgradeMultiplierContacts  = j.value("upgradeMultiplierContacts",  out.upgradeMultiplierContacts);
+        out.maxPoisoned                = j.value("maxPoisoned",                out.maxPoisoned);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
     }
@@ -130,6 +131,12 @@ static void LoadItems(const std::string& dir, std::vector<ItemDef>& out) {
             item.techSlots         = ij.value("techSlots",         0);
             item.agencyRestriction = ij.value("agencyRestriction", -1);
             item.description       = ij.value("description",      std::string{});
+            item.spawnAmmo           = ij.value("spawnAmmo",           0);
+            item.spawnInventoryCount = ij.value("spawnInventoryCount", 0);
+            item.pickupAmmo          = ij.value("pickupAmmo",          0);
+            item.maxAmmo             = ij.value("maxAmmo",             0);
+            item.healAmount          = ij.value("healAmount",          0);
+            item.poisonDose          = ij.value("poisonDose",          0);
             out.push_back(std::move(item));
         }
     } catch (const std::exception& e) {

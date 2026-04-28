@@ -23,6 +23,7 @@
 #include "mapfetch.h"
 #include "actordef.h"
 #include "behaviortree.h"
+#include "gasloader.h"
 #include <algorithm>
 #include <stdio.h>
 
@@ -2274,38 +2275,48 @@ void Game::GiveDefaultItems(Player & player){
 			switch(buyableitem->id){
 				case World::BUY_LASER:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.laserammo = 5;
+						const ItemDef* def = GASLoader::Get().GetItemDef("laser");
+						player.laserammo = def ? def->spawnAmmo : 5;
 					}
 				}break;
 				case World::BUY_ROCKET:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.rocketammo = 3;
+						const ItemDef* def = GASLoader::Get().GetItemDef("rocket");
+						player.rocketammo = def ? def->spawnAmmo : 3;
 					}
 				}break;
 				case World::BUY_FLAMER:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.flamerammo = 15;
+						const ItemDef* def = GASLoader::Get().GetItemDef("flamer");
+						player.flamerammo = def ? def->spawnAmmo : 15;
 					}
 				}break;
 				case World::BUY_HEALTH:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.AddInventoryItem(Player::INV_HEALTHPACK);
+						const ItemDef* def = GASLoader::Get().GetItemDef("healthpack");
+						int count = def ? def->spawnInventoryCount : 1;
+						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_HEALTHPACK);
 					}
 				}break;
 				case World::BUY_VIRUS:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.AddInventoryItem(Player::INV_VIRUS);
+						const ItemDef* def = GASLoader::Get().GetItemDef("virus");
+						int count = def ? def->spawnInventoryCount : 1;
+						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_VIRUS);
 					}
 				}break;
 				case World::BUY_POISON:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.AddInventoryItem(Player::INV_POISON);
-						player.AddInventoryItem(Player::INV_POISON);
+						const ItemDef* def = GASLoader::Get().GetItemDef("poison");
+						int count = def ? def->spawnInventoryCount : 2;
+						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_POISON);
 					}
 				}break;
 				case World::BUY_TRACT:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.AddInventoryItem(Player::INV_LAZARUSTRACT);
+						const ItemDef* def = GASLoader::Get().GetItemDef("lazarustract");
+						int count = def ? def->spawnInventoryCount : 1;
+						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_LAZARUSTRACT);
 					}
 				}break;
 			}

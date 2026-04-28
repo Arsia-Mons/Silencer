@@ -763,10 +763,12 @@ void Player::Tick(World & world){
 				case INV_HEALTHPACK:{
 					if(state != DEAD && state != DYING){
 						if(health < maxhealth){
-							if(maxhealth - health < 100){
+							const ItemDef* def = GASLoader::Get().GetItemDef("healthpack");
+							int heal = def ? def->healAmount : 100;
+							if(maxhealth - health < heal){
 								health = maxhealth;
 							}else{
-								health += 100;
+								health += heal;
 							}
 							Peer * peer = GetPeer(world);
 							if(peer){
@@ -855,7 +857,9 @@ void Player::Tick(World & world){
 						for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 							found = true;
 							Player * player = static_cast<Player *>(*it);
-							if(player->Poison(world, id, 3)){
+							const ItemDef* poisondef = GASLoader::Get().GetItemDef("poison");
+							int dose = poisondef ? poisondef->poisonDose : 3;
+							if(player->Poison(world, id, dose)){
 								Peer * peer = GetPeer(world);
 								if(peer){
 									peer->stats.poisons++;
@@ -863,7 +867,8 @@ void Player::Tick(World & world){
 								RemoveInventoryItem(INV_POISON);
 								break;
 							}else{
-								if(player->poisonedamount == maxpoisoned){
+								int maxpois = GASLoader::Get().player.maxPoisoned;
+								if(player->poisonedamount == maxpois){
 									world.ShowStatus("Victim maximally poisoned", 208, true, GetPeer(world));
 								}
 							}
@@ -2940,13 +2945,14 @@ bool Player::IsInvisible(World & world){
 }
 
 bool Player::Poison(World & world, Uint16 playerid, Uint8 amount){
-	if(poisonedamount < maxpoisoned){
+	int maxpois = GASLoader::Get().player.maxPoisoned;
+	if(poisonedamount < maxpois){
 		Player * player = static_cast<Player *>(world.GetObjectFromId(playerid));
 		if(player && !world.BelongsToTeam(*player, teamid)){
 			poisonedby = playerid;
 			poisonedamount += amount;
-			if(poisonedamount > maxpoisoned){
-				poisonedamount = maxpoisoned;
+			if(poisonedamount > maxpois){
+				poisonedamount = maxpois;
 			}
 			state_hit = 1 + (3 * 32);
 			hitx = 50;
@@ -3223,29 +3229,32 @@ bool Player::BuyItem(World & world, Uint8 id){
 		bool bought = false;
 		switch(id){
 			case World::BUY_LASER:{
-				if(laserammo < 30){
-					laserammo += 5;
-					if(laserammo > 30){
-						laserammo = 30;
-					}
+				const ItemDef* def = GASLoader::Get().GetItemDef("laser");
+				int pickup = def ? def->pickupAmmo : 5;
+				int cap    = def ? def->maxAmmo    : 30;
+				if(laserammo < cap){
+					laserammo += pickup;
+					if(laserammo > cap) laserammo = cap;
 					bought = true;
 				}
 			}break;
 			case World::BUY_ROCKET:{
-				if(rocketammo < 30){
-					rocketammo += 3;
-					if(rocketammo > 30){
-						rocketammo = 30;
-					}
+				const ItemDef* def = GASLoader::Get().GetItemDef("rocket");
+				int pickup = def ? def->pickupAmmo : 3;
+				int cap    = def ? def->maxAmmo    : 30;
+				if(rocketammo < cap){
+					rocketammo += pickup;
+					if(rocketammo > cap) rocketammo = cap;
 					bought = true;
 				}
 			}break;
 			case World::BUY_FLAMER:{
-				if(flamerammo < 75){
-					flamerammo += 15;
-					if(flamerammo > 75){
-						flamerammo = 75;
-					}
+				const ItemDef* def = GASLoader::Get().GetItemDef("flamer");
+				int pickup = def ? def->pickupAmmo : 15;
+				int cap    = def ? def->maxAmmo    : 75;
+				if(flamerammo < cap){
+					flamerammo += pickup;
+					if(flamerammo > cap) flamerammo = cap;
 					bought = true;
 				}
 			}break;
@@ -4292,8 +4301,10 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 		}break;
 		case PickUp::LASERAMMO:{
 			laserammo += pickup.quantity;
-			if(laserammo > 30){
-				laserammo = 30;
+			{
+				const ItemDef* def = GASLoader::Get().GetItemDef("laser");
+				int cap = def ? def->maxAmmo : 30;
+				if(laserammo > cap) laserammo = cap;
 			}
 			if(islocalplayer){
 				char temp[256];
@@ -4304,8 +4315,10 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 		}break;
 		case PickUp::ROCKETAMMO:{
 			rocketammo += pickup.quantity;
-			if(rocketammo > 30){
-				rocketammo = 30;
+			{
+				const ItemDef* def = GASLoader::Get().GetItemDef("rocket");
+				int cap = def ? def->maxAmmo : 30;
+				if(rocketammo > cap) rocketammo = cap;
 			}
 			if(islocalplayer){
 				char temp[256];
@@ -4316,8 +4329,10 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 		}break;
 		case PickUp::FLAMERAMMO:{
 			flamerammo += pickup.quantity;
-			if(flamerammo > 75){
-				flamerammo = 75;
+			{
+				const ItemDef* def = GASLoader::Get().GetItemDef("flamer");
+				int cap = def ? def->maxAmmo : 75;
+				if(flamerammo > cap) flamerammo = cap;
 			}
 			if(islocalplayer){
 				char temp[256];

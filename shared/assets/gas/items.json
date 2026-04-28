@@ -12,10 +12,10 @@
       "techChoice": 1,
       "techSlots": 1,
       "agencyRestriction": -1,
-      "description": "Immediately after shield technology\nwas capable of dampening weapon\neffects, the Frost-Light laser was\nreleased.\n \nTwo hits should remove any standard\nshield, but very little damage is\ndone to an unshielded target."
-    },
-    {
-      "id": "rocket",
+      "description": "Immediately after shield technology\nwas capable of dampening weapon\neffects, the Frost-Light laser was\nreleased.\n \nTwo hits should remove any standard\nshield, but very little damage is\ndone to an unshielded target.",
+      "spawnAmmo": 5,
+      "pickupAmmo": 5,
+      "maxAmmo": 30
       "enumId": 2,
       "name": "Rocket",
       "price": 250,
@@ -25,10 +25,10 @@
       "techChoice": 2,
       "techSlots": 1,
       "agencyRestriction": -1,
-      "description": "Long range, high yield mini-warheads\nwill devastate any unshielded\nopponent.\n \nIncludes an attached camera for\nin-flight kill tracking."
-    },
-    {
-      "id": "flamer",
+      "description": "Long range, high yield mini-warheads\nwill devastate any unshielded\nopponent.\n \nIncludes an attached camera for\nin-flight kill tracking.",
+      "spawnAmmo": 3,
+      "pickupAmmo": 3,
+      "maxAmmo": 30
       "enumId": 3,
       "name": "Flamer Ammo",
       "price": 200,
@@ -38,10 +38,10 @@
       "techChoice": 4,
       "techSlots": 1,
       "agencyRestriction": -1,
-      "description": "Kills any unshielded target.\n \nNo shield has been made that the\nCrucible flamer cannot ignore.\n \nDeadly at close range."
-    },
-    {
-      "id": "healthpack",
+      "description": "Kills any unshielded target.\n \nNo shield has been made that the\nCrucible flamer cannot ignore.\n \nDeadly at close range.",
+      "spawnAmmo": 15,
+      "pickupAmmo": 15,
+      "maxAmmo": 75
       "enumId": 4,
       "name": "Health Pack",
       "price": 200,
@@ -51,10 +51,9 @@
       "techChoice": 8,
       "techSlots": 1,
       "agencyRestriction": 0,
-      "description": "A small portable boost for Noxis\nagents in the field.\n \nRestores lost health, but must be\nmanually applied."
-    },
-    {
-      "id": "lazarustract",
+      "description": "A small portable boost for Noxis\nagents in the field.\n \nRestores lost health, but must be\nmanually applied.",
+      "spawnInventoryCount": 1,
+      "healAmount": 100
       "enumId": 5,
       "name": "Lazarus Tract",
       "price": 250,
@@ -64,10 +63,8 @@
       "techChoice": 16384,
       "techSlots": 1,
       "agencyRestriction": 1,
-      "description": "The definitive and unquestionable\ntruth about Mars' oddest and most\npowerful religious organization.\n \nHelpful in converting disbelieving\ncitizens to your cause."
-    },
-    {
-      "id": "securitypass",
+      "description": "The definitive and unquestionable\ntruth about Mars' oddest and most\npowerful religious organization.\n \nHelpful in converting disbelieving\ncitizens to your cause.",
+      "spawnInventoryCount": 1
       "enumId": 6,
       "name": "Security Pass",
       "price": 1000,
@@ -90,10 +87,8 @@
       "techChoice": 524288,
       "techSlots": 1,
       "agencyRestriction": 3,
-      "description": "A portable virus whipped up by the\nsnotty underage hackers of Static.\n \nGives you immediate control over\ncannons and robots in the field.\n \nMay harm enemy in-base weapon\nstations."
-    },
-    {
-      "id": "poison",
+      "description": "A portable virus whipped up by the\nsnotty underage hackers of Static.\n \nGives you immediate control over\ncannons and robots in the field.\n \nMay harm enemy in-base weapon\nstations.",
+      "spawnInventoryCount": 1
       "enumId": 8,
       "name": "Poison",
       "price": 100,
@@ -103,10 +98,9 @@
       "techChoice": 32768,
       "techSlots": 1,
       "agencyRestriction": 4,
-      "description": "Hollowhead poisons are pernicious\nbio-rad toxins, administered via\ninjection.\n \nCauses the victim to lose health\nuntil cured, multiple doses\nrecommended."
-    },
-    {
-      "id": "empbomb",
+      "description": "Hollowhead poisons are pernicious\nbio-rad toxins, administered via\ninjection.\n \nCauses the victim to lose health\nuntil cured, multiple doses\nrecommended.",
+      "spawnInventoryCount": 2,
+      "poisonDose": 3
       "enumId": 9,
       "name": "E.M.P. Bomb",
       "price": 1000,

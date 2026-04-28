@@ -56,6 +56,7 @@ struct PlayerDef {
     int upgradeMultiplierJetpack    = 10;   // fuel per jetpack point
     double upgradeMultiplierHacking  = 0.10; // hacking speed bonus per point
     double upgradeMultiplierContacts = 0.10; // credits bonus per point
+    int maxPoisoned                 = 9;    // max simultaneous poison doses
 };
 
 // ---- Weapon ----------------------------------------------------------------
@@ -73,16 +74,25 @@ struct WeaponDef {
 
 struct ItemDef {
     std::string id;
-    int         enumId            = 0;
+    int         enumId               = 0;
     std::string name;
-    int         price             = 0;
-    int         repairPrice       = 0;
-    int         spriteBank        = 0;
-    int         spriteIndex       = 0;
-    int         techChoice        = 0;   // bitmask
-    int         techSlots         = 0;
-    int         agencyRestriction = -1;  // -1 = no restriction, else Team::* int
+    int         price                = 0;
+    int         repairPrice          = 0;
+    int         spriteBank           = 0;
+    int         spriteIndex          = 0;
+    int         techChoice           = 0;   // bitmask
+    int         techSlots            = 0;
+    int         agencyRestriction    = -1;  // -1 = no restriction, else Team::* int
     std::string description;
+    // Spawn loadout — ammo or inventory items granted at respawn if tech is unlocked.
+    int         spawnAmmo            = 0;   // ammo granted (laser/rocket/flamer)
+    int         spawnInventoryCount  = 0;   // inventory items granted (consumables)
+    // Ammo pickup from inventory station
+    int         pickupAmmo           = 0;   // ammo per purchase
+    int         maxAmmo              = 0;   // ammo cap
+    // Item effects
+    int         healAmount           = 0;   // health restored (healthpack)
+    int         poisonDose           = 0;   // poison units applied per use
 };
 
 // ---- Enemy -----------------------------------------------------------------
