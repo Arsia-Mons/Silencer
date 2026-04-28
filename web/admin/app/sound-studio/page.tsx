@@ -257,6 +257,21 @@ export default function SoundStudioPage() {
     }
     ctx.fillStyle = '#1a2a1a'; ctx.fillRect(0, 0, w, h);
     const mid = h / 2;
+
+    // Game volume ceiling line
+    const volCalls = refs[sel.name]?.volumeCalls;
+    const gameVol = volCalls?.length ? (typeof volCalls[0].vol === 'number' ? volCalls[0].vol as number : 128) : 128;
+    const volScale = gameVol / 128;
+    if (volScale < 1) {
+      const ceiling = mid * volScale;
+      ctx.strokeStyle = '#2a4a2a'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(0, mid - ceiling); ctx.lineTo(w, mid - ceiling); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, mid + ceiling); ctx.lineTo(w, mid + ceiling); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#3a6a3a'; ctx.font = '9px monospace';
+      ctx.fillText(`${gameVol}/128`, 3, mid - ceiling - 2);
+    }
+
     ctx.strokeStyle = '#4a8'; ctx.lineWidth = 1;
     ctx.beginPath();
     for (let i = 0; i < lvl.waveform.length; i++) {
@@ -265,7 +280,7 @@ export default function SoundStudioPage() {
       ctx.moveTo(x, mid - amp); ctx.lineTo(x, mid + amp);
     }
     ctx.stroke();
-  }, [levels, selectedIdx, sounds]);
+  }, [levels, selectedIdx, sounds, refs]);
 
   // ── Arrow key navigation + Space to play ──────────────────────────────────
   useEffect(() => {
@@ -1092,15 +1107,26 @@ export default function SoundStudioPage() {
                             </td>
                             <td style={{ padding: '3px 5px', textAlign: 'right', color: '#444', fontVariantNumeric: 'tabular-nums' }}>{formatBytes(size)}</td>
                             <td style={{ padding: '3px 5px' }}>
-                              {lvl ? (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                                  <div style={{ width: 50, height: 5, background: '#222', borderRadius: 2, overflow: 'hidden' }}>
-                                    <div style={{ width: `${Math.round(lvl.peak * 100)}%`, height: '100%', background: lvl.peak > 0.9 ? '#f44' : lvl.peak > 0.6 ? '#fa4' : '#4a8', borderRadius: 2 }} />
+                              {lvl ? (() => {
+                                const vcs = ref?.volumeCalls;
+                                const gv = vcs?.length ? (typeof vcs[0].vol === 'number' ? vcs[0].vol as number : 128) : null;
+                                const effectivePeak = gv != null ? lvl.peak * (gv / 128) : null;
+                                const displayPeak = effectivePeak ?? lvl.peak;
+                                const barColor = displayPeak > 0.9 ? '#f44' : displayPeak > 0.6 ? '#fa4' : '#4a8';
+                                return (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                    <div style={{ width: 50, height: 5, background: '#222', borderRadius: 2, overflow: 'hidden', position: 'relative' }}>
+                                      {effectivePeak != null && (
+                                        <div style={{ position: 'absolute', width: `${Math.round(lvl.peak * 100)}%`, height: '100%', background: '#2a2a2a', borderRadius: 2 }} />
+                                      )}
+                                      <div style={{ position: 'absolute', width: `${Math.round(displayPeak * 100)}%`, height: '100%', background: barColor, borderRadius: 2 }} />
+                                    </div>
+                                    <span style={{ color: '#444', fontSize: 9 }}>{Math.round(displayPeak * 100)}%</span>
+                                    {gv != null && gv < 128 && <span style={{ color: '#3a5a3a', fontSize: 9 }}>{gv}</span>}
+                                    {willLowHeadroom(s.name) && <span title="Low headroom at vol=128" style={{ color: '#f44', fontSize: 8, fontWeight: 'bold' }}>HDR</span>}
                                   </div>
-                                  <span style={{ color: '#444', fontSize: 9 }}>{Math.round(lvl.peak * 100)}%</span>
-                                  {willLowHeadroom(s.name) && <span title="Low headroom at vol=128" style={{ color: '#f44', fontSize: 8, fontWeight: 'bold' }}>HDR</span>}
-                                </div>
-                              ) : <span style={{ color: '#2a2a2a', fontSize: 9 }}>—</span>}
+                                );
+                              })() : <span style={{ color: '#2a2a2a', fontSize: 9 }}>—</span>}
                             </td>
                             <td style={{ padding: '3px 5px', textAlign: 'right' }}>
                               <span style={{ display: 'inline-flex', gap: 2, alignItems: 'center' }}>
