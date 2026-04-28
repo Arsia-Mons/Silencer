@@ -57,7 +57,7 @@ export default function DesignerPage() {
   const [selectedPlatformIdx, setSelectedPlatformIdx] = useState<number | null>(null);
   const [zoom, setZoom]   = useState(0.5);
   const [pan, setPan]     = useState({ x: 32, y: 32 });
-  const [fitTrigger, setFitTrigger] = useState(0);
+  const fitPendingRef = useRef(false);
   const [cursor, setCursor] = useState<{ tx: number; ty: number; wx: number; wy: number }>({ tx: 0, ty: 0, wx: 0, wy: 0 });
   const [dragPlatform, setDragPlatform] = useState<DragPlatform | null>(null);
   const [lumMode, setLumMode] = useState(false);
@@ -222,8 +222,8 @@ export default function DesignerPage() {
 
   const handleOpenSil = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files?.[0]) return;
-    const loaded = await openMap(e.target.files[0]);
-    if (loaded) setFitTrigger(t => t + 1);
+    fitPendingRef.current = true;
+    await openMap(e.target.files[0]);
   };
 
   const handleTilePaint = useCallback((layerType: 'bg' | 'fg', layerIdx: number, tx: number, ty: number, tileId: number) => {
@@ -308,11 +308,20 @@ export default function DesignerPage() {
     setPan({ x: (cw - map.width * 64 * newZoom) / 2, y: (ch - map.height * 64 * newZoom) / 2 });
   };
 
-  // Run fitToScreen after React has committed the new map to the DOM
+  // Run fitToScreen after React commits a new map — rAF lets the browser paint first
   useEffect(() => {
-    if (fitTrigger > 0) fitToScreen();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fitTrigger]);
+    if (!fitPendingRef.current || !map) return;
+    fitPendingRef.current = false;
+    const { width, height } = map;
+    requestAnimationFrame(() => {
+      const container = document.getElementById('canvas-container');
+      if (!container) return;
+      const { width: cw, height: ch } = container.getBoundingClientRect();
+      const newZoom = Math.min(cw / (width * 64), ch / (height * 64)) * 0.95;
+      setZoom(newZoom);
+      setPan({ x: (cw - width * 64 * newZoom) / 2, y: (ch - height * 64 * newZoom) / 2 });
+    });
+  }, [map]);
 
   const isLoading = progress.total > 0 && progress.done < progress.total;
 
@@ -405,7 +414,7 @@ export default function DesignerPage() {
                     if (!w || !h || w < 1 || h < 1 || w > 512 || h > 512) return;
                     createMap(w, h, newMapDesc);
                     setShowNewMap(false);
-                    setFitTrigger(t => t + 1);
+                    fitPendingRef.current = true;
                   }}
                     className="flex-1 py-1 text-xs font-mono border border-game-primary text-game-primary rounded hover:bg-game-dark transition-colors">
                     CREATE
