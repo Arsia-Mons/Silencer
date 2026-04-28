@@ -47,7 +47,7 @@ interface PendingDiff {
   renamed: { from: string; to: string }[];
 }
 
-type FilterMode = 'all' | 'cpp' | 'actordef' | 'orphaned' | 'missing' | 'ambient' | 'headroom' | 'loop' | 'attenuated';
+type FilterMode = 'all' | 'cpp' | 'actordef' | 'orphaned' | 'missing' | 'ambient' | 'headroom' | 'loop' | 'attenuated' | 'ui';
 type TabMode = 'sounds' | 'music' | 'ambient';
 type SortKey = 'name' | 'size' | 'duration' | 'level' | 'refs';
 
@@ -749,6 +749,7 @@ export default function SoundStudioPage() {
     if (filter === 'ambient') return !!(ref?.role) || !!(ref?.loop);
     if (filter === 'loop') return !!(ref?.loop);
     if (filter === 'attenuated') return !!(ref?.volumeCalls?.some((vc: { vol: number | string }) => typeof vc.vol === 'number' && vc.vol < 128));
+    if (filter === 'ui') return ref?.category === 'ui';
     return true;
   }
 
@@ -1019,7 +1020,7 @@ export default function SoundStudioPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderBottom: '1px solid #222', background: '#131313', flexWrap: 'wrap' }}>
             <input type="text" placeholder="search…" value={search} onChange={e => setSearch(e.target.value)}
               style={{ padding: '2px 7px', background: '#222', border: '1px solid #444', borderRadius: 3, color: '#ccc', fontFamily: 'monospace', fontSize: 11, width: 140 }} />
-            {(['all','cpp','actordef','loop','ambient','attenuated','orphaned','missing','headroom'] as FilterMode[]).map(f => (
+            {(['all','cpp','actordef','loop','ambient','attenuated','ui','orphaned','missing','headroom'] as FilterMode[]).map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 style={{ padding: '1px 7px', fontSize: 10, fontFamily: 'monospace',
                   background: filter === f ? '#2a3a4a' : 'transparent',
@@ -1159,6 +1160,7 @@ export default function SoundStudioPage() {
                               {isMissing && <span style={{ marginLeft: 5, color: '#f90', fontSize: 9 }}>[missing]</span>}
                               {ref?.role && <span style={{ marginLeft: 5, color: '#8af', fontSize: 9 }}>[{ref.role}]</span>}
                               {!ref?.role && isLoop && <span style={{ marginLeft: 5, color: '#68a', fontSize: 9 }}>[loop]</span>}
+                              {ref?.category === 'ui' && <span style={{ marginLeft: 5, color: '#a8f', fontSize: 9 }}>[ui]</span>}
                               {ref?.soundSet && <span style={{ marginLeft: 5, color: '#a86', fontSize: 9 }}>[{ref.soundSet}]</span>}
                             </td>
                             <td style={{ padding: '3px 5px', textAlign: 'right', color: '#383838', fontVariantNumeric: 'tabular-nums', fontSize: 10 }}>
