@@ -10,6 +10,7 @@ body {
   background-attachment: fixed;
   color: #d1fad7;
   font-family: 'Courier New', Courier, monospace;
+  font-size: 16px;
   line-height: 1.6;
 }
 
@@ -17,7 +18,7 @@ body::after {
   content: '';
   position: fixed;
   inset: 0;
-  background: rgba(3, 6, 3, 0.72);
+  background: rgba(3, 6, 3, 0.55);
   pointer-events: none;
   z-index: 0;
 }
@@ -60,72 +61,64 @@ header { text-align: center; }
 
 blockquote {
   margin: 0 auto;
-  padding: 0.9rem 1.1rem;
-  max-width: 440px;
-  background: rgba(0, 0, 0, 0.35);
-  font-size: 0.75rem;
-  line-height: 1.5;
+  padding: 1rem 1.2rem;
+  max-width: 480px;
+  background: rgba(0, 0, 0, 0.4);
+  font-size: 0.95rem;
+  line-height: 1.55;
 }
 
-blockquote p { margin: 0 0 0.7rem; }
+blockquote p { margin: 0 0 0.8rem; }
 
 blockquote footer {
-  font-size: 0.65rem;
-  color: #6cab78;
+  font-size: 0.8rem;
+  color: #88c194;
   text-align: right;
 }
 
 .cta {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  margin-top: 0.25rem;
+  font-size: 1.05rem;
 }
 
 .cta a {
-  display: inline-block;
-  padding: 0.75rem 1.5rem;
-  color: #d1fad7;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid #005b1c;
+  color: #88c194;
   text-decoration: none;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.95rem;
-  transition: background 0.15s, border-color 0.15s;
+  letter-spacing: 0.04em;
+  padding: 0.4rem 0;
+  transition: color 0.12s;
 }
 
-.cta a:hover, .cta a:focus {
-  background: rgba(0, 163, 40, 0.15);
-  border-color: #00a328;
-  outline: none;
+.cta a::before {
+  content: '> ';
+  color: #00a328;
 }
 
 .cta a.primary {
-  background: rgba(0, 163, 40, 0.18);
-  border-color: #00a328;
   color: #e8ffea;
   font-weight: bold;
+  font-size: 1.35rem;
 }
 
-.cta a.primary:hover, .cta a.primary:focus {
-  background: rgba(0, 163, 40, 0.30);
+.cta a.primary::before {
+  color: #00ff32;
 }
 
-.cta a.icon {
-  padding: 0.65rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.cta a:hover, .cta a:focus-visible {
+  color: #e8ffea;
+  outline: none;
 }
 
-.cta a.icon svg {
-  width: 1.4rem;
-  height: 1.4rem;
-  fill: currentColor;
-  display: block;
+.cta a:hover::before,
+.cta a:focus-visible::before {
+  color: #00ff32;
 }
 
 @media (max-width: 600px) {
+  body { background-attachment: scroll; }
   main { padding: 2rem 1rem; gap: 2rem; }
 }
