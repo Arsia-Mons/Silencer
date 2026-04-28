@@ -101,6 +101,7 @@ struct PlayerDef {
     int warpNonCollidableTicks      = 24;   // state_warp <= this → entity non-collidable
     int warpTeleportTick            = 12;   // state_warp == this → player x/y set to destination
     int deadAutoRespawnTick         = 48;   // ticks in DEAD state before auto-respawn triggers
+    int deployAnimationTicks        = 8;    // ticks of DEPLOYING beam-in animation after deployWait completes
 };
 
 // ---- Weapon ----------------------------------------------------------------

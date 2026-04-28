@@ -90,6 +90,7 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.warpNonCollidableTicks     = j.value("warpNonCollidableTicks",     out.warpNonCollidableTicks);
         out.warpTeleportTick           = j.value("warpTeleportTick",           out.warpTeleportTick);
         out.deadAutoRespawnTick        = j.value("deadAutoRespawnTick",        out.deadAutoRespawnTick);
+        out.deployAnimationTicks       = j.value("deployAnimationTicks",       out.deployAnimationTicks);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
     }

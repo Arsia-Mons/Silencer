@@ -1163,7 +1163,7 @@ void Player::Tick(World & world){
 					res_bank  = 68;
 					res_index = anim_i;
 				}
-				if(state_i >= deploywait + 8){
+				if(state_i >= deploywait + GASLoader::Get().player.deployAnimationTicks){
 					state = STANDING;
 					state_i = -1;
 					break;

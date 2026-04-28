@@ -55,7 +55,7 @@ void Robot::InitBT() {
 		return BTResult::Success;
 	};
 
-	// LookSides: only from WALKING during search phase (bt_walk_ticks_ < 600) — orient toward target.
+	// LookSides: only from WALKING during search phase (bt_walk_ticks_ < searchTicks from GAS) — orient toward target.
 	// Always returns Failure so the Selector continues to Patrol (orient + move each tick).
 	btctx_.actions["LookSides"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
@@ -123,7 +123,8 @@ void Robot::InitBT() {
 	btctx_.actions["ReturnToSpawn"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		if (patrol) return BTResult::Failure;
-		if (bt_walk_ticks_ < 600) return BTResult::Failure;
+		const EnemyDef* _rd = GASLoader::Get().GetEnemyDef("robot");
+		if (bt_walk_ticks_ < (_rd ? _rd->searchTicks : 600)) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
 		if (Look(world, 1) || Look(world, 2)) {
 			bt_walk_ticks_ = 0; // target spotted — reset and keep hunting

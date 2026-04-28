@@ -47,5 +47,6 @@
   "warpDurationTicks": 40,
   "warpNonCollidableTicks": 24,
   "warpTeleportTick": 12,
-  "deadAutoRespawnTick": 48
+  "deadAutoRespawnTick": 48,
+  "deployAnimationTicks": 8
 }
