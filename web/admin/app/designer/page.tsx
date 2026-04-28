@@ -265,6 +265,7 @@ export default function DesignerPage() {
         case 'b': handleToolChange('TILE_BG');    break;
         case 'f': handleToolChange('TILE_FG');    break;
         case 'e': handleToolChange('ERASE_TILE'); break;
+        case 'i': handleToolChange('FLOOD_FILL'); break;
         case 'p': setActiveTool('RECT');       break;
         case 'a': setActiveTool('ACTOR');      break;
         case 's': setActiveTool('SELECT');     break;
@@ -830,6 +831,7 @@ export default function DesignerPage() {
               onZoomChange={setZoom}
               onPanChange={setPan}
               onTilePaint={handleTilePaint}
+              onFloodFill={applyTileBatch}
               onBeginPaint={beginPaint}
               onCommitPaint={commitPaint}
               onPlatformDraw={handlePlatformDraw}

@@ -101,6 +101,7 @@ interface Props {
   onZoomChange: (zoom: number) => void;
   onPanChange: (val: { x: number; y: number } | ((prev: { x: number; y: number }) => { x: number; y: number })) => void;
   onTilePaint: (layerType: 'bg' | 'fg', layerIdx: number, tx: number, ty: number, tileId: number) => void;
+  onFloodFill?: (layerType: 'bg' | 'fg', layerIdx: number, updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }>) => void;
   onPlatformDraw: (platform: MapPlatform) => void;
   onPlatformRemove: (idx: number) => void;
   onActorPlace: (pos: { wx: number; wy: number }) => void;
@@ -136,7 +137,7 @@ interface Props {
 export default function MapCanvas({
   map, tileImages, spriteImages, vis, activeTool, activeLayer, selectedTileId,
   zoom, pan, onZoomChange, onPanChange,
-  onTilePaint, onPlatformDraw, onPlatformRemove, onActorPlace, onActorRemove, onActorRightClick,
+  onTilePaint, onFloodFill, onPlatformDraw, onPlatformRemove, onActorPlace, onActorRemove, onActorRightClick,
   onTileRightClick,
   onBeginPaint, onCommitPaint,
   selectedActorId, dragPlatform, onDragPlatformChange,
@@ -814,6 +815,32 @@ export default function MapCanvas({
       return;
     }
 
+    if (activeTool === 'FLOOD_FILL') {
+      if (!onFloodFill || !selectedTileId || tx < 0 || tx >= map.width || ty < 0 || ty >= map.height) return;
+      const lt = (eraseLayerType ?? 'bg') as 'bg' | 'fg';
+      const layerArr = lt === 'fg' ? map.layers.fg : map.layers.bg;
+      const targetId = layerArr[activeLayer][ty * map.width + tx]?.tile_id ?? 0;
+      if (targetId === selectedTileId) return;
+      // BFS 4-connected flood fill
+      const visited = new Uint8Array(map.width * map.height);
+      const queue: Array<[number, number]> = [[tx, ty]];
+      const updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }> = [];
+      visited[ty * map.width + tx] = 1;
+      while (queue.length) {
+        const [cx, cy] = queue.shift()!;
+        updates.push({ x: cx, y: cy, tile_id: selectedTileId, flip: 0, lum: 0 });
+        for (const [nx, ny] of [[cx-1,cy],[cx+1,cy],[cx,cy-1],[cx,cy+1]] as [number,number][]) {
+          if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height) continue;
+          if (visited[ny * map.width + nx]) continue;
+          if ((layerArr[activeLayer][ny * map.width + nx]?.tile_id ?? 0) !== targetId) continue;
+          visited[ny * map.width + nx] = 1;
+          queue.push([nx, ny]);
+        }
+      }
+      onFloodFill(lt, activeLayer, updates);
+      return;
+    }
+
     if (activeTool === 'TILE_SELECT') {
       if (tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
         isSelectingTile.current = true;
@@ -908,7 +935,7 @@ export default function MapCanvas({
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
       onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
       selectedPlatformIdx, onPlatformSelect, onActorSelect, highlightActorIdx, snap,
-      pastePending, onTilePaste, onTileSelection]);
+      pastePending, onTilePaste, onTileSelection, onFloodFill]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1129,6 +1156,7 @@ export default function MapCanvas({
     : (isPanning.current || isSpacePanning.current || isCtrlPanning.current)
       ? 'grab'
       : pastePending ? 'copy'
+      : activeTool === 'FLOOD_FILL' ? 'cell'
       : activeTool === 'SELECT' ? 'pointer'
       : activeTool === 'TILE_SELECT' ? 'crosshair'
       : activeTool === 'ERASE_TILE' ? 'crosshair'
