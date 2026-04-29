@@ -201,6 +201,15 @@ blockquote footer a:focus-visible {
 
 /* --- Responsive Polish --- */
 @media (max-width: 800px) {
+  /* iOS Safari mis-renders the custom OT-SVG Silencer fonts (upside-down,
+     mirrored, and dim — currentColor isn't honored). Fall back to the
+     system monospace stack on small screens. */
+  body,
+  blockquote footer,
+  .links {
+    font-family: 'Courier New', Courier, monospace;
+  }
+
   body {
     align-items: start;
     padding: 0;
