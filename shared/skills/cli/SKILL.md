@@ -1,6 +1,6 @@
 ---
 name: using-silencer-cli
-description: Use when you need to drive the Silencer game from a terminal — verifying UI changes, navigating menus, taking screenshots, reading game state — without a human at the keyboard. The CLI talks JSON-lines TCP to a long-running silencer client.
+description: Use when you need to drive the Silencer game from a terminal — verifying UI changes, navigating menus, taking screenshots, reading game state, validating GAS data files, or rebinding controls — without a human at the keyboard. Most ops talk JSON-lines TCP to a running silencer client; a few (e.g. `gas validate`) run locally with no daemon.
 ---
 
 # using-silencer-cli
@@ -67,6 +67,53 @@ positional shorthand (`click LABEL`, `set_text LABEL TEXT`,
 | `wait_ms` | `--n N` | `{}` — replies after N wallclock ms |
 | `wait_for_state` | `--state X [--timeout-ms 5000]` | `{}` or `TIMEOUT` error. **Timeouts are milliseconds.** |
 | `quit` | — | `{}` — sets `quitRequested`; daemon exits cleanly |
+
+### Noun-first ops: `gas` and `keybind`
+
+A few ops use a `<noun> <subop>` shape (`gas validate`, `keybind put`, etc).
+The first positional after the noun is the subop; flags follow as usual.
+
+| Op | Flags / positional | Result | Daemon? |
+|----|-------------------|--------|---------|
+| `gas validate <dir>` | `--dir PATH` (or trailing positional) | `{ok, errors:[{file,instancePath,code,message}]}`. Exit 1 if `errors[]` non-empty. | **no** — runs in-process via `validateDirectory`; never opens the control socket |
+| `gas reload` | — | `{loaded, errors:[…]}` — re-runs the C++ GAS loader against the daemon's gas dir | yes |
+| `keybind list` | — | `{profiles:[…], current}` | yes |
+| `keybind actions` | — | `{actions:[…]}` — every bindable action id | yes |
+| `keybind get` | `[--profile N] [--action A]` | `{bindings:{action:[…]}}` — defaults to current profile / all actions | yes |
+| `keybind put` | `--profile N --action A --bindings KEY:F PAD:south` | `{}` — comma joins keys into an AND-chord (e.g. `--bindings KEY:Up,KEY:Left`) | yes |
+| `keybind unset` | `--profile N --action A` | `{}` | yes |
+| `keybind use <profile>` | positional or `--profile N` | `{}` — switches the active profile | yes |
+| `keybind new` | `--profile N [--from M]` | `{}` — creates a new profile, optionally seeded from another | yes |
+| `keybind delete <profile>` | positional or `--profile N` | `{}` | yes |
+
+`--profile` and `--action` are kept as strings even when numeric; the
+parser knows about this via `STRING_FLAGS` in `clients/cli/index.ts` so
+`--profile 1` doesn't silently retarget profile `"1"` vs `1`.
+
+### Validating GAS data files (no daemon)
+
+```bash
+bun clients/cli/index.ts gas validate shared/assets/gas
+# → {"ok":true,"errors":[]}                       (exit 0)
+# → {"ok":false,"errors":[{...}, {...}]}          (exit 1)
+```
+
+Use this in a remediation loop to drive edits against
+`shared/assets/gas/*.json`. Errors carry `instancePath` as an RFC 6901
+JSON Pointer that round-trips into an Edit against the source file.
+Schema source is `shared/gas-validation/schemas.ts`, which mirrors the
+C++ structs in `clients/silencer/src/gas/gasloader.h`.
+
+### Hot-reloading GAS on the daemon
+
+```bash
+cli --port "$PORT" gas reload
+```
+
+Re-runs `GASLoader::Load()` against the daemon's gas directory and
+returns the same `{file, instancePath, code, message}` error shape as
+`gas validate`. Only safe from `NONE` / `MAINMENU` / `LOBBY` /
+`MISSIONSUMMARY` — errors `WRONG_STATE` mid-game.
 
 ### State names
 
@@ -168,3 +215,10 @@ You rarely need to speak the protocol directly — use the CLI wrapper.
   textboxes, `select` for selectboxes.
 - **Logs.** `start_silencer` redirects daemon stdout+stderr to
   `/tmp/silencer-e2e-<PORT>.log`. Check it when the daemon misbehaves.
+- **`gas validate` is a local op.** No daemon, no `--port`. Don't wrap
+  it in `start_silencer`/`stop_silencer` — it just reads files. The
+  registry of local ops lives in `LOCAL_OPS` at the top of
+  `clients/cli/index.ts`.
+- **`gas reload` is state-gated.** Errors `WRONG_STATE` outside
+  `NONE`/`MAINMENU`/`LOBBY`/`MISSIONSUMMARY`; loader does not run
+  mid-game.
