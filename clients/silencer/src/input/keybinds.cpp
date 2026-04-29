@@ -9,6 +9,11 @@
 #include <set>
 
 #ifdef _WIN32
+// Without this, <windows.h> drags in <winsock.h> (winsock 1.x) and any
+// translation unit that later includes <winsock2.h> — e.g. when CMake's
+// unity build bundles us with net/controlserver.cpp — collides on
+// sockaddr/fd_set/etc.
+#define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
 #include <dirent.h>
