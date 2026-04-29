@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Silencer Title";
-  src: url("/assets/silencer-title.otf?v=3") format("opentype");
+  src: url("/assets/silencer-title.otf?v=4") format("opentype");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -8,7 +8,7 @@
 
 @font-face {
   font-family: "Silencer UI";
-  src: url("/assets/silencer-ui.otf?v=3") format("opentype");
+  src: url("/assets/silencer-ui.otf?v=4") format("opentype");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -16,7 +16,7 @@
 
 @font-face {
   font-family: "Silencer UI Large";
-  src: url("/assets/silencer-ui-large.otf?v=3") format("opentype");
+  src: url("/assets/silencer-ui-large.otf?v=4") format("opentype");
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -201,15 +201,6 @@ blockquote footer a:focus-visible {
 
 /* --- Responsive Polish --- */
 @media (max-width: 800px) {
-  /* iOS Safari mis-renders the custom OT-SVG Silencer fonts (upside-down,
-     mirrored, and dim — currentColor isn't honored). Fall back to the
-     system monospace stack on small screens. */
-  body,
-  blockquote footer,
-  .links {
-    font-family: 'Courier New', Courier, monospace;
-  }
-
   body {
     align-items: start;
     padding: 0;
