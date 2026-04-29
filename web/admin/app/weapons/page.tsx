@@ -5,8 +5,10 @@ import { useAuth } from '../../lib/auth';
 import Sidebar from '../../components/Sidebar';
 import { useWsConnected } from '../../lib/socket';
 import { decodeAdpcmWav } from '../sound-studio/adpcm';
+import { apiFetch } from '../../lib/api';
 import * as gasStore from '../../lib/gas-store';
 import * as audioStore from '../../lib/audio-store';
+import * as soundStudioStore from '../../lib/sound-studio-store';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,6 +88,18 @@ export default function WeaponsPage() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const [playingSound, setPlayingSound] = useState<string | null>(null);
+
+  // ── Sound list for dropdowns ─────────────────────────────────────────────────
+  const [soundList, setSoundList] = useState<string[]>(
+    () => (soundStudioStore.get()?.sounds ?? []).map(s => s.name).sort(),
+  );
+  useEffect(() => {
+    if (soundList.length > 0) return;
+    apiFetch('/sounds').then((data: unknown) => {
+      const names = (data as Array<{ name: string }>).map(s => s.name).sort();
+      setSoundList(names);
+    }).catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getToken = () => (typeof window !== 'undefined' ? localStorage.getItem('zs_token') ?? '' : '');
 
@@ -443,13 +457,20 @@ export default function WeaponsPage() {
                     return (
                       <div key={String(key)} className="flex items-center gap-2">
                         <span className="text-[9px] font-mono text-[#4a7a4a] w-16 shrink-0">{label}</span>
-                        <input
-                          type="text"
+                        <select
                           value={val}
-                          placeholder="filename.wav"
                           onChange={e => patchWeapon(currentWeapon.id, { [key]: e.target.value })}
                           className="flex-1 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded focus:border-[#00a328] outline-none"
-                        />
+                        >
+                          <option value="">— none —</option>
+                          {soundList.map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                          {/* keep current value visible even if list not yet loaded */}
+                          {val && !soundList.includes(val) && (
+                            <option value={val}>{val}</option>
+                          )}
+                        </select>
                         {val && (
                           <button
                             title={`Play ${val}`}
