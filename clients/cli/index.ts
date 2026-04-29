@@ -32,6 +32,7 @@ function usage(): never {
       `       silencer-cli keybind actions\n` +
       `       silencer-cli keybind get [--profile N] [--action A]\n` +
       `       silencer-cli keybind put --profile N --action A --bindings KEY:F PAD:south\n` +
+      `         (comma joins keys into an AND-chord, e.g. --bindings KEY:Up,KEY:Left)\n` +
       `       silencer-cli keybind unset --profile N --action A\n` +
       `       silencer-cli keybind use <profile>\n` +
       `       silencer-cli keybind new --profile N [--from M]\n` +
@@ -56,6 +57,28 @@ const VARIADIC_FLAGS: Record<string, Record<string, Set<string>>> = {
     put: new Set(["bindings"]),
   },
 };
+// Per (op,subop) pair: flags whose values must stay strings even when they
+// look numeric. Without this, `--profile 1` would JSON-encode as `{profile:1}`
+// and the C++ side's `args.value("profile", default)` would return the default
+// (silent operation on the wrong profile).
+const STRING_FLAGS: Record<string, Record<string, Set<string>>> = {
+  keybind: {
+    get:    new Set(["profile", "action"]),
+    put:    new Set(["profile", "action"]),
+    unset:  new Set(["profile", "action"]),
+    use:    new Set(["profile"]),
+    new:    new Set(["profile", "from"]),
+    delete: new Set(["profile"]),
+  },
+};
+// Bindings within VARIADIC_FLAGS that accept comma-separated chord syntax:
+// `--bindings KEY:Up,KEY:Left` becomes JSON `[["KEY:Up","KEY:Left"]]` (an
+// AND-chord) instead of `["KEY:Up","KEY:Left"]` (two OR'd singles).
+const CHORD_SPLIT_FLAGS: Record<string, Record<string, Set<string>>> = {
+  keybind: {
+    put: new Set(["bindings"]),
+  },
+};
 
 function parseArgs(argv: string[]): { host: string; port: number; op: string; args: Record<string, unknown> } {
   let host = process.env.SILENCER_CONTROL_HOST ?? "127.0.0.1";
@@ -72,18 +95,29 @@ function parseArgs(argv: string[]): { host: string; port: number; op: string; ar
     } else if (a.startsWith("--")) {
       const key = a.slice(2).replace(/-/g, "_");
       const variadic = op && subop && VARIADIC_FLAGS[op]?.[subop]?.has(key);
+      const chordSplit = op && subop && CHORD_SPLIT_FLAGS[op]?.[subop]?.has(key);
+      const stringOnly = op && subop && STRING_FLAGS[op]?.[subop]?.has(key);
       if (variadic) {
-        // Consume every following non-flag token as a list element.
-        const list: string[] = [];
+        // Consume every following non-flag token as a list element. If the
+        // flag accepts comma-chord syntax, a token like "KEY:Up,KEY:Left"
+        // becomes a nested array (AND chord); plain tokens stay flat.
+        const list: (string | string[])[] = [];
         while (i + 1 < argv.length && !argv[i + 1]!.startsWith("--")) {
-          list.push(argv[++i]!);
+          const tok = argv[++i]!;
+          if (chordSplit && tok.includes(",")) {
+            list.push(tok.split(",").filter((s) => s.length > 0));
+          } else {
+            list.push(tok);
+          }
         }
         args[key] = list;
-        if (list.length === 0) args[key] = [];
       } else {
         const next = argv[i + 1];
         if (next === undefined || next.startsWith("--")) {
           args[key] = true;
+        } else if (stringOnly) {
+          args[key] = next;
+          i++;
         } else {
           const num = Number(next);
           args[key] = Number.isFinite(num) && next.match(/^-?\d+(\.\d+)?$/) ? num : next;

@@ -728,9 +728,15 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 			return;
 		}
 		// If the active profile lost its writable copy, fall back to whatever
-		// resolves now (the built-in if any, else "default").
+		// resolves now (the built-in if any, else "default") and persist the
+		// resolved name so `list` and the next restart agree on what's active.
 		if (profile == activeName) {
 			game.LoadActiveKeymap();
+			const std::string& resolved = game.GetKeyMap().name;
+			std::strncpy(cfg.active_keybind_profile, resolved.c_str(),
+			             sizeof(cfg.active_keybind_profile) - 1);
+			cfg.active_keybind_profile[sizeof(cfg.active_keybind_profile) - 1] = '\0';
+			cfg.Save();
 		}
 		nlohmann::json r;
 		r["profile"] = profile;
