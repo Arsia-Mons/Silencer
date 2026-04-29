@@ -1,5 +1,7 @@
-// JSON schemas for each GAS file — used by Monaco for inline validation + hover docs.
-// Field descriptions match the comments in clients/silencer/src/gas/gasloader.h.
+// JSON Schema definitions for every GAS file. Canonical home; the
+// admin Monaco editor and the silencer-cli `gas validate` op both
+// import from here. Field descriptions match the comments in
+// clients/silencer/src/gas/gasloader.h.
 
 const int = (description: string, defaultVal?: number) => ({
   type: 'integer' as const,

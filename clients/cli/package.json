@@ -6,7 +6,11 @@
     "silencer-cli": "./index.ts"
   },
   "scripts": {
-    "fmt": "oxfmt --write ."
+    "fmt": "oxfmt --write .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@silencer/gas-validation": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.3.13",

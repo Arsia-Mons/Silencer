@@ -37,6 +37,8 @@ function usage(): never {
       `       silencer-cli keybind use <profile>\n` +
       `       silencer-cli keybind new --profile N [--from M]\n` +
       `       silencer-cli keybind delete <profile>\n` +
+      `       silencer-cli gas validate <dir>\n` +
+      `         (runs locally; no daemon required. Exit 1 if errors[] non-empty.)\n` +
       `\n` +
       `Env: SILENCER_CONTROL_HOST (default 127.0.0.1)\n` +
       `     SILENCER_CONTROL_PORT (default 5170)`,
@@ -46,10 +48,26 @@ function usage(): never {
 
 // Ops with a noun-first dispatch shape: `silencer-cli <op> <subop> [args]`.
 // The wrapper recognizes the first positional as the op, the second as
-// args.subop. For now `keybind` is the only op with this shape, but the
-// pattern is centralized so future namespaces (e.g. `profile`, `audio`)
-// can opt in without touching the parser.
-const NOUN_FIRST_OPS = new Set(["keybind"]);
+// args.subop. The pattern is centralized so future namespaces (e.g.
+// `profile`, `audio`) can opt in without touching the parser.
+const NOUN_FIRST_OPS = new Set(["keybind", "gas"]);
+
+// (op, subop) pairs that run entirely in this process and never touch
+// the daemon. Each handler returns a JSON-serializable result and a
+// boolean `clean` flag; `clean=false` exits non-zero so shell loops
+// can branch on it.
+type LocalHandler = (args: Record<string, unknown>) => Promise<{ clean: boolean; result: unknown }>;
+const LOCAL_OPS: Record<string, Record<string, LocalHandler>> = {
+  gas: {
+    validate: async (args) => {
+      const dir = (args["dir"] as string | undefined) ?? (args["_positional"] as string | undefined);
+      if (!dir) throw new Error("gas validate requires a directory: silencer-cli gas validate <dir>");
+      const { validateDirectory } = await import("@silencer/gas-validation");
+      const res = await validateDirectory(dir);
+      return { clean: res.ok, result: res };
+    },
+  },
+};
 // Per (op,subop) pair: which flag accepts a list of values rather than
 // a single value. `--bindings KEY:A PAD:south` consumes both.
 const VARIADIC_FLAGS: Record<string, Record<string, Set<string>>> = {
@@ -69,6 +87,9 @@ const STRING_FLAGS: Record<string, Record<string, Set<string>>> = {
     use:    new Set(["profile"]),
     new:    new Set(["profile", "from"]),
     delete: new Set(["profile"]),
+  },
+  gas: {
+    validate: new Set(["dir"]),
   },
 };
 // Bindings within VARIADIC_FLAGS that accept comma-separated chord syntax:
@@ -143,6 +164,11 @@ function parseArgs(argv: string[]): { host: string; port: number; op: string; ar
       else if (op === "keybind" && (subop === "use" || subop === "delete") && args["profile"] === undefined) {
         args["profile"] = a;
       }
+      // gas validate: third positional is the directory (allows
+      // `silencer-cli gas validate shared/assets/gas/` w/o --dir).
+      else if (op === "gas" && subop === "validate" && args["dir"] === undefined) {
+        args["dir"] = a;
+      }
     }
   }
   if (!op) usage();
@@ -151,6 +177,16 @@ function parseArgs(argv: string[]): { host: string; port: number; op: string; ar
 
 async function main() {
   const { host, port, op, args } = parseArgs(process.argv.slice(2));
+
+  // Local ops: run in-process, never open the control socket.
+  const subop = args["subop"] as string | undefined;
+  const local = subop ? LOCAL_OPS[op]?.[subop] : undefined;
+  if (local) {
+    const { clean, result } = await local(args);
+    process.stdout.write(JSON.stringify(result) + "\n");
+    process.exit(clean ? 0 : 1);
+  }
+
   const id = Math.floor(Math.random() * 1_000_000) + 1;
   const payload = JSON.stringify({ id, op, args }) + "\n";
 

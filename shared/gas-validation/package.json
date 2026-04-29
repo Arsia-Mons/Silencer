@@ -1,0 +1,23 @@
+{
+  "name": "@silencer/gas-validation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".":         { "types": "./index.ts", "default": "./index.ts" },
+    "./schemas": { "types": "./schemas.ts", "default": "./schemas.ts" }
+  },
+  "scripts": {
+    "fmt":       "oxfmt --write .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.13",
+    "typescript": "^5.4.0"
+  }
+}
