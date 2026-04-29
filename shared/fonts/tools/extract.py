@@ -54,7 +54,7 @@ OUT_DIR = FONTS_DIR
 # advance: nominal advance width in font units (matches `width` arg to DrawText).
 BANKS = [
     {"bank": 132, "filename": "silencer-tiny.otf",     "family": "Silencer Tiny",     "ioffset": 34, "advance": 4},
-    {"bank": 133, "filename": "silencer-ui.otf",       "family": "Silencer UI",       "ioffset": 33, "advance": 6},
+    {"bank": 133, "filename": "silencer-ui.otf",       "family": "Silencer UI",       "ioffset": 33, "advance": 7},
     {"bank": 134, "filename": "silencer-ui-large.otf", "family": "Silencer UI Large", "ioffset": 33, "advance": 9},
     {"bank": 136, "filename": "silencer-title.otf",    "family": "Silencer Title",    "ioffset": 33, "advance": 16},
 ]
@@ -213,7 +213,7 @@ def make_svg(glyph_id, ox, oy, w, h, pixels, upem, pix, opacity_map):
     )
 
 
-def make_outline_glyph(ox, oy, w, h, pixels, upem, pix):
+def make_outline_glyph(ox, oy, w, h, pixels, upem, pix, opacity_map):
     """Monochrome outline fallback (one square per non-zero pixel).
 
     Used when the renderer doesn't support the SVG-in-OpenType table.
@@ -222,7 +222,10 @@ def make_outline_glyph(ox, oy, w, h, pixels, upem, pix):
     pen = TTGlyphPen(None)
     for y in range(h):
         for x in range(w):
-            if pixels[y*w + x] == 0:
+            p = pixels[y*w + x]
+            if p == 0:
+                continue
+            if opacity_map and opacity_map.get(p, 1.0) < 0.5:
                 continue
             xl = (ox + x) * pix
             xr = xl + pix
@@ -299,7 +302,7 @@ def build_font(cfg):
         if cw == 0:
             glyfs[gname] = TTGlyphPen(None).glyph()
         else:
-            glyfs[gname] = make_outline_glyph(ox, oy, cw, ch, cropped, upem, pix)
+            glyfs[gname] = make_outline_glyph(ox, oy, cw, ch, cropped, upem, pix, opacity_map)
         metrics[gname] = (advance_units, 0)
         gid = len(glyph_order) - 1
         svg = make_svg(gid, ox, oy, cw, ch, cropped, upem, pix, opacity_map)
