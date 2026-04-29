@@ -309,6 +309,26 @@ function SpritesPageInner() {
     [tabAssets, decodedBanks],
   );
 
+  // ── Keyboard navigation through bank list ────────────────────────────────
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (!occupiedBanks.length) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      const pos = occupiedBanks.findIndex(b => b.idx === selectedBank);
+      if (e.key === 'ArrowUp') {
+        const next = pos <= 0 ? occupiedBanks[occupiedBanks.length - 1] : occupiedBanks[pos - 1];
+        selectBank(next.idx);
+      } else {
+        const next = pos < 0 || pos >= occupiedBanks.length - 1 ? occupiedBanks[0] : occupiedBanks[pos + 1];
+        selectBank(next.idx);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [occupiedBanks, selectedBank, selectBank]);
+
   const currentBank: DecodedBank | undefined =
     selectedBank !== null ? decodedBanks.get(selectedBank) : undefined;
 
@@ -799,6 +819,7 @@ function SpritesPageInner() {
                   return (
                     <button
                       key={idx}
+                      ref={el => { if (selectedBank === idx && el) el.scrollIntoView({ block: 'nearest' }); }}
                       onClick={() => selectBank(idx)}
                       className={`w-full text-left px-3 py-2 text-xs font-mono flex items-center gap-2 transition-colors ${
                         selectedBank === idx
