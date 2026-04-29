@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { ACTOR_DEFS } from './Toolbar';
 import type { SpriteEntry } from '../../lib/types';
 import * as gameDataStore from '../../lib/game-data-store';
@@ -272,23 +272,19 @@ async function processData(
 }
 
 export function useGameData() {
-  const [loaded, setLoaded]             = useState(false);
+  const [loaded, setLoaded]             = useState(() => gameDataStore.isLoaded());
   const [error, setError]               = useState<string | null>(null);
   const [palette, setPalette]           = useState<Uint8Array | null>(null);
-  const [tileImages, setTileImages]     = useState<Map<number, ImageBitmap[]>>(new Map());
-  const [spriteImages, setSpriteImages] = useState<Map<number, (SpriteEntry | null)[]>>(new Map());
-  const [tileBankCounts, setTileBankCounts] = useState<Map<number, number>>(new Map());
+  const [tileImages, setTileImages]     = useState<Map<number, ImageBitmap[]>>(
+    () => gameDataStore.get()?.tileImages ?? new Map(),
+  );
+  const [spriteImages, setSpriteImages] = useState<Map<number, (SpriteEntry | null)[]>>(
+    () => gameDataStore.get()?.spriteImages ?? new Map(),
+  );
+  const [tileBankCounts, setTileBankCounts] = useState<Map<number, number>>(
+    () => gameDataStore.get()?.tileBankCounts ?? new Map(),
+  );
   const [progress, setProgress]         = useState({ total: 0, done: 0 });
-
-  // Hydrate from game-data-store so navigating back skips processData
-  useEffect(() => {
-    const stored = gameDataStore.get();
-    if (!stored) return;
-    setTileImages(stored.tileImages);
-    setSpriteImages(stored.spriteImages);
-    setTileBankCounts(stored.tileBankCounts);
-    setLoaded(true);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const reset = () => { setLoaded(false); setError(null); setProgress({ total: 0, done: 0 }); gameDataStore.clear(); };
 

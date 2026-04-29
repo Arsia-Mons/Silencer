@@ -6,6 +6,7 @@ import { apiFetch } from '../../lib/api';
 import { useServerReachable } from '../../lib/socket';
 import { decodeAdpcmWav } from './adpcm';
 import * as audioStore from '../../lib/audio-store';
+import * as soundStudioStore from '../../lib/sound-studio-store';
 
 interface SoundEntry {
   name: string;
@@ -107,10 +108,10 @@ export default function SoundStudioPage() {
 
   // ── State ───────────────────────────────────────────────────────────────────
   const [tab, setTab] = useState<TabMode>('sounds');
-  const [sounds, setSounds] = useState<SoundEntry[]>([]);
-  const [refs, setRefs] = useState<Record<string, SoundRef>>({});
+  const [sounds, setSounds] = useState<SoundEntry[]>(() => soundStudioStore.get()?.sounds ?? []);
+  const [refs, setRefs] = useState<Record<string, SoundRef>>(() => soundStudioStore.get()?.refs ?? {});
   const [levels, setLevels] = useState<Record<string, LevelInfo>>({});
-  const [binLoaded, setBinLoaded] = useState(false);
+  const [binLoaded, setBinLoaded] = useState(() => soundStudioStore.isLoaded());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -191,9 +192,15 @@ export default function SoundStudioPage() {
       ]);
       setSounds(soundsData); setRefs(refsData);
       setBinLoaded(true);
+      soundStudioStore.set({ sounds: soundsData, refs: refsData });
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   }, []);
+
+  // Auto-load from API on mount if store is empty
+  useEffect(() => {
+    if (!soundStudioStore.isLoaded()) load();
+  }, [load]);
 
   const handleBinFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -212,6 +219,7 @@ export default function SoundStudioPage() {
       });
       if (!res.ok) throw new Error(`Upload failed: ${res.status} ${res.statusText}`);
       audioStore.clear(); // new sound.bin — old decoded buffers are stale
+      soundStudioStore.clear(); // force re-fetch of updated sound list
       await load();
     } catch (e: any) { setError(e.message); setLoading(false); }
     if (e.target) e.target.value = '';

@@ -179,22 +179,22 @@ function SpritesPageInner() {
 
   // ── Folder open ──────────────────────────────────────────────────────────
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const [folder, setFolder] = useState<FolderState | null>(null);
-  const [folderName, setFolderName] = useState<string | null>(null);
 
-  // Hydrate from assets-store so the folder doesn't need re-picking after navigation
-  useEffect(() => {
-    const stored = assetsStore.get();
-    if (!stored) return;
-    const sprites = stored.sprites
-      ? { datBuf: stored.sprites.datBuf, frameCounts: parseDat(stored.sprites.datBuf), bankFiles: stored.sprites.bankFiles }
-      : null;
-    const tiles = stored.tiles
-      ? { datBuf: stored.tiles.datBuf, frameCounts: parseDat(stored.tiles.datBuf), bankFiles: stored.tiles.bankFiles }
-      : null;
-    setFolderName(stored.folderName);
-    setFolder({ sprites, tiles, paletteBuf: stored.paletteBuf });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  function storeToFolderState(stored: ReturnType<typeof assetsStore.get>): FolderState | null {
+    if (!stored) return null;
+    return {
+      sprites: stored.sprites
+        ? { datBuf: stored.sprites.datBuf, frameCounts: parseDat(stored.sprites.datBuf), bankFiles: stored.sprites.bankFiles }
+        : null,
+      tiles: stored.tiles
+        ? { datBuf: stored.tiles.datBuf, frameCounts: parseDat(stored.tiles.datBuf), bankFiles: stored.tiles.bankFiles }
+        : null,
+      paletteBuf: stored.paletteBuf,
+    };
+  }
+
+  const [folder, setFolder] = useState<FolderState | null>(() => storeToFolderState(assetsStore.get()));
+  const [folderName, setFolderName] = useState<string | null>(() => assetsStore.get()?.folderName ?? null);
 
   async function loadTabAssets(
     all: File[],
