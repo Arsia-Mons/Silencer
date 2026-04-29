@@ -20,7 +20,7 @@ const COLLECTIONS: CollectionSpec[] = [
   { file: "enemies.json",     arrayKey: "enemies",   idKey: "id" },
   { file: "agencies.json",    arrayKey: "agencies",  idKey: "id" },
   { file: "abilities.json",   arrayKey: "abilities", idKey: "id" },
-  { file: "gameobjects.json", arrayKey: "objects",   idKey: "id" },
+  { file: "gameobjects.json", arrayKey: "gameObjects", idKey: "id" },
   { file: "gameobjects.json", arrayKey: "terminals", idKey: "id" },
 ];
 

@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import type { OnMount } from '@monaco-editor/react';
 import type { editor as EditorNS } from 'monaco-editor';
 import type { Monaco } from '@monaco-editor/react';
-import { GAS_SCHEMAS } from '@silencer/gas-validation';
+import { GAS_SCHEMAS } from '@silencer/gas-validation/schemas';
 
 // Lazy-load Monaco — SSR incompatible and large.
 const MonacoEditorComponent = dynamic(() => import('@monaco-editor/react'), {
