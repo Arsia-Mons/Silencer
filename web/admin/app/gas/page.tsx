@@ -86,15 +86,37 @@ function applyRestore(curr: unknown, orig: unknown, violation: string): void {
     const idMatch = path.match(/^\[id=(.+?)\]\.(.+)$/);
     if (!idMatch) return;
     const [, id, subpath] = idMatch;
-    if (!Array.isArray(curr) || !Array.isArray(orig)) return;
-    const currItem = curr.find((i: unknown) => typeof i === 'object' && i !== null && String((i as Record<string, unknown>).id) === String(id)) as Record<string, unknown> | undefined;
-    const origItem = orig.find((i: unknown) => typeof i === 'object' && i !== null && String((i as Record<string, unknown>).id) === String(id)) as Record<string, unknown> | undefined;
-    if (!currItem || !origItem) return;
-    restoreAtPath(currItem, origItem, subpath.split('.'));
+    // Deep-search all arrays in the object for the item with this id
+    applyRestoreById(curr, orig, id, subpath.split('.'));
   } else {
     if (typeof curr !== 'object' || curr === null || typeof orig !== 'object' || orig === null) return;
     restoreAtPath(curr as Record<string, unknown>, orig as Record<string, unknown>, path.split('.'));
   }
+}
+
+// Recursively search for an array containing an item with the given id, then restore the subpath.
+function applyRestoreById(curr: unknown, orig: unknown, id: string, parts: string[]): boolean {
+  if (Array.isArray(curr) && Array.isArray(orig)) {
+    const currItem = curr.find(
+      (i: unknown) => typeof i === 'object' && i !== null && String((i as Record<string, unknown>).id) === String(id),
+    ) as Record<string, unknown> | undefined;
+    const origItem = orig.find(
+      (i: unknown) => typeof i === 'object' && i !== null && String((i as Record<string, unknown>).id) === String(id),
+    ) as Record<string, unknown> | undefined;
+    if (currItem && origItem) {
+      restoreAtPath(currItem, origItem, parts);
+      return true;
+    }
+  }
+  if (typeof curr === 'object' && curr !== null && !Array.isArray(curr) &&
+      typeof orig === 'object' && orig !== null && !Array.isArray(orig)) {
+    const co = curr as Record<string, unknown>;
+    const oo = orig as Record<string, unknown>;
+    for (const key of Object.keys(co)) {
+      if (key in oo && applyRestoreById(co[key], oo[key], id, parts)) return true;
+    }
+  }
+  return false;
 }
 
 function restoreAtPath(curr: Record<string, unknown>, orig: Record<string, unknown>, parts: string[]): void {
