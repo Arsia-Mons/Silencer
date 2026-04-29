@@ -23,6 +23,7 @@
 #include "mapfetch.h"
 #include "actordef.h"
 #include "behaviortree.h"
+#include "gasloader.h"
 #include <algorithm>
 #include <stdio.h>
 
@@ -100,6 +101,8 @@ Game::~Game(){
 	mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
 	if(mapjointhread.joinable()) mapjointhread.join();
 	if(dlthread.joinable()) dlthread.join();
+	mapUploadGeneration.fetch_add(1, std::memory_order_relaxed);
+	if(mapUploadThread.joinable()) mapUploadThread.join();
 	// Bring the control server down first. Stop() runs the shutdown drain we
 	// registered at Load() time, fulfilling promises for both queued and
 	// pendingWaits commands so handler threads can unblock from fut.get() before
@@ -235,6 +238,9 @@ bool Game::Load(char * cmdline){
 		printf("Could not load resources\n");
 		return false;
 	}
+	// GAS is loaded inside resources.Load() — rebuild buyable items now that
+	// GASLoader::Get().items is populated (World constructor ran too early).
+	world.LoadBuyableItems();
 	printf("Resources loaded\n");
 	lasttick = SDL_GetTicks();
 	if(controlPort > 0){
@@ -652,6 +658,26 @@ bool Game::Tick(void){
 					}
 				}
 				if(gamecreateinterface){
+					// Handle deferred CreateGame after map upload completes.
+					int us = mapUploadState.load(std::memory_order_acquire);
+					if(us == 2){
+						mapUploadState.store(0, std::memory_order_relaxed);
+						const char * pw = pendingCreate.password.empty() ? nullptr : pendingCreate.password.c_str();
+						world.lobby.CreateGame(
+							pendingCreate.gamename.c_str(),
+							pendingCreate.mapname.c_str(),
+							pendingCreate.maphash,
+							pw,
+							pendingCreate.securitylevel,
+							pendingCreate.minlevel,
+							pendingCreate.maxlevel,
+							pendingCreate.maxplayers,
+							pendingCreate.maxteams);
+					}else if(us == 3){
+						mapUploadState.store(0, std::memory_order_relaxed);
+						creategameclicked = false;
+						CreateModalDialog("Could not upload map");
+					}
 					if(world.lobby.creategamestatus == 1){
 						world.lobby.creategamestatus = 0;
 						Peer * authoritypeer = world.GetAuthorityPeer();
@@ -696,7 +722,8 @@ bool Game::Tick(void){
 								if(object && object->type == ObjectTypes::OVERLAY){
 									Overlay * overlay = static_cast<Overlay *>(object);
 									if(overlay->text.length() > 0){
-										overlay->text = "Creating game";
+										overlay->text = (mapUploadState.load(std::memory_order_relaxed) == 1)
+											? "Uploading map" : "Creating game";
 										int dots = (world.tickcount / 4) % 6;
 										if(dots > 3){
 											dots = 6 - dots;
@@ -709,7 +736,7 @@ bool Game::Tick(void){
 							}
 						}
 					}
-					if(!modaldialoghasok && world.lobby.creategamestatus != 100 && (world.state == World::CONNECTED || world.state == World::IDLE)){
+					if(!modaldialoghasok && world.lobby.creategamestatus != 100 && mapUploadState.load(std::memory_order_relaxed) == 0 && (world.state == World::CONNECTED || world.state == World::IDLE)){
 						DestroyModalDialog();
 						creategameclicked = false;
 					}
@@ -1062,7 +1089,7 @@ bool Game::Tick(void){
 				Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 				player->suitcolor = team->color;
 				player->laserammo = 0;
-				player->credits = 500;
+				player->credits = GASLoader::Get().player.startingCredits;
 				player->RemoveInventoryItem(Player::INV_BASEDOOR);
 				ShowDeployMessage();
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
@@ -1259,7 +1286,7 @@ bool Game::Tick(void){
 							world.message_i = 0;
 						}
 						if(player->credits < 250){
-							player->credits = 250;
+						player->credits = GASLoader::Get().player.creditFloor;
 						}
 						if(player->rocketammo > 0){
 							singleplayermessage++;
@@ -1848,7 +1875,7 @@ bool Game::Tick(void){
 				Player * player = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 				player->suitcolor = team->GetColor();
 				player->laserammo = 0;
-				player->credits = 0xffff;
+				player->credits = GASLoader::Get().player.creditCap;
 				player->oldx = player->x;
 				player->oldy = player->y;
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
@@ -1866,7 +1893,7 @@ bool Game::Tick(void){
 						Player * botplayer = (Player *)world.CreateObject(ObjectTypes::PLAYER);
 						botplayer->suitcolor = botteam->GetColor();
 						botplayer->laserammo = 0;
-						botplayer->credits = 500;
+						botplayer->credits = GASLoader::Get().player.startingCredits;
 						botplayer->ai = new PlayerAI(*botplayer);
 						botpeer->controlledlist.push_back(botplayer->id);
 						world.map.RandomPlayerStartLocation(world, botplayer->x, botplayer->y);
@@ -2260,38 +2287,48 @@ void Game::GiveDefaultItems(Player & player){
 			switch(buyableitem->id){
 				case World::BUY_LASER:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.laserammo = 5;
+						const ItemDef* def = GASLoader::Get().GetItemDef("laser");
+						player.laserammo = def ? def->spawnAmmo : 5;
 					}
 				}break;
 				case World::BUY_ROCKET:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.rocketammo = 3;
+						const ItemDef* def = GASLoader::Get().GetItemDef("rocket");
+						player.rocketammo = def ? def->spawnAmmo : 3;
 					}
 				}break;
 				case World::BUY_FLAMER:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.flamerammo = 15;
+						const ItemDef* def = GASLoader::Get().GetItemDef("flamer");
+						player.flamerammo = def ? def->spawnAmmo : 15;
 					}
 				}break;
 				case World::BUY_HEALTH:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.AddInventoryItem(Player::INV_HEALTHPACK);
+						const ItemDef* def = GASLoader::Get().GetItemDef("healthpack");
+						int count = def ? def->spawnInventoryCount : 1;
+						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_HEALTHPACK);
 					}
 				}break;
 				case World::BUY_VIRUS:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.AddInventoryItem(Player::INV_VIRUS);
+						const ItemDef* def = GASLoader::Get().GetItemDef("virus");
+						int count = def ? def->spawnInventoryCount : 1;
+						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_VIRUS);
 					}
 				}break;
 				case World::BUY_POISON:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.AddInventoryItem(Player::INV_POISON);
-						player.AddInventoryItem(Player::INV_POISON);
+						const ItemDef* def = GASLoader::Get().GetItemDef("poison");
+						int count = def ? def->spawnInventoryCount : 2;
+						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_POISON);
 					}
 				}break;
 				case World::BUY_TRACT:{
 					if(team->GetAvailableTech(world) & buyableitem->techchoice){
-						player.AddInventoryItem(Player::INV_LAZARUSTRACT);
+						const ItemDef* def = GASLoader::Get().GetItemDef("lazarustract");
+						int count = def ? def->spawnInventoryCount : 1;
+						for(int i = 0; i < count; i++) player.AddInventoryItem(Player::INV_LAZARUSTRACT);
 					}
 				}break;
 			}
@@ -4674,7 +4711,11 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 										overlay->text = "LOSSES: " + std::to_string(user->agency[selectedagency].losses);
 									}break;
 									case 5:{
-										overlay->text = "XP TO NEXT LEVEL: " + std::to_string(user->agency[selectedagency].xptonextlevel);
+										// xptonextlevel is accumulated XP toward current level;
+										// threshold is 100*(level+1). Display the remaining amount.
+										int lvl = user->agency[selectedagency].level;
+										int remaining = 100 * (lvl + 1) - (int)user->agency[selectedagency].xptonextlevel;
+										overlay->text = "XP TO NEXT LEVEL: " + std::to_string(remaining);
 										agencychanged = false;
 									}break;
 								}
@@ -4896,11 +4937,32 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 												}else{
 													unsigned char maphash[20];
 													CalculateMapHash(FindMap(mapname).c_str(), &maphash);
-													world.lobby.CreateGame(gamename, mapname, maphash, password, securitylevel, minlevel, maxlevel, maxplayers, maxteams);
+													// Store args for deferred CreateGame after upload.
+													pendingCreate.gamename = gamename;
+													pendingCreate.mapname  = mapname;
+													pendingCreate.password = password ? password : "";
+													memcpy(pendingCreate.maphash, maphash, 20);
+													pendingCreate.securitylevel = securitylevel;
+													pendingCreate.minlevel      = minlevel;
+													pendingCreate.maxlevel      = maxlevel;
+													pendingCreate.maxplayers    = maxplayers;
+													pendingCreate.maxteams      = maxteams;
+													// Upload map before creating so the dedicated server
+													// can find it by filename.  Duplicate SHA-1 is a no-op.
+													if(mapUploadThread.joinable()) mapUploadThread.detach();
+													uint32_t gen = ++mapUploadGeneration;
+													std::string mppath = FindMap(mapname);
+													std::string apiURL = Config::GetInstance().mapapiurl;
+													mapUploadState.store(1, std::memory_order_relaxed);
+													mapUploadThread = std::thread([this, mapname_str=std::string(mapname), mppath, apiURL, gen](){
+														bool ok = UploadMapToServer(mapname_str.c_str(), mppath.c_str(), apiURL.c_str());
+														if(mapUploadGeneration.load(std::memory_order_relaxed) != gen) return;
+														mapUploadState.store(ok ? 2 : 3, std::memory_order_release);
+													});
 													creategameclicked = true;
 													strcpy(Config::GetInstance().defaultgamename, gamename);
 													Config::GetInstance().Save();
-													CreateModalDialog("Creating game...", false);
+													CreateModalDialog("Uploading map...", false);
 												}
 												}else{
 													CreateModalDialog("No map selected");

@@ -60,7 +60,7 @@ export const ACTOR_DEFS: ActorDefEntry[] = [
   { id: 2,  label: 'Captain Laser',   icon: 'CL', color: '#ef4444', bank: 59,   frame: 0 },
   { id: 3,  label: 'Trooper Rocket',  icon: 'TR', color: '#ef4444', bank: 59,   frame: 0 },
   { id: 6,  label: 'Robot',           icon: 'RB', color: '#a855f7', bank: 47,   frame: 0 },
-  { id: 36, label: 'Player Start',    icon: 'PS', color: '#22d3ee', bank: 9,    frame: 0 },
+  { id: 36, label: 'Player Start',    icon: 'PS', color: '#22d3ee', bank: 78,   frame: 0 },
   { id: 37, label: 'Camera',          icon: 'CM', color: '#f59e0b', bank: 65,   frame: 0 },
   { id: 47, label: 'Doodad',          icon: 'DD', color: '#6b7280', bank: null, frame: 0 },
   { id: 50, label: 'Surv. Monitor',   icon: 'SM', color: '#f59e0b', bank: 65,   frame: 0 },

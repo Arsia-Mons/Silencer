@@ -3,12 +3,15 @@
 #include "bodypart.h"
 #include "player.h"
 #include "plasmaprojectile.h"
+#include "gasloader.h"
+#include "gasloader.h"
 
 Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	requiresauthority = true;
 	state = NEW;
 	state_i = 0;
-	speed = 4;
+	const EnemyDef* c = GASLoader::Get().GetEnemyDef("civilian");
+	speed = c ? c->speed : 4;
 	res_bank = 121;
 	res_index = 0;
 	suitcolor = defaultsuitcolor;
@@ -122,7 +125,7 @@ void Civilian::Tick(World & world){
 				state_i = -1;
 				break;
 			}
-			xv = (mirrored ? -1 : 1) * (5 + speed);
+			{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("civilian"); int _bonus = _gd ? _gd->runSpeedBonus : 5; xv = (mirrored ? -1 : 1) * (_bonus + speed); }
 			res_bank = 123;
 			res_index = state_i % 15;
 			// play per-frame sounds defined in actordefs/civilian.json
@@ -259,7 +262,10 @@ bool Civilian::Look(World & world){
 	types.push_back(ObjectTypes::PLASMAPROJECTILE);
 	types.push_back(ObjectTypes::WALLPROJECTILE);
 	types.push_back(ObjectTypes::FLAREPROJECTILE);
-	std::vector<Object *> objects = world.TestAABB(x - 200, y - 100, x + 200, y + 100, types);
+	const EnemyDef* _civgd = GASLoader::Get().GetEnemyDef("civilian");
+	int _tdx = _civgd ? _civgd->threatDetectX : 200;
+	int _tdy = _civgd ? _civgd->threatDetectY : 100;
+	std::vector<Object *> objects = world.TestAABB(x - _tdx, y - _tdy, x + _tdx, y + _tdy, types);
 	if(objects.size() > 0){
 		if(objects[0]->x > x){
 			mirrored = true;
@@ -292,8 +298,11 @@ bool Civilian::CheckTractVictim(World & world){
 			state = DYINGEXPLODE;
 			EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
 			Object tractprojectile(ObjectTypes::PLASMAPROJECTILE);
-			tractprojectile.healthdamage = 80;
-			tractprojectile.shielddamage = 80;
+		{
+			const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian");
+			tractprojectile.healthdamage = def ? def->tractHealthDamage : 80;
+			tractprojectile.shielddamage = def ? def->tractShieldDamage : 80;
+		}
 			tractprojectile.ownerid = id;
 			player->HandleHit(world, 50, 50, tractprojectile);
 			Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};

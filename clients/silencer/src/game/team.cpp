@@ -2,6 +2,7 @@
 #include "overlay.h"
 #include "terminal.h"
 #include "player.h"
+#include "../gas/gasloader.h"
 
 Team::Team() : Object(ObjectTypes::TEAM){
 	agency = NOXIS;
@@ -54,7 +55,7 @@ void Team::Tick(World & world){
 			newpeerschecksum += world.peerlist[peers[i]]->ip;
 		}
 	}
-	if(secretprogress - oldsecretprogress >= 20){
+	if(secretprogress - oldsecretprogress >= GASLoader::Get().player.secretProgressSoundThresh){
 		/*Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 		if(localplayer && this == localplayer->GetTeam(world)){
 			Audio::GetInstance().Play(world.resources.soundbank["select2.wav"], 32);
@@ -80,7 +81,7 @@ void Team::Tick(World & world){
 				if(player->secretteamid != id){
 					stolen = true;
 				}
-				int remaining = 3 - secrets;
+				int remaining = GASLoader::Get().player.secretsNeededToWin - secrets;
 				char text[128];
 				sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded 1000 credits", user->name, stolen ? "stolen secret" : "secret", remaining);
 				if(!world.intutorialmode){
@@ -91,11 +92,11 @@ void Team::Tick(World & world){
 		for(int i = 0; i < numpeers; i++){
 			Player * player = world.GetPeerPlayer(peers[i]);
 			if(player){
-				player->AddCredits(1000);
+				player->AddCredits(GASLoader::Get().player.secretDeliveryCredits);
 			}
 		}
 		world.Illuminate();
-		if(secrets >= 3){
+		if(secrets >= GASLoader::Get().player.secretsNeededToWin){
 			// game won
 			if(!world.winningteamid){
 				world.winningteamid = id;
@@ -150,13 +151,13 @@ void Team::Tick(World & world){
 		}
 		secretdelivered = 0;
 	}
-	if(secrets >= 3){
+	if(secrets >= GASLoader::Get().player.secretsNeededToWin){
 		// bug fix for when secretdelivered packet is lost
 		if(!world.winningteamid){
 			world.winningteamid = id;
 		}
 	}
-	if(secretprogress >= 180 && oldsecretprogress > 0){
+	if(secretprogress >= GASLoader::Get().player.secretProgressBeamThresh && oldsecretprogress > 0){
 		secretprogress = 0;
 		oldsecretprogress = 0;
 		if(world.IsAuthority()){
@@ -175,7 +176,7 @@ void Team::Tick(World & world){
 				terminal->state = Terminal::SECRETBEAMING;
 				terminal->state_i = 0;
 				beamingterminalid = terminal->id;
-				terminal->beamingtime = 65;
+				{ const TerminalDef* _td = GASLoader::Get().GetTerminalDef("big"); terminal->beamingtime = _td ? _td->beaconTimeSecs : 65; }
 				char teamtext[256];
 				char enemytext[256];
 				sprintf(teamtext, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : %d seconds", terminal->beamingtime);
@@ -317,10 +318,8 @@ void Team::OnDestroy(World & world){
 }
 
 bool Team::AddPeer(Uint8 id){
-	Uint8 maxplayers = 4;
-	if(agency == BLACKROSE){
-		maxplayers = 1;
-	}
+	const AgencyDef* ad = GASLoader::Get().GetAgencyDef(agency);
+	Uint8 maxplayers = ad ? ad->maxPlayersPerTeam : 4;
 	for(int i = 0; i < numpeers; i++){
 		if(peers[i] == id){
 			return false;

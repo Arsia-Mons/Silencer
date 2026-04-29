@@ -385,6 +385,7 @@ func (c *Client) handleRegisterStats(r *reader) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("[stats] game=%d acct=%d agency=%d won=%d xp=%d", gameID, acct, statsagency, won, xp)
 
 	// Parse the Stats::Serialize blob (34 Uint32 LE values = 136 bytes).
 	// Order mirrors Stats::Serialize in stats.cpp: weapons arrays first,
@@ -436,6 +437,8 @@ func (c *Client) handleRegisterStats(r *reader) error {
 	ms.HealsDone = readU32()
 
 	if updatedAgency, ok := c.hub.store.UpdateStats(acct, statsagency, won != 0, xp); ok {
+		log.Printf("[stats] saved: acct=%d agency=%d wins=%d losses=%d level=%d xp=%d",
+			acct, statsagency, updatedAgency.Wins, updatedAgency.Losses, updatedAgency.Level, updatedAgency.XPToNextLevel)
 		if c.hub.events != nil {
 			now := time.Now().UnixMilli()
 			c.hub.events.Publish("player.stats_update", playerStatsUpdateEvent{
@@ -447,6 +450,8 @@ func (c *Client) handleRegisterStats(r *reader) error {
 				Won: won != 0, XP: xp, Stats: ms, Timestamp: now,
 			})
 		}
+	} else {
+		log.Printf("[stats] UpdateStats failed: acct=%d not found in store", acct)
 	}
 	return nil
 }

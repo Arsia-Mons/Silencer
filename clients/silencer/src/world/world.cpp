@@ -13,6 +13,7 @@
 #include "basedoor.h"
 #include "interface.h"
 #include "bodypart.h"
+#include "gasloader.h"
 #include <algorithm>
 
 #define DELTAENABLED 1
@@ -44,7 +45,7 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	message_i = 0;
 	showchat_i = 0;
 	gameplaystate = NONE;
-	LoadBuyableItems();
+	// LoadBuyableItems() is called from Game::Init() after GAS loads via resources.Load()
 	lastpingsent = 0;
 	pingtime = 0;
 	highlightsecrets = false;
@@ -1376,31 +1377,20 @@ void World::ActivateTerminals(void){
 }
 
 void World::LoadBuyableItems(void){
-	// 97:0 base door, 1 health pack, 2 laz tract, 3 security pass, 4 camera, 5 poison, 6-9 bomb, 10 flare, 11 cannon, 12 plasma det, 13 poison flare, 14 virus, 15 base def, 16 laser ammo, 17 rockets, 18 flamer,
-	buyableitems.push_back(new BuyableItem(BUY_LASER, "Laser", 150, 300, 97, 16, 1 << 0, 1, "Immediately after shield technology\nwas capable of dampening weapon\neffects, the Frost-Light laser was\nreleased.\n \nTwo hits should remove any standard\nshield, but very little damage is\ndone to an unshielded target."));
-	buyableitems.push_back(new BuyableItem(BUY_ROCKET, "Rocket", 250, 400, 97, 17, 1 << 1, 1, "Long range, high yield mini-warheads\nwill devastate any unshielded\nopponent.\n \nIncludes an attached camera for\nin-flight kill tracking."));
-	buyableitems.push_back(new BuyableItem(BUY_FLAMER, "Flamer Ammo", 200, 350, 97, 18, 1 << 2, 1, "Kills any unshielded target.\n \nNo shield has been made that the\nCrucible flamer cannot ignore.\n \nDeadly at close range."));
-	buyableitems.push_back(new BuyableItem(BUY_HEALTH, "Health Pack", 200, 400, 97, 1, 1 << 3, 1, "A small portable boost for Noxis\nagents in the field.\n \nRestores lost health, but must be\nmanually applied.", Team::NOXIS));
-	buyableitems.push_back(new BuyableItem(BUY_TRACT, "Lazarus Tract", 250, 500, 97, 2, 1 << 14, 1, "The definitive and unquestionable\ntruth about Mars' oddest and most\npowerful religious organization.\n \nHelpful in converting disbelieving\ncitizens to your cause.", Team::LAZARUS));
-	buyableitems.push_back(new BuyableItem(BUY_SECURITYPASS, "Security Pass", 1000, 1000, 97, 3, 1 << 17, 1, "Unlimited security access.\n \nGovernment agents will ignore you\nin the field.", Team::CALIBER));
-	buyableitems.push_back(new BuyableItem(BUY_VIRUS, "Virus", 400, 300, 97, 14, 1 << 19, 1, "A portable virus whipped up by the\nsnotty underage hackers of Static.\n \nGives you immediate control over\ncannons and robots in the field.\n \nMay harm enemy in-base weapon\nstations.", Team::STATIC));
-	buyableitems.push_back(new BuyableItem(BUY_POISON, "Poison", 100, 400, 97, 5, 1 << 15, 1, "Hollowhead poisons are pernicious\nbio-rad toxins, administered via\ninjection.\n \nCauses the victim to lose health\nuntil cured, multiple doses\nrecommended.", Team::BLACKROSE));
-	buyableitems.push_back(new BuyableItem(BUY_EMPB, "E.M.P. Bomb", 1000, 1000, 97, 6, 1 << 4, 4, "Upon detonation it emits a\nelectromagnetic pulse that drops all\nshields in a several mile radius.\n \nThe user is protected by a frequency\nmodulator that comes with the\ndevice."));
-	buyableitems.push_back(new BuyableItem(BUY_SHAPEDB, "Shaped Bomb", 100, 200, 97, 7, 1 << 5, 1, "Derived from the plasma bomb, this\nbomb focus its destructive force \nupwards."));
-	buyableitems.push_back(new BuyableItem(BUY_PLASMAB, "Plasma Bomb", 200, 300, 97, 8, 1 << 6, 2, "An indescriminate terrorist device\ncapable of killing even a\nperfectly healthy opponent.\n \nA core explosion with multiple\nshrapnel tendrils, extremely\nlethal."));
-	buyableitems.push_back(new BuyableItem(BUY_NEUTRONB, "Neutron Bomb", 4000, 2000, 97, 9, 1 << 7, 8, "A portable neutron bomb that\nswiftly elimates all opposition in\nthe entire region.\n \nThe only defense against it is to\nbe in your base.\n \nUse with extreme caution."));
-	buyableitems.push_back(new BuyableItem(BUY_DET, "Plasma Detonator", 200, 400, 97, 12, 1 << 8, 2, "A remote detonation device.\n \nDeploy in strategic locations and\ndetonate from a safe distance."));
-	buyableitems.push_back(new BuyableItem(BUY_FIXEDC, "Fixed Cannon", 300, 500, 97, 11, 1 << 9, 1, "A stationary laser turret with\nexcellent offensive and defensive\ncapabilities.\n \nThis mechanical friend in the\nfield can do your work for you."));
-	buyableitems.push_back(new BuyableItem(BUY_FLARE, "Flare", 200, 400, 97, 10, 1 << 10, 1, "The Orion Flare is a stationary\nmini-torch looks like a bomb in\nflight but has a more lingering\neffect.\n \nUseful for blocking off tight areas\nor herding enemies."));
-	buyableitems.push_back(new BuyableItem(BUY_POISONFLARE, "Poison Flare", 200, 700, 97, 13, 1 << 16, 1, "A more devious strain of the Orion\nFlare, the Poison Flare\nincapacitates its victims in seconds\nand leaves them poisoned as\nwell.\n \nEnvironmentally disastrous, but\nhighly lethal.", Team::BLACKROSE));
-	buyableitems.push_back(new BuyableItem(BUY_CAMERA, "Camera", 100, 200, 97, 4, 1 << 18, 1, "A remote viewing device that allows\nan agent to monitor an area on\nhis/her HUD.\n \nCan be discreetly removed in a puff\nof smoke.\n \nWhen secrecy is a way of life."));
-	buyableitems.push_back(new BuyableItem(BUY_DOOR, "Base Door", 300, 600, 97, 0, 1 << 11, 1, "The ability to relocate the warp\ndoor to your base."));
-	buyableitems.push_back(new BuyableItem(BUY_DEFENSE, "Base Defense", 100, 500, 97, 15, 1 << 12, 1, "Internal security systems to deter\nwould-be ambushers.\n \nIn-base laser turrets.\n \nMultiple purchases increase turret\nstructure durability."));
-	buyableitems.push_back(new BuyableItem(BUY_INFO, "Insider Info", 500, 500, 0xFF, 0, 1 << 13, 1, "Your contacts on the inside can\ngive you information about secrets.\n \nFor a price of course."));
-	buyableitems.push_back(new BuyableItem(BUY_GIVE0, "Give To ", 100, 100, 0xFF, 0, 0, 0, ""));
-	buyableitems.push_back(new BuyableItem(BUY_GIVE1, "Give To ", 100, 100, 0xFF, 0, 0, 0, ""));
-	buyableitems.push_back(new BuyableItem(BUY_GIVE2, "Give To ", 100, 100, 0xFF, 0, 0, 0, ""));
-	buyableitems.push_back(new BuyableItem(BUY_GIVE3, "Give To ", 100, 100, 0xFF, 0, 0, 0, ""));
+	for(const ItemDef& def : GASLoader::Get().items){
+		buyableitems.push_back(new BuyableItem(
+			(Uint8)def.enumId,
+			def.name.c_str(),
+			def.price,
+			def.repairPrice,
+			(Uint8)def.spriteBank,
+			(Uint8)def.spriteIndex,
+			(Uint32)def.techChoice,
+			(Uint8)def.techSlots,
+			def.description.c_str(),
+			def.agencyRestriction
+		));
+	}
 }
 
 void World::BuyItem(Uint8 id){

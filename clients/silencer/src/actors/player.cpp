@@ -8,6 +8,7 @@
 #include "vent.h"
 #include "basedoor.h"
 #include "projectile.h"
+#include "gasloader.h"
 #include "blasterprojectile.h"
 #include "laserprojectile.h"
 #include "rocketprojectile.h"
@@ -64,27 +65,31 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	y = 0;
 	currentplatformid = 0;
 	height = 50;
-	maxhealth = 100;
+	maxhealth = GASLoader::Get().player.baseHealth;
 	health = maxhealth;
-	maxshield = 100;
+	maxshield = GASLoader::Get().player.baseShield;
 	shield = maxshield;
 	laserammo = 0;
 	rocketammo = 0;
 	flamerammo = 0;
 	fuellow = false;
-	maxfuel = 80;
+	maxfuel = GASLoader::Get().player.baseFuel;
 	fuel = maxfuel;
 	currentweapon = 0;
 	oldweapon = 0;
 	files = 0;
-	maxfiles = 2800;
+	maxfiles = GASLoader::Get().player.maxFiles;
 	credits = 0;
 	effecthacking = false;
 	suitcolor = (7 << 4) + 13;
-	weaponfiredelay[0] = 7;
-	weaponfiredelay[1] = 11;
-	weaponfiredelay[2] = 21;
-	weaponfiredelay[3] = 2;
+	// Wire fire delays from GAS
+	{
+		const WeaponDef* wd;
+		wd = GASLoader::Get().GetWeaponDef("blaster"); weaponfiredelay[0] = wd ? wd->fireDelay : 7;
+		wd = GASLoader::Get().GetWeaponDef("laser");   weaponfiredelay[1] = wd ? wd->fireDelay : 11;
+		wd = GASLoader::Get().GetWeaponDef("rocket");  weaponfiredelay[2] = wd ? wd->fireDelay : 21;
+		wd = GASLoader::Get().GetWeaponDef("flamer");  weaponfiredelay[3] = wd ? wd->fireDelay : 2;
+	}
 	weaponfirecool = 0;
 	teamid = 0;
 	hacksoundchannel = -1;
@@ -279,8 +284,7 @@ void Player::Tick(World & world){
 		if(state_warp == 2){
 			//draw = false;
 		}
-		if(state_warp == 12){
-			//draw = true;
+		if(state_warp == GASLoader::Get().player.warpTeleportTick){
 			x = warpx;
 			y = warpy;
 			currentplatformid = 0;
@@ -303,7 +307,8 @@ void Player::Tick(World & world){
 		}
 	}
 	if(poisonedby){
-		if(poisoned_i % (24 / poisonedamount) == 0){
+		int poisonCycle = GASLoader::Get().player.poisonTickCycle;
+		if(poisoned_i % (poisonCycle / poisonedamount) == 0){
 			if(health){
 				health--;
 			}
@@ -339,13 +344,13 @@ void Player::Tick(World & world){
 			}
 		}
 		poisoned_i++;
-		if(poisoned_i >= 24){
+		if(poisoned_i >= GASLoader::Get().player.poisonTickCycle){
 			poisoned_i = 0;
 		}
 	}
 	if(tracetime > 0 && secondcounter == 0 && !world.replaying){
 		tracetime--;
-		if(tracetime == 8){
+		if(tracetime == GASLoader::Get().player.neutronWarnTick){
 			world.SendSound("vModDeto.wav");
 		}
 		if(tracetime == 0){
@@ -450,12 +455,13 @@ void Player::Tick(World & world){
 		justjumpedfromladder = false;
 	}
 	if(input.keydisguise && !oldinput.keydisguise){
-		if(disguised >= 100){
+		const auto& pd = GASLoader::Get().player;
+		if(disguised >= pd.disguiseThreshold){
 			UnDisguise(world);
 		}else{
 			if(state != JETPACK && state != DEPLOYING && state != DYING && state != DEAD){
 				if(currentplatformid || !OnGround()){
-					disguised = 112;
+					disguised = pd.disguiseActivationTicks;
 					EmitSound(world, world.resources.soundbank["disguise.wav"], 64);
 					if(OnGround()){
 						state = RUNNING;
@@ -473,7 +479,7 @@ void Player::Tick(World & world){
 			disguised--;
 		}
 	}
-	if(state != HACKING || state_i >= 17){
+	if(state != HACKING || state_i >= GASLoader::Get().player.hackingExitThreshold){
 		if(!world.replaying && hacksoundchannel != -1){
 			EmitSound(world, world.resources.soundbank["jackout.wav"], 20);
 			Audio::GetInstance().Stop(hacksoundchannel, 700);
@@ -762,10 +768,12 @@ void Player::Tick(World & world){
 				case INV_HEALTHPACK:{
 					if(state != DEAD && state != DYING){
 						if(health < maxhealth){
-							if(maxhealth - health < 100){
+							const ItemDef* def = GASLoader::Get().GetItemDef("healthpack");
+							int heal = def ? def->healAmount : 100;
+							if(maxhealth - health < heal){
 								health = maxhealth;
 							}else{
-								health += 100;
+								health += heal;
 							}
 							Peer * peer = GetPeer(world);
 							if(peer){
@@ -854,7 +862,9 @@ void Player::Tick(World & world){
 						for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 							found = true;
 							Player * player = static_cast<Player *>(*it);
-							if(player->Poison(world, id, 3)){
+							const ItemDef* poisondef = GASLoader::Get().GetItemDef("poison");
+							int dose = poisondef ? poisondef->poisonDose : 3;
+							if(player->Poison(world, id, dose)){
 								Peer * peer = GetPeer(world);
 								if(peer){
 									peer->stats.poisons++;
@@ -862,7 +872,8 @@ void Player::Tick(World & world){
 								RemoveInventoryItem(INV_POISON);
 								break;
 							}else{
-								if(player->poisonedamount == maxpoisoned){
+								int maxpois = GASLoader::Get().player.maxPoisoned;
+								if(player->poisonedamount == maxpois){
 									world.ShowStatus("Victim maximally poisoned", 208, true, GetPeer(world));
 								}
 							}
@@ -1144,7 +1155,7 @@ void Player::Tick(World & world){
 	
 	switch(state){
 		case DEPLOYING:{
-			Uint8 deploywait = 60;
+			int deploywait = GASLoader::Get().player.deployWaitTicks;
 			if(state_i >= deploywait){
 				draw = true;
 				int anim_i = state_i - deploywait;
@@ -1152,7 +1163,7 @@ void Player::Tick(World & world){
 					res_bank  = 68;
 					res_index = anim_i;
 				}
-				if(state_i >= deploywait + 8){
+				if(state_i >= deploywait + GASLoader::Get().player.deployAnimationTicks){
 					state = STANDING;
 					state_i = -1;
 					break;
@@ -1439,14 +1450,14 @@ void Player::Tick(World & world){
 					}
 				}
 			}
-			int xvmax = 14;
+			int xvmax = GASLoader::Get().player.runSpeed;
 			if(IsDisguised()){
-				xvmax = 11;
+				xvmax = GASLoader::Get().player.runSpeedDisguised;
 			}
 			if(hassecret){
-				xvmax = 11;
+				xvmax = GASLoader::Get().player.runSpeedSecret;
 				if(IsDisguised()){
-					xvmax = 8;
+					xvmax = GASLoader::Get().player.runSpeedSecretDisguised;
 				}
 			}
 			if(xv > xvmax){
@@ -1874,13 +1885,13 @@ void Player::Tick(World & world){
 				fallingnudge = 8;
 			}*/
 			//xv *= 1.2;
-			Uint32 impulse = -17 + jumpimpulse;
+			Uint32 impulse = -GASLoader::Get().player.jumpImpulse + jumpimpulse;
 			if(justjumpedfromladder){
 				if((!input.keymoveleft && !input.keymoveright) || (input.keymoveleft && input.keymoveright)){
-					impulse = -29 + jumpimpulse;
+					impulse = -GASLoader::Get().player.ladderJumpImpulse + jumpimpulse;
 				}else{
 					if(input.keyactivate){
-						impulse = -8 + jumpimpulse;
+						impulse = -GASLoader::Get().player.ladderActivateImpulse + jumpimpulse;
 					}
 				}
 			}
@@ -2191,12 +2202,12 @@ void Player::Tick(World & world){
 							EmitSound(world, world.resources.soundbank[sounds[rand() % (sizeof(sounds) / sizeof(const char *))]], 64);
 						}
 						effecthacking = true;
-						effecthackingcontinue = 5;
-						state_i = 15;
+						effecthackingcontinue = GASLoader::Get().player.hackingEffectTicks;
+						state_i = GASLoader::Get().player.hackingCompleteThreshold;
 					}
 				}
 			}
-			if(state_i >= 15 || !hackable){
+			if(state_i >= GASLoader::Get().player.hackingCompleteThreshold || !hackable){
 				if((input.keymoveleft && !oldinput.keymoveleft) || (input.keymoveright && !oldinput.keymoveright)){
 					state = RUNNING;
 					state_i = -1;
@@ -2226,11 +2237,11 @@ void Player::Tick(World & world){
 				// 127:0-18 civilian hacking
 				res_bank = 127;
 			}
-			if(state_i >= 17){
+			if(state_i >= GASLoader::Get().player.hackingExitThreshold){
 				effecthacking = false;
 				effecthackingcontinue = 0;
-				res_index = (17 - state_i) + 16;
-				if(state_i - 17 == 16){
+				res_index = (GASLoader::Get().player.hackingExitThreshold - state_i) + 16;
+				if(state_i - GASLoader::Get().player.hackingExitThreshold == 16){
 					state = STANDING;
 					state_i = -1;
 					break;
@@ -2459,7 +2470,7 @@ void Player::Tick(World & world){
 			}
 			x += xe;
 			y += ye;
-			if(((input.keyactivate && !oldinput.keyactivate) || state_i > 48) && !state_warp && !world.winningteamid){
+			if(((input.keyactivate && !oldinput.keyactivate) || state_i > GASLoader::Get().player.deadAutoRespawnTick) && !state_warp && !world.winningteamid){
 				state_hit = 0;
 				Team * team = GetTeam(world);
 				if(team && team->agency == Team::LAZARUS && canresurrect && !world.winningteamid){
@@ -2612,7 +2623,7 @@ void Player::Tick(World & world){
 								if(files > maxfiles){
 									files = maxfiles;
 								}
-								Uint16 creditamount = files * (1 + creditsbonus);
+								Uint16 creditamount = files * (GASLoader::Get().player.fileConversionBase + creditsbonus);
 								AddCredits(creditamount);
 								Peer * peer = GetPeer(world);
 								if(peer){
@@ -2912,7 +2923,7 @@ Team * Player::TeamOfCurrentBase(World & world){
 }
 
 bool Player::IsDisguised(void){
-	if(disguised >= 100){
+	if(disguised >= GASLoader::Get().player.disguiseThreshold){
 		return true;
 	}
 	return false;
@@ -2939,13 +2950,14 @@ bool Player::IsInvisible(World & world){
 }
 
 bool Player::Poison(World & world, Uint16 playerid, Uint8 amount){
-	if(poisonedamount < maxpoisoned){
+	int maxpois = GASLoader::Get().player.maxPoisoned;
+	if(poisonedamount < maxpois){
 		Player * player = static_cast<Player *>(world.GetObjectFromId(playerid));
 		if(player && !world.BelongsToTeam(*player, teamid)){
 			poisonedby = playerid;
 			poisonedamount += amount;
-			if(poisonedamount > maxpoisoned){
-				poisonedamount = maxpoisoned;
+			if(poisonedamount > maxpois){
+				poisonedamount = maxpois;
 			}
 			state_hit = 1 + (3 * 32);
 			hitx = 50;
@@ -3222,29 +3234,32 @@ bool Player::BuyItem(World & world, Uint8 id){
 		bool bought = false;
 		switch(id){
 			case World::BUY_LASER:{
-				if(laserammo < 30){
-					laserammo += 5;
-					if(laserammo > 30){
-						laserammo = 30;
-					}
+				const ItemDef* def = GASLoader::Get().GetItemDef("laser");
+				int pickup = def ? def->pickupAmmo : 5;
+				int cap    = def ? def->maxAmmo    : 30;
+				if(laserammo < cap){
+					laserammo += pickup;
+					if(laserammo > cap) laserammo = cap;
 					bought = true;
 				}
 			}break;
 			case World::BUY_ROCKET:{
-				if(rocketammo < 30){
-					rocketammo += 3;
-					if(rocketammo > 30){
-						rocketammo = 30;
-					}
+				const ItemDef* def = GASLoader::Get().GetItemDef("rocket");
+				int pickup = def ? def->pickupAmmo : 3;
+				int cap    = def ? def->maxAmmo    : 30;
+				if(rocketammo < cap){
+					rocketammo += pickup;
+					if(rocketammo > cap) rocketammo = cap;
 					bought = true;
 				}
 			}break;
 			case World::BUY_FLAMER:{
-				if(flamerammo < 75){
-					flamerammo += 15;
-					if(flamerammo > 75){
-						flamerammo = 75;
-					}
+				const ItemDef* def = GASLoader::Get().GetItemDef("flamer");
+				int pickup = def ? def->pickupAmmo : 15;
+				int cap    = def ? def->maxAmmo    : 75;
+				if(flamerammo < cap){
+					flamerammo += pickup;
+					if(flamerammo > cap) flamerammo = cap;
 					bought = true;
 				}
 			}break;
@@ -3358,7 +3373,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[0]){
 						Player * player = world.GetPeerPlayer(team->peers[0]);
 						if(player){
-							player->AddCredits(100);
+							player->AddCredits(GASLoader::Get().player.teamGiftCredits);
 							bought = true;
 						}
 					}
@@ -3370,7 +3385,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[1]){
 						Player * player = world.GetPeerPlayer(team->peers[1]);
 						if(player){
-							player->AddCredits(100);
+							player->AddCredits(GASLoader::Get().player.teamGiftCredits);
 							bought = true;
 						}
 					}
@@ -3382,7 +3397,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[2]){
 						Player * player = world.GetPeerPlayer(team->peers[2]);
 						if(player){
-							player->AddCredits(100);
+							player->AddCredits(GASLoader::Get().player.teamGiftCredits);
 							bought = true;
 						}
 					}
@@ -3394,7 +3409,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 					if(team->peers[3]){
 						Player * player = world.GetPeerPlayer(team->peers[3]);
 						if(player){
-							player->AddCredits(100);
+							player->AddCredits(GASLoader::Get().player.teamGiftCredits);
 							bought = true;
 						}
 					}
@@ -3482,14 +3497,14 @@ void Player::LoadAbilities(World & world){
 		Team * team = GetTeam(world);
 		User * user = world.lobby.GetUserInfo(peer->accountid);
 		if(team && user && !user->retrieving){
-			maxfuel += user->agency[team->agency].jetpack * 10;
+			maxfuel += user->agency[team->agency].jetpack * GASLoader::Get().player.upgradeMultiplierJetpack;
 			fuel = maxfuel;
-			maxshield += user->agency[team->agency].shield * 20;
+			maxshield += user->agency[team->agency].shield * GASLoader::Get().player.upgradeMultiplierShield;
 			shield = maxshield;
-			maxhealth += user->agency[team->agency].endurance * 20;
+			maxhealth += user->agency[team->agency].endurance * GASLoader::Get().player.upgradeMultiplierEndurance;
 			health = maxhealth;
-			hackingbonus = user->agency[team->agency].hacking * 0.10;
-			creditsbonus = user->agency[team->agency].contacts * 0.10;
+			hackingbonus = user->agency[team->agency].hacking * GASLoader::Get().player.upgradeMultiplierHacking;
+			creditsbonus = user->agency[team->agency].contacts * GASLoader::Get().player.upgradeMultiplierContacts;
 			if(team->agency == Team::NOXIS){
 				jumpimpulse = -3;
 			}
@@ -3561,7 +3576,7 @@ Projectile * Player::Fire(World & world, Uint8 direction){
 	Projectile * projectile = 0;
 	if(FireDelayPassed(world)){
 		Uint8 oldweaponfirecool = weaponfirecool;
-		weaponfirecool = weaponfiredelay[currentweapon] + 3;
+		weaponfirecool = weaponfiredelay[currentweapon] + GASLoader::Get().player.weaponFireCooldownPad;
 		// fire
 		Object * projectile = 0;
 		Uint8 oldlaserammo = laserammo;
@@ -3849,18 +3864,15 @@ bool Player::ProcessJetpackState(World & world){
 		//xv = xv / 2;
 		state_i = -1;
 	}
-	Uint8 xvmax = 14;
-	/*if(hassecret){
-		xvmax = 12;
-	}*/
+	Uint8 xvmax = GASLoader::Get().player.jetpackXvMax;
 	if(xv > xvmax){
 		xv = xvmax;
 	}
 	if(xv < -xvmax){
 		xv = -xvmax;
 	}
-	if(yv < -9){
-		yv = -9;
+	if(yv < -GASLoader::Get().player.jetpackYvMax){
+		yv = -GASLoader::Get().player.jetpackYvMax;
 	}
 	//if(yv > 0){
 	//	yv = 0;
@@ -4291,8 +4303,10 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 		}break;
 		case PickUp::LASERAMMO:{
 			laserammo += pickup.quantity;
-			if(laserammo > 30){
-				laserammo = 30;
+			{
+				const ItemDef* def = GASLoader::Get().GetItemDef("laser");
+				int cap = def ? def->maxAmmo : 30;
+				if(laserammo > cap) laserammo = cap;
 			}
 			if(islocalplayer){
 				char temp[256];
@@ -4303,8 +4317,10 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 		}break;
 		case PickUp::ROCKETAMMO:{
 			rocketammo += pickup.quantity;
-			if(rocketammo > 30){
-				rocketammo = 30;
+			{
+				const ItemDef* def = GASLoader::Get().GetItemDef("rocket");
+				int cap = def ? def->maxAmmo : 30;
+				if(rocketammo > cap) rocketammo = cap;
 			}
 			if(islocalplayer){
 				char temp[256];
@@ -4315,8 +4331,10 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 		}break;
 		case PickUp::FLAMERAMMO:{
 			flamerammo += pickup.quantity;
-			if(flamerammo > 75){
-				flamerammo = 75;
+			{
+				const ItemDef* def = GASLoader::Get().GetItemDef("flamer");
+				int cap = def ? def->maxAmmo : 75;
+				if(flamerammo > cap) flamerammo = cap;
 			}
 			if(islocalplayer){
 				char temp[256];
@@ -4388,7 +4406,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			switch(pickup.type){
 				case PickUp::SUPERSHIELD:{
 					powerupname = "You've gained the Super Shield!";
-					shield = maxshield * 2;
+					shield = maxshield * GASLoader::Get().player.superShieldMultiplier;
 				}break;
 				case PickUp::NEUTRONBOMB:{
 					powerupname = "Neutron Bomb activation in 15 seconds!";
@@ -4407,22 +4425,22 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				}break;
 				case PickUp::JETPACK:{
 					powerupname = "Extra Jetpack propellant!";
-					jetpackbonustime = world.tickcount + (20 * 24);
+					jetpackbonustime = world.tickcount + GASLoader::Get().player.jetpackBonusDurationTicks;
 					fuel = maxfuel;
 					fuellow = false;
 				}break;
 				case PickUp::HACKING:{
 					powerupname = "Double hacking until codes changed!";
-					hackingbonustime = world.tickcount + (30 * 24);
+					hackingbonustime = world.tickcount + GASLoader::Get().player.hackingBonusDurationTicks;
 				}break;
 				case PickUp::INVISIBLE:{
 					powerupname = "Shielding will render you invisible for 30 seconds!";
-					invisiblebonustime = world.tickcount + (30 * 24);
+					invisiblebonustime = world.tickcount + GASLoader::Get().player.invisibilityDurationTicks;
 					invisible = true;
 				}break;
 				case PickUp::RADAR:{
 					powerupname = "You can see your enemies on radar!";
-					radarbonustime = world.tickcount + (30 * 24);
+					radarbonustime = world.tickcount + GASLoader::Get().player.radarBonusDurationTicks;
 				}break;
 				case PickUp::DEPOSITOR:{
 					powerupname = "You are now protected from a Neutron Bomb!";

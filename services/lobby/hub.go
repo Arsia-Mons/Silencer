@@ -156,7 +156,33 @@ func (h *Hub) Leave(c *Client) {
 	}
 }
 
-// SetClientGame updates a client's gameID+status and announces the change.
+// GameExited is called by the proc manager when a dedicated server process exits.
+// It removes the game from the hub and publishes a game.ended event.
+func (h *Hub) GameExited(gameID uint32) {
+	h.mu.Lock()
+	_, inGames := h.games[gameID]
+	if inGames {
+		delete(h.games, gameID)
+	}
+	clients := make([]*Client, 0, len(h.clients))
+	for c := range h.clients {
+		clients = append(clients, c)
+	}
+	h.mu.Unlock()
+
+	if !inGames {
+		return
+	}
+
+	for _, c := range clients {
+		c.sendDelGame(gameID)
+	}
+	if h.events != nil {
+		h.events.Publish("game.ended", gameEndedEvent{GameID: gameID, Timestamp: time.Now().UnixMilli()})
+	}
+}
+
+
 // status: 0 = main lobby, 1 = pregame (game-specific lobby), 2 = playing.
 // gameID=0 requires status=0. Unknown non-zero IDs are rejected.
 func (h *Hub) SetClientGame(c *Client, gameID uint32, status uint8) {

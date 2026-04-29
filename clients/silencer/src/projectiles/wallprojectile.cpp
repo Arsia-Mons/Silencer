@@ -1,17 +1,19 @@
 #include "wallprojectile.h"
 #include "overlay.h"
 #include "shrapnel.h"
+#include "gasloader.h"
 
 WallProjectile::WallProjectile() : Object(ObjectTypes::WALLPROJECTILE){
 	requiresauthority = true;
 	res_bank = 0xFF;
 	res_index = 0;
 	state_i = 0;
-	healthdamage = 10;
-	shielddamage = 60;
-	velocity = 35;
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("wall");
+	healthdamage = w ? w->healthDamage : 10;
+	shielddamage = w ? w->shieldDamage : 60;
+	velocity = w ? w->velocity : 35;
 	emitoffset = 0;
-	moveamount = 6;
+	moveamount = w ? w->moveAmount : 6;
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;

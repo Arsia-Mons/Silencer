@@ -1,6 +1,7 @@
 #include "techstation.h"
 #include "plume.h"
 #include "team.h"
+#include "gasloader.h"
 #include <algorithm>
 
 TechStation::TechStation() : Object(ObjectTypes::TECHSTATION){
@@ -90,8 +91,9 @@ void TechStation::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 }
 
 void TechStation::Repair(void){
-	health = 240;
-	shield = 240;
+	const GameObjectDef* gdef = GASLoader::Get().GetGameObjectDef("techStation");
+	health = gdef ? gdef->techHealth : 240;
+	shield = gdef ? gdef->techShield : 240;
 	techdisabled = 0;
 	collidable = true;
 }

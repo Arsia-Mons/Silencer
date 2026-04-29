@@ -1,19 +1,21 @@
 #include "plasmaprojectile.h"
 #include "plume.h"
+#include "gasloader.h"
 
 PlasmaProjectile::PlasmaProjectile() : Object(ObjectTypes::PLASMAPROJECTILE){
 	requiresauthority = false;
 	res_bank = 0xFF;
 	res_index = 0;
 	state_i = 0;
-	healthdamage = 4;
-	shielddamage = 5;
-	velocity = 5;
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("plasma");
+	healthdamage = w ? w->healthDamage : 4;
+	shielddamage = w ? w->shieldDamage : 5;
+	velocity = w ? w->velocity : 5;
 	drawcheckered = true;
 	renderpass = 3;
 	large = false;
-	moveamount = 4;
-	radius = 5;
+	moveamount = w ? w->moveAmount : 4;
+	radius = w ? w->radius : 5;
 	renderpass = 2;
 	stopatobjectcollision = false;
 	isprojectile = true;
@@ -29,8 +31,9 @@ void PlasmaProjectile::Serialize(bool write, Serializer & data, Serializer * old
 
 void PlasmaProjectile::Tick(World & world){
 	if(large){
-		healthdamage = 5;
-		shielddamage = 6;
+		const WeaponDef* w = GASLoader::Get().GetWeaponDef("plasma");
+		healthdamage = w ? w->healthDamageLarge : 5;
+		shielddamage = w ? w->shieldDamageLarge : 6;
 	}
 	Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 	if(plume){
@@ -63,11 +66,12 @@ void PlasmaProjectile::Tick(World & world){
 		}
 		//world->MarkDestroyObject(id);
 	}
-	yv += 2;
+	{ const WeaponDef* _gd = GASLoader::Get().GetWeaponDef("plasma"); yv += _gd ? _gd->plasmaGravity : 2; }
 	res_index = state_i;
-	Uint8 life = 20;
+	const WeaponDef* _pgd = GASLoader::Get().GetWeaponDef("plasma");
+	Uint8 life = _pgd ? _pgd->plasmaLifeNormal : 20;
 	if(large){
-		life = 7;
+		life = _pgd ? _pgd->plasmaLifeLarge : 7;
 	}
 	if(state_i >= life){
 		world.MarkDestroyObject(id);

@@ -18,6 +18,7 @@
 #include "overlay.h"
 #include "team.h"
 #include "warper.h"
+#include "gasloader.h"
 #include "walldefense.h"
 #include "pickup.h"
 #include "baseexit.h"
@@ -282,12 +283,14 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 					civilian->x = actorx;
 					civilian->y = actory;
 					switch(actortype){
-						case 0:
-							civilian->speed = 4;
-						break;
-						case 1:
-							civilian->speed = 5;
-						break;
+						case 0: {
+							const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
+							civilian->speed = gd ? gd->speed : 4;
+						} break;
+						case 1: {
+							const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
+							civilian->speed = gd ? gd->speedAlt : 5;
+						} break;
 					}
 				}
 			}break;
@@ -577,7 +580,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 						pickup->x = actorx;
 						pickup->y = actory;
 						pickup->draw = false;
-						pickup->poweruprespawntime = 60;
+						pickup->poweruprespawntime = GASLoader::Get().player.powerupRespawnTicks;
 						pickup->quantity = pickup->poweruprespawntime;
 					}
 				}
