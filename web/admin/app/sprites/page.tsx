@@ -527,6 +527,45 @@ function SpritesPageInner() {
     e.target.value = '';
   }
 
+  // ── Export sprite sheet PNG ───────────────────────────────────────────────
+  function handleExportSheet() {
+    if (!currentBank || !palette) return;
+    const frames = currentBank.frames;
+    if (frames.length === 0) return;
+
+    const cols = Math.ceil(Math.sqrt(frames.length));
+    const rows = Math.ceil(frames.length / cols);
+    const cellW = Math.max(...frames.map(f => f.header.width));
+    const cellH = Math.max(...frames.map(f => f.header.height));
+
+    const canvas = document.createElement('canvas');
+    canvas.width  = cols * cellW;
+    canvas.height = rows * cellH;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    frames.forEach((frame, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const imgData = frameToImageData(frame, palette);
+      const tmp = document.createElement('canvas');
+      tmp.width  = frame.header.width;
+      tmp.height = frame.header.height;
+      tmp.getContext('2d')!.putImageData(imgData, 0, 0);
+      ctx.drawImage(tmp, col * cellW, row * cellH);
+    });
+
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${BIN_PREFIX[tab]}${String(selectedBank!).padStart(3, '0')}_sheet.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }
+
   // ── Download .BIN ─────────────────────────────────────────────────────────
   function handleDownloadBin() {
     if (selectedBank === null || !currentBank) return;
@@ -739,6 +778,13 @@ function SpritesPageInner() {
                   className="px-3 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors"
                 >
                   ↓ {DAT_NAME[tab]}
+                </button>
+                <button
+                  onClick={handleExportSheet}
+                  disabled={!currentBank || !palette || currentBank.frames.length === 0}
+                  className="px-3 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors disabled:opacity-30"
+                >
+                  ↓ SHEET.PNG
                 </button>
                 {selectedBank !== null && currentBank && (
                   <span className="ml-2 text-xs font-mono text-[#4a7a4a]">
