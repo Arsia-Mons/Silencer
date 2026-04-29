@@ -7,7 +7,7 @@ same fonts (and the same colors via CSS `color:`) the game uses.
 | File                    | Source bank | Native em | Advance | Used for in-game            |
 | ----------------------- | ----------- | --------- | ------- | --------------------------- |
 | `silencer-tiny.otf`     | 132         | 5px       | 4px     | HUD digits (`DrawTinyText`) |
-| `silencer-ui.otf`       | 133         | 11px      | 6px     | Main UI text                |
+| `silencer-ui.otf`       | 133         | 11px      | 7px     | Main UI text                |
 | `silencer-ui-large.otf` | 134         | 13px      | 9px     | Toggle labels / headers     |
 | `silencer-title.otf`    | 136         | 24px      | 16px    | Announcement titles         |
 

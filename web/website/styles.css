@@ -1,38 +1,61 @@
 @font-face {
   font-family: "Silencer Title";
-  src: url("/assets/silencer-title.otf") format("opentype");
+  src: url("/assets/silencer-title.otf?v=3") format("opentype");
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 
 @font-face {
   font-family: "Silencer UI";
-  src: url("/assets/silencer-ui.otf") format("opentype");
+  src: url("/assets/silencer-ui.otf?v=3") format("opentype");
   font-weight: normal;
   font-style: normal;
+  font-display: swap;
 }
 
-* { box-sizing: border-box; }
+@font-face {
+  font-family: "Silencer UI Large";
+  src: url("/assets/silencer-ui-large.otf?v=3") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 
-html, body { margin: 0; padding: 0; min-height: 100%; }
+/* --- Base & Reset --- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow-x: hidden;
+  width: 100%;
+}
 
 body {
-  background-color: #050a05;
+  background-color: #030603;
   background-image: url('/assets/menu-bg.png');
   background-size: cover;
-  background-position: center right;
+  background-position: center;
   background-attachment: fixed;
-  color: #d1fad7;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 16px;
-  line-height: 1.4;
+  color: #c5e1c5;
+  font-family: "Silencer UI", 'Courier New', Courier, monospace;
+  line-height: 1.6;
+  text-rendering: optimizeSpeed;
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
 }
 
+/* --- Atmospheric Effects --- */
 body::after {
   content: '';
   position: fixed;
   inset: 0;
-  background: rgba(3, 6, 3, 0.55);
+  background: radial-gradient(circle at 50% 50%, rgba(3, 6, 3, 0.1) 0%, rgba(3, 6, 3, 0.9) 100%);
   pointer-events: none;
   z-index: 0;
 }
@@ -45,92 +68,193 @@ body::before {
     0deg,
     transparent,
     transparent 2px,
-    rgba(0, 163, 40, 0.018) 2px,
-    rgba(0, 163, 40, 0.018) 4px
+    rgba(24, 124, 20, 0.02) 2px,
+    rgba(24, 124, 20, 0.02) 4px
   );
   pointer-events: none;
   z-index: 10000;
 }
 
+/* --- Layout --- */
 main {
   position: relative;
   z-index: 1;
-  max-width: 80ch;
-  margin: 0;
-  padding: 1lh 2ch;
+  display: grid;
+  grid-template-columns: minmax(auto, 520px) max-content;
+  grid-template-rows: auto auto;
+  column-gap: 3.5rem;
+  row-gap: 1.5rem;
+  padding: 2rem;
+  align-items: start;
 }
 
-main > * + * { margin-top: 1lh; }
-
+/* --- Typography & Ingredients --- */
 .logo {
-  display: block;
-  width: 60ch;
+  grid-column: 1 / -1;
+  width: auto;
   max-width: 100%;
-  height: auto;
-  margin: 0 0 2lh 0;
+  height: 75px;
+  filter: drop-shadow(0 0 20px rgba(24, 124, 20, 0.1));
+  margin-bottom: 1rem;
+  image-rendering: pixelated;
 }
 
 blockquote {
-  margin: 2lh 0 2lh 6ch;
-  padding: 0;
-  max-width: 64ch;
-  position: relative;
-  color: #a0c4a0;
+  grid-column: 1 / 2;
+  align-self: start;
+  color: #92b592;
+  padding-left: 0;
 }
 
-blockquote p { margin: 0 0 1lh; }
-blockquote p:last-of-type { margin-bottom: 0; }
-
-blockquote p:first-of-type::before {
-  content: '"';
-  position: absolute;
-  left: -2ch;
+blockquote p {
+  font-size: 16px;
+  line-height: 1.6;
+  margin-bottom: 1.2rem;
 }
 
-blockquote p:last-of-type::after {
-  content: '"';
+blockquote p:last-of-type {
+  margin-bottom: 0;
 }
 
 blockquote footer {
-  color: #88c194;
-  margin-top: 1lh;
-  display: block;
-  text-align: right;
+  color: #5b8a65;
+  margin-top: 1.5rem;
+  font-family: "Silencer UI Large", monospace;
+  font-size: 13px;
+  letter-spacing: 0.1rem;
+  display: flex;
+  align-items: center;
+  text-transform: uppercase;
+  opacity: 0.8;
 }
 
 blockquote footer::before {
-  content: "-- ";
+  content: "";
+  display: block;
+  width: 20px;
+  height: 1px;
+  background: currentColor;
+  margin-right: 1ch;
+  opacity: 0.4;
 }
 
+blockquote footer a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease;
+}
+
+blockquote footer a:hover,
+blockquote footer a:focus-visible {
+  color: #c5e1c5;
+  outline: none;
+}
+
+/* --- Interactive Elements --- */
 .links {
+  grid-column: 2 / 3;
+  align-self: start;
+  justify-self: end;
   list-style: none;
-  margin: 2lh 0 0 0;
-  padding: 0;
-  font-family: "Silencer Title", 'Courier New', Courier, monospace;
-  font-size: 24px;
+  font-family: "Silencer Title", monospace;
+  font-size: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding-top: 0.2rem;
 }
 
 .links li {
-  margin: 0;
-  padding: 0;
+  display: flex;
+  align-items: center;
 }
 
 .links li::before {
-  content: "> ";
-  color: #187C14;
+  content: ">";
+  color: #5b8a65;
+  margin-right: 1.2ch;
+  font-size: 0.8em;
+}
+
+.links li:hover::before,
+.links li:focus-within::before {
+  color: #c5e1c5;
 }
 
 .links a {
-  color: #187C14;
+  color: #5b8a65;
   text-decoration: none;
-}
-
-.links a.primary {
-  color: #187C14;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1em 0;
+  position: relative;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .links a:hover,
 .links a:focus-visible {
-  text-decoration: underline;
+  color: #c5e1c5;
   outline: none;
+}
+
+/* --- Responsive Polish --- */
+@media (max-width: 800px) {
+  body {
+    align-items: start;
+    padding: 0;
+  }
+  
+  main {
+    grid-template-columns: 100%;
+    gap: 1.5rem;
+    padding: 2rem 1rem;
+    width: 100vw;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-wrap: break-word;
+  }
+  
+  .logo {
+    height: auto;
+    width: 100%;
+    max-width: 240px;
+    margin: 0 auto;
+    display: block;
+  }
+  
+  blockquote {
+    grid-column: 1 / -1;
+    padding-left: 0;
+    margin: 0;
+  }
+  
+  blockquote p {
+    font-size: 16px;
+    margin-bottom: 1rem;
+  }
+  
+  .links {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    font-size: 18px;
+    gap: 1.5rem;
+    padding: 1.5rem 0 0 0;
+    margin: 0;
+    border-top: 1px solid rgba(184, 225, 184, 0.1);
+  }
+
+  .links li::before {
+    display: none; /* Hide chevrons to save space in row layout */
+  }
+
+  .links a {
+    padding: 0.5rem 0;
+    width: auto;
+  }
 }
