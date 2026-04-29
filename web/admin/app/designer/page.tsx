@@ -137,7 +137,10 @@ export default function DesignerPage() {
   }, []);
 
   useEffect(() => {
-    if (showMaps) fetchMapList();
+    if (!showMaps) return;
+    fetchMapList();
+    const id = setInterval(fetchMapList, 4000);
+    return () => clearInterval(id);
   }, [showMaps, fetchMapList]);
 
   const handleDeleteMap = useCallback(async (name: string) => {

@@ -4,6 +4,7 @@
 #include "robot.h"
 #include "team.h"
 #include "plume.h"
+#include "gasloader.h"
 
 FixedCannon::FixedCannon() : Object(ObjectTypes::FIXEDCANNON){
 	requiresauthority = true;
@@ -17,8 +18,9 @@ FixedCannon::FixedCannon() : Object(ObjectTypes::FIXEDCANNON){
 	renderpass = 3;
 	state = NEW;
 	suitcolor = 0;
-	health = 40;
-	shield = 16;
+	const GameObjectDef* def = GASLoader::Get().GetGameObjectDef("fixedCannon");
+	health = def ? def->health : 40;
+	shield = def ? def->shield : 16;
 	renderpass = 2;
 	ishittable = true;
 	isphysical = true;
@@ -249,7 +251,10 @@ bool FixedCannon::Look(World & world, bool up, bool behind){
 			direction = true;
 		}
 	}
-	std::vector<Object *> objects = world.TestAABB(x + (direction ? -70 : 70), y + y2, x + (direction ? -300 : 300), y + y2, types);
+	const GameObjectDef* _fcgd = GASLoader::Get().GetGameObjectDef("fixedCannon");
+	int _ir = _fcgd ? _fcgd->innerRange : 70;
+	int _or = _fcgd ? _fcgd->outerRange : 300;
+	std::vector<Object *> objects = world.TestAABB(x + (direction ? -_ir : _ir), y + y2, x + (direction ? -_or : _or), y + y2, types);
 	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 		switch((*it)->type){
 			case ObjectTypes::PLAYER:{

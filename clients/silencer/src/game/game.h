@@ -196,6 +196,17 @@ private:
 	std::string           mapjoinpath;           // absolute path set by thread when state→2
 	std::mutex            mapjoinmutex;          // guards mapjoinpath
 	std::thread           mapjointhread;
+	// Map upload for create-game flow: when a user creates a game with a local
+	// map, we upload it first so the dedicated server can find it by name.
+	// State: 0=idle 1=uploading 2=ok 3=fail.
+	std::atomic<int>      mapUploadState{0};
+	std::atomic<uint32_t> mapUploadGeneration{0};
+	std::thread           mapUploadThread;
+	struct {
+		std::string gamename, mapname, password;
+		unsigned char maphash[20];
+		Uint8 securitylevel, minlevel, maxlevel, maxplayers, maxteams;
+	} pendingCreate;
 	Uint32 lastmusicplaytime;
 	char currentmusictrack[256];
 	bool fullscreentoggled;

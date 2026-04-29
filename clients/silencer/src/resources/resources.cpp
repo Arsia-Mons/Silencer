@@ -4,6 +4,7 @@
 #include "game.h"
 #include "os.h"
 #include "behaviortree.h"
+#include "gasloader.h"
 
 Resources::Resources(){
 	spritebank.assign(256, std::vector<std::shared_ptr<Surface>>(256, std::make_shared<Surface>(0, 0)));
@@ -35,6 +36,7 @@ bool Resources::Load(Game & game, bool dedicatedserver){
 		fprintf(stderr, "[actordef] loaded %d actor definition(s)\n", ndefs);
 	}
 	BehaviorTreeLibrary::instance().loadDir(GetResDir() + "behaviortrees");
+	GASLoader::Get().Load(GetResDir() + "gas");
 	return true;
 }
 

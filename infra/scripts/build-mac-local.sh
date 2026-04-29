@@ -5,8 +5,9 @@
 #   ./infra/scripts/build-mac-local.sh               # lobby at 127.0.0.1:15170
 #   LOBBY_HOST=1.2.3.4 ./infra/scripts/build-mac-local.sh
 #   LOBBY_PORT=517      ./infra/scripts/build-mac-local.sh
+#   VERSION=00040       ./infra/scripts/build-mac-local.sh  # must match lobby -version flag
 #
-# The lobby host and port are baked into the binary at compile time.
+# The lobby host, port, and version are baked into the binary at compile time.
 # Run `docker compose -f infra/docker-compose.yml up -d` first so the lobby is ready before launching.
 
 set -euo pipefail
@@ -14,6 +15,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 LOBBY_HOST="${LOBBY_HOST:-127.0.0.1}"
 LOBBY_PORT="${LOBBY_PORT:-15170}"
+VERSION="${VERSION:-00040}"
 BUILD_DIR="$REPO_ROOT/build"
 
 echo "==> Installing/updating dependencies via Homebrew"
@@ -40,13 +42,14 @@ if [ ! -f "$SDL3_MIXER_PREFIX/lib/libSDL3_mixer.dylib" ]; then
   cmake --build "$SRC_DIR/build" -j"$(sysctl -n hw.ncpu)" --target install
 fi
 
-echo "==> Configuring (lobby=${LOBBY_HOST}:${LOBBY_PORT})"
+echo "==> Configuring (lobby=${LOBBY_HOST}:${LOBBY_PORT}, version=${VERSION})"
 cmake -B "$BUILD_DIR" -S "$REPO_ROOT/clients/silencer" \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
   -DCMAKE_PREFIX_PATH="$SDL3_MIXER_PREFIX;/opt/homebrew" \
   -DSILENCER_LOBBY_HOST="$LOBBY_HOST" \
-  -DSILENCER_LOBBY_PORT="$LOBBY_PORT"
+  -DSILENCER_LOBBY_PORT="$LOBBY_PORT" \
+  -DSILENCER_VERSION="$VERSION"
 
 echo "==> Building ($(sysctl -n hw.ncpu) cores)"
 cmake --build "$BUILD_DIR" --config Release -j"$(sysctl -n hw.ncpu)"

@@ -1,15 +1,17 @@
 #include "blasterprojectile.h"
 #include "shrapnel.h"
 #include "overlay.h"
+#include "gasloader.h"
 
 BlasterProjectile::BlasterProjectile() : Object(ObjectTypes::BLASTERPROJECTILE){
 	requiresauthority = true;
 	res_bank = 0xFF;
 	res_index = 0;
 	state_i = 0;
-	healthdamage = 40;
-	shielddamage = 4;
-	moveamount = 10;
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("blaster");
+	healthdamage = w ? w->healthDamage : 40;
+	shielddamage = w ? w->shieldDamage : 4;
+	moveamount = w ? w->moveAmount : 10;
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;

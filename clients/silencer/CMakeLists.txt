@@ -142,6 +142,7 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/updater"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/gas"
 )
 
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's

@@ -1,6 +1,7 @@
 #include "pickup.h"
 #include "player.h"
 #include "grenade.h"
+#include "gasloader.h"
 
 PickUp::PickUp() : Object(ObjectTypes::PICKUP){
 	requiresauthority = true;
@@ -136,7 +137,8 @@ void PickUp::Tick(World & world){
 void PickUp::ArmNeutron(Uint16 activator){
 	if(type == NEUTRONBOMB){
 		neutronactivator = activator;
-		tracetime = 15;
+		const WeaponDef* gd = GASLoader::Get().GetWeaponDef("grenade");
+		tracetime = gd ? gd->neutronTraceTime : 15;
 	}
 }
 

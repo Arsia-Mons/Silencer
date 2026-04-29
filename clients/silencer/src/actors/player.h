@@ -152,7 +152,6 @@ private:
 	Uint16 poisonedby;
 	Uint8 poisonedamount;
 	Uint8 poisoned_i;
-	static const Uint8 maxpoisoned = 9;
 	Uint32 lastweaponchangesound;
 	Uint16 teamid;
 	bool invisible;

@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
     "@types/dagre": "^0.7.54",
     "dagre": "^0.8.5",
     "next": "^14.2.4",

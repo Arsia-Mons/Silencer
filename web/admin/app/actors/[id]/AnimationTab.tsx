@@ -9,7 +9,15 @@ import { getSpriteFrames, type FrameMeta, type ActorDef } from '../../../lib/api
 function useSounds(): string[] {
   const [sounds, setSounds] = useState<string[]>([]);
   useEffect(() => {
-    fetch('/api/sounds').then(r => r.json()).then(setSounds).catch(() => {});
+    const token = localStorage.getItem('zs_token') ?? '';
+    fetch('/api/sounds', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        if (Array.isArray(data)) {
+          setSounds(data.map((s: unknown) => (s && typeof s === 'object' && 'name' in s ? String((s as {name: unknown}).name) : String(s))).filter(Boolean));
+        }
+      })
+      .catch(() => {});
   }, []);
   return sounds;
 }

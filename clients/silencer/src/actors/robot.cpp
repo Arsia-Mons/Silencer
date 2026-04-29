@@ -4,6 +4,7 @@
 #include "player.h"
 #include "fixedcannon.h"
 #include "plume.h"
+#include "gasloader.h"
 
 Robot::Robot() : Object(ObjectTypes::ROBOT){
 	requiresauthority = true;
@@ -11,16 +12,17 @@ Robot::Robot() : Object(ObjectTypes::ROBOT){
 	state_i = 0;
 	res_bank = 47;
 	res_index = 0;
-	maxhealth = 200;
-	health = maxhealth;
-	maxshield = 400;
-	shield = maxshield;
+	const EnemyDef* r = GASLoader::Get().GetEnemyDef("robot");
+	maxhealth = r ? r->health : 200;
+	health    = maxhealth;
+	maxshield = r ? r->shield : 400;
+	shield    = maxshield;
 	renderpass = 2;
 	ishittable = true;
 	isbipedal = true;
 	isphysical = true;
 	snapshotinterval = 48;
-	respawnseconds = 45;
+	respawnseconds = r ? r->respawnSeconds : 45;
 	virusplanter = 0;
 	damaging = 0;
 	soundchannel = -1;
@@ -53,11 +55,11 @@ void Robot::InitBT() {
 		return BTResult::Success;
 	};
 
-	// LookSides: only from WALKING during search phase (bt_walk_ticks_ < 600) — orient toward target.
+	// LookSides: only from WALKING during search phase (bt_walk_ticks_ < searchTicks from GAS) — orient toward target.
 	// Always returns Failure so the Selector continues to Patrol (orient + move each tick).
 	btctx_.actions["LookSides"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
-		if (bt_walk_ticks_ >= 600) return BTResult::Failure; // ReturnToSpawn handles orientation
+		if (bt_walk_ticks_ >= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->searchTicks : 600)) return BTResult::Failure; // ReturnToSpawn handles orientation
 		World& world = *static_cast<World*>(ctx.userData);
 		if (Look(world, 2)) { mirrored = true; }
 		else if (Look(world, 1)) { mirrored = false; }
@@ -67,7 +69,7 @@ void Robot::InitBT() {
 	// MeleeCheck: only from WALKING, throttled to every 40 ticks.
 	btctx_.actions["MeleeCheck"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
-		if (state_i % 40 != 0) return BTResult::Failure;
+		if (state_i % (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->meleeCheckInterval : 40) != 0) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
 		int x1, y1, x2, y2;
 		GetAABB(world.resources, &x1, &y1, &x2, &y2);
@@ -110,18 +112,19 @@ void Robot::InitBT() {
 	btctx_.actions["Patrol"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
-		xv = mirrored ? -4 : 4;
+		{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); xv = mirrored ? -(_gd ? _gd->speed : 4) : (_gd ? _gd->speed : 4); }
 		FollowGround(*this, world, xv);
 		if (DistanceToEnd(*this, world) <= world.minwalldistance) mirrored = !mirrored;
 		return BTResult::Success;
 	};
 
-	// ReturnToSpawn: after 10s search phase (!patrol, bt_walk_ticks_ >= 600), walk back to spawn and sleep.
+	// ReturnToSpawn: after search phase (!patrol, searchTicks from GAS), walk back to spawn and sleep.
 	// If a target is spotted en-route, reset the search timer and resume hunting.
 	btctx_.actions["ReturnToSpawn"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		if (patrol) return BTResult::Failure;
-		if (bt_walk_ticks_ < 600) return BTResult::Failure;
+		const EnemyDef* _rd = GASLoader::Get().GetEnemyDef("robot");
+		if (bt_walk_ticks_ < (_rd ? _rd->searchTicks : 600)) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
 		if (Look(world, 1) || Look(world, 2)) {
 			bt_walk_ticks_ = 0; // target spotted — reset and keep hunting
@@ -129,7 +132,7 @@ void Robot::InitBT() {
 		}
 		// Orient toward spawn and let Patrol move us there
 		mirrored = (signed(originalx) < signed(x));
-		if (abs(signed(x) - signed(originalx)) <= 20) {
+		if (abs(signed(x) - signed(originalx)) <= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->returnProximity : 20)) {
 			state = SLEEPING;
 			state_i = -1;
 			return BTResult::Success;
@@ -227,7 +230,8 @@ void Robot::Tick(World & world){
 			res_bank = 45;
 			res_index = state_i % 20;
 			if (!bt_) {
-				if(state_i >= 100 && !patrol){
+				const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+				if(state_i >= (rd ? rd->sleepTicks : 100) && !patrol){
 					state = SLEEPING;
 					state_i = -1;
 					break;
@@ -239,7 +243,7 @@ void Robot::Tick(World & world){
 				}
 				if(Look(world, 2)){ mirrored = true; }
 				if(Look(world, 1)){ mirrored = false; }
-				if(state_i % 40 == 0){
+				if(state_i % (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->meleeCheckInterval : 40) == 0){
 					int x1, y1, x2, y2;
 					GetAABB(world.resources, &x1, &y1, &x2, &y2);
 					std::vector<Uint8> types;
@@ -278,7 +282,7 @@ void Robot::Tick(World & world){
 						EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
 					}
 				}
-				xv = mirrored ? -4 : 4;
+				{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); xv = mirrored ? -(_gd ? _gd->speed : 4) : (_gd ? _gd->speed : 4); }
 				FollowGround(*this, world, xv);
 				if(DistanceToEnd(*this, world) <= world.minwalldistance){
 					mirrored = mirrored ? false : true;
@@ -299,7 +303,7 @@ void Robot::Tick(World & world){
 			}
 			if(state_i == 0){
 				if(Look(world, 0)){
-					if(shootcooldown < 50 && shootcooldown){
+					if(shootcooldown < ([](){ const EnemyDef* _g = GASLoader::Get().GetEnemyDef("robot"); return _g ? _g->shootCooldownCap : 50; }()) && shootcooldown){
 						state_i--;
 					}
 				}
@@ -312,10 +316,10 @@ void Robot::Tick(World & world){
 					rocketprojectile->y = y - 60;
 					if(mirrored){
 						rocketprojectile->x = x - 70;
-						rocketprojectile->xv = -25;
+						{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("robot"); rocketprojectile->xv = -(_grd ? _grd->rocketLaunchXv : 25); }
 					}else{
 						rocketprojectile->x = x + 70;
-						rocketprojectile->xv = 25;
+						{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("robot"); rocketprojectile->xv = (_grd ? _grd->rocketLaunchXv : 25); }
 					}
 				}
 				shootcooldown = 1;
@@ -326,7 +330,7 @@ void Robot::Tick(World & world){
 				PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
 				if(pickup){
 					pickup->type = PickUp::FILES;
-					pickup->quantity = 250;
+					{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); pickup->quantity = _gd ? _gd->deathDropFiles : 250; }
 					pickup->x = x;
 					pickup->y = y - 1;
 					pickup->xv = (world.Random() % 9) - 4;
@@ -388,7 +392,7 @@ void Robot::Tick(World & world){
 				x = originalx;
 				y = originaly;
 				state_i = -1;
-				state_warp = 12;
+				state_warp = GASLoader::Get().player.warpTeleportTick;
 				health = maxhealth;
 				shield = maxshield;
 				break;
@@ -456,26 +460,27 @@ bool Robot::Look(World & world, Uint8 direction){
 	if(virusplanter){
 		types.push_back(ObjectTypes::GUARD);
 	}
-	int y1 = -60;
+	const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+	int y1 = rd ? rd->lookDefaultY : -60;
 	int y2 = y1;
-	int minx = 70;
-	int maxx = 500;
+	int minx = rd ? rd->lookDefaultMinX : 70;
+	int maxx = rd ? rd->lookDefaultMaxX : 500;
 	minx *= (mirrored ? -1 : 1);
 	maxx *= (mirrored ? -1 : 1);
 	switch(direction){
 		case 0:
 		break;
 		case 1:
-			minx = 70;
-			maxx = 200;
-			y1 = -10;
-			y2 = -100;
+			minx = rd ? rd->lookDirMinX : 70;
+			maxx = rd ? rd->lookDirMaxX : 200;
+			y1 = rd ? rd->lookDirY1 : -10;
+			y2 = rd ? rd->lookDirY2 : -100;
 		break;
 		case 2:
-			minx = -70;
-			maxx = -200;
-			y1 = -10;
-			y2 = -100;
+			minx = -(rd ? rd->lookDirMinX : 70);
+			maxx = -(rd ? rd->lookDirMaxX : 200);
+			y1 = rd ? rd->lookDirY1 : -10;
+			y2 = rd ? rd->lookDirY2 : -100;
 		break;
 	}
 	if(signed(x) + minx < 0){
@@ -547,9 +552,10 @@ void Robot::StopAmbience(void){
 
 void Robot::Melee(Object & object, World & world){
 	damaging = 1;
+	const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
 	Object damageprojectile(ObjectTypes::FLAREPROJECTILE);
-	damageprojectile.healthdamage = 60;
-	damageprojectile.shielddamage = 60;
+	damageprojectile.healthdamage = rd ? rd->meleeDamageHealth : 60;
+	damageprojectile.shielddamage = rd ? rd->meleeDamageShield : 60;
 	damageprojectile.ownerid = id;
 	object.HandleHit(world, 50, 50, damageprojectile);
 }

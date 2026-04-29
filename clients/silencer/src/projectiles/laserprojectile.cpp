@@ -1,17 +1,19 @@
 #include "laserprojectile.h"
 #include "shrapnel.h"
 #include "overlay.h"
+#include "gasloader.h"
 
 LaserProjectile::LaserProjectile() : Object(ObjectTypes::LASERPROJECTILE){
 	requiresauthority = true;
 	res_bank = 0xFF;
 	res_index = 0;
 	state_i = 0;
-	healthdamage = 10;
-	shielddamage = 60;
-	velocity = 30;
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("laser");
+	healthdamage = w ? w->healthDamage : 10;
+	shielddamage = w ? w->shieldDamage : 60;
+	velocity = w ? w->velocity : 30;
 	emitoffset = 24;
-	moveamount = 12;
+	moveamount = w ? w->moveAmount : 12;
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;

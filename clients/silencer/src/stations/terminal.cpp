@@ -1,5 +1,6 @@
 #include "terminal.h"
 #include "player.h"
+#include "gasloader.h"
 
 Terminal::Terminal() : Object(ObjectTypes::TERMINAL){
 	state = INACTIVE;
@@ -153,19 +154,20 @@ void Terminal::Tick(World & world){
 		if(beamingtime == 0){
 			state = SECRETREADY;
 			if(!world.intutorialmode){
-				tracetime = 90;
+				const TerminalDef* tdef = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
+				tracetime = tdef ? tdef->traceTimeBase : 90;
 				for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
 					Team * team = static_cast<Team *>(world.GetObjectFromId(*it));
 					if(team && team->beamingterminalid == id){
 						switch(team->secrets){
 							case 0:
-								tracetime = 150;
+								tracetime = tdef ? tdef->traceTimeExtended : 150;
 							break;
 							case 1:
-								tracetime = 120;
+								tracetime = tdef ? tdef->traceTimeMedium : 120;
 							break;
 							case 2:
-								tracetime = 90;
+								tracetime = tdef ? tdef->traceTimeBase : 90;
 							break;
 						}
 						break;
@@ -208,12 +210,13 @@ Uint8 Terminal::GetPercent(void){
 
 void Terminal::SetSize(bool big){
 	isbig = big;
+	const TerminalDef* tdef = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
 	if(isbig){
 		res_bank = 184;
 		res_index = 0;
-		juice = 150;
-		files = 400;
-		secretinfo = 45;
+		juice      = tdef ? tdef->juice      : 150;
+		files      = tdef ? tdef->files      : 400;
+		secretinfo = tdef ? tdef->secretInfo : 45;
 		inactiveframes = 5;
 		beamingframes = 9;
 		readyframes = 9;
@@ -221,9 +224,9 @@ void Terminal::SetSize(bool big){
 	}else{
 		res_bank = 183;
 		res_index = 0;
-		juice = 80;
-		files = 100;
-		secretinfo = 15;
+		juice      = tdef ? tdef->juice      : 80;
+		files      = tdef ? tdef->files      : 100;
+		secretinfo = tdef ? tdef->secretInfo : 15;
 		inactiveframes = 5;
 		beamingframes = 0;
 		readyframes = 5;

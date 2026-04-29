@@ -32,7 +32,7 @@ export default function Audit() {
       if (filter.type) params.type = filter.type;
       if (filter.accountId) params.accountId = filter.accountId;
       const res = await getEvents(params);
-      setEvents(res.events.reverse());
+      setEvents(res.events);
       setTotal(res.total);
     } catch (e) { console.error(e); }
   };
@@ -44,23 +44,23 @@ export default function Audit() {
   const wsConnected = useSocket({
     'player.login':   (...args: unknown[]) => {
       const d = args[0] as AuditEvent;
-      if (live && page === totalPages) setEvents(prev => [...prev, { ...d, type: 'player.login', ts: new Date().toISOString() }]);
+      if (live && page === 1) setEvents(prev => [{ ...d, type: 'player.login', ts: new Date().toISOString() }, ...prev]);
     },
     'player.logout':  (...args: unknown[]) => {
       const d = args[0] as AuditEvent;
-      if (live && page === totalPages) setEvents(prev => [...prev, { ...d, type: 'player.logout', ts: new Date().toISOString() }]);
+      if (live && page === 1) setEvents(prev => [{ ...d, type: 'player.logout', ts: new Date().toISOString() }, ...prev]);
     },
     'game.created':   (...args: unknown[]) => {
       const d = args[0] as AuditEvent;
-      if (live && page === totalPages) setEvents(prev => [...prev, { ...d, type: 'game.created', ts: new Date().toISOString() }]);
+      if (live && page === 1) setEvents(prev => [{ ...d, type: 'game.created', ts: new Date().toISOString() }, ...prev]);
     },
     'game.ready':     (...args: unknown[]) => {
       const d = args[0] as AuditEvent;
-      if (live && page === totalPages) setEvents(prev => [...prev, { ...d, type: 'game.ready', ts: new Date().toISOString() }]);
+      if (live && page === 1) setEvents(prev => [{ ...d, type: 'game.ready', ts: new Date().toISOString() }, ...prev]);
     },
     'game.ended':     (...args: unknown[]) => {
       const d = args[0] as AuditEvent;
-      if (live && page === totalPages) setEvents(prev => [...prev, { ...d, type: 'game.ended', ts: new Date().toISOString() }]);
+      if (live && page === 1) setEvents(prev => [{ ...d, type: 'game.ended', ts: new Date().toISOString() }, ...prev]);
     },
   });
 

@@ -3,6 +3,7 @@
 #include "player.h"
 #include "robot.h"
 #include "guard.h"
+#include "gasloader.h"
 #include <math.h>
 
 RocketProjectile::RocketProjectile() : Object(ObjectTypes::ROCKETPROJECTILE){
@@ -10,10 +11,11 @@ RocketProjectile::RocketProjectile() : Object(ObjectTypes::ROCKETPROJECTILE){
 	res_bank = 0xFF;
 	res_index = 0;
 	state_i = 0;
-	healthdamage = 75;
-	shielddamage = 25;
-	moveamount = 15;
-	velocity = 35;
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("rocket");
+	healthdamage = w ? w->healthDamage : 75;
+	shielddamage = w ? w->shieldDamage : 25;
+	moveamount = w ? w->moveAmount : 15;
+	velocity = w ? w->velocity : 35;
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;
@@ -59,20 +61,26 @@ void RocketProjectile::Tick(World & world){
 		res_index = 3;
 		mirrored = true;
 	}
-	if(state_i == 100){
-		oldxv = xv;
-		oldyv = yv;
-		xv = ceil(float(xv) * 0.3);
-		yv = ceil(float(yv) * 0.3);
-		soundchannel = EmitSound(world, world.resources.soundbank["rocket4.wav"], 128);
-		state_i = 11;
-		res_bank = 87;
+	{
+		const WeaponDef* _gd = GASLoader::Get().GetWeaponDef("rocket");
+		int _ht = _gd ? _gd->rocketHoverTick : 100;
+		float _hs = _gd ? _gd->rocketSlowHover : 0.3f;
+		if(state_i == _ht){
+			oldxv = xv;
+			oldyv = yv;
+			xv = ceil(float(xv) * _hs);
+			yv = ceil(float(yv) * _hs);
+			soundchannel = EmitSound(world, world.resources.soundbank["rocket4.wav"], 128);
+			state_i = 11;
+			res_bank = 87;
+		}
 	}
 	if(state_i == 0){
 		oldxv = xv;
 		oldyv = yv;
-		xv = ceil(float(xv) * 0.2);
-		yv = ceil(float(yv) * 0.2);
+		{ const WeaponDef* _gd = GASLoader::Get().GetWeaponDef("rocket"); float _s = _gd ? _gd->rocketSlowInitial : 0.2f;
+		xv = ceil(float(xv) * _s);
+		yv = ceil(float(yv) * _s); }
 		soundchannel = EmitSound(world, world.resources.soundbank["rocket9.wav"], 128);
 	}
 	if(state_i == 3){
@@ -163,7 +171,9 @@ void RocketProjectile::Tick(World & world){
 					}break;
 				}
 			}
-			std::vector<Object *> objects = world.TestAABB(x - 30, y - 30, x + 30, y + 30, types, ownerid, teamid);
+			const WeaponDef* _rocketgd = GASLoader::Get().GetWeaponDef("rocket");
+		int _splashr = _rocketgd ? _rocketgd->radius : 30;
+		std::vector<Object *> objects = world.TestAABB(x - _splashr, y - _splashr, x + _splashr, y + _splashr, types, ownerid, teamid);
 			for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 				if(!object || (object && (*it)->id != object->id)){
 					if(!issecurity || (issecurity && !world.IsSecurity(*(*it)))){ // prevents robots/rocket guards from doing slash damage to other security

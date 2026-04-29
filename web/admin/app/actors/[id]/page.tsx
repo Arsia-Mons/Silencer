@@ -6,7 +6,7 @@
  * C5: Hitbox editor (per-frame AABB drawing)
  * C7: Actor properties + export/save
  */
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth';
@@ -23,7 +23,9 @@ import PropsTab from './PropsTab';
 type Tab = 'animation' | 'hitbox' | 'props';
 const VALID_TABS: Tab[] = ['animation', 'hitbox', 'props'];
 
-export default function ActorEditorPage() {
+// useSearchParams() requires Suspense in Next.js 14 production builds.
+// Inner component reads search params; outer wraps it in Suspense.
+function ActorEditorInner() {
   useAuth();
   const wsConnected = useWsConnected();
   const { id } = useParams() as { id: string };
@@ -132,5 +134,13 @@ export default function ActorEditorPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function ActorEditorPage() {
+  return (
+    <Suspense>
+      <ActorEditorInner />
+    </Suspense>
   );
 }

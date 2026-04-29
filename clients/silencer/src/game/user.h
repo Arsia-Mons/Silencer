@@ -34,12 +34,6 @@ public:
 		Uint8 maxcontacts;
 	} agency[5];
 	static const Uint8 maxlevel = 99;
-	static const Uint8 maxendurance = 5;
-	static const Uint8 maxshield = 5;
-	static const Uint8 maxjetpack = 5;
-	static const Uint8 maxtechslots = 8;
-	static const Uint8 maxhacking = 5;
-	static const Uint8 maxcontacts = 5;
 	// local only
 	Stats statscopy;
 	Uint8 statsagency;

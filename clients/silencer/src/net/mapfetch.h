@@ -26,4 +26,12 @@ std::vector<std::pair<std::string, std::string>> FetchServerMapList(const char *
 // Called once when the Create Game screen opens to populate community maps.
 void FetchAndSyncServerMaps(const char * apiURL);
 
+// UploadMapToServer uploads a local .SIL file to the community map server at
+// apiURL via POST /api/maps.  Returns true on success (HTTP 200 or 201),
+// false on error.  Safe to call from a background thread — uses an absolute
+// filepath and does not call CDDataDir().
+bool UploadMapToServer(const char * mapname,
+                       const char * filepath,
+                       const char * apiURL);
+
 #endif // MAPFETCH_H

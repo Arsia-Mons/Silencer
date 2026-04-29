@@ -2,6 +2,7 @@
 #include "wallprojectile.h"
 #include "plume.h"
 #include "player.h"
+#include "gasloader.h"
 #include <math.h>
 
 WallDefense::WallDefense() : Object(ObjectTypes::WALLDEFENSE){
@@ -40,7 +41,8 @@ void WallDefense::Tick(World & world){
 			}
 		}break;
 		case WAITING:{
-			if(state_i >= 12){
+			{ const GameObjectDef* _wd = GASLoader::Get().GetGameObjectDef("wallDefense");
+			if(state_i >= (_wd ? _wd->refireReadyTick : 12)){
 				state_i = 11;
 				Object * object = Look(world);
 				if(object){
@@ -63,11 +65,13 @@ void WallDefense::Tick(World & world){
 					state_i = -1;
 				}
 			}
+			} // _wd scope
 		}break;
 		case DEAD:{
 			collidable = false;
 			res_index = 0;
-			if(state_i >= 60){
+			{ const GameObjectDef* _wd = GASLoader::Get().GetGameObjectDef("wallDefense");
+			if(state_i >= (_wd ? _wd->reloadTick : 60)){
 				if(teamid == 0){
 					state = ACTIVATING;
 					state_i = -1;
@@ -76,6 +80,7 @@ void WallDefense::Tick(World & world){
 					state_i = -1;
 				}
 			}
+			} // _wd scope
 			if(world.tickcount % 24 != 0){
 				state_i--;
 			}
@@ -89,17 +94,22 @@ bool WallDefense::AddDefense(void){
 		state = ACTIVATING;
 		state_i = 0;
 	}
+	const GameObjectDef* def = GASLoader::Get().GetGameObjectDef("wallDefense");
+	const int neutralHealth = def ? def->health      : 40;
+	const int healthMax     = def ? def->healthMax   : 60;
+	const int healthRegen   = def ? def->healthRegen : 15;
+	const int shieldAtMax   = def ? def->shieldMax   :  4;
 	if(!teamid){
-		health = 40;
+		health = neutralHealth;
 		shield = 0;
 		return true;
 	}
-	if(health < 60){
-		health += 15;
+	if(health < healthMax){
+		health += healthRegen;
 		shield += 1;
-		if(health > 60){
-			health = 60;
-			shield = 4;
+		if(health > healthMax){
+			health = healthMax;
+			shield = shieldAtMax;
 		}
 		return true;
 	}
@@ -138,7 +148,9 @@ void WallDefense::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 Object * WallDefense::Look(World & world){
 	std::vector<Uint8> types;
 	types.push_back(ObjectTypes::PLAYER);
-	std::vector<Object *> objects = world.TestAABB(x - 600, y - 600, x + 600, y + 600, types);
+	const GameObjectDef* gd = GASLoader::Get().GetGameObjectDef("wallDefense");
+	int dr = gd ? gd->detectionRange : 600;
+	std::vector<Object *> objects = world.TestAABB(x - dr, y - dr, x + dr, y + dr, types);
 	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 		Object * object = *it;
 		Player * player = static_cast<Player *>(object);

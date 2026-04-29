@@ -1,4 +1,5 @@
 #include "grenade.h"
+#include "gasloader.h"
 #include "player.h"
 #include "plasmaprojectile.h"
 #include "flareprojectile.h"
@@ -76,7 +77,7 @@ void Grenade::Tick(World & world){
 				}
 			}
 		}
-		if(state_i == 30){
+		if(state_i == (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->explosionTick : 30)){
 			// initial explosion
 			draw = false;
 			switch(type){
@@ -156,7 +157,7 @@ void Grenade::Tick(World & world){
 				}break;
 			}
 		}else
-		if(state_i == 33){
+		if(state_i == (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->secondaryTick : 33)){
 			// secondary explosion
 			switch(type){
 				case SHAPED:{
@@ -195,14 +196,14 @@ void Grenade::Tick(World & world){
 				}break;
 			}
 		}else
-		if(state_i == 40 && type != NEUTRON && type != FLARE && type != POISONFLARE){
+		if(state_i == (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->destroyTick : 40) && type != NEUTRON && type != FLARE && type != POISONFLARE){
 			world.MarkDestroyObject(id);
 		}else
-		if(state_i == 120 && type == NEUTRON){
+		if(state_i == (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->neutronDestroyTick : 120) && type == NEUTRON){
 			world.MarkDestroyObject(id);
 			NeutronBlast(world, y, ownerid);
 		}else
-		if(state_i == 30 + 168){ // flares last 7 seconds
+		if(state_i == (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->flareDuration : 198)){
 			world.MarkDestroyObject(id);
 		}
 	}
@@ -219,7 +220,7 @@ bool Grenade::WasThrown(void){
 bool Grenade::UpdatePosition(World & world, Player & player){
 	if(state_i <= 0){
 		if(state_i == 0){
-			xv = 20;
+			xv = (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->throwSpeedStanding : 20);
 			mirrored = player.mirrored;
 			if(player.input.keymoveleft){
 				mirrored = true;
@@ -230,9 +231,9 @@ bool Grenade::UpdatePosition(World & world, Player & player){
 			x = player.x + (5 * (mirrored ? -1 : 1));
 			y = player.y - 70;
 			if(player.input.keymoveleft || player.input.keymoveright){
-				xv = 30;
+				xv = (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->throwSpeedMoving : 30);
 				if(player.state == Player::RUNNING){
-					xv = 26 + abs(player.xv);
+					xv = (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->throwSpeedRunning : 26) + abs(player.xv);
 				}
 			}
 			if(player.input.keymovedown){

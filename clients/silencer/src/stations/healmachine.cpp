@@ -1,4 +1,5 @@
 #include "healmachine.h"
+#include "gasloader.h"
 
 HealMachine::HealMachine() : Object(ObjectTypes::HEALMACHINE){
 	res_bank = 172;
@@ -33,7 +34,8 @@ void HealMachine::Tick(World & world){
 
 bool HealMachine::Activate(void){
 	if(cooldown == 0){
-		cooldown = 240;
+		const GameObjectDef* def = GASLoader::Get().GetGameObjectDef("healMachine");
+		cooldown = def ? def->cooldownTicks : 240;
 		state_i = 1;
 		return true;
 	}
