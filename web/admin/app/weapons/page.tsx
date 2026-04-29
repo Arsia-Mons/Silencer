@@ -10,17 +10,14 @@ import { useWsConnected } from '../../lib/socket';
 interface WeaponDef {
   id: string;
   projectileType?: string;
-  // Numeric ballistics (owned by GAS editor — read-only here)
   healthDamage?: number;
   shieldDamage?: number;
   fireDelay?: number;
   velocity?: number;
   moveAmount?: number;
   radius?: number;
-  // Sprite banks (8-directional: up, upR, right, downR, down, downL, left, upL)
   spriteBanks?: number[];
   hitOverlayBank?: number;
-  // Sounds
   soundFire?: string;
   soundHit1?: string;
   soundHit2?: string;
@@ -28,10 +25,8 @@ interface WeaponDef {
   soundExplosion?: string;
   soundLand?: string;
   soundThrow?: string;
-  // Ammo
   ammoCapacity?: number;
   reloadTicks?: number;
-  // Allow additional numeric fields from GAS
   [key: string]: unknown;
 }
 
@@ -45,8 +40,8 @@ interface AgencyDef {
 interface FolderState {
   weapons: WeaponDef[];
   agencies: AgencyDef[];
-  weaponsFile: FileSystemFileHandle | null;
-  agenciesFile: FileSystemFileHandle | null;
+  rawWeapons: Record<string, unknown>;
+  rawAgencies: Record<string, unknown>;
   folderName: string;
 }
 
@@ -73,71 +68,67 @@ const NUMERIC_BALLISTICS: { key: string; label: string }[] = [
   { key: 'reloadTicks',    label: 'Reload Ticks' },
 ];
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
-async function readJson(handle: FileSystemFileHandle): Promise<unknown> {
-  const file = await handle.getFile();
-  return JSON.parse(await file.text());
-}
-
-async function writeJson(handle: FileSystemFileHandle, data: unknown): Promise<void> {
-  const writable = await handle.createWritable();
-  await writable.write(JSON.stringify(data, null, 2));
-  await writable.close();
-}
-
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function WeaponsPage() {
   useAuth();
   const wsConnected = useWsConnected();
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const [folder, setFolder] = useState<FolderState | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // ── Open folder ─────────────────────────────────────────────────────────
-  const openFolder = useCallback(async () => {
-    try {
-      const dirHandle = await (window as unknown as { showDirectoryPicker(): Promise<FileSystemDirectoryHandle> }).showDirectoryPicker();
-      let weaponsFile: FileSystemFileHandle | null = null;
-      let agenciesFile: FileSystemFileHandle | null = null;
-      for await (const [name, handle] of (dirHandle as unknown as AsyncIterable<[string, FileSystemHandle]>)) {
-        if (name === 'weapons.json') weaponsFile = handle as FileSystemFileHandle;
-        if (name === 'agencies.json') agenciesFile = handle as FileSystemFileHandle;
+  // ── Open folder (webkitdirectory) ────────────────────────────────────────
+  async function handleFolderPicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    e.target.value = '';
+
+    let weaponsText: string | null = null;
+    let agenciesText: string | null = null;
+    let folderName = '';
+
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      // The path is like "gas/weapons.json" — grab folder from first file
+      if (!folderName && f.webkitRelativePath) {
+        folderName = f.webkitRelativePath.split('/')[0];
       }
-      if (!weaponsFile) { setError('weapons.json not found in selected folder.'); return; }
-      if (!agenciesFile) { setError('agencies.json not found in selected folder.'); return; }
-      const [wData, aData] = await Promise.all([readJson(weaponsFile), readJson(agenciesFile)]);
-      const weapons = ((wData as Record<string, unknown>).weapons as WeaponDef[]) ?? [];
-      const agencies = ((aData as Record<string, unknown>).agencies as AgencyDef[]) ?? [];
-      setFolder({ weapons, agencies, weaponsFile, agenciesFile, folderName: dirHandle.name });
+      const name = f.name;
+      if (name === 'weapons.json')  weaponsText  = await f.text();
+      if (name === 'agencies.json') agenciesText = await f.text();
+    }
+
+    if (!weaponsText)  { setError('weapons.json not found in selected folder.'); return; }
+    if (!agenciesText) { setError('agencies.json not found in selected folder.'); return; }
+
+    try {
+      const wData = JSON.parse(weaponsText) as Record<string, unknown>;
+      const aData = JSON.parse(agenciesText) as Record<string, unknown>;
+      const weapons = (wData.weapons as WeaponDef[]) ?? [];
+      const agencies = (aData.agencies as AgencyDef[]) ?? [];
+      setFolder({ weapons, agencies, rawWeapons: wData, rawAgencies: aData, folderName: folderName || 'gas' });
       setSelectedId(weapons[0]?.id ?? null);
       setDirty(false);
       setError('');
-    } catch (e) {
-      if ((e as Error).name !== 'AbortError') setError(String(e));
+    } catch (err) {
+      setError(String(err));
     }
-  }, []);
+  }
 
-  // ── Close folder ────────────────────────────────────────────────────────
   function closeFolder() {
     setFolder(null);
     setSelectedId(null);
     setDirty(false);
   }
 
-  // ── Patch weapon field ───────────────────────────────────────────────────
+  // ── Patch weapon ─────────────────────────────────────────────────────────
   function patchWeapon(id: string, patch: Partial<WeaponDef>) {
-    setFolder(f => {
-      if (!f) return f;
-      return { ...f, weapons: f.weapons.map(w => w.id === id ? { ...w, ...patch } : w) };
-    });
+    setFolder(f => f ? { ...f, weapons: f.weapons.map(w => w.id === id ? { ...w, ...patch } : w) } : f);
     setDirty(true);
   }
 
-  // ── Patch sprite bank at direction index ─────────────────────────────────
   function patchSpriteBank(id: string, dirIdx: number, value: number) {
     setFolder(f => {
       if (!f) return f;
@@ -145,7 +136,7 @@ export default function WeaponsPage() {
         ...f,
         weapons: f.weapons.map(w => {
           if (w.id !== id) return w;
-          const banks = [...(w.spriteBanks ?? [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])];
+          const banks = [...(w.spriteBanks ?? Array(8).fill(0xFF))];
           while (banks.length < 8) banks.push(0xFF);
           banks[dirIdx] = value;
           return { ...w, spriteBanks: banks };
@@ -155,7 +146,6 @@ export default function WeaponsPage() {
     setDirty(true);
   }
 
-  // ── Toggle agency weapon ─────────────────────────────────────────────────
   function toggleAgencyWeapon(agencyId: number, weaponId: string) {
     setFolder(f => {
       if (!f) return f;
@@ -164,38 +154,27 @@ export default function WeaponsPage() {
         agencies: f.agencies.map(a => {
           if (a.id !== agencyId) return a;
           const has = (a.weapons ?? []).includes(weaponId);
-          const weapons = has
-            ? (a.weapons ?? []).filter(w => w !== weaponId)
-            : [...(a.weapons ?? []), weaponId];
-          return { ...a, weapons };
+          return { ...a, weapons: has ? (a.weapons ?? []).filter(w => w !== weaponId) : [...(a.weapons ?? []), weaponId] };
         }),
       };
     });
     setDirty(true);
   }
 
-  // ── Save ─────────────────────────────────────────────────────────────────
-  async function handleSave() {
+  // ── Download modified JSONs ───────────────────────────────────────────────
+  function downloadJson(filename: string, data: unknown) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleSave() {
     if (!folder) return;
-    setSaving(true);
-    try {
-      // Reconstruct full JSON preserving top-level structure
-      const [wRaw, aRaw] = await Promise.all([
-        readJson(folder.weaponsFile!),
-        readJson(folder.agenciesFile!),
-      ]);
-      const wOut = { ...(wRaw as Record<string, unknown>), weapons: folder.weapons };
-      const aOut = { ...(aRaw as Record<string, unknown>), agencies: folder.agencies };
-      await Promise.all([
-        writeJson(folder.weaponsFile!, wOut),
-        writeJson(folder.agenciesFile!, aOut),
-      ]);
-      setDirty(false);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setSaving(false);
-    }
+    downloadJson('weapons.json',  { ...folder.rawWeapons,  weapons:  folder.weapons });
+    downloadJson('agencies.json', { ...folder.rawAgencies, agencies: folder.agencies });
+    setDirty(false);
   }
 
   const currentWeapon = folder?.weapons.find(w => w.id === selectedId) ?? null;
@@ -205,13 +184,22 @@ export default function WeaponsPage() {
     return (
       <div className="flex h-screen overflow-hidden bg-[#080f08] text-[#d1fad7]">
         <Sidebar wsConnected={wsConnected} />
+        <input
+          ref={folderInputRef}
+          type="file"
+          // @ts-expect-error non-standard attribute
+          webkitdirectory=""
+          multiple
+          className="hidden"
+          onChange={handleFolderPicked}
+        />
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center gap-6 text-center max-w-sm">
             <div className="text-5xl">⚔</div>
             <div className="text-xl font-mono tracking-widest text-[#00a328]">WEAPON TOOL</div>
             <div className="text-xs text-[#4a7a4a] font-mono leading-relaxed">
-              Visual weapon authoring tool. Open your <code className="text-[#7aaa7a]">shared/assets/gas/</code> folder
-              to manage sprite bank assignments, sounds, and agency loadouts.
+              Open your <code className="text-[#7aaa7a]">shared/assets/gas/</code> folder to manage
+              sprite bank assignments, sounds, and agency loadouts.
             </div>
             <ul className="text-[10px] text-[#4a7a4a] font-mono text-left space-y-1">
               <li>◆ Sprite bank pickers (8-directional)</li>
@@ -220,8 +208,9 @@ export default function WeaponsPage() {
               <li>◆ Numeric stats (read-only — edit in GAS)</li>
               <li>◆ Ballistics trajectory preview</li>
             </ul>
+            {error && <p className="text-xs text-red-400 font-mono">{error}</p>}
             <button
-              onClick={openFolder}
+              onClick={() => folderInputRef.current?.click()}
               className="px-8 py-3 border border-[#00a328] text-[#00a328] font-mono text-sm tracking-widest hover:bg-[#00a328]/10 transition-colors"
             >
               [ OPEN FOLDER ]
@@ -236,24 +225,34 @@ export default function WeaponsPage() {
   return (
     <div className="flex h-screen overflow-hidden bg-[#080f08] text-[#d1fad7]">
       <Sidebar wsConnected={wsConnected} />
+      <input
+        ref={folderInputRef}
+        type="file"
+        // @ts-expect-error non-standard attribute
+        webkitdirectory=""
+        multiple
+        className="hidden"
+        onChange={handleFolderPicked}
+      />
 
-      {/* Header */}
       <div className="flex flex-col flex-1 min-w-0">
+        {/* Header */}
         <div className="flex items-center gap-3 px-4 py-2 border-b border-[#1a2e1a] shrink-0">
           <span className="text-xs font-mono text-[#00a328] tracking-widest">⚔ WEAPON TOOL</span>
           <span className="text-xs font-mono text-[#4a7a4a]">[ {folder.folderName} ]</span>
           <div className="flex-1" />
           {error && <span className="text-xs text-red-400 font-mono">{error}</span>}
           {dirty && (
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-3 py-1 text-xs font-mono border border-[#00a328] text-[#00a328] hover:bg-[#00a328]/10 disabled:opacity-50 transition-colors"
-            >
-              {saving ? 'SAVING…' : '↓ SAVE'}
-            </button>
+            <>
+              <span className="text-[10px] font-mono text-[#f59e0b]">● unsaved</span>
+              <button
+                onClick={handleSave}
+                className="px-3 py-1 text-xs font-mono border border-[#00a328] text-[#00a328] hover:bg-[#00a328]/10 transition-colors"
+              >
+                ↓ DOWNLOAD JSON
+              </button>
+            </>
           )}
-          {dirty && <span className="text-[10px] font-mono text-[#f59e0b]">● unsaved</span>}
           <button
             onClick={closeFolder}
             className="px-2 py-1 text-xs font-mono text-[#4a7a4a] hover:text-red-400 border border-[#1a2e1a] hover:border-red-400 transition-colors"
@@ -263,7 +262,7 @@ export default function WeaponsPage() {
         </div>
 
         <div className="flex flex-1 min-h-0">
-          {/* Left: weapon list */}
+          {/* Weapon list */}
           <div className="flex flex-col border-r border-[#1a2e1a]" style={{ width: 180, minWidth: 180 }}>
             <div className="px-3 py-2 border-b border-[#1a2e1a]">
               <span className="text-[10px] font-mono text-[#4a7a4a]">WEAPONS</span>
@@ -288,7 +287,7 @@ export default function WeaponsPage() {
             </div>
           </div>
 
-          {/* Center + Right: weapon detail */}
+          {/* Weapon detail */}
           {currentWeapon ? (
             <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-6">
               <div className="flex items-center gap-3">
@@ -301,14 +300,11 @@ export default function WeaponsPage() {
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-                {/* Numeric ballistics (read-only) */}
+                {/* Ballistics (read-only) */}
                 <section className="border border-[#1a2e1a] rounded p-4 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">BALLISTICS</span>
-                    <Link
-                      href="/gas?tab=weapons"
-                      className="text-[9px] font-mono text-[#4a7a4a] hover:text-[#00a328] transition-colors"
-                    >
+                    <Link href="/gas?tab=weapons" className="text-[9px] font-mono text-[#4a7a4a] hover:text-[#00a328] transition-colors">
                       EDIT IN GAS →
                     </Link>
                   </div>
@@ -326,26 +322,20 @@ export default function WeaponsPage() {
                 <section className="border border-[#1a2e1a] rounded p-4 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">SPRITE BANKS</span>
-                    <Link
-                      href="/sprites"
-                      className="text-[9px] font-mono text-[#4a7a4a] hover:text-[#00a328] transition-colors"
-                    >
+                    <Link href="/sprites" className="text-[9px] font-mono text-[#4a7a4a] hover:text-[#00a328] transition-colors">
                       BROWSE →
                     </Link>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     {DIRECTIONS.map((dir, i) => {
-                      const banks = currentWeapon.spriteBanks ?? [];
-                      const val = banks[i] ?? 0xFF;
+                      const val = (currentWeapon.spriteBanks ?? [])[i] ?? 0xFF;
                       return (
                         <div key={dir} className="flex items-center gap-2">
                           <span className="text-[9px] font-mono text-[#4a7a4a] w-8">{dir}</span>
                           <input
-                            type="number"
-                            min={0}
-                            max={255}
+                            type="number" min={0} max={255}
                             value={val === 0xFF ? '' : val}
-                            placeholder="0xFF"
+                            placeholder="—"
                             onChange={e => {
                               const n = e.target.value === '' ? 0xFF : parseInt(e.target.value, 10);
                               patchSpriteBank(currentWeapon.id, i, isNaN(n) ? 0xFF : n);
@@ -359,9 +349,7 @@ export default function WeaponsPage() {
                   <div className="flex items-center gap-2 border-t border-[#1a2e1a] pt-3">
                     <span className="text-[9px] font-mono text-[#4a7a4a] w-20">hit overlay</span>
                     <input
-                      type="number"
-                      min={-1}
-                      max={255}
+                      type="number" min={-1} max={255}
                       value={currentWeapon.hitOverlayBank ?? -1}
                       onChange={e => patchWeapon(currentWeapon.id, { hitOverlayBank: parseInt(e.target.value, 10) || -1 })}
                       className="w-full bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded focus:border-[#00a328] outline-none"
@@ -373,10 +361,7 @@ export default function WeaponsPage() {
                 <section className="border border-[#1a2e1a] rounded p-4 flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">SOUNDS</span>
-                    <Link
-                      href="/sound-studio"
-                      className="text-[9px] font-mono text-[#4a7a4a] hover:text-[#00a328] transition-colors"
-                    >
+                    <Link href="/sound-studio" className="text-[9px] font-mono text-[#4a7a4a] hover:text-[#00a328] transition-colors">
                       BROWSE →
                     </Link>
                   </div>
@@ -394,21 +379,22 @@ export default function WeaponsPage() {
                   ))}
                 </section>
 
-                {/* Agency loadouts */}
+                {/* Agency loadout */}
                 <section className="border border-[#1a2e1a] rounded p-4 flex flex-col gap-3">
                   <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">AGENCY LOADOUT</span>
                   <p className="text-[9px] text-[#4a7a4a] font-mono">Which agencies can equip this weapon.</p>
                   {folder.agencies.map(agency => {
                     const has = (agency.weapons ?? []).includes(currentWeapon.id);
                     return (
-                      <label key={agency.id} className="flex items-center gap-3 cursor-pointer group">
-                        <div
-                          onClick={() => toggleAgencyWeapon(agency.id, currentWeapon.id)}
-                          className={`w-3 h-3 border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
-                            has ? 'border-[#00a328] bg-[#00a328]' : 'border-[#1a2e1a] group-hover:border-[#4a7a4a]'
-                          }`}
-                        >
-                          {has && <span className="text-[8px] text-black">✓</span>}
+                      <label
+                        key={agency.id}
+                        onClick={() => toggleAgencyWeapon(agency.id, currentWeapon.id)}
+                        className="flex items-center gap-3 cursor-pointer group"
+                      >
+                        <div className={`w-3 h-3 border flex items-center justify-center shrink-0 transition-colors ${
+                          has ? 'border-[#00a328] bg-[#00a328]' : 'border-[#1a2e1a] group-hover:border-[#4a7a4a]'
+                        }`}>
+                          {has && <span className="text-[8px] text-black leading-none">✓</span>}
                         </div>
                         <span className="text-xs font-mono text-[#7aaa7a] group-hover:text-[#d1fad7] transition-colors">
                           {agency.name ?? `Agency ${agency.id}`}
@@ -418,7 +404,7 @@ export default function WeaponsPage() {
                   })}
                 </section>
 
-                {/* Ballistics preview — placeholder for Phase 6 */}
+                {/* Ballistics preview */}
                 <section className="border border-[#1a2e1a] rounded p-4 flex flex-col gap-3 lg:col-span-2">
                   <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">BALLISTICS PREVIEW</span>
                   <BallisticsPreview weapon={currentWeapon} />
@@ -436,7 +422,7 @@ export default function WeaponsPage() {
   );
 }
 
-// ── Ballistics preview canvas ────────────────────────────────────────────────
+// ── Ballistics preview ───────────────────────────────────────────────────────
 
 function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -457,69 +443,62 @@ function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
     ctx.fillStyle = '#080f08';
     ctx.fillRect(0, 0, W, H);
 
-    // Ground line
     ctx.strokeStyle = '#1a2e1a';
     ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(0, H - 20); ctx.lineTo(W, H - 20); ctx.stroke();
 
-    if (velocity === 0 && type !== 'grenade') {
+    if (velocity === 0 && type !== 'grenade' && type !== 'arcing') {
       ctx.fillStyle = '#2a4a2a';
       ctx.font = '10px monospace';
-      ctx.fillText('no velocity — melee / instant', 10, H / 2);
+      ctx.fillText('no velocity — melee / instant / contact', 10, H / 2);
       return;
     }
 
-    // Simulate trajectory
     const scale = 1.5;
-    let x = 20, y = H - 20, xv = velocity * scale, yv = 0;
+    let x = 20, y = H - 20;
+    let xv = velocity * scale;
+    let yv = 0;
     const path: [number, number][] = [[x, y]];
 
     if (type === 'grenade' || type === 'arcing') {
       yv = -8 * scale;
-      xv = (weapon.throwSpeedStanding as number ?? velocity ?? 20) * scale * 0.5;
+      xv = ((weapon as Record<string, unknown>).throwSpeedStanding as number ?? velocity ?? 20) * scale * 0.5;
     }
 
-    const maxSteps = 600;
-    for (let step = 0; step < maxSteps; step++) {
+    for (let step = 0; step < 600; step++) {
       for (let m = 0; m < Math.max(1, moveAmount); m++) {
         x += xv / Math.max(1, moveAmount);
         y += yv / Math.max(1, moveAmount);
       }
       if (gravity) yv += gravity * 0.3;
-      if (y >= H - 20 && (type === 'grenade' || type === 'arcing')) break;
       if (y >= H - 20) break;
       if (x > W) break;
       path.push([x, y]);
     }
 
-    // Draw path
     ctx.strokeStyle = '#00a32888';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     path.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py));
     ctx.stroke();
 
-    // Draw impact point
     const [ix, iy] = path[path.length - 1];
     ctx.fillStyle = '#00a328';
     ctx.beginPath(); ctx.arc(ix, iy, 3, 0, Math.PI * 2); ctx.fill();
 
-    // Draw splash radius
     if (radius > 0) {
       ctx.strokeStyle = '#f59e0b44';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(ix, iy, radius * scale * 0.5, 0, Math.PI * 2); ctx.stroke();
       ctx.fillStyle = '#f59e0b22';
-      ctx.beginPath(); ctx.arc(ix, iy, radius * scale * 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(ix, iy, radius * scale * 0.5, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
     }
 
-    // Labels
     ctx.fillStyle = '#4a7a4a';
     ctx.font = '9px monospace';
-    ctx.fillText(`v=${velocity} mv=${moveAmount}${gravity ? ` g=${gravity}` : ''}${radius ? ` r=${radius}px` : ''}`, 6, 12);
+    ctx.fillText(`v=${velocity} steps=${moveAmount}${gravity ? ` g=${gravity}` : ''}${radius ? ` r=${radius}px` : ''}`, 6, 12);
   }, [weapon]);
 
-  // Draw whenever weapon changes
   useEffect(() => { simulate(); }, [simulate]);
 
   return (
@@ -528,18 +507,15 @@ function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
         ref={canvasRef}
         width={560}
         height={160}
-        className="w-full border border-[#1a2e1a] rounded bg-[#080f08]"
+        className="w-full border border-[#1a2e1a] rounded"
         style={{ imageRendering: 'pixelated' }}
       />
-      <div className="flex gap-2">
-        <button
-          onClick={simulate}
-          className="px-3 py-1 text-[10px] font-mono border border-[#1a2e1a] text-[#4a7a4a] hover:border-[#00a328] hover:text-[#00a328] transition-colors"
-        >
-          ▶ REDRAW
-        </button>
-        <span className="text-[9px] font-mono text-[#2a4a2a] self-center">tick-accurate simulation</span>
-      </div>
+      <button
+        onClick={simulate}
+        className="self-start px-3 py-1 text-[10px] font-mono border border-[#1a2e1a] text-[#4a7a4a] hover:border-[#00a328] hover:text-[#00a328] transition-colors"
+      >
+        ▶ REDRAW
+      </button>
     </div>
   );
 }
