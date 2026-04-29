@@ -7,7 +7,8 @@
   "types": "./index.ts",
   "exports": {
     ".":         { "types": "./index.ts", "default": "./index.ts" },
-    "./schemas": { "types": "./schemas.ts", "default": "./schemas.ts" }
+    "./schemas": { "types": "./schemas.ts", "default": "./schemas.ts" },
+    "./node":    { "types": "./validate-fs.ts", "default": "./validate-fs.ts" }
   },
   "scripts": {
     "fmt":       "oxfmt --write .",

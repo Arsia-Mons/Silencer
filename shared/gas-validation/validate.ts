@@ -1,6 +1,8 @@
-// Validation entry points. `validateAll()` operates on already-parsed
-// JSON (used by the admin web UI, in-browser); `validateDirectory()`
-// reads from disk via fs/promises (used by the silencer-cli).
+// Pure schema validation entry point — safe to import from any
+// runtime, including browser bundles. The fs-backed
+// `validateDirectory()` lives in `./validate-fs.ts` (exported as
+// `@silencer/gas-validation/node`) so webpack/Next don't try to
+// resolve `node:fs/promises` for the admin client bundle.
 
 import Ajv, { type ErrorObject } from "ajv";
 import { GAS_SCHEMAS } from "./schemas";
@@ -87,49 +89,5 @@ export function validateAll(
   errors.push(
     ...checkReferences(files as Record<string, Record<string, unknown>>),
   );
-  return { ok: errors.length === 0, errors };
-}
-
-// Disk-backed entry point. Reads each known GAS file from `dir`,
-// parses it, and routes failures into the same GASError pipeline.
-// Missing files surface as OPEN_FAILED; bad JSON as PARSE_ERROR.
-export async function validateDirectory(
-  dir: string,
-): Promise<ValidationResult> {
-  const { readFile } = await import("node:fs/promises");
-  const path        = await import("node:path");
-
-  const errors: GASError[] = [];
-  const parsed: Record<string, unknown> = {};
-
-  for (const file of GAS_FILES) {
-    const fp = path.join(dir, file);
-    let raw: string;
-    try {
-      raw = await readFile(fp, "utf8");
-    } catch (e) {
-      errors.push({
-        file,
-        instancePath: "",
-        code: "OPEN_FAILED",
-        message: e instanceof Error ? e.message : String(e),
-      });
-      continue;
-    }
-    try {
-      parsed[file] = JSON.parse(raw);
-    } catch (e) {
-      errors.push({
-        file,
-        instancePath: "",
-        code: "PARSE_ERROR",
-        message: e instanceof Error ? e.message : String(e),
-      });
-      continue;
-    }
-  }
-
-  const structural = validateAll(parsed);
-  errors.push(...structural.errors);
   return { ok: errors.length === 0, errors };
 }

@@ -64,7 +64,7 @@ const LOCAL_OPS: Record<string, Record<string, LocalHandler>> = {
     validate: async (args) => {
       const dir = (args["dir"] as string | undefined) ?? (args["_positional"] as string | undefined);
       if (!dir) throw new Error("gas validate requires a directory: silencer-cli gas validate <dir>");
-      const { validateDirectory } = await import("@silencer/gas-validation");
+      const { validateDirectory } = await import("@silencer/gas-validation/node");
       const res = await validateDirectory(dir);
       return { clean: res.ok, result: res };
     },

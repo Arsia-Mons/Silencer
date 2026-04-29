@@ -10,12 +10,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // fallbacks (production: empty → relative URLs; dev: docker-compose build
 // args supply the values).
 //
-// outputFileTracingRoot pins the trace root at the monorepo root so the
-// standalone output picks up `@silencer/gas-validation` and any other
-// workspace dependencies hoisted into `<root>/node_modules/`.
+// experimental.outputFileTracingRoot pins the trace root at the monorepo
+// root so the standalone output picks up `@silencer/gas-validation` and
+// any other workspace dependencies hoisted into `<root>/node_modules/`.
+// (Promoted to top-level in Next 15+; we're on 14.2 so it lives under
+// experimental — top-level emits an "Unrecognized key" warning and is
+// silently ignored.)
 const nextConfig = {
   output: 'standalone',
-  outputFileTracingRoot: path.join(__dirname, '../../'),
+  experimental: {
+    outputFileTracingRoot: path.join(__dirname, '../../'),
+  },
 };
 
 export default nextConfig;
