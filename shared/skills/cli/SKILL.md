@@ -76,7 +76,7 @@ The first positional after the noun is the subop; flags follow as usual.
 | Op | Flags / positional | Result | Daemon? |
 |----|-------------------|--------|---------|
 | `gas validate <dir>` | `--dir PATH` (or trailing positional) | `{ok, errors:[{file,instancePath,code,message}]}`. Exit 1 if `errors[]` non-empty. | **no** — runs in-process via `validateDirectory`; never opens the control socket |
-| `gas reload` | — | `{loaded, errors:[…]}` — re-runs the C++ GAS loader against the daemon's gas dir | yes |
+| `gas reload` | — | `{counts:{agencies,weapons,items,enemies,abilities,gameObjects,terminals}, errors:[…]}` — re-runs the C++ GAS loader against the daemon's gas dir | yes |
 | `keybind list` | — | `{profiles:[…], current}` | yes |
 | `keybind actions` | — | `{actions:[…]}` — every bindable action id | yes |
 | `keybind get` | `[--profile N] [--action A]` | `{bindings:{action:[…]}}` — defaults to current profile / all actions | yes |

@@ -379,6 +379,11 @@ bool GASLoader::Load(const std::string& gasDir) {
 }
 
 void GASLoader::Reload(const std::string& gasDir) {
+    // Reset to compiled-in defaults before reloading so a key removed
+    // from a JSON file reverts to its struct default rather than
+    // sticking at the previously-loaded value. Vectors clear; the
+    // single PlayerDef gets a default-constructed reset.
+    player = PlayerDef{};
     agencies.clear();
     weapons.clear();
     items.clear();
