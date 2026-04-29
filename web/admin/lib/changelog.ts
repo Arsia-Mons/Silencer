@@ -17,29 +17,45 @@ export const CHANGELOG: ChangelogRelease[] = [
   {
     version: 'v00041',
     date: '2026-04-28',
-    title: 'GAS Editor, Map Upload & Vendored JSON',
+    title: 'GAS — Data-Driven Gameplay, Map Upload & GAS Editor',
     entries: [
-      {
-        category: 'DASHBOARD',
-        changes: [
-          'GAS editor: URL-linked tabs — each file tab updates ?tab= so tabs are bookmarkable and survive page refresh',
-          'GAS editor: baseline validation — saving blocked if any field present at folder-open time is missing, including fields inside array entries matched by id (weapons, enemies, items, etc.)',
-          'GAS editor: VS Code-style Problems panel inline below the tab bar — lists every violation with full field path, scrollable, clicking a file header jumps to that tab',
-          'GAS editor: ↩ RE-ADD button per violation restores the missing field from the baseline in one click',
-          'GAS editor: ↩ RE-ADD ALL (N) per file in the Problems panel restores all missing fields for that file atomically',
-        ],
-      },
       {
         category: 'CLIENT',
         changes: [
-          'Community map upload — client uploads the current map to the server before creating a game so other players can download it; URL read from mapapiurl config key',
+          'GAS (Gameplay Ability System) — all gameplay values migrated from hardcoded C++ constants to JSON data files loaded at startup from shared/assets/gas/',
+          'GAS player.json — player movement speeds (run, disguised, secret, jetpack), jump impulse, ladder impulse, health/shield/poison caps, upgrade multipliers, all wired via PlayerDef',
+          'GAS weapons.json — every weapon\'s ammo count, fire rate, damage, throw speeds, explosion ticks, splash radius, all wired via WeaponDef (blaster, flamer, flare, laser, plasma, rocket, wall, grenade)',
+          'GAS enemies.json — guard, robot, civilian patrol speeds, target heights, ladder thresholds, patrol proximity, all wired via EnemyDef',
+          'GAS items.json — pickup heal amounts, shield amounts, jetpack fuel, wired via ItemDef',
+          'GAS gameobjects.json — fixed cannon, wall defense, detonator, heal machine parameters wired via GameObjectDef',
+          'Community map upload — client auto-uploads the current local .sil map to the lobby server before creating a game; shows "Uploading map…" modal and proceeds to CreateGame on success',
+          'Map upload URL read from mapapiurl config key (set to https://admin.arsiamons.com)',
+        ],
+      },
+      {
+        category: 'SERVER',
+        changes: [
+          'Map symlinks — lobby server creates name-based symlinks in the dedicated server level directory at startup and on every upload so the dedicated server finds maps by filename without a restart',
+          'Atomic symlink replace — tmp + rename so in-flight reads never see a broken link',
+        ],
+      },
+      {
+        category: 'DASHBOARD',
+        changes: [
+          'GAS editor (/gas): URL-linked tabs — each file tab updates ?tab= so tabs are bookmarkable and survive page refresh',
+          'GAS editor: baseline validation — saving blocked if any field present at folder-open time is missing, including fields inside array entries matched by id (weapons, enemies, items, game objects)',
+          'GAS editor: deep validation walks entire JSON tree recursively — catches removed fields at any nesting depth',
+          'GAS editor: VS Code-style Problems panel inline below the tab bar — lists every violation with full field path, scrollable, clicking a file header jumps to that tab',
+          'GAS editor: VALIDATE ALL button opens/closes the Problems panel and turns red when any file has violations',
+          'GAS editor: ↩ RE-ADD button per violation — restores the missing field from the baseline in one click without touching other fields',
+          'GAS editor: ↩ RE-ADD ALL (N) per file — restores all missing fields for that file in one atomic update',
+          'Designer: maps panel auto-refreshes every 4s while open so uploaded maps appear without a manual reload',
         ],
       },
       {
         category: 'INFRASTRUCTURE',
         changes: [
-          'nlohmann/json vendored — json.hpp (v3.12.0) checked in to clients/silencer/third_party/nlohmann/ to eliminate flaky CMake FetchContent download in CI',
-          'Map symlinks — lobby server maintains a maps/ symlink directory so the dedicated server can read uploaded maps without a restart',
+          'nlohmann/json vendored — json.hpp v3.12.0 checked in to clients/silencer/third_party/nlohmann/ — eliminates flaky CMake FetchContent download step in CI',
         ],
       },
     ],
