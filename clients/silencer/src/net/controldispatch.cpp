@@ -9,6 +9,8 @@
 #include "objecttypes.h"
 #include "keybinds.h"
 #include "config.h"
+#include "gasloader.h"
+#include "os.h"
 #include <cstring>
 #include <cstdio>
 #include <fstream>
@@ -59,6 +61,7 @@ static ControlReply Err(int id, const char* code, const std::string& msg){
 // this file. Lives in the same TU because it only ever reads/mutates Game's
 // KeyMap and Config; no other consumers.
 static void HandleKeybind(Game& game, ControlCommand& cmd);
+static void HandleGas(Game& game, ControlCommand& cmd);
 
 void HandleImmediate(Game& game, ControlCommand& cmd) {
 	if(cmd.op == "ping"){
@@ -272,6 +275,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	}
 	if(cmd.op == "keybind"){
 		HandleKeybind(game, cmd);
+		return;
+	}
+	if(cmd.op == "gas"){
+		HandleGas(game, cmd);
 		return;
 	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));
@@ -767,6 +774,72 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 	}
 
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown keybind subop: " + subop));
+}
+
+// ---------------------------------------------------------------------------
+// gas sub-dispatch
+//
+// `reload` is the only subop. It re-runs GASLoader::Load() against the
+// shipped gas dir. State-gated: actor cache invalidation isn't worth the
+// risk mid-match (per-instance state in robot.cpp/guard.cpp/civilian.cpp
+// caches values from the def at construction), so reload only fires from
+// non-INGAME states. Errors round-trip in the same {file, instancePath,
+// code, message} shape as shared/gas-validation/errors.ts so the agent's
+// remediation loop is platform-agnostic.
+// ---------------------------------------------------------------------------
+
+static void HandleGas(Game& game, ControlCommand& cmd) {
+	const std::string subop = cmd.args.value("subop", std::string());
+	if (subop.empty()) {
+		cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "gas requires args.subop"));
+		return;
+	}
+
+	if (subop == "reload") {
+		// Hot-reload is unsafe mid-match: actors cached EnemyDef values at
+		// construction. Restrict to quiescent states. Game's state enum is
+		// private to the class, so compare via the StateName string keys
+		// (same approach as wait_for_state).
+		const std::string st = Game::StateName(game.GetState());
+		const bool safe = (st == "NONE" || st == "MAINMENU" ||
+		                   st == "LOBBY" || st == "MISSIONSUMMARY");
+		if (!safe) {
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"gas reload not safe from state " + st +
+				" (allowed: NONE, MAINMENU, LOBBY, MISSIONSUMMARY)"));
+			return;
+		}
+
+		GASLoader& gas = GASLoader::Get();
+		gas.Reload(GetResDir() + "gas");
+
+		nlohmann::json errs = nlohmann::json::array();
+		for (const auto& e : gas.lastLoadErrors) {
+			errs.push_back({
+				{"file",         e.file},
+				{"instancePath", e.instancePath},
+				{"code",         e.code},
+				{"message",      e.message},
+			});
+		}
+
+		nlohmann::json counts;
+		counts["agencies"]    = gas.agencies.size();
+		counts["weapons"]     = gas.weapons.size();
+		counts["items"]       = gas.items.size();
+		counts["enemies"]     = gas.enemies.size();
+		counts["abilities"]   = gas.abilities.size();
+		counts["gameObjects"] = gas.gameObjects.size();
+		counts["terminals"]   = gas.terminals.size();
+
+		nlohmann::json r;
+		r["counts"] = counts;
+		r["errors"] = errs;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+
+	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown gas subop: " + subop));
 }
 
 } // namespace ControlDispatch

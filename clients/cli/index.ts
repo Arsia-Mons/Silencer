@@ -39,6 +39,8 @@ function usage(): never {
       `       silencer-cli keybind delete <profile>\n` +
       `       silencer-cli gas validate <dir>\n` +
       `         (runs locally; no daemon required. Exit 1 if errors[] non-empty.)\n` +
+      `       silencer-cli gas reload\n` +
+      `         (re-runs the daemon's GAS loader; only safe from NONE/MAINMENU/LOBBY/MISSIONSUMMARY)\n` +
       `\n` +
       `Env: SILENCER_CONTROL_HOST (default 127.0.0.1)\n` +
       `     SILENCER_CONTROL_PORT (default 5170)`,

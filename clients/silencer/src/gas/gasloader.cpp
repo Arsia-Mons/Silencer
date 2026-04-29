@@ -18,18 +18,27 @@ GASLoader& GASLoader::Get() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-static bool OpenJson(const std::string& path, json& out) {
+// Strip the gasDir prefix off a full path so error file fields are
+// stable (e.g. "weapons.json", not "/var/lib/.../assets/gas/weapons.json").
+static std::string Basename(const std::string& path) {
+    const auto slash = path.find_last_of("/\\");
+    return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+static bool OpenJson(const std::string& path, json& out,
+                     std::vector<GASLoadError>& errors) {
     std::ifstream f(path);
     if (!f.is_open()) {
-        fprintf(stderr, "[gas] cannot open %s (using compiled-in defaults)\n", path.c_str());
+        errors.push_back({Basename(path), "", "OPEN_FAILED",
+                          "cannot open " + path + " (using compiled-in defaults)"});
         return false;
     }
     try {
         f >> out;
         return true;
     } catch (const std::exception& e) {
-        fprintf(stderr, "[gas] parse error in %s: %s (using compiled-in defaults)\n",
-                path.c_str(), e.what());
+        errors.push_back({Basename(path), "", "PARSE_ERROR",
+                          std::string(e.what()) + " (using compiled-in defaults)"});
         return false;
     }
 }
@@ -38,9 +47,10 @@ static bool OpenJson(const std::string& path, json& out) {
 // Per-file parsers
 // ---------------------------------------------------------------------------
 
-static void LoadPlayer(const std::string& dir, PlayerDef& out) {
+static void LoadPlayer(const std::string& dir, PlayerDef& out,
+                       std::vector<GASLoadError>& errors) {
     json j;
-    if (!OpenJson(dir + "/player.json", j)) return;
+    if (!OpenJson(dir + "/player.json", j, errors)) return;
     try {
         out.baseHealth                 = j.value("baseHealth",                 out.baseHealth);
         out.baseShield                 = j.value("baseShield",                 out.baseShield);
@@ -92,13 +102,14 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.deadAutoRespawnTick        = j.value("deadAutoRespawnTick",        out.deadAutoRespawnTick);
         out.deployAnimationTicks       = j.value("deployAnimationTicks",       out.deployAnimationTicks);
     } catch (const std::exception& e) {
-        fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
+        errors.push_back({"player.json", "", "FIELD_ERROR", e.what()});
     }
 }
 
-static void LoadAgencies(const std::string& dir, std::vector<AgencyDef>& out) {
+static void LoadAgencies(const std::string& dir, std::vector<AgencyDef>& out,
+                         std::vector<GASLoadError>& errors) {
     json j;
-    if (!OpenJson(dir + "/agencies.json", j)) return;
+    if (!OpenJson(dir + "/agencies.json", j, errors)) return;
     try {
         out.clear();
         for (const auto& aj : j.at("agencies")) {
@@ -128,14 +139,15 @@ static void LoadAgencies(const std::string& dir, std::vector<AgencyDef>& out) {
             out.push_back(std::move(a));
         }
     } catch (const std::exception& e) {
-        fprintf(stderr, "[gas] agencies.json field error: %s\n", e.what());
+        errors.push_back({"agencies.json", "", "FIELD_ERROR", e.what()});
         out.clear();
     }
 }
 
-static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
+static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out,
+                        std::vector<GASLoadError>& errors) {
     json j;
-    if (!OpenJson(dir + "/weapons.json", j)) return;
+    if (!OpenJson(dir + "/weapons.json", j, errors)) return;
     try {
         out.clear();
         for (const auto& wj : j.at("weapons")) {
@@ -168,14 +180,15 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             out.push_back(std::move(w));
         }
     } catch (const std::exception& e) {
-        fprintf(stderr, "[gas] weapons.json field error: %s\n", e.what());
+        errors.push_back({"weapons.json", "", "FIELD_ERROR", e.what()});
         out.clear();
     }
 }
 
-static void LoadItems(const std::string& dir, std::vector<ItemDef>& out) {
+static void LoadItems(const std::string& dir, std::vector<ItemDef>& out,
+                      std::vector<GASLoadError>& errors) {
     json j;
-    if (!OpenJson(dir + "/items.json", j)) return;
+    if (!OpenJson(dir + "/items.json", j, errors)) return;
     try {
         out.clear();
         for (const auto& ij : j.at("items")) {
@@ -200,14 +213,15 @@ static void LoadItems(const std::string& dir, std::vector<ItemDef>& out) {
             out.push_back(std::move(item));
         }
     } catch (const std::exception& e) {
-        fprintf(stderr, "[gas] items.json field error: %s\n", e.what());
+        errors.push_back({"items.json", "", "FIELD_ERROR", e.what()});
         out.clear();
     }
 }
 
-static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
+static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out,
+                        std::vector<GASLoadError>& errors) {
     json j;
-    if (!OpenJson(dir + "/enemies.json", j)) return;
+    if (!OpenJson(dir + "/enemies.json", j, errors)) return;
     try {
         out.clear();
         for (const auto& ej : j.at("enemies")) {
@@ -256,14 +270,15 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {
-        fprintf(stderr, "[gas] enemies.json field error: %s\n", e.what());
+        errors.push_back({"enemies.json", "", "FIELD_ERROR", e.what()});
         out.clear();
     }
 }
 
-static void LoadAbilities(const std::string& dir, std::vector<AbilityDef>& out) {
+static void LoadAbilities(const std::string& dir, std::vector<AbilityDef>& out,
+                          std::vector<GASLoadError>& errors) {
     json j;
-    if (!OpenJson(dir + "/abilities.json", j)) return;
+    if (!OpenJson(dir + "/abilities.json", j, errors)) return;
     try {
         out.clear();
         for (const auto& aj : j.at("abilities")) {
@@ -276,13 +291,15 @@ static void LoadAbilities(const std::string& dir, std::vector<AbilityDef>& out) 
             out.push_back(std::move(a));
         }
     } catch (const std::exception& e) {
-        fprintf(stderr, "[gas] abilities.json field error: %s\n", e.what());
+        errors.push_back({"abilities.json", "", "FIELD_ERROR", e.what()});
         out.clear();
     }
 }
 
-static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& out) {    json j;
-    if (!OpenJson(dir + "/gameobjects.json", j)) return;
+static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& out,
+                            std::vector<GASLoadError>& errors) {
+    json j;
+    if (!OpenJson(dir + "/gameobjects.json", j, errors)) return;
     try {
         out.clear();
         for (const auto& gj : j.at("gameObjects")) {
@@ -304,7 +321,7 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             out.push_back(std::move(g));
         }
     } catch (const std::exception& e) {
-        fprintf(stderr, "[gas] gameobjects.json field error: %s\n", e.what());
+        errors.push_back({"gameobjects.json", "", "FIELD_ERROR", e.what()});
         out.clear();
     }
 }
@@ -313,9 +330,13 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
 // Public API
 // ---------------------------------------------------------------------------
 
-static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out) {
+static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out,
+                          std::vector<GASLoadError>& errors) {
     json j;
-    if (!OpenJson(dir + "/gameobjects.json", j)) return;
+    // Don't double-report missing/parse errors — LoadGameObjects already
+    // covered this exact file path. Only the terminals field-walk runs here.
+    std::vector<GASLoadError> dropped;
+    if (!OpenJson(dir + "/gameobjects.json", j, dropped)) return;
     if (!j.contains("terminals")) return;
     try {
         out.clear();
@@ -332,7 +353,7 @@ static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out)
             out.push_back(std::move(t));
         }
     } catch (const std::exception& e) {
-        fprintf(stderr, "[gas] gameobjects.json terminals error: %s\n", e.what());
+        errors.push_back({"gameobjects.json", "/terminals", "FIELD_ERROR", e.what()});
         out.clear();
     }
 }
@@ -340,19 +361,21 @@ static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out)
 // ---------------------------------------------------------------------------
 
 bool GASLoader::Load(const std::string& gasDir) {
-    LoadPlayer(gasDir, player);
-    LoadAgencies(gasDir, agencies);
-    LoadWeapons(gasDir, weapons);
-    LoadItems(gasDir, items);
-    LoadEnemies(gasDir, enemies);
-    LoadAbilities(gasDir, abilities);
-    LoadGameObjects(gasDir, gameObjects);
-    LoadTerminals(gasDir, terminals);
+    lastLoadErrors.clear();
+    LoadPlayer(gasDir, player, lastLoadErrors);
+    LoadAgencies(gasDir, agencies, lastLoadErrors);
+    LoadWeapons(gasDir, weapons, lastLoadErrors);
+    LoadItems(gasDir, items, lastLoadErrors);
+    LoadEnemies(gasDir, enemies, lastLoadErrors);
+    LoadAbilities(gasDir, abilities, lastLoadErrors);
+    LoadGameObjects(gasDir, gameObjects, lastLoadErrors);
+    LoadTerminals(gasDir, terminals, lastLoadErrors);
     loaded = true;
-    fprintf(stderr, "[gas] loaded: %zu agencies, %zu weapons, %zu items, %zu enemies, %zu abilities, %zu gameObjects, %zu terminals\n",
+    fprintf(stderr, "[gas] loaded: %zu agencies, %zu weapons, %zu items, %zu enemies, %zu abilities, %zu gameObjects, %zu terminals (%zu errors)\n",
             agencies.size(), weapons.size(), items.size(),
-            enemies.size(), abilities.size(), gameObjects.size(), terminals.size());
-    return true;
+            enemies.size(), abilities.size(), gameObjects.size(), terminals.size(),
+            lastLoadErrors.size());
+    return lastLoadErrors.empty();
 }
 
 void GASLoader::Reload(const std::string& gasDir) {
