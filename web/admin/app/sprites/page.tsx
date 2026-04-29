@@ -8,9 +8,11 @@ import { zipSync } from 'fflate';
 import {
   parseDat,
   decodeBank,
+  decodeTileBank,
   loadPalette,
   frameToImageData,
   encodeBank,
+  encodeTileBank,
   encodeDat,
   quantizeToPalette,
   type DecodedBank,
@@ -300,13 +302,15 @@ function SpritesPageInner() {
       if (!buf) return;
       const numFrames = tabAssets.frameCounts[idx] ?? 0;
       try {
-        const bank = decodeBank(idx, buf, numFrames);
+        const bank = tab === 'tiles'
+          ? decodeTileBank(idx, buf, numFrames)
+          : decodeBank(idx, buf, numFrames);
         setDecodedBanks(prev => new Map(prev).set(idx, bank));
       } catch (e) {
         setError(`Failed to decode bank ${idx}: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
-    [tabAssets, decodedBanks],
+    [tabAssets, decodedBanks, tab],
   );
 
   // ── Keyboard navigation through bank list ────────────────────────────────
@@ -589,7 +593,7 @@ function SpritesPageInner() {
 
     for (const [idx, bank] of decodedBanks) {
       if (!bank.dirty) continue;
-      const encoded = encodeBank(bank);
+      const encoded = tab === 'tiles' ? encodeTileBank(bank) : encodeBank(bank);
       files[`${dir}/${bankFilename(tab, idx)}`] = encoded;
     }
 
@@ -645,7 +649,7 @@ function SpritesPageInner() {
   // ── Download .BIN ─────────────────────────────────────────────────────────
   function handleDownloadBin() {
     if (selectedBank === null || !currentBank) return;
-    const bytes = encodeBank(currentBank);
+    const bytes = tab === 'tiles' ? encodeTileBank(currentBank) : encodeBank(currentBank);
     const binBuf = new ArrayBuffer(bytes.byteLength);
     new Uint8Array(binBuf).set(bytes);
     const blob = new Blob([binBuf], { type: 'application/octet-stream' });

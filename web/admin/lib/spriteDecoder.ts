@@ -224,6 +224,64 @@ function estimateTileSize(
   return pos;
 }
 
+// ── Tile bank decode/encode (TIL_NNN.BIN — different format from sprites) ─────
+//
+// Tile header: 12 bytes per frame (not 344). Game reads but ignores header data.
+// Pixel data: single linear RLE block for ALL frames together, starting after header.
+// Each tile is always 64×64 = 4096 bytes in the decompressed output.
+// Frame j starts at j * 4096 in decompressed pixels.
+
+const TILE_W = 64;
+const TILE_H = 64;
+const TILE_PIXELS = TILE_W * TILE_H; // 4096
+const TILE_HEADER_SIZE = 12;
+
+export function decodeTileBank(bankIndex: number, buf: ArrayBuffer, numFrames: number): DecodedBank {
+  if (numFrames === 0) return { bankIndex, frames: [], dirty: false };
+
+  const view = new DataView(buf);
+  const bytes = new Uint8Array(buf);
+  const headerTotal = numFrames * TILE_HEADER_SIZE + 4;
+  const compSize = buf.byteLength - headerTotal;
+  const totalPixels = numFrames * TILE_PIXELS;
+
+  const allPixels = decodeLinearRle(view, headerTotal, compSize, totalPixels);
+
+  const frames: DecodedFrame[] = [];
+  for (let j = 0; j < numFrames; j++) {
+    const headerBase = j * TILE_HEADER_SIZE;
+    const headerBytes = bytes.slice(headerBase, headerBase + TILE_HEADER_SIZE);
+    const indexedPixels = allPixels.slice(j * TILE_PIXELS, (j + 1) * TILE_PIXELS);
+    frames.push({
+      header: { width: TILE_W, height: TILE_H, offsetX: 0, offsetY: 0, compSize: 0, mode: 1, headerBytes },
+      indexedPixels,
+      dirty: false,
+    });
+  }
+
+  return { bankIndex, frames, dirty: false };
+}
+
+export function encodeTileBank(bank: DecodedBank): Uint8Array {
+  const { frames } = bank;
+  const numFrames = frames.length;
+  const headerTotal = numFrames * TILE_HEADER_SIZE + 4;
+
+  // Combine all frames' pixels into one block then RLE-encode together
+  const allPixels = new Uint8Array(numFrames * TILE_PIXELS);
+  for (let j = 0; j < numFrames; j++) {
+    allPixels.set(frames[j].indexedPixels.slice(0, TILE_PIXELS), j * TILE_PIXELS);
+  }
+  const pixelData = encodeRleLinear(allPixels);
+
+  const out = new Uint8Array(headerTotal + pixelData.byteLength);
+  for (let j = 0; j < numFrames; j++) {
+    out.set(frames[j].header.headerBytes.slice(0, TILE_HEADER_SIZE), j * TILE_HEADER_SIZE);
+  }
+  out.set(pixelData, headerTotal);
+  return out;
+}
+
 // ── Display ───────────────────────────────────────────────────────────────────
 
 /** Convert indexed pixels → RGBA ImageData for display. */
