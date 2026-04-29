@@ -189,6 +189,7 @@ endif()
 
 include_directories(${ZLIB_INCLUDE_DIRS})
 include_directories(${NLOHMANN_JSON_INCLUDE_DIR})
+include_directories(${NLOHMANN_JSON_INCLUDE_DIR}/nlohmann)
 find_package(SDL3_mixer REQUIRED CONFIG)
 if(TARGET SDL3_mixer::SDL3_mixer)
   get_target_property(_sdl3mixer_inc SDL3_mixer::SDL3_mixer INTERFACE_INCLUDE_DIRECTORIES)
