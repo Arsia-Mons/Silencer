@@ -142,74 +142,14 @@ function decodeTileRle(
 
 // ── Bank decode ───────────────────────────────────────────────────────────────
 
-/** Decode a single bank file → DecodedBank. */
-export function decodeBank(bankIndex: number, buf: ArrayBuffer): DecodedBank {
+/**
+ * Decode a single bank file → DecodedBank.
+ * numFrames must come from parseDat() — it is NOT stored in the BIN file itself.
+ */
+export function decodeBank(bankIndex: number, buf: ArrayBuffer, numFrames: number): DecodedBank {
+  if (numFrames === 0) return { bankIndex, frames: [], dirty: false };
   const view = new DataView(buf);
   const bytes = new Uint8Array(buf);
-
-  // Read first header to get frame count embedded in header section
-  // But we don't know numFrames yet — we get it from parseDat / caller.
-  // Use the DAT count or auto-detect: scan until we find a plausible numFrames.
-  // The caller passes bankIndex but numFrames must come from .DAT.
-  // For self-contained use, we can infer numFrames from comp_sizes:
-  //   Try reading numFrames from DAT is not available here.
-  //   Instead, peek at offset 2 of the file — but that's not a field.
-  // Actually, we have no way to get numFrames without the DAT inside this fn.
-  // Design says: caller knows numFrames from parseDat(). 
-  // We must accept it. But the public API only takes (bankIndex, buf).
-  // Solution: auto-detect by scanning. We'll read the file assuming the
-  // header count can be derived: walk headers and stop when w==0 && h==0.
-  // OR: trust that parseDat was called by the UI; expose an overload.
-  //
-  // Simplest correct approach: derive numFrames by trying to read a frame
-  // header at offset 0 and checking whether comp_sizes add up. But that's
-  // circular. Let's expose a two-arg decode that takes numFrames, keeping the
-  // public API clean via a wrapper that defaults to scanning.
-
-  // Actually let's read numFrames from within the file: the DAT stores the
-  // count at index*64+2. Since we're inside a per-bank file, we DON'T have
-  // the DAT here. The convention: numFrames is NOT stored in the BIN file
-  // itself per the spec. The only correct source is BIN_SPR.DAT[bankIndex*64+2].
-  //
-  // For the API to be self-contained given only the BIN buffer, we scan for
-  // the last plausible frame. A frame header is 344 bytes. We look at the
-  // first header's compSize and see how many fit, or just scan until w=0.
-  // 
-  // Since the task says the UI calls parseDat first and then decodeBank,
-  // we'll use a private function and have decodeBank accept an optional hint.
-  // To match the declared API exactly, we'll need to detect numFrames.
-  //
-  // Heuristic: read consecutive 344-byte headers until width==0 && height==0
-  // or we exceed a sane limit. The file starts with all headers, then +4
-  // filler, then data. Since we can't know the boundary precisely without
-  // the DAT, we'll use a smarter approach: compute how many frames would
-  // produce a valid header section. We know comp_sizes tell us data sizes.
-  // Start by assuming frame 0 header is valid, then frame 1, etc., and stop
-  // when the implied data section overruns the file.
-
-  // Practical approach that works for all real banks:
-  // Read up to 256 consecutive frame headers. For each candidate numFrames N,
-  // verify: sum(comp_sizes[0..N-1]) + N*344 + 4 == buf.byteLength.
-  // If no N matches exactly (e.g. tile mode comp_size is unreliable),
-  // use the first N where sum of comp_sizes + N*344+4 <= buf.byteLength
-  // and header[N].width == 0.
-
-  let numFrames = 0;
-  for (let n = 1; n <= 256; n++) {
-    if (n * 344 + 4 > buf.byteLength) break;
-    const headerN = (n - 1) * 344;
-    const w = view.getUint16(headerN + 0, true);
-    const h = view.getUint16(headerN + 2, true);
-    if (w === 0 || h === 0) break; // found end sentinel
-    numFrames = n;
-    // Check if next header slot is empty (beyond file or zero)
-    if (n * 344 + 4 >= buf.byteLength) break;
-    if (n < 256) {
-      const nextW = view.getUint16(n * 344 + 0, true);
-      const nextH = view.getUint16(n * 344 + 2, true);
-      if (nextW === 0 && nextH === 0) break;
-    }
-  }
 
   const frames: DecodedFrame[] = [];
   const headerTotal = numFrames * 344 + 4;

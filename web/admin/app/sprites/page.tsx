@@ -40,11 +40,16 @@ const THUMB_H   = 80;
 
 // ── Folder state ─────────────────────────────────────────────────────────────
 
+interface TabAssets {
+  datBuf:      ArrayBuffer;
+  frameCounts: number[];             // [256]
+  bankFiles:   Map<number, ArrayBuffer>;
+}
+
 interface FolderState {
-  datBuf:       ArrayBuffer;          // original DAT binary
-  frameCounts:  number[];             // [256]
-  bankFiles:    Map<number, ArrayBuffer>; // bank index → BIN ArrayBuffer
-  paletteBuf:   ArrayBuffer | null;
+  sprites:    TabAssets | null;
+  tiles:      TabAssets | null;
+  paletteBuf: ArrayBuffer | null;
 }
 
 // ── Per-bank edit state ──────────────────────────────────────────────────────
@@ -172,40 +177,27 @@ function SpritesPageInner() {
   const [folder, setFolder] = useState<FolderState | null>(null);
   const [folderName, setFolderName] = useState<string | null>(null);
 
-  async function openFolder(files: FileList) {
-    const all = Array.from(files);
-    // Find DAT files and BIN files for current tab
+  async function loadTabAssets(
+    all: File[],
+    t: TabKey,
+  ): Promise<TabAssets | null> {
     const datFile = all.find(f => {
       const parts = f.webkitRelativePath.split('/');
-      return parts[parts.length - 1].toUpperCase() === DAT_NAME[tab];
+      return parts[parts.length - 1].toUpperCase() === DAT_NAME[t];
     });
-    const paletteFile = all.find(f => {
-      const parts = f.webkitRelativePath.split('/');
-      return parts[parts.length - 1].toUpperCase() === 'PALETTE.BIN';
-    });
-    const binDir = DIR_NAME[tab].toLowerCase();
+    if (!datFile) return null;
+    const datBuf = await datFile.arrayBuffer();
+    const frameCounts = parseDat(datBuf);
+    const binDir = DIR_NAME[t].toLowerCase();
     const binFiles = all.filter(f => {
       const lower = f.webkitRelativePath.toLowerCase();
       return lower.includes('/' + binDir + '/') && lower.endsWith('.bin');
     });
-
-    if (!datFile) {
-      alert(`No ${DAT_NAME[tab]} found in the selected folder.`);
-      return;
-    }
-
-    const [datBuf, palBuf] = await Promise.all([
-      datFile.arrayBuffer(),
-      paletteFile ? paletteFile.arrayBuffer() : Promise.resolve(null),
-    ]);
-
-    const frameCounts = parseDat(datBuf);
-
     const bankFiles = new Map<number, ArrayBuffer>();
     await Promise.all(
       binFiles.map(async f => {
         const fname = f.name.toUpperCase();
-        const prefix = BIN_PREFIX[tab].toUpperCase();
+        const prefix = BIN_PREFIX[t].toUpperCase();
         if (!fname.startsWith(prefix) || !fname.endsWith('.BIN')) return;
         const numStr = fname.slice(prefix.length, fname.length - 4);
         const idx = parseInt(numStr, 10);
@@ -213,10 +205,30 @@ function SpritesPageInner() {
         bankFiles.set(idx, await f.arrayBuffer());
       }),
     );
+    return { datBuf, frameCounts, bankFiles };
+  }
+
+  async function openFolder(files: FileList) {
+    const all = Array.from(files);
+    const paletteFile = all.find(f => {
+      const parts = f.webkitRelativePath.split('/');
+      return parts[parts.length - 1].toUpperCase() === 'PALETTE.BIN';
+    });
+
+    const [sprites, tiles, palBuf] = await Promise.all([
+      loadTabAssets(all, 'sprites'),
+      loadTabAssets(all, 'tiles'),
+      paletteFile ? paletteFile.arrayBuffer() : Promise.resolve(null),
+    ]);
+
+    if (!sprites && !tiles) {
+      alert('No BIN_SPR.DAT or BIN_TIL.DAT found in the selected folder.');
+      return;
+    }
 
     const folderRoot = all[0]?.webkitRelativePath?.split('/')[0] ?? 'assets';
     setFolderName(folderRoot);
-    setFolder({ datBuf, frameCounts, bankFiles, paletteBuf: palBuf });
+    setFolder({ sprites, tiles, paletteBuf: palBuf });
     setDecodedBanks(new Map());
     setSelectedBank(null);
     setSelectedFrame(null);
@@ -250,6 +262,16 @@ function SpritesPageInner() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
+  // Current tab's assets
+  const tabAssets: TabAssets | null = folder ? (tab === 'sprites' ? folder.sprites : folder.tiles) : null;
+
+  // Clear decoded bank cache when switching tabs
+  useEffect(() => {
+    setDecodedBanks(new Map());
+    setSelectedBank(null);
+    setSelectedFrame(null);
+  }, [tab]);
+
   // ── Palette ───────────────────────────────────────────────────────────────
   const [palette, setPalette] = useState<Uint8Array>(() => new Uint8Array(256 * 4));
 
@@ -259,8 +281,8 @@ function SpritesPageInner() {
   }, [folder?.paletteBuf, subPalette]);
 
   // ── Occupied banks list ───────────────────────────────────────────────────
-  const occupiedBanks: Array<{ idx: number; count: number }> = folder
-    ? folder.frameCounts
+  const occupiedBanks: Array<{ idx: number; count: number }> = tabAssets
+    ? tabAssets.frameCounts
         .map((count, idx) => ({ idx, count }))
         .filter(b => b.count > 0 && !deletedBanks.includes(b.idx))
     : [];
@@ -270,18 +292,19 @@ function SpritesPageInner() {
     (idx: number) => {
       setSelectedBank(idx);
       setSelectedFrame(null);
-      if (!folder) return;
+      if (!tabAssets) return;
       if (decodedBanks.has(idx)) return;
-      const buf = folder.bankFiles.get(idx);
+      const buf = tabAssets.bankFiles.get(idx);
       if (!buf) return;
+      const numFrames = tabAssets.frameCounts[idx] ?? 0;
       try {
-        const bank = decodeBank(idx, buf);
+        const bank = decodeBank(idx, buf, numFrames);
         setDecodedBanks(prev => new Map(prev).set(idx, bank));
       } catch (e) {
         setError(`Failed to decode bank ${idx}: ${e instanceof Error ? e.message : String(e)}`);
       }
     },
-    [folder, decodedBanks],
+    [tabAssets, decodedBanks],
   );
 
   const currentBank: DecodedBank | undefined =
@@ -328,30 +351,30 @@ function SpritesPageInner() {
     });
     setSelectedFrame(null);
     // Update frameCounts
-    if (folder) {
-      const newCounts = [...folder.frameCounts];
+    if (folder && tabAssets) {
+      const newCounts = [...tabAssets.frameCounts];
       newCounts[bankIdx] = Math.max(0, newCounts[bankIdx] - 1);
-      setFolder(f => f ? { ...f, frameCounts: newCounts } : f);
+      setFolder(f => f ? { ...f, [tab]: { ...tabAssets, frameCounts: newCounts } } : f);
     }
     setDirtyDat(true);
   }
 
   // ── New bank ──────────────────────────────────────────────────────────────
   function handleNewBank() {
-    if (!folder) return;
+    if (!folder || !tabAssets) return;
     const input = prompt('Bank index (0–255):');
     if (input === null) return;
     const idx = parseInt(input, 10);
     if (isNaN(idx) || idx < 0 || idx > 255) { setError('Invalid bank index.'); return; }
-    if (folder.frameCounts[idx] > 0 && !deletedBanks.includes(idx)) {
+    if (tabAssets.frameCounts[idx] > 0 && !deletedBanks.includes(idx)) {
       setError(`Bank ${idx} is already occupied.`);
       return;
     }
     const newBank: DecodedBank = { bankIndex: idx, frames: [], dirty: true };
     setDecodedBanks(prev => new Map(prev).set(idx, newBank));
-    const newCounts = [...folder.frameCounts];
+    const newCounts = [...tabAssets.frameCounts];
     newCounts[idx] = 0;
-    setFolder(f => f ? { ...f, frameCounts: newCounts } : f);
+    setFolder(f => f ? { ...f, [tab]: { ...tabAssets, frameCounts: newCounts } } : f);
     setDeletedBanks(d => d.filter(x => x !== idx));
     setSelectedBank(idx);
     setSelectedFrame(null);
@@ -363,9 +386,11 @@ function SpritesPageInner() {
     if (selectedBank === null) return;
     if (!confirm(`Delete bank ${selectedBank}? You must also manually git rm the .BIN file.`)) return;
     setDeletedBanks(d => [...d, selectedBank]);
-    const newCounts = [...(folder?.frameCounts ?? [])];
-    newCounts[selectedBank] = 0;
-    setFolder(f => f ? { ...f, frameCounts: newCounts } : f);
+    if (tabAssets) {
+      const newCounts = [...tabAssets.frameCounts];
+      newCounts[selectedBank] = 0;
+      setFolder(f => f ? { ...f, [tab]: { ...tabAssets, frameCounts: newCounts } } : f);
+    }
     setNotice(
       `Bank ${selectedBank} deleted. You must also run: git rm shared/assets/${DIR_NAME[tab]}/${bankFilename(tab, selectedBank)}`,
     );
@@ -421,9 +446,9 @@ function SpritesPageInner() {
           });
           return m;
         });
-        const newCounts = [...(folder?.frameCounts ?? [])];
+        const newCounts = [...(tabAssets?.frameCounts ?? new Array(256).fill(0))];
         newCounts[selectedBank] = (newCounts[selectedBank] ?? 0) + 1;
-        setFolder(f => f ? { ...f, frameCounts: newCounts } : f);
+        setFolder(f => f && tabAssets ? { ...f, [tab]: { ...tabAssets, frameCounts: newCounts } } : f);
         setDirtyDat(true);
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -493,9 +518,9 @@ function SpritesPageInner() {
         m.set(selectedBank, { bankIndex: selectedBank, frames, dirty: true });
         return m;
       });
-      const newCounts = [...(folder?.frameCounts ?? [])];
+      const newCounts = [...(tabAssets?.frameCounts ?? new Array(256).fill(0))];
       newCounts[selectedBank] = (newCounts[selectedBank] ?? 0) + newFrames.length;
-      setFolder(f => f ? { ...f, frameCounts: newCounts } : f);
+      setFolder(f => f && tabAssets ? { ...f, [tab]: { ...tabAssets, frameCounts: newCounts } } : f);
       setDirtyDat(true);
     };
     img.src = url;
@@ -519,8 +544,8 @@ function SpritesPageInner() {
 
   // ── Download DAT ──────────────────────────────────────────────────────────
   function handleDownloadDat() {
-    if (!folder) return;
-    let outBuf: ArrayBuffer = folder.datBuf.slice(0);
+    if (!folder || !tabAssets) return;
+    let outBuf: ArrayBuffer = tabAssets.datBuf.slice(0);
     for (const [idx, bank] of decodedBanks) {
       const patched = encodeDat(outBuf, idx, bank.frames.length);
       outBuf = new ArrayBuffer(patched.byteLength);
