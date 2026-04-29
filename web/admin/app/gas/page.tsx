@@ -6,7 +6,7 @@ import { useAuth } from '../../lib/auth';
 import { useSocket } from '../../lib/socket';
 import Sidebar from '../../components/Sidebar';
 import type { EditorAPI, CursorInfo } from '../../components/GasMonacoEditor';
-import { GAS_SCHEMAS } from '../../lib/gas-schemas';
+import { GAS_SCHEMAS } from '@silencer/gas-validation/schemas';
 // Lazy-load the Monaco-based editor (client only)
 const GasMonacoEditor = dynamic(() => import('../../components/GasMonacoEditor'), { ssr: false });
 

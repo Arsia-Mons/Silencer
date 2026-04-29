@@ -29,6 +29,8 @@ jobs:
           filters: |
             relevant:
               - 'services/admin-api/**'
+              - 'package.json'
+              - 'bun.lock'
               - '.github/workflows/ci-build-admin-api.yml'
 
       - if: steps.changes.outputs.relevant == 'true'
@@ -38,7 +40,7 @@ jobs:
         if: steps.changes.outputs.relevant == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: services/admin-api
+          context: .
           file: services/admin-api/Dockerfile
           push: false
           platforms: linux/arm64

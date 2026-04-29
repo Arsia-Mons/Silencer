@@ -23,6 +23,7 @@ Each component owns its own `CLAUDE.md` with build/run/test/gotchas:
 - `services/admin-api/` — Express → Bun+TS admin backend
 - `web/admin/` — Next.js admin dashboard + level designer
 - `shared/assets/` — runtime game assets (sprites, tiles, sounds, levels)
+- `shared/gas-validation/` — TS package: GAS schemas + validator shared by admin web and `silencer-cli`
 - `shared/icons/` — app icons used by `clients/silencer` build
 - `shared/skills/` — Claude Code skills surfaced to agents via `.claude/skills/` symlinks
 - `infra/terraform/` — AWS infra
@@ -49,6 +50,27 @@ Each component owns its own `CLAUDE.md` with build/run/test/gotchas:
    No abstractions for single-use code. No "flexibility" or
    "configurability" that wasn't requested. No error handling for
    impossible scenarios. If 200 lines could be 50, rewrite it.
+
+## Bun workspaces
+
+Bun packages share a single root `bun.lock`. Every Bun-runtime dir
+(`clients/cli/`, `services/admin-api/`, `shared/fonts/`,
+`shared/gas-validation/`, `web/admin/`, `web/website/`) is listed in
+the root `package.json`'s `workspaces` array. Run `bun install` from
+the repo root, never inside a sub-package.
+
+- **Adding a workspace dep on another local package:** declare it as
+  `"@silencer/<name>": "workspace:*"`. The lockfile resolves it to
+  the in-tree path.
+- **Preventing version drift:** when two workspaces declare the same
+  third-party dep, identical version ranges dedupe in the lockfile
+  automatically. Different ranges install side-by-side — that's the
+  drift signal. To force alignment, add the dep to the root
+  `package.json`'s `"overrides"` map. Treat per-workspace divergence
+  as a deliberate exception, documented in that workspace's CLAUDE.md.
+- **Docker builds:** images copy the workspace root + the target
+  package's manifest, then `bun install --filter <pkg>`. Don't
+  reintroduce per-package lockfiles.
 
 ## More
 
