@@ -5,6 +5,8 @@ import { useAuth } from '../../lib/auth';
 import { useWsConnected } from '../../lib/socket';
 import Sidebar from '../../components/Sidebar';
 import { zipSync } from 'fflate';
+import * as assetsStore from '../../lib/assets-store';
+import * as gameDataStore from '../../lib/game-data-store';
 import {
   parseDat,
   decodeBank,
@@ -180,6 +182,20 @@ function SpritesPageInner() {
   const [folder, setFolder] = useState<FolderState | null>(null);
   const [folderName, setFolderName] = useState<string | null>(null);
 
+  // Hydrate from assets-store so the folder doesn't need re-picking after navigation
+  useEffect(() => {
+    const stored = assetsStore.get();
+    if (!stored) return;
+    const sprites = stored.sprites
+      ? { datBuf: stored.sprites.datBuf, frameCounts: parseDat(stored.sprites.datBuf), bankFiles: stored.sprites.bankFiles }
+      : null;
+    const tiles = stored.tiles
+      ? { datBuf: stored.tiles.datBuf, frameCounts: parseDat(stored.tiles.datBuf), bankFiles: stored.tiles.bankFiles }
+      : null;
+    setFolderName(stored.folderName);
+    setFolder({ sprites, tiles, paletteBuf: stored.paletteBuf });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function loadTabAssets(
     all: File[],
     t: TabKey,
@@ -237,6 +253,14 @@ function SpritesPageInner() {
     setSelectedFrame(null);
     setDeletedBanks([]);
     setDirtyDat(false);
+
+    // Persist raw buffers so the folder survives navigation
+    assetsStore.set({
+      folderName: folderRoot,
+      paletteBuf: palBuf,
+      sprites: sprites ? { datBuf: sprites.datBuf, bankFiles: sprites.bankFiles } : null,
+      tiles:   tiles   ? { datBuf: tiles.datBuf,   bankFiles: tiles.bankFiles   } : null,
+    });
   }
 
   function handleFolderInput(e: React.ChangeEvent<HTMLInputElement>) {
@@ -246,6 +270,8 @@ function SpritesPageInner() {
   }
 
   function handleCloseFolder() {
+    assetsStore.clear();
+    gameDataStore.clear();
     setFolder(null);
     setFolderName(null);
     setDecodedBanks(new Map());

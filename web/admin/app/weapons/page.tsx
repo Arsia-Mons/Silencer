@@ -6,6 +6,7 @@ import Sidebar from '../../components/Sidebar';
 import { useWsConnected } from '../../lib/socket';
 import { decodeAdpcmWav } from '../sound-studio/adpcm';
 import * as gasStore from '../../lib/gas-store';
+import * as audioStore from '../../lib/audio-store';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,7 +85,6 @@ export default function WeaponsPage() {
   // ── Audio (ADPCM via Web Audio API, same as Sound Studio) ───────────────────
   const audioCtxRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
-  const decodedCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
   const [playingSound, setPlayingSound] = useState<string | null>(null);
 
   const getToken = () => (typeof window !== 'undefined' ? localStorage.getItem('zs_token') ?? '' : '');
@@ -103,7 +103,7 @@ export default function WeaponsPage() {
     }
     if (playingSound === name) { setPlayingSound(null); return; }
     try {
-      let decoded = decodedCacheRef.current.get(name);
+      let decoded = audioStore.get(name);
       if (!decoded) {
         const r = await fetch(`/api/sounds/${encodeURIComponent(name)}/play`, {
           headers: { Authorization: `Bearer ${getToken()}` },
@@ -116,7 +116,7 @@ export default function WeaponsPage() {
         const ctx = getAudioCtx();
         if (ctx.state === 'suspended') await ctx.resume();
         decoded = await decodeAdpcmWav(buf, ctx);
-        decodedCacheRef.current.set(name, decoded);
+        audioStore.set(name, decoded);
       }
       const ctx = getAudioCtx();
       const source = ctx.createBufferSource();

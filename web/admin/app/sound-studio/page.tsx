@@ -5,6 +5,7 @@ import Sidebar from '../../components/Sidebar';
 import { apiFetch } from '../../lib/api';
 import { useServerReachable } from '../../lib/socket';
 import { decodeAdpcmWav } from './adpcm';
+import * as audioStore from '../../lib/audio-store';
 
 interface SoundEntry {
   name: string;
@@ -175,7 +176,6 @@ export default function SoundStudioPage() {
   const compareSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const bgSourcesRef = useRef<(AudioBufferSourceNode | null)[]>([null, null, null]);
   const bgGainsRef = useRef<(GainNode | null)[]>([null, null, null]);
-  const decodedCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
 
   useEffect(() => { selectedVolCtxRef.current = selectedVolCtx; }, [selectedVolCtx]);
 
@@ -211,6 +211,7 @@ export default function SoundStudioPage() {
         body: buf,
       });
       if (!res.ok) throw new Error(`Upload failed: ${res.status} ${res.statusText}`);
+      audioStore.clear(); // new sound.bin — old decoded buffers are stale
       await load();
     } catch (e: any) { setError(e.message); setLoading(false); }
     if (e.target) e.target.value = '';
@@ -344,7 +345,8 @@ export default function SoundStudioPage() {
   }
 
   async function fetchAndDecode(name: string): Promise<AudioBuffer> {
-    if (decodedCacheRef.current.has(name)) return decodedCacheRef.current.get(name)!;
+    const cached = audioStore.get(name);
+    if (cached) return cached;
     const r = await fetch(`/api/sounds/${encodeURIComponent(name)}/play`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
@@ -356,7 +358,7 @@ export default function SoundStudioPage() {
     const audioCtx = getAudioCtx();
     if (audioCtx.state === 'suspended') await audioCtx.resume();
     const decoded = await decodeAdpcmWav(arrayBuf, audioCtx);
-    decodedCacheRef.current.set(name, decoded);
+    audioStore.set(name, decoded);
     return decoded;
   }
 
