@@ -662,7 +662,7 @@ function SpritesPageInner() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-screen bg-[#050a05] text-[#d1fad7]">
+    <div className="flex h-screen overflow-hidden bg-[#050a05] text-[#d1fad7]">
       <Sidebar wsConnected={wsConnected} />
 
       {/* Hidden file inputs */}
@@ -767,7 +767,7 @@ function SpritesPageInner() {
           <div className="flex flex-1 min-h-0">
             {/* ── Left panel: bank list ── */}
             <div
-              className="flex flex-col border-r border-[#1a2e1a]"
+              className="flex flex-col border-r border-[#1a2e1a] min-h-0"
               style={{ width: 200, minWidth: 200 }}
             >
               {/* Toolbar */}
