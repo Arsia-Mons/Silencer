@@ -15,6 +15,36 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: 'v00041',
+    date: '2026-04-28',
+    title: 'GAS Editor, Map Upload & Vendored JSON',
+    entries: [
+      {
+        category: 'DASHBOARD',
+        changes: [
+          'GAS editor: URL-linked tabs — each file tab updates ?tab= so tabs are bookmarkable and survive page refresh',
+          'GAS editor: baseline validation — saving blocked if any field present at folder-open time is missing, including fields inside array entries matched by id (weapons, enemies, items, etc.)',
+          'GAS editor: VS Code-style Problems panel inline below the tab bar — lists every violation with full field path, scrollable, clicking a file header jumps to that tab',
+          'GAS editor: ↩ RE-ADD button per violation restores the missing field from the baseline in one click',
+          'GAS editor: ↩ RE-ADD ALL (N) per file in the Problems panel restores all missing fields for that file atomically',
+        ],
+      },
+      {
+        category: 'CLIENT',
+        changes: [
+          'Community map upload — client uploads the current map to the server before creating a game so other players can download it; URL read from mapapiurl config key',
+        ],
+      },
+      {
+        category: 'INFRASTRUCTURE',
+        changes: [
+          'nlohmann/json vendored — json.hpp (v3.12.0) checked in to clients/silencer/third_party/nlohmann/ to eliminate flaky CMake FetchContent download in CI',
+          'Map symlinks — lobby server maintains a maps/ symlink directory so the dedicated server can read uploaded maps without a restart',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v1.9.0',
     date: '2026-04-26',
     title: 'Behavior Trees, Actor Editor & Data-Driven Sounds',
