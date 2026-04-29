@@ -248,3 +248,70 @@ void FetchAndSyncServerMaps(const char * apiURL) {
         FetchMapFromServer(name.c_str(), sha1bytes, apiURL);
     }
 }
+
+bool UploadMapToServer(const char * mapname,
+                       const char * filepath,
+                       const char * apiURL)
+{
+    // Read file using the absolute path (no CDDataDir needed — thread-safe).
+    SDL_IOStream * f = SDL_IOFromFile(filepath, "rb");
+    if (!f) {
+        fprintf(stderr, "[mapfetch] upload: cannot open %s\n", filepath);
+        return false;
+    }
+    Sint64 size = SDL_GetIOSize(f);
+    if (size <= 0 || size > 65535) {
+        SDL_CloseIO(f);
+        fprintf(stderr, "[mapfetch] upload: %s has unexpected size %lld\n",
+                filepath, (long long)size);
+        return false;
+    }
+    std::vector<unsigned char> data((size_t)size);
+    SDL_ReadIO(f, data.data(), data.size());
+    SDL_CloseIO(f);
+
+    // Build POST URL and request headers.
+    std::string url = apiURL;
+    url += "/api/maps";
+
+    std::string filenameHdr = std::string("X-Filename: ") + mapname;
+    struct curl_slist * headers = nullptr;
+    headers = curl_slist_append(headers, filenameHdr.c_str());
+    headers = curl_slist_append(headers, "X-Author: player");
+    headers = curl_slist_append(headers, "Content-Type: application/octet-stream");
+
+    StringBuf respBuf;
+    CURL * curl = curl_easy_init();
+    if (!curl) {
+        curl_slist_free_all(headers);
+        return false;
+    }
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.data());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)data.size());
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, StringWriteCallback);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &respBuf);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 15L);
+    curl_easy_setopt(curl, CURLOPT_USERAGENT, "silencer/" SILENCER_VERSION);
+
+    CURLcode rc = curl_easy_perform(curl);
+    long httpStatus = 0;
+    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &httpStatus);
+    curl_slist_free_all(headers);
+    curl_easy_cleanup(curl);
+
+    if (rc != CURLE_OK) {
+        fprintf(stderr, "[mapfetch] upload %s failed: curl=%d\n", mapname, (int)rc);
+        return false;
+    }
+    if (httpStatus == 200 || httpStatus == 201) {
+        fprintf(stderr, "[mapfetch] uploaded %s (%zu bytes)\n", mapname, data.size());
+        return true;
+    }
+    fprintf(stderr, "[mapfetch] upload %s failed: http=%ld\n", mapname, httpStatus);
+    return false;
+}

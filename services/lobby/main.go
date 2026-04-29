@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -88,6 +89,7 @@ func main() {
 
 	proc := newProcManager(*gameBinary, port, *gamePortBase, *gamePortCount)
 	hub := NewHub(store, motd, *publicAddr, proc, events)
+	proc.onExit = hub.GameExited
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", *addr)
 	if err != nil {
@@ -111,7 +113,13 @@ func main() {
 
 	go StartPlayerAuthServer(*playerAuthAddr, store, hub)
 
-	mapStore, err := NewMapStore(*mapsDir, *mapUploadKey)
+	linkDir := ""
+	if h := os.Getenv("HOME"); h != "" {
+		linkDir = filepath.Join(h, ".config/silencer/level/download")
+	} else {
+		log.Printf("[lobby] HOME not set — dedicated server map symlinks disabled")
+	}
+	mapStore, err := NewMapStore(*mapsDir, *mapUploadKey, linkDir)
 	if err != nil {
 		log.Fatalf("map store: %v", err)
 	}

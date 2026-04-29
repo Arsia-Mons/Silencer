@@ -120,6 +120,8 @@ Game::~Game(){
 	mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
 	if(mapjointhread.joinable()) mapjointhread.join();
 	if(dlthread.joinable()) dlthread.join();
+	mapUploadGeneration.fetch_add(1, std::memory_order_relaxed);
+	if(mapUploadThread.joinable()) mapUploadThread.join();
 	// Bring the control server down first. Stop() runs the shutdown drain we
 	// registered at Load() time, fulfilling promises for both queued and
 	// pendingWaits commands so handler threads can unblock from fut.get() before
@@ -669,6 +671,26 @@ bool Game::Tick(void){
 					}
 				}
 				if(gamecreateinterface){
+					// Handle deferred CreateGame after map upload completes.
+					int us = mapUploadState.load(std::memory_order_acquire);
+					if(us == 2){
+						mapUploadState.store(0, std::memory_order_relaxed);
+						const char * pw = pendingCreate.password.empty() ? nullptr : pendingCreate.password.c_str();
+						world.lobby.CreateGame(
+							pendingCreate.gamename.c_str(),
+							pendingCreate.mapname.c_str(),
+							pendingCreate.maphash,
+							pw,
+							pendingCreate.securitylevel,
+							pendingCreate.minlevel,
+							pendingCreate.maxlevel,
+							pendingCreate.maxplayers,
+							pendingCreate.maxteams);
+					}else if(us == 3){
+						mapUploadState.store(0, std::memory_order_relaxed);
+						creategameclicked = false;
+						CreateModalDialog("Could not upload map");
+					}
 					if(world.lobby.creategamestatus == 1){
 						world.lobby.creategamestatus = 0;
 						Peer * authoritypeer = world.GetAuthorityPeer();
@@ -713,7 +735,8 @@ bool Game::Tick(void){
 								if(object && object->type == ObjectTypes::OVERLAY){
 									Overlay * overlay = static_cast<Overlay *>(object);
 									if(overlay->text.length() > 0){
-										overlay->text = "Creating game";
+										overlay->text = (mapUploadState.load(std::memory_order_relaxed) == 1)
+											? "Uploading map" : "Creating game";
 										int dots = (world.tickcount / 4) % 6;
 										if(dots > 3){
 											dots = 6 - dots;
@@ -726,7 +749,7 @@ bool Game::Tick(void){
 							}
 						}
 					}
-					if(!modaldialoghasok && world.lobby.creategamestatus != 100 && (world.state == World::CONNECTED || world.state == World::IDLE)){
+					if(!modaldialoghasok && world.lobby.creategamestatus != 100 && mapUploadState.load(std::memory_order_relaxed) == 0 && (world.state == World::CONNECTED || world.state == World::IDLE)){
 						DestroyModalDialog();
 						creategameclicked = false;
 					}
@@ -4928,11 +4951,32 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 												}else{
 													unsigned char maphash[20];
 													CalculateMapHash(FindMap(mapname).c_str(), &maphash);
-													world.lobby.CreateGame(gamename, mapname, maphash, password, securitylevel, minlevel, maxlevel, maxplayers, maxteams);
+													// Store args for deferred CreateGame after upload.
+													pendingCreate.gamename = gamename;
+													pendingCreate.mapname  = mapname;
+													pendingCreate.password = password ? password : "";
+													memcpy(pendingCreate.maphash, maphash, 20);
+													pendingCreate.securitylevel = securitylevel;
+													pendingCreate.minlevel      = minlevel;
+													pendingCreate.maxlevel      = maxlevel;
+													pendingCreate.maxplayers    = maxplayers;
+													pendingCreate.maxteams      = maxteams;
+													// Upload map before creating so the dedicated server
+													// can find it by filename.  Duplicate SHA-1 is a no-op.
+													if(mapUploadThread.joinable()) mapUploadThread.detach();
+													uint32_t gen = ++mapUploadGeneration;
+													std::string mppath = FindMap(mapname);
+													std::string apiURL = Config::GetInstance().mapapiurl;
+													mapUploadState.store(1, std::memory_order_relaxed);
+													mapUploadThread = std::thread([this, mapname_str=std::string(mapname), mppath, apiURL, gen](){
+														bool ok = UploadMapToServer(mapname_str.c_str(), mppath.c_str(), apiURL.c_str());
+														if(mapUploadGeneration.load(std::memory_order_relaxed) != gen) return;
+														mapUploadState.store(ok ? 2 : 3, std::memory_order_release);
+													});
 													creategameclicked = true;
 													strcpy(Config::GetInstance().defaultgamename, gamename);
 													Config::GetInstance().Save();
-													CreateModalDialog("Creating game...", false);
+													CreateModalDialog("Uploading map...", false);
 												}
 												}else{
 													CreateModalDialog("No map selected");
