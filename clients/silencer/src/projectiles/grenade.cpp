@@ -84,7 +84,9 @@ void Grenade::Tick(World & world){
 			draw = false;
 			switch(type){
 				case EMP:{
-					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("empbomb");
+						const std::string& sfx = (tw && !tw->soundExplosion.empty()) ? tw->soundExplosion : "q_expl02.wav";
+						EmitSound(world, world.resources.soundbank[sfx], 96); }
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){
@@ -108,7 +110,9 @@ void Grenade::Tick(World & world){
 					}
 				}break;
 				case SHAPED:{
-					EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("shapedbomb");
+						const std::string& sfx = (tw && !tw->soundExplosion.empty()) ? tw->soundExplosion : "seekexp1.wav";
+						EmitSound(world, world.resources.soundbank[sfx], 128); }
 					Sint8 xvs[] = {-10, -5, 0, 5, 10};
 					Sint8 yvs[] = {-33, -34, -35, -34, -33};
 					Sint8 ys[] = {0, 0, 0, 0, 0};
@@ -125,7 +129,9 @@ void Grenade::Tick(World & world){
 					}
 				}break;
 				case PLASMA:{
-					EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("plasmabomb");
+						const std::string& sfx = (tw && !tw->soundExplosion.empty()) ? tw->soundExplosion : "seekexp1.wav";
+						EmitSound(world, world.resources.soundbank[sfx], 128); }
 					Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
 					Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
 					Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -143,7 +149,9 @@ void Grenade::Tick(World & world){
 				}break;
 				case NEUTRON:{
 					world.SendSound("grenade1.wav");
-					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("neutronbomb");
+						const std::string& sfx = (tw && !tw->soundExplosion.empty()) ? tw->soundExplosion : "q_expl02.wav";
+						EmitSound(world, world.resources.soundbank[sfx], 96); }
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){
@@ -155,7 +163,10 @@ void Grenade::Tick(World & world){
 				case POISONFLARE:
 				case FLARE:{
 					draw = true;
-					EmitSound(world, world.resources.soundbank["rocket1.wav"], 128);
+					{	const char* wid = (type == POISONFLARE) ? "poisonflare" : "flarebomb";
+						const WeaponDef* tw = GASLoader::Get().GetWeaponDef(wid);
+						const std::string& sfx = (tw && !tw->soundExplosion.empty()) ? tw->soundExplosion : "rocket1.wav";
+						EmitSound(world, world.resources.soundbank[sfx], 128); }
 				}break;
 			}
 		}else

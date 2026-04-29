@@ -92,7 +92,7 @@
     {
       "id": "grenade",
       "projectileType": "grenade",
-      "_comment": "Grenade/bomb throw speeds and explosion timings (all in ticks @ 24 ticks/sec).",
+      "_comment": "Shared grenade timing + throw/land sounds. Explosion sounds are per-subtype below.",
       "throwSpeedStanding": 20,
       "throwSpeedMoving": 30,
       "throwSpeedRunning": 26,
@@ -105,8 +105,49 @@
       "detonatorLaunchYv": 15,
       "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],
       "soundThrow": "grenthro.wav",
-      "soundExplosion": "q_expl02.wav",
       "soundLand": "land1.wav"
+    },
+    {
+      "id": "empbomb",
+      "projectileType": "grenade",
+      "_comment": "EMP grenade — stuns shields across the whole team row.",
+      "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],
+      "soundExplosion": "q_expl02.wav"
+    },
+    {
+      "id": "shapedbomb",
+      "projectileType": "grenade",
+      "_comment": "Shaped-charge grenade — fires a tight spray of plasma bolts upward.",
+      "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],
+      "soundExplosion": "seekexp1.wav"
+    },
+    {
+      "id": "plasmabomb",
+      "projectileType": "grenade",
+      "_comment": "Plasma grenade — releases a wide spread of plasma bolts.",
+      "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],
+      "soundExplosion": "seekexp1.wav"
+    },
+    {
+      "id": "neutronbomb",
+      "projectileType": "grenade",
+      "_comment": "Neutron grenade — large-radius explosion that passes through shielding.",
+      "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],
+      "soundExplosion": "q_expl02.wav"
+    },
+    {
+      "id": "flarebomb",
+      "projectileType": "grenade",
+      "_comment": "Flare bomb (INV_FLARE) — illumination grenade, stays airborne after exploding.",
+      "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],
+      "soundExplosion": "rocket1.wav"
+    },
+    {
+      "id": "poisonflare",
+      "projectileType": "grenade",
+      "_comment": "Poison flare bomb — like flarebomb but inflicts poison damage in radius.",
+      "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],
+      "soundExplosion": "rocket1.wav"
     }
   ]
 }
