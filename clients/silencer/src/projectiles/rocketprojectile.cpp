@@ -31,6 +31,9 @@ void RocketProjectile::Serialize(bool write, Serializer & data, Serializer * old
 }
 
 void RocketProjectile::Tick(World & world){
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("rocket");
+	const std::vector<int>& sb = w ? w->spriteBanks : std::vector<int>();
+	int defaultBank = !sb.empty() ? sb[0] : 87;
 	if(yv < 0 && xv == 0){ // up
 		res_index = 4;
 	}
@@ -70,9 +73,9 @@ void RocketProjectile::Tick(World & world){
 			oldyv = yv;
 			xv = ceil(float(xv) * _hs);
 			yv = ceil(float(yv) * _hs);
-			soundchannel = EmitSound(world, world.resources.soundbank["rocket4.wav"], 128);
+			soundchannel = EmitSound(world, world.resources.soundbank[w && !w->soundLoop.empty() ? w->soundLoop : "rocket4.wav"], 128);
 			state_i = 11;
-			res_bank = 87;
+			res_bank = defaultBank;
 		}
 	}
 	if(state_i == 0){
@@ -81,10 +84,10 @@ void RocketProjectile::Tick(World & world){
 		{ const WeaponDef* _gd = GASLoader::Get().GetWeaponDef("rocket"); float _s = _gd ? _gd->rocketSlowInitial : 0.2f;
 		xv = ceil(float(xv) * _s);
 		yv = ceil(float(yv) * _s); }
-		soundchannel = EmitSound(world, world.resources.soundbank["rocket9.wav"], 128);
+		soundchannel = EmitSound(world, world.resources.soundbank[w && !w->soundLand.empty() ? w->soundLand : "rocket9.wav"], 128);
 	}
 	if(state_i == 3){
-		res_bank = 87;
+		res_bank = defaultBank;
 	}
 	if(state_i == 11){
 		if(xv > 0){
@@ -191,7 +194,7 @@ void RocketProjectile::Tick(World & world){
 			if(soundchannel){
 				Audio::GetInstance().Stop(soundchannel, 100);
 			}
-			EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
+			EmitSound(world, world.resources.soundbank[w && !w->soundExplosion.empty() ? w->soundExplosion : "seekexp1.wav"], 128);
 		}
 		for(int i = 0; i < 2; i++){
 			int xv2 = (signed(oldx) - x) * (1.25 * i);

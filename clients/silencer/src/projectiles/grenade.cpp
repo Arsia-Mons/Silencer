@@ -7,10 +7,10 @@
 #include <math.h>
 
 Grenade::Grenade() : Object(ObjectTypes::GRENADE){
-	// 79:0-15 is grenade
 	requiresauthority = true;
 	renderpass = 2;
-	res_bank = 79;
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("grenade");
+	res_bank = (w && !w->spriteBanks.empty()) ? w->spriteBanks[0] : 79;
 	res_index = 0;
 	type = PLASMA;
 	ownerid = 0;
@@ -34,7 +34,9 @@ void Grenade::Serialize(bool write, Serializer & data, Serializer * old){
 void Grenade::Tick(World & world){
 	if(state_i <= 4){
 		if(state_i == 4){
-			EmitSound(world, world.resources.soundbank["grenthro.wav"], 64);
+			const WeaponDef* w = GASLoader::Get().GetWeaponDef("grenade");
+			const std::string& sfx = w && !w->soundThrow.empty() ? w->soundThrow : "grenthro.wav";
+			EmitSound(world, world.resources.soundbank[sfx], 64);
 		}
 		/*Player * player = (Player *)world->GetObjectFromId(ownerid);
 		if(player){
@@ -356,7 +358,7 @@ void Grenade::Move(Object & object, World & world, int v){
 		object.xv = 0;
 		object.yv = 0;
 	}else{
-		object.EmitSound(world, world.resources.soundbank["land1.wav"], volume);
+		object.EmitSound(world, world.resources.soundbank[GASLoader::Get().GetWeaponDef("grenade") && !GASLoader::Get().GetWeaponDef("grenade")->soundLand.empty() ? GASLoader::Get().GetWeaponDef("grenade")->soundLand : "land1.wav"], volume);
 		object.yv += world.gravity;
 	}
 }
