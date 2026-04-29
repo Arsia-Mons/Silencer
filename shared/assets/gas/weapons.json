@@ -1,15 +1,97 @@
 {
-  "_comment": "Weapon damage values — 1:1 from *projectile.cpp constructors. Do not change during GAS migration.",
+  "_comment": "Weapon definitions — numeric values 1:1 from *projectile.cpp constructors. Sprite banks and sounds extracted from hardcoded values in each projectile Tick(). Do not change balance during migration.",
   "weapons": [
-    { "id": "blaster", "healthDamage": 40, "shieldDamage": 4,  "fireDelay": 7,  "moveAmount": 10 },
-    { "id": "laser",   "healthDamage": 10, "shieldDamage": 60, "fireDelay": 11, "velocity": 30, "moveAmount": 12 },
-    { "id": "flamer",  "healthDamage": 2,  "shieldDamage": 1,  "fireDelay": 2,  "velocity": 7,  "moveAmount": 6, "radius": 10 },
-    { "id": "rocket",  "healthDamage": 75, "shieldDamage": 25, "fireDelay": 21, "velocity": 35, "moveAmount": 15, "radius": 30, "rocketSlowInitial": 0.2, "rocketHoverTick": 100, "rocketSlowHover": 0.3 },
-    { "id": "plasma",  "healthDamage": 4,  "shieldDamage": 5,  "healthDamageLarge": 5, "shieldDamageLarge": 6, "velocity": 5, "moveAmount": 4, "radius": 5, "plasmaGravity": 2, "plasmaLifeNormal": 20, "plasmaLifeLarge": 7 },
-    { "id": "flare",   "healthDamage": 1,  "shieldDamage": 1,  "velocity": 5,  "moveAmount": 1 },
-    { "id": "wall",    "healthDamage": 10, "shieldDamage": 60, "velocity": 35, "moveAmount": 6 },
+    {
+      "id": "blaster",
+      "projectileType": "physics",
+      "healthDamage": 40,
+      "shieldDamage": 4,
+      "fireDelay": 7,
+      "moveAmount": 10,
+      "spriteBanks": [160, 161, 162, 163, 164, 163, 162, 161],
+      "hitOverlayBank": 222,
+      "soundFire": "!laserme.wav",
+      "soundHit1": "rico1.wav",
+      "soundHit2": "rico2.wav"
+    },
+    {
+      "id": "laser",
+      "projectileType": "physics",
+      "healthDamage": 10,
+      "shieldDamage": 60,
+      "fireDelay": 11,
+      "velocity": 30,
+      "moveAmount": 12,
+      "spriteBanks": [165, 166, 167, 168, 169, 168, 167, 166],
+      "hitOverlayBank": 222,
+      "soundFire": "!laserel.wav",
+      "soundHit1": "strike03.wav",
+      "soundHit2": "strike04.wav"
+    },
+    {
+      "id": "flamer",
+      "projectileType": "flamer",
+      "healthDamage": 2,
+      "shieldDamage": 1,
+      "fireDelay": 2,
+      "velocity": 7,
+      "moveAmount": 6,
+      "radius": 10
+    },
+    {
+      "id": "rocket",
+      "projectileType": "rocket",
+      "healthDamage": 75,
+      "shieldDamage": 25,
+      "fireDelay": 21,
+      "velocity": 35,
+      "moveAmount": 15,
+      "radius": 30,
+      "rocketSlowInitial": 0.2,
+      "rocketHoverTick": 100,
+      "rocketSlowHover": 0.3,
+      "spriteBanks": [87, 87, 87, 87, 87, 87, 87, 87],
+      "soundLoop": "rocket4.wav",
+      "soundExplosion": "seekexp1.wav",
+      "soundLand": "rocket9.wav"
+    },
+    {
+      "id": "plasma",
+      "projectileType": "plasma",
+      "healthDamage": 4,
+      "shieldDamage": 5,
+      "healthDamageLarge": 5,
+      "shieldDamageLarge": 6,
+      "velocity": 5,
+      "moveAmount": 4,
+      "radius": 5,
+      "plasmaGravity": 2,
+      "plasmaLifeNormal": 20,
+      "plasmaLifeLarge": 7
+    },
+    {
+      "id": "flare",
+      "projectileType": "arcing",
+      "healthDamage": 1,
+      "shieldDamage": 1,
+      "velocity": 5,
+      "moveAmount": 1
+    },
+    {
+      "id": "wall",
+      "projectileType": "wall",
+      "healthDamage": 10,
+      "shieldDamage": 60,
+      "velocity": 35,
+      "moveAmount": 6,
+      "hitOverlayBank": 222,
+      "soundFire": "!laserel.wav",
+      "soundHit1": "strike03.wav",
+      "soundHit2": "strike04.wav"
+    },
     {
       "id": "grenade",
+      "projectileType": "grenade",
       "_comment": "Grenade/bomb throw speeds and explosion timings (all in ticks @ 24 ticks/sec).",
       "throwSpeedStanding": 20,
       "throwSpeedMoving": 30,
@@ -20,7 +102,11 @@
       "neutronDestroyTick": 120,
       "flareDuration": 198,
       "neutronTraceTime": 15,
-      "detonatorLaunchYv": 15
+      "detonatorLaunchYv": 15,
+      "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],
+      "soundThrow": "grenthro.wav",
+      "soundExplosion": "q_expl02.wav",
+      "soundLand": "land1.wav"
     }
   ]
 }

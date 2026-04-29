@@ -125,6 +125,11 @@ static void LoadAgencies(const std::string& dir, std::vector<AgencyDef>& out) {
                 a.upgradeCaps.hacking    = caps.value("hacking",    a.upgradeCaps.hacking);
                 a.upgradeCaps.contacts   = caps.value("contacts",   a.upgradeCaps.contacts);
             }
+            if (aj.contains("weapons") && aj["weapons"].is_array()) {
+                for (const auto& wid : aj["weapons"]) {
+                    a.weapons.push_back(wid.get<std::string>());
+                }
+            }
             out.push_back(std::move(a));
         }
     } catch (const std::exception& e) {
@@ -165,6 +170,22 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.plasmaGravity       = wj.value("plasmaGravity",       w.plasmaGravity);
             w.plasmaLifeNormal    = wj.value("plasmaLifeNormal",    w.plasmaLifeNormal);
             w.plasmaLifeLarge     = wj.value("plasmaLifeLarge",     w.plasmaLifeLarge);
+            w.projectileType  = wj.value("projectileType", std::string{});
+            w.hitOverlayBank  = wj.value("hitOverlayBank", -1);
+            w.soundFire       = wj.value("soundFire",      std::string{});
+            w.soundHit1       = wj.value("soundHit1",      std::string{});
+            w.soundHit2       = wj.value("soundHit2",      std::string{});
+            w.soundLoop       = wj.value("soundLoop",      std::string{});
+            w.soundExplosion  = wj.value("soundExplosion", std::string{});
+            w.soundLand       = wj.value("soundLand",      std::string{});
+            w.soundThrow      = wj.value("soundThrow",     std::string{});
+            w.ammoCapacity    = wj.value("ammoCapacity",   0);
+            w.reloadTicks     = wj.value("reloadTicks",    0);
+            if (wj.contains("spriteBanks") && wj["spriteBanks"].is_array()) {
+                for (const auto& b : wj["spriteBanks"]) {
+                    w.spriteBanks.push_back(b.get<int>());
+                }
+            }
             out.push_back(std::move(w));
         }
     } catch (const std::exception& e) {

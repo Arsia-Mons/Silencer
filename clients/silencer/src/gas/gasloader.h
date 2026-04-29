@@ -43,6 +43,10 @@ struct AgencyDef {
     uint8_t              maxPlayersPerTeam = 4; // max peers that can join this team
     AgencyDefaultUpgrades defaultUpgrades;
     AgencyUpgradeCaps    upgradeCaps;
+
+    // Ordered list of weapon IDs this agency can equip.
+    // Empty = no restriction (use compiled-in weapon availability logic).
+    std::vector<std::string> weapons;
 };
 
 // ---- Player ----------------------------------------------------------------
@@ -137,6 +141,28 @@ struct WeaponDef {
     int   plasmaGravity     = 2;    // plasma: yv increment per tick
     int   plasmaLifeNormal  = 20;   // plasma: ticks before small plasma is destroyed
     int   plasmaLifeLarge   = 7;    // plasma: ticks before large plasma is destroyed
+
+    // ---- Sprite banks (8-directional: up,upR,right,downR,down,downL,left,upL) ----
+    // Index 0xFF means no sprite assigned. Empty vector = use compiled-in fallback.
+    std::vector<int> spriteBanks;   // 8 entries when set
+    int hitOverlayBank = -1;        // overlay bank on impact (-1 = none)
+
+    // ---- Sounds (empty string = use compiled-in fallback) ----------------------
+    std::string soundFire;          // on firing
+    std::string soundHit1;          // on hit, variant 1
+    std::string soundHit2;          // on hit, variant 2
+    std::string soundLoop;          // looping (e.g. rocket engine)
+    std::string soundExplosion;     // explosion
+    std::string soundLand;          // landing / bounce
+    std::string soundThrow;         // throw (grenade)
+
+    // ---- Projectile type (for generic factory, Phase 3) -----------------------
+    // Values: "physics", "arcing", "flamer", "plasma", "rocket", "wall", "grenade"
+    std::string projectileType;
+
+    // ---- Ammo (supplements items.json spawnAmmo/maxAmmo/pickupAmmo) -----------
+    int ammoCapacity  = 0;   // max ammo this weapon can hold (0 = use items.json)
+    int reloadTicks   = 0;   // ticks to reload one unit (0 = instant)
 };
 
 // ---- Item ------------------------------------------------------------------
