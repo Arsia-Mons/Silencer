@@ -647,8 +647,26 @@ function SpritesPageInner() {
         )}
 
         {!folder ? (
-          <div className="flex-1 flex items-center justify-center text-[#2a4a2a] font-mono text-sm">
-            Open a shared/assets folder to begin.
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center flex flex-col items-center gap-6">
+              <div className="text-6xl opacity-60">◈</div>
+              <div>
+                <p className="text-[#d1fad7] text-lg font-bold tracking-wide font-mono mb-1">SPRITE BANK MANAGER</p>
+                <p className="text-[#4a7a4a] text-sm font-mono">Open <code className="text-[#00a328]">shared/assets/</code> to begin</p>
+              </div>
+              <div className="text-xs text-[#4a7a4a] font-mono space-y-1 border border-[#1a2e1a] p-4 text-left">
+                <p>✦ View and manage sprite &amp; tile banks</p>
+                <p>✦ Import PNG frames from external tools</p>
+                <p>✦ Export .BIN banks and updated .DAT index</p>
+                <p>✦ Add, delete, and reorder frames per bank</p>
+              </div>
+              <button
+                onClick={() => folderInputRef.current?.click()}
+                className="px-6 py-2 text-sm font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors"
+              >
+                [ OPEN FOLDER ]
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex flex-1 min-h-0">
