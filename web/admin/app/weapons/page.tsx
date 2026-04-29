@@ -255,11 +255,11 @@ export default function WeaponsPage() {
 
         <div className="flex flex-1 min-h-0">
           {/* Weapon list */}
-          <div className="flex flex-col border-r border-[#1a2e1a]" style={{ width: 180, minWidth: 180 }}>
-            <div className="px-3 py-2 border-b border-[#1a2e1a]">
+          <div className="flex flex-col border-r border-[#1a2e1a] h-full" style={{ width: 180, minWidth: 180 }}>
+            <div className="px-3 py-2 border-b border-[#1a2e1a] shrink-0">
               <span className="text-[10px] font-mono text-[#4a7a4a]">WEAPONS</span>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto min-h-0">
               {folder.weapons.map(w => (
                 <button
                   key={w.id}
@@ -357,18 +357,33 @@ export default function WeaponsPage() {
                       BROWSE →
                     </Link>
                   </div>
-                  {SOUND_FIELDS.map(({ key, label }) => (
-                    <div key={String(key)} className="flex items-center gap-2">
-                      <span className="text-[9px] font-mono text-[#4a7a4a] w-16">{label}</span>
-                      <input
-                        type="text"
-                        value={String(currentWeapon[key] ?? '')}
-                        placeholder="filename.wav"
-                        onChange={e => patchWeapon(currentWeapon.id, { [key]: e.target.value })}
-                        className="flex-1 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded focus:border-[#00a328] outline-none"
-                      />
-                    </div>
-                  ))}
+                  {SOUND_FIELDS.map(({ key, label }) => {
+                    const val = String(currentWeapon[key] ?? '');
+                    return (
+                      <div key={String(key)} className="flex items-center gap-2">
+                        <span className="text-[9px] font-mono text-[#4a7a4a] w-16 shrink-0">{label}</span>
+                        <input
+                          type="text"
+                          value={val}
+                          placeholder="filename.wav"
+                          onChange={e => patchWeapon(currentWeapon.id, { [key]: e.target.value })}
+                          className="flex-1 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded focus:border-[#00a328] outline-none"
+                        />
+                        {val && (
+                          <button
+                            title={`Play ${val}`}
+                            onClick={() => {
+                              const audio = new Audio(`/api/sounds/${encodeURIComponent(val)}/play`);
+                              audio.play().catch(() => {});
+                            }}
+                            className="shrink-0 text-[10px] font-mono text-[#4a7a4a] hover:text-[#00a328] transition-colors px-1"
+                          >
+                            ▶
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </section>
 
                 {/* Agency loadout */}
@@ -426,11 +441,15 @@ function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
     if (!ctx) return;
 
     const W = cvs.width, H = cvs.height;
-    const velocity = weapon.velocity ?? 0;
-    const gravity = (weapon as Record<string, unknown>).plasmaGravity as number ?? 0;
+    const type = weapon.projectileType ?? 'physics';
+    const velocityRaw = weapon.velocity as number | undefined;
+    // Blaster has no static velocity — it fires at a fixed speed set by the engine.
+    // Use a representative value so the preview draws something useful.
+    const velocity = velocityRaw ?? (type === 'physics' ? 20 : 0);
+    const gravity = (weapon as Record<string, unknown>).plasmaGravity as number | undefined
+      ?? (type === 'grenade' || type === 'arcing' ? 1.5 : 0);
     const moveAmount = weapon.moveAmount ?? 1;
     const radius = weapon.radius ?? 0;
-    const type = weapon.projectileType ?? 'physics';
 
     ctx.fillStyle = '#080f08';
     ctx.fillRect(0, 0, W, H);
@@ -442,7 +461,7 @@ function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
     if (velocity === 0 && type !== 'grenade' && type !== 'arcing') {
       ctx.fillStyle = '#2a4a2a';
       ctx.font = '10px monospace';
-      ctx.fillText('no velocity — melee / instant / contact', 10, H / 2);
+      ctx.fillText('no velocity — contact / fixed-direction', 10, H / 2);
       return;
     }
 
@@ -453,17 +472,19 @@ function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
     const path: [number, number][] = [[x, y]];
 
     if (type === 'grenade' || type === 'arcing') {
-      yv = -8 * scale;
-      xv = ((weapon as Record<string, unknown>).throwSpeedStanding as number ?? velocity ?? 20) * scale * 0.5;
+      const throwSpeed = (weapon as Record<string, unknown>).throwSpeedStanding as number ?? 20;
+      xv = throwSpeed * scale * 0.5;
+      yv = -10 * scale;
     }
 
-    for (let step = 0; step < 600; step++) {
-      for (let m = 0; m < Math.max(1, moveAmount); m++) {
-        x += xv / Math.max(1, moveAmount);
-        y += yv / Math.max(1, moveAmount);
+    for (let step = 0; step < 800; step++) {
+      const steps = Math.max(1, moveAmount);
+      for (let m = 0; m < steps; m++) {
+        x += xv / steps;
+        y += yv / steps;
       }
-      if (gravity) yv += gravity * 0.3;
-      if (y >= H - 20) break;
+      if (gravity) yv += gravity * 0.4;
+      if (y >= H - 20 && step > 0) break;
       if (x > W) break;
       path.push([x, y]);
     }
@@ -486,9 +507,15 @@ function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
       ctx.fill(); ctx.stroke();
     }
 
+    const label = [
+      velocityRaw !== undefined ? `v=${velocity}` : `v≈${velocity}(est)`,
+      `steps=${moveAmount}`,
+      gravity ? `g=${gravity}` : null,
+      radius ? `r=${radius}px` : null,
+    ].filter(Boolean).join('  ');
     ctx.fillStyle = '#4a7a4a';
     ctx.font = '9px monospace';
-    ctx.fillText(`v=${velocity} steps=${moveAmount}${gravity ? ` g=${gravity}` : ''}${radius ? ` r=${radius}px` : ''}`, 6, 12);
+    ctx.fillText(label, 6, 12);
   }, [weapon]);
 
   useEffect(() => { simulate(); }, [simulate]);
