@@ -87,6 +87,17 @@ endif()
 
 target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_14)
 
+if(WIN32)
+	# Strip <winsock.h> (and other legacy subsystems) out of <windows.h>.
+	# Without this, any TU that pulls in <windows.h> via zlib's zconf.h,
+	# behaviortree.cpp, actordef.cpp, etc. drags in winsock 1.x; another
+	# TU including <winsock2.h> then redefines sockaddr/fd_set/etc. The
+	# collision is invisible to non-unity builds (each TU is isolated)
+	# but surfaces in unity batches. We use winsock2 only — no Shell/
+	# RPC/Crypto/DDE call sites in the codebase to break.
+	target_compile_definitions(${SILENCER_TARGET} PRIVATE WIN32_LEAN_AND_MEAN)
+endif()
+
 # Unity (jumbo) build: combines src/*.cpp into batched TUs to dramatically
 # speed up clean builds. Off by default — incremental single-file edits are
 # slower under unity since changing one .cpp recompiles its whole batch.
