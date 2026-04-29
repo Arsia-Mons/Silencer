@@ -130,4 +130,10 @@ std::string ResolveProfilePath(const std::string& name);
 // Always returns the datadir path for `name`, whether or not it exists.
 std::string WritableProfilePath(const std::string& name);
 
+// Profile names are used directly in filesystem paths, so they must not
+// contain path separators or traversal sequences. Allowed characters are
+// [A-Za-z0-9_-], length 1-64. Returns false for anything else (including
+// empty, "..", names with '/', '\\', or '.').
+bool IsValidProfileName(const std::string& name);
+
 #endif

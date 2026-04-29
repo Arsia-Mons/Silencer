@@ -49,6 +49,16 @@ std::string GetDataDir(void){
 	std::string d = std::string(home) + "/Library/Application Support/Silencer/";
 	CreateDirectory(d.c_str());
 	return d;
+#elif defined(_WIN32)
+	const char * appdata = getenv("APPDATA");
+	if(!appdata || !*appdata) return "";
+	// Use forward slashes so concatenations like `GetDataDir() + "level/download"`
+	// produce a uniform path; Windows file APIs accept either separator, but
+	// CreateDirectory() above only walks '/' to create intermediates.
+	std::string d = std::string(appdata) + "/Silencer/";
+	for(char & c : d){ if(c == '\\') c = '/'; }
+	CreateDirectory(d.c_str());
+	return d;
 #else
 	return "";
 #endif

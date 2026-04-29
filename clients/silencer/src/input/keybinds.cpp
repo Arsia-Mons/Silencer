@@ -329,7 +329,20 @@ std::string KeybindsDataDir() {
 	return out;
 }
 
+bool IsValidProfileName(const std::string& name) {
+	if (name.empty() || name.size() > 64) return false;
+	for (char c : name) {
+		bool ok = (c >= 'a' && c <= 'z') ||
+		          (c >= 'A' && c <= 'Z') ||
+		          (c >= '0' && c <= '9') ||
+		          c == '_' || c == '-';
+		if (!ok) return false;
+	}
+	return true;
+}
+
 std::string WritableProfilePath(const std::string& name) {
+	if (!IsValidProfileName(name)) return "";
 	return KeybindsDataDir() + name + ".json";
 }
 
@@ -344,8 +357,9 @@ static bool FileExists(const std::string& path) {
 }
 
 std::string ResolveProfilePath(const std::string& name) {
+	if (!IsValidProfileName(name)) return "";
 	std::string a = WritableProfilePath(name);
-	if (FileExists(a)) return a;
+	if (!a.empty() && FileExists(a)) return a;
 	std::string r = KeybindsResDir();
 	if (!r.empty()) {
 		std::string b = r + name + ".json";

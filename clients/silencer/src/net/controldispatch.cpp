@@ -484,6 +484,28 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 		return;
 	}
 
+	// Profile names flow into filesystem paths via WritableProfilePath /
+	// ResolveProfilePath. Reject anything that isn't a plain identifier
+	// before we touch disk — without this, a name like "../foo" can escape
+	// the keybinds directory (and `delete`'s std::remove() could nuke
+	// arbitrary user files). Skip subops that don't take a profile name.
+	if (subop != "list" && subop != "actions" && cmd.args.contains("profile")) {
+		const std::string profile = cmd.args.value("profile", std::string());
+		if (!profile.empty() && !IsValidProfileName(profile)) {
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+				"invalid profile name (allowed: [A-Za-z0-9_-], 1-64 chars): " + profile));
+			return;
+		}
+	}
+	if (cmd.args.contains("from")) {
+		const std::string from = cmd.args.value("from", std::string());
+		if (!from.empty() && !IsValidProfileName(from)) {
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+				"invalid source profile name: " + from));
+			return;
+		}
+	}
+
 	// ---- list ---------------------------------------------------------
 	if (subop == "list") {
 		ProfileListing pl = ListProfiles();

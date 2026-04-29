@@ -6198,6 +6198,22 @@ bool Game::HandleSDLEvents(void){
 					iface->ProcessMouseMove(world, (float(event.button.x) / w) * 640, (float(event.button.y) / h) * 480);
 				}
 			}break;
+			case SDL_EVENT_GAMEPAD_ADDED:{
+				// SDL3 doesn't auto-open gamepads; without this, a pad plugged
+				// in mid-session is only picked up by PollGamepadState's
+				// fallback (which itself stops working if `gamepad` is stale).
+				if(!gamepad) OpenFirstGamepad();
+			}break;
+			case SDL_EVENT_GAMEPAD_REMOVED:{
+				// SDL keeps the SDL_Gamepad* valid until SDL_CloseGamepad, so
+				// we must explicitly close + null on removal — otherwise
+				// PollGamepadState's `if(!gamepad)` reopen guard never fires.
+				if(gamepad && event.gdevice.which == SDL_GetGamepadID(gamepad)){
+					SDL_CloseGamepad(gamepad);
+					gamepad = nullptr;
+					gamepadstate.connected = false;
+				}
+			}break;
 			case SDL_EVENT_QUIT:
 				return false;
 			break;
