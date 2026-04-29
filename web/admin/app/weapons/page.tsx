@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useAuth } from '../../lib/auth';
 import Sidebar from '../../components/Sidebar';
 import { useWsConnected } from '../../lib/socket';
+import { decodeAdpcmWav } from '../sound-studio/adpcm';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,57 @@ export default function WeaponsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
+
+  // ── Audio (ADPCM via Web Audio API, same as Sound Studio) ───────────────────
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const decodedCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
+  const [playingSound, setPlayingSound] = useState<string | null>(null);
+
+  const getToken = () => (typeof window !== 'undefined' ? localStorage.getItem('zs_token') ?? '' : '');
+
+  function getAudioCtx(): AudioContext {
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      audioCtxRef.current = new AudioContext();
+    }
+    return audioCtxRef.current;
+  }
+
+  async function playSound(name: string) {
+    if (audioSourceRef.current) {
+      try { audioSourceRef.current.stop(); } catch { /* already ended */ }
+      audioSourceRef.current = null;
+    }
+    if (playingSound === name) { setPlayingSound(null); return; }
+    try {
+      let decoded = decodedCacheRef.current.get(name);
+      if (!decoded) {
+        const r = await fetch(`/api/sounds/${encodeURIComponent(name)}/play`, {
+          headers: { Authorization: `Bearer ${getToken()}` },
+        });
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ error: r.statusText })) as { error?: string };
+          throw new Error(err.error ?? r.statusText);
+        }
+        const buf = await r.arrayBuffer();
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') await ctx.resume();
+        decoded = await decodeAdpcmWav(buf, ctx);
+        decodedCacheRef.current.set(name, decoded);
+      }
+      const ctx = getAudioCtx();
+      const source = ctx.createBufferSource();
+      source.buffer = decoded;
+      source.connect(ctx.destination);
+      source.start();
+      audioSourceRef.current = source;
+      setPlayingSound(name);
+      source.onended = () => { setPlayingSound(null); audioSourceRef.current = null; };
+    } catch (e: unknown) {
+      setPlayingSound(null);
+      setError(`Cannot play ${name}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 
   // ── Open folder (webkitdirectory) ────────────────────────────────────────
   async function handleFolderPicked(e: React.ChangeEvent<HTMLInputElement>) {
@@ -372,13 +424,10 @@ export default function WeaponsPage() {
                         {val && (
                           <button
                             title={`Play ${val}`}
-                            onClick={() => {
-                              const audio = new Audio(`/api/sounds/${encodeURIComponent(val)}/play`);
-                              audio.play().catch(() => {});
-                            }}
+                            onClick={() => playSound(val)}
                             className="shrink-0 text-[10px] font-mono text-[#4a7a4a] hover:text-[#00a328] transition-colors px-1"
                           >
-                            ▶
+                            {playingSound === val ? '■' : '▶'}
                           </button>
                         )}
                       </div>
@@ -466,12 +515,13 @@ function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
     }
 
     const scale = 1.5;
-    let x = 20, y = H - 20;
+    const isThrow = type === 'grenade' || type === 'arcing';
+    let x = 20, y = isThrow ? H - 20 : H * 0.6;
     let xv = velocity * scale;
     let yv = 0;
     const path: [number, number][] = [[x, y]];
 
-    if (type === 'grenade' || type === 'arcing') {
+    if (isThrow) {
       const throwSpeed = (weapon as Record<string, unknown>).throwSpeedStanding as number ?? 20;
       xv = throwSpeed * scale * 0.5;
       yv = -10 * scale;
