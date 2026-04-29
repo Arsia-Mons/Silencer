@@ -2,28 +2,9 @@ cmake_minimum_required(VERSION 3.16)
 
 project(Silencer)
 
-include(FetchContent)
-
-# nlohmann/json — header-only, C++14 compatible
-# v3.12.0: fixes std::_snprintf removed from MSVC 14.44 (VS 2022 17.13+)
-FetchContent_Declare(
-	nlohmann_json
-	URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.hpp
-	URL_HASH SHA256=aaf127c04cb31c406e5b04a63f1ae89369fccde6d8fa7cdda1ed4f32dfc5de63
-	DOWNLOAD_NO_EXTRACT TRUE
-)
-FetchContent_MakeAvailable(nlohmann_json)
-# Expose a simple include dir so we can do #include "nlohmann/json.hpp".
-# FetchContent downloads json.hpp directly into nlohmann_json_SOURCE_DIR,
-# so we create a nlohmann/ subdirectory wrapper and copy the header there.
-set(_nlohmann_wrapper "${CMAKE_BINARY_DIR}/nlohmann_include")
-file(MAKE_DIRECTORY "${_nlohmann_wrapper}/nlohmann")
-configure_file(
-	"${nlohmann_json_SOURCE_DIR}/json.hpp"
-	"${_nlohmann_wrapper}/nlohmann/json.hpp"
-	COPYONLY
-)
-set(NLOHMANN_JSON_INCLUDE_DIR "${_nlohmann_wrapper}")
+# nlohmann/json v3.12.0 — vendored header (third_party/nlohmann/json.hpp)
+# Vendored to avoid CMake FetchContent redirect issues with GitHub CDN in CI.
+set(NLOHMANN_JSON_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 
 # Linux GNU lowercase convention; macOS/Windows pick up mixed-case via
 # bundle/output-name overrides below.
@@ -208,8 +189,6 @@ endif()
 
 include_directories(${ZLIB_INCLUDE_DIRS})
 include_directories(${NLOHMANN_JSON_INCLUDE_DIR})
-# Also expose the raw json.hpp dir for existing includes that use #include "json.hpp"
-include_directories(${nlohmann_json_SOURCE_DIR})
 find_package(SDL3_mixer REQUIRED CONFIG)
 if(TARGET SDL3_mixer::SDL3_mixer)
   get_target_property(_sdl3mixer_inc SDL3_mixer::SDL3_mixer INTERFACE_INCLUDE_DIRECTORIES)
