@@ -488,6 +488,9 @@ function SpritesPageInner() {
   const sheetInputRef = useRef<HTMLInputElement>(null);
   const [sheetW, setSheetW] = useState('');
   const [sheetH, setSheetH] = useState('');
+  // Source tile size in the PNG (for tiles tab — may differ from 64×64 game size)
+  const [tileSrcW, setTileSrcW] = useState('');
+  const [tileSrcH, setTileSrcH] = useState('');
 
   function handleImportSheet(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -497,31 +500,54 @@ function SpritesPageInner() {
     img.onload = () => {
       URL.revokeObjectURL(url);
 
-      // Tiles are always 64×64. For sprites, use inputs → existing frame → full image.
+      // For tiles: source size from inputs (required), output always 64×64.
+      // For sprites: use inputs → existing frame → full image.
       const existingFrame = currentBank?.frames[0];
-      const fw = tab === 'tiles' ? 64 : (parseInt(sheetW, 10) || existingFrame?.header.width || img.width);
-      const fh = tab === 'tiles' ? 64 : (parseInt(sheetH, 10) || existingFrame?.header.height || img.height);
+      let srcW: number, srcH: number, outW: number, outH: number;
+      if (tab === 'tiles') {
+        srcW = parseInt(tileSrcW, 10);
+        srcH = parseInt(tileSrcH, 10);
+        if (isNaN(srcW) || srcW <= 0 || isNaN(srcH) || srcH <= 0) {
+          setError('Enter the source tile size (W × H) in the PNG before importing.');
+          return;
+        }
+        outW = 64; outH = 64;
+      } else {
+        srcW = parseInt(sheetW, 10) || existingFrame?.header.width || img.width;
+        srcH = parseInt(sheetH, 10) || existingFrame?.header.height || img.height;
+        outW = srcW; outH = srcH;
+      }
 
-      if (fw % 4 !== 0) { setError(`Frame width (${fw}) must be a multiple of 4.`); return; }
-      const cols = Math.floor(img.width / fw);
-      const rows = Math.floor(img.height / fh);
-      if (cols === 0 || rows === 0) { setError('Image smaller than one frame.'); return; }
-      const cvs = document.createElement('canvas');
-      cvs.width = img.width;
-      cvs.height = img.height;
-      const ctx = cvs.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(img, 0, 0);
+      if (outW % 4 !== 0) { setError(`Output width (${outW}) must be a multiple of 4.`); return; }
+      const cols = Math.floor(img.width / srcW);
+      const rows = Math.floor(img.height / srcH);
+      if (cols === 0 || rows === 0) { setError('Image smaller than one tile.'); return; }
+
+      // Source canvas — draw full image once
+      const srcCvs = document.createElement('canvas');
+      srcCvs.width = img.width; srcCvs.height = img.height;
+      const srcCtx = srcCvs.getContext('2d');
+      if (!srcCtx) return;
+      srcCtx.drawImage(img, 0, 0);
+
+      // Output canvas — reused per frame, scales src region → outW×outH
+      const outCvs = document.createElement('canvas');
+      outCvs.width = outW; outCvs.height = outH;
+      const outCtx = outCvs.getContext('2d');
+      if (!outCtx) return;
+
       const newFrames: DecodedFrame[] = [];
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-          const imageData = ctx.getImageData(col * fw, row * fh, fw, fh);
+          outCtx.clearRect(0, 0, outW, outH);
+          outCtx.drawImage(srcCvs, col * srcW, row * srcH, srcW, srcH, 0, 0, outW, outH);
+          const imageData = outCtx.getImageData(0, 0, outW, outH);
           try {
             const indexed = quantizeToPalette(imageData, palette);
             newFrames.push({
               header: {
-                width: fw,
-                height: fh,
+                width: outW,
+                height: outH,
                 offsetX: 0,
                 offsetY: 0,
                 compSize: 0,
@@ -993,16 +1019,38 @@ function SpritesPageInner() {
                   </p>
                 )}
                 {tab === 'tiles' && (
-                  <button
-                    onClick={() => {
-                      if (selectedBank === null) { setError('Select a bank first.'); return; }
-                      sheetInputRef.current?.click();
-                    }}
-                    className="w-full px-3 py-1.5 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors text-left"
-                    title="Slices into 64×64 tiles automatically"
-                  >
-                    + IMPORT SHEET (64×64)
-                  </button>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2 items-center">
+                      <input
+                        type="number"
+                        placeholder="src W"
+                        value={tileSrcW}
+                        onChange={e => setTileSrcW(e.target.value)}
+                        className="w-16 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded"
+                      />
+                      <span className="text-[#4a7a4a] text-xs">×</span>
+                      <input
+                        type="number"
+                        placeholder="src H"
+                        value={tileSrcH}
+                        onChange={e => setTileSrcH(e.target.value)}
+                        className="w-16 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded"
+                      />
+                      <button
+                        onClick={() => {
+                          if (selectedBank === null) { setError('Select a bank first.'); return; }
+                          sheetInputRef.current?.click();
+                        }}
+                        className="flex-1 px-2 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors"
+                        title="Source tile size in the PNG — scaled to 64×64 on import"
+                      >
+                        + SHEET→64
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-[#4a7a4a] font-mono">
+                      enter source tile size in PNG; each tile scales to 64×64
+                    </p>
+                  </div>
                 )}
               </div>
 
