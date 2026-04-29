@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../lib/auth';
 import { useWsConnected } from '../../lib/socket';
 import Sidebar from '../../components/Sidebar';
+import { zipSync } from 'fflate';
 import {
   parseDat,
   decodeBank,
@@ -261,6 +262,7 @@ function SpritesPageInner() {
   const [dirtyDat, setDirtyDat] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [draggingFrameIdx, setDraggingFrameIdx] = useState<number | null>(null);
 
   // Current tab's assets
   const tabAssets: TabAssets | null = folder ? (tab === 'sprites' ? folder.sprites : folder.tiles) : null;
@@ -527,6 +529,60 @@ function SpritesPageInner() {
     e.target.value = '';
   }
 
+  // ── Reorder frame (drag-and-drop) ─────────────────────────────────────────
+  function reorderFrame(bankIdx: number, fromIdx: number, toIdx: number) {
+    if (fromIdx === toIdx) return;
+    setDecodedBanks(prev => {
+      const m = new Map(prev);
+      const bank = m.get(bankIdx);
+      if (!bank) return prev;
+      const frames = [...bank.frames];
+      const [moved] = frames.splice(fromIdx, 1);
+      frames.splice(toIdx, 0, moved);
+      m.set(bankIdx, { ...bank, frames, dirty: true });
+      return m;
+    });
+    setSelectedFrame(toIdx);
+  }
+
+  // ── Zip export (all modified banks + DAT) ────────────────────────────────
+  function handleDownloadZip() {
+    if (!tabAssets) return;
+
+    // Build updated DAT
+    let datBuf: ArrayBuffer = tabAssets.datBuf.slice(0);
+    for (const [idx, bank] of decodedBanks) {
+      const p = encodeDat(datBuf, idx, bank.frames.length);
+      datBuf = new ArrayBuffer(p.byteLength);
+      new Uint8Array(datBuf).set(p);
+    }
+    for (const idx of deletedBanks) {
+      const p = encodeDat(datBuf, idx, 0);
+      datBuf = new ArrayBuffer(p.byteLength);
+      new Uint8Array(datBuf).set(p);
+    }
+
+    const dir = DIR_NAME[tab];
+    const files: Record<string, Uint8Array> = {
+      [DAT_NAME[tab]]: new Uint8Array(datBuf),
+    };
+
+    for (const [idx, bank] of decodedBanks) {
+      if (!bank.dirty) continue;
+      const encoded = encodeBank(bank);
+      files[`${dir}/${bankFilename(tab, idx)}`] = encoded;
+    }
+
+    const zipped = zipSync(files, { level: 0 });
+    const blob = new Blob([zipped.buffer as ArrayBuffer], { type: 'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `silencer-${dir}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // ── Export sprite sheet PNG ───────────────────────────────────────────────
   function handleExportSheet() {
     if (!currentBank || !palette) return;
@@ -786,6 +842,14 @@ function SpritesPageInner() {
                 >
                   ↓ SHEET.PNG
                 </button>
+                <button
+                  onClick={handleDownloadZip}
+                  disabled={!tabAssets}
+                  title="Download all modified banks + index as a zip"
+                  className="px-3 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors disabled:opacity-30"
+                >
+                  ↓ ZIP ALL
+                </button>
                 {selectedBank !== null && currentBank && (
                   <span className="ml-2 text-xs font-mono text-[#4a7a4a]">
                     Bank {String(selectedBank).padStart(3, '0')} — {currentBank.frames.length} frames
@@ -805,13 +869,27 @@ function SpritesPageInner() {
                 {currentBank && (
                   <div className="flex flex-wrap gap-2">
                     {currentBank.frames.map((f, i) => (
-                      <Thumbnail
+                      <div
                         key={i}
-                        frame={f}
-                        palette={palette}
-                        selected={selectedFrame === i}
-                        onClick={() => setSelectedFrame(i)}
-                      />
+                        draggable
+                        onDragStart={() => setDraggingFrameIdx(i)}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={() => {
+                          if (draggingFrameIdx !== null && selectedBank !== null) {
+                            reorderFrame(selectedBank, draggingFrameIdx, i);
+                          }
+                          setDraggingFrameIdx(null);
+                        }}
+                        onDragEnd={() => setDraggingFrameIdx(null)}
+                        className={`cursor-grab active:cursor-grabbing transition-opacity ${draggingFrameIdx === i ? 'opacity-40' : ''}`}
+                      >
+                        <Thumbnail
+                          frame={f}
+                          palette={palette}
+                          selected={selectedFrame === i}
+                          onClick={() => setSelectedFrame(i)}
+                        />
+                      </div>
                     ))}
                     {currentBank.frames.length === 0 && (
                       <div className="text-[#2a4a2a] text-xs font-mono">No frames. Import a PNG to add one.</div>
