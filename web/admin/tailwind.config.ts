@@ -23,10 +23,7 @@ const config: Config = {
         },
       },
       fontFamily: {
-        mono: ['"Silencer UI"', '"Courier New"', 'Courier', 'monospace'],
-        'silencer-title': ['"Silencer Title"', '"Courier New"', 'monospace'],
-        'silencer-large': ['"Silencer UI Large"', '"Courier New"', 'monospace'],
-        'silencer-tiny': ['"Silencer Tiny"', '"Courier New"', 'monospace'],
+        mono: ['"Courier New"', 'Courier', 'monospace'],
       },
     },
   },
