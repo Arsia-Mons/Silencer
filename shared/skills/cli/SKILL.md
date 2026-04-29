@@ -115,6 +115,13 @@ returns the same `{file, instancePath, code, message}` error shape as
 `gas validate`. Only safe from `NONE` / `MAINMENU` / `LOBBY` /
 `MISSIONSUMMARY` — errors `WRONG_STATE` mid-game.
 
+Exit-code semantics differ from `gas validate`: `gas reload` exits 0
+as long as the operation ran (the daemon reloaded its struct state).
+Whether the new files were clean is reported in the response's
+`errors[]` array, not the exit code. CI loops that want a hard
+pass/fail on data validity should run `gas validate` first and gate
+the `gas reload` call on its exit status.
+
 ### State names
 
 `state` and `wait_for_state --state` use the daemon's uppercase state

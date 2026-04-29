@@ -11,6 +11,7 @@
 #include "config.h"
 #include "gasloader.h"
 #include "os.h"
+#include "shared.h"
 #include <cstring>
 #include <cstdio>
 #include <fstream>
@@ -810,6 +811,11 @@ static void HandleGas(Game& game, ControlCommand& cmd) {
 			return;
 		}
 
+		// On macOS GetResDir() returns "" and the bundle resources are reached
+		// via a chdir set up by CDResDir(); other code paths (CDDataDir, replay
+		// readers) may have moved the cwd since startup. Re-anchor before the
+		// relative "gas" lookup, mirroring resources.cpp::Load.
+		CDResDir();
 		GASLoader& gas = GASLoader::Get();
 		gas.Reload(GetResDir() + "gas");
 
