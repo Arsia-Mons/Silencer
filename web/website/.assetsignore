@@ -2,6 +2,7 @@ CLAUDE.md
 AGENTS.md
 package.json
 server.ts
+worker.ts
 node_modules
 .wrangler
 bun.lock
