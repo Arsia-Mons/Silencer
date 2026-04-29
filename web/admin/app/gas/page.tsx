@@ -7,6 +7,7 @@ import { useSocket } from '../../lib/socket';
 import Sidebar from '../../components/Sidebar';
 import type { EditorAPI, CursorInfo } from '../../components/GasMonacoEditor';
 import { GAS_SCHEMAS } from '../../lib/gas-schemas';
+import * as gasStore from '../../lib/gas-store';
 // Lazy-load the Monaco-based editor (client only)
 const GasMonacoEditor = dynamic(() => import('../../components/GasMonacoEditor'), { ssr: false });
 
@@ -147,6 +148,24 @@ function GasPageInner() {
   const [copyTick,    setCopyTick]    = useState(false);
   const [showValidate, setShowValidate] = useState(false);
 
+  // ── Hydrate from shared GAS store on mount (persists across navigations) ──
+  useEffect(() => {
+    if (gasStore.isLoaded() && !localFolder) {
+      const data: Partial<Record<FileKey, string>> = {};
+      for (const tab of TABS) {
+        const text = gasStore.getFile(tab.file);
+        if (text) data[tab.file] = text;
+      }
+      if (Object.keys(data).length > 0) {
+        setFiles(data);
+        setSavedFiles(data);
+        setOriginalFiles(data);
+        setLocalFolder(gasStore.getFolderName()!);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // URL-driven active tab — ?tab=weapons etc.
   const tabParam = searchParams.get('tab') as FileKey | null;
   const validTab = TABS.some(t => t.file === tabParam) ? tabParam! : 'player';
@@ -190,9 +209,11 @@ function GasPageInner() {
     setSaveMsg('');
     setErrors({});
     e.target.value = '';
+    gasStore.loadFolder(folderName || 'gas', data as Record<string, string>);
   }
 
   function handleCloseFolder() {
+    gasStore.clear();
     setLocalFolder(null);
     setFiles({});
     setSavedFiles({});
@@ -204,6 +225,7 @@ function GasPageInner() {
 
   function handleTextChange(value: string) {
     setFiles(prev => ({ ...prev, [activeTab]: value }));
+    gasStore.setFile(activeTab, value);
     setSaveErr('');
     setSaveMsg('');
   }

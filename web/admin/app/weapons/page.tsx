@@ -5,6 +5,7 @@ import { useAuth } from '../../lib/auth';
 import Sidebar from '../../components/Sidebar';
 import { useWsConnected } from '../../lib/socket';
 import { decodeAdpcmWav } from '../sound-studio/adpcm';
+import * as gasStore from '../../lib/gas-store';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,6 +132,32 @@ export default function WeaponsPage() {
     }
   }
 
+  // ── Hydrate from shared GAS store on mount ───────────────────────────────
+  useEffect(() => {
+    if (gasStore.isLoaded() && !folder) {
+      const wText = gasStore.getFile('weapons');
+      const aText = gasStore.getFile('agencies');
+      if (wText && aText) {
+        try {
+          const wData = JSON.parse(wText) as Record<string, unknown>;
+          const aData = JSON.parse(aText) as Record<string, unknown>;
+          const weapons = (wData.weapons as WeaponDef[]) ?? [];
+          const agencies = (aData.agencies as AgencyDef[]) ?? [];
+          setFolder({ weapons, agencies, rawWeapons: wData, rawAgencies: aData, folderName: gasStore.getFolderName() ?? 'gas' });
+          setSelectedId(weapons[0]?.id ?? null);
+        } catch { /* corrupt store data — ignore */ }
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Keep GAS store in sync with edits ────────────────────────────────────
+  useEffect(() => {
+    if (!folder) return;
+    gasStore.setFile('weapons',  JSON.stringify({ ...folder.rawWeapons,  weapons:  folder.weapons  }, null, 2));
+    gasStore.setFile('agencies', JSON.stringify({ ...folder.rawAgencies, agencies: folder.agencies }, null, 2));
+  }, [folder]);
+
   // ── Open folder (webkitdirectory) ────────────────────────────────────────
   async function handleFolderPicked(e: React.ChangeEvent<HTMLInputElement>) {
     // Snapshot into array BEFORE resetting the input (FileList is a live reference)
@@ -156,12 +183,14 @@ export default function WeaponsPage() {
       setSelectedId(weapons[0]?.id ?? null);
       setDirty(false);
       setError('');
+      gasStore.loadFolder(folderName || 'gas', { weapons: weaponsText, agencies: agenciesText });
     } catch (err) {
       setError(String(err));
     }
   }
 
   function closeFolder() {
+    gasStore.clear();
     setFolder(null);
     setSelectedId(null);
     setDirty(false);
