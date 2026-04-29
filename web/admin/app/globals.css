@@ -3,6 +3,31 @@
 @tailwind utilities;
 @import 'reactflow/dist/style.css';
 
+@font-face {
+  font-family: "Silencer UI";
+  src: url("/fonts/silencer-ui.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Silencer UI Large";
+  src: url("/fonts/silencer-ui-large.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Silencer Title";
+  src: url("/fonts/silencer-title.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Silencer Tiny";
+  src: url("/fonts/silencer-tiny.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+}
+
 /* Override ReactFlow's default blue selected-node outline */
 .react-flow__node.selected > div,
 .react-flow__node:focus > div {
@@ -20,7 +45,7 @@ body {
   background-position: center right;
   background-attachment: fixed;
   color: #d1fad7;
-  font-family: 'Courier New', Courier, monospace;
+  font-family: 'Silencer UI', 'Courier New', Courier, monospace;
 }
 
 /* Dark overlay so text stays readable over the planet */
