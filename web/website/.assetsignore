@@ -3,6 +3,7 @@ AGENTS.md
 package.json
 server.ts
 worker.ts
+wrangler.jsonc
 node_modules
 .wrangler
 bun.lock
