@@ -4,6 +4,7 @@
 #include "renderdevice.h"
 #include "renderer.h"
 #include "input.h"
+#include "keybinds.h"
 #include "state.h"
 #include "interface.h"
 #include "button.h"
@@ -55,6 +56,13 @@ public:
 	Uint64 stepWallclockDeadlineMs;
 	int controlPort;
 	bool headless;
+
+	// Keybind access for ControlDispatch.
+	KeyMap& GetKeyMap() { return keymap; }
+	const KeyMap& GetKeyMap() const { return keymap; }
+	// Load the active profile (per Config::active_keybind_profile) into keymap.
+	// Falls back to "default" (built-in) if the named profile is missing.
+	void LoadActiveKeymap();
 
 private:
 	bool Tick(void);
@@ -122,8 +130,20 @@ private:
 	void AddSummaryLine(TextBox & textbox, const char * name, Uint32 value, bool percentage = false);
 	void ShowTeamOverlays(bool show);
 	Uint8 GetSelectedAgency(void);
-	void IndexToConfigKey(int index, SDL_Scancode ** key1, SDL_Scancode ** key2, bool ** keyop);
 	const char * GetKeyName(SDL_Scancode sym);
+	// Display name for the first key bound to an action; "(unbound)" if none.
+	// Used by tutorial overlays that say "press %s to fire".
+	const char * GetActionKeyDisplayName(Action a);
+
+	// Two-key view of an action's bindings used by the controls UI.
+	// See implementation comment in game.cpp for the round-trip rules.
+	struct LegacyView {
+		SDL_Scancode key1 = SDL_SCANCODE_UNKNOWN;
+		SDL_Scancode key2 = SDL_SCANCODE_UNKNOWN;
+		bool         and_ = false;  // true = AND chord; false = OR (or single key)
+	};
+	static LegacyView ViewLegacy(const KeyMap& km, Action a);
+	static void WriteLegacy(KeyMap& km, Action a, SDL_Scancode key1, SDL_Scancode key2, bool and_);
 	void GetGameChannelName(LobbyGame & lobbygame, char * name);
 	void CreateAmbienceChannels(void);
 	void UpdateAmbienceChannels(void);
@@ -136,8 +156,11 @@ private:
 	std::string StringFromHash(unsigned char (*hash)[20]);
 	void LoadMapData(const char * filename);
 	void ProcessMapDownload(void);
-	static const int numkeys = 20;
-	const char * keynames[numkeys];
+	KeyMap keymap;
+	GamepadState gamepadstate;
+	SDL_Gamepad * gamepad;
+	void OpenFirstGamepad(void);
+	void PollGamepadState(void);
 	Uint8 keystate[SDL_SCANCODE_COUNT];
 	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, UPDATING, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, OPTIONSDISPLAY, OPTIONSAUDIO, HOSTGAME, JOINGAME, REPLAYGAME, TESTGAME};
 	Uint8 state;
