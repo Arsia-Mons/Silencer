@@ -201,11 +201,22 @@ blockquote footer a:focus-visible {
 
 /* --- Responsive Polish --- */
 @media (max-width: 800px) {
+  /* Drop the custom OT-SVG fonts on mobile: iOS Safari renders them dim
+     (currentColor isn't honored, so text and underlines fade to grey or
+     vanish). Fall back to the system monospace stack. */
+  body,
+  blockquote,
+  blockquote footer,
+  .links {
+    font-family: 'Courier New', Courier, monospace;
+  }
+
   body {
     align-items: start;
     padding: 0;
+    color: #c5e1c5;
   }
-  
+
   main {
     grid-template-columns: 100%;
     gap: 1.5rem;
@@ -215,7 +226,7 @@ blockquote footer a:focus-visible {
     box-sizing: border-box;
     overflow-wrap: break-word;
   }
-  
+
   .logo {
     height: auto;
     width: 100%;
@@ -223,18 +234,28 @@ blockquote footer a:focus-visible {
     margin: 0 auto;
     display: block;
   }
-  
+
   blockquote {
     grid-column: 1 / -1;
     padding-left: 0;
     margin: 0;
+    color: #c5e1c5;
   }
-  
+
   blockquote p {
     font-size: 16px;
     margin-bottom: 1rem;
   }
-  
+
+  blockquote footer {
+    color: #c5e1c5;
+    opacity: 1;
+  }
+
+  blockquote footer a {
+    color: #c5e1c5;
+  }
+
   .links {
     grid-column: 1 / -1;
     display: flex;
@@ -254,6 +275,7 @@ blockquote footer a:focus-visible {
   }
 
   .links a {
+    color: #c5e1c5;
     padding: 0.5rem 0;
     width: auto;
   }
