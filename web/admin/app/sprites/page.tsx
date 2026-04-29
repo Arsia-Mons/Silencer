@@ -492,17 +492,17 @@ function SpritesPageInner() {
   function handleImportSheet(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || selectedBank === null) return;
-    const fw = parseInt(sheetW, 10);
-    const fh = parseInt(sheetH, 10);
-    if (isNaN(fw) || isNaN(fh) || fw <= 0 || fh <= 0) {
-      setError('Set frame W and H before importing a sprite sheet.');
-      return;
-    }
-    if (fw % 4 !== 0) { setError(`Frame width (${fw}) must be a multiple of 4.`); return; }
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(url);
+
+      // Tiles are always 64×64. For sprites, use inputs → existing frame → full image.
+      const existingFrame = currentBank?.frames[0];
+      const fw = tab === 'tiles' ? 64 : (parseInt(sheetW, 10) || existingFrame?.header.width || img.width);
+      const fh = tab === 'tiles' ? 64 : (parseInt(sheetH, 10) || existingFrame?.header.height || img.height);
+
+      if (fw % 4 !== 0) { setError(`Frame width (${fw}) must be a multiple of 4.`); return; }
       const cols = Math.floor(img.width / fw);
       const rows = Math.floor(img.height / fh);
       if (cols === 0 || rows === 0) { setError('Image smaller than one frame.'); return; }
@@ -958,32 +958,52 @@ function SpritesPageInner() {
                 >
                   + IMPORT PNG
                 </button>
-                <div className="flex gap-2 items-center">
-                  <input
-                    type="number"
-                    placeholder="W"
-                    value={sheetW}
-                    onChange={e => setSheetW(e.target.value)}
-                    className="w-14 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded"
-                  />
-                  <span className="text-[#4a7a4a] text-xs">×</span>
-                  <input
-                    type="number"
-                    placeholder="H"
-                    value={sheetH}
-                    onChange={e => setSheetH(e.target.value)}
-                    className="w-14 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded"
-                  />
+                {tab === 'sprites' && (
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="number"
+                      placeholder={currentBank?.frames[0] ? String(currentBank.frames[0].header.width) : 'W'}
+                      value={sheetW}
+                      onChange={e => setSheetW(e.target.value)}
+                      className="w-14 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded"
+                    />
+                    <span className="text-[#4a7a4a] text-xs">×</span>
+                    <input
+                      type="number"
+                      placeholder={currentBank?.frames[0] ? String(currentBank.frames[0].header.height) : 'H'}
+                      value={sheetH}
+                      onChange={e => setSheetH(e.target.value)}
+                      className="w-14 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded"
+                    />
+                    <button
+                      onClick={() => {
+                        if (selectedBank === null) { setError('Select a bank first.'); return; }
+                        sheetInputRef.current?.click();
+                      }}
+                      className="flex-1 px-2 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors"
+                      title="Leave W/H blank to auto-detect from existing frames or full image size"
+                    >
+                      + SHEET
+                    </button>
+                  </div>
+                )}
+                {tab === 'sprites' && currentBank?.frames[0] && !sheetW && !sheetH && (
+                  <p className="text-[10px] text-[#4a7a4a] font-mono">
+                    auto {currentBank.frames[0].header.width}×{currentBank.frames[0].header.height} from bank
+                  </p>
+                )}
+                {tab === 'tiles' && (
                   <button
                     onClick={() => {
                       if (selectedBank === null) { setError('Select a bank first.'); return; }
                       sheetInputRef.current?.click();
                     }}
-                    className="flex-1 px-2 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors"
+                    className="w-full px-3 py-1.5 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors text-left"
+                    title="Slices into 64×64 tiles automatically"
                   >
-                    + SHEET
+                    + IMPORT SHEET (64×64)
                   </button>
-                </div>
+                )}
               </div>
 
               {currentFrame ? (
