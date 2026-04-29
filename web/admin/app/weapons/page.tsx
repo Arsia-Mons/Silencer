@@ -81,27 +81,19 @@ export default function WeaponsPage() {
 
   // ── Open folder (webkitdirectory) ────────────────────────────────────────
   async function handleFolderPicked(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+    // Snapshot into array BEFORE resetting the input (FileList is a live reference)
+    const files = Array.from(e.target.files ?? []);
     e.target.value = '';
+    if (files.length === 0) return;
 
-    let weaponsText: string | null = null;
-    let agenciesText: string | null = null;
-    let folderName = '';
+    const folderName = files[0]?.webkitRelativePath?.split('/')[0] ?? 'gas';
+    const wFile  = files.find(f => f.name === 'weapons.json');
+    const aFile  = files.find(f => f.name === 'agencies.json');
 
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
-      // The path is like "gas/weapons.json" — grab folder from first file
-      if (!folderName && f.webkitRelativePath) {
-        folderName = f.webkitRelativePath.split('/')[0];
-      }
-      const name = f.name;
-      if (name === 'weapons.json')  weaponsText  = await f.text();
-      if (name === 'agencies.json') agenciesText = await f.text();
-    }
+    if (!wFile)  { setError('weapons.json not found in selected folder.'); return; }
+    if (!aFile)  { setError('agencies.json not found in selected folder.'); return; }
 
-    if (!weaponsText)  { setError('weapons.json not found in selected folder.'); return; }
-    if (!agenciesText) { setError('agencies.json not found in selected folder.'); return; }
+    const [weaponsText, agenciesText] = await Promise.all([wFile.text(), aFile.text()]);
 
     try {
       const wData = JSON.parse(weaponsText) as Record<string, unknown>;
