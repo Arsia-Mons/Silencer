@@ -64,12 +64,16 @@ void BaseDoor::SetTeam(Team & team){
 void BaseDoor::CheckForPlayersInView(World & world){
 	std::vector<Uint8> types;
 	types.push_back(ObjectTypes::PLAYER);
-	std::vector<Object *> objects = world.TestAABB(x - 320, y - 240, x + 320, y + 240, types);
-	for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
+	{ const GameObjectDef* _bd = GASLoader::Get().GetGameObjectDef("baseDoor");
+	  int _dw = _bd ? _bd->detectionWidth  : 320;
+	  int _dh = _bd ? _bd->detectionHeight : 240;
+	  std::vector<Object *> objects = world.TestAABB(x - _dw, y - _dh, x + _dw, y + _dh, types);
+	  for(std::vector<Object *>::iterator it = objects.begin(); it != objects.end(); it++){
 		Player * player = static_cast<Player *>(*it);
 		Team * team = player->GetTeam(world);
 		if(team){
 			discoveredby[team->number] = true;
 		}
+	  }
 	}
 }

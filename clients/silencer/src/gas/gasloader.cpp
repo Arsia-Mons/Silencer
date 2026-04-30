@@ -232,6 +232,24 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
                     w.spriteBanks.push_back(b.get<int>());
                 }
             }
+            w.primaryVectors.clear();
+            if (wj.contains("primaryVectors") && wj["primaryVectors"].is_array()) {
+                for (const auto& v : wj["primaryVectors"]) {
+                    SpreadVector sv;
+                    sv.xv = v.value("xv", 0);
+                    sv.yv = v.value("yv", 0);
+                    w.primaryVectors.push_back(sv);
+                }
+            }
+            w.secondaryVectors.clear();
+            if (wj.contains("secondaryVectors") && wj["secondaryVectors"].is_array()) {
+                for (const auto& v : wj["secondaryVectors"]) {
+                    SpreadVector sv;
+                    sv.xv = v.value("xv", 0);
+                    sv.yv = v.value("yv", 0);
+                    w.secondaryVectors.push_back(sv);
+                }
+            }
             out.push_back(std::move(w));
         }
     } catch (const std::exception& e) {
@@ -401,6 +419,16 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             g.soundHeal       = gj.value("soundHeal",       std::string{});
             g.soundAmbient    = gj.value("soundAmbient",    std::string{});
             g.soundOpen       = gj.value("soundOpen",       std::string{});
+            g.ventPlumeCount     = gj.value("ventPlumeCount",     g.ventPlumeCount);
+            g.ventActiveDuration = gj.value("ventActiveDuration", g.ventActiveDuration);
+            g.ventCycleTicks     = gj.value("ventCycleTicks",     g.ventCycleTicks);
+            g.ventSpreadX        = gj.value("ventSpreadX",        g.ventSpreadX);
+            g.ventSpreadY        = gj.value("ventSpreadY",        g.ventSpreadY);
+            g.ventYOffset        = gj.value("ventYOffset",        g.ventYOffset);
+            g.ventBaseYV         = gj.value("ventBaseYV",         g.ventBaseYV);
+            g.ventYVRange        = gj.value("ventYVRange",        g.ventYVRange);
+            g.detectionWidth     = gj.value("detectionWidth",     g.detectionWidth);
+            g.detectionHeight    = gj.value("detectionHeight",    g.detectionHeight);
             out.push_back(std::move(g));
         }
     } catch (const std::exception& e) {

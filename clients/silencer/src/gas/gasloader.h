@@ -152,6 +152,11 @@ struct PlayerDef {
 
 // ---- Weapon ----------------------------------------------------------------
 
+struct SpreadVector {
+    int xv = 0;
+    int yv = 0;
+};
+
 struct WeaponDef {
     std::string id;
     int healthDamage      = 0;
@@ -216,6 +221,8 @@ struct WeaponDef {
     // ---- Grenade fan counts ------------------------------------------------
     int   primaryCount    = 0;    // shaped/plasma bomb: projectiles on first burst (0 = compiled default)
     int   secondaryCount  = 0;    // shaped/plasma bomb: projectiles on second burst (0 = compiled default)
+    std::vector<SpreadVector> primaryVectors;   // per-projectile velocity for primary burst
+    std::vector<SpreadVector> secondaryVectors; // per-projectile velocity for secondary burst
     // ---- Poison ------------------------------------------------------------
     int   poisonRate      = 0;    // poison amount applied per hit (0 = use compiled default 1)
     int   poisonMax       = 0;    // max poison stack (0 = use compiled default 3)
@@ -356,6 +363,18 @@ struct GameObjectDef {
     std::string soundHeal;     // healMachine: heal sound
     std::string soundAmbient;  // vent/baseExit: ambient loop
     std::string soundOpen;     // baseDoor: door open sound
+    // ---- Vent visuals -------------------------------------------------------
+    int ventPlumeCount     = 4;   // plumes spawned per tick while active
+    int ventActiveDuration = 18;  // ticks of plume emission per activation
+    int ventCycleTicks     = 20;  // total cycle length before reset
+    int ventSpreadX        = 80;  // horizontal spread width (px)
+    int ventSpreadY        = 8;   // vertical position jitter (px)
+    int ventYOffset        = 3;   // Y spawn offset from vent center (px)
+    int ventBaseYV         = 30;  // base upward velocity (px/tick, applied negative)
+    int ventYVRange        = 20;  // random additional upward velocity range
+    // ---- BaseDoor detection -------------------------------------------------
+    int detectionWidth     = 320; // half-width of player-detection AABB (px)
+    int detectionHeight    = 240; // half-height of player-detection AABB (px)
 };
 
 // ---- Terminal ---------------------------------------------------------------

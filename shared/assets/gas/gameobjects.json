@@ -40,8 +40,12 @@
       "cooldownTicks": 240,
       "soundHeal": "if15.wav"
     },
-    { "id": "vent", "soundAmbient": "airvent2.wav" },
-    { "id": "baseDoor", "soundOpen": "portal1.wav" },
+    { "id": "vent", "soundAmbient": "airvent2.wav",
+      "ventPlumeCount": 4, "ventActiveDuration": 18, "ventCycleTicks": 20,
+      "ventSpreadX": 80, "ventSpreadY": 8, "ventYOffset": 3,
+      "ventBaseYV": 30, "ventYVRange": 20 },
+    { "id": "baseDoor", "soundOpen": "portal1.wav",
+      "detectionWidth": 320, "detectionHeight": 240 },
     { "id": "baseExit", "soundAmbient": "wndloopc.wav" }
   ],
   "terminals": [

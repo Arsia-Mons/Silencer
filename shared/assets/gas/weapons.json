@@ -169,7 +169,9 @@
       "_comment": "Plasma detonator \u2014 remote-detonated device. soundFire=arm/deploy, iscamera=true uses soundHit1, iscamera=false uses soundExplosion.",
       "soundFire": "shield2.wav",
       "soundExplosion": "seekexp1.wav",
-      "soundHit1": "q_expl02.wav"
+      "soundHit1": "q_expl02.wav",
+      "primaryVectors":   [{"xv":-14,"yv":-25},{"xv":14,"yv":-25},{"xv":-10,"yv":0},{"xv":10,"yv":0},{"xv":-10,"yv":5},{"xv":10,"yv":5}],
+      "secondaryVectors": [{"xv":-14,"yv":-5},{"xv":0,"yv":-10},{"xv":14,"yv":-5},{"xv":-5,"yv":5},{"xv":0,"yv":5},{"xv":5,"yv":5}]
     },
     {
       "id": "empbomb",
@@ -205,7 +207,9 @@
       ],
       "soundExplosion": "seekexp1.wav",
       "primaryCount": 5,
-      "secondaryCount": 4
+      "secondaryCount": 4,
+      "primaryVectors":   [{"xv":-10,"yv":-33},{"xv":-5,"yv":-34},{"xv":0,"yv":-35},{"xv":5,"yv":-34},{"xv":10,"yv":-33}],
+      "secondaryVectors": [{"xv":-10,"yv":-29},{"xv":-5,"yv":-30},{"xv":5,"yv":-30},{"xv":10,"yv":-29}]
     },
     {
       "id": "plasmabomb",
@@ -223,7 +227,9 @@
       ],
       "soundExplosion": "seekexp1.wav",
       "primaryCount": 6,
-      "secondaryCount": 6
+      "secondaryCount": 6,
+      "primaryVectors":   [{"xv":-14,"yv":-25},{"xv":14,"yv":-25},{"xv":-10,"yv":-10},{"xv":10,"yv":-10},{"xv":-10,"yv":-5},{"xv":10,"yv":-5}],
+      "secondaryVectors": [{"xv":-14,"yv":-20},{"xv":0,"yv":-10},{"xv":14,"yv":-20},{"xv":-5,"yv":-15},{"xv":0,"yv":-15},{"xv":5,"yv":-15}]
     },
     {
       "id": "neutronbomb",

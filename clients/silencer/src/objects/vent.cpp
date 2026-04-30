@@ -14,22 +14,30 @@ void Vent::Tick(World & world){
 			{ const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("vent");
 			EmitSound(world, world.resources.soundbank[(_d && !_d->soundAmbient.empty()) ? _d->soundAmbient : "airvent2.wav"], 96); }
 		}
-		if(active <= 18){
-			for(int i = 0; i < 4; i++){
-				Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
-				if(plume){
-					plume->type = rand() % 2;
-					plume->cycle = true;
-					plume->renderpass = 2;
-					plume->SetPosition(x + (rand() % 80 - 40), y - (rand() % 8) + 3);
-					plume->yv = -(rand() % 20) - 30;
-					plume->xv = (rand() % 5) - 2;
+		{ const GameObjectDef* _vd = GASLoader::Get().GetGameObjectDef("vent");
+			int _dur  = _vd ? _vd->ventActiveDuration : 18;
+			int _cyc  = _vd ? _vd->ventCycleTicks     : 20;
+			int _cnt  = _vd ? _vd->ventPlumeCount     : 4;
+			int _spX  = _vd ? _vd->ventSpreadX        : 80;
+			int _spY  = _vd ? _vd->ventSpreadY        : 8;
+			int _offY = _vd ? _vd->ventYOffset        : 3;
+			int _bYV  = _vd ? _vd->ventBaseYV         : 30;
+			int _rYV  = _vd ? _vd->ventYVRange        : 20;
+			if(active <= _dur){
+				for(int i = 0; i < _cnt; i++){
+					Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
+					if(plume){
+						plume->type = rand() % 2;
+						plume->cycle = true;
+						plume->renderpass = 2;
+						plume->SetPosition(x + (rand() % _spX - _spX/2), y - (rand() % _spY) + _offY);
+						plume->yv = -(rand() % _rYV) - _bYV;
+						plume->xv = (rand() % 5) - 2;
+					}
 				}
 			}
-		}
-		active++;
-		if(active >= 20){
-			active = 0;
+			active++;
+			if(active >= _cyc){ active = 0; }
 		}
 	}
 	res_index = (state_i / 4) % 8;
