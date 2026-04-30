@@ -528,6 +528,7 @@ struct GameEngineDef {
     int ticksPerSecond       = 24;   // ticks in one second (used for time-based counters)
     int audioStopAllFadeMs   = 200;  // fade duration for global StopAll() on scene change
     int nopeersTimeoutTicks  = 240;  // dedicated server: ticks with no peers before shutdown
+    int heartbeatIntervalTicks = 100;// dedicated server: ticks between heartbeat sends to lobby
     int maxStaleSnapshots    = 50;   // max stale object sync packets per tick
     int chatDisplayTicks     = 255;  // ticks chat overlay is visible after a new message
     int chatMaxLines         = 5;    // max lines kept in chat history
@@ -536,6 +537,8 @@ struct GameEngineDef {
     int snapshotQueueInitMaxSize = 2;   // initial snapshot queue max size on world start
     int snapshotQueueMaxCap      = 4;   // upper cap the adaptive max size can reach
     int pingIntervalMs       = 1000; // ms between ping packets on replica peers
+    int shrapnelLifeNormal   = 20;   // ticks before normal shrapnel self-destructs
+    int shrapnelLifeLaser    = 13;   // ticks before laser shrapnel (bank 110) self-destructs
 };
 
 // ---------------------------------------------------------------------------

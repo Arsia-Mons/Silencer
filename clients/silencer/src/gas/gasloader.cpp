@@ -605,7 +605,8 @@ static void LoadGameEngine(const std::string& dir, GameEngineDef& out) {
         out.tickIntervalMs      = j.value("tickIntervalMs",      out.tickIntervalMs);
         out.ticksPerSecond      = j.value("ticksPerSecond",      out.ticksPerSecond);
         out.audioStopAllFadeMs  = j.value("audioStopAllFadeMs",  out.audioStopAllFadeMs);
-        out.nopeersTimeoutTicks = j.value("nopeersTimeoutTicks", out.nopeersTimeoutTicks);
+        out.nopeersTimeoutTicks      = j.value("nopeersTimeoutTicks",      out.nopeersTimeoutTicks);
+        out.heartbeatIntervalTicks   = j.value("heartbeatIntervalTicks",   out.heartbeatIntervalTicks);
         out.maxStaleSnapshots        = j.value("maxStaleSnapshots",        out.maxStaleSnapshots);
         out.chatDisplayTicks         = j.value("chatDisplayTicks",         out.chatDisplayTicks);
         out.chatMaxLines             = j.value("chatMaxLines",             out.chatMaxLines);
@@ -614,6 +615,8 @@ static void LoadGameEngine(const std::string& dir, GameEngineDef& out) {
         out.snapshotQueueInitMaxSize = j.value("snapshotQueueInitMaxSize", out.snapshotQueueInitMaxSize);
         out.snapshotQueueMaxCap      = j.value("snapshotQueueMaxCap",      out.snapshotQueueMaxCap);
         out.pingIntervalMs           = j.value("pingIntervalMs",           out.pingIntervalMs);
+        out.shrapnelLifeNormal       = j.value("shrapnelLifeNormal",       out.shrapnelLifeNormal);
+        out.shrapnelLifeLaser        = j.value("shrapnelLifeLaser",        out.shrapnelLifeLaser);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] gameengine.json error: %s\n", e.what());
     }

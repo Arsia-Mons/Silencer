@@ -10,5 +10,8 @@
   "snapshotQueueMinSize": 1,
   "snapshotQueueInitMaxSize": 2,
   "snapshotQueueMaxCap": 4,
-  "pingIntervalMs": 1000
+  "pingIntervalMs": 1000,
+  "heartbeatIntervalTicks": 100,
+  "shrapnelLifeNormal": 20,
+  "shrapnelLifeLaser": 13
 }

@@ -1,11 +1,12 @@
 #include "dedicatedserver.h"
 #include "world.h"
 #include "team.h"
+#include "../gas/gasloader.h"
 #include <algorithm>
 
 DedicatedServer::DedicatedServer(){
 	active = false;
-	state_i = 100;
+	state_i = GASLoader::Get().gameengine.heartbeatIntervalTicks;
 	sockethandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	unsigned long iomode = 1;
     ioctl(sockethandle, FIONBIO, &iomode);
@@ -47,7 +48,7 @@ void DedicatedServer::Tick(World & world){
 	}else{
 		nopeerstime = 0;
 	}
-	if(state_i == 100){
+	if(state_i == GASLoader::Get().gameengine.heartbeatIntervalTicks){
 		Uint8 state = 0;
 		if(world.gameplaystate == World::INGAME){
 			state = 1;

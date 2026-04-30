@@ -1,4 +1,5 @@
 #include "shrapnel.h"
+#include "../gas/gasloader.h"
 #include <math.h>
 
 Shrapnel::Shrapnel() : Object(ObjectTypes::SHRAPNEL){
@@ -19,7 +20,7 @@ void Shrapnel::Tick(World & world){
 		}
 		x += xv;
 		y += yv;
-		if(state_i >= 13){
+		if(state_i >= GASLoader::Get().gameengine.shrapnelLifeLaser){
 			world.MarkDestroyObject(id);
 		}
 	}else{
@@ -68,7 +69,7 @@ void Shrapnel::Tick(World & world){
 		x += xv;
 		y += yv;
 		yv += world.gravity / 2;
-		if(state_i >= 20){
+		if(state_i >= GASLoader::Get().gameengine.shrapnelLifeNormal){
 			world.MarkDestroyObject(id);
 			return;
 		}
