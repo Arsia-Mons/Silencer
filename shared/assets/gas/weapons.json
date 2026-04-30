@@ -36,7 +36,8 @@
       "fireDelay": 2,
       "velocity": 7,
       "moveAmount": 6,
-      "radius": 10
+      "radius": 10,
+      "soundLoop": "flamebg2.wav"
     },
     {
       "id": "rocket",
@@ -108,7 +109,13 @@
       "soundLand": "land1.wav"
     },
     {
-      "id": "empbomb",
+      "id": "plasmadetonator",
+      "projectileType": "grenade",
+      "_comment": "Plasma detonator — remote-detonated device. iscamera=true uses soundHit1, iscamera=false uses soundExplosion.",
+      "soundExplosion": "seekexp1.wav",
+      "soundHit1": "q_expl02.wav"
+    },
+    {
       "projectileType": "grenade",
       "_comment": "EMP grenade — stuns shields across the whole team row.",
       "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],

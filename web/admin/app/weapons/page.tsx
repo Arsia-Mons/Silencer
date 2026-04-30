@@ -17,6 +17,8 @@ interface WeaponDef {
   projectileType?: string;
   healthDamage?: number;
   shieldDamage?: number;
+  healthDamageLarge?: number;
+  shieldDamageLarge?: number;
   fireDelay?: number;
   velocity?: number;
   moveAmount?: number;
@@ -32,6 +34,25 @@ interface WeaponDef {
   soundThrow?: string;
   ammoCapacity?: number;
   reloadTicks?: number;
+  // Grenade timing + throw speeds
+  throwSpeedStanding?: number;
+  throwSpeedMoving?: number;
+  throwSpeedRunning?: number;
+  explosionTick?: number;
+  secondaryTick?: number;
+  destroyTick?: number;
+  neutronDestroyTick?: number;
+  flareDuration?: number;
+  neutronTraceTime?: number;
+  detonatorLaunchYv?: number;
+  // Rocket physics
+  rocketSlowInitial?: number;
+  rocketHoverTick?: number;
+  rocketSlowHover?: number;
+  // Plasma physics
+  plasmaGravity?: number;
+  plasmaLifeNormal?: number;
+  plasmaLifeLarge?: number;
   [key: string]: unknown;
 }
 
@@ -71,6 +92,33 @@ const NUMERIC_BALLISTICS: { key: string; label: string }[] = [
   { key: 'radius',         label: 'Blast Radius (px)' },
   { key: 'ammoCapacity',   label: 'Ammo Capacity' },
   { key: 'reloadTicks',    label: 'Reload Ticks' },
+];
+
+const GRENADE_FIELDS: { key: string; label: string }[] = [
+  { key: 'throwSpeedStanding',  label: 'Throw Speed (standing)' },
+  { key: 'throwSpeedMoving',    label: 'Throw Speed (moving)' },
+  { key: 'throwSpeedRunning',   label: 'Throw Speed (running)' },
+  { key: 'explosionTick',       label: 'Explosion Tick' },
+  { key: 'secondaryTick',       label: 'Secondary Tick' },
+  { key: 'destroyTick',         label: 'Destroy Tick' },
+  { key: 'neutronDestroyTick',  label: 'Neutron Destroy Tick' },
+  { key: 'flareDuration',       label: 'Flare Duration (ticks)' },
+  { key: 'neutronTraceTime',    label: 'Neutron Trace Time' },
+  { key: 'detonatorLaunchYv',   label: 'Detonator Launch yv' },
+];
+
+const ROCKET_FIELDS: { key: string; label: string }[] = [
+  { key: 'rocketSlowInitial', label: 'Launch Speed Mult' },
+  { key: 'rocketHoverTick',   label: 'Hover Start Tick' },
+  { key: 'rocketSlowHover',   label: 'Hover Speed Mult' },
+];
+
+const PLASMA_FIELDS: { key: string; label: string }[] = [
+  { key: 'plasmaGravity',    label: 'Gravity (yv/tick)' },
+  { key: 'plasmaLifeNormal', label: 'Life Normal (ticks)' },
+  { key: 'plasmaLifeLarge',  label: 'Life Large (ticks)' },
+  { key: 'healthDamageLarge', label: 'Health DMG (large)' },
+  { key: 'shieldDamageLarge', label: 'Shield DMG (large)' },
 ];
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -404,6 +452,51 @@ export default function WeaponsPage() {
                     ) : null
                   )}
                 </section>
+
+                {/* Grenade-specific fields */}
+                {currentWeapon.projectileType === 'grenade' && (
+                  <section className="border border-[#1a2e1a] rounded p-4 flex flex-col gap-3">
+                    <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">GRENADE PARAMS</span>
+                    {GRENADE_FIELDS.map(({ key, label }) =>
+                      currentWeapon[key] !== undefined ? (
+                        <div key={key} className="flex justify-between items-center">
+                          <span className="text-[10px] font-mono text-[#7aaa7a]">{label}</span>
+                          <span className="text-xs font-mono text-[#d1fad7]">{String(currentWeapon[key])}</span>
+                        </div>
+                      ) : null
+                    )}
+                  </section>
+                )}
+
+                {/* Rocket-specific fields */}
+                {currentWeapon.projectileType === 'rocket' && (
+                  <section className="border border-[#1a2e1a] rounded p-4 flex flex-col gap-3">
+                    <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">ROCKET PARAMS</span>
+                    {ROCKET_FIELDS.map(({ key, label }) =>
+                      currentWeapon[key] !== undefined ? (
+                        <div key={key} className="flex justify-between items-center">
+                          <span className="text-[10px] font-mono text-[#7aaa7a]">{label}</span>
+                          <span className="text-xs font-mono text-[#d1fad7]">{String(currentWeapon[key])}</span>
+                        </div>
+                      ) : null
+                    )}
+                  </section>
+                )}
+
+                {/* Plasma-specific fields */}
+                {currentWeapon.projectileType === 'plasma' && (
+                  <section className="border border-[#1a2e1a] rounded p-4 flex flex-col gap-3">
+                    <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">PLASMA PARAMS</span>
+                    {PLASMA_FIELDS.map(({ key, label }) =>
+                      currentWeapon[key] !== undefined ? (
+                        <div key={key} className="flex justify-between items-center">
+                          <span className="text-[10px] font-mono text-[#7aaa7a]">{label}</span>
+                          <span className="text-xs font-mono text-[#d1fad7]">{String(currentWeapon[key])}</span>
+                        </div>
+                      ) : null
+                    )}
+                  </section>
+                )}
 
                 {/* Sprite banks */}
                 <section className="border border-[#1a2e1a] rounded p-4 flex flex-col gap-3">

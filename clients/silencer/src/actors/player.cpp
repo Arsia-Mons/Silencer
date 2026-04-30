@@ -3611,7 +3611,9 @@ Projectile * Player::Fire(World & world, Uint8 direction){
 				}else{
 					projectile = world.CreateObject(ObjectTypes::FLAMERPROJECTILE);
 					if(flamersoundchannel == -1){
-						flamersoundchannel = EmitSound(world, world.resources.soundbank["flamebg2.wav"], 128, true);
+						const WeaponDef* fw = GASLoader::Get().GetWeaponDef("flamer");
+						const std::string& lp = (fw && !fw->soundLoop.empty()) ? fw->soundLoop : "flamebg2.wav";
+						flamersoundchannel = EmitSound(world, world.resources.soundbank[lp], 128, true);
 					}
 					flamerammo--;
 				}

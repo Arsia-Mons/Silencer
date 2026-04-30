@@ -48,9 +48,11 @@ void Detonator::Tick(World & world){
 		if(state_i >= (4 * 4) + 6){
 			if(state_i == (4 * 4) + 6){
 				// explode
+				const WeaponDef* dw = GASLoader::Get().GetWeaponDef("plasmadetonator");
 				if(iscamera){
 					draw = false;
-					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 64);
+					const std::string& sfx = (dw && !dw->soundHit1.empty()) ? dw->soundHit1 : "q_expl02.wav";
+					EmitSound(world, world.resources.soundbank[sfx], 64);
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){
@@ -59,7 +61,8 @@ void Detonator::Tick(World & world){
 						}
 					}
 				}else{
-					EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
+					const std::string& sfx = (dw && !dw->soundExplosion.empty()) ? dw->soundExplosion : "seekexp1.wav";
+					EmitSound(world, world.resources.soundbank[sfx], 128);
 					Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
 					Sint8 yvs[] = {-25, -25, 0, 0, 5, 5};
 					Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};
