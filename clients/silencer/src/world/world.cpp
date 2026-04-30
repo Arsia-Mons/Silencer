@@ -204,9 +204,9 @@ void World::TickObjects(void){
 	DestroyMarkedObjects();
 	Player * localplayer = GetPeerPlayer(localpeerid);
 	if(localplayer){
-		audio.UpdateAllVolumes(*this, localplayer->x, localplayer->y, 500);
+		audio.UpdateAllVolumes(*this, localplayer->x, localplayer->y, GASLoader::Get().world.audioRange);
 	}else{
-		audio.UpdateAllVolumes(*this, replay.x, replay.y, 500);
+		audio.UpdateAllVolumes(*this, replay.x, replay.y, GASLoader::Get().world.audioRange);
 	}
 }
 
@@ -1040,7 +1040,7 @@ void World::CheckExists(void){
 	// check for these objects, because they can get destroyed while we are not there, and they wont get deleted
 	for(int i = 0; i < sizeof(types) / sizeof(Uint8); i++){
 		for(std::vector<Uint16>::iterator it = objectsbytype[types[i]].begin(); it != objectsbytype[types[i]].end(); it++){
-			if(count >= 50){
+			if(count >= GASLoader::Get().gameengine.maxStaleSnapshots){
 				break;
 			}
 			Object * object = GetObjectFromId(*it);
@@ -1246,13 +1246,14 @@ bool World::RelevantToPlayer(Player * player, Object * object){
 		return true;
 	}
 	if(object->issprite){
-		if(abs(player->x - object->x) <= 500 && abs(player->y - object->y) <= 450){
+		const WorldDef& _wd = GASLoader::Get().world;
+		if(abs(player->x - object->x) <= _wd.networkSyncRangeX && abs(player->y - object->y) <= _wd.networkSyncRangeY){
 			return true;
 		}
 		for(std::vector<Uint16>::iterator it = objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].begin(); it != objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].end(); it++){
 			Object * obj = GetObjectFromId((*it));
 			if(obj){
-				if(abs(player->x - obj->x) <= 500 && abs(player->y - obj->y) <= 500){
+				if(abs(player->x - obj->x) <= _wd.networkSyncRangeX && abs(player->y - obj->y) <= _wd.networkSyncRangeY){
 					SurveillanceMonitor * surveillancemonitor = static_cast<SurveillanceMonitor *>(obj);
 					if(surveillancemonitor->camera.IsVisible(*this, *object)){
 						return true;
@@ -1262,13 +1263,13 @@ bool World::RelevantToPlayer(Player * player, Object * object){
 		}
 		Object * grenade = GetObjectFromId(player->currentgrenade);
 		if(grenade){
-			if(abs(grenade->x - object->x) <= 300 && abs(grenade->y - object->y) <= 300){
+			if(abs(grenade->x - object->x) <= _wd.grenadesyncRangeX && abs(grenade->y - object->y) <= _wd.grenadesyncRangeY){
 				return true;
 			}
 		}
 		Object * detonator = GetObjectFromId(player->currentdetonator);
 		if(detonator){
-			if(abs(detonator->x - object->x) <= 300 && abs(detonator->y - object->y) <= 300){
+			if(abs(detonator->x - object->x) <= _wd.grenadesyncRangeX && abs(detonator->y - object->y) <= _wd.grenadesyncRangeY){
 				return true;
 			}
 		}
@@ -1353,19 +1354,20 @@ void World::ActivateTerminals(void){
 			}
 		}
 	}
-	int numtoactivate = terminallist.size() * 0.35;
+	const WorldDef& _wdef = GASLoader::Get().world;
+	int numtoactivate = (int)(terminallist.size() * _wdef.terminalActivatePercent);
 	numtoactivate -= numused;
 	numtoactivate += numsecret;
 	int numactivated = 0;
 	if(numtoactivate > 0){
-		for(int i = 0; i < terminallist.size(); i++){
+		for(int i = 0; i < (int)terminallist.size(); i++){
 			Terminal * terminal = terminallist[i];
 			if(terminal->state == Terminal::INACTIVE){
 				terminal->state = Terminal::BEAMING;
 				if(terminal->isbig){
-					terminal->beamingseconds = (Random() % 26) + 10;
+					terminal->beamingseconds = (Random() % _wdef.terminalBigBeamRange) + _wdef.terminalBigBeamMin;
 				}else{
-					terminal->beamingseconds = (Random() % 10) + 1;
+					terminal->beamingseconds = (Random() % _wdef.terminalSmallBeamRange) + _wdef.terminalSmallBeamMin;
 				}
 				numactivated++;
 				if(numactivated >= numtoactivate){
@@ -1871,7 +1873,7 @@ bool World::IsAuthority(void){
 }
 
 void World::Illuminate(void){
-	illuminate = 15;
+	illuminate = GASLoader::Get().world.illuminateLevel;
 }
 
 void World::ShowMessage(const char * message, Uint8 time, Uint8 type, bool networked, Peer * peer){

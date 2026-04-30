@@ -332,7 +332,7 @@ bool Game::Loop(void){
 	}
 	if(quitRequested) return false;
 	DrainControlQueue();
-	unsigned int wait = 42; // 24 fps
+	unsigned int wait = GASLoader::Get().gameengine.tickIntervalMs;
 	if(updatetitle){
 		if(!headless && window){
 			char title[128];
@@ -477,7 +477,7 @@ bool Game::Tick(void){
 		}
 	}
 	if(world.dedicatedserver.active && state != HOSTGAME){
-		if(world.dedicatedserver.nopeerstime >= 10 * 24){
+		if(world.dedicatedserver.nopeerstime >= GASLoader::Get().gameengine.nopeersTimeoutTicks){
 			world.dedicatedserver.SendHeartBeat(world, 2);
 			return false;
 		}
@@ -2119,7 +2119,7 @@ bool Game::LoadMap(const char * name){
 }
 
 void Game::UnloadGame(void){
-	Audio::GetInstance().StopAll(200);
+	Audio::GetInstance().StopAll(GASLoader::Get().gameengine.audioStopAllFadeMs);
 	currentlobbygameid = 0;
 	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
 		bgchannel[i] = -1;

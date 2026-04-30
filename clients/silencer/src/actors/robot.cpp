@@ -549,7 +549,8 @@ bool Robot::Look(World & world, Uint8 direction){
 
 void Robot::StopAmbience(void){
 	if(soundchannel != -1){
-		Audio::GetInstance().Stop(soundchannel, 800);
+		const EnemyDef* _rd = GASLoader::Get().GetEnemyDef("robot");
+		Audio::GetInstance().Stop(soundchannel, _rd ? _rd->audioFadeAmbientMs : 800);
 	}
 	soundchannel = -1;
 }

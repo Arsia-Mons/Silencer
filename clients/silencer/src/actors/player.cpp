@@ -302,7 +302,7 @@ void Player::Tick(World & world){
 	}
 	if(!world.replaying){
 		secondcounter++;
-		if(secondcounter >= 24){
+		if(secondcounter >= GASLoader::Get().gameengine.ticksPerSecond){
 			secondcounter = 0;
 		}
 	}
@@ -485,7 +485,7 @@ void Player::Tick(World & world){
 	if(state != HACKING || state_i >= GASLoader::Get().player.hackingExitThreshold){
 		if(!world.replaying && hacksoundchannel != -1){
 			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundJackout], 20);
-			Audio::GetInstance().Stop(hacksoundchannel, 700);
+			Audio::GetInstance().Stop(hacksoundchannel, GASLoader::Get().player.audioFadeHackMs);
 			hacksoundchannel = -1;
 		}
 	}
@@ -494,7 +494,7 @@ void Player::Tick(World & world){
 			if(!world.replaying){
 				//GetTeam(*world)->secretdelivered = true;
 				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundJetpack], 64);
-				Audio::GetInstance().Stop(jetpacksoundchannel, 200);
+				Audio::GetInstance().Stop(jetpacksoundchannel, GASLoader::Get().player.audioFadeJetpackMs);
 				jetpacksoundchannel = -1;
 			}
 		}
@@ -502,7 +502,7 @@ void Player::Tick(World & world){
 	if(flamersoundchannel != -1){
 		if((state != STANDINGSHOOT && state != CROUCHEDSHOOT && state != LADDERSHOOT && state != FALLINGSHOOT && state != JETPACKSHOOT) || res_index != 5){
 			if(!world.replaying){
-				Audio::GetInstance().Stop(flamersoundchannel, 200);
+				Audio::GetInstance().Stop(flamersoundchannel, GASLoader::Get().player.audioFadeFlamerMs);
 				flamersoundchannel = -1;
 			}
 		}

@@ -1,0 +1,7 @@
+{
+  "tickIntervalMs": 42,
+  "ticksPerSecond": 24,
+  "audioStopAllFadeMs": 200,
+  "nopeersTimeoutTicks": 240,
+  "maxStaleSnapshots": 50
+}

@@ -116,5 +116,8 @@
   "disguiseDeactivationTicks": 12,
   "rollSpeed": 12,
   "cannonBuildCheckX": 40,
-  "cannonBuildCheckY": 50
+  "cannonBuildCheckY": 50,
+  "audioFadeHackMs": 700,
+  "audioFadeJetpackMs": 200,
+  "audioFadeFlamerMs": 200
 }

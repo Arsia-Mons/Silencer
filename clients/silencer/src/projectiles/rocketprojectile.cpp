@@ -193,7 +193,7 @@ void RocketProjectile::Tick(World & world){
 			yv = 0;
 			res_bank = 0xFF;
 			if(soundchannel){
-				Audio::GetInstance().Stop(soundchannel, 100);
+				Audio::GetInstance().Stop(soundchannel, w ? w->audioFadePropulsionMs : 100);
 			}
 			EmitSound(world, world.resources.soundbank[w && !w->soundExplosion.empty() ? w->soundExplosion : "seekexp1.wav"], 128);
 		}

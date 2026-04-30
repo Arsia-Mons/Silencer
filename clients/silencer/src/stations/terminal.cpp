@@ -50,7 +50,8 @@ void Terminal::Tick(World & world){
 		}
 	}else{
 		if(soundchannel != -1){
-			Audio::GetInstance().Stop(soundchannel, 1000);
+			const TerminalDef* _td = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
+			Audio::GetInstance().Stop(soundchannel, _td ? _td->audioFadeMs : 1000);
 			soundchannel = -1;
 		}
 	}

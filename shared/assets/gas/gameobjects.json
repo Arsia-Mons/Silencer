@@ -1,5 +1,5 @@
 {
-  "_comment": "Game object parameters — 1:1 from station/object constructors. Upgrade costs live server-side in the lobby. Do not change during GAS migration.",
+  "_comment": "Game object parameters \u2014 1:1 from station/object constructors. Upgrade costs live server-side in the lobby. Do not change during GAS migration.",
   "gameObjects": [
     {
       "id": "fixedCannon",
@@ -40,31 +40,56 @@
       "cooldownTicks": 240,
       "soundHeal": "if15.wav"
     },
-    { "id": "vent", "soundAmbient": "airvent2.wav",
-      "ventPlumeCount": 4, "ventActiveDuration": 18, "ventCycleTicks": 20,
-      "ventSpreadX": 80, "ventSpreadY": 8, "ventYOffset": 3,
-      "ventBaseYV": 30, "ventYVRange": 20 },
-    { "id": "baseDoor", "soundOpen": "portal1.wav",
-      "detectionWidth": 320, "detectionHeight": 240 },
-    { "id": "baseExit", "soundAmbient": "wndloopc.wav" }
+    {
+      "id": "vent",
+      "soundAmbient": "airvent2.wav",
+      "ventPlumeCount": 4,
+      "ventActiveDuration": 18,
+      "ventCycleTicks": 20,
+      "ventSpreadX": 80,
+      "ventSpreadY": 8,
+      "ventYOffset": 3,
+      "ventBaseYV": 30,
+      "ventYVRange": 20
+    },
+    {
+      "id": "baseDoor",
+      "soundOpen": "portal1.wav",
+      "detectionWidth": 320,
+      "detectionHeight": 240
+    },
+    {
+      "id": "baseExit",
+      "soundAmbient": "wndloopc.wav"
+    }
   ],
   "terminals": [
     {
       "id": "big",
-      "juice": 150, "files": 400, "secretInfo": 45,
-      "traceTimeBase": 90, "traceTimeMedium": 120, "traceTimeExtended": 150,
+      "juice": 150,
+      "files": 400,
+      "secretInfo": 45,
+      "traceTimeBase": 90,
+      "traceTimeMedium": 120,
+      "traceTimeExtended": 150,
       "beaconTimeSecs": 65,
       "soundAmbient": "ambloop4.wav",
       "soundHack": "typerev6.wav",
-      "snapshotInterval": 24
+      "snapshotInterval": 24,
+      "audioFadeMs": 1000
     },
     {
       "id": "small",
-      "juice": 80, "files": 100, "secretInfo": 15,
-      "traceTimeBase": 90, "traceTimeMedium": 120, "traceTimeExtended": 150,
+      "juice": 80,
+      "files": 100,
+      "secretInfo": 15,
+      "traceTimeBase": 90,
+      "traceTimeMedium": 120,
+      "traceTimeExtended": 150,
       "soundAmbient": "ambloop4.wav",
       "soundHack": "typerev6.wav",
-      "snapshotInterval": 24
+      "snapshotInterval": 24,
+      "audioFadeMs": 1000
     }
   ]
 }

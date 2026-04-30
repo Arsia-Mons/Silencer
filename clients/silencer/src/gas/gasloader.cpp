@@ -71,6 +71,9 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.hackingEffectTicks         = j.value("hackingEffectTicks",         out.hackingEffectTicks);
         out.hackingCompleteThreshold   = j.value("hackingCompleteThreshold",   out.hackingCompleteThreshold);
         out.hackingExitThreshold       = j.value("hackingExitThreshold",       out.hackingExitThreshold);
+        out.audioFadeHackMs            = j.value("audioFadeHackMs",            out.audioFadeHackMs);
+        out.audioFadeJetpackMs         = j.value("audioFadeJetpackMs",         out.audioFadeJetpackMs);
+        out.audioFadeFlamerMs          = j.value("audioFadeFlamerMs",          out.audioFadeFlamerMs);
         out.deployWaitTicks            = j.value("deployWaitTicks",            out.deployWaitTicks);
         out.cannonBuildCheckX          = j.value("cannonBuildCheckX",          out.cannonBuildCheckX);
         out.cannonBuildCheckY          = j.value("cannonBuildCheckY",          out.cannonBuildCheckY);
@@ -248,6 +251,7 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.soundLand       = wj.value("soundLand",      std::string{});
             w.soundThrow      = wj.value("soundThrow",     std::string{});
             w.soundWarn       = wj.value("soundWarn",      std::string{});
+            w.audioFadePropulsionMs = wj.value("audioFadePropulsionMs", w.audioFadePropulsionMs);
             w.ammoCapacity    = wj.value("ammoCapacity",   0);
             w.reloadTicks     = wj.value("reloadTicks",    0);
             w.projectileLife  = wj.value("projectileLife",  0);
@@ -391,6 +395,7 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.soundAlert4    = ej.value("soundAlert4",    e.soundAlert4);
             e.soundAlert5        = ej.value("soundAlert5",        e.soundAlert5);
             e.searchTimeoutTicks = ej.value("searchTimeoutTicks", e.searchTimeoutTicks);
+            e.audioFadeAmbientMs = ej.value("audioFadeAmbientMs", e.audioFadeAmbientMs);
             e.snapshotInterval = ej.value("snapshotInterval", e.snapshotInterval);
             e.warpTeleportTick = ej.value("warpTeleportTick", e.warpTeleportTick);
             e.runDurationTicks = ej.value("runDurationTicks",  e.runDurationTicks);
@@ -503,6 +508,7 @@ static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out)
             t.soundAmbient       = tj.value("soundAmbient",       std::string{});
             t.soundHack          = tj.value("soundHack",          std::string{});
             t.snapshotInterval   = tj.value("snapshotInterval",   t.snapshotInterval);
+            t.audioFadeMs        = tj.value("audioFadeMs",        t.audioFadeMs);
             out.push_back(std::move(t));
         }
     } catch (const std::exception& e) {
@@ -520,17 +526,46 @@ static void LoadWorld(const std::string& dir, WorldDef& out) {
     if (!f.is_open()) return;
     try {
         f >> j;
-        out.soundAmbience1 = j.value("soundAmbience1", out.soundAmbience1);
-        out.soundAmbience2 = j.value("soundAmbience2", out.soundAmbience2);
-        out.soundAmbience3 = j.value("soundAmbience3", out.soundAmbience3);
+        out.soundAmbience1            = j.value("soundAmbience1",            out.soundAmbience1);
+        out.soundAmbience2            = j.value("soundAmbience2",            out.soundAmbience2);
+        out.soundAmbience3            = j.value("soundAmbience3",            out.soundAmbience3);
+        out.audioRange                = j.value("audioRange",                out.audioRange);
+        out.networkSyncRangeX         = j.value("networkSyncRangeX",         out.networkSyncRangeX);
+        out.networkSyncRangeY         = j.value("networkSyncRangeY",         out.networkSyncRangeY);
+        out.grenadesyncRangeX         = j.value("grenadesyncRangeX",         out.grenadesyncRangeX);
+        out.grenadesyncRangeY         = j.value("grenadesyncRangeY",         out.grenadesyncRangeY);
+        out.illuminateLevel           = j.value("illuminateLevel",           out.illuminateLevel);
+        out.terminalActivatePercent   = j.value("terminalActivatePercent",   out.terminalActivatePercent);
+        out.terminalBigBeamMin        = j.value("terminalBigBeamMin",        out.terminalBigBeamMin);
+        out.terminalBigBeamRange      = j.value("terminalBigBeamRange",      out.terminalBigBeamRange);
+        out.terminalSmallBeamMin      = j.value("terminalSmallBeamMin",      out.terminalSmallBeamMin);
+        out.terminalSmallBeamRange    = j.value("terminalSmallBeamRange",    out.terminalSmallBeamRange);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] world.json error: %s\n", e.what());
+    }
+}
+
+static void LoadGameEngine(const std::string& dir, GameEngineDef& out) {
+    json j;
+    std::string path = dir + "gameengine.json";
+    std::ifstream f(path);
+    if (!f.is_open()) return;
+    try {
+        f >> j;
+        out.tickIntervalMs      = j.value("tickIntervalMs",      out.tickIntervalMs);
+        out.ticksPerSecond      = j.value("ticksPerSecond",      out.ticksPerSecond);
+        out.audioStopAllFadeMs  = j.value("audioStopAllFadeMs",  out.audioStopAllFadeMs);
+        out.nopeersTimeoutTicks = j.value("nopeersTimeoutTicks", out.nopeersTimeoutTicks);
+        out.maxStaleSnapshots   = j.value("maxStaleSnapshots",   out.maxStaleSnapshots);
+    } catch (const std::exception& e) {
+        fprintf(stderr, "[gas] gameengine.json error: %s\n", e.what());
     }
 }
 
 // ---------------------------------------------------------------------------
 
 bool GASLoader::Load(const std::string& gasDir) {
+    LoadGameEngine(gasDir, gameengine);
     LoadPlayer(gasDir, player);
     LoadWorld(gasDir, world);
     LoadAgencies(gasDir, agencies);

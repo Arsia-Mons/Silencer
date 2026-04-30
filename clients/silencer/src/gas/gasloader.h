@@ -85,6 +85,10 @@ struct PlayerDef {
     int hackingEffectTicks          = 5;    // ticks for hacking visual/audio effect
     int hackingCompleteThreshold    = 15;   // state_i value when hack completes
     int hackingExitThreshold        = 17;   // state_i value when player regains movement
+    // ---- Audio fade durations (ms) ----------------------------------------
+    int audioFadeHackMs             = 700;  // hack ambient sound fade on exit
+    int audioFadeJetpackMs          = 200;  // jetpack loop fade on land/stop
+    int audioFadeFlamerMs           = 200;  // flamer loop fade on release
     int deployWaitTicks             = 60;   // ticks before deployed item becomes active
     int cannonBuildCheckX           = 40;   // half-width of cannon placement exclusion AABB
     int cannonBuildCheckY           = 50;   // height of cannon placement exclusion AABB
@@ -237,6 +241,7 @@ struct WeaponDef {
     std::string soundLand;          // landing / bounce
     std::string soundThrow;         // throw (grenade)
     std::string soundWarn;          // warning / trace alert (neutron bomb)
+    int audioFadePropulsionMs = 100; // fade duration when stopping loop sound on impact (ms)
 
     // ---- Projectile type (for generic factory, Phase 3) -----------------------
     // Values: "physics", "arcing", "flamer", "plasma", "rocket", "wall", "grenade"
@@ -364,6 +369,7 @@ struct EnemyDef {
     std::string soundAlert4     = "freezrt1.wav"; // guard spotted-target voice 4
     std::string soundAlert5     = "drop4.wav";    // guard spotted-target voice 5
     int searchTimeoutTicks = 600; // ticks guard searches before giving up (0 = never)
+    int audioFadeAmbientMs = 800; // robot: ambient loop fade duration on death/deactivate (ms)
     // ---- Network / state timers ------------------------------------------------
     int snapshotInterval  = 48;   // network snapshot frequency (0 = object default)
     int warpTeleportTick  = 12;   // state_warp value at which warp completes
@@ -435,6 +441,7 @@ struct TerminalDef {
     std::string soundAmbient;     // terminal: ambient hum loop ("ambloop4.wav")
     std::string soundHack;        // terminal: hacking key sound ("typerev6.wav")
     int snapshotInterval = 24;    // network snapshot frequency
+    int audioFadeMs      = 1000;  // fade duration when stopping ambient sound (ms)
 };
 
 // ---- World -----------------------------------------------------------------
@@ -444,6 +451,31 @@ struct WorldDef {
     std::string soundAmbience1 = "wndloopb.wav"; // outdoor wind A
     std::string soundAmbience2 = "cphum11.wav";  // indoor CPU hum
     std::string soundAmbience3 = "wndloop1.wav"; // outdoor wind B
+    // ---- Audio range
+    int audioRange          = 500;  // px radius for spatial audio volume update
+    // ---- Network visibility / sync ranges
+    int networkSyncRangeX   = 500;  // object included in snapshot within this X distance
+    int networkSyncRangeY   = 450;  // object included in snapshot within this Y distance
+    int grenadesyncRangeX   = 300;  // grenade/detonator sync range X
+    int grenadesyncRangeY   = 300;  // grenade/detonator sync range Y
+    // ---- Illumination
+    int illuminateLevel     = 15;   // flare illumination level (0..15)
+    // ---- Terminal activation on map load
+    float terminalActivatePercent = 0.35f; // fraction of terminals to activate
+    int terminalBigBeamMin        = 10;    // big terminal: min beaming seconds
+    int terminalBigBeamRange      = 26;    // big terminal: random seconds added (0..range-1)
+    int terminalSmallBeamMin      = 1;     // small terminal: min beaming seconds
+    int terminalSmallBeamRange    = 10;    // small terminal: random seconds added (0..range-1)
+};
+
+// ---- Game Engine -----------------------------------------------------------
+
+struct GameEngineDef {
+    int tickIntervalMs       = 42;   // ms per game tick (~24fps)
+    int ticksPerSecond       = 24;   // ticks in one second (used for time-based counters)
+    int audioStopAllFadeMs   = 200;  // fade duration for global StopAll() on scene change
+    int nopeersTimeoutTicks  = 240;  // dedicated server: ticks with no peers before shutdown
+    int maxStaleSnapshots    = 50;   // max stale object sync packets per tick
 };
 
 // ---------------------------------------------------------------------------
@@ -474,6 +506,7 @@ public:
 
     PlayerDef                player;
     WorldDef                 world;
+    GameEngineDef            gameengine;
     std::vector<AgencyDef>   agencies;
     std::vector<WeaponDef>   weapons;
     std::vector<ItemDef>     items;
