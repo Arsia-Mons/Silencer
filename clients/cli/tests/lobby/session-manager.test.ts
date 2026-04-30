@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import type { ClientEvents } from "@silencer/lobby-sdk";
 import { SessionManager, type LobbyLike } from "../../src/lobby/session-manager.ts";
-
-type Listener = (...args: any[]) => void;
 
 class FakeLobby implements LobbyLike {
   state:
@@ -13,10 +12,12 @@ class FakeLobby implements LobbyLike {
     | "failed" = "disconnected";
   accountId = 0;
   lastError = "";
-  private ls: Record<string, Set<Listener>> = {};
-  on(event: string, fn: Listener): () => void {
-    (this.ls[event] ??= new Set()).add(fn);
-    return () => this.ls[event]?.delete(fn);
+  private ls: Record<string, Set<(...args: unknown[]) => void>> = {};
+  on<K extends keyof ClientEvents>(event: K, fn: ClientEvents[K]): () => void {
+    (this.ls[event] ??= new Set()).add(fn as (...args: unknown[]) => void);
+    return () => {
+      this.ls[event]?.delete(fn as (...args: unknown[]) => void);
+    };
   }
   emit(event: string, ...args: unknown[]): void {
     for (const fn of this.ls[event] ?? []) fn(...args);
@@ -26,6 +27,7 @@ class FakeLobby implements LobbyLike {
   }
   async disconnect(): Promise<void> {
     this.state = "disconnected";
+    this.accountId = 0;
     this.emit("stateChanged", "disconnected");
   }
   sendVersion(): void {}

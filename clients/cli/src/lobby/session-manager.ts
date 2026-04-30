@@ -3,26 +3,20 @@
 // Decoupled from @silencer/lobby-sdk via the LobbyLike interface so tests
 // can substitute an in-memory fake without standing up a real lobby server.
 
-import type { LobbyClient as RealLobbyClient } from "@silencer/lobby-sdk";
+import type { ClientEvents, ConnectionState, LobbyGame } from "@silencer/lobby-sdk";
 
 export interface LobbyLike {
-  readonly state:
-    | "disconnected"
-    | "connecting"
-    | "awaiting_version"
-    | "awaiting_auth"
-    | "authenticated"
-    | "failed";
+  readonly state: ConnectionState;
   readonly accountId: number;
   readonly lastError: string;
-  on(event: string, fn: (...args: any[]) => void): () => void;
+  on<K extends keyof ClientEvents>(event: K, fn: ClientEvents[K]): () => void;
   connect(): Promise<void>;
   disconnect(): Promise<void>;
   sendVersion(): void;
   sendCredentials(user: string, pass: string): void;
   sendChat(channel: string, text: string): void;
   joinChannel(channel: string): void;
-  createGame(g: any): void;
+  createGame(g: LobbyGame): void;
   setGame(gameId: number, status: number): void;
 }
 
@@ -154,10 +148,10 @@ export class SessionManager {
 export async function realLobbyFactory(): Promise<LobbyFactory> {
   const sdk = await import("@silencer/lobby-sdk");
   return (cfg) =>
-    new (sdk.LobbyClient as typeof RealLobbyClient)({
+    new sdk.LobbyClient({
       host: cfg.host,
       port: cfg.port,
       version: cfg.version,
       platform: cfg.platform as 0 | 1 | 2,
-    }) as unknown as LobbyLike;
+    });
 }
