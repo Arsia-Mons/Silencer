@@ -240,7 +240,8 @@ bool Grenade::WasThrown(void){
 bool Grenade::UpdatePosition(World & world, Player & player){
 	if(state_i <= 0){
 		if(state_i == 0){
-			xv = (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->throwSpeedStanding : 20);
+			const WeaponDef* gw = GASLoader::Get().GetWeaponDef("grenade");
+			xv = (gw ? gw->throwSpeedStanding : 20);
 			mirrored = player.mirrored;
 			if(player.input.keymoveleft){
 				mirrored = true;
@@ -251,35 +252,35 @@ bool Grenade::UpdatePosition(World & world, Player & player){
 			x = player.x + (5 * (mirrored ? -1 : 1));
 			y = player.y - 70;
 			if(player.input.keymoveleft || player.input.keymoveright){
-				xv = (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->throwSpeedMoving : 30);
+				xv = (gw ? gw->throwSpeedMoving : 30);
 				if(player.state == Player::RUNNING){
-					xv = (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->throwSpeedRunning : 26) + abs(player.xv);
+					xv = (gw ? gw->throwSpeedRunning : 26) + abs(player.xv);
 				}
 			}
 			if(player.input.keymovedown){
 				y = player.y - 30;
 				x = player.x;
 				xv = 0;
-				yv = 5;
+				yv = gw ? gw->throwYvDown : 5;
 			}
 			if(player.input.keylookdownleft || player.input.keylookdownright){
 				y = player.y - 30;
-				xv = 25;
-				yv = 10;
+				xv = gw ? gw->throwXvDownDiag : 25;
+				yv = gw ? gw->throwYvDownDiag : 10;
 			}
 			if(player.input.keymoveup){
 				x = player.x;
-				xv = 5;
-				yv = -30;
+				xv = gw ? gw->throwXvUp : 5;
+				yv = -(gw ? gw->throwYvUp : 30);
 			}
 			if(player.input.keylookupleft || player.input.keylookupright){
-				xv = 25;
-				yv = -20;
+				xv = gw ? gw->throwXvUpDiag : 25;
+				yv = -(gw ? gw->throwYvUpDiag : 20);
 			}
 			if(player.state == Player::CROUCHEDTHROWING){
-				xv = 20;
+				xv = gw ? gw->throwXvCrouch : 20;
 				y = player.y - 30;
-				yv = -10;
+				yv = -(gw ? gw->throwYvCrouch : 10);
 			}
 			if(xv < 0){
 				if(!mirrored){

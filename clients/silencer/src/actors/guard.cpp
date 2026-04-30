@@ -866,7 +866,7 @@ void Guard::Tick(World & world){
 						mirrored = true;
 					}
 				}else
-					if(abs(object->x - x) > 90){
+					if(abs(object->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax){
 						state = WALKING;
 						if(object->x > x){
 							mirrored = false;

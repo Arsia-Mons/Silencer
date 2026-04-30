@@ -215,6 +215,15 @@ struct WeaponDef {
     int throwSpeedStanding  = 0;  // xv when player is standing
     int throwSpeedMoving    = 0;  // xv when player is moving
     int throwSpeedRunning   = 0;  // base xv when player is running (abs(player.xv) added)
+    int throwYvDown         = 5;  // yv when throwing straight down
+    int throwXvDownDiag     = 25; // xv when throwing down-diagonal
+    int throwYvDownDiag     = 10; // yv when throwing down-diagonal
+    int throwXvUp           = 5;  // xv when throwing straight up
+    int throwYvUp           = 30; // yv when throwing up (applied negative)
+    int throwXvUpDiag       = 25; // xv when throwing up-diagonal
+    int throwYvUpDiag       = 20; // yv when throwing up-diagonal (applied negative)
+    int throwXvCrouch       = 20; // xv when throwing from crouch
+    int throwYvCrouch       = 10; // yv when throwing from crouch (applied negative)
     int explosionTick       = 0;  // state_i when first explosion fires
     int secondaryTick       = 0;  // state_i when secondary shrapnel fires
     int destroyTick         = 0;  // state_i when non-special grenade is destroyed

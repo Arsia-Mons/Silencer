@@ -230,6 +230,15 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.throwSpeedStanding  = wj.value("throwSpeedStanding",  0);
             w.throwSpeedMoving    = wj.value("throwSpeedMoving",    0);
             w.throwSpeedRunning   = wj.value("throwSpeedRunning",   0);
+            w.throwYvDown         = wj.value("throwYvDown",         w.throwYvDown);
+            w.throwXvDownDiag     = wj.value("throwXvDownDiag",     w.throwXvDownDiag);
+            w.throwYvDownDiag     = wj.value("throwYvDownDiag",     w.throwYvDownDiag);
+            w.throwXvUp           = wj.value("throwXvUp",           w.throwXvUp);
+            w.throwYvUp           = wj.value("throwYvUp",           w.throwYvUp);
+            w.throwXvUpDiag       = wj.value("throwXvUpDiag",       w.throwXvUpDiag);
+            w.throwYvUpDiag       = wj.value("throwYvUpDiag",       w.throwYvUpDiag);
+            w.throwXvCrouch       = wj.value("throwXvCrouch",       w.throwXvCrouch);
+            w.throwYvCrouch       = wj.value("throwYvCrouch",       w.throwYvCrouch);
             w.explosionTick       = wj.value("explosionTick",       0);
             w.secondaryTick       = wj.value("secondaryTick",       0);
             w.destroyTick         = wj.value("destroyTick",         0);

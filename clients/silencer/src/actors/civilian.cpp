@@ -109,7 +109,7 @@ void Civilian::Tick(World & world){
 			if(state_i % 10 == 0){
 				if(!bt_) InitBT();
 				if(bt_){
-					btctx_.dt = 10.0f / 24.0f;
+					btctx_.dt = 10.0f / GASLoader::Get().gameengine.ticksPerSecond;
 					btctx_.bbSet("threat_nearby", Look(world));
 					bt_->tick(btctx_);
 				}else{
