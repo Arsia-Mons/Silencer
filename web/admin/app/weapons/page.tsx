@@ -162,6 +162,19 @@ const PLASMA_FIELDS: { key: string; label: string }[] = [
   { key: 'shieldDamageLarge', label: 'Shield DMG (large)' },
 ];
 
+// ── Sprite bank list cache (module-level, survives navigation) ───────────────
+
+interface SpriteBank { bank: number; frames: number }
+let _spriteBankCache: SpriteBank[] | null = null;
+
+async function fetchSpriteBanks(): Promise<SpriteBank[]> {
+  if (_spriteBankCache) return _spriteBankCache;
+  const r = await fetch('/api/sprites');
+  const data = await r.json() as SpriteBank[];
+  _spriteBankCache = data;
+  return data;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function WeaponsPage() {
@@ -172,6 +185,7 @@ export default function WeaponsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
+  const [spritePicker, setSpritePicker] = useState<{ weaponId: string; dirIdx: number } | null>(null);
 
   // ── Audio (ADPCM via Web Audio API, same as Sound Studio) ───────────────────
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -551,8 +565,9 @@ export default function WeaponsPage() {
                     {DIRECTIONS.map((dir, i) => {
                       const val = (currentWeapon.spriteBanks ?? [])[i] ?? 0xFF;
                       return (
-                        <div key={dir} className="flex items-center gap-2">
-                          <span className="text-[9px] font-mono text-[#4a7a4a] w-8">{dir}</span>
+                        <div key={dir} className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-mono text-[#4a7a4a] w-8 shrink-0">{dir}</span>
+                          <SpriteThumb bank={val} size={28} />
                           <input
                             type="number" min={0} max={255}
                             value={val === 0xFF ? '' : val}
@@ -563,18 +578,29 @@ export default function WeaponsPage() {
                             }}
                             className="w-full bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded focus:border-[#00a328] outline-none"
                           />
+                          <button
+                            onClick={() => setSpritePicker({ weaponId: currentWeapon.id, dirIdx: i })}
+                            title="Pick sprite bank"
+                            className="shrink-0 text-[10px] font-mono text-[#4a7a4a] hover:text-[#00a328] border border-[#1a2e1a] hover:border-[#00a328] px-1.5 py-1 rounded transition-colors"
+                          >⊞</button>
                         </div>
                       );
                     })}
                   </div>
-                  <div className="flex items-center gap-2 border-t border-[#1a2e1a] pt-3">
-                    <span className="text-[9px] font-mono text-[#4a7a4a] w-20">hit overlay</span>
+                  <div className="flex items-center gap-1.5 border-t border-[#1a2e1a] pt-3">
+                    <span className="text-[9px] font-mono text-[#4a7a4a] w-20 shrink-0">hit overlay</span>
+                    <SpriteThumb bank={currentWeapon.hitOverlayBank ?? 0xFF} size={28} />
                     <input
                       type="number" min={-1} max={255}
                       value={currentWeapon.hitOverlayBank ?? -1}
                       onChange={e => patchWeapon(currentWeapon.id, { hitOverlayBank: parseInt(e.target.value, 10) || -1 })}
                       className="w-full bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded focus:border-[#00a328] outline-none"
                     />
+                    <button
+                      onClick={() => setSpritePicker({ weaponId: currentWeapon.id, dirIdx: -1 })}
+                      title="Pick sprite bank"
+                      className="shrink-0 text-[10px] font-mono text-[#4a7a4a] hover:text-[#00a328] border border-[#1a2e1a] hover:border-[#00a328] px-1.5 py-1 rounded transition-colors"
+                    >⊞</button>
                   </div>
                 </section>
 
@@ -658,6 +684,101 @@ export default function WeaponsPage() {
             </div>
           )}
         </div>
+      </div>
+      {spritePicker && (
+        <SpriteBankPicker
+          onPick={bank => {
+            if (spritePicker.dirIdx === -1) {
+              patchWeapon(spritePicker.weaponId, { hitOverlayBank: bank });
+            } else {
+              patchSpriteBank(spritePicker.weaponId, spritePicker.dirIdx, bank);
+            }
+          }}
+          onClose={() => setSpritePicker(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Sprite bank thumbnail ─────────────────────────────────────────────────────
+
+function SpriteThumb({ bank, size = 32 }: { bank: number; size?: number }) {
+  const unset = bank === 0xFF || bank < 0;
+  if (unset) {
+    return (
+      <div
+        style={{ width: size, height: size }}
+        className="shrink-0 border border-[#1a2e1a] bg-[#080f08] flex items-center justify-center text-[8px] font-mono text-[#2a4a2a]"
+      >—</div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/api/sprites/${bank}`}
+      width={size}
+      height={size}
+      alt={`bank ${bank}`}
+      className="shrink-0 border border-[#1a2e1a] bg-[#080f08]"
+      style={{ imageRendering: 'pixelated', objectFit: 'contain' }}
+    />
+  );
+}
+
+// ── Sprite bank picker modal ──────────────────────────────────────────────────
+
+function SpriteBankPicker({ onPick, onClose }: { onPick: (bank: number) => void; onClose: () => void }) {
+  const [banks, setBanks] = useState<{ bank: number; frames: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchSpriteBanks()
+      .then(data => { setBanks(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#080f08] border border-[#1a2e1a] rounded p-4 flex flex-col gap-3 w-[640px] max-h-[80vh]"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between shrink-0">
+          <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">SELECT SPRITE BANK</span>
+          <button
+            onClick={onClose}
+            className="text-[10px] font-mono text-[#4a7a4a] hover:text-[#00a328] transition-colors"
+          >✕ CLOSE</button>
+        </div>
+        {loading ? (
+          <p className="text-[9px] font-mono text-[#2a4a2a]">Loading…</p>
+        ) : (
+          <div className="overflow-y-auto grid grid-cols-8 gap-2">
+            {banks.map(({ bank, frames }) => (
+              <button
+                key={bank}
+                onClick={() => { onPick(bank); onClose(); }}
+                className="flex flex-col items-center gap-1 p-1 border border-[#1a2e1a] hover:border-[#00a328] transition-colors rounded"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/sprites/${bank}`}
+                  width={52}
+                  height={52}
+                  alt={`bank ${bank}`}
+                  className="bg-[#080f08]"
+                  style={{ imageRendering: 'pixelated', objectFit: 'contain' }}
+                />
+                <span className="text-[8px] font-mono text-[#d1fad7]">{bank}</span>
+                <span className="text-[7px] font-mono text-[#2a4a2a]">{frames}f</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
