@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, afterEach } from "bun:test";
 import { resolveLobbydDir, socketPath, logPath, MAX_SUN_PATH } from "../../src/lobby/paths.ts";
 
 describe("resolveLobbydDir", () => {
