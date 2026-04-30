@@ -66,3 +66,79 @@ describe("rpcStream", () => {
     expect(out.map((r) => (r.result as any).event ?? "<final>")).toEqual(["a", "b", "<final>"]);
   });
 });
+
+describe("rpcStream error semantics", () => {
+  test("pending waiter rejects when daemon closes mid-stream", async () => {
+    // Echo replies one frame and then stops the server, simulating mid-stream close.
+    let serverSocket: any;
+    server = Bun.listen({
+      unix: sock,
+      socket: {
+        open(s) {
+          serverSocket = s;
+          (s as any).__b = "";
+        },
+        data(s, chunk) {
+          (s as any).__b += new TextDecoder().decode(chunk);
+          const { frames, rest } = parseFrames<Request>((s as any).__b);
+          (s as any).__b = rest;
+          for (const f of frames) {
+            // Send one non-final frame, then close.
+            s.write(encodeFrame({ id: f.id, ok: true, result: { event: "a" }, final: false }));
+            s.end();
+          }
+        },
+        close() {},
+        error() {},
+      },
+    });
+
+    const out: Reply[] = [];
+    let errMsg = "";
+    try {
+      for await (const r of rpcStream(sock, { id: 1, op: "tail", args: {}, stream: true })) {
+        out.push(r);
+      }
+    } catch (e) {
+      errMsg = (e as Error).message;
+    }
+    expect(out).toHaveLength(1);
+    expect(errMsg).toMatch(/closed connection/);
+  });
+
+  test("malformed reply propagates as iterator error", async () => {
+    server = Bun.listen({
+      unix: sock,
+      socket: {
+        open(s) {
+          s.write("{not json}\n");
+          s.end();
+        },
+        data() {},
+        close() {},
+        error() {},
+      },
+    });
+    let errMsg = "";
+    try {
+      for await (const _r of rpcStream(sock, { id: 1, op: "x", args: {} })) {
+        // shouldn't yield anything
+      }
+    } catch (e) {
+      errMsg = (e as Error).message;
+    }
+    expect(errMsg).toMatch(/malformed RPC frame/);
+  });
+
+  test("two frames in one chunk yield in order", async () => {
+    startEcho((req) => [
+      { id: req.id, ok: true, result: { n: 1 }, final: false },
+      { id: req.id, ok: true, result: { n: 2 }, final: true },
+    ]);
+    const out: Reply[] = [];
+    for await (const r of rpcStream(sock, { id: 1, op: "x", args: {}, stream: true })) {
+      out.push(r);
+    }
+    expect(out.map((r) => (r.result as any).n)).toEqual([1, 2]);
+  });
+});

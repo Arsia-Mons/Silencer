@@ -1,5 +1,7 @@
 import { encodeFrame, parseFrames, type Reply, type Request } from "./protocol.ts";
 
+const decoder = new TextDecoder();
+
 export async function rpcCall(socketPath: string, req: Request): Promise<Reply> {
   for await (const r of rpcStream(socketPath, req)) {
     if (r.final) return r;
@@ -11,20 +13,21 @@ export function rpcStream(socketPath: string, req: Request): AsyncIterable<Reply
   return {
     [Symbol.asyncIterator]() {
       const queue: Reply[] = [];
-      let waiters: Array<(r: IteratorResult<Reply>) => void> = [];
+      type Waiter = { resolve: (r: IteratorResult<Reply>) => void; reject: (e: unknown) => void };
+      let waiters: Waiter[] = [];
       let done = false;
       let errored: unknown = null;
       let buf = "";
       let socket: any;
 
       const push = (r: Reply) => {
-        if (waiters.length) waiters.shift()!({ value: r, done: false });
+        if (waiters.length) waiters.shift()!.resolve({ value: r, done: false });
         else queue.push(r);
         if (r.final) finish();
       };
       const finish = () => {
         done = true;
-        for (const w of waiters) w({ value: undefined as any, done: true });
+        for (const w of waiters) w.resolve({ value: undefined, done: true });
         waiters = [];
         try {
           socket?.end();
@@ -35,8 +38,13 @@ export function rpcStream(socketPath: string, req: Request): AsyncIterable<Reply
       const fail = (e: unknown) => {
         errored = e;
         done = true;
-        for (const w of waiters) w({ value: undefined as any, done: true });
+        for (const w of waiters) w.reject(e);
         waiters = [];
+        try {
+          socket?.end();
+        } catch {
+          /* ignore */
+        }
       };
 
       Bun.connect({
@@ -47,7 +55,7 @@ export function rpcStream(socketPath: string, req: Request): AsyncIterable<Reply
             s.write(encodeFrame(req));
           },
           data(_s: any, chunk: Uint8Array) {
-            buf += new TextDecoder().decode(chunk);
+            buf += decoder.decode(chunk);
             let parsed;
             try {
               parsed = parseFrames<Reply>(buf);
@@ -72,7 +80,13 @@ export function rpcStream(socketPath: string, req: Request): AsyncIterable<Reply
           if (errored) throw errored;
           if (queue.length) return { value: queue.shift()!, done: false };
           if (done) return { value: undefined as any, done: true };
-          return new Promise((resolve) => waiters.push(resolve));
+          return new Promise<IteratorResult<Reply>>((resolve, reject) =>
+            waiters.push({ resolve, reject }),
+          );
+        },
+        async return(value?: unknown): Promise<IteratorResult<Reply>> {
+          finish();
+          return { value: value as Reply, done: true };
         },
       };
     },
