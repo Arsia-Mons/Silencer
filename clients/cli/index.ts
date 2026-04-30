@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { connect } from "node:net";
+import { LOBBY_HANDLERS } from "./src/lobby/commands.ts";
 
 type Reply = {
   id: number;
@@ -41,6 +42,14 @@ function usage(): never {
       `         (runs locally; no daemon required. Exit 1 if errors[] non-empty.)\n` +
       `       silencer-cli gas reload\n` +
       `         (re-runs the daemon's GAS loader; only safe from NONE/MAINMENU/LOBBY/MISSIONSUMMARY)\n` +
+      `       silencer-cli lobby spawn --as alice --host H --port P --version V --user U --pass P\n` +
+      `       silencer-cli lobby ls\n` +
+      `       silencer-cli lobby chat --as alice --channel main --text "hi"\n` +
+      `       silencer-cli lobby game create --as alice --name TEST [--map M --max-players 8]\n` +
+      `       silencer-cli lobby game join   --as alice --id 12345\n` +
+      `       silencer-cli lobby tail --as alice\n` +
+      `       silencer-cli lobby kill --as alice | --all\n` +
+      `       silencer-cli lobby join_channel --as alice --channel main\n` +
       `\n` +
       `Env: SILENCER_CONTROL_HOST (default 127.0.0.1)\n` +
       `     SILENCER_CONTROL_PORT (default 5170)`,
@@ -52,7 +61,7 @@ function usage(): never {
 // The wrapper recognizes the first positional as the op, the second as
 // args.subop. The pattern is centralized so future namespaces (e.g.
 // `profile`, `audio`) can opt in without touching the parser.
-const NOUN_FIRST_OPS = new Set(["keybind", "gas"]);
+const NOUN_FIRST_OPS = new Set(["keybind", "gas", "lobby"]);
 
 // (op, subop) pairs that run entirely in this process and never touch
 // the daemon. Each handler returns a JSON-serializable result and a
@@ -62,13 +71,16 @@ type LocalHandler = (args: Record<string, unknown>) => Promise<{ clean: boolean;
 const LOCAL_OPS: Record<string, Record<string, LocalHandler>> = {
   gas: {
     validate: async (args) => {
-      const dir = (args["dir"] as string | undefined) ?? (args["_positional"] as string | undefined);
-      if (!dir) throw new Error("gas validate requires a directory: silencer-cli gas validate <dir>");
+      const dir =
+        (args["dir"] as string | undefined) ?? (args["_positional"] as string | undefined);
+      if (!dir)
+        throw new Error("gas validate requires a directory: silencer-cli gas validate <dir>");
       const { validateDirectory } = await import("@silencer/gas-validation/node");
       const res = await validateDirectory(dir);
       return { clean: res.ok, result: res };
     },
   },
+  lobby: LOBBY_HANDLERS,
 };
 // Per (op,subop) pair: which flag accepts a list of values rather than
 // a single value. `--bindings KEY:A PAD:south` consumes both.
@@ -83,15 +95,23 @@ const VARIADIC_FLAGS: Record<string, Record<string, Set<string>>> = {
 // (silent operation on the wrong profile).
 const STRING_FLAGS: Record<string, Record<string, Set<string>>> = {
   keybind: {
-    get:    new Set(["profile", "action"]),
-    put:    new Set(["profile", "action"]),
-    unset:  new Set(["profile", "action"]),
-    use:    new Set(["profile"]),
-    new:    new Set(["profile", "from"]),
+    get: new Set(["profile", "action"]),
+    put: new Set(["profile", "action"]),
+    unset: new Set(["profile", "action"]),
+    use: new Set(["profile"]),
+    new: new Set(["profile", "from"]),
     delete: new Set(["profile"]),
   },
   gas: {
     validate: new Set(["dir"]),
+  },
+  lobby: {
+    spawn: new Set(["as", "user", "pass", "version", "host"]),
+    chat: new Set(["as", "channel", "text"]),
+    join_channel: new Set(["as", "channel"]),
+    kill: new Set(["as"]),
+    game: new Set(["as", "name", "map", "password"]),
+    tail: new Set(["as"]),
   },
 };
 // Bindings within VARIADIC_FLAGS that accept comma-separated chord syntax:
@@ -103,7 +123,12 @@ const CHORD_SPLIT_FLAGS: Record<string, Record<string, Set<string>>> = {
   },
 };
 
-function parseArgs(argv: string[]): { host: string; port: number; op: string; args: Record<string, unknown> } {
+function parseArgs(argv: string[]): {
+  host: string;
+  port: number;
+  op: string;
+  args: Record<string, unknown>;
+} {
   let host = process.env.SILENCER_CONTROL_HOST ?? "127.0.0.1";
   let port = Number.parseInt(process.env.SILENCER_CONTROL_PORT ?? "5170", 10);
   const args: Record<string, unknown> = {};
@@ -111,9 +136,9 @@ function parseArgs(argv: string[]): { host: string; port: number; op: string; ar
   let subop: string | null = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    if (a === "--host") {
+    if (a === "--host" && op === null) {
       host = argv[++i] ?? usage();
-    } else if (a === "--port") {
+    } else if (a === "--port" && op === null) {
       port = Number.parseInt(argv[++i] ?? usage(), 10);
     } else if (a.startsWith("--")) {
       const key = a.slice(2).replace(/-/g, "_");
@@ -155,7 +180,8 @@ function parseArgs(argv: string[]): { host: string; port: number; op: string; ar
     } else {
       // positional after op → treat as shorthand for the most common arg.
       if (op === "click" && args["label"] === undefined) args["label"] = a;
-      else if ((op === "set_text" || op === "select") && args["label"] === undefined) args["label"] = a;
+      else if ((op === "set_text" || op === "select") && args["label"] === undefined)
+        args["label"] = a;
       else if (op === "set_text" && args["text"] === undefined) args["text"] = a;
       else if (op === "select" && args["index"] === undefined) {
         const num = Number(a);
@@ -163,13 +189,21 @@ function parseArgs(argv: string[]): { host: string; port: number; op: string; ar
       }
       // keybind: third positional (after `keybind <subop>`) is the profile name
       // for `use` / `delete` (the most common single-positional shape).
-      else if (op === "keybind" && (subop === "use" || subop === "delete") && args["profile"] === undefined) {
+      else if (
+        op === "keybind" &&
+        (subop === "use" || subop === "delete") &&
+        args["profile"] === undefined
+      ) {
         args["profile"] = a;
       }
       // gas validate: third positional is the directory (allows
       // `silencer-cli gas validate shared/assets/gas/` w/o --dir).
       else if (op === "gas" && subop === "validate" && args["dir"] === undefined) {
         args["dir"] = a;
+      }
+      // lobby game <create|join>: third positional is the sub-subcommand.
+      else if (op === "lobby" && subop === "game" && args["_subgame"] === undefined) {
+        args["_subgame"] = a;
       }
     }
   }
@@ -185,7 +219,9 @@ async function main() {
   const local = subop ? LOCAL_OPS[op]?.[subop] : undefined;
   if (local) {
     const { clean, result } = await local(args);
-    process.stdout.write(JSON.stringify(result) + "\n");
+    // Streaming handlers (e.g. lobby tail) already wrote line-per-event to stdout
+    // and signal "no trailing summary" by returning result === null.
+    if (result !== null) process.stdout.write(JSON.stringify(result) + "\n");
     process.exit(clean ? 0 : 1);
   }
 

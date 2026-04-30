@@ -1,16 +1,19 @@
 {
   "name": "silencer-cli",
   "private": true,
-  "type": "module",
   "bin": {
-    "silencer-cli": "./index.ts"
+    "silencer-cli": "./index.ts",
+    "silencer-lobbyd": "./src/lobby/daemon.ts"
   },
+  "type": "module",
   "scripts": {
     "fmt": "oxfmt --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
   },
   "dependencies": {
-    "@silencer/gas-validation": "workspace:*"
+    "@silencer/gas-validation": "workspace:*",
+    "@silencer/lobby-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.3.13",
