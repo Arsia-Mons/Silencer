@@ -195,7 +195,9 @@
         79,
         79
       ],
-      "soundExplosion": "seekexp1.wav"
+      "soundExplosion": "seekexp1.wav",
+      "primaryCount": 5,
+      "secondaryCount": 4
     },
     {
       "id": "plasmabomb",
@@ -211,7 +213,9 @@
         79,
         79
       ],
-      "soundExplosion": "seekexp1.wav"
+      "soundExplosion": "seekexp1.wav",
+      "primaryCount": 6,
+      "secondaryCount": 6
     },
     {
       "id": "neutronbomb",
@@ -263,7 +267,9 @@
         79,
         79
       ],
-      "soundExplosion": "rocket1.wav"
+      "soundExplosion": "rocket1.wav",
+      "poisonRate": 1,
+      "poisonMax": 3
     }
   ]
 }

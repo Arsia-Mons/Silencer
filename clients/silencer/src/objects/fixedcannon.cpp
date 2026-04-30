@@ -42,7 +42,9 @@ void FixedCannon::Tick(World & world){
 	switch(state){
 		case NEW:{
 			state_warp = 12;
-			EmitSound(world, world.resources.soundbank["shield2.wav"], 96);
+			{	const GameObjectDef* d = GASLoader::Get().GetGameObjectDef("fixedCannon");
+				const std::string& sfx = (d && !d->soundDeploy.empty()) ? d->soundDeploy : "shield2.wav";
+				EmitSound(world, world.resources.soundbank[sfx], 96); }
 			state = UP;
 		}break;
 		case UP:{
@@ -138,7 +140,9 @@ void FixedCannon::Tick(World & world){
 		}break;
 		case SHOOTING_UP:{
 			if(state_i == 0){
-				EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
+				{	const GameObjectDef* d = GASLoader::Get().GetGameObjectDef("fixedCannon");
+					const std::string& sfx = (d && !d->soundFire.empty()) ? d->soundFire : "!laserew.wav";
+					EmitSound(world, world.resources.soundbank[sfx], 64); }
 				LaserProjectile * laserprojectile = (LaserProjectile *)world.CreateObject(ObjectTypes::LASERPROJECTILE);
 				if(laserprojectile){
 					laserprojectile->x = x + ((mirrored ? -1 : 1) * (45 + laserprojectile->emitoffset));
@@ -158,7 +162,9 @@ void FixedCannon::Tick(World & world){
 		}break;
 		case SHOOTING_DOWN:{
 			if(state_i == 0){
-				EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
+				{	const GameObjectDef* d = GASLoader::Get().GetGameObjectDef("fixedCannon");
+					const std::string& sfx = (d && !d->soundFire.empty()) ? d->soundFire : "!laserew.wav";
+					EmitSound(world, world.resources.soundbank[sfx], 64); }
 				LaserProjectile * laserprojectile = (LaserProjectile *)world.CreateObject(ObjectTypes::LASERPROJECTILE);
 				if(laserprojectile){
 					laserprojectile->x = x + ((mirrored ? -1 : 1) * (45 + laserprojectile->emitoffset));
@@ -178,7 +184,9 @@ void FixedCannon::Tick(World & world){
 		}break;
 		case DYING:{
 			if(state_i == 0){
-				EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
+				{	const GameObjectDef* d = GASLoader::Get().GetGameObjectDef("fixedCannon");
+					const std::string& sfx = (d && !d->soundDestroy.empty()) ? d->soundDestroy : "q_expl02.wav";
+					EmitSound(world, world.resources.soundbank[sfx], 96); }
 				for(int i = 0; i < 6; i++){
 					Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 					if(plume){

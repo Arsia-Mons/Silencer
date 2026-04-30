@@ -14,7 +14,10 @@
       "health": 40,
       "shield": 16,
       "innerRange": 70,
-      "outerRange": 300
+      "outerRange": 300,
+      "soundDeploy": "shield2.wav",
+      "soundFire": "!laserew.wav",
+      "soundDestroy": "q_expl02.wav"
     },
     {
       "id": "wallDefense",

@@ -187,6 +187,10 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.exhaustPlumes   = wj.value("exhaustPlumes",   0);
             w.bounceDamping   = wj.value("bounceDamping",   0.0f);
             w.trailPlumes     = wj.value("trailPlumes",     0);
+            w.primaryCount    = wj.value("primaryCount",    0);
+            w.secondaryCount  = wj.value("secondaryCount",  0);
+            w.poisonRate      = wj.value("poisonRate",      0);
+            w.poisonMax       = wj.value("poisonMax",       0);
             if (wj.contains("spriteBanks") && wj["spriteBanks"].is_array()) {
                 for (const auto& b : wj["spriteBanks"]) {
                     w.spriteBanks.push_back(b.get<int>());
@@ -328,6 +332,9 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             g.innerRange      = gj.value("innerRange",      g.innerRange);
             g.outerRange      = gj.value("outerRange",      g.outerRange);
             g.detectionRange  = gj.value("detectionRange",  g.detectionRange);
+            g.soundDeploy     = gj.value("soundDeploy",     std::string{});
+            g.soundFire       = gj.value("soundFire",       std::string{});
+            g.soundDestroy    = gj.value("soundDestroy",    std::string{});
             out.push_back(std::move(g));
         }
     } catch (const std::exception& e) {

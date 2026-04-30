@@ -117,7 +117,9 @@ void Grenade::Tick(World & world){
 					Sint8 xvs[] = {-10, -5, 0, 5, 10};
 					Sint8 yvs[] = {-33, -34, -35, -34, -33};
 					Sint8 ys[] = {0, 0, 0, 0, 0};
-					for(int i = 0; i < 5; i++){
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("shapedbomb");
+						int n = (tw && tw->primaryCount) ? tw->primaryCount : 5;
+						for(int i = 0; i < n && i < 5; i++){
 						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
 						if(plasmaprojectile){
 							plasmaprojectile->large = false;
@@ -127,7 +129,7 @@ void Grenade::Tick(World & world){
 							plasmaprojectile->xv = xvs[i];
 							plasmaprojectile->yv = yvs[i];
 						}
-					}
+					} }
 				}break;
 				case PLASMA:{
 					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("plasmabomb");
@@ -136,7 +138,9 @@ void Grenade::Tick(World & world){
 					Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
 					Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
 					Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};
-					for(int i = 0; i < 6; i++){
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("plasmabomb");
+						int n = (tw && tw->primaryCount) ? tw->primaryCount : 6;
+						for(int i = 0; i < n && i < 6; i++){
 						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
 						if(plasmaprojectile){
 							plasmaprojectile->large = false;
@@ -146,7 +150,7 @@ void Grenade::Tick(World & world){
 							plasmaprojectile->xv = xvs[i];
 							plasmaprojectile->yv = yvs[i];
 						}
-					}
+					} }
 				}break;
 				case NEUTRON:{
 					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("neutronbomb");
@@ -180,7 +184,9 @@ void Grenade::Tick(World & world){
 					Sint8 xvs[] = {-10, -5, 5, 10};
 					Sint8 yvs[] = {-29, -30, -30, -29};
 					Sint8 ys[] = {0, 0, 0, 0};
-					for(int i = 0; i < 4; i++){
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("shapedbomb");
+						int n = (tw && tw->secondaryCount) ? tw->secondaryCount : 4;
+						for(int i = 0; i < n && i < 4; i++){
 						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
 						if(plasmaprojectile){
 							plasmaprojectile->large = true;
@@ -192,13 +198,15 @@ void Grenade::Tick(World & world){
 							plasmaprojectile->xv = xvs[i];
 							plasmaprojectile->yv = yvs[i];
 						}
-					}
+					} }
 				}break;
 				case PLASMA:{
 					Sint8 xvs[] = {-14, 0, 14, -5, 0, 5};
 					Sint8 yvs[] = {-20, -10, -20, -15, -15, -15};
 					Sint8 ys[] = {0, 0, 0, 0, 0, 0};
-					for(int i = 0; i < 6; i++){
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("plasmabomb");
+						int n = (tw && tw->secondaryCount) ? tw->secondaryCount : 6;
+						for(int i = 0; i < n && i < 6; i++){
 						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
 						if(plasmaprojectile){
 							plasmaprojectile->large = true;
@@ -208,7 +216,7 @@ void Grenade::Tick(World & world){
 							plasmaprojectile->xv = xvs[i];
 							plasmaprojectile->yv = yvs[i];
 						}
-					}
+					} }
 				}break;
 			}
 		}else

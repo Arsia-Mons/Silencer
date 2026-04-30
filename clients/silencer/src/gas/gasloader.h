@@ -171,6 +171,12 @@ struct WeaponDef {
     int   exhaustPlumes   = 0;    // rocket exhaust plume count (0 = use compiled default)
     float bounceDamping   = 0.0f; // velocity multiplier on wall/floor bounce (0 = use compiled default)
     int   trailPlumes     = 0;    // flamer/flare trail plume count (0 = use compiled default)
+    // ---- Grenade fan counts ------------------------------------------------
+    int   primaryCount    = 0;    // shaped/plasma bomb: projectiles on first burst (0 = compiled default)
+    int   secondaryCount  = 0;    // shaped/plasma bomb: projectiles on second burst (0 = compiled default)
+    // ---- Poison ------------------------------------------------------------
+    int   poisonRate      = 0;    // poison amount applied per hit (0 = use compiled default 1)
+    int   poisonMax       = 0;    // max poison stack (0 = use compiled default 3)
 };
 
 // ---- Item ------------------------------------------------------------------
@@ -278,6 +284,9 @@ struct GameObjectDef {
     int innerRange      = 70;  // fixed cannon: near edge of detection box (x offset)
     int outerRange      = 300; // fixed cannon: far edge of detection box (x offset)
     int detectionRange  = 600; // wall defense: AABB half-extent for player detection
+    std::string soundDeploy;   // fixedCannon: init/activate sound
+    std::string soundFire;     // fixedCannon: shot sound
+    std::string soundDestroy;  // fixedCannon: death/explosion sound
 };
 
 // ---- Terminal ---------------------------------------------------------------

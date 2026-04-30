@@ -60,6 +60,10 @@ interface WeaponDef {
   exhaustPlumes?: number;
   bounceDamping?: number;
   trailPlumes?: number;
+  primaryCount?: number;
+  secondaryCount?: number;
+  poisonRate?: number;
+  poisonMax?: number;
   [key: string]: unknown;
 }
 
@@ -125,6 +129,10 @@ const NUMERIC_BALLISTICS: { key: string; label: string }[] = [
   { key: 'exhaustPlumes',  label: 'Exhaust Plumes' },
   { key: 'bounceDamping',  label: 'Bounce Damping' },
   { key: 'trailPlumes',    label: 'Trail Plumes' },
+  { key: 'primaryCount',   label: 'Primary Burst Count' },
+  { key: 'secondaryCount', label: 'Secondary Burst Count' },
+  { key: 'poisonRate',     label: 'Poison Rate' },
+  { key: 'poisonMax',      label: 'Poison Max Stack' },
 ];
 
 const GRENADE_FIELDS: { key: string; label: string }[] = [
