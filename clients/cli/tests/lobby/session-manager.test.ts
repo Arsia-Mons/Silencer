@@ -36,8 +36,6 @@ class FakeLobby implements LobbyLike {
   setGame(): void {}
 }
 
-const factory = (_cfg: unknown) => new FakeLobby();
-
 describe("SessionManager", () => {
   test("spawn resolves with accountId on auth success", async () => {
     let lobby!: FakeLobby;
