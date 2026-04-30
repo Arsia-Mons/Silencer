@@ -221,6 +221,8 @@ export async function startRpcServer(opts: RpcServerOptions): Promise<RpcServer>
           }
           // Register endTail as the cleanup for this tail; it's idempotent.
           tailUnsubs.set(socket, [...(tailUnsubs.get(socket) ?? []), endTail]);
+          // One-time ack so the client knows the listeners are hot.
+          send(socket, { id: req.id, ok: true, result: { event: "registered" }, final: false });
           return;
         }
         default:

@@ -219,7 +219,9 @@ async function main() {
   const local = subop ? LOCAL_OPS[op]?.[subop] : undefined;
   if (local) {
     const { clean, result } = await local(args);
-    process.stdout.write(JSON.stringify(result) + "\n");
+    // Streaming handlers (e.g. lobby tail) already wrote line-per-event to stdout
+    // and signal "no trailing summary" by returning result === null.
+    if (result !== null) process.stdout.write(JSON.stringify(result) + "\n");
     process.exit(clean ? 0 : 1);
   }
 

@@ -18,10 +18,7 @@ async function call(
 ): Promise<{ clean: boolean; result: unknown }> {
   const sock = await ensureDaemon();
   const r = await rpcCall(sock, { id: reqId(), op, args });
-  if (!r.ok) {
-    process.stderr.write(`[${r.code ?? "ERR"}] ${r.error ?? ""}\n`);
-    return { clean: false, result: { error: r.error, code: r.code } };
-  }
+  if (!r.ok) return { clean: false, result: { error: r.error, code: r.code } };
   return { clean: true, result: r.result ?? {} };
 }
 
@@ -97,8 +94,10 @@ export const LOBBY_HANDLERS: Record<string, Handler> = {
       stream: true,
     })) {
       if (r.final) break;
+      const result = r.result as { event?: string };
+      if (result?.event === "registered") continue; // server ack, not user-visible
       process.stdout.write(JSON.stringify(r.result) + "\n");
     }
-    return { clean: true, result: {} };
+    return { clean: true, result: null };
   },
 };

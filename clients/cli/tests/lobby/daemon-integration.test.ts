@@ -76,16 +76,25 @@ describe("daemon integration", () => {
     expect(spawn.ok).toBe(true);
 
     // Open a tail before sending chat so we observe the emitted event.
-    const tailIter = rpcStream(sock, { id: 2, op: "tail", args: { name: "alice" }, stream: true });
+    const iter = rpcStream(sock, {
+      id: 2,
+      op: "tail",
+      args: { name: "alice" },
+      stream: true,
+    })[Symbol.asyncIterator]();
+    // Wait for the tail to ack registration before sending events through it.
+    const ack = await iter.next();
+    expect((ack.value as any).result).toEqual({ event: "registered" });
+
     const events: any[] = [];
     const consumer = (async () => {
-      for await (const r of tailIter) {
-        if (r.final) break;
-        events.push(r.result);
+      for (;;) {
+        const r = await iter.next();
+        if (r.done) break;
+        if (r.value.final) break;
+        events.push(r.value.result);
       }
     })();
-    // Give the tail RPC a tick to register listeners.
-    await new Promise((r) => setTimeout(r, 20));
 
     const chat = await rpcCall(sock, {
       id: 3,
