@@ -155,6 +155,7 @@
       "destroyTick": 40,
       "neutronDestroyTick": 120,
       "flareDuration": 198,
+      "flareSpawnInterval": 3,
       "neutronTraceTime": 15,
       "detonatorLaunchYv": 15,
       "spriteBanks": [

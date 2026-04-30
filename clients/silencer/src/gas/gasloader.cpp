@@ -253,6 +253,7 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.destroyTick         = wj.value("destroyTick",         0);
             w.neutronDestroyTick  = wj.value("neutronDestroyTick",  0);
             w.flareDuration       = wj.value("flareDuration",       0);
+            w.flareSpawnInterval  = wj.value("flareSpawnInterval",  0);
             w.velocity            = wj.value("velocity",            0);
             w.moveAmount          = wj.value("moveAmount",          0);
             w.radius              = wj.value("radius",              0);

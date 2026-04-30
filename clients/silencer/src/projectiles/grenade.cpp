@@ -44,13 +44,16 @@ void Grenade::Tick(World & world){
 			y = player->y - 60;
 		}*/
 	}else{
-		if(state_i < 30 || (type == FLARE || type == POISONFLARE)){
-			if(state_i < 30){
+		const WeaponDef* gw = GASLoader::Get().GetWeaponDef("grenade");
+		int expTick = (gw && gw->explosionTick) ? gw->explosionTick : 30;
+		if(state_i < expTick || (type == FLARE || type == POISONFLARE)){
+			if(state_i < expTick){
 				res_index = state_i % 16;
 			}
 			Move(*this, world);
 		}
-		if(state_i >= 30 && (type == FLARE || type == POISONFLARE) && state_i % 3 == 0){
+		int flareInterval = (gw && gw->flareSpawnInterval) ? gw->flareSpawnInterval : 3;
+		if(state_i >= expTick && (type == FLARE || type == POISONFLARE) && state_i % flareInterval == 0){
 			for(int i = 0; i < 3; i++){
 				FlareProjectile * flareprojectile = static_cast<FlareProjectile *>(world.CreateObject(ObjectTypes::FLAREPROJECTILE));
 				if(flareprojectile){

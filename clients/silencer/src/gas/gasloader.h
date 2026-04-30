@@ -238,6 +238,7 @@ struct WeaponDef {
     int destroyTick         = 0;  // state_i when non-special grenade is destroyed
     int neutronDestroyTick  = 0;  // state_i when neutron bomb is destroyed
     int flareDuration       = 0;  // state_i when flare/poisonflare is destroyed (30 + 168)
+    int flareSpawnInterval  = 0;  // ticks between flare projectile spawns when airborne (0 = default 3)
     // Projectile physics
     int velocity            = 0;  // travel speed (px per move step)
     int moveAmount          = 0;  // collision steps per tick
