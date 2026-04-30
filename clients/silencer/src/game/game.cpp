@@ -2246,7 +2246,7 @@ void Game::ProcessInGameInterfaces(void){
 				SelectBox * selectbox = (SelectBox *)iface->GetObjectWithUid(world, 1);
 				if(selectbox){
 					if(selectbox->selecteditem != oldselecteditem){
-						Audio::GetInstance().Play(world.resources.soundbank["grndown.wav"], 64);
+						Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
 						oldselecteditem = selectbox->selecteditem;
 						if(buying){
 							localplayer->buyifacelastitem = selectbox->selecteditem;

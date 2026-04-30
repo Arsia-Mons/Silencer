@@ -756,15 +756,16 @@ void Guard::Tick(World & world){
 		}break;
 		case DYING:{
 			if(state_i == 0){
+				const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
 				switch(rand() % 3){
 					case 0:
-						EmitSound(world, world.resources.soundbank["groan2.wav"], 128);
+						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt1.empty()) ? gd->soundHurt1 : "groan2.wav"], 128);
 						break;
 					case 1:
-						EmitSound(world, world.resources.soundbank["groan2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt2.empty()) ? gd->soundHurt2 : "groan2a.wav"], 128);
 						break;
 					case 2:
-						EmitSound(world, world.resources.soundbank["grunt2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt3.empty()) ? gd->soundHurt3 : "grunt2a.wav"], 128);
 						break;
 				}
 			}

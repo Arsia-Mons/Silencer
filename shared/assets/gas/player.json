@@ -69,6 +69,12 @@
   "soundAmmo2": "ammo02.wav",
   "soundAmmo3": "ammo03.wav",
   "soundAmmo4": "ammo05.wav",
+  "soundUIClick": "whoom.wav",
+  "soundTeamJoin": "select2.wav",
+  "soundTeamHQ": "cathdoor.wav",
+  "soundTeamHeal": "if15.wav",
+  "soundTeamHack": "typerev6.wav",
+  "soundRoundCountdown": "grndown.wav",
   "worldGravity": 3,
   "worldMaxYVelocity": 45
 }

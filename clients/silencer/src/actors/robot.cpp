@@ -102,7 +102,7 @@ void Robot::InitBT() {
 		}
 		if (meleed) {
 			StopAmbience();
-			EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
+			{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundFire.empty()) ? rd->soundFire : "!laserew.wav"], 64); }
 			return BTResult::Success;
 		}
 		return BTResult::Failure;
@@ -159,7 +159,7 @@ void Robot::Tick(World & world){
 	}
 	if(state != DEAD && rand() % (24 * 15) == 0){
 		StopAmbience();
-		EmitSound(world, world.resources.soundbank["airlokj.wav"], 64);
+		{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundActivate.empty()) ? rd->soundActivate : "airlokj.wav"], 64); }
 	}
 	// BT patrol timer: counts up while WALKING, resets in any other state
 	if (bt_) {
@@ -189,7 +189,7 @@ void Robot::Tick(World & world){
 		}break;
 		case ASLEEP:{
 			if(soundchannel == -1){
-				soundchannel = EmitSound(world, world.resources.soundbank["wndloope.wav"], 32, true);
+				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); soundchannel = EmitSound(world, world.resources.soundbank[(rd && !rd->soundAmbient.empty()) ? rd->soundAmbient : "wndloope.wav"], 32, true); }
 			}
 			res_bank = 47;
 			res_index = 0;
@@ -205,7 +205,7 @@ void Robot::Tick(World & world){
 		case AWAKENING:{
 			if(state_i == 0){
 				StopAmbience();
-				EmitSound(world, world.resources.soundbank["robotarm.wav"], 128);
+				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMelee.empty()) ? rd->soundMelee : "robotarm.wav"], 128); }
 			}
 			if(state_i >= 15){
 				state = WALKING;
@@ -221,11 +221,11 @@ void Robot::Tick(World & world){
 			}
 			if(state_i % 20 == 1){
 				StopAmbience();
-				EmitSound(world, world.resources.soundbank["robot3r.wav"], 48);
+				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveRight.empty()) ? rd->soundMoveRight : "robot3r.wav"], 48); }
 			}
 			if(state_i % 20 == 10){
 				StopAmbience();
-				EmitSound(world, world.resources.soundbank["robot3l.wav"], 48);
+				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveLeft.empty()) ? rd->soundMoveLeft : "robot3l.wav"], 48); }
 			}
 			res_bank = 45;
 			res_index = state_i % 20;
@@ -279,7 +279,7 @@ void Robot::Tick(World & world){
 					}
 					if(meleed){
 						StopAmbience();
-						EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
+						{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundFire.empty()) ? rd->soundFire : "!laserew.wav"], 64); }
 					}
 				}
 				{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); xv = mirrored ? -(_gd ? _gd->speed : 4) : (_gd ? _gd->speed : 4); }
@@ -349,11 +349,11 @@ void Robot::Tick(World & world){
 			}
 			if(state_i == 4 * 2){
 				StopAmbience();
-				EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
+				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128); }
 			}
 			collidable = false;
 			if(state_i >= 48 * 2){
-				EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
+				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128); }
 				Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
 				Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
 				Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};
@@ -436,7 +436,7 @@ void Robot::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		}
 	} else if (health > 0 && (state == ASLEEP || state == SLEEPING)) {
 		StopAmbience();
-		EmitSound(world, world.resources.soundbank["robotarm.wav"], 128);
+		{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMelee.empty()) ? rd->soundMelee : "robotarm.wav"], 128); }
 		state = AWAKENING;
 		state_i = -1;
 	}

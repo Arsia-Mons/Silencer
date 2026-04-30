@@ -19,7 +19,10 @@
       "ladderYThreshold": 48,
       "ladderXTolerance": 8,
       "patrolReturnProximity": 20,
-      "ladderClimbSpeed": 5
+      "ladderClimbSpeed": 5,
+      "soundHurt1": "groan2.wav",
+      "soundHurt2": "groan2a.wav",
+      "soundHurt3": "grunt2a.wav"
     },
     {
       "id": "guard-laser",
@@ -40,7 +43,10 @@
       "ladderXTolerance": 8,
       "patrolReturnProximity": 20,
       "ladderClimbSpeed": 5,
-      "ammoDropQuantity": 5
+      "ammoDropQuantity": 5,
+      "soundHurt1": "groan2.wav",
+      "soundHurt2": "groan2a.wav",
+      "soundHurt3": "grunt2a.wav"
     },
     {
       "id": "guard-rocket",
@@ -61,7 +67,10 @@
       "ladderXTolerance": 8,
       "patrolReturnProximity": 20,
       "ladderClimbSpeed": 5,
-      "ammoDropQuantity": 3
+      "ammoDropQuantity": 3,
+      "soundHurt1": "groan2.wav",
+      "soundHurt2": "groan2a.wav",
+      "soundHurt3": "grunt2a.wav"
     },
     {
       "id": "robot",
@@ -85,7 +94,14 @@
       "lookDirMinX": 70,
       "lookDirMaxX": 200,
       "lookDirY1": -10,
-      "lookDirY2": -100
+      "lookDirY2": -100,
+      "soundFire": "!laserew.wav",
+      "soundActivate": "airlokj.wav",
+      "soundAmbient": "wndloope.wav",
+      "soundMelee": "robotarm.wav",
+      "soundMoveRight": "robot3r.wav",
+      "soundMoveLeft": "robot3l.wav",
+      "soundDeath": "seekexp1.wav"
     },
     {
       "id": "civilian",
@@ -98,6 +114,10 @@
       "runSpeedBonus": 5,
       "threatDetectX": 200,
       "threatDetectY": 100,
+      "soundHurt1": "groan2.wav",
+      "soundHurt2": "groan2a.wav",
+      "soundHurt3": "grunt2a.wav",
+      "soundDeath": "seekexp1.wav",
       "_note": "Civilian health is not set in constructor — Object base default applies."
     }
   ]

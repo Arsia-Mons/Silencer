@@ -150,15 +150,16 @@ void Civilian::Tick(World & world){
 		case DYINGFORWARD:{
 			tractteamid = 0;
 			if(state_i == 0){
+				const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
 				switch(rand() % 3){
 					case 0:
-						EmitSound(world, world.resources.soundbank["groan2.wav"], 128);
+						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt1.empty()) ? gd->soundHurt1 : "groan2.wav"], 128);
 					break;
 					case 1:
-						EmitSound(world, world.resources.soundbank["groan2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt2.empty()) ? gd->soundHurt2 : "groan2a.wav"], 128);
 					break;
 					case 2:
-						EmitSound(world, world.resources.soundbank["grunt2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt3.empty()) ? gd->soundHurt3 : "grunt2a.wav"], 128);
 					break;
 				}
 			}
@@ -175,15 +176,16 @@ void Civilian::Tick(World & world){
 		case DYINGBACKWARD:{
 			tractteamid = 0;
 			if(state_i == 0){
+				const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
 				switch(rand() % 3){
 					case 0:
-						EmitSound(world, world.resources.soundbank["groan2.wav"], 128);
+						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt1.empty()) ? gd->soundHurt1 : "groan2.wav"], 128);
 					break;
 					case 1:
-						EmitSound(world, world.resources.soundbank["groan2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt2.empty()) ? gd->soundHurt2 : "groan2a.wav"], 128);
 					break;
 					case 2:
-						EmitSound(world, world.resources.soundbank["grunt2a.wav"], 128);
+						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt3.empty()) ? gd->soundHurt3 : "grunt2a.wav"], 128);
 					break;
 				}
 			}
@@ -296,7 +298,7 @@ bool Civilian::CheckTractVictim(World & world){
 		if(team && team->id != tractteamid){
 			world.Explode(*this, suitcolor, 1);
 			state = DYINGEXPLODE;
-			EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
+			{ const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian"); EmitSound(world, world.resources.soundbank[(def && !def->soundDeath.empty()) ? def->soundDeath : "seekexp1.wav"], 128); }
 			Object tractprojectile(ObjectTypes::PLASMAPROJECTILE);
 		{
 			const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian");

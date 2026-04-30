@@ -128,6 +128,13 @@ struct PlayerDef {
     std::string soundAmmo2              = "ammo02.wav";
     std::string soundAmmo3              = "ammo03.wav";
     std::string soundAmmo4              = "ammo05.wav";
+    // ---- UI / team / game sounds ------------------------------------------------
+    std::string soundUIClick            = "whoom.wav";    // button/menu click
+    std::string soundTeamJoin           = "select2.wav";  // player joins team
+    std::string soundTeamHQ             = "cathdoor.wav"; // HQ door access
+    std::string soundTeamHeal           = "if15.wav";     // teammate heals player
+    std::string soundTeamHack           = "typerev6.wav"; // team hack event echo
+    std::string soundRoundCountdown     = "grndown.wav";  // round countdown tick
     // ---- World physics --------------------------------------------------------
     int worldGravity      = 3;   // gravitational acceleration (px/tick²)
     int worldMaxYVelocity = 45;  // terminal falling velocity cap (px/tick)
@@ -279,6 +286,17 @@ struct EnemyDef {
     int lookDirMaxX     = 200;  // directional: far edge
     int lookDirY1       = -10;  // directional: top of box
     int lookDirY2       = -100; // directional: bottom of box
+    // ---- Enemy sounds -----------------------------------------------------------
+    std::string soundFire       = "";   // ranged attack shot
+    std::string soundActivate   = "";   // activation/alert sound
+    std::string soundAmbient    = "";   // ambient loop (robots)
+    std::string soundMelee      = "";   // melee attack swing
+    std::string soundMoveRight  = "";   // footstep / movement right
+    std::string soundMoveLeft   = "";   // footstep / movement left
+    std::string soundDeath      = "";   // death/explosion
+    std::string soundHurt1      = "";   // pain sound variant 1
+    std::string soundHurt2      = "";   // pain sound variant 2
+    std::string soundHurt3      = "";   // pain sound variant 3
 };
 
 // ---- Ability ---------------------------------------------------------------

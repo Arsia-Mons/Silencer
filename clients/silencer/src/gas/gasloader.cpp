@@ -113,6 +113,12 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.soundAmmo4                 = j.value("soundAmmo4",                 out.soundAmmo4);
         out.worldGravity               = j.value("worldGravity",               out.worldGravity);
         out.worldMaxYVelocity          = j.value("worldMaxYVelocity",          out.worldMaxYVelocity);
+        out.soundUIClick        = j.value("soundUIClick",        out.soundUIClick);
+        out.soundTeamJoin       = j.value("soundTeamJoin",       out.soundTeamJoin);
+        out.soundTeamHQ         = j.value("soundTeamHQ",         out.soundTeamHQ);
+        out.soundTeamHeal       = j.value("soundTeamHeal",       out.soundTeamHeal);
+        out.soundTeamHack       = j.value("soundTeamHack",       out.soundTeamHack);
+        out.soundRoundCountdown = j.value("soundRoundCountdown", out.soundRoundCountdown);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
     }
@@ -306,6 +312,16 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.lookDirMaxX           = ej.value("lookDirMaxX",           e.lookDirMaxX);
             e.lookDirY1             = ej.value("lookDirY1",             e.lookDirY1);
             e.lookDirY2             = ej.value("lookDirY2",             e.lookDirY2);
+            e.soundFire      = ej.value("soundFire",      std::string{});
+            e.soundActivate  = ej.value("soundActivate",  std::string{});
+            e.soundAmbient   = ej.value("soundAmbient",   std::string{});
+            e.soundMelee     = ej.value("soundMelee",     std::string{});
+            e.soundMoveRight = ej.value("soundMoveRight", std::string{});
+            e.soundMoveLeft  = ej.value("soundMoveLeft",  std::string{});
+            e.soundDeath     = ej.value("soundDeath",     std::string{});
+            e.soundHurt1     = ej.value("soundHurt1",     std::string{});
+            e.soundHurt2     = ej.value("soundHurt2",     std::string{});
+            e.soundHurt3     = ej.value("soundHurt3",     std::string{});
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {
