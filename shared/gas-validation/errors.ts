@@ -9,7 +9,8 @@ export type GASErrorCode =
   | "OPEN_FAILED"      // file missing or unreadable (C++ loader)
   | "PARSE_ERROR"      // JSON syntax error (C++ loader or this package)
   | "SCHEMA_ERROR"     // failed JSON Schema validation (this package)
-  | "REFERENCE_ERROR"; // cross-file referential integrity (this package)
+  | "REFERENCE_ERROR"  // cross-file referential integrity (this package)
+  | "FIELD_ERROR";     // C++ loader field-walk threw (e.g. type mismatch in nlohmann::json::value)
 
 export interface GASError {
   /** filename relative to the gas dir, e.g. "weapons.json" */

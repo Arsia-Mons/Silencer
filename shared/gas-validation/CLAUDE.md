@@ -34,7 +34,11 @@ Every error — schema, reference, parse, file-open — lands in:
 
 `instancePath` is RFC 6901 JSON Pointer, suitable for round-tripping
 into an `Edit` call against the source file. `code` is one of
-`OPEN_FAILED | PARSE_ERROR | SCHEMA_ERROR | REFERENCE_ERROR`.
+`OPEN_FAILED | PARSE_ERROR | SCHEMA_ERROR | REFERENCE_ERROR | FIELD_ERROR`.
+(`FIELD_ERROR` only originates in the C++ loader's per-file field-walk
+catch blocks; the TS pipeline never produces it. Consumers switching on
+`code` should still handle it because `gas reload` round-trips C++
+errors over the control socket as-is.)
 
 The C++ loader (`clients/silencer/src/gas/gasloader.cpp`) emits the
 same shape over the control socket so the agent's remediation loop

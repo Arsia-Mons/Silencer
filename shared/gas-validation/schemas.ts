@@ -33,7 +33,7 @@ const playerSchema = {
     upgradeMultiplierEndurance:  int('HP per endurance upgrade point', 20),
     upgradeMultiplierShield:     int('Shield per shield upgrade point', 20),
     upgradeMultiplierJetpack:    int('Fuel per jetpack upgrade point', 10),
-    upgradeMultiplierHacking:    num('Hacking speed bonus per contacts upgrade point', 0.10),
+    upgradeMultiplierHacking:    num('Hacking speed bonus per hacking upgrade point', 0.10),
     upgradeMultiplierContacts:   num('Credits bonus per contacts upgrade point', 0.10),
     maxPoisoned:                 int('Max simultaneous poison doses', 9),
     runSpeed:                    int('Run speed (no disguise, no secret)', 14),
