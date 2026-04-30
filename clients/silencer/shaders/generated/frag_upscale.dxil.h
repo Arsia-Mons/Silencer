@@ -1,4 +1,4 @@
-#if 0
+same#if 0
 ;
 ; Input signature:
 ;

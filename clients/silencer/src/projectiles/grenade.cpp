@@ -346,15 +346,18 @@ void Grenade::Move(Object & object, World & world, int v){
 		}
 		float xn, yn;
 		platform->GetNormal(object.x, object.y, &xn, &yn);
-		if(xn){
+		{ const WeaponDef* gd_b = GASLoader::Get().GetWeaponDef("grenade");
+		  float bd = (gd_b && gd_b->bounceDamping > 0.0f) ? gd_b->bounceDamping : 0.8f;
+		  if(xn){
 			object.xv = (xn * abs(object.xv)) * 0.5;
-		}else{
-			object.xv *= 0.8;
-		}
-		if(yn){
+		  }else{
+			object.xv *= bd;
+		  }
+		  if(yn){
 			object.yv = (yn * abs(object.yv)) * 0.4;
-		}else{
-			object.yv *= 0.8;
+		  }else{
+			object.yv *= bd;
+		  }
 		}
 	}
 	object.x += xv2;

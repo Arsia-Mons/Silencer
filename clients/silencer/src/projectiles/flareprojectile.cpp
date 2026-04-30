@@ -1,6 +1,7 @@
 #include "flareprojectile.h"
 #include "plume.h"
 #include "gasloader.h"
+#include <algorithm>
 
 FlareProjectile::FlareProjectile() : Object(ObjectTypes::FLAREPROJECTILE){
 	//requiresauthority = true;
@@ -12,7 +13,8 @@ FlareProjectile::FlareProjectile() : Object(ObjectTypes::FLAREPROJECTILE){
 	shielddamage = w ? w->shieldDamage : 1;
 	velocity = w ? w->velocity : 5;
 	drawcheckered = true;
-	for(int i = 0; i < plumecount; i++){
+	plumecount = (w && w->trailPlumes > 0) ? std::min(w->trailPlumes, MAX_PLUMES) : 4;
+	for(int i = 0; i < MAX_PLUMES; i++){
 		plumeids[i] = 0;
 	}
 	moveamount = w ? w->moveAmount : 1;

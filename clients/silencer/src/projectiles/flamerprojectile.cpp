@@ -1,6 +1,7 @@
 #include "flamerprojectile.h"
 #include "plume.h"
 #include "gasloader.h"
+#include <algorithm>
 
 FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 	requiresauthority = true;
@@ -13,10 +14,11 @@ FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 	shielddamage = w ? w->shieldDamage : 1;
 	velocity = w ? w->velocity : 7;
 	drawcheckered = true;
-	for(int i = 0; i < plumecount; i++){
+	plumecount = (w && w->trailPlumes > 0) ? std::min(w->trailPlumes, MAX_PLUMES) : 7;
+	for(int i = 0; i < MAX_PLUMES; i++){
 		plumeids[i] = 0;
 	}
-	emitoffset = -7;
+	emitoffset = (w && w->emitOffset) ? w->emitOffset : -7;
 	moveamount = w ? w->moveAmount : 6;
 	soundplaying = 0;
 	renderpass = 2;

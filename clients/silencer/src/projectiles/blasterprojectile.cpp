@@ -35,7 +35,7 @@ void BlasterProjectile::Tick(World & world){
 	if(yv > 0 && xv < 0)   res_bank = bank(5, 163); // down-left
 	if(yv == 0 && xv < 0)  res_bank = bank(6, 162); // left
 	if(yv < 0 && xv < 0)   res_bank = bank(7, 161); // up-left
-	Uint8 life = 6;
+	Uint8 life = (w && w->projectileLife) ? (Uint8)w->projectileLife : 6;
 	if(state_i == 4){
 		const std::string& sfx = w && !w->soundFire.empty() ? w->soundFire : "!laserme.wav";
 		EmitSound(world, world.resources.soundbank[sfx], 128);

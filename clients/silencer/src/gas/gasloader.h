@@ -164,6 +164,13 @@ struct WeaponDef {
     // ---- Ammo (supplements items.json spawnAmmo/maxAmmo/pickupAmmo) -----------
     int ammoCapacity  = 0;   // max ammo this weapon can hold (0 = use items.json)
     int reloadTicks   = 0;   // ticks to reload one unit (0 = instant)
+
+    // ---- Projectile physics (tunable rendering/feel) --------------------------
+    int   projectileLife  = 0;    // bolt lifetime ticks after launch phase (0 = compiled default)
+    int   emitOffset      = 0;    // pixel offset from player when spawning (0 = use compiled default)
+    int   exhaustPlumes   = 0;    // rocket exhaust plume count (0 = use compiled default)
+    float bounceDamping   = 0.0f; // velocity multiplier on wall/floor bounce (0 = use compiled default)
+    int   trailPlumes     = 0;    // flamer/flare trail plume count (0 = use compiled default)
 };
 
 // ---- Item ------------------------------------------------------------------

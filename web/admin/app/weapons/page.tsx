@@ -54,6 +54,12 @@ interface WeaponDef {
   plasmaGravity?: number;
   plasmaLifeNormal?: number;
   plasmaLifeLarge?: number;
+  // Projectile params
+  projectileLife?: number;
+  emitOffset?: number;
+  exhaustPlumes?: number;
+  bounceDamping?: number;
+  trailPlumes?: number;
   [key: string]: unknown;
 }
 
@@ -114,6 +120,11 @@ const NUMERIC_BALLISTICS: { key: string; label: string }[] = [
   { key: 'radius',         label: 'Blast Radius (px)' },
   { key: 'ammoCapacity',   label: 'Ammo Capacity' },
   { key: 'reloadTicks',    label: 'Reload Ticks' },
+  { key: 'projectileLife', label: 'Projectile Life (ticks)' },
+  { key: 'emitOffset',     label: 'Emit Offset (px)' },
+  { key: 'exhaustPlumes',  label: 'Exhaust Plumes' },
+  { key: 'bounceDamping',  label: 'Bounce Damping' },
+  { key: 'trailPlumes',    label: 'Trail Plumes' },
 ];
 
 const GRENADE_FIELDS: { key: string; label: string }[] = [

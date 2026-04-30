@@ -61,8 +61,10 @@ void PlasmaProjectile::Tick(World & world){
 			if(yn){
 				yv = (yn * abs(yv));
 			}
-			xv *= 0.8;
-			yv *= 0.8;
+			{ const WeaponDef* pd = GASLoader::Get().GetWeaponDef("plasma");
+			  float bd = (pd && pd->bounceDamping > 0.0f) ? pd->bounceDamping : 0.8f;
+			  xv *= bd;
+			  yv *= bd; }
 		}
 		//world->MarkDestroyObject(id);
 	}

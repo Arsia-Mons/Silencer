@@ -12,7 +12,7 @@ LaserProjectile::LaserProjectile() : Object(ObjectTypes::LASERPROJECTILE){
 	healthdamage = w ? w->healthDamage : 10;
 	shielddamage = w ? w->shieldDamage : 60;
 	velocity = w ? w->velocity : 30;
-	emitoffset = 24;
+	emitoffset = (w && w->emitOffset) ? w->emitOffset : 24;
 	moveamount = w ? w->moveAmount : 12;
 	renderpass = 2;
 	isprojectile = true;
@@ -37,7 +37,7 @@ void LaserProjectile::Tick(World & world){
 	if(yv > 0 && xv < 0)   res_bank = bank(5, 168); // down-left
 	if(yv == 0 && xv < 0)  res_bank = bank(6, 167); // left
 	if(yv < 0 && xv < 0)   res_bank = bank(7, 166); // up-left
-	Uint8 life = 10;
+	Uint8 life = (w && w->projectileLife) ? (Uint8)w->projectileLife : 10;
 	if(state_i == 1){
 		const std::string& sfx = w && !w->soundFire.empty() ? w->soundFire : "!laserel.wav";
 		EmitSound(world, world.resources.soundbank[sfx], 128);

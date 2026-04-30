@@ -12,7 +12,7 @@ WallProjectile::WallProjectile() : Object(ObjectTypes::WALLPROJECTILE){
 	healthdamage = w ? w->healthDamage : 10;
 	shielddamage = w ? w->shieldDamage : 60;
 	velocity = w ? w->velocity : 35;
-	emitoffset = 0;
+	emitoffset = (w && w->emitOffset) ? w->emitOffset : 0;
 	moveamount = w ? w->moveAmount : 6;
 	renderpass = 2;
 	isprojectile = true;
@@ -27,7 +27,7 @@ void WallProjectile::Serialize(bool write, Serializer & data, Serializer * old){
 
 void WallProjectile::Tick(World & world){
 	const WeaponDef* w = GASLoader::Get().GetWeaponDef("wall");
-	Uint8 life = 20;
+	Uint8 life = (w && w->projectileLife) ? (Uint8)w->projectileLife : 20;
 	if(state_i == 1){
 		const std::string& sfx = w && !w->soundFire.empty() ? w->soundFire : "!laserel.wav";
 		EmitSound(world, world.resources.soundbank[sfx], 64);

@@ -182,6 +182,11 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.soundWarn       = wj.value("soundWarn",      std::string{});
             w.ammoCapacity    = wj.value("ammoCapacity",   0);
             w.reloadTicks     = wj.value("reloadTicks",    0);
+            w.projectileLife  = wj.value("projectileLife",  0);
+            w.emitOffset      = wj.value("emitOffset",      0);
+            w.exhaustPlumes   = wj.value("exhaustPlumes",   0);
+            w.bounceDamping   = wj.value("bounceDamping",   0.0f);
+            w.trailPlumes     = wj.value("trailPlumes",     0);
             if (wj.contains("spriteBanks") && wj["spriteBanks"].is_array()) {
                 for (const auto& b : wj["spriteBanks"]) {
                     w.spriteBanks.push_back(b.get<int>());

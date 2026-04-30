@@ -115,7 +115,8 @@ void RocketProjectile::Tick(World & world){
 			if(platform){
 				platform->GetNormal(x, y, &xn, &yn);
 			}
-			int numplumes = 6;
+			const WeaponDef* w_r = GASLoader::Get().GetWeaponDef("rocket");
+		int numplumes = (w_r && w_r->exhaustPlumes) ? w_r->exhaustPlumes : 6;
 			float anglen = (rand() % 100) / float(100);
 			for(int i = 0; i < numplumes; i++){
 				Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
