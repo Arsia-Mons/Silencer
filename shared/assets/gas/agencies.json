@@ -21,7 +21,7 @@
         "hacking": 5,
         "contacts": 5
       },
-      "weapons": ["blaster", "grenade"]
+      "weapons": ["blaster", "laser", "rocket", "flamer", "grenade", "empbomb", "shapedbomb", "plasmabomb", "neutronbomb", "flarebomb", "plasmadetonator", "flare"]
     },
     {
       "id": 1,
@@ -43,7 +43,7 @@
         "hacking": 5,
         "contacts": 5
       },
-      "weapons": ["blaster", "laser", "grenade"]
+      "weapons": ["blaster", "laser", "rocket", "flamer", "grenade", "empbomb", "shapedbomb", "plasmabomb", "neutronbomb", "flarebomb", "plasmadetonator", "flare"]
     },
     {
       "id": 2,
@@ -65,7 +65,7 @@
         "hacking": 5,
         "contacts": 8
       },
-      "weapons": ["blaster", "flamer", "grenade"]
+      "weapons": ["blaster", "laser", "rocket", "flamer", "grenade", "empbomb", "shapedbomb", "plasmabomb", "neutronbomb", "flarebomb", "plasmadetonator", "flare"]
     },
     {
       "id": 3,
@@ -87,7 +87,7 @@
         "hacking": 8,
         "contacts": 5
       },
-      "weapons": ["blaster", "rocket", "grenade"]
+      "weapons": ["blaster", "laser", "rocket", "flamer", "grenade", "empbomb", "shapedbomb", "plasmabomb", "neutronbomb", "flarebomb", "plasmadetonator", "flare"]
     },
     {
       "id": 4,
@@ -110,7 +110,7 @@
         "hacking": 5,
         "contacts": 5
       },
-      "weapons": ["blaster", "grenade"]
+      "weapons": ["blaster", "laser", "rocket", "flamer", "grenade", "empbomb", "shapedbomb", "plasmabomb", "neutronbomb", "flarebomb", "plasmadetonator", "flare", "poisonflare"]
     }
   ]
 }
