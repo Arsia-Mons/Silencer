@@ -46,7 +46,7 @@ void WallDefense::Tick(World & world){
 				state_i = 11;
 				Object * object = Look(world);
 				if(object){
-					EmitSound(world, world.resources.soundbank["!laserew.wav"], 64);
+					EmitSound(world, world.resources.soundbank[(_wd && !_wd->soundFire.empty()) ? _wd->soundFire : "!laserew.wav"], 64);
 					WallProjectile * wallprojectile = (WallProjectile *)world.CreateObject(ObjectTypes::WALLPROJECTILE);
 					if(wallprojectile){
 						int x1, y1, x2, y2;
@@ -121,7 +121,8 @@ void WallDefense::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 	if(health == 0 && state != DEAD){
 		state = DEAD;
 		state_i = 0;
-		EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
+		{ const GameObjectDef* _wd = GASLoader::Get().GetGameObjectDef("wallDefense");
+		EmitSound(world, world.resources.soundbank[(_wd && !_wd->soundDestroy.empty()) ? _wd->soundDestroy : "q_expl02.wav"], 96); }
 		for(int i = 0; i < 6; i++){
 			Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 			if(plume){

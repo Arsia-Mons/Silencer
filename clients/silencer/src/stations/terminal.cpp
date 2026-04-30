@@ -44,7 +44,8 @@ void Terminal::Tick(World & world){
 	}
 	if(state == READY || state == HACKING || state == HACKERGONE){
 		if(soundchannel == -1){
-			soundchannel = EmitSound(world, world.resources.soundbank["ambloop4.wav"], isbig ? 45 : 32, true);
+			const TerminalDef* _td = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
+			soundchannel = EmitSound(world, world.resources.soundbank[(_td && !_td->soundAmbient.empty()) ? _td->soundAmbient : "ambloop4.wav"], isbig ? 45 : 32, true);
 		}
 	}else{
 		if(soundchannel != -1){
@@ -68,7 +69,8 @@ void Terminal::Tick(World & world){
 		}break;
 		case SECRETREADY:
 			if(!secretreadynotified){
-				world.SendSound("typerev6.wav");
+				{ const TerminalDef* _td = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
+				world.SendSound((_td && !_td->soundHack.empty()) ? _td->soundHack.c_str() : "typerev6.wav"); }
 				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 					if((*it)->type == ObjectTypes::TEAM){
 						Team * team = static_cast<Team *>(*it);

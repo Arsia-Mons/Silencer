@@ -106,6 +106,31 @@ struct PlayerDef {
     int warpTeleportTick            = 12;   // state_warp == this → player x/y set to destination
     int deadAutoRespawnTick         = 48;   // ticks in DEAD state before auto-respawn triggers
     int deployAnimationTicks        = 8;    // ticks of DEPLOYING beam-in animation after deployWait completes
+    // ---- Hittable impact sounds ------------------------------------------------
+    std::string soundImpactBlaster1     = "strike03.wav";
+    std::string soundImpactBlaster2     = "strike04.wav";
+    std::string soundImpactLaserShield1 = "strike01.wav";
+    std::string soundImpactLaserShield2 = "strike02.wav";
+    std::string soundImpactLaser1       = "strike03.wav";
+    std::string soundImpactLaser2       = "strike04.wav";
+    std::string soundImpactFlamer       = "s_flmc01.wav";
+    std::string soundShieldDown         = "shlddn1.wav";
+    // ---- Player action sounds --------------------------------------------------
+    std::string soundGrunt              = "grunt2a.wav";
+    std::string soundDisguise           = "disguise.wav";
+    std::string soundJackout            = "jackout.wav";
+    std::string soundJetpack            = "jetpak2a.wav";
+    std::string soundMenuSelect         = "cliksel2.wav";
+    std::string soundWeaponCharged      = "charged.wav";
+    std::string soundAlertWarn          = "alwarn.wav";
+    std::string soundAlertInvestigate   = "alinvest.wav";
+    std::string soundAmmo1              = "ammo01.wav";
+    std::string soundAmmo2              = "ammo02.wav";
+    std::string soundAmmo3              = "ammo03.wav";
+    std::string soundAmmo4              = "ammo05.wav";
+    // ---- World physics --------------------------------------------------------
+    int worldGravity      = 3;   // gravitational acceleration (px/tick²)
+    int worldMaxYVelocity = 45;  // terminal falling velocity cap (px/tick)
 };
 
 // ---- Weapon ----------------------------------------------------------------
@@ -285,8 +310,12 @@ struct GameObjectDef {
     int outerRange      = 300; // fixed cannon: far edge of detection box (x offset)
     int detectionRange  = 600; // wall defense: AABB half-extent for player detection
     std::string soundDeploy;   // fixedCannon: init/activate sound
-    std::string soundFire;     // fixedCannon: shot sound
-    std::string soundDestroy;  // fixedCannon: death/explosion sound
+    std::string soundFire;     // fixedCannon/wallDefense: shot sound
+    std::string soundDestroy;  // fixedCannon/wallDefense/techStation: death/explosion sound
+    std::string soundPurchase; // creditMachine: purchase confirmation
+    std::string soundHeal;     // healMachine: heal sound
+    std::string soundAmbient;  // vent/baseExit: ambient loop
+    std::string soundOpen;     // baseDoor: door open sound
 };
 
 // ---- Terminal ---------------------------------------------------------------
@@ -300,6 +329,8 @@ struct TerminalDef {
     int traceTimeMedium   = 120;  // trace timer when 1 secret hacked
     int traceTimeExtended = 150;  // trace timer when 2+ secrets hacked
     int beaconTimeSecs    = 65;   // team objective: seconds for beacon countdown when this terminal is selected
+    std::string soundAmbient;     // terminal: ambient hum loop ("ambloop4.wav")
+    std::string soundHack;        // terminal: hacking key sound ("typerev6.wav")
 };
 
 // ---------------------------------------------------------------------------

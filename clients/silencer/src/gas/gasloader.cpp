@@ -91,6 +91,28 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.warpTeleportTick           = j.value("warpTeleportTick",           out.warpTeleportTick);
         out.deadAutoRespawnTick        = j.value("deadAutoRespawnTick",        out.deadAutoRespawnTick);
         out.deployAnimationTicks       = j.value("deployAnimationTicks",       out.deployAnimationTicks);
+        out.soundImpactBlaster1        = j.value("soundImpactBlaster1",        out.soundImpactBlaster1);
+        out.soundImpactBlaster2        = j.value("soundImpactBlaster2",        out.soundImpactBlaster2);
+        out.soundImpactLaserShield1    = j.value("soundImpactLaserShield1",    out.soundImpactLaserShield1);
+        out.soundImpactLaserShield2    = j.value("soundImpactLaserShield2",    out.soundImpactLaserShield2);
+        out.soundImpactLaser1          = j.value("soundImpactLaser1",          out.soundImpactLaser1);
+        out.soundImpactLaser2          = j.value("soundImpactLaser2",          out.soundImpactLaser2);
+        out.soundImpactFlamer          = j.value("soundImpactFlamer",          out.soundImpactFlamer);
+        out.soundShieldDown            = j.value("soundShieldDown",            out.soundShieldDown);
+        out.soundGrunt                 = j.value("soundGrunt",                 out.soundGrunt);
+        out.soundDisguise              = j.value("soundDisguise",              out.soundDisguise);
+        out.soundJackout               = j.value("soundJackout",               out.soundJackout);
+        out.soundJetpack               = j.value("soundJetpack",               out.soundJetpack);
+        out.soundMenuSelect            = j.value("soundMenuSelect",            out.soundMenuSelect);
+        out.soundWeaponCharged         = j.value("soundWeaponCharged",         out.soundWeaponCharged);
+        out.soundAlertWarn             = j.value("soundAlertWarn",             out.soundAlertWarn);
+        out.soundAlertInvestigate      = j.value("soundAlertInvestigate",      out.soundAlertInvestigate);
+        out.soundAmmo1                 = j.value("soundAmmo1",                 out.soundAmmo1);
+        out.soundAmmo2                 = j.value("soundAmmo2",                 out.soundAmmo2);
+        out.soundAmmo3                 = j.value("soundAmmo3",                 out.soundAmmo3);
+        out.soundAmmo4                 = j.value("soundAmmo4",                 out.soundAmmo4);
+        out.worldGravity               = j.value("worldGravity",               out.worldGravity);
+        out.worldMaxYVelocity          = j.value("worldMaxYVelocity",          out.worldMaxYVelocity);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
     }
@@ -335,6 +357,10 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             g.soundDeploy     = gj.value("soundDeploy",     std::string{});
             g.soundFire       = gj.value("soundFire",       std::string{});
             g.soundDestroy    = gj.value("soundDestroy",    std::string{});
+            g.soundPurchase   = gj.value("soundPurchase",   std::string{});
+            g.soundHeal       = gj.value("soundHeal",       std::string{});
+            g.soundAmbient    = gj.value("soundAmbient",    std::string{});
+            g.soundOpen       = gj.value("soundOpen",       std::string{});
             out.push_back(std::move(g));
         }
     } catch (const std::exception& e) {
@@ -363,6 +389,8 @@ static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out)
             t.traceTimeMedium    = tj.value("traceTimeMedium",    t.traceTimeMedium);
             t.traceTimeExtended  = tj.value("traceTimeExtended",  t.traceTimeExtended);
             t.beaconTimeSecs     = tj.value("beaconTimeSecs",     t.beaconTimeSecs);
+            t.soundAmbient       = tj.value("soundAmbient",       std::string{});
+            t.soundHack          = tj.value("soundHack",          std::string{});
             out.push_back(std::move(t));
         }
     } catch (const std::exception& e) {

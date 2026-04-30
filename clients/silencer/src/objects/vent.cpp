@@ -1,5 +1,6 @@
 #include "vent.h"
 #include "plume.h"
+#include "../gas/gasloader.h"
 
 Vent::Vent() : Object(ObjectTypes::VENT){
 	requiresauthority = false;
@@ -10,7 +11,8 @@ Vent::Vent() : Object(ObjectTypes::VENT){
 void Vent::Tick(World & world){
 	if(active >= 1){
 		if(active == 1){
-			EmitSound(world, world.resources.soundbank["airvent2.wav"], 96);
+			{ const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("vent");
+			EmitSound(world, world.resources.soundbank[(_d && !_d->soundAmbient.empty()) ? _d->soundAmbient : "airvent2.wav"], 96); }
 		}
 		if(active <= 18){
 			for(int i = 0; i < 4; i++){

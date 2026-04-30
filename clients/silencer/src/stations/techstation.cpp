@@ -49,7 +49,8 @@ void TechStation::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 	Hittable::HandleHit(*this, world, x, y, projectile);
 	if(oldhealth != health && health == 0 && projectile.healthdamage > 0){
 		collidable = false;
-		EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
+		{ const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("techStation");
+		EmitSound(world, world.resources.soundbank[(_d && !_d->soundDestroy.empty()) ? _d->soundDestroy : "q_expl02.wav"], 96); }
 		Team * team = static_cast<Team *>(world.GetObjectFromId(teamid));
 		if(team){
 			Uint32 tech = team->GetAvailableTech(world);

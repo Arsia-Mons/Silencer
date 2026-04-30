@@ -340,7 +340,7 @@ void Player::Tick(World & world){
 				}
 				state = DYING;
 				state_i = 0;
-				EmitSound(world, world.resources.soundbank["grunt2a.wav"]);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundGrunt]);
 			}
 		}
 		poisoned_i++;
@@ -464,7 +464,7 @@ void Player::Tick(World & world){
 			if(state != JETPACK && state != DEPLOYING && state != DYING && state != DEAD){
 				if(currentplatformid || !OnGround()){
 					disguised = pd.disguiseActivationTicks;
-					EmitSound(world, world.resources.soundbank["disguise.wav"], 64);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundDisguise], 64);
 					if(OnGround()){
 						state = RUNNING;
 						state_i = 25;
@@ -483,7 +483,7 @@ void Player::Tick(World & world){
 	}
 	if(state != HACKING || state_i >= GASLoader::Get().player.hackingExitThreshold){
 		if(!world.replaying && hacksoundchannel != -1){
-			EmitSound(world, world.resources.soundbank["jackout.wav"], 20);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundJackout], 20);
 			Audio::GetInstance().Stop(hacksoundchannel, 700);
 			hacksoundchannel = -1;
 		}
@@ -492,7 +492,7 @@ void Player::Tick(World & world){
 		if(state != JETPACK && state != JETPACKSHOOT){
 			if(!world.replaying){
 				//GetTeam(*world)->secretdelivered = true;
-				EmitSound(world, world.resources.soundbank["jetpak2a.wav"], 64);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundJetpack], 64);
 				Audio::GetInstance().Stop(jetpacksoundchannel, 200);
 				jetpacksoundchannel = -1;
 			}
@@ -545,7 +545,7 @@ void Player::Tick(World & world){
 				selectbox->scrolled = buyifacelastscrolled;
 				iface->AddObject(selectbox->id);
 				iface->activeobject = selectbox->id;
-				Audio::GetInstance().Play(world.resources.soundbank["cliksel2.wav"], 96);
+				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundMenuSelect], 96);
 				buyinterfaceid = iface->id;
 			}
 		}else
@@ -581,7 +581,7 @@ void Player::Tick(World & world){
 				selectbox->selecteditem = 0;
 				iface->AddObject(selectbox->id);
 				iface->activeobject = selectbox->id;
-				Audio::GetInstance().Play(world.resources.soundbank["cliksel2.wav"], 96);
+				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundMenuSelect], 96);
 				techinterfaceid = iface->id;
 			}
 		}else
@@ -610,7 +610,7 @@ void Player::Tick(World & world){
 	if(fuel == maxfuel && fuellow){
 		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 		if(localplayer && localplayer->id == id){
-			Audio::GetInstance().Play(world.resources.soundbank["charged.wav"], 96);
+			Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundWeaponCharged], 96);
 		}
 		fuellow = false;
 	}
@@ -633,9 +633,9 @@ void Player::Tick(World & world){
 		if(hassecret){
 			Team * team = GetTeam(world);
 			if(team && team->secrets == 2){
-				world.SendSound("alwarn.wav");
+				world.SendSound(GASLoader::Get().player.soundAlertWarn.c_str());
 			}else{
-				world.SendSound("alinvest.wav");
+				world.SendSound(GASLoader::Get().player.soundAlertInvestigate.c_str());
 			}
 			if(peer && !world.intutorialmode){
 				User * user = world.lobby.GetUserInfo(peer->accountid);
@@ -690,16 +690,16 @@ void Player::Tick(World & world){
 		if(localplayer && localplayer->id == id && world.tickcount - lastweaponchangesound >= 4){
 			switch(currentweapon){
 				case 0:
-					Audio::GetInstance().Play(world.resources.soundbank["ammo01.wav"]);
+					Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundAmmo1]);
 				break;
 				case 1:
-					Audio::GetInstance().Play(world.resources.soundbank["ammo02.wav"]);
+					Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundAmmo2]);
 				break;
 				case 2:
-					Audio::GetInstance().Play(world.resources.soundbank["ammo03.wav"]);
+					Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundAmmo3]);
 				break;
 				case 3:
-					Audio::GetInstance().Play(world.resources.soundbank["ammo05.wav"]);
+					Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundAmmo4]);
 				break;
 			}
 			lastweaponchangesound = world.tickcount;
@@ -2845,7 +2845,7 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		}
 		state = DYING;
 		state_i = 0;
-		EmitSound(world, world.resources.soundbank["grunt2a.wav"]);
+		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundGrunt]);
 	}
 }
 
@@ -2934,7 +2934,7 @@ bool Player::IsDisguised(void){
 void Player::UnDisguise(World & world){
 	if(IsDisguised()){
 		disguised = 12;
-		EmitSound(world, world.resources.soundbank["disguise.wav"], 64);
+		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundDisguise], 64);
 	}
 }
 

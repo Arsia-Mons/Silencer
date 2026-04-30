@@ -2,6 +2,7 @@
 #include "object.h"
 #include "projectile.h"
 #include "shrapnel.h"
+#include "../gas/gasloader.h"
 #include <math.h>
 
 Hittable::Hittable(){
@@ -80,26 +81,19 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 	}
 	switch(projectile.type){
 		case ObjectTypes::BLASTERPROJECTILE:{
-			if(rand() % 2 == 0){
-				object.EmitSound(world, world.resources.soundbank["strike03.wav"], 96);
-			}else{
-				object.EmitSound(world, world.resources.soundbank["strike04.wav"], 96);
-			}
+			const PlayerDef& pd = GASLoader::Get().player;
+			const std::string& s = (rand() % 2 == 0) ? pd.soundImpactBlaster1 : pd.soundImpactBlaster2;
+			object.EmitSound(world, world.resources.soundbank[s], 96);
 		}break;
 		case ObjectTypes::WALLPROJECTILE:
 		case ObjectTypes::LASERPROJECTILE:{
+			const PlayerDef& pd = GASLoader::Get().player;
 			if(damagedshield){
-				if(rand() % 2 == 0){
-					object.EmitSound(world, world.resources.soundbank["strike01.wav"], 96);
-				}else{
-					object.EmitSound(world, world.resources.soundbank["strike02.wav"], 96);
-				}
+				const std::string& s = (rand() % 2 == 0) ? pd.soundImpactLaserShield1 : pd.soundImpactLaserShield2;
+				object.EmitSound(world, world.resources.soundbank[s], 96);
 			}else{
-				if(rand() % 2 == 0){
-					object.EmitSound(world, world.resources.soundbank["strike03.wav"], 96);
-				}else{
-					object.EmitSound(world, world.resources.soundbank["strike04.wav"], 96);
-				}
+				const std::string& s = (rand() % 2 == 0) ? pd.soundImpactLaser1 : pd.soundImpactLaser2;
+				object.EmitSound(world, world.resources.soundbank[s], 96);
 			}
 		}break;
 		case ObjectTypes::ROCKETPROJECTILE:{
@@ -107,13 +101,13 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 		}break;
 		case ObjectTypes::FLAMERPROJECTILE:{
 			if(world.tickcount % 4 == 0){
-				object.EmitSound(world, world.resources.soundbank["s_flmc01.wav"], 128);
+				object.EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundImpactFlamer], 128);
 			}
 		}break;
 	}
 	Uint8 hit_type = state_hit / 32;
 	if(hit_type == 1 && health > 0){
-		object.EmitSound(world, world.resources.soundbank["shlddn1.wav"]);
+		object.EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundShieldDown]);
 	}
 	hitx = x;
 	hity = y;
