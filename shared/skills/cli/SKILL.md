@@ -141,11 +141,12 @@ bun clients/cli/index.ts gas validate shared/assets/gas
 # → {"ok":false,"errors":[{...}, {...}]}        (exit 1)
 ```
 
-GAS = "Game Asset Spec," the JSON files under `shared/assets/gas/`
-that define agencies, weapons, items, enemies, etc. This command runs
-in-process — no game has to be running, no port required. Errors carry
-`instancePath` as an RFC 6901 JSON Pointer, which round-trips cleanly
-into a code-edit against the source file.
+GAS = "Gameplay Ability System" (borrowed from Unreal's terminology).
+The JSON files under `shared/assets/gas/` define agencies, weapons,
+items, enemies, and other content the game used to hardcode in C++.
+This command runs in-process — no game has to be running, no port
+required. Errors carry `instancePath` as an RFC 6901 JSON Pointer,
+which round-trips cleanly into a code-edit against the source file.
 
 The TypeScript schemas live in `shared/gas-validation/schemas.ts` and
 mirror the C++ structs in `clients/silencer/src/gas/gasloader.h`. If
