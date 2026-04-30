@@ -1,0 +1,1782 @@
+ ▐▛███▜▌   Claude Code v2.1.123
+▝▜█████▛▘  Opus 4.7 · Claude Max
+  ▘▘ ▝▝    ~/repos/Silencer/services/lobby
+
+❯ please tell me all of the api endpoints our Go server has. would we have any  
+  performnace loss by going to typescript                                       
+
+  Read 1 file, listed 1 directory (ctrl+o to expand)
+
+⏺ Bash(cd /Users/henryventura/repos/Silencer/services/lobby && grep -n
+      "HandleFunc\|Handle(\|http\." main.go playerauth.go update.go maps.go
+      events.go 2>/dev/null | he…)
+  ⎿  maps.go:274:func setCORSHeaders(w http.ResponseWriter, origin string)
+     {
+     maps.go:296:       mux := http.NewServeMux()
+     … +39 lines (ctrl+o to expand)
+
+  Searched for 5 patterns, read 1 file (ctrl+o to expand)
+
+⏺ API endpoints
+
+  The Go lobby server is not primarily HTTP — most traffic is a custom binary
+  TCP protocol. It exposes three listeners:
+
+  1. Custom TCP protocol on :517 (protocol.go:9)
+
+  Frame format [len u8][payload], max 255 bytes. Opcodes:
+
+  ┌─────┬─────────────────┬────────────────────────────────────────┐
+  │ Op  │      Name       │                                        │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 0   │ opAuth          │ login (name + SHA-1 hash)              │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 1   │ opMOTD          │ server → client only                   │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 2   │ opChat          │ channel chat                           │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 3   │ opNewGame       │ create game (spawns dedicated server)  │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 4   │ opDelGame       │ server → client only                   │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 5   │ opChannel       │ join channel                           │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 6   │ opConnect       │ server → client only                   │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 7   │ opVersion       │ client version check + update manifest │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 8   │ opUserInfo      │ lookup by accountID                    │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 9   │ opPing          │ keepalive                              │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 10  │ opUpgradeStat   │ spend XP on stat                       │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 11  │ opRegisterStats │ match-end stats from dedicated server  │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 12  │ opPresence      │ server → client only                   │
+  ├─────┼─────────────────┼────────────────────────────────────────┤
+  │ 13  │ opSetGame       │ set client's current game              │
+  └─────┴─────────────────┴────────────────────────────────────────┘
+
+  2. UDP heartbeats on :517 (udp.go)
+
+  [0x00][gameid u32][port u16][state u8] — dedicated servers report liveness
+  every <30s.
+
+  3. HTTP — community maps on :8080 (maps.go:296)
+
+  - GET  /api/maps — list
+  - POST /api/maps — upload (raw .SIL, headers X-Filename, X-Author, X-Api-Key)
+  - GET  /api/maps/by-sha1/{sha1} — download by hash
+  - GET  /api/maps/{name} — download by name
+  - DELETE /api/maps/{name} — auth'd delete
+
+  4. HTTP — internal player auth on :15171 (playerauth.go)
+
+  Not exposed outside Docker. Called by admin-api.
+  - POST /player-auth — validate credentials
+  - POST /ban — set ban
+  - POST /delete-player — remove account
+
+  ---
+  Would TypeScript cost you performance?
+
+  Realistic answer: probably not in any way you'd notice for this workload, but 
+  with caveats.
+
+  What this server actually does is light: short binary frames, one goroutine
+  per TCP conn, mutex-guarded in-memory state, occasional Mongo/AMQP fan-out.
+  It's not CPU-bound.
+
+  Where Go beats Bun/Node, and how much it matters here:
+  - Concurrency model. Go's per-conn goroutines map cleanly to client.go's
+  blocking read loop. In Bun you'd write async per-socket handlers on a single
+  event loop. Fine until you have a slow handler — one blocking JSON.parse
+  stalls everyone. With your traffic (a lobby, not a game tick loop), it's a
+  non-issue.
+  - CPU cost of binary protocol parsing. Bit-aligned Serializer work in V8 is
+  2–5× slower per op than Go, but you're parsing ≤255-byte frames at human-rate
+  cadence. Irrelevant.
+  - Memory footprint. Bun process will sit ~50–150 MB vs. Go's ~10–30 MB.
+  Matters for tiny VMs, otherwise no.
+  - Latency tail. GC pauses in V8 are larger and less predictable than Go's. For
+   lobby chat/listing, sub-ms vs. few-ms doesn't matter. For the UDP heartbeat 
+  path it also doesn't matter (30s window).
+  - Subprocess spawning (proc.go). Identical — both shell out via exec.
+
+  Where you'd actually feel it:
+  - If the dedicated game server itself were ported (it's not — that's the C++
+  binary, same process as the client). Game tick is the only latency-sensitive
+  path and it stays C++.
+  - If you ever fold in real-time game state through the lobby. Don't.
+
+  Real tradeoffs that aren't about perf:
+  - You'd lose the type safety / compile-time guarantees Go gives on the wire
+  format. Doable in TS with discriminated unions but it's more work.
+  - You'd gain shared types with shared/gas-validation/, clients/cli/, and the
+  admin stack — your repo is already mostly Bun/TS, so the lobby is the odd one
+  out.
+  - AMQP and MongoDB clients in TS are fine; amqplib and the official Mongo
+  driver are mature.
+
+  Bottom line: for a chat/lobby/listing server at indie-game scale, Bun+TS would
+   perform indistinguishably. The reason to keep it in Go is the existing
+  battle-tested code and the natural fit of goroutines to the per-conn model —
+  not raw throughput.
+
+✻ Brewed for 1m 9s
+
+❯ what does that custom tcp protocol buy us                                     
+
+⏺ Honest answer: not much, and some of what it buys you is actively costing you.
+
+  What it actually buys
+
+  1. Wire compatibility with the existing C++ client. This is the only real
+  reason. clients/silencer/src/net/lobby.cpp already speaks this exact format
+  with a matching bit-aligned Serializer. Changing the protocol means a
+  coordinated client+server change and a forced version bump for every player.
+  That's a meaningful cost that doesn't exist in greenfield.
+  2. A persistent connection for presence/chat fan-out. The hub can push NewGame
+   / DelGame / Presence to every subscriber over the same socket they auth'd on.
+   But WebSocket gives you the identical model — this isn't unique to a custom
+  protocol.
+  3. Tiny frames. [len u8][payload] with max 255 bytes is a few bytes lighter
+  than a WS text frame with JSON. At lobby cadence (chat lines, ping, occasional
+   game-list delta) the bandwidth difference per user per day is measured in
+  kilobytes. Irrelevant.
+
+  What it costs you
+
+  - Two implementations to keep in lockstep. protocol.go mirrors Serializer in
+  C++ by hand. The CLAUDE.md literally says "Adding [an opcode] requires both
+  sides and a client version bump."
+  - The 255-byte frame cap leaks into design. See protocol.go:27: maxUpdateURL =
+   200 // leaves room for [framelen][op][success][urllen u16][sha256] in a 
+  255-byte frame. You're sizing real product fields around the wire format.
+  That's the tail wagging the dog.
+  - No off-the-shelf tooling. You can't curl it, can't inspect it in a browser,
+  can't replay it from Postman. Debugging is print statements on both ends.
+  - Awkward for new surfaces. Maps API is HTTP because uploading a 64 KiB .SIL
+  blob through 255-byte frames is a non-starter. Player auth is HTTP because
+  admin-api isn't going to speak the binary protocol. So you already have three
+  protocols (TCP binary, UDP heartbeat, HTTP) and the binary one only covers the
+   original client's needs.
+  - Type safety is manual. A new field on opUserInfo is a hand-written
+  encoder/decoder pair on both sides. JSON-over-WS with a shared schema in
+  shared/gas-validation/ would be type-checked end-to-end.
+
+  The honest framing
+
+  This isn't a designed-today protocol — it's inherited from zSILENCER and
+  predates the rebrand. If you were starting fresh and the C++ client didn't
+  exist, you'd almost certainly use WebSocket+JSON (or +protobuf if you wanted
+  compactness without giving up tooling). The reason to keep it isn't that it's
+  good; it's that the C++ client already speaks it and rewriting both sides for
+  ergonomic wins isn't worth a forced client update — unless you're doing it
+  anyway as part of something larger.
+
+  If you ever do replace it, the natural seam is: WebSocket transport, JSON or
+  protobuf payloads, schema lives in shared/, both C++ and a future Bun/TS
+  server consume it. UDP heartbeats stay UDP regardless — they're already the
+  right shape.
+
+✻ Worked for 33s
+
+❯ okay, and that proposal for replacing it doesnt change the custom protocol    
+  for the actual game server right, just the Go server?                         
+
+⏺ Correct. Two completely separate protocols, only one would change.
+
+  What you'd be replacing
+
+  The lobby protocol — the 14 opcodes in protocol.go, used over TCP :517 for
+  login/chat/game-list/stats. This is the only thing that talks to the Go
+  server. Switching it to WebSocket+JSON touches services/lobby/ and
+  clients/silencer/src/net/lobby.cpp.
+
+  What you would NOT touch
+
+  The gameplay protocol — UDP packets between the game client and the dedicated
+  silencer -s server during a match. That's player input, world state deltas,
+  the whole netcode. It lives entirely in clients/silencer/src/net/ (separate
+  files from lobby.cpp) and never goes through the Go process. The lobby just
+  spawns the dedicated server (proc.go) and hands the client an IP+port; after
+  that the Go server isn't in the data path.
+
+  The one tiny overlap
+
+  UDP heartbeats from the dedicated server back to the lobby on :517 (udp.go) —
+  [0x00][gameid][port][state], sent every few seconds. That's its own thing,
+  fixed 7-byte packet, and you'd almost certainly leave it alone. It's not
+  really "the gameplay protocol," just a liveness ping.
+
+  So the rewrite scope is: lobby TCP framing + the C++ side of lobby.cpp. The
+  hot path (60Hz gameplay netcode) is untouched and stays C++ ↔ C++ over UDP.
+
+  This is also why the perf question from earlier is even less interesting than
+  it sounded — the latency-sensitive code was never in Go to begin with.
+
+✻ Crunched for 12s
+
+❯ yeah I think we would have a lot to gain by having the lobby protocol be an   
+  openapi defined spec                                                          
+
+⏺ Schema-driven on both sides — yes, big win. OpenAPI specifically — wrong tool 
+  for this shape. Worth being precise about why, because the right pick is
+  meaningfully different.
+
+  OpenAPI assumes request/response over HTTP. Your lobby protocol is
+  bidirectional and push-heavy: opMOTD, opDelGame, opPresence, opConnect, the
+  NewGame fan-out — those are server-initiated messages with no request that
+  triggered them. You can shoehorn them into OpenAPI's webhooks section, but
+  you'll spend the rewrite fighting the spec instead of using it.
+
+  The closer analogs:
+
+  - AsyncAPI — literally "OpenAPI for event-driven / message-based." Models
+  channels, pub/sub, WebSocket. Codegen ecosystem is real but thinner than
+  OpenAPI's, and the C++ generators are weak.
+  - Protobuf (+ optionally gRPC or just framed messages over WS) — best fit IMO.
+   Native C++ codegen is excellent (you already need it for the client), TS
+  codegen is solid (ts-proto, protobuf-ts), schema is the contract, versioning
+  rules are well-understood. You don't need gRPC; you can just send
+  length-prefixed protobuf frames over WebSocket and keep the bidirectional
+  semantics you have today.
+  - JSON + Zod/JSON Schema — fine for the TS side, but you'd be hand-writing the
+   C++ decoder again. Loses the main thing you want.
+
+  Given one side stays C++ for the foreseeable future, protobuf is the path with
+   the least friction. The schema lives somewhere like shared/lobby-protocol/,
+  both clients/silencer/ and services/lobby/ (or its TS successor) generate from
+   it, and adding a field stops being a manual two-sided edit.
+
+  One thing OpenAPI is genuinely right for, today: the existing HTTP surfaces —
+  /api/maps/* on :8080 and the player-auth endpoints on :15171. Those are real
+  request/response HTTP. An OpenAPI spec there would give you typed clients in
+  admin-api and the CLI for free, and it's a small, contained piece of work you
+  could do this week without touching the binary protocol at all. Probably the
+  right first move regardless of what you decide about the lobby rewrite.
+
+✻ Churned for 34s
+
+❯ how does the server send a message to the client without the client having    
+  requested it?                                                                 
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Because TCP is bidirectional and the connection stays open. The "client
+  requests, server responds" pattern is an HTTP convention, not a TCP one — once
+   the socket is open, either side can write a frame at any time. The other side
+   has a read loop that dispatches by opcode, and it doesn't care whether what
+  just arrived was a reply to something or unsolicited.
+
+  Concretely, here's how it works in this codebase:
+
+  1. The client is also running a read loop.
+  On the C++ side, lobby.cpp is doing the mirror image of client.go:51's for { 
+  readFrame; handleFrame }. It just reads opcodes and dispatches. When opNewGame
+   arrives, the client adds the game to its UI list. It has no idea whether the
+  server sent it because this client asked, or because someone else's opNewGame
+  triggered a fan-out.
+
+  2. The server keeps a list of connected clients.
+  Hub holds *Client pointers for everyone authed. When something happens, it
+  iterates that list and calls c.send(...) on each — which writes a frame to
+  that client's socket.
+
+  3. Sends happen from server-side goroutines, not from a request handler.
+
+  Trace one path: Alice clicks "Create Game."
+  - Alice's client → server: frame with opNewGame. client.go:113 dispatches to
+  handleNewGame, which calls hub.RequestCreateGame.
+  - Hub spawns the dedicated server, then iterates every connected client and
+  calls c.sendNewGame(status, g) on each — Bob, Carol, everyone in the lobby.
+  - Bob's socket receives [len][opNewGame][...]. Bob never asked. His read loop
+  just sees the opcode and updates the UI.
+
+  4. Some messages are 100% server-initiated, no client trigger at all.
+  pingLoop (client.go:69) is a goroutine that ticks every 10s and pushes opPing
+  to the client. The client never asks for it. Same for opPresence when someone
+  else logs in/out, and for opDelGame fan-outs.
+
+  5. There's no request ID.
+  The protocol has no correlation field — the client correlates purely by opcode
+   + its own state. opUserInfo arriving means "here is user info, slot it into
+  the cache," whether it's a reply to a lookup or (hypothetically) a push.
+
+  This is exactly how IRC, WebSocket, MQTT, and any persistent-connection
+  protocol works. The mental shift from HTTP is: the connection is the session,
+  and either side speaks whenever it has something to say.
+
+✻ Worked for 35s
+
+❯ so lets list out individually all of the different requests made between      
+  server and client here and say what would be the best suit for it             
+
+⏺ Going through every message currently flowing between client and server. For
+  each I'll tag the pattern and recommend a transport. Three buckets emerge:
+  HTTP (one-shot, no session), WebSocket (session/push/fan-out), stays as-is
+  (UDP, existing HTTP).
+
+  Lobby protocol opcodes
+
+  #: 7
+  Op: opVersion
+  Direction: C→S, S→C reply
+  Pattern: one-shot RPC, before auth
+  Best fit: HTTP GET /version?platform=...
+  Why: Pure lookup, no session needed. The client polls at launch — that's
+    literally what HTTP fetch is for. Can be a static manifest behind
+  CloudFront.
+  ────────────────────────────────────────
+  #: 0
+  Op: opAuth
+  Direction: C→S, S→C reply
+  Pattern: session establishment
+  Best fit: HTTP POST /auth → token → WS upgrade with token
+  Why: Login should mint a token; the WS connection is then authenticated by
+    header. Cleanly separates "do I have a valid identity" from "am I connected
+    to the lobby."
+  ────────────────────────────────────────
+  #: 1
+  Op: opMOTD
+  Direction: S→C push, chunked
+  Pattern: static-ish content delivered at session start
+  Best fit: HTTP GET /motd on launch
+  Why: It's a string, fetched once. The chunking only exists because of the
+    255-byte frame cap. Pulling it out of the session means MOTD edits don't
+  need
+     a lobby reconnect.
+  ────────────────────────────────────────
+  #: 5
+  Op: opChannel
+  Direction: S→C confirm
+  Pattern: response to client's /join chat command
+  Best fit: WS message
+  Why: Trivially part of the chat stream. Could even be implicit (server starts
+    sending you messages from the new channel).
+  ────────────────────────────────────────
+  #: 2
+  Op: opChat
+  Direction: C→S send, S→many fan-out
+  Pattern: pub/sub
+  Best fit: WS message
+  Why: Canonical WebSocket case. Channel = topic.
+  ────────────────────────────────────────
+  #: 3
+  Op: opNewGame
+  Direction: C→S create, S→all fan-out
+  Pattern: command + broadcast
+  Best fit: WS message (or split: HTTP POST /games + WS broadcast)
+  Why: The fan-out must be WS. Whether the create itself is HTTP or WS is taste
+  —
+    keeping it all-WS is simpler; splitting it lets non-game-clients (admin
+    tools) create games via REST.
+  ────────────────────────────────────────
+  #: 4
+  Op: opDelGame
+  Direction: S→all fan-out
+  Pattern: broadcast
+  Best fit: WS message
+  Why: Same shape as NewGame fan-out.
+  ────────────────────────────────────────
+  #: 6
+  Op: opConnect
+  Direction: S→one push
+  Pattern: async result delivery
+  Best fit: WS message
+  Why: Server has spawned the dedicated server and is telling this client where
+    to connect. Naturally a push. If create goes HTTP, this can be the POST
+    response instead.
+  ────────────────────────────────────────
+  #: 12
+  Op: opPresence
+  Direction: S→all fan-out
+  Pattern: presence delta
+  Best fit: WS message
+  Why: Canonical WebSocket case #2.
+  ────────────────────────────────────────
+  #: 8
+  Op: opUserInfo
+  Direction: C→S lookup, S→C reply
+  Pattern: one-shot RPC with cacheable result
+  Best fit: HTTP GET /users/{accountID}
+  Why: Independent of session state. With Cache-Control: max-age=... you also
+  get
+    free CDN-able caching of names/levels.
+  ────────────────────────────────────────
+  #: 13
+  Op: opSetGame
+  Direction: C→S only
+  Pattern: session-state update
+  Best fit: WS message
+  Why: "I'm now in game N with status pregame." Updates server's view of this
+    connection. Belongs to the session.
+  ────────────────────────────────────────
+  #: 10
+  Op: opUpgradeStat
+  Direction: C→S, S→C ack
+  Pattern: command
+  Best fit: HTTP POST /me/agencies/{idx}/stats/{stat}/upgrade
+  Why: Pure request/response on the player's own resource. The AMQP event
+    publishing happens server-side regardless of transport.
+  ────────────────────────────────────────
+  #: 11
+  Op: opRegisterStats
+  Direction: dedicated server → lobby
+  Pattern: backend-to-backend match-end report
+  Best fit: HTTP POST /games/{id}/results
+  Why: Dedicated server is internal infra, not a connected lobby client. No
+    reason for it to hold a TCP session. Idempotency keys solve the retry story.
+  ────────────────────────────────────────
+  #: 9
+  Op: opPing
+  Direction: S→C, C ack
+  Pattern: keepalive
+  Best fit: delete entirely
+  Why: WebSocket has native ping/pong control frames. The opcode only exists
+    because raw TCP doesn't.
+
+  Already non-opcode traffic
+
+  ┌────────────────────────┬─────────┬──────────────────────────────────────┐
+  │        Channel         │ Current │            Recommendation            │
+  ├────────────────────────┼─────────┼──────────────────────────────────────┤
+  │ Heartbeats from        │         │ Keep UDP. 7-byte unreliable liveness │
+  │ dedicated server       │ UDP     │  is the textbook UDP use case.       │
+  │ (udp.go)               │         │                                      │
+  ├────────────────────────┼─────────┼──────────────────────────────────────┤
+  │ Community maps API     │         │ Keep HTTP. Already shaped correctly. │
+  │ (maps.go, :8080)       │ HTTP    │  Add an OpenAPI spec — the existing  │
+  │                        │         │ endpoints are a 30-minute write-up.  │
+  ├────────────────────────┼─────────┼──────────────────────────────────────┤
+  │ Player auth callbacks  │         │ Keep HTTP. Internal admin-api call,  │
+  │ (playerauth.go,        │ HTTP    │ already correct. Worth specifying in │
+  │ :15171)                │         │  OpenAPI for the typed admin-api     │
+  │                        │         │ client.                              │
+  └────────────────────────┴─────────┴──────────────────────────────────────┘
+
+  Resulting picture
+
+  After the shake-out:
+  - HTTP, public: /version, /motd, /auth, /users/{id}, /me/agencies/.../upgrade,
+   /games/{id}/results, plus existing /api/maps/*. All OpenAPI-spec-able.
+  - HTTP, internal: /player-auth, /ban, /delete-player. Already exist.
+  - WebSocket session (post-auth): chat, channel, presence, game create/delete
+  fan-out, set-game, connect-to-dedicated. ~6 message types, schema-defined
+  (protobuf or JSON+schema).
+  - UDP: dedicated-server heartbeats, unchanged.
+
+  The interesting consequence: more than half of what's currently in the custom
+  binary protocol turns out to be one-shot RPCs that never needed a persistent
+  connection in the first place. The actual stateful surface is small — chat,
+  presence, and game-list deltas. That's the part that genuinely needs
+  WebSocket.
+
+✻ Baked for 1m 4s
+
+❯ okay so everything is either an http get, post, or websocket.                 
+                                                                                
+  where does rpc come into play?                                                
+
+⏺ RPC isn't a fourth option alongside GET/POST/WebSocket — it's a different way 
+  of describing the same wire traffic. "HTTP POST" tells you the transport;
+  "RPC" tells you how the call is framed and how the client/server code is
+  generated.
+
+  What "RPC" actually means
+
+  The model: calling a function on a remote machine looks like calling a local
+  function. lobbyClient.UpgradeStat({agency: 0, stat: 2}) instead of
+  fetch('/me/agencies/0/stats/2/upgrade', {method: 'POST'}). The bytes on the
+  wire might be identical — the difference is in tooling and mental model.
+
+  Concrete stacks:
+  - gRPC — HTTP/2 + protobuf, codegen'd stubs in every language, supports unary
+  + streaming.
+  - Connect / Connect-RPC — Buf's variant: protobuf schemas, but plain HTTP/1.1
+  with JSON or protobuf payloads. Works in browsers without a proxy.
+  - JSON-RPC — just an envelope format ({method, params, id}), works over HTTP
+  or WebSocket.
+  - tRPC — TS-to-TS, types flow end-to-end with no IDL.
+
+  Where it would slot into Silencer
+
+  Looking at the table from the previous turn, RPC could replace either the HTTP
+   endpoints or the WebSocket message envelopes (or both). It does not replace
+  WebSocket as a transport — gRPC streaming and JSON-RPC-over-WS both still need
+   a long-lived connection underneath.
+
+  The four reasonable design points:
+
+  1. REST + OpenAPI for HTTP, hand-framed messages for WS. What I described
+  before. Most curl-able, browser-friendly, CDN-cacheable. Two schema systems
+  (OpenAPI for HTTP, protobuf/JSON-schema for WS).
+  2. RPC for HTTP, hand-framed for WS. E.g. Connect-RPC for the request/response
+   surface, custom WS frames for chat/presence. Tighter codegen on the request
+  side; still two schema systems.
+  3. RPC for both. One protobuf service definition covers everything.
+  LobbyService has unary methods (UpgradeStat, GetUserInfo) AND a
+  server-streaming method (SubscribeLobby) that delivers chat/presence/game-list
+   deltas. One schema, one codegen path.
+  4. All WebSocket, JSON-RPC envelopes. Every call is {method, params, id} over
+  WS. Simple, but loses HTTP's caching/CDN/curl benefits and forces
+  auth-before-any-call.
+
+  Silencer-specific take
+
+  The strongest argument for RPC here is schema unification. You have at least
+  three consumers (C++ game client, future TS lobby server, TS admin-api) of
+  overlapping types — User, LobbyGame, MatchStats. With protobuf you define
+  those once and codegen all three sides. With OpenAPI + JSON-schema for WS, you
+   maintain two schema systems that drift.
+
+  But there are real reasons to stay REST for the public-facing surface:
+  - Curl-debuggability. When a user posts "I can't connect" in Discord, you can
+  curl /version and check what they're getting. gRPC needs grpcurl and proto
+  files.
+  - CDN caching. /version, /motd, /users/{id} — all naturally cacheable via
+  plain HTTP semantics. gRPC bypasses that whole layer.
+  - Browser clients. The admin-web could call lobby endpoints. Plain REST works
+  in any browser; gRPC needs gRPC-Web (proxy) or Connect (which fixes this).
+
+  The strongest pragmatic split for Silencer:
+
+  - Backend-to-backend HTTP (opRegisterStats from dedicated server → lobby;
+  admin-api → playerauth) — good RPC candidates. Never touched by browsers,
+  never curl'd by users, both sides type-checked. Connect-RPC fits cleanly.
+  - Public HTTP (/version, /motd, /users/{id}, /auth) — stay REST + OpenAPI.
+  Debuggability and caching matter more than codegen here.
+  - WebSocket session — protobuf-framed messages, schema shared with the RPC
+  services if you go that route. You wouldn't really call individual chat
+  messages "RPC calls," even if the framing is identical.
+
+  If you want one sentence: RPC is the right answer when you want strong typed 
+  contracts between two systems you fully control, and the wrong answer when you
+   want maximum interoperability with the rest of the web. Silencer has both
+  surfaces, so the real call is which endpoints fall on which side of that line.
+
+✻ Cooked for 1m 1s
+
+❯ why cant a curl be done if osmething is defined in rpc?                       
+
+⏺ You're right to push back — I overstated that. The accurate version is more
+  nuanced.
+
+  The thing that's not curl-able isn't RPC, it's binary wire formats. I
+  conflated the two because they correlate in the wild.
+
+  What's actually true
+
+  RPC stack: gRPC (classic)
+  Curl-able?: No, in practice
+  Why: Uses HTTP/2 + protobuf binary + gRPC-specific 5-byte length prefix per
+    message. Curl can do HTTP/2 but the body is opaque bytes; you need grpcurl
+    (which holds the proto files and decodes for you).
+  ────────────────────────────────────────
+  RPC stack: Connect-RPC
+  Curl-able?: Yes
+  Why: Same protobuf schema, but the wire is just POST /package.Service/Method
+    with Content-Type: application/json and a JSON body. Curl works the same as
+    any REST endpoint. This is explicitly one of Connect's selling points.
+  ────────────────────────────────────────
+  RPC stack: JSON-RPC
+  Curl-able?: Yes
+  Why: It's literally JSON over HTTP POST. curl -d 
+    '{"method":"upgradeStat","params":{...},"id":1}' ...
+  ────────────────────────────────────────
+  RPC stack: tRPC
+  Curl-able?: Yes
+  Why: HTTP under the hood, JSON payloads. The URL shape is funky
+    (/api/trpc/lobby.upgradeStat) but it's just a POST.
+
+  So the rule is really: JSON on the wire → curl-able. Binary on the wire → need
+   a tool that knows the schema. Whether the programming model is REST or RPC is
+   orthogonal.
+
+  What this means for the recommendation
+
+  The reason I leaned away from gRPC for the public surface still stands, but
+  the framing should have been "binary wire formats are awkward to debug
+  ad-hoc," not "RPC is awkward."
+
+  If you go Connect-RPC, you get:
+  - One protobuf schema, codegen for C++ / TS / whatever.
+  - Binary protobuf payloads when the typed client talks to the server (fast,
+  compact, type-checked).
+  - JSON payloads when curl or a browser hits the same endpoint (debuggable, no
+  tooling needed).
+  - Same endpoint URL for both — server picks based on Content-Type.
+
+  That genuinely is the best of both worlds, and it weakens the case for
+  splitting "public REST + internal RPC." You could put everything on Connect
+  and still curl any endpoint when debugging. The only thing it doesn't fix is
+  CDN caching of GETs — Connect calls are POSTs by default, so HTTP cache
+  semantics don't apply the same way.
+
+  Sidebar: gRPC can be made curl-able too
+
+  - grpc-gateway generates a REST/JSON proxy from your .proto annotations.
+  - Envoy gRPC-JSON transcoding does it at the proxy layer.
+
+  These exist precisely because the binary-only thing is a real pain point.
+  Connect was Buf's "stop bolting on REST gateways, just speak JSON natively"
+  answer.
+
+  So: my earlier "RPC isn't curl-able" was sloppy shorthand for "classic gRPC
+  isn't curl-able." For Silencer, if you want RPC's codegen wins without losing
+  curl, Connect-RPC is the specific answer.
+✻ Worked for 34s
+
+❯ openapi cant handle websockets?                                               
+
+⏺ Not really, no. Worth being precise about what the limit is.
+
+  What OpenAPI can and can't model for WebSockets
+
+  Can:
+  - The HTTP upgrade request itself — GET /lobby with Upgrade: websocket
+  headers, auth, query params. That much is just an HTTP endpoint and OpenAPI
+  documents it fine.
+
+  Can't (in any standard way):
+  - The message protocol after the upgrade succeeds. OpenAPI has no vocabulary
+  for "either side can send any of these N message types at any time, here's
+  their shape, here's which trigger which fan-out." That's the actual
+  interesting part of a WS protocol and OpenAPI 3.1 has no slot for it.
+
+  OpenAPI 3.1's webhooks and callbacks are sometimes mistaken for WebSocket
+  support — they aren't. They describe the server making outbound HTTP calls 
+  back to the client, which is a different shape entirely (still
+  request/response, still HTTP).
+
+  There are community extensions (e.g., x-websocket annotations in some
+  toolchains) but nothing standardized, and tooling support is essentially zero.
+
+  What you'd use instead
+
+  AsyncAPI is the sister spec for exactly this — same authors' philosophy,
+  JSON-Schema-based components, but the top-level model is channels + messages +
+   operations (publish/subscribe) instead of paths + operations. It has
+  first-class WebSocket bindings. AsyncAPI 3.0 is current and stable.
+
+  The clean pattern is:
+
+  - openapi.yaml describes the HTTP surface (/version, /users/{id},
+  /me/.../upgrade, etc.)
+  - asyncapi.yaml describes the WebSocket session (chat, presence, game-list
+  deltas)
+  - Shared components/schemas/*.yaml — User, LobbyGame, MatchStats, etc. Both
+  specs $ref into the same JSON Schema files. One source of truth for types, two
+   specs for the two transport shapes.
+
+  This is the OpenAPI-native answer to the schema-unification problem.
+
+  Tooling caveat
+
+  AsyncAPI's codegen ecosystem is real but noticeably thinner than OpenAPI's.
+  For TS it's usable (@asyncapi/modelina, generators for various clients). For
+  C++ it's weak — and your game client is C++. That's the practical reason a lot
+   of game/realtime stacks reach for protobuf + Connect-RPC streams instead of
+  AsyncAPI: protobuf's C++ codegen is industrial-strength in a way AsyncAPI's
+  isn't.
+
+  So for Silencer specifically
+
+  Three realistic options for "spec-driven everything":
+
+  1. OpenAPI + AsyncAPI + shared JSON Schema. Spec-first, two specs, shared
+  types. Best-in-class for the HTTP side; weaker C++ codegen for the WS side.
+  2. OpenAPI for HTTP + protobuf for WS messages. Two schema systems, but
+  protobuf gives you strong C++ codegen for the WS payloads. Most pragmatic for
+  a C++ client.
+  3. Connect-RPC for everything (HTTP + WS streams). One protobuf schema covers
+  both surfaces. Loses some HTTP idioms (caching, REST-y URLs) but unifies the
+  C++ codegen story.
+
+  Option 2 is probably the sweet spot for this codebase: OpenAPI describes the
+  human-facing HTTP, protobuf describes the binary-but-typed WS frames, the C++
+  client gets first-class codegen for the part it cares about most.
+
+✻ Baked for 38s
+
+❯ sell me on having a split in the api across openapi and protobuf. how is that 
+   maintined?                                                                   
+
+⏺ Fair challenge. The case has to be that the cost of two specs is lower than 
+  the cost of compromising on either side. Here's the honest version.
+
+  Why the split actually buys you something
+
+  The win is that each spec is best-in-class for its half of the surface, and
+  your specific codebase rewards both:
+
+  - The C++ client gets first-class codegen. This is the #1 reason. Protobuf's
+  C++ tooling is industrial; you write .proto, protoc produces a User struct
+  with parsers, validators, and field numbering rules baked in. AsyncAPI and
+  JSON-Schema codegen for C++ are weak-to-nonexistent. If the WS messages were
+  JSON-only, you'd be writing C++ decoders by hand — exactly the problem you're 
+  trying to escape from the current binary protocol.
+  - The HTTP surface gets the ecosystem. Swagger UI for support tooling, mock
+  servers for admin-web development, oasdiff for breaking-change CI,
+  browser-friendliness, CDN-able GETs, curl debugging, generated typed clients
+  in services/admin-api/, clients/cli/, web/admin/ from one spec.
+  Protobuf-everywhere via Connect-RPC could approximate this but you'd lose
+  Swagger UI, lose HTTP cache semantics on GETs, and force every admin tool onto
+   the Connect TS client.
+
+  The "single spec to rule them all" alternatives all force a real compromise on
+   one side. The split lets each surface use the tool that's actually best for
+  it.
+
+  How it's maintained — concrete workflow
+
+  Layout (slots into your existing structure):
+
+  shared/api/
+    openapi.yaml              # HTTP endpoints
+    proto/
+      lobby.proto             # WebSocket messages
+      common.proto            # types referenced by both transports
+    package.json              # codegen scripts
+
+  Codegen pipeline. Each spec has one bun run script. Generated code lives next
+  to its consumer:
+
+  clients/silencer/src/api/proto/      # protoc → C++ headers
+  clients/cli/src/api/openapi/         # openapi-typescript → TS types
+  clients/cli/src/api/proto/           # protobuf-ts → TS types
+  services/admin-api/src/api/openapi/  # typed admin-api server stubs
+  web/admin/src/api/openapi/           # typed fetch client for browser
+  services/lobby/internal/api/openapi/ # generated Go HTTP server interfaces
+  services/lobby/internal/api/proto/   # generated Go protobuf types
+
+  Run bun run codegen from the repo root. Commit the output. The fact that
+  generated files are reviewable in PRs is a feature — you see exactly what
+  changed downstream when you edit a spec.
+
+  A typical change. Adding lastSeen to a user:
+
+  1. Edit shared/api/openapi.yaml — add lastSeen to the User response schema for
+   GET /users/{id}.
+  2. Edit shared/api/proto/common.proto — add int64 last_seen = 5; to User.
+  3. bun run codegen. Diff shows new field in C++ headers, TS types, Go types,
+  OpenAPI clients.
+  4. Implement the field in services/lobby/.
+  5. One PR. Reviewers see both spec changes and the generated downstream
+  effects together.
+
+  This is the same shape as a typical OpenAPI-only or protobuf-only PR — you
+  just touch two files when the field genuinely lives on both transports.
+
+  The honest cost: shared types
+
+  This is the only real friction point. User, LobbyGame, Agency exist on both
+  transports, and you have to keep their definitions consistent across
+  openapi.yaml and common.proto. Three ways to handle it, in increasing order of
+   automation:
+
+  1. Manual + review discipline. Define in both, rely on PR review. Works fine
+  if shared types change rarely (true for Silencer). Bad if drift is silent.
+  2. Drift test in CI. ~50 lines: parse both specs, normalize the field set for
+  each shared type, assert equal. Drift becomes a failing CI check, not a
+  runtime mystery. This is what I'd actually do.
+  3. Generate one from the other. protoc-gen-openapi (or Buf's plugin) emits an
+  OpenAPI fragment from annotated protos. Protobuf becomes source of truth,
+  OpenAPI schemas are derived. Eliminates drift but adds a build step and
+  constrains how you can describe HTTP-specific things (status codes, request
+  bodies). Worth it on big systems with many shared types; overkill for ~5
+  shared types.
+
+  For Silencer's size, (2) is the sweet spot. You define each spec in its native
+   idiom, share types via the test, and don't drag in a generator just to keep
+  five structs aligned.
+
+  Versioning and breaking changes
+
+  Different per side, both well-understood:
+
+  - OpenAPI: semver in info.version. For a breaking response shape change, add
+  /v2/users/{id} and keep /v1/ for the deploy window. oasdiff in CI catches
+  accidental breaks.
+  - Protobuf: the field-number discipline (never reuse, never retype, mark
+  reserved on removal). buf breaking in CI enforces it. The C++ client and lobby
+   server can run different protobuf versions during a rollout because
+  protobuf's wire compat is rock-solid by design.
+
+  Both tools — oasdiff and buf breaking — are mature. This isn't theoretical;
+  it's a known boring problem with known boring solutions.
+
+  What it looks like 6 months in
+
+  shared/api/ becomes the thing both sides change together. New endpoint?
+  OpenAPI edit. New WS message? Protobuf edit. Field shared between them? Both,
+  plus the drift test catches you if you only do one. The C++ client is the
+  biggest beneficiary — it stops shipping hand-written decoders entirely. The
+  admin tools and CLI get free typed clients. Onboarding cost is "learn OpenAPI"
+   + "learn protobuf field rules," both of which most engineers already know.
+
+  The pitch in one line: OpenAPI gives you the HTTP ecosystem, protobuf gives 
+  you the C++ codegen, and the maintenance overhead is one extra spec file plus 
+  one drift test. That's a small price for not having to hand-write either
+  side's decoders ever again.
+
+✻ Baked for 1m 19s
+
+❯ and can the openapi cover the api routes of all of our different http         
+  servers? (lobby, admin, etc.)                                                 
+
+⏺ Technically yes — OpenAPI supports multiple servers in a single spec via the
+  servers: array. But "can it" and "should it" are different questions, and for
+  Silencer the answer to "should it" is no — one spec per service, shared types 
+  in a common dir.
+
+  What OpenAPI lets you do
+
+  You can write one giant openapi.yaml with a top-level servers: block listing
+  every base URL, plus per-operation servers: overrides:
+
+  servers:
+    - url: https://lobby.silencer.gg
+      description: Lobby
+    - url: https://admin-api.silencer.gg
+      description: Admin API
+
+  paths:
+    /users/{id}:
+      get:
+        servers: [{url: https://lobby.silencer.gg}]
+        ...
+    /admin/players/{id}/ban:
+      post:
+        servers: [{url: https://admin-api.silencer.gg}]
+        ...
+
+  This is valid OpenAPI. Generators handle it. So the question is whether it's a
+   good idea.
+
+  Why one mega-spec is wrong for Silencer
+
+  Three concrete costs:
+
+  1. Coupling. A change to admin-api forces editing the same file as a lobby
+  change. Right now services/lobby/ and services/admin-api/ deploy independently
+   and PR independently — your CLAUDE.md structure already reflects "each
+  component owns its own spec/docs." A unified OpenAPI breaks that.
+  2. Bloated generated clients. clients/cli/ only needs the lobby's public
+  endpoints. If it codegens off a unified spec, it pulls in admin types,
+  player-auth types, internal endpoints — none of which it should know about.
+  You can filter, but now you're maintaining filter rules instead of just having
+   scoped specs.
+  3. Mixed security schemes. Lobby uses player tokens; admin-api uses admin
+  tokens; player-auth is internal-only (no auth header at all, just network
+  isolation). Putting all three in one spec means every operation needs explicit
+   security: overrides to escape the wrong default. Per-service specs each pick
+  the right default once.
+
+  What works instead
+
+  Each service owns its own spec, shared types live in a common dir, both $ref
+  into it:
+
+  shared/api/
+    components/
+      schemas/
+        user.yaml         # the User schema, single source of truth
+        agency.yaml
+        lobby-game.yaml
+      security/
+        player-token.yaml
+        admin-token.yaml
+    proto/
+      lobby.proto         # WS messages (from previous discussion)
+
+  services/lobby/
+    api/openapi.yaml      # lobby's public HTTP, $refs
+  ../../shared/api/components/
+
+  services/admin-api/
+    api/openapi.yaml      # admin endpoints, same $ref pattern
+
+  OpenAPI's $ref resolves cross-file natively. Tools like redocly bundle,
+  swagger-cli bundle, or openapi-typescript handle multi-file specs
+  transparently.
+
+  What about the maps API and player-auth?
+
+  Two ways to slice it:
+
+  - By process/binary. The lobby Go binary serves three HTTP listeners: public
+  lobby endpoints (post-rewrite), maps on :8080, player-auth on :15171. Three
+  separate OpenAPI specs, all in services/lobby/api/. Reflects the actual
+  deployment shape.
+  - By port. Same idea — services/lobby/api/maps.openapi.yaml,
+  services/lobby/api/player-auth.openapi.yaml. Clean separation between
+  public/internal.
+
+  I'd do the latter. Player-auth's spec doesn't even need to be published — it's
+   an internal contract between admin-api and lobby. Keeping it in its own file
+  makes the public/internal boundary obvious.
+
+  "But I want one place to see all the APIs"
+
+  Different problem, different tool. Documentation aggregators like Redocly 
+  Workflows, Stoplight Platform, ReadMe.io, or self-hosted Redoc with multiple
+  specs let you publish a single developer-portal site that surfaces every spec
+  under tabs or sections, without merging them. The specs stay independent; the
+  docs are unified.
+
+  For Silencer's scale (~5 small HTTP surfaces), the simplest version is a
+  docs/api/ directory and a static Redoc build with one tab per spec. ~30
+  minutes of setup, regenerates on commit.
+
+  Concrete recommendation
+
+  - One OpenAPI per service surface — lobby public, lobby maps, lobby
+  player-auth, admin-api. Four files, small.
+  - Shared types in shared/api/components/, referenced via relative $ref.
+  - One unified docs site that bundles all four for browsing.
+  - Same shared/api/proto/ strategy for the WS protocol from the earlier
+  discussion.
+
+  The net is: one spec per process boundary, shared schemas across them, one 
+  docs portal on top. That's the shape that scales without coupling services
+  together, and it's how every multi-service OpenAPI setup I've seen in the wild
+   ends up.
+
+✻ Worked for 53s
+
+❯ and how does the C++ client interact with the WS and HTTP routes with this?   
+
+⏺ Concretely, here's the picture. The split-spec design pays off most on the C++
+   side, because both transports end up using the same generated data model.
+
+  Library choices for C++
+
+  Concern: HTTP
+  Library: libcurl (or cpr as a C++ wrapper)
+  Why: Already universal; handles TLS, redirects, timeouts. cpr gives you a
+    tolerable C++ API on top.
+  ────────────────────────────────────────
+  Concern: WebSocket
+  Library: IXWebSocket
+  Why: Modern C++14 (matches your CLAUDE.md stack), client-focused, built-in TLS
+
+    via mbedTLS, dedicated receive thread. Boost.Beast also works but pulls in
+    Boost.
+  ────────────────────────────────────────
+  Concern: Protobuf
+  Library: protoc-generated C++
+  Why: Standard. protobuf::util::JsonStringToMessage is the magic that ties HTTP
+
+    and WS together (see below).
+  ────────────────────────────────────────
+  Concern: OpenAPI client
+  Library: hand-written thin layer over libcurl
+  Why: C++ OpenAPI codegen exists (openapi-generator has cpp targets) but the
+    output quality is mediocre. ~10–20 hand-written 5-line functions are clearer
+
+    and decouple you from generator churn.
+
+  The trick that unifies everything: protobuf-JSON
+
+  Define your types in protobuf once (shared/api/proto/common.proto). On the
+  wire:
+
+  - WS messages → binary protobuf encoding (compact, fast).
+  - HTTP request/response bodies → protobuf's canonical JSON encoding
+  (Content-Type: application/json).
+
+  Both decode into the same generated User, LobbyGame, MatchStats structs in
+  C++. One data model, two transports, zero hand-written decoders:
+
+  // HTTP response → same struct as WS would produce
+  api::User user;
+  google::protobuf::util::JsonStringToMessage(httpBody, &user);
+
+  // WS message → same struct
+  api::LobbyServerMessage msg;
+  msg.ParseFromArray(wsFrame.data(), wsFrame.size());
+
+  The OpenAPI spec for HTTP endpoints describes those JSON shapes in standard
+  JSON Schema (Buf can emit these from your protos, or you write a small
+  adapter). Browsers and curl still see normal JSON; the C++ client never
+  deserializes by hand.
+
+  This is the same pattern Connect-RPC uses internally and the reason
+  gRPC-gateway exists. You're getting the benefit without committing to either
+  framework.
+
+  Layout in clients/silencer/
+
+  clients/silencer/src/
+    net/
+      http_client.{h,cpp}      # libcurl wrapper; thread pool; bearer-token
+  injection
+      ws_client.{h,cpp}        # IXWebSocket wrapper; reconnect; auth on upgrade
+      lobby_routes.{h,cpp}     # GetUser(id), UpgradeStat(...), etc. — thin
+  functions
+                               # that build URLs, post protos, parse responses
+      lobby_session.{h,cpp}    # owns the WS, dispatches LobbyServerMessage by
+  tag
+                               # (replaces the current lobby.cpp opcode switch)
+    api/                       # generated, .gitignore'd; built by CMake step
+      common.pb.{h,cc}
+      lobby.pb.{h,cc}
+
+  Generated files go in the build tree (CMake custom command runs protoc) or get
+   committed under clients/silencer/src/api/ if your team prefers reviewable
+  codegen output. Either is fine; build-tree is cleaner.
+
+  Threading model
+
+  Currently lobby.cpp reads TCP frames on (or near) the game thread. The new
+  shape:
+
+  - WS thread owned by IXWebSocket. Receives frames, parses them into
+  LobbyServerMessage, pushes onto a thread-safe queue.
+  - HTTP thread pool for request/response calls. Each call posts its result to
+  the same queue (or via SDL custom events).
+  - Game main thread drains the queue once per frame, dispatches by message
+  kind:
+
+  void Lobby::tick() {
+    api::LobbyServerMessage msg;
+    while (queue.tryPop(msg)) {
+      switch (msg.kind_case()) {
+        case api::LobbyServerMessage::kChat:    onChat(msg.chat()); break;
+        case api::LobbyServerMessage::kPresence: onPresence(msg.presence());
+  break;
+        case api::LobbyServerMessage::kNewGame: onNewGame(msg.new_game());
+  break;
+        case api::LobbyServerMessage::kDelGame: onDelGame(msg.del_game());
+  break;
+        // ...
+      }
+    }
+  }
+
+  This replaces the current opcode switch in lobby.cpp. The dispatch shape is
+  the same; the wire format and the message types are generated.
+
+  Auth flow
+
+  1. Client calls POST /auth (HTTP) with name + password hash → server returns a
+   player session token.
+  2. Token cached in memory (and optionally on disk for "remember me").
+  3. WS upgrade includes the token, e.g., as a subprotocol header:
+  Sec-WebSocket-Protocol: silencer.v1, bearer.<token>.
+  4. Subsequent HTTP calls add Authorization: Bearer <token>.
+
+  This replaces the current opAuth flow. The "auth happens inside the binary
+  protocol" coupling goes away — auth is HTTP, the WS connection just presents a
+   token.
+
+  Build integration
+
+  CMake adds a custom command for codegen:
+
+  find_package(Protobuf REQUIRED)
+  file(GLOB PROTOS "${CMAKE_SOURCE_DIR}/shared/api/proto/*.proto")
+  protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS ${PROTOS})
+
+  add_library(silencer_api STATIC ${PROTO_SRCS} ${PROTO_HDRS})
+  target_link_libraries(silencer_api PUBLIC protobuf::libprotobuf)
+  target_include_directories(silencer_api PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+
+  target_link_libraries(silencer PRIVATE silencer_api ixwebsocket cpr::cpr)
+
+  Dependencies via vcpkg, Conan, or FetchContent — your call based on what the
+  rest of the project does. IXWebSocket and cpr both build cleanly with CMake.
+
+  What this replaces in lobby.cpp
+
+  The current C++ side has hand-rolled bit-aligned Serializer calls for each
+  opcode. After the rewrite:
+
+  - All Serializer calls → gone, replaced by msg.set_*() and protobuf parse.
+  - Manual frame [len][op][payload] packing → gone, WS framing is provided.
+  - Opcode constants synced to protocol.go → gone, kind_case() enum comes from
+  the proto.
+  - Length-cap workarounds (the 200-byte URL limit) → gone, no frame cap.
+
+  Net effect: less code, no two-sided manual sync, same threading model, plus
+  you can curl any HTTP endpoint when debugging. The C++ client gets more
+  maintainable, not less, despite adding two libraries.
+
+  One thing to be careful about
+
+  Protobuf C++ runtime is ~1–2 MB statically linked. For a desktop game binary,
+  irrelevant. If you ever ship to a constrained platform, protobuf-lite (drops
+  descriptors and reflection) cuts that in half. Worth knowing, not worth
+  optimizing for now.
+
+✻ Cooked for 1m 22s
+
+❯ this game is only 8MB and I'd hate to needlessly increase its filesize by     
+  1-2MB - almost 25%!                                                           
+
+⏺ You're right, that's a fair pushback. 1–2 MB on an 8 MB binary is not a
+  rounding error, and the protobuf-lite shortcut (~50% smaller) breaks the
+  JSON-unification trick because JsonStringToMessage lives in the full runtime,
+  not lite. Let me redo the C++ side properly with that constraint.
+
+  Better path: JSON on both wires, plain C++ structs
+
+  Drop protobuf entirely. Use JSON as the wire format for both HTTP and 
+  WebSocket. Define schemas once in JSON Schema (referenced from OpenAPI),
+  generate or hand-write C++ structs that match.
+
+  What you give up:
+  - Wire compactness. JSON is ~2-3× the bytes of protobuf for typical lobby
+  messages. For Silencer's traffic — chat lines, presence updates, game-list
+  deltas — this is meaningless. You're talking single-digit KB/sec per client at
+   peak. The 255-byte cap pain came from the framing, not the verbosity.
+  - Protobuf's rigorous field-number evolution rules. JSON Schema has its own
+  patterns (additive changes are usually safe, document removals as breaking)
+  but they're less battle-tested.
+
+  What you keep:
+  - One schema → one C++ data model used by both transports.
+  - No hand-written decoders.
+  - Curl-able everything (already JSON).
+  - Browser-friendly admin tools.
+
+  Library cost in C++
+
+  ┌────────────────┬──────────────┬─────────────────────────────────────────┐
+  │    Library     │  Compiled    │                  Notes                  │
+  │                │ size impact  │                                         │
+  ├────────────────┼──────────────┼─────────────────────────────────────────┤
+  │ rapidjson      │ ~80–150 KB   │ Fast, low-allocation, header-only-ish.  │
+  │                │              │ Standard answer.                        │
+  ├────────────────┼──────────────┼─────────────────────────────────────────┤
+  │ nlohmann::json │ ~200–400 KB  │ Friendlier API, slower compiles, more   │
+  │                │              │ bloat. Works fine.                      │
+  ├────────────────┼──────────────┼─────────────────────────────────────────┤
+  │ simdjson       │ ~100 KB      │ Fastest parser, but parse-only — you'd  │
+  │                │              │ still need rapidjson for serializing.   │
+  └────────────────┴──────────────┴─────────────────────────────────────────┘
+
+  Pick rapidjson. You'd land at ~150 KB total binary growth instead of 1–2 MB.
+  Roughly 1.5–2% of your current size, vs. ~25% for protobuf.
+
+  Plus the IXWebSocket library itself is ~200 KB statically linked (less if you
+  use the system OpenSSL/SecureTransport instead of bundled mbedTLS). All-in:
+  maybe 350–400 KB binary growth for HTTP+WS+JSON. Still well under the protobuf
+   path.
+
+  Generating the C++ structs
+
+  For ~10 WS message types and ~5 shared HTTP types, three options:
+
+  1. quicktype — JSON Schema → C++ structs. Works, but it's a JS-based tool, and
+   the generated code is functional rather than pretty. Adds a build-time dep.
+  2. sourcemeta/jsontoolkit — newer C++ ecosystem tool. Less mature.
+  3. Hand-write the structs. ~15 types × ~5 fields each = ~75 lines of C++. The
+  schemas in shared/api/components/ are the contract; the C++ structs mirror
+  them. Add a CI test that parses the JSON Schema and asserts the field set
+  matches the C++ struct (~50-line test using rapidjson reflection on a
+  manifest).
+
+  For your scale, (3) is genuinely the best answer. Generated code from immature
+   C++ JSON-Schema tooling buys you nothing for ~15 small types, and
+  hand-written structs read better. The drift test gives you the safety net.
+
+  What the C++ side actually looks like
+
+  // shared/api/components/schemas/user.yaml is the contract.
+  // clients/silencer/src/api/types.h mirrors it:
+  struct User {
+    uint32_t accountId;
+    std::string name;
+    uint8_t level;
+    std::vector<Agency> agencies;
+
+    static User fromJson(const rapidjson::Value& v);
+    void toJson(rapidjson::Writer<rapidjson::StringBuffer>& w) const;
+  };
+
+  // Same struct used for HTTP responses and WS payloads.
+
+  Tiny per-type fromJson/toJson methods — repetitive but trivial, and you can
+  wrap them with a couple of macros if it bothers you. ~10 lines per type.
+
+  WS dispatch becomes a JSON-tag switch instead of a protobuf-tag switch:
+
+  void Lobby::onWsMessage(const std::string& json) {
+    rapidjson::Document d;
+    d.Parse(json.c_str());
+    std::string kind = d["kind"].GetString();
+    if (kind == "chat")     onChat(Chat::fromJson(d["payload"]));
+    else if (kind == "presence") onPresence(Presence::fromJson(d["payload"]));
+    else if (kind == "newGame")  onNewGame(NewGame::fromJson(d["payload"]));
+    // ...
+  }
+
+  The kind discriminator pattern is conventional for JSON-Schema-described
+  unions (oneOf with a tag).
+
+  Schema layout, revised
+
+  shared/api/
+    components/schemas/      # JSON Schema, single source of truth
+      user.yaml
+      lobby-game.yaml
+      agency.yaml
+    ws/
+      messages.yaml          # JSON Schema for WS message envelopes
+                             # (kind + payload union)
+    openapi.yaml             # HTTP, $refs into components/schemas/
+
+  OpenAPI handles the HTTP side with native JSON Schema. The WS message catalog
+  is just another JSON Schema file (or AsyncAPI if you want richer message-flow
+  docs — but for a small surface, plain JSON Schema is enough). Both reference
+  components/schemas/ for shared types.
+
+  Net effect
+
+  - Binary growth: ~350–400 KB (rapidjson + IXWebSocket + a bit of TLS), not 1–2
+   MB.
+  - Schema-driven, no hand-written codecs, curl-able.
+  - JSON wire is "fat" but Silencer's lobby cadence makes that irrelevant — the
+  heavy traffic is gameplay UDP, which never touched any of this.
+  - Drops protobuf's strong evolution rules — you compensate with versioned
+  endpoints and additive-only changes by convention, plus the drift test.
+
+  This is a better fit for Silencer's constraints than what I described before.
+  The protobuf pitch was solid in the abstract; for an 8 MB indie game binary,
+  JSON-everywhere is the right call.
+
+✻ Cogitated for 1m 16s
+
+❯ cant we achieve these goals of improving our API without adding any size to   
+  the bundle?                                                                   
+
+⏺ Mostly yes, with a small irreducible cost (~5–10 KB, not 100+). Here's the
+  architecture that gets you there.
+
+  The shift: C++ client speaks WS only, never HTTP
+
+  The OpenAPI surface from earlier exists for admin-web, the CLI, curl 
+  debugging, third-party tools — not for the game client. The game client
+  doesn't need to be browser-friendly or curl-debuggable; it itself is the only 
+  thing calling those endpoints. So expose every operation on both transports,
+  and let the C++ client use only WS.
+
+                       ┌──────────────────────────┐
+  clients/silencer ──►─│  WebSocket session       │──┐
+                       │  (binary frames)         │  │
+                       └──────────────────────────┘  │
+                                                      ├──► Lobby Server
+     admin-web                                        │     (one impl per op,
+     CLI tools         ┌──────────────────────────┐  │      two transports)
+     curl              │  HTTP/JSON               │──┘
+     admin-api      ──►│  (OpenAPI-described)     │
+                       └──────────────────────────┘
+
+  Server implements each operation once. Both transports wrap it. The HTTP+JSON
+  path costs you bytes only on the server, where you don't care about bundle
+  size.
+
+  Keep the current binary wire format
+
+  Inside the WebSocket session, frames stay binary — same compact bit-packed
+  encoding your current Serializer produces. No JSON parser in the C++ client.
+  No protobuf runtime. Zero new serialization libraries.
+
+  The change is only that the codec is now generated instead of hand-written:
+
+  shared/api/schema.???     ◄─── single source of truth
+                             │
+          ┌──────────────────┼──────────────────┐
+          │                  │                  │
+     C++ binary codec    Go binary codec    JSON Schema
+     (clients/silencer)  (services/lobby)   (server-side
+                                             HTTP responses
+                                             use the same types)
+
+  The C++ codegen output looks like the current Serializer-based code — same
+  wire format, same primitives — just authored by a code generator. Zero runtime
+   dependency. Probably negative binary cost vs. today, because generated code
+  can be tighter than hand-written.
+
+  What schema to use as the IDL
+
+  Three realistic choices, in order of pragmatism:
+
+  1. A tiny custom DSL. Define types in a 50-line YAML or JSON schema you parse
+  with a small TS or Python script. Emit C++ binary codec, Go binary codec, JSON
+   Schema for OpenAPI. Most flexible, most code to maintain (~300–500 LOC of
+  codegen).
+  2. Protobuf .proto files as the IDL only. Use protoc to parse the schema, then
+   a custom protoc plugin emits your existing binary wire format for C++ and Go,
+   and standard plugins emit JSON Schema for OpenAPI. You never link the 
+  protobuf C++ runtime — protobuf is purely a build-time tool. This gets you the
+   type-system rigor without the binary cost.
+  3. JSON Schema as the IDL. OpenAPI components are the source of truth; a
+  generator emits binary codec for C++ and Go. Same idea, JSON-Schema-flavored.
+
+  Option 2 is what I'd actually do. Protobuf's IDL is well-designed, the parser
+  is built into protoc, and writing a custom plugin that emits your binary
+  format is ~200 LOC. You get protobuf's evolution rules and its tooling without
+   paying its runtime cost.
+
+  Irreducible costs
+
+  You can't actually get to literally zero. The honest list:
+
+  Cost: WebSocket framing
+  Estimate: ~5–8 KB compiled
+  Notes: Hand-rolled. The protocol is small: HTTP upgrade handshake, frame
+    masking, opcode dispatch, control frames. ~300–500 LOC of C++ replaces an
+    external library.
+  ────────────────────────────────────────
+  Cost: TLS, if you want WSS
+  Estimate: 0 KB on macOS/Windows / variable on Linux
+  Notes: Use Security.framework (Apple) and Schannel (Win) — both ship with the
+    OS, no bundling. Linux: link system OpenSSL dynamically (~0 KB added; OS
+    already has it). The current binary protocol is plaintext, so this is only a
+
+    cost if you decide to add TLS.
+  ────────────────────────────────────────
+  Cost: Generated codec
+  Estimate: likely net-zero or negative
+  Notes: Replaces hand-written Serializer calls with generated ones. Same wire,
+    possibly tighter code.
+
+  Total: maybe +5–10 KB for WS framing if you don't already do it, and zero TLS
+  cost on consumer platforms.
+
+  What you give up vs. the JSON-everywhere version
+
+  - The C++ client cannot be debugged with curl. You can debug the same
+  operation by curling the HTTP endpoint, since both transports wrap the same
+  server-side handler. The traffic the client actually sends stays opaque.
+  Acceptable tradeoff — curl-debuggability was a benefit for users and tooling,
+  not for game-client developers.
+  - Wire format diverges between transports. Internal sanity check: a CI test
+  that takes a representative message, encodes it with both serializers, and
+  decodes both into the same struct, asserting equality. ~30 lines.
+
+  Net picture
+
+  - Server: one implementation per operation, exposed on both WS (binary, for
+  game client) and HTTP (JSON, for everything else). Server has the size budget;
+   pays both costs.
+  - Game client: only WS. Only the binary codec. Roughly the same code shape as
+  today, but generated. ~5–10 KB binary growth for WS framing if you currently
+  rely on raw TCP.
+  - Schema: one source of truth (.proto files used as IDL), drives C++ codec, Go
+   codec, and JSON Schema embedded in OpenAPI.
+  - Admin-web, CLI, ops tools: hit the OpenAPI HTTP endpoints, pay no attention
+  to the binary wire.
+
+  You get the schema-driven, single-source-of-truth, OpenAPI-described,
+  codegen'd everything — without the protobuf runtime or a JSON parser in the
+  game binary. The cost is ~10 KB and a custom protoc plugin (one-time, ~200
+  LOC). For an 8 MB binary that's noise.
+
+✻ Crunched for 1m 36s
+
+❯ how about our cli - could it still leverage this to talk to lobby?            
+
+  Read 1 file, listed 2 directories (ctrl+o to expand)
+
+⏺ Yes — and you're already 60% of the way there. You have shared/lobby-protocol/
+   with golden test vectors (vectors.json), clients/lobby-sdk/ts/ and
+  clients/lobby-sdk/cpp/ mirrored against it, and services/lobby/protocol.go as
+  the authoritative impl. The pattern is in place; the rewrite just promotes the
+   schema to be machine-driving instead of doc-mirroring.
+
+  What changes for the CLI specifically
+
+  The CLI doesn't ship to users at game-binary scale — it's a Bun TS tool. None 
+  of the bundle-size tradeoffs from the C++ conversation apply. It can use
+  whichever transport is ergonomic per call, and pull in any libraries it wants.
+
+  The natural split mirrors what the game client + admin-web does, combined into
+   one consumer:
+
+  - Session-y operations → WS-binary, via clients/lobby-sdk/ts/. Fake-player
+  daemon (the recent #105 work), chat injection, presence emulation, watching
+  the game-list stream. Anything that requires being a connected lobby client.
+  Same wire format as the C++ game client.
+  - One-shot operations → HTTP-JSON, via openapi-generated TS client. Read user
+  info, query games, post stats, upload maps. Anything where you don't need the
+  persistent session.
+
+  Both consume the same generated User, LobbyGame, etc. types — schema-driven
+  all the way down.
+
+  How clients/lobby-sdk/ts/ slots in
+
+  Today it's a hand-written TS implementation kept in sync with protocol.go via
+  the vectors.json round-trip tests. After the rewrite:
+
+  - Source of truth shifts from services/lobby/protocol.go to a machine-readable
+   schema (the .proto-as-IDL or whatever IDL you land on).
+  - clients/lobby-sdk/ts/ becomes a generated artifact, not hand-written. CI
+  regenerates and runs the same vectors.json round-trip tests.
+  - The CLI's import surface is unchanged — it still does import { LobbyClient }
+   from '@silencer/lobby-sdk' — but the SDK's internals are codegen'd.
+  - vectors.json stops being the spec and becomes pure test fixture; the schema
+  is the spec.
+
+  This is a strict upgrade: the same three-implementation contract tests still
+  run, but drift is now structurally impossible because all three
+  implementations regenerate from the same source.
+
+  How HTTP enters the CLI
+
+  Add a new client alongside the SDK:
+
+  clients/lobby-sdk/ts/      # WS-binary, generated from IDL
+  clients/admin-sdk/ts/      # HTTP+JSON, generated from OpenAPI
+                             # (or fold both into a single @silencer/api
+  package)
+
+  Generated via openapi-typescript or orval. CLI imports both, picks the right
+  one per command.
+
+  Concrete shape after the change
+
+  shared/api/
+    proto/                        # IDL — drives all binary codecs
+      lobby.proto
+      common.proto
+    openapi.yaml                  # HTTP — $refs into shared JSON Schema
+    vectors.json                  # contract-test corpus, regenerated from IDL
+
+  clients/lobby-sdk/
+    cpp/                          # generated; consumed by clients/silencer/
+    ts/                           # generated; consumed by clients/cli/
+
+  clients/admin-sdk/ts/           # OpenAPI-generated HTTP client; consumed by
+                                  # clients/cli/, web/admin/,
+  services/admin-api/
+
+  clients/cli/
+    src/                          # uses both SDKs as needed
+
+  Why this is a strong fit for what the CLI is becoming
+
+  The recent commits show the CLI growing into a real player-emulation tool —
+  multiplexed fake players, lobby commands, presumably more lobby-introspection
+  features ahead. That trajectory wants:
+
+  - Type safety on the WS message types so adding/changing a message doesn't
+  silently break the CLI.
+  - Cheap one-shot HTTP calls for non-session work (querying state, admin
+  commands) without spinning up a full WS session each time.
+  - Shared types with admin-api so the CLI can call admin endpoints with the
+  same User / Player types admin-api uses.
+
+  The split-spec design hands you all three. The CLI is arguably the consumer
+  that benefits the most from schema-driven generation — because it spans both
+  transports, it's the only consumer that would be writing both the WS encoder
+  and the HTTP fetch wrapper by hand if the schema didn't exist.
+
+  Net upgrade for the CLI vs. today
+
+  ┌────────────────────────────────────────────┬────────────────────────────┐
+  │                   Today                    │           After            │
+  ├────────────────────────────────────────────┼────────────────────────────┤
+  │ Hand-written TS lobby client, kept in sync │ Generated TS lobby client, │
+  │  via vectors.json                          │  drift impossible          │
+  ├────────────────────────────────────────────┼────────────────────────────┤
+  │ HTTP calls (e.g. to admin-api) hand-typed  │ Typed HTTP client from     │
+  │ via fetch                                  │ OpenAPI                    │
+  ├────────────────────────────────────────────┼────────────────────────────┤
+  │ User, LobbyGame types defined per consumer │ Shared types from a single │
+  │                                            │  schema                    │
+  ├────────────────────────────────────────────┼────────────────────────────┤
+  │ Adding a new lobby field: edit Go + C++ +  │ Edit IDL, regenerate, done │
+  │ TS + protocol.md + vectors.json            │                            │
+  └────────────────────────────────────────────┴────────────────────────────┘
+
+  The CLI is the cleanest case for this whole exercise — Bun runtime means no
+  bundle-size constraints, you already have the SDK seam, and the CLI's role
+  straddles both transports naturally.
+
+✻ Sautéed for 1m 18s
+
+❯ okay, lets now circle back and outline the whole thing                        
+
+⏺ Silencer API redesign — full outline
+
+  1. Goals
+
+  - Schema-driven: one source of truth defines all types and message shapes; no
+  hand-written encoders/decoders on any consumer.
+  - Two transports per operation: binary WS for the C++ game client, JSON HTTP
+  for everyone else. Both wrap the same server-side handlers.
+  - Bundle-neutral on the C++ side: ~10 KB binary growth, no protobuf or JSON
+  runtime in the game binary.
+  - Curl-able HTTP surface for admin tooling, support, and the rest of the web
+  stack.
+  - Don't touch gameplay netcode — the in-match UDP protocol between game client
+   and dedicated server stays C++↔C++ over UDP, untouched.
+
+  2. Architecture at a glance
+
+                       ┌────────────────────────────┐
+  clients/silencer ───►│ WebSocket (binary frames)  │──┐
+  clients/cli/lobby ──►│                            │  │
+                       └────────────────────────────┘  │
+                                                        ├──► Lobby Server
+     web/admin                                          │     (one handler per
+  op,
+     clients/cli (one-shots)  ┌───────────────────┐    │      both transports
+     services/admin-api    ──►│ HTTP (JSON)        │───┘      wrap it)
+     curl / support           │ OpenAPI-described  │
+                              └───────────────────┘
+
+     Dedicated server  ──UDP──► Lobby (heartbeat, unchanged)
+     Dedicated server  ──HTTP──► Lobby (match-end stats, was opRegisterStats)
+
+     Game client  ──UDP──► Dedicated server (gameplay, untouched)
+
+  3. Source of truth
+
+  shared/api/
+    proto/
+      common.proto           # User, LobbyGame, Agency, MatchStats — shared
+  types
+      lobby.proto            # WebSocket message envelopes (kind union +
+  payloads)
+    openapi/
+      lobby-public.yaml      # /version, /motd, /auth, /users/{id}, /me/...,
+  /games/{id}/results
+      lobby-maps.yaml        # /api/maps/*  (existing)
+      lobby-player-auth.yaml # /player-auth, /ban, /delete-player  (internal)
+      admin-api.yaml         # admin-api's own surface
+    components/schemas/      # shared JSON Schema, $ref'd from openapi/*
+                             # generated from common.proto via protoc plugin
+    vectors.json             # contract-test corpus, regenerated from schema
+
+  .proto files are used as IDL only — protoc parses them, custom and standard
+  plugins emit codecs. No protobuf runtime is ever linked.
+
+  4. Operation breakdown
+
+  ┌─────────────────────────┬─────────────────────────────┬─────────────────┐
+  │        Operation        │          Transport          │      Notes      │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │                         │                             │ Pre-auth;       │
+  │ Version check / update  │ HTTP GET /version           │ client polls on │
+  │ manifest                │                             │  launch.        │
+  │                         │                             │ Cacheable.      │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │                         │                             │ Static-ish;     │
+  │ MOTD                    │ HTTP GET /motd              │ fetched at      │
+  │                         │                             │ launch.         │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Auth (login)            │ HTTP POST /auth             │ Returns session │
+  │                         │                             │  token.         │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ User info lookup        │ HTTP GET /users/{id}        │ Cacheable.      │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Upgrade stat            │ HTTP POST /me/agencies/{a}/ │ One-shot RPC.   │
+  │                         │ stats/{s}/upgrade           │                 │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Match-end stats         │ HTTP POST                   │ Backend-to-back │
+  │ (dedicated→lobby)       │ /games/{id}/results         │ end.            │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Maps (list/upload/downl │ HTTP — existing             │ Already         │
+  │ oad/delete)             │                             │ correct.        │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Player auth callbacks   │ HTTP — existing internal    │ Already         │
+  │                         │                             │ correct.        │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Chat                    │ WS message                  │ Pub/sub by      │
+  │                         │                             │ channel.        │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Channel switch          │ WS message                  │ Server-confirme │
+  │                         │                             │ d.              │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Presence                │ WS server-push fan-out      │ Canonical WS    │
+  │ (join/leave/move)       │                             │ use case.       │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │                         │                             │ Or split: HTTP  │
+  │ Game create + fan-out   │ WS message + WS broadcast   │ create + WS     │
+  │                         │                             │ broadcast.      │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Game delete fan-out     │ WS server-push              │                 │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Set current game        │ WS message                  │ Session-state   │
+  │                         │                             │ update.         │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ "Connect to dedicated"  │                             │ Server delivers │
+  │ hint                    │ WS server-push              │  IP+port after  │
+  │                         │                             │ spawn.          │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Keepalive               │ WS native ping/pong         │ opPing deleted. │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ Dedicated-server        │ UDP — unchanged             │ 7-byte          │
+  │ liveness                │                             │ heartbeat.      │
+  ├─────────────────────────┼─────────────────────────────┼─────────────────┤
+  │ In-match netcode        │ UDP — unchanged             │ Never touched   │
+  │                         │                             │ lobby.          │
+  └─────────────────────────┴─────────────────────────────┴─────────────────┘
+
+  5. Per-component changes
+
+  services/lobby/ (Go, possibly future Bun/TS)
+  - New WS server (binary frames) replaces the custom TCP listener on :517.
+  - New HTTP listener for the public surface (alongside existing :8080 maps and
+  :15171 player-auth).
+  - One handler per operation; thin transport adapters wrap it as WS message or
+  HTTP route.
+  - UDP heartbeat path unchanged.
+  - protocol.go deleted (replaced by generated codec).
+
+  clients/silencer/ (C++)
+  - WS framing added (~300–500 LOC, hand-written, no library).
+  - Generated binary codec replaces hand-written Serializer calls in lobby.cpp.
+  - TLS via platform-native APIs (Security.framework / Schannel) — zero bundle
+  cost on macOS/Windows.
+  - Opcode switch in lobby.cpp becomes message-kind switch on generated structs.
+  - Threading: WS receive thread → message queue → game thread dispatch.
+  - Game-side gameplay netcode untouched.
+
+  clients/cli/ (Bun/TS)
+  - Imports two generated SDKs:
+    - @silencer/lobby-sdk (WS-binary, replaces the current hand-written
+  clients/lobby-sdk/ts/)
+    - @silencer/api-client (HTTP, generated from OpenAPI)
+  - Fake-player daemon (the recent #105 work) uses the WS SDK; one-shot commands
+   use the HTTP SDK.
+  - Existing clients/lobby-sdk/ts/ becomes a generated artifact.
+
+  web/admin/ (Next.js)
+  - Imports @silencer/api-client for typed access to admin-api and (where
+  appropriate) lobby HTTP.
+  - No WS dependency.
+
+  services/admin-api/ (Bun)
+  - Generated HTTP server stubs from admin-api.yaml.
+  - Generated HTTP client to call lobby's public/internal endpoints.
+
+  shared/lobby-protocol/
+  - Pivots from "hand-written spec mirror" to "generated test corpus."
+  vectors.json is regenerated from the IDL; round-trip contract tests stay.
+
+  6. Codegen pipeline
+
+  Single bun run codegen from the repo root:
+
+  ┌─────────────────────┬──────────────────┬───────────────────────────────┐
+  │      Generator      │      Input       │            Output             │
+  ├─────────────────────┼──────────────────┼───────────────────────────────┤
+  │ protoc + custom     │ proto/*.proto    │ C++ binary codec → clients/si │
+  │ plugin              │                  │ lencer/build-tree/api/        │
+  ├─────────────────────┼──────────────────┼───────────────────────────────┤
+  │ protoc + custom     │ proto/*.proto    │ Go binary codec →             │
+  │ plugin              │                  │ services/lobby/internal/api/  │
+  ├─────────────────────┼──────────────────┼───────────────────────────────┤
+  │ protoc + custom     │ proto/*.proto    │ TS binary codec →             │
+  │ plugin              │                  │ clients/lobby-sdk/ts/src/     │
+  ├─────────────────────┼──────────────────┼───────────────────────────────┤
+  │ protoc-gen-jsonsche │ proto/common.pro │ JSON Schema →                 │
+  │ ma                  │ to               │ components/schemas/           │
+  ├─────────────────────┼──────────────────┼───────────────────────────────┤
+  │                     │                  │ Typed TS clients →            │
+  │ openapi-typescript  │ openapi/*.yaml   │ clients/cli/src/api/,         │
+  │                     │                  │ web/admin/src/api/,           │
+  │                     │                  │ services/admin-api/src/api/   │
+  ├─────────────────────┼──────────────────┼───────────────────────────────┤
+  │ oapi-codegen (Go)   │ openapi/*.yaml   │ Go HTTP server stubs →        │
+  │                     │                  │ services/lobby/internal/http/ │
+  └─────────────────────┴──────────────────┴───────────────────────────────┘
+
+  Plus CI checks:
+  - oasdiff — breaking-change detection on OpenAPI specs.
+  - buf breaking — same on .proto IDL.
+  - Drift test — assert shared types match between protobuf and JSON Schema.
+  - Round-trip contract tests via vectors.json, run in C++/Go/TS.
+
+  The custom protoc plugin emitting your binary wire format is ~200 LOC, written
+   once.
+
+  7. Migration phases
+
+  Designed so each phase ships independently and lobbies/clients stay
+  backward-compatible until the C++ client cuts over.
+
+  Phase 0 — OpenAPI for what's already HTTP (low-risk, immediate value)
+  - Spec the existing /api/maps/* and /player-auth endpoints in OpenAPI.
+  - Generate typed clients for services/admin-api/ and clients/cli/ to consume
+  them.
+  - Stand up the unified Redoc docs site. No server code changes.
+
+  Phase 1 — IDL + codegen plumbing
+  - Define common.proto and lobby.proto.
+  - Build the custom protoc plugin and codegen scripts.
+  - Regenerate clients/lobby-sdk/{cpp,ts} from IDL; verify vectors.json
+  round-trip still passes against unchanged Go server.
+  - No wire-format changes yet — IDL describes the current binary protocol.
+
+  Phase 2 — New HTTP endpoints on the lobby (alongside the existing TCP
+  protocol)
+  - Add GET /version, /motd, /users/{id}, POST /auth, /me/.../upgrade,
+  /games/{id}/results.
+  - Implementation reuses existing handlers internally.
+  - Old TCP opcodes still work; new HTTP clients can opt in.
+  - CLI starts using HTTP for one-shots immediately.
+
+  Phase 3 — WS replacement of session-y opcodes
+  - Add wss:// (or ws://) endpoint on the lobby; binary frames carry generated
+  message types.
+  - C++ client gains WS support behind a flag; old TCP path stays in parallel
+  for one release.
+  - Once a release cycle passes with WS-only clients, delete the TCP path on
+  both sides.
+
+  Phase 4 — Cleanup
+  - Delete protocol.go and the C++ Serializer calls in lobby.cpp.
+  - shared/lobby-protocol/protocol.md retires; the IDL is the spec.
+
+  Optional Phase 5 — Lobby in TS
+  - Once both transports are stable and codegen'd, rewriting services/lobby/ in
+  Bun+TS is straightforward (Go-vs-Bun perf is irrelevant for this workload, see
+   earlier discussion). The transport adapters and handlers regenerate; only the
+   business logic ports.
+
+  8. What it costs and what it buys
+
+  Costs
+  - Two specs to maintain (OpenAPI + IDL), shared types $ref'd/codegen'd between
+   them.
+  - ~200 LOC custom protoc plugin (one-time).
+  - ~50 LOC drift test, ~150 LOC vectors round-trip tests (already exist).
+  - ~10 KB game binary growth (WS framing).
+  - Migration is real — phased over 3–4 releases.
+
+  Buys
+  - Single source of truth for every type and message.
+  - Generated codecs in C++, Go, TS — no hand-written encoders anywhere.
+  - Curl-able, browser-friendly HTTP surface for admin/support/tooling.
+  - CDN-cacheable GETs for /version, /motd, /users/{id}.
+  - Breaking-change detection in CI on both spec families.
+  - 255-byte frame cap and bit-aligned parsing pain — gone.
+  - Adding a new field is an IDL edit + regen, not a 5-place hand-sync.
+  - The C++ game client's lobby code shrinks (generated codec replaces
+  hand-written Serializer usage).
+
+  9. What is explicitly not changing
+
+  - Gameplay netcode (UDP, dedicated server ↔ game client during a match).
+  - UDP heartbeats from the dedicated server to the lobby.
+  - The dedicated server's spawning model (proc.go, fork from the lobby).
+  - The C++ game binary's threading model — same main loop, same SDL3 event
+  flow; just the lobby socket changes shape.
+
+  That's the whole picture: shared IDL → split into binary WS for the game
+  client and JSON HTTP for everyone else → codegen everywhere → phased migration
+   → gameplay path untouched.
+
+✻ Cogitated for 1m 30s
+
+※ recap: We outlined a redesign of Silencer's lobby API: shared schema (proto IDL + OpenAPI), binary WS for the C++ game client, JSON HTTP for everyone else. Next action is deciding whether to start with Phase 0, specifying the existing maps and player-auth HTTP endpoints in OpenAPI. (disable recaps in /config)
