@@ -7,6 +7,7 @@ WORKDIR /app
 # the workspace graph; --filter ./services/admin-api scopes the dep set.
 COPY package.json bun.lock ./
 COPY clients/cli/package.json            ./clients/cli/
+COPY clients/lobby-sdk/ts/package.json   ./clients/lobby-sdk/ts/
 COPY services/admin-api/package.json     ./services/admin-api/
 COPY shared/fonts/package.json           ./shared/fonts/
 COPY shared/gas-validation/package.json  ./shared/gas-validation/
