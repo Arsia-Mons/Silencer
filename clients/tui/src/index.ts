@@ -172,7 +172,14 @@ async function main(): Promise<void> {
   }
 
   process.stdin.on('data', (chunk: Buffer) => {
-    inputs.feed(chunk);
+    const events = inputs.feed(chunk);
+    for (const ev of events) {
+      if (ev.kind === 'name') {
+        control.sendNoAwait('key', { key: ev.name });
+      } else {
+        control.sendNoAwait('key', { ascii: ev.ascii });
+      }
+    }
   });
 
   // Render loop — fires whenever a new frame arrives. Bundles the rasterizer
@@ -203,10 +210,6 @@ async function main(): Promise<void> {
     if (inputs.quitRequested) {
       cleanup();
       process.exit(0);
-    }
-    if (inputs.backRequested) {
-      inputs.backRequested = false;
-      control.sendNoAwait('back');
     }
     inputs.decay();
     const snap = inputs.snapshot();

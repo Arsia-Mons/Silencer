@@ -20,10 +20,16 @@ silencer-tui (TS)              silencer --tui (C++)
   ships `[u8 type][u32 len][payload]` messages.
   Type 0x01 = palette (256×RGBA), type 0x02 = frame (u16 w, u16 h, w·h indexed).
   Engine flag `--tui` (game.cpp) skips video init, keeps audio, swaps backends.
-- **Input** is the canonical `Input` struct serialized as JSON over the
-  control socket's new `input` op (`controldispatch.cpp`). Last-write-wins
-  per tick. Terminal stdin → key autorelease timer (no keyup events from
-  cooked terminals) → snapshot sent at 24 Hz.
+- **Input is split across two ops** because the engine has two input paths:
+  - **Gameplay** (held keys: move/aim/fire/jump) goes through the canonical
+    `Input` struct via the `input` control op, last-write-wins per tick.
+    Terminal stdin → autorelease timer (no keyup events from cooked
+    terminals) → snapshot sent at 24 Hz.
+  - **Menu navigation + text input** uses a separate edge-triggered `key`
+    op that calls `Interface::ProcessKeyPress(world, ascii)` on the current
+    interface. Arrow keys map to magic chars 1-4, plus `\t`/`\n`/`\b`/0x1B
+    and printable ASCII pass through. Mirrors the SDL client's
+    `HandleSDLEvents` SDL_EVENT_KEY_DOWN translation.
 
 ## Run during dev
 

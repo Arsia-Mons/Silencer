@@ -41,6 +41,13 @@ type BoolField =
 //
 // Movement WASD; jump/jetpack/fire/use/activate on familiar keys; arrow keys
 // drive interface navigation (keyup/keydown/keyleft/keyright/keyactivate-Enter).
+const ARROW_NAME: Record<string, 'up' | 'down' | 'left' | 'right'> = {
+  '\x1b[A': 'up',
+  '\x1b[B': 'down',
+  '\x1b[C': 'right',
+  '\x1b[D': 'left',
+};
+
 const KEYMAP: Record<string, BoolField | BoolField[]> = {
   // Movement.
   w: 'keymoveup',
@@ -142,16 +149,26 @@ function emptyInput(): InputState {
   };
 }
 
+/** Edge-triggered key event for the engine's `key` control op. */
+export type KeyEvent =
+  | { kind: 'name'; name: 'up' | 'down' | 'left' | 'right' | 'tab' | 'enter' | 'escape' | 'backspace' }
+  | { kind: 'char'; ascii: number };
+
 export class TerminalInput {
   private state: InputState = emptyInput();
   private lastSeen = new Map<BoolField, number>();
   private weaponLastSeen = new Map<number, number>();
   /** User pressed Ctrl-C / Ctrl-Q — host should exit. */
   quitRequested = false;
-  /** User pressed Esc — host should send a "back" control op. */
-  backRequested = false;
 
-  feed(chunk: Buffer): void {
+  /**
+   * Consume a stdin chunk. Updates gameplay InputState (held keys with
+   * autorelease) AND returns edge-triggered key events that should be
+   * forwarded to the engine via the `key` control op for menu nav and
+   * text input.
+   */
+  feed(chunk: Buffer): KeyEvent[] {
+    const events: KeyEvent[] = [];
     const s = chunk.toString('utf8');
     let i = 0;
     while (i < s.length) {
@@ -162,22 +179,36 @@ export class TerminalInput {
         i++;
         continue;
       }
-      // Esc — could be a lone Esc or the start of a CSI sequence.
+      // CSI sequence (\x1b[X) — arrow keys.
+      if (c === '\x1b' && i + 2 < s.length && s[i + 1] === '[') {
+        const seq = s.slice(i, i + 3);
+        const arrow = ARROW_NAME[seq];
+        if (arrow) events.push({ kind: 'name', name: arrow });
+        this.press(seq);
+        i += 3;
+        continue;
+      }
+      // Lone Esc.
       if (c === '\x1b') {
-        if (i + 2 < s.length && s[i + 1] === '[') {
-          const seq = s.slice(i, i + 3);
-          this.press(seq);
-          i += 3;
-          continue;
-        }
-        // Lone Esc.
-        this.backRequested = true;
+        events.push({ kind: 'name', name: 'escape' });
         i++;
         continue;
+      }
+      // Named control chars.
+      if (c === '\r' || c === '\n') {
+        events.push({ kind: 'name', name: 'enter' });
+      } else if (c === '\t') {
+        events.push({ kind: 'name', name: 'tab' });
+      } else if (c === '\x7f' || c === '\b') {
+        events.push({ kind: 'name', name: 'backspace' });
+      } else if (c >= ' ' && c <= '~') {
+        // Printable ASCII — text input passes through ProcessKeyPress.
+        events.push({ kind: 'char', ascii: c.charCodeAt(0) });
       }
       this.press(c);
       i++;
     }
+    return events;
   }
 
   private press(key: string): void {

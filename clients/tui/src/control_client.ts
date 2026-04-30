@@ -64,7 +64,8 @@ export class ControlClient {
   send(op: string, args: Record<string, unknown> = {}): Promise<unknown> {
     if (!this.sock) return Promise.reject(new Error('not connected'));
     const id = this.nextId++;
-    const line = JSON.stringify({ id, op, ...args }) + '\n';
+    // The server's parser (controlserver.cpp:190) wants args nested under "args".
+    const line = JSON.stringify({ id, op, args }) + '\n';
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
       this.sock!.write(line);
