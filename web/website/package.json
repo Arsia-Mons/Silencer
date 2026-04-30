@@ -1,0 +1,12 @@
+{
+  "name": "silencer-website",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "bun run server.ts",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.86.0"
+  }
+}

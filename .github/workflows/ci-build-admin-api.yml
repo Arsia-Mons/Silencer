@@ -3,14 +3,8 @@ name: CI Build (admin-api Docker)
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'services/admin-api/**'
-      - '.github/workflows/ci-build-admin-api.yml'
   push:
     branches: [main]
-    paths:
-      - 'services/admin-api/**'
-      - '.github/workflows/ci-build-admin-api.yml'
 
 concurrency:
   group: ci-build-admin-api-${{ github.event.pull_request.number || github.ref }}
@@ -25,14 +19,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
+      # Path filter is gated inside the job (not on:) so the required check
+      # context always reports — branch protection treats a never-run workflow
+      # as "Expected" and blocks merge, but a job whose steps are skipped via
+      # if: still reports the job as success.
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            relevant:
+              - 'services/admin-api/**'
+              - 'package.json'
+              - 'bun.lock'
+              - '.github/workflows/ci-build-admin-api.yml'
+
+      - if: steps.changes.outputs.relevant == 'true'
+        uses: docker/setup-buildx-action@v3
 
       - name: Build image (no push)
+        if: steps.changes.outputs.relevant == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: services/admin-api
+          context: .
           file: services/admin-api/Dockerfile
           push: false
           platforms: linux/arm64
           cache-from: type=gha,scope=admin-api
           cache-to: type=gha,scope=admin-api,mode=max
+
+      - if: steps.changes.outputs.relevant != 'true'
+        run: echo "No admin-api changes; skipping build."

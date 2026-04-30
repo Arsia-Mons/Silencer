@@ -33,25 +33,98 @@ type MapMeta struct {
 
 // MapStore manages community maps stored as files in a directory.
 type MapStore struct {
-	mu     sync.RWMutex
-	dir    string
-	apiKey string
-	bySHA1 map[string]*MapMeta // lowercase sha1hex → meta
-	byName map[string]*MapMeta // uppercase name → meta (last-upload wins)
+	mu      sync.RWMutex
+	dir     string
+	linkDir string // where name-based symlinks are created for the dedicated server
+	apiKey  string
+	bySHA1  map[string]*MapMeta // lowercase sha1hex → meta
+	byName  map[string]*MapMeta // uppercase name → meta (last-upload wins)
 }
 
-func NewMapStore(dir, apiKey string) (*MapStore, error) {
+// NewMapStore creates a MapStore rooted at dir. linkDir (if non-empty) is a
+// directory where symlinks named {map.Name} → {dir}/{sha1}.sil are maintained
+// so the dedicated server's FindMap() can locate community maps by filename.
+// linkDir should be the GetDataDir()/level/download path the dedicated server
+// uses — typically $HOME/.config/silencer/level/download on Linux.
+func NewMapStore(dir, apiKey, linkDir string) (*MapStore, error) {
+	var err error
+	dir, err = filepath.Abs(dir)
+	if err != nil {
+		return nil, fmt.Errorf("resolve maps dir: %w", err)
+	}
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, fmt.Errorf("create maps dir: %w", err)
 	}
+	if linkDir != "" {
+		if err := os.MkdirAll(linkDir, 0755); err != nil {
+			log.Printf("[map-api] warn: cannot create link dir %s: %v — map symlinks disabled", linkDir, err)
+			linkDir = ""
+		}
+	}
 	s := &MapStore{
-		dir:    dir,
-		apiKey: apiKey,
-		bySHA1: make(map[string]*MapMeta),
-		byName: make(map[string]*MapMeta),
+		dir:     dir,
+		linkDir: linkDir,
+		apiKey:  apiKey,
+		bySHA1:  make(map[string]*MapMeta),
+		byName:  make(map[string]*MapMeta),
 	}
 	s.loadIndex()
+	if linkDir != "" {
+		s.rebuildLinks()
+	}
 	return s, nil
+}
+
+// rebuildLinks creates/refreshes symlinks for all known maps and removes stale
+// ones. Called once at startup without the mutex (single-threaded init).
+func (s *MapStore) rebuildLinks() {
+	for _, meta := range s.byName {
+		if err := s.updateLink(meta); err != nil {
+			log.Printf("[map-api] warn: symlink for %s: %v", meta.Name, err)
+		}
+	}
+	// Remove symlinks in linkDir that no longer correspond to a known map.
+	entries, err := os.ReadDir(s.linkDir)
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if s.byName[strings.ToUpper(e.Name())] != nil {
+			continue
+		}
+		p := filepath.Join(s.linkDir, e.Name())
+		fi, err := os.Lstat(p)
+		if err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			_ = os.Remove(p)
+		}
+	}
+}
+
+// updateLink atomically creates or replaces the name-based symlink for meta.
+// The caller must either hold s.mu (write) or be in single-threaded init.
+func (s *MapStore) updateLink(meta *MapMeta) error {
+	if s.linkDir == "" {
+		return nil
+	}
+	target := filepath.Join(s.dir, meta.SHA1+".sil")
+	link := filepath.Join(s.linkDir, meta.Name)
+
+	// Don't overwrite a real file (only manage symlinks we own).
+	if fi, err := os.Lstat(link); err == nil && fi.Mode()&os.ModeSymlink == 0 {
+		log.Printf("[map-api] warn: %s exists and is not a symlink — skipping", link)
+		return nil
+	}
+
+	tmp := link + ".tmp"
+	_ = os.Remove(tmp)
+	if err := os.Symlink(target, tmp); err != nil {
+		return fmt.Errorf("symlink: %w", err)
+	}
+	if err := os.Rename(tmp, link); err != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("rename symlink: %w", err)
+	}
+	return nil
 }
 
 func (s *MapStore) indexPath() string        { return filepath.Join(s.dir, "index.json") }
@@ -125,6 +198,9 @@ func (s *MapStore) Upload(name, author string, data []byte) (*MapMeta, error) {
 	s.bySHA1[sha1hex] = meta
 	s.byName[strings.ToUpper(name)] = meta
 	s.saveIndex()
+	if err := s.updateLink(meta); err != nil {
+		log.Printf("[map-api] warn: symlink for %s: %v", name, err)
+	}
 	return meta, nil
 }
 
@@ -160,6 +236,41 @@ func (s *MapStore) List() []*MapMeta {
 	return out
 }
 
+// Delete removes a map by name. If no other name references the same SHA-1
+// blob, the file is also deleted from disk.
+func (s *MapStore) Delete(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	meta := s.byName[strings.ToUpper(name)]
+	if meta == nil {
+		return false
+	}
+	delete(s.byName, strings.ToUpper(name))
+
+	// Check whether any remaining byName entry still references this SHA-1.
+	stillReferenced := false
+	for _, m := range s.byName {
+		if m.SHA1 == meta.SHA1 {
+			stillReferenced = true
+			break
+		}
+	}
+	if !stillReferenced {
+		delete(s.bySHA1, strings.ToLower(meta.SHA1))
+		_ = os.Remove(s.mapPath(meta.SHA1))
+	}
+	s.saveIndex()
+	if s.linkDir != "" {
+		p := filepath.Join(s.linkDir, meta.Name)
+		if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+			_ = os.Remove(p)
+		}
+	}
+	log.Printf("[map-api] deleted map: %s (sha1=%s, blob_removed=%v)", name, meta.SHA1[:8], !stillReferenced)
+	return true
+}
+
 func setCORSHeaders(w http.ResponseWriter, origin string) {
 	if origin == "" {
 		return
@@ -170,7 +281,7 @@ func setCORSHeaders(w http.ResponseWriter, origin string) {
 		allow = "*"
 	}
 	w.Header().Set("Access-Control-Allow-Origin", allow)
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Filename, X-Author, X-Api-Key")
 	w.Header().Set("Access-Control-Max-Age", "86400")
 }
@@ -233,19 +344,42 @@ func StartMapAPIServer(addr string, ms *MapStore) {
 		}
 	})
 
-	// /api/maps/ — download by SHA-1 or by name
+	// /api/maps/ — download by SHA-1 or by name, or DELETE by name
 	mux.HandleFunc("/api/maps/", func(w http.ResponseWriter, r *http.Request) {
 		setCORSHeaders(w, r.Header.Get("Origin"))
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+
+		sub := strings.TrimPrefix(r.URL.Path, "/api/maps/")
+
+		// DELETE /api/maps/{name}
+		if r.Method == http.MethodDelete {
+			if ms.apiKey != "" {
+				key := r.Header.Get("X-Api-Key")
+				if key == "" {
+					key = r.URL.Query().Get("key")
+				}
+				if key != ms.apiKey {
+					http.Error(w, "unauthorized", http.StatusUnauthorized)
+					return
+				}
+			}
+			name := filepath.Base(sub)
+			if !ms.Delete(name) {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]string{"deleted": name})
+			return
+		}
+
 		if r.Method != http.MethodGet {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-
-		sub := strings.TrimPrefix(r.URL.Path, "/api/maps/")
 
 		// /api/maps/by-sha1/{sha1hex}
 		if strings.HasPrefix(sub, "by-sha1/") {

@@ -3,14 +3,8 @@ name: CI Build (admin-web Docker)
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - 'web/admin/**'
-      - '.github/workflows/ci-build-admin-web.yml'
   push:
     branches: [main]
-    paths:
-      - 'web/admin/**'
-      - '.github/workflows/ci-build-admin-web.yml'
 
 concurrency:
   group: ci-build-admin-web-${{ github.event.pull_request.number || github.ref }}
@@ -24,14 +18,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
+      # See ci-build-admin-api.yml for why path filtering happens inside the
+      # job rather than via on: paths.
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            relevant:
+              - 'web/admin/**'
+              - 'shared/gas-validation/**'
+              - 'package.json'
+              - 'bun.lock'
+              - '.github/workflows/ci-build-admin-web.yml'
+
+      - if: steps.changes.outputs.relevant == 'true'
+        uses: docker/setup-buildx-action@v3
 
       - name: Build image (no push)
+        if: steps.changes.outputs.relevant == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: web/admin
+          context: .
           file: web/admin/Dockerfile
           push: false
           platforms: linux/arm64
           cache-from: type=gha,scope=admin-web
           cache-to: type=gha,scope=admin-web,mode=max
+
+      - if: steps.changes.outputs.relevant != 'true'
+        run: echo "No admin-web changes; skipping build."

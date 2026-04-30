@@ -16,6 +16,8 @@ type procManager struct {
 	gamePortBase  int
 	gamePortCount int
 
+	onExit func(gameID uint32)
+
 	mu    sync.Mutex
 	procs map[uint32]*exec.Cmd
 }
@@ -72,6 +74,9 @@ func (p *procManager) Start(gameID, accountID uint32) error {
 			log.Printf("[proc] dedicated server for game %d exited: %v", gameID, err)
 		} else {
 			log.Printf("[proc] dedicated server for game %d exited cleanly", gameID)
+		}
+		if p.onExit != nil {
+			p.onExit(gameID)
 		}
 	}()
 	return nil

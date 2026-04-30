@@ -385,10 +385,13 @@ func (c *Client) handleRegisterStats(r *reader) error {
 	if err != nil {
 		return err
 	}
+	log.Printf("[stats] game=%d acct=%d agency=%d won=%d xp=%d", gameID, acct, statsagency, won, xp)
 
 	ms := readMatchStats(r)
 
 	if updatedAgency, ok := c.hub.store.UpdateStats(acct, statsagency, won != 0, xp); ok {
+		log.Printf("[stats] saved: acct=%d agency=%d wins=%d losses=%d level=%d xp=%d",
+			acct, statsagency, updatedAgency.Wins, updatedAgency.Losses, updatedAgency.Level, updatedAgency.XPToNextLevel)
 		if c.hub.events != nil {
 			now := time.Now().UnixMilli()
 			c.hub.events.Publish("player.stats_update", playerStatsUpdateEvent{
@@ -400,6 +403,8 @@ func (c *Client) handleRegisterStats(r *reader) error {
 				Won: won != 0, XP: xp, Stats: ms, Timestamp: now,
 			})
 		}
+	} else {
+		log.Printf("[stats] UpdateStats failed: acct=%d not found in store", acct)
 	}
 	return nil
 }

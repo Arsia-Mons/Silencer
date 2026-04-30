@@ -1,6 +1,30 @@
 # Changelog
 
-All notable changes to zSILENCER are documented here.
+All notable changes to Silencer are documented here.
+
+## [v00041] — 2026-04-28
+
+### Admin dashboard
+
+#### GAS editor (`/gas`)
+
+- **URL-linked tabs** — each GAS file tab updates the URL (`?tab=filename`) so tabs are bookmarkable and survive page refresh.
+- **Baseline validation** — on folder open the editor captures a baseline snapshot of all loaded JSON. Saving is blocked if any field that existed at load time has been removed, including fields inside array entries matched by `id` (weapons, enemies, items, etc.).
+- **Problems panel** — a VS Code-style inline tray below the tab bar lists every validation violation with full field path. Clicking a file header in the tray jumps to that tab.
+- **RE-ADD button** — each violation row shows a `↩ RE-ADD` button that restores the missing field from the baseline in one click.
+- **RE-ADD ALL** — each file section header in the Problems panel shows `↩ RE-ADD ALL (N)` to restore all missing fields for that file in a single atomic update.
+- **Direct tab URLs** — each tab is an `<a>` tag so tabs can be opened directly or middle-clicked.
+
+### Game client
+
+- **Community map upload** — client uploads the current map to the server before creating a game, so other players can download it. Upload URL read from `mapapiurl` config key.
+
+### Infrastructure
+
+- **nlohmann/json vendored** — `json.hpp` (v3.12.0) checked in to `clients/silencer/third_party/nlohmann/` to eliminate a flaky CMake FetchContent download step in CI.
+- **Map symlinks** — lobby server maintains a `maps/` symlink directory so the dedicated server binary can read uploaded maps without a restart.
+
+---
 
 ## [v1.9.0 / v00029] — 2026-04-26
 

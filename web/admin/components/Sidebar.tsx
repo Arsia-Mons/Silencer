@@ -26,6 +26,9 @@ const NAV = [
   { href: '/actors',          label: '[ ACTOR EDITOR ]',      icon: '◉', minRank: 3 },
   { href: '/behavior-trees',  label: '[ BEHAVIOR TREES ]',    icon: '◬', minRank: 3 },
   { href: '/designer',        label: '[ MAP DESIGNER ]',      icon: '◫', minRank: 3 },
+  { href: '/sound-studio',    label: '[ SOUND STUDIO ]',      icon: '♪', minRank: 3 },
+  { href: '/gas',             label: '[ GAS EDITOR ]',         icon: '⚡', minRank: 3 },
+  { href: '/sprites',         label: '[ SPRITES ]',            icon: '◈', minRank: 3 },
   { href: '/health',          label: '[ SERVER HEALTH ]',     icon: '◎', minRank: 0 },
   { href: '/changelog',       label: '[ CHANGELOG ]',         icon: '◑', minRank: 0 },
 ];

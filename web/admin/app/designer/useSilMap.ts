@@ -127,12 +127,14 @@ export function platformTypeNums(typeName: string): [number, number] {
 
 export interface UseSilMapReturn {
   map: SilMapData | null;
-  openMap: (file: File) => Promise<void>;
+  openMap: (file: File) => Promise<SilMapData | null>;
   saveMap: () => Promise<void>;
   publishMap: (opts: { author: string; apiUrl: string; apiKey: string }) => Promise<{ ok: boolean; meta?: Record<string, unknown>; error?: string }>;
   createMap: (width: number, height: number, description: string) => void;
   updateTile: (layerType: 'bg' | 'fg', layerIdx: number, x: number, y: number, tile_id: number, flip?: number, lum?: number) => void;
   patchTile: (layerType: 'bg' | 'fg', layerIdx: number, x: number, y: number, patch: Partial<TileCell>) => void;
+  applyTileBatch: (layerType: 'bg' | 'fg', layerIdx: number, updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }>) => void;
+  applyAllLayersBatch: (patches: Array<{ layerType: 'bg' | 'fg'; layerIdx: number; updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }> }>) => void;
   beginPaint: () => void;
   commitPaint: () => void;
   addPlatform: (platform: MapPlatform) => void;
@@ -217,7 +219,7 @@ export function useSilMap(): UseSilMapReturn {
   }, []);
 
 
-  const openMap = useCallback(async (file: File) => {
+  const openMap = useCallback(async (file: File): Promise<SilMapData | null> => {
     try {
       const buf = await file.arrayBuffer();
       const bytes = new Uint8Array(buf);
@@ -239,10 +241,13 @@ export function useSilMap(): UseSilMapReturn {
       historyRef.current = [];
       futureRef.current = [];
       syncUndoRedo();
-      setMapData({ header, width, height, layers, actors, platforms, rawMinimap, minimapCompressedSize, fileName: file.name });
+      const loaded: SilMapData = { header, width, height, layers, actors, platforms, rawMinimap, minimapCompressedSize, fileName: file.name };
+      setMapData(loaded);
+      return loaded;
     } catch (e) {
       console.error('Failed to open SIL map:', e);
       alert('Failed to parse map: ' + (e as Error).message);
+      return null;
     }
   }, []);
 
@@ -486,6 +491,47 @@ export function useSilMap(): UseSilMapReturn {
     });
   }, [pushHistory]);
 
+  const applyTileBatch = useCallback((
+    layerType: 'bg' | 'fg', layerIdx: number,
+    updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }>
+  ) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const { width, height, layers } = prev;
+      const srcArr = layerType === 'fg' ? layers.fg : layers.bg;
+      const newArr = srcArr.map((l, i) => i === layerIdx ? l.slice() : l);
+      for (const { x, y, tile_id, flip, lum } of updates) {
+        if (x >= 0 && x < width && y >= 0 && y < height)
+          newArr[layerIdx][y * width + x] = { tile_id, flip, lum };
+      }
+      return { ...prev, layers: layerType === 'fg'
+        ? { bg: layers.bg, fg: newArr }
+        : { bg: newArr, fg: layers.fg } };
+    });
+  }, [pushHistory]);
+
+  const applyAllLayersBatch = useCallback((
+    patches: Array<{ layerType: 'bg' | 'fg'; layerIdx: number; updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }> }>
+  ) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const { width, height } = prev;
+      let newBg = prev.layers.bg.map(l => l.slice());
+      let newFg = prev.layers.fg.map(l => l.slice());
+      for (const { layerType, layerIdx, updates } of patches) {
+        const arr = layerType === 'fg' ? newFg : newBg;
+        for (const { x, y, tile_id, flip, lum } of updates) {
+          if (x >= 0 && x < width && y >= 0 && y < height)
+            arr[layerIdx][y * width + x] = { tile_id, flip, lum };
+        }
+        if (layerType === 'fg') newFg = arr; else newBg = arr;
+      }
+      return { ...prev, layers: { bg: newBg as typeof prev.layers.bg, fg: newFg as typeof prev.layers.fg } };
+    });
+  }, [pushHistory]);
+
   const patchTile = useCallback((layerType: 'bg' | 'fg', layerIdx: number, x: number, y: number, patch: Partial<TileCell>) => {
     setMapData(prev => {
       if (!prev) return prev;
@@ -614,7 +660,7 @@ export function useSilMap(): UseSilMapReturn {
 
   return {
     map: mapData, openMap, saveMap, publishMap, createMap,
-    updateTile, patchTile, beginPaint, commitPaint,
+    updateTile, patchTile, applyTileBatch, applyAllLayersBatch, beginPaint, commitPaint,
     addPlatform, removePlatform, updatePlatform,
     addActor, removeActor, updateActor, moveActor,
     updateHeader,

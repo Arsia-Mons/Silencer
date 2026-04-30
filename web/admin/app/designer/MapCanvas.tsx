@@ -75,6 +75,7 @@ interface VisState {
   actors: boolean;
   grid: boolean;
   lighting: boolean;
+  parallax: boolean;
 }
 
 interface TileRightClickInfo {
@@ -100,6 +101,7 @@ interface Props {
   onZoomChange: (zoom: number) => void;
   onPanChange: (val: { x: number; y: number } | ((prev: { x: number; y: number }) => { x: number; y: number })) => void;
   onTilePaint: (layerType: 'bg' | 'fg', layerIdx: number, tx: number, ty: number, tileId: number) => void;
+  onFloodFill?: (layerType: 'bg' | 'fg', layerIdx: number, updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }>) => void;
   onPlatformDraw: (platform: MapPlatform) => void;
   onPlatformRemove: (idx: number) => void;
   onActorPlace: (pos: { wx: number; wy: number }) => void;
@@ -118,12 +120,24 @@ interface Props {
   selectedPlatformIdx: number | null;
   onPlatformSelect: (idx: number | null) => void;
   onPlatformUpdate: (idx: number, x1: number, y1: number, x2: number, y2: number) => void;
+  onActorSelect?: (idx: number | null) => void;
+  onActorFlip?: (idx: number) => void;
+  gridSize: number;
+  tileSelection?: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null;
+  onTileSelection?: (sel: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null) => void;
+  tileCopyBuffer?: {
+    w: number; h: number;
+    bg: [Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>];
+    fg: [Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>, Array<{ tile_id: number; flip: number; lum: number }>];
+  } | null;
+  pastePending?: boolean;
+  onTilePaste?: (tx: number, ty: number) => void;
 }
 
 export default function MapCanvas({
   map, tileImages, spriteImages, vis, activeTool, activeLayer, selectedTileId,
   zoom, pan, onZoomChange, onPanChange,
-  onTilePaint, onPlatformDraw, onPlatformRemove, onActorPlace, onActorRemove, onActorRightClick,
+  onTilePaint, onFloodFill, onPlatformDraw, onPlatformRemove, onActorPlace, onActorRemove, onActorRightClick,
   onTileRightClick,
   onBeginPaint, onCommitPaint,
   selectedActorId, dragPlatform, onDragPlatformChange,
@@ -132,6 +146,14 @@ export default function MapCanvas({
   eraseLayerType,
   highlightActorIdx,
   selectedPlatformIdx, onPlatformSelect, onPlatformUpdate,
+  onActorSelect,
+  onActorFlip,
+  gridSize,
+  tileSelection,
+  onTileSelection,
+  tileCopyBuffer,
+  pastePending,
+  onTilePaste,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -147,6 +169,11 @@ export default function MapCanvas({
   const platformDragRef = useRef<PlatformDragState | null>(null);
   // Current preview bounds during platform drag { wx1, wy1, wx2, wy2 }
   const platformPreviewRef = useRef<PlatformPreview | null>(null);
+  // Tile selection drag
+  const isSelectingTile = useRef(false);
+  const tileSelStartRef = useRef<{ tx: number; ty: number } | null>(null);
+  // Current hover tile (for paste preview — updated every mousemove, no re-render)
+  const hoverTileRef = useRef<{ tx: number; ty: number }>({ tx: 0, ty: 0 });
 
   // World → canvas coords
   const worldToCanvas = useCallback((wx: number, wy: number) => ({
@@ -165,6 +192,12 @@ export default function MapCanvas({
     wx: (cx - pan.x) / zoom,
     wy: (cy - pan.y) / zoom,
   }), [zoom, pan]);
+
+  // Snap a world coordinate to the grid (no-op when grid is off or gridSize is 0)
+  const snap = useCallback((v: number) => {
+    if (!vis?.grid || gridSize <= 0) return v;
+    return Math.round(v / gridSize) * gridSize;
+  }, [vis?.grid, gridSize]);
 
   // Draw the map
   useEffect(() => {
@@ -224,6 +257,24 @@ export default function MapCanvas({
         ctx.restore();
       } else {
         ctx.drawImage(bmp, dx, dy, tileSize, tileSize);
+      }
+    }
+
+    // Draw parallax background stretched to cover the full map extent
+    if (vis?.parallax !== false) {
+      const parallaxIdx = map.header?.parallax ?? 0;
+      const bgBank = spriteImages?.get(parallaxIdx);
+      if (bgBank) {
+        const BG_COLS = 20, BG_ROWS = 12;
+        const bw = (width  * tileSize) / BG_COLS;
+        const bh = (height * tileSize) / BG_ROWS;
+        for (let row = 0; row < BG_ROWS; row++) {
+          for (let col = 0; col < BG_COLS; col++) {
+            const spr = bgBank[row * BG_COLS + col];
+            if (!spr) continue;
+            ctx.drawImage(spr.bitmap, col * bw + pan.x, row * bh + pan.y, bw, bh);
+          }
+        }
       }
     }
 
@@ -409,11 +460,19 @@ export default function MapCanvas({
         const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
         const spr = sprBank?.[def.frame ?? 0];
         if (spr) {
-          const sx = cx - spr.offsetX * zoom;
+          const mirrored = a.direction !== 0;
+          const sx = cx - (mirrored ? spr.width - spr.offsetX : spr.offsetX) * zoom;
           const sy = cy - spr.offsetY * zoom;
           const sw = spr.width * zoom;
           const sh = spr.height * zoom;
-          ctx.drawImage(spr.bitmap, sx, sy, sw, sh);
+          if (mirrored) {
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.drawImage(spr.bitmap, -sx - sw, sy, sw, sh);
+            ctx.restore();
+          } else {
+            ctx.drawImage(spr.bitmap, sx, sy, sw, sh);
+          }
           if (zoom > 0.3) {
             ctx.fillStyle = def.color + 'cc';
             ctx.fillRect(cx - 12, cy + 2, 24, 11);
@@ -475,7 +534,7 @@ export default function MapCanvas({
     return () => resizer.disconnect();
   }, []);
 
-  // Animated marching-ants selection highlight on overlay canvas
+  // Animated marching-ants selection highlight + tile selection + paste preview on overlay canvas
   useEffect(() => {
     const overlay = overlayCanvasRef.current;
     if (!overlay) return;
@@ -483,8 +542,10 @@ export default function MapCanvas({
 
     const hasActorHighlight = highlightActorIdx != null && map?.actors[highlightActorIdx];
     const hasPlatformHighlight = selectedPlatformIdx != null && map?.platforms[selectedPlatformIdx];
+    const hasTileSelection = tileSelection != null;
+    const hasPastePreview = !!(pastePending && tileCopyBuffer);
 
-    if (!hasActorHighlight && !hasPlatformHighlight) {
+    if (!hasActorHighlight && !hasPlatformHighlight && !hasTileSelection && !hasPastePreview) {
       ctx.clearRect(0, 0, overlay.width, overlay.height);
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
       return;
@@ -493,7 +554,7 @@ export default function MapCanvas({
     const actor = hasActorHighlight ? map!.actors[highlightActorIdx!] : null;
     const def = actor ? getActorDef(actor.id) : null;
 
-    function getSpriteRect() {
+    function getSpriteRect(overrideCx?: number, overrideCy?: number) {
       if (!actor || !def) return null;
       let bankNum = def.bank;
       if (actor.id === 54) bankNum = actor.type === 0 ? 183 : 184;
@@ -501,8 +562,8 @@ export default function MapCanvas({
       if (actor.id === 63) bankNum = actor.type === 0 ? 200 : actor.type === 2 ? 201 : 205;
       const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
       const spr = sprBank?.[def.frame ?? 0];
-      const cx = actor.x * zoom + pan.x;
-      const cy = actor.y * zoom + pan.y;
+      const cx = overrideCx ?? actor.x * zoom + pan.x;
+      const cy = overrideCy ?? actor.y * zoom + pan.y;
       if (spr) {
         const pad = 3;
         return { x: cx - spr.offsetX * zoom - pad, y: cy - spr.offsetY * zoom - pad,
@@ -513,13 +574,63 @@ export default function MapCanvas({
       return { circle: true, cx, cy, r: r + 3, x: 0, y: 0, w: 0, h: 0 };
     }
 
+    // Draw X/Y axis gizmo at a canvas-space origin point
+    function drawAxis(ocx: number, ocy: number) {
+      const SHAFT = 56;
+      const HEAD  = 9;
+      const W     = overlay!.width;
+      const H     = overlay!.height;
+      ctx.save();
+      ctx.setLineDash([]);
+
+      // Faint full-canvas crosshair guides
+      ctx.lineWidth = 0.75;
+      ctx.strokeStyle = 'rgba(210,60,60,0.18)';
+      ctx.beginPath(); ctx.moveTo(0, ocy); ctx.lineTo(W, ocy); ctx.stroke();
+      ctx.strokeStyle = 'rgba(60,200,60,0.18)';
+      ctx.beginPath(); ctx.moveTo(ocx, 0); ctx.lineTo(ocx, H); ctx.stroke();
+
+      // X+ arrow (right, red)
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(230,60,60,0.95)';
+      ctx.fillStyle   = 'rgba(230,60,60,0.95)';
+      ctx.beginPath(); ctx.moveTo(ocx, ocy); ctx.lineTo(ocx + SHAFT, ocy); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ocx + SHAFT, ocy);
+      ctx.lineTo(ocx + SHAFT - HEAD, ocy - HEAD / 2);
+      ctx.lineTo(ocx + SHAFT - HEAD, ocy + HEAD / 2);
+      ctx.closePath(); ctx.fill();
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText('X', ocx + SHAFT + 4, ocy + 4);
+
+      // Y+ arrow (down — Y increases downward in game world coords, green)
+      ctx.strokeStyle = 'rgba(60,200,60,0.95)';
+      ctx.fillStyle   = 'rgba(60,200,60,0.95)';
+      ctx.beginPath(); ctx.moveTo(ocx, ocy); ctx.lineTo(ocx, ocy + SHAFT); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(ocx, ocy + SHAFT);
+      ctx.lineTo(ocx - HEAD / 2, ocy + SHAFT - HEAD);
+      ctx.lineTo(ocx + HEAD / 2, ocy + SHAFT - HEAD);
+      ctx.closePath(); ctx.fill();
+      ctx.fillText('Y', ocx + 4, ocy + SHAFT + 12);
+
+      // Origin dot
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath(); ctx.arc(ocx, ocy, 3, 0, Math.PI * 2); ctx.fill();
+
+      ctx.restore();
+    }
+
     let dashOffset = 0;
     function draw() {
       ctx.clearRect(0, 0, overlay!.width, overlay!.height);
 
-      // Actor marching-ants highlight
+      // Actor marching-ants highlight + axis gizmo
       if (hasActorHighlight) {
-        const rect = getSpriteRect();
+        const isDragging = dragActorPreview?.idx === highlightActorIdx;
+        const liveCx = isDragging ? dragActorPreview!.wx * zoom + pan.x : actor!.x * zoom + pan.x;
+        const liveCy = isDragging ? dragActorPreview!.wy * zoom + pan.y : actor!.y * zoom + pan.y;
+        const rect = getSpriteRect(liveCx, liveCy);
         if (rect) {
           ctx.save();
           ctx.lineWidth = 2;
@@ -540,6 +651,7 @@ export default function MapCanvas({
           }
           ctx.restore();
         }
+        if (actor) drawAxis(liveCx, liveCy);
       }
 
       // Platform marching-ants highlight + resize handles
@@ -584,6 +696,70 @@ export default function MapCanvas({
           ctx.fillRect(hx - hs, hy - hs, HS, HS);
           ctx.strokeRect(hx - hs, hy - hs, HS, HS);
         }
+
+        drawAxis((cx1 + cx2) / 2, (cy1 + cy2) / 2);
+      }
+
+      // Tile selection rect
+      if (hasTileSelection) {
+        const { tx1, ty1, tx2, ty2 } = tileSelection!;
+        const sx = tx1 * 64 * zoom + pan.x;
+        const sy = ty1 * 64 * zoom + pan.y;
+        const sw = (tx2 - tx1 + 1) * 64 * zoom;
+        const sh = (ty2 - ty1 + 1) * 64 * zoom;
+        ctx.save();
+        ctx.fillStyle = 'rgba(80,150,255,0.12)';
+        ctx.fillRect(sx, sy, sw, sh);
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.strokeStyle = 'rgba(130,190,255,0.9)';
+        ctx.lineDashOffset = -dashOffset;
+        ctx.strokeRect(sx, sy, sw, sh);
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineDashOffset = -dashOffset + 5;
+        ctx.strokeRect(sx, sy, sw, sh);
+        ctx.restore();
+      }
+
+      // Paste preview at hover tile — render all 8 layers (bg[0..3] then fg[0..3]) composited
+      if (hasPastePreview) {
+        const { tx: hx, ty: hy } = hoverTileRef.current;
+        const { w, h, bg, fg } = tileCopyBuffer!;
+        ctx.save();
+        ctx.globalAlpha = 0.55;
+        const allLayers = [...bg, ...fg];
+        const ts = 64 * zoom;
+        for (const layerCells of allLayers) {
+          for (let dy = 0; dy < h; dy++) {
+            for (let dx = 0; dx < w; dx++) {
+              const tile = layerCells[dy * w + dx];
+              if (!tile || tile.tile_id === 0) continue;
+              const bank = (tile.tile_id >> 8) & 0xFF;
+              const slot = tile.tile_id & 0xFF;
+              const bitmaps = tileImages?.get(bank);
+              const img = bitmaps?.[slot];
+              if (!img) continue;
+              const px = (hx + dx) * ts + pan.x;
+              const py = (hy + dy) * ts + pan.y;
+              if (tile.flip) {
+                ctx.save();
+                ctx.translate(px + ts, py);
+                ctx.scale(-1, 1);
+                ctx.drawImage(img, 0, 0, ts, ts);
+                ctx.restore();
+              } else {
+                ctx.drawImage(img, px, py, ts, ts);
+              }
+            }
+          }
+        }
+        ctx.globalAlpha = 1;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 3]);
+        ctx.strokeStyle = 'rgba(255,220,60,0.9)';
+        ctx.lineDashOffset = -dashOffset;
+        ctx.strokeRect(hx * 64 * zoom + pan.x, hy * 64 * zoom + pan.y, w * 64 * zoom, h * 64 * zoom);
+        ctx.restore();
       }
 
       dashOffset = (dashOffset + 0.5) % 10;
@@ -591,7 +767,7 @@ export default function MapCanvas({
     }
     rafRef.current = requestAnimationFrame(draw);
     return () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
-  }, [highlightActorIdx, selectedPlatformIdx, map, spriteImages, zoom, pan]);
+  }, [highlightActorIdx, selectedPlatformIdx, map, spriteImages, zoom, pan, dragActorPreview, tileSelection, tileCopyBuffer, pastePending, tileImages]);
 
   // Mouse event handlers
   const getCanvasPos = (e: { clientX: number; clientY: number }) => {
@@ -633,7 +809,45 @@ export default function MapCanvas({
     const { tx, ty } = canvasToTile(cx, cy);
     const { wx, wy } = canvasToWorld(cx, cy);
 
-    if (activeTool === 'TILE_BG' || activeTool === 'TILE_FG') {
+    // Paste intercept: left-click in bounds while paste is pending stamps the buffer
+    if (pastePending && tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
+      onTilePaste?.(tx, ty);
+      return;
+    }
+
+    if (activeTool === 'FLOOD_FILL') {
+      if (!onFloodFill || !selectedTileId || tx < 0 || tx >= map.width || ty < 0 || ty >= map.height) return;
+      const lt = (eraseLayerType ?? 'bg') as 'bg' | 'fg';
+      const layerArr = lt === 'fg' ? map.layers.fg : map.layers.bg;
+      const targetId = layerArr[activeLayer][ty * map.width + tx]?.tile_id ?? 0;
+      if (targetId === selectedTileId) return;
+      // BFS 4-connected flood fill
+      const visited = new Uint8Array(map.width * map.height);
+      const queue: Array<[number, number]> = [[tx, ty]];
+      const updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }> = [];
+      visited[ty * map.width + tx] = 1;
+      while (queue.length) {
+        const [cx, cy] = queue.shift()!;
+        updates.push({ x: cx, y: cy, tile_id: selectedTileId, flip: 0, lum: 0 });
+        for (const [nx, ny] of [[cx-1,cy],[cx+1,cy],[cx,cy-1],[cx,cy+1]] as [number,number][]) {
+          if (nx < 0 || nx >= map.width || ny < 0 || ny >= map.height) continue;
+          if (visited[ny * map.width + nx]) continue;
+          if ((layerArr[activeLayer][ny * map.width + nx]?.tile_id ?? 0) !== targetId) continue;
+          visited[ny * map.width + nx] = 1;
+          queue.push([nx, ny]);
+        }
+      }
+      onFloodFill(lt, activeLayer, updates);
+      return;
+    }
+
+    if (activeTool === 'TILE_SELECT') {
+      if (tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
+        isSelectingTile.current = true;
+        tileSelStartRef.current = { tx, ty };
+        onTileSelection?.({ tx1: tx, ty1: ty, tx2: tx, ty2: ty, layerType: 'bg', layerIdx: 0 });
+      }
+    } else if (activeTool === 'TILE_BG' || activeTool === 'TILE_FG') {
       isPainting.current = true;
       onBeginPaint?.();
       if (selectedTileId && tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
@@ -647,7 +861,7 @@ export default function MapCanvas({
       }
     } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM'].includes(activeTool)) {
       isPainting.current = true;
-      onDragPlatformChange({ wx1: wx, wy1: wy, wx2: wx, wy2: wy, tool: activeTool });
+      onDragPlatformChange({ wx1: snap(wx), wy1: snap(wy), wx2: snap(wx), wy2: snap(wy), tool: activeTool });
     } else if (activeTool === 'ERASE_PLATFORM') {
       // Find platform under cursor and remove
       for (let i = map.platforms.length - 1; i >= 0; i--) {
@@ -658,7 +872,7 @@ export default function MapCanvas({
         }
       }
     } else if (activeTool === 'ACTOR') {
-      onActorPlace({ wx, wy });
+      onActorPlace({ wx: snap(wx), wy: snap(wy) });
     } else if (activeTool === 'SELECT') {
       const handleSize = 8 / zoom;
       const hs = handleSize / 2;
@@ -686,33 +900,42 @@ export default function MapCanvas({
         }
       }
 
-      // 2. Hit-test all platforms for selection
+      // 2. Hit-test actors — priority over new platform selection; cycle through stack on repeated clicks
+      const HIT = 48 / zoom;
+      const hits: number[] = [];
+      for (let i = map.actors.length - 1; i >= 0; i--) {
+        if (Math.hypot(map.actors[i].x - wx, map.actors[i].y - wy) < HIT) hits.push(i);
+      }
+      if (hits.length > 0) {
+        // If the currently selected actor is already in this stack, cycle to the next
+        const stackPos = hits.indexOf(highlightActorIdx ?? -1);
+        const nextIdx = stackPos >= 0 ? hits[(stackPos + 1) % hits.length] : hits[0];
+        const a = map.actors[nextIdx];
+        onActorSelect?.(nextIdx);
+        onPlatformSelect(null);
+        draggingActorRef.current = { idx: nextIdx, startWx: wx, startWy: wy, origX: a.x, origY: a.y, moved: false };
+        setDragActorPreview({ idx: nextIdx, wx: a.x, wy: a.y });
+        return;
+      }
+
+      // 3. Hit-test all platforms for selection
       for (let i = map.platforms.length - 1; i >= 0; i--) {
         const p = map.platforms[i];
         if (wx >= p.x1 && wx <= p.x2 && wy >= p.y1 && wy <= p.y2) {
           onPlatformSelect(i);
+          onActorSelect?.(null);
           return;
         }
       }
 
-      // 3. Hit-test actors (existing logic)
-      const HIT = 48 / zoom;
-      for (let i = map.actors.length - 1; i >= 0; i--) {
-        const a = map.actors[i];
-        const dist = Math.hypot(a.x - wx, a.y - wy);
-        if (dist < HIT) {
-          draggingActorRef.current = { idx: i, startWx: wx, startWy: wy, origX: a.x, origY: a.y, moved: false };
-          setDragActorPreview({ idx: i, wx: a.x, wy: a.y });
-          return;
-        }
-      }
-
-      // 4. Click on empty → deselect
+      // 4. Click on empty → deselect all
       onPlatformSelect(null);
+      onActorSelect?.(null);
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
       onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
-      selectedPlatformIdx, onPlatformSelect]);
+      selectedPlatformIdx, onPlatformSelect, onActorSelect, highlightActorIdx, snap,
+      pastePending, onTilePaste, onTileSelection, onFloodFill]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -763,6 +986,20 @@ export default function MapCanvas({
     const { wx, wy } = canvasToWorld(cx, cy);
     onCursorChange({ tx, ty, wx, wy });
 
+    // Always update hover tile for paste preview (no re-render)
+    hoverTileRef.current = { tx, ty };
+
+    // Live tile selection drag
+    if (isSelectingTile.current && tileSelStartRef.current) {
+      const { tx: stx, ty: sty } = tileSelStartRef.current;
+      onTileSelection?.({
+        tx1: Math.min(stx, tx), ty1: Math.min(sty, ty),
+        tx2: Math.max(stx, tx), ty2: Math.max(sty, ty),
+        layerType: 'bg', layerIdx: 0,
+      });
+      return;
+    }
+
     // Platform drag (SELECT tool — handle or body move)
     if (platformDragRef.current) {
       const { mode, handle, origPlatform, startWx, startWy } = platformDragRef.current;
@@ -772,20 +1009,22 @@ export default function MapCanvas({
       let { x1, y1, x2, y2 } = origPlatform;
 
       if (mode === 'body') {
-        x1 = origPlatform.x1 + dx;
-        y1 = origPlatform.y1 + dy;
-        x2 = origPlatform.x2 + dx;
-        y2 = origPlatform.y2 + dy;
+        const rawX1 = origPlatform.x1 + dx;
+        const rawY1 = origPlatform.y1 + dy;
+        x1 = snap(rawX1);
+        y1 = snap(rawY1);
+        x2 = x1 + (origPlatform.x2 - origPlatform.x1);
+        y2 = y1 + (origPlatform.y2 - origPlatform.y1);
       } else {
         switch (handle) {
-          case 'TL': x1 = origPlatform.x1 + dx; y1 = origPlatform.y1 + dy; break;
-          case 'TR': x2 = origPlatform.x2 + dx; y1 = origPlatform.y1 + dy; break;
-          case 'BL': x1 = origPlatform.x1 + dx; y2 = origPlatform.y2 + dy; break;
-          case 'BR': x2 = origPlatform.x2 + dx; y2 = origPlatform.y2 + dy; break;
-          case 'T':  y1 = origPlatform.y1 + dy; break;
-          case 'B':  y2 = origPlatform.y2 + dy; break;
-          case 'L':  x1 = origPlatform.x1 + dx; break;
-          case 'R':  x2 = origPlatform.x2 + dx; break;
+          case 'TL': x1 = snap(origPlatform.x1 + dx); y1 = snap(origPlatform.y1 + dy); break;
+          case 'TR': x2 = snap(origPlatform.x2 + dx); y1 = snap(origPlatform.y1 + dy); break;
+          case 'BL': x1 = snap(origPlatform.x1 + dx); y2 = snap(origPlatform.y2 + dy); break;
+          case 'BR': x2 = snap(origPlatform.x2 + dx); y2 = snap(origPlatform.y2 + dy); break;
+          case 'T':  y1 = snap(origPlatform.y1 + dy); break;
+          case 'B':  y2 = snap(origPlatform.y2 + dy); break;
+          case 'L':  x1 = snap(origPlatform.x1 + dx); break;
+          case 'R':  x2 = snap(origPlatform.x2 + dx); break;
         }
         if (x2 - x1 < MIN_SIZE) {
           if (handle === 'TL' || handle === 'BL' || handle === 'L') x1 = x2 - MIN_SIZE;
@@ -805,8 +1044,8 @@ export default function MapCanvas({
     // Actor drag (SELECT tool)
     if (draggingActorRef.current) {
       const { startWx, startWy, origX, origY } = draggingActorRef.current;
-      const newWx = origX + (wx - startWx);
-      const newWy = origY + (wy - startWy);
+      const newWx = snap(origX + (wx - startWx));
+      const newWy = snap(origY + (wy - startWy));
       draggingActorRef.current.moved = Math.hypot(wx - startWx, wy - startWy) > 4;
       setDragActorPreview({ idx: draggingActorRef.current.idx, wx: newWx, wy: newWy });
       return;
@@ -822,15 +1061,23 @@ export default function MapCanvas({
           onTilePaint((eraseLayerType ?? 'bg') as 'bg' | 'fg', activeLayer, tx, ty, 0);
         }
       } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM'].includes(activeTool)) {
-        onDragPlatformChange(prev => prev ? { ...prev, wx2: wx, wy2: wy } : null);
+        onDragPlatformChange(prev => prev ? { ...prev, wx2: snap(wx), wy2: snap(wy) } : null);
       }
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, eraseLayerType,
-      onTilePaint, onPanChange, onCursorChange, onDragPlatformChange]);
+      onTilePaint, onPanChange, onCursorChange, onDragPlatformChange, snap,
+      onTileSelection]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isPanning.current) {
       isPanning.current = false;
+      return;
+    }
+
+    // Finish tile selection drag
+    if (isSelectingTile.current) {
+      isSelectingTile.current = false;
+      tileSelStartRef.current = null;
       return;
     }
 
@@ -871,20 +1118,25 @@ export default function MapCanvas({
         onCommitPaint?.();
       } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM'].includes(activeTool) && dragPlatform) {
         const { wx1, wy1 } = dragPlatform;
+        const snWx = snap(wx), snWy = snap(wy);
         const t = PLATFORM_TOOL_TYPES[activeTool];
-        const x1 = Math.min(wx1, wx), y1 = Math.min(wy1, wy);
-        const x2 = Math.max(wx1, wx), y2 = Math.max(wy1, wy);
+        const x1 = Math.min(wx1, snWx), y1 = Math.min(wy1, snWy);
+        const x2 = Math.max(wx1, snWx), y2 = Math.max(wy1, snWy);
         if (x2 - x1 > 2 && y2 - y1 > 2 && t) onPlatformDraw({ x1, y1, x2, y2, ...t });
         onDragPlatformChange(null);
       }
     }
     isPainting.current = false;
-  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect]);
+  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.code === 'Space') { isSpacePanning.current = true; e.preventDefault(); }
     if (e.code === 'ControlLeft' || e.code === 'ControlRight') isCtrlPanning.current = true;
-  }, []);
+    if (e.code === 'KeyF' && highlightActorIdx != null) {
+      onActorFlip?.(highlightActorIdx);
+      e.preventDefault();
+    }
+  }, [highlightActorIdx, onActorFlip]);
   const handleKeyUp = useCallback((e: KeyboardEvent) => {
     if (e.code === 'Space') isSpacePanning.current = false;
     if (e.code === 'ControlLeft' || e.code === 'ControlRight') isCtrlPanning.current = false;
@@ -903,7 +1155,10 @@ export default function MapCanvas({
     ? 'grabbing'
     : (isPanning.current || isSpacePanning.current || isCtrlPanning.current)
       ? 'grab'
+      : pastePending ? 'copy'
+      : activeTool === 'FLOOD_FILL' ? 'cell'
       : activeTool === 'SELECT' ? 'pointer'
+      : activeTool === 'TILE_SELECT' ? 'crosshair'
       : activeTool === 'ERASE_TILE' ? 'crosshair'
       : isPainting.current ? 'crosshair'
       : 'default';

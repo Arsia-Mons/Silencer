@@ -32,6 +32,10 @@ services/admin-api/node_modules/
 web/admin/node_modules/
 web/admin/.next/
 
+# Python tooling (shared/fonts/tools/)
+__pycache__/
+.venv/
+
 # Git worktrees (claude-code superpowers)
 .worktrees/
 

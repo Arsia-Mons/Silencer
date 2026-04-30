@@ -16,6 +16,7 @@ import MapPropertiesPanel from './MapPropertiesPanel';
 import ActorListPanel from './ActorListPanel';
 import Minimap from './Minimap';
 import type { MapActor } from '../../lib/types';
+import { API } from '../../lib/api';
 
 interface VisState {
   bg: boolean[];
@@ -24,6 +25,7 @@ interface VisState {
   actors: boolean;
   grid: boolean;
   lighting: boolean;
+  parallax: boolean;
 }
 
 interface ActorMenu {
@@ -42,10 +44,19 @@ export default function DesignerPage() {
   const wsConnected = useSocket({});
 
   const { loaded, error, tileImages, spriteImages, tileBankCounts, progress, loadFiles } = useGameData();
-  const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, beginPaint, commitPaint,
+  const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, applyTileBatch, applyAllLayersBatch, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
           updateHeader, updatePlatform,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
+
+  type TileSel = { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number };
+  type TileCell = { tile_id: number; flip: number; lum: number };
+  // All 8 layers: bg[0..3] and fg[0..3], each a flat w*h array
+  type TileCopyBuf = {
+    w: number; h: number;
+    bg: [TileCell[], TileCell[], TileCell[], TileCell[]];
+    fg: [TileCell[], TileCell[], TileCell[], TileCell[]];
+  };
 
   const [activeTool, setActiveTool]     = useState('TILE_BG');
   const [activeLayer, setActiveLayer]   = useState(0);
@@ -53,8 +64,13 @@ export default function DesignerPage() {
   const [selectedTileId, setSelectedTile] = useState(0);
   const [selectedActorId, setSelectedActor] = useState(36); // player start default
   const [selectedPlatformIdx, setSelectedPlatformIdx] = useState<number | null>(null);
+  const [tileLayerType, setTileLayerType] = useState<'bg' | 'fg'>('bg');
+  const [tileSelection, setTileSelection] = useState<TileSel | null>(null);
+  const [tileCopyBuffer, setTileCopyBuffer] = useState<TileCopyBuf | null>(null);
+  const [pastePending, setPastePending] = useState(false);
   const [zoom, setZoom]   = useState(0.5);
   const [pan, setPan]     = useState({ x: 32, y: 32 });
+  const fitPendingRef = useRef(false);
   const [cursor, setCursor] = useState<{ tx: number; ty: number; wx: number; wy: number }>({ tx: 0, ty: 0, wx: 0, wy: 0 });
   const [dragPlatform, setDragPlatform] = useState<DragPlatform | null>(null);
   const [lumMode, setLumMode] = useState(false);
@@ -77,7 +93,9 @@ export default function DesignerPage() {
     actors: true,
     grid: true,
     lighting: true,
+    parallax: true,
   });
+  const [gridSize, setGridSize] = useState(16);
   const toggleVis = (key: keyof VisState, idx: number | null = null) => setVis(v => {
     if (idx !== null) {
       const arr = [...(v[key] as boolean[])]; arr[idx] = !arr[idx]; return { ...v, [key]: arr };
@@ -92,16 +110,70 @@ export default function DesignerPage() {
   const [pubAuthor, setPubAuthor]     = useState('');
   const [pubStatus, setPubStatus]     = useState<PubStatus | null>(null);
 
+  // Published maps panel
+  const [showMaps, setShowMaps]             = useState(false);
+  const [mapList, setMapList]               = useState<Array<{ sha1: string; name: string; size: number; author: string; uploaded_at: string }>>([]);
+  const [mapListLoading, setMapListLoading] = useState(false);
+  const [mapListError, setMapListError]     = useState<string | null>(null);
+  const [deleteStatus, setDeleteStatus]     = useState<Record<string, string>>({});
+  const [lastPublishedSha1, setLastPublishedSha1] = useState<string | null>(null);
+
+  const fetchMapList = useCallback(async () => {
+    setMapListLoading(true);
+    setMapListError(null);
+    try {
+      const r = await fetch(`${API}/maps`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      const sorted = [...data].sort((a: { uploaded_at: string }, b: { uploaded_at: string }) =>
+        new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime()
+      );
+      setMapList(sorted);
+    } catch (e) {
+      setMapListError(e instanceof Error ? e.message : 'Failed to load');
+    } finally {
+      setMapListLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showMaps) return;
+    fetchMapList();
+    const id = setInterval(fetchMapList, 4000);
+    return () => clearInterval(id);
+  }, [showMaps, fetchMapList]);
+
+  const handleDeleteMap = useCallback(async (name: string) => {
+    if (!confirm(`Delete "${name}" from the server?`)) return;
+    setDeleteStatus(s => ({ ...s, [name]: 'deleting…' }));
+    try {
+      const headers: Record<string, string> = {};
+      if (pubApiKey) headers['X-Api-Key'] = pubApiKey;
+      const r = await fetch(`${API}/maps/${encodeURIComponent(name)}`, { method: 'DELETE', headers });
+      if (r.ok) {
+        setDeleteStatus(s => ({ ...s, [name]: '✓ deleted' }));
+        fetchMapList();
+      } else {
+        const body = await r.json().catch(() => ({ error: r.statusText }));
+        setDeleteStatus(s => ({ ...s, [name]: `✗ ${body.error ?? r.statusText}` }));
+      }
+    } catch {
+      setDeleteStatus(s => ({ ...s, [name]: '✗ network error' }));
+    }
+  }, [pubApiKey, fetchMapList]);
+
   const handlePublish = useCallback(async () => {
     setPubStatus({ ok: null, msg: 'Publishing…' });
     const result = await publishMap({ author: pubAuthor, apiUrl: pubApiUrl, apiKey: pubApiKey });
     if (result.ok) {
       const sha1 = String((result.meta as Record<string, unknown>)?.sha1 ?? '');
       setPubStatus({ ok: true, msg: `✓ Published  sha1: ${sha1.slice(0, 8)}…` });
+      setLastPublishedSha1(sha1);
+      fetchMapList();
     } else {
       setPubStatus({ ok: false, msg: result.error ?? 'Unknown error' });
     }
-  }, [publishMap, pubAuthor, pubApiUrl, pubApiKey]);
+  }, [publishMap, pubAuthor, pubApiUrl, pubApiKey, fetchMapList]);
 
   // Sync resize inputs when map changes
   useEffect(() => {
@@ -125,6 +197,62 @@ export default function DesignerPage() {
   const dataDirRef   = useRef<HTMLInputElement>(null);
   const dataFilesRef = useRef<HTMLInputElement>(null);
 
+  // Tool change: track tile layer type and clear selection/paste on tool switch
+  const handleToolChange = useCallback((tool: string) => {
+    if (tool === 'TILE_BG') setTileLayerType('bg');
+    else if (tool === 'TILE_FG') setTileLayerType('fg');
+    if (tool !== 'TILE_SELECT') { setTileSelection(null); setPastePending(false); }
+    setActiveTool(tool);
+  }, []);
+
+  // Ref to access latest copy/paste context from stable keyboard handler
+  const clipCtxRef = useRef({ tileSelection, tileCopyBuffer, map, activeLayer, tileLayerType, pastePending });
+  useEffect(() => { clipCtxRef.current = { tileSelection, tileCopyBuffer, map, activeLayer, tileLayerType, pastePending }; });
+
+  // Copy/paste keyboard shortcuts (Ctrl/Cmd+C, Ctrl/Cmd+V, Escape)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        const { tileSelection: sel, map: m } = clipCtxRef.current;
+        if (!sel || !m) return;
+        e.preventDefault();
+        const { tx1, ty1, tx2, ty2 } = sel;
+        const w = tx2 - tx1 + 1; const h = ty2 - ty1 + 1;
+        const extractLayer = (arr: Array<{ tile_id: number; flip: number; lum: number } | null>) => {
+          const out: TileCell[] = [];
+          for (let dy = 0; dy < h; dy++)
+            for (let dx = 0; dx < w; dx++)
+              out.push(arr[(ty1 + dy) * m.width + (tx1 + dx)] ?? { tile_id: 0, flip: 0, lum: 0 });
+          return out;
+        };
+        setTileCopyBuffer({
+          w, h,
+          bg: [
+            extractLayer(m.layers.bg[0]),
+            extractLayer(m.layers.bg[1]),
+            extractLayer(m.layers.bg[2]),
+            extractLayer(m.layers.bg[3]),
+          ],
+          fg: [
+            extractLayer(m.layers.fg[0]),
+            extractLayer(m.layers.fg[1]),
+            extractLayer(m.layers.fg[2]),
+            extractLayer(m.layers.fg[3]),
+          ],
+        });
+        setPastePending(false);
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        if (!clipCtxRef.current.tileCopyBuffer) return;
+        e.preventDefault();
+        setPastePending(p => !p);
+      } else if (e.key === 'Escape') {
+        setPastePending(false);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []); // stable — reads via ref
+
   // Global keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -137,9 +265,10 @@ export default function DesignerPage() {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
 
       switch (e.key) {
-        case 'b': setActiveTool('TILE_BG');    break;
-        case 'f': setActiveTool('TILE_FG');    break;
-        case 'e': setActiveTool('ERASE_TILE'); break;
+        case 'b': handleToolChange('TILE_BG');    break;
+        case 'f': handleToolChange('TILE_FG');    break;
+        case 'e': handleToolChange('ERASE_TILE'); break;
+        case 'i': handleToolChange('FLOOD_FILL'); break;
         case 'p': setActiveTool('RECT');       break;
         case 'a': setActiveTool('ACTOR');      break;
         case 's': setActiveTool('SELECT');     break;
@@ -155,7 +284,7 @@ export default function DesignerPage() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undo, redo]);
+  }, [undo, redo, handleToolChange]);
 
   const handleDataDir = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) loadFiles(e.target.files);
@@ -164,8 +293,10 @@ export default function DesignerPage() {
     if (e.target.files?.length) loadFiles(e.target.files);
   };
 
-  const handleOpenSil = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) openMap(e.target.files[0]);
+  const handleOpenSil = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0]) return;
+    fitPendingRef.current = true;
+    await openMap(e.target.files[0]);
   };
 
   const handleTilePaint = useCallback((layerType: 'bg' | 'fg', layerIdx: number, tx: number, ty: number, tileId: number) => {
@@ -194,6 +325,22 @@ export default function DesignerPage() {
   const handleActorMove = useCallback((idx: number, x: number, y: number) => {
     moveActor(idx, x, y);
   }, [moveActor]);
+
+  const handleActorFlip = useCallback((idx: number) => {
+    const actor = map?.actors[idx];
+    if (!actor) return;
+    updateActor(idx, { direction: actor.direction ? 0 : 1 });
+  }, [map, updateActor]);
+
+  const handleTilePaste = useCallback((tx: number, ty: number) => {
+    if (!tileCopyBuffer || !map) return;
+    const { w, bg, fg } = tileCopyBuffer;
+    const patches = [
+      ...bg.map((cells, li) => ({ layerType: 'bg' as const, layerIdx: li, updates: cells.map((t, i) => ({ x: tx + (i % w), y: ty + Math.floor(i / w), ...t })) })),
+      ...fg.map((cells, li) => ({ layerType: 'fg' as const, layerIdx: li, updates: cells.map((t, i) => ({ x: tx + (i % w), y: ty + Math.floor(i / w), ...t })) })),
+    ];
+    applyAllLayersBatch(patches);
+  }, [tileCopyBuffer, map, applyAllLayersBatch]);
 
   const canvasContainerRef = useRef<HTMLDivElement>(null);
 
@@ -243,6 +390,21 @@ export default function DesignerPage() {
     setZoom(newZoom);
     setPan({ x: (cw - map.width * 64 * newZoom) / 2, y: (ch - map.height * 64 * newZoom) / 2 });
   };
+
+  // Run fitToScreen after React commits a new map — rAF lets the browser paint first
+  useEffect(() => {
+    if (!fitPendingRef.current || !map) return;
+    fitPendingRef.current = false;
+    const { width, height } = map;
+    requestAnimationFrame(() => {
+      const container = document.getElementById('canvas-container');
+      if (!container) return;
+      const { width: cw, height: ch } = container.getBoundingClientRect();
+      const newZoom = Math.min(cw / (width * 64), ch / (height * 64)) * 0.95;
+      setZoom(newZoom);
+      setPan({ x: (cw - width * 64 * newZoom) / 2, y: (ch - height * 64 * newZoom) / 2 });
+    });
+  }, [map]);
 
   const isLoading = progress.total > 0 && progress.done < progress.total;
 
@@ -335,6 +497,7 @@ export default function DesignerPage() {
                     if (!w || !h || w < 1 || h < 1 || w > 512 || h > 512) return;
                     createMap(w, h, newMapDesc);
                     setShowNewMap(false);
+                    fitPendingRef.current = true;
                   }}
                     className="flex-1 py-1 text-xs font-mono border border-game-primary text-game-primary rounded hover:bg-game-dark transition-colors">
                     CREATE
@@ -422,6 +585,76 @@ export default function DesignerPage() {
               )}
             </div>
           )}
+
+          {/* Manage published maps */}
+          <div className="relative flex items-center">
+            <button
+              onClick={() => setShowMaps(p => !p)}
+              className={`px-3 py-1 text-xs font-mono border rounded transition-colors ${showMaps ? 'border-game-primary text-game-primary bg-game-dark' : 'border-game-border text-game-textDim hover:border-game-primary hover:text-game-text'}`}
+            >
+              📋 MAPS
+            </button>
+            {showMaps && (
+              <div className="absolute top-8 left-0 z-50 bg-game-bgCard border border-game-border rounded p-3 w-96 shadow-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-mono text-game-primary">Published Maps</div>
+                  <button
+                    onClick={fetchMapList}
+                    className="text-xs font-mono text-game-textDim hover:text-game-text border border-game-border rounded px-2 py-0.5 transition-colors"
+                    title="Refresh"
+                  >↻ refresh</button>
+                </div>
+                {pubApiKey === '' && (
+                  <div className="mb-2">
+                    <input
+                      type="password"
+                      placeholder="API key for delete (optional)"
+                      onChange={e => setPubApiKey(e.target.value)}
+                      className="w-full px-2 py-1 text-xs font-mono bg-game-bg border border-game-border rounded text-game-text focus:outline-none focus:border-game-primary"
+                    />
+                  </div>
+                )}
+                {mapListLoading && <div className="text-xs font-mono text-game-textDim">Loading…</div>}
+                {mapListError  && <div className="text-xs font-mono text-red-400">{mapListError}</div>}
+                {!mapListLoading && !mapListError && mapList.length === 0 && (
+                  <div className="text-xs font-mono text-game-textDim">No maps published yet.</div>
+                )}
+                {!mapListLoading && mapList.length > 0 && (
+                  <div className="flex flex-col gap-1 max-h-72 overflow-y-auto">
+                    {mapList.map(m => (
+                      <div
+                        key={m.sha1}
+                        className={`flex items-center gap-2 px-2 py-1 rounded text-xs font-mono ${lastPublishedSha1 === m.sha1 ? 'bg-game-primary bg-opacity-10 border border-game-primary' : 'bg-game-bg'}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-game-text truncate">{m.name}</div>
+                          <div className="text-game-textDim text-[10px]">{m.author} · {(m.size / 1024).toFixed(1)}KB · {new Date(m.uploaded_at).toLocaleDateString()}</div>
+                        </div>
+                        {deleteStatus[m.name] ? (
+                          <span className={`text-[10px] ${deleteStatus[m.name].startsWith('✓') ? 'text-game-primary' : 'text-red-400'}`}>
+                            {deleteStatus[m.name]}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleDeleteMap(m.name)}
+                            className="text-[10px] text-red-400 hover:text-red-300 border border-red-800 hover:border-red-500 rounded px-1.5 py-0.5 transition-colors flex-shrink-0"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  onClick={() => setShowMaps(false)}
+                  className="mt-2 w-full px-2 py-1 text-xs font-mono border border-game-border text-game-textDim rounded hover:border-game-primary transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Props */}
           {map && (
@@ -525,7 +758,7 @@ export default function DesignerPage() {
         {/* Toolbar */}
         <Toolbar
           activeTool={activeTool}
-          onToolChange={setActiveTool}
+          onToolChange={handleToolChange}
           activeLayer={activeLayer}
           onLayerChange={setActiveLayer}
           selectedActor={selectedActorId}
@@ -542,6 +775,7 @@ export default function DesignerPage() {
             header={map.header}
             onUpdate={updateHeader}
             onClose={() => setShowProps(false)}
+            spriteImages={spriteImages}
           />
         )}
 
@@ -567,15 +801,43 @@ export default function DesignerPage() {
                 </button>
               ))}
               <span className="text-[#1a3a1a] text-xs mx-0.5">|</span>
-              {([['PLT','platforms'],['ACT','actors'],['GRID','grid'],['LIGHT','lighting']] as [string, keyof VisState][]).map(([lbl, key]) => (
+              {([['PLT','platforms'],['ACT','actors'],['PARA','parallax'],['GRID','grid'],['LIGHT','lighting']] as [string, keyof VisState][]).map(([lbl, key]) => (
                 <button key={key} onClick={() => toggleVis(key)}
                   className={`px-1.5 py-0.5 text-xs font-mono rounded border ${vis[key] ? 'border-[#3a3a2a] text-[#c0c080] bg-[#1a1a0d]' : 'border-[#1a1a1a] text-[#3a3a3a] bg-transparent line-through'}`}>
                   {lbl}
                 </button>
               ))}
+              {vis.grid && (
+                <>
+                  <span className="text-[#1a3a1a] text-xs mx-0.5">⊞</span>
+                  {([8, 16, 32, 64] as const).map(sz => (
+                    <button key={sz} onClick={() => setGridSize(sz)}
+                      className={`px-1.5 py-0.5 text-xs font-mono rounded border ${gridSize === sz ? 'border-[#3a3a2a] text-[#c0c080] bg-[#1a1a0d]' : 'border-[#1a1a1a] text-[#3a3a3a] bg-transparent'}`}>
+                      {sz}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
 
             <div className="flex-1 relative min-h-0">
+            {!loaded && !isLoading && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 bg-game-bg">
+                <div className="flex flex-col items-center gap-4 p-12 border border-game-border rounded text-center">
+                  <div className="text-4xl">🗺</div>
+                  <div className="text-game-textDim text-xs font-mono leading-relaxed">
+                    Select your game <code className="text-game-primary">shared/assets/</code> folder<br />
+                    to load tile banks and sprite sheets.
+                  </div>
+                  <button
+                    onClick={() => dataDirRef.current?.click()}
+                    className="px-6 py-2 text-xs font-mono border border-game-primary text-game-primary rounded hover:bg-game-primary hover:text-game-bg transition-colors tracking-widest">
+                    [ OPEN ASSETS FOLDER ]
+                  </button>
+                  {error && <div className="text-game-danger text-xs font-mono">{error}</div>}
+                </div>
+              </div>
+            )}
             <MapCanvas
               map={map}
               tileImages={tileImages}
@@ -589,6 +851,7 @@ export default function DesignerPage() {
               onZoomChange={setZoom}
               onPanChange={setPan}
               onTilePaint={handleTilePaint}
+              onFloodFill={applyTileBatch}
               onBeginPaint={beginPaint}
               onCommitPaint={commitPaint}
               onPlatformDraw={handlePlatformDraw}
@@ -596,7 +859,9 @@ export default function DesignerPage() {
               onActorPlace={handleActorPlace}
               onActorRemove={removeActor}
               onActorMove={handleActorMove}
+              onActorFlip={handleActorFlip}
               onActorRightClick={(idx, sx, sy) => { setActorMenu({ idx, screenX: sx, screenY: sy }); setHighlightActorIdx(idx); }}
+              onActorSelect={setHighlightActorIdx}
               onTileRightClick={(info) => { setActorMenu(null); setTileMenu(info); }}
               selectedActorId={selectedActorId}
               dragPlatform={dragPlatform}
@@ -607,6 +872,12 @@ export default function DesignerPage() {
               selectedPlatformIdx={selectedPlatformIdx}
               onPlatformSelect={setSelectedPlatformIdx}
               onPlatformUpdate={updatePlatform}
+              gridSize={gridSize}
+              tileSelection={tileSelection}
+              onTileSelection={setTileSelection}
+              tileCopyBuffer={tileCopyBuffer}
+              pastePending={pastePending}
+              onTilePaste={handleTilePaste}
             />
             <Minimap
               map={map}
@@ -656,9 +927,17 @@ export default function DesignerPage() {
               MAP {map.width}×{map.height} | {map.actors.length} actors | {map.platforms.length} platforms
             </span>
           )}
-          <span className="text-xs font-mono text-game-muted ml-auto">
-            CTRL/SPACE+DRAG or MMB to pan · SCROLL to zoom · CTRL+Z/Y to undo/redo
-          </span>
+          {tileCopyBuffer && (
+            <span className="text-xs font-mono text-[#c0c040]">
+              📋 {tileCopyBuffer.w}×{tileCopyBuffer.h} ALL LAYERS
+              {pastePending ? ' — PASTE MODE (click to stamp · Esc to cancel)' : ' — Ctrl+V to paste'}
+            </span>
+          )}
+          {tileSelection && !tileCopyBuffer && (
+            <span className="text-xs font-mono text-[#80b0ff]">
+              ⬚ {tileSelection.tx2 - tileSelection.tx1 + 1}×{tileSelection.ty2 - tileSelection.ty1 + 1} sel — Ctrl+C to copy
+            </span>
+          )}
         </div>
       </div>
 
@@ -707,7 +986,7 @@ export default function DesignerPage() {
               <span className="text-game-primary">A</span><span>Actor tool</span>
               <span className="text-game-primary">S</span><span>Select / drag tool</span>
               <span className="text-game-primary">1–4</span><span>Layer 0–3</span>
-              <span className="text-game-primary">G</span><span>Toggle grid</span>
+              <span className="text-game-primary">G</span><span>Toggle grid snap</span>
               <span className="text-game-primary">L</span><span>Toggle lighting</span>
               <span className="text-game-primary">Ctrl+Z</span><span>Undo</span>
               <span className="text-game-primary">Ctrl+Y / Ctrl+Shift+Z</span><span>Redo</span>

@@ -1,0 +1,442 @@
+#include "gasloader.h"
+#include "nlohmann/json.hpp"
+#include <fstream>
+#include <cstdio>
+
+using json = nlohmann::json;
+
+// ---------------------------------------------------------------------------
+// Singleton
+// ---------------------------------------------------------------------------
+
+GASLoader& GASLoader::Get() {
+    static GASLoader instance;
+    return instance;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// Strip the gasDir prefix off a full path so error file fields are
+// stable (e.g. "weapons.json", not "/var/lib/.../assets/gas/weapons.json").
+static std::string Basename(const std::string& path) {
+    const auto slash = path.find_last_of("/\\");
+    return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+static bool OpenJson(const std::string& path, json& out,
+                     std::vector<GASLoadError>& errors) {
+    std::ifstream f(path);
+    if (!f.is_open()) {
+        errors.push_back({Basename(path), "", "OPEN_FAILED",
+                          "cannot open " + path + " (using compiled-in defaults)"});
+        return false;
+    }
+    try {
+        f >> out;
+        return true;
+    } catch (const std::exception& e) {
+        errors.push_back({Basename(path), "", "PARSE_ERROR",
+                          std::string(e.what()) + " (using compiled-in defaults)"});
+        return false;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Per-file parsers
+// ---------------------------------------------------------------------------
+
+static void LoadPlayer(const std::string& dir, PlayerDef& out,
+                       std::vector<GASLoadError>& errors) {
+    json j;
+    if (!OpenJson(dir + "/player.json", j, errors)) return;
+    try {
+        out.baseHealth                 = j.value("baseHealth",                 out.baseHealth);
+        out.baseShield                 = j.value("baseShield",                 out.baseShield);
+        out.baseFuel                   = j.value("baseFuel",                   out.baseFuel);
+        out.maxFiles                   = j.value("maxFiles",                   out.maxFiles);
+        out.upgradeMultiplierEndurance = j.value("upgradeMultiplierEndurance", out.upgradeMultiplierEndurance);
+        out.upgradeMultiplierShield    = j.value("upgradeMultiplierShield",    out.upgradeMultiplierShield);
+        out.upgradeMultiplierJetpack   = j.value("upgradeMultiplierJetpack",   out.upgradeMultiplierJetpack);
+        out.upgradeMultiplierHacking   = j.value("upgradeMultiplierHacking",   out.upgradeMultiplierHacking);
+        out.upgradeMultiplierContacts  = j.value("upgradeMultiplierContacts",  out.upgradeMultiplierContacts);
+        out.maxPoisoned                = j.value("maxPoisoned",                out.maxPoisoned);
+        out.runSpeed                   = j.value("runSpeed",                   out.runSpeed);
+        out.runSpeedDisguised          = j.value("runSpeedDisguised",          out.runSpeedDisguised);
+        out.runSpeedSecret             = j.value("runSpeedSecret",             out.runSpeedSecret);
+        out.runSpeedSecretDisguised    = j.value("runSpeedSecretDisguised",    out.runSpeedSecretDisguised);
+        out.jetpackXvMax               = j.value("jetpackXvMax",               out.jetpackXvMax);
+        out.jetpackXvMaxDisguised      = j.value("jetpackXvMaxDisguised",      out.jetpackXvMaxDisguised);
+        out.jetpackYvMax               = j.value("jetpackYvMax",               out.jetpackYvMax);
+        out.jumpImpulse                = j.value("jumpImpulse",                out.jumpImpulse);
+        out.ladderJumpImpulse          = j.value("ladderJumpImpulse",          out.ladderJumpImpulse);
+        out.ladderActivateImpulse      = j.value("ladderActivateImpulse",      out.ladderActivateImpulse);
+        out.disguiseActivationTicks    = j.value("disguiseActivationTicks",    out.disguiseActivationTicks);
+        out.disguiseThreshold          = j.value("disguiseThreshold",          out.disguiseThreshold);
+        out.invisibilityDurationTicks  = j.value("invisibilityDurationTicks",  out.invisibilityDurationTicks);
+        out.poisonTickCycle            = j.value("poisonTickCycle",            out.poisonTickCycle);
+        out.hackingEffectTicks         = j.value("hackingEffectTicks",         out.hackingEffectTicks);
+        out.hackingCompleteThreshold   = j.value("hackingCompleteThreshold",   out.hackingCompleteThreshold);
+        out.hackingExitThreshold       = j.value("hackingExitThreshold",       out.hackingExitThreshold);
+        out.deployWaitTicks            = j.value("deployWaitTicks",            out.deployWaitTicks);
+        out.startingCredits            = j.value("startingCredits",            out.startingCredits);
+        out.creditFloor                = j.value("creditFloor",                out.creditFloor);
+        out.creditCap                  = j.value("creditCap",                  out.creditCap);
+        out.neutronWarnTick            = j.value("neutronWarnTick",            out.neutronWarnTick);
+        out.superShieldMultiplier      = j.value("superShieldMultiplier",      out.superShieldMultiplier);
+        out.powerupRespawnTicks        = j.value("powerupRespawnTicks",        out.powerupRespawnTicks);
+        out.fileConversionBase         = j.value("fileConversionBase",         out.fileConversionBase);
+        out.teamGiftCredits            = j.value("teamGiftCredits",            out.teamGiftCredits);
+        out.secretDeliveryCredits      = j.value("secretDeliveryCredits",      out.secretDeliveryCredits);
+        out.weaponFireCooldownPad      = j.value("weaponFireCooldownPad",      out.weaponFireCooldownPad);
+        out.secretsNeededToWin         = j.value("secretsNeededToWin",         out.secretsNeededToWin);
+        out.secretProgressBeamThresh   = j.value("secretProgressBeamThresh",   out.secretProgressBeamThresh);
+        out.secretProgressSoundThresh  = j.value("secretProgressSoundThresh",  out.secretProgressSoundThresh);
+        out.jetpackBonusDurationTicks  = j.value("jetpackBonusDurationTicks",  out.jetpackBonusDurationTicks);
+        out.hackingBonusDurationTicks  = j.value("hackingBonusDurationTicks",  out.hackingBonusDurationTicks);
+        out.radarBonusDurationTicks    = j.value("radarBonusDurationTicks",    out.radarBonusDurationTicks);
+        out.warpDurationTicks          = j.value("warpDurationTicks",          out.warpDurationTicks);
+        out.warpNonCollidableTicks     = j.value("warpNonCollidableTicks",     out.warpNonCollidableTicks);
+        out.warpTeleportTick           = j.value("warpTeleportTick",           out.warpTeleportTick);
+        out.deadAutoRespawnTick        = j.value("deadAutoRespawnTick",        out.deadAutoRespawnTick);
+        out.deployAnimationTicks       = j.value("deployAnimationTicks",       out.deployAnimationTicks);
+    } catch (const std::exception& e) {
+        errors.push_back({"player.json", "", "FIELD_ERROR", e.what()});
+    }
+}
+
+static void LoadAgencies(const std::string& dir, std::vector<AgencyDef>& out,
+                         std::vector<GASLoadError>& errors) {
+    json j;
+    if (!OpenJson(dir + "/agencies.json", j, errors)) return;
+    try {
+        out.clear();
+        for (const auto& aj : j.at("agencies")) {
+            AgencyDef a;
+            a.id             = aj.value("id", 0);
+            a.name           = aj.value("name", std::string{});
+            a.defaultBonuses      = aj.value("defaultBonuses",      a.defaultBonuses);
+            a.maxPlayersPerTeam   = aj.value("maxPlayersPerTeam",   a.maxPlayersPerTeam);
+            if (aj.contains("defaultUpgrades")) {
+                const auto& du = aj["defaultUpgrades"];
+                a.defaultUpgrades.endurance = du.value("endurance", a.defaultUpgrades.endurance);
+                a.defaultUpgrades.shield    = du.value("shield",    a.defaultUpgrades.shield);
+                a.defaultUpgrades.jetpack   = du.value("jetpack",   a.defaultUpgrades.jetpack);
+                a.defaultUpgrades.techslots = du.value("techslots", a.defaultUpgrades.techslots);
+                a.defaultUpgrades.hacking   = du.value("hacking",   a.defaultUpgrades.hacking);
+                a.defaultUpgrades.contacts  = du.value("contacts",  a.defaultUpgrades.contacts);
+            }
+            if (aj.contains("upgradeCaps")) {
+                const auto& caps = aj["upgradeCaps"];
+                a.upgradeCaps.endurance  = caps.value("endurance",  a.upgradeCaps.endurance);
+                a.upgradeCaps.shield     = caps.value("shield",     a.upgradeCaps.shield);
+                a.upgradeCaps.jetpack    = caps.value("jetpack",    a.upgradeCaps.jetpack);
+                a.upgradeCaps.techslots  = caps.value("techslots",  a.upgradeCaps.techslots);
+                a.upgradeCaps.hacking    = caps.value("hacking",    a.upgradeCaps.hacking);
+                a.upgradeCaps.contacts   = caps.value("contacts",   a.upgradeCaps.contacts);
+            }
+            out.push_back(std::move(a));
+        }
+    } catch (const std::exception& e) {
+        errors.push_back({"agencies.json", "", "FIELD_ERROR", e.what()});
+        out.clear();
+    }
+}
+
+static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out,
+                        std::vector<GASLoadError>& errors) {
+    json j;
+    if (!OpenJson(dir + "/weapons.json", j, errors)) return;
+    try {
+        out.clear();
+        for (const auto& wj : j.at("weapons")) {
+            WeaponDef w;
+            w.id               = wj.value("id",                std::string{});
+            w.healthDamage     = wj.value("healthDamage",       0);
+            w.shieldDamage     = wj.value("shieldDamage",       0);
+            w.healthDamageLarge = wj.value("healthDamageLarge", 0);
+            w.shieldDamageLarge = wj.value("shieldDamageLarge", 0);
+            w.fireDelay           = wj.value("fireDelay",           0);
+            w.throwSpeedStanding  = wj.value("throwSpeedStanding",  0);
+            w.throwSpeedMoving    = wj.value("throwSpeedMoving",    0);
+            w.throwSpeedRunning   = wj.value("throwSpeedRunning",   0);
+            w.explosionTick       = wj.value("explosionTick",       0);
+            w.secondaryTick       = wj.value("secondaryTick",       0);
+            w.destroyTick         = wj.value("destroyTick",         0);
+            w.neutronDestroyTick  = wj.value("neutronDestroyTick",  0);
+            w.flareDuration       = wj.value("flareDuration",       0);
+            w.velocity            = wj.value("velocity",            0);
+            w.moveAmount          = wj.value("moveAmount",          0);
+            w.radius              = wj.value("radius",              0);
+            w.detonatorLaunchYv   = wj.value("detonatorLaunchYv",  0);
+            w.neutronTraceTime    = wj.value("neutronTraceTime",    0);
+            w.rocketSlowInitial   = wj.value("rocketSlowInitial",   w.rocketSlowInitial);
+            w.rocketHoverTick     = wj.value("rocketHoverTick",     w.rocketHoverTick);
+            w.rocketSlowHover     = wj.value("rocketSlowHover",     w.rocketSlowHover);
+            w.plasmaGravity       = wj.value("plasmaGravity",       w.plasmaGravity);
+            w.plasmaLifeNormal    = wj.value("plasmaLifeNormal",    w.plasmaLifeNormal);
+            w.plasmaLifeLarge     = wj.value("plasmaLifeLarge",     w.plasmaLifeLarge);
+            out.push_back(std::move(w));
+        }
+    } catch (const std::exception& e) {
+        errors.push_back({"weapons.json", "", "FIELD_ERROR", e.what()});
+        out.clear();
+    }
+}
+
+static void LoadItems(const std::string& dir, std::vector<ItemDef>& out,
+                      std::vector<GASLoadError>& errors) {
+    json j;
+    if (!OpenJson(dir + "/items.json", j, errors)) return;
+    try {
+        out.clear();
+        for (const auto& ij : j.at("items")) {
+            ItemDef item;
+            item.id                = ij.value("id",                std::string{});
+            item.enumId            = ij.value("enumId",            0);
+            item.name              = ij.value("name",              std::string{});
+            item.price             = ij.value("price",             0);
+            item.repairPrice       = ij.value("repairPrice",       0);
+            item.spriteBank        = ij.value("spriteBank",        0);
+            item.spriteIndex       = ij.value("spriteIndex",       0);
+            item.techChoice        = ij.value("techChoice",        0);
+            item.techSlots         = ij.value("techSlots",         0);
+            item.agencyRestriction = ij.value("agencyRestriction", -1);
+            item.description       = ij.value("description",      std::string{});
+            item.spawnAmmo           = ij.value("spawnAmmo",           0);
+            item.spawnInventoryCount = ij.value("spawnInventoryCount", 0);
+            item.pickupAmmo          = ij.value("pickupAmmo",          0);
+            item.maxAmmo             = ij.value("maxAmmo",             0);
+            item.healAmount          = ij.value("healAmount",          0);
+            item.poisonDose          = ij.value("poisonDose",          0);
+            out.push_back(std::move(item));
+        }
+    } catch (const std::exception& e) {
+        errors.push_back({"items.json", "", "FIELD_ERROR", e.what()});
+        out.clear();
+    }
+}
+
+static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out,
+                        std::vector<GASLoadError>& errors) {
+    json j;
+    if (!OpenJson(dir + "/enemies.json", j, errors)) return;
+    try {
+        out.clear();
+        for (const auto& ej : j.at("enemies")) {
+            EnemyDef e;
+            e.id     = ej.value("id",     std::string{});
+            e.health = ej.value("health", 0);
+            e.shield = ej.value("shield", 0);
+            e.speed  = ej.value("speed",  0);
+            e.weapon = ej.value("weapon", 0);
+            e.shotCooldown       = ej.value("shotCooldown",       e.shotCooldown);
+            e.chaseRangeClose    = ej.value("chaseRangeClose",    e.chaseRangeClose);
+            e.chaseRangeStop     = ej.value("chaseRangeStop",     e.chaseRangeStop);
+            e.chaseRangeMax      = ej.value("chaseRangeMax",      e.chaseRangeMax);
+            e.searchTicks        = ej.value("searchTicks",        e.searchTicks);
+            e.meleeCheckInterval = ej.value("meleeCheckInterval", e.meleeCheckInterval);
+            e.tractHealthDamage  = ej.value("tractHealthDamage",  e.tractHealthDamage);
+            e.tractShieldDamage  = ej.value("tractShieldDamage",  e.tractShieldDamage);
+            e.respawnSeconds     = ej.value("respawnSeconds",     e.respawnSeconds);
+            e.ladderCooldown     = ej.value("ladderCooldown",     e.ladderCooldown);
+            e.meleeDamageHealth  = ej.value("meleeDamageHealth",  e.meleeDamageHealth);
+            e.meleeDamageShield  = ej.value("meleeDamageShield",  e.meleeDamageShield);
+            e.returnProximity    = ej.value("returnProximity",    e.returnProximity);
+            e.sleepTicks         = ej.value("sleepTicks",         e.sleepTicks);
+            e.meleeCycleTicks       = ej.value("meleeCycleTicks",       e.meleeCycleTicks);
+            e.meleeDelayTicks       = ej.value("meleeDelayTicks",       e.meleeDelayTicks);
+            e.targetStandingHeight  = ej.value("targetStandingHeight",  e.targetStandingHeight);
+            e.ladderYThreshold      = ej.value("ladderYThreshold",      e.ladderYThreshold);
+            e.ladderXTolerance      = ej.value("ladderXTolerance",      e.ladderXTolerance);
+            e.patrolReturnProximity = ej.value("patrolReturnProximity", e.patrolReturnProximity);
+            e.speedAlt              = ej.value("speedAlt",              e.speedAlt);
+            e.runSpeedBonus         = ej.value("runSpeedBonus",         e.runSpeedBonus);
+            e.threatDetectX         = ej.value("threatDetectX",         e.threatDetectX);
+            e.threatDetectY         = ej.value("threatDetectY",         e.threatDetectY);
+            e.shootCooldownCap      = ej.value("shootCooldownCap",      e.shootCooldownCap);
+            e.deathDropFiles        = ej.value("deathDropFiles",        e.deathDropFiles);
+            e.ladderClimbSpeed      = ej.value("ladderClimbSpeed",      e.ladderClimbSpeed);
+            e.rocketLaunchXv        = ej.value("rocketLaunchXv",        e.rocketLaunchXv);
+            e.ammoDropQuantity      = ej.value("ammoDropQuantity",      e.ammoDropQuantity);
+            e.lookDefaultMinX       = ej.value("lookDefaultMinX",       e.lookDefaultMinX);
+            e.lookDefaultMaxX       = ej.value("lookDefaultMaxX",       e.lookDefaultMaxX);
+            e.lookDefaultY          = ej.value("lookDefaultY",          e.lookDefaultY);
+            e.lookDirMinX           = ej.value("lookDirMinX",           e.lookDirMinX);
+            e.lookDirMaxX           = ej.value("lookDirMaxX",           e.lookDirMaxX);
+            e.lookDirY1             = ej.value("lookDirY1",             e.lookDirY1);
+            e.lookDirY2             = ej.value("lookDirY2",             e.lookDirY2);
+            out.push_back(std::move(e));
+        }
+    } catch (const std::exception& e) {
+        errors.push_back({"enemies.json", "", "FIELD_ERROR", e.what()});
+        out.clear();
+    }
+}
+
+static void LoadAbilities(const std::string& dir, std::vector<AbilityDef>& out,
+                          std::vector<GASLoadError>& errors) {
+    json j;
+    if (!OpenJson(dir + "/abilities.json", j, errors)) return;
+    try {
+        out.clear();
+        for (const auto& aj : j.at("abilities")) {
+            AbilityDef a;
+            a.id          = aj.value("id",          std::string{});
+            a.displayName = aj.value("displayName", std::string{});
+            a.creditCost  = aj.value("creditCost",  0);
+            a.cooldownMs  = aj.value("cooldownMs",  0);
+            a.effectType  = aj.value("effectType",  std::string{});
+            out.push_back(std::move(a));
+        }
+    } catch (const std::exception& e) {
+        errors.push_back({"abilities.json", "", "FIELD_ERROR", e.what()});
+        out.clear();
+    }
+}
+
+static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& out,
+                            std::vector<GASLoadError>& errors) {
+    json j;
+    if (!OpenJson(dir + "/gameobjects.json", j, errors)) return;
+    try {
+        out.clear();
+        for (const auto& gj : j.at("gameObjects")) {
+            GameObjectDef g;
+            g.id            = gj.value("id",            std::string{});
+            g.cooldownTicks = gj.value("cooldownTicks",  0);
+            g.health        = gj.value("health",         0);
+            g.shield        = gj.value("shield",         0);
+            g.shieldMax     = gj.value("shieldMax",      0);
+            g.healthMax     = gj.value("healthMax",      0);
+            g.healthRegen   = gj.value("healthRegen",    0);
+            g.techHealth    = gj.value("techHealth",     0);
+            g.techShield    = gj.value("techShield",     0);
+            g.refireReadyTick = gj.value("refireReadyTick", g.refireReadyTick);
+            g.reloadTick      = gj.value("reloadTick",      g.reloadTick);
+            g.innerRange      = gj.value("innerRange",      g.innerRange);
+            g.outerRange      = gj.value("outerRange",      g.outerRange);
+            g.detectionRange  = gj.value("detectionRange",  g.detectionRange);
+            out.push_back(std::move(g));
+        }
+    } catch (const std::exception& e) {
+        errors.push_back({"gameobjects.json", "", "FIELD_ERROR", e.what()});
+        out.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out,
+                          std::vector<GASLoadError>& errors) {
+    json j;
+    // Don't double-report missing/parse errors — LoadGameObjects already
+    // covered this exact file path. Only the terminals field-walk runs here.
+    std::vector<GASLoadError> dropped;
+    if (!OpenJson(dir + "/gameobjects.json", j, dropped)) return;
+    if (!j.contains("terminals")) return;
+    try {
+        out.clear();
+        for (const auto& tj : j.at("terminals")) {
+            TerminalDef t;
+            t.id              = tj.value("id",              std::string{});
+            t.juice           = tj.value("juice",           0);
+            t.files           = tj.value("files",           0);
+            t.secretInfo      = tj.value("secretInfo",      0);
+            t.traceTimeBase      = tj.value("traceTimeBase",      t.traceTimeBase);
+            t.traceTimeMedium    = tj.value("traceTimeMedium",    t.traceTimeMedium);
+            t.traceTimeExtended  = tj.value("traceTimeExtended",  t.traceTimeExtended);
+            t.beaconTimeSecs     = tj.value("beaconTimeSecs",     t.beaconTimeSecs);
+            out.push_back(std::move(t));
+        }
+    } catch (const std::exception& e) {
+        errors.push_back({"gameobjects.json", "/terminals", "FIELD_ERROR", e.what()});
+        out.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+
+bool GASLoader::Load(const std::string& gasDir) {
+    lastLoadErrors.clear();
+    LoadPlayer(gasDir, player, lastLoadErrors);
+    LoadAgencies(gasDir, agencies, lastLoadErrors);
+    LoadWeapons(gasDir, weapons, lastLoadErrors);
+    LoadItems(gasDir, items, lastLoadErrors);
+    LoadEnemies(gasDir, enemies, lastLoadErrors);
+    LoadAbilities(gasDir, abilities, lastLoadErrors);
+    LoadGameObjects(gasDir, gameObjects, lastLoadErrors);
+    LoadTerminals(gasDir, terminals, lastLoadErrors);
+    loaded = true;
+    fprintf(stderr, "[gas] loaded: %zu agencies, %zu weapons, %zu items, %zu enemies, %zu abilities, %zu gameObjects, %zu terminals (%zu errors)\n",
+            agencies.size(), weapons.size(), items.size(),
+            enemies.size(), abilities.size(), gameObjects.size(), terminals.size(),
+            lastLoadErrors.size());
+    return lastLoadErrors.empty();
+}
+
+void GASLoader::Reload(const std::string& gasDir) {
+    // Reset to compiled-in defaults before reloading so a key removed
+    // from a JSON file reverts to its struct default rather than
+    // sticking at the previously-loaded value. Vectors clear; the
+    // single PlayerDef gets a default-constructed reset.
+    player = PlayerDef{};
+    agencies.clear();
+    weapons.clear();
+    items.clear();
+    enemies.clear();
+    abilities.clear();
+    gameObjects.clear();
+    terminals.clear();
+    loaded = false;
+    Load(gasDir);
+}
+
+// ---------------------------------------------------------------------------
+// Lookup helpers
+// ---------------------------------------------------------------------------
+
+const AgencyDef* GASLoader::GetAgencyDef(int id) const {
+    for (const auto& a : agencies)
+        if (a.id == id) return &a;
+    return nullptr;
+}
+
+const WeaponDef* GASLoader::GetWeaponDef(const std::string& id) const {
+    for (const auto& w : weapons)
+        if (w.id == id) return &w;
+    return nullptr;
+}
+
+const ItemDef* GASLoader::GetItemDef(const std::string& id) const {
+    for (const auto& item : items)
+        if (item.id == id) return &item;
+    return nullptr;
+}
+
+const EnemyDef* GASLoader::GetEnemyDef(const std::string& id) const {
+    for (const auto& e : enemies)
+        if (e.id == id) return &e;
+    return nullptr;
+}
+
+const AbilityDef* GASLoader::GetAbilityDef(const std::string& id) const {
+    for (const auto& a : abilities)
+        if (a.id == id) return &a;
+    return nullptr;
+}
+
+const GameObjectDef* GASLoader::GetGameObjectDef(const std::string& id) const {
+    for (const auto& g : gameObjects)
+        if (g.id == id) return &g;
+    return nullptr;
+}
+
+const TerminalDef* GASLoader::GetTerminalDef(const std::string& id) const {
+    for (const auto& t : terminals)
+        if (t.id == id) return &t;
+    return nullptr;
+}

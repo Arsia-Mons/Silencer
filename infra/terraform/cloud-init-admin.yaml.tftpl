@@ -74,6 +74,7 @@ write_files:
       AMQP_URL=amqp://silencer:$LAVINMQ_PWD@127.0.0.1:5672/
       JWT_SECRET=$JWT
       LOBBY_PLAYER_AUTH_URL=http://lobby.${internal_zone_name}:15171
+      LOBBY_MAP_API_URL=http://lobby.${internal_zone_name}:15172
       BACKUP_DIR=/var/lib/silencer-backups
       BACKUP_CRON=0 */6 * * *
       BACKUP_KEEP=10

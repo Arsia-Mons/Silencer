@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { apiFetch } from './api';
 
 // Production: NEXT_PUBLIC_WS_URL is unset → io() connects to the current
 //   origin (admin.arsiamons.com), and Cloudflare Tunnel routes /socket.io/*
@@ -68,4 +69,24 @@ export function useSocket(events: Record<string, (...args: unknown[]) => void>):
 /** Lightweight hook — just the connection status, no event subscriptions. */
 export function useWsConnected(): boolean {
   return useSocket({});
+}
+
+/** Polls GET /api/health every 10 s. Returns undefined until first response. */
+export function useServerReachable(): boolean | undefined {
+  const [reachable, setReachable] = useState<boolean | undefined>(undefined);
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      try {
+        await apiFetch('/health');
+        if (alive) setReachable(true);
+      } catch {
+        if (alive) setReachable(false);
+      }
+    };
+    check();
+    const id = setInterval(check, 10_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
+  return reachable;
 }

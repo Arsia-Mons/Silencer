@@ -6,6 +6,8 @@ on:
     paths:
       - 'services/admin-api/**'
       - 'shared/assets/**'
+      - 'package.json'
+      - 'bun.lock'
       - '.github/workflows/deploy-admin-api.yml'
   workflow_dispatch:
 
@@ -48,7 +50,7 @@ jobs:
       - name: Build + push image (ARM64 native)
         uses: docker/build-push-action@v6
         with:
-          context: services/admin-api
+          context: .
           file: services/admin-api/Dockerfile
           push: true
           platforms: linux/arm64

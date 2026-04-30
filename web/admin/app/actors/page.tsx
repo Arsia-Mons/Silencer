@@ -103,7 +103,7 @@ export default function ActorsPage() {
                 📁 OPEN FOLDER
               </button>
             )}
-            <Link href="/actors/sprites" className="px-4 py-2 border border-game-border text-game-textDim hover:text-game-text text-sm tracking-wider">
+            <Link href="/sprites" className="px-4 py-2 border border-game-border text-game-textDim hover:text-game-text text-sm tracking-wider">
               [ SPRITE BROWSER ]
             </Link>
           </div>

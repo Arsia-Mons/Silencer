@@ -2,28 +2,9 @@ cmake_minimum_required(VERSION 3.16)
 
 project(Silencer)
 
-include(FetchContent)
-
-# nlohmann/json — header-only, C++14 compatible
-# v3.12.0: fixes std::_snprintf removed from MSVC 14.44 (VS 2022 17.13+)
-FetchContent_Declare(
-	nlohmann_json
-	URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.hpp
-	URL_HASH SHA256=aaf127c04cb31c406e5b04a63f1ae89369fccde6d8fa7cdda1ed4f32dfc5de63
-	DOWNLOAD_NO_EXTRACT TRUE
-)
-FetchContent_MakeAvailable(nlohmann_json)
-# Expose a simple include dir so we can do #include "nlohmann/json.hpp".
-# FetchContent downloads json.hpp directly into nlohmann_json_SOURCE_DIR,
-# so we create a nlohmann/ subdirectory wrapper and copy the header there.
-set(_nlohmann_wrapper "${CMAKE_BINARY_DIR}/nlohmann_include")
-file(MAKE_DIRECTORY "${_nlohmann_wrapper}/nlohmann")
-configure_file(
-	"${nlohmann_json_SOURCE_DIR}/json.hpp"
-	"${_nlohmann_wrapper}/nlohmann/json.hpp"
-	COPYONLY
-)
-set(NLOHMANN_JSON_INCLUDE_DIR "${_nlohmann_wrapper}")
+# nlohmann/json v3.12.0 — vendored header (third_party/nlohmann/json.hpp)
+# Vendored to avoid CMake FetchContent redirect issues with GitHub CDN in CI.
+set(NLOHMANN_JSON_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 
 # Linux GNU lowercase convention; macOS/Windows pick up mixed-case via
 # bundle/output-name overrides below.
@@ -87,6 +68,17 @@ endif()
 
 target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_14)
 
+if(WIN32)
+	# Strip <winsock.h> (and other legacy subsystems) out of <windows.h>.
+	# Without this, any TU that pulls in <windows.h> via zlib's zconf.h,
+	# behaviortree.cpp, actordef.cpp, etc. drags in winsock 1.x; another
+	# TU including <winsock2.h> then redefines sockaddr/fd_set/etc. The
+	# collision is invisible to non-unity builds (each TU is isolated)
+	# but surfaces in unity batches. We use winsock2 only — no Shell/
+	# RPC/Crypto/DDE call sites in the codebase to break.
+	target_compile_definitions(${SILENCER_TARGET} PRIVATE WIN32_LEAN_AND_MEAN)
+endif()
+
 # Unity (jumbo) build: combines src/*.cpp into batched TUs to dramatically
 # speed up clean builds. Off by default — incremental single-file edits are
 # slower under unity since changing one .cpp recompiles its whole batch.
@@ -124,6 +116,26 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated")
 target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
+# Expose src/ and every first-level subdomain so that bare-name includes
+# (#include "lobby.h") continue to resolve after the src/ reorganisation.
+target_include_directories(${SILENCER_TARGET} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/platform"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/render"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/audio"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/input"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/actors"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/projectiles"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/objects"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/stations"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/net"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/updater"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/gas"
+)
 
 # /Z7 embeds debug info into .obj files instead of routing it through MSVC's
 # mspdbsrv.exe — which has a habit of failing with C1090 PDB errors on some
@@ -188,8 +200,7 @@ endif()
 
 include_directories(${ZLIB_INCLUDE_DIRS})
 include_directories(${NLOHMANN_JSON_INCLUDE_DIR})
-# Also expose the raw json.hpp dir for existing includes that use #include "json.hpp"
-include_directories(${nlohmann_json_SOURCE_DIR})
+include_directories(${NLOHMANN_JSON_INCLUDE_DIR}/nlohmann)
 find_package(SDL3_mixer REQUIRED CONFIG)
 if(TARGET SDL3_mixer::SDL3_mixer)
   get_target_property(_sdl3mixer_inc SDL3_mixer::SDL3_mixer INTERFACE_INCLUDE_DIRECTORIES)

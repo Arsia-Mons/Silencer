@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - 'web/admin/**'
+      - 'shared/gas-validation/**'
+      - 'package.json'
+      - 'bun.lock'
       - '.github/workflows/deploy-admin-web.yml'
   workflow_dispatch:
 
@@ -48,7 +51,7 @@ jobs:
       - name: Build + push image (ARM64 native)
         uses: docker/build-push-action@v6
         with:
-          context: web/admin
+          context: .
           file: web/admin/Dockerfile
           push: true
           platforms: linux/arm64
