@@ -805,6 +805,8 @@ function buildPath(weapon: WeaponDef, W: number, H: number): [number, number][] 
 
   if (isThrow) {
     const throwSpeed = (weapon as Record<string, unknown>).throwSpeedStanding as number ?? 20;
+    // throwSpeedStanding === 0 means "placed device" — no trajectory
+    if (throwSpeed === 0) return path;
     xv = throwSpeed * scale * 0.5;
     yv = -10 * scale;
   }
@@ -851,6 +853,17 @@ function drawFrame(
     ctx.fillStyle = '#2a4a2a';
     ctx.font = '10px monospace';
     ctx.fillText('no velocity — contact / fixed-direction', 10, H / 2);
+    return;
+  }
+
+  // Placed device (grenade type with throwSpeedStanding === 0)
+  const throwSpeed = (weapon as Record<string, unknown>).throwSpeedStanding as number | undefined;
+  if (path.length <= 1 && (type === 'grenade' || type === 'arcing') && throwSpeed === 0) {
+    ctx.fillStyle = '#00a328';
+    ctx.beginPath(); ctx.arc(20, H - 20, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#4a7a4a';
+    ctx.font = '9px monospace';
+    ctx.fillText('placed device', 30, H - 16);
     return;
   }
 

@@ -114,24 +114,17 @@
     {
       "id": "flare",
       "projectileType": "arcing",
-      "healthDamage": 1,
-      "shieldDamage": 1,
-      "velocity": 5,
-      "moveAmount": 1,
-      "trailPlumes": 4,
-      "projectileLife": 14,
-      "snapshotInterval": 6
-      "projectileType": "wall",
       "healthDamage": 10,
       "shieldDamage": 60,
       "velocity": 35,
       "moveAmount": 6,
+      "trailPlumes": 4,
+      "projectileLife": 20,
+      "snapshotInterval": 6,
       "hitOverlayBank": 222,
       "soundFire": "!laserel.wav",
       "soundHit1": "strike03.wav",
-      "soundHit2": "strike04.wav",
-      "projectileLife": 20,
-      "snapshotInterval": 6
+      "soundHit2": "strike04.wav"
     },
     {
       "id": "grenade",
@@ -231,6 +224,17 @@
           "xv": 5,
           "yv": 5
         }
+      ],
+      "throwSpeedStanding": 0,
+      "spriteBanks": [
+        182,
+        182,
+        182,
+        182,
+        182,
+        182,
+        182,
+        182
       ]
     },
     {
