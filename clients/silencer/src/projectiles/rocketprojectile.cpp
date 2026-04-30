@@ -128,8 +128,9 @@ void RocketProjectile::Tick(World & world){
 					plume->yv = (yn * abs(plume->yv)) + (rand() % 33) - 16;*/
 					float angle = (i / float(numplumes)) * (2 * 3.14);
 					angle += anglen;
-					plume->xv = (sin(angle)) * 15;
-					plume->yv = (cos(angle)) * 15;
+					float _eps = w_r ? w_r->rocketExplosionPlumeSpeed : 15;
+					plume->xv = (sin(angle)) * _eps;
+					plume->yv = (cos(angle)) * _eps;
 					if(xn || yn){
 						plume->xv = (xn * abs(plume->xv)) + (rand() % 17) - 8;
 						plume->yv = (yn * abs(plume->yv)) + (rand() % 17) - 8;

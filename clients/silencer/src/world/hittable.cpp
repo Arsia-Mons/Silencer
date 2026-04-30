@@ -55,7 +55,7 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 			shield -= projectile.shielddamage;
 			state_hit = 1 + (2 * 32);
 		}
-		if(shield <= 60){
+		if(shield <= GASLoader::Get().player.shieldShrapnelThreshold){
 			switch(projectile.type){
 				case ObjectTypes::BLASTERPROJECTILE:
 				case ObjectTypes::LASERPROJECTILE:

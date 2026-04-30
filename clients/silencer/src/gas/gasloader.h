@@ -271,6 +271,7 @@ struct WeaponDef {
     int   projectileLife  = 0;    // bolt lifetime ticks after launch phase (0 = compiled default)
     int   emitOffset      = 0;    // pixel offset from player when spawning (0 = use compiled default)
     int   exhaustPlumes   = 0;    // rocket exhaust plume count (0 = use compiled default)
+    int   rocketExplosionPlumeSpeed = 15; // rocket: radial speed of explosion plumes (px/tick)
     float bounceDamping   = 0.0f; // velocity multiplier on wall/floor bounce (0 = use compiled default)
     int   trailPlumes     = 0;    // flamer/flare trail plume count (0 = use compiled default)
     // ---- Grenade fan counts ------------------------------------------------

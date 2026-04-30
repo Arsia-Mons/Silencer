@@ -270,8 +270,9 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.reloadTicks     = wj.value("reloadTicks",    0);
             w.projectileLife  = wj.value("projectileLife",  0);
             w.emitOffset      = wj.value("emitOffset",      0);
-            w.exhaustPlumes   = wj.value("exhaustPlumes",   0);
-            w.bounceDamping   = wj.value("bounceDamping",   0.0f);
+            w.exhaustPlumes             = wj.value("exhaustPlumes",             0);
+            w.rocketExplosionPlumeSpeed = wj.value("rocketExplosionPlumeSpeed", w.rocketExplosionPlumeSpeed);
+            w.bounceDamping             = wj.value("bounceDamping",             0.0f);
             w.trailPlumes     = wj.value("trailPlumes",     0);
             w.primaryCount    = wj.value("primaryCount",    0);
             w.secondaryCount  = wj.value("secondaryCount",  0);

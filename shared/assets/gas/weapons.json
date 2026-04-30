@@ -91,6 +91,7 @@
       "soundExplosion": "seekexp1.wav",
       "soundLand": "rocket9.wav",
       "exhaustPlumes": 6,
+      "rocketExplosionPlumeSpeed": 15,
       "snapshotInterval": 6
     },
     {
