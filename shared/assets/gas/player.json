@@ -134,5 +134,10 @@
   "fallingNudgeXvDivisor": 2,
   "hackingSoundIntervalBase": 6,
   "hackingSoundIntervalRandom": 4,
-  "standingShootDecel": 4
+  "standingShootDecel": 4,
+  "aiDisguiseInterval": 50,
+  "aiHackInterval": 3,
+  "aiLadderJumpUpInterval": 12,
+  "aiLadderJumpDownInterval": 5,
+  "aiArrivalThreshold": 8
 }

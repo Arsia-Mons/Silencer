@@ -340,8 +340,9 @@ void Robot::Tick(World & world){
 					{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); pickup->quantity = _gd ? _gd->deathDropFiles : 250; }
 					pickup->x = x;
 					pickup->y = y - 1;
-					pickup->xv = (world.Random() % 9) - 4;
-					{ const EnemyDef* _gd2 = GASLoader::Get().GetEnemyDef("robot"); pickup->yv = -(_gd2 ? _gd2->deathDropYV : 15); }
+					{ const EnemyDef* _gd2 = GASLoader::Get().GetEnemyDef("robot");
+					  pickup->xv = (world.Random() % (2 * (_gd2 ? _gd2->deathDropXVRange : 4) + 1)) - (_gd2 ? _gd2->deathDropXVRange : 4);
+					  pickup->yv = -(_gd2 ? _gd2->deathDropYV : 15); }
 				}
 			}
 			if(state_i % 2 == 0 && state_i >= 5){

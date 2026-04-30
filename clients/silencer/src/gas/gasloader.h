@@ -122,6 +122,11 @@ struct PlayerDef {
     // Movement physics
     int walkAcceleration            = 3;    // px/tick added per tick when walking left/right
     int standingShootDecel          = 4;    // px/tick bled off xv each tick in STANDINGSHOOT state
+    int aiDisguiseInterval          = 50;   // AI: 1-in-N chance per hack-state tick to press disguise
+    int aiHackInterval              = 3;    // AI: 1-in-N chance per tick at terminal to press activate
+    int aiLadderJumpUpInterval      = 12;   // AI: 1-in-N chance per tick to jump while climbing up
+    int aiLadderJumpDownInterval    = 5;    // AI: 1-in-N chance per tick to jump while descending
+    int aiArrivalThreshold          = 8;    // AI: px distance considered close enough to target
     int ladderSpeedReduction        = 4;    // px/tick subtracted from run speed on ladders
     int disguisedDecelSpeed         = 4;    // xv snap when decelerating while disguised
     int disguisedDecelSpeedSecret   = 2;    // xv snap when decelerating while disguised + carrying secret
@@ -370,7 +375,9 @@ struct EnemyDef {
     int rocketLaunchXv        = 25;  // robot: horizontal velocity of fired rocket projectile
     int rocketOffsetX         = 70;  // robot: horizontal distance from center for rocket spawn
     int rocketOffsetY         = 60;  // robot: height above actor for rocket spawn
-    int deathDropYV           = 15;  // robot: upward launch yv of death-drop pickup (stored positive)
+    int deathDropYV           = 15;  // upward launch yv of death-drop pickup (stored positive)
+    int patrolTurnInterval    = 3;   // 1-in-N chance to walk after standing (0 = never)
+    int deathDropXVRange      = 4;   // ±px/tick random horizontal velocity of death-drop pickup
     int meleeHitDuration      = 24;  // robot: ticks the damaging state persists per hit
     int ammoDropQuantity      = 0;   // guard: ammo quantity dropped on death (0 = no drop)
     // Robot look-range AABB (Look() detection box)

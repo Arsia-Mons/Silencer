@@ -104,6 +104,11 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.deployAnimationTicks       = j.value("deployAnimationTicks",       out.deployAnimationTicks);
         out.walkAcceleration           = j.value("walkAcceleration",           out.walkAcceleration);
         out.standingShootDecel         = j.value("standingShootDecel",         out.standingShootDecel);
+        out.aiDisguiseInterval         = j.value("aiDisguiseInterval",         out.aiDisguiseInterval);
+        out.aiHackInterval             = j.value("aiHackInterval",             out.aiHackInterval);
+        out.aiLadderJumpUpInterval     = j.value("aiLadderJumpUpInterval",     out.aiLadderJumpUpInterval);
+        out.aiLadderJumpDownInterval   = j.value("aiLadderJumpDownInterval",   out.aiLadderJumpDownInterval);
+        out.aiArrivalThreshold         = j.value("aiArrivalThreshold",         out.aiArrivalThreshold);
         out.ladderSpeedReduction       = j.value("ladderSpeedReduction",       out.ladderSpeedReduction);
         out.disguisedDecelSpeed        = j.value("disguisedDecelSpeed",        out.disguisedDecelSpeed);
         out.disguisedDecelSpeedSecret  = j.value("disguisedDecelSpeedSecret",  out.disguisedDecelSpeedSecret);
@@ -397,6 +402,8 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.rocketOffsetX         = ej.value("rocketOffsetX",         e.rocketOffsetX);
             e.rocketOffsetY         = ej.value("rocketOffsetY",         e.rocketOffsetY);
             e.deathDropYV           = ej.value("deathDropYV",           e.deathDropYV);
+            e.patrolTurnInterval    = ej.value("patrolTurnInterval",    e.patrolTurnInterval);
+            e.deathDropXVRange      = ej.value("deathDropXVRange",      e.deathDropXVRange);
             e.meleeHitDuration      = ej.value("meleeHitDuration",      e.meleeHitDuration);
             e.ammoDropQuantity      = ej.value("ammoDropQuantity",      e.ammoDropQuantity);
             e.lookDefaultMinX       = ej.value("lookDefaultMinX",       e.lookDefaultMinX);

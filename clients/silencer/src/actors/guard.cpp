@@ -64,7 +64,7 @@ void Guard::InitBT(){
 					_ag ? &_ag->soundAlert4 : &_def.soundAlert4,
 					_ag ? &_ag->soundAlert5 : &_def.soundAlert5
 				};
-				EmitSound(world, world.resources.soundbank[*alerts[rand() % 5]], 128);
+				EmitSound(world, world.resources.soundbank[*alerts[rand() % (int)(sizeof(alerts)/sizeof(alerts[0]))]], 128);
 			  }
 			}
 		} else {
@@ -483,7 +483,7 @@ void Guard::Tick(World & world){
 						_ag ? &_ag->soundAlert4 : &_def.soundAlert4,
 						_ag ? &_ag->soundAlert5 : &_def.soundAlert5
 					};
-					EmitSound(world, world.resources.soundbank[*alerts[rand() % 5]], 128);
+					EmitSound(world, world.resources.soundbank[*alerts[rand() % (int)(sizeof(alerts)/sizeof(alerts[0]))]], 128);
 				  }
 				}
 			}
@@ -512,7 +512,7 @@ void Guard::Tick(World & world){
 			res_index = 0;
 			{ const EnemyDef* _gsd = GASLoader::Get().GetEnemyDef("guard-blaster");
 			  if(state_i >= (_gsd ? _gsd->standingDurationTicks : 48)){
-				if(patrol && world.Random() % 3 == 0){
+				if(patrol && _gsd && _gsd->patrolTurnInterval > 0 && world.Random() % _gsd->patrolTurnInterval == 0){
 					state = WALKING;
 				}else{
 					state = LOOKING;
@@ -930,8 +930,9 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 				}
 				pickup->x = Guard::x;
 				pickup->y = Guard::y - 1;
-				pickup->xv = (world.Random() % 9) - 4;
-				{ const EnemyDef* _gb = GASLoader::Get().GetEnemyDef("guard-blaster"); pickup->yv = -(_gb ? _gb->deathDropYV : 15); }
+				{ const EnemyDef* _gb = GASLoader::Get().GetEnemyDef("guard-blaster");
+				  pickup->xv = (world.Random() % (2 * (_gb ? _gb->deathDropXVRange : 4) + 1)) - (_gb ? _gb->deathDropXVRange : 4);
+				  pickup->yv = -(_gb ? _gb->deathDropYV : 15); }
 			}
 		}
 		Object * owner = world.GetObjectFromId(projectile.ownerid);
