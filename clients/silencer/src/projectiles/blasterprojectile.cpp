@@ -15,7 +15,7 @@ BlasterProjectile::BlasterProjectile() : Object(ObjectTypes::BLASTERPROJECTILE){
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;
-	snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 }
 
 void BlasterProjectile::Serialize(bool write, Serializer & data, Serializer * old){

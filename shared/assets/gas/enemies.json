@@ -22,7 +22,20 @@
       "ladderClimbSpeed": 5,
       "soundHurt1": "groan2.wav",
       "soundHurt2": "groan2a.wav",
-      "soundHurt3": "grunt2a.wav"
+      "soundHurt3": "grunt2a.wav",
+      "snapshotInterval": 48,
+      "warpTeleportTick": 12,
+      "lookBoxes": [
+        {"dir": 0,  "x1": 70,   "x2": 200, "y1": -55,  "y2": -55},
+        {"dir": 1,  "x1": 70,   "x2": 200, "y1": -37,  "y2": -37},
+        {"dir": 2,  "x1": 2,    "x2": 2,   "y1": -150, "y2": -300},
+        {"dir": 3,  "x1": 12,   "x2": 12,  "y1": 50,   "y2": 200},
+        {"dir": 4,  "x1": 20,   "x2": 220, "y1": -82,  "y2": -282},
+        {"dir": 5,  "x1": 28,   "x2": 228, "y1": -30,  "y2": 170},
+        {"dir": 6,  "x1": 4,    "x2": 4,   "y1": -150, "y2": -300},
+        {"dir": 7,  "x1": 11,   "x2": 11,  "y1": 50,   "y2": 200},
+        {"dir": 10, "x1": -100, "x2": 0,   "y1": -55,  "y2": -55}
+      ]
     },
     {
       "id": "guard-laser",
@@ -46,7 +59,20 @@
       "ammoDropQuantity": 5,
       "soundHurt1": "groan2.wav",
       "soundHurt2": "groan2a.wav",
-      "soundHurt3": "grunt2a.wav"
+      "soundHurt3": "grunt2a.wav",
+      "snapshotInterval": 48,
+      "warpTeleportTick": 12,
+      "lookBoxes": [
+        {"dir": 0,  "x1": 70,   "x2": 200, "y1": -55,  "y2": -55},
+        {"dir": 1,  "x1": 70,   "x2": 200, "y1": -37,  "y2": -37},
+        {"dir": 2,  "x1": 2,    "x2": 2,   "y1": -150, "y2": -300},
+        {"dir": 3,  "x1": 12,   "x2": 12,  "y1": 50,   "y2": 200},
+        {"dir": 4,  "x1": 20,   "x2": 220, "y1": -82,  "y2": -282},
+        {"dir": 5,  "x1": 28,   "x2": 228, "y1": -30,  "y2": 170},
+        {"dir": 6,  "x1": 4,    "x2": 4,   "y1": -150, "y2": -300},
+        {"dir": 7,  "x1": 11,   "x2": 11,  "y1": 50,   "y2": 200},
+        {"dir": 10, "x1": -100, "x2": 0,   "y1": -55,  "y2": -55}
+      ]
     },
     {
       "id": "guard-rocket",
@@ -70,7 +96,20 @@
       "ammoDropQuantity": 3,
       "soundHurt1": "groan2.wav",
       "soundHurt2": "groan2a.wav",
-      "soundHurt3": "grunt2a.wav"
+      "soundHurt3": "grunt2a.wav",
+      "snapshotInterval": 48,
+      "warpTeleportTick": 12,
+      "lookBoxes": [
+        {"dir": 0,  "x1": 70,   "x2": 200, "y1": -55,  "y2": -55},
+        {"dir": 1,  "x1": 70,   "x2": 200, "y1": -37,  "y2": -37},
+        {"dir": 2,  "x1": 2,    "x2": 2,   "y1": -150, "y2": -300},
+        {"dir": 3,  "x1": 12,   "x2": 12,  "y1": 50,   "y2": 200},
+        {"dir": 4,  "x1": 20,   "x2": 220, "y1": -82,  "y2": -282},
+        {"dir": 5,  "x1": 28,   "x2": 228, "y1": -30,  "y2": 170},
+        {"dir": 6,  "x1": 4,    "x2": 4,   "y1": -150, "y2": -300},
+        {"dir": 7,  "x1": 11,   "x2": 11,  "y1": 50,   "y2": 200},
+        {"dir": 10, "x1": -100, "x2": 0,   "y1": -55,  "y2": -55}
+      ]
     },
     {
       "id": "robot",
@@ -101,7 +140,8 @@
       "soundMelee": "robotarm.wav",
       "soundMoveRight": "robot3r.wav",
       "soundMoveLeft": "robot3l.wav",
-      "soundDeath": "seekexp1.wav"
+      "soundDeath": "seekexp1.wav",
+      "snapshotInterval": 48
     },
     {
       "id": "civilian",
@@ -118,6 +158,10 @@
       "soundHurt2": "groan2a.wav",
       "soundHurt3": "grunt2a.wav",
       "soundDeath": "seekexp1.wav",
+      "snapshotInterval": 72,
+      "warpTeleportTick": 12,
+      "runDurationTicks": 150,
+      "deadRespawnTicks": 100,
       "_note": "Civilian health is not set in constructor — Object base default applies."
     }
   ]

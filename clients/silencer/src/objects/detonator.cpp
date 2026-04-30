@@ -36,7 +36,7 @@ void Detonator::Tick(World & world){
 		{ const WeaponDef* dw = GASLoader::Get().GetWeaponDef("plasmadetonator");
 		  const std::string& arm = (dw && !dw->soundFire.empty()) ? dw->soundFire : std::string("shield2.wav");
 		  EmitSound(world, world.resources.soundbank[arm], 96); }
-		state_warp = 12;
+		state_warp = GASLoader::Get().player.warpTeleportTick;
 	}
 	res_index = (state_i / 4) % 4;
 	if(state_i == 4 * 4){

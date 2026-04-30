@@ -22,7 +22,8 @@
       "soundFire": "!laserme.wav",
       "soundHit1": "rico1.wav",
       "soundHit2": "rico2.wav",
-      "projectileLife": 6
+      "projectileLife": 6,
+      "snapshotInterval": 6
     },
     {
       "id": "laser",
@@ -47,7 +48,8 @@
       "soundHit1": "strike03.wav",
       "soundHit2": "strike04.wav",
       "projectileLife": 10,
-      "emitOffset": 24
+      "emitOffset": 24,
+      "snapshotInterval": 6
     },
     {
       "id": "flamer",
@@ -60,7 +62,8 @@
       "radius": 10,
       "soundLoop": "flamebg2.wav",
       "emitOffset": -7,
-      "trailPlumes": 7
+      "trailPlumes": 7,
+      "snapshotInterval": 6
     },
     {
       "id": "rocket",
@@ -87,7 +90,8 @@
       "soundLoop": "rocket4.wav",
       "soundExplosion": "seekexp1.wav",
       "soundLand": "rocket9.wav",
-      "exhaustPlumes": 6
+      "exhaustPlumes": 6,
+      "snapshotInterval": 6
     },
     {
       "id": "plasma",
@@ -102,7 +106,8 @@
       "plasmaGravity": 2,
       "plasmaLifeNormal": 20,
       "plasmaLifeLarge": 7,
-      "bounceDamping": 0.8
+      "bounceDamping": 0.8,
+      "snapshotInterval": 6
     },
     {
       "id": "flare",
@@ -111,7 +116,8 @@
       "shieldDamage": 1,
       "velocity": 5,
       "moveAmount": 1,
-      "trailPlumes": 4
+      "trailPlumes": 4,
+      "snapshotInterval": 6
     },
     {
       "id": "wall",
@@ -124,7 +130,8 @@
       "soundFire": "!laserel.wav",
       "soundHit1": "strike03.wav",
       "soundHit2": "strike04.wav",
-      "projectileLife": 20
+      "projectileLife": 20,
+      "snapshotInterval": 6
     },
     {
       "id": "grenade",
@@ -153,7 +160,8 @@
       "soundThrow": "grenthro.wav",
       "soundLand": "land1.wav",
       "radius": 5,
-      "bounceDamping": 0.8
+      "bounceDamping": 0.8,
+      "snapshotInterval": 6
     },
     {
       "id": "plasmadetonator",

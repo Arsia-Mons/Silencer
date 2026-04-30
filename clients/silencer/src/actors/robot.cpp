@@ -21,7 +21,8 @@ Robot::Robot() : Object(ObjectTypes::ROBOT){
 	ishittable = true;
 	isbipedal = true;
 	isphysical = true;
-	snapshotinterval = 48;
+	{ const EnemyDef* _rd = GASLoader::Get().GetEnemyDef("robot");
+	  snapshotinterval = _rd ? _rd->snapshotInterval : 48; }
 	respawnseconds = r ? r->respawnSeconds : 45;
 	virusplanter = 0;
 	damaging = 0;

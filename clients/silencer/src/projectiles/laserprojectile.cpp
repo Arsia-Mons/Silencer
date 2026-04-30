@@ -17,7 +17,7 @@ LaserProjectile::LaserProjectile() : Object(ObjectTypes::LASERPROJECTILE){
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;
-	snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 }
 
 void LaserProjectile::Serialize(bool write, Serializer & data, Serializer * old){

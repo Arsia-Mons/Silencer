@@ -76,5 +76,7 @@
   "soundTeamHack": "typerev6.wav",
   "soundRoundCountdown": "grndown.wav",
   "worldGravity": 3,
-  "worldMaxYVelocity": 45
+  "worldMaxYVelocity": 45,
+  "playerHeight": 50,
+  "snapshotInterval": 24
 }

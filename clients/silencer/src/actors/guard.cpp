@@ -35,7 +35,8 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	ishittable = true;
 	isbipedal = true;
 	isphysical = true;
-	snapshotinterval = 48;
+	{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("guard-blaster");
+	  snapshotinterval = _gd ? _gd->snapshotInterval : 48; }
 	respawnseconds   = g ? g->respawnSeconds : 30;
 	patrol = false;
 	lastspoke = 0;
@@ -811,7 +812,8 @@ void Guard::Tick(World & world){
 				mirrored = originalmirrored;
 				state = NEW;
 				state_i = -1;
-				state_warp = 12;
+				{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+				  state_warp = _gd ? _gd->warpTeleportTick : GASLoader::Get().player.warpTeleportTick; }
 				health = maxhealth;
 				shield = maxshield;
 				break;
@@ -952,61 +954,30 @@ Object * Guard::Look(World & world, Uint8 direction){
 	Sint16 y2 = 0;
 	Sint16 x1 = 0;
 	Sint16 x2 = 0;
-	switch(direction){
-		case 0:
-			y1 = -55;
-			y2 = y1;
-			x1 = 70;
-			x2 = 200;
-		break;
-		case 1:
-			y1 = -37;
-			y2 = y1;
-			x1 = 70;
-			x2 = 200;
-		break;
-		case 2:
-			x1 = 2;
-			x2 = 2;
-			y1 = -150;
-			y2 = -300;
-		break;
-		case 3:
-			x1 = 12;
-			x2 = 12;
-			y1 = 50;
-			y2 = 200;
-		break;
-		case 4:
-			x1 = 20;
-			y1 = -82;
-			x2 = x1 + 200;
-			y2 = y1 - 200;
-		break;
-		case 5:
-			x1 = 28;
-			y1 = -30;
-			x2 = x1 + 200;
-			y2 = y1 + 200;
-		break;
-		case 6:
-			x1 = 4;
-			x2 = 4;
-			y1 = -150;
-			y2 = -300;
-			break;
-		case 7:
-			x1 = 11;
-			x2 = 11;
-			y1 = 50;
-			y2 = 200;
-			break;
-		case 10:
-			y1 = -55;
-			y2 = y1;
-			x1 = -100;
-			x2 = 0;
-		break;
+	const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+	bool usedGAS = false;
+	if (gd && !gd->lookBoxes.empty()) {
+		auto it = gd->lookBoxes.find(direction);
+		if (it != gd->lookBoxes.end()) {
+			x1 = it->second.x1;
+			x2 = it->second.x2;
+			y1 = it->second.y1;
+			y2 = it->second.y2;
+			usedGAS = true;
+		}
+	}
+	if (!usedGAS) {
+		switch(direction){
+			case 0: y1=-55; y2=y1; x1=70; x2=200; break;
+			case 1: y1=-37; y2=y1; x1=70; x2=200; break;
+			case 2: x1=2; x2=2; y1=-150; y2=-300; break;
+			case 3: x1=12; x2=12; y1=50; y2=200; break;
+			case 4: x1=20; y1=-82; x2=x1+200; y2=y1-200; break;
+			case 5: x1=28; y1=-30; x2=x1+200; y2=y1+200; break;
+			case 6: x1=4; x2=4; y1=-150; y2=-300; break;
+			case 7: x1=11; x2=11; y1=50; y2=200; break;
+			case 10: y1=-55; y2=y1; x1=-100; x2=0; break;
+		}
 	}
 	x1 *= (mirrored ? -1 : 1);
 	x2 *= (mirrored ? -1 : 1);

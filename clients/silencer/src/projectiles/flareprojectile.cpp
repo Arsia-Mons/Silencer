@@ -24,7 +24,7 @@ FlareProjectile::FlareProjectile() : Object(ObjectTypes::FLAREPROJECTILE){
 	isprojectile = true;
 	isphysical = true;
 	poisonous = false;
-	//snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 }
 
 void FlareProjectile::Serialize(bool write, Serializer & data, Serializer * old){

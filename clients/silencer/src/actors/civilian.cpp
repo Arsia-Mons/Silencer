@@ -19,7 +19,8 @@ Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	ishittable = true;
 	isbipedal = true;
 	isphysical = true;
-	snapshotinterval = 72;
+	{ const EnemyDef* _cd = GASLoader::Get().GetEnemyDef("civilian");
+	  snapshotinterval = _cd ? _cd->snapshotInterval : 72; }
 	tractteamid = 0;
 	bt_ = nullptr;
 }
@@ -120,10 +121,13 @@ void Civilian::Tick(World & world){
 			if(CheckTractVictim(world)){
 				break;
 			}
-			if(state_i >= 150){
+			{ const EnemyDef* _cd = GASLoader::Get().GetEnemyDef("civilian");
+			  int _rdt = _cd ? _cd->runDurationTicks : 150;
+			  if(state_i >= _rdt){
 				state = WALKING;
 				state_i = -1;
 				break;
+			  }
 			}
 			{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("civilian"); int _bonus = _gd ? _gd->runSpeedBonus : 5; xv = (mirrored ? -1 : 1) * (_bonus + speed); }
 			res_bank = 123;
@@ -208,13 +212,16 @@ void Civilian::Tick(World & world){
 		}break;
 		case DEAD:{
 			collidable = false;
-			if(state_i >= 100){
+			{ const EnemyDef* _cd = GASLoader::Get().GetEnemyDef("civilian");
+			  int _drt = _cd ? _cd->deadRespawnTicks : 100;
+			  if(state_i >= _drt){
 				draw = true;
 				collidable = true;
 				state = WALKING;
-				state_warp = 12;
+				state_warp = _cd ? _cd->warpTeleportTick : GASLoader::Get().player.warpTeleportTick;
 				state_i = -1;
 				break;
+			  }
 			}
 		}break;
 	}

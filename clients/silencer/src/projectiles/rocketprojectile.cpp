@@ -19,7 +19,7 @@ RocketProjectile::RocketProjectile() : Object(ObjectTypes::ROCKETPROJECTILE){
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;
-	snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 	soundchannel = 0;
 }
 

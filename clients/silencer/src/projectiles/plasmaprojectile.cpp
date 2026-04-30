@@ -20,7 +20,7 @@ PlasmaProjectile::PlasmaProjectile() : Object(ObjectTypes::PLASMAPROJECTILE){
 	stopatobjectcollision = false;
 	isprojectile = true;
 	isphysical = true;
-	snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 }
 
 void PlasmaProjectile::Serialize(bool write, Serializer & data, Serializer * old){

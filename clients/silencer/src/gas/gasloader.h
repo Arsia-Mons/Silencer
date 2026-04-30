@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <map>
 #include <cstdint>
 
 // ---------------------------------------------------------------------------
@@ -138,6 +139,9 @@ struct PlayerDef {
     // ---- World physics --------------------------------------------------------
     int worldGravity      = 3;   // gravitational acceleration (px/tick²)
     int worldMaxYVelocity = 45;  // terminal falling velocity cap (px/tick)
+    // ---- Network / collision --------------------------------------------------
+    int playerHeight      = 50;  // collision box height (px)
+    int snapshotInterval  = 24;  // network snapshot frequency (every N ticks)
 };
 
 // ---- Weapon ----------------------------------------------------------------
@@ -209,6 +213,8 @@ struct WeaponDef {
     // ---- Poison ------------------------------------------------------------
     int   poisonRate      = 0;    // poison amount applied per hit (0 = use compiled default 1)
     int   poisonMax       = 0;    // max poison stack (0 = use compiled default 3)
+    // ---- Network -----------------------------------------------------------
+    int snapshotInterval  = 0;   // projectile network snapshot freq; 0 = use compiled default (6)
 };
 
 // ---- Item ------------------------------------------------------------------
@@ -237,6 +243,10 @@ struct ItemDef {
 };
 
 // ---- Enemy -----------------------------------------------------------------
+
+struct GuardLookBox {
+    int x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+};
 
 struct EnemyDef {
     std::string id;
@@ -297,6 +307,12 @@ struct EnemyDef {
     std::string soundHurt1      = "";   // pain sound variant 1
     std::string soundHurt2      = "";   // pain sound variant 2
     std::string soundHurt3      = "";   // pain sound variant 3
+    // ---- Network / state timers ------------------------------------------------
+    int snapshotInterval  = 48;   // network snapshot frequency (0 = object default)
+    int warpTeleportTick  = 12;   // state_warp value at which warp completes
+    int runDurationTicks  = 150;  // civilian: ticks in RUNNING state before reverting
+    int deadRespawnTicks  = 100;  // civilian: ticks in DEAD state before respawning
+    std::map<int, GuardLookBox> lookBoxes; // guard: vision AABB per direction index
 };
 
 // ---- Ability ---------------------------------------------------------------
@@ -349,6 +365,7 @@ struct TerminalDef {
     int beaconTimeSecs    = 65;   // team objective: seconds for beacon countdown when this terminal is selected
     std::string soundAmbient;     // terminal: ambient hum loop ("ambloop4.wav")
     std::string soundHack;        // terminal: hacking key sound ("typerev6.wav")
+    int snapshotInterval = 24;    // network snapshot frequency
 };
 
 // ---------------------------------------------------------------------------

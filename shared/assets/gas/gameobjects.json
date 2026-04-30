@@ -51,14 +51,16 @@
       "traceTimeBase": 90, "traceTimeMedium": 120, "traceTimeExtended": 150,
       "beaconTimeSecs": 65,
       "soundAmbient": "ambloop4.wav",
-      "soundHack": "typerev6.wav"
+      "soundHack": "typerev6.wav",
+      "snapshotInterval": 24
     },
     {
       "id": "small",
       "juice": 80, "files": 100, "secretInfo": 15,
       "traceTimeBase": 90, "traceTimeMedium": 120, "traceTimeExtended": 150,
       "soundAmbient": "ambloop4.wav",
-      "soundHack": "typerev6.wav"
+      "soundHack": "typerev6.wav",
+      "snapshotInterval": 24
     }
   ]
 }

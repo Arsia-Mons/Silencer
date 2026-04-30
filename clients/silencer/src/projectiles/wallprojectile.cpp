@@ -17,7 +17,7 @@ WallProjectile::WallProjectile() : Object(ObjectTypes::WALLPROJECTILE){
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;
-	snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 }
 
 void WallProjectile::Serialize(bool write, Serializer & data, Serializer * old){

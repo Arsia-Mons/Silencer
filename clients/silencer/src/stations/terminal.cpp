@@ -20,7 +20,8 @@ Terminal::Terminal() : Object(ObjectTypes::TERMINAL){
 	//SetSize(0);
 	isbig = false;
 	sizeset = false;
-	snapshotinterval = 24;
+	{ const TerminalDef* _td = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
+	  snapshotinterval = _td ? _td->snapshotInterval : 24; }
 	tracetime = 0;
 	soundchannel = -1;
 	secretreadynotified = false;

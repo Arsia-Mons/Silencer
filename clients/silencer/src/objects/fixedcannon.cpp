@@ -41,7 +41,7 @@ void FixedCannon::Tick(World & world){
 	WarpTick();
 	switch(state){
 		case NEW:{
-			state_warp = 12;
+			state_warp = GASLoader::Get().player.warpTeleportTick;
 			{	const GameObjectDef* d = GASLoader::Get().GetGameObjectDef("fixedCannon");
 				const std::string& sfx = (d && !d->soundDeploy.empty()) ? d->soundDeploy : "shield2.wav";
 				EmitSound(world, world.resources.soundbank[sfx], 96); }

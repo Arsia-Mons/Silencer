@@ -26,7 +26,7 @@ FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 	stopatobjectcollision = false;
 	isprojectile = true;
 	isphysical = true;
-	snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 	hitonce = false;
 }
 

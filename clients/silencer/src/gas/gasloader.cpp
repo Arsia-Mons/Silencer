@@ -113,6 +113,8 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.soundAmmo4                 = j.value("soundAmmo4",                 out.soundAmmo4);
         out.worldGravity               = j.value("worldGravity",               out.worldGravity);
         out.worldMaxYVelocity          = j.value("worldMaxYVelocity",          out.worldMaxYVelocity);
+        out.playerHeight               = j.value("playerHeight",               out.playerHeight);
+        out.snapshotInterval           = j.value("snapshotInterval",           out.snapshotInterval);
         out.soundUIClick        = j.value("soundUIClick",        out.soundUIClick);
         out.soundTeamJoin       = j.value("soundTeamJoin",       out.soundTeamJoin);
         out.soundTeamHQ         = j.value("soundTeamHQ",         out.soundTeamHQ);
@@ -219,6 +221,7 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.secondaryCount  = wj.value("secondaryCount",  0);
             w.poisonRate      = wj.value("poisonRate",      0);
             w.poisonMax       = wj.value("poisonMax",       0);
+            w.snapshotInterval = wj.value("snapshotInterval", 0);
             if (wj.contains("spriteBanks") && wj["spriteBanks"].is_array()) {
                 for (const auto& b : wj["spriteBanks"]) {
                     w.spriteBanks.push_back(b.get<int>());
@@ -322,6 +325,22 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.soundHurt1     = ej.value("soundHurt1",     std::string{});
             e.soundHurt2     = ej.value("soundHurt2",     std::string{});
             e.soundHurt3     = ej.value("soundHurt3",     std::string{});
+            e.snapshotInterval = ej.value("snapshotInterval", e.snapshotInterval);
+            e.warpTeleportTick = ej.value("warpTeleportTick", e.warpTeleportTick);
+            e.runDurationTicks = ej.value("runDurationTicks",  e.runDurationTicks);
+            e.deadRespawnTicks = ej.value("deadRespawnTicks",  e.deadRespawnTicks);
+            if (ej.contains("lookBoxes") && ej["lookBoxes"].is_array()) {
+                for (const auto& lb : ej["lookBoxes"]) {
+                    int dir = lb.value("dir", -1);
+                    if (dir < 0) continue;
+                    GuardLookBox box;
+                    box.x1 = lb.value("x1", 0);
+                    box.x2 = lb.value("x2", 0);
+                    box.y1 = lb.value("y1", 0);
+                    box.y2 = lb.value("y2", 0);
+                    e.lookBoxes[dir] = box;
+                }
+            }
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {
@@ -407,6 +426,7 @@ static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out)
             t.beaconTimeSecs     = tj.value("beaconTimeSecs",     t.beaconTimeSecs);
             t.soundAmbient       = tj.value("soundAmbient",       std::string{});
             t.soundHack          = tj.value("soundHack",          std::string{});
+            t.snapshotInterval   = tj.value("snapshotInterval",   t.snapshotInterval);
             out.push_back(std::move(t));
         }
     } catch (const std::exception& e) {

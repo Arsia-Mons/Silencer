@@ -20,7 +20,7 @@ Grenade::Grenade() : Object(ObjectTypes::GRENADE){
 	color = 0;
 	radius = w ? w->radius : 5;
 	isphysical = true;
-	snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 }
 
 void Grenade::Serialize(bool write, Serializer & data, Serializer * old){

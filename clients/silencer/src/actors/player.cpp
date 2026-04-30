@@ -64,7 +64,7 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	x = 0;
 	y = 0;
 	currentplatformid = 0;
-	height = 50;
+	height = GASLoader::Get().player.playerHeight;
 	maxhealth = GASLoader::Get().player.baseHealth;
 	health = maxhealth;
 	maxshield = GASLoader::Get().player.baseShield;
@@ -130,7 +130,7 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	iscontrollable = true;
 	disguised = false;
 	hasdepositor = false;
-	snapshotinterval = 24;
+	snapshotinterval = GASLoader::Get().player.snapshotInterval;
 	jumpimpulse = 0;
 	hackingbonus = 0;
 	creditsbonus = 0;
