@@ -132,6 +132,11 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.shrapnelSpeed              = j.value("shrapnelSpeed",              out.shrapnelSpeed);
         out.flamerSoundInterval        = j.value("flamerSoundInterval",        out.flamerSoundInterval);
         out.shieldEffectTicks          = j.value("shieldEffectTicks",          out.shieldEffectTicks);
+        out.hitSoundCooldownTicks      = j.value("hitSoundCooldownTicks",      out.hitSoundCooldownTicks);
+        out.fallingNudgeMax            = j.value("fallingNudgeMax",            out.fallingNudgeMax);
+        out.fallingNudgeXvDivisor      = j.value("fallingNudgeXvDivisor",      out.fallingNudgeXvDivisor);
+        out.hackingSoundIntervalBase   = j.value("hackingSoundIntervalBase",   out.hackingSoundIntervalBase);
+        out.hackingSoundIntervalRandom = j.value("hackingSoundIntervalRandom", out.hackingSoundIntervalRandom);
         out.soundUIClick        = j.value("soundUIClick",        out.soundUIClick);
         out.soundTeamJoin       = j.value("soundTeamJoin",       out.soundTeamJoin);
         out.soundTeamHQ         = j.value("soundTeamHQ",         out.soundTeamHQ);

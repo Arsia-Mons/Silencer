@@ -2201,7 +2201,7 @@ void Player::Tick(World & world){
 							}
 							oldfiles += 6;
 						}*/
-						if(hackingbonustime > world.tickcount && world.tickcount % ((rand() % 4) + 6) == 0){
+						if(hackingbonustime > world.tickcount && world.tickcount % ((rand() % GASLoader::Get().player.hackingSoundIntervalRandom) + GASLoader::Get().player.hackingSoundIntervalBase) == 0){
 							{ const PlayerDef& _pd = GASLoader::Get().player;
 							  const std::string* typesounds[] = {&_pd.soundType1, &_pd.soundType2, &_pd.soundType3, &_pd.soundType4, &_pd.soundType5};
 							  EmitSound(world, world.resources.soundbank[*typesounds[rand() % 5]], 64); }
@@ -2733,7 +2733,7 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	//printf("hit at %d, %d\n", x, y);
 	Hittable::HandleHit(*this, world, x, y, projectile);
 	UnDisguise(world);
-	if(world.tickcount - hitsoundplaytick > 10){
+	if(world.tickcount - hitsoundplaytick > (unsigned)GASLoader::Get().player.hitSoundCooldownTicks){
 		if(rand() % 2 == 0){
 			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundHurtA]);
 		}else{
@@ -3957,18 +3957,20 @@ bool Player::ProcessFallingState(World & world){
 	if(input.keymoveleft){
 		mirrored = true;
 		fallingnudge--;
-		if(fallingnudge < -8){
-			fallingnudge = -8;
+		const int nudgeMax = GASLoader::Get().player.fallingNudgeMax;
+		if(fallingnudge < -nudgeMax){
+			fallingnudge = -nudgeMax;
 		}
 	}
 	if(input.keymoveright){
 		mirrored = false;
 		fallingnudge++;
-		if(fallingnudge > 8){
-			fallingnudge = 8;
+		const int nudgeMax = GASLoader::Get().player.fallingNudgeMax;
+		if(fallingnudge > nudgeMax){
+			fallingnudge = nudgeMax;
 		}
 	}
-	xv += fallingnudge / 2;
+	xv += fallingnudge / GASLoader::Get().player.fallingNudgeXvDivisor;
 	int xv2 = xv;
 	int yv2 = yv;
 	Platform * platform = world.map.TestIncr(x, y - height, x, y, &xv2, &yv2, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN);

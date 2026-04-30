@@ -193,6 +193,11 @@ struct PlayerDef {
     float shrapnelSpeed           = 4.0f;// shrapnel velocity (px/tick)
     int   flamerSoundInterval     = 4;   // play flamer impact sound every N ticks
     int   shieldEffectTicks       = 48;  // duration of shield-hit flash effect (ticks)
+    int   hitSoundCooldownTicks   = 10;  // min ticks between player hit sounds
+    int   fallingNudgeMax         = 8;   // max falling nudge magnitude (clamped ±)
+    int   fallingNudgeXvDivisor   = 2;   // divides nudge before adding to xv
+    int   hackingSoundIntervalBase  = 6; // base interval (ticks) for hacking bonus sound
+    int   hackingSoundIntervalRandom = 4;// random range added to base (0..N-1)
 };
 
 // ---- Weapon ----------------------------------------------------------------

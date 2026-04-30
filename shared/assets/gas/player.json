@@ -124,5 +124,10 @@
   "cannonBuildCheckY": 50,
   "audioFadeHackMs": 700,
   "audioFadeJetpackMs": 200,
-  "audioFadeFlamerMs": 200
+  "audioFadeFlamerMs": 200,
+  "hitSoundCooldownTicks": 10,
+  "fallingNudgeMax": 8,
+  "fallingNudgeXvDivisor": 2,
+  "hackingSoundIntervalBase": 6,
+  "hackingSoundIntervalRandom": 4
 }
