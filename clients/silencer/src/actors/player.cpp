@@ -1015,7 +1015,8 @@ void Player::Tick(World & world){
 					if(OnGround()){
 						std::vector<Uint8> types;
 						types.push_back(ObjectTypes::FIXEDCANNON);
-						std::vector<Object *> objects = world.TestAABB(x - 40, y - 50, x + 40, y, types);
+						{ const PlayerDef& _cbpd = GASLoader::Get().player;
+						  std::vector<Object *> objects = world.TestAABB(x - _cbpd.cannonBuildCheckX, y - _cbpd.cannonBuildCheckY, x + _cbpd.cannonBuildCheckX, y, types);
 						if(objects.size() == 0){
 							FixedCannon * fixedcannon = (FixedCannon *)world.CreateObject(ObjectTypes::FIXEDCANNON);
 							if(fixedcannon){
@@ -1032,6 +1033,7 @@ void Player::Tick(World & world){
 						}else{
 							world.ShowStatus("Can't build a cannon here", 208, true, GetPeer(world));
 						}
+						} // _cbpd scope
 					}
 				}break;
 				case INV_FLARE:{
@@ -1830,7 +1832,7 @@ void Player::Tick(World & world){
 			}
 		}break;
 		case ROLLING:{
-			xv = mirrored ? -12 : 12;
+			xv = GASLoader::Get().player.rollSpeed * (mirrored ? -1 : 1);
 			if(!ApplyActorSeq(world, "player", "ROLLING", state_i, res_bank, res_index)){
 				res_bank  = 88;
 				res_index = state_i;

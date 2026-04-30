@@ -314,13 +314,17 @@ void Robot::Tick(World & world){
 				if(rocketprojectile){
 					rocketprojectile->FromSecurity();
 					rocketprojectile->ownerid = id;
-					rocketprojectile->y = y - 60;
-					if(mirrored){
-						rocketprojectile->x = x - 70;
-						{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("robot"); rocketprojectile->xv = -(_grd ? _grd->rocketLaunchXv : 25); }
-					}else{
-						rocketprojectile->x = x + 70;
-						{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("robot"); rocketprojectile->xv = (_grd ? _grd->rocketLaunchXv : 25); }
+					{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("robot");
+					  const int _rox = _grd ? _grd->rocketOffsetX : 70;
+					  const int _roy = _grd ? _grd->rocketOffsetY : 60;
+					  rocketprojectile->y = y - _roy;
+					  if(mirrored){
+						rocketprojectile->x = x - _rox;
+						rocketprojectile->xv = -(_grd ? _grd->rocketLaunchXv : 25);
+					  }else{
+						rocketprojectile->x = x + _rox;
+						rocketprojectile->xv = (_grd ? _grd->rocketLaunchXv : 25);
+					  }
 					}
 				}
 				shootcooldown = 1;
@@ -335,7 +339,7 @@ void Robot::Tick(World & world){
 					pickup->x = x;
 					pickup->y = y - 1;
 					pickup->xv = (world.Random() % 9) - 4;
-					pickup->yv = -15;
+					{ const EnemyDef* _gd2 = GASLoader::Get().GetEnemyDef("robot"); pickup->yv = -(_gd2 ? _gd2->deathDropYV : 15); }
 				}
 			}
 			if(state_i % 2 == 0 && state_i >= 5){
@@ -414,9 +418,8 @@ void Robot::Tick(World & world){
 
 	if(damaging){
 		damaging++;
-		if(damaging > 24){
-			damaging = 0;
-		}
+		{ const EnemyDef* _rd = GASLoader::Get().GetEnemyDef("robot");
+		  if(damaging > (_rd ? _rd->meleeHitDuration : 24)){ damaging = 0; } }
 	}
 	state_i++;
 }

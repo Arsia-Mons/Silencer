@@ -56,6 +56,7 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.runSpeedDisguised          = j.value("runSpeedDisguised",          out.runSpeedDisguised);
         out.runSpeedSecret             = j.value("runSpeedSecret",             out.runSpeedSecret);
         out.runSpeedSecretDisguised    = j.value("runSpeedSecretDisguised",    out.runSpeedSecretDisguised);
+        out.rollSpeed                  = j.value("rollSpeed",                  out.rollSpeed);
         out.jetpackXvMax               = j.value("jetpackXvMax",               out.jetpackXvMax);
         out.jetpackXvMaxDisguised      = j.value("jetpackXvMaxDisguised",      out.jetpackXvMaxDisguised);
         out.jetpackYvMax               = j.value("jetpackYvMax",               out.jetpackYvMax);
@@ -71,6 +72,8 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.hackingCompleteThreshold   = j.value("hackingCompleteThreshold",   out.hackingCompleteThreshold);
         out.hackingExitThreshold       = j.value("hackingExitThreshold",       out.hackingExitThreshold);
         out.deployWaitTicks            = j.value("deployWaitTicks",            out.deployWaitTicks);
+        out.cannonBuildCheckX          = j.value("cannonBuildCheckX",          out.cannonBuildCheckX);
+        out.cannonBuildCheckY          = j.value("cannonBuildCheckY",          out.cannonBuildCheckY);
         out.startingCredits            = j.value("startingCredits",            out.startingCredits);
         out.creditFloor                = j.value("creditFloor",                out.creditFloor);
         out.creditCap                  = j.value("creditCap",                  out.creditCap);
@@ -360,6 +363,10 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.deathDropFiles        = ej.value("deathDropFiles",        e.deathDropFiles);
             e.ladderClimbSpeed      = ej.value("ladderClimbSpeed",      e.ladderClimbSpeed);
             e.rocketLaunchXv        = ej.value("rocketLaunchXv",        e.rocketLaunchXv);
+            e.rocketOffsetX         = ej.value("rocketOffsetX",         e.rocketOffsetX);
+            e.rocketOffsetY         = ej.value("rocketOffsetY",         e.rocketOffsetY);
+            e.deathDropYV           = ej.value("deathDropYV",           e.deathDropYV);
+            e.meleeHitDuration      = ej.value("meleeHitDuration",      e.meleeHitDuration);
             e.ammoDropQuantity      = ej.value("ammoDropQuantity",      e.ammoDropQuantity);
             e.lookDefaultMinX       = ej.value("lookDefaultMinX",       e.lookDefaultMinX);
             e.lookDefaultMaxX       = ej.value("lookDefaultMaxX",       e.lookDefaultMaxX);

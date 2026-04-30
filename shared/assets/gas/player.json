@@ -113,5 +113,8 @@
   "shrapnelSpeed": 4.0,
   "flamerSoundInterval": 4,
   "shieldEffectTicks": 48,
-  "disguiseDeactivationTicks": 12
+  "disguiseDeactivationTicks": 12,
+  "rollSpeed": 12,
+  "cannonBuildCheckX": 40,
+  "cannonBuildCheckY": 50
 }

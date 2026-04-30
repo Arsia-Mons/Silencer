@@ -68,6 +68,7 @@ struct PlayerDef {
     int runSpeedDisguised           = 11;   // while disguised
     int runSpeedSecret              = 11;   // carrying secret
     int runSpeedSecretDisguised     = 8;    // carrying secret + disguised
+    int rollSpeed                   = 12;   // horizontal speed while rolling
     int jetpackXvMax                = 14;   // jetpack horizontal max
     int jetpackXvMaxDisguised       = 12;   // jetpack horizontal max while disguised (unused currently)
     int jetpackYvMax                = 9;    // jetpack upward velocity cap (stored positive, applied negative)
@@ -85,6 +86,8 @@ struct PlayerDef {
     int hackingCompleteThreshold    = 15;   // state_i value when hack completes
     int hackingExitThreshold        = 17;   // state_i value when player regains movement
     int deployWaitTicks             = 60;   // ticks before deployed item becomes active
+    int cannonBuildCheckX           = 40;   // half-width of cannon placement exclusion AABB
+    int cannonBuildCheckY           = 50;   // height of cannon placement exclusion AABB
     int startingCredits             = 500;  // credits on spawn
     int creditFloor                 = 250;  // min credits after event
     int creditCap                   = 65535; // max credits
@@ -331,6 +334,10 @@ struct EnemyDef {
     int deathDropFiles        = 0;   // robot: quantity of FILES pickup spawned on death
     int ladderClimbSpeed      = 5;   // guard/robot: abs(yv) when climbing a ladder
     int rocketLaunchXv        = 25;  // robot: horizontal velocity of fired rocket projectile
+    int rocketOffsetX         = 70;  // robot: horizontal distance from center for rocket spawn
+    int rocketOffsetY         = 60;  // robot: height above actor for rocket spawn
+    int deathDropYV           = 15;  // robot: upward launch yv of death-drop pickup (stored positive)
+    int meleeHitDuration      = 24;  // robot: ticks the damaging state persists per hit
     int ammoDropQuantity      = 0;   // guard: ammo quantity dropped on death (0 = no drop)
     // Robot look-range AABB (Look() detection box)
     int lookDefaultMinX = 70;   // default detection box: near edge (x offset from robot)
