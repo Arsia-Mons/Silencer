@@ -136,9 +136,9 @@ function parseArgs(argv: string[]): {
   let subop: string | null = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    if (a === "--host") {
+    if (a === "--host" && op === null) {
       host = argv[++i] ?? usage();
-    } else if (a === "--port") {
+    } else if (a === "--port" && op === null) {
       port = Number.parseInt(argv[++i] ?? usage(), 10);
     } else if (a.startsWith("--")) {
       const key = a.slice(2).replace(/-/g, "_");

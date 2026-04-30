@@ -31,6 +31,10 @@ export async function startRpcServer(opts: RpcServerOptions): Promise<RpcServer>
   await unlink(opts.socketPath).catch(() => {});
 
   let activeConns = 0;
+  // Only trigger idle auto-exit if at least one session was ever created.
+  // Without this guard, a plain `lobby ls` with sessions=0 would cause the
+  // daemon to exit when the connection closes.
+  let hadSessions = false;
   const tailUnsubs = new WeakMap<object, Array<() => void>>();
   const tailing = new WeakSet<object>();
 
@@ -66,7 +70,7 @@ export async function startRpcServer(opts: RpcServerOptions): Promise<RpcServer>
         activeConns--;
         for (const off of tailUnsubs.get(socket) ?? []) off();
         tailUnsubs.delete(socket);
-        if (activeConns === 0 && opts.manager.size() === 0) opts.onIdle?.();
+        if (hadSessions && activeConns === 0 && opts.manager.size() === 0) opts.onIdle?.();
       },
       error(_socket, err: Error) {
         console.warn(`[lobbyd] socket error: ${err.message}`);
@@ -97,6 +101,7 @@ export async function startRpcServer(opts: RpcServerOptions): Promise<RpcServer>
         case "spawn": {
           const a = req.args as any;
           const r = await opts.manager.spawn(a);
+          hadSessions = true;
           send(socket, { id: req.id, ok: true, result: r, final: true });
           return;
         }

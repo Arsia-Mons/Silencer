@@ -31,6 +31,24 @@ silencer-cli ping
 - `1` — `ok:false`; `[CODE] error` to stderr.
 - `2` — transport failure (connect refused / closed prematurely / etc).
 
+## Lobby fake players
+
+`lobby` namespace spawns persistent authenticated lobby presences in a
+shared supervisor daemon. See [`src/lobby/CLAUDE.md`](src/lobby/CLAUDE.md).
+
+```bash
+silencer-cli lobby spawn --as alice --host LOBBY_HOST --port 15170 \
+                         --version 1.2.3 --user alice --pass hunter2
+silencer-cli lobby chat  --as alice --channel main --text "hi"
+silencer-cli lobby tail  --as alice    # streams events until SIGINT
+silencer-cli lobby kill  --as alice
+```
+
+Defaults co-locate socket+log at `$SILENCER_LOBBYD_DIR` (override) or
+the platform default (`$XDG_RUNTIME_DIR/silencer/` on Linux,
+`$TMPDIR/silencer/` on macOS, `%LOCALAPPDATA%\Silencer\lobbyd\` on
+Windows).
+
 ## Wire protocol
 
 See `docs/superpowers/specs/2026-04-26-cli-agent-control-design.md`.
