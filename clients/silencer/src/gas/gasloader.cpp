@@ -98,6 +98,11 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.warpTeleportTick           = j.value("warpTeleportTick",           out.warpTeleportTick);
         out.deadAutoRespawnTick        = j.value("deadAutoRespawnTick",        out.deadAutoRespawnTick);
         out.deployAnimationTicks       = j.value("deployAnimationTicks",       out.deployAnimationTicks);
+        out.walkAcceleration           = j.value("walkAcceleration",           out.walkAcceleration);
+        out.ladderSpeedReduction       = j.value("ladderSpeedReduction",       out.ladderSpeedReduction);
+        out.disguisedDecelSpeed        = j.value("disguisedDecelSpeed",        out.disguisedDecelSpeed);
+        out.disguisedDecelSpeedSecret  = j.value("disguisedDecelSpeedSecret",  out.disguisedDecelSpeedSecret);
+        out.hackingPowerupBonus        = j.value("hackingPowerupBonus",        out.hackingPowerupBonus);
         out.soundImpactBlaster1        = j.value("soundImpactBlaster1",        out.soundImpactBlaster1);
         out.soundImpactBlaster2        = j.value("soundImpactBlaster2",        out.soundImpactBlaster2);
         out.soundImpactLaserShield1    = j.value("soundImpactLaserShield1",    out.soundImpactLaserShield1);
@@ -547,6 +552,8 @@ static void LoadWorld(const std::string& dir, WorldDef& out) {
         out.terminalBigBeamRange      = j.value("terminalBigBeamRange",      out.terminalBigBeamRange);
         out.terminalSmallBeamMin      = j.value("terminalSmallBeamMin",      out.terminalSmallBeamMin);
         out.terminalSmallBeamRange    = j.value("terminalSmallBeamRange",    out.terminalSmallBeamRange);
+        out.bodyPartSpawnYOffset      = j.value("bodyPartSpawnYOffset",      out.bodyPartSpawnYOffset);
+        out.bodyPartLaunchYV          = j.value("bodyPartLaunchYV",          out.bodyPartLaunchYV);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] world.json error: %s\n", e.what());
     }
@@ -564,6 +571,7 @@ static void LoadGameEngine(const std::string& dir, GameEngineDef& out) {
         out.audioStopAllFadeMs  = j.value("audioStopAllFadeMs",  out.audioStopAllFadeMs);
         out.nopeersTimeoutTicks = j.value("nopeersTimeoutTicks", out.nopeersTimeoutTicks);
         out.maxStaleSnapshots   = j.value("maxStaleSnapshots",   out.maxStaleSnapshots);
+        out.chatDisplayTicks    = j.value("chatDisplayTicks",    out.chatDisplayTicks);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] gameengine.json error: %s\n", e.what());
     }

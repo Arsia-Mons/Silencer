@@ -93,7 +93,7 @@ public:
 	bool replaying;
 	Uint8 quitstate;
 	std::deque<std::string> chatlines;
-	Uint8 showchat_i;
+	int showchat_i;
 	std::vector<BuyableItem *> buyableitems;
 	std::deque<char *> statusmessages;
 	static const int maxstatusmessages = 4;

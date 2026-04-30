@@ -12,5 +12,7 @@
   "terminalBigBeamMin": 10,
   "terminalBigBeamRange": 26,
   "terminalSmallBeamMin": 1,
-  "terminalSmallBeamRange": 10
+  "terminalSmallBeamRange": 10,
+  "bodyPartSpawnYOffset": 50,
+  "bodyPartLaunchYV": 20
 }

@@ -1415,7 +1415,7 @@ void Player::Tick(World & world){
 				}
 			}
 			if(input.keymoveleft || (ladder && x > center)){
-				xv -= 3;
+				xv -= GASLoader::Get().player.walkAcceleration;
 				if(xv > 0){
 					xv = 0;
 				}
@@ -1427,7 +1427,7 @@ void Player::Tick(World & world){
 				mirrored = true;
 			}else
 			if(input.keymoveright || (ladder && x < center)){
-				xv += 3;
+				xv += GASLoader::Get().player.walkAcceleration;
 				if(xv < 0){
 					xv = 0;
 				}
@@ -1443,9 +1443,9 @@ void Player::Tick(World & world){
 					if(state_i < 25){
 						state_i = 25;
 					}
-					int xvmax = 4;
+					int xvmax = GASLoader::Get().player.disguisedDecelSpeed;
 					if(hassecret){
-						xvmax = 2;
+						xvmax = GASLoader::Get().player.disguisedDecelSpeedSecret;
 					}
 					xv = xvmax * (mirrored ? -1 : 1);
 				}else{
@@ -1653,11 +1653,11 @@ void Player::Tick(World & world){
 		}break;
 		case CROUCHING:{
 			//xv = 0;
-			if(xv >= 3){
-				xv -= 3;
+			if(xv >= GASLoader::Get().player.walkAcceleration){
+				xv -= GASLoader::Get().player.walkAcceleration;
 			}else
-			if(xv <= -3){
-				xv += 3;
+			if(xv <= -GASLoader::Get().player.walkAcceleration){
+				xv += GASLoader::Get().player.walkAcceleration;
 			}else{
 				xv = 0;
 			}
@@ -2168,7 +2168,7 @@ void Player::Tick(World & world){
 				if(terminal && hackable){
 					float hackingpowerupbonus = 0;
 					if(hackingbonustime > world.tickcount){
-						hackingpowerupbonus = 1.00;
+						hackingpowerupbonus = GASLoader::Get().player.hackingPowerupBonus;
 					}
 					Uint16 oldfilesleft = ((100 - terminal->GetPercent()) / 100.0) * terminal->files;
 					Uint8 oldsecretinfoleft = ((100 - terminal->GetPercent()) / 100.0) * (terminal->secretinfo * (1 + hackingbonus + hackingpowerupbonus));
@@ -4061,14 +4061,15 @@ bool Player::ProcessStandingState(World & world){
 
 bool Player::ProcessLadderState(World &world){
 	xv = 0;
-	Uint8 xvmax = 14;
+	const auto& p = GASLoader::Get().player;
+	Uint8 xvmax = p.runSpeed;
 	if(hassecret){
-		xvmax = 11;
+		xvmax = p.runSpeedSecret;
 		if(IsDisguised()){
-			xvmax = 8;
+			xvmax = p.runSpeedSecretDisguised;
 		}
 	}
-	xvmax -= 4;
+	xvmax -= p.ladderSpeedReduction;
 	if(input.keyfire && state != LADDERSHOOT){
 		state = LADDERSHOOT;
 		state_i = -1;

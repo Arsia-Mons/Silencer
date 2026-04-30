@@ -716,7 +716,7 @@ void World::DoNetwork_Replica(void){
 				}
 				delete[] wrapped;
 				
-				showchat_i = 255;
+				showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
 				while(chatlines.size() > 5){
 					chatlines.pop_front();
 				}*/
@@ -1459,7 +1459,7 @@ void World::DisplayChatMessage(Uint32 accountid, const char * msg){
 	}
 	delete[] wrapped;
 	
-	showchat_i = 255;
+	showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
 	while(chatlines.size() > 5){
 		chatlines.pop_front();
 	}
@@ -2051,12 +2051,12 @@ void World::Explode(Object & object, Uint8 suitcolor, float hitx){
 		if(bodypart){
 			bodypart->suitcolor = suitcolor;
 			bodypart->x = object.x;
-			bodypart->y = object.y - 50;
+			bodypart->y = object.y - GASLoader::Get().world.bodyPartSpawnYOffset;
 			bodypart->type = i;
 			bodypart->xv += (abs(object.xv) * 2) * hitx;
 			if(i == 0){
 				bodypart->xv = 0;
-				bodypart->yv = -20;
+				bodypart->yv = -GASLoader::Get().world.bodyPartLaunchYV;
 			}
 		}
 	}

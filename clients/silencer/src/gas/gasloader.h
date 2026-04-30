@@ -115,6 +115,13 @@ struct PlayerDef {
     int warpTeleportTick            = 12;   // state_warp == this → player x/y set to destination
     int deadAutoRespawnTick         = 48;   // ticks in DEAD state before auto-respawn triggers
     int deployAnimationTicks        = 8;    // ticks of DEPLOYING beam-in animation after deployWait completes
+    // Movement physics
+    int walkAcceleration            = 3;    // px/tick added per tick when walking left/right
+    int ladderSpeedReduction        = 4;    // px/tick subtracted from run speed on ladders
+    int disguisedDecelSpeed         = 4;    // xv snap when decelerating while disguised
+    int disguisedDecelSpeedSecret   = 2;    // xv snap when decelerating while disguised + carrying secret
+    // Hacking powerup
+    double hackingPowerupBonus      = 1.0;  // hacking speed bonus multiplier when powerup active
     // ---- Hittable impact sounds ------------------------------------------------
     std::string soundImpactBlaster1     = "strike03.wav";
     std::string soundImpactBlaster2     = "strike04.wav";
@@ -473,6 +480,9 @@ struct WorldDef {
     int terminalBigBeamRange      = 26;    // big terminal: random seconds added (0..range-1)
     int terminalSmallBeamMin      = 1;     // small terminal: min beaming seconds
     int terminalSmallBeamRange    = 10;    // small terminal: random seconds added (0..range-1)
+    // Body part death spawn physics
+    int bodyPartSpawnYOffset      = 50;    // px above object center where body parts spawn
+    int bodyPartLaunchYV          = 20;    // upward velocity applied to body parts on death
 };
 
 // ---- Game Engine -----------------------------------------------------------
@@ -483,6 +493,7 @@ struct GameEngineDef {
     int audioStopAllFadeMs   = 200;  // fade duration for global StopAll() on scene change
     int nopeersTimeoutTicks  = 240;  // dedicated server: ticks with no peers before shutdown
     int maxStaleSnapshots    = 50;   // max stale object sync packets per tick
+    int chatDisplayTicks     = 255;  // ticks chat overlay is visible after a new message
 };
 
 // ---------------------------------------------------------------------------
