@@ -7,8 +7,11 @@ import type { ClientEvents, ConnectionState, LobbyGame } from "@silencer/lobby-s
 
 export class NoSessionError extends Error {
   readonly code = "NO_SESSION" as const;
-  constructor(public readonly name: string) {
-    super(`NO_SESSION: ${name}`);
+  // Avoid `name` here — it would shadow Error.prototype.name and corrupt
+  // stack traces (toString would show "<sessionName>: NO_SESSION: ..." rather
+  // than "NoSessionError: NO_SESSION: ...").
+  constructor(public readonly sessionName: string) {
+    super(`NO_SESSION: ${sessionName}`);
   }
 }
 

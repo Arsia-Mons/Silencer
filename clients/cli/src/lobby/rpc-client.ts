@@ -1,7 +1,5 @@
 import { encodeFrame, parseFrames, type Reply, type Request } from "./protocol.ts";
 
-const decoder = new TextDecoder();
-
 export async function rpcCall(socketPath: string, req: Request): Promise<Reply> {
   for await (const r of rpcStream(socketPath, req)) {
     if (r.final) return r;
@@ -19,6 +17,11 @@ export function rpcStream(socketPath: string, req: Request): AsyncIterable<Reply
       let errored: unknown = null;
       let buf = "";
       let socket: any;
+      // Per-iterator decoder + stream:true so a multi-byte UTF-8 sequence
+      // split across two `data` callbacks survives. A module-level decoder
+      // would also work for one consumer, but it would corrupt boundary
+      // state if multiple iterators ran concurrently (which the tests do).
+      const decoder = new TextDecoder();
 
       const push = (r: Reply) => {
         if (waiters.length) waiters.shift()!.resolve({ value: r, done: false });
@@ -55,7 +58,7 @@ export function rpcStream(socketPath: string, req: Request): AsyncIterable<Reply
             s.write(encodeFrame(req));
           },
           data(_s: any, chunk: Uint8Array) {
-            buf += decoder.decode(chunk);
+            buf += decoder.decode(chunk, { stream: true });
             let parsed;
             try {
               parsed = parseFrames<Reply>(buf);

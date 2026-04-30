@@ -44,9 +44,14 @@ export async function startRpcServer(opts: RpcServerOptions): Promise<RpcServer>
       open(socket) {
         activeConns++;
         (socket as any).__buf = "";
+        // Per-connection decoder + stream:true so a multi-byte UTF-8
+        // sequence split across two `data` callbacks (e.g. emoji in chat
+        // text on a slow connection) survives. A fresh `new TextDecoder()`
+        // per chunk would lose the trailing-byte state.
+        (socket as any).__decoder = new TextDecoder();
       },
       data(socket, chunk: Uint8Array) {
-        (socket as any).__buf += new TextDecoder().decode(chunk);
+        (socket as any).__buf += (socket as any).__decoder.decode(chunk, { stream: true });
         let parsed;
         try {
           parsed = parseFrames<Request>((socket as any).__buf);
