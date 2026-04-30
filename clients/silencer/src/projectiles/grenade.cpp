@@ -18,7 +18,7 @@ Grenade::Grenade() : Object(ObjectTypes::GRENADE){
 	yv = -10;
 	state_i = 0;
 	color = 0;
-	radius = 5;
+	radius = w ? w->radius : 5;
 	isphysical = true;
 	snapshotinterval = 6;
 }
@@ -101,8 +101,9 @@ void Grenade::Tick(World & world){
 							//int distance = sqrt((float)((x - object->x) * (x - object->x)) + ((y - object->y) * (y - object->y)));
 							//if(distance < radius){
 								Object empprojectile(ObjectTypes::FLAREPROJECTILE);
-								empprojectile.healthdamage = 0;
-								empprojectile.shielddamage = 0xFFFF;
+								{ const WeaponDef* ew = GASLoader::Get().GetWeaponDef("empbomb");
+								  empprojectile.healthdamage = ew ? ew->healthDamage : 0;
+								  empprojectile.shielddamage = (ew && ew->shieldDamage) ? ew->shieldDamage : 0xFFFF; }
 								empprojectile.ownerid = ownerid;
 								object->HandleHit(world, 50, 50, empprojectile);
 							//}
@@ -390,8 +391,9 @@ void Grenade::NeutronBlast(World & world, Sint16 y, Uint16 ownerid){
 			}
 			if(!invulnerable){
 				Object neutronprojectile(ObjectTypes::FLAREPROJECTILE);
-				neutronprojectile.healthdamage = 0xFFFF;
-				neutronprojectile.shielddamage = 0xFFFF;
+				{ const WeaponDef* nw2 = GASLoader::Get().GetWeaponDef("neutronbomb");
+				  neutronprojectile.healthdamage = (nw2 && nw2->healthDamage) ? nw2->healthDamage : 0xFFFF;
+				  neutronprojectile.shielddamage = (nw2 && nw2->shieldDamage) ? nw2->shieldDamage : 0xFFFF; }
 				neutronprojectile.ownerid = ownerid;
 				object->HandleHit(world, 50, 50, neutronprojectile);
 			}
