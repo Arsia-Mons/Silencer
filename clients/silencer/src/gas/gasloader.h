@@ -121,6 +121,7 @@ struct PlayerDef {
     int deployAnimationTicks        = 8;    // ticks of DEPLOYING beam-in animation after deployWait completes
     // Movement physics
     int walkAcceleration            = 3;    // px/tick added per tick when walking left/right
+    int standingShootDecel          = 4;    // px/tick bled off xv each tick in STANDINGSHOOT state
     int ladderSpeedReduction        = 4;    // px/tick subtracted from run speed on ladders
     int disguisedDecelSpeed         = 4;    // xv snap when decelerating while disguised
     int disguisedDecelSpeedSecret   = 2;    // xv snap when decelerating while disguised + carrying secret

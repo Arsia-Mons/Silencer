@@ -1845,7 +1845,7 @@ bool Game::Tick(void){
 										player->oldx = player->x;
 										player->oldy = player->y;
 										//player->AddInventoryItem(Player::INV_VIRUS);
-										player->credits = 50000;
+										player->credits = GASLoader::Get().player.startingCredits;
 										Uint8 teamcolor = team->GetColor();
 										player->suitcolor = (((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
 										for(int j = 0; j < 5; j++){

@@ -1255,11 +1255,12 @@ void Player::Tick(World & world){
 			if(state_i < 4){
 				state_i++;
 			}
-			if(xv >= 4){
-				xv -= 4;
+			int _ssd = GASLoader::Get().player.standingShootDecel;
+			if(xv >= _ssd){
+				xv -= _ssd;
 			}else
-			if(xv <= -4){
-				xv += 4;
+			if(xv <= -_ssd){
+				xv += _ssd;
 			}else{
 				xv = 0;
 			}

@@ -103,6 +103,7 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.deadAutoRespawnTick        = j.value("deadAutoRespawnTick",        out.deadAutoRespawnTick);
         out.deployAnimationTicks       = j.value("deployAnimationTicks",       out.deployAnimationTicks);
         out.walkAcceleration           = j.value("walkAcceleration",           out.walkAcceleration);
+        out.standingShootDecel         = j.value("standingShootDecel",         out.standingShootDecel);
         out.ladderSpeedReduction       = j.value("ladderSpeedReduction",       out.ladderSpeedReduction);
         out.disguisedDecelSpeed        = j.value("disguisedDecelSpeed",        out.disguisedDecelSpeed);
         out.disguisedDecelSpeedSecret  = j.value("disguisedDecelSpeedSecret",  out.disguisedDecelSpeedSecret);

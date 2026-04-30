@@ -133,5 +133,6 @@
   "fallingNudgeMax": 8,
   "fallingNudgeXvDivisor": 2,
   "hackingSoundIntervalBase": 6,
-  "hackingSoundIntervalRandom": 4
+  "hackingSoundIntervalRandom": 4,
+  "standingShootDecel": 4
 }

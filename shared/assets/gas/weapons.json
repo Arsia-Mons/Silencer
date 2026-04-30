@@ -63,6 +63,7 @@
       "soundLoop": "flamebg2.wav",
       "emitOffset": -7,
       "trailPlumes": 7,
+      "projectileLife": 14,
       "snapshotInterval": 6
     },
     {
@@ -118,10 +119,8 @@
       "velocity": 5,
       "moveAmount": 1,
       "trailPlumes": 4,
+      "projectileLife": 14,
       "snapshotInterval": 6
-    },
-    {
-      "id": "wall",
       "projectileType": "wall",
       "healthDamage": 10,
       "shieldDamage": 60,

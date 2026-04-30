@@ -72,7 +72,9 @@ void FlareProjectile::Tick(World & world){
 		//world->MarkDestroyObject(id);
 	}
 	res_index = state_i;
-	if(state_i >= 14){
+	const WeaponDef* wfl = GASLoader::Get().GetWeaponDef("flare");
+	int life = (wfl && wfl->projectileLife) ? wfl->projectileLife : 14;
+	if(state_i >= life){
 		world.MarkDestroyObject(id);
 	}
 	state_i++;
