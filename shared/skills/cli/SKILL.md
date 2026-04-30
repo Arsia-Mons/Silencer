@@ -1,29 +1,39 @@
 ---
 name: using-silencer-cli
-description: Use when you need to drive the Silencer game from a terminal — verifying UI changes, navigating menus, taking screenshots, reading game state, validating GAS data files, or rebinding controls — without a human at the keyboard. Most ops talk JSON-lines TCP to a running silencer client; a few (e.g. `gas validate`) run locally with no daemon.
+description: Use when you need to drive the Silencer game from a terminal — verifying UI changes, navigating menus, taking screenshots, reading game state, validating GAS data files, rebinding controls, or spawning persistent authenticated lobby presences ("fake players") for multiplayer dev — without a human at the keyboard. Ops route through three execution contexts: JSON-lines TCP to a running game client, in-process for `gas validate`, and JSON-lines unix socket to `silencer-lobbyd` for the `lobby` namespace.
 ---
 
 # using-silencer-cli
 
 This skill teaches agents how to drive the Silencer game client via the
-`silencer-cli` Bun+TS wrapper that talks JSON-lines TCP to the game's
-`--control-port`.
+`silencer-cli` Bun+TS wrapper. It serves three execution contexts:
+
+1. **Game control** (`ping`, `click`, `state`, `screenshot`, `keybind`,
+   `gas reload`, …) — JSON-lines TCP to the game's `--control-port`.
+2. **Local helpers** (`gas validate`) — pure in-process, no daemon.
+3. **Lobby fake players** (`lobby spawn`, `chat`, `tail`, `kill`, …) —
+   JSON-lines over a unix socket to an auto-spawned `silencer-lobbyd`
+   supervisor daemon that holds N authenticated lobby connections.
 
 ## What it is
 
-`clients/cli/index.ts` — a thin command-line client over the game's TCP
-control socket. Each invocation sends one JSON command, prints the JSON
-result, and exits.
+`clients/cli/index.ts` — a thin command-line client. Each invocation
+sends one JSON command (or one streaming request, for `lobby tail`),
+prints the JSON result, and exits.
 
 ```
-bun clients/cli/index.ts --port <PORT> <op> [--key value ...]
+bun clients/cli/index.ts [--port <PORT>] <op> [--key value ...]
 ```
+
+`--port` is for the **game control** TCP context only; lobby ops ignore
+it and route through the unix socket instead.
 
 Exit codes: `0` on success (JSON `result` to stdout), `1` on op error
 (`[CODE] message` to stderr), `2` on transport failure.
 
-The daemon is the normal Silencer binary launched with
-`--headless --control-port <PORT>`.
+The game-control daemon is the normal Silencer binary launched with
+`--headless --control-port <PORT>`. The lobby supervisor (`silencer-lobbyd`)
+auto-spawns the first time you run `lobby spawn` — no manual setup.
 
 ## Quickstart
 
@@ -68,10 +78,11 @@ positional shorthand (`click LABEL`, `set_text LABEL TEXT`,
 | `wait_for_state` | `--state X [--timeout-ms 5000]` | `{}` or `TIMEOUT` error. **Timeouts are milliseconds.** |
 | `quit` | — | `{}` — sets `quitRequested`; daemon exits cleanly |
 
-### Noun-first ops: `gas` and `keybind`
+### Noun-first ops: `gas`, `keybind`, `lobby`
 
-A few ops use a `<noun> <subop>` shape (`gas validate`, `keybind put`, etc).
-The first positional after the noun is the subop; flags follow as usual.
+A few ops use a `<noun> <subop>` shape (`gas validate`, `keybind put`,
+`lobby spawn`, etc). The first positional after the noun is the subop;
+flags follow as usual.
 
 | Op | Flags / positional | Result | Daemon? |
 |----|-------------------|--------|---------|
@@ -89,6 +100,42 @@ The first positional after the noun is the subop; flags follow as usual.
 `--profile` and `--action` are kept as strings even when numeric; the
 parser knows about this via `STRING_FLAGS` in `clients/cli/index.ts` so
 `--profile 1` doesn't silently retarget profile `"1"` vs `1`.
+
+### Lobby fake players (separate daemon)
+
+The `lobby` namespace spawns persistent authenticated lobby presences
+in a shared supervisor daemon (`silencer-lobbyd`). Useful when dev work
+needs other authed players in a lobby — chatting, creating games,
+appearing in presence lists — without standing up real clients. The
+daemon auto-spawns on first use and auto-exits when its last session
+is killed and its last connection drops.
+
+`--port` is **not used** for lobby ops; the daemon listens on a unix
+socket co-located with its log file under
+`$SILENCER_LOBBYD_DIR` (override) or the platform default
+(`$XDG_RUNTIME_DIR/silencer/` on Linux, `$TMPDIR/silencer/` on macOS,
+`%LOCALAPPDATA%\Silencer\lobbyd\` on Windows).
+
+| Op | Flags / positional | Result | Connects to |
+|----|-------------------|--------|-------------|
+| `lobby spawn` | `--as N --host H --port P --version V --user U --pass P [--platform 0\|1\|2]` | `{accountId}` — completes after lobby version+auth handshake; rejects on bad creds | lobby server |
+| `lobby ls` | — | `{sessions:[{name,state,accountId,host,port}]}` — every active session in the daemon | daemon only |
+| `lobby kill` | `--as N` *or* `--all` | `{}` — disconnects and removes; `--all` also winds down the daemon | daemon only |
+| `lobby chat` | `--as N --channel C --text T` | `{}` | lobby server |
+| `lobby join_channel` | `--as N --channel C` | `{}` | lobby server |
+| `lobby game create` | `--as N --name X [--map M --max-players 8 --max-teams 2 --password P]` | `{gameId}` — resolves on the echoed `newGame` event (10 s timeout) | lobby server |
+| `lobby game join` | `--as N --id GAMEID` | `{}` — sends `setGame(gameId, Lobby)` | lobby server |
+| `lobby tail` | `--as N` | streams one JSON line per event (`chat`, `presence`, `channel`, `newGame`, `delGame`, `stateChanged`) until the session ends or you SIGINT | daemon only |
+
+Credentials (`--user`, `--pass`) are passed once on `spawn` and held
+in daemon memory; subsequent calls reference the session by `--as <name>`
+only. Passwords never touch disk.
+
+`lobby tail` is the only streaming op — it stays open and writes events
+as they arrive. Pipe it into `jq` or grep just as you would any
+JSON-lines stream. Sessions can be tailed exactly once per CLI
+invocation (a second concurrent tail on the same connection returns
+`ALREADY_TAILING`).
 
 ### Validating GAS data files (no daemon)
 
@@ -176,6 +223,33 @@ cli --port "$PORT" step --frames 30   # advances 30 frames, re-pauses
 cli --port "$PORT" resume
 ```
 
+### Spawn fake players for a multiplayer test
+
+```bash
+# Bring two authed presences online (no real clients needed).
+bun clients/cli/index.ts lobby spawn --as alice --host 127.0.0.1 --port 15170 \
+                                      --version "" --user alice --pass alice
+bun clients/cli/index.ts lobby spawn --as bob   --host 127.0.0.1 --port 15170 \
+                                      --version "" --user bob   --pass bob
+
+# Have them talk while you watch what the lobby emits.
+bun clients/cli/index.ts lobby tail --as alice &
+TAIL_PID=$!
+bun clients/cli/index.ts lobby chat --as bob --channel main --text "hi"
+bun clients/cli/index.ts lobby chat --as alice --channel main --text "hey"
+
+# Tear everything down — also exits the daemon.
+kill $TAIL_PID
+bun clients/cli/index.ts lobby kill --all
+```
+
+`lobby ls` is useful for sanity-checking session state without disturbing
+anyone:
+
+```bash
+bun clients/cli/index.ts lobby ls | jq '.sessions[] | {name,state,accountId}'
+```
+
 ## Wire protocol
 
 One JSON object per line, both directions.
@@ -229,3 +303,18 @@ You rarely need to speak the protocol directly — use the CLI wrapper.
 - **`gas reload` is state-gated.** Errors `WRONG_STATE` outside
   `NONE`/`MAINMENU`/`LOBBY`/`MISSIONSUMMARY`; loader does not run
   mid-game.
+- **`lobby` ops talk to a separate daemon.** `silencer-lobbyd`
+  auto-spawns on first `lobby spawn`, holds N `LobbyClient` instances
+  in one process, and auto-exits when the last session dies. To force
+  a clean restart: `lobby kill --all`. The daemon's log file is at
+  `$SILENCER_LOBBYD_DIR/lobbyd.log` — read it when `lobby spawn` times
+  out. On macOS, `$TMPDIR` is per-user and ephemeral (`periodic` GCs
+  files after ~3 days idle), which is fine for dev.
+- **Lobby creds in memory only.** `--user`/`--pass` are passed once on
+  `spawn` and never written to disk. Subsequent ops reference the
+  session by `--as <name>`. If the daemon dies (e.g. SIGINT), all
+  sessions go with it and you must respawn.
+- **`lobby game create` mapHash defaults to all-zeros.** Fine for
+  emitting test traffic; a production lobby may reject games without a
+  real SHA-1 of the map file. If you need a joinable game from the CLI,
+  extend `commands.ts::game` with `--map-hash`/`--listen-port` flags.
