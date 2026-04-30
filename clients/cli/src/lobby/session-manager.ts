@@ -5,6 +5,13 @@
 
 import type { ClientEvents, ConnectionState, LobbyGame } from "@silencer/lobby-sdk";
 
+export class NoSessionError extends Error {
+  readonly code = "NO_SESSION" as const;
+  constructor(public readonly name: string) {
+    super(`NO_SESSION: ${name}`);
+  }
+}
+
 export interface LobbyLike {
   readonly state: ConnectionState;
   readonly accountId: number;
@@ -112,7 +119,7 @@ export class SessionManager {
 
   async kill(name: string): Promise<void> {
     const s = this.sessions.get(name);
-    if (!s) throw new Error(`NO_SESSION: ${name}`);
+    if (!s) throw new NoSessionError(name);
     this.sessions.delete(name);
     await s.lobby.disconnect();
   }
@@ -124,7 +131,7 @@ export class SessionManager {
 
   getOrThrow(name: string): Session {
     const s = this.sessions.get(name);
-    if (!s) throw new Error(`NO_SESSION: ${name}`);
+    if (!s) throw new NoSessionError(name);
     return s;
   }
 

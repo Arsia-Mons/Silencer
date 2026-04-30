@@ -1,7 +1,9 @@
 import { unlink } from "node:fs/promises";
 import type { ClientEvents } from "@silencer/lobby-sdk";
-import type { SessionManager } from "./session-manager.ts";
+import { NoSessionError, type SessionManager } from "./session-manager.ts";
 import { encodeFrame, parseFrames, type Reply, type Request } from "./protocol.ts";
+
+const GAME_CREATE_TIMEOUT_MS = 10_000;
 
 export interface RpcServerOptions {
   socketPath: string;
@@ -30,6 +32,7 @@ export async function startRpcServer(opts: RpcServerOptions): Promise<RpcServer>
 
   let activeConns = 0;
   const tailUnsubs = new WeakMap<object, Array<() => void>>();
+  const tailing = new WeakSet<object>();
 
   const server = Bun.listen({
     unix: opts.socketPath,
@@ -65,8 +68,9 @@ export async function startRpcServer(opts: RpcServerOptions): Promise<RpcServer>
         tailUnsubs.delete(socket);
         if (activeConns === 0 && opts.manager.size() === 0) opts.onIdle?.();
       },
-      error(_s, _e) {
-        /* swallow; close will fire */
+      error(_socket, err: Error) {
+        console.warn(`[lobbyd] socket error: ${err.message}`);
+        // close handler will fire next; cleanup happens there.
       },
     },
   });
@@ -123,11 +127,40 @@ export async function startRpcServer(opts: RpcServerOptions): Promise<RpcServer>
         case "game_create": {
           const a = req.args as any;
           const session = opts.manager.getOrThrow(a.name);
-          const off = session.lobby.on("newGame", (e: any) => {
-            off();
+          let off: (() => void) | null = null;
+          let timer: ReturnType<typeof setTimeout> | null = null;
+          const cleanup = () => {
+            if (timer) {
+              clearTimeout(timer);
+              timer = null;
+            }
+            if (off) {
+              off();
+              off = null;
+            }
+          };
+          off = session.lobby.on("newGame", (e: { game: { id: number } }) => {
+            cleanup();
             send(socket, { id: req.id, ok: true, result: { gameId: e.game.id }, final: true });
           });
-          session.lobby.createGame(a.game);
+          // Track for socket-close teardown.
+          tailUnsubs.set(socket, [...(tailUnsubs.get(socket) ?? []), cleanup]);
+          timer = setTimeout(() => {
+            cleanup();
+            send(socket, {
+              id: req.id,
+              ok: false,
+              error: "game_create timed out",
+              code: "TIMEOUT",
+              final: true,
+            });
+          }, GAME_CREATE_TIMEOUT_MS);
+          try {
+            session.lobby.createGame(a.game);
+          } catch (e) {
+            cleanup();
+            throw e; // outer catch routes to ERR
+          }
           return;
         }
         case "game_join": {
@@ -137,6 +170,17 @@ export async function startRpcServer(opts: RpcServerOptions): Promise<RpcServer>
           return;
         }
         case "tail": {
+          if (tailing.has(socket)) {
+            send(socket, {
+              id: req.id,
+              ok: false,
+              error: "already tailing on this connection",
+              code: "ALREADY_TAILING",
+              final: true,
+            });
+            return;
+          }
+          tailing.add(socket);
           const a = req.args as any;
           const session = opts.manager.getOrThrow(a.name);
           const offs: Array<() => void> = [];
@@ -166,7 +210,7 @@ export async function startRpcServer(opts: RpcServerOptions): Promise<RpcServer>
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      const code = msg.startsWith("NO_SESSION") ? "NO_SESSION" : "ERR";
+      const code = e instanceof NoSessionError ? "NO_SESSION" : "ERR";
       send(socket, { id: req.id, ok: false, error: msg, code, final: true });
     }
   }

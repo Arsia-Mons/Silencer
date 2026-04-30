@@ -33,7 +33,9 @@ class FakeLobby {
   sendCredentials() {}
   sendChat() {}
   joinChannel() {}
-  createGame() {}
+  createGame(g: any) {
+    queueMicrotask(() => this.emit("newGame", { game: { id: 999 } }));
+  }
   setGame() {}
 }
 
@@ -130,5 +132,110 @@ describe("rpc-server", () => {
     const r = await rpc({ id: 5, op: "nope", args: {} });
     expect(r.ok).toBe(false);
     expect(r.code).toBe("BAD_OP");
+  });
+
+  test("malformed JSON frame returns BAD_FRAME and closes socket", async () => {
+    // Direct send (bypassing rpc helper) to inject malformed bytes.
+    const replies: Reply[] = [];
+    let buf = "";
+    await new Promise<void>((resolve, reject) => {
+      Bun.connect({
+        unix: sock,
+        socket: {
+          open(s) {
+            s.write("{not json}\n");
+          },
+          data(_s, chunk) {
+            buf += new TextDecoder().decode(chunk);
+            const { frames, rest } = parseFrames<Reply>(buf);
+            buf = rest;
+            replies.push(...frames);
+          },
+          close() {
+            resolve();
+          },
+          error(_s, e) {
+            reject(e);
+          },
+        },
+      });
+    });
+    expect(replies).toHaveLength(1);
+    expect(replies[0]!.ok).toBe(false);
+    expect(replies[0]!.code).toBe("BAD_FRAME");
+  });
+
+  test("game_create happy path resolves on echoed newGame", async () => {
+    // Spawn alice first.
+    const s = await rpc({
+      id: 100,
+      op: "spawn",
+      args: {
+        name: "alice",
+        host: "h",
+        port: 1,
+        version: "v",
+        platform: 0,
+        user: "u",
+        pass: "p",
+      },
+    });
+    expect(s.ok).toBe(true);
+
+    // FakeLobby.createGame emits newGame via queueMicrotask; the listener resolves.
+    const r = await rpc({ id: 101, op: "game_create", args: { name: "alice", game: { id: 0 } } });
+    expect(r.ok).toBe(true);
+    expect((r.result as any).gameId).toBe(999);
+  });
+
+  test("second tail on the same connection returns ALREADY_TAILING", async () => {
+    await rpc({
+      id: 200,
+      op: "spawn",
+      args: {
+        name: "alice",
+        host: "h",
+        port: 1,
+        version: "v",
+        platform: 0,
+        user: "u",
+        pass: "p",
+      },
+    });
+    // Open a connection, send tail, then a second tail on the SAME connection,
+    // and observe both replies.
+    const replies: Reply[] = [];
+    let buf = "";
+    await new Promise<void>((resolve, reject) => {
+      Bun.connect({
+        unix: sock,
+        socket: {
+          open(s) {
+            s.write(encodeFrame({ id: 201, op: "tail", args: { name: "alice" }, stream: true }));
+            s.write(encodeFrame({ id: 202, op: "tail", args: { name: "alice" }, stream: true }));
+          },
+          data(s, chunk) {
+            buf += new TextDecoder().decode(chunk);
+            const { frames, rest } = parseFrames<Reply>(buf);
+            buf = rest;
+            replies.push(...frames);
+            // Wait for the rejection of id 202 then close.
+            if (replies.some((r) => r.id === 202 && r.final)) {
+              s.end();
+            }
+          },
+          close() {
+            resolve();
+          },
+          error(_s, e) {
+            reject(e);
+          },
+        },
+      });
+    });
+    const second = replies.find((r) => r.id === 202);
+    expect(second).toBeTruthy();
+    expect(second!.ok).toBe(false);
+    expect(second!.code).toBe("ALREADY_TAILING");
   });
 });
