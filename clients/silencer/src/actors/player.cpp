@@ -3237,6 +3237,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 				const ItemDef* def = GASLoader::Get().GetItemDef("laser");
 				int pickup = def ? def->pickupAmmo : 5;
 				int cap    = def ? def->maxAmmo    : 30;
+				{ const WeaponDef* wd = GASLoader::Get().GetWeaponDef("laser"); if (wd && wd->ammoCapacity > 0) cap = wd->ammoCapacity; }
 				if(laserammo < cap){
 					laserammo += pickup;
 					if(laserammo > cap) laserammo = cap;
@@ -3247,6 +3248,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 				const ItemDef* def = GASLoader::Get().GetItemDef("rocket");
 				int pickup = def ? def->pickupAmmo : 3;
 				int cap    = def ? def->maxAmmo    : 30;
+				{ const WeaponDef* wd = GASLoader::Get().GetWeaponDef("rocket"); if (wd && wd->ammoCapacity > 0) cap = wd->ammoCapacity; }
 				if(rocketammo < cap){
 					rocketammo += pickup;
 					if(rocketammo > cap) rocketammo = cap;
@@ -3257,6 +3259,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 				const ItemDef* def = GASLoader::Get().GetItemDef("flamer");
 				int pickup = def ? def->pickupAmmo : 15;
 				int cap    = def ? def->maxAmmo    : 75;
+				{ const WeaponDef* wd = GASLoader::Get().GetWeaponDef("flamer"); if (wd && wd->ammoCapacity > 0) cap = wd->ammoCapacity; }
 				if(flamerammo < cap){
 					flamerammo += pickup;
 					if(flamerammo > cap) flamerammo = cap;
@@ -4308,6 +4311,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			{
 				const ItemDef* def = GASLoader::Get().GetItemDef("laser");
 				int cap = def ? def->maxAmmo : 30;
+				{ const WeaponDef* wd = GASLoader::Get().GetWeaponDef("laser"); if (wd && wd->ammoCapacity > 0) cap = wd->ammoCapacity; }
 				if(laserammo > cap) laserammo = cap;
 			}
 			if(islocalplayer){
@@ -4322,6 +4326,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			{
 				const ItemDef* def = GASLoader::Get().GetItemDef("rocket");
 				int cap = def ? def->maxAmmo : 30;
+				{ const WeaponDef* wd = GASLoader::Get().GetWeaponDef("rocket"); if (wd && wd->ammoCapacity > 0) cap = wd->ammoCapacity; }
 				if(rocketammo > cap) rocketammo = cap;
 			}
 			if(islocalplayer){
@@ -4336,6 +4341,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			{
 				const ItemDef* def = GASLoader::Get().GetItemDef("flamer");
 				int cap = def ? def->maxAmmo : 75;
+				{ const WeaponDef* wd = GASLoader::Get().GetWeaponDef("flamer"); if (wd && wd->ammoCapacity > 0) cap = wd->ammoCapacity; }
 				if(flamerammo > cap) flamerammo = cap;
 			}
 			if(islocalplayer){

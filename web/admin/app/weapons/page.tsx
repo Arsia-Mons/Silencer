@@ -83,6 +83,26 @@ const SOUND_FIELDS: { key: keyof WeaponDef; label: string }[] = [
   { key: 'soundThrow',     label: 'Throw' },
 ];
 
+// Sound fields that are relevant per projectile type.
+// Fields with an existing value are always shown regardless of type.
+const SOUNDS_BY_TYPE: Partial<Record<string, (keyof WeaponDef)[]>> = {
+  physics: ['soundFire', 'soundHit1', 'soundHit2'],
+  wall:    ['soundFire', 'soundHit1', 'soundHit2'],
+  rocket:  ['soundLoop', 'soundExplosion', 'soundLand'],
+  flamer:  ['soundLoop'],
+  grenade: ['soundThrow', 'soundExplosion', 'soundLand', 'soundHit1'],
+  arcing:  [],
+  plasma:  [],
+};
+
+function soundFieldsForWeapon(weapon: WeaponDef): { key: keyof WeaponDef; label: string }[] {
+  const relevant = SOUNDS_BY_TYPE[weapon.projectileType ?? ''] ?? SOUND_FIELDS.map(f => f.key);
+  // Always include fields that already carry a value.
+  const withValue = SOUND_FIELDS.filter(f => weapon[f.key]).map(f => f.key);
+  const keys = Array.from(new Set([...relevant, ...withValue]));
+  return SOUND_FIELDS.filter(f => keys.includes(f.key));
+}
+
 const NUMERIC_BALLISTICS: { key: string; label: string }[] = [
   { key: 'healthDamage',   label: 'Health DMG' },
   { key: 'shieldDamage',   label: 'Shield DMG' },
@@ -545,7 +565,9 @@ export default function WeaponsPage() {
                       BROWSE →
                     </Link>
                   </div>
-                  {SOUND_FIELDS.map(({ key, label }) => {
+                  {soundFieldsForWeapon(currentWeapon).length === 0 ? (
+                    <p className="text-[9px] font-mono text-[#2a4a2a]">No sounds for this projectile type.</p>
+                  ) : soundFieldsForWeapon(currentWeapon).map(({ key, label }) => {
                     const val = String(currentWeapon[key] ?? '');
                     return (
                       <div key={String(key)} className="flex items-center gap-2">
@@ -559,7 +581,6 @@ export default function WeaponsPage() {
                           {soundList.map(name => (
                             <option key={name} value={name}>{name}</option>
                           ))}
-                          {/* keep current value visible even if list not yet loaded */}
                           {val && !soundList.includes(val) && (
                             <option value={val}>{val}</option>
                           )}
@@ -623,111 +644,198 @@ export default function WeaponsPage() {
 
 // ── Ballistics preview ───────────────────────────────────────────────────────
 
+const TICKS_PER_SEC = 24;
+
+function buildPath(weapon: WeaponDef, W: number, H: number): [number, number][] {
+  const type = weapon.projectileType ?? 'physics';
+  const velocityRaw = weapon.velocity as number | undefined;
+  const velocity = velocityRaw ?? (type === 'physics' ? 20 : 0);
+  const gravity = (weapon as Record<string, unknown>).plasmaGravity as number | undefined
+    ?? (type === 'grenade' || type === 'arcing' ? 1.5 : 0);
+  const moveAmount = weapon.moveAmount ?? 1;
+  const scale = 1.5;
+  const isThrow = type === 'grenade' || type === 'arcing';
+
+  let x = 20, y = isThrow ? H - 20 : H * 0.6;
+  let xv = velocity * scale;
+  let yv = 0;
+  const path: [number, number][] = [[x, y]];
+
+  if (isThrow) {
+    const throwSpeed = (weapon as Record<string, unknown>).throwSpeedStanding as number ?? 20;
+    xv = throwSpeed * scale * 0.5;
+    yv = -10 * scale;
+  }
+
+  if (velocity === 0 && !isThrow) return path;
+
+  for (let step = 0; step < 800; step++) {
+    const steps = Math.max(1, moveAmount);
+    for (let m = 0; m < steps; m++) {
+      x += xv / steps;
+      y += yv / steps;
+    }
+    if (gravity) yv += gravity * 0.4;
+    if (y >= H - 20 && step > 0) break;
+    if (x > W) break;
+    path.push([x, y]);
+  }
+  return path;
+}
+
+function drawFrame(
+  ctx: CanvasRenderingContext2D,
+  weapon: WeaponDef,
+  path: [number, number][],
+  tickIdx: number,
+  W: number,
+  H: number,
+) {
+  const type = weapon.projectileType ?? 'physics';
+  const velocityRaw = weapon.velocity as number | undefined;
+  const velocity = velocityRaw ?? (type === 'physics' ? 20 : 0);
+  const gravity = (weapon as Record<string, unknown>).plasmaGravity as number | undefined
+    ?? (type === 'grenade' || type === 'arcing' ? 1.5 : 0);
+  const radius = weapon.radius ?? 0;
+  const scale = 1.5;
+
+  ctx.fillStyle = '#080f08';
+  ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = '#1a2e1a';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, H - 20); ctx.lineTo(W, H - 20); ctx.stroke();
+
+  if (path.length <= 1 && velocity === 0 && type !== 'grenade' && type !== 'arcing') {
+    ctx.fillStyle = '#2a4a2a';
+    ctx.font = '10px monospace';
+    ctx.fillText('no velocity — contact / fixed-direction', 10, H / 2);
+    return;
+  }
+
+  const end = Math.min(tickIdx + 1, path.length);
+  const visible = path.slice(0, end);
+
+  ctx.strokeStyle = '#00a32888';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  visible.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py));
+  ctx.stroke();
+
+  const [cx, cy] = visible[visible.length - 1];
+  ctx.fillStyle = '#00a328';
+  ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+
+  // Show blast radius only at final rest
+  if (tickIdx >= path.length - 1 && radius > 0) {
+    const [ix, iy] = path[path.length - 1];
+    ctx.strokeStyle = '#f59e0b44';
+    ctx.fillStyle = '#f59e0b22';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(ix, iy, radius * scale * 0.5, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+  }
+
+  const label = [
+    velocityRaw !== undefined ? `v=${velocity}` : `v≈${velocity}(est)`,
+    `steps=${weapon.moveAmount ?? 1}`,
+    gravity ? `g=${gravity}` : null,
+    radius ? `r=${radius}px` : null,
+    `tick ${Math.min(tickIdx, path.length - 1)}/${path.length - 1}`,
+  ].filter(Boolean).join('  ');
+  ctx.fillStyle = '#4a7a4a';
+  ctx.font = '9px monospace';
+  ctx.fillText(label, 6, 12);
+}
+
 function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const tickRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+  const lastTimeRef = useRef<number | null>(null);
+  const pathRef = useRef<[number, number][]>([]);
 
-  const simulate = useCallback(() => {
+  const W = 560, H = 160;
+
+  const stopAnim = useCallback(() => {
+    if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    lastTimeRef.current = null;
+    setPlaying(false);
+  }, []);
+
+  const drawStatic = useCallback((atTick?: number) => {
     const cvs = canvasRef.current;
     if (!cvs) return;
     const ctx = cvs.getContext('2d');
     if (!ctx) return;
-
-    const W = cvs.width, H = cvs.height;
-    const type = weapon.projectileType ?? 'physics';
-    const velocityRaw = weapon.velocity as number | undefined;
-    // Blaster has no static velocity — it fires at a fixed speed set by the engine.
-    // Use a representative value so the preview draws something useful.
-    const velocity = velocityRaw ?? (type === 'physics' ? 20 : 0);
-    const gravity = (weapon as Record<string, unknown>).plasmaGravity as number | undefined
-      ?? (type === 'grenade' || type === 'arcing' ? 1.5 : 0);
-    const moveAmount = weapon.moveAmount ?? 1;
-    const radius = weapon.radius ?? 0;
-
-    ctx.fillStyle = '#080f08';
-    ctx.fillRect(0, 0, W, H);
-
-    ctx.strokeStyle = '#1a2e1a';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, H - 20); ctx.lineTo(W, H - 20); ctx.stroke();
-
-    if (velocity === 0 && type !== 'grenade' && type !== 'arcing') {
-      ctx.fillStyle = '#2a4a2a';
-      ctx.font = '10px monospace';
-      ctx.fillText('no velocity — contact / fixed-direction', 10, H / 2);
-      return;
-    }
-
-    const scale = 1.5;
-    const isThrow = type === 'grenade' || type === 'arcing';
-    let x = 20, y = isThrow ? H - 20 : H * 0.6;
-    let xv = velocity * scale;
-    let yv = 0;
-    const path: [number, number][] = [[x, y]];
-
-    if (isThrow) {
-      const throwSpeed = (weapon as Record<string, unknown>).throwSpeedStanding as number ?? 20;
-      xv = throwSpeed * scale * 0.5;
-      yv = -10 * scale;
-    }
-
-    for (let step = 0; step < 800; step++) {
-      const steps = Math.max(1, moveAmount);
-      for (let m = 0; m < steps; m++) {
-        x += xv / steps;
-        y += yv / steps;
-      }
-      if (gravity) yv += gravity * 0.4;
-      if (y >= H - 20 && step > 0) break;
-      if (x > W) break;
-      path.push([x, y]);
-    }
-
-    ctx.strokeStyle = '#00a32888';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    path.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py));
-    ctx.stroke();
-
-    const [ix, iy] = path[path.length - 1];
-    ctx.fillStyle = '#00a328';
-    ctx.beginPath(); ctx.arc(ix, iy, 3, 0, Math.PI * 2); ctx.fill();
-
-    if (radius > 0) {
-      ctx.strokeStyle = '#f59e0b44';
-      ctx.fillStyle = '#f59e0b22';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(ix, iy, radius * scale * 0.5, 0, Math.PI * 2);
-      ctx.fill(); ctx.stroke();
-    }
-
-    const label = [
-      velocityRaw !== undefined ? `v=${velocity}` : `v≈${velocity}(est)`,
-      `steps=${moveAmount}`,
-      gravity ? `g=${gravity}` : null,
-      radius ? `r=${radius}px` : null,
-    ].filter(Boolean).join('  ');
-    ctx.fillStyle = '#4a7a4a';
-    ctx.font = '9px monospace';
-    ctx.fillText(label, 6, 12);
+    const path = pathRef.current;
+    drawFrame(ctx, weapon, path, atTick ?? path.length - 1, W, H);
   }, [weapon]);
 
-  useEffect(() => { simulate(); }, [simulate]);
+  // Rebuild path whenever weapon changes; redraw static frame
+  useEffect(() => {
+    pathRef.current = buildPath(weapon, W, H);
+    tickRef.current = pathRef.current.length - 1;
+    stopAnim();
+    drawStatic();
+  }, [weapon, stopAnim, drawStatic]);
+
+  const startAnim = useCallback(() => {
+    const path = pathRef.current;
+    if (path.length === 0) return;
+    tickRef.current = 0;
+    lastTimeRef.current = null;
+    setPlaying(true);
+
+    const loop = (now: number) => {
+      if (lastTimeRef.current === null) lastTimeRef.current = now;
+      const elapsed = now - lastTimeRef.current;
+      const ticksElapsed = Math.floor(elapsed / (1000 / TICKS_PER_SEC));
+      if (ticksElapsed > 0) {
+        tickRef.current = Math.min(tickRef.current + ticksElapsed, path.length - 1);
+        lastTimeRef.current = now - (elapsed % (1000 / TICKS_PER_SEC));
+        const cvs = canvasRef.current;
+        const ctx = cvs?.getContext('2d');
+        if (ctx) drawFrame(ctx, weapon, path, tickRef.current, W, H);
+        if (tickRef.current >= path.length - 1) { stopAnim(); return; }
+      }
+      rafRef.current = requestAnimationFrame(loop);
+    };
+    rafRef.current = requestAnimationFrame(loop);
+  }, [weapon, stopAnim]);
 
   return (
     <div className="flex flex-col gap-2">
       <canvas
         ref={canvasRef}
-        width={560}
-        height={160}
+        width={W}
+        height={H}
         className="w-full border border-[#1a2e1a] rounded"
         style={{ imageRendering: 'pixelated' }}
       />
-      <button
-        onClick={simulate}
-        className="self-start px-3 py-1 text-[10px] font-mono border border-[#1a2e1a] text-[#4a7a4a] hover:border-[#00a328] hover:text-[#00a328] transition-colors"
-      >
-        ▶ REDRAW
-      </button>
+      <div className="flex gap-2">
+        {!playing ? (
+          <button
+            onClick={startAnim}
+            className="px-3 py-1 text-[10px] font-mono border border-[#1a2e1a] text-[#4a7a4a] hover:border-[#00a328] hover:text-[#00a328] transition-colors"
+          >
+            ▶ PLAY
+          </button>
+        ) : (
+          <button
+            onClick={stopAnim}
+            className="px-3 py-1 text-[10px] font-mono border border-[#1a2e1a] text-[#4a7a4a] hover:border-[#00a328] hover:text-[#00a328] transition-colors"
+          >
+            ■ STOP
+          </button>
+        )}
+        <button
+          onClick={() => { stopAnim(); drawStatic(); }}
+          className="px-3 py-1 text-[10px] font-mono border border-[#1a2e1a] text-[#4a7a4a] hover:border-[#00a328] hover:text-[#00a328] transition-colors"
+        >
+          ↺ RESET
+        </button>
+      </div>
     </div>
   );
 }
