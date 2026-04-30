@@ -184,19 +184,43 @@ export async function startRpcServer(opts: RpcServerOptions): Promise<RpcServer>
           const a = req.args as any;
           const session = opts.manager.getOrThrow(a.name);
           const offs: Array<() => void> = [];
+          let tailEnded = false;
+          // Cleanup helper: unsubscribe all tail listeners and send final reply.
+          const endTail = () => {
+            if (tailEnded) return;
+            tailEnded = true;
+            for (const off of offs.splice(0)) off();
+            tailing.delete(socket);
+            send(socket, { id: req.id, ok: true, result: { event: "end", data: {} }, final: true });
+          };
           for (const ev of TAIL_EVENTS) {
-            offs.push(
-              session.lobby.on(ev, (data: unknown) => {
-                send(socket, {
-                  id: req.id,
-                  ok: true,
-                  result: { event: ev, data },
-                  final: false,
-                });
-              }),
-            );
+            if (ev === "stateChanged") {
+              offs.push(
+                session.lobby.on(ev, (state: unknown) => {
+                  send(socket, {
+                    id: req.id,
+                    ok: true,
+                    result: { event: ev, data: state },
+                    final: false,
+                  });
+                  if (state === "disconnected" || state === "failed") endTail();
+                }),
+              );
+            } else {
+              offs.push(
+                session.lobby.on(ev, (data: unknown) => {
+                  send(socket, {
+                    id: req.id,
+                    ok: true,
+                    result: { event: ev, data },
+                    final: false,
+                  });
+                }),
+              );
+            }
           }
-          tailUnsubs.set(socket, [...(tailUnsubs.get(socket) ?? []), ...offs]);
+          // Register endTail as the cleanup for this tail; it's idempotent.
+          tailUnsubs.set(socket, [...(tailUnsubs.get(socket) ?? []), endTail]);
           return;
         }
         default:
