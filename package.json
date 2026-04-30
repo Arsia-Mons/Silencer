@@ -4,6 +4,7 @@
   "type": "module",
   "workspaces": [
     "clients/cli",
+    "clients/lobby-sdk/ts",
     "services/admin-api",
     "shared/fonts",
     "shared/gas-validation",

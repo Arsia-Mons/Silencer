@@ -9,13 +9,23 @@
       "name": "silencer-cli",
       "bin": {
         "silencer-cli": "./index.ts",
+        "silencer-lobbyd": "./src/lobby/daemon.ts",
       },
       "dependencies": {
         "@silencer/gas-validation": "workspace:*",
+        "@silencer/lobby-sdk": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "^1.3.13",
         "typescript": "^5.4.0",
+      },
+    },
+    "clients/lobby-sdk/ts": {
+      "name": "@silencer/lobby-sdk",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@types/bun": "latest",
+        "typescript": "^5.6.0",
       },
     },
     "services/admin-api": {
@@ -265,6 +275,8 @@
     "@reactflow/node-toolbar": ["@reactflow/node-toolbar@1.3.14", "", { "dependencies": { "@reactflow/core": "11.11.4", "classcat": "^5.0.3", "zustand": "^4.4.1" }, "peerDependencies": { "react": ">=17", "react-dom": ">=17" } }, "sha512-rbynXQnH/xFNu4P9H+hVqlEUafDCkEoCy0Dg9mG22Sg+rY/0ck6KkrAQrYrTgXusd+cEJOMK0uOOFCK2/5rSGQ=="],
 
     "@silencer/gas-validation": ["@silencer/gas-validation@workspace:shared/gas-validation"],
+
+    "@silencer/lobby-sdk": ["@silencer/lobby-sdk@workspace:clients/lobby-sdk/ts"],
 
     "@sindresorhus/is": ["@sindresorhus/is@7.2.0", "", {}, "sha512-P1Cz1dWaFfR4IR+U13mqqiGsLFf1KbayybWwdd2vfctdV6hDpUkgCY0nKOLLTMSoRd/jJNjtbqzf13K8DCCXQw=="],
 
