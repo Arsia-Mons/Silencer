@@ -470,6 +470,13 @@ bool Game::Loop(void){
 		world.DoNetwork();
 		//Uint32 drawtick = SDL_GetTicks();
 		if(!headless || tui) Present();
+		// In TUI mode, the frontend owning our render output may disconnect
+		// (terminal closed, host process killed). TUIBackend tears the socket
+		// down on any write failure; we observe that here and exit cleanly
+		// rather than burning CPU rendering frames nobody reads.
+		if(tui && renderdevice && !renderdevice->IsAlive()){
+			quitRequested = true;
+		}
 		// SDL3GPUBackend's swapchain Present blocks on vsync (~16 ms) so the
 		// non-TUI loop self-throttles. TUIBackend writes to a TCP socket that
 		// never blocks the engine, so without an explicit cap the loop runs

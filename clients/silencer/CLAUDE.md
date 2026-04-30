@@ -167,6 +167,7 @@ usage patterns.
 |------|---------|
 | `--headless` | Skip SDL video/audio init (required in CI) |
 | `--control-port <n>` | Open JSON-lines TCP control socket on port *n* |
+| `--tui` | Stream paletted framebuffer over TCP to the `silencer-tui` host (`SILENCER_TUI_FRAME_HOST/_PORT`); skips SDL video, keeps audio. See `clients/tui/CLAUDE.md`. |
 
 ## Gotchas
 

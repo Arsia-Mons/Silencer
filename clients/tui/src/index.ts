@@ -130,6 +130,16 @@ async function main(): Promise<void> {
     stdin: 'ignore',
   });
 
+  // term.ts handlers for SIGINT/SIGTERM/SIGHUP call process.exit directly
+  // to restore the cursor + alt screen ASAP. They bypass cleanup(), so
+  // register an exit hook to kill the engine — otherwise it stays running
+  // as an orphan with audio looping and CPU burning in SDL_Delay(33).
+  process.on('exit', () => {
+    try {
+      child.kill();
+    } catch {}
+  });
+
   // Stream the engine's stderr to our own stderr but only after exit so it
   // doesn't trample the alt screen mid-render. We hold it in memory in case
   // the user wants it for debugging.

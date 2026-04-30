@@ -25,6 +25,7 @@ public:
 	void UploadFrame(const Uint8 *indexed_pixels, int w, int h) override;
 	void Present() override;
 	void SetScaleFilter(bool /*linear*/) override {}
+	bool IsAlive() const override { return sock >= 0; }
 
 private:
 	bool WriteAll(const void *data, size_t len);

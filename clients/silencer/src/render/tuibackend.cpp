@@ -97,7 +97,13 @@ bool TUIBackend::WriteAll(const void *data, size_t len){
 #else
 		ssize_t n = send(sock, p, left, 0);
 #endif
-		if(n <= 0) return false;
+		if(n <= 0){
+			// Frontend disconnected. Tear the socket down so subsequent
+			// Present() calls bail at the sock < 0 guard, and IsAlive()
+			// flips to false so the game loop exits instead of spinning.
+			Shutdown();
+			return false;
+		}
 		p += n;
 		left -= (size_t)n;
 	}

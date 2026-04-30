@@ -8,6 +8,7 @@ WORKDIR /app
 COPY package.json bun.lock ./
 COPY clients/cli/package.json            ./clients/cli/
 COPY clients/lobby-sdk/ts/package.json   ./clients/lobby-sdk/ts/
+COPY clients/tui/package.json            ./clients/tui/
 COPY services/admin-api/package.json     ./services/admin-api/
 COPY shared/fonts/package.json           ./shared/fonts/
 COPY shared/gas-validation/package.json  ./shared/gas-validation/
