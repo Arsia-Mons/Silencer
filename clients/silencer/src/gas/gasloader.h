@@ -136,6 +136,36 @@ struct PlayerDef {
     std::string soundTeamHeal           = "if15.wav";     // teammate heals player
     std::string soundTeamHack           = "typerev6.wav"; // team hack event echo
     std::string soundRoundCountdown     = "grndown.wav";  // round countdown tick
+    // ---- Player sounds (remaining) ------------------------------------------
+    std::string soundUndeploy           = "transrev.wav"; // undeploy / uncloak / warp-end
+    std::string soundBreath             = "breath2.wav";  // outdoor idle breath
+    std::string soundFootstepCrouchL   = "futstonl.wav"; // crouching footstep left
+    std::string soundFootstepCrouchR   = "futstonr.wav"; // crouching footstep right
+    std::string soundFootstepStairL    = "stostep1.wav"; // stair footstep left
+    std::string soundFootstepStairR    = "stostepr.wav"; // stair footstep right
+    std::string soundBaseAlarm         = "alarm3a.wav";  // base intrusion alarm
+    std::string soundIntrude           = "intrude.wav";  // intrusion detected
+    std::string soundSecurityPass      = "portpas2.wav"; // security card swipe
+    std::string soundRoll              = "roll2.wav";    // roll / dodge
+    std::string soundPickup            = "juunewne.wav"; // item pickup
+    std::string soundJackIn            = "jackin.wav";   // hacking jack-in
+    std::string soundHackAmbient       = "ambloop5.wav"; // hacking ambient loop
+    std::string soundType1             = "type1.wav";    // typing SFX variant 1
+    std::string soundType2             = "type2.wav";    // typing SFX variant 2
+    std::string soundType3             = "type3.wav";    // typing SFX variant 3
+    std::string soundType4             = "type4.wav";    // typing SFX variant 4
+    std::string soundType5             = "type5.wav";    // typing SFX variant 5
+    std::string soundRepair            = "repair.wav";   // resurrection / repair
+    std::string soundHurtA             = "s_hita01.wav"; // player hurt variant A
+    std::string soundHurtB             = "s_hitb01.wav"; // player hurt variant B
+    std::string soundLandCrouch        = "land11.wav";   // landing while crouching
+    std::string soundReload            = "reload2.wav";  // weapon reload / buy
+    std::string soundJetpackLoop       = "jetpak1.wav";  // jetpack looping engine
+    std::string soundLand              = "land1.wav";    // standard landing
+    std::string soundFall              = "fall2b.wav";   // fall impact / wall bounce
+    std::string soundLadder1           = "ladder1.wav";  // ladder step 1
+    std::string soundLadder2           = "ladder2.wav";  // ladder step 2
+    std::string soundPowerUp           = "power11.wav";  // powerup pickup
     // ---- World physics --------------------------------------------------------
     int worldGravity      = 3;   // gravitational acceleration (px/tick²)
     int worldMaxYVelocity = 45;  // terminal falling velocity cap (px/tick)

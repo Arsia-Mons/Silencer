@@ -1178,8 +1178,7 @@ void Player::Tick(World & world){
 		case UNDEPLOYING:{
 			collidable = false;
 			if(state_i == 0 && !world.winningteamid){
-				EmitSound(world, world.resources.soundbank["transrev.wav"], 96);
-			}
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundUndeploy], 96);			}
 			if(!ApplyActorSeq(world, "player", "UNDEPLOYING", state_i, res_bank, res_index)){
 				res_bank  = 68;
 				res_index = (8 - state_i);
@@ -1195,7 +1194,7 @@ void Player::Tick(World & world){
 			xv = 0;
 			yv = 0;
 			if(state_i == 12 && world.map.TestAABB(x, y, x, y, Platform::OUTSIDEROOM)){
-				EmitSound(world, world.resources.soundbank["breath2.wav"], 16);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundBreath], 16);
 				Plume * plume = static_cast<Plume *>(world.CreateObject(ObjectTypes::PLUME));
 				if(plume){
 					plume->type = 8;
@@ -1493,7 +1492,7 @@ void Player::Tick(World & world){
 					res_bank = 66;
 					res_index = state_i;
 					if(res_index == 3){
-						EmitSound(world, world.resources.soundbank["futstonl.wav"], 24);
+						EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 24);
 					}
 				}
 			}
@@ -1507,17 +1506,17 @@ void Player::Tick(World & world){
 					res_bank = 123;
 				}
 				if(res_index == 4){
-					EmitSound(world, world.resources.soundbank["futstonl.wav"], 24);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 24);
 				}
 				if(res_index == 11){
-					EmitSound(world, world.resources.soundbank["futstonr.wav"], 24);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchR], 24);
 				}
 			}
 			if(state_i >= 21 && state_i < 25){
 				res_bank = 67;
 				res_index = state_i - 21;
 				if(res_index == 3){
-					EmitSound(world, world.resources.soundbank["futstonl.wav"], 24);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 24);
 				}
 				if(input.keymoveleft || input.keymoveright){
 					state_i = -1;
@@ -1539,10 +1538,10 @@ void Player::Tick(World & world){
 					state_i = 25 - 1;
 				}
 				if(res_index == 5){
-					EmitSound(world, world.resources.soundbank["stostep1.wav"], 16);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepStairL], 16);
 				}
 				if(res_index == 15){
-					EmitSound(world, world.resources.soundbank["stostepr.wav"], 16);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepStairR], 16);
 				}
 			}
 			//printf("bank: %d  index: %d\n", res_bank, res_index);
@@ -1574,9 +1573,9 @@ void Player::Tick(World & world){
 						for(int i = 0; i < 4; i++){
 							Peer * peer = world.peerlist[team->peers[i]];
 							if(peer){
-								world.SendSound("alarm3a.wav", peer, 96);
+								world.SendSound(GASLoader::Get().player.soundBaseAlarm.c_str(), peer, 96);
 								if(discovered){
-									world.SendSound("intrude.wav", peer, 96);
+									world.SendSound(GASLoader::Get().player.soundIntrude.c_str(), peer, 96);
 								}
 							}
 						}
@@ -1600,7 +1599,7 @@ void Player::Tick(World & world){
 				res_index = state_i;
 			}
 			if(state_i == 1){
-				EmitSound(world, world.resources.soundbank["portpas2.wav"], 32);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundSecurityPass], 32);
 			}
 			if(state_i >= 15){
 				collidable = true;
@@ -1634,7 +1633,7 @@ void Player::Tick(World & world){
 			collidable = false;
 			xv = 0;
 			if(state_i == 0){
-				EmitSound(world, world.resources.soundbank["portpas2.wav"], 32);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundSecurityPass], 32);
 			}
 			if(!ApplyActorSeq(world, "player", "WALKOUT", state_i, res_bank, res_index)){
 				res_bank  = 19;
@@ -1707,7 +1706,7 @@ void Player::Tick(World & world){
 		}break;
 		case CROUCHED:{
 			if(state_i == 12 && world.map.TestAABB(x, y, x, y, Platform::OUTSIDEROOM)){
-				EmitSound(world, world.resources.soundbank["breath2.wav"], 16);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundBreath], 16);
 				Plume * plume = static_cast<Plume *>(world.CreateObject(ObjectTypes::PLUME));
 				if(plume){
 					plume->type = 8;
@@ -1836,7 +1835,7 @@ void Player::Tick(World & world){
 				res_index = state_i;
 			}
 			if(res_index == 0 && res_bank == 88){
-				EmitSound(world, world.resources.soundbank["roll2.wav"], 32);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundRoll], 32);
 			}
 			if(state_i >= 8){
 				if(state_i >= 10){
@@ -1927,7 +1926,7 @@ void Player::Tick(World & world){
 			}
 			////
 			
-			EmitSound(world, world.resources.soundbank["juunewne.wav"], 96);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundPickup], 96);
 			yv = v;
 			xv2 = xv;
 			yv2 = yv;
@@ -2154,11 +2153,11 @@ void Player::Tick(World & world){
 			}
 			if(hackable && terminal){
 				if(state_i == 14){
-					EmitSound(world, world.resources.soundbank["jackin.wav"], 30);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundJackIn], 30);
 				}
 				if(state_i >= 14 && state_i <= 16){
 					if(hacksoundchannel == -1){
-						hacksoundchannel = EmitSound(world, world.resources.soundbank["ambloop5.wav"], 40, true);
+						hacksoundchannel = EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundHackAmbient], 40, true);
 					}
 				}
 			}
@@ -2200,8 +2199,9 @@ void Player::Tick(World & world){
 							oldfiles += 6;
 						}*/
 						if(hackingbonustime > world.tickcount && world.tickcount % ((rand() % 4) + 6) == 0){
-							const char * sounds[] = {"type1.wav", "type2.wav", "type3.wav", "type4.wav", "type5.wav"};
-							EmitSound(world, world.resources.soundbank[sounds[rand() % (sizeof(sounds) / sizeof(const char *))]], 64);
+							{ const PlayerDef& _pd = GASLoader::Get().player;
+							  const std::string* typesounds[] = {&_pd.soundType1, &_pd.soundType2, &_pd.soundType3, &_pd.soundType4, &_pd.soundType5};
+							  EmitSound(world, world.resources.soundbank[*typesounds[rand() % 5]], 64); }
 						}
 						effecthacking = true;
 						effecthackingcontinue = GASLoader::Get().player.hackingEffectTicks;
@@ -2504,7 +2504,7 @@ void Player::Tick(World & world){
 			draw = true;
 			res_bank = 198;
 			if(state_i == 0){
-				EmitSound(world, world.resources.soundbank["transrev.wav"], 64);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundUndeploy], 64);
 			}
 			if(state_i / 2 > 27){
 				//rocketammo = 10;
@@ -2533,7 +2533,7 @@ void Player::Tick(World & world){
 			res_bank = 199;
 			res_index = state_i / 2;
 			if(state_i == 2){
-				EmitSound(world, world.resources.soundbank["repair.wav"], 128);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundRepair], 128);
 			}
 			if(state_i >= 27 * 2){
 				health = maxhealth;
@@ -2732,9 +2732,9 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	UnDisguise(world);
 	if(world.tickcount - hitsoundplaytick > 10){
 		if(rand() % 2 == 0){
-			EmitSound(world, world.resources.soundbank["s_hita01.wav"]);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundHurtA]);
 		}else{
-			EmitSound(world, world.resources.soundbank["s_hitb01.wav"]);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundHurtB]);
 		}
 		hitsoundplaytick = world.tickcount;
 	}
@@ -3017,8 +3017,8 @@ bool Player::CheckForGround(World & world, Platform & platform){
 	justjumpedfromladder = false;
 	int yt = platform.XtoY(x);
 	if(y <= yt || ((platform.type == Platform::STAIRSUP || platform.type == Platform::STAIRSDOWN) && y <= yt + 1)){
-		EmitSound(world, world.resources.soundbank["futstonr.wav"], 32);
-		EmitSound(world, world.resources.soundbank["land11.wav"], 96);
+		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchR], 32);
+		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLandCrouch], 96);
 		yv = 0;
 		currentplatformid = platform.id;
 		y = yt;
@@ -3422,7 +3422,7 @@ bool Player::BuyItem(World & world, Uint8 id){
 			}break;
 		}
 		if(bought){
-			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
 			world.BuyItem(id);
 			Peer * peer = GetPeer(world);
 			if(peer) peer->stats.creditsspent += buyableitem->price;
@@ -3453,7 +3453,7 @@ bool Player::RepairItem(World & world, Uint8 id){
 			}
 			
 			team->disabledtech &= ~(buyableitem->techchoice);
-			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
 			world.RepairItem(id);
 			Peer * peer = GetPeer(world);
 			if(peer) peer->stats.creditsspent += buyableitem->repairprice;
@@ -3486,7 +3486,7 @@ bool Player::VirusItem(World & world, Uint8 id){
 				}
 				
 				team->disabledtech |= buyableitem->techchoice;
-				EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
 				world.VirusItem(id);
 				RemoveInventoryItem(INV_VIRUS);
 				return true;
@@ -3825,7 +3825,7 @@ bool Player::ProcessJetpackState(World & world){
 		fuel--;
 	}
 	if(jetpacksoundchannel == -1){
-		jetpacksoundchannel = EmitSound(world, world.resources.soundbank["jetpak1.wav"], 64, true);
+		jetpacksoundchannel = EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundJetpackLoop], 64, true);
 	}
 	/*if(currentplatformid){
 		y--;
@@ -3919,7 +3919,7 @@ bool Player::ProcessJetpackState(World & world){
 			xv /= 2;
 			yv /= 2;
 			if(abs(xv) >= 2 || abs(yv) >= 2){
-				EmitSound(world, world.resources.soundbank["land1.wav"], 96);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLand], 96);
 			}
 		}
 	}
@@ -3988,7 +3988,7 @@ bool Player::ProcessFallingState(World & world){
 			xv = (xn * abs(xv)) / 2;
 			yv = (yn * abs(yv)) / 2;
 			if(abs(xv) >= 2 || abs(yv) >= 2){
-				EmitSound(world, world.resources.soundbank["fall2b.wav"], 96);
+				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFall], 96);
 			}
 		}
 	}else{
@@ -4228,10 +4228,10 @@ bool Player::ProcessLadderState(World &world){
 	}
 	res_index = state_i;
 	if(res_index == 4){
-		EmitSound(world, world.resources.soundbank["ladder1.wav"], 24);
+		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLadder1], 24);
 	}
 	if(res_index == 15){
-		EmitSound(world, world.resources.soundbank["ladder2.wav"], 24);
+		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLadder2], 24);
 	}
 	return false;
 }
@@ -4260,7 +4260,7 @@ void Player::Warp(World & world, Sint16 x, Sint16 y){
 		warpx = x;
 		warpy = y;
 		state_warp = 1;
-		EmitSound(world, world.resources.soundbank["transrev.wav"], 96);
+		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundUndeploy], 96);
 	}
 }
 
@@ -4306,7 +4306,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 			effecthacking = true;
 			effecthackingcontinue = 5;
-			EmitSound(world, world.resources.soundbank["power11.wav"], 64);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundPowerUp], 64);
 		}break;
 		case PickUp::LASERAMMO:{
 			laserammo += pickup.quantity;
@@ -4321,7 +4321,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Laser ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
 		}break;
 		case PickUp::ROCKETAMMO:{
 			rocketammo += pickup.quantity;
@@ -4336,7 +4336,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Rocket ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
 		}break;
 		case PickUp::FLAMERAMMO:{
 			flamerammo += pickup.quantity;
@@ -4351,7 +4351,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "Picked up %d Flamer ammo", pickup.quantity);
 				world.ShowStatus(temp);
 			}
-			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
 		}break;
 		case PickUp::NEUTRONBOMB:{
 			if(!pickup.powerup){
@@ -4400,7 +4400,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 			}
 		}
 		if(added){
-			EmitSound(world, world.resources.soundbank["reload2.wav"], 96);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundReload], 96);
 			if(islocalplayer){
 				char temp[256];
 				sprintf(temp, "Picked up %d %s", pickup.quantity, invname);
@@ -4421,7 +4421,9 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				case PickUp::NEUTRONBOMB:{
 					powerupname = "Neutron Bomb activation in 15 seconds!";
 					pickup.ArmNeutron(id);
-					world.SendSound("grenade1.wav");
+					{ const WeaponDef* _nw = GASLoader::Get().GetWeaponDef("neutronbomb");
+					  const std::string& _ns = (_nw && !_nw->soundHit1.empty()) ? _nw->soundHit1 : "grenade1.wav";
+					  world.SendSound(_ns.c_str()); }
 					char text[256];
 					const char * username = "???";
 					Peer * peer = GetPeer(world);
@@ -4466,7 +4468,7 @@ bool Player::PickUpItem(World & world, PickUp & pickup){
 				sprintf(temp, "%s", powerupname);
 				world.ShowStatus(temp);
 			}
-			EmitSound(world, world.resources.soundbank["power11.wav"], 96);
+			EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundPowerUp], 96);
 		}
 		/*	pickup.draw = false;
 			pickup.quantity = pickup.poweruprespawntime;

@@ -126,6 +126,35 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.soundTeamHeal       = j.value("soundTeamHeal",       out.soundTeamHeal);
         out.soundTeamHack       = j.value("soundTeamHack",       out.soundTeamHack);
         out.soundRoundCountdown = j.value("soundRoundCountdown", out.soundRoundCountdown);
+        out.soundUndeploy         = j.value("soundUndeploy",         out.soundUndeploy);
+        out.soundBreath           = j.value("soundBreath",           out.soundBreath);
+        out.soundFootstepCrouchL  = j.value("soundFootstepCrouchL",  out.soundFootstepCrouchL);
+        out.soundFootstepCrouchR  = j.value("soundFootstepCrouchR",  out.soundFootstepCrouchR);
+        out.soundFootstepStairL   = j.value("soundFootstepStairL",   out.soundFootstepStairL);
+        out.soundFootstepStairR   = j.value("soundFootstepStairR",   out.soundFootstepStairR);
+        out.soundBaseAlarm        = j.value("soundBaseAlarm",        out.soundBaseAlarm);
+        out.soundIntrude          = j.value("soundIntrude",          out.soundIntrude);
+        out.soundSecurityPass     = j.value("soundSecurityPass",     out.soundSecurityPass);
+        out.soundRoll             = j.value("soundRoll",             out.soundRoll);
+        out.soundPickup           = j.value("soundPickup",           out.soundPickup);
+        out.soundJackIn           = j.value("soundJackIn",           out.soundJackIn);
+        out.soundHackAmbient      = j.value("soundHackAmbient",      out.soundHackAmbient);
+        out.soundType1            = j.value("soundType1",            out.soundType1);
+        out.soundType2            = j.value("soundType2",            out.soundType2);
+        out.soundType3            = j.value("soundType3",            out.soundType3);
+        out.soundType4            = j.value("soundType4",            out.soundType4);
+        out.soundType5            = j.value("soundType5",            out.soundType5);
+        out.soundRepair           = j.value("soundRepair",           out.soundRepair);
+        out.soundHurtA            = j.value("soundHurtA",            out.soundHurtA);
+        out.soundHurtB            = j.value("soundHurtB",            out.soundHurtB);
+        out.soundLandCrouch       = j.value("soundLandCrouch",       out.soundLandCrouch);
+        out.soundReload           = j.value("soundReload",           out.soundReload);
+        out.soundJetpackLoop      = j.value("soundJetpackLoop",      out.soundJetpackLoop);
+        out.soundLand             = j.value("soundLand",             out.soundLand);
+        out.soundFall             = j.value("soundFall",             out.soundFall);
+        out.soundLadder1          = j.value("soundLadder1",          out.soundLadder1);
+        out.soundLadder2          = j.value("soundLadder2",          out.soundLadder2);
+        out.soundPowerUp          = j.value("soundPowerUp",          out.soundPowerUp);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] player.json field error: %s\n", e.what());
     }
