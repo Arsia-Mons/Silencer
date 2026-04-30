@@ -1,8 +1,8 @@
 # services/lobby/ — Go lobby server
 
-Pairs players, hosts the game-listing browser, brokers chat, and
-spawns dedicated `silencer -s` game servers when someone hits "Create
-Game". Build/run/flags and the how-it-works narrative live in
+Hosts the game-listing browser, brokers chat, tracks who's online,
+and spawns dedicated `silencer -s` game servers when someone hits
+"Create Game". Build/run/flags and the how-it-works narrative live in
 [`README.md`](README.md); this file is for editing the code.
 
 Stack: Go stdlib + `mongo-driver` (only when `MONGO_URL` set) +

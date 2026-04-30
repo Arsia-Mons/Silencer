@@ -11,7 +11,8 @@ routed three ways:
 
 - **Game-control** commands → JSON-line TCP to a running game
   (`silencer --headless --control-port <P>`). Server side lives in
-  `clients/silencer/src/control/`.
+  `clients/silencer/src/net/controlserver.{h,cpp}` (accept loop +
+  framing) and `controldispatch.{h,cpp}` (per-op handlers).
 - **Local** commands (`gas validate`, anything in `LOCAL_OPS` at the
   top of `index.ts`) → in-process. No socket, no daemon. Used in
   tight edit loops where startup cost matters.
@@ -51,7 +52,6 @@ For lobby commands the boundary rules differ — see `src/lobby/CLAUDE.md`.
 
 ## Docs
 
-- [`docs/superpowers/specs/2026-04-26-cli-agent-control-design.md`](../../docs/superpowers/specs/2026-04-26-cli-agent-control-design.md)
-  — full wire-protocol spec.
 - [`shared/skills/cli/SKILL.md`](../../shared/skills/cli/SKILL.md)
-  — user-facing guide; quick wire-protocol summary at the bottom.
+  — user-facing guide. Wire-protocol reference is at the bottom
+  ("If you need to skip the wrapper").
