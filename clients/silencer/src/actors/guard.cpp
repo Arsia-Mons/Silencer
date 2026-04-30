@@ -784,17 +784,13 @@ void Guard::Tick(World & world){
 		case DYING:{
 			if(state_i == 0){
 				const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
-				switch(rand() % 3){
-					case 0:
-						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt1.empty()) ? gd->soundHurt1 : "groan2.wav"], 128);
-						break;
-					case 1:
-						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt2.empty()) ? gd->soundHurt2 : "groan2a.wav"], 128);
-						break;
-					case 2:
-						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt3.empty()) ? gd->soundHurt3 : "grunt2a.wav"], 128);
-						break;
-				}
+				static const EnemyDef _ged;
+				const std::string* hurts[] = {
+					gd ? &gd->soundHurt1 : &_ged.soundHurt1,
+					gd ? &gd->soundHurt2 : &_ged.soundHurt2,
+					gd ? &gd->soundHurt3 : &_ged.soundHurt3
+				};
+				EmitSound(world, world.resources.soundbank[*hurts[rand() % (int)(sizeof(hurts)/sizeof(hurts[0]))]], 128);
 			}
 			collidable = false;
 			if(state_i >= 10){

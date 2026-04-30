@@ -155,17 +155,13 @@ void Civilian::Tick(World & world){
 			tractteamid = 0;
 			if(state_i == 0){
 				const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
-				switch(rand() % 3){
-					case 0:
-						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt1.empty()) ? gd->soundHurt1 : "groan2.wav"], 128);
-					break;
-					case 1:
-						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt2.empty()) ? gd->soundHurt2 : "groan2a.wav"], 128);
-					break;
-					case 2:
-						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt3.empty()) ? gd->soundHurt3 : "grunt2a.wav"], 128);
-					break;
-				}
+				static const EnemyDef _ced;
+				const std::string* hurts[] = {
+					gd ? &gd->soundHurt1 : &_ced.soundHurt1,
+					gd ? &gd->soundHurt2 : &_ced.soundHurt2,
+					gd ? &gd->soundHurt3 : &_ced.soundHurt3
+				};
+				EmitSound(world, world.resources.soundbank[*hurts[rand() % (int)(sizeof(hurts)/sizeof(hurts[0]))]], 128);
 			}
 			collidable = false;
 			if(state_i >= 14){
@@ -181,17 +177,13 @@ void Civilian::Tick(World & world){
 			tractteamid = 0;
 			if(state_i == 0){
 				const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
-				switch(rand() % 3){
-					case 0:
-						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt1.empty()) ? gd->soundHurt1 : "groan2.wav"], 128);
-					break;
-					case 1:
-						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt2.empty()) ? gd->soundHurt2 : "groan2a.wav"], 128);
-					break;
-					case 2:
-						EmitSound(world, world.resources.soundbank[(gd && !gd->soundHurt3.empty()) ? gd->soundHurt3 : "grunt2a.wav"], 128);
-					break;
-				}
+				static const EnemyDef _ced;
+				const std::string* hurts[] = {
+					gd ? &gd->soundHurt1 : &_ced.soundHurt1,
+					gd ? &gd->soundHurt2 : &_ced.soundHurt2,
+					gd ? &gd->soundHurt3 : &_ced.soundHurt3
+				};
+				EmitSound(world, world.resources.soundbank[*hurts[rand() % (int)(sizeof(hurts)/sizeof(hurts[0]))]], 128);
 			}
 			collidable = false;
 			if(state_i >= 14){

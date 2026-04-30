@@ -1,4 +1,5 @@
 #include "bodypart.h"
+#include "../gas/gasloader.h"
 
 BodyPart::BodyPart() : Object(ObjectTypes::BODYPART){
 	res_bank = 0xFF;
@@ -7,8 +8,9 @@ BodyPart::BodyPart() : Object(ObjectTypes::BODYPART){
 	state_i = 0;
 	type = 0;
 	suitcolor = 0;
-	xv = (rand() % 33) - 16;
-	yv = (rand() % 33) - 16;
+	{ int _bvr = GASLoader::Get().world.bodyPartVelocityRange;
+	  xv = (rand() % (2 * _bvr + 1)) - _bvr;
+	  yv = (rand() % (2 * _bvr + 1)) - _bvr; }
 	isphysical = true;
 }
 

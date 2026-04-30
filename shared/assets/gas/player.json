@@ -139,5 +139,9 @@
   "aiHackInterval": 3,
   "aiLadderJumpUpInterval": 12,
   "aiLadderJumpDownInterval": 5,
-  "aiArrivalThreshold": 8
+  "aiArrivalThreshold": 8,
+  "deathDropXVRange": 4,
+  "deathDropYV": 15,
+  "govtKillPlasmaXVRange": 8,
+  "govtKillPlasmaYVRange": 37
 }

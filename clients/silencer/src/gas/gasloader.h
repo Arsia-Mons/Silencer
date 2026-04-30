@@ -127,6 +127,10 @@ struct PlayerDef {
     int aiLadderJumpUpInterval      = 12;   // AI: 1-in-N chance per tick to jump while climbing up
     int aiLadderJumpDownInterval    = 5;    // AI: 1-in-N chance per tick to jump while descending
     int aiArrivalThreshold          = 8;    // AI: px distance considered close enough to target
+    int deathDropXVRange            = 4;    // ±px/tick random horizontal velocity of dropped pickups
+    int deathDropYV                 = 15;   // upward launch yv of dropped pickups (stored positive)
+    int govtKillPlasmaXVRange       = 8;    // govt-kill plasma bolt xv scatter range (% (2*range+1) - range)
+    int govtKillPlasmaYVRange       = 37;   // govt-kill plasma bolt yv scatter range (% range downward)
     int ladderSpeedReduction        = 4;    // px/tick subtracted from run speed on ladders
     int disguisedDecelSpeed         = 4;    // xv snap when decelerating while disguised
     int disguisedDecelSpeedSecret   = 2;    // xv snap when decelerating while disguised + carrying secret
@@ -514,6 +518,7 @@ struct WorldDef {
     // Body part death spawn physics
     int bodyPartSpawnYOffset      = 50;    // px above object center where body parts spawn
     int bodyPartLaunchYV          = 20;    // upward velocity applied to body parts on death
+    int bodyPartVelocityRange     = 16;    // ±px/tick random xv/yv for body part scatter
 };
 
 // ---- Game Engine -----------------------------------------------------------

@@ -109,6 +109,10 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.aiLadderJumpUpInterval     = j.value("aiLadderJumpUpInterval",     out.aiLadderJumpUpInterval);
         out.aiLadderJumpDownInterval   = j.value("aiLadderJumpDownInterval",   out.aiLadderJumpDownInterval);
         out.aiArrivalThreshold         = j.value("aiArrivalThreshold",         out.aiArrivalThreshold);
+        out.deathDropXVRange           = j.value("deathDropXVRange",           out.deathDropXVRange);
+        out.deathDropYV                = j.value("deathDropYV",                out.deathDropYV);
+        out.govtKillPlasmaXVRange      = j.value("govtKillPlasmaXVRange",      out.govtKillPlasmaXVRange);
+        out.govtKillPlasmaYVRange      = j.value("govtKillPlasmaYVRange",      out.govtKillPlasmaYVRange);
         out.ladderSpeedReduction       = j.value("ladderSpeedReduction",       out.ladderSpeedReduction);
         out.disguisedDecelSpeed        = j.value("disguisedDecelSpeed",        out.disguisedDecelSpeed);
         out.disguisedDecelSpeedSecret  = j.value("disguisedDecelSpeedSecret",  out.disguisedDecelSpeedSecret);
@@ -584,6 +588,7 @@ static void LoadWorld(const std::string& dir, WorldDef& out) {
         out.terminalSmallBeamRange    = j.value("terminalSmallBeamRange",    out.terminalSmallBeamRange);
         out.bodyPartSpawnYOffset      = j.value("bodyPartSpawnYOffset",      out.bodyPartSpawnYOffset);
         out.bodyPartLaunchYV          = j.value("bodyPartLaunchYV",          out.bodyPartLaunchYV);
+        out.bodyPartVelocityRange     = j.value("bodyPartVelocityRange",     out.bodyPartVelocityRange);
         out.minWallDistance           = j.value("minWallDistance",           out.minWallDistance);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] world.json error: %s\n", e.what());

@@ -2205,7 +2205,7 @@ void Player::Tick(World & world){
 						if(hackingbonustime > world.tickcount && world.tickcount % ((rand() % GASLoader::Get().player.hackingSoundIntervalRandom) + GASLoader::Get().player.hackingSoundIntervalBase) == 0){
 							{ const PlayerDef& _pd = GASLoader::Get().player;
 							  const std::string* typesounds[] = {&_pd.soundType1, &_pd.soundType2, &_pd.soundType3, &_pd.soundType4, &_pd.soundType5};
-							  EmitSound(world, world.resources.soundbank[*typesounds[rand() % 5]], 64); }
+							  EmitSound(world, world.resources.soundbank[*typesounds[rand() % (int)(sizeof(typesounds)/sizeof(typesounds[0]))]], 64); }
 						}
 						effecthacking = true;
 						effecthackingcontinue = GASLoader::Get().player.hackingEffectTicks;
@@ -3535,8 +3535,9 @@ void Player::KillByGovt(World & world){
 			if(plasmaprojectile){
 				plasmaprojectile->x = x;
 				plasmaprojectile->y = y - 10;
-				plasmaprojectile->xv = (world.Random() % 17) - 8;
-				plasmaprojectile->yv = -(world.Random() % 37);
+			{ const PlayerDef& _pgk = GASLoader::Get().player;
+			plasmaprojectile->xv = (world.Random() % (2 * _pgk.govtKillPlasmaXVRange + 1)) - _pgk.govtKillPlasmaXVRange;
+				plasmaprojectile->yv = -(world.Random() % _pgk.govtKillPlasmaYVRange); }
 				plasmaprojectile->ownerid = govtprojectile.ownerid;
 			}
 		}
@@ -4637,8 +4638,9 @@ PickUp * Player::DropItem(World & world, Uint8 type, Uint16 quantity){
 		pickup->type = type;
 		pickup->x = x;
 		pickup->y = y - 1;
-		pickup->xv = (world.Random() % 9) - 4;
-		pickup->yv = -15;
+		{ const PlayerDef& _ppd = GASLoader::Get().player;
+		  pickup->xv = (world.Random() % (2 * _ppd.deathDropXVRange + 1)) - _ppd.deathDropXVRange;
+		  pickup->yv = -_ppd.deathDropYV; }
 		pickup->quantity = quantity;
 	}
 	return pickup;
