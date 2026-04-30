@@ -10,6 +10,7 @@
 #include "keybinds.h"
 #include "config.h"
 #include "gasloader.h"
+#include "input.h"
 #include "os.h"
 #include "shared.h"
 #include <cstring>
@@ -280,6 +281,51 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	}
 	if(cmd.op == "gas"){
 		HandleGas(game, cmd);
+		return;
+	}
+	if(cmd.op == "input"){
+		// Stamp world.localinput from the JSON payload. TUI mode replaces SDL
+		// keyboard polling with this op; non-TUI clients can also drive input
+		// programmatically. Last-write-wins per tick.
+		Input& in = game.GetWorld().localinput;
+		const nlohmann::json& a = cmd.args;
+		auto getb = [&](const char* k, bool& out){
+			if(a.contains(k) && a[k].is_boolean()) out = a[k].get<bool>();
+		};
+		getb("keymoveup",       in.keymoveup);
+		getb("keymovedown",     in.keymovedown);
+		getb("keymoveleft",     in.keymoveleft);
+		getb("keymoveright",    in.keymoveright);
+		getb("keylookupleft",   in.keylookupleft);
+		getb("keylookupright",  in.keylookupright);
+		getb("keylookdownleft", in.keylookdownleft);
+		getb("keylookdownright",in.keylookdownright);
+		getb("keynextinv",      in.keynextinv);
+		getb("keynextcam",      in.keynextcam);
+		getb("keyprevcam",      in.keyprevcam);
+		getb("keydetonate",     in.keydetonate);
+		getb("keyjump",         in.keyjump);
+		getb("keyjetpack",      in.keyjetpack);
+		getb("keyactivate",     in.keyactivate);
+		getb("keyuse",          in.keyuse);
+		getb("keyfire",         in.keyfire);
+		getb("keydisguise",     in.keydisguise);
+		getb("keynextweapon",   in.keynextweapon);
+		getb("keyup",           in.keyup);
+		getb("keydown",         in.keydown);
+		getb("keyleft",         in.keyleft);
+		getb("keyright",        in.keyright);
+		getb("keychat",         in.keychat);
+		getb("mousedown",       in.mousedown);
+		if(a.contains("keyweapon") && a["keyweapon"].is_array()){
+			const auto& kw = a["keyweapon"];
+			for(int i = 0; i < 4 && i < (int)kw.size(); i++){
+				if(kw[i].is_boolean()) in.keyweapon[i] = kw[i].get<bool>();
+			}
+		}
+		if(a.contains("mousex") && a["mousex"].is_number()) in.mousex = (Uint16)a["mousex"].get<int>();
+		if(a.contains("mousey") && a["mousey"].is_number()) in.mousey = (Uint16)a["mousey"].get<int>();
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));

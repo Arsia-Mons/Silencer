@@ -1,6 +1,7 @@
 #include "game.h"
 #include "controldispatch.h"
 #include "sdl3gpubackend.h"
+#include "tuibackend.h"
 #include <math.h>
 #include "overlay.h"
 #include "interface.h"
@@ -88,6 +89,7 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	replayfile = 0;
 	controlPort = 0;
 	headless = false;
+	tui = false;
 	paused = false;
 	stepFramesRemaining = 0;
 	stepWallclockDeadlineMs = 0;
@@ -182,6 +184,9 @@ bool Game::Load(char * cmdline){
 			else if(strcmp(cmdline, "--headless") == 0){
 				headless = true;
 			}
+			else if(strcmp(cmdline, "--tui") == 0){
+				tui = true;
+			}
 		}while((cmdline = strtok(0, " ")));
 	}
 	Config::GetInstance().Load();
@@ -196,18 +201,41 @@ bool Game::Load(char * cmdline){
 	if(!world.dedicatedserver.active){
 		// SDL_INIT_GAMEPAD is opt-in; without it SDL_GetGamepads() returns
 		// nothing. Headless builds (CI / control-socket smoke tests) skip it
-		// since they don't need controller input.
-		Uint32 sdlflags = headless ? 0 : (SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD);
+		// since they don't need controller input. TUI mode keeps audio so the
+		// engine's normal mixer path works, but skips video and gamepad.
+		Uint32 sdlflags;
+		if(tui){
+			sdlflags = SDL_INIT_AUDIO;
+		}else if(headless){
+			sdlflags = 0;
+		}else{
+			sdlflags = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD;
+		}
 		if(!SDL_Init(sdlflags)){
 			printf("Could not initialize SDL %s\n", SDL_GetError());
 			return false;
 		}
-		if(!headless) OpenFirstGamepad();
+		if(!headless && !tui) OpenFirstGamepad();
 		printf("Loading palette...\n");
 		if(!renderer.palette.SetPalette(0)){
 			return false;
 		}
-		if(!headless){
+		if(tui){
+			if(!MIX_Init()){
+				printf("Could not initialize SDL_mixer: %s\n", SDL_GetError());
+			}
+			if(!Audio::GetInstance().Init(this)){
+				printf("Could not initialize audio\n");
+			}
+			Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
+			// No SDL_AddTimer (FPS counter title bar is window-only).
+			// No window — TUIBackend connects to the TS frontend over TCP.
+			if(!SetupRenderDevice()){
+				printf("Could not initialize TUI render device\n");
+				return false;
+			}
+			SetColors(renderer.palette.GetColors());
+		}else if(!headless){
 			if(!MIX_Init()){
 				printf("Could not initialize SDL_mixer: %s\n", SDL_GetError());
 			}
@@ -264,6 +292,17 @@ bool Game::Load(char * cmdline){
 }
 
 bool Game::SetupRenderDevice(void){
+	if(tui){
+		TUIBackend *backend = new TUIBackend();
+		if(!backend->Init(nullptr)){
+			delete backend;
+			return false;
+		}
+		renderdevice = backend;
+		// TUIBackend ignores SetScaleFilter; safe to call.
+		renderdevice->SetScaleFilter(false);
+		return true;
+	}
 	SDL3GPUBackend *backend = new SDL3GPUBackend();
 	if(!backend->Init(window)){
 		delete backend;
@@ -364,7 +403,9 @@ bool Game::Loop(void){
 		world.systemcameraactive[0] = false;
 		world.systemcameraactive[1] = false;
 		world.DoNetwork();
-		UpdateInputState(world.localinput);
+		// In TUI mode, world.localinput is stamped by the control socket's
+		// "input" op handler; SDL keyboard polling is unavailable.
+		if(!tui) UpdateInputState(world.localinput);
 		world.SendInput();
 		if(!Tick()){
 			return false;
@@ -428,7 +469,14 @@ bool Game::Loop(void){
 		}
 		world.DoNetwork();
 		//Uint32 drawtick = SDL_GetTicks();
-		if(!headless) Present();
+		if(!headless || tui) Present();
+		// SDL3GPUBackend's swapchain Present blocks on vsync (~16 ms) so the
+		// non-TUI loop self-throttles. TUIBackend writes to a TCP socket that
+		// never blocks the engine, so without an explicit cap the loop runs
+		// thousands of times per second. Sleep enough to land at ~30 fps —
+		// well above the 24 Hz sim rate (catch-up loop handles the sim
+		// cadence) and well below "burn a CPU core for no reason".
+		if(tui) SDL_Delay(33);
 		PostFrameReplies();
 		//Uint32 afterdrawtick = SDL_GetTicks();
 		/*if(1 || afterdrawtick - drawtick > wait){
@@ -5986,7 +6034,7 @@ bool Game::HandleSDLEvents(void){
 	if(world.dedicatedserver.active){
 		return true;
 	}
-	if(headless){
+	if(headless || tui){
 		// SDL_INIT_VIDEO was skipped, so `window` is NULL; event handlers below
 		// would deref it via SDL_GetWindowSize. Bail before SDL_PollEvent.
 		return true;

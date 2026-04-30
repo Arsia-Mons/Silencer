@@ -56,6 +56,10 @@ public:
 	Uint64 stepWallclockDeadlineMs;
 	int controlPort;
 	bool headless;
+	// TUI mode: audio enabled, no SDL window/events, frames stream to a TS
+	// frontend over TCP via TUIBackend. Input arrives via the control socket
+	// "input" op rather than SDL keyboard polling.
+	bool tui;
 
 	// Keybind access for ControlDispatch.
 	KeyMap& GetKeyMap() { return keymap; }
