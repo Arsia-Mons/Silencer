@@ -78,5 +78,10 @@
   "worldGravity": 3,
   "worldMaxYVelocity": 45,
   "playerHeight": 50,
-  "snapshotInterval": 24
+  "snapshotInterval": 24,
+  "shieldShrapnelThreshold": 60,
+  "shrapnelCount": 8,
+  "shrapnelSpeed": 4.0,
+  "flamerSoundInterval": 4,
+  "shieldEffectTicks": 48
 }

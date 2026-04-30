@@ -59,20 +59,26 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 			switch(projectile.type){
 				case ObjectTypes::BLASTERPROJECTILE:
 				case ObjectTypes::LASERPROJECTILE:
-				case ObjectTypes::ROCKETPROJECTILE:
-					for(int i = 0; i < 8; i++){
-						Shrapnel * shrapnel = (Shrapnel *)world.CreateObject(ObjectTypes::SHRAPNEL);
-						if(shrapnel){
-							shrapnel->x = projectile.x;
-							shrapnel->y = projectile.y;
-							shrapnel->res_index = rand() % 9;
-							shrapnel->res_bank = 110;
-							float angle = (i / float(8)) * (2 * 3.14);
-							angle += (rand() % 10) / float(10);
-							shrapnel->xv = (sin(angle)) * 4;
-							shrapnel->yv = (cos(angle)) * 4;
+				case ObjectTypes::ROCKETPROJECTILE:{
+					const PlayerDef& _pd = GASLoader::Get().player;
+					if(shield <= _pd.shieldShrapnelThreshold){
+						int _n = _pd.shrapnelCount;
+						float _spd = _pd.shrapnelSpeed;
+						for(int i = 0; i < _n; i++){
+							Shrapnel * shrapnel = (Shrapnel *)world.CreateObject(ObjectTypes::SHRAPNEL);
+							if(shrapnel){
+								shrapnel->x = projectile.x;
+								shrapnel->y = projectile.y;
+								shrapnel->res_index = rand() % 9;
+								shrapnel->res_bank = 110;
+								float angle = (i / float(_n)) * (2 * 3.14);
+								angle += (rand() % 10) / float(10);
+								shrapnel->xv = (sin(angle)) * _spd;
+								shrapnel->yv = (cos(angle)) * _spd;
+							}
 						}
 					}
+				}
 				break;
 				default:
 				break;
@@ -100,7 +106,7 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 			
 		}break;
 		case ObjectTypes::FLAMERPROJECTILE:{
-			if(world.tickcount % 4 == 0){
+			if(world.tickcount % GASLoader::Get().player.flamerSoundInterval == 0){
 				object.EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundImpactFlamer], 128);
 			}
 		}break;

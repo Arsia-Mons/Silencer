@@ -142,6 +142,12 @@ struct PlayerDef {
     // ---- Network / collision --------------------------------------------------
     int playerHeight      = 50;  // collision box height (px)
     int snapshotInterval  = 24;  // network snapshot frequency (every N ticks)
+    // ---- Hittable / shrapnel -------------------------------------------------
+    int   shieldShrapnelThreshold = 60;  // shield HP below which shrapnel bursts spawn
+    int   shrapnelCount           = 8;   // shrapnel projectiles per burst
+    float shrapnelSpeed           = 4.0f;// shrapnel velocity (px/tick)
+    int   flamerSoundInterval     = 4;   // play flamer impact sound every N ticks
+    int   shieldEffectTicks       = 48;  // duration of shield-hit flash effect (ticks)
 };
 
 // ---- Weapon ----------------------------------------------------------------

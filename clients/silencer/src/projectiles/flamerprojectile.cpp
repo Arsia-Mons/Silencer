@@ -3,6 +3,7 @@
 #include "gasloader.h"
 #include <algorithm>
 
+const int FlamerProjectile::MAX_PLUMES;
 FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 	requiresauthority = true;
 	res_bank = 0xFF;

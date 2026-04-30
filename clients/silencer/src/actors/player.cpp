@@ -2739,7 +2739,7 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		hitsoundplaytick = world.tickcount;
 	}
 	if(state_hit / 32 == 1){
-		effectshieldcontinue = 48;
+		effectshieldcontinue = GASLoader::Get().player.shieldEffectTicks;
 	}
 	float xpcnt = -((x - 50) / 50.0) * (mirrored ? -1 : 1);
 	float ypcnt = -((y - 50) / 50.0);

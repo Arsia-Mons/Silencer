@@ -115,6 +115,11 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.worldMaxYVelocity          = j.value("worldMaxYVelocity",          out.worldMaxYVelocity);
         out.playerHeight               = j.value("playerHeight",               out.playerHeight);
         out.snapshotInterval           = j.value("snapshotInterval",           out.snapshotInterval);
+        out.shieldShrapnelThreshold    = j.value("shieldShrapnelThreshold",    out.shieldShrapnelThreshold);
+        out.shrapnelCount              = j.value("shrapnelCount",              out.shrapnelCount);
+        out.shrapnelSpeed              = j.value("shrapnelSpeed",              out.shrapnelSpeed);
+        out.flamerSoundInterval        = j.value("flamerSoundInterval",        out.flamerSoundInterval);
+        out.shieldEffectTicks          = j.value("shieldEffectTicks",          out.shieldEffectTicks);
         out.soundUIClick        = j.value("soundUIClick",        out.soundUIClick);
         out.soundTeamJoin       = j.value("soundTeamJoin",       out.soundTeamJoin);
         out.soundTeamHQ         = j.value("soundTeamHQ",         out.soundTeamHQ);
