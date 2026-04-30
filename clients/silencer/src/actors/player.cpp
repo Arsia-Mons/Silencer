@@ -351,7 +351,8 @@ void Player::Tick(World & world){
 	if(tracetime > 0 && secondcounter == 0 && !world.replaying){
 		tracetime--;
 		if(tracetime == GASLoader::Get().player.neutronWarnTick){
-			world.SendSound("vModDeto.wav");
+			const WeaponDef* nw = GASLoader::Get().GetWeaponDef("neutronbomb");
+			world.SendSound(nw && !nw->soundWarn.empty() ? nw->soundWarn : "vModDeto.wav");
 		}
 		if(tracetime == 0){
 			hassecret = false;

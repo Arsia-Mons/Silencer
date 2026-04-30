@@ -32,6 +32,7 @@ interface WeaponDef {
   soundExplosion?: string;
   soundLand?: string;
   soundThrow?: string;
+  soundWarn?: string;
   ammoCapacity?: number;
   reloadTicks?: number;
   // Grenade timing + throw speeds
@@ -81,6 +82,7 @@ const SOUND_FIELDS: { key: keyof WeaponDef; label: string }[] = [
   { key: 'soundExplosion', label: 'Explosion' },
   { key: 'soundLand',      label: 'Land' },
   { key: 'soundThrow',     label: 'Throw' },
+  { key: 'soundWarn',      label: 'Warn' },
 ];
 
 // Sound fields that are relevant per projectile type.
@@ -90,7 +92,7 @@ const SOUNDS_BY_TYPE: Partial<Record<string, (keyof WeaponDef)[]>> = {
   wall:    ['soundFire', 'soundHit1', 'soundHit2'],
   rocket:  ['soundLoop', 'soundExplosion', 'soundLand'],
   flamer:  ['soundLoop'],
-  grenade: ['soundThrow', 'soundExplosion', 'soundLand', 'soundHit1'],
+  grenade: ['soundThrow', 'soundExplosion', 'soundLand', 'soundHit1', 'soundWarn'],
   arcing:  [],
   plasma:  [],
 };

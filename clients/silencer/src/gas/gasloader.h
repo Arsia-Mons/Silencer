@@ -155,6 +155,7 @@ struct WeaponDef {
     std::string soundExplosion;     // explosion
     std::string soundLand;          // landing / bounce
     std::string soundThrow;         // throw (grenade)
+    std::string soundWarn;          // warning / trace alert (neutron bomb)
 
     // ---- Projectile type (for generic factory, Phase 3) -----------------------
     // Values: "physics", "arcing", "flamer", "plasma", "rocket", "wall", "grenade"

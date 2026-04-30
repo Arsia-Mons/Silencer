@@ -116,6 +116,7 @@
       "soundHit1": "q_expl02.wav"
     },
     {
+      "id": "empbomb",
       "projectileType": "grenade",
       "_comment": "EMP grenade — stuns shields across the whole team row.",
       "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],
@@ -140,7 +141,8 @@
       "projectileType": "grenade",
       "_comment": "Neutron grenade — large-radius explosion that passes through shielding.",
       "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],
-      "soundExplosion": "q_expl02.wav"
+      "soundExplosion": "q_expl02.wav",
+      "soundWarn": "vModDeto.wav"
     },
     {
       "id": "flarebomb",

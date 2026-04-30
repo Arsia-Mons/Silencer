@@ -179,6 +179,7 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.soundExplosion  = wj.value("soundExplosion", std::string{});
             w.soundLand       = wj.value("soundLand",      std::string{});
             w.soundThrow      = wj.value("soundThrow",     std::string{});
+            w.soundWarn       = wj.value("soundWarn",      std::string{});
             w.ammoCapacity    = wj.value("ammoCapacity",   0);
             w.reloadTicks     = wj.value("reloadTicks",    0);
             if (wj.contains("spriteBanks") && wj["spriteBanks"].is_array()) {
