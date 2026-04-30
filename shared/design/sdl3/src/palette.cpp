@@ -24,10 +24,13 @@ bool Palette::LoadFromFile(const std::string &path) {
   std::fclose(f);
 
   // PALETTE.BIN layout per docs/design/palette.md: 4-byte file prefix, then
-  // 11 records of [4-byte sub-header, 768-byte color table]. Color block s
-  // therefore starts at `4 + s * (768 + 4)`; the per-sub 4-byte header is
-  // skipped (filler zeros). Total = 4 + 11*772 = 8496 bytes; file is 8448,
-  // so the last block over-reads off the end (zero-fill on EOF).
+  // 11 records of 772 bytes each. The engine
+  // (clients/silencer/src/palette.cpp) reads color data from
+  // `4 + s * 772` — i.e. the start of each record, treating its leading
+  // 4 bytes as the first 4 bytes of the color table. We mirror that
+  // formula exactly so sub-palettes resolve to identical RGBs. Total =
+  // 4 + 11*772 = 8496 bytes; file is 8448, so the last block over-reads
+  // off the end (zero-fill on EOF).
   //
   // History: this previously used `8 + s*768`, which coincidentally matches
   // at s=1 (4 + 1*772 = 776 = 8 + 1*768) — that's why every prior menu/options
