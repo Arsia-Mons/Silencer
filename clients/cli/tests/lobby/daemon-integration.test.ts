@@ -119,4 +119,73 @@ describe("daemon integration", () => {
     const seenChat = events.some((e) => e.event === "chat" && e.data.text === "hi");
     expect(seenChat).toBe(true);
   });
+
+  // Regression for Devin-flagged JSON round-trip bug: `new Uint8Array(20)` in
+  // commands.ts serialized to {"0":0,...,"19":0} (object keys, not an array)
+  // and `g.mapHash.length` came out undefined on the daemon side, causing the
+  // SDK's encodeLobbyGame to throw before any bytes hit the wire. The fix is
+  // to send mapHash as a regular array; this test asserts the wire shape
+  // round-trips with a usable .length.
+  test("game_create payload survives JSON round-trip with usable mapHash", async () => {
+    let receivedHash: unknown;
+    class CapturingLobby extends FakeLobby {
+      override createGame(g: any) {
+        receivedHash = g.mapHash;
+        super.createGame(g);
+      }
+    }
+    const mgr = new SessionManager(() => new CapturingLobby());
+    const localSock = join(tmp, "lobbyd-cap.sock");
+    const localServer = await startRpcServer({ socketPath: localSock, manager: mgr });
+    try {
+      await rpcCall(localSock, {
+        id: 1,
+        op: "spawn",
+        args: {
+          name: "alice",
+          host: "h",
+          port: 1,
+          version: "v",
+          platform: 0,
+          user: "u",
+          pass: "p",
+        },
+      });
+      const r = await rpcCall(localSock, {
+        id: 2,
+        op: "game_create",
+        args: {
+          name: "alice",
+          // Mirrors what commands.ts builds; the regression here is whether
+          // an array of 20 zeros survives the JSON round-trip with .length === 20.
+          game: {
+            id: 0,
+            name: "TEST",
+            password: "",
+            mapName: "",
+            maxPlayers: 8,
+            maxTeams: 2,
+            minLevel: 0,
+            maxLevel: 0,
+            securityLevel: 0,
+            extra: 0,
+            players: 0,
+            state: 0,
+            accountId: 0,
+            hostname: "",
+            mapHash: new Array(20).fill(0),
+            port: 0,
+          },
+        },
+      });
+      expect(r.ok).toBe(true);
+      // The bug class: if mapHash was sent as a Uint8Array, JSON serialization
+      // would drop .length on the daemon side. We assert .length resolves and
+      // every element is iterable as a number.
+      expect((receivedHash as unknown[])?.length).toBe(20);
+      for (let i = 0; i < 20; i++) expect((receivedHash as number[])[i]).toBe(0);
+    } finally {
+      await localServer.stop();
+    }
+  });
 });

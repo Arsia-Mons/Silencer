@@ -73,7 +73,10 @@ export const LOBBY_HANDLERS: Record<string, Handler> = {
           state: 0,
           accountId: 0,
           hostname: "",
-          mapHash: new Uint8Array(20),
+          // 20-byte map hash; sent as number[] because Uint8Array
+          // doesn't survive JSON.stringify (becomes {"0":0,...} not [0,...]).
+          // The SDK's encodeLobbyGame iterates by index, so number[] works.
+          mapHash: new Array(20).fill(0),
           port: 0,
         },
       });
