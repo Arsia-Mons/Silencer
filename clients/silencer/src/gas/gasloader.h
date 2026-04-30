@@ -518,7 +518,11 @@ struct GameEngineDef {
     int nopeersTimeoutTicks  = 240;  // dedicated server: ticks with no peers before shutdown
     int maxStaleSnapshots    = 50;   // max stale object sync packets per tick
     int chatDisplayTicks     = 255;  // ticks chat overlay is visible after a new message
+    int chatMaxLines         = 5;    // max lines kept in chat history
     int snapshotQueueShrinkTicks = 73;  // ticks between automatic snapshot queue max-size reductions
+    int snapshotQueueMinSize     = 1;   // minimum snapshot queue size (fixed floor)
+    int snapshotQueueInitMaxSize = 2;   // initial snapshot queue max size on world start
+    int snapshotQueueMaxCap      = 4;   // upper cap the adaptive max size can reach
     int pingIntervalMs       = 1000; // ms between ping packets on replica peers
 };
 

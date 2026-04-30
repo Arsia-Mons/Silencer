@@ -54,8 +54,8 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	intutorialmode = false;
 	choosingtech = false;
 	boundport = 0;
-	snapshotqueueminsize = 1;
-	snapshotqueuemaxsize = 2;
+	snapshotqueueminsize = GASLoader::Get().gameengine.snapshotQueueMinSize;
+	snapshotqueuemaxsize = GASLoader::Get().gameengine.snapshotQueueInitMaxSize;
 	lastsnapshotqueueadjust = 0;
 	for(int i = 0; i < sizeof(pinghistory) / sizeof(int); i++){
 		pinghistory[i] = 0;
@@ -948,7 +948,7 @@ void World::ProcessSnapshotQueue(void){
 		maxruns = 2;
 	}
 	if(snapshotqueue.size() == 0){
-		if(snapshotqueuemaxsize < 4){
+		if(snapshotqueuemaxsize < GASLoader::Get().gameengine.snapshotQueueMaxCap){
 			snapshotqueuemaxsize++;
 		}
 	}
@@ -1461,7 +1461,7 @@ void World::DisplayChatMessage(Uint32 accountid, const char * msg){
 	delete[] wrapped;
 	
 	showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
-	while(chatlines.size() > 5){
+	while((int)chatlines.size() > GASLoader::Get().gameengine.chatMaxLines){
 		chatlines.pop_front();
 	}
 }

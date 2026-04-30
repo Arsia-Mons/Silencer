@@ -5,6 +5,10 @@
   "nopeersTimeoutTicks": 240,
   "maxStaleSnapshots": 50,
   "chatDisplayTicks": 255,
+  "chatMaxLines": 5,
   "snapshotQueueShrinkTicks": 73,
+  "snapshotQueueMinSize": 1,
+  "snapshotQueueInitMaxSize": 2,
+  "snapshotQueueMaxCap": 4,
   "pingIntervalMs": 1000
 }

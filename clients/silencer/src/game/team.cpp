@@ -83,7 +83,7 @@ void Team::Tick(World & world){
 				}
 				int remaining = GASLoader::Get().player.secretsNeededToWin - secrets;
 				char text[128];
-				sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded 1000 credits", user->name, stolen ? "stolen secret" : "secret", remaining);
+				sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded %d credits", user->name, stolen ? "stolen secret" : "secret", remaining, GASLoader::Get().player.secretDeliveryCredits);
 				if(!world.intutorialmode){
 					world.ShowMessage(text, 128, 0, true);
 				}

@@ -596,7 +596,11 @@ static void LoadGameEngine(const std::string& dir, GameEngineDef& out) {
         out.nopeersTimeoutTicks = j.value("nopeersTimeoutTicks", out.nopeersTimeoutTicks);
         out.maxStaleSnapshots        = j.value("maxStaleSnapshots",        out.maxStaleSnapshots);
         out.chatDisplayTicks         = j.value("chatDisplayTicks",         out.chatDisplayTicks);
+        out.chatMaxLines             = j.value("chatMaxLines",             out.chatMaxLines);
         out.snapshotQueueShrinkTicks = j.value("snapshotQueueShrinkTicks", out.snapshotQueueShrinkTicks);
+        out.snapshotQueueMinSize     = j.value("snapshotQueueMinSize",     out.snapshotQueueMinSize);
+        out.snapshotQueueInitMaxSize = j.value("snapshotQueueInitMaxSize", out.snapshotQueueInitMaxSize);
+        out.snapshotQueueMaxCap      = j.value("snapshotQueueMaxCap",      out.snapshotQueueMaxCap);
         out.pingIntervalMs           = j.value("pingIntervalMs",           out.pingIntervalMs);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] gameengine.json error: %s\n", e.what());
