@@ -775,14 +775,79 @@ function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
   const rafRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number | null>(null);
   const pathRef = useRef<[number, number][]>([]);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const loopSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   const W = 560, H = 160;
+
+  function getPreviewToken() {
+    return typeof window !== 'undefined' ? localStorage.getItem('zs_token') ?? '' : '';
+  }
+
+  function getPreviewAudioCtx(): AudioContext {
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      audioCtxRef.current = new AudioContext();
+    }
+    return audioCtxRef.current;
+  }
+
+  async function fetchAudioBuffer(name: string): Promise<AudioBuffer | null> {
+    const cached = audioStore.get(name);
+    if (cached) return cached;
+    try {
+      const r = await fetch(`/api/sounds/${encodeURIComponent(name)}/play`, {
+        headers: { Authorization: `Bearer ${getPreviewToken()}` },
+      });
+      if (!r.ok) return null;
+      const buf = await r.arrayBuffer();
+      const ctx = getPreviewAudioCtx();
+      if (ctx.state === 'suspended') await ctx.resume();
+      const decoded = await decodeAdpcmWav(buf, ctx);
+      audioStore.set(name, decoded);
+      return decoded;
+    } catch { return null; }
+  }
+
+  function playSoundOnce(name: string) {
+    if (!name) return;
+    fetchAudioBuffer(name).then(decoded => {
+      if (!decoded) return;
+      const ctx = getPreviewAudioCtx();
+      const source = ctx.createBufferSource();
+      source.buffer = decoded;
+      source.connect(ctx.destination);
+      source.start();
+    }).catch(() => {/* ignore */});
+  }
+
+  function playLoopSound(name: string) {
+    stopLoopSound();
+    if (!name) return;
+    fetchAudioBuffer(name).then(decoded => {
+      if (!decoded) return;
+      const ctx = getPreviewAudioCtx();
+      const source = ctx.createBufferSource();
+      source.buffer = decoded;
+      source.loop = true;
+      source.connect(ctx.destination);
+      source.start();
+      loopSourceRef.current = source;
+    }).catch(() => {/* ignore */});
+  }
+
+  function stopLoopSound() {
+    if (loopSourceRef.current) {
+      try { loopSourceRef.current.stop(); } catch { /* already ended */ }
+      loopSourceRef.current = null;
+    }
+  }
 
   const stopAnim = useCallback(() => {
     if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     lastTimeRef.current = null;
+    stopLoopSound();
     setPlaying(false);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const drawStatic = useCallback((atTick?: number) => {
     const cvs = canvasRef.current;
@@ -808,6 +873,27 @@ function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
     lastTimeRef.current = null;
     setPlaying(true);
 
+    const type = weapon.projectileType ?? 'physics';
+    const isThrow = type === 'grenade' || type === 'arcing';
+    const isLooping = type === 'rocket' || type === 'flamer';
+
+    // Pick fire and impact sounds by projectile type
+    const fireSound = isThrow
+      ? (weapon.soundThrow || weapon.soundFire || '')
+      : isLooping
+        ? ''
+        : (weapon.soundFire || '');
+    const loopSound = isLooping ? (weapon.soundLoop || '') : '';
+    const impactSound = isThrow || isLooping
+      ? (weapon.soundExplosion || weapon.soundLand || '')
+      : (weapon.soundHit1 || weapon.soundHit2 || '');
+
+    // Fire/loop sounds at launch
+    if (fireSound) playSoundOnce(fireSound);
+    if (loopSound) playLoopSound(loopSound);
+
+    let impactPlayed = false;
+
     const loop = (now: number) => {
       if (lastTimeRef.current === null) lastTimeRef.current = now;
       const elapsed = now - lastTimeRef.current;
@@ -818,12 +904,19 @@ function BallisticsPreview({ weapon }: { weapon: WeaponDef }) {
         const cvs = canvasRef.current;
         const ctx = cvs?.getContext('2d');
         if (ctx) drawFrame(ctx, weapon, path, tickRef.current, W, H);
-        if (tickRef.current >= path.length - 1) { stopAnim(); return; }
+        if (tickRef.current >= path.length - 1) {
+          if (!impactPlayed && impactSound) {
+            impactPlayed = true;
+            playSoundOnce(impactSound);
+          }
+          stopAnim();
+          return;
+        }
       }
       rafRef.current = requestAnimationFrame(loop);
     };
     rafRef.current = requestAnimationFrame(loop);
-  }, [weapon, stopAnim]);
+  }, [weapon, stopAnim]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col gap-2">
