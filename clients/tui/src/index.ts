@@ -156,8 +156,24 @@ async function main(): Promise<void> {
   }
 
   // Wait for the engine to connect back on the frame port before we start
-  // pushing input. Connection can take ~1-2s while assets load.
-  await frameConnected;
+  // pushing input. Connection can take ~1-2s while assets load. Race
+  // against child.exited so a crash during asset load surfaces as a clear
+  // error instead of hanging silently with no terminal output.
+  const frameOrExit = await Promise.race([
+    frameConnected.then(() => 'connected' as const),
+    child.exited.then((code) => ({ exitCode: code })),
+  ]);
+  if (typeof frameOrExit === 'object' && 'exitCode' in frameOrExit) {
+    if (stderrChunks.length > 0) {
+      process.stderr.write(
+        Buffer.concat(stderrChunks.map((c) => Buffer.from(c))),
+      );
+    }
+    console.error(
+      `silencer-tui: engine exited (code ${frameOrExit.exitCode}) before connecting to frame port`,
+    );
+    process.exit(4);
+  }
 
   // Connect the control socket. Retry briefly because the C++ side starts
   // its control server only after Load() finishes (asset load).

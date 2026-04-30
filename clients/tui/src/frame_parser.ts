@@ -27,11 +27,16 @@ export class FrameStreamParser {
     const out: FrameMessage[] = [];
     while (this.buf.length >= 5) {
       const type = this.buf[0]!;
+      // `>>> 0` coerces to unsigned. Without it `<< 24` returns a signed
+      // int32: any length with byte[4] >= 0x80 wraps negative, the `length
+      // < 5+len` guard never trips, and the buffer-advance step clamps
+      // back to 0 on a negative end — i.e. infinite loop on corrupt data.
       const len =
-        this.buf[1]! |
-        (this.buf[2]! << 8) |
-        (this.buf[3]! << 16) |
-        (this.buf[4]! << 24);
+        (this.buf[1]! |
+          (this.buf[2]! << 8) |
+          (this.buf[3]! << 16) |
+          (this.buf[4]! << 24)) >>>
+        0;
       if (this.buf.length < 5 + len) break;
       const payload = this.buf.subarray(5, 5 + len);
       this.buf = this.buf.slice(5 + len);
