@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../lib/auth';
 import Sidebar from '../../components/Sidebar';
@@ -561,46 +561,52 @@ export default function WeaponsPage() {
                       BROWSE →
                     </Link>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {DIRECTIONS.map((dir, i) => {
+                  {/* Compass grid: up/upR/right/downR/down/downL/left/upL arranged as 3×3 with center empty */}
+                  {(() => {
+                    // DIRECTIONS = ['up','upR','right','downR','down','downL','left','upL']
+                    // Map to grid positions [col, row] (0-indexed, 3×3)
+                    const GRID: [number, number][] = [
+                      [1,0],[2,0],[2,1],[2,2],[1,2],[0,2],[0,1],[0,0]
+                    ];
+                    const cells: (React.ReactElement | null)[] = Array(9).fill(null);
+                    DIRECTIONS.forEach((dir, i) => {
                       const val = (currentWeapon.spriteBanks ?? [])[i] ?? 0xFF;
-                      return (
-                        <div key={dir} className="flex items-center gap-1.5">
-                          <span className="text-[9px] font-mono text-[#4a7a4a] w-8 shrink-0">{dir}</span>
-                          <SpriteThumb bank={val} size={28} />
-                          <input
-                            type="number" min={0} max={255}
-                            value={val === 0xFF ? '' : val}
-                            placeholder="—"
-                            onChange={e => {
-                              const n = e.target.value === '' ? 0xFF : parseInt(e.target.value, 10);
-                              patchSpriteBank(currentWeapon.id, i, isNaN(n) ? 0xFF : n);
-                            }}
-                            className="w-full bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded focus:border-[#00a328] outline-none"
-                          />
-                          <button
-                            onClick={() => setSpritePicker({ weaponId: currentWeapon.id, dirIdx: i })}
-                            title="Pick sprite bank"
-                            className="shrink-0 text-[10px] font-mono text-[#4a7a4a] hover:text-[#00a328] border border-[#1a2e1a] hover:border-[#00a328] px-1.5 py-1 rounded transition-colors"
-                          >⊞</button>
-                        </div>
+                      const [col, row] = GRID[i];
+                      cells[row * 3 + col] = (
+                        <button
+                          key={dir}
+                          onClick={() => setSpritePicker({ weaponId: currentWeapon.id, dirIdx: i })}
+                          title={`${dir}: bank ${val === 0xFF ? 'none' : val} — click to change`}
+                          className="flex flex-col items-center gap-1 border border-[#1a2e1a] hover:border-[#00a328] transition-colors p-1 rounded group"
+                        >
+                          <SpriteThumb bank={val} size={64} />
+                          <span className="text-[8px] font-mono text-[#4a7a4a] group-hover:text-[#00a328] transition-colors leading-none">{dir}</span>
+                          <span className="text-[8px] font-mono text-[#2a4a2a] leading-none">{val === 0xFF ? '—' : val}</span>
+                        </button>
                       );
-                    })}
-                  </div>
-                  <div className="flex items-center gap-1.5 border-t border-[#1a2e1a] pt-3">
-                    <span className="text-[9px] font-mono text-[#4a7a4a] w-20 shrink-0">hit overlay</span>
-                    <SpriteThumb bank={currentWeapon.hitOverlayBank ?? 0xFF} size={28} />
-                    <input
-                      type="number" min={-1} max={255}
-                      value={currentWeapon.hitOverlayBank ?? -1}
-                      onChange={e => patchWeapon(currentWeapon.id, { hitOverlayBank: parseInt(e.target.value, 10) || -1 })}
-                      className="w-full bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded focus:border-[#00a328] outline-none"
-                    />
+                    });
+                    // center cell: empty placeholder
+                    cells[4] = (
+                      <div key="center" className="border border-[#0f1f0f] rounded opacity-20" />
+                    );
+                    return (
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {cells}
+                      </div>
+                    );
+                  })()}
+                  <div className="flex items-center gap-2 border-t border-[#1a2e1a] pt-3">
                     <button
                       onClick={() => setSpritePicker({ weaponId: currentWeapon.id, dirIdx: -1 })}
-                      title="Pick sprite bank"
-                      className="shrink-0 text-[10px] font-mono text-[#4a7a4a] hover:text-[#00a328] border border-[#1a2e1a] hover:border-[#00a328] px-1.5 py-1 rounded transition-colors"
-                    >⊞</button>
+                      title="Hit overlay: click to change"
+                      className="flex flex-col items-center gap-1 border border-[#1a2e1a] hover:border-[#00a328] transition-colors p-1 rounded group"
+                    >
+                      <SpriteThumb bank={currentWeapon.hitOverlayBank ?? 0xFF} size={48} />
+                      <span className="text-[8px] font-mono text-[#4a7a4a] group-hover:text-[#00a328] transition-colors leading-none">hit overlay</span>
+                      <span className="text-[8px] font-mono text-[#2a4a2a] leading-none">
+                        {(currentWeapon.hitOverlayBank ?? -1) < 0 ? '—' : currentWeapon.hitOverlayBank}
+                      </span>
+                    </button>
                   </div>
                 </section>
 
