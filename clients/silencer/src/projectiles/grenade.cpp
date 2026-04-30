@@ -148,7 +148,9 @@ void Grenade::Tick(World & world){
 					}
 				}break;
 				case NEUTRON:{
-					world.SendSound("grenade1.wav");
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("neutronbomb");
+						const std::string& pulse = (tw && !tw->soundHit1.empty()) ? tw->soundHit1 : std::string("grenade1.wav");
+						world.SendSound(pulse.c_str()); }
 					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("neutronbomb");
 						const std::string& sfx = (tw && !tw->soundExplosion.empty()) ? tw->soundExplosion : "q_expl02.wav";
 						EmitSound(world, world.resources.soundbank[sfx], 96); }

@@ -33,7 +33,9 @@ void Detonator::Tick(World & world){
 	}
 	// 182:0-3 det/camera
 	if(state_i == 0){
-		EmitSound(world, world.resources.soundbank["shield2.wav"], 96);
+		{ const WeaponDef* dw = GASLoader::Get().GetWeaponDef("plasmadetonator");
+		  const std::string& arm = (dw && !dw->soundFire.empty()) ? dw->soundFire : std::string("shield2.wav");
+		  EmitSound(world, world.resources.soundbank[arm], 96); }
 		state_warp = 12;
 	}
 	res_index = (state_i / 4) % 4;

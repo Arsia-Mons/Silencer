@@ -111,7 +111,8 @@
     {
       "id": "plasmadetonator",
       "projectileType": "grenade",
-      "_comment": "Plasma detonator — remote-detonated device. iscamera=true uses soundHit1, iscamera=false uses soundExplosion.",
+      "_comment": "Plasma detonator — remote-detonated device. soundFire=arm/deploy, iscamera=true uses soundHit1, iscamera=false uses soundExplosion.",
+      "soundFire": "shield2.wav",
       "soundExplosion": "seekexp1.wav",
       "soundHit1": "q_expl02.wav"
     },
@@ -141,6 +142,7 @@
       "projectileType": "grenade",
       "_comment": "Neutron grenade — large-radius explosion that passes through shielding.",
       "spriteBanks": [79, 79, 79, 79, 79, 79, 79, 79],
+      "soundHit1": "grenade1.wav",
       "soundExplosion": "q_expl02.wav",
       "soundWarn": "vModDeto.wav"
     },
