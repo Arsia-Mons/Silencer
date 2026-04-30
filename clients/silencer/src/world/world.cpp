@@ -601,7 +601,7 @@ void World::DoNetwork_Replica(void){
 	if(!peerlist[authoritypeer]){
 		return;
 	}
-	if(SDL_GetTicks() - lastpingsent >= 1000){
+	if(SDL_GetTicks() - lastpingsent >= (Uint32)GASLoader::Get().gameengine.pingIntervalMs){
 		SendPing();
 	}
 	Serializer data(10000); // hopefully snapshots dont get larger than this
@@ -951,7 +951,7 @@ void World::ProcessSnapshotQueue(void){
 			snapshotqueuemaxsize++;
 		}
 	}
-	if(tickcount - lastsnapshotqueueadjust > 73){
+	if(tickcount - lastsnapshotqueueadjust > (Uint32)GASLoader::Get().gameengine.snapshotQueueShrinkTicks){
 		if(snapshotqueuemaxsize - snapshotqueueminsize > 1){
 			snapshotqueuemaxsize--;
 			lastsnapshotqueueadjust = tickcount;

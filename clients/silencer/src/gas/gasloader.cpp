@@ -475,6 +475,7 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             g.healthRegen   = gj.value("healthRegen",    0);
             g.techHealth    = gj.value("techHealth",     0);
             g.techShield    = gj.value("techShield",     0);
+            g.techPlumeYV   = gj.value("techPlumeYV",   g.techPlumeYV);
             g.refireReadyTick = gj.value("refireReadyTick", g.refireReadyTick);
             g.reloadTick      = gj.value("reloadTick",      g.reloadTick);
             g.innerRange      = gj.value("innerRange",      g.innerRange);
@@ -579,8 +580,10 @@ static void LoadGameEngine(const std::string& dir, GameEngineDef& out) {
         out.ticksPerSecond      = j.value("ticksPerSecond",      out.ticksPerSecond);
         out.audioStopAllFadeMs  = j.value("audioStopAllFadeMs",  out.audioStopAllFadeMs);
         out.nopeersTimeoutTicks = j.value("nopeersTimeoutTicks", out.nopeersTimeoutTicks);
-        out.maxStaleSnapshots   = j.value("maxStaleSnapshots",   out.maxStaleSnapshots);
-        out.chatDisplayTicks    = j.value("chatDisplayTicks",    out.chatDisplayTicks);
+        out.maxStaleSnapshots        = j.value("maxStaleSnapshots",        out.maxStaleSnapshots);
+        out.chatDisplayTicks         = j.value("chatDisplayTicks",         out.chatDisplayTicks);
+        out.snapshotQueueShrinkTicks = j.value("snapshotQueueShrinkTicks", out.snapshotQueueShrinkTicks);
+        out.pingIntervalMs           = j.value("pingIntervalMs",           out.pingIntervalMs);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] gameengine.json error: %s\n", e.what());
     }

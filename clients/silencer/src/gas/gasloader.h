@@ -423,6 +423,7 @@ struct GameObjectDef {
     // TechStation
     int techHealth    = 0;
     int techShield    = 0;
+    int techPlumeYV   = 25; // techStation: upward velocity of destruction plumes (applied negative)
     int refireReadyTick = 12;  // wall defense: state_i to trigger shot
     int reloadTick      = 60;  // wall defense: state_i to reset from DEAD state
     int innerRange      = 70;  // fixed cannon: near edge of detection box (x offset)
@@ -503,6 +504,8 @@ struct GameEngineDef {
     int nopeersTimeoutTicks  = 240;  // dedicated server: ticks with no peers before shutdown
     int maxStaleSnapshots    = 50;   // max stale object sync packets per tick
     int chatDisplayTicks     = 255;  // ticks chat overlay is visible after a new message
+    int snapshotQueueShrinkTicks = 73;  // ticks between automatic snapshot queue max-size reductions
+    int pingIntervalMs       = 1000; // ms between ping packets on replica peers
 };
 
 // ---------------------------------------------------------------------------

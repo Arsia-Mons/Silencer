@@ -29,6 +29,7 @@
       "id": "techStation",
       "techHealth": 240,
       "techShield": 240,
+      "techPlumeYV": 25,
       "soundDestroy": "q_expl02.wav"
     },
     {

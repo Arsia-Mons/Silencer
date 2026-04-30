@@ -4,5 +4,7 @@
   "audioStopAllFadeMs": 200,
   "nopeersTimeoutTicks": 240,
   "maxStaleSnapshots": 50,
-  "chatDisplayTicks": 255
+  "chatDisplayTicks": 255,
+  "snapshotQueueShrinkTicks": 73,
+  "pingIntervalMs": 1000
 }

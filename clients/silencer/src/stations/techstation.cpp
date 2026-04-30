@@ -34,7 +34,8 @@ void TechStation::Tick(World & world){
 				plume->renderpass = renderpass;
 				plume->SetPosition(TechStation::x + xs[i] + (rand() % 9) - 4, TechStation::y + ys[i] + (rand() % 9) - 4);
 				plume->xv = (rand() % 9) - 4;
-				plume->yv = -25;
+				const GameObjectDef* _tsd = GASLoader::Get().GetGameObjectDef("techStation");
+				plume->yv = -(_tsd ? _tsd->techPlumeYV : 25);
 			}
 		}
 		Team * team = static_cast<Team *>(world.GetObjectFromId(teamid));
