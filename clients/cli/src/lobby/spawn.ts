@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveLobbydDir, socketPath } from "./paths.ts";
+import { logPath, resolveLobbydDir, socketPath } from "./paths.ts";
 
 const POLL_INTERVAL_MS = 50;
 const POLL_TIMEOUT_MS = 5_000;
@@ -30,6 +30,7 @@ export async function ensureDaemon(): Promise<string> {
   const dir = resolveLobbydDir();
   mkdirSync(dir, { recursive: true });
   const sock = socketPath(dir);
+  const log = logPath(dir);
   if (await probe(sock)) return sock;
 
   // Daemon entry lives next to this file at runtime.
@@ -40,7 +41,9 @@ export async function ensureDaemon(): Promise<string> {
     cmd: ["bun", daemonEntry],
     stdio: ["ignore", "ignore", "ignore"],
     // Detach so the parent CLI can exit while the daemon stays up.
-    // unref() lets node-style event-loop drain even if we forget to wait.
+    // unref() removes the child handle from the parent's event-loop
+    // refcount; combined with stdio: ignore, the daemon survives the
+    // CLI's exit.
   }).unref();
 
   const deadline = Date.now() + POLL_TIMEOUT_MS;
@@ -48,5 +51,7 @@ export async function ensureDaemon(): Promise<string> {
     if (await probe(sock)) return sock;
     await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
   }
-  throw new Error(`lobbyd did not start within ${POLL_TIMEOUT_MS}ms (socket: ${sock})`);
+  throw new Error(
+    `lobbyd did not start within ${POLL_TIMEOUT_MS}ms (socket: ${sock}; check ${log} for startup errors)`,
+  );
 }
