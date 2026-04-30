@@ -20,8 +20,10 @@ Stack: Go stdlib + `mongo-driver` (only when `MONGO_URL` set) +
 - `protocol.go` — wire format: `[len u8][payload]`, max 255 bytes.
   Reader/writer mirrors the client's `Serializer` (bit-aligned, but
   lobby fields happen to be byte-aligned).
-- `proc.go` — spawns `silencer -s <publicAddr> <port> <gameID>
+- `proc.go` — spawns `silencer -s 127.0.0.1 <lobbyPort> <gameID>
   <accountID>` per `MSG_NEWGAME`; tracks PIDs; `StopAll()` on shutdown.
+  The lobby host is hardcoded loopback because the dedicated server's
+  heartbeat path uses `inet_addr()` (dotted-decimal only).
 - `udp.go` — decodes heartbeat `[0x00][gameid u32][port u16][state u8]`
   → `hub.OnHeartbeat`.
 - `store.go` — `lobby.json` atomic writes (temp + rename), SHA-1
@@ -43,12 +45,13 @@ Stack: Go stdlib + `mongo-driver` (only when `MONGO_URL` set) +
 
 ## Invariants
 
-- **Opcodes must match `src/lobby.cpp`.** Adding one requires both
-  sides and a client version bump.
-- **Heartbeat timeout: 30 s** (`hub.go:28`). Miss → pending create
+- **Opcodes must match `clients/silencer/src/net/lobby.cpp`.** Adding
+  one requires both sides and a client version bump.
+- **Heartbeat timeout: 30 s** (`hub.go:30`). Miss → pending create
   fails with `status=2`.
 - **`status=2` on `opNewGame` is reserved** for the client's "Could
-  not create game" dialog (`src/game.cpp:824`). Don't reuse.
+  not create game" dialog (`clients/silencer/src/game/game.cpp:704`).
+  Don't reuse.
 - **Don't hold `h.mu` across network I/O.** Copy state under lock,
   send outside.
 

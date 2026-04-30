@@ -43,7 +43,7 @@ exercise a change against a real game build.
 
 ## Adding a game-control command
 
-1. Add the C++ handler in `clients/silencer/src/control/`.
+1. Add the C++ handler in `clients/silencer/src/net/controldispatch.cpp`.
 2. If args need special parsing, add entries to `STRING_FLAGS` /
    `VARIADIC_FLAGS` / `CHORD_SPLIT_FLAGS` in `index.ts`.
 3. Document it in the SKILL.md table.
