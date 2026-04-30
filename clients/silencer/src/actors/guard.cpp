@@ -238,7 +238,9 @@ void Guard::InitBT(){
 		if (bt_walk_ticks_ == 0 && !chasing) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
 		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
-		if (bt_walk_ticks_ < 600 && chasing) {
+		{ const EnemyDef* _sg = GASLoader::Get().GetEnemyDef("guard-blaster");
+		  const int _stout = _sg && _sg->searchTimeoutTicks > 0 ? _sg->searchTimeoutTicks : 600;
+		  if (bt_walk_ticks_ < _stout && chasing) {
 			// Search phase: orient toward target when not on a ladder and not too close.
 			if (state != LADDER) {
 				Object* obj = world.GetObjectFromId(chasing);
@@ -284,6 +286,7 @@ void Guard::InitBT(){
 			}
 			return BTResult::Running;
 		}
+		} // _sg scope
 		// Return-to-post phase: face toward spawn, climb ladders back if needed
 		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
 		{ const EnemyDef* _ggr = GASLoader::Get().GetEnemyDef("guard-blaster");

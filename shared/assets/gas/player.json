@@ -1,5 +1,5 @@
 {
-  "_comment": "Player base stats — values are 1:1 from player.cpp and player.h static consts. Do not change during GAS migration.",
+  "_comment": "Player base stats \u2014 values are 1:1 from player.cpp and player.h static consts. Do not change during GAS migration.",
   "baseHealth": 100,
   "baseShield": 100,
   "baseFuel": 80,
@@ -7,8 +7,8 @@
   "upgradeMultiplierEndurance": 20,
   "upgradeMultiplierShield": 20,
   "upgradeMultiplierJetpack": 10,
-  "upgradeMultiplierHacking": 0.10,
-  "upgradeMultiplierContacts": 0.10,
+  "upgradeMultiplierHacking": 0.1,
+  "upgradeMultiplierContacts": 0.1,
   "maxPoisoned": 9,
   "runSpeed": 14,
   "runSpeedDisguised": 11,
@@ -112,5 +112,6 @@
   "shrapnelCount": 8,
   "shrapnelSpeed": 4.0,
   "flamerSoundInterval": 4,
-  "shieldEffectTicks": 48
+  "shieldEffectTicks": 48,
+  "disguiseDeactivationTicks": 12
 }

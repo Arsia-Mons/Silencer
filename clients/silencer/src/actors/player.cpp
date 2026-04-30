@@ -474,10 +474,11 @@ void Player::Tick(World & world){
 		}
 	}
 	if(disguised){
-		if(disguised > 100){
+		const int _dt = GASLoader::Get().player.disguiseThreshold;
+		if(disguised > _dt){
 			disguised--;
 		}
-		if(disguised > 0 && disguised < 100){
+		if(disguised > 0 && disguised < _dt){
 			disguised--;
 		}
 	}
@@ -2933,7 +2934,7 @@ bool Player::IsDisguised(void){
 
 void Player::UnDisguise(World & world){
 	if(IsDisguised()){
-		disguised = 12;
+		disguised = GASLoader::Get().player.disguiseDeactivationTicks;
 		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundDisguise], 64);
 	}
 }

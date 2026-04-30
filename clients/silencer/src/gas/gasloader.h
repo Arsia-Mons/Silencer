@@ -78,6 +78,7 @@ struct PlayerDef {
     // Ability timers (ticks)
     int disguiseActivationTicks     = 112;  // ticks to reach fully-disguised state
     int disguiseThreshold           = 100;  // value at which player is considered fully disguised
+    int disguiseDeactivationTicks   = 12;   // countdown ticks for undisguise fade-out
     int invisibilityDurationTicks   = 720;  // duration of invisibility powerup (30 * 24)
     int poisonTickCycle             = 24;   // ticks per poison damage cycle
     int hackingEffectTicks          = 5;    // ticks for hacking visual/audio effect
@@ -355,6 +356,7 @@ struct EnemyDef {
     std::string soundAlert3     = "freeze3.wav";  // guard spotted-target voice 3
     std::string soundAlert4     = "freezrt1.wav"; // guard spotted-target voice 4
     std::string soundAlert5     = "drop4.wav";    // guard spotted-target voice 5
+    int searchTimeoutTicks = 600; // ticks guard searches before giving up (0 = never)
     // ---- Network / state timers ------------------------------------------------
     int snapshotInterval  = 48;   // network snapshot frequency (0 = object default)
     int warpTeleportTick  = 12;   // state_warp value at which warp completes

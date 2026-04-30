@@ -64,6 +64,7 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.ladderActivateImpulse      = j.value("ladderActivateImpulse",      out.ladderActivateImpulse);
         out.disguiseActivationTicks    = j.value("disguiseActivationTicks",    out.disguiseActivationTicks);
         out.disguiseThreshold          = j.value("disguiseThreshold",          out.disguiseThreshold);
+        out.disguiseDeactivationTicks  = j.value("disguiseDeactivationTicks",  out.disguiseDeactivationTicks);
         out.invisibilityDurationTicks  = j.value("invisibilityDurationTicks",  out.invisibilityDurationTicks);
         out.poisonTickCycle            = j.value("poisonTickCycle",            out.poisonTickCycle);
         out.hackingEffectTicks         = j.value("hackingEffectTicks",         out.hackingEffectTicks);
@@ -381,7 +382,8 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.soundAlert2    = ej.value("soundAlert2",    e.soundAlert2);
             e.soundAlert3    = ej.value("soundAlert3",    e.soundAlert3);
             e.soundAlert4    = ej.value("soundAlert4",    e.soundAlert4);
-            e.soundAlert5    = ej.value("soundAlert5",    e.soundAlert5);
+            e.soundAlert5        = ej.value("soundAlert5",        e.soundAlert5);
+            e.searchTimeoutTicks = ej.value("searchTimeoutTicks", e.searchTimeoutTicks);
             e.snapshotInterval = ej.value("snapshotInterval", e.snapshotInterval);
             e.warpTeleportTick = ej.value("warpTeleportTick", e.warpTeleportTick);
             e.runDurationTicks = ej.value("runDurationTicks",  e.runDurationTicks);
