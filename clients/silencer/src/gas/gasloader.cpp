@@ -377,6 +377,11 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.soundHurt1     = ej.value("soundHurt1",     std::string{});
             e.soundHurt2     = ej.value("soundHurt2",     std::string{});
             e.soundHurt3     = ej.value("soundHurt3",     std::string{});
+            e.soundAlert1    = ej.value("soundAlert1",    e.soundAlert1);
+            e.soundAlert2    = ej.value("soundAlert2",    e.soundAlert2);
+            e.soundAlert3    = ej.value("soundAlert3",    e.soundAlert3);
+            e.soundAlert4    = ej.value("soundAlert4",    e.soundAlert4);
+            e.soundAlert5    = ej.value("soundAlert5",    e.soundAlert5);
             e.snapshotInterval = ej.value("snapshotInterval", e.snapshotInterval);
             e.warpTeleportTick = ej.value("warpTeleportTick", e.warpTeleportTick);
             e.runDurationTicks = ej.value("runDurationTicks",  e.runDurationTicks);
@@ -499,8 +504,26 @@ static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out)
 
 // ---------------------------------------------------------------------------
 
+static void LoadWorld(const std::string& dir, WorldDef& out) {
+    json j;
+    std::string path = dir + "world.json";
+    std::ifstream f(path);
+    if (!f.is_open()) return;
+    try {
+        f >> j;
+        out.soundAmbience1 = j.value("soundAmbience1", out.soundAmbience1);
+        out.soundAmbience2 = j.value("soundAmbience2", out.soundAmbience2);
+        out.soundAmbience3 = j.value("soundAmbience3", out.soundAmbience3);
+    } catch (const std::exception& e) {
+        fprintf(stderr, "[gas] world.json error: %s\n", e.what());
+    }
+}
+
+// ---------------------------------------------------------------------------
+
 bool GASLoader::Load(const std::string& gasDir) {
     LoadPlayer(gasDir, player);
+    LoadWorld(gasDir, world);
     LoadAgencies(gasDir, agencies);
     LoadWeapons(gasDir, weapons);
     LoadItems(gasDir, items);

@@ -350,6 +350,11 @@ struct EnemyDef {
     std::string soundHurt1      = "";   // pain sound variant 1
     std::string soundHurt2      = "";   // pain sound variant 2
     std::string soundHurt3      = "";   // pain sound variant 3
+    std::string soundAlert1     = "theres3.wav";  // guard spotted-target voice 1
+    std::string soundAlert2     = "stop4.wav";    // guard spotted-target voice 2
+    std::string soundAlert3     = "freeze3.wav";  // guard spotted-target voice 3
+    std::string soundAlert4     = "freezrt1.wav"; // guard spotted-target voice 4
+    std::string soundAlert5     = "drop4.wav";    // guard spotted-target voice 5
     // ---- Network / state timers ------------------------------------------------
     int snapshotInterval  = 48;   // network snapshot frequency (0 = object default)
     int warpTeleportTick  = 12;   // state_warp value at which warp completes
@@ -423,6 +428,15 @@ struct TerminalDef {
     int snapshotInterval = 24;    // network snapshot frequency
 };
 
+// ---- World -----------------------------------------------------------------
+
+struct WorldDef {
+    // ---- Ambience channels (played simultaneously as spatial background mix)
+    std::string soundAmbience1 = "wndloopb.wav"; // outdoor wind A
+    std::string soundAmbience2 = "cphum11.wav";  // indoor CPU hum
+    std::string soundAmbience3 = "wndloop1.wav"; // outdoor wind B
+};
+
 // ---------------------------------------------------------------------------
 // GASLoader singleton
 // ---------------------------------------------------------------------------
@@ -450,6 +464,7 @@ public:
     const TerminalDef*   GetTerminalDef(const std::string& id) const;
 
     PlayerDef                player;
+    WorldDef                 world;
     std::vector<AgencyDef>   agencies;
     std::vector<WeaponDef>   weapons;
     std::vector<ItemDef>     items;

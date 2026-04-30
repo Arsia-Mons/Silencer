@@ -55,8 +55,16 @@ void Guard::InitBT(){
 			chasing = f->id;
 			if(world.tickcount - lastspoke > 24 * 10){
 				lastspoke = world.tickcount;
-				const char* sounds[5] = {"theres3.wav","stop4.wav","freeze3.wav","freezrt1.wav","drop4.wav"};
-				EmitSound(world, world.resources.soundbank[sounds[rand() % 5]], 128);
+				const EnemyDef* _ag = GASLoader::Get().GetEnemyDef("guard-blaster");
+				static const EnemyDef _def;
+				const std::string* alerts[] = {
+					_ag ? &_ag->soundAlert1 : &_def.soundAlert1,
+					_ag ? &_ag->soundAlert2 : &_def.soundAlert2,
+					_ag ? &_ag->soundAlert3 : &_def.soundAlert3,
+					_ag ? &_ag->soundAlert4 : &_def.soundAlert4,
+					_ag ? &_ag->soundAlert5 : &_def.soundAlert5
+				};
+				EmitSound(world, world.resources.soundbank[*alerts[rand() % 5]], 128);
 			}
 		} else {
 			chasing = f->id;
@@ -461,8 +469,16 @@ void Guard::Tick(World & world){
 				chasing = found->id;
 				if(world.tickcount - lastspoke > 24 * 10){
 					lastspoke = world.tickcount;
-					const char * sounds[5] = {"theres3.wav", "stop4.wav", "freeze3.wav", "freezrt1.wav", "drop4.wav"};
-					EmitSound(world, world.resources.soundbank[sounds[rand() % 5]], 128);
+					const EnemyDef* _ag = GASLoader::Get().GetEnemyDef("guard-blaster");
+					static const EnemyDef _def;
+					const std::string* alerts[] = {
+						_ag ? &_ag->soundAlert1 : &_def.soundAlert1,
+						_ag ? &_ag->soundAlert2 : &_def.soundAlert2,
+						_ag ? &_ag->soundAlert3 : &_def.soundAlert3,
+						_ag ? &_ag->soundAlert4 : &_def.soundAlert4,
+						_ag ? &_ag->soundAlert5 : &_def.soundAlert5
+					};
+					EmitSound(world, world.resources.soundbank[*alerts[rand() % 5]], 128);
 				}
 			}
 		}else{

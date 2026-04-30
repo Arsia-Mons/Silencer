@@ -5654,7 +5654,8 @@ void Game::GetGameChannelName(LobbyGame & lobbygame, char * name){
 }
 
 void Game::CreateAmbienceChannels(void){
-	const char * bgchannelbanks[3] = {"wndloopb.wav", "cphum11.wav", "wndloop1.wav"};
+	const WorldDef& wd = GASLoader::Get().world;
+	const std::string bgchannelbanks[3] = {wd.soundAmbience1, wd.soundAmbience2, wd.soundAmbience3};
 	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
 		if(bgchannel[i] == -1){
 			bgchannel[i] = Audio::GetInstance().Play(world.resources.soundbank[bgchannelbanks[i]], 0, true);
