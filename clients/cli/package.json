@@ -1,11 +1,11 @@
 {
   "name": "silencer-cli",
   "private": true,
-  "type": "module",
   "bin": {
     "silencer-cli": "./index.ts",
     "silencer-lobbyd": "./src/lobby/daemon.ts"
   },
+  "type": "module",
   "scripts": {
     "fmt": "oxfmt --write .",
     "typecheck": "tsc --noEmit",
