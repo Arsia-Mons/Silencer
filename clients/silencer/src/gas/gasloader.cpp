@@ -60,6 +60,10 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out) {
         out.jetpackXvMax               = j.value("jetpackXvMax",               out.jetpackXvMax);
         out.jetpackXvMaxDisguised      = j.value("jetpackXvMaxDisguised",      out.jetpackXvMaxDisguised);
         out.jetpackYvMax               = j.value("jetpackYvMax",               out.jetpackYvMax);
+        out.jetpackThrust              = j.value("jetpackThrust",              out.jetpackThrust);
+        out.jetpackXvAccel             = j.value("jetpackXvAccel",             out.jetpackXvAccel);
+        out.jetpackCeilingCheckRange   = j.value("jetpackCeilingCheckRange",   out.jetpackCeilingCheckRange);
+        out.hitKnockbackAirFactor      = j.value("hitKnockbackAirFactor",      out.hitKnockbackAirFactor);
         out.jumpImpulse                = j.value("jumpImpulse",                out.jumpImpulse);
         out.ladderJumpImpulse          = j.value("ladderJumpImpulse",          out.ladderJumpImpulse);
         out.ladderActivateImpulse      = j.value("ladderActivateImpulse",      out.ladderActivateImpulse);

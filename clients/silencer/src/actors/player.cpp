@@ -2758,8 +2758,8 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 			FollowGround(*this, world, xpcnt * projectile.moveamount);
 		break;
 		default:
-			xv += xpcnt * (projectile.moveamount * 0.6);
-			yv += ypcnt * (projectile.moveamount * 0.6);
+			xv += xpcnt * (projectile.moveamount * GASLoader::Get().player.hitKnockbackAirFactor);
+			yv += ypcnt * (projectile.moveamount * GASLoader::Get().player.hitKnockbackAirFactor);
 		break;
 	}
 	/*if(x < 50){
@@ -3850,22 +3850,22 @@ bool Player::ProcessJetpackState(World & world){
 	if(state != JETPACKSHOOT){
 		if(input.keymoveleft){
 			if(state_i % 2 == 0){
-				xv += -1;
+				xv += -GASLoader::Get().player.jetpackXvAccel;
 			}
 			mirrored = true;
 		}
 		if(input.keymoveright){
 			if(state_i % 2 == 0){
-				xv += 1;
+				xv += GASLoader::Get().player.jetpackXvAccel;
 			}
 			mirrored = false;
 		}
 	}
 	if(state_i % 2 == 0){
-		yv -= 1;
+		yv -= GASLoader::Get().player.jetpackThrust;
 	}
 	int xv2 = xv;
-	int yv2 = -30;
+	int yv2 = -GASLoader::Get().player.jetpackCeilingCheckRange;
 	Platform * platform1 = world.map.TestIncr(x, y - height, x, y, &xv2, &yv2, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, 0, true);
 	if(platform1 && y >= platform1->y2){
 		//float close = ((float)yv2 / -30);

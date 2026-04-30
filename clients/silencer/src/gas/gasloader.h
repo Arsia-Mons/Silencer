@@ -72,6 +72,10 @@ struct PlayerDef {
     int jetpackXvMax                = 14;   // jetpack horizontal max
     int jetpackXvMaxDisguised       = 12;   // jetpack horizontal max while disguised (unused currently)
     int jetpackYvMax                = 9;    // jetpack upward velocity cap (stored positive, applied negative)
+    int jetpackThrust               = 1;    // upward thrust applied to yv every 2 ticks
+    int jetpackXvAccel              = 1;    // horizontal acceleration per 2 ticks when moving left/right
+    int jetpackCeilingCheckRange    = 30;   // ceiling proximity test range (px above player)
+    float hitKnockbackAirFactor     = 0.6f; // knockback scale for airborne players (x and y)
     // Jump impulses (applied as negative yv; stored positive)
     int jumpImpulse                 = 17;   // normal jump
     int ladderJumpImpulse           = 29;   // jump from ladder (no directional input)
