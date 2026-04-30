@@ -931,7 +931,7 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 				pickup->x = Guard::x;
 				pickup->y = Guard::y - 1;
 				pickup->xv = (world.Random() % 9) - 4;
-				pickup->yv = -15;
+				{ const EnemyDef* _gb = GASLoader::Get().GetEnemyDef("guard-blaster"); pickup->yv = -(_gb ? _gb->deathDropYV : 15); }
 			}
 		}
 		Object * owner = world.GetObjectFromId(projectile.ownerid);
