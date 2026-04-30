@@ -45,6 +45,12 @@ async function listenRandomPort(): Promise<{ server: Server; port: number }> {
   return { server, port: addr.port };
 }
 
+async function reserveFreePort(): Promise<number> {
+  const { server, port } = await listenRandomPort();
+  await new Promise<void>((res) => server.close(() => res()));
+  return port;
+}
+
 function findBinary(): string {
   if (process.env.SILENCER_BIN) return process.env.SILENCER_BIN;
   const candidates = [
@@ -68,8 +74,12 @@ async function main(): Promise<void> {
   }
 
   const bin = findBinary();
-  const controlListener = await listenRandomPort();
+  // Frame listener stays open — we're the server, the engine connects in.
   const frameListener = await listenRandomPort();
+  // Control port: we're the *client*, the engine binds the port. Reserve a
+  // free port number, then close immediately so the engine can bind it.
+  // (Brief race window between close and engine's bind; haven't hit it.)
+  const controlPort = await reserveFreePort();
 
   const inputs = new TerminalInput();
   const rasterizer = new HalfBlockRasterizer();
@@ -108,7 +118,7 @@ async function main(): Promise<void> {
       bin,
       '--tui',
       '--control-port',
-      String(controlListener.port),
+      String(controlPort),
     ],
     env: {
       ...process.env,
@@ -142,13 +152,22 @@ async function main(): Promise<void> {
   // Connect the control socket. Retry briefly because the C++ side starts
   // its control server only after Load() finishes (asset load).
   const control = new ControlClient();
-  for (let attempt = 0; attempt < 50; attempt++) {
+  let controlConnected = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
     try {
-      await control.connect('127.0.0.1', controlListener.port);
+      await control.connect('127.0.0.1', controlPort);
+      controlConnected = true;
       break;
     } catch {
       await Bun.sleep(100);
     }
+  }
+  if (!controlConnected) {
+    cleanup();
+    console.error(
+      `silencer-tui: failed to connect to engine control port ${controlPort} after 10s — input will not work`,
+    );
+    process.exit(3);
   }
 
   let cleaned = false;
@@ -162,7 +181,6 @@ async function main(): Promise<void> {
       child.kill();
     } catch {}
     try {
-      controlListener.server.close();
       frameListener.server.close();
     } catch {}
     if (stderrChunks.length > 0) {
