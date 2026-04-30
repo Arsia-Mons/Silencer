@@ -387,54 +387,7 @@ func (c *Client) handleRegisterStats(r *reader) error {
 	}
 	log.Printf("[stats] game=%d acct=%d agency=%d won=%d xp=%d", gameID, acct, statsagency, won, xp)
 
-	// Parse the Stats::Serialize blob (34 Uint32 LE values = 136 bytes).
-	// Order mirrors Stats::Serialize in stats.cpp: weapons arrays first,
-	// then the scalar counters in declaration order.
-	var ms MatchStats
-	readU32 := func() uint32 {
-		v, e := r.u32()
-		if e != nil {
-			return 0
-		}
-		return v
-	}
-	for i := 0; i < 4; i++ {
-		ms.Weapons[i].Fires = readU32()
-		ms.Weapons[i].Hits = readU32()
-		ms.Weapons[i].PlayerKills = readU32()
-	}
-	ms.CiviliansKilled = readU32()
-	ms.GuardsKilled = readU32()
-	ms.RobotsKilled = readU32()
-	ms.DefenseKilled = readU32()
-	ms.SecretsPickedUp = readU32()
-	ms.SecretsReturned = readU32()
-	ms.SecretsStolen = readU32()
-	ms.SecretsDropped = readU32()
-	ms.PowerupsPickedUp = readU32()
-	ms.Deaths = readU32()
-	ms.Kills = readU32()
-	ms.Suicides = readU32()
-	ms.Poisons = readU32()
-	ms.TractsPlanted = readU32()
-	ms.GrenadesThrown = readU32()
-	ms.NeutronsThrown = readU32()
-	ms.EMPsThrown = readU32()
-	ms.ShapedThrown = readU32()
-	ms.PlasmasThrown = readU32()
-	ms.FlaresThrown = readU32()
-	ms.PoisonFlaresThrown = readU32()
-	ms.HealthPacksUsed = readU32()
-	ms.FixedCannonsPlaced = readU32()
-	ms.FixedCannonsDestroyed = readU32()
-	ms.DetsPlanted = readU32()
-	ms.CamerasPlanted = readU32()
-	ms.VirusesUsed = readU32()
-	ms.FilesHacked = readU32()
-	ms.FilesReturned = readU32()
-	ms.CreditsEarned = readU32()
-	ms.CreditsSpent = readU32()
-	ms.HealsDone = readU32()
+	ms := readMatchStats(r)
 
 	if updatedAgency, ok := c.hub.store.UpdateStats(acct, statsagency, won != 0, xp); ok {
 		log.Printf("[stats] saved: acct=%d agency=%d wins=%d losses=%d level=%d xp=%d",
