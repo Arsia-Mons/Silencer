@@ -24,9 +24,11 @@ async function main(): Promise<void> {
   const ts = () => new Date().toISOString();
   const logLine = (msg: string) => writeSync(logFd, `${ts()} ${msg}\n`);
 
-  // If a daemon is already up, defer to it. The CLI client's auto-spawn
-  // probes first and only invokes us when no peer answered, but a race
-  // between two parallel spawns is still possible.
+  // Defer to an existing daemon if one's already listening. Bun.listen is the
+  // real serialization primitive; symmetric simultaneous starters will both
+  // reject this probe and race at bind. The narrow gap is a peer mid-shutdown
+  // answering our probe — we'd exit prematurely, but spawn.ts re-probes after
+  // the spawn timeout and can fork a fresh daemon, so the system self-heals.
   try {
     await Bun.connect({
       unix: sock,
@@ -49,10 +51,17 @@ async function main(): Promise<void> {
   const manager = new SessionManager(factory);
   let server: Awaited<ReturnType<typeof startRpcServer>>;
 
+  let shuttingDown = false;
   const shutdown = async (reason: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     logLine(`shutdown: ${reason}`);
-    await manager.killAll().catch(() => {});
-    await server?.stop().catch(() => {});
+    await manager
+      .killAll()
+      .catch((e) => logLine(`killAll error: ${e instanceof Error ? e.message : String(e)}`));
+    await server
+      ?.stop()
+      .catch((e) => logLine(`server.stop error: ${e instanceof Error ? e.message : String(e)}`));
     process.exit(0);
   };
 
