@@ -351,7 +351,7 @@ bool Game::Loop(void){
 	world.DoNetwork();
 	Uint64 tickcheck = SDL_GetTicks();
 	if(world.replay.IsPlaying()){
-		wait = 42 * world.replay.speed;
+		wait = GASLoader::Get().gameengine.tickIntervalMs * world.replay.speed;
 		if(world.replay.ffmpeg && world.replay.ffmpegvideo){
 			tickcheck = world.replay.tick;
 			if(!tickcheck){
