@@ -158,9 +158,11 @@ void Robot::Tick(World & world){
 	if(shootcooldown){
 		shootcooldown++;
 	}
-	if(state != DEAD && rand() % (24 * 15) == 0){
+	{ const EnemyDef* _ramb = GASLoader::Get().GetEnemyDef("robot");
+	  if(state != DEAD && rand() % (_ramb ? _ramb->ambientSoundIntervalTicks : 360) == 0){
 		StopAmbience();
-		{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundActivate.empty()) ? rd->soundActivate : "airlokj.wav"], 64); }
+		EmitSound(world, world.resources.soundbank[(_ramb && !_ramb->soundActivate.empty()) ? _ramb->soundActivate : "airlokj.wav"], 64);
+	  }
 	}
 	// BT patrol timer: counts up while WALKING, resets in any other state
 	if (bt_) {
@@ -357,7 +359,8 @@ void Robot::Tick(World & world){
 				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128); }
 			}
 			collidable = false;
-			if(state_i >= 48 * 2){
+			{ const EnemyDef* _rdd = GASLoader::Get().GetEnemyDef("robot");
+			  if(state_i >= (_rdd ? _rdd->deathExplosionDelayTicks : 96)){
 				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128); }
 				Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
 				Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
@@ -376,6 +379,7 @@ void Robot::Tick(World & world){
 				state = DEAD;
 				state_i = -1;
 				break;
+			  }
 			}
 			res_bank = 48;
 			res_index = state_i / 2;

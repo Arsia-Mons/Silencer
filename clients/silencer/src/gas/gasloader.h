@@ -368,7 +368,13 @@ struct EnemyDef {
     std::string soundAlert3     = "freeze3.wav";  // guard spotted-target voice 3
     std::string soundAlert4     = "freezrt1.wav"; // guard spotted-target voice 4
     std::string soundAlert5     = "drop4.wav";    // guard spotted-target voice 5
-    int searchTimeoutTicks = 600; // ticks guard searches before giving up (0 = never)
+    int searchTimeoutTicks      = 600; // ticks guard searches before giving up (0 = never)
+    int speakCooldownTicks      = 240; // guard: min ticks between alert voice lines
+    int standingDurationTicks   = 48;  // guard: ticks in STANDING state before resuming patrol
+    int walkingDurationTicks    = 240; // guard: ticks in WALKING state before LOOKING
+    int chaseProximityX         = 60;  // guard: x-distance at which guard holds position on player
+    int ambientSoundIntervalTicks = 360; // robot: mean ticks between random ambient vocalisation
+    int deathExplosionDelayTicks  = 96;  // robot: ticks after DYING before death-explosion fires
     int audioFadeAmbientMs = 800; // robot: ambient loop fade duration on death/deactivate (ms)
     // ---- Network / state timers ------------------------------------------------
     int snapshotInterval  = 48;   // network snapshot frequency (0 = object default)
@@ -425,6 +431,7 @@ struct GameObjectDef {
     // ---- BaseDoor detection -------------------------------------------------
     int detectionWidth     = 320; // half-width of player-detection AABB (px)
     int detectionHeight    = 240; // half-height of player-detection AABB (px)
+    int downIdleTicks      = 24;  // fixedCannon: ticks in DOWN state before raising
 };
 
 // ---- Terminal ---------------------------------------------------------------

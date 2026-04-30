@@ -395,6 +395,12 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out) {
             e.soundAlert4    = ej.value("soundAlert4",    e.soundAlert4);
             e.soundAlert5        = ej.value("soundAlert5",        e.soundAlert5);
             e.searchTimeoutTicks = ej.value("searchTimeoutTicks", e.searchTimeoutTicks);
+            e.speakCooldownTicks = ej.value("speakCooldownTicks", e.speakCooldownTicks);
+            e.standingDurationTicks   = ej.value("standingDurationTicks",   e.standingDurationTicks);
+            e.walkingDurationTicks    = ej.value("walkingDurationTicks",    e.walkingDurationTicks);
+            e.chaseProximityX         = ej.value("chaseProximityX",         e.chaseProximityX);
+            e.ambientSoundIntervalTicks = ej.value("ambientSoundIntervalTicks", e.ambientSoundIntervalTicks);
+            e.deathExplosionDelayTicks  = ej.value("deathExplosionDelayTicks",  e.deathExplosionDelayTicks);
             e.audioFadeAmbientMs = ej.value("audioFadeAmbientMs", e.audioFadeAmbientMs);
             e.snapshotInterval = ej.value("snapshotInterval", e.snapshotInterval);
             e.warpTeleportTick = ej.value("warpTeleportTick", e.warpTeleportTick);
@@ -477,6 +483,7 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             g.ventYVRange        = gj.value("ventYVRange",        g.ventYVRange);
             g.detectionWidth     = gj.value("detectionWidth",     g.detectionWidth);
             g.detectionHeight    = gj.value("detectionHeight",    g.detectionHeight);
+            g.downIdleTicks      = gj.value("downIdleTicks",      g.downIdleTicks);
             out.push_back(std::move(g));
         }
     } catch (const std::exception& e) {

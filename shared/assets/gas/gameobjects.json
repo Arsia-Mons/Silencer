@@ -9,7 +9,8 @@
       "outerRange": 300,
       "soundDeploy": "shield2.wav",
       "soundFire": "!laserew.wav",
-      "soundDestroy": "q_expl02.wav"
+      "soundDestroy": "q_expl02.wav",
+      "downIdleTicks": 24
     },
     {
       "id": "wallDefense",

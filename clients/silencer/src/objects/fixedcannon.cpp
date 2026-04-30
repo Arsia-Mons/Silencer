@@ -114,10 +114,12 @@ void FixedCannon::Tick(World & world){
 				state_i = -1;
 				break;
 			}
-			if(state_i >= 24){
+			{ const GameObjectDef* _fcd = GASLoader::Get().GetGameObjectDef("fixedCannon");
+			  if(state_i >= (_fcd ? _fcd->downIdleTicks : 24)){
 				state = MOVING_UP;
 				state_i = -1;
 				break;
+			  }
 			}
 		}break;
 		case MOVING_UP:{

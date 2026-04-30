@@ -53,10 +53,10 @@ void Guard::InitBT(){
 	auto updateChasing = [this](Object* f, World& world){
 		if(!chasing){
 			chasing = f->id;
-			if(world.tickcount - lastspoke > 24 * 10){
+			{ const EnemyDef* _ag = GASLoader::Get().GetEnemyDef("guard-blaster");
+			  static const EnemyDef _def;
+			  if(world.tickcount - lastspoke > (Uint32)(_ag ? _ag->speakCooldownTicks : 240)){
 				lastspoke = world.tickcount;
-				const EnemyDef* _ag = GASLoader::Get().GetEnemyDef("guard-blaster");
-				static const EnemyDef _def;
 				const std::string* alerts[] = {
 					_ag ? &_ag->soundAlert1 : &_def.soundAlert1,
 					_ag ? &_ag->soundAlert2 : &_def.soundAlert2,
@@ -65,6 +65,7 @@ void Guard::InitBT(){
 					_ag ? &_ag->soundAlert5 : &_def.soundAlert5
 				};
 				EmitSound(world, world.resources.soundbank[*alerts[rand() % 5]], 128);
+			  }
 			}
 		} else {
 			chasing = f->id;
@@ -454,7 +455,8 @@ void Guard::Tick(World & world){
 			if((found = Look(world, 5))){
 				Player* player = static_cast<Player*>(found);
 				if(player){
-					if(abs(player->x - x) < 60){
+					const EnemyDef* _gcp = GASLoader::Get().GetEnemyDef("guard-blaster");
+					if(abs(player->x - x) < (_gcp ? _gcp->chaseProximityX : 60)){
 						break;
 					}
 				}
@@ -470,10 +472,10 @@ void Guard::Tick(World & world){
 		if(found){
 			if(!chasing){
 				chasing = found->id;
-				if(world.tickcount - lastspoke > 24 * 10){
+				{ const EnemyDef* _ag = GASLoader::Get().GetEnemyDef("guard-blaster");
+				  static const EnemyDef _def;
+				  if(world.tickcount - lastspoke > (Uint32)(_ag ? _ag->speakCooldownTicks : 240)){
 					lastspoke = world.tickcount;
-					const EnemyDef* _ag = GASLoader::Get().GetEnemyDef("guard-blaster");
-					static const EnemyDef _def;
 					const std::string* alerts[] = {
 						_ag ? &_ag->soundAlert1 : &_def.soundAlert1,
 						_ag ? &_ag->soundAlert2 : &_def.soundAlert2,
@@ -482,6 +484,7 @@ void Guard::Tick(World & world){
 						_ag ? &_ag->soundAlert5 : &_def.soundAlert5
 					};
 					EmitSound(world, world.resources.soundbank[*alerts[rand() % 5]], 128);
+				  }
 				}
 			}
 		}else{
@@ -507,13 +510,15 @@ void Guard::Tick(World & world){
 			yv = 0;
 			res_bank = 59;
 			res_index = 0;
-			if(state_i >= 48){
+			{ const EnemyDef* _gsd = GASLoader::Get().GetEnemyDef("guard-blaster");
+			  if(state_i >= (_gsd ? _gsd->standingDurationTicks : 48)){
 				if(patrol && world.Random() % 3 == 0){
 					state = WALKING;
 				}else{
 					state = LOOKING;
 				}
 				state_i = -1;
+			}
 			}
 		}break;
 		case CROUCHING:{
@@ -595,10 +600,12 @@ void Guard::Tick(World & world){
 					}
 				}
 			}
-			if(state_i == 240){
+			{ const EnemyDef* _gwd = GASLoader::Get().GetEnemyDef("guard-blaster");
+			  if(state_i >= (_gwd ? _gwd->walkingDurationTicks : 240)){
 				state = LOOKING;
 				state_i = -1;
 				break;
+			  }
 			}
 		}break;
 		case SHOOTSTANDING:{
