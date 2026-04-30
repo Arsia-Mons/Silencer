@@ -32,8 +32,9 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	memset(oldsnapshots, 0, sizeof(oldsnapshots));
 	totalsnapshots = 0;
 	totalinputpackets = 0;
-	gravity      = GASLoader::Get().player.worldGravity;
-	maxyvelocity = GASLoader::Get().player.worldMaxYVelocity;
+	gravity         = GASLoader::Get().player.worldGravity;
+	maxyvelocity    = GASLoader::Get().player.worldMaxYVelocity;
+	minwalldistance = GASLoader::Get().world.minWallDistance;
 	replaying = false;
 	state = IDLE;
 	illuminate = 0;

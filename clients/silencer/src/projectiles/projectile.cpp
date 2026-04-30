@@ -133,9 +133,9 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 				if(thecollidedobject->type == ObjectTypes::PLAYER){
 					Player * collidedplayer = static_cast<Player *>(thecollidedobject);
 					if(poisonous /*&& collidedplayer->id != ownerid*/){
-						// poison a little bit 4 times per second, max of 3 poison
-						if(world.tickcount % 6 == 0){
-							const WeaponDef* pw = GASLoader::Get().GetWeaponDef("poisonflare");
+						const WeaponDef* pw = GASLoader::Get().GetWeaponDef("poisonflare");
+						int pinterval = (pw && pw->poisonCheckInterval) ? pw->poisonCheckInterval : 6;
+						if(world.tickcount % pinterval == 0){
 							int pmax  = (pw && pw->poisonMax)  ? pw->poisonMax  : 3;
 							int prate = (pw && pw->poisonRate) ? pw->poisonRate : 1;
 							if(collidedplayer->poisonedamount < pmax){

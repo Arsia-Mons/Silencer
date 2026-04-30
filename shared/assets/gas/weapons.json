@@ -431,7 +431,8 @@
       ],
       "soundExplosion": "rocket1.wav",
       "poisonRate": 1,
-      "poisonMax": 3
+      "poisonMax": 3,
+      "poisonCheckInterval": 6
     }
   ]
 }

@@ -14,5 +14,6 @@
   "terminalSmallBeamMin": 1,
   "terminalSmallBeamRange": 10,
   "bodyPartSpawnYOffset": 50,
-  "bodyPartLaunchYV": 20
+  "bodyPartLaunchYV": 20,
+  "minWallDistance": 35
 }

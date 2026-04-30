@@ -88,7 +88,7 @@ public:
 	unsigned int totalsnapshots;
 	unsigned int totalinputpackets;
 	Uint8 gravity;
-	static const int minwalldistance = 35;
+	int minwalldistance;
 	Uint8 maxyvelocity;
 	bool replaying;
 	Uint8 quitstate;

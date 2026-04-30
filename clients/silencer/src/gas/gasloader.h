@@ -280,8 +280,9 @@ struct WeaponDef {
     std::vector<SpreadVector> primaryVectors;   // per-projectile velocity for primary burst
     std::vector<SpreadVector> secondaryVectors; // per-projectile velocity for secondary burst
     // ---- Poison ------------------------------------------------------------
-    int   poisonRate      = 0;    // poison amount applied per hit (0 = use compiled default 1)
-    int   poisonMax       = 0;    // max poison stack (0 = use compiled default 3)
+    int   poisonRate          = 0;    // poison amount applied per hit (0 = use compiled default 1)
+    int   poisonMax           = 0;    // max poison stack (0 = use compiled default 3)
+    int   poisonCheckInterval = 0;    // ticks between poison applications (0 = use compiled default 6)
     // ---- Network -----------------------------------------------------------
     int snapshotInterval  = 0;   // projectile network snapshot freq; 0 = use compiled default (6)
 };
@@ -491,6 +492,7 @@ struct WorldDef {
     int terminalBigBeamRange      = 26;    // big terminal: random seconds added (0..range-1)
     int terminalSmallBeamMin      = 1;     // small terminal: min beaming seconds
     int terminalSmallBeamRange    = 10;    // small terminal: random seconds added (0..range-1)
+    int   minWallDistance         = 35;   // min px to platform end before NPC turns around
     // Body part death spawn physics
     int bodyPartSpawnYOffset      = 50;    // px above object center where body parts spawn
     int bodyPartLaunchYV          = 20;    // upward velocity applied to body parts on death

@@ -276,8 +276,9 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out) {
             w.trailPlumes     = wj.value("trailPlumes",     0);
             w.primaryCount    = wj.value("primaryCount",    0);
             w.secondaryCount  = wj.value("secondaryCount",  0);
-            w.poisonRate      = wj.value("poisonRate",      0);
-            w.poisonMax       = wj.value("poisonMax",       0);
+            w.poisonRate          = wj.value("poisonRate",          0);
+            w.poisonMax           = wj.value("poisonMax",           0);
+            w.poisonCheckInterval = wj.value("poisonCheckInterval", 0);
             w.snapshotInterval = wj.value("snapshotInterval", 0);
             if (wj.contains("spriteBanks") && wj["spriteBanks"].is_array()) {
                 for (const auto& b : wj["spriteBanks"]) {
@@ -565,6 +566,7 @@ static void LoadWorld(const std::string& dir, WorldDef& out) {
         out.terminalSmallBeamRange    = j.value("terminalSmallBeamRange",    out.terminalSmallBeamRange);
         out.bodyPartSpawnYOffset      = j.value("bodyPartSpawnYOffset",      out.bodyPartSpawnYOffset);
         out.bodyPartLaunchYV          = j.value("bodyPartLaunchYV",          out.bodyPartLaunchYV);
+        out.minWallDistance           = j.value("minWallDistance",           out.minWallDistance);
     } catch (const std::exception& e) {
         fprintf(stderr, "[gas] world.json error: %s\n", e.what());
     }
