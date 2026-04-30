@@ -102,7 +102,8 @@ void World::Tick(void){
 		SendSnapshots();
 	}
 	if(mode == REPLICA){
-		if(tickcount % 24 == 0){
+		const int tps = GASLoader::Get().gameengine.ticksPerSecond;
+		if(tickcount % tps == 0){
 			//snapshotqueuemaxsize = ceil(float(AveragePingJitter()) / 42);
 			CheckExists();
 		}
@@ -127,7 +128,7 @@ void World::Tick(void){
 			}
 		}
 	}
-	if(tickcount % 24 == 0 && IsAuthority()){
+	if(tickcount % GASLoader::Get().gameengine.ticksPerSecond == 0 && IsAuthority()){
 		ActivateTerminals();
 	}
 	tickcount++;

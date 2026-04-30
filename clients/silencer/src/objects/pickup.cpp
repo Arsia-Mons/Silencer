@@ -35,7 +35,7 @@ void PickUp::Tick(World & world){
 		CheckForPickedUp(world);
 		switch(type){
 			case SECRET:{
-				if(tracetime > 0 && world.tickcount % 24 == 0){
+				if(tracetime > 0 && world.tickcount % GASLoader::Get().gameengine.ticksPerSecond == 0){
 					tracetime--;
 					if(tracetime == 0){
 						world.MarkDestroyObject(id);
@@ -112,7 +112,7 @@ void PickUp::Tick(World & world){
 				state_i--;
 			}
 		}else{
-			if(state_i % 24 == 0){
+			if(state_i % GASLoader::Get().gameengine.ticksPerSecond == 0){
 				state_i = 0;
 				if(quantity){
 					quantity--;

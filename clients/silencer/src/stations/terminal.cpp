@@ -111,7 +111,7 @@ void Terminal::Tick(World & world){
 		case BEAMING:{
 			secretreadynotified = false;
 			if(world.IsAuthority()){
-				if(state_i % 24 == 0){
+				if(state_i % GASLoader::Get().gameengine.ticksPerSecond == 0){
 					beamingcount++;
 					if(beamingcount >= beamingseconds){
 						state = READY;
@@ -137,7 +137,7 @@ void Terminal::Tick(World & world){
 		hackerid = 0;
 		state_i++;
 	}
-	if(tracetime > 0 && world.tickcount % 24 == 0 && world.IsAuthority()){
+	if(tracetime > 0 && world.tickcount % GASLoader::Get().gameengine.ticksPerSecond == 0 && world.IsAuthority()){
 		tracetime--;
 		if(tracetime == 0){
 			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
@@ -153,7 +153,7 @@ void Terminal::Tick(World & world){
 			state_i = 0;
 		}
 	}
-	if(beamingtime > 0 && world.tickcount % 24 == 0 && world.IsAuthority()){
+	if(beamingtime > 0 && world.tickcount % GASLoader::Get().gameengine.ticksPerSecond == 0 && world.IsAuthority()){
 		beamingtime--;
 		if(beamingtime == 0){
 			state = SECRETREADY;

@@ -81,7 +81,7 @@ void WallDefense::Tick(World & world){
 				}
 			}
 			} // _wd scope
-			if(world.tickcount % 24 != 0){
+			if(world.tickcount % GASLoader::Get().gameengine.ticksPerSecond != 0){
 				state_i--;
 			}
 		}break;

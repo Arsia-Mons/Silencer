@@ -2152,7 +2152,7 @@ bool Game::CheckForQuit(void){
 
 bool Game::CheckForEndOfGame(void){
 	if(world.winningteamid){
-		if(world.message_i == 24 * 3){
+		if(world.message_i == GASLoader::Get().gameengine.ticksPerSecond * 3){
 			if(world.IsAuthority()){
 				if(world.replay.IsRecording()){
 					world.replay.EndRecording();

@@ -1525,7 +1525,7 @@ void Player::Tick(World & world){
 					state_i = -1;
 					break;
 				}
-				if(state_i >= 24){
+				if(state_i >= GASLoader::Get().gameengine.ticksPerSecond){
 					state = STANDING;
 					state_i = -1;
 					break;

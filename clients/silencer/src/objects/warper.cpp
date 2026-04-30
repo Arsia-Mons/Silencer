@@ -1,5 +1,6 @@
 #include "warper.h"
 #include "player.h"
+#include "../gas/gasloader.h"
 
 Warper::Warper() : Object(ObjectTypes::WARPER){
 	requiresauthority = true;
@@ -18,11 +19,12 @@ void Warper::Serialize(bool write, Serializer & data, Serializer * old){
 }
 
 void Warper::Tick(World & world){
+	const int tps = GASLoader::Get().gameengine.ticksPerSecond;
 	state_i++;
-	if(state_i / 24 >= 6){
+	if(state_i / tps >= 6){
 		state_i = 0;
 	}
-	if(GetCountdown() == 0 && state_i % 24 == 0){
+	if(GetCountdown() == 0 && state_i % tps == 0){
 		std::vector<Uint8> types;
 		types.push_back(ObjectTypes::PLAYER);
 		Uint16 x1 = x - world.resources.spriteoffsetx[res_bank][res_index];
@@ -61,5 +63,5 @@ void Warper::FindMatch(World & world){
 }
 
 Uint8 Warper::GetCountdown(void){
-	return 5 - (state_i / 24);
+	return 5 - (state_i / GASLoader::Get().gameengine.ticksPerSecond);
 }
