@@ -1,11 +1,14 @@
-# services/lobby/ — Go lobby
+# services/lobby/ — Go lobby server
 
-Go: stdlib + `mongo-driver` (used only when `MONGO_URL` set) + `amqp091-go`
-(used only when `AMQP_URL` set). Build/run instructions, flags, and
-the how-it-works narrative are in `README.md`; this file is for editing
-the code.
+Pairs players, hosts the game-listing browser, brokers chat, and
+spawns dedicated `silencer -s` game servers when someone hits "Create
+Game". Build/run/flags and the how-it-works narrative live in
+[`README.md`](README.md); this file is for editing the code.
 
-## Per-file
+Stack: Go stdlib + `mongo-driver` (only when `MONGO_URL` set) +
+`amqp091-go` (only when `AMQP_URL` set).
+
+## Files
 
 - `main.go` — flag parsing, wires `store → proc → hub`, TCP accept
   loop + UDP goroutine.
@@ -62,3 +65,9 @@ Mongo is a mirror, not a backup — if it diverges, `lobby.json` wins.
 - **Port 517 needs root on macOS/Linux.** For local dev, run on
   `:15170` and rebuild the client with
   `-DSILENCER_LOBBY_PORT=15170` (see `clients/silencer/CLAUDE.md` gotchas).
+
+## Docs
+
+- [`README.md`](README.md) — build, run, flags, deployment, how-it-works.
+- [`../../docs/production.md`](../../docs/production.md) — production
+  deployment topology including the lobby's place in it.
