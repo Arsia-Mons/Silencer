@@ -382,7 +382,8 @@ export default function ItemDetailPage() {
     acc[i.enumId] = (acc[i.enumId] ?? 0) + 1; return acc;
   }, {});
   const hasDupEnumId = item ? (enumIdCounts[item.enumId] ?? 0) > 1 : false;
-  const hasUnsetSprite = item ? (item.spriteBank === 255 || item.spriteBank == null) : false;
+  // 255 is the valid sentinel for "no sprite" (abstract items: give0-give3, insiderinfo, etc.)
+  const hasUnsetSprite = item ? item.spriteBank == null : false;
 
   // ── Filtered list ─────────────────────────────────────────────────────────
 
@@ -475,7 +476,7 @@ export default function ItemDetailPage() {
             <div className="flex-1 overflow-y-auto">
               {filtered.map(i => {
                 const dupEnum = (enumIdCounts[i.enumId] ?? 0) > 1;
-                const unsetSp = i.spriteBank === 255 || i.spriteBank == null;
+                const unsetSp = i.spriteBank == null;
                 return (
                   <Link key={i.id} href={`/items/${i.id}`} scroll={false}
                     ref={i.id === id ? selectedRef : null}
@@ -523,16 +524,11 @@ export default function ItemDetailPage() {
               </div>
 
               {/* Validation warnings */}
-              {(hasDupEnumId || hasUnsetSprite) && (
+              {hasDupEnumId && (
                 <div className="border border-[#f59e0b]/40 rounded p-3 flex flex-col gap-1">
                   {hasDupEnumId && (
                     <p className="text-[10px] font-mono text-[#f59e0b]">
                       ⚠ enumId {item.enumId} is used by multiple items
-                    </p>
-                  )}
-                  {hasUnsetSprite && (
-                    <p className="text-[10px] font-mono text-[#f59e0b]">
-                      ⚠ Sprite bank is unset (255)
                     </p>
                   )}
                 </div>
@@ -575,7 +571,18 @@ export default function ItemDetailPage() {
                   </button>
                 </div>
                 <div className="flex items-start gap-4">
-                  {item.spriteBank != null && item.spriteBank !== 255 ? (
+                  {item.spriteBank == null ? (
+                    <button onClick={() => setSpritePicker(true)}
+                      className="w-16 h-16 border border-[#1a2e1a] hover:border-[#00a328] bg-[#080f08] flex items-center justify-center text-[10px] font-mono text-[#2a4a2a] shrink-0 transition-colors">
+                      PICK
+                    </button>
+                  ) : item.spriteBank === 255 ? (
+                    <button onClick={() => setSpritePicker(true)}
+                      className="w-16 h-16 border border-[#1a2e1a] hover:border-[#4a7a4a] bg-[#080f08] flex items-center justify-center text-[10px] font-mono text-[#4a7a4a] shrink-0 transition-colors"
+                      title="255 = no sprite (abstract item). Click to assign one.">
+                      ∅
+                    </button>
+                  ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={`/api/sprites/${item.spriteBank}/${item.spriteIndex ?? 0}`}
                       alt={`bank ${item.spriteBank} frame ${item.spriteIndex}`}
@@ -583,11 +590,6 @@ export default function ItemDetailPage() {
                       className="border border-[#1a2e1a] bg-[#080f08] shrink-0 cursor-pointer hover:border-[#00a328] transition-colors"
                       style={{ imageRendering: 'pixelated', objectFit: 'contain' }}
                       onClick={() => setSpritePicker(true)} />
-                  ) : (
-                    <button onClick={() => setSpritePicker(true)}
-                      className="w-16 h-16 border border-[#1a2e1a] hover:border-[#00a328] bg-[#080f08] flex items-center justify-center text-[10px] font-mono text-[#2a4a2a] shrink-0 transition-colors">
-                      PICK
-                    </button>
                   )}
                   <div className="grid grid-cols-2 gap-3 flex-1">
                     <label className="flex flex-col gap-1">
