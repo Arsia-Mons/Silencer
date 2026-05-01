@@ -153,7 +153,7 @@ endif()
 set(SILENCER_LOBBY_HOST "lobby.arsiamons.com" CACHE STRING "Lobby host the client connects to at startup")
 set(SILENCER_LOBBY_PORT "517" CACHE STRING "Lobby TCP port")
 set(SILENCER_VERSION "00000" CACHE STRING "Client version string sent to the lobby during MSG_VERSION; overridden by release.yml from git tag")
-set(SILENCER_MAP_API_URL "https://maps.arsiamons.com" CACHE STRING "Base URL for the community map HTTP API (used when fetching a missing map before falling back to P2P)")
+set(SILENCER_MAP_API_URL "https://admin.arsiamons.com" CACHE STRING "Base URL for the community map HTTP API (used when fetching a missing map before falling back to P2P)")
 set(SILENCER_ADMIN_API_URL "https://admin.arsiamons.com" CACHE STRING "Base URL for the admin API (actordefs sync, etc.)")
 target_compile_definitions(${SILENCER_TARGET} PRIVATE
 	SILENCER_LOBBY_HOST="${SILENCER_LOBBY_HOST}"
