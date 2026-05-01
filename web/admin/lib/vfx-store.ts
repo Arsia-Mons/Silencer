@@ -1,101 +1,72 @@
-// In-memory store for VFX presets — load from local JSON file, edit, download.
-// Same pattern as gas-store: no server persistence, all local.
+// Sprite Animation store — define frame sequences that map to how the game
+// actually renders effects (sprite bank + frame index cycling).
+// Same load/save pattern as other admin tools.
 
-export interface VFXPreset {
+export interface SpriteAnimation {
   id: string;
   name: string;
   description?: string;
-  effectType: 'particles' | 'sprite-flash' | 'screen-shake';
-
-  // Particle emitter params (effectType === 'particles')
-  emissionRate: number;    // particles per second (continuous mode)
-  burstCount: number;      // >0 = one-shot burst of N particles, 0 = continuous
-  particleLifetime: number; // seconds each particle lives
-  startSize: number;       // px at birth
-  endSize: number;         // px at death
-  startColor: string;      // hex e.g. '#ff8800'
-  endColor: string;
-  startAlpha: number;      // 0-1
-  endAlpha: number;
-  speed: number;           // px/sec base
-  speedVariance: number;   // ± random added to speed
-  spread: number;          // degrees (360 = omnidirectional, 0 = single direction)
-  angle: number;           // base emit angle degrees (0 = up)
-  gravity: number;         // px/sec² downward acceleration
-  duration: number;        // total effect run time seconds (0 = infinite/looping)
-
-  // Sprite flash params (effectType === 'sprite-flash')
-  flashColor?: string;
-  flashDuration?: number;  // seconds
-
-  // Screen shake params (effectType === 'screen-shake')
-  shakeIntensity?: number;
-  shakeDuration?: number;
+  bank: number;       // sprite bank index (matches game's res_bank)
+  frames: number[];   // frame indices in playback order
+  fps: number;        // playback speed in frames per second
+  loop: boolean;
+  pingPong: boolean;  // reverse at end before looping
+  usedBy?: string;    // free-text note, e.g. "rocket explosion"
 }
 
-export const DEFAULT_PRESET: Omit<VFXPreset, 'id' | 'name'> = {
-  effectType: 'particles',
-  emissionRate: 30,
-  burstCount: 0,
-  particleLifetime: 0.6,
-  startSize: 6,
-  endSize: 1,
-  startColor: '#ff8800',
-  endColor: '#440000',
-  startAlpha: 1.0,
-  endAlpha: 0.0,
-  speed: 80,
-  speedVariance: 30,
-  spread: 360,
-  angle: 0,
-  gravity: 40,
-  duration: 0,
+export const DEFAULT_ANIM: Omit<SpriteAnimation, 'id' | 'name'> = {
+  bank: 0,
+  frames: [0],
+  fps: 12,
+  loop: true,
+  pingPong: false,
+  usedBy: '',
 };
 
 interface Store {
   folderName: string | null;
-  presets: VFXPreset[];
+  animations: SpriteAnimation[];
 }
 
-const store: Store = { folderName: null, presets: [] };
+const store: Store = { folderName: null, animations: [] };
 
 export function isLoaded(): boolean { return store.folderName !== null; }
 export function getFolderName(): string | null { return store.folderName; }
-export function listAll(): VFXPreset[] { return store.presets; }
-export function getById(id: string): VFXPreset | undefined {
-  return store.presets.find(p => p.id === id);
+export function listAll(): SpriteAnimation[] { return store.animations; }
+export function getById(id: string): SpriteAnimation | undefined {
+  return store.animations.find(a => a.id === id);
 }
 
 export function loadFromJson(folderName: string, json: string): void {
-  const data = JSON.parse(json) as { presets?: VFXPreset[] };
+  const data = JSON.parse(json) as { animations?: SpriteAnimation[] };
   store.folderName = folderName;
-  store.presets = data.presets ?? [];
+  store.animations = data.animations ?? [];
 }
 
 export function clear(): void {
   store.folderName = null;
-  store.presets = [];
+  store.animations = [];
 }
 
-export function setPreset(preset: VFXPreset): void {
-  const idx = store.presets.findIndex(p => p.id === preset.id);
-  if (idx >= 0) store.presets[idx] = preset;
-  else store.presets.push(preset);
+export function setAnimation(anim: SpriteAnimation): void {
+  const idx = store.animations.findIndex(a => a.id === anim.id);
+  if (idx >= 0) store.animations[idx] = anim;
+  else store.animations.push(anim);
 }
 
-export function removePreset(id: string): void {
-  store.presets = store.presets.filter(p => p.id !== id);
+export function removeAnimation(id: string): void {
+  store.animations = store.animations.filter(a => a.id !== id);
 }
 
-export function addPreset(preset: VFXPreset): void {
-  store.presets.push(preset);
+export function addAnimation(anim: SpriteAnimation): void {
+  store.animations.push(anim);
 }
 
 export function toJson(): string {
-  return JSON.stringify({ _comment: 'VFX presets — Silencer admin tool', presets: store.presets }, null, 2);
+  return JSON.stringify({ _comment: 'Sprite animations — Silencer admin tool', animations: store.animations }, null, 2);
 }
 
-export function downloadJson(filename = 'vfx-presets.json'): void {
+export function downloadJson(filename = 'sprite-animations.json'): void {
   const blob = new Blob([toJson()], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

@@ -9,14 +9,12 @@ export default function VFXPage() {
   useAuth();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [folderName, setFolderName] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (vfxStore.isLoaded()) {
       const all = vfxStore.listAll();
       if (all.length > 0) router.replace(`/vfx/${all[0].id}`);
-      else setFolderName(vfxStore.getFolderName());
     }
   }, [router]);
 
@@ -28,7 +26,6 @@ export default function VFXPage() {
       vfxStore.loadFromJson(file.name.replace(/\.json$/, ''), text);
       const all = vfxStore.listAll();
       if (all.length > 0) router.push(`/vfx/${all[0].id}`);
-      else { setFolderName(vfxStore.getFolderName()); }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -36,9 +33,9 @@ export default function VFXPage() {
   }
 
   function handleNew() {
-    vfxStore.loadFromJson('new-vfx-presets', JSON.stringify({ presets: [] }));
-    const id = 'new-effect';
-    vfxStore.addPreset({ ...vfxStore.DEFAULT_PRESET, id, name: 'New Effect' });
+    vfxStore.loadFromJson('sprite-animations', JSON.stringify({ animations: [] }));
+    const id = 'new-animation';
+    vfxStore.addAnimation({ ...vfxStore.DEFAULT_ANIM, id, name: 'New Animation' });
     router.push(`/vfx/${id}`);
   }
 
@@ -47,24 +44,20 @@ export default function VFXPage() {
       <Sidebar />
       <main className="flex-1 flex items-center justify-center">
         <div className="border border-[#1a2e1a] rounded p-8 max-w-sm w-full flex flex-col gap-4">
-          <div className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">✦ VFX EDITOR</div>
+          <div className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">✦ ANIMATION STUDIO</div>
           <p className="text-xs font-mono text-[#d1fad7]">
-            Load a <code className="text-[#00a328]">vfx-presets.json</code> file to begin.
+            Load a <code className="text-[#00a328]">sprite-animations.json</code> file to begin,
+            or start a new one.
           </p>
-          {folderName && (
-            <p className="text-[10px] font-mono text-[#4a7a4a]">Loaded: {folderName} (no presets)</p>
-          )}
           {error && <p className="text-[10px] font-mono text-red-400">{error}</p>}
           <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleFile} />
-          <button
-            onClick={() => fileRef.current?.click()}
+          <button onClick={() => fileRef.current?.click()}
             className="px-4 py-2 text-xs font-mono border border-[#00a328] text-[#00a328] hover:bg-[#00a328]/10 transition-colors">
-            ↑ OPEN vfx-presets.json
+            ↑ OPEN sprite-animations.json
           </button>
-          <button
-            onClick={handleNew}
+          <button onClick={handleNew}
             className="px-4 py-2 text-xs font-mono border border-[#1a2e1a] text-[#4a7a4a] hover:text-[#00a328] hover:border-[#00a328] transition-colors">
-            + NEW PRESET FILE
+            + NEW ANIMATION FILE
           </button>
         </div>
       </main>
