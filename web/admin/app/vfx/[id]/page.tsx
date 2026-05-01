@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth';
 import Sidebar from '../../../components/Sidebar';
 import * as vfxStore from '../../../lib/vfx-store';
-import type { SpriteAnimation } from '../../../lib/vfx-store';
+import type { EffectDef } from '../../../lib/vfx-store';
 
 const INPUT  = 'bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 w-full focus:border-[#00a328] outline-none';
 const LABEL  = 'text-[9px] font-mono text-[#4a7a4a] tracking-widest uppercase';
@@ -134,8 +134,8 @@ export default function AnimDetailPage() {
   useAuth();
   const { id } = useParams() as { id: string };
   const router = useRouter();
-  const [animations, setAnimations] = useState<SpriteAnimation[]>([]);
-  const [anim, setAnim] = useState<SpriteAnimation | null>(null);
+  const [effects, setEffects] = useState<EffectDef[]>([]);
+  const [anim, setAnim] = useState<EffectDef | null>(null);
   const [dirty, setDirty] = useState(false);
   const [search, setSearch] = useState('');
   const [folderName, setFolderName] = useState<string | null>(null);
@@ -144,7 +144,7 @@ export default function AnimDetailPage() {
   useEffect(() => {
     if (!vfxStore.isLoaded()) { router.replace('/vfx'); return; }
     setFolderName(vfxStore.getFolderName());
-    setAnimations(vfxStore.listAll());
+    setEffects(vfxStore.listAll());
     const found = vfxStore.getById(id);
     setAnim(found ? { ...found } : null);
     setDirty(false);
@@ -159,38 +159,38 @@ export default function AnimDetailPage() {
       if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
       e.preventDefault();
       const filtered = search
-        ? animations.filter(a => a.id.includes(search) || a.name.toLowerCase().includes(search.toLowerCase()))
-        : animations;
+        ? effects.filter(a => a.id.includes(search) || a.name.toLowerCase().includes(search.toLowerCase()))
+        : effects;
       const idx = filtered.findIndex(a => a.id === id);
       const next = e.key === 'ArrowDown' ? Math.min(idx + 1, filtered.length - 1) : Math.max(idx - 1, 0);
       if (filtered[next] && filtered[next].id !== id) router.push(`/vfx/${filtered[next].id}`, { scroll: false } as never);
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [id, animations, search, router]);
+  }, [id, effects, search, router]);
 
-  const patch = useCallback((partial: Partial<SpriteAnimation>) => {
+  const patch = useCallback((partial: Partial<EffectDef>) => {
     setAnim(prev => prev ? { ...prev, ...partial } : prev);
     setDirty(true);
   }, []);
 
   function save() {
     if (!anim) return;
-    vfxStore.setAnimation(anim);
-    setAnimations(vfxStore.listAll());
+    vfxStore.setEffect(anim);
+    setEffects(vfxStore.listAll());
     setDirty(false);
   }
 
   function handleDownload() {
     save();
-    vfxStore.downloadJson(folderName ? `${folderName}.json` : 'sprite-animations.json');
+    vfxStore.downloadJson(folderName ? `${folderName}.json` : 'effects.json');
   }
 
-  function addAnimation() {
+  function addEffect() {
     const newId = `anim-${Date.now().toString(36)}`;
-    const na: SpriteAnimation = { ...vfxStore.DEFAULT_ANIM, id: newId, name: 'New Animation' };
-    vfxStore.addAnimation(na);
-    setAnimations(vfxStore.listAll());
+    const na: EffectDef = { ...vfxStore.DEFAULT_EFFECT, id: newId, name: 'New Effect' };
+    vfxStore.addEffect(na);
+    setEffects(vfxStore.listAll());
     router.push(`/vfx/${newId}`, { scroll: false } as never);
   }
 
@@ -198,17 +198,17 @@ export default function AnimDetailPage() {
     if (!anim) return;
     save();
     const newId = `${anim.id}-copy`;
-    const na: SpriteAnimation = { ...anim, id: newId, name: `${anim.name} (copy)` };
-    vfxStore.addAnimation(na);
-    setAnimations(vfxStore.listAll());
+    const na: EffectDef = { ...anim, id: newId, name: `${anim.name} (copy)` };
+    vfxStore.addEffect(na);
+    setEffects(vfxStore.listAll());
     router.push(`/vfx/${newId}`, { scroll: false } as never);
   }
 
   function deleteAnimation() {
     if (!anim || !confirm(`Delete "${anim.name}"?`)) return;
-    vfxStore.removeAnimation(anim.id);
+    vfxStore.removeEffect(anim.id);
     const remaining = vfxStore.listAll();
-    setAnimations(remaining);
+    setEffects(remaining);
     if (remaining.length > 0) router.push(`/vfx/${remaining[0].id}`, { scroll: false } as never);
     else router.push('/vfx');
   }
@@ -242,8 +242,8 @@ export default function AnimDetailPage() {
   if (!vfxStore.isLoaded()) return null;
 
   const filtered = search
-    ? animations.filter(a => a.id.includes(search) || a.name.toLowerCase().includes(search.toLowerCase()))
-    : animations;
+    ? effects.filter(a => a.id.includes(search) || a.name.toLowerCase().includes(search.toLowerCase()))
+    : effects;
 
   return (
     <div className="flex min-h-screen bg-[#080f08] text-[#d1fad7]">
@@ -252,7 +252,7 @@ export default function AnimDetailPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="border-b border-[#1a2e1a] px-4 py-2 flex items-center gap-3 shrink-0">
-          <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">✦ ANIMATION STUDIO</span>
+          <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">✦ EFFECT EDITOR</span>
           {folderName && <span className="text-[10px] font-mono text-[#2a4a2a]">· {folderName}</span>}
           <div className="ml-auto flex gap-2">
             <button onClick={handleDownload}
@@ -273,14 +273,14 @@ export default function AnimDetailPage() {
               <input type="text" placeholder="filter…" value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="flex-1 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-[10px] font-mono px-2 py-0.5 focus:border-[#00a328] outline-none" />
-              <button onClick={addAnimation} title="Add animation"
+              <button onClick={addEffect} title="Add animation"
                 className="px-2 text-[#4a7a4a] hover:text-[#00a328] border border-[#1a2e1a] hover:border-[#00a328] text-xs transition-colors">
                 +
               </button>
             </div>
             <div className="px-3 py-1 border-b border-[#1a2e1a] shrink-0">
               <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">
-                ANIMATIONS ({filtered.length}{search ? `/${animations.length}` : ''})
+                EFFECTS ({filtered.length}{search ? `/${effects.length}` : ''})
               </span>
             </div>
             <div className="flex-1 overflow-y-auto">
@@ -334,12 +334,6 @@ export default function AnimDetailPage() {
                     <span className={LABEL}>NAME</span>
                     <input type="text" className={INPUT} value={anim.name}
                       onChange={e => patch({ name: e.target.value })} />
-                  </label>
-                  <label className="col-span-2 flex flex-col gap-1">
-                    <span className={LABEL}>USED BY (note)</span>
-                    <input type="text" className={INPUT} value={anim.usedBy ?? ''}
-                      placeholder="e.g. rocket explosion (PLUME object)"
-                      onChange={e => patch({ usedBy: e.target.value })} />
                   </label>
                   <label className="col-span-2 flex flex-col gap-1">
                     <span className={LABEL}>DESCRIPTION</span>

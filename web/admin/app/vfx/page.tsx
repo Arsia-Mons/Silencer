@@ -33,9 +33,9 @@ export default function VFXPage() {
   }
 
   function handleNew() {
-    vfxStore.loadFromJson('sprite-animations', JSON.stringify({ animations: [] }));
-    const id = 'new-animation';
-    vfxStore.addAnimation({ ...vfxStore.DEFAULT_ANIM, id, name: 'New Animation' });
+    vfxStore.loadFromJson('effects', JSON.stringify({ effects: [] }));
+    const id = 'new-effect';
+    vfxStore.addEffect({ ...vfxStore.DEFAULT_EFFECT, id, name: 'New Effect' });
     router.push(`/vfx/${id}`);
   }
 
@@ -44,20 +44,20 @@ export default function VFXPage() {
       <Sidebar />
       <main className="flex-1 flex items-center justify-center">
         <div className="border border-[#1a2e1a] rounded p-8 max-w-sm w-full flex flex-col gap-4">
-          <div className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">✦ ANIMATION STUDIO</div>
+          <div className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">✦ EFFECT EDITOR</div>
           <p className="text-xs font-mono text-[#d1fad7]">
-            Load a <code className="text-[#00a328]">sprite-animations.json</code> file to begin,
+            Load <code className="text-[#00a328]">shared/assets/gas/effects.json</code> to begin,
             or start a new one.
           </p>
           {error && <p className="text-[10px] font-mono text-red-400">{error}</p>}
           <input ref={fileRef} type="file" accept=".json" className="hidden" onChange={handleFile} />
           <button onClick={() => fileRef.current?.click()}
             className="px-4 py-2 text-xs font-mono border border-[#00a328] text-[#00a328] hover:bg-[#00a328]/10 transition-colors">
-            ↑ OPEN sprite-animations.json
+            ↑ OPEN effects.json
           </button>
           <button onClick={handleNew}
             className="px-4 py-2 text-xs font-mono border border-[#1a2e1a] text-[#4a7a4a] hover:text-[#00a328] hover:border-[#00a328] transition-colors">
-            + NEW ANIMATION FILE
+            + NEW EFFECTS FILE
           </button>
         </div>
       </main>

@@ -434,6 +434,19 @@ struct AbilityDef {
     std::string effectType;
 };
 
+// ---- Effect ----------------------------------------------------------------
+
+struct EffectDef {
+    std::string       id;
+    std::string       name;
+    std::string       description;
+    int               bank      = 0;
+    std::vector<int>  frames;        // frame indices in playback order
+    int               fps       = 12; // playback speed (informational — no C++ consumer yet)
+    bool              loop      = false;
+    bool              pingPong  = false;
+};
+
 // ---- Load errors -----------------------------------------------------------
 
 // Surfaced via the `gas reload` control-socket op; shape matches the
@@ -580,6 +593,7 @@ public:
     const AbilityDef*    GetAbilityDef(const std::string& id) const;
     const GameObjectDef* GetGameObjectDef(const std::string& id) const;
     const TerminalDef*   GetTerminalDef(const std::string& id) const;
+    const EffectDef*     GetEffectDef(const std::string& id) const;
 
     PlayerDef                player;
     WorldDef                 world;
@@ -591,6 +605,7 @@ public:
     std::vector<AbilityDef>  abilities;
     std::vector<GameObjectDef> gameObjects;
     std::vector<TerminalDef>   terminals;
+    std::vector<EffectDef>     effects;
 
     // Errors from the most recent Load() / Reload(). Cleared at the
     // start of each load. Read-only consumers should treat

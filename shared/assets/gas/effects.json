@@ -1,6 +1,6 @@
 {
-  "_comment": "Sprite animations — Silencer admin tool. References real game sprite banks used for visual effects.",
-  "animations": [
+  "_comment": "Effect definitions — Silencer GAS data. Loaded by GASLoader::LoadEffects(). Maps named effect IDs to sprite bank animation sequences. No C++ behavior is driven by this file yet — it documents intent for the data-driven VFX migration.",
+  "effects": [
     {
       "id": "plume-explosion",
       "name": "Plume (Explosion)",
@@ -9,52 +9,47 @@
       "frames": [0, 1, 2, 3, 4, 5, 6],
       "fps": 16,
       "loop": false,
-      "pingPong": false,
-      "usedBy": "rocket/grenade explosion (PLUME object)"
+      "pingPong": false
     },
     {
       "id": "heal-machine",
       "name": "HealMachine Animation",
-      "description": "HealMachine object animation. Bank 172 shared with explosion effects.",
+      "description": "HealMachine object idle animation. Bank 172 shared with explosion plumes.",
       "bank": 172,
       "frames": [0, 1, 2, 3, 4, 5],
       "fps": 8,
       "loop": true,
-      "pingPong": false,
-      "usedBy": "HealMachine object"
+      "pingPong": false
     },
     {
       "id": "tech-station",
       "name": "TechStation Animation",
-      "description": "TechStation object animation — cycles 8 frames.",
+      "description": "TechStation object idle animation — cycles 8 frames.",
       "bank": 106,
       "frames": [0, 1, 2, 3, 4, 5, 6, 7],
       "fps": 8,
       "loop": true,
-      "pingPong": false,
-      "usedBy": "TechStation object"
+      "pingPong": false
     },
     {
       "id": "secret-return",
       "name": "SecretReturn Billboard",
-      "description": "Animated billboard shown when a secret is returned. Bank 152.",
+      "description": "Animated billboard shown when a secret is returned.",
       "bank": 152,
       "frames": [0, 1, 2, 3, 4, 5, 6, 7],
       "fps": 10,
       "loop": true,
-      "pingPong": false,
-      "usedBy": "SecretReturn object"
+      "pingPong": false
     },
     {
       "id": "jetpack-flame",
       "name": "Jetpack Flame Overlay",
-      "description": "Flame overlay drawn on player while jetpack is active. Bank 218.",
+      "description": "Flame overlay drawn on player while jetpack is active.",
       "bank": 218,
       "frames": [0],
       "fps": 1,
       "loop": true,
-      "pingPong": false,
-      "usedBy": "Player jetpack overlay"
+      "pingPong": false
     }
   ]
 }
