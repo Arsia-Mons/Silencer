@@ -2,8 +2,15 @@
 // Idempotent restore on exit signals so a crash doesn't strand a broken
 // terminal. The same restore path runs in process exit handlers.
 
-const ENTER = '\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H';
-const LEAVE = '\x1b[?25h\x1b[?1049l\x1b[0m';
+// 1000 = button-event tracking (press + release). 1002 adds drag motion
+// while a button is held. 1003 adds any-motion (hover without button) —
+// matches native SDL which dispatches MOUSE_MOTION on every move, not just
+// drag. 1006 = SGR coordinate encoding (lifts the 223-cell limit and
+// avoids the encoding ambiguity of the legacy X10 form).
+const ENTER =
+  '\x1b[?1049h\x1b[?25l\x1b[2J\x1b[H\x1b[?1000h\x1b[?1002h\x1b[?1003h\x1b[?1006h';
+const LEAVE =
+  '\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l\x1b[?25h\x1b[?1049l\x1b[0m';
 
 // Kitty graphics delete-all. Sent on shutdown if the kitty rasterizer was
 // in use so any free-floating images are cleared. APC envelope; ignored by

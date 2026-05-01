@@ -352,6 +352,33 @@ async function main(): Promise<void> {
         control?.sendNoReply('key', { ascii: ev.ascii });
       }
     }
+    const mouseEvents = inputs.drainMouseEvents();
+    if (mouseEvents.length > 0 && inputClient) {
+      const { cols, rows } = term.size();
+      // Engine's logical UI resolution (game.cpp Game::Game initializes
+      // screenbuffer(640, 480) and HandleSDLEvents converts mouse coords
+      // into this same space). Center-of-cell sampling: a click on cell
+      // (cx, cy) lands mid-cell rather than the top-left corner.
+      const UI_W = 640;
+      const UI_H = 480;
+      for (const me of mouseEvents) {
+        const px = Math.min(
+          UI_W - 1,
+          Math.max(
+            0,
+            Math.floor(((me.cellX + 0.5) * UI_W) / Math.max(1, cols)),
+          ),
+        );
+        const py = Math.min(
+          UI_H - 1,
+          Math.max(
+            0,
+            Math.floor(((me.cellY + 0.5) * UI_H) / Math.max(1, rows)),
+          ),
+        );
+        inputClient.sendMouse(px, py, me.leftDown);
+      }
+    }
   });
 
   // Render loop — fires whenever a new frame arrives. Bundles the rasterizer

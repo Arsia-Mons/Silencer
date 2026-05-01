@@ -9,7 +9,7 @@
 
 // One-way binary input channel.
 //
-// Two layered message types — both latest-wins, both honored simultaneously:
+// Three layered message types — all latest-wins, all honored simultaneously:
 //
 //   type 0x01 INPUT_SNAPSHOT     action-level state ("keymoveup is held")
 //     12-byte payload, see inputserver.cpp.
@@ -24,9 +24,17 @@
 //     pipeline as native SDL — so the user's keymap profile (default.json
 //     or custom) is honored automatically.
 //
+//   type 0x03 MOUSE_SNAPSHOT     mouse position + button state
+//     5-byte payload: [u16 LE x][u16 LE y][u8 buttons]. buttons bit 0 = left.
+//     Coordinates are engine-pixel-space (same units as
+//     SDL_GetMouseState produces in native mode). The TUI sends this
+//     independently of the action/scancode messages so mouse motion
+//     doesn't trample held-key state.
+//
 // Combination: each tick the engine writes the scancode bitmask into
-// keystate, derives action-level Input via keymap.IsPressed, then ORs the
-// action snapshot on top. A client may send only one type, or both.
+// keystate, derives action-level Input via keymap.IsPressed, ORs the
+// action snapshot on top, then overwrites mouse fields with the latest
+// mouse snapshot. A client may send any subset of the three types.
 //
 // Wire envelope (little-endian, framed):
 //   [u8 type][u16 len][payload]
@@ -52,6 +60,11 @@ public:
 	// arrived; on false `out` is untouched.
 	bool LatestScancodes(Uint8* out);
 
+	// Most recent mouse snapshot (engine-pixel coords + left-button state).
+	// Returns true if any mouse snapshot has arrived; on false outputs
+	// are untouched.
+	bool LatestMouse(Uint16& x, Uint16& y, bool& down);
+
 private:
 	void AcceptLoop();
 	void HandleConnection(int fd);
@@ -71,6 +84,12 @@ private:
 	std::mutex sc_mu;
 	Uint8 sc_state[SDL_SCANCODE_COUNT];
 	bool have_sc;
+
+	std::mutex mouse_mu;
+	Uint16 mouse_x;
+	Uint16 mouse_y;
+	bool mouse_down;
+	bool have_mouse;
 };
 
 #endif

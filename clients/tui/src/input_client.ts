@@ -1,7 +1,7 @@
 // Binary input channel: TS host → engine. One-way, latest-wins, no replies.
 //
-// Wire format mirrors clients/silencer/src/net/inputserver.{h,cpp}. Two
-// message types, both layered on the engine side:
+// Wire format mirrors clients/silencer/src/net/inputserver.{h,cpp}. Three
+// message types, all layered on the engine side:
 //
 //   type 0x01 INPUT_SNAPSHOT (action-level)
 //     12-byte payload — for programmatic / CLI / agent control. Bypasses
@@ -18,8 +18,13 @@
 //     and runs the same UpdateInputState pipeline as native SDL, so the
 //     user's keymap profile is honored automatically.
 //
+//   type 0x03 MOUSE_SNAPSHOT
+//     5-byte payload: [u16 LE x][u16 LE y][u8 buttons]; buttons bit 0 = left.
+//     Engine pixel coordinates. Sent independently of scancodes/actions so
+//     mouse motion doesn't trample held-key state.
+//
 // Handshake: client sends 1 byte (protocol version 0x01) before the first
-// message. Either or both message types may be sent on the same connection.
+// message. Any subset of message types may be sent on the same connection.
 
 import { Socket } from 'node:net';
 import { SCANCODE_BYTES } from './input';
@@ -27,7 +32,9 @@ import { SCANCODE_BYTES } from './input';
 const PROTO_VERSION = 0x01;
 const MSG_ACTION   = 0x01;
 const MSG_SCANCODE = 0x02;
+const MSG_MOUSE    = 0x03;
 const ACTION_PAYLOAD_BYTES = 12;
+const MOUSE_PAYLOAD_BYTES  = 5;
 
 // Bit positions MUST match clients/silencer/src/net/inputserver.cpp.
 const KEY_BIT: Record<string, number> = {
@@ -159,6 +166,21 @@ export class InputClient {
     buf[1] = SCANCODE_BYTES & 0xff;
     buf[2] = (SCANCODE_BYTES >> 8) & 0xff;
     buf.set(bitmask, 3);
+    this.sock.write(buf);
+  }
+
+  /** Send a mouse position + button-state snapshot (engine pixel coords). */
+  sendMouse(x: number, y: number, leftDown: boolean): void {
+    if (!this.sock) return;
+    const buf = new Uint8Array(3 + MOUSE_PAYLOAD_BYTES);
+    buf[0] = MSG_MOUSE;
+    buf[1] = MOUSE_PAYLOAD_BYTES & 0xff;
+    buf[2] = (MOUSE_PAYLOAD_BYTES >> 8) & 0xff;
+    buf[3] = x & 0xff;
+    buf[4] = (x >>> 8) & 0xff;
+    buf[5] = y & 0xff;
+    buf[6] = (y >>> 8) & 0xff;
+    buf[7] = leftDown ? 0x01 : 0x00;
     this.sock.write(buf);
   }
 

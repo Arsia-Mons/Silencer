@@ -20,16 +20,24 @@ silencer-tui (TS)              silencer --tui (C++)
   ships `[u8 type][u32 len][payload]` messages.
   Type 0x01 = palette (256×RGBA), type 0x02 = frame (u16 w, u16 h, w·h indexed).
   Engine flag `--tui` (game.cpp) skips video init, keeps audio, swaps backends.
-- **Input is split across two ops** because the engine has two input paths:
+- **Input is split across multiple paths** because the engine has separate
+  consumers:
   - **Gameplay** (held keys: move/aim/fire/jump) goes through the canonical
-    `Input` struct via the `input` control op, last-write-wins per tick.
+    `Input` struct via the binary input channel, last-write-wins per tick.
     Terminal stdin → autorelease timer (no keyup events from cooked
     terminals) → snapshot sent at 24 Hz.
   - **Menu navigation + text input** uses a separate edge-triggered `key`
-    op that calls `Interface::ProcessKeyPress(world, ascii)` on the current
-    interface. Arrow keys map to magic chars 1-4, plus `\t`/`\n`/`\b`/0x1B
-    and printable ASCII pass through. Mirrors the SDL client's
+    op on the JSON control socket that calls
+    `Interface::ProcessKeyPress(world, ascii)` on the current interface.
+    Arrow keys map to magic chars 1-4, plus `\t`/`\n`/`\b`/0x1B and
+    printable ASCII pass through. Mirrors the SDL client's
     `HandleSDLEvents` SDL_EVENT_KEY_DOWN translation.
+  - **Mouse** uses SGR mouse tracking (`CSI ?1000;1002;1006 h`) on stdin.
+    `input.ts` parses `\x1b[<btn;col;row M|m`; `index.ts` converts cell
+    coords to engine pixels using the latest frame size, then ships them
+    via the binary input channel's `MSG_MOUSE` (type 0x03) — see
+    `inputserver.h` for the wire format. Sent independently of scancodes
+    so motion doesn't trample held keys.
 
 ## Run during dev
 
@@ -57,9 +65,12 @@ bun ./clients/tui/tests/probe.ts            # state probe over control socket
 - **Tick rate is 24 Hz** in the engine (`game.cpp:361`, `wait = 42`). TUI
   mode adds `SDL_Delay(33)` per Loop because TUIBackend's TCP write doesn't
   block (no vsync gate). Without that, the loop ran at ~1500 fps.
-- **Mouse coords default to 0xFFFF** (sentinel for "no mouse position",
-  per `input.cpp:Serialize`). `TerminalInput.snapshot()` preserves this so
-  the wire-level mouse path stays inactive in TUI mode.
+- **Mouse cell→pixel mapping is approximate.** Half-block packs 2 engine
+  rows per cell vertically and 1:1 horizontally, then nearest-neighbor
+  scales to fit the terminal. Inverting gives center-of-cell sampling — a
+  click on cell `(cx,cy)` lands at `floor((cx+0.5)*fw/cols)`,
+  `floor((cy+0.5)*fh/rows)`. Good enough for menu hit-tests; in-game
+  aiming will feel chunky vs. native SDL.
 - **Binary discovery** (`findBinary` in `index.ts`) tries, in order:
   `SILENCER_BIN` env var, the matching
   `@arsia-mons/silencer-<process.platform>-<process.arch>` package

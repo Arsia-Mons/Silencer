@@ -90,6 +90,17 @@ export type KeyEvent =
   | { kind: 'name'; name: 'up' | 'down' | 'left' | 'right' | 'tab' | 'enter' | 'escape' | 'backspace' }
   | { kind: 'char'; ascii: number };
 
+/** Mouse event in terminal cell coordinates (1-based on the wire,
+ *  0-based here). The host converts to engine pixels using the latest
+ *  frame size before shipping to the engine. */
+export type MouseEvent = {
+  kind: 'press' | 'release' | 'move' | 'drag';
+  cellX: number;
+  cellY: number;
+  /** True iff the left mouse button is currently held. */
+  leftDown: boolean;
+};
+
 export class TerminalInput {
   // Held-scancode bitmask, wire-ready (bit i of byte i>>3).
   private state = new Uint8Array(SCANCODE_BYTES);
@@ -98,6 +109,13 @@ export class TerminalInput {
   private kittyKbd = false;
   // Carries an incomplete CSI tail across stdin chunks.
   private kittyTail = '';
+  // Carries an incomplete SGR mouse sequence across legacy-mode chunks.
+  private legacyTail = '';
+  // Mouse events parsed during feed() but not yet drained. SGR mouse
+  // sequences arrive interleaved with keys; the host pulls them per-tick
+  // via drainMouseEvents().
+  private mouseQueue: MouseEvent[] = [];
+  private leftDown = false;
   /** User pressed Ctrl-C / Ctrl-Q — host should exit. */
   quitRequested = false;
 
@@ -112,6 +130,16 @@ export class TerminalInput {
   /** Held-scancode bitmask. Caller may not mutate. */
   snapshot(): Uint8Array {
     return this.state;
+  }
+
+  /** Drain mouse events buffered during feed(). Returns empty array if
+   *  none. The host converts cell coords → engine pixel coords before
+   *  shipping to the engine. */
+  drainMouseEvents(): MouseEvent[] {
+    if (this.mouseQueue.length === 0) return [];
+    const out = this.mouseQueue;
+    this.mouseQueue = [];
+    return out;
   }
 
   /** Call once per tick. Skips when kitty mode delivers real release events,
@@ -140,7 +168,8 @@ export class TerminalInput {
 
   private feedLegacy(chunk: Buffer): KeyEvent[] {
     const events: KeyEvent[] = [];
-    const s = chunk.toString('utf8');
+    const s = this.legacyTail + chunk.toString('utf8');
+    this.legacyTail = '';
     let i = 0;
     while (i < s.length) {
       const c = s[i]!;
@@ -148,6 +177,19 @@ export class TerminalInput {
         this.quitRequested = true;
         i++;
         continue;
+      }
+      // SGR mouse: \x1b[<btn;col;row M|m. Check before generic CSI so the
+      // arrow-key matcher doesn't grab \x1b[< as a malformed arrow.
+      if (c === '\x1b' && i + 2 < s.length && s[i + 1] === '[' && s[i + 2] === '<') {
+        const consumed = this.tryParseSGRMouse(s, i);
+        if (consumed > 0) {
+          i += consumed;
+          continue;
+        }
+        if (consumed < 0) {
+          this.legacyTail = s.slice(i);
+          return events;
+        }
       }
       // CSI arrow keys: \x1b[A/B/C/D
       if (c === '\x1b' && i + 2 < s.length && s[i + 1] === '[') {
@@ -202,6 +244,21 @@ export class TerminalInput {
         continue;
       }
       if (c === '\x1b' && i + 1 < s.length && s[i + 1] === '[') {
+        // SGR mouse sequences share the CSI envelope but terminate on `M`/`m`
+        // and start with `<`. Handle before the generic CSI matcher so the
+        // mouse params (which include `;`) aren't misread as kitty kbd args.
+        if (i + 2 < s.length && s[i + 2] === '<') {
+          const consumed = this.tryParseSGRMouse(s, i);
+          if (consumed > 0) {
+            i += consumed;
+            continue;
+          }
+          if (consumed < 0) {
+            // Incomplete — partial sequence still pending bytes.
+            this.kittyTail = s.slice(i);
+            return events;
+          }
+        }
         let j = i + 2;
         while (j < s.length && !/[A-Za-z~]/.test(s[j]!)) j++;
         if (j >= s.length) {
@@ -297,6 +354,71 @@ export class TerminalInput {
     if (sc < 0) return;
     if (isPress || isRepeat) this.scancodeOn(sc);
     else if (isRelease)      this.scancodeOff(sc);
+  }
+
+  /** Try to parse a single SGR mouse report at s[start]. The form is
+   *   `\x1b[<btn;col;row M`  (press / drag / motion)
+   *   `\x1b[<btn;col;row m`  (release)
+   *  with col/row 1-based.
+   *
+   *  Return value:
+   *    >0  bytes consumed
+   *    0   not an SGR mouse sequence (malformed)
+   *   -1   incomplete — full terminator hasn't arrived yet, caller should
+   *        stash and retry on the next chunk. */
+  private tryParseSGRMouse(s: string, start: number): number {
+    // Caller guarantees s[start..start+2] === '\x1b[<'.
+    let j = start + 3;
+    while (j < s.length && s[j] !== 'M' && s[j] !== 'm') j++;
+    if (j >= s.length) return -1;
+    const params = s.slice(start + 3, j);
+    const isPress = s[j] === 'M';
+    const parts = params.split(';');
+    if (parts.length !== 3) return j + 1 - start; // malformed but consumed
+    const btn = parseInt(parts[0]!, 10);
+    const col = parseInt(parts[1]!, 10);
+    const row = parseInt(parts[2]!, 10);
+    if (!Number.isFinite(btn) || !Number.isFinite(col) || !Number.isFinite(row)) {
+      return j + 1 - start;
+    }
+    // SGR button byte: low 2 bits select button (0=left, 1=middle, 2=right);
+    // bit 5 (32) = motion (drag if any button held, else move); bit 6 (64) =
+    // wheel (we ignore for now). Modifier bits (4=shift, 8=meta, 16=ctrl)
+    // are ignored.
+    const isWheel = (btn & 64) !== 0;
+    const isMotion = (btn & 32) !== 0;
+    const baseBtn = btn & 0x03;
+    const cellX = Math.max(0, col - 1);
+    const cellY = Math.max(0, row - 1);
+
+    if (isWheel) {
+      // Wheel events still update position but don't change leftDown.
+      this.mouseQueue.push({
+        kind: 'move',
+        cellX,
+        cellY,
+        leftDown: this.leftDown,
+      });
+      return j + 1 - start;
+    }
+
+    let kind: MouseEvent['kind'];
+    if (isMotion) {
+      kind = this.leftDown ? 'drag' : 'move';
+    } else if (isPress && baseBtn === 0) {
+      this.leftDown = true;
+      kind = 'press';
+    } else if (!isPress && baseBtn === 0) {
+      this.leftDown = false;
+      kind = 'release';
+    } else {
+      // Non-left button press/release — still report position; leftDown
+      // unchanged. Treat as 'move' so the host updates mousex/mousey only.
+      kind = 'move';
+    }
+
+    this.mouseQueue.push({ kind, cellX, cellY, leftDown: this.leftDown });
+    return j + 1 - start;
   }
 
   private handleKittyBareByte(c: string, events: KeyEvent[]): void {

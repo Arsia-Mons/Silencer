@@ -87,6 +87,10 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	mapexistchecked = false;
 	fullscreentoggled = false;
 	replayfile = 0;
+	tui_prev_mouse_x = 0;
+	tui_prev_mouse_y = 0;
+	tui_prev_mouse_down = false;
+	tui_have_prev_mouse = false;
 	controlPort = 0;
 	tuiInputPort = 0;
 	headless = false;
@@ -477,6 +481,40 @@ bool Game::Loop(void){
 				if(action.mousex != 0xFFFF) world.localinput.mousex = action.mousex;
 				if(action.mousey != 0xFFFF) world.localinput.mousey = action.mousey;
 				world.localinput.mousedown        |= action.mousedown;
+			}
+			// Latest mouse snapshot (TUI cell→pixel conversion already done
+			// host-side). Overwrites whatever UpdateInputState wrote — in TUI
+			// mode SDL_GetMouseState returns 0,0 since there's no video.
+			Uint16 mx, my;
+			bool md;
+			if(inputserver.LatestMouse(mx, my, md)){
+				world.localinput.mousex    = mx;
+				world.localinput.mousey    = my;
+				world.localinput.mousedown = md;
+				// Edge-detect transitions and dispatch to the current
+				// interface — mirrors HandleSDLEvents' SDL_EVENT_MOUSE_*
+				// handlers (game.cpp ~6275). Without this the menu UI
+				// never sees the mouse, since iface state is driven by
+				// ProcessMousePress / ProcessMouseMove rather than
+				// world.localinput reads.
+				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+				if(iface){
+					bool moved = !tui_have_prev_mouse ||
+					             mx != tui_prev_mouse_x ||
+					             my != tui_prev_mouse_y;
+					bool downChanged = !tui_have_prev_mouse ||
+					                   md != tui_prev_mouse_down;
+					if(moved){
+						iface->ProcessMouseMove(world, mx, my);
+					}
+					if(downChanged){
+						iface->ProcessMousePress(world, md, mx, my);
+					}
+				}
+				tui_prev_mouse_x    = mx;
+				tui_prev_mouse_y    = my;
+				tui_prev_mouse_down = md;
+				tui_have_prev_mouse = true;
 			}
 		} else {
 			UpdateInputState(world.localinput);

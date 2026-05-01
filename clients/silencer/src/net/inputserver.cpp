@@ -20,7 +20,9 @@ namespace {
 const uint8_t kProtoVersion   = 0x01;
 const uint8_t kMsgAction      = 0x01;
 const uint8_t kMsgScancode    = 0x02;
+const uint8_t kMsgMouse       = 0x03;
 const size_t  kActionPayload  = 12;
+const size_t  kMousePayload   = 5;
 // Bytes needed to cover all SDL scancodes as a bitmask (rounded up).
 const size_t  kScancodeBytes  = (SDL_SCANCODE_COUNT + 7) / 8;
 
@@ -109,7 +111,8 @@ void Decode(const uint8_t* payload, Input& out){
 
 InputServer::InputServer()
 	: listenfd(-1), running(false), connfd(-1),
-	  have_action(false), have_sc(false) {
+	  have_action(false), have_sc(false),
+	  mouse_x(0), mouse_y(0), mouse_down(false), have_mouse(false) {
 	memset(sc_state, 0, sizeof(sc_state));
 }
 
@@ -244,6 +247,14 @@ void InputServer::HandleConnection(int fd){
 			have_sc = true;
 			continue;
 		}
+		if(type == kMsgMouse && len == kMousePayload){
+			std::lock_guard<std::mutex> lk(mouse_mu);
+			mouse_x    = read_u16_le(payload);
+			mouse_y    = read_u16_le(payload + 2);
+			mouse_down = (payload[4] & 0x01) != 0;
+			have_mouse = true;
+			continue;
+		}
 		// Unknown / mismatched types silently dropped — forward-compat.
 	}
 	int my_fd = -1;
@@ -268,5 +279,14 @@ bool InputServer::LatestScancodes(Uint8* out){
 	std::lock_guard<std::mutex> lk(sc_mu);
 	if(!have_sc) return false;
 	memcpy(out, sc_state, sizeof(sc_state));
+	return true;
+}
+
+bool InputServer::LatestMouse(Uint16& x, Uint16& y, bool& down){
+	std::lock_guard<std::mutex> lk(mouse_mu);
+	if(!have_mouse) return false;
+	x    = mouse_x;
+	y    = mouse_y;
+	down = mouse_down;
 	return true;
 }

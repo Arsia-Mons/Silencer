@@ -256,6 +256,13 @@ private:
 	bool stage2spawned;
 	ControlServer controlserver;
 	InputServer inputserver;
+	// TUI mouse edge-detection state. Tracks the last (x, y, down) we
+	// applied so the TUI loop can synthesize ProcessMousePress / Move
+	// calls on transitions, mirroring HandleSDLEvents on native.
+	Uint16 tui_prev_mouse_x;
+	Uint16 tui_prev_mouse_y;
+	bool   tui_prev_mouse_down;
+	bool   tui_have_prev_mouse;
 	void DrainControlQueue();
 	void PostFrameReplies();
 };
