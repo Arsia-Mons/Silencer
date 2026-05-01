@@ -388,10 +388,14 @@ jobs:
           bun run --cwd clients/tui build
 
       - name: Stage npm packages
+        # Tag scheme is a zero-padded build counter (vNNNNN), but npm
+        # requires semver. Map vNNNNN → 0.0.N (decimal, no leading zeros)
+        # so each release becomes a patch-level bump.
         env:
           VERSION: ${{ github.ref_name }}
         run: |
-          ver="${VERSION#v}"
+          raw="${VERSION#v}"
+          ver="0.0.$((10#$raw))"
           bun clients/tui/scripts/stage-npm-packages.ts \
             --version "$ver" \
             --artifacts ./artifacts \
