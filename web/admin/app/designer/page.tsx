@@ -15,8 +15,6 @@ import type { TileMenuInfo } from './TileContextMenu';
 import MapPropertiesPanel from './MapPropertiesPanel';
 import ActorListPanel from './ActorListPanel';
 import Minimap from './Minimap';
-import VFXTriggersPanel from './VFXTriggersPanel';
-import type { VFXTrigger } from './VFXTriggersPanel';
 import type { MapActor } from '../../lib/types';
 import { API } from '../../lib/api';
 
@@ -88,8 +86,7 @@ export default function DesignerPage() {
   const [actorMenu, setActorMenu] = useState<ActorMenu | null>(null);
   const [tileMenu, setTileMenu] = useState<TileMenuInfo | null>(null);
   const [highlightActorIdx, setHighlightActorIdx] = useState<number | null>(null);
-  const [rightTab, setRightTab] = useState<'tiles' | 'actors' | 'vfx'>('tiles');
-  const [vfxTriggers, setVfxTriggers] = useState<VFXTrigger[]>([]);
+  const [rightTab, setRightTab] = useState<'tiles' | 'actors'>('tiles');
   const [vis, setVis] = useState<VisState>({
     bg: [true, true, true, true],
     fg: [true, true, true, true],
@@ -201,15 +198,6 @@ export default function DesignerPage() {
   const dataDirRef   = useRef<HTMLInputElement>(null);
   const dataFilesRef = useRef<HTMLInputElement>(null);
 
-  function downloadSidecar() {
-    const name = (map?.fileName ?? 'map').replace(/\.sil$/i, '');
-    const data = JSON.stringify({ _comment: 'Silencer map sidecar — VFX triggers', vfxTriggers }, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `${name}.sil.meta.json`; a.click();
-    URL.revokeObjectURL(url);
-  }
 
   // Tool change: track tile layer type and clear selection/paste on tool switch
   const handleToolChange = useCallback((tool: string) => {
@@ -904,18 +892,18 @@ export default function DesignerPage() {
             </div>
           </div>
 
-          {/* Right panel: tiles / actors / vfx tabs */}
+          {/* Right panel: tiles / actors tabs */}
           <div className="w-72 flex-shrink-0 border-l border-game-border bg-game-bgCard overflow-hidden flex flex-col">
             {/* Tab bar */}
             <div className="flex border-b border-game-border shrink-0">
-              {(['tiles', 'actors', 'vfx'] as const).map(tab => (
+              {(['tiles', 'actors'] as const).map(tab => (
                 <button key={tab} onClick={() => setRightTab(tab)}
                   className={`flex-1 py-1.5 text-[10px] font-mono tracking-widest transition-colors ${
                     rightTab === tab
                       ? 'text-game-primary border-b-2 border-game-primary bg-game-dark'
                       : 'text-game-textDim hover:text-game-text'
                   }`}>
-                  {tab === 'tiles' ? 'TILES' : tab === 'actors' ? 'ACTORS' : '✦ VFX'}
+                  {tab === 'tiles' ? 'TILES' : 'ACTORS'}
                 </button>
               ))}
             </div>
@@ -942,14 +930,6 @@ export default function DesignerPage() {
               <div className="flex-1 flex items-center justify-center p-4">
                 <span className="text-[10px] font-mono text-game-textDim">No map loaded</span>
               </div>
-            )}
-            {rightTab === 'vfx' && (
-              <VFXTriggersPanel
-                triggers={vfxTriggers}
-                onChange={setVfxTriggers}
-                onDownload={downloadSidecar}
-                mapLoaded={!!map}
-              />
             )}
           </div>
         </div>
