@@ -58,7 +58,7 @@ body::after {
   inset: 0;
   background-image:
     linear-gradient(rgba(3, 6, 3, 0.72), rgba(3, 6, 3, 0.72)),
-    url('/mars.gif');
+    url('/mars.png');
   background-repeat: no-repeat, no-repeat;
   background-size: 100% 100%, 42vmin;
   background-position: 0 0, 88% 58%;
