@@ -100,7 +100,8 @@ services:
 
   admin-web:
     build:
-      context: ../web/admin
+      context: ..
+      dockerfile: web/admin/Dockerfile
       args:
         NEXT_PUBLIC_API_URL: "http://${PUBLIC_ADDR:-localhost}:24080"
         NEXT_PUBLIC_WS_URL: "ws://${PUBLIC_ADDR:-localhost}:24080"
