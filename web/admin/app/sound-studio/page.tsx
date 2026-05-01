@@ -854,7 +854,7 @@ export default function SoundStudioPage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'monospace', background: '#111', color: '#ccc' }}>
+    <div style={{ display: 'flex', height: '100vh' }}>
       <Sidebar wsConnected={serverReachable} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
