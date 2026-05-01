@@ -38,22 +38,34 @@
   outline: none !important;
 }
 
+@keyframes mars-drift {
+  0%   { background-position: 88% 58%; }
+  33%  { background-position: 84% 62%; }
+  66%  { background-position: 90% 54%; }
+  100% { background-position: 88% 58%; }
+}
+
 body {
   background-color: #050a05;
-  background-image: url('/menu-bg.png');
-  background-size: cover;
-  background-position: center right;
-  background-attachment: fixed;
+  background-image: url('/starfield.gif');
+  background-repeat: repeat;
+  background-size: auto;
   color: #d1fad7;
   font-family: 'Courier New', Courier, monospace;
 }
 
-/* Dark overlay so text stays readable over the planet */
+/* Mars planet — slowly drifts + dark overlay stacked on top of it */
 body::after {
   content: '';
   position: fixed;
   inset: 0;
-  background: rgba(3, 6, 3, 0.72);
+  background-image:
+    linear-gradient(rgba(3, 6, 3, 0.68), rgba(3, 6, 3, 0.68)),
+    url('/mars.gif');
+  background-repeat: no-repeat, no-repeat;
+  background-size: auto, 42vmin;
+  background-position: 0 0, 88% 58%;
+  animation: mars-drift 40s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
 }
@@ -75,7 +87,7 @@ body::before {
 }
 
 /* Ensure all page content sits above the dark overlay */
-#__next > * {
+#app-root {
   position: relative;
   z-index: 1;
 }

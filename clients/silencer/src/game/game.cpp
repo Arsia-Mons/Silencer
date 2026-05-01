@@ -4966,13 +4966,20 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 													if(mapUploadThread.joinable()) mapUploadThread.detach();
 													uint32_t gen = ++mapUploadGeneration;
 													std::string mppath = FindMap(mapname);
+													std::string dataDir = GetDataDir();
+													bool isBundledMap = dataDir.empty() || mppath.substr(0, dataDir.size()) != dataDir;
 													std::string apiURL = Config::GetInstance().mapapiurl;
-													mapUploadState.store(1, std::memory_order_relaxed);
-													mapUploadThread = std::thread([this, mapname_str=std::string(mapname), mppath, apiURL, gen](){
-														bool ok = UploadMapToServer(mapname_str.c_str(), mppath.c_str(), apiURL.c_str());
-														if(mapUploadGeneration.load(std::memory_order_relaxed) != gen) return;
-														mapUploadState.store(ok ? 2 : 3, std::memory_order_release);
-													});
+													if(isBundledMap){
+														// Bundled maps ship with the game; no upload needed.
+														mapUploadState.store(2, std::memory_order_release);
+													}else{
+														mapUploadState.store(1, std::memory_order_relaxed);
+														mapUploadThread = std::thread([this, mapname_str=std::string(mapname), mppath, apiURL, gen](){
+															bool ok = UploadMapToServer(mapname_str.c_str(), mppath.c_str(), apiURL.c_str());
+															if(mapUploadGeneration.load(std::memory_order_relaxed) != gen) return;
+															mapUploadState.store(ok ? 2 : 3, std::memory_order_release);
+														});
+													}
 													creategameclicked = true;
 													strcpy(Config::GetInstance().defaultgamename, gamename);
 													Config::GetInstance().Save();
@@ -5797,6 +5804,12 @@ std::string Game::FindMap(const char * name, unsigned char (*hash)[20], const ch
 			isarchive = true;
 		}
 		CDResDir();
+		// Capture the absolute resources path while cwd = Resources (GetResDir returns "" on macOS).
+		std::string absResDir = GetResDir();
+		if(absResDir.empty()){
+			char _cwd[PATH_MAX];
+			if(getcwd(_cwd, PATH_MAX)) absResDir = std::string(_cwd) + "/";
+		}
 		std::vector<std::string> files = ListFiles((GetResDir() + directory).c_str());
 		CDDataDir();
 		std::vector<std::string> files2 = ListFiles((GetDataDir() + directory).c_str());
@@ -5816,7 +5829,7 @@ std::string Game::FindMap(const char * name, unsigned char (*hash)[20], const ch
 				filename.append(*it);
 				SDL_IOStream * file = SDL_IOFromFile(filename.c_str(), "rb");
 				if(!file){
-					filename = GetResDir() + directory;
+					filename = absResDir + directory;
 					filename.append("/");
 					filename.append(*it);
 				}else{
