@@ -99,7 +99,6 @@ export const ACTOR_TYPE_HINTS: Record<number, ActorTypeHint> = {
   50: { label: 'Size',     options: { 4:'Small', 5:'Small Alt', 6:'Large', 7:'Default' } },
   65: { label: 'Side',     options: { 0:'Team A', 1:'Team B' } },
   67: { label: 'Type',     options: { 0:'Base Defense', 1:'Guard Defense (Laser)' } },
-  71: { label: 'Size',     options: { 0:'Small', 1:'Medium', 2:'Large' } },
 };
 
 interface ToolbarProps {

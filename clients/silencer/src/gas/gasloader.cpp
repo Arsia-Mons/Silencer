@@ -670,6 +670,31 @@ static void LoadEffects(const std::string& dir, std::vector<EffectDef>& out,
 
 // ---------------------------------------------------------------------------
 
+static void LoadLights(const std::string& dir, std::vector<LightDef>& out,
+                       std::vector<GASLoadError>& errors) {
+    json j;
+    if (!OpenJson(dir + "/lights.json", j, errors)) return;
+    try {
+        out.clear();
+        for (const auto& lj : j.at("lights")) {
+            LightDef l;
+            l.id          = lj.value("id",          std::string{});
+            l.name        = lj.value("name",        std::string{});
+            l.description = lj.value("description", std::string{});
+            l.bank        = lj.value("bank",        222);
+            l.frame       = lj.value("frame",       0);
+            l.radius      = lj.value("radius",      128);
+            l.intensity   = lj.value("intensity",   1.0f);
+            out.push_back(std::move(l));
+        }
+    } catch (const std::exception& ex) {
+        errors.push_back({"lights.json", "", "FIELD_ERROR", ex.what()});
+        out.clear();
+    }
+}
+
+// ---------------------------------------------------------------------------
+
 bool GASLoader::Load(const std::string& gasDir) {
     lastLoadErrors.clear();
     LoadGameEngine(gasDir, gameengine);
@@ -683,11 +708,12 @@ bool GASLoader::Load(const std::string& gasDir) {
     LoadGameObjects(gasDir, gameObjects, lastLoadErrors);
     LoadTerminals(gasDir, terminals, lastLoadErrors);
     LoadEffects(gasDir, effects, lastLoadErrors);
+    LoadLights(gasDir, lights, lastLoadErrors);
     loaded = true;
-    fprintf(stderr, "[gas] loaded: %zu agencies, %zu weapons, %zu items, %zu enemies, %zu abilities, %zu gameObjects, %zu terminals, %zu effects (%zu errors)\n",
+    fprintf(stderr, "[gas] loaded: %zu agencies, %zu weapons, %zu items, %zu enemies, %zu abilities, %zu gameObjects, %zu terminals, %zu effects, %zu lights (%zu errors)\n",
             agencies.size(), weapons.size(), items.size(),
             enemies.size(), abilities.size(), gameObjects.size(), terminals.size(),
-            effects.size(), lastLoadErrors.size());
+            effects.size(), lights.size(), lastLoadErrors.size());
     return lastLoadErrors.empty();
 }
 
@@ -705,6 +731,7 @@ void GASLoader::Reload(const std::string& gasDir) {
     gameObjects.clear();
     terminals.clear();
     effects.clear();
+    lights.clear();
     loaded = false;
     Load(gasDir);
 }
@@ -758,5 +785,11 @@ const TerminalDef* GASLoader::GetTerminalDef(const std::string& id) const {
 const EffectDef* GASLoader::GetEffectDef(const std::string& id) const {
     for (const auto& e : effects)
         if (e.id == id) return &e;
+    return nullptr;
+}
+
+const LightDef* GASLoader::GetLightDef(const std::string& id) const {
+    for (const auto& l : lights)
+        if (l.id == id) return &l;
     return nullptr;
 }

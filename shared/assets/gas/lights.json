@@ -1,0 +1,31 @@
+{
+  "lights": [
+    {
+      "id": "halo_small",
+      "name": "Small Halo",
+      "description": "Compact light halo — candle, indicator light, small lamp.",
+      "bank": 222,
+      "frame": 0,
+      "radius": 64,
+      "intensity": 0.6
+    },
+    {
+      "id": "halo_medium",
+      "name": "Medium Halo",
+      "description": "Mid-sized light halo — wall sconce, ceiling panel, spotlight.",
+      "bank": 222,
+      "frame": 1,
+      "radius": 128,
+      "intensity": 1.0
+    },
+    {
+      "id": "halo_large",
+      "name": "Large Halo",
+      "description": "Wide ambient glow — floodlight, large industrial lamp, window light.",
+      "bank": 222,
+      "frame": 2,
+      "radius": 192,
+      "intensity": 1.4
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { ACTOR_DEFS, ACTOR_TYPE_HINTS } from './Toolbar';
+import { useLightsStore } from '../../lib/lights-store';
 import type { MapActor } from '../../lib/types';
 
 // Guards (0,2,3) use direction as a facing boolean only: 0=Right, 1=Left
@@ -31,7 +32,14 @@ interface Props {
 export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, onUpdate, onDelete, onClose }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const def = ACTOR_DEFS.find(d => d.id === actor.id) ?? { label: `Unknown (${actor.id})`, color: '#6b7280' };
-  const typeHint = ACTOR_TYPE_HINTS[actor.id];
+  const { lights, load: loadLights } = useLightsStore();
+
+  useEffect(() => { if (actor.id === 71) loadLights(); }, [actor.id, loadLights]);
+
+  // For Light actors, build type options from the catalogue; fall back to static hints
+  const typeHint = actor.id === 71 && lights.length > 0
+    ? { label: 'Light Type', options: Object.fromEntries(lights.map(l => [String(l.frame), l.name])) }
+    : ACTOR_TYPE_HINTS[actor.id];
 
   const [fields, setFields] = useState<FieldState>({
     type:       String(actor.type ?? 0),
