@@ -65,7 +65,8 @@ jobs:
             libminizip-dev libcurl4-openssl-dev \
             libasound2-dev libpulse-dev libudev-dev libxext-dev \
             libxinerama-dev libxcursor-dev libxrandr-dev libxss-dev \
-            libwayland-dev libxkbcommon-dev libdbus-1-dev libibus-1.0-dev
+            libxi-dev libwayland-dev libxkbcommon-dev libdbus-1-dev \
+            libibus-1.0-dev
 
       - name: Install SDL3 + SDL3_mixer
         if: steps.changes.outputs.relevant == 'true'
