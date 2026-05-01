@@ -88,6 +88,7 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	fullscreentoggled = false;
 	replayfile = 0;
 	controlPort = 0;
+	tuiInputPort = 0;
 	headless = false;
 	tui = false;
 	paused = false;
@@ -111,6 +112,7 @@ Game::~Game(){
 	// we join them. Doing this before tearing down anything else keeps members
 	// pendingWaits/etc alive while the drain runs.
 	controlserver.Stop();
+	inputserver.Stop();
 	if(renderdevice){
 		renderdevice->Shutdown();
 		delete renderdevice;
@@ -179,6 +181,12 @@ bool Game::Load(char * cmdline){
 				char * portstr = strtok(NULL, " ");
 				if(portstr){
 					controlPort = atoi(portstr);
+				}
+			}
+			else if(strcmp(cmdline, "--tui-input-port") == 0){
+				char * portstr = strtok(NULL, " ");
+				if(portstr){
+					tuiInputPort = atoi(portstr);
 				}
 			}
 			else if(strcmp(cmdline, "--headless") == 0){
@@ -286,6 +294,11 @@ bool Game::Load(char * cmdline){
 		};
 		if(!controlserver.Start(controlPort, drainPendingWaits)){
 			fprintf(stderr, "[control] failed to start; continuing without\n");
+		}
+	}
+	if(tui && tuiInputPort > 0){
+		if(!inputserver.Start(tuiInputPort)){
+			fprintf(stderr, "[input] failed to start; continuing without\n");
 		}
 	}
 	return true;
@@ -403,9 +416,71 @@ bool Game::Loop(void){
 		world.systemcameraactive[0] = false;
 		world.systemcameraactive[1] = false;
 		world.DoNetwork();
-		// In TUI mode, world.localinput is stamped by the control socket's
-		// "input" op handler; SDL keyboard polling is unavailable.
-		if(!tui) UpdateInputState(world.localinput);
+		// In TUI mode, world.localinput is built from the binary input channel
+		// rather than SDL keyboard polling. Two layered sources, each
+		// latest-wins:
+		//   - scancode bitmask  → Game::keystate → UpdateInputState (same
+		//                          path as native SDL, so the user's keymap
+		//                          profile is honored)
+		//   - action snapshot   → ORed on top so programmatic / CLI clients
+		//                          can drive Input fields directly without
+		//                          knowing the keymap.
+		// Edge events (menu nav, text input) still arrive via the control
+		// socket "key" op and bypass this path entirely.
+		if(tui){
+			Uint8 newkeystate[SDL_SCANCODE_COUNT];
+			if(inputserver.LatestScancodes(newkeystate)){
+				// Edge-detect: feed press/release transitions through the
+				// same handlers the SDL path uses, so the in-game ESC
+				// quitstate machine, F1 player-list, debug overlay etc.
+				// behave identically with a TUI keyboard.
+				for(int sc = 0; sc < SDL_SCANCODE_COUNT; ++sc){
+					bool was = keystate[sc] != 0;
+					bool now = newkeystate[sc] != 0;
+					if(was == now) continue;
+					if(now) OnScancodeDown(sc);
+					else    OnScancodeUp(sc);
+				}
+				memcpy(keystate, newkeystate, sizeof(keystate));
+			}
+			UpdateInputState(world.localinput);
+			Input action;
+			if(inputserver.LatestAction(action)){
+				world.localinput.keymoveup        |= action.keymoveup;
+				world.localinput.keymovedown      |= action.keymovedown;
+				world.localinput.keymoveleft      |= action.keymoveleft;
+				world.localinput.keymoveright     |= action.keymoveright;
+				world.localinput.keylookupleft    |= action.keylookupleft;
+				world.localinput.keylookupright   |= action.keylookupright;
+				world.localinput.keylookdownleft  |= action.keylookdownleft;
+				world.localinput.keylookdownright |= action.keylookdownright;
+				world.localinput.keynextinv       |= action.keynextinv;
+				world.localinput.keynextcam       |= action.keynextcam;
+				world.localinput.keyprevcam       |= action.keyprevcam;
+				world.localinput.keydetonate      |= action.keydetonate;
+				world.localinput.keyjump          |= action.keyjump;
+				world.localinput.keyjetpack       |= action.keyjetpack;
+				world.localinput.keyactivate      |= action.keyactivate;
+				world.localinput.keyuse           |= action.keyuse;
+				world.localinput.keyfire          |= action.keyfire;
+				world.localinput.keydisguise      |= action.keydisguise;
+				world.localinput.keynextweapon    |= action.keynextweapon;
+				world.localinput.keyup            |= action.keyup;
+				world.localinput.keydown          |= action.keydown;
+				world.localinput.keyleft          |= action.keyleft;
+				world.localinput.keyright         |= action.keyright;
+				world.localinput.keychat          |= action.keychat;
+				world.localinput.keyweapon[0]     |= action.keyweapon[0];
+				world.localinput.keyweapon[1]     |= action.keyweapon[1];
+				world.localinput.keyweapon[2]     |= action.keyweapon[2];
+				world.localinput.keyweapon[3]     |= action.keyweapon[3];
+				if(action.mousex != 0xFFFF) world.localinput.mousex = action.mousex;
+				if(action.mousey != 0xFFFF) world.localinput.mousey = action.mousey;
+				world.localinput.mousedown        |= action.mousedown;
+			}
+		} else {
+			UpdateInputState(world.localinput);
+		}
 		world.SendInput();
 		if(!Tick()){
 			return false;
@@ -6102,49 +6177,7 @@ bool Game::HandleSDLEvents(void){
 				}
 			}break;
 			case SDL_EVENT_KEY_DOWN:{
-				if(event.key.scancode == quitscancode){
-					Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-					if(localplayer && !localplayer->chatinterfaceid && !localplayer->buyinterfaceid){
-						if(world.quitstate == 0){
-							world.quitstate = 1;
-						}else
-						if(world.quitstate == 2){
-							world.quitstate = 3;
-						}
-					}
-				}
-				if(event.key.scancode == SDL_SCANCODE_F1){
-					world.showplayerlist = true;
-				}
-				if(event.key.scancode == SDL_SCANCODE_F2){
-					if(world.showteamcolors){
-						world.showteamcolors = false;
-					}else{
-						world.showteamcolors = true;
-					}
-				}
-				if(event.key.scancode == SDL_SCANCODE_F5){
-					// play new music track
-					LoadRandomGameMusic();
-					//Audio::GetInstance().PlayMusic(world.resources.gamemusic);
-					PlayMusic(world.resources.gamemusic);
-				}
-				if(event.key.scancode == SDL_SCANCODE_F4){
-					// toggle music playing
-					if(Config::GetInstance().music){
-						if(Audio::GetInstance().MusicPaused()){
-							Audio::GetInstance().ResumeMusic();
-							world.ShowTopMessage("           MUSIC RESUMED");
-						}else{
-							Audio::GetInstance().PauseMusic();
-							world.ShowTopMessage("          *MUSIC PAUSED*");
-						}
-					}
-				}
-				if(event.key.scancode == SDL_SCANCODE_F9){
-					world.debugoverlay = !world.debugoverlay;
-					world.ShowTopMessage(world.debugoverlay ? "        DEBUG OVERLAY ON" : "       DEBUG OVERLAY OFF");
-				}
+				OnScancodeDown(event.key.scancode);
 				keystate[event.key.scancode] = true;
 			bool skip = true;
 			Uint8 ascii;
@@ -6201,17 +6234,7 @@ bool Game::HandleSDLEvents(void){
 				}
 			}break;
 			case SDL_EVENT_KEY_UP:{
-				if(event.key.scancode == quitscancode){
-					if(world.quitstate == 1){
-						world.quitstate = 2;
-					}
-					if(world.quitstate == 3){
-						world.quitstate = 0;
-					}
-				}
-				if(event.key.scancode == SDL_SCANCODE_F1){
-					world.showplayerlist = false;
-				}
+				OnScancodeUp(event.key.scancode);
 				keystate[event.key.scancode] = false;
 			}break;
 			case SDL_EVENT_MOUSE_WHEEL:{
@@ -6275,6 +6298,59 @@ bool Game::HandleSDLEvents(void){
 		}
 	}
 	return true;
+}
+
+void Game::OnScancodeDown(int sc){
+	if(sc == quitscancode){
+		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+		if(localplayer && !localplayer->chatinterfaceid && !localplayer->buyinterfaceid){
+			if(world.quitstate == 0){
+				world.quitstate = 1;
+			}else
+			if(world.quitstate == 2){
+				world.quitstate = 3;
+			}
+		}
+	}
+	if(sc == SDL_SCANCODE_F1){
+		world.showplayerlist = true;
+	}
+	if(sc == SDL_SCANCODE_F2){
+		world.showteamcolors = !world.showteamcolors;
+	}
+	if(sc == SDL_SCANCODE_F5){
+		LoadRandomGameMusic();
+		PlayMusic(world.resources.gamemusic);
+	}
+	if(sc == SDL_SCANCODE_F4){
+		if(Config::GetInstance().music){
+			if(Audio::GetInstance().MusicPaused()){
+				Audio::GetInstance().ResumeMusic();
+				world.ShowTopMessage("           MUSIC RESUMED");
+			}else{
+				Audio::GetInstance().PauseMusic();
+				world.ShowTopMessage("          *MUSIC PAUSED*");
+			}
+		}
+	}
+	if(sc == SDL_SCANCODE_F9){
+		world.debugoverlay = !world.debugoverlay;
+		world.ShowTopMessage(world.debugoverlay ? "        DEBUG OVERLAY ON" : "       DEBUG OVERLAY OFF");
+	}
+}
+
+void Game::OnScancodeUp(int sc){
+	if(sc == quitscancode){
+		if(world.quitstate == 1){
+			world.quitstate = 2;
+		}
+		if(world.quitstate == 3){
+			world.quitstate = 0;
+		}
+	}
+	if(sc == SDL_SCANCODE_F1){
+		world.showplayerlist = false;
+	}
 }
 
 void Game::DrainControlQueue(){

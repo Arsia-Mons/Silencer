@@ -64,7 +64,7 @@ export class ControlClient {
   send(op: string, args: Record<string, unknown> = {}): Promise<unknown> {
     if (!this.sock) return Promise.reject(new Error('not connected'));
     const id = this.nextId++;
-    // The server's parser (controlserver.cpp:190) wants args nested under "args".
+    // The server's parser wants args nested under "args".
     const line = JSON.stringify({ id, op, args }) + '\n';
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -72,11 +72,13 @@ export class ControlClient {
     });
   }
 
-  // Fire-and-forget variant for high-frequency ops where we don't care to wait
-  // for the ack (e.g. per-tick input updates). Reply is still consumed by the
-  // dispatcher so the C++ side stays happy; we just don't await it.
-  sendNoAwait(op: string, args: Record<string, unknown> = {}): void {
-    void this.send(op, args).catch(() => {});
+  // Fire-and-forget — engine sees `noreply: true` and skips writing back. No
+  // entry in this.pending; no allocation per call beyond the JSON line itself.
+  // Use for edge events (menu key presses) that don't need an ack.
+  sendNoReply(op: string, args: Record<string, unknown> = {}): void {
+    if (!this.sock) return;
+    const line = JSON.stringify({ id: 0, op, args, noreply: true }) + '\n';
+    this.sock.write(line);
   }
 
   close(): void {

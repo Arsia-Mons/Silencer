@@ -12,6 +12,7 @@
 #include "textbox.h"
 #include "updater.h"
 #include "controlserver.h"
+#include "inputserver.h"
 #include <map>
 #include <array>
 #include <atomic>
@@ -55,10 +56,13 @@ public:
 	int stepFramesRemaining;
 	Uint64 stepWallclockDeadlineMs;
 	int controlPort;
+	int tuiInputPort;
 	bool headless;
 	// TUI mode: audio enabled, no SDL window/events, frames stream to a TS
-	// frontend over TCP via TUIBackend. Input arrives via the control socket
-	// "input" op rather than SDL keyboard polling.
+	// frontend over TCP via TUIBackend. Input arrives via the dedicated binary
+	// input channel (InputServer, --tui-input-port) rather than SDL keyboard
+	// polling. Edge-triggered key events for menu nav still use the control
+	// socket "key" op.
 	bool tui;
 
 	// Keybind access for ControlDispatch.
@@ -72,6 +76,13 @@ private:
 	bool Tick(void);
 	void Present(void);
 	bool SetupRenderDevice(void);
+	// Edge-triggered scancode handlers. Called from HandleSDLEvents on real
+	// SDL key events, and from Loop()'s TUI branch when comparing the
+	// previous scancode bitmask against a freshly received one. Centralising
+	// them keeps the in-game ESC quitstate machine, F1 player-list overlay,
+	// debug toggles, etc. working identically in both paths.
+	void OnScancodeDown(int scancode);
+	void OnScancodeUp(int scancode);
 	static Uint32 TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval);
 	void SetColors(SDL_Color * colors);
 	void UpdateInputState(Input & input);
@@ -244,6 +255,7 @@ private:
 	// audible pop on the restarted client.
 	bool stage2spawned;
 	ControlServer controlserver;
+	InputServer inputserver;
 	void DrainControlQueue();
 	void PostFrameReplies();
 };

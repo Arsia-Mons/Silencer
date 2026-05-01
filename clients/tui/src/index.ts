@@ -1,15 +1,15 @@
 #!/usr/bin/env bun
 // silencer-tui: spawns a Silencer headless engine in TUI mode and renders the
-// resulting framebuffer in a terminal. End-to-end shape:
+// resulting framebuffer in a terminal. Three TCP channels:
 //
-//   1. Allocate two free TCP ports: one for control (JSON-line, existing) and
-//      one for framebuffer streaming (binary, new).
-//   2. Listen on both. Spawn the silencer binary with --tui --control-port P1
-//      and SILENCER_TUI_FRAME_HOST/PORT pointing at P2.
-//   3. The engine's TUIBackend connects back to the frame port and starts
-//      writing palette + frame messages. We rasterize each into the terminal.
-//   4. stdin keypresses → InputState → JSON "input" op shipped over the
-//      control socket every tick (24 Hz).
+//   1. Frame socket   (engine → host, binary)   — palette + framebuffer.
+//   2. Input socket   (host → engine, binary)   — packed snapshots, latest-wins.
+//   3. Control socket (host ↔ engine, JSON RPC) — menu keys, automation ops.
+//
+// Each channel matches the shape of its data: streaming framebuffers, lossy
+// state replication, and ordered RPC, respectively. Earlier the per-tick input
+// snapshot rode on the control socket; that piled up behind the request/reply
+// pump and produced multi-second input lag.
 //
 // Exit cleanly on Ctrl-C / SIGINT — the term.ts handlers restore the cursor +
 // alt screen so the user's terminal isn't stranded.
@@ -23,9 +23,20 @@ import { resolve } from 'node:path';
 import { FrameStreamParser } from './frame_parser';
 import type { Palette } from './frame_parser';
 import { HalfBlockRasterizer } from './raster_halfblock';
+import { KittyRasterizer } from './raster_kitty';
 import { ControlClient } from './control_client';
+import { InputClient } from './input_client';
 import { TerminalInput } from './input';
 import * as term from './term';
+
+interface Rasterizer {
+  reset(): void;
+  render(
+    frame: { w: number; h: number; pixels: Uint8Array },
+    palette: Palette,
+    target: { cols: number; rows: number },
+  ): Uint8Array;
+}
 
 const TICK_MS = 42; // engine runs at 24 fps; match it for input cadence.
 
@@ -76,16 +87,21 @@ async function main(): Promise<void> {
   const bin = findBinary();
   // Frame listener stays open — we're the server, the engine connects in.
   const frameListener = await listenRandomPort();
-  // Control port: we're the *client*, the engine binds the port. Reserve a
-  // free port number, then close immediately so the engine can bind it.
-  // (Brief race window between close and engine's bind; haven't hit it.)
+  // Control + input ports: engine binds, we're the client. Reserve free port
+  // numbers and close immediately so the engine can take them. Brief race
+  // window between close and engine's bind; haven't hit it.
   const controlPort = await reserveFreePort();
+  const inputPort = await reserveFreePort();
 
   const inputs = new TerminalInput();
-  const rasterizer = new HalfBlockRasterizer();
+  let rasterizer: Rasterizer = new HalfBlockRasterizer();
   const parser = new FrameStreamParser();
   let lastPalette: Palette | null = null;
   let pendingFrame: { w: number; h: number; pixels: Uint8Array } | null = null;
+  // Buffered for stderr-after-exit (so log lines don't trample the alt screen
+  // mid-render). Lifted above the spawn so the kitty probe diagnostic can
+  // also use it.
+  const stderrChunks: Uint8Array[] = [];
 
   // Start the frame listener first so the spawned engine has somewhere to
   // connect when its TUIBackend::Init runs. Resolves once the engine connects.
@@ -113,12 +129,47 @@ async function main(): Promise<void> {
   // into a partially-initialized alt screen.
   term.setup();
 
+  // Probe for kitty support (graphics + keyboard) BEFORE attaching the
+  // long-lived stdin input handler — the probes need unobstructed access to
+  // the response bytes and would race with input.feed() otherwise. Bypass
+  // either probe via env var.
+  const supportsKitty = await term.probeKittyGraphics();
+  let cellPixelSize: { width: number; height: number } | null = null;
+  if (supportsKitty) {
+    // Measure cell pixel dims so the kitty rasterizer can compute exact
+    // aspect-correct placement. Probe runs after the kitty probe — each
+    // consumes its own DA1 sentinel so they don't interleave.
+    cellPixelSize = await term.probeCellSize();
+    rasterizer = new KittyRasterizer({ cellPixelSize });
+    term.markKittyInUse();
+  }
+  const supportsKittyKbd = await term.probeKittyKeyboard();
+  if (supportsKittyKbd) {
+    term.enableKittyKeyboard();
+    inputs.setKittyKeyboard(true);
+  }
+  if (process.env.SILENCER_TUI_DEBUG === '1') {
+    const { cols, rows } = term.size();
+    const cellTxt = cellPixelSize
+      ? `${cellPixelSize.width}x${cellPixelSize.height}`
+      : 'unknown';
+    stderrChunks.push(
+      new TextEncoder().encode(
+        `[silencer-tui] rasterizer=${supportsKitty ? 'kitty' : 'half-block'}` +
+          ` keyboard=${supportsKittyKbd ? 'kitty' : 'legacy'}` +
+          ` terminal=${cols}x${rows} cell-px=${cellTxt}\n`,
+      ),
+    );
+  }
+
   const child: Subprocess = spawn({
     cmd: [
       bin,
       '--tui',
       '--control-port',
       String(controlPort),
+      '--tui-input-port',
+      String(inputPort),
     ],
     env: {
       ...process.env,
@@ -133,17 +184,25 @@ async function main(): Promise<void> {
   // term.ts handlers for SIGINT/SIGTERM/SIGHUP call process.exit directly
   // to restore the cursor + alt screen ASAP. They bypass cleanup(), so
   // register an exit hook to kill the engine — otherwise it stays running
-  // as an orphan with audio looping and CPU burning in SDL_Delay(33).
+  // as an orphan with audio looping and CPU burning in SDL_Delay(33). Also
+  // flush any buffered stderr (kitty probe diag, engine warnings) so signal
+  // exits don't swallow them.
   process.on('exit', () => {
     try {
       child.kill();
     } catch {}
+    if (stderrChunks.length > 0) {
+      try {
+        process.stderr.write(
+          Buffer.concat(stderrChunks.map((c) => Buffer.from(c))),
+        );
+        stderrChunks.length = 0;
+      } catch {}
+    }
   });
 
-  // Stream the engine's stderr to our own stderr but only after exit so it
-  // doesn't trample the alt screen mid-render. We hold it in memory in case
-  // the user wants it for debugging.
-  const stderrChunks: Uint8Array[] = [];
+  // Stream the engine's stderr into the same buffered sink. Flushed at exit
+  // so log lines don't trample the alt screen mid-render.
   if (child.stderr) {
     const reader = (child.stderr as ReadableStream<Uint8Array>).getReader();
     (async () => {
@@ -178,6 +237,7 @@ async function main(): Promise<void> {
   // Connect the control socket. Retry briefly because the C++ side starts
   // its control server only after Load() finishes (asset load).
   const control = new ControlClient();
+  const inputClient = new InputClient();
   let controlConnected = false;
   for (let attempt = 0; attempt < 100; attempt++) {
     try {
@@ -195,6 +255,26 @@ async function main(): Promise<void> {
     );
     process.exit(3);
   }
+  // The engine starts the input server in the same Load() phase as the
+  // control server, so a successful control connect implies the input
+  // listener is up. Still retry briefly to cover the small ordering gap.
+  let inputConnected = false;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    try {
+      await inputClient.connect('127.0.0.1', inputPort);
+      inputConnected = true;
+      break;
+    } catch {
+      await Bun.sleep(100);
+    }
+  }
+  if (!inputConnected) {
+    cleanup();
+    console.error(
+      `silencer-tui: failed to connect to engine input port ${inputPort} — input will not work`,
+    );
+    process.exit(3);
+  }
 
   let cleaned = false;
   function cleanup(): void {
@@ -204,24 +284,40 @@ async function main(): Promise<void> {
       control.close();
     } catch {}
     try {
+      inputClient.close();
+    } catch {}
+    try {
       child.kill();
     } catch {}
     try {
       frameListener.server.close();
     } catch {}
-    if (stderrChunks.length > 0) {
-      const buf = Buffer.concat(stderrChunks.map((c) => Buffer.from(c)));
-      process.stderr.write(buf);
-    }
+    // stderr flush deliberately lives in the process.on('exit') hook above:
+    // it must run AFTER term.ts's restore handler exits the alt screen,
+    // otherwise the writes land in the alt-screen buffer and disappear when
+    // the primary screen is restored.
   }
 
+  const trace = process.env.SILENCER_TUI_INPUT_TRACE === '1';
   process.stdin.on('data', (chunk: Buffer) => {
+    if (trace) {
+      stderrChunks.push(
+        new TextEncoder().encode(`[trace] in: ${chunk.toString('hex')}\n`),
+      );
+    }
     const events = inputs.feed(chunk);
+    if (trace && events.length > 0) {
+      stderrChunks.push(
+        new TextEncoder().encode(
+          `[trace] events: ${JSON.stringify(events)}\n`,
+        ),
+      );
+    }
     for (const ev of events) {
       if (ev.kind === 'name') {
-        control.sendNoAwait('key', { key: ev.name });
+        control.sendNoReply('key', { key: ev.name });
       } else {
-        control.sendNoAwait('key', { ascii: ev.ascii });
+        control.sendNoReply('key', { ascii: ev.ascii });
       }
     }
   });
@@ -256,8 +352,7 @@ async function main(): Promise<void> {
       process.exit(0);
     }
     inputs.decay();
-    const snap = inputs.snapshot();
-    control.sendNoAwait('input', snap as unknown as Record<string, unknown>);
+    inputClient.sendScancodes(inputs.snapshot());
     if (pendingFrame) scheduleRender();
   }, TICK_MS);
 
