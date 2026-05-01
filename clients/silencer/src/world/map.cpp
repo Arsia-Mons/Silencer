@@ -753,6 +753,22 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 	}
 	//fclose(fileo);
 	
+	// Shadow zones — optional trailing section (forward-compat: old maps simply end here)
+	if(i + 8 <= level.size()){
+		Uint32 numzones = 0;
+		memcpy(&numzones, &level[i], sizeof(numzones));
+		numzones = SDL_Swap32LE(numzones);
+		i += sizeof(Uint32) + sizeof(Uint32); // count + padding
+		for(Uint32 z = 0; z < numzones && i + 16 <= level.size(); z++){
+			ShadowZone sz;
+			memcpy(&sz.x1, &level[i],      4); sz.x1 = SDL_Swap32LE(sz.x1); i += 4;
+			memcpy(&sz.y1, &level[i],      4); sz.y1 = SDL_Swap32LE(sz.y1); i += 4;
+			memcpy(&sz.x2, &level[i],      4); sz.x2 = SDL_Swap32LE(sz.x2); i += 4;
+			memcpy(&sz.y2, &level[i],      4); sz.y2 = SDL_Swap32LE(sz.y2); i += 4;
+			if(team == 0) shadowzones.push_back(sz);
+		}
+	}
+
 	//delete[] levelcompressed;
 	//delete[] level;
 	
@@ -766,6 +782,7 @@ void Map::Unload(void){
 	playerstartlocations.clear();
 	surveillancecameras.clear();
 	rainpuddlelocations.clear();
+	shadowzones.clear();
 	for(size_t i = 0; i < 4; i++){
 		tiles[i].clear();
 	}

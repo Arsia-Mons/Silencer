@@ -46,7 +46,7 @@ export default function DesignerPage() {
   const { loaded, error, tileImages, spriteImages, tileBankCounts, progress, loadFiles } = useGameData();
   const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, applyTileBatch, applyAllLayersBatch, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
-          updateHeader, updatePlatform,
+          updateHeader, updatePlatform, addShadowZone, removeShadowZone,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   type TileSel = { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number };
@@ -333,6 +333,14 @@ export default function DesignerPage() {
     if (!actor) return;
     updateActor(idx, { direction: actor.direction ? 0 : 1 });
   }, [map, updateActor]);
+
+  const handleShadowZoneDraw = useCallback((zone: Parameters<typeof addShadowZone>[0]) => {
+    addShadowZone(zone);
+  }, [addShadowZone]);
+
+  const handleShadowZoneRemove = useCallback((idx: number) => {
+    removeShadowZone(idx);
+  }, [removeShadowZone]);
 
   const handleTilePaste = useCallback((tx: number, ty: number) => {
     if (!tileCopyBuffer || !map) return;
@@ -874,6 +882,8 @@ export default function DesignerPage() {
               selectedPlatformIdx={selectedPlatformIdx}
               onPlatformSelect={setSelectedPlatformIdx}
               onPlatformUpdate={updatePlatform}
+              onShadowZoneDraw={handleShadowZoneDraw}
+              onShadowZoneRemove={handleShadowZoneRemove}
               gridSize={gridSize}
               tileSelection={tileSelection}
               onTileSelection={setTileSelection}

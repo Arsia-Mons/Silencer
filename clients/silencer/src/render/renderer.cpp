@@ -1024,12 +1024,13 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 	if(world.map.loaded){
 		if(drawluminance){
 			DrawForegroundLuminance(surface, camera);
+			const std::vector<Map::ShadowZone> * zones = world.map.shadowzones.empty() ? nullptr : &world.map.shadowzones;
 			for(std::vector<Object *>::iterator it = objectlights.begin(); it != objectlights.end(); it++){
 				Surface * src = world.resources.spritebank[(*it)->res_bank][(*it)->res_index].get();
 				Rect dstrect;
 				dstrect.x = (*it)->x - world.resources.spriteoffsetx[(*it)->res_bank][(*it)->res_index] + camera.GetXOffset();
 				dstrect.y = (*it)->y - world.resources.spriteoffsety[(*it)->res_bank][(*it)->res_index] + camera.GetYOffset();
-				DrawLight(surface, src, &dstrect);
+				DrawLight(surface, src, &dstrect, (*it)->x, (*it)->y, camera.GetXOffset(), camera.GetYOffset(), zones);
 			}
 		}
 		DrawForeground(surface, camera);
@@ -2195,7 +2196,7 @@ void Renderer::DrawMirrored(Surface * src, Rect * srcrect, Surface * dst, Rect *
     }
 }
 
-void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect){
+void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const std::vector<Map::ShadowZone> * zones){
 	if(rect->x <= surface->w && rect->y <= surface->h && rect->x >= -src->w && rect->y >= -src->h){
 		int surfacew = surface->w;
 		int surfaceh = surface->h;
@@ -2221,32 +2222,57 @@ void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect){
 		}
 		int srcw = src->w;
 		Uint8 * pixels = (Uint8 *)src->pixels.data();
+		const bool hasShadows = zones && !zones->empty();
 		for(int y1 = miny1, y2 = minh; y2 < maxh; y1++, y2++){
 			unsigned int i = (y1 * srcw) + minx1;
 			unsigned int i2 = (y2 * surfacew) + minw;
 			for(int x2 = minw; x2 < maxw; x2++){
 				Uint8 lum = pixels[i];
+				if(lum && hasShadows){
+					// Ray from light center to this pixel, both in world-space.
+					// Screen pixel (x2,y2) → world = screen - cameraOffset
+					float px = (float)(x2 - cameraOffX);
+					float py = (float)(y2 - cameraOffY);
+					float lx = (float)lightWorldX;
+					float ly = (float)lightWorldY;
+					float dx = px - lx, dy = py - ly;
+					bool occluded = false;
+					for(const auto & z : *zones){
+						// Parametric ray-AABB slab test: segment lx,ly → px,py
+						float x1f = (float)(z.x1 < z.x2 ? z.x1 : z.x2);
+						float x2f = (float)(z.x1 < z.x2 ? z.x2 : z.x1);
+						float y1f = (float)(z.y1 < z.y2 ? z.y1 : z.y2);
+						float y2f = (float)(z.y1 < z.y2 ? z.y2 : z.y1);
+						float tmin = 0.0f, tmax = 1.0f;
+						if(dx == 0){
+							if(lx < x1f || lx > x2f){ goto nextzone; }
+						}else{
+							float tx1 = (x1f - lx) / dx;
+							float tx2 = (x2f - lx) / dx;
+							if(tx1 > tx2){ float t = tx1; tx1 = tx2; tx2 = t; }
+							if(tx1 > tmin) tmin = tx1;
+							if(tx2 < tmax) tmax = tx2;
+							if(tmin > tmax){ goto nextzone; }
+						}
+						if(dy == 0){
+							if(ly < y1f || ly > y2f){ goto nextzone; }
+						}else{
+							float ty1 = (y1f - ly) / dy;
+							float ty2 = (y2f - ly) / dy;
+							if(ty1 > ty2){ float t = ty1; ty1 = ty2; ty2 = t; }
+							if(ty1 > tmin) tmin = ty1;
+							if(ty2 < tmax) tmax = ty2;
+							if(tmin > tmax){ goto nextzone; }
+						}
+						// Intersection found in (0,1) range — pixel is in shadow
+						if(tmin < 1.0f && tmax > 0.0f){ occluded = true; break; }
+						nextzone:;
+					}
+					if(occluded){ i++; i2++; continue; }
+				}
 				Uint8 * surfacepixel = &surface->pixels[i2];
 				Uint8 newcolor = palette.Light(*surfacepixel, lum);
 				*surfacepixel = newcolor;
-				/*
-				// Unoptimized lighting algorithm
-				int lum = pixels[i] % 16;
-				Uint8 * surfacepixel = &surface->pixels[i2];
-				if(lum && *surfacepixel < 114 && *surfacepixel > 1){
-					int lum2 = (lum * 8) + ambiencelevel;
-					if(lum2 > 128){
-						lum = 128;
-					}else{
-						lum = lum2;
-					}
-					Uint8 newcolor = palette.Brightness(*surfacepixel, lum);
-					int newcolorbrightness = (newcolor - 2) % 16;
-					Uint8 oldcolorbrightness = (*surfacepixel - 2) % 16;
-					if(newcolorbrightness >= oldcolorbrightness * (float(ambiencelevel) / 128)){
-						*surfacepixel = newcolor + 112;
-					}
-				}*/
 				i++;
 				i2++;
 			}

@@ -122,6 +122,8 @@ interface Props {
   onPlatformUpdate: (idx: number, x1: number, y1: number, x2: number, y2: number) => void;
   onActorSelect?: (idx: number | null) => void;
   onActorFlip?: (idx: number) => void;
+  onShadowZoneDraw?: (zone: { x1: number; y1: number; x2: number; y2: number }) => void;
+  onShadowZoneRemove?: (idx: number) => void;
   gridSize: number;
   tileSelection?: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null;
   onTileSelection?: (sel: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null) => void;
@@ -148,6 +150,8 @@ export default function MapCanvas({
   selectedPlatformIdx, onPlatformSelect, onPlatformUpdate,
   onActorSelect,
   onActorFlip,
+  onShadowZoneDraw,
+  onShadowZoneRemove,
   gridSize,
   tileSelection,
   onTileSelection,
@@ -169,6 +173,9 @@ export default function MapCanvas({
   const platformDragRef = useRef<PlatformDragState | null>(null);
   // Current preview bounds during platform drag { wx1, wy1, wx2, wy2 }
   const platformPreviewRef = useRef<PlatformPreview | null>(null);
+  // Shadow zone drag: start world pos while drawing
+  const shadowZoneDragRef = useRef<{ startWx: number; startWy: number; curWx: number; curWy: number } | null>(null);
+  const [shadowZonePreview, setShadowZonePreview] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   // Tile selection drag
   const isSelectingTile = useRef(false);
   const tileSelStartRef = useRef<{ tx: number; ty: number } | null>(null);
@@ -219,7 +226,7 @@ export default function MapCanvas({
     }
 
     const tileSize = 64 * zoom;
-    const { width, height, layers, actors, platforms } = map;
+    const { width, height, layers, actors, platforms, shadowZones } = map;
 
     // Draw checkerboard background
     ctx.fillStyle = '#0a0a0f';
@@ -435,6 +442,46 @@ export default function MapCanvas({
       drawPlatform(cx1, cy1, cx2, cy2, typeName ?? 'RECTANGLE', true);
     }
 
+    // Shadow zones (rendered after platforms, before actors)
+    if (shadowZones && shadowZones.length > 0) {
+      for (const z of shadowZones) {
+        const zx1 = Math.min(z.x1, z.x2) * zoom + pan.x;
+        const zy1 = Math.min(z.y1, z.y2) * zoom + pan.y;
+        const zw  = Math.abs(z.x2 - z.x1) * zoom;
+        const zh  = Math.abs(z.y2 - z.y1) * zoom;
+        ctx.fillStyle = 'rgba(160,20,20,0.25)';
+        ctx.fillRect(zx1, zy1, zw, zh);
+        ctx.strokeStyle = 'rgba(220,60,60,0.8)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(zx1, zy1, zw, zh);
+        ctx.setLineDash([]);
+        if (zoom > 0.25) {
+          ctx.fillStyle = 'rgba(220,100,100,0.9)';
+          ctx.font = `${Math.max(9, 10 * zoom)}px monospace`;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText('SZ', zx1 + 3, zy1 + 2);
+        }
+      }
+    }
+
+    // Shadow zone preview while drawing
+    if (shadowZonePreview) {
+      const { x1, y1, x2, y2 } = shadowZonePreview;
+      const px1 = Math.min(x1, x2) * zoom + pan.x;
+      const py1 = Math.min(y1, y2) * zoom + pan.y;
+      const pw  = Math.abs(x2 - x1) * zoom;
+      const ph  = Math.abs(y2 - y1) * zoom;
+      ctx.fillStyle = 'rgba(200,50,50,0.2)';
+      ctx.fillRect(px1, py1, pw, ph);
+      ctx.strokeStyle = 'rgba(255,80,80,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(px1, py1, pw, ph);
+      ctx.setLineDash([]);
+    }
+
     // Actor icons
     if (vis?.actors !== false) {
       ctx.font = 'bold 9px monospace';
@@ -532,7 +579,7 @@ export default function MapCanvas({
       ctx.setLineDash([]);
       ctx.restore();
     }
-  }, [map, tileImages, spriteImages, vis, zoom, pan, dragPlatform, dragActorPreview]);
+  }, [map, tileImages, spriteImages, vis, zoom, pan, dragPlatform, dragActorPreview, shadowZonePreview]);
 
   // Resize canvas to fill container
   useEffect(() => {
@@ -889,6 +936,10 @@ export default function MapCanvas({
       }
     } else if (activeTool === 'ACTOR') {
       onActorPlace({ wx: snap(wx), wy: snap(wy) });
+    } else if (activeTool === 'SHADOW_ZONE') {
+      isPainting.current = true;
+      shadowZoneDragRef.current = { startWx: snap(wx), startWy: snap(wy), curWx: snap(wx), curWy: snap(wy) };
+      setShadowZonePreview({ x1: snap(wx), y1: snap(wy), x2: snap(wx), y2: snap(wy) });
     } else if (activeTool === 'SELECT') {
       const handleSize = 8 / zoom;
       const hs = handleSize / 2;
@@ -973,6 +1024,19 @@ export default function MapCanvas({
       return;
     }
 
+    // Right-click on a shadow zone removes it
+    if (activeTool === 'SHADOW_ZONE' && map.shadowZones) {
+      for (let i = map.shadowZones.length - 1; i >= 0; i--) {
+        const z = map.shadowZones[i];
+        const x1 = Math.min(z.x1, z.x2), x2 = Math.max(z.x1, z.x2);
+        const y1 = Math.min(z.y1, z.y2), y2 = Math.max(z.y1, z.y2);
+        if (wx >= x1 && wx <= x2 && wy >= y1 && wy <= y2) {
+          onShadowZoneRemove?.(i);
+          return;
+        }
+      }
+    }
+
     // Fall through to tile
     if (onTileRightClick) {
       const { tx, ty } = canvasToTile(cx, cy);
@@ -984,7 +1048,7 @@ export default function MapCanvas({
         onTileRightClick({ tx, ty, layerType, layerIdx, cell, x: e.clientX, y: e.clientY });
       }
     }
-  }, [map, canvasToWorld, canvasToTile, zoom, activeTool, activeLayer, onActorRightClick, onTileRightClick]);
+  }, [map, canvasToWorld, canvasToTile, zoom, activeTool, activeLayer, onActorRightClick, onTileRightClick, onShadowZoneRemove]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const { cx, cy } = getCanvasPos(e);
@@ -1078,6 +1142,11 @@ export default function MapCanvas({
         }
       } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM'].includes(activeTool)) {
         onDragPlatformChange(prev => prev ? { ...prev, wx2: snap(wx), wy2: snap(wy) } : null);
+      } else if (activeTool === 'SHADOW_ZONE' && shadowZoneDragRef.current) {
+        const snWx = snap(wx), snWy = snap(wy);
+        shadowZoneDragRef.current.curWx = snWx;
+        shadowZoneDragRef.current.curWy = snWy;
+        setShadowZonePreview({ x1: shadowZoneDragRef.current.startWx, y1: shadowZoneDragRef.current.startWy, x2: snWx, y2: snWy });
       }
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, eraseLayerType,
@@ -1140,10 +1209,17 @@ export default function MapCanvas({
         const x2 = Math.max(wx1, snWx), y2 = Math.max(wy1, snWy);
         if (x2 - x1 > 2 && y2 - y1 > 2 && t) onPlatformDraw({ x1, y1, x2, y2, ...t });
         onDragPlatformChange(null);
+      } else if (activeTool === 'SHADOW_ZONE' && shadowZoneDragRef.current) {
+        const { startWx, startWy, curWx, curWy } = shadowZoneDragRef.current;
+        const x1 = Math.min(startWx, curWx), y1 = Math.min(startWy, curWy);
+        const x2 = Math.max(startWx, curWx), y2 = Math.max(startWy, curWy);
+        if (x2 - x1 > 4 && y2 - y1 > 4) onShadowZoneDraw?.({ x1, y1, x2, y2 });
+        shadowZoneDragRef.current = null;
+        setShadowZonePreview(null);
       }
     }
     isPainting.current = false;
-  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap]);
+  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap, onShadowZoneDraw]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.code === 'Space') { isSpacePanning.current = true; e.preventDefault(); }
@@ -1176,6 +1252,7 @@ export default function MapCanvas({
       : activeTool === 'SELECT' ? 'pointer'
       : activeTool === 'TILE_SELECT' ? 'crosshair'
       : activeTool === 'ERASE_TILE' ? 'crosshair'
+      : activeTool === 'SHADOW_ZONE' ? 'crosshair'
       : isPainting.current ? 'crosshair'
       : 'default';
 

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import pako from 'pako';
-import type { SilMapData, MapActor, MapPlatform, TileCell, MapHeader, MapLayers } from '../../lib/types';
+import type { SilMapData, MapActor, MapPlatform, MapShadowZone, TileCell, MapHeader, MapLayers } from '../../lib/types';
 import * as mapStore from '../../lib/map-store';
 
 const CELL_SIZE = 36; // bytes per map cell
@@ -107,6 +107,20 @@ function parsePlatforms(dv: DataView, offset: number): { platforms: MapPlatform[
   return { platforms, offset };
 }
 
+function parseShadowZones(dv: DataView, offset: number): { shadowZones: MapShadowZone[]; offset: number } {
+  const shadowZones: MapShadowZone[] = [];
+  if (offset + 8 > dv.byteLength) return { shadowZones, offset };
+  const numZones = dv.getUint32(offset, true);
+  offset += 8; // count + padding
+  for (let i = 0; i < numZones && offset + 16 <= dv.byteLength; i++) {
+    const x1 = dv.getInt32(offset, true), y1 = dv.getInt32(offset + 4, true);
+    const x2 = dv.getInt32(offset + 8, true), y2 = dv.getInt32(offset + 12, true);
+    shadowZones.push({ x1, y1, x2, y2 });
+    offset += 16;
+  }
+  return { shadowZones, offset };
+}
+
 function platformType(type1: number, type2: number): string {
   if (type1 === 0 && type2 === 0) return 'RECTANGLE';
   if (type1 === 1 && type2 === 0) return 'LADDER';
@@ -145,6 +159,8 @@ export interface UseSilMapReturn {
   removeActor: (idx: number) => void;
   updateActor: (idx: number, patch: Partial<MapActor>) => void;
   moveActor: (idx: number, x: number, y: number) => void;
+  addShadowZone: (zone: MapShadowZone) => void;
+  removeShadowZone: (idx: number) => void;
   updateHeader: (patch: Partial<MapHeader>) => void;
   undo: () => void;
   redo: () => void;
@@ -217,6 +233,7 @@ export function useSilMap(): UseSilMapReturn {
       },
       actors: [],
       platforms: [],
+      shadowZones: [],
       rawMinimap: new Uint8Array(0),
       minimapCompressedSize: 0,
     });
@@ -240,12 +257,13 @@ export function useSilMap(): UseSilMapReturn {
 
       let offset = tileSectionSize;
       const { actors, offset: off2 } = parseActors(levelDV, offset);
-      const { platforms } = parsePlatforms(levelDV, off2);
+      const { platforms, offset: off3 } = parsePlatforms(levelDV, off2);
+      const { shadowZones } = parseShadowZones(levelDV, off3);
 
       historyRef.current = [];
       futureRef.current = [];
       syncUndoRedo();
-      const loaded: SilMapData = { header, width, height, layers, actors, platforms, rawMinimap, minimapCompressedSize, fileName: file.name };
+      const loaded: SilMapData = { header, width, height, layers, actors, platforms, shadowZones, rawMinimap, minimapCompressedSize, fileName: file.name };
       setMapData(loaded);
       return loaded;
     } catch (e) {
@@ -257,12 +275,13 @@ export function useSilMap(): UseSilMapReturn {
 
   const saveMap = useCallback(async () => {
     if (!mapData) return;
-    const { header, width, height, layers, actors, platforms, rawMinimap, fileName } = mapData;
+    const { header, width, height, layers, actors, platforms, shadowZones, rawMinimap, fileName } = mapData;
     const numCells = width * height;
     const tileSectionSize = numCells * CELL_SIZE;
     const actorsSectionSize = 8 + actors.length * 36;
     const platformsSectionSize = 8 + platforms.length * 24;
-    const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize);
+    const shadowZonesSectionSize = shadowZones.length > 0 ? 8 + shadowZones.length * 16 : 0;
+    const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize);
     const ldv = new DataView(levelBuf);
 
     for (let i = 0; i < numCells; i++) {
@@ -308,6 +327,18 @@ export function useSilMap(): UseSilMapReturn {
       ldv.setInt32(off + 16, p.type1, true);
       ldv.setInt32(off + 20, p.type2, true);
       off += 24;
+    }
+
+    if (shadowZones.length > 0) {
+      ldv.setUint32(off, shadowZones.length, true); off += 4;
+      ldv.setUint32(off, 0, true); off += 4;
+      for (const z of shadowZones) {
+        ldv.setInt32(off,      z.x1, true);
+        ldv.setInt32(off + 4,  z.y1, true);
+        ldv.setInt32(off + 8,  z.x2, true);
+        ldv.setInt32(off + 12, z.y2, true);
+        off += 16;
+      }
     }
 
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
@@ -462,10 +493,11 @@ export function useSilMap(): UseSilMapReturn {
       // Clamp actors and platforms to new bounds (in world pixels)
       const maxX = newWidth * 64;
       const maxY = newHeight * 64;
-      const actors    = prev.actors.filter(a => a.x < maxX && a.y < maxY);
-      const platforms = prev.platforms.filter(p => p.x1 < maxX && p.y1 < maxY);
+      const actors      = prev.actors.filter(a => a.x < maxX && a.y < maxY);
+      const platforms   = prev.platforms.filter(p => p.x1 < maxX && p.y1 < maxY);
+      const shadowZones = prev.shadowZones.filter(z => z.x1 < maxX && z.y1 < maxY);
 
-      return { ...prev, width: newWidth, height: newHeight, layers: newLayers, actors, platforms };
+      return { ...prev, width: newWidth, height: newHeight, layers: newLayers, actors, platforms, shadowZones };
     });
   }, [pushHistory]);
 
@@ -492,6 +524,22 @@ export function useSilMap(): UseSilMapReturn {
       pushHistory(prev);
       const platforms = prev.platforms.map((p, i) => i === idx ? { ...p, x1, y1, x2, y2 } : p);
       return { ...prev, platforms };
+    });
+  }, [pushHistory]);
+
+  const addShadowZone = useCallback((zone: MapShadowZone) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      return { ...prev, shadowZones: [...prev.shadowZones, zone] };
+    });
+  }, [pushHistory]);
+
+  const removeShadowZone = useCallback((idx: number) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      return { ...prev, shadowZones: prev.shadowZones.filter((_, i) => i !== idx) };
     });
   }, [pushHistory]);
 
@@ -557,12 +605,13 @@ export function useSilMap(): UseSilMapReturn {
 
   const publishMap = useCallback(async ({ author, apiUrl, apiKey }: { author: string; apiUrl: string; apiKey: string }): Promise<{ ok: boolean; meta?: Record<string, unknown>; error?: string }> => {
     if (!mapData) return { ok: false, error: 'No map loaded' };
-    const { header, width, height, layers, actors, platforms, rawMinimap, fileName } = mapData;
+    const { header, width, height, layers, actors, platforms, shadowZones, rawMinimap, fileName } = mapData;
     const numCells = width * height;
     const tileSectionSize = numCells * CELL_SIZE;
     const actorsSectionSize = 8 + actors.length * 36;
     const platformsSectionSize = 8 + platforms.length * 24;
-    const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize);
+    const shadowZonesSectionSize = shadowZones.length > 0 ? 8 + shadowZones.length * 16 : 0;
+    const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize);
     const ldv = new DataView(levelBuf);
 
     for (let i = 0; i < numCells; i++) {
@@ -610,6 +659,17 @@ export function useSilMap(): UseSilMapReturn {
       off += 24;
     }
 
+    if (shadowZones.length > 0) {
+      ldv.setUint32(off, shadowZones.length, true); off += 4;
+      ldv.setUint32(off, 0, true); off += 4;
+      for (const z of shadowZones) {
+        ldv.setInt32(off,      z.x1, true);
+        ldv.setInt32(off + 4,  z.y1, true);
+        ldv.setInt32(off + 8,  z.x2, true);
+        ldv.setInt32(off + 12, z.y2, true);
+        off += 16;
+      }
+    }
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
     const descBytes = new TextEncoder().encode(header.description);
     const descBuf = new Uint8Array(128);
@@ -667,6 +727,7 @@ export function useSilMap(): UseSilMapReturn {
     updateTile, patchTile, applyTileBatch, applyAllLayersBatch, beginPaint, commitPaint,
     addPlatform, removePlatform, updatePlatform,
     addActor, removeActor, updateActor, moveActor,
+    addShadowZone, removeShadowZone,
     updateHeader,
     undo, redo, canUndo, canRedo,
     resizeMap,

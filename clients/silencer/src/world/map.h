@@ -81,6 +81,8 @@ public:
 	Uint16 currentid;
 	MiniMap minimap;
 	std::vector<Uint8> nodetypes;
+	struct ShadowZone { Sint32 x1, y1, x2, y2; };
+	std::vector<ShadowZone> shadowzones;
 	
 //private:
 	static bool CompareType(std::shared_ptr<Platform> a, std::shared_ptr<Platform> b);
