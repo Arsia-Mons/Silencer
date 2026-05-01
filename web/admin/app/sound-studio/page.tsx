@@ -1081,7 +1081,7 @@ export default function SoundStudioPage() {
                 </div>
               )}
               {loading ? <div style={{ color: '#555', padding: 40, textAlign: 'center' }}>Loading…</div> : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ color: '#444', borderBottom: '1px solid #2a2a2a', position: 'sticky', top: 0, background: '#131313' }}>
                       <th style={{ textAlign: 'left', padding: '4px 5px', width: 20 }}></th>
@@ -1157,12 +1157,12 @@ export default function SoundStudioPage() {
                               {!isMissing ? (
                                 <button onClick={e => { e.stopPropagation(); if (!s.pendingDelete) { setSelectedIdx(visIdx); play(s.name); } }}
                                   disabled={s.pendingDelete}
-                                  style={{ background: 'none', border: 'none', color: isPlaying ? '#4a8' : '#555', cursor: 'pointer', fontSize: 12, padding: 0 }}>
+                                  style={{ background: 'none', border: 'none', color: isPlaying ? '#4a8' : '#8a8', cursor: 'pointer', fontSize: 13, padding: 0 }}>
                                   {isPlaying ? '⏹' : '▶'}
                                 </button>
                               ) : <span style={{ color: '#f90', fontSize: 10 }}>✗</span>}
                             </td>
-                            <td style={{ padding: '3px 5px', color: s.pendingDelete ? '#555' : isMissing ? '#f90' : '#ddd' }}>
+                            <td style={{ padding: '3px 5px', color: s.pendingDelete ? '#666' : isMissing ? '#f90' : '#fff' }}>
                               {s.name}
                               {s.pendingDelete && <span style={{ marginLeft: 5, color: '#f66', fontSize: 9 }}>[del]</span>}
                               {s.source === 'staged' && <span style={{ marginLeft: 5, color: '#88f', fontSize: 9 }}>[staged]</span>}
@@ -1173,10 +1173,10 @@ export default function SoundStudioPage() {
                               {ref?.category === 'ui' && <span style={{ marginLeft: 5, color: '#a8f', fontSize: 9 }}>[ui]</span>}
                               {ref?.soundSet && <span style={{ marginLeft: 5, color: '#a86', fontSize: 9 }}>[{ref.soundSet}]</span>}
                             </td>
-                            <td style={{ padding: '3px 5px', textAlign: 'right', color: '#383838', fontVariantNumeric: 'tabular-nums', fontSize: 10 }}>
+                            <td style={{ padding: '3px 5px', textAlign: 'right', color: '#888', fontVariantNumeric: 'tabular-nums', fontSize: 11 }}>
                               {formatDuration((s as any).durationSec)}
                             </td>
-                            <td style={{ padding: '3px 5px', textAlign: 'right', color: '#444', fontVariantNumeric: 'tabular-nums' }}>{formatBytes(size)}</td>
+                            <td style={{ padding: '3px 5px', textAlign: 'right', color: '#888', fontVariantNumeric: 'tabular-nums' }}>{formatBytes(size)}</td>
                             <td style={{ padding: '3px 5px' }}>
                               {lvl ? (() => {
                                 const vcs = ref?.volumeCalls;
@@ -1192,8 +1192,8 @@ export default function SoundStudioPage() {
                                       )}
                                       <div style={{ position: 'absolute', width: `${Math.round(displayPeak * 100)}%`, height: '100%', background: barColor, borderRadius: 2 }} />
                                     </div>
-                                    <span style={{ color: '#444', fontSize: 9 }}>{Math.round(displayPeak * 100)}%</span>
-                                    {gv != null && gv < 128 && <span style={{ color: '#3a5a3a', fontSize: 9 }}>{gv}</span>}
+                                    <span style={{ color: '#888', fontSize: 10 }}>{Math.round(displayPeak * 100)}%</span>
+                                    {gv != null && gv < 128 && <span style={{ color: '#5a8a5a', fontSize: 10 }}>{gv}</span>}
                                     {willLowHeadroom(s.name) && <span title="Low headroom at vol=128" style={{ color: '#f44', fontSize: 8, fontWeight: 'bold' }}>HDR</span>}
                                   </div>
                                 );
