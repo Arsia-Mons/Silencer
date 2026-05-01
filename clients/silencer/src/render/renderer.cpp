@@ -1026,11 +1026,17 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 			DrawForegroundLuminance(surface, camera);
 			const std::vector<Map::ShadowZone> * zones = world.map.shadowzones.empty() ? nullptr : &world.map.shadowzones;
 			for(std::vector<Object *>::iterator it = objectlights.begin(); it != objectlights.end(); it++){
-				Surface * src = world.resources.spritebank[(*it)->res_bank][(*it)->res_index].get();
+				Overlay * light = static_cast<Overlay *>(*it);
+				Surface * src = world.resources.spritebank[light->res_bank][light->res_index].get();
 				Rect dstrect;
-				dstrect.x = (*it)->x - world.resources.spriteoffsetx[(*it)->res_bank][(*it)->res_index] + camera.GetXOffset();
-				dstrect.y = (*it)->y - world.resources.spriteoffsety[(*it)->res_bank][(*it)->res_index] + camera.GetYOffset();
-				DrawLight(surface, src, &dstrect, (*it)->x, (*it)->y, camera.GetXOffset(), camera.GetYOffset(), zones);
+				dstrect.x = light->x - world.resources.spriteoffsetx[light->res_bank][light->res_index] + camera.GetXOffset();
+				dstrect.y = light->y - world.resources.spriteoffsety[light->res_bank][light->res_index] + camera.GetYOffset();
+				Uint8 colorIndex = 0;
+				if(light->lightColorR || light->lightColorG || light->lightColorB){
+					SDL_Color tint = { light->lightColorR, light->lightColorG, light->lightColorB, 255 };
+					colorIndex = palette.ClosestMatch(tint);
+				}
+				DrawLight(surface, src, &dstrect, light->x, light->y, camera.GetXOffset(), camera.GetYOffset(), zones, colorIndex);
 			}
 		}
 		DrawForeground(surface, camera);
@@ -2196,7 +2202,7 @@ void Renderer::DrawMirrored(Surface * src, Rect * srcrect, Surface * dst, Rect *
     }
 }
 
-void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const std::vector<Map::ShadowZone> * zones){
+void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const std::vector<Map::ShadowZone> * zones, Uint8 colorIndex){
 	if(rect->x <= surface->w && rect->y <= surface->h && rect->x >= -src->w && rect->y >= -src->h){
 		int surfacew = surface->w;
 		int surfaceh = surface->h;
@@ -2271,7 +2277,8 @@ void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 l
 					if(occluded){ i++; i2++; continue; }
 				}
 				Uint8 * surfacepixel = &surface->pixels[i2];
-				Uint8 newcolor = palette.Light(*surfacepixel, lum);
+				Uint8 basepixel = colorIndex ? palette.Color(*surfacepixel, colorIndex) : *surfacepixel;
+				Uint8 newcolor = palette.Light(basepixel, lum);
 				*surfacepixel = newcolor;
 				i++;
 				i2++;

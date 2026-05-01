@@ -9,6 +9,7 @@ export interface LightDef {
   frame: number;
   radius: number;
   intensity: number;
+  defaultColor?: string;
 }
 
 interface LightsStore {

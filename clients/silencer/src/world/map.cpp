@@ -670,11 +670,17 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 				}
 			}break;
 			case 71:{
-				// environment light halo — bank 222, res_index from actortype
+				// environment light halo — bank 222
+				// actortype encodes: bits 0-1=size, bit 2=shape, bits 3-4=anim, bits 8-15=colorR, bits 16-23=colorG, bits 24-31=colorB
 				Overlay * overlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 				if(overlay){
+					Uint32 u = (Uint32)actortype;
 					overlay->res_bank = 222;
-					overlay->res_index = (Uint8)actortype;
+					overlay->res_index = (Uint8)(u & 3);
+					overlay->mapLight = true;
+					overlay->lightColorR = (Uint8)((u >> 8) & 0xFF);
+					overlay->lightColorG = (Uint8)((u >> 16) & 0xFF);
+					overlay->lightColorB = (Uint8)((u >> 24) & 0xFF);
 					overlay->x = actorx;
 					overlay->y = actory;
 				}

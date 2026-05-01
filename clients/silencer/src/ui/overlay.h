@@ -25,6 +25,9 @@ public:
 	std::vector<Uint8> customsprite;
 	int customspritew;
 	int customspriteh;
+	// Bank-222 environment lights loaded from the map
+	bool mapLight;
+	Uint8 lightColorR, lightColorG, lightColorB;
 };
 
 #endif

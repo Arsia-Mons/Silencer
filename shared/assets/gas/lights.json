@@ -7,7 +7,8 @@
       "bank": 222,
       "frame": 0,
       "radius": 64,
-      "intensity": 0.6
+      "intensity": 0.6,
+      "defaultColor": ""
     },
     {
       "id": "halo_medium",
@@ -16,7 +17,8 @@
       "bank": 222,
       "frame": 1,
       "radius": 128,
-      "intensity": 1.0
+      "intensity": 1.0,
+      "defaultColor": ""
     },
     {
       "id": "halo_large",
@@ -25,7 +27,8 @@
       "bank": 222,
       "frame": 2,
       "radius": 192,
-      "intensity": 1.4
+      "intensity": 1.4,
+      "defaultColor": ""
     }
   ]
 }

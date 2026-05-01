@@ -502,11 +502,12 @@ export default function MapCanvas({
           else if (a.type === 2) bankNum = 201;
           else bankNum = 205;
         }
-        if (a.id === 71) bankNum = 222; // light halo — res_index from actor.type
+        if (a.id === 71) bankNum = 222; // light halo — frame from bits 0-1 of actor.type
+        const lightFrame = a.id === 71 ? (a.type ?? 0) & 3 : null;
 
         // Try to draw actual sprite
         const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
-        const spr = sprBank?.[a.id === 71 ? (a.type ?? 0) : (def.frame ?? 0)];
+        const spr = sprBank?.[lightFrame != null ? lightFrame : (def.frame ?? 0)];
         if (spr) {
           // Light actors: draw sprite with additive-style glow overlay
           if (a.id === 71 && vis?.lighting !== false) {
@@ -514,9 +515,17 @@ export default function MapCanvas({
             const gy = cy - (spr.height / 2) * zoom;
             const gw = spr.width * zoom;
             const gh = spr.height * zoom;
+            // Decode color from actortype bits 8-30
+            const u = (a.type ?? 0) >>> 0;
+            const cr = (u >>> 8) & 0xFF;
+            const cg = (u >>> 16) & 0xFF;
+            const cb = (u >>> 24) & 0xFF;
+            const hasColor = cr || cg || cb;
+            const inner = hasColor ? `rgba(${cr},${cg},${cb},0.5)` : 'rgba(255,220,100,0.35)';
+            const outer = hasColor ? `rgba(${cr},${cg},${cb},0)` : 'rgba(255,180,50,0)';
             const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(gw, gh) / 2);
-            grad.addColorStop(0, 'rgba(255,220,100,0.35)');
-            grad.addColorStop(1, 'rgba(255,180,50,0)');
+            grad.addColorStop(0, inner);
+            grad.addColorStop(1, outer);
             ctx.fillStyle = grad;
             ctx.fillRect(gx, gy, gw, gh);
             ctx.drawImage(spr.bitmap, gx, gy, gw, gh);
@@ -624,7 +633,8 @@ export default function MapCanvas({
       if (actor.id === 63) bankNum = actor.type === 0 ? 200 : actor.type === 2 ? 201 : 205;
       if (actor.id === 71) bankNum = 222;
       const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
-      const spr = sprBank?.[actor.id === 71 ? (actor.type ?? 0) : (def.frame ?? 0)];
+      const lightFrame = actor.id === 71 ? ((actor.type ?? 0) >>> 0) & 3 : null;
+      const spr = sprBank?.[lightFrame != null ? lightFrame : (def.frame ?? 0)];
       const cx = overrideCx ?? actor.x * zoom + pan.x;
       const cy = overrideCy ?? actor.y * zoom + pan.y;
       if (spr) {
