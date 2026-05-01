@@ -19,6 +19,8 @@ Overlay::Overlay() : Object(ObjectTypes::OVERLAY){
 	lightColorB = 0;
 	lightAnim = 0;
 	lightPulseSpeed = 0;
+	lightShape = 0;
+	lightDirection = 0;
 }
 
 void Overlay::Tick(World & world){

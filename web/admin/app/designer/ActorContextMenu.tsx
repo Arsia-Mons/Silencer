@@ -14,13 +14,13 @@ const DIRECTION_LABELS: Record<number, string> = {
 
 // Light actor (id=71) actortype bitfield helpers
 // bits 0-1: size, bit 2: shape, bits 3-4: animation, bits 5-6: pulse speed, bits 8-15: colorR, bits 16-23: colorG, bits 24-31: colorB
-function decodeLightType(type: number): { size: number; anim: number; pulseSpeed: number; r: number; g: number; b: number } {
+// actor.direction (separate field): spot direction 0-7 (E,NE,N,NW,W,SW,S,SE)
+function decodeLightType(type: number): { size: number; shape: number; anim: number; pulseSpeed: number; r: number; g: number; b: number } {
   const u = (type ?? 0) >>> 0;
-  return { size: u & 3, anim: (u >>> 3) & 3, pulseSpeed: (u >>> 5) & 3, r: (u >>> 8) & 0xFF, g: (u >>> 16) & 0xFF, b: (u >>> 24) & 0xFF };
+  return { size: u & 3, shape: (u >>> 2) & 1, anim: (u >>> 3) & 3, pulseSpeed: (u >>> 5) & 3, r: (u >>> 8) & 0xFF, g: (u >>> 16) & 0xFF, b: (u >>> 24) & 0xFF };
 }
-function encodeLightType(size: number, anim: number, pulseSpeed: number, r: number, g: number, b: number, existing: number): number {
-  const u = (existing >>> 0) & ~0xFFFFFF7F; // preserve shape (bit 2), clear size+anim+pulseSpeed+color
-  return (u | (size & 3) | ((anim & 3) << 3) | ((pulseSpeed & 3) << 5) | ((r & 0xFF) << 8) | ((g & 0xFF) << 16) | ((b & 0xFF) << 24)) | 0;
+function encodeLightType(size: number, shape: number, anim: number, pulseSpeed: number, r: number, g: number, b: number): number {
+  return ((size & 3) | ((shape & 1) << 2) | ((anim & 3) << 3) | ((pulseSpeed & 3) << 5) | ((r & 0xFF) << 8) | ((g & 0xFF) << 16) | ((b & 0xFF) << 24)) | 0;
 }
 function rgbToHex(r: number, g: number, b: number): string {
   return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
@@ -30,6 +30,9 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
   return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : { r: 0, g: 0, b: 0 };
 }
 const LIGHT_SIZE_LABELS: Record<number, string> = { 0: 'Small', 1: 'Medium', 2: 'Large' };
+const SPOT_DIR_LABELS: Record<number, string> = { 0: 'E', 1: 'NE', 2: 'N', 3: 'NW', 4: 'W', 5: 'SW', 6: 'S', 7: 'SE' };
+// Compass layout: [row][col] = direction index (or -1 for center)
+const COMPASS_GRID = [[3,2,1],[4,-1,0],[5,6,7]] as const;
 
 interface FieldState {
   type: string;
@@ -40,9 +43,11 @@ interface FieldState {
 
 interface LightFieldState {
   size: number;
+  shape: number;
   anim: number;
   pulseSpeed: number;
   colorHex: string;
+  direction: number;
 }
 
 interface Props {
@@ -79,9 +84,11 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
   const initLight = decodeLightType(actor.type ?? 0);
   const [lightFields, setLightFields] = useState<LightFieldState>({
     size: initLight.size,
+    shape: initLight.shape,
     anim: initLight.anim,
     pulseSpeed: initLight.pulseSpeed,
     colorHex: (initLight.r || initLight.g || initLight.b) ? rgbToHex(initLight.r, initLight.g, initLight.b) : '#000000',
+    direction: actor.direction ?? 0,
   });
   // Whether the color is active (non-black = tinted)
   const [lightColorEnabled, setLightColorEnabled] = useState(!!(initLight.r || initLight.g || initLight.b));
@@ -106,7 +113,10 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
   const apply = () => {
     if (isLight) {
       const { r, g, b } = lightColorEnabled ? hexToRgb(lightFields.colorHex) : { r: 0, g: 0, b: 0 };
-      onUpdate(actorIdx, { type: encodeLightType(lightFields.size, lightFields.anim, lightFields.pulseSpeed, r, g, b, actor.type ?? 0) });
+      onUpdate(actorIdx, {
+        type: encodeLightType(lightFields.size, lightFields.shape, lightFields.anim, lightFields.pulseSpeed, r, g, b),
+        direction: lightFields.direction,
+      });
     } else {
       onUpdate(actorIdx, {
         type:       parseInt(fields.type,       10) || 0,
@@ -149,6 +159,31 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
               ))}
             </select>
           </div>
+          <div className="mb-1.5">
+            <div className={lbl}>Shape</div>
+            <select value={lightFields.shape} onChange={e => setLightFields(f => ({ ...f, shape: Number(e.target.value) }))} className={inp + ' cursor-pointer'}>
+              <option value={0}>Halo (radial)</option>
+              <option value={1}>Spot (cone) ⚠ needs art</option>
+            </select>
+          </div>
+          {lightFields.shape === 1 && (
+            <div className="mb-1.5">
+              <div className={lbl}>Direction</div>
+              <div className="grid grid-cols-3 gap-0.5 w-20 mt-0.5">
+                {COMPASS_GRID.map((row, ri) => row.map((dir, ci) => (
+                  dir === -1
+                    ? <div key={`${ri}-${ci}`} className="w-6 h-6 rounded bg-[#0a0a18] border border-[#1a2e1a]" />
+                    : <button
+                        key={dir}
+                        onClick={() => setLightFields(f => ({ ...f, direction: dir }))}
+                        className={`w-6 h-6 rounded text-[9px] font-bold border ${lightFields.direction === dir ? 'bg-[#2a4a2a] border-[#4a8a4a] text-[#c0f0c0]' : 'bg-[#0a0a18] border-[#1a2e1a] text-[#5a8a5a]'} cursor-pointer`}
+                      >
+                        {SPOT_DIR_LABELS[dir]}
+                      </button>
+                )))}
+              </div>
+            </div>
+          )}
           <div className="mb-1.5">
             <div className={lbl}>Animation</div>
             <select value={lightFields.anim} onChange={e => setLightFields(f => ({ ...f, anim: Number(e.target.value) }))} className={inp + ' cursor-pointer'}>

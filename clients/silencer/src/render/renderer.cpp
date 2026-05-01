@@ -1027,10 +1027,18 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 			const std::vector<Map::ShadowZone> * zones = world.map.shadowzones.empty() ? nullptr : &world.map.shadowzones;
 			for(std::vector<Object *>::iterator it = objectlights.begin(); it != objectlights.end(); it++){
 				Overlay * light = static_cast<Overlay *>(*it);
-				Surface * src = world.resources.spritebank[light->res_bank][light->res_index].get();
+				// Spot lights use frame 3+(direction*3)+size; fall back to halo frame if sprites not loaded
+				Uint8 frameIdx = light->res_index;
+				if(light->lightShape == 1){
+					Uint8 spotFrame = 3 + (light->lightDirection * 3) + light->res_index;
+					if(spotFrame < world.resources.spritebank[light->res_bank].size()){
+						frameIdx = spotFrame;
+					}
+				}
+				Surface * src = world.resources.spritebank[light->res_bank][frameIdx].get();
 				Rect dstrect;
-				dstrect.x = light->x - world.resources.spriteoffsetx[light->res_bank][light->res_index] + camera.GetXOffset();
-				dstrect.y = light->y - world.resources.spriteoffsety[light->res_bank][light->res_index] + camera.GetYOffset();
+				dstrect.x = light->x - world.resources.spriteoffsetx[light->res_bank][frameIdx] + camera.GetXOffset();
+				dstrect.y = light->y - world.resources.spriteoffsety[light->res_bank][frameIdx] + camera.GetYOffset();
 				Uint8 colorIndex = 0;
 				if(light->lightColorR || light->lightColorG || light->lightColorB){
 					SDL_Color tint = { light->lightColorR, light->lightColorG, light->lightColorB, 255 };
