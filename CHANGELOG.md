@@ -2,6 +2,22 @@
 
 All notable changes to Silencer are documented here.
 
+## [v00044] — 2026-05-01
+
+### Admin dashboard
+
+#### VFX Editor (`/vfx`) — new page
+
+- **Particle preset editor** — create, edit, and preview VFX effect presets in a two-pane layout.
+- **Live canvas preview** — real-time particle simulation in the browser; updates instantly as you change parameters.
+- **Effect types** — Particles, Sprite Flash, Screen Shake.
+- **Particle controls** — emission rate, burst count, lifetime, start/end size, color gradient (color picker + hex), alpha, speed, speed variance, spread angle, gravity.
+- **6 sample presets** included: Explosion (Small/Large), Sparks, Smoke (Rising), Plasma Trail, Screen Shake (Impact).
+- **Load/save** `vfx-presets.json` locally; download updated file to your GAS folder.
+- **Arrow key navigation** and search/filter in preset list.
+- Add, duplicate, delete presets.
+- VFX Trigger system integration with level designer (Phase 2 — in progress).
+
 ## [v00043] — 2026-05-01
 
 ### Admin dashboard
