@@ -74,7 +74,8 @@ services:
 
   admin-api:
     build:
-      context: ../services/admin-api
+      context: ..
+      dockerfile: services/admin-api/Dockerfile
     ports:
       - "24080:24080"
     depends_on:
