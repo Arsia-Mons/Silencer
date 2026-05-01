@@ -54,34 +54,34 @@ body {
   font-family: 'Courier New', Courier, monospace;
 }
 
-/* Mars planet — slowly drifts + dark overlay stacked on top of it */
+/* Mars planet — slowly drifts */
 body::after {
   content: '';
   position: fixed;
   inset: 0;
-  background-image:
-    linear-gradient(rgba(3, 6, 3, 0.68), rgba(3, 6, 3, 0.68)),
-    url('/mars.gif');
-  background-repeat: no-repeat, no-repeat;
-  background-size: auto, 42vmin;
-  background-position: 0 0, 88% 58%;
+  background-image: url('/mars.gif');
+  background-repeat: no-repeat;
+  background-size: 42vmin;
+  background-position: 88% 58%;
   animation: mars-drift 40s ease-in-out infinite;
   pointer-events: none;
   z-index: 0;
 }
 
-/* CRT scanline effect on top of everything */
+/* Dark tint + CRT scanlines on top of everything */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 163, 40, 0.018) 2px,
-    rgba(0, 163, 40, 0.018) 4px
-  );
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 163, 40, 0.018) 2px,
+      rgba(0, 163, 40, 0.018) 4px
+    ),
+    linear-gradient(rgba(3, 6, 3, 0.45), rgba(3, 6, 3, 0.45));
   pointer-events: none;
   z-index: 10000;
 }
