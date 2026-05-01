@@ -15,6 +15,42 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: 'v00042',
+    date: '2026-04-30',
+    title: 'Weapon Tool, Animated UI, Bug Fixes',
+    entries: [
+      {
+        category: 'DASHBOARD',
+        changes: [
+          'Weapon Tool (/weapons) — new page: weapon list, sprite bank pickers (8-directional), sound pickers with live preview, ballistics canvas simulation (tick-accurate: gravity, rocket hover, plasma gravity, explosion radius), agency loadout checkboxes, saves to weapons.json + agencies.json',
+          'Ballistics preview — canvas panel simulates grenade arc, rocket loft, EMP/neutron effects at 24 ticks/sec with play/pause and fast-forward',
+          'Shared GAS store — folder opened in /weapons stays loaded when navigating to /gas or /sound-studio without re-picking the folder',
+          'GAS editor: ↩ RE-ADD and ↩ RE-ADD ALL now sync restored fields to the shared store so changes are not lost on navigation',
+          'Sound Studio: page now inherits the global dark theme instead of hardcoded inline background/color/font overrides',
+          'Animated space background — programmatic starfield (350 twinkling stars), comets with fading gradient tails, slowly drifting Mars surface image, mouse parallax (±25 px smoothed)',
+        ],
+      },
+      {
+        category: 'CLIENT',
+        changes: [
+          'Bundled maps skip upload — maps shipped in the app bundle (Resources/) are pre-loaded on the server and no longer trigger a redundant upload attempt',
+          'FindMap absolute path fix — FindMap() captures an absolute path immediately after CDResDir() so the fallback is always absolute regardless of cwd',
+          'All projectile classes fully data-driven — blaster, laser, rocket, flamer, plasma, flare, wall, grenade read sprite banks, sounds, and physics from weapons.json with hardcoded fallbacks (zero behavior change)',
+          'Fix: neutron bomb and EMP bomb 0-damage values were falling back to 0xFFFF (max damage) due to int-as-bool check',
+          'Fix: rocket launch sound was reading soundLand (landing/bounce) instead of soundFire',
+          'Fix: std::min macro clash on Windows in flamer/flare projectile constructors',
+        ],
+      },
+      {
+        category: 'INFRASTRUCTURE',
+        changes: [
+          'Docker build context fixed — admin-web and admin-api Dockerfiles require repo root context; docker-compose.yml updated to context: .. with explicit dockerfile: paths',
+          'Compiled-in production defaults — CMakeLists.txt now defaults to lobby.arsiamons.com, maps.arsiamons.com, admin.arsiamons.com',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v00041',
     date: '2026-04-28',
     title: 'GAS — Data-Driven Gameplay, Map Upload & GAS Editor',
