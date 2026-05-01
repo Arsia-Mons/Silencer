@@ -348,6 +348,10 @@ export default function DesignerPage() {
     updateActor(idx, { direction: actor.direction ? 0 : 1 });
   }, [map, updateActor]);
 
+  const handleActorTypeChange = useCallback((idx: number, type: number) => {
+    updateActor(idx, { type });
+  }, [updateActor]);
+
   const handleShadowZoneDraw = useCallback((zone: Parameters<typeof addShadowZone>[0]) => {
     addShadowZone(zone);
   }, [addShadowZone]);
@@ -884,6 +888,7 @@ export default function DesignerPage() {
               onActorRemove={removeActor}
               onActorMove={handleActorMove}
               onActorFlip={handleActorFlip}
+              onActorTypeChange={handleActorTypeChange}
               onActorRightClick={(idx, sx, sy) => { setActorMenu({ idx, screenX: sx, screenY: sy }); setHighlightActorIdx(idx); }}
               onActorSelect={setHighlightActorIdx}
               onTileRightClick={(info) => { setActorMenu(null); setTileMenu(info); }}

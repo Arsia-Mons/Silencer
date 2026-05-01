@@ -124,6 +124,7 @@ interface Props {
   onActorFlip?: (idx: number) => void;
   onShadowZoneDraw?: (zone: { x1: number; y1: number; x2: number; y2: number }) => void;
   onShadowZoneRemove?: (idx: number) => void;
+  onActorTypeChange?: (idx: number, type: number) => void;
   gridSize: number;
   tileSelection?: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null;
   onTileSelection?: (sel: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null) => void;
@@ -152,6 +153,7 @@ export default function MapCanvas({
   onActorFlip,
   onShadowZoneDraw,
   onShadowZoneRemove,
+  onActorTypeChange,
   gridSize,
   tileSelection,
   onTileSelection,
@@ -181,6 +183,10 @@ export default function MapCanvas({
   const tileSelStartRef = useRef<{ tx: number; ty: number } | null>(null);
   // Current hover tile (for paste preview — updated every mousemove, no re-render)
   const hoverTileRef = useRef<{ tx: number; ty: number }>({ tx: 0, ty: 0 });
+  // Light radius ring drag: tracks active drag state
+  const lightRadiusDragRef = useRef<{ actorIdx: number; origType: number } | null>(null);
+  const lastEmittedSizeRef = useRef<number | null>(null);
+  const [isLightRadiusDragging, setIsLightRadiusDragging] = useState(false);
 
   // World → canvas coords
   const worldToCanvas = useCallback((wx: number, wy: number) => ({
@@ -1052,6 +1058,19 @@ export default function MapCanvas({
         }
       }
 
+      // 1.5. Light radius ring drag — if the selected actor is a light and the click is near its ring
+      if (highlightActorIdx != null && map.actors[highlightActorIdx]?.id === 71) {
+        const a = map.actors[highlightActorIdx];
+        const lightSize = (a.type ?? 0) & 3;
+        const lightRadius = lightSize === 2 ? 200 : lightSize === 1 ? 140 : 80;
+        if (Math.abs(Math.hypot(wx - a.x, wy - a.y) - lightRadius) < 12) {
+          lightRadiusDragRef.current = { actorIdx: highlightActorIdx, origType: a.type ?? 0 };
+          lastEmittedSizeRef.current = lightSize;
+          setIsLightRadiusDragging(true);
+          return;
+        }
+      }
+
       // 2. Hit-test actors — priority over new platform selection; cycle through stack on repeated clicks
       const HIT = 48 / zoom;
       const hits: number[] = [];
@@ -1087,7 +1106,7 @@ export default function MapCanvas({
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
       onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
       selectedPlatformIdx, onPlatformSelect, onActorSelect, highlightActorIdx, snap,
-      pastePending, onTilePaste, onTileSelection, onFloodFill]);
+      pastePending, onTilePaste, onTileSelection, onFloodFill, onActorTypeChange]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1216,6 +1235,21 @@ export default function MapCanvas({
       return;
     }
 
+    // Light radius ring drag (SELECT tool)
+    if (lightRadiusDragRef.current) {
+      const { actorIdx, origType } = lightRadiusDragRef.current;
+      const a = map.actors[actorIdx];
+      if (a) {
+        const dist = Math.hypot(wx - a.x, wy - a.y);
+        const newSize = dist < 110 ? 0 : dist < 170 ? 1 : 2;
+        if (newSize !== lastEmittedSizeRef.current) {
+          lastEmittedSizeRef.current = newSize;
+          onActorTypeChange?.(actorIdx, (origType & ~3) | newSize);
+        }
+      }
+      return;
+    }
+
     if (isPainting.current) {
       if (activeTool === 'TILE_BG' || activeTool === 'TILE_FG') {
         if (selectedTileId && tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
@@ -1236,7 +1270,7 @@ export default function MapCanvas({
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, eraseLayerType,
       onTilePaint, onPanChange, onCursorChange, onDragPlatformChange, snap,
-      onTileSelection]);
+      onTileSelection, onActorTypeChange]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isPanning.current) {
@@ -1279,6 +1313,23 @@ export default function MapCanvas({
       return;
     }
 
+    // Finish light radius ring drag
+    if (lightRadiusDragRef.current) {
+      const { actorIdx, origType } = lightRadiusDragRef.current;
+      lightRadiusDragRef.current = null;
+      lastEmittedSizeRef.current = null;
+      setIsLightRadiusDragging(false);
+      if (map?.actors[actorIdx]) {
+        const a = map.actors[actorIdx];
+        const { cx, cy } = getCanvasPos(e);
+        const { wx, wy } = canvasToWorld(cx, cy);
+        const dist = Math.hypot(wx - a.x, wy - a.y);
+        const newSize = dist < 110 ? 0 : dist < 170 ? 1 : 2;
+        onActorTypeChange?.(actorIdx, (origType & ~3) | newSize);
+      }
+      return;
+    }
+
     if (!map) { isPainting.current = false; return; }
     const { cx, cy } = getCanvasPos(e);
     const { wx, wy } = canvasToWorld(cx, cy);
@@ -1304,7 +1355,7 @@ export default function MapCanvas({
       }
     }
     isPainting.current = false;
-  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap, onShadowZoneDraw]);
+  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap, onShadowZoneDraw, onActorTypeChange]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.code === 'Space') { isSpacePanning.current = true; e.preventDefault(); }
@@ -1328,7 +1379,9 @@ export default function MapCanvas({
     };
   }, [handleKeyDown, handleKeyUp]);
 
-  const cursorStyle = dragActorPreview
+  const cursorStyle = isLightRadiusDragging
+    ? 'ew-resize'
+    : dragActorPreview
     ? 'grabbing'
     : (isPanning.current || isSpacePanning.current || isCtrlPanning.current)
       ? 'grab'
