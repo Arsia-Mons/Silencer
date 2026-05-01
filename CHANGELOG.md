@@ -2,6 +2,47 @@
 
 All notable changes to Silencer are documented here.
 
+## [v00042] — 2026-04-30
+
+### Admin dashboard
+
+#### Weapon Tool (`/weapons`) — new page
+
+- **Weapon list** — all weapons from `weapons.json` with search/filter.
+- **Property panel** — sprite bank pickers (8-directional), sound pickers per event (`soundFire`, `soundHit1/2`, `soundLoop`, `soundExplosion`, `soundLand`, `soundThrow`) with live preview links to Sound Studio.
+- **Ballistics preview** — tick-accurate canvas simulation: gravity, velocity, rocket hover, plasma gravity, explosion radius, splash damage labels. Grenade arc, rocket loft, EMP/neutron effects all simulated at 24 ticks/sec.
+- **Agency loadout editor** — checkbox grid showing which agencies carry each weapon; saves back to `agencies.json`.
+- **Shared GAS store** — folder opened in `/weapons` stays loaded when navigating to `/gas` or `/sound-studio` without re-picking the folder.
+
+#### GAS editor (`/gas`)
+
+- **Restore sync fix** — `↩ RE-ADD` and `↩ RE-ADD ALL` now update the shared GAS store so restored fields are not lost on navigation.
+
+#### Sound Studio (`/sound-studio`)
+
+- **Styling parity** — page now inherits the global dark theme instead of rendering with hardcoded inline background/color/font overrides.
+
+#### Admin UI
+
+- **Animated space background** — programmatic starfield (350 stars with twinkling), comets with gradient fading tails, slowly drifting Mars surface image, mouse parallax (±25 px, smoothed).
+
+### Game client
+
+- **Bundled map upload skip** — maps shipped inside the app bundle (`Resources/`) are pre-loaded on the server and no longer trigger a redundant upload attempt on game start.
+- **FindMap absolute path fix** — `FindMap()` now captures an absolute path immediately after `CDResDir()` so the fallback path is always absolute regardless of the current working directory.
+- **GAS: all projectile classes data-driven** — blaster, laser, rocket, flamer, plasma, flare, wall, and grenade projectiles read sprite banks, sounds, and physics from `weapons.json` with hardcoded fallbacks (zero behavior change).
+- **Bug fixes from code review:**
+  - Neutron bomb and EMP bomb: `0` damage values were incorrectly treated as "not set" and fell back to `0xFFFF` (max damage). Fixed.
+  - Rocket launch sound: was reading from `soundLand` (landing/bounce field) instead of `soundFire`.
+  - `std::min` macro clash on Windows in flamer/flare projectile constructors fixed with `(std::min)()`.
+
+### Infrastructure
+
+- **Docker build context fixed** — `admin-web` and `admin-api` Dockerfiles use the repo root as build context (workspace lockfile + all `package.json` manifests live there). `docker-compose.yml` context pointers updated to `..` with explicit `dockerfile:` paths.
+- **Compiled-in production defaults** — CMakeLists.txt now defaults to `lobby.arsiamons.com`, `maps.arsiamons.com`, and `admin.arsiamons.com` so release builds connect to production without manual config.
+
+---
+
 ## [v00041] — 2026-04-28
 
 ### Admin dashboard
