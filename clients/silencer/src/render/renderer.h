@@ -7,7 +7,7 @@
 #include "camera.h"
 #include "textinput.h"
 #include "surface.h"
-#include <unordered_map>
+#include <cmath>
 #include <vector>
 #include <cstdint>
 
@@ -70,6 +70,7 @@ public:
 	static void BlitSurfaceRLEClipped(int w, Uint8 * srcbuf, Rect * srcrect, Surface * dst, Rect * dstrect);
 	struct DynOccluder { int x1, y1, x2, y2; };
 	void DrawLight(Surface * surface, Surface * src, Rect * Rect, Sint32 lightWorldX = 0, Sint32 lightWorldY = 0, Sint32 cameraOffX = 0, Sint32 cameraOffY = 0, const std::vector<Map::ShadowZone> * zones = nullptr, Uint8 colorIndex = 0, float lumScale = 1.0f, const Uint8 * mask = nullptr, const std::vector<DynOccluder> * dynoccluders = nullptr);
+	void DrawLightRadial(Surface * surface, int screenX, int screenY, int radius, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const Uint8 * mask, int diam, Uint8 colorIndex, float lumScale, const std::vector<DynOccluder> * dynoccluders);
 	static void DrawTile(Surface * surface, Surface * tile, Rect * Rect);
 	void DrawParallax(Surface * surface, Camera & camera);
 	void DrawBackground(Surface * surface, Camera & camera, bool drawluminance = true);
@@ -91,12 +92,7 @@ private:
 	Uint8 state_i;
 	Uint8 ex, ey;
 	bool playerinbaseold;
-	// Light shadow baking: keyed by (x<<32|y as uint64_t) for pointer-free cache safety
-	std::unordered_map<uint64_t, std::vector<Uint8>> lightmasks;
-	bool lightmasksbaked;
 	std::vector<Object *> objectlights; // rebuilt each DrawWorld call; used by debug overlay
-	void BakeLightMasks();
-	void ClearLightMasks();
 	static Uint8 GetLightFrameIdx(const class Overlay * light, const Resources & res);
 	static const int raindropscount = 100;
 	int raindropsx[raindropscount];

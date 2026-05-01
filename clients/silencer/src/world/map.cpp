@@ -780,6 +780,24 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		}
 	}
 
+	// Light shadow masks — optional trailing section baked by the designer at save time
+	if(i + 8 <= level.size()){
+		Uint32 numMasks = 0;
+		memcpy(&numMasks, &level[i], 4); numMasks = SDL_Swap32LE(numMasks);
+		i += 8; // count + padding
+		for(Uint32 m = 0; m < numMasks && i + 12 <= level.size(); m++){
+			LightShadowMask lm;
+			memcpy(&lm.x,    &level[i], 4); lm.x    = SDL_Swap32LE(lm.x);    i += 4;
+			memcpy(&lm.y,    &level[i], 4); lm.y    = SDL_Swap32LE(lm.y);    i += 4;
+			memcpy(&lm.diam, &level[i], 4); lm.diam = SDL_Swap32LE(lm.diam); i += 4;
+			size_t dataSize = (size_t)lm.diam * lm.diam;
+			if(i + dataSize > level.size()) break;
+			lm.data.assign(level.begin() + i, level.begin() + i + dataSize);
+			i += dataSize;
+			if(team == 0) lightShadowMasks.push_back(std::move(lm));
+		}
+	}
+
 	//delete[] levelcompressed;
 	//delete[] level;
 	
@@ -794,6 +812,7 @@ void Map::Unload(void){
 	surveillancecameras.clear();
 	rainpuddlelocations.clear();
 	shadowzones.clear();
+	lightShadowMasks.clear();
 	for(size_t i = 0; i < 4; i++){
 		tiles[i].clear();
 	}

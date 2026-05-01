@@ -3,6 +3,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import pako from 'pako';
 import type { SilMapData, MapActor, MapPlatform, MapShadowZone, TileCell, MapHeader, MapLayers } from '../../lib/types';
 import * as mapStore from '../../lib/map-store';
+import { bakeMapLightMasks } from './lightBaker';
 
 const CELL_SIZE = 36; // bytes per map cell
 const MAX_HISTORY = 50;
@@ -281,7 +282,14 @@ export function useSilMap(): UseSilMapReturn {
     const actorsSectionSize = 8 + actors.length * 36;
     const platformsSectionSize = 8 + platforms.length * 24;
     const shadowZonesSectionSize = shadowZones.length > 0 ? 8 + shadowZones.length * 16 : 0;
-    const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize);
+
+    // Bake shadow masks for all placed map lights fresh at save time
+    const lightMasks = bakeMapLightMasks(actors, platforms, shadowZones);
+    const lightMasksSectionSize = lightMasks.length > 0
+      ? 8 + lightMasks.reduce((sum, m) => sum + 12 + m.data.length, 0)
+      : 0;
+
+    const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize + lightMasksSectionSize);
     const ldv = new DataView(levelBuf);
 
     for (let i = 0; i < numCells; i++) {
@@ -338,6 +346,20 @@ export function useSilMap(): UseSilMapReturn {
         ldv.setInt32(off + 8,  z.x2, true);
         ldv.setInt32(off + 12, z.y2, true);
         off += 16;
+      }
+    }
+
+    // Light shadow masks section — baked per-pixel wall-occlusion for each placed map light
+    if (lightMasks.length > 0) {
+      ldv.setUint32(off, lightMasks.length, true); off += 4;
+      ldv.setUint32(off, 0, true); off += 4;
+      const levelBytes = new Uint8Array(levelBuf);
+      for (const m of lightMasks) {
+        ldv.setInt32(off,  m.x,    true); off += 4;
+        ldv.setInt32(off,  m.y,    true); off += 4;
+        ldv.setUint32(off, m.diam, true); off += 4;
+        levelBytes.set(m.data, off);
+        off += m.data.length;
       }
     }
 
