@@ -1,11 +1,14 @@
-# services/lobby/ — Go lobby
+# services/lobby/ — Go lobby server
 
-Go: stdlib + `mongo-driver` (used only when `MONGO_URL` set) + `amqp091-go`
-(used only when `AMQP_URL` set). Build/run instructions, flags, and
-the how-it-works narrative are in `README.md`; this file is for editing
-the code.
+Hosts the game-listing browser, brokers chat, tracks who's online,
+and spawns dedicated `silencer -s` game servers when someone hits
+"Create Game". Build/run/flags and the how-it-works narrative live in
+[`README.md`](README.md); this file is for editing the code.
 
-## Per-file
+Stack: Go stdlib + `mongo-driver` (only when `MONGO_URL` set) +
+`amqp091-go` (only when `AMQP_URL` set).
+
+## Files
 
 - `main.go` — flag parsing, wires `store → proc → hub`, TCP accept
   loop + UDP goroutine.
@@ -17,8 +20,10 @@ the code.
 - `protocol.go` — wire format: `[len u8][payload]`, max 255 bytes.
   Reader/writer mirrors the client's `Serializer` (bit-aligned, but
   lobby fields happen to be byte-aligned).
-- `proc.go` — spawns `silencer -s <publicAddr> <port> <gameID>
+- `proc.go` — spawns `silencer -s 127.0.0.1 <lobbyPort> <gameID>
   <accountID>` per `MSG_NEWGAME`; tracks PIDs; `StopAll()` on shutdown.
+  The lobby host is hardcoded loopback because the dedicated server's
+  heartbeat path uses `inet_addr()` (dotted-decimal only).
 - `udp.go` — decodes heartbeat `[0x00][gameid u32][port u16][state u8]`
   → `hub.OnHeartbeat`.
 - `store.go` — `lobby.json` atomic writes (temp + rename), SHA-1
@@ -40,12 +45,13 @@ the code.
 
 ## Invariants
 
-- **Opcodes must match `src/lobby.cpp`.** Adding one requires both
-  sides and a client version bump.
-- **Heartbeat timeout: 30 s** (`hub.go:28`). Miss → pending create
+- **Opcodes must match `clients/silencer/src/net/lobby.cpp`.** Adding
+  one requires both sides and a client version bump.
+- **Heartbeat timeout: 30 s** (`hub.go:30`). Miss → pending create
   fails with `status=2`.
 - **`status=2` on `opNewGame` is reserved** for the client's "Could
-  not create game" dialog (`src/game.cpp:824`). Don't reuse.
+  not create game" dialog (`clients/silencer/src/game/game.cpp:704`).
+  Don't reuse.
 - **Don't hold `h.mu` across network I/O.** Copy state under lock,
   send outside.
 
@@ -62,3 +68,9 @@ Mongo is a mirror, not a backup — if it diverges, `lobby.json` wins.
 - **Port 517 needs root on macOS/Linux.** For local dev, run on
   `:15170` and rebuild the client with
   `-DSILENCER_LOBBY_PORT=15170` (see `clients/silencer/CLAUDE.md` gotchas).
+
+## Docs
+
+- [`README.md`](README.md) — build, run, flags, deployment, how-it-works.
+- [`../../docs/production.md`](../../docs/production.md) — production
+  deployment topology including the lobby's place in it.

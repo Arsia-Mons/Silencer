@@ -6,7 +6,8 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
     "types": ["bun"]
   },
-  "include": ["index.ts"]
+  "include": ["index.ts", "src/**/*.ts", "tests/**/*.ts"]
 }

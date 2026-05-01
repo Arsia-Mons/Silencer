@@ -300,7 +300,8 @@ export default function WeaponsPage() {
       setSelectedId(weapons[0]?.id ?? null);
       setDirty(false);
       setError('');
-      gasStore.loadFolder(folderName || 'gas', { weapons: weaponsText, agencies: agenciesText });
+      const existingFiles = gasStore.getAllFiles();
+      gasStore.loadFolder(folderName || 'gas', { ...existingFiles, weapons: weaponsText, agencies: agenciesText });
     } catch (err) {
       setError(String(err));
     }

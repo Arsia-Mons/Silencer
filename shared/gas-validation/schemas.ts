@@ -1,0 +1,365 @@
+// JSON Schema definitions for every GAS file. Canonical home; the
+// admin Monaco editor and the silencer-cli `gas validate` op both
+// import from here. Field descriptions match the comments in
+// clients/silencer/src/gas/gasloader.h.
+
+const int = (description: string, defaultVal?: number) => ({
+  type: 'integer' as const,
+  description: defaultVal !== undefined ? `${description} (default: ${defaultVal})` : description,
+});
+
+const num = (description: string, defaultVal?: number) => ({
+  type: 'number' as const,
+  description: defaultVal !== undefined ? `${description} (default: ${defaultVal})` : description,
+});
+
+// ── player.json ──────────────────────────────────────────────────────────────
+
+// Property list mirrors `PlayerDef` in clients/silencer/src/gas/gasloader.h
+// and the j.value() reads in gasloader.cpp::LoadPlayer. Keep in lockstep
+// when adding/removing fields on the C++ side — `additionalProperties: false`
+// turns drift into a CLI failure, which is the point.
+const playerSchema = {
+  type: 'object',
+  title: 'PlayerDef',
+  description: 'Global player stats, economy, and timing constants.',
+  additionalProperties: false,
+  properties: {
+    _comment:                    { type: 'string', description: 'Optional dev note (ignored by the loader)' },
+    baseHealth:                  int('Starting health points', 100),
+    baseShield:                  int('Starting shield points', 100),
+    baseFuel:                    int('Starting jetpack fuel', 80),
+    maxFiles:                    int('Maximum file count a player can carry', 2800),
+    upgradeMultiplierEndurance:  int('HP per endurance upgrade point', 20),
+    upgradeMultiplierShield:     int('Shield per shield upgrade point', 20),
+    upgradeMultiplierJetpack:    int('Fuel per jetpack upgrade point', 10),
+    upgradeMultiplierHacking:    num('Hacking speed bonus per hacking upgrade point', 0.10),
+    upgradeMultiplierContacts:   num('Credits bonus per contacts upgrade point', 0.10),
+    maxPoisoned:                 int('Max simultaneous poison doses', 9),
+    runSpeed:                    int('Run speed (no disguise, no secret)', 14),
+    runSpeedDisguised:           int('Run speed while disguised', 11),
+    runSpeedSecret:              int('Run speed while carrying a secret', 11),
+    runSpeedSecretDisguised:     int('Run speed while disguised + carrying secret', 8),
+    jetpackXvMax:                int('Max horizontal jetpack velocity (px/tick)', 14),
+    jetpackXvMaxDisguised:       int('Max horizontal jetpack velocity while disguised (currently unused)', 12),
+    jetpackYvMax:                int('Max vertical jetpack velocity (px/tick)', 9),
+    jumpImpulse:                 int('Standing jump impulse', 17),
+    ladderJumpImpulse:           int('Jump impulse off a ladder (no directional input)', 29),
+    ladderActivateImpulse:       int('Jump impulse off a ladder with activate held', 8),
+    disguiseActivationTicks:     int('Ticks for disguise animation to fully activate', 112),
+    disguiseThreshold:           int('Disguise progress value at which disguise is active', 100),
+    invisibilityDurationTicks:   int('Ticks of invisibility per powerup/ability use', 720),
+    poisonTickCycle:             int('Ticks between poison damage ticks', 24),
+    hackingEffectTicks:          int('Ticks of hacking effect per input press', 5),
+    hackingCompleteThreshold:    int('Hacking progress value that completes the hack', 15),
+    hackingExitThreshold:        int('Hacking progress value that aborts and ejects the player', 17),
+    deployWaitTicks:             int('Ticks of deploy wait before beam-in animation', 60),
+    startingCredits:             int('Credits each player starts with', 500),
+    creditFloor:                 int('Minimum credits (cannot go below this)', 250),
+    creditCap:                   int('Maximum credits a player can hold', 65535),
+    neutronWarnTick:             int('Ticks before neutron detonation to show warning', 8),
+    superShieldMultiplier:       int('Shield points restored per shield pickup', 2),
+    powerupRespawnTicks:         int('Ticks before a dropped powerup respawns', 60),
+    fileConversionBase:          int('Base in files*(base+creditsbonus) credit formula', 1),
+    teamGiftCredits:             int('Credits awarded via BUY_GIVE actions to teammates', 100),
+    secretDeliveryCredits:       int('Credits per team member on secret delivery', 1000),
+    weaponFireCooldownPad:       int('Extra ticks added to every weapon fireDelay on fire', 3),
+    secretsNeededToWin:          int('Secrets a team must deliver to win the round', 3),
+    secretProgressBeamThresh:    int('secretprogress value that triggers secret-beaming sequence', 180),
+    secretProgressSoundThresh:   int('Min progress delta to trigger team progress sound', 20),
+    jetpackBonusDurationTicks:   int('Extra jetpack propellant powerup duration (20s @ 24 ticks/s)', 480),
+    hackingBonusDurationTicks:   int('Double-hacking bonus duration (30s)', 720),
+    radarBonusDurationTicks:     int('Radar powerup duration (30s)', 720),
+    warpDurationTicks:           int('Total ticks for one warp animation cycle', 40),
+    warpNonCollidableTicks:      int('state_warp <= this → entity non-collidable during warp', 24),
+    warpTeleportTick:            int('state_warp == this → player x/y set to warp destination', 12),
+    deadAutoRespawnTick:         int('Ticks in DEAD state before auto-respawn triggers', 48),
+    deployAnimationTicks:        int('Ticks of DEPLOYING beam-in animation after deployWait', 8),
+  },
+};
+
+// ── weapons.json ─────────────────────────────────────────────────────────────
+
+const weaponDef = {
+  type: 'object',
+  title: 'WeaponDef',
+  required: ['id'],
+  properties: {
+    id:                  { type: 'string', description: 'Weapon identifier (blaster, laser, rocket, flamer, flare, wall, plasma, grenade)' },
+    fireDelay:           int('Ticks between shots'),
+    healthDamage:        int('Direct health damage per hit'),
+    shieldDamage:        int('Direct shield damage per hit'),
+    healthDamageLarge:   int('Plasma large-state health damage'),
+    shieldDamageLarge:   int('Plasma large-state shield damage'),
+    velocity:            int('Projectile initial velocity (px/tick)'),
+    moveAmount:          int('Collision steps per tick'),
+    radius:              int('Hit detection radius (px)'),
+    // Grenade-only
+    explosionTick:       int('Tick at which primary explosion triggers'),
+    secondaryTick:       int('Tick at which secondary shockwave triggers'),
+    destroyTick:         int('Tick at which grenade is destroyed'),
+    neutronDestroyTick:  int('Tick at which neutron bomb is destroyed'),
+    flareDuration:       int('Ticks a flare lasts before burning out'),
+    throwSpeedStanding:  int('Horizontal throw speed when standing'),
+    throwSpeedMoving:    int('Horizontal throw speed when moving (non-running)'),
+    throwSpeedRunning:   int('Base horizontal throw speed when running (+ abs(player xv) added)'),
+    neutronTraceTime:    int('Ticks of trace effect on neutron bomb pickup'),
+    detonatorLaunchYv:   int('Vertical launch velocity of detonator projectile'),
+    // Rocket-only
+    rocketSlowInitial:   num('Velocity multiplier on launch (tick 0)'),
+    rocketHoverTick:     int('state_i value that triggers hover mode'),
+    rocketSlowHover:     num('Velocity multiplier when entering hover'),
+    // Plasma-only
+    plasmaGravity:       int('yv increment per tick'),
+    plasmaLifeNormal:    int('Plasma lifetime in normal (small) state (ticks)'),
+    plasmaLifeLarge:     int('Plasma lifetime in large (attached) state (ticks)'),
+  },
+};
+
+const weaponsSchema = {
+  type: 'object',
+  title: 'Weapons',
+  required: ['weapons'],
+  properties: {
+    weapons: { type: 'array', items: weaponDef },
+  },
+};
+
+// ── enemies.json ─────────────────────────────────────────────────────────────
+
+const enemyDef = {
+  type: 'object',
+  title: 'EnemyDef',
+  required: ['id'],
+  properties: {
+    id:                   { type: 'string', description: 'Enemy identifier (guard-blaster, guard-laser, guard-rocket, robot, civilian)' },
+    health:               int('Starting health'),
+    shield:               int('Starting shield'),
+    speed:                int('Movement speed (px/tick)'),
+    weapon:               int('Guard weapon variant: 0=blaster 1=laser 2=rocket'),
+    shotCooldown:         int('Ticks between guard shots (cooldowntime)', 48),
+    chaseRangeClose:      int('px — within this range guard skips shooting (too close)', 60),
+    chaseRangeStop:       int('px — within this distance guard stops chasing', 80),
+    chaseRangeMax:        int('px — beyond this distance guard actively walks toward target', 90),
+    searchTicks:          int('Ticks robot searches before returning to spawn', 600),
+    meleeCheckInterval:   int('Robot checks melee every N ticks', 40),
+    tractHealthDamage:    int('Civilian tract projectile health damage'),
+    tractShieldDamage:    int('Civilian tract projectile shield damage'),
+    respawnSeconds:       int('Seconds before enemy respawns after death'),
+    ladderCooldown:       int('Guard: ticks between ladder re-climbs', 120),
+    meleeDamageHealth:    int('Robot melee health damage', 60),
+    meleeDamageShield:    int('Robot melee shield damage', 60),
+    returnProximity:      int('Robot: px to spawn to consider "returned"', 20),
+    sleepTicks:           int('Robot: ticks idle at spawn before resuming patrol', 100),
+    meleeCycleTicks:      int('Guard melee attack state_hit modulus', 32),
+    meleeDelayTicks:      int('Min state_hit within cycle to allow guard attack', 10),
+    targetStandingHeight: int('Target AABB height >= this → standing (else crouched)', 50),
+    ladderYThreshold:     int('abs(ydiff) > this to attempt ladder climb (px)', 48),
+    ladderXTolerance:     int('abs(center-x) <= this to align with ladder (px)', 8),
+    patrolReturnProximity:int('abs(x-originalx) <= this to consider at post (px)', 20),
+    speedAlt:             int('Civilian actortype=1 speed override'),
+    runSpeedBonus:        int('Civilian: xv = speed + runSpeedBonus when fleeing'),
+    threatDetectX:        int('Civilian threat detection AABB half-width (px)', 200),
+    threatDetectY:        int('Civilian threat detection AABB half-height (px)', 100),
+    shootCooldownCap:     int('Robot: shootcooldown threshold for attack loop check', 50),
+    deathDropFiles:       int('Robot: FILE pickup quantity spawned on death'),
+    ladderClimbSpeed:     int('Guard/robot: abs(yv) when climbing a ladder', 5),
+    rocketLaunchXv:       int('Robot: horizontal velocity of fired rocket (px/tick)', 25),
+    ammoDropQuantity:     int('Guard: ammo dropped on death (0 = no drop)'),
+    lookDefaultMinX:      int('Robot default look AABB: near X edge (px from robot)', 70),
+    lookDefaultMaxX:      int('Robot default look AABB: far X edge (px from robot)', 500),
+    lookDefaultY:         int('Robot default look AABB: Y offset (top & bottom)', -60),
+    lookDirMinX:          int('Robot directional look AABB: near X edge', 70),
+    lookDirMaxX:          int('Robot directional look AABB: far X edge', 200),
+    lookDirY1:            int('Robot directional look AABB: top Y offset', -10),
+    lookDirY2:            int('Robot directional look AABB: bottom Y offset', -100),
+    _note:               { type: 'string', description: 'Optional dev note (ignored by game)' },
+  },
+};
+
+const enemiesSchema = {
+  type: 'object',
+  title: 'Enemies',
+  required: ['enemies'],
+  properties: {
+    enemies: { type: 'array', items: enemyDef },
+  },
+};
+
+// ── agencies.json ─────────────────────────────────────────────────────────────
+
+const upgradeLevels = { type: 'integer', minimum: 0, maximum: 10 };
+
+const agencyDef = {
+  type: 'object',
+  title: 'AgencyDef',
+  required: ['id', 'name'],
+  properties: {
+    id:                { type: 'integer', description: 'Agency numeric ID (0–4)' },
+    name:              { type: 'string',  description: 'Display name' },
+    defaultBonuses:    int('Free bonus points subtracted in TotalUpgradePointsPossible'),
+    maxPlayersPerTeam: int('Max peers that can join this team (default: 4, Blackrose: 1)', 4),
+    defaultUpgrades: {
+      type: 'object',
+      description: 'Free starting upgrade levels each agency receives',
+      properties: {
+        endurance: upgradeLevels,
+        shield:    upgradeLevels,
+        jetpack:   upgradeLevels,
+        techslots: upgradeLevels,
+        hacking:   upgradeLevels,
+        contacts:  upgradeLevels,
+      },
+    },
+    upgradeCaps: {
+      type: 'object',
+      description: 'Per-agency final upgrade cap values (bonuses baked in)',
+      properties: {
+        endurance: upgradeLevels,
+        shield:    upgradeLevels,
+        jetpack:   upgradeLevels,
+        techslots: upgradeLevels,
+        hacking:   upgradeLevels,
+        contacts:  upgradeLevels,
+      },
+    },
+  },
+};
+
+const agenciesSchema = {
+  type: 'object',
+  title: 'Agencies',
+  required: ['agencies'],
+  properties: {
+    _comment:  { type: 'string' },
+    agencies:  { type: 'array', items: agencyDef },
+  },
+};
+
+// ── items.json ────────────────────────────────────────────────────────────────
+
+// Property list mirrors `ItemDef` in clients/silencer/src/gas/gasloader.h
+// and the j.value() reads in gasloader.cpp::LoadItems.
+const itemDef = {
+  type: 'object',
+  title: 'ItemDef',
+  required: ['id'],
+  properties: {
+    id:                  { type: 'string', description: 'Item identifier matching BUY_* constants' },
+    enumId:              int('world.h BUY_* enum value (BUY_NONE=0, BUY_LASER=1, …)'),
+    name:                { type: 'string', description: 'Human-readable name shown in buy menu' },
+    price:               int('Purchase price in credits'),
+    repairPrice:         int('Repair price in credits'),
+    spriteBank:          int('Sprite bank index'),
+    spriteIndex:         int('Sprite index within bank'),
+    techChoice:          int('Tech bitmask (1<<N)'),
+    techSlots:           int('Tech slots consumed when equipping'),
+    agencyRestriction:   int('Agency lock (-1 = none, else Team::* int)'),
+    description:         { type: 'string', description: 'Buy-menu description text' },
+    spawnAmmo:           int('Ammo granted on respawn (laser/rocket/flamer)'),
+    spawnInventoryCount: int('Inventory items granted on respawn (consumables)'),
+    pickupAmmo:          int('Ammo per inventory-station purchase'),
+    maxAmmo:             int('Ammo cap for this weapon'),
+    healAmount:          int('Health restored per use (healthpack only)'),
+    poisonDose:          int('Poison units applied per use (poison only)'),
+  },
+};
+
+const itemsSchema = {
+  type: 'object',
+  title: 'Items',
+  required: ['items'],
+  properties: {
+    _comment: { type: 'string' },
+    items:    { type: 'array', items: itemDef },
+  },
+};
+
+// ── gameobjects.json ──────────────────────────────────────────────────────────
+
+const gameObjectDef = {
+  type: 'object',
+  title: 'GameObjectDef',
+  required: ['id'],
+  properties: {
+    id:              { type: 'string' },
+    cooldownTicks:   int('Ticks before object can activate again'),
+    health:          int('Starting health'),
+    shield:          int('Starting shield'),
+    healthMax:       int('Maximum health'),
+    shieldMax:       int('Maximum shield'),
+    healthRegen:     int('Health restored per upgrade level'),
+    techHealth:      int('Tech station health value'),
+    techShield:      int('Tech station shield value'),
+    refireReadyTick: int('Wall defense: state_i when shot fires', 12),
+    reloadTick:      int('Wall defense: state_i to reset from DEAD state', 60),
+    innerRange:      int('Fixed cannon: near edge of detection box X offset (px)', 70),
+    outerRange:      int('Fixed cannon: far edge of detection box X offset (px)', 300),
+    detectionRange:  int('Wall defense: AABB half-extent for player detection (px)', 600),
+    _note:           { type: 'string' },
+  },
+};
+
+const terminalDef = {
+  type: 'object',
+  title: 'TerminalDef',
+  required: ['id'],
+  properties: {
+    id:                  { type: 'string', description: '"big" or "small"' },
+    juice:               int('Ticks to complete terminal hack'),
+    files:               int('Files awarded on hack completion'),
+    secretInfo:          int('Secret info awarded on hack completion'),
+    traceTimeBase:       int('Trace timer with 0 secrets hacked', 90),
+    traceTimeMedium:     int('Trace timer with 1 secret hacked', 120),
+    traceTimeExtended:   int('Trace timer with 2+ secrets hacked', 150),
+    beaconTimeSecs:      int('Seconds for beacon countdown when terminal selected (big only)', 65),
+  },
+};
+
+const gameObjectsSchema = {
+  type: 'object',
+  title: 'GameObjects',
+  properties: {
+    _comment:    { type: 'string' },
+    gameObjects: { type: 'array', items: gameObjectDef },
+    terminals:   { type: 'array', items: terminalDef },
+  },
+};
+
+// ── abilities.json ────────────────────────────────────────────────────────────
+
+const abilityDef = {
+  type: 'object',
+  title: 'AbilityDef',
+  description: 'Reserved for future dedicated ability system. Currently empty.',
+  required: ['id'],
+  properties: {
+    id:          { type: 'string' },
+    displayName: { type: 'string' },
+    creditCost:  int('Credit cost to activate'),
+    cooldownMs:  int('Cooldown in milliseconds'),
+    effectType:  { type: 'string', description: 'Effect type identifier' },
+  },
+};
+
+const abilitiesSchema = {
+  type: 'object',
+  title: 'Abilities',
+  description: 'Placeholder for a future dedicated ability system. All ability values currently live in player.json.',
+  properties: {
+    _comment:  { type: 'string' },
+    abilities: { type: 'array', items: abilityDef },
+  },
+};
+
+// ── Export ────────────────────────────────────────────────────────────────────
+
+export const GAS_SCHEMAS: Record<string, { uri: string; schema: object }> = {
+  player:      { uri: 'inmemory://gas/player.json',      schema: playerSchema },
+  weapons:     { uri: 'inmemory://gas/weapons.json',     schema: weaponsSchema },
+  enemies:     { uri: 'inmemory://gas/enemies.json',     schema: enemiesSchema },
+  agencies:    { uri: 'inmemory://gas/agencies.json',    schema: agenciesSchema },
+  items:       { uri: 'inmemory://gas/items.json',       schema: itemsSchema },
+  gameobjects: { uri: 'inmemory://gas/gameobjects.json', schema: gameObjectsSchema },
+  abilities:   { uri: 'inmemory://gas/abilities.json',   schema: abilitiesSchema },
+};

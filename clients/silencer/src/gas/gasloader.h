@@ -434,6 +434,20 @@ struct AbilityDef {
     std::string effectType;
 };
 
+// ---- Load errors -----------------------------------------------------------
+
+// Surfaced via the `gas reload` control-socket op; shape matches the
+// GASError type emitted by the shared TS validator
+// (shared/gas-validation/errors.ts) so an agent's remediation loop is
+// platform-agnostic — same {file, instancePath, code, message} regardless
+// of which side caught the problem.
+struct GASLoadError {
+    std::string file;          // e.g. "weapons.json"
+    std::string instancePath;  // RFC 6901 JSON Pointer; "" for whole-file errors
+    std::string code;          // OPEN_FAILED | PARSE_ERROR | FIELD_ERROR
+    std::string message;
+};
+
 // ---- Game object -----------------------------------------------------------
 
 struct GameObjectDef {
@@ -577,6 +591,11 @@ public:
     std::vector<AbilityDef>  abilities;
     std::vector<GameObjectDef> gameObjects;
     std::vector<TerminalDef>   terminals;
+
+    // Errors from the most recent Load() / Reload(). Cleared at the
+    // start of each load. Read-only consumers should treat
+    // `lastLoadErrors.empty()` as "clean".
+    std::vector<GASLoadError> lastLoadErrors;
 
     bool loaded = false;
 

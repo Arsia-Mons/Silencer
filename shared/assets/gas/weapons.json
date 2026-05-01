@@ -1,5 +1,5 @@
 {
-  "_comment": "Weapon definitions \u2014 numeric values 1:1 from *projectile.cpp constructors. Sprite banks and sounds extracted from hardcoded values in each projectile Tick(). Do not change balance during migration.",
+  "_comment": "Weapon definitions — numeric values 1:1 from *projectile.cpp constructors. Sprite banks and sounds extracted from hardcoded values in each projectile Tick(). Do not change balance during migration.",
   "weapons": [
     {
       "id": "blaster",
@@ -122,7 +122,7 @@
       "projectileLife": 20,
       "snapshotInterval": 6,
       "hitOverlayBank": 222,
-      "soundFire": "!laserel.wav",
+      "soundFire": "grenthro.wav",
       "soundHit1": "strike03.wav",
       "soundHit2": "strike04.wav"
     },
@@ -169,7 +169,7 @@
     {
       "id": "plasmadetonator",
       "projectileType": "grenade",
-      "_comment": "Plasma detonator \u2014 remote-detonated device. soundFire=arm/deploy, iscamera=true uses soundHit1, iscamera=false uses soundExplosion.",
+      "_comment": "Plasma detonator — remote-detonated device. soundFire=arm/deploy, iscamera=true uses soundHit1, iscamera=false uses soundExplosion.",
       "soundFire": "shield2.wav",
       "soundExplosion": "seekexp1.wav",
       "soundHit1": "q_expl02.wav",
@@ -240,7 +240,7 @@
     {
       "id": "empbomb",
       "projectileType": "grenade",
-      "_comment": "EMP grenade \u2014 stuns shields across the whole team row.",
+      "_comment": "EMP grenade — stuns shields across the whole team row.",
       "spriteBanks": [
         79,
         79,
@@ -253,12 +253,13 @@
       ],
       "soundExplosion": "q_expl02.wav",
       "healthDamage": 0,
-      "shieldDamage": 65535
+      "shieldDamage": 65535,
+      "soundThrow": "grenthro.wav"
     },
     {
       "id": "shapedbomb",
       "projectileType": "grenade",
-      "_comment": "Shaped-charge grenade \u2014 fires a tight spray of plasma bolts upward.",
+      "_comment": "Shaped-charge grenade — fires a tight spray of plasma bolts upward.",
       "spriteBanks": [
         79,
         79,
@@ -311,12 +312,13 @@
           "xv": 10,
           "yv": -29
         }
-      ]
+      ],
+      "soundThrow": "grenthro.wav"
     },
     {
       "id": "plasmabomb",
       "projectileType": "grenade",
-      "_comment": "Plasma grenade \u2014 releases a wide spread of plasma bolts.",
+      "_comment": "Plasma grenade — releases a wide spread of plasma bolts.",
       "spriteBanks": [
         79,
         79,
@@ -381,12 +383,13 @@
           "xv": 5,
           "yv": -15
         }
-      ]
+      ],
+      "soundThrow": "grenthro.wav"
     },
     {
       "id": "neutronbomb",
       "projectileType": "grenade",
-      "_comment": "Neutron grenade \u2014 large-radius explosion that passes through shielding.",
+      "_comment": "Neutron grenade — large-radius explosion that passes through shielding.",
       "spriteBanks": [
         79,
         79,
@@ -401,12 +404,13 @@
       "soundExplosion": "q_expl02.wav",
       "soundWarn": "vModDeto.wav",
       "healthDamage": 65535,
-      "shieldDamage": 65535
+      "shieldDamage": 65535,
+      "soundThrow": "grenthro.wav"
     },
     {
       "id": "flarebomb",
       "projectileType": "grenade",
-      "_comment": "Flare bomb (INV_FLARE) \u2014 illumination grenade, stays airborne after exploding.",
+      "_comment": "Flare bomb (INV_FLARE) — illumination grenade, stays airborne after exploding.",
       "spriteBanks": [
         79,
         79,
@@ -417,12 +421,13 @@
         79,
         79
       ],
-      "soundExplosion": "rocket1.wav"
+      "soundExplosion": "rocket1.wav",
+      "soundThrow": "grenthro.wav"
     },
     {
       "id": "poisonflare",
       "projectileType": "grenade",
-      "_comment": "Poison flare bomb \u2014 like flarebomb but inflicts poison damage in radius.",
+      "_comment": "Poison flare bomb — like flarebomb but inflicts poison damage in radius.",
       "spriteBanks": [
         79,
         79,
@@ -436,7 +441,8 @@
       "soundExplosion": "rocket1.wav",
       "poisonRate": 1,
       "poisonMax": 3,
-      "poisonCheckInterval": 6
+      "poisonCheckInterval": 6,
+      "soundThrow": "grenthro.wav"
     }
   ]
 }

@@ -1,36 +1,57 @@
-# clients/cli — agent control wrapper
+# clients/cli — Bun CLI for driving the game from scripts
 
-Stateless Bun + TypeScript CLI that talks JSON-lines TCP to a running
-`silencer` started with `--control-port <P>`. One command per
-invocation; the game stays up across many calls.
+Source for `silencer-cli`. To **use** the CLI, read
+[`shared/skills/cli/SKILL.md`](../../shared/skills/cli/SKILL.md). The
+rest of this file is for editing the CLI itself.
 
-## Run
+## How it fits
+
+Stateless Bun + TypeScript wrapper. One invocation = one command,
+routed three ways:
+
+- **Game-control** commands → JSON-line TCP to a running game
+  (`silencer --headless --control-port <P>`). Server side lives in
+  `clients/silencer/src/net/controlserver.{h,cpp}` (accept loop +
+  framing) and `controldispatch.{h,cpp}` (per-op handlers).
+- **Local** commands (`gas validate`, anything in `LOCAL_OPS` at the
+  top of `index.ts`) → in-process. No socket, no daemon. Used in
+  tight edit loops where startup cost matters.
+- **Lobby** commands → unix socket to `silencer-lobbyd`, auto-spawned.
+  See [`src/lobby/CLAUDE.md`](src/lobby/CLAUDE.md).
+
+`index.ts` does arg parsing, the routing decision, and the
+read/write loop. Lobby handlers live under `src/lobby/`.
+
+## Run during dev
 
 ```bash
-bun ./index.ts ping
 bun ./index.ts --port 5170 click --label OPTIONS
-bun ./index.ts wait_for_state --state OPTIONS --timeout-ms 3000
-bun ./index.ts screenshot --out /tmp/x.png
+# or: bun link  →  silencer-cli --port 5170 click --label OPTIONS
 ```
 
-Or install into PATH locally:
+End-to-end tests source `tests/cli-agent/e2e/lib.sh` for cross-platform
+binary detection and free-port allocation — the easiest way to
+exercise a change against a real game build.
 
-```bash
-bun link
-silencer-cli ping
-```
+## Env / exit codes
 
-## Env
+- `SILENCER_CONTROL_HOST` / `SILENCER_CONTROL_PORT` — game-control TCP defaults.
+- `SILENCER_LOBBYD_DIR` — overrides the lobby daemon's socket+log dir
+  (see `src/lobby/paths.ts`).
+- Exit `0` (ok, JSON to stdout) / `1` (`[CODE] msg` to stderr) /
+  `2` (transport failure).
 
-- `SILENCER_CONTROL_HOST` (default `127.0.0.1`)
-- `SILENCER_CONTROL_PORT` (default `5170`)
+## Adding a game-control command
 
-## Exit codes
+1. Add the C++ handler in `clients/silencer/src/net/controldispatch.cpp`.
+2. If args need special parsing, add entries to `STRING_FLAGS` /
+   `VARIADIC_FLAGS` / `CHORD_SPLIT_FLAGS` in `index.ts`.
+3. Document it in the SKILL.md table.
 
-- `0` — `ok:true`; result JSON to stdout.
-- `1` — `ok:false`; `[CODE] error` to stderr.
-- `2` — transport failure (connect refused / closed prematurely / etc).
+For lobby commands the boundary rules differ — see `src/lobby/CLAUDE.md`.
 
-## Wire protocol
+## Docs
 
-See `docs/superpowers/specs/2026-04-26-cli-agent-control-design.md`.
+- [`shared/skills/cli/SKILL.md`](../../shared/skills/cli/SKILL.md)
+  — user-facing guide. Wire-protocol reference is at the bottom
+  ("If you need to skip the wrapper").

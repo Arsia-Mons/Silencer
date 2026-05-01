@@ -13,6 +13,11 @@ ln -s ../../shared/skills/<skill-name> .claude/skills/<skill-name>
 
 The Claude Code session reloads skills on next launch.
 
+**For agents:** if a task references a `shared/skills/<name>/SKILL.md`
+whose `.claude/skills/<name>` symlink is absent, the skill isn't loaded
+in this session — propose the `ln -s` above (and a Claude Code restart)
+before relying on the skill's content.
+
 ## Skills
 
 - `cli/` — drive the Silencer game via the CLI agent control channel for

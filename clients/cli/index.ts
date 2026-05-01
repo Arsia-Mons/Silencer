@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 import { connect } from "node:net";
+import { LOBBY_HANDLERS } from "./src/lobby/commands.ts";
 
 type Reply = {
   id: number;
@@ -28,6 +29,27 @@ function usage(): never {
       `       silencer-cli pause | resume\n` +
       `       silencer-cli step --frames 10 | --ms 200\n` +
       `       silencer-cli quit\n` +
+      `       silencer-cli keybind list\n` +
+      `       silencer-cli keybind actions\n` +
+      `       silencer-cli keybind get [--profile N] [--action A]\n` +
+      `       silencer-cli keybind put --profile N --action A --bindings KEY:F PAD:south\n` +
+      `         (comma joins keys into an AND-chord, e.g. --bindings KEY:Up,KEY:Left)\n` +
+      `       silencer-cli keybind unset --profile N --action A\n` +
+      `       silencer-cli keybind use <profile>\n` +
+      `       silencer-cli keybind new --profile N [--from M]\n` +
+      `       silencer-cli keybind delete <profile>\n` +
+      `       silencer-cli gas validate <dir>\n` +
+      `         (runs locally; no daemon required. Exit 1 if errors[] non-empty.)\n` +
+      `       silencer-cli gas reload\n` +
+      `         (re-runs the daemon's GAS loader; only safe from NONE/MAINMENU/LOBBY/MISSIONSUMMARY)\n` +
+      `       silencer-cli lobby spawn --as alice --host H --port P --version V --user U --pass P\n` +
+      `       silencer-cli lobby ls\n` +
+      `       silencer-cli lobby chat --as alice --channel main --text "hi"\n` +
+      `       silencer-cli lobby game create --as alice --name TEST [--map M --max-players 8]\n` +
+      `       silencer-cli lobby game join   --as alice --id 12345\n` +
+      `       silencer-cli lobby tail --as alice\n` +
+      `       silencer-cli lobby kill --as alice | --all\n` +
+      `       silencer-cli lobby join_channel --as alice --channel main\n` +
       `\n` +
       `Env: SILENCER_CONTROL_HOST (default 127.0.0.1)\n` +
       `     SILENCER_CONTROL_PORT (default 5170)`,
@@ -35,37 +57,153 @@ function usage(): never {
   process.exit(2);
 }
 
-function parseArgs(argv: string[]): { host: string; port: number; op: string; args: Record<string, unknown> } {
+// Ops with a noun-first dispatch shape: `silencer-cli <op> <subop> [args]`.
+// The wrapper recognizes the first positional as the op, the second as
+// args.subop. The pattern is centralized so future namespaces (e.g.
+// `profile`, `audio`) can opt in without touching the parser.
+const NOUN_FIRST_OPS = new Set(["keybind", "gas", "lobby"]);
+
+// (op, subop) pairs that run entirely in this process and never touch
+// the daemon. Each handler returns a JSON-serializable result and a
+// boolean `clean` flag; `clean=false` exits non-zero so shell loops
+// can branch on it.
+type LocalHandler = (args: Record<string, unknown>) => Promise<{ clean: boolean; result: unknown }>;
+const LOCAL_OPS: Record<string, Record<string, LocalHandler>> = {
+  gas: {
+    validate: async (args) => {
+      const dir =
+        (args["dir"] as string | undefined) ?? (args["_positional"] as string | undefined);
+      if (!dir)
+        throw new Error("gas validate requires a directory: silencer-cli gas validate <dir>");
+      const { validateDirectory } = await import("@silencer/gas-validation/node");
+      const res = await validateDirectory(dir);
+      return { clean: res.ok, result: res };
+    },
+  },
+  lobby: LOBBY_HANDLERS,
+};
+// Per (op,subop) pair: which flag accepts a list of values rather than
+// a single value. `--bindings KEY:A PAD:south` consumes both.
+const VARIADIC_FLAGS: Record<string, Record<string, Set<string>>> = {
+  keybind: {
+    put: new Set(["bindings"]),
+  },
+};
+// Per (op,subop) pair: flags whose values must stay strings even when they
+// look numeric. Without this, `--profile 1` would JSON-encode as `{profile:1}`
+// and the C++ side's `args.value("profile", default)` would return the default
+// (silent operation on the wrong profile).
+const STRING_FLAGS: Record<string, Record<string, Set<string>>> = {
+  keybind: {
+    get: new Set(["profile", "action"]),
+    put: new Set(["profile", "action"]),
+    unset: new Set(["profile", "action"]),
+    use: new Set(["profile"]),
+    new: new Set(["profile", "from"]),
+    delete: new Set(["profile"]),
+  },
+  gas: {
+    validate: new Set(["dir"]),
+  },
+  lobby: {
+    spawn: new Set(["as", "user", "pass", "version", "host"]),
+    chat: new Set(["as", "channel", "text"]),
+    join_channel: new Set(["as", "channel"]),
+    kill: new Set(["as"]),
+    game: new Set(["as", "name", "map", "password"]),
+    tail: new Set(["as"]),
+  },
+};
+// Bindings within VARIADIC_FLAGS that accept comma-separated chord syntax:
+// `--bindings KEY:Up,KEY:Left` becomes JSON `[["KEY:Up","KEY:Left"]]` (an
+// AND-chord) instead of `["KEY:Up","KEY:Left"]` (two OR'd singles).
+const CHORD_SPLIT_FLAGS: Record<string, Record<string, Set<string>>> = {
+  keybind: {
+    put: new Set(["bindings"]),
+  },
+};
+
+function parseArgs(argv: string[]): {
+  host: string;
+  port: number;
+  op: string;
+  args: Record<string, unknown>;
+} {
   let host = process.env.SILENCER_CONTROL_HOST ?? "127.0.0.1";
   let port = Number.parseInt(process.env.SILENCER_CONTROL_PORT ?? "5170", 10);
   const args: Record<string, unknown> = {};
   let op: string | null = null;
+  let subop: string | null = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    if (a === "--host") {
+    if (a === "--host" && op === null) {
       host = argv[++i] ?? usage();
-    } else if (a === "--port") {
+    } else if (a === "--port" && op === null) {
       port = Number.parseInt(argv[++i] ?? usage(), 10);
     } else if (a.startsWith("--")) {
       const key = a.slice(2).replace(/-/g, "_");
-      const next = argv[i + 1];
-      if (next === undefined || next.startsWith("--")) {
-        args[key] = true;
+      const variadic = op && subop && VARIADIC_FLAGS[op]?.[subop]?.has(key);
+      const chordSplit = op && subop && CHORD_SPLIT_FLAGS[op]?.[subop]?.has(key);
+      const stringOnly = op && subop && STRING_FLAGS[op]?.[subop]?.has(key);
+      if (variadic) {
+        // Consume every following non-flag token as a list element. If the
+        // flag accepts comma-chord syntax, a token like "KEY:Up,KEY:Left"
+        // becomes a nested array (AND chord); plain tokens stay flat.
+        const list: (string | string[])[] = [];
+        while (i + 1 < argv.length && !argv[i + 1]!.startsWith("--")) {
+          const tok = argv[++i]!;
+          if (chordSplit && tok.includes(",")) {
+            list.push(tok.split(",").filter((s) => s.length > 0));
+          } else {
+            list.push(tok);
+          }
+        }
+        args[key] = list;
       } else {
-        const num = Number(next);
-        args[key] = Number.isFinite(num) && next.match(/^-?\d+(\.\d+)?$/) ? num : next;
-        i++;
+        const next = argv[i + 1];
+        if (next === undefined || next.startsWith("--")) {
+          args[key] = true;
+        } else if (stringOnly) {
+          args[key] = next;
+          i++;
+        } else {
+          const num = Number(next);
+          args[key] = Number.isFinite(num) && next.match(/^-?\d+(\.\d+)?$/) ? num : next;
+          i++;
+        }
       }
     } else if (op === null) {
       op = a;
+    } else if (NOUN_FIRST_OPS.has(op) && subop === null) {
+      subop = a;
+      args["subop"] = a;
     } else {
-      // positional after op → treat as label/text shorthand for click/set_text/select
+      // positional after op → treat as shorthand for the most common arg.
       if (op === "click" && args["label"] === undefined) args["label"] = a;
-      else if ((op === "set_text" || op === "select") && args["label"] === undefined) args["label"] = a;
+      else if ((op === "set_text" || op === "select") && args["label"] === undefined)
+        args["label"] = a;
       else if (op === "set_text" && args["text"] === undefined) args["text"] = a;
       else if (op === "select" && args["index"] === undefined) {
         const num = Number(a);
         args[Number.isInteger(num) ? "index" : "text"] = Number.isInteger(num) ? num : a;
+      }
+      // keybind: third positional (after `keybind <subop>`) is the profile name
+      // for `use` / `delete` (the most common single-positional shape).
+      else if (
+        op === "keybind" &&
+        (subop === "use" || subop === "delete") &&
+        args["profile"] === undefined
+      ) {
+        args["profile"] = a;
+      }
+      // gas validate: third positional is the directory (allows
+      // `silencer-cli gas validate shared/assets/gas/` w/o --dir).
+      else if (op === "gas" && subop === "validate" && args["dir"] === undefined) {
+        args["dir"] = a;
+      }
+      // lobby game <create|join>: third positional is the sub-subcommand.
+      else if (op === "lobby" && subop === "game" && args["_subgame"] === undefined) {
+        args["_subgame"] = a;
       }
     }
   }
@@ -75,6 +213,18 @@ function parseArgs(argv: string[]): { host: string; port: number; op: string; ar
 
 async function main() {
   const { host, port, op, args } = parseArgs(process.argv.slice(2));
+
+  // Local ops: run in-process, never open the control socket.
+  const subop = args["subop"] as string | undefined;
+  const local = subop ? LOCAL_OPS[op]?.[subop] : undefined;
+  if (local) {
+    const { clean, result } = await local(args);
+    // Streaming handlers (e.g. lobby tail) already wrote line-per-event to stdout
+    // and signal "no trailing summary" by returning result === null.
+    if (result !== null) process.stdout.write(JSON.stringify(result) + "\n");
+    process.exit(clean ? 0 : 1);
+  }
+
   const id = Math.floor(Math.random() * 1_000_000) + 1;
   const payload = JSON.stringify({ id, op, args }) + "\n";
 

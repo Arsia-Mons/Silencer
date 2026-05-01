@@ -140,6 +140,60 @@ func (w *writer) lenStr(s string) {
 	w.b = append(w.b, []byte(s)...)
 }
 
+// readMatchStats consumes the 44 × u32 LE Stats::Serialize blob in
+// declaration order (4 weapons × {fires, hits, player_kills}, then 32
+// scalar counters). Short reads silently zero — matches the original
+// inline behaviour and the reference C++ Stats::Serialize, which is
+// best-effort for partial blobs.
+func readMatchStats(r *reader) MatchStats {
+	read := func() uint32 {
+		v, err := r.u32()
+		if err != nil {
+			return 0
+		}
+		return v
+	}
+	var ms MatchStats
+	for i := 0; i < 4; i++ {
+		ms.Weapons[i].Fires = read()
+		ms.Weapons[i].Hits = read()
+		ms.Weapons[i].PlayerKills = read()
+	}
+	ms.CiviliansKilled = read()
+	ms.GuardsKilled = read()
+	ms.RobotsKilled = read()
+	ms.DefenseKilled = read()
+	ms.SecretsPickedUp = read()
+	ms.SecretsReturned = read()
+	ms.SecretsStolen = read()
+	ms.SecretsDropped = read()
+	ms.PowerupsPickedUp = read()
+	ms.Deaths = read()
+	ms.Kills = read()
+	ms.Suicides = read()
+	ms.Poisons = read()
+	ms.TractsPlanted = read()
+	ms.GrenadesThrown = read()
+	ms.NeutronsThrown = read()
+	ms.EMPsThrown = read()
+	ms.ShapedThrown = read()
+	ms.PlasmasThrown = read()
+	ms.FlaresThrown = read()
+	ms.PoisonFlaresThrown = read()
+	ms.HealthPacksUsed = read()
+	ms.FixedCannonsPlaced = read()
+	ms.FixedCannonsDestroyed = read()
+	ms.DetsPlanted = read()
+	ms.CamerasPlanted = read()
+	ms.VirusesUsed = read()
+	ms.FilesHacked = read()
+	ms.FilesReturned = read()
+	ms.CreditsEarned = read()
+	ms.CreditsSpent = read()
+	ms.HealsDone = read()
+	return ms
+}
+
 // LobbyGame wire layout (matches src/lobbygame.cpp::Serialize).
 type LobbyGame struct {
 	ID            uint32

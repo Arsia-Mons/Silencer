@@ -13,8 +13,8 @@ Required status check IDs: `build-macos`, `build-windows`,
 |---|---|---|
 | `ci-build-macos.yml` | every PR + push to `main` | change touches anything **outside** the denylist (see below) |
 | `ci-build-windows.yml` | every PR + push to `main` | same denylist as macOS |
-| `ci-build-admin-api.yml` | every PR + push to `main` | `services/admin-api/**` or this workflow |
-| `ci-build-admin-web.yml` | every PR + push to `main` | `web/admin/**` or this workflow |
+| `ci-build-admin-api.yml` | every PR + push to `main` | `services/admin-api/**`, root `package.json`, `bun.lock`, or this workflow |
+| `ci-build-admin-web.yml` | every PR + push to `main` | `web/admin/**`, `shared/gas-validation/**`, root `package.json`, `bun.lock`, or this workflow |
 | `ci-build-lobby-docker.yml` | every PR + push to `main` | `services/lobby/**`, `clients/silencer/**`, `shared/assets/**`, or this workflow |
 
 macOS / Windows denylist (skip the build when **only** these
@@ -28,8 +28,8 @@ change): `services/`, `web/`, `infra/`, `docs/`, `designer/`,
 | Workflow | Triggers (`on:`) |
 |---|---|
 | `deploy.yml` (game client + lobby) | `workflow_run` after a successful `Release` on a `v*` tag, or manual dispatch |
-| `deploy-admin-api.yml` | push to `main` touching `services/admin-api/**`, `shared/assets/**`, or this workflow; or manual |
-| `deploy-admin-web.yml` | push to `main` touching `web/admin/**` or this workflow; or manual |
+| `deploy-admin-api.yml` | push to `main` touching `services/admin-api/**`, `shared/assets/**`, root `package.json`, `bun.lock`, or this workflow; or manual |
+| `deploy-admin-web.yml` | push to `main` touching `web/admin/**`, `shared/gas-validation/**`, root `package.json`, `bun.lock`, or this workflow; or manual |
 
 ## Release
 

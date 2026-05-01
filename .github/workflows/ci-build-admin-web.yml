@@ -26,6 +26,9 @@ jobs:
           filters: |
             relevant:
               - 'web/admin/**'
+              - 'shared/gas-validation/**'
+              - 'package.json'
+              - 'bun.lock'
               - '.github/workflows/ci-build-admin-web.yml'
 
       - if: steps.changes.outputs.relevant == 'true'
@@ -35,7 +38,7 @@ jobs:
         if: steps.changes.outputs.relevant == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: web/admin
+          context: .
           file: web/admin/Dockerfile
           push: false
           platforms: linux/arm64

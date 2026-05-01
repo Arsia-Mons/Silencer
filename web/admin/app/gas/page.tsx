@@ -232,30 +232,30 @@ function GasPageInner() {
 
   function handleRestoreField(fileKey: FileKey, violation: string) {
     const orig = originalFiles[fileKey];
-    setFiles(prev => {
-      const curr = prev[fileKey];
-      if (!orig || !curr) return prev;
-      try {
-        const origObj = JSON.parse(orig);
-        const currObj = JSON.parse(curr);
-        applyRestore(currObj, origObj, violation);
-        return { ...prev, [fileKey]: JSON.stringify(currObj, null, 2) };
-      } catch { return prev; }
-    });
+    const curr = files[fileKey];
+    if (!orig || !curr) return;
+    try {
+      const origObj = JSON.parse(orig);
+      const currObj = JSON.parse(curr);
+      applyRestore(currObj, origObj, violation);
+      const newVal = JSON.stringify(currObj, null, 2);
+      setFiles(prev => ({ ...prev, [fileKey]: newVal }));
+      gasStore.setFile(fileKey, newVal);
+    } catch { /* ignore */ }
   }
 
   function handleRestoreAllFields(fileKey: FileKey, violations: string[]) {
     const orig = originalFiles[fileKey];
-    setFiles(prev => {
-      const curr = prev[fileKey];
-      if (!orig || !curr) return prev;
-      try {
-        const origObj = JSON.parse(orig);
-        const currObj = JSON.parse(curr);
-        violations.forEach(v => applyRestore(currObj, origObj, v));
-        return { ...prev, [fileKey]: JSON.stringify(currObj, null, 2) };
-      } catch { return prev; }
-    });
+    const curr = files[fileKey];
+    if (!orig || !curr) return;
+    try {
+      const origObj = JSON.parse(orig);
+      const currObj = JSON.parse(curr);
+      violations.forEach(v => applyRestore(currObj, origObj, v));
+      const newVal = JSON.stringify(currObj, null, 2);
+      setFiles(prev => ({ ...prev, [fileKey]: newVal }));
+      gasStore.setFile(fileKey, newVal);
+    } catch { /* ignore */ }
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────
