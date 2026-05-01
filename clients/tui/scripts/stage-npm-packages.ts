@@ -106,8 +106,11 @@ async function stagePlatformPackage(opts: {
 }
 
 async function stageDarwinArm64(args: Args): Promise<void> {
-  // Artifact: silencer-macos-arm64.zip — a `ditto -ck`'d Silencer.app at the
-  // root. Notarized + stapled, so unzip preserves the signature.
+  // Artifact: silencer-macos-arm64.zip — a `ditto -ck --keepParent`'d
+  // Silencer.app, so the zip contains `Silencer.app/...` at the root. The
+  // `publish-npm` job runs on ubuntu-latest where `ditto` is unavailable;
+  // `unzip` exists on both macOS and Linux and preserves the bundle's
+  // notarization + stapled signature.
   await stagePlatformPackage({
     out: args.out,
     pkgDir: 'silencer-darwin-arm64',
@@ -116,10 +119,10 @@ async function stageDarwinArm64(args: Args): Promise<void> {
     version: args.version,
     artifact: join(args.artifacts, 'macos-arm64', 'silencer-macos-arm64.zip'),
     extract: async (dest) => {
-      await run('ditto', [
-        '-x',
-        '-k',
+      await run('unzip', [
+        '-q',
         join(args.artifacts, 'macos-arm64', 'silencer-macos-arm64.zip'),
+        '-d',
         dest,
       ]);
     },

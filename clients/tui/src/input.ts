@@ -114,9 +114,12 @@ export class TerminalInput {
     return this.state;
   }
 
-  /** Call once per tick. No-op in kitty mode (real release events). */
+  /** Call once per tick. Skips when kitty mode delivers real release events,
+   * but still drains lastSeen — handleKittyBareByte populates it for terminals
+   * that advertise kitty kbd without honoring flag 0x8, and those scancodes
+   * have no release event so they need autorelease. */
   decay(): void {
-    if (this.kittyKbd) return;
+    if (this.kittyKbd && this.lastSeen.size === 0) return;
     const now = performance.now();
     for (const [sc, t] of this.lastSeen) {
       if (now - t > HOLD_MS) {
