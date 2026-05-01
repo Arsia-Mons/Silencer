@@ -61,6 +61,8 @@ function isOccluded(lx: number, ly: number, px: number, py: number, occluders: A
 function bakeSingleLight(
   lx: number, ly: number, radius: number,
   occluders: AABB[],
+  shape: number,
+  direction: number,
 ): Uint8Array {
   const diam = radius * 2;
   const data = new Uint8Array(diam * diam);
@@ -70,11 +72,27 @@ function bakeSingleLight(
     o.x2 >= lx - radius && o.x1 <= lx + radius &&
     o.y2 >= ly - radius && o.y1 <= ly + radius
   );
+
+  const HALF_ANGLE = Math.PI / 4; // 45°
+  const cosHalf = Math.cos(HALF_ANGLE);
+  const DIR_ANGLES = [0, -Math.PI/4, -Math.PI/2, -3*Math.PI/4, Math.PI, 3*Math.PI/4, Math.PI/2, Math.PI/4];
+  const dirAngle = DIR_ANGLES[direction & 7];
+  const cosDirX = Math.cos(dirAngle);
+  const sinDirY = Math.sin(dirAngle);
+
   for (let my = 0; my < diam; my++) {
     for (let mx = 0; mx < diam; mx++) {
       const dx = mx - radius;
       const dy = my - radius;
       if (dx * dx + dy * dy >= r2) continue; // outside circle
+      if (shape === 1) {
+        // Spot light: clip to cone before occlusion
+        const dist = Math.hypot(dx, dy);
+        if (dist > 0.5) {
+          const dot = (dx/dist) * cosDirX + (dy/dist) * sinDirY;
+          if (dot < cosHalf) continue; // outside cone
+        }
+      }
       const px = lx + dx;
       const py = ly + dy;
       if (!isOccluded(lx, ly, px, py, localOcc)) {
@@ -95,8 +113,9 @@ export function bakeMapLightMasks(
   for (const actor of actors) {
     if (actor.id !== 71) continue; // only light overlays (type 71)
     const size = (actor.type >>> 0) & 3;
+    const shape = (actor.type >>> 2) & 1;
     const radius = LIGHT_RADII[size] ?? 80;
-    const data = bakeSingleLight(actor.x, actor.y, radius, occluders);
+    const data = bakeSingleLight(actor.x, actor.y, radius, occluders, shape, actor.direction & 7);
     masks.push({ x: actor.x, y: actor.y, diam: radius * 2, data });
   }
   return masks;

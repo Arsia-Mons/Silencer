@@ -1110,8 +1110,43 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 					DrawLightRadial(surface, screenX, screenY, radius, light->x, light->y,
 						camera.GetXOffset(), camera.GetYOffset(),
 						maskPtr, diam, colorIndex, lumScale, dynPtr);
+				}else if(light->mapLight && light->lightShape == 1){
+					// Procedural spot light
+					int radius = light->res_index == 2 ? 200 : light->res_index == 1 ? 140 : 80;
+					int diam = radius * 2;
+					int screenX = light->x + camera.GetXOffset();
+					int screenY = light->y + camera.GetYOffset();
+
+					const Uint8 * maskPtr = nullptr;
+					for(const auto & lm : world.map.lightShadowMasks){
+						if(lm.x == light->x && lm.y == light->y && (int)lm.diam == diam){
+							maskPtr = lm.data.data();
+							break;
+						}
+					}
+
+					int lbx1 = light->x - radius, lby1 = light->y - radius;
+					int lbx2 = light->x + radius, lby2 = light->y + radius;
+					std::vector<DynOccluder> dynForLight;
+					if(light->lightDynShadows){
+						for(const auto & d : allDynOccluders){
+							int dminx = d.x1 < d.x2 ? d.x1 : d.x2;
+							int dmaxx = d.x1 < d.x2 ? d.x2 : d.x1;
+							int dminy = d.y1 < d.y2 ? d.y1 : d.y2;
+							int dmaxy = d.y1 < d.y2 ? d.y2 : d.y1;
+							if(dmaxx >= lbx1 && dminx <= lbx2 && dmaxy >= lby1 && dminy <= lby2){
+								if(light->x >= dminx && light->x <= dmaxx && light->y >= dminy && light->y <= dmaxy) continue;
+								dynForLight.push_back(d);
+							}
+						}
+					}
+					const std::vector<DynOccluder> * dynPtr = dynForLight.empty() ? nullptr : &dynForLight;
+					DrawLightSpot(surface, screenX, screenY, radius, light->x, light->y,
+						camera.GetXOffset(), camera.GetYOffset(),
+						light->lightDirection,
+						maskPtr, diam, colorIndex, lumScale, dynPtr);
 				}else{
-					// Spot lights and hit-glow overlays: sprite-based DrawLight
+					// Hit-glow overlays (mapLight=false): sprite-based DrawLight
 					Uint8 frameIdx = GetLightFrameIdx(light, world.resources);
 					Surface * src = world.resources.spritebank[light->res_bank][frameIdx].get();
 					Rect dstrect;
@@ -2345,6 +2380,104 @@ void Renderer::DrawLightRadial(Surface * surface, int screenX, int screenY, int 
 			Uint8 lum = lumf < 0.5f ? 0 : (Uint8)(lumf + 0.5f);
 			if(lum > 15) lum = 15;
 			if(!lum) continue;
+			if(dynoccluders && !dynoccluders->empty()){
+				float lxf = (float)lightWorldX;
+				float lyf = (float)lightWorldY;
+				float px = (float)(x - cameraOffX);
+				float py = (float)(y - cameraOffY);
+				float ddx = px - lxf, ddy = py - lyf;
+				bool blocked = false;
+				for(const auto & d : *dynoccluders){
+					float x1f = (float)(d.x1 < d.x2 ? d.x1 : d.x2);
+					float x2f = (float)(d.x1 < d.x2 ? d.x2 : d.x1);
+					float y1f = (float)(d.y1 < d.y2 ? d.y1 : d.y2);
+					float y2f = (float)(d.y1 < d.y2 ? d.y2 : d.y1);
+					float tmin2 = 0.01f, tmax2 = 0.99f;
+					if(ddx == 0){ if(lxf < x1f || lxf > x2f) continue; }
+					else{
+						float tx1 = (x1f - lxf) / ddx, tx2 = (x2f - lxf) / ddx;
+						if(tx1 > tx2){ float t = tx1; tx1 = tx2; tx2 = t; }
+						if(tx1 > tmin2) tmin2 = tx1;
+						if(tx2 < tmax2) tmax2 = tx2;
+						if(tmin2 > tmax2) continue;
+					}
+					if(ddy == 0){ if(lyf < y1f || lyf > y2f) continue; }
+					else{
+						float ty1 = (y1f - lyf) / ddy, ty2 = (y2f - lyf) / ddy;
+						if(ty1 > ty2){ float t = ty1; ty1 = ty2; ty2 = t; }
+						if(ty1 > tmin2) tmin2 = ty1;
+						if(ty2 < tmax2) tmax2 = ty2;
+						if(tmin2 > tmax2) continue;
+					}
+					blocked = true; break;
+				}
+				if(blocked) continue;
+			}
+			Uint8 * surfacepixel = &surface->pixels[y * surfacew + x];
+			Uint8 basepixel = colorIndex ? palette.Color(*surfacepixel, colorIndex) : *surfacepixel;
+			*surfacepixel = palette.Light(basepixel, lum);
+		}
+	}
+}
+
+void Renderer::DrawLightSpot(Surface * surface, int screenX, int screenY, int radius,
+		Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY,
+		Uint8 direction,
+		const Uint8 * mask, int diam,
+		Uint8 colorIndex, float lumScale,
+		const std::vector<DynOccluder> * dynoccluders){
+	static const float DIR_ANGLES[8] = { 0.f, -M_PI/4.f, -M_PI/2.f, -3.f*M_PI/4.f, M_PI, 3.f*M_PI/4.f, M_PI/2.f, M_PI/4.f };
+	const float dirAngle = DIR_ANGLES[direction & 7];
+	const float cosDirX = cosf(dirAngle);
+	const float sinDirY = sinf(dirAngle);
+	const float cosHalf = cosf(M_PI / 4.f); // ~0.7071
+
+	int surfacew = surface->w;
+	int surfaceh = surface->h;
+	int x0 = screenX - radius;
+	int y0 = screenY - radius;
+	int x1 = x0 < 0 ? 0 : x0;
+	int y1 = y0 < 0 ? 0 : y0;
+	int x2 = x0 + diam > surfacew ? surfacew : x0 + diam;
+	int y2 = y0 + diam > surfaceh ? surfaceh : y0 + diam;
+	if(x1 >= x2 || y1 >= y2) return;
+	const float r2 = (float)(radius * radius);
+	for(int y = y1; y < y2; y++){
+		for(int x = x1; x < x2; x++){
+			float dx = (float)(x - screenX);
+			float dy = (float)(y - screenY);
+			float dist2 = dx * dx + dy * dy;
+			if(dist2 >= r2) continue;
+
+			float dist = sqrtf(dist2);
+			Uint8 lum;
+			if(dist < 0.5f){
+				// Pixel at light center: full brightness, no cone check
+				float lumf = 15.0f * lumScale;
+				lum = (Uint8)(lumf + 0.5f);
+				if(lum > 15) lum = 15;
+			}else{
+				float nx = dx / dist;
+				float ny = dy / dist;
+				float dot = nx * cosDirX + ny * sinDirY;
+				if(dot < cosHalf) continue; // outside cone
+
+				// Check baked mask (cone-clipped for spot lights in the baker)
+				if(mask){
+					int mx = x - x0;
+					int my = y - y0;
+					if(!mask[my * diam + mx]) continue;
+				}
+
+				float angT = (dot - cosHalf) / (1.0f - cosHalf);
+				float angFall = angT * angT;
+				float t = 1.0f - dist / (float)radius;
+				float lumf = 15.0f * t * sqrtf(t) * angFall * lumScale;
+				lum = lumf < 0.5f ? 0 : (Uint8)(lumf + 0.5f);
+				if(lum > 15) lum = 15;
+				if(!lum) continue;
+			}
+
 			if(dynoccluders && !dynoccluders->empty()){
 				float lxf = (float)lightWorldX;
 				float lyf = (float)lightWorldY;
