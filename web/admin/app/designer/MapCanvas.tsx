@@ -703,6 +703,69 @@ export default function MapCanvas({
         const isDragging = dragActorPreview?.idx === highlightActorIdx;
         const liveCx = isDragging ? dragActorPreview!.wx * zoom + pan.x : actor!.x * zoom + pan.x;
         const liveCy = isDragging ? dragActorPreview!.wy * zoom + pan.y : actor!.y * zoom + pan.y;
+
+        // Shadow preview for selected light actors
+        if (actor?.id === 71 && map) {
+          const lx = liveCx, ly = liveCy;
+          // Light radius in world pixels by size (bits 0-1 of actortype)
+          const lightSize = ((actor.type ?? 0) >>> 0) & 3;
+          const lightRange = lightSize === 2 ? 420 : lightSize === 1 ? 280 : 160;
+          const REACH = lightRange * 2 * zoom;
+          const RECTANGLE_TYPE = 1;
+
+          const projectShadow = (r: { x1: number; y1: number; x2: number; y2: number }) => {
+            const minX = Math.min(r.x1, r.x2), maxX = Math.max(r.x1, r.x2);
+            const minY = Math.min(r.y1, r.y2), maxY = Math.max(r.y1, r.y2);
+            // Skip if light is inside occluder
+            if (actor.x >= minX && actor.x <= maxX && actor.y >= minY && actor.y <= maxY) return;
+            // Cull if center is too far
+            const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+            if (Math.hypot(cx - actor.x, cy - actor.y) > lightRange * 1.5) return;
+            // Convert corners to screen space
+            const corners: [number, number][] = [
+              [r.x1 * zoom + pan.x, r.y1 * zoom + pan.y],
+              [r.x2 * zoom + pan.x, r.y1 * zoom + pan.y],
+              [r.x2 * zoom + pan.x, r.y2 * zoom + pan.y],
+              [r.x1 * zoom + pan.x, r.y2 * zoom + pan.y],
+            ];
+            // Sort corners by angle from light, find largest gap (= silhouette edges)
+            const wa = corners.map(([cx, cy]) => ({ cx, cy, a: Math.atan2(cy - ly, cx - lx) }))
+              .sort((a, b) => a.a - b.a);
+            let maxGap = -Infinity, maxI = 0;
+            for (let i = 0; i < 4; i++) {
+              const gap = ((wa[(i + 1) % 4].a - wa[i].a + 3 * Math.PI) % (2 * Math.PI));
+              if (gap > maxGap) { maxGap = gap; maxI = i; }
+            }
+            const c1 = wa[(maxI + 1) % 4], c2 = wa[maxI];
+            const proj = (cx: number, cy: number): [number, number] => {
+              const dx = cx - lx, dy = cy - ly;
+              const len = Math.hypot(dx, dy) || 1;
+              return [cx + (dx / len) * REACH, cy + (dy / len) * REACH];
+            };
+            ctx.beginPath();
+            ctx.moveTo(c1.cx, c1.cy);
+            const [p1x, p1y] = proj(c1.cx, c1.cy);
+            ctx.lineTo(p1x, p1y);
+            const [p2x, p2y] = proj(c2.cx, c2.cy);
+            ctx.lineTo(p2x, p2y);
+            ctx.lineTo(c2.cx, c2.cy);
+            ctx.closePath();
+            ctx.fill();
+          };
+
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          ctx.fillStyle = '#000033';
+          for (const p of map.platforms) {
+            if (!(p.type1 & RECTANGLE_TYPE)) continue;
+            projectShadow(p);
+          }
+          for (const z of map.shadowZones) {
+            projectShadow(z);
+          }
+          ctx.restore();
+        }
+
         const rect = getSpriteRect(liveCx, liveCy);
         if (rect) {
           ctx.save();

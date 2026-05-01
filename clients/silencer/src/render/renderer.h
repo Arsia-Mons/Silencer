@@ -7,6 +7,9 @@
 #include "camera.h"
 #include "textinput.h"
 #include "surface.h"
+#include <unordered_map>
+#include <vector>
+#include <cstdint>
 
 class Renderer
 {
@@ -65,7 +68,7 @@ public:
 	static void BlitSurfaceFast(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	static void BlitSurfaceRLE(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	static void BlitSurfaceRLEClipped(int w, Uint8 * srcbuf, Rect * srcrect, Surface * dst, Rect * dstrect);
-	void DrawLight(Surface * surface, Surface * src, Rect * Rect, Sint32 lightWorldX = 0, Sint32 lightWorldY = 0, Sint32 cameraOffX = 0, Sint32 cameraOffY = 0, const std::vector<Map::ShadowZone> * zones = nullptr, Uint8 colorIndex = 0, float lumScale = 1.0f);
+	void DrawLight(Surface * surface, Surface * src, Rect * Rect, Sint32 lightWorldX = 0, Sint32 lightWorldY = 0, Sint32 cameraOffX = 0, Sint32 cameraOffY = 0, const std::vector<Map::ShadowZone> * zones = nullptr, Uint8 colorIndex = 0, float lumScale = 1.0f, const Uint8 * mask = nullptr);
 	static void DrawTile(Surface * surface, Surface * tile, Rect * Rect);
 	void DrawParallax(Surface * surface, Camera & camera);
 	void DrawBackground(Surface * surface, Camera & camera, bool drawluminance = true);
@@ -87,6 +90,12 @@ private:
 	Uint8 state_i;
 	Uint8 ex, ey;
 	bool playerinbaseold;
+	// Light shadow baking: keyed by (x<<32|y as uint64_t) for pointer-free cache safety
+	std::unordered_map<uint64_t, std::vector<Uint8>> lightmasks;
+	bool lightmasksbaked;
+	void BakeLightMasks();
+	void ClearLightMasks();
+	static Uint8 GetLightFrameIdx(const class Overlay * light, const Resources & res);
 	static const int raindropscount = 100;
 	int raindropsx[raindropscount];
 	int raindropsy[raindropscount];

@@ -48,6 +48,7 @@ Renderer::Renderer(World & world) : world(world), camera(640, 480){
 		raindropsy[i] = rand();
 	}
 	playerinbaseold = false;
+	lightmasksbaked = false;
 }
 	
 void Renderer::Draw(Surface * surface, float frametime){
@@ -248,6 +249,10 @@ void Renderer::Tick(void){
 	}
 	camera.Tick();
 	state_i++;
+	// Invalidate baked masks when map unloads
+	if(!world.map.loaded && lightmasksbaked){
+		ClearLightMasks();
+	}
 }
 
 void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, bool drawluminance, int recursion, float frametime){
@@ -1023,18 +1028,17 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 	}
 	if(world.map.loaded){
 		if(drawluminance){
+			// Lazy bake / invalidate light shadow masks
+			if(!lightmasksbaked){
+				BakeLightMasks();
+			} else if(lightmasks.empty() == false && !world.map.loaded){
+				ClearLightMasks();
+			}
 			DrawForegroundLuminance(surface, camera);
 			const std::vector<Map::ShadowZone> * zones = world.map.shadowzones.empty() ? nullptr : &world.map.shadowzones;
 			for(std::vector<Object *>::iterator it = objectlights.begin(); it != objectlights.end(); it++){
 				Overlay * light = static_cast<Overlay *>(*it);
-				// Spot lights use frame 3+(direction*3)+size; fall back to halo frame if sprites not loaded
-				Uint8 frameIdx = light->res_index;
-				if(light->lightShape == 1){
-					Uint8 spotFrame = 3 + (light->lightDirection * 3) + light->res_index;
-					if(spotFrame < world.resources.spritebank[light->res_bank].size()){
-						frameIdx = spotFrame;
-					}
-				}
+				Uint8 frameIdx = GetLightFrameIdx(light, world.resources);
 				Surface * src = world.resources.spritebank[light->res_bank][frameIdx].get();
 				Rect dstrect;
 				dstrect.x = light->x - world.resources.spriteoffsetx[light->res_bank][frameIdx] + camera.GetXOffset();
@@ -1055,7 +1059,12 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 					float phase = (float)(state_i + ((light->x ^ light->y) & 0xFF)) / period;
 					lumScale = 0.65f + 0.35f * sinf(phase * 6.28318530f);
 				}
-				DrawLight(surface, src, &dstrect, light->x, light->y, camera.GetXOffset(), camera.GetYOffset(), zones, colorIndex, lumScale);
+				// Use baked shadow mask if available; otherwise fall back to runtime zone test
+				uint64_t key = ((uint64_t)(uint32_t)light->x << 32) | (uint32_t)light->y;
+				auto mit = lightmasks.find(key);
+				const Uint8 * maskPtr = (mit != lightmasks.end()) ? mit->second.data() : nullptr;
+				const std::vector<Map::ShadowZone> * zonesForLight = maskPtr ? nullptr : zones;
+				DrawLight(surface, src, &dstrect, light->x, light->y, camera.GetXOffset(), camera.GetYOffset(), zonesForLight, colorIndex, lumScale, maskPtr);
 			}
 		}
 		DrawForeground(surface, camera);
@@ -2221,7 +2230,125 @@ void Renderer::DrawMirrored(Surface * src, Rect * srcrect, Surface * dst, Rect *
     }
 }
 
-void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const std::vector<Map::ShadowZone> * zones, Uint8 colorIndex, float lumScale){
+// Returns the sprite frame index for a bank-222 light overlay (shared by DrawWorld and BakeLightMasks)
+Uint8 Renderer::GetLightFrameIdx(const Overlay * light, const Resources & res){
+	Uint8 frameIdx = light->res_index;
+	if(light->lightShape == 1){
+		Uint8 spotFrame = 3 + (light->lightDirection * 3) + light->res_index;
+		if(spotFrame < res.spritebank[222].size()){
+			frameIdx = spotFrame;
+		}
+	}
+	return frameIdx;
+}
+
+void Renderer::ClearLightMasks(){
+	lightmasks.clear();
+	lightmasksbaked = false;
+}
+
+void Renderer::BakeLightMasks(){
+	lightmasks.clear();
+
+	for(auto * obj : world.objectlist){
+		if(obj->res_bank != 222) continue;
+		Overlay * light = static_cast<Overlay *>(obj);
+		if(!light->mapLight) continue;
+
+		Uint8 frameIdx = GetLightFrameIdx(light, world.resources);
+		if(frameIdx >= world.resources.spritebank[222].size()) continue;
+		Surface * src = world.resources.spritebank[222][frameIdx].get();
+		if(!src || src->pixels.empty()) continue;
+
+		int srcw = src->w;
+		int srch = src->h;
+		int offx = world.resources.spriteoffsetx[222][frameIdx];
+		int offy = world.resources.spriteoffsety[222][frameIdx];
+
+		float wx0 = (float)(light->x - offx);
+		float wy0 = (float)(light->y - offy);
+		float lx  = (float)light->x;
+		float ly  = (float)light->y;
+
+		// Sprite bounding box in world space for occluder culling
+		float bbx1 = wx0,        bby1 = wy0;
+		float bbx2 = wx0 + srcw, bby2 = wy0 + srch;
+
+		std::vector<Uint8> mask(srcw * srch, 1); // 1=lit by default
+		const Uint8 * pixels = (const Uint8 *)src->pixels.data();
+
+		// Gather occluders (RECTANGLE platforms + shadow zones) that overlap the sprite bounds
+		struct AABB { float x1, y1, x2, y2; };
+		std::vector<AABB> occluders;
+		for(const auto & plat : world.map.platforms){
+			if(!(plat->type & Platform::RECTANGLE)) continue;
+			float ox1 = (float)(plat->x1 < plat->x2 ? plat->x1 : plat->x2);
+			float oy1 = (float)(plat->y1 < plat->y2 ? plat->y1 : plat->y2);
+			float ox2 = (float)(plat->x1 < plat->x2 ? plat->x2 : plat->x1);
+			float oy2 = (float)(plat->y1 < plat->y2 ? plat->y2 : plat->y1);
+			if(ox2 < bbx1 || ox1 > bbx2 || oy2 < bby1 || oy1 > bby2) continue;
+			occluders.push_back({ox1, oy1, ox2, oy2});
+		}
+		for(const auto & z : world.map.shadowzones){
+			float zx1 = (float)(z.x1 < z.x2 ? z.x1 : z.x2);
+			float zy1 = (float)(z.y1 < z.y2 ? z.y1 : z.y2);
+			float zx2 = (float)(z.x1 < z.x2 ? z.x2 : z.x1);
+			float zy2 = (float)(z.y1 < z.y2 ? z.y2 : z.y1);
+			occluders.push_back({zx1, zy1, zx2, zy2});
+		}
+
+		if(!occluders.empty()){
+			// Per-pixel ray-AABB slab test (lambda for clean continue-from-occluder-loop)
+			auto isOccluded = [&](float px, float py) -> bool {
+				float dx = px - lx, dy = py - ly;
+				for(const auto & occ : occluders){
+					// Skip if light origin is inside this occluder (avoids self-shadow)
+					if(lx >= occ.x1 && lx <= occ.x2 && ly >= occ.y1 && ly <= occ.y2) continue;
+					float tmin = 0.01f, tmax = 0.99f;
+					if(dx == 0.0f){
+						if(lx < occ.x1 || lx > occ.x2) continue;
+					} else {
+						float tx1 = (occ.x1 - lx) / dx;
+						float tx2 = (occ.x2 - lx) / dx;
+						if(tx1 > tx2){ float t = tx1; tx1 = tx2; tx2 = t; }
+						if(tx1 > tmin) tmin = tx1;
+						if(tx2 < tmax) tmax = tx2;
+						if(tmin > tmax) continue;
+					}
+					if(dy == 0.0f){
+						if(ly < occ.y1 || ly > occ.y2) continue;
+					} else {
+						float ty1 = (occ.y1 - ly) / dy;
+						float ty2 = (occ.y2 - ly) / dy;
+						if(ty1 > ty2){ float t = ty1; ty1 = ty2; ty2 = t; }
+						if(ty1 > tmin) tmin = ty1;
+						if(ty2 < tmax) tmax = ty2;
+						if(tmin > tmax) continue;
+					}
+					if(tmin < 1.0f && tmax > 0.0f) return true;
+				}
+				return false;
+			};
+
+			for(int sy = 0; sy < srch; sy++){
+				for(int sx = 0; sx < srcw; sx++){
+					if(!pixels[sy * srcw + sx]) continue; // lum=0, skip baking
+					if(isOccluded(wx0 + sx, wy0 + sy)){
+						mask[sy * srcw + sx] = 0;
+					}
+				}
+			}
+		}
+
+		// Key by encoded world position — no Object* lifetime dependency
+		uint64_t key = ((uint64_t)(uint32_t)light->x << 32) | (uint32_t)light->y;
+		lightmasks[key] = std::move(mask);
+	}
+
+	lightmasksbaked = true;
+}
+
+void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const std::vector<Map::ShadowZone> * zones, Uint8 colorIndex, float lumScale, const Uint8 * mask){
 	if(rect->x <= surface->w && rect->y <= surface->h && rect->x >= -src->w && rect->y >= -src->h){
 		int surfacew = surface->w;
 		int surfaceh = surface->h;
@@ -2257,6 +2384,7 @@ void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 l
 					int scaled = (int)(lum * lumScale);
 					lum = scaled < 0 ? 0 : (Uint8)scaled;
 				}
+				if(mask && !mask[i]){ i++; i2++; continue; }
 				if(lum && hasShadows){
 					// Ray from light center to this pixel, both in world-space.
 					// Screen pixel (x2,y2) → world = screen - cameraOffset
