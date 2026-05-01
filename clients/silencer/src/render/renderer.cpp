@@ -1036,6 +1036,18 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 			}
 			DrawForegroundLuminance(surface, camera);
 			const std::vector<Map::ShadowZone> * zones = world.map.shadowzones.empty() ? nullptr : &world.map.shadowzones;
+			// Gather moving occluders (players, guards, civilians, robots) for dynamic shadow tests
+			static const Uint8 dynTypes[] = { ObjectTypes::PLAYER, ObjectTypes::GUARD, ObjectTypes::CIVILIAN, ObjectTypes::ROBOT };
+			std::vector<DynOccluder> allDynOccluders;
+			for(Uint8 t : dynTypes){
+				for(Uint16 oid : world.objectsbytype[t]){
+					Object * obj = world.GetObjectFromId(oid);
+					if(!obj || !obj->collidable) continue;
+					int ox1, oy1, ox2, oy2;
+					obj->GetAABB(world.resources, &ox1, &oy1, &ox2, &oy2);
+					allDynOccluders.push_back({ ox1, oy1, ox2, oy2 });
+				}
+			}
 			for(std::vector<Object *>::iterator it = objectlights.begin(); it != objectlights.end(); it++){
 				Overlay * light = static_cast<Overlay *>(*it);
 				Uint8 frameIdx = GetLightFrameIdx(light, world.resources);
@@ -1059,12 +1071,31 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 					float phase = (float)(state_i + ((light->x ^ light->y) & 0xFF)) / period;
 					lumScale = 0.65f + 0.35f * sinf(phase * 6.28318530f);
 				}
+				// Cull dynamic occluders to those within the light sprite's world bounding box
+				int sprW = src->w, sprH = src->h;
+				int sprOffX = world.resources.spriteoffsetx[light->res_bank][frameIdx];
+				int sprOffY = world.resources.spriteoffsety[light->res_bank][frameIdx];
+				int lightBx1 = light->x - sprOffX, lightBy1 = light->y - sprOffY;
+				int lightBx2 = lightBx1 + sprW,    lightBy2 = lightBy1 + sprH;
+				std::vector<DynOccluder> dynForLight;
+				for(const auto & d : allDynOccluders){
+					int dminx = d.x1 < d.x2 ? d.x1 : d.x2;
+					int dmaxx = d.x1 < d.x2 ? d.x2 : d.x1;
+					int dminy = d.y1 < d.y2 ? d.y1 : d.y2;
+					int dmaxy = d.y1 < d.y2 ? d.y2 : d.y1;
+					if(dmaxx >= lightBx1 && dminx <= lightBx2 && dmaxy >= lightBy1 && dminy <= lightBy2){
+						// Skip if light center is inside this occluder (self-shadowing)
+						if(light->x >= dminx && light->x <= dmaxx && light->y >= dminy && light->y <= dmaxy) continue;
+						dynForLight.push_back(d);
+					}
+				}
 				// Use baked shadow mask if available; otherwise fall back to runtime zone test
 				uint64_t key = ((uint64_t)(uint32_t)light->x << 32) | (uint32_t)light->y;
 				auto mit = lightmasks.find(key);
 				const Uint8 * maskPtr = (mit != lightmasks.end()) ? mit->second.data() : nullptr;
 				const std::vector<Map::ShadowZone> * zonesForLight = maskPtr ? nullptr : zones;
-				DrawLight(surface, src, &dstrect, light->x, light->y, camera.GetXOffset(), camera.GetYOffset(), zonesForLight, colorIndex, lumScale, maskPtr);
+				const std::vector<DynOccluder> * dynPtr = dynForLight.empty() ? nullptr : &dynForLight;
+				DrawLight(surface, src, &dstrect, light->x, light->y, camera.GetXOffset(), camera.GetYOffset(), zonesForLight, colorIndex, lumScale, maskPtr, dynPtr);
 			}
 		}
 		DrawForeground(surface, camera);
@@ -2348,7 +2379,7 @@ void Renderer::BakeLightMasks(){
 	lightmasksbaked = true;
 }
 
-void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const std::vector<Map::ShadowZone> * zones, Uint8 colorIndex, float lumScale, const Uint8 * mask){
+void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const std::vector<Map::ShadowZone> * zones, Uint8 colorIndex, float lumScale, const Uint8 * mask, const std::vector<DynOccluder> * dynoccluders){
 	if(rect->x <= surface->w && rect->y <= surface->h && rect->x >= -src->w && rect->y >= -src->h){
 		int surfacew = surface->w;
 		int surfaceh = surface->h;
@@ -2427,12 +2458,48 @@ void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 l
 					}
 					if(occluded){ i++; i2++; continue; }
 				}
+				// Dynamic occluder ray-AABB test (players, guards etc. in light range)
+				if(lum && dynoccluders && !dynoccluders->empty()){
+					float px = (float)(x2 - cameraOffX);
+					float py = (float)(y2 - cameraOffY);
+					float lxf = (float)lightWorldX;
+					float lyf = (float)lightWorldY;
+					float ddx = px - lxf, ddy = py - lyf;
+					for(const auto & d : *dynoccluders){
+						float x1f = (float)(d.x1 < d.x2 ? d.x1 : d.x2);
+						float x2f = (float)(d.x1 < d.x2 ? d.x2 : d.x1);
+						float y1f = (float)(d.y1 < d.y2 ? d.y1 : d.y2);
+						float y2f = (float)(d.y1 < d.y2 ? d.y2 : d.y1);
+						float tmin2 = 0.01f, tmax2 = 0.99f;
+						if(ddx == 0){ if(lxf < x1f || lxf > x2f) continue; }
+						else{
+							float tx1 = (x1f - lxf) / ddx, tx2 = (x2f - lxf) / ddx;
+							if(tx1 > tx2){ float t = tx1; tx1 = tx2; tx2 = t; }
+							if(tx1 > tmin2) tmin2 = tx1;
+							if(tx2 < tmax2) tmax2 = tx2;
+							if(tmin2 > tmax2) continue;
+						}
+						if(ddy == 0){ if(lyf < y1f || lyf > y2f) continue; }
+						else{
+							float ty1 = (y1f - lyf) / ddy, ty2 = (y2f - lyf) / ddy;
+							if(ty1 > ty2){ float t = ty1; ty1 = ty2; ty2 = t; }
+							if(ty1 > tmin2) tmin2 = ty1;
+							if(ty2 < tmax2) tmax2 = ty2;
+							if(tmin2 > tmax2) continue;
+						}
+						// Ray hits this dynamic occluder — skip pixel
+						i++; i2++; goto nextdynpixel;
+					}
+				}
+				{
 				Uint8 * surfacepixel = &surface->pixels[i2];
 				Uint8 basepixel = colorIndex ? palette.Color(*surfacepixel, colorIndex) : *surfacepixel;
 				Uint8 newcolor = palette.Light(basepixel, lum);
 				*surfacepixel = newcolor;
+				}
 				i++;
 				i2++;
+				nextdynpixel:;
 			}
 		}
 	}
