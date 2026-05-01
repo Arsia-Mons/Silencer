@@ -1077,8 +1077,8 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 
 				if(light->mapLight && light->lightShape == 0){
 					// Halo mapLight: procedural radial gradient + designer-baked shadow mask
-					int size = light->actortype & 3;
-					int radius = size == 0 ? 80 : size == 1 ? 140 : 200;
+					// res_index holds size bits (0-1 of original actortype)
+					int radius = light->res_index == 2 ? 200 : light->res_index == 1 ? 140 : 80;
 					int diam = radius * 2;
 					int screenX = light->x + camera.GetXOffset();
 					int screenY = light->y + camera.GetYOffset();
