@@ -2,6 +2,17 @@
 
 All notable changes to Silencer are documented here.
 
+## [v00043] — 2026-05-01
+
+### Admin dashboard
+
+#### Items Tool (`/items`) — new page
+
+- **Item list** — all items from `items.json` in a sidebar.
+- **Property panel** — inline-editable identity (id, enumId, name, description), sprite (bank + index), purchase prices, tech-tree (techChoice bitmask, techSlots), agency restriction dropdown (All / per-agency), stats & effects (ammo, heal, poison).
+- **GAS store integration** — folder opened in `/items` (or any other tool) stays loaded when navigating across tools without re-picking.
+- Saves back to `items.json` via browser download.
+
 ## [v00042] — 2026-04-30
 
 ### Admin dashboard
