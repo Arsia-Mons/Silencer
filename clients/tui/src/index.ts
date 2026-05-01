@@ -103,6 +103,36 @@ async function main(): Promise<void> {
   // also use it.
   const stderrChunks: Uint8Array[] = [];
 
+  // Cleanup state declared up-front: the frame socket's close handler and the
+  // control/input retry-failure paths can all invoke cleanup() before later
+  // setup completes. Keeping `cleaned` and `function cleanup` at the top
+  // avoids a TDZ ReferenceError on those early call sites; child / control /
+  // inputClient stay nullable until their respective spawn / connect lands.
+  let cleaned = false;
+  let child: Subprocess | null = null;
+  let control: ControlClient | null = null;
+  let inputClient: InputClient | null = null;
+  function cleanup(): void {
+    if (cleaned) return;
+    cleaned = true;
+    try {
+      control?.close();
+    } catch {}
+    try {
+      inputClient?.close();
+    } catch {}
+    try {
+      child?.kill();
+    } catch {}
+    try {
+      frameListener.server.close();
+    } catch {}
+    // stderr flush deliberately lives in the process.on('exit') hook below:
+    // it must run AFTER term.ts's restore handler exits the alt screen,
+    // otherwise the writes land in the alt-screen buffer and disappear when
+    // the primary screen is restored.
+  }
+
   // Start the frame listener first so the spawned engine has somewhere to
   // connect when its TUIBackend::Init runs. Resolves once the engine connects.
   const frameConnected = (async () => {
@@ -162,7 +192,7 @@ async function main(): Promise<void> {
     );
   }
 
-  const child: Subprocess = spawn({
+  child = spawn({
     cmd: [
       bin,
       '--tui',
@@ -189,7 +219,7 @@ async function main(): Promise<void> {
   // exits don't swallow them.
   process.on('exit', () => {
     try {
-      child.kill();
+      child?.kill();
     } catch {}
     if (stderrChunks.length > 0) {
       try {
@@ -236,8 +266,8 @@ async function main(): Promise<void> {
 
   // Connect the control socket. Retry briefly because the C++ side starts
   // its control server only after Load() finishes (asset load).
-  const control = new ControlClient();
-  const inputClient = new InputClient();
+  control = new ControlClient();
+  inputClient = new InputClient();
   let controlConnected = false;
   for (let attempt = 0; attempt < 100; attempt++) {
     try {
@@ -276,28 +306,6 @@ async function main(): Promise<void> {
     process.exit(3);
   }
 
-  let cleaned = false;
-  function cleanup(): void {
-    if (cleaned) return;
-    cleaned = true;
-    try {
-      control.close();
-    } catch {}
-    try {
-      inputClient.close();
-    } catch {}
-    try {
-      child.kill();
-    } catch {}
-    try {
-      frameListener.server.close();
-    } catch {}
-    // stderr flush deliberately lives in the process.on('exit') hook above:
-    // it must run AFTER term.ts's restore handler exits the alt screen,
-    // otherwise the writes land in the alt-screen buffer and disappear when
-    // the primary screen is restored.
-  }
-
   const trace = process.env.SILENCER_TUI_INPUT_TRACE === '1';
   process.stdin.on('data', (chunk: Buffer) => {
     if (trace) {
@@ -315,9 +323,9 @@ async function main(): Promise<void> {
     }
     for (const ev of events) {
       if (ev.kind === 'name') {
-        control.sendNoReply('key', { key: ev.name });
+        control?.sendNoReply('key', { key: ev.name });
       } else {
-        control.sendNoReply('key', { ascii: ev.ascii });
+        control?.sendNoReply('key', { ascii: ev.ascii });
       }
     }
   });
@@ -352,7 +360,7 @@ async function main(): Promise<void> {
       process.exit(0);
     }
     inputs.decay();
-    inputClient.sendScancodes(inputs.snapshot());
+    inputClient?.sendScancodes(inputs.snapshot());
     if (pendingFrame) scheduleRender();
   }, TICK_MS);
 
