@@ -91,6 +91,19 @@ export default function Starfield() {
     let stars: Star[] = [];
     let comets: Comet[] = [];
 
+    // Parallax: target and smoothed offset
+    let targetX = 0, targetY = 0;
+    let smoothX = 0, smoothY = 0;
+    const PARALLAX_STRENGTH = 25; // max px offset
+    const PARALLAX_LERP = 0.05;   // smoothing (lower = lazier)
+
+    const onMouseMove = (e: MouseEvent) => {
+      const w = starCanvas.width, h = starCanvas.height;
+      targetX = ((e.clientX / w) - 0.5) * PARALLAX_STRENGTH;
+      targetY = ((e.clientY / h) - 0.5) * PARALLAX_STRENGTH;
+    };
+    window.addEventListener('mousemove', onMouseMove);
+
     const resize = () => {
       starCanvas.width  = cometCanvas.width  = window.innerWidth;
       starCanvas.height = cometCanvas.height = window.innerHeight;
@@ -108,14 +121,18 @@ export default function Starfield() {
       const h = starCanvas.height;
       const ts = t / 1000;
 
-      // Stars — behind the dark overlay
+      // Smooth parallax
+      smoothX += (targetX - smoothX) * PARALLAX_LERP;
+      smoothY += (targetY - smoothY) * PARALLAX_LERP;
+
+      // Stars — behind the dark overlay, offset by parallax
       sCtx.clearRect(0, 0, w, h);
       for (const s of stars) {
         const alpha = s.twinkleAmp > 0
           ? s.base + s.twinkleAmp * Math.sin(ts * s.twinkleSpeed + s.phase)
           : s.base;
         sCtx.beginPath();
-        sCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        sCtx.arc(s.x + smoothX, s.y + smoothY, s.size, 0, Math.PI * 2);
         sCtx.fillStyle = `rgba(220,230,255,${alpha.toFixed(3)})`;
         sCtx.fill();
       }
@@ -142,6 +159,7 @@ export default function Starfield() {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
+      window.removeEventListener('mousemove', onMouseMove);
     };
   }, []);
 
