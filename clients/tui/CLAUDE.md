@@ -60,20 +60,36 @@ bun ./clients/tui/tests/probe.ts            # state probe over control socket
 - **Mouse coords default to 0xFFFF** (sentinel for "no mouse position",
   per `input.cpp:Serialize`). `TerminalInput.snapshot()` preserves this so
   the wire-level mouse path stays inactive in TUI mode.
-- **Binary discovery** (`findBinary` in `index.ts`) checks
-  `clients/silencer/build/Silencer.app/Contents/MacOS/Silencer` (macOS),
-  then `build/silencer` (Linux), then `build/Silencer.exe` (Windows).
-  Override with `SILENCER_BIN=<path>`.
+- **Binary discovery** (`findBinary` in `index.ts`) tries, in order:
+  `SILENCER_BIN` env var, the matching
+  `@arsia-mons/silencer-<process.platform>-<process.arch>` package
+  (production install), then the dev build paths
+  (`clients/silencer/build/{Silencer.app/...,silencer,Silencer.exe}`).
+
+## npm distribution
+
+Published via the `publish-npm` job in `.github/workflows/release.yml`
+on every `v*` tag — five packages, all sharing the tag's version:
+
+| Package | Contents |
+|---|---|
+| `@arsia-mons/silencer` | top-level: bundled `dist/index.js` from `bun build`; `optionalDependencies` pin all three platform packages at the same version |
+| `@arsia-mons/silencer-darwin-arm64` | notarized + stapled `Silencer.app` |
+| `@arsia-mons/silencer-linux-x64` | `silencer` binary, bundled `libSDL3*.so.0` (RUNPATH=`$ORIGIN`), `assets/` |
+| `@arsia-mons/silencer-win32-x64` | `Silencer.exe`, vcpkg DLLs, `assets/` |
+| `silencer-tui` (unscoped) | one-line redirect — `import '@arsia-mons/silencer'` and a matching `dependencies` entry |
+
+`scripts/stage-npm-packages.ts` assembles the five package directories
+from the release artifacts; the workflow runs it then `npm publish
+--access public --provenance` on each. Versions in the source
+`package.json` (`0.1.0`) are placeholders — the staging script
+rewrites them to `${GITHUB_REF_NAME#v}` in lockstep before publish.
 
 ## What's not yet here
 
 - **Kitty graphics rasterizer** — design intent was both half-block and
   kitty graphics protocol in v1; only half-block is implemented today.
   C++ side stays unchanged when the kitty backend lands.
-- **Per-platform npm packaging** — distribution shape (esbuild's
-  `optionalDependencies` of `@silencer/tui-{darwin,linux,win32}-{arm64,x64}`)
-  is designed but not built. `silencer-tui` is `private: true` until that
-  lands.
 - **Lobby + gameplay flows** are unverified end-to-end. Engine handles them
   through the same `screenbuffer` → `UploadFrame` path, so they should
   work, but contract testing against a real lobby is open work.

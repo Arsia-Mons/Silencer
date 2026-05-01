@@ -18,7 +18,8 @@ import { spawn, type Subprocess } from 'bun';
 import { createServer, type Server } from 'node:net';
 import { once } from 'node:events';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
 
 import { FrameStreamParser } from './frame_parser';
 import type { Palette } from './frame_parser';
@@ -62,8 +63,31 @@ async function reserveFreePort(): Promise<number> {
   return port;
 }
 
+// Engine binary location inside each per-platform npm package. `process.platform`
+// + `process.arch` keys select which @arsia-mons/silencer-<platform>-<arch>
+// optionalDependency npm installed; resolving its package.json gives us the
+// install root.
+const PLATFORM_BINARY: Record<string, string> = {
+  'darwin-arm64': 'Silencer.app/Contents/MacOS/Silencer',
+  'linux-x64': 'silencer',
+  'win32-x64': 'Silencer.exe',
+};
+
 function findBinary(): string {
   if (process.env.SILENCER_BIN) return process.env.SILENCER_BIN;
+  const key = `${process.platform}-${process.arch}`;
+  const rel = PLATFORM_BINARY[key];
+  if (rel) {
+    try {
+      const req = createRequire(import.meta.url);
+      const pkgJson = req.resolve(`@arsia-mons/silencer-${key}/package.json`);
+      const candidate = resolve(dirname(pkgJson), rel);
+      if (existsSync(candidate)) return candidate;
+    } catch {
+      // Platform package not installed — fall through to dev fallbacks.
+    }
+  }
+  // Dev fallbacks: `cmake --build clients/silencer/build` next to source.
   const candidates = [
     resolve(
       import.meta.dir,
@@ -74,7 +98,7 @@ function findBinary(): string {
   ];
   for (const c of candidates) if (existsSync(c)) return c;
   throw new Error(
-    'silencer binary not found (set SILENCER_BIN or build clients/silencer)',
+    `silencer engine not found for ${key} (set SILENCER_BIN, install @arsia-mons/silencer-${key}, or build clients/silencer)`,
   );
 }
 

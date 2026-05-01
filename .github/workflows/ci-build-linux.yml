@@ -1,0 +1,117 @@
+name: CI Build (Linux)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-build-linux-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build-linux:
+    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # mozilla-actions/sccache-action exposes ACTIONS_CACHE_URL +
+      # ACTIONS_RUNTIME_TOKEN, but sccache only routes through the GHA
+      # backend when this is set — otherwise it writes to the runner's
+      # local disk and every fresh runner starts with an empty cache
+      # (100% miss rate).
+      SCCACHE_GHA_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need history back to the PR base / push-before SHA so the diff
+          # step below can see what actually changed.
+          fetch-depth: 0
+
+      # See ci-build-macos.yml for why path filtering happens inside the job
+      # rather than via on: paths-ignore. Inverse of the previous ignore list:
+      # relevant=true unless every changed file is under an ignored prefix.
+      - id: changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base='${{ github.event.pull_request.base.sha }}'
+          else
+            base='${{ github.event.before }}'
+          fi
+          if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$base" HEAD | grep -Ev \
+               '^(services/|web/|infra/|docs/|designer/|shared/(design|skills)/|[^/]+\.md$|\.gitignore$|\.github/workflows/(ci-build-admin-[^/]*|ci-build-lobby-docker|deploy[^/]*|release)\.yml$)' \
+               | grep -q .; then
+            echo "relevant=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "relevant=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install build deps
+        if: steps.changes.outputs.relevant == 'true'
+        # SDL3 itself comes from setup-sdl below (built from source). The list
+        # here is what setup-sdl needs at configure time + minizip + patchelf
+        # (used post-build to point the binary's RUNPATH at $ORIGIN).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build patchelf pkg-config \
+            libminizip-dev libcurl4-openssl-dev \
+            libasound2-dev libpulse-dev libudev-dev libxext-dev \
+            libxinerama-dev libxcursor-dev libxrandr-dev libxss-dev \
+            libwayland-dev libxkbcommon-dev libdbus-1-dev libibus-1.0-dev
+
+      - name: Install SDL3 + SDL3_mixer
+        if: steps.changes.outputs.relevant == 'true'
+        uses: libsdl-org/setup-sdl@main
+        with:
+          version: 3-latest
+          version-sdl-mixer: 3-latest
+
+      - name: Setup sccache
+        if: steps.changes.outputs.relevant == 'true'
+        uses: mozilla-actions/sccache-action@v0.0.10
+
+      - name: Configure
+        if: steps.changes.outputs.relevant == 'true'
+        run: |
+          cmake -B build -S clients/silencer \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DSILENCER_UNITY_BUILD=ON
+
+      - name: Build
+        if: steps.changes.outputs.relevant == 'true'
+        run: cmake --build build -j"$(nproc)"
+
+      - name: sccache stats
+        if: always() && steps.changes.outputs.relevant == 'true'
+        run: sccache --show-stats
+
+      - name: Bundle SDL3 + assets
+        if: steps.changes.outputs.relevant == 'true'
+        run: |
+          stage="build/package/silencer"
+          mkdir -p "$stage"
+          cp build/silencer "$stage/"
+          cp -L "$SDL3_ROOT/lib/libSDL3.so.0" "$stage/"
+          cp -L "$SDL3_mixer_ROOT/lib/libSDL3_mixer.so.0" "$stage/"
+          patchelf --set-rpath '$ORIGIN' "$stage/silencer"
+          cp -r shared/assets "$stage/assets"
+          echo "--- bundled files ---"
+          ls -la "$stage"
+
+      - name: Verify bundled dependencies
+        if: steps.changes.outputs.relevant == 'true'
+        run: tests/e2e/check-bundle-linux.sh build/package/silencer
+
+      - if: steps.changes.outputs.relevant != 'true'
+        run: echo "No client/asset/test changes; skipping Linux build."

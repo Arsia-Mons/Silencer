@@ -216,8 +216,93 @@ jobs:
           path: build/silencer-windows-x64.zip
           if-no-files-found: error
 
+  build-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps
+        # SDL3 itself comes from setup-sdl below (built from source). The list
+        # here is what setup-sdl needs at configure time + minizip + patchelf
+        # (used post-build to point the binary's RUNPATH at $ORIGIN so it
+        # loads the bundled SDL3 from the same dir as the executable).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build patchelf pkg-config \
+            libminizip-dev libcurl4-openssl-dev \
+            libasound2-dev libpulse-dev libudev-dev libxext-dev \
+            libxinerama-dev libxcursor-dev libxrandr-dev libxss-dev \
+            libwayland-dev libxkbcommon-dev libdbus-1-dev libibus-1.0-dev
+
+      - name: Install SDL3 + SDL3_mixer
+        uses: libsdl-org/setup-sdl@main
+        with:
+          version: 3-latest
+          version-sdl-mixer: 3-latest
+
+      - name: Configure
+        env:
+          LOBBY_HOST: ${{ vars.LOBBY_HOST }}
+        run: |
+          lobby="${LOBBY_HOST:-lobby.arsiamons.com}"
+          cmake -B build -S clients/silencer \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSILENCER_UNITY_BUILD=ON \
+            -DSILENCER_LOBBY_HOST="$lobby" \
+            -DSILENCER_MAP_API_URL="https://admin.arsiamons.com" \
+            -DSILENCER_VERSION="${GITHUB_REF_NAME#v}"
+
+      - name: Build
+        run: cmake --build build -j"$(nproc)"
+
+      - name: Bundle SDL3 + assets
+        run: |
+          stage="build/package/silencer"
+          mkdir -p "$stage"
+          cp build/silencer "$stage/"
+          # setup-sdl exposes per-runner install roots via SDL3_ROOT /
+          # SDL3_mixer_ROOT (same env as the macOS job uses for dylibbundler).
+          # Copy each .so dereferenced — the binary's NEEDED entry is the
+          # soname (libSDL3.so.0), so a single regular file at that path is
+          # what dlopen wants.
+          echo "--- SDL3 install roots ---"
+          echo "  SDL3_ROOT=$SDL3_ROOT"
+          echo "  SDL3_mixer_ROOT=$SDL3_mixer_ROOT"
+          cp -L "$SDL3_ROOT/lib/libSDL3.so.0" "$stage/"
+          cp -L "$SDL3_mixer_ROOT/lib/libSDL3_mixer.so.0" "$stage/"
+          # Point the binary at $ORIGIN so the bundled SDL3 loads from the
+          # same directory as the executable instead of the build-time
+          # install paths (which don't exist on users' machines).
+          patchelf --set-rpath '$ORIGIN' "$stage/silencer"
+          # Assets next to the binary — `os.cpp` CDResDir's Linux fallback
+          # is `<exe>/assets/`.
+          cp -r shared/assets "$stage/assets"
+          echo "--- bundled files ---"
+          ls -la "$stage"
+          echo "--- ldd output ---"
+          ldd "$stage/silencer"
+          # Fail loudly if the dynamic loader can't resolve everything from
+          # the bundle + base system.
+          if ldd "$stage/silencer" | grep -F "not found"; then
+            echo "ERROR: missing dynamic library dependencies"
+            exit 1
+          fi
+
+      - name: Package
+        run: |
+          tar czf build/silencer-linux-x64.tar.gz -C build/package silencer
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: build/silencer-linux-x64.tar.gz
+          if-no-files-found: error
+
   release:
-    needs: [build-macos, build-windows]
+    needs: [build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -249,13 +334,81 @@ jobs:
           files: |
             artifacts/macos-arm64/*
             artifacts/windows-x64/*
+            artifacts/linux-x64/*
           body: |
             ## Downloads
 
             - **macOS (Apple Silicon):** `silencer-macos-arm64.zip`
             - **Windows (x64):** `silencer-windows-x64.zip`
+            - **Linux (x64):** `silencer-linux-x64.tar.gz`
 
             ## First-run warnings
 
             ### Windows
             The Windows build isn't code-signed. If SmartScreen shows *"Windows protected your PC"*, click **More info** → **Run anyway**.
+
+  publish-npm:
+    # Tag-only — manual workflow_dispatch on a non-tag ref skips this job
+    # because the staging script needs a real semver to pin packages with.
+    #
+    # Gating note: `needs: [release]` means a publish failure marks the
+    # whole Release workflow as failed, which gates deploy.yml's
+    # workflow_run trigger. If publish-npm fails post-release-created, the
+    # GitHub Release still lands but the engine deploy doesn't auto-fire —
+    # rerun deploy.yml manually after fixing the npm side.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write  # for `npm publish --provenance` via GitHub OIDC.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Build top-level bundle
+        # `bun run build` runs `bun build src/index.ts --target=bun` which
+        # produces clients/tui/dist/index.js. The staging script copies
+        # dist/ into the @arsia-mons/silencer package directory.
+        run: |
+          bun install --frozen-lockfile
+          bun run --cwd clients/tui build
+
+      - name: Stage npm packages
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          ver="${VERSION#v}"
+          bun clients/tui/scripts/stage-npm-packages.ts \
+            --version "$ver" \
+            --artifacts ./artifacts \
+            --out ./npm-staging \
+            --tui-pkg ./clients/tui
+
+      - name: Publish to npm
+        # Order matters for tidiness only — optionalDependencies don't fail
+        # the install if the matching one isn't published yet, but we still
+        # publish bottom-up: per-platform binaries → top-level → unscoped
+        # redirect. --access public is required on first publish of a
+        # scoped package; idempotent thereafter.
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -e
+          for pkg in silencer-darwin-arm64 silencer-linux-x64 silencer-win32-x64 silencer silencer-tui; do
+            echo "=== publishing $pkg ==="
+            (cd "npm-staging/$pkg" && npm publish --access public --provenance)
+          done
