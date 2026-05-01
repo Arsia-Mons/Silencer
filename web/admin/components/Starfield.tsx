@@ -19,8 +19,8 @@ interface Comet {
 }
 
 const STAR_COUNT = 350;
-const MAX_COMETS = 4;
-const COMET_SPAWN_CHANCE = 0.0015; // per frame
+const MAX_COMETS = 12;
+const COMET_SPAWN_CHANCE = 0.02;
 
 function buildStars(w: number, h: number): Star[] {
   return Array.from({ length: STAR_COUNT }, () => {
@@ -38,12 +38,10 @@ function buildStars(w: number, h: number): Star[] {
 }
 
 function spawnComet(w: number, h: number): Comet {
-  // Random angle roughly diagonal across screen (30–150°)
   const angle = (Math.random() * (5 / 6) + 1 / 12) * Math.PI;
   const speed = Math.random() * 5 + 3;
   const vx = Math.cos(angle) * speed;
   const vy = Math.sin(angle) * speed;
-  // Spawn off-screen on the top or left edge
   const fromTop = Math.random() < 0.5;
   return {
     x: fromTop ? Math.random() * w : -80,
@@ -51,7 +49,7 @@ function spawnComet(w: number, h: number): Comet {
     vx, vy,
     tailLen: Math.random() * 140 + 80,
     width: Math.random() * 1.2 + 0.6,
-    alpha: Math.random() * 0.5 + 0.5,
+    alpha: Math.random() * 0.4 + 0.6,
   };
 }
 
@@ -74,7 +72,6 @@ function drawComet(ctx: CanvasRenderingContext2D, c: Comet) {
   ctx.lineCap = 'round';
   ctx.stroke();
 
-  // Bright head
   ctx.beginPath();
   ctx.arc(c.x, c.y, c.width * 1.8, 0, Math.PI * 2);
   ctx.fillStyle = `rgba(255,255,255,${c.alpha.toFixed(3)})`;
@@ -82,54 +79,59 @@ function drawComet(ctx: CanvasRenderingContext2D, c: Comet) {
 }
 
 export default function Starfield() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const starCanvasRef  = useRef<HTMLCanvasElement>(null);
+  const cometCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current!;
-    const ctx = canvas.getContext('2d')!;
+    const starCanvas  = starCanvasRef.current!;
+    const cometCanvas = cometCanvasRef.current!;
+    const sCtx = starCanvas.getContext('2d')!;
+    const cCtx = cometCanvas.getContext('2d')!;
     let raf: number;
     let stars: Star[] = [];
     let comets: Comet[] = [];
 
     const resize = () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-      stars = buildStars(canvas.width, canvas.height);
+      starCanvas.width  = cometCanvas.width  = window.innerWidth;
+      starCanvas.height = cometCanvas.height = window.innerHeight;
+      stars = buildStars(starCanvas.width, starCanvas.height);
     };
     resize();
     window.addEventListener('resize', resize);
 
-    const draw = (t: number) => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const ts = t / 1000;
-      const w = canvas.width;
-      const h = canvas.height;
+    // Seed with comets immediately so they're visible on load
+    for (let i = 0; i < 4; i++)
+      comets.push(spawnComet(cometCanvas.width, cometCanvas.height));
 
-      // Stars
+    const draw = (t: number) => {
+      const w = starCanvas.width;
+      const h = starCanvas.height;
+      const ts = t / 1000;
+
+      // Stars — behind the dark overlay
+      sCtx.clearRect(0, 0, w, h);
       for (const s of stars) {
         const alpha = s.twinkleAmp > 0
           ? s.base + s.twinkleAmp * Math.sin(ts * s.twinkleSpeed + s.phase)
           : s.base;
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(220,230,255,${alpha.toFixed(3)})`;
-        ctx.fill();
+        sCtx.beginPath();
+        sCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        sCtx.fillStyle = `rgba(220,230,255,${alpha.toFixed(3)})`;
+        sCtx.fill();
       }
 
-      // Spawn comets
+      // Comets — above the dark overlay
+      cCtx.clearRect(0, 0, w, h);
       if (comets.length < MAX_COMETS && Math.random() < COMET_SPAWN_CHANCE) {
         comets.push(spawnComet(w, h));
       }
-
-      // Update + draw comets
       comets = comets.filter(c => {
         c.x += c.vx;
         c.y += c.vy;
-        // Fade out near edges
         const margin = 120;
         if (c.x > w - margin) c.alpha *= 0.96;
         if (c.y > h - margin) c.alpha *= 0.96;
-        drawComet(ctx, c);
+        drawComet(cCtx, c);
         return c.x < w + 100 && c.y < h + 100 && c.alpha > 0.02;
       });
 
@@ -144,9 +146,11 @@ export default function Starfield() {
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}
-    />
+    <>
+      {/* Stars sit behind the dark overlay (z-index 1) */}
+      <canvas ref={starCanvasRef}  style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }} />
+      {/* Comets sit above the dark overlay but below page content (z-index 2) */}
+      <canvas ref={cometCanvasRef} style={{ position: 'fixed', inset: 0, zIndex: 2, pointerEvents: 'none' }} />
+    </>
   );
 }
