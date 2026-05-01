@@ -66,6 +66,16 @@ async function run(
 const PROJECT_DESCRIPTION =
   'An action/strategy multiplayer side-scrolling platform game set on a futuristic Mars.';
 
+// `npm publish --provenance` cross-checks package.json `repository.url`
+// against the GitHub repository in the OIDC token. Mismatch (or empty
+// field) → 422 Unprocessable Entity. Keep this URL canonical.
+const PROJECT_REPOSITORY = {
+  type: 'git',
+  url: 'git+https://github.com/Arsia-Mons/Silencer.git',
+};
+const PROJECT_HOMEPAGE = 'https://github.com/Arsia-Mons/Silencer#readme';
+const PROJECT_BUGS = 'https://github.com/Arsia-Mons/Silencer/issues';
+
 function platformPkgJson(
   platform: 'darwin' | 'linux' | 'win32',
   arch: 'arm64' | 'x64',
@@ -75,6 +85,9 @@ function platformPkgJson(
     name: `@arsia-mons/silencer-${platform}-${arch}`,
     version,
     description: PROJECT_DESCRIPTION,
+    repository: PROJECT_REPOSITORY,
+    homepage: PROJECT_HOMEPAGE,
+    bugs: { url: PROJECT_BUGS },
     os: [platform],
     cpu: [arch],
   };
@@ -198,6 +211,11 @@ async function stageTopLevel(args: Args): Promise<void> {
     await readFile(join(args.tuiPkg, 'package.json'), 'utf8'),
   ) as Record<string, unknown>;
   srcPkg.version = args.version;
+  // Inject the canonical repo metadata `npm publish --provenance` requires
+  // (without it the registry rejects with 422 on the OIDC verify step).
+  srcPkg.repository = PROJECT_REPOSITORY;
+  srcPkg.homepage = PROJECT_HOMEPAGE;
+  srcPkg.bugs = { url: PROJECT_BUGS };
   const optDeps = srcPkg.optionalDependencies as Record<string, string>;
   for (const k of Object.keys(optDeps)) optDeps[k] = args.version;
   // devDependencies aren't installed for end-users; drop to avoid resolver
@@ -223,6 +241,9 @@ async function stageTuiRedirect(args: Args): Promise<void> {
     name: 'silencer-tui',
     version: args.version,
     description: PROJECT_DESCRIPTION,
+    repository: PROJECT_REPOSITORY,
+    homepage: PROJECT_HOMEPAGE,
+    bugs: { url: PROJECT_BUGS },
     type: 'module',
     bin: { 'silencer-tui': './index.js' },
     files: ['index.js'],
