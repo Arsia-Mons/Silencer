@@ -15,12 +15,12 @@ const DIRECTION_LABELS: Record<number, string> = {
 // Light actor (id=71) actortype bitfield helpers
 // bits 0-1: size, bit 2: shape, bits 3-4: animation, bits 5-6: pulse speed, bits 8-15: colorR, bits 16-23: colorG, bits 24-31: colorB
 // actor.direction (separate field): spot direction 0-7 (E,NE,N,NW,W,SW,S,SE)
-function decodeLightType(type: number): { size: number; shape: number; anim: number; pulseSpeed: number; r: number; g: number; b: number } {
+function decodeLightType(type: number): { size: number; shape: number; anim: number; pulseSpeed: number; dynShadows: boolean; r: number; g: number; b: number } {
   const u = (type ?? 0) >>> 0;
-  return { size: u & 3, shape: (u >>> 2) & 1, anim: (u >>> 3) & 3, pulseSpeed: (u >>> 5) & 3, r: (u >>> 8) & 0xFF, g: (u >>> 16) & 0xFF, b: (u >>> 24) & 0xFF };
+  return { size: u & 3, shape: (u >>> 2) & 1, anim: (u >>> 3) & 3, pulseSpeed: (u >>> 5) & 3, dynShadows: !!((u >>> 7) & 1), r: (u >>> 8) & 0xFF, g: (u >>> 16) & 0xFF, b: (u >>> 24) & 0xFF };
 }
-function encodeLightType(size: number, shape: number, anim: number, pulseSpeed: number, r: number, g: number, b: number): number {
-  return ((size & 3) | ((shape & 1) << 2) | ((anim & 3) << 3) | ((pulseSpeed & 3) << 5) | ((r & 0xFF) << 8) | ((g & 0xFF) << 16) | ((b & 0xFF) << 24)) | 0;
+function encodeLightType(size: number, shape: number, anim: number, pulseSpeed: number, dynShadows: boolean, r: number, g: number, b: number): number {
+  return ((size & 3) | ((shape & 1) << 2) | ((anim & 3) << 3) | ((pulseSpeed & 3) << 5) | (dynShadows ? 1 << 7 : 0) | ((r & 0xFF) << 8) | ((g & 0xFF) << 16) | ((b & 0xFF) << 24)) | 0;
 }
 function rgbToHex(r: number, g: number, b: number): string {
   return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
@@ -46,6 +46,7 @@ interface LightFieldState {
   shape: number;
   anim: number;
   pulseSpeed: number;
+  dynShadows: boolean;
   colorHex: string;
   direction: number;
 }
@@ -87,6 +88,7 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
     shape: initLight.shape,
     anim: initLight.anim,
     pulseSpeed: initLight.pulseSpeed,
+    dynShadows: initLight.dynShadows,
     colorHex: (initLight.r || initLight.g || initLight.b) ? rgbToHex(initLight.r, initLight.g, initLight.b) : '#000000',
     direction: actor.direction ?? 0,
   });
@@ -114,7 +116,7 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
     if (isLight) {
       const { r, g, b } = lightColorEnabled ? hexToRgb(lightFields.colorHex) : { r: 0, g: 0, b: 0 };
       onUpdate(actorIdx, {
-        type: encodeLightType(lightFields.size, lightFields.shape, lightFields.anim, lightFields.pulseSpeed, r, g, b),
+        type: encodeLightType(lightFields.size, lightFields.shape, lightFields.anim, lightFields.pulseSpeed, lightFields.dynShadows, r, g, b),
         direction: lightFields.direction,
       });
     } else {
@@ -202,6 +204,13 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
               </select>
             </div>
           )}
+          <div className="mb-1.5">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={lightFields.dynShadows} onChange={e => setLightFields(f => ({ ...f, dynShadows: e.target.checked }))} className="accent-[#4a8a4a]" />
+              <span className={lbl}>Dynamic shadows</span>
+            </label>
+            <div className="text-[#3a6a3a] text-[10px] mt-0.5">Players &amp; guards cast shadows at runtime</div>
+          </div>
           <div className="mb-1.5">
             <div className="flex items-center gap-2 mb-0.5">
               <span className={lbl}>Color tint</span>

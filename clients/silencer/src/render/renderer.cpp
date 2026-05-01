@@ -1094,14 +1094,16 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 					int lbx1 = light->x - radius, lby1 = light->y - radius;
 					int lbx2 = light->x + radius, lby2 = light->y + radius;
 					std::vector<DynOccluder> dynForLight;
-					for(const auto & d : allDynOccluders){
-						int dminx = d.x1 < d.x2 ? d.x1 : d.x2;
-						int dmaxx = d.x1 < d.x2 ? d.x2 : d.x1;
-						int dminy = d.y1 < d.y2 ? d.y1 : d.y2;
-						int dmaxy = d.y1 < d.y2 ? d.y2 : d.y1;
-						if(dmaxx >= lbx1 && dminx <= lbx2 && dmaxy >= lby1 && dminy <= lby2){
-							if(light->x >= dminx && light->x <= dmaxx && light->y >= dminy && light->y <= dmaxy) continue;
-							dynForLight.push_back(d);
+					if(light->lightDynShadows){
+						for(const auto & d : allDynOccluders){
+							int dminx = d.x1 < d.x2 ? d.x1 : d.x2;
+							int dmaxx = d.x1 < d.x2 ? d.x2 : d.x1;
+							int dminy = d.y1 < d.y2 ? d.y1 : d.y2;
+							int dmaxy = d.y1 < d.y2 ? d.y2 : d.y1;
+							if(dmaxx >= lbx1 && dminx <= lbx2 && dmaxy >= lby1 && dminy <= lby2){
+								if(light->x >= dminx && light->x <= dmaxx && light->y >= dminy && light->y <= dmaxy) continue;
+								dynForLight.push_back(d);
+							}
 						}
 					}
 					const std::vector<DynOccluder> * dynPtr = dynForLight.empty() ? nullptr : &dynForLight;

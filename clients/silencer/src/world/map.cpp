@@ -685,6 +685,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 					overlay->lightAnim       = (Uint8)((u >> 3) & 3);
 					overlay->lightPulseSpeed = (Uint8)((u >> 5) & 3);
 					overlay->lightShape      = (Uint8)((u >> 2) & 1);
+					overlay->lightDynShadows = (bool)((u >> 7) & 1);
 					overlay->lightDirection  = (Uint8)(actordirection & 7);
 					overlay->x = actorx;
 					overlay->y = actory;

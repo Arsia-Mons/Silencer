@@ -32,6 +32,7 @@ public:
 	Uint8 lightPulseSpeed; // 0=slow(128t), 1=med(64t), 2=fast(32t)
 	Uint8 lightShape;      // 0=halo, 1=spot
 	Uint8 lightDirection;  // 0-7: E,NE,N,NW,W,SW,S,SE (spot only)
+	bool lightDynShadows;  // bit 7 of actortype: enable runtime player/guard shadow casting
 };
 
 #endif
