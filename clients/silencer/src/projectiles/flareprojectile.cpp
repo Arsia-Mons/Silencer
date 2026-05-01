@@ -14,7 +14,7 @@ FlareProjectile::FlareProjectile() : Object(ObjectTypes::FLAREPROJECTILE){
 	shielddamage = w ? w->shieldDamage : 1;
 	velocity = w ? w->velocity : 5;
 	drawcheckered = true;
-	plumecount = (w && w->trailPlumes > 0) ? std::min(w->trailPlumes, MAX_PLUMES) : 4;
+	plumecount = (w && w->trailPlumes > 0) ? (std::min)(w->trailPlumes, MAX_PLUMES) : 4;
 	for(int i = 0; i < MAX_PLUMES; i++){
 		plumeids[i] = 0;
 	}
