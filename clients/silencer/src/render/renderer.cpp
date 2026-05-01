@@ -1036,7 +1036,18 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 					SDL_Color tint = { light->lightColorR, light->lightColorG, light->lightColorB, 255 };
 					colorIndex = palette.ClosestMatch(tint);
 				}
-				DrawLight(surface, src, &dstrect, light->x, light->y, camera.GetXOffset(), camera.GetYOffset(), zones, colorIndex);
+				float lumScale = 1.0f;
+				if(light->lightAnim == 1){
+					// Flicker: per-light hash gives independent random-ish variation [0.3, 1.0]
+					Uint32 h = (Uint32)state_i * 2654435761u ^ ((Uint32)light->x * 1234567u ^ (Uint32)light->y * 7654321u);
+					lumScale = 0.3f + 0.7f * ((h & 0xFFFF) / 65535.0f);
+				}else if(light->lightAnim == 2){
+					// Pulse: sinusoidal [0.3, 1.0], period depends on speed
+					float period = light->lightPulseSpeed == 2 ? 32.0f : light->lightPulseSpeed == 1 ? 64.0f : 128.0f;
+					float phase = (float)(state_i + ((light->x ^ light->y) & 0xFF)) / period;
+					lumScale = 0.65f + 0.35f * sinf(phase * 6.28318530f);
+				}
+				DrawLight(surface, src, &dstrect, light->x, light->y, camera.GetXOffset(), camera.GetYOffset(), zones, colorIndex, lumScale);
 			}
 		}
 		DrawForeground(surface, camera);
@@ -2202,7 +2213,7 @@ void Renderer::DrawMirrored(Surface * src, Rect * srcrect, Surface * dst, Rect *
     }
 }
 
-void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const std::vector<Map::ShadowZone> * zones, Uint8 colorIndex){
+void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const std::vector<Map::ShadowZone> * zones, Uint8 colorIndex, float lumScale){
 	if(rect->x <= surface->w && rect->y <= surface->h && rect->x >= -src->w && rect->y >= -src->h){
 		int surfacew = surface->w;
 		int surfaceh = surface->h;
@@ -2234,6 +2245,10 @@ void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 l
 			unsigned int i2 = (y2 * surfacew) + minw;
 			for(int x2 = minw; x2 < maxw; x2++){
 				Uint8 lum = pixels[i];
+				if(lum && lumScale < 1.0f){
+					int scaled = (int)(lum * lumScale);
+					lum = scaled < 0 ? 0 : (Uint8)scaled;
+				}
 				if(lum && hasShadows){
 					// Ray from light center to this pixel, both in world-space.
 					// Screen pixel (x2,y2) → world = screen - cameraOffset

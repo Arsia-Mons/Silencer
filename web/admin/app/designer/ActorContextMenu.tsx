@@ -13,14 +13,14 @@ const DIRECTION_LABELS: Record<number, string> = {
 };
 
 // Light actor (id=71) actortype bitfield helpers
-// bits 0-1: size, bit 2: shape, bits 3-4: animation, bits 8-15: colorR, bits 16-23: colorG, bits 24-31: colorB
-function decodeLightType(type: number): { size: number; r: number; g: number; b: number } {
+// bits 0-1: size, bit 2: shape, bits 3-4: animation, bits 5-6: pulse speed, bits 8-15: colorR, bits 16-23: colorG, bits 24-31: colorB
+function decodeLightType(type: number): { size: number; anim: number; pulseSpeed: number; r: number; g: number; b: number } {
   const u = (type ?? 0) >>> 0;
-  return { size: u & 3, r: (u >>> 8) & 0xFF, g: (u >>> 16) & 0xFF, b: (u >>> 24) & 0xFF };
+  return { size: u & 3, anim: (u >>> 3) & 3, pulseSpeed: (u >>> 5) & 3, r: (u >>> 8) & 0xFF, g: (u >>> 16) & 0xFF, b: (u >>> 24) & 0xFF };
 }
-function encodeLightType(size: number, r: number, g: number, b: number, existing: number): number {
-  const u = (existing >>> 0) & ~0xFFFFFF07; // preserve shape/anim bits (2-4), clear size+color
-  return (u | (size & 3) | ((r & 0xFF) << 8) | ((g & 0xFF) << 16) | ((b & 0xFF) << 24)) | 0;
+function encodeLightType(size: number, anim: number, pulseSpeed: number, r: number, g: number, b: number, existing: number): number {
+  const u = (existing >>> 0) & ~0xFFFFFF7F; // preserve shape (bit 2), clear size+anim+pulseSpeed+color
+  return (u | (size & 3) | ((anim & 3) << 3) | ((pulseSpeed & 3) << 5) | ((r & 0xFF) << 8) | ((g & 0xFF) << 16) | ((b & 0xFF) << 24)) | 0;
 }
 function rgbToHex(r: number, g: number, b: number): string {
   return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
@@ -40,6 +40,8 @@ interface FieldState {
 
 interface LightFieldState {
   size: number;
+  anim: number;
+  pulseSpeed: number;
   colorHex: string;
 }
 
@@ -77,6 +79,8 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
   const initLight = decodeLightType(actor.type ?? 0);
   const [lightFields, setLightFields] = useState<LightFieldState>({
     size: initLight.size,
+    anim: initLight.anim,
+    pulseSpeed: initLight.pulseSpeed,
     colorHex: (initLight.r || initLight.g || initLight.b) ? rgbToHex(initLight.r, initLight.g, initLight.b) : '#000000',
   });
   // Whether the color is active (non-black = tinted)
@@ -102,7 +106,7 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
   const apply = () => {
     if (isLight) {
       const { r, g, b } = lightColorEnabled ? hexToRgb(lightFields.colorHex) : { r: 0, g: 0, b: 0 };
-      onUpdate(actorIdx, { type: encodeLightType(lightFields.size, r, g, b, actor.type ?? 0) });
+      onUpdate(actorIdx, { type: encodeLightType(lightFields.size, lightFields.anim, lightFields.pulseSpeed, r, g, b, actor.type ?? 0) });
     } else {
       onUpdate(actorIdx, {
         type:       parseInt(fields.type,       10) || 0,
@@ -145,6 +149,24 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
               ))}
             </select>
           </div>
+          <div className="mb-1.5">
+            <div className={lbl}>Animation</div>
+            <select value={lightFields.anim} onChange={e => setLightFields(f => ({ ...f, anim: Number(e.target.value) }))} className={inp + ' cursor-pointer'}>
+              <option value={0}>Static</option>
+              <option value={1}>Flicker</option>
+              <option value={2}>Pulse</option>
+            </select>
+          </div>
+          {lightFields.anim === 2 && (
+            <div className="mb-1.5">
+              <div className={lbl}>Pulse speed</div>
+              <select value={lightFields.pulseSpeed} onChange={e => setLightFields(f => ({ ...f, pulseSpeed: Number(e.target.value) }))} className={inp + ' cursor-pointer'}>
+                <option value={0}>Slow</option>
+                <option value={1}>Medium</option>
+                <option value={2}>Fast</option>
+              </select>
+            </div>
+          )}
           <div className="mb-1.5">
             <div className="flex items-center gap-2 mb-0.5">
               <span className={lbl}>Color tint</span>

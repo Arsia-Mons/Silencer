@@ -28,6 +28,8 @@ public:
 	// Bank-222 environment lights loaded from the map
 	bool mapLight;
 	Uint8 lightColorR, lightColorG, lightColorB;
+	Uint8 lightAnim;       // 0=static, 1=flicker, 2=pulse
+	Uint8 lightPulseSpeed; // 0=slow(128t), 1=med(64t), 2=fast(32t)
 };
 
 #endif
