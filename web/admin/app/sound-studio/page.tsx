@@ -1150,7 +1150,7 @@ export default function SoundStudioPage() {
                               borderBottom: '1px solid #1a1a1a',
                               opacity: s.pendingDelete ? 0.4 : isMissing ? 0.7 : 1,
                               cursor: s.pendingDelete ? 'default' : 'pointer',
-                              background: multiSel.has(s.name) ? '#1e2a1e' : isMissing ? '#1e1000' : isPlaying ? '#1a2a1a' : isSelected ? '#1e1e28' : s.source === 'staged' ? '#1a1a2a' : 'transparent',
+                              background: multiSel.has(s.name) ? '#1e2a1e' : isMissing ? '#1e1000' : isPlaying ? '#1a2a1a' : isSelected ? '#1e1e28' : s.source === 'staged' ? '#1a1a2a' : ri % 2 === 0 ? '#0e140e' : '#0b100b',
                               outline: multiSel.has(s.name) ? '1px solid #4a6' : isSelected ? '1px solid #445' : 'none',
                             }}>
                             <td style={{ padding: '3px 5px', textAlign: 'center' }}>
