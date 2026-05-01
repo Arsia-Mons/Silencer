@@ -77,6 +77,7 @@ export const ACTOR_DEFS: ActorDefEntry[] = [
   { id: 68, label: 'Team Billboard',  icon: 'TB', color: '#22d3ee', bank: 151,  frame: 0 },
   { id: 69, label: 'Computer',        icon: 'PC', color: '#6b7280', bank: 171,  frame: 0 },
   { id: 70, label: 'Credit Machine',  icon: 'CR', color: '#f59e0b', bank: 80,   frame: 0 },
+  { id: 71, label: 'Light',           icon: 'LT', color: '#fde68a', bank: 222,  frame: 0 },
 ];
 
 export const ACTOR_TYPE_HINTS: Record<number, ActorTypeHint> = {
@@ -98,6 +99,7 @@ export const ACTOR_TYPE_HINTS: Record<number, ActorTypeHint> = {
   50: { label: 'Size',     options: { 4:'Small', 5:'Small Alt', 6:'Large', 7:'Default' } },
   65: { label: 'Side',     options: { 0:'Team A', 1:'Team B' } },
   67: { label: 'Type',     options: { 0:'Base Defense', 1:'Guard Defense (Laser)' } },
+  71: { label: 'Size',     options: { 0:'Small', 1:'Medium', 2:'Large' } },
 };
 
 interface ToolbarProps {

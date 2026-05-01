@@ -669,6 +669,16 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 					creditmachine->y = actory;
 				}
 			}break;
+			case 71:{
+				// environment light halo — bank 222, res_index from actortype
+				Overlay * overlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+				if(overlay){
+					overlay->res_bank = 222;
+					overlay->res_index = (Uint8)actortype;
+					overlay->x = actorx;
+					overlay->y = actory;
+				}
+			}break;
 		}
 	}
 	memcpy(&numplatforms, &level[i], sizeof(numplatforms));

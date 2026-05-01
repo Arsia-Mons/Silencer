@@ -455,11 +455,25 @@ export default function MapCanvas({
           else if (a.type === 2) bankNum = 201;
           else bankNum = 205;
         }
+        if (a.id === 71) bankNum = 222; // light halo — res_index from actor.type
 
         // Try to draw actual sprite
         const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
-        const spr = sprBank?.[def.frame ?? 0];
+        const spr = sprBank?.[a.id === 71 ? (a.type ?? 0) : (def.frame ?? 0)];
         if (spr) {
+          // Light actors: draw sprite with additive-style glow overlay
+          if (a.id === 71 && vis?.lighting !== false) {
+            const gx = cx - (spr.width / 2) * zoom;
+            const gy = cy - (spr.height / 2) * zoom;
+            const gw = spr.width * zoom;
+            const gh = spr.height * zoom;
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(gw, gh) / 2);
+            grad.addColorStop(0, 'rgba(255,220,100,0.35)');
+            grad.addColorStop(1, 'rgba(255,180,50,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(gx, gy, gw, gh);
+            ctx.drawImage(spr.bitmap, gx, gy, gw, gh);
+          } else {
           const mirrored = a.direction !== 0;
           const sx = cx - (mirrored ? spr.width - spr.offsetX : spr.offsetX) * zoom;
           const sy = cy - spr.offsetY * zoom;
@@ -479,6 +493,7 @@ export default function MapCanvas({
             ctx.fillStyle = '#fff';
             ctx.fillText(def.icon, cx, cy + 7);
           }
+          } // end else (non-light actor)
         } else {
           // Fallback: colored circle with icon
           const r = Math.max(6, 8 * zoom);
@@ -560,8 +575,9 @@ export default function MapCanvas({
       if (actor.id === 54) bankNum = actor.type === 0 ? 183 : 184;
       if (actor.id === 47) bankNum = 49 + Math.min(actor.type ?? 0, 9);
       if (actor.id === 63) bankNum = actor.type === 0 ? 200 : actor.type === 2 ? 201 : 205;
+      if (actor.id === 71) bankNum = 222;
       const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
-      const spr = sprBank?.[def.frame ?? 0];
+      const spr = sprBank?.[actor.id === 71 ? (actor.type ?? 0) : (def.frame ?? 0)];
       const cx = overrideCx ?? actor.x * zoom + pan.x;
       const cy = overrideCy ?? actor.y * zoom + pan.y;
       if (spr) {
