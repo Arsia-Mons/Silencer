@@ -15,6 +15,24 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: 'v00044',
+    date: '2026-05-01',
+    title: 'VFX Editor',
+    entries: [
+      {
+        category: 'DASHBOARD',
+        changes: [
+          'VFX Editor tool added (/vfx) — create and preview particle effect presets',
+          'Live canvas particle simulator with real-time feedback as you edit parameters',
+          'Support for particles, sprite-flash, and screen-shake effect types',
+          'Particle properties: emission rate, burst count, lifetime, size, color gradient, alpha, speed, spread, angle, gravity',
+          'Save/load vfx-presets.json; download to local GAS folder',
+          'Added 6 built-in sample presets: explosion (small/large), sparks, smoke, plasma trail, screen shake',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v00043',
     date: '2026-05-01',
     title: 'Items Tool',

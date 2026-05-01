@@ -86,6 +86,7 @@ export default function DesignerPage() {
   const [actorMenu, setActorMenu] = useState<ActorMenu | null>(null);
   const [tileMenu, setTileMenu] = useState<TileMenuInfo | null>(null);
   const [highlightActorIdx, setHighlightActorIdx] = useState<number | null>(null);
+  const [rightTab, setRightTab] = useState<'tiles' | 'actors'>('tiles');
   const [vis, setVis] = useState<VisState>({
     bg: [true, true, true, true],
     fg: [true, true, true, true],
@@ -196,6 +197,7 @@ export default function DesignerPage() {
   const silInputRef  = useRef<HTMLInputElement>(null);
   const dataDirRef   = useRef<HTMLInputElement>(null);
   const dataFilesRef = useRef<HTMLInputElement>(null);
+
 
   // Tool change: track tile layer type and clear selection/paste on tool switch
   const handleToolChange = useCallback((tool: string) => {
@@ -890,23 +892,44 @@ export default function DesignerPage() {
             </div>
           </div>
 
-          {/* Right panel: tile picker + actor list */}
+          {/* Right panel: tiles / actors tabs */}
           <div className="w-72 flex-shrink-0 border-l border-game-border bg-game-bgCard overflow-hidden flex flex-col">
-            <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-              <TilePicker
-                tileImages={tileImages}
-                tileBankCounts={tileBankCounts}
-                selectedTileId={selectedTileId}
-                onSelectTile={setSelectedTile}
-              />
+            {/* Tab bar */}
+            <div className="flex border-b border-game-border shrink-0">
+              {(['tiles', 'actors'] as const).map(tab => (
+                <button key={tab} onClick={() => setRightTab(tab)}
+                  className={`flex-1 py-1.5 text-[10px] font-mono tracking-widest transition-colors ${
+                    rightTab === tab
+                      ? 'text-game-primary border-b-2 border-game-primary bg-game-dark'
+                      : 'text-game-textDim hover:text-game-text'
+                  }`}>
+                  {tab === 'tiles' ? 'TILES' : 'ACTORS'}
+                </button>
+              ))}
             </div>
-            {map && (
+
+            {rightTab === 'tiles' && (
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                <TilePicker
+                  tileImages={tileImages}
+                  tileBankCounts={tileBankCounts}
+                  selectedTileId={selectedTileId}
+                  onSelectTile={setSelectedTile}
+                />
+              </div>
+            )}
+            {rightTab === 'actors' && map && (
               <ActorListPanel
                 actors={map.actors}
                 highlightIdx={highlightActorIdx}
                 onCenter={(actor) => { handleCenterOnActor(actor); setHighlightActorIdx(map.actors.indexOf(actor)); }}
                 onActorRightClick={(idx, sx, sy) => { setActorMenu({ idx, screenX: sx, screenY: sy }); setHighlightActorIdx(idx); }}
               />
+            )}
+            {rightTab === 'actors' && !map && (
+              <div className="flex-1 flex items-center justify-center p-4">
+                <span className="text-[10px] font-mono text-game-textDim">No map loaded</span>
+              </div>
             )}
           </div>
         </div>
