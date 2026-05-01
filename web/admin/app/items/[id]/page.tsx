@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth';
@@ -113,6 +113,31 @@ export default function ItemDetailPage() {
   }
 
   const item = items.find(i => i.id === id) ?? null;
+  const selectedRef = useRef<HTMLAnchorElement>(null);
+
+  // Scroll selected item into view without jumping the panel to top
+  useEffect(() => {
+    selectedRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [id]);
+
+  // Arrow key navigation
+  const navigate = useCallback((dir: 1 | -1) => {
+    const idx = items.findIndex(i => i.id === id);
+    if (idx === -1) return;
+    const next = items[idx + dir];
+    if (next) router.push(`/items/${next.id}`, { scroll: false });
+  }, [items, id, router]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.key === 'ArrowUp')   { e.preventDefault(); navigate(-1); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); navigate(1);  }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navigate]);
 
   function patch(update: Partial<ItemDef>) {
     if (!item) return;
@@ -206,7 +231,8 @@ export default function ItemDetailPage() {
             </div>
             <div className="flex-1 overflow-y-auto">
               {items.map(i => (
-                <Link key={i.id} href={`/items/${i.id}`}
+                <Link key={i.id} href={`/items/${i.id}`} scroll={false}
+                  ref={i.id === id ? selectedRef : null}
                   className={`flex flex-col px-3 py-2 border-b border-[#1a2e1a] transition-colors ${
                     i.id === id
                       ? 'bg-[#00a328] text-black'
