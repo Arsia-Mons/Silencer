@@ -14,14 +14,14 @@ const STAR_COUNT = 350;
 
 function buildStars(w: number, h: number): Star[] {
   return Array.from({ length: STAR_COUNT }, () => {
-    const isBright = Math.random() < 0.08;
+    const isBright = Math.random() < 0.35;
     return {
       x: Math.random() * w,
       y: Math.random() * h,
-      size: isBright ? Math.random() * 1.2 + 0.8 : Math.random() * 0.8 + 0.2,
-      base: isBright ? Math.random() * 0.4 + 0.55 : Math.random() * 0.35 + 0.15,
-      twinkleAmp: isBright ? Math.random() * 0.35 + 0.1 : 0,
-      twinkleSpeed: Math.random() * 0.6 + 0.2,
+      size: isBright ? Math.random() * 1.4 + 0.7 : Math.random() * 0.7 + 0.2,
+      base: isBright ? Math.random() * 0.3 + 0.5 : Math.random() * 0.3 + 0.1,
+      twinkleAmp: isBright ? Math.random() * 0.5 + 0.2 : Math.random() < 0.4 ? Math.random() * 0.2 + 0.05 : 0,
+      twinkleSpeed: Math.random() * 1.5 + 0.3,
       phase: Math.random() * Math.PI * 2,
     };
   });
