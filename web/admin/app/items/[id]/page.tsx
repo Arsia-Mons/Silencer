@@ -258,7 +258,7 @@ export default function ItemDetailPage() {
                   </label>
                   <label className="col-span-2 flex flex-col gap-1">
                     <span className={LABEL}>DESCRIPTION</span>
-                    <textarea rows={3} className={`${INPUT} resize-y`} value={item.description}
+                    <textarea rows={6} className={`${INPUT} resize-y`} value={item.description}
                       onChange={e => patch({ description: e.target.value })} />
                   </label>
                 </div>
@@ -267,17 +267,32 @@ export default function ItemDetailPage() {
               {/* Sprite */}
               <section className="border border-[#1a2e1a] rounded p-4 flex flex-col gap-3">
                 <span className="text-[10px] font-mono text-[#4a7a4a] tracking-widest">SPRITE</span>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-1">
-                    <span className={LABEL}>BANK</span>
-                    <input type="number" className={INPUT} value={item.spriteBank ?? ''}
-                      onChange={e => patchNum('spriteBank', e.target.value)} />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className={LABEL}>INDEX</span>
-                    <input type="number" className={INPUT} value={item.spriteIndex ?? ''}
-                      onChange={e => patchNum('spriteIndex', e.target.value)} />
-                  </label>
+                <div className="flex items-start gap-4">
+                  {/* Preview */}
+                  {item.spriteBank != null && item.spriteBank !== 0xFF ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/sprites/${item.spriteBank}/${item.spriteIndex ?? 0}`}
+                      alt={`bank ${item.spriteBank} frame ${item.spriteIndex}`}
+                      width={64} height={64}
+                      className="border border-[#1a2e1a] bg-[#080f08] shrink-0"
+                      style={{ imageRendering: 'pixelated', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <div className="w-16 h-16 border border-[#1a2e1a] bg-[#080f08] flex items-center justify-center text-[10px] font-mono text-[#2a4a2a] shrink-0">—</div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3 flex-1">
+                    <label className="flex flex-col gap-1">
+                      <span className={LABEL}>BANK</span>
+                      <input type="number" className={INPUT} value={item.spriteBank ?? ''}
+                        onChange={e => patchNum('spriteBank', e.target.value)} />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className={LABEL}>INDEX</span>
+                      <input type="number" className={INPUT} value={item.spriteIndex ?? ''}
+                        onChange={e => patchNum('spriteIndex', e.target.value)} />
+                    </label>
+                  </div>
                 </div>
               </section>
 
