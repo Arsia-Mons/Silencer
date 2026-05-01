@@ -81,7 +81,7 @@ body::before {
       rgba(0, 163, 40, 0.018) 2px,
       rgba(0, 163, 40, 0.018) 4px
     ),
-    linear-gradient(rgba(3, 6, 3, 0.45), rgba(3, 6, 3, 0.45));
+    linear-gradient(rgba(3, 6, 3, 0.72), rgba(3, 6, 3, 0.72));
   pointer-events: none;
   z-index: 10000;
 }
