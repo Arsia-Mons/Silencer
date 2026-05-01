@@ -529,6 +529,18 @@ export default function MapCanvas({
             ctx.fillStyle = grad;
             ctx.fillRect(gx, gy, gw, gh);
             ctx.drawImage(spr.bitmap, gx, gy, gw, gh);
+            // Radius circle: size 0=80, 1=140, 2=200 world px
+            const lightSize = (u >>> 0) & 3;
+            const lightRadius = lightSize === 2 ? 200 : lightSize === 1 ? 140 : 80;
+            const ringColor = hasColor ? `rgba(${cr},${cg},${cb},0.45)` : 'rgba(255,200,80,0.45)';
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = ringColor;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(cx, cy, lightRadius * zoom, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
           } else {
           const mirrored = a.direction !== 0;
           const sx = cx - (mirrored ? spr.width - spr.offsetX : spr.offsetX) * zoom;
