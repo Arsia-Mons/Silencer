@@ -208,7 +208,7 @@ export function useSilMap(): UseSilMapReturn {
     futureRef.current = [];
     syncUndoRedo();
     setMapData({
-      header: { firstbyte: 0, version: 0, maxplayers: 8, maxteams: 2, parallax: 0, ambience: 0, flags: 0, description: description || 'New Map' },
+      header: { firstbyte: 0, version: 0, maxplayers: 8, maxteams: 2, parallax: 0, ambience: -20, flags: 0, description: description || 'New Map' },
       width, height,
       fileName: 'new_map.SIL',
       layers: {
