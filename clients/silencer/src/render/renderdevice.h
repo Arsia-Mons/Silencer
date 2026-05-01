@@ -38,6 +38,12 @@ public:
 	// Nearest-pixel is always used for the indexed→palette remap step regardless.
 	virtual void SetScaleFilter(bool linear) = 0;
 
+	// Returns false if the backend has lost its presentation target and can no
+	// longer render (e.g. TUI frame socket closed by the frontend). Game loop
+	// uses this to exit cleanly instead of spinning on broken writes.
+	// Default: always alive — GPU backends own the window directly.
+	virtual bool IsAlive() const { return true; }
+
 	// -------------------------------------------------------------------------
 	// Phase 3 — Lighting (additive emissive overlay)
 	// Lights are composited additively onto the scene AFTER palette remap, so

@@ -1,0 +1,27 @@
+{
+  "name": "@arsia-mons/silencer",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "An action/strategy multiplayer side-scrolling platform game set on a futuristic Mars.",
+  "bin": {
+    "silencer": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "bun build src/index.ts --target=bun --outfile=dist/index.js && chmod +x dist/index.js",
+    "fmt": "oxfmt --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "optionalDependencies": {
+    "@arsia-mons/silencer-darwin-arm64": "0.1.0",
+    "@arsia-mons/silencer-linux-x64": "0.1.0",
+    "@arsia-mons/silencer-win32-x64": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.13",
+    "typescript": "^5.4.0"
+  }
+}

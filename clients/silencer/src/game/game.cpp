@@ -1,6 +1,7 @@
 #include "game.h"
 #include "controldispatch.h"
 #include "sdl3gpubackend.h"
+#include "tuibackend.h"
 #include <math.h>
 #include "overlay.h"
 #include "interface.h"
@@ -87,7 +88,9 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	fullscreentoggled = false;
 	replayfile = 0;
 	controlPort = 0;
+	tuiInputPort = 0;
 	headless = false;
+	tui = false;
 	paused = false;
 	stepFramesRemaining = 0;
 	stepWallclockDeadlineMs = 0;
@@ -109,6 +112,7 @@ Game::~Game(){
 	// we join them. Doing this before tearing down anything else keeps members
 	// pendingWaits/etc alive while the drain runs.
 	controlserver.Stop();
+	inputserver.Stop();
 	if(renderdevice){
 		renderdevice->Shutdown();
 		delete renderdevice;
@@ -179,8 +183,17 @@ bool Game::Load(char * cmdline){
 					controlPort = atoi(portstr);
 				}
 			}
+			else if(strcmp(cmdline, "--tui-input-port") == 0){
+				char * portstr = strtok(NULL, " ");
+				if(portstr){
+					tuiInputPort = atoi(portstr);
+				}
+			}
 			else if(strcmp(cmdline, "--headless") == 0){
 				headless = true;
+			}
+			else if(strcmp(cmdline, "--tui") == 0){
+				tui = true;
 			}
 		}while((cmdline = strtok(0, " ")));
 	}
@@ -196,18 +209,41 @@ bool Game::Load(char * cmdline){
 	if(!world.dedicatedserver.active){
 		// SDL_INIT_GAMEPAD is opt-in; without it SDL_GetGamepads() returns
 		// nothing. Headless builds (CI / control-socket smoke tests) skip it
-		// since they don't need controller input.
-		Uint32 sdlflags = headless ? 0 : (SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD);
+		// since they don't need controller input. TUI mode keeps audio so the
+		// engine's normal mixer path works, but skips video and gamepad.
+		Uint32 sdlflags;
+		if(tui){
+			sdlflags = SDL_INIT_AUDIO;
+		}else if(headless){
+			sdlflags = 0;
+		}else{
+			sdlflags = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD;
+		}
 		if(!SDL_Init(sdlflags)){
 			printf("Could not initialize SDL %s\n", SDL_GetError());
 			return false;
 		}
-		if(!headless) OpenFirstGamepad();
+		if(!headless && !tui) OpenFirstGamepad();
 		printf("Loading palette...\n");
 		if(!renderer.palette.SetPalette(0)){
 			return false;
 		}
-		if(!headless){
+		if(tui){
+			if(!MIX_Init()){
+				printf("Could not initialize SDL_mixer: %s\n", SDL_GetError());
+			}
+			if(!Audio::GetInstance().Init(this)){
+				printf("Could not initialize audio\n");
+			}
+			Audio::GetInstance().SetMusicVolume(Config::GetInstance().musicvolume);
+			// No SDL_AddTimer (FPS counter title bar is window-only).
+			// No window — TUIBackend connects to the TS frontend over TCP.
+			if(!SetupRenderDevice()){
+				printf("Could not initialize TUI render device\n");
+				return false;
+			}
+			SetColors(renderer.palette.GetColors());
+		}else if(!headless){
 			if(!MIX_Init()){
 				printf("Could not initialize SDL_mixer: %s\n", SDL_GetError());
 			}
@@ -260,10 +296,26 @@ bool Game::Load(char * cmdline){
 			fprintf(stderr, "[control] failed to start; continuing without\n");
 		}
 	}
+	if(tui && tuiInputPort > 0){
+		if(!inputserver.Start(tuiInputPort)){
+			fprintf(stderr, "[input] failed to start; continuing without\n");
+		}
+	}
 	return true;
 }
 
 bool Game::SetupRenderDevice(void){
+	if(tui){
+		TUIBackend *backend = new TUIBackend();
+		if(!backend->Init(nullptr)){
+			delete backend;
+			return false;
+		}
+		renderdevice = backend;
+		// TUIBackend ignores SetScaleFilter; safe to call.
+		renderdevice->SetScaleFilter(false);
+		return true;
+	}
 	SDL3GPUBackend *backend = new SDL3GPUBackend();
 	if(!backend->Init(window)){
 		delete backend;
@@ -364,7 +416,71 @@ bool Game::Loop(void){
 		world.systemcameraactive[0] = false;
 		world.systemcameraactive[1] = false;
 		world.DoNetwork();
-		UpdateInputState(world.localinput);
+		// In TUI mode, world.localinput is built from the binary input channel
+		// rather than SDL keyboard polling. Two layered sources, each
+		// latest-wins:
+		//   - scancode bitmask  → Game::keystate → UpdateInputState (same
+		//                          path as native SDL, so the user's keymap
+		//                          profile is honored)
+		//   - action snapshot   → ORed on top so programmatic / CLI clients
+		//                          can drive Input fields directly without
+		//                          knowing the keymap.
+		// Edge events (menu nav, text input) still arrive via the control
+		// socket "key" op and bypass this path entirely.
+		if(tui){
+			Uint8 newkeystate[SDL_SCANCODE_COUNT];
+			if(inputserver.LatestScancodes(newkeystate)){
+				// Edge-detect: feed press/release transitions through the
+				// same handlers the SDL path uses, so the in-game ESC
+				// quitstate machine, F1 player-list, debug overlay etc.
+				// behave identically with a TUI keyboard.
+				for(int sc = 0; sc < SDL_SCANCODE_COUNT; ++sc){
+					bool was = keystate[sc] != 0;
+					bool now = newkeystate[sc] != 0;
+					if(was == now) continue;
+					if(now) OnScancodeDown(sc);
+					else    OnScancodeUp(sc);
+				}
+				memcpy(keystate, newkeystate, sizeof(keystate));
+			}
+			UpdateInputState(world.localinput);
+			Input action;
+			if(inputserver.LatestAction(action)){
+				world.localinput.keymoveup        |= action.keymoveup;
+				world.localinput.keymovedown      |= action.keymovedown;
+				world.localinput.keymoveleft      |= action.keymoveleft;
+				world.localinput.keymoveright     |= action.keymoveright;
+				world.localinput.keylookupleft    |= action.keylookupleft;
+				world.localinput.keylookupright   |= action.keylookupright;
+				world.localinput.keylookdownleft  |= action.keylookdownleft;
+				world.localinput.keylookdownright |= action.keylookdownright;
+				world.localinput.keynextinv       |= action.keynextinv;
+				world.localinput.keynextcam       |= action.keynextcam;
+				world.localinput.keyprevcam       |= action.keyprevcam;
+				world.localinput.keydetonate      |= action.keydetonate;
+				world.localinput.keyjump          |= action.keyjump;
+				world.localinput.keyjetpack       |= action.keyjetpack;
+				world.localinput.keyactivate      |= action.keyactivate;
+				world.localinput.keyuse           |= action.keyuse;
+				world.localinput.keyfire          |= action.keyfire;
+				world.localinput.keydisguise      |= action.keydisguise;
+				world.localinput.keynextweapon    |= action.keynextweapon;
+				world.localinput.keyup            |= action.keyup;
+				world.localinput.keydown          |= action.keydown;
+				world.localinput.keyleft          |= action.keyleft;
+				world.localinput.keyright         |= action.keyright;
+				world.localinput.keychat          |= action.keychat;
+				world.localinput.keyweapon[0]     |= action.keyweapon[0];
+				world.localinput.keyweapon[1]     |= action.keyweapon[1];
+				world.localinput.keyweapon[2]     |= action.keyweapon[2];
+				world.localinput.keyweapon[3]     |= action.keyweapon[3];
+				if(action.mousex != 0xFFFF) world.localinput.mousex = action.mousex;
+				if(action.mousey != 0xFFFF) world.localinput.mousey = action.mousey;
+				world.localinput.mousedown        |= action.mousedown;
+			}
+		} else {
+			UpdateInputState(world.localinput);
+		}
 		world.SendInput();
 		if(!Tick()){
 			return false;
@@ -428,7 +544,21 @@ bool Game::Loop(void){
 		}
 		world.DoNetwork();
 		//Uint32 drawtick = SDL_GetTicks();
-		if(!headless) Present();
+		if(!headless || tui) Present();
+		// In TUI mode, the frontend owning our render output may disconnect
+		// (terminal closed, host process killed). TUIBackend tears the socket
+		// down on any write failure; we observe that here and exit cleanly
+		// rather than burning CPU rendering frames nobody reads.
+		if(tui && renderdevice && !renderdevice->IsAlive()){
+			quitRequested = true;
+		}
+		// SDL3GPUBackend's swapchain Present blocks on vsync (~16 ms) so the
+		// non-TUI loop self-throttles. TUIBackend writes to a TCP socket that
+		// never blocks the engine, so without an explicit cap the loop runs
+		// thousands of times per second. Sleep enough to land at ~30 fps —
+		// well above the 24 Hz sim rate (catch-up loop handles the sim
+		// cadence) and well below "burn a CPU core for no reason".
+		if(tui) SDL_Delay(33);
 		PostFrameReplies();
 		//Uint32 afterdrawtick = SDL_GetTicks();
 		/*if(1 || afterdrawtick - drawtick > wait){
@@ -6000,7 +6130,7 @@ bool Game::HandleSDLEvents(void){
 	if(world.dedicatedserver.active){
 		return true;
 	}
-	if(headless){
+	if(headless || tui){
 		// SDL_INIT_VIDEO was skipped, so `window` is NULL; event handlers below
 		// would deref it via SDL_GetWindowSize. Bail before SDL_PollEvent.
 		return true;
@@ -6061,49 +6191,7 @@ bool Game::HandleSDLEvents(void){
 				}
 			}break;
 			case SDL_EVENT_KEY_DOWN:{
-				if(event.key.scancode == quitscancode){
-					Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-					if(localplayer && !localplayer->chatinterfaceid && !localplayer->buyinterfaceid){
-						if(world.quitstate == 0){
-							world.quitstate = 1;
-						}else
-						if(world.quitstate == 2){
-							world.quitstate = 3;
-						}
-					}
-				}
-				if(event.key.scancode == SDL_SCANCODE_F1){
-					world.showplayerlist = true;
-				}
-				if(event.key.scancode == SDL_SCANCODE_F2){
-					if(world.showteamcolors){
-						world.showteamcolors = false;
-					}else{
-						world.showteamcolors = true;
-					}
-				}
-				if(event.key.scancode == SDL_SCANCODE_F5){
-					// play new music track
-					LoadRandomGameMusic();
-					//Audio::GetInstance().PlayMusic(world.resources.gamemusic);
-					PlayMusic(world.resources.gamemusic);
-				}
-				if(event.key.scancode == SDL_SCANCODE_F4){
-					// toggle music playing
-					if(Config::GetInstance().music){
-						if(Audio::GetInstance().MusicPaused()){
-							Audio::GetInstance().ResumeMusic();
-							world.ShowTopMessage("           MUSIC RESUMED");
-						}else{
-							Audio::GetInstance().PauseMusic();
-							world.ShowTopMessage("          *MUSIC PAUSED*");
-						}
-					}
-				}
-				if(event.key.scancode == SDL_SCANCODE_F9){
-					world.debugoverlay = !world.debugoverlay;
-					world.ShowTopMessage(world.debugoverlay ? "        DEBUG OVERLAY ON" : "       DEBUG OVERLAY OFF");
-				}
+				OnScancodeDown(event.key.scancode);
 				keystate[event.key.scancode] = true;
 			bool skip = true;
 			Uint8 ascii;
@@ -6160,17 +6248,7 @@ bool Game::HandleSDLEvents(void){
 				}
 			}break;
 			case SDL_EVENT_KEY_UP:{
-				if(event.key.scancode == quitscancode){
-					if(world.quitstate == 1){
-						world.quitstate = 2;
-					}
-					if(world.quitstate == 3){
-						world.quitstate = 0;
-					}
-				}
-				if(event.key.scancode == SDL_SCANCODE_F1){
-					world.showplayerlist = false;
-				}
+				OnScancodeUp(event.key.scancode);
 				keystate[event.key.scancode] = false;
 			}break;
 			case SDL_EVENT_MOUSE_WHEEL:{
@@ -6234,6 +6312,59 @@ bool Game::HandleSDLEvents(void){
 		}
 	}
 	return true;
+}
+
+void Game::OnScancodeDown(int sc){
+	if(sc == quitscancode){
+		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+		if(localplayer && !localplayer->chatinterfaceid && !localplayer->buyinterfaceid){
+			if(world.quitstate == 0){
+				world.quitstate = 1;
+			}else
+			if(world.quitstate == 2){
+				world.quitstate = 3;
+			}
+		}
+	}
+	if(sc == SDL_SCANCODE_F1){
+		world.showplayerlist = true;
+	}
+	if(sc == SDL_SCANCODE_F2){
+		world.showteamcolors = !world.showteamcolors;
+	}
+	if(sc == SDL_SCANCODE_F5){
+		LoadRandomGameMusic();
+		PlayMusic(world.resources.gamemusic);
+	}
+	if(sc == SDL_SCANCODE_F4){
+		if(Config::GetInstance().music){
+			if(Audio::GetInstance().MusicPaused()){
+				Audio::GetInstance().ResumeMusic();
+				world.ShowTopMessage("           MUSIC RESUMED");
+			}else{
+				Audio::GetInstance().PauseMusic();
+				world.ShowTopMessage("          *MUSIC PAUSED*");
+			}
+		}
+	}
+	if(sc == SDL_SCANCODE_F9){
+		world.debugoverlay = !world.debugoverlay;
+		world.ShowTopMessage(world.debugoverlay ? "        DEBUG OVERLAY ON" : "       DEBUG OVERLAY OFF");
+	}
+}
+
+void Game::OnScancodeUp(int sc){
+	if(sc == quitscancode){
+		if(world.quitstate == 1){
+			world.quitstate = 2;
+		}
+		if(world.quitstate == 3){
+			world.quitstate = 0;
+		}
+	}
+	if(sc == SDL_SCANCODE_F1){
+		world.showplayerlist = false;
+	}
 }
 
 void Game::DrainControlQueue(){

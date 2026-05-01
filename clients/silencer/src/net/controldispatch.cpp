@@ -282,6 +282,41 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		HandleGas(game, cmd);
 		return;
 	}
+	if(cmd.op == "key"){
+		// Edge-triggered key event for the current interface. Mirrors the SDL
+		// SDL_EVENT_KEY_DOWN → ascii translation in HandleSDLEvents — magic
+		// values 1-4 = LEFT/RIGHT/UP/DOWN, '\t'/'\n'/0x1B/'\b' = TAB/ENTER/
+		// ESCAPE/BACKSPACE — and printable chars pass through to text inputs.
+		// Used by the TUI client (no SDL events) to drive menu nav.
+		int ascii = -1;
+		if(cmd.args.contains("ascii") && cmd.args["ascii"].is_number()){
+			ascii = cmd.args["ascii"].get<int>();
+		}else if(cmd.args.contains("key") && cmd.args["key"].is_string()){
+			std::string k = cmd.args["key"].get<std::string>();
+			if(k == "left")           ascii = 1;
+			else if(k == "right")     ascii = 2;
+			else if(k == "up")        ascii = 3;
+			else if(k == "down")      ascii = 4;
+			else if(k == "tab")       ascii = '\t';
+			else if(k == "enter")     ascii = '\n';
+			else if(k == "escape")    ascii = 0x1B;
+			else if(k == "backspace") ascii = '\b';
+			else if(k.size() == 1)    ascii = (unsigned char)k[0];
+		}
+		if(ascii < 0){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "key needs 'ascii' int or 'key' name/char"));
+			return;
+		}
+		Uint16 ifid = game.GetCurrentInterfaceId();
+		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
+		if(!iface){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
+			return;
+		}
+		iface->ProcessKeyPress(game.GetWorld(), (char)ascii);
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));
 }
 

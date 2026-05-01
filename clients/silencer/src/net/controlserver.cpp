@@ -1,9 +1,11 @@
 #include "controlserver.h"
 #include "controldispatch.h"
 #include <algorithm>
+#include <condition_variable>
 #include <cstdio>
 #include <cstring>
 #include <chrono>
+#include <deque>
 #ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
@@ -179,10 +181,55 @@ static std::string ReplyToLine(const ControlReply& r) {
 }
 
 void ControlServer::HandleConnection(int cfd) {
+	// Reader/writer split: the reader thread (this one) parses lines, queues
+	// commands, and pushes futures into `pending`. A per-connection writer
+	// thread drains those futures in arrival order and emits replies as they
+	// resolve. This eliminates head-of-line blocking — a slow MULTI_FRAME op
+	// no longer blocks subsequent fast ops on the same connection. JS-side
+	// ControlClient multiplexes replies by id, so wire ordering is irrelevant
+	// to correctness even if futures resolve out of order.
+	std::deque<std::shared_future<ControlReply>> pending;
+	std::mutex pending_mu;
+	std::condition_variable pending_cv;
+	std::atomic<bool> reader_done{false};
+	std::atomic<bool> write_failed{false};
+
+	std::thread writer([&](){
+		while(true){
+			std::shared_future<ControlReply> fut;
+			{
+				std::unique_lock<std::mutex> lk(pending_mu);
+				pending_cv.wait(lk, [&]{
+					return write_failed.load() || !pending.empty() ||
+					       (reader_done.load() && pending.empty());
+				});
+				if(write_failed.load()) return;
+				if(pending.empty()){
+					if(reader_done.load()) return;
+					continue;
+				}
+				fut = pending.front();
+				pending.pop_front();
+			}
+			ControlReply got = fut.get();
+			if(!WriteAll(cfd, ReplyToLine(got))){
+				write_failed.store(true);
+				// Closing the socket nudges the reader's recv() out of its
+				// blocking wait so it observes EOF and unwinds.
+#ifdef _WIN32
+				::shutdown(cfd, SD_BOTH);
+#else
+				::shutdown(cfd, SHUT_RDWR);
+#endif
+				return;
+			}
+		}
+	});
+
 	std::string line;
-	while(running.load() && ReadLine(cfd, line)){
+	while(running.load() && !write_failed.load() && ReadLine(cfd, line)){
 		ControlCommand cmd;
-		ControlReply rpl;
+		bool noreply = false;
 		try {
 			json j = json::parse(line);
 			cmd.id = j.value("id", 0);
@@ -190,18 +237,28 @@ void ControlServer::HandleConnection(int cfd) {
 			if(j.contains("args") && j["args"].is_object()){
 				cmd.args = j["args"];
 			}
+			noreply = j.value("noreply", false);
 		} catch(const std::exception& e) {
+			ControlReply rpl;
 			rpl.id = 0;
 			rpl.ok = false;
 			rpl.code = "BAD_REQUEST";
 			rpl.error = e.what();
-			WriteAll(cfd, ReplyToLine(rpl));
+			auto p = std::make_shared<std::promise<ControlReply>>();
+			p->set_value(rpl);
+			{
+				std::lock_guard<std::mutex> lk(pending_mu);
+				pending.push_back(p->get_future().share());
+			}
+			pending_cv.notify_one();
 			break;
 		}
 		cmd.phase = ControlDispatch::PhaseFor(cmd.op);
 		auto promise = std::make_shared<std::promise<ControlReply>>();
-		auto fut = promise->get_future();
+		auto fut = promise->get_future().share();
 		cmd.reply = promise;
+		// Queue for the dispatcher first so the future is guaranteed reachable
+		// before the writer can pop it.
 		{
 			std::lock_guard<std::mutex> lk(queue_mu);
 			if(cmd.phase == ControlCommand::POST_RENDER){
@@ -210,9 +267,18 @@ void ControlServer::HandleConnection(int cfd) {
 				immediate.push_back(std::move(cmd));
 			}
 		}
-		ControlReply got = fut.get();
-		if(!WriteAll(cfd, ReplyToLine(got))) break;
+		if(!noreply){
+			std::lock_guard<std::mutex> lk(pending_mu);
+			pending.push_back(fut);
+			pending_cv.notify_one();
+		}
+		// noreply=true: future is fulfilled by the dispatcher and quietly
+		// dropped. No wire chatter, no allocation pressure on the writer.
 	}
+	reader_done.store(true);
+	pending_cv.notify_one();
+	if(writer.joinable()) writer.join();
+
 	// Take ownership of the close: Stop() may have already closed and -1'd our
 	// entry; only close if the entry still names our fd.
 	int my_cfd = -1;
