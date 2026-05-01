@@ -1,6 +1,7 @@
 #include "playerai.h"
 #include <algorithm>
 #include "basedoor.h"
+#include "../gas/gasloader.h"
 
 PlayerAI::PlayerAI(Player & player) : player(player){
 	direction = false;
@@ -60,7 +61,8 @@ void PlayerAI::Tick(World & world){
 	}
 	
 	if(state == HACK){
-		if(rand() % 50 == 0){
+		const PlayerDef& _pd = GASLoader::Get().player;
+		if(_pd.aiDisguiseInterval > 0 && rand() % _pd.aiDisguiseInterval == 0){
 			player.input.keydisguise = true;
 		}
 		std::vector<Uint8> types;
@@ -72,7 +74,7 @@ void PlayerAI::Tick(World & world){
 					Terminal * terminal = static_cast<Terminal *>(*it);
 					if(terminal->state == Terminal::READY || terminal->state == Terminal::HACKERGONE){
 						if(player.state != Player::HACKING){
-							if(rand() % 3 == 0){
+							if(_pd.aiHackInterval > 0 && rand() % _pd.aiHackInterval == 0){
 								player.input.keyactivate = true;
 							}
 							ClearTarget();
@@ -212,9 +214,10 @@ bool PlayerAI::FollowPath(World & world){
 		}
 	}
 	if(targetplatformset){
+		const PlayerDef& _pd2 = GASLoader::Get().player;
 		if(currentplatform && targetplatformset == currentplatform->set){
 			int diff = abs(targetx - player.x);
-			if(diff > 8){
+			if(diff > _pd2.aiArrivalThreshold){
 				if(targetx < player.x){
 					player.input.keymoveleft = true;
 				}else
@@ -229,7 +232,7 @@ bool PlayerAI::FollowPath(World & world){
 			ladderjumping = false;
 			if(direction){
 				player.input.keymoveup = true;
-				if(rand() % 12 == 0){
+				if(_pd2.aiLadderJumpUpInterval > 0 && rand() % _pd2.aiLadderJumpUpInterval == 0){
 					player.input.keyjump = true;
 					player.input.keymoveleft = false;
 					player.input.keymoveright = false;
@@ -237,7 +240,7 @@ bool PlayerAI::FollowPath(World & world){
 				}
 			}else{
 				player.input.keymovedown = true;
-				if(rand() % 5 == 0){
+				if(_pd2.aiLadderJumpDownInterval > 0 && rand() % _pd2.aiLadderJumpDownInterval == 0){
 					player.input.keyjump = true;
 				}
 			}
@@ -246,7 +249,7 @@ bool PlayerAI::FollowPath(World & world){
 			player.input.keymoveleft = false;
 			player.input.keymoveright = false;
 			if(ladderjumping){
-				if(rand() % 12 == 0){
+				if(_pd2.aiLadderJumpUpInterval > 0 && rand() % _pd2.aiLadderJumpUpInterval == 0){
 					player.input.keymoveup = true;
 				}
 			}

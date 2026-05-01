@@ -2,6 +2,7 @@
 #include "object.h"
 #include "projectile.h"
 #include "shrapnel.h"
+#include "../gas/gasloader.h"
 #include <math.h>
 
 Hittable::Hittable(){
@@ -54,24 +55,30 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 			shield -= projectile.shielddamage;
 			state_hit = 1 + (2 * 32);
 		}
-		if(shield <= 60){
+		if(shield <= GASLoader::Get().player.shieldShrapnelThreshold){
 			switch(projectile.type){
 				case ObjectTypes::BLASTERPROJECTILE:
 				case ObjectTypes::LASERPROJECTILE:
-				case ObjectTypes::ROCKETPROJECTILE:
-					for(int i = 0; i < 8; i++){
-						Shrapnel * shrapnel = (Shrapnel *)world.CreateObject(ObjectTypes::SHRAPNEL);
-						if(shrapnel){
-							shrapnel->x = projectile.x;
-							shrapnel->y = projectile.y;
-							shrapnel->res_index = rand() % 9;
-							shrapnel->res_bank = 110;
-							float angle = (i / float(8)) * (2 * 3.14);
-							angle += (rand() % 10) / float(10);
-							shrapnel->xv = (sin(angle)) * 4;
-							shrapnel->yv = (cos(angle)) * 4;
+				case ObjectTypes::ROCKETPROJECTILE:{
+					const PlayerDef& _pd = GASLoader::Get().player;
+					if(shield <= _pd.shieldShrapnelThreshold){
+						int _n = _pd.shrapnelCount;
+						float _spd = _pd.shrapnelSpeed;
+						for(int i = 0; i < _n; i++){
+							Shrapnel * shrapnel = (Shrapnel *)world.CreateObject(ObjectTypes::SHRAPNEL);
+							if(shrapnel){
+								shrapnel->x = projectile.x;
+								shrapnel->y = projectile.y;
+								shrapnel->res_index = rand() % 9;
+								shrapnel->res_bank = 110;
+								float angle = (i / float(_n)) * (2 * 3.14);
+								angle += (rand() % 10) / float(10);
+								shrapnel->xv = (sin(angle)) * _spd;
+								shrapnel->yv = (cos(angle)) * _spd;
+							}
 						}
 					}
+				}
 				break;
 				default:
 				break;
@@ -80,40 +87,33 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 	}
 	switch(projectile.type){
 		case ObjectTypes::BLASTERPROJECTILE:{
-			if(rand() % 2 == 0){
-				object.EmitSound(world, world.resources.soundbank["strike03.wav"], 96);
-			}else{
-				object.EmitSound(world, world.resources.soundbank["strike04.wav"], 96);
-			}
+			const PlayerDef& pd = GASLoader::Get().player;
+			const std::string& s = (rand() % 2 == 0) ? pd.soundImpactBlaster1 : pd.soundImpactBlaster2;
+			object.EmitSound(world, world.resources.soundbank[s], 96);
 		}break;
 		case ObjectTypes::WALLPROJECTILE:
 		case ObjectTypes::LASERPROJECTILE:{
+			const PlayerDef& pd = GASLoader::Get().player;
 			if(damagedshield){
-				if(rand() % 2 == 0){
-					object.EmitSound(world, world.resources.soundbank["strike01.wav"], 96);
-				}else{
-					object.EmitSound(world, world.resources.soundbank["strike02.wav"], 96);
-				}
+				const std::string& s = (rand() % 2 == 0) ? pd.soundImpactLaserShield1 : pd.soundImpactLaserShield2;
+				object.EmitSound(world, world.resources.soundbank[s], 96);
 			}else{
-				if(rand() % 2 == 0){
-					object.EmitSound(world, world.resources.soundbank["strike03.wav"], 96);
-				}else{
-					object.EmitSound(world, world.resources.soundbank["strike04.wav"], 96);
-				}
+				const std::string& s = (rand() % 2 == 0) ? pd.soundImpactLaser1 : pd.soundImpactLaser2;
+				object.EmitSound(world, world.resources.soundbank[s], 96);
 			}
 		}break;
 		case ObjectTypes::ROCKETPROJECTILE:{
 			
 		}break;
 		case ObjectTypes::FLAMERPROJECTILE:{
-			if(world.tickcount % 4 == 0){
-				object.EmitSound(world, world.resources.soundbank["s_flmc01.wav"], 128);
+			if(world.tickcount % GASLoader::Get().player.flamerSoundInterval == 0){
+				object.EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundImpactFlamer], 128);
 			}
 		}break;
 	}
 	Uint8 hit_type = state_hit / 32;
 	if(hit_type == 1 && health > 0){
-		object.EmitSound(world, world.resources.soundbank["shlddn1.wav"]);
+		object.EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundShieldDown]);
 	}
 	hitx = x;
 	hity = y;

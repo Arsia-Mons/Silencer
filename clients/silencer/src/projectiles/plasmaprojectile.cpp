@@ -20,7 +20,7 @@ PlasmaProjectile::PlasmaProjectile() : Object(ObjectTypes::PLASMAPROJECTILE){
 	stopatobjectcollision = false;
 	isprojectile = true;
 	isphysical = true;
-	snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 }
 
 void PlasmaProjectile::Serialize(bool write, Serializer & data, Serializer * old){
@@ -61,8 +61,10 @@ void PlasmaProjectile::Tick(World & world){
 			if(yn){
 				yv = (yn * abs(yv));
 			}
-			xv *= 0.8;
-			yv *= 0.8;
+			{ const WeaponDef* pd = GASLoader::Get().GetWeaponDef("plasma");
+			  float bd = (pd && pd->bounceDamping > 0.0f) ? pd->bounceDamping : 0.8f;
+			  xv *= bd;
+			  yv *= bd; }
 		}
 		//world->MarkDestroyObject(id);
 	}

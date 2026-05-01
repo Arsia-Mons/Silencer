@@ -33,8 +33,10 @@ void Detonator::Tick(World & world){
 	}
 	// 182:0-3 det/camera
 	if(state_i == 0){
-		EmitSound(world, world.resources.soundbank["shield2.wav"], 96);
-		state_warp = 12;
+		{ const WeaponDef* dw = GASLoader::Get().GetWeaponDef("plasmadetonator");
+		  const std::string& arm = (dw && !dw->soundFire.empty()) ? dw->soundFire : std::string("shield2.wav");
+		  EmitSound(world, world.resources.soundbank[arm], 96); }
+		state_warp = GASLoader::Get().player.warpTeleportTick;
 	}
 	res_index = (state_i / 4) % 4;
 	if(state_i == 4 * 4){
@@ -48,9 +50,11 @@ void Detonator::Tick(World & world){
 		if(state_i >= (4 * 4) + 6){
 			if(state_i == (4 * 4) + 6){
 				// explode
+				const WeaponDef* dw = GASLoader::Get().GetWeaponDef("plasmadetonator");
 				if(iscamera){
 					draw = false;
-					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 64);
+					const std::string& sfx = (dw && !dw->soundHit1.empty()) ? dw->soundHit1 : "q_expl02.wav";
+					EmitSound(world, world.resources.soundbank[sfx], 64);
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){
@@ -59,40 +63,41 @@ void Detonator::Tick(World & world){
 						}
 					}
 				}else{
-					EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
-					Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
-					Sint8 yvs[] = {-25, -25, 0, 0, 5, 5};
-					Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};
+					const std::string& sfx = (dw && !dw->soundExplosion.empty()) ? dw->soundExplosion : "seekexp1.wav";
+					EmitSound(world, world.resources.soundbank[sfx], 128);
+					{ const WeaponDef* dw2 = GASLoader::Get().GetWeaponDef("plasmadetonator");
+					static const Sint8 fbx[] = {-14, 14, -10, 10, -10, 10};
+					static const Sint8 fby[] = {-25, -25, 0, 0, 5, 5};
 					for(int i = 0; i < 6; i++){
 						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
 						if(plasmaprojectile){
 							plasmaprojectile->large = false;
 							plasmaprojectile->x = x;
-							plasmaprojectile->y = y + ys[i];
+							plasmaprojectile->y = y;
 							plasmaprojectile->ownerid = ownerid;
-							plasmaprojectile->xv = xvs[i];
-							plasmaprojectile->yv = yvs[i];
+							plasmaprojectile->xv = (dw2 && i < (int)dw2->primaryVectors.size()) ? dw2->primaryVectors[i].xv : fbx[i];
+							plasmaprojectile->yv = (dw2 && i < (int)dw2->primaryVectors.size()) ? dw2->primaryVectors[i].yv : fby[i];
 						}
-					}
+					} }
 				}
 			}
 			if(state_i == (4 * 4) + 8){
 				if(!iscamera){
 					// explode
-					Sint8 xvs[] = {-14, 0, 14, -5, 0, 5};
-					Sint8 yvs[] = {-5, -10, -5, 5, 5, 5};
-					Sint8 ys[] = {0, 0, 0, 0, 0, 0};
+					{ const WeaponDef* dw2 = GASLoader::Get().GetWeaponDef("plasmadetonator");
+					static const Sint8 fbx[] = {-14, 0, 14, -5, 0, 5};
+					static const Sint8 fby[] = {-5, -10, -5, 5, 5, 5};
 					for(int i = 0; i < 6; i++){
 						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
 						if(plasmaprojectile){
 							plasmaprojectile->large = true;
 							plasmaprojectile->x = x;
-							plasmaprojectile->y = y + ys[i];
+							plasmaprojectile->y = y;
 							plasmaprojectile->ownerid = ownerid;
-							plasmaprojectile->xv = xvs[i];
-							plasmaprojectile->yv = yvs[i];
+							plasmaprojectile->xv = (dw2 && i < (int)dw2->secondaryVectors.size()) ? dw2->secondaryVectors[i].xv : fbx[i];
+							plasmaprojectile->yv = (dw2 && i < (int)dw2->secondaryVectors.size()) ? dw2->secondaryVectors[i].yv : fby[i];
 						}
-					}
+					} }
 				}
 			}
 			draw = false;

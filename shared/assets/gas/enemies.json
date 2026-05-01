@@ -1,104 +1,337 @@
 {
-  "_comment": "Enemy NPC base stats — 1:1 from guard.cpp, robot.cpp, civilian.cpp constructors. Guards share the same base health/speed/shield across all weapon variants (weapon=0 blaster, 1 laser, 2 rocket — distinguished by actordef id). Do not change during GAS migration.",
-  "enemies": [
-    {
-      "id": "guard-blaster",
-      "health": 25,
-      "shield": 15,
-      "speed": 5,
-      "weapon": 0,
-      "shotCooldown": 48,
-      "chaseRangeClose": 60,
-      "chaseRangeStop": 80,
-      "chaseRangeMax": 90,
-      "respawnSeconds": 30,
-      "ladderCooldown": 120,
-      "meleeCycleTicks": 32,
-      "meleeDelayTicks": 10,
-      "targetStandingHeight": 50,
-      "ladderYThreshold": 48,
-      "ladderXTolerance": 8,
-      "patrolReturnProximity": 20,
-      "ladderClimbSpeed": 5
-    },
-    {
-      "id": "guard-laser",
-      "health": 25,
-      "shield": 15,
-      "speed": 5,
-      "weapon": 1,
-      "shotCooldown": 48,
-      "chaseRangeClose": 60,
-      "chaseRangeStop": 80,
-      "chaseRangeMax": 90,
-      "respawnSeconds": 30,
-      "ladderCooldown": 120,
-      "meleeCycleTicks": 32,
-      "meleeDelayTicks": 10,
-      "targetStandingHeight": 50,
-      "ladderYThreshold": 48,
-      "ladderXTolerance": 8,
-      "patrolReturnProximity": 20,
-      "ladderClimbSpeed": 5,
-      "ammoDropQuantity": 5
-    },
-    {
-      "id": "guard-rocket",
-      "health": 25,
-      "shield": 15,
-      "speed": 5,
-      "weapon": 2,
-      "shotCooldown": 48,
-      "chaseRangeClose": 60,
-      "chaseRangeStop": 80,
-      "chaseRangeMax": 90,
-      "respawnSeconds": 30,
-      "ladderCooldown": 120,
-      "meleeCycleTicks": 32,
-      "meleeDelayTicks": 10,
-      "targetStandingHeight": 50,
-      "ladderYThreshold": 48,
-      "ladderXTolerance": 8,
-      "patrolReturnProximity": 20,
-      "ladderClimbSpeed": 5,
-      "ammoDropQuantity": 3
-    },
-    {
-      "id": "robot",
-      "health": 200,
-      "shield": 400,
-      "speed": 4,
-      "searchTicks": 600,
-      "meleeCheckInterval": 40,
-      "respawnSeconds": 45,
-      "meleeDamageHealth": 60,
-      "meleeDamageShield": 60,
-      "returnProximity": 20,
-      "sleepTicks": 100,
-      "shootCooldownCap": 50,
-      "deathDropFiles": 250,
-      "ladderClimbSpeed": 5,
-      "rocketLaunchXv": 25,
-      "lookDefaultMinX": 70,
-      "lookDefaultMaxX": 500,
-      "lookDefaultY": -60,
-      "lookDirMinX": 70,
-      "lookDirMaxX": 200,
-      "lookDirY1": -10,
-      "lookDirY2": -100
-    },
-    {
-      "id": "civilian",
-      "health": 0,
-      "shield": 0,
-      "speed": 4,
-      "speedAlt": 5,
-      "tractHealthDamage": 80,
-      "tractShieldDamage": 80,
-      "runSpeedBonus": 5,
-      "threatDetectX": 200,
-      "threatDetectY": 100,
-      "_note": "Civilian health is not set in constructor — Object base default applies."
-    }
-  ]
+      "_comment": "Enemy NPC base stats \u2014 1:1 from guard.cpp, robot.cpp, civilian.cpp constructors. Guards share the same base health/speed/shield across all weapon variants (weapon=0 blaster, 1 laser, 2 rocket \u2014 distinguished by actordef id). Do not change during GAS migration.",
+      "enemies": [
+            {
+                  "id": "guard-blaster",
+                  "health": 25,
+                  "shield": 15,
+                  "speed": 5,
+                  "weapon": 0,
+                  "shotCooldown": 48,
+                  "chaseRangeClose": 60,
+                  "chaseRangeStop": 80,
+                  "chaseRangeMax": 90,
+                  "respawnSeconds": 30,
+                  "ladderCooldown": 120,
+                  "meleeCycleTicks": 32,
+                  "meleeDelayTicks": 10,
+                  "targetStandingHeight": 50,
+                  "ladderYThreshold": 48,
+                  "ladderXTolerance": 8,
+                  "patrolReturnProximity": 20,
+                  "ladderClimbSpeed": 5,
+                  "deathDropYV": 15,
+                  "patrolTurnInterval": 3,
+                  "deathDropXVRange": 4,
+                  "soundHurt1": "groan2.wav",
+                  "soundHurt2": "groan2a.wav",
+                  "soundHurt3": "grunt2a.wav",
+                  "snapshotInterval": 48,
+                  "warpTeleportTick": 12,
+                  "lookBoxes": [
+                        {
+                              "dir": 0,
+                              "x1": 70,
+                              "x2": 200,
+                              "y1": -55,
+                              "y2": -55
+                        },
+                        {
+                              "dir": 1,
+                              "x1": 70,
+                              "x2": 200,
+                              "y1": -37,
+                              "y2": -37
+                        },
+                        {
+                              "dir": 2,
+                              "x1": 2,
+                              "x2": 2,
+                              "y1": -150,
+                              "y2": -300
+                        },
+                        {
+                              "dir": 3,
+                              "x1": 12,
+                              "x2": 12,
+                              "y1": 50,
+                              "y2": 200
+                        },
+                        {
+                              "dir": 4,
+                              "x1": 20,
+                              "x2": 220,
+                              "y1": -82,
+                              "y2": -282
+                        },
+                        {
+                              "dir": 5,
+                              "x1": 28,
+                              "x2": 228,
+                              "y1": -30,
+                              "y2": 170
+                        },
+                        {
+                              "dir": 6,
+                              "x1": 4,
+                              "x2": 4,
+                              "y1": -150,
+                              "y2": -300
+                        },
+                        {
+                              "dir": 7,
+                              "x1": 11,
+                              "x2": 11,
+                              "y1": 50,
+                              "y2": 200
+                        },
+                        {
+                              "dir": 10,
+                              "x1": -100,
+                              "x2": 0,
+                              "y1": -55,
+                              "y2": -55
+                        }
+                  ]
+            },
+            {
+                  "id": "guard-laser",
+                  "health": 25,
+                  "shield": 15,
+                  "speed": 5,
+                  "weapon": 1,
+                  "shotCooldown": 48,
+                  "chaseRangeClose": 60,
+                  "chaseRangeStop": 80,
+                  "chaseRangeMax": 90,
+                  "respawnSeconds": 30,
+                  "ladderCooldown": 120,
+                  "meleeCycleTicks": 32,
+                  "meleeDelayTicks": 10,
+                  "targetStandingHeight": 50,
+                  "ladderYThreshold": 48,
+                  "ladderXTolerance": 8,
+                  "patrolReturnProximity": 20,
+                  "ladderClimbSpeed": 5,
+                  "ammoDropQuantity": 5,
+                  "deathDropYV": 15,
+                  "soundHurt1": "groan2.wav",
+                  "soundHurt2": "groan2a.wav",
+                  "soundHurt3": "grunt2a.wav",
+                  "snapshotInterval": 48,
+                  "warpTeleportTick": 12,
+                  "lookBoxes": [
+                        {
+                              "dir": 0,
+                              "x1": 70,
+                              "x2": 200,
+                              "y1": -55,
+                              "y2": -55
+                        },
+                        {
+                              "dir": 1,
+                              "x1": 70,
+                              "x2": 200,
+                              "y1": -37,
+                              "y2": -37
+                        },
+                        {
+                              "dir": 2,
+                              "x1": 2,
+                              "x2": 2,
+                              "y1": -150,
+                              "y2": -300
+                        },
+                        {
+                              "dir": 3,
+                              "x1": 12,
+                              "x2": 12,
+                              "y1": 50,
+                              "y2": 200
+                        },
+                        {
+                              "dir": 4,
+                              "x1": 20,
+                              "x2": 220,
+                              "y1": -82,
+                              "y2": -282
+                        },
+                        {
+                              "dir": 5,
+                              "x1": 28,
+                              "x2": 228,
+                              "y1": -30,
+                              "y2": 170
+                        },
+                        {
+                              "dir": 6,
+                              "x1": 4,
+                              "x2": 4,
+                              "y1": -150,
+                              "y2": -300
+                        },
+                        {
+                              "dir": 7,
+                              "x1": 11,
+                              "x2": 11,
+                              "y1": 50,
+                              "y2": 200
+                        },
+                        {
+                              "dir": 10,
+                              "x1": -100,
+                              "x2": 0,
+                              "y1": -55,
+                              "y2": -55
+                        }
+                  ]
+            },
+            {
+                  "id": "guard-rocket",
+                  "health": 25,
+                  "shield": 15,
+                  "speed": 5,
+                  "weapon": 2,
+                  "shotCooldown": 48,
+                  "chaseRangeClose": 60,
+                  "chaseRangeStop": 80,
+                  "chaseRangeMax": 90,
+                  "respawnSeconds": 30,
+                  "ladderCooldown": 120,
+                  "meleeCycleTicks": 32,
+                  "meleeDelayTicks": 10,
+                  "targetStandingHeight": 50,
+                  "ladderYThreshold": 48,
+                  "ladderXTolerance": 8,
+                  "patrolReturnProximity": 20,
+                  "ladderClimbSpeed": 5,
+                  "ammoDropQuantity": 3,
+                  "deathDropYV": 15,
+                  "soundHurt1": "groan2.wav",
+                  "soundHurt2": "groan2a.wav",
+                  "soundHurt3": "grunt2a.wav",
+                  "snapshotInterval": 48,
+                  "warpTeleportTick": 12,
+                  "lookBoxes": [
+                        {
+                              "dir": 0,
+                              "x1": 70,
+                              "x2": 200,
+                              "y1": -55,
+                              "y2": -55
+                        },
+                        {
+                              "dir": 1,
+                              "x1": 70,
+                              "x2": 200,
+                              "y1": -37,
+                              "y2": -37
+                        },
+                        {
+                              "dir": 2,
+                              "x1": 2,
+                              "x2": 2,
+                              "y1": -150,
+                              "y2": -300
+                        },
+                        {
+                              "dir": 3,
+                              "x1": 12,
+                              "x2": 12,
+                              "y1": 50,
+                              "y2": 200
+                        },
+                        {
+                              "dir": 4,
+                              "x1": 20,
+                              "x2": 220,
+                              "y1": -82,
+                              "y2": -282
+                        },
+                        {
+                              "dir": 5,
+                              "x1": 28,
+                              "x2": 228,
+                              "y1": -30,
+                              "y2": 170
+                        },
+                        {
+                              "dir": 6,
+                              "x1": 4,
+                              "x2": 4,
+                              "y1": -150,
+                              "y2": -300
+                        },
+                        {
+                              "dir": 7,
+                              "x1": 11,
+                              "x2": 11,
+                              "y1": 50,
+                              "y2": 200
+                        },
+                        {
+                              "dir": 10,
+                              "x1": -100,
+                              "x2": 0,
+                              "y1": -55,
+                              "y2": -55
+                        }
+                  ]
+            },
+            {
+                  "id": "robot",
+                  "health": 200,
+                  "shield": 400,
+                  "speed": 4,
+                  "searchTicks": 600,
+                  "meleeCheckInterval": 40,
+                  "respawnSeconds": 45,
+                  "meleeDamageHealth": 60,
+                  "meleeDamageShield": 60,
+                  "returnProximity": 20,
+                  "sleepTicks": 100,
+                  "shootCooldownCap": 50,
+                  "deathDropFiles": 250,
+                  "deathDropYV": 15,
+                  "deathDropXVRange": 4,
+                  "ladderClimbSpeed": 5,
+                  "rocketLaunchXv": 25,
+                  "lookDefaultMinX": 70,
+                  "lookDefaultMaxX": 500,
+                  "lookDefaultY": -60,
+                  "lookDirMinX": 70,
+                  "lookDirMaxX": 200,
+                  "lookDirY1": -10,
+                  "lookDirY2": -100,
+                  "soundFire": "!laserew.wav",
+                  "soundActivate": "airlokj.wav",
+                  "soundAmbient": "wndloope.wav",
+                  "soundMelee": "robotarm.wav",
+                  "soundMoveRight": "robot3r.wav",
+                  "soundMoveLeft": "robot3l.wav",
+                  "soundDeath": "seekexp1.wav",
+                  "snapshotInterval": 48
+            },
+            {
+                  "id": "civilian",
+                  "health": 0,
+                  "shield": 0,
+                  "speed": 4,
+                  "speedAlt": 5,
+                  "tractHealthDamage": 80,
+                  "tractShieldDamage": 80,
+                  "runSpeedBonus": 5,
+                  "threatDetectX": 200,
+                  "threatDetectY": 100,
+                  "soundHurt1": "groan2.wav",
+                  "soundHurt2": "groan2a.wav",
+                  "soundHurt3": "grunt2a.wav",
+                  "soundDeath": "seekexp1.wav",
+                  "snapshotInterval": 72,
+                  "warpTeleportTick": 12,
+                  "runDurationTicks": 150,
+                  "deadRespawnTicks": 100,
+                  "_note": "Civilian health is not set in constructor \u2014 Object base default applies."
+            }
+      ]
 }

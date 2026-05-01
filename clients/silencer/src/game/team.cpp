@@ -63,17 +63,17 @@ void Team::Tick(World & world){
 		for(int i = 0; i < numpeers; i++){
 			Peer * peer = world.peerlist[peers[i]];
 			if(peer){
-				world.SendSound("select2.wav", peer, 32);
+				world.SendSound(GASLoader::Get().player.soundTeamJoin.c_str(), peer, 32);
 			}
 		}
 		oldsecretprogress = secretprogress;
 	}
 	if(secretdelivered){
 		secrets++;
-		world.SendSound("cathdoor.wav");
+		world.SendSound(GASLoader::Get().player.soundTeamHQ.c_str());
 		Player * player = static_cast<Player *>(world.GetObjectFromId(secretdelivered));
 		if(player){
-			player->EmitSound(world, world.resources.soundbank["if15.wav"], 48);
+			player->EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundTeamHeal], 48);
 			Peer * peer = player->GetPeer(world);
 			if(peer){
 				User * user = world.lobby.GetUserInfo(peer->accountid);
@@ -83,7 +83,7 @@ void Team::Tick(World & world){
 				}
 				int remaining = GASLoader::Get().player.secretsNeededToWin - secrets;
 				char text[128];
-				sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded 1000 credits", user->name, stolen ? "stolen secret" : "secret", remaining);
+				sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded %d credits", user->name, stolen ? "stolen secret" : "secret", remaining, GASLoader::Get().player.secretDeliveryCredits);
 				if(!world.intutorialmode){
 					world.ShowMessage(text, 128, 0, true);
 				}
@@ -191,7 +191,7 @@ void Team::Tick(World & world){
 						}
 					}
 				}
-				world.SendSound("typerev6.wav");
+				world.SendSound(GASLoader::Get().player.soundTeamHack.c_str());
 			}
 		}
 	}

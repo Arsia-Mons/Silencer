@@ -88,12 +88,12 @@ public:
 	unsigned int totalsnapshots;
 	unsigned int totalinputpackets;
 	Uint8 gravity;
-	static const int minwalldistance = 35;
+	int minwalldistance;
 	Uint8 maxyvelocity;
 	bool replaying;
 	Uint8 quitstate;
 	std::deque<std::string> chatlines;
-	Uint8 showchat_i;
+	int showchat_i;
 	std::vector<BuyableItem *> buyableitems;
 	std::deque<char *> statusmessages;
 	static const int maxstatusmessages = 4;

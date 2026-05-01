@@ -6,6 +6,7 @@
 #include "fixedcannon.h"
 #include "flamerprojectile.h"
 #include "flareprojectile.h"
+#include "../gas/gasloader.h"
 
 Projectile::Projectile(){
 	shielddamage = 0;
@@ -132,11 +133,14 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 				if(thecollidedobject->type == ObjectTypes::PLAYER){
 					Player * collidedplayer = static_cast<Player *>(thecollidedobject);
 					if(poisonous /*&& collidedplayer->id != ownerid*/){
-						// poison a little bit 4 times per second, max of 3 poison
-						if(world.tickcount % 6 == 0 && collidedplayer->poisonedamount < 3 && collidedplayer->Poison(world, ownerid, 1)){
-							/*if(peer){
-								peer->stats.poisons++;
-							}*/
+						const WeaponDef* pw = GASLoader::Get().GetWeaponDef("poisonflare");
+						int pinterval = (pw && pw->poisonCheckInterval) ? pw->poisonCheckInterval : 6;
+						if(world.tickcount % pinterval == 0){
+							int pmax  = (pw && pw->poisonMax)  ? pw->poisonMax  : 3;
+							int prate = (pw && pw->poisonRate) ? pw->poisonRate : 1;
+							if(collidedplayer->poisonedamount < pmax){
+								collidedplayer->Poison(world, ownerid, prate);
+							}
 						}
 					}
 				}

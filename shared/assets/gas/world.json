@@ -1,0 +1,20 @@
+{
+  "soundAmbience1": "wndloopb.wav",
+  "soundAmbience2": "cphum11.wav",
+  "soundAmbience3": "wndloop1.wav",
+  "audioRange": 500,
+  "networkSyncRangeX": 500,
+  "networkSyncRangeY": 450,
+  "grenadesyncRangeX": 300,
+  "grenadesyncRangeY": 300,
+  "illuminateLevel": 15,
+  "terminalActivatePercent": 0.35,
+  "terminalBigBeamMin": 10,
+  "terminalBigBeamRange": 26,
+  "terminalSmallBeamMin": 1,
+  "terminalSmallBeamRange": 10,
+  "bodyPartSpawnYOffset": 50,
+  "bodyPartLaunchYV": 20,
+  "bodyPartVelocityRange": 16,
+  "minWallDistance": 35
+}

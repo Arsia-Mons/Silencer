@@ -35,7 +35,8 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 	ishittable = true;
 	isbipedal = true;
 	isphysical = true;
-	snapshotinterval = 48;
+	{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("guard-blaster");
+	  snapshotinterval = _gd ? _gd->snapshotInterval : 48; }
 	respawnseconds   = g ? g->respawnSeconds : 30;
 	patrol = false;
 	lastspoke = 0;
@@ -52,10 +53,19 @@ void Guard::InitBT(){
 	auto updateChasing = [this](Object* f, World& world){
 		if(!chasing){
 			chasing = f->id;
-			if(world.tickcount - lastspoke > 24 * 10){
+			{ const EnemyDef* _ag = GASLoader::Get().GetEnemyDef("guard-blaster");
+			  static const EnemyDef _def;
+			  if(world.tickcount - lastspoke > (Uint32)(_ag ? _ag->speakCooldownTicks : 240)){
 				lastspoke = world.tickcount;
-				const char* sounds[5] = {"theres3.wav","stop4.wav","freeze3.wav","freezrt1.wav","drop4.wav"};
-				EmitSound(world, world.resources.soundbank[sounds[rand() % 5]], 128);
+				const std::string* alerts[] = {
+					_ag ? &_ag->soundAlert1 : &_def.soundAlert1,
+					_ag ? &_ag->soundAlert2 : &_def.soundAlert2,
+					_ag ? &_ag->soundAlert3 : &_def.soundAlert3,
+					_ag ? &_ag->soundAlert4 : &_def.soundAlert4,
+					_ag ? &_ag->soundAlert5 : &_def.soundAlert5
+				};
+				EmitSound(world, world.resources.soundbank[*alerts[rand() % (int)(sizeof(alerts)/sizeof(alerts[0]))]], 128);
+			  }
 			}
 		} else {
 			chasing = f->id;
@@ -229,7 +239,9 @@ void Guard::InitBT(){
 		if (bt_walk_ticks_ == 0 && !chasing) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
 		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
-		if (bt_walk_ticks_ < 600 && chasing) {
+		{ const EnemyDef* _sg = GASLoader::Get().GetEnemyDef("guard-blaster");
+		  const int _stout = _sg && _sg->searchTimeoutTicks > 0 ? _sg->searchTimeoutTicks : 600;
+		  if (bt_walk_ticks_ < _stout && chasing) {
 			// Search phase: orient toward target when not on a ladder and not too close.
 			if (state != LADDER) {
 				Object* obj = world.GetObjectFromId(chasing);
@@ -275,6 +287,7 @@ void Guard::InitBT(){
 			}
 			return BTResult::Running;
 		}
+		} // _sg scope
 		// Return-to-post phase: face toward spawn, climb ladders back if needed
 		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
 		{ const EnemyDef* _ggr = GASLoader::Get().GetEnemyDef("guard-blaster");
@@ -442,7 +455,8 @@ void Guard::Tick(World & world){
 			if((found = Look(world, 5))){
 				Player* player = static_cast<Player*>(found);
 				if(player){
-					if(abs(player->x - x) < 60){
+					const EnemyDef* _gcp = GASLoader::Get().GetEnemyDef("guard-blaster");
+					if(abs(player->x - x) < (_gcp ? _gcp->chaseProximityX : 60)){
 						break;
 					}
 				}
@@ -458,10 +472,19 @@ void Guard::Tick(World & world){
 		if(found){
 			if(!chasing){
 				chasing = found->id;
-				if(world.tickcount - lastspoke > 24 * 10){
+				{ const EnemyDef* _ag = GASLoader::Get().GetEnemyDef("guard-blaster");
+				  static const EnemyDef _def;
+				  if(world.tickcount - lastspoke > (Uint32)(_ag ? _ag->speakCooldownTicks : 240)){
 					lastspoke = world.tickcount;
-					const char * sounds[5] = {"theres3.wav", "stop4.wav", "freeze3.wav", "freezrt1.wav", "drop4.wav"};
-					EmitSound(world, world.resources.soundbank[sounds[rand() % 5]], 128);
+					const std::string* alerts[] = {
+						_ag ? &_ag->soundAlert1 : &_def.soundAlert1,
+						_ag ? &_ag->soundAlert2 : &_def.soundAlert2,
+						_ag ? &_ag->soundAlert3 : &_def.soundAlert3,
+						_ag ? &_ag->soundAlert4 : &_def.soundAlert4,
+						_ag ? &_ag->soundAlert5 : &_def.soundAlert5
+					};
+					EmitSound(world, world.resources.soundbank[*alerts[rand() % (int)(sizeof(alerts)/sizeof(alerts[0]))]], 128);
+				  }
 				}
 			}
 		}else{
@@ -487,13 +510,15 @@ void Guard::Tick(World & world){
 			yv = 0;
 			res_bank = 59;
 			res_index = 0;
-			if(state_i >= 48){
-				if(patrol && world.Random() % 3 == 0){
+			{ const EnemyDef* _gsd = GASLoader::Get().GetEnemyDef("guard-blaster");
+			  if(state_i >= (_gsd ? _gsd->standingDurationTicks : 48)){
+				if(patrol && _gsd && _gsd->patrolTurnInterval > 0 && world.Random() % _gsd->patrolTurnInterval == 0){
 					state = WALKING;
 				}else{
 					state = LOOKING;
 				}
 				state_i = -1;
+			}
 			}
 		}break;
 		case CROUCHING:{
@@ -575,10 +600,12 @@ void Guard::Tick(World & world){
 					}
 				}
 			}
-			if(state_i == 240){
+			{ const EnemyDef* _gwd = GASLoader::Get().GetEnemyDef("guard-blaster");
+			  if(state_i >= (_gwd ? _gwd->walkingDurationTicks : 240)){
 				state = LOOKING;
 				state_i = -1;
 				break;
+			  }
 			}
 		}break;
 		case SHOOTSTANDING:{
@@ -756,17 +783,14 @@ void Guard::Tick(World & world){
 		}break;
 		case DYING:{
 			if(state_i == 0){
-				switch(rand() % 3){
-					case 0:
-						EmitSound(world, world.resources.soundbank["groan2.wav"], 128);
-						break;
-					case 1:
-						EmitSound(world, world.resources.soundbank["groan2a.wav"], 128);
-						break;
-					case 2:
-						EmitSound(world, world.resources.soundbank["grunt2a.wav"], 128);
-						break;
-				}
+				const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+				static const EnemyDef _ged;
+				const std::string* hurts[] = {
+					gd ? &gd->soundHurt1 : &_ged.soundHurt1,
+					gd ? &gd->soundHurt2 : &_ged.soundHurt2,
+					gd ? &gd->soundHurt3 : &_ged.soundHurt3
+				};
+				EmitSound(world, world.resources.soundbank[*hurts[rand() % (int)(sizeof(hurts)/sizeof(hurts[0]))]], 128);
 			}
 			collidable = false;
 			if(state_i >= 10){
@@ -810,12 +834,13 @@ void Guard::Tick(World & world){
 				mirrored = originalmirrored;
 				state = NEW;
 				state_i = -1;
-				state_warp = 12;
+				{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+				  state_warp = _gd ? _gd->warpTeleportTick : GASLoader::Get().player.warpTeleportTick; }
 				health = maxhealth;
 				shield = maxshield;
 				break;
 			}
-			if(world.tickcount % 24 != 0){
+			if(world.tickcount % GASLoader::Get().gameengine.ticksPerSecond != 0){
 				state_i--;
 			}
 		}break;
@@ -837,7 +862,7 @@ void Guard::Tick(World & world){
 						mirrored = true;
 					}
 				}else
-					if(abs(object->x - x) > 90){
+					if(abs(object->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax){
 						state = WALKING;
 						if(object->x > x){
 							mirrored = false;
@@ -901,8 +926,9 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 				}
 				pickup->x = Guard::x;
 				pickup->y = Guard::y - 1;
-				pickup->xv = (world.Random() % 9) - 4;
-				pickup->yv = -15;
+				{ const EnemyDef* _gb = GASLoader::Get().GetEnemyDef("guard-blaster");
+				  pickup->xv = (world.Random() % (2 * (_gb ? _gb->deathDropXVRange : 4) + 1)) - (_gb ? _gb->deathDropXVRange : 4);
+				  pickup->yv = -(_gb ? _gb->deathDropYV : 15); }
 			}
 		}
 		Object * owner = world.GetObjectFromId(projectile.ownerid);
@@ -951,61 +977,30 @@ Object * Guard::Look(World & world, Uint8 direction){
 	Sint16 y2 = 0;
 	Sint16 x1 = 0;
 	Sint16 x2 = 0;
-	switch(direction){
-		case 0:
-			y1 = -55;
-			y2 = y1;
-			x1 = 70;
-			x2 = 200;
-		break;
-		case 1:
-			y1 = -37;
-			y2 = y1;
-			x1 = 70;
-			x2 = 200;
-		break;
-		case 2:
-			x1 = 2;
-			x2 = 2;
-			y1 = -150;
-			y2 = -300;
-		break;
-		case 3:
-			x1 = 12;
-			x2 = 12;
-			y1 = 50;
-			y2 = 200;
-		break;
-		case 4:
-			x1 = 20;
-			y1 = -82;
-			x2 = x1 + 200;
-			y2 = y1 - 200;
-		break;
-		case 5:
-			x1 = 28;
-			y1 = -30;
-			x2 = x1 + 200;
-			y2 = y1 + 200;
-		break;
-		case 6:
-			x1 = 4;
-			x2 = 4;
-			y1 = -150;
-			y2 = -300;
-			break;
-		case 7:
-			x1 = 11;
-			x2 = 11;
-			y1 = 50;
-			y2 = 200;
-			break;
-		case 10:
-			y1 = -55;
-			y2 = y1;
-			x1 = -100;
-			x2 = 0;
-		break;
+	const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+	bool usedGAS = false;
+	if (gd && !gd->lookBoxes.empty()) {
+		auto it = gd->lookBoxes.find(direction);
+		if (it != gd->lookBoxes.end()) {
+			x1 = it->second.x1;
+			x2 = it->second.x2;
+			y1 = it->second.y1;
+			y2 = it->second.y2;
+			usedGAS = true;
+		}
+	}
+	if (!usedGAS) {
+		switch(direction){
+			case 0: y1=-55; y2=y1; x1=70; x2=200; break;
+			case 1: y1=-37; y2=y1; x1=70; x2=200; break;
+			case 2: x1=2; x2=2; y1=-150; y2=-300; break;
+			case 3: x1=12; x2=12; y1=50; y2=200; break;
+			case 4: x1=20; y1=-82; x2=x1+200; y2=y1-200; break;
+			case 5: x1=28; y1=-30; x2=x1+200; y2=y1+200; break;
+			case 6: x1=4; x2=4; y1=-150; y2=-300; break;
+			case 7: x1=11; x2=11; y1=50; y2=200; break;
+			case 10: y1=-55; y2=y1; x1=-100; x2=0; break;
+		}
 	}
 	x1 *= (mirrored ? -1 : 1);
 	x2 *= (mirrored ? -1 : 1);

@@ -1,26 +1,448 @@
 {
-  "_comment": "Weapon damage values — 1:1 from *projectile.cpp constructors. Do not change during GAS migration.",
+  "_comment": "Weapon definitions — numeric values 1:1 from *projectile.cpp constructors. Sprite banks and sounds extracted from hardcoded values in each projectile Tick(). Do not change balance during migration.",
   "weapons": [
-    { "id": "blaster", "healthDamage": 40, "shieldDamage": 4,  "fireDelay": 7,  "moveAmount": 10 },
-    { "id": "laser",   "healthDamage": 10, "shieldDamage": 60, "fireDelay": 11, "velocity": 30, "moveAmount": 12 },
-    { "id": "flamer",  "healthDamage": 2,  "shieldDamage": 1,  "fireDelay": 2,  "velocity": 7,  "moveAmount": 6, "radius": 10 },
-    { "id": "rocket",  "healthDamage": 75, "shieldDamage": 25, "fireDelay": 21, "velocity": 35, "moveAmount": 15, "radius": 30, "rocketSlowInitial": 0.2, "rocketHoverTick": 100, "rocketSlowHover": 0.3 },
-    { "id": "plasma",  "healthDamage": 4,  "shieldDamage": 5,  "healthDamageLarge": 5, "shieldDamageLarge": 6, "velocity": 5, "moveAmount": 4, "radius": 5, "plasmaGravity": 2, "plasmaLifeNormal": 20, "plasmaLifeLarge": 7 },
-    { "id": "flare",   "healthDamage": 1,  "shieldDamage": 1,  "velocity": 5,  "moveAmount": 1 },
-    { "id": "wall",    "healthDamage": 10, "shieldDamage": 60, "velocity": 35, "moveAmount": 6 },
+    {
+      "id": "blaster",
+      "projectileType": "physics",
+      "healthDamage": 40,
+      "shieldDamage": 4,
+      "fireDelay": 7,
+      "moveAmount": 10,
+      "spriteBanks": [
+        160,
+        161,
+        162,
+        163,
+        164,
+        163,
+        162,
+        161
+      ],
+      "hitOverlayBank": 222,
+      "soundFire": "!laserme.wav",
+      "soundHit1": "rico1.wav",
+      "soundHit2": "rico2.wav",
+      "projectileLife": 6,
+      "snapshotInterval": 6
+    },
+    {
+      "id": "laser",
+      "projectileType": "physics",
+      "healthDamage": 10,
+      "shieldDamage": 60,
+      "fireDelay": 11,
+      "velocity": 30,
+      "moveAmount": 12,
+      "spriteBanks": [
+        165,
+        166,
+        167,
+        168,
+        169,
+        168,
+        167,
+        166
+      ],
+      "hitOverlayBank": 222,
+      "soundFire": "!laserel.wav",
+      "soundHit1": "strike03.wav",
+      "soundHit2": "strike04.wav",
+      "projectileLife": 10,
+      "emitOffset": 24,
+      "snapshotInterval": 6
+    },
+    {
+      "id": "flamer",
+      "projectileType": "flamer",
+      "healthDamage": 2,
+      "shieldDamage": 1,
+      "fireDelay": 2,
+      "velocity": 7,
+      "moveAmount": 6,
+      "radius": 10,
+      "soundLoop": "flamebg2.wav",
+      "emitOffset": -7,
+      "trailPlumes": 7,
+      "projectileLife": 14,
+      "snapshotInterval": 6
+    },
+    {
+      "id": "rocket",
+      "projectileType": "rocket",
+      "healthDamage": 75,
+      "shieldDamage": 25,
+      "fireDelay": 21,
+      "velocity": 35,
+      "moveAmount": 15,
+      "radius": 30,
+      "rocketSlowInitial": 0.2,
+      "rocketHoverTick": 100,
+      "rocketSlowHover": 0.3,
+      "spriteBanks": [
+        87,
+        87,
+        87,
+        87,
+        87,
+        87,
+        87,
+        87
+      ],
+      "soundLoop": "rocket4.wav",
+      "soundExplosion": "seekexp1.wav",
+      "soundFire": "rocket9.wav",
+      "exhaustPlumes": 6,
+      "rocketExplosionPlumeSpeed": 15,
+      "snapshotInterval": 6
+    },
+    {
+      "id": "plasma",
+      "projectileType": "plasma",
+      "healthDamage": 4,
+      "shieldDamage": 5,
+      "healthDamageLarge": 5,
+      "shieldDamageLarge": 6,
+      "velocity": 5,
+      "moveAmount": 4,
+      "radius": 5,
+      "plasmaGravity": 2,
+      "plasmaLifeNormal": 20,
+      "plasmaLifeLarge": 7,
+      "bounceDamping": 0.8,
+      "snapshotInterval": 6
+    },
+    {
+      "id": "flare",
+      "projectileType": "arcing",
+      "healthDamage": 10,
+      "shieldDamage": 60,
+      "velocity": 35,
+      "moveAmount": 6,
+      "trailPlumes": 4,
+      "projectileLife": 20,
+      "snapshotInterval": 6,
+      "hitOverlayBank": 222,
+      "soundFire": "grenthro.wav",
+      "soundHit1": "strike03.wav",
+      "soundHit2": "strike04.wav"
+    },
     {
       "id": "grenade",
-      "_comment": "Grenade/bomb throw speeds and explosion timings (all in ticks @ 24 ticks/sec).",
+      "projectileType": "grenade",
+      "_comment": "Shared grenade timing + throw/land sounds. Explosion sounds are per-subtype below.",
       "throwSpeedStanding": 20,
       "throwSpeedMoving": 30,
       "throwSpeedRunning": 26,
+      "throwYvDown": 5,
+      "throwXvDownDiag": 25,
+      "throwYvDownDiag": 10,
+      "throwXvUp": 5,
+      "throwYvUp": 30,
+      "throwXvUpDiag": 25,
+      "throwYvUpDiag": 20,
+      "throwXvCrouch": 20,
+      "throwYvCrouch": 10,
       "explosionTick": 30,
       "secondaryTick": 33,
       "destroyTick": 40,
       "neutronDestroyTick": 120,
       "flareDuration": 198,
+      "flareSpawnInterval": 3,
       "neutronTraceTime": 15,
-      "detonatorLaunchYv": 15
+      "detonatorLaunchYv": 15,
+      "spriteBanks": [
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79
+      ],
+      "soundThrow": "grenthro.wav",
+      "soundLand": "land1.wav",
+      "radius": 5,
+      "bounceDamping": 0.8,
+      "snapshotInterval": 6
+    },
+    {
+      "id": "plasmadetonator",
+      "projectileType": "grenade",
+      "_comment": "Plasma detonator — remote-detonated device. soundFire=arm/deploy, iscamera=true uses soundHit1, iscamera=false uses soundExplosion.",
+      "soundFire": "shield2.wav",
+      "soundExplosion": "seekexp1.wav",
+      "soundHit1": "q_expl02.wav",
+      "primaryVectors": [
+        {
+          "xv": -14,
+          "yv": -25
+        },
+        {
+          "xv": 14,
+          "yv": -25
+        },
+        {
+          "xv": -10,
+          "yv": 0
+        },
+        {
+          "xv": 10,
+          "yv": 0
+        },
+        {
+          "xv": -10,
+          "yv": 5
+        },
+        {
+          "xv": 10,
+          "yv": 5
+        }
+      ],
+      "secondaryVectors": [
+        {
+          "xv": -14,
+          "yv": -5
+        },
+        {
+          "xv": 0,
+          "yv": -10
+        },
+        {
+          "xv": 14,
+          "yv": -5
+        },
+        {
+          "xv": -5,
+          "yv": 5
+        },
+        {
+          "xv": 0,
+          "yv": 5
+        },
+        {
+          "xv": 5,
+          "yv": 5
+        }
+      ],
+      "throwSpeedStanding": 0,
+      "spriteBanks": [
+        182,
+        182,
+        182,
+        182,
+        182,
+        182,
+        182,
+        182
+      ]
+    },
+    {
+      "id": "empbomb",
+      "projectileType": "grenade",
+      "_comment": "EMP grenade — stuns shields across the whole team row.",
+      "spriteBanks": [
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79
+      ],
+      "soundExplosion": "q_expl02.wav",
+      "healthDamage": 0,
+      "shieldDamage": 65535,
+      "soundThrow": "grenthro.wav"
+    },
+    {
+      "id": "shapedbomb",
+      "projectileType": "grenade",
+      "_comment": "Shaped-charge grenade — fires a tight spray of plasma bolts upward.",
+      "spriteBanks": [
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79
+      ],
+      "soundExplosion": "seekexp1.wav",
+      "primaryCount": 5,
+      "secondaryCount": 4,
+      "primaryVectors": [
+        {
+          "xv": -10,
+          "yv": -33
+        },
+        {
+          "xv": -5,
+          "yv": -34
+        },
+        {
+          "xv": 0,
+          "yv": -35
+        },
+        {
+          "xv": 5,
+          "yv": -34
+        },
+        {
+          "xv": 10,
+          "yv": -33
+        }
+      ],
+      "secondaryVectors": [
+        {
+          "xv": -10,
+          "yv": -29
+        },
+        {
+          "xv": -5,
+          "yv": -30
+        },
+        {
+          "xv": 5,
+          "yv": -30
+        },
+        {
+          "xv": 10,
+          "yv": -29
+        }
+      ],
+      "soundThrow": "grenthro.wav"
+    },
+    {
+      "id": "plasmabomb",
+      "projectileType": "grenade",
+      "_comment": "Plasma grenade — releases a wide spread of plasma bolts.",
+      "spriteBanks": [
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79
+      ],
+      "soundExplosion": "seekexp1.wav",
+      "primaryCount": 6,
+      "secondaryCount": 6,
+      "primaryVectors": [
+        {
+          "xv": -14,
+          "yv": -25
+        },
+        {
+          "xv": 14,
+          "yv": -25
+        },
+        {
+          "xv": -10,
+          "yv": -10
+        },
+        {
+          "xv": 10,
+          "yv": -10
+        },
+        {
+          "xv": -10,
+          "yv": -5
+        },
+        {
+          "xv": 10,
+          "yv": -5
+        }
+      ],
+      "secondaryVectors": [
+        {
+          "xv": -14,
+          "yv": -20
+        },
+        {
+          "xv": 0,
+          "yv": -10
+        },
+        {
+          "xv": 14,
+          "yv": -20
+        },
+        {
+          "xv": -5,
+          "yv": -15
+        },
+        {
+          "xv": 0,
+          "yv": -15
+        },
+        {
+          "xv": 5,
+          "yv": -15
+        }
+      ],
+      "soundThrow": "grenthro.wav"
+    },
+    {
+      "id": "neutronbomb",
+      "projectileType": "grenade",
+      "_comment": "Neutron grenade — large-radius explosion that passes through shielding.",
+      "spriteBanks": [
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79
+      ],
+      "soundHit1": "grenade1.wav",
+      "soundExplosion": "q_expl02.wav",
+      "soundWarn": "vModDeto.wav",
+      "healthDamage": 65535,
+      "shieldDamage": 65535,
+      "soundThrow": "grenthro.wav"
+    },
+    {
+      "id": "flarebomb",
+      "projectileType": "grenade",
+      "_comment": "Flare bomb (INV_FLARE) — illumination grenade, stays airborne after exploding.",
+      "spriteBanks": [
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79
+      ],
+      "soundExplosion": "rocket1.wav",
+      "soundThrow": "grenthro.wav"
+    },
+    {
+      "id": "poisonflare",
+      "projectileType": "grenade",
+      "_comment": "Poison flare bomb — like flarebomb but inflicts poison damage in radius.",
+      "spriteBanks": [
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79
+      ],
+      "soundExplosion": "rocket1.wav",
+      "poisonRate": 1,
+      "poisonMax": 3,
+      "poisonCheckInterval": 6,
+      "soundThrow": "grenthro.wav"
     }
   ]
 }

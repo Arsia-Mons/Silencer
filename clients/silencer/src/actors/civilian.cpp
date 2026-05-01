@@ -19,7 +19,8 @@ Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	ishittable = true;
 	isbipedal = true;
 	isphysical = true;
-	snapshotinterval = 72;
+	{ const EnemyDef* _cd = GASLoader::Get().GetEnemyDef("civilian");
+	  snapshotinterval = _cd ? _cd->snapshotInterval : 72; }
 	tractteamid = 0;
 	bt_ = nullptr;
 }
@@ -108,7 +109,7 @@ void Civilian::Tick(World & world){
 			if(state_i % 10 == 0){
 				if(!bt_) InitBT();
 				if(bt_){
-					btctx_.dt = 10.0f / 24.0f;
+					btctx_.dt = 10.0f / GASLoader::Get().gameengine.ticksPerSecond;
 					btctx_.bbSet("threat_nearby", Look(world));
 					bt_->tick(btctx_);
 				}else{
@@ -120,10 +121,13 @@ void Civilian::Tick(World & world){
 			if(CheckTractVictim(world)){
 				break;
 			}
-			if(state_i >= 150){
+			{ const EnemyDef* _cd = GASLoader::Get().GetEnemyDef("civilian");
+			  int _rdt = _cd ? _cd->runDurationTicks : 150;
+			  if(state_i >= _rdt){
 				state = WALKING;
 				state_i = -1;
 				break;
+			  }
 			}
 			{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("civilian"); int _bonus = _gd ? _gd->runSpeedBonus : 5; xv = (mirrored ? -1 : 1) * (_bonus + speed); }
 			res_bank = 123;
@@ -150,17 +154,14 @@ void Civilian::Tick(World & world){
 		case DYINGFORWARD:{
 			tractteamid = 0;
 			if(state_i == 0){
-				switch(rand() % 3){
-					case 0:
-						EmitSound(world, world.resources.soundbank["groan2.wav"], 128);
-					break;
-					case 1:
-						EmitSound(world, world.resources.soundbank["groan2a.wav"], 128);
-					break;
-					case 2:
-						EmitSound(world, world.resources.soundbank["grunt2a.wav"], 128);
-					break;
-				}
+				const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
+				static const EnemyDef _ced;
+				const std::string* hurts[] = {
+					gd ? &gd->soundHurt1 : &_ced.soundHurt1,
+					gd ? &gd->soundHurt2 : &_ced.soundHurt2,
+					gd ? &gd->soundHurt3 : &_ced.soundHurt3
+				};
+				EmitSound(world, world.resources.soundbank[*hurts[rand() % (int)(sizeof(hurts)/sizeof(hurts[0]))]], 128);
 			}
 			collidable = false;
 			if(state_i >= 14){
@@ -175,17 +176,14 @@ void Civilian::Tick(World & world){
 		case DYINGBACKWARD:{
 			tractteamid = 0;
 			if(state_i == 0){
-				switch(rand() % 3){
-					case 0:
-						EmitSound(world, world.resources.soundbank["groan2.wav"], 128);
-					break;
-					case 1:
-						EmitSound(world, world.resources.soundbank["groan2a.wav"], 128);
-					break;
-					case 2:
-						EmitSound(world, world.resources.soundbank["grunt2a.wav"], 128);
-					break;
-				}
+				const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
+				static const EnemyDef _ced;
+				const std::string* hurts[] = {
+					gd ? &gd->soundHurt1 : &_ced.soundHurt1,
+					gd ? &gd->soundHurt2 : &_ced.soundHurt2,
+					gd ? &gd->soundHurt3 : &_ced.soundHurt3
+				};
+				EmitSound(world, world.resources.soundbank[*hurts[rand() % (int)(sizeof(hurts)/sizeof(hurts[0]))]], 128);
 			}
 			collidable = false;
 			if(state_i >= 14){
@@ -206,13 +204,16 @@ void Civilian::Tick(World & world){
 		}break;
 		case DEAD:{
 			collidable = false;
-			if(state_i >= 100){
+			{ const EnemyDef* _cd = GASLoader::Get().GetEnemyDef("civilian");
+			  int _drt = _cd ? _cd->deadRespawnTicks : 100;
+			  if(state_i >= _drt){
 				draw = true;
 				collidable = true;
 				state = WALKING;
-				state_warp = 12;
+				state_warp = _cd ? _cd->warpTeleportTick : GASLoader::Get().player.warpTeleportTick;
 				state_i = -1;
 				break;
+			  }
 			}
 		}break;
 	}
@@ -296,7 +297,7 @@ bool Civilian::CheckTractVictim(World & world){
 		if(team && team->id != tractteamid){
 			world.Explode(*this, suitcolor, 1);
 			state = DYINGEXPLODE;
-			EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
+			{ const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian"); EmitSound(world, world.resources.soundbank[(def && !def->soundDeath.empty()) ? def->soundDeath : "seekexp1.wav"], 128); }
 			Object tractprojectile(ObjectTypes::PLASMAPROJECTILE);
 		{
 			const EnemyDef* def = GASLoader::Get().GetEnemyDef("civilian");

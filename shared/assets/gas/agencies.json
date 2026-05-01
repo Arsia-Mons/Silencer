@@ -20,7 +20,8 @@
         "techslots": 8,
         "hacking": 5,
         "contacts": 5
-      }
+      },
+      "weapons": ["blaster", "laser", "rocket", "flamer", "grenade", "empbomb", "shapedbomb", "plasmabomb", "neutronbomb", "flarebomb", "plasmadetonator", "flare"]
     },
     {
       "id": 1,
@@ -41,7 +42,8 @@
         "techslots": 8,
         "hacking": 5,
         "contacts": 5
-      }
+      },
+      "weapons": ["blaster", "laser", "rocket", "flamer", "grenade", "empbomb", "shapedbomb", "plasmabomb", "neutronbomb", "flarebomb", "plasmadetonator", "flare"]
     },
     {
       "id": 2,
@@ -62,7 +64,8 @@
         "techslots": 8,
         "hacking": 5,
         "contacts": 8
-      }
+      },
+      "weapons": ["blaster", "laser", "rocket", "flamer", "grenade", "empbomb", "shapedbomb", "plasmabomb", "neutronbomb", "flarebomb", "plasmadetonator", "flare"]
     },
     {
       "id": 3,
@@ -83,7 +86,8 @@
         "techslots": 8,
         "hacking": 8,
         "contacts": 5
-      }
+      },
+      "weapons": ["blaster", "laser", "rocket", "flamer", "grenade", "empbomb", "shapedbomb", "plasmabomb", "neutronbomb", "flarebomb", "plasmadetonator", "flare"]
     },
     {
       "id": 4,
@@ -105,7 +109,8 @@
         "techslots": 8,
         "hacking": 5,
         "contacts": 5
-      }
+      },
+      "weapons": ["blaster", "laser", "rocket", "flamer", "grenade", "empbomb", "shapedbomb", "plasmabomb", "neutronbomb", "flarebomb", "plasmadetonator", "flare", "poisonflare"]
     }
   ]
 }

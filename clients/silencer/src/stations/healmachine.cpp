@@ -22,7 +22,8 @@ void HealMachine::Tick(World & world){
 		}
 		if(state_i > 0){
 			if(state_i == 2){
-				EmitSound(world, world.resources.soundbank["if15.wav"], 96);
+				{ const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("healMachine");
+				EmitSound(world, world.resources.soundbank[(_d && !_d->soundHeal.empty()) ? _d->soundHeal : "if15.wav"], 96); }
 			}
 			state_i++;
 			if(state_i >= 10){

@@ -1,7 +1,8 @@
 'use client';
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import pako from 'pako';
 import type { SilMapData, MapActor, MapPlatform, TileCell, MapHeader, MapLayers } from '../../lib/types';
+import * as mapStore from '../../lib/map-store';
 
 const CELL_SIZE = 36; // bytes per map cell
 const MAX_HISTORY = 50;
@@ -153,9 +154,12 @@ export interface UseSilMapReturn {
 }
 
 export function useSilMap(): UseSilMapReturn {
-  const [mapData, setMapData] = useState<SilMapData | null>(null);
+  const [mapData, setMapData] = useState<SilMapData | null>(() => mapStore.get());
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+
+  // Sync map state to module store on every change so it survives navigation
+  useEffect(() => { if (mapData) mapStore.set(mapData); else mapStore.clear(); }, [mapData]);
 
   // History stacks stored in refs to avoid triggering re-renders on push/pop
   const historyRef   = useRef<SilMapData[]>([]); // past states

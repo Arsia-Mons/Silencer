@@ -1,7 +1,9 @@
 #include "flamerprojectile.h"
 #include "plume.h"
 #include "gasloader.h"
+#include <algorithm>
 
+const int FlamerProjectile::MAX_PLUMES;
 FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 	requiresauthority = true;
 	res_bank = 0xFF;
@@ -13,10 +15,11 @@ FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 	shielddamage = w ? w->shieldDamage : 1;
 	velocity = w ? w->velocity : 7;
 	drawcheckered = true;
-	for(int i = 0; i < plumecount; i++){
+	plumecount = (w && w->trailPlumes > 0) ? (std::min)(w->trailPlumes, MAX_PLUMES) : 7;
+	for(int i = 0; i < MAX_PLUMES; i++){
 		plumeids[i] = 0;
 	}
-	emitoffset = -7;
+	emitoffset = (w && w->emitOffset) ? w->emitOffset : -7;
 	moveamount = w ? w->moveAmount : 6;
 	soundplaying = 0;
 	renderpass = 2;
@@ -24,7 +27,7 @@ FlamerProjectile::FlamerProjectile() : Object(ObjectTypes::FLAMERPROJECTILE){
 	stopatobjectcollision = false;
 	isprojectile = true;
 	isphysical = true;
-	snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 	hitonce = false;
 }
 
@@ -68,7 +71,9 @@ void FlamerProjectile::Tick(World & world){
 		//world->MarkDestroyObject(id);
 	}
 	res_index = state_i;
-	if(state_i >= 14){
+	const WeaponDef* wf = GASLoader::Get().GetWeaponDef("flamer");
+	int life = (wf && wf->projectileLife) ? wf->projectileLife : 14;
+	if(state_i >= life){
 		world.MarkDestroyObject(id);
 	}
 	state_i++;

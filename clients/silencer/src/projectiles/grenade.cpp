@@ -7,10 +7,10 @@
 #include <math.h>
 
 Grenade::Grenade() : Object(ObjectTypes::GRENADE){
-	// 79:0-15 is grenade
 	requiresauthority = true;
 	renderpass = 2;
-	res_bank = 79;
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("grenade");
+	res_bank = (w && !w->spriteBanks.empty()) ? w->spriteBanks[0] : 79;
 	res_index = 0;
 	type = PLASMA;
 	ownerid = 0;
@@ -18,9 +18,9 @@ Grenade::Grenade() : Object(ObjectTypes::GRENADE){
 	yv = -10;
 	state_i = 0;
 	color = 0;
-	radius = 5;
+	radius = w ? w->radius : 5;
 	isphysical = true;
-	snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 }
 
 void Grenade::Serialize(bool write, Serializer & data, Serializer * old){
@@ -34,7 +34,9 @@ void Grenade::Serialize(bool write, Serializer & data, Serializer * old){
 void Grenade::Tick(World & world){
 	if(state_i <= 4){
 		if(state_i == 4){
-			EmitSound(world, world.resources.soundbank["grenthro.wav"], 64);
+			const WeaponDef* w = GASLoader::Get().GetWeaponDef("grenade");
+			const std::string& sfx = w && !w->soundThrow.empty() ? w->soundThrow : "grenthro.wav";
+			EmitSound(world, world.resources.soundbank[sfx], 64);
 		}
 		/*Player * player = (Player *)world->GetObjectFromId(ownerid);
 		if(player){
@@ -42,13 +44,16 @@ void Grenade::Tick(World & world){
 			y = player->y - 60;
 		}*/
 	}else{
-		if(state_i < 30 || (type == FLARE || type == POISONFLARE)){
-			if(state_i < 30){
+		const WeaponDef* gw = GASLoader::Get().GetWeaponDef("grenade");
+		int expTick = (gw && gw->explosionTick) ? gw->explosionTick : 30;
+		if(state_i < expTick || (type == FLARE || type == POISONFLARE)){
+			if(state_i < expTick){
 				res_index = state_i % 16;
 			}
 			Move(*this, world);
 		}
-		if(state_i >= 30 && (type == FLARE || type == POISONFLARE) && state_i % 3 == 0){
+		int flareInterval = (gw && gw->flareSpawnInterval) ? gw->flareSpawnInterval : 3;
+		if(state_i >= expTick && (type == FLARE || type == POISONFLARE) && state_i % flareInterval == 0){
 			for(int i = 0; i < 3; i++){
 				FlareProjectile * flareprojectile = static_cast<FlareProjectile *>(world.CreateObject(ObjectTypes::FLAREPROJECTILE));
 				if(flareprojectile){
@@ -82,7 +87,9 @@ void Grenade::Tick(World & world){
 			draw = false;
 			switch(type){
 				case EMP:{
-					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("empbomb");
+						const std::string& sfx = (tw && !tw->soundExplosion.empty()) ? tw->soundExplosion : "q_expl02.wav";
+						EmitSound(world, world.resources.soundbank[sfx], 96); }
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){
@@ -97,8 +104,9 @@ void Grenade::Tick(World & world){
 							//int distance = sqrt((float)((x - object->x) * (x - object->x)) + ((y - object->y) * (y - object->y)));
 							//if(distance < radius){
 								Object empprojectile(ObjectTypes::FLAREPROJECTILE);
-								empprojectile.healthdamage = 0;
-								empprojectile.shielddamage = 0xFFFF;
+								{ const WeaponDef* ew = GASLoader::Get().GetWeaponDef("empbomb");
+								  empprojectile.healthdamage = ew ? ew->healthDamage : 0;
+								  empprojectile.shielddamage = ew ? ew->shieldDamage : 0xFFFF; }
 								empprojectile.ownerid = ownerid;
 								object->HandleHit(world, 50, 50, empprojectile);
 							//}
@@ -106,42 +114,52 @@ void Grenade::Tick(World & world){
 					}
 				}break;
 				case SHAPED:{
-					EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
-					Sint8 xvs[] = {-10, -5, 0, 5, 10};
-					Sint8 yvs[] = {-33, -34, -35, -34, -33};
-					Sint8 ys[] = {0, 0, 0, 0, 0};
-					for(int i = 0; i < 5; i++){
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("shapedbomb");
+						const std::string& sfx = (tw && !tw->soundExplosion.empty()) ? tw->soundExplosion : "seekexp1.wav";
+						EmitSound(world, world.resources.soundbank[sfx], 128); }
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("shapedbomb");
+						static const Sint8 fbx[] = {-10, -5, 0, 5, 10};
+						static const Sint8 fby[] = {-33, -34, -35, -34, -33};
+						int n = (tw && tw->primaryCount) ? tw->primaryCount : 5;
+						for(int i = 0; i < n && i < 5; i++){
 						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
 						if(plasmaprojectile){
 							plasmaprojectile->large = false;
 							plasmaprojectile->x = x;
-							plasmaprojectile->y = y + ys[i] - 1;
+							plasmaprojectile->y = y - 1;
 							plasmaprojectile->ownerid = ownerid;
-							plasmaprojectile->xv = xvs[i];
-							plasmaprojectile->yv = yvs[i];
+							plasmaprojectile->xv = (tw && i < (int)tw->primaryVectors.size()) ? tw->primaryVectors[i].xv : fbx[i];
+							plasmaprojectile->yv = (tw && i < (int)tw->primaryVectors.size()) ? tw->primaryVectors[i].yv : fby[i];
 						}
-					}
+					} }
 				}break;
 				case PLASMA:{
-					EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
-					Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
-					Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
-					Sint8 ys[] = {0, 0, 0, 0, 0, 0, 0, 0};
-					for(int i = 0; i < 6; i++){
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("plasmabomb");
+						const std::string& sfx = (tw && !tw->soundExplosion.empty()) ? tw->soundExplosion : "seekexp1.wav";
+						EmitSound(world, world.resources.soundbank[sfx], 128); }
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("plasmabomb");
+						static const Sint8 fbx[] = {-14, 14, -10, 10, -10, 10};
+						static const Sint8 fby[] = {-25, -25, -10, -10, -5, -5};
+						int n = (tw && tw->primaryCount) ? tw->primaryCount : 6;
+						for(int i = 0; i < n && i < 6; i++){
 						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
 						if(plasmaprojectile){
 							plasmaprojectile->large = false;
 							plasmaprojectile->x = x;
-							plasmaprojectile->y = y + ys[i] - 1;
+							plasmaprojectile->y = y - 1;
 							plasmaprojectile->ownerid = ownerid;
-							plasmaprojectile->xv = xvs[i];
-							plasmaprojectile->yv = yvs[i];
+							plasmaprojectile->xv = (tw && i < (int)tw->primaryVectors.size()) ? tw->primaryVectors[i].xv : fbx[i];
+							plasmaprojectile->yv = (tw && i < (int)tw->primaryVectors.size()) ? tw->primaryVectors[i].yv : fby[i];
 						}
-					}
+					} }
 				}break;
 				case NEUTRON:{
-					world.SendSound("grenade1.wav");
-					EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("neutronbomb");
+						const std::string& pulse = (tw && !tw->soundHit1.empty()) ? tw->soundHit1 : std::string("grenade1.wav");
+						world.SendSound(pulse.c_str()); }
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("neutronbomb");
+						const std::string& sfx = (tw && !tw->soundExplosion.empty()) ? tw->soundExplosion : "q_expl02.wav";
+						EmitSound(world, world.resources.soundbank[sfx], 96); }
 					for(int i = 0; i < 8; i++){
 						Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
 						if(plume){
@@ -153,7 +171,10 @@ void Grenade::Tick(World & world){
 				case POISONFLARE:
 				case FLARE:{
 					draw = true;
-					EmitSound(world, world.resources.soundbank["rocket1.wav"], 128);
+					{	const char* wid = (type == POISONFLARE) ? "poisonflare" : "flarebomb";
+						const WeaponDef* tw = GASLoader::Get().GetWeaponDef(wid);
+						const std::string& sfx = (tw && !tw->soundExplosion.empty()) ? tw->soundExplosion : "rocket1.wav";
+						EmitSound(world, world.resources.soundbank[sfx], 128); }
 				}break;
 			}
 		}else
@@ -161,38 +182,40 @@ void Grenade::Tick(World & world){
 			// secondary explosion
 			switch(type){
 				case SHAPED:{
-					Sint8 xvs[] = {-10, -5, 5, 10};
-					Sint8 yvs[] = {-29, -30, -30, -29};
-					Sint8 ys[] = {0, 0, 0, 0};
-					for(int i = 0; i < 4; i++){
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("shapedbomb");
+						static const Sint8 fbx[] = {-10, -5, 5, 10};
+						static const Sint8 fby[] = {-29, -30, -30, -29};
+						int n = (tw && tw->secondaryCount) ? tw->secondaryCount : 4;
+						for(int i = 0; i < n && i < 4; i++){
 						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
 						if(plasmaprojectile){
 							plasmaprojectile->large = true;
 							plasmaprojectile->x = x;
-							plasmaprojectile->y = y + ys[i] - 1;
+							plasmaprojectile->y = y - 1;
 							plasmaprojectile->oldx = plasmaprojectile->x;
 							plasmaprojectile->oldy = plasmaprojectile->y;
 							plasmaprojectile->ownerid = ownerid;
-							plasmaprojectile->xv = xvs[i];
-							plasmaprojectile->yv = yvs[i];
+							plasmaprojectile->xv = (tw && i < (int)tw->secondaryVectors.size()) ? tw->secondaryVectors[i].xv : fbx[i];
+							plasmaprojectile->yv = (tw && i < (int)tw->secondaryVectors.size()) ? tw->secondaryVectors[i].yv : fby[i];
 						}
-					}
+					} }
 				}break;
 				case PLASMA:{
-					Sint8 xvs[] = {-14, 0, 14, -5, 0, 5};
-					Sint8 yvs[] = {-20, -10, -20, -15, -15, -15};
-					Sint8 ys[] = {0, 0, 0, 0, 0, 0};
-					for(int i = 0; i < 6; i++){
+					{	const WeaponDef* tw = GASLoader::Get().GetWeaponDef("plasmabomb");
+						static const Sint8 fbx[] = {-14, 0, 14, -5, 0, 5};
+						static const Sint8 fby[] = {-20, -10, -20, -15, -15, -15};
+						int n = (tw && tw->secondaryCount) ? tw->secondaryCount : 6;
+						for(int i = 0; i < n && i < 6; i++){
 						PlasmaProjectile * plasmaprojectile = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
 						if(plasmaprojectile){
 							plasmaprojectile->large = true;
 							plasmaprojectile->x = x;
-							plasmaprojectile->y = y + ys[i] - 1;
+							plasmaprojectile->y = y - 1;
 							plasmaprojectile->ownerid = ownerid;
-							plasmaprojectile->xv = xvs[i];
-							plasmaprojectile->yv = yvs[i];
+							plasmaprojectile->xv = (tw && i < (int)tw->secondaryVectors.size()) ? tw->secondaryVectors[i].xv : fbx[i];
+							plasmaprojectile->yv = (tw && i < (int)tw->secondaryVectors.size()) ? tw->secondaryVectors[i].yv : fby[i];
 						}
-					}
+					} }
 				}break;
 			}
 		}else
@@ -220,7 +243,8 @@ bool Grenade::WasThrown(void){
 bool Grenade::UpdatePosition(World & world, Player & player){
 	if(state_i <= 0){
 		if(state_i == 0){
-			xv = (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->throwSpeedStanding : 20);
+			const WeaponDef* gw = GASLoader::Get().GetWeaponDef("grenade");
+			xv = (gw ? gw->throwSpeedStanding : 20);
 			mirrored = player.mirrored;
 			if(player.input.keymoveleft){
 				mirrored = true;
@@ -231,35 +255,35 @@ bool Grenade::UpdatePosition(World & world, Player & player){
 			x = player.x + (5 * (mirrored ? -1 : 1));
 			y = player.y - 70;
 			if(player.input.keymoveleft || player.input.keymoveright){
-				xv = (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->throwSpeedMoving : 30);
+				xv = (gw ? gw->throwSpeedMoving : 30);
 				if(player.state == Player::RUNNING){
-					xv = (GASLoader::Get().GetWeaponDef("grenade") ? GASLoader::Get().GetWeaponDef("grenade")->throwSpeedRunning : 26) + abs(player.xv);
+					xv = (gw ? gw->throwSpeedRunning : 26) + abs(player.xv);
 				}
 			}
 			if(player.input.keymovedown){
 				y = player.y - 30;
 				x = player.x;
 				xv = 0;
-				yv = 5;
+				yv = gw ? gw->throwYvDown : 5;
 			}
 			if(player.input.keylookdownleft || player.input.keylookdownright){
 				y = player.y - 30;
-				xv = 25;
-				yv = 10;
+				xv = gw ? gw->throwXvDownDiag : 25;
+				yv = gw ? gw->throwYvDownDiag : 10;
 			}
 			if(player.input.keymoveup){
 				x = player.x;
-				xv = 5;
-				yv = -30;
+				xv = gw ? gw->throwXvUp : 5;
+				yv = -(gw ? gw->throwYvUp : 30);
 			}
 			if(player.input.keylookupleft || player.input.keylookupright){
-				xv = 25;
-				yv = -20;
+				xv = gw ? gw->throwXvUpDiag : 25;
+				yv = -(gw ? gw->throwYvUpDiag : 20);
 			}
 			if(player.state == Player::CROUCHEDTHROWING){
-				xv = 20;
+				xv = gw ? gw->throwXvCrouch : 20;
 				y = player.y - 30;
-				yv = -10;
+				yv = -(gw ? gw->throwYvCrouch : 10);
 			}
 			if(xv < 0){
 				if(!mirrored){
@@ -330,15 +354,18 @@ void Grenade::Move(Object & object, World & world, int v){
 		}
 		float xn, yn;
 		platform->GetNormal(object.x, object.y, &xn, &yn);
-		if(xn){
+		{ const WeaponDef* gd_b = GASLoader::Get().GetWeaponDef("grenade");
+		  float bd = (gd_b && gd_b->bounceDamping > 0.0f) ? gd_b->bounceDamping : 0.8f;
+		  if(xn){
 			object.xv = (xn * abs(object.xv)) * 0.5;
-		}else{
-			object.xv *= 0.8;
-		}
-		if(yn){
+		  }else{
+			object.xv *= bd;
+		  }
+		  if(yn){
 			object.yv = (yn * abs(object.yv)) * 0.4;
-		}else{
-			object.yv *= 0.8;
+		  }else{
+			object.yv *= bd;
+		  }
 		}
 	}
 	object.x += xv2;
@@ -356,7 +383,7 @@ void Grenade::Move(Object & object, World & world, int v){
 		object.xv = 0;
 		object.yv = 0;
 	}else{
-		object.EmitSound(world, world.resources.soundbank["land1.wav"], volume);
+		object.EmitSound(world, world.resources.soundbank[GASLoader::Get().GetWeaponDef("grenade") && !GASLoader::Get().GetWeaponDef("grenade")->soundLand.empty() ? GASLoader::Get().GetWeaponDef("grenade")->soundLand : "land1.wav"], volume);
 		object.yv += world.gravity;
 	}
 }
@@ -375,8 +402,9 @@ void Grenade::NeutronBlast(World & world, Sint16 y, Uint16 ownerid){
 			}
 			if(!invulnerable){
 				Object neutronprojectile(ObjectTypes::FLAREPROJECTILE);
-				neutronprojectile.healthdamage = 0xFFFF;
-				neutronprojectile.shielddamage = 0xFFFF;
+				{ const WeaponDef* nw2 = GASLoader::Get().GetWeaponDef("neutronbomb");
+				  neutronprojectile.healthdamage = nw2 ? nw2->healthDamage : 0xFFFF;
+				  neutronprojectile.shielddamage = nw2 ? nw2->shieldDamage : 0xFFFF; }
 				neutronprojectile.ownerid = ownerid;
 				object->HandleHit(world, 50, 50, neutronprojectile);
 			}

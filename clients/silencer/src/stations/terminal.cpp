@@ -20,7 +20,8 @@ Terminal::Terminal() : Object(ObjectTypes::TERMINAL){
 	//SetSize(0);
 	isbig = false;
 	sizeset = false;
-	snapshotinterval = 24;
+	{ const TerminalDef* _td = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
+	  snapshotinterval = _td ? _td->snapshotInterval : 24; }
 	tracetime = 0;
 	soundchannel = -1;
 	secretreadynotified = false;
@@ -44,11 +45,13 @@ void Terminal::Tick(World & world){
 	}
 	if(state == READY || state == HACKING || state == HACKERGONE){
 		if(soundchannel == -1){
-			soundchannel = EmitSound(world, world.resources.soundbank["ambloop4.wav"], isbig ? 45 : 32, true);
+			const TerminalDef* _td = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
+			soundchannel = EmitSound(world, world.resources.soundbank[(_td && !_td->soundAmbient.empty()) ? _td->soundAmbient : "ambloop4.wav"], isbig ? 45 : 32, true);
 		}
 	}else{
 		if(soundchannel != -1){
-			Audio::GetInstance().Stop(soundchannel, 1000);
+			const TerminalDef* _td = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
+			Audio::GetInstance().Stop(soundchannel, _td ? _td->audioFadeMs : 1000);
 			soundchannel = -1;
 		}
 	}
@@ -68,7 +71,8 @@ void Terminal::Tick(World & world){
 		}break;
 		case SECRETREADY:
 			if(!secretreadynotified){
-				world.SendSound("typerev6.wav");
+				{ const TerminalDef* _td = GASLoader::Get().GetTerminalDef(isbig ? "big" : "small");
+				world.SendSound((_td && !_td->soundHack.empty()) ? _td->soundHack.c_str() : "typerev6.wav"); }
 				for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 					if((*it)->type == ObjectTypes::TEAM){
 						Team * team = static_cast<Team *>(*it);
@@ -107,7 +111,7 @@ void Terminal::Tick(World & world){
 		case BEAMING:{
 			secretreadynotified = false;
 			if(world.IsAuthority()){
-				if(state_i % 24 == 0){
+				if(state_i % GASLoader::Get().gameengine.ticksPerSecond == 0){
 					beamingcount++;
 					if(beamingcount >= beamingseconds){
 						state = READY;
@@ -133,7 +137,7 @@ void Terminal::Tick(World & world){
 		hackerid = 0;
 		state_i++;
 	}
-	if(tracetime > 0 && world.tickcount % 24 == 0 && world.IsAuthority()){
+	if(tracetime > 0 && world.tickcount % GASLoader::Get().gameengine.ticksPerSecond == 0 && world.IsAuthority()){
 		tracetime--;
 		if(tracetime == 0){
 			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
@@ -149,7 +153,7 @@ void Terminal::Tick(World & world){
 			state_i = 0;
 		}
 	}
-	if(beamingtime > 0 && world.tickcount % 24 == 0 && world.IsAuthority()){
+	if(beamingtime > 0 && world.tickcount % GASLoader::Get().gameengine.ticksPerSecond == 0 && world.IsAuthority()){
 		beamingtime--;
 		if(beamingtime == 0){
 			state = SECRETREADY;

@@ -2,6 +2,7 @@
 import { useState, useCallback } from 'react';
 import { ACTOR_DEFS } from './Toolbar';
 import type { SpriteEntry } from '../../lib/types';
+import * as gameDataStore from '../../lib/game-data-store';
 
 const NEEDED_SPRITE_BANKS = new Set([
   0, 1, 2, 3, 4, // parallax backgrounds
@@ -271,17 +272,21 @@ async function processData(
 }
 
 export function useGameData() {
-  const [loaded, setLoaded]             = useState(false);
+  const [loaded, setLoaded]             = useState(() => gameDataStore.isLoaded());
   const [error, setError]               = useState<string | null>(null);
   const [palette, setPalette]           = useState<Uint8Array | null>(null);
-  const [tileImages, setTileImages]     = useState<Map<number, ImageBitmap[]>>(new Map());
-  const [spriteImages, setSpriteImages] = useState<Map<number, (SpriteEntry | null)[]>>(new Map());
-  const [tileBankCounts, setTileBankCounts] = useState<Map<number, number>>(new Map());
+  const [tileImages, setTileImages]     = useState<Map<number, ImageBitmap[]>>(
+    () => gameDataStore.get()?.tileImages ?? new Map(),
+  );
+  const [spriteImages, setSpriteImages] = useState<Map<number, (SpriteEntry | null)[]>>(
+    () => gameDataStore.get()?.spriteImages ?? new Map(),
+  );
+  const [tileBankCounts, setTileBankCounts] = useState<Map<number, number>>(
+    () => gameDataStore.get()?.tileBankCounts ?? new Map(),
+  );
   const [progress, setProgress]         = useState({ total: 0, done: 0 });
 
-  const setters: Setters = { setPalette, setTileBankCounts, setProgress, setTileImages, setSpriteImages, setLoaded };
-
-  const reset = () => { setLoaded(false); setError(null); setProgress({ total: 0, done: 0 }); };
+  const reset = () => { setLoaded(false); setError(null); setProgress({ total: 0, done: 0 }); gameDataStore.clear(); };
 
   const loadFiles = useCallback(async (fileList: FileList) => {
     reset();
@@ -314,8 +319,30 @@ export function useGameData() {
         }).filter((x): x is [number, File] => x !== null)
       );
 
+      // Capture final values so we can store them after processData finishes
+      let capturedTile:   Map<number, ImageBitmap[]>             | null = null;
+      let capturedSprite: Map<number, (SpriteEntry | null)[]>    | null = null;
+      let capturedCounts: Map<number, number>                    | null = null;
+      const wrappedSetters: Setters = {
+        setPalette,
+        setTileBankCounts: (m) => { capturedCounts = m; setTileBankCounts(m); },
+        setProgress,
+        setTileImages:     (m) => { capturedTile   = m; setTileImages(m); },
+        setSpriteImages:   (m) => { capturedSprite  = m; setSpriteImages(m); },
+        setLoaded: (v) => {
+          if (v && capturedTile && capturedCounts) {
+            gameDataStore.set({
+              tileImages:     capturedTile,
+              spriteImages:   capturedSprite ?? new Map(),
+              tileBankCounts: capturedCounts,
+            });
+          }
+          setLoaded(v);
+        },
+      };
+
       await processData(palBytes, binTilBytes, tilFileMap, binSprBytes, sprFileMap,
-        async (f) => new Uint8Array(await f.arrayBuffer()), setters);
+        async (f) => new Uint8Array(await f.arrayBuffer()), wrappedSetters);
     } catch (e) {
       setError((e as Error).message);
     }

@@ -319,7 +319,7 @@ bool Game::Loop(void){
 	}
 	if(quitRequested) return false;
 	DrainControlQueue();
-	unsigned int wait = 42; // 24 fps
+	unsigned int wait = GASLoader::Get().gameengine.tickIntervalMs;
 	if(updatetitle){
 		if(!headless && window){
 			char title[128];
@@ -338,7 +338,7 @@ bool Game::Loop(void){
 	world.DoNetwork();
 	Uint64 tickcheck = SDL_GetTicks();
 	if(world.replay.IsPlaying()){
-		wait = 42 * world.replay.speed;
+		wait = GASLoader::Get().gameengine.tickIntervalMs * world.replay.speed;
 		if(world.replay.ffmpeg && world.replay.ffmpegvideo){
 			tickcheck = world.replay.tick;
 			if(!tickcheck){
@@ -464,7 +464,7 @@ bool Game::Tick(void){
 		}
 	}
 	if(world.dedicatedserver.active && state != HOSTGAME){
-		if(world.dedicatedserver.nopeerstime >= 10 * 24){
+		if(world.dedicatedserver.nopeerstime >= GASLoader::Get().gameengine.nopeersTimeoutTicks){
 			world.dedicatedserver.SendHeartBeat(world, 2);
 			return false;
 		}
@@ -1816,7 +1816,7 @@ bool Game::Tick(void){
 										player->oldx = player->x;
 										player->oldy = player->y;
 										//player->AddInventoryItem(Player::INV_VIRUS);
-										player->credits = 50000;
+										player->credits = GASLoader::Get().player.startingCredits;
 										Uint8 teamcolor = team->GetColor();
 										player->suitcolor = (((teamcolor >> 4) - i) << 4) + (teamcolor & 0xF);
 										for(int j = 0; j < 5; j++){
@@ -2105,7 +2105,7 @@ bool Game::LoadMap(const char * name){
 }
 
 void Game::UnloadGame(void){
-	Audio::GetInstance().StopAll(200);
+	Audio::GetInstance().StopAll(GASLoader::Get().gameengine.audioStopAllFadeMs);
 	currentlobbygameid = 0;
 	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
 		bgchannel[i] = -1;
@@ -2138,7 +2138,7 @@ bool Game::CheckForQuit(void){
 
 bool Game::CheckForEndOfGame(void){
 	if(world.winningteamid){
-		if(world.message_i == 24 * 3){
+		if(world.message_i == GASLoader::Get().gameengine.ticksPerSecond * 3){
 			if(world.IsAuthority()){
 				if(world.replay.IsRecording()){
 					world.replay.EndRecording();
@@ -2232,7 +2232,7 @@ void Game::ProcessInGameInterfaces(void){
 				SelectBox * selectbox = (SelectBox *)iface->GetObjectWithUid(world, 1);
 				if(selectbox){
 					if(selectbox->selecteditem != oldselecteditem){
-						Audio::GetInstance().Play(world.resources.soundbank["grndown.wav"], 64);
+						Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
 						oldselecteditem = selectbox->selecteditem;
 						if(buying){
 							localplayer->buyifacelastitem = selectbox->selecteditem;
@@ -4952,13 +4952,20 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 													if(mapUploadThread.joinable()) mapUploadThread.detach();
 													uint32_t gen = ++mapUploadGeneration;
 													std::string mppath = FindMap(mapname);
+													std::string dataDir = GetDataDir();
+													bool isBundledMap = dataDir.empty() || mppath.substr(0, dataDir.size()) != dataDir;
 													std::string apiURL = Config::GetInstance().mapapiurl;
-													mapUploadState.store(1, std::memory_order_relaxed);
-													mapUploadThread = std::thread([this, mapname_str=std::string(mapname), mppath, apiURL, gen](){
-														bool ok = UploadMapToServer(mapname_str.c_str(), mppath.c_str(), apiURL.c_str());
-														if(mapUploadGeneration.load(std::memory_order_relaxed) != gen) return;
-														mapUploadState.store(ok ? 2 : 3, std::memory_order_release);
-													});
+													if(isBundledMap){
+														// Bundled maps ship with the game; no upload needed.
+														mapUploadState.store(2, std::memory_order_release);
+													}else{
+														mapUploadState.store(1, std::memory_order_relaxed);
+														mapUploadThread = std::thread([this, mapname_str=std::string(mapname), mppath, apiURL, gen](){
+															bool ok = UploadMapToServer(mapname_str.c_str(), mppath.c_str(), apiURL.c_str());
+															if(mapUploadGeneration.load(std::memory_order_relaxed) != gen) return;
+															mapUploadState.store(ok ? 2 : 3, std::memory_order_release);
+														});
+													}
 													creategameclicked = true;
 													strcpy(Config::GetInstance().defaultgamename, gamename);
 													Config::GetInstance().Save();
@@ -5659,7 +5666,8 @@ void Game::GetGameChannelName(LobbyGame & lobbygame, char * name){
 }
 
 void Game::CreateAmbienceChannels(void){
-	const char * bgchannelbanks[3] = {"wndloopb.wav", "cphum11.wav", "wndloop1.wav"};
+	const WorldDef& wd = GASLoader::Get().world;
+	const std::string bgchannelbanks[3] = {wd.soundAmbience1, wd.soundAmbience2, wd.soundAmbience3};
 	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
 		if(bgchannel[i] == -1){
 			bgchannel[i] = Audio::GetInstance().Play(world.resources.soundbank[bgchannelbanks[i]], 0, true);
@@ -5801,6 +5809,12 @@ std::string Game::FindMap(const char * name, unsigned char (*hash)[20], const ch
 			isarchive = true;
 		}
 		CDResDir();
+		// Capture the absolute resources path while cwd = Resources (GetResDir returns "" on macOS).
+		std::string absResDir = GetResDir();
+		if(absResDir.empty()){
+			char _cwd[PATH_MAX];
+			if(getcwd(_cwd, PATH_MAX)) absResDir = std::string(_cwd) + "/";
+		}
 		std::vector<std::string> files = ListFiles((GetResDir() + directory).c_str());
 		CDDataDir();
 		std::vector<std::string> files2 = ListFiles((GetDataDir() + directory).c_str());
@@ -5820,7 +5834,7 @@ std::string Game::FindMap(const char * name, unsigned char (*hash)[20], const ch
 				filename.append(*it);
 				SDL_IOStream * file = SDL_IOFromFile(filename.c_str(), "rb");
 				if(!file){
-					filename = GetResDir() + directory;
+					filename = absResDir + directory;
 					filename.append("/");
 					filename.append(*it);
 				}else{

@@ -1,7 +1,9 @@
 #include "flareprojectile.h"
 #include "plume.h"
 #include "gasloader.h"
+#include <algorithm>
 
+const int FlareProjectile::MAX_PLUMES;
 FlareProjectile::FlareProjectile() : Object(ObjectTypes::FLAREPROJECTILE){
 	//requiresauthority = true;
 	res_bank = 0xFF;
@@ -12,7 +14,8 @@ FlareProjectile::FlareProjectile() : Object(ObjectTypes::FLAREPROJECTILE){
 	shielddamage = w ? w->shieldDamage : 1;
 	velocity = w ? w->velocity : 5;
 	drawcheckered = true;
-	for(int i = 0; i < plumecount; i++){
+	plumecount = (w && w->trailPlumes > 0) ? (std::min)(w->trailPlumes, MAX_PLUMES) : 4;
+	for(int i = 0; i < MAX_PLUMES; i++){
 		plumeids[i] = 0;
 	}
 	moveamount = w ? w->moveAmount : 1;
@@ -22,7 +25,7 @@ FlareProjectile::FlareProjectile() : Object(ObjectTypes::FLAREPROJECTILE){
 	isprojectile = true;
 	isphysical = true;
 	poisonous = false;
-	//snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 }
 
 void FlareProjectile::Serialize(bool write, Serializer & data, Serializer * old){
@@ -69,7 +72,9 @@ void FlareProjectile::Tick(World & world){
 		//world->MarkDestroyObject(id);
 	}
 	res_index = state_i;
-	if(state_i >= 14){
+	const WeaponDef* wfl = GASLoader::Get().GetWeaponDef("flare");
+	int life = (wfl && wfl->projectileLife) ? wfl->projectileLife : 14;
+	if(state_i >= life){
 		world.MarkDestroyObject(id);
 	}
 	state_i++;

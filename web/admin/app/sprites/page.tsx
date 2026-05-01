@@ -5,6 +5,8 @@ import { useAuth } from '../../lib/auth';
 import { useWsConnected } from '../../lib/socket';
 import Sidebar from '../../components/Sidebar';
 import { zipSync } from 'fflate';
+import * as assetsStore from '../../lib/assets-store';
+import * as gameDataStore from '../../lib/game-data-store';
 import {
   parseDat,
   decodeBank,
@@ -177,8 +179,22 @@ function SpritesPageInner() {
 
   // ── Folder open ──────────────────────────────────────────────────────────
   const folderInputRef = useRef<HTMLInputElement>(null);
-  const [folder, setFolder] = useState<FolderState | null>(null);
-  const [folderName, setFolderName] = useState<string | null>(null);
+
+  function storeToFolderState(stored: ReturnType<typeof assetsStore.get>): FolderState | null {
+    if (!stored) return null;
+    return {
+      sprites: stored.sprites
+        ? { datBuf: stored.sprites.datBuf, frameCounts: parseDat(stored.sprites.datBuf), bankFiles: stored.sprites.bankFiles }
+        : null,
+      tiles: stored.tiles
+        ? { datBuf: stored.tiles.datBuf, frameCounts: parseDat(stored.tiles.datBuf), bankFiles: stored.tiles.bankFiles }
+        : null,
+      paletteBuf: stored.paletteBuf,
+    };
+  }
+
+  const [folder, setFolder] = useState<FolderState | null>(() => storeToFolderState(assetsStore.get()));
+  const [folderName, setFolderName] = useState<string | null>(() => assetsStore.get()?.folderName ?? null);
 
   async function loadTabAssets(
     all: File[],
@@ -237,6 +253,14 @@ function SpritesPageInner() {
     setSelectedFrame(null);
     setDeletedBanks([]);
     setDirtyDat(false);
+
+    // Persist raw buffers so the folder survives navigation
+    assetsStore.set({
+      folderName: folderRoot,
+      paletteBuf: palBuf,
+      sprites: sprites ? { datBuf: sprites.datBuf, bankFiles: sprites.bankFiles } : null,
+      tiles:   tiles   ? { datBuf: tiles.datBuf,   bankFiles: tiles.bankFiles   } : null,
+    });
   }
 
   function handleFolderInput(e: React.ChangeEvent<HTMLInputElement>) {
@@ -246,6 +270,8 @@ function SpritesPageInner() {
   }
 
   function handleCloseFolder() {
+    assetsStore.clear();
+    gameDataStore.clear();
     setFolder(null);
     setFolderName(null);
     setDecodedBanks(new Map());

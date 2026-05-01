@@ -150,11 +150,11 @@ if(MSVC)
 		"/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/msvc_snprintf_compat.h")
 endif()
 
-set(SILENCER_LOBBY_HOST "127.0.0.1" CACHE STRING "Lobby host the client connects to at startup")
+set(SILENCER_LOBBY_HOST "lobby.arsiamons.com" CACHE STRING "Lobby host the client connects to at startup")
 set(SILENCER_LOBBY_PORT "517" CACHE STRING "Lobby TCP port")
 set(SILENCER_VERSION "00000" CACHE STRING "Client version string sent to the lobby during MSG_VERSION; overridden by release.yml from git tag")
-set(SILENCER_MAP_API_URL "http://127.0.0.1:15172" CACHE STRING "Base URL for the community map HTTP API (used when fetching a missing map before falling back to P2P)")
-set(SILENCER_ADMIN_API_URL "http://127.0.0.1:24080" CACHE STRING "Base URL for the admin API (actordefs sync, etc.)")
+set(SILENCER_MAP_API_URL "https://maps.arsiamons.com" CACHE STRING "Base URL for the community map HTTP API (used when fetching a missing map before falling back to P2P)")
+set(SILENCER_ADMIN_API_URL "https://admin.arsiamons.com" CACHE STRING "Base URL for the admin API (actordefs sync, etc.)")
 target_compile_definitions(${SILENCER_TARGET} PRIVATE
 	SILENCER_LOBBY_HOST="${SILENCER_LOBBY_HOST}"
 	SILENCER_LOBBY_PORT=${SILENCER_LOBBY_PORT}

@@ -34,7 +34,8 @@ void TechStation::Tick(World & world){
 				plume->renderpass = renderpass;
 				plume->SetPosition(TechStation::x + xs[i] + (rand() % 9) - 4, TechStation::y + ys[i] + (rand() % 9) - 4);
 				plume->xv = (rand() % 9) - 4;
-				plume->yv = -25;
+				const GameObjectDef* _tsd = GASLoader::Get().GetGameObjectDef("techStation");
+				plume->yv = -(_tsd ? _tsd->techPlumeYV : 25);
 			}
 		}
 		Team * team = static_cast<Team *>(world.GetObjectFromId(teamid));
@@ -49,7 +50,8 @@ void TechStation::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile
 	Hittable::HandleHit(*this, world, x, y, projectile);
 	if(oldhealth != health && health == 0 && projectile.healthdamage > 0){
 		collidable = false;
-		EmitSound(world, world.resources.soundbank["q_expl02.wav"], 96);
+		{ const GameObjectDef* _d = GASLoader::Get().GetGameObjectDef("techStation");
+		EmitSound(world, world.resources.soundbank[(_d && !_d->soundDestroy.empty()) ? _d->soundDestroy : "q_expl02.wav"], 96); }
 		Team * team = static_cast<Team *>(world.GetObjectFromId(teamid));
 		if(team){
 			Uint32 tech = team->GetAvailableTech(world);

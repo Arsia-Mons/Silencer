@@ -1,5 +1,6 @@
 #include "button.h"
 #include "objecttypes.h"
+#include "../gas/gasloader.h"
 
 Button::Button() : Object(ObjectTypes::BUTTON){
 	x = 0;
@@ -49,7 +50,7 @@ void Button::Tick(World & world){
 				break;
 			}
 			if(state_i == 0){
-				Audio::GetInstance().Play(world.resources.soundbank["whoom.wav"]);
+				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundUIClick]);
 			}
 			effectbrightness = 128 + (state_i * 2);
 			if(type != B156x21){

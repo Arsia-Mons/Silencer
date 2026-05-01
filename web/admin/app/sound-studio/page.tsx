@@ -5,6 +5,8 @@ import Sidebar from '../../components/Sidebar';
 import { apiFetch } from '../../lib/api';
 import { useServerReachable } from '../../lib/socket';
 import { decodeAdpcmWav } from './adpcm';
+import * as audioStore from '../../lib/audio-store';
+import * as soundStudioStore from '../../lib/sound-studio-store';
 
 interface SoundEntry {
   name: string;
@@ -106,10 +108,10 @@ export default function SoundStudioPage() {
 
   // ── State ───────────────────────────────────────────────────────────────────
   const [tab, setTab] = useState<TabMode>('sounds');
-  const [sounds, setSounds] = useState<SoundEntry[]>([]);
-  const [refs, setRefs] = useState<Record<string, SoundRef>>({});
+  const [sounds, setSounds] = useState<SoundEntry[]>(() => soundStudioStore.get()?.sounds ?? []);
+  const [refs, setRefs] = useState<Record<string, SoundRef>>(() => soundStudioStore.get()?.refs ?? {});
   const [levels, setLevels] = useState<Record<string, LevelInfo>>({});
-  const [binLoaded, setBinLoaded] = useState(false);
+  const [binLoaded, setBinLoaded] = useState(() => soundStudioStore.isLoaded());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
@@ -175,7 +177,6 @@ export default function SoundStudioPage() {
   const compareSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const bgSourcesRef = useRef<(AudioBufferSourceNode | null)[]>([null, null, null]);
   const bgGainsRef = useRef<(GainNode | null)[]>([null, null, null]);
-  const decodedCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
 
   useEffect(() => { selectedVolCtxRef.current = selectedVolCtx; }, [selectedVolCtx]);
 
@@ -191,9 +192,15 @@ export default function SoundStudioPage() {
       ]);
       setSounds(soundsData); setRefs(refsData);
       setBinLoaded(true);
+      soundStudioStore.set({ sounds: soundsData, refs: refsData });
     } catch (e: any) { setError(e.message); }
     finally { setLoading(false); }
   }, []);
+
+  // Auto-load from API on mount if store is empty
+  useEffect(() => {
+    if (!soundStudioStore.isLoaded()) load();
+  }, [load]);
 
   const handleBinFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -211,6 +218,8 @@ export default function SoundStudioPage() {
         body: buf,
       });
       if (!res.ok) throw new Error(`Upload failed: ${res.status} ${res.statusText}`);
+      audioStore.clear(); // new sound.bin — old decoded buffers are stale
+      soundStudioStore.clear(); // force re-fetch of updated sound list
       await load();
     } catch (e: any) { setError(e.message); setLoading(false); }
     if (e.target) e.target.value = '';
@@ -344,7 +353,8 @@ export default function SoundStudioPage() {
   }
 
   async function fetchAndDecode(name: string): Promise<AudioBuffer> {
-    if (decodedCacheRef.current.has(name)) return decodedCacheRef.current.get(name)!;
+    const cached = audioStore.get(name);
+    if (cached) return cached;
     const r = await fetch(`/api/sounds/${encodeURIComponent(name)}/play`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     });
@@ -356,7 +366,7 @@ export default function SoundStudioPage() {
     const audioCtx = getAudioCtx();
     if (audioCtx.state === 'suspended') await audioCtx.resume();
     const decoded = await decodeAdpcmWav(arrayBuf, audioCtx);
-    decodedCacheRef.current.set(name, decoded);
+    audioStore.set(name, decoded);
     return decoded;
   }
 
@@ -844,7 +854,7 @@ export default function SoundStudioPage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', height: '100vh', fontFamily: 'monospace', background: '#111', color: '#ccc' }}>
+    <div style={{ display: 'flex', height: '100vh' }}>
       <Sidebar wsConnected={serverReachable} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

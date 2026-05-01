@@ -15,8 +15,9 @@ public:
 	
 private:
 	Uint8 state_i;
-	static const int plumecount = 7;
-	Uint16 plumeids[plumecount];
+	static const int MAX_PLUMES = 16;
+	int plumecount;
+	Uint16 plumeids[MAX_PLUMES];
 	int soundplaying;
 	bool hitonce;
 };

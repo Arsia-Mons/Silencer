@@ -66,20 +66,31 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out,
         out.runSpeedDisguised          = j.value("runSpeedDisguised",          out.runSpeedDisguised);
         out.runSpeedSecret             = j.value("runSpeedSecret",             out.runSpeedSecret);
         out.runSpeedSecretDisguised    = j.value("runSpeedSecretDisguised",    out.runSpeedSecretDisguised);
+        out.rollSpeed                  = j.value("rollSpeed",                  out.rollSpeed);
         out.jetpackXvMax               = j.value("jetpackXvMax",               out.jetpackXvMax);
         out.jetpackXvMaxDisguised      = j.value("jetpackXvMaxDisguised",      out.jetpackXvMaxDisguised);
         out.jetpackYvMax               = j.value("jetpackYvMax",               out.jetpackYvMax);
+        out.jetpackThrust              = j.value("jetpackThrust",              out.jetpackThrust);
+        out.jetpackXvAccel             = j.value("jetpackXvAccel",             out.jetpackXvAccel);
+        out.jetpackCeilingCheckRange   = j.value("jetpackCeilingCheckRange",   out.jetpackCeilingCheckRange);
+        out.hitKnockbackAirFactor      = j.value("hitKnockbackAirFactor",      out.hitKnockbackAirFactor);
         out.jumpImpulse                = j.value("jumpImpulse",                out.jumpImpulse);
         out.ladderJumpImpulse          = j.value("ladderJumpImpulse",          out.ladderJumpImpulse);
         out.ladderActivateImpulse      = j.value("ladderActivateImpulse",      out.ladderActivateImpulse);
         out.disguiseActivationTicks    = j.value("disguiseActivationTicks",    out.disguiseActivationTicks);
         out.disguiseThreshold          = j.value("disguiseThreshold",          out.disguiseThreshold);
+        out.disguiseDeactivationTicks  = j.value("disguiseDeactivationTicks",  out.disguiseDeactivationTicks);
         out.invisibilityDurationTicks  = j.value("invisibilityDurationTicks",  out.invisibilityDurationTicks);
         out.poisonTickCycle            = j.value("poisonTickCycle",            out.poisonTickCycle);
         out.hackingEffectTicks         = j.value("hackingEffectTicks",         out.hackingEffectTicks);
         out.hackingCompleteThreshold   = j.value("hackingCompleteThreshold",   out.hackingCompleteThreshold);
         out.hackingExitThreshold       = j.value("hackingExitThreshold",       out.hackingExitThreshold);
+        out.audioFadeHackMs            = j.value("audioFadeHackMs",            out.audioFadeHackMs);
+        out.audioFadeJetpackMs         = j.value("audioFadeJetpackMs",         out.audioFadeJetpackMs);
+        out.audioFadeFlamerMs          = j.value("audioFadeFlamerMs",          out.audioFadeFlamerMs);
         out.deployWaitTicks            = j.value("deployWaitTicks",            out.deployWaitTicks);
+        out.cannonBuildCheckX          = j.value("cannonBuildCheckX",          out.cannonBuildCheckX);
+        out.cannonBuildCheckY          = j.value("cannonBuildCheckY",          out.cannonBuildCheckY);
         out.startingCredits            = j.value("startingCredits",            out.startingCredits);
         out.creditFloor                = j.value("creditFloor",                out.creditFloor);
         out.creditCap                  = j.value("creditCap",                  out.creditCap);
@@ -101,6 +112,90 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out,
         out.warpTeleportTick           = j.value("warpTeleportTick",           out.warpTeleportTick);
         out.deadAutoRespawnTick        = j.value("deadAutoRespawnTick",        out.deadAutoRespawnTick);
         out.deployAnimationTicks       = j.value("deployAnimationTicks",       out.deployAnimationTicks);
+        out.walkAcceleration           = j.value("walkAcceleration",           out.walkAcceleration);
+        out.standingShootDecel         = j.value("standingShootDecel",         out.standingShootDecel);
+        out.aiDisguiseInterval         = j.value("aiDisguiseInterval",         out.aiDisguiseInterval);
+        out.aiHackInterval             = j.value("aiHackInterval",             out.aiHackInterval);
+        out.aiLadderJumpUpInterval     = j.value("aiLadderJumpUpInterval",     out.aiLadderJumpUpInterval);
+        out.aiLadderJumpDownInterval   = j.value("aiLadderJumpDownInterval",   out.aiLadderJumpDownInterval);
+        out.aiArrivalThreshold         = j.value("aiArrivalThreshold",         out.aiArrivalThreshold);
+        out.deathDropXVRange           = j.value("deathDropXVRange",           out.deathDropXVRange);
+        out.deathDropYV                = j.value("deathDropYV",                out.deathDropYV);
+        out.govtKillPlasmaXVRange      = j.value("govtKillPlasmaXVRange",      out.govtKillPlasmaXVRange);
+        out.govtKillPlasmaYVRange      = j.value("govtKillPlasmaYVRange",      out.govtKillPlasmaYVRange);
+        out.ladderSpeedReduction       = j.value("ladderSpeedReduction",       out.ladderSpeedReduction);
+        out.disguisedDecelSpeed        = j.value("disguisedDecelSpeed",        out.disguisedDecelSpeed);
+        out.disguisedDecelSpeedSecret  = j.value("disguisedDecelSpeedSecret",  out.disguisedDecelSpeedSecret);
+        out.hackingPowerupBonus        = j.value("hackingPowerupBonus",        out.hackingPowerupBonus);
+        out.soundImpactBlaster1        = j.value("soundImpactBlaster1",        out.soundImpactBlaster1);
+        out.soundImpactBlaster2        = j.value("soundImpactBlaster2",        out.soundImpactBlaster2);
+        out.soundImpactLaserShield1    = j.value("soundImpactLaserShield1",    out.soundImpactLaserShield1);
+        out.soundImpactLaserShield2    = j.value("soundImpactLaserShield2",    out.soundImpactLaserShield2);
+        out.soundImpactLaser1          = j.value("soundImpactLaser1",          out.soundImpactLaser1);
+        out.soundImpactLaser2          = j.value("soundImpactLaser2",          out.soundImpactLaser2);
+        out.soundImpactFlamer          = j.value("soundImpactFlamer",          out.soundImpactFlamer);
+        out.soundShieldDown            = j.value("soundShieldDown",            out.soundShieldDown);
+        out.soundGrunt                 = j.value("soundGrunt",                 out.soundGrunt);
+        out.soundDisguise              = j.value("soundDisguise",              out.soundDisguise);
+        out.soundJackout               = j.value("soundJackout",               out.soundJackout);
+        out.soundJetpack               = j.value("soundJetpack",               out.soundJetpack);
+        out.soundMenuSelect            = j.value("soundMenuSelect",            out.soundMenuSelect);
+        out.soundWeaponCharged         = j.value("soundWeaponCharged",         out.soundWeaponCharged);
+        out.soundAlertWarn             = j.value("soundAlertWarn",             out.soundAlertWarn);
+        out.soundAlertInvestigate      = j.value("soundAlertInvestigate",      out.soundAlertInvestigate);
+        out.soundAmmo1                 = j.value("soundAmmo1",                 out.soundAmmo1);
+        out.soundAmmo2                 = j.value("soundAmmo2",                 out.soundAmmo2);
+        out.soundAmmo3                 = j.value("soundAmmo3",                 out.soundAmmo3);
+        out.soundAmmo4                 = j.value("soundAmmo4",                 out.soundAmmo4);
+        out.worldGravity               = j.value("worldGravity",               out.worldGravity);
+        out.worldMaxYVelocity          = j.value("worldMaxYVelocity",          out.worldMaxYVelocity);
+        out.playerHeight               = j.value("playerHeight",               out.playerHeight);
+        out.snapshotInterval           = j.value("snapshotInterval",           out.snapshotInterval);
+        out.shieldShrapnelThreshold    = j.value("shieldShrapnelThreshold",    out.shieldShrapnelThreshold);
+        out.shrapnelCount              = j.value("shrapnelCount",              out.shrapnelCount);
+        out.shrapnelSpeed              = j.value("shrapnelSpeed",              out.shrapnelSpeed);
+        out.flamerSoundInterval        = j.value("flamerSoundInterval",        out.flamerSoundInterval);
+        out.shieldEffectTicks          = j.value("shieldEffectTicks",          out.shieldEffectTicks);
+        out.hitSoundCooldownTicks      = j.value("hitSoundCooldownTicks",      out.hitSoundCooldownTicks);
+        out.fallingNudgeMax            = j.value("fallingNudgeMax",            out.fallingNudgeMax);
+        out.fallingNudgeXvDivisor      = j.value("fallingNudgeXvDivisor",      out.fallingNudgeXvDivisor);
+        out.hackingSoundIntervalBase   = j.value("hackingSoundIntervalBase",   out.hackingSoundIntervalBase);
+        out.hackingSoundIntervalRandom = j.value("hackingSoundIntervalRandom", out.hackingSoundIntervalRandom);
+        out.soundUIClick        = j.value("soundUIClick",        out.soundUIClick);
+        out.soundTeamJoin       = j.value("soundTeamJoin",       out.soundTeamJoin);
+        out.soundTeamHQ         = j.value("soundTeamHQ",         out.soundTeamHQ);
+        out.soundTeamHeal       = j.value("soundTeamHeal",       out.soundTeamHeal);
+        out.soundTeamHack       = j.value("soundTeamHack",       out.soundTeamHack);
+        out.soundRoundCountdown = j.value("soundRoundCountdown", out.soundRoundCountdown);
+        out.soundUndeploy         = j.value("soundUndeploy",         out.soundUndeploy);
+        out.soundBreath           = j.value("soundBreath",           out.soundBreath);
+        out.soundFootstepCrouchL  = j.value("soundFootstepCrouchL",  out.soundFootstepCrouchL);
+        out.soundFootstepCrouchR  = j.value("soundFootstepCrouchR",  out.soundFootstepCrouchR);
+        out.soundFootstepStairL   = j.value("soundFootstepStairL",   out.soundFootstepStairL);
+        out.soundFootstepStairR   = j.value("soundFootstepStairR",   out.soundFootstepStairR);
+        out.soundBaseAlarm        = j.value("soundBaseAlarm",        out.soundBaseAlarm);
+        out.soundIntrude          = j.value("soundIntrude",          out.soundIntrude);
+        out.soundSecurityPass     = j.value("soundSecurityPass",     out.soundSecurityPass);
+        out.soundRoll             = j.value("soundRoll",             out.soundRoll);
+        out.soundPickup           = j.value("soundPickup",           out.soundPickup);
+        out.soundJackIn           = j.value("soundJackIn",           out.soundJackIn);
+        out.soundHackAmbient      = j.value("soundHackAmbient",      out.soundHackAmbient);
+        out.soundType1            = j.value("soundType1",            out.soundType1);
+        out.soundType2            = j.value("soundType2",            out.soundType2);
+        out.soundType3            = j.value("soundType3",            out.soundType3);
+        out.soundType4            = j.value("soundType4",            out.soundType4);
+        out.soundType5            = j.value("soundType5",            out.soundType5);
+        out.soundRepair           = j.value("soundRepair",           out.soundRepair);
+        out.soundHurtA            = j.value("soundHurtA",            out.soundHurtA);
+        out.soundHurtB            = j.value("soundHurtB",            out.soundHurtB);
+        out.soundLandCrouch       = j.value("soundLandCrouch",       out.soundLandCrouch);
+        out.soundReload           = j.value("soundReload",           out.soundReload);
+        out.soundJetpackLoop      = j.value("soundJetpackLoop",      out.soundJetpackLoop);
+        out.soundLand             = j.value("soundLand",             out.soundLand);
+        out.soundFall             = j.value("soundFall",             out.soundFall);
+        out.soundLadder1          = j.value("soundLadder1",          out.soundLadder1);
+        out.soundLadder2          = j.value("soundLadder2",          out.soundLadder2);
+        out.soundPowerUp          = j.value("soundPowerUp",          out.soundPowerUp);
     } catch (const std::exception& e) {
         errors.push_back({"player.json", "", "FIELD_ERROR", e.what()});
     }
@@ -136,6 +231,11 @@ static void LoadAgencies(const std::string& dir, std::vector<AgencyDef>& out,
                 a.upgradeCaps.hacking    = caps.value("hacking",    a.upgradeCaps.hacking);
                 a.upgradeCaps.contacts   = caps.value("contacts",   a.upgradeCaps.contacts);
             }
+            if (aj.contains("weapons") && aj["weapons"].is_array()) {
+                for (const auto& wid : aj["weapons"]) {
+                    a.weapons.push_back(wid.get<std::string>());
+                }
+            }
             out.push_back(std::move(a));
         }
     } catch (const std::exception& e) {
@@ -161,11 +261,21 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out,
             w.throwSpeedStanding  = wj.value("throwSpeedStanding",  0);
             w.throwSpeedMoving    = wj.value("throwSpeedMoving",    0);
             w.throwSpeedRunning   = wj.value("throwSpeedRunning",   0);
+            w.throwYvDown         = wj.value("throwYvDown",         w.throwYvDown);
+            w.throwXvDownDiag     = wj.value("throwXvDownDiag",     w.throwXvDownDiag);
+            w.throwYvDownDiag     = wj.value("throwYvDownDiag",     w.throwYvDownDiag);
+            w.throwXvUp           = wj.value("throwXvUp",           w.throwXvUp);
+            w.throwYvUp           = wj.value("throwYvUp",           w.throwYvUp);
+            w.throwXvUpDiag       = wj.value("throwXvUpDiag",       w.throwXvUpDiag);
+            w.throwYvUpDiag       = wj.value("throwYvUpDiag",       w.throwYvUpDiag);
+            w.throwXvCrouch       = wj.value("throwXvCrouch",       w.throwXvCrouch);
+            w.throwYvCrouch       = wj.value("throwYvCrouch",       w.throwYvCrouch);
             w.explosionTick       = wj.value("explosionTick",       0);
             w.secondaryTick       = wj.value("secondaryTick",       0);
             w.destroyTick         = wj.value("destroyTick",         0);
             w.neutronDestroyTick  = wj.value("neutronDestroyTick",  0);
             w.flareDuration       = wj.value("flareDuration",       0);
+            w.flareSpawnInterval  = wj.value("flareSpawnInterval",  0);
             w.velocity            = wj.value("velocity",            0);
             w.moveAmount          = wj.value("moveAmount",          0);
             w.radius              = wj.value("radius",              0);
@@ -177,6 +287,54 @@ static void LoadWeapons(const std::string& dir, std::vector<WeaponDef>& out,
             w.plasmaGravity       = wj.value("plasmaGravity",       w.plasmaGravity);
             w.plasmaLifeNormal    = wj.value("plasmaLifeNormal",    w.plasmaLifeNormal);
             w.plasmaLifeLarge     = wj.value("plasmaLifeLarge",     w.plasmaLifeLarge);
+            w.projectileType  = wj.value("projectileType", std::string{});
+            w.hitOverlayBank  = wj.value("hitOverlayBank", -1);
+            w.soundFire       = wj.value("soundFire",      std::string{});
+            w.soundHit1       = wj.value("soundHit1",      std::string{});
+            w.soundHit2       = wj.value("soundHit2",      std::string{});
+            w.soundLoop       = wj.value("soundLoop",      std::string{});
+            w.soundExplosion  = wj.value("soundExplosion", std::string{});
+            w.soundLand       = wj.value("soundLand",      std::string{});
+            w.soundThrow      = wj.value("soundThrow",     std::string{});
+            w.soundWarn       = wj.value("soundWarn",      std::string{});
+            w.audioFadePropulsionMs = wj.value("audioFadePropulsionMs", w.audioFadePropulsionMs);
+            w.ammoCapacity    = wj.value("ammoCapacity",   0);
+            w.reloadTicks     = wj.value("reloadTicks",    0);
+            w.projectileLife  = wj.value("projectileLife",  0);
+            w.emitOffset      = wj.value("emitOffset",      0);
+            w.exhaustPlumes             = wj.value("exhaustPlumes",             0);
+            w.rocketExplosionPlumeSpeed = wj.value("rocketExplosionPlumeSpeed", w.rocketExplosionPlumeSpeed);
+            w.bounceDamping             = wj.value("bounceDamping",             0.0f);
+            w.trailPlumes     = wj.value("trailPlumes",     0);
+            w.primaryCount    = wj.value("primaryCount",    0);
+            w.secondaryCount  = wj.value("secondaryCount",  0);
+            w.poisonRate          = wj.value("poisonRate",          0);
+            w.poisonMax           = wj.value("poisonMax",           0);
+            w.poisonCheckInterval = wj.value("poisonCheckInterval", 0);
+            w.snapshotInterval = wj.value("snapshotInterval", 0);
+            if (wj.contains("spriteBanks") && wj["spriteBanks"].is_array()) {
+                for (const auto& b : wj["spriteBanks"]) {
+                    w.spriteBanks.push_back(b.get<int>());
+                }
+            }
+            w.primaryVectors.clear();
+            if (wj.contains("primaryVectors") && wj["primaryVectors"].is_array()) {
+                for (const auto& v : wj["primaryVectors"]) {
+                    SpreadVector sv;
+                    sv.xv = v.value("xv", 0);
+                    sv.yv = v.value("yv", 0);
+                    w.primaryVectors.push_back(sv);
+                }
+            }
+            w.secondaryVectors.clear();
+            if (wj.contains("secondaryVectors") && wj["secondaryVectors"].is_array()) {
+                for (const auto& v : wj["secondaryVectors"]) {
+                    SpreadVector sv;
+                    sv.xv = v.value("xv", 0);
+                    sv.yv = v.value("yv", 0);
+                    w.secondaryVectors.push_back(sv);
+                }
+            }
             out.push_back(std::move(w));
         }
     } catch (const std::exception& e) {
@@ -259,6 +417,12 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out,
             e.deathDropFiles        = ej.value("deathDropFiles",        e.deathDropFiles);
             e.ladderClimbSpeed      = ej.value("ladderClimbSpeed",      e.ladderClimbSpeed);
             e.rocketLaunchXv        = ej.value("rocketLaunchXv",        e.rocketLaunchXv);
+            e.rocketOffsetX         = ej.value("rocketOffsetX",         e.rocketOffsetX);
+            e.rocketOffsetY         = ej.value("rocketOffsetY",         e.rocketOffsetY);
+            e.deathDropYV           = ej.value("deathDropYV",           e.deathDropYV);
+            e.patrolTurnInterval    = ej.value("patrolTurnInterval",    e.patrolTurnInterval);
+            e.deathDropXVRange      = ej.value("deathDropXVRange",      e.deathDropXVRange);
+            e.meleeHitDuration      = ej.value("meleeHitDuration",      e.meleeHitDuration);
             e.ammoDropQuantity      = ej.value("ammoDropQuantity",      e.ammoDropQuantity);
             e.lookDefaultMinX       = ej.value("lookDefaultMinX",       e.lookDefaultMinX);
             e.lookDefaultMaxX       = ej.value("lookDefaultMaxX",       e.lookDefaultMaxX);
@@ -267,6 +431,45 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out,
             e.lookDirMaxX           = ej.value("lookDirMaxX",           e.lookDirMaxX);
             e.lookDirY1             = ej.value("lookDirY1",             e.lookDirY1);
             e.lookDirY2             = ej.value("lookDirY2",             e.lookDirY2);
+            e.soundFire      = ej.value("soundFire",      std::string{});
+            e.soundActivate  = ej.value("soundActivate",  std::string{});
+            e.soundAmbient   = ej.value("soundAmbient",   std::string{});
+            e.soundMelee     = ej.value("soundMelee",     std::string{});
+            e.soundMoveRight = ej.value("soundMoveRight", std::string{});
+            e.soundMoveLeft  = ej.value("soundMoveLeft",  std::string{});
+            e.soundDeath     = ej.value("soundDeath",     std::string{});
+            e.soundHurt1     = ej.value("soundHurt1",     std::string{});
+            e.soundHurt2     = ej.value("soundHurt2",     std::string{});
+            e.soundHurt3     = ej.value("soundHurt3",     std::string{});
+            e.soundAlert1    = ej.value("soundAlert1",    e.soundAlert1);
+            e.soundAlert2    = ej.value("soundAlert2",    e.soundAlert2);
+            e.soundAlert3    = ej.value("soundAlert3",    e.soundAlert3);
+            e.soundAlert4    = ej.value("soundAlert4",    e.soundAlert4);
+            e.soundAlert5        = ej.value("soundAlert5",        e.soundAlert5);
+            e.searchTimeoutTicks = ej.value("searchTimeoutTicks", e.searchTimeoutTicks);
+            e.speakCooldownTicks = ej.value("speakCooldownTicks", e.speakCooldownTicks);
+            e.standingDurationTicks   = ej.value("standingDurationTicks",   e.standingDurationTicks);
+            e.walkingDurationTicks    = ej.value("walkingDurationTicks",    e.walkingDurationTicks);
+            e.chaseProximityX         = ej.value("chaseProximityX",         e.chaseProximityX);
+            e.ambientSoundIntervalTicks = ej.value("ambientSoundIntervalTicks", e.ambientSoundIntervalTicks);
+            e.deathExplosionDelayTicks  = ej.value("deathExplosionDelayTicks",  e.deathExplosionDelayTicks);
+            e.audioFadeAmbientMs = ej.value("audioFadeAmbientMs", e.audioFadeAmbientMs);
+            e.snapshotInterval = ej.value("snapshotInterval", e.snapshotInterval);
+            e.warpTeleportTick = ej.value("warpTeleportTick", e.warpTeleportTick);
+            e.runDurationTicks = ej.value("runDurationTicks",  e.runDurationTicks);
+            e.deadRespawnTicks = ej.value("deadRespawnTicks",  e.deadRespawnTicks);
+            if (ej.contains("lookBoxes") && ej["lookBoxes"].is_array()) {
+                for (const auto& lb : ej["lookBoxes"]) {
+                    int dir = lb.value("dir", -1);
+                    if (dir < 0) continue;
+                    GuardLookBox box;
+                    box.x1 = lb.value("x1", 0);
+                    box.x2 = lb.value("x2", 0);
+                    box.y1 = lb.value("y1", 0);
+                    box.y2 = lb.value("y2", 0);
+                    e.lookBoxes[dir] = box;
+                }
+            }
             out.push_back(std::move(e));
         }
     } catch (const std::exception& e) {
@@ -313,11 +516,30 @@ static void LoadGameObjects(const std::string& dir, std::vector<GameObjectDef>& 
             g.healthRegen   = gj.value("healthRegen",    0);
             g.techHealth    = gj.value("techHealth",     0);
             g.techShield    = gj.value("techShield",     0);
+            g.techPlumeYV   = gj.value("techPlumeYV",   g.techPlumeYV);
             g.refireReadyTick = gj.value("refireReadyTick", g.refireReadyTick);
             g.reloadTick      = gj.value("reloadTick",      g.reloadTick);
             g.innerRange      = gj.value("innerRange",      g.innerRange);
             g.outerRange      = gj.value("outerRange",      g.outerRange);
             g.detectionRange  = gj.value("detectionRange",  g.detectionRange);
+            g.soundDeploy     = gj.value("soundDeploy",     std::string{});
+            g.soundFire       = gj.value("soundFire",       std::string{});
+            g.soundDestroy    = gj.value("soundDestroy",    std::string{});
+            g.soundPurchase   = gj.value("soundPurchase",   std::string{});
+            g.soundHeal       = gj.value("soundHeal",       std::string{});
+            g.soundAmbient    = gj.value("soundAmbient",    std::string{});
+            g.soundOpen       = gj.value("soundOpen",       std::string{});
+            g.ventPlumeCount     = gj.value("ventPlumeCount",     g.ventPlumeCount);
+            g.ventActiveDuration = gj.value("ventActiveDuration", g.ventActiveDuration);
+            g.ventCycleTicks     = gj.value("ventCycleTicks",     g.ventCycleTicks);
+            g.ventSpreadX        = gj.value("ventSpreadX",        g.ventSpreadX);
+            g.ventSpreadY        = gj.value("ventSpreadY",        g.ventSpreadY);
+            g.ventYOffset        = gj.value("ventYOffset",        g.ventYOffset);
+            g.ventBaseYV         = gj.value("ventBaseYV",         g.ventBaseYV);
+            g.ventYVRange        = gj.value("ventYVRange",        g.ventYVRange);
+            g.detectionWidth     = gj.value("detectionWidth",     g.detectionWidth);
+            g.detectionHeight    = gj.value("detectionHeight",    g.detectionHeight);
+            g.downIdleTicks      = gj.value("downIdleTicks",      g.downIdleTicks);
             out.push_back(std::move(g));
         }
     } catch (const std::exception& e) {
@@ -350,6 +572,10 @@ static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out,
             t.traceTimeMedium    = tj.value("traceTimeMedium",    t.traceTimeMedium);
             t.traceTimeExtended  = tj.value("traceTimeExtended",  t.traceTimeExtended);
             t.beaconTimeSecs     = tj.value("beaconTimeSecs",     t.beaconTimeSecs);
+            t.soundAmbient       = tj.value("soundAmbient",       std::string{});
+            t.soundHack          = tj.value("soundHack",          std::string{});
+            t.snapshotInterval   = tj.value("snapshotInterval",   t.snapshotInterval);
+            t.audioFadeMs        = tj.value("audioFadeMs",        t.audioFadeMs);
             out.push_back(std::move(t));
         }
     } catch (const std::exception& e) {
@@ -360,9 +586,70 @@ static void LoadTerminals(const std::string& dir, std::vector<TerminalDef>& out,
 
 // ---------------------------------------------------------------------------
 
+static void LoadWorld(const std::string& dir, WorldDef& out) {
+    json j;
+    std::string path = dir + "world.json";
+    std::ifstream f(path);
+    if (!f.is_open()) return;
+    try {
+        f >> j;
+        out.soundAmbience1            = j.value("soundAmbience1",            out.soundAmbience1);
+        out.soundAmbience2            = j.value("soundAmbience2",            out.soundAmbience2);
+        out.soundAmbience3            = j.value("soundAmbience3",            out.soundAmbience3);
+        out.audioRange                = j.value("audioRange",                out.audioRange);
+        out.networkSyncRangeX         = j.value("networkSyncRangeX",         out.networkSyncRangeX);
+        out.networkSyncRangeY         = j.value("networkSyncRangeY",         out.networkSyncRangeY);
+        out.grenadesyncRangeX         = j.value("grenadesyncRangeX",         out.grenadesyncRangeX);
+        out.grenadesyncRangeY         = j.value("grenadesyncRangeY",         out.grenadesyncRangeY);
+        out.illuminateLevel           = j.value("illuminateLevel",           out.illuminateLevel);
+        out.terminalActivatePercent   = j.value("terminalActivatePercent",   out.terminalActivatePercent);
+        out.terminalBigBeamMin        = j.value("terminalBigBeamMin",        out.terminalBigBeamMin);
+        out.terminalBigBeamRange      = j.value("terminalBigBeamRange",      out.terminalBigBeamRange);
+        out.terminalSmallBeamMin      = j.value("terminalSmallBeamMin",      out.terminalSmallBeamMin);
+        out.terminalSmallBeamRange    = j.value("terminalSmallBeamRange",    out.terminalSmallBeamRange);
+        out.bodyPartSpawnYOffset      = j.value("bodyPartSpawnYOffset",      out.bodyPartSpawnYOffset);
+        out.bodyPartLaunchYV          = j.value("bodyPartLaunchYV",          out.bodyPartLaunchYV);
+        out.bodyPartVelocityRange     = j.value("bodyPartVelocityRange",     out.bodyPartVelocityRange);
+        out.minWallDistance           = j.value("minWallDistance",           out.minWallDistance);
+    } catch (const std::exception& e) {
+        fprintf(stderr, "[gas] world.json error: %s\n", e.what());
+    }
+}
+
+static void LoadGameEngine(const std::string& dir, GameEngineDef& out) {
+    json j;
+    std::string path = dir + "gameengine.json";
+    std::ifstream f(path);
+    if (!f.is_open()) return;
+    try {
+        f >> j;
+        out.tickIntervalMs      = j.value("tickIntervalMs",      out.tickIntervalMs);
+        out.ticksPerSecond      = j.value("ticksPerSecond",      out.ticksPerSecond);
+        out.audioStopAllFadeMs  = j.value("audioStopAllFadeMs",  out.audioStopAllFadeMs);
+        out.nopeersTimeoutTicks      = j.value("nopeersTimeoutTicks",      out.nopeersTimeoutTicks);
+        out.heartbeatIntervalTicks   = j.value("heartbeatIntervalTicks",   out.heartbeatIntervalTicks);
+        out.maxStaleSnapshots        = j.value("maxStaleSnapshots",        out.maxStaleSnapshots);
+        out.chatDisplayTicks         = j.value("chatDisplayTicks",         out.chatDisplayTicks);
+        out.chatMaxLines             = j.value("chatMaxLines",             out.chatMaxLines);
+        out.snapshotQueueShrinkTicks = j.value("snapshotQueueShrinkTicks", out.snapshotQueueShrinkTicks);
+        out.snapshotQueueMinSize     = j.value("snapshotQueueMinSize",     out.snapshotQueueMinSize);
+        out.snapshotQueueInitMaxSize = j.value("snapshotQueueInitMaxSize", out.snapshotQueueInitMaxSize);
+        out.snapshotQueueMaxCap      = j.value("snapshotQueueMaxCap",      out.snapshotQueueMaxCap);
+        out.pingIntervalMs           = j.value("pingIntervalMs",           out.pingIntervalMs);
+        out.shrapnelLifeNormal       = j.value("shrapnelLifeNormal",       out.shrapnelLifeNormal);
+        out.shrapnelLifeLaser        = j.value("shrapnelLifeLaser",        out.shrapnelLifeLaser);
+    } catch (const std::exception& e) {
+        fprintf(stderr, "[gas] gameengine.json error: %s\n", e.what());
+    }
+}
+
+// ---------------------------------------------------------------------------
+
 bool GASLoader::Load(const std::string& gasDir) {
     lastLoadErrors.clear();
+    LoadGameEngine(gasDir, gameengine);
     LoadPlayer(gasDir, player, lastLoadErrors);
+    LoadWorld(gasDir, world);
     LoadAgencies(gasDir, agencies, lastLoadErrors);
     LoadWeapons(gasDir, weapons, lastLoadErrors);
     LoadItems(gasDir, items, lastLoadErrors);

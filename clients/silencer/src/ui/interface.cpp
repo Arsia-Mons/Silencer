@@ -5,6 +5,7 @@
 #include "scrollbar.h"
 #include "selectbox.h"
 #include "overlay.h"
+#include "../gas/gasloader.h"
 #include <algorithm>
 
 Interface::Interface() : Object(ObjectTypes::INTERFACE){
@@ -605,7 +606,7 @@ void Interface::Prev(World & world){
 			if(scrollbar->scrollposition == 0){
 				gotonext = true;
 			}else{
-				Audio::GetInstance().Play(world.resources.soundbank["whoom.wav"]);
+				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundUIClick]);
 				gotonext = false;
 			}
 		}
@@ -648,7 +649,7 @@ void Interface::Next(World & world){
 			if(scrollbar->scrollposition == scrollbar->scrollmax){
 				gotonext = true;
 			}else{
-				Audio::GetInstance().Play(world.resources.soundbank["whoom.wav"]);
+				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundUIClick]);
 				gotonext = false;
 			}
 		}

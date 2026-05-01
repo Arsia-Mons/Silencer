@@ -19,7 +19,7 @@ RocketProjectile::RocketProjectile() : Object(ObjectTypes::ROCKETPROJECTILE){
 	renderpass = 2;
 	isprojectile = true;
 	isphysical = true;
-	snapshotinterval = 6;
+	snapshotinterval = (w && w->snapshotInterval) ? w->snapshotInterval : 6;
 	soundchannel = 0;
 }
 
@@ -31,6 +31,9 @@ void RocketProjectile::Serialize(bool write, Serializer & data, Serializer * old
 }
 
 void RocketProjectile::Tick(World & world){
+	const WeaponDef* w = GASLoader::Get().GetWeaponDef("rocket");
+	const std::vector<int>& sb = w ? w->spriteBanks : std::vector<int>();
+	int defaultBank = !sb.empty() ? sb[0] : 87;
 	if(yv < 0 && xv == 0){ // up
 		res_index = 4;
 	}
@@ -70,9 +73,9 @@ void RocketProjectile::Tick(World & world){
 			oldyv = yv;
 			xv = ceil(float(xv) * _hs);
 			yv = ceil(float(yv) * _hs);
-			soundchannel = EmitSound(world, world.resources.soundbank["rocket4.wav"], 128);
+			soundchannel = EmitSound(world, world.resources.soundbank[w && !w->soundLoop.empty() ? w->soundLoop : "rocket4.wav"], 128);
 			state_i = 11;
-			res_bank = 87;
+			res_bank = defaultBank;
 		}
 	}
 	if(state_i == 0){
@@ -81,10 +84,10 @@ void RocketProjectile::Tick(World & world){
 		{ const WeaponDef* _gd = GASLoader::Get().GetWeaponDef("rocket"); float _s = _gd ? _gd->rocketSlowInitial : 0.2f;
 		xv = ceil(float(xv) * _s);
 		yv = ceil(float(yv) * _s); }
-		soundchannel = EmitSound(world, world.resources.soundbank["rocket9.wav"], 128);
+		soundchannel = EmitSound(world, world.resources.soundbank[w && !w->soundFire.empty() ? w->soundFire : "rocket9.wav"], 128);
 	}
 	if(state_i == 3){
-		res_bank = 87;
+		res_bank = defaultBank;
 	}
 	if(state_i == 11){
 		if(xv > 0){
@@ -112,7 +115,8 @@ void RocketProjectile::Tick(World & world){
 			if(platform){
 				platform->GetNormal(x, y, &xn, &yn);
 			}
-			int numplumes = 6;
+			const WeaponDef* w_r = GASLoader::Get().GetWeaponDef("rocket");
+		int numplumes = (w_r && w_r->exhaustPlumes) ? w_r->exhaustPlumes : 6;
 			float anglen = (rand() % 100) / float(100);
 			for(int i = 0; i < numplumes; i++){
 				Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
@@ -124,8 +128,9 @@ void RocketProjectile::Tick(World & world){
 					plume->yv = (yn * abs(plume->yv)) + (rand() % 33) - 16;*/
 					float angle = (i / float(numplumes)) * (2 * 3.14);
 					angle += anglen;
-					plume->xv = (sin(angle)) * 15;
-					plume->yv = (cos(angle)) * 15;
+					float _eps = w_r ? w_r->rocketExplosionPlumeSpeed : 15;
+					plume->xv = (sin(angle)) * _eps;
+					plume->yv = (cos(angle)) * _eps;
 					if(xn || yn){
 						plume->xv = (xn * abs(plume->xv)) + (rand() % 17) - 8;
 						plume->yv = (yn * abs(plume->yv)) + (rand() % 17) - 8;
@@ -189,9 +194,9 @@ void RocketProjectile::Tick(World & world){
 			yv = 0;
 			res_bank = 0xFF;
 			if(soundchannel){
-				Audio::GetInstance().Stop(soundchannel, 100);
+				Audio::GetInstance().Stop(soundchannel, w ? w->audioFadePropulsionMs : 100);
 			}
-			EmitSound(world, world.resources.soundbank["seekexp1.wav"], 128);
+			EmitSound(world, world.resources.soundbank[w && !w->soundExplosion.empty() ? w->soundExplosion : "seekexp1.wav"], 128);
 		}
 		for(int i = 0; i < 2; i++){
 			int xv2 = (signed(oldx) - x) * (1.25 * i);

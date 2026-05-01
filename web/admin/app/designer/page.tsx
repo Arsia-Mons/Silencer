@@ -70,7 +70,7 @@ export default function DesignerPage() {
   const [pastePending, setPastePending] = useState(false);
   const [zoom, setZoom]   = useState(0.5);
   const [pan, setPan]     = useState({ x: 32, y: 32 });
-  const fitPendingRef = useRef(false);
+  const fitPendingRef = useRef(!!map); // true on return-navigation so we auto-fit the restored map
   const [cursor, setCursor] = useState<{ tx: number; ty: number; wx: number; wy: number }>({ tx: 0, ty: 0, wx: 0, wy: 0 });
   const [dragPlatform, setDragPlatform] = useState<DragPlatform | null>(null);
   const [lumMode, setLumMode] = useState(false);
