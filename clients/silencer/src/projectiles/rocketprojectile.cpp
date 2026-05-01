@@ -84,7 +84,7 @@ void RocketProjectile::Tick(World & world){
 		{ const WeaponDef* _gd = GASLoader::Get().GetWeaponDef("rocket"); float _s = _gd ? _gd->rocketSlowInitial : 0.2f;
 		xv = ceil(float(xv) * _s);
 		yv = ceil(float(yv) * _s); }
-		soundchannel = EmitSound(world, world.resources.soundbank[w && !w->soundLand.empty() ? w->soundLand : "rocket9.wav"], 128);
+		soundchannel = EmitSound(world, world.resources.soundbank[w && !w->soundFire.empty() ? w->soundFire : "rocket9.wav"], 128);
 	}
 	if(state_i == 3){
 		res_bank = defaultBank;
