@@ -15,6 +15,19 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: 'v00043',
+    date: '2026-05-01',
+    title: 'Items Tool',
+    entries: [
+      {
+        category: 'DASHBOARD',
+        changes: [
+          'Items Tool (/items) — new page: item list sidebar, inline-editable property panel (identity, sprite, purchase price, tech-tree, stats/effects), agency restriction dropdown, saves to items.json; GAS store integrated (folder stays loaded across navigation)',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v00042',
     date: '2026-04-30',
     title: 'Weapon Tool, Animated UI, Bug Fixes',
