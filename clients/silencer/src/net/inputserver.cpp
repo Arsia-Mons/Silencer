@@ -200,12 +200,18 @@ void InputServer::AcceptLoop(){
 }
 
 void InputServer::HandleConnection(int fd){
-	uint8_t version;
+	uint8_t version = 0;
 	if(!RecvAll(fd, &version, 1) || version != kProtoVersion){
 		fprintf(stderr, "[input] handshake failed (version=%u)\n", version);
-		CLOSE_SOCK(fd);
-		std::lock_guard<std::mutex> lk(conn_mu);
-		if(connfd == fd) connfd = -1;
+		int my_fd = -1;
+		{
+			std::lock_guard<std::mutex> lk(conn_mu);
+			if(connfd == fd){
+				my_fd = connfd;
+				connfd = -1;
+			}
+		}
+		if(my_fd >= 0) CLOSE_SOCK(my_fd);
 		return;
 	}
 	uint8_t hdr[3];
