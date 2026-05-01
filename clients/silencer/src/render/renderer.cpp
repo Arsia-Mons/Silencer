@@ -1042,9 +1042,10 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 			for(Uint8 t : dynTypes){
 				for(Uint16 oid : world.objectsbytype[t]){
 					Object * obj = world.GetObjectFromId(oid);
-					if(!obj || !obj->collidable) continue;
+					if(!obj || !obj->draw) continue;
 					int ox1, oy1, ox2, oy2;
 					obj->GetAABB(world.resources, &ox1, &oy1, &ox2, &oy2);
+					if(ox2 <= ox1 || oy2 <= oy1) continue; // degenerate AABB
 					allDynOccluders.push_back({ ox1, oy1, ox2, oy2 });
 				}
 			}
