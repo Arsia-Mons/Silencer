@@ -30,7 +30,7 @@ const NAV = [
   { href: '/gas',             label: '[ GAS EDITOR ]',         icon: '⚡', minRank: 3 },
   { href: '/sprites',         label: '[ SPRITES ]',            icon: '◈', minRank: 3 },
   { href: '/weapons',         label: '[ WEAPONS ]',            icon: '⚔', minRank: 3 },
-  { href: '/items',           label: '[ ITEMS ]',              icon: '🎒', minRank: 3 },
+  { href: '/items',           label: '[ ITEMS ]',              icon: '⊟', minRank: 3 },
   { href: '/health',          label: '[ SERVER HEALTH ]',     icon: '◎', minRank: 0 },
   { href: '/changelog',       label: '[ CHANGELOG ]',         icon: '◑', minRank: 0 },
 ];
