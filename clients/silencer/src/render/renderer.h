@@ -94,6 +94,7 @@ private:
 	// Light shadow baking: keyed by (x<<32|y as uint64_t) for pointer-free cache safety
 	std::unordered_map<uint64_t, std::vector<Uint8>> lightmasks;
 	bool lightmasksbaked;
+	std::vector<Object *> objectlights; // rebuilt each DrawWorld call; used by debug overlay
 	void BakeLightMasks();
 	void ClearLightMasks();
 	static Uint8 GetLightFrameIdx(const class Overlay * light, const Resources & res);

@@ -162,6 +162,24 @@ void Renderer::Draw(Surface * surface, float frametime){
 				DrawLine(surface, bx1+ox, by2+oy, bx1+ox, by1+oy, col, 1); // left
 			}
 		}
+		// Draw light actor positions: crosshair + radius circle + label
+		if(!objectlights.empty()){
+			const int crossSize = 5;
+			const Uint8 lightCol = 221; // yellow
+			int ox = camera.GetXOffset(), oy = camera.GetYOffset();
+			for(Object * obj : objectlights){
+				Overlay * light = static_cast<Overlay *>(obj);
+				int sx = light->x + ox, sy = light->y + oy;
+				DrawLine(surface, sx - crossSize, sy, sx + crossSize, sy, lightCol, 1);
+				DrawLine(surface, sx, sy - crossSize, sx, sy + crossSize, lightCol, 1);
+				int radius = (light->res_index == 2) ? 200 : (light->res_index == 1) ? 140 : 80;
+				DrawCircle(surface, sx, sy, radius, lightCol);
+				const char * anim = light->lightAnim == 1 ? "flicker" : light->lightAnim == 2 ? "pulse" : "static";
+				char lbl[32];
+				snprintf(lbl, sizeof(lbl), "LIGHT(%s)", anim);
+				DrawText(surface, (Uint16)(sx - 24), (Uint16)(sy - crossSize - 8), lbl, 133, 6, false, lightCol, 0, false);
+			}
+		}
 	}else{
 		world.debuglines.clear();
 	}
@@ -270,7 +288,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 		DrawRain(surface, camera, frametime);
 		DrawRainPuddles(surface, camera);
 	}
-	std::vector<Object *> objectlights;
+	objectlights.clear();
 	for(unsigned int renderpass = 0; renderpass < 4; renderpass++){
 		for(std::list<Object *>::iterator i = world.objectlist.begin(); i != world.objectlist.end(); i++){
 			Object * object = *i;
