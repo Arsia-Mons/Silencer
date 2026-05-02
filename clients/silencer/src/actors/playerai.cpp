@@ -70,6 +70,13 @@ bool PlayerAI::ApplyCombat(World & world){
 		return false;
 	}
 
+	// Don't engage combat when too close — bots would freeze facing each other.
+	// Let navigation handle separation instead.
+	int dist = abs(target->x - player.x);
+	if(dist < 80){
+		return false;
+	}
+
 	// Face + fire toward target
 	if(target->x > player.x){
 		player.input.keymoveright = true;
