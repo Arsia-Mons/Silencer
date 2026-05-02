@@ -296,6 +296,22 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 		DrawRainPuddles(surface, camera);
 	}
 	objectlights.clear();
+	// Gather map lights using radius-aware screen overlap, not the sprite bounds.
+	// This prevents lights from popping out when only their tiny sprite goes off-screen.
+	if(drawluminance){
+		for(Object * obj : world.objectlist){
+			if(!obj->draw || obj->res_bank != 222) continue;
+			Overlay * ov = static_cast<Overlay *>(obj);
+			if(!ov->mapLight) continue;
+			int radius = ov->res_index == 2 ? 200 : ov->res_index == 1 ? 140 : 80;
+			int sx = obj->x + camera.GetXOffset();
+			int sy = obj->y + camera.GetYOffset();
+			if(sx + radius >= 0 && sx - radius < surface->w &&
+			   sy + radius >= 0 && sy - radius < surface->h){
+				objectlights.push_back(obj);
+			}
+		}
+	}
 	for(unsigned int renderpass = 0; renderpass < 4; renderpass++){
 		for(std::list<Object *>::iterator i = world.objectlist.begin(); i != world.objectlist.end(); i++){
 			Object * object = *i;
@@ -643,9 +659,9 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								switch(overlay->res_bank){
 									case 222:{
 										src = 0;
-										objectlights.push_back(object);
-										//lightingsurfacebank = overlay->res_bank;
-										//lightingsurfaceindex = overlay->res_index;
+										// Map lights gathered separately above with radius-aware visibility.
+										// Hit-glow overlays (mapLight=false) still need to be collected here.
+										if(!overlay->mapLight) objectlights.push_back(object);
 									}break;
 								}
 							}break;
