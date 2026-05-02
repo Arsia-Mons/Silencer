@@ -7,6 +7,7 @@
 #include "baseexit.h"
 #include "secretreturn.h"
 #include "basedoor.h"
+#include "../stations/healmachine.h"
 
 class PlayerAI
 {
@@ -28,6 +29,7 @@ public:
 	BaseExit * GetBaseExit(World & world);
 	SecretReturn * GetSecretReturn(World & world);
 	BaseDoor * GetBaseDoor(World & world);
+	HealMachine * GetHealMachine(World & world);
 	
 private:
 	bool ScanForTarget(World & world);

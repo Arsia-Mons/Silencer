@@ -232,11 +232,22 @@ void PlayerAI::Tick(World & world){
 
 	if(state == RETREAT){
 		if(player.InBase(world)){
-			// HealMachine heals automatically — wait here until healthy enough to re-engage
 			const PlayerDef& pd = GASLoader::Get().player;
 			int threshold = (player.maxhealth * pd.aiRetreatHealthPct) / 100;
+			// Once healed enough, leave
 			if(player.health >= player.maxhealth - (player.maxhealth / 4)){
 				SetState(EXITBASE);
+			} else {
+				// Navigate to HealMachine so it can heal us
+				if(!targetplatformset){
+					HealMachine * hm = GetHealMachine(world);
+					if(hm){
+						SetTarget(world, hm->x, hm->y);
+					} else {
+						// No HealMachine found — just exit
+						SetState(EXITBASE);
+					}
+				}
 			}
 			(void)threshold;
 		} else {
@@ -555,6 +566,24 @@ void PlayerAI::SetState(Uint8 state){
 		PlayerAI::state = state;
 		ClearTarget();
 	}
+}
+
+HealMachine * PlayerAI::GetHealMachine(World & world){
+	// Find any HealMachine in the world — healing eligibility is enforced by player.cpp
+	// (checks team->basedoorid == basedoorentering), so any machine in own base works.
+	HealMachine * best = 0;
+	int bestDist = INT_MAX;
+	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+		if((*it)->type == ObjectTypes::HEALMACHINE){
+			HealMachine * hm = static_cast<HealMachine *>(*it);
+			int dist = abs(hm->x - player.x) + abs(hm->y - player.y);
+			if(dist < bestDist){
+				bestDist = dist;
+				best = hm;
+			}
+		}
+	}
+	return best;
 }
 
 bool PlayerAI::TerminalSort(Terminal * a, Terminal * b){
