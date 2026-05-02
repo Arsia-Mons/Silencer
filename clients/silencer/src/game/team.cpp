@@ -374,7 +374,7 @@ Uint8 Team::GetColor(void){
 		return color;
 	}
 	// basecolor index maps to palette group (basecolor*16):
-	//   8=white/silver, 9=yellow, 10=red, 11=tan, 12=purple, 13=blue, 14=green, 15=black
+	//   8=white/silver, 9=yellow, 10=red, 11=tan, 12=orange, 13=blue, 14=green, 15=black
 	// shade: 8=natural, 9=brighter, 7=darker
 	Uint8 basecolor = 14;
 	Uint8 shade = 9;
