@@ -127,6 +127,10 @@ struct PlayerDef {
     int aiLadderJumpUpInterval      = 12;   // AI: 1-in-N chance per tick to jump while climbing up
     int aiLadderJumpDownInterval    = 5;    // AI: 1-in-N chance per tick to jump while descending
     int aiArrivalThreshold          = 8;    // AI: px distance considered close enough to target
+    int aiCombatRange               = 300;  // AI: horizontal scan radius in px for enemy detection
+    int aiFireInterval              = 4;    // AI: ticks between shots (medium; easy=*3, hard=*1)
+    int aiEvadeInterval             = 15;   // AI: 1-in-N chance per tick to crouch when in combat
+    int aiTargetLockTicks           = 20;   // AI: ticks to keep current target before re-scanning
     int deathDropXVRange            = 4;    // ±px/tick random horizontal velocity of dropped pickups
     int deathDropYV                 = 15;   // upward launch yv of dropped pickups (stored positive)
     int govtKillPlasmaXVRange       = 8;    // govt-kill plasma bolt xv scatter range (% (2*range+1) - range)

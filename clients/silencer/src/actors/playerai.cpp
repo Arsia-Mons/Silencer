@@ -3,13 +3,103 @@
 #include "basedoor.h"
 #include "../gas/gasloader.h"
 
-PlayerAI::PlayerAI(Player & player) : player(player){
+PlayerAI::PlayerAI(Player & player, Difficulty diff) : player(player){
 	direction = false;
 	targetplatformset = 0;
 	ladderjumping = false;
 	linktype = LINK_NONE;
 	linkladder = 0;
 	state = IDLE;
+	difficulty = diff;
+	combatTarget = 0;
+	combatLockTicks = 0;
+	fireCooldown = 0;
+	lastHealth = player.health;
+}
+
+bool PlayerAI::ScanForTarget(World & world){
+	combatTarget = 0;
+	const PlayerDef& pd = GASLoader::Get().player;
+	int range = pd.aiCombatRange;
+	std::vector<Uint8> types;
+	types.push_back(ObjectTypes::PLAYER);
+	std::vector<Object *> candidates = world.TestAABB(
+		player.x - range, player.y - 80,
+		player.x + range, player.y + 10,
+		types);
+	Team * myTeam = player.GetTeam(world);
+	int bestDist = range + 1;
+	for(auto it = candidates.begin(); it != candidates.end(); ++it){
+		Player * p = static_cast<Player *>(*it);
+		if(p->id == player.id) continue;
+		if(p->state == Player::DEAD || p->state == Player::RESURRECTING) continue;
+		if(p->IsInvisible(world) || p->IsDisguised()) continue;
+		if(p->InBase(world)) continue;
+		// Skip teammates
+		Team * theirTeam = p->GetTeam(world);
+		if(myTeam && theirTeam && myTeam->id == theirTeam->id) continue;
+		int dist = abs(p->x - player.x);
+		if(dist < bestDist){
+			bestDist = dist;
+			combatTarget = p->id;
+		}
+	}
+	return combatTarget != 0;
+}
+
+bool PlayerAI::ApplyCombat(World & world){
+	const PlayerDef& pd = GASLoader::Get().player;
+	if(fireCooldown > 0) fireCooldown--;
+	if(combatLockTicks > 0) combatLockTicks--;
+
+	// Re-scan when lock expires or we have no target
+	if(combatLockTicks <= 0 || combatTarget == 0){
+		ScanForTarget(world);
+		combatLockTicks = pd.aiTargetLockTicks;
+	}
+	if(combatTarget == 0) return false;
+
+	Object * obj = world.GetObjectFromId(combatTarget);
+	if(!obj || obj->type != ObjectTypes::PLAYER){
+		combatTarget = 0;
+		return false;
+	}
+	Player * target = static_cast<Player *>(obj);
+	if(target->state == Player::DEAD || target->state == Player::RESURRECTING){
+		combatTarget = 0;
+		return false;
+	}
+
+	// Face + fire toward target
+	if(target->x > player.x){
+		player.input.keymoveright = true;
+	}else{
+		player.input.keymoveleft = true;
+	}
+
+	// Compute fire interval based on difficulty
+	int interval = pd.aiFireInterval;
+	if(difficulty == EASY)   interval *= 3;
+	else if(difficulty == HARD) interval = (interval > 1 ? interval - 1 : 1);
+
+	if(fireCooldown <= 0){
+		player.input.keyfire = true;
+		fireCooldown = interval;
+	}
+
+	// Evasion: MEDIUM+ jump-dodge when recently damaged
+	if(difficulty != EASY){
+		if(player.health < lastHealth){
+			if(pd.aiEvadeInterval > 0 && rand() % pd.aiEvadeInterval == 0){
+				player.input.keyjump = true;
+			}
+		}
+	}
+	lastHealth = player.health;
+
+	// Interrupt hacking by pressing movement key (exits HACKING state after complete)
+	// (keymoveleft/right already set above)
+	return true;
 }
 
 void PlayerAI::Tick(World & world){
@@ -41,7 +131,11 @@ void PlayerAI::Tick(World & world){
 			SetState(GOTOBASE);
 		}
 	}
-	
+
+	// Combat has higher priority than navigation — skip nav while engaged.
+	bool inCombat = ApplyCombat(world);
+	if(inCombat) return;
+
 	
 	if(!targetplatformset && player.state != Player::HACKING){
 		if(state == HACK){

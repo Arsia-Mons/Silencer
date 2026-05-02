@@ -11,7 +11,9 @@
 class PlayerAI
 {
 public:
-	PlayerAI(Player & player);
+	enum Difficulty { EASY = 0, MEDIUM = 1, HARD = 2 };
+
+	PlayerAI(Player & player, Difficulty diff = MEDIUM);
 	void Tick(World & world);
 	bool CreatePathToPlatformSet(World & world, std::deque<PlatformSet *> & path, PlatformSet & target);
 	bool FollowPath(World & world);
@@ -28,10 +30,13 @@ public:
 	BaseDoor * GetBaseDoor(World & world);
 	
 private:
+	bool ScanForTarget(World & world);
+	bool ApplyCombat(World & world);
 	void SetState(Uint8 state);
 	static bool TerminalSort(Terminal * a, Terminal * b);
 	enum {IDLE, HACK, EXITBASE, GETSECRET, GOTOBASE, RETURNSECRET};
 	Uint8 state;
+	Difficulty difficulty;
 	Player & player;
 	bool direction;
 	Sint16 targetx, targety;
@@ -41,6 +46,11 @@ private:
 	int linktype;
 	Platform * linkladder;
 	std::deque<PlatformSet *> platformsetpath;
+	// Combat
+	Uint16 combatTarget;   // object id of current enemy, 0=none
+	int combatLockTicks;   // ticks remaining before re-scan
+	int fireCooldown;      // ticks until next shot allowed
+	Sint16 lastHealth;     // used to detect recent damage for evasion
 };
 
 #endif
