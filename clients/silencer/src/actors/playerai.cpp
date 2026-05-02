@@ -74,6 +74,29 @@ bool PlayerAI::ApplyCombat(World & world){
 		return false;
 	}
 
+	// Line-of-sight check — don't fire through solid walls
+	{
+		int xe = 0, ye = 0;
+		int midBot    = player.y - player.height / 2;
+		int midTarget = target->y  - target->height / 2;
+		Platform * wall = world.map.TestLine(player.x, midBot, target->x, midTarget, &xe, &ye, Platform::RECTANGLE);
+		if(wall){
+			combatTarget = 0;
+			return false;
+		}
+	}
+
+	// Force facing toward target — override nav-set movement keys so
+	// STANDINGSHOOT fires in the correct direction.
+	bool targetRight = (target->x > player.x);
+	if(targetRight){
+		player.input.keymoveleft  = false;
+		player.input.keymoveright = true;
+	} else {
+		player.input.keymoveright = false;
+		player.input.keymoveleft  = true;
+	}
+
 	// Hold keyfire — STANDINGSHOOT needs it held for ~7 frames before the shot fires.
 	// The player animation naturally limits fire rate; no separate cooldown needed.
 	// EASY bots fire at half rate via a simple tick modulus.
@@ -132,13 +155,6 @@ void PlayerAI::Tick(World & world){
 		}
 	}
 
-	// Combat: opportunistically fire at enemies while navigating.
-	// Does NOT override movement — nav/hacking stays the priority.
-	// Skip combat entirely while retreating.
-	if(state != RETREAT){
-		ApplyCombat(world);
-	}
-
 	
 	if(!targetplatformset && player.state != Player::HACKING){
 		if(state == HACK){
@@ -155,6 +171,12 @@ void PlayerAI::Tick(World & world){
 	if(!FollowPath(world)){
 		// Done following path
 		ClearTarget();
+	}
+
+	// Combat: runs after nav so facing override (keymoveleft/keymoveright toward target)
+	// takes precedence over nav direction. Skipped while retreating.
+	if(state != RETREAT){
+		ApplyCombat(world);
 	}
 	
 	if(state == HACK){
