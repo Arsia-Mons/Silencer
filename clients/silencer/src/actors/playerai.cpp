@@ -70,18 +70,10 @@ bool PlayerAI::ApplyCombat(World & world){
 		return false;
 	}
 
-	// Don't engage combat when too close — bots would freeze facing each other.
-	// Let navigation handle separation instead.
+	// Don't engage combat when too close — let nav handle separation.
 	int dist = abs(target->x - player.x);
 	if(dist < 80){
 		return false;
-	}
-
-	// Face + fire toward target
-	if(target->x > player.x){
-		player.input.keymoveright = true;
-	}else{
-		player.input.keymoveleft = true;
 	}
 
 	// Compute fire interval based on difficulty
@@ -103,9 +95,6 @@ bool PlayerAI::ApplyCombat(World & world){
 		}
 	}
 	lastHealth = player.health;
-
-	// Interrupt hacking by pressing movement key (exits HACKING state after complete)
-	// (keymoveleft/right already set above)
 	return true;
 }
 
@@ -139,9 +128,9 @@ void PlayerAI::Tick(World & world){
 		}
 	}
 
-	// Combat has higher priority than navigation — skip nav while engaged.
-	bool inCombat = ApplyCombat(world);
-	if(inCombat) return;
+	// Combat: opportunistically fire at enemies while navigating.
+	// Does NOT override movement — nav/hacking stays the priority.
+	ApplyCombat(world);
 
 	
 	if(!targetplatformset && player.state != Player::HACKING){
