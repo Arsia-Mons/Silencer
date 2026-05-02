@@ -13,7 +13,6 @@ PlayerAI::PlayerAI(Player & player, Difficulty diff) : player(player){
 	difficulty = diff;
 	combatTarget = 0;
 	combatLockTicks = 0;
-	fireCooldown = 0;
 	lastHealth = player.health;
 }
 
@@ -49,7 +48,6 @@ bool PlayerAI::ScanForTarget(World & world){
 
 bool PlayerAI::ApplyCombat(World & world){
 	const PlayerDef& pd = GASLoader::Get().player;
-	if(fireCooldown > 0) fireCooldown--;
 	if(combatLockTicks > 0) combatLockTicks--;
 
 	// Re-scan when lock expires or we have no target
@@ -76,15 +74,12 @@ bool PlayerAI::ApplyCombat(World & world){
 		return false;
 	}
 
-	// Compute fire interval based on difficulty
-	int interval = pd.aiFireInterval;
-	if(difficulty == EASY)   interval *= 3;
-	else if(difficulty == HARD) interval = (interval > 1 ? interval - 1 : 1);
-
-	if(fireCooldown <= 0){
-		player.input.keyfire = true;
-		fireCooldown = interval;
-	}
+	// Hold keyfire — STANDINGSHOOT needs it held for ~7 frames before the shot fires.
+	// The player animation naturally limits fire rate; no separate cooldown needed.
+	// EASY bots fire at half rate via a simple tick modulus.
+	bool doFire = true;
+	if(difficulty == EASY && world.tickcount % 2 == 0) doFire = false;
+	if(doFire) player.input.keyfire = true;
 
 	// Evasion: MEDIUM+ jump-dodge when recently damaged
 	if(difficulty != EASY){

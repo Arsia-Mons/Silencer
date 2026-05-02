@@ -49,7 +49,6 @@ private:
 	// Combat
 	Uint16 combatTarget;   // object id of current enemy, 0=none
 	int combatLockTicks;   // ticks remaining before re-scan
-	int fireCooldown;      // ticks until next shot allowed
 	Sint16 lastHealth;     // used to detect recent damage for evasion
 };
 
