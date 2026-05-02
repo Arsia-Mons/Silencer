@@ -169,7 +169,7 @@ void Renderer::Draw(Surface * surface, float frametime){
 				DrawLine(surface, bx1+ox, by2+oy, bx1+ox, by1+oy, col, 1); // left
 			}
 		}
-		// Draw light actor positions: crosshair + radius circle + label
+		// Draw light actor positions: crosshair + radius circle/cone + label
 		if(!objectlights.empty()){
 			const int crossSize = 5;
 			const Uint8 lightCol = 221; // yellow
@@ -180,7 +180,29 @@ void Renderer::Draw(Surface * surface, float frametime){
 				DrawLine(surface, sx - crossSize, sy, sx + crossSize, sy, lightCol, 1);
 				DrawLine(surface, sx, sy - crossSize, sx, sy + crossSize, lightCol, 1);
 				int radius = (light->res_index == 2) ? 200 : (light->res_index == 1) ? 140 : 80;
-				DrawCircle(surface, sx, sy, radius, lightCol);
+				if(light->lightShape == 1){
+					// Spotlight: draw a cone outline (two radial lines + arc)
+					static const float DIR_ANGLES_DBG[8] = { 0.f, -(float)M_PI/4.f, -(float)M_PI/2.f, -3.f*(float)M_PI/4.f, (float)M_PI, 3.f*(float)M_PI/4.f, (float)M_PI/2.f, (float)M_PI/4.f };
+					float da = DIR_ANGLES_DBG[light->lightDirection & 7];
+					float half = (float)M_PI / 4.f;
+					int ex1 = sx + (int)(cosf(da - half) * radius);
+					int ey1 = sy + (int)(sinf(da - half) * radius);
+					int ex2 = sx + (int)(cosf(da + half) * radius);
+					int ey2 = sy + (int)(sinf(da + half) * radius);
+					DrawLine(surface, sx, sy, ex1, ey1, lightCol, 1);
+					DrawLine(surface, sx, sy, ex2, ey2, lightCol, 1);
+					// Arc along the cone edge (24 segments)
+					for(int seg = 0; seg < 24; seg++){
+						float a0 = (da - half) + (float)seg       / 24.f * (half * 2.f);
+						float a1 = (da - half) + (float)(seg + 1) / 24.f * (half * 2.f);
+						DrawLine(surface,
+							sx + (int)(cosf(a0) * radius), sy + (int)(sinf(a0) * radius),
+							sx + (int)(cosf(a1) * radius), sy + (int)(sinf(a1) * radius),
+							lightCol, 1);
+					}
+				} else {
+					DrawCircle(surface, sx, sy, radius, lightCol);
+				}
 				const char * anim = light->lightAnim == 1 ? "flicker" : light->lightAnim == 2 ? "pulse" : "static";
 				char lbl[32];
 				snprintf(lbl, sizeof(lbl), "LIGHT(%s)", anim);
