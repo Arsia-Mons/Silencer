@@ -46,7 +46,7 @@ public:
 	void DrawAlphaed(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	Surface * CreateSurfaceCopy(Surface * src);
 	void EffectHacking(Surface * dst, Rect * dstrect, Uint8 color);
-	void EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot = false);
+	void EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot = false, bool ui = false);
 	Uint8 TeamColorToIndex(Uint8 values);
 	void EffectBrightness(Surface * dst, Rect * dstrect, Uint8 brightness);
 	void EffectColor(Surface * dst, Rect * dstrect, Uint8 color);

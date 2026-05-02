@@ -2113,9 +2113,25 @@ void Renderer::EffectHacking(Surface * dst, Rect * dstrect, Uint8 color){
 	}
 }
 
-void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot){
-	Uint8 brightness = (values >> 4) * 16;
-	Uint8 color = (values & 0x0F) * 16;
+void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot, bool ui){
+	// Palette dark-range groups (indices 0-127) share the same 8 hues as lit-range (128-255)
+	// but ONLY the first 2 entries of each group are that hue — entries 2+ are sprite ramps.
+	// Dark-range pixels participate in CopyWithBrightness ambient darkening and DrawLightRadial.
+	// Black (bc=0 or bc=15) stays in the lit range (always-dark, no ambient change needed).
+	// ui=true: use lit-range anchors so UI/minimap colors are unaffected by ambient darkening.
+	// darkAnchor[basecolor 0-15] → first dark-range palette index for that hue
+	static const Uint8 darkAnchor[16] = {
+		240, 16, 32, 48, 64, 80, 96, 112,  // bc=0-7 (bc=0/black → keep in lit range 240)
+		16,  32, 48, 64, 80, 96, 112, 240  // bc=8-15 (same hues; bc=15/black → lit range 240)
+	};
+	Uint8 basecolor = values & 0x0F;
+	bool keepLit = (basecolor == 0 || basecolor == 15); // black stays in lit range always
+	Uint8 anchor;
+	if(ui || keepLit){
+		anchor = (basecolor < 8 ? basecolor + 8 : basecolor) * 16; // lit-range anchor
+	}else{
+		anchor = darkAnchor[basecolor];
+	}
 	int dstw = dst->w;
 	int dsth = dst->h;
 	if(robot){
@@ -2123,10 +2139,11 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 			for(int x = 0; x < dstw; x++){
 				Uint8 * pixel = &((Uint8 *)dst->pixels.data())[x + (y * dstw)];
 				if(*pixel >= 130){
-					*pixel = palette.Color(*pixel - 16, color);
-					*pixel = palette.Brightness(*pixel, brightness);
-					// Bring into the ambient-darkened range so lighting affects it
-					if(*pixel >= 114) *pixel -= 112;
+					if(keepLit){
+						*pixel = 240;
+					}else{
+						*pixel = anchor + (*pixel >= 144 ? 1 : 0);
+					}
 				}
 			}
 		}
@@ -2135,16 +2152,13 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 			for(int x = 0; x < dstw; x++){
 				Uint8 * pixel = &((Uint8 *)dst->pixels.data())[x + (y * dstw)];
 				if(*pixel >= 195 && *pixel <= 208){
-					*pixel = palette.Color(*pixel, color);
-					*pixel = palette.Brightness(*pixel, brightness);
-					// Bring into the ambient-darkened range so lighting affects it
-					if(*pixel >= 114) *pixel -= 112;
-				}else
-				if(*pixel >= 81 && *pixel <= 92){
-					*pixel = palette.Color(*pixel + 128, color);
-					*pixel = palette.Brightness(*pixel, brightness);
-					// Bring into the ambient-darkened range so lighting affects it
-					if(*pixel >= 114) *pixel -= 112;
+					if(keepLit){
+						*pixel = 240;
+					}else{
+						*pixel = anchor + (*pixel >= 202 ? 1 : 0);
+					}
+				}else if(*pixel >= 81 && *pixel <= 92){
+					*pixel = keepLit ? Uint8(241) : Uint8(anchor + 1);
 				}
 			}
 		}
@@ -2152,11 +2166,9 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 }
 
 Uint8 Renderer::TeamColorToIndex(Uint8 values){
-	Uint8 brightness = (values >> 4) * 16;
-	Uint8 color = (values & 0x0F) * 16;
-	Uint8 index = palette.Color(204, color);
-	index = palette.Brightness(index, brightness);
-	return index;
+	// Return lit-range anchor for always-visible minimap dots
+	Uint8 basecolor = values & 0x0F;
+	return basecolor * 16;
 }
 
 void Renderer::EffectBrightness(Surface * dst, Rect * dstrect, Uint8 brightness){
@@ -2326,7 +2338,7 @@ void Renderer::MiniMapBlit(Uint8 res_bank, Uint8 res_index, int x, int y, bool a
 	if(teamcolor || alpha){
 		Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[res_bank][res_index].get());
 		if(teamcolor){
-			EffectTeamColor(newsurface, 0, teamcolor);
+			EffectTeamColor(newsurface, 0, teamcolor, false, true);
 		}
 		if(alpha){
 			DrawAlphaed(newsurface, 0, &world.map.minimap.surface, &dstrect);
@@ -3112,7 +3124,7 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 				dstrect.x = 5;
 				dstrect.y = teamyoffset + 1;
 				Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[181][team->agency].get());
-				EffectTeamColor(newsurface, 0, team->GetColor());
+				EffectTeamColor(newsurface, 0, team->GetColor(), false, true);
 				DrawScaled(newsurface, 0, surface, &dstrect);
 				delete newsurface;
 				for(int i = 0; i < team->numpeers; i++){
@@ -3464,7 +3476,7 @@ void Renderer::DrawPlayerList(Surface * surface){
 	for(std::vector<Team *>::iterator it = teams.begin(); it != teams.end(); it++){
 		Team * team = *it;
 		Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[181][team->agency].get());
-		EffectTeamColor(newsurface, 0, team->GetColor());
+		EffectTeamColor(newsurface, 0, team->GetColor(), false, true);
 		Rect dstrect;
 		dstrect.x = 50 + 10;
 		dstrect.y = 50 + 10 + yoffset + 10;
