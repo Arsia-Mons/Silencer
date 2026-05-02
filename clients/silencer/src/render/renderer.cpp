@@ -2148,13 +2148,13 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 		for(int y = 0; y < dsth; y++){
 			for(int x = 0; x < dstw; x++){
 				Uint8 * pixel = &((Uint8 *)dst->pixels.data())[x + (y * dstw)];
-				if(*pixel >= 193 && *pixel <= 208){
+				if(*pixel >= 193 && *pixel <= 209){
 					if(keepLit){
 						*pixel = 240;
 					}else{
 						*pixel = anchor + (*pixel >= 202 ? 1 : 0);
 					}
-				}else if(*pixel >= 81 && *pixel <= 95){
+				}else if(*pixel >= 81 && *pixel <= 97){
 					*pixel = keepLit ? Uint8(241) : Uint8(anchor + 1);
 				}
 			}
