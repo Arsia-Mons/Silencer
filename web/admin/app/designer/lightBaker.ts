@@ -7,11 +7,11 @@ export interface BakedLightMask {
   data: Uint8Array; // diam×diam, 0=wall-occluded or outside circle, 1=lit
 }
 
-const LIGHT_RADII = [80, 140, 200] as const;
+export const LIGHT_RADII = [80, 140, 200] as const;
 
 type AABB = { x1: number; y1: number; x2: number; y2: number };
 
-function buildOccluders(platforms: MapPlatform[], shadowZones: MapShadowZone[]): AABB[] {
+export function buildOccluders(platforms: MapPlatform[], shadowZones: MapShadowZone[]): AABB[] {
   const out: AABB[] = [];
   for (const p of platforms) {
     if (!(p.type1 & 1)) continue; // RECTANGLE bit only
@@ -58,7 +58,7 @@ function isOccluded(lx: number, ly: number, px: number, py: number, occluders: A
   return false;
 }
 
-function bakeSingleLight(
+export function bakeSingleLight(
   lx: number, ly: number, radius: number,
   occluders: AABB[],
   shape: number,

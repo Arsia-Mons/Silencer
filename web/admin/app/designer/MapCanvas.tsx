@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { ACTOR_DEFS, PLATFORM_TOOL_TYPES } from './Toolbar';
+import { bakeSingleLight, buildOccluders, LIGHT_RADII } from './lightBaker';
 import type { SilMapData, MapPlatform, SpriteEntry, TileCell } from '../../lib/types';
 
 // Platform overlay colors
@@ -187,6 +188,57 @@ export default function MapCanvas({
   const lightRadiusDragRef = useRef<{ actorIdx: number; origType: number } | null>(null);
   const lastEmittedSizeRef = useRef<number | null>(null);
   const [isLightRadiusDragging, setIsLightRadiusDragging] = useState(false);
+
+  // Baked shadow preview canvases for static lights (dynShadows=false)
+  const bakedLightPreviewsRef = useRef<Array<{ canvas: OffscreenCanvas; wx: number; wy: number; diam: number }>>([]);
+  useEffect(() => {
+    if (!map) { bakedLightPreviewsRef.current = []; return; }
+    const occluders = buildOccluders(map.platforms, map.shadowZones);
+    const previews: typeof bakedLightPreviewsRef.current = [];
+    const HALF_ANGLE = Math.PI / 4;
+    const cosHalf = Math.cos(HALF_ANGLE);
+    const DIR_ANGLES = [0, -Math.PI/4, -Math.PI/2, -3*Math.PI/4, Math.PI, 3*Math.PI/4, Math.PI/2, Math.PI/4];
+    for (const actor of map.actors) {
+      if (actor.id !== 71) continue;
+      const u = (actor.type ?? 0) >>> 0;
+      const dynShadows = (u >>> 7) & 1;
+      if (dynShadows) continue; // only static (baked) lights
+      const size = u & 3;
+      const shape = (u >>> 2) & 1;
+      const radius = LIGHT_RADII[size] ?? 80;
+      const diam = radius * 2;
+      const data = bakeSingleLight(actor.x, actor.y, radius, occluders, shape, (actor.direction ?? 0) & 7);
+      const cr = (u >>> 8) & 0xFF, cg = (u >>> 16) & 0xFF, cb = (u >>> 24) & 0xFF;
+      const lr = cr || 255, lg = cg || 220, lb = cb || 100;
+      const dirAngle = DIR_ANGLES[(actor.direction ?? 0) & 7];
+      const cosDirX = Math.cos(dirAngle), sinDirY = Math.sin(dirAngle);
+      const oc = new OffscreenCanvas(diam, diam);
+      const octx = oc.getContext('2d')!;
+      const imgData = octx.createImageData(diam, diam);
+      for (let my = 0; my < diam; my++) {
+        for (let mx = 0; mx < diam; mx++) {
+          const idx = my * diam + mx;
+          const dx = mx - radius, dy = my - radius;
+          if (dx * dx + dy * dy >= radius * radius) continue;
+          if (shape === 1) {
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0.5 && (dx/dist)*cosDirX + (dy/dist)*sinDirY < cosHalf) continue;
+          }
+          const px = idx * 4;
+          if (data[idx] === 1) {
+            imgData.data[px] = lr; imgData.data[px+1] = lg; imgData.data[px+2] = lb;
+            imgData.data[px+3] = 55;
+          } else {
+            imgData.data[px] = 0; imgData.data[px+1] = 0; imgData.data[px+2] = 20;
+            imgData.data[px+3] = 110;
+          }
+        }
+      }
+      octx.putImageData(imgData, 0, 0);
+      previews.push({ canvas: oc, wx: actor.x, wy: actor.y, diam });
+    }
+    bakedLightPreviewsRef.current = previews;
+  }, [map]);
 
   // World → canvas coords
   const worldToCanvas = useCallback((wx: number, wy: number) => ({
@@ -490,6 +542,17 @@ export default function MapCanvas({
 
     // Actor icons
     if (vis?.actors !== false) {
+      // Draw baked shadow previews for static lights before actor sprites
+      if (vis?.lighting !== false && bakedLightPreviewsRef.current.length > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        for (const { canvas, wx, wy, diam } of bakedLightPreviewsRef.current) {
+          const mx = wx * zoom + pan.x - (diam / 2) * zoom;
+          const my = wy * zoom + pan.y - (diam / 2) * zoom;
+          ctx.drawImage(canvas, mx, my, diam * zoom, diam * zoom);
+        }
+        ctx.restore();
+      }
       ctx.font = 'bold 9px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
