@@ -2114,24 +2114,21 @@ void Renderer::EffectHacking(Surface * dst, Rect * dstrect, Uint8 color){
 }
 
 void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot, bool ui){
-	// Palette dark-range groups (indices 0-127) share the same 8 hues as lit-range (128-255)
-	// but ONLY the first 2 entries of each group are that hue — entries 2+ are sprite ramps.
-	// Dark-range pixels participate in CopyWithBrightness ambient darkening and DrawLightRadial.
-	// Black (bc=0 or bc=15) stays in the lit range (always-dark, no ambient change needed).
+	// Palette dark-range (2-113): ambient-darkened. Lit-range (114-255): always vivid.
+	// Most group anchors are at bc*16 but yellow (bc=9/2) is pale cream at that index.
+	// Use idx 28/140 instead — both are RGB(252,252,0) pure saturated yellow.
 	// ui=true: use lit-range anchors so UI/minimap colors are unaffected by ambient darkening.
-	// darkAnchor[basecolor 0-15] → first dark-range palette index for that hue
 	static const Uint8 darkAnchor[16] = {
-		240, 16, 32, 48, 64, 80, 96, 112,  // bc=0-7 (bc=0/black → keep in lit range 240)
-		16,  32, 48, 64, 80, 96, 112, 240  // bc=8-15 (same hues; bc=15/black → lit range 240)
+		240, 16, 28, 48, 64, 80, 96, 112,  // bc=0-7 (bc=0→black lit; bc=2→yellow uses idx 28)
+		16,  28, 48, 64, 80, 96, 112, 240  // bc=8-15 (bc=9→yellow uses idx 28)
+	};
+	static const Uint8 litAnchor[16] = {
+		240, 128, 140, 160, 176, 192, 208, 224,  // bc=0-7 (bc=2→yellow uses idx 140)
+		128, 140, 160, 176, 192, 208, 224, 240   // bc=8-15 (bc=9→yellow uses idx 140)
 	};
 	Uint8 basecolor = values & 0x0F;
 	bool keepLit = (basecolor == 0 || basecolor == 15); // black stays in lit range always
-	Uint8 anchor;
-	if(ui || keepLit){
-		anchor = (basecolor < 8 ? basecolor + 8 : basecolor) * 16; // lit-range anchor
-	}else{
-		anchor = darkAnchor[basecolor];
-	}
+	Uint8 anchor = (ui || keepLit) ? litAnchor[basecolor] : darkAnchor[basecolor];
 	int dstw = dst->w;
 	int dsth = dst->h;
 	if(robot){
