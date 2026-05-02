@@ -49,9 +49,14 @@ private:
 	Platform * linkladder;
 	std::deque<PlatformSet *> platformsetpath;
 	// Combat
-	Uint16 combatTarget;   // object id of current enemy, 0=none
-	int combatLockTicks;   // ticks remaining before re-scan
-	Sint16 lastHealth;     // used to detect recent damage for evasion
+	Uint16 combatTarget;        // object id of current enemy, 0=none
+	int combatLockTicks;        // ticks remaining before re-scan
+	Sint16 lastHealth;          // used to detect recent damage for evasion
+	int reactionTicks;          // delay before shooting at a freshly spotted enemy
+	int fireBurstRemaining;     // ticks left in current fire burst
+	int firePauseRemaining;     // ticks left in pause between bursts
+	int jetpackCooldown;        // ticks until next jetpack dodge is allowed
+	int thinkDelay;             // micro-pause ticks after state transitions
 };
 
 #endif

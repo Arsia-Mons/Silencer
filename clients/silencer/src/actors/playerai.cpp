@@ -14,6 +14,11 @@ PlayerAI::PlayerAI(Player & player, Difficulty diff) : player(player){
 	combatTarget = 0;
 	combatLockTicks = 0;
 	lastHealth = player.health;
+	reactionTicks = 0;
+	fireBurstRemaining = 0;
+	firePauseRemaining = 0;
+	jetpackCooldown = 0;
+	thinkDelay = 0;
 }
 
 bool PlayerAI::ScanForTarget(World & world){
@@ -51,11 +56,39 @@ bool PlayerAI::ApplyCombat(World & world){
 	if(combatLockTicks > 0) combatLockTicks--;
 
 	// Re-scan when lock expires or we have no target
+	bool hadTarget = (combatTarget != 0);
 	if(combatLockTicks <= 0 || combatTarget == 0){
 		ScanForTarget(world);
 		combatLockTicks = pd.aiTargetLockTicks;
+		// Reaction delay when freshly spotting an enemy
+		if(combatTarget != 0 && !hadTarget){
+			int react = pd.aiReactionTicks;
+			if(difficulty == EASY)       react = react * 2;
+			else if(difficulty == HARD)  react = react / 2;
+			reactionTicks = react + (react > 0 ? rand() % react : 0);
+			fireBurstRemaining = 0;
+			firePauseRemaining = 0;
+		}
 	}
-	if(combatTarget == 0) return false;
+	if(combatTarget == 0){
+		reactionTicks = 0;
+		fireBurstRemaining = 0;
+		firePauseRemaining = 0;
+		return false;
+	}
+
+	// During reaction delay: face target but don't fire yet
+	if(reactionTicks > 0){
+		reactionTicks--;
+		Object * robj = world.GetObjectFromId(combatTarget);
+		if(robj){
+			Player * rtarget = static_cast<Player *>(robj);
+			if(rtarget->x > player.x){ player.input.keymoveright = true; }
+			else { player.input.keymoveleft = true; }
+		}
+		lastHealth = player.health;
+		return true;
+	}
 
 	Object * obj = world.GetObjectFromId(combatTarget);
 	if(!obj || obj->type != ObjectTypes::PLAYER){
@@ -97,12 +130,39 @@ bool PlayerAI::ApplyCombat(World & world){
 		player.input.keymoveleft  = true;
 	}
 
-	// Hold keyfire — STANDINGSHOOT needs it held for ~7 frames before the shot fires.
-	// The player animation naturally limits fire rate; no separate cooldown needed.
-	// EASY bots fire at half rate via a simple tick modulus.
-	bool doFire = true;
-	if(difficulty == EASY && world.tickcount % 2 == 0) doFire = false;
-	if(doFire) player.input.keyfire = true;
+	// Burst fire: hold keyfire for a burst, pause, then fire again.
+	// This gives bots a human-like shooting rhythm instead of holding fire every tick.
+	if(firePauseRemaining > 0){
+		firePauseRemaining--;
+	} else {
+		if(fireBurstRemaining <= 0){
+			int burst = pd.aiShootBurstTicks;
+			if(difficulty == EASY)       burst = burst / 2 + 1;
+			else if(difficulty == HARD)  burst = burst + burst / 2;
+			fireBurstRemaining = burst;
+		}
+		player.input.keyfire = true;
+		fireBurstRemaining--;
+		if(fireBurstRemaining <= 0){
+			int pause = pd.aiShootPauseTicks;
+			if(difficulty == EASY)       pause = pause + pause / 2;
+			else if(difficulty == HARD)  pause = pause / 2;
+			firePauseRemaining = pause + (pause > 0 ? rand() % pause : 0);
+		}
+	}
+
+	// Jetpack dodge: use jetpack randomly in combat, more often when taking damage.
+	if(jetpackCooldown > 0){
+		jetpackCooldown--;
+	} else if(difficulty != EASY && !player.fuellow){
+		bool damaged = (player.health < lastHealth);
+		int jChance = pd.aiJetpackCombatInterval;
+		if(damaged) jChance = (jChance > 1) ? jChance / 2 : 1;
+		if(jChance > 0 && rand() % jChance == 0){
+			player.input.keyjetpack = true;
+			jetpackCooldown = 30 + rand() % 30;
+		}
+	}
 
 	// Evasion: MEDIUM+ jump-dodge when recently damaged
 	if(difficulty != EASY){
@@ -157,7 +217,9 @@ void PlayerAI::Tick(World & world){
 
 	
 	if(!targetplatformset && player.state != Player::HACKING){
-		if(state == HACK){
+		if(thinkDelay > 0){
+			thinkDelay--;
+		} else if(state == HACK){
 			std::vector<Terminal *> terminals = FindNearestTerminals(world);
 			if(terminals.size() > 0){
 				for(std::vector<Terminal *>::iterator it = terminals.begin(); it != terminals.end(); it++){
@@ -587,6 +649,11 @@ void PlayerAI::SetState(Uint8 state){
 	if(PlayerAI::state != state){
 		PlayerAI::state = state;
 		ClearTarget();
+		// Short random pause before acting in new state — feels more human
+		const PlayerDef& pd = GASLoader::Get().player;
+		if(pd.aiThinkDelayMax > 0){
+			thinkDelay = rand() % pd.aiThinkDelayMax;
+		}
 	}
 }
 
