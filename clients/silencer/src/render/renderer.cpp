@@ -2148,7 +2148,7 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 		for(int y = 0; y < dsth; y++){
 			for(int x = 0; x < dstw; x++){
 				Uint8 * pixel = &((Uint8 *)dst->pixels.data())[x + (y * dstw)];
-				if(*pixel >= 195 && *pixel <= 208){
+				if(*pixel >= 193 && *pixel <= 208){
 					if(keepLit){
 						*pixel = 240;
 					}else{
@@ -2163,9 +2163,12 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 }
 
 Uint8 Renderer::TeamColorToIndex(Uint8 values){
-	// Return lit-range anchor for always-visible minimap dots
-	Uint8 basecolor = values & 0x0F;
-	return basecolor * 16;
+	// Use litAnchor table so minimap dots always use the vivid lit-range color
+	static const Uint8 litAnchor[16] = {
+		240, 128, 140, 160, 176, 192, 208, 224,
+		128, 140, 160, 176, 192, 208, 224, 240
+	};
+	return litAnchor[values & 0x0F];
 }
 
 void Renderer::EffectBrightness(Surface * dst, Rect * dstrect, Uint8 brightness){
