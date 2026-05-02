@@ -2132,6 +2132,13 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 	}else{
 		anchor = darkAnchor[basecolor];
 	}
+	// UI colors are fully saturated lit-range; darken slightly so they better match
+	// in-world sprites which are ambient-darkened at runtime.
+	static const Uint8 uiBrightness = 100; // ~78% of max (128 = neutral)
+	// darkRampStart: each dark-range color group has 16 entries.
+	// The anchor sits at position 14 (near-peak). Full ramp: anchor-14 to anchor+1.
+	// We map source pixels 195-208 (14 steps) to anchor-12..anchor+1 for gradient.
+	Uint8 darkRampStart = anchor > 12 ? anchor - 12 : anchor;
 	int dstw = dst->w;
 	int dsth = dst->h;
 	if(robot){
@@ -2143,6 +2150,7 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 						*pixel = 240;
 					}else{
 						*pixel = anchor + (*pixel >= 144 ? 1 : 0);
+						if(ui) *pixel = palette.Brightness(*pixel, uiBrightness);
 					}
 				}
 			}
@@ -2154,11 +2162,23 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 				if(*pixel >= 195 && *pixel <= 208){
 					if(keepLit){
 						*pixel = 240;
-					}else{
+					}else if(ui){
 						*pixel = anchor + (*pixel >= 202 ? 1 : 0);
+						*pixel = palette.Brightness(*pixel, uiBrightness);
+					}else{
+						// gradient: dark (195) → shadow end of ramp, bright (208) → highlight
+						*pixel = darkRampStart + (*pixel - 195);
 					}
 				}else if(*pixel >= 81 && *pixel <= 92){
-					*pixel = keepLit ? Uint8(241) : Uint8(anchor + 1);
+					if(keepLit){
+						*pixel = 241;
+					}else if(ui){
+						*pixel = anchor + 1;
+						*pixel = palette.Brightness(*pixel, uiBrightness);
+					}else{
+						// secondary accent: mid-ramp gradient
+						*pixel = darkRampStart + 4 + (*pixel - 81);
+					}
 				}
 			}
 		}
