@@ -3125,6 +3125,13 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 				dstrect.y = teamyoffset + 1;
 				Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[181][team->agency].get());
 				EffectTeamColor(newsurface, 0, team->GetColor(), false, true);
+				{ // 1px white outline (DrawScaled factor=2 → 16×14 output)
+					int ix = dstrect.x, iy = dstrect.y, iw = 16, ih = 14;
+					DrawFilledRectangle(surface, ix-1, iy-1, ix+iw+1, iy,    17);
+					DrawFilledRectangle(surface, ix-1, iy+ih, ix+iw+1, iy+ih+1, 17);
+					DrawFilledRectangle(surface, ix-1, iy,   ix,       iy+ih, 17);
+					DrawFilledRectangle(surface, ix+iw, iy,  ix+iw+1, iy+ih, 17);
+				}
 				DrawScaled(newsurface, 0, surface, &dstrect);
 				delete newsurface;
 				for(int i = 0; i < team->numpeers; i++){
@@ -3480,6 +3487,13 @@ void Renderer::DrawPlayerList(Surface * surface){
 		Rect dstrect;
 		dstrect.x = 50 + 10;
 		dstrect.y = 50 + 10 + yoffset + 10;
+		{ // 1px white outline (BlitSurface 1:1 → newsurface->w × newsurface->h)
+			int ix = dstrect.x, iy = dstrect.y, iw = newsurface->w, ih = newsurface->h;
+			DrawFilledRectangle(surface, ix-1, iy-1, ix+iw+1, iy,      17);
+			DrawFilledRectangle(surface, ix-1, iy+ih, ix+iw+1, iy+ih+1, 17);
+			DrawFilledRectangle(surface, ix-1, iy,   ix,       iy+ih,   17);
+			DrawFilledRectangle(surface, ix+iw, iy,  ix+iw+1, iy+ih,   17);
+		}
 		BlitSurface(newsurface, 0, surface, &dstrect);
 		dstrect.y -= 10;
 		delete newsurface;
