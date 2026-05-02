@@ -34,7 +34,7 @@ private:
 	bool ApplyCombat(World & world);
 	void SetState(Uint8 state);
 	static bool TerminalSort(Terminal * a, Terminal * b);
-	enum {IDLE, HACK, EXITBASE, GETSECRET, GOTOBASE, RETURNSECRET};
+	enum {IDLE, HACK, EXITBASE, GETSECRET, GOTOBASE, RETURNSECRET, RETREAT};
 	Uint8 state;
 	Difficulty difficulty;
 	Player & player;

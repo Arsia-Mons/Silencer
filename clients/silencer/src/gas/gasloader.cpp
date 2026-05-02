@@ -123,6 +123,7 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out,
         out.aiFireInterval             = j.value("aiFireInterval",             out.aiFireInterval);
         out.aiEvadeInterval            = j.value("aiEvadeInterval",            out.aiEvadeInterval);
         out.aiTargetLockTicks          = j.value("aiTargetLockTicks",          out.aiTargetLockTicks);
+        out.aiRetreatHealthPct         = j.value("aiRetreatHealthPct",         out.aiRetreatHealthPct);
         out.deathDropXVRange           = j.value("deathDropXVRange",           out.deathDropXVRange);
         out.deathDropYV                = j.value("deathDropYV",                out.deathDropYV);
         out.govtKillPlasmaXVRange      = j.value("govtKillPlasmaXVRange",      out.govtKillPlasmaXVRange);

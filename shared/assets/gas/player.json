@@ -144,6 +144,7 @@
   "aiFireInterval": 4,
   "aiEvadeInterval": 15,
   "aiTargetLockTicks": 20,
+  "aiRetreatHealthPct": 30,
   "deathDropXVRange": 4,
   "deathDropYV": 15,
   "govtKillPlasmaXVRange": 8,

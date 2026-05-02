@@ -123,9 +123,21 @@ void PlayerAI::Tick(World & world){
 		}
 	}
 
+	// Retreat to base when health is critical — don't fight, just run
+	if(!player.hassecret && state != RETREAT && !player.InBase(world)){
+		const PlayerDef& pd = GASLoader::Get().player;
+		int threshold = (player.maxhealth * pd.aiRetreatHealthPct) / 100;
+		if(player.health > 0 && player.health <= threshold){
+			SetState(RETREAT);
+		}
+	}
+
 	// Combat: opportunistically fire at enemies while navigating.
 	// Does NOT override movement — nav/hacking stays the priority.
-	ApplyCombat(world);
+	// Skip combat entirely while retreating.
+	if(state != RETREAT){
+		ApplyCombat(world);
+	}
 
 	
 	if(!targetplatformset && player.state != Player::HACKING){
@@ -215,6 +227,38 @@ void PlayerAI::Tick(World & world){
 		}
 		if(!player.hassecret){
 			SetState(EXITBASE);
+		}
+	}
+
+	if(state == RETREAT){
+		if(player.InBase(world)){
+			// HealMachine heals automatically — wait here until healthy enough to re-engage
+			const PlayerDef& pd = GASLoader::Get().player;
+			int threshold = (player.maxhealth * pd.aiRetreatHealthPct) / 100;
+			if(player.health >= player.maxhealth - (player.maxhealth / 4)){
+				SetState(EXITBASE);
+			}
+			(void)threshold;
+		} else {
+			// Navigate to own base door and enter
+			if(!targetplatformset){
+				BaseDoor * basedoor = GetBaseDoor(world);
+				if(basedoor){
+					SetTarget(world, basedoor->x, basedoor->y);
+				}
+			}
+			Team * team = player.GetTeam(world);
+			if(team){
+				std::vector<Uint8> types;
+				types.push_back(ObjectTypes::BASEDOOR);
+				std::vector<Object *> collided = world.TestAABB(player.x, player.y - player.height, player.x, player.y, types);
+				for(std::vector<Object *>::iterator it = collided.begin(); it != collided.end(); it++){
+					BaseDoor * basedoor = static_cast<BaseDoor *>(*it);
+					if(basedoor->teamid == team->id){
+						player.input.keyactivate = true;
+					}
+				}
+			}
 		}
 	}
 
