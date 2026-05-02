@@ -665,7 +665,10 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 										surveillancemonitor->camera.x = objectfollowing->x + objectfollowing->nudgex;
 										surveillancemonitor->camera.y = objectfollowing->y + objectfollowing->nudgey - 40;
 									}
-									DrawWorldScaled(&newsurface, surveillancemonitor->camera, recursion, frametime, surveillancemonitor->scalefactor);
+									// Save outer objectlights before recursive DrawWorld clears the member
+								auto savedLights = objectlights;
+								DrawWorldScaled(&newsurface, surveillancemonitor->camera, recursion, frametime, surveillancemonitor->scalefactor);
+								objectlights = savedLights;
 									EffectRampColor(&newsurface, 0, 198);
 									BlitSurface(&newsurface, 0, surface, &dstrect);
 								}

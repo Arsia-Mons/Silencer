@@ -69,10 +69,8 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
 
   useEffect(() => { if (isLight) loadLights(); }, [isLight, loadLights]);
 
-  // For Light actors, build type options from the catalogue; fall back to static hints
-  const typeHint = !isLight && actor.id === 71 && lights.length > 0
-    ? { label: 'Light Type', options: Object.fromEntries(lights.map(l => [String(l.frame), l.name])) }
-    : ACTOR_TYPE_HINTS[actor.id];
+  // For non-light actors, build type hint label from static hints catalogue
+  const typeHint = !isLight ? ACTOR_TYPE_HINTS[actor.id] : undefined;
 
   const [fields, setFields] = useState<FieldState>({
     type:       String(actor.type ?? 0),

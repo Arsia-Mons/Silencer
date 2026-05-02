@@ -24,7 +24,7 @@ export const useLightsStore = create<LightsStore>((set, get) => ({
   load: async () => {
     if (get().loaded) return;
     try {
-      const res = await fetch('/gas/lights.json');
+      const res = await fetch('/api/gas/lights');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       set({ lights: data.lights ?? [], loaded: true });

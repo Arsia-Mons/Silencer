@@ -14,7 +14,7 @@ type AABB = { x1: number; y1: number; x2: number; y2: number };
 export function buildOccluders(platforms: MapPlatform[], shadowZones: MapShadowZone[]): AABB[] {
   const out: AABB[] = [];
   for (const p of platforms) {
-    if (!(p.type1 & 1)) continue; // RECTANGLE bit only
+    if (p.type1 !== 0) continue; // only solid platforms (RECTANGLE/STAIRS) cast shadows
     out.push({
       x1: Math.min(p.x1, p.x2), y1: Math.min(p.y1, p.y2),
       x2: Math.max(p.x1, p.x2), y2: Math.max(p.y1, p.y2),

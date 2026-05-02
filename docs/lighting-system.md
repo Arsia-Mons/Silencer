@@ -29,7 +29,7 @@ The designer exposes ambience in **Map Properties** with four presets:
 | Bright    | 0         |
 | Medium    | −10       |
 | Dark      | −20       |
-| Very Dark | −35       |
+| Very Dark | −28       |
 
 New maps default to `ambience = −20`.
 

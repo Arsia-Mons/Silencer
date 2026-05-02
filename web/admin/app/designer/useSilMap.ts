@@ -281,7 +281,7 @@ export function useSilMap(): UseSilMapReturn {
     const tileSectionSize = numCells * CELL_SIZE;
     const actorsSectionSize = 8 + actors.length * 36;
     const platformsSectionSize = 8 + platforms.length * 24;
-    const shadowZonesSectionSize = shadowZones.length > 0 ? 8 + shadowZones.length * 16 : 0;
+    const shadowZonesSectionSize = 8 + shadowZones.length * 16; // always write header so C++ can find light masks
 
     // Bake shadow masks for all placed map lights fresh at save time
     const lightMasks = bakeMapLightMasks(actors, platforms, shadowZones);
@@ -337,16 +337,15 @@ export function useSilMap(): UseSilMapReturn {
       off += 24;
     }
 
-    if (shadowZones.length > 0) {
-      ldv.setUint32(off, shadowZones.length, true); off += 4;
-      ldv.setUint32(off, 0, true); off += 4;
-      for (const z of shadowZones) {
-        ldv.setInt32(off,      z.x1, true);
-        ldv.setInt32(off + 4,  z.y1, true);
-        ldv.setInt32(off + 8,  z.x2, true);
-        ldv.setInt32(off + 12, z.y2, true);
-        off += 16;
-      }
+    // Always write shadow zone header so the C++ parser can find trailing sections
+    ldv.setUint32(off, shadowZones.length, true); off += 4;
+    ldv.setUint32(off, 0, true); off += 4;
+    for (const z of shadowZones) {
+      ldv.setInt32(off,      z.x1, true);
+      ldv.setInt32(off + 4,  z.y1, true);
+      ldv.setInt32(off + 8,  z.x2, true);
+      ldv.setInt32(off + 12, z.y2, true);
+      off += 16;
     }
 
     // Light shadow masks section — baked per-pixel wall-occlusion for each placed map light
@@ -632,8 +631,12 @@ export function useSilMap(): UseSilMapReturn {
     const tileSectionSize = numCells * CELL_SIZE;
     const actorsSectionSize = 8 + actors.length * 36;
     const platformsSectionSize = 8 + platforms.length * 24;
-    const shadowZonesSectionSize = shadowZones.length > 0 ? 8 + shadowZones.length * 16 : 0;
-    const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize);
+    const shadowZonesSectionSize = 8 + shadowZones.length * 16; // always write header
+    const lightMasks = bakeMapLightMasks(actors, platforms, shadowZones);
+    const lightMasksSectionSize = lightMasks.length > 0
+      ? 8 + lightMasks.reduce((sum, m) => sum + 12 + m.data.length, 0)
+      : 0;
+    const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize + lightMasksSectionSize);
     const ldv = new DataView(levelBuf);
 
     for (let i = 0; i < numCells; i++) {
@@ -681,17 +684,30 @@ export function useSilMap(): UseSilMapReturn {
       off += 24;
     }
 
-    if (shadowZones.length > 0) {
-      ldv.setUint32(off, shadowZones.length, true); off += 4;
+    // Always write shadow zone header so the C++ parser can find trailing sections
+    ldv.setUint32(off, shadowZones.length, true); off += 4;
+    ldv.setUint32(off, 0, true); off += 4;
+    for (const z of shadowZones) {
+      ldv.setInt32(off,      z.x1, true);
+      ldv.setInt32(off + 4,  z.y1, true);
+      ldv.setInt32(off + 8,  z.x2, true);
+      ldv.setInt32(off + 12, z.y2, true);
+      off += 16;
+    }
+
+    if (lightMasks.length > 0) {
+      ldv.setUint32(off, lightMasks.length, true); off += 4;
       ldv.setUint32(off, 0, true); off += 4;
-      for (const z of shadowZones) {
-        ldv.setInt32(off,      z.x1, true);
-        ldv.setInt32(off + 4,  z.y1, true);
-        ldv.setInt32(off + 8,  z.x2, true);
-        ldv.setInt32(off + 12, z.y2, true);
-        off += 16;
+      const levelBytes = new Uint8Array(levelBuf);
+      for (const m of lightMasks) {
+        ldv.setInt32(off,  m.x,    true); off += 4;
+        ldv.setInt32(off,  m.y,    true); off += 4;
+        ldv.setUint32(off, m.diam, true); off += 4;
+        levelBytes.set(m.data, off);
+        off += m.data.length;
       }
     }
+
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
     const descBytes = new TextEncoder().encode(header.description);
     const descBuf = new Uint8Array(128);

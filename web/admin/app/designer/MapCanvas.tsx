@@ -855,7 +855,7 @@ export default function MapCanvas({
           ctx.globalAlpha = 0.5;
           ctx.fillStyle = '#000033';
           for (const p of map.platforms) {
-            if (!(p.type1 & RECTANGLE_TYPE)) continue;
+            if (p.type1 !== 0) continue; // only solid platforms cast shadows
             projectShadow(p);
           }
           for (const z of map.shadowZones) {
