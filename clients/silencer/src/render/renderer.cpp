@@ -3125,12 +3125,22 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 				dstrect.y = teamyoffset + 1;
 				Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[181][team->agency].get());
 				EffectTeamColor(newsurface, 0, team->GetColor(), false, true);
-				{ // 1px white outline (DrawScaled factor=2 → 16×14 output)
-					int ix = dstrect.x, iy = dstrect.y, iw = 16, ih = 14;
-					DrawFilledRectangle(surface, ix-1, iy-1, ix+iw+1, iy,    17);
-					DrawFilledRectangle(surface, ix-1, iy+ih, ix+iw+1, iy+ih+1, 17);
-					DrawFilledRectangle(surface, ix-1, iy,   ix,       iy+ih, 17);
-					DrawFilledRectangle(surface, ix+iw, iy,  ix+iw+1, iy+ih, 17);
+				{ // silhouette outline: transparent pixels touching a visible pixel → white
+					int sw = newsurface->w, sh = newsurface->h;
+					std::vector<Uint8> orig(sw * sh);
+					for(int py = 0; py < sh; py++)
+						for(int px = 0; px < sw; px++)
+							orig[py*sw + px] = GetPixel(newsurface, px, py);
+					for(int py = 0; py < sh; py++){
+						for(int px = 0; px < sw; px++){
+							if(orig[py*sw + px]) continue;
+							if((px > 0    && orig[py*sw + px-1]) ||
+							   (px < sw-1 && orig[py*sw + px+1]) ||
+							   (py > 0    && orig[(py-1)*sw + px]) ||
+							   (py < sh-1 && orig[(py+1)*sw + px]))
+								SetPixel(newsurface, px, py, 17);
+						}
+					}
 				}
 				DrawScaled(newsurface, 0, surface, &dstrect);
 				delete newsurface;
@@ -3484,16 +3494,26 @@ void Renderer::DrawPlayerList(Surface * surface){
 		Team * team = *it;
 		Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[181][team->agency].get());
 		EffectTeamColor(newsurface, 0, team->GetColor(), false, true);
+		{ // silhouette outline: transparent pixels touching a visible pixel → white
+			int sw = newsurface->w, sh = newsurface->h;
+			std::vector<Uint8> orig(sw * sh);
+			for(int py = 0; py < sh; py++)
+				for(int px = 0; px < sw; px++)
+					orig[py*sw + px] = GetPixel(newsurface, px, py);
+			for(int py = 0; py < sh; py++){
+				for(int px = 0; px < sw; px++){
+					if(orig[py*sw + px]) continue;
+					if((px > 0    && orig[py*sw + px-1]) ||
+					   (px < sw-1 && orig[py*sw + px+1]) ||
+					   (py > 0    && orig[(py-1)*sw + px]) ||
+					   (py < sh-1 && orig[(py+1)*sw + px]))
+						SetPixel(newsurface, px, py, 17);
+				}
+			}
+		}
 		Rect dstrect;
 		dstrect.x = 50 + 10;
 		dstrect.y = 50 + 10 + yoffset + 10;
-		{ // 1px white outline (BlitSurface 1:1 → newsurface->w × newsurface->h)
-			int ix = dstrect.x, iy = dstrect.y, iw = newsurface->w, ih = newsurface->h;
-			DrawFilledRectangle(surface, ix-1, iy-1, ix+iw+1, iy,      17);
-			DrawFilledRectangle(surface, ix-1, iy+ih, ix+iw+1, iy+ih+1, 17);
-			DrawFilledRectangle(surface, ix-1, iy,   ix,       iy+ih,   17);
-			DrawFilledRectangle(surface, ix+iw, iy,  ix+iw+1, iy+ih,   17);
-		}
 		BlitSurface(newsurface, 0, surface, &dstrect);
 		dstrect.y -= 10;
 		delete newsurface;
