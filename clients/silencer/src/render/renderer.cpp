@@ -2097,6 +2097,8 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 				if(*pixel >= 130){
 					*pixel = palette.Color(*pixel - 16, color);
 					*pixel = palette.Brightness(*pixel, brightness);
+					// Bring into the ambient-darkened range so lighting affects it
+					if(*pixel >= 114) *pixel -= 112;
 				}
 			}
 		}
@@ -2105,12 +2107,16 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 			for(int x = 0; x < dstw; x++){
 				Uint8 * pixel = &((Uint8 *)dst->pixels.data())[x + (y * dstw)];
 				if(*pixel >= 195 && *pixel <= 208){
-					*pixel = palette.Color(*pixel/* - 195 + 114*/, color);
-					*pixel = palette.Brightness(*pixel/* - 195 + 114*/, brightness);
+					*pixel = palette.Color(*pixel, color);
+					*pixel = palette.Brightness(*pixel, brightness);
+					// Bring into the ambient-darkened range so lighting affects it
+					if(*pixel >= 114) *pixel -= 112;
 				}else
 				if(*pixel >= 81 && *pixel <= 92){
-					*pixel = palette.Color(*pixel + 128/* - 81 + 114*/, color);
-					*pixel = palette.Brightness(*pixel/* - 195 + 114*/, brightness);
+					*pixel = palette.Color(*pixel + 128, color);
+					*pixel = palette.Brightness(*pixel, brightness);
+					// Bring into the ambient-darkened range so lighting affects it
+					if(*pixel >= 114) *pixel -= 112;
 				}
 			}
 		}

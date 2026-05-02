@@ -535,17 +535,34 @@ export default function MapCanvas({
             ctx.fillStyle = grad;
             ctx.fillRect(gx, gy, gw, gh);
             ctx.drawImage(spr.bitmap, gx, gy, gw, gh);
-            // Radius circle: size 0=80, 1=140, 2=200 world px
+            // Radius indicator: circle for halo, cone wedge for spot
             const lightSize = (u >>> 0) & 3;
             const lightRadius = lightSize === 2 ? 200 : lightSize === 1 ? 140 : 80;
+            const lightShape = (u >>> 2) & 1; // 0=halo, 1=spot
             const ringColor = hasColor ? `rgba(${cr},${cg},${cb},0.45)` : 'rgba(255,200,80,0.45)';
+            const fillColor = hasColor ? `rgba(${cr},${cg},${cb},0.08)` : 'rgba(255,200,80,0.08)';
             ctx.save();
             ctx.setLineDash([4, 4]);
             ctx.strokeStyle = ringColor;
             ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(cx, cy, lightRadius * zoom, 0, Math.PI * 2);
-            ctx.stroke();
+            if (lightShape === 1) {
+              // Spot light: draw a 90° cone wedge in the actor's direction
+              const DIR_ANGLES = [0, -Math.PI/4, -Math.PI/2, -3*Math.PI/4, Math.PI, 3*Math.PI/4, Math.PI/2, Math.PI/4];
+              const dirAngle = DIR_ANGLES[(a.direction ?? 0) & 7];
+              const half = Math.PI / 4;
+              const r = lightRadius * zoom;
+              ctx.beginPath();
+              ctx.moveTo(cx, cy);
+              ctx.arc(cx, cy, r, dirAngle - half, dirAngle + half);
+              ctx.closePath();
+              ctx.fillStyle = fillColor;
+              ctx.fill();
+              ctx.stroke();
+            } else {
+              ctx.beginPath();
+              ctx.arc(cx, cy, lightRadius * zoom, 0, Math.PI * 2);
+              ctx.stroke();
+            }
             ctx.restore();
           } else {
           const mirrored = a.direction !== 0;
