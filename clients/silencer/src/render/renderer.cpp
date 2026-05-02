@@ -2154,7 +2154,7 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 					}else{
 						*pixel = anchor + (*pixel >= 202 ? 1 : 0);
 					}
-				}else if(*pixel >= 81 && *pixel <= 92){
+				}else if(*pixel >= 81 && *pixel <= 95){
 					*pixel = keepLit ? Uint8(241) : Uint8(anchor + 1);
 				}
 			}
