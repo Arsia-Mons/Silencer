@@ -669,6 +669,28 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 					creditmachine->y = actory;
 				}
 			}break;
+			case 71:{
+				// environment light halo/spot — bank 222
+				// actortype: bits 0-1=size, bit 2=shape, bits 3-4=anim, bits 5-6=pulseSpeed, bits 8-15=colorR, bits 16-23=colorG, bits 24-31=colorB
+				// actordirection: spot direction 0-7 (E,NE,N,NW,W,SW,S,SE)
+				Overlay * overlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+				if(overlay){
+					Uint32 u = (Uint32)actortype;
+					overlay->res_bank = 222;
+					overlay->res_index = (Uint8)(u & 3);
+					overlay->mapLight = true;
+					overlay->lightColorR    = (Uint8)((u >> 8)  & 0xFF);
+					overlay->lightColorG    = (Uint8)((u >> 16) & 0xFF);
+					overlay->lightColorB    = (Uint8)((u >> 24) & 0xFF);
+					overlay->lightAnim       = (Uint8)((u >> 3) & 3);
+					overlay->lightPulseSpeed = (Uint8)((u >> 5) & 3);
+					overlay->lightShape      = (Uint8)((u >> 2) & 1);
+					overlay->lightDynShadows = (bool)((u >> 7) & 1);
+					overlay->lightDirection  = (Uint8)(actordirection & 7);
+					overlay->x = actorx;
+					overlay->y = actory;
+				}
+			}break;
 		}
 	}
 	memcpy(&numplatforms, &level[i], sizeof(numplatforms));
@@ -743,6 +765,40 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 	}
 	//fclose(fileo);
 	
+	// Shadow zones — optional trailing section (forward-compat: old maps simply end here)
+	if(i + 8 <= level.size()){
+		Uint32 numzones = 0;
+		memcpy(&numzones, &level[i], sizeof(numzones));
+		numzones = SDL_Swap32LE(numzones);
+		i += sizeof(Uint32) + sizeof(Uint32); // count + padding
+		for(Uint32 z = 0; z < numzones && i + 16 <= level.size(); z++){
+			ShadowZone sz;
+			memcpy(&sz.x1, &level[i],      4); sz.x1 = SDL_Swap32LE(sz.x1); i += 4;
+			memcpy(&sz.y1, &level[i],      4); sz.y1 = SDL_Swap32LE(sz.y1); i += 4;
+			memcpy(&sz.x2, &level[i],      4); sz.x2 = SDL_Swap32LE(sz.x2); i += 4;
+			memcpy(&sz.y2, &level[i],      4); sz.y2 = SDL_Swap32LE(sz.y2); i += 4;
+			if(team == 0) shadowzones.push_back(sz);
+		}
+	}
+
+	// Light shadow masks — optional trailing section baked by the designer at save time
+	if(i + 8 <= level.size()){
+		Uint32 numMasks = 0;
+		memcpy(&numMasks, &level[i], 4); numMasks = SDL_Swap32LE(numMasks);
+		i += 8; // count + padding
+		for(Uint32 m = 0; m < numMasks && i + 12 <= level.size(); m++){
+			LightShadowMask lm;
+			memcpy(&lm.x,    &level[i], 4); lm.x    = SDL_Swap32LE(lm.x);    i += 4;
+			memcpy(&lm.y,    &level[i], 4); lm.y    = SDL_Swap32LE(lm.y);    i += 4;
+			memcpy(&lm.diam, &level[i], 4); lm.diam = SDL_Swap32LE(lm.diam); i += 4;
+			size_t dataSize = (size_t)lm.diam * lm.diam;
+			if(i + dataSize > level.size()) break;
+			lm.data.assign(level.begin() + i, level.begin() + i + dataSize);
+			i += dataSize;
+			if(team == 0) lightShadowMasks.push_back(std::move(lm));
+		}
+	}
+
 	//delete[] levelcompressed;
 	//delete[] level;
 	
@@ -756,6 +812,8 @@ void Map::Unload(void){
 	playerstartlocations.clear();
 	surveillancecameras.clear();
 	rainpuddlelocations.clear();
+	shadowzones.clear();
+	lightShadowMasks.clear();
 	for(size_t i = 0; i < 4; i++){
 		tiles[i].clear();
 	}

@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { ACTOR_DEFS, PLATFORM_TOOL_TYPES } from './Toolbar';
+import { bakeSingleLight, buildOccluders, LIGHT_RADII } from './lightBaker';
 import type { SilMapData, MapPlatform, SpriteEntry, TileCell } from '../../lib/types';
 
 // Platform overlay colors
@@ -122,6 +123,9 @@ interface Props {
   onPlatformUpdate: (idx: number, x1: number, y1: number, x2: number, y2: number) => void;
   onActorSelect?: (idx: number | null) => void;
   onActorFlip?: (idx: number) => void;
+  onShadowZoneDraw?: (zone: { x1: number; y1: number; x2: number; y2: number }) => void;
+  onShadowZoneRemove?: (idx: number) => void;
+  onActorTypeChange?: (idx: number, type: number) => void;
   gridSize: number;
   tileSelection?: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null;
   onTileSelection?: (sel: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null) => void;
@@ -148,6 +152,9 @@ export default function MapCanvas({
   selectedPlatformIdx, onPlatformSelect, onPlatformUpdate,
   onActorSelect,
   onActorFlip,
+  onShadowZoneDraw,
+  onShadowZoneRemove,
+  onActorTypeChange,
   gridSize,
   tileSelection,
   onTileSelection,
@@ -169,11 +176,69 @@ export default function MapCanvas({
   const platformDragRef = useRef<PlatformDragState | null>(null);
   // Current preview bounds during platform drag { wx1, wy1, wx2, wy2 }
   const platformPreviewRef = useRef<PlatformPreview | null>(null);
+  // Shadow zone drag: start world pos while drawing
+  const shadowZoneDragRef = useRef<{ startWx: number; startWy: number; curWx: number; curWy: number } | null>(null);
+  const [shadowZonePreview, setShadowZonePreview] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   // Tile selection drag
   const isSelectingTile = useRef(false);
   const tileSelStartRef = useRef<{ tx: number; ty: number } | null>(null);
   // Current hover tile (for paste preview — updated every mousemove, no re-render)
   const hoverTileRef = useRef<{ tx: number; ty: number }>({ tx: 0, ty: 0 });
+  // Light radius ring drag: tracks active drag state
+  const lightRadiusDragRef = useRef<{ actorIdx: number; origType: number } | null>(null);
+  const lastEmittedSizeRef = useRef<number | null>(null);
+  const [isLightRadiusDragging, setIsLightRadiusDragging] = useState(false);
+
+  // Baked shadow preview canvases for static lights (dynShadows=false)
+  const bakedLightPreviewsRef = useRef<Array<{ canvas: OffscreenCanvas; wx: number; wy: number; diam: number }>>([]);
+  useEffect(() => {
+    if (!map) { bakedLightPreviewsRef.current = []; return; }
+    const occluders = buildOccluders(map.platforms, map.shadowZones);
+    const previews: typeof bakedLightPreviewsRef.current = [];
+    const HALF_ANGLE = Math.PI / 4;
+    const cosHalf = Math.cos(HALF_ANGLE);
+    const DIR_ANGLES = [0, -Math.PI/4, -Math.PI/2, -3*Math.PI/4, Math.PI, 3*Math.PI/4, Math.PI/2, Math.PI/4];
+    for (const actor of map.actors) {
+      if (actor.id !== 71) continue;
+      const u = (actor.type ?? 0) >>> 0;
+      const dynShadows = (u >>> 7) & 1;
+      if (dynShadows) continue; // only static (baked) lights
+      const size = u & 3;
+      const shape = (u >>> 2) & 1;
+      const radius = LIGHT_RADII[size] ?? 80;
+      const diam = radius * 2;
+      const data = bakeSingleLight(actor.x, actor.y, radius, occluders, shape, (actor.direction ?? 0) & 7);
+      const cr = (u >>> 8) & 0xFF, cg = (u >>> 16) & 0xFF, cb = (u >>> 24) & 0xFF;
+      const lr = cr || 255, lg = cg || 220, lb = cb || 100;
+      const dirAngle = DIR_ANGLES[(actor.direction ?? 0) & 7];
+      const cosDirX = Math.cos(dirAngle), sinDirY = Math.sin(dirAngle);
+      const oc = new OffscreenCanvas(diam, diam);
+      const octx = oc.getContext('2d')!;
+      const imgData = octx.createImageData(diam, diam);
+      for (let my = 0; my < diam; my++) {
+        for (let mx = 0; mx < diam; mx++) {
+          const idx = my * diam + mx;
+          const dx = mx - radius, dy = my - radius;
+          if (dx * dx + dy * dy >= radius * radius) continue;
+          if (shape === 1) {
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0.5 && (dx/dist)*cosDirX + (dy/dist)*sinDirY < cosHalf) continue;
+          }
+          const px = idx * 4;
+          if (data[idx] === 1) {
+            imgData.data[px] = lr; imgData.data[px+1] = lg; imgData.data[px+2] = lb;
+            imgData.data[px+3] = 55;
+          } else {
+            imgData.data[px] = 0; imgData.data[px+1] = 0; imgData.data[px+2] = 20;
+            imgData.data[px+3] = 110;
+          }
+        }
+      }
+      octx.putImageData(imgData, 0, 0);
+      previews.push({ canvas: oc, wx: actor.x, wy: actor.y, diam });
+    }
+    bakedLightPreviewsRef.current = previews;
+  }, [map]);
 
   // World → canvas coords
   const worldToCanvas = useCallback((wx: number, wy: number) => ({
@@ -219,7 +284,7 @@ export default function MapCanvas({
     }
 
     const tileSize = 64 * zoom;
-    const { width, height, layers, actors, platforms } = map;
+    const { width, height, layers, actors, platforms, shadowZones } = map;
 
     // Draw checkerboard background
     ctx.fillStyle = '#0a0a0f';
@@ -435,8 +500,59 @@ export default function MapCanvas({
       drawPlatform(cx1, cy1, cx2, cy2, typeName ?? 'RECTANGLE', true);
     }
 
+    // Shadow zones (rendered after platforms, before actors)
+    if (shadowZones && shadowZones.length > 0) {
+      for (const z of shadowZones) {
+        const zx1 = Math.min(z.x1, z.x2) * zoom + pan.x;
+        const zy1 = Math.min(z.y1, z.y2) * zoom + pan.y;
+        const zw  = Math.abs(z.x2 - z.x1) * zoom;
+        const zh  = Math.abs(z.y2 - z.y1) * zoom;
+        ctx.fillStyle = 'rgba(160,20,20,0.25)';
+        ctx.fillRect(zx1, zy1, zw, zh);
+        ctx.strokeStyle = 'rgba(220,60,60,0.8)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(zx1, zy1, zw, zh);
+        ctx.setLineDash([]);
+        if (zoom > 0.25) {
+          ctx.fillStyle = 'rgba(220,100,100,0.9)';
+          ctx.font = `${Math.max(9, 10 * zoom)}px monospace`;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+          ctx.fillText('SZ', zx1 + 3, zy1 + 2);
+        }
+      }
+    }
+
+    // Shadow zone preview while drawing
+    if (shadowZonePreview) {
+      const { x1, y1, x2, y2 } = shadowZonePreview;
+      const px1 = Math.min(x1, x2) * zoom + pan.x;
+      const py1 = Math.min(y1, y2) * zoom + pan.y;
+      const pw  = Math.abs(x2 - x1) * zoom;
+      const ph  = Math.abs(y2 - y1) * zoom;
+      ctx.fillStyle = 'rgba(200,50,50,0.2)';
+      ctx.fillRect(px1, py1, pw, ph);
+      ctx.strokeStyle = 'rgba(255,80,80,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(px1, py1, pw, ph);
+      ctx.setLineDash([]);
+    }
+
     // Actor icons
     if (vis?.actors !== false) {
+      // Draw baked shadow previews for static lights before actor sprites
+      if (vis?.lighting !== false && bakedLightPreviewsRef.current.length > 0) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        for (const { canvas, wx, wy, diam } of bakedLightPreviewsRef.current) {
+          const mx = wx * zoom + pan.x - (diam / 2) * zoom;
+          const my = wy * zoom + pan.y - (diam / 2) * zoom;
+          ctx.drawImage(canvas, mx, my, diam * zoom, diam * zoom);
+        }
+        ctx.restore();
+      }
       ctx.font = 'bold 9px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -455,11 +571,63 @@ export default function MapCanvas({
           else if (a.type === 2) bankNum = 201;
           else bankNum = 205;
         }
+        if (a.id === 71) bankNum = 222; // light halo — frame from bits 0-1 of actor.type
+        const lightFrame = a.id === 71 ? (a.type ?? 0) & 3 : null;
 
         // Try to draw actual sprite
         const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
-        const spr = sprBank?.[def.frame ?? 0];
+        const spr = sprBank?.[lightFrame != null ? lightFrame : (def.frame ?? 0)];
         if (spr) {
+          // Light actors: draw sprite with additive-style glow overlay
+          if (a.id === 71 && vis?.lighting !== false) {
+            const gx = cx - (spr.width / 2) * zoom;
+            const gy = cy - (spr.height / 2) * zoom;
+            const gw = spr.width * zoom;
+            const gh = spr.height * zoom;
+            // Decode color from actortype bits 8-30
+            const u = (a.type ?? 0) >>> 0;
+            const cr = (u >>> 8) & 0xFF;
+            const cg = (u >>> 16) & 0xFF;
+            const cb = (u >>> 24) & 0xFF;
+            const hasColor = cr || cg || cb;
+            const inner = hasColor ? `rgba(${cr},${cg},${cb},0.5)` : 'rgba(255,220,100,0.35)';
+            const outer = hasColor ? `rgba(${cr},${cg},${cb},0)` : 'rgba(255,180,50,0)';
+            const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(gw, gh) / 2);
+            grad.addColorStop(0, inner);
+            grad.addColorStop(1, outer);
+            ctx.fillStyle = grad;
+            ctx.fillRect(gx, gy, gw, gh);
+            ctx.drawImage(spr.bitmap, gx, gy, gw, gh);
+            // Radius indicator: circle for halo, cone wedge for spot
+            const lightSize = (u >>> 0) & 3;
+            const lightRadius = lightSize === 2 ? 200 : lightSize === 1 ? 140 : 80;
+            const lightShape = (u >>> 2) & 1; // 0=halo, 1=spot
+            const ringColor = hasColor ? `rgba(${cr},${cg},${cb},0.45)` : 'rgba(255,200,80,0.45)';
+            const fillColor = hasColor ? `rgba(${cr},${cg},${cb},0.08)` : 'rgba(255,200,80,0.08)';
+            ctx.save();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = ringColor;
+            ctx.lineWidth = 1;
+            if (lightShape === 1) {
+              // Spot light: draw a 90° cone wedge in the actor's direction
+              const DIR_ANGLES = [0, -Math.PI/4, -Math.PI/2, -3*Math.PI/4, Math.PI, 3*Math.PI/4, Math.PI/2, Math.PI/4];
+              const dirAngle = DIR_ANGLES[(a.direction ?? 0) & 7];
+              const half = Math.PI / 4;
+              const r = lightRadius * zoom;
+              ctx.beginPath();
+              ctx.moveTo(cx, cy);
+              ctx.arc(cx, cy, r, dirAngle - half, dirAngle + half);
+              ctx.closePath();
+              ctx.fillStyle = fillColor;
+              ctx.fill();
+              ctx.stroke();
+            } else {
+              ctx.beginPath();
+              ctx.arc(cx, cy, lightRadius * zoom, 0, Math.PI * 2);
+              ctx.stroke();
+            }
+            ctx.restore();
+          } else {
           const mirrored = a.direction !== 0;
           const sx = cx - (mirrored ? spr.width - spr.offsetX : spr.offsetX) * zoom;
           const sy = cy - spr.offsetY * zoom;
@@ -479,6 +647,7 @@ export default function MapCanvas({
             ctx.fillStyle = '#fff';
             ctx.fillText(def.icon, cx, cy + 7);
           }
+          } // end else (non-light actor)
         } else {
           // Fallback: colored circle with icon
           const r = Math.max(6, 8 * zoom);
@@ -517,7 +686,7 @@ export default function MapCanvas({
       ctx.setLineDash([]);
       ctx.restore();
     }
-  }, [map, tileImages, spriteImages, vis, zoom, pan, dragPlatform, dragActorPreview]);
+  }, [map, tileImages, spriteImages, vis, zoom, pan, dragPlatform, dragActorPreview, shadowZonePreview]);
 
   // Resize canvas to fill container
   useEffect(() => {
@@ -560,8 +729,10 @@ export default function MapCanvas({
       if (actor.id === 54) bankNum = actor.type === 0 ? 183 : 184;
       if (actor.id === 47) bankNum = 49 + Math.min(actor.type ?? 0, 9);
       if (actor.id === 63) bankNum = actor.type === 0 ? 200 : actor.type === 2 ? 201 : 205;
+      if (actor.id === 71) bankNum = 222;
       const sprBank = bankNum != null ? spriteImages?.get(bankNum) : null;
-      const spr = sprBank?.[def.frame ?? 0];
+      const lightFrame = actor.id === 71 ? ((actor.type ?? 0) >>> 0) & 3 : null;
+      const spr = sprBank?.[lightFrame != null ? lightFrame : (def.frame ?? 0)];
       const cx = overrideCx ?? actor.x * zoom + pan.x;
       const cy = overrideCy ?? actor.y * zoom + pan.y;
       if (spr) {
@@ -630,6 +801,69 @@ export default function MapCanvas({
         const isDragging = dragActorPreview?.idx === highlightActorIdx;
         const liveCx = isDragging ? dragActorPreview!.wx * zoom + pan.x : actor!.x * zoom + pan.x;
         const liveCy = isDragging ? dragActorPreview!.wy * zoom + pan.y : actor!.y * zoom + pan.y;
+
+        // Shadow preview for selected light actors
+        if (actor?.id === 71 && map) {
+          const lx = liveCx, ly = liveCy;
+          // Light radius in world pixels by size (bits 0-1 of actortype)
+          const lightSize = ((actor.type ?? 0) >>> 0) & 3;
+          const lightRange = lightSize === 2 ? 420 : lightSize === 1 ? 280 : 160;
+          const REACH = lightRange * 2 * zoom;
+          const RECTANGLE_TYPE = 1;
+
+          const projectShadow = (r: { x1: number; y1: number; x2: number; y2: number }) => {
+            const minX = Math.min(r.x1, r.x2), maxX = Math.max(r.x1, r.x2);
+            const minY = Math.min(r.y1, r.y2), maxY = Math.max(r.y1, r.y2);
+            // Skip if light is inside occluder
+            if (actor.x >= minX && actor.x <= maxX && actor.y >= minY && actor.y <= maxY) return;
+            // Cull if center is too far
+            const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+            if (Math.hypot(cx - actor.x, cy - actor.y) > lightRange * 1.5) return;
+            // Convert corners to screen space
+            const corners: [number, number][] = [
+              [r.x1 * zoom + pan.x, r.y1 * zoom + pan.y],
+              [r.x2 * zoom + pan.x, r.y1 * zoom + pan.y],
+              [r.x2 * zoom + pan.x, r.y2 * zoom + pan.y],
+              [r.x1 * zoom + pan.x, r.y2 * zoom + pan.y],
+            ];
+            // Sort corners by angle from light, find largest gap (= silhouette edges)
+            const wa = corners.map(([cx, cy]) => ({ cx, cy, a: Math.atan2(cy - ly, cx - lx) }))
+              .sort((a, b) => a.a - b.a);
+            let maxGap = -Infinity, maxI = 0;
+            for (let i = 0; i < 4; i++) {
+              const gap = ((wa[(i + 1) % 4].a - wa[i].a + 3 * Math.PI) % (2 * Math.PI));
+              if (gap > maxGap) { maxGap = gap; maxI = i; }
+            }
+            const c1 = wa[(maxI + 1) % 4], c2 = wa[maxI];
+            const proj = (cx: number, cy: number): [number, number] => {
+              const dx = cx - lx, dy = cy - ly;
+              const len = Math.hypot(dx, dy) || 1;
+              return [cx + (dx / len) * REACH, cy + (dy / len) * REACH];
+            };
+            ctx.beginPath();
+            ctx.moveTo(c1.cx, c1.cy);
+            const [p1x, p1y] = proj(c1.cx, c1.cy);
+            ctx.lineTo(p1x, p1y);
+            const [p2x, p2y] = proj(c2.cx, c2.cy);
+            ctx.lineTo(p2x, p2y);
+            ctx.lineTo(c2.cx, c2.cy);
+            ctx.closePath();
+            ctx.fill();
+          };
+
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          ctx.fillStyle = '#000033';
+          for (const p of map.platforms) {
+            if (p.type1 !== 0) continue; // only solid platforms cast shadows
+            projectShadow(p);
+          }
+          for (const z of map.shadowZones) {
+            projectShadow(z);
+          }
+          ctx.restore();
+        }
+
         const rect = getSpriteRect(liveCx, liveCy);
         if (rect) {
           ctx.save();
@@ -873,6 +1107,10 @@ export default function MapCanvas({
       }
     } else if (activeTool === 'ACTOR') {
       onActorPlace({ wx: snap(wx), wy: snap(wy) });
+    } else if (activeTool === 'SHADOW_ZONE') {
+      isPainting.current = true;
+      shadowZoneDragRef.current = { startWx: snap(wx), startWy: snap(wy), curWx: snap(wx), curWy: snap(wy) };
+      setShadowZonePreview({ x1: snap(wx), y1: snap(wy), x2: snap(wx), y2: snap(wy) });
     } else if (activeTool === 'SELECT') {
       const handleSize = 8 / zoom;
       const hs = handleSize / 2;
@@ -896,6 +1134,19 @@ export default function MapCanvas({
         }
         if (wx >= x1 && wx <= x2 && wy >= y1 && wy <= y2) {
           platformDragRef.current = { mode: 'body', handle: null, idx: selectedPlatformIdx, origPlatform: { ...p }, startWx: wx, startWy: wy };
+          return;
+        }
+      }
+
+      // 1.5. Light radius ring drag — if the selected actor is a light and the click is near its ring
+      if (highlightActorIdx != null && map.actors[highlightActorIdx]?.id === 71) {
+        const a = map.actors[highlightActorIdx];
+        const lightSize = (a.type ?? 0) & 3;
+        const lightRadius = lightSize === 2 ? 200 : lightSize === 1 ? 140 : 80;
+        if (Math.abs(Math.hypot(wx - a.x, wy - a.y) - lightRadius) < 12) {
+          lightRadiusDragRef.current = { actorIdx: highlightActorIdx, origType: a.type ?? 0 };
+          lastEmittedSizeRef.current = lightSize;
+          setIsLightRadiusDragging(true);
           return;
         }
       }
@@ -935,7 +1186,7 @@ export default function MapCanvas({
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
       onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
       selectedPlatformIdx, onPlatformSelect, onActorSelect, highlightActorIdx, snap,
-      pastePending, onTilePaste, onTileSelection, onFloodFill]);
+      pastePending, onTilePaste, onTileSelection, onFloodFill, onActorTypeChange]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -957,6 +1208,19 @@ export default function MapCanvas({
       return;
     }
 
+    // Right-click on a shadow zone removes it
+    if (activeTool === 'SHADOW_ZONE' && map.shadowZones) {
+      for (let i = map.shadowZones.length - 1; i >= 0; i--) {
+        const z = map.shadowZones[i];
+        const x1 = Math.min(z.x1, z.x2), x2 = Math.max(z.x1, z.x2);
+        const y1 = Math.min(z.y1, z.y2), y2 = Math.max(z.y1, z.y2);
+        if (wx >= x1 && wx <= x2 && wy >= y1 && wy <= y2) {
+          onShadowZoneRemove?.(i);
+          return;
+        }
+      }
+    }
+
     // Fall through to tile
     if (onTileRightClick) {
       const { tx, ty } = canvasToTile(cx, cy);
@@ -968,7 +1232,7 @@ export default function MapCanvas({
         onTileRightClick({ tx, ty, layerType, layerIdx, cell, x: e.clientX, y: e.clientY });
       }
     }
-  }, [map, canvasToWorld, canvasToTile, zoom, activeTool, activeLayer, onActorRightClick, onTileRightClick]);
+  }, [map, canvasToWorld, canvasToTile, zoom, activeTool, activeLayer, onActorRightClick, onTileRightClick, onShadowZoneRemove]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const { cx, cy } = getCanvasPos(e);
@@ -1051,6 +1315,21 @@ export default function MapCanvas({
       return;
     }
 
+    // Light radius ring drag (SELECT tool)
+    if (lightRadiusDragRef.current) {
+      const { actorIdx, origType } = lightRadiusDragRef.current;
+      const a = map.actors[actorIdx];
+      if (a) {
+        const dist = Math.hypot(wx - a.x, wy - a.y);
+        const newSize = dist < 110 ? 0 : dist < 170 ? 1 : 2;
+        if (newSize !== lastEmittedSizeRef.current) {
+          lastEmittedSizeRef.current = newSize;
+          onActorTypeChange?.(actorIdx, (origType & ~3) | newSize);
+        }
+      }
+      return;
+    }
+
     if (isPainting.current) {
       if (activeTool === 'TILE_BG' || activeTool === 'TILE_FG') {
         if (selectedTileId && tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
@@ -1062,11 +1341,16 @@ export default function MapCanvas({
         }
       } else if (['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM'].includes(activeTool)) {
         onDragPlatformChange(prev => prev ? { ...prev, wx2: snap(wx), wy2: snap(wy) } : null);
+      } else if (activeTool === 'SHADOW_ZONE' && shadowZoneDragRef.current) {
+        const snWx = snap(wx), snWy = snap(wy);
+        shadowZoneDragRef.current.curWx = snWx;
+        shadowZoneDragRef.current.curWy = snWy;
+        setShadowZonePreview({ x1: shadowZoneDragRef.current.startWx, y1: shadowZoneDragRef.current.startWy, x2: snWx, y2: snWy });
       }
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, eraseLayerType,
       onTilePaint, onPanChange, onCursorChange, onDragPlatformChange, snap,
-      onTileSelection]);
+      onTileSelection, onActorTypeChange]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isPanning.current) {
@@ -1109,6 +1393,23 @@ export default function MapCanvas({
       return;
     }
 
+    // Finish light radius ring drag
+    if (lightRadiusDragRef.current) {
+      const { actorIdx, origType } = lightRadiusDragRef.current;
+      lightRadiusDragRef.current = null;
+      lastEmittedSizeRef.current = null;
+      setIsLightRadiusDragging(false);
+      if (map?.actors[actorIdx]) {
+        const a = map.actors[actorIdx];
+        const { cx, cy } = getCanvasPos(e);
+        const { wx, wy } = canvasToWorld(cx, cy);
+        const dist = Math.hypot(wx - a.x, wy - a.y);
+        const newSize = dist < 110 ? 0 : dist < 170 ? 1 : 2;
+        onActorTypeChange?.(actorIdx, (origType & ~3) | newSize);
+      }
+      return;
+    }
+
     if (!map) { isPainting.current = false; return; }
     const { cx, cy } = getCanvasPos(e);
     const { wx, wy } = canvasToWorld(cx, cy);
@@ -1124,10 +1425,17 @@ export default function MapCanvas({
         const x2 = Math.max(wx1, snWx), y2 = Math.max(wy1, snWy);
         if (x2 - x1 > 2 && y2 - y1 > 2 && t) onPlatformDraw({ x1, y1, x2, y2, ...t });
         onDragPlatformChange(null);
+      } else if (activeTool === 'SHADOW_ZONE' && shadowZoneDragRef.current) {
+        const { startWx, startWy, curWx, curWy } = shadowZoneDragRef.current;
+        const x1 = Math.min(startWx, curWx), y1 = Math.min(startWy, curWy);
+        const x2 = Math.max(startWx, curWx), y2 = Math.max(startWy, curWy);
+        if (x2 - x1 > 4 && y2 - y1 > 4) onShadowZoneDraw?.({ x1, y1, x2, y2 });
+        shadowZoneDragRef.current = null;
+        setShadowZonePreview(null);
       }
     }
     isPainting.current = false;
-  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap]);
+  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap, onShadowZoneDraw, onActorTypeChange]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.code === 'Space') { isSpacePanning.current = true; e.preventDefault(); }
@@ -1151,7 +1459,9 @@ export default function MapCanvas({
     };
   }, [handleKeyDown, handleKeyUp]);
 
-  const cursorStyle = dragActorPreview
+  const cursorStyle = isLightRadiusDragging
+    ? 'ew-resize'
+    : dragActorPreview
     ? 'grabbing'
     : (isPanning.current || isSpacePanning.current || isCtrlPanning.current)
       ? 'grab'
@@ -1160,6 +1470,7 @@ export default function MapCanvas({
       : activeTool === 'SELECT' ? 'pointer'
       : activeTool === 'TILE_SELECT' ? 'crosshair'
       : activeTool === 'ERASE_TILE' ? 'crosshair'
+      : activeTool === 'SHADOW_ZONE' ? 'crosshair'
       : isPainting.current ? 'crosshair'
       : 'default';
 

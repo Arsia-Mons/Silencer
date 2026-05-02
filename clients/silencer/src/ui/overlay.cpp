@@ -13,6 +13,15 @@ Overlay::Overlay() : Object(ObjectTypes::OVERLAY){
 	textallownewline = false;
 	textlineheight = 10;
 	clicked = false;
+	mapLight = false;
+	lightColorR = 0;
+	lightColorG = 0;
+	lightColorB = 0;
+	lightAnim = 0;
+	lightPulseSpeed = 0;
+	lightShape = 0;
+	lightDirection = 0;
+	lightDynShadows = false;
 }
 
 void Overlay::Tick(World & world){
@@ -68,10 +77,12 @@ void Overlay::Tick(World & world){
 				}
 			break;
 			case 222:
+			if(!mapLight){
 				if(state_i >= 3){
 					world.MarkDestroyObject(id);
 				}
 				res_index = state_i;
+			}
 			break;
 		}
 	}

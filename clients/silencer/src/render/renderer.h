@@ -7,6 +7,9 @@
 #include "camera.h"
 #include "textinput.h"
 #include "surface.h"
+#include <cmath>
+#include <vector>
+#include <cstdint>
 
 class Renderer
 {
@@ -43,7 +46,7 @@ public:
 	void DrawAlphaed(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	Surface * CreateSurfaceCopy(Surface * src);
 	void EffectHacking(Surface * dst, Rect * dstrect, Uint8 color);
-	void EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot = false);
+	void EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot = false, bool ui = false);
 	Uint8 TeamColorToIndex(Uint8 values);
 	void EffectBrightness(Surface * dst, Rect * dstrect, Uint8 brightness);
 	void EffectColor(Surface * dst, Rect * dstrect, Uint8 color);
@@ -65,7 +68,15 @@ public:
 	static void BlitSurfaceFast(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	static void BlitSurfaceRLE(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	static void BlitSurfaceRLEClipped(int w, Uint8 * srcbuf, Rect * srcrect, Surface * dst, Rect * dstrect);
-	void DrawLight(Surface * surface, Surface * src, Rect * Rect);
+	struct DynOccluder { int x1, y1, x2, y2; };
+	void DrawLight(Surface * surface, Surface * src, Rect * Rect, Sint32 lightWorldX = 0, Sint32 lightWorldY = 0, Sint32 cameraOffX = 0, Sint32 cameraOffY = 0, const std::vector<Map::ShadowZone> * zones = nullptr, Uint8 colorIndex = 0, float lumScale = 1.0f, const Uint8 * mask = nullptr, const std::vector<DynOccluder> * dynoccluders = nullptr);
+	void DrawLightRadial(Surface * surface, int screenX, int screenY, int radius, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const Uint8 * mask, int diam, Uint8 colorIndex, float lumScale, const std::vector<DynOccluder> * dynoccluders);
+	void DrawLightSpot(Surface * surface, int screenX, int screenY, int radius,
+		Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY,
+		Uint8 direction,
+		const Uint8 * mask, int diam,
+		Uint8 colorIndex, float lumScale,
+		const std::vector<DynOccluder> * dynoccluders);
 	static void DrawTile(Surface * surface, Surface * tile, Rect * Rect);
 	void DrawParallax(Surface * surface, Camera & camera);
 	void DrawBackground(Surface * surface, Camera & camera, bool drawluminance = true);
@@ -87,6 +98,12 @@ private:
 	Uint8 state_i;
 	Uint8 ex, ey;
 	bool playerinbaseold;
+	std::vector<Object *> objectlights; // rebuilt each DrawWorld call; used by debug overlay
+	// FPS counter
+	Uint32 fpsLastTick = 0;
+	int fpsFrameCount = 0;
+	int fpsDisplay = 0;
+	static Uint8 GetLightFrameIdx(const class Overlay * light, const Resources & res);
 	static const int raindropscount = 100;
 	int raindropsx[raindropscount];
 	int raindropsy[raindropscount];

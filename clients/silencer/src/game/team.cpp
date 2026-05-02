@@ -373,35 +373,22 @@ Uint8 Team::GetColor(void){
 	if(color){
 		return color;
 	}
+	// basecolor index maps to palette group (basecolor*16):
+	//   8=white/silver, 9=yellow, 10=red, 11=tan, 12=orange, 13=blue, 14=green, 15=black
+	// shade: 8=natural, 9=brighter, 7=darker
 	Uint8 basecolor = 14;
-	Uint8 shade = 8;
+	Uint8 shade = 9;
 	switch(number){
-		case 0:
-			basecolor = 10;
-			shade = 7;
-		break;
-		case 1:
-			basecolor = 14;
-		break;
-		case 2:
-			basecolor = 13;
-		break;
-		case 3:
-			basecolor = 9;
-			shade = 8;
-		break;
-		case 4:
-			basecolor = 15;
-			shade = 11;
-		break;
-		case 5:
-			basecolor = 12;
-			shade = 10;
-		break;
+		case 0: basecolor = 10; break; // red
+		case 1: basecolor = 14; break; // green
+		case 2: basecolor = 13; break; // blue
+		case 3: basecolor = 9;  break; // yellow
+		case 4: basecolor = 12; break; // orange
+		case 5: basecolor = 8;  break; // silver/white
 	}
 	if(agency == BLACKROSE){
-		basecolor = 8;
-		shade = 8 + (number - 4);
+		basecolor = 15; // true black
+		shade = 8;
 	}
 	return ((shade << 4) + basecolor);
 }

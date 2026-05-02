@@ -51,6 +51,14 @@ Renderer::Renderer(World & world) : world(world), camera(640, 480){
 }
 	
 void Renderer::Draw(Surface * surface, float frametime){
+	// FPS tracking
+	Uint32 now = SDL_GetTicks();
+	fpsFrameCount++;
+	if(now - fpsLastTick >= 1000){
+		fpsDisplay = fpsFrameCount;
+		fpsFrameCount = 0;
+		fpsLastTick = now;
+	}
 	// Uncomment below to find and view individual sprites
 	/*surface->Clear(112);
 	const Uint8 * keystate = SDL_GetKeyboardState(NULL);
@@ -161,6 +169,50 @@ void Renderer::Draw(Surface * surface, float frametime){
 				DrawLine(surface, bx1+ox, by2+oy, bx1+ox, by1+oy, col, 1); // left
 			}
 		}
+		// Draw light actor positions: crosshair + radius circle/cone + label
+		if(!objectlights.empty()){
+			const int crossSize = 5;
+			const Uint8 lightCol = 221; // yellow
+			int ox = camera.GetXOffset(), oy = camera.GetYOffset();
+			for(Object * obj : objectlights){
+				Overlay * light = static_cast<Overlay *>(obj);
+				int sx = light->x + ox, sy = light->y + oy;
+				DrawLine(surface, sx - crossSize, sy, sx + crossSize, sy, lightCol, 1);
+				DrawLine(surface, sx, sy - crossSize, sx, sy + crossSize, lightCol, 1);
+				int radius = (light->res_index == 2) ? 200 : (light->res_index == 1) ? 140 : 80;
+				if(light->lightShape == 1){
+					// Spotlight: draw a cone outline (two radial lines + arc)
+					static const float DIR_ANGLES_DBG[8] = { 0.f, -(float)M_PI/4.f, -(float)M_PI/2.f, -3.f*(float)M_PI/4.f, (float)M_PI, 3.f*(float)M_PI/4.f, (float)M_PI/2.f, (float)M_PI/4.f };
+					float da = DIR_ANGLES_DBG[light->lightDirection & 7];
+					float half = (float)M_PI / 4.f;
+					int ex1 = sx + (int)(cosf(da - half) * radius);
+					int ey1 = sy + (int)(sinf(da - half) * radius);
+					int ex2 = sx + (int)(cosf(da + half) * radius);
+					int ey2 = sy + (int)(sinf(da + half) * radius);
+					DrawLine(surface, sx, sy, ex1, ey1, lightCol, 1);
+					DrawLine(surface, sx, sy, ex2, ey2, lightCol, 1);
+					// Arc along the cone edge (24 segments)
+					for(int seg = 0; seg < 24; seg++){
+						float a0 = (da - half) + (float)seg       / 24.f * (half * 2.f);
+						float a1 = (da - half) + (float)(seg + 1) / 24.f * (half * 2.f);
+						DrawLine(surface,
+							sx + (int)(cosf(a0) * radius), sy + (int)(sinf(a0) * radius),
+							sx + (int)(cosf(a1) * radius), sy + (int)(sinf(a1) * radius),
+							lightCol, 1);
+					}
+				} else {
+					DrawCircle(surface, sx, sy, radius, lightCol);
+				}
+				const char * anim = light->lightAnim == 1 ? "flicker" : light->lightAnim == 2 ? "pulse" : "static";
+				char lbl[32];
+				snprintf(lbl, sizeof(lbl), "LIGHT(%s)", anim);
+				DrawText(surface, (Uint16)(sx - 24), (Uint16)(sy - crossSize - 8), lbl, 133, 6, false, lightCol, 0, false);
+			}
+		}
+		// FPS counter in top-left corner
+		char fpsbuf[16];
+		snprintf(fpsbuf, sizeof(fpsbuf), "%d FPS", fpsDisplay);
+		DrawText(surface, 4, 4, fpsbuf, 133, 6, false, 68, 0, false);
 	}else{
 		world.debuglines.clear();
 	}
@@ -265,7 +317,23 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 		DrawRain(surface, camera, frametime);
 		DrawRainPuddles(surface, camera);
 	}
-	std::vector<Object *> objectlights;
+	objectlights.clear();
+	// Gather map lights using radius-aware screen overlap, not the sprite bounds.
+	// This prevents lights from popping out when only their tiny sprite goes off-screen.
+	if(drawluminance){
+		for(Object * obj : world.objectlist){
+			if(!obj->draw || obj->res_bank != 222) continue;
+			Overlay * ov = static_cast<Overlay *>(obj);
+			if(!ov->mapLight) continue;
+			int radius = ov->res_index == 2 ? 200 : ov->res_index == 1 ? 140 : 80;
+			int sx = obj->x + camera.GetXOffset();
+			int sy = obj->y + camera.GetYOffset();
+			if(sx + radius >= 0 && sx - radius < surface->w &&
+			   sy + radius >= 0 && sy - radius < surface->h){
+				objectlights.push_back(obj);
+			}
+		}
+	}
 	for(unsigned int renderpass = 0; renderpass < 4; renderpass++){
 		for(std::list<Object *>::iterator i = world.objectlist.begin(); i != world.objectlist.end(); i++){
 			Object * object = *i;
@@ -597,7 +665,10 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 										surveillancemonitor->camera.x = objectfollowing->x + objectfollowing->nudgex;
 										surveillancemonitor->camera.y = objectfollowing->y + objectfollowing->nudgey - 40;
 									}
-									DrawWorldScaled(&newsurface, surveillancemonitor->camera, recursion, frametime, surveillancemonitor->scalefactor);
+									// Save outer objectlights before recursive DrawWorld clears the member
+								auto savedLights = objectlights;
+								DrawWorldScaled(&newsurface, surveillancemonitor->camera, recursion, frametime, surveillancemonitor->scalefactor);
+								objectlights = savedLights;
 									EffectRampColor(&newsurface, 0, 198);
 									BlitSurface(&newsurface, 0, surface, &dstrect);
 								}
@@ -613,9 +684,9 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								switch(overlay->res_bank){
 									case 222:{
 										src = 0;
-										objectlights.push_back(object);
-										//lightingsurfacebank = overlay->res_bank;
-										//lightingsurfaceindex = overlay->res_index;
+										// Map lights gathered separately above with radius-aware visibility.
+										// Hit-glow overlays (mapLight=false) still need to be collected here.
+										if(!overlay->mapLight) objectlights.push_back(object);
 									}break;
 								}
 							}break;
@@ -1024,12 +1095,136 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 	if(world.map.loaded){
 		if(drawluminance){
 			DrawForegroundLuminance(surface, camera);
-			for(std::vector<Object *>::iterator it = objectlights.begin(); it != objectlights.end(); it++){
-				Surface * src = world.resources.spritebank[(*it)->res_bank][(*it)->res_index].get();
-				Rect dstrect;
-				dstrect.x = (*it)->x - world.resources.spriteoffsetx[(*it)->res_bank][(*it)->res_index] + camera.GetXOffset();
-				dstrect.y = (*it)->y - world.resources.spriteoffsety[(*it)->res_bank][(*it)->res_index] + camera.GetYOffset();
-				DrawLight(surface, src, &dstrect);
+			const std::vector<Map::ShadowZone> * zones = world.map.shadowzones.empty() ? nullptr : &world.map.shadowzones;
+			// Gather moving occluders (players, guards, civilians, robots) for dynamic shadow tests
+			static const Uint8 dynTypes[] = { ObjectTypes::PLAYER, ObjectTypes::GUARD, ObjectTypes::CIVILIAN, ObjectTypes::ROBOT };
+			std::vector<DynOccluder> allDynOccluders;
+			for(Uint8 t : dynTypes){
+				for(Uint16 oid : world.objectsbytype[t]){
+					Object * obj = world.GetObjectFromId(oid);
+					if(!obj || !obj->draw) continue;
+					int ox1, oy1, ox2, oy2;
+					obj->GetAABB(world.resources, &ox1, &oy1, &ox2, &oy2);
+					if(ox2 <= ox1 || oy2 <= oy1) continue;
+					allDynOccluders.push_back({ ox1, oy1, ox2, oy2 });
+				}
+			}
+			for(Object * obj : objectlights){
+				Overlay * light = static_cast<Overlay *>(obj);
+
+				// Color tint and animation scale (shared by both draw paths)
+				Uint8 colorIndex = 0;
+				if(light->lightColorR || light->lightColorG || light->lightColorB){
+					SDL_Color tint = { light->lightColorR, light->lightColorG, light->lightColorB, 255 };
+					colorIndex = palette.ClosestMatch(tint);
+				}
+				float lumScale = 1.0f;
+				if(light->lightAnim == 1){
+					Uint32 h = (Uint32)state_i * 2654435761u ^ ((Uint32)light->x * 1234567u ^ (Uint32)light->y * 7654321u);
+					lumScale = 0.3f + 0.7f * ((h & 0xFFFF) / 65535.0f);
+				}else if(light->lightAnim == 2){
+					float period = light->lightPulseSpeed == 2 ? 32.0f : light->lightPulseSpeed == 1 ? 64.0f : 128.0f;
+					float phase = (float)(state_i + ((light->x ^ light->y) & 0xFF)) / period;
+					lumScale = 0.65f + 0.35f * sinf(phase * 6.28318530f);
+				}
+
+				if(light->mapLight && light->lightShape == 0){
+					// Halo mapLight: procedural radial gradient + designer-baked shadow mask
+					// res_index holds size bits (0-1 of original actortype)
+					int radius = light->res_index == 2 ? 200 : light->res_index == 1 ? 140 : 80;
+					int diam = radius * 2;
+					int screenX = light->x + camera.GetXOffset();
+					int screenY = light->y + camera.GetYOffset();
+
+					const Uint8 * maskPtr = nullptr;
+					for(const auto & lm : world.map.lightShadowMasks){
+						if(lm.x == light->x && lm.y == light->y && (int)lm.diam == diam){
+							maskPtr = lm.data.data();
+							break;
+						}
+					}
+
+					int lbx1 = light->x - radius, lby1 = light->y - radius;
+					int lbx2 = light->x + radius, lby2 = light->y + radius;
+					std::vector<DynOccluder> dynForLight;
+					if(light->lightDynShadows){
+						for(const auto & d : allDynOccluders){
+							int dminx = d.x1 < d.x2 ? d.x1 : d.x2;
+							int dmaxx = d.x1 < d.x2 ? d.x2 : d.x1;
+							int dminy = d.y1 < d.y2 ? d.y1 : d.y2;
+							int dmaxy = d.y1 < d.y2 ? d.y2 : d.y1;
+							if(dmaxx >= lbx1 && dminx <= lbx2 && dmaxy >= lby1 && dminy <= lby2){
+								if(light->x >= dminx && light->x <= dmaxx && light->y >= dminy && light->y <= dmaxy) continue;
+								dynForLight.push_back(d);
+							}
+						}
+					}
+					const std::vector<DynOccluder> * dynPtr = dynForLight.empty() ? nullptr : &dynForLight;
+					DrawLightRadial(surface, screenX, screenY, radius, light->x, light->y,
+						camera.GetXOffset(), camera.GetYOffset(),
+						maskPtr, diam, colorIndex, lumScale, dynPtr);
+				}else if(light->mapLight && light->lightShape == 1){
+					// Procedural spot light
+					int radius = light->res_index == 2 ? 200 : light->res_index == 1 ? 140 : 80;
+					int diam = radius * 2;
+					int screenX = light->x + camera.GetXOffset();
+					int screenY = light->y + camera.GetYOffset();
+
+					const Uint8 * maskPtr = nullptr;
+					for(const auto & lm : world.map.lightShadowMasks){
+						if(lm.x == light->x && lm.y == light->y && (int)lm.diam == diam){
+							maskPtr = lm.data.data();
+							break;
+						}
+					}
+
+					int lbx1 = light->x - radius, lby1 = light->y - radius;
+					int lbx2 = light->x + radius, lby2 = light->y + radius;
+					std::vector<DynOccluder> dynForLight;
+					if(light->lightDynShadows){
+						for(const auto & d : allDynOccluders){
+							int dminx = d.x1 < d.x2 ? d.x1 : d.x2;
+							int dmaxx = d.x1 < d.x2 ? d.x2 : d.x1;
+							int dminy = d.y1 < d.y2 ? d.y1 : d.y2;
+							int dmaxy = d.y1 < d.y2 ? d.y2 : d.y1;
+							if(dmaxx >= lbx1 && dminx <= lbx2 && dmaxy >= lby1 && dminy <= lby2){
+								if(light->x >= dminx && light->x <= dmaxx && light->y >= dminy && light->y <= dmaxy) continue;
+								dynForLight.push_back(d);
+							}
+						}
+					}
+					const std::vector<DynOccluder> * dynPtr = dynForLight.empty() ? nullptr : &dynForLight;
+					DrawLightSpot(surface, screenX, screenY, radius, light->x, light->y,
+						camera.GetXOffset(), camera.GetYOffset(),
+						light->lightDirection,
+						maskPtr, diam, colorIndex, lumScale, dynPtr);
+				}else{
+					// Hit-glow overlays (mapLight=false): sprite-based DrawLight
+					Uint8 frameIdx = GetLightFrameIdx(light, world.resources);
+					Surface * src = world.resources.spritebank[light->res_bank][frameIdx].get();
+					Rect dstrect;
+					dstrect.x = light->x - world.resources.spriteoffsetx[light->res_bank][frameIdx] + camera.GetXOffset();
+					dstrect.y = light->y - world.resources.spriteoffsety[light->res_bank][frameIdx] + camera.GetYOffset();
+					int sprOffX = world.resources.spriteoffsetx[light->res_bank][frameIdx];
+					int sprOffY = world.resources.spriteoffsety[light->res_bank][frameIdx];
+					int lbx1 = light->x - sprOffX, lby1 = light->y - sprOffY;
+					int lbx2 = lbx1 + src->w,      lby2 = lby1 + src->h;
+					std::vector<DynOccluder> dynForLight;
+					for(const auto & d : allDynOccluders){
+						int dminx = d.x1 < d.x2 ? d.x1 : d.x2;
+						int dmaxx = d.x1 < d.x2 ? d.x2 : d.x1;
+						int dminy = d.y1 < d.y2 ? d.y1 : d.y2;
+						int dmaxy = d.y1 < d.y2 ? d.y2 : d.y1;
+						if(dmaxx >= lbx1 && dminx <= lbx2 && dmaxy >= lby1 && dminy <= lby2){
+							if(light->x >= dminx && light->x <= dmaxx && light->y >= dminy && light->y <= dmaxy) continue;
+							dynForLight.push_back(d);
+						}
+					}
+					const std::vector<DynOccluder> * dynPtr = dynForLight.empty() ? nullptr : &dynForLight;
+					DrawLight(surface, src, &dstrect, light->x, light->y,
+						camera.GetXOffset(), camera.GetYOffset(),
+						zones, colorIndex, lumScale, nullptr, dynPtr);
+				}
 			}
 		}
 		DrawForeground(surface, camera);
@@ -1943,9 +2138,22 @@ void Renderer::EffectHacking(Surface * dst, Rect * dstrect, Uint8 color){
 	}
 }
 
-void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot){
-	Uint8 brightness = (values >> 4) * 16;
-	Uint8 color = (values & 0x0F) * 16;
+void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool robot, bool ui){
+	// Palette dark-range (2-113): ambient-darkened. Lit-range (114-255): always vivid.
+	// Most group anchors are at bc*16 but yellow (bc=9/2) is pale cream at that index.
+	// Use idx 28/140 instead — both are RGB(252,252,0) pure saturated yellow.
+	// ui=true: use lit-range anchors so UI/minimap colors are unaffected by ambient darkening.
+	static const Uint8 darkAnchor[16] = {
+		240, 16, 28, 48, 64, 80, 96, 112,  // bc=0-7 (bc=0→black lit; bc=2→yellow uses idx 28)
+		16,  28, 48, 64, 80, 96, 112, 240  // bc=8-15 (bc=9→yellow uses idx 28)
+	};
+	static const Uint8 litAnchor[16] = {
+		240, 128, 140, 160, 176, 192, 208, 224,  // bc=0-7 (bc=2→yellow uses idx 140)
+		128, 140, 160, 176, 192, 208, 224, 240   // bc=8-15 (bc=9→yellow uses idx 140)
+	};
+	Uint8 basecolor = values & 0x0F;
+	bool keepLit = (basecolor == 0 || basecolor == 15); // black stays in lit range always
+	Uint8 anchor = (ui || keepLit) ? litAnchor[basecolor] : darkAnchor[basecolor];
 	int dstw = dst->w;
 	int dsth = dst->h;
 	if(robot){
@@ -1953,8 +2161,11 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 			for(int x = 0; x < dstw; x++){
 				Uint8 * pixel = &((Uint8 *)dst->pixels.data())[x + (y * dstw)];
 				if(*pixel >= 130){
-					*pixel = palette.Color(*pixel - 16, color);
-					*pixel = palette.Brightness(*pixel, brightness);
+					if(keepLit){
+						*pixel = 240;
+					}else{
+						*pixel = anchor + (*pixel >= 144 ? 1 : 0);
+					}
 				}
 			}
 		}
@@ -1962,13 +2173,14 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 		for(int y = 0; y < dsth; y++){
 			for(int x = 0; x < dstw; x++){
 				Uint8 * pixel = &((Uint8 *)dst->pixels.data())[x + (y * dstw)];
-				if(*pixel >= 195 && *pixel <= 208){
-					*pixel = palette.Color(*pixel/* - 195 + 114*/, color);
-					*pixel = palette.Brightness(*pixel/* - 195 + 114*/, brightness);
-				}else
-				if(*pixel >= 81 && *pixel <= 92){
-					*pixel = palette.Color(*pixel + 128/* - 81 + 114*/, color);
-					*pixel = palette.Brightness(*pixel/* - 195 + 114*/, brightness);
+				if(*pixel >= 193 && *pixel <= 209){
+					if(keepLit){
+						*pixel = 240;
+					}else{
+						*pixel = anchor + (*pixel >= 202 ? 1 : 0);
+					}
+				}else if(*pixel >= 81 && *pixel <= 97){
+					*pixel = keepLit ? Uint8(241) : Uint8(anchor + 1);
 				}
 			}
 		}
@@ -1976,11 +2188,12 @@ void Renderer::EffectTeamColor(Surface * dst, Rect * dstrect, Uint8 values, bool
 }
 
 Uint8 Renderer::TeamColorToIndex(Uint8 values){
-	Uint8 brightness = (values >> 4) * 16;
-	Uint8 color = (values & 0x0F) * 16;
-	Uint8 index = palette.Color(204, color);
-	index = palette.Brightness(index, brightness);
-	return index;
+	// Use litAnchor table so minimap dots always use the vivid lit-range color
+	static const Uint8 litAnchor[16] = {
+		240, 128, 140, 160, 176, 192, 208, 224,
+		128, 140, 160, 176, 192, 208, 224, 240
+	};
+	return litAnchor[values & 0x0F];
 }
 
 void Renderer::EffectBrightness(Surface * dst, Rect * dstrect, Uint8 brightness){
@@ -2150,7 +2363,7 @@ void Renderer::MiniMapBlit(Uint8 res_bank, Uint8 res_index, int x, int y, bool a
 	if(teamcolor || alpha){
 		Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[res_bank][res_index].get());
 		if(teamcolor){
-			EffectTeamColor(newsurface, 0, teamcolor);
+			EffectTeamColor(newsurface, 0, teamcolor, false, true);
 		}
 		if(alpha){
 			DrawAlphaed(newsurface, 0, &world.map.minimap.surface, &dstrect);
@@ -2195,7 +2408,188 @@ void Renderer::DrawMirrored(Surface * src, Rect * srcrect, Surface * dst, Rect *
     }
 }
 
-void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect){
+// Returns the sprite frame index for a bank-222 light overlay
+Uint8 Renderer::GetLightFrameIdx(const Overlay * light, const Resources & res){
+	Uint8 frameIdx = light->res_index;
+	if(light->lightShape == 1){
+		Uint8 spotFrame = 3 + (light->lightDirection * 3) + light->res_index;
+		if(spotFrame < res.spritebank[222].size()){
+			frameIdx = spotFrame;
+		}
+	}
+	return frameIdx;
+}
+
+void Renderer::DrawLightRadial(Surface * surface, int screenX, int screenY, int radius,
+		Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY,
+		const Uint8 * mask, int diam,
+		Uint8 colorIndex, float lumScale,
+		const std::vector<DynOccluder> * dynoccluders){
+	int surfacew = surface->w;
+	int surfaceh = surface->h;
+	int x0 = screenX - radius;
+	int y0 = screenY - radius;
+	int x1 = x0 < 0 ? 0 : x0;
+	int y1 = y0 < 0 ? 0 : y0;
+	int x2 = x0 + diam > surfacew ? surfacew : x0 + diam;
+	int y2 = y0 + diam > surfaceh ? surfaceh : y0 + diam;
+	if(x1 >= x2 || y1 >= y2) return;
+	const float r2 = (float)(radius * radius);
+	for(int y = y1; y < y2; y++){
+		for(int x = x1; x < x2; x++){
+			float dx = (float)(x - screenX);
+			float dy = (float)(y - screenY);
+			float dist2 = dx * dx + dy * dy;
+			if(dist2 >= r2) continue;
+			if(mask){
+				int mx = x - x0;
+				int my = y - y0;
+				if(!mask[my * diam + mx]) continue;
+			}
+			float t = 1.0f - sqrtf(dist2) / (float)radius;
+			float lumf = 15.0f * t * sqrtf(t) * lumScale;
+			Uint8 lum = lumf < 0.5f ? 0 : (Uint8)(lumf + 0.5f);
+			if(lum > 15) lum = 15;
+			if(!lum) continue;
+			if(dynoccluders && !dynoccluders->empty()){
+				float lxf = (float)lightWorldX;
+				float lyf = (float)lightWorldY;
+				float px = (float)(x - cameraOffX);
+				float py = (float)(y - cameraOffY);
+				float ddx = px - lxf, ddy = py - lyf;
+				bool blocked = false;
+				for(const auto & d : *dynoccluders){
+					float x1f = (float)(d.x1 < d.x2 ? d.x1 : d.x2);
+					float x2f = (float)(d.x1 < d.x2 ? d.x2 : d.x1);
+					float y1f = (float)(d.y1 < d.y2 ? d.y1 : d.y2);
+					float y2f = (float)(d.y1 < d.y2 ? d.y2 : d.y1);
+					float tmin2 = 0.01f, tmax2 = 0.99f;
+					if(ddx == 0){ if(lxf < x1f || lxf > x2f) continue; }
+					else{
+						float tx1 = (x1f - lxf) / ddx, tx2 = (x2f - lxf) / ddx;
+						if(tx1 > tx2){ float t = tx1; tx1 = tx2; tx2 = t; }
+						if(tx1 > tmin2) tmin2 = tx1;
+						if(tx2 < tmax2) tmax2 = tx2;
+						if(tmin2 > tmax2) continue;
+					}
+					if(ddy == 0){ if(lyf < y1f || lyf > y2f) continue; }
+					else{
+						float ty1 = (y1f - lyf) / ddy, ty2 = (y2f - lyf) / ddy;
+						if(ty1 > ty2){ float t = ty1; ty1 = ty2; ty2 = t; }
+						if(ty1 > tmin2) tmin2 = ty1;
+						if(ty2 < tmax2) tmax2 = ty2;
+						if(tmin2 > tmax2) continue;
+					}
+					blocked = true; break;
+				}
+				if(blocked) continue;
+			}
+			Uint8 * surfacepixel = &surface->pixels[y * surfacew + x];
+			Uint8 basepixel = colorIndex ? palette.Color(*surfacepixel, colorIndex) : *surfacepixel;
+			*surfacepixel = palette.Light(basepixel, lum);
+		}
+	}
+}
+
+void Renderer::DrawLightSpot(Surface * surface, int screenX, int screenY, int radius,
+		Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY,
+		Uint8 direction,
+		const Uint8 * mask, int diam,
+		Uint8 colorIndex, float lumScale,
+		const std::vector<DynOccluder> * dynoccluders){
+	static const float DIR_ANGLES[8] = { 0.f, -M_PI/4.f, -M_PI/2.f, -3.f*M_PI/4.f, M_PI, 3.f*M_PI/4.f, M_PI/2.f, M_PI/4.f };
+	const float dirAngle = DIR_ANGLES[direction & 7];
+	const float cosDirX = cosf(dirAngle);
+	const float sinDirY = sinf(dirAngle);
+	const float cosHalf = cosf(M_PI / 4.f); // ~0.7071
+
+	int surfacew = surface->w;
+	int surfaceh = surface->h;
+	int x0 = screenX - radius;
+	int y0 = screenY - radius;
+	int x1 = x0 < 0 ? 0 : x0;
+	int y1 = y0 < 0 ? 0 : y0;
+	int x2 = x0 + diam > surfacew ? surfacew : x0 + diam;
+	int y2 = y0 + diam > surfaceh ? surfaceh : y0 + diam;
+	if(x1 >= x2 || y1 >= y2) return;
+	const float r2 = (float)(radius * radius);
+	for(int y = y1; y < y2; y++){
+		for(int x = x1; x < x2; x++){
+			float dx = (float)(x - screenX);
+			float dy = (float)(y - screenY);
+			float dist2 = dx * dx + dy * dy;
+			if(dist2 >= r2) continue;
+
+			float dist = sqrtf(dist2);
+			Uint8 lum;
+			if(dist < 0.5f){
+				// Pixel at light center: full brightness, no cone check
+				float lumf = 15.0f * lumScale;
+				lum = (Uint8)(lumf + 0.5f);
+				if(lum > 15) lum = 15;
+			}else{
+				float nx = dx / dist;
+				float ny = dy / dist;
+				float dot = nx * cosDirX + ny * sinDirY;
+				if(dot < cosHalf) continue; // outside cone
+
+				// Check baked mask (cone-clipped for spot lights in the baker)
+				if(mask){
+					int mx = x - x0;
+					int my = y - y0;
+					if(!mask[my * diam + mx]) continue;
+				}
+
+				float angT = (dot - cosHalf) / (1.0f - cosHalf);
+				float angFall = angT * angT;
+				float t = 1.0f - dist / (float)radius;
+				float lumf = 15.0f * t * sqrtf(t) * angFall * lumScale;
+				lum = lumf < 0.5f ? 0 : (Uint8)(lumf + 0.5f);
+				if(lum > 15) lum = 15;
+				if(!lum) continue;
+			}
+
+			if(dynoccluders && !dynoccluders->empty()){
+				float lxf = (float)lightWorldX;
+				float lyf = (float)lightWorldY;
+				float px = (float)(x - cameraOffX);
+				float py = (float)(y - cameraOffY);
+				float ddx = px - lxf, ddy = py - lyf;
+				bool blocked = false;
+				for(const auto & d : *dynoccluders){
+					float x1f = (float)(d.x1 < d.x2 ? d.x1 : d.x2);
+					float x2f = (float)(d.x1 < d.x2 ? d.x2 : d.x1);
+					float y1f = (float)(d.y1 < d.y2 ? d.y1 : d.y2);
+					float y2f = (float)(d.y1 < d.y2 ? d.y2 : d.y1);
+					float tmin2 = 0.01f, tmax2 = 0.99f;
+					if(ddx == 0){ if(lxf < x1f || lxf > x2f) continue; }
+					else{
+						float tx1 = (x1f - lxf) / ddx, tx2 = (x2f - lxf) / ddx;
+						if(tx1 > tx2){ float t = tx1; tx1 = tx2; tx2 = t; }
+						if(tx1 > tmin2) tmin2 = tx1;
+						if(tx2 < tmax2) tmax2 = tx2;
+						if(tmin2 > tmax2) continue;
+					}
+					if(ddy == 0){ if(lyf < y1f || lyf > y2f) continue; }
+					else{
+						float ty1 = (y1f - lyf) / ddy, ty2 = (y2f - lyf) / ddy;
+						if(ty1 > ty2){ float t = ty1; ty1 = ty2; ty2 = t; }
+						if(ty1 > tmin2) tmin2 = ty1;
+						if(ty2 < tmax2) tmax2 = ty2;
+						if(tmin2 > tmax2) continue;
+					}
+					blocked = true; break;
+				}
+				if(blocked) continue;
+			}
+			Uint8 * surfacepixel = &surface->pixels[y * surfacew + x];
+			Uint8 basepixel = colorIndex ? palette.Color(*surfacepixel, colorIndex) : *surfacepixel;
+			*surfacepixel = palette.Light(basepixel, lum);
+		}
+	}
+}
+
+void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const std::vector<Map::ShadowZone> * zones, Uint8 colorIndex, float lumScale, const Uint8 * mask, const std::vector<DynOccluder> * dynoccluders){
 	if(rect->x <= surface->w && rect->y <= surface->h && rect->x >= -src->w && rect->y >= -src->h){
 		int surfacew = surface->w;
 		int surfaceh = surface->h;
@@ -2221,34 +2615,101 @@ void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect){
 		}
 		int srcw = src->w;
 		Uint8 * pixels = (Uint8 *)src->pixels.data();
+		const bool hasShadows = zones && !zones->empty();
 		for(int y1 = miny1, y2 = minh; y2 < maxh; y1++, y2++){
 			unsigned int i = (y1 * srcw) + minx1;
 			unsigned int i2 = (y2 * surfacew) + minw;
 			for(int x2 = minw; x2 < maxw; x2++){
 				Uint8 lum = pixels[i];
+				if(lum && lumScale < 1.0f){
+					int scaled = (int)(lum * lumScale);
+					lum = scaled < 0 ? 0 : (Uint8)scaled;
+				}
+				if(mask && !mask[i]){ i++; i2++; continue; }
+				if(lum && hasShadows){
+					// Ray from light center to this pixel, both in world-space.
+					// Screen pixel (x2,y2) → world = screen - cameraOffset
+					float px = (float)(x2 - cameraOffX);
+					float py = (float)(y2 - cameraOffY);
+					float lx = (float)lightWorldX;
+					float ly = (float)lightWorldY;
+					float dx = px - lx, dy = py - ly;
+					bool occluded = false;
+					for(const auto & z : *zones){
+						// Parametric ray-AABB slab test: segment lx,ly → px,py
+						float x1f = (float)(z.x1 < z.x2 ? z.x1 : z.x2);
+						float x2f = (float)(z.x1 < z.x2 ? z.x2 : z.x1);
+						float y1f = (float)(z.y1 < z.y2 ? z.y1 : z.y2);
+						float y2f = (float)(z.y1 < z.y2 ? z.y2 : z.y1);
+						float tmin = 0.0f, tmax = 1.0f;
+						if(dx == 0){
+							if(lx < x1f || lx > x2f){ goto nextzone; }
+						}else{
+							float tx1 = (x1f - lx) / dx;
+							float tx2 = (x2f - lx) / dx;
+							if(tx1 > tx2){ float t = tx1; tx1 = tx2; tx2 = t; }
+							if(tx1 > tmin) tmin = tx1;
+							if(tx2 < tmax) tmax = tx2;
+							if(tmin > tmax){ goto nextzone; }
+						}
+						if(dy == 0){
+							if(ly < y1f || ly > y2f){ goto nextzone; }
+						}else{
+							float ty1 = (y1f - ly) / dy;
+							float ty2 = (y2f - ly) / dy;
+							if(ty1 > ty2){ float t = ty1; ty1 = ty2; ty2 = t; }
+							if(ty1 > tmin) tmin = ty1;
+							if(ty2 < tmax) tmax = ty2;
+							if(tmin > tmax){ goto nextzone; }
+						}
+						// Intersection found in (0,1) range — pixel is in shadow
+						if(tmin < 1.0f && tmax > 0.0f){ occluded = true; break; }
+						nextzone:;
+					}
+					if(occluded){ i++; i2++; continue; }
+				}
+				// Dynamic occluder ray-AABB test (players, guards etc. in light range)
+				if(lum && dynoccluders && !dynoccluders->empty()){
+					float px = (float)(x2 - cameraOffX);
+					float py = (float)(y2 - cameraOffY);
+					float lxf = (float)lightWorldX;
+					float lyf = (float)lightWorldY;
+					float ddx = px - lxf, ddy = py - lyf;
+					for(const auto & d : *dynoccluders){
+						float x1f = (float)(d.x1 < d.x2 ? d.x1 : d.x2);
+						float x2f = (float)(d.x1 < d.x2 ? d.x2 : d.x1);
+						float y1f = (float)(d.y1 < d.y2 ? d.y1 : d.y2);
+						float y2f = (float)(d.y1 < d.y2 ? d.y2 : d.y1);
+						float tmin2 = 0.01f, tmax2 = 0.99f;
+						if(ddx == 0){ if(lxf < x1f || lxf > x2f) continue; }
+						else{
+							float tx1 = (x1f - lxf) / ddx, tx2 = (x2f - lxf) / ddx;
+							if(tx1 > tx2){ float t = tx1; tx1 = tx2; tx2 = t; }
+							if(tx1 > tmin2) tmin2 = tx1;
+							if(tx2 < tmax2) tmax2 = tx2;
+							if(tmin2 > tmax2) continue;
+						}
+						if(ddy == 0){ if(lyf < y1f || lyf > y2f) continue; }
+						else{
+							float ty1 = (y1f - lyf) / ddy, ty2 = (y2f - lyf) / ddy;
+							if(ty1 > ty2){ float t = ty1; ty1 = ty2; ty2 = t; }
+							if(ty1 > tmin2) tmin2 = ty1;
+							if(ty2 < tmax2) tmax2 = ty2;
+							if(tmin2 > tmax2) continue;
+						}
+						// Ray hits this dynamic occluder — skip pixel
+						i++; i2++; goto nextdynpixel;
+					}
+				}
+				{
 				Uint8 * surfacepixel = &surface->pixels[i2];
-				Uint8 newcolor = palette.Light(*surfacepixel, lum);
+				Uint8 basepixel = colorIndex ? palette.Color(*surfacepixel, colorIndex) : *surfacepixel;
+				Uint8 newcolor = palette.Light(basepixel, lum);
 				*surfacepixel = newcolor;
-				/*
-				// Unoptimized lighting algorithm
-				int lum = pixels[i] % 16;
-				Uint8 * surfacepixel = &surface->pixels[i2];
-				if(lum && *surfacepixel < 114 && *surfacepixel > 1){
-					int lum2 = (lum * 8) + ambiencelevel;
-					if(lum2 > 128){
-						lum = 128;
-					}else{
-						lum = lum2;
-					}
-					Uint8 newcolor = palette.Brightness(*surfacepixel, lum);
-					int newcolorbrightness = (newcolor - 2) % 16;
-					Uint8 oldcolorbrightness = (*surfacepixel - 2) % 16;
-					if(newcolorbrightness >= oldcolorbrightness * (float(ambiencelevel) / 128)){
-						*surfacepixel = newcolor + 112;
-					}
-				}*/
+				}
 				i++;
 				i2++;
+				nextdynpixel:;
 			}
 		}
 	}
@@ -2688,7 +3149,24 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 				dstrect.x = 5;
 				dstrect.y = teamyoffset + 1;
 				Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[181][team->agency].get());
-				EffectTeamColor(newsurface, 0, team->GetColor());
+				EffectTeamColor(newsurface, 0, team->GetColor(), false, true);
+				{ // silhouette outline: transparent pixels touching a visible pixel → white
+					int sw = newsurface->w, sh = newsurface->h;
+					std::vector<Uint8> orig(sw * sh);
+					for(int py = 0; py < sh; py++)
+						for(int px = 0; px < sw; px++)
+							orig[py*sw + px] = GetPixel(newsurface, px, py);
+					for(int py = 0; py < sh; py++){
+						for(int px = 0; px < sw; px++){
+							if(orig[py*sw + px]) continue;
+							if((px > 0    && orig[py*sw + px-1]) ||
+							   (px < sw-1 && orig[py*sw + px+1]) ||
+							   (py > 0    && orig[(py-1)*sw + px]) ||
+							   (py < sh-1 && orig[(py+1)*sw + px]))
+								SetPixel(newsurface, px, py, 17);
+						}
+					}
+				}
 				DrawScaled(newsurface, 0, surface, &dstrect);
 				delete newsurface;
 				for(int i = 0; i < team->numpeers; i++){
@@ -3040,7 +3518,24 @@ void Renderer::DrawPlayerList(Surface * surface){
 	for(std::vector<Team *>::iterator it = teams.begin(); it != teams.end(); it++){
 		Team * team = *it;
 		Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[181][team->agency].get());
-		EffectTeamColor(newsurface, 0, team->GetColor());
+		EffectTeamColor(newsurface, 0, team->GetColor(), false, true);
+		{ // silhouette outline: transparent pixels touching a visible pixel → white
+			int sw = newsurface->w, sh = newsurface->h;
+			std::vector<Uint8> orig(sw * sh);
+			for(int py = 0; py < sh; py++)
+				for(int px = 0; px < sw; px++)
+					orig[py*sw + px] = GetPixel(newsurface, px, py);
+			for(int py = 0; py < sh; py++){
+				for(int px = 0; px < sw; px++){
+					if(orig[py*sw + px]) continue;
+					if((px > 0    && orig[py*sw + px-1]) ||
+					   (px < sw-1 && orig[py*sw + px+1]) ||
+					   (py > 0    && orig[(py-1)*sw + px]) ||
+					   (py < sh-1 && orig[(py+1)*sw + px]))
+						SetPixel(newsurface, px, py, 17);
+				}
+			}
+		}
 		Rect dstrect;
 		dstrect.x = 50 + 10;
 		dstrect.y = 50 + 10 + yoffset + 10;

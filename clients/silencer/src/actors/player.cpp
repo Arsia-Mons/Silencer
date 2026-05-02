@@ -1833,6 +1833,13 @@ void Player::Tick(World & world){
 			}
 		}break;
 		case ROLLING:{
+			// Sequence is 12 ticks (0-11); transition before animation is applied
+			// to avoid a 1-frame flash from the out-of-bounds fallback at tick 12.
+			if(state_i >= 12){
+				state = CROUCHED;
+				state_i = state_i - 6;
+				break;
+			}
 			xv = GASLoader::Get().player.rollSpeed * (mirrored ? -1 : 1);
 			if(!ApplyActorSeq(world, "player", "ROLLING", state_i, res_bank, res_index)){
 				res_bank  = 88;
@@ -1867,10 +1874,6 @@ void Player::Tick(World & world){
 					state_i = -1;
 					break;
 				}
-			}
-			if(state_i >= 12){
-				state = CROUCHED;
-				state_i = state_i - 6;
 			}
 			Sint16 oldx = x;
 			if(!FollowGround(*this, world, xv)){

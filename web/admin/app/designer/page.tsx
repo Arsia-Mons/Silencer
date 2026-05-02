@@ -17,6 +17,7 @@ import ActorListPanel from './ActorListPanel';
 import Minimap from './Minimap';
 import type { MapActor } from '../../lib/types';
 import { API } from '../../lib/api';
+import { useLightsStore } from '../../lib/lights-store';
 
 interface VisState {
   bg: boolean[];
@@ -44,9 +45,11 @@ export default function DesignerPage() {
   const wsConnected = useSocket({});
 
   const { loaded, error, tileImages, spriteImages, tileBankCounts, progress, loadFiles } = useGameData();
+  const { lights: lightDefs, load: loadLights } = useLightsStore();
+  useEffect(() => { loadLights(); }, [loadLights]);
   const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, applyTileBatch, applyAllLayersBatch, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
-          updateHeader, updatePlatform,
+          updateHeader, updatePlatform, addShadowZone, removeShadowZone,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   type TileSel = { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number };
@@ -310,19 +313,30 @@ export default function DesignerPage() {
   }, [addPlatform]);
 
   const handleActorPlace = useCallback(({ wx, wy }: { wx: number; wy: number }) => {
-    const _def = ACTOR_DEFS.find(a => a.id === selectedActorId); // eslint-disable-line @typescript-eslint/no-unused-vars
+    let type = 0;
+    if (selectedActorId === 71) {
+      // Light actor: seed actortype from matching LightDef (size from frame, color from defaultColor)
+      const lightDef = lightDefs.find(l => l.frame === type);
+      if (lightDef?.defaultColor) {
+        const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(lightDef.defaultColor);
+        if (m) {
+          const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+          type = (type & 3) | ((r & 0xFF) << 8) | ((g & 0xFF) << 16) | ((b & 0xFF) << 24);
+        }
+      }
+    }
     addActor({
       id: selectedActorId,
       x: Math.round(wx),
       y: Math.round(wy),
       direction: 0,
-      type: 0,
+      type,
       matchid: 0,
       subplane: 0,
       unknown: 0,
       securityid: 0,
     });
-  }, [selectedActorId, addActor]);
+  }, [selectedActorId, addActor, lightDefs]);
 
   const handleActorMove = useCallback((idx: number, x: number, y: number) => {
     moveActor(idx, x, y);
@@ -333,6 +347,18 @@ export default function DesignerPage() {
     if (!actor) return;
     updateActor(idx, { direction: actor.direction ? 0 : 1 });
   }, [map, updateActor]);
+
+  const handleActorTypeChange = useCallback((idx: number, type: number) => {
+    updateActor(idx, { type });
+  }, [updateActor]);
+
+  const handleShadowZoneDraw = useCallback((zone: Parameters<typeof addShadowZone>[0]) => {
+    addShadowZone(zone);
+  }, [addShadowZone]);
+
+  const handleShadowZoneRemove = useCallback((idx: number) => {
+    removeShadowZone(idx);
+  }, [removeShadowZone]);
 
   const handleTilePaste = useCallback((tx: number, ty: number) => {
     if (!tileCopyBuffer || !map) return;
@@ -862,6 +888,7 @@ export default function DesignerPage() {
               onActorRemove={removeActor}
               onActorMove={handleActorMove}
               onActorFlip={handleActorFlip}
+              onActorTypeChange={handleActorTypeChange}
               onActorRightClick={(idx, sx, sy) => { setActorMenu({ idx, screenX: sx, screenY: sy }); setHighlightActorIdx(idx); }}
               onActorSelect={setHighlightActorIdx}
               onTileRightClick={(info) => { setActorMenu(null); setTileMenu(info); }}
@@ -874,6 +901,8 @@ export default function DesignerPage() {
               selectedPlatformIdx={selectedPlatformIdx}
               onPlatformSelect={setSelectedPlatformIdx}
               onPlatformUpdate={updatePlatform}
+              onShadowZoneDraw={handleShadowZoneDraw}
+              onShadowZoneRemove={handleShadowZoneRemove}
               gridSize={gridSize}
               tileSelection={tileSelection}
               onTileSelection={setTileSelection}

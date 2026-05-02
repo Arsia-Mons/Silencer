@@ -25,6 +25,14 @@ public:
 	std::vector<Uint8> customsprite;
 	int customspritew;
 	int customspriteh;
+	// Bank-222 environment lights loaded from the map
+	bool mapLight;
+	Uint8 lightColorR, lightColorG, lightColorB;
+	Uint8 lightAnim;       // 0=static, 1=flicker, 2=pulse
+	Uint8 lightPulseSpeed; // 0=slow(128t), 1=med(64t), 2=fast(32t)
+	Uint8 lightShape;      // 0=halo, 1=spot
+	Uint8 lightDirection;  // 0-7: E,NE,N,NW,W,SW,S,SE (spot only)
+	bool lightDynShadows;  // bit 7 of actortype: enable runtime player/guard shadow casting
 };
 
 #endif

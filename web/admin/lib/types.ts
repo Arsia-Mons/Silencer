@@ -175,6 +175,13 @@ export interface MapLayers {
   fg: (TileCell | null)[][];
 }
 
+export interface MapShadowZone {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
 export interface SilMapData {
   header: MapHeader;
   width: number;
@@ -182,6 +189,7 @@ export interface SilMapData {
   layers: MapLayers;
   actors: MapActor[];
   platforms: MapPlatform[];
+  shadowZones: MapShadowZone[];
   rawMinimap: Uint8Array;
   minimapCompressedSize: number;
   fileName?: string;

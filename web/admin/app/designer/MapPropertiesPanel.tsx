@@ -125,6 +125,18 @@ export default function MapPropertiesPanel({ header, onUpdate, onClose, spriteIm
           <input type="range" min={-128} max={127} value={fields.ambience}
             onChange={e => setFields(f => ({ ...f, ambience: e.target.value }))}
             className="w-full accent-game-primary" />
+          <div className="flex gap-1 mt-1">
+            {([['Bright', 0], ['Medium', -10], ['Dark', -20], ['Very Dark', -28]] as [string, number][]).map(([label, val]) => (
+              <button key={label} onClick={() => setFields(f => ({ ...f, ambience: String(val) }))}
+                className={`flex-1 text-[9px] font-mono px-1 py-0.5 rounded border transition-colors ${
+                  parseInt(fields.ambience||'0',10) === val
+                    ? 'border-game-primary text-game-primary bg-[#0d1a0d]'
+                    : 'border-game-border/50 text-game-textDim hover:border-game-border'
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="w-24">
           <div className={lbl}>Max Players</div>

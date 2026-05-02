@@ -447,6 +447,18 @@ struct EffectDef {
     bool              pingPong  = false;
 };
 
+// ---- Light -----------------------------------------------------------------
+
+struct LightDef {
+    std::string id;
+    std::string name;
+    std::string description;
+    int   bank      = 222;  // sprite bank (222 = env halo)
+    int   frame     = 0;    // sprite frame index (maps to MapActor.type)
+    int   radius    = 128;  // approximate visual radius in pixels (informational)
+    float intensity = 1.0f; // relative brightness multiplier (informational)
+};
+
 // ---- Load errors -----------------------------------------------------------
 
 // Surfaced via the `gas reload` control-socket op; shape matches the
@@ -594,6 +606,7 @@ public:
     const GameObjectDef* GetGameObjectDef(const std::string& id) const;
     const TerminalDef*   GetTerminalDef(const std::string& id) const;
     const EffectDef*     GetEffectDef(const std::string& id) const;
+    const LightDef*      GetLightDef(const std::string& id) const;
 
     PlayerDef                player;
     WorldDef                 world;
@@ -606,6 +619,7 @@ public:
     std::vector<GameObjectDef> gameObjects;
     std::vector<TerminalDef>   terminals;
     std::vector<EffectDef>     effects;
+    std::vector<LightDef>      lights;
 
     // Errors from the most recent Load() / Reload(). Cleared at the
     // start of each load. Read-only consumers should treat

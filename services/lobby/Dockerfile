@@ -54,6 +54,8 @@ RUN apt-get -o Acquire::Check-Valid-Until=false \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+ARG SILENCER_VERSION=00044
+
 WORKDIR /src
 COPY clients/silencer/CMakeLists.txt clients/silencer/
 COPY clients/silencer/cmake/         clients/silencer/cmake/
@@ -64,6 +66,7 @@ COPY shared/assets/ shared/assets/
 
 RUN cmake -B build -S clients/silencer \
         -DCMAKE_BUILD_TYPE=Release \
+        -DSILENCER_VERSION="${SILENCER_VERSION}" \
         -DSILENCER_LOBBY_HOST="127.0.0.1" \
         -DSILENCER_LOBBY_PORT=15170 \
         -DSDL3_DIR=/opt/sdl3/lib/cmake/SDL3 \
