@@ -99,6 +99,10 @@ private:
 	Uint8 ex, ey;
 	bool playerinbaseold;
 	std::vector<Object *> objectlights; // rebuilt each DrawWorld call; used by debug overlay
+	// FPS counter
+	Uint32 fpsLastTick = 0;
+	int fpsFrameCount = 0;
+	int fpsDisplay = 0;
 	static Uint8 GetLightFrameIdx(const class Overlay * light, const Resources & res);
 	static const int raindropscount = 100;
 	int raindropsx[raindropscount];

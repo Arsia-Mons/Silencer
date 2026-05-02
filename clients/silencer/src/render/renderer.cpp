@@ -51,6 +51,14 @@ Renderer::Renderer(World & world) : world(world), camera(640, 480){
 }
 	
 void Renderer::Draw(Surface * surface, float frametime){
+	// FPS tracking
+	Uint32 now = SDL_GetTicks();
+	fpsFrameCount++;
+	if(now - fpsLastTick >= 1000){
+		fpsDisplay = fpsFrameCount;
+		fpsFrameCount = 0;
+		fpsLastTick = now;
+	}
 	// Uncomment below to find and view individual sprites
 	/*surface->Clear(112);
 	const Uint8 * keystate = SDL_GetKeyboardState(NULL);
@@ -179,6 +187,10 @@ void Renderer::Draw(Surface * surface, float frametime){
 				DrawText(surface, (Uint16)(sx - 24), (Uint16)(sy - crossSize - 8), lbl, 133, 6, false, lightCol, 0, false);
 			}
 		}
+		// FPS counter in top-left corner
+		char fpsbuf[16];
+		snprintf(fpsbuf, sizeof(fpsbuf), "%d FPS", fpsDisplay);
+		DrawText(surface, 4, 4, fpsbuf, 133, 6, false, 68, 0, false);
 	}else{
 		world.debuglines.clear();
 	}
