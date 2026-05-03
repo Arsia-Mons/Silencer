@@ -381,8 +381,8 @@ export default function DesignerPage() {
     removeShadowZone(idx);
   }, [removeShadowZone]);
 
-  const handleNavLinkAdd = useCallback((fromIdx: number, toIdx: number, type: 0 | 1 | 2, targetX: number) => {
-    addNavLink({ fromIdx, toIdx, type, targetX });
+  const handleNavLinkAdd = useCallback((fromIdx: number, toIdx: number, type: 0 | 1 | 2, sourceX: number, targetX: number) => {
+    addNavLink({ fromIdx, toIdx, type, sourceX, targetX });
   }, [addNavLink]);
 
   const handleTilePaste = useCallback((tx: number, ty: number) => {
@@ -1001,6 +1001,8 @@ export default function DesignerPage() {
                 onSelect={setSelectedNavLinkIdx}
                 onRemove={removeNavLink}
                 onTypeChange={(idx, type) => updateNavLink(idx, { type })}
+                onSourceXChange={(idx, v) => updateNavLink(idx, { sourceX: v })}
+                onTargetXChange={(idx, v) => updateNavLink(idx, { targetX: v })}
                 onCenter={(midX, midY) => {
                   const container = canvasContainerRef.current;
                   if (!container) return;

@@ -22,6 +22,7 @@ PlayerAI::PlayerAI(Player & player, Difficulty diff) : player(player){
 	linkDir = 0;
 	linkEdgeX = 0;
 	linkTargetX = INT32_MIN;
+	linkFromSet = nullptr;
 	linkStuckTicks = 0;
 	thinkDelay = 0;
 	targetTerminal = 0;
@@ -33,12 +34,14 @@ bool PlayerAI::ScanForTarget(World & world){
 	int range = pd.aiCombatRange;
 	std::vector<Uint8> types;
 	types.push_back(ObjectTypes::PLAYER);
+	// Use a wider scan box so secret holders are found at longer range
+	int scanRange = (state == KILLSECRET) ? range * 3 : range;
 	std::vector<Object *> candidates = world.TestAABB(
-		player.x - range, player.y - 80,
-		player.x + range, player.y + 10,
+		player.x - scanRange, player.y - 80,
+		player.x + scanRange, player.y + 10,
 		types);
 	Team * myTeam = player.GetTeam(world);
-	int bestDist = range + 1;
+	int bestDist = scanRange + 1;
 	for(auto it = candidates.begin(); it != candidates.end(); ++it){
 		Player * p = static_cast<Player *>(*it);
 		if(p->id == player.id) continue;
@@ -48,6 +51,8 @@ bool PlayerAI::ScanForTarget(World & world){
 		// Skip teammates
 		Team * theirTeam = p->GetTeam(world);
 		if(myTeam && theirTeam && myTeam->id == theirTeam->id) continue;
+		// Secret holder always wins regardless of distance
+		if(p->hassecret){ combatTarget = p->id; return true; }
 		int dist = abs(p->x - player.x);
 		if(dist < bestDist){
 			bestDist = dist;
@@ -183,6 +188,9 @@ bool PlayerAI::ApplyCombat(World & world){
 }
 
 void PlayerAI::Tick(World & world){
+	// Mirror what HandleInput does for human players: snapshot last tick's input
+	// before overwriting it, so rising-edge checks (keyX && !oldinput.keyX) work correctly.
+	player.oldinput = player.input;
 	Input zeroinput;
 	player.input = zeroinput;
 
@@ -226,6 +234,27 @@ void PlayerAI::Tick(World & world){
 		}
 	}
 
+	// KILLSECRET: if any enemy has the secret, chase them down.
+	// Switch back to HACK once no enemy holds the secret.
+	if(!player.hassecret && state != RETREAT && !player.InBase(world)){
+		Team* myTeam = player.GetTeam(world);
+		Player* secretHolder = nullptr;
+		for(Uint16 sid : world.objectsbytype[ObjectTypes::PLAYER]){
+			Object* sobj = world.GetObjectFromId(sid);
+			if(!sobj) continue;
+			Player* sp = static_cast<Player*>(sobj);
+			if(sp->id == player.id || sp->state == Player::DEAD) continue;
+			Team* theirTeam = sp->GetTeam(world);
+			if(myTeam && theirTeam && myTeam->id == theirTeam->id) continue;
+			if(sp->hassecret){ secretHolder = sp; break; }
+		}
+		if(secretHolder && state != KILLSECRET){
+			SetState(KILLSECRET);
+		} else if(!secretHolder && state == KILLSECRET){
+			SetState(HACK);
+		}
+	}
+
 	
 	// Check if we're standing at a hackable terminal right now
 	bool atHackableTerminal = false;
@@ -256,6 +285,18 @@ void PlayerAI::Tick(World & world){
 					}
 				}
 			}
+		} else if(state == KILLSECRET){
+			// Navigate toward enemy secret holder; re-target each time we clear
+			Team* myTeam = player.GetTeam(world);
+			for(Uint16 sid : world.objectsbytype[ObjectTypes::PLAYER]){
+				Object* sobj = world.GetObjectFromId(sid);
+				if(!sobj) continue;
+				Player* sp = static_cast<Player*>(sobj);
+				if(sp->id == player.id || sp->state == Player::DEAD) continue;
+				Team* theirTeam = sp->GetTeam(world);
+				if(myTeam && theirTeam && myTeam->id == theirTeam->id) continue;
+				if(sp->hassecret){ SetTarget(world, sp->x, sp->y); break; }
+			}
 		}
 	}
 	if(!FollowPath(world)){
@@ -263,9 +304,10 @@ void PlayerAI::Tick(World & world){
 		ClearTarget();
 	}
 
-	// Combat: runs after nav so facing override (keymoveleft/keymoveright toward target)
-	// takes precedence over nav direction. Skipped while retreating.
-	if(state != RETREAT){
+	// Combat: HACK state focuses on the terminal — skip combat so bots don't
+	// get distracted or have movement keys interrupt the hacking animation.
+	// KILLSECRET state always fights; so do all other states except RETREAT.
+	if(state != RETREAT && state != HACK){
 		ApplyCombat(world);
 	}
 
@@ -439,6 +481,8 @@ bool PlayerAI::FollowPath(World & world){
 				linkStuckTicks = 0;
 				if(!FindAnyLink(world, *currentplatform->set, *targetplatformset)){
 					ClearTarget();
+				} else {
+					linkFromSet = currentplatform->set;
 				}
 			}
 			// If we've been stuck on this link too long, blacklist it and replan
@@ -489,11 +533,11 @@ bool PlayerAI::FollowPath(World & world){
 					}
 				}break;
 				case LINK_JETPACK:{
-					if(linkDir > 0) player.input.keymoveright = true;
-					else player.input.keymoveleft = true;
-					// Walk to the edge first — same as LINK_JUMP — so the bot doesn't fire
-					// the jetpack while pressed against the source platform's adjacent wall.
-					bool atEdge = (linkDir > 0) ? (player.x >= linkEdgeX) : (player.x <= linkEdgeX);
+					// Move directly toward linkEdgeX regardless of which side it's on.
+					const int EDGE_DEAD = 4;
+					if(player.x < linkEdgeX - EDGE_DEAD) player.input.keymoveright = true;
+					else if(player.x > linkEdgeX + EDGE_DEAD) player.input.keymoveleft = true;
+					bool atEdge = (player.x >= linkEdgeX - EDGE_DEAD && player.x <= linkEdgeX + EDGE_DEAD);
 					if(atEdge){
 						if(!player.fuellow) player.input.keyjetpack = true;
 						if(player.OnGround()) player.input.keyjump = true;
@@ -510,6 +554,8 @@ bool PlayerAI::FollowPath(World & world){
 	   (linktype == LINK_JUMP || linktype == LINK_FALL || linktype == LINK_JETPACK)){
 		linkStuckTicks++;
 		if(linkStuckTicks > 180){
+			if(linkFromSet && targetplatformset)
+				badLinks.push_back({linkFromSet, targetplatformset, 600});
 			linkStuckTicks = 0;
 			ClearTarget();
 			return false;
@@ -634,6 +680,7 @@ void PlayerAI::ClearTarget(void){
 	targetplatformset = 0;
 	platformsetpath.clear();
 	linkStuckTicks = 0;
+	linkFromSet = nullptr;
 	targetTerminal = 0;
 }
 
@@ -767,16 +814,66 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 			int fromCX = (fromX1 + fromX2) / 2;
 			int toCX   = (toX1   + toX2)   / 2;
 			linkDir  = (toCX >= fromCX) ? 1 : -1;
-			// Only check for a horizontal wall blocking the gap between platforms.
-			// Do NOT check the vertical column — intermediate floor platforms are
-			// also RECTANGLE type and would block every multi-story jetpack link.
+			// Check for a wall in the horizontal gap between platforms.
 			if(gap > 0){
 				int gX1 = (linkDir > 0) ? fromX2 + 1 : toX2 + 1;
 				int gX2 = (linkDir > 0) ? toX1 - 1   : fromX1 - 1;
-				// Check at source level height for walls in the gap
 				if(gX2 > gX1 && world.map.TestAABB(gX1, fromY - 50, gX2, fromY, Platform::RECTANGLE)) break;
 			}
-			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 : fromX1);
+			// Helper: returns true if a narrow vertical column at x is clear of floor
+			// platforms (wider than tall) between toY and fromY.
+			auto columnClear = [&](int x) -> bool {
+				Platform* exc = nullptr;
+				for(int i = 0; i < 32; ++i){
+					Platform* hit = world.map.TestAABB(x - 8, toY + 1, x + 8, fromY - 1, Platform::RECTANGLE, exc);
+					if(!hit) return true;
+					if((hit->x2 - hit->x1) > (hit->y2 - hit->y1)) return false; // floor blocks path
+					exc = hit; // wall platform — skip and keep searching
+				}
+				return true;
+			};
+			int oX1 = std::max(fromX1, toX1);
+			int oX2 = std::min(fromX2, toX2);
+			if(oX1 < oX2){
+				// Platforms overlap in X — scan the overlap for a clear vertical column.
+				// Search outward from the center in 16px steps so we prefer the most
+				// natural (central) launch point.
+				int mid  = (oX1 + oX2) / 2;
+				int half = (oX2 - oX1) / 2;
+				int clearX = INT32_MIN;
+				for(int step = 0; step <= half + 16 && clearX == INT32_MIN; step += 16){
+					int candidates[2] = { mid + step, mid - step };
+					int nCandidates = (step == 0) ? 1 : 2;
+					for(int j = 0; j < nCandidates && clearX == INT32_MIN; ++j){
+						int x = candidates[j];
+						if(x < oX1 + 8 || x > oX2 - 8) continue;
+						if(columnClear(x)) clearX = x;
+					}
+				}
+				if(clearX == INT32_MIN) break; // every column blocked — no safe route
+				// Walk toward the clear column, then jet straight up through it.
+				linkDir     = (clearX >= fromCX) ? 1 : -1;
+				linkEdgeX   = (Sint16)clearX;
+				linkTargetX = clearX;
+			} else {
+				// No X overlap — platforms are side by side; bot arcs diagonally.
+				// Check the entire union X span for blocking floor platforms.
+				int fullX1 = std::min(fromX1, toX1) + 1;
+				int fullX2 = std::max(fromX2, toX2) - 1;
+				if(fullX2 > fullX1){
+					Platform* exc = nullptr;
+					bool blocked = false;
+					for(int i = 0; i < 32; ++i){
+						Platform* hit = world.map.TestAABB(fullX1, toY + 1, fullX2, fromY - 1, Platform::RECTANGLE, exc);
+						if(!hit) break;
+						if((hit->x2 - hit->x1) > (hit->y2 - hit->y1)){ blocked = true; break; }
+						exc = hit;
+					}
+					if(blocked) break;
+				}
+				linkEdgeX   = (Sint16)((linkDir > 0) ? fromX2 : fromX1);
+				linkTargetX = INT32_MIN;
+			}
 			linktype = LINK_JETPACK;
 			return true;
 		} break;
@@ -801,15 +898,23 @@ bool PlayerAI::FindAnyLink(World & world, PlatformSet & from, PlatformSet & to){
 			for(auto* p : from.platforms){ if(p->x1 < fX1) fX1 = p->x1; if(p->x2 > fX2) fX2 = p->x2; }
 			for(auto* p : to.platforms)  { if(p->x1 < tX1) tX1 = p->x1; if(p->x2 > tX2) tX2 = p->x2; }
 			int fromCX = (fX1 + fX2) / 2, toCX = (tX1 + tX2) / 2;
-			linkDir  = (toCX >= fromCX) ? 1 : -1;
 			int ltype = nl.type == Map::NAVLINK_JUMP  ? LINK_JUMP  :
 			            nl.type == Map::NAVLINK_FALL  ? LINK_FALL  : LINK_JETPACK;
-			linkEdgeX   = (Sint16)((linkDir > 0) ? fX2 : fX1);
-			if(ltype == LINK_JUMP) linkEdgeX = (Sint16)((linkDir > 0) ? fX2 - 8 : fX1 + 8);
-			linktype    = ltype;
 			linkTargetX = INT32_MIN;
+			if(ltype == LINK_JETPACK && nl.sourceX != INT32_MIN){
+				// Designer specified exact launch point — walk to it then jet.
+				linkEdgeX = (Sint16)nl.sourceX;
+				linkDir   = (nl.sourceX >= fromCX) ? 1 : -1;
+			} else {
+				linkDir   = (toCX >= fromCX) ? 1 : -1;
+				linkEdgeX = (Sint16)((linkDir > 0) ? fX2 : fX1);
+				if(ltype == LINK_JUMP) linkEdgeX = (Sint16)((linkDir > 0) ? fX2 - 8 : fX1 + 8);
+			}
 			if(ltype == LINK_JETPACK && nl.targetX != INT32_MIN)
 				linkTargetX = nl.targetX;
+			else if(ltype == LINK_JETPACK && nl.sourceX != INT32_MIN)
+				linkDir = (toCX >= nl.sourceX) ? 1 : -1; // air direction from sourceX toward dest
+			linktype = ltype;
 			return true;
 		}
 		// No baked link for this pair — bot cannot traverse it.

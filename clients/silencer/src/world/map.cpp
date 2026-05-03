@@ -804,14 +804,20 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		Uint32 numLinks = 0;
 		memcpy(&numLinks, &level[i], 4); numLinks = SDL_Swap32LE(numLinks);
 		i += 8; // count + padding
-		for(Uint32 l = 0; l < numLinks && i + 16 <= level.size(); l++){
-			Uint32 fromIdx = 0, toIdx = 0; Uint8 type = 0; Sint32 targetX = INT32_MIN;
+		// Auto-detect stride: new format = 20 bytes (sourceX + targetX), old = 16 bytes (targetX only)
+		const size_t remaining = level.size() - i;
+		const Uint32 stride = (numLinks > 0 && remaining >= (size_t)numLinks * 20) ? 20 : 16;
+		for(Uint32 l = 0; l < numLinks && i + stride <= level.size(); l++){
+			Uint32 fromIdx = 0, toIdx = 0; Uint8 type = 0; Sint32 sourceX = INT32_MIN; Sint32 targetX = INT32_MIN;
 			memcpy(&fromIdx, &level[i], 4); fromIdx = SDL_Swap32LE(fromIdx); i += 4;
 			memcpy(&toIdx,   &level[i], 4); toIdx   = SDL_Swap32LE(toIdx);   i += 4;
 			type = level[i]; i += 4; // type + 3 padding bytes
+			if(stride >= 20){
+				memcpy(&sourceX, &level[i], 4); sourceX = (Sint32)SDL_Swap32LE((Uint32)sourceX); i += 4;
+			}
 			memcpy(&targetX, &level[i], 4); targetX = (Sint32)SDL_Swap32LE((Uint32)targetX); i += 4;
 			if(fromIdx < platforms.size() && toIdx < platforms.size() && team == 0)
-				navlinks.push_back({ platforms[fromIdx].get(), platforms[toIdx].get(), type, targetX });
+				navlinks.push_back({ platforms[fromIdx].get(), platforms[toIdx].get(), type, sourceX, targetX });
 		}
 	}
 

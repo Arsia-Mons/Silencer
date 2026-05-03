@@ -35,7 +35,7 @@ private:
 	bool ScanForTarget(World & world);
 	bool ApplyCombat(World & world);
 	void SetState(Uint8 state);
-	enum {IDLE, HACK, EXITBASE, GETSECRET, GOTOBASE, RETURNSECRET, RETREAT};
+	enum {IDLE, HACK, EXITBASE, GETSECRET, GOTOBASE, RETURNSECRET, RETREAT, KILLSECRET};
 	Uint8 state;
 	Difficulty difficulty;
 	Player & player;
@@ -49,6 +49,7 @@ private:
 	int linkDir;      // -1=left, 1=right for fall/jump/jetpack links
 	Sint16 linkEdgeX; // x position to be at before executing jump/fall
 	Sint32 linkTargetX; // baked focal point for LINK_JETPACK airborne (INT32_MIN = use platform range)
+	PlatformSet* linkFromSet; // platform set the bot launched from (for airborne blacklisting)
 	std::deque<PlatformSet *> platformsetpath;
 	// Combat
 	Uint16 combatTarget;        // object id of current enemy, 0=none

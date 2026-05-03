@@ -182,7 +182,7 @@ export interface MapShadowZone {
   y2: number;
 }
 
-export interface NavLink { fromIdx: number; toIdx: number; type: 0 | 1 | 2; targetX: number; }
+export interface NavLink { fromIdx: number; toIdx: number; type: 0 | 1 | 2; sourceX: number; targetX: number; }
 
 export interface SilMapData {
   header: MapHeader;

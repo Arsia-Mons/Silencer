@@ -276,18 +276,21 @@ export function useSilMap(): UseSilMapReturn {
         }
       }
 
-      // Parse nav links section
+      // Parse nav links section — auto-detect stride: 20 bytes (sourceX+targetX), 16 bytes (targetX only)
       const navLinks: NavLink[] = [];
       if (off5 + 8 <= levelDV.byteLength) {
         const numLinks = levelDV.getUint32(off5, true);
         off5 += 8;
-        for (let i = 0; i < numLinks && off5 + 16 <= levelDV.byteLength; i++) {
+        const remaining = levelDV.byteLength - off5;
+        const stride = (numLinks > 0 && remaining >= numLinks * 20) ? 20 : 16;
+        for (let i = 0; i < numLinks && off5 + stride <= levelDV.byteLength; i++) {
           const fromIdx = levelDV.getUint32(off5, true);
           const toIdx = levelDV.getUint32(off5 + 4, true);
           const type = levelDV.getUint8(off5 + 8) as 0 | 1 | 2;
-          const targetX = levelDV.getInt32(off5 + 12, true);
-          navLinks.push({ fromIdx, toIdx, type, targetX });
-          off5 += 16;
+          const sourceX = stride >= 20 ? levelDV.getInt32(off5 + 12, true) : -2147483648;
+          const targetX = stride >= 20 ? levelDV.getInt32(off5 + 16, true) : levelDV.getInt32(off5 + 12, true);
+          navLinks.push({ fromIdx, toIdx, type, sourceX, targetX });
+          off5 += stride;
         }
       }
 
@@ -317,11 +320,9 @@ export function useSilMap(): UseSilMapReturn {
     const lightMasks = bakeMapLightMasks(actors, platforms, shadowZones);
     const navLinks = mapData.navLinks ?? [];
     const lightMasksSectionSize = 8 + lightMasks.reduce((sum, m) => sum + 12 + m.data.length, 0);
-    const navLinksSectionSize = 8 + navLinks.length * 16;
-
+    const navLinksSectionSize = 8 + navLinks.length * 20;
     const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize);
     const ldv = new DataView(levelBuf);
-
     for (let i = 0; i < numCells; i++) {
       const base = i * CELL_SIZE;
       for (let l = 0; l < 4; l++) {
@@ -392,13 +393,14 @@ export function useSilMap(): UseSilMapReturn {
       }
     }
 
-    // Nav links section
+    // Nav links section — 20 bytes per link: fromIdx, toIdx, type+pad, sourceX, targetX
     ldv.setUint32(off, navLinks.length, true); off += 4;
     ldv.setUint32(off, 0, true); off += 4;
     for (const link of navLinks) {
       ldv.setUint32(off, link.fromIdx, true); off += 4;
       ldv.setUint32(off, link.toIdx,   true); off += 4;
       ldv.setUint8 (off, link.type);          off += 4; // 1 byte type + 3 padding (buffer is pre-zeroed)
+      ldv.setInt32 (off, link.sourceX ?? -2147483648, true); off += 4;
       ldv.setInt32 (off, link.targetX, true); off += 4;
     }
 
@@ -717,7 +719,7 @@ export function useSilMap(): UseSilMapReturn {
     const lightMasks = bakeMapLightMasks(actors, platforms, shadowZones);
     const navLinks = mapData.navLinks ?? [];
     const lightMasksSectionSize = 8 + lightMasks.reduce((sum, m) => sum + 12 + m.data.length, 0);
-    const navLinksSectionSize = 8 + navLinks.length * 16;
+    const navLinksSectionSize = 8 + navLinks.length * 20;
     const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize);
     const ldv = new DataView(levelBuf);
 
@@ -790,13 +792,14 @@ export function useSilMap(): UseSilMapReturn {
       }
     }
 
-    // Nav links section
+    // Nav links section — 20 bytes per link: fromIdx, toIdx, type+pad, sourceX, targetX
     ldv.setUint32(off, navLinks.length, true); off += 4;
     ldv.setUint32(off, 0, true); off += 4;
     for (const link of navLinks) {
       ldv.setUint32(off,     link.fromIdx, true); off += 4;
       ldv.setUint32(off,     link.toIdx,   true); off += 4;
       ldv.setUint8 (off,     link.type);          off += 4;
+      ldv.setInt32 (off,     link.sourceX ?? -2147483648, true); off += 4;
       ldv.setInt32 (off,     link.targetX, true); off += 4;
     }
 

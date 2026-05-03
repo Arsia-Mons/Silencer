@@ -140,7 +140,7 @@ interface Props {
   navLinkType?: 0 | 1 | 2;
   linkFromIdx?: number | null;
   selectedNavLinkIdx?: number | null;
-  onNavLinkAdd?: (fromIdx: number, toIdx: number, type: 0 | 1 | 2, targetX: number) => void;
+  onNavLinkAdd?: (fromIdx: number, toIdx: number, type: 0 | 1 | 2, sourceX: number, targetX: number) => void;
   onNavLinkSelect?: (idx: number | null) => void;
   onLinkFromIdxChange?: (idx: number | null) => void;
 }
@@ -192,6 +192,8 @@ export default function MapCanvas({
   // Shadow zone drag: start world pos while drawing
   const shadowZoneDragRef = useRef<{ startWx: number; startWy: number; curWx: number; curWy: number } | null>(null);
   const [shadowZonePreview, setShadowZonePreview] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  // Pending sourceX for NAV_LINK JETPACK — set on first click, used on second
+  const navLinkSourceXRef = useRef<number>(-2147483648);
   // Tile selection drag
   const isSelectingTile = useRef(false);
   const tileSelStartRef = useRef<{ tx: number; ty: number } | null>(null);
@@ -594,19 +596,30 @@ export default function MapCanvas({
           ctx.textBaseline = 'middle';
           ctx.fillText(NAV_LINK_LABELS[link.type] ?? '', mx, my - 8);
         }
-        // JETPACK focal point — diamond at targetX on destination platform top
-        if (link.type === 2 && link.targetX !== -2147483648) {
-          const fpx = link.targetX * zoom + pan.x;
-          const fpy = Math.min(to.y1, to.y2) * zoom + pan.y;
-          const ds = Math.max(4, 5 * zoom);
-          ctx.fillStyle = color;
-          ctx.beginPath();
-          ctx.moveTo(fpx, fpy - ds);
-          ctx.lineTo(fpx + ds, fpy);
-          ctx.lineTo(fpx, fpy + ds);
-          ctx.lineTo(fpx - ds, fpy);
-          ctx.closePath();
-          ctx.fill();
+        // JETPACK focal points — diamond at targetX on dest platform, circle at sourceX on source platform
+        if (link.type === 2) {
+          if (link.targetX !== -2147483648) {
+            const fpx = link.targetX * zoom + pan.x;
+            const fpy = Math.min(to.y1, to.y2) * zoom + pan.y;
+            const ds = Math.max(4, 5 * zoom);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(fpx, fpy - ds);
+            ctx.lineTo(fpx + ds, fpy);
+            ctx.lineTo(fpx, fpy + ds);
+            ctx.lineTo(fpx - ds, fpy);
+            ctx.closePath();
+            ctx.fill();
+          }
+          if (link.sourceX !== -2147483648) {
+            const spx = link.sourceX * zoom + pan.x;
+            const spy = Math.min(from.y1, from.y2) * zoom + pan.y;
+            const r = Math.max(3, 4 * zoom);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(spx, spy, r, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
       }
     }
@@ -1204,12 +1217,14 @@ export default function MapCanvas({
       }
       if (hitIdx !== null) {
         if (linkFromIdx == null) {
+          // First click: record from-platform and, for JETPACK, the launch X
+          navLinkSourceXRef.current = (navLinkType === 2) ? Math.round(wx) : -2147483648;
           onLinkFromIdxChange?.(hitIdx);
         } else if (hitIdx !== linkFromIdx) {
-          // For JETPACK links, use the exact click X as the focal point.
-          // For JUMP/FALL, targetX is unused (pass 0x80000000 = INT32_MIN sentinel).
+          // Second click: targetX is click X on dest (JETPACK), sourceX was recorded on first click
           const targetX = (navLinkType === 2) ? Math.round(wx) : -2147483648;
-          onNavLinkAdd?.(linkFromIdx, hitIdx, navLinkType ?? 0, targetX);
+          onNavLinkAdd?.(linkFromIdx, hitIdx, navLinkType ?? 0, navLinkSourceXRef.current, targetX);
+          navLinkSourceXRef.current = -2147483648;
           onLinkFromIdxChange?.(null);
         }
       }
