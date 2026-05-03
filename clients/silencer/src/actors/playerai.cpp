@@ -519,7 +519,9 @@ bool PlayerAI::FollowPath(World & world){
 			}
 			if(!player.fuellow){
 				int targetY = (int)targetplatformset->platforms[0]->y1;
-				if(player.y > targetY + 15) player.input.keyjetpack = true;
+				// 48px margin lets the bot decelerate before reaching the platform surface
+				// so it arrives with downward velocity and lands rather than oscillating.
+				if(player.y > targetY + 48) player.input.keyjetpack = true;
 			}
 		} else if(linktype == LINK_JUMP && !targetplatformset->platforms.empty()){
 			// Clamp horizontal push for jump links — stop when within target platform x range
@@ -791,7 +793,7 @@ bool PlayerAI::FindAnyLink(World & world, PlatformSet & from, PlatformSet & to){
 				linkTargetX = nl.targetX;
 			return true;
 		}
-		return false;
+		// No baked link for this pair — fall through to heuristics so uncovered routes still work.
 	}
 
 	// No baked links — fall back to runtime geometry heuristics (old maps).
