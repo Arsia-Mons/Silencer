@@ -18,6 +18,8 @@ PlayerAI::PlayerAI(Player & player, Difficulty diff) : player(player){
 	fireBurstRemaining = 0;
 	firePauseRemaining = 0;
 	jetpackCooldown = 0;
+	linkDir = 0;
+	linkEdgeX = 0;
 	thinkDelay = 0;
 }
 
@@ -434,6 +436,36 @@ bool PlayerAI::FollowPath(World & world){
 						}
 					}
 				}break;
+				case LINK_FALL:{
+					// Walk off the edge in the right direction
+					if(linkDir > 0) player.input.keymoveright = true;
+					else player.input.keymoveleft = true;
+				}break;
+				case LINK_JUMP:{
+					if(player.OnGround()){
+						if(linkDir > 0) player.input.keymoveright = true;
+						else player.input.keymoveleft = true;
+						// Jump once we reach the edge
+						bool atEdge = (linkDir > 0) ? (player.x >= linkEdgeX) : (player.x <= linkEdgeX);
+						if(atEdge) player.input.keyjump = true;
+					} else {
+						// Airborne: keep moving toward target
+						if(linkDir > 0) player.input.keymoveright = true;
+						else player.input.keymoveleft = true;
+					}
+				}break;
+				case LINK_JETPACK:{
+					if(linkDir > 0) player.input.keymoveright = true;
+					else player.input.keymoveleft = true;
+					if(!player.fuellow){
+						// Thrust until we're at or above the target platform level
+						int targetY = (targetplatformset && !targetplatformset->platforms.empty())
+							? (int)targetplatformset->platforms[0]->y1 : 0;
+						if(player.y > targetY + 15) player.input.keyjetpack = true;
+					} else if(player.OnGround()){
+						player.input.keyjump = true; // no fuel fallback
+					}
+				}break;
 			}
 		}
 	}
@@ -470,8 +502,10 @@ bool PlayerAI::FollowPath(World & world){
 			}
 		}
 		if(player.state == Player::FALLING || player.state == Player::JUMPING){
-			player.input.keymoveleft = false;
-			player.input.keymoveright = false;
+			if(linktype != LINK_JUMP && linktype != LINK_FALL && linktype != LINK_JETPACK){
+				player.input.keymoveleft = false;
+				player.input.keymoveright = false;
+			}
 			if(ladderjumping){
 				if(_pd2.aiLadderJumpUpInterval > 0 && rand() % _pd2.aiLadderJumpUpInterval == 0){
 					player.input.keymoveup = true;
@@ -540,20 +574,89 @@ Platform * PlayerAI::FindClosestLadderToPlatform(World & world, PlatformSet & fr
 }
 
 bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet & to){
+	// Helpers to get bounding x and representative y of a platform set
+	auto getX1 = [](PlatformSet& ps) -> int {
+		int x = 32767;
+		for(auto* p : ps.platforms) if(p->x1 < x) x = p->x1;
+		return x;
+	};
+	auto getX2 = [](PlatformSet& ps) -> int {
+		int x = -32768;
+		for(auto* p : ps.platforms) if(p->x2 > x) x = p->x2;
+		return x;
+	};
+	auto getY = [](PlatformSet& ps) -> int {
+		return ps.platforms.empty() ? 0 : (int)ps.platforms[0]->y1;
+	};
+
 	switch(type){
 		default:
 		case LINK_NONE:
 			linktype = LINK_NONE;
 			return false;
 		break;
-		case LINK_LADDER:
+		case LINK_LADDER: {
 			Platform * ladder = FindClosestLadderToPlatform(world, from, to, player.x);
 			if(ladder){
 				linktype = LINK_LADDER;
 				linkladder = ladder;
 				return true;
 			}
-		break;
+		} break;
+		case LINK_FALL: {
+			if(from.platforms.empty() || to.platforms.empty()) break;
+			int fromY = getY(from);
+			int toY   = getY(to);
+			if(toY <= fromY + 10) break; // to must be clearly below from
+			int fromX1 = getX1(from), fromX2 = getX2(from);
+			int toX1   = getX1(to),   toX2   = getX2(to);
+			// x-ranges must overlap (within small drift margin)
+			if(toX2 < fromX1 - 30 || toX1 > fromX2 + 30) break;
+			int fromCX = (fromX1 + fromX2) / 2;
+			int toCX   = (toX1   + toX2)   / 2;
+			linkDir  = (toCX >= fromCX) ? 1 : -1;
+			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 : fromX1);
+			linktype = LINK_FALL;
+			return true;
+		} break;
+		case LINK_JUMP: {
+			if(from.platforms.empty() || to.platforms.empty()) break;
+			int fromY      = getY(from);
+			int toY        = getY(to);
+			int heightDiff = fromY - toY; // positive = to is higher up
+			// Regular jump reaches ~48px up; also allow gap-jumps at same/slightly lower level
+			if(heightDiff > 50)  break; // too high — use jetpack
+			if(heightDiff < -20) break; // too far below — use fall
+			int fromX1 = getX1(from), fromX2 = getX2(from);
+			int toX1   = getX1(to),   toX2   = getX2(to);
+			int gap = std::max(0, std::max(toX1 - fromX2, fromX1 - toX2));
+			if(gap > 160) break; // too far horizontally for a running jump
+			int fromCX = (fromX1 + fromX2) / 2;
+			int toCX   = (toX1   + toX2)   / 2;
+			linkDir  = (toCX >= fromCX) ? 1 : -1;
+			// Jump off edge facing target
+			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 - 8 : fromX1 + 8);
+			linktype = LINK_JUMP;
+			return true;
+		} break;
+		case LINK_JETPACK: {
+			if(from.platforms.empty() || to.platforms.empty()) break;
+			int fromY      = getY(from);
+			int toY        = getY(to);
+			int heightDiff = fromY - toY; // positive = to is higher up
+			if(heightDiff <= 50)  break; // jump can handle it
+			if(heightDiff > 600)  break; // probably a different zone
+			int fromX1 = getX1(from), fromX2 = getX2(from);
+			int toX1   = getX1(to),   toX2   = getX2(to);
+			int gap = std::max(0, std::max(toX1 - fromX2, fromX1 - toX2));
+			if(gap > 250) break; // too far horizontally
+			int fromCX = (fromX1 + fromX2) / 2;
+			int toCX   = (toX1   + toX2)   / 2;
+			linkDir  = (toCX >= fromCX) ? 1 : -1;
+			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 : fromX1);
+			linktype = LINK_JETPACK;
+			return true;
+		} break;
 	}
 	linktype = LINK_NONE;
 	return false;

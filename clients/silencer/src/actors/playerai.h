@@ -44,9 +44,11 @@ private:
 	Sint16 targetx, targety;
 	PlatformSet * targetplatformset;
 	bool ladderjumping;
-	enum {LINK_NONE, LINK_LADDER, LINK_FALL, LINK_MAXENUM};
+	enum {LINK_NONE, LINK_LADDER, LINK_FALL, LINK_JUMP, LINK_JETPACK, LINK_MAXENUM};
 	int linktype;
 	Platform * linkladder;
+	int linkDir;      // -1=left, 1=right for fall/jump/jetpack links
+	Sint16 linkEdgeX; // x position to be at before executing jump/fall
 	std::deque<PlatformSet *> platformsetpath;
 	// Combat
 	Uint16 combatTarget;        // object id of current enemy, 0=none
