@@ -21,6 +21,7 @@ PlayerAI::PlayerAI(Player & player, Difficulty diff) : player(player){
 	jetpackCooldown = 0;
 	linkDir = 0;
 	linkEdgeX = 0;
+	linkStuckTicks = 0;
 	thinkDelay = 0;
 }
 
@@ -417,9 +418,17 @@ bool PlayerAI::FollowPath(World & world){
 	if(targetplatformset){
 		if(currentplatform && targetplatformset != currentplatform->set){
 			if(linktype == LINK_NONE){
+				linkStuckTicks = 0;
 				if(!FindAnyLink(world, *currentplatform->set, *targetplatformset)){
 					ClearTarget();
 				}
+			}
+			// If we've been stuck on this link too long, give up and replan
+			linkStuckTicks++;
+			if(linkStuckTicks > 150){
+				linkStuckTicks = 0;
+				ClearTarget();
+				return false;
 			}
 			switch(linktype){
 				case LINK_LADDER:{
@@ -463,11 +472,9 @@ bool PlayerAI::FollowPath(World & world){
 				case LINK_JETPACK:{
 					if(linkDir > 0) player.input.keymoveright = true;
 					else player.input.keymoveleft = true;
-					// Jetpack only activates when airborne — jump first to launch,
-					// then the airborne block below holds keyjetpack each tick.
-					if(player.OnGround()){
-						player.input.keyjump = true;
-					}
+					// Jetpack works from ground; jump too to get airborne faster
+					if(!player.fuellow) player.input.keyjetpack = true;
+					if(player.OnGround()) player.input.keyjump = true;
 				}break;
 			}
 		}
@@ -560,6 +567,7 @@ bool PlayerAI::SetTarget(World & world, Sint16 x, Sint16 y){
 void PlayerAI::ClearTarget(void){
 	targetplatformset = 0;
 	platformsetpath.clear();
+	linkStuckTicks = 0;
 }
 
 void PlayerAI::GetCurrentNode(int & x, int & y){
