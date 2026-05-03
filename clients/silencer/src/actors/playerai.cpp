@@ -1,5 +1,6 @@
 #include "playerai.h"
 #include <algorithm>
+#include <map>
 #include "basedoor.h"
 #include "../gas/gasloader.h"
 
@@ -365,34 +366,39 @@ void PlayerAI::Tick(World & world){
 }
 
 bool PlayerAI::CreatePathToPlatformSet(World & world, std::deque<PlatformSet *> & path, PlatformSet & to){
-	PlatformSet * platformset = 0;
 	Platform * currentplatform = world.map.platformids[player.currentplatformid];
-	if(path.size() == 0){
-		if(currentplatform){
-			platformset = currentplatform->set;
-			path.push_back(platformset);
-		}
-	}else{
-		platformset = path.back();
+	if(!currentplatform) return false;
+	PlatformSet * start = currentplatform->set;
+	if(!start) return false;
+	if(start == &to){
+		path.push_back(start);
+		return true;
 	}
-	if(platformset){
-		if(platformset == &to){
-			return true;
-		}else{
-			for(auto it = world.map.platformsets.begin(); it != world.map.platformsets.end(); it++){
-				if(std::find(path.begin(), path.end(), it->get()) == path.end()){
-					if(FindAnyLink(world, *platformset, *(*it))){
-						path.push_back(it->get());
-						if(CreatePathToPlatformSet(world, path, to)){
-							return true;
-						}
-					}
+
+	// BFS — avoids exponential blowup now that jump/fall/jetpack connect many more sets
+	std::map<PlatformSet *, PlatformSet *> parent; // node → predecessor
+	std::deque<PlatformSet *> queue;
+	queue.push_back(start);
+	parent[start] = nullptr;
+
+	while(!queue.empty()){
+		PlatformSet * cur = queue.front(); queue.pop_front();
+		for(auto it = world.map.platformsets.begin(); it != world.map.platformsets.end(); it++){
+			PlatformSet * next = it->get();
+			if(parent.count(next)) continue;
+			if(FindAnyLink(world, *cur, *next)){
+				parent[next] = cur;
+				if(next == &to){
+					// Reconstruct path start → ... → to
+					std::deque<PlatformSet *> rev;
+					for(PlatformSet * n = next; n != nullptr; n = parent[n])
+						rev.push_front(n);
+					path = rev;
+					return true;
 				}
+				queue.push_back(next);
 			}
 		}
-	}
-	if(path.size() > 0){
-		path.pop_back();
 	}
 	return false;
 }
