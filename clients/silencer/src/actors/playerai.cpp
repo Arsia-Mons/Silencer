@@ -463,13 +463,10 @@ bool PlayerAI::FollowPath(World & world){
 				case LINK_JETPACK:{
 					if(linkDir > 0) player.input.keymoveright = true;
 					else player.input.keymoveleft = true;
-					if(!player.fuellow){
-						// Thrust until we're at or above the target platform level
-						int targetY = (targetplatformset && !targetplatformset->platforms.empty())
-							? (int)targetplatformset->platforms[0]->y1 : 0;
-						if(player.y > targetY + 15) player.input.keyjetpack = true;
-					} else if(player.OnGround()){
-						player.input.keyjump = true; // no fuel fallback
+					// Jetpack only activates when airborne — jump first to launch,
+					// then the airborne block below holds keyjetpack each tick.
+					if(player.OnGround()){
+						player.input.keyjump = true;
 					}
 				}break;
 			}
