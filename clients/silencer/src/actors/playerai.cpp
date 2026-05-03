@@ -475,6 +475,19 @@ bool PlayerAI::FollowPath(World & world){
 			}
 		}
 	}
+	// Airborne continuation for jump/fall/jetpack links — the switch above only runs
+	// when currentplatform is non-null (bot on ground). Once airborne, currentplatform
+	// is null so we must keep applying direction and jetpack thrust here every tick.
+	if(targetplatformset && !currentplatform &&
+	   (linktype == LINK_JUMP || linktype == LINK_FALL || linktype == LINK_JETPACK)){
+		if(linkDir > 0) player.input.keymoveright = true;
+		else            player.input.keymoveleft  = true;
+		if(linktype == LINK_JETPACK && !player.fuellow){
+			int targetY = targetplatformset->platforms.empty()
+				? 0 : (int)targetplatformset->platforms[0]->y1;
+			if(player.y > targetY + 15) player.input.keyjetpack = true;
+		}
+	}
 	if(targetplatformset){
 		const PlayerDef& _pd2 = GASLoader::Get().player;
 		if(currentplatform && targetplatformset == currentplatform->set){
