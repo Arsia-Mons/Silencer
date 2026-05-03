@@ -77,6 +77,7 @@ interface VisState {
   grid: boolean;
   lighting: boolean;
   parallax: boolean;
+  links: boolean;
 }
 
 interface TileRightClickInfo {
@@ -556,7 +557,7 @@ export default function MapCanvas({
     const NAV_LINK_COLORS: Record<number, string> = { 0: '#00ff88', 1: '#ffdd00', 2: '#ff6644' };
     const NAV_LINK_LABELS: Record<number, string> = { 0: 'JUMP', 1: 'FALL', 2: 'JETPACK' };
     const navLinks: NavLink[] = map.navLinks ?? [];
-    if (navLinks.length > 0) {
+    if (vis?.links !== false && navLinks.length > 0) {
       const ah = Math.max(8, 10 * zoom);
       for (let i = 0; i < navLinks.length; i++) {
         const link = navLinks[i];
