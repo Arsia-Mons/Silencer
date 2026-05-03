@@ -248,27 +248,41 @@ void Renderer::Draw(Surface * surface, float frametime){
 					for(auto* la : a->ladders){ for(auto* lb : b->ladders){ if(la==lb){ladder=true;break;} } if(ladder) break; }
 					if(ladder){ DrawLine(surface, acx+ox, ay+oy, bcx+ox, by+oy, 68, 1); continue; }
 
-					int xe=0, ye=0;
 					int hd = ay - by; // positive = b is higher
 					int gap = std::max(0, std::max(bx1-ax2, ax1-bx2));
-					int edgeX = (bcx >= acx) ? ax2 : ax1;
+					int ldir = (bcx >= acx) ? 1 : -1;
+					int edgeX = (ldir > 0) ? ax2 : ax1;
 
-					// Jump (green)
+					// Jump A→B (green) — same AABB check as FindLink
 					if(hd<=50 && hd>=-20 && gap<=160){
-						if(!world.map.TestLine(edgeX, ay-25, bcx, by-25, &xe, &ye, Platform::RECTANGLE))
-							DrawLine(surface, acx+ox, ay+oy, bcx+ox, by+oy, 80, 1);
+						bool blocked = false;
+						if(gap > 0){
+							int gX1=(ldir>0)?ax2+1:bx2+1, gX2=(ldir>0)?bx1-1:ax1-1;
+							int gY1=std::min(ay,by)-50, gY2=std::max(ay,by);
+							if(gX2>gX1 && world.map.TestAABB(gX1,gY1,gX2,gY2,Platform::RECTANGLE)) blocked=true;
+						}
+						if(!blocked) DrawLine(surface, acx+ox, ay+oy, bcx+ox, by+oy, 80, 1);
 					}
-					// Jetpack (red) — check A→B direction
+					// Jetpack A→B (red)
 					if(hd>50 && hd<=600 && gap<=250){
-						if(!world.map.TestLine(edgeX, ay-25, bcx, by-25, &xe, &ye, Platform::RECTANGLE))
-							DrawLine(surface, acx+ox, ay+oy, bcx+ox, by+oy, 40, 1);
+						bool blocked = world.map.TestAABB(edgeX-8,by,edgeX+8,ay-1,Platform::RECTANGLE) != nullptr;
+						if(!blocked && gap>0){
+							int gX1=(ldir>0)?ax2+1:bx2+1, gX2=(ldir>0)?bx1-1:ax1-1;
+							if(gX2>gX1 && world.map.TestAABB(gX1,by,gX2,ay,Platform::RECTANGLE)) blocked=true;
+						}
+						if(!blocked) DrawLine(surface, acx+ox, ay+oy, bcx+ox, by+oy, 40, 1);
 					}
-					// Jetpack B→A direction (b is lower, a is higher)
-					int hd2 = by - ay;
-					int edgeX2 = (acx >= bcx) ? bx2 : bx1;
-					if(hd2>50 && hd2<=600 && gap<=250){
-						if(!world.map.TestLine(edgeX2, by-25, acx, ay-25, &xe, &ye, Platform::RECTANGLE))
-							DrawLine(surface, bcx+ox, by+oy, acx+ox, ay+oy, 40, 1);
+					// Jetpack B→A (red)
+					{
+						int hd2=by-ay, ldir2=(acx>=bcx)?1:-1, edge2=(ldir2>0)?bx2:bx1;
+						if(hd2>50 && hd2<=600 && gap<=250){
+							bool blocked = world.map.TestAABB(edge2-8,ay,edge2+8,by-1,Platform::RECTANGLE) != nullptr;
+							if(!blocked && gap>0){
+								int gX1=(ldir2>0)?bx2+1:ax2+1, gX2=(ldir2>0)?ax1-1:bx1-1;
+								if(gX2>gX1 && world.map.TestAABB(gX1,ay,gX2,by,Platform::RECTANGLE)) blocked=true;
+							}
+							if(!blocked) DrawLine(surface, bcx+ox, by+oy, acx+ox, ay+oy, 40, 1);
+						}
 					}
 					// Fall A→B (yellow)
 					if(by > ay+10 && gap<=30)

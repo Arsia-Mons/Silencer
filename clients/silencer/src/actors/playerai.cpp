@@ -661,11 +661,15 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 			int fromCX = (fromX1 + fromX2) / 2;
 			int toCX   = (toX1   + toX2)   / 2;
 			linkDir  = (toCX >= fromCX) ? 1 : -1;
-			// Wall check: ensure no solid wall blocks the jump arc
-			{
-				int edgeX = (linkDir > 0) ? fromX2 : fromX1;
-				int xe = 0, ye = 0;
-				if(world.map.TestLine(edgeX, fromY - 25, toCX, toY - 25, &xe, &ye, Platform::RECTANGLE)) break;
+			// Wall check: if there's a horizontal gap between platforms, check that
+			// no solid wall fills it at player-body height. TestLine is unreliable
+			// when the ray starts at a platform surface, so use AABB on the gap.
+			if(gap > 0){
+				int gX1 = (linkDir > 0) ? fromX2 + 1 : toX2 + 1;
+				int gX2 = (linkDir > 0) ? toX1 - 1   : fromX1 - 1;
+				int gY1 = std::min(fromY, toY) - 50;
+				int gY2 = std::max(fromY, toY);
+				if(gX2 > gX1 && world.map.TestAABB(gX1, gY1, gX2, gY2, Platform::RECTANGLE)) break;
 			}
 			// Jump off edge facing target
 			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 - 8 : fromX1 + 8);
@@ -686,14 +690,14 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 			int fromCX = (fromX1 + fromX2) / 2;
 			int toCX   = (toX1   + toX2)   / 2;
 			linkDir  = (toCX >= fromCX) ? 1 : -1;
-			// Check only that the vertical ascent above the source isn't blocked.
-			// (A diagonal LOS check is too aggressive — jetpacks ascend nearly
-			// vertically before drifting horizontally, so they can clear walls
-			// that a straight line to the target would hit.)
-			{
-				int edgeX = (linkDir > 0) ? fromX2 : fromX1;
-				int xe = 0, ye = 0;
-				if(world.map.TestLine(edgeX, fromY - 25, edgeX, toY - 10, &xe, &ye, Platform::RECTANGLE)) break;
+			int edgeX = (linkDir > 0) ? fromX2 : fromX1;
+			// Check vertical column above launch edge is clear (no ceiling blocking ascent)
+			if(world.map.TestAABB(edgeX - 8, toY, edgeX + 8, fromY - 1, Platform::RECTANGLE)) break;
+			// If there's a horizontal gap, check it's clear of walls too
+			if(gap > 0){
+				int gX1 = (linkDir > 0) ? fromX2 + 1 : toX2 + 1;
+				int gX2 = (linkDir > 0) ? toX1 - 1   : fromX1 - 1;
+				if(gX2 > gX1 && world.map.TestAABB(gX1, toY, gX2, fromY, Platform::RECTANGLE)) break;
 			}
 			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 : fromX1);
 			linktype = LINK_JETPACK;
