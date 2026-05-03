@@ -500,9 +500,11 @@ bool PlayerAI::FollowPath(World & world){
 		if(linktype == LINK_JETPACK && !targetplatformset->platforms.empty()){
 			// If a baked focal point is set, aim for that X precisely.
 			// Otherwise fall back to the full platform X range.
+			// Stop pushing in linkDir once the player has reached/passed the target X.
+			// Direction-aware: avoids overshoot continuing to push into the opposite wall.
 			bool inRange;
 			if(linkTargetX != INT32_MIN){
-				inRange = abs(player.x - (int)linkTargetX) <= 8;
+				inRange = (linkDir > 0) ? (player.x >= linkTargetX) : (player.x <= linkTargetX);
 			} else {
 				int toX1 = 32767, toX2 = -32768;
 				for(auto* p : targetplatformset->platforms){
