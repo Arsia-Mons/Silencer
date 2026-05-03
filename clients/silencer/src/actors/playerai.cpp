@@ -661,15 +661,21 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 			int fromCX = (fromX1 + fromX2) / 2;
 			int toCX   = (toX1   + toX2)   / 2;
 			linkDir  = (toCX >= fromCX) ? 1 : -1;
-			// Wall check: if there's a horizontal gap between platforms, check that
-			// no solid wall fills it at player-body height. TestLine is unreliable
-			// when the ray starts at a platform surface, so use AABB on the gap.
-			if(gap > 0){
-				int gX1 = (linkDir > 0) ? fromX2 + 1 : toX2 + 1;
-				int gX2 = (linkDir > 0) ? toX1 - 1   : fromX1 - 1;
-				int gY1 = std::min(fromY, toY) - 50;
-				int gY2 = std::max(fromY, toY);
-				if(gX2 > gX1 && world.map.TestAABB(gX1, gY1, gX2, gY2, Platform::RECTANGLE)) break;
+			// Wall check: look for solid walls in the travel corridor.
+			// For gap > 0: check the open space between the platform edges.
+			// For gap == 0: check a narrow corridor between the two platform centers.
+			{
+				int cX1, cX2;
+				if(gap > 0){
+					cX1 = (linkDir > 0) ? fromX2 + 1 : toX2 + 1;
+					cX2 = (linkDir > 0) ? toX1 - 1   : fromX1 - 1;
+				} else {
+					cX1 = std::min(fromCX, toCX) + 4;
+					cX2 = std::max(fromCX, toCX) - 4;
+				}
+				int cY1 = std::min(fromY, toY) - 32; // player body height above lower platform
+				int cY2 = std::max(fromY, toY) - 1;
+				if(cX2 > cX1 && world.map.TestAABB(cX1, cY1, cX2, cY2, Platform::RECTANGLE)) break;
 			}
 			// Jump off edge facing target
 			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 - 8 : fromX1 + 8);
@@ -690,14 +696,14 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 			int fromCX = (fromX1 + fromX2) / 2;
 			int toCX   = (toX1   + toX2)   / 2;
 			linkDir  = (toCX >= fromCX) ? 1 : -1;
-			int edgeX = (linkDir > 0) ? fromX2 : fromX1;
-			// Check vertical column above launch edge is clear (no ceiling blocking ascent)
-			if(world.map.TestAABB(edgeX - 8, toY, edgeX + 8, fromY - 1, Platform::RECTANGLE)) break;
-			// If there's a horizontal gap, check it's clear of walls too
+			// Only check for a horizontal wall blocking the gap between platforms.
+			// Do NOT check the vertical column — intermediate floor platforms are
+			// also RECTANGLE type and would block every multi-story jetpack link.
 			if(gap > 0){
 				int gX1 = (linkDir > 0) ? fromX2 + 1 : toX2 + 1;
 				int gX2 = (linkDir > 0) ? toX1 - 1   : fromX1 - 1;
-				if(gX2 > gX1 && world.map.TestAABB(gX1, toY, gX2, fromY, Platform::RECTANGLE)) break;
+				// Check at source level height for walls in the gap
+				if(gX2 > gX1 && world.map.TestAABB(gX1, fromY - 50, gX2, fromY, Platform::RECTANGLE)) break;
 			}
 			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 : fromX1);
 			linktype = LINK_JETPACK;
