@@ -23,6 +23,7 @@ PlayerAI::PlayerAI(Player & player, Difficulty diff) : player(player){
 	linkEdgeX = 0;
 	linkStuckTicks = 0;
 	thinkDelay = 0;
+	targetTerminal = 0;
 }
 
 bool PlayerAI::ScanForTarget(World & world){
@@ -228,6 +229,7 @@ void PlayerAI::Tick(World & world){
 			if(terminals.size() > 0){
 				for(std::vector<Terminal *>::iterator it = terminals.begin(); it != terminals.end(); it++){
 					if(SetTarget(world, (*it)->x, (*it)->y)){
+						targetTerminal = *it;
 						break;
 					}
 				}
@@ -568,6 +570,7 @@ void PlayerAI::ClearTarget(void){
 	targetplatformset = 0;
 	platformsetpath.clear();
 	linkStuckTicks = 0;
+	targetTerminal = 0;
 }
 
 void PlayerAI::GetCurrentNode(int & x, int & y){
@@ -715,18 +718,37 @@ bool PlayerAI::FindAnyLink(World & world, PlatformSet & from, PlatformSet & to){
 
 std::vector<Terminal *> PlayerAI::FindNearestTerminals(World & world){
 	Team * team = player.GetTeam(world);
-	std::vector<Terminal * >terminals;
+
+	// Collect terminals already claimed by a teammate bot
+	std::vector<Terminal *> claimed;
+	for(Uint16 id : world.objectsbytype[ObjectTypes::PLAYER]){
+		Object* obj = world.GetObjectFromId(id);
+		if(!obj) continue;
+		Player* p = static_cast<Player*>(obj);
+		if(p == &player || !p->ai) continue;
+		if(p->GetTeam(world) == team && p->ai->targetTerminal)
+			claimed.push_back(p->ai->targetTerminal);
+	}
+
+	std::vector<Terminal *> terminals;
 	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 		if((*it)->type == ObjectTypes::TERMINAL){
 			Terminal * terminal = static_cast<Terminal *>(*it);
 			if(terminal->state == Terminal::READY || terminal->state == Terminal::HACKERGONE || (terminal->state == Terminal::SECRETREADY && team && team->beamingterminalid == terminal->id)){
-				/*if(!nearestterminal){
-					nearestterminal = terminal;
-				}
-				if(abs(terminal->x - player.x) < abs(nearestterminal->x - player.x)){
-					nearestterminal = terminal;
-				}*/
-				terminals.push_back(terminal);
+				bool isClaimed = false;
+				for(Terminal* c : claimed){ if(c == terminal){ isClaimed = true; break; } }
+				if(!isClaimed)
+					terminals.push_back(terminal);
+			}
+		}
+	}
+	// Fall back to all available terminals if everything is claimed
+	if(terminals.empty()){
+		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+			if((*it)->type == ObjectTypes::TERMINAL){
+				Terminal * terminal = static_cast<Terminal *>(*it);
+				if(terminal->state == Terminal::READY || terminal->state == Terminal::HACKERGONE || (terminal->state == Terminal::SECRETREADY && team && team->beamingterminalid == terminal->id))
+					terminals.push_back(terminal);
 			}
 		}
 	}

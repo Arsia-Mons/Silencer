@@ -60,6 +60,7 @@ private:
 	int jetpackCooldown;        // ticks until next jetpack dodge is allowed
 	int thinkDelay;             // micro-pause ticks after state transitions
 	int linkStuckTicks;         // ticks spent trying the current movement link
+	Terminal * targetTerminal;  // terminal this bot is currently assigned to hack
 };
 
 #endif
