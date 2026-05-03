@@ -534,13 +534,16 @@ bool PlayerAI::FollowPath(World & world){
 				}break;
 				case LINK_JETPACK:{
 					// Move directly toward linkEdgeX regardless of which side it's on.
-					const int EDGE_DEAD = 4;
+					const int EDGE_DEAD = 32; // half a tile — proportionate to 64px tile grid
 					if(player.x < linkEdgeX - EDGE_DEAD) player.input.keymoveright = true;
 					else if(player.x > linkEdgeX + EDGE_DEAD) player.input.keymoveleft = true;
 					bool atEdge = (player.x >= linkEdgeX - EDGE_DEAD && player.x <= linkEdgeX + EDGE_DEAD);
-					if(atEdge){
+					// Once at the edge OR already mid-launch (state left ground), hold jetpack.
+					// Reset stuck timer whenever at edge — bot may be waiting for fuel to refill,
+					// which is not "stuck" and should not trigger a replan.
+					if(atEdge || !player.OnGround()){
+						linkStuckTicks = 0;
 						if(!player.fuellow) player.input.keyjetpack = true;
-						if(player.OnGround()) player.input.keyjump = true;
 					}
 				}break;
 			}
@@ -561,10 +564,7 @@ bool PlayerAI::FollowPath(World & world){
 			return false;
 		}
 		if(linktype == LINK_JETPACK && !targetplatformset->platforms.empty()){
-			// If a baked focal point is set, aim for that X precisely.
-			// Otherwise fall back to the full platform X range.
-			// Stop pushing in linkDir once the player has reached/passed the target X.
-			// Direction-aware: avoids overshoot continuing to push into the opposite wall.
+			// Horizontal: push toward targetX (or dest center) until in range.
 			bool inRange;
 			if(linkTargetX != INT32_MIN){
 				inRange = (linkDir > 0) ? (player.x >= linkTargetX) : (player.x <= linkTargetX);
@@ -580,11 +580,12 @@ bool PlayerAI::FollowPath(World & world){
 				if(linkDir > 0) player.input.keymoveright = true;
 				else            player.input.keymoveleft  = true;
 			}
+			// Vertical: hold jetpack until we reach the target platform surface.
 			if(!player.fuellow){
-				int targetY = (int)targetplatformset->platforms[0]->y1;
-				// 48px margin lets the bot decelerate before reaching the platform surface
-				// so it arrives with downward velocity and lands rather than oscillating.
-				if(player.y > targetY + 48) player.input.keyjetpack = true;
+				int targetY = INT32_MAX;
+				for(auto* p : targetplatformset->platforms)
+					if((int)p->y1 < targetY) targetY = (int)p->y1;
+				if(player.y > targetY) player.input.keyjetpack = true;
 			}
 		} else if(linktype == LINK_JUMP && !targetplatformset->platforms.empty()){
 			// Clamp horizontal push for jump links — stop when within target platform x range
@@ -757,7 +758,7 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 			int fromCX = (fromX1 + fromX2) / 2;
 			int toCX   = (toX1   + toX2)   / 2;
 			linkDir  = (toCX >= fromCX) ? 1 : -1;
-			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 : fromX1);
+			linkEdgeX = ((linkDir > 0) ? fromX2 : fromX1);
 			linktype = LINK_FALL;
 			return true;
 		} break;
@@ -796,7 +797,7 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 					if(blocked) break;
 				}
 			}
-			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 - 8 : fromX1 + 8);
+			linkEdgeX = ((linkDir > 0) ? fromX2 - 8 : fromX1 + 8);
 			linktype = LINK_JUMP;
 			return true;
 		} break;
@@ -853,7 +854,7 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 				if(clearX == INT32_MIN) break; // every column blocked — no safe route
 				// Walk toward the clear column, then jet straight up through it.
 				linkDir     = (clearX >= fromCX) ? 1 : -1;
-				linkEdgeX   = (Sint16)clearX;
+				linkEdgeX   = clearX;
 				linkTargetX = clearX;
 			} else {
 				// No X overlap — platforms are side by side; bot arcs diagonally.
@@ -871,7 +872,7 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 					}
 					if(blocked) break;
 				}
-				linkEdgeX   = (Sint16)((linkDir > 0) ? fromX2 : fromX1);
+				linkEdgeX   = ((linkDir > 0) ? fromX2 : fromX1);
 				linkTargetX = INT32_MIN;
 			}
 			linktype = LINK_JETPACK;
@@ -901,19 +902,27 @@ bool PlayerAI::FindAnyLink(World & world, PlatformSet & from, PlatformSet & to){
 			int ltype = nl.type == Map::NAVLINK_JUMP  ? LINK_JUMP  :
 			            nl.type == Map::NAVLINK_FALL  ? LINK_FALL  : LINK_JETPACK;
 			linkTargetX = INT32_MIN;
-			if(ltype == LINK_JETPACK && nl.sourceX != INT32_MIN){
-				// Designer specified exact launch point — walk to it then jet.
-				linkEdgeX = (Sint16)nl.sourceX;
-				linkDir   = (nl.sourceX >= fromCX) ? 1 : -1;
+			if(ltype == LINK_JETPACK){
+				// Ground phase: walk to sourceX (or platform edge if not set).
+				if(nl.sourceX != INT32_MIN){
+					linkEdgeX = nl.sourceX;
+				} else {
+					int defaultDir = (toCX >= fromCX) ? 1 : -1;
+					linkEdgeX = (defaultDir > 0) ? fX2 : fX1;
+				}
+				// Air phase: linkDir points from launch point toward destination.
+				int airFrom = (nl.sourceX != INT32_MIN) ? nl.sourceX : (int)linkEdgeX;
+				if(nl.targetX != INT32_MIN){
+					linkTargetX = nl.targetX;
+					linkDir = (nl.targetX >= airFrom) ? 1 : -1;
+				} else {
+					linkDir = (toCX >= airFrom) ? 1 : -1;
+				}
 			} else {
 				linkDir   = (toCX >= fromCX) ? 1 : -1;
-				linkEdgeX = (Sint16)((linkDir > 0) ? fX2 : fX1);
-				if(ltype == LINK_JUMP) linkEdgeX = (Sint16)((linkDir > 0) ? fX2 - 8 : fX1 + 8);
+				linkEdgeX = ((linkDir > 0) ? fX2 : fX1);
+				if(ltype == LINK_JUMP) linkEdgeX = ((linkDir > 0) ? fX2 - 8 : fX1 + 8);
 			}
-			if(ltype == LINK_JETPACK && nl.targetX != INT32_MIN)
-				linkTargetX = nl.targetX;
-			else if(ltype == LINK_JETPACK && nl.sourceX != INT32_MIN)
-				linkDir = (toCX >= nl.sourceX) ? 1 : -1; // air direction from sourceX toward dest
 			linktype = ltype;
 			return true;
 		}
