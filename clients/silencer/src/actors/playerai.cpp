@@ -796,7 +796,8 @@ bool PlayerAI::FindAnyLink(World & world, PlatformSet & from, PlatformSet & to){
 				linkTargetX = nl.targetX;
 			return true;
 		}
-		// No baked link for this pair — fall through to heuristics so uncovered routes still work.
+		// No baked link for this pair — bot cannot traverse it.
+		return false;
 	}
 
 	// No baked links — fall back to runtime geometry heuristics (old maps).
