@@ -566,10 +566,14 @@ export default function MapCanvas({
         const from = platforms[link.fromIdx];
         const to = platforms[link.toIdx];
         if (!from || !to) continue;
-        const fx = ((from.x1 + from.x2) / 2) * zoom + pan.x;
-        const fy = Math.min(from.y1, from.y2) * zoom + pan.y;
-        const tx = ((to.x1 + to.x2) / 2) * zoom + pan.x;
-        const ty = Math.min(to.y1, to.y2) * zoom + pan.y;
+        const fromTopY = Math.min(from.y1, from.y2);
+        const toTopY   = Math.min(to.y1,   to.y2);
+        // For JETPACK links, draw arrow from sourceX/targetX waypoints when set
+        const useWaypoints = link.type === 2 && link.sourceX !== -2147483648 && link.targetX !== -2147483648;
+        const fx = (useWaypoints ? link.sourceX : (from.x1 + from.x2) / 2) * zoom + pan.x;
+        const fy = fromTopY * zoom + pan.y;
+        const tx = (useWaypoints ? link.targetX : (to.x1 + to.x2) / 2) * zoom + pan.x;
+        const ty = toTopY * zoom + pan.y;
         const isSelected = i === selectedNavLinkIdx;
         const color = isSelected ? '#ffffff' : (NAV_LINK_COLORS[link.type] ?? '#00ff88');
         ctx.strokeStyle = color;
