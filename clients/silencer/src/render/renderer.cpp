@@ -2,6 +2,7 @@
 #include "stb_image_write.h"
 #include "renderer.h"
 #include "sprite.h"
+#include "platformset.h"
 #include "resources.h"
 #include "objecttypes.h"
 #include "button.h"
@@ -213,6 +214,74 @@ void Renderer::Draw(Surface * surface, float frametime){
 		char fpsbuf[16];
 		snprintf(fpsbuf, sizeof(fpsbuf), "%d FPS", fpsDisplay);
 		DrawText(surface, 4, 4, fpsbuf, 133, 6, false, 68, 0, false);
+
+		// Platform-set link visualization
+		// Colors: white=platform bar, blue=ladder, green=jump, yellow=fall, red=jetpack
+		if(world.map.loaded){
+			int ox = camera.GetXOffset(), oy = camera.GetYOffset();
+			auto psX1 = [](PlatformSet& ps){ int x=32767; for(auto*p:ps.platforms) if(p->x1<x) x=p->x1; return x; };
+			auto psX2 = [](PlatformSet& ps){ int x=-32768; for(auto*p:ps.platforms) if(p->x2>x) x=p->x2; return x; };
+			auto psY  = [](PlatformSet& ps){ return ps.platforms.empty() ? 0 : (int)ps.platforms[0]->y1; };
+
+			// Draw platform set bars
+			for(auto& ps : world.map.platformsets){
+				if(ps->platforms.empty()) continue;
+				int x1=psX1(*ps), x2=psX2(*ps), y=psY(*ps);
+				DrawLine(surface, x1+ox, y+oy, x2+ox, y+oy, 203, 2);
+			}
+
+			// Draw connections (drawn once per ordered pair to keep it readable)
+			for(size_t i = 0; i < world.map.platformsets.size(); i++){
+				PlatformSet* a = world.map.platformsets[i].get();
+				if(a->platforms.empty()) continue;
+				int ax1=psX1(*a), ax2=psX2(*a), ay=psY(*a);
+				int acx=(ax1+ax2)/2;
+
+				for(size_t j = i+1; j < world.map.platformsets.size(); j++){
+					PlatformSet* b = world.map.platformsets[j].get();
+					if(b->platforms.empty()) continue;
+					int bx1=psX1(*b), bx2=psX2(*b), by=psY(*b);
+					int bcx=(bx1+bx2)/2;
+
+					// Ladder
+					bool ladder = false;
+					for(auto* la : a->ladders){ for(auto* lb : b->ladders){ if(la==lb){ladder=true;break;} } if(ladder) break; }
+					if(ladder){ DrawLine(surface, acx+ox, ay+oy, bcx+ox, by+oy, 68, 1); continue; }
+
+					int xe=0, ye=0;
+					int hd = ay - by; // positive = b is higher
+					int gap = std::max(0, std::max(bx1-ax2, ax1-bx2));
+					int edgeX = (bcx >= acx) ? ax2 : ax1;
+
+					// Jump (green)
+					if(hd<=50 && hd>=-20 && gap<=160){
+						if(!world.map.TestLine(edgeX, ay-25, bcx, by-25, &xe, &ye, Platform::RECTANGLE))
+							DrawLine(surface, acx+ox, ay+oy, bcx+ox, by+oy, 80, 1);
+					}
+					// Jetpack (red) — check A→B direction
+					if(hd>50 && hd<=600 && gap<=250){
+						if(!world.map.TestLine(edgeX, ay-25, bcx, by-25, &xe, &ye, Platform::RECTANGLE))
+							DrawLine(surface, acx+ox, ay+oy, bcx+ox, by+oy, 40, 1);
+					}
+					// Jetpack B→A direction (b is lower, a is higher)
+					int hd2 = by - ay;
+					int edgeX2 = (acx >= bcx) ? bx2 : bx1;
+					if(hd2>50 && hd2<=600 && gap<=250){
+						if(!world.map.TestLine(edgeX2, by-25, acx, ay-25, &xe, &ye, Platform::RECTANGLE))
+							DrawLine(surface, bcx+ox, by+oy, acx+ox, ay+oy, 40, 1);
+					}
+					// Fall A→B (yellow)
+					if(by > ay+10 && gap<=30)
+						DrawLine(surface, acx+ox, ay+oy, bcx+ox, by+oy, 221, 1);
+					// Fall B→A
+					if(ay > by+10 && gap<=30)
+						DrawLine(surface, bcx+ox, by+oy, acx+ox, ay+oy, 221, 1);
+				}
+			}
+
+			// Legend
+			DrawText(surface, 4, 14, "LINKS: BLUE=ladder GREEN=jump YELLOW=fall RED=jetpack", 133, 6, false, 203, 0, false);
+		}
 	}else{
 		world.debuglines.clear();
 	}
