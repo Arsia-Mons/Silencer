@@ -268,6 +268,13 @@ void PlayerAI::Tick(World & world){
 	if(state != RETREAT){
 		ApplyCombat(world);
 	}
+
+	// While the player is in the HACKING animation, movement keys must not be set —
+	// a fresh keymoveleft/keymoveright press exits the hacking state (player.cpp).
+	if(player.state == Player::HACKING){
+		player.input.keymoveleft  = false;
+		player.input.keymoveright = false;
+	}
 	
 	if(state == HACK){
 		const PlayerDef& _pd = GASLoader::Get().player;
@@ -498,8 +505,15 @@ bool PlayerAI::FollowPath(World & world){
 	// Airborne continuation for jump/fall/jetpack links — the switch above only runs
 	// when currentplatform is non-null (bot on ground). Once airborne, currentplatform
 	// is null so we must keep applying direction and jetpack thrust here every tick.
+	// Also enforce a stuck timeout while airborne so bots can't fly into walls forever.
 	if(targetplatformset && !currentplatform &&
 	   (linktype == LINK_JUMP || linktype == LINK_FALL || linktype == LINK_JETPACK)){
+		linkStuckTicks++;
+		if(linkStuckTicks > 180){
+			linkStuckTicks = 0;
+			ClearTarget();
+			return false;
+		}
 		if(linktype == LINK_JETPACK && !targetplatformset->platforms.empty()){
 			// If a baked focal point is set, aim for that X precisely.
 			// Otherwise fall back to the full platform X range.
