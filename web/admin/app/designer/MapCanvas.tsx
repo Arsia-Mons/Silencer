@@ -564,9 +564,9 @@ export default function MapCanvas({
         const to = platforms[link.toIdx];
         if (!from || !to) continue;
         const fx = ((from.x1 + from.x2) / 2) * zoom + pan.x;
-        const fy = ((from.y1 + from.y2) / 2) * zoom + pan.y;
+        const fy = Math.min(from.y1, from.y2) * zoom + pan.y;
         const tx = ((to.x1 + to.x2) / 2) * zoom + pan.x;
-        const ty = ((to.y1 + to.y2) / 2) * zoom + pan.y;
+        const ty = Math.min(to.y1, to.y2) * zoom + pan.y;
         const isSelected = i === selectedNavLinkIdx;
         const color = isSelected ? '#ffffff' : (NAV_LINK_COLORS[link.type] ?? '#00ff88');
         ctx.strokeStyle = color;
@@ -1209,9 +1209,9 @@ export default function MapCanvas({
           const to = map.platforms[link.toIdx];
           if (!from || !to) continue;
           const fx = (from.x1 + from.x2) / 2;
-          const fy = (from.y1 + from.y2) / 2;
+          const fy = Math.min(from.y1, from.y2);
           const tx = (to.x1 + to.x2) / 2;
-          const ty = (to.y1 + to.y2) / 2;
+          const ty = Math.min(to.y1, to.y2);
           const dx = tx - fx, dy = ty - fy;
           const len2 = dx * dx + dy * dy;
           const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((wx - fx) * dx + (wy - fy) * dy) / len2));
