@@ -164,6 +164,7 @@ export interface UseSilMapReturn {
   removeShadowZone: (idx: number) => void;
   addNavLink: (link: NavLink) => void;
   removeNavLink: (idx: number) => void;
+  updateNavLink: (idx: number, patch: Partial<NavLink>) => void;
   updateHeader: (patch: Partial<MapHeader>) => void;
   undo: () => void;
   redo: () => void;
@@ -634,6 +635,15 @@ export function useSilMap(): UseSilMapReturn {
     });
   }, [pushHistory]);
 
+  const updateNavLink = useCallback((idx: number, patch: Partial<NavLink>) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      const navLinks = (prev.navLinks ?? []).map((nl, i) => i === idx ? { ...nl, ...patch } : nl);
+      return { ...prev, navLinks };
+    });
+  }, [pushHistory]);
+
   const applyTileBatch = useCallback((
     layerType: 'bg' | 'fg', layerIdx: number,
     updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }>
@@ -845,7 +855,7 @@ export function useSilMap(): UseSilMapReturn {
     addPlatform, removePlatform, updatePlatform,
     addActor, removeActor, updateActor, moveActor,
     addShadowZone, removeShadowZone,
-    addNavLink, removeNavLink,
+    addNavLink, removeNavLink, updateNavLink,
     updateHeader,
     undo, redo, canUndo, canRedo,
     resizeMap,
