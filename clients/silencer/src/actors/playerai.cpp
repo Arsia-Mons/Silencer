@@ -227,7 +227,23 @@ void PlayerAI::Tick(World & world){
 	}
 
 	
-	if(!targetplatformset && player.state != Player::HACKING){
+	// Check if we're standing at a hackable terminal right now
+	bool atHackableTerminal = false;
+	if(state == HACK){
+		std::vector<Uint8> types;
+		types.push_back(ObjectTypes::TERMINAL);
+		std::vector<Object *> collided = world.TestAABB(player.x, player.y - player.height, player.x, player.y, types);
+		for(auto* obj : collided){
+			Terminal * terminal = static_cast<Terminal *>(obj);
+			if(terminal->state == Terminal::READY || terminal->state == Terminal::HACKERGONE){
+				atHackableTerminal = true;
+				break;
+			}
+		}
+	}
+
+	// Only pick a new nav target when not hacking and not already at a terminal
+	if(!targetplatformset && player.state != Player::HACKING && !atHackableTerminal){
 		if(thinkDelay > 0){
 			thinkDelay--;
 		} else if(state == HACK){
@@ -258,23 +274,10 @@ void PlayerAI::Tick(World & world){
 		if(_pd.aiDisguiseInterval > 0 && rand() % _pd.aiDisguiseInterval == 0){
 			player.input.keydisguise = true;
 		}
-		std::vector<Uint8> types;
-		types.push_back(ObjectTypes::TERMINAL);
-		std::vector<Object *> collided = world.TestAABB(player.x, player.y - player.height, player.x, player.y, types);
-		for(std::vector<Object *>::iterator it = collided.begin(); it != collided.end(); it++){
-			switch((*it)->type){
-				case ObjectTypes::TERMINAL:{
-					Terminal * terminal = static_cast<Terminal *>(*it);
-					if(terminal->state == Terminal::READY || terminal->state == Terminal::HACKERGONE){
-						if(player.state != Player::HACKING){
-							if(_pd.aiHackInterval > 0 && rand() % _pd.aiHackInterval == 0){
-								player.input.keyactivate = true;
-							}
-							ClearTarget();
-						}
-					}
-				}break;
-			}
+		if(atHackableTerminal){
+			// Always activate — no random interval — and stay put until hacking completes.
+			player.input.keyactivate = true;
+			ClearTarget();
 		}
 	}
 	
