@@ -50,6 +50,7 @@ export default function DesignerPage() {
   const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, applyTileBatch, applyAllLayersBatch, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
           updateHeader, updatePlatform, addShadowZone, removeShadowZone,
+          addNavLink, removeNavLink,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   type TileSel = { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number };
@@ -67,6 +68,9 @@ export default function DesignerPage() {
   const [selectedTileId, setSelectedTile] = useState(0);
   const [selectedActorId, setSelectedActor] = useState(36); // player start default
   const [selectedPlatformIdx, setSelectedPlatformIdx] = useState<number | null>(null);
+  const [navLinkType, setNavLinkType] = useState<0 | 1 | 2>(0);
+  const [linkFromIdx, setLinkFromIdx] = useState<number | null>(null);
+  const [selectedNavLinkIdx, setSelectedNavLinkIdx] = useState<number | null>(null);
   const [tileLayerType, setTileLayerType] = useState<'bg' | 'fg'>('bg');
   const [tileSelection, setTileSelection] = useState<TileSel | null>(null);
   const [tileCopyBuffer, setTileCopyBuffer] = useState<TileCopyBuf | null>(null);
@@ -189,6 +193,14 @@ export default function DesignerPage() {
     if (activeTool !== 'SELECT') setSelectedPlatformIdx(null);
   }, [activeTool]);
 
+  useEffect(() => {
+    if (activeTool !== 'NAV_LINK') setLinkFromIdx(null);
+  }, [activeTool]);
+
+  useEffect(() => {
+    if (activeTool !== 'SELECT') setSelectedNavLinkIdx(null);
+  }, [activeTool]);
+
   const applyResize = () => {
     const w = parseInt(resizeW, 10);
     const h = parseInt(resizeH, 10);
@@ -284,12 +296,18 @@ export default function DesignerPage() {
         case 'g': setVis(v => ({ ...v, grid: !v.grid })); break;
         case 'l': setVis(v => ({ ...v, lighting: !v.lighting })); break;
         case '?': setShowHotkeys(h => !h); break;
+        case 'Delete':
+          if (selectedNavLinkIdx !== null) {
+            removeNavLink(selectedNavLinkIdx);
+            setSelectedNavLinkIdx(null);
+          }
+          break;
         default: break;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undo, redo, handleToolChange]);
+  }, [undo, redo, handleToolChange, selectedNavLinkIdx, removeNavLink]);
 
   const handleDataDir = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) loadFiles(e.target.files);
@@ -359,6 +377,10 @@ export default function DesignerPage() {
   const handleShadowZoneRemove = useCallback((idx: number) => {
     removeShadowZone(idx);
   }, [removeShadowZone]);
+
+  const handleNavLinkAdd = useCallback((fromIdx: number, toIdx: number, type: 0 | 1 | 2) => {
+    addNavLink({ fromIdx, toIdx, type });
+  }, [addNavLink]);
 
   const handleTilePaste = useCallback((tx: number, ty: number) => {
     if (!tileCopyBuffer || !map) return;
@@ -795,6 +817,8 @@ export default function DesignerPage() {
           onLumModeChange={setLumMode}
           eraseLayerType={eraseLayerType}
           onEraseLayerTypeChange={setEraseLayerType}
+          navLinkType={navLinkType}
+          onNavLinkTypeChange={setNavLinkType}
         />
 
         {/* Map Properties Panel */}
@@ -909,6 +933,12 @@ export default function DesignerPage() {
               tileCopyBuffer={tileCopyBuffer}
               pastePending={pastePending}
               onTilePaste={handleTilePaste}
+              navLinkType={navLinkType}
+              linkFromIdx={linkFromIdx}
+              selectedNavLinkIdx={selectedNavLinkIdx}
+              onNavLinkAdd={handleNavLinkAdd}
+              onNavLinkSelect={setSelectedNavLinkIdx}
+              onLinkFromIdxChange={setLinkFromIdx}
             />
             <Minimap
               map={map}

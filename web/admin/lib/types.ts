@@ -182,6 +182,8 @@ export interface MapShadowZone {
   y2: number;
 }
 
+export interface NavLink { fromIdx: number; toIdx: number; type: 0 | 1 | 2; }
+
 export interface SilMapData {
   header: MapHeader;
   width: number;
@@ -190,6 +192,7 @@ export interface SilMapData {
   actors: MapActor[];
   platforms: MapPlatform[];
   shadowZones: MapShadowZone[];
+  navLinks: NavLink[];
   rawMinimap: Uint8Array;
   minimapCompressedSize: number;
   fileName?: string;
