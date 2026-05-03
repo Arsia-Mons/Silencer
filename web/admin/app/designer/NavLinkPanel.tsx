@@ -11,6 +11,7 @@ interface Props {
   onSelect: (idx: number) => void;
   onRemove: (idx: number) => void;
   onTypeChange: (idx: number, type: 0 | 1 | 2) => void;
+  onCenter?: (midX: number, midY: number) => void;
 }
 
 function platLabel(p: MapPlatform | undefined, idx: number) {
@@ -20,7 +21,7 @@ function platLabel(p: MapPlatform | undefined, idx: number) {
   return `#${idx} (${cx},${cy})`;
 }
 
-export default function NavLinkPanel({ navLinks, platforms, selectedIdx, onSelect, onRemove, onTypeChange }: Props) {
+export default function NavLinkPanel({ navLinks, platforms, selectedIdx, onSelect, onRemove, onTypeChange, onCenter }: Props) {
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="px-3 py-1.5 border-b border-game-border/50 flex items-center justify-between flex-shrink-0">
@@ -43,6 +44,12 @@ export default function NavLinkPanel({ navLinks, platforms, selectedIdx, onSelec
             <div
               key={i}
               onClick={() => onSelect(i)}
+              onDoubleClick={() => {
+                if (!from || !to) return;
+                const midX = ((from.x1 + from.x2) / 2 + (to.x1 + to.x2) / 2) / 2;
+                const midY = (Math.min(from.y1, from.y2) + Math.min(to.y1, to.y2)) / 2;
+                onCenter?.(midX, midY);
+              }}
               className={`flex items-center gap-2 px-3 py-1.5 text-[11px] font-mono cursor-pointer border-b border-game-border/30 select-none transition-colors ${
                 isSelected ? 'bg-[#1a2e1a] text-game-text' : 'hover:bg-game-dark text-game-textDim'
               }`}

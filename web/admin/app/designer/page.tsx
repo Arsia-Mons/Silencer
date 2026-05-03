@@ -999,6 +999,12 @@ export default function DesignerPage() {
                 onSelect={setSelectedNavLinkIdx}
                 onRemove={removeNavLink}
                 onTypeChange={(idx, type) => updateNavLink(idx, { type })}
+                onCenter={(midX, midY) => {
+                  const container = canvasContainerRef.current;
+                  if (!container) return;
+                  const { width: cw, height: ch } = container.getBoundingClientRect();
+                  setPan({ x: cw / 2 - midX * zoom, y: ch / 2 - midY * zoom });
+                }}
               />
             )}
             {rightTab === 'links' && !map && (
