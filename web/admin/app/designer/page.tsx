@@ -379,8 +379,8 @@ export default function DesignerPage() {
     removeShadowZone(idx);
   }, [removeShadowZone]);
 
-  const handleNavLinkAdd = useCallback((fromIdx: number, toIdx: number, type: 0 | 1 | 2) => {
-    addNavLink({ fromIdx, toIdx, type });
+  const handleNavLinkAdd = useCallback((fromIdx: number, toIdx: number, type: 0 | 1 | 2, targetX: number) => {
+    addNavLink({ fromIdx, toIdx, type, targetX });
   }, [addNavLink]);
 
   const handleTilePaste = useCallback((tx: number, ty: number) => {

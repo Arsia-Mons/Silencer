@@ -281,12 +281,13 @@ export function useSilMap(): UseSilMapReturn {
       if (off5 + 8 <= levelDV.byteLength) {
         const numLinks = levelDV.getUint32(off5, true);
         off5 += 8;
-        for (let i = 0; i < numLinks && off5 + 12 <= levelDV.byteLength; i++) {
+        for (let i = 0; i < numLinks && off5 + 16 <= levelDV.byteLength; i++) {
           const fromIdx = levelDV.getUint32(off5, true);
           const toIdx = levelDV.getUint32(off5 + 4, true);
           const type = levelDV.getUint8(off5 + 8) as 0 | 1 | 2;
-          navLinks.push({ fromIdx, toIdx, type });
-          off5 += 12;
+          const targetX = levelDV.getInt32(off5 + 12, true);
+          navLinks.push({ fromIdx, toIdx, type, targetX });
+          off5 += 16;
         }
       }
 
@@ -316,7 +317,7 @@ export function useSilMap(): UseSilMapReturn {
     const lightMasks = bakeMapLightMasks(actors, platforms, shadowZones);
     const navLinks = mapData.navLinks ?? [];
     const lightMasksSectionSize = 8 + lightMasks.reduce((sum, m) => sum + 12 + m.data.length, 0);
-    const navLinksSectionSize = 8 + navLinks.length * 12;
+    const navLinksSectionSize = 8 + navLinks.length * 16;
 
     const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize);
     const ldv = new DataView(levelBuf);
@@ -397,7 +398,9 @@ export function useSilMap(): UseSilMapReturn {
     for (const link of navLinks) {
       ldv.setUint32(off,     link.fromIdx, true); off += 4;
       ldv.setUint32(off,     link.toIdx,   true); off += 4;
-      ldv.setUint8 (off,     link.type);          off += 4; // 1 byte type + 3 padding (buffer is pre-zeroed)
+      ldv.setUint8 (off,     link.type);          off += 4;
+      ldv.setInt32 (off,     link.targetX, true); off += 4; // 1 byte type + 3 padding (buffer is pre-zeroed)
+      ldv.setInt32 (off,     link.targetX, true); off += 4;
     }
 
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
@@ -715,7 +718,7 @@ export function useSilMap(): UseSilMapReturn {
     const lightMasks = bakeMapLightMasks(actors, platforms, shadowZones);
     const navLinks = mapData.navLinks ?? [];
     const lightMasksSectionSize = 8 + lightMasks.reduce((sum, m) => sum + 12 + m.data.length, 0);
-    const navLinksSectionSize = 8 + navLinks.length * 12;
+    const navLinksSectionSize = 8 + navLinks.length * 16;
     const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize);
     const ldv = new DataView(levelBuf);
 
@@ -795,6 +798,7 @@ export function useSilMap(): UseSilMapReturn {
       ldv.setUint32(off,     link.fromIdx, true); off += 4;
       ldv.setUint32(off,     link.toIdx,   true); off += 4;
       ldv.setUint8 (off,     link.type);          off += 4;
+      ldv.setInt32 (off,     link.targetX, true); off += 4;
     }
 
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));

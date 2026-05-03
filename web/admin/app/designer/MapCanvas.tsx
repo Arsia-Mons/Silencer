@@ -139,7 +139,7 @@ interface Props {
   navLinkType?: 0 | 1 | 2;
   linkFromIdx?: number | null;
   selectedNavLinkIdx?: number | null;
-  onNavLinkAdd?: (fromIdx: number, toIdx: number, type: 0 | 1 | 2) => void;
+  onNavLinkAdd?: (fromIdx: number, toIdx: number, type: 0 | 1 | 2, targetX: number) => void;
   onNavLinkSelect?: (idx: number | null) => void;
   onLinkFromIdxChange?: (idx: number | null) => void;
 }
@@ -592,6 +592,20 @@ export default function MapCanvas({
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(NAV_LINK_LABELS[link.type] ?? '', mx, my - 8);
+        }
+        // JETPACK focal point — diamond at targetX on destination platform top
+        if (link.type === 2 && link.targetX !== -2147483648) {
+          const fpx = link.targetX * zoom + pan.x;
+          const fpy = Math.min(to.y1, to.y2) * zoom + pan.y;
+          const ds = Math.max(4, 5 * zoom);
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.moveTo(fpx, fpy - ds);
+          ctx.lineTo(fpx + ds, fpy);
+          ctx.lineTo(fpx, fpy + ds);
+          ctx.lineTo(fpx - ds, fpy);
+          ctx.closePath();
+          ctx.fill();
         }
       }
     }
@@ -1191,7 +1205,10 @@ export default function MapCanvas({
         if (linkFromIdx == null) {
           onLinkFromIdxChange?.(hitIdx);
         } else if (hitIdx !== linkFromIdx) {
-          onNavLinkAdd?.(linkFromIdx, hitIdx, navLinkType ?? 0);
+          // For JETPACK links, use the exact click X as the focal point.
+          // For JUMP/FALL, targetX is unused (pass 0x80000000 = INT32_MIN sentinel).
+          const targetX = (navLinkType === 2) ? Math.round(wx) : -2147483648;
+          onNavLinkAdd?.(linkFromIdx, hitIdx, navLinkType ?? 0, targetX);
           onLinkFromIdxChange?.(null);
         }
       }

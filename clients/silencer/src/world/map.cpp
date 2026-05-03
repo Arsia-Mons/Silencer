@@ -804,13 +804,14 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		Uint32 numLinks = 0;
 		memcpy(&numLinks, &level[i], 4); numLinks = SDL_Swap32LE(numLinks);
 		i += 8; // count + padding
-		for(Uint32 l = 0; l < numLinks && i + 12 <= level.size(); l++){
-			Uint32 fromIdx = 0, toIdx = 0; Uint8 type = 0;
+		for(Uint32 l = 0; l < numLinks && i + 16 <= level.size(); l++){
+			Uint32 fromIdx = 0, toIdx = 0; Uint8 type = 0; Sint32 targetX = INT32_MIN;
 			memcpy(&fromIdx, &level[i], 4); fromIdx = SDL_Swap32LE(fromIdx); i += 4;
 			memcpy(&toIdx,   &level[i], 4); toIdx   = SDL_Swap32LE(toIdx);   i += 4;
 			type = level[i]; i += 4; // type + 3 padding bytes
+			memcpy(&targetX, &level[i], 4); targetX = (Sint32)SDL_Swap32LE((Uint32)targetX); i += 4;
 			if(fromIdx < platforms.size() && toIdx < platforms.size() && team == 0)
-				navlinks.push_back({ platforms[fromIdx].get(), platforms[toIdx].get(), type });
+				navlinks.push_back({ platforms[fromIdx].get(), platforms[toIdx].get(), type, targetX });
 		}
 	}
 

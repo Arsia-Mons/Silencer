@@ -60,11 +60,14 @@ export default function NavLinkPanel({ navLinks, platforms, selectedIdx, onSelec
                 <option value={2} style={{ color: '#ff6644' }}>JETPACK</option>
               </select>
 
-              {/* From → To */}
+              {/* From → To + targetX for jetpack */}
               <span className="flex-1 truncate text-[10px]">
                 <span className="text-game-textDim">{platLabel(from, nl.fromIdx)}</span>
                 <span className="text-game-muted mx-1">→</span>
                 <span className="text-game-textDim">{platLabel(to, nl.toIdx)}</span>
+                {nl.type === 2 && nl.targetX !== -2147483648 && (
+                  <span className="text-game-muted ml-1">@{nl.targetX}</span>
+                )}
               </span>
 
               {/* Delete */}

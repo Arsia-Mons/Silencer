@@ -49,6 +49,7 @@ private:
 	Platform * linkladder;
 	int linkDir;      // -1=left, 1=right for fall/jump/jetpack links
 	Sint16 linkEdgeX; // x position to be at before executing jump/fall
+	Sint32 linkTargetX; // baked focal point for LINK_JETPACK airborne (INT32_MIN = use platform range)
 	std::deque<PlatformSet *> platformsetpath;
 	// Combat
 	Uint16 combatTarget;        // object id of current enemy, 0=none

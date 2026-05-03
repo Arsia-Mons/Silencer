@@ -21,6 +21,7 @@ PlayerAI::PlayerAI(Player & player, Difficulty diff) : player(player){
 	jetpackCooldown = 0;
 	linkDir = 0;
 	linkEdgeX = 0;
+	linkTargetX = INT32_MIN;
 	linkStuckTicks = 0;
 	thinkDelay = 0;
 	targetTerminal = 0;
@@ -497,14 +498,20 @@ bool PlayerAI::FollowPath(World & world){
 	if(targetplatformset && !currentplatform &&
 	   (linktype == LINK_JUMP || linktype == LINK_FALL || linktype == LINK_JETPACK)){
 		if(linktype == LINK_JETPACK && !targetplatformset->platforms.empty()){
-			// Only push horizontally while not yet over the target platform X range —
-			// prevents the bot flying into the wall adjacent to the destination platform.
-			int toX1 = 32767, toX2 = -32768;
-			for(auto* p : targetplatformset->platforms){
-				if(p->x1 < toX1) toX1 = p->x1;
-				if(p->x2 > toX2) toX2 = p->x2;
+			// If a baked focal point is set, aim for that X precisely.
+			// Otherwise fall back to the full platform X range.
+			bool inRange;
+			if(linkTargetX != INT32_MIN){
+				inRange = abs(player.x - (int)linkTargetX) <= 8;
+			} else {
+				int toX1 = 32767, toX2 = -32768;
+				for(auto* p : targetplatformset->platforms){
+					if(p->x1 < toX1) toX1 = p->x1;
+					if(p->x2 > toX2) toX2 = p->x2;
+				}
+				inRange = (player.x >= toX1 && player.x <= toX2);
 			}
-			if(player.x < toX1 || player.x > toX2){
+			if(!inRange){
 				if(linkDir > 0) player.input.keymoveright = true;
 				else            player.input.keymoveleft  = true;
 			}
@@ -741,6 +748,7 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 		} break;
 	}
 	linktype = LINK_NONE;
+	linkTargetX = INT32_MIN;
 	return false;
 }
 
@@ -755,7 +763,12 @@ bool PlayerAI::FindAnyLink(World & world, PlatformSet & from, PlatformSet & to){
 			if(nl.from->set != &from || nl.to->set != &to) continue;
 			int ltype = nl.type == Map::NAVLINK_JUMP    ? LINK_JUMP  :
 			            nl.type == Map::NAVLINK_FALL    ? LINK_FALL  : LINK_JETPACK;
-			if(FindLink(world, ltype, from, to)) return true;
+			if(FindLink(world, ltype, from, to)){
+				// For jetpack links, use the designer-baked focal point if set.
+				if(ltype == LINK_JETPACK && nl.targetX != INT32_MIN)
+					linkTargetX = nl.targetX;
+				return true;
+			}
 		}
 		return false;
 	}
