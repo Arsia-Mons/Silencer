@@ -35,6 +35,7 @@ these change): `services/`, `web/`, `infra/`, `docs/`, `designer/`,
 | `deploy.yml` (game client + lobby) | `workflow_run` after a successful `Release` on a `v*` tag, or manual dispatch |
 | `deploy-admin-api.yml` | push to `main` touching `services/admin-api/**`, `shared/assets/**`, root `package.json`, `bun.lock`, or this workflow; or manual |
 | `deploy-admin-web.yml` | push to `main` touching `web/admin/**`, `shared/gas-validation/**`, root `package.json`, `bun.lock`, or this workflow; or manual |
+| `deploy-staging.yml` (lobby + dedicated server + admin-api + admin-web → single-box staging) | every push to `main` (no path filter — staging mirrors the full stack); `concurrency.cancel-in-progress: false` coalesces queued runs to the newest commit |
 
 ## Release
 
