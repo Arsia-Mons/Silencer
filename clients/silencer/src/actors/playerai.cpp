@@ -185,11 +185,16 @@ void PlayerAI::Tick(World & world){
 	Input zeroinput;
 	player.input = zeroinput;
 
+	// Age out bad links
+	for(int i = (int)badLinks.size() - 1; i >= 0; i--){
+		if(--badLinks[i].ttl <= 0) badLinks.erase(badLinks.begin() + i);
+	}
 	if(state == IDLE){
 		SetState(HACK);
 	}
 	if(player.state == Player::RESURRECTING){
 		SetState(IDLE);
+		badLinks.clear(); // fresh start after respawn
 	}
 	if(player.state == Player::RESPAWNING){
 		SetState(EXITBASE);
@@ -425,9 +430,10 @@ bool PlayerAI::FollowPath(World & world){
 					ClearTarget();
 				}
 			}
-			// If we've been stuck on this link too long, give up and replan
+			// If we've been stuck on this link too long, blacklist it and replan
 			linkStuckTicks++;
 			if(linkStuckTicks > 120){
+				badLinks.push_back({currentplatform->set, targetplatformset, 600});
 				linkStuckTicks = 0;
 				ClearTarget();
 				return false;
@@ -601,6 +607,10 @@ Platform * PlayerAI::FindClosestLadderToPlatform(World & world, PlatformSet & fr
 }
 
 bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet & to){
+	// Reject blacklisted links immediately
+	for(auto& bl : badLinks){
+		if(bl.from == &from && bl.to == &to){ linktype = LINK_NONE; return false; }
+	}
 	// Helpers to get bounding x and representative y of a platform set
 	auto getX1 = [](PlatformSet& ps) -> int {
 		int x = 32767;

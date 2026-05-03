@@ -61,6 +61,8 @@ private:
 	int thinkDelay;             // micro-pause ticks after state transitions
 	int linkStuckTicks;         // ticks spent trying the current movement link
 	Terminal * targetTerminal;  // terminal this bot is currently assigned to hack
+	struct BadLink { PlatformSet* from; PlatformSet* to; int ttl; };
+	std::vector<BadLink> badLinks; // links that recently failed; avoided in BFS+FindLink
 };
 
 #endif
