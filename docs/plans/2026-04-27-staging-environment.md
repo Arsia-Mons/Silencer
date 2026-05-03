@@ -1,7 +1,7 @@
 # Staging Environment
 
-**Status:** Proposed
-**Date:** 2026-04-27
+**Status:** Approved
+**Date:** 2026-04-27 (revised 2026-05-03)
 
 ## Goal
 
@@ -23,34 +23,41 @@ of tag-driven prod releases.
 
 ## Architecture
 
-Single `t4g.micro` ARM64 box (`silencer-staging`) running every
-component as a systemd unit. No containers, no Cloudflare Tunnel, no
-separate stateful EBS volumes.
+Single `t4g.small` ARM64 box (`silencer-staging`) running every
+component on one host. **Same deployment shape as prod** — admin-api
+and admin-web run as `docker run --network host` from GHCR, lobby runs
+as a native systemd unit. The only structural simplifications versus
+prod are: one box instead of two, no separate stateful EBS volumes, no
+DLM snapshots, no Cloudflare Tunnel.
 
 | Component | Unit | Notes |
 |---|---|---|
 | `silencer-lobby` (Go) | systemd | Same binary as prod; spawns `silencer -s` per game |
-| `mongod` | apt | Default `cacheSizeGB: 0.25`, localhost-only |
+| `mongod` | apt | `cacheSizeGB: 0.25`, `bindIp: 127.0.0.1` (localhost only) |
 | `lavinmq` | apt | localhost-only |
-| `silencer-admin-api` | systemd (`bun run …`) | Native Bun, no Docker |
-| `silencer-admin-web` | systemd (`bun run …`) | Next.js standalone under Bun, no Docker |
-| `tailscaled` | apt | SSH for humans + GH Actions runner |
+| `silencer-admin-api` | systemd (`docker run`) | Same GHCR image flow as prod |
+| `silencer-admin-web` | systemd (`docker run`) | Same GHCR image flow as prod |
+| `tailscaled` | apt | SSH for humans + GH Actions runner; only path to admin-web :24000 |
 
 Mongo + LavinMQ data dirs live on the root volume — wiped on instance
-replacement, which is the intended recovery path. Realistic peak RAM
-with one active game ≈ ~650 MB on ~850 MB usable; no special tuning
-required (analysis in `docs/plans/2026-04-25-production-deployment-architecture.md`
-§ Sizing decisions, applied at staging traffic levels).
+replacement, which is the intended recovery path.
 
-An EIP is **required** (not optional) — see Developer access below.
-The lobby's `-public-addr` flag, which it hands clients during the
-dedicated-server handoff, must be a dotted-decimal IP because the C++
-join path uses `inet_addr()` not `getaddrinfo()` (`deploy.yml:223-225`
-documents the constraint). Without a stable IP, every instance
-replacement re-bakes every client binary built against staging.
+**Sizing rationale.** Prod's per-component RSS analysis (in
+`docs/plans/2026-04-25-production-deployment-architecture.md`) sums to
+~1.7 GB across the two prod boxes; collapsing both onto one staging box
+plus the lobby + dedicated subprocess lands ~1.0 GB resident, fitting
+comfortably on `t4g.small` (2 GB) but not `t4g.micro` (1 GB).
 
-Estimated monthly cost: **~$10.60** (t4g.micro $6 + ~16 GB gp3 root
-$1.30 + EIP $3.60, no snapshots, no second box).
+An EIP is **required** (not optional). The lobby's `-public-addr`
+flag, which it hands clients during the dedicated-server handoff, must
+be a dotted-decimal IP because the C++ join path uses `inet_addr()`
+not `getaddrinfo()` (`deploy.yml:222-227` documents the same
+constraint for prod). Without a stable IP, every instance replacement
+would re-bake every client binary built against staging.
+
+Estimated monthly cost: **~$18.30**
+(t4g.small $13.40 + ~16 GB gp3 root $1.30 + EIP $3.60, no snapshots,
+no second box).
 
 ## Deploy flow
 
@@ -92,59 +99,86 @@ Mirrors the shape of `deploy.yml` + `deploy-admin-api.yml` +
 `deploy-admin-web.yml`, collapsed into one job since staging has all
 four artifacts on one box:
 
-1. Build lobby (Go) and dedicated server (C++ / ARM64) — same as
-   prod's `deploy.yml`, but with `LOBBY_HOST=staging.<domain>` (or the
-   staging IP) baked into the dedicated-server build.
-2. Build admin-api and admin-web — `bun install --frozen-lockfile`,
-   `bun run build` for the Next.js app, tar the output trees. No
-   GHCR push (no Docker on staging).
-3. Tailscale up, SSH to `silencer-staging`, scp tarballs into
-   `/opt/silencer-staging/releases/<sha>/`, swap `current` symlink,
-   `systemctl restart silencer-lobby silencer-admin-api silencer-admin-web`.
-4. Prune to last 3 releases.
+1. **Build lobby** (Go) and **dedicated server** (C++ / ARM64) — same
+   as `deploy.yml`, but with `LOBBY_HOST=${{ vars.STAGING_LOBBY_HOST }}`
+   baked into the dedicated-server cmake invocation. SDL3 .so bundling
+   via `patchelf --set-rpath` is identical to prod.
+2. **Build + push admin-api** image to GHCR as
+   `ghcr.io/.../silencer-admin-api:staging-<sha>` (separate tag from
+   prod's `<sha>` so the registry stays untangled).
+3. **Build + push admin-web** image to GHCR as
+   `ghcr.io/.../silencer-admin-web:staging-<sha>`.
+4. **Deploy.** Tailscale up, SSH to `silencer-staging`, scp lobby +
+   dedicated server + assets, write `/etc/silencer/admin-api.image` and
+   `/etc/silencer/admin-web.image` with the new tags, restart all three
+   units, smoke-test.
+5. Prune to last 3 release directories on the box.
 
 No macOS / Windows client build — staging doesn't ship to end users.
 Tag-driven `release.yml` + `deploy.yml` remain prod's release path,
 unchanged.
 
-Total runtime estimate: ~5–8 min per deploy.
+**EIP plumbing.** The staging lobby's `-public-addr` is sourced from
+`vars.STAGING_LOBBY_PUBLIC_IP` (a GitHub repo variable populated from
+the `staging_lobby_ip` Terraform output after first apply). Prod
+hardcodes its EIP in `deploy.yml:227`'s systemd drop-in; staging keeps
+the value out of YAML so a different account / region can use the same
+workflow.
+
+Total runtime estimate: ~6–9 min per deploy (admin-api/web Docker
+builds dominate).
 
 ## Terraform
 
-Add a `single_box = true` mode to the existing `infra/terraform/`
-module that:
+Implemented as a **separate module** at `infra/terraform/staging/` —
+not a workspace + flag on the existing module. Two reasons:
 
-- Creates one `t4g.micro` instance instead of the prod two-box pair.
-- Skips `dlm.tf` (no snapshots).
-- Skips the separate Mongo / LavinMQ EBS volumes (root volume only).
-- Skips Cloudflare Tunnel ingress and the `cloudflared` install in
-  cloud-init.
-- Skips the GitHub-backed Mongo backup wiring.
+- The cloud-init template is meaningfully different (single box, all
+  services local, env vars point at `127.0.0.1` not internal DNS, no
+  Cloudflare Tunnel, no separate EBS mounts). Squeezing this into the
+  prod template via conditional logic would make every future prod
+  edit reason about staging side-effects.
+- Prod has `prevent_destroy = true` on the Mongo and LavinMQ EBS
+  volumes; flipping `single_box = true` on the prod state would make
+  apply refuse. Separate modules → zero shared state → zero
+  cross-contamination risk.
 
-State separated via `terraform workspace new staging`, same module.
+What the staging module contains:
 
-A new `cloud-init-staging.yaml.tftpl` borrows from the prod admin
-template but: installs everything on root, runs admin-api / admin-web
-as native `bun run` systemd units (not Docker), and puts the lobby on
-the same box.
+- `main.tf` — provider + VPC/subnet/AMI data sources (mirrors prod) +
+  one EC2 + EIP + SG + Route 53 A record (`staging.<domain>`, if
+  zone configured).
+- `iam.tf` — single instance role with read access to
+  `/silencer-staging/*` SSM params.
+- `ssm.tf` — apply-time data sources for one-shot values
+  (Tailscale auth key, deploy SSH pubkey, GHCR pull token).
+- `cloud-init-staging.yaml.tftpl` — bootstraps Mongo, LavinMQ, Docker,
+  the two admin systemd units, the lobby unit, and Tailscale.
+- `outputs.tf` — `staging_lobby_ip` (the EIP that goes into
+  `vars.STAGING_LOBBY_PUBLIC_IP`).
+- `backend.tf` + `backend.hcl.example` — its own S3 state key
+  (`staging.tfstate` in the same bucket bootstrapped for prod).
 
-Secrets namespaced under `/silencer-staging/*` in SSM — JWT secret,
-Mongo / LavinMQ passwords, Tailscale auth key all distinct from prod.
-SSH pubkeys can be shared.
+Secrets namespaced under `/silencer-staging/*` in SSM. SSH pubkeys
+(`/silencer/shared/{ssh_admin,deploy_ssh}_pubkey`) and GHCR pull token
+(`/silencer/admin/ghcr_pull_token`) are reused; everything else
+(Mongo/LavinMQ passwords, JWT secret, Tailscale auth key) is staging-
+specific and seeded by `seed-ssm.sh`.
 
 ## Data lifecycle
 
 Staging starts fresh on every instance replacement. `mongod`, `lavinmq`,
-and `lobby.json` all live on the root volume. Default admin seed
-(`admin/admin`) is recreated each rebuild. No backups.
+`lobby.json`, and the `/var/lib/silencer/assets/` tree all live on the
+root volume. Default admin seed (`admin/admin`) is recreated each
+rebuild. No backups, no `BACKUP_CRON`.
 
 ## Developer access
 
+### Game client
+
 `LOBBY_HOST` is baked into the client binary at build time
 (`clients/silencer` cmake variable `SILENCER_LOBBY_HOST`), so a stock
-prod client cannot reach staging. Two paths:
-
-**Default — local build.** Devs who already have the toolchain run:
+prod client cannot reach staging.
 
 ```sh
 cd clients/silencer
@@ -157,20 +191,17 @@ dedicated-server handoff still flows through the EIP directly (per the
 `inet_addr()` constraint in Architecture above), so DNS only matters
 for the lobby connection itself.
 
-**Opt-in — CI-built artifacts.** `deploy-staging.yml` accepts a
-`build_clients: true` `workflow_dispatch` input that adds Mac + Windows
-build jobs (mirroring `release.yml`'s shape but with
-`LOBBY_HOST=staging.<domain>`) and uploads the zips via
-`actions/upload-artifact`. Useful when a non-builder needs to playtest
-staging — adds ~10–15 min to the run, so it's off by default. macOS
-zips are unsigned; users `xattr -d com.apple.quarantine` before
-launching.
+### Admin dashboard
 
-The day-to-day staging loop (push → "did the lobby boot, do admin
-routes still work") is covered by Tailscale-only access to the admin
-dashboard plus the deploy workflow's own health checks; rebuilding the
-client only matters when validating real protocol or game-logic
-changes.
+admin-web binds `:24000` and admin-api binds `:24080`, both bound to
+`0.0.0.0`. Neither is reachable from the public internet — the SG only
+opens 22/517/30000-61000 — but both are reachable from anyone on the
+tailnet. Devs hit `http://<staging-tailscale-name>:24000` for the
+dashboard.
+
+This is plain HTTP. Auth flows that depend on `Secure`-only cookies
+will not work on staging; that's acceptable for a smoke-test
+environment, and matches how dev loops already work.
 
 ## Required checks / branch protection
 
@@ -178,9 +209,9 @@ changes.
 existing five (`build-macos`, `build-windows`, `build-admin-api`,
 `build-admin-web`, `build-lobby-docker`) remain the merge gates.
 
-## Open questions
+## Resolved questions
 
-1. **`lobby_version_string` for staging?** Setting a distinct value
-   (e.g. `"staging-<sha>"`) prevents a prod client from accidentally
-   connecting to the staging lobby. Worth doing if the staging lobby
-   is publicly reachable.
+- **`lobby_version_string` for staging?** No. The staging EIP isn't
+  published anywhere a prod client would discover (no DNS bootstrap
+  pointing at it, no `update.json` referencing it). The lockout adds
+  rebuild churn for negligible safety gain.

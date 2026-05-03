@@ -1,0 +1,310 @@
+#cloud-config
+# Bootstraps the Silencer staging single-box. Runs all of:
+#   - mongod (apt) + lavinmq (apt), data on root volume, localhost-bound
+#   - silencer-lobby (systemd, native binary; spawns dedicated server subprocesses)
+#   - silencer-admin-api + silencer-admin-web (systemd, docker run from GHCR)
+#   - tailscaled
+#
+# Same deployment shape as prod's admin box (Docker for the admin
+# services), collapsed onto one host. The two structural differences vs
+# `cloud-init-admin.yaml.tftpl`:
+#   1. No EBS volume waits / mkfs / mount — staging keeps everything on
+#      the root volume.
+#   2. The lobby binary lives here too (systemd unit at the bottom),
+#      and the admin services point at 127.0.0.1 for Mongo / LavinMQ /
+#      LOBBY_* instead of the prod private DNS zone.
+
+users:
+  - default
+  - name: silencer
+    system: true
+    shell: /usr/sbin/nologin
+    home: /var/lib/silencer
+
+ssh_authorized_keys:
+  - ${deploy_ssh_public_key}
+
+packages:
+  - docker.io
+  - jq
+  - curl
+  - gnupg
+  # Lobby's runtime shared libs — silencer-lobby itself only needs
+  # libcurl + libminizip; SDL3 .so files arrive bundled alongside the
+  # dedicated-server binary via patchelf rpath (see deploy-staging.yml).
+  - libcurl4t64
+  - libminizip1t64
+
+write_files:
+  # Pulls runtime secrets from SSM and writes /etc/silencer/{lobby,admin-api}.env.
+  # Idempotent — overwrites both files on every run, so this also doubles
+  # as the rotation tool.
+  - path: /usr/local/sbin/silencer-fetch-secrets
+    permissions: '0755'
+    owner: root:root
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+      REGION=${aws_region}
+      get() {
+        aws ssm get-parameter --region "$REGION" --name "$1" \
+          --with-decryption --query Parameter.Value --output text
+      }
+      MONGO_PWD=$(get /silencer-staging/mongo_silencer_password)
+      LAVINMQ_PWD=$(get /silencer-staging/lavinmq_silencer_password)
+      JWT=$(get /silencer-staging/jwt_secret)
+      GHCR_TOKEN=$(get /silencer/admin/ghcr_pull_token)
+      umask 077
+      mkdir -p /etc/silencer
+
+      # Lobby env. Mongo + LavinMQ talk via localhost — single box.
+      cat > /etc/silencer/lobby.env <<EOF
+      MONGO_URL=mongodb://silencer:$MONGO_PWD@127.0.0.1:27017/silencer?authSource=silencer
+      AMQP_URL=amqp://silencer:$LAVINMQ_PWD@127.0.0.1:5672/
+      EOF
+      chmod 0600 /etc/silencer/lobby.env
+
+      # admin-api env. LOBBY_* point at localhost; no GitHub-backed
+      # backups (BACKUP_KEEP=0 disables the cron in services/admin-api).
+      cat > /etc/silencer/admin-api.env <<EOF
+      PORT=24080
+      MONGO_URL=mongodb://silencer:$MONGO_PWD@127.0.0.1:27017/silencer?authSource=silencer
+      AMQP_URL=amqp://silencer:$LAVINMQ_PWD@127.0.0.1:5672/
+      JWT_SECRET=$JWT
+      LOBBY_PLAYER_AUTH_URL=http://127.0.0.1:15171
+      LOBBY_MAP_API_URL=http://127.0.0.1:15172
+      BACKUP_DIR=/var/lib/silencer-backups
+      BACKUP_KEEP=0
+      ASSETS_DIR=/assets
+      EOF
+      chmod 0600 /etc/silencer/admin-api.env
+
+      # docker login to ghcr.io so the admin units can pull their images.
+      echo "$GHCR_TOKEN" | docker login ghcr.io -u silencer --password-stdin
+
+  - path: /etc/silencer/admin-web.env
+    permissions: '0600'
+    owner: root:root
+    content: |
+      PORT=24000
+      HOSTNAME=0.0.0.0
+      NODE_ENV=production
+      NEXT_TELEMETRY_DISABLED=1
+
+  # Image refs updated by deploy-staging.yml. EnvironmentFile-shape so
+  # systemd $${IMAGE} substitution works in ExecStart.
+  - path: /etc/silencer/admin-api.image
+    permissions: '0644'
+    owner: root:root
+    content: |
+      IMAGE=${admin_image_admin_api}
+
+  - path: /etc/silencer/admin-web.image
+    permissions: '0644'
+    owner: root:root
+    content: |
+      IMAGE=${admin_image_admin_web}
+
+  # MongoDB override: enable auth + bind localhost only. Single-box
+  # staging has no remote consumers — everything talks to mongod over
+  # 127.0.0.1.
+  - path: /etc/silencer/mongod-overrides.conf
+    permissions: '0644'
+    owner: root:root
+    content: |
+      security:
+        authorization: enabled
+
+  - path: /etc/systemd/system/silencer-lobby.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Silencer lobby server (staging)
+      After=network-online.target mongod.service lavinmq.service
+      Wants=network-online.target
+      Requires=mongod.service lavinmq.service
+
+      [Service]
+      Type=simple
+      User=silencer
+      Group=silencer
+      WorkingDirectory=/opt/silencer/current
+      # Dedicated-server subprocess writes PALETTECALC*.BIN under $HOME.
+      Environment=HOME=/var/lib/silencer
+      EnvironmentFile=-/etc/silencer/lobby.env
+      ExecStart=/opt/silencer/current/silencer-lobby \
+        -addr :517 \
+        -db /var/lib/silencer/lobby.json \
+        -maps-dir /var/lib/silencer/maps \
+        -map-api-addr :15172 \
+        -update-manifest /opt/silencer/update.json \
+        -public-addr ${public_ip} \
+        -game-binary /opt/silencer/current/silencer
+      Restart=always
+      RestartSec=2
+      AmbientCapabilities=CAP_NET_BIND_SERVICE
+      CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+      NoNewPrivileges=true
+      ProtectSystem=strict
+      ProtectHome=true
+      ReadWritePaths=/var/lib/silencer
+      LimitNOFILE=65535
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/silencer-admin-api.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Silencer admin API (staging)
+      After=docker.service network-online.target mongod.service lavinmq.service
+      Wants=docker.service network-online.target
+      Requires=docker.service
+
+      [Service]
+      Type=simple
+      EnvironmentFile=/etc/silencer/admin-api.image
+      ExecStartPre=-/usr/bin/docker rm -f silencer-admin-api
+      ExecStartPre=/bin/sh -c '[ -n "$${IMAGE}" ] && /usr/bin/docker pull "$${IMAGE}"'
+      ExecStart=/usr/bin/docker run --rm --name silencer-admin-api \
+        --network host \
+        --env-file /etc/silencer/admin-api.env \
+        -v /var/lib/silencer-backups:/backups \
+        -v /var/lib/silencer/assets:/assets \
+        $${IMAGE}
+      ExecStop=/usr/bin/docker stop silencer-admin-api
+      Restart=always
+      RestartSec=5
+      LimitNOFILE=65535
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/systemd/system/silencer-admin-web.service
+    permissions: '0644'
+    owner: root:root
+    content: |
+      [Unit]
+      Description=Silencer admin web (staging)
+      After=docker.service network-online.target
+      Wants=docker.service network-online.target
+      Requires=docker.service
+
+      [Service]
+      Type=simple
+      EnvironmentFile=/etc/silencer/admin-web.image
+      ExecStartPre=-/usr/bin/docker rm -f silencer-admin-web
+      ExecStartPre=/bin/sh -c '[ -n "$${IMAGE}" ] && /usr/bin/docker pull "$${IMAGE}"'
+      ExecStart=/usr/bin/docker run --rm --name silencer-admin-web \
+        --network host \
+        --env-file /etc/silencer/admin-web.env \
+        $${IMAGE}
+      ExecStop=/usr/bin/docker stop silencer-admin-web
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  - mkdir -p /opt/silencer/releases /var/lib/silencer/maps /var/lib/silencer/assets /var/lib/silencer-backups
+
+  # Install AWS CLI v2. The `awscli` apt package is gone from Ubuntu
+  # Noble; the official installer is small, current, and arch-correct.
+  - |
+    set -e
+    for i in 1 2 3 4 5; do
+      DEBIAN_FRONTEND=noninteractive apt-get install -y unzip && break
+      sleep 10
+    done
+    curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip" -o /tmp/awscliv2.zip
+    unzip -q /tmp/awscliv2.zip -d /tmp
+    /tmp/aws/install
+    rm -rf /tmp/aws /tmp/awscliv2.zip
+
+  # Add MongoDB 8.0 + LavinMQ apt repos, then install both.
+  - install -d -m 0755 /etc/apt/keyrings
+  - curl -fsSL https://www.mongodb.org/static/pgp/server-8.0.asc | gpg --dearmor -o /etc/apt/keyrings/mongodb-server-8.0.gpg
+  - |
+    echo "deb [arch=arm64 signed-by=/etc/apt/keyrings/mongodb-server-8.0.gpg] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" \
+      > /etc/apt/sources.list.d/mongodb-org-8.0.list
+  - curl -fsSL https://packagecloud.io/cloudamqp/lavinmq/gpgkey | gpg --dearmor -o /etc/apt/keyrings/lavinmq.gpg
+  - |
+    . /etc/os-release
+    echo "deb [signed-by=/etc/apt/keyrings/lavinmq.gpg] https://packagecloud.io/cloudamqp/lavinmq/$ID $VERSION_CODENAME main" \
+      > /etc/apt/sources.list.d/lavinmq.list
+  - apt-get update
+  - DEBIAN_FRONTEND=noninteractive apt-get install -y mongodb-org lavinmq
+
+  # mongod config: cap WT cache + bind localhost. Same three-mechanism
+  # pattern as prod (sed to overwrite bindIp, awk to inject cacheSizeGB
+  # under storage:, cat-append for the security: top-level key).
+  - |
+    sed -i "s|^  bindIp:.*|  bindIp: 127.0.0.1|" /etc/mongod.conf
+    awk '/^storage:$/{print; print "  wiredTiger:"; print "    engineConfig:"; print "      cacheSizeGB: 0.25"; next} {print}' /etc/mongod.conf > /etc/mongod.conf.new
+    mv /etc/mongod.conf.new /etc/mongod.conf
+    cat /etc/silencer/mongod-overrides.conf >> /etc/mongod.conf
+
+  # Render /etc/silencer/{lobby,admin-api}.env from SSM and docker-login GHCR.
+  - /usr/local/sbin/silencer-fetch-secrets
+
+  # Bootstrap the silencer Mongo user with auth temporarily disabled,
+  # then re-enable. Same shape as prod-admin.
+  - "sed -i 's|^  authorization: enabled|  authorization: disabled|' /etc/mongod.conf"
+  - chown -R mongodb:mongodb /var/lib/mongodb
+  - systemctl daemon-reload
+  - systemctl enable --now mongod
+  - sleep 5
+  - |
+    MONGO_PWD=$(aws ssm get-parameter --region ${aws_region} \
+      --name /silencer-staging/mongo_silencer_password \
+      --with-decryption --query Parameter.Value --output text)
+    TMPF=$(mktemp); chmod 0600 "$TMPF"
+    cat > "$TMPF" <<EOF
+    try { db.dropUser("silencer"); } catch (e) {}
+    db.createUser({user: "silencer", pwd: "$MONGO_PWD", roles: [ { role: "readWrite", db: "silencer" } ]});
+    EOF
+    mongosh "mongodb://127.0.0.1:27017/silencer" --quiet --file "$TMPF"
+    rm -f "$TMPF"
+    unset MONGO_PWD
+  - "sed -i 's|^  authorization: disabled|  authorization: enabled|' /etc/mongod.conf"
+  - systemctl restart mongod
+
+  # LavinMQ user with full perms on / vhost.
+  - chown -R lavinmq:lavinmq /var/lib/lavinmq
+  - systemctl enable --now lavinmq
+  - sleep 3
+  - |
+    LAVINMQ_PWD=$(aws ssm get-parameter --region ${aws_region} \
+      --name /silencer-staging/lavinmq_silencer_password \
+      --with-decryption --query Parameter.Value --output text)
+    lavinmqctl add_user silencer "$LAVINMQ_PWD"
+    lavinmqctl set_permissions -p / silencer '.*' '.*' '.*'
+    unset LAVINMQ_PWD
+
+  # /opt/silencer is ubuntu-owned so GH Actions can scp releases without sudo.
+  - chown -R ubuntu:ubuntu /opt/silencer
+  - chown -R silencer:silencer /var/lib/silencer
+
+  # Tailscale: tag:server (same ACL as prod) so GH Actions runners can
+  # SSH in. --accept-dns=false prevents MagicDNS from interfering with
+  # AWS internal DNS resolution.
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  - systemctl enable --now tailscaled
+  - tailscale up --authkey=${tailscale_auth_key} --hostname=${tailscale_hostname} --advertise-tags=tag:server --accept-dns=false --ssh=false
+
+  # Symlink shared/assets dir into the path the dedicated-server expects.
+  # The deploy workflow scps assets into /opt/silencer/current/assets;
+  # this just creates the destination link so the binary finds them.
+  - ln -sfn /opt/silencer/current/assets /usr/local/share/silencer || true
+
+  # Enable docker + the three app units. All three crash-loop until the
+  # deploy workflow lands the lobby binary and writes real image refs to
+  # /etc/silencer/{admin-api,admin-web}.image — same pattern as prod.
+  - systemctl enable --now docker
+  - usermod -aG docker ubuntu
+  - systemctl daemon-reload
+  - systemctl enable silencer-lobby silencer-admin-api silencer-admin-web
+  - systemctl start silencer-lobby silencer-admin-api silencer-admin-web || true
