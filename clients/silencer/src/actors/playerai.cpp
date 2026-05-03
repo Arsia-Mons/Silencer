@@ -519,6 +519,17 @@ bool PlayerAI::FollowPath(World & world){
 				int targetY = (int)targetplatformset->platforms[0]->y1;
 				if(player.y > targetY + 15) player.input.keyjetpack = true;
 			}
+		} else if(linktype == LINK_JUMP && !targetplatformset->platforms.empty()){
+			// Clamp horizontal push for jump links — stop when within target platform x range
+			int toX1 = 32767, toX2 = -32768;
+			for(auto* p : targetplatformset->platforms){
+				if(p->x1 < toX1) toX1 = p->x1;
+				if(p->x2 > toX2) toX2 = p->x2;
+			}
+			if(player.x < toX1 || player.x > toX2){
+				if(linkDir > 0) player.input.keymoveright = true;
+				else            player.input.keymoveleft  = true;
+			}
 		} else {
 			if(linkDir > 0) player.input.keymoveright = true;
 			else            player.input.keymoveleft  = true;
@@ -761,14 +772,22 @@ bool PlayerAI::FindAnyLink(World & world, PlatformSet & from, PlatformSet & to){
 	if(!world.map.navlinks.empty()){
 		for(const auto & nl : world.map.navlinks){
 			if(nl.from->set != &from || nl.to->set != &to) continue;
-			int ltype = nl.type == Map::NAVLINK_JUMP    ? LINK_JUMP  :
-			            nl.type == Map::NAVLINK_FALL    ? LINK_FALL  : LINK_JETPACK;
-			if(FindLink(world, ltype, from, to)){
-				// For jetpack links, use the designer-baked focal point if set.
-				if(ltype == LINK_JETPACK && nl.targetX != INT32_MIN)
-					linkTargetX = nl.targetX;
-				return true;
-			}
+			if(from.platforms.empty() || to.platforms.empty()) continue;
+			// Trust the designer — bypass geometry thresholds and set link params directly.
+			int fX1 = 32767, fX2 = -32768, tX1 = 32767, tX2 = -32768;
+			for(auto* p : from.platforms){ if(p->x1 < fX1) fX1 = p->x1; if(p->x2 > fX2) fX2 = p->x2; }
+			for(auto* p : to.platforms)  { if(p->x1 < tX1) tX1 = p->x1; if(p->x2 > tX2) tX2 = p->x2; }
+			int fromCX = (fX1 + fX2) / 2, toCX = (tX1 + tX2) / 2;
+			linkDir  = (toCX >= fromCX) ? 1 : -1;
+			int ltype = nl.type == Map::NAVLINK_JUMP  ? LINK_JUMP  :
+			            nl.type == Map::NAVLINK_FALL  ? LINK_FALL  : LINK_JETPACK;
+			linkEdgeX   = (Sint16)((linkDir > 0) ? fX2 : fX1);
+			if(ltype == LINK_JUMP) linkEdgeX = (Sint16)((linkDir > 0) ? fX2 - 8 : fX1 + 8);
+			linktype    = ltype;
+			linkTargetX = INT32_MIN;
+			if(ltype == LINK_JETPACK && nl.targetX != INT32_MIN)
+				linkTargetX = nl.targetX;
+			return true;
 		}
 		return false;
 	}
