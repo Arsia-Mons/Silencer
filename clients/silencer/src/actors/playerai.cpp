@@ -427,7 +427,7 @@ bool PlayerAI::FollowPath(World & world){
 			}
 			// If we've been stuck on this link too long, give up and replan
 			linkStuckTicks++;
-			if(linkStuckTicks > 60){
+			if(linkStuckTicks > 120){
 				linkStuckTicks = 0;
 				ClearTarget();
 				return false;
@@ -686,11 +686,14 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 			int fromCX = (fromX1 + fromX2) / 2;
 			int toCX   = (toX1   + toX2)   / 2;
 			linkDir  = (toCX >= fromCX) ? 1 : -1;
-			// Wall check: ensure no solid wall blocks the flight path
+			// Check only that the vertical ascent above the source isn't blocked.
+			// (A diagonal LOS check is too aggressive — jetpacks ascend nearly
+			// vertically before drifting horizontally, so they can clear walls
+			// that a straight line to the target would hit.)
 			{
 				int edgeX = (linkDir > 0) ? fromX2 : fromX1;
 				int xe = 0, ye = 0;
-				if(world.map.TestLine(edgeX, fromY - 25, toCX, toY - 25, &xe, &ye, Platform::RECTANGLE)) break;
+				if(world.map.TestLine(edgeX, fromY - 25, edgeX, toY - 10, &xe, &ye, Platform::RECTANGLE)) break;
 			}
 			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 : fromX1);
 			linktype = LINK_JETPACK;
