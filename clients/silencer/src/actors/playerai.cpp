@@ -480,9 +480,13 @@ bool PlayerAI::FollowPath(World & world){
 				case LINK_JETPACK:{
 					if(linkDir > 0) player.input.keymoveright = true;
 					else player.input.keymoveleft = true;
-					// Jetpack works from ground; jump too to get airborne faster
-					if(!player.fuellow) player.input.keyjetpack = true;
-					if(player.OnGround()) player.input.keyjump = true;
+					// Walk to the edge first — same as LINK_JUMP — so the bot doesn't fire
+					// the jetpack while pressed against the source platform's adjacent wall.
+					bool atEdge = (linkDir > 0) ? (player.x >= linkEdgeX) : (player.x <= linkEdgeX);
+					if(atEdge){
+						if(!player.fuellow) player.input.keyjetpack = true;
+						if(player.OnGround()) player.input.keyjump = true;
+					}
 				}break;
 			}
 		}
@@ -492,12 +496,25 @@ bool PlayerAI::FollowPath(World & world){
 	// is null so we must keep applying direction and jetpack thrust here every tick.
 	if(targetplatformset && !currentplatform &&
 	   (linktype == LINK_JUMP || linktype == LINK_FALL || linktype == LINK_JETPACK)){
-		if(linkDir > 0) player.input.keymoveright = true;
-		else            player.input.keymoveleft  = true;
-		if(linktype == LINK_JETPACK && !player.fuellow){
-			int targetY = targetplatformset->platforms.empty()
-				? 0 : (int)targetplatformset->platforms[0]->y1;
-			if(player.y > targetY + 15) player.input.keyjetpack = true;
+		if(linktype == LINK_JETPACK && !targetplatformset->platforms.empty()){
+			// Only push horizontally while not yet over the target platform X range —
+			// prevents the bot flying into the wall adjacent to the destination platform.
+			int toX1 = 32767, toX2 = -32768;
+			for(auto* p : targetplatformset->platforms){
+				if(p->x1 < toX1) toX1 = p->x1;
+				if(p->x2 > toX2) toX2 = p->x2;
+			}
+			if(player.x < toX1 || player.x > toX2){
+				if(linkDir > 0) player.input.keymoveright = true;
+				else            player.input.keymoveleft  = true;
+			}
+			if(!player.fuellow){
+				int targetY = (int)targetplatformset->platforms[0]->y1;
+				if(player.y > targetY + 15) player.input.keyjetpack = true;
+			}
+		} else {
+			if(linkDir > 0) player.input.keymoveright = true;
+			else            player.input.keymoveleft  = true;
 		}
 	}
 	if(targetplatformset){
@@ -661,7 +678,6 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 			int fromY      = getY(from);
 			int toY        = getY(to);
 			int heightDiff = fromY - toY; // positive = to is higher up
-			// Regular jump reaches ~48px up; also allow gap-jumps at same/slightly lower level
 			if(heightDiff > 50)  break; // too high — use jetpack
 			if(heightDiff < -20) break; // too far below — use fall
 			int fromX1 = getX1(from), fromX2 = getX2(from);
@@ -671,23 +687,27 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 			int fromCX = (fromX1 + fromX2) / 2;
 			int toCX   = (toX1   + toX2)   / 2;
 			linkDir  = (toCX >= fromCX) ? 1 : -1;
-			// Wall check: look for solid walls in the travel corridor.
-			// For gap > 0: check the open space between the platform edges.
-			// For gap == 0: check a narrow corridor between the two platform centers.
+			// Check the full travel corridor for wall-like platforms.
+			// Walls are taller than wide (height > width); floors are wider than tall.
+			// Check from 2px above the lower platform up to player-body height so the
+			// source/target floor platforms themselves are excluded from the box.
 			{
-				int cX1, cX2;
-				if(gap > 0){
-					cX1 = (linkDir > 0) ? fromX2 + 1 : toX2 + 1;
-					cX2 = (linkDir > 0) ? toX1 - 1   : fromX1 - 1;
-				} else {
-					cX1 = std::min(fromCX, toCX) + 4;
-					cX2 = std::max(fromCX, toCX) - 4;
+				int cX1 = std::min(fromX1, toX1) + 1;
+				int cX2 = std::max(fromX2, toX2) - 1;
+				int cY1 = std::min(fromY, toY) - 52;
+				int cY2 = std::max(fromY, toY) - 2;
+				if(cX2 > cX1){
+					Platform* exc = nullptr;
+					bool blocked = false;
+					for(int i = 0; i < 32; ++i){
+						Platform* hit = world.map.TestAABB(cX1, cY1, cX2, cY2, Platform::RECTANGLE, exc);
+						if(!hit) break;
+						if((hit->y2 - hit->y1) > (hit->x2 - hit->x1)){ blocked = true; break; }
+						exc = hit;
+					}
+					if(blocked) break;
 				}
-				int cY1 = std::min(fromY, toY) - 32; // player body height above lower platform
-				int cY2 = std::max(fromY, toY) - 1;
-				if(cX2 > cX1 && world.map.TestAABB(cX1, cY1, cX2, cY2, Platform::RECTANGLE)) break;
 			}
-			// Jump off edge facing target
 			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 - 8 : fromX1 + 8);
 			linktype = LINK_JUMP;
 			return true;
