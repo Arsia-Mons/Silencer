@@ -537,6 +537,8 @@ bool PlayerAI::FollowPath(World & world){
 				if(linkDir > 0) player.input.keymoveright = true;
 				else            player.input.keymoveleft  = true;
 			}
+		} else if(linktype == LINK_FALL){
+			// FALL: platforms overlap in X so gravity handles landing; no horizontal push needed.
 		} else {
 			if(linkDir > 0) player.input.keymoveright = true;
 			else            player.input.keymoveleft  = true;
@@ -846,8 +848,15 @@ std::vector<Terminal *> PlayerAI::FindNearestTerminals(World & world){
 			}
 		}
 	}
-	std::random_shuffle(terminals.begin(), terminals.end());
-	std::sort(terminals.begin(), terminals.end(), TerminalSort);
+	// Sort: SECRETREADY first, then by Manhattan distance so each bot targets its nearest terminal.
+	std::sort(terminals.begin(), terminals.end(), [this](Terminal* a, Terminal* b){
+		bool aSecret = (a->state == Terminal::SECRETREADY);
+		bool bSecret = (b->state == Terminal::SECRETREADY);
+		if(aSecret != bSecret) return aSecret > bSecret;
+		int distA = abs(a->x - player.x) + abs(a->y - player.y);
+		int distB = abs(b->x - player.x) + abs(b->y - player.y);
+		return distA < distB;
+	});
 	return terminals;
 }
 
@@ -928,11 +937,4 @@ HealMachine * PlayerAI::GetHealMachine(World & world){
 		}
 	}
 	return best;
-}
-
-bool PlayerAI::TerminalSort(Terminal * a, Terminal * b){
-	if(a->state == Terminal::SECRETREADY && b->state != Terminal::SECRETREADY){
-		return true;
-	}
-	return false;
 }
