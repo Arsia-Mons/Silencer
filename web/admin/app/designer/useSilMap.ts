@@ -396,11 +396,10 @@ export function useSilMap(): UseSilMapReturn {
     ldv.setUint32(off, navLinks.length, true); off += 4;
     ldv.setUint32(off, 0, true); off += 4;
     for (const link of navLinks) {
-      ldv.setUint32(off,     link.fromIdx, true); off += 4;
-      ldv.setUint32(off,     link.toIdx,   true); off += 4;
-      ldv.setUint8 (off,     link.type);          off += 4;
-      ldv.setInt32 (off,     link.targetX, true); off += 4; // 1 byte type + 3 padding (buffer is pre-zeroed)
-      ldv.setInt32 (off,     link.targetX, true); off += 4;
+      ldv.setUint32(off, link.fromIdx, true); off += 4;
+      ldv.setUint32(off, link.toIdx,   true); off += 4;
+      ldv.setUint8 (off, link.type);          off += 4; // 1 byte type + 3 padding (buffer is pre-zeroed)
+      ldv.setInt32 (off, link.targetX, true); off += 4;
     }
 
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
