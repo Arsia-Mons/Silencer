@@ -2,6 +2,7 @@
 #include "stb_image_write.h"
 #include "renderer.h"
 #include "sprite.h"
+#include "platformset.h"
 #include "resources.h"
 #include "objecttypes.h"
 #include "button.h"
@@ -213,6 +214,8 @@ void Renderer::Draw(Surface * surface, float frametime){
 		char fpsbuf[16];
 		snprintf(fpsbuf, sizeof(fpsbuf), "%d FPS", fpsDisplay);
 		DrawText(surface, 4, 4, fpsbuf, 133, 6, false, 68, 0, false);
+
+
 	}else{
 		world.debuglines.clear();
 	}
@@ -3553,7 +3556,13 @@ void Renderer::DrawPlayerList(Surface * surface){
 						int textx = dstrect.x + 40;
 						int texty = dstrect.y + yoffset2 + (i * 12) + 1;
 						User * user = world.lobby.GetUserInfo(peer->accountid);
-						DrawText(surface, textx, texty, user->name, 133, 6);
+						char displayname[120];
+						if(peer->isbot){
+							snprintf(displayname, sizeof(displayname), "%s [BOT]", user->name);
+						}else{
+							snprintf(displayname, sizeof(displayname), "%s", user->name);
+						}
+						DrawText(surface, textx, texty, displayname, 133, 6);
 						char text[100];
 						sprintf(text, "L:%d    E:%d  S:%d  J:%d  H:%d  C:%d", user->agency[team->agency].level, user->agency[team->agency].endurance, user->agency[team->agency].shield, user->agency[team->agency].jetpack, user->agency[team->agency].hacking, user->agency[team->agency].contacts);
 						DrawText(surface, 640 - 50 - 10 - ((strlen(text) + 1) * 6), texty, text, 133, 6);

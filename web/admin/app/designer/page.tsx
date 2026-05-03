@@ -14,6 +14,7 @@ import TileContextMenu from './TileContextMenu';
 import type { TileMenuInfo } from './TileContextMenu';
 import MapPropertiesPanel from './MapPropertiesPanel';
 import ActorListPanel from './ActorListPanel';
+import NavLinkPanel from './NavLinkPanel';
 import Minimap from './Minimap';
 import type { MapActor } from '../../lib/types';
 import { API } from '../../lib/api';
@@ -27,6 +28,7 @@ interface VisState {
   grid: boolean;
   lighting: boolean;
   parallax: boolean;
+  links: boolean;
 }
 
 interface ActorMenu {
@@ -50,6 +52,7 @@ export default function DesignerPage() {
   const { map, openMap, saveMap, publishMap, createMap, updateTile, patchTile, applyTileBatch, applyAllLayersBatch, beginPaint, commitPaint,
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
           updateHeader, updatePlatform, addShadowZone, removeShadowZone,
+          addNavLink, removeNavLink, updateNavLink,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   type TileSel = { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number };
@@ -67,6 +70,9 @@ export default function DesignerPage() {
   const [selectedTileId, setSelectedTile] = useState(0);
   const [selectedActorId, setSelectedActor] = useState(36); // player start default
   const [selectedPlatformIdx, setSelectedPlatformIdx] = useState<number | null>(null);
+  const [navLinkType, setNavLinkType] = useState<0 | 1 | 2>(0);
+  const [linkFromIdx, setLinkFromIdx] = useState<number | null>(null);
+  const [selectedNavLinkIdx, setSelectedNavLinkIdx] = useState<number | null>(null);
   const [tileLayerType, setTileLayerType] = useState<'bg' | 'fg'>('bg');
   const [tileSelection, setTileSelection] = useState<TileSel | null>(null);
   const [tileCopyBuffer, setTileCopyBuffer] = useState<TileCopyBuf | null>(null);
@@ -89,7 +95,7 @@ export default function DesignerPage() {
   const [actorMenu, setActorMenu] = useState<ActorMenu | null>(null);
   const [tileMenu, setTileMenu] = useState<TileMenuInfo | null>(null);
   const [highlightActorIdx, setHighlightActorIdx] = useState<number | null>(null);
-  const [rightTab, setRightTab] = useState<'tiles' | 'actors'>('tiles');
+  const [rightTab, setRightTab] = useState<'tiles' | 'actors' | 'links'>('tiles');
   const [vis, setVis] = useState<VisState>({
     bg: [true, true, true, true],
     fg: [true, true, true, true],
@@ -98,6 +104,7 @@ export default function DesignerPage() {
     grid: true,
     lighting: true,
     parallax: true,
+    links: true,
   });
   const [gridSize, setGridSize] = useState(16);
   const toggleVis = (key: keyof VisState, idx: number | null = null) => setVis(v => {
@@ -187,6 +194,14 @@ export default function DesignerPage() {
   // Clear platform selection when switching away from SELECT tool
   useEffect(() => {
     if (activeTool !== 'SELECT') setSelectedPlatformIdx(null);
+  }, [activeTool]);
+
+  useEffect(() => {
+    if (activeTool !== 'NAV_LINK') setLinkFromIdx(null);
+  }, [activeTool]);
+
+  useEffect(() => {
+    if (activeTool !== 'SELECT') setSelectedNavLinkIdx(null);
   }, [activeTool]);
 
   const applyResize = () => {
@@ -284,12 +299,18 @@ export default function DesignerPage() {
         case 'g': setVis(v => ({ ...v, grid: !v.grid })); break;
         case 'l': setVis(v => ({ ...v, lighting: !v.lighting })); break;
         case '?': setShowHotkeys(h => !h); break;
+        case 'Delete':
+          if (selectedNavLinkIdx !== null) {
+            removeNavLink(selectedNavLinkIdx);
+            setSelectedNavLinkIdx(null);
+          }
+          break;
         default: break;
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undo, redo, handleToolChange]);
+  }, [undo, redo, handleToolChange, selectedNavLinkIdx, removeNavLink]);
 
   const handleDataDir = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) loadFiles(e.target.files);
@@ -359,6 +380,10 @@ export default function DesignerPage() {
   const handleShadowZoneRemove = useCallback((idx: number) => {
     removeShadowZone(idx);
   }, [removeShadowZone]);
+
+  const handleNavLinkAdd = useCallback((fromIdx: number, toIdx: number, type: 0 | 1 | 2, sourceX: number, targetX: number) => {
+    addNavLink({ fromIdx, toIdx, type, sourceX, targetX });
+  }, [addNavLink]);
 
   const handleTilePaste = useCallback((tx: number, ty: number) => {
     if (!tileCopyBuffer || !map) return;
@@ -795,6 +820,8 @@ export default function DesignerPage() {
           onLumModeChange={setLumMode}
           eraseLayerType={eraseLayerType}
           onEraseLayerTypeChange={setEraseLayerType}
+          navLinkType={navLinkType}
+          onNavLinkTypeChange={setNavLinkType}
         />
 
         {/* Map Properties Panel */}
@@ -829,7 +856,7 @@ export default function DesignerPage() {
                 </button>
               ))}
               <span className="text-[#1a3a1a] text-xs mx-0.5">|</span>
-              {([['PLT','platforms'],['ACT','actors'],['PARA','parallax'],['GRID','grid'],['LIGHT','lighting']] as [string, keyof VisState][]).map(([lbl, key]) => (
+              {([['PLT','platforms'],['ACT','actors'],['PARA','parallax'],['GRID','grid'],['LIGHT','lighting'],['LINKS','links']] as [string, keyof VisState][]).map(([lbl, key]) => (
                 <button key={key} onClick={() => toggleVis(key)}
                   className={`px-1.5 py-0.5 text-xs font-mono rounded border ${vis[key] ? 'border-[#3a3a2a] text-[#c0c080] bg-[#1a1a0d]' : 'border-[#1a1a1a] text-[#3a3a3a] bg-transparent line-through'}`}>
                   {lbl}
@@ -909,6 +936,12 @@ export default function DesignerPage() {
               tileCopyBuffer={tileCopyBuffer}
               pastePending={pastePending}
               onTilePaste={handleTilePaste}
+              navLinkType={navLinkType}
+              linkFromIdx={linkFromIdx}
+              selectedNavLinkIdx={selectedNavLinkIdx}
+              onNavLinkAdd={handleNavLinkAdd}
+              onNavLinkSelect={setSelectedNavLinkIdx}
+              onLinkFromIdxChange={setLinkFromIdx}
             />
             <Minimap
               map={map}
@@ -925,14 +958,14 @@ export default function DesignerPage() {
           <div className="w-72 flex-shrink-0 border-l border-game-border bg-game-bgCard overflow-hidden flex flex-col">
             {/* Tab bar */}
             <div className="flex border-b border-game-border shrink-0">
-              {(['tiles', 'actors'] as const).map(tab => (
+              {(['tiles', 'actors', 'links'] as const).map(tab => (
                 <button key={tab} onClick={() => setRightTab(tab)}
                   className={`flex-1 py-1.5 text-[10px] font-mono tracking-widest transition-colors ${
                     rightTab === tab
                       ? 'text-game-primary border-b-2 border-game-primary bg-game-dark'
                       : 'text-game-textDim hover:text-game-text'
                   }`}>
-                  {tab === 'tiles' ? 'TILES' : 'ACTORS'}
+                  {tab === 'tiles' ? 'TILES' : tab === 'actors' ? 'ACTORS' : 'LINKS'}
                 </button>
               ))}
             </div>
@@ -956,6 +989,29 @@ export default function DesignerPage() {
               />
             )}
             {rightTab === 'actors' && !map && (
+              <div className="flex-1 flex items-center justify-center p-4">
+                <span className="text-[10px] font-mono text-game-textDim">No map loaded</span>
+              </div>
+            )}
+            {rightTab === 'links' && map && (
+              <NavLinkPanel
+                navLinks={map.navLinks ?? []}
+                platforms={map.platforms}
+                selectedIdx={selectedNavLinkIdx}
+                onSelect={setSelectedNavLinkIdx}
+                onRemove={removeNavLink}
+                onTypeChange={(idx, type) => updateNavLink(idx, { type })}
+                onSourceXChange={(idx, v) => updateNavLink(idx, { sourceX: v })}
+                onTargetXChange={(idx, v) => updateNavLink(idx, { targetX: v })}
+                onCenter={(midX, midY) => {
+                  const container = canvasContainerRef.current;
+                  if (!container) return;
+                  const { width: cw, height: ch } = container.getBoundingClientRect();
+                  setPan({ x: cw / 2 - midX * zoom, y: ch / 2 - midY * zoom });
+                }}
+              />
+            )}
+            {rightTab === 'links' && !map && (
               <div className="flex-1 flex items-center justify-center p-4">
                 <span className="text-[10px] font-mono text-game-textDim">No map loaded</span>
               </div>

@@ -81,6 +81,12 @@ label.fbtn:hover { background: #1e1e3a; }
   <button id="tb-track"    class="tool-btn" onclick="setTool('track')"    title="Draw TRACK platform (drag)">— TRK</button>
   <button id="tb-erase_plat" class="tool-btn" onclick="setTool('erase_plat')" title="Erase platform under click">✕ EPLAT</button>
   <button id="tb-actor"    class="tool-btn" onclick="setTool('actor')"    title="Place actor at click position">● ACT</button>
+  <button id="tb-link"     class="tool-btn" onclick="setTool('link')"     title="Place AI nav link between platforms (N) — click source then dest; right-click to cancel">⇒ LINK</button>
+  <select id="link-type-sel" onchange="state.linkType=this.value" title="Nav link type for LINK tool" style="width:82px">
+    <option value="JUMP">JUMP</option>
+    <option value="FALL">FALL</option>
+    <option value="JETPACK">JETPACK</option>
+  </select>
   <div class="sep"></div>
   <span class="sl">Layer:</span>
   <select id="layer-sel" onchange="updateLayer()" style="width:62px">
@@ -274,7 +280,8 @@ const state = {
   panning: false, panStart:null, camAtPan:null,
   drawing: false, drawWX:0, drawWY:0,
 
-  selActor: null, selPlat: null,
+  selActor: null, selPlat: null, selLink: null,
+  linkType: 'JUMP', linkFrom: null,
   showGrid: false, showPlat: true, showAct: true,
   dirty: true,
 };
@@ -524,7 +531,37 @@ function parseSIL(ab) {
     platforms.push(pl);
   }
 
-  return { hdr, cells, actors, platforms, mmBytes, W, H };
+  // Shadow zones — skip (16 bytes each; not edited in designer)
+  if(li + 8 <= level.length) {
+    const numZones = rd32le(level, li); li += 8;
+    li += numZones * 16;
+  }
+
+  // Light shadow masks — skip (variable size; not edited in designer)
+  if(li + 8 <= level.length) {
+    const numMasks = rd32le(level, li); li += 8;
+    for(let m = 0; m < numMasks && li + 12 <= level.length; m++) {
+      li += 8; // x, y
+      const diam = rd32le(level, li); li += 4;
+      li += diam * diam;
+    }
+  }
+
+  // Nav links — designer-baked AI traversal hints (jump/fall/jetpack)
+  const LINK_TYPES_BY_BYTE = ['JUMP', 'FALL', 'JETPACK'];
+  const navlinks = [];
+  if(li + 8 <= level.length) {
+    const numLinks = rd32le(level, li); li += 8;
+    for(let l = 0; l < numLinks && li + 12 <= level.length; l++) {
+      const fromIdx = rd32le(level, li); li += 4;
+      const toIdx   = rd32le(level, li); li += 4;
+      const type    = LINK_TYPES_BY_BYTE[level[li]] ?? 'JUMP'; li += 4;
+      if(fromIdx < platforms.length && toIdx < platforms.length)
+        navlinks.push({ from: platforms[fromIdx], to: platforms[toIdx], type });
+    }
+  }
+
+  return { hdr, cells, actors, platforms, navlinks, mmBytes, W, H };
 }
 
 function platType(t1,t2) {
@@ -709,6 +746,55 @@ function render() {
     }
   }
 
+  // Nav links — colored arrows between platform centers
+  if(showPlat && mapData.navlinks && mapData.navlinks.length) {
+    const LINK_CLR = { JUMP: '#00ff88', FALL: '#ffdd00', JETPACK: '#ff6644' };
+    const platCx = pl => (pl.x1 + pl.x2) / 2;
+    const platCy = pl => (pl.y1 + pl.y2) / 2;
+    mctx.lineWidth = Math.max(1, 2/zoom);
+    for(const nl of mapData.navlinks) {
+      const color = LINK_CLR[nl.type] || '#fff';
+      const ax = platCx(nl.from), ay = platCy(nl.from);
+      const bx = platCx(nl.to),   by = platCy(nl.to);
+      const dx = bx - ax, dy = by - ay, len = Math.sqrt(dx*dx+dy*dy);
+      if(len < 1) continue;
+      const ux = dx/len, uy = dy/len;
+      const px = -uy, py = ux; // perpendicular (for offset, avoid overlap)
+      const ox = px*4, oy = py*4;
+      const selected = nl === state.selLink;
+      mctx.strokeStyle = selected ? '#fff' : color + 'cc';
+      mctx.beginPath();
+      mctx.moveTo(ax+ox, ay+oy);
+      mctx.lineTo(bx+ox, by+oy);
+      mctx.stroke();
+      // Arrowhead
+      const ah = 10, aw = 5;
+      const tx = bx+ox - ux*ah, ty = by+oy - uy*ah;
+      mctx.fillStyle = selected ? '#fff' : color + 'cc';
+      mctx.beginPath();
+      mctx.moveTo(bx+ox, by+oy);
+      mctx.lineTo(tx + px*aw, ty + py*aw);
+      mctx.lineTo(tx - px*aw, ty - py*aw);
+      mctx.closePath();
+      mctx.fill();
+      // Label
+      if(zoom >= 0.35) {
+        mctx.fillStyle = selected ? '#fff' : color;
+        mctx.font = `${Math.max(6, 8/zoom)}px monospace`;
+        mctx.textAlign = 'center'; mctx.textBaseline = 'bottom';
+        mctx.fillText(nl.type, (ax+bx)/2+ox, (ay+by)/2+oy);
+      }
+    }
+    // Highlight linkFrom platform while placing a link
+    if(state.linkFrom) {
+      mctx.strokeStyle = '#fff';
+      mctx.lineWidth = Math.max(2, 3/zoom);
+      const p = state.linkFrom;
+      const px2 = Math.min(p.x1,p.x2), py2 = Math.min(p.y1,p.y2);
+      mctx.strokeRect(px2, py2, Math.abs(p.x2-p.x1), Math.abs(p.y2-p.y1));
+    }
+  }
+
   // Hovered cell highlight (tile tool)
   if (state.tool==='tile' && state.mouse.cx>=0 && state.mouse.cy>=0) {
     mctx.strokeStyle='rgba(0,255,136,0.7)';
@@ -787,6 +873,7 @@ tileCanvas.addEventListener('click', (e) => {
 // ═══════════════════════════════════════════════════════
 function setTool(t) {
   state.tool=t;
+  state.linkFrom=null; // cancel pending link
   document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
   const tb=document.getElementById('tb-'+t);
   if(tb) tb.classList.add('active');
@@ -883,6 +970,40 @@ function addPlatform(wx1,wy1,wx2,wy2) {
   state.dirty=true;
 }
 
+function platAt(wx, wy) {
+  if(!state.mapData) return null;
+  const plats = state.mapData.platforms;
+  for(let i = plats.length-1; i >= 0; i--) {
+    const p = plats[i];
+    if(wx>=Math.min(p.x1,p.x2)&&wx<=Math.max(p.x1,p.x2)&&
+       wy>=Math.min(p.y1,p.y2)&&wy<=Math.max(p.y1,p.y2)) return p;
+  }
+  return null;
+}
+
+function linkAt(wx, wy) {
+  if(!state.mapData || !state.mapData.navlinks) return null;
+  const platCx = p => (p.x1+p.x2)/2, platCy = p => (p.y1+p.y2)/2;
+  const THRESH = 10 / state.cam.zoom;
+  for(const nl of state.mapData.navlinks) {
+    const ax = platCx(nl.from), ay = platCy(nl.from);
+    const bx = platCx(nl.to),   by = platCy(nl.to);
+    const dx = bx-ax, dy = by-ay, len = Math.sqrt(dx*dx+dy*dy);
+    if(len < 1) continue;
+    const t = Math.max(0, Math.min(1, ((wx-ax)*dx+(wy-ay)*dy)/(len*len)));
+    const cx = ax+t*dx, cy = ay+t*dy;
+    if(Math.sqrt((wx-cx)**2+(wy-cy)**2) <= THRESH) return nl;
+  }
+  return null;
+}
+
+function addNavLink(from, to) {
+  if(!state.mapData) return;
+  if(!state.mapData.navlinks) state.mapData.navlinks = [];
+  state.mapData.navlinks.push({ from, to, type: state.linkType });
+  state.dirty = true;
+}
+
 function eraseplatAt(wx,wy) {
   if(!state.mapData) return;
   const plats=state.mapData.platforms;
@@ -897,7 +1018,7 @@ function eraseplatAt(wx,wy) {
 
 function selectAt(wx,wy) {
   if(!state.mapData) return;
-  state.selActor=null; state.selPlat=null;
+  state.selActor=null; state.selPlat=null; state.selLink=null;
   // Check actors first
   for(const ac of state.mapData.actors) {
     const dx=ac.x-wx, dy=ac.y-wy;
@@ -911,6 +1032,9 @@ function selectAt(wx,wy) {
       state.selPlat=p; state.dirty=true; return;
     }
   }
+  // Then nav links
+  const nl = linkAt(wx, wy);
+  if(nl) { state.selLink=nl; state.dirty=true; return; }
   state.dirty=true;
 }
 
@@ -922,9 +1046,19 @@ function deleteSelected() {
     state.selActor=null; state.dirty=true;
   }
   if(state.selPlat) {
+    // Also remove nav links that reference this platform
+    if(state.mapData.navlinks) {
+      state.mapData.navlinks = state.mapData.navlinks.filter(
+        nl => nl.from !== state.selPlat && nl.to !== state.selPlat);
+    }
     const i=state.mapData.platforms.indexOf(state.selPlat);
     if(i>=0) state.mapData.platforms.splice(i,1);
     state.selPlat=null; state.dirty=true;
+  }
+  if(state.selLink) {
+    const i = state.mapData.navlinks.indexOf(state.selLink);
+    if(i>=0) state.mapData.navlinks.splice(i,1);
+    state.selLink=null; state.dirty=true;
   }
 }
 
@@ -967,6 +1101,19 @@ mapCanvas.addEventListener('mousedown', (e) => {
       case 'select': selectAt(wx,wy); break;
       case 'actor': placeActor(wx,wy); break;
       case 'erase_plat': eraseplatAt(wx,wy); break;
+      case 'link': {
+        const p = platAt(wx, wy);
+        if(p) {
+          if(!state.linkFrom) {
+            state.linkFrom = p;
+          } else if(p !== state.linkFrom) {
+            addNavLink(state.linkFrom, p);
+            state.linkFrom = null;
+          }
+          state.dirty = true;
+        }
+        break;
+      }
       default:
         if(TOOL_TO_PLAT[state.tool]) {
           state.drawing=true;
@@ -977,7 +1124,8 @@ mapCanvas.addEventListener('mousedown', (e) => {
   } else if(e.button===2) {
     state.rmbDown=true;
     if(state.tool==='tile') paintTile(cx,cy,true);
-    if(state.tool==='select') { state.selActor=null; state.selPlat=null; state.dirty=true; }
+    if(state.tool==='select') { state.selActor=null; state.selPlat=null; state.selLink=null; state.dirty=true; }
+    if(state.tool==='link') { state.linkFrom=null; state.dirty=true; }
   }
 });
 
@@ -1046,6 +1194,7 @@ document.addEventListener('keydown', (e) => {
   if(key==='g') toggleGrid();
   if(key==='v') setTool('select');
   if(key==='t') setTool('tile');
+  if(key==='n') setTool('link');
   if(key==='delete'||key==='backspace') deleteSelected();
   if(key==='+' || key==='=') adjustZoom(0.25);
   if(key==='-') adjustZoom(-0.25);
@@ -1072,12 +1221,14 @@ document.addEventListener('keyup', (e) => {
 // SAVE / EXPORT
 // ═══════════════════════════════════════════════════════
 function buildLevelBytes(mapData) {
-  const {cells,actors,platforms,W,H}=mapData;
+  const {cells,actors,platforms,navlinks,W,H}=mapData;
+  const navLinks = navlinks || [];
   const numCells=W*H;
   const cellBytes=numCells*36;
   const actBytes=8+actors.length*36;
   const platBytes=8+platforms.length*24;
-  const buf=new Uint8Array(cellBytes+actBytes+platBytes);
+  const navBytes=8+navLinks.length*12;
+  const buf=new Uint8Array(cellBytes+actBytes+platBytes+navBytes);
   let i=0;
 
   for(let c=0;c<numCells;c++) {
@@ -1116,6 +1267,18 @@ function buildLevelBytes(mapData) {
     wi32le(buf,i,pl.x1); i+=4; wi32le(buf,i,pl.y1); i+=4;
     wi32le(buf,i,pl.x2); i+=4; wi32le(buf,i,pl.y2); i+=4;
     wi32le(buf,i,info.t1); i+=4; wi32le(buf,i,info.t2); i+=4;
+  }
+
+  const LINK_TYPE_BYTE = { JUMP: 0, FALL: 1, JETPACK: 2 };
+  wr32le(buf,i,navLinks.length); i+=4;
+  wr32le(buf,i,0); i+=4;
+  for(const nl of navLinks) {
+    const fromIdx = platforms.indexOf(nl.from);
+    const toIdx   = platforms.indexOf(nl.to);
+    if(fromIdx < 0 || toIdx < 0) { i+=12; continue; } // dangling ref — skip
+    wr32le(buf,i,fromIdx); i+=4;
+    wr32le(buf,i,toIdx);   i+=4;
+    buf[i] = LINK_TYPE_BYTE[nl.type] ?? 0; i+=4; // type + 3 implicit padding bytes
   }
   return buf;
 }

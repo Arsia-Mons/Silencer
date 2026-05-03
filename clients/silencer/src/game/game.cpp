@@ -2049,6 +2049,12 @@ bool Game::Tick(void){
 				world.GetAuthorityPeer()->controlledlist.push_back(player->id);
 				GiveDefaultItems(*player);
 				int botnum = 0;
+				// Spawn a mix of difficulties: 4 easy, 4 medium, 2 hard
+				const PlayerAI::Difficulty diffs[10] = {
+					PlayerAI::EASY, PlayerAI::EASY, PlayerAI::EASY, PlayerAI::EASY,
+					PlayerAI::MEDIUM, PlayerAI::MEDIUM, PlayerAI::MEDIUM, PlayerAI::MEDIUM,
+					PlayerAI::HARD, PlayerAI::HARD
+				};
 				for(int i = 0; i < 10; i++){
 					Uint8 agency;
 					do{
@@ -2062,7 +2068,7 @@ bool Game::Tick(void){
 						botplayer->suitcolor = botteam->GetColor();
 						botplayer->laserammo = 0;
 						botplayer->credits = GASLoader::Get().player.startingCredits;
-						botplayer->ai = new PlayerAI(*botplayer);
+						botplayer->ai = new PlayerAI(*botplayer, diffs[botnum]);
 						botpeer->controlledlist.push_back(botplayer->id);
 						world.map.RandomPlayerStartLocation(world, botplayer->x, botplayer->y);
 						botplayer->oldx = botplayer->x;
@@ -2560,7 +2566,7 @@ Interface * Game::CreateMainMenuInterface(void){
 	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	iface->AddObject(startbutton->id);
 	iface->AddObject(lobbybutton->id);
-	if(0){
+	if(1){
 		Button * hostbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 		hostbutton->y = -270;
 		hostbutton->x = -240;

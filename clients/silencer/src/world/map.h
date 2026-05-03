@@ -85,6 +85,11 @@ public:
 	std::vector<ShadowZone> shadowzones;
 	struct LightShadowMask { Sint32 x, y; Uint32 diam; std::vector<Uint8> data; };
 	std::vector<LightShadowMask> lightShadowMasks;
+	// Designer-baked AI nav links (jump/fall/jetpack between platform sets).
+	// Directional: from->set → to->set. Empty = fall back to runtime heuristics.
+	static const Uint8 NAVLINK_JUMP = 0, NAVLINK_FALL = 1, NAVLINK_JETPACK = 2;
+	struct NavLink { Platform * from; Platform * to; Uint8 type; Sint32 sourceX; Sint32 targetX; };
+	std::vector<NavLink> navlinks;
 	
 //private:
 	static bool CompareType(std::shared_ptr<Platform> a, std::shared_ptr<Platform> b);

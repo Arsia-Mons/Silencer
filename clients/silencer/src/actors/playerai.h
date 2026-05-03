@@ -7,11 +7,14 @@
 #include "baseexit.h"
 #include "secretreturn.h"
 #include "basedoor.h"
+#include "../stations/healmachine.h"
 
 class PlayerAI
 {
 public:
-	PlayerAI(Player & player);
+	enum Difficulty { EASY = 0, MEDIUM = 1, HARD = 2 };
+
+	PlayerAI(Player & player, Difficulty diff = MEDIUM);
 	void Tick(World & world);
 	bool CreatePathToPlatformSet(World & world, std::deque<PlatformSet *> & path, PlatformSet & target);
 	bool FollowPath(World & world);
@@ -26,21 +29,41 @@ public:
 	BaseExit * GetBaseExit(World & world);
 	SecretReturn * GetSecretReturn(World & world);
 	BaseDoor * GetBaseDoor(World & world);
+	HealMachine * GetHealMachine(World & world);
 	
 private:
+	bool ScanForTarget(World & world);
+	bool ApplyCombat(World & world);
 	void SetState(Uint8 state);
-	static bool TerminalSort(Terminal * a, Terminal * b);
-	enum {IDLE, HACK, EXITBASE, GETSECRET, GOTOBASE, RETURNSECRET};
+	enum {IDLE, HACK, EXITBASE, GETSECRET, GOTOBASE, RETURNSECRET, RETREAT, KILLSECRET};
 	Uint8 state;
+	Difficulty difficulty;
 	Player & player;
 	bool direction;
 	Sint16 targetx, targety;
 	PlatformSet * targetplatformset;
 	bool ladderjumping;
-	enum {LINK_NONE, LINK_LADDER, LINK_FALL, LINK_MAXENUM};
+	enum {LINK_NONE, LINK_LADDER, LINK_FALL, LINK_JUMP, LINK_JETPACK, LINK_MAXENUM};
 	int linktype;
 	Platform * linkladder;
+	int linkDir;      // -1=left, 1=right for fall/jump/jetpack links
+	Sint32 linkEdgeX; // x position to be at before executing jump/fall
+	Sint32 linkTargetX; // baked focal point for LINK_JETPACK airborne (INT32_MIN = use platform range)
+	PlatformSet* linkFromSet; // platform set the bot launched from (for airborne blacklisting)
 	std::deque<PlatformSet *> platformsetpath;
+	// Combat
+	Uint16 combatTarget;        // object id of current enemy, 0=none
+	int combatLockTicks;        // ticks remaining before re-scan
+	Sint16 lastHealth;          // used to detect recent damage for evasion
+	int reactionTicks;          // delay before shooting at a freshly spotted enemy
+	int fireBurstRemaining;     // ticks left in current fire burst
+	int firePauseRemaining;     // ticks left in pause between bursts
+	int jetpackCooldown;        // ticks until next jetpack dodge is allowed
+	int thinkDelay;             // micro-pause ticks after state transitions
+	int linkStuckTicks;         // ticks spent trying the current movement link
+	Terminal * targetTerminal;  // terminal this bot is currently assigned to hack
+	struct BadLink { PlatformSet* from; PlatformSet* to; int ttl; };
+	std::vector<BadLink> badLinks; // links that recently failed; avoided in BFS+FindLink
 };
 
 #endif

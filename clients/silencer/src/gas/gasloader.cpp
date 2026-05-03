@@ -119,6 +119,16 @@ static void LoadPlayer(const std::string& dir, PlayerDef& out,
         out.aiLadderJumpUpInterval     = j.value("aiLadderJumpUpInterval",     out.aiLadderJumpUpInterval);
         out.aiLadderJumpDownInterval   = j.value("aiLadderJumpDownInterval",   out.aiLadderJumpDownInterval);
         out.aiArrivalThreshold         = j.value("aiArrivalThreshold",         out.aiArrivalThreshold);
+        out.aiCombatRange              = j.value("aiCombatRange",              out.aiCombatRange);
+        out.aiFireInterval             = j.value("aiFireInterval",             out.aiFireInterval);
+        out.aiEvadeInterval            = j.value("aiEvadeInterval",            out.aiEvadeInterval);
+        out.aiTargetLockTicks          = j.value("aiTargetLockTicks",          out.aiTargetLockTicks);
+        out.aiRetreatHealthPct         = j.value("aiRetreatHealthPct",         out.aiRetreatHealthPct);
+        out.aiReactionTicks            = j.value("aiReactionTicks",            out.aiReactionTicks);
+        out.aiShootBurstTicks          = j.value("aiShootBurstTicks",          out.aiShootBurstTicks);
+        out.aiShootPauseTicks          = j.value("aiShootPauseTicks",          out.aiShootPauseTicks);
+        out.aiJetpackCombatInterval    = j.value("aiJetpackCombatInterval",    out.aiJetpackCombatInterval);
+        out.aiThinkDelayMax            = j.value("aiThinkDelayMax",            out.aiThinkDelayMax);
         out.deathDropXVRange           = j.value("deathDropXVRange",           out.deathDropXVRange);
         out.deathDropYV                = j.value("deathDropYV",                out.deathDropYV);
         out.govtKillPlasmaXVRange      = j.value("govtKillPlasmaXVRange",      out.govtKillPlasmaXVRange);
