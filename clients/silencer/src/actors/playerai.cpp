@@ -425,7 +425,7 @@ bool PlayerAI::FollowPath(World & world){
 			}
 			// If we've been stuck on this link too long, give up and replan
 			linkStuckTicks++;
-			if(linkStuckTicks > 150){
+			if(linkStuckTicks > 60){
 				linkStuckTicks = 0;
 				ClearTarget();
 				return false;
@@ -658,6 +658,12 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 			int fromCX = (fromX1 + fromX2) / 2;
 			int toCX   = (toX1   + toX2)   / 2;
 			linkDir  = (toCX >= fromCX) ? 1 : -1;
+			// Wall check: ensure no solid wall blocks the jump arc
+			{
+				int edgeX = (linkDir > 0) ? fromX2 : fromX1;
+				int xe = 0, ye = 0;
+				if(world.map.TestLine(edgeX, fromY - 25, toCX, toY - 25, &xe, &ye, Platform::RECTANGLE)) break;
+			}
 			// Jump off edge facing target
 			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 - 8 : fromX1 + 8);
 			linktype = LINK_JUMP;
@@ -677,6 +683,12 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 			int fromCX = (fromX1 + fromX2) / 2;
 			int toCX   = (toX1   + toX2)   / 2;
 			linkDir  = (toCX >= fromCX) ? 1 : -1;
+			// Wall check: ensure no solid wall blocks the flight path
+			{
+				int edgeX = (linkDir > 0) ? fromX2 : fromX1;
+				int xe = 0, ye = 0;
+				if(world.map.TestLine(edgeX, fromY - 25, toCX, toY - 25, &xe, &ye, Platform::RECTANGLE)) break;
+			}
 			linkEdgeX = (Sint16)((linkDir > 0) ? fromX2 : fromX1);
 			linktype = LINK_JETPACK;
 			return true;
