@@ -1,7 +1,7 @@
 # .github/workflows/ — GitHub Actions
 
 Six CI builds (five required by branch protection on `main`,
-`build-linux` optional until added), three deploys, one release.
+`build-linux` optional until added), four deploys, one release.
 Path filters for the CI builds live **inside the job**, not in
 `on:` — see "Required check trap" below.
 
