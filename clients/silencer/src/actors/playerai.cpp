@@ -745,16 +745,27 @@ bool PlayerAI::FindLink(World & world, int type, PlatformSet & from, PlatformSet
 }
 
 bool PlayerAI::FindAnyLink(World & world, PlatformSet & from, PlatformSet & to){
-	int starttype = (rand() % (LINK_MAXENUM - 1)) + 1;
+	// Ladders are always resolved dynamically — they're explicit LADDER geometry.
+	if(FindLink(world, LINK_LADDER, from, to)) return true;
+
+	// If the map has designer-baked nav links, use those exclusively for
+	// jump/fall/jetpack; skip the runtime heuristics entirely.
+	if(!world.map.navlinks.empty()){
+		for(const auto & nl : world.map.navlinks){
+			if(nl.from->set != &from || nl.to->set != &to) continue;
+			int ltype = nl.type == Map::NAVLINK_JUMP    ? LINK_JUMP  :
+			            nl.type == Map::NAVLINK_FALL    ? LINK_FALL  : LINK_JETPACK;
+			if(FindLink(world, ltype, from, to)) return true;
+		}
+		return false;
+	}
+
+	// No baked links — fall back to runtime geometry heuristics (old maps).
+	int starttype = (rand() % (LINK_MAXENUM - 2)) + 2; // skip LINK_NONE and LINK_LADDER
 	int type = starttype;
 	do{
-		if(FindLink(world, type, from, to)){
-			return true;
-		}
-		type++;
-		if(type >= LINK_MAXENUM){
-			type = 1;
-		}
+		if(FindLink(world, type, from, to)) return true;
+		if(++type >= LINK_MAXENUM) type = 2;
 	}while(type != starttype);
 	return false;
 }
