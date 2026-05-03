@@ -81,7 +81,7 @@ label.fbtn:hover { background: #1e1e3a; }
   <button id="tb-track"    class="tool-btn" onclick="setTool('track')"    title="Draw TRACK platform (drag)">— TRK</button>
   <button id="tb-erase_plat" class="tool-btn" onclick="setTool('erase_plat')" title="Erase platform under click">✕ EPLAT</button>
   <button id="tb-actor"    class="tool-btn" onclick="setTool('actor')"    title="Place actor at click position">● ACT</button>
-  <button id="tb-link"     class="tool-btn" onclick="setTool('link')"     title="Place AI nav link between platforms (L) — click source then dest; right-click to cancel">⇒ LINK</button>
+  <button id="tb-link"     class="tool-btn" onclick="setTool('link')"     title="Place AI nav link between platforms (N) — click source then dest; right-click to cancel">⇒ LINK</button>
   <select id="link-type-sel" onchange="state.linkType=this.value" title="Nav link type for LINK tool" style="width:82px">
     <option value="JUMP">JUMP</option>
     <option value="FALL">FALL</option>
@@ -1194,7 +1194,7 @@ document.addEventListener('keydown', (e) => {
   if(key==='g') toggleGrid();
   if(key==='v') setTool('select');
   if(key==='t') setTool('tile');
-  if(key==='l') setTool('link');
+  if(key==='n') setTool('link');
   if(key==='delete'||key==='backspace') deleteSelected();
   if(key==='+' || key==='=') adjustZoom(0.25);
   if(key==='-') adjustZoom(-0.25);
