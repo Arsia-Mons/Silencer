@@ -1,0 +1,228 @@
+name: Deploy staging
+
+# Redeploys the entire stack (lobby + dedicated server + admin-api +
+# admin-web) onto the single-box staging environment on every push to
+# main. Concurrency is the entire backpressure mechanism — see
+# docs/plans/2026-04-27-staging-environment.md for the truth-table.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image refs
+        id: img
+        run: |
+          set -euo pipefail
+          OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          SHORT="${GITHUB_SHA:0:8}"
+          API_IMAGE="ghcr.io/$OWNER/silencer-admin-api"
+          WEB_IMAGE="ghcr.io/$OWNER/silencer-admin-web"
+          # Staging tags are prefixed `staging-` so they never collide
+          # with prod's bare `<sha>` tags in the same registry.
+          echo "api_ref=$API_IMAGE:staging-$SHORT" >> "$GITHUB_OUTPUT"
+          echo "web_ref=$WEB_IMAGE:staging-$SHORT" >> "$GITHUB_OUTPUT"
+
+      # ---- Lobby + dedicated server (mirrors deploy.yml) ----------------
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: services/lobby/go.sum
+
+      - name: Install C++ build deps
+        uses: awalsh128/cache-apt-pkgs-action@v1
+        with:
+          packages: cmake build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf
+          version: 2.0
+
+      - name: Install SDL3 + SDL3_mixer
+        id: setup-sdl
+        uses: libsdl-org/setup-sdl@main
+        with:
+          install-linux-dependencies: true
+          version: 3-latest
+          version-sdl-mixer: 3-latest
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ runner.os }}-${{ github.job }}-staging
+          max-size: 500M
+
+      - name: Build lobby server
+        working-directory: services/lobby
+        run: go build -trimpath -ldflags '-s -w' -o silencer-lobby .
+
+      - name: Build dedicated server (C++ / ARM64)
+        env:
+          # vars.STAGING_LOBBY_HOST is the DNS name (or EIP) devs build
+          # the client against. The same value is baked into the
+          # dedicated server so its self-reported address survives the
+          # client's inet_addr() handoff. Falls back to the public IP
+          # if the host variable isn't set yet.
+          LOBBY_HOST: ${{ vars.STAGING_LOBBY_HOST || vars.STAGING_LOBBY_PUBLIC_IP }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LOBBY_HOST}" ]; then
+            echo "STAGING_LOBBY_HOST or STAGING_LOBBY_PUBLIC_IP repo variable must be set" >&2
+            exit 1
+          fi
+          mkdir -p build && cd build
+          cmake \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DSILENCER_UNITY_BUILD=ON \
+            -DSILENCER_LOBBY_HOST="${LOBBY_HOST}" \
+            ../clients/silencer
+          make -j"$(nproc)"
+
+      # Same SDL3 .so bundling pattern as deploy.yml — without this the
+      # dedicated-server subprocess fails to dlopen libSDL3_mixer.so.0
+      # at runtime and games never start.
+      - name: Bundle SDL3 libs with binary
+        env:
+          SDL3_ROOT: ${{ env.SDL3_ROOT }}
+          SDL3_MIXER_ROOT: ${{ env.SDL3_mixer_ROOT }}
+        run: |
+          set -euo pipefail
+          mkdir -p build/lib
+          cp -L "$SDL3_ROOT/lib/libSDL3.so.0" build/lib/
+          cp -L "$SDL3_MIXER_ROOT/lib/libSDL3_mixer.so.0" build/lib/
+          patchelf --set-rpath '$ORIGIN/lib' build/silencer
+          (cd build && LD_LIBRARY_PATH=lib ldd silencer | grep -E "SDL3|not found")
+
+      # ---- admin-api + admin-web Docker images (mirror deploy-admin-*.yml)
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + push admin-api image (ARM64 native)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/admin-api/Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: ${{ steps.img.outputs.api_ref }}
+          cache-from: type=gha,scope=admin-api
+          cache-to: type=gha,scope=admin-api,mode=max
+
+      - name: Build + push admin-web image (ARM64 native)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: web/admin/Dockerfile
+          push: true
+          platforms: linux/arm64
+          tags: ${{ steps.img.outputs.web_ref }}
+          cache-from: type=gha,scope=admin-web
+          cache-to: type=gha,scope=admin-web,mode=max
+
+      # ---- Deploy ------------------------------------------------------
+
+      - name: Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up \
+            --authkey='${{ secrets.TS_AUTHKEY }}' \
+            --hostname=gh-runner-${{ github.run_id }} \
+            --advertise-tags=tag:server
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+
+      - name: Deploy
+        env:
+          HOST: ${{ vars.STAGING_DEPLOY_HOST }}
+          SHA: ${{ github.sha }}
+          API_REF: ${{ steps.img.outputs.api_ref }}
+          WEB_REF: ${{ steps.img.outputs.web_ref }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HOST}" ]; then
+            echo "STAGING_DEPLOY_HOST repo variable must be set" >&2
+            exit 1
+          fi
+          SHORT=${SHA:0:8}
+          STAGING_DIR=/tmp/silencer-$SHORT
+          RELEASE=/opt/silencer/releases/$SHORT
+          SSH_OPTS="-i ~/.ssh/deploy -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=~/.ssh/known_hosts"
+          SSH="ssh $SSH_OPTS ubuntu@$HOST"
+          SCP="scp $SSH_OPTS"
+
+          # 1. Lobby + dedicated server + assets via scp.
+          $SSH "mkdir -p $STAGING_DIR"
+          $SCP services/lobby/silencer-lobby ubuntu@$HOST:$STAGING_DIR/
+          $SCP build/silencer                ubuntu@$HOST:$STAGING_DIR/
+          $SCP -r build/lib                  ubuntu@$HOST:$STAGING_DIR/
+          $SCP -r shared/assets              ubuntu@$HOST:$STAGING_DIR/
+
+          # 2. Atomic swap + image-ref bumps + restart. The lobby unit's
+          #    ExecStart (including -public-addr) is already templated by
+          #    cloud-init from Terraform's `aws_eip.staging.public_ip`, so
+          #    no drop-in needed — the prod deploy.yml writes one because
+          #    its unit predates the templated -public-addr; we don't have
+          #    that baggage here.
+          $SSH bash -s "$API_REF" "$WEB_REF" "$SHORT" << 'REMOTE'
+          set -euo pipefail
+          API_REF="$1"
+          WEB_REF="$2"
+          SHORT="$3"
+          RELEASE=/opt/silencer/releases/$SHORT
+          STAGING_DIR=/tmp/silencer-$SHORT
+
+          sudo mkdir -p /opt/silencer/releases
+          sudo rm -rf "$RELEASE"
+          sudo mv "$STAGING_DIR" "$RELEASE"
+          sudo chmod +x "$RELEASE/silencer-lobby" "$RELEASE/silencer"
+          sudo ln -sfn "$RELEASE" /opt/silencer/current
+          sudo ln -sfn /opt/silencer/current/assets /usr/local/share/silencer
+
+          # Sync runtime assets dir for admin-api's /assets mount.
+          sudo mkdir -p /var/lib/silencer/assets
+          sudo cp -RL "$RELEASE/assets/." /var/lib/silencer/assets/
+
+          # Image refs.
+          echo "IMAGE=$API_REF" | sudo tee /etc/silencer/admin-api.image > /dev/null
+          echo "IMAGE=$WEB_REF" | sudo tee /etc/silencer/admin-web.image > /dev/null
+
+          sudo systemctl daemon-reload
+          sudo systemctl restart silencer-lobby silencer-admin-api silencer-admin-web
+
+          # Smoke checks. Lobby comes up first; admin units pull their
+          # images on first start so give them more time.
+          sleep 3
+          sudo systemctl is-active silencer-lobby
+          sleep 15
+          sudo systemctl is-active silencer-admin-api
+          sudo systemctl is-active silencer-admin-web
+          curl -sf http://127.0.0.1:24080/api/sprites/121/0 > /dev/null
+
+          # Prune to last 3 releases.
+          cd /opt/silencer/releases
+          ls -1t | tail -n +4 | xargs -r sudo rm -rf
+          REMOTE
