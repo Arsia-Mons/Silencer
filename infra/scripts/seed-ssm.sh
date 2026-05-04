@@ -64,8 +64,11 @@ put_param() {
 }
 
 # Generate a 32-byte url-safe random secret. Used for password-shaped
-# values where any high-entropy string works.
-gen_secret() { openssl rand -base64 32 | tr -d '\n='; }
+# values where any high-entropy string works. Output is base64url
+# (RFC 4648 §5) — `+` → `-`, `/` → `_`, padding stripped — because
+# these passwords end up inside `mongodb://` and `amqp://` URLs and a
+# raw `/` makes Go's `net/url.Parse` see "invalid port after host".
+gen_secret() { openssl rand -base64 32 | tr -d '\n=' | tr '/+' '_-'; }
 
 # Prompt for a value, hiding input. Echoes the result.
 prompt_secret() {
