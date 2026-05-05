@@ -2,7 +2,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { ACTOR_DEFS, PLATFORM_TOOL_TYPES } from './Toolbar';
 import { bakeSingleLight, buildOccluders, LIGHT_RADII } from './lightBaker';
-import type { SilMapData, MapPlatform, NavLink, SpriteEntry, TileCell } from '../../lib/types';
+import type { SilMapData, MapPlatform, NavLink, SpriteEntry, TileCell, TriggerNode } from '../../lib/types';
 
 // Platform overlay colors
 const PLATFORM_COLORS: Record<string, string> = {
@@ -626,6 +626,48 @@ export default function MapCanvas({
           }
         }
       }
+    }
+
+    // MOVE_ACTOR path previews — dashed lines from each actor to its trigger target
+    const triggers: TriggerNode[] = map.triggers ?? [];
+    if (triggers.length > 0) {
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1.5;
+      ctx.font = `${Math.max(7, 8 * zoom)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      for (const node of triggers) {
+        for (const action of node.actions) {
+          if (action.type !== 'MOVE_ACTOR' || !action.actorId) continue;
+          // actor_id in designer = actor matchid (set in context menu)
+          const srcActor = actors.find(a => a.matchid === action.actorId);
+          if (!srcActor) continue;
+          const srcCx    = srcActor.x * zoom + pan.x;
+          const srcCy    = srcActor.y * zoom + pan.y;
+          const targetCx = action.paramX * zoom + pan.x;
+          const targetCy = action.paramY * zoom + pan.y;
+          ctx.strokeStyle = '#ff8800';
+          ctx.fillStyle   = '#ff8800';
+          ctx.beginPath();
+          ctx.moveTo(srcCx, srcCy);
+          ctx.lineTo(targetCx, targetCy);
+          ctx.stroke();
+          // Target marker cross
+          const r = Math.max(4, 5 * zoom);
+          ctx.beginPath();
+          ctx.arc(targetCx, targetCy, r, 0, Math.PI * 2);
+          ctx.fill();
+          if (zoom > 0.2) {
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#ff8800';
+            ctx.fillText('MOVE', (srcCx + targetCx) / 2, (srcCy + targetCy) / 2 - 2);
+            ctx.setLineDash([4, 4]);
+          }
+        }
+      }
+      ctx.setLineDash([]);
+      ctx.restore();
     }
 
     // Highlight linkFromIdx platform (pending NAV_LINK first-click)

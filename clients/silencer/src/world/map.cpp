@@ -258,6 +258,7 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		actory += yoffset * 64;
 		//printf("(%u, %u) %d id:%u type:%d match:%u subp:%u unk:%x secid:%d\n", actorx, actory, actordirection, actorid, actortype, actormatchid, actorsubplane, actorunknown, actorsecurityid);
 		
+		Object* prevBack = world.objectlist.empty() ? nullptr : world.objectlist.back();
 		switch(actorid){
 			case 0:{
 				// agent guard (has blaster)
@@ -693,6 +694,17 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 					overlay->y = actory;
 				}
 			}break;
+		}
+		// Apply destructible / collectible flags packed into actorunknown
+		// bit 0: destructible, bit 1: collectible, bits 8-15: max health (0 = default 100)
+		if (actorunknown && !world.objectlist.empty() && world.objectlist.back() != prevBack) {
+			Object* obj = world.objectlist.back();
+			if (actorunknown & 1) {
+				obj->destructible = true;
+				Uint8 hp = (actorunknown >> 8) & 0xFF;
+				obj->SetHealth(hp ? (Uint16)hp : 100);
+			}
+			if (actorunknown & 2) obj->collectible = true;
 		}
 	}
 	memcpy(&numplatforms, &level[i], sizeof(numplatforms));
