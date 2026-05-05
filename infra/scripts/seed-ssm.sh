@@ -64,8 +64,11 @@ put_param() {
 }
 
 # Generate a 32-byte url-safe random secret. Used for password-shaped
-# values where any high-entropy string works.
-gen_secret() { openssl rand -base64 32 | tr -d '\n='; }
+# values where any high-entropy string works. Output is base64url
+# (RFC 4648 §5) — `+` → `-`, `/` → `_`, padding stripped — because
+# these passwords end up inside `mongodb://` and `amqp://` URLs and a
+# raw `/` makes Go's `net/url.Parse` see "invalid port after host".
+gen_secret() { openssl rand -base64 32 | tr -d '\n=' | tr '/+' '_-'; }
 
 # Prompt for a value, hiding input. Echoes the result.
 prompt_secret() {
@@ -166,6 +169,28 @@ if ! aws ssm get-parameter --region "$REGION" \
   put_param /silencer/admin/github_backup_token SecureString "${token:-}"
 fi
 
+# --- staging ----------------------------------------------------------
+# Single-box staging stack. Distinct passwords + JWT secret + Tailscale
+# auth key from prod so a leaked staging value can't reach into prod.
+# SSH pubkeys (/silencer/shared/*) and the GHCR pull token
+# (/silencer/admin/ghcr_pull_token) are reused from prod above.
+
+echo "==> /silencer-staging/*"
+
+put_param /silencer-staging/mongo_silencer_password   SecureString "$(gen_secret)"
+put_param /silencer-staging/lavinmq_silencer_password SecureString "$(gen_secret)"
+put_param /silencer-staging/jwt_secret                SecureString "$(gen_secret)"
+
+if ! aws ssm get-parameter --region "$REGION" \
+       --name /silencer-staging/tailscale_auth_key >/dev/null 2>&1 \
+   || [ "$OVERWRITE" -eq 1 ]; then
+  put_param /silencer-staging/tailscale_auth_key SecureString \
+    "$(prompt_secret 'staging Tailscale auth key (tag:server, reusable=no, ephemeral=no)')"
+else
+  put_param /silencer-staging/tailscale_auth_key SecureString "(unused)"
+fi
+
 echo
 echo "Done. Verify with:"
 echo "  aws ssm get-parameters-by-path --region $REGION --path /silencer --recursive --query 'Parameters[].Name'"
+echo "  aws ssm get-parameters-by-path --region $REGION --path /silencer-staging --recursive --query 'Parameters[].Name'"
