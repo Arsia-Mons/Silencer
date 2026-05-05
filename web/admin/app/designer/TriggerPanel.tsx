@@ -1,0 +1,433 @@
+'use client';
+import { useState } from 'react';
+import type {
+  TriggerNode, TriggerAction, TriggerCondition, ObjectiveDef,
+  TriggerEventType, TriggerActionType, TriggerConditionType, ConditionLogic,
+} from '../../lib/types';
+
+// ── Label maps ────────────────────────────────────────────────────────────────
+
+const EVENT_LABELS: Record<TriggerEventType, string> = {
+  NONE:               '—',
+  TRIGGER_ENTER_ZONE: '📍 Enter Zone',
+  TERMINAL_ACTIVATED: '💻 Terminal',
+  ACTOR_KILLED:       '💀 Actor Killed',
+  ACTOR_DAMAGED:      '🩹 Actor Damaged',
+  OBJECTIVE_COMPLETE: '✅ Objective Done',
+  ITEM_COLLECTED:     '📦 Item Collected',
+  PLAYER_DIED:        '☠️  Player Died',
+  ALL_PLAYERS_DIED:   '💣 All Players Died',
+  TIMER_EXPIRED:      '⏱ Timer',
+  GAME_START:         '🚩 Game Start',
+};
+
+const ACTION_LABELS: Record<TriggerActionType, string> = {
+  NONE:                '—',
+  OPEN_DOOR:           '🚪 Open Door',
+  LOCK_DOOR:           '🔒 Lock Door',
+  UNLOCK_DOOR:         '🔓 Unlock Door',
+  PLAY_SOUND:          '🔊 Play Sound',
+  SHOW_OBJECTIVE:      '📋 Show Message',
+  PAN_CAMERA:          '🎥 Pan Camera',
+  SPAWN_ACTOR:         '👾 Spawn Actor',
+  END_MISSION:         '🏁 End Mission',
+  DESTROY_ACTOR:       '💥 Destroy Actor',
+  MOVE_ACTOR:          '➡️  Move Actor',
+  APPLY_DAMAGE_IN_ZONE:'☢️  Damage Zone',
+  ENABLE_TRIGGER:      '▶️  Enable Trigger',
+  DISABLE_TRIGGER:     '⏸ Disable Trigger',
+};
+
+const COND_LABELS: Record<TriggerConditionType, string> = {
+  NONE:             '—',
+  TEAM_CHECK:       '👥 Team',
+  OBJECTIVE_STATE:  '📋 Objective',
+  PLAYER_COUNT:     '🎮 Player Count',
+  HEALTH_THRESHOLD: '❤️  Health',
+};
+
+const EVENT_OPTS = Object.keys(EVENT_LABELS) as TriggerEventType[];
+const ACTION_OPTS = Object.keys(ACTION_LABELS) as TriggerActionType[];
+const COND_OPTS  = Object.keys(COND_LABELS)  as TriggerConditionType[];
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function nextId(items: Array<{ id: number }>): number {
+  return items.length ? Math.max(...items.map(x => x.id)) + 1 : 1;
+}
+
+function emptyNode(id: number): TriggerNode {
+  return { id, triggerEvent: 'GAME_START', actorId: 0, oneShot: true, enabled: true,
+    conditionLogic: 'ALL_OF', timerSeconds: 0, conditions: [], actions: [] };
+}
+
+function emptyCondition(): TriggerCondition {
+  return { type: 'TEAM_CHECK', team: 0, objectiveId: 0, playerCount: 1, healthPct: 50 };
+}
+
+function emptyAction(): TriggerAction {
+  return { type: 'OPEN_DOOR', actorId: 0, delay: 0, paramX: 0, paramY: 0, paramF: 0, paramU8: 0, sound: '', message: '' };
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <span className="text-[9px] text-game-muted font-mono flex-shrink-0 w-16 text-right">{label}</span>
+      {children}
+    </div>
+  );
+}
+
+const inp = 'bg-game-bgCard border border-game-border/60 font-mono text-[10px] px-1 py-0.5 rounded focus:outline-none focus:border-game-primary text-game-text min-w-0';
+const sel = inp + ' cursor-pointer';
+
+function ConditionRow({ c, onChange, onRemove }: {
+  c: TriggerCondition;
+  onChange: (patch: Partial<TriggerCondition>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1 pl-2 border-l-2 border-game-border/40 py-1">
+      <div className="flex items-center gap-1">
+        <select className={sel} value={c.type} onChange={e => onChange({ type: e.target.value as TriggerConditionType })}>
+          {COND_OPTS.map(o => <option key={o} value={o}>{COND_LABELS[o]}</option>)}
+        </select>
+        <button onClick={onRemove} className="text-game-muted hover:text-red-400 px-1 text-[10px] ml-auto flex-shrink-0">✕</button>
+      </div>
+      {c.type === 'TEAM_CHECK' && (
+        <Field label="team">
+          <input className={inp + ' w-12'} type="number" min={0} max={3} value={c.team} onChange={e => onChange({ team: +e.target.value })} />
+        </Field>
+      )}
+      {c.type === 'OBJECTIVE_STATE' && (
+        <Field label="obj id">
+          <input className={inp + ' w-16'} type="number" min={0} value={c.objectiveId} onChange={e => onChange({ objectiveId: +e.target.value })} />
+        </Field>
+      )}
+      {c.type === 'PLAYER_COUNT' && (
+        <Field label="min players">
+          <input className={inp + ' w-12'} type="number" min={0} value={c.playerCount} onChange={e => onChange({ playerCount: +e.target.value })} />
+        </Field>
+      )}
+      {c.type === 'HEALTH_THRESHOLD' && (
+        <Field label="health %">
+          <input className={inp + ' w-12'} type="number" min={0} max={100} value={c.healthPct} onChange={e => onChange({ healthPct: +e.target.value })} />
+        </Field>
+      )}
+    </div>
+  );
+}
+
+function ActionRow({ a, onChange, onRemove }: {
+  a: TriggerAction;
+  onChange: (patch: Partial<TriggerAction>) => void;
+  onRemove: () => void;
+}) {
+  const needsActor = ['OPEN_DOOR','LOCK_DOOR','UNLOCK_DOOR','DESTROY_ACTOR','MOVE_ACTOR','ENABLE_TRIGGER','DISABLE_TRIGGER'].includes(a.type);
+  const needsXY    = ['PAN_CAMERA','SPAWN_ACTOR','MOVE_ACTOR','APPLY_DAMAGE_IN_ZONE'].includes(a.type);
+  const needsSound = a.type === 'PLAY_SOUND';
+  const needsMsg   = a.type === 'SHOW_OBJECTIVE';
+  const needsU8    = a.type === 'SPAWN_ACTOR' || a.type === 'APPLY_DAMAGE_IN_ZONE';
+  const needsF     = a.type === 'MOVE_ACTOR' || a.type === 'APPLY_DAMAGE_IN_ZONE';
+
+  return (
+    <div className="flex flex-col gap-1 pl-2 border-l-2 border-game-border/40 py-1">
+      <div className="flex items-center gap-1">
+        <select className={sel} value={a.type} onChange={e => onChange({ type: e.target.value as TriggerActionType })}>
+          {ACTION_OPTS.map(o => <option key={o} value={o}>{ACTION_LABELS[o]}</option>)}
+        </select>
+        <button onClick={onRemove} className="text-game-muted hover:text-red-400 px-1 text-[10px] ml-auto flex-shrink-0">✕</button>
+      </div>
+      <Field label="delay (s)">
+        <input className={inp + ' w-16'} type="number" min={0} step={0.1} value={a.delay} onChange={e => onChange({ delay: +e.target.value })} />
+      </Field>
+      {needsActor && (
+        <Field label="actor id">
+          <input className={inp + ' w-16'} type="number" min={0} value={a.actorId} onChange={e => onChange({ actorId: +e.target.value })} />
+        </Field>
+      )}
+      {needsXY && (
+        <>
+          <Field label="X">
+            <input className={inp + ' w-16'} type="number" value={a.paramX} onChange={e => onChange({ paramX: +e.target.value })} />
+          </Field>
+          <Field label="Y">
+            <input className={inp + ' w-16'} type="number" value={a.paramY} onChange={e => onChange({ paramY: +e.target.value })} />
+          </Field>
+        </>
+      )}
+      {needsF && (
+        <Field label={a.type === 'MOVE_ACTOR' ? 'duration' : 'radius'}>
+          <input className={inp + ' w-16'} type="number" min={0} step={0.1} value={a.paramF} onChange={e => onChange({ paramF: +e.target.value })} />
+        </Field>
+      )}
+      {needsU8 && (
+        <Field label={a.type === 'SPAWN_ACTOR' ? 'actor type' : 'damage'}>
+          <input className={inp + ' w-16'} type="number" min={0} max={255} value={a.paramU8} onChange={e => onChange({ paramU8: +e.target.value })} />
+        </Field>
+      )}
+      {needsSound && (
+        <Field label="sound file">
+          <input className={inp + ' flex-1'} type="text" maxLength={63} value={a.sound} placeholder="sound.ogg" onChange={e => onChange({ sound: e.target.value })} />
+        </Field>
+      )}
+      {needsMsg && (
+        <Field label="message">
+          <input className={inp + ' flex-1'} type="text" maxLength={127} value={a.message} placeholder="Objective text…" onChange={e => onChange({ message: e.target.value })} />
+        </Field>
+      )}
+    </div>
+  );
+}
+
+// ── TriggerNodeRow ────────────────────────────────────────────────────────────
+
+function TriggerNodeRow({ node, expanded, onToggle, onChange, onRemove }: {
+  node: TriggerNode;
+  expanded: boolean;
+  onToggle: () => void;
+  onChange: (patch: Partial<TriggerNode>) => void;
+  onRemove: () => void;
+}) {
+  const patchCond = (i: number, patch: Partial<TriggerCondition>) => {
+    const conditions = node.conditions.map((c, ci) => ci === i ? { ...c, ...patch } : c);
+    onChange({ conditions });
+  };
+  const removeCond = (i: number) => onChange({ conditions: node.conditions.filter((_, ci) => ci !== i) });
+  const addCond    = () => onChange({ conditions: [...node.conditions, emptyCondition()] });
+
+  const patchAction = (i: number, patch: Partial<TriggerAction>) => {
+    const actions = node.actions.map((a, ai) => ai === i ? { ...a, ...patch } : a);
+    onChange({ actions });
+  };
+  const removeAction = (i: number) => onChange({ actions: node.actions.filter((_, ai) => ai !== i) });
+  const addAction    = () => onChange({ actions: [...node.actions, emptyAction()] });
+
+  return (
+    <div className="border-b border-game-border/30">
+      {/* Header row */}
+      <div
+        className={`flex items-center gap-1.5 px-2 py-1.5 cursor-pointer select-none transition-colors ${expanded ? 'bg-[#1a2e1a]' : 'hover:bg-game-dark'}`}
+        onClick={onToggle}
+      >
+        <span className="text-[9px] font-mono text-game-muted w-6 flex-shrink-0">#{node.id}</span>
+        <span className="flex-1 text-[10px] font-mono text-game-text truncate">{EVENT_LABELS[node.triggerEvent]}</span>
+        <span className={`text-[8px] px-1 rounded font-mono ${node.enabled ? 'text-game-primary' : 'text-game-muted line-through'}`}>
+          {node.enabled ? 'ON' : 'OFF'}
+        </span>
+        {node.oneShot && <span className="text-[8px] text-[#c0a000] font-mono">1×</span>}
+        <span className="text-game-muted text-[10px] ml-0.5">{expanded ? '▲' : '▼'}</span>
+        <button
+          onClick={e => { e.stopPropagation(); onRemove(); }}
+          className="text-game-muted hover:text-red-400 text-[10px] px-0.5 flex-shrink-0"
+        >✕</button>
+      </div>
+
+      {/* Expanded editor */}
+      {expanded && (
+        <div className="px-2 pb-2 flex flex-col gap-2 bg-[#0d1a0d]" onClick={e => e.stopPropagation()}>
+
+          {/* Core fields */}
+          <div className="flex flex-col gap-1 pt-1">
+            <Field label="event">
+              <select className={sel + ' flex-1'} value={node.triggerEvent}
+                onChange={e => onChange({ triggerEvent: e.target.value as TriggerEventType })}>
+                {EVENT_OPTS.map(o => <option key={o} value={o}>{EVENT_LABELS[o]}</option>)}
+              </select>
+            </Field>
+            {node.triggerEvent !== 'GAME_START' && node.triggerEvent !== 'ALL_PLAYERS_DIED' && node.triggerEvent !== 'NONE' && (
+              <Field label="actor id">
+                <input className={inp + ' w-16'} type="number" min={0} value={node.actorId}
+                  onChange={e => onChange({ actorId: +e.target.value })}
+                  title="0 = any actor" />
+                <span className="text-[8px] text-game-muted font-mono">0=any</span>
+              </Field>
+            )}
+            {node.triggerEvent === 'TIMER_EXPIRED' && (
+              <Field label="secs">
+                <input className={inp + ' w-16'} type="number" min={0.1} step={0.1} value={node.timerSeconds}
+                  onChange={e => onChange({ timerSeconds: +e.target.value })} />
+              </Field>
+            )}
+            <div className="flex gap-3 pl-[74px]">
+              <label className="flex items-center gap-1 cursor-pointer select-none">
+                <input type="checkbox" checked={node.enabled}
+                  onChange={e => onChange({ enabled: e.target.checked })}
+                  className="accent-green-500" />
+                <span className="text-[9px] font-mono text-game-textDim">enabled</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer select-none">
+                <input type="checkbox" checked={node.oneShot}
+                  onChange={e => onChange({ oneShot: e.target.checked })}
+                  className="accent-yellow-500" />
+                <span className="text-[9px] font-mono text-game-textDim">one-shot</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Conditions */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[9px] font-mono text-game-muted tracking-widest">CONDITIONS</span>
+              <select className={sel} value={node.conditionLogic}
+                onChange={e => onChange({ conditionLogic: e.target.value as ConditionLogic })}>
+                <option value="ALL_OF">ALL OF</option>
+                <option value="ANY_OF">ANY OF</option>
+              </select>
+              <button onClick={addCond}
+                className="ml-auto text-[9px] font-mono text-game-primary border border-game-primary/40 rounded px-1 hover:bg-game-primary/10 transition-colors">
+                + COND
+              </button>
+            </div>
+            {node.conditions.length === 0 && (
+              <div className="text-[9px] text-game-muted font-mono pl-2">No conditions (always fires)</div>
+            )}
+            {node.conditions.map((c, i) => (
+              <ConditionRow key={i} c={c} onChange={p => patchCond(i, p)} onRemove={() => removeCond(i)} />
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[9px] font-mono text-game-muted tracking-widest">ACTIONS</span>
+              <button onClick={addAction}
+                className="ml-auto text-[9px] font-mono text-game-primary border border-game-primary/40 rounded px-1 hover:bg-game-primary/10 transition-colors">
+                + ACTION
+              </button>
+            </div>
+            {node.actions.length === 0 && (
+              <div className="text-[9px] text-game-muted font-mono pl-2">No actions</div>
+            )}
+            {node.actions.map((a, i) => (
+              <ActionRow key={i} a={a} onChange={p => patchAction(i, p)} onRemove={() => removeAction(i)} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+interface Props {
+  triggers: TriggerNode[];
+  objectives: ObjectiveDef[];
+  onSetTriggers: (t: TriggerNode[]) => void;
+  onSetObjectives: (o: ObjectiveDef[]) => void;
+}
+
+export default function TriggerPanel({ triggers, objectives, onSetTriggers, onSetObjectives }: Props) {
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [objSection, setObjSection] = useState(true);
+
+  const addTrigger = () => {
+    const node = emptyNode(nextId(triggers));
+    onSetTriggers([...triggers, node]);
+    setExpandedId(node.id);
+  };
+
+  const removeTrigger = (id: number) => {
+    onSetTriggers(triggers.filter(t => t.id !== id));
+    if (expandedId === id) setExpandedId(null);
+  };
+
+  const patchTrigger = (id: number, patch: Partial<TriggerNode>) => {
+    onSetTriggers(triggers.map(t => t.id === id ? { ...t, ...patch } : t));
+  };
+
+  const addObjective = () => {
+    const obj: ObjectiveDef = { id: nextId(objectives), required: true, text: '' };
+    onSetObjectives([...objectives, obj]);
+  };
+
+  const removeObjective = (id: number) => onSetObjectives(objectives.filter(o => o.id !== id));
+  const patchObjective  = (id: number, patch: Partial<ObjectiveDef>) =>
+    onSetObjectives(objectives.map(o => o.id === id ? { ...o, ...patch } : o));
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+
+      {/* Triggers section */}
+      <div className="flex items-center px-3 py-1.5 border-b border-game-border/50 flex-shrink-0">
+        <span className="text-[10px] font-mono text-game-textDim tracking-widest flex-1">
+          {triggers.length} TRIGGER{triggers.length !== 1 ? 'S' : ''}
+        </span>
+        <button onClick={addTrigger}
+          className="text-[9px] font-mono text-game-primary border border-game-primary/40 rounded px-1.5 py-0.5 hover:bg-game-primary/10 transition-colors">
+          + ADD
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        {triggers.length === 0 && (
+          <div className="px-3 py-4 text-[11px] text-game-muted font-mono text-center">
+            No triggers.<br />Click + ADD to create one.
+          </div>
+        )}
+        {triggers.map(node => (
+          <TriggerNodeRow
+            key={node.id}
+            node={node}
+            expanded={expandedId === node.id}
+            onToggle={() => setExpandedId(prev => prev === node.id ? null : node.id)}
+            onChange={patch => patchTrigger(node.id, patch)}
+            onRemove={() => removeTrigger(node.id)}
+          />
+        ))}
+
+        {/* Objectives section */}
+        <div className="border-t border-game-border/50 mt-1">
+          <button
+            className="w-full flex items-center px-3 py-1.5 hover:bg-game-dark transition-colors"
+            onClick={() => setObjSection(v => !v)}
+          >
+            <span className="text-[10px] font-mono text-game-textDim tracking-widest flex-1">
+              {objectives.length} OBJECTIVE{objectives.length !== 1 ? 'S' : ''}
+            </span>
+            <span className="text-[9px] text-game-muted mr-2">{objSection ? '▲' : '▼'}</span>
+            <span
+              role="button"
+              onClick={e => { e.stopPropagation(); addObjective(); }}
+              className="text-[9px] font-mono text-game-primary border border-game-primary/40 rounded px-1.5 py-0.5 hover:bg-game-primary/10 transition-colors"
+            >+ ADD</span>
+          </button>
+
+          {objSection && (
+            <>
+              {objectives.length === 0 && (
+                <div className="px-3 py-2 text-[10px] text-game-muted font-mono">No objectives defined.</div>
+              )}
+              {objectives.map(obj => (
+                <div key={obj.id} className="flex flex-col gap-1 px-3 py-1.5 border-b border-game-border/30">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-mono text-game-muted w-5">#{obj.id}</span>
+                    <label className="flex items-center gap-1 flex-shrink-0">
+                      <input type="checkbox" checked={obj.required}
+                        onChange={e => patchObjective(obj.id, { required: e.target.checked })}
+                        className="accent-yellow-500" />
+                      <span className="text-[9px] font-mono text-game-muted">req</span>
+                    </label>
+                    <button onClick={() => removeObjective(obj.id)}
+                      className="ml-auto text-game-muted hover:text-red-400 text-[10px] px-0.5">✕</button>
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={127}
+                    value={obj.text}
+                    placeholder="Objective text…"
+                    onChange={e => patchObjective(obj.id, { text: e.target.value })}
+                    className={inp + ' w-full'}
+                  />
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
