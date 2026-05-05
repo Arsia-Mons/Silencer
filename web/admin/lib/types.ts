@@ -184,6 +184,62 @@ export interface MapShadowZone {
 
 export interface NavLink { fromIdx: number; toIdx: number; type: 0 | 1 | 2; sourceX: number; targetX: number; }
 
+// ── Trigger scripting types (issue #30) ─────────────────────────────────────
+
+export type TriggerEventType =
+  | 'NONE' | 'TRIGGER_ENTER_ZONE' | 'TERMINAL_ACTIVATED' | 'ACTOR_KILLED'
+  | 'ACTOR_DAMAGED' | 'OBJECTIVE_COMPLETE' | 'ITEM_COLLECTED' | 'PLAYER_DIED'
+  | 'ALL_PLAYERS_DIED' | 'TIMER_EXPIRED' | 'GAME_START';
+
+export type TriggerActionType =
+  | 'NONE' | 'OPEN_DOOR' | 'LOCK_DOOR' | 'UNLOCK_DOOR' | 'PLAY_SOUND'
+  | 'SHOW_OBJECTIVE' | 'PAN_CAMERA' | 'SPAWN_ACTOR' | 'END_MISSION'
+  | 'DESTROY_ACTOR' | 'MOVE_ACTOR' | 'APPLY_DAMAGE_IN_ZONE'
+  | 'ENABLE_TRIGGER' | 'DISABLE_TRIGGER';
+
+export type TriggerConditionType =
+  | 'NONE' | 'TEAM_CHECK' | 'OBJECTIVE_STATE' | 'PLAYER_COUNT' | 'HEALTH_THRESHOLD';
+
+export type ConditionLogic = 'ALL_OF' | 'ANY_OF';
+
+export interface TriggerCondition {
+  type: TriggerConditionType;
+  team: number;
+  objectiveId: number;
+  playerCount: number;
+  healthPct: number;
+}
+
+export interface TriggerAction {
+  type: TriggerActionType;
+  actorId: number;
+  delay: number;       // seconds
+  paramX: number;
+  paramY: number;
+  paramF: number;
+  paramU8: number;
+  sound: string;       // max 63 chars
+  message: string;     // max 127 chars
+}
+
+export interface TriggerNode {
+  id: number;
+  triggerEvent: TriggerEventType;
+  actorId: number;      // 0 = any actor
+  oneShot: boolean;
+  enabled: boolean;
+  conditionLogic: ConditionLogic;
+  timerSeconds: number; // > 0 for TIMER_EXPIRED nodes
+  conditions: TriggerCondition[];
+  actions: TriggerAction[];
+}
+
+export interface ObjectiveDef {
+  id: number;
+  required: boolean;
+  text: string;         // max 127 chars
+}
+
 export interface SilMapData {
   header: MapHeader;
   width: number;
@@ -193,6 +249,8 @@ export interface SilMapData {
   platforms: MapPlatform[];
   shadowZones: MapShadowZone[];
   navLinks: NavLink[];
+  triggers: TriggerNode[];
+  objectives: ObjectiveDef[];
   rawMinimap: Uint8Array;
   minimapCompressedSize: number;
   fileName?: string;
