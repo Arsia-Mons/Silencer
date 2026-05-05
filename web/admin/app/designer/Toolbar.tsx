@@ -43,6 +43,7 @@ export const TOOLS: ToolDef[] = [
   { id: 'ERASE_PLATFORM', label: 'ERASE PLT',  icon: '✕' },
   { id: 'ACTOR',          label: 'ACTOR',      icon: '☻' },
   { id: 'SHADOW_ZONE',    label: 'SHADOW',     icon: '🌑' },
+  { id: 'NAV_LINK',       label: 'LINK',       icon: '⇒' },
 ];
 
 export const PLATFORM_TOOL_TYPES: Record<string, PlatformToolType> = {
@@ -113,16 +114,19 @@ interface ToolbarProps {
   onLumModeChange: (v: boolean) => void;
   eraseLayerType: string;
   onEraseLayerTypeChange?: (t: string) => void;
+  navLinkType?: 0 | 1 | 2;
+  onNavLinkTypeChange?: (t: 0 | 1 | 2) => void;
 }
 
 export default function Toolbar({
   activeTool, onToolChange, activeLayer, onLayerChange,
   selectedActor, onActorChange, lumMode, onLumModeChange,
   eraseLayerType, onEraseLayerTypeChange,
+  navLinkType, onNavLinkTypeChange,
 }: ToolbarProps) {
   const tileTools     = TOOLS.filter(t => ['TILE_BG', 'TILE_FG', 'ERASE_TILE', 'TILE_SELECT', 'FLOOD_FILL'].includes(t.id));
   const platformTools = TOOLS.filter(t => ['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM','ERASE_PLATFORM'].includes(t.id));
-  const otherTools    = TOOLS.filter(t => ['SELECT','ACTOR','SHADOW_ZONE'].includes(t.id));
+  const otherTools    = TOOLS.filter(t => ['SELECT','ACTOR','SHADOW_ZONE','NAV_LINK'].includes(t.id));
 
   const btnCls = (id: string) =>
     `px-2 py-1 text-xs font-mono border rounded transition-colors ${
@@ -230,6 +234,24 @@ export default function Toolbar({
               <option key={a.id} value={a.id}>{a.label} (id={a.id})</option>
             ))}
           </select>
+        </>
+      )}
+      {activeTool === 'NAV_LINK' && (
+        <>
+          <div className="w-px h-5 bg-game-border" />
+          <div className="flex gap-1 items-center">
+            <span className="text-xs text-game-textDim mr-1">TYPE:</span>
+            {(['JUMP', 'FALL', 'JETPACK'] as const).map((label, i) => (
+              <button key={label} onClick={() => onNavLinkTypeChange?.(i as 0 | 1 | 2)}
+                className={`px-2 py-1 text-xs font-mono border rounded transition-colors ${
+                  navLinkType === i
+                    ? 'border-game-primary text-game-primary bg-game-dark'
+                    : 'border-game-border text-game-textDim hover:border-game-primary'
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
         </>
       )}
     </div>

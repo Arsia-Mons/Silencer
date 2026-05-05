@@ -2,7 +2,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { ACTOR_DEFS, PLATFORM_TOOL_TYPES } from './Toolbar';
 import { bakeSingleLight, buildOccluders, LIGHT_RADII } from './lightBaker';
-import type { SilMapData, MapPlatform, SpriteEntry, TileCell } from '../../lib/types';
+import type { SilMapData, MapPlatform, NavLink, SpriteEntry, TileCell } from '../../lib/types';
 
 // Platform overlay colors
 const PLATFORM_COLORS: Record<string, string> = {
@@ -77,6 +77,7 @@ interface VisState {
   grid: boolean;
   lighting: boolean;
   parallax: boolean;
+  links: boolean;
 }
 
 interface TileRightClickInfo {
@@ -136,6 +137,12 @@ interface Props {
   } | null;
   pastePending?: boolean;
   onTilePaste?: (tx: number, ty: number) => void;
+  navLinkType?: 0 | 1 | 2;
+  linkFromIdx?: number | null;
+  selectedNavLinkIdx?: number | null;
+  onNavLinkAdd?: (fromIdx: number, toIdx: number, type: 0 | 1 | 2, sourceX: number, targetX: number) => void;
+  onNavLinkSelect?: (idx: number | null) => void;
+  onLinkFromIdxChange?: (idx: number | null) => void;
 }
 
 export default function MapCanvas({
@@ -161,6 +168,12 @@ export default function MapCanvas({
   tileCopyBuffer,
   pastePending,
   onTilePaste,
+  navLinkType,
+  linkFromIdx,
+  selectedNavLinkIdx,
+  onNavLinkAdd,
+  onNavLinkSelect,
+  onLinkFromIdxChange,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -179,6 +192,8 @@ export default function MapCanvas({
   // Shadow zone drag: start world pos while drawing
   const shadowZoneDragRef = useRef<{ startWx: number; startWy: number; curWx: number; curWy: number } | null>(null);
   const [shadowZonePreview, setShadowZonePreview] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  // Pending sourceX for NAV_LINK JETPACK — set on first click, used on second
+  const navLinkSourceXRef = useRef<number>(-2147483648);
   // Tile selection drag
   const isSelectingTile = useRef(false);
   const tileSelStartRef = useRef<{ tx: number; ty: number } | null>(null);
@@ -540,6 +555,93 @@ export default function MapCanvas({
       ctx.setLineDash([]);
     }
 
+    // Nav link arrows
+    const NAV_LINK_COLORS: Record<number, string> = { 0: '#00ff88', 1: '#ffdd00', 2: '#ff6644' };
+    const NAV_LINK_LABELS: Record<number, string> = { 0: 'JUMP', 1: 'FALL', 2: 'JETPACK' };
+    const navLinks: NavLink[] = map.navLinks ?? [];
+    if (vis?.links !== false && navLinks.length > 0) {
+      const ah = Math.max(8, 10 * zoom);
+      for (let i = 0; i < navLinks.length; i++) {
+        const link = navLinks[i];
+        const from = platforms[link.fromIdx];
+        const to = platforms[link.toIdx];
+        if (!from || !to) continue;
+        const fromTopY = Math.min(from.y1, from.y2);
+        const toTopY   = Math.min(to.y1,   to.y2);
+        // For JETPACK links, draw arrow from sourceX/targetX waypoints when set
+        const useWaypoints = link.type === 2 && link.sourceX !== -2147483648 && link.targetX !== -2147483648;
+        const fx = (useWaypoints ? link.sourceX : (from.x1 + from.x2) / 2) * zoom + pan.x;
+        const fy = fromTopY * zoom + pan.y;
+        const tx = (useWaypoints ? link.targetX : (to.x1 + to.x2) / 2) * zoom + pan.x;
+        const ty = toTopY * zoom + pan.y;
+        const isSelected = i === selectedNavLinkIdx;
+        const color = isSelected ? '#ffffff' : (NAV_LINK_COLORS[link.type] ?? '#00ff88');
+        ctx.strokeStyle = color;
+        ctx.lineWidth = isSelected ? 3 : 2;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(fx, fy);
+        ctx.lineTo(tx, ty);
+        ctx.stroke();
+        const angle = Math.atan2(ty - fy, tx - fx);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(tx - ah * Math.cos(angle - Math.PI / 6), ty - ah * Math.sin(angle - Math.PI / 6));
+        ctx.lineTo(tx - ah * Math.cos(angle + Math.PI / 6), ty - ah * Math.sin(angle + Math.PI / 6));
+        ctx.closePath();
+        ctx.fill();
+        if (zoom > 0.2) {
+          const mx = (fx + tx) / 2;
+          const my = (fy + ty) / 2;
+          ctx.font = `${Math.max(8, 9 * zoom)}px monospace`;
+          ctx.fillStyle = color;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(NAV_LINK_LABELS[link.type] ?? '', mx, my - 8);
+        }
+        // JETPACK focal points — diamond at targetX on dest platform, circle at sourceX on source platform
+        if (link.type === 2) {
+          if (link.targetX !== -2147483648) {
+            const fpx = link.targetX * zoom + pan.x;
+            const fpy = Math.min(to.y1, to.y2) * zoom + pan.y;
+            const ds = Math.max(4, 5 * zoom);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(fpx, fpy - ds);
+            ctx.lineTo(fpx + ds, fpy);
+            ctx.lineTo(fpx, fpy + ds);
+            ctx.lineTo(fpx - ds, fpy);
+            ctx.closePath();
+            ctx.fill();
+          }
+          if (link.sourceX !== -2147483648) {
+            const spx = link.sourceX * zoom + pan.x;
+            const spy = Math.min(from.y1, from.y2) * zoom + pan.y;
+            const r = Math.max(3, 4 * zoom);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(spx, spy, r, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+    }
+
+    // Highlight linkFromIdx platform (pending NAV_LINK first-click)
+    if (activeTool === 'NAV_LINK' && linkFromIdx != null && platforms[linkFromIdx]) {
+      const p = platforms[linkFromIdx];
+      const px1 = p.x1 * zoom + pan.x;
+      const py1 = p.y1 * zoom + pan.y;
+      const px2 = p.x2 * zoom + pan.x;
+      const py2 = p.y2 * zoom + pan.y;
+      ctx.strokeStyle = '#00ff88';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(px1, py1, px2 - px1, py2 - py1);
+      ctx.setLineDash([]);
+    }
+
     // Actor icons
     if (vis?.actors !== false) {
       // Draw baked shadow previews for static lights before actor sprites
@@ -686,7 +788,7 @@ export default function MapCanvas({
       ctx.setLineDash([]);
       ctx.restore();
     }
-  }, [map, tileImages, spriteImages, vis, zoom, pan, dragPlatform, dragActorPreview, shadowZonePreview]);
+  }, [map, tileImages, spriteImages, vis, zoom, pan, dragPlatform, dragActorPreview, shadowZonePreview, selectedNavLinkIdx, linkFromIdx, activeTool]);
 
   // Resize canvas to fill container
   useEffect(() => {
@@ -1111,9 +1213,54 @@ export default function MapCanvas({
       isPainting.current = true;
       shadowZoneDragRef.current = { startWx: snap(wx), startWy: snap(wy), curWx: snap(wx), curWy: snap(wy) };
       setShadowZonePreview({ x1: snap(wx), y1: snap(wy), x2: snap(wx), y2: snap(wy) });
+    } else if (activeTool === 'NAV_LINK') {
+      let hitIdx: number | null = null;
+      for (let i = map.platforms.length - 1; i >= 0; i--) {
+        const p = map.platforms[i];
+        if (wx >= p.x1 && wx <= p.x2 && wy >= p.y1 && wy <= p.y2) { hitIdx = i; break; }
+      }
+      if (hitIdx !== null) {
+        if (linkFromIdx == null) {
+          // First click: record from-platform and, for JETPACK, the launch X
+          navLinkSourceXRef.current = (navLinkType === 2) ? Math.round(wx) : -2147483648;
+          onLinkFromIdxChange?.(hitIdx);
+        } else if (hitIdx !== linkFromIdx) {
+          // Second click: targetX is click X on dest (JETPACK), sourceX was recorded on first click
+          const targetX = (navLinkType === 2) ? Math.round(wx) : -2147483648;
+          onNavLinkAdd?.(linkFromIdx, hitIdx, navLinkType ?? 0, navLinkSourceXRef.current, targetX);
+          navLinkSourceXRef.current = -2147483648;
+          onLinkFromIdxChange?.(null);
+        }
+      }
     } else if (activeTool === 'SELECT') {
       const handleSize = 8 / zoom;
       const hs = handleSize / 2;
+
+      // 0. Check nav links for selection
+      const navLinksArr: NavLink[] = map.navLinks ?? [];
+      if (navLinksArr.length > 0) {
+        const LINK_HIT = 12 / zoom;
+        for (let i = navLinksArr.length - 1; i >= 0; i--) {
+          const link = navLinksArr[i];
+          const from = map.platforms[link.fromIdx];
+          const to = map.platforms[link.toIdx];
+          if (!from || !to) continue;
+          const fx = (from.x1 + from.x2) / 2;
+          const fy = Math.min(from.y1, from.y2);
+          const tx = (to.x1 + to.x2) / 2;
+          const ty = Math.min(to.y1, to.y2);
+          const dx = tx - fx, dy = ty - fy;
+          const len2 = dx * dx + dy * dy;
+          const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((wx - fx) * dx + (wy - fy) * dy) / len2));
+          const dist = Math.hypot(wx - (fx + t * dx), wy - (fy + t * dy));
+          if (dist < LINK_HIT) {
+            onNavLinkSelect?.(i);
+            onPlatformSelect(null);
+            onActorSelect?.(null);
+            return;
+          }
+        }
+      }
 
       // 1. If a platform is already selected, check its handles then body first
       if (selectedPlatformIdx != null && map.platforms[selectedPlatformIdx]) {
@@ -1186,12 +1333,20 @@ export default function MapCanvas({
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
       onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
       selectedPlatformIdx, onPlatformSelect, onActorSelect, highlightActorIdx, snap,
-      pastePending, onTilePaste, onTileSelection, onFloodFill, onActorTypeChange]);
+      pastePending, onTilePaste, onTileSelection, onFloodFill, onActorTypeChange,
+      linkFromIdx, navLinkType, onNavLinkAdd, onNavLinkSelect, onLinkFromIdxChange]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     if (!map) return;
+
+    // NAV_LINK: right-click cancels pending from-idx
+    if (activeTool === 'NAV_LINK') {
+      onLinkFromIdxChange?.(null);
+      return;
+    }
+
     const { cx, cy } = getCanvasPos(e);
     const { wx, wy } = canvasToWorld(cx, cy);
 
@@ -1232,7 +1387,7 @@ export default function MapCanvas({
         onTileRightClick({ tx, ty, layerType, layerIdx, cell, x: e.clientX, y: e.clientY });
       }
     }
-  }, [map, canvasToWorld, canvasToTile, zoom, activeTool, activeLayer, onActorRightClick, onTileRightClick, onShadowZoneRemove]);
+  }, [map, canvasToWorld, canvasToTile, zoom, activeTool, activeLayer, onActorRightClick, onTileRightClick, onShadowZoneRemove, onLinkFromIdxChange]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const { cx, cy } = getCanvasPos(e);
@@ -1471,6 +1626,7 @@ export default function MapCanvas({
       : activeTool === 'TILE_SELECT' ? 'crosshair'
       : activeTool === 'ERASE_TILE' ? 'crosshair'
       : activeTool === 'SHADOW_ZONE' ? 'crosshair'
+      : activeTool === 'NAV_LINK' ? 'crosshair'
       : isPainting.current ? 'crosshair'
       : 'default';
 
