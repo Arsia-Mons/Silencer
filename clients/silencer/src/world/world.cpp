@@ -132,6 +132,19 @@ void World::Tick(void){
 	if(tickcount % GASLoader::Get().gameengine.ticksPerSecond == 0 && IsAuthority()){
 		ActivateTerminals();
 	}
+
+	// Emit GAME_START on the very first tick so trigger scripts can respond.
+	if (tickcount == 0 && IsAuthority()) {
+		GameEvent ev;
+		ev.type = EventType::GAME_START;
+		triggerGraph.Bus().Emit(ev);
+	}
+
+	{
+		const float dt = 1.f / GASLoader::Get().gameengine.ticksPerSecond;
+		triggerGraph.Tick(*this, dt);
+	}
+
 	tickcount++;
 	if(replay.IsRecording()){
 		replay.WriteTick();

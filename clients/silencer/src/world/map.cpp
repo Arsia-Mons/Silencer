@@ -78,6 +78,8 @@ bool Map::Load(const char * filename, World & world){
 			CalculateNodes();
 			CalculatePlatformSetConnections();
 			CalculateRainPuddleLocations();
+			// Load trigger graph into the runtime system.
+			world.triggerGraph.Load(triggers, objectives);
 			return true;
 		}
 	}

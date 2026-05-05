@@ -20,6 +20,7 @@
 #include "dedicatedserver.h"
 #include "buyableitem.h"
 #include "replay.h"
+#include "TriggerGraph.h"
 
 class World
 {
@@ -103,6 +104,8 @@ public:
 	bool debugoverlay;
 	struct DebugLine { int x1, y1, x2, y2; Uint8 color; };
 	std::vector<DebugLine> debuglines;
+
+	TriggerGraph triggerGraph;
 	
 	friend class Renderer;
 	friend class Game;
@@ -120,6 +123,7 @@ public:
 	friend class PlayerAI;
 	friend class Replay;
 	friend class Audio;
+	friend class TriggerGraph;
 	
 protected:
 	std::list<class Object *> objectlist;

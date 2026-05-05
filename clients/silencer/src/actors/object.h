@@ -36,6 +36,19 @@ public:
 	bool isbipedal;
 	bool isprojectile;
 	bool iscontrollable;
+
+	// ── Collectible item pickup ───────────────────────────────────────────
+	bool collectible = false;  // emits ITEM_COLLECTED when a player overlaps
+	bool collected   = false;  // set true after first pickup (for one-shot items)
+
+	// ── Scripted movement (MOVE_ACTOR action) ────────────────────────────
+	bool   is_moving      = false;
+	Sint16 move_origin_x  = 0;
+	Sint16 move_origin_y  = 0;
+	Sint16 move_target_x  = 0;
+	Sint16 move_target_y  = 0;
+	float  move_duration  = 0.f; // total seconds for the move
+	float  move_elapsed   = 0.f; // seconds elapsed so far
 };
 
 #endif

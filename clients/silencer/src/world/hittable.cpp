@@ -2,7 +2,8 @@
 #include "object.h"
 #include "projectile.h"
 #include "shrapnel.h"
-#include "../gas/gasloader.h"
+#include "gasloader.h"
+#include "EventBus.h"
 #include <math.h>
 
 Hittable::Hittable(){
@@ -10,7 +11,9 @@ Hittable::Hittable(){
 	hitx = 0;
 	hity = 0;
 	health = 0;
+	maxhealth = 0;
 	shield = 0;
+	destructible = false;
 }
 
 void Hittable::Serialize(bool write, Serializer & data, Serializer * old){
@@ -117,4 +120,17 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 	}
 	hitx = x;
 	hity = y;
+
+	if (destructible && world.IsAuthority()) {
+		GameEvent ev;
+		ev.actor_id = object.id;
+		if (health == 0) {
+			ev.type = EventType::ACTOR_KILLED;
+			world.triggerGraph.Bus().Emit(ev);
+		} else {
+			ev.type  = EventType::ACTOR_DAMAGED;
+			ev.value = static_cast<Sint32>(projectile.healthdamage);
+			world.triggerGraph.Bus().Emit(ev);
+		}
+	}
 }

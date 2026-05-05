@@ -8,6 +8,7 @@
 #include "platform.h"
 #include "platformset.h"
 #include "minimap.h"
+#include "TriggerDef.h"
 #include <zlib.h>
 
 class Map
@@ -90,6 +91,10 @@ public:
 	static const Uint8 NAVLINK_JUMP = 0, NAVLINK_FALL = 1, NAVLINK_JETPACK = 2;
 	struct NavLink { Platform * from; Platform * to; Uint8 type; Sint32 sourceX; Sint32 targetX; };
 	std::vector<NavLink> navlinks;
+
+	// Mission trigger graph and objectives (loaded from .sil trigger section).
+	std::vector<TriggerNode> triggers;
+	std::vector<ObjectiveDef> objectives;
 	
 //private:
 	static bool CompareType(std::shared_ptr<Platform> a, std::shared_ptr<Platform> b);
