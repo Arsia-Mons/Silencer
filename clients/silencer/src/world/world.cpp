@@ -563,6 +563,7 @@ void World::DoNetwork_Authority(void){
 						case MAP_DOWNLOADED:{
 							peer->mapdownloaded = true;
 							SendPeerList();
+							BroadcastTriggerState();
 						}break;
 						case MAP_GETCHUNK:{
 							Uint32 offset;
@@ -821,6 +822,11 @@ void World::DoNetwork_Replica(void){
 							StoreMapChunk((unsigned char *)&data.data[data.BitsToBytes(data.readoffset)], offset, size);
 						}break;
 					}
+				}
+			}break;
+			case MSG_TRIGGER_STATE:{
+				if(peer){
+					triggerGraph.ApplySerializedState(data);
 				}
 			}break;
 		}
@@ -1988,6 +1994,22 @@ void World::SendSound(const char * name, Peer * peer, Uint8 volume){
 			}
 		}
 	}
+}
+
+void World::BroadcastTriggerState() {
+    if (!IsAuthority()) return;
+    Serializer payload;
+    triggerGraph.SerializeState(payload);
+    int msgsize = 1 + payload.offset;
+    char * msg = new char[msgsize];
+    msg[0] = MSG_TRIGGER_STATE;
+    memcpy(&msg[1], payload.data, payload.offset);
+    for (unsigned int i = 0; i < maxpeers; i++) {
+        if (peerlist[i] && i != localpeerid) {
+            SendPacket(peerlist[i], msg, msgsize);
+        }
+    }
+    delete[] msg;
 }
 
 char * World::CreateStatusString(const char * status, Uint8 color, Uint8 duration){

@@ -51,6 +51,7 @@ public:
 	void Illuminate(void);
 	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0, bool networked = false, Peer * peer = 0);
 	void ShowStatus(const char * status, Uint8 color = 0, bool networked = false, Peer * peer = 0);
+	void BroadcastTriggerState();
 	void ShowTopMessage(const char * message);
 	void SendChat(bool toteam, char * message);
 	void SendSound(const char * name, Peer * peer = 0, Uint8 volume = 128);
@@ -203,7 +204,8 @@ private:
 	enum {NONE, INLOBBY, INGAME} gameplaystate;
 	enum {MSG_CONNECT, MSG_SNAPSHOT, MSG_INPUT, MSG_PEERLIST, MSG_DISCONNECT, MSG_PING, MSG_PONG,
 		MSG_GAMEINFO, MSG_READY, MSG_CHAT, MSG_STATION, MSG_CHANGETEAM, MSG_STATUS,
-		MSG_MESSAGE, MSG_GOVTKILL, MSG_SOUND, MSG_TECH, MSG_STATS, MSG_EXISTS, MSG_REMOVE, MSG_MAP, MSG_SETAGENCY, MSG_KICK};
+		MSG_MESSAGE, MSG_GOVTKILL, MSG_SOUND, MSG_TECH, MSG_STATS, MSG_EXISTS, MSG_REMOVE, MSG_MAP, MSG_SETAGENCY, MSG_KICK,
+		MSG_TRIGGER_STATE};
 	enum {STA_BUY, STA_REPAIR, STA_VIRUS};
 	enum {MAP_DOWNLOADED, MAP_GETCHUNK, MAP_PUTCHUNK};
 	Serializer * oldsnapshots[maxpeers][maxoldsnapshots];

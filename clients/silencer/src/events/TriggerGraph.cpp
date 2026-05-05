@@ -80,16 +80,23 @@ void TriggerGraph::Tick(World & world, float dt) {
             // repeatable: reset after firing so it can fire again
             fired_[idx] = false;
         }
+        state_dirty_ = true;
     }
     pending_events_.clear();
 
     actions_.Tick(world, dt);
+
+    if (state_dirty_) {
+        world.BroadcastTriggerState();
+        state_dirty_ = false;
+    }
 }
 
 void TriggerGraph::CompleteObjective(Uint16 id, World & world) {
     for (ObjectiveDef & obj : objectives_) {
         if (obj.id == id) {
             obj.complete = true;
+            state_dirty_ = true;
             GameEvent ev;
             ev.type        = EventType::OBJECTIVE_COMPLETE;
             ev.objective_id = id;
@@ -110,7 +117,56 @@ void TriggerGraph::SetEnabled(Uint16 node_id, bool enabled) {
     for (TriggerNode & node : nodes_) {
         if (node.id == node_id) {
             node.enabled = enabled;
+            state_dirty_ = true;
             return;
+        }
+    }
+}
+
+void TriggerGraph::SerializeState(Serializer & data) const {
+    Uint16 num_objectives = static_cast<Uint16>(objectives_.size());
+    data.Put(num_objectives);
+    for (const ObjectiveDef & obj : objectives_) {
+        data.Put(const_cast<Uint16 &>(obj.id));
+        Uint8 complete = obj.complete ? 1 : 0;
+        data.Put(complete);
+    }
+    Uint16 num_nodes = static_cast<Uint16>(nodes_.size());
+    data.Put(num_nodes);
+    for (size_t i = 0; i < nodes_.size(); i++) {
+        data.Put(const_cast<Uint16 &>(nodes_[i].id));
+        Uint8 flags = 0;
+        if (nodes_[i].enabled) flags |= 0x01;
+        if (i < fired_.size() && fired_[i]) flags |= 0x02;
+        data.Put(flags);
+    }
+}
+
+void TriggerGraph::ApplySerializedState(Serializer & data) {
+    Uint16 num_objectives = 0;
+    data.Get(num_objectives);
+    for (Uint16 i = 0; i < num_objectives; i++) {
+        Uint16 id = 0;
+        Uint8 complete = 0;
+        data.Get(id);
+        data.Get(complete);
+        for (ObjectiveDef & obj : objectives_) {
+            if (obj.id == id) { obj.complete = (complete != 0); break; }
+        }
+    }
+    Uint16 num_nodes = 0;
+    data.Get(num_nodes);
+    for (Uint16 i = 0; i < num_nodes; i++) {
+        Uint16 id = 0;
+        Uint8 flags = 0;
+        data.Get(id);
+        data.Get(flags);
+        for (size_t j = 0; j < nodes_.size(); j++) {
+            if (nodes_[j].id == id) {
+                nodes_[j].enabled = (flags & 0x01) != 0;
+                if (j < fired_.size()) fired_[j] = (flags & 0x02) != 0;
+                break;
+            }
         }
     }
 }
