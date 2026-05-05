@@ -825,7 +825,75 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 
 	//delete[] levelcompressed;
 	//delete[] level;
-	
+
+	// Trigger nodes section
+	if(i + 8 <= level.size()){
+		Uint32 numTriggers = 0;
+		memcpy(&numTriggers, &level[i], 4); numTriggers = SDL_Swap32LE(numTriggers);
+		i += 8; // count + padding
+		for(Uint32 t = 0; t < numTriggers; t++){
+			if(i + 14 > level.size()) break;
+			TriggerNode node;
+			Uint16 id16 = 0; memcpy(&id16, &level[i], 2); node.id = SDL_Swap16LE(id16); i += 2;
+			node.trigger_event    = (EventType)level[i++];
+			Uint8 flags           = level[i++];
+			node.one_shot         = (flags & 1) != 0;
+			node.enabled          = (flags & 2) != 0;
+			Uint16 aid = 0;       memcpy(&aid, &level[i], 2); node.actor_id = SDL_Swap16LE(aid); i += 2;
+			node.condition_logic  = (ConditionLogic)level[i++];
+			Uint8 numConds        = level[i++];
+			Uint8 numActions      = level[i++];
+			i++; // padding
+			memcpy(&node.timer_seconds, &level[i], 4); i += 4;
+
+			for(Uint8 c = 0; c < numConds; c++){
+				if(i + 8 > level.size()) break;
+				TriggerCondition cond;
+				cond.type         = (ConditionType)level[i++];
+				cond.team         = level[i++];
+				Uint16 oid = 0;   memcpy(&oid, &level[i], 2); cond.objective_id = SDL_Swap16LE(oid); i += 2;
+				cond.player_count = level[i++];
+				cond.health_pct   = level[i++];
+				i += 2; // padding
+				node.conditions.push_back(cond);
+			}
+
+			for(Uint8 a = 0; a < numActions; a++){
+				if(i + 208 > level.size()) break;
+				TriggerAction act;
+				act.type          = (ActionType)level[i++];
+				act.param_u8      = level[i++];
+				Uint16 aaid = 0;  memcpy(&aaid, &level[i], 2); act.actor_id = SDL_Swap16LE(aaid); i += 2;
+				memcpy(&act.delay,   &level[i], 4); i += 4;
+				Sint16 px = 0, py = 0;
+				memcpy(&px, &level[i], 2); act.param_x = (Sint16)SDL_Swap16LE((Uint16)px); i += 2;
+				memcpy(&py, &level[i], 2); act.param_y = (Sint16)SDL_Swap16LE((Uint16)py); i += 2;
+				memcpy(&act.param_f, &level[i], 4); i += 4;
+				memcpy(act.sound,   &level[i], 64);  act.sound[63]   = '\0'; i += 64;
+				memcpy(act.message, &level[i], 128); act.message[127] = '\0'; i += 128;
+				node.actions.push_back(act);
+			}
+
+			triggers.push_back(node);
+		}
+	}
+
+	// Objectives section
+	if(i + 8 <= level.size()){
+		Uint32 numObjectives = 0;
+		memcpy(&numObjectives, &level[i], 4); numObjectives = SDL_Swap32LE(numObjectives);
+		i += 8; // count + padding
+		for(Uint32 o = 0; o < numObjectives; o++){
+			if(i + 132 > level.size()) break;
+			ObjectiveDef obj;
+			Uint16 oid = 0; memcpy(&oid, &level[i], 2); obj.id = SDL_Swap16LE(oid); i += 2;
+			obj.required = level[i++] != 0;
+			i++; // padding
+			memcpy(obj.text, &level[i], 128); obj.text[127] = '\0'; i += 128;
+			objectives.push_back(obj);
+		}
+	}
+
 	return true;
 }
 

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import pako from 'pako';
-import type { SilMapData, MapActor, MapPlatform, MapShadowZone, NavLink, TileCell, MapHeader, MapLayers } from '../../lib/types';
+import type { SilMapData, MapActor, MapPlatform, MapShadowZone, NavLink, TileCell, MapHeader, MapLayers, TriggerNode, ObjectiveDef, TriggerEventType, TriggerActionType, TriggerConditionType, ConditionLogic } from '../../lib/types';
 import * as mapStore from '../../lib/map-store';
 import { bakeMapLightMasks } from './lightBaker';
 
@@ -122,8 +122,175 @@ function parseShadowZones(dv: DataView, offset: number): { shadowZones: MapShado
   return { shadowZones, offset };
 }
 
-function platformType(type1: number, type2: number): string {
-  if (type1 === 0 && type2 === 0) return 'RECTANGLE';
+// ── Trigger event/action/condition enums (must match TriggerDef.h) ────────────
+
+const EVENT_TYPES: TriggerEventType[] = [
+  'NONE','TRIGGER_ENTER_ZONE','TERMINAL_ACTIVATED','ACTOR_KILLED','ACTOR_DAMAGED',
+  'OBJECTIVE_COMPLETE','ITEM_COLLECTED','PLAYER_DIED','ALL_PLAYERS_DIED',
+  'TIMER_EXPIRED','GAME_START',
+];
+const ACTION_TYPES: TriggerActionType[] = [
+  'NONE','OPEN_DOOR','LOCK_DOOR','UNLOCK_DOOR','PLAY_SOUND','SHOW_OBJECTIVE',
+  'PAN_CAMERA','SPAWN_ACTOR','END_MISSION','DESTROY_ACTOR','MOVE_ACTOR',
+  'APPLY_DAMAGE_IN_ZONE','ENABLE_TRIGGER','DISABLE_TRIGGER',
+];
+const COND_TYPES: TriggerConditionType[] = [
+  'NONE','TEAM_CHECK','OBJECTIVE_STATE','PLAYER_COUNT','HEALTH_THRESHOLD',
+];
+
+// Node header: 14 bytes. Condition: 8 bytes. Action: 208 bytes.
+const COND_BYTES  = 8;
+const ACTION_BYTES = 208;
+
+function readNullString(bytes: Uint8Array, offset: number, maxLen: number): string {
+  let end = offset;
+  while (end < offset + maxLen && bytes[end] !== 0) end++;
+  return new TextDecoder().decode(bytes.slice(offset, end));
+}
+
+function parseTriggers(dv: DataView, bytes: Uint8Array, offset: number): {
+  triggers: TriggerNode[]; objectives: ObjectiveDef[]; offset: number;
+} {
+  const triggers: TriggerNode[] = [];
+  const objectives: ObjectiveDef[] = [];
+
+  // Trigger nodes section
+  if (offset + 8 > dv.byteLength) return { triggers, objectives, offset };
+  const numNodes = dv.getUint32(offset, true);
+  offset += 8;
+
+  for (let n = 0; n < numNodes; n++) {
+    if (offset + 14 > dv.byteLength) break;
+    const id          = dv.getUint16(offset,     true);
+    const eventIdx    = dv.getUint8 (offset + 2);
+    const flags       = dv.getUint8 (offset + 3);
+    const actorId     = dv.getUint16(offset + 4, true);
+    const condLogic   = dv.getUint8 (offset + 6);
+    const numConds    = dv.getUint8 (offset + 7);
+    const numActions  = dv.getUint8 (offset + 8);
+    // offset+9 = padding
+    const timerSecs   = dv.getFloat32(offset + 10, true);
+    offset += 14;
+
+    const conditions = [];
+    for (let c = 0; c < numConds && offset + COND_BYTES <= dv.byteLength; c++) {
+      conditions.push({
+        type:        COND_TYPES[dv.getUint8(offset)]     ?? 'NONE',
+        team:        dv.getUint8 (offset + 1),
+        objectiveId: dv.getUint16(offset + 2, true),
+        playerCount: dv.getUint8 (offset + 4),
+        healthPct:   dv.getUint8 (offset + 5),
+      });
+      offset += COND_BYTES;
+    }
+
+    const actions = [];
+    for (let a = 0; a < numActions && offset + ACTION_BYTES <= dv.byteLength; a++) {
+      actions.push({
+        type:    ACTION_TYPES[dv.getUint8(offset)]       ?? 'NONE',
+        paramU8: dv.getUint8 (offset + 1),
+        actorId: dv.getUint16(offset + 2, true),
+        delay:   dv.getFloat32(offset + 4, true),
+        paramX:  dv.getInt16 (offset + 8,  true),
+        paramY:  dv.getInt16 (offset + 10, true),
+        paramF:  dv.getFloat32(offset + 12, true),
+        sound:   readNullString(bytes, offset + 16, 64),
+        message: readNullString(bytes, offset + 80, 128),
+      });
+      offset += ACTION_BYTES;
+    }
+
+    triggers.push({
+      id,
+      triggerEvent:   EVENT_TYPES[eventIdx] ?? 'NONE',
+      actorId,
+      oneShot:        !!(flags & 1),
+      enabled:        !!(flags & 2),
+      conditionLogic: condLogic === 1 ? 'ANY_OF' : 'ALL_OF',
+      timerSeconds:   timerSecs,
+      conditions,
+      actions,
+    });
+  }
+
+  // Objectives section
+  if (offset + 8 <= dv.byteLength) {
+    const numObjs = dv.getUint32(offset, true);
+    offset += 8;
+    for (let o = 0; o < numObjs && offset + 132 <= dv.byteLength; o++) {
+      const id       = dv.getUint16(offset,     true);
+      const required = dv.getUint8 (offset + 2) !== 0;
+      const text     = readNullString(bytes, offset + 4, 128);
+      objectives.push({ id, required, text });
+      offset += 132;
+    }
+  }
+
+  return { triggers, objectives, offset };
+}
+
+function writeNullString(bytes: Uint8Array, offset: number, value: string, maxLen: number): void {
+  const enc = new TextEncoder().encode(value);
+  const n = Math.min(enc.length, maxLen - 1);
+  bytes.set(enc.slice(0, n), offset);
+  bytes[offset + n] = 0;
+}
+
+function writeTriggerSections(ldv: DataView, bytes: Uint8Array, off: number,
+  triggers: TriggerNode[], objectives: ObjectiveDef[]): number {
+
+  // Trigger nodes section
+  ldv.setUint32(off, triggers.length, true); off += 4;
+  ldv.setUint32(off, 0, true);               off += 4;
+
+  for (const node of triggers) {
+    const flags = (node.oneShot ? 1 : 0) | (node.enabled ? 2 : 0);
+    ldv.setUint16(off,     node.id,                                      true); off += 2;
+    ldv.setUint8 (off,     EVENT_TYPES.indexOf(node.triggerEvent));              off += 1;
+    ldv.setUint8 (off,     flags);                                               off += 1;
+    ldv.setUint16(off,     node.actorId,                                 true); off += 2;
+    ldv.setUint8 (off,     node.conditionLogic === 'ANY_OF' ? 1 : 0);           off += 1;
+    ldv.setUint8 (off,     node.conditions.length);                              off += 1;
+    ldv.setUint8 (off,     node.actions.length);                                 off += 1;
+    off += 1; // padding
+    ldv.setFloat32(off,    node.timerSeconds,                            true); off += 4;
+
+    for (const c of node.conditions) {
+      ldv.setUint8 (off,     COND_TYPES.indexOf(c.type));   off += 1;
+      ldv.setUint8 (off,     c.team);                        off += 1;
+      ldv.setUint16(off,     c.objectiveId, true);           off += 2;
+      ldv.setUint8 (off,     c.playerCount);                 off += 1;
+      ldv.setUint8 (off,     c.healthPct);                   off += 1;
+      off += 2; // padding
+    }
+
+    for (const a of node.actions) {
+      ldv.setUint8  (off,    ACTION_TYPES.indexOf(a.type)); off += 1;
+      ldv.setUint8  (off,    a.paramU8);                     off += 1;
+      ldv.setUint16 (off,    a.actorId,  true);              off += 2;
+      ldv.setFloat32(off,    a.delay,    true);               off += 4;
+      ldv.setInt16  (off,    a.paramX,   true);               off += 2;
+      ldv.setInt16  (off,    a.paramY,   true);               off += 2;
+      ldv.setFloat32(off,    a.paramF,   true);               off += 4;
+      writeNullString(bytes, off, a.sound,   64); off += 64;
+      writeNullString(bytes, off, a.message, 128); off += 128;
+    }
+  }
+
+  // Objectives section
+  ldv.setUint32(off, objectives.length, true); off += 4;
+  ldv.setUint32(off, 0, true);                 off += 4;
+  for (const obj of objectives) {
+    ldv.setUint16(off,     obj.id,              true); off += 2;
+    ldv.setUint8 (off,     obj.required ? 1 : 0);      off += 1;
+    off += 1; // padding
+    writeNullString(bytes, off, obj.text, 128); off += 128;
+  }
+
+  return off;
+}
+
+function platformType(type1: number, type2: number): string {  if (type1 === 0 && type2 === 0) return 'RECTANGLE';
   if (type1 === 1 && type2 === 0) return 'LADDER';
   if (type1 === 0 && type2 === 1) return 'STAIRSUP';
   if (type1 === 0 && type2 === 2) return 'STAIRSDOWN';
@@ -165,6 +332,8 @@ export interface UseSilMapReturn {
   addNavLink: (link: NavLink) => void;
   removeNavLink: (idx: number) => void;
   updateNavLink: (idx: number, patch: Partial<NavLink>) => void;
+  setTriggers: (triggers: TriggerNode[]) => void;
+  setObjectives: (objectives: ObjectiveDef[]) => void;
   updateHeader: (patch: Partial<MapHeader>) => void;
   undo: () => void;
   redo: () => void;
@@ -239,6 +408,8 @@ export function useSilMap(): UseSilMapReturn {
       platforms: [],
       shadowZones: [],
       navLinks: [],
+      triggers: [],
+      objectives: [],
       rawMinimap: new Uint8Array(0),
       minimapCompressedSize: 0,
     });
@@ -294,10 +465,13 @@ export function useSilMap(): UseSilMapReturn {
         }
       }
 
+      // Parse trigger nodes + objectives sections
+      const { triggers, objectives } = parseTriggers(levelDV, levelRaw, off5);
+
       historyRef.current = [];
       futureRef.current = [];
       syncUndoRedo();
-      const loaded: SilMapData = { header, width, height, layers, actors, platforms, shadowZones, navLinks, rawMinimap, minimapCompressedSize, fileName: file.name };
+      const loaded: SilMapData = { header, width, height, layers, actors, platforms, shadowZones, navLinks, triggers, objectives, rawMinimap, minimapCompressedSize, fileName: file.name };
       setMapData(loaded);
       return loaded;
     } catch (e) {
@@ -319,9 +493,18 @@ export function useSilMap(): UseSilMapReturn {
     // Bake shadow masks for all placed map lights fresh at save time
     const lightMasks = bakeMapLightMasks(actors, platforms, shadowZones);
     const navLinks = mapData.navLinks ?? [];
+    const triggers = mapData.triggers ?? [];
+    const objectives = mapData.objectives ?? [];
     const lightMasksSectionSize = 8 + lightMasks.reduce((sum, m) => sum + 12 + m.data.length, 0);
     const navLinksSectionSize = 8 + navLinks.length * 20;
-    const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize);
+    const triggerNodesSectionSize = 8 + triggers.reduce((sum, n) =>
+      sum + 14 + n.conditions.length * COND_BYTES + n.actions.length * ACTION_BYTES, 0);
+    const objectivesSectionSize = 8 + objectives.length * 132;
+    const levelBuf = new ArrayBuffer(
+      tileSectionSize + actorsSectionSize + platformsSectionSize +
+      shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize +
+      triggerNodesSectionSize + objectivesSectionSize,
+    );
     const ldv = new DataView(levelBuf);
     for (let i = 0; i < numCells; i++) {
       const base = i * CELL_SIZE;
@@ -403,6 +586,9 @@ export function useSilMap(): UseSilMapReturn {
       ldv.setInt32 (off, link.sourceX ?? -2147483648, true); off += 4;
       ldv.setInt32 (off, link.targetX, true); off += 4;
     }
+
+    // Trigger nodes + objectives sections
+    off = writeTriggerSections(ldv, new Uint8Array(levelBuf), off, triggers, objectives);
 
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
     const descBytes = new TextEncoder().encode(header.description);
@@ -648,6 +834,22 @@ export function useSilMap(): UseSilMapReturn {
     });
   }, [pushHistory]);
 
+  const setTriggers = useCallback((triggers: TriggerNode[]) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      return { ...prev, triggers };
+    });
+  }, [pushHistory]);
+
+  const setObjectives = useCallback((objectives: ObjectiveDef[]) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      return { ...prev, objectives };
+    });
+  }, [pushHistory]);
+
   const applyTileBatch = useCallback((
     layerType: 'bg' | 'fg', layerIdx: number,
     updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }>
@@ -718,9 +920,18 @@ export function useSilMap(): UseSilMapReturn {
     const shadowZonesSectionSize = 8 + shadowZones.length * 16; // always write header
     const lightMasks = bakeMapLightMasks(actors, platforms, shadowZones);
     const navLinks = mapData.navLinks ?? [];
+    const triggers = mapData.triggers ?? [];
+    const objectives = mapData.objectives ?? [];
     const lightMasksSectionSize = 8 + lightMasks.reduce((sum, m) => sum + 12 + m.data.length, 0);
     const navLinksSectionSize = 8 + navLinks.length * 20;
-    const levelBuf = new ArrayBuffer(tileSectionSize + actorsSectionSize + platformsSectionSize + shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize);
+    const triggerNodesSectionSize = 8 + triggers.reduce((sum, n) =>
+      sum + 14 + n.conditions.length * COND_BYTES + n.actions.length * ACTION_BYTES, 0);
+    const objectivesSectionSize = 8 + objectives.length * 132;
+    const levelBuf = new ArrayBuffer(
+      tileSectionSize + actorsSectionSize + platformsSectionSize +
+      shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize +
+      triggerNodesSectionSize + objectivesSectionSize,
+    );
     const ldv = new DataView(levelBuf);
 
     for (let i = 0; i < numCells; i++) {
@@ -803,6 +1014,9 @@ export function useSilMap(): UseSilMapReturn {
       ldv.setInt32 (off,     link.targetX, true); off += 4;
     }
 
+    // Trigger nodes + objectives sections
+    off = writeTriggerSections(ldv, new Uint8Array(levelBuf), off, triggers, objectives);
+
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
     const descBytes = new TextEncoder().encode(header.description);
     const descBuf = new Uint8Array(128);
@@ -862,6 +1076,7 @@ export function useSilMap(): UseSilMapReturn {
     addActor, removeActor, updateActor, moveActor,
     addShadowZone, removeShadowZone,
     addNavLink, removeNavLink, updateNavLink,
+    setTriggers, setObjectives,
     updateHeader,
     undo, redo, canUndo, canRedo,
     resizeMap,
