@@ -227,8 +227,25 @@ void Guard::InitBT(){
 		return BTResult::Running;
 	};
 
-	btctx_.actions["Patrol"] = [this](BTContext&) -> BTResult {
-		if(state == STANDING || state == LOOKING){ state = WALKING; state_i = 0; }
+	btctx_.actions["Patrol"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(state == STANDING || state == LOOKING){
+			state = WALKING;
+			state_i = 0;
+		} else if(state == WALKING){
+			// Patrol owns turnaround at chain ends and the walk-duration timeout.
+			// Both used to live in the WALKING state block; the former fought with
+			// SearchAndReturn writing `mirrored` every tick, wedging guards at walls.
+			if(DistanceToEnd(*this, world) <= world.minwalldistance){
+				mirrored = !mirrored;
+			}
+			const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster");
+			const int dur = gd ? gd->walkingDurationTicks : 240;
+			if(state_i >= dur){
+				state = LOOKING;
+				state_i = 0;
+			}
+		}
 		return BTResult::Success;
 	};
 
@@ -260,6 +277,15 @@ void Guard::InitBT(){
 						mirrored = (obj->x < x); // orient toward target
 					}
 					// <=80px: keep current direction to avoid oscillation
+					// Blocked at the platform-chain end facing the target — give up the chase
+					// instead of pressing into the wall for the full search timeout.
+					if (state == WALKING && DistanceToEnd(*this, world) <= world.minwalldistance) {
+						bool target_on_wall_side = mirrored ? (signed(obj->x) <= signed(x)) : (signed(obj->x) >= signed(x));
+						if (target_on_wall_side) {
+							chasing = 0;
+							return BTResult::Running;
+						}
+					}
 					// Climb ladder toward target if on a meaningfully different level
 					int ydiff = signed(obj->y) - signed(y);
 					{ const EnemyDef* _gg = GASLoader::Get().GetEnemyDef("guard-blaster");
@@ -301,6 +327,16 @@ void Guard::InitBT(){
 		}
 		if (state != LADDER) {
 			mirrored = (signed(originalx) < signed(x));
+			// Blocked at the platform-chain end on the way home — accept current
+			// position as "home enough" rather than wedging at the wall.
+			if (state == WALKING && DistanceToEnd(*this, world) <= world.minwalldistance) {
+				chasing = 0;
+				bt_walk_ticks_ = 0;
+				state = STANDING;
+				state_i = -1;
+				mirrored = originalmirrored;
+				return BTResult::Success;
+			}
 			// Climb ladders back to original level
 			int ydiff = signed(originaly) - signed(y);
 			if(abs(ydiff) > (_ggr?_ggr->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
@@ -582,13 +618,12 @@ void Guard::Tick(World & world){
 			res_index = state_i / 4;
 		}break;
 		case WALKING:{
+			// Pure motion + animation. Turnaround and duration timeout are BT decisions
+			// (see the "Patrol" / "SearchAndReturn" actions in InitBT).
 			res_bank = 60;
 			res_index = state_i % 19;
 			xv = mirrored ? -speed : speed;
 			FollowGround(*this, world, xv);
-			if(DistanceToEnd(*this, world) <= world.minwalldistance){
-				mirrored = !mirrored;
-			}
 			// play per-frame sounds defined in actordefs/guard.json
 			{
 				auto it = world.resources.actordefs.find(ActorDefName(weapon));
@@ -599,13 +634,6 @@ void Guard::Tick(World & world){
 						EmitSound(world, world.resources.soundbank[snd], vol);
 					}
 				}
-			}
-			{ const EnemyDef* _gwd = GASLoader::Get().GetEnemyDef("guard-blaster");
-			  if(state_i >= (_gwd ? _gwd->walkingDurationTicks : 240)){
-				state = LOOKING;
-				state_i = -1;
-				break;
-			  }
 			}
 		}break;
 		case SHOOTSTANDING:{
@@ -1030,7 +1058,7 @@ Object * Guard::Look(World & world, Uint8 direction){
 			int yv2 = y2 - y1;
 			Object * object = world.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, types);
 			if(object && ShouldTarget(*object, world)){
-				if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
+				if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSUP | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
 					if(world.debugoverlay) world.debuglines.push_back({x+x1, y+y1, x+x2, y+y2, 68}); // green = hit
 					return object;
 				}
@@ -1042,7 +1070,7 @@ Object * Guard::Look(World & world, Uint8 direction){
 		int yv2 = y2 - y1;
 		Object * object = world.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, types);
 		if(object && ShouldTarget(*object, world)){
-			if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
+			if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSUP | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
 				if(world.debugoverlay) world.debuglines.push_back({x+x1, y+y1, x+x2, y+y2, 68}); // green = hit
 				return object;
 			}

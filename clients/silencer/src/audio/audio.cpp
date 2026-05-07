@@ -184,7 +184,7 @@ bool Audio::PlayMusic(MIX_Audio * music){
 
 void Audio::StopMusic(void){
 	if(!enabled) return;
-	MIX_StopTrack(musictrack, MIX_MSToFrames(mixerspec.freq, 700));
+	MIX_StopTrack(musictrack, MIX_TrackMSToFrames(musictrack, 700));
 }
 
 void Audio::PauseMusic(void){

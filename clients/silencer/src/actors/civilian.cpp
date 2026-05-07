@@ -62,7 +62,7 @@ void Civilian::Tick(World & world){
 			}
 			Uint32 xe = x + xv;
 			Uint32 ye = y + yv;
-			Platform * platform = world->map.TestLine(x, y, xe, ye, &xe, &ye, Platform::RECTANGLE | Platform::STAIRSDOWN | Platform::STAIRSDOWN);
+			Platform * platform = world->map.TestLine(x, y, xe, ye, &xe, &ye, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN);
 			if(platform){
 				currentplatformid = platform->id;
 				state = WALKING;
