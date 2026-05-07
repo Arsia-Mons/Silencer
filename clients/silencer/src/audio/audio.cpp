@@ -127,6 +127,8 @@ void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int rad
 			MIX_SetTrackGain(tracks[channel], ((oldvolume * volume) / 128.0f) * effectvolume);
 			lastx = x;
 			lasty = y;
+		}else{
+			MIX_StopTrack(tracks[channel], 0);
 		}
 	}
 }
