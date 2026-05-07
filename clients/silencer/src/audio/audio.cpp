@@ -79,7 +79,11 @@ int Audio::Play(MIX_Audio * chunk, int volume, bool loop){
 
 void Audio::Stop(int channel, int fadeoutms){
 	if(!enabled || channel < 0 || channel >= maxchannels) return;
-	Sint64 fade_frames = fadeoutms ? MIX_MSToFrames(mixerspec.freq, fadeoutms) : 0;
+	Sint64 fade_frames = 0;
+	if(fadeoutms > 0){
+		fade_frames = MIX_TrackMSToFrames(tracks[channel], fadeoutms);
+		if(fade_frames < 0) fade_frames = 0;
+	}
 	MIX_StopTrack(tracks[channel], fade_frames);
 }
 
@@ -127,8 +131,6 @@ void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int rad
 			MIX_SetTrackGain(tracks[channel], ((oldvolume * volume) / 128.0f) * effectvolume);
 			lastx = x;
 			lasty = y;
-		}else{
-			MIX_StopTrack(tracks[channel], 0);
 		}
 	}
 }
