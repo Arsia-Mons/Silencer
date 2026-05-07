@@ -71,6 +71,14 @@ public:
 	// Load the active profile (per Config::active_keybind_profile) into keymap.
 	// Falls back to "default" (built-in) if the named profile is missing.
 	void LoadActiveKeymap();
+	// Advance Config::active_keybind_profile to the next entry in
+	// ListProfiles().all (wraps), then reload the live keymap. Used by the
+	// Configure Controls preset cycle button.
+	void CycleKeybindPreset();
+	// If the active profile is a built-in (default/wasd/gamepad), flip the
+	// in-memory active profile to "<name>-custom" with a "(Custom)" label so
+	// edits don't shadow the on-disk built-in. No-op if already a custom.
+	void ForkActiveProfileIfBuiltin();
 
 private:
 	bool Tick(void);
@@ -135,6 +143,7 @@ private:
 	Button * c1button[6];
 	Button * cobutton[6];
 	Button * c2button[6];
+	Button * presetbutton;
 	bool ProcessMainMenuInterface(Interface * iface);
 	void ProcessLobbyConnectInterface(Interface * iface);
 	bool ProcessLobbyInterface(Interface * iface);
