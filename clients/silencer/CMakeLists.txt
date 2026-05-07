@@ -148,6 +148,8 @@ if(MSVC)
 	# Force-include the shim before every TU to re-expose it.
 	target_compile_options(${SILENCER_TARGET} PRIVATE
 		"/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/msvc_snprintf_compat.h")
+	# windows.h's min/max macros mangle std::min / std::max calls.
+	target_compile_definitions(${SILENCER_TARGET} PRIVATE NOMINMAX)
 endif()
 
 set(SILENCER_LOBBY_HOST "lobby.arsiamons.com" CACHE STRING "Lobby host the client connects to at startup")
