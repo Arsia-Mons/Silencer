@@ -1029,7 +1029,7 @@ Object * Guard::Look(World & world, Uint8 direction){
 			int xv2 = x2 - x1;
 			int yv2 = y2 - y1;
 			Object * object = world.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, types);
-			if(object){
+			if(object && ShouldTarget(*object, world)){
 				if(!world.map.TestIncr(x + x1, y + y1 - 1, x + x1, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
 					if(world.debugoverlay) world.debuglines.push_back({x+x1, y+y1, x+x2, y+y2, 68}); // green = hit
 					return object;
