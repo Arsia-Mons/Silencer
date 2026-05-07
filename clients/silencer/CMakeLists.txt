@@ -229,6 +229,21 @@ endif()
 
 target_link_libraries(${SILENCER_TARGET} minizip_dep)
 
+# Dev-build asset staging (Windows/Linux): copy shared/assets/ next to the
+# binary so the runtime fallback (`GetResDir() + "<subdir>/..."` in
+# `src/platform/os.cpp`) resolves without needing `cmake --install`. Affects
+# gas/, keybinds/, behaviortrees/, and any future runtime asset subdir;
+# without this every fresh build silently runs with empty GAS/keybind data.
+# macOS bakes assets into the .app bundle directly via the bundle_extras
+# list above, so this branch is no-op there.
+if(NOT APPLE)
+	add_custom_command(TARGET ${SILENCER_TARGET} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E copy_directory
+				"${SILENCER_SHARED_DIR}/assets"
+				"$<TARGET_FILE_DIR:${SILENCER_TARGET}>/assets"
+		COMMENT "Staging shared/assets/ next to ${SILENCER_TARGET}")
+endif()
+
 install(TARGETS "${SILENCER_TARGET}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(DIRECTORY "${SILENCER_SHARED_DIR}/assets/" DESTINATION "${CMAKE_INSTALL_DATADIR}/silencer")
 install(FILES "${SILENCER_SHARED_DIR}/icons/icon_16.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps"   RENAME "silencer.png")
