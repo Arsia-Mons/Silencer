@@ -168,7 +168,7 @@ Object * WallDefense::Look(World & world){
 		int objecty = y1 + ((y2 - y1) / 2);
 		int xv2 = objectx - x;
 		int yv2 = objecty - y;
-		if(!world.map.TestIncr(x, y, x, y, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
+		if(!world.map.TestIncr(x, y, x, y, &xv2, &yv2, Platform::STAIRSUP | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
 			return object;
 		}
 	}

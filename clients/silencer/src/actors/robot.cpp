@@ -536,7 +536,7 @@ bool Robot::Look(World & world, Uint8 direction){
 			int yv2 = y2 - y1;
 			Object * object = world.TestIncr(x + minx, y + y1 - 1, x + minx, y + y1, &xv2, &yv2, types);
 			if(object){
-				if(!world.map.TestIncr(x + minx, y + y1 - 1, x + minx, y + y1, &xv2, &yv2, Platform::STAIRSDOWN | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
+				if(!world.map.TestIncr(x + minx, y + y1 - 1, x + minx, y + y1, &xv2, &yv2, Platform::STAIRSUP | Platform::STAIRSDOWN | Platform::RECTANGLE, 0, true)){
 					if(state == ASLEEP){
 						if(object->x < x){
 							mirrored = true;
