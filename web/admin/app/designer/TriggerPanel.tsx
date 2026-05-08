@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type {
-  TriggerNode, TriggerAction, TriggerCondition, ObjectiveDef,
+  TriggerNode, TriggerAction, TriggerCondition, ObjectiveDef, TriggerZone,
   TriggerEventType, TriggerActionType, TriggerConditionType, ConditionLogic,
 } from '../../lib/types';
 
@@ -36,6 +36,10 @@ const ACTION_LABELS: Record<TriggerActionType, string> = {
   APPLY_DAMAGE_IN_ZONE:'☢️  Damage Zone',
   ENABLE_TRIGGER:      '▶️  Enable Trigger',
   DISABLE_TRIGGER:     '⏸ Disable Trigger',
+  COMPLETE_OBJECTIVE:  '✅ Complete Obj',
+  LOCK_INPUT:          '🔒 Lock Input',
+  UNLOCK_INPUT:        '🔓 Unlock Input',
+  SET_FLAG:            '🚩 Set Flag',
 };
 
 const COND_LABELS: Record<TriggerConditionType, string> = {
@@ -44,6 +48,8 @@ const COND_LABELS: Record<TriggerConditionType, string> = {
   OBJECTIVE_STATE:  '📋 Objective',
   PLAYER_COUNT:     '🎮 Player Count',
   HEALTH_THRESHOLD: '❤️  Health',
+  COUNT_REACHED:    '🔢 Hit Count',
+  FLAG_SET:         '🚩 Flag Set',
 };
 
 const EVENT_OPTS = Object.keys(EVENT_LABELS) as TriggerEventType[];
@@ -62,7 +68,7 @@ function emptyNode(id: number): TriggerNode {
 }
 
 function emptyCondition(): TriggerCondition {
-  return { type: 'TEAM_CHECK', team: 0, objectiveId: 0, playerCount: 1, healthPct: 50 };
+  return { type: 'TEAM_CHECK', team: 0, objectiveId: 0, playerCount: 1, healthPct: 50, count: 1 };
 }
 
 function emptyAction(): TriggerAction {
@@ -116,6 +122,16 @@ function ConditionRow({ c, onChange, onRemove }: {
           <input className={inp + ' w-12'} type="number" min={0} max={100} value={c.healthPct} onChange={e => onChange({ healthPct: +e.target.value })} />
         </Field>
       )}
+      {c.type === 'COUNT_REACHED' && (
+        <Field label="min hits">
+          <input className={inp + ' w-12'} type="number" min={1} max={255} value={c.count ?? 1} onChange={e => onChange({ count: +e.target.value })} />
+        </Field>
+      )}
+      {c.type === 'FLAG_SET' && (
+        <Field label="flag id">
+          <input className={inp + ' w-12'} type="number" min={0} max={255} value={c.team} onChange={e => onChange({ team: +e.target.value })} />
+        </Field>
+      )}
     </div>
   );
 }
@@ -126,12 +142,13 @@ function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
   onRemove: () => void;
   onRequestActorLink?: (target: { label: string; onLinked: (matchid: number) => void }) => void;
 }) {
-  const needsActor = ['OPEN_DOOR','LOCK_DOOR','UNLOCK_DOOR','DESTROY_ACTOR','MOVE_ACTOR','ENABLE_TRIGGER','DISABLE_TRIGGER'].includes(a.type);
+  const needsActor = ['OPEN_DOOR','LOCK_DOOR','UNLOCK_DOOR','DESTROY_ACTOR','MOVE_ACTOR','ENABLE_TRIGGER','DISABLE_TRIGGER','COMPLETE_OBJECTIVE'].includes(a.type);
   const needsXY    = ['PAN_CAMERA','SPAWN_ACTOR','MOVE_ACTOR','APPLY_DAMAGE_IN_ZONE'].includes(a.type);
   const needsSound = a.type === 'PLAY_SOUND';
   const needsMsg   = a.type === 'SHOW_OBJECTIVE';
-  const needsU8    = a.type === 'SPAWN_ACTOR' || a.type === 'APPLY_DAMAGE_IN_ZONE';
-  const needsF     = a.type === 'MOVE_ACTOR' || a.type === 'APPLY_DAMAGE_IN_ZONE';
+  const needsU8    = a.type === 'SPAWN_ACTOR' || a.type === 'APPLY_DAMAGE_IN_ZONE' || a.type === 'SET_FLAG';
+  const needsF     = a.type === 'MOVE_ACTOR' || a.type === 'APPLY_DAMAGE_IN_ZONE' || a.type === 'SET_FLAG';
+  const needsOutcome = a.type === 'END_MISSION';
 
   return (
     <div className="flex flex-col gap-1 pl-2 border-l-2 border-game-border/40 py-1">
@@ -145,15 +162,24 @@ function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
         <input className={inp + ' w-16'} type="number" min={0} step={0.1} value={a.delay} onChange={e => onChange({ delay: +e.target.value })} />
       </Field>
       {needsActor && (
-        <Field label="actor id">
+        <Field label={a.type === 'COMPLETE_OBJECTIVE' ? 'obj id' : 'actor id'}>
           <input className={inp + ' w-16'} type="number" min={0} value={a.actorId} onChange={e => onChange({ actorId: +e.target.value })} />
-          {onRequestActorLink && (
+          {onRequestActorLink && a.type !== 'COMPLETE_OBJECTIVE' && (
             <button
               title="Pick actor from canvas"
               onClick={() => onRequestActorLink({ label: `action actor`, onLinked: (id) => onChange({ actorId: id }) })}
               className="text-[10px] hover:text-game-primary transition-colors flex-shrink-0"
             >🎯</button>
           )}
+        </Field>
+      )}
+      {needsOutcome && (
+        <Field label="outcome">
+          <select className={sel} value={a.paramU8} onChange={e => onChange({ paramU8: +e.target.value })}>
+            <option value={0}>neutral</option>
+            <option value={1}>win</option>
+            <option value={2}>lose</option>
+          </select>
         </Field>
       )}
       {needsXY && (
@@ -167,12 +193,17 @@ function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
         </>
       )}
       {needsF && (
-        <Field label={a.type === 'MOVE_ACTOR' ? 'duration' : 'radius'}>
-          <input className={inp + ' w-16'} type="number" min={0} step={0.1} value={a.paramF} onChange={e => onChange({ paramF: +e.target.value })} />
+        <Field label={a.type === 'MOVE_ACTOR' ? 'duration' : a.type === 'SET_FLAG' ? 'value' : 'radius'}>
+          {a.type === 'SET_FLAG' ? (
+            <input className={inp + ' w-12'} type="checkbox" checked={a.paramF !== 0}
+              onChange={e => onChange({ paramF: e.target.checked ? 1 : 0 })} />
+          ) : (
+            <input className={inp + ' w-16'} type="number" min={0} step={0.1} value={a.paramF} onChange={e => onChange({ paramF: +e.target.value })} />
+          )}
         </Field>
       )}
       {needsU8 && (
-        <Field label={a.type === 'SPAWN_ACTOR' ? 'actor type' : 'damage'}>
+        <Field label={a.type === 'SPAWN_ACTOR' ? 'actor type' : a.type === 'SET_FLAG' ? 'flag id' : 'damage'}>
           <input className={inp + ' w-16'} type="number" min={0} max={255} value={a.paramU8} onChange={e => onChange({ paramU8: +e.target.value })} />
         </Field>
       )}
@@ -332,14 +363,17 @@ function TriggerNodeRow({ node, expanded, onToggle, onChange, onRemove, onReques
 interface Props {
   triggers: TriggerNode[];
   objectives: ObjectiveDef[];
+  zones: TriggerZone[];
   onSetTriggers: (t: TriggerNode[]) => void;
   onSetObjectives: (o: ObjectiveDef[]) => void;
+  onSetZones: (z: TriggerZone[]) => void;
   onRequestActorLink?: (target: { label: string; onLinked: (matchid: number) => void }) => void;
 }
 
-export default function TriggerPanel({ triggers, objectives, onSetTriggers, onSetObjectives, onRequestActorLink }: Props) {
+export default function TriggerPanel({ triggers, objectives, zones, onSetTriggers, onSetObjectives, onSetZones, onRequestActorLink }: Props) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [objSection, setObjSection] = useState(true);
+  const [zoneSection, setZoneSection] = useState(true);
 
   const addTrigger = () => {
     const node = emptyNode(nextId(triggers));
@@ -364,6 +398,14 @@ export default function TriggerPanel({ triggers, objectives, onSetTriggers, onSe
   const removeObjective = (id: number) => onSetObjectives(objectives.filter(o => o.id !== id));
   const patchObjective  = (id: number, patch: Partial<ObjectiveDef>) =>
     onSetObjectives(objectives.map(o => o.id === id ? { ...o, ...patch } : o));
+
+  const addZone = () => {
+    const id = zones.length ? Math.max(...zones.map(z => z.id)) + 1 : 1;
+    onSetZones([...zones, { id, label: `Zone ${id}`, x1: 0, y1: 0, x2: 256, y2: 256 }]);
+  };
+  const removeZone = (id: number) => onSetZones(zones.filter(z => z.id !== id));
+  const patchZone  = (id: number, patch: Partial<TriggerZone>) =>
+    onSetZones(zones.map(z => z.id === id ? { ...z, ...patch } : z));
 
   return (
     <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
@@ -440,6 +482,58 @@ export default function TriggerPanel({ triggers, objectives, onSetTriggers, onSe
                     onChange={e => patchObjective(obj.id, { text: e.target.value })}
                     className={inp + ' w-full'}
                   />
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Zones section */}
+        <div className="border-t border-game-border/50 mt-1">
+          <button
+            className="w-full flex items-center px-3 py-1.5 hover:bg-game-dark transition-colors"
+            onClick={() => setZoneSection(v => !v)}
+          >
+            <span className="text-[10px] font-mono text-game-textDim tracking-widest flex-1">
+              {zones.length} ZONE{zones.length !== 1 ? 'S' : ''}
+            </span>
+            <span className="text-[9px] text-game-muted mr-2">{zoneSection ? '▲' : '▼'}</span>
+            <span
+              role="button"
+              onClick={e => { e.stopPropagation(); addZone(); }}
+              className="text-[9px] font-mono text-game-primary border border-game-primary/40 rounded px-1.5 py-0.5 hover:bg-game-primary/10 transition-colors"
+            >+ ADD</span>
+          </button>
+
+          {zoneSection && (
+            <>
+              {zones.length === 0 && (
+                <div className="px-3 py-2 text-[10px] text-game-muted font-mono">No zones. Draw with TRIGGER ZONE tool or + ADD.</div>
+              )}
+              {zones.map(zone => (
+                <div key={zone.id} className="flex flex-col gap-1 px-3 py-1.5 border-b border-game-border/30">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-mono text-[#00dcc8] w-6">#{zone.id}</span>
+                    <input
+                      type="text"
+                      value={zone.label}
+                      placeholder={`Zone ${zone.id}`}
+                      onChange={e => patchZone(zone.id, { label: e.target.value })}
+                      className={inp + ' flex-1 min-w-0'}
+                    />
+                    <button onClick={() => removeZone(zone.id)}
+                      className="ml-auto text-game-muted hover:text-red-400 text-[10px] px-0.5 flex-shrink-0">✕</button>
+                  </div>
+                  <div className="flex gap-1 flex-wrap pl-6">
+                    <span className="text-[8px] font-mono text-game-muted self-center">x1</span>
+                    <input className={inp + ' w-14'} type="number" value={zone.x1} onChange={e => patchZone(zone.id, { x1: +e.target.value })} />
+                    <span className="text-[8px] font-mono text-game-muted self-center">y1</span>
+                    <input className={inp + ' w-14'} type="number" value={zone.y1} onChange={e => patchZone(zone.id, { y1: +e.target.value })} />
+                    <span className="text-[8px] font-mono text-game-muted self-center">x2</span>
+                    <input className={inp + ' w-14'} type="number" value={zone.x2} onChange={e => patchZone(zone.id, { x2: +e.target.value })} />
+                    <span className="text-[8px] font-mono text-game-muted self-center">y2</span>
+                    <input className={inp + ' w-14'} type="number" value={zone.y2} onChange={e => patchZone(zone.id, { y2: +e.target.value })} />
+                  </div>
                 </div>
               ))}
             </>

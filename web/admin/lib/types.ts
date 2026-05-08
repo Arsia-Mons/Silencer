@@ -195,10 +195,12 @@ export type TriggerActionType =
   | 'NONE' | 'OPEN_DOOR' | 'LOCK_DOOR' | 'UNLOCK_DOOR' | 'PLAY_SOUND'
   | 'SHOW_OBJECTIVE' | 'PAN_CAMERA' | 'SPAWN_ACTOR' | 'END_MISSION'
   | 'DESTROY_ACTOR' | 'MOVE_ACTOR' | 'APPLY_DAMAGE_IN_ZONE'
-  | 'ENABLE_TRIGGER' | 'DISABLE_TRIGGER';
+  | 'ENABLE_TRIGGER' | 'DISABLE_TRIGGER'
+  | 'COMPLETE_OBJECTIVE' | 'LOCK_INPUT' | 'UNLOCK_INPUT' | 'SET_FLAG';
 
 export type TriggerConditionType =
-  | 'NONE' | 'TEAM_CHECK' | 'OBJECTIVE_STATE' | 'PLAYER_COUNT' | 'HEALTH_THRESHOLD';
+  | 'NONE' | 'TEAM_CHECK' | 'OBJECTIVE_STATE' | 'PLAYER_COUNT' | 'HEALTH_THRESHOLD'
+  | 'COUNT_REACHED' | 'FLAG_SET';
 
 export type ConditionLogic = 'ALL_OF' | 'ANY_OF';
 
@@ -208,6 +210,7 @@ export interface TriggerCondition {
   objectiveId: number;
   playerCount: number;
   healthPct: number;
+  count: number;  // COUNT_REACHED: minimum hit count
 }
 
 export interface TriggerAction {
@@ -240,6 +243,15 @@ export interface ObjectiveDef {
   text: string;         // max 127 chars
 }
 
+export interface TriggerZone {
+  id: number;
+  label: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
 export interface SilMapData {
   header: MapHeader;
   width: number;
@@ -251,6 +263,7 @@ export interface SilMapData {
   navLinks: NavLink[];
   triggers: TriggerNode[];
   objectives: ObjectiveDef[];
+  zones?: TriggerZone[];
   rawMinimap: Uint8Array;
   minimapCompressedSize: number;
   fileName?: string;

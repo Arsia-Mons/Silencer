@@ -36,6 +36,10 @@ enum class ActionType : Uint8 {
     APPLY_DAMAGE_IN_ZONE,
     ENABLE_TRIGGER,
     DISABLE_TRIGGER,
+    COMPLETE_OBJECTIVE,  // actor_id = objective id to complete
+    LOCK_INPUT,          // block all player input
+    UNLOCK_INPUT,        // restore player input
+    SET_FLAG,            // param_u8 = flag id (0-255), param_f != 0 => true
 };
 
 // ── Condition types ───────────────────────────────────────────────────────────
@@ -45,6 +49,8 @@ enum class ConditionType : Uint8 {
     OBJECTIVE_STATE,
     PLAYER_COUNT,
     HEALTH_THRESHOLD,
+    COUNT_REACHED,  // fires when hit_counts_ >= cond.count
+    FLAG_SET,       // team field reused as flag_id (0-255)
 };
 
 enum class ConditionLogic : Uint8 { ALL_OF = 0, ANY_OF = 1 };
@@ -53,10 +59,11 @@ enum class ConditionLogic : Uint8 { ALL_OF = 0, ANY_OF = 1 };
 
 struct TriggerCondition {
     ConditionType type  = ConditionType::NONE;
-    Uint8 team          = 0;    // TEAM_CHECK: team id; unused otherwise
+    Uint8 team          = 0;    // TEAM_CHECK: team id; FLAG_SET: flag id; unused otherwise
     Uint16 objective_id = 0;    // OBJECTIVE_STATE
     Uint8 player_count  = 0;    // PLAYER_COUNT threshold
     Uint8 health_pct    = 0;    // HEALTH_THRESHOLD 0-100
+    Uint8 count         = 0;    // COUNT_REACHED: minimum hit count
 };
 
 struct TriggerAction {
@@ -89,6 +96,12 @@ struct ObjectiveDef {
     bool required    = true;
     bool complete    = false;
     char text[128]   = {};
+};
+
+// ── Trigger zone (runtime-only spatial region, serialized in zones section) ───
+struct TriggerZone {
+    Uint16 id;
+    Sint16 x1, y1, x2, y2;
 };
 
 #endif

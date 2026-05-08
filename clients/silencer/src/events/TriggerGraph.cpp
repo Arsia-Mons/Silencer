@@ -8,6 +8,9 @@ void TriggerGraph::Load(const std::vector<TriggerNode> & nodes,
     objectives_ = objectives;
     fired_.assign(nodes_.size(), false);
     timer_elapsed_.assign(nodes_.size(), 0.f);
+    hit_counts_.clear();
+    flags_.fill(false);
+    zone_occupants_.clear();
 
     // Subscribe once per event type that any node listens to.
     bus_.Clear();
@@ -19,12 +22,21 @@ void TriggerGraph::Load(const std::vector<TriggerNode> & nodes,
     }
 }
 
+void TriggerGraph::LoadZones(const std::vector<TriggerZone> & zones) {
+    zones_ = zones;
+    zone_occupants_.clear();
+}
+
 void TriggerGraph::Clear() {
     nodes_.clear();
     objectives_.clear();
+    zones_.clear();
     fired_.clear();
     timer_elapsed_.clear();
     pending_events_.clear();
+    hit_counts_.clear();
+    flags_.fill(false);
+    zone_occupants_.clear();
     bus_.Clear();
     actions_.Clear();
 }
@@ -38,6 +50,34 @@ void TriggerGraph::Tick(World & world, float dt) {
     }
 
     bus_.Flush();
+
+    // Zone entry detection: compare current occupants to previous frame.
+    if (!zones_.empty()) {
+        std::set<std::pair<Uint16, Uint16>> current_occupants;
+        for (const TriggerZone & zone : zones_) {
+            const Sint16 zx1 = std::min(zone.x1, zone.x2);
+            const Sint16 zy1 = std::min(zone.y1, zone.y2);
+            const Sint16 zx2 = std::max(zone.x1, zone.x2);
+            const Sint16 zy2 = std::max(zone.y1, zone.y2);
+            for (const Object * obj : world.objectlist) {
+                if (obj->type != ObjectTypes::PLAYER) continue;
+                if (obj->x >= zx1 && obj->x <= zx2 && obj->y >= zy1 && obj->y <= zy2) {
+                    current_occupants.insert({zone.id, static_cast<Uint16>(obj->id)});
+                }
+            }
+        }
+        // Emit TRIGGER_ENTER_ZONE for newly-entered (zone_id, player) pairs.
+        for (const auto & pair : current_occupants) {
+            if (zone_occupants_.find(pair) == zone_occupants_.end()) {
+                GameEvent ev;
+                ev.type     = EventType::TRIGGER_ENTER_ZONE;
+                ev.actor_id = pair.first; // zone id
+                bus_.Emit(ev);
+                bus_.Flush();
+            }
+        }
+        zone_occupants_ = current_occupants;
+    }
 
     // Advance and fire TIMER_EXPIRED nodes.
     for (size_t i = 0; i < nodes_.size(); i++) {
@@ -67,6 +107,10 @@ void TriggerGraph::Tick(World & world, float dt) {
 
         // actor_id filter: 0 means "any actor"
         if (node.actor_id != 0 && node.actor_id != ev.actor_id) continue;
+
+        // Increment hit count before evaluating COUNT_REACHED so the condition
+        // can see the up-to-date count for this firing attempt.
+        hit_counts_[node.id]++;
 
         if (!EvalConditions(node, ev, world)) continue;
 
@@ -123,6 +167,15 @@ void TriggerGraph::SetEnabled(Uint16 node_id, bool enabled) {
     }
 }
 
+void TriggerGraph::SetFlag(Uint8 flag_id, bool value) {
+    flags_[flag_id] = value;
+    state_dirty_ = true;
+}
+
+bool TriggerGraph::GetFlag(Uint8 flag_id) const {
+    return flags_[flag_id];
+}
+
 void TriggerGraph::SerializeState(Serializer & data) const {
     Uint16 num_objectives = static_cast<Uint16>(objectives_.size());
     data.Put(num_objectives);
@@ -139,6 +192,18 @@ void TriggerGraph::SerializeState(Serializer & data) const {
         if (nodes_[i].enabled) flags |= 0x01;
         if (i < fired_.size() && fired_[i]) flags |= 0x02;
         data.Put(flags);
+        // hit count for this node
+        auto it = hit_counts_.find(nodes_[i].id);
+        Uint16 hc = (it != hit_counts_.end()) ? it->second : 0;
+        data.Put(hc);
+    }
+    // Flags bitfield: 256 bits = 32 bytes
+    for (int byte_idx = 0; byte_idx < 32; byte_idx++) {
+        Uint8 b = 0;
+        for (int bit = 0; bit < 8; bit++) {
+            if (flags_[byte_idx * 8 + bit]) b |= (1 << bit);
+        }
+        data.Put(b);
     }
 }
 
@@ -159,14 +224,25 @@ void TriggerGraph::ApplySerializedState(Serializer & data) {
     for (Uint16 i = 0; i < num_nodes; i++) {
         Uint16 id = 0;
         Uint8 flags = 0;
+        Uint16 hc = 0;
         data.Get(id);
         data.Get(flags);
+        data.Get(hc);
         for (size_t j = 0; j < nodes_.size(); j++) {
             if (nodes_[j].id == id) {
                 nodes_[j].enabled = (flags & 0x01) != 0;
                 if (j < fired_.size()) fired_[j] = (flags & 0x02) != 0;
+                hit_counts_[id] = hc;
                 break;
             }
+        }
+    }
+    // Flags bitfield
+    for (int byte_idx = 0; byte_idx < 32; byte_idx++) {
+        Uint8 b = 0;
+        data.Get(b);
+        for (int bit = 0; bit < 8; bit++) {
+            flags_[byte_idx * 8 + bit] = (b & (1 << bit)) != 0;
         }
     }
 }
@@ -206,6 +282,15 @@ bool TriggerGraph::EvalConditions(const TriggerNode & node, const GameEvent & ev
                 }
                 break;
             }
+            case ConditionType::COUNT_REACHED: {
+                auto it = hit_counts_.find(node.id);
+                Uint16 hc = (it != hit_counts_.end()) ? it->second : 0;
+                pass = (hc >= cond.count);
+                break;
+            }
+            case ConditionType::FLAG_SET:
+                pass = flags_[cond.team]; // team field reused as flag_id
+                break;
             default:
                 pass = true;
                 break;

@@ -54,7 +54,7 @@ export default function DesignerPage() {
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
           updateHeader, updatePlatform, addShadowZone, removeShadowZone,
           addNavLink, removeNavLink, updateNavLink,
-          setTriggers, setObjectives,
+          setTriggers, setObjectives, setZones,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   type TileSel = { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number };
@@ -383,6 +383,14 @@ export default function DesignerPage() {
   const handleShadowZoneRemove = useCallback((idx: number) => {
     removeShadowZone(idx);
   }, [removeShadowZone]);
+
+  const handleTriggerZoneDraw = useCallback((zone: import('../../lib/types').TriggerZone) => {
+    setZones([...(map?.zones ?? []), zone]);
+  }, [map, setZones]);
+
+  const handleTriggerZoneRemove = useCallback((id: number) => {
+    setZones((map?.zones ?? []).filter(z => z.id !== id));
+  }, [map, setZones]);
 
   const handleNavLinkAdd = useCallback((fromIdx: number, toIdx: number, type: 0 | 1 | 2, sourceX: number, targetX: number) => {
     addNavLink({ fromIdx, toIdx, type, sourceX, targetX });
@@ -933,6 +941,8 @@ export default function DesignerPage() {
               onPlatformUpdate={updatePlatform}
               onShadowZoneDraw={handleShadowZoneDraw}
               onShadowZoneRemove={handleShadowZoneRemove}
+              onTriggerZoneDraw={handleTriggerZoneDraw}
+              onTriggerZoneRemove={handleTriggerZoneRemove}
               gridSize={gridSize}
               tileSelection={tileSelection}
               onTileSelection={setTileSelection}
@@ -1028,8 +1038,10 @@ export default function DesignerPage() {
               <TriggerPanel
                 triggers={map.triggers ?? []}
                 objectives={map.objectives ?? []}
+                zones={map.zones ?? []}
                 onSetTriggers={setTriggers}
                 onSetObjectives={setObjectives}
+                onSetZones={setZones}
                 onRequestActorLink={(target) => {
                   setActorLinkTarget(target);
                   // Switch focus to canvas so the click lands there, not on panel

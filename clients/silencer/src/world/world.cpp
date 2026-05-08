@@ -944,7 +944,7 @@ bool World::ProcessInputQueue(Peer & peer){
 						object->oldx = object->x;
 						object->oldy = object->y;
 					//}
-					object->HandleInput(peer.input);
+					if (!input_locked) object->HandleInput(peer.input);
 					object->Tick(*this);
 					object->lasttick = tickcount;
 					//printf("Processed input for peer %d at tick %d\n", peer.id, tickcount);
@@ -1654,7 +1654,7 @@ void World::SendInput(void){
 					object->oldx = object->x;
 					object->oldy = object->y;
 				//}
-				object->HandleInput(peer->input);
+				if (!input_locked) object->HandleInput(peer->input);
 				object->Tick(*this);
 				object->lasttick = tickcount;
 			}

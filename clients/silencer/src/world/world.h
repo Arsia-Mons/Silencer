@@ -107,6 +107,7 @@ public:
 	std::vector<DebugLine> debuglines;
 
 	TriggerGraph triggerGraph;
+	bool input_locked = false; // set by LOCK_INPUT action, cleared by UNLOCK_INPUT
 	
 	friend class Renderer;
 	friend class Game;

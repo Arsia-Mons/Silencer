@@ -1,7 +1,7 @@
 'use client';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import pako from 'pako';
-import type { SilMapData, MapActor, MapPlatform, MapShadowZone, NavLink, TileCell, MapHeader, MapLayers, TriggerNode, ObjectiveDef, TriggerEventType, TriggerActionType, TriggerConditionType, ConditionLogic } from '../../lib/types';
+import type { SilMapData, MapActor, MapPlatform, MapShadowZone, NavLink, TileCell, MapHeader, MapLayers, TriggerNode, ObjectiveDef, TriggerZone, TriggerEventType, TriggerActionType, TriggerConditionType, ConditionLogic } from '../../lib/types';
 import * as mapStore from '../../lib/map-store';
 import { bakeMapLightMasks } from './lightBaker';
 
@@ -133,9 +133,11 @@ const ACTION_TYPES: TriggerActionType[] = [
   'NONE','OPEN_DOOR','LOCK_DOOR','UNLOCK_DOOR','PLAY_SOUND','SHOW_OBJECTIVE',
   'PAN_CAMERA','SPAWN_ACTOR','END_MISSION','DESTROY_ACTOR','MOVE_ACTOR',
   'APPLY_DAMAGE_IN_ZONE','ENABLE_TRIGGER','DISABLE_TRIGGER',
+  'COMPLETE_OBJECTIVE','LOCK_INPUT','UNLOCK_INPUT','SET_FLAG',
 ];
 const COND_TYPES: TriggerConditionType[] = [
   'NONE','TEAM_CHECK','OBJECTIVE_STATE','PLAYER_COUNT','HEALTH_THRESHOLD',
+  'COUNT_REACHED','FLAG_SET',
 ];
 
 // Node header: 14 bytes. Condition: 8 bytes. Action: 208 bytes.
@@ -149,13 +151,14 @@ function readNullString(bytes: Uint8Array, offset: number, maxLen: number): stri
 }
 
 function parseTriggers(dv: DataView, bytes: Uint8Array, offset: number): {
-  triggers: TriggerNode[]; objectives: ObjectiveDef[]; offset: number;
+  triggers: TriggerNode[]; objectives: ObjectiveDef[]; zones: TriggerZone[]; offset: number;
 } {
   const triggers: TriggerNode[] = [];
   const objectives: ObjectiveDef[] = [];
+  const zones: TriggerZone[] = [];
 
   // Trigger nodes section
-  if (offset + 8 > dv.byteLength) return { triggers, objectives, offset };
+  if (offset + 8 > dv.byteLength) return { triggers, objectives, zones, offset };
   const numNodes = dv.getUint32(offset, true);
   offset += 8;
 
@@ -180,6 +183,7 @@ function parseTriggers(dv: DataView, bytes: Uint8Array, offset: number): {
         objectiveId: dv.getUint16(offset + 2, true),
         playerCount: dv.getUint8 (offset + 4),
         healthPct:   dv.getUint8 (offset + 5),
+        count:       dv.getUint8 (offset + 6),
       });
       offset += COND_BYTES;
     }
@@ -226,7 +230,23 @@ function parseTriggers(dv: DataView, bytes: Uint8Array, offset: number): {
     }
   }
 
-  return { triggers, objectives, offset };
+  // Zones section (forward-compat: 12 bytes per zone)
+  if (offset + 8 <= dv.byteLength) {
+    const numZones = dv.getUint32(offset, true);
+    offset += 8;
+    for (let z = 0; z < numZones && offset + 12 <= dv.byteLength; z++) {
+      const id = dv.getUint16(offset,      true);
+      const x1 = dv.getInt16 (offset + 2,  true);
+      const y1 = dv.getInt16 (offset + 4,  true);
+      const x2 = dv.getInt16 (offset + 6,  true);
+      const y2 = dv.getInt16 (offset + 8,  true);
+      // offset+10 = Uint16 padding
+      zones.push({ id, label: `Zone ${id}`, x1, y1, x2, y2 });
+      offset += 12;
+    }
+  }
+
+  return { triggers, objectives, zones, offset };
 }
 
 function writeNullString(bytes: Uint8Array, offset: number, value: string, maxLen: number): void {
@@ -237,7 +257,7 @@ function writeNullString(bytes: Uint8Array, offset: number, value: string, maxLe
 }
 
 function writeTriggerSections(ldv: DataView, bytes: Uint8Array, off: number,
-  triggers: TriggerNode[], objectives: ObjectiveDef[]): number {
+  triggers: TriggerNode[], objectives: ObjectiveDef[], zones: TriggerZone[]): number {
 
   // Trigger nodes section
   ldv.setUint32(off, triggers.length, true); off += 4;
@@ -261,7 +281,8 @@ function writeTriggerSections(ldv: DataView, bytes: Uint8Array, off: number,
       ldv.setUint16(off,     c.objectiveId, true);           off += 2;
       ldv.setUint8 (off,     c.playerCount);                 off += 1;
       ldv.setUint8 (off,     c.healthPct);                   off += 1;
-      off += 2; // padding
+      ldv.setUint8 (off,     c.count ?? 0);                  off += 1;
+      off += 1; // padding
     }
 
     for (const a of node.actions) {
@@ -285,6 +306,18 @@ function writeTriggerSections(ldv: DataView, bytes: Uint8Array, off: number,
     ldv.setUint8 (off,     obj.required ? 1 : 0);      off += 1;
     off += 1; // padding
     writeNullString(bytes, off, obj.text, 128); off += 128;
+  }
+
+  // Zones section — 12 bytes per zone
+  ldv.setUint32(off, zones.length, true); off += 4;
+  ldv.setUint32(off, 0, true);            off += 4;
+  for (const z of zones) {
+    ldv.setUint16(off,     z.id,   true); off += 2;
+    ldv.setInt16 (off,     z.x1,   true); off += 2;
+    ldv.setInt16 (off,     z.y1,   true); off += 2;
+    ldv.setInt16 (off,     z.x2,   true); off += 2;
+    ldv.setInt16 (off,     z.y2,   true); off += 2;
+    off += 2; // padding
   }
 
   return off;
@@ -334,6 +367,7 @@ export interface UseSilMapReturn {
   updateNavLink: (idx: number, patch: Partial<NavLink>) => void;
   setTriggers: (triggers: TriggerNode[]) => void;
   setObjectives: (objectives: ObjectiveDef[]) => void;
+  setZones: (zones: TriggerZone[]) => void;
   updateHeader: (patch: Partial<MapHeader>) => void;
   undo: () => void;
   redo: () => void;
@@ -410,6 +444,7 @@ export function useSilMap(): UseSilMapReturn {
       navLinks: [],
       triggers: [],
       objectives: [],
+      zones: [],
       rawMinimap: new Uint8Array(0),
       minimapCompressedSize: 0,
     });
@@ -466,12 +501,12 @@ export function useSilMap(): UseSilMapReturn {
       }
 
       // Parse trigger nodes + objectives sections
-      const { triggers, objectives } = parseTriggers(levelDV, levelRaw, off5);
+      const { triggers, objectives, zones } = parseTriggers(levelDV, levelRaw, off5);
 
       historyRef.current = [];
       futureRef.current = [];
       syncUndoRedo();
-      const loaded: SilMapData = { header, width, height, layers, actors, platforms, shadowZones, navLinks, triggers, objectives, rawMinimap, minimapCompressedSize, fileName: file.name };
+      const loaded: SilMapData = { header, width, height, layers, actors, platforms, shadowZones, navLinks, triggers, objectives, zones, rawMinimap, minimapCompressedSize, fileName: file.name };
       setMapData(loaded);
       return loaded;
     } catch (e) {
@@ -495,15 +530,17 @@ export function useSilMap(): UseSilMapReturn {
     const navLinks = mapData.navLinks ?? [];
     const triggers = mapData.triggers ?? [];
     const objectives = mapData.objectives ?? [];
+    const zones = mapData.zones ?? [];
     const lightMasksSectionSize = 8 + lightMasks.reduce((sum, m) => sum + 12 + m.data.length, 0);
     const navLinksSectionSize = 8 + navLinks.length * 20;
     const triggerNodesSectionSize = 8 + triggers.reduce((sum, n) =>
       sum + 14 + n.conditions.length * COND_BYTES + n.actions.length * ACTION_BYTES, 0);
     const objectivesSectionSize = 8 + objectives.length * 132;
+    const zonesSectionSize = 8 + zones.length * 12;
     const levelBuf = new ArrayBuffer(
       tileSectionSize + actorsSectionSize + platformsSectionSize +
       shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize +
-      triggerNodesSectionSize + objectivesSectionSize,
+      triggerNodesSectionSize + objectivesSectionSize + zonesSectionSize,
     );
     const ldv = new DataView(levelBuf);
     for (let i = 0; i < numCells; i++) {
@@ -588,7 +625,7 @@ export function useSilMap(): UseSilMapReturn {
     }
 
     // Trigger nodes + objectives sections
-    off = writeTriggerSections(ldv, new Uint8Array(levelBuf), off, triggers, objectives);
+    off = writeTriggerSections(ldv, new Uint8Array(levelBuf), off, triggers, objectives, zones);
 
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
     const descBytes = new TextEncoder().encode(header.description);
@@ -850,6 +887,14 @@ export function useSilMap(): UseSilMapReturn {
     });
   }, [pushHistory]);
 
+  const setZones = useCallback((zones: TriggerZone[]) => {
+    setMapData(prev => {
+      if (!prev) return prev;
+      pushHistory(prev);
+      return { ...prev, zones };
+    });
+  }, [pushHistory]);
+
   const applyTileBatch = useCallback((
     layerType: 'bg' | 'fg', layerIdx: number,
     updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }>
@@ -922,15 +967,17 @@ export function useSilMap(): UseSilMapReturn {
     const navLinks = mapData.navLinks ?? [];
     const triggers = mapData.triggers ?? [];
     const objectives = mapData.objectives ?? [];
+    const zones = mapData.zones ?? [];
     const lightMasksSectionSize = 8 + lightMasks.reduce((sum, m) => sum + 12 + m.data.length, 0);
     const navLinksSectionSize = 8 + navLinks.length * 20;
     const triggerNodesSectionSize = 8 + triggers.reduce((sum, n) =>
       sum + 14 + n.conditions.length * COND_BYTES + n.actions.length * ACTION_BYTES, 0);
     const objectivesSectionSize = 8 + objectives.length * 132;
+    const zonesSectionSize = 8 + zones.length * 12;
     const levelBuf = new ArrayBuffer(
       tileSectionSize + actorsSectionSize + platformsSectionSize +
       shadowZonesSectionSize + lightMasksSectionSize + navLinksSectionSize +
-      triggerNodesSectionSize + objectivesSectionSize,
+      triggerNodesSectionSize + objectivesSectionSize + zonesSectionSize,
     );
     const ldv = new DataView(levelBuf);
 
@@ -1015,7 +1062,7 @@ export function useSilMap(): UseSilMapReturn {
     }
 
     // Trigger nodes + objectives sections
-    off = writeTriggerSections(ldv, new Uint8Array(levelBuf), off, triggers, objectives);
+    off = writeTriggerSections(ldv, new Uint8Array(levelBuf), off, triggers, objectives, zones);
 
     const levelCompressed = pako.deflate(new Uint8Array(levelBuf));
     const descBytes = new TextEncoder().encode(header.description);
@@ -1076,7 +1123,7 @@ export function useSilMap(): UseSilMapReturn {
     addActor, removeActor, updateActor, moveActor,
     addShadowZone, removeShadowZone,
     addNavLink, removeNavLink, updateNavLink,
-    setTriggers, setObjectives,
+    setTriggers, setObjectives, setZones,
     updateHeader,
     undo, redo, canUndo, canRedo,
     resizeMap,

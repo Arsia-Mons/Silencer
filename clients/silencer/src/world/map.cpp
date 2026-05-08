@@ -80,6 +80,7 @@ bool Map::Load(const char * filename, World & world){
 			CalculateRainPuddleLocations();
 			// Load trigger graph into the runtime system.
 			world.triggerGraph.Load(triggers, objectives);
+			world.triggerGraph.LoadZones(zones);
 			return true;
 		}
 	}
@@ -906,6 +907,25 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 		}
 	}
 
+	// Zones section (forward-compat: skip if not enough bytes remain)
+	if(i + 8 <= level.size()){
+		Uint32 numZones = 0;
+		memcpy(&numZones, &level[i], 4); numZones = SDL_Swap32LE(numZones);
+		i += 8; // count + padding
+		for(Uint32 z = 0; z < numZones; z++){
+			if(i + 12 > level.size()) break;
+			TriggerZone zone;
+			Uint16 zid = 0; memcpy(&zid, &level[i], 2); zone.id = SDL_Swap16LE(zid); i += 2;
+			Sint16 sx = 0;
+			memcpy(&sx, &level[i], 2); zone.x1 = (Sint16)SDL_Swap16LE((Uint16)sx); i += 2;
+			memcpy(&sx, &level[i], 2); zone.y1 = (Sint16)SDL_Swap16LE((Uint16)sx); i += 2;
+			memcpy(&sx, &level[i], 2); zone.x2 = (Sint16)SDL_Swap16LE((Uint16)sx); i += 2;
+			memcpy(&sx, &level[i], 2); zone.y2 = (Sint16)SDL_Swap16LE((Uint16)sx); i += 2;
+			i += 2; // padding
+			zones.push_back(zone);
+		}
+	}
+
 	return true;
 }
 
@@ -919,6 +939,9 @@ void Map::Unload(void){
 	shadowzones.clear();
 	lightShadowMasks.clear();
 	navlinks.clear();
+	triggers.clear();
+	objectives.clear();
+	zones.clear();
 	for(size_t i = 0; i < 4; i++){
 		tiles[i].clear();
 	}

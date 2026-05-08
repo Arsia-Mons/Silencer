@@ -95,6 +95,7 @@ public:
 	// Mission trigger graph and objectives (loaded from .sil trigger section).
 	std::vector<TriggerNode> triggers;
 	std::vector<ObjectiveDef> objectives;
+	std::vector<TriggerZone> zones;
 	
 //private:
 	static bool CompareType(std::shared_ptr<Platform> a, std::shared_ptr<Platform> b);

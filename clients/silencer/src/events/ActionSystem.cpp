@@ -78,7 +78,8 @@ void ActionSystem::Execute(const TriggerAction & action, World & world) {
             break;
         }
         case ActionType::END_MISSION: {
-            world.quitstate = 1;
+            // param_u8: 0=neutral, 1=win, 2=lose
+            world.quitstate = (action.param_u8 == 0) ? 1 : action.param_u8;
             break;
         }
         case ActionType::DESTROY_ACTOR: {
@@ -117,6 +118,22 @@ void ActionSystem::Execute(const TriggerAction & action, World & world) {
         }
         case ActionType::DISABLE_TRIGGER: {
             world.triggerGraph.SetEnabled(action.actor_id, false);
+            break;
+        }
+        case ActionType::COMPLETE_OBJECTIVE: {
+            world.triggerGraph.CompleteObjective(action.actor_id, world);
+            break;
+        }
+        case ActionType::LOCK_INPUT: {
+            world.input_locked = true;
+            break;
+        }
+        case ActionType::UNLOCK_INPUT: {
+            world.input_locked = false;
+            break;
+        }
+        case ActionType::SET_FLAG: {
+            world.triggerGraph.SetFlag(action.param_u8, action.param_f != 0.f);
             break;
         }
         default:
