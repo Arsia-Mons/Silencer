@@ -219,6 +219,11 @@ function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
           </select>
         </Field>
       )}
+      {(a.type === 'SPAWN_ACTOR' && (a.paramU8 === 12 || a.paramU8 === 13)) && (
+        <Field label="patrol">
+          <input type="checkbox" checked={a.paramF !== 0} onChange={e => onChange({ paramF: e.target.checked ? 1 : 0 })} />
+        </Field>
+      )}
       {(a.type === 'APPLY_DAMAGE_IN_ZONE' || a.type === 'SET_FLAG') && (
         <Field label={a.type === 'SET_FLAG' ? 'flag id' : 'damage'}>
           <input className={inp + ' w-16'} type="number" min={0} max={255} value={a.paramU8} onChange={e => onChange({ paramU8: +e.target.value })} />

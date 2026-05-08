@@ -82,6 +82,7 @@ void ActionSystem::Execute(const TriggerAction & action, World & world) {
                 if (obj->type == ObjectTypes::GUARD) {
                     Guard * g = static_cast<Guard *>(obj);
                     g->weapon    = action.actor_id & 0xFF; // 0=blaster, 1=laser, 2=rocket
+                    g->patrol    = action.param_f != 0.f;
                     g->originalx = action.param_x;
                     g->originaly = action.param_y;
                 } else if (obj->type == ObjectTypes::ROBOT) {
