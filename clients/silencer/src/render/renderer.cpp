@@ -107,7 +107,11 @@ void Renderer::Draw(Surface * surface, float frametime){
 		int px = localplayer->x + ((localplayer->oldx - localplayer->x) * frametime);
 		int py = localplayer->y + ((localplayer->oldy - localplayer->y) * frametime);
 		if(px && py){
-			camera.Follow(world, px, py, 15, 100, 0, 30);
+			if(world.pancameraactive){
+				camera.Follow(world, world.pancamerax, world.pancameray, 0, 0, 0, 30);
+			} else {
+				camera.Follow(world, px, py, 15, 100, 0, 30);
+			}
 			camera.Smooth(frametime);
 		}
 		world.replay.x = localplayer->x;

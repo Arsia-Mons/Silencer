@@ -27,6 +27,10 @@ class World
 public:
 	World(bool mode = AUTHORITY);
 	~World();
+	// Cinematic camera pan — overrides main camera follow when active.
+	bool pancameraactive;
+	Sint16 pancamerax;
+	Sint16 pancameray;
 	class Object * CreateObject(Uint8 type, Uint16 id = 0);
 	Object * GetObjectFromId(Uint16 id);
 	void MarkDestroyObject(Uint16 id);

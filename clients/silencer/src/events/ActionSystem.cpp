@@ -68,7 +68,9 @@ void ActionSystem::Execute(const TriggerAction & action, World & world) {
             break;
         }
         case ActionType::PAN_CAMERA: {
-            world.SetSystemCamera(true, 0, action.param_x, action.param_y);
+            world.pancameraactive = true;
+            world.pancamerax = action.param_x;
+            world.pancameray = action.param_y;
             world.BroadcastCamera(action.param_x, action.param_y);
             break;
         }
@@ -143,6 +145,9 @@ void ActionSystem::Execute(const TriggerAction & action, World & world) {
         }
         case ActionType::UNLOCK_INPUT: {
             world.input_locked = false;
+            // Release cinematic camera pan so main camera returns to following the player.
+            world.pancameraactive = false;
+            world.BroadcastCamera(0, 0);
             break;
         }
         case ActionType::SET_FLAG: {
