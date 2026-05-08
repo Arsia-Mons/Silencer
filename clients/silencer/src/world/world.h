@@ -113,6 +113,7 @@ public:
 
 	TriggerGraph triggerGraph;
 	bool input_locked = false; // set by LOCK_INPUT action, cleared by UNLOCK_INPUT
+	bool player_spawn_emitted = false;
 	
 	friend class Renderer;
 	friend class Game;

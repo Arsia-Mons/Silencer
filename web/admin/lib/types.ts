@@ -189,7 +189,7 @@ export interface NavLink { fromIdx: number; toIdx: number; type: 0 | 1 | 2; sour
 export type TriggerEventType =
   | 'NONE' | 'TRIGGER_ENTER_ZONE' | 'TERMINAL_ACTIVATED' | 'ACTOR_KILLED'
   | 'ACTOR_DAMAGED' | 'OBJECTIVE_COMPLETE' | 'ITEM_COLLECTED' | 'PLAYER_DIED'
-  | 'ALL_PLAYERS_DIED' | 'TIMER_EXPIRED' | 'GAME_START';
+  | 'ALL_PLAYERS_DIED' | 'TIMER_EXPIRED' | 'GAME_START' | 'PLAYER_SPAWN';
 
 export type TriggerActionType =
   | 'NONE' | 'OPEN_DOOR' | 'LOCK_DOOR' | 'UNLOCK_DOOR' | 'PLAY_SOUND'

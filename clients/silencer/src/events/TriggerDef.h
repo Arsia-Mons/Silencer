@@ -18,6 +18,7 @@ enum class EventType : Uint8 {
     ALL_PLAYERS_DIED,
     TIMER_EXPIRED,
     GAME_START,
+    PLAYER_SPAWN,
 };
 
 // ── Action types ─────────────────────────────────────────────────────────────

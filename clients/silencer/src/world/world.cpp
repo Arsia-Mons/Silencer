@@ -143,6 +143,16 @@ void World::Tick(void){
 		triggerGraph.Bus().Emit(ev);
 	}
 
+	// Emit PLAYER_SPAWN the first time the local player exists in the world.
+	if (!player_spawn_emitted && IsAuthority()) {
+		if (GetPeerPlayer(localpeerid) != nullptr) {
+			player_spawn_emitted = true;
+			GameEvent ev;
+			ev.type = EventType::PLAYER_SPAWN;
+			triggerGraph.Bus().Emit(ev);
+		}
+	}
+
 	{
 		const float dt = 1.f / GASLoader::Get().gameengine.ticksPerSecond;
 		triggerGraph.Tick(*this, dt);

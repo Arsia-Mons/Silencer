@@ -19,6 +19,7 @@ const EVENT_LABELS: Record<TriggerEventType, string> = {
   ALL_PLAYERS_DIED:   '💣 All Players Died',
   TIMER_EXPIRED:      '⏱ Timer',
   GAME_START:         '🚩 Game Start',
+  PLAYER_SPAWN:       '🎮 Player Spawn',
 };
 
 const ACTION_LABELS: Record<TriggerActionType, string> = {
@@ -299,7 +300,7 @@ function TriggerNodeRow({ node, expanded, onToggle, onChange, onRemove, onReques
                 {EVENT_OPTS.map(o => <option key={o} value={o}>{EVENT_LABELS[o]}</option>)}
               </select>
             </Field>
-            {node.triggerEvent !== 'GAME_START' && node.triggerEvent !== 'ALL_PLAYERS_DIED' && node.triggerEvent !== 'NONE' && (
+            {node.triggerEvent !== 'GAME_START' && node.triggerEvent !== 'PLAYER_SPAWN' && node.triggerEvent !== 'ALL_PLAYERS_DIED' && node.triggerEvent !== 'NONE' && (
               <Field label="actor id">
                 <input className={inp + ' w-16'} type="number" min={0} value={node.actorId}
                   onChange={e => onChange({ actorId: +e.target.value })}
