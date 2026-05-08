@@ -160,7 +160,12 @@ static void CleanupPreviousUpdate(void) {
 	std::string exe = buf;
 	size_t slash = exe.find_last_of("/\\");
 	if (slash == std::string::npos) return;
-	std::string old_dir = exe.substr(0, slash) + ".old";
+	std::string install_dir = exe.substr(0, slash);
+
+	// Legacy: directory-rename-based stage-2 left a `<install>.old` sibling.
+	// Pre-per-file-replace builds still produce these; sweep until they age
+	// out of the user base.
+	std::string old_dir = install_dir + ".old";
 	struct stat st;
 	if (stat(old_dir.c_str(), &st) == 0) {
 		fprintf(stderr, "[updater] cleaning up prior install: %s\n", old_dir.c_str());
@@ -171,6 +176,23 @@ static void CleanupPreviousUpdate(void) {
 #endif
 		system(cmd.c_str());
 	}
+
+#ifdef _WIN32
+	// Per-file replace (updaterstage2.cpp ReplaceFileAtomic) sidelines locked
+	// targets as `<file>.old-<ticks>` rather than failing the whole update.
+	// Files locked at update time are typically free now — sweep them.
+	WIN32_FIND_DATAA fd;
+	std::string pattern = install_dir + "\\*.old-*";
+	HANDLE h = FindFirstFileA(pattern.c_str(), &fd);
+	if (h != INVALID_HANDLE_VALUE) {
+		do {
+			if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+			std::string victim = install_dir + "\\" + fd.cFileName;
+			DeleteFileA(victim.c_str());  // best-effort; locked files retry next launch
+		} while (FindNextFileA(h, &fd));
+		FindClose(h);
+	}
+#endif
 #endif
 }
 

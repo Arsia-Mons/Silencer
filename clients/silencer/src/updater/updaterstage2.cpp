@@ -132,12 +132,12 @@ bool WaitForPidExit(int pid, int timeout_ms) {
 bool RenameDir(const std::string &src, const std::string &dst) {
 #ifdef _WIN32
     if (MoveFileA(src.c_str(), dst.c_str()) != 0) return true;
-    fprintf(stderr, "[stage2] MoveFileA %s -> %s failed: %lu\n",
+    Logf("MoveFileA %s -> %s failed: %lu",
         src.c_str(), dst.c_str(), GetLastError());
     return false;
 #else
     if (rename(src.c_str(), dst.c_str()) == 0) return true;
-    fprintf(stderr, "[stage2] rename %s -> %s failed: %s\n",
+    Logf("rename %s -> %s failed: %s",
         src.c_str(), dst.c_str(), strerror(errno));
     return false;
 #endif
@@ -237,6 +237,90 @@ std::string FindSingleTopDir(const std::string &dir) {
 #endif
 }
 
+#ifdef _WIN32
+// Atomically replace dst with src. Retries on transient AV-induced failures
+// (Defender opens scanned files without FILE_SHARE_DELETE, blocking renames
+// until the scan finishes). Falls back to sidelining the existing dst when
+// the file is genuinely locked — the running EXE itself, for instance: you
+// can rename a locked file even though you can't delete or replace it. The
+// sidelined `.old-<ticks>` leftover gets swept by main.cpp's
+// CleanupPreviousUpdate on next launch.
+bool ReplaceFileAtomic(const std::string &src, const std::string &dst) {
+    for (int attempt = 0; attempt < 20; attempt++) {
+        if (MoveFileExA(src.c_str(), dst.c_str(),
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED |
+                MOVEFILE_WRITE_THROUGH)) {
+            return true;
+        }
+        DWORD err = GetLastError();
+        if (err != ERROR_ACCESS_DENIED && err != ERROR_SHARING_VIOLATION) {
+            Logf("MoveFileEx %s -> %s failed: %lu", src.c_str(), dst.c_str(), err);
+            return false;
+        }
+        Sleep(100);
+    }
+    char suffix[32];
+    snprintf(suffix, sizeof(suffix), ".old-%lu", GetTickCount());
+    std::string sidelined = dst + suffix;
+    if (!MoveFileExA(dst.c_str(), sidelined.c_str(), 0)) {
+        Logf("sideline %s failed: %lu", dst.c_str(), GetLastError());
+        return false;
+    }
+    if (!MoveFileExA(src.c_str(), dst.c_str(),
+            MOVEFILE_COPY_ALLOWED | MOVEFILE_WRITE_THROUGH)) {
+        DWORD err = GetLastError();
+        Logf("move new %s -> %s failed: %lu (rolling back sideline)",
+            src.c_str(), dst.c_str(), err);
+        MoveFileExA(sidelined.c_str(), dst.c_str(), 0);
+        return false;
+    }
+    DeleteFileA(sidelined.c_str());  // best-effort; locked files swept on next launch
+    return true;
+}
+
+// Walk new_root recursively; for each file, atomically replace its
+// counterpart under install_root via ReplaceFileAtomic. Per-file replace
+// instead of directory rename because Windows directory rename fails if
+// any descendant has an open handle without FILE_SHARE_DELETE — and AV
+// scanners (Defender on Downloads especially) routinely hold such handles.
+// Per-file replace only locks one file at a time, so AV scans of unrelated
+// files don't doom the whole update.
+//
+// Files in install_root that aren't in new_root are left in place. Stale
+// DLLs from a previous version cost a few MB and are harmless until a name
+// collision happens, which is rare. Add a manifest if it bites.
+bool MergeTreeWindows(const std::string &new_root, const std::string &install_root) {
+    WIN32_FIND_DATAA fd;
+    std::string pattern = new_root + "\\*";
+    HANDLE h = FindFirstFileA(pattern.c_str(), &fd);
+    if (h == INVALID_HANDLE_VALUE) {
+        Logf("FindFirstFile %s failed: %lu", pattern.c_str(), GetLastError());
+        return false;
+    }
+    do {
+        std::string n = fd.cFileName;
+        if (n == "." || n == "..") continue;
+        std::string src = new_root + "\\" + n;
+        std::string dst = install_root + "\\" + n;
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            // Ensure dst dir exists; ignore "already exists" since merging
+            // into an established install is the normal path.
+            if (!CreateDirectoryA(dst.c_str(), NULL) &&
+                GetLastError() != ERROR_ALREADY_EXISTS) {
+                Logf("CreateDirectory %s failed: %lu", dst.c_str(), GetLastError());
+                FindClose(h);
+                return false;
+            }
+            if (!MergeTreeWindows(src, dst)) { FindClose(h); return false; }
+        } else {
+            if (!ReplaceFileAtomic(src, dst)) { FindClose(h); return false; }
+        }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    return true;
+}
+#endif
+
 } // namespace
 
 namespace UpdaterStage2 {
@@ -312,10 +396,35 @@ int Run(int argc, char **argv) {
         Logf("detected zip wrapper dir '%s'; hoisting contents", wrapper.c_str());
     }
 
-    std::string old_path = install_dir + ".old";
 #ifdef _WIN32
-    RemoveDirectoryA(old_path.c_str());
-#endif
+    // Per-file replace (see ReplaceFileAtomic / MergeTreeWindows above for why
+    // we don't directory-rename on Windows). Loses the all-or-nothing
+    // atomicity of POSIX rename, but the alternative is updates that
+    // mysteriously fail when Defender is mid-scan — which is the bug we're
+    // fixing.
+    if (!MergeTreeWindows(effective_new, install_dir)) {
+        Logf("merge failed; install dir may be in a partial state");
+        // Best-effort relaunch the old exe so the user isn't left with
+        // nothing to launch. Some files may already be replaced — that
+        // implies an ABI mismatch is theoretically possible, but in
+        // practice the .exe and its DLLs move together.
+        if (!exe_to_relaunch.empty()) {
+            STARTUPINFOA si{}; si.cb = sizeof(si);
+            PROCESS_INFORMATION pi{};
+            std::string install_dir_for_relaunch = exe_to_relaunch.substr(
+                0, exe_to_relaunch.find_last_of("/\\"));
+            std::string cmdline = "\"" + exe_to_relaunch + "\"";
+            CreateProcessA(NULL, const_cast<LPSTR>(cmdline.c_str()),
+                NULL, NULL, FALSE, DETACHED_PROCESS,
+                NULL, install_dir_for_relaunch.c_str(), &si, &pi);
+            CloseHandle(pi.hProcess); CloseHandle(pi.hThread);
+        }
+        return 3;
+    }
+    // Best-effort cleanup of the now-empty staging tree.
+    RemoveDirRecursive(staging);
+#else
+    std::string old_path = install_dir + ".old";
     if (!RenameDir(install_dir, old_path)) {
         Logf("rename install→old failed");
         return 3;
@@ -327,12 +436,9 @@ int Run(int argc, char **argv) {
     }
     // If we unwrapped, the staging container is now empty; best-effort remove.
     if (!wrapper.empty()) {
-#ifdef _WIN32
-        RemoveDirectoryA(staging.c_str());
-#else
         rmdir(staging.c_str());
-#endif
     }
+#endif
 
     std::string new_exe = exe_to_relaunch;
     Logf("relaunching: %s", new_exe.c_str());

@@ -2,6 +2,7 @@ build/
 build-new/
 build-old/
 test-update-host/
+test-updater.*.log
 update.json
 .vcpkg/
 lobby.json

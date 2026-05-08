@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$OldVer = "00023",
     [string]$NewVer = "00024"
 )
@@ -8,6 +8,30 @@ $Repo = (Resolve-Path "$PSScriptRoot\..\..").Path
 Set-Location $Repo
 
 $PlatformZip = "silencer-windows-x64.zip"
+
+# Bring MSVC + bundled Ninja into the current PowerShell environment by
+# sourcing vcvars64.bat and replaying its env vars. CI uses ilammy/msvc-dev-cmd
+# for the same effect; locally we use vswhere to find the install. Skipped
+# when the env is already initialised (e.g. running from a Developer prompt).
+if (-not $env:VSINSTALLDIR) {
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (-not (Test-Path $vswhere)) { throw "vswhere.exe not found at $vswhere" }
+    $vsInstall = (& $vswhere -latest -property installationPath).Trim()
+    if (-not $vsInstall) { throw "no Visual Studio install found by vswhere" }
+    $vcvars = Join-Path $vsInstall 'VC\Auxiliary\Build\vcvars64.bat'
+    if (-not (Test-Path $vcvars)) { throw "vcvars64.bat not found at $vcvars" }
+    Write-Host "Sourcing vcvars64 from $vcvars"
+    & cmd /c "`"$vcvars`" >nul && set" | ForEach-Object {
+        if ($_ -match '^([^=]+)=(.*)$') {
+            Set-Item -Path "env:$($Matches[1])" -Value $Matches[2]
+        }
+    }
+    # Bundled Ninja ships with VS but isn't on PATH after vcvars64; prepend it.
+    $bundledNinja = Join-Path $vsInstall 'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja'
+    if (Test-Path (Join-Path $bundledNinja 'ninja.exe')) {
+        $env:PATH = "$bundledNinja;$env:PATH"
+    }
+}
 
 # Resolve vcpkg toolchain. Prefer an existing install; bootstrap a repo-local
 # one into .vcpkg/ if the user has none. Mirrors release.yml so the test
@@ -54,14 +78,15 @@ function Invoke-CMakeConfigure {
     # `-D...=127` plus a stray `.0.0.1` positional arg, which cmake then warns
     # about and silently drops — leaving LOBBY_HOST baked in as "127".
     cmake -B $BuildDir -S clients/silencer @fresh `
-        -A x64 `
+        -G Ninja `
+        -DCMAKE_BUILD_TYPE=Release `
         "-DCMAKE_TOOLCHAIN_FILE=$Toolchain" `
         "-DVCPKG_TARGET_TRIPLET=x64-windows" `
         "-DSILENCER_VERSION=$Version" `
         "-DSILENCER_LOBBY_HOST=127.0.0.1" `
         "-DSILENCER_LOBBY_PORT=15170"
     if ($LASTEXITCODE -ne 0) { throw "cmake configure ($BuildDir) failed" }
-    cmake --build $BuildDir --config Release -j
+    cmake --build $BuildDir -j
     if ($LASTEXITCODE -ne 0) { throw "cmake build ($BuildDir) failed" }
 }
 
@@ -75,7 +100,7 @@ Invoke-CMakeConfigure -BuildDir "build-new" -Version $NewVer
 $stage = "build-new/package/silencer"
 if (Test-Path "build-new/package") { Remove-Item -Recurse -Force "build-new/package" }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
-Copy-Item build-new/Release/Silencer.exe $stage/ -Force
+Copy-Item build-new/Silencer.exe $stage/ -Force
 # Ship the same vcpkg runtime DLLs production does, so the unzipped install
 # can actually launch without the system having vcpkg.
 $vcpkgBin = "build-new/vcpkg_installed/x64-windows/bin"
@@ -86,7 +111,16 @@ New-Item -ItemType Directory -Force -Path test-update-host | Out-Null
 if (Test-Path "test-update-host/$PlatformZip") { Remove-Item "test-update-host/$PlatformZip" }
 Compress-Archive -Path $stage -DestinationPath "test-update-host/$PlatformZip" -Force
 
-$sha = (Get-FileHash "test-update-host/$PlatformZip" -Algorithm SHA256).Hash.ToLower()
+# Use .NET SHA256 directly — Get-FileHash auto-loads via PSModulePath, which
+# vcvars64.bat's env replay can leave in a state that breaks cmdlet resolution.
+$zipPath = (Resolve-Path "test-update-host/$PlatformZip").Path
+$fs = [System.IO.File]::OpenRead($zipPath)
+try {
+    $sha = ([System.Security.Cryptography.SHA256]::Create().ComputeHash($fs) `
+        | ForEach-Object { '{0:x2}' -f $_ }) -join ''
+} finally {
+    $fs.Dispose()
+}
 Write-Host "NEW zip sha256=$sha"
 
 Write-Host "=== Building OLD version ($OldVer) ===" -ForegroundColor Cyan
@@ -98,7 +132,7 @@ Invoke-CMakeConfigure -BuildDir "build-old" -Version $OldVer
 $oldInstall = "build-old/install/silencer"
 if (Test-Path "build-old/install") { Remove-Item -Recurse -Force "build-old/install" }
 New-Item -ItemType Directory -Force -Path $oldInstall | Out-Null
-Copy-Item build-old/Release/Silencer.exe $oldInstall/ -Force
+Copy-Item build-old/Silencer.exe $oldInstall/ -Force
 $vcpkgBinOld = "build-old/vcpkg_installed/x64-windows/bin"
 if (Test-Path $vcpkgBinOld) { Copy-Item "$vcpkgBinOld/*.dll" $oldInstall/ -Force }
 Copy-Item -Recurse -Force shared/assets  $oldInstall/assets
