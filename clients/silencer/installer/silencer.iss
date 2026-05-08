@@ -55,3 +55,9 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\Silencer.exe"; Tasks: deskt
 
 [Run]
 Filename: "{app}\Silencer.exe"; Description: "Launch {#MyAppName}"; Flags: postinstall nowait skipifsilent
+
+[UninstallDelete]
+; Inno only deletes files it tracked. The auto-updater drops new files
+; (and sidelines `*.old-<ticks>`) that aren't in the manifest, so wipe the
+; whole install dir. Safe — user data is at %APPDATA%\Silencer\.
+Type: filesandordirs; Name: "{app}"

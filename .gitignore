@@ -46,3 +46,4 @@ __pycache__/
 .claude/
 
 clients/silencer/build_test/
+clients/silencer/installer/Output/
