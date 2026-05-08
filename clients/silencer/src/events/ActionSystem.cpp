@@ -4,6 +4,8 @@
 #include "objecttypes.h"
 #include "basedoor.h"
 #include "hittable.h"
+#include "guard.h"
+#include "robot.h"
 #include "TriggerGraph.h"
 #include <cstring>
 #include <cstdio>
@@ -74,6 +76,15 @@ void ActionSystem::Execute(const TriggerAction & action, World & world) {
             if (obj) {
                 obj->x = action.param_x;
                 obj->y = action.param_y;
+                if (obj->type == ObjectTypes::GUARD) {
+                    Guard * g = static_cast<Guard *>(obj);
+                    g->originalx = action.param_x;
+                    g->originaly = action.param_y;
+                } else if (obj->type == ObjectTypes::ROBOT) {
+                    Robot * r = static_cast<Robot *>(obj);
+                    r->originalx = action.param_x;
+                    r->originaly = action.param_y;
+                }
             }
             break;
         }
