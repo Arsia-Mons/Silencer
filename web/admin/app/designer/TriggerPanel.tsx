@@ -203,10 +203,19 @@ function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
       )}
       {a.type === 'SPAWN_ACTOR' && (
         <Field label="actor type">
-          <select className={sel} value={a.paramU8} onChange={e => onChange({ paramU8: +e.target.value })}>
-            <option value={11}>👤 Civilian (11)</option>
-            <option value={12}>💂 Guard (12)</option>
-            <option value={13}>🤖 Robot (13)</option>
+          <select className={sel} value={a.paramU8} onChange={e => onChange({ paramU8: +e.target.value, actorId: 0 })}>
+            <option value={11}>👤 Civilian</option>
+            <option value={12}>💂 Guard</option>
+            <option value={13}>🤖 Robot</option>
+          </select>
+        </Field>
+      )}
+      {a.type === 'SPAWN_ACTOR' && a.paramU8 === 12 && (
+        <Field label="weapon">
+          <select className={sel} value={a.actorId} onChange={e => onChange({ actorId: +e.target.value })}>
+            <option value={0}>🔫 Blaster</option>
+            <option value={1}>⚡ Laser</option>
+            <option value={2}>🚀 Rocket</option>
           </select>
         </Field>
       )}
