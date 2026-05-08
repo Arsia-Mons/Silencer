@@ -146,8 +146,13 @@ void World::Tick(void){
 	}
 
 	// Emit PLAYER_SPAWN the first time the local player exists in the world.
-	if (!player_spawn_emitted && IsAuthority()) {
-		if (GetPeerPlayer(localpeerid) != nullptr) {
+	if (!player_spawn_emitted && IsAuthority() && gameplaystate == World::INGAME) {
+		Player* pp = GetPeerPlayer(localpeerid);
+		// Fallback for solo/TESTGAME mode where peerlist[localpeerid] may be null
+		if (!pp && objectsbytype[ObjectTypes::PLAYER].size() > 0) {
+			pp = static_cast<Player*>(GetObjectFromId(objectsbytype[ObjectTypes::PLAYER].front()));
+		}
+		if (pp != nullptr) {
 			player_spawn_emitted = true;
 			GameEvent ev;
 			ev.type = EventType::PLAYER_SPAWN;
