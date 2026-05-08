@@ -85,6 +85,7 @@ bool Map::Load(const char * filename, World & world){
 			world.player_spawn_emitted = false;
 			world.pancameraactive = false;
 			world.pancamerareturn = false;
+			world.pancamerareturncount = 0;
 			return true;
 		}
 	}

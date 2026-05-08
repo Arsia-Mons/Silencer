@@ -69,6 +69,7 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	topmessage_i = 0;
 	pancameraactive = false;
 	pancamerareturn = false;
+	pancamerareturncount = 0;
 	pancamerax = 0;
 	pancameray = 0;
 }
@@ -151,6 +152,15 @@ void World::Tick(void){
 			GameEvent ev;
 			ev.type = EventType::PLAYER_SPAWN;
 			triggerGraph.Bus().Emit(ev);
+		}
+	}
+
+	// Countdown timer for camera return pan — releases input when it hits 0.
+	if(pancamerareturncount > 0){
+		pancamerareturncount--;
+		if(pancamerareturncount == 0){
+			pancamerareturn = false;
+			input_locked = false;
 		}
 	}
 

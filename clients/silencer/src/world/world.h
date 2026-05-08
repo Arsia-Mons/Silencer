@@ -30,6 +30,7 @@ public:
 	// Cinematic camera pan — overrides main camera follow when active.
 	bool pancameraactive;
 	bool pancamerareturn;
+	Uint32 pancamerareturncount; // ticks remaining in return pan; releases input at 0
 	Sint16 pancamerax;
 	Sint16 pancameray;
 	class Object * CreateObject(Uint8 type, Uint16 id = 0);

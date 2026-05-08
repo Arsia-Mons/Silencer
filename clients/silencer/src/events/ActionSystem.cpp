@@ -149,10 +149,10 @@ void ActionSystem::Execute(const TriggerAction & action, World & world) {
             break;
         }
         case ActionType::UNLOCK_INPUT: {
-            // Start return pan; input_locked is released by the renderer
-            // once the camera has eased back to the player.
+            // Start return pan; input released by tick timer after ~1.5s.
             world.pancameraactive = false;
             world.pancamerareturn = true;
+            world.pancamerareturncount = 45; // ~1.5s at 30tps
             world.BroadcastCamera(0, 0);
             break;
         }

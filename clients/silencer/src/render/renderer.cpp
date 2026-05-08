@@ -90,17 +90,13 @@ void Renderer::Draw(Surface * surface, float frametime){
 		camera.newx = camera.x;
 		camera.newy = camera.y;
 	} else if(world.pancamerareturn && localplayer){
-		// Smooth lerp back to player; release input when close
+		// Smooth lerp back to player; input released by World::Tick timer
 		int px = localplayer->x + ((localplayer->oldx - localplayer->x) * frametime);
 		int py = localplayer->y + ((localplayer->oldy - localplayer->y) * frametime);
 		camera.x += (Sint16)((px - camera.x) * 0.08f);
 		camera.y += (Sint16)((py - camera.y) * 0.08f);
 		camera.newx = camera.x;
 		camera.newy = camera.y;
-		if(abs(camera.x - px) < 40 && abs(camera.y - py) < 40){
-			world.pancamerareturn = false;
-			world.input_locked = false;
-		}
 	} else if(localplayer){
 		if(localplayer->InBase(world) && !playerinbaseold){
 			localplayer->oldx = localplayer->x;
