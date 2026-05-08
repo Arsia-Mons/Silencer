@@ -146,7 +146,6 @@ function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
   const needsXY    = ['PAN_CAMERA','SPAWN_ACTOR','MOVE_ACTOR','APPLY_DAMAGE_IN_ZONE'].includes(a.type);
   const needsSound = a.type === 'PLAY_SOUND';
   const needsMsg   = a.type === 'SHOW_OBJECTIVE';
-  const needsU8    = a.type === 'SPAWN_ACTOR' || a.type === 'APPLY_DAMAGE_IN_ZONE' || a.type === 'SET_FLAG';
   const needsF     = a.type === 'MOVE_ACTOR' || a.type === 'APPLY_DAMAGE_IN_ZONE' || a.type === 'SET_FLAG';
   const needsOutcome = a.type === 'END_MISSION';
 
@@ -202,8 +201,17 @@ function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
           )}
         </Field>
       )}
-      {needsU8 && (
-        <Field label={a.type === 'SPAWN_ACTOR' ? 'actor type' : a.type === 'SET_FLAG' ? 'flag id' : 'damage'}>
+      {a.type === 'SPAWN_ACTOR' && (
+        <Field label="actor type">
+          <select className={sel} value={a.paramU8} onChange={e => onChange({ paramU8: +e.target.value })}>
+            <option value={11}>👤 Civilian (11)</option>
+            <option value={12}>💂 Guard (12)</option>
+            <option value={13}>🤖 Robot (13)</option>
+          </select>
+        </Field>
+      )}
+      {(a.type === 'APPLY_DAMAGE_IN_ZONE' || a.type === 'SET_FLAG') && (
+        <Field label={a.type === 'SET_FLAG' ? 'flag id' : 'damage'}>
           <input className={inp + ' w-16'} type="number" min={0} max={255} value={a.paramU8} onChange={e => onChange({ paramU8: +e.target.value })} />
         </Field>
       )}
