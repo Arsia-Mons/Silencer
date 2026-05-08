@@ -141,6 +141,28 @@ void CDResDir(void){
 }
 
 #ifdef _WIN32
+// Inno Setup writes uninstall metadata under HKCU at this AppId-derived key
+// (see clients/silencer/installer/silencer.iss — must stay in sync). Stage-2
+// only swaps files; without this, Add/Remove Programs keeps showing the
+// install-time DisplayVersion forever.
+static void SyncInstalledVersionRegistry(void) {
+#ifndef SILENCER_VERSION
+#define SILENCER_VERSION "00000"
+#endif
+	HKEY key;
+	const char *path = "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{F6A1252E-1BF3-4768-ABD8-C1A9C140E459}_is1";
+	if (RegOpenKeyExA(HKEY_CURRENT_USER, path, 0, KEY_SET_VALUE, &key) != ERROR_SUCCESS) return;
+	const char *ver = SILENCER_VERSION;
+	RegSetValueExA(key, "DisplayVersion", 0, REG_SZ,
+		(const BYTE*)ver, (DWORD)strlen(ver) + 1);
+	// Pre-AppVerName installers wrote DisplayName="Silencer version <ver>".
+	// Overwrite so existing installs match the new bare-name convention.
+	const char *name = "Silencer";
+	RegSetValueExA(key, "DisplayName", 0, REG_SZ,
+		(const BYTE*)name, (DWORD)strlen(name) + 1);
+	RegCloseKey(key);
+}
+
 static void SweepSidelinedFiles(const std::string &dir) {
 	WIN32_FIND_DATAA fd;
 	std::string pattern = dir + "\\*";
@@ -251,6 +273,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #endif
 
 	CleanupPreviousUpdate();
+#ifdef _WIN32
+	SyncInstalledVersionRegistry();
+#endif
 
 #ifndef POSIX
 	WSADATA wsaData;

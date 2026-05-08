@@ -16,6 +16,7 @@
 ; uninstall off this GUID, so a change orphans every prior install.
 AppId={{F6A1252E-1BF3-4768-ABD8-C1A9C140E459}
 AppName={#MyAppName}
+AppVerName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
