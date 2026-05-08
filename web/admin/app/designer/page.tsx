@@ -72,6 +72,7 @@ export default function DesignerPage() {
   const [selectedTileId, setSelectedTile] = useState(0);
   const [selectedActorId, setSelectedActor] = useState(36); // player start default
   const [selectedPlatformIdx, setSelectedPlatformIdx] = useState<number | null>(null);
+  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [navLinkType, setNavLinkType] = useState<0 | 1 | 2>(0);
   const [linkFromIdx, setLinkFromIdx] = useState<number | null>(null);
   const [selectedNavLinkIdx, setSelectedNavLinkIdx] = useState<number | null>(null);
@@ -390,6 +391,10 @@ export default function DesignerPage() {
 
   const handleTriggerZoneRemove = useCallback((id: number) => {
     setZones((map?.zones ?? []).filter(z => z.id !== id));
+  }, [map, setZones]);
+
+  const handleTriggerZoneUpdate = useCallback((id: number, x1: number, y1: number, x2: number, y2: number) => {
+    setZones((map?.zones ?? []).map(z => z.id === id ? { ...z, x1, y1, x2, y2 } : z));
   }, [map, setZones]);
 
   const handleNavLinkAdd = useCallback((fromIdx: number, toIdx: number, type: 0 | 1 | 2, sourceX: number, targetX: number) => {
@@ -943,6 +948,9 @@ export default function DesignerPage() {
               onShadowZoneRemove={handleShadowZoneRemove}
               onTriggerZoneDraw={handleTriggerZoneDraw}
               onTriggerZoneRemove={handleTriggerZoneRemove}
+              onTriggerZoneUpdate={handleTriggerZoneUpdate}
+              selectedZoneId={selectedZoneId}
+              onTriggerZoneSelect={setSelectedZoneId}
               gridSize={gridSize}
               tileSelection={tileSelection}
               onTileSelection={setTileSelection}
