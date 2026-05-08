@@ -216,6 +216,27 @@ jobs:
           path: build/silencer-windows-x64.zip
           if-no-files-found: error
 
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $ver = $env:GITHUB_REF_NAME -replace '^v', ''
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            "/DMyAppVersion=$ver" `
+            clients/silencer/installer/silencer.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC.exe failed" }
+          # ISCC writes to <iss-dir>/Output by default. Hoist into build/ so
+          # the upload-artifact glob picks it up alongside the zip.
+          Move-Item clients/silencer/installer/Output/*.exe build/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-setup
+          path: build/silencer-windows-x64-setup-*.exe
+          if-no-files-found: error
+
   build-linux:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -334,12 +355,14 @@ jobs:
           files: |
             artifacts/macos-arm64/*
             artifacts/windows-x64/*
+            artifacts/windows-x64-setup/*
             artifacts/linux-x64/*
           body: |
             ## Downloads
 
             - **macOS (Apple Silicon):** `silencer-macos-arm64.zip`
-            - **Windows (x64):** `silencer-windows-x64.zip`
+            - **Windows (x64) — installer (recommended):** `silencer-windows-x64-setup-*.exe`
+            - **Windows (x64) — portable zip:** `silencer-windows-x64.zip`
             - **Linux (x64):** `silencer-linux-x64.tar.gz`
 
             ## First-run warnings
