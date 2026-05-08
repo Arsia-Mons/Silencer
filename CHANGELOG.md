@@ -2,6 +2,48 @@
 
 All notable changes to Silencer are documented here.
 
+## [v00045] — 2026-05-07
+
+### Game client
+
+#### Configure Controls — preset cycle (#127)
+
+- **Preset row** — new "Preset:" button at the top of the Configure Controls menu cycles through available keybind profiles (`default` / `wasd` / `gamepad` plus any user-saved profiles) and updates the live keymap immediately.
+- **Auto-fork on edit** — editing any binding while a built-in profile is active forks to `<name>-custom`, so on-disk built-ins are never shadowed by writable copies. Save skips writing built-in profiles since any edit forks first.
+- **Default WASD bindings tweaked** — `fire` is now `J` (was Mouse 1) and `prev_cam` ships unbound (was Left Ctrl). Existing custom profiles are unaffected.
+
+#### Bots & Test mode (#122, issue #32)
+
+- **Test button on the main menu** — `Test` (and the previously hidden `Host Game` / `Join Game` / `Test Replay` buttons) is now exposed; `Test` launches a TESTGAME with 10 bots.
+- **Combat AI** — `PlayerAI::ScanForTarget` does an AABB scan for the nearest valid enemy in `aiCombatRange` (300 px), filtering teammates / invisible / disguised / in-base players. `ApplyCombat` faces and fires at the locked target; combat input has higher priority than navigation so path inputs don't fight aim direction.
+- **Difficulty system** — `EASY` (3× fire interval, no evasion), `MEDIUM` (2×, jump-dodge on damage), `HARD` (1×, jump-dodge on damage). TESTGAME spawns 4 easy / 4 medium / 2 hard.
+- **`[BOT]` tag** in the player list.
+- **New tunable GAS params** in `player.json`: `aiCombatRange`, `aiFireInterval`, `aiEvadeInterval`, `aiTargetLockTicks`.
+
+#### Lighting & shadow editor (#120, issue #38)
+
+- **Default ambience −20** — new maps start at `ambiencelevel ≈ 38` so placed lights visibly pop against the dark background. Closer to the original look the game was designed around.
+- **Map Properties: ambience presets** — quick buttons: Bright (0) / Medium (−10) / Dark (−20) / Very Dark (−28).
+- **Light actor placement** (Phase 2) — admin level designer now places `Light` actor (`id=71`); `map.cpp` case 71 spawns a bank-222 OVERLAY at `(x, y)` with `res_index = actortype`. Renderer pushes bank 222 overlays to `objectlights` and draws via `palette.Light()`.
+- **`ALLY10cNight.sil`** added to the bundled map set.
+
+### Game client — bug fixes
+
+- **Guards stop wedging at walls** (#126) — `WALKING` is now pure motion (`xv`, `FollowGround`, footstep sounds). Turnaround/duration decisions move into the BT: `Patrol` flips `mirrored` at chain ends and transitions WALKING→LOOKING at `walkingDurationTicks`; `SearchAndReturn` clears `chasing` when blocked at a wall in the search direction (guard searches blindly the rest of the timeout) and snaps to `STANDING` facing `originalmirrored` when blocked on the way home.
+- **Jetpack / hack / flamer / terminal / base-exit loops cut off correctly** (#125) — `Audio::Stop` was passing `MIX_MSToFrames(mixerspec.freq, ms)` to `MIX_StopTrack`, but `fade_out_frames` is in the *track input's* sample rate. With ~22 kHz ADPCM and 96 kHz mixer output, a 200 ms requested fade ran ~870 ms. Switched to `MIX_TrackMSToFrames(track, ms)`.
+- **Civilian-disguise bypass** (#125, issue #3) — in `Guard::Look`'s line-shaped lookbox path (forward standing/crouched, up, down — directions 0/1/2/3), an AABB scan would set `target=true` from an undisguised player, then `TestIncr` returned a closer disguised one and the guard fired on the disguise. Now mirrors the rectangular-lookbox path and re-validates `ShouldTarget` on the `TestIncr` return.
+- **Map API URL default** — corrected to `admin.arsiamons.com` (admin-api proxies `/api/maps` to the lobby; `maps.arsiamons.com` doesn't exist).
+
+#### Windows / MSVC build
+
+- `NOMINMAX` defined to stop `windows.h`'s unscoped `min`/`max` macros from breaking `std::min` / `std::max`.
+- `_USE_MATH_DEFINES` force-included via `msvc_snprintf_compat.h` so every TU sees `M_PI` before any math header is pulled in (renderer.cpp errors after the lighting merge).
+
+### Infrastructure
+
+- **Staging environment** (#91) — disposable `t4g.small` running the full prod stack (lobby + dedicated game servers + admin-api + admin-web + Mongo + LavinMQ) as native systemd units, redeployed on every push to `main` via GitHub Actions. `concurrency: cancel-in-progress: false` coalesces queued runs to the newest commit. Sibling Terraform module at `infra/terraform/staging/` (kept separate from prod due to cloud-init divergence and prod's `prevent_destroy` EBS volumes). Detail in `docs/plans/2026-04-27-staging-environment.md`.
+- **URL-safe seeded credentials** — `seed-ssm` now uses base64url for the seeded Mongo and LavinMQ passwords. Plain base64's `/` and `+` broke `net/url.Parse` when the password landed inside `mongodb://` / `amqp://` URLs (bit the staging lobby on first deploy).
+
 ## [v00044] — 2026-05-01
 
 ### Admin dashboard
