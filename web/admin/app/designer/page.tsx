@@ -98,6 +98,7 @@ export default function DesignerPage() {
   const [tileMenu, setTileMenu] = useState<TileMenuInfo | null>(null);
   const [highlightActorIdx, setHighlightActorIdx] = useState<number | null>(null);
   const [rightTab, setRightTab] = useState<'tiles' | 'actors' | 'links' | 'triggers'>('tiles');
+  const [actorLinkTarget, setActorLinkTarget] = useState<{ label: string; onLinked: (matchid: number) => void } | null>(null);
   const [vis, setVis] = useState<VisState>({
     bg: [true, true, true, true],
     fg: [true, true, true, true],
@@ -944,6 +945,11 @@ export default function DesignerPage() {
               onNavLinkAdd={handleNavLinkAdd}
               onNavLinkSelect={setSelectedNavLinkIdx}
               onLinkFromIdxChange={setLinkFromIdx}
+              actorLinkTarget={actorLinkTarget}
+              onActorLinked={(matchid) => {
+                actorLinkTarget?.onLinked(matchid);
+                setActorLinkTarget(null);
+              }}
             />
             <Minimap
               map={map}
@@ -1024,6 +1030,10 @@ export default function DesignerPage() {
                 objectives={map.objectives ?? []}
                 onSetTriggers={setTriggers}
                 onSetObjectives={setObjectives}
+                onRequestActorLink={(target) => {
+                  setActorLinkTarget(target);
+                  // Switch focus to canvas so the click lands there, not on panel
+                }}
               />
             )}
             {rightTab === 'triggers' && !map && (

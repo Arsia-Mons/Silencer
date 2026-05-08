@@ -120,10 +120,11 @@ function ConditionRow({ c, onChange, onRemove }: {
   );
 }
 
-function ActionRow({ a, onChange, onRemove }: {
+function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
   a: TriggerAction;
   onChange: (patch: Partial<TriggerAction>) => void;
   onRemove: () => void;
+  onRequestActorLink?: (target: { label: string; onLinked: (matchid: number) => void }) => void;
 }) {
   const needsActor = ['OPEN_DOOR','LOCK_DOOR','UNLOCK_DOOR','DESTROY_ACTOR','MOVE_ACTOR','ENABLE_TRIGGER','DISABLE_TRIGGER'].includes(a.type);
   const needsXY    = ['PAN_CAMERA','SPAWN_ACTOR','MOVE_ACTOR','APPLY_DAMAGE_IN_ZONE'].includes(a.type);
@@ -146,6 +147,13 @@ function ActionRow({ a, onChange, onRemove }: {
       {needsActor && (
         <Field label="actor id">
           <input className={inp + ' w-16'} type="number" min={0} value={a.actorId} onChange={e => onChange({ actorId: +e.target.value })} />
+          {onRequestActorLink && (
+            <button
+              title="Pick actor from canvas"
+              onClick={() => onRequestActorLink({ label: `action actor`, onLinked: (id) => onChange({ actorId: id }) })}
+              className="text-[10px] hover:text-game-primary transition-colors flex-shrink-0"
+            >🎯</button>
+          )}
         </Field>
       )}
       {needsXY && (
@@ -184,12 +192,13 @@ function ActionRow({ a, onChange, onRemove }: {
 
 // ── TriggerNodeRow ────────────────────────────────────────────────────────────
 
-function TriggerNodeRow({ node, expanded, onToggle, onChange, onRemove }: {
+function TriggerNodeRow({ node, expanded, onToggle, onChange, onRemove, onRequestActorLink }: {
   node: TriggerNode;
   expanded: boolean;
   onToggle: () => void;
   onChange: (patch: Partial<TriggerNode>) => void;
   onRemove: () => void;
+  onRequestActorLink?: (target: { label: string; onLinked: (matchid: number) => void }) => void;
 }) {
   const patchCond = (i: number, patch: Partial<TriggerCondition>) => {
     const conditions = node.conditions.map((c, ci) => ci === i ? { ...c, ...patch } : c);
@@ -243,6 +252,13 @@ function TriggerNodeRow({ node, expanded, onToggle, onChange, onRemove }: {
                   onChange={e => onChange({ actorId: +e.target.value })}
                   title="0 = any actor" />
                 <span className="text-[8px] text-game-muted font-mono">0=any</span>
+                {onRequestActorLink && (
+                  <button
+                    title="Pick actor from canvas"
+                    onClick={() => onRequestActorLink({ label: `trigger actor`, onLinked: (id) => onChange({ actorId: id }) })}
+                    className="text-[10px] hover:text-game-primary transition-colors flex-shrink-0"
+                  >🎯</button>
+                )}
               </Field>
             )}
             {node.triggerEvent === 'TIMER_EXPIRED' && (
@@ -302,7 +318,7 @@ function TriggerNodeRow({ node, expanded, onToggle, onChange, onRemove }: {
               <div className="text-[9px] text-game-muted font-mono pl-2">No actions</div>
             )}
             {node.actions.map((a, i) => (
-              <ActionRow key={i} a={a} onChange={p => patchAction(i, p)} onRemove={() => removeAction(i)} />
+              <ActionRow key={i} a={a} onChange={p => patchAction(i, p)} onRemove={() => removeAction(i)} onRequestActorLink={onRequestActorLink} />
             ))}
           </div>
         </div>
@@ -318,9 +334,10 @@ interface Props {
   objectives: ObjectiveDef[];
   onSetTriggers: (t: TriggerNode[]) => void;
   onSetObjectives: (o: ObjectiveDef[]) => void;
+  onRequestActorLink?: (target: { label: string; onLinked: (matchid: number) => void }) => void;
 }
 
-export default function TriggerPanel({ triggers, objectives, onSetTriggers, onSetObjectives }: Props) {
+export default function TriggerPanel({ triggers, objectives, onSetTriggers, onSetObjectives, onRequestActorLink }: Props) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [objSection, setObjSection] = useState(true);
 
@@ -376,6 +393,7 @@ export default function TriggerPanel({ triggers, objectives, onSetTriggers, onSe
             onToggle={() => setExpandedId(prev => prev === node.id ? null : node.id)}
             onChange={patch => patchTrigger(node.id, patch)}
             onRemove={() => removeTrigger(node.id)}
+            onRequestActorLink={onRequestActorLink}
           />
         ))}
 

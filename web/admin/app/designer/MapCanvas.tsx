@@ -143,6 +143,9 @@ interface Props {
   onNavLinkAdd?: (fromIdx: number, toIdx: number, type: 0 | 1 | 2, sourceX: number, targetX: number) => void;
   onNavLinkSelect?: (idx: number | null) => void;
   onLinkFromIdxChange?: (idx: number | null) => void;
+  // Trigger actor linking: when set, next actor click calls this with the actor's matchid
+  actorLinkTarget?: { label: string } | null;
+  onActorLinked?: (matchid: number) => void;
 }
 
 export default function MapCanvas({
@@ -174,6 +177,8 @@ export default function MapCanvas({
   onNavLinkAdd,
   onNavLinkSelect,
   onLinkFromIdxChange,
+  actorLinkTarget,
+  onActorLinked,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -1187,6 +1192,18 @@ export default function MapCanvas({
     const { tx, ty } = canvasToTile(cx, cy);
     const { wx, wy } = canvasToWorld(cx, cy);
 
+    // Trigger actor linking mode: clicking an actor fills its matchid into the waiting field
+    if (actorLinkTarget && onActorLinked) {
+      const HIT = 48 / zoom;
+      for (let i = map.actors.length - 1; i >= 0; i--) {
+        if (Math.hypot(map.actors[i].x - wx, map.actors[i].y - wy) < HIT) {
+          onActorLinked(map.actors[i].matchid ?? 0);
+          return;
+        }
+      }
+      return; // click in empty space during link mode = cancel
+    }
+
     // Paste intercept: left-click in bounds while paste is pending stamps the buffer
     if (pastePending && tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
       onTilePaste?.(tx, ty);
@@ -1376,7 +1393,8 @@ export default function MapCanvas({
       onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
       selectedPlatformIdx, onPlatformSelect, onActorSelect, highlightActorIdx, snap,
       pastePending, onTilePaste, onTileSelection, onFloodFill, onActorTypeChange,
-      linkFromIdx, navLinkType, onNavLinkAdd, onNavLinkSelect, onLinkFromIdxChange]);
+      linkFromIdx, navLinkType, onNavLinkAdd, onNavLinkSelect, onLinkFromIdxChange,
+      actorLinkTarget, onActorLinked]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1656,7 +1674,9 @@ export default function MapCanvas({
     };
   }, [handleKeyDown, handleKeyUp]);
 
-  const cursorStyle = isLightRadiusDragging
+  const cursorStyle = actorLinkTarget
+    ? 'crosshair'
+    : isLightRadiusDragging
     ? 'ew-resize'
     : dragActorPreview
     ? 'grabbing'
@@ -1690,6 +1710,15 @@ export default function MapCanvas({
         ref={overlayCanvasRef}
         style={{ position: 'absolute', inset: 0, pointerEvents: 'none', width: '100%', height: '100%' }}
       />
+      {actorLinkTarget && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none
+          bg-[#0d1a0d]/90 border border-game-primary/60 rounded px-3 py-1.5
+          text-[11px] font-mono text-game-primary flex items-center gap-2 shadow-lg">
+          <span className="animate-pulse">🎯</span>
+          Click actor → <span className="text-game-text">{actorLinkTarget.label}</span>
+          <span className="text-game-muted text-[9px]">(click empty to cancel)</span>
+        </div>
+      )}
     </div>
   );
 }
