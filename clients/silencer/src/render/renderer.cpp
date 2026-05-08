@@ -83,7 +83,10 @@ void Renderer::Draw(Surface * surface, float frametime){
 			break;
 		}
 	}*/
-	if(localplayer){
+	if(world.pancameraactive){
+		camera.Follow(world, world.pancamerax, world.pancameray, 0, 0, 0, 30);
+		camera.Smooth(frametime);
+	} else if(localplayer){
 		if(localplayer->InBase(world) && !playerinbaseold){
 			localplayer->oldx = localplayer->x;
 			localplayer->oldy = localplayer->y;
@@ -107,11 +110,7 @@ void Renderer::Draw(Surface * surface, float frametime){
 		int px = localplayer->x + ((localplayer->oldx - localplayer->x) * frametime);
 		int py = localplayer->y + ((localplayer->oldy - localplayer->y) * frametime);
 		if(px && py){
-			if(world.pancameraactive){
-				camera.Follow(world, world.pancamerax, world.pancameray, 0, 0, 0, 30);
-			} else {
-				camera.Follow(world, px, py, 15, 100, 0, 30);
-			}
+			camera.Follow(world, px, py, 15, 100, 0, 30);
 			camera.Smooth(frametime);
 		}
 		world.replay.x = localplayer->x;
