@@ -140,12 +140,31 @@ void CDResDir(void){
 #endif
 }
 
+#ifdef _WIN32
+static void SweepSidelinedFiles(const std::string &dir) {
+	WIN32_FIND_DATAA fd;
+	std::string pattern = dir + "\\*";
+	HANDLE h = FindFirstFileA(pattern.c_str(), &fd);
+	if (h == INVALID_HANDLE_VALUE) return;
+	do {
+		std::string n = fd.cFileName;
+		if (n == "." || n == "..") continue;
+		std::string child = dir + "\\" + n;
+		if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+			SweepSidelinedFiles(child);
+		} else if (n.find(".old-") != std::string::npos) {
+			DeleteFileA(child.c_str());
+		}
+	} while (FindNextFileA(h, &fd));
+	FindClose(h);
+}
+#endif
+
 static void CleanupPreviousUpdate(void) {
 #ifdef __APPLE__
 	// .app install: sibling foo.app.old. We don't know our exact install dir
 	// here without mach-o/dyld logic; skip cleanup on macOS and rely on the
-	// user trashing .app.old manually. A future tweak could mirror
-	// UpdaterStage2::ResolveInstallDir but that's not worth the coupling yet.
+	// user trashing .app.old manually.
 #else
 	char buf[1024];
 	int n = 0;
@@ -162,9 +181,8 @@ static void CleanupPreviousUpdate(void) {
 	if (slash == std::string::npos) return;
 	std::string install_dir = exe.substr(0, slash);
 
-	// Legacy: directory-rename-based stage-2 left a `<install>.old` sibling.
-	// Pre-per-file-replace builds still produce these; sweep until they age
-	// out of the user base.
+	// Pre-per-file-replace builds left a `<install>.old` sibling; sweep until
+	// they age out.
 	std::string old_dir = install_dir + ".old";
 	struct stat st;
 	if (stat(old_dir.c_str(), &st) == 0) {
@@ -178,20 +196,9 @@ static void CleanupPreviousUpdate(void) {
 	}
 
 #ifdef _WIN32
-	// Per-file replace (updaterstage2.cpp ReplaceFileAtomic) sidelines locked
-	// targets as `<file>.old-<ticks>` rather than failing the whole update.
-	// Files locked at update time are typically free now — sweep them.
-	WIN32_FIND_DATAA fd;
-	std::string pattern = install_dir + "\\*.old-*";
-	HANDLE h = FindFirstFileA(pattern.c_str(), &fd);
-	if (h != INVALID_HANDLE_VALUE) {
-		do {
-			if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
-			std::string victim = install_dir + "\\" + fd.cFileName;
-			DeleteFileA(victim.c_str());  // best-effort; locked files retry next launch
-		} while (FindNextFileA(h, &fd));
-		FindClose(h);
-	}
+	// ReplaceFileAtomic sidelines locked targets as `<file>.old-<ticks>`;
+	// they're usually unlocked by next launch.
+	SweepSidelinedFiles(install_dir);
 #endif
 #endif
 }

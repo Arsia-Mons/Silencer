@@ -1,13 +1,4 @@
-; Inno Setup script for Silencer (Windows). Produces a per-user installer
-; that lands at %LOCALAPPDATA%\Programs\Silencer\ — outside Defender's
-; hot-path scanning of Downloads, where in-place directory renames fail.
-;
-; Build:
-;   ISCC.exe /DMyAppVersion=00045 silencer.iss
-;
-; Source files come from `build\package\silencer\` (staged by release.yml's
-; Package step or by infra/scripts/test-updater.ps1). Override with
-;   /DSourceDir=path\to\staged\dir
+; Build:  ISCC.exe /DMyAppVersion=<ver> [/DSourceDir=<staged>] silencer.iss
 
 #define MyAppName "Silencer"
 #define MyAppPublisher "Arsia Mons"
@@ -42,8 +33,6 @@ WizardStyle=modern
 UninstallDisplayIcon={app}\Silencer.exe
 DisableDirPage=auto
 DisableProgramGroupPage=yes
-; CloseApplications: ask running Silencer to quit before replacing files,
-; so an upgrade install doesn't fight with an open process.
 CloseApplications=yes
 RestartApplications=no
 

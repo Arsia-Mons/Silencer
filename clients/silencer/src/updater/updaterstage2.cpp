@@ -238,13 +238,10 @@ std::string FindSingleTopDir(const std::string &dir) {
 }
 
 #ifdef _WIN32
-// Atomically replace dst with src. Retries on transient AV-induced failures
-// (Defender opens scanned files without FILE_SHARE_DELETE, blocking renames
-// until the scan finishes). Falls back to sidelining the existing dst when
-// the file is genuinely locked — the running EXE itself, for instance: you
-// can rename a locked file even though you can't delete or replace it. The
-// sidelined `.old-<ticks>` leftover gets swept by main.cpp's
-// CleanupPreviousUpdate on next launch.
+// Retries on AV-induced failures (Defender opens scanned files without
+// FILE_SHARE_DELETE, briefly blocking renames). Sidelines a locked dst as
+// `<dst>.old-<ticks>` — works even on a running EXE, since rename is
+// permitted on locked files where delete/replace isn't.
 bool ReplaceFileAtomic(const std::string &src, const std::string &dst) {
     for (int attempt = 0; attempt < 20; attempt++) {
         if (MoveFileExA(src.c_str(), dst.c_str(),
@@ -278,17 +275,8 @@ bool ReplaceFileAtomic(const std::string &src, const std::string &dst) {
     return true;
 }
 
-// Walk new_root recursively; for each file, atomically replace its
-// counterpart under install_root via ReplaceFileAtomic. Per-file replace
-// instead of directory rename because Windows directory rename fails if
-// any descendant has an open handle without FILE_SHARE_DELETE — and AV
-// scanners (Defender on Downloads especially) routinely hold such handles.
-// Per-file replace only locks one file at a time, so AV scans of unrelated
-// files don't doom the whole update.
-//
-// Files in install_root that aren't in new_root are left in place. Stale
-// DLLs from a previous version cost a few MB and are harmless until a name
-// collision happens, which is rare. Add a manifest if it bites.
+// Files in install_root that aren't in new_root are left in place — no
+// manifest of removed files yet.
 bool MergeTreeWindows(const std::string &new_root, const std::string &install_root) {
     WIN32_FIND_DATAA fd;
     std::string pattern = new_root + "\\*";
@@ -303,8 +291,6 @@ bool MergeTreeWindows(const std::string &new_root, const std::string &install_ro
         std::string src = new_root + "\\" + n;
         std::string dst = install_root + "\\" + n;
         if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            // Ensure dst dir exists; ignore "already exists" since merging
-            // into an established install is the normal path.
             if (!CreateDirectoryA(dst.c_str(), NULL) &&
                 GetLastError() != ERROR_ALREADY_EXISTS) {
                 Logf("CreateDirectory %s failed: %lu", dst.c_str(), GetLastError());
@@ -397,17 +383,12 @@ int Run(int argc, char **argv) {
     }
 
 #ifdef _WIN32
-    // Per-file replace (see ReplaceFileAtomic / MergeTreeWindows above for why
-    // we don't directory-rename on Windows). Loses the all-or-nothing
-    // atomicity of POSIX rename, but the alternative is updates that
-    // mysteriously fail when Defender is mid-scan — which is the bug we're
-    // fixing.
+    // Per-file replace, not directory rename: a directory rename on Windows
+    // fails if any descendant has an open handle without FILE_SHARE_DELETE,
+    // which AV scanners routinely hold. Trades POSIX-rename atomicity for
+    // updates that don't fail when Defender is mid-scan.
     if (!MergeTreeWindows(effective_new, install_dir)) {
         Logf("merge failed; install dir may be in a partial state");
-        // Best-effort relaunch the old exe so the user isn't left with
-        // nothing to launch. Some files may already be replaced — that
-        // implies an ABI mismatch is theoretically possible, but in
-        // practice the .exe and its DLLs move together.
         if (!exe_to_relaunch.empty()) {
             STARTUPINFOA si{}; si.cb = sizeof(si);
             PROCESS_INFORMATION pi{};
