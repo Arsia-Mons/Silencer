@@ -84,8 +84,23 @@ void Renderer::Draw(Surface * surface, float frametime){
 		}
 	}*/
 	if(world.pancameraactive){
-		camera.Follow(world, world.pancamerax, world.pancameray, 0, 0, 0, 30);
-		camera.Smooth(frametime);
+		// Smooth lerp toward pan target (~0.08 per frame ≈ 1s at 30fps)
+		camera.x += (Sint16)((world.pancamerax - camera.x) * 0.08f);
+		camera.y += (Sint16)((world.pancameray - camera.y) * 0.08f);
+		camera.newx = camera.x;
+		camera.newy = camera.y;
+	} else if(world.pancamerareturn && localplayer){
+		// Smooth lerp back to player; release input when close
+		int px = localplayer->x + ((localplayer->oldx - localplayer->x) * frametime);
+		int py = localplayer->y + ((localplayer->oldy - localplayer->y) * frametime);
+		camera.x += (Sint16)((px - camera.x) * 0.08f);
+		camera.y += (Sint16)((py - camera.y) * 0.08f);
+		camera.newx = camera.x;
+		camera.newy = camera.y;
+		if(abs(camera.x - px) < 40 && abs(camera.y - py) < 40){
+			world.pancamerareturn = false;
+			world.input_locked = false;
+		}
 	} else if(localplayer){
 		if(localplayer->InBase(world) && !playerinbaseold){
 			localplayer->oldx = localplayer->x;

@@ -146,7 +146,7 @@ function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
   const needsActor = ['OPEN_DOOR','LOCK_DOOR','UNLOCK_DOOR','DESTROY_ACTOR','MOVE_ACTOR','ENABLE_TRIGGER','DISABLE_TRIGGER','COMPLETE_OBJECTIVE'].includes(a.type);
   const needsXY    = ['PAN_CAMERA','SPAWN_ACTOR','MOVE_ACTOR','APPLY_DAMAGE_IN_ZONE'].includes(a.type);
   const needsSound = a.type === 'PLAY_SOUND';
-  const needsMsg   = a.type === 'SHOW_OBJECTIVE';
+  const needsMsg   = a.type === 'SHOW_OBJECTIVE' || a.type === 'PAN_CAMERA';
   const needsF     = a.type === 'MOVE_ACTOR' || a.type === 'APPLY_DAMAGE_IN_ZONE' || a.type === 'SET_FLAG';
   const needsOutcome = a.type === 'END_MISSION';
 
@@ -237,7 +237,9 @@ function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
       )}
       {needsMsg && (
         <Field label="message">
-          <input className={inp + ' flex-1'} type="text" maxLength={127} value={a.message} placeholder="Objective text…" onChange={e => onChange({ message: e.target.value })} />
+          <input className={inp + ' flex-1'} type="text" maxLength={127} value={a.message}
+            placeholder={a.type === 'PAN_CAMERA' ? 'Location label (optional)…' : 'Objective text…'}
+            onChange={e => onChange({ message: e.target.value })} />
         </Field>
       )}
     </div>

@@ -69,8 +69,12 @@ void ActionSystem::Execute(const TriggerAction & action, World & world) {
         }
         case ActionType::PAN_CAMERA: {
             world.pancameraactive = true;
+            world.pancamerareturn = false;
             world.pancamerax = action.param_x;
             world.pancameray = action.param_y;
+            if(action.message[0]){
+                world.ShowMessage(action.message, 200, 0, true);
+            }
             world.BroadcastCamera(action.param_x, action.param_y);
             break;
         }
@@ -145,9 +149,10 @@ void ActionSystem::Execute(const TriggerAction & action, World & world) {
             break;
         }
         case ActionType::UNLOCK_INPUT: {
-            world.input_locked = false;
-            // Release cinematic camera pan so main camera returns to following the player.
+            // Start return pan; input_locked is released by the renderer
+            // once the camera has eased back to the player.
             world.pancameraactive = false;
+            world.pancamerareturn = true;
             world.BroadcastCamera(0, 0);
             break;
         }

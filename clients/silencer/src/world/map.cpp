@@ -83,6 +83,8 @@ bool Map::Load(const char * filename, World & world){
 			world.triggerGraph.LoadZones(zones);
 			world.tickcount = 0;
 			world.player_spawn_emitted = false;
+			world.pancameraactive = false;
+			world.pancamerareturn = false;
 			return true;
 		}
 	}

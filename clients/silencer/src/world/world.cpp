@@ -68,6 +68,7 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	memset(topmessage, 0, sizeof(topmessage));
 	topmessage_i = 0;
 	pancameraactive = false;
+	pancamerareturn = false;
 	pancamerax = 0;
 	pancameray = 0;
 }
@@ -846,9 +847,15 @@ void World::DoNetwork_Replica(void){
 				Sint16 cx, cy;
 				memcpy(&cx, &data.data[data.BitsToBytes(data.readoffset)],     sizeof(cx));
 				memcpy(&cy, &data.data[data.BitsToBytes(data.readoffset) + 2], sizeof(cy));
-				pancameraactive = (cx != 0 || cy != 0);
-				pancamerax = cx;
-				pancameray = cy;
+				if(cx != 0 || cy != 0){
+					pancameraactive = true;
+					pancamerareturn = false;
+					pancamerax = cx;
+					pancameray = cy;
+				} else {
+					pancameraactive = false;
+					pancamerareturn = true;
+				}
 			}break;
 		}
 	}
