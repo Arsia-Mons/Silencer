@@ -41,6 +41,8 @@
 #define SILENCER_MAP_API_URL "http://127.0.0.1:8080"
 #endif
 
+static bool IsBuiltinProfile(const std::string& name);
+
 Game::Game() : renderer(world), screenbuffer(640, 480){
 	world.SetVersion(SILENCER_VERSION);
 	frames = 0;
@@ -1675,7 +1677,7 @@ bool Game::Tick(void){
 			if(iface){
 				ScrollBar * scrollbar = (ScrollBar *)world.GetObjectFromId(iface->scrollbar);
 				if(!iface->disabled){
-					for(int i = 0; i < 6; i++){
+					for(int i = 0; i < 5; i++){
 						int row = i + scrollbar->scrollposition;
 						if(row < 0 || row >= (int)Action::Count) continue;
 						Action a = ACTION_TABLE[row].action;
@@ -1684,6 +1686,15 @@ bool Game::Tick(void){
 						strcpy(c1button[i]->text, GetKeyName(v.key1));
 						strcpy(c2button[i]->text, GetKeyName(v.key2));
 					}
+					// Preset button text reflects the active profile's label.
+					// The static "Preset:" overlay to its left supplies the noun.
+					std::string presetText = !keymap.label.empty() ? keymap.label
+					                       : !keymap.name.empty()  ? keymap.name
+					                       : std::string(Config::GetInstance().active_keybind_profile);
+					if(presetText.size() >= sizeof(presetbutton->text)){
+						presetText.resize(sizeof(presetbutton->text) - 1);
+					}
+					strcpy(presetbutton->text, presetText.c_str());
 				}
 				iface->buttonenter = 200;
 				for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
@@ -1692,7 +1703,7 @@ bool Game::Tick(void){
 						Button * button = static_cast<Button *>(object);
 						if(button){
 							if(button->state == Button::ACTIVE || button->state == Button::ACTIVATING){
-								if(button->uid >= 0 && button->uid < 200){
+								if((button->uid >= 0 && button->uid < 200) || button->uid == 250){
 									iface->buttonenter = button->id;
 								}
 							}
@@ -1722,6 +1733,7 @@ bool Game::Tick(void){
 										Action a = ACTION_TABLE[row].action;
 										LegacyView v = ViewLegacy(keymap, a);
 										if(slot < 100) v.key1 = sym; else v.key2 = sym;
+										ForkActiveProfileIfBuiltin();
 										WriteLegacy(keymap, a, v.key1, v.key2, v.and_);
 									}
 									iface->disabled = false;
@@ -1740,16 +1752,26 @@ bool Game::Tick(void){
 										Action a = ACTION_TABLE[row].action;
 										LegacyView v = ViewLegacy(keymap, a);
 										v.and_ = !v.and_;
+										ForkActiveProfileIfBuiltin();
 										WriteLegacy(keymap, a, v.key1, v.key2, v.and_);
 									}
+								}
+								if(button->uid == 250){
+									CycleKeybindPreset();
 								}
 								switch(button->uid){
 									case 200:{
 										// Persist the live keymap to the active profile's
 										// writable file, then save the rest of Config (which
 										// is now just the active_keybind_profile pointer plus
-										// graphics/audio/network).
-										keymap.SaveFile(WritableProfilePath(Config::GetInstance().active_keybind_profile));
+										// graphics/audio/network). Skip writing built-ins —
+										// any edit forks via ForkActiveProfileIfBuiltin, so a
+										// built-in name here means cycle-only (no edits) and
+										// shouldn't shadow the on-disk built-in with a copy.
+										const std::string active = Config::GetInstance().active_keybind_profile;
+										if(!IsBuiltinProfile(active)){
+											keymap.SaveFile(WritableProfilePath(active));
+										}
 										Config::GetInstance().Save();
 										GoToState(OPTIONS);
 									}break;
@@ -2660,28 +2682,54 @@ Interface * Game::CreateOptionsControlsInterface(void){
 	title->x = 320 - ((title->text.length() * title->textwidth) / 2);
 	title->y = 14;
 	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	for(int i = 0; i < 6; i++){
+
+	// Preset cycle row. Static "Preset:" label on the left at the same x/y as
+	// binding row labels; cycle button on the right carrying the profile name.
+	// B220x33 keeps the same vertical sprite anchor as the (now-shifted)
+	// binding row buttons (B112x33), so y=0 places it where row 0 used to
+	// render. x left-aligns the visible button with c1button below; both
+	// render with bank-6 sprites but at different indices, so we add the
+	// sprite-offset delta (B220x33 res_index 23 vs B112x33 res_index 28) to
+	// c1's obj-space x — see resources.cpp:66 for the header read.
+	Overlay * presetlabel = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	presetlabel->text = "Preset:";
+	presetlabel->textbank  = 134;
+	presetlabel->textwidth = 10;
+	presetlabel->x = 80;
+	presetlabel->y = 95;
+
+	presetbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	presetbutton->SetType(Button::B220x33);
+	presetbutton->x = -30 + (world.resources.spriteoffsetx[6][23] - world.resources.spriteoffsetx[6][28]);
+	presetbutton->y = 0;
+	presetbutton->uid = 250;
+	strcpy(presetbutton->text, "");
+	iface->AddObject(presetbutton->id);
+	iface->AddTabObject(presetbutton->id);
+
+	for(int i = 0; i < 5; i++){
+		int slot = i + 1;  // visual row index — preset takes slot 0
 		Overlay * name = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 		keynameoverlay[i] = name;
 		name->textbank = 134;
 		name->textwidth = 10;
 		name->x = 80;
-		name->y = 95 + (i * 53);
-		
+		name->y = 95 + (slot * 53);
+
 		Button * c1button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 		Game::c1button[i] = c1button;
 		c1button->SetType(Button::B112x33);
-		c1button->y = 0 + (i * 53);
+		c1button->y = 0 + (slot * 53);
 		c1button->x = -30;
 		c1button->uid = i;
 		strcpy(c1button->text, "");
 		iface->AddObject(c1button->id);
 		iface->AddTabObject(c1button->id);
-		
+
 		Button * buttonop = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 		Game::cobutton[i] = buttonop;
 		buttonop->SetType(Button::BNONE);
-		buttonop->y = 95 + (i * 53);
+		buttonop->y = 95 + (slot * 53);
 		buttonop->x = 383;
 		buttonop->uid = 150 + i;
 		buttonop->width = 40;
@@ -2690,11 +2738,11 @@ Interface * Game::CreateOptionsControlsInterface(void){
 		buttonop->textwidth = 9;
 		strcpy(buttonop->text, "");
 		iface->AddObject(buttonop->id);
-		
+
 		Button * c2button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 		Game::c2button[i] = c2button;
 		c2button->SetType(Button::B112x33);
-		c2button->y = 0 + (i * 53);
+		c2button->y = 0 + (slot * 53);
 		c2button->x = 120;
 		c2button->uid = 100 + i;
 		strcpy(c2button->text, "");
@@ -2702,13 +2750,13 @@ Interface * Game::CreateOptionsControlsInterface(void){
 		iface->AddTabObject(c2button->id);
 	}
 	iface->objectupscroll = c1button[0]->id;
-	iface->objectdownscroll = c2button[5]->id;
-	
+	iface->objectdownscroll = c2button[4]->id;
+
 	ScrollBar * scrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
 	scrollbar->res_index = 9;
 	scrollbar->scrollpixels = 53;
 	scrollbar->scrollposition = 0;
-	scrollbar->scrollmax = (int)Action::Count - 6;
+	scrollbar->scrollmax = (int)Action::Count - 5;
 	iface->AddObject(scrollbar->id);
 	iface->scrollbar = scrollbar->id;
 	
@@ -5658,6 +5706,37 @@ void Game::LoadActiveKeymap(){
 		keymap.LoadFile(path);
 	}
 	if(keymap.name.empty()) keymap.name = name;
+}
+
+static bool IsBuiltinProfile(const std::string& name){
+	return name == "default" || name == "wasd" || name == "gamepad";
+}
+
+void Game::CycleKeybindPreset(){
+	ProfileListing pl = ListProfiles();
+	if(pl.all.empty()) return;
+	std::string current = Config::GetInstance().active_keybind_profile;
+	size_t next = 0;
+	for(size_t i = 0; i < pl.all.size(); i++){
+		if(pl.all[i] == current){ next = (i + 1) % pl.all.size(); break; }
+	}
+	const std::string& chosen = pl.all[next];
+	std::strncpy(Config::GetInstance().active_keybind_profile, chosen.c_str(),
+	             sizeof(Config::GetInstance().active_keybind_profile) - 1);
+	Config::GetInstance().active_keybind_profile[sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
+	LoadActiveKeymap();
+}
+
+void Game::ForkActiveProfileIfBuiltin(){
+	std::string active = Config::GetInstance().active_keybind_profile;
+	if(!IsBuiltinProfile(active)) return;
+	std::string forked = active + "-custom";
+	std::string forkedLabel = (keymap.label.empty() ? active : keymap.label) + "-Custom";
+	std::strncpy(Config::GetInstance().active_keybind_profile, forked.c_str(),
+	             sizeof(Config::GetInstance().active_keybind_profile) - 1);
+	Config::GetInstance().active_keybind_profile[sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
+	keymap.name = forked;
+	keymap.label = forkedLabel;
 }
 
 void Game::OpenFirstGamepad(){
