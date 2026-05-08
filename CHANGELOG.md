@@ -2,6 +2,22 @@
 
 All notable changes to Silencer are documented here.
 
+## [v00046] — 2026-05-07
+
+### Game client
+
+#### Main menu cleanup (#130)
+
+- **Dev-only buttons removed** — `Host Game` / `Join Game` / `Test` / `Test Replay` (uids 4/5/6/7) gone from the main menu; they were dev entry points behind an `if(1)` gate, never intended user-facing. Rolls back the "Test button on the main menu" bullet from v00045. State enums and handlers stay (HOSTGAME is referenced by the dedicated-server gate; REPLAYGAME is reachable via the `-r` CLI flag).
+
+#### Windows installer & auto-updater (#131)
+
+- **Inno Setup installer** — new `silencer-windows-x64-setup-<version>.exe` artifact ships alongside the portable zip. Installs per-user to `%LOCALAPPDATA%\Programs\Silencer\`, outside Defender's hot-path Downloads scan. Recommended channel; the zip stays for advanced users.
+- **Per-file replace updater on Windows** — stage-2's directory rename (`MoveFileA install → install.old`) was failing with `STATUS_ACCESS_DENIED` whenever any descendant had an open handle without `FILE_SHARE_DELETE` — exactly what Defender's hot-path scan of Downloads holds, which is why every prod update from a Downloads-extracted zip silently failed (`rename install→old failed`) and the user was never relaunched. Replaced with a recursive `MoveFileEx (REPLACE_EXISTING | COPY_ALLOWED | WRITE_THROUGH)` walk. For the rare genuinely-locked file, sideline as `<file>.old-<ticks>` and move the new one in; startup-time `CleanupPreviousUpdate` sweeps those leftovers recursively (so nested files under `assets/` aren't missed). POSIX rename keeps the original directory-swap path — `rename(2)` on Linux/macOS handles open files atomically.
+- **Add/Remove Programs version sync** — stage-2 only swapped files on disk, leaving Inno's HKCU `{AppId}_is1` uninstall key's `DisplayVersion` stuck at install-time forever. Startup hook now overwrites `DisplayVersion` and `DisplayName` from the running EXE's compiled-in `SILENCER_VERSION`. No-op for zip users (the key doesn't exist; `RegOpenKeyEx` fails fast). `silencer.iss` also pins `AppVerName` so `DisplayName` is plain `Silencer` instead of Inno's default `Silencer version <ver>`.
+- **Uninstaller wipes install dir** — `[UninstallDelete] Type: filesandordirs; Name: "{app}"` removes any file the auto-updater dropped in `{app}` (or earlier installs left there) — Inno's uninstaller only deletes files in its install-time manifest. Safe because user data lives at `%APPDATA%\Silencer\`.
+- **Update log visibility** — `RenameDir`'s `MoveFileA` error path now routes through `Logf` (visible in `%TEMP%\silencer-update.log`) instead of stderr-only `fprintf`, so future failures are diagnosable.
+
 ## [v00045] — 2026-05-07
 
 ### Game client

@@ -15,6 +15,23 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: 'v00046',
+    date: '2026-05-07',
+    title: 'Windows installer + updater fix',
+    entries: [
+      {
+        category: 'CLIENT',
+        changes: [
+          'Windows: new Inno Setup installer (silencer-windows-x64-setup-*.exe) — installs per-user to %LOCALAPPDATA%\\Programs\\Silencer\\, outside Defender\'s Downloads hot-path. Recommended channel; the portable zip stays for advanced users.',
+          'Windows auto-updater fix — per-file MoveFileEx replace instead of directory rename. The old directory-rename swap silently failed with STATUS_ACCESS_DENIED when running the updater from Downloads (Defender held handles without FILE_SHARE_DELETE), so prod auto-updates never relaunched.',
+          'Windows: Add/Remove Programs DisplayVersion now syncs from the running EXE\'s compiled-in version after auto-update (was previously stuck at install-time). DisplayName cleaned up to plain "Silencer".',
+          'Windows uninstaller wipes the install dir, removing auto-updater files left outside Inno\'s install manifest.',
+          'Removed dev-only main menu buttons (Host Game / Join Game / Test / Test Replay) — they were dev entry points, not intended for end users.',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v00044',
     date: '2026-05-01',
     title: 'VFX Editor',
