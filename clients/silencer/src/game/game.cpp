@@ -2588,37 +2588,6 @@ Interface * Game::CreateMainMenuInterface(void){
 	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	iface->AddObject(startbutton->id);
 	iface->AddObject(lobbybutton->id);
-	if(1){
-		Button * hostbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		hostbutton->y = -270;
-		hostbutton->x = -240;
-		hostbutton->uid = 4;
-		strcpy(hostbutton->text, "Host Game");
-		
-		Button * joinbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		joinbutton->y = -230;
-		joinbutton->x = -240;
-		joinbutton->uid = 5;
-		strcpy(joinbutton->text, "Join Game");
-		
-		Button * replaybutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		replaybutton->y = -270;
-		replaybutton->x = -40;
-		replaybutton->uid = 7;
-		strcpy(replaybutton->text, "Test Replay");
-		
-		Button * testbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		testbutton->y = -201;
-		testbutton->x = 0;
-		testbutton->uid = 6;
-		strcpy(testbutton->text, "Test");
-		
-		iface->AddObject(hostbutton->id);
-		iface->AddObject(joinbutton->id);
-		iface->AddObject(replaybutton->id);
-		iface->AddObject(testbutton->id);
-		iface->AddTabObject(testbutton->id);
-	}
 	iface->AddObject(optionsbutton->id);
 	iface->AddObject(exitbutton->id);
 	iface->AddTabObject(startbutton->id);
@@ -4358,18 +4327,6 @@ bool Game::ProcessMainMenuInterface(Interface * iface){
 					break;
 					case 3:
 						return false;
-					break;
-					case 4:
-						GoToState(HOSTGAME);
-					break;
-					case 5:
-						GoToState(JOINGAME);
-					break;
-					case 6:
-						GoToState(TESTGAME);
-					break;
-					case 7:
-						GoToState(REPLAYGAME);
 					break;
 				}
 			}
