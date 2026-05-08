@@ -129,6 +129,7 @@ interface Props {
   onTriggerZoneDraw?: (zone: Omit<TriggerZone, 'label'> & { label: string }) => void;
   onTriggerZoneRemove?: (id: number) => void;
   onTriggerZoneUpdate?: (id: number, x1: number, y1: number, x2: number, y2: number) => void;
+  onTriggerZoneLiveUpdate?: (id: number, x1: number, y1: number, x2: number, y2: number) => void;
   selectedZoneId?: number | null;
   onTriggerZoneSelect?: (id: number | null) => void;
   onActorTypeChange?: (idx: number, type: number) => void;
@@ -172,6 +173,7 @@ export default function MapCanvas({
   onTriggerZoneDraw,
   onTriggerZoneRemove,
   onTriggerZoneUpdate,
+  onTriggerZoneLiveUpdate,
   selectedZoneId,
   onTriggerZoneSelect,
   onActorTypeChange,
@@ -1704,8 +1706,8 @@ export default function MapCanvas({
         }
       }
       zonePreviewRef.current = { x1, y1, x2, y2 };
-      // Live-update zone in map so render shows the drag
-      onTriggerZoneUpdate?.(zoneDragRef.current.id, x1, y1, x2, y2);
+      // Live preview — no history push
+      onTriggerZoneLiveUpdate?.(zoneDragRef.current.id, x1, y1, x2, y2);
       return;
     }
 
@@ -1749,7 +1751,7 @@ export default function MapCanvas({
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, eraseLayerType,
       onTilePaint, onPanChange, onCursorChange, onDragPlatformChange, snap,
-      onTileSelection, onActorTypeChange]);
+      onTileSelection, onActorTypeChange, onTriggerZoneLiveUpdate]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isPanning.current) {
@@ -1856,7 +1858,7 @@ export default function MapCanvas({
       }
     }
     isPainting.current = false;
-  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap, onShadowZoneDraw, onTriggerZoneDraw, onActorTypeChange, onTriggerZoneUpdate]);
+  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap, onShadowZoneDraw, onTriggerZoneDraw, onActorTypeChange, onTriggerZoneUpdate, onTriggerZoneLiveUpdate]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.code === 'Space') { isSpacePanning.current = true; e.preventDefault(); }

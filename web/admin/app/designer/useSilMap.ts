@@ -368,6 +368,7 @@ export interface UseSilMapReturn {
   setTriggers: (triggers: TriggerNode[]) => void;
   setObjectives: (objectives: ObjectiveDef[]) => void;
   setZones: (zones: TriggerZone[]) => void;
+  setZonesLive: (zones: TriggerZone[]) => void;
   updateHeader: (patch: Partial<MapHeader>) => void;
   undo: () => void;
   redo: () => void;
@@ -895,6 +896,10 @@ export function useSilMap(): UseSilMapReturn {
     });
   }, [pushHistory]);
 
+  const setZonesLive = useCallback((zones: TriggerZone[]) => {
+    setMapData(prev => prev ? { ...prev, zones } : prev);
+  }, []);
+
   const applyTileBatch = useCallback((
     layerType: 'bg' | 'fg', layerIdx: number,
     updates: Array<{ x: number; y: number; tile_id: number; flip: number; lum: number }>
@@ -1123,7 +1128,7 @@ export function useSilMap(): UseSilMapReturn {
     addActor, removeActor, updateActor, moveActor,
     addShadowZone, removeShadowZone,
     addNavLink, removeNavLink, updateNavLink,
-    setTriggers, setObjectives, setZones,
+    setTriggers, setObjectives, setZones, setZonesLive,
     updateHeader,
     undo, redo, canUndo, canRedo,
     resizeMap,

@@ -54,7 +54,7 @@ export default function DesignerPage() {
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
           updateHeader, updatePlatform, addShadowZone, removeShadowZone,
           addNavLink, removeNavLink, updateNavLink,
-          setTriggers, setObjectives, setZones,
+          setTriggers, setObjectives, setZones, setZonesLive,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   type TileSel = { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number };
@@ -392,6 +392,10 @@ export default function DesignerPage() {
   const handleTriggerZoneRemove = useCallback((id: number) => {
     setZones((map?.zones ?? []).filter(z => z.id !== id));
   }, [map, setZones]);
+
+  const handleTriggerZoneLiveUpdate = useCallback((id: number, x1: number, y1: number, x2: number, y2: number) => {
+    setZonesLive((map?.zones ?? []).map(z => z.id === id ? { ...z, x1, y1, x2, y2 } : z));
+  }, [map, setZonesLive]);
 
   const handleTriggerZoneUpdate = useCallback((id: number, x1: number, y1: number, x2: number, y2: number) => {
     setZones((map?.zones ?? []).map(z => z.id === id ? { ...z, x1, y1, x2, y2 } : z));
@@ -948,6 +952,7 @@ export default function DesignerPage() {
               onShadowZoneRemove={handleShadowZoneRemove}
               onTriggerZoneDraw={handleTriggerZoneDraw}
               onTriggerZoneRemove={handleTriggerZoneRemove}
+              onTriggerZoneLiveUpdate={handleTriggerZoneLiveUpdate}
               onTriggerZoneUpdate={handleTriggerZoneUpdate}
               selectedZoneId={selectedZoneId}
               onTriggerZoneSelect={setSelectedZoneId}
