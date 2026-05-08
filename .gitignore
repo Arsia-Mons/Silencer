@@ -2,6 +2,7 @@ build/
 build-new/
 build-old/
 test-update-host/
+test-updater.*.log
 update.json
 .vcpkg/
 lobby.json
@@ -45,3 +46,4 @@ __pycache__/
 .claude/
 
 clients/silencer/build_test/
+clients/silencer/installer/Output/
