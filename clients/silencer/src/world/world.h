@@ -73,6 +73,7 @@ public:
 	int AveragePingJitter(void);
 	bool SecurityIDCanSpawn(Uint8 securityid);
 	void SetSystemCamera(bool system, Uint16 objectfollow, Sint16 x, Sint16 y);
+	void BroadcastCamera(Sint16 x, Sint16 y);
 	bool TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types, bool onlycollidable = true);
 	std::vector<Object *> TestAABB(int x1, int y1, int x2, int y2, std::vector<Uint8> & types, Uint16 except = 0, Uint16 teamid = 0, bool onlycollidable = true);
 	Object * TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, std::vector<Uint8> & types, Uint16 except = 0, Uint16 teamid = 0);
@@ -206,7 +207,7 @@ private:
 	enum {MSG_CONNECT, MSG_SNAPSHOT, MSG_INPUT, MSG_PEERLIST, MSG_DISCONNECT, MSG_PING, MSG_PONG,
 		MSG_GAMEINFO, MSG_READY, MSG_CHAT, MSG_STATION, MSG_CHANGETEAM, MSG_STATUS,
 		MSG_MESSAGE, MSG_GOVTKILL, MSG_SOUND, MSG_TECH, MSG_STATS, MSG_EXISTS, MSG_REMOVE, MSG_MAP, MSG_SETAGENCY, MSG_KICK,
-		MSG_TRIGGER_STATE};
+		MSG_TRIGGER_STATE, MSG_CAMERA};
 	enum {STA_BUY, STA_REPAIR, STA_VIRUS};
 	enum {MAP_DOWNLOADED, MAP_GETCHUNK, MAP_PUTCHUNK};
 	Serializer * oldsnapshots[maxpeers][maxoldsnapshots];

@@ -69,6 +69,7 @@ void ActionSystem::Execute(const TriggerAction & action, World & world) {
         }
         case ActionType::PAN_CAMERA: {
             world.SetSystemCamera(true, 0, action.param_x, action.param_y);
+            world.BroadcastCamera(action.param_x, action.param_y);
             break;
         }
         case ActionType::SPAWN_ACTOR: {

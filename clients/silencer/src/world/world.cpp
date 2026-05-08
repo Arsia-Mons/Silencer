@@ -829,6 +829,12 @@ void World::DoNetwork_Replica(void){
 					triggerGraph.ApplySerializedState(data);
 				}
 			}break;
+			case MSG_CAMERA:{
+				Sint16 cx, cy;
+				memcpy(&cx, &data.data[data.BitsToBytes(data.readoffset)],     sizeof(cx));
+				memcpy(&cy, &data.data[data.BitsToBytes(data.readoffset) + 2], sizeof(cy));
+				SetSystemCamera(true, 0, cx, cy);
+			}break;
 		}
 	}
 	Uint32 tickcheck = SDL_GetTicks();
@@ -2283,6 +2289,18 @@ void World::SetSystemCamera(bool system, Uint16 objectfollow, Sint16 x, Sint16 y
 	systemcamerafollow[system] = objectfollow;
 	systemcamerax[system] = x;
 	systemcameray[system] = y;
+}
+
+void World::BroadcastCamera(Sint16 x, Sint16 y){
+	if(!IsAuthority()) return;
+	char msg[5];
+	msg[0] = MSG_CAMERA;
+	memcpy(&msg[1], &x, 2);
+	memcpy(&msg[3], &y, 2);
+	for(unsigned int i = 0; i < maxpeers; i++){
+		Peer * p = peerlist[i];
+		if(p && i != localpeerid) SendPacket(p, msg, 5);
+	}
 }
 
 Object * World::GetObjectFromId(Uint16 id){
