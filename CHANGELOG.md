@@ -2,6 +2,10 @@
 
 All notable changes to Silencer are documented here.
 
+## [v00047] — 2026-05-07
+
+Test release — no behavior change. Cut to validate the v00046 Windows auto-updater end-to-end (per-file `MoveFileEx` replace path + `DisplayVersion`/`DisplayName` sync into Inno's HKCU `{AppId}_is1` uninstall key). An existing v00046 install should detect, download, swap, and relaunch as v00047 without manual intervention.
+
 ## [v00046] — 2026-05-07
 
 ### Game client
