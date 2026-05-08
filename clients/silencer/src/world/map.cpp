@@ -78,9 +78,11 @@ bool Map::Load(const char * filename, World & world){
 			CalculateNodes();
 			CalculatePlatformSetConnections();
 			CalculateRainPuddleLocations();
-			// Load trigger graph into the runtime system.
+			// Load trigger graph into the runtime system and reset per-game state.
 			world.triggerGraph.Load(triggers, objectives);
 			world.triggerGraph.LoadZones(zones);
+			world.tickcount = 0;
+			world.player_spawn_emitted = false;
 			return true;
 		}
 	}
