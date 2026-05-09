@@ -2,6 +2,9 @@
 #include "world.h"
 #include "config.h"
 #include "game.h"
+#include "gasloader.h"
+#include "map.h"
+#include "platform.h"
 #include <math.h>
 
 Audio::Audio(){
@@ -15,6 +18,10 @@ Audio::Audio(){
 		tracks[i] = nullptr;
 		channelobject[i] = 0;
 		channelvolume[i] = 128;
+		occlusionCache[i] = 1.0f;
+		filterAlpha[i] = 1.0f;
+		filterState[i][0] = 0.0f;
+		filterState[i][1] = 0.0f;
 	}
 }
 
@@ -35,6 +42,7 @@ bool Audio::Init(Game * game){
 		tracks[i] = MIX_CreateTrack(mixer);
 		if(tracks[i]){
 			MIX_SetTrackStoppedCallback(tracks[i], TrackStoppedCallback, (void*)(intptr_t)i);
+			MIX_SetTrackCookedCallback(tracks[i], FilterCallback, (void*)(intptr_t)i);
 		}
 	}
 	musictrack = MIX_CreateTrack(mixer);
@@ -118,21 +126,54 @@ int Audio::EmitSound(World & world, Uint16 objectid, MIX_Audio * chunk, int volu
 
 void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int radius){
 	Uint16 objectid = channelobject[channel];
-	if(objectid){
-		Object * object = world.GetObjectFromId(objectid);
-		if(object){
-			int diffx = abs(signed(x) - object->x);
-			int diffy = abs(signed(y) - object->y);
-			float distance = abs(sqrt(float((diffx * diffx) + (diffy * diffy))));
-			float volume = 1 - (distance / radius);
-			if(volume < 0) volume = 0;
-			if(volume > 1) volume = 1;
-			int oldvolume = channelvolume[channel];
-			MIX_SetTrackGain(tracks[channel], ((oldvolume * volume) / 128.0f) * effectvolume);
-			lastx = x;
-			lasty = y;
-		}
+	if(!objectid) return;
+	Object * object = world.GetObjectFromId(objectid);
+	if(!object) return;
+
+	float dx = float(signed(x)) - float(object->x);
+	float dy = float(signed(y)) - float(object->y);
+	float distance = sqrtf(dx*dx + dy*dy);
+	float distVolume = 1.0f - (distance / float(radius));
+	if(distVolume < 0.0f) distVolume = 0.0f;
+
+	const WorldDef & cfg = GASLoader::Get().world;
+
+	// Phase 1: ray-based occlusion
+	float targetOcclusion = 1.0f;
+	if(cfg.soundOcclusionEnabled && distVolume > 0.0f){
+		targetOcclusion = ComputeOcclusion(world.map,
+			int(x), int(y), int(object->x), int(object->y),
+			cfg.occlusionDampenRect, cfg.occlusionDampenStairs);
 	}
+	occlusionCache[channel] += (targetOcclusion - occlusionCache[channel]) * cfg.occlusionLerpSpeed;
+	float occlusion = occlusionCache[channel];
+
+	// Phase 2: per-track IIR low-pass coefficient (applied in FilterCallback)
+	if(occlusion < cfg.occlusionMuffleThreshold){
+		float t = occlusion / cfg.occlusionMuffleThreshold;
+		float cutoffHz = cfg.occlusionMuffleMinHz + t * (cfg.occlusionMuffleMaxHz - cfg.occlusionMuffleMinHz);
+		float sampleRate = float(mixerspec.freq > 0 ? mixerspec.freq : 44100);
+		filterAlpha[channel] = 1.0f - expf(-2.0f * 3.14159265f * cutoffHz / sampleRate);
+	} else {
+		filterAlpha[channel] = 1.0f; // passthrough — FilterCallback skips processing
+	}
+
+	int oldvolume = channelvolume[channel];
+	MIX_SetTrackGain(tracks[channel], ((oldvolume * distVolume * occlusion) / 128.0f) * effectvolume);
+
+	// Phase 3: stereo pan from horizontal offset
+	if(cfg.soundPanningEnabled && radius > 0){
+		float pan = -(dx / float(radius)) * 0.8f; // -1=left, +1=right
+		if(pan < -1.0f) pan = -1.0f;
+		if(pan >  1.0f) pan =  1.0f;
+		MIX_StereoGains gains;
+		gains.left  = 1.0f - (pan > 0.0f ? pan : 0.0f);
+		gains.right = 1.0f - (pan < 0.0f ? -pan : 0.0f);
+		MIX_SetTrackStereo(tracks[channel], &gains);
+	}
+
+	lastx = x;
+	lasty = y;
 }
 
 void Audio::UpdateAllVolumes(World & world, Sint16 x, Sint16 y, int radius){
@@ -211,9 +252,60 @@ void Audio::SetMusicVolume(int volume){
 	musicvolume = volume;
 }
 
+float Audio::ComputeOcclusion(Map & map, int lx, int ly, int ex, int ey, float dampenRect, float dampenStairs){
+	float factor = 1.0f;
+	int cx = lx, cy = ly;
+	int origdx = ex - lx, origdy = ey - ly;
+
+	for(int pass = 0; pass < 16; pass++){
+		int xe = ex, ye = ey;
+		Platform * hit = map.TestLine(cx, cy, ex, ey, &xe, &ye,
+			Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN);
+		if(!hit) break;
+
+		factor *= (hit->type & Platform::RECTANGLE) ? dampenRect : dampenStairs;
+		if(factor < 0.001f) return 0.0f;
+
+		// Advance 2px past the hit point along the ray direction.
+		int dx = ex - cx, dy = ey - cy;
+		float len = sqrtf(float(dx*dx + dy*dy));
+		if(len < 2.0f) break;
+		cx = xe + int(float(dx) / len * 2.0f + 0.5f);
+		cy = ye + int(float(dy) / len * 2.0f + 0.5f);
+
+		// Stop if the new start has passed or reached the emitter.
+		int rdx = ex - cx, rdy = ey - cy;
+		if(rdx * origdx + rdy * origdy <= 0) break;
+	}
+	return factor;
+}
+
+void Audio::FilterCallback(void * userdata, MIX_Track * /*track*/, const SDL_AudioSpec * spec, float * pcm, int samples){
+	int channel = (int)(intptr_t)userdata;
+	Audio & audio = Audio::GetInstance();
+	float alpha = audio.filterAlpha[channel];
+	if(alpha >= 1.0f) return; // no occlusion — passthrough
+
+	int numCh = spec->channels < 2 ? 1 : 2;
+	for(int s = 0; s < samples; s++){
+		for(int c = 0; c < numCh; c++){
+			float & y = audio.filterState[channel][c];
+			float x = pcm[s * spec->channels + c];
+			y = alpha * x + (1.0f - alpha) * y;
+			pcm[s * spec->channels + c] = y;
+		}
+	}
+}
+
 void Audio::TrackStoppedCallback(void *userdata, MIX_Track *track){
 	int channel = (int)(intptr_t)userdata;
-	Audio::GetInstance().channelobject[channel] = 0;
+	Audio & audio = Audio::GetInstance();
+	audio.channelobject[channel] = 0;
+	audio.occlusionCache[channel] = 1.0f;
+	audio.filterAlpha[channel] = 1.0f;
+	audio.filterState[channel][0] = 0.0f;
+	audio.filterState[channel][1] = 0.0f;
+	MIX_SetTrackStereo(track, nullptr); // clear forced-stereo pan
 }
 
 void Audio::MixingFunction(void * udata, Uint8 * stream, int len){
