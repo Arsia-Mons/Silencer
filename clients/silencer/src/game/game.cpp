@@ -45,7 +45,10 @@
 
 static bool IsBuiltinProfile(const std::string& name);
 
-Game::Game() : renderer(world), screenbuffer(640, 480), screenContext(*this, world, renderer, world.lobby, keymap, updater){
+Game::Game() : renderer(world), screenbuffer(640, 480),
+               mapDownloader(world),
+               ambienceMixer(world, renderer, mapDownloader, fade_i),
+               screenContext(*this, world, renderer, world.lobby, keymap, updater){
 	world.SetVersion(SILENCER_VERSION);
 	frames = 0;
 	fps = 0;
@@ -78,17 +81,13 @@ Game::Game() : renderer(world), screenbuffer(640, 480), screenContext(*this, wor
 	window = 0;
 	renderdevice = nullptr;
 	memset(palettecolors, 0, sizeof(palettecolors));
-	oldambiencelevel = 0;
 	nextstateprocessed = false;
-	lastmapchunkrequest = 0;
 	strcpy(localusername, "");
-	lastmusicplaytime = 0;
 #ifdef OUYA
 	quitscancode = SDL_SCANCODE_HOME;
 #else
 	quitscancode = SDL_SCANCODE_ESCAPE;
 #endif
-	mapexistchecked = false;
 	fullscreentoggled = false;
 	replayfile = 0;
 	tui_prev_mouse_x = 0;
@@ -107,13 +106,9 @@ Game::Game() : renderer(world), screenbuffer(640, 480), screenContext(*this, wor
 
 Game::~Game(){
 	// Join background download threads before tearing down SDL so they don't
-	// reference freed resources. Increment generation first so any in-flight
-	// result is discarded after the join returns.
-	mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
-	if(mapjointhread.joinable()) mapjointhread.join();
-	if(dlthread.joinable()) dlthread.join();
-	mapUploadGeneration.fetch_add(1, std::memory_order_relaxed);
-	if(mapUploadThread.joinable()) mapUploadThread.join();
+	// reference freed resources. The MapDownloader destructor would also do
+	// this, but it runs after SDL teardown — call it explicitly here.
+	mapDownloader.JoinAndShutdown();
 	// Bring the control server down first. Stop() runs the shutdown drain we
 	// registered at Load() time, fulfilling promises for both queued and
 	// pendingWaits commands so handler threads can unblock from fut.get() before
@@ -542,7 +537,7 @@ bool Game::Loop(void){
 		}
 		if(world.gameplaystate == World::INGAME){
 			Uint8 newambiencelevel = renderer.GetAmbienceLevel();
-			if(newambiencelevel != oldambiencelevel || fade_i <= 15){
+			if(newambiencelevel != ambienceMixer.oldambiencelevel || fade_i <= 15){
 				SDL_Color * colors = renderer.palette.GetColors();
 				if(fade_i <= 15){
 					colors = renderer.palette.GetTempPalette();
@@ -550,7 +545,7 @@ bool Game::Loop(void){
 				SDL_Color * ambiencepalette = renderer.palette.CopyWithBrightness(colors, newambiencelevel, 2, 114);
 				SetColors(ambiencepalette);
 				renderer.palette.CalculateLighted(newambiencelevel);
-				oldambiencelevel = newambiencelevel;
+				ambienceMixer.oldambiencelevel = newambiencelevel;
 			}
 		}
 		fade_i++;
@@ -656,7 +651,7 @@ bool Game::Tick(void){
 			}
 		}
 		if(world.gameplaystate == World::INLOBBY){
-			ProcessMapDownload();
+			mapDownloader.ProcessMapDownload();
 			if(gamejoininterface){
 				Interface * gamejoiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
 				if(gamejoiniface){
@@ -672,7 +667,7 @@ bool Game::Tick(void){
 		/*Peer * localpeer = world.peerlist[world.localpeerid];
 		if(localpeer){
 			if(localpeer->gameinfoloaded && !world.dedicatedserver.checkedhavemap){
-				if(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).size() > 0){
+				if(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).size() > 0){
 					localpeer->mapdownloaded = true;
 					world.SendPeerList();
 				}
@@ -710,7 +705,7 @@ bool Game::Tick(void){
 	}
 	
 	if(world.gameplaystate == World::INGAME && (state == INGAME || state == SINGLEPLAYERGAME || state == TESTGAME)){
-		UpdateAmbienceChannels();
+		ambienceMixer.UpdateAmbienceChannels();
 		if(!headless) SDL_HideCursor();
 	}else{
 		if(!headless) SDL_ShowCursor();
@@ -758,9 +753,9 @@ bool Game::Tick(void){
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					//Audio::GetInstance().PlayMusic(world.resources.menumusic);
-					PlayMusic(world.resources.menumusic);
+				if(ambienceMixer.FadedIn()){
+					//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.menumusic);
+					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 				if(iface){
@@ -784,9 +779,9 @@ bool Game::Tick(void){
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					//Audio::GetInstance().PlayMusic(world.resources.menumusic);
-					PlayMusic(world.resources.menumusic);
+				if(ambienceMixer.FadedIn()){
+					//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.menumusic);
+					ambienceMixer.PlayMusic(world.resources.menumusic);
 					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 					if(iface){
 						ProcessLobbyConnectInterface(iface);
@@ -822,9 +817,9 @@ bool Game::Tick(void){
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					//Audio::GetInstance().PlayMusic(world.resources.menumusic);
-					PlayMusic(world.resources.menumusic);
+				if(ambienceMixer.FadedIn()){
+					//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.menumusic);
+					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 				if(world.lobby.state == Lobby::DISCONNECTED){
 					world.Disconnect();
@@ -839,22 +834,22 @@ bool Game::Tick(void){
 				}
 				if(gamecreateinterface){
 					// Handle deferred CreateGame after map upload completes.
-					int us = mapUploadState.load(std::memory_order_acquire);
+					int us = mapDownloader.mapUploadState.load(std::memory_order_acquire);
 					if(us == 2){
-						mapUploadState.store(0, std::memory_order_relaxed);
-						const char * pw = pendingCreate.password.empty() ? nullptr : pendingCreate.password.c_str();
+						mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
+						const char * pw = mapDownloader.pendingCreate.password.empty() ? nullptr : mapDownloader.pendingCreate.password.c_str();
 						world.lobby.CreateGame(
-							pendingCreate.gamename.c_str(),
-							pendingCreate.mapname.c_str(),
-							pendingCreate.maphash,
+							mapDownloader.pendingCreate.gamename.c_str(),
+							mapDownloader.pendingCreate.mapname.c_str(),
+							mapDownloader.pendingCreate.maphash,
 							pw,
-							pendingCreate.securitylevel,
-							pendingCreate.minlevel,
-							pendingCreate.maxlevel,
-							pendingCreate.maxplayers,
-							pendingCreate.maxteams);
+							mapDownloader.pendingCreate.securitylevel,
+							mapDownloader.pendingCreate.minlevel,
+							mapDownloader.pendingCreate.maxlevel,
+							mapDownloader.pendingCreate.maxplayers,
+							mapDownloader.pendingCreate.maxteams);
 					}else if(us == 3){
-						mapUploadState.store(0, std::memory_order_relaxed);
+						mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
 						creategameclicked = false;
 						CreateModalDialog("Could not upload map");
 					}
@@ -872,7 +867,7 @@ bool Game::Tick(void){
 							sharedstate = 0;
 							currentlobbygameid = lobbygame->id;
 							world.Connect(GetSelectedAgency(), world.lobby.accountid, lobbygame->password);
-							LoadMapData(FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
+							mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
 							joininggame = true;
 						}
 						/*Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
@@ -902,7 +897,7 @@ bool Game::Tick(void){
 								if(object && object->type == ObjectTypes::OVERLAY){
 									Overlay * overlay = static_cast<Overlay *>(object);
 									if(overlay->text.length() > 0){
-										overlay->text = (mapUploadState.load(std::memory_order_relaxed) == 1)
+										overlay->text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
 											? "Uploading map" : "Creating game";
 										int dots = (world.tickcount / 4) % 6;
 										if(dots > 3){
@@ -916,7 +911,7 @@ bool Game::Tick(void){
 							}
 						}
 					}
-					if(!modaldialoghasok && world.lobby.creategamestatus != 100 && mapUploadState.load(std::memory_order_relaxed) == 0 && (world.state == World::CONNECTED || world.state == World::IDLE)){
+					if(!modaldialoghasok && world.lobby.creategamestatus != 100 && mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 && (world.state == World::CONNECTED || world.state == World::IDLE)){
 						DestroyModalDialog();
 						creategameclicked = false;
 					}
@@ -943,23 +938,23 @@ bool Game::Tick(void){
 								}
 								gamecreateinterface = 0;
 							}
-							mapexistchecked = false;
+							mapDownloader.mapexistchecked = false;
 						// Invalidate any in-flight server map fetch for the previous
 						// game; the thread will see the stale generation and discard
 						// its result. Detach so we don't block here.
-						mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
-						mapjoinstate.store(0, std::memory_order_relaxed);
-						if(mapjointhread.joinable()) mapjointhread.detach();
+						mapDownloader.mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
+						mapDownloader.mapjoinstate.store(0, std::memory_order_relaxed);
+						if(mapDownloader.mapjointhread.joinable()) mapDownloader.mapjointhread.detach();
 							world.SetTech(Config::GetInstance().defaulttechchoices[GetSelectedAgency()]);
 							gamejoininterface = CreateGameJoinInterface()->id;
 							LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
 							if(lobbygame){
 								char temp[256];
-								GetGameChannelName(*lobbygame, temp);
+								ambienceMixer.GetGameChannelName(*lobbygame, temp);
 								strcpy(lastchannel, world.lobby.channel);
 								world.lobby.JoinChannel(temp);
 								UpdateLobbyMapName(lobbygame->mapname);
-								/*if(FindMap(lobbygame->mapname, &lobbygame->maphash).size() > 0){
+								/*if(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).size() > 0){
 									world.SendMapDownloaded();
 								}*/
 							}
@@ -971,7 +966,7 @@ bool Game::Tick(void){
 					}
 				}
 				
-				ProcessMapDownload();
+				mapDownloader.ProcessMapDownload();
 				
 				
 				if(world.state != World::CONNECTED && !modalinterface){
@@ -992,8 +987,8 @@ bool Game::Tick(void){
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					PlayMusic(world.resources.menumusic);
+				if(ambienceMixer.FadedIn()){
+					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 				Interface * iface = static_cast<Interface *>(world.GetObjectFromId(updateinterface));
 				if(iface){
@@ -1019,7 +1014,7 @@ bool Game::Tick(void){
 				screenbuffer.Clear(0);
 				//char mapname[7 + 256];
 				//sprintf(mapname, "level/%s", world.gameinfo.mapname);
-				if(!LoadMap(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str())){
+				if(!LoadMap(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str())){
 					printf("Unable to load map\n");
 					if(world.replay.IsPlaying()){
 						world.replay.EndPlaying();
@@ -1079,12 +1074,12 @@ bool Game::Tick(void){
 				renderer.palette.SetParallaxColors(world.map.parallax);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
-				LoadRandomGameMusic();
+				ambienceMixer.LoadRandomGameMusic();
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					//Audio::GetInstance().PlayMusic(world.resources.gamemusic);
-					PlayMusic(world.resources.gamemusic);
+				if(ambienceMixer.FadedIn()){
+					//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.gamemusic);
+					ambienceMixer.PlayMusic(world.resources.gamemusic);
 				}
 				if(world.replay.IsPlaying()){
 					// replay controls
@@ -1243,9 +1238,9 @@ bool Game::Tick(void){
 				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
-				if(FadedIn()){
-					//Audio::GetInstance().PlayMusic(world.resources.menumusic);
-					PlayMusic(world.resources.menumusic);
+				if(ambienceMixer.FadedIn()){
+					//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.menumusic);
+					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 				Interface * gamesummaryiface = static_cast<Interface *>(world.GetObjectFromId(gamesummaryinterface));
 				if(gamesummaryiface){
@@ -1287,11 +1282,11 @@ bool Game::Tick(void){
 				SetColors(renderer.palette.GetColors());
 				singleplayermessage = 0;
 				stateisnew = false;
-				LoadRandomGameMusic();
+				ambienceMixer.LoadRandomGameMusic();
 			}
-			if(FadedIn()){
-				//Audio::GetInstance().PlayMusic(world.resources.gamemusic);
-				PlayMusic(world.resources.gamemusic);
+			if(ambienceMixer.FadedIn()){
+				//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.gamemusic);
+				ambienceMixer.PlayMusic(world.resources.gamemusic);
 			}
 			Player * player = world.GetPeerPlayer(world.localpeerid);
 			if(player){
@@ -1982,7 +1977,7 @@ bool Game::Tick(void){
 				}
 				stateisnew = false;
 			}
-			ProcessMapDownload();
+			mapDownloader.ProcessMapDownload();
 			/*if(world.tickcount % 48 == 0){
 				world.SendPeerList();
 			}*/
@@ -1993,7 +1988,7 @@ bool Game::Tick(void){
 				}
 				//char mapname[256];
 				//sprintf(mapname, "level/%s", world.gameinfo.mapname);
-				LoadMap(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
+				LoadMap(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
 				renderer.palette.SetPalette(0);
 				renderer.palette.SetParallaxColors(world.map.parallax);
 				SetColors(renderer.palette.GetColors());
@@ -2038,7 +2033,7 @@ bool Game::Tick(void){
 		case JOINGAME:{
 			if(stateisnew){
 				strcpy(world.gameinfo.mapname, "STAR72.SIL");
-				CalculateMapHash(FindMap(world.gameinfo.mapname).c_str(), &world.gameinfo.maphash);
+				mapDownloader.CalculateMapHash(mapDownloader.FindMap(world.gameinfo.mapname).c_str(), &world.gameinfo.maphash);
 				world.gameinfo.accountid = 1;
 				world.gameinfo.loaded = true;
 				sharedstate = 0;
@@ -2046,7 +2041,7 @@ bool Game::Tick(void){
 				authoritypeer->ip = ntohl(inet_addr("127.0.0.1"));
 				authoritypeer->port = 12456;
 				world.Connect(rand() % 5, 1);
-				LoadMapData(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
+				mapDownloader.LoadMapData(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
 				//printf("map data: %d %d\n", world.currentmapdatalength, world.currentmapdatamax);
 				Audio::GetInstance().StopMusic();
 				currentinterface = 0;
@@ -2057,7 +2052,7 @@ bool Game::Tick(void){
 				if(sharedstateobject && sharedstateobject->state == 2){
 					world.gameplaystate = World::INGAME;
 				}
-				ProcessMapDownload();
+				mapDownloader.ProcessMapDownload();
 			}
 		}break;
 		case TESTGAME:{
@@ -2304,7 +2299,7 @@ bool Game::LoadMap(const char * name){
 		return false;
 	}
 	if(!world.dedicatedserver.active){
-		CreateAmbienceChannels();
+		ambienceMixer.CreateAmbienceChannels();
 		renderer.palette.SetParallaxColors(world.map.parallax);
 	}
 	return true;
@@ -2313,8 +2308,8 @@ bool Game::LoadMap(const char * name){
 void Game::UnloadGame(void){
 	Audio::GetInstance().StopAll(GASLoader::Get().gameengine.audioStopAllFadeMs);
 	currentlobbygameid = 0;
-	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
-		bgchannel[i] = -1;
+	for(int i = 0; i < sizeof(ambienceMixer.bgchannel) / sizeof(int); i++){
+		ambienceMixer.bgchannel[i] = -1;
 	}
 	world.SwitchToLocalAuthorityMode();
 	if(world.map.loaded){ // if the map was loaded, then the music was played
@@ -3298,7 +3293,7 @@ Interface * Game::CreateChatInterface(void){
 
 Interface * Game::CreateGameCreateInterface(void){
 	creategameclicked = false;
-	selectedmap = -1;
+	mapDownloader.selectedmap = -1;
 	Interface * gamecreateinterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	gamecreateinterface->x = 403;
 	gamecreateinterface->y = 87;
@@ -3428,7 +3423,6 @@ Interface * Game::CreateGameCreateInterface(void){
 	mapselect->height = 265;
 	mapselect->lineheight = 14;
 	mapselect->uid = 4;
-	//mapselect->ListFiles("level");
 #ifdef __ANDROID__
 	// need to get android directory enumeration working, hardcoded for now
 	const char * maps[] = {"ALLY10c.sil", "CRAN01h.SIL", "EASY05c.SIL", "PIT16d.SIL", "STAR72.SIL", "THET06e.SIL"};
@@ -3439,10 +3433,10 @@ Interface * Game::CreateGameCreateInterface(void){
 	std::vector<std::string> maps;
 	std::vector<std::string> files;
 	CDResDir();
-	files = ListFiles((GetResDir() + "level").c_str());
+	files = mapDownloader.ListFiles((GetResDir() + "level").c_str());
 	maps.insert(maps.end(), files.begin(), files.end());
 	CDDataDir();
-	files = ListFiles((GetDataDir() + "level/download").c_str());
+	files = mapDownloader.ListFiles((GetDataDir() + "level/download").c_str());
 	for(std::vector<std::string>::iterator it = files.begin(); it != files.end(); it++){
 		if(std::find(maps.begin(), maps.end(), (*it)) == maps.end()){
 			maps.push_back(*it);
@@ -3454,14 +3448,14 @@ Interface * Game::CreateGameCreateInterface(void){
 		mapselect->AddItem((*it).c_str());
 	}
 	// Add server-only maps (not yet downloaded) with a download prefix
-	servermaps.clear();
+	mapDownloader.servermaps.clear();
 	auto serverlist = FetchServerMapList(Config::GetInstance().mapapiurl);
 	for(auto & entry : serverlist){
 		bool alreadylocal = std::find(maps.begin(), maps.end(), entry.first) != maps.end();
 		if(!alreadylocal){
 			std::string label = "[DL] " + entry.first;
 			mapselect->AddItem(label.c_str());
-			servermaps[label] = entry.second;
+			mapDownloader.servermaps[label] = entry.second;
 		}
 	}
 #endif
@@ -4170,15 +4164,6 @@ Interface * Game::CreateMapPreview(const char * filename){
 	return previewinterface;
 }
 
-void Game::PlayMusic(Mix_Music * music){
-	if(music && Audio::GetInstance().PlayMusic(music)){
-		lastmusicplaytime = world.tickcount;
-		char text[256];
-		snprintf(text, sizeof(text) - 1, "Playing: %s", currentmusictrack);
-		world.ShowTopMessage(text);
-	}
-}
-
 void Game::DestroyModalDialog(void){
 	if(modalinterface){
 		currentinterface = aftermodalinterface;
@@ -4549,13 +4534,13 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							}
 							if(selectbox->uid == 4){ // map select
 								// Poll async download completion each frame
-								if(!dlitemname.empty()){
-									int res = dlresult.load();
+								if(!mapDownloader.dlitemname.empty()){
+									int res = mapDownloader.dlresult.load();
 									if(res == 1){ // success — rebuild interface the same way the Create button does
 										selectbox->downloadprogress = -1;
 										selectbox->downloaditem[0] = '\0';
-										servermaps.erase(dlitemname);
-										dlitemname.clear();
+										mapDownloader.servermaps.erase(mapDownloader.dlitemname);
+										mapDownloader.dlitemname.clear();
 										Interface * parentIface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
 										Interface * old_create = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
 										if(old_create && parentIface) old_create->DestroyInterface(world, parentIface);
@@ -4569,22 +4554,22 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 									}else if(res == -1){ // failed
 										selectbox->downloadprogress = -1;
 										selectbox->downloaditem[0] = '\0';
-										dlitemname.clear();
+										mapDownloader.dlitemname.clear();
 										CreateModalDialog("Download failed");
 									}else{ // still in progress — update progress bar
-										selectbox->downloadprogress = dlprogress.load();
+										selectbox->downloadprogress = mapDownloader.dlprogress.load();
 									}
 								}
 								int index = selectbox->MouseInside(world, iface->mousex, iface->mousey);
 								// DL badge click: raw coord check (badge lives in the 16px right margin MouseInside excludes)
-								if(iface->mousedown && dlitemname.empty() &&
+								if(iface->mousedown && mapDownloader.dlitemname.empty() &&
 								   iface->mousex >= selectbox->x + selectbox->width - 16 &&
 								   iface->mousey >= selectbox->y && iface->mousey < selectbox->y + selectbox->height){
 									int row = (iface->mousey - selectbox->y) / selectbox->lineheight + selectbox->scrolled;
 									if(row >= 0 && row < (int)selectbox->items.size()){
 										std::string clickeditem = selectbox->GetItemName(row);
-										auto dlit = servermaps.find(clickeditem);
-										if(dlit != servermaps.end()){
+										auto dlit = mapDownloader.servermaps.find(clickeditem);
+										if(dlit != mapDownloader.servermaps.end()){
 											const std::string & hex = dlit->second;
 											unsigned char sha1bytes[20] = {};
 											bool ok = hex.size() == 40;
@@ -4601,16 +4586,16 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 											}
 											if(ok){
 												std::string dlname = clickeditem.substr(5);
-												dlitemname = clickeditem;
-												dlresult.store(0);
-												dlprogress.store(0);
+												mapDownloader.dlitemname = clickeditem;
+												mapDownloader.dlresult.store(0);
+												mapDownloader.dlprogress.store(0);
 												snprintf(selectbox->downloaditem, sizeof(selectbox->downloaditem), "%s", dlname.c_str());
 												selectbox->downloadprogress = 0;
-												if(dlthread.joinable()) dlthread.join();
+												if(mapDownloader.dlthread.joinable()) mapDownloader.dlthread.join();
 												std::string apiURL = Config::GetInstance().mapapiurl;
-												dlthread = std::thread([this, dlname, sha1bytes, apiURL]() mutable {
-													std::string res = FetchMapFromServer(dlname.c_str(), sha1bytes, apiURL.c_str(), &dlprogress);
-													dlresult.store(res.empty() ? -1 : 1);
+												mapDownloader.dlthread = std::thread([this, dlname, sha1bytes, apiURL]() mutable {
+													std::string res = FetchMapFromServer(dlname.c_str(), sha1bytes, apiURL.c_str(), &mapDownloader.dlprogress);
+													mapDownloader.dlresult.store(res.empty() ? -1 : 1);
 												});
 											}
 										}
@@ -4618,8 +4603,8 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								}
 								if(index != -1){
 									std::string itemname = selectbox->GetItemName(index);
-									bool isserver = servermaps.count(itemname) > 0;
-									if(index != selectedmap){
+									bool isserver = mapDownloader.servermaps.count(itemname) > 0;
+									if(index != mapDownloader.selectedmap){
 										if(mappreviewinterface){
 											Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
 											if(mappreviewiface){
@@ -4628,10 +4613,10 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 											mappreviewinterface = 0;
 										}
 										if(!isserver){
-											std::string filename = FindMap(itemname.c_str());
+											std::string filename = mapDownloader.FindMap(itemname.c_str());
 											mappreviewinterface = CreateMapPreview(filename.c_str())->id;
 										}
-										selectedmap = index;
+										mapDownloader.selectedmap = index;
 									}
 									if(!isserver && mappreviewinterface){
 										Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
@@ -4665,7 +4650,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 									if(mappreviewiface){
 										mappreviewiface->DestroyInterface(world);
 									}
-									selectedmap = -1;
+									mapDownloader.selectedmap = -1;
 									mappreviewinterface = 0;
 								}
 							}else
@@ -5124,38 +5109,38 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 												SelectBox * selectbox = static_cast<SelectBox *>(tobject);
 												if(selectbox->selecteditem >= 0){
 													mapname = selectbox->GetItemName(selectbox->selecteditem);
-												if(servermaps.count(mapname) > 0){
+												if(mapDownloader.servermaps.count(mapname) > 0){
 													CreateModalDialog("Download the map first");
 												}else{
 													unsigned char maphash[20];
-													CalculateMapHash(FindMap(mapname).c_str(), &maphash);
+													mapDownloader.CalculateMapHash(mapDownloader.FindMap(mapname).c_str(), &maphash);
 													// Store args for deferred CreateGame after upload.
-													pendingCreate.gamename = gamename;
-													pendingCreate.mapname  = mapname;
-													pendingCreate.password = password ? password : "";
-													memcpy(pendingCreate.maphash, maphash, 20);
-													pendingCreate.securitylevel = securitylevel;
-													pendingCreate.minlevel      = minlevel;
-													pendingCreate.maxlevel      = maxlevel;
-													pendingCreate.maxplayers    = maxplayers;
-													pendingCreate.maxteams      = maxteams;
+													mapDownloader.pendingCreate.gamename = gamename;
+													mapDownloader.pendingCreate.mapname  = mapname;
+													mapDownloader.pendingCreate.password = password ? password : "";
+													memcpy(mapDownloader.pendingCreate.maphash, maphash, 20);
+													mapDownloader.pendingCreate.securitylevel = securitylevel;
+													mapDownloader.pendingCreate.minlevel      = minlevel;
+													mapDownloader.pendingCreate.maxlevel      = maxlevel;
+													mapDownloader.pendingCreate.maxplayers    = maxplayers;
+													mapDownloader.pendingCreate.maxteams      = maxteams;
 													// Upload map before creating so the dedicated server
 													// can find it by filename.  Duplicate SHA-1 is a no-op.
-													if(mapUploadThread.joinable()) mapUploadThread.detach();
-													uint32_t gen = ++mapUploadGeneration;
-													std::string mppath = FindMap(mapname);
+													if(mapDownloader.mapUploadThread.joinable()) mapDownloader.mapUploadThread.detach();
+													uint32_t gen = ++mapDownloader.mapUploadGeneration;
+													std::string mppath = mapDownloader.FindMap(mapname);
 													std::string dataDir = GetDataDir();
 													bool isBundledMap = dataDir.empty() || mppath.substr(0, dataDir.size()) != dataDir;
 													std::string apiURL = Config::GetInstance().mapapiurl;
 													if(isBundledMap){
 														// Bundled maps ship with the game; no upload needed.
-														mapUploadState.store(2, std::memory_order_release);
+														mapDownloader.mapUploadState.store(2, std::memory_order_release);
 													}else{
-														mapUploadState.store(1, std::memory_order_relaxed);
-														mapUploadThread = std::thread([this, mapname_str=std::string(mapname), mppath, apiURL, gen](){
+														mapDownloader.mapUploadState.store(1, std::memory_order_relaxed);
+														mapDownloader.mapUploadThread = std::thread([this, mapname_str=std::string(mapname), mppath, apiURL, gen](){
 															bool ok = UploadMapToServer(mapname_str.c_str(), mppath.c_str(), apiURL.c_str());
-															if(mapUploadGeneration.load(std::memory_order_relaxed) != gen) return;
-															mapUploadState.store(ok ? 2 : 3, std::memory_order_release);
+															if(mapDownloader.mapUploadGeneration.load(std::memory_order_relaxed) != gen) return;
+															mapDownloader.mapUploadState.store(ok ? 2 : 3, std::memory_order_release);
 														});
 													}
 													creategameclicked = true;
@@ -5884,341 +5869,6 @@ const char * Game::GetKeyName(SDL_Scancode sym){
 	}
 }
 
-void Game::GetGameChannelName(LobbyGame & lobbygame, char * name){
-	sprintf(name, "#%s-%d", lobbygame.name, lobbygame.id);
-}
-
-void Game::CreateAmbienceChannels(void){
-	const WorldDef& wd = GASLoader::Get().world;
-	const std::string bgchannelbanks[3] = {wd.soundAmbience1, wd.soundAmbience2, wd.soundAmbience3};
-	for(int i = 0; i < sizeof(bgchannel) / sizeof(int); i++){
-		if(bgchannel[i] == -1){
-			bgchannel[i] = Audio::GetInstance().Play(world.resources.soundbank[bgchannelbanks[i]], 0, true);
-		}
-	}
-}
-
-void Game::UpdateAmbienceChannels(void){
-	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-	if(localplayer){
-		int columns = 5;
-		int rows = 5;
-		int w = 640;
-		int h = 480;
-		int outsideamount = 0;
-		int maxamount = columns * rows;
-		for(int x = 0; x < columns; x++){
-			for(int y = 0; y < rows; y++){
-				int x1 = (w * (x / float(columns))) - (w / 2);
-				x1 += - renderer.camera.GetXOffset();
-				int x2 = (w * ((x + 1) / float(columns))) - (w / 2);
-				x2 += - renderer.camera.GetXOffset();
-				int y1 = (h * (y / float(rows))) - (h / 2);
-				y1 += - renderer.camera.GetYOffset();
-				int y2 = (h * ((y + 1) / float(rows))) - (h / 2);
-				y2 += - renderer.camera.GetYOffset();
-				if(world.map.TestAABB(x1, y1, x2, y2, Platform::OUTSIDEROOM)){
-					outsideamount++;
-				}
-			}
-		}
-		if(localplayer->InBase(world)){
-			Audio::GetInstance().SetVolume(bgchannel[BG_BASE], 32);
-			Audio::GetInstance().SetVolume(bgchannel[BG_AMBIENT], 0);
-			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 0);
-		}else{
-			Audio::GetInstance().SetVolume(bgchannel[BG_BASE], 0);
-			Audio::GetInstance().SetVolume(bgchannel[BG_AMBIENT], 8 * (1 - (outsideamount / float(maxamount))));
-			Audio::GetInstance().SetVolume(bgchannel[BG_OUTSIDE], 8 * (outsideamount / float(maxamount)));
-		}
-	}
-}
-
-bool Game::FadedIn(void){
-	if(fade_i == 16){
-		return true;
-	}
-	return false;
-}
-
-std::vector<std::string> Game::ListFiles(const char * directory){
-	std::vector<std::string> files;
-#ifdef POSIX
-	DIR * dir = opendir(directory);
-	if(dir){
-		dirent * info;
-		while((info = readdir(dir))){
-			struct stat st;
-			char filename[PATH_MAX];
-			strcpy(filename, directory);
-			strcat(filename, "/");
-			strcat(filename, info->d_name);
-			if(stat(filename, &st) == 0){
-				if(info->d_type != DT_DIR && !S_ISDIR(st.st_mode) && info->d_name[0] != '.'){
-					files.push_back(std::string(info->d_name));
-				}
-			}
-		}
-		closedir(dir);
-	}
-#elif _WIN32
-	WIN32_FIND_DATA info;
-	char directory2[MAX_PATH];
-	strcpy(directory2, directory);
-	strcat(directory2, "\\*");
-	HANDLE dir = FindFirstFile(directory2, &info);
-	if(dir != INVALID_HANDLE_VALUE){
-		do{
-			char fullname[MAX_PATH];
-			sprintf(fullname, "%s\\%s", directory, info.cFileName);
-			if(!(GetFileAttributes(fullname) & FILE_ATTRIBUTE_DIRECTORY)){
-				files.push_back(std::string(info.cFileName));
-			}
-		}while(FindNextFile(dir, &info));
-		FindClose(dir);
-	}
-#endif
-	return files;
-}
-
-void Game::LoadRandomGameMusic(void){
-	if(!Config::GetInstance().music){
-		return;
-	}
-	if(world.resources.gamemusic){
-		Audio::GetInstance().StopMusic();
-		MIX_DestroyAudio(world.resources.gamemusic);
-		world.resources.gamemusic = 0;
-	}
-	if(!world.resources.gamemusic){
-		const char * directory = "music";
-		CDDataDir();
-		std::vector<std::string> files = ListFiles(directory);
-		if(files.size() == 0){
-			CDResDir();
-			files = ListFiles(directory);
-		}
-		if(files.size() > 0){
-			char filename[1024];
-			strcpy(filename, directory);
-			strcat(filename, "/");
-			const char * randomfile = files[rand() % files.size()].c_str();
-			strcat(filename, randomfile);
-			strncpy(currentmusictrack, randomfile, sizeof(currentmusictrack) - 1);
-			world.resources.gamemusic = MIX_LoadAudio(Audio::GetInstance().GetMixer(), filename, false);
-		}
-	}
-}
-
-std::string Game::FindMap(const char * name, unsigned char (*hash)[20], const char * directory){
-	if(!directory){
-		std::string result;
-		result = FindMap(name, hash, "level");
-		if(result.length() > 0){
-			return result;
-		}
-		result = FindMap(name, hash, "level/download");
-		if(result.length() > 0){
-			return result;
-		}
-		result = FindMap(name, hash, "level/archive");
-		if(result.length() > 0){
-			return result;
-		}
-	}else{
-		//printf("searching %s\n", directory);
-		bool isarchive = false;
-		if(strcmp(directory, "level/archive") == 0){
-			isarchive = true;
-		}
-		CDResDir();
-		// Capture the absolute resources path while cwd = Resources (GetResDir returns "" on macOS).
-		std::string absResDir = GetResDir();
-		if(absResDir.empty()){
-			char _cwd[PATH_MAX];
-			if(getcwd(_cwd, PATH_MAX)) absResDir = std::string(_cwd) + "/";
-		}
-		std::vector<std::string> files = ListFiles((GetResDir() + directory).c_str());
-		CDDataDir();
-		std::vector<std::string> files2 = ListFiles((GetDataDir() + directory).c_str());
-		files.insert(files.end(), files2.begin(), files2.end());
-		for(std::vector<std::string>::iterator it = files.begin(); it != files.end(); it++){
-			std::string cname = (*it);
-			if(isarchive){
-				std::size_t p = cname.find_first_of(".");
-				if(p != std::string::npos){
-					cname.erase(0, p + 1);
-				}
-			}
-			//printf("map: %s cname: %s\n", (*it).c_str(), cname.c_str());
-			if(cname.compare(name) == 0){
-				std::string filename = GetDataDir() + directory;
-				filename.append("/");
-				filename.append(*it);
-				SDL_IOStream * file = SDL_IOFromFile(filename.c_str(), "rb");
-				if(!file){
-					filename = absResDir + directory;
-					filename.append("/");
-					filename.append(*it);
-				}else{
-					SDL_CloseIO(file);
-				}
-				//printf("found %s\n", filename.c_str());
-				if(!hash){
-					return filename;
-				}else{
-					unsigned char filehash[20];
-					CalculateMapHash(filename.c_str(), &filehash);
-					if(memcmp(*hash, filehash, sizeof(*hash)) == 0){
-						//printf("hash matches\n");
-						return filename;
-					}
-				}
-			}
-		}
-	}
-	std::string empty;
-	return empty;
-}
-
-std::string Game::SaveMap(const char * name, unsigned char * data, int size){
-	CDDataDir();
-	std::string filename = GetDataDir() + "level/download/";
-	CreateDirectory((GetDataDir() + "level/download").c_str());
-	CreateDirectory((GetDataDir() + "level/archive").c_str());
-	filename.append(name);
-	SDL_IOStream * file = SDL_IOFromFile(filename.c_str(), "wb");
-	if(file){
-		SDL_WriteIO(file, data, size);
-		SDL_CloseIO(file);
-	}
-	unsigned char hash[20];
-	CalculateMapHash(filename.c_str(), &hash);
-	std::string archivefilename = GetDataDir() + "level/archive/";
-	archivefilename.append(StringFromHash(&hash));
-	archivefilename.append(".");
-	archivefilename.append(name);
-	file = SDL_IOFromFile(archivefilename.c_str(), "wb");
-	if(file){
-		SDL_WriteIO(file, data, size);
-		SDL_CloseIO(file);
-	}
-	return filename;
-}
-
-bool Game::CalculateMapHash(const char * filename, unsigned char (*hash)[20]){
-	std::vector<Uint8> mapdata(65535);
-	CDDataDir();
-	SDL_IOStream * file = SDL_IOFromFile(filename, "rb");
-	if(!file){
-		CDResDir();
-		file = SDL_IOFromFile(filename, "rb");
-	}
-	if(file){
-		int mapdatasize = SDL_ReadIO(file, mapdata.data(), mapdata.size());
-		SDL_CloseIO(file);
-		sha1::calc(mapdata.data(), mapdatasize, *hash);
-		return true;
-	}
-	return false;
-}
-
-std::string Game::StringFromHash(unsigned char (*hash)[20]){
-	char hashstring[(20 * 2) + 1];
-	memset(hashstring, 0, sizeof(hashstring));
-	for(int i = 0; i < 20; i++){
-		unsigned char byte = (*hash)[i];
-		sprintf(&hashstring[i * 2], "%.2X", byte);
-	}
-	return std::string(hashstring);
-}
-
-void Game::LoadMapData(const char * filename){
-	//printf("loading map data from %s\n", filename);
-	CDDataDir();
-	SDL_IOStream * file = SDL_IOFromFile((GetDataDir() + filename).c_str(), "rb");
-	if(!file){
-		CDResDir();
-		file = SDL_IOFromFile((GetResDir() + filename).c_str(), "rb");
-	}
-	if(file){
-		int length = SDL_ReadIO(file, world.currentmapdata.data(), world.currentmapdata.size());
-		world.currentmapdata.resize(length);
-		world.currentmapdataend = true;
-		//printf("length: %d %s\n", world.currentmapdata.size(), SDL_GetError());
-		SDL_CloseIO(file);
-	}
-}
-
-void Game::ProcessMapDownload(void){
-	Peer * localpeer = world.peerlist[world.localpeerid];
-	if(localpeer){
-		if(localpeer->gameinfoloaded){
-			if(!localpeer->mapdownloaded){
-				if(!mapexistchecked){
-					std::string mapfilename = FindMap(world.gameinfo.mapname, &world.gameinfo.maphash);
-					if(mapfilename.size() > 0){
-						world.SendMapDownloaded();
-						LoadMapData(mapfilename.c_str());
-						mapexistchecked = true;
-					} else {
-						// Map not available locally. Try the community map server
-						// asynchronously so the game loop (and UDP keepalives) stay
-						// responsive during the fetch. Falling back to peer-to-peer
-						// chunk transfer happens once the async result is known.
-						int js = mapjoinstate.load(std::memory_order_acquire);
-						if(js == 0){
-							mapjoinstate.store(1, std::memory_order_relaxed);
-							uint32_t gen = mapjoingeneration.load(std::memory_order_relaxed);
-							std::string dlname = world.gameinfo.mapname;
-							std::array<unsigned char, 20> sha1;
-							memcpy(sha1.data(), world.gameinfo.maphash, 20);
-							std::string apiURL = Config::GetInstance().mapapiurl;
-							mapjointhread = std::thread([this, dlname, sha1, apiURL, gen]() mutable {
-								std::string path = FetchMapFromServer(dlname.c_str(), sha1.data(), apiURL.c_str());
-								if(mapjoingeneration.load(std::memory_order_relaxed) != gen) return;
-								std::lock_guard<std::mutex> lk(mapjoinmutex);
-								mapjoinpath = path;
-								mapjoinstate.store(path.empty() ? 3 : 2, std::memory_order_release);
-							});
-						} else if(js == 2){
-							// Server had the map; hand it to the engine.
-							std::string path;
-							{ std::lock_guard<std::mutex> lk(mapjoinmutex); path = mapjoinpath; }
-							world.SendMapDownloaded();
-							LoadMapData(path.c_str());
-							mapexistchecked = true;
-						} else if(js == 3){
-							// Server doesn't have it; fall through to P2P chunk transfer.
-							mapexistchecked = true;
-						}
-						// js == 1: fetch in progress; come back next tick.
-					}
-				}else{
-					if(!world.currentmapdataprocessed || world.tickcount - lastmapchunkrequest > 24){
-						// request map chunks after received, or if last request was a while ago
-						if(world.currentmapdataend){
-							//printf("map done downloading\n");
-							std::string mapfilename = SaveMap(world.gameinfo.mapname, world.currentmapdata.data(), world.currentmapdata.size());
-							world.SendMapDownloaded();
-							LoadMapData(mapfilename.c_str());
-						}else{
-							world.GetMapChunk(world.currentmapdata.size());
-							world.currentmapdataprocessed = true;
-						}
-					}
-					if(world.currentmapdataend && world.tickcount % 48 == 0){
-						// this is just in case the SendMapDownloaded packet is lost
-						if(FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).size() > 0){
-							world.SendMapDownloaded();
-						}
-					}
-				}
-			}
-		}
-	}
-}
-
 bool Game::HandleSDLEvents(void){
 	if(world.dedicatedserver.active){
 		return true;
@@ -6426,8 +6076,8 @@ void Game::OnScancodeDown(int sc){
 		world.showteamcolors = !world.showteamcolors;
 	}
 	if(sc == SDL_SCANCODE_F5){
-		LoadRandomGameMusic();
-		PlayMusic(world.resources.gamemusic);
+		ambienceMixer.LoadRandomGameMusic();
+		ambienceMixer.PlayMusic(world.resources.gamemusic);
 	}
 	if(sc == SDL_SCANCODE_F4){
 		if(Config::GetInstance().music){

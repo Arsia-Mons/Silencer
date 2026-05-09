@@ -28,7 +28,9 @@ Don't tick the box if any of the four fails. Investigate, fix, re-verify.
 
 ## Status
 
-Phase 1 complete (all 8 steps landed in one commit per user direction). Verified: clean Release build, clean jumbo/unity build (no cyclic dependencies introduced), all 3 E2E scenarios pass (00_ping, 10_navigate, 20_screenshot). The screen stack is empty at runtime — every menu still flows through the legacy `Create*Interface`/`Process*Interface` helpers. Phases 2 and 3 not started.
+Phase 1 complete (all 8 steps landed in one commit per user direction). Verified: clean Release build, clean jumbo/unity build (no cyclic dependencies introduced), all 3 E2E scenarios pass (00_ping, 10_navigate, 20_screenshot). The screen stack is empty at runtime — every menu still flows through the legacy `Create*Interface`/`Process*Interface` helpers.
+
+Phase 2 landed in one commit (both extractions). `MapDownloader` and `AmbienceMixer` are constructed and own all the moved state; `World` was given `friend class MapDownloader;` and `friend class AmbienceMixer;` so the two collaborators retain the same private-access reach Game had. Verified: clean Release build (only the pre-existing C4804 warning at `IsLiveMultiplayer`). **Suspected regression on the create-game flow** — clicking "Create Game" on the lobby kicks back to the lobby connect screen on at least one user's machine; not yet root-caused. Unity build + interactive lobby smoke test pending. Phase 3 not started.
 
 ---
 
@@ -65,8 +67,10 @@ After Phase 1: new infrastructure exists, fully unused. Reverting the entire pha
 
 Each extraction is one commit. Methods and members move from `Game` to a new class; callers within `Game` update to go through the new class instance. The behavior is unchanged.
 
-- [ ] **Extract `MapDownloader`** at `src/game/map_downloader.h/.cpp`. Move `dlprogress`, `dlresult`, `dlitemname`, `dlthread`, `mapjoin*`, `mapUpload*`, `pendingCreate`, `servermaps`, `lastmapchunkrequest`, `mapexistchecked`, `selectedmap` plus the 7 methods (`ListFiles`, `FindMap`, `SaveMap`, `CalculateMapHash`, `StringFromHash`, `LoadMapData`, `ProcessMapDownload`). `Game` gets a `MapDownloader mapDownloader` member; everywhere `Game` referenced the old members, it now goes through `mapDownloader.X`. **Verify:** smoke-test the map download flow — join a game whose map you don't have locally; create a game with a local map (triggers upload).
-- [ ] **Extract `AmbienceMixer`** at `src/game/ambience_mixer.h/.cpp`. Move `bgchannel[3]`, `lastmusicplaytime`, `currentmusictrack`, `oldambiencelevel` plus the 6 methods (`CreateAmbienceChannels`, `UpdateAmbienceChannels`, `LoadRandomGameMusic`, `FadedIn`, `PlayMusic`, `GetGameChannelName`). **Verify:** smoke-test audio — main-menu music plays; entering a game switches tracks; ambience cross-fades when you change levels in-game.
+- [x] **Extract `MapDownloader`** at `src/game/map_downloader.h/.cpp`. Move `dlprogress`, `dlresult`, `dlitemname`, `dlthread`, `mapjoin*`, `mapUpload*`, `pendingCreate`, `servermaps`, `lastmapchunkrequest`, `mapexistchecked`, `selectedmap` plus the 7 methods (`ListFiles`, `FindMap`, `SaveMap`, `CalculateMapHash`, `StringFromHash`, `LoadMapData`, `ProcessMapDownload`). `Game` gets a `MapDownloader mapDownloader` member; everywhere `Game` referenced the old members, it now goes through `mapDownloader.X`. **Verify:** smoke-test the map download flow — join a game whose map you don't have locally; create a game with a local map (triggers upload).
+- [x] **Extract `AmbienceMixer`** at `src/game/ambience_mixer.h/.cpp`. Move `bgchannel[3]`, `lastmusicplaytime`, `currentmusictrack`, `oldambiencelevel` plus the 6 methods (`CreateAmbienceChannels`, `UpdateAmbienceChannels`, `LoadRandomGameMusic`, `FadedIn`, `PlayMusic`, `GetGameChannelName`). **Verify:** smoke-test audio — main-menu music plays; entering a game switches tracks; ambience cross-fades when you change levels in-game.
+
+> Both extractions landed together in one commit per user direction. The two share a `friend` grant in `World` so they retain Game's private-member reach. **Open follow-up:** suspected regression in the lobby's "Create Game" button — investigate before merging.
 
 ---
 

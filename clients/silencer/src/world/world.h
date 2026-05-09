@@ -119,6 +119,8 @@ public:
 	
 	friend class Renderer;
 	friend class Game;
+	friend class MapDownloader;
+	friend class AmbienceMixer;
 	friend class Team;
 	friend class Lobby;
 	friend class Player;

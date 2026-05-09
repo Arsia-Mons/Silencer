@@ -14,12 +14,10 @@
 #include "controlserver.h"
 #include "inputserver.h"
 #include "screen_context.h"
-#include <map>
+#include "map_downloader.h"
+#include "ambience_mixer.h"
 #include <array>
-#include <atomic>
 #include <memory>
-#include <mutex>
-#include <thread>
 #include <vector>
 
 class Screen;
@@ -135,7 +133,6 @@ private:
 	void ProcessUpdateInterface(Interface * iface);
 	void LaunchStage2(void);
 	Interface * CreateMapPreview(const char * filename);
-	void PlayMusic(Mix_Music * music);
 	void DestroyModalDialog(void);
 	Interface * CreatePasswordDialog(void);
 	Uint16 lobbyinterface;
@@ -180,18 +177,6 @@ private:
 	};
 	static LegacyView ViewLegacy(const KeyMap& km, Action a);
 	static void WriteLegacy(KeyMap& km, Action a, SDL_Scancode key1, SDL_Scancode key2, bool and_);
-	void GetGameChannelName(LobbyGame & lobbygame, char * name);
-	void CreateAmbienceChannels(void);
-	void UpdateAmbienceChannels(void);
-	bool FadedIn(void);
-	std::vector<std::string> ListFiles(const char * directory);
-	void LoadRandomGameMusic(void);
-	std::string FindMap(const char * name, unsigned char (*hash)[20] = 0, const char * directory = 0);
-	std::string SaveMap(const char * name, unsigned char * data, int size);
-	bool CalculateMapHash(const char * filename, unsigned char (*hash)[20]);
-	std::string StringFromHash(unsigned char (*hash)[20]);
-	void LoadMapData(const char * filename);
-	void ProcessMapDownload(void);
 	KeyMap keymap;
 	GamepadState gamepadstate;
 	SDL_Gamepad * gamepad;
@@ -219,8 +204,6 @@ private:
 	Uint32 chatlinesprinted;
 	char localusername[16 + 1];
 	Uint16 sharedstate;
-	int bgchannel[3];
-	enum {BG_AMBIENT = 0, BG_BASE, BG_OUTSIDE};
 	int oldselecteditem;
 	Uint8 singleplayermessage;
 	bool updatetitle;
@@ -229,7 +212,6 @@ private:
 	Uint8 lastannouncedstatus;
 	char lastchannel[64];
 	Uint8 oldselectedagency;
-	Uint8 oldambiencelevel;
 	bool agencychanged;
 	bool gamesummaryinfoloaded;
 	bool minimized;
@@ -240,34 +222,6 @@ private:
 	Uint32 optionscontrolstick;
 	int quitscancode;
 	bool interfaceenterfix;
-	Uint32 lastmapchunkrequest;
-	bool mapexistchecked;
-	int selectedmap;
-	std::map<std::string, std::string> servermaps; // "[↓] NAME.SIL" → sha1hex
-	std::atomic<int> dlprogress{0};    // 0-100 while downloading
-	std::atomic<int> dlresult{0};      // 0=idle, 1=success, -1=fail
-	std::string dlitemname;            // key in servermaps being downloaded
-	std::thread dlthread;
-	// Pre-game map fetch (join path): async server download before P2P fallback.
-	// State: 0=idle 1=in-flight 2=downloaded 3=not-on-server.
-	std::atomic<int>      mapjoinstate{0};
-	std::atomic<uint32_t> mapjoingeneration{0}; // incremented on reset to discard stale results
-	std::string           mapjoinpath;           // absolute path set by thread when state→2
-	std::mutex            mapjoinmutex;          // guards mapjoinpath
-	std::thread           mapjointhread;
-	// Map upload for create-game flow: when a user creates a game with a local
-	// map, we upload it first so the dedicated server can find it by name.
-	// State: 0=idle 1=uploading 2=ok 3=fail.
-	std::atomic<int>      mapUploadState{0};
-	std::atomic<uint32_t> mapUploadGeneration{0};
-	std::thread           mapUploadThread;
-	struct {
-		std::string gamename, mapname, password;
-		unsigned char maphash[20];
-		Uint8 securitylevel, minlevel, maxlevel, maxplayers, maxteams;
-	} pendingCreate;
-	Uint32 lastmusicplaytime;
-	char currentmusictrack[256];
 	bool fullscreentoggled;
 	char * replayfile;
 	// Set when UpdaterStage2 has been spawned; next Loop() returns false so
@@ -287,8 +241,13 @@ private:
 	void DrainControlQueue();
 	void PostFrameReplies();
 
-	// New-tier UI plumbing (Phase 1). Stack starts empty; legacy menu paths
-	// remain authoritative until each screen migrates in Phase 3.
+	// mapDownloader must be declared before ambienceMixer — the latter's
+	// constructor captures it by reference (for ListFiles in music selection).
+	MapDownloader mapDownloader;
+	AmbienceMixer ambienceMixer;
+
+	// Stack-based UI. Starts empty; legacy Create*/Process*Interface helpers
+	// drive the menus until screens migrate over.
 	std::vector<std::unique_ptr<Screen>> screenStack;
 	ScreenContext screenContext;
 	void TickActiveScreen();
