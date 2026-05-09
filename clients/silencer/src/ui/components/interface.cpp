@@ -31,6 +31,40 @@ Interface::Interface() : Object(ObjectTypes::INTERFACE){
 	issprite = false;
 	iscontrollable = true;
 	modal = false;
+	formscrollbar = 0;
+	scrollviewporttop = 0;
+	scrollviewportrows = 0;
+	scrollrowheight = 0;
+}
+
+void Interface::AddFormScrollRow(Uint16 objectId, Sint16 baseY){
+	scrollrows.push_back({objectId, baseY});
+}
+
+void Interface::ApplyFormScroll(World & world){
+	// Translate each registered row's y by the formscrollbar's
+	// scrollposition, and hide rows whose translated y falls outside the
+	// configured viewport band. Called at row registration and from the
+	// wheel handler — Interface::Tick does not run reliably in lobby state.
+	if(!formscrollbar || scrollrows.empty() || scrollrowheight == 0){
+		return;
+	}
+	ScrollBar * sb = static_cast<ScrollBar *>(world.GetObjectFromId(formscrollbar));
+	if(!sb){
+		return;
+	}
+	Sint16 viewporttop = scrollviewporttop;
+	Sint16 viewportbottom = viewporttop + (scrollviewportrows * scrollrowheight);
+	Sint16 dy = -(Sint16)(sb->scrollposition * scrollrowheight);
+	for(const FormScrollRow & row : scrollrows){
+		Object * obj = world.GetObjectFromId(row.objectId);
+		if(!obj){
+			continue;
+		}
+		Sint16 effY = row.baseY + dy;
+		obj->y = effY;
+		obj->draw = (effY >= viewporttop && effY < viewportbottom);
+	}
 }
 
 void Interface::Tick(World & world){
@@ -142,11 +176,16 @@ void Interface::ActiveChanged(World & world, Interface * callinginterface, bool 
 					ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
 					if(scrollbar){
 						if(world.GetObjectFromId(callinginterface->activeobject) == this || callinginterface == this){
-							if(mousewheelup){
-								scrollbar->ScrollUp();
-							}
-							if(mousewheeldown){
-								scrollbar->ScrollDown();
+							if((mousewheelup || mousewheeldown) && scrollbar->MouseInsideWheelRegion(world, mousex, mousey)){
+								if(mousewheelup){
+									scrollbar->ScrollUp();
+								}
+								if(mousewheeldown){
+									scrollbar->ScrollDown();
+								}
+								if(scrollbar->id == formscrollbar){
+									ApplyFormScroll(world);
+								}
 							}
 						}
 						if(mousedown){
@@ -231,6 +270,9 @@ void Interface::ActiveChanged(World & world, Interface * callinginterface, bool 
 				case ObjectTypes::OVERLAY:{
 					Overlay * overlay = static_cast<Overlay *>(object);
 					if(overlay){
+						if(!overlay->draw){
+							break;
+						}
 						if(mouse && mousedown){
 							if(overlay->MouseInside(world, mousex, mousey)){
 								overlay->clicked = true;
@@ -271,6 +313,9 @@ void Interface::ActiveChanged(World & world, Interface * callinginterface, bool 
 				case ObjectTypes::TEXTINPUT:{
 					TextInput * textinput = static_cast<TextInput *>(object);
 					if(textinput){
+						if(!textinput->draw){
+							break;
+						}
 						if(mouse && mousedown){
 							int index = textinput->MouseInside(mousex, mousey);
 							if(index != -1){

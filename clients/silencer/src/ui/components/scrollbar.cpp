@@ -8,6 +8,18 @@ ScrollBar::ScrollBar() : Object(ObjectTypes::SCROLLBAR){
 	scrollmax = 0;
 	scrollposition = 0;
 	requiresmaptobeloaded = false;
+	scrollregionx = 0;
+	scrollregiony = 0;
+	scrollregionw = 0;
+	scrollregionh = 0;
+}
+
+bool ScrollBar::MouseInsideWheelRegion(World & world, Uint16 mousex, Uint16 mousey){
+	if(scrollregionw == 0 || scrollregionh == 0){
+		return true;
+	}
+	return mousex >= scrollregionx && mousex < scrollregionx + scrollregionw
+	    && mousey >= scrollregiony && mousey < scrollregiony + scrollregionh;
 }
 
 bool ScrollBar::MouseInside(World & world, Uint16 mousex, Uint16 mousey){

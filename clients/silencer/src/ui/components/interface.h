@@ -12,6 +12,18 @@ public:
 	void AddObject(Uint16 id);
 	void RemoveObject(Uint16 id);
 	void AddTabObject(Uint16 id);
+	// Register a child object as a scrollable form row at logical row index
+	// `rowIndex`. Its baseY (saved on registration) is the unscrolled y; the
+	// live `y` is recomputed by ApplyFormScroll. Out-of-viewport rows are
+	// hidden via draw=false.
+	void AddFormScrollRow(Uint16 objectId, Sint16 baseY);
+	void ApplyFormScroll(World & world);
+	struct FormScrollRow { Uint16 objectId; Sint16 baseY; };
+	std::vector<FormScrollRow> scrollrows;
+	Uint16 formscrollbar;
+	Sint16 scrollviewporttop;
+	Uint16 scrollviewportrows;
+	Uint16 scrollrowheight;
 	void ProcessKeyPress(World & world, char ascii);
 	void ProcessMousePress(World & world, bool pressed, Uint16 x, Uint16 y);
 	void ProcessMouseMove(World & world, Uint16 x, Uint16 y);

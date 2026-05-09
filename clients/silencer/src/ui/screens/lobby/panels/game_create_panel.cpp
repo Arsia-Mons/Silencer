@@ -242,6 +242,29 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	mapscrollbar->scrollposition = mapselect->scrolled;
 	mapscrollbar->scrollmax = mapselect->items.size();
 	mapscrollbar->scrollposition = 0;
+	// Restrict map-list wheel events to the right pane so they don't fire
+	// when the user is wheeling over the form on the left.
+	mapscrollbar->scrollregionx = mapselect->x;
+	mapscrollbar->scrollregiony = mapselect->y;
+	mapscrollbar->scrollregionw = mapselect->width;
+	mapscrollbar->scrollregionh = mapselect->height;
+
+	// Form-row scrollbar. Invisible (draw=false) — chrome would require a
+	// new bank-7 sprite. Wheel-scroll only, mirroring how mapscrollbar
+	// behaves when its list doesn't overflow.
+	ScrollBar * formscrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
+	formscrollbar->res_index = 9;
+	formscrollbar->scrollpixels = yspace;
+	formscrollbar->scrollposition = 0;
+	formscrollbar->draw = false;
+	// Region covers the form's labels + value column so the wheel routes
+	// here whenever the cursor is over Game Options.
+	formscrollbar->scrollregionx = 240;
+	formscrollbar->scrollregiony = 87;
+	formscrollbar->scrollregionw = 160;
+	formscrollbar->scrollregionh = 5 * yspace;
+	// 6 rows total, 5 visible.
+	formscrollbar->scrollmax = 1;
 
 	Overlay * nametext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	nametext->text = "Game name:";
@@ -303,6 +326,7 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	gamecreateinterface->AddObject(selectmaptext->id);
 	gamecreateinterface->AddObject(mapselect->id);
 	gamecreateinterface->AddObject(mapscrollbar->id);
+	gamecreateinterface->AddObject(formscrollbar->id);
 	gamecreateinterface->AddObject(nametext->id);
 	gamecreateinterface->AddObject(nametextinput->id);
 	gamecreateinterface->AddObject(passwordtext->id);
@@ -318,6 +342,30 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	gamecreateinterface->scrollbar = mapscrollbar->id;
 	gamecreateinterface->buttonenter = gamecreatebutton->id;
 	gamecreateinterface->activeobject = nametextinput->id;
+
+	// Form scroll registry: each row's two child objects (label + value
+	// widget) are translated and shown/hidden together based on the form
+	// scrollbar's position.
+	gamecreateinterface->formscrollbar = formscrollbar->id;
+	gamecreateinterface->scrollviewporttop = 87 + yoffset;
+	gamecreateinterface->scrollviewportrows = 5;
+	gamecreateinterface->scrollrowheight = yspace;
+	for(int i = 0; i < 6; i++){
+		Sint16 rowy = 87 + (yspace * i) + yoffset;
+		Uint16 lblid = 0;
+		Uint16 valid = 0;
+		switch(i){
+			case 0: lblid = securitytext->id;    valid = buttonsecurity->id;    break;
+			case 1: lblid = minleveltext->id;    valid = minlevelinput->id;     break;
+			case 2: lblid = maxleveltext->id;    valid = maxlevelinput->id;     break;
+			case 3: lblid = maxplayerstext->id;  valid = maxplayersinput->id;   break;
+			case 4: lblid = maxteamstext->id;    valid = maxteamsinput->id;     break;
+			case 5: lblid = spectatabletext->id; valid = spectatablebutton->id; break;
+		}
+		gamecreateinterface->AddFormScrollRow(lblid, rowy);
+		gamecreateinterface->AddFormScrollRow(valid, rowy);
+	}
+	gamecreateinterface->ApplyFormScroll(world);
 
 	interfaceId = gamecreateinterface->id;
 	if(parent){
