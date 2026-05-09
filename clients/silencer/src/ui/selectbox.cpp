@@ -113,7 +113,7 @@ void SelectBox::ListFiles(const char * directory){
 	strcpy(directory2, directory);
 	strcat(directory2, "\\*");
 	HANDLE dir = FindFirstFile(directory2, &info);
-	if(dir){
+	if(dir != INVALID_HANDLE_VALUE){
 		do{
 			char fullname[MAX_PATH];
 			sprintf(fullname, "%s\\%s", directory, info.cFileName);
