@@ -2,6 +2,34 @@
 
 All notable changes to Silencer are documented here.
 
+## [Unreleased]
+
+### Game client
+
+#### Mission / Trigger Scripting Tool (#124, issue #30)
+
+- **Generic event bus** — `TRIGGER_ENTER_ZONE`, `TERMINAL_ACTIVATED`, `ACTOR_KILLED`, `ACTOR_DAMAGED`, `OBJECTIVE_COMPLETE`, `ITEM_COLLECTED`, `PLAYER_DIED`, `ALL_PLAYERS_DIED`, `TIMER_EXPIRED`, `GAME_START` events wired into the trigger graph.
+- **Action system** — `OPEN_DOOR`, `LOCK_DOOR`, `UNLOCK_DOOR`, `PLAY_SOUND`, `SHOW_OBJECTIVE`, `PAN_CAMERA`, `SPAWN_ACTOR`, `END_MISSION`, `DESTROY_ACTOR`, `MOVE_ACTOR`, `APPLY_DAMAGE_IN_ZONE`, `ENABLE_TRIGGER`, `DISABLE_TRIGGER`. Each action supports an optional delay in seconds.
+- **Condition system** — `ALL_OF`, `ANY_OF`, team check, objective state, player count, health threshold.
+- **One-shot vs repeatable** flag per trigger; trigger enable/disable state (triggers can arm/disarm other triggers).
+- **Hit counter + `COUNT_REACHED` condition** — trigger fires only after it has been hit N times.
+- **Flag system** — 256 boolean runtime flags; `SET_FLAG` action and `FLAG_SET` condition; synced via `MSG_TRIGGER_STATE`.
+- **Destructible actors** — actors flagged as destructible take damage and fire `ACTOR_KILLED` on death.
+- **Collectible actors** — `ITEM_COLLECTED` fires when a player walks over a flagged actor.
+- **`MOVE_ACTOR` action** — smoothly moves an actor to a target X/Y over N seconds (elevators, moving platforms).
+- **Zone definitions** — invisible trigger regions placed in the designer, stored in `.sil`, checked each tick. `TRIGGER_ENTER_ZONE` fires when a player enters a zone.
+- **`COMPLETE_OBJECTIVE` action** — marks an objective complete from a trigger.
+- **`END_MISSION` outcome** — paramU8: 0 = neutral, 1 = win, 2 = lose.
+- **`LOCK_INPUT` / `UNLOCK_INPUT`** — freeze and restore local player controls (used during camera pan cutscenes).
+- **Script loader** — reads the trigger graph from the `.sil` map file at load time; new trigger and zone sections appended to the binary format.
+- **Authority-owned trigger state** — only the AUTHORITY peer fires triggers; `MSG_TRIGGER_STATE` replicates objectives, flags, and hit counts to all peers.
+- **Camera pan intro** — `GAME_START` fires at tick=0 (reliable, before any player interaction). `PAN_CAMERA` lerps the camera to a target zone; `UNLOCK_INPUT` lerps it back to the player. Camera pan state is reset in `UnloadGame()` so the menu renders correctly if the player disconnects mid-pan.
+- **Designer trigger panel** — full TRIGGERS tab in the map designer sidebar: all trigger/condition/action node types, action delay fields, one-shot/repeatable toggle, objective list editor (add/remove, required/optional), zone tool (draw zones on canvas with cyan dashed outline + id label), zone list editor, actor canvas linking (🎯 button enters crosshair mode to fill actor id by clicking the canvas), Move Actor path preview on canvas. Serializes trigger graph into the map file.
+
+#### Loading screen
+
+- **Green gradient progress bar** — loading bar uses the game's green palette (indices 101–113), dark-to-bright left-to-right gradient, 32 px height, dark green background track.
+
 ## [v00047] — 2026-05-07
 
 Test release — no behavior change. Cut to validate the v00046 Windows auto-updater end-to-end (per-file `MoveFileEx` replace path + `DisplayVersion`/`DisplayName` sync into Inno's HKCU `{AppId}_is1` uninstall key). An existing v00046 install should detect, download, swap, and relaunch as v00047 without manual intervention.
