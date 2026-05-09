@@ -276,6 +276,7 @@ static LobbyGame make_test_game() {
     g.max_players     = 24;
     g.max_teams       = 6;
     g.extra           = 0;
+    g.spectatable     = 0;
     g.port            = 5000;
     return g;
 }

@@ -159,7 +159,8 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 				mapDownloader.pendingCreate.minlevel,
 				mapDownloader.pendingCreate.maxlevel,
 				mapDownloader.pendingCreate.maxplayers,
-				mapDownloader.pendingCreate.maxteams);
+				mapDownloader.pendingCreate.maxteams,
+				mapDownloader.pendingCreate.spectatable);
 		}else if(us == 3){
 			mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
 			game.creategameclicked = false;

@@ -82,6 +82,7 @@ struct LobbyGame {
     uint8_t                   max_players     = 24;
     uint8_t                   max_teams       = 6;
     uint8_t                   extra           = 0;
+    uint8_t                   spectatable     = 0;
     uint16_t                  port            = 0;
 };
 

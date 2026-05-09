@@ -90,6 +90,7 @@ export interface LobbyGame {
     maxPlayers: number;
     maxTeams: number;
     extra: number;
+    spectatable: number;
     port: number;
 }
 

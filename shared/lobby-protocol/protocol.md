@@ -337,6 +337,7 @@ u8     max_level
 u8     max_players
 u8     max_teams
 u8     extra
+u8     spectatable    (0 = no spectators, 1 = accepts spectators; password gate applies equally)
 u16    port
 ```
 

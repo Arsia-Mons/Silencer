@@ -35,8 +35,9 @@ namespace
 // Prefixed to dodge anonymous-namespace collisions when SILENCER_UNITY_BUILD
 // merges this TU with sibling lobby panel .cpp files.
 enum GameCreateButton : Uint8 {
-	GCRT_BTN_SECURITY = 40,
-	GCRT_BTN_CREATE   = 35,
+	GCRT_BTN_SECURITY    = 40,
+	GCRT_BTN_CREATE      = 35,
+	GCRT_BTN_SPECTATABLE = 45,
 };
 enum GameCreateInput : Uint8 {
 	GCRT_INPUT_NAME      = 5,
@@ -171,6 +172,23 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	maxteamsinput->numbersonly = true;
 	maxteamsinput->SetText("6");
 
+	Overlay * spectatabletext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	spectatabletext->text = "Spectatable:";
+	spectatabletext->textbank = 134;
+	spectatabletext->textwidth = 8;
+	spectatabletext->x = 245;
+	spectatabletext->y = 87 + (yspace * 5) + yoffset;
+	Button * spectatablebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	spectatablebutton->SetType(Button::BNONE);
+	spectatablebutton->x = 350;
+	spectatablebutton->y = 87 + (yspace * 5) + yoffset;
+	spectatablebutton->uid = GCRT_BTN_SPECTATABLE;
+	spectatablebutton->width = 40;
+	spectatablebutton->height = 20;
+	spectatablebutton->textbank = 134;
+	spectatablebutton->textwidth = 9;
+	strcpy(spectatablebutton->text, Config::GetInstance().lastspectatable ? "Yes" : "No");
+
 	Overlay * selectmaptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	selectmaptext->text = "Select Map";
 	selectmaptext->textbank = 134;
@@ -280,6 +298,8 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	gamecreateinterface->AddObject(maxplayersinput->id);
 	gamecreateinterface->AddObject(maxteamstext->id);
 	gamecreateinterface->AddObject(maxteamsinput->id);
+	gamecreateinterface->AddObject(spectatabletext->id);
+	gamecreateinterface->AddObject(spectatablebutton->id);
 	gamecreateinterface->AddObject(selectmaptext->id);
 	gamecreateinterface->AddObject(mapselect->id);
 	gamecreateinterface->AddObject(mapscrollbar->id);
@@ -455,6 +475,13 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 							strcpy(button->text, "Off");
 						}
 					}break;
+					case GCRT_BTN_SPECTATABLE:{
+						button->clicked = false;
+						bool nowOn = strcmp(button->text, "No") == 0;
+						strcpy(button->text, nowOn ? "Yes" : "No");
+						Config::GetInstance().lastspectatable = nowOn;
+						Config::GetInstance().Save();
+					}break;
 					case GCRT_BTN_CREATE:{
 						button->clicked = false;
 						if(ctx.game.creategameclicked) break;
@@ -496,6 +523,12 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						tobject = iface->GetObjectWithUid(world, GCRT_INPUT_TEAMS);
 						if(tobject) maxteams = atoi(static_cast<TextInput *>(tobject)->text);
 						if(maxteams <= 0) maxteams = 1;
+						bool spectatable = true;
+						tobject = iface->GetObjectWithUid(world, GCRT_BTN_SPECTATABLE);
+						if(tobject){
+							Button * sbutton = static_cast<Button *>(tobject);
+							spectatable = strcmp(sbutton->text, "No") != 0;
+						}
 
 						if(strlen(gamename) == 0){
 							ctx.ShowMessage("No game name");
@@ -527,6 +560,7 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						mapDownloader.pendingCreate.maxlevel      = maxlevel;
 						mapDownloader.pendingCreate.maxplayers    = maxplayers;
 						mapDownloader.pendingCreate.maxteams      = maxteams;
+						mapDownloader.pendingCreate.spectatable   = spectatable;
 						if(mapDownloader.mapUploadThread.joinable()) mapDownloader.mapUploadThread.detach();
 						uint32_t gen = ++mapDownloader.mapUploadGeneration;
 						std::string mppath = mapDownloader.FindMap(mapname);

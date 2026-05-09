@@ -26,6 +26,7 @@ public:
 	Uint8 maxplayers;
 	Uint8 maxteams;
 	Uint8 extra;
+	bool spectatable;
 	bool loaded;
 	bool mapdownloaded;
 	Uint32 createdtime;
