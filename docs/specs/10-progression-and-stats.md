@@ -69,9 +69,81 @@ Total possible upgrade points for an agency =
 ## Experience & Leveling
 
 Experience is earned at the end of each game based on in-match statistics.
-The `CalculateExperience()` function tallies weighted values from the stat
-sheet (see below). When accumulated XP exceeds the threshold for the current
-level, the player levels up.
+`CalculateExperience()` (`ui/stats.cpp`) tallies weighted values from the stat
+sheet and returns an XP amount (minimum 0). The lobby server applies the gain
+via `UpdateStats()` (`services/lobby/store.go`), which advances the player's
+level as many times as the XP warrants.
+
+### XP Awards per Match
+
+| Action | XP |
+|--------|-----|
+| Player kill | +35 |
+| Death | −10 |
+| Secret returned to own base | +125 |
+| Secret stolen (enemy secret returned) | +200 |
+| Secret picked up | +25 |
+| Secret dropped (died while carrying) | −10 |
+| Guard killed | +5 |
+| Robot killed | +8 |
+| Fixed cannon destroyed | +10 |
+| Wall defense destroyed | +10 |
+| Civilian killed | −2 |
+| Blaster hits (per 3) | +1 |
+| Laser hits (per 3) | +2 |
+| Rocket hits (per 3) | +3 |
+| Files hacked (per 50) | +1 |
+| Files returned (per 50) | +1 |
+
+Total XP for a match is clamped to a minimum of 0.
+
+### Level Thresholds
+
+`XPToNextLevel` stores XP accumulated within the **current level** bucket
+(range: 0 to threshold − 1). The threshold to advance from level N to N+1 is:
+
+```
+threshold(N) = 100 × (N + 1)
+```
+
+This means each level costs 100 more XP than the previous one. Max level is 99.
+
+**Cumulative XP formula** (total XP needed to reach level N from level 0):
+
+```
+total_xp(N) = 50 × N × (N + 1)
+```
+
+**Level breakdown (selected milestones):**
+
+| Level | XP for this level | Cumulative XP to reach |
+|-------|-------------------|------------------------|
+| 0 | 100 | 0 |
+| 1 | 200 | 100 |
+| 2 | 300 | 300 |
+| 3 | 400 | 600 |
+| 4 | 500 | 1,000 |
+| 5 | 600 | 1,500 |
+| 10 | 1,100 | 5,500 |
+| 15 | 1,600 | 12,000 |
+| 20 | 2,100 | 21,000 |
+| 25 | 2,600 | 32,500 |
+| 30 | 3,100 | 46,500 |
+| 40 | 4,100 | 82,000 |
+| 50 | 5,100 | 127,500 |
+| 60 | 6,100 | 183,000 |
+| 70 | 7,100 | 248,500 |
+| 75 | 7,600 | 285,000 |
+| 80 | 8,100 | 324,000 |
+| 90 | 9,100 | 409,500 |
+| 95 | 9,600 | 456,000 |
+| 99 | 10,000 | 495,000 |
+
+The UI displays **XP remaining** to next level:
+
+```
+xp_remaining = 100 × (level + 1) − XPToNextLevel
+```
 
 ## Match Statistics
 
