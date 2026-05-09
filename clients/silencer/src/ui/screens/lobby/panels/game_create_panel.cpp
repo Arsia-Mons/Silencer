@@ -239,9 +239,12 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	ScrollBar * mapscrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
 	mapscrollbar->res_index = 9;
 	mapscrollbar->scrollpixels = mapselect->lineheight;
-	mapscrollbar->scrollposition = mapselect->scrolled;
-	mapscrollbar->scrollmax = mapselect->items.size();
 	mapscrollbar->scrollposition = 0;
+	{
+		int visible = (int)std::ceil(float(mapselect->height) / mapselect->lineheight);
+		int overflow = (int)mapselect->items.size() - visible;
+		mapscrollbar->scrollmax = overflow > 0 ? overflow : 0;
+	}
 	// Restrict map-list wheel events to the right pane so they don't fire
 	// when the user is wheeling over the form on the left.
 	mapscrollbar->scrollregionx = mapselect->x;
@@ -380,6 +383,10 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 	Interface * iface = (Interface *)world.GetObjectFromId(interfaceId);
 	if(!iface) return;
 
+	// Mirror the SelectBox/ScrollBar per-frame sync pattern below: read the
+	// form scrollbar's position and translate registered rows accordingly.
+	iface->ApplyFormScroll(world);
+
 	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
 		Object * object = world.GetObjectFromId(*it);
 		if(!object) continue;
@@ -396,6 +403,11 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						scrollbar->scrollmax = selectbox->items.size() - std::ceil(float(selectbox->height) / selectbox->lineheight);
 					}else{
 						scrollbar->draw = false;
+						scrollbar->scrollmax = 0;
+						if(scrollbar->scrollposition > 0){
+							scrollbar->scrollposition = 0;
+							selectbox->scrolled = 0;
+						}
 					}
 				}
 

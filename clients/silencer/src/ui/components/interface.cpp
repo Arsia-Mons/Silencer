@@ -183,9 +183,6 @@ void Interface::ActiveChanged(World & world, Interface * callinginterface, bool 
 								if(mousewheeldown){
 									scrollbar->ScrollDown();
 								}
-								if(scrollbar->id == formscrollbar){
-									ApplyFormScroll(world);
-								}
 							}
 						}
 						if(mousedown){
