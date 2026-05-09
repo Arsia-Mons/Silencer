@@ -13,11 +13,17 @@
 #include "updater.h"
 #include "controlserver.h"
 #include "inputserver.h"
+#include "screen_context.h"
 #include <map>
 #include <array>
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <thread>
+#include <vector>
+
+class Screen;
+class Modal;
 
 class Game
 {
@@ -64,6 +70,12 @@ public:
 	// polling. Edge-triggered key events for menu nav still use the control
 	// socket "key" op.
 	bool tui;
+
+	// Screen-stack ops. The stack starts empty and stays empty until screens
+	// migrate over from the legacy Create*/Process*Interface helpers.
+	void PushScreen(std::unique_ptr<Screen> s);
+	void PopScreen();
+	void ReplaceScreen(std::unique_ptr<Screen> s);
 
 	// Keybind access for ControlDispatch.
 	KeyMap& GetKeyMap() { return keymap; }
@@ -274,6 +286,12 @@ private:
 	bool   tui_have_prev_mouse;
 	void DrainControlQueue();
 	void PostFrameReplies();
+
+	// New-tier UI plumbing (Phase 1). Stack starts empty; legacy menu paths
+	// remain authoritative until each screen migrates in Phase 3.
+	std::vector<std::unique_ptr<Screen>> screenStack;
+	ScreenContext screenContext;
+	void TickActiveScreen();
 };
 
 #endif

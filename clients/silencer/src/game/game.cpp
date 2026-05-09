@@ -25,6 +25,8 @@
 #include "actordef.h"
 #include "behaviortree.h"
 #include "gasloader.h"
+#include "screen.h"
+#include "modal.h"
 #include <algorithm>
 #include <stdio.h>
 
@@ -43,7 +45,7 @@
 
 static bool IsBuiltinProfile(const std::string& name);
 
-Game::Game() : renderer(world), screenbuffer(640, 480){
+Game::Game() : renderer(world), screenbuffer(640, 480), screenContext(*this, world, renderer, world.lobby, keymap, updater){
 	world.SetVersion(SILENCER_VERSION);
 	frames = 0;
 	fps = 0;
@@ -619,6 +621,7 @@ bool Game::Loop(void){
 }
 
 bool Game::Tick(void){
+	TickActiveScreen();
 	ProcessInGameInterfaces();
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
@@ -6542,4 +6545,26 @@ nlohmann::json Game::GetWorldSummary(){
 
 bool Game::IsLiveMultiplayer() const {
 	return (world.peercount > 1) && (world.gameplaystate == World::INGAME);
+}
+
+void Game::PushScreen(std::unique_ptr<Screen> s){
+	if(!s) return;
+	s->Build(screenContext);
+	screenStack.push_back(std::move(s));
+}
+
+void Game::PopScreen(){
+	if(screenStack.empty()) return;
+	screenStack.back()->Destroy(screenContext);
+	screenStack.pop_back();
+}
+
+void Game::ReplaceScreen(std::unique_ptr<Screen> s){
+	PopScreen();
+	PushScreen(std::move(s));
+}
+
+void Game::TickActiveScreen(){
+	if(screenStack.empty()) return;
+	screenStack.back()->Tick(screenContext);
 }

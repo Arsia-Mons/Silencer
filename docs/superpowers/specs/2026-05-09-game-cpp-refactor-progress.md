@@ -1,0 +1,170 @@
+# game.cpp refactor — progress tracker
+
+**Design:** [`2026-05-09-game-cpp-refactor-design.md`](./2026-05-09-game-cpp-refactor-design.md)
+**Branch:** `refactor/game-cpp` (worktree at `.worktrees/refactor-game-cpp/`)
+
+This doc tracks execution across sessions. Tick boxes as work lands; update the status note + decisions log as we learn.
+
+---
+
+## The green-at-every-step rule
+
+**Every checkbox below is one mergeable commit. After each one, the game builds and is interactively playable.** No item assumes "we'll fix it in the next commit." If a step would break the game mid-way, it's split further.
+
+The pattern this forces: when we introduce new abstractions, we leave the old code in place until each consumer migrates over individually. New + old coexist for the duration of a phase. The last commit in each phase is "delete the old."
+
+### Verification protocol
+
+Before marking any checkbox done, run all four:
+
+1. **Build:** `cmake --build build` — clean compile, no new warnings.
+2. **E2E suite:** `bash tests/cli-agent/e2e/00_ping.sh && bash tests/cli-agent/e2e/10_navigate.sh && bash tests/cli-agent/e2e/20_screenshot.sh` (or platform equivalent).
+3. **Interactive smoke test:** launch the game, exercise the surface you touched (specifics per phase below).
+4. **Confirm no regression in adjacent surfaces** — if you migrated one screen, also click through one neighboring screen.
+
+Don't tick the box if any of the four fails. Investigate, fix, re-verify.
+
+---
+
+## Status
+
+Phase 1 complete (all 8 steps landed in one commit per user direction). Verified: clean Release build, clean jumbo/unity build (no cyclic dependencies introduced), all 3 E2E scenarios pass (00_ping, 10_navigate, 20_screenshot). The screen stack is empty at runtime — every menu still flows through the legacy `Create*Interface`/`Process*Interface` helpers. Phases 2 and 3 not started.
+
+---
+
+## Phase 0 — Baseline
+
+Establish the green starting point before changing anything.
+
+- [x] Build clean from scratch on this worktree. Pre-existing warning: `C4804` at `game.cpp:6232` (unsafe `bool` in comparison, in `IsLiveMultiplayer`/adjacent code untouched by the refactor).
+- [x] Run the E2E suite. Baseline: `00_ping`, `10_navigate`, `20_screenshot` all pass.
+- [ ] Interactive smoke test (deferred — agent session). The CLI-driven `10_navigate` scenario covers Main → Options → back, which is the only menu path automation can drive headlessly. Full interactive (lobby connect, in-game, exit) belongs to a human pass before merge.
+
+After Phase 0: we have a known-good baseline to compare every subsequent step against.
+
+---
+
+## Phase 1 — Foundation (infrastructure-only, nothing uses it yet)
+
+Each step adds infrastructure. The game runs identically after each — old code paths untouched.
+
+- [x] **CMake: add new include paths.** Append `src/ui/components`, `src/ui/panels`, `src/ui/modals`, `src/ui/screens` (and lobby's two subdirs) to `target_include_directories`. The directories don't exist yet — that's fine, CMake doesn't error on absent dirs in this list. **Verify:** game still builds + runs identically.
+- [x] **Move existing widgets into `ui/components/`.** Pure file move: every `.h/.cpp` currently in `src/ui/` (button, interface, overlay, scrollbar, selectbox, stats, teambillboard, textbox, textinput, toggle) goes into `src/ui/components/`. Bare-filename includes still resolve via the new include path added above. **Verify:** game still builds + runs identically; smoke-test any screen with buttons/textboxes (main menu).
+- [x] **Create `Screen` base class** at `src/ui/screens/screen.h`. Pure header, no `.cpp`. Nothing #includes it yet. **Verify:** build still passes.
+- [x] **Create `Panel` base class** at `src/ui/panels/panel.h`. Same — pure header, unused. **Verify:** build still passes.
+- [x] **Create `Modal` base class** at `src/ui/modals/modal.h`. Same — pure header, unused. **Verify:** build still passes.
+- [x] **Create `ScreenContext`** at `src/ui/screens/screen_context.h/.cpp`. Constructor takes references to all subsystems; methods are stubs that do nothing yet (or assert false). Nothing constructs it. **Verify:** build still passes.
+- [x] **Add `screenStack` member to `Game`** + `PushScreen`/`PopScreen`/`ReplaceScreen` impls. Stack starts empty and stays empty. Add a one-line call in `Game::Tick` to tick the active screen if any (no-op while stack is empty). **Verify:** game runs identically — every menu still works via the old Create/Process methods.
+- [x] **Wire `ScreenContext` construction in `Game`** so `Game` holds one (initialized with refs to its members). Still nothing uses it. **Verify:** build still passes.
+
+After Phase 1: new infrastructure exists, fully unused. Reverting the entire phase would not change behavior. We're ready to migrate one screen.
+
+---
+
+## Phase 2 — Extract collaborators (independent of Phase 3; can run in parallel)
+
+Each extraction is one commit. Methods and members move from `Game` to a new class; callers within `Game` update to go through the new class instance. The behavior is unchanged.
+
+- [ ] **Extract `MapDownloader`** at `src/game/map_downloader.h/.cpp`. Move `dlprogress`, `dlresult`, `dlitemname`, `dlthread`, `mapjoin*`, `mapUpload*`, `pendingCreate`, `servermaps`, `lastmapchunkrequest`, `mapexistchecked`, `selectedmap` plus the 7 methods (`ListFiles`, `FindMap`, `SaveMap`, `CalculateMapHash`, `StringFromHash`, `LoadMapData`, `ProcessMapDownload`). `Game` gets a `MapDownloader mapDownloader` member; everywhere `Game` referenced the old members, it now goes through `mapDownloader.X`. **Verify:** smoke-test the map download flow — join a game whose map you don't have locally; create a game with a local map (triggers upload).
+- [ ] **Extract `AmbienceMixer`** at `src/game/ambience_mixer.h/.cpp`. Move `bgchannel[3]`, `lastmusicplaytime`, `currentmusictrack`, `oldambiencelevel` plus the 6 methods (`CreateAmbienceChannels`, `UpdateAmbienceChannels`, `LoadRandomGameMusic`, `FadedIn`, `PlayMusic`, `GetGameChannelName`). **Verify:** smoke-test audio — main-menu music plays; entering a game switches tracks; ambience cross-fades when you change levels in-game.
+
+---
+
+## Phase 3 — Migrate screens (one screen per commit, each independently green)
+
+The migration pattern for each screen:
+
+1. Create the new `<Name>Screen` class file(s).
+2. In the corresponding `case <STATE>:` of `Game::Tick`, replace the inline body with: if `stateisnew`, `PushScreen(make_unique<NameScreen>())`; let the screen-stack tick run.
+3. Delete `Game::Create<Name>Interface` and `Game::Process<Name>Interface` (and any `Update<Name>Interface`).
+4. Delete the corresponding `Uint16 <name>interface` member from `game.h`.
+5. Build + interactively smoke-test that screen — every button, every back-out path. Smoke-test the screens it transitions to and from.
+
+**Order:** small screens first to validate the pattern; the big screen (Lobby) last. Modals before LobbyScreen because LobbyScreen depends on them.
+
+- [ ] **`MainMenuScreen`.** Smallest screen, validates the pattern. **Smoke:** all 4 buttons (Start, Lobby Connect, Options, Quit). Confirm Quit still exits cleanly.
+- [ ] **`LobbyConnectScreen`.** Validates a screen with non-trivial Tick logic (state machine that cycles through Lobby connection states). **Smoke:** connect to a running lobby; force a connection failure (wrong host) and confirm the error display path; back-out to main menu.
+- [ ] **`ModalDialog` (in `ui/modals/`).** Add as a `Modal` and route `Game::CreateModalDialog` calls to `ctx.ShowMessage(...)`. Old method stays for now (still called from un-migrated screens). **Smoke:** trigger any modal-dialog path that's already exercised — currently those are only fired from in-lobby code paths. Use `silencer-cli` to inject one if needed for testing.
+- [ ] **`PasswordDialog` (in `ui/modals/`).** Same treatment as ModalDialog. **Smoke:** join a password-protected game.
+- [ ] **`MapPreviewModal` (in `ui/screens/lobby/modals/`).** Same — added as a Modal but old `CreateMapPreview` stays callable until LobbyScreen migrates. **Smoke:** select a map in the game-create flow and confirm the preview shows.
+- [ ] **`OptionsScreen`.** Top-level options menu. **Smoke:** Options → all 3 sub-buttons → back to main menu.
+- [ ] **`OptionsControlsScreen`** — biggest options screen, carries the keybind UI helpers (`LegacyView`, `WriteLegacy`, `GetActionKeyDisplayName`, `GetKeyName`, `CycleKeybindPreset`, `ForkActiveProfileIfBuiltin`). **Smoke:** open Controls, rebind one key, cycle preset, save, back out, reopen, confirm persistence.
+- [ ] **`OptionsDisplayScreen`.** **Smoke:** toggle fullscreen, change resolution if applicable, back out.
+- [ ] **`OptionsAudioScreen`.** **Smoke:** change a volume slider, back out, reopen, confirm value persisted.
+- [ ] **`UpdateScreen`.** **Smoke:** trigger the updater path (lobby reports out-of-date version); confirm progress bar, completion, stage-2 launch.
+- [ ] **`GameSummaryScreen`.** **Smoke:** finish a game (or use replay/test mode); confirm summary stats render and "back to lobby" works.
+
+### LobbyScreen — special case (multi-step, each step green)
+
+LobbyScreen has 6 panels. Migrate it in stages so the lobby keeps working throughout.
+
+- [ ] **Stage A: land `LobbyScreen` with adapter calls.** `LobbyScreen::Build` calls into the existing `Game::CreateCharacterInterface()`, `Game::CreateChatInterface()`, etc. as before. `LobbyScreen::Tick` calls into the existing `Game::ProcessLobbyInterface()`. The 731-line method stays intact for now — we've just moved the entry point. **Smoke:** full lobby flow — connect, character select, chat, browse games, create game, join game, leave lobby. This is the biggest single smoke-test of the refactor.
+- [ ] **Stage B: migrate `CharacterPanel`.** Replace the `Game::CreateCharacterInterface` call inside `LobbyScreen::Build` with `character.Build(ctx, parent)` using the new `CharacterPanel`. Move the panel's process logic out of `Game::ProcessLobbyInterface` into `CharacterPanel::Tick`. Delete `Game::CreateCharacterInterface`. **Smoke:** character select — pick each agency, confirm display updates.
+- [ ] **Stage C: migrate `ChatPanel`.** **Smoke:** type chat messages, confirm they appear; receive messages from another client.
+- [ ] **Stage D: migrate `GameSelectPanel`.** **Smoke:** browse server list, refresh, see games appear/disappear.
+- [ ] **Stage E: migrate `GameCreatePanel`.** **Smoke:** open create-game form, enter game name, select map, set parameters, click create; confirm map upload triggers; confirm you land in the lobby of the created game.
+- [ ] **Stage F: migrate `GameJoinPanel`.** **Smoke:** join a game from the list; confirm player roster updates.
+- [ ] **Stage G: migrate `GameTechPanel`.** **Smoke:** open tech tree, browse, select a research item.
+- [ ] **Stage H: cleanup.** Delete what's left of `Game::ProcessLobbyInterface`, `Game::CreateLobbyInterface`, `Game::UpdateLobbyMapName`, and the `lobbyinterface`/`chatinterface`/etc. `Uint16` members. **Smoke:** full lobby flow once more.
+
+After Phase 3: every menu surface is a Screen/Panel/Modal class. `Game` has no `Create*Interface`/`Process*Interface` methods left.
+
+---
+
+## Phase 4 — Mechanical splits (non-UI, file moves only)
+
+Pure file moves. Each commit moves a group of `Game::` member implementations into a new `.cpp` while the declarations stay in `game.h`. Behavior unchanged.
+
+- [ ] **Move SDL event handling** into `src/game/events.cpp` (`HandleSDLEvents`, `OnScancodeDown/Up`, `UpdateInputState`, `OpenFirstGamepad`, `PollGamepadState`). **Smoke:** keyboard navigation on every screen; gamepad if available.
+- [ ] **Move in-game lifecycle** into `src/game/ingame.cpp` (`LoadMap`, `UnloadGame`, `JoinGame`, `GiveDefaultItems`, `ShowDeployMessage`, `CheckForQuit`/`EndOfGame`/`ConnectionLost`, `ProcessInGameInterfaces`, `ShowTeamOverlays`). **Smoke:** start a game, play through to end-of-mission.
+- [ ] **Move headless-control glue** into `src/game/headless.cpp` (`DrainControlQueue`, `PostFrameReplies`). **Smoke:** run the full E2E suite (every test exercises this path).
+- [ ] **Split `Game::Tick`'s gameplay-state cases.** This is six commits, one per gameplay state — the switch dispatcher stays in `game.cpp` but each `case <STATE>:` body moves into a per-state method (e.g., `Game::TickInGame()`) defined in `src/game/tick/tick_<state>.cpp`.
+  - [ ] `tick_misc.cpp` — `FADEOUT` (smallest first to validate). **Smoke:** transition between any two states.
+  - [ ] `tick_replay.cpp` — `REPLAYGAME`. **Smoke:** play a replay file.
+  - [ ] `tick_hostjoin.cpp` — `HOSTGAME`, `JOINGAME`, `TESTGAME`. **Smoke:** host a game; join a game; launch test mode.
+  - [ ] `tick_singleplayer.cpp` — `SINGLEPLAYERGAME` (391 lines). **Smoke:** start single-player, complete a level.
+  - [ ] `tick_ingame.cpp` — `INGAME` (228 lines). **Smoke:** play multiplayer end-to-end.
+
+---
+
+## Phase 5 — Cleanup
+
+- [ ] **Delete dead members from `Game`.** Anything no longer referenced (old interface IDs, helpers wholly absorbed by panels). **Verify:** build passes, full E2E suite passes.
+- [ ] **Verify size targets.** `game.cpp` ≈ 250 lines, `game.h` ≈ 170 lines, no UI file >300 lines except `lobby_screen.cpp` (~300). If anything is way over, decide whether to split further or leave it.
+- [ ] **Update `clients/silencer/CLAUDE.md`.** The "Where to look" section currently points at `src/game.cpp`; update it to reflect the new layout.
+- [ ] **Final full smoke test.** Main menu → options (each sub-screen) → lobby connect → lobby → character → chat → game create → join game → in-game → end-of-mission summary → back to lobby → quit. Every modal that triggers along the way (bad password, download failed, disconnected, etc.).
+- [ ] **Final E2E suite run.** Compare to Phase 0 baseline — should be identical pass/fail status.
+
+---
+
+## Decisions log
+
+Choices made during brainstorming, anchored here so future sessions don't have to relitigate.
+
+- **Three-tier UI model.** `Screen` (top-level, stack-managed) / `Panel` (sub-`Interface` owned by a Screen as a member) / `Modal` (overlay-on-top with callback). Chosen over flat "everything is a Screen" because it matches how the existing UI actually composes (lobby has co-visible sub-panels via `iface->AddObject(...)`).
+- **Co-location.** Things used by exactly one screen live inside that screen's folder (`ui/screens/<screen>/panels/`, `ui/screens/<screen>/modals/`). Things used across screens live at the top of `ui/`. Same rule for panels and modals.
+- **`ScreenContext` is curated.** Only subsystem refs (World, Renderer, Lobby, Config, KeyMap, Updater, AmbienceMixer, MapDownloader) and state-machine actions (GoToState, GoBack, RequestQuit, PushScreen, PopScreen, ReplaceScreen, ShowModal). No session-specific accessors (`LocalUsername`, `SelectedAgency`, `IsLiveMultiplayer`) — those data points get re-homed to where they semantically belong (Config, character-screen state, World/inline).
+- **Existing `ui/*.{h,cpp}` move into `ui/components/`.** Bare-filename includes (`#include "button.h"`) keep working because the new subfolder is added to CMake's include path. No caller updates needed for the move.
+- **`ui/panels/`** exists but is empty initially (all 6 panels are lobby-owned). Holds `panel.h` only.
+- **Modals split:** `ModalDialog` and `PasswordDialog` go in `ui/modals/` (generic); `MapPreviewModal` goes in `ui/screens/lobby/modals/` (lobby-only).
+- **Gameplay-state Tick bodies stay on `Game`.** `INGAME`, `SINGLEPLAYERGAME`, `HOSTGAME`, `JOINGAME`, `TESTGAME`, `REPLAYGAME` aren't UI surfaces — they're the actual game running. They're mechanically split into `src/game/tick/tick_*.cpp`, not converted to Screens.
+- **Green at every commit.** Old code paths are not deleted until each consumer migrates. Migration uses adapter pattern (e.g., LobbyScreen Stage A calls into existing `Game::Create*` helpers). Last commit in each migration sequence is "delete the old."
+- **`Modal` is a `Screen` subclass with `IsOverlay()` virtual on `Screen`.** Renderer/screen-stack checks `IsOverlay()` to decide whether to draw the underneath. Putting the virtual on `Screen` (not `Modal`) means the stack never has to type-check.
+- **`ScreenContext` dispatches actions through a private `Game&` ref.** This is an implementation choice; the contract is the public surface (named subsystem refs + named action methods). The design doc was originally over-prescriptive ("no `Game&`") — amended on 2026-05-09 to leave the dispatch mechanism free.
+
+---
+
+## Open questions
+
+- **Panel ownership pattern.** Value member (`CharacterPanel character;`) vs `unique_ptr<Panel>` — value works for always-alive panels, `unique_ptr` for swappable ones (GameSelect ↔ GameCreate). Decide per-panel during Phase 3.
+
+---
+
+## Notes for next session
+
+When picking this up:
+1. Read the design doc end-to-end before touching code.
+2. Run Phase 0 first — without a known-good baseline, you can't tell if a regression you hit was caused by the refactor or was pre-existing.
+3. Phase 1 is sequential within itself. Phases 2 and 3 can interleave — extract `MapDownloader` whenever it's convenient, doesn't block screen migrations.
+4. **One commit per checkbox.** Resist batching. The whole point is that any single commit can be reverted without breaking the game.
+5. After each commit, run the verification protocol at the top of this doc. Don't tick the box if any of the four steps fails.
