@@ -43,6 +43,7 @@ export const TOOLS: ToolDef[] = [
   { id: 'ERASE_PLATFORM', label: 'ERASE PLT',  icon: '✕' },
   { id: 'ACTOR',          label: 'ACTOR',      icon: '☻' },
   { id: 'SHADOW_ZONE',    label: 'SHADOW',     icon: '🌑' },
+  { id: 'TRIGGER_ZONE',  label: 'TRIG ZONE',  icon: '⬡' },
   { id: 'NAV_LINK',       label: 'LINK',       icon: '⇒' },
 ];
 
@@ -126,7 +127,7 @@ export default function Toolbar({
 }: ToolbarProps) {
   const tileTools     = TOOLS.filter(t => ['TILE_BG', 'TILE_FG', 'ERASE_TILE', 'TILE_SELECT', 'FLOOD_FILL'].includes(t.id));
   const platformTools = TOOLS.filter(t => ['RECT','STAIRSUP','STAIRSDOWN','LADDER','TRACK','OUTSIDEROOM','SPECIFICROOM','ERASE_PLATFORM'].includes(t.id));
-  const otherTools    = TOOLS.filter(t => ['SELECT','ACTOR','SHADOW_ZONE','NAV_LINK'].includes(t.id));
+  const otherTools    = TOOLS.filter(t => ['SELECT','ACTOR','SHADOW_ZONE','TRIGGER_ZONE','NAV_LINK'].includes(t.id));
 
   const btnCls = (id: string) =>
     `px-2 py-1 text-xs font-mono border rounded transition-colors ${

@@ -39,6 +39,9 @@ interface FieldState {
   direction: string;
   matchid: string;
   securityid: string;
+  destructible: boolean;
+  collectible: boolean;
+  health: string;
 }
 
 interface LightFieldState {
@@ -73,10 +76,13 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
   const typeHint = !isLight ? ACTOR_TYPE_HINTS[actor.id] : undefined;
 
   const [fields, setFields] = useState<FieldState>({
-    type:       String(actor.type ?? 0),
-    direction:  String(actor.direction ?? 0),
-    matchid:    String(actor.matchid ?? 0),
-    securityid: String(actor.securityid ?? 0),
+    type:         String(actor.type ?? 0),
+    direction:    String(actor.direction ?? 0),
+    matchid:      String(actor.matchid ?? 0),
+    securityid:   String(actor.securityid ?? 0),
+    destructible: !!(actor.unknown & 1),
+    collectible:  !!(actor.unknown & 2),
+    health:       String(((actor.unknown ?? 0) >> 8) & 0xFF || 100),
   });
 
   // Light-specific decoded state
@@ -118,11 +124,14 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
         direction: lightFields.direction,
       });
     } else {
+      const hp = Math.min(255, Math.max(1, parseInt(fields.health, 10) || 100));
+      const unknownFlags = (fields.destructible ? 1 : 0) | (fields.collectible ? 2 : 0) | ((fields.destructible ? hp : 0) << 8);
       onUpdate(actorIdx, {
         type:       parseInt(fields.type,       10) || 0,
         direction:  parseInt(fields.direction,  10) || 0,
         matchid:    parseInt(fields.matchid,    10) || 0,
         securityid: parseInt(fields.securityid, 10) || 0,
+        unknown:    unknownFlags,
       });
     }
     onClose();
@@ -281,6 +290,29 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
               <option value="5">5 — Low or High</option>
               <option value="6">6 — Medium or High</option>
             </select>
+          </div>
+
+          <div className="border-t border-[#1a3a1a] pt-1.5 mt-1.5 flex flex-col gap-1">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={fields.destructible}
+                onChange={e => setFields(f => ({ ...f, destructible: e.target.checked }))}
+                className="accent-[#ff6644]" />
+              <span className={lbl}>Destructible</span>
+            </label>
+            {fields.destructible && (
+              <div className="flex items-center gap-2 pl-5">
+                <span className={lbl}>Max HP</span>
+                <input type="number" min={1} max={255} value={fields.health}
+                  onChange={e => setFields(f => ({ ...f, health: e.target.value }))}
+                  className={inp + ' w-16'} />
+              </div>
+            )}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={fields.collectible}
+                onChange={e => setFields(f => ({ ...f, collectible: e.target.checked }))}
+                className="accent-[#4a8a4a]" />
+              <span className={lbl}>Collectible</span>
+            </label>
           </div>
         </>
       )}

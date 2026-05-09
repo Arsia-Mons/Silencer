@@ -1,6 +1,8 @@
 #include "object.h"
 #include "resources.h"
 #include "audio.h"
+#include "EventBus.h"
+#include "gasloader.h"
 
 Object::Object(Uint8 type){
 	Object::type = type;
@@ -17,6 +19,9 @@ Object::Object(Uint8 type){
 	isbipedal = false;
 	isprojectile = false;
 	iscontrollable = false;
+	collectible = false;
+	collected   = false;
+	is_moving   = false;
 }
 
 bool Object::RequiresAuthority(void){
@@ -24,7 +29,34 @@ bool Object::RequiresAuthority(void){
 }
 
 void Object::Tick(World & world){
+	const float dt = 1.f / GASLoader::Get().gameengine.ticksPerSecond;
 
+	// Scripted movement (MOVE_ACTOR action)
+	if (is_moving && move_duration > 0.f) {
+		move_elapsed += dt;
+		float t = move_elapsed / move_duration;
+		if (t >= 1.f) {
+			t = 1.f;
+			is_moving = false;
+		}
+		x = static_cast<Sint16>(move_origin_x + (move_target_x - move_origin_x) * t);
+		y = static_cast<Sint16>(move_origin_y + (move_target_y - move_origin_y) * t);
+	}
+
+	// Collectible item pickup (authority only; one-shot by default)
+	if (collectible && !collected && world.IsAuthority()) {
+		int r = 16; // overlap radius in world units
+		std::vector<Uint8> playertypes = { ObjectTypes::PLAYER };
+		std::vector<Object *> nearby = world.TestAABB(x - r, y - r, x + r, y + r, playertypes);
+		if (!nearby.empty()) {
+			collected = true;
+			GameEvent ev;
+			ev.type     = EventType::ITEM_COLLECTED;
+			ev.actor_id = id;
+			ev.player_id = nearby[0]->id;
+			world.triggerGraph.Bus().Emit(ev);
+		}
+	}
 }
 
 void Object::Serialize(bool write, Serializer & data, Serializer * old){

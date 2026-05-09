@@ -541,6 +541,19 @@ void Guard::Tick(World & world){
 				state_i = -1;
 				break;
 			}
+			// Not on a platform yet — fall until we land on one.
+			yv += world.gravity;
+			if(yv > world.maxyvelocity) yv = world.maxyvelocity;
+			int xe = x + xv;
+			int ye = y + yv;
+			Platform * platform = world.map.TestLine(x, y, xe, ye, &xe, &ye, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN);
+			if(platform){
+				currentplatformid = platform->id;
+				state = STANDING;
+				state_i = -1;
+			}
+			x = xe;
+			y = ye;
 		}break;
 		case STANDING:{
 			yv = 0;

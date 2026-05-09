@@ -3,6 +3,7 @@
 #include "objecttypes.h"
 #include "plume.h"
 #include "civilian.h"
+#include "EventBus.h"
 #include "robot.h"
 #include "terminal.h"
 #include "vent.h"
@@ -2853,6 +2854,35 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		state = DYING;
 		state_i = 0;
 		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundGrunt]);
+
+		if (world.IsAuthority()) {
+			// Emit PLAYER_DIED so trigger scripts can respond.
+			GameEvent ev;
+			ev.type      = EventType::PLAYER_DIED;
+			ev.actor_id  = id;
+			ev.player_id = id;
+			if (Team * team = world.GetPeerTeam(GetPeer(world) ? GetPeer(world)->id : 0))
+				ev.team = team->agency;
+			world.triggerGraph.Bus().Emit(ev);
+
+			// Check if ALL players are dead and emit ALL_PLAYERS_DIED.
+			bool any_alive = false;
+			for (std::list<Object *>::iterator it = world.objectlist.begin();
+			     it != world.objectlist.end(); ++it) {
+				Object * obj = *it;
+				if (obj->type != ObjectTypes::PLAYER || obj->id == id) continue;
+				Player * p = static_cast<Player *>(obj);
+				if (p->state != DYING && p->state != DEAD) {
+					any_alive = true;
+					break;
+				}
+			}
+			if (!any_alive) {
+				GameEvent all_ev;
+				all_ev.type = EventType::ALL_PLAYERS_DIED;
+				world.triggerGraph.Bus().Emit(all_ev);
+			}
+		}
 	}
 }
 

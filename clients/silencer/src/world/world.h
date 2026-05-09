@@ -20,12 +20,19 @@
 #include "dedicatedserver.h"
 #include "buyableitem.h"
 #include "replay.h"
+#include "TriggerGraph.h"
 
 class World
 {
 public:
 	World(bool mode = AUTHORITY);
 	~World();
+	// Cinematic camera pan — overrides main camera follow when active.
+	bool pancameraactive;
+	bool pancamerareturn;
+	Uint32 pancamerareturncount; // ticks remaining in return pan; releases input at 0
+	Sint16 pancamerax;
+	Sint16 pancameray;
 	class Object * CreateObject(Uint8 type, Uint16 id = 0);
 	Object * GetObjectFromId(Uint16 id);
 	void MarkDestroyObject(Uint16 id);
@@ -50,6 +57,7 @@ public:
 	void Illuminate(void);
 	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0, bool networked = false, Peer * peer = 0);
 	void ShowStatus(const char * status, Uint8 color = 0, bool networked = false, Peer * peer = 0);
+	void BroadcastTriggerState();
 	void ShowTopMessage(const char * message);
 	void SendChat(bool toteam, char * message);
 	void SendSound(const char * name, Peer * peer = 0, Uint8 volume = 128);
@@ -71,6 +79,7 @@ public:
 	int AveragePingJitter(void);
 	bool SecurityIDCanSpawn(Uint8 securityid);
 	void SetSystemCamera(bool system, Uint16 objectfollow, Sint16 x, Sint16 y);
+	void BroadcastCamera(Sint16 x, Sint16 y);
 	bool TestAABB(int x1, int y1, int x2, int y2, Object * object, std::vector<Uint8> & types, bool onlycollidable = true);
 	std::vector<Object *> TestAABB(int x1, int y1, int x2, int y2, std::vector<Uint8> & types, Uint16 except = 0, Uint16 teamid = 0, bool onlycollidable = true);
 	Object * TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, std::vector<Uint8> & types, Uint16 except = 0, Uint16 teamid = 0);
@@ -103,6 +112,10 @@ public:
 	bool debugoverlay;
 	struct DebugLine { int x1, y1, x2, y2; Uint8 color; };
 	std::vector<DebugLine> debuglines;
+
+	TriggerGraph triggerGraph;
+	bool input_locked = false; // set by LOCK_INPUT action, cleared by UNLOCK_INPUT
+	bool player_spawn_emitted = false;
 	
 	friend class Renderer;
 	friend class Game;
@@ -120,6 +133,7 @@ public:
 	friend class PlayerAI;
 	friend class Replay;
 	friend class Audio;
+	friend class TriggerGraph;
 	
 protected:
 	std::list<class Object *> objectlist;
@@ -199,7 +213,8 @@ private:
 	enum {NONE, INLOBBY, INGAME} gameplaystate;
 	enum {MSG_CONNECT, MSG_SNAPSHOT, MSG_INPUT, MSG_PEERLIST, MSG_DISCONNECT, MSG_PING, MSG_PONG,
 		MSG_GAMEINFO, MSG_READY, MSG_CHAT, MSG_STATION, MSG_CHANGETEAM, MSG_STATUS,
-		MSG_MESSAGE, MSG_GOVTKILL, MSG_SOUND, MSG_TECH, MSG_STATS, MSG_EXISTS, MSG_REMOVE, MSG_MAP, MSG_SETAGENCY, MSG_KICK};
+		MSG_MESSAGE, MSG_GOVTKILL, MSG_SOUND, MSG_TECH, MSG_STATS, MSG_EXISTS, MSG_REMOVE, MSG_MAP, MSG_SETAGENCY, MSG_KICK,
+		MSG_TRIGGER_STATE, MSG_CAMERA};
 	enum {STA_BUY, STA_REPAIR, STA_VIRUS};
 	enum {MAP_DOWNLOADED, MAP_GETCHUNK, MAP_PUTCHUNK};
 	Serializer * oldsnapshots[maxpeers][maxoldsnapshots];

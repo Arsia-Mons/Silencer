@@ -347,9 +347,16 @@ void Game::LoadProgressCallback(int progress, int totalprogressitems){
 	if(SDL_GetTicks() - lasttick >= 100){
 		int width = 500;
 		int widthp = (float(progress) / totalprogressitems) * width;
-		//const char * text = "Loading...";
-		//renderer.DrawText(&screenbuffer, 320 - ((strlen(text) * 12) / 2), 200, text, 135, 12);
-		renderer.DrawFilledRectangle(&screenbuffer, (640 - (width)) / 2, (480 - 20) / 2, (640 + (widthp)) / 2, (480 + 20) / 2, 123);
+		int barx = (640 - width) / 2;
+		int bary = (480 - 32) / 2;
+		renderer.DrawFilledRectangle(&screenbuffer, barx, bary, barx + width, bary + 32, 101);
+		if(widthp > 0){
+			for(int c = 0; c < 13; c++){
+				int x0 = barx + (c * widthp) / 13;
+				int x1 = barx + ((c + 1) * widthp) / 13;
+				if(x1 > x0) renderer.DrawFilledRectangle(&screenbuffer, x0, bary, x1, bary + 32, 101 + c);
+			}
+		}
 		Present();
 		lasttick = SDL_GetTicks();
 	}
@@ -2311,6 +2318,9 @@ void Game::UnloadGame(void){
 		Audio::GetInstance().StopMusic();
 	}
 	world.map.Unload();
+	world.pancameraactive = false;
+	world.pancamerareturn = false;
+	world.pancamerareturncount = 0;
 	world.message_i = 0;
 	world.winningteamid = 0;
 	world.DestroyAllObjects();

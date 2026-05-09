@@ -1,6 +1,7 @@
 #include "terminal.h"
 #include "player.h"
 #include "gasloader.h"
+#include "EventBus.h"
 
 Terminal::Terminal() : Object(ObjectTypes::TERMINAL){
 	state = INACTIVE;
@@ -116,6 +117,11 @@ void Terminal::Tick(World & world){
 					if(beamingcount >= beamingseconds){
 						state = READY;
 						state_i = (beamingframes + inactiveframes) * 4;
+						// Emit TERMINAL_ACTIVATED so trigger scripts can respond.
+						GameEvent ev;
+						ev.type     = EventType::TERMINAL_ACTIVATED;
+						ev.actor_id = id;
+						world.triggerGraph.Bus().Emit(ev);
 						break;
 					}
 				}

@@ -15,9 +15,18 @@ public:
 	friend class Renderer;
 
 	bool IsAlive() const { return health > 0; }
+	Uint16 GetHealth() const { return health; }
+	Uint16 GetMaxHealth() const { return maxhealth; }
+	void ApplyDamage(Uint16 dmg) { health = (health > dmg) ? health - dmg : 0; }
+
+	// Set both health and maxhealth together (e.g. during actor init).
+	void SetHealth(Uint16 hp) { health = hp; maxhealth = hp; }
+
+	bool destructible = false; // if true, emits ACTOR_KILLED via EventBus on death
 
 protected:
 	Uint16 health;
+	Uint16 maxhealth = 0;
 	Uint16 shield;
 	Uint8 state_hit;
 	Uint8 hitx;

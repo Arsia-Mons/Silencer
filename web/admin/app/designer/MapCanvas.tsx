@@ -2,7 +2,7 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { ACTOR_DEFS, PLATFORM_TOOL_TYPES } from './Toolbar';
 import { bakeSingleLight, buildOccluders, LIGHT_RADII } from './lightBaker';
-import type { SilMapData, MapPlatform, NavLink, SpriteEntry, TileCell } from '../../lib/types';
+import type { SilMapData, MapPlatform, NavLink, SpriteEntry, TileCell, TriggerNode, TriggerZone } from '../../lib/types';
 
 // Platform overlay colors
 const PLATFORM_COLORS: Record<string, string> = {
@@ -126,6 +126,12 @@ interface Props {
   onActorFlip?: (idx: number) => void;
   onShadowZoneDraw?: (zone: { x1: number; y1: number; x2: number; y2: number }) => void;
   onShadowZoneRemove?: (idx: number) => void;
+  onTriggerZoneDraw?: (zone: Omit<TriggerZone, 'label'> & { label: string }) => void;
+  onTriggerZoneRemove?: (id: number) => void;
+  onTriggerZoneUpdate?: (id: number, x1: number, y1: number, x2: number, y2: number) => void;
+  onTriggerZoneLiveUpdate?: (id: number, x1: number, y1: number, x2: number, y2: number) => void;
+  selectedZoneId?: number | null;
+  onTriggerZoneSelect?: (id: number | null) => void;
   onActorTypeChange?: (idx: number, type: number) => void;
   gridSize: number;
   tileSelection?: { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number } | null;
@@ -143,6 +149,9 @@ interface Props {
   onNavLinkAdd?: (fromIdx: number, toIdx: number, type: 0 | 1 | 2, sourceX: number, targetX: number) => void;
   onNavLinkSelect?: (idx: number | null) => void;
   onLinkFromIdxChange?: (idx: number | null) => void;
+  // Trigger actor linking: when set, next actor click calls this with the actor's matchid
+  actorLinkTarget?: { label: string } | null;
+  onActorLinked?: (matchid: number) => void;
 }
 
 export default function MapCanvas({
@@ -161,6 +170,12 @@ export default function MapCanvas({
   onActorFlip,
   onShadowZoneDraw,
   onShadowZoneRemove,
+  onTriggerZoneDraw,
+  onTriggerZoneRemove,
+  onTriggerZoneUpdate,
+  onTriggerZoneLiveUpdate,
+  selectedZoneId,
+  onTriggerZoneSelect,
   onActorTypeChange,
   gridSize,
   tileSelection,
@@ -174,6 +189,8 @@ export default function MapCanvas({
   onNavLinkAdd,
   onNavLinkSelect,
   onLinkFromIdxChange,
+  actorLinkTarget,
+  onActorLinked,
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -192,6 +209,13 @@ export default function MapCanvas({
   // Shadow zone drag: start world pos while drawing
   const shadowZoneDragRef = useRef<{ startWx: number; startWy: number; curWx: number; curWy: number } | null>(null);
   const [shadowZonePreview, setShadowZonePreview] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  // Trigger zone draw drag
+  const triggerZoneDragRef = useRef<{ startWx: number; startWy: number; curWx: number; curWy: number } | null>(null);
+  const [triggerZonePreview, setTriggerZonePreview] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  // Trigger zone select/move/resize drag (SELECT tool)
+  type ZoneDragState = { mode: 'body' | 'handle'; handle: string | null; id: number; origZone: { x1: number; y1: number; x2: number; y2: number }; startWx: number; startWy: number };
+  const zoneDragRef = useRef<ZoneDragState | null>(null);
+  const zonePreviewRef = useRef<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
   // Pending sourceX for NAV_LINK JETPACK — set on first click, used on second
   const navLinkSourceXRef = useRef<number>(-2147483648);
   // Tile selection drag
@@ -555,6 +579,69 @@ export default function MapCanvas({
       ctx.setLineDash([]);
     }
 
+    // Trigger zones (cyan/teal, drawn after shadow zones)
+    const triggerZones = map.zones ?? [];
+    if (triggerZones.length > 0) {
+      for (const z of triggerZones) {
+        const isSelected = z.id === selectedZoneId;
+        const zx1 = Math.min(z.x1, z.x2) * zoom + pan.x;
+        const zy1 = Math.min(z.y1, z.y2) * zoom + pan.y;
+        const zw  = Math.abs(z.x2 - z.x1) * zoom;
+        const zh  = Math.abs(z.y2 - z.y1) * zoom;
+        ctx.fillStyle = isSelected ? 'rgba(0,220,200,0.25)' : 'rgba(0,220,200,0.15)';
+        ctx.fillRect(zx1, zy1, zw, zh);
+        ctx.strokeStyle = isSelected ? 'rgba(0,255,220,1.0)' : 'rgba(0,220,200,0.8)';
+        ctx.lineWidth = isSelected ? 2 : 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.strokeRect(zx1, zy1, zw, zh);
+        ctx.setLineDash([]);
+        if (zoom > 0.25) {
+          ctx.fillStyle = isSelected ? 'rgba(0,255,220,1.0)' : 'rgba(0,220,200,0.9)';
+          ctx.font = `${Math.max(9, 10 * zoom)}px monospace`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(`Z${z.id}`, zx1 + zw / 2, zy1 + zh / 2);
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'top';
+        }
+        // Draw resize handles on selected zone
+        if (isSelected) {
+          const handleSize = Math.max(6, 8 * zoom);
+          const hs = handleSize / 2;
+          const hx1 = zx1, hx2 = zx1 + zw, hmx = zx1 + zw / 2;
+          const hy1 = zy1, hy2 = zy1 + zh, hmy = zy1 + zh / 2;
+          const handlePositions = [
+            [hx1, hy1], [hmx, hy1], [hx2, hy1],
+            [hx1, hmy],              [hx2, hmy],
+            [hx1, hy2], [hmx, hy2], [hx2, hy2],
+          ];
+          ctx.fillStyle = '#00ffdc';
+          ctx.strokeStyle = '#003333';
+          ctx.lineWidth = 1;
+          for (const [hx, hy] of handlePositions) {
+            ctx.fillRect(hx - hs, hy - hs, handleSize, handleSize);
+            ctx.strokeRect(hx - hs, hy - hs, handleSize, handleSize);
+          }
+        }
+      }
+    }
+
+    // Trigger zone preview while drawing
+    if (triggerZonePreview) {
+      const { x1, y1, x2, y2 } = triggerZonePreview;
+      const px1 = Math.min(x1, x2) * zoom + pan.x;
+      const py1 = Math.min(y1, y2) * zoom + pan.y;
+      const pw  = Math.abs(x2 - x1) * zoom;
+      const ph  = Math.abs(y2 - y1) * zoom;
+      ctx.fillStyle = 'rgba(0,220,200,0.2)';
+      ctx.fillRect(px1, py1, pw, ph);
+      ctx.strokeStyle = 'rgba(0,255,230,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(px1, py1, pw, ph);
+      ctx.setLineDash([]);
+    }
+
     // Nav link arrows
     const NAV_LINK_COLORS: Record<number, string> = { 0: '#00ff88', 1: '#ffdd00', 2: '#ff6644' };
     const NAV_LINK_LABELS: Record<number, string> = { 0: 'JUMP', 1: 'FALL', 2: 'JETPACK' };
@@ -626,6 +713,48 @@ export default function MapCanvas({
           }
         }
       }
+    }
+
+    // MOVE_ACTOR path previews — dashed lines from each actor to its trigger target
+    const triggers: TriggerNode[] = map.triggers ?? [];
+    if (triggers.length > 0) {
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1.5;
+      ctx.font = `${Math.max(7, 8 * zoom)}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      for (const node of triggers) {
+        for (const action of node.actions) {
+          if (action.type !== 'MOVE_ACTOR' || !action.actorId) continue;
+          // actor_id in designer = actor matchid (set in context menu)
+          const srcActor = actors.find(a => a.matchid === action.actorId);
+          if (!srcActor) continue;
+          const srcCx    = srcActor.x * zoom + pan.x;
+          const srcCy    = srcActor.y * zoom + pan.y;
+          const targetCx = action.paramX * zoom + pan.x;
+          const targetCy = action.paramY * zoom + pan.y;
+          ctx.strokeStyle = '#ff8800';
+          ctx.fillStyle   = '#ff8800';
+          ctx.beginPath();
+          ctx.moveTo(srcCx, srcCy);
+          ctx.lineTo(targetCx, targetCy);
+          ctx.stroke();
+          // Target marker cross
+          const r = Math.max(4, 5 * zoom);
+          ctx.beginPath();
+          ctx.arc(targetCx, targetCy, r, 0, Math.PI * 2);
+          ctx.fill();
+          if (zoom > 0.2) {
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#ff8800';
+            ctx.fillText('MOVE', (srcCx + targetCx) / 2, (srcCy + targetCy) / 2 - 2);
+            ctx.setLineDash([4, 4]);
+          }
+        }
+      }
+      ctx.setLineDash([]);
+      ctx.restore();
     }
 
     // Highlight linkFromIdx platform (pending NAV_LINK first-click)
@@ -788,7 +917,7 @@ export default function MapCanvas({
       ctx.setLineDash([]);
       ctx.restore();
     }
-  }, [map, tileImages, spriteImages, vis, zoom, pan, dragPlatform, dragActorPreview, shadowZonePreview, selectedNavLinkIdx, linkFromIdx, activeTool]);
+  }, [map, tileImages, spriteImages, vis, zoom, pan, dragPlatform, dragActorPreview, shadowZonePreview, triggerZonePreview, selectedNavLinkIdx, linkFromIdx, activeTool, selectedZoneId]);
 
   // Resize canvas to fill container
   useEffect(() => {
@@ -1145,6 +1274,18 @@ export default function MapCanvas({
     const { tx, ty } = canvasToTile(cx, cy);
     const { wx, wy } = canvasToWorld(cx, cy);
 
+    // Trigger actor linking mode: clicking an actor fills its matchid into the waiting field
+    if (actorLinkTarget && onActorLinked) {
+      const HIT = 48 / zoom;
+      for (let i = map.actors.length - 1; i >= 0; i--) {
+        if (Math.hypot(map.actors[i].x - wx, map.actors[i].y - wy) < HIT) {
+          onActorLinked(map.actors[i].matchid ?? 0);
+          return;
+        }
+      }
+      return; // click in empty space during link mode = cancel
+    }
+
     // Paste intercept: left-click in bounds while paste is pending stamps the buffer
     if (pastePending && tx >= 0 && tx < map.width && ty >= 0 && ty < map.height) {
       onTilePaste?.(tx, ty);
@@ -1213,6 +1354,10 @@ export default function MapCanvas({
       isPainting.current = true;
       shadowZoneDragRef.current = { startWx: snap(wx), startWy: snap(wy), curWx: snap(wx), curWy: snap(wy) };
       setShadowZonePreview({ x1: snap(wx), y1: snap(wy), x2: snap(wx), y2: snap(wy) });
+    } else if (activeTool === 'TRIGGER_ZONE') {
+      isPainting.current = true;
+      triggerZoneDragRef.current = { startWx: snap(wx), startWy: snap(wy), curWx: snap(wx), curWy: snap(wy) };
+      setTriggerZonePreview({ x1: snap(wx), y1: snap(wy), x2: snap(wx), y2: snap(wy) });
     } else if (activeTool === 'NAV_LINK') {
       let hitIdx: number | null = null;
       for (let i = map.platforms.length - 1; i >= 0; i--) {
@@ -1322,6 +1467,49 @@ export default function MapCanvas({
         if (wx >= p.x1 && wx <= p.x2 && wy >= p.y1 && wy <= p.y2) {
           onPlatformSelect(i);
           onActorSelect?.(null);
+          onTriggerZoneSelect?.(null);
+          return;
+        }
+      }
+
+      // 3.5. Hit-test trigger zones for selection/move/resize
+      const triggerZonesArr = map.zones ?? [];
+      // First check handles on already-selected zone
+      if (selectedZoneId != null) {
+        const selZ = triggerZonesArr.find(z => z.id === selectedZoneId);
+        if (selZ) {
+          const handleSize = 8 / zoom;
+          const hs = handleSize / 2;
+          const zx1 = Math.min(selZ.x1, selZ.x2), zx2 = Math.max(selZ.x1, selZ.x2);
+          const zy1 = Math.min(selZ.y1, selZ.y2), zy2 = Math.max(selZ.y1, selZ.y2);
+          const zmx = (zx1 + zx2) / 2, zmy = (zy1 + zy2) / 2;
+          const handles = [
+            { name: 'TL', hx: zx1, hy: zy1 }, { name: 'T',  hx: zmx, hy: zy1 }, { name: 'TR', hx: zx2, hy: zy1 },
+            { name: 'L',  hx: zx1, hy: zmy },                                      { name: 'R',  hx: zx2, hy: zmy },
+            { name: 'BL', hx: zx1, hy: zy2 }, { name: 'B',  hx: zmx, hy: zy2 }, { name: 'BR', hx: zx2, hy: zy2 },
+          ];
+          for (const { name, hx, hy } of handles) {
+            if (Math.abs(wx - hx) <= hs && Math.abs(wy - hy) <= hs) {
+              zoneDragRef.current = { mode: 'handle', handle: name, id: selZ.id, origZone: { x1: zx1, y1: zy1, x2: zx2, y2: zy2 }, startWx: wx, startWy: wy };
+              return;
+            }
+          }
+          if (wx >= zx1 && wx <= zx2 && wy >= zy1 && wy <= zy2) {
+            zoneDragRef.current = { mode: 'body', handle: null, id: selZ.id, origZone: { x1: zx1, y1: zy1, x2: zx2, y2: zy2 }, startWx: wx, startWy: wy };
+            return;
+          }
+        }
+      }
+      // Check all zones for selection
+      for (let i = triggerZonesArr.length - 1; i >= 0; i--) {
+        const z = triggerZonesArr[i];
+        const zx1 = Math.min(z.x1, z.x2), zx2 = Math.max(z.x1, z.x2);
+        const zy1 = Math.min(z.y1, z.y2), zy2 = Math.max(z.y1, z.y2);
+        if (wx >= zx1 && wx <= zx2 && wy >= zy1 && wy <= zy2) {
+          onTriggerZoneSelect?.(z.id);
+          onPlatformSelect(null);
+          onActorSelect?.(null);
+          zoneDragRef.current = { mode: 'body', handle: null, id: z.id, origZone: { x1: zx1, y1: zy1, x2: zx2, y2: zy2 }, startWx: wx, startWy: wy };
           return;
         }
       }
@@ -1329,12 +1517,14 @@ export default function MapCanvas({
       // 4. Click on empty → deselect all
       onPlatformSelect(null);
       onActorSelect?.(null);
+      onTriggerZoneSelect?.(null);
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, zoom, eraseLayerType,
       onTilePaint, onPlatformRemove, onActorPlace, onDragPlatformChange, onBeginPaint,
       selectedPlatformIdx, onPlatformSelect, onActorSelect, highlightActorIdx, snap,
       pastePending, onTilePaste, onTileSelection, onFloodFill, onActorTypeChange,
-      linkFromIdx, navLinkType, onNavLinkAdd, onNavLinkSelect, onLinkFromIdxChange]);
+      linkFromIdx, navLinkType, onNavLinkAdd, onNavLinkSelect, onLinkFromIdxChange,
+      actorLinkTarget, onActorLinked, selectedZoneId, onTriggerZoneSelect]);
 
   // Right-click: actors take priority, fall through to tile property editor
   const handleContextMenu = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -1376,6 +1566,19 @@ export default function MapCanvas({
       }
     }
 
+    // Right-click on a trigger zone removes it
+    if (activeTool === 'TRIGGER_ZONE' && map.zones) {
+      for (let i = map.zones.length - 1; i >= 0; i--) {
+        const z = map.zones[i];
+        const x1 = Math.min(z.x1, z.x2), x2 = Math.max(z.x1, z.x2);
+        const y1 = Math.min(z.y1, z.y2), y2 = Math.max(z.y1, z.y2);
+        if (wx >= x1 && wx <= x2 && wy >= y1 && wy <= y2) {
+          onTriggerZoneRemove?.(z.id);
+          return;
+        }
+      }
+    }
+
     // Fall through to tile
     if (onTileRightClick) {
       const { tx, ty } = canvasToTile(cx, cy);
@@ -1387,7 +1590,7 @@ export default function MapCanvas({
         onTileRightClick({ tx, ty, layerType, layerIdx, cell, x: e.clientX, y: e.clientY });
       }
     }
-  }, [map, canvasToWorld, canvasToTile, zoom, activeTool, activeLayer, onActorRightClick, onTileRightClick, onShadowZoneRemove, onLinkFromIdxChange]);
+  }, [map, canvasToWorld, canvasToTile, zoom, activeTool, activeLayer, onActorRightClick, onTileRightClick, onShadowZoneRemove, onTriggerZoneRemove, onLinkFromIdxChange]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const { cx, cy } = getCanvasPos(e);
@@ -1470,6 +1673,44 @@ export default function MapCanvas({
       return;
     }
 
+    // Zone drag (SELECT tool — move or resize trigger zone)
+    if (zoneDragRef.current) {
+      const { mode, handle, origZone, startWx, startWy } = zoneDragRef.current;
+      const dx = wx - startWx;
+      const dy = wy - startWy;
+      const MIN_SIZE = 16;
+      let { x1, y1, x2, y2 } = origZone;
+      if (mode === 'body') {
+        x1 = snap(origZone.x1 + dx);
+        y1 = snap(origZone.y1 + dy);
+        x2 = x1 + (origZone.x2 - origZone.x1);
+        y2 = y1 + (origZone.y2 - origZone.y1);
+      } else {
+        switch (handle) {
+          case 'TL': x1 = snap(origZone.x1 + dx); y1 = snap(origZone.y1 + dy); break;
+          case 'TR': x2 = snap(origZone.x2 + dx); y1 = snap(origZone.y1 + dy); break;
+          case 'BL': x1 = snap(origZone.x1 + dx); y2 = snap(origZone.y2 + dy); break;
+          case 'BR': x2 = snap(origZone.x2 + dx); y2 = snap(origZone.y2 + dy); break;
+          case 'T':  y1 = snap(origZone.y1 + dy); break;
+          case 'B':  y2 = snap(origZone.y2 + dy); break;
+          case 'L':  x1 = snap(origZone.x1 + dx); break;
+          case 'R':  x2 = snap(origZone.x2 + dx); break;
+        }
+        if (x2 - x1 < MIN_SIZE) {
+          if (handle === 'TL' || handle === 'BL' || handle === 'L') x1 = x2 - MIN_SIZE;
+          else x2 = x1 + MIN_SIZE;
+        }
+        if (y2 - y1 < MIN_SIZE) {
+          if (handle === 'TL' || handle === 'TR' || handle === 'T') y1 = y2 - MIN_SIZE;
+          else y2 = y1 + MIN_SIZE;
+        }
+      }
+      zonePreviewRef.current = { x1, y1, x2, y2 };
+      // Live preview — no history push
+      onTriggerZoneLiveUpdate?.(zoneDragRef.current.id, x1, y1, x2, y2);
+      return;
+    }
+
     // Light radius ring drag (SELECT tool)
     if (lightRadiusDragRef.current) {
       const { actorIdx, origType } = lightRadiusDragRef.current;
@@ -1501,11 +1742,16 @@ export default function MapCanvas({
         shadowZoneDragRef.current.curWx = snWx;
         shadowZoneDragRef.current.curWy = snWy;
         setShadowZonePreview({ x1: shadowZoneDragRef.current.startWx, y1: shadowZoneDragRef.current.startWy, x2: snWx, y2: snWy });
+      } else if (activeTool === 'TRIGGER_ZONE' && triggerZoneDragRef.current) {
+        const snWx = snap(wx), snWy = snap(wy);
+        triggerZoneDragRef.current.curWx = snWx;
+        triggerZoneDragRef.current.curWy = snWy;
+        setTriggerZonePreview({ x1: triggerZoneDragRef.current.startWx, y1: triggerZoneDragRef.current.startWy, x2: snWx, y2: snWy });
       }
     }
   }, [map, activeTool, activeLayer, selectedTileId, canvasToTile, canvasToWorld, eraseLayerType,
       onTilePaint, onPanChange, onCursorChange, onDragPlatformChange, snap,
-      onTileSelection, onActorTypeChange]);
+      onTileSelection, onActorTypeChange, onTriggerZoneLiveUpdate]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (isPanning.current) {
@@ -1548,6 +1794,17 @@ export default function MapCanvas({
       return;
     }
 
+    // Finish zone drag (SELECT tool — move or resize trigger zone)
+    if (zoneDragRef.current) {
+      const preview = zonePreviewRef.current;
+      if (preview) {
+        onTriggerZoneUpdate?.(zoneDragRef.current.id, Math.round(preview.x1), Math.round(preview.y1), Math.round(preview.x2), Math.round(preview.y2));
+      }
+      zoneDragRef.current = null;
+      zonePreviewRef.current = null;
+      return;
+    }
+
     // Finish light radius ring drag
     if (lightRadiusDragRef.current) {
       const { actorIdx, origType } = lightRadiusDragRef.current;
@@ -1587,10 +1844,21 @@ export default function MapCanvas({
         if (x2 - x1 > 4 && y2 - y1 > 4) onShadowZoneDraw?.({ x1, y1, x2, y2 });
         shadowZoneDragRef.current = null;
         setShadowZonePreview(null);
+      } else if (activeTool === 'TRIGGER_ZONE' && triggerZoneDragRef.current) {
+        const { startWx, startWy, curWx, curWy } = triggerZoneDragRef.current;
+        const x1 = Math.min(startWx, curWx), y1 = Math.min(startWy, curWy);
+        const x2 = Math.max(startWx, curWx), y2 = Math.max(startWy, curWy);
+        if (x2 - x1 > 4 && y2 - y1 > 4) {
+          const existingZones = map.zones ?? [];
+          const id = existingZones.length ? Math.max(...existingZones.map(z => z.id)) + 1 : 1;
+          onTriggerZoneDraw?.({ id, label: `Zone ${id}`, x1, y1, x2, y2 });
+        }
+        triggerZoneDragRef.current = null;
+        setTriggerZonePreview(null);
       }
     }
     isPainting.current = false;
-  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap, onShadowZoneDraw, onActorTypeChange]);
+  }, [map, activeTool, dragPlatform, dragActorPreview, canvasToWorld, onPlatformDraw, onDragPlatformChange, onCommitPaint, onActorMove, onPlatformUpdate, onPlatformSelect, snap, onShadowZoneDraw, onTriggerZoneDraw, onActorTypeChange, onTriggerZoneUpdate, onTriggerZoneLiveUpdate]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.code === 'Space') { isSpacePanning.current = true; e.preventDefault(); }
@@ -1614,7 +1882,9 @@ export default function MapCanvas({
     };
   }, [handleKeyDown, handleKeyUp]);
 
-  const cursorStyle = isLightRadiusDragging
+  const cursorStyle = actorLinkTarget
+    ? 'crosshair'
+    : isLightRadiusDragging
     ? 'ew-resize'
     : dragActorPreview
     ? 'grabbing'
@@ -1626,6 +1896,7 @@ export default function MapCanvas({
       : activeTool === 'TILE_SELECT' ? 'crosshair'
       : activeTool === 'ERASE_TILE' ? 'crosshair'
       : activeTool === 'SHADOW_ZONE' ? 'crosshair'
+      : activeTool === 'TRIGGER_ZONE' ? 'crosshair'
       : activeTool === 'NAV_LINK' ? 'crosshair'
       : isPainting.current ? 'crosshair'
       : 'default';
@@ -1648,6 +1919,15 @@ export default function MapCanvas({
         ref={overlayCanvasRef}
         style={{ position: 'absolute', inset: 0, pointerEvents: 'none', width: '100%', height: '100%' }}
       />
+      {actorLinkTarget && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 pointer-events-none
+          bg-[#0d1a0d]/90 border border-game-primary/60 rounded px-3 py-1.5
+          text-[11px] font-mono text-game-primary flex items-center gap-2 shadow-lg">
+          <span className="animate-pulse">🎯</span>
+          Click actor → <span className="text-game-text">{actorLinkTarget.label}</span>
+          <span className="text-game-muted text-[9px]">(click empty to cancel)</span>
+        </div>
+      )}
     </div>
   );
 }

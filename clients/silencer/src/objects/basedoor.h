@@ -20,7 +20,8 @@ public:
 	Uint8 teamnumber;
 	bool discoveredby[World::maxteams];
 	bool enteredby[World::maxteams];
-	
+	bool locked = false; // LOCK_DOOR/UNLOCK_DOOR trigger actions
+
 private:
 	Uint8 state_i;
 };

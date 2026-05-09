@@ -16,6 +16,7 @@ import MapPropertiesPanel from './MapPropertiesPanel';
 import ActorListPanel from './ActorListPanel';
 import NavLinkPanel from './NavLinkPanel';
 import Minimap from './Minimap';
+import TriggerPanel from './TriggerPanel';
 import type { MapActor } from '../../lib/types';
 import { API } from '../../lib/api';
 import { useLightsStore } from '../../lib/lights-store';
@@ -53,6 +54,7 @@ export default function DesignerPage() {
           addPlatform, removePlatform, addActor, removeActor, updateActor, moveActor,
           updateHeader, updatePlatform, addShadowZone, removeShadowZone,
           addNavLink, removeNavLink, updateNavLink,
+          setTriggers, setObjectives, setZones, setZonesLive,
           undo, redo, canUndo, canRedo, resizeMap } = useSilMap();
 
   type TileSel = { tx1: number; ty1: number; tx2: number; ty2: number; layerType: 'bg' | 'fg'; layerIdx: number };
@@ -70,6 +72,7 @@ export default function DesignerPage() {
   const [selectedTileId, setSelectedTile] = useState(0);
   const [selectedActorId, setSelectedActor] = useState(36); // player start default
   const [selectedPlatformIdx, setSelectedPlatformIdx] = useState<number | null>(null);
+  const [selectedZoneId, setSelectedZoneId] = useState<number | null>(null);
   const [navLinkType, setNavLinkType] = useState<0 | 1 | 2>(0);
   const [linkFromIdx, setLinkFromIdx] = useState<number | null>(null);
   const [selectedNavLinkIdx, setSelectedNavLinkIdx] = useState<number | null>(null);
@@ -95,7 +98,8 @@ export default function DesignerPage() {
   const [actorMenu, setActorMenu] = useState<ActorMenu | null>(null);
   const [tileMenu, setTileMenu] = useState<TileMenuInfo | null>(null);
   const [highlightActorIdx, setHighlightActorIdx] = useState<number | null>(null);
-  const [rightTab, setRightTab] = useState<'tiles' | 'actors' | 'links'>('tiles');
+  const [rightTab, setRightTab] = useState<'tiles' | 'actors' | 'links' | 'triggers'>('tiles');
+  const [actorLinkTarget, setActorLinkTarget] = useState<{ label: string; onLinked: (matchid: number) => void } | null>(null);
   const [vis, setVis] = useState<VisState>({
     bg: [true, true, true, true],
     fg: [true, true, true, true],
@@ -380,6 +384,22 @@ export default function DesignerPage() {
   const handleShadowZoneRemove = useCallback((idx: number) => {
     removeShadowZone(idx);
   }, [removeShadowZone]);
+
+  const handleTriggerZoneDraw = useCallback((zone: import('../../lib/types').TriggerZone) => {
+    setZones([...(map?.zones ?? []), zone]);
+  }, [map, setZones]);
+
+  const handleTriggerZoneRemove = useCallback((id: number) => {
+    setZones((map?.zones ?? []).filter(z => z.id !== id));
+  }, [map, setZones]);
+
+  const handleTriggerZoneLiveUpdate = useCallback((id: number, x1: number, y1: number, x2: number, y2: number) => {
+    setZonesLive((map?.zones ?? []).map(z => z.id === id ? { ...z, x1, y1, x2, y2 } : z));
+  }, [map, setZonesLive]);
+
+  const handleTriggerZoneUpdate = useCallback((id: number, x1: number, y1: number, x2: number, y2: number) => {
+    setZones((map?.zones ?? []).map(z => z.id === id ? { ...z, x1, y1, x2, y2 } : z));
+  }, [map, setZones]);
 
   const handleNavLinkAdd = useCallback((fromIdx: number, toIdx: number, type: 0 | 1 | 2, sourceX: number, targetX: number) => {
     addNavLink({ fromIdx, toIdx, type, sourceX, targetX });
@@ -930,6 +950,12 @@ export default function DesignerPage() {
               onPlatformUpdate={updatePlatform}
               onShadowZoneDraw={handleShadowZoneDraw}
               onShadowZoneRemove={handleShadowZoneRemove}
+              onTriggerZoneDraw={handleTriggerZoneDraw}
+              onTriggerZoneRemove={handleTriggerZoneRemove}
+              onTriggerZoneLiveUpdate={handleTriggerZoneLiveUpdate}
+              onTriggerZoneUpdate={handleTriggerZoneUpdate}
+              selectedZoneId={selectedZoneId}
+              onTriggerZoneSelect={setSelectedZoneId}
               gridSize={gridSize}
               tileSelection={tileSelection}
               onTileSelection={setTileSelection}
@@ -942,6 +968,11 @@ export default function DesignerPage() {
               onNavLinkAdd={handleNavLinkAdd}
               onNavLinkSelect={setSelectedNavLinkIdx}
               onLinkFromIdxChange={setLinkFromIdx}
+              actorLinkTarget={actorLinkTarget}
+              onActorLinked={(matchid) => {
+                actorLinkTarget?.onLinked(matchid);
+                setActorLinkTarget(null);
+              }}
             />
             <Minimap
               map={map}
@@ -958,14 +989,14 @@ export default function DesignerPage() {
           <div className="w-72 flex-shrink-0 border-l border-game-border bg-game-bgCard overflow-hidden flex flex-col">
             {/* Tab bar */}
             <div className="flex border-b border-game-border shrink-0">
-              {(['tiles', 'actors', 'links'] as const).map(tab => (
+              {(['tiles', 'actors', 'links', 'triggers'] as const).map(tab => (
                 <button key={tab} onClick={() => setRightTab(tab)}
                   className={`flex-1 py-1.5 text-[10px] font-mono tracking-widest transition-colors ${
                     rightTab === tab
                       ? 'text-game-primary border-b-2 border-game-primary bg-game-dark'
                       : 'text-game-textDim hover:text-game-text'
                   }`}>
-                  {tab === 'tiles' ? 'TILES' : tab === 'actors' ? 'ACTORS' : 'LINKS'}
+                  {tab === 'tiles' ? 'TILES' : tab === 'actors' ? 'ACTORS' : tab === 'links' ? 'LINKS' : 'TRIGGERS'}
                 </button>
               ))}
             </div>
@@ -1012,6 +1043,25 @@ export default function DesignerPage() {
               />
             )}
             {rightTab === 'links' && !map && (
+              <div className="flex-1 flex items-center justify-center p-4">
+                <span className="text-[10px] font-mono text-game-textDim">No map loaded</span>
+              </div>
+            )}
+            {rightTab === 'triggers' && map && (
+              <TriggerPanel
+                triggers={map.triggers ?? []}
+                objectives={map.objectives ?? []}
+                zones={map.zones ?? []}
+                onSetTriggers={setTriggers}
+                onSetObjectives={setObjectives}
+                onSetZones={setZones}
+                onRequestActorLink={(target) => {
+                  setActorLinkTarget(target);
+                  // Switch focus to canvas so the click lands there, not on panel
+                }}
+              />
+            )}
+            {rightTab === 'triggers' && !map && (
               <div className="flex-1 flex items-center justify-center p-4">
                 <span className="text-[10px] font-mono text-game-textDim">No map loaded</span>
               </div>

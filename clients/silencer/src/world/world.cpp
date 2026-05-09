@@ -67,6 +67,11 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	debugoverlay = false;
 	memset(topmessage, 0, sizeof(topmessage));
 	topmessage_i = 0;
+	pancameraactive = false;
+	pancamerareturn = false;
+	pancamerareturncount = 0;
+	pancamerax = 0;
+	pancameray = 0;
 }
 
 World::~World(){
@@ -132,6 +137,43 @@ void World::Tick(void){
 	if(tickcount % GASLoader::Get().gameengine.ticksPerSecond == 0 && IsAuthority()){
 		ActivateTerminals();
 	}
+
+	// Emit GAME_START on the very first tick so trigger scripts can respond.
+	if (tickcount == 0 && IsAuthority()) {
+		GameEvent ev;
+		ev.type = EventType::GAME_START;
+		triggerGraph.Bus().Emit(ev);
+	}
+
+	// Emit PLAYER_SPAWN the first time the local player exists in the world.
+	if (!player_spawn_emitted && IsAuthority() && gameplaystate == World::INGAME) {
+		Player* pp = GetPeerPlayer(localpeerid);
+		// Fallback for solo/TESTGAME mode where peerlist[localpeerid] may be null
+		if (!pp && objectsbytype[ObjectTypes::PLAYER].size() > 0) {
+			pp = static_cast<Player*>(GetObjectFromId(objectsbytype[ObjectTypes::PLAYER].front()));
+		}
+		if (pp != nullptr) {
+			player_spawn_emitted = true;
+			GameEvent ev;
+			ev.type = EventType::PLAYER_SPAWN;
+			triggerGraph.Bus().Emit(ev);
+		}
+	}
+
+	// Countdown timer for camera return pan — releases input when it hits 0.
+	if(pancamerareturncount > 0){
+		pancamerareturncount--;
+		if(pancamerareturncount == 0){
+			pancamerareturn = false;
+			input_locked = false;
+		}
+	}
+
+	{
+		const float dt = 1.f / GASLoader::Get().gameengine.ticksPerSecond;
+		triggerGraph.Tick(*this, dt);
+	}
+
 	tickcount++;
 	if(replay.IsRecording()){
 		replay.WriteTick();
@@ -550,6 +592,7 @@ void World::DoNetwork_Authority(void){
 						case MAP_DOWNLOADED:{
 							peer->mapdownloaded = true;
 							SendPeerList();
+							BroadcastTriggerState();
 						}break;
 						case MAP_GETCHUNK:{
 							Uint32 offset;
@@ -810,6 +853,25 @@ void World::DoNetwork_Replica(void){
 					}
 				}
 			}break;
+			case MSG_TRIGGER_STATE:{
+				if(peer){
+					triggerGraph.ApplySerializedState(data);
+				}
+			}break;
+			case MSG_CAMERA:{
+				Sint16 cx, cy;
+				memcpy(&cx, &data.data[data.BitsToBytes(data.readoffset)],     sizeof(cx));
+				memcpy(&cy, &data.data[data.BitsToBytes(data.readoffset) + 2], sizeof(cy));
+				if(cx != 0 || cy != 0){
+					pancameraactive = true;
+					pancamerareturn = false;
+					pancamerax = cx;
+					pancameray = cy;
+				} else {
+					pancameraactive = false;
+					pancamerareturn = true;
+				}
+			}break;
 		}
 	}
 	Uint32 tickcheck = SDL_GetTicks();
@@ -925,7 +987,7 @@ bool World::ProcessInputQueue(Peer & peer){
 						object->oldx = object->x;
 						object->oldy = object->y;
 					//}
-					object->HandleInput(peer.input);
+					if (!input_locked) object->HandleInput(peer.input);
 					object->Tick(*this);
 					object->lasttick = tickcount;
 					//printf("Processed input for peer %d at tick %d\n", peer.id, tickcount);
@@ -1635,7 +1697,7 @@ void World::SendInput(void){
 					object->oldx = object->x;
 					object->oldy = object->y;
 				//}
-				object->HandleInput(peer->input);
+				if (!input_locked) object->HandleInput(peer->input);
 				object->Tick(*this);
 				object->lasttick = tickcount;
 			}
@@ -1977,6 +2039,22 @@ void World::SendSound(const char * name, Peer * peer, Uint8 volume){
 	}
 }
 
+void World::BroadcastTriggerState() {
+    if (!IsAuthority()) return;
+    Serializer payload;
+    triggerGraph.SerializeState(payload);
+    int msgsize = 1 + payload.offset;
+    char * msg = new char[msgsize];
+    msg[0] = MSG_TRIGGER_STATE;
+    memcpy(&msg[1], payload.data, payload.offset);
+    for (unsigned int i = 0; i < maxpeers; i++) {
+        if (peerlist[i] && i != localpeerid) {
+            SendPacket(peerlist[i], msg, msgsize);
+        }
+    }
+    delete[] msg;
+}
+
 char * World::CreateStatusString(const char * status, Uint8 color, Uint8 duration){
 	char * newstatus = new char[strlen(status) + 1 + 1 + 1];
 	strcpy(newstatus, status);
@@ -2248,6 +2326,18 @@ void World::SetSystemCamera(bool system, Uint16 objectfollow, Sint16 x, Sint16 y
 	systemcamerafollow[system] = objectfollow;
 	systemcamerax[system] = x;
 	systemcameray[system] = y;
+}
+
+void World::BroadcastCamera(Sint16 x, Sint16 y){
+	if(!IsAuthority()) return;
+	char msg[5];
+	msg[0] = MSG_CAMERA;
+	memcpy(&msg[1], &x, 2);
+	memcpy(&msg[3], &y, 2);
+	for(unsigned int i = 0; i < maxpeers; i++){
+		Peer * p = peerlist[i];
+		if(p && i != localpeerid) SendPacket(p, msg, 5);
+	}
 }
 
 Object * World::GetObjectFromId(Uint16 id){
