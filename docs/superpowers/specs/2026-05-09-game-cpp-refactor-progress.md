@@ -30,7 +30,17 @@ Don't tick the box if any of the four fails. Investigate, fix, re-verify.
 
 Phase 1 complete (all 8 steps landed in one commit per user direction). Verified: clean Release build, clean jumbo/unity build (no cyclic dependencies introduced), all 3 E2E scenarios pass (00_ping, 10_navigate, 20_screenshot). The screen stack is empty at runtime — every menu still flows through the legacy `Create*Interface`/`Process*Interface` helpers.
 
-Phase 2 landed in one commit (both extractions). `MapDownloader` and `AmbienceMixer` are constructed and own all the moved state; `World` was given `friend class MapDownloader;` and `friend class AmbienceMixer;` so the two collaborators retain the same private-access reach Game had. Verified: clean Release build (only the pre-existing C4804 warning at `IsLiveMultiplayer`). **Suspected regression on the create-game flow** — clicking "Create Game" on the lobby kicks back to the lobby connect screen on at least one user's machine; not yet root-caused. Unity build + interactive lobby smoke test pending. Phase 3 not started.
+Phase 2 landed in one commit (both extractions). `MapDownloader` and `AmbienceMixer` are constructed and own all the moved state; `World` was given `friend class MapDownloader;` and `friend class AmbienceMixer;` so the two collaborators retain the same private-access reach Game had. Verified: clean Release build (only the pre-existing C4804 warning at `IsLiveMultiplayer`). **Suspected regression on the create-game flow** — clicking "Create Game" on the lobby kicks back to the lobby connect screen on at least one user's machine; not yet root-caused. Unity build + interactive lobby smoke test pending.
+
+Phase 3 started — `MainMenuScreen` migrated. `Game::CreateMainMenuInterface` and `Game::ProcessMainMenuInterface` deleted. The MAINMENU case body now does state setup (Disconnect/UnloadGame/palette) and `PushScreen(std::make_unique<MainMenuScreen>())`; button-click handling lives in `MainMenuScreen::Tick`, dispatched by `TickActiveScreen()` at the top of `Game::Tick`. Side effects of this first migration:
+- `ScreenContext::GoToState`/`GoBack`/`RequestQuit`/`PushScreen`/`PopScreen`/`ReplaceScreen` are wired (no longer assert-stubs); `ShowModal`/`ShowMessage` still stubs (no consumers yet).
+- `ScreenContext` is a `friend class` of `Game` so it can dispatch to private `GoToState`.
+- `Game::PushScreen`/`PopScreen` sync `currentinterface` so legacy input dispatch (`HandleSDLEvents`, TUI mouse) keeps routing to the active screen's interface.
+- `Game::GoToState` now sets `screenStackPendingTeardown`; `Game::Tick` pops the stack at the next frame's start, so a screen calling `GoToState` from inside its own `Tick` isn't destroyed mid-call.
+- The state enum (`MAINMENU`, `LOBBY`, …) was extracted to `clients/silencer/src/game/game_state.h` so screens can name states without including `game.h`. Existing `game.cpp` callsites are preserved via a file-scope `using namespace GameState;`.
+- `World::GetVersion()` accessor added so `MainMenuScreen::Build` can render the version string without needing `friend class` reach into `World`.
+
+Verified: clean Release + unity builds (only the pre-existing C4804 warning); `00_ping` E2E passes. Interactive smoke test of the four main-menu buttons pending.
 
 ---
 
@@ -86,7 +96,7 @@ The migration pattern for each screen:
 
 **Order:** small screens first to validate the pattern; the big screen (Lobby) last. Modals before LobbyScreen because LobbyScreen depends on them.
 
-- [ ] **`MainMenuScreen`.** Smallest screen, validates the pattern. **Smoke:** all 4 buttons (Start, Lobby Connect, Options, Quit). Confirm Quit still exits cleanly.
+- [x] **`MainMenuScreen`.** Smallest screen, validates the pattern. **Smoke:** all 4 buttons (Start, Lobby Connect, Options, Quit) — interactive pass pending.
 - [ ] **`LobbyConnectScreen`.** Validates a screen with non-trivial Tick logic (state machine that cycles through Lobby connection states). **Smoke:** connect to a running lobby; force a connection failure (wrong host) and confirm the error display path; back-out to main menu.
 - [ ] **`ModalDialog` (in `ui/modals/`).** Add as a `Modal` and route `Game::CreateModalDialog` calls to `ctx.ShowMessage(...)`. Old method stays for now (still called from un-migrated screens). **Smoke:** trigger any modal-dialog path that's already exercised — currently those are only fired from in-lobby code paths. Use `silencer-cli` to inject one if needed for testing.
 - [ ] **`PasswordDialog` (in `ui/modals/`).** Same treatment as ModalDialog. **Smoke:** join a password-protected game.

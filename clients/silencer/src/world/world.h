@@ -43,6 +43,7 @@ public:
 	void Tick(void);
 	void TickObjects(void);
 	void SetVersion(const char * version);
+	const char * GetVersion() const { return version; }
 	bool Listen(unsigned short port = 0);
 	unsigned short Bind(unsigned short port = 0);
 	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0);

@@ -27,8 +27,11 @@
 #include "gasloader.h"
 #include "screen.h"
 #include "modal.h"
+#include "main_menu_screen.h"
 #include <algorithm>
 #include <stdio.h>
+
+using namespace GameState;
 
 #ifndef SILENCER_LOBBY_HOST
 #define SILENCER_LOBBY_HOST "127.0.0.1"
@@ -616,6 +619,10 @@ bool Game::Loop(void){
 }
 
 bool Game::Tick(void){
+	if(screenStackPendingTeardown){
+		while(!screenStack.empty()) PopScreen();
+		screenStackPendingTeardown = false;
+	}
 	TickActiveScreen();
 	ProcessInGameInterfaces();
 	if(!world.dedicatedserver.active){
@@ -745,7 +752,7 @@ bool Game::Tick(void){
 				UnloadGame();
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				currentinterface = CreateMainMenuInterface()->id;
+				PushScreen(std::make_unique<MainMenuScreen>());
 				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 				renderer.camera.SetPosition(320, 240);
 				renderer.palette.SetPalette(1);
@@ -754,15 +761,10 @@ bool Game::Tick(void){
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
-					//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.menumusic);
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					if(!ProcessMainMenuInterface(iface)){
-						return false;
-					}
-				}
+				// Button-click handling lives in MainMenuScreen::Tick, dispatched
+				// by TickActiveScreen() at the top of Game::Tick.
 			}
 		}break;
 		case LOBBYCONNECT:{
@@ -2558,53 +2560,10 @@ void Game::GoToState(Uint8 newstate){
 	fade_i = 0;
 	stateisnew = true;
 	nextstateprocessed = false;
-}
-
-Interface * Game::CreateMainMenuInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 6;
-	background->res_index = 0;
-	Overlay * logo = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	logo->res_bank = 208;
-	Overlay * version = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	version->text = "Silencer v";
-	version->text += world.version;
-	version->textbank = 133;
-	version->textwidth = 11;
-	version->x = 10;
-	version->y = 480 - 10 - 7;
-	Button * startbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	startbutton->y = -134;
-	startbutton->x = 40;
-	startbutton->uid = 0;
-	strcpy(startbutton->text, "Tutorial");
-	Button * lobbybutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	lobbybutton->y = -67;
-	lobbybutton->x = 80;
-	lobbybutton->uid = 1;
-	strcpy(lobbybutton->text, "Connect To Lobby");
-	Button * optionsbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	strcpy(optionsbutton->text, "Options");
-	optionsbutton->x = 40;
-	optionsbutton->uid = 2;
-	Button * exitbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	strcpy(exitbutton->text, "Exit");
-	exitbutton->x = 0;
-	exitbutton->y = 67;
-	exitbutton->uid = 3;
-	
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	iface->AddObject(startbutton->id);
-	iface->AddObject(lobbybutton->id);
-	iface->AddObject(optionsbutton->id);
-	iface->AddObject(exitbutton->id);
-	iface->AddTabObject(startbutton->id);
-	iface->AddTabObject(lobbybutton->id);
-	iface->AddTabObject(optionsbutton->id);
-	iface->AddTabObject(exitbutton->id);
-	iface->activeobject = 0;
-	iface->buttonescape = exitbutton->id;
-	return iface;
+	// Defer the teardown so the active screen's Tick (which may have called
+	// GoToState in response to a button click) can return safely before its
+	// destructor runs.
+	screenStackPendingTeardown = true;
 }
 
 Interface * Game::CreateOptionsInterface(void){
@@ -4305,32 +4264,6 @@ bool Game::GoBack(void){
 		GoToState(MAINMENU);
 	}
 	return false;
-}
-
-bool Game::ProcessMainMenuInterface(Interface * iface){
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object->type == ObjectTypes::BUTTON){
-			Button * button = static_cast<Button *>(object);
-			if(button->clicked){
-				switch(button->uid){
-					case 0:
-						GoToState(SINGLEPLAYERGAME);
-					break;
-					case 1:
-						GoToState(LOBBYCONNECT);
-					break;
-					case 2:
-						GoToState(OPTIONS);
-					break;
-					case 3:
-						return false;
-					break;
-				}
-			}
-		}
-	}
-	return true;
 }
 
 void Game::ProcessLobbyConnectInterface(Interface * iface){
@@ -6201,12 +6134,14 @@ void Game::PushScreen(std::unique_ptr<Screen> s){
 	if(!s) return;
 	s->Build(screenContext);
 	screenStack.push_back(std::move(s));
+	currentinterface = screenStack.back()->interfaceId;
 }
 
 void Game::PopScreen(){
 	if(screenStack.empty()) return;
 	screenStack.back()->Destroy(screenContext);
 	screenStack.pop_back();
+	currentinterface = screenStack.empty() ? 0 : screenStack.back()->interfaceId;
 }
 
 void Game::ReplaceScreen(std::unique_ptr<Screen> s){

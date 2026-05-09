@@ -14,6 +14,7 @@
 #include "controlserver.h"
 #include "inputserver.h"
 #include "screen_context.h"
+#include "game_state.h"
 #include "map_downloader.h"
 #include "ambience_mixer.h"
 #include <array>
@@ -34,6 +35,7 @@ public:
 	void LoadProgressCallback(int progress, int totalprogressitems);
 
 	friend class Audio;
+	friend class ScreenContext;
 
 public:
 	// Exposed for ControlDispatch (game-thread only).
@@ -114,7 +116,6 @@ private:
 	void GiveDefaultItems(Player & player);
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
 	void GoToState(Uint8 newstate);
-	Interface * CreateMainMenuInterface(void);
 	Interface * CreateOptionsInterface(void);
 	Interface * CreateOptionsControlsInterface(void);
 	Interface * CreateOptionsDisplayInterface(void);
@@ -153,7 +154,6 @@ private:
 	Button * cobutton[6];
 	Button * c2button[6];
 	Button * presetbutton;
-	bool ProcessMainMenuInterface(Interface * iface);
 	void ProcessLobbyConnectInterface(Interface * iface);
 	bool ProcessLobbyInterface(Interface * iface);
 	void ProcessGameSummaryInterface(Interface * iface);
@@ -183,7 +183,6 @@ private:
 	void OpenFirstGamepad(void);
 	void PollGamepadState(void);
 	Uint8 keystate[SDL_SCANCODE_COUNT];
-	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, UPDATING, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, OPTIONSDISPLAY, OPTIONSAUDIO, HOSTGAME, JOINGAME, REPLAYGAME, TESTGAME};
 	Uint8 state;
 	Uint8 nextstate;
 	Uint8 fade_i;
@@ -251,6 +250,10 @@ private:
 	std::vector<std::unique_ptr<Screen>> screenStack;
 	ScreenContext screenContext;
 	void TickActiveScreen();
+	// Set by GoToState; processed at the next Tick() entry to pop screens
+	// safely after the active screen's Tick has returned. Avoids destroying
+	// a screen mid-Tick when a button click triggers a state transition.
+	bool screenStackPendingTeardown = false;
 };
 
 #endif
