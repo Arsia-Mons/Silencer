@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type {
   TriggerNode, TriggerAction, TriggerCondition, ObjectiveDef, TriggerZone,
   TriggerEventType, TriggerActionType, TriggerConditionType, ConditionLogic,
@@ -160,11 +160,12 @@ function ConditionRow({ c, onChange, onRemove }: {
   );
 }
 
-function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
+function ActionRow({ a, onChange, onRemove, onRequestActorLink, dragHandle }: {
   a: TriggerAction;
   onChange: (patch: Partial<TriggerAction>) => void;
   onRemove: () => void;
   onRequestActorLink?: (target: { label: string; onLinked: (matchid: number) => void }) => void;
+  dragHandle?: React.ReactNode;
 }) {
   const needsActor = ['OPEN_DOOR','LOCK_DOOR','UNLOCK_DOOR','DESTROY_ACTOR','MOVE_ACTOR','ENABLE_TRIGGER','DISABLE_TRIGGER','COMPLETE_OBJECTIVE'].includes(a.type);
   const needsXY    = ['PAN_CAMERA','SPAWN_ACTOR','MOVE_ACTOR','APPLY_DAMAGE_IN_ZONE'].includes(a.type);
@@ -176,6 +177,7 @@ function ActionRow({ a, onChange, onRemove, onRequestActorLink }: {
   return (
     <div className="flex flex-col gap-1 pl-2 border-l-2 border-game-border/40 py-1">
       <div className="flex items-center gap-1">
+        {dragHandle}
         <select className={sel} value={a.type} onChange={e => onChange({ type: e.target.value as TriggerActionType })}>
           {ACTION_OPTS.map(o => <option key={o} value={o}>{ACTION_LABELS[o]}</option>)}
         </select>
@@ -296,6 +298,15 @@ function TriggerNodeRow({ node, expanded, onToggle, onChange, onRemove, onReques
   const removeAction = (i: number) => onChange({ actions: node.actions.filter((_, ai) => ai !== i) });
   const addAction    = () => onChange({ actions: [...node.actions, emptyAction()] });
 
+  const dragIdx = useRef<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+  const moveAction = (from: number, to: number) => {
+    const next = [...node.actions];
+    const [item] = next.splice(from, 1);
+    next.splice(to, 0, item);
+    onChange({ actions: next });
+  };
+
   return (
     <div className="border-b border-game-border/30">
       {/* Header row */}
@@ -400,7 +411,29 @@ function TriggerNodeRow({ node, expanded, onToggle, onChange, onRemove, onReques
               <div className="text-[9px] text-game-muted font-mono pl-2">No actions</div>
             )}
             {node.actions.map((a, i) => (
-              <ActionRow key={i} a={a} onChange={p => patchAction(i, p)} onRemove={() => removeAction(i)} onRequestActorLink={onRequestActorLink} />
+              <div
+                key={i}
+                draggable
+                onDragStart={() => { dragIdx.current = i; }}
+                onDragOver={e => { e.preventDefault(); setDragOverIdx(i); }}
+                onDrop={e => {
+                  e.preventDefault();
+                  if (dragIdx.current !== null && dragIdx.current !== i) moveAction(dragIdx.current, i);
+                  dragIdx.current = null; setDragOverIdx(null);
+                }}
+                onDragEnd={() => { dragIdx.current = null; setDragOverIdx(null); }}
+                className={dragOverIdx === i && dragIdx.current !== i ? 'border-t-2 border-game-primary' : ''}
+              >
+                <ActionRow
+                  key={i} a={a}
+                  onChange={p => patchAction(i, p)}
+                  onRemove={() => removeAction(i)}
+                  onRequestActorLink={onRequestActorLink}
+                  dragHandle={
+                    <span className="cursor-grab text-game-muted text-[10px] select-none flex-shrink-0 px-0.5" title="Drag to reorder">⠿</span>
+                  }
+                />
+              </div>
             ))}
           </div>
         </div>
