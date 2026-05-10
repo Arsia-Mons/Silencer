@@ -28,8 +28,10 @@
 #include "render.h"
 #include "ui_state.h"
 #include "main_menu.h"
+#include "options.h"
 
 #include "main_menu_screen.h"
+#include "options_screen.h"
 #include "renderer.h"
 #include "renderdevice.h"
 #include "resources.h"
@@ -121,6 +123,15 @@ int Game::RunPreview()
 		running = false;
 	};
 
+	ui::v2::OptionsHandlers options_handlers;
+	options_handlers.on_controls = [](){ printf("[preview] Controls clicked\n"); };
+	options_handlers.on_display  = [](){ printf("[preview] Display clicked\n"); };
+	options_handlers.on_audio    = [](){ printf("[preview] Audio clicked\n"); };
+	options_handlers.on_go_back  = [&running](){
+		printf("[preview] Go Back clicked\n");
+		running = false;
+	};
+
 	// `with_state=false` is the dump-PPM path: NULL UIState → render
 	// snaps + dt is ignored, so output stays byte-identical to legacy.
 	auto make_ctx = [&](bool with_state){
@@ -146,35 +157,58 @@ int Game::RunPreview()
 	auto render_once = [&](bool with_state){
 		screenbuffer.Clear(0);
 		if(use_legacy){
-			if(strcmp(preview_screen, "main_menu") != 0){
+			if(strcmp(preview_screen, "main_menu") == 0){
+				// MainMenuScreen::Build creates the widget Object tree on
+				// world.objectlist, parks the camera at (320, 240), and
+				// re-runs ResetPresentation. Renderer::Draw walks objectlist
+				// (the HUD/map paths skip because no map is loaded).
+				auto screen = std::make_unique<MainMenuScreen>();
+				screen->Build(screenContext);
+				// In the live game the loop runs world.Tick() (-> TickObjects)
+				// every frame. This advances Object::Tick — Button::Tick sets
+				// res_index = 7 for B196x33 chrome on the first call, and
+				// Overlay::Tick for bank 208 (the logo) ramps state_i through
+				// frames 29..58 then holds at 60. state_i++ runs at the END
+				// of Tick, so 61 ticks land state_i at 61 (>= 60 threshold) →
+				// res_index = 60, matching v2's static Sprite(208, 60).
+				// renderer.Tick() is skipped — it advances ambience / raindrop
+				// state we don't want in a deterministic dump.
+				for(int i = 0; i < 61; i++){
+					world.TickObjects();
+				}
+				renderer.Draw(&screenbuffer, /*frametime=*/0);
+				screen->Destroy(screenContext);
+			}else if(strcmp(preview_screen, "options") == 0){
+				// OptionsScreen doesn't call ResetPresentation or
+				// SetPosition itself — it inherits the camera from the
+				// previous screen (MainMenu parks it at 320, 240 so the
+				// menu backdrop draws at logical (0, 0) after the camera
+				// offset cancels out). Mirror that here so the standalone
+				// preview matches the in-game appearance.
+				renderer.camera.SetPosition(320, 240);
+				auto screen = std::make_unique<OptionsScreen>();
+				screen->Build(screenContext);
+				// One TickObjects() is enough — Button::Tick sets
+				// res_index = 7 for B196x33 chrome on the first call.
+				// No bank-208 logo here so no animation ramp is needed.
+				world.TickObjects();
+				renderer.Draw(&screenbuffer, /*frametime=*/0);
+				screen->Destroy(screenContext);
+			}else{
 				fprintf(stderr, "[preview] unknown screen '%s' for legacy impl\n", preview_screen);
 				return;
 			}
-			// MainMenuScreen::Build creates the widget Object tree on
-			// world.objectlist, parks the camera at (320, 240), and
-			// re-runs ResetPresentation. Renderer::Draw walks objectlist
-			// (the HUD/map paths skip because no map is loaded).
-			auto screen = std::make_unique<MainMenuScreen>();
-			screen->Build(screenContext);
-			// In the live game the loop runs world.Tick() (-> TickObjects)
-			// every frame. This advances Object::Tick — Button::Tick sets
-			// res_index = 7 for B196x33 chrome on the first call, and
-			// Overlay::Tick for bank 208 (the logo) ramps state_i through
-			// frames 29..58 then holds at 60. state_i++ runs at the END
-			// of Tick, so 61 ticks land state_i at 61 (>= 60 threshold) →
-			// res_index = 60, matching v2's static Sprite(208, 60).
-			// renderer.Tick() is skipped — it advances ambience / raindrop
-			// state we don't want in a deterministic dump.
-			for(int i = 0; i < 61; i++){
-				world.TickObjects();
-			}
-			renderer.Draw(&screenbuffer, /*frametime=*/0);
-			screen->Destroy(screenContext);
 		}else{
 			ui::v2::Context ctx = make_ctx(with_state);
 			if(strcmp(preview_screen, "main_menu") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
+				ui::v2::Layout(tree, ctx);
+				ui::v2::Render(tree, ctx, screenbuffer, renderer);
+				if(ctx.state) ctx.state->EndFrame();
+			}else if(strcmp(preview_screen, "options") == 0){
+				if(ctx.state) ctx.state->BeginFrame();
+				ui::v2::Node tree = ui::v2::BuildOptions(ctx, options_handlers);
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
@@ -230,13 +264,19 @@ int Game::RunPreview()
 				window_to_logical(ev.motion.x, ev.motion.y, mouse_x, mouse_y);
 			}else if(ev.type == SDL_EVENT_MOUSE_BUTTON_DOWN && ev.button.button == SDL_BUTTON_LEFT){
 				window_to_logical(ev.button.x, ev.button.y, mouse_x, mouse_y);
-				if(!use_legacy && strcmp(preview_screen, "main_menu") == 0){
+				if(!use_legacy){
 					ui::v2::Context ctx = make_ctx(/*with_state=*/false);
-					ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
 					// Hit-test consults rect_* for layout-managed buttons,
 					// so the same layout pass must run before dispatch.
-					ui::v2::Layout(tree, ctx);
-					ui::v2::DispatchClick(tree, ctx);
+					if(strcmp(preview_screen, "main_menu") == 0){
+						ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
+						ui::v2::Layout(tree, ctx);
+						ui::v2::DispatchClick(tree, ctx);
+					}else if(strcmp(preview_screen, "options") == 0){
+						ui::v2::Node tree = ui::v2::BuildOptions(ctx, options_handlers);
+						ui::v2::Layout(tree, ctx);
+						ui::v2::DispatchClick(tree, ctx);
+					}
 				}
 			}
 		}
