@@ -84,16 +84,76 @@ runs the click handlers.
 
 ### Layout engine
 
-**Yoga** (Facebook's C++14 Flexbox engine). Console-proven via React
-Native, full CSS Flexbox + Grid, shared vocabulary with the
-`web/admin/` React app. Vendored via CMake `FetchContent` when
-needed. **Deferred until the first container node lands** — PR #1's
-MainMenu uses absolute positioning to preserve pixel-identical output
-against legacy, so Yoga would be cosmetic dead weight in the
-foundation PR.
+**Clay** (Nic Barker's single-header C flexbox-ish layout library,
+designed for games). Vendored as a single header file. Microsecond-
+class on small trees, emits render commands that drop straight into
+our palette-indexed framebuffer, no exceptions, no STL, no retained
+view tree. Matches our pure-`Build`-each-frame architecture.
+**Deferred until the first container node lands** — PR #1's MainMenu
+uses absolute positioning to preserve pixel-identical output against
+legacy, so a layout engine would be dead weight in the foundation PR.
 
-**Fallback if Yoga becomes a problem:** Clay (smaller, game-oriented,
-single-header). Considered but not chosen.
+Clay also owns one piece of UI state (scroll offsets) because scroll
+needs to feed back into measurement. Everything else (hover, focus,
+textbox, etc.) lives in our own `UIState` (see "State model" below).
+
+**Why not Yoga.** Yoga is C++20 (we're C++14), considerably heavier,
+and designed to feed a retained native view tree (React Native's
+shadow tree). It fights our "rebuild the tree every frame" model.
+Earlier drafts of this doc picked Yoga for "console-proven via React
+Native"; Clay is also console-targeted and doesn't drag the
+framework with it.
+
+### State model
+
+`Build` is a pure function of `Context`, but persistent things — hover
+animation phase, keyboard focus, textbox cursor, scroll offset — must
+live somewhere across frames. The model:
+
+- A single `UIState` (per screen, per session, or per frame-stack —
+  scope TBD when in-game UI lands) owns a few `unordered_map<NodeId,
+  T>` shards, one per state type:
+  - `anim` (float per ID, e.g. `hot_t` and `active_t`)
+  - `text` (textbox cursor / contents)
+  - `focus` (single hashed-ID slot, "who has focus")
+  - scroll lives inside Clay (the carve-out)
+- `Node` carries an optional explicit string `key`. Nodes that need
+  per-instance state set it via `.key("foo")`. The `Button` factory
+  auto-keys from its text label, since labels are unique within a
+  screen — authors don't have to think about keys for the common case.
+- `Render` and `DispatchClick` take `Context` (which holds a
+  `UIState*` + frame `dt`). They read/write through the maps using
+  hashed keys.
+- End of frame: any IDs not visited this frame get GC'd from the maps
+  (and, eventually, get cleanup effects emitted — like a "useEffect
+  return" in React, but explicit).
+
+**Why explicit keys, not React-style hooks.** React hooks rely on TLS
++ a "rules of hooks" lint rule + a fiber tree to attach the per-hook
+slot array to a position-in-call-order. C++ has no lint enforcing
+that, and coding agents will silently violate the rules and get
+undefined behavior. Explicit `string` keys are greppable, refactorable,
+and a stale key is a visible bug instead of UB.
+
+### Animation
+
+Two persistent floats per ID, exponentially approached toward a target
+each frame — Ryan Fleury's "hot_t / active_t" pattern from the RAD
+Debugger UI series:
+
+```cpp
+hot_t    = Approach(hot_t,    hovered ? 1.f : 0.f, /*rate=*/12.f, dt);
+active_t = Approach(active_t, pressed ? 1.f : 0.f, /*rate=*/20.f, dt);
+```
+
+Visual mapping is per-widget: a button might map `hot_t` to chrome
+frame index (`base + (int)(hot_t * 4)`) and brightness, `active_t` to
+an extra brightness pulse on press. The legacy 4-frame ACTIVATING /
+DEACTIVATING animation reduces to one `hot_t` slot.
+
+This handles every smooth-state transition we have today (hover
+brighten, button press) plus everything we're likely to add (fade-in,
+focus halo, tooltip pop-in). No per-screen animation bookkeeping.
 
 ### Verification
 
@@ -164,25 +224,25 @@ These need a decision before the affected phase starts:
   button chrome carries `offsetx=-310, offsety=-288` baked in,
   forcing the "magic negative-anchor" coordinate convention. Baking
   them out lets layout primitives operate in clean screen-pixel
-  space; keeping them means `VStack` (and friends) quietly subtract
-  the offsets forever. Not blocking PR #1 / #2 — affects the PR that
-  introduces containers.
+  space; keeping them means Clay containers (and friends) quietly
+  subtract the offsets forever. Not blocking PR #1 / #2 — affects the
+  PR that introduces containers.
 - **Hot-reload mechanism beyond restart-on-rebuild.** Currently the
   preview restarts after every `cmake --build`. A shared-library swap
   (dlopen the screen's `.o` and reload on file change) is on the
   table if iteration speed bites. Not blocking PR #1.
-- **Animation in v2 nodes.** The live game animates the MAINMENU
+- **`UIState` lifetime / scope.** Per-screen instance, per-game-session
+  singleton, or stack alongside the screen stack? Per-screen is the
+  obvious default but a stack matches the screen-stack semantics
+  (modal opens → its UIState stacks on top). Decide when in-game UI
+  (chat / buy / tech) lands, since those genuinely overlap.
+- **Logo animation parity.** The live game animates the MAINMENU
   logo through frames 29–60–29 via `Overlay::Tick`. v2 currently
-  picks the steady-state frame (60) and renders static. Reaching
-  full parity will need animation support — either per-node Tick
-  callbacks or external state pumped through `Context`. Not blocking
-  pixel-identity at the steady-state frame.
-- **Input handling shape for v2.** Polled `clicked` flag was the
-  legacy pattern. v2's `.onClick(...)` handlers point at a different
-  shape (callback on hit-test), but the dispatch plumbing
-  (mouse / keyboard / gamepad → hit-test → handler) isn't designed
-  yet. Lands in the PR that wires the first v2 screen into the live
-  game state machine.
+  picks the steady-state frame (60) and renders static. The
+  `hot_t`/`active_t` pattern doesn't naturally express a triangle
+  wave; this likely wants its own `anim_phase` slot in `UIState`
+  driven by an explicit time function. Not blocking pixel-identity
+  at the steady-state frame.
 - **In-game UI migration timing.** Chat / buy / tech popups are
   spawned imperatively from `Player::Tick` (`actors/player.cpp`) and
   bypass the Screen system. They become v2 trees in some later PR;
