@@ -53,19 +53,28 @@ jobs:
             echo "relevant=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Capture runner ImageVersion
+        if: steps.changes.outputs.relevant == 'true'
+        shell: bash
+        # The runner image sets ImageVersion in its env, but GHA
+        # expressions only see vars that have been written to
+        # $GITHUB_ENV. Forward it so the cache keys below can use it.
+        run: echo "IMAGE_VERSION=$ImageVersion" >> "$GITHUB_ENV"
+
       - name: Cache vcpkg binaries
         if: steps.changes.outputs.relevant == 'true'
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.vcpkg-cache
-          # ImageVersion captures runner image rotation, which is what
-          # actually moves vcpkg port versions (and therefore package
-          # ABIs). Hashing only vcpkg.json — as the previous setup did
-          # — left a single key that mapped to many different ABI sets
-          # over time, so vcpkg rebuilt every package on every run.
-          key: vcpkg-${{ runner.os }}-${{ env.ImageVersion }}-${{ hashFiles('clients/silencer/vcpkg.json') }}
+          # IMAGE_VERSION ties cache identity to the runner image,
+          # which is what actually moves vcpkg port versions (and
+          # therefore package ABIs). Hashing only vcpkg.json — as
+          # the previous setup did — left a single key mapping to
+          # many ABI sets over time, so the restore was always stale
+          # and vcpkg rebuilt every package on every run.
+          key: vcpkg-${{ runner.os }}-${{ env.IMAGE_VERSION }}-${{ hashFiles('clients/silencer/vcpkg.json') }}
           restore-keys: |
-            vcpkg-${{ runner.os }}-${{ env.ImageVersion }}-
+            vcpkg-${{ runner.os }}-${{ env.IMAGE_VERSION }}-
             vcpkg-${{ runner.os }}-
 
       - name: Cache vcpkg tool downloads
@@ -73,7 +82,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: C:\vcpkg\downloads\tools
-          key: vcpkg-tools-${{ runner.os }}-${{ env.ImageVersion }}-v1
+          key: vcpkg-tools-${{ runner.os }}-${{ env.IMAGE_VERSION }}-v1
           restore-keys: |
             vcpkg-tools-${{ runner.os }}-
 
