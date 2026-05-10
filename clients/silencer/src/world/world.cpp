@@ -317,12 +317,16 @@ void World::DoNetwork_Authority(void){
 						if(dedicatedserver.IsBanned(accountid)){
 							canjoin = false;
 						}
-						if(!rejoinpeer && peercount >= gameinfo.maxplayers){
+						if(!rejoinpeer && !observerRequest && peercount >= gameinfo.maxplayers){
 							canjoin = false;
 						}
 					}
-					if(canjoin && gameplaystate == INGAME && !rejoinpeer){
-						// mid-game connects are only for rejoiners
+					if(canjoin && observerRequest && !gameinfo.spectatable){
+						// defense-in-depth: button gating already prevents this in normal flow
+						canjoin = false;
+					}
+					if(canjoin && gameplaystate == INGAME && !rejoinpeer && !observerRequest){
+						// mid-game connects are only for rejoiners or observers
 						canjoin = false;
 					}
 					if(canjoin && rejoinpeer){
@@ -349,6 +353,17 @@ void World::DoNetwork_Authority(void){
 						response.Put(rejoinpeer->id);
 						SendGameInfo(rejoinpeer->id);
 						SendPeerList();
+					}else if(canjoin && observerRequest){
+						Peer * newpeer = AddPeer(host, port, agency, accountid);
+						if(newpeer){
+							newpeer->observer = true;
+							response.PutBit(true);
+							response.Put(newpeer->id);
+							SendGameInfo(newpeer->id);
+							SendPeerList();
+						}else{
+							response.PutBit(false);
+						}
 					}else if(canjoin){
 						Peer * newpeer = AddPeer(host, port, agency, accountid);
 						if(newpeer){
