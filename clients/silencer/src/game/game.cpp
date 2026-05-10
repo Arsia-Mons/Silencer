@@ -5799,7 +5799,7 @@ void Game::TickGamepadMenuNav(){
 	}
 }
 
-
+const char * Game::GetActionKeyDisplayName(Action a){
 	static thread_local char buf[32];
 	const auto& ab = keymap.Get(a);
 	for(const auto& b : ab.bindings){
