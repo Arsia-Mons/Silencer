@@ -22,6 +22,10 @@ before relying on the skill's content.
 
 - `cli/` — drive the Silencer game via the CLI agent control channel for
   end-to-end UI testing. Harness path: `.claude/skills/using-silencer-cli`.
+- `silencer-ui/` — surviving the Silencer client UI subsystem (widget
+  required-fields, anchor-offset coords, polled `clicked` flags,
+  `objects`/`tabobjects` lists, `Destroy` cleanup, in-game popups in
+  `Player::Tick`). Harness path: `.claude/skills/editing-silencer-ui`.
 
 ## Adding a skill
 
