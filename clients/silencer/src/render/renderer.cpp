@@ -92,6 +92,9 @@ void Renderer::Draw(Surface * surface, float frametime){
 		camera.y += (Sint16)((world.pancameray - camera.y) * 0.08f);
 		camera.newx = camera.x;
 		camera.newy = camera.y;
+	} else if(world.spectator.freecam){
+		camera.Follow(world, world.spectator.camx, world.spectator.camy, 0, 0, 0, 30);
+		camera.Smooth(frametime);
 	} else if(world.pancamerareturn && localplayer){
 		// Smooth lerp back to player; input released by World::Tick timer
 		int px = localplayer->x + ((localplayer->oldx - localplayer->x) * frametime);
@@ -827,7 +830,7 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 									}
 								}
 							}
-							if((localplayer && player->GetTeam(world) == localplayer->GetTeam(world) && player != localplayer) || (world.replay.IsPlaying() && world.replay.ShowAllNames())){
+							if((localplayer && player->GetTeam(world) == localplayer->GetTeam(world) && player != localplayer) || (world.replay.IsPlaying() && world.replay.ShowAllNames()) || (world.IsLocalObserver() && world.spectator.holdshowallnames)){
 								Peer * peer = player->GetPeer(world);
 								if(peer){
 									User * user = world.lobby.GetUserInfo(peer->accountid);
@@ -1353,7 +1356,7 @@ void Renderer::DrawMiniMap(Object * object){
 						int radius = terminal->beamingtime * 2;
 						Uint8 color = enemycolor;
 						if(Config::GetInstance().teamcolors || world.showteamcolors){
-							Player * player = world.GetPeerPlayer(world.localpeerid);
+							Player * player = world.GetPeerPlayer(world.viewedpeerid);
 							if(player){
 								Team * team = player->GetTeam(world);
 								if(team){
@@ -2959,7 +2962,9 @@ void Renderer::DrawForegroundLuminance(Surface * surface, Camera & camera){
 
 void Renderer::DrawHUD(Surface * surface, float frametime){
 	Player * player = 0;
-	Peer * peer = world.peerlist[world.localpeerid];
+	// Drive HUD from the focus peer (viewedpeerid) so spectators see the
+	// followed player's health/fuel/shield/files as-is.
+	Peer * peer = world.peerlist[world.viewedpeerid];
 	if(peer){
 		for(std::list<Uint16>::iterator it = peer->controlledlist.begin(); it != peer->controlledlist.end(); it++){
 			Object * object = world.GetObjectFromId(*it);
