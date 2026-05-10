@@ -106,7 +106,6 @@ private:
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
 	void GoToState(Uint8 newstate);
 	Interface * CreateLobbyInterface(void);
-	Interface * CreateCharacterInterface(void);
 	Interface * CreateGameSelectInterface(void);
 	Interface * CreateChatInterface(void);
 	Interface * CreateGameCreateInterface(void);
@@ -129,6 +128,10 @@ private:
 	Uint16 passwordinterface;
 	Uint16 mappreviewinterface;
 	Updater updater;
+	// Push a CharacterPanel agency change to the live World if a network
+	// session is in progress. Wraps the World::CONNECTED check which is
+	// gated by World's private friend list.
+	void SetAgencyIfConnected(Uint8 agency);
 	bool ProcessLobbyInterface(Interface * iface);
 	// Per-tick lobby pump: drives ProcessLobbyInterface, the deferred
 	// CreateGame / map-upload state machine, modal teardown, and the
@@ -177,8 +180,6 @@ private:
 	Uint32 lastannouncedgameid;
 	Uint8 lastannouncedstatus;
 	char lastchannel[64];
-	Uint8 oldselectedagency;
-	bool agencychanged;
 	bool gamesummaryinfoloaded;
 	bool minimized;
 	bool creategameclicked;

@@ -78,8 +78,6 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	gamepad = nullptr;
 	singleplayermessage = 0;
 	updatetitle = true;
-	oldselectedagency = -1;
-	agencychanged = true;
 	currentinterface = 0;
 	lastchannel[0] = 0;
 	minimized = false;
@@ -790,7 +788,6 @@ bool Game::Tick(void){
 			if(stateisnew){
 				world.lobby.ForgetAllUserInfo();
 				world.gameplaystate = World::INLOBBY;
-				agencychanged = true;
 				UnloadGame();
 				world.Disconnect();
 				renderer.camera.SetPosition(320, 240);
@@ -2116,6 +2113,12 @@ void Game::GoToState(Uint8 newstate){
 	screenStackPendingTeardown = true;
 }
 
+void Game::SetAgencyIfConnected(Uint8 agency){
+	if(world.state == World::CONNECTED){
+		world.SetAgency(agency);
+	}
+}
+
 void Game::TickLobbyBody(void){
 	if(world.lobby.state == Lobby::DISCONNECTED){
 		world.Disconnect();
@@ -2299,11 +2302,10 @@ Interface * Game::CreateLobbyInterface(void){
 	exitbutton->SetType(Button::B156x21);
 	exitbutton->uid = 10;
 	strcpy(exitbutton->text, "Go Back");
-	
-	characterinterface = CreateCharacterInterface()->id;
+
 	gameselectinterface = CreateGameSelectInterface()->id;
 	chatinterface = CreateChatInterface()->id;
-	
+
 	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	iface->AddObject(background->id);
 	iface->AddObject(toptext->id);
@@ -2311,130 +2313,11 @@ Interface * Game::CreateLobbyInterface(void){
 	iface->AddObject(mapnametext->id);
 	iface->AddObject(exitbutton->id);
 	iface->AddObject(chatinterface);
-	iface->AddObject(characterinterface);
 	iface->AddObject(gameselectinterface);
 	iface->buttonescape = exitbutton->id;
 	iface->activeobject = chatinterface;
 	iface->ActiveChanged(world, iface, false);
 	return iface;
-}
-
-Interface * Game::CreateCharacterInterface(void){
-	Interface * characterinterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	characterinterface->x = 10;
-	characterinterface->y = 64;
-	characterinterface->width = 217;
-	characterinterface->height = 120;
-	Overlay * usertext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	usertext->text = world.lobby.GetLocalUsername();
-	usertext->textbank = 134;
-	usertext->textwidth = 8;
-	usertext->effectcolor = 200;
-	usertext->x = 20;
-	usertext->y = 71;
-	Overlay * leveltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	leveltext->uid = 2;
-	leveltext->textbank = 133;
-	leveltext->textwidth = 7;
-	leveltext->effectcolor = 129;
-	leveltext->effectbrightness = 128 + 32;
-	leveltext->textcolorramp = true;
-	leveltext->x = 17;
-	leveltext->y = 130;
-	Overlay * winstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	winstext->uid = 3;
-	winstext->textbank = 133;
-	winstext->textwidth = 7;
-	winstext->effectcolor = 129;
-	winstext->effectbrightness = 128 + 32;
-	winstext->textcolorramp = true;
-	winstext->x = 17;
-	winstext->y = 143;
-	Overlay * lossestext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	lossestext->uid = 4;
-	lossestext->textbank = 133;
-	lossestext->textwidth = 7;
-	lossestext->effectcolor = 129;
-	lossestext->effectbrightness = 128 + 32;
-	lossestext->textcolorramp = true;
-	lossestext->x = 17;
-	lossestext->y = 156;
-	Overlay * etctext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	etctext->uid = 5;
-	etctext->textbank = 133;
-	etctext->textwidth = 7;
-	etctext->effectcolor = 129;
-	etctext->effectbrightness = 128 + 32;
-	etctext->textcolorramp = true;
-	etctext->x = 17;
-	etctext->y = 169;
-	int xmargin = 42;
-	Toggle * noxisbutton = (Toggle *)world.CreateObject(ObjectTypes::TOGGLE);
-	noxisbutton->y = 90;
-	noxisbutton->x = 20 + (0 * xmargin);
-	noxisbutton->res_bank = 181;
-	noxisbutton->res_index = 0;
-	noxisbutton->uid = 1;
-	noxisbutton->set = 1;
-	if(Config::GetInstance().defaultagency == Team::NOXIS){
-		noxisbutton->selected = true;
-	}
-	Toggle * lazarusbutton = (Toggle *)world.CreateObject(ObjectTypes::TOGGLE);
-	lazarusbutton->y = 90;
-	lazarusbutton->x = 20 + (1 * xmargin);
-	lazarusbutton->res_bank = 181;
-	lazarusbutton->res_index = 1;
-	lazarusbutton->uid = 2;
-	lazarusbutton->set = 1;
-	if(Config::GetInstance().defaultagency == Team::LAZARUS){
-		lazarusbutton->selected = true;
-	}
-	Toggle * caliberbutton = (Toggle *)world.CreateObject(ObjectTypes::TOGGLE);
-	caliberbutton->y = 90;
-	caliberbutton->x = 20 + (2 * xmargin);
-	caliberbutton->res_bank = 181;
-	caliberbutton->res_index = 2;
-	caliberbutton->uid = 3;
-	caliberbutton->set = 1;
-	if(Config::GetInstance().defaultagency == Team::CALIBER){
-		caliberbutton->selected = true;
-	}
-	Toggle * staticbutton = (Toggle *)world.CreateObject(ObjectTypes::TOGGLE);
-	staticbutton->y = 90;
-	staticbutton->x = 20 + (3 * xmargin);
-	staticbutton->res_bank = 181;
-	staticbutton->res_index = 3;
-	staticbutton->uid = 4;
-	staticbutton->set = 1;
-	if(Config::GetInstance().defaultagency == Team::STATIC){
-		staticbutton->selected = true;
-	}
-	Toggle * blackrosebutton = (Toggle *)world.CreateObject(ObjectTypes::TOGGLE);
-	blackrosebutton->y = 90;
-	blackrosebutton->x = 20 + (4 * xmargin);
-	blackrosebutton->res_bank = 181;
-	blackrosebutton->res_index = 4;
-	blackrosebutton->uid = 5;
-	blackrosebutton->set = 1;
-	if(Config::GetInstance().defaultagency == Team::BLACKROSE){
-		blackrosebutton->selected = true;
-	}
-	characterinterface->AddObject(usertext->id);
-	characterinterface->AddObject(leveltext->id);
-	characterinterface->AddObject(winstext->id);
-	characterinterface->AddObject(lossestext->id);
-	characterinterface->AddObject(etctext->id);
-	characterinterface->AddObject(noxisbutton->id);
-	characterinterface->AddObject(lazarusbutton->id);
-	characterinterface->AddObject(caliberbutton->id);
-	characterinterface->AddObject(staticbutton->id);
-	characterinterface->AddObject(blackrosebutton->id);
-	/*characterinterface->AddTabObject(noxisbutton->id);
-	characterinterface->AddTabObject(lazarusbutton->id);
-	characterinterface->AddTabObject(caliberbutton->id);
-	characterinterface->AddTabObject(staticbutton->id);
-	characterinterface->AddTabObject(blackrosebutton->id);*/
-	return characterinterface;
 }
 
 Interface * Game::CreateGameSelectInterface(void){
@@ -3669,20 +3552,6 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 						}
 					}
 				}break;
-				case ObjectTypes::TOGGLE:{
-					if(iface->id == characterinterface){
-						Uint8 selectedagency = GetSelectedAgency();
-						if(selectedagency != oldselectedagency){
-							Config::GetInstance().defaultagency = selectedagency;
-							Config::GetInstance().Save();
-							oldselectedagency = selectedagency;
-							agencychanged = true;
-							if(world.state == World::CONNECTED){
-								world.SetAgency(selectedagency);
-							}
-						}
-					}
-				}break;
 				case ObjectTypes::TEXTBOX:{
 					TextBox * textbox = static_cast<TextBox *>(object);
 					if(textbox && textbox->uid == 9){
@@ -3781,32 +3650,8 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								}
 							}break;
 						}
-						if(agencychanged && iface->id == characterinterface){
-							//printf("agency changed\n");
-							User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-							if(user && !user->retrieving){
-								Uint8 selectedagency = GetSelectedAgency();
-								switch(overlay->uid){
-									case 2:{
-										overlay->text = "LEVEL: " + std::to_string(user->agency[selectedagency].level);
-									}break;
-									case 3:{
-										overlay->text = "WINS: " + std::to_string(user->agency[selectedagency].wins);
-									}break;
-									case 4:{
-										overlay->text = "LOSSES: " + std::to_string(user->agency[selectedagency].losses);
-									}break;
-									case 5:{
-										// xptonextlevel is accumulated XP toward current level;
-										// threshold is 100*(level+1). Display the remaining amount.
-										int lvl = user->agency[selectedagency].level;
-										int remaining = 100 * (lvl + 1) - (int)user->agency[selectedagency].xptonextlevel;
-										overlay->text = "XP TO NEXT LEVEL: " + std::to_string(remaining);
-										agencychanged = false;
-									}break;
-								}
-							}
-						}
+						// Character-panel level/wins/losses/XP overlays handled
+						// by CharacterPanel::Tick.
 					}
 				}break;
 				case ObjectTypes::BUTTON:{

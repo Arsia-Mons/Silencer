@@ -2,16 +2,21 @@
 #define LOBBY_SCREEN_H
 
 #include "screen.h"
+#include "character_panel.h"
 
-// Stage-A adapter: Build delegates to Game::CreateLobbyInterface() and Tick
-// delegates to Game::TickLobbyBody(). Subsequent stages migrate one panel at
-// a time out of those legacy helpers and onto Panel members of LobbyScreen.
+// In-progress migration of the lobby surface out of Game::ProcessLobbyInterface.
+// Build delegates to Game::CreateLobbyInterface() (legacy chrome + un-migrated
+// panels) and Tick delegates to Game::TickLobbyBody() (legacy lobby pump).
+// Migrated panels live as members and run after the legacy pump each frame.
 class LobbyScreen : public Screen
 {
 public:
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
 	void Destroy(ScreenContext & ctx) override;
+
+private:
+	CharacterPanel character;
 };
 
 #endif

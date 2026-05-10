@@ -63,6 +63,17 @@ public:
 	Uint16 BuildLegacyLobbyInterface();
 	void TickLegacyLobbyBody();
 
+	// Selected agency from the character toggles. Reads game.characterinterface
+	// — kept on Game for now because GetSelectedAgency is consumed by the lobby
+	// pump (joining/create flows) and JoinGame, not just by CharacterPanel.
+	Uint8 GetSelectedAgency() const;
+	// CharacterPanel writes back its interface id so legacy code keeps working
+	// during the multi-stage migration. Removed in stage H.
+	void SetCharacterInterfaceId(Uint16 id);
+	// Push an agency change to the live World if a network session is active.
+	// Wraps the World::CONNECTED check so panels don't reach into World privates.
+	void NotifyAgencyChanged(Uint8 agency);
+
 private:
 	Game & game;
 };

@@ -4,6 +4,7 @@
 #include "screen.h"
 #include "modal.h"
 #include "interface.h"
+#include "world.h"
 #include <cassert>
 
 ScreenContext::ScreenContext(Game & game_,
@@ -44,3 +45,8 @@ Uint16 ScreenContext::BuildLegacyLobbyInterface()
 }
 
 void ScreenContext::TickLegacyLobbyBody() { game.TickLobbyBody(); }
+
+Uint8 ScreenContext::GetSelectedAgency() const { return game.GetSelectedAgency(); }
+void ScreenContext::SetCharacterInterfaceId(Uint16 id) { game.characterinterface = id; }
+
+void ScreenContext::NotifyAgencyChanged(Uint8 agency) { game.SetAgencyIfConnected(agency); }
