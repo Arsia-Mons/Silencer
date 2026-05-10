@@ -2,7 +2,9 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
+#ifndef __EMSCRIPTEN__
 #include <curl/curl.h>
+#endif
 
 #if defined(_WIN32)
 #  include <windows.h>
@@ -275,7 +277,11 @@ void BehaviorTreeLibrary::update(const std::string& id, const json& j) {
 }
 
 // ── HTTP fetch helpers (shared curl write callback) ───────────────────────────
+// Native builds only — the Stage 1 browser build doesn't fetch behavior
+// trees (the main menu doesn't load them). Stage 5 will swap this for
+// emscripten_fetch when in-game spectating pulls trees on demand.
 
+#ifndef __EMSCRIPTEN__
 namespace {
 
 struct BTStrBuf {
@@ -308,6 +314,7 @@ static std::string BTCurlGet(const std::string& url) {
 }
 
 } // namespace
+#endif // !__EMSCRIPTEN__
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -316,6 +323,10 @@ static std::string BTCurlGet(const std::string& url) {
 int FetchBehaviorTrees(const char* apiBase, BehaviorTreeLibrary& lib) {
     if (!apiBase || apiBase[0] == '\0') return 0;
 
+#ifdef __EMSCRIPTEN__
+    (void)lib;
+    return 0;
+#else
     // GET /api/behaviortrees → JSON array of id strings
     std::string listBody = BTCurlGet(std::string(apiBase) + "/api/behaviortrees");
     if (listBody.empty()) {
@@ -350,6 +361,7 @@ int FetchBehaviorTrees(const char* apiBase, BehaviorTreeLibrary& lib) {
         }
     }
     return loaded;
+#endif
 }
 
 void BehaviorTreeLibrary::loadDir(const std::string& dir) {
