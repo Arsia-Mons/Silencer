@@ -7,6 +7,7 @@
 #include <memory>
 
 class GameSelectPanel;
+class GameCreatePanel;
 
 // In-progress migration of the lobby surface out of Game::ProcessLobbyInterface.
 // Build delegates to Game::CreateLobbyInterface() (legacy chrome + un-migrated
@@ -33,7 +34,10 @@ public:
 private:
 	CharacterPanel character;
 	ChatPanel chat;
+	// One of gameSelect / gameCreate is active at a time (right-side panel).
+	// Stages F/G will introduce GameJoinPanel and GameTechPanel here too.
 	std::unique_ptr<GameSelectPanel> gameSelect;
+	std::unique_ptr<GameCreatePanel> gameCreate;
 };
 
 #endif

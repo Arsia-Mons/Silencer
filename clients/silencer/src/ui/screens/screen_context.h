@@ -14,6 +14,7 @@ class Screen;
 class Modal;
 class Game;
 class AmbienceMixer;
+class MapDownloader;
 class RenderDevice;
 struct SDL_Window;
 
@@ -32,6 +33,7 @@ public:
 	              KeyMap & keymap,
 	              Updater & updater,
 	              AmbienceMixer & ambienceMixer,
+	              MapDownloader & mapDownloader,
 	              SDL_Window * & window,
 	              RenderDevice * & renderdevice);
 
@@ -42,6 +44,7 @@ public:
 	KeyMap &   keymap;
 	Updater &  updater;
 	AmbienceMixer & ambienceMixer;
+	MapDownloader & mapDownloader;
 	// Live refs to Game's SDL window + render device. Pointers because both
 	// are nullable in headless / dedicated-server mode and are assigned
 	// after ScreenContext is constructed (during SetupRenderDevice).

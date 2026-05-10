@@ -93,6 +93,19 @@ Architectural changes:
 
 Verified: clean regular + unity Debug builds (only the pre-existing C4804 warning at `IsLiveMultiplayer` and unrelated `sprintf` deprecations in `resources.cpp`). E2E `00_ping`/`10_navigate`/`20_screenshot` pass. Headless agent navigation MainMenu → Connect To Lobby → back to MainMenu works (LOBBYCONNECT screenshot taken). Interactive lobby smoke (login, browse games, Join, Create Game swap, GoBack) not exercised — same TEXTINPUT/login limitation as Stages A–C; verification rests on (a) builds, (b) E2E passing, (c) the panel impl being a near-mechanical move of the legacy widget construction + per-tick logic into the panel class.
 
+Stage E landed: `GameCreatePanel` at `clients/silencer/src/ui/screens/lobby/panels/game_create_panel.{h,cpp}`. Owns the create-game form (security toggle, level range, max players/teams, map list with `[DL]` server-only entries, game name, password) plus the per-frame map preview tracking, [DL] download badge clicks, and the Create-button kickoff (validate → upload map → CreateModalDialog "Uploading map..."). `Game::CreateGameCreateInterface` deleted; the SELECTBOX uid 4, BUTTON uid 35, BUTTON uid 40 arms in `Game::ProcessLobbyInterface` deleted. The remaining ProcessLobbyInterface SELECTBOX arm collapsed to a comment — both lobby selectboxes (uid 4 / uid 10) are now panel-owned.
+
+Architectural changes:
+- `MapDownloader &` added to `ScreenContext` per the original design — it's a subsystem ref like `AmbienceMixer`, not screen-specific scaffolding. `GameCreatePanel` reads it via `ctx.mapDownloader`.
+- `LobbyScreen` now owns `std::unique_ptr<GameCreatePanel> gameCreate` alongside `gameSelect` (one of the two is alive at a time; future stages F/G will introduce GameJoin/GameTech panels here too). `ShowGameSelect` and `ShowGameCreate` each tear down whichever right-side panel is currently active before constructing a fresh one.
+- `LobbyScreen::Tick` checks after `TickLobbyBody` whether `ctx.game.gameselectinterface` / `gamecreateinterface` were zeroed (the legacy CONNECTED transition tears them down on Join/Create handoff) and resets the matching panel objects so they don't tick stale ifaces next frame.
+- `Game::GoBack`'s gamecreate-path simplified: it no longer manually destroys the iface and rebuilds — it just clears `gamesprocessed` and delegates to `LobbyScreen::ShowGameSelect`, which handles the panel teardown. Same shape as the Stage D delegation for the gamejoin/gametech path.
+- `creategameclicked` and `mappreviewinterface` moved to public Game scaffolding so the panel can read/write them; the matching private declarations were removed (no duplicates). Removed in stage H.
+- The legacy `Game::CreateGameCreateInterface` map-download lambda captured `this` to reach `mapDownloader.dlprogress`/`dlresult`; the panel's lambda captures the atomics by pointer instead so the worker thread keeps running cleanly even if the panel object is destroyed mid-flight (the thread observes the same atomics on `mapDownloader`, which outlives the panel).
+- Anon-namespace uid enumerators in `game_create_panel.cpp` are file-prefixed (`GCRT_BTN_*` / `GCRT_INPUT_*` / `GCRT_SEL_*`).
+
+Verified: clean regular + unity Debug builds. E2E `00_ping`/`10_navigate`/`20_screenshot` pass. Headless menu navigation (MainMenu ↔ Options) verified. Interactive create-game flow (form fill, map upload, CreateGame round-trip) not exercised — same TEXTINPUT login limitation; verification rests on (a) builds, (b) E2E passing, (c) the Build / Tick code being a near-mechanical move from the legacy site.
+
 ---
 
 ## Phase 0 — Baseline
@@ -167,7 +180,7 @@ LobbyScreen has 6 panels. Migrate it in stages so the lobby keeps working throug
 - [x] **Stage B: migrate `CharacterPanel`.** Replace the `Game::CreateCharacterInterface` call inside `LobbyScreen::Build` with `character.Build(ctx, parent)` using the new `CharacterPanel`. Move the panel's process logic out of `Game::ProcessLobbyInterface` into `CharacterPanel::Tick`. Delete `Game::CreateCharacterInterface`. **Smoke:** character select — pick each agency, confirm display updates.
 - [x] **Stage C: migrate `ChatPanel`.** **Smoke:** type chat messages, confirm they appear; receive messages from another client.
 - [x] **Stage D: migrate `GameSelectPanel`.** **Smoke:** browse server list, refresh, see games appear/disappear — interactive pass pending (TEXTINPUT login limitation).
-- [ ] **Stage E: migrate `GameCreatePanel`.** **Smoke:** open create-game form, enter game name, select map, set parameters, click create; confirm map upload triggers; confirm you land in the lobby of the created game.
+- [x] **Stage E: migrate `GameCreatePanel`.** **Smoke:** open create-game form, enter game name, select map, set parameters, click create; confirm map upload triggers; confirm you land in the lobby of the created game — interactive pass pending (TEXTINPUT login limitation).
 - [ ] **Stage F: migrate `GameJoinPanel`.** **Smoke:** join a game from the list; confirm player roster updates.
 - [ ] **Stage G: migrate `GameTechPanel`.** **Smoke:** open tech tree, browse, select a research item.
 - [ ] **Stage H: cleanup.** Delete what's left of `Game::ProcessLobbyInterface`, `Game::CreateLobbyInterface`, `Game::UpdateLobbyMapName`, and the `lobbyinterface`/`chatinterface`/etc. `Uint16` members. **Smoke:** full lobby flow once more.

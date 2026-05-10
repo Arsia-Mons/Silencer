@@ -12,6 +12,7 @@ ScreenContext::ScreenContext(Game & game_,
                              KeyMap & keymap_,
                              Updater & updater_,
                              AmbienceMixer & ambienceMixer_,
+                             MapDownloader & mapDownloader_,
                              SDL_Window * & window_,
                              RenderDevice * & renderdevice_)
     : game(game_),
@@ -21,6 +22,7 @@ ScreenContext::ScreenContext(Game & game_,
       keymap(keymap_),
       updater(updater_),
       ambienceMixer(ambienceMixer_),
+      mapDownloader(mapDownloader_),
       window(window_),
       renderdevice(renderdevice_)
 {

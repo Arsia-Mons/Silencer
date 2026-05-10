@@ -92,13 +92,15 @@ public:
 	Uint16 chatinterface;
 	Uint16 gameselectinterface;
 	Uint16 gamecreateinterface;
+	Uint16 mappreviewinterface;
 	Uint16 currentinterface;
 	Uint32 currentlobbygameid;
 	bool minimized;
+	bool creategameclicked;
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
-	Interface * CreateGameCreateInterface(void);
 	Interface * CreateModalDialog(const char * message, bool ok = true);
 	Interface * CreatePasswordDialog(void);
+	Interface * CreateMapPreview(const char * filename);
 
 private:
 	bool Tick(void);
@@ -126,14 +128,12 @@ private:
 	Interface * CreateGameJoinInterface(void);
 	Interface * CreateGameTechInterface(void);
 	Interface * CreateGameSummaryInterface(Stats & stats, Uint8 agency);
-	Interface * CreateMapPreview(const char * filename);
 	void DestroyModalDialog(void);
 	Uint16 gamejoininterface;
 	Uint16 gametechinterface;
 	Uint16 gamesummaryinterface;
 	Uint16 modalinterface;
 	Uint16 passwordinterface;
-	Uint16 mappreviewinterface;
 	Updater updater;
 	bool ProcessLobbyInterface(Interface * iface);
 	void ProcessGameSummaryInterface(Interface * iface);
@@ -173,7 +173,6 @@ private:
 	Uint32 lastannouncedgameid;
 	Uint8 lastannouncedstatus;
 	bool gamesummaryinfoloaded;
-	bool creategameclicked;
 	bool modaldialoghasok;
 	bool joininggame;
 	bool deploymessageshown;

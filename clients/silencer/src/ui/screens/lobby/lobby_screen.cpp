@@ -7,6 +7,7 @@
 #include "interface.h"
 #include "objecttypes.h"
 #include "game_select_panel.h"
+#include "game_create_panel.h"
 
 LobbyScreen::LobbyScreen() = default;
 LobbyScreen::~LobbyScreen() = default;
@@ -30,7 +31,20 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	character.Tick(ctx);
 	chat.Tick(ctx);
 	if(gameSelect) gameSelect->Tick(ctx);
+	if(gameCreate) gameCreate->Tick(ctx);
 	ctx.game.TickLobbyBody();
+
+	// TickLobbyBody tears down gameselectinterface / gamecreateinterface
+	// when the CONNECTED transition fires (Join/Create handoff into a game).
+	// Drop the matching panel objects so we don't tick stale ifaces next
+	// frame and so a subsequent ShowGameSelect/ShowGameCreate rebuild starts
+	// fresh.
+	if(gameSelect && ctx.game.gameselectinterface == 0){
+		gameSelect.reset();
+	}
+	if(gameCreate && ctx.game.gamecreateinterface == 0){
+		gameCreate.reset();
+	}
 }
 
 void LobbyScreen::Destroy(ScreenContext & ctx)
@@ -41,12 +55,30 @@ void LobbyScreen::Destroy(ScreenContext & ctx)
 		gameSelect->Destroy(ctx);
 		gameSelect.reset();
 	}
+	if(gameCreate){
+		gameCreate->Destroy(ctx);
+		gameCreate.reset();
+	}
 }
 
 void LobbyScreen::ShowGameSelect(ScreenContext & ctx)
 {
 	Interface * lobbyiface = (Interface *)ctx.world.GetObjectFromId(interfaceId);
 	if(!lobbyiface) return;
+	// Tear down whichever right-side panel is currently active before
+	// building a fresh GameSelectPanel.
+	if(gameSelect){
+		Interface * panelIface = (Interface *)ctx.world.GetObjectFromId(gameSelect->interfaceId);
+		if(panelIface) panelIface->DestroyInterface(ctx.world, lobbyiface);
+		gameSelect.reset();
+		ctx.game.gameselectinterface = 0;
+	}
+	if(gameCreate){
+		Interface * panelIface = (Interface *)ctx.world.GetObjectFromId(gameCreate->interfaceId);
+		if(panelIface) panelIface->DestroyInterface(ctx.world, lobbyiface);
+		gameCreate.reset();
+		ctx.game.gamecreateinterface = 0;
+	}
 	gameSelect = std::unique_ptr<GameSelectPanel>(new GameSelectPanel(*this));
 	gameSelect->Build(ctx, lobbyiface);
 }
@@ -56,7 +88,7 @@ void LobbyScreen::ShowGameCreate(ScreenContext & ctx)
 	Interface * lobbyiface = (Interface *)ctx.world.GetObjectFromId(interfaceId);
 	if(!lobbyiface) return;
 
-	// Tear down the GameSelect panel.
+	// Tear down whichever right-side panel is active.
 	if(gameSelect){
 		Interface * panelIface = (Interface *)ctx.world.GetObjectFromId(gameSelect->interfaceId);
 		if(panelIface){
@@ -65,13 +97,19 @@ void LobbyScreen::ShowGameCreate(ScreenContext & ctx)
 		gameSelect.reset();
 		ctx.game.gameselectinterface = 0;
 	}
+	if(gameCreate){
+		Interface * panelIface = (Interface *)ctx.world.GetObjectFromId(gameCreate->interfaceId);
+		if(panelIface){
+			panelIface->DestroyInterface(ctx.world, lobbyiface);
+		}
+		gameCreate.reset();
+		ctx.game.gamecreateinterface = 0;
+	}
 
-	// Stage D: GameCreate is still the legacy iface; Stage E swaps it to a
-	// GameCreatePanel and this branch becomes a panel construction.
-	Interface * gamecreateiface = ctx.game.CreateGameCreateInterface();
-	ctx.game.gamecreateinterface = gamecreateiface->id;
-	lobbyiface->AddObject(gamecreateiface->id);
-	lobbyiface->activeobject = gamecreateiface->id;
+	gameCreate = std::unique_ptr<GameCreatePanel>(new GameCreatePanel(*this));
+	gameCreate->Build(ctx, lobbyiface);
+
+	lobbyiface->activeobject = ctx.game.gamecreateinterface;
 	Interface * chatiface = (Interface *)ctx.world.GetObjectFromId(ctx.game.chatinterface);
 	if(chatiface){
 		chatiface->activeobject = 0;
