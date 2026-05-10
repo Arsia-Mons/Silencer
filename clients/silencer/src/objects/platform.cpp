@@ -38,8 +38,8 @@ int Platform::XtoY(int x){
 	if(type == STAIRSUP || type == STAIRSDOWN){
 		int tx1, ty1, tx2, ty2;
 		GetTopSegment(tx1, ty1, tx2, ty2);
-		int length = abs(signed(tx2) - signed(tx1));
-		int pos = abs(signed(x) - signed(tx1));
+		int length = std::abs(signed(tx2) - signed(tx1));
+		int pos = std::abs(signed(x) - signed(tx1));
 		float time = float(pos) / length;
 		if(type == STAIRSUP){
 			// these checks fix an issue but can cause replay desyncs in different versions of version 22
@@ -50,7 +50,7 @@ int Platform::XtoY(int x){
 				return ty1;
 			}
 			//
-			return (-abs(signed(ty1) - signed(ty2)) * time) + ty1;
+			return (-std::abs(signed(ty1) - signed(ty2)) * time) + ty1;
 		}else{
 			//
 			if(x < tx1){
@@ -60,7 +60,7 @@ int Platform::XtoY(int x){
 				return ty2;
 			}
 			//
-			return (abs(signed(ty1) - signed(ty2)) * time) + ty1;
+			return (std::abs(signed(ty1) - signed(ty2)) * time) + ty1;
 		}
 	}else{
 		return y1;
@@ -120,5 +120,5 @@ void Platform::GetNormal(int x, int y, float * xn, float * yn){
 }
 
 int Platform::GetLength(void){
-	return abs(x2 - x1);
+	return std::abs(x2 - x1);
 }

@@ -100,10 +100,10 @@ void RocketProjectile::Tick(World & world){
 		}else{
 			yv--;
 		}
-		if(abs(xv) > abs(oldxv)){
+		if(std::abs(xv) > std::abs(oldxv)){
 			xv = oldxv;
 		}
-		if(abs(yv) > abs(oldyv)){
+		if(std::abs(yv) > std::abs(oldyv)){
 			yv = oldyv;
 		}
 		Platform * platform = 0;
@@ -124,16 +124,16 @@ void RocketProjectile::Tick(World & world){
 					plume->type = 4;
 					/*plume->xv = (rand() % 17) - 8;
 					plume->yv = (rand() % 17) - 8;
-					plume->xv = (xn * abs(plume->xv)) + (rand() % 33) - 16;
-					plume->yv = (yn * abs(plume->yv)) + (rand() % 33) - 16;*/
+					plume->xv = (xn * std::abs(plume->xv)) + (rand() % 33) - 16;
+					plume->yv = (yn * std::abs(plume->yv)) + (rand() % 33) - 16;*/
 					float angle = (i / float(numplumes)) * (2 * 3.14);
 					angle += anglen;
 					float _eps = w_r ? w_r->rocketExplosionPlumeSpeed : 15;
 					plume->xv = (sin(angle)) * _eps;
 					plume->yv = (cos(angle)) * _eps;
 					if(xn || yn){
-						plume->xv = (xn * abs(plume->xv)) + (rand() % 17) - 8;
-						plume->yv = (yn * abs(plume->yv)) + (rand() % 17) - 8;
+						plume->xv = (xn * std::abs(plume->xv)) + (rand() % 17) - 8;
+						plume->yv = (yn * std::abs(plume->yv)) + (rand() % 17) - 8;
 					}
 					plume->SetPosition(x, y);
 					

@@ -243,7 +243,7 @@ struct WeaponDef {
     // Grenade/bomb: throw speed and explosion timing (ticks).
     int throwSpeedStanding  = 0;  // xv when player is standing
     int throwSpeedMoving    = 0;  // xv when player is moving
-    int throwSpeedRunning   = 0;  // base xv when player is running (abs(player.xv) added)
+    int throwSpeedRunning   = 0;  // base xv when player is running (std::abs(player.xv) added)
     int throwYvDown         = 5;  // yv when throwing straight down
     int throwXvDownDiag     = 25; // xv when throwing down-diagonal
     int throwYvDownDiag     = 10; // yv when throwing down-diagonal
@@ -375,9 +375,9 @@ struct EnemyDef {
     int meleeCycleTicks       = 32;  // melee attack state_hit modulus
     int meleeDelayTicks       = 10;  // minimum state_hit within cycle to allow attack
     int targetStandingHeight  = 50;  // target AABB height >= this => standing (else crouched)
-    int ladderYThreshold      = 48;  // abs(ydiff) > this to attempt ladder climb
-    int ladderXTolerance      = 8;   // abs(center-x) <= this to align with ladder
-    int patrolReturnProximity = 20;  // abs(x-originalx) <= this to consider returned to post
+    int ladderYThreshold      = 48;  // std::abs(ydiff) > this to attempt ladder climb
+    int ladderXTolerance      = 8;   // std::abs(center-x) <= this to align with ladder
+    int patrolReturnProximity = 20;  // std::abs(x-originalx) <= this to consider returned to post
     // Civilian variant speeds
     int speedAlt              = 0;   // actortype=1 civilian speed override
     int runSpeedBonus         = 0;   // civilian: xv = speed + runSpeedBonus when fleeing
@@ -385,7 +385,7 @@ struct EnemyDef {
     int threatDetectY         = 100; // civilian: threat detection AABB half-height
     int shootCooldownCap      = 50;  // robot: shootcooldown threshold for attack loop check
     int deathDropFiles        = 0;   // robot: quantity of FILES pickup spawned on death
-    int ladderClimbSpeed      = 5;   // guard/robot: abs(yv) when climbing a ladder
+    int ladderClimbSpeed      = 5;   // guard/robot: std::abs(yv) when climbing a ladder
     int rocketLaunchXv        = 25;  // robot: horizontal velocity of fired rocket projectile
     int rocketOffsetX         = 70;  // robot: horizontal distance from center for rocket spawn
     int rocketOffsetY         = 60;  // robot: height above actor for rocket spawn

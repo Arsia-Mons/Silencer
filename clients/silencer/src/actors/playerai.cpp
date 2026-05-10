@@ -53,7 +53,7 @@ bool PlayerAI::ScanForTarget(World & world){
 		if(myTeam && theirTeam && myTeam->id == theirTeam->id) continue;
 		// Secret holder always wins regardless of distance
 		if(p->hassecret){ combatTarget = p->id; return true; }
-		int dist = abs(p->x - player.x);
+		int dist = std::abs(p->x - player.x);
 		if(dist < bestDist){
 			bestDist = dist;
 			combatTarget = p->id;
@@ -113,7 +113,7 @@ bool PlayerAI::ApplyCombat(World & world){
 	}
 
 	// Don't engage combat when too close — let nav handle separation.
-	int dist = abs(target->x - player.x);
+	int dist = std::abs(target->x - player.x);
 	if(dist < 80){
 		return false;
 	}
@@ -608,7 +608,7 @@ bool PlayerAI::FollowPath(World & world){
 	if(targetplatformset){
 		const PlayerDef& _pd2 = GASLoader::Get().player;
 		if(currentplatform && targetplatformset == currentplatform->set){
-			int diff = abs(targetx - player.x);
+			int diff = std::abs(targetx - player.x);
 			if(diff > _pd2.aiArrivalThreshold){
 				if(targetx < player.x){
 					player.input.keymoveleft = true;
@@ -705,7 +705,7 @@ Platform * PlayerAI::FindClosestLadderToPlatform(World & world, PlatformSet & fr
 		if(!ladder){
 			ladder = newladder;
 		}
-		if(abs(x - newladder->x1) < abs(x - ladder->x1)){
+		if(std::abs(x - newladder->x1) < std::abs(x - ladder->x1)){
 			ladder = newladder;
 		}
 	}
@@ -981,8 +981,8 @@ std::vector<Terminal *> PlayerAI::FindNearestTerminals(World & world){
 		bool aSecret = (a->state == Terminal::SECRETREADY);
 		bool bSecret = (b->state == Terminal::SECRETREADY);
 		if(aSecret != bSecret) return aSecret > bSecret;
-		int distA = abs(a->x - player.x) + abs(a->y - player.y);
-		int distB = abs(b->x - player.x) + abs(b->y - player.y);
+		int distA = std::abs(a->x - player.x) + std::abs(a->y - player.y);
+		int distB = std::abs(b->x - player.x) + std::abs(b->y - player.y);
 		return distA < distB;
 	});
 	return terminals;
@@ -1057,7 +1057,7 @@ HealMachine * PlayerAI::GetHealMachine(World & world){
 	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 		if((*it)->type == ObjectTypes::HEALMACHINE){
 			HealMachine * hm = static_cast<HealMachine *>(*it);
-			int dist = abs(hm->x - player.x) + abs(hm->y - player.y);
+			int dist = std::abs(hm->x - player.x) + std::abs(hm->y - player.y);
 			if(dist < bestDist){
 				bestDist = dist;
 				best = hm;

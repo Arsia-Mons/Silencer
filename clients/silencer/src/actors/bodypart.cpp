@@ -33,8 +33,8 @@ void BodyPart::Tick(World & world){
 	if(platform){
 		float xn, yn;
 		platform->GetNormal(x, y, &xn, &yn);
-		xv = (xn * abs(xv)) / 2;
-		yv = (yn * abs(yv)) / 2;
+		xv = (xn * std::abs(xv)) / 2;
+		yv = (yn * std::abs(yv)) / 2;
 	}
 	x += xv;
 	y += yv;

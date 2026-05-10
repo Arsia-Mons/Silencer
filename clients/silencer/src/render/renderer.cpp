@@ -101,7 +101,7 @@ void Renderer::Draw(Surface * surface, float frametime){
 		camera.newx = camera.x;
 		camera.newy = camera.y;
 		// Release early if camera has caught up with player
-		if(abs(camera.x - px) < 8 && abs(camera.y - py) < 8){
+		if(std::abs(camera.x - px) < 8 && std::abs(camera.y - py) < 8){
 			world.pancamerareturn = false;
 			world.pancamerareturncount = 0;
 		}
@@ -1839,8 +1839,8 @@ void Renderer::DrawShadow(Surface * surface, Camera & camera, Object * object){
 			x -= world.resources.spriteoffsetx[object->res_bank][object->res_index];
 		}
 		for(int y1 = y + yv + camera.GetYOffset() - 1; y1 < y + yv + camera.GetYOffset() + 3; y1++){
-			int x1a = x + camera.GetXOffset() + (abs(y2) * 4) - 4;
-			int x1b = x + camera.GetXOffset() + width - (abs(y2) * 4) + 4;
+			int x1a = x + camera.GetXOffset() + (std::abs(y2) * 4) - 4;
+			int x1b = x + camera.GetXOffset() + width - (std::abs(y2) * 4) + 4;
 			for(int x1 = x1a; x1 < x1b; x1++){
 				if(i % 2){
 					SetPixel(surface, x1, y1, 115);
@@ -2635,13 +2635,13 @@ void Renderer::DrawLight(Surface * surface, Surface * src, Rect * rect, Sint32 l
 		int minw = rect->x;
 		int minx1 = 0;
 		if(minw < 0){
-			minx1 += abs(minw);
+			minx1 += std::abs(minw);
 			minw = 0;
 		}
 		int minh = rect->y;
 		int miny1 = 0;
 		if(minh < 0){
-			miny1 += abs(minh);
+			miny1 += std::abs(minh);
 			minh = 0;
 		}
 		int maxw = rect->x + src->w;

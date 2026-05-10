@@ -24,7 +24,7 @@ void Shrapnel::Tick(World & world){
 			world.MarkDestroyObject(id);
 		}
 	}else{
-		/*if((yv != 0 && abs(xv / yv) == 1)){
+		/*if((yv != 0 && std::abs(xv / yv) == 1)){
 			res_bank = 107;
 		}else{
 			res_bank = state_i < 5 ? 108 : 109;
@@ -61,9 +61,9 @@ void Shrapnel::Tick(World & world){
 		if(platform){
 			float xn, yn;
 			platform->GetNormal(x, y, &xn, &yn);
-			xv = (xn * abs(xv)) / 2;
+			xv = (xn * std::abs(xv)) / 2;
 			xv += (rand() % 3) - 1;
-			yv = (yn * abs(yv)) / 2;
+			yv = (yn * std::abs(yv)) / 2;
 			yv += (rand() % 3) - 1;
 		}
 		x += xv;

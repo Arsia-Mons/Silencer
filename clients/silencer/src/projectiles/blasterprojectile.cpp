@@ -84,8 +84,8 @@ void BlasterProjectile::Tick(World & world){
 					shrapnel->y = y;
 					shrapnel->xv = (rand() % 9) - 4;
 					shrapnel->yv = (rand() % 9) - 8;
-					shrapnel->xv = (xn * abs(shrapnel->xv)) + (rand() % 9) - 4;
-					shrapnel->yv = (yn * abs(shrapnel->yv)) + (rand() % 9) - 8;
+					shrapnel->xv = (xn * std::abs(shrapnel->xv)) + (rand() % 9) - 4;
+					shrapnel->yv = (yn * std::abs(shrapnel->yv)) + (rand() % 9) - 8;
 				}
 			}
 			world.MarkDestroyObject(id);

@@ -1138,7 +1138,7 @@ void Map::CalculatePlatformSets(void){
 	for(unsigned int i = 0 ; i < platforms.size(); i++){
 		if(platforms[i]->type == Platform::LADDER){
 			Platform * ladder = platforms[i].get();
-			Sint16 center = abs(ladder->x2 - ladder->x1) + ladder->x1;
+			Sint16 center = std::abs(ladder->x2 - ladder->x1) + ladder->x1;
 			Platform * top = TestAABB(center, ladder->y1, center, ladder->y1, Platform::RECTANGLE);
 			if(top){
 				PlatformSet * set = top->set;
@@ -1317,7 +1317,7 @@ Platform * Map::TestLine(int x1, int y1, int x2, int y2, int * xe, int * ye, Uin
 			}
 			for(int i = 0; i < segments; i++){
 				if(LineSegmentIntersection((float)x1, (float)y1, (float)x2, (float)y2, x[i], y[i], x[(i + 1) % segments], y[(i + 1) % segments], &xed, &yed)){
-					if(abs(x1 - xed) <= abs((float)x1 - xe1) || abs(y1 - yed) <= abs((float)y1 - ye1)){
+					if(std::abs(x1 - xed) <= std::abs((float)x1 - xe1) || std::abs(y1 - yed) <= std::abs((float)y1 - ye1)){
 						xe1 = xed;
 						ye1 = yed;
 						if(xe){

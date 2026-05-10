@@ -168,7 +168,7 @@ void Guard::InitBT(){
 		if(!f) return BTResult::Failure;
 		if(f->type == ObjectTypes::PLAYER){
 			Player* p = static_cast<Player*>(f);
-			if(p && abs(p->x - x) < GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeClose){
+			if(p && std::abs(p->x - x) < GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeClose){
 				// Too close for this angle — mark seen so leaf_uncrouch won't fire, then chase.
 				ctx.bbSet("target_seen", true);
 				updateChasing(f, world);
@@ -203,18 +203,18 @@ void Guard::InitBT(){
 			if(p->InBase(world) || p->IsInvisible(world)){ chasing = 0; return BTResult::Failure; }
 		}
 		if(state == STANDING || state == WALKING){
-			if(abs(obj->x - x) <= GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax && abs(obj->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeStop){
+			if(std::abs(obj->x - x) <= GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax && std::abs(obj->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeStop){
 				mirrored = (obj->x < x);
-			} else if(abs(obj->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax){
+			} else if(std::abs(obj->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax){
 				state = WALKING;
 				mirrored = (obj->x < x);
 			} else {
 				state = WALKING;
 			}
-			Platform* ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
+			Platform* ladder = world.map.TestAABB(x - std::abs(xv), y, x + std::abs(xv), y, Platform::LADDER);
 			if(ladder){
 				Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-				if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
+				if(std::abs(signed(center) - x) <= std::abs(ceil(float(xv)))){
 					if(ladder->y2 == obj->y && y != obj->y && ladder->y2 > y){
 						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = _gls ? _gls->ladderClimbSpeed : 5; state = LADDER; state_i = 0; }
 					}
@@ -272,7 +272,7 @@ void Guard::InitBT(){
 							return BTResult::Running;
 						}
 					}
-					int dist = abs(signed(obj->x) - signed(x));
+					int dist = std::abs(signed(obj->x) - signed(x));
 					if (dist > ([]{ const EnemyDef* _g = GASLoader::Get().GetEnemyDef("guard-blaster"); return _g ? _g->chaseRangeStop : 80; }())) {
 						mirrored = (obj->x < x); // orient toward target
 					}
@@ -289,11 +289,11 @@ void Guard::InitBT(){
 					// Climb ladder toward target if on a meaningfully different level
 					int ydiff = signed(obj->y) - signed(y);
 					{ const EnemyDef* _gg = GASLoader::Get().GetEnemyDef("guard-blaster");
-					if(abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
+					if(std::abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
 						Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
 						if(ladder && state == WALKING){
 							Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-							if(abs(signed(center) - signed(x)) <= (_gg?_gg->ladderXTolerance:8)){
+							if(std::abs(signed(center) - signed(x)) <= (_gg?_gg->ladderXTolerance:8)){
 								if(ydiff < 0 && signed(ladder->y1) < signed(y)){
 									// player above, ladder goes up
 									x = center; yv = -(_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
@@ -317,7 +317,7 @@ void Guard::InitBT(){
 		// Return-to-post phase: face toward spawn, climb ladders back if needed
 		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
 		{ const EnemyDef* _ggr = GASLoader::Get().GetEnemyDef("guard-blaster");
-		if (abs(signed(x) - signed(originalx)) <= (_ggr?_ggr->patrolReturnProximity:20)) {
+		if (std::abs(signed(x) - signed(originalx)) <= (_ggr?_ggr->patrolReturnProximity:20)) {
 			chasing = 0;
 			bt_walk_ticks_ = 0;
 			state = STANDING;
@@ -339,11 +339,11 @@ void Guard::InitBT(){
 			}
 			// Climb ladders back to original level
 			int ydiff = signed(originaly) - signed(y);
-			if(abs(ydiff) > (_ggr?_ggr->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
+			if(std::abs(ydiff) > (_ggr?_ggr->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
 				Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
 				if(ladder && state == WALKING){
 					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-					if(abs(signed(center) - signed(x)) <= (_ggr?_ggr->ladderXTolerance:8)){
+					if(std::abs(signed(center) - signed(x)) <= (_ggr?_ggr->ladderXTolerance:8)){
 						if(ydiff < 0 && signed(ladder->y1) < signed(y)){
 							x = center; yv = -(_ggr ? _ggr->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
 							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
@@ -492,7 +492,7 @@ void Guard::Tick(World & world){
 				Player* player = static_cast<Player*>(found);
 				if(player){
 					const EnemyDef* _gcp = GASLoader::Get().GetEnemyDef("guard-blaster");
-					if(abs(player->x - x) < (_gcp ? _gcp->chaseProximityX : 60)){
+					if(std::abs(player->x - x) < (_gcp ? _gcp->chaseProximityX : 60)){
 						break;
 					}
 				}
@@ -896,14 +896,14 @@ void Guard::Tick(World & world){
 				}
 			}
 			if(state == STANDING || state == WALKING){
-				if(abs(object->x - x) <= GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax && abs(object->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeStop){
+				if(std::abs(object->x - x) <= GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax && std::abs(object->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeStop){
 					if(object->x > x){
 						mirrored = false;
 					}else{
 						mirrored = true;
 					}
 				}else
-					if(abs(object->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax){
+					if(std::abs(object->x - x) > GASLoader::Get().GetEnemyDef("guard-blaster")->chaseRangeMax){
 						state = WALKING;
 						if(object->x > x){
 							mirrored = false;
@@ -913,10 +913,10 @@ void Guard::Tick(World & world){
 					}else{
 						state = WALKING;
 					}
-				Platform * ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
+				Platform * ladder = world.map.TestAABB(x - std::abs(xv), y, x + std::abs(xv), y, Platform::LADDER);
 				if(ladder){
 					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-					if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
+					if(std::abs(signed(center) - x) <= std::abs(ceil(float(xv)))){
 						if(ladder->y2 == object->y && y != object->y && ladder->y2 > y){
 							x = center;
 							{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); yv = _gls ? _gls->ladderClimbSpeed : 5; }
@@ -986,9 +986,9 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		FollowGround(*this, world, xv);
 	}
 	/*if(x < 50){
-		xv = abs(xv) * (mirrored ? -1 : 1);
+		xv = std::abs(xv) * (mirrored ? -1 : 1);
 	}else{
-		xv = -abs(speed) * (mirrored ? -1 : 1);
+		xv = -std::abs(speed) * (mirrored ? -1 : 1);
 	}*/
 	if(projectile.type == ObjectTypes::ROCKETPROJECTILE || projectile.type == ObjectTypes::PLASMAPROJECTILE){
 		if(health == 0 && state != DYINGEXPLODE){

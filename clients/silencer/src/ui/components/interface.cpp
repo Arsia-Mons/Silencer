@@ -176,7 +176,7 @@ void Interface::ActiveChanged(World & world, Interface * callinginterface, bool 
 									if(scrolly < -1){
 										scrolly = -1;
 									}
-									scrollbar->scrollposition = abs(scrolly) * scrollbar->scrollmax;*/
+									scrollbar->scrollposition = std::abs(scrolly) * scrollbar->scrollmax;*/
  								}
 							}
 						}

@@ -56,10 +56,10 @@ void PlasmaProjectile::Tick(World & world){
 		if(platform){
 			platform->GetNormal(x, y, &xn, &yn);
 			if(xn){
-				xv = (xn * abs(xv));
+				xv = (xn * std::abs(xv));
 			}
 			if(yn){
-				yv = (yn * abs(yv));
+				yv = (yn * std::abs(yv));
 			}
 			{ const WeaponDef* pd = GASLoader::Get().GetWeaponDef("plasma");
 			  float bd = (pd && pd->bounceDamping > 0.0f) ? pd->bounceDamping : 0.8f;

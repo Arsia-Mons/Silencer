@@ -133,7 +133,7 @@ void Robot::InitBT() {
 		}
 		// Orient toward spawn and let Patrol move us there
 		mirrored = (signed(originalx) < signed(x));
-		if (abs(signed(x) - signed(originalx)) <= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->returnProximity : 20)) {
+		if (std::abs(signed(x) - signed(originalx)) <= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->returnProximity : 20)) {
 			state = SLEEPING;
 			state_i = -1;
 			return BTResult::Success;

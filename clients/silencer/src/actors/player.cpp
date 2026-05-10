@@ -1408,7 +1408,7 @@ void Player::Tick(World & world){
 				ladder = world.map.TestAABB(x - 20, y + yt, x + 20, y + yt, Platform::LADDER);
 				if(ladder){
 					center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-					if(abs(signed(center) - x) <= abs(ceil(float(xv) / 2))){
+					if(std::abs(signed(center) - x) <= std::abs(ceil(float(xv) / 2))){
 						x = center;
 						state = LADDER;
 						state_i = -1;
@@ -1491,7 +1491,7 @@ void Player::Tick(World & world){
 				if(IsDisguised()){
 					state_i = 6;
 				}else{
-					if(state_i <= 1 && abs(xv) >= 4){
+					if(state_i <= 1 && std::abs(xv) >= 4){
 						state_i = 1;
 					}
 					res_bank = 66;
@@ -1927,7 +1927,7 @@ void Player::Tick(World & world){
 					yv3 += test;
 					test += world.gravity;
 				}
-				if(abs(yv3) <= abs(yv2)){
+				if(std::abs(yv3) <= std::abs(yv2)){
 					break;
 				}
 				v++;
@@ -2648,7 +2648,7 @@ void Player::Tick(World & world){
 				}break;
 				case ObjectTypes::SECRETRETURN:{
 					SecretReturn * secretreturn = static_cast<SecretReturn *>(object);
-					if(secretreturn && abs(x - secretreturn->x) < 30 && abs(y - secretreturn->y) < 50){
+					if(secretreturn && std::abs(x - secretreturn->x) < 30 && std::abs(y - secretreturn->y) < 50){
 						if(hassecret){
 							Team * team = GetTeam(world);
 							if(team){
@@ -2768,9 +2768,9 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		break;
 	}
 	/*if(x < 50){
-		xv = (abs(xv) + 5) * (mirrored ? -1 : 1);
+		xv = (std::abs(xv) + 5) * (mirrored ? -1 : 1);
 	}else{
-		xv = -(abs(xv) + 5) * (mirrored ? -1 : 1);
+		xv = -(std::abs(xv) + 5) * (mirrored ? -1 : 1);
 	}*/
 	if(health == 0 && state != DYING && state != DEAD){
 		Peer * peer = GetPeer(world);
@@ -3031,10 +3031,10 @@ bool Player::CheckForBaseExit(World & world){
 }
 
 bool Player::CheckForLadder(World & world){
-	Platform * ladder = world.map.TestAABB(x - abs(xv), y - height, x + abs(xv), y, Platform::LADDER);
+	Platform * ladder = world.map.TestAABB(x - std::abs(xv), y - height, x + std::abs(xv), y, Platform::LADDER);
 	if(!justjumpedfromladder && input.keymoveup && ladder){
 		Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-		if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
+		if(std::abs(signed(center) - x) <= std::abs(ceil(float(xv)))){
 			x = center;
 			state = LADDER;
 			if(IsDisguised()){
@@ -3597,7 +3597,7 @@ bool Player::CanExhaustInputQueue(World & world, int queuesize){
 	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::PLAYER].begin(); it != world.objectsbytype[ObjectTypes::PLAYER].end(); it++){
 		Player * player = static_cast<Player *>(world.GetObjectFromId(*it));
 		if(player->id != id){
-			if(abs(player->x - x) < 400 && abs(player->y - y) < 400){
+			if(std::abs(player->x - x) < 400 && std::abs(player->y - y) < 400){
 				otherplayersinview = true;
 				break;
 			}
@@ -3951,14 +3951,14 @@ bool Player::ProcessJetpackState(World & world){
 			float xn, yn;
 			platform->GetNormal(x, y, &xn, &yn);
 			if(xn){
-				xv = (xn * abs(xv));
+				xv = (xn * std::abs(xv));
 			}
 			if(yn){
-				yv = (yn * abs(yv));
+				yv = (yn * std::abs(yv));
 			}
 			xv /= 2;
 			yv /= 2;
-			if(abs(xv) >= 2 || abs(yv) >= 2){
+			if(std::abs(xv) >= 2 || std::abs(yv) >= 2){
 				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundLand], 96);
 			}
 		}
@@ -4027,9 +4027,9 @@ bool Player::ProcessFallingState(World & world){
 			x = x + xv2;
 			y = y + yv2;
 			platform->GetNormal(x, y, &xn, &yn);
-			xv = (xn * abs(xv)) / 2;
-			yv = (yn * abs(yv)) / 2;
-			if(abs(xv) >= 2 || abs(yv) >= 2){
+			xv = (xn * std::abs(xv)) / 2;
+			yv = (yn * std::abs(yv)) / 2;
+			if(std::abs(xv) >= 2 || std::abs(yv) >= 2){
 				EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFall], 96);
 			}
 		}
@@ -4074,7 +4074,7 @@ bool Player::ProcessStandingState(World & world){
 		Platform * ladder = world.map.TestAABB(x - 20, y + yt, x + 20, y + yt, Platform::LADDER);
 		if(ladder){
 			Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-			if(abs(signed(center) - x) < 5){
+			if(std::abs(signed(center) - x) < 5){
 				x = center;
 				state = LADDER;
 				state_i = -1;

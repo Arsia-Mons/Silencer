@@ -142,9 +142,9 @@ Uint8 Palette::ClosestMatch(SDL_Color color, bool upperonly){
 		int y = colors[currentpalette][i].g - color.g;
 		int z = colors[currentpalette][i].b - color.b;
 		int diff = (x * x) + (y * y) + (z * z);
-		//diff += abs(colors[currentpalette][i].r - color.r);
-		//diff += abs(colors[currentpalette][i].g - color.g);
-		//diff += abs(colors[currentpalette][i].b - color.b);
+		//diff += std::abs(colors[currentpalette][i].r - color.r);
+		//diff += std::abs(colors[currentpalette][i].g - color.g);
+		//diff += std::abs(colors[currentpalette][i].b - color.b);
 		if(diff < smallestdiff){
 			smallestdiff = diff;
 			choice = i;

@@ -257,7 +257,7 @@ bool Grenade::UpdatePosition(World & world, Player & player){
 			if(player.input.keymoveleft || player.input.keymoveright){
 				xv = (gw ? gw->throwSpeedMoving : 30);
 				if(player.state == Player::RUNNING){
-					xv = (gw ? gw->throwSpeedRunning : 26) + abs(player.xv);
+					xv = (gw ? gw->throwSpeedRunning : 26) + std::abs(player.xv);
 				}
 			}
 			if(player.input.keymovedown){
@@ -287,7 +287,7 @@ bool Grenade::UpdatePosition(World & world, Player & player){
 			}
 			if(xv < 0){
 				if(!mirrored){
-					xv = abs(xv);
+					xv = std::abs(xv);
 				}
 			}else{
 				if(mirrored){
@@ -340,10 +340,10 @@ void Grenade::Move(Object & object, World & world, int v){
 			platform = world.map.TestIncr(object.x - object.radius, object.y - object.radius, object.x + object.radius, object.y + object.radius, &xv2, &yv2, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN, platform);
 		}
 	}
-	int morex = abs(object.xv - xv2);
-	int morey = abs(object.yv - yv2);
-	int movedx = abs(object.xv) - morex;
-	int movedy = abs(object.yv) - morey;
+	int morex = std::abs(object.xv - xv2);
+	int morey = std::abs(object.yv - yv2);
+	int movedx = std::abs(object.xv) - morex;
+	int movedy = std::abs(object.yv) - morey;
 	int volume = 0;
 	if(platform){
 		if(!v){
@@ -357,12 +357,12 @@ void Grenade::Move(Object & object, World & world, int v){
 		{ const WeaponDef* gd_b = GASLoader::Get().GetWeaponDef("grenade");
 		  float bd = (gd_b && gd_b->bounceDamping > 0.0f) ? gd_b->bounceDamping : 0.8f;
 		  if(xn){
-			object.xv = (xn * abs(object.xv)) * 0.5;
+			object.xv = (xn * std::abs(object.xv)) * 0.5;
 		  }else{
 			object.xv *= bd;
 		  }
 		  if(yn){
-			object.yv = (yn * abs(object.yv)) * 0.4;
+			object.yv = (yn * std::abs(object.yv)) * 0.4;
 		  }else{
 			object.yv *= bd;
 		  }
@@ -379,7 +379,7 @@ void Grenade::Move(Object & object, World & world, int v){
 		}
 		Move(object, world, v);
 	}
-	if(movedx == 0 && v && abs(movedy - v) <= 2){
+	if(movedx == 0 && v && std::abs(movedy - v) <= 2){
 		object.xv = 0;
 		object.yv = 0;
 	}else{

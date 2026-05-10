@@ -235,7 +235,7 @@ void Civilian::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		state = DYINGBACKWARD;
 	}
 	if((xpcnt < 0 && xv < 0) || (xpcnt > 0 && xv > 0)){
-		xv = abs(xv) * xpcnt;
+		xv = std::abs(xv) * xpcnt;
 	}else{
 		xv = speed * xpcnt;
 	}

@@ -1312,13 +1312,13 @@ bool World::RelevantToPlayer(Player * player, Object * object){
 	}
 	if(object->issprite){
 		const WorldDef& _wd = GASLoader::Get().world;
-		if(abs(player->x - object->x) <= _wd.networkSyncRangeX && abs(player->y - object->y) <= _wd.networkSyncRangeY){
+		if(std::abs(player->x - object->x) <= _wd.networkSyncRangeX && std::abs(player->y - object->y) <= _wd.networkSyncRangeY){
 			return true;
 		}
 		for(std::vector<Uint16>::iterator it = objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].begin(); it != objectsbytype[ObjectTypes::SURVEILLANCEMONITOR].end(); it++){
 			Object * obj = GetObjectFromId((*it));
 			if(obj){
-				if(abs(player->x - obj->x) <= _wd.networkSyncRangeX && abs(player->y - obj->y) <= _wd.networkSyncRangeY){
+				if(std::abs(player->x - obj->x) <= _wd.networkSyncRangeX && std::abs(player->y - obj->y) <= _wd.networkSyncRangeY){
 					SurveillanceMonitor * surveillancemonitor = static_cast<SurveillanceMonitor *>(obj);
 					if(surveillancemonitor->camera.IsVisible(*this, *object)){
 						return true;
@@ -1328,13 +1328,13 @@ bool World::RelevantToPlayer(Player * player, Object * object){
 		}
 		Object * grenade = GetObjectFromId(player->currentgrenade);
 		if(grenade){
-			if(abs(grenade->x - object->x) <= _wd.grenadesyncRangeX && abs(grenade->y - object->y) <= _wd.grenadesyncRangeY){
+			if(std::abs(grenade->x - object->x) <= _wd.grenadesyncRangeX && std::abs(grenade->y - object->y) <= _wd.grenadesyncRangeY){
 				return true;
 			}
 		}
 		Object * detonator = GetObjectFromId(player->currentdetonator);
 		if(detonator){
-			if(abs(detonator->x - object->x) <= _wd.grenadesyncRangeX && abs(detonator->y - object->y) <= _wd.grenadesyncRangeY){
+			if(std::abs(detonator->x - object->x) <= _wd.grenadesyncRangeX && std::abs(detonator->y - object->y) <= _wd.grenadesyncRangeY){
 				return true;
 			}
 		}
@@ -2141,7 +2141,7 @@ void World::Explode(Object & object, Uint8 suitcolor, float hitx){
 			bodypart->x = object.x;
 			bodypart->y = object.y - GASLoader::Get().world.bodyPartSpawnYOffset;
 			bodypart->type = i;
-			bodypart->xv += (abs(object.xv) * 2) * hitx;
+			bodypart->xv += (std::abs(object.xv) * 2) * hitx;
 			if(i == 0){
 				bodypart->xv = 0;
 				bodypart->yv = -GASLoader::Get().world.bodyPartLaunchYV;
@@ -2273,7 +2273,7 @@ int World::GetPingTime(void){
 int World::AveragePingJitter(void){
 	int average = 0;
 	for(int i = 0; i < sizeof(pinghistory) / sizeof(int); i++){
-		int jitter = abs(pinghistory[i] - pinghistory[(i - 1) % sizeof(pinghistory) / sizeof(int)]);
+		int jitter = std::abs(pinghistory[i] - pinghistory[(i - 1) % sizeof(pinghistory) / sizeof(int)]);
 		average += jitter;
 	}
 	average /= sizeof(pinghistory) / sizeof(int);

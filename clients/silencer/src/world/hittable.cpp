@@ -46,7 +46,7 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 	}else{
 		damagedshield = true;
 		if(shield - projectile.shielddamage <= 0){
-			int more = abs(shield - projectile.shielddamage);
+			int more = std::abs(shield - projectile.shielddamage);
 			more = (float(more) / projectile.shielddamage) * projectile.healthdamage;
 			shield = 0;
 			if(health - more < 0){
