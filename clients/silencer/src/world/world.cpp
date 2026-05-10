@@ -400,7 +400,7 @@ void World::DoNetwork_Authority(void){
 				SendPacket(&temppeer, response.data, response.BitsToBytes(response.offset));
 			}break;
 			case MSG_INPUT:{ // client sending input
-				if(peer && gameplaystate == INGAME){
+				if(peer && !peer->observer && gameplaystate == INGAME){
 					totalinputpackets++;
 					peer->totalinputs++;
 					Serializer * inputcopy = new Serializer;
@@ -482,6 +482,9 @@ void World::DoNetwork_Authority(void){
 					Player * player = GetPeerPlayer(peer->id);
 					Uint8 to;
 					data.Get(to);
+					if(peer->observer && to == 1){
+						to = 0;
+					}
 					Serializer response;
 					Uint8 code = MSG_CHAT;
 					response.Put(code);
