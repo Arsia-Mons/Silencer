@@ -1583,18 +1583,22 @@ bool Game::Tick(void){
 							world.ShowMessage(text, 255);
 						}
 						Team * team = player->GetTeam(world);
-						if(team && team->beamingterminalid){
+						bool advance22 = player->hassecret || (team && team->secrets > 0);
+						if(!advance22 && team && team->beamingterminalid){
 							Terminal * terminal = static_cast<Terminal *>(world.GetObjectFromId(team->beamingterminalid));
 							if(terminal){
 								if(terminal->beamingtime > 45){
 									terminal->beamingtime = 45;
 								}
 								if(terminal->state == Terminal::SECRETREADY){
-									world.highlightminimap = false;
-									singleplayermessage++;
-									world.message_i = 0;
+									advance22 = true;
 								}
 							}
+						}
+						if(advance22){
+							world.highlightminimap = false;
+							singleplayermessage++;
+							world.message_i = 0;
 						}
 					}break;
 					case 23:{
@@ -1603,7 +1607,8 @@ bool Game::Tick(void){
 							sprintf(text, "Pick up the secret at the location shown\non your radar map");
 							world.ShowMessage(text, 128);
 						}
-						if(player->hassecret){
+						Team * team23 = player->GetTeam(world);
+						if(player->hassecret || (team23 && team23->secrets > 0)){
 							singleplayermessage++;
 							world.message_i = 0;
 						}
@@ -1614,7 +1619,8 @@ bool Game::Tick(void){
 							sprintf(text, "Now, you must return the secret to your base.\nIf this were a real government secret,\nyou would have limited time before\nthe government traced your location.");
 							world.ShowMessage(text, 255);
 						}
-						if(player->InBase(world)){
+						Team * team24 = player->GetTeam(world);
+						if(player->InBase(world) || (team24 && team24->secrets > 0)){
 							singleplayermessage++;
 							world.message_i = 0;
 						}
