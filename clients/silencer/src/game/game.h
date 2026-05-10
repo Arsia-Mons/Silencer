@@ -23,6 +23,7 @@
 
 class Screen;
 class Modal;
+class MessageModal;
 
 class Game
 {
@@ -94,15 +95,11 @@ public:
 	Uint16 gamecreateinterface;
 	Uint16 gamejoininterface;       // mirrored by GameJoinPanel; removed in stage H.
 	Uint16 gametechinterface;       // mirrored by GameTechPanel; removed in stage H.
-	Uint16 mappreviewinterface;
 	Uint16 currentinterface;
 	Uint32 currentlobbygameid;
 	bool minimized;
 	bool creategameclicked;
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
-	Interface * CreateModalDialog(const char * message, bool ok = true);
-	Interface * CreatePasswordDialog(void);
-	Interface * CreateMapPreview(const char * filename);
 	// Toggle in-lobby team overlay visibility. Called by LobbyScreen's
 	// right-side panel swaps (ShowGameTech / TearDownRightPanels) when
 	// entering / leaving the tech-choice surface. Removed in stage H once
@@ -133,10 +130,12 @@ private:
 	void GiveDefaultItems(Player & player);
 	void GoToState(Uint8 newstate);
 	Interface * CreateGameSummaryInterface(Stats & stats, Uint8 agency);
-	void DestroyModalDialog(void);
+	// Modal-stack peeks used by TickLobbyBody during the create-game spinner
+	// poll. Removed in stage H along with TickLobbyBody itself.
+	bool TopIsModal(void) const;
+	MessageModal * TopAsProgressModal(void) const;
+	void DismissProgressModal(void);
 	Uint16 gamesummaryinterface;
-	Uint16 modalinterface;
-	Uint16 passwordinterface;
 	Updater updater;
 	bool ProcessLobbyInterface(Interface * iface);
 	void ProcessGameSummaryInterface(Interface * iface);
@@ -166,7 +165,6 @@ private:
 	int frames;
 	int fps;
 	Uint64 lasttick;
-	Uint16 aftermodalinterface;
 	Uint16 sharedstate;
 	int oldselecteditem;
 	Uint8 singleplayermessage;
@@ -174,7 +172,6 @@ private:
 	Uint32 lastannouncedgameid;
 	Uint8 lastannouncedstatus;
 	bool gamesummaryinfoloaded;
-	bool modaldialoghasok;
 	bool joininggame;
 	bool deploymessageshown;
 	int quitscancode;

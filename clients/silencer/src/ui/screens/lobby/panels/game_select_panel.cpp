@@ -14,6 +14,10 @@
 #include "button.h"
 #include "selectbox.h"
 #include "scrollbar.h"
+#include "message_modal.h"
+#include "password_modal.h"
+
+#include <memory>
 
 #include <cmath>
 #include <cstring>
@@ -260,7 +264,7 @@ void GameSelectPanel::Tick(ScreenContext & ctx)
 					}
 					if(!selectbox) break;
 					if(selectbox->selecteditem == -1){
-						ctx.game.CreateModalDialog("No game selected");
+						ctx.PushScreen(std::make_unique<MessageModal>("No game selected"));
 						break;
 					}
 					Uint32 gameid = selectbox->IndexToId(selectbox->selecteditem);
@@ -273,16 +277,26 @@ void GameSelectPanel::Tick(ScreenContext & ctx)
 					if(user){
 						if(lobbygame->minlevel > user->agency[Config::GetInstance().defaultagency].level){
 							canjoin = false;
-							ctx.game.CreateModalDialog("Your player level is too low");
+							ctx.PushScreen(std::make_unique<MessageModal>("Your player level is too low"));
 						}else if(lobbygame->maxlevel < user->agency[Config::GetInstance().defaultagency].level){
 							canjoin = false;
-							ctx.game.CreateModalDialog("Your player level is too high");
+							ctx.PushScreen(std::make_unique<MessageModal>("Your player level is too high"));
 						}
 					}
 					if(!canjoin) break;
 					ctx.game.currentlobbygameid = lobbygame->id;
 					if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
-						ctx.game.currentinterface = ctx.game.CreatePasswordDialog()->id;
+						Uint32 gameId = lobbygame->id;
+						ctx.PushScreen(std::make_unique<PasswordModal>(
+							[&ctx, gameId](const char * password){
+								LobbyGame * lg = ctx.world.lobby.GetGameById(gameId);
+								if(lg){
+									char buf[64];
+									std::strncpy(buf, password ? password : "", sizeof(buf) - 1);
+									buf[sizeof(buf) - 1] = '\0';
+									ctx.game.JoinGame(*lg, buf);
+								}
+							}));
 					}else{
 						ctx.game.JoinGame(*lobbygame);
 					}

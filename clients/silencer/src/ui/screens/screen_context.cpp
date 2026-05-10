@@ -3,6 +3,7 @@
 #include "game.h"
 #include "screen.h"
 #include "modal.h"
+#include "message_modal.h"
 #include <cassert>
 
 ScreenContext::ScreenContext(Game & game_,
@@ -34,5 +35,14 @@ void ScreenContext::RequestQuit() { game.quitRequested = true; }
 void ScreenContext::PushScreen(std::unique_ptr<Screen> s) { game.PushScreen(std::move(s)); }
 void ScreenContext::PopScreen() { game.PopScreen(); }
 void ScreenContext::ReplaceScreen(std::unique_ptr<Screen> s) { game.ReplaceScreen(std::move(s)); }
-void ScreenContext::ShowModal(std::unique_ptr<Modal>) { assert(false && "ScreenContext::ShowModal not wired yet"); }
-void ScreenContext::ShowMessage(const char *, std::function<void(bool)>) { assert(false && "ScreenContext::ShowMessage not wired yet"); }
+void ScreenContext::ShowModal(std::unique_ptr<Modal> m) {
+	game.PushScreen(std::unique_ptr<Screen>(static_cast<Screen *>(m.release())));
+}
+
+void ScreenContext::ShowMessage(const char * msg, std::function<void(bool ok)> onClose) {
+	std::function<void()> wrapped;
+	if(onClose){
+		wrapped = [onClose = std::move(onClose)]() { onClose(true); };
+	}
+	game.PushScreen(std::make_unique<MessageModal>(msg ? msg : "", std::move(wrapped)));
+}

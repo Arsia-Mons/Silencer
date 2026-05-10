@@ -3,6 +3,8 @@
 
 #include "panel.h"
 
+#include <SDL3/SDL_stdinc.h>
+
 class LobbyScreen;
 
 // Right-side game-creation form on the LobbyScreen: security toggle, level
@@ -19,7 +21,14 @@ public:
 	void Destroy(ScreenContext & ctx) override;
 
 private:
+	// Build a floating preview iface (minimap + name + description) from the
+	// map at `filename`. Returned id is the new Interface id on world; caller
+	// owns the lifetime via DestroyInterface.
+	Uint16 BuildMapPreview(class World & world, const char * filename);
+	void TearDownMapPreview(class World & world);
+
 	LobbyScreen & owner;
+	Uint16 mapPreviewId = 0;
 };
 
 #endif

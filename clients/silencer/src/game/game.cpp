@@ -26,6 +26,8 @@
 #include "gasloader.h"
 #include "screen.h"
 #include "modal.h"
+#include "message_modal.h"
+#include "password_modal.h"
 #include "main_menu_screen.h"
 #include "options_screen.h"
 #include "options_controls_screen.h"
@@ -67,8 +69,6 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	gamejoininterface = 0;
 	gametechinterface = 0;
 	gameselectinterface = 0;
-	mappreviewinterface = 0;
-	modalinterface = 0;
 	sharedstate = 0;
 	currentlobbygameid = 0;
 	lastannouncedgameid = 0;
@@ -80,7 +80,6 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	updatetitle = true;
 	currentinterface = 0;
 	minimized = false;
-	modaldialoghasok = false;
 	window = 0;
 	renderdevice = nullptr;
 	memset(palettecolors, 0, sizeof(palettecolors));
@@ -788,8 +787,6 @@ bool Game::Tick(void){
 				gamejoininterface = 0;
 				gametechinterface = 0;
 				gamesummaryinterface = 0;
-				modalinterface = 0;
-				passwordinterface = 0;
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
 				renderer.palette.SetPalette(2);
@@ -2133,7 +2130,9 @@ void Game::TickLobbyBody(void){
 		}else if(us == 3){
 			mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
 			creategameclicked = false;
-			CreateModalDialog("Could not upload map");
+			// Pop any progress modal still up before stacking the error.
+			DismissProgressModal();
+			PushScreen(std::make_unique<MessageModal>("Could not upload map"));
 		}
 		if(world.lobby.creategamestatus == 1){
 			world.lobby.creategamestatus = 0;
@@ -2154,7 +2153,9 @@ void Game::TickLobbyBody(void){
 		}else
 		if(world.lobby.creategamestatus != 1 && world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0){ // failed and not creating
 			world.lobby.creategamestatus = 0;
-			CreateModalDialog("Could not create game");
+			creategameclicked = false;
+			DismissProgressModal();
+			PushScreen(std::make_unique<MessageModal>("Could not create game"));
 		}
 	}
 	if(gameselectinterface || gamecreateinterface){
@@ -2164,33 +2165,20 @@ void Game::TickLobbyBody(void){
 			}
 			if(world.state == World::IDLE){
 				joininggame = false;
-				CreateModalDialog("Unable to join game");
+				DismissProgressModal();
+				PushScreen(std::make_unique<MessageModal>("Unable to join game"));
 			}
 		}
-		if(modalinterface && !modaldialoghasok){
-			Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
-			if(modaliface){
-				for(std::vector<Uint16>::iterator it = modaliface->objects.begin(); it != modaliface->objects.end(); it++){
-					Object * object = world.GetObjectFromId(*it);
-					if(object && object->type == ObjectTypes::OVERLAY){
-						Overlay * overlay = static_cast<Overlay *>(object);
-						if(overlay->text.length() > 0){
-							overlay->text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
-								? "Uploading map" : "Creating game";
-							int dots = (world.tickcount / 4) % 6;
-							if(dots > 3){
-								dots = 6 - dots;
-							}
-							for(int i = 0; i < dots; i++){
-								overlay->text += ".";
-							}
-						}
-					}
-				}
-			}
+		if(MessageModal * progress = TopAsProgressModal()){
+			std::string text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
+				? "Uploading map" : "Creating game";
+			int dots = (world.tickcount / 4) % 6;
+			if(dots > 3) dots = 6 - dots;
+			for(int i = 0; i < dots; i++) text += ".";
+			progress->SetText(screenContext, text);
 		}
-		if(!modaldialoghasok && world.lobby.creategamestatus != 100 && mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 && (world.state == World::CONNECTED || world.state == World::IDLE)){
-			DestroyModalDialog();
+		if(TopAsProgressModal() && world.lobby.creategamestatus != 100 && mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 && (world.state == World::CONNECTED || world.state == World::IDLE)){
+			PopScreen();
 			creategameclicked = false;
 		}
 		if(world.state == World::CONNECTED && lobbyinterface){
@@ -2227,10 +2215,27 @@ void Game::TickLobbyBody(void){
 
 	mapDownloader.ProcessMapDownload();
 
-	if(world.state != World::CONNECTED && !modalinterface){
+	if(world.state != World::CONNECTED && !TopIsModal()){
 		if(gamejoininterface || gametechinterface){
-			CreateModalDialog("Disconnected from game");
+			PushScreen(std::make_unique<MessageModal>("Disconnected from game", [this]() { GoBack(); }));
 		}
+	}
+}
+
+bool Game::TopIsModal(void) const {
+	if(screenStack.empty()) return false;
+	return screenStack.back()->IsOverlay();
+}
+
+MessageModal * Game::TopAsProgressModal(void) const {
+	if(screenStack.empty()) return nullptr;
+	MessageModal * m = dynamic_cast<MessageModal *>(screenStack.back().get());
+	return (m && m->IsProgress()) ? m : nullptr;
+}
+
+void Game::DismissProgressModal(void) {
+	if(TopAsProgressModal()){
+		PopScreen();
 	}
 }
 
@@ -2432,173 +2437,6 @@ Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
 	return iface;
 }
 
-Interface * Game::CreateModalDialog(const char * message, bool ok){
-	DestroyModalDialog();
-	// 40:4 model dialog background
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->renderpass = 3;
-	background->res_bank = 40;
-	background->res_index = 4;
-	Overlay * text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	text->renderpass = 3;
-	text->text = message;
-	text->textbank = 134;
-	text->textwidth = 8;
-	text->x = 320 - ((text->text.length() * text->textwidth) / 2);
-	text->y = 200;
-	Interface * dialoginterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	if(ok){
-		Button * okbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		okbutton->renderpass = 3;
-		okbutton->x = 242;
-		okbutton->y = 230;
-		okbutton->SetType(Button::B156x21);
-		okbutton->uid = 50;
-		strcpy(okbutton->text, "OK");
-		dialoginterface->AddObject(okbutton->id);
-		dialoginterface->buttonenter = okbutton->id;
-	}else{
-		text->y = 218;
-	}
-	modaldialoghasok = ok;
-	dialoginterface->AddObject(background->id);
-	dialoginterface->AddObject(text->id);
-	dialoginterface->modal = true;
-	modalinterface = dialoginterface->id;
-	Interface * iface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
-	if(iface){
-		iface->AddObject(modalinterface);
-	}
-	aftermodalinterface = currentinterface;
-	currentinterface = dialoginterface->id;
-	return dialoginterface;
-}
-
-Interface * Game::CreateMapPreview(const char * filename){
-	Interface * previewinterface = static_cast<Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
-	Overlay * minimap = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	minimap->customsprite.resize(172 * 62);
-	minimap->uid = 1;
-	memset(minimap->customsprite.data(), 0, minimap->customsprite.size());
-	Overlay * mapname = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	mapname->textbank = 133;
-	mapname->textwidth = 7;
-	mapname->effectcolor = 129;
-	mapname->effectbrightness = 128 + 32;
-	mapname->textcolorramp = true;
-	mapname->uid = 2;
-	std::string smallfilename = filename;
-	int lastslash = smallfilename.find_last_of("/");
-	if(lastslash){
-		smallfilename.erase(0, lastslash + 1);
-	}
-	mapname->text = smallfilename.substr(0, 29);
-	Overlay * maptext = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	maptext->textbank = 133;
-	maptext->textwidth = 7;
-	maptext->textallownewline = true;
-	maptext->textlineheight = 10;
-	maptext->effectcolor = 129;
-	maptext->effectbrightness = 128 + 32;
-	maptext->textcolorramp = true;
-	maptext->uid = 3;
-	char mapdesc[0x80];
-	strcpy(mapdesc, "");
-	CDDataDir();
-	SDL_IOStream * file = SDL_IOFromFile(filename, "rb");
-	if(!file){
-		CDResDir();
-		file = SDL_IOFromFile(filename, "rb");
-	}
-	if(file){
-		Map::Header header;
-		Map::LoadHeader(file, header);
-		strcpy(mapdesc, header.description);
-		Map::UncompressMinimap((Uint8 (*)[172 * 62])minimap->customsprite.data(), header.minimapcompressed, header.minimapcompressedsize);
-		minimap->customspritew = 172;
-		minimap->customspriteh = 62;
-		SDL_CloseIO(file);
-	}
-	maptext->text = Interface::WordWrap(mapdesc, 29);
-	previewinterface->AddObject(mapname->id);
-	previewinterface->AddObject(minimap->id);
-	previewinterface->AddObject(maptext->id);
-	return previewinterface;
-}
-
-void Game::DestroyModalDialog(void){
-	if(modalinterface){
-		currentinterface = aftermodalinterface;
-		aftermodalinterface = 0;
-		Interface * iface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
-		if(iface){
-			Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
-			if(modaliface){
-				modaliface->DestroyInterface(world, iface);
-			}
-		}
-		modalinterface = 0;
-	}
-}
-
-Interface * Game::CreatePasswordDialog(void){
-	// 40:2 model dialog password input
-	DestroyModalDialog();
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->renderpass = 3;
-	background->res_bank = 40;
-	background->res_index = 2;
-	background->x = 320 - (world.resources.spritewidth[background->res_bank][background->res_index] / 2);
-	background->y = 240 - (world.resources.spriteheight[background->res_bank][background->res_index] / 2);
-	Interface * dialoginterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	Overlay * text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	text->renderpass = 3;
-	text->text = "This game requires a password";
-	text->textbank = 134;
-	text->textwidth = 8;
-	text->x = 320 - ((text->text.length() * text->textwidth) / 2);
-	text->y = 196;
-	TextInput * passwordinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	passwordinput->renderpass = 3;
-	passwordinput->x = 210;
-	passwordinput->y = 243;
-	passwordinput->width = 180;
-	passwordinput->height = 14;
-	passwordinput->res_bank = 135;
-	passwordinput->fontwidth = 11;
-	passwordinput->maxchars = 20;
-	passwordinput->maxwidth = 20;
-	passwordinput->password = true;
-	passwordinput->uid = 1;
-	modaldialoghasok = true;
-	Button * okbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	okbutton->renderpass = 3;
-	okbutton->x = 242;
-	okbutton->y = 267;
-	okbutton->SetType(Button::B156x21);
-	okbutton->uid = 50;
-	strcpy(okbutton->text, "OK");
-	dialoginterface->AddObject(background->id);
-	dialoginterface->AddObject(text->id);
-	dialoginterface->AddObject(passwordinput->id);
-	dialoginterface->AddObject(okbutton->id);
-	dialoginterface->AddTabObject(passwordinput->id);
-	dialoginterface->AddTabObject(okbutton->id);
-	dialoginterface->activeobject = passwordinput->id;
-	dialoginterface->buttonenter = okbutton->id;
-	dialoginterface->buttonescape = okbutton->id;
-	dialoginterface->modal = true;
-	modalinterface = dialoginterface->id;
-	aftermodalinterface = currentinterface;
-	Interface * iface = static_cast<Interface *>(world.GetObjectFromId(currentinterface));
-	if(iface){
-		iface->AddObject(modalinterface);
-	}
-	currentinterface = dialoginterface->id;
-	passwordinterface = dialoginterface->id;
-	return dialoginterface;
-}
-
 bool Game::GoBack(void){
 	if(gamejoininterface || gametechinterface){
 		world.Disconnect();
@@ -2644,14 +2482,8 @@ bool Game::GoBack(void){
 
 bool Game::ProcessLobbyInterface(Interface * iface){
 	// UpdateTechInterface() removed in Stage G — GameTechPanel::Tick now
-	// drives the per-frame tech-checkbox refresh.
-	if(mappreviewinterface && !gamecreateinterface){
-		Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
-		if(mappreviewiface){
-			mappreviewiface->DestroyInterface(world);
-		}
-		mappreviewinterface = 0;
-	}
+	// drives the per-frame tech-checkbox refresh. Map-preview lifecycle
+	// owned by GameCreatePanel since the modal migration.
 	for(int i = 0; i < iface->objects.size(); i++){
 		if(i >= iface->objects.size()){
 			return false;
@@ -2711,26 +2543,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							// (calls LobbyScreen::ShowGameCreate).
 							// Create-confirm (uid 35) and security-cycle (uid 40)
 							// handled by GameCreatePanel::Tick.
-						case 50: // modal ok button pressed
-								if(modalinterface){
-									Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
-									if(iface->id == passwordinterface && modaliface){
-										TextInput * passwordinput = static_cast<TextInput *>(modaliface->GetObjectWithUid(world, 1));
-										LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
-										if(lobbygame && passwordinput){
-											JoinGame(*lobbygame, passwordinput->text);
-										}
-									}
-									DestroyModalDialog();
-									creategameclicked = false;
-									if(gamejoininterface || gametechinterface){
-										if(GoBack()){
-											return false;
-										}
-									}
-									return false;
-								}
-							break;
+									// Modal OK (uid 50) — MessageModal/PasswordModal own their own dispatch since the modal migration.
 						}
 					}
 				}break;
@@ -3334,5 +3147,13 @@ void Game::ReplaceScreen(std::unique_ptr<Screen> s){
 
 void Game::TickActiveScreen(){
 	if(screenStack.empty()) return;
-	screenStack.back()->Tick(screenContext);
+	// Tick the topmost non-overlay plus every overlay stacked above it. Modals
+	// are overlays — the screen beneath continues to tick (and run its
+	// per-frame state polling) while the modal is up. Input dispatch is
+	// blocked by `currentinterface` already pointing at the topmost iface.
+	int start = (int)screenStack.size() - 1;
+	while(start > 0 && screenStack[start]->IsOverlay()) --start;
+	for(size_t i = (size_t)start; i < screenStack.size(); ++i){
+		screenStack[i]->Tick(screenContext);
+	}
 }

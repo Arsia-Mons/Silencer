@@ -16,8 +16,14 @@
 #include "textinput.h"
 #include "map_downloader.h"
 #include "mapfetch.h"
+#include "message_modal.h"
+#include "map.h"
+#include "resources.h"
+
+#include <SDL3/SDL_iostream.h>
 
 #include <algorithm>
+#include <memory>
 #include <cmath>
 #include <cstring>
 #include <string>
@@ -307,13 +313,6 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 	Interface * iface = (Interface *)world.GetObjectFromId(interfaceId);
 	if(!iface) return;
 
-	// Drop the map preview when the cursor leaves the panel entirely.
-	// Unlike SELECTBOX-internal hover (handled below), this catches the
-	// case where the panel itself loses focus.
-	if(ctx.game.mappreviewinterface){
-		// nothing yet — preview lifecycle handled inside SELECTBOX uid 4 below
-	}
-
 	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
 		Object * object = world.GetObjectFromId(*it);
 		if(!object) continue;
@@ -350,7 +349,7 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						selectbox->downloadprogress = -1;
 						selectbox->downloaditem[0] = '\0';
 						mapDownloader.dlitemname.clear();
-						ctx.game.CreateModalDialog("Download failed");
+						ctx.PushScreen(std::make_unique<MessageModal>("Download failed"));
 					}else{
 						selectbox->downloadprogress = mapDownloader.dlprogress.load();
 					}
@@ -405,21 +404,15 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 					std::string itemname = selectbox->GetItemName(index);
 					bool isserver = mapDownloader.servermaps.count(itemname) > 0;
 					if(index != mapDownloader.selectedmap){
-						if(ctx.game.mappreviewinterface){
-							Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(ctx.game.mappreviewinterface));
-							if(mappreviewiface){
-								mappreviewiface->DestroyInterface(world);
-							}
-							ctx.game.mappreviewinterface = 0;
-						}
+						TearDownMapPreview(world);
 						if(!isserver){
 							std::string filename = mapDownloader.FindMap(itemname.c_str());
-							ctx.game.mappreviewinterface = ctx.game.CreateMapPreview(filename.c_str())->id;
+							mapPreviewId = BuildMapPreview(world, filename.c_str());
 						}
 						mapDownloader.selectedmap = index;
 					}
-					if(!isserver && ctx.game.mappreviewinterface){
-						Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(ctx.game.mappreviewinterface));
+					if(!isserver && mapPreviewId){
+						Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mapPreviewId));
 						if(mappreviewiface){
 							for(std::vector<Uint16>::iterator it2 = mappreviewiface->objects.begin(); it2 != mappreviewiface->objects.end(); it2++){
 								Object * preview = world.GetObjectFromId(*it2);
@@ -443,12 +436,8 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						}
 					}
 				}else{
-					Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(ctx.game.mappreviewinterface));
-					if(mappreviewiface){
-						mappreviewiface->DestroyInterface(world);
-					}
+					TearDownMapPreview(world);
 					mapDownloader.selectedmap = -1;
-					ctx.game.mappreviewinterface = 0;
 				}
 			}break;
 			case ObjectTypes::BUTTON:{
@@ -510,22 +499,22 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						if(maxteams <= 0) maxteams = 1;
 
 						if(strlen(gamename) == 0){
-							ctx.game.CreateModalDialog("No game name");
+							ctx.PushScreen(std::make_unique<MessageModal>("No game name"));
 							break;
 						}
 						tobject = iface->GetObjectWithUid(world, GCRT_SEL_MAP);
 						if(!tobject){
-							ctx.game.CreateModalDialog("No map selected");
+							ctx.PushScreen(std::make_unique<MessageModal>("No map selected"));
 							break;
 						}
 						SelectBox * mapselect = static_cast<SelectBox *>(tobject);
 						if(mapselect->selecteditem < 0){
-							ctx.game.CreateModalDialog("No map selected");
+							ctx.PushScreen(std::make_unique<MessageModal>("No map selected"));
 							break;
 						}
 						mapname = mapselect->GetItemName(mapselect->selecteditem);
 						if(mapDownloader.servermaps.count(mapname) > 0){
-							ctx.game.CreateModalDialog("Download the map first");
+							ctx.PushScreen(std::make_unique<MessageModal>("Download the map first"));
 							break;
 						}
 						unsigned char maphash[20];
@@ -561,7 +550,7 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						ctx.game.creategameclicked = true;
 						strcpy(Config::GetInstance().defaultgamename, gamename);
 						Config::GetInstance().Save();
-						ctx.game.CreateModalDialog("Uploading map...", false);
+						ctx.PushScreen(MessageModal::Progress("Uploading map..."));
 					}break;
 				}
 			}break;
@@ -571,5 +560,66 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 
 void GameCreatePanel::Destroy(ScreenContext & ctx)
 {
-	(void)ctx;
+	TearDownMapPreview(ctx.world);
+}
+
+void GameCreatePanel::TearDownMapPreview(World & world)
+{
+	if(!mapPreviewId) return;
+	Interface * iface = static_cast<Interface *>(world.GetObjectFromId(mapPreviewId));
+	if(iface) iface->DestroyInterface(world);
+	mapPreviewId = 0;
+}
+
+Uint16 GameCreatePanel::BuildMapPreview(World & world, const char * filename)
+{
+	Interface * previewinterface = static_cast<Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
+	Overlay * minimap = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+	minimap->customsprite.resize(172 * 62);
+	minimap->uid = 1;
+	memset(minimap->customsprite.data(), 0, minimap->customsprite.size());
+	Overlay * mapname = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+	mapname->textbank = 133;
+	mapname->textwidth = 7;
+	mapname->effectcolor = 129;
+	mapname->effectbrightness = 128 + 32;
+	mapname->textcolorramp = true;
+	mapname->uid = 2;
+	std::string smallfilename = filename;
+	int lastslash = smallfilename.find_last_of("/");
+	if(lastslash){
+		smallfilename.erase(0, lastslash + 1);
+	}
+	mapname->text = smallfilename.substr(0, 29);
+	Overlay * maptext = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+	maptext->textbank = 133;
+	maptext->textwidth = 7;
+	maptext->textallownewline = true;
+	maptext->textlineheight = 10;
+	maptext->effectcolor = 129;
+	maptext->effectbrightness = 128 + 32;
+	maptext->textcolorramp = true;
+	maptext->uid = 3;
+	char mapdesc[0x80];
+	strcpy(mapdesc, "");
+	CDDataDir();
+	SDL_IOStream * file = SDL_IOFromFile(filename, "rb");
+	if(!file){
+		CDResDir();
+		file = SDL_IOFromFile(filename, "rb");
+	}
+	if(file){
+		Map::Header header;
+		Map::LoadHeader(file, header);
+		strcpy(mapdesc, header.description);
+		Map::UncompressMinimap((Uint8 (*)[172 * 62])minimap->customsprite.data(), header.minimapcompressed, header.minimapcompressedsize);
+		minimap->customspritew = 172;
+		minimap->customspriteh = 62;
+		SDL_CloseIO(file);
+	}
+	maptext->text = Interface::WordWrap(mapdesc, 29);
+	previewinterface->AddObject(mapname->id);
+	previewinterface->AddObject(minimap->id);
+	previewinterface->AddObject(maptext->id);
+	return previewinterface->id;
 }
