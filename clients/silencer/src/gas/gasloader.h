@@ -550,6 +550,18 @@ struct WorldDef {
     std::string soundAmbience3 = "wndloop1.wav"; // outdoor wind B
     // ---- Audio range
     int audioRange          = 500;  // px radius for spatial audio volume update
+    // ---- Sound occlusion (ray-based wall dampening)
+    bool  soundOcclusionEnabled    = true;   // enable ray-cast occlusion + volume dampening
+    bool  soundFilterEnabled       = false;  // low-pass filter on sounds behind solid walls (disabled — needs further tuning)
+    float occlusionDampenRect      = 0.15f;  // volume factor per RECTANGLE platform crossed
+    float occlusionDampenStairs    = 0.60f;  // volume factor per STAIRSUP/DOWN crossed
+    float occlusionLerpSpeed       = 0.25f;  // per-update smoothing (0=none, 1=instant)
+    float occlusionMuffleThreshold = 0.70f;  // occlusion below this activates low-pass filter
+    float occlusionMuffleMinHz     = 200.0f; // filter cutoff (Hz) when fully occluded
+    float occlusionMuffleMaxHz     = 4000.0f;// filter cutoff (Hz) when at threshold
+    int   occlusionRayYOffset      = 56;     // px above object origin for ray endpoints (≈ top of hurtbox)
+    // ---- Stereo panning
+    bool  soundPanningEnabled      = true;   // enable left/right stereo panning
     // ---- Network visibility / sync ranges
     int networkSyncRangeX   = 500;  // object included in snapshot within this X distance
     int networkSyncRangeY   = 450;  // object included in snapshot within this Y distance
