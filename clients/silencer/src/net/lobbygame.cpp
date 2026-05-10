@@ -17,6 +17,7 @@ LobbyGame::LobbyGame(){
 	maxteams = 6;
 	extra = 0;
 	spectatable = false;
+	canrejoin = false;
 	port = 0;
 	players = 0;
 	state = 0;

@@ -310,6 +310,10 @@ NewGameEvent decode_new_game(Reader& r) {
     NewGameEvent ev;
     ev.status = r.u8();
     decode_lobby_game(r, ev.game);
+    // Per-recipient can-rejoin bit. Older servers omit it; treat absent as 0.
+    if (r.remaining() >= 1) {
+        ev.can_rejoin = r.u8();
+    }
     return ev;
 }
 

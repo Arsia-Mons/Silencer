@@ -264,8 +264,9 @@ describe("golden vectors", () => {
         expect(ev.game.port).toBe(5000);
         expect(ev.game.securityLevel).toBe(SecurityLevel.Medium);
         expect(toHex(ev.game.mapHash)).toBe("deadbeef".repeat(5));
+        expect(ev.canRejoin).toBe(0);
 
-        const w = new Writer(); w.u8(Op.NewGame); w.u8(ev.status); encodeLobbyGame(w, ev.game);
+        const w = new Writer(); w.u8(Op.NewGame); w.u8(ev.status); encodeLobbyGame(w, ev.game); w.u8(ev.canRejoin);
         expect(framedHex(w.bytes())).toBe(v.hex);
     });
 

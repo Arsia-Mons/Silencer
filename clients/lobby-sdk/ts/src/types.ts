@@ -210,6 +210,10 @@ export interface PresenceUpdate {
 export interface NewGameEvent {
     status: number; // 1 = success/advertise, 2 = create failed
     game: LobbyGame;
+    // Per-recipient bit derived by the lobby: 1 = this client has a parked
+    // peer slot on the game's dedicated server and can rejoin via the
+    // existing MSG_CONNECT rejoin path; 0 = no rejoin available.
+    canRejoin: number;
 }
 
 export interface MotdChunk {

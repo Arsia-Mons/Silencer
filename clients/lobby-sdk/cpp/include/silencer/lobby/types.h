@@ -160,8 +160,12 @@ struct PresenceUpdate {
 };
 
 struct NewGameEvent {
-    uint8_t   status = 0; // 1 = success/advertise, 2 = create failed
+    uint8_t   status     = 0; // 1 = success/advertise, 2 = create failed
     LobbyGame game;
+    // Per-recipient bit derived by the lobby: 1 = this client has a parked
+    // peer slot on the game's dedicated server and can rejoin via the
+    // existing MSG_CONNECT rejoin path; 0 = no rejoin available.
+    uint8_t   can_rejoin = 0;
 };
 
 } // namespace lobby

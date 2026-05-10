@@ -37,8 +37,9 @@ enum GameSelectOverlay : Uint8 {
 	GSEL_OVL_LIMITS  = 5,
 };
 enum GameSelectButton : Uint8 {
-	GSEL_BTN_JOIN   = 20,
-	GSEL_BTN_CREATE = 30,
+	GSEL_BTN_JOIN     = 20,
+	GSEL_BTN_SPECTATE = 21,
+	GSEL_BTN_CREATE   = 30,
 };
 enum GameSelectSelect : Uint8 {
 	GSEL_SEL_GAMES = 10,
@@ -112,6 +113,13 @@ void GameSelectPanel::Build(ScreenContext & ctx, Interface * parent)
 	gamejoinbutton->SetType(Button::B156x21);
 	gamejoinbutton->uid = GSEL_BTN_JOIN;
 	strcpy(gamejoinbutton->text, "Join Game");
+	Button * gamespectatebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	gamespectatebutton->y = 408;
+	gamespectatebutton->x = 436;
+	gamespectatebutton->SetType(Button::B156x21);
+	gamespectatebutton->uid = GSEL_BTN_SPECTATE;
+	strcpy(gamespectatebutton->text, "Spectate");
+	gamespectatebutton->draw = false;
 	Button * gamecreatebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 	gamecreatebutton->y = 68;
 	gamecreatebutton->x = 242;
@@ -121,6 +129,7 @@ void GameSelectPanel::Build(ScreenContext & ctx, Interface * parent)
 	gameselectinterface->AddObject(rightborder->id);
 	gameselectinterface->AddObject(gamestext->id);
 	gameselectinterface->AddObject(gamejoinbutton->id);
+	gameselectinterface->AddObject(gamespectatebutton->id);
 	gameselectinterface->AddObject(gamecreatebutton->id);
 	gameselectinterface->AddObject(gameselect->id);
 	gameselectinterface->AddObject(gamescrollbar->id);
@@ -232,17 +241,52 @@ void GameSelectPanel::Tick(ScreenContext & ctx)
 					overlay->text = "";
 				}
 			}
+			// LobbyGame::state — 0 = pre-match lobby, 1 = INGAME (heartbeat-driven).
+			bool ingame = lobbygame && lobbygame->state == 1;
 			tobject = iface->GetObjectWithUid(world, GSEL_OVL_LIMITS);
 			if(tobject && tobject->type == ObjectTypes::OVERLAY){
 				Overlay * overlay = static_cast<Overlay *>(tobject);
-				if(lobbygame){
+				if(lobbygame && !ingame){
 					overlay->text = "MinLv:" + std::to_string(lobbygame->minlevel)
 					              + " MaxLv:" + std::to_string(lobbygame->maxlevel)
 					              + " MaxPl:" + std::to_string(lobbygame->maxplayers)
 					              + " MaxTm:" + std::to_string(lobbygame->maxteams);
 				}else{
+					// Hidden for INGAME rows — Spectate button at y=408 shares that row.
 					overlay->text = "";
 				}
+			}
+			// Dual-button visibility: Join when the user is permitted (pre-match
+			// row with capacity, or INGAME row with a parked-peer slot for our
+			// accountid); Spectate when the game is INGAME and spectatable.
+			bool joinvisible = false;
+			bool spectatevisible = false;
+			if(lobbygame){
+				if(!ingame && lobbygame->players < lobbygame->maxplayers){
+					joinvisible = true;
+				}else if(ingame && lobbygame->canrejoin){
+					joinvisible = true;
+				}
+				if(ingame && lobbygame->spectatable){
+					spectatevisible = true;
+				}
+			}
+			Object * joinobj = iface->GetObjectWithUid(world, GSEL_BTN_JOIN);
+			if(joinobj && joinobj->type == ObjectTypes::BUTTON){
+				static_cast<Button *>(joinobj)->draw = joinvisible;
+			}
+			Object * spectateobj = iface->GetObjectWithUid(world, GSEL_BTN_SPECTATE);
+			if(spectateobj && spectateobj->type == ObjectTypes::BUTTON){
+				static_cast<Button *>(spectateobj)->draw = spectatevisible;
+			}
+			// Enter activates Join when visible; otherwise Spectate when only it
+			// is visible. Fall back to Join (no-op) when neither is visible.
+			if(joinvisible){
+				iface->buttonenter = joinobj ? joinobj->id : 0;
+			}else if(spectatevisible){
+				iface->buttonenter = spectateobj ? spectateobj->id : 0;
+			}else{
+				iface->buttonenter = joinobj ? joinobj->id : 0;
 			}
 		}else if(object->type == ObjectTypes::BUTTON){
 			Button * button = static_cast<Button *>(object);
@@ -296,6 +340,12 @@ void GameSelectPanel::Tick(ScreenContext & ctx)
 					}else{
 						ctx.game.JoinGame(*lobbygame);
 					}
+				}break;
+				case GSEL_BTN_SPECTATE:{
+					button->clicked = false;
+					// Phase 3 wires this to the dedicated-server spectator connect
+					// path. For now Phase 2 only delivers the affordance.
+					ctx.ShowMessage("Spectating coming soon");
 				}break;
 				case GSEL_BTN_CREATE:{
 					button->clicked = false;

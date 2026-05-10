@@ -222,6 +222,22 @@ void Lobby::DoNetwork(void){
 									LobbyGame * lobbygame = new LobbyGame;
 									lobbygame->createdtime = SDL_GetTicks();
 									lobbygame->Serialize(Serializer::READ, data);
+									// Trailing can-rejoin byte the lobby derives per recipient
+									// (set when our accountid matches one of the dedicated server's
+									// parked peers — signals that "Join" on an INGAME row will rebind
+									// our preserved slot via PR #152's rejoin path).
+									{
+										unsigned int consumed_bits = data.readoffset;
+										unsigned int total_bits = data.offset;
+										unsigned int remaining_bytes = (total_bits > consumed_bits)
+											? (total_bits - consumed_bits) / 8
+											: 0;
+										if(remaining_bytes >= 1){
+											Uint8 canrejoinflag;
+											data.Get(canrejoinflag);
+											lobbygame->canrejoin = (canrejoinflag != 0);
+										}
+									}
 									//printf("password: %s\n", lobbygame->password);
 									for(std::list<LobbyGame *>::iterator dit = games.begin(); dit != games.end(); ){
 										if((*dit)->id == lobbygame->id){

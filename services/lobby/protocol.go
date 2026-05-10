@@ -195,24 +195,29 @@ func readMatchStats(r *reader) MatchStats {
 }
 
 // LobbyGame wire layout (matches src/lobbygame.cpp::Serialize).
+//
+// ParkedAccountIDs is server-side state only — not part of Encode/Decode.
+// It's populated from dedicated-server UDP heartbeats and consumed by
+// Client.sendNewGame to derive a per-recipient can-rejoin bit.
 type LobbyGame struct {
-	ID            uint32
-	AccountID     uint32
-	Name          string
-	Password      string
-	Hostname      string // "ip,port"
-	MapName       string
-	MapHash       [20]byte
-	Players       uint8
-	State         uint8
-	SecurityLevel uint8
-	MinLevel      uint8
-	MaxLevel      uint8
-	MaxPlayers    uint8
-	MaxTeams      uint8
-	Extra         uint8
-	Spectatable   uint8
-	Port          uint16
+	ID               uint32
+	AccountID        uint32
+	Name             string
+	Password         string
+	Hostname         string // "ip,port"
+	MapName          string
+	MapHash          [20]byte
+	Players          uint8
+	State            uint8
+	SecurityLevel    uint8
+	MinLevel         uint8
+	MaxLevel         uint8
+	MaxPlayers       uint8
+	MaxTeams         uint8
+	Extra            uint8
+	Spectatable      uint8
+	Port             uint16
+	ParkedAccountIDs []uint32
 }
 
 func (g *LobbyGame) Decode(r *reader) error {

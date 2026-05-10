@@ -7,7 +7,10 @@ import (
 )
 
 // serveUDP handles dedicated-server heartbeats:
-// [0x00][u32 gameid][u16 port][u8 state]
+// [0x00][u32 gameid][u16 port][u8 state][u8 parkedcount][u32 acct]*parkedcount
+//
+// The parkedcount + accountid list is optional for forward-compat with
+// older dedicated servers that haven't yet started reporting parked peers.
 func serveUDP(conn *net.UDPConn, hub *Hub) {
 	buf := make([]byte, 512)
 	for {
@@ -27,7 +30,19 @@ func serveUDP(conn *net.UDPConn, hub *Hub) {
 			gameID := binary.LittleEndian.Uint32(buf[1:5])
 			port := binary.LittleEndian.Uint16(buf[5:7])
 			state := buf[7]
-			hub.OnHeartbeat(gameID, addr.IP.String(), port, state)
+			var parked []uint32
+			if n >= 1+4+2+1+1 {
+				count := int(buf[8])
+				off := 9
+				if n >= off+count*4 {
+					parked = make([]uint32, count)
+					for i := 0; i < count; i++ {
+						parked[i] = binary.LittleEndian.Uint32(buf[off : off+4])
+						off += 4
+					}
+				}
+			}
+			hub.OnHeartbeat(gameID, addr.IP.String(), port, state, parked)
 		default:
 			log.Printf("[udp] unknown opcode 0x%02x from %s", buf[0], addr)
 		}

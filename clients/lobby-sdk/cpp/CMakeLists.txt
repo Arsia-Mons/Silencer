@@ -9,13 +9,23 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_library(silencer_lobby_sdk STATIC
+set(silencer_lobby_sdk_sources
     src/codec.cpp
-    src/client.cpp
     src/sha1.cpp
 )
+# client.cpp uses POSIX sockets (sys/socket.h / arpa/inet.h). Per the SDK's
+# CLAUDE.md, a Win32 port is a focused follow-up; the codec layer is fully
+# portable and is what the test suite covers.
+if (NOT WIN32)
+    list(APPEND silencer_lobby_sdk_sources src/client.cpp)
+endif()
+add_library(silencer_lobby_sdk STATIC ${silencer_lobby_sdk_sources})
 target_include_directories(silencer_lobby_sdk PUBLIC include)
-target_compile_options(silencer_lobby_sdk PRIVATE -Wall -Wextra -Wpedantic)
+if (MSVC)
+    target_compile_options(silencer_lobby_sdk PRIVATE /W4 /permissive-)
+else()
+    target_compile_options(silencer_lobby_sdk PRIVATE -Wall -Wextra -Wpedantic)
+endif()
 add_library(silencer::lobby_sdk ALIAS silencer_lobby_sdk)
 
 option(SILENCER_LOBBY_SDK_TESTS "Build SDK tests" ON)
@@ -30,7 +40,8 @@ if (SILENCER_LOBBY_SDK_TESTS)
     add_test(NAME codec_test COMMAND codec_test)
 endif()
 
-if (SILENCER_LOBBY_SDK_EXAMPLES)
+if (SILENCER_LOBBY_SDK_EXAMPLES AND NOT WIN32)
+    # chat_listener depends on the Client/socket path which is POSIX-only.
     add_executable(chat_listener examples/chat_listener.cpp)
     target_link_libraries(chat_listener PRIVATE silencer_lobby_sdk)
 endif()

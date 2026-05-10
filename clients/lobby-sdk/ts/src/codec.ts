@@ -350,7 +350,9 @@ export function decodeChatPush(r: Reader): ChatMessage {
 export function decodeNewGame(r: Reader): NewGameEvent {
     const status = r.u8();
     const game = decodeLobbyGame(r);
-    return { status, game };
+    // Per-recipient can-rejoin bit. Older servers omit it; treat absent as 0.
+    const canRejoin = r.remaining >= 1 ? r.u8() : 0;
+    return { status, game, canRejoin };
 }
 
 export const decodeDelGame = (r: Reader): number => r.u32Le();
