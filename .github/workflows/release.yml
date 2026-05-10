@@ -407,7 +407,8 @@ jobs:
           body: |
             ## Downloads
 
-            - **macOS (Apple Silicon):** `silencer-macos-arm64.dmg` (drag to Applications)
+            - **macOS (Apple Silicon) — DMG (recommended):** `silencer-macos-arm64.dmg` (drag to Applications)
+            - **macOS (Apple Silicon) — portable zip:** `silencer-macos-arm64.zip`
             - **Windows (x64) — installer (recommended):** `silencer-windows-x64-setup-*.exe`
             - **Windows (x64) — portable zip:** `silencer-windows-x64.zip`
             - **Linux (x64):** `silencer-linux-x64.tar.gz`
