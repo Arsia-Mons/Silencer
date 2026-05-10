@@ -361,8 +361,11 @@ bool Game::HandleSDLEvents(void){
 
 void Game::OnScancodeDown(int sc){
 	if(sc == quitscancode){
+		Peer * lp = world.peerlist[world.localpeerid];
+		bool isobserver = lp && lp->observer;
 		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-		if(localplayer && !localplayer->chatinterfaceid && !localplayer->buyinterfaceid){
+		bool playerok = localplayer && !localplayer->chatinterfaceid && !localplayer->buyinterfaceid;
+		if(isobserver || playerok){
 			if(world.quitstate == 0){
 				world.quitstate = 1;
 			}else
