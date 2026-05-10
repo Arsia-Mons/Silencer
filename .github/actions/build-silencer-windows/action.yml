@@ -1,0 +1,99 @@
+name: Build Silencer (Windows)
+description: Configure + build + package the silencer client for Windows x64. Used by CI and release. Caller must have run actions/checkout first.
+
+inputs:
+  lobby-host:
+    description: SILENCER_LOBBY_HOST cmake define
+    default: lobby.arsiamons.com
+  silencer-version:
+    description: SILENCER_VERSION cmake define (release passes the git tag, CI uses the default)
+    default: "00000"
+  map-api-url:
+    description: SILENCER_MAP_API_URL cmake define
+    default: https://admin.arsiamons.com
+  admin-api-url:
+    description: SILENCER_ADMIN_API_URL cmake define
+    default: https://admin.arsiamons.com
+
+runs:
+  using: composite
+  steps:
+    - name: Capture runner ImageVersion
+      shell: bash
+      # GHA expressions only see env vars written to $GITHUB_ENV; the
+      # runner's own ImageVersion isn't exposed otherwise. The vcpkg
+      # caches below key on it because runner image rotation is what
+      # actually moves vcpkg port versions and therefore package ABIs.
+      run: echo "IMAGE_VERSION=$ImageVersion" >> "$GITHUB_ENV"
+
+    - name: Cache vcpkg binaries
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/.vcpkg-cache
+        key: vcpkg-${{ runner.os }}-${{ env.IMAGE_VERSION }}-${{ hashFiles('clients/silencer/vcpkg.json') }}
+        restore-keys: |
+          vcpkg-${{ runner.os }}-${{ env.IMAGE_VERSION }}-
+          vcpkg-${{ runner.os }}-
+
+    - name: Cache vcpkg tool downloads
+      uses: actions/cache@v4
+      with:
+        path: C:\vcpkg\downloads\tools
+        key: vcpkg-tools-${{ runner.os }}-${{ env.IMAGE_VERSION }}-v1
+        restore-keys: |
+          vcpkg-tools-${{ runner.os }}-
+
+    - name: Setup sccache
+      uses: mozilla-actions/sccache-action@v0.0.10
+
+    - name: Setup MSVC dev environment
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+
+    - name: Configure
+      shell: pwsh
+      env:
+        VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite"
+        LOBBY_HOST: ${{ inputs.lobby-host }}
+        SILENCER_VERSION_INPUT: ${{ inputs.silencer-version }}
+        MAP_API_URL: ${{ inputs.map-api-url }}
+        ADMIN_API_URL: ${{ inputs.admin-api-url }}
+      run: |
+        cmake -B build -S clients/silencer `
+          -G Ninja `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+          -DVCPKG_TARGET_TRIPLET=x64-windows `
+          -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+          -DCMAKE_CXX_COMPILER_LAUNCHER=sccache `
+          -DSILENCER_UNITY_BUILD=ON `
+          -DSILENCER_LOBBY_HOST="$env:LOBBY_HOST" `
+          -DSILENCER_MAP_API_URL="$env:MAP_API_URL" `
+          -DSILENCER_ADMIN_API_URL="$env:ADMIN_API_URL" `
+          -DSILENCER_VERSION="$env:SILENCER_VERSION_INPUT"
+
+    - name: Build
+      shell: pwsh
+      run: cmake --build build
+
+    - name: sccache stats
+      if: always()
+      shell: pwsh
+      run: sccache --show-stats
+
+    - name: Package
+      shell: pwsh
+      # Stages Silencer.exe + vcpkg DLLs (SDL3, SDL3_mixer, zlib, codecs)
+      # + assets/ at build/package/silencer/. Without the DLL bundle the
+      # exe fails to start on machines without vcpkg; assets/ is what the
+      # Windows runtime (`os.cpp` GetResDir) looks for next to the exe.
+      run: |
+        $stage = "build/package/silencer"
+        New-Item -ItemType Directory -Force -Path $stage | Out-Null
+        Copy-Item build/Silencer.exe $stage/
+        $vcpkgBin = "build/vcpkg_installed/x64-windows/bin"
+        Copy-Item "$vcpkgBin/*.dll" $stage/
+        Copy-Item -Recurse shared/assets $stage/assets
+        Write-Host "--- packaged files ---"
+        Get-ChildItem $stage

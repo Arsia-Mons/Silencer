@@ -53,62 +53,9 @@ jobs:
             echo "relevant=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install build deps
+      - name: Build silencer
         if: steps.changes.outputs.relevant == 'true'
-        # SDL3 itself comes from setup-sdl below (built from source). The list
-        # here is what setup-sdl needs at configure time + minizip + patchelf
-        # (used post-build to point the binary's RUNPATH at $ORIGIN).
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build patchelf pkg-config \
-            libminizip-dev libcurl4-openssl-dev \
-            libasound2-dev libpulse-dev libudev-dev libxext-dev \
-            libxinerama-dev libxcursor-dev libxrandr-dev libxss-dev \
-            libxi-dev libxfixes-dev libxtst-dev libwayland-dev \
-            libxkbcommon-dev libdbus-1-dev libibus-1.0-dev
-
-      - name: Install SDL3 + SDL3_mixer
-        if: steps.changes.outputs.relevant == 'true'
-        uses: libsdl-org/setup-sdl@main
-        with:
-          version: 3-latest
-          version-sdl-mixer: 3-latest
-
-      - name: Setup sccache
-        if: steps.changes.outputs.relevant == 'true'
-        uses: mozilla-actions/sccache-action@v0.0.10
-
-      - name: Configure
-        if: steps.changes.outputs.relevant == 'true'
-        run: |
-          cmake -B build -S clients/silencer \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -DSILENCER_UNITY_BUILD=ON
-
-      - name: Build
-        if: steps.changes.outputs.relevant == 'true'
-        run: cmake --build build -j"$(nproc)"
-
-      - name: sccache stats
-        if: always() && steps.changes.outputs.relevant == 'true'
-        run: sccache --show-stats
-
-      - name: Bundle SDL3 + assets
-        if: steps.changes.outputs.relevant == 'true'
-        run: |
-          stage="build/package/silencer"
-          mkdir -p "$stage"
-          cp build/silencer "$stage/"
-          cp -L "$SDL3_ROOT/lib/libSDL3.so.0" "$stage/"
-          cp -L "$SDL3_mixer_ROOT/lib/libSDL3_mixer.so.0" "$stage/"
-          patchelf --set-rpath '$ORIGIN' "$stage/silencer"
-          cp -r shared/assets "$stage/assets"
-          echo "--- bundled files ---"
-          ls -la "$stage"
+        uses: ./.github/actions/build-silencer-linux
 
       - name: Verify bundled dependencies
         if: steps.changes.outputs.relevant == 'true'

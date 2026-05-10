@@ -15,29 +15,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-deploy:
+  # ---- Lobby + dedicated server (native ARM64 binaries) -----------------
+  build-native:
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 25
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 20
+    env:
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
-
-      - name: Compute image refs
-        id: img
-        run: |
-          set -euo pipefail
-          OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-          SHORT="${GITHUB_SHA:0:8}"
-          API_IMAGE="ghcr.io/$OWNER/silencer-admin-api"
-          WEB_IMAGE="ghcr.io/$OWNER/silencer-admin-web"
-          # Staging tags are prefixed `staging-` so they never collide
-          # with prod's bare `<sha>` tags in the same registry.
-          echo "api_ref=$API_IMAGE:staging-$SHORT" >> "$GITHUB_OUTPUT"
-          echo "web_ref=$WEB_IMAGE:staging-$SHORT" >> "$GITHUB_OUTPUT"
-
-      # ---- Lobby + dedicated server (mirrors deploy.yml) ----------------
 
       - uses: actions/setup-go@v5
         with:
@@ -47,22 +32,18 @@ jobs:
       - name: Install C++ build deps
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: cmake build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf
+          packages: cmake ninja-build build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf
           version: 2.0
 
       - name: Install SDL3 + SDL3_mixer
-        id: setup-sdl
         uses: libsdl-org/setup-sdl@main
         with:
           install-linux-dependencies: true
           version: 3-latest
           version-sdl-mixer: 3-latest
 
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1
-        with:
-          key: ${{ runner.os }}-${{ github.job }}-staging
-          max-size: 500M
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Build lobby server
         working-directory: services/lobby
@@ -82,14 +63,13 @@ jobs:
             echo "STAGING_LOBBY_HOST or STAGING_LOBBY_PUBLIC_IP repo variable must be set" >&2
             exit 1
           fi
-          mkdir -p build && cd build
-          cmake \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          cmake -B build -S clients/silencer \
+            -G Ninja \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DSILENCER_UNITY_BUILD=ON \
-            -DSILENCER_LOBBY_HOST="${LOBBY_HOST}" \
-            ../clients/silencer
-          make -j"$(nproc)"
+            -DSILENCER_LOBBY_HOST="${LOBBY_HOST}"
+          cmake --build build -j"$(nproc)"
 
       # Same SDL3 .so bundling pattern as deploy.yml — without this the
       # dedicated-server subprocess fails to dlopen libSDL3_mixer.so.0
@@ -106,7 +86,41 @@ jobs:
           patchelf --set-rpath '$ORIGIN/lib' build/silencer
           (cd build && LD_LIBRARY_PATH=lib ldd silencer | grep -E "SDL3|not found")
 
-      # ---- admin-api + admin-web Docker images (mirror deploy-admin-*.yml)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: staging-native-${{ github.sha }}
+          path: |
+            services/lobby/silencer-lobby
+            build/silencer
+            build/lib/
+            shared/assets/
+          if-no-files-found: error
+
+  # ---- admin-api + admin-web Docker images --------------------------------
+  build-docker:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      api_ref: ${{ steps.img.outputs.api_ref }}
+      web_ref: ${{ steps.img.outputs.web_ref }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image refs
+        id: img
+        run: |
+          set -euo pipefail
+          OWNER="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          SHORT="${GITHUB_SHA:0:8}"
+          API_IMAGE="ghcr.io/$OWNER/silencer-admin-api"
+          WEB_IMAGE="ghcr.io/$OWNER/silencer-admin-web"
+          # Staging tags are prefixed `staging-` so they never collide
+          # with prod's bare `<sha>` tags in the same registry.
+          echo "api_ref=$API_IMAGE:staging-$SHORT" >> "$GITHUB_OUTPUT"
+          echo "web_ref=$WEB_IMAGE:staging-$SHORT" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
 
@@ -139,15 +153,23 @@ jobs:
           cache-from: type=gha,scope=admin-web
           cache-to: type=gha,scope=admin-web,mode=max
 
-      # ---- Deploy ------------------------------------------------------
+  # ---- Deploy -------------------------------------------------------------
+  deploy:
+    needs: [build-native, build-docker]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - name: Download native binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: staging-native-${{ github.sha }}
 
       - name: Tailscale
-        run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo tailscale up \
-            --authkey='${{ secrets.TS_AUTHKEY }}' \
-            --hostname=gh-runner-${{ github.run_id }} \
-            --advertise-tags=tag:server
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TS_AUTHKEY }}
+          hostname: gh-runner-${{ github.run_id }}
+          args: --advertise-tags=tag:server
 
       - name: Configure SSH
         run: |
@@ -159,8 +181,8 @@ jobs:
         env:
           HOST: ${{ vars.STAGING_DEPLOY_HOST }}
           SHA: ${{ github.sha }}
-          API_REF: ${{ steps.img.outputs.api_ref }}
-          WEB_REF: ${{ steps.img.outputs.web_ref }}
+          API_REF: ${{ needs.build-docker.outputs.api_ref }}
+          WEB_REF: ${{ needs.build-docker.outputs.web_ref }}
         run: |
           set -euo pipefail
           if [ -z "${HOST}" ]; then
@@ -175,6 +197,7 @@ jobs:
           SCP="scp $SSH_OPTS"
 
           # 1. Lobby + dedicated server + assets via scp.
+          #    Paths match the artifact structure: artifact root == repo root.
           $SSH "mkdir -p $STAGING_DIR"
           $SCP services/lobby/silencer-lobby ubuntu@$HOST:$STAGING_DIR/
           $SCP build/silencer                ubuntu@$HOST:$STAGING_DIR/
@@ -213,11 +236,18 @@ jobs:
           sudo systemctl daemon-reload
           sudo systemctl restart silencer-lobby silencer-admin-api silencer-admin-web
 
-          # Smoke checks. Lobby comes up first; admin units pull their
-          # images on first start so give them more time.
-          sleep 3
+          # Smoke checks. Poll each unit; admin units pull Docker images on
+          # first start so they get more attempts than the lobby.
+          for i in 1 2 3 4 5; do
+            sudo systemctl is-active silencer-lobby && break
+            sleep 3
+          done
           sudo systemctl is-active silencer-lobby
-          sleep 15
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            sudo systemctl is-active silencer-admin-api && \
+            sudo systemctl is-active silencer-admin-web && break
+            sleep 3
+          done
           sudo systemctl is-active silencer-admin-api
           sudo systemctl is-active silencer-admin-web
           curl -sf http://127.0.0.1:24080/api/sprites/121/0 > /dev/null
