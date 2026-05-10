@@ -29,6 +29,8 @@ jobs:
        startsWith(github.event.workflow_run.head_branch, 'v'))
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 15
+    env:
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - name: Resolve deploy context
         id: ctx
@@ -87,11 +89,8 @@ jobs:
           version: 3-latest
           version-sdl-mixer: 3-latest
 
-      - name: Setup ccache
-        uses: hendrikmuhs/ccache-action@v1
-        with:
-          key: ${{ runner.os }}-${{ github.job }}
-          max-size: 500M
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
 
       - name: Build lobby server
         working-directory: services/lobby
@@ -103,8 +102,8 @@ jobs:
         run: |
           cmake -B build -S clients/silencer \
             -G Ninja \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DSILENCER_UNITY_BUILD=ON \
             -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}"
           cmake --build build -j"$(nproc)"
