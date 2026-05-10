@@ -80,6 +80,19 @@ Stage C landed alongside an architecture cleanup of the migration scaffolding th
 
 Verified: clean regular + unity Debug builds. E2E `00_ping`/`10_navigate`/`20_screenshot` pass.
 
+Stage D landed: `GameSelectPanel` at `clients/silencer/src/ui/screens/lobby/panels/game_select_panel.{h,cpp}`. Owns the right-side server browser (Active Games selectbox + per-game info readouts: name, map, security/password, creator, level limits) and the Join Game / Create Game button handlers. Build is a verbatim move of `Game::CreateGameSelectInterface` widgets; Tick is a verbatim move of the SELECTBOX uid 10 refresh + per-row info rendering and the BUTTON uid 20 (Join) / uid 30 (Create Game) cases. `Game::CreateGameSelectInterface` deleted; the SELECTBOX uid 10 + BUTTON uid 20 + BUTTON uid 30 arms in `Game::ProcessLobbyInterface` deleted.
+
+Architectural changes:
+- `LobbyScreen` now owns `std::unique_ptr<GameSelectPanel> gameSelect` and exposes `ShowGameSelect(ctx)` / `ShowGameCreate(ctx)` swap helpers. Stage D: `ShowGameCreate` still calls into legacy `Game::CreateGameCreateInterface` until Stage E migrates it to a panel.
+- `GameSelectPanel` holds a back-pointer to its owning `LobbyScreen` (passed in the constructor); the Create Game button calls `owner.ShowGameCreate(ctx)` rather than reaching into Game directly.
+- `Game::GoBack` no longer calls `CreateGameSelectInterface` — when transitioning back from gamecreate or gamejoin/gametech, it dynamic-casts the top-of-stack screen to `LobbyScreen` and calls `ShowGameSelect(ctx)` to rebuild the panel cleanly.
+- **Tick ordering flipped in `LobbyScreen::Tick`** — panels now run *before* `Game::TickLobbyBody()` so panel handlers see fresh `button->clicked` / `textinput->enterpressed` flags before the recursive ProcessLobbyInterface walk clears them. Stage C's chat-send path was likely silently broken by the legacy walk clearing `enterpressed` before `ChatPanel::Tick` could read it; the new ordering fixes this incidentally.
+- `World::IsIdle()` added (mirrors the existing `IsConnected()` accessor) so the panel can gate Join on `state == IDLE` without reaching into World's private state enum.
+- Temp scaffolding made public on `Game` for panel access (deleted in stage H along with the legacy lobby pump): `gameselectinterface`, `gamecreateinterface`, `currentinterface`, `currentlobbygameid`, `JoinGame`, `CreateGameCreateInterface`, `CreateModalDialog`, `CreatePasswordDialog`. The matching private declarations were removed (no duplicates).
+- Anon-namespace uid enumerators in `game_select_panel.cpp` are file-prefixed (`GSEL_OVL_*` / `GSEL_BTN_*` / `GSEL_SEL_*`) so they don't collide under `SILENCER_UNITY_BUILD`.
+
+Verified: clean regular + unity Debug builds (only the pre-existing C4804 warning at `IsLiveMultiplayer` and unrelated `sprintf` deprecations in `resources.cpp`). E2E `00_ping`/`10_navigate`/`20_screenshot` pass. Headless agent navigation MainMenu → Connect To Lobby → back to MainMenu works (LOBBYCONNECT screenshot taken). Interactive lobby smoke (login, browse games, Join, Create Game swap, GoBack) not exercised — same TEXTINPUT/login limitation as Stages A–C; verification rests on (a) builds, (b) E2E passing, (c) the panel impl being a near-mechanical move of the legacy widget construction + per-tick logic into the panel class.
+
 ---
 
 ## Phase 0 — Baseline
@@ -153,7 +166,7 @@ LobbyScreen has 6 panels. Migrate it in stages so the lobby keeps working throug
 - [x] **Stage A: land `LobbyScreen` with adapter calls.** `LobbyScreen::Build` calls into the existing `Game::CreateCharacterInterface()`, `Game::CreateChatInterface()`, etc. as before. `LobbyScreen::Tick` calls into the existing `Game::ProcessLobbyInterface()`. The 731-line method stays intact for now — we've just moved the entry point. **Smoke:** full lobby flow — connect, character select, chat, browse games, create game, join game, leave lobby. This is the biggest single smoke-test of the refactor.
 - [x] **Stage B: migrate `CharacterPanel`.** Replace the `Game::CreateCharacterInterface` call inside `LobbyScreen::Build` with `character.Build(ctx, parent)` using the new `CharacterPanel`. Move the panel's process logic out of `Game::ProcessLobbyInterface` into `CharacterPanel::Tick`. Delete `Game::CreateCharacterInterface`. **Smoke:** character select — pick each agency, confirm display updates.
 - [x] **Stage C: migrate `ChatPanel`.** **Smoke:** type chat messages, confirm they appear; receive messages from another client.
-- [ ] **Stage D: migrate `GameSelectPanel`.** **Smoke:** browse server list, refresh, see games appear/disappear.
+- [x] **Stage D: migrate `GameSelectPanel`.** **Smoke:** browse server list, refresh, see games appear/disappear — interactive pass pending (TEXTINPUT login limitation).
 - [ ] **Stage E: migrate `GameCreatePanel`.** **Smoke:** open create-game form, enter game name, select map, set parameters, click create; confirm map upload triggers; confirm you land in the lobby of the created game.
 - [ ] **Stage F: migrate `GameJoinPanel`.** **Smoke:** join a game from the list; confirm player roster updates.
 - [ ] **Stage G: migrate `GameTechPanel`.** **Smoke:** open tech tree, browse, select a research item.

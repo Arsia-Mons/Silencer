@@ -90,7 +90,15 @@ public:
 	void TickLobbyBody();
 	Uint16 lobbyinterface;
 	Uint16 chatinterface;
+	Uint16 gameselectinterface;
+	Uint16 gamecreateinterface;
+	Uint16 currentinterface;
+	Uint32 currentlobbygameid;
 	bool minimized;
+	void JoinGame(LobbyGame & lobbygame, char * password = 0);
+	Interface * CreateGameCreateInterface(void);
+	Interface * CreateModalDialog(const char * message, bool ok = true);
+	Interface * CreatePasswordDialog(void);
 
 private:
 	bool Tick(void);
@@ -114,19 +122,12 @@ private:
 	void ProcessInGameInterfaces(void);
 	void ShowDeployMessage(void);
 	void GiveDefaultItems(Player & player);
-	void JoinGame(LobbyGame & lobbygame, char * password = 0);
 	void GoToState(Uint8 newstate);
-	Interface * CreateGameSelectInterface(void);
-	Interface * CreateGameCreateInterface(void);
 	Interface * CreateGameJoinInterface(void);
 	Interface * CreateGameTechInterface(void);
 	Interface * CreateGameSummaryInterface(Stats & stats, Uint8 agency);
-	Interface * CreateModalDialog(const char * message, bool ok = true);
 	Interface * CreateMapPreview(const char * filename);
 	void DestroyModalDialog(void);
-	Interface * CreatePasswordDialog(void);
-	Uint16 gameselectinterface;
-	Uint16 gamecreateinterface;
 	Uint16 gamejoininterface;
 	Uint16 gametechinterface;
 	Uint16 gamesummaryinterface;
@@ -164,13 +165,11 @@ private:
 	int frames;
 	int fps;
 	Uint64 lasttick;
-	Uint16 currentinterface;
 	Uint16 aftermodalinterface;
 	Uint16 sharedstate;
 	int oldselecteditem;
 	Uint8 singleplayermessage;
 	bool updatetitle;
-	Uint32 currentlobbygameid;
 	Uint32 lastannouncedgameid;
 	Uint8 lastannouncedstatus;
 	bool gamesummaryinfoloaded;
