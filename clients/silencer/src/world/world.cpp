@@ -334,7 +334,7 @@ void World::DoNetwork_Authority(void){
 								p->health = p->maxhealth;
 								p->shield = p->maxshield;
 								p->state = Player::DEPLOYING;
-								p->state_i = 0;
+								p->state_i = GASLoader::Get().player.deployWaitTicks;
 								p->draw = false;
 								p->collidable = false;
 							}
