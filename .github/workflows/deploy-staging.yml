@@ -250,6 +250,14 @@ jobs:
           done
           sudo systemctl is-active silencer-admin-api
           sudo systemctl is-active silencer-admin-web
+          # Poll the sprite endpoint: systemd reports the unit active as
+          # soon as Docker is launched, but the container still has to
+          # pull a freshly-tagged image and start serving HTTP. ~30s
+          # tolerance covers a cold pull on staging's link.
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            curl -sf http://127.0.0.1:24080/api/sprites/121/0 > /dev/null && break
+            sleep 3
+          done
           curl -sf http://127.0.0.1:24080/api/sprites/121/0 > /dev/null
 
           # Prune to last 3 releases.
