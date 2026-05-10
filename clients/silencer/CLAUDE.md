@@ -110,9 +110,14 @@ lambdas read/write it via `ctx.bb<T>(key, default)` / `ctx.bbSet(key, val)`.
 - Simulation loop, socket, peer list, replay: `src/world.cpp`.
 - Rendering: `src/renderer.cpp`, `src/surface.cpp`, `src/sprite.cpp`, `src/palette.cpp`.
 - Audio (skipped in `-s`): `src/audio.cpp`.
-- UI widgets: `src/interface.cpp`, `src/button.cpp`, `src/textbox.cpp`,
-  `src/selectbox.cpp`, `src/scrollbar.cpp`, `src/toggle.cpp`, `src/overlay.cpp`,
-  `src/minimap.cpp`.
+- UI widgets: `src/ui/components/` (`interface`, `button`, `textbox`,
+  `textinput`, `selectbox`, `scrollbar`, `toggle`, `overlay`, …).
+- UI screens / modals / panels: `src/ui/screens/`, `src/ui/modals/`,
+  `src/ui/screens/<name>/panels/`. **Before touching any UI code,
+  read [`../../shared/skills/silencer-ui/SKILL.md`](../../shared/skills/silencer-ui/SKILL.md)**
+  (loaded via `.claude/skills/editing-silencer-ui`) — the widget
+  system has no defaults, no event delivery, and several non-obvious
+  conventions that bite new code.
 - Projectiles: `src/*projectile.cpp` + `src/shrapnel.cpp`.
 - Stations: `src/healmachine.cpp`, `src/creditmachine.cpp`,
   `src/inventorystation.cpp`, `src/techstation.cpp`, `src/walldefense.cpp`,
