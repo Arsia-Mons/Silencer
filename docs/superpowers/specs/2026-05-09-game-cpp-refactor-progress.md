@@ -3,6 +3,14 @@
 **Design:** [`2026-05-09-game-cpp-refactor-design.md`](./2026-05-09-game-cpp-refactor-design.md)
 **Branch:** `refactor/game-cpp` (worktree at `.worktrees/refactor-game-cpp/`)
 
+> **Picking this up?** Start at the **Phase 4 — Mechanical splits**
+> checklist. The first item (`events.cpp`) is the smallest and validates
+> the pattern — pure file moves with declarations staying in `game.h`. Run
+> `bash tests/cli-agent/run.sh` after each commit; `30_lobby_login`
+> exercises the most surface end-to-end. Memory note: the user prefers
+> editing `docs/plans/` and this doc directly — skip the
+> brainstorming/writing-plans skill machinery.
+
 ---
 
 ## Status
