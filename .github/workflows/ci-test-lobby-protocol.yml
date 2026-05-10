@@ -39,9 +39,6 @@ jobs:
       - name: go vet
         working-directory: services/lobby
         run: go vet ./...
-      - name: go build
-        working-directory: services/lobby
-        run: go build ./...
       - name: go test
         working-directory: services/lobby
         run: go test ./... -count=1
