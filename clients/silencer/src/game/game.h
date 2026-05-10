@@ -112,6 +112,7 @@ private:
 	Interface * CreateLobbyConnectInterface(void);
 	Interface * CreateLobbyInterface(void);
 	Interface * CreateCharacterInterface(void);
+	Interface * CreateNewCharacterInterface(void);
 	Interface * CreateGameSelectInterface(void);
 	Interface * CreateChatInterface(void);
 	Interface * CreateGameCreateInterface(void);
@@ -186,7 +187,7 @@ private:
 	void OpenFirstGamepad(void);
 	void PollGamepadState(void);
 	Uint8 keystate[SDL_SCANCODE_COUNT];
-	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, UPDATING, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, OPTIONSDISPLAY, OPTIONSAUDIO, HOSTGAME, JOINGAME, REPLAYGAME, TESTGAME};
+	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, UPDATING, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, OPTIONSDISPLAY, OPTIONSAUDIO, HOSTGAME, JOINGAME, REPLAYGAME, TESTGAME, CREATECHARACTER};
 	Uint8 state;
 	Uint8 nextstate;
 	Uint8 fade_i;

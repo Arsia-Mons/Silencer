@@ -7,20 +7,23 @@ import (
 )
 
 const (
-	opAuth          = 0
-	opMOTD          = 1
-	opChat          = 2
-	opNewGame       = 3
-	opDelGame       = 4
-	opChannel       = 5
-	opConnect       = 6
-	opVersion       = 7
-	opUserInfo      = 8
-	opPing          = 9
-	opUpgradeStat   = 10
-	opRegisterStats = 11
-	opPresence      = 12
-	opSetGame       = 13
+	opAuth             = 0
+	opMOTD             = 1
+	opChat             = 2
+	opNewGame          = 3
+	opDelGame          = 4
+	opChannel          = 5
+	opConnect          = 6
+	opVersion          = 7
+	opUserInfo         = 8
+	opPing             = 9
+	opUpgradeStat      = 10
+	opRegisterStats    = 11
+	opPresence         = 12
+	opSetGame          = 13
+	opCharacters       = 14 // server→client: full character list for the authed player
+	opCreateCharacter  = 15 // client→server: create a new character
+	opSelectCharacter  = 16 // client→server: select an existing character
 )
 
 const maxFrame = 255
@@ -289,10 +292,56 @@ func (g *LobbyGame) Encode(w *writer) {
 }
 
 // User wire layout (matches src/user.cpp::Serialize).
+// Sends: accountID, selectedCharID, agencyIdx, active char stats, accountName, charName.
+// If no character is selected, sends zeros.
 func encodeUser(w *writer, u *User) {
 	w.u32(u.AccountID)
-	for i := 0; i < 5; i++ {
-		a := &u.Agency[i]
+	ch := selectedChar(u)
+	if ch == nil {
+		w.u32(0)             // charID
+		w.u8(0)              // agencyIdx
+		w.u16(0); w.u16(0); w.u16(0) // wins, losses, xp
+		w.u8(0); w.u8(0); w.u8(0); w.u8(0); w.u8(0); w.u8(0); w.u8(0) // stats + level
+		w.lenStr(u.Name)
+		w.lenStr("")
+		return
+	}
+	a := &ch.Stats
+	w.u32(ch.ID)
+	w.u8(ch.AgencyIdx)
+	w.u16(a.Wins)
+	w.u16(a.Losses)
+	w.u16(a.XPToNextLevel)
+	w.u8(a.Level)
+	w.u8(a.Endurance)
+	w.u8(a.Shield)
+	w.u8(a.Jetpack)
+	w.u8(a.TechSlots)
+	w.u8(a.Hacking)
+	w.u8(a.Contacts)
+	w.lenStr(u.Name)
+	w.lenStr(ch.Name)
+}
+
+// encodeCharacters builds an opCharacters frame.
+// Layout: [u8 count][u32 selectedCharID][count × char]
+// Each char: [u32 id][u8 agencyIdx][u16 wins][u16 losses][u16 xp][u8 level]
+//
+//	[u8 endurance][u8 shield][u8 jetpack][u8 techslots][u8 hacking][u8 contacts][lenStr name]
+func encodeCharacters(u *User) []byte {
+	var w writer
+	w.u8(opCharacters)
+	count := len(u.Characters)
+	if count > 255 {
+		count = 255
+	}
+	w.u8(uint8(count))
+	w.u32(u.SelectedCharID)
+	for i := 0; i < count; i++ {
+		ch := &u.Characters[i]
+		a := &ch.Stats
+		w.u32(ch.ID)
+		w.u8(ch.AgencyIdx)
 		w.u16(a.Wins)
 		w.u16(a.Losses)
 		w.u16(a.XPToNextLevel)
@@ -303,8 +352,9 @@ func encodeUser(w *writer, u *User) {
 		w.u8(a.TechSlots)
 		w.u8(a.Hacking)
 		w.u8(a.Contacts)
+		w.lenStr(ch.Name)
 	}
-	w.lenStr(u.Name)
+	return w.b
 }
 
 // Platform byte appended to MSG_VERSION request by updater-capable clients.

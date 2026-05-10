@@ -11,6 +11,7 @@ import (
 	"sync"
 )
 
+// Agency holds the stats for one character's agency progression.
 type Agency struct {
 	Wins          uint16 `json:"w"`
 	Losses        uint16 `json:"l"`
@@ -24,29 +25,42 @@ type Agency struct {
 	Contacts      uint8  `json:"c"`
 }
 
+// Character is a named playable character locked to one agency.
+type Character struct {
+	ID        uint32 `json:"id"`
+	Name      string `json:"name"`
+	AgencyIdx uint8  `json:"agency"` // 0=Noxis 1=Lazarus 2=Caliber 3=Static 4=BlackRose
+	Stats     Agency `json:"stats"`
+}
+
 type User struct {
-	AccountID uint32    `json:"id"`
-	Name      string    `json:"name"`
-	PassHash  string    `json:"pw"` // hex of sha1
-	Agency    [5]Agency `json:"a"`
-	Banned    bool      `json:"banned,omitempty"`
+	AccountID      uint32      `json:"id"`
+	Name           string      `json:"name"`
+	PassHash       string      `json:"pw"` // hex of sha1
+	Characters     []Character `json:"chars,omitempty"`
+	SelectedCharID uint32      `json:"selchar,omitempty"`
+	// Legacy field — only present in old JSON; migrated to Characters on load.
+	LegacyAgency [5]Agency `json:"a,omitempty"`
+	Banned       bool      `json:"banned,omitempty"`
 }
 
 type Store struct {
-	path    string
-	mu      sync.Mutex
-	NextID  uint32           `json:"next"`
-	ByName  map[string]*User `json:"users"`
-	dirty   bool
-	saveErr error
-	mongo   *MongoSync
+	path       string
+	mu         sync.Mutex
+	NextID     uint32           `json:"next"`
+	NextCharID uint32           `json:"nextchar"`
+	ByName     map[string]*User `json:"users"`
+	dirty      bool
+	saveErr    error
+	mongo      *MongoSync
 }
 
 func NewStore(path string) (*Store, error) {
 	s := &Store{
-		path:   path,
-		NextID: 1,
-		ByName: map[string]*User{},
+		path:       path,
+		NextID:     1,
+		NextCharID: 1,
+		ByName:     map[string]*User{},
 	}
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -64,11 +78,13 @@ func NewStore(path string) (*Store, error) {
 	if s.NextID == 0 {
 		s.NextID = 1
 	}
+	if s.NextCharID == 0 {
+		s.NextCharID = 1
+	}
 	// Migrate any mixed-case keys to lowercase (one-time fix for existing data)
 	for key, u := range s.ByName {
 		lower := strings.ToLower(key)
 		if lower != key {
-			// Duplicate: lowercase key already exists — keep higher accountId (newer)
 			if existing, ok := s.ByName[lower]; ok {
 				if u.AccountID > existing.AccountID {
 					s.ByName[lower] = u
@@ -79,7 +95,29 @@ func NewStore(path string) (*Store, error) {
 			delete(s.ByName, key)
 		}
 	}
-	return s, s.save() // persist migrated keys
+	// Migrate legacy Agency[5] to Characters.
+	agencyNames := [5]string{"Noxis", "Lazarus", "Caliber", "Static", "BlackRose"}
+	for _, u := range s.ByName {
+		if len(u.Characters) == 0 {
+			for i, a := range u.LegacyAgency {
+				if a.Wins > 0 || a.Losses > 0 || a.Level > 0 {
+					u.Characters = append(u.Characters, Character{
+						ID:        s.NextCharID,
+						Name:      agencyNames[i],
+						AgencyIdx: uint8(i),
+						Stats:     a,
+					})
+					if u.SelectedCharID == 0 {
+						u.SelectedCharID = s.NextCharID
+					}
+					s.NextCharID++
+				}
+			}
+			// Clear legacy field so it doesn't accumulate in JSON.
+			u.LegacyAgency = [5]Agency{}
+		}
+	}
+	return s, s.save()
 }
 
 // SetMongo attaches a MongoSync and triggers a full startup sync.
@@ -104,7 +142,6 @@ func (s *Store) save() error {
 }
 
 // Authenticate validates an existing player's credentials.
-// Unlike Login(), it never creates a new account — returns nil, false if not found.
 func (s *Store) Authenticate(name string, sha1sum []byte) (*User, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -116,11 +153,10 @@ func (s *Store) Authenticate(name string, sha1sum []byte) (*User, bool) {
 	return u, true
 }
 
-
 func (s *Store) Login(name string, sha1sum []byte) (user *User, ok bool, banned bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	key  := strings.ToLower(name)
+	key := strings.ToLower(name)
 	hash := hex.EncodeToString(sha1sum)
 	u, exists := s.ByName[key]
 	if !exists {
@@ -128,9 +164,6 @@ func (s *Store) Login(name string, sha1sum []byte) (user *User, ok bool, banned 
 			AccountID: s.NextID,
 			Name:      name,
 			PassHash:  hash,
-		}
-		for i := range u.Agency {
-			u.Agency[i] = defaultAgency()
 		}
 		s.ByName[key] = u
 		s.NextID++
@@ -158,25 +191,89 @@ func (s *Store) ByAccountID(id uint32) *User {
 	return nil
 }
 
-// UpdateStats records a match result and XP gain for one agency slot.
-// Returns the updated Agency and true if the player was found.
-func (s *Store) UpdateStats(accountID uint32, agencyIdx uint8, won bool, xpGained uint32) (Agency, bool) {
+// CreateCharacter adds a new character to the account and selects it.
+// Returns the updated User and true on success; false if name is blank or >16 chars.
+func (s *Store) CreateCharacter(accountID uint32, name string, agencyIdx uint8) (*User, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if agencyIdx >= 5 {
-		return Agency{}, false
+	name = strings.TrimSpace(name)
+	if name == "" || len(name) > 16 || agencyIdx >= 5 {
+		return nil, false
 	}
 	for _, u := range s.ByName {
 		if u.AccountID != accountID {
 			continue
 		}
-		a := &u.Agency[agencyIdx]
+		ch := Character{
+			ID:        s.NextCharID,
+			Name:      name,
+			AgencyIdx: agencyIdx,
+			Stats:     defaultAgency(),
+		}
+		s.NextCharID++
+		u.Characters = append(u.Characters, ch)
+		u.SelectedCharID = ch.ID
+		_ = s.save()
+		s.mongo.SyncPlayer(u)
+		return u, true
+	}
+	return nil, false
+}
+
+// SelectCharacter sets the active character for an account.
+// Returns the updated User and true; false if charID doesn't belong to the account.
+func (s *Store) SelectCharacter(accountID uint32, charID uint32) (*User, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, u := range s.ByName {
+		if u.AccountID != accountID {
+			continue
+		}
+		for _, ch := range u.Characters {
+			if ch.ID == charID {
+				u.SelectedCharID = charID
+				_ = s.save()
+				return u, true
+			}
+		}
+		return nil, false
+	}
+	return nil, false
+}
+
+// selectedChar returns the currently selected Character for the user (nil if none).
+// Must be called under s.mu.
+func selectedChar(u *User) *Character {
+	for i := range u.Characters {
+		if u.Characters[i].ID == u.SelectedCharID {
+			return &u.Characters[i]
+		}
+	}
+	if len(u.Characters) > 0 {
+		return &u.Characters[0]
+	}
+	return nil
+}
+
+// UpdateStats records a match result and XP gain for the player's selected character.
+// Returns the updated Agency and true if the player and character were found.
+func (s *Store) UpdateStats(accountID uint32, _ uint8, won bool, xpGained uint32) (Agency, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, u := range s.ByName {
+		if u.AccountID != accountID {
+			continue
+		}
+		ch := selectedChar(u)
+		if ch == nil {
+			return Agency{}, false
+		}
+		a := &ch.Stats
 		if won {
 			a.Wins++
 		} else {
 			a.Losses++
 		}
-		// simple leveling: bar is 100 * (level+1). rolls over any number of levels.
 		x := uint32(a.XPToNextLevel) + xpGained
 		for {
 			next := uint32(100) * uint32(a.Level+1)
@@ -194,19 +291,20 @@ func (s *Store) UpdateStats(accountID uint32, agencyIdx uint8, won bool, xpGaine
 	return Agency{}, false
 }
 
-// UpgradeStat increments a single stat for one agency slot.
+// UpgradeStat increments a single stat for the player's selected character.
 // Returns the updated Agency and true if the upgrade was applied.
-func (s *Store) UpgradeStat(accountID uint32, agencyIdx uint8, stat uint8) (Agency, bool) {
+func (s *Store) UpgradeStat(accountID uint32, _ uint8, stat uint8) (Agency, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if agencyIdx >= 5 {
-		return Agency{}, false
-	}
 	for _, u := range s.ByName {
 		if u.AccountID != accountID {
 			continue
 		}
-		a := &u.Agency[agencyIdx]
+		ch := selectedChar(u)
+		if ch == nil {
+			return Agency{}, false
+		}
+		a := &ch.Stats
 		const (
 			statEndurance = iota
 			statShield
@@ -215,7 +313,6 @@ func (s *Store) UpgradeStat(accountID uint32, agencyIdx uint8, stat uint8) (Agen
 			statHacking
 			statContacts
 		)
-		// cap at 5 (8 for techslots) — matches client's User static maxima.
 		max := uint8(5)
 		if stat == statTechSlots {
 			max = 8
@@ -253,7 +350,6 @@ func (s *Store) UpgradeStat(accountID uint32, agencyIdx uint8, stat uint8) (Agen
 }
 
 // SetBan sets the banned flag for a player by accountId.
-// Returns false if the player was not found.
 func (s *Store) SetBan(accountID uint32, banned bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -269,7 +365,6 @@ func (s *Store) SetBan(accountID uint32, banned bool) bool {
 }
 
 // DeletePlayer removes a player from the store by accountId.
-// Returns false if the player was not found.
 func (s *Store) DeletePlayer(accountID uint32) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -284,7 +379,6 @@ func (s *Store) DeletePlayer(accountID uint32) bool {
 	return false
 }
 
-// wireUser converts a store User to the wire-format User for encoding.
 func wireUser(u *User) *User { return u }
 
 func hashPassword(plain string) []byte {
@@ -292,9 +386,7 @@ func hashPassword(plain string) []byte {
 	return h[:]
 }
 
-// defaultAgency mirrors src/user.cpp starting values (non-bonus fields only —
-// the server-side record tracks purchased upgrades; the client adds its agency
-// perks locally).
 func defaultAgency() Agency {
 	return Agency{TechSlots: 3}
 }
+

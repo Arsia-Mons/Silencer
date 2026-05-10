@@ -37,6 +37,8 @@ Lobby::Lobby(World * world){
 	updateavailable = false;
 	updateurl.clear();
 	memset(updatesha256, 0, sizeof(updatesha256));
+	selectedcharid = 0;
+	charactersreceived = false;
 }
 
 Lobby::~Lobby(){
@@ -432,9 +434,67 @@ void Lobby::DoNetwork(void){
 									}
 									presencechanged = true;
 								}break;
-							}
-							msgsize = 0;
-						}
+								case MSG_CHARACTERS:{
+									Uint8 count;
+									data.Get(count);
+									Uint32 selid;
+									data.Get(selid);
+									characters.clear();
+									selectedcharid = selid;
+									for(int i = 0; i < count; i++){
+										Character ch;
+										memset(&ch, 0, sizeof(ch));
+										data.Get(ch.id);
+										data.Get(ch.agencyIdx);
+										data.Get(ch.stats.wins);
+										data.Get(ch.stats.losses);
+										data.Get(ch.stats.xp);
+										data.Get(ch.stats.level);
+										data.Get(ch.stats.endurance);
+										data.Get(ch.stats.shield);
+										data.Get(ch.stats.jetpack);
+										data.Get(ch.stats.techslots);
+										data.Get(ch.stats.hacking);
+										data.Get(ch.stats.contacts);
+										Uint8 namelen;
+										data.Get(namelen);
+										if(namelen > 16) namelen = 16;
+										for(Uint8 j = 0; j < namelen; j++) data.Get(ch.name[j]);
+										ch.name[namelen] = 0;
+										characters.push_back(ch);
+									}
+									// Also refresh self userinfo from the selected character so
+									// the lobby stats panel shows up-to-date data.
+									if(accountid != 0 && selid != 0){
+										for(const auto& ch : characters){
+											if(ch.id == selid){
+												User * user = GetUserInfo(accountid);
+												user->statsagency = ch.agencyIdx;
+												user->selectedcharid = ch.id;
+												auto& a = user->agency[ch.agencyIdx];
+												a.wins          = ch.stats.wins;
+												a.losses        = ch.stats.losses;
+												a.xptonextlevel = ch.stats.xp;
+												a.level         = ch.stats.level;
+												a.endurance     = ch.stats.endurance;
+												a.shield        = ch.stats.shield;
+												a.jetpack       = ch.stats.jetpack;
+												a.techslots     = ch.stats.techslots;
+												a.hacking       = ch.stats.hacking;
+												a.contacts      = ch.stats.contacts;
+												break;
+											}
+										}
+									}
+									selectedagency = 0;
+									for(const auto& ch : characters){
+										if(ch.id == selid){
+											selectedagency = ch.agencyIdx;
+											break;
+										}
+									}
+									charactersreceived = true;
+								}break;
 					}else
 					if(ret == 0){
 						Disconnect();
@@ -660,6 +720,28 @@ void Lobby::RegisterStats(User & user, Uint8 won, Uint32 gameid){
 	msg.Put(xp);
 	user.statscopy.Serialize(Serializer::WRITE, msg);
 	SendMessage(msg.data, msg.BitsToBytes(msg.offset));
+}
+
+void Lobby::CreateCharacter(const char * name, Uint8 agencyIdx){
+	Serializer data;
+	Uint8 code = MSG_CREATECHARACTER;
+	data.Put(code);
+	Uint8 namelen = (Uint8)strnlen(name, 16);
+	data.Put(namelen);
+	for(int i = 0; i < namelen; i++){
+		char c = name[i];
+		data.Put(c);
+	}
+	data.Put(agencyIdx);
+	SendMessage(data.data, data.BitsToBytes(data.offset));
+}
+
+void Lobby::SelectCharacter(Uint32 charID){
+	Serializer data;
+	Uint8 code = MSG_SELECTCHARACTER;
+	data.Put(code);
+	data.Put(charID);
+	SendMessage(data.data, data.BitsToBytes(data.offset));
 }
 
 bool Lobby::Send(const char * data, unsigned int size){

@@ -57,11 +57,11 @@ func (m *MongoSync) SyncPlayer(u *User) {
 		return
 	}
 	doc := bson.M{
-		"accountId": u.AccountID,
-		"callsign":  u.Name,
-		"banned":    u.Banned,
-		"agencies":  agenciesToBSON(u.Agency),
-		"lastSeen":  time.Now().UTC(),
+		"accountId":  u.AccountID,
+		"callsign":   u.Name,
+		"banned":     u.Banned,
+		"characters": charactersToBSON(u.Characters),
+		"lastSeen":   time.Now().UTC(),
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -103,10 +103,14 @@ func (m *MongoSync) SyncAll(users map[string]*User) {
 	}()
 }
 
-func agenciesToBSON(agencies [5]Agency) []bson.M {
-	out := make([]bson.M, 5)
-	for i, a := range agencies {
+func charactersToBSON(chars []Character) []bson.M {
+	out := make([]bson.M, len(chars))
+	for i, ch := range chars {
+		a := ch.Stats
 		out[i] = bson.M{
+			"id":            ch.ID,
+			"name":          ch.Name,
+			"agencyIdx":     ch.AgencyIdx,
 			"wins":          a.Wins,
 			"losses":        a.Losses,
 			"xpToNextLevel": a.XPToNextLevel,
