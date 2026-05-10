@@ -68,6 +68,7 @@ Game::Game() : renderer(world), screenbuffer(640, 480){
 	singleplayermessage = 0;
 	updatetitle = true;
 	oldselectedagency = -1;
+	createCharEnterCount = 0;
 	agencychanged = true;
 	currentinterface = 0;
 	lastchannel[0] = 0;
@@ -998,13 +999,16 @@ bool Game::Tick(void){
 				renderer.palette.SetPalette(2);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
+				world.lobby.LockMutex();
+				createCharEnterCount = world.lobby.characters.size();
+				world.lobby.UnlockMutex();
 				stateisnew = false;
 			}else{
 				if(FadedIn()){
 					PlayMusic(world.resources.menumusic);
 					world.lobby.LockMutex();
-					// If MSG_CHARACTERS arrived while we were here → go to lobby.
-					if(world.lobby.charactersreceived && !world.lobby.characters.empty()){
+					// Go to lobby once a new character has been created (count increased).
+					if(world.lobby.charactersreceived && world.lobby.characters.size() > createCharEnterCount){
 						world.lobby.UnlockMutex();
 						GoToState(LOBBY);
 						break;

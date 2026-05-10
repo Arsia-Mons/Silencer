@@ -218,6 +218,7 @@ private:
 	Uint8 lastannouncedstatus;
 	char lastchannel[64];
 	Uint8 oldselectedagency;
+	size_t createCharEnterCount; // character count when CREATECHARACTER state was entered
 	Uint8 oldambiencelevel;
 	bool agencychanged;
 	bool gamesummaryinfoloaded;
