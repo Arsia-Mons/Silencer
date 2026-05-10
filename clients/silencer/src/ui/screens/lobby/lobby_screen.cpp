@@ -6,6 +6,7 @@
 #include "world.h"
 #include "lobby.h"
 #include "lobbygame.h"
+#include "serializer.h"
 #include "config.h"
 #include "interface.h"
 #include "overlay.h"
@@ -169,6 +170,14 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			world.lobby.creategamestatus = 0;
 			LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
 			if(lobbygame){
+				// Populate world.gameinfo from the lobby's record so the host can
+				// SendGameInfo to the dedicated server. Without this the host's
+				// gameinfo.loaded stays false (world.cpp:709 gate), gameinfo never
+				// reaches the dedicated server, AllPeersLoadedGameInfo never trips,
+				// and Ready can't progress the shared state to INGAME.
+				Serializer data;
+				lobbygame->Serialize(Serializer::WRITE, data);
+				world.gameinfo.Serialize(Serializer::READ, data);
 				game.JoinGame(*lobbygame, lobbygame->password);
 				mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
 				game.currentlobbygameid = lobbygame->id;
