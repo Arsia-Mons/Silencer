@@ -36,6 +36,7 @@
 #include "lobby_connect_screen.h"
 #include "lobby_screen.h"
 #include "update_screen.h"
+#include "mission_summary_screen.h"
 #include <algorithm>
 #include <stdio.h>
 
@@ -786,7 +787,6 @@ bool Game::Tick(void){
 				gamecreateinterface = 0;
 				gamejoininterface = 0;
 				gametechinterface = 0;
-				gamesummaryinterface = 0;
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
 				renderer.palette.SetPalette(2);
@@ -1051,24 +1051,16 @@ bool Game::Tick(void){
 		case MISSIONSUMMARY:{
 			if(stateisnew){
 				UnloadGame();
-				gamesummaryinfoloaded = false;
 				world.Disconnect();
 				renderer.camera.SetPosition(320, 240);
-				User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-				gamesummaryinterface = CreateGameSummaryInterface(user->statscopy, user->statsagency)->id;
-				currentinterface = gamesummaryinterface;
 				renderer.palette.SetPalette(1);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
+				PushScreen(std::make_unique<MissionSummaryScreen>());
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
-					//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.menumusic);
 					ambienceMixer.PlayMusic(world.resources.menumusic);
-				}
-				Interface * gamesummaryiface = static_cast<Interface *>(world.GetObjectFromId(gamesummaryinterface));
-				if(gamesummaryiface){
-					ProcessGameSummaryInterface(gamesummaryiface);
 				}
 			}
 		}break;
@@ -2286,156 +2278,6 @@ Interface * Game::CreateLobbyInterface(void){
 	return iface;
 }
 
-Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 6;
-	background->res_index = 0;
-	Overlay * background2 = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background2->res_bank = 7;
-	background2->res_index = 5;
-	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	title->text = "Mission Summary";
-	title->textbank = 135;
-	title->textwidth = 12;
-	title->x = 192 - ((title->text.length() * title->textwidth) / 2);
-	title->y = 44;
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	TextBox * textbox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
-	textbox->x = 89;
-	textbox->y = 92;
-	textbox->width = 180;
-	textbox->height = 300;
-	textbox->res_bank = 133;
-	textbox->lineheight = 11;
-	textbox->fontwidth = 6;
-	
-	AddSummaryLine(*textbox, "Kills:", stats.kills);
-	AddSummaryLine(*textbox, "Deaths:", stats.deaths);
-	AddSummaryLine(*textbox, "Suicides", stats.suicides);
-	textbox->AddLine("");
-	textbox->AddLine("Secrets");
-	AddSummaryLine(*textbox, "  Returned:", stats.secretsreturned);
-	AddSummaryLine(*textbox, "  Stolen:", stats.secretsstolen);
-	AddSummaryLine(*textbox, "  Picked up:", stats.secretspickedup);
-	AddSummaryLine(*textbox, "  Fumbled:", stats.secretsdropped);
-	textbox->AddLine("");
-	AddSummaryLine(*textbox, "Civilians killed:", stats.civilianskilled);
-	AddSummaryLine(*textbox, "Guards killed:", stats.guardskilled);
-	AddSummaryLine(*textbox, "Robots killed:", stats.robotskilled);
-	AddSummaryLine(*textbox, "Defenses destroyed:", stats.defensekilled);
-	AddSummaryLine(*textbox, "Fixed Cannons destroyed:", stats.fixedcannonsdestroyed);
-	textbox->AddLine("");
-	textbox->AddLine("Files");
-	AddSummaryLine(*textbox, "  Hacked:", stats.fileshacked);
-	AddSummaryLine(*textbox, "  Returned:", stats.filesreturned);
-	textbox->AddLine("");
-	AddSummaryLine(*textbox, "Powerups picked up:", stats.powerupspickedup);
-	AddSummaryLine(*textbox, "Health packs used:", stats.healthpacksused);
-	AddSummaryLine(*textbox, "Cameras placed:", stats.camerasplanted);
-	AddSummaryLine(*textbox, "Detonators planted:", stats.detsplanted);
-	AddSummaryLine(*textbox, "Fixed Cannons placed:", stats.fixedcannonsplaced);
-	AddSummaryLine(*textbox, "Viruses used:", stats.virusesused);
-	AddSummaryLine(*textbox, "Poisons:", stats.poisons);
-	AddSummaryLine(*textbox, "Lazarus Tracts planted:", stats.tractsplanted);
-	textbox->AddLine("");
-	textbox->AddLine("Grenades thrown");
-	AddSummaryLine(*textbox, "  E.M.P:", stats.empsthrown);
-	AddSummaryLine(*textbox, "  Plasma:", stats.plasmasthrown);
-	AddSummaryLine(*textbox, "  Shaped:", stats.shapedthrown);
-	AddSummaryLine(*textbox, "  Flare:", stats.flaresthrown);
-	AddSummaryLine(*textbox, "  Poison Flare:", stats.poisonflaresthrown);
-	AddSummaryLine(*textbox, "  Neutron:", stats.neutronsthrown);
-	for(int i = 0; i < 4; i++){
-		textbox->AddLine("");
-		switch(i){
-			case 0: textbox->AddLine("Blaster"); break;
-			case 1: textbox->AddLine("Laser"); break;
-			case 2: textbox->AddLine("Rocket"); break;
-			case 3: textbox->AddLine("Flamer"); break;
-		}
-		AddSummaryLine(*textbox, "  Shots fired:", stats.weaponfires[i]);
-		AddSummaryLine(*textbox, "  Hits:", stats.weaponhits[i]);
-		AddSummaryLine(*textbox, "  Accuracy:", (float(stats.weaponhits[i]) / stats.weaponfires[i]) * 100, true);
-		AddSummaryLine(*textbox, "  Player kills:", stats.playerkillsweapon[i]);
-	}
-	ScrollBar * scrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
-	scrollbar->res_index = 9;
-	scrollbar->scrollposition = 0;
-	scrollbar->scrollmax = textbox->text.size() - (textbox->height / textbox->lineheight);
-	scrollbar->scrollpixels = textbox->lineheight;
-	scrollbar->scrollposition = 0;
-	
-	Overlay * xptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	xptext->text = "+ ";
-	xptext->text += std::to_string(stats.CalculateExperience()) + " XP";
-	xptext->textbank = 136;
-	xptext->textwidth = 15;
-	xptext->x = 467 - ((xptext->text.length() * xptext->textwidth) / 2);
-	xptext->y = 45;
-	
-	//bool upgradeavailable = true;
-	
-	Overlay * line1text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	line1text->text = "*NEW UPGRADE AVAILABLE*";
-	line1text->textbank = 133;
-	line1text->effectcolor = 129;
-	line1text->effectbrightness = 128 + 32;
-	line1text->textcolorramp = true;
-	line1text->textwidth = 6;
-	line1text->uid = 1;
-	line1text->x = 467 - ((line1text->text.length() * line1text->textwidth) / 2);
-	line1text->y = 77;
-	line1text->draw = false;
-	iface->AddObject(line1text->id);
-	/*if(upgradeavailable){
-		line1text->draw = true;
-	}else{
-		line1text->draw = false;
-	}*/
-	
-	for(int i = 0; i < 6; i++){
-		Overlay * text = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		Overlay * textlevel = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		switch(i){
-			default:
-			case 0: text->text = "Current Endurance Level:"; break;
-			case 1: text->text = "Current Shield Level:"; break;
-			case 2: text->text = "Current Jetpack Level:"; break;
-			case 3: text->text = "Current Tech Slot Level:"; break;
-			case 4: text->text = "Current Hacking Level:"; break;
-			case 5: text->text = "Current Contacts Level:"; break;
-		}
-		text->textbank = 133;
-		textlevel->textbank = 133;
-		text->textwidth = 6;
-		textlevel->textwidth = 6;
-		textlevel->uid = 20 + i;
-		text->x = 390;
-		textlevel->x = 556 - (textlevel->text.length() * textlevel->textwidth);
-		text->y = 97 + (i * 46);
-		textlevel->y = text->y;
-		iface->AddObject(text->id);
-		iface->AddObject(textlevel->id);
-	}
-	
-	Button * okbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	okbutton->y = 100;
-	okbutton->x = 62;
-	okbutton->uid = 0;
-	strcpy(okbutton->text, "Done");
-	iface->AddObject(background->id);
-	iface->AddObject(background2->id);
-	iface->AddObject(title->id);
-	iface->AddObject(textbox->id);
-	iface->AddObject(scrollbar->id);
-	iface->AddObject(okbutton->id);
-	iface->buttonenter = okbutton->id;
-	iface->buttonescape = okbutton->id;
-	iface->scrollbar = scrollbar->id;
-	gamesummaryinterface = iface->id;
-	UpdateGameSummaryInterface();
-	return iface;
-}
 
 bool Game::GoBack(void){
 	if(gamejoininterface || gametechinterface){
@@ -2553,67 +2395,6 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 	return true;
 }
 
-void Game::ProcessGameSummaryInterface(Interface * iface){
-	if(world.lobby.statupgraded || !gamesummaryinfoloaded){
-		User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-		if(user && !user->retrieving){
-			UpdateGameSummaryInterface();
-			world.lobby.statupgraded = false;
-		}
-	}
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object){
-			switch(object->type){
-				case ObjectTypes::TEXTBOX:{
-					TextBox * textbox = static_cast<TextBox *>(object);
-					if(textbox){
-						Object * object = world.GetObjectFromId(iface->scrollbar);
-						ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-						if(scrollbar){
-							textbox->scrolled = scrollbar->scrollposition;
-						}
-					}
-				}break;
-				case ObjectTypes::BUTTON:{
-					Button * button = static_cast<Button *>(object);
-					if(button && button->clicked){
-						button->clicked = false;
-						User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-						switch(button->uid){
-							case 0:{ // continue
-								if(world.lobby.state == Lobby::AUTHENTICATED){
-									GoToState(LOBBY);
-									world.lobby.JoinChannel(world.lobby.lastchannel);
-								}else{
-									GoToState(MAINMENU);
-								}
-							}break;
-							case 10:{ // upgrade endurance
-								world.lobby.UpgradeStat(user->statsagency, 0);
-							}break;
-							case 11:{ // upgrade shield
-								world.lobby.UpgradeStat(user->statsagency, 1);
-							}break;
-							case 12:{ // upgrade jetpack
-								world.lobby.UpgradeStat(user->statsagency, 2);
-							}break;
-							case 13:{ // upgrade techslots
-								world.lobby.UpgradeStat(user->statsagency, 3);
-							}break;
-							case 14:{ // upgrade hacking
-								world.lobby.UpgradeStat(user->statsagency, 4);
-							}break;
-							case 15:{ // upgrade contacts
-								world.lobby.UpgradeStat(user->statsagency, 5);
-							}break;
-						}
-					}
-				}
-			}
-		}
-	}
-}
 
 void Game::UpdateLobbyMapName(const char * name){
 	Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
@@ -2631,116 +2412,7 @@ void Game::UpdateLobbyMapName(const char * name){
 	}
 }
 
-void Game::UpdateGameSummaryInterface(void){
-	if(!gamesummaryinterface){
-		return;
-	}
-	Interface * gamesummaryiface = static_cast<Interface *>(world.GetObjectFromId(gamesummaryinterface));
-	if(gamesummaryiface){
-		//printf("Updated game summary\n");
-		bool upgradeavailable = false;
-		bool upgradesavailable[6];
-		for(int i = 0; i < 6; i++){
-			upgradesavailable[i] = false;
-		}
-		int totalbonusupgrades = 0;
-		User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-		if(user && !user->retrieving){
-			//printf("user found\n");
-			gamesummaryinfoloaded = true;
-			totalbonusupgrades += user->agency[user->statsagency].endurance;
-			totalbonusupgrades += user->agency[user->statsagency].shield;
-			totalbonusupgrades += user->agency[user->statsagency].jetpack;
-			totalbonusupgrades += user->agency[user->statsagency].techslots;
-			totalbonusupgrades += user->agency[user->statsagency].hacking;
-			totalbonusupgrades += user->agency[user->statsagency].contacts;
-			if(user->agency[user->statsagency].endurance < user->agency[user->statsagency].maxendurance){
-				upgradesavailable[0] = true;
-			}
-			if(user->agency[user->statsagency].shield < user->agency[user->statsagency].maxshield){
-				upgradesavailable[1] = true;
-			}
-			if(user->agency[user->statsagency].jetpack < user->agency[user->statsagency].maxjetpack){
-				upgradesavailable[2] = true;
-			}
-			if(user->agency[user->statsagency].techslots < user->agency[user->statsagency].maxtechslots){
-				upgradesavailable[3] = true;
-			}
-			if(user->agency[user->statsagency].hacking < user->agency[user->statsagency].maxhacking){
-				upgradesavailable[4] = true;
-			}
-			if(user->agency[user->statsagency].contacts < user->agency[user->statsagency].maxcontacts){
-				upgradesavailable[5] = true;
-			}
-			int maxupgrades = user->agency[user->statsagency].level;
-			if(maxupgrades > user->TotalUpgradePointsPossible(user->statsagency)){
-				maxupgrades = user->TotalUpgradePointsPossible(user->statsagency);
-			}
-			if(totalbonusupgrades - user->agency[user->statsagency].defaultbonuses < maxupgrades){
-				upgradeavailable = true;
-			}
-		}
-		for(int i = 0; i < 6; i++){
-			if(upgradesavailable[i] && upgradeavailable){
-				if(!gamesummaryiface->GetObjectWithUid(world, 10 + i)){
-					Button * button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-					button->y = -180 + (i * 46);
-					button->x = 62;
-					button->uid = 10 + i;
-					switch(i){
-						case 0: sprintf(button->text, "+1 Endurance"); break;
-						case 1: sprintf(button->text, "+1 Shield   "); break;
-						case 2: sprintf(button->text, "+1 Jetpack  "); break;
-						case 3: sprintf(button->text, "+1 Tech Slot"); break;
-						case 4: sprintf(button->text, "+1 Hacking  "); break;
-						case 5: sprintf(button->text, "+1 Contacts "); break;
-					}
-					gamesummaryiface->AddObject(button->id);
-				}
-			}else{
-				Button * button = static_cast<Button *>(gamesummaryiface->GetObjectWithUid(world, 10 + i));
-				if(button){
-					gamesummaryiface->RemoveObject(button->id);
-					world.MarkDestroyObject(button->id);
-				}
-			}
-			Overlay * overlay = static_cast<Overlay *>(gamesummaryiface->GetObjectWithUid(world, 20 + i));
-			if(overlay){
-				switch(i){
-					case 0: overlay->text = std::to_string(user->agency[user->statsagency].endurance); break;
-					case 1: overlay->text = std::to_string(user->agency[user->statsagency].shield); break;
-					case 2: overlay->text = std::to_string(user->agency[user->statsagency].jetpack); break;
-					case 3: overlay->text = std::to_string(user->agency[user->statsagency].techslots); break;
-					case 4: overlay->text = std::to_string(user->agency[user->statsagency].hacking); break;
-					case 5: overlay->text = std::to_string(user->agency[user->statsagency].contacts); break;
-				}
-				overlay->x = 556 - (overlay->text.length() * overlay->textwidth);
-			}
-		}
-		Overlay * overlay = static_cast<Overlay *>(gamesummaryiface->GetObjectWithUid(world, 1));
-		if(overlay){
-			if(upgradeavailable){
-				overlay->draw = true;
-			}else{
-				overlay->draw = false;
-			}
-		}
-	}
-}
 
-void Game::AddSummaryLine(TextBox & textbox, const char * name, Uint32 value, bool percentage){
-	char string[256];
-	char valuetext[64];
-	sprintf(valuetext, "%d%s", value, percentage ? "%" : " ");
-	int maxchars = textbox.width / textbox.fontwidth;
-	int used = strlen(name) + strlen(valuetext);
-	strcpy(string, name);
-	for(int i = 0; i < maxchars - used; i++){
-		strcat(string, " ");
-	}
-	strcat(string, valuetext);
-	textbox.AddLine(string);
-}
 
 void Game::ShowTeamOverlays(bool show){
 	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){

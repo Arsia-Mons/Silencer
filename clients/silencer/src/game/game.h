@@ -129,19 +129,14 @@ private:
 	void ShowDeployMessage(void);
 	void GiveDefaultItems(Player & player);
 	void GoToState(Uint8 newstate);
-	Interface * CreateGameSummaryInterface(Stats & stats, Uint8 agency);
 	// Modal-stack peeks used by TickLobbyBody during the create-game spinner
 	// poll. Removed in stage H along with TickLobbyBody itself.
 	bool TopIsModal(void) const;
 	MessageModal * TopAsProgressModal(void) const;
 	void DismissProgressModal(void);
-	Uint16 gamesummaryinterface;
 	Updater updater;
 	bool ProcessLobbyInterface(Interface * iface);
-	void ProcessGameSummaryInterface(Interface * iface);
 	void UpdateLobbyMapName(const char * name);
-	void UpdateGameSummaryInterface(void);
-	void AddSummaryLine(TextBox & textbox, const char * name, Uint32 value, bool percentage = false);
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".
 	const char * GetActionKeyDisplayName(Action a);
@@ -171,7 +166,6 @@ private:
 	bool updatetitle;
 	Uint32 lastannouncedgameid;
 	Uint8 lastannouncedstatus;
-	bool gamesummaryinfoloaded;
 	bool joininggame;
 	bool deploymessageshown;
 	int quitscancode;
