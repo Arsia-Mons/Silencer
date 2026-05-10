@@ -93,7 +93,7 @@ public:
 	Uint16 gameselectinterface;
 	Uint16 gamecreateinterface;
 	Uint16 gamejoininterface;       // mirrored by GameJoinPanel; removed in stage H.
-	Uint16 gametechinterface;       // legacy backing for ShowGameTech; removed in stage G.
+	Uint16 gametechinterface;       // mirrored by GameTechPanel; removed in stage H.
 	Uint16 mappreviewinterface;
 	Uint16 currentinterface;
 	Uint32 currentlobbygameid;
@@ -103,13 +103,10 @@ public:
 	Interface * CreateModalDialog(const char * message, bool ok = true);
 	Interface * CreatePasswordDialog(void);
 	Interface * CreateMapPreview(const char * filename);
-	// Called from LobbyScreen::ShowGameTech (Stage F backs the tech surface
-	// with the legacy iface; Stage G replaces both with GameTechPanel).
-	Interface * CreateGameTechInterface(void);
-	void UpdateTechInterface(void);
-	// Toggle in-lobby team overlay visibility. Called by ShowGameJoin /
-	// ShowGameTech when entering/leaving the tech-choice surface. Removed
-	// in stage G (folded into the panel).
+	// Toggle in-lobby team overlay visibility. Called by LobbyScreen's
+	// right-side panel swaps (ShowGameTech / TearDownRightPanels) when
+	// entering / leaving the tech-choice surface. Removed in stage H once
+	// the panel can reach world.objectlist directly.
 	void ShowTeamOverlays(bool show);
 
 private:

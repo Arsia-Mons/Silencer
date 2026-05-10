@@ -147,6 +147,11 @@ public:
 	// AllPeersDownloadedMap, gameplaystate) to refresh the Ready button
 	// label, and dispatches SendReady on click.
 	friend class GameJoinPanel;
+	// GameTechPanel ports the legacy Game::UpdateTechInterface — reads
+	// peerlist[team peers] to drive the per-peer tech checkbox grid, calls
+	// RequestPeerList when the local-peer slot is empty (recovery for a
+	// dropped peerlist packet).
+	friend class GameTechPanel;
 
 protected:
 	std::list<class Object *> objectlist;

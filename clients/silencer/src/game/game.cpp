@@ -2281,124 +2281,6 @@ Interface * Game::CreateLobbyInterface(void){
 	return iface;
 }
 
-Interface * Game::CreateGameTechInterface(void){
-	Interface * gametechinterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	gametechinterface->x = 403;
-	gametechinterface->y = 87;
-	gametechinterface->width = 222;
-	gametechinterface->height = 390;
-	Button * teamsbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	teamsbutton->x = 242;
-	teamsbutton->y = 68;
-	teamsbutton->SetType(Button::B156x21);
-	teamsbutton->uid = 28;
-	strcpy(teamsbutton->text, "Back To Teams");
-	Overlay * techslotsoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	if(techslotsoverlay){
-		techslotsoverlay->x = 455;
-		techslotsoverlay->y = 100;
-		techslotsoverlay->textbank = 133;
-		techslotsoverlay->textwidth = 6;
-		techslotsoverlay->effectcolor = 129;
-		techslotsoverlay->effectbrightness = 128 + 16;
-		techslotsoverlay->textcolorramp = true;
-		techslotsoverlay->uid = 70;
-		gametechinterface->AddObject(techslotsoverlay->id);
-	}
-	for(int i = 0; i < 3; i++){
-		int j = 2 - i;
-		Overlay * techoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		if(techoverlay){
-			techoverlay->text = "Player ";
-			techoverlay->text += std::to_string(i + 1);
-			techoverlay->textbank = 133;
-			techoverlay->textwidth = 6;
-			techoverlay->uid = 80 + i;
-			techoverlay->x = 375 - (techoverlay->text.length() * techoverlay->textwidth);
-			techoverlay->y = 112 + (j * 16);
-			techoverlay->draw = false;
-			gametechinterface->AddObject(techoverlay->id);
-		}
-		Overlay * techlineoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		if(techlineoverlay){
-			techlineoverlay->x = 0;
-			techlineoverlay->y = 0;
-			techlineoverlay->uid = 90 + i;
-			techlineoverlay->res_bank = 7;
-			techlineoverlay->res_index = 20 + j;
-			techlineoverlay->draw = false;
-			gametechinterface->AddObject(techlineoverlay->id);
-		}
-	}
-	Team * team = world.GetPeerTeam(world.localpeerid);
-	if(team){
-		for(int x = 0; x < 4; x++){
-			int i = 0;
-			int ipos = 0;
-			for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
-				BuyableItem * buyableitem = *it;
-				if(buyableitem->techslots){
-					if(buyableitem->agencyspecific == -1 || (buyableitem->agencyspecific == team->agency)){
-						Button * button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-						if(button){
-							button->x = 410 + (x * 14);
-							button->y = 125 + (ipos * 13);
-							button->uid = 110 + (30 * x) + i;
-							button->SetType(Button::BCHECKBOX);
-							if(x < 3){
-								button->effectbrightness = 64;
-								button->draw = false;
-							}
-							gametechinterface->AddObject(button->id);
-							if(x == 3){
-								Overlay * technameoverlay = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-								if(technameoverlay){
-									technameoverlay->text = buyableitem->name;
-									technameoverlay->text += " (" + std::to_string(buyableitem->techslots) + ")";
-									technameoverlay->x = 425 + (x * 14);
-									technameoverlay->y = 127 + (ipos * 13);
-									technameoverlay->textbank = 133;
-									technameoverlay->textwidth = 6;
-									technameoverlay->uid = 230 + i;
-									gametechinterface->AddObject(technameoverlay->id);
-								}
-							}
-						}
-						ipos++;
-					}
-					i++;
-				}
-			}
-		}
-	}
-	Overlay * techname = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	if(techname){
-		techname->textbank = 134;
-		techname->textwidth = 8;
-		techname->uid = 60;
-		techname->x = 401 + (116 - ((techname->text.length() * techname->textwidth) / 2));
-		techname->y = 350;
-		gametechinterface->AddObject(techname->id);
-	}
-	for(int i = 0; i < 8; i++){
-		Overlay * techdesc = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		if(techdesc){
-			techdesc->textbank = 133;
-			techdesc->textwidth = 6;
-			techdesc->effectcolor = 129;
-			techdesc->effectbrightness = 128 + 16;
-			techdesc->textcolorramp = true;
-			techdesc->uid = 61 + i;
-			techdesc->x = 405;
-			techdesc->y = 370 + (i * 10);
-			gametechinterface->AddObject(techdesc->id);
-		}
-	}
-	gametechinterface->AddObject(teamsbutton->id);
-	gametechinterface->buttonescape = teamsbutton->id;
-	return gametechinterface;
-}
-
 Interface * Game::CreateGameSummaryInterface(Stats & stats, Uint8 agency){
 	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	background->res_bank = 6;
@@ -2725,41 +2607,15 @@ bool Game::GoBack(void){
 		world.lobby.channelchanged = true;
 		world.SwitchToLocalAuthorityMode();
 		sharedstate = 0;
-		Object * object = world.GetObjectFromId(currentinterface);
-		Interface * iface = static_cast<Interface *>(object);
-		if(gamejoininterface){
-			Interface * gamejoiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
-			if(gamejoiniface){
-				gamejoiniface->DestroyInterface(world, iface);
-			}
-			gamejoininterface = 0;
-			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-				Object * object = *it;
-				switch(object->type){
-					case ObjectTypes::TEAM:{
-						Team * team = static_cast<Team *>(object);
-						team->DestroyOverlays(world);
-						world.MarkDestroyObject(object->id);
-					}break;
-				}
-			}
-		}else
-		if(gametechinterface){
-			Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
-			if(gametechiface){
-				gametechiface->DestroyInterface(world, iface);
-			}
-			gametechinterface = 0;
-			world.choosingtech = false;
-			for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-				Object * object = *it;
-				switch(object->type){
-					case ObjectTypes::TEAM:{
-						Team * team = static_cast<Team *>(object);
-						team->DestroyOverlays(world);
-						world.MarkDestroyObject(object->id);
-					}break;
-				}
+		// Destroy the team overlays now that we're leaving the joined-game
+		// surface. ShowGameSelect (via TearDownRightPanels) owns the panel
+		// iface teardown + choosingtech / ShowTeamOverlays(true) reset.
+		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+			Object * object = *it;
+			if(object->type == ObjectTypes::TEAM){
+				Team * team = static_cast<Team *>(object);
+				team->DestroyOverlays(world);
+				world.MarkDestroyObject(object->id);
 			}
 		}
 		world.lobby.JoinChannel(world.lobby.lastchannel);
@@ -2767,7 +2623,7 @@ bool Game::GoBack(void){
 		if(lobby){
 			lobby->ShowGameSelect(screenContext);
 		}
-		currentinterface = iface->id;
+		currentinterface = lobbyinterface;
 		return true;
 	}else
 	if(gamecreateinterface){
@@ -2787,7 +2643,8 @@ bool Game::GoBack(void){
 }
 
 bool Game::ProcessLobbyInterface(Interface * iface){
-	UpdateTechInterface();
+	// UpdateTechInterface() removed in Stage G — GameTechPanel::Tick now
+	// drives the per-frame tech-checkbox refresh.
 	if(mappreviewinterface && !gamecreateinterface){
 		Interface * mappreviewiface = static_cast<Interface *>(world.GetObjectFromId(mappreviewinterface));
 		if(mappreviewiface){
@@ -2849,20 +2706,7 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 							// Join button (uid 20) handled by GameSelectPanel::Tick.
 							// Ready (uid 25), Change Team (uid 26), Choose Tech (uid 27)
 							// handled by GameJoinPanel::Tick.
-							case 28:{ // back to teams (gametech "Back To Teams")
-								if(!gamejoininterface && gametechinterface){
-									button->clicked = false;
-									LobbyScreen * lobby = screenStack.empty() ? nullptr : dynamic_cast<LobbyScreen *>(screenStack.back().get());
-									if(lobby){
-										// ShowGameJoin tears down the
-										// gametech iface (and resets choosingtech /
-										// team overlays) before building the
-										// GameJoinPanel onto the lobby iface.
-										lobby->ShowGameJoin(screenContext);
-									}
-									return false;
-								}
-							}break;
+							// Back To Teams (uid 28) handled by GameTechPanel::Tick.
 							// Create-game button (uid 30) handled by GameSelectPanel::Tick
 							// (calls LobbyScreen::ShowGameCreate).
 							// Create-confirm (uid 35) and security-cycle (uid 40)
@@ -2968,157 +2812,6 @@ void Game::UpdateLobbyMapName(const char * name){
 				if(overlay->uid == 8){
 					overlay->text = name;
 					overlay->text = overlay->text.substr(0, 25);
-				}
-			}
-		}
-	}
-}
-
-void Game::UpdateTechInterface(void){
-	if(gametechinterface){
-		int techslotsleft = 0;
-		Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
-		if(gametechiface){
-			Overlay * overlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 70));
-			if(overlay){
-				Peer * peer = world.peerlist[world.localpeerid];
-				if(peer){
-					Team * team = world.GetPeerTeam(world.localpeerid);
-					User * user = world.lobby.GetUserInfo(peer->accountid);
-					if(user && team){
-						techslotsleft = user->agency[team->agency].techslots - world.TechSlotsUsed(*peer);
-						overlay->text = "Tech slots left: " + std::to_string(techslotsleft);
-					}
-				}else{
-					if(world.tickcount % 12 == 0){
-						// fix for when the tech interface doesnt appear if the peerlist packet was lost
-						world.RequestPeerList();
-					}
-				}
-			}
-		}
-		Team * team = world.GetPeerTeam(world.localpeerid);
-		if(team){
-			int peerindex = 0;
-			for(int i = 0; i < 4; i++){
-				Peer * peer = world.peerlist[team->peers[i]];
-				User * user = 0;
-				if(peer){
-					user = world.lobby.GetUserInfo(peer->accountid);
-				}
-				bool draw = true;
-				if(i >= team->numpeers){
-					draw = false;
-				}
-				int b = 0;
-				int bpos = 0;
-				for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
-					BuyableItem * buyableitem = *it;
-					if(buyableitem->techslots){
-						if(buyableitem->agencyspecific == -1 || buyableitem->agencyspecific == team->agency){
-							bool usable = true;
-							Uint8 uid = 110 + (30 * peerindex) + b;
-							if(team->peers[i] == world.localpeerid){
-								uid = 110 + (30 * 3) + b;
-								if(buyableitem->techslots <= techslotsleft || (peer && peer->techchoices & buyableitem->techchoice)){
-									usable = false;
-								}
-							}
-							Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
-							if(gametechiface){
-								Button * button = static_cast<Button *>(gametechiface->GetObjectWithUid(world, uid));
-								if(button){
-									if(peer && peer->techchoices & buyableitem->techchoice){
-										button->res_index = 18; // on
-									}else{
-										button->res_index = 19; // off
-									}
-									if(team->peers[i] == world.localpeerid){
-										if(!usable){
-											button->effectbrightness = 128;
-										}else{
-											button->effectbrightness = 64;
-										}
-									}
-									if(button && button->type == Button::BCHECKBOX){
-										if(button->clicked){
-											if(button->uid >= 200 && button->effectbrightness == 128){
-												//Uint32 techchoice = 1 << (button->uid - 200);
-												Peer * peer = world.peerlist[world.localpeerid];
-												//printf("tech slots used: %d, %d\n", world.TechSlotsUsed(*peer), peer->techchoices);
-												if(peer){
-													world.SetTech(peer->techchoices ^ buyableitem->techchoice);
-													Team * team = world.GetPeerTeam(world.localpeerid);
-													if(team){
-														Config::GetInstance().defaulttechchoices[team->agency] = peer->techchoices ^ buyableitem->techchoice;
-														Config::GetInstance().Save();
-													}
-												}
-											}
-											button->clicked = false;
-										}
-									}
-									button->draw = draw;
-								}
-							}
-							if(gametechiface){
-								Overlay * overlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 230 + b));
-								if(overlay){
-									if(overlay->clicked){
-										overlay->clicked = false;
-										Overlay * nameoverlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 60));
-										if(nameoverlay){
-											nameoverlay->text = "-" + std::string(buyableitem->name) + "-";
-											nameoverlay->x = 401 + (116 - ((nameoverlay->text.length() * nameoverlay->textwidth) / 2));
-										}
-										char desc[1024];
-										strcpy(desc, buyableitem->description);
-										int linenum = 0;
-										char * descline = strtok(desc, "\n");
-										while(descline){
-											Overlay * descoverlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 61 + linenum));
-											if(descoverlay){
-												descoverlay->text = descline;
-											}
-											linenum++;
-											descline = strtok(NULL, "\n");
-										}
-										for(int i = linenum; i < 9; i++){
-											Overlay * descoverlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 61 + i));
-											if(descoverlay){
-												descoverlay->text = "";
-											}
-										}
-									}
-									if(team->peers[i] == world.localpeerid){
-										if(!usable){
-											overlay->effectbrightness = 128;
-										}else{
-											overlay->effectbrightness = 64;
-										}
-									}
-								}
-							}
-							bpos++;
-						}
-						b++;
-					}
-				}
-				if(team->peers[i] != world.localpeerid){
-					Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
-					if(gametechiface){
-						Overlay * overlay = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 80 + peerindex));
-						Overlay * overlayline = static_cast<Overlay *>(gametechiface->GetObjectWithUid(world, 90 + peerindex));
-						if(overlay && overlayline){
-							overlay->draw = draw;
-							if(user){
-								overlay->text = user->name;
-								overlay->x = 375 - (overlay->text.length() * overlay->textwidth);
-							}
-							overlayline->draw = draw;
-						}
-					}
-					peerindex++;
 				}
 			}
 		}
