@@ -77,16 +77,6 @@ jobs:
         with:
           arch: x64
 
-      - name: Fetch vcpkg baseline commit
-        if: steps.changes.outputs.relevant == 'true'
-        shell: pwsh
-        run: |
-          # Runner ships a shallow vcpkg clone; pinned builtin-baseline
-          # may not be in its history. Pull the specific commit so vcpkg
-          # can `git show <sha>:versions/baseline.json`.
-          $sha = (Get-Content clients/silencer/vcpkg.json | ConvertFrom-Json).'builtin-baseline'
-          git -C "$env:VCPKG_INSTALLATION_ROOT" fetch --depth=1 origin $sha
-
       - name: Configure
         if: steps.changes.outputs.relevant == 'true'
         shell: pwsh
