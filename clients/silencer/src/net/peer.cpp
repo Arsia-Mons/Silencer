@@ -17,6 +17,7 @@ Peer::Peer(){
 	isbot = false;
 	firstinputtime = 0;
 	totalinputs = 0;
+	disconnected = false;
 }
 
 void Peer::Serialize(bool write, Serializer & data){
