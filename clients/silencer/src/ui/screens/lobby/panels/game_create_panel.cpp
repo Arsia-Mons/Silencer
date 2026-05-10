@@ -69,46 +69,82 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	rightborder->res_bank = 7;
 	rightborder->res_index = 8;
 
+	// Form layout: bank-133 width-6 glyphs (~9px tall) → widget height 14
+	// matches the chat textinput's pairing; yspace 16 keeps a 2px row gap.
+	const int yoffset      = 4;
+	const int yspace       = 16;
+	const int rowheight    = 14;
+	const int labelx       = 245;
+	const int valuex       = 320;
+	const int form_left    = 240;
+	const int form_top     = 87;
+	const int form_width   = 159;
+	const int form_height  = 86;
+
 	Overlay * optionstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	optionstext->text = "Game Options";
-	optionstext->textbank = 134;
-	optionstext->textwidth = 8;
-	optionstext->x = 272;
-	optionstext->y = 70;
+	optionstext->textbank = 133;
+	optionstext->textwidth = 6;
+	// Centered over the form border (border center x = form_left + form_width/2),
+	// 12 chars × 6px = 72px wide.
+	optionstext->x = form_left + (form_width - 12 * 6) / 2;
+	optionstext->y = 76;
 
-	int yoffset = 6;
-	int yspace = 18;
+	// Bright-green 1px outline around the form viewport, matching the chrome
+	// around the map list. Palette index 220 = the chrome's stroke color
+	// (sampled directly from sprite (7,8) pixels). The right stroke at
+	// x=form_left+form_width-1 (=398) aligns with the darker decorative
+	// stroke at x=398 baked into the lobby background.
+	Overlay * formborder = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	formborder->x = form_left;
+	formborder->y = form_top;
+	formborder->customspritew = form_width;
+	formborder->customspriteh = form_height;
+	formborder->customsprite.assign(formborder->customspritew * formborder->customspriteh, 0);
+	{
+		const Uint8 strokeColor = 220;
+		int bw = formborder->customspritew;
+		int bh = formborder->customspriteh;
+		for(int px = 0; px < bw; px++){
+			formborder->customsprite[px] = strokeColor;
+			formborder->customsprite[(bh - 1) * bw + px] = strokeColor;
+		}
+		for(int py = 0; py < bh; py++){
+			formborder->customsprite[py * bw] = strokeColor;
+			formborder->customsprite[py * bw + (bw - 1)] = strokeColor;
+		}
+	}
 
 	Overlay * securitytext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	securitytext->text = "Security:";
-	securitytext->textbank = 134;
-	securitytext->textwidth = 8;
-	securitytext->x = 245;
-	securitytext->y = 87 + (yspace * 0) + yoffset;
+	securitytext->textbank = 133;
+	securitytext->textwidth = 6;
+	securitytext->x = labelx;
+	securitytext->y = form_top + (yspace * 0) + yoffset;
 	Button * buttonsecurity = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 	buttonsecurity->SetType(Button::BNONE);
-	buttonsecurity->x = 323;
-	buttonsecurity->y = 87 + (yspace * 0) + yoffset;
+	buttonsecurity->x = valuex;
+	buttonsecurity->y = form_top + (yspace * 0) + yoffset;
 	buttonsecurity->uid = GCRT_BTN_SECURITY;
-	buttonsecurity->width = 70;
-	buttonsecurity->height = 20;
-	buttonsecurity->textbank = 134;
-	buttonsecurity->textwidth = 9;
+	buttonsecurity->width = 40;
+	buttonsecurity->height = rowheight;
+	buttonsecurity->textbank = 133;
+	buttonsecurity->textwidth = 6;
 	strcpy(buttonsecurity->text, "Medium");
 
 	Overlay * minleveltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	minleveltext->text = "Min Level:";
-	minleveltext->textbank = 134;
-	minleveltext->textwidth = 8;
-	minleveltext->x = 245;
-	minleveltext->y = 87 + (yspace * 1) + yoffset;
+	minleveltext->textbank = 133;
+	minleveltext->textwidth = 6;
+	minleveltext->x = labelx;
+	minleveltext->y = form_top + (yspace * 1) + yoffset;
 	TextInput * minlevelinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	minlevelinput->x = 350;
-	minlevelinput->y = 87 + (yspace * 1) + yoffset;
+	minlevelinput->x = valuex;
+	minlevelinput->y = form_top + (yspace * 1) + yoffset;
 	minlevelinput->width = 20;
-	minlevelinput->height = 20;
-	minlevelinput->res_bank = 134;
-	minlevelinput->fontwidth = 8;
+	minlevelinput->height = rowheight;
+	minlevelinput->res_bank = 133;
+	minlevelinput->fontwidth = 6;
 	minlevelinput->maxchars = 2;
 	minlevelinput->maxwidth = 50;
 	minlevelinput->uid = GCRT_INPUT_MINLEVEL;
@@ -117,17 +153,17 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 
 	Overlay * maxleveltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	maxleveltext->text = "Max Level:";
-	maxleveltext->textbank = 134;
-	maxleveltext->textwidth = 8;
-	maxleveltext->x = 245;
-	maxleveltext->y = 87 + (yspace * 2) + yoffset;
+	maxleveltext->textbank = 133;
+	maxleveltext->textwidth = 6;
+	maxleveltext->x = labelx;
+	maxleveltext->y = form_top + (yspace * 2) + yoffset;
 	TextInput * maxlevelinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	maxlevelinput->x = 350;
-	maxlevelinput->y = 87 + (yspace * 2) + yoffset;
+	maxlevelinput->x = valuex;
+	maxlevelinput->y = form_top + (yspace * 2) + yoffset;
 	maxlevelinput->width = 20;
-	maxlevelinput->height = 20;
-	maxlevelinput->res_bank = 134;
-	maxlevelinput->fontwidth = 8;
+	maxlevelinput->height = rowheight;
+	maxlevelinput->res_bank = 133;
+	maxlevelinput->fontwidth = 6;
 	maxlevelinput->maxchars = 2;
 	maxlevelinput->maxwidth = 50;
 	maxlevelinput->uid = GCRT_INPUT_MAXLEVEL;
@@ -136,17 +172,17 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 
 	Overlay * maxplayerstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	maxplayerstext->text = "Max Players:";
-	maxplayerstext->textbank = 134;
-	maxplayerstext->textwidth = 8;
-	maxplayerstext->x = 245;
-	maxplayerstext->y = 87 + (yspace * 3) + yoffset;
+	maxplayerstext->textbank = 133;
+	maxplayerstext->textwidth = 6;
+	maxplayerstext->x = labelx;
+	maxplayerstext->y = form_top + (yspace * 3) + yoffset;
 	TextInput * maxplayersinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	maxplayersinput->x = 350;
-	maxplayersinput->y = 87 + (yspace * 3) + yoffset;
+	maxplayersinput->x = valuex;
+	maxplayersinput->y = form_top + (yspace * 3) + yoffset;
 	maxplayersinput->width = 20;
-	maxplayersinput->height = 20;
-	maxplayersinput->res_bank = 134;
-	maxplayersinput->fontwidth = 8;
+	maxplayersinput->height = rowheight;
+	maxplayersinput->res_bank = 133;
+	maxplayersinput->fontwidth = 6;
 	maxplayersinput->maxchars = 2;
 	maxplayersinput->maxwidth = 50;
 	maxplayersinput->uid = GCRT_INPUT_PLAYERS;
@@ -155,17 +191,17 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 
 	Overlay * maxteamstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	maxteamstext->text = "Max Teams:";
-	maxteamstext->textbank = 134;
-	maxteamstext->textwidth = 8;
-	maxteamstext->x = 245;
-	maxteamstext->y = 87 + (yspace * 4) + yoffset;
+	maxteamstext->textbank = 133;
+	maxteamstext->textwidth = 6;
+	maxteamstext->x = labelx;
+	maxteamstext->y = form_top + (yspace * 4) + yoffset;
 	TextInput * maxteamsinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	maxteamsinput->x = 350;
-	maxteamsinput->y = 87 + (yspace * 4) + yoffset;
+	maxteamsinput->x = valuex;
+	maxteamsinput->y = form_top + (yspace * 4) + yoffset;
 	maxteamsinput->width = 20;
-	maxteamsinput->height = 20;
-	maxteamsinput->res_bank = 134;
-	maxteamsinput->fontwidth = 8;
+	maxteamsinput->height = rowheight;
+	maxteamsinput->res_bank = 133;
+	maxteamsinput->fontwidth = 6;
 	maxteamsinput->maxchars = 2;
 	maxteamsinput->maxwidth = 50;
 	maxteamsinput->uid = GCRT_INPUT_TEAMS;
@@ -174,19 +210,19 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 
 	Overlay * spectatabletext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	spectatabletext->text = "Spectatable:";
-	spectatabletext->textbank = 134;
-	spectatabletext->textwidth = 8;
-	spectatabletext->x = 245;
-	spectatabletext->y = 87 + (yspace * 5) + yoffset;
+	spectatabletext->textbank = 133;
+	spectatabletext->textwidth = 6;
+	spectatabletext->x = labelx;
+	spectatabletext->y = form_top + (yspace * 5) + yoffset;
 	Button * spectatablebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 	spectatablebutton->SetType(Button::BNONE);
-	spectatablebutton->x = 350;
-	spectatablebutton->y = 87 + (yspace * 5) + yoffset;
+	spectatablebutton->x = valuex;
+	spectatablebutton->y = form_top + (yspace * 5) + yoffset;
 	spectatablebutton->uid = GCRT_BTN_SPECTATABLE;
-	spectatablebutton->width = 40;
-	spectatablebutton->height = 20;
-	spectatablebutton->textbank = 134;
-	spectatablebutton->textwidth = 9;
+	spectatablebutton->width = 20;
+	spectatablebutton->height = rowheight;
+	spectatablebutton->textbank = 133;
+	spectatablebutton->textwidth = 6;
 	strcpy(spectatablebutton->text, Config::GetInstance().lastspectatable ? "Yes" : "No");
 
 	Overlay * selectmaptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
@@ -252,25 +288,27 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	mapscrollbar->scrollregionw = mapselect->width;
 	mapscrollbar->scrollregionh = mapselect->height;
 
-	// Form-row scrollbar. Sits in the narrow gap between the form's value
-	// column and the map list; uses the variable-height path to stretch the
-	// bank-7 track sprite to the form viewport (5 rows).
+	// Form-row scrollbar. Anchored so its right edge (x=398) coincides with
+	// the form border's right stroke, which itself sits on top of the lobby
+	// background's darker decorative stroke at x=398. The track sprite is
+	// 16px wide, so its top-left lands at x=383. The variable-height path
+	// stretches the bank-7 track sprite to span the full form viewport.
 	ScrollBar * formscrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
 	formscrollbar->res_index = 9;
 	formscrollbar->scrollpixels = yspace;
 	formscrollbar->scrollposition = 0;
 	formscrollbar->draw = true;
-	formscrollbar->height = 5 * yspace;
-	// Anchor the track's screen-space top-left at (398, 87). The sprite's
-	// offsets are baked for a different layout, so undo them here.
-	formscrollbar->x = 398 + world.resources.spriteoffsetx[7][9];
-	formscrollbar->y = 87 + world.resources.spriteoffsety[7][9];
-	// Region covers the form's labels + value column so the wheel routes
-	// here whenever the cursor is over Game Options.
-	formscrollbar->scrollregionx = 240;
-	formscrollbar->scrollregiony = 87;
-	formscrollbar->scrollregionw = 160;
-	formscrollbar->scrollregionh = 5 * yspace;
+	formscrollbar->height = form_height;
+	// Sprite offsets are baked for a different layout — undo them here so
+	// the on-screen top-left lands at (383, form_top).
+	formscrollbar->x = 383 + world.resources.spriteoffsetx[7][9];
+	formscrollbar->y = form_top + world.resources.spriteoffsety[7][9];
+	// Region matches the form border so the wheel routes here whenever
+	// the cursor is anywhere over Game Options (not the map list).
+	formscrollbar->scrollregionx = form_left;
+	formscrollbar->scrollregiony = form_top;
+	formscrollbar->scrollregionw = form_width;
+	formscrollbar->scrollregionh = form_height;
 	// 6 rows total, 5 visible.
 	formscrollbar->scrollmax = 1;
 
@@ -318,6 +356,7 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	strcpy(gamecreatebutton->text, "Create");
 
 	gamecreateinterface->AddObject(rightborder->id);
+	gamecreateinterface->AddObject(formborder->id);
 	gamecreateinterface->AddObject(optionstext->id);
 	gamecreateinterface->AddObject(securitytext->id);
 	gamecreateinterface->AddObject(buttonsecurity->id);
@@ -355,11 +394,11 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	// widget) are translated and shown/hidden together based on the form
 	// scrollbar's position.
 	gamecreateinterface->formscrollbar = formscrollbar->id;
-	gamecreateinterface->scrollviewporttop = 87 + yoffset;
+	gamecreateinterface->scrollviewporttop = form_top + yoffset;
 	gamecreateinterface->scrollviewportrows = 5;
 	gamecreateinterface->scrollrowheight = yspace;
 	for(int i = 0; i < 6; i++){
-		Sint16 rowy = 87 + (yspace * i) + yoffset;
+		Sint16 rowy = form_top + (yspace * i) + yoffset;
 		Uint16 lblid = 0;
 		Uint16 valid = 0;
 		switch(i){
