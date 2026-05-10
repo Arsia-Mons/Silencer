@@ -18,71 +18,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install deps (Homebrew)
-        # SDL3 and especially SDL3_mixer aren't reliably in homebrew-core
-        # on the macos-latest runner image — install via setup-sdl below
-        # (same approach as deploy.yml's Linux build).
-        run: brew install minizip dylibbundler create-dmg
+      - name: Compute version from tag
+        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      - name: Install SDL3 + SDL3_mixer
-        uses: libsdl-org/setup-sdl@main
+      - name: Install create-dmg
+        # Release-only; the shared composite installs minizip + dylibbundler.
+        run: brew install create-dmg
+
+      - name: Build silencer
+        uses: ./.github/actions/build-silencer-macos
         with:
-          version: 3-latest
-          version-sdl-mixer: 3-latest
-
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.10
-
-      - name: Configure
-        env:
-          LOBBY_HOST: ${{ vars.LOBBY_HOST }}
-        run: |
-          lobby="${LOBBY_HOST:-lobby.arsiamons.com}"
-          cmake -B build -S clients/silencer \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0 \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -DSILENCER_UNITY_BUILD=ON \
-            -DSILENCER_LOBBY_HOST="$lobby" \
-            -DSILENCER_MAP_API_URL="https://admin.arsiamons.com" \
-            -DSILENCER_VERSION="${GITHUB_REF_NAME#v}"
-
-      - name: Build
-        run: cmake --build build --config Release -j"$(sysctl -n hw.ncpu)"
-
-      - name: sccache stats
-        if: always()
-        run: sccache --show-stats
-
-      - name: Bundle dylibs
-        working-directory: build
-        run: |
-          mkdir -p Silencer.app/Contents/Frameworks
-          # setup-sdl exports SDL3_ROOT + SDL3_mixer_ROOT env vars pointing
-          # at the per-runner install dirs (/var/folders/.../setupsdl/...).
-          # Pass them to dylibbundler as -s search paths so it can resolve
-          # @rpath/libSDL3*.dylib references in the binary. Without these,
-          # dylibbundler drops into an interactive prompt loop and hangs.
-          echo "--- SDL3 install roots ---"
-          echo "  SDL3_ROOT=$SDL3_ROOT"
-          echo "  SDL3_mixer_ROOT=$SDL3_mixer_ROOT"
-          dylibbundler \
-            -s "$SDL3_ROOT/lib" \
-            -s "$SDL3_mixer_ROOT/lib" \
-            --overwrite-dir \
-            --bundle-deps \
-            --create-dir \
-            --fix-file Silencer.app/Contents/MacOS/Silencer \
-            --dest-dir Silencer.app/Contents/Frameworks/ \
-            --install-path @rpath/ \
-            </dev/null
-          install_name_tool -add_rpath @executable_path/../Frameworks \
-            Silencer.app/Contents/MacOS/Silencer 2>/dev/null || true
-          echo "--- bundled dylibs ---"
-          ls Silencer.app/Contents/Frameworks/
-          echo "--- main binary linkage ---"
-          otool -L Silencer.app/Contents/MacOS/Silencer
+          lobby-host: ${{ vars.LOBBY_HOST || 'lobby.arsiamons.com' }}
+          silencer-version: ${{ env.SILENCER_VERSION }}
 
       - name: Import Developer ID cert
         env:
@@ -258,87 +205,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install build deps
-        # SDL3 itself comes from setup-sdl below (built from source). The list
-        # here is what setup-sdl needs at configure time + minizip + patchelf
-        # (used post-build to point the binary's RUNPATH at $ORIGIN so it
-        # loads the bundled SDL3 from the same dir as the executable).
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential cmake ninja-build patchelf pkg-config \
-            libminizip-dev libcurl4-openssl-dev \
-            libasound2-dev libpulse-dev libudev-dev libxext-dev \
-            libxinerama-dev libxcursor-dev libxrandr-dev libxss-dev \
-            libwayland-dev libxkbcommon-dev libdbus-1-dev libibus-1.0-dev
+      - name: Compute version from tag
+        run: echo "SILENCER_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      - name: Install SDL3 + SDL3_mixer
-        uses: libsdl-org/setup-sdl@main
+      - name: Build silencer
+        uses: ./.github/actions/build-silencer-linux
         with:
-          version: 3-latest
-          version-sdl-mixer: 3-latest
-
-      - name: Setup sccache
-        uses: mozilla-actions/sccache-action@v0.0.10
-
-      - name: Configure
-        env:
-          LOBBY_HOST: ${{ vars.LOBBY_HOST }}
-        run: |
-          lobby="${LOBBY_HOST:-lobby.arsiamons.com}"
-          cmake -B build -S clients/silencer \
-            -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
-            -DSILENCER_UNITY_BUILD=ON \
-            -DSILENCER_LOBBY_HOST="$lobby" \
-            -DSILENCER_MAP_API_URL="https://admin.arsiamons.com" \
-            -DSILENCER_VERSION="${GITHUB_REF_NAME#v}"
-
-      - name: Build
-        run: cmake --build build -j"$(nproc)"
-
-      - name: sccache stats
-        if: always()
-        run: sccache --show-stats
-
-      - name: Bundle SDL3 + assets
-        run: |
-          stage="build/package/silencer"
-          mkdir -p "$stage"
-          cp build/silencer "$stage/"
-          # setup-sdl exposes per-runner install roots via SDL3_ROOT /
-          # SDL3_mixer_ROOT (same env as the macOS job uses for dylibbundler).
-          # Copy each .so dereferenced — the binary's NEEDED entry is the
-          # soname (libSDL3.so.0), so a single regular file at that path is
-          # what dlopen wants.
-          echo "--- SDL3 install roots ---"
-          echo "  SDL3_ROOT=$SDL3_ROOT"
-          echo "  SDL3_mixer_ROOT=$SDL3_mixer_ROOT"
-          cp -L "$SDL3_ROOT/lib/libSDL3.so.0" "$stage/"
-          cp -L "$SDL3_mixer_ROOT/lib/libSDL3_mixer.so.0" "$stage/"
-          # Point the binary at $ORIGIN so the bundled SDL3 loads from the
-          # same directory as the executable instead of the build-time
-          # install paths (which don't exist on users' machines).
-          patchelf --set-rpath '$ORIGIN' "$stage/silencer"
-          # Assets next to the binary — `os.cpp` CDResDir's Linux fallback
-          # is `<exe>/assets/`.
-          cp -r shared/assets "$stage/assets"
-          echo "--- bundled files ---"
-          ls -la "$stage"
-          echo "--- ldd output ---"
-          ldd "$stage/silencer"
-          # Fail loudly if the dynamic loader can't resolve everything from
-          # the bundle + base system.
-          if ldd "$stage/silencer" | grep -F "not found"; then
-            echo "ERROR: missing dynamic library dependencies"
-            exit 1
-          fi
+          lobby-host: ${{ vars.LOBBY_HOST || 'lobby.arsiamons.com' }}
+          silencer-version: ${{ env.SILENCER_VERSION }}
 
       - name: Package
-        run: |
-          tar czf build/silencer-linux-x64.tar.gz -C build/package silencer
+        run: tar czf build/silencer-linux-x64.tar.gz -C build/package silencer
 
       - uses: actions/upload-artifact@v4
         with:
