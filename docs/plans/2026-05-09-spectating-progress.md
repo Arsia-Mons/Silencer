@@ -93,6 +93,7 @@ On branch `hv/spectator` after `c77622c`:
 | `90ec196` | `feat(spectating): add viewedpeerid for camera/HUD focus` |
 | `c023ecd` | `feat(spectating): implement spectator controls` |
 | `e07b30d` | `fix(spectating): drop redundant Smooth() in spectator free-cam branch` |
+| `4b3f786` | `feat(spectating): move chat state from Player to Peer; enable observer chat` |
 
 Compile-verified on macOS via
 `cmake -B clients/silencer/build -S clients/silencer && cmake --build clients/silencer/build`.
@@ -131,13 +132,18 @@ Compile-verified on macOS via
 >   advance the quitstate without a `Player`. Chat/buy modal checks
 >   remain for players.
 >
+> **Observer chat** is now wired (post-design addition): `chatinterfaceid`
+> and `chatwithteam` moved from `Player` to `Peer`, chat-open moved
+> from `Player::Tick` to `Game::TickInGame`, input zeroing during
+> chat lifted outside the `if(localplayer)` gate in
+> `UpdateInputState`. Observers send all-chat only (UI Tab toggle
+> suppressed for observers; AUTHORITY-side coercion stays as
+> defense-in-depth).
+>
 > **Out of scope, intentionally not added**: spectator-only HUD,
-> ping/mark/door inputs, live rewind/scrub/pause, in-game chat
-> opening for observers (Phase 3 only coerces *sent* observer chat
-> to all-chat; opening the chat interface for observers is a
-> separate ask), spectator count, "X is spectating" indicator to
-> players, per-game spectator cap, minimap-click follow (dropped —
-> Tab cycle is sufficient).
+> ping/mark/door inputs, live rewind/scrub/pause, spectator count,
+> "X is spectating" indicator to players, per-game spectator cap,
+> minimap-click follow (dropped — Tab cycle is sufficient).
 >
 > **Remaining work: three-client manual smoke.**
 >
@@ -154,11 +160,10 @@ Compile-verified on macOS via
 > 6. Followed player's HUD (health/fuel/shield/files) renders as-is.
 > 7. `ESC` → confirm returns spectator to lobby; host and player
 >    continue.
-> 8. Spectator types a message — host and player see it as all-chat
->    regardless of `to` (Phase 3 chat coercion).
->    *Caveat: opening the chat interface for observers is not wired
->    in Phase 3/4 — if this step is blocked, mark it deferred and
->    move on; it is not a Phase 4 regression.*
+> 8. Spectator presses chat key, types a message — host and player
+>    see it as all-chat regardless of `to`. Tab inside chat does
+>    nothing for observers (no team-chat toggle). ESC closes chat
+>    without leaving the match.
 > 9. Spectator disconnects abruptly → AUTHORITY frees the slot
 >    immediately (no parking).
 > 10. Match ends naturally → spectator returns to lobby alongside
