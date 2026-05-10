@@ -29,6 +29,8 @@
     "ui_up":           { "bindings": ["PAD:dpup",   "PAD:lefty-"] },
     "ui_down":         { "bindings": ["PAD:dpdown", "PAD:lefty+"] },
     "ui_left":         { "bindings": ["PAD:dpleft", "PAD:leftx-"] },
-    "ui_right":        { "bindings": ["PAD:dpright","PAD:leftx+"] }
+    "ui_right":        { "bindings": ["PAD:dpright","PAD:leftx+"] },
+    "ui_confirm":      { "bindings": ["PAD:south"] },
+    "ui_cancel":       { "bindings": ["PAD:east"] }
   }
 }

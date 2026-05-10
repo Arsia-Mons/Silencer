@@ -21,6 +21,7 @@ enum class Action : uint8_t {
 	Disguise, NextWeapon,
 	Weapon1, Weapon2, Weapon3, Weapon4,
 	UiUp, UiDown, UiLeft, UiRight,
+	UiConfirm, UiCancel,
 	Count
 };
 

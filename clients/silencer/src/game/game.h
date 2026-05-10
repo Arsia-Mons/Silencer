@@ -154,7 +154,7 @@ private:
 	void AddSummaryLine(TextBox & textbox, const char * name, Uint32 value, bool percentage = false);
 	void ShowTeamOverlays(bool show);
 	Uint8 GetSelectedAgency(void);
-	const char * GetKeyName(SDL_Scancode sym);
+	const char * GetKeyName(SDL_Scancode sym) const;
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".
 	const char * GetActionKeyDisplayName(Action a);
@@ -274,6 +274,37 @@ private:
 	bool   tui_have_prev_mouse;
 	void DrainControlQueue();
 	void PostFrameReplies();
+
+	// Profile to restore when a gamepad disconnects.  Stays empty when the
+	// active profile was already "gamepad" before the pad was connected.
+	std::string prevGamepadProfile;
+
+	// Per-direction software-repeat state for gamepad menu navigation.
+	// Gamepad events are polled each frame, not event-driven, so we
+	// synthesise key-repeat manually: first press fires immediately, further
+	// repeats fire after GAMEPAD_NAV_DELAY_MS then every GAMEPAD_NAV_REPEAT_MS.
+	static constexpr Uint32 GAMEPAD_NAV_DELAY_MS  = 300;
+	static constexpr Uint32 GAMEPAD_NAV_REPEAT_MS = 120;
+	struct GamepadNavDir {
+		bool       held     = false;
+		Uint32     nextfire = 0;  // SDL_GetTicks() value at which next repeat fires
+	};
+	GamepadNavDir gamepadNavUp;
+	GamepadNavDir gamepadNavDown;
+	GamepadNavDir gamepadNavLeft;
+	GamepadNavDir gamepadNavRight;
+	void TickGamepadMenuNav();
+	// Trigger SDL_RumbleGamepad for fire/hit/land events on the local player.
+	void TickRumble();
+
+	// Gamepad input snapshot taken when a controls-rebind field is activated.
+	// Used to distinguish "held at rebind start" from "newly pressed during rebind".
+	uint32_t rebindGamepadButtons = 0;
+	int16_t  rebindGamepadAxes[SDL_GAMEPAD_AXIS_COUNT] = {};
+
+	// Returns human-readable display label for the slot-th binding of an action.
+	// Handles keyboard, gamepad, and mouse — unlike GetKeyName which is keyboard-only.
+	std::string GetBindingLabel(Action a, int slot) const;
 };
 
 #endif

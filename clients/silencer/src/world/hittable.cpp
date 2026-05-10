@@ -41,6 +41,7 @@ void Hittable::HandleHit(Object & object, World & world, Uint8 x, Uint8 y, Objec
 		}else{
 			health -= projectile.healthdamage;
 		}
+		rumbleHit = true;
 		state_hit = 1 + (0 * 32);
 	}else{
 		damagedshield = true;

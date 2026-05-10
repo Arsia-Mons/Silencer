@@ -3062,6 +3062,7 @@ bool Player::CheckForGround(World & world, Platform & platform){
 		xv /= 4;
 		FollowGround(*this, world, xv/* - xv2*/);
 		justlandedfromair = true;
+		rumbleLand = true;
 		if(input.keymoveright || input.keymoveleft){
 			state = RUNNING;
 		}else{
@@ -3663,6 +3664,7 @@ Projectile * Player::Fire(World & world, Uint8 direction){
 			}break;
 		}
 		if(projectile){
+			rumbleFire = true;
 			currentprojectileid = projectile->id;
 			projectile->ownerid = id;
 			projectile->x = x;

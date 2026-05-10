@@ -527,6 +527,16 @@ bool Game::Loop(void){
 			}
 		} else {
 			UpdateInputState(world.localinput);
+			// If a rebind slot is waiting for input, zero out gamepad-driven
+			// localinput so button presses don't leak into gameplay/UI actions.
+			if(currentinterface){
+				Interface* rebindIface = (Interface*)world.GetObjectFromId(currentinterface);
+				if(rebindIface && rebindIface->disabled){
+					world.localinput.keyup = world.localinput.keydown =
+					world.localinput.keyleft = world.localinput.keyright = false;
+				}
+			}
+			TickGamepadMenuNav();
 		}
 		world.SendInput();
 		if(!Tick()){
@@ -534,6 +544,7 @@ bool Game::Loop(void){
 		}
 		if(!world.replay.IsPlaying() || (world.replay.IsPlaying() && world.gameplaystate == World::INGAME)){
 			world.Tick();
+			TickRumble();
 		}
 		if(!world.dedicatedserver.active){
 			renderer.Tick();
@@ -1573,18 +1584,22 @@ bool Game::Tick(void){
 							world.ShowMessage(text, 255);
 						}
 						Team * team = player->GetTeam(world);
-						if(team && team->beamingterminalid){
+						bool advance22 = player->hassecret || (team && team->secrets > 0);
+						if(!advance22 && team && team->beamingterminalid){
 							Terminal * terminal = static_cast<Terminal *>(world.GetObjectFromId(team->beamingterminalid));
 							if(terminal){
 								if(terminal->beamingtime > 45){
 									terminal->beamingtime = 45;
 								}
 								if(terminal->state == Terminal::SECRETREADY){
-									world.highlightminimap = false;
-									singleplayermessage++;
-									world.message_i = 0;
+									advance22 = true;
 								}
 							}
+						}
+						if(advance22){
+							world.highlightminimap = false;
+							singleplayermessage++;
+							world.message_i = 0;
 						}
 					}break;
 					case 23:{
@@ -1593,7 +1608,8 @@ bool Game::Tick(void){
 							sprintf(text, "Pick up the secret at the location shown\non your radar map");
 							world.ShowMessage(text, 128);
 						}
-						if(player->hassecret){
+						Team * team23 = player->GetTeam(world);
+						if(player->hassecret || (team23 && team23->secrets > 0)){
 							singleplayermessage++;
 							world.message_i = 0;
 						}
@@ -1604,7 +1620,8 @@ bool Game::Tick(void){
 							sprintf(text, "Now, you must return the secret to your base.\nIf this were a real government secret,\nyou would have limited time before\nthe government traced your location.");
 							world.ShowMessage(text, 255);
 						}
-						if(player->InBase(world)){
+						Team * team24 = player->GetTeam(world);
+						if(player->InBase(world) || (team24 && team24->secrets > 0)){
 							singleplayermessage++;
 							world.message_i = 0;
 						}
@@ -1688,10 +1705,13 @@ bool Game::Tick(void){
 						int row = i + scrollbar->scrollposition;
 						if(row < 0 || row >= (int)Action::Count) continue;
 						Action a = ACTION_TABLE[row].action;
-						LegacyView v = ViewLegacy(keymap, a);
 						keynameoverlay[i]->text = std::string(GetActionInfo(a).label) + ":";
-						strcpy(c1button[i]->text, GetKeyName(v.key1));
-						strcpy(c2button[i]->text, GetKeyName(v.key2));
+						std::string lbl0 = GetBindingLabel(a, 0);
+						std::string lbl1 = GetBindingLabel(a, 1);
+						strncpy(c1button[i]->text, lbl0.c_str(), sizeof(c1button[i]->text) - 1);
+						c1button[i]->text[sizeof(c1button[i]->text) - 1] = 0;
+						strncpy(c2button[i]->text, lbl1.c_str(), sizeof(c2button[i]->text) - 1);
+						c2button[i]->text[sizeof(c2button[i]->text) - 1] = 0;
 					}
 					// Preset button text reflects the active profile's label.
 					// The static "Preset:" overlay to its left supplies the noun.
@@ -1723,6 +1743,50 @@ bool Game::Tick(void){
 							}
 							if(button->uid >= 0 && button->uid < 150){
 								const int timeout = 72;
+								// Check for newly-pressed gamepad button/axis during rebind wait.
+								if(iface->disabled && button->state == Button::ACTIVE && gamepadstate.connected){
+									int slot = button->uid;
+									int row  = (slot < 100 ? slot : slot - 100) + scrollbar->scrollposition;
+									BindingKey padKey{}; bool padFound = false;
+									for(int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT && !padFound; b++){
+										bool was = (rebindGamepadButtons >> b) & 1;
+										bool is  = (gamepadstate.buttons >> b) & 1;
+										if(is && !was){
+											padKey.device = BindingDevice::GamepadButton;
+											padKey.code   = b; padKey.axisDir = 0;
+											padFound = true;
+										}
+									}
+									for(int ax = 0; ax < SDL_GAMEPAD_AXIS_COUNT && !padFound; ax++){
+										int16_t was = rebindGamepadAxes[ax];
+										int16_t is  = gamepadstate.axes[ax];
+										if(abs(is) > AXIS_DEADZONE && abs(was) <= AXIS_DEADZONE){
+											padKey.device  = BindingDevice::GamepadAxis;
+											padKey.code    = ax;
+											padKey.axisDir = (is > 0) ? 1 : -1;
+											padFound = true;
+										}
+									}
+									if(padFound && row >= 0 && row < (int)Action::Count){
+										ForkActiveProfileIfBuiltin();
+										auto& ab = keymap.Get(ACTION_TABLE[row].action);
+										Binding binding; binding.keys.push_back(padKey);
+										if(slot < 100){
+											if(ab.bindings.empty()) ab.bindings.push_back(binding);
+											else ab.bindings[0] = binding;
+										} else {
+											if(ab.bindings.empty()) ab.bindings.push_back(Binding{});
+											if(ab.bindings.size() < 2) ab.bindings.push_back(binding);
+											else ab.bindings[1] = binding;
+										}
+										std::string label = Stringify(padKey);
+										auto colon = label.find(':');
+										if(colon != std::string::npos) label = label.substr(colon + 1);
+										strncpy(button->text, label.c_str(), sizeof(button->text) - 1);
+										button->text[sizeof(button->text) - 1] = 0;
+										iface->disabled = false;
+									}
+								}
 								if(iface->disabled && button->state == Button::ACTIVE && (iface->lastsym != SDL_SCANCODE_UNKNOWN || world.tickcount - optionscontrolstick > timeout)){
 									int slot = button->uid;     // 0..99 = primary; 100..149 = secondary
 									int row  = (slot < 100 ? slot : slot - 100) + scrollbar->scrollposition;
@@ -1752,6 +1816,8 @@ bool Game::Tick(void){
 									iface->disabled = true;
 									optionscontrolstick = world.tickcount;
 									iface->lastsym = SDL_SCANCODE_UNKNOWN;
+									rebindGamepadButtons = gamepadstate.buttons;
+									memcpy(rebindGamepadAxes, gamepadstate.axes, sizeof(rebindGamepadAxes));
 								}
 								if(button->uid >= 150 && button->uid < 200){
 									int row = button->uid - 150 + scrollbar->scrollposition;
@@ -5706,6 +5772,28 @@ void Game::ForkActiveProfileIfBuiltin(){
 	keymap.label = forkedLabel;
 }
 
+void Game::TickRumble(){
+	if(!gamepad || world.gameplaystate != World::INGAME) return;
+	Player* player = world.GetPeerPlayer(world.localpeerid);
+	if(!player) return;
+
+	// Fire: short high-frequency click
+	if(player->rumbleFire){
+		player->rumbleFire = false;
+		SDL_RumbleGamepad(gamepad, 0, 12000, 80);
+	}
+	// Hit: strong punch on both motors
+	if(player->rumbleHit){
+		player->rumbleHit = false;
+		SDL_RumbleGamepad(gamepad, 30000, 15000, 200);
+	}
+	// Land: low thud (left motor only)
+	if(player->rumbleLand){
+		player->rumbleLand = false;
+		SDL_RumbleGamepad(gamepad, 18000, 0, 120);
+	}
+}
+
 void Game::OpenFirstGamepad(){
 	if(gamepad){ SDL_CloseGamepad(gamepad); gamepad = nullptr; }
 	int count = 0;
@@ -5715,6 +5803,22 @@ void Game::OpenFirstGamepad(){
 		SDL_free(ids);
 	}
 	gamepadstate.connected = (gamepad != nullptr);
+	if(gamepadstate.connected){
+		// Auto-switch to the gamepad keybind profile, but only if the current
+		// profile isn't already gamepad-derived (e.g. "gamepad-custom" saved
+		// from a previous session — don't clobber it with the built-in).
+		const char* cur = Config::GetInstance().active_keybind_profile;
+		std::string curStr = (cur && *cur) ? cur : "default";
+		bool alreadyGamepad = (curStr.find("gamepad") != std::string::npos);
+		if(!alreadyGamepad){
+			prevGamepadProfile = curStr;
+			std::strncpy(Config::GetInstance().active_keybind_profile, "gamepad",
+			             sizeof(Config::GetInstance().active_keybind_profile) - 1);
+			Config::GetInstance().active_keybind_profile[
+				sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
+			LoadActiveKeymap();
+		}
+	}
 }
 
 void Game::PollGamepadState(){
@@ -5736,22 +5840,153 @@ void Game::PollGamepadState(){
 	}
 }
 
+void Game::TickGamepadMenuNav(){
+	// Only meaningful when a gamepad is connected and a menu interface is open.
+	if(!gamepadstate.connected) return;
+	Interface* iface = (Interface*)world.GetObjectFromId(currentinterface);
+	if(!iface) return;
+
+	// During rebind-wait (iface->disabled=true) the rebind capture code owns
+	// all gamepad input.  Don't let nav/confirm/cancel fire as side effects.
+	if(iface->disabled) return;
+
+	Uint32 now = SDL_GetTicks();
+
+	// Helper: fire a nav key press with software repeat on held direction.
+	auto tick = [&](GamepadNavDir& dir, Action action, Uint8 ascii){
+		bool pressed = keymap.IsPressed(action, keystate, gamepadstate);
+		if(!pressed){
+			dir.held    = false;
+			dir.nextfire = 0;
+			return;
+		}
+		if(!dir.held){
+			// First frame held — fire immediately.
+			dir.held     = true;
+			dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
+			iface->ProcessKeyPress(world, ascii);
+		} else if(now >= dir.nextfire){
+			// Repeat.
+			dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
+			iface->ProcessKeyPress(world, ascii);
+		}
+	};
+
+	tick(gamepadNavUp,    Action::UiUp,    3);
+	tick(gamepadNavDown,  Action::UiDown,  4);
+	tick(gamepadNavLeft,  Action::UiLeft,  1);
+	tick(gamepadNavRight, Action::UiRight, 2);
+
+	// Confirm (A/Cross) — no repeat, edge-detect only.
+	// If nothing is focused, auto-focus the first item so the user sees where
+	// they are before committing.
+	{
+		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
+		static bool confirmPrev = false;
+		if(confirmNow && !confirmPrev){
+			if(iface->activeobject == 0 && !iface->tabobjects.empty()){
+				iface->ProcessKeyPress(world, 4);  // focus first item; next A confirms
+			} else {
+				iface->ProcessKeyPress(world, '\n');
+			}
+		}
+		confirmPrev = confirmNow;
+	}
+}
+
+// Maps an SDL gamepad button/axis name (after stripping "PAD:" prefix) to a
+// short display label appropriate for the connected controller type.
+// e.g. "leftshoulder" → "LB" (Xbox) or "L1" (PS).
+static std::string GamepadShortLabel(const std::string& raw, SDL_GamepadType type) {
+	// Strip trailing axis direction modifier (+/-)
+	std::string base = raw;
+	if(!base.empty() && (base.back() == '+' || base.back() == '-'))
+		base.pop_back();
+
+	static const struct { const char* sdl; const char* xbox; const char* ps; } kTable[] = {
+		{"south",         "A",       "Cross"},
+		{"north",         "Y",       "Tri"},
+		{"east",          "B",       "Circle"},
+		{"west",          "X",       "Square"},
+		{"back",          "Back",    "Select"},
+		{"guide",         "Guide",   "PS"},
+		{"start",         "Menu",    "Options"},
+		{"leftstick",     "LS",      "L3"},
+		{"rightstick",    "RS",      "R3"},
+		{"leftshoulder",  "LB",      "L1"},
+		{"rightshoulder", "RB",      "R1"},
+		{"dpup",          "D-Up",    "D-Up"},
+		{"dpdown",        "D-Dn",    "D-Dn"},
+		{"dpleft",        "D-Lt",    "D-Lt"},
+		{"dpright",       "D-Rt",    "D-Rt"},
+		{"lefttrigger",   "LT",      "L2"},
+		{"righttrigger",  "RT",      "R2"},
+		{"leftx",         "L-X",     "L-X"},
+		{"lefty",         "L-Y",     "L-Y"},
+		{"rightx",        "R-X",     "R-X"},
+		{"righty",        "R-Y",     "R-Y"},
+		{"misc1",         "Share",   "Share"},
+		{"touchpad",      "Touch",   "Touch"},
+	};
+	bool isPs = (type == SDL_GAMEPAD_TYPE_PS3 ||
+	             type == SDL_GAMEPAD_TYPE_PS4 ||
+	             type == SDL_GAMEPAD_TYPE_PS5);
+	for(const auto& e : kTable){
+		if(base == e.sdl)
+			return isPs ? e.ps : e.xbox;
+	}
+	return raw; // unknown: return original (already has suffix stripped)
+}
+
 const char * Game::GetActionKeyDisplayName(Action a){
 	static thread_local char buf[32];
 	const auto& ab = keymap.Get(a);
+	// Prefer keyboard binding; fall back to any other device (gamepad/mouse).
+	const BindingKey* fallback = nullptr;
 	for(const auto& b : ab.bindings){
 		if(b.keys.empty()) continue;
 		const auto& k = b.keys[0];
 		if(k.device == BindingDevice::Keyboard){
 			return GetKeyName((SDL_Scancode)k.code);
 		}
+		if(!fallback) fallback = &k;
+	}
+	if(fallback){
+		std::string s = Stringify(*fallback);
+		auto colon = s.find(':');
+		std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+		std::string label = GamepadShortLabel(raw, gamepad ? SDL_GetGamepadType(gamepad) : SDL_GAMEPAD_TYPE_UNKNOWN);
+		std::strncpy(buf, label.c_str(), sizeof(buf) - 1);
+		buf[sizeof(buf) - 1] = '\0';
+		return buf;
 	}
 	std::strncpy(buf, "(unbound)", sizeof(buf) - 1);
 	buf[sizeof(buf) - 1] = '\0';
 	return buf;
 }
 
-const char * Game::GetKeyName(SDL_Scancode sym){
+std::string Game::GetBindingLabel(Action a, int slot) const {
+	const auto& ab = keymap.Get(a);
+	int found = 0;
+	for(const auto& b : ab.bindings){
+		if(b.keys.empty()) continue;
+		if(found == slot){
+			const auto& k = b.keys[0];
+			if(k.device == BindingDevice::Keyboard){
+				return GetKeyName((SDL_Scancode)k.code);
+			}
+			// Gamepad/mouse: strip device prefix ("PAD:south" → "south") then shorten
+			std::string s = Stringify(k);
+			auto colon = s.find(':');
+			std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+			return GamepadShortLabel(raw, gamepad ? SDL_GetGamepadType(gamepad) : SDL_GAMEPAD_TYPE_UNKNOWN);
+		}
+		found++;
+	}
+	return GetKeyName(SDL_SCANCODE_UNKNOWN);
+}
+
+const char * Game::GetKeyName(SDL_Scancode sym) const{
 #ifdef OUYA // Custom scancodes for ouya controller
 	switch((int)sym){
 		case SDL_SCANCODE_LALT: return "L2"; break;
@@ -6394,6 +6629,16 @@ bool Game::HandleSDLEvents(void){
 					SDL_CloseGamepad(gamepad);
 					gamepad = nullptr;
 					gamepadstate.connected = false;
+					// Restore the pre-gamepad keybind profile if we auto-switched.
+					if(!prevGamepadProfile.empty()){
+						std::strncpy(Config::GetInstance().active_keybind_profile,
+						             prevGamepadProfile.c_str(),
+						             sizeof(Config::GetInstance().active_keybind_profile) - 1);
+						Config::GetInstance().active_keybind_profile[
+							sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
+						LoadActiveKeymap();
+						prevGamepadProfile.clear();
+					}
 				}
 			}break;
 			case SDL_EVENT_QUIT:

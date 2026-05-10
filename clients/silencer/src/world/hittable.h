@@ -22,9 +22,9 @@ public:
 	// Set both health and maxhealth together (e.g. during actor init).
 	void SetHealth(Uint16 hp) { health = hp; maxhealth = hp; }
 
-	bool destructible = false; // if true, emits ACTOR_KILLED via EventBus on death
+	bool rumbleHit = false;  // set by HandleHit; consumed by Game::TickRumble
 
-protected:
+	bool destructible = false; // if true, emits ACTOR_KILLED via EventBus on deathprotected:
 	Uint16 health;
 	Uint16 maxhealth = 0;
 	Uint16 shield;
