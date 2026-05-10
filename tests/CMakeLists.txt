@@ -33,13 +33,10 @@ find_package(CURL REQUIRED)
 target_link_libraries(silencer_tests PRIVATE CURL::libcurl)
 
 find_package(ZLIB REQUIRED)
-find_package(unofficial-minizip CONFIG QUIET)
-if(NOT unofficial-minizip_FOUND)
-    find_package(minizip CONFIG QUIET)
-endif()
 target_link_libraries(silencer_tests PRIVATE ${ZLIB_LIBRARY})
-if(TARGET unofficial::minizip::minizip)
-    target_link_libraries(silencer_tests PRIVATE unofficial::minizip::minizip)
-elseif(TARGET minizip::minizip)
-    target_link_libraries(silencer_tests PRIVATE minizip::minizip)
+# Reuse the parent CMakeLists' minizip_dep interface target — it already
+# handles vcpkg vs homebrew/pkg-config include-path differences (vcpkg
+# flattens unzip.h into include/, homebrew nests it in include/minizip/).
+if(TARGET minizip_dep)
+    target_link_libraries(silencer_tests PRIVATE minizip_dep)
 endif()
