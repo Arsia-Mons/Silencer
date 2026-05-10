@@ -65,7 +65,15 @@ public:
 	Uint8 selectedagency;
 	bool statupgraded;
 
+	// Username the player typed at the LobbyConnect screen, captured before
+	// SendCredentials runs. CharacterPanel reads this back to render the
+	// "Welcome, <name>" line.
+	void SetLocalUsername(const char * name);
+	const char * GetLocalUsername() const { return localusername; }
+
 private:
+	char localusername[17];
+
 	bool Send(const char * data, unsigned int size);
 	void SendMessage(const char msg[0xFF], Uint8 size);
 	void ResolveHostname(const char * host);

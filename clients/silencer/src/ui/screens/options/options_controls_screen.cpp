@@ -24,9 +24,10 @@ constexpr int CANCEL_BTN_UID  = 201;
 constexpr int PRESET_BTN_UID  = 250;
 constexpr int REBIND_TIMEOUT_TICKS = 72;
 
-// Local copy of game.cpp's same-named helper; kept screen-local to avoid an
-// extra public surface on KeyMap. Renamed to dodge file-static collision
-// under SILENCER_UNITY_BUILD (game.cpp has a `static IsBuiltinProfile`).
+// Mirrors the screen-private "is this a built-in profile?" predicate used by
+// keybinds.cpp's ForkActiveProfileIfBuiltin. Kept renamed to dodge file-static
+// collision under SILENCER_UNITY_BUILD (keybinds.cpp has a `static
+// IsBuiltinProfile`).
 bool IsBuiltinKeybindProfile(const std::string & name)
 {
 	return name == "default" || name == "wasd" || name == "gamepad";
@@ -223,8 +224,8 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx)
 			Action a = ACTION_TABLE[row].action;
 			LegacyView v = ViewLegacy(keymap, a);
 			keynameoverlay[i]->text = std::string(GetActionInfo(a).label) + ":";
-			strcpy(c1button[i]->text, ctx.KeyName(v.key1));
-			strcpy(c2button[i]->text, ctx.KeyName(v.key2));
+			strcpy(c1button[i]->text, KeyMap::GetKeyName(v.key1));
+			strcpy(c2button[i]->text, KeyMap::GetKeyName(v.key2));
 		}
 		// Preset button text reflects the active profile's label.
 		// The static "Preset:" overlay to its left supplies the noun.
@@ -275,12 +276,12 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx)
 					sym = SDL_SCANCODE_UNKNOWN;
 				}
 #endif
-				strcpy(button->text, ctx.KeyName(sym));
+				strcpy(button->text, KeyMap::GetKeyName(sym));
 				if(row >= 0 && row < (int)Action::Count){
 					Action a = ACTION_TABLE[row].action;
 					LegacyView v = ViewLegacy(keymap, a);
 					if(slot < SECONDARY_SLOT_BASE) v.key1 = sym; else v.key2 = sym;
-					ctx.ForkActiveProfileIfBuiltin();
+					ForkActiveProfileIfBuiltin(ctx.keymap);
 					WriteLegacy(keymap, a, v.key1, v.key2, v.and_);
 				}
 				iface->disabled = false;
@@ -302,13 +303,13 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx)
 				Action a = ACTION_TABLE[row].action;
 				LegacyView v = ViewLegacy(keymap, a);
 				v.and_ = !v.and_;
-				ctx.ForkActiveProfileIfBuiltin();
+				ForkActiveProfileIfBuiltin(ctx.keymap);
 				WriteLegacy(keymap, a, v.key1, v.key2, v.and_);
 			}
 		}
 
 		if(button->uid == PRESET_BTN_UID){
-			ctx.CycleKeybindPreset();
+			CycleKeybindPreset(ctx.keymap);
 		}
 
 		switch(button->uid){
@@ -329,7 +330,7 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx)
 			}break;
 			case CANCEL_BTN_UID:{
 				// Reload the keymap from disk so any in-UI edits are discarded.
-				ctx.LoadActiveKeymap();
+				LoadActiveKeymap(ctx.keymap);
 				Config::GetInstance().Load();
 				ctx.GoToState(GameState::OPTIONS);
 			}break;

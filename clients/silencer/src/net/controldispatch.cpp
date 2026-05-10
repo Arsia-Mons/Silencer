@@ -734,7 +734,7 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 		             sizeof(cfg.active_keybind_profile) - 1);
 		cfg.active_keybind_profile[sizeof(cfg.active_keybind_profile) - 1] = '\0';
 		cfg.Save();
-		game.LoadActiveKeymap();
+		LoadActiveKeymap(game.GetKeyMap());
 		nlohmann::json r;
 		r["active"] = profile;
 		cmd.reply->set_value(OkResult(cmd.id, r));
@@ -796,7 +796,7 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 		// resolves now (the built-in if any, else "default") and persist the
 		// resolved name so `list` and the next restart agree on what's active.
 		if (profile == activeName) {
-			game.LoadActiveKeymap();
+			LoadActiveKeymap(game.GetKeyMap());
 			const std::string& resolved = game.GetKeyMap().name;
 			std::strncpy(cfg.active_keybind_profile, resolved.c_str(),
 			             sizeof(cfg.active_keybind_profile) - 1);

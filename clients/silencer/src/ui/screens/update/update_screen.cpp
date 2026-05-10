@@ -8,6 +8,7 @@
 #include "button.h"
 #include "overlay.h"
 #include "updater.h"
+#include "updaterstage2.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -235,10 +236,25 @@ void UpdateScreen::Tick(ScreenContext & ctx)
 		}
 		button->clicked = false;
 	}
-	// If the updater reached STAGING, hand off to the stage-2 launcher (lives
-	// on Game because it touches process / SDL teardown state).
+	// If the updater reached STAGING, spawn the stage-2 child. On success,
+	// flag the Updater so Game::Loop returns false next tick and main()
+	// unwinds — that lets ~Game tear down SDL/audio cleanly before the new
+	// process opens the device (skipping it produces an audible pop).
 	if(ctx.updater.GetState() == Updater::STAGING){
-		ctx.LaunchStage2();
+		std::string zippath =
+#ifdef _WIN32
+			std::string(getenv("TEMP") ? getenv("TEMP") : ".") + "\\silencer-update.zip";
+#else
+			"/tmp/silencer-update.zip";
+#endif
+		fprintf(stderr, "[updater] UpdateScreen invoking UpdaterStage2::Launch with zip=%s\n",
+			zippath.c_str());
+		if(UpdaterStage2::Launch(zippath)){
+			ctx.updater.MarkStage2Spawned();
+			return;
+		}
+		fprintf(stderr, "[updater] UpdaterStage2::Launch failed; returning to main menu\n");
+		ctx.GoToState(GameState::MAINMENU);
 	}
 }
 

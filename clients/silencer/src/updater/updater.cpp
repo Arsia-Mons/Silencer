@@ -30,6 +30,9 @@ Updater::~Updater() {
     if (worker.joinable()) worker.join();
 }
 
+void Updater::MarkStage2Spawned() { stage2spawned = true; }
+bool Updater::IsStage2Spawned() const { return stage2spawned; }
+
 void Updater::PresentUpdate(const std::string &u, const uint8_t s[32]) {
     std::lock_guard<std::mutex> lk(mu);
     url = u;

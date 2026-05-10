@@ -80,17 +80,6 @@ public:
 	// Keybind access for ControlDispatch.
 	KeyMap& GetKeyMap() { return keymap; }
 	const KeyMap& GetKeyMap() const { return keymap; }
-	// Load the active profile (per Config::active_keybind_profile) into keymap.
-	// Falls back to "default" (built-in) if the named profile is missing.
-	void LoadActiveKeymap();
-	// Advance Config::active_keybind_profile to the next entry in
-	// ListProfiles().all (wraps), then reload the live keymap. Used by the
-	// Configure Controls preset cycle button.
-	void CycleKeybindPreset();
-	// If the active profile is a built-in (default/wasd/gamepad), flip the
-	// in-memory active profile to "<name>-custom" with a "(Custom)" label so
-	// edits don't shadow the on-disk built-in. No-op if already a custom.
-	void ForkActiveProfileIfBuiltin();
 
 private:
 	bool Tick(void);
@@ -125,10 +114,6 @@ private:
 	Interface * CreateGameTechInterface(void);
 	Interface * CreateGameSummaryInterface(Stats & stats, Uint8 agency);
 	Interface * CreateModalDialog(const char * message, bool ok = true);
-	// Spawns the stage-2 updater process and tears down SDL/audio cleanly.
-	// Stays on Game (touches process and SDL teardown state); UpdateScreen
-	// invokes it via ScreenContext::LaunchStage2.
-	void LaunchStage2(void);
 	Interface * CreateMapPreview(const char * filename);
 	void DestroyModalDialog(void);
 	Interface * CreatePasswordDialog(void);
@@ -152,7 +137,6 @@ private:
 	void AddSummaryLine(TextBox & textbox, const char * name, Uint32 value, bool percentage = false);
 	void ShowTeamOverlays(bool show);
 	Uint8 GetSelectedAgency(void);
-	const char * GetKeyName(SDL_Scancode sym);
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".
 	const char * GetActionKeyDisplayName(Action a);
@@ -179,7 +163,6 @@ private:
 	Uint16 currentinterface;
 	Uint16 aftermodalinterface;
 	Uint32 chatlinesprinted;
-	char localusername[16 + 1];
 	Uint16 sharedstate;
 	int oldselecteditem;
 	Uint8 singleplayermessage;
@@ -200,11 +183,6 @@ private:
 	bool interfaceenterfix;
 	bool fullscreentoggled;
 	char * replayfile;
-	// Set when UpdaterStage2 has been spawned; next Loop() returns false so
-	// main unwinds and ~Game tears down SDL/audio cleanly before the new
-	// client process opens the device. Skipping this teardown produces an
-	// audible pop on the restarted client.
-	bool stage2spawned;
 	ControlServer controlserver;
 	InputServer inputserver;
 	// TUI mouse edge-detection state. Tracks the last (x, y, down) we

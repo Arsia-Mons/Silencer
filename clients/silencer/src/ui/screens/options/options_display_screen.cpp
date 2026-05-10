@@ -8,7 +8,9 @@
 #include "button.h"
 #include "overlay.h"
 #include "config.h"
+#include "renderdevice.h"
 
+#include <SDL3/SDL_video.h>
 #include <cstring>
 
 namespace
@@ -129,12 +131,12 @@ void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 				case DSP_BTN_FULLSCREEN:{
 					Config & cfg = Config::GetInstance();
 					cfg.fullscreen = !cfg.fullscreen;
-					ctx.SetFullscreen(cfg.fullscreen);
+					if(ctx.window) SDL_SetWindowFullscreen(ctx.window, cfg.fullscreen);
 				}break;
 				case DSP_BTN_SMOOTH_SCALING:{
 					Config & cfg = Config::GetInstance();
 					cfg.scalefilter = !cfg.scalefilter;
-					ctx.SetScaleFilter(cfg.scalefilter);
+					if(ctx.renderdevice) ctx.renderdevice->SetScaleFilter(cfg.scalefilter);
 				}break;
 				case DSP_BTN_SAVE:{
 					Config::GetInstance().Save();
@@ -143,8 +145,8 @@ void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 				case DSP_BTN_CANCEL:{
 					Config & cfg = Config::GetInstance();
 					cfg.Load();
-					ctx.SetScaleFilter(cfg.scalefilter);
-					ctx.SetFullscreen(cfg.fullscreen);
+					if(ctx.renderdevice) ctx.renderdevice->SetScaleFilter(cfg.scalefilter);
+					if(ctx.window) SDL_SetWindowFullscreen(ctx.window, cfg.fullscreen);
 					ctx.GoToState(GameState::OPTIONS);
 				}break;
 			}

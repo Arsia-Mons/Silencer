@@ -1,5 +1,6 @@
 #include "keybinds.h"
 #include "os.h"
+#include "config.h"
 #include <SDL3/SDL.h>
 #include <nlohmann/json.hpp>
 #include <fstream>
@@ -408,4 +409,179 @@ ProfileListing ListProfiles() {
 	std::sort(out.writable.begin(), out.writable.end());
 	std::sort(out.builtins.begin(), out.builtins.end());
 	return out;
+}
+
+static bool IsBuiltinProfile(const std::string& name) {
+	return name == "default" || name == "wasd" || name == "gamepad";
+}
+
+void LoadActiveKeymap(KeyMap& keymap) {
+	const char* name = Config::GetInstance().active_keybind_profile;
+	if (!name || !*name) name = "default";
+	std::string path = ResolveProfilePath(name);
+	if (path.empty()) {
+		path = ResolveProfilePath("default");
+	}
+	keymap.Clear();
+	if (!path.empty()) {
+		keymap.LoadFile(path);
+	}
+	if (keymap.name.empty()) keymap.name = name;
+}
+
+void CycleKeybindPreset(KeyMap& keymap) {
+	ProfileListing pl = ListProfiles();
+	if (pl.all.empty()) return;
+	std::string current = Config::GetInstance().active_keybind_profile;
+	size_t next = 0;
+	for (size_t i = 0; i < pl.all.size(); i++) {
+		if (pl.all[i] == current) { next = (i + 1) % pl.all.size(); break; }
+	}
+	const std::string& chosen = pl.all[next];
+	std::strncpy(Config::GetInstance().active_keybind_profile, chosen.c_str(),
+	             sizeof(Config::GetInstance().active_keybind_profile) - 1);
+	Config::GetInstance().active_keybind_profile[sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
+	LoadActiveKeymap(keymap);
+}
+
+void ForkActiveProfileIfBuiltin(KeyMap& keymap) {
+	std::string active = Config::GetInstance().active_keybind_profile;
+	if (!IsBuiltinProfile(active)) return;
+	std::string forked = active + "-custom";
+	std::string forkedLabel = (keymap.label.empty() ? active : keymap.label) + "-Custom";
+	std::strncpy(Config::GetInstance().active_keybind_profile, forked.c_str(),
+	             sizeof(Config::GetInstance().active_keybind_profile) - 1);
+	Config::GetInstance().active_keybind_profile[sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
+	keymap.name = forked;
+	keymap.label = forkedLabel;
+}
+
+const char * KeyMap::GetKeyName(SDL_Scancode sym){
+#ifdef OUYA // Custom scancodes for ouya controller
+	switch((int)sym){
+		case SDL_SCANCODE_LALT: return "L2"; break;
+		case SDL_SCANCODE_RALT: return "R2"; break;
+		case SDL_SCANCODE_HOME: return "Menu"; break;
+		case SDL_SCANCODE_RETURN: return "O"; break;
+		case SDL_SCANCODE_ESCAPE: return "A"; break;
+		case 99: return "U"; break;
+		case 100: return "Y"; break;
+		case 102: return "L1"; break;
+		case 103: return "R1"; break;
+		case 106: return "L3"; break;
+		case 107: return "R3"; break;
+		case SDL_SCANCODE_KP_2: return "RUp"; break;
+		case SDL_SCANCODE_KP_4: return "RLeft"; break;
+		case SDL_SCANCODE_KP_6: return "RRight"; break;
+		case SDL_SCANCODE_KP_8: return "RDown"; break;
+	}
+#endif
+	switch(sym){
+		case SDL_SCANCODE_UNKNOWN: return ""; break;
+		case SDL_SCANCODE_UP: return "Up"; break;
+		case SDL_SCANCODE_DOWN: return "Down"; break;
+		case SDL_SCANCODE_LEFT: return "Left"; break;
+		case SDL_SCANCODE_RIGHT: return "Right"; break;
+		case SDL_SCANCODE_TAB: return "Tab"; break;
+		case SDL_SCANCODE_CAPSLOCK: return "CapsLock"; break;
+		case SDL_SCANCODE_RSHIFT: return "RShift"; break;
+		case SDL_SCANCODE_LSHIFT: return "LShift"; break;
+		case SDL_SCANCODE_RETURN: return "Enter"; break;
+		case SDL_SCANCODE_SEMICOLON: return ";"; break;
+		case SDL_SCANCODE_COMMA: return ","; break;
+		case SDL_SCANCODE_PERIOD: return "."; break;
+		case SDL_SCANCODE_LEFTBRACKET: return "("; break;
+		case SDL_SCANCODE_RIGHTBRACKET: return ")"; break;
+		case SDL_SCANCODE_BACKSLASH: return "Backslash"; break;
+		case SDL_SCANCODE_BACKSPACE: return "Backspace"; break;
+		case SDL_SCANCODE_SLASH: return "Slash"; break;
+		case SDL_SCANCODE_SPACE: return "Space"; break;
+		case SDL_SCANCODE_RALT: return "RAlt"; break;
+		case SDL_SCANCODE_LALT: return "LAlt"; break;
+		case SDL_SCANCODE_RCTRL: return "RCtrl"; break;
+		case SDL_SCANCODE_LCTRL: return "LCtrl"; break;
+		case SDL_SCANCODE_EQUALS: return "="; break;
+		case SDL_SCANCODE_MINUS: return "Minus"; break;
+		case SDL_SCANCODE_RGUI: return "RWin"; break;
+		case SDL_SCANCODE_LGUI: return "LWin"; break;
+		case SDL_SCANCODE_APOSTROPHE: return "'"; break;
+		case SDL_SCANCODE_GRAVE: return "'"; break;
+		case SDL_SCANCODE_ESCAPE: return "Escape"; break;
+		case SDL_SCANCODE_INSERT: return "Insert"; break;
+		case SDL_SCANCODE_HOME: return "Home"; break;
+		case SDL_SCANCODE_END: return "End"; break;
+		case SDL_SCANCODE_PAGEUP: return "Page Up"; break;
+		case SDL_SCANCODE_PAGEDOWN: return "Page Down"; break;
+		case SDL_SCANCODE_NUMLOCKCLEAR: return "NumLock"; break;
+		case SDL_SCANCODE_SCROLLLOCK: return "ScrollLock"; break;
+		case SDL_SCANCODE_KP_0: return "NumPad 0"; break;
+		case SDL_SCANCODE_KP_1: return "NumPad 1"; break;
+		case SDL_SCANCODE_KP_2: return "NumPad 2"; break;
+		case SDL_SCANCODE_KP_3: return "NumPad 3"; break;
+		case SDL_SCANCODE_KP_4: return "NumPad 4"; break;
+		case SDL_SCANCODE_KP_5: return "NumPad 5"; break;
+		case SDL_SCANCODE_KP_6: return "NumPad 6"; break;
+		case SDL_SCANCODE_KP_7: return "NumPad 7"; break;
+		case SDL_SCANCODE_KP_8: return "NumPad 8"; break;
+		case SDL_SCANCODE_KP_9: return "NumPad 9"; break;
+		case SDL_SCANCODE_KP_PERIOD: return "NumPad ."; break;
+		case SDL_SCANCODE_KP_DIVIDE: return "NumPad /"; break;
+		case SDL_SCANCODE_KP_ENTER: return "NumPad E"; break;
+		case SDL_SCANCODE_KP_EQUALS: return "NumPad ="; break;
+		case SDL_SCANCODE_KP_MINUS: return "NumPad -"; break;
+		case SDL_SCANCODE_KP_MULTIPLY: return "NumPad x"; break;
+		case SDL_SCANCODE_KP_PLUS: return "NumPad +"; break;
+		case SDL_SCANCODE_F1: return "F1"; break;
+		case SDL_SCANCODE_F2: return "F2"; break;
+		case SDL_SCANCODE_F3: return "F3"; break;
+		case SDL_SCANCODE_F4: return "F4"; break;
+		case SDL_SCANCODE_F5: return "F5"; break;
+		case SDL_SCANCODE_F6: return "F6"; break;
+		case SDL_SCANCODE_F7: return "F7"; break;
+		case SDL_SCANCODE_F8: return "F8"; break;
+		case SDL_SCANCODE_F9: return "F9"; break;
+		case SDL_SCANCODE_F10: return "F10"; break;
+		case SDL_SCANCODE_F11: return "F11"; break;
+		case SDL_SCANCODE_F12: return "F12"; break;
+		case SDL_SCANCODE_F13: return "F13"; break;
+		case SDL_SCANCODE_F14: return "F14"; break;
+		case SDL_SCANCODE_F15: return "F15"; break;
+		case SDL_SCANCODE_A: return "A"; break;
+		case SDL_SCANCODE_B: return "B"; break;
+		case SDL_SCANCODE_C: return "C"; break;
+		case SDL_SCANCODE_D: return "D"; break;
+		case SDL_SCANCODE_E: return "E"; break;
+		case SDL_SCANCODE_F: return "F"; break;
+		case SDL_SCANCODE_G: return "G"; break;
+		case SDL_SCANCODE_H: return "H"; break;
+		case SDL_SCANCODE_I: return "I"; break;
+		case SDL_SCANCODE_J: return "J"; break;
+		case SDL_SCANCODE_K: return "K"; break;
+		case SDL_SCANCODE_L: return "L"; break;
+		case SDL_SCANCODE_M: return "M"; break;
+		case SDL_SCANCODE_N: return "N"; break;
+		case SDL_SCANCODE_O: return "O"; break;
+		case SDL_SCANCODE_P: return "P"; break;
+		case SDL_SCANCODE_Q: return "Q"; break;
+		case SDL_SCANCODE_R: return "R"; break;
+		case SDL_SCANCODE_S: return "S"; break;
+		case SDL_SCANCODE_T: return "T"; break;
+		case SDL_SCANCODE_U: return "U"; break;
+		case SDL_SCANCODE_V: return "V"; break;
+		case SDL_SCANCODE_W: return "W"; break;
+		case SDL_SCANCODE_X: return "X"; break;
+		case SDL_SCANCODE_Y: return "Y"; break;
+		case SDL_SCANCODE_Z: return "Z"; break;
+		case SDL_SCANCODE_1: return "1"; break;
+		case SDL_SCANCODE_2: return "2"; break;
+		case SDL_SCANCODE_3: return "3"; break;
+		case SDL_SCANCODE_4: return "4"; break;
+		case SDL_SCANCODE_5: return "5"; break;
+		case SDL_SCANCODE_6: return "6"; break;
+		case SDL_SCANCODE_7: return "7"; break;
+		case SDL_SCANCODE_8: return "8"; break;
+		case SDL_SCANCODE_9: return "9"; break;
+		case SDL_SCANCODE_0: return "0"; break;
+		default: return "?"; break;
+	}
 }

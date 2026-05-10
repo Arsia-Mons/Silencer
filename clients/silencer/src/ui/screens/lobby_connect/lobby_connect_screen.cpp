@@ -243,7 +243,7 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 							TextInput * usernameinput = static_cast<TextInput *>(iface->GetObjectWithUid(world, LBY_INPUT_USERNAME));
 							TextInput * passwordinput = static_cast<TextInput *>(iface->GetObjectWithUid(world, LBY_INPUT_PASSWORD));
 							if(usernameinput && passwordinput){
-								ctx.SetLocalUsername(usernameinput->text);
+								world.lobby.SetLocalUsername(usernameinput->text);
 								world.lobby.SendCredentials(usernameinput->text, passwordinput->text);
 								world.lobby.state = Lobby::AUTHSENT;
 							}
