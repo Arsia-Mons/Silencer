@@ -21,6 +21,7 @@ public:
 	bool isready;
 	Uint32 techchoices;
 	Uint32 accountid;
+	bool disconnected;
 	std::list<Uint16> controlledlist;
 
 	// local only

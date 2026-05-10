@@ -192,7 +192,7 @@ private:
 	void SendPacket(Peer * peer, char * data, unsigned int size);
 	void SwitchToMode(bool newmode);
 	void DeleteOldSnapshots(Uint8 peerid);
-	void HandleDisconnect(Uint8 peerid);
+	void HandleDisconnect(Uint8 peerid, bool permanent = false);
 	bool RelevantToPlayer(class Player * player, Object * object);
 	bool BelongsToTeam(Object & object, Uint16 teamid);
 	void ActivateTerminals(void);
