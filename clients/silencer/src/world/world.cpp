@@ -324,6 +324,21 @@ void World::DoNetwork_Authority(void){
 						rejoinpeer->port = port;
 						rejoinpeer->lastpacket = SDL_GetTicks();
 						rejoinpeer->disconnected = false;
+						for(std::list<Uint16>::iterator it = rejoinpeer->controlledlist.begin(); it != rejoinpeer->controlledlist.end(); it++){
+							Object * obj = GetObjectFromId(*it);
+							if(obj && obj->type == ObjectTypes::PLAYER){
+								Player * p = static_cast<Player *>(obj);
+								map.RandomPlayerStartLocation(*this, p->x, p->y);
+								p->oldx = p->x;
+								p->oldy = p->y;
+								p->health = p->maxhealth;
+								p->shield = p->maxshield;
+								p->state = Player::DEPLOYING;
+								p->state_i = 0;
+								p->draw = false;
+								p->collidable = false;
+							}
+						}
 						response.PutBit(true);
 						response.Put(rejoinpeer->id);
 						SendGameInfo(rejoinpeer->id);
