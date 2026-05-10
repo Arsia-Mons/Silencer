@@ -112,7 +112,9 @@ private:
 	Interface * CreateLobbyConnectInterface(void);
 	Interface * CreateLobbyInterface(void);
 	Interface * CreateCharacterInterface(void);
-	Interface * CreateNewCharacterInterface(void);
+	Interface * CreateSelectAgentInterface(void);
+	Interface * CreateEnterAliasInterface(void);
+	Interface * CreateSelectAgencyInterface(void);
 	Interface * CreateGameSelectInterface(void);
 	Interface * CreateChatInterface(void);
 	Interface * CreateGameCreateInterface(void);
@@ -219,6 +221,9 @@ private:
 	char lastchannel[64];
 	Uint8 oldselectedagency;
 	size_t createCharEnterCount; // character count when CREATECHARACTER state was entered
+	int createCharSubState;      // 0=select agent, 1=enter alias, 2=select agency
+	char createCharTempName[17]; // name held between alias and agency screens
+	int createCharLastAgencyIdx; // tracks agency selection change in SELECT AGENCY
 	Uint8 oldambiencelevel;
 	bool agencychanged;
 	bool gamesummaryinfoloaded;
