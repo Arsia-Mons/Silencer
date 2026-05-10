@@ -94,7 +94,6 @@ void Renderer::Draw(Surface * surface, float frametime){
 		camera.newy = camera.y;
 	} else if(world.spectator.freecam){
 		camera.Follow(world, world.spectator.camx, world.spectator.camy, 0, 0, 0, 30);
-		camera.Smooth(frametime);
 	} else if(world.pancamerareturn && localplayer){
 		// Smooth lerp back to player; input released by World::Tick timer
 		int px = localplayer->x + ((localplayer->oldx - localplayer->x) * frametime);
