@@ -1,15 +1,19 @@
 build/
 build-new/
 build-old/
+build-unity/
+clients/silencer/build-unity/
 test-update-host/
 test-updater.*.log
 update.json
 .vcpkg/
 lobby.json
+services/lobby/lobby
 services/lobby/silencer-lobby
 services/lobby/silencer-lobby.exe
 services/lobby/silencer-lobby.exe~
 services/lobby/*.tmp
+services/lobby/run/
 *.o
 *.obj
 *~
@@ -44,6 +48,7 @@ __pycache__/
 # and are wired in via symlink (e.g. .claude/skills/using-silencer-cli ->
 # ../../shared/skills/cli).
 .claude/
+.mcp.json
 
 clients/silencer/build_test/
 clients/silencer/installer/Output/

@@ -4,6 +4,7 @@
 #include <cstring>
 #include <string>
 #include <sys/stat.h>
+#include <unistd.h>
 
 // Path to mini.zip — set at configure time via a compile definition.
 #ifndef ZIP_FIXTURE_DIR

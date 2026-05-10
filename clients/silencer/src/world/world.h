@@ -43,6 +43,7 @@ public:
 	void Tick(void);
 	void TickObjects(void);
 	void SetVersion(const char * version);
+	const char * GetVersion() const { return version; }
 	bool Listen(unsigned short port = 0);
 	unsigned short Bind(unsigned short port = 0);
 	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0);
@@ -54,6 +55,8 @@ public:
 	void SendInput(void);
 	void SwitchToLocalAuthorityMode(void);
 	bool IsAuthority(void);
+	bool IsConnected() const;
+	bool IsIdle() const;
 	void Illuminate(void);
 	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0, bool networked = false, Peer * peer = 0);
 	void ShowStatus(const char * status, Uint8 color = 0, bool networked = false, Peer * peer = 0);
@@ -119,6 +122,8 @@ public:
 	
 	friend class Renderer;
 	friend class Game;
+	friend class MapDownloader;
+	friend class AmbienceMixer;
 	friend class Team;
 	friend class Lobby;
 	friend class Player;
@@ -134,7 +139,20 @@ public:
 	friend class Replay;
 	friend class Audio;
 	friend class TriggerGraph;
-	
+	// Stage F of the game.cpp refactor: LobbyScreen::ShowGameTech calls
+	// World::RequestPeerList from the gametech-view enter path. Removed
+	// in stage G when the call moves into GameTechPanel::Build.
+	friend class LobbyScreen;
+	// GameJoinPanel reads localpeer state (peerlist[localpeerid].ishost,
+	// AllPeersDownloadedMap, gameplaystate) to refresh the Ready button
+	// label, and dispatches SendReady on click.
+	friend class GameJoinPanel;
+	// GameTechPanel ports the legacy Game::UpdateTechInterface — reads
+	// peerlist[team peers] to drive the per-peer tech checkbox grid, calls
+	// RequestPeerList when the local-peer slot is empty (recovery for a
+	// dropped peerlist packet).
+	friend class GameTechPanel;
+
 protected:
 	std::list<class Object *> objectlist;
 	std::list<class Object *> tobjectlist;

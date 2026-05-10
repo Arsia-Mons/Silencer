@@ -13,11 +13,16 @@
 #include "updater.h"
 #include "controlserver.h"
 #include "inputserver.h"
-#include <map>
+#include "screen_context.h"
+#include "game_state.h"
+#include "map_downloader.h"
+#include "ambience_mixer.h"
 #include <array>
-#include <atomic>
-#include <mutex>
-#include <thread>
+#include <memory>
+#include <vector>
+
+class Screen;
+class Modal;
 
 class Game
 {
@@ -30,6 +35,7 @@ public:
 	void LoadProgressCallback(int progress, int totalprogressitems);
 
 	friend class Audio;
+	friend class ScreenContext;
 
 public:
 	// Exposed for ControlDispatch (game-thread only).
@@ -65,23 +71,52 @@ public:
 	// socket "key" op.
 	bool tui;
 
+	// Screen-stack ops. Every menu surface is a Screen; the stack drives
+	// rendering and input via TickActiveScreen() at the top of Tick().
+	void PushScreen(std::unique_ptr<Screen> s);
+	void PopScreen();
+	void ReplaceScreen(std::unique_ptr<Screen> s);
+	Screen * GetTopScreen() const;
+
 	// Keybind access for ControlDispatch.
 	KeyMap& GetKeyMap() { return keymap; }
 	const KeyMap& GetKeyMap() const { return keymap; }
-	// Load the active profile (per Config::active_keybind_profile) into keymap.
-	// Falls back to "default" (built-in) if the named profile is missing.
-	void LoadActiveKeymap();
-	// Advance Config::active_keybind_profile to the next entry in
-	// ListProfiles().all (wraps), then reload the live keymap. Used by the
-	// Configure Controls preset cycle button.
-	void CycleKeybindPreset();
-	// If the active profile is a built-in (default/wasd/gamepad), flip the
-	// in-memory active profile to "<name>-custom" with a "(Custom)" label so
-	// edits don't shadow the on-disk built-in. No-op if already a custom.
-	void ForkActiveProfileIfBuiltin();
+
+	// Gamepad access for screens that need to capture rebind input or
+	// query the connected pad type (e.g. OptionsControlsScreen).
+	const GamepadState& GetGamepadState() const { return gamepadstate; }
+	SDL_Gamepad * GetGamepad() const { return gamepad; }
+
+	// LobbyScreen + per-panel interop. Public so panels can reach in via
+	// `ScreenContext::game`.
+	Uint16 currentinterface;
+	Uint32 currentlobbygameid;
+	bool minimized;
+	bool creategameclicked;
+	bool joininggame;
+	void JoinGame(LobbyGame & lobbygame, char * password = 0);
+	// Tear down a joined game's session/world state (Disconnect, switch
+	// authority, destroy team overlays, rejoin previous chat channel). UI
+	// concerns (panel swap, map-name overlay) stay on LobbyScreen.
+	void LeaveJoinedGame();
+	// Toggle in-lobby team overlay visibility. Called by LobbyScreen's
+	// right-side panel swaps (ShowGameTech / TearDownRightPanels) when
+	// entering / leaving the tech-choice surface.
+	void ShowTeamOverlays(bool show);
 
 private:
 	bool Tick(void);
+	// Gameplay-state Tick bodies — one per state. Each lives in its own
+	// src/game/tick/tick_*.cpp file. The switch in Tick() dispatches to
+	// these. Menu/screen states (MAINMENU, LOBBY, OPTIONS*, …) stay inline
+	// in the dispatcher — they're trivial PushScreen wrappers.
+	void TickFadeOut();
+	void TickInGame();
+	void TickSinglePlayerGame();
+	void TickHostGame();
+	void TickJoinGame();
+	void TickTestGame();
+	void TickReplayGame();
 	void Present(void);
 	bool SetupRenderDevice(void);
 	// Edge-triggered scancode handlers. Called from HandleSDLEvents on real
@@ -102,91 +137,17 @@ private:
 	void ProcessInGameInterfaces(void);
 	void ShowDeployMessage(void);
 	void GiveDefaultItems(Player & player);
-	void JoinGame(LobbyGame & lobbygame, char * password = 0);
 	void GoToState(Uint8 newstate);
-	Interface * CreateMainMenuInterface(void);
-	Interface * CreateOptionsInterface(void);
-	Interface * CreateOptionsControlsInterface(void);
-	Interface * CreateOptionsDisplayInterface(void);
-	Interface * CreateOptionsAudioInterface(void);
-	Interface * CreateLobbyConnectInterface(void);
-	Interface * CreateLobbyInterface(void);
-	Interface * CreateCharacterInterface(void);
-	Interface * CreateGameSelectInterface(void);
-	Interface * CreateChatInterface(void);
-	Interface * CreateGameCreateInterface(void);
-	Interface * CreateGameJoinInterface(void);
-	Interface * CreateGameTechInterface(void);
-	Interface * CreateGameSummaryInterface(Stats & stats, Uint8 agency);
-	Interface * CreateModalDialog(const char * message, bool ok = true);
-	Interface * CreateUpdateInterface(void);
-	void ProcessUpdateInterface(Interface * iface);
-	void LaunchStage2(void);
-	Interface * CreateMapPreview(const char * filename);
-	void PlayMusic(Mix_Music * music);
-	void DestroyModalDialog(void);
-	Interface * CreatePasswordDialog(void);
-	Uint16 lobbyinterface;
-	Uint16 characterinterface;
-	Uint16 chatinterface;
-	Uint16 gameselectinterface;
-	Uint16 gamecreateinterface;
-	Uint16 gamejoininterface;
-	Uint16 gametechinterface;
-	Uint16 gamesummaryinterface;
-	Uint16 modalinterface;
-	Uint16 passwordinterface;
-	Uint16 mappreviewinterface;
-	Uint16 updateinterface;
 	Updater updater;
-	Overlay * keynameoverlay[6];
-	Button * c1button[6];
-	Button * cobutton[6];
-	Button * c2button[6];
-	Button * presetbutton;
-	bool ProcessMainMenuInterface(Interface * iface);
-	void ProcessLobbyConnectInterface(Interface * iface);
-	bool ProcessLobbyInterface(Interface * iface);
-	void ProcessGameSummaryInterface(Interface * iface);
-	void UpdateLobbyMapName(const char * name);
-	void UpdateTechInterface(void);
-	void UpdateGameSummaryInterface(void);
-	void AddSummaryLine(TextBox & textbox, const char * name, Uint32 value, bool percentage = false);
-	void ShowTeamOverlays(bool show);
-	Uint8 GetSelectedAgency(void);
-	const char * GetKeyName(SDL_Scancode sym) const;
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".
 	const char * GetActionKeyDisplayName(Action a);
-
-	// Two-key view of an action's bindings used by the controls UI.
-	// See implementation comment in game.cpp for the round-trip rules.
-	struct LegacyView {
-		SDL_Scancode key1 = SDL_SCANCODE_UNKNOWN;
-		SDL_Scancode key2 = SDL_SCANCODE_UNKNOWN;
-		bool         and_ = false;  // true = AND chord; false = OR (or single key)
-	};
-	static LegacyView ViewLegacy(const KeyMap& km, Action a);
-	static void WriteLegacy(KeyMap& km, Action a, SDL_Scancode key1, SDL_Scancode key2, bool and_);
-	void GetGameChannelName(LobbyGame & lobbygame, char * name);
-	void CreateAmbienceChannels(void);
-	void UpdateAmbienceChannels(void);
-	bool FadedIn(void);
-	std::vector<std::string> ListFiles(const char * directory);
-	void LoadRandomGameMusic(void);
-	std::string FindMap(const char * name, unsigned char (*hash)[20] = 0, const char * directory = 0);
-	std::string SaveMap(const char * name, unsigned char * data, int size);
-	bool CalculateMapHash(const char * filename, unsigned char (*hash)[20]);
-	std::string StringFromHash(unsigned char (*hash)[20]);
-	void LoadMapData(const char * filename);
-	void ProcessMapDownload(void);
 	KeyMap keymap;
 	GamepadState gamepadstate;
 	SDL_Gamepad * gamepad;
 	void OpenFirstGamepad(void);
 	void PollGamepadState(void);
 	Uint8 keystate[SDL_SCANCODE_COUNT];
-	enum {NONE, FADEOUT, MAINMENU, LOBBYCONNECT, LOBBY, UPDATING, INGAME, MISSIONSUMMARY, SINGLEPLAYERGAME, OPTIONS, OPTIONSCONTROLS, OPTIONSDISPLAY, OPTIONSAUDIO, HOSTGAME, JOINGAME, REPLAYGAME, TESTGAME};
 	Uint8 state;
 	Uint8 nextstate;
 	Uint8 fade_i;
@@ -201,68 +162,17 @@ private:
 	int frames;
 	int fps;
 	Uint64 lasttick;
-	Uint16 currentinterface;
-	Uint16 aftermodalinterface;
-	bool motdprinted;
-	Uint32 chatlinesprinted;
-	char localusername[16 + 1];
 	Uint16 sharedstate;
-	int bgchannel[3];
-	enum {BG_AMBIENT = 0, BG_BASE, BG_OUTSIDE};
 	int oldselecteditem;
 	Uint8 singleplayermessage;
 	bool updatetitle;
-	Uint32 currentlobbygameid;
 	Uint32 lastannouncedgameid;
 	Uint8 lastannouncedstatus;
-	char lastchannel[64];
-	Uint8 oldselectedagency;
-	Uint8 oldambiencelevel;
-	bool agencychanged;
-	bool gamesummaryinfoloaded;
-	bool minimized;
-	bool creategameclicked;
-	bool modaldialoghasok;
-	bool joininggame;
 	bool deploymessageshown;
-	Uint32 optionscontrolstick;
 	int quitscancode;
 	bool interfaceenterfix;
-	Uint32 lastmapchunkrequest;
-	bool mapexistchecked;
-	int selectedmap;
-	std::map<std::string, std::string> servermaps; // "[↓] NAME.SIL" → sha1hex
-	std::atomic<int> dlprogress{0};    // 0-100 while downloading
-	std::atomic<int> dlresult{0};      // 0=idle, 1=success, -1=fail
-	std::string dlitemname;            // key in servermaps being downloaded
-	std::thread dlthread;
-	// Pre-game map fetch (join path): async server download before P2P fallback.
-	// State: 0=idle 1=in-flight 2=downloaded 3=not-on-server.
-	std::atomic<int>      mapjoinstate{0};
-	std::atomic<uint32_t> mapjoingeneration{0}; // incremented on reset to discard stale results
-	std::string           mapjoinpath;           // absolute path set by thread when state→2
-	std::mutex            mapjoinmutex;          // guards mapjoinpath
-	std::thread           mapjointhread;
-	// Map upload for create-game flow: when a user creates a game with a local
-	// map, we upload it first so the dedicated server can find it by name.
-	// State: 0=idle 1=uploading 2=ok 3=fail.
-	std::atomic<int>      mapUploadState{0};
-	std::atomic<uint32_t> mapUploadGeneration{0};
-	std::thread           mapUploadThread;
-	struct {
-		std::string gamename, mapname, password;
-		unsigned char maphash[20];
-		Uint8 securitylevel, minlevel, maxlevel, maxplayers, maxteams;
-	} pendingCreate;
-	Uint32 lastmusicplaytime;
-	char currentmusictrack[256];
 	bool fullscreentoggled;
 	char * replayfile;
-	// Set when UpdaterStage2 has been spawned; next Loop() returns false so
-	// main unwinds and ~Game tears down SDL/audio cleanly before the new
-	// client process opens the device. Skipping this teardown produces an
-	// audible pop on the restarted client.
-	bool stage2spawned;
 	ControlServer controlserver;
 	InputServer inputserver;
 	// TUI mouse edge-detection state. Tracks the last (x, y, down) we
@@ -274,6 +184,19 @@ private:
 	bool   tui_have_prev_mouse;
 	void DrainControlQueue();
 	void PostFrameReplies();
+
+	// mapDownloader must be declared before ambienceMixer — the latter's
+	// constructor captures it by reference (for ListFiles in music selection).
+	MapDownloader mapDownloader;
+	AmbienceMixer ambienceMixer;
+
+	std::vector<std::unique_ptr<Screen>> screenStack;
+	ScreenContext screenContext;
+	void TickActiveScreen();
+	// Set by GoToState; processed at the next Tick() entry to pop screens
+	// safely after the active screen's Tick has returned. Avoids destroying
+	// a screen mid-Tick when a button click triggers a state transition.
+	bool screenStackPendingTeardown = false;
 
 	// Profile to restore when a gamepad disconnects.  Stays empty when the
 	// active profile was already "gamepad" before the pad was connected.
@@ -296,15 +219,6 @@ private:
 	void TickGamepadMenuNav();
 	// Trigger SDL_RumbleGamepad for fire/hit/land events on the local player.
 	void TickRumble();
-
-	// Gamepad input snapshot taken when a controls-rebind field is activated.
-	// Used to distinguish "held at rebind start" from "newly pressed during rebind".
-	uint32_t rebindGamepadButtons = 0;
-	int16_t  rebindGamepadAxes[SDL_GAMEPAD_AXIS_COUNT] = {};
-
-	// Returns human-readable display label for the slot-th binding of an action.
-	// Handles keyboard, gamepad, and mouse — unlike GetKeyName which is keyboard-only.
-	std::string GetBindingLabel(Action a, int slot) const;
 };
 
 #endif

@@ -31,12 +31,20 @@ Lobby::Lobby(World * world){
 	presencechanged = false;
 	channelchanged = false;
 	channel[0] = 0;
+	lastchannel[0] = 0;
 	serverip[0] = 0;
 	sockethandle = -1;
 	statupgraded = false;
 	updateavailable = false;
 	updateurl.clear();
 	memset(updatesha256, 0, sizeof(updatesha256));
+	localusername[0] = '\0';
+}
+
+void Lobby::SetLocalUsername(const char * name){
+	if(!name) return;
+	strncpy(localusername, name, sizeof(localusername) - 1);
+	localusername[sizeof(localusername) - 1] = '\0';
 }
 
 Lobby::~Lobby(){

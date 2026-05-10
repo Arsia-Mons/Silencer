@@ -1937,6 +1937,14 @@ bool World::IsAuthority(void){
 	return mode == AUTHORITY;
 }
 
+bool World::IsConnected() const {
+	return state == CONNECTED;
+}
+
+bool World::IsIdle() const {
+	return state == IDLE;
+}
+
 void World::Illuminate(void){
 	illuminate = GASLoader::Get().world.illuminateLevel;
 }

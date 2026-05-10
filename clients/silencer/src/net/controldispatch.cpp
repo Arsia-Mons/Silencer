@@ -5,6 +5,7 @@
 #include "button.h"
 #include "toggle.h"
 #include "textbox.h"
+#include "textinput.h"
 #include "selectbox.h"
 #include "objecttypes.h"
 #include "keybinds.h"
@@ -80,6 +81,22 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["current_interface_id"] = game.GetCurrentInterfaceId();
 		r["frame"] = game.GetFrameCount();
 		r["paused"] = game.paused;
+		// Expose the lobby connection sub-state so test scripts can wait for
+		// AUTHENTICATING before dispatching a Login click — the LobbyConnect
+		// state machine progresses asynchronously through Connect/version
+		// check, and a click before AUTHENTICATING is silently consumed.
+		static const char * lobbyStateNames[] = {
+			"IDLE","WAITING","CONNECTING","RESOLVING","WAITINGFORRESOLVER",
+			"RESOLVED","RESOLVEFAILED","CONNECTIONFAILED","CONNECTED",
+			"CHECKINGVERSION","AUTHENTICATING","AUTHSENT","AUTHENTICATED",
+			"AUTHFAILED","DISCONNECTED"
+		};
+		int ls = (int)game.GetWorld().lobby.state;
+		if(ls >= 0 && ls < (int)(sizeof(lobbyStateNames)/sizeof(lobbyStateNames[0]))){
+			r["lobby_state"] = lobbyStateNames[ls];
+		}else{
+			r["lobby_state"] = "UNKNOWN";
+		}
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
@@ -123,6 +140,19 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 					// uid is the developer-assigned identifier; expose it so
 					// agents can disambiguate textboxes (which have no label).
 					w["uid"] = tb->uid;
+					break;
+				}
+				case ObjectTypes::TEXTINPUT: {
+					TextInput* ti = (TextInput*)o;
+					w["kind"] = "textinput";
+					w["w"] = ti->width; w["h"] = ti->height;
+					w["uid"] = ti->uid;
+					w["password"] = ti->password;
+					// Expose current text so agents can verify what they typed.
+					// Mask password fields — same instinct as a UI: don't echo
+					// secrets back over the control socket.
+					w["text"] = ti->password ? std::string(strlen(ti->text), '*') : std::string(ti->text);
+					w["maxchars"] = ti->maxchars;
 					break;
 				}
 				case ObjectTypes::SELECTBOX: {
@@ -192,22 +222,46 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "set_text"){
-		std::string target = cmd.args.value("label", std::string());
-		std::string text   = cmd.args.value("text", std::string());
+		std::string text = cmd.args.value("text", std::string());
 		Uint16 ifid = game.GetCurrentInterfaceId();
 		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
 		if(!iface){ cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface")); return; }
-		Uint64 mask = (1ULL << ObjectTypes::TEXTBOX);
-		Uint16 wid = 0;
-		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
-		if(m != Interface::MATCH_OK){
-			cmd.reply->set_value(Err(cmd.id, m == Interface::MATCH_NOT_FOUND
-				? "WIDGET_NOT_FOUND" : "WIDGET_AMBIGUOUS", target));
+		// Address either by uid (developer-assigned label inside the iface,
+		// stable across runs) or by the existing label/id path. uid wins when
+		// both are passed.
+		Object* target = nullptr;
+		if(cmd.args.contains("uid")){
+			int uid = cmd.args["uid"].get<int>();
+			target = iface->GetObjectWithUid(game.GetWorld(), (Uint8)uid);
+			if(!target){
+				cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
+					"no widget with uid " + std::to_string(uid)));
+				return;
+			}
+		}else{
+			std::string label = cmd.args.value("label", std::string());
+			Uint64 mask = (1ULL << ObjectTypes::TEXTBOX) | (1ULL << ObjectTypes::TEXTINPUT);
+			Uint16 wid = 0;
+			auto m = iface->FindWidgetByLabel(game.GetWorld(), label.c_str(), mask, &wid);
+			if(m != Interface::MATCH_OK){
+				cmd.reply->set_value(Err(cmd.id, m == Interface::MATCH_NOT_FOUND
+					? "WIDGET_NOT_FOUND" : "WIDGET_AMBIGUOUS", label));
+				return;
+			}
+			target = game.GetWorld().GetObjectFromId(wid);
+		}
+		if(target->type == ObjectTypes::TEXTBOX){
+			TextBox* tb = (TextBox*)target;
+			tb->text.clear();
+			tb->AddText(text.c_str());
+		}else if(target->type == ObjectTypes::TEXTINPUT){
+			TextInput* ti = (TextInput*)target;
+			ti->SetText(text.c_str());
+		}else{
+			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
+				"widget is not a textbox or textinput"));
 			return;
 		}
-		TextBox* tb = (TextBox*)game.GetWorld().GetObjectFromId(wid);
-		tb->text.clear();
-		tb->AddText(text.c_str());
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
@@ -734,7 +788,7 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 		             sizeof(cfg.active_keybind_profile) - 1);
 		cfg.active_keybind_profile[sizeof(cfg.active_keybind_profile) - 1] = '\0';
 		cfg.Save();
-		game.LoadActiveKeymap();
+		LoadActiveKeymap(game.GetKeyMap());
 		nlohmann::json r;
 		r["active"] = profile;
 		cmd.reply->set_value(OkResult(cmd.id, r));
@@ -796,7 +850,7 @@ static void HandleKeybind(Game& game, ControlCommand& cmd) {
 		// resolves now (the built-in if any, else "default") and persist the
 		// resolved name so `list` and the next restart agree on what's active.
 		if (profile == activeName) {
-			game.LoadActiveKeymap();
+			LoadActiveKeymap(game.GetKeyMap());
 			const std::string& resolved = game.GetKeyMap().name;
 			std::strncpy(cfg.active_keybind_profile, resolved.c_str(),
 			             sizeof(cfg.active_keybind_profile) - 1);

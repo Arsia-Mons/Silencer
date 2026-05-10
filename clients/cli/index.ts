@@ -20,6 +20,7 @@ function usage(): never {
       `       silencer-cli world_state\n` +
       `       silencer-cli click --label "OPTIONS"\n` +
       `       silencer-cli set_text --label TEXT_ID --text "hi"\n` +
+      `       silencer-cli set_text --uid 1 --text "alice"   (textbox or textinput)\n` +
       `       silencer-cli select --label LISTBOX --index 0\n` +
       `       silencer-cli back\n` +
       `       silencer-cli screenshot [--out /path/x.png]\n` +
@@ -180,7 +181,11 @@ function parseArgs(argv: string[]): {
     } else {
       // positional after op → treat as shorthand for the most common arg.
       if (op === "click" && args["label"] === undefined) args["label"] = a;
-      else if ((op === "set_text" || op === "select") && args["label"] === undefined)
+      else if (
+        (op === "set_text" || op === "select") &&
+        args["label"] === undefined &&
+        !(op === "set_text" && args["uid"] !== undefined)
+      )
         args["label"] = a;
       else if (op === "set_text" && args["text"] === undefined) args["text"] = a;
       else if (op === "select" && args["index"] === undefined) {

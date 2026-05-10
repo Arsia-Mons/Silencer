@@ -60,6 +60,11 @@ struct BindingKey {
 bool ParseBindingKey(const std::string& s, BindingKey& out);
 std::string Stringify(const BindingKey& k);
 
+// Maps an SDL gamepad button/axis name (after stripping "PAD:" prefix) to a
+// short display label appropriate for the connected controller type.
+// e.g. "leftshoulder" → "LB" (Xbox) or "L1" (PS).
+std::string GamepadShortLabel(const std::string& raw, SDL_GamepadType type);
+
 struct Binding {
 	std::vector<BindingKey> keys;   // size 1 = single key, size N = AND chord
 };
@@ -83,6 +88,11 @@ static constexpr int16_t AXIS_DEADZONE = 16384;
 
 class KeyMap {
 public:
+	// Human-readable label for an SDL scancode, e.g. "Space", "F5", "Up".
+	// Returns "?" for unmapped scancodes and "" for SDL_SCANCODE_UNKNOWN.
+	// Pure mapping with no instance state, hence static.
+	static const char * GetKeyName(SDL_Scancode sym);
+
 	// Reset to all-empty bindings (action exists but is unbound).
 	void Clear();
 
@@ -136,5 +146,19 @@ std::string WritableProfilePath(const std::string& name);
 // [A-Za-z0-9_-], length 1-64. Returns false for anything else (including
 // empty, "..", names with '/', '\\', or '.').
 bool IsValidProfileName(const std::string& name);
+
+// Load the profile named in Config::active_keybind_profile into `keymap`.
+// Falls back to the built-in "default" if the named profile is missing.
+void LoadActiveKeymap(KeyMap& keymap);
+
+// Advance Config::active_keybind_profile to the next entry in
+// ListProfiles().all (wraps), then reload `keymap`. Used by the Configure
+// Controls preset cycle button.
+void CycleKeybindPreset(KeyMap& keymap);
+
+// If the active profile is a built-in (default/wasd/gamepad), flip the
+// in-memory active profile to "<name>-custom" with a "(Custom)" label so
+// edits don't shadow the on-disk built-in. No-op if already a custom.
+void ForkActiveProfileIfBuiltin(KeyMap& keymap);
 
 #endif
