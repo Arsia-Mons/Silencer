@@ -130,6 +130,12 @@ private:
 	Uint16 mappreviewinterface;
 	Updater updater;
 	bool ProcessLobbyInterface(Interface * iface);
+	// Per-tick lobby pump: drives ProcessLobbyInterface, the deferred
+	// CreateGame / map-upload state machine, modal teardown, and the
+	// post-create handoff into the joining flow. Called from
+	// LobbyScreen::Tick via ScreenContext::TickLegacyLobbyBody. Stages B–H
+	// migrate the contents onto Panel::Tick methods.
+	void TickLobbyBody();
 	void ProcessGameSummaryInterface(Interface * iface);
 	void UpdateLobbyMapName(const char * name);
 	void UpdateTechInterface(void);

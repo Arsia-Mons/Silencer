@@ -3,6 +3,7 @@
 #include "game.h"
 #include "screen.h"
 #include "modal.h"
+#include "interface.h"
 #include <cassert>
 
 ScreenContext::ScreenContext(Game & game_,
@@ -34,3 +35,12 @@ void ScreenContext::PopScreen() { game.PopScreen(); }
 void ScreenContext::ReplaceScreen(std::unique_ptr<Screen> s) { game.ReplaceScreen(std::move(s)); }
 void ScreenContext::ShowModal(std::unique_ptr<Modal>) { assert(false && "ScreenContext::ShowModal not wired yet"); }
 void ScreenContext::ShowMessage(const char *, std::function<void(bool)>) { assert(false && "ScreenContext::ShowMessage not wired yet"); }
+
+Uint16 ScreenContext::BuildLegacyLobbyInterface()
+{
+	Interface * iface = game.CreateLobbyInterface();
+	game.lobbyinterface = iface->id;
+	return iface->id;
+}
+
+void ScreenContext::TickLegacyLobbyBody() { game.TickLobbyBody(); }

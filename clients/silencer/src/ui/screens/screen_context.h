@@ -57,6 +57,12 @@ public:
 	void ShowModal(std::unique_ptr<Modal> m);
 	void ShowMessage(const char * msg, std::function<void(bool ok)> onClose);
 
+	// Stage-A lobby adapter. Delegates to Game::CreateLobbyInterface and the
+	// extracted Game::TickLobbyBody. Replaced piecewise across stages B–H as
+	// each panel migrates onto LobbyScreen.
+	Uint16 BuildLegacyLobbyInterface();
+	void TickLegacyLobbyBody();
+
 private:
 	Game & game;
 };

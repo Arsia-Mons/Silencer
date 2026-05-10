@@ -56,6 +56,13 @@ Verified: clean Release + unity builds (only the pre-existing C4804 warning); `0
 
 Verified: clean regular + unity Debug builds (only the pre-existing C4804 warning at `IsLiveMultiplayer`). Authentic interactive smoke for the full lobby→update path: ran a local lobby with `-version "99999" -update-manifest manifest.json` (manifest pointed at `https://example.invalid/...` to flip `updateavailable=true`); client transitioned LobbyConnect → UpdateScreen on version-reject, displayed PROMPTING, dispatched Update → DOWNLOADING → FAILED with "Could not resolve hostname" and the Retry+Cancel button pair at the correct positions. Pixel-identical to the pre-refactor render (the screen code is a byte-for-byte move, only the dispatch surface changed).
 
+Stage A of LobbyScreen migration landed. `LobbyScreen` is a thin adapter at `clients/silencer/src/ui/screens/lobby/lobby_screen.{h,cpp}` whose `Build` delegates to `Game::CreateLobbyInterface()` and whose `Tick` delegates to a new `Game::TickLobbyBody()`. The `case LOBBY:` body in `Game::Tick` now follows the canonical shape: `if(stateisnew){ <reset interfaces> + PushScreen(make_unique<LobbyScreen>()); stateisnew = false; }else{ <ambience music> }`. The 700+ lines of lobby pump logic (state-machine, deferred CreateGame upload pump, modal teardown, post-create handoff) moved verbatim into `Game::TickLobbyBody`; nothing was reshaped, so per-stage smoke can compare against pre-refactor behavior byte-for-byte. Side effects:
+- New `ScreenContext` actions: `BuildLegacyLobbyInterface()` (returns interface id, also sets `game.lobbyinterface` so legacy code keeps working) and `TickLegacyLobbyBody()` (delegates to `Game::TickLobbyBody`).
+- `src/ui/screens/lobby/` added to `target_include_directories`. The `lobby/panels/` and `lobby/modals/` paths were already wired.
+- No anon-namespace uids in `lobby_screen.cpp` yet (Stage A is a wrapper); per-panel prefixes (`CHR_*`, `CHT_*`, `GSEL_*`, `GCRT_*`, `GJN_*`, `GTECH_*`) come in stages B–G.
+
+Verified: clean regular + unity Debug builds (only the pre-existing C4804). E2E `00_ping`/`10_navigate`/`20_screenshot` pass. Interactive lobby login flow not exercised — the control protocol's `set_text` op only targets `TEXTBOX` widgets, not `TEXTINPUT` (pre-existing CLI limitation), so driving the lobby_connect login form headlessly isn't currently possible. Verification rests on: (a) builds, (b) E2E passing, (c) `case LOBBY:` body is a literal mechanical move from the old else-branch into `Game::TickLobbyBody` with no logic reshape.
+
 ---
 
 ## Phase 0 — Baseline
@@ -126,7 +133,7 @@ The migration pattern for each screen:
 
 LobbyScreen has 6 panels. Migrate it in stages so the lobby keeps working throughout.
 
-- [ ] **Stage A: land `LobbyScreen` with adapter calls.** `LobbyScreen::Build` calls into the existing `Game::CreateCharacterInterface()`, `Game::CreateChatInterface()`, etc. as before. `LobbyScreen::Tick` calls into the existing `Game::ProcessLobbyInterface()`. The 731-line method stays intact for now — we've just moved the entry point. **Smoke:** full lobby flow — connect, character select, chat, browse games, create game, join game, leave lobby. This is the biggest single smoke-test of the refactor.
+- [x] **Stage A: land `LobbyScreen` with adapter calls.** `LobbyScreen::Build` calls into the existing `Game::CreateCharacterInterface()`, `Game::CreateChatInterface()`, etc. as before. `LobbyScreen::Tick` calls into the existing `Game::ProcessLobbyInterface()`. The 731-line method stays intact for now — we've just moved the entry point. **Smoke:** full lobby flow — connect, character select, chat, browse games, create game, join game, leave lobby. This is the biggest single smoke-test of the refactor.
 - [ ] **Stage B: migrate `CharacterPanel`.** Replace the `Game::CreateCharacterInterface` call inside `LobbyScreen::Build` with `character.Build(ctx, parent)` using the new `CharacterPanel`. Move the panel's process logic out of `Game::ProcessLobbyInterface` into `CharacterPanel::Tick`. Delete `Game::CreateCharacterInterface`. **Smoke:** character select — pick each agency, confirm display updates.
 - [ ] **Stage C: migrate `ChatPanel`.** **Smoke:** type chat messages, confirm they appear; receive messages from another client.
 - [ ] **Stage D: migrate `GameSelectPanel`.** **Smoke:** browse server list, refresh, see games appear/disappear.

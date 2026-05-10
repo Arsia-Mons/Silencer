@@ -32,6 +32,7 @@
 #include "options_display_screen.h"
 #include "options_audio_screen.h"
 #include "lobby_connect_screen.h"
+#include "lobby_screen.h"
 #include "update_screen.h"
 #include <algorithm>
 #include <stdio.h>
@@ -805,171 +806,19 @@ bool Game::Tick(void){
 				passwordinterface = 0;
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
-				lobbyinterface = CreateLobbyInterface()->id;
-				currentinterface = lobbyinterface;
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 				renderer.palette.SetPalette(2);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
+				PushScreen(std::make_unique<LobbyScreen>());
+				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
-					//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.menumusic);
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
-				if(world.lobby.state == Lobby::DISCONNECTED){
-					world.Disconnect();
-					GoToState(LOBBYCONNECT);
-					break;
-				}
-				if(lobbyinterface){
-					Interface * iface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-					if(iface){
-						ProcessLobbyInterface(iface);
-					}
-				}
-				if(gamecreateinterface){
-					// Handle deferred CreateGame after map upload completes.
-					int us = mapDownloader.mapUploadState.load(std::memory_order_acquire);
-					if(us == 2){
-						mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
-						const char * pw = mapDownloader.pendingCreate.password.empty() ? nullptr : mapDownloader.pendingCreate.password.c_str();
-						world.lobby.CreateGame(
-							mapDownloader.pendingCreate.gamename.c_str(),
-							mapDownloader.pendingCreate.mapname.c_str(),
-							mapDownloader.pendingCreate.maphash,
-							pw,
-							mapDownloader.pendingCreate.securitylevel,
-							mapDownloader.pendingCreate.minlevel,
-							mapDownloader.pendingCreate.maxlevel,
-							mapDownloader.pendingCreate.maxplayers,
-							mapDownloader.pendingCreate.maxteams);
-					}else if(us == 3){
-						mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
-						creategameclicked = false;
-						CreateModalDialog("Could not upload map");
-					}
-					if(world.lobby.creategamestatus == 1){
-						world.lobby.creategamestatus = 0;
-						Peer * authoritypeer = world.GetAuthorityPeer();
-						LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
-						if(lobbygame){
-							Serializer data;
-							lobbygame->Serialize(Serializer::WRITE, data);
-							world.gameinfo.Serialize(Serializer::READ, data);
-							authoritypeer->ip = ntohl(inet_addr(lobbygame->hostname));
-							//authoritypeer->ip = ntohl(inet_addr("127.0.0.1")); // temporary
-							authoritypeer->port = lobbygame->port;
-							sharedstate = 0;
-							currentlobbygameid = lobbygame->id;
-							world.Connect(GetSelectedAgency(), world.lobby.accountid, lobbygame->password);
-							mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
-							joininggame = true;
-						}
-						/*Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
-						team->AddPeer(world.GetAuthorityPeer()->id);
-						team->agency = GetSelectedAgency();*/
-					}else
-					if(world.lobby.creategamestatus != 1 && world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0){ // failed and not creating
-						world.lobby.creategamestatus = 0;
-						CreateModalDialog("Could not create game");
-					}
-				}
-				if(gameselectinterface || gamecreateinterface){
-					if(joininggame){
-						if(world.state == World::CONNECTED){
-							joininggame = false;
-						}
-						if(world.state == World::IDLE){
-							joininggame = false;
-							CreateModalDialog("Unable to join game");
-						}
-					}
-					if(modalinterface && !modaldialoghasok){
-						Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
-						if(modaliface){
-							for(std::vector<Uint16>::iterator it = modaliface->objects.begin(); it != modaliface->objects.end(); it++){
-								Object * object = world.GetObjectFromId(*it);
-								if(object && object->type == ObjectTypes::OVERLAY){
-									Overlay * overlay = static_cast<Overlay *>(object);
-									if(overlay->text.length() > 0){
-										overlay->text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
-											? "Uploading map" : "Creating game";
-										int dots = (world.tickcount / 4) % 6;
-										if(dots > 3){
-											dots = 6 - dots;
-										}
-										for(int i = 0; i < dots; i++){
-											overlay->text += ".";
-										}
-									}
-								}
-							}
-						}
-					}
-					if(!modaldialoghasok && world.lobby.creategamestatus != 100 && mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 && (world.state == World::CONNECTED || world.state == World::IDLE)){
-						DestroyModalDialog();
-						creategameclicked = false;
-					}
-					if(world.state == World::CONNECTED && lobbyinterface){
-						Peer * peer = world.peerlist[world.localpeerid];
-						if(peer){
-							if(gameselectinterface){
-								Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-								if(lobbyiface){
-									Interface * gameselectiface = static_cast<Interface *>(world.GetObjectFromId(gameselectinterface));
-									if(gameselectiface){
-										gameselectiface->DestroyInterface(world, lobbyiface);
-									}
-								}
-								gameselectinterface = 0;
-							}
-							if(gamecreateinterface){
-								Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-								if(lobbyiface){
-									Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-									if(gamecreateiface){
-										gamecreateiface->DestroyInterface(world, lobbyiface);
-									}
-								}
-								gamecreateinterface = 0;
-							}
-							mapDownloader.mapexistchecked = false;
-						// Invalidate any in-flight server map fetch for the previous
-						// game; the thread will see the stale generation and discard
-						// its result. Detach so we don't block here.
-						mapDownloader.mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
-						mapDownloader.mapjoinstate.store(0, std::memory_order_relaxed);
-						if(mapDownloader.mapjointhread.joinable()) mapDownloader.mapjointhread.detach();
-							world.SetTech(Config::GetInstance().defaulttechchoices[GetSelectedAgency()]);
-							gamejoininterface = CreateGameJoinInterface()->id;
-							LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
-							if(lobbygame){
-								char temp[256];
-								ambienceMixer.GetGameChannelName(*lobbygame, temp);
-								strcpy(lastchannel, world.lobby.channel);
-								world.lobby.JoinChannel(temp);
-								UpdateLobbyMapName(lobbygame->mapname);
-								/*if(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).size() > 0){
-									world.SendMapDownloaded();
-								}*/
-							}
-							Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-							if(lobbyiface){
-								lobbyiface->AddObject(gamejoininterface);
-							}
-						}
-					}
-				}
-				
-				mapDownloader.ProcessMapDownload();
-				
-				
-				if(world.state != World::CONNECTED && !modalinterface){
-					if(gamejoininterface || gametechinterface){
-						CreateModalDialog("Disconnected from game");
-					}
-				}
+				// Lobby pump (state-machine + deferred-create) lives in
+				// LobbyScreen::Tick, dispatched by TickActiveScreen() at the
+				// top of Game::Tick.
 			}
 		}break;
 		case UPDATING:{
@@ -2265,6 +2114,154 @@ void Game::GoToState(Uint8 newstate){
 	// GoToState in response to a button click) can return safely before its
 	// destructor runs.
 	screenStackPendingTeardown = true;
+}
+
+void Game::TickLobbyBody(void){
+	if(world.lobby.state == Lobby::DISCONNECTED){
+		world.Disconnect();
+		GoToState(LOBBYCONNECT);
+		return;
+	}
+	if(lobbyinterface){
+		Interface * iface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+		if(iface){
+			ProcessLobbyInterface(iface);
+		}
+	}
+	if(gamecreateinterface){
+		// Handle deferred CreateGame after map upload completes.
+		int us = mapDownloader.mapUploadState.load(std::memory_order_acquire);
+		if(us == 2){
+			mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
+			const char * pw = mapDownloader.pendingCreate.password.empty() ? nullptr : mapDownloader.pendingCreate.password.c_str();
+			world.lobby.CreateGame(
+				mapDownloader.pendingCreate.gamename.c_str(),
+				mapDownloader.pendingCreate.mapname.c_str(),
+				mapDownloader.pendingCreate.maphash,
+				pw,
+				mapDownloader.pendingCreate.securitylevel,
+				mapDownloader.pendingCreate.minlevel,
+				mapDownloader.pendingCreate.maxlevel,
+				mapDownloader.pendingCreate.maxplayers,
+				mapDownloader.pendingCreate.maxteams);
+		}else if(us == 3){
+			mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
+			creategameclicked = false;
+			CreateModalDialog("Could not upload map");
+		}
+		if(world.lobby.creategamestatus == 1){
+			world.lobby.creategamestatus = 0;
+			Peer * authoritypeer = world.GetAuthorityPeer();
+			LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
+			if(lobbygame){
+				Serializer data;
+				lobbygame->Serialize(Serializer::WRITE, data);
+				world.gameinfo.Serialize(Serializer::READ, data);
+				authoritypeer->ip = ntohl(inet_addr(lobbygame->hostname));
+				authoritypeer->port = lobbygame->port;
+				sharedstate = 0;
+				currentlobbygameid = lobbygame->id;
+				world.Connect(GetSelectedAgency(), world.lobby.accountid, lobbygame->password);
+				mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
+				joininggame = true;
+			}
+		}else
+		if(world.lobby.creategamestatus != 1 && world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0){ // failed and not creating
+			world.lobby.creategamestatus = 0;
+			CreateModalDialog("Could not create game");
+		}
+	}
+	if(gameselectinterface || gamecreateinterface){
+		if(joininggame){
+			if(world.state == World::CONNECTED){
+				joininggame = false;
+			}
+			if(world.state == World::IDLE){
+				joininggame = false;
+				CreateModalDialog("Unable to join game");
+			}
+		}
+		if(modalinterface && !modaldialoghasok){
+			Interface * modaliface = static_cast<Interface *>(world.GetObjectFromId(modalinterface));
+			if(modaliface){
+				for(std::vector<Uint16>::iterator it = modaliface->objects.begin(); it != modaliface->objects.end(); it++){
+					Object * object = world.GetObjectFromId(*it);
+					if(object && object->type == ObjectTypes::OVERLAY){
+						Overlay * overlay = static_cast<Overlay *>(object);
+						if(overlay->text.length() > 0){
+							overlay->text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
+								? "Uploading map" : "Creating game";
+							int dots = (world.tickcount / 4) % 6;
+							if(dots > 3){
+								dots = 6 - dots;
+							}
+							for(int i = 0; i < dots; i++){
+								overlay->text += ".";
+							}
+						}
+					}
+				}
+			}
+		}
+		if(!modaldialoghasok && world.lobby.creategamestatus != 100 && mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 && (world.state == World::CONNECTED || world.state == World::IDLE)){
+			DestroyModalDialog();
+			creategameclicked = false;
+		}
+		if(world.state == World::CONNECTED && lobbyinterface){
+			Peer * peer = world.peerlist[world.localpeerid];
+			if(peer){
+				if(gameselectinterface){
+					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+					if(lobbyiface){
+						Interface * gameselectiface = static_cast<Interface *>(world.GetObjectFromId(gameselectinterface));
+						if(gameselectiface){
+							gameselectiface->DestroyInterface(world, lobbyiface);
+						}
+					}
+					gameselectinterface = 0;
+				}
+				if(gamecreateinterface){
+					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+					if(lobbyiface){
+						Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
+						if(gamecreateiface){
+							gamecreateiface->DestroyInterface(world, lobbyiface);
+						}
+					}
+					gamecreateinterface = 0;
+				}
+				mapDownloader.mapexistchecked = false;
+				// Invalidate any in-flight server map fetch for the previous
+				// game; the thread will see the stale generation and discard
+				// its result. Detach so we don't block here.
+				mapDownloader.mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
+				mapDownloader.mapjoinstate.store(0, std::memory_order_relaxed);
+				if(mapDownloader.mapjointhread.joinable()) mapDownloader.mapjointhread.detach();
+				world.SetTech(Config::GetInstance().defaulttechchoices[GetSelectedAgency()]);
+				gamejoininterface = CreateGameJoinInterface()->id;
+				LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
+				if(lobbygame){
+					char temp[256];
+					ambienceMixer.GetGameChannelName(*lobbygame, temp);
+					strcpy(lastchannel, world.lobby.channel);
+					world.lobby.JoinChannel(temp);
+					UpdateLobbyMapName(lobbygame->mapname);
+				}
+				Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
+				if(lobbyiface){
+					lobbyiface->AddObject(gamejoininterface);
+				}
+			}
+		}
+	}
+
+	mapDownloader.ProcessMapDownload();
+
+	if(world.state != World::CONNECTED && !modalinterface){
+		if(gamejoininterface || gametechinterface){
+			CreateModalDialog("Disconnected from game");
+		}
+	}
 }
 
 Interface * Game::CreateLobbyInterface(void){
