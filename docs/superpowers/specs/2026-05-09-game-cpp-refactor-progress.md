@@ -93,6 +93,14 @@ Architectural changes:
 
 Verified: clean regular + unity Debug builds (only the pre-existing C4804 warning at `IsLiveMultiplayer` and unrelated `sprintf` deprecations in `resources.cpp`). E2E `00_ping`/`10_navigate`/`20_screenshot` pass. Headless agent navigation MainMenu → Connect To Lobby → back to MainMenu works (LOBBYCONNECT screenshot taken). Interactive lobby smoke (login, browse games, Join, Create Game swap, GoBack) not exercised — same TEXTINPUT/login limitation as Stages A–C; verification rests on (a) builds, (b) E2E passing, (c) the panel impl being a near-mechanical move of the legacy widget construction + per-tick logic into the panel class.
 
+Stages F + G landed in two commits: `GameJoinPanel` at `clients/silencer/src/ui/screens/lobby/panels/game_join_panel.{h,cpp}` (Ready / Change Team / Choose Tech buttons + the per-frame Ready label refresh that flips between "Waiting..." and "Ready" while the host waits on map downloads), then `GameTechPanel` at `clients/silencer/src/ui/screens/lobby/panels/game_tech_panel.{h,cpp}` (per-team-peer tech checkbox grid, slots-left counter, description-overlay click handler, Back To Teams button). LobbyScreen now owns all four right-side panels (`gameSelect`/`gameCreate`/`gameJoin`/`gameTech` as `unique_ptr` slots, swapped via `ShowGameSelect`/`ShowGameCreate`/`ShowGameJoin`/`ShowGameTech`); each helper goes through a shared `TearDownRightPanels` static that destroys the active panel iface + zeros the mirror id on Game + (for gameTech) resets `world.choosingtech` and re-enables team overlays. Architectural changes:
+- `Game::TickLobbyBody`'s CONNECTED transition no longer hand-builds the gamejoin iface; it calls `LobbyScreen::ShowGameJoin(ctx)`. The two explicit teardown blocks (gameselectinterface, gamecreateinterface destruction) collapsed into the `TearDownRightPanels` call inside `ShowGameJoin`.
+- `Game::ProcessLobbyInterface` shrunk further: BUTTON cases 25 (Ready), 26 (Change Team), 27 (Choose Tech), and 28 (Back To Teams) deleted; only the lobby Go Back (uid 10) and modal-OK (uid 50) arms remain. The leading `UpdateTechInterface()` call deleted (`GameTechPanel::Tick` now drives the per-frame tech-checkbox refresh).
+- `Game::GoBack` simplified — the gamejoin/gametech branches no longer manually destroy ifaces or flip `world.choosingtech`. `TearDownRightPanels` (via `ShowGameSelect`) owns that. `Game::GoBack` keeps the genuine game-state work (`Disconnect`, `SwitchToLocalAuthorityMode`, channel rejoin, team-overlay destroy via `MarkDestroyObject`).
+- `Game::CreateGameJoinInterface`, `Game::CreateGameTechInterface`, `Game::UpdateTechInterface` deleted. The per-frame Ready button "Waiting..." text update at line ~660 (case INGAME's INLOBBY branch) moved into `GameJoinPanel::Tick`.
+- `World` gained three friend grants for the migration: `LobbyScreen` (RequestPeerList in ShowGameTech), `GameJoinPanel` (peerlist[localpeerid].ishost / AllPeersDownloadedMap / SendReady on the Ready button), and `GameTechPanel` (peerlist[team peers] for the checkbox grid + RequestPeerList recovery). All three are scoped to the migration; Stage H trims them as Game/World accessors are widened or the panels move to the `world.lobby.X` pattern.
+- Anon-namespace uid enumerators in `game_join_panel.cpp` (`GJN_BTN_*`) and `game_tech_panel.cpp` (`GTECH_BTN_*` / `GTECH_OVL_*`) are file-prefixed for unity-build TU merging.
+
 Stage E landed: `GameCreatePanel` at `clients/silencer/src/ui/screens/lobby/panels/game_create_panel.{h,cpp}`. Owns the create-game form (security toggle, level range, max players/teams, map list with `[DL]` server-only entries, game name, password) plus the per-frame map preview tracking, [DL] download badge clicks, and the Create-button kickoff (validate → upload map → CreateModalDialog "Uploading map..."). `Game::CreateGameCreateInterface` deleted; the SELECTBOX uid 4, BUTTON uid 35, BUTTON uid 40 arms in `Game::ProcessLobbyInterface` deleted. The remaining ProcessLobbyInterface SELECTBOX arm collapsed to a comment — both lobby selectboxes (uid 4 / uid 10) are now panel-owned.
 
 Architectural changes:
@@ -181,8 +189,8 @@ LobbyScreen has 6 panels. Migrate it in stages so the lobby keeps working throug
 - [x] **Stage C: migrate `ChatPanel`.** **Smoke:** type chat messages, confirm they appear; receive messages from another client.
 - [x] **Stage D: migrate `GameSelectPanel`.** **Smoke:** browse server list, refresh, see games appear/disappear — interactive pass pending (TEXTINPUT login limitation).
 - [x] **Stage E: migrate `GameCreatePanel`.** **Smoke:** open create-game form, enter game name, select map, set parameters, click create; confirm map upload triggers; confirm you land in the lobby of the created game — interactive pass pending (TEXTINPUT login limitation).
-- [ ] **Stage F: migrate `GameJoinPanel`.** **Smoke:** join a game from the list; confirm player roster updates.
-- [ ] **Stage G: migrate `GameTechPanel`.** **Smoke:** open tech tree, browse, select a research item.
+- [x] **Stage F: migrate `GameJoinPanel`.** Verified: clean regular + unity Debug builds; E2E `00_ping`/`10_navigate`/`20_screenshot` pass. Interactive lobby smoke (login, ready/change-team/choose-tech roundtrip) not exercised — TEXTINPUT login limitation.
+- [x] **Stage G: migrate `GameTechPanel`.** Verified: clean regular + unity Debug builds; E2E suite passes. Interactive smoke (per-peer checkbox click, description scroll, Back To Teams) not exercised — TEXTINPUT login limitation.
 - [ ] **Stage H: cleanup.** Delete what's left of `Game::ProcessLobbyInterface`, `Game::CreateLobbyInterface`, `Game::UpdateLobbyMapName`, and the `lobbyinterface`/`chatinterface`/etc. `Uint16` members. **Smoke:** full lobby flow once more.
 
 After Phase 3: every menu surface is a Screen/Panel/Modal class. `Game` has no `Create*Interface`/`Process*Interface` methods left.
@@ -255,12 +263,14 @@ You're picking up the `refactor/game-cpp` branch mid-Phase-3. The user is largel
 
 ### What's already landed
 
-Stages A–E of Phase 3 are committed. The lobby right-side surface is now panel-driven:
-- `ui/screens/lobby/lobby_screen.{h,cpp}` — owns panels by composition, exposes `ShowGameSelect(ctx)` / `ShowGameCreate(ctx)` swap helpers.
+Stages A–G of Phase 3 are committed. The lobby right-side surface is now fully panel-driven:
+- `ui/screens/lobby/lobby_screen.{h,cpp}` — owns panels by composition, exposes `ShowGameSelect(ctx)` / `ShowGameCreate(ctx)` / `ShowGameJoin(ctx)` / `ShowGameTech(ctx)` swap helpers (all routed through a shared `TearDownRightPanels` static).
 - `ui/screens/lobby/panels/character_panel.{h,cpp}` (value member, always-alive)
 - `ui/screens/lobby/panels/chat_panel.{h,cpp}` (value member, always-alive)
-- `ui/screens/lobby/panels/game_select_panel.{h,cpp}` (`unique_ptr`, swap with gameCreate)
-- `ui/screens/lobby/panels/game_create_panel.{h,cpp}` (`unique_ptr`, swap with gameSelect)
+- `ui/screens/lobby/panels/game_select_panel.{h,cpp}` (`unique_ptr`, mutually exclusive with the other three)
+- `ui/screens/lobby/panels/game_create_panel.{h,cpp}` (`unique_ptr`, mutually exclusive)
+- `ui/screens/lobby/panels/game_join_panel.{h,cpp}` (`unique_ptr`, mutually exclusive)
+- `ui/screens/lobby/panels/game_tech_panel.{h,cpp}` (`unique_ptr`, mutually exclusive)
 
 `ScreenContext` carries `World/Renderer/Lobby/KeyMap/Updater/AmbienceMixer/MapDownloader` refs + state-machine actions; it is **not** a junk drawer of per-screen accessors. Panels reach Game directly via `ctx.game.X` for temp scaffolding (members made public during the migration; deleted in Stage H).
 
@@ -268,20 +278,20 @@ Stages A–E of Phase 3 are committed. The lobby right-side surface is now panel
 
 ### Next checkboxes (in order)
 
-1. **Stage F — `GameJoinPanel`.** Small (~35 LoC). 3 buttons: Ready (uid 25), Change Team (uid 26), Choose Tech (uid 27). The panel is built/torn down by `Game::TickLobbyBody`'s CONNECTED transition (line ~2236) and by `Game::GoBack` (gamejoin/gametech path). You'll want a `LobbyScreen::ShowGameJoin(ctx)` helper, parallel to `ShowGameSelect`/`ShowGameCreate`. The Choose Tech button swaps to `GameTechPanel` — until Stage G that's still legacy `Game::CreateGameTechInterface`. Watch the BUTTON uid 27/28 swap inside `ProcessLobbyInterface` — those need to move out.
-2. **Stage G — `GameTechPanel`.** Bigger (~270 LoC) including `Game::UpdateTechInterface()` (per-tick refresh of tech-slot buttons + team peer overlays). The tech buttons are dynamically generated based on `world.buyableitems` × the local team's agency — keep that loop intact. `UpdateTechInterface` is called from `Game::ProcessLobbyInterface` line ~3186 (the very first line) — that call moves into `GameTechPanel::Tick`.
-3. **Stage H — cleanup.** What should be deletable after F + G:
-   - `Game::CreateGameJoinInterface`, `Game::CreateGameTechInterface`, `Game::UpdateTechInterface`, `Game::UpdateLobbyMapName` (only called from `TickLobbyBody`'s CONNECTED transition).
-   - The remaining `Game::ProcessLobbyInterface` body (it should be only the BUTTON uid 10 GoBack arm + the BUTTON uid 50 modal-OK arm at that point — both can move; uid 50 is modal lifecycle, lifts to Stage Modals).
-   - Public scaffolding members on `Game`: `lobbyinterface`, `chatinterface`, `gameselectinterface`, `gamecreateinterface`, `currentinterface` (move back to private once panels stop touching it), `currentlobbygameid`, `creategameclicked`, `mappreviewinterface`, `minimized`. The methods `CreateLobbyInterface`, `TickLobbyBody`, `JoinGame`, `CreateModalDialog`, `CreatePasswordDialog`, `CreateMapPreview` likewise — once their last caller is migrated.
+1. **Stage H — cleanup.** What's still standing after F + G that *could* go away:
+   - `Game::UpdateLobbyMapName` is only called from `TickLobbyBody`'s CONNECTED transition. It mutates a uid-8 overlay inside the lobby iface — natural home is on a panel that owns the lobby chrome (or fold into a future LobbyChromePanel).
+   - `Game::ProcessLobbyInterface` is now only the BUTTON uid 10 (Go Back) + uid 50 (modal OK) arms plus the modaldialog teardown loop. uid 10 is genuine lobby chrome ("Go Back" is on the lobby iface itself, not a panel). uid 50 is modal lifecycle — lifts to the still-pending Modals work (`ModalDialog`, `PasswordDialog`).
+   - Public scaffolding members on `Game`: `lobbyinterface`, `chatinterface`, `gameselectinterface`, `gamecreateinterface`, `gamejoininterface`, `gametechinterface`, `currentinterface`, `currentlobbygameid`, `creategameclicked`, `mappreviewinterface`, `minimized`. Some can be re-privatized today; others (`gamecreateinterface`, `currentlobbygameid`, `creategameclicked`) are still actively read by the deferred-create state machine in `Game::TickLobbyBody`.
+   - The `World` friend grants for `GameJoinPanel` / `GameTechPanel` / `LobbyScreen` are migration-scoped — replace with narrow public accessors (`World::GetLocalPeer()`, `World::IsHost()`, etc.) when convenient.
    - **Watch for**: the deferred-create state machine in `Game::TickLobbyBody` (lines ~2126–2167) still polls `mapDownloader.mapUploadState` + `world.lobby.creategamestatus`. Reasonable home is in `GameCreatePanel::Tick` (the panel kicked it off), but the `world.Connect` + `joininggame=true` handoff is genuinely Game-state. Decide based on what's left of `TickLobbyBody` after Stage H.
 
-### Other work queued in the spec
+2. **Modals work** (`ModalDialog`, `PasswordDialog`, `MapPreviewModal`) — needed before `Game::CreateModalDialog` / `CreatePasswordDialog` / `CreateMapPreview` can be deleted. Wire up `ScreenContext::ShowMessage` (currently asserts) when you do this. The case 50 (modal OK) arm in `ProcessLobbyInterface` migrates here.
 
-- The Modals (`ModalDialog`, `PasswordDialog`, `MapPreviewModal`) — needed before `Game::CreateModalDialog` / `CreatePasswordDialog` / `CreateMapPreview` can be deleted. Wire up `ScreenContext::ShowMessage` (currently asserts) when you do this.
-- `GameSummaryScreen` — straightforward, similar pattern to other screens.
-- Phase 4 mechanical splits (events.cpp, ingame.cpp, headless.cpp, tick_*.cpp) — pure file moves, save for last.
-- Phase 5 cleanup + size-target check.
+3. **`GameSummaryScreen`** — straightforward, similar pattern to other screens.
+
+4. **Phase 4 mechanical splits** (events.cpp, ingame.cpp, headless.cpp, tick_*.cpp) — pure file moves, save for last.
+
+5. **Phase 5 cleanup + size-target check.**
 
 ### Verification
 
