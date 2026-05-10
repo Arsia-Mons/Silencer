@@ -32,6 +32,8 @@
 #include "options_controls_screen.h"
 #include "options_display_screen.h"
 #include "options_audio_screen.h"
+#include "lobby_connect_screen.h"
+#include "update_screen.h"
 #include <algorithm>
 #include <stdio.h>
 
@@ -55,7 +57,7 @@ static bool IsBuiltinProfile(const std::string& name);
 Game::Game() : renderer(world), screenbuffer(640, 480),
                mapDownloader(world),
                ambienceMixer(world, renderer, mapDownloader, fade_i),
-               screenContext(*this, world, renderer, world.lobby, keymap, updater){
+               screenContext(*this, world, renderer, world.lobby, keymap, updater, ambienceMixer){
 	world.SetVersion(SILENCER_VERSION);
 	frames = 0;
 	fps = 0;
@@ -68,7 +70,6 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	gametechinterface = 0;
 	gameselectinterface = 0;
 	mappreviewinterface = 0;
-	updateinterface = 0;
 	modalinterface = 0;
 	sharedstate = 0;
 	currentlobbygameid = 0;
@@ -776,22 +777,16 @@ bool Game::Tick(void){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
 				world.lobby.ClearGames();
-				currentinterface = CreateLobbyConnectInterface()->id;
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-				renderer.palette.SetPalette(2);
 				world.lobby.state = Lobby::WAITING;
-				motdprinted = false;
+				renderer.palette.SetPalette(2);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
+				PushScreen(std::make_unique<LobbyConnectScreen>());
+				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
-					//Audio::GetInstance().ambienceMixer.PlayMusic(world.resources.menumusic);
 					ambienceMixer.PlayMusic(world.resources.menumusic);
-					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-					if(iface){
-						ProcessLobbyConnectInterface(iface);
-					}
 				}
 			}
 		}break;
@@ -986,19 +981,15 @@ bool Game::Tick(void){
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				CreateUpdateInterface();
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 				renderer.palette.SetPalette(2);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
+				PushScreen(std::make_unique<UpdateScreen>());
+				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
-				}
-				Interface * iface = static_cast<Interface *>(world.GetObjectFromId(updateinterface));
-				if(iface){
-					ProcessUpdateInterface(iface);
 				}
 			}
 		}break;
@@ -2281,89 +2272,6 @@ void Game::GoToState(Uint8 newstate){
 	screenStackPendingTeardown = true;
 }
 
-Interface * Game::CreateLobbyConnectInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 7;
-	background->res_index = 2;
-	Button * loginbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	loginbutton->y = 339;
-	loginbutton->x = 264;
-	loginbutton->SetType(Button::B52x21);
-	loginbutton->uid = 0;
-	strcpy(loginbutton->text, "Login");
-	Button * cancelbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	cancelbutton->y = 339;
-	cancelbutton->x = 321;
-	cancelbutton->SetType(Button::B52x21);
-	cancelbutton->uid = 1;
-	strcpy(cancelbutton->text, "Cancel");
-	TextBox * textbox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
-	textbox->x = 185;
-	textbox->y = 101;
-	textbox->width = 250;
-	textbox->height = 170;
-	textbox->res_bank = 133;
-	textbox->lineheight = 11;
-	textbox->fontwidth = 6;
-	Overlay * usernametext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	usernametext->text = "Username";
-	usernametext->textbank = 134;
-	usernametext->textwidth = 9;
-	usernametext->x = 190;
-	usernametext->y = 291;
-	Overlay * passwordtext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	passwordtext->text = "Password";
-	passwordtext->textbank = 134;
-	passwordtext->textwidth = 9;
-	passwordtext->x = 190;
-	passwordtext->y = 318;
-	TextInput * usernameinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	usernameinput->x = 275;
-	usernameinput->y = 293;
-	usernameinput->width = 180;
-	usernameinput->height = 14;
-	usernameinput->res_bank = 133;
-	usernameinput->fontwidth = 6;
-	usernameinput->maxchars = 16;
-	usernameinput->maxwidth = 16;
-	usernameinput->uid = 1;
-	TextInput * passwordinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	passwordinput->x = 275;
-	passwordinput->y = 320;
-	passwordinput->width = 180;
-	passwordinput->height = 14;
-	passwordinput->res_bank = 133;
-	passwordinput->fontwidth = 6;
-	passwordinput->maxchars = 28;
-	passwordinput->maxwidth = 28;
-	passwordinput->password = true;
-	passwordinput->uid = 2;
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-#ifdef OUYA
-	Overlay * helptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	helptext->text = "Use the trackpad to click on input boxes";
-	helptext->textbank = 134;
-	helptext->textwidth = 9;
-	helptext->x = 320 - ((strlen(helptextstring) * helptext->textwidth) / 2);
-	helptext->y = 400;
-#endif
-	
-	iface->AddObject(textbox->id);
-	iface->AddObject(usernameinput->id);
-	iface->AddObject(passwordinput->id);
-	iface->AddObject(loginbutton->id);
-	iface->AddObject(cancelbutton->id);
-	iface->AddTabObject(usernameinput->id);
-	iface->AddTabObject(passwordinput->id);
-	iface->AddTabObject(loginbutton->id);
-	iface->AddTabObject(cancelbutton->id);
-	iface->activeobject = usernameinput->id;
-	iface->ActiveChanged(world, iface, false);
-	iface->buttonenter = loginbutton->id;
-	iface->buttonescape = cancelbutton->id;
-	return iface;
-}
-
 Interface * Game::CreateLobbyInterface(void){
 	chatlinesprinted = 0;
 	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
@@ -3287,210 +3195,6 @@ Interface * Game::CreateModalDialog(const char * message, bool ok){
 	return dialoginterface;
 }
 
-Interface * Game::CreateUpdateInterface(void){
-	Interface * iface = static_cast<Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
-	// Background (reuse modal-dialog sprite — same one CreateModalDialog uses;
-	// its baked-in offsets center it, so no x/y needed).
-	Overlay * background = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	background->renderpass = 3;
-	background->res_bank = 40;
-	background->res_index = 4;
-	// Status line (mutated each frame; x re-centered in ProcessUpdateInterface
-	// since text length varies with state).
-	Overlay * status = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	status->renderpass = 3;
-	status->text = "";
-	status->textbank = 134;
-	status->textwidth = 8;
-	status->x = 320;
-	status->y = 200;
-	status->uid = 1;
-	// Progress bar (sized by ProcessUpdateInterface while DOWNLOADING).
-	Overlay * progress = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	progress->renderpass = 3;
-	progress->text = "";
-	progress->textbank = 134;
-	progress->textwidth = 8;
-	progress->x = 320;
-	progress->y = 215;
-	progress->uid = 2;
-	// Action buttons — uids 250, 252, 253 share the left slot; exactly one is
-	// visible based on Updater state. Cancel (251) is always on the right.
-	// Two B156x21 side-by-side centered on x=320 (mirrors horizontal pair
-	// in CreateLobbyConnectInterface, scaled up).
-	Button * updatebutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	updatebutton->renderpass = 3;
-	updatebutton->x = 161;
-	updatebutton->y = 230;
-	updatebutton->SetType(Button::B156x21);
-	updatebutton->uid = 250;
-	strcpy(updatebutton->text, "Update");
-	Button * cancelbutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	cancelbutton->renderpass = 3;
-	cancelbutton->x = 322;
-	cancelbutton->y = 230;
-	cancelbutton->SetType(Button::B156x21);
-	cancelbutton->uid = 251;
-	strcpy(cancelbutton->text, "Cancel");
-	Button * retrybutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	retrybutton->renderpass = 3;
-	retrybutton->x = 161;
-	retrybutton->y = 230;
-	retrybutton->SetType(Button::B156x21);
-	retrybutton->uid = 252;
-	strcpy(retrybutton->text, "Retry");
-	Button * openbutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	openbutton->renderpass = 3;
-	openbutton->x = 161;
-	openbutton->y = 230;
-	openbutton->SetType(Button::B156x21);
-	openbutton->uid = 253;
-	strcpy(openbutton->text, "Download");
-	iface->AddObject(background->id);
-	iface->AddObject(status->id);
-	iface->AddObject(progress->id);
-	iface->AddObject(updatebutton->id);
-	iface->AddObject(cancelbutton->id);
-	iface->AddObject(retrybutton->id);
-	iface->AddObject(openbutton->id);
-	iface->modal = true;
-	updateinterface = iface->id;
-	currentinterface = iface->id;
-	return iface;
-}
-
-void Game::ProcessUpdateInterface(Interface * iface){
-	Updater::State ustate = updater.GetState();
-	// Pass 1: update status/progress overlays and button inactive flags.
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(!object){
-			continue;
-		}
-		if(object->type == ObjectTypes::OVERLAY){
-			Overlay * overlay = static_cast<Overlay *>(object);
-			if(overlay->uid == 1){
-				switch(ustate){
-					case Updater::PROMPTING:
-						overlay->text = "An update is required to play online.";
-					break;
-					case Updater::DOWNLOADING:{
-						char buf[32];
-						snprintf(buf, sizeof(buf), "%d%%", int(updater.GetProgress() * 100));
-						overlay->text = buf;
-					}break;
-					case Updater::VERIFYING:
-						overlay->text = "Verifying...";
-					break;
-					case Updater::STAGING:
-						overlay->text = "Restarting...";
-					break;
-					case Updater::FAILED:
-						overlay->text = updater.GetErrorMessage();
-					break;
-					case Updater::IDLE:
-					case Updater::DONE:
-					default:
-						overlay->text = "";
-					break;
-				}
-				overlay->x = 320 - ((overlay->text.length() * overlay->textwidth) / 2);
-			}else if(overlay->uid == 2){
-				// Simple textual progress indicator for now; real bar rendering
-				// can be introduced later without re-touching the state wiring.
-				if(ustate == Updater::DOWNLOADING){
-					int width = int(updater.GetProgress() * 20.0f);
-					std::string bar = "[";
-					for(int i = 0; i < 20; i++){
-						bar += (i < width) ? "=" : " ";
-					}
-					bar += "]";
-					overlay->text = bar;
-				}else{
-					overlay->text = "";
-				}
-				overlay->x = 320 - ((overlay->text.length() * overlay->textwidth) / 2);
-			}
-		}else if(object->type == ObjectTypes::BUTTON){
-			Button * button = static_cast<Button *>(object);
-			bool active = false;
-			switch(button->uid){
-				case 250: // Update
-					active = (ustate == Updater::PROMPTING);
-				break;
-				case 251: // Cancel
-					active = (ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED);
-				break;
-				case 252: // Retry
-					active = (ustate == Updater::FAILED && updater.GetRetryCount() < 3);
-				break;
-				case 253: // Download (opens browser to release page)
-					active = (ustate == Updater::FAILED && updater.GetRetryCount() >= 3);
-				break;
-				default:
-					continue;
-			}
-			// 250/252/253 overlap (same x/y); only the active one draws.
-			// Cancel (251) always draws; the click handler below guards by
-			// ustate so stale clicks during VERIFYING/STAGING are no-ops.
-			// Don't touch button->state here — Interface::Tick owns hover
-			// activation, and fighting it causes the hover sound to spam
-			// every frame the mouse isn't over the button.
-			button->draw = active || (button->uid == 251);
-		}
-	}
-	// Pass 2: dispatch button clicks.
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(!object || object->type != ObjectTypes::BUTTON){
-			continue;
-		}
-		Button * button = static_cast<Button *>(object);
-		if(!button->clicked){
-			continue;
-		}
-		switch(button->uid){
-			case 250:{
-				if(ustate == Updater::PROMPTING){
-					updater.Consent();
-				}
-			}break;
-			case 251:{
-				if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
-					if(ustate == Updater::DOWNLOADING){
-						updater.Cancel();
-					}
-					GoToState(MAINMENU);
-				}
-			}break;
-			case 252:{
-				if(ustate == Updater::FAILED && updater.GetRetryCount() < 3){
-					updater.Retry();
-				}
-			}break;
-			case 253:{
-				if(ustate == Updater::FAILED && updater.GetRetryCount() >= 3){
-					std::string url = updater.GetDownloadURL();
-#ifdef _WIN32
-					std::string cmd = "start \"\" \"" + url + "\"";
-#elif defined(__APPLE__)
-					std::string cmd = "open '" + url + "'";
-#else
-					std::string cmd = "xdg-open '" + url + "' &";
-#endif
-					system(cmd.c_str());
-					GoToState(MAINMENU);
-				}
-			}break;
-		}
-		button->clicked = false;
-	}
-	// If the updater reached STAGING, hand off to the stage-2 launcher.
-	if(updater.GetState() == Updater::STAGING){
-		LaunchStage2();
-	}
-}
-
 void Game::LaunchStage2(void){
 	std::string zippath =
 #ifdef _WIN32
@@ -3706,146 +3410,6 @@ bool Game::GoBack(void){
 		GoToState(MAINMENU);
 	}
 	return false;
-}
-
-void Game::ProcessLobbyConnectInterface(Interface * iface){
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object->type == ObjectTypes::TEXTBOX){
-			TextBox * textbox = static_cast<TextBox *>(object);
-			if(textbox){
-				world.lobby.LockMutex();
-				switch(world.lobby.state){
-					case Lobby::CONNECTING:
-					
-					break;
-					case Lobby::WAITINGFORRESOLVER:
-						
-					break;
-					case Lobby::AUTHSENT:
-						
-					break;
-					case Lobby::IDLE:
-						
-					break;
-					case Lobby::WAITING:{
-						char line[128];
-						snprintf(line, sizeof(line), "Connecting to %s:%d", Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
-						textbox->AddLine(line);
-						world.lobby.Connect(Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
-						//world.lobby.state = Lobby::AUTHENTICATED;
-					}break;
-					case Lobby::RESOLVING:
-						textbox->AddLine("Resolving hostname...");
-						world.lobby.state = Lobby::WAITINGFORRESOLVER;
-					break;
-					case Lobby::RESOLVEFAILED:
-						textbox->AddLine("Could not resolve hostname");
-						//world.lobby.Disconnect();
-						world.lobby.state = Lobby::IDLE;
-					break;
-					case Lobby::RESOLVED:
-						textbox->AddLine("Hostname resolved");
-						world.lobby.Connect(Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
-					break;
-					case Lobby::CONNECTED:
-						textbox->AddLine("Connected");
-						textbox->AddLine("Checking version...");
-						world.lobby.SendVersion();
-						world.lobby.state = Lobby::CHECKINGVERSION;
-					break;
-					case Lobby::CHECKINGVERSION:
-						if(world.lobby.versionchecked){
-							if(world.lobby.versionok){
-								textbox->AddLine("Software version is current");
-								world.lobby.state = Lobby::AUTHENTICATING;
-							}else{
-								if(world.lobby.updateavailable){
-									// Route into the auto-updater flow.
-									updater.PresentUpdate(world.lobby.updateurl, world.lobby.updatesha256);
-									world.lobby.Disconnect();
-									world.lobby.state = Lobby::IDLE;
-									world.lobby.UnlockMutex();
-									GoToState(UPDATING);
-									return;
-								}else{
-									textbox->AddLine("Software is out of date");
-									textbox->AddLine("Get latest version at:");
-									textbox->AddLine("https://github.com/Arsia-Mons/Silencer");
-									world.lobby.Disconnect();
-									world.lobby.state = Lobby::IDLE;
-								}
-							}
-						}
-					break;
-					case Lobby::AUTHENTICATING:
-						//world.lobby.state = Lobby::AUTHENTICATED;
-					break;
-					case Lobby::AUTHFAILED:
-						textbox->AddLine("Authentication failed");
-						if(strlen(world.lobby.failmessage) > 0){
-							textbox->AddLine(world.lobby.failmessage);
-						}
-						world.lobby.state = Lobby::AUTHENTICATING;
-						//world.lobby.Disconnect();
-					break;
-					case Lobby::AUTHENTICATED:
-						textbox->AddLine("Authenticated");
-						GoToState(LOBBY);
-					break;
-					case Lobby::CONNECTIONFAILED:
-						textbox->AddLine("Connection failed");
-						world.lobby.state = Lobby::IDLE;
-					break;
-					case Lobby::DISCONNECTED:
-						textbox->AddLine("Disconnected");
-						world.lobby.state = Lobby::IDLE;
-					break;
-				}
-				if(world.lobby.motdreceived && !motdprinted){
-					char * line = strtok(world.lobby.motd, "\n");
-					while(line != 0){
-						textbox->AddLine(line);
-						line = strtok(NULL, "\n");
-					}
-					motdprinted = true;
-				}
-				world.lobby.UnlockMutex();
-			}
-		}else
-		if(object->type == ObjectTypes::BUTTON){
-			Button * button = static_cast<Button *>(object);
-			if(button && button->clicked){
-				switch(button->uid){
-					case 0:{
-						if(world.lobby.state == Lobby::AUTHENTICATING){
-							TextInput * usernameinput = static_cast<TextInput *>(iface->GetObjectWithUid(world, 1));
-							TextInput * passwordinput = static_cast<TextInput *>(iface->GetObjectWithUid(world, 2));
-							if(usernameinput && passwordinput){
-								strcpy(localusername, usernameinput->text);
-								world.lobby.SendCredentials(usernameinput->text, passwordinput->text);
-								world.lobby.state = Lobby::AUTHSENT;
-							}
-						}
-					}break;
-					case 1:{
-						GoToState(MAINMENU);
-					}break;
-				}
-				button->clicked = false;
-			}
-		}else
-		if(object->type == ObjectTypes::TEXTINPUT){
-			TextInput * textinput = static_cast<TextInput *>(object);
-			if(textinput){
-				if(world.lobby.state == Lobby::AUTHSENT){
-					textinput->inactive = true;
-				}else{
-					textinput->inactive = false;
-				}
-			}
-		}
-	}
 }
 
 bool Game::ProcessLobbyInterface(Interface * iface){

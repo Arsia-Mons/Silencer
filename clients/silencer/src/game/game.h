@@ -116,7 +116,6 @@ private:
 	void GiveDefaultItems(Player & player);
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
 	void GoToState(Uint8 newstate);
-	Interface * CreateLobbyConnectInterface(void);
 	Interface * CreateLobbyInterface(void);
 	Interface * CreateCharacterInterface(void);
 	Interface * CreateGameSelectInterface(void);
@@ -126,8 +125,9 @@ private:
 	Interface * CreateGameTechInterface(void);
 	Interface * CreateGameSummaryInterface(Stats & stats, Uint8 agency);
 	Interface * CreateModalDialog(const char * message, bool ok = true);
-	Interface * CreateUpdateInterface(void);
-	void ProcessUpdateInterface(Interface * iface);
+	// Spawns the stage-2 updater process and tears down SDL/audio cleanly.
+	// Stays on Game (touches process and SDL teardown state); UpdateScreen
+	// invokes it via ScreenContext::LaunchStage2.
 	void LaunchStage2(void);
 	Interface * CreateMapPreview(const char * filename);
 	void DestroyModalDialog(void);
@@ -143,9 +143,7 @@ private:
 	Uint16 modalinterface;
 	Uint16 passwordinterface;
 	Uint16 mappreviewinterface;
-	Uint16 updateinterface;
 	Updater updater;
-	void ProcessLobbyConnectInterface(Interface * iface);
 	bool ProcessLobbyInterface(Interface * iface);
 	void ProcessGameSummaryInterface(Interface * iface);
 	void UpdateLobbyMapName(const char * name);
@@ -180,7 +178,6 @@ private:
 	Uint64 lasttick;
 	Uint16 currentinterface;
 	Uint16 aftermodalinterface;
-	bool motdprinted;
 	Uint32 chatlinesprinted;
 	char localusername[16 + 1];
 	Uint16 sharedstate;

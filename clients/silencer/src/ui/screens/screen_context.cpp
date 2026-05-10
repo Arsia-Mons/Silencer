@@ -6,18 +6,21 @@
 #include "renderdevice.h"
 #include <SDL3/SDL_video.h>
 #include <cassert>
+#include <cstring>
 
 ScreenContext::ScreenContext(Game & game_,
                              World & world_,
                              Renderer & renderer_,
                              Lobby & lobby_,
                              KeyMap & keymap_,
-                             Updater & updater_)
+                             Updater & updater_,
+                             AmbienceMixer & ambienceMixer_)
     : world(world_),
       renderer(renderer_),
       lobby(lobby_),
       keymap(keymap_),
       updater(updater_),
+      ambienceMixer(ambienceMixer_),
       game(game_)
 {
 }
@@ -48,4 +51,14 @@ void ScreenContext::SetScaleFilter(bool on)
 const char * ScreenContext::KeyName(SDL_Scancode sc) const
 {
 	return game.GetKeyName(sc);
+}
+
+void ScreenContext::LaunchStage2() { game.LaunchStage2(); }
+
+void ScreenContext::SetLocalUsername(const char * name)
+{
+	if(!name) return;
+	const size_t cap = sizeof(game.localusername);
+	strncpy(game.localusername, name, cap - 1);
+	game.localusername[cap - 1] = '\0';
 }

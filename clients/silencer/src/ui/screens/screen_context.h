@@ -14,6 +14,7 @@ class KeyMap;
 class Screen;
 class Modal;
 class Game;
+class AmbienceMixer;
 
 // Curated API screens use to talk to Game. Holds refs to subsystems and the
 // state-machine / screen-stack actions Screens are allowed to invoke. No
@@ -27,13 +28,15 @@ public:
 	              Renderer & renderer,
 	              Lobby & lobby,
 	              KeyMap & keymap,
-	              Updater & updater);
+	              Updater & updater,
+	              AmbienceMixer & ambienceMixer);
 
 	World &   world;
 	Renderer & renderer;
 	Lobby &   lobby;
 	KeyMap &  keymap;
 	Updater & updater;
+	AmbienceMixer & ambienceMixer;
 
 	// State-machine + screen-stack actions. Phase-1 stubs — wired up when the
 	// first screen migrates.
@@ -60,6 +63,16 @@ public:
 	// Keyname lookup shared with tutorial overlays; kept on Game so screen
 	// callers go through the context rather than reaching for Game.
 	const char * KeyName(SDL_Scancode sc) const;
+
+	// Updater stage-2 hand-off lives on Game because it touches process /
+	// SDL teardown state the screen has no business with. UpdateScreen
+	// invokes it via this shim.
+	void LaunchStage2();
+
+	// LobbyConnectScreen captures the entered username into Game's
+	// localusername buffer so CharacterPanel (still on Game today) can
+	// render it after authentication.
+	void SetLocalUsername(const char * name);
 
 private:
 	Game & game;

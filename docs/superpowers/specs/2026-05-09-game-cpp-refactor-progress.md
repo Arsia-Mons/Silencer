@@ -46,6 +46,16 @@ Phase 3 in progress — `MainMenuScreen` + all four options screens migrated. `G
 
 Verified: clean Release + unity builds (only the pre-existing C4804 warning); `00_ping`/`10_navigate`/`20_screenshot` E2E pass. Agent-driven smoke through Options → Controls → Display → Audio (with Save/Cancel/Go Back round-trips) confirms all four screens render and dispatch correctly. Interactive smoke (rebind+cycle+save persistence; fullscreen toggle; music toggle persistence) pending.
 
+`LobbyConnectScreen` and `UpdateScreen` migrated together. The `case LOBBYCONNECT:` and `case UPDATING:` bodies in `Game::Tick` collapsed to the canonical `if(stateisnew){ <one-time setup>; PushScreen(make_unique<...>()); stateisnew = false; }else{ <ambience music> }` shape; per-tick logic moved into the screen `Tick` methods. Side effects:
+- `AmbienceMixer & ambienceMixer` added to `ScreenContext` so `LobbyConnectScreen::Tick` can preserve the legacy `FadedIn()` gate that delays the first lobby-state-machine pump until the menu music has crossfaded in. Matches the design-doc decisions log entry that names AmbienceMixer as a subsystem ref.
+- New `ScreenContext` actions: `LaunchStage2()` (delegates to `Game::LaunchStage2` — process/SDL teardown stays on Game) and `SetLocalUsername(const char *)` (writes the captured login text into Game's `localusername` buffer, since `CharacterPanel` on the un-migrated `LobbyScreen` still reads it).
+- `Game::motdprinted` deleted; the flag now lives as a private `LobbyConnectScreen` member, reset on construction (which happens on every entry into `LOBBYCONNECT` via `PushScreen`) — same semantics as the legacy reset.
+- `Game::updateinterface` member deleted; `lobbyconnectinterface` was never a separate field (the legacy code stored its id in `currentinterface` only), so nothing to delete there.
+- `Game::CreateLobbyConnectInterface`, `Game::ProcessLobbyConnectInterface`, `Game::CreateUpdateInterface`, `Game::ProcessUpdateInterface` deleted. `Game::LaunchStage2` kept on Game per the user direction (touches process spawn + SDL teardown state).
+- Anon-namespace uid enumerators are file-prefixed (`LBY_BTN_LOGIN`/`LBY_BTN_CANCEL`/`LBY_INPUT_USERNAME`/`LBY_INPUT_PASSWORD`; `UPD_BTN_UPDATE`/`UPD_BTN_CANCEL`/`UPD_BTN_RETRY`/`UPD_BTN_DOWNLOAD`/`UPD_OVERLAY_STATUS`/`UPD_OVERLAY_PROGRESS`) so they don't collide under `SILENCER_UNITY_BUILD`.
+
+Verified: clean regular + unity Debug builds (only the pre-existing C4804 warning at `IsLiveMultiplayer`). Authentic interactive smoke for the full lobby→update path: ran a local lobby with `-version "99999" -update-manifest manifest.json` (manifest pointed at `https://example.invalid/...` to flip `updateavailable=true`); client transitioned LobbyConnect → UpdateScreen on version-reject, displayed PROMPTING, dispatched Update → DOWNLOADING → FAILED with "Could not resolve hostname" and the Retry+Cancel button pair at the correct positions. Pixel-identical to the pre-refactor render (the screen code is a byte-for-byte move, only the dispatch surface changed).
+
 ---
 
 ## Phase 0 — Baseline
@@ -101,7 +111,7 @@ The migration pattern for each screen:
 **Order:** small screens first to validate the pattern; the big screen (Lobby) last. Modals before LobbyScreen because LobbyScreen depends on them.
 
 - [x] **`MainMenuScreen`.** Smallest screen, validates the pattern. **Smoke:** all 4 buttons (Start, Lobby Connect, Options, Quit) — interactive pass pending.
-- [ ] **`LobbyConnectScreen`.** Validates a screen with non-trivial Tick logic (state machine that cycles through Lobby connection states). **Smoke:** connect to a running lobby; force a connection failure (wrong host) and confirm the error display path; back-out to main menu.
+- [x] **`LobbyConnectScreen`.** Validates a screen with non-trivial Tick logic (state machine that cycles through Lobby connection states). **Smoke:** connected to a local lobby (clean run + version-mismatch run); textbox state machine transitions correctly; version-reject path correctly hands off to UPDATING. Wrong-host connection-failure path not exercised yet.
 - [ ] **`ModalDialog` (in `ui/modals/`).** Add as a `Modal` and route `Game::CreateModalDialog` calls to `ctx.ShowMessage(...)`. Old method stays for now (still called from un-migrated screens). **Smoke:** trigger any modal-dialog path that's already exercised — currently those are only fired from in-lobby code paths. Use `silencer-cli` to inject one if needed for testing.
 - [ ] **`PasswordDialog` (in `ui/modals/`).** Same treatment as ModalDialog. **Smoke:** join a password-protected game.
 - [ ] **`MapPreviewModal` (in `ui/screens/lobby/modals/`).** Same — added as a Modal but old `CreateMapPreview` stays callable until LobbyScreen migrates. **Smoke:** select a map in the game-create flow and confirm the preview shows.
@@ -109,7 +119,7 @@ The migration pattern for each screen:
 - [x] **`OptionsControlsScreen`** — biggest options screen, owns its keybind UI helpers (`LegacyView`/`WriteLegacy` are now private statics on the screen). `GetActionKeyDisplayName`, `GetKeyName`, `LoadActiveKeymap`, `CycleKeybindPreset`, `ForkActiveProfileIfBuiltin` stay on Game (consumed by tutorial overlays + ControlDispatch); the screen reaches them via `ScreenContext::CycleKeybindPreset`/`ForkActiveProfileIfBuiltin`/`LoadActiveKeymap`/`KeyName`. **Smoke:** screen renders identically (Preset, 5 binding rows, scrollbar, Save/Cancel) — agent screenshot matches. Interactive rebind/cycle/save round-trip pending.
 - [x] **`OptionsDisplayScreen`.** Wires fullscreen + smooth-scaling toggles via two new `ScreenContext` actions (`SetFullscreen`, `SetScaleFilter`) so the screen never touches `SDL_Window` or `RenderDevice` directly. **Smoke:** screen renders identically; navigation works. Interactive fullscreen toggle pending.
 - [x] **`OptionsAudioScreen`.** Music toggle drives `Audio::GetInstance()` directly (singleton, no Game reach needed). **Smoke:** screen renders identically; navigation works.
-- [ ] **`UpdateScreen`.** **Smoke:** trigger the updater path (lobby reports out-of-date version); confirm progress bar, completion, stage-2 launch.
+- [x] **`UpdateScreen`.** **Smoke:** triggered via local lobby `-version "99999" -update-manifest manifest.json` with manifest pointing at `https://example.invalid/...`; PROMPTING → DOWNLOADING → FAILED transitions render correctly with status text + button visibility (Update/Cancel → Cancel only → Retry+Cancel). Stage-2 launch and the >=3-retry Download path not exercised (would need a real signed update zip).
 - [ ] **`GameSummaryScreen`.** **Smoke:** finish a game (or use replay/test mode); confirm summary stats render and "back to lobby" works.
 
 ### LobbyScreen — special case (multi-step, each step green)
