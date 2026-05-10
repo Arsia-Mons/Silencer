@@ -73,7 +73,7 @@ jobs:
       - name: Install C++ build deps
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: cmake build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf
+          packages: cmake ninja-build build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf
           version: 2.0
 
       # SDL3 + SDL3_mixer aren't in Ubuntu Noble's apt repos. Install via
@@ -101,14 +101,13 @@ jobs:
         env:
           LOBBY_HOST: ${{ vars.LOBBY_HOST }}
         run: |
-          mkdir -p build && cd build
-          cmake \
+          cmake -B build -S clients/silencer \
+            -G Ninja \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DSILENCER_UNITY_BUILD=ON \
-            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}" \
-            ../clients/silencer
-          make -j"$(nproc)"
+            -DSILENCER_LOBBY_HOST="${LOBBY_HOST:-lobby.arsiamons.com}"
+          cmake --build build -j"$(nproc)"
 
       # Ship SDL3 + SDL3_mixer .so files in lib/ next to the binary, with
       # rpath = $ORIGIN/lib, so the dedicated server runs on the lobby box

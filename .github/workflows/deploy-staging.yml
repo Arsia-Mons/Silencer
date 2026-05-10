@@ -47,7 +47,7 @@ jobs:
       - name: Install C++ build deps
         uses: awalsh128/cache-apt-pkgs-action@v1
         with:
-          packages: cmake build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf
+          packages: cmake ninja-build build-essential zlib1g-dev libcurl4-openssl-dev libminizip-dev patchelf
           version: 2.0
 
       - name: Install SDL3 + SDL3_mixer
@@ -82,14 +82,13 @@ jobs:
             echo "STAGING_LOBBY_HOST or STAGING_LOBBY_PUBLIC_IP repo variable must be set" >&2
             exit 1
           fi
-          mkdir -p build && cd build
-          cmake \
+          cmake -B build -S clients/silencer \
+            -G Ninja \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DSILENCER_UNITY_BUILD=ON \
-            -DSILENCER_LOBBY_HOST="${LOBBY_HOST}" \
-            ../clients/silencer
-          make -j"$(nproc)"
+            -DSILENCER_LOBBY_HOST="${LOBBY_HOST}"
+          cmake --build build -j"$(nproc)"
 
       # Same SDL3 .so bundling pattern as deploy.yml — without this the
       # dedicated-server subprocess fails to dlopen libSDL3_mixer.so.0
