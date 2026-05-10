@@ -1,7 +1,9 @@
 build/
 build-new/
 build-old/
+build-release/
 build-unity/
+clients/silencer/build-release/
 clients/silencer/build-unity/
 test-update-host/
 test-updater.*.log

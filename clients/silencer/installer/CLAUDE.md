@@ -26,19 +26,19 @@ for advanced users.
 ```powershell
 choco install innosetup -y
 # Stage files the way release.yml does:
-cmake -B build -S clients/silencer -G Ninja -DCMAKE_BUILD_TYPE=Release `
-  -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
-  -DVCPKG_TARGET_TRIPLET=x64-windows
-cmake --build build
-$stage = "build/package/silencer"
+$env:VCPKG_ROOT = "$env:USERPROFILE\vcpkg"   # one-time
+cd clients\silencer
+cmake --preset win-ninja-release
+cmake --build --preset win-ninja-release
+$stage = "build-release/package/silencer"
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
-Copy-Item build/Silencer.exe $stage/
-Copy-Item "build/vcpkg_installed/x64-windows/bin/*.dll" $stage/
-Copy-Item -Recurse shared/assets $stage/assets
+Copy-Item build-release/Silencer.exe $stage/
+Copy-Item "build-release/vcpkg_installed/x64-windows/bin/*.dll" $stage/
+Copy-Item -Recurse ../../shared/assets $stage/assets
 
 # Compile the installer:
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
-  /DMyAppVersion=00045 clients/silencer/installer/silencer.iss
+  /DMyAppVersion=00045 installer/silencer.iss
 ```
 
 Output lands in `clients/silencer/installer/Output/`.
