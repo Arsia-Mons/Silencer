@@ -471,6 +471,8 @@ void Lobby::DoNetwork(void){
 												User * user = GetUserInfo(accountid);
 												user->statsagency = ch.agencyIdx;
 												user->selectedcharid = ch.id;
+												strncpy(user->charname, ch.name, 16);
+												user->charname[16] = 0;
 												auto& a = user->agency[ch.agencyIdx];
 												a.wins          = ch.stats.wins;
 												a.losses        = ch.stats.losses;

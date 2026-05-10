@@ -809,6 +809,32 @@ bool Game::Tick(void){
 		case LOBBY:{
 			if(stateisnew){
 				world.lobby.ForgetAllUserInfo();
+				// Re-seed our own user from cached characters so the panel shows immediately.
+				world.lobby.LockMutex();
+				if(world.lobby.accountid != 0 && !world.lobby.characters.empty()){
+					for(const auto& ch : world.lobby.characters){
+						if(ch.id == world.lobby.selectedcharid){
+							User * self = world.lobby.GetUserInfo(world.lobby.accountid);
+							self->statsagency = ch.agencyIdx;
+							self->selectedcharid = ch.id;
+							strncpy(self->charname, ch.name, 16);
+							self->charname[16] = 0;
+							auto& a = self->agency[ch.agencyIdx];
+							a.wins          = ch.stats.wins;
+							a.losses        = ch.stats.losses;
+							a.xptonextlevel = ch.stats.xp;
+							a.level         = ch.stats.level;
+							a.endurance     = ch.stats.endurance;
+							a.shield        = ch.stats.shield;
+							a.jetpack       = ch.stats.jetpack;
+							a.techslots     = ch.stats.techslots;
+							a.hacking       = ch.stats.hacking;
+							a.contacts      = ch.stats.contacts;
+							break;
+						}
+					}
+				}
+				world.lobby.UnlockMutex();
 				world.gameplaystate = World::INLOBBY;
 				agencychanged = true;
 				UnloadGame();
