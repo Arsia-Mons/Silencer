@@ -137,8 +137,7 @@ jobs:
           # 5. Apply unit changes and restart
           sudo systemctl daemon-reload
           sudo systemctl restart silencer-admin-api
-          sleep 5
-          sudo systemctl is-active silencer-admin-api
+          timeout 60 bash -c 'until sudo systemctl is-active silencer-admin-api; do sleep 1; done'
 
           # 6. Smoke-test the sprite endpoint
           curl -sf http://127.0.0.1:24080/api/sprites/121/0 > /dev/null

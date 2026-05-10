@@ -88,6 +88,5 @@ jobs:
             set -e
             echo 'IMAGE=$IMAGE_REF' | sudo tee /etc/silencer/admin-web.image > /dev/null
             sudo systemctl restart silencer-admin-web
-            sleep 5
-            sudo systemctl is-active silencer-admin-web
+            timeout 60 bash -c 'until sudo systemctl is-active silencer-admin-web; do sleep 1; done'
           "

@@ -213,13 +213,11 @@ jobs:
           sudo systemctl daemon-reload
           sudo systemctl restart silencer-lobby silencer-admin-api silencer-admin-web
 
-          # Smoke checks. Lobby comes up first; admin units pull their
-          # images on first start so give them more time.
-          sleep 3
-          sudo systemctl is-active silencer-lobby
-          sleep 15
-          sudo systemctl is-active silencer-admin-api
-          sudo systemctl is-active silencer-admin-web
+          # Smoke checks. Poll until active or 30 s timeout — more
+          # robust than a fixed sleep when Docker image pulls are slow.
+          timeout 30 bash -c 'until sudo systemctl is-active silencer-lobby; do sleep 1; done'
+          timeout 60 bash -c 'until sudo systemctl is-active silencer-admin-api; do sleep 1; done'
+          timeout 60 bash -c 'until sudo systemctl is-active silencer-admin-web; do sleep 1; done'
           curl -sf http://127.0.0.1:24080/api/sprites/121/0 > /dev/null
 
           # Prune to last 3 releases.
