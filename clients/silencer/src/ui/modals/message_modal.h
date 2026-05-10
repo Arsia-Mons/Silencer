@@ -3,6 +3,7 @@
 
 #include "modal.h"
 #include <functional>
+#include <memory>
 #include <string>
 
 // Centred message overlay with a single OK button. When OK is clicked the
