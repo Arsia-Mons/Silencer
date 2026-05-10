@@ -53,6 +53,8 @@ const ActionInfo ACTION_TABLE[(int)Action::Count] = {
 	{ Action::UiDown,         "ui_down",         "UI Down"         },
 	{ Action::UiLeft,         "ui_left",         "UI Left"         },
 	{ Action::UiRight,        "ui_right",        "UI Right"        },
+	{ Action::UiConfirm,      "ui_confirm",      "UI Confirm"      },
+	{ Action::UiCancel,       "ui_cancel",       "UI Cancel"       },
 };
 
 const ActionInfo* FindAction(const std::string& id) {

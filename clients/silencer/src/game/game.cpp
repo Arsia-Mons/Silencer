@@ -527,6 +527,7 @@ bool Game::Loop(void){
 			}
 		} else {
 			UpdateInputState(world.localinput);
+			TickGamepadMenuNav();
 		}
 		world.SendInput();
 		if(!Tick()){
@@ -5715,6 +5716,19 @@ void Game::OpenFirstGamepad(){
 		SDL_free(ids);
 	}
 	gamepadstate.connected = (gamepad != nullptr);
+	if(gamepadstate.connected){
+		// Switch to gamepad profile if not already on it.
+		const char* cur = Config::GetInstance().active_keybind_profile;
+		std::string curStr = (cur && *cur) ? cur : "default";
+		if(curStr != "gamepad"){
+			prevGamepadProfile = curStr;
+			std::strncpy(Config::GetInstance().active_keybind_profile, "gamepad",
+			             sizeof(Config::GetInstance().active_keybind_profile) - 1);
+			Config::GetInstance().active_keybind_profile[
+				sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
+			LoadActiveKeymap();
+		}
+	}
 }
 
 void Game::PollGamepadState(){
@@ -5736,7 +5750,56 @@ void Game::PollGamepadState(){
 	}
 }
 
-const char * Game::GetActionKeyDisplayName(Action a){
+void Game::TickGamepadMenuNav(){
+	// Only meaningful when a gamepad is connected and a menu interface is open.
+	if(!gamepadstate.connected) return;
+	Interface* iface = (Interface*)world.GetObjectFromId(currentinterface);
+	if(!iface) return;
+
+	Uint32 now = SDL_GetTicks();
+
+	// Helper: fire a nav key press with software repeat on held direction.
+	auto tick = [&](GamepadNavDir& dir, Action action, Uint8 ascii){
+		bool pressed = keymap.IsPressed(action, keystate, gamepadstate);
+		if(!pressed){
+			dir.held    = false;
+			dir.nextfire = 0;
+			return;
+		}
+		if(!dir.held){
+			// First frame held — fire immediately.
+			dir.held     = true;
+			dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
+			iface->ProcessKeyPress(world, ascii);
+		} else if(now >= dir.nextfire){
+			// Repeat.
+			dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
+			iface->ProcessKeyPress(world, ascii);
+		}
+	};
+
+	tick(gamepadNavUp,    Action::UiUp,    3);
+	tick(gamepadNavDown,  Action::UiDown,  4);
+	tick(gamepadNavLeft,  Action::UiLeft,  1);
+	tick(gamepadNavRight, Action::UiRight, 2);
+
+	// Confirm (A/Cross) and Cancel (B/Circle) — no repeat, edge-detect only.
+	// UiConfirm fires Enter; UiCancel fires Escape.
+	{
+		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
+		static bool confirmPrev = false;
+		if(confirmNow && !confirmPrev) iface->ProcessKeyPress(world, '\n');
+		confirmPrev = confirmNow;
+	}
+	{
+		bool cancelNow = keymap.IsPressed(Action::UiCancel, keystate, gamepadstate);
+		static bool cancelPrev = false;
+		if(cancelNow && !cancelPrev) iface->ProcessKeyPress(world, 0x1B);
+		cancelPrev = cancelNow;
+	}
+}
+
+
 	static thread_local char buf[32];
 	const auto& ab = keymap.Get(a);
 	for(const auto& b : ab.bindings){
@@ -6394,6 +6457,16 @@ bool Game::HandleSDLEvents(void){
 					SDL_CloseGamepad(gamepad);
 					gamepad = nullptr;
 					gamepadstate.connected = false;
+					// Restore the pre-gamepad keybind profile if we auto-switched.
+					if(!prevGamepadProfile.empty()){
+						std::strncpy(Config::GetInstance().active_keybind_profile,
+						             prevGamepadProfile.c_str(),
+						             sizeof(Config::GetInstance().active_keybind_profile) - 1);
+						Config::GetInstance().active_keybind_profile[
+							sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
+						LoadActiveKeymap();
+						prevGamepadProfile.clear();
+					}
 				}
 			}break;
 			case SDL_EVENT_QUIT:

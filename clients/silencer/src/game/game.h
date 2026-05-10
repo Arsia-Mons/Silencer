@@ -274,6 +274,26 @@ private:
 	bool   tui_have_prev_mouse;
 	void DrainControlQueue();
 	void PostFrameReplies();
+
+	// Profile to restore when a gamepad disconnects.  Stays empty when the
+	// active profile was already "gamepad" before the pad was connected.
+	std::string prevGamepadProfile;
+
+	// Per-direction software-repeat state for gamepad menu navigation.
+	// Gamepad events are polled each frame, not event-driven, so we
+	// synthesise key-repeat manually: first press fires immediately, further
+	// repeats fire after GAMEPAD_NAV_DELAY_MS then every GAMEPAD_NAV_REPEAT_MS.
+	static constexpr Uint32 GAMEPAD_NAV_DELAY_MS  = 300;
+	static constexpr Uint32 GAMEPAD_NAV_REPEAT_MS = 120;
+	struct GamepadNavDir {
+		bool       held     = false;
+		Uint32     nextfire = 0;  // SDL_GetTicks() value at which next repeat fires
+	};
+	GamepadNavDir gamepadNavUp;
+	GamepadNavDir gamepadNavDown;
+	GamepadNavDir gamepadNavLeft;
+	GamepadNavDir gamepadNavRight;
+	void TickGamepadMenuNav();
 };
 
 #endif
