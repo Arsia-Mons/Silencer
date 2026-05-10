@@ -412,8 +412,6 @@ jobs:
             - **Windows (x64) — portable zip:** `silencer-windows-x64.zip`
             - **Linux (x64):** `silencer-linux-x64.tar.gz`
 
-            The macOS `.zip` artifact is consumed by the in-app updater; first-time installs should use the `.dmg`.
-
             ## First-run warnings
 
             ### Windows
