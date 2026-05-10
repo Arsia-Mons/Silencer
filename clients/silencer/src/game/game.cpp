@@ -1032,15 +1032,39 @@ bool Game::Tick(void){
 					if(!iface) break;
 
 					if(createCharSubState == 0){
-						// SELECT AGENT — handle selectbox selection
+						// SELECT AGENT — handle selectbox selection (Enter key or mouse click)
 						for(auto it = iface->objects.begin(); it != iface->objects.end(); it++){
 							Object * o = world.GetObjectFromId(*it);
 							if(!o) continue;
 							if(o->type == ObjectTypes::SELECTBOX){
 								SelectBox * sb = static_cast<SelectBox *>(o);
-								if(sb->uid == 1 && sb->enterpressed){
+								if(sb->uid != 1) continue;
+								// Sync scrollbar
+								Object * sbobj = world.GetObjectFromId(iface->scrollbar);
+								if(sbobj && sbobj->type == ObjectTypes::SCROLLBAR){
+									ScrollBar * scrollbar = static_cast<ScrollBar *>(sbobj);
+									sb->scrolled = scrollbar->scrollposition;
+								}
+								// Detect click on a list item
+								bool triggered = false;
+								int clickedIndex = -1;
+								if(iface->mousedown){
+									int idx = sb->MouseInside(world, iface->mousex, iface->mousey);
+									if(idx >= 0 && idx == sb->selecteditem){
+										// Already selected — second click / confirm
+										triggered = true;
+										clickedIndex = idx;
+									} else if(idx >= 0){
+										sb->selecteditem = idx;
+									}
+								}
+								if(sb->enterpressed){
 									sb->enterpressed = false;
-									if(sb->selecteditem == 0){
+									triggered = true;
+									clickedIndex = sb->selecteditem;
+								}
+								if(triggered && clickedIndex >= 0){
+									if(clickedIndex == 0){
 										// Create New Character — go to alias input
 										world.GetAuthorityPeer()->controlledlist.clear();
 										world.DestroyAllObjects();
@@ -1049,7 +1073,7 @@ bool Game::Tick(void){
 										world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 									}else{
 										// Existing character selected — select and go to lobby
-										Uint32 charId = sb->IndexToId(sb->selecteditem);
+										Uint32 charId = sb->IndexToId(clickedIndex);
 										world.lobby.LockMutex();
 										world.lobby.SelectCharacter(charId);
 										world.lobby.UnlockMutex();
@@ -1126,7 +1150,20 @@ bool Game::Tick(void){
 							if(!o) continue;
 							if(o->type == ObjectTypes::SELECTBOX){
 								SelectBox * sb = static_cast<SelectBox *>(o);
-								if(sb->uid == 1) agencyselect = sb;
+								if(sb->uid == 1){
+									agencyselect = sb;
+									// Sync scrollbar
+									Object * sbobj = world.GetObjectFromId(iface->scrollbar);
+									if(sbobj && sbobj->type == ObjectTypes::SCROLLBAR){
+										ScrollBar * scrollbar = static_cast<ScrollBar *>(sbobj);
+										sb->scrolled = scrollbar->scrollposition;
+									}
+									// Mouse click selection
+									if(iface->mousedown){
+										int idx = sb->MouseInside(world, iface->mousex, iface->mousey);
+										if(idx >= 0) sb->selecteditem = idx;
+									}
+								}
 							}
 							if(o->type == ObjectTypes::TEXTBOX){
 								TextBox * tb = static_cast<TextBox *>(o);
