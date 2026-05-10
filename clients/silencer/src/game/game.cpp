@@ -5871,6 +5871,50 @@ void Game::TickGamepadMenuNav(){
 	}
 }
 
+// Maps an SDL gamepad button/axis name (after stripping "PAD:" prefix) to a
+// short display label appropriate for the connected controller type.
+// e.g. "leftshoulder" → "LB" (Xbox) or "L1" (PS).
+static std::string GamepadShortLabel(const std::string& raw, SDL_GamepadType type) {
+	// Strip trailing axis direction modifier (+/-)
+	std::string base = raw;
+	if(!base.empty() && (base.back() == '+' || base.back() == '-'))
+		base.pop_back();
+
+	static const struct { const char* sdl; const char* xbox; const char* ps; } kTable[] = {
+		{"south",         "A",       "Cross"},
+		{"north",         "Y",       "Tri"},
+		{"east",          "B",       "Circle"},
+		{"west",          "X",       "Square"},
+		{"back",          "Back",    "Select"},
+		{"guide",         "Guide",   "PS"},
+		{"start",         "Menu",    "Options"},
+		{"leftstick",     "LS",      "L3"},
+		{"rightstick",    "RS",      "R3"},
+		{"leftshoulder",  "LB",      "L1"},
+		{"rightshoulder", "RB",      "R1"},
+		{"dpup",          "D-Up",    "D-Up"},
+		{"dpdown",        "D-Dn",    "D-Dn"},
+		{"dpleft",        "D-Lt",    "D-Lt"},
+		{"dpright",       "D-Rt",    "D-Rt"},
+		{"lefttrigger",   "LT",      "L2"},
+		{"righttrigger",  "RT",      "R2"},
+		{"leftx",         "L-X",     "L-X"},
+		{"lefty",         "L-Y",     "L-Y"},
+		{"rightx",        "R-X",     "R-X"},
+		{"righty",        "R-Y",     "R-Y"},
+		{"misc1",         "Share",   "Share"},
+		{"touchpad",      "Touch",   "Touch"},
+	};
+	bool isPs = (type == SDL_GAMEPAD_TYPE_PS3 ||
+	             type == SDL_GAMEPAD_TYPE_PS4 ||
+	             type == SDL_GAMEPAD_TYPE_PS5);
+	for(const auto& e : kTable){
+		if(base == e.sdl)
+			return isPs ? e.ps : e.xbox;
+	}
+	return raw; // unknown: return original (already has suffix stripped)
+}
+
 const char * Game::GetActionKeyDisplayName(Action a){
 	static thread_local char buf[32];
 	const auto& ab = keymap.Get(a);
@@ -5887,7 +5931,8 @@ const char * Game::GetActionKeyDisplayName(Action a){
 	if(fallback){
 		std::string s = Stringify(*fallback);
 		auto colon = s.find(':');
-		std::string label = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+		std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+		std::string label = GamepadShortLabel(raw, gamepad ? SDL_GetGamepadType(gamepad) : SDL_GAMEPAD_TYPE_UNKNOWN);
 		std::strncpy(buf, label.c_str(), sizeof(buf) - 1);
 		buf[sizeof(buf) - 1] = '\0';
 		return buf;
@@ -5907,10 +5952,11 @@ std::string Game::GetBindingLabel(Action a, int slot) const {
 			if(k.device == BindingDevice::Keyboard){
 				return GetKeyName((SDL_Scancode)k.code);
 			}
-			// Gamepad/mouse: strip device prefix ("PAD:south" → "south")
+			// Gamepad/mouse: strip device prefix ("PAD:south" → "south") then shorten
 			std::string s = Stringify(k);
 			auto colon = s.find(':');
-			return (colon != std::string::npos) ? s.substr(colon + 1) : s;
+			std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+			return GamepadShortLabel(raw, gamepad ? SDL_GetGamepadType(gamepad) : SDL_GAMEPAD_TYPE_UNKNOWN);
 		}
 		found++;
 	}
