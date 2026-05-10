@@ -544,6 +544,7 @@ bool Game::Loop(void){
 		}
 		if(!world.replay.IsPlaying() || (world.replay.IsPlaying() && world.gameplaystate == World::INGAME)){
 			world.Tick();
+			TickRumble();
 		}
 		if(!world.dedicatedserver.active){
 			renderer.Tick();
@@ -5769,6 +5770,28 @@ void Game::ForkActiveProfileIfBuiltin(){
 	Config::GetInstance().active_keybind_profile[sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
 	keymap.name = forked;
 	keymap.label = forkedLabel;
+}
+
+void Game::TickRumble(){
+	if(!gamepad || world.gameplaystate != World::INGAME) return;
+	Player* player = world.GetPeerPlayer(world.localpeerid);
+	if(!player) return;
+
+	// Fire: short high-frequency click
+	if(player->rumbleFire){
+		player->rumbleFire = false;
+		SDL_RumbleGamepad(gamepad, 0, 12000, 80);
+	}
+	// Hit: strong punch on both motors
+	if(player->rumbleHit){
+		player->rumbleHit = false;
+		SDL_RumbleGamepad(gamepad, 30000, 15000, 200);
+	}
+	// Land: low thud (left motor only)
+	if(player->rumbleLand){
+		player->rumbleLand = false;
+		SDL_RumbleGamepad(gamepad, 18000, 0, 120);
+	}
 }
 
 void Game::OpenFirstGamepad(){

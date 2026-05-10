@@ -294,6 +294,8 @@ private:
 	GamepadNavDir gamepadNavLeft;
 	GamepadNavDir gamepadNavRight;
 	void TickGamepadMenuNav();
+	// Trigger SDL_RumbleGamepad for fire/hit/land events on the local player.
+	void TickRumble();
 
 	// Gamepad input snapshot taken when a controls-rebind field is activated.
 	// Used to distinguish "held at rebind start" from "newly pressed during rebind".

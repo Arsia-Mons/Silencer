@@ -67,6 +67,8 @@ public:
 	bool oldhassecret;
 	Uint16 secretteamid;
 	Uint8 suitcolor;
+	bool rumbleFire = false; // set by Fire(); consumed by Game::TickRumble
+	bool rumbleLand = false; // set on landing; consumed by Game::TickRumble
 	Uint16 chatinterfaceid;
 	bool chatwithteam;
 	Sint8 fallingnudge;
