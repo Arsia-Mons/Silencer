@@ -1689,10 +1689,13 @@ bool Game::Tick(void){
 						int row = i + scrollbar->scrollposition;
 						if(row < 0 || row >= (int)Action::Count) continue;
 						Action a = ACTION_TABLE[row].action;
-						LegacyView v = ViewLegacy(keymap, a);
 						keynameoverlay[i]->text = std::string(GetActionInfo(a).label) + ":";
-						strcpy(c1button[i]->text, GetKeyName(v.key1));
-						strcpy(c2button[i]->text, GetKeyName(v.key2));
+						std::string lbl0 = GetBindingLabel(a, 0);
+						std::string lbl1 = GetBindingLabel(a, 1);
+						strncpy(c1button[i]->text, lbl0.c_str(), sizeof(c1button[i]->text) - 1);
+						c1button[i]->text[sizeof(c1button[i]->text) - 1] = 0;
+						strncpy(c2button[i]->text, lbl1.c_str(), sizeof(c2button[i]->text) - 1);
+						c2button[i]->text[sizeof(c2button[i]->text) - 1] = 0;
 					}
 					// Preset button text reflects the active profile's label.
 					// The static "Preset:" overlay to its left supplies the noun.
@@ -1724,6 +1727,50 @@ bool Game::Tick(void){
 							}
 							if(button->uid >= 0 && button->uid < 150){
 								const int timeout = 72;
+								// Check for newly-pressed gamepad button/axis during rebind wait.
+								if(iface->disabled && button->state == Button::ACTIVE && gamepadstate.connected){
+									int slot = button->uid;
+									int row  = (slot < 100 ? slot : slot - 100) + scrollbar->scrollposition;
+									BindingKey padKey{}; bool padFound = false;
+									for(int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT && !padFound; b++){
+										bool was = (rebindGamepadButtons >> b) & 1;
+										bool is  = (gamepadstate.buttons >> b) & 1;
+										if(is && !was){
+											padKey.device = BindingDevice::GamepadButton;
+											padKey.code   = b; padKey.axisDir = 0;
+											padFound = true;
+										}
+									}
+									for(int ax = 0; ax < SDL_GAMEPAD_AXIS_COUNT && !padFound; ax++){
+										int16_t was = rebindGamepadAxes[ax];
+										int16_t is  = gamepadstate.axes[ax];
+										if(abs(is) > AXIS_DEADZONE * 2 && abs(was) <= AXIS_DEADZONE){
+											padKey.device  = BindingDevice::GamepadAxis;
+											padKey.code    = ax;
+											padKey.axisDir = (is > 0) ? 1 : -1;
+											padFound = true;
+										}
+									}
+									if(padFound && row >= 0 && row < (int)Action::Count){
+										ForkActiveProfileIfBuiltin();
+										auto& ab = keymap.Get(ACTION_TABLE[row].action);
+										Binding binding; binding.keys.push_back(padKey);
+										if(slot < 100){
+											if(ab.bindings.empty()) ab.bindings.push_back(binding);
+											else ab.bindings[0] = binding;
+										} else {
+											if(ab.bindings.empty()) ab.bindings.push_back(Binding{});
+											if(ab.bindings.size() < 2) ab.bindings.push_back(binding);
+											else ab.bindings[1] = binding;
+										}
+										std::string label = Stringify(padKey);
+										auto colon = label.find(':');
+										if(colon != std::string::npos) label = label.substr(colon + 1);
+										strncpy(button->text, label.c_str(), sizeof(button->text) - 1);
+										button->text[sizeof(button->text) - 1] = 0;
+										iface->disabled = false;
+									}
+								}
 								if(iface->disabled && button->state == Button::ACTIVE && (iface->lastsym != SDL_SCANCODE_UNKNOWN || world.tickcount - optionscontrolstick > timeout)){
 									int slot = button->uid;     // 0..99 = primary; 100..149 = secondary
 									int row  = (slot < 100 ? slot : slot - 100) + scrollbar->scrollposition;
@@ -1753,6 +1800,8 @@ bool Game::Tick(void){
 									iface->disabled = true;
 									optionscontrolstick = world.tickcount;
 									iface->lastsym = SDL_SCANCODE_UNKNOWN;
+									rebindGamepadButtons = gamepadstate.buttons;
+									memcpy(rebindGamepadAxes, gamepadstate.axes, sizeof(rebindGamepadAxes));
 								}
 								if(button->uid >= 150 && button->uid < 200){
 									int row = button->uid - 150 + scrollbar->scrollposition;
@@ -5785,10 +5834,18 @@ void Game::TickGamepadMenuNav(){
 
 	// Confirm (A/Cross) and Cancel (B/Circle) — no repeat, edge-detect only.
 	// UiConfirm fires Enter; UiCancel fires Escape.
+	// If nothing is focused when Confirm is pressed, auto-focus the first item
+	// so the user gets visual feedback before committing.
 	{
 		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
 		static bool confirmPrev = false;
-		if(confirmNow && !confirmPrev) iface->ProcessKeyPress(world, '\n');
+		if(confirmNow && !confirmPrev){
+			if(iface->activeobject == 0 && !iface->tabobjects.empty()){
+				iface->ProcessKeyPress(world, 4);  // focus first item via Down; user presses A again to confirm
+			} else {
+				iface->ProcessKeyPress(world, '\n');
+			}
+		}
 		confirmPrev = confirmNow;
 	}
 	{
@@ -5814,7 +5871,27 @@ const char * Game::GetActionKeyDisplayName(Action a){
 	return buf;
 }
 
-const char * Game::GetKeyName(SDL_Scancode sym){
+std::string Game::GetBindingLabel(Action a, int slot) const {
+	const auto& ab = keymap.Get(a);
+	int found = 0;
+	for(const auto& b : ab.bindings){
+		if(b.keys.empty()) continue;
+		if(found == slot){
+			const auto& k = b.keys[0];
+			if(k.device == BindingDevice::Keyboard){
+				return GetKeyName((SDL_Scancode)k.code);
+			}
+			// Gamepad/mouse: strip device prefix ("PAD:south" → "south")
+			std::string s = Stringify(k);
+			auto colon = s.find(':');
+			return (colon != std::string::npos) ? s.substr(colon + 1) : s;
+		}
+		found++;
+	}
+	return GetKeyName(SDL_SCANCODE_UNKNOWN);
+}
+
+const char * Game::GetKeyName(SDL_Scancode sym) const{
 #ifdef OUYA // Custom scancodes for ouya controller
 	switch((int)sym){
 		case SDL_SCANCODE_LALT: return "L2"; break;
