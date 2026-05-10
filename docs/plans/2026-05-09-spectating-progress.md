@@ -20,12 +20,20 @@ they're complete on branch.
   every `opNewGame` push; game-select panel renders dual Join /
   Spectate buttons contextually. Spectate click is stubbed
   ("Spectating coming soon") pending Phase 3.
-- [ ] **Phase 3 — Joining as spectator (any time).** Aligned with
-  PR #152 (rejoin); not started. Reuse `MSG_CONNECT` with an
-  `observer` bit, `Peer::observer` flag mirroring `Peer::disconnected`,
-  `SendGameInfo` + `SendPeerList` resync, shared `maxpeers` pool.
-  Open: auth, spectator cap, fog-of-war vs full state, chat/voice,
-  match-end behavior.
+- [x] **Phase 3 — Joining as spectator (any time).** Done on branch.
+  `MSG_CONNECT` carries a trailing `observer` bit; `Peer::observer`
+  mirrors `Peer::disconnected` and is serialized on the peer-list.
+  AUTHORITY-side admit gets a third branch (rejoin → observer → new
+  player) that ignores the player-cap but respects the 25-slot pool
+  and `gameinfo.spectatable` defense-in-depth. Observer inputs are
+  dropped at the network layer; observer team-chat is coerced to
+  all-chat; observers free their slot immediately on disconnect (no
+  parking). Lobby panel `GSEL_BTN_SPECTATE` now calls
+  `Game::SpectateGame`, which mirrors `JoinGame` but passes
+  `observer=true` to `World::Connect`. Design spec at
+  [docs/superpowers/specs/2026-05-10-spectating-phase3-design.md](../superpowers/specs/2026-05-10-spectating-phase3-design.md);
+  plan at
+  [docs/superpowers/plans/2026-05-10-spectating-phase3.md](../superpowers/plans/2026-05-10-spectating-phase3.md).
 - [ ] **Phase 4 — Spectator controls.** Not started.
 
 ## Handoff prompt
