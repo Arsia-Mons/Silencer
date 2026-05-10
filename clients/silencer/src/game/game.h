@@ -23,7 +23,6 @@
 
 class Screen;
 class Modal;
-class MessageModal;
 
 class Game
 {
@@ -77,33 +76,31 @@ public:
 	void PushScreen(std::unique_ptr<Screen> s);
 	void PopScreen();
 	void ReplaceScreen(std::unique_ptr<Screen> s);
+	Screen * GetTopScreen() const;
 
 	// Keybind access for ControlDispatch.
 	KeyMap& GetKeyMap() { return keymap; }
 	const KeyMap& GetKeyMap() const { return keymap; }
 
-	// LobbyScreen + per-panel interop. Public during the multi-stage migration
-	// of Game::Create*Interface / ProcessLobbyInterface onto Screen/Panel
-	// classes — panels reach in via `ScreenContext::game` rather than going
-	// through narrow shim methods. Moves toward fully encapsulating once stage
-	// H lands and the legacy helpers are deleted.
-	Interface * CreateLobbyInterface(void);
-	void TickLobbyBody();
+	// LobbyScreen + per-panel interop. Public so panels can reach in via
+	// `ScreenContext::game`. Mirror ids (gameselectinterface etc.) are written
+	// by the panels as they Build, read by Game::GoBack to decide which lobby
+	// surface is active.
 	Uint16 lobbyinterface;
 	Uint16 chatinterface;
 	Uint16 gameselectinterface;
 	Uint16 gamecreateinterface;
-	Uint16 gamejoininterface;       // mirrored by GameJoinPanel; removed in stage H.
-	Uint16 gametechinterface;       // mirrored by GameTechPanel; removed in stage H.
+	Uint16 gamejoininterface;
+	Uint16 gametechinterface;
 	Uint16 currentinterface;
 	Uint32 currentlobbygameid;
 	bool minimized;
 	bool creategameclicked;
+	bool joininggame;
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
 	// Toggle in-lobby team overlay visibility. Called by LobbyScreen's
 	// right-side panel swaps (ShowGameTech / TearDownRightPanels) when
-	// entering / leaving the tech-choice surface. Removed in stage H once
-	// the panel can reach world.objectlist directly.
+	// entering / leaving the tech-choice surface.
 	void ShowTeamOverlays(bool show);
 
 private:
@@ -129,14 +126,7 @@ private:
 	void ShowDeployMessage(void);
 	void GiveDefaultItems(Player & player);
 	void GoToState(Uint8 newstate);
-	// Modal-stack peeks used by TickLobbyBody during the create-game spinner
-	// poll. Removed in stage H along with TickLobbyBody itself.
-	bool TopIsModal(void) const;
-	MessageModal * TopAsProgressModal(void) const;
-	void DismissProgressModal(void);
 	Updater updater;
-	bool ProcessLobbyInterface(Interface * iface);
-	void UpdateLobbyMapName(const char * name);
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".
 	const char * GetActionKeyDisplayName(Action a);
@@ -166,7 +156,6 @@ private:
 	bool updatetitle;
 	Uint32 lastannouncedgameid;
 	Uint8 lastannouncedstatus;
-	bool joininggame;
 	bool deploymessageshown;
 	int quitscancode;
 	bool interfaceenterfix;

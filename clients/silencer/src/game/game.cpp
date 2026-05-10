@@ -2091,198 +2091,11 @@ void Game::GoToState(Uint8 newstate){
 	screenStackPendingTeardown = true;
 }
 
-void Game::TickLobbyBody(void){
-	if(world.lobby.state == Lobby::DISCONNECTED){
-		world.Disconnect();
-		GoToState(LOBBYCONNECT);
-		return;
-	}
-	if(lobbyinterface){
-		Interface * iface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-		if(iface){
-			ProcessLobbyInterface(iface);
-		}
-	}
-	if(gamecreateinterface){
-		// Handle deferred CreateGame after map upload completes.
-		int us = mapDownloader.mapUploadState.load(std::memory_order_acquire);
-		if(us == 2){
-			mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
-			const char * pw = mapDownloader.pendingCreate.password.empty() ? nullptr : mapDownloader.pendingCreate.password.c_str();
-			world.lobby.CreateGame(
-				mapDownloader.pendingCreate.gamename.c_str(),
-				mapDownloader.pendingCreate.mapname.c_str(),
-				mapDownloader.pendingCreate.maphash,
-				pw,
-				mapDownloader.pendingCreate.securitylevel,
-				mapDownloader.pendingCreate.minlevel,
-				mapDownloader.pendingCreate.maxlevel,
-				mapDownloader.pendingCreate.maxplayers,
-				mapDownloader.pendingCreate.maxteams);
-		}else if(us == 3){
-			mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
-			creategameclicked = false;
-			// Pop any progress modal still up before stacking the error.
-			DismissProgressModal();
-			PushScreen(std::make_unique<MessageModal>("Could not upload map"));
-		}
-		if(world.lobby.creategamestatus == 1){
-			world.lobby.creategamestatus = 0;
-			Peer * authoritypeer = world.GetAuthorityPeer();
-			LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
-			if(lobbygame){
-				Serializer data;
-				lobbygame->Serialize(Serializer::WRITE, data);
-				world.gameinfo.Serialize(Serializer::READ, data);
-				authoritypeer->ip = ntohl(inet_addr(lobbygame->hostname));
-				authoritypeer->port = lobbygame->port;
-				sharedstate = 0;
-				currentlobbygameid = lobbygame->id;
-				world.Connect(Config::GetInstance().defaultagency, world.lobby.accountid, lobbygame->password);
-				mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
-				joininggame = true;
-			}
-		}else
-		if(world.lobby.creategamestatus != 1 && world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0){ // failed and not creating
-			world.lobby.creategamestatus = 0;
-			creategameclicked = false;
-			DismissProgressModal();
-			PushScreen(std::make_unique<MessageModal>("Could not create game"));
-		}
-	}
-	if(gameselectinterface || gamecreateinterface){
-		if(joininggame){
-			if(world.state == World::CONNECTED){
-				joininggame = false;
-			}
-			if(world.state == World::IDLE){
-				joininggame = false;
-				DismissProgressModal();
-				PushScreen(std::make_unique<MessageModal>("Unable to join game"));
-			}
-		}
-		if(MessageModal * progress = TopAsProgressModal()){
-			std::string text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
-				? "Uploading map" : "Creating game";
-			int dots = (world.tickcount / 4) % 6;
-			if(dots > 3) dots = 6 - dots;
-			for(int i = 0; i < dots; i++) text += ".";
-			progress->SetText(screenContext, text);
-		}
-		if(TopAsProgressModal() && world.lobby.creategamestatus != 100 && mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 && (world.state == World::CONNECTED || world.state == World::IDLE)){
-			PopScreen();
-			creategameclicked = false;
-		}
-		if(world.state == World::CONNECTED && lobbyinterface){
-			Peer * peer = world.peerlist[world.localpeerid];
-			if(peer){
-				mapDownloader.mapexistchecked = false;
-				// Invalidate any in-flight server map fetch for the previous
-				// game; the thread will see the stale generation and discard
-				// its result. Detach so we don't block here.
-				mapDownloader.mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
-				mapDownloader.mapjoinstate.store(0, std::memory_order_relaxed);
-				if(mapDownloader.mapjointhread.joinable()) mapDownloader.mapjointhread.detach();
-				world.SetTech(Config::GetInstance().defaulttechchoices[Config::GetInstance().defaultagency]);
-				// LobbyScreen::ShowGameJoin tears down whichever right-side
-				// panel is active (gameSelect/gameCreate) and builds the
-				// GameJoinPanel onto the lobby iface; mirrors the iface id
-				// onto ctx.game.gamejoininterface for the legacy GoBack /
-				// disconnected-modal paths.
-				LobbyScreen * lobby = screenStack.empty() ? nullptr : dynamic_cast<LobbyScreen *>(screenStack.back().get());
-				if(lobby){
-					lobby->ShowGameJoin(screenContext);
-				}
-				LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
-				if(lobbygame){
-					char temp[256];
-					ambienceMixer.GetGameChannelName(*lobbygame, temp);
-					strcpy(world.lobby.lastchannel, world.lobby.channel);
-					world.lobby.JoinChannel(temp);
-					UpdateLobbyMapName(lobbygame->mapname);
-				}
-			}
-		}
-	}
-
-	mapDownloader.ProcessMapDownload();
-
-	if(world.state != World::CONNECTED && !TopIsModal()){
-		if(gamejoininterface || gametechinterface){
-			PushScreen(std::make_unique<MessageModal>("Disconnected from game", [this]() { GoBack(); }));
-		}
-	}
-}
-
-bool Game::TopIsModal(void) const {
-	if(screenStack.empty()) return false;
-	return screenStack.back()->IsOverlay();
-}
-
-MessageModal * Game::TopAsProgressModal(void) const {
-	if(screenStack.empty()) return nullptr;
-	MessageModal * m = dynamic_cast<MessageModal *>(screenStack.back().get());
-	return (m && m->IsProgress()) ? m : nullptr;
-}
-
-void Game::DismissProgressModal(void) {
-	if(TopAsProgressModal()){
-		PopScreen();
-	}
-}
-
-Interface * Game::CreateLobbyInterface(void){
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 7;
-	background->res_index = 1;
-	Overlay * toptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	toptext->text = "Silencer";
-	toptext->textbank = 135;
-	toptext->textwidth = 11;
-	toptext->effectcolor = 152;
-	toptext->x = 15;
-	toptext->y = 32;
-	Overlay * vertext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	vertext->text = "v.";
-	vertext->text += world.version;
-	vertext->textbank = 133;
-	vertext->textwidth = 6;
-	vertext->effectcolor = 189;
-	vertext->x = 115;
-	vertext->y = 39;
-	Overlay * mapnametext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	mapnametext->textbank = 135;
-	mapnametext->textwidth = 11;
-	mapnametext->effectcolor = 129;
-	mapnametext->effectbrightness = 128 + 32;
-	mapnametext->textcolorramp = true;
-	mapnametext->x = 180;
-	mapnametext->y = 32;
-	mapnametext->uid = 8;
-	Button * exitbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	exitbutton->y = 29;
-	exitbutton->x = 473;
-	exitbutton->SetType(Button::B156x21);
-	exitbutton->uid = 10;
-	strcpy(exitbutton->text, "Go Back");
-
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	iface->AddObject(background->id);
-	iface->AddObject(toptext->id);
-	iface->AddObject(vertext->id);
-	iface->AddObject(mapnametext->id);
-	iface->AddObject(exitbutton->id);
-	iface->buttonescape = exitbutton->id;
-	// gameselectinterface is added by GameSelectPanel::Build; ChatPanel sets
-	// the lobby iface's activeobject + ActiveChanged when it attaches.
-	return iface;
-}
-
-
 bool Game::GoBack(void){
 	if(gamejoininterface || gametechinterface){
 		world.Disconnect();
-		UpdateLobbyMapName("");
+		LobbyScreen * lobby = screenStack.empty() ? nullptr : dynamic_cast<LobbyScreen *>(screenStack.back().get());
+		if(lobby) lobby->SetMapNameOverlay(world, "");
 		world.lobby.gamesprocessed = false;
 		world.lobby.channelchanged = true;
 		world.SwitchToLocalAuthorityMode();
@@ -2299,10 +2112,7 @@ bool Game::GoBack(void){
 			}
 		}
 		world.lobby.JoinChannel(world.lobby.lastchannel);
-		LobbyScreen * lobby = screenStack.empty() ? nullptr : dynamic_cast<LobbyScreen *>(screenStack.back().get());
-		if(lobby){
-			lobby->ShowGameSelect(screenContext);
-		}
+		if(lobby) lobby->ShowGameSelect(screenContext);
 		currentinterface = lobbyinterface;
 		return true;
 	}else
@@ -2322,95 +2132,6 @@ bool Game::GoBack(void){
 	return false;
 }
 
-bool Game::ProcessLobbyInterface(Interface * iface){
-	// UpdateTechInterface() removed in Stage G — GameTechPanel::Tick now
-	// drives the per-frame tech-checkbox refresh. Map-preview lifecycle
-	// owned by GameCreatePanel since the modal migration.
-	for(int i = 0; i < iface->objects.size(); i++){
-		if(i >= iface->objects.size()){
-			return false;
-		}
-		Uint16 id = iface->objects[i];
-		Object * object = world.GetObjectFromId(id);
-		if(object){
-			switch(object->type){
-				case ObjectTypes::SCROLLBAR:{
-					ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-					if(scrollbar){
-						
-					}
-				}break;
-				case ObjectTypes::INTERFACE:{
-					Interface * iface = static_cast<Interface *>(object);
-					if(iface){
-						if(!ProcessLobbyInterface(iface)){
-							return false;
-						}
-					}
-				}break;
-				case ObjectTypes::TEXTINPUT:{
-					// Chat input handled by ChatPanel::Tick; this arm just
-					// clears the enterpressed flag for un-migrated textinputs
-					// (game-create form, etc.).
-					TextInput * textinput = static_cast<TextInput *>(object);
-					if(textinput && textinput->enterpressed){
-						textinput->enterpressed = false;
-					}
-				}break;
-				case ObjectTypes::SELECTBOX:{
-					// Map-select (uid 4) handled by GameCreatePanel::Tick;
-					// game-select (uid 10) handled by GameSelectPanel::Tick.
-					// No remaining lobby selectboxes for ProcessLobbyInterface
-					// to walk through.
-				}break;
-				// Chat presence + scrollback handled by ChatPanel::Tick.
-				// Channel-name overlay (uid 1) handled by ChatPanel::Tick.
-				// Character-panel level/wins/losses/XP overlays handled
-				// by CharacterPanel::Tick.
-				case ObjectTypes::BUTTON:{
-					Button * button = static_cast<Button *>(object);
-					if(button && button->clicked && button->type != Button::BCHECKBOX){
-						button->clicked = false;
-						switch(button->uid){
-							case 10:{ // go back
-								if(GoBack()){
-									return false;
-								}
-							}break;
-							// Join button (uid 20) handled by GameSelectPanel::Tick.
-							// Ready (uid 25), Change Team (uid 26), Choose Tech (uid 27)
-							// handled by GameJoinPanel::Tick.
-							// Back To Teams (uid 28) handled by GameTechPanel::Tick.
-							// Create-game button (uid 30) handled by GameSelectPanel::Tick
-							// (calls LobbyScreen::ShowGameCreate).
-							// Create-confirm (uid 35) and security-cycle (uid 40)
-							// handled by GameCreatePanel::Tick.
-									// Modal OK (uid 50) — MessageModal/PasswordModal own their own dispatch since the modal migration.
-						}
-					}
-				}break;
-			}
-		}
-	}
-	return true;
-}
-
-
-void Game::UpdateLobbyMapName(const char * name){
-	Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-	if(lobbyiface){
-		for(std::vector<Uint16>::iterator it = lobbyiface->objects.begin(); it != lobbyiface->objects.end(); it++){
-			Object * object = world.GetObjectFromId(*it);
-			if(object->type == ObjectTypes::OVERLAY){
-				Overlay * overlay = static_cast<Overlay *>(object);
-				if(overlay->uid == 8){
-					overlay->text = name;
-					overlay->text = overlay->text.substr(0, 25);
-				}
-			}
-		}
-	}
-}
 
 
 
@@ -2815,6 +2536,10 @@ void Game::PopScreen(){
 void Game::ReplaceScreen(std::unique_ptr<Screen> s){
 	PopScreen();
 	PushScreen(std::move(s));
+}
+
+Screen * Game::GetTopScreen() const {
+	return screenStack.empty() ? nullptr : screenStack.back().get();
 }
 
 void Game::TickActiveScreen(){

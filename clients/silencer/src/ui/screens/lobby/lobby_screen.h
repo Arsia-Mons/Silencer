@@ -11,12 +11,12 @@ class GameCreatePanel;
 class GameJoinPanel;
 class GameTechPanel;
 
-// In-progress migration of the lobby surface out of Game::ProcessLobbyInterface.
-// Build delegates to Game::CreateLobbyInterface() (legacy chrome + un-migrated
-// panels) and Tick delegates to Game::TickLobbyBody() (legacy lobby pump).
-// Migrated panels live as members and run before the legacy pump each frame
-// so panel handlers see fresh button-clicked / textinput-enterpressed flags
-// before the recursive walk in ProcessLobbyInterface clears them.
+// Top-level lobby surface. Owns the lobby chrome (background, title, version,
+// map-name overlay, Go Back button), the always-on character + chat panels,
+// and one of four mutually-exclusive right-side panels (game select / create
+// / join / tech). Drives the lobby pump: deferred CreateGame state machine,
+// CONNECTED → GameJoin handoff, disconnect detection, async map-download
+// progress, and the create-game progress / error modals.
 class LobbyScreen : public Screen
 {
 public:
@@ -28,12 +28,16 @@ public:
 
 	// Right-side panel swap helpers. Called by panels (GameSelectPanel's
 	// "Create Game" button, GameJoinPanel's "Choose Tech", GameTechPanel's
-	// "Back To Teams") and by Game::GoBack and Game::TickLobbyBody when
-	// transitioning between gameselect / gamecreate / gamejoin / gametech.
+	// "Back To Teams") and by Game::GoBack when transitioning between
+	// gameselect / gamecreate / gamejoin / gametech.
 	void ShowGameSelect(ScreenContext & ctx);
 	void ShowGameCreate(ScreenContext & ctx);
 	void ShowGameJoin(ScreenContext & ctx);
 	void ShowGameTech(ScreenContext & ctx);
+
+	// Update the map-name overlay (uid 8) on the lobby chrome — called by the
+	// CONNECTED→GameJoin handoff and by Game::GoBack when leaving a game.
+	void SetMapNameOverlay(class World & world, const char * name);
 
 private:
 	CharacterPanel character;
