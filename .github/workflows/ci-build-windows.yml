@@ -53,21 +53,19 @@ jobs:
             echo "relevant=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Cache vcpkg binaries
-        if: steps.changes.outputs.relevant == 'true'
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/.vcpkg-cache
-          key: vcpkg-${{ runner.os }}-${{ hashFiles('clients/silencer/vcpkg.json') }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}-
+      # vcpkg port binaries cached via x-gha in the Configure step.
+      # x-gha needs ACTIONS_CACHE_URL + ACTIONS_RUNTIME_TOKEN, which
+      # mozilla-actions/sccache-action exports — so it must run before
+      # Configure.
 
       - name: Cache vcpkg tool downloads
         if: steps.changes.outputs.relevant == 'true'
         uses: actions/cache@v4
         with:
           path: C:\vcpkg\downloads\tools
-          key: vcpkg-tools-${{ runner.os }}-v1
+          key: vcpkg-tools-${{ runner.os }}-${{ env.ImageVersion }}-v1
+          restore-keys: |
+            vcpkg-tools-${{ runner.os }}-
 
       - name: Setup sccache
         if: steps.changes.outputs.relevant == 'true'
@@ -83,7 +81,7 @@ jobs:
         if: steps.changes.outputs.relevant == 'true'
         shell: pwsh
         env:
-          VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/.vcpkg-cache,readwrite"
+          VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
         run: |
           cmake -B build -S clients/silencer `
             -G Ninja `

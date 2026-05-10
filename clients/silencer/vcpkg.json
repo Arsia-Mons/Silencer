@@ -2,6 +2,7 @@
 	"name": "silencer",
 	"version-string": "0.0.0",
 	"description": "Silencer multiplayer client build dependencies",
+	"builtin-baseline": "99a97de2cb371449d4fb9dc970f2ac562d689ec2",
 	"dependencies": [
 		"sdl3",
 		{
