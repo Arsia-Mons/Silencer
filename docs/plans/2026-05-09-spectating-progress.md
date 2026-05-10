@@ -133,45 +133,29 @@ controls that let a spectator interact and leave gracefully.
 >
 > **Local smoke setup that worked for Phase 3.**
 >
-> 1. Reconfigure the client to point at the local lobby:
+> 1. Reconfigure the client for a local lobby and build:
 >    ```
 >    cmake -B clients/silencer/build-unity -S clients/silencer \
 >          -DSILENCER_LOBBY_HOST=127.0.0.1 -DSILENCER_LOBBY_PORT=15170
 >    cmake --build clients/silencer/build-unity
 >    ```
->    On Windows, MSVC is not on the bash PATH by default — drive
->    cmake through cmd.exe with `vcvars64.bat`:
->    ```
->    cmd.exe /c '"<VS install>\VC\Auxiliary\Build\vcvars64.bat" \
->              && cmake --build clients/silencer/build-unity'
->    ```
->    `<VS install>` is typically one of:
->    `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`,
->    `...\2022\Community`, `...\2022\Professional`, or
->    `...\2022\Enterprise`. Probe with
->    `ls "C:\Program Files (x86)\Microsoft Visual Studio\2022\"` to
->    find which is installed.
-> 2. Build the lobby: `cd services/lobby && go build -o silencer-lobby.exe .`
+> 2. Build the lobby: `cd services/lobby && go build`
 > 3. Run the lobby with an isolated DB so it doesn't trample local
 >    dev state:
 >    ```
->    ./silencer-lobby.exe -addr :15170 \
->      -game-binary "../../clients/silencer/build-unity/Silencer.exe" \
+>    ./silencer-lobby -addr :15170 \
+>      -game-binary <path-to-built-Silencer-binary> \
 >      -db lobby-smoketest.json
 >    ```
 > 4. **Gotcha.** A saved client config from a prior dev session
->    will pin its own `lobbyport` / `lobbyhost` and OVERRIDE the new
->    CMake defaults. Locations per platform:
->    - Windows: `%APPDATA%/Silencer/config.cfg`
->    - macOS: `~/Library/Application Support/Silencer/config.cfg`
->    - Linux: `~/.config/silencer/config.cfg`
->
->    If a freshly-built local client says "couldn't connect,"
->    inspect that file first — patch `lobbyport` / `lobbyhost` to
->    match the local lobby (e.g. `lobbyhost = 127.0.0.1`,
->    `lobbyport = 15170`) before relaunching. We hit this on
->    2026-05-10 with a stale `lobbyport = 60456` from an old
->    experiment.
+>    pins its own `lobbyport` / `lobbyhost` and overrides the new
+>    CMake defaults — `Config::LoadDefaults` only fires when no
+>    saved file exists. On macOS the file is
+>    `~/Library/Application Support/Silencer/config.cfg`. If a
+>    freshly-built local client says "couldn't connect," patch
+>    `lobbyhost` / `lobbyport` in that file to match the local
+>    lobby (e.g. `lobbyhost = 127.0.0.1`, `lobbyport = 15170`)
+>    before relaunching. (We hit this on 2026-05-10.)
 >
 > **CLI-agent E2E remains deferred.** The `tests/cli-agent` harness
 > still has no op for driving game creation. Adding one would
