@@ -607,6 +607,16 @@ static void LoadWorld(const std::string& dir, WorldDef& out) {
         out.soundAmbience2            = j.value("soundAmbience2",            out.soundAmbience2);
         out.soundAmbience3            = j.value("soundAmbience3",            out.soundAmbience3);
         out.audioRange                = j.value("audioRange",                out.audioRange);
+        out.soundOcclusionEnabled     = j.value("soundOcclusionEnabled",     out.soundOcclusionEnabled);
+        out.soundFilterEnabled        = j.value("soundFilterEnabled",        out.soundFilterEnabled);
+        out.occlusionDampenRect       = j.value("occlusionDampenRect",       out.occlusionDampenRect);
+        out.occlusionDampenStairs     = j.value("occlusionDampenStairs",     out.occlusionDampenStairs);
+        out.occlusionLerpSpeed        = j.value("occlusionLerpSpeed",        out.occlusionLerpSpeed);
+        out.occlusionMuffleThreshold  = j.value("occlusionMuffleThreshold",  out.occlusionMuffleThreshold);
+        out.occlusionMuffleMinHz      = j.value("occlusionMuffleMinHz",      out.occlusionMuffleMinHz);
+        out.occlusionMuffleMaxHz      = j.value("occlusionMuffleMaxHz",      out.occlusionMuffleMaxHz);
+        out.occlusionRayYOffset       = j.value("occlusionRayYOffset",       out.occlusionRayYOffset);
+        out.soundPanningEnabled       = j.value("soundPanningEnabled",       out.soundPanningEnabled);
         out.networkSyncRangeX         = j.value("networkSyncRangeX",         out.networkSyncRangeX);
         out.networkSyncRangeY         = j.value("networkSyncRangeY",         out.networkSyncRangeY);
         out.grenadesyncRangeX         = j.value("grenadesyncRangeX",         out.grenadesyncRangeX);

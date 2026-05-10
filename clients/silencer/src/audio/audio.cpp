@@ -1,5 +1,6 @@
 #include "audio.h"
 #include "world.h"
+#include "player.h"
 #include "config.h"
 #include "game.h"
 #include "gasloader.h"
@@ -14,6 +15,8 @@ Audio::Audio(){
 	mixer = nullptr;
 	musictrack = nullptr;
 	SDL_zero(mixerspec);
+	lastx = 0;
+	lasty = 0;
 	for(int i = 0; i < maxchannels; i++){
 		tracks[i] = nullptr;
 		channelobject[i] = 0;
@@ -22,6 +25,8 @@ Audio::Audio(){
 		filterAlpha[i] = 1.0f;
 		filterState[i][0] = 0.0f;
 		filterState[i][1] = 0.0f;
+		filterState[i][2] = 0.0f;
+		filterState[i][3] = 0.0f;
 	}
 }
 
@@ -67,6 +72,13 @@ int Audio::Play(MIX_Audio * chunk, int volume, bool loop){
 	if(enabled && chunk){
 		for(int i = 0; i < maxchannels; i++){
 			if(!MIX_TrackPlaying(tracks[i]) && !MIX_TrackPaused(tracks[i])){
+				// Reset per-channel spatial state before reuse so stale occlusion
+				// from a previous sound never bleeds into the new one.
+				occlusionCache[i] = 1.0f;
+				filterAlpha[i]    = 1.0f;
+				filterState[i][0] = filterState[i][1] = filterState[i][2] = filterState[i][3] = 0.0f;
+				MIX_SetTrackStereo(tracks[i], nullptr);
+
 				MIX_SetTrackAudio(tracks[i], chunk);
 				MIX_SetTrackGain(tracks[i], (volume / 128.0f) * effectvolume);
 				SDL_PropertiesID options = 0;
@@ -119,7 +131,7 @@ int Audio::EmitSound(World & world, Uint16 objectid, MIX_Audio * chunk, int volu
 	int channel = Play(chunk, volume * effectvolume, loop);
 	if(channel != -1){
 		channelobject[channel] = objectid;
-		UpdateVolume(world, channel, lastx, lasty, 500);
+		UpdateVolume(world, channel, lastx, lasty, GASLoader::Get().world.audioRange);
 	}
 	return channel;
 }
@@ -130,6 +142,16 @@ void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int rad
 	Object * object = world.GetObjectFromId(objectid);
 	if(!object) return;
 
+	// Local player's own sounds are never attenuated, filtered, or panned.
+	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+	if(localplayer && objectid == localplayer->id){
+		MIX_SetTrackGain(tracks[channel], (channelvolume[channel] / 128.0f) * effectvolume);
+		filterAlpha[channel] = 1.0f;
+		occlusionCache[channel] = 1.0f;
+		lastx = x; lasty = y;
+		return;
+	}
+
 	float dx = float(signed(x)) - float(object->x);
 	float dy = float(signed(y)) - float(object->y);
 	float distance = sqrtf(dx*dx + dy*dy);
@@ -139,17 +161,22 @@ void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int rad
 	const WorldDef & cfg = GASLoader::Get().world;
 
 	// Phase 1: ray-based occlusion
+	// Offset ray endpoints to the top of each character's hurtbox so the ray
+	// doesn't clip through the floor platform they're both standing on.
+	int rayYOffset = GASLoader::Get().world.occlusionRayYOffset;
 	float targetOcclusion = 1.0f;
-	if(cfg.soundOcclusionEnabled && distVolume > 0.0f){
+	if(cfg.soundOcclusionEnabled && distVolume > 0.0f && distance > 32.0f){
 		targetOcclusion = ComputeOcclusion(world.map,
-			int(x), int(y), int(object->x), int(object->y),
+			int(x),          int(y)          - rayYOffset,
+			int(object->x),  int(object->y)  - rayYOffset,
 			cfg.occlusionDampenRect, cfg.occlusionDampenStairs);
 	}
 	occlusionCache[channel] += (targetOcclusion - occlusionCache[channel]) * cfg.occlusionLerpSpeed;
 	float occlusion = occlusionCache[channel];
 
 	// Phase 2: per-track IIR low-pass coefficient (applied in FilterCallback)
-	if(occlusion < cfg.occlusionMuffleThreshold){
+	// Disabled by default (soundFilterEnabled=false) until ray accuracy is confirmed.
+	if(cfg.soundFilterEnabled && occlusion < cfg.occlusionMuffleThreshold){
 		float t = occlusion / cfg.occlusionMuffleThreshold;
 		float cutoffHz = cfg.occlusionMuffleMinHz + t * (cfg.occlusionMuffleMaxHz - cfg.occlusionMuffleMinHz);
 		float sampleRate = float(mixerspec.freq > 0 ? mixerspec.freq : 44100);
@@ -289,10 +316,14 @@ void Audio::FilterCallback(void * userdata, MIX_Track * /*track*/, const SDL_Aud
 	int numCh = spec->channels < 2 ? 1 : 2;
 	for(int s = 0; s < samples; s++){
 		for(int c = 0; c < numCh; c++){
-			float & y = audio.filterState[channel][c];
 			float x = pcm[s * spec->channels + c];
-			y = alpha * x + (1.0f - alpha) * y;
-			pcm[s * spec->channels + c] = y;
+			// Pass 1
+			float & y1 = audio.filterState[channel][c];
+			y1 = alpha * x + (1.0f - alpha) * y1;
+			// Pass 2 (cascaded — 12dB/oct rolloff)
+			float & y2 = audio.filterState[channel][2 + c];
+			y2 = alpha * y1 + (1.0f - alpha) * y2;
+			pcm[s * spec->channels + c] = y2;
 		}
 	}
 }
@@ -305,6 +336,8 @@ void Audio::TrackStoppedCallback(void *userdata, MIX_Track *track){
 	audio.filterAlpha[channel] = 1.0f;
 	audio.filterState[channel][0] = 0.0f;
 	audio.filterState[channel][1] = 0.0f;
+	audio.filterState[channel][2] = 0.0f;
+	audio.filterState[channel][3] = 0.0f;
 	MIX_SetTrackStereo(track, nullptr); // clear forced-stereo pan
 }
 
