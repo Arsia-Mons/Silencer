@@ -5868,12 +5868,23 @@ void Game::TickGamepadMenuNav(){
 const char * Game::GetActionKeyDisplayName(Action a){
 	static thread_local char buf[32];
 	const auto& ab = keymap.Get(a);
+	// Prefer keyboard binding; fall back to any other device (gamepad/mouse).
+	const BindingKey* fallback = nullptr;
 	for(const auto& b : ab.bindings){
 		if(b.keys.empty()) continue;
 		const auto& k = b.keys[0];
 		if(k.device == BindingDevice::Keyboard){
 			return GetKeyName((SDL_Scancode)k.code);
 		}
+		if(!fallback) fallback = &k;
+	}
+	if(fallback){
+		std::string s = Stringify(*fallback);
+		auto colon = s.find(':');
+		std::string label = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+		std::strncpy(buf, label.c_str(), sizeof(buf) - 1);
+		buf[sizeof(buf) - 1] = '\0';
+		return buf;
 	}
 	std::strncpy(buf, "(unbound)", sizeof(buf) - 1);
 	buf[sizeof(buf) - 1] = '\0';
