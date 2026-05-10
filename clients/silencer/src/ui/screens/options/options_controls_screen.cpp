@@ -1,6 +1,7 @@
 #include "options_controls_screen.h"
 
 #include "screen_context.h"
+#include "game.h"
 #include "game_state.h"
 #include "world.h"
 #include "objecttypes.h"
@@ -10,6 +11,7 @@
 #include "scrollbar.h"
 #include "config.h"
 
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -85,6 +87,28 @@ void OptionsControlsScreen::WriteLegacy(KeyMap & km, Action a, SDL_Scancode key1
 		Binding b; b.keys.push_back(mk(key2));
 		ab.bindings.push_back(std::move(b));
 	}
+}
+
+std::string OptionsControlsScreen::GetBindingLabel(ScreenContext & ctx, Action a, int slot) const
+{
+	const auto & ab = ctx.keymap.Get(a);
+	int found = 0;
+	for(const auto & b : ab.bindings){
+		if(b.keys.empty()) continue;
+		if(found == slot){
+			const auto & k = b.keys[0];
+			if(k.device == BindingDevice::Keyboard){
+				return KeyMap::GetKeyName((SDL_Scancode)k.code);
+			}
+			std::string s = Stringify(k);
+			auto colon = s.find(':');
+			std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+			SDL_Gamepad * pad = ctx.game.GetGamepad();
+			return GamepadShortLabel(raw, pad ? SDL_GetGamepadType(pad) : SDL_GAMEPAD_TYPE_UNKNOWN);
+		}
+		found++;
+	}
+	return KeyMap::GetKeyName(SDL_SCANCODE_UNKNOWN);
 }
 
 void OptionsControlsScreen::Build(ScreenContext & ctx)
@@ -222,10 +246,13 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx)
 			int row = i + scrollbar->scrollposition;
 			if(row < 0 || row >= (int)Action::Count) continue;
 			Action a = ACTION_TABLE[row].action;
-			LegacyView v = ViewLegacy(keymap, a);
 			keynameoverlay[i]->text = std::string(GetActionInfo(a).label) + ":";
-			strcpy(c1button[i]->text, KeyMap::GetKeyName(v.key1));
-			strcpy(c2button[i]->text, KeyMap::GetKeyName(v.key2));
+			std::string lbl0 = GetBindingLabel(ctx, a, 0);
+			std::string lbl1 = GetBindingLabel(ctx, a, 1);
+			strncpy(c1button[i]->text, lbl0.c_str(), sizeof(c1button[i]->text) - 1);
+			c1button[i]->text[sizeof(c1button[i]->text) - 1] = 0;
+			strncpy(c2button[i]->text, lbl1.c_str(), sizeof(c2button[i]->text) - 1);
+			c2button[i]->text[sizeof(c2button[i]->text) - 1] = 0;
 		}
 		// Preset button text reflects the active profile's label.
 		// The static "Preset:" overlay to its left supplies the noun.
@@ -263,6 +290,51 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx)
 		// and put the UI back into edit mode. iface->disabled gates the rest of
 		// the UI while we wait for input.
 		if(button->uid >= PRIMARY_SLOT_BASE && button->uid < OR_AND_TOGGLE_BASE && scrollbar){
+			const GamepadState & gp = ctx.game.GetGamepadState();
+			// First: check for newly-pressed gamepad button/axis during rebind wait.
+			if(iface->disabled && button->state == Button::ACTIVE && gp.connected){
+				int slot = button->uid;
+				int row  = (slot < SECONDARY_SLOT_BASE ? slot : slot - SECONDARY_SLOT_BASE) + scrollbar->scrollposition;
+				BindingKey padKey{}; bool padFound = false;
+				for(int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT && !padFound; b++){
+					bool was = (rebindGamepadButtons >> b) & 1;
+					bool is  = (gp.buttons >> b) & 1;
+					if(is && !was){
+						padKey.device = BindingDevice::GamepadButton;
+						padKey.code   = b; padKey.axisDir = 0;
+						padFound = true;
+					}
+				}
+				for(int ax = 0; ax < SDL_GAMEPAD_AXIS_COUNT && !padFound; ax++){
+					int16_t was = rebindGamepadAxes[ax];
+					int16_t is  = gp.axes[ax];
+					if(std::abs(is) > AXIS_DEADZONE && std::abs(was) <= AXIS_DEADZONE){
+						padKey.device  = BindingDevice::GamepadAxis;
+						padKey.code    = ax;
+						padKey.axisDir = (is > 0) ? 1 : -1;
+						padFound = true;
+					}
+				}
+				if(padFound && row >= 0 && row < (int)Action::Count){
+					ForkActiveProfileIfBuiltin(ctx.keymap);
+					auto & ab = keymap.Get(ACTION_TABLE[row].action);
+					Binding binding; binding.keys.push_back(padKey);
+					if(slot < SECONDARY_SLOT_BASE){
+						if(ab.bindings.empty()) ab.bindings.push_back(binding);
+						else ab.bindings[0] = binding;
+					} else {
+						if(ab.bindings.empty()) ab.bindings.push_back(Binding{});
+						if(ab.bindings.size() < 2) ab.bindings.push_back(binding);
+						else ab.bindings[1] = binding;
+					}
+					std::string label = Stringify(padKey);
+					auto colon = label.find(':');
+					if(colon != std::string::npos) label = label.substr(colon + 1);
+					strncpy(button->text, label.c_str(), sizeof(button->text) - 1);
+					button->text[sizeof(button->text) - 1] = 0;
+					iface->disabled = false;
+				}
+			}
 			if(iface->disabled && button->state == Button::ACTIVE &&
 			   (iface->lastsym != SDL_SCANCODE_UNKNOWN || world.tickcount - optionscontrolstick > REBIND_TIMEOUT_TICKS)){
 				int slot = button->uid;     // 0..99 = primary; 100..149 = secondary
@@ -295,6 +367,11 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx)
 			iface->disabled = true;
 			optionscontrolstick = world.tickcount;
 			iface->lastsym = SDL_SCANCODE_UNKNOWN;
+			// Snapshot the gamepad state so the capture branch above only
+			// reacts to buttons/axes pressed *after* the rebind started.
+			const GamepadState & gp = ctx.game.GetGamepadState();
+			rebindGamepadButtons = gp.buttons;
+			memcpy(rebindGamepadAxes, gp.axes, sizeof(rebindGamepadAxes));
 		}
 
 		if(button->uid >= OR_AND_TOGGLE_BASE && button->uid < SAVE_BTN_UID && scrollbar){

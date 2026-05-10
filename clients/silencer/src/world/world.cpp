@@ -870,6 +870,7 @@ void World::DoNetwork_Replica(void){
 				} else {
 					pancameraactive = false;
 					pancamerareturn = true;
+					pancamerareturncount = GASLoader::Get().gameengine.ticksPerSecond * 3; // 3s return window
 				}
 			}break;
 		}

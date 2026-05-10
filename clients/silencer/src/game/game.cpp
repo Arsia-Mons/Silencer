@@ -550,6 +550,16 @@ bool Game::Loop(void){
 			}
 		} else {
 			UpdateInputState(world.localinput);
+			// If a rebind slot is waiting for input, zero out gamepad-driven
+			// localinput so button presses don't leak into gameplay/UI actions.
+			if(currentinterface){
+				Interface* rebindIface = (Interface*)world.GetObjectFromId(currentinterface);
+				if(rebindIface && rebindIface->disabled){
+					world.localinput.keyup = world.localinput.keydown =
+					world.localinput.keyleft = world.localinput.keyright = false;
+				}
+			}
+			TickGamepadMenuNav();
 		}
 		world.SendInput();
 		if(!Tick()){
@@ -557,6 +567,7 @@ bool Game::Loop(void){
 		}
 		if(!world.replay.IsPlaying() || (world.replay.IsPlaying() && world.gameplaystate == World::INGAME)){
 			world.Tick();
+			TickRumble();
 		}
 		if(!world.dedicatedserver.active){
 			renderer.Tick();
@@ -1412,18 +1423,22 @@ bool Game::Tick(void){
 							world.ShowMessage(text, 255);
 						}
 						Team * team = player->GetTeam(world);
-						if(team && team->beamingterminalid){
+						bool advance22 = player->hassecret || (team && team->secrets > 0);
+						if(!advance22 && team && team->beamingterminalid){
 							Terminal * terminal = static_cast<Terminal *>(world.GetObjectFromId(team->beamingterminalid));
 							if(terminal){
 								if(terminal->beamingtime > 45){
 									terminal->beamingtime = 45;
 								}
 								if(terminal->state == Terminal::SECRETREADY){
-									world.highlightminimap = false;
-									singleplayermessage++;
-									world.message_i = 0;
+									advance22 = true;
 								}
 							}
+						}
+						if(advance22){
+							world.highlightminimap = false;
+							singleplayermessage++;
+							world.message_i = 0;
 						}
 					}break;
 					case 23:{
@@ -1432,7 +1447,8 @@ bool Game::Tick(void){
 							sprintf(text, "Pick up the secret at the location shown\non your radar map");
 							world.ShowMessage(text, 128);
 						}
-						if(player->hassecret){
+						Team * team23 = player->GetTeam(world);
+						if(player->hassecret || (team23 && team23->secrets > 0)){
 							singleplayermessage++;
 							world.message_i = 0;
 						}
@@ -1443,7 +1459,8 @@ bool Game::Tick(void){
 							sprintf(text, "Now, you must return the secret to your base.\nIf this were a real government secret,\nyou would have limited time before\nthe government traced your location.");
 							world.ShowMessage(text, 255);
 						}
-						if(player->InBase(world)){
+						Team * team24 = player->GetTeam(world);
+						if(player->InBase(world) || (team24 && team24->secrets > 0)){
 							singleplayermessage++;
 							world.message_i = 0;
 						}
@@ -2170,6 +2187,28 @@ void Game::ShowTeamOverlays(bool show){
 	}
 }
 
+void Game::TickRumble(){
+	if(!gamepad || world.gameplaystate != World::INGAME) return;
+	Player* player = world.GetPeerPlayer(world.localpeerid);
+	if(!player) return;
+
+	// Fire: short high-frequency click
+	if(player->rumbleFire){
+		player->rumbleFire = false;
+		SDL_RumbleGamepad(gamepad, 0, 12000, 80);
+	}
+	// Hit: strong punch on both motors
+	if(player->rumbleHit){
+		player->rumbleHit = false;
+		SDL_RumbleGamepad(gamepad, 30000, 15000, 200);
+	}
+	// Land: low thud (left motor only)
+	if(player->rumbleLand){
+		player->rumbleLand = false;
+		SDL_RumbleGamepad(gamepad, 18000, 0, 120);
+	}
+}
+
 void Game::OpenFirstGamepad(){
 	if(gamepad){ SDL_CloseGamepad(gamepad); gamepad = nullptr; }
 	int count = 0;
@@ -2179,6 +2218,22 @@ void Game::OpenFirstGamepad(){
 		SDL_free(ids);
 	}
 	gamepadstate.connected = (gamepad != nullptr);
+	if(gamepadstate.connected){
+		// Auto-switch to the gamepad keybind profile, but only if the current
+		// profile isn't already gamepad-derived (e.g. "gamepad-custom" saved
+		// from a previous session — don't clobber it with the built-in).
+		const char* cur = Config::GetInstance().active_keybind_profile;
+		std::string curStr = (cur && *cur) ? cur : "default";
+		bool alreadyGamepad = (curStr.find("gamepad") != std::string::npos);
+		if(!alreadyGamepad){
+			prevGamepadProfile = curStr;
+			std::strncpy(Config::GetInstance().active_keybind_profile, "gamepad",
+			             sizeof(Config::GetInstance().active_keybind_profile) - 1);
+			Config::GetInstance().active_keybind_profile[
+				sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
+			LoadActiveKeymap(keymap);
+		}
+	}
 }
 
 void Game::PollGamepadState(){
@@ -2200,15 +2255,81 @@ void Game::PollGamepadState(){
 	}
 }
 
+void Game::TickGamepadMenuNav(){
+	// Only meaningful when a gamepad is connected and a menu interface is open.
+	if(!gamepadstate.connected) return;
+	Interface* iface = (Interface*)world.GetObjectFromId(currentinterface);
+	if(!iface) return;
+
+	// During rebind-wait (iface->disabled=true) the rebind capture code owns
+	// all gamepad input.  Don't let nav/confirm/cancel fire as side effects.
+	if(iface->disabled) return;
+
+	Uint32 now = SDL_GetTicks();
+
+	// Helper: fire a nav key press with software repeat on held direction.
+	auto tick = [&](GamepadNavDir& dir, Action action, Uint8 ascii){
+		bool pressed = keymap.IsPressed(action, keystate, gamepadstate);
+		if(!pressed){
+			dir.held    = false;
+			dir.nextfire = 0;
+			return;
+		}
+		if(!dir.held){
+			// First frame held — fire immediately.
+			dir.held     = true;
+			dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
+			iface->ProcessKeyPress(world, ascii);
+		} else if(now >= dir.nextfire){
+			// Repeat.
+			dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
+			iface->ProcessKeyPress(world, ascii);
+		}
+	};
+
+	tick(gamepadNavUp,    Action::UiUp,    3);
+	tick(gamepadNavDown,  Action::UiDown,  4);
+	tick(gamepadNavLeft,  Action::UiLeft,  1);
+	tick(gamepadNavRight, Action::UiRight, 2);
+
+	// Confirm (A/Cross) — no repeat, edge-detect only.
+	// If nothing is focused, auto-focus the first item so the user sees where
+	// they are before committing.
+	{
+		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
+		static bool confirmPrev = false;
+		if(confirmNow && !confirmPrev){
+			if(iface->activeobject == 0 && !iface->tabobjects.empty()){
+				iface->ProcessKeyPress(world, 4);  // focus first item; next A confirms
+			} else {
+				iface->ProcessKeyPress(world, '\n');
+			}
+		}
+		confirmPrev = confirmNow;
+	}
+}
+
 const char * Game::GetActionKeyDisplayName(Action a){
 	static thread_local char buf[32];
 	const auto& ab = keymap.Get(a);
+	// Prefer keyboard binding; fall back to any other device (gamepad/mouse).
+	const BindingKey* fallback = nullptr;
 	for(const auto& b : ab.bindings){
 		if(b.keys.empty()) continue;
 		const auto& k = b.keys[0];
 		if(k.device == BindingDevice::Keyboard){
 			return KeyMap::GetKeyName((SDL_Scancode)k.code);
 		}
+		if(!fallback) fallback = &k;
+	}
+	if(fallback){
+		std::string s = Stringify(*fallback);
+		auto colon = s.find(':');
+		std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+		std::string label = GamepadShortLabel(raw, gamepad ? SDL_GetGamepadType(gamepad) : SDL_GAMEPAD_TYPE_UNKNOWN);
+		std::strncpy(buf, label.c_str(), sizeof(buf) - 1);
+		buf[sizeof(buf) - 1] = '\0';
+		return buf;
 	}
 	std::strncpy(buf, "(unbound)", sizeof(buf) - 1);
 	buf[sizeof(buf) - 1] = '\0';
@@ -2394,6 +2515,16 @@ bool Game::HandleSDLEvents(void){
 					SDL_CloseGamepad(gamepad);
 					gamepad = nullptr;
 					gamepadstate.connected = false;
+					// Restore the pre-gamepad keybind profile if we auto-switched.
+					if(!prevGamepadProfile.empty()){
+						std::strncpy(Config::GetInstance().active_keybind_profile,
+						             prevGamepadProfile.c_str(),
+						             sizeof(Config::GetInstance().active_keybind_profile) - 1);
+						Config::GetInstance().active_keybind_profile[
+							sizeof(Config::GetInstance().active_keybind_profile) - 1] = '\0';
+						LoadActiveKeymap(keymap);
+						prevGamepadProfile.clear();
+					}
 				}
 			}break;
 			case SDL_EVENT_QUIT:

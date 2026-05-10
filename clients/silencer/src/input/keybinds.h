@@ -21,6 +21,7 @@ enum class Action : uint8_t {
 	Disguise, NextWeapon,
 	Weapon1, Weapon2, Weapon3, Weapon4,
 	UiUp, UiDown, UiLeft, UiRight,
+	UiConfirm, UiCancel,
 	Count
 };
 
@@ -58,6 +59,11 @@ struct BindingKey {
 // Returns false on unrecognized prefix or unknown name.
 bool ParseBindingKey(const std::string& s, BindingKey& out);
 std::string Stringify(const BindingKey& k);
+
+// Maps an SDL gamepad button/axis name (after stripping "PAD:" prefix) to a
+// short display label appropriate for the connected controller type.
+// e.g. "leftshoulder" → "LB" (Xbox) or "L1" (PS).
+std::string GamepadShortLabel(const std::string& raw, SDL_GamepadType type);
 
 struct Binding {
 	std::vector<BindingKey> keys;   // size 1 = single key, size N = AND chord

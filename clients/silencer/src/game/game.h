@@ -82,6 +82,11 @@ public:
 	KeyMap& GetKeyMap() { return keymap; }
 	const KeyMap& GetKeyMap() const { return keymap; }
 
+	// Gamepad access for screens that need to capture rebind input or
+	// query the connected pad type (e.g. OptionsControlsScreen).
+	const GamepadState& GetGamepadState() const { return gamepadstate; }
+	SDL_Gamepad * GetGamepad() const { return gamepad; }
+
 	// LobbyScreen + per-panel interop. Public so panels can reach in via
 	// `ScreenContext::game`. Mirror ids (gameselectinterface etc.) are written
 	// by the panels as they Build, read by Game::GoBack to decide which lobby
@@ -187,6 +192,28 @@ private:
 	// safely after the active screen's Tick has returned. Avoids destroying
 	// a screen mid-Tick when a button click triggers a state transition.
 	bool screenStackPendingTeardown = false;
+
+	// Profile to restore when a gamepad disconnects.  Stays empty when the
+	// active profile was already "gamepad" before the pad was connected.
+	std::string prevGamepadProfile;
+
+	// Per-direction software-repeat state for gamepad menu navigation.
+	// Gamepad events are polled each frame, not event-driven, so we
+	// synthesise key-repeat manually: first press fires immediately, further
+	// repeats fire after GAMEPAD_NAV_DELAY_MS then every GAMEPAD_NAV_REPEAT_MS.
+	static constexpr Uint32 GAMEPAD_NAV_DELAY_MS  = 300;
+	static constexpr Uint32 GAMEPAD_NAV_REPEAT_MS = 120;
+	struct GamepadNavDir {
+		bool       held     = false;
+		Uint32     nextfire = 0;  // SDL_GetTicks() value at which next repeat fires
+	};
+	GamepadNavDir gamepadNavUp;
+	GamepadNavDir gamepadNavDown;
+	GamepadNavDir gamepadNavLeft;
+	GamepadNavDir gamepadNavRight;
+	void TickGamepadMenuNav();
+	// Trigger SDL_RumbleGamepad for fire/hit/land events on the local player.
+	void TickRumble();
 };
 
 #endif

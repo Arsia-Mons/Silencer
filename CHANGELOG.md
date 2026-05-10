@@ -4,7 +4,29 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00048] — 2026-05-09
+
 ### Game client
+
+#### Controller support — Bluetooth & USB gamepads (#141)
+
+- **Auto-detect** — `SDL_EVENT_GAMEPAD_ADDED` / `_REMOVED` open and close `SDL_Gamepad` handles; D-pad and left stick drive UI focus nav with software repeat (300 ms initial delay, 120 ms repeat). A confirms, B cancels; first A press auto-focuses the first item.
+- **Profile auto-switch** — connecting a gamepad switches the live keybind profile to `gamepad`; disconnect restores the previous keyboard profile. `gamepad-custom` and other gamepad-derived profiles persist across restarts.
+- **Defaults & rebinding** — `gamepad.json` ships Xbox-style defaults for every game action. Configure Controls renders short button names (LB/RB/LT/RT/A/B/X/Y …), PlayStation-aware via `SDL_GetGamepadType()`. Rebind captures buttons and axes; bindings persist as JSON. Fixed an axis-rebind threshold bug where the trigger compared against `32768` (above `int16` max) and never fired — corrected to `AXIS_DEADZONE`.
+- **Rumble** — fire 80 ms click, hit 200 ms punch, land 120 ms thud via `SDL_RumbleGamepad`.
+- **Tutorial** — key hints render gamepad button names instead of `(unbound)` when on a gamepad profile; tutorial steps 22–24 no longer freeze if the player outpaces the internal state machine.
+- **Sign-off** — Xbox controller (Bluetooth) tested end-to-end. Remaining polish tracked in #143.
+
+#### 2D sound occlusion, low-pass filter, stereo pan (#137, #138)
+
+- **Occlusion rays** — `ComputeOcclusion()` walks `world.map.TestLine()` between listener and emitter, accumulating dampening per platform crossing (`RECTANGLE × 0.15`, `STAIRSUP/DOWN × 0.60`, all GAS-tunable). Per-channel `occlusionCache[]` lerps each update (`occlusionLerpSpeed`, default `0.25`) to avoid zipper noise as players or emitters move.
+- **IIR low-pass filter** — `MIX_SetTrackCookedCallback` registers a single-pole IIR per track in the SDL3_mixer pipeline. Cutoff lerps from `occlusionMuffleMaxHz` (8 kHz) down to `occlusionMuffleMinHz` (400 Hz) below `occlusionMuffleThreshold`; passthrough above. Volume vs. filter factors are computed separately so stairs reduce volume but no longer trigger muffle. **Disabled by default** (`soundFilterEnabled=false`) until ray accuracy is confirmed across all maps; opt in per-map via `world.json`.
+- **Stereo panning** — `MIX_SetTrackStereo()` updated each `UpdateVolume()` with `MIX_StereoGains`; `pan = -(dx/radius) × 0.8` clamped to ±1.
+- **Local-player bypass** — your own footsteps, fire sounds, and impacts skip all spatial processing (no distance falloff, no occlusion, no filter, no pan) and always play at full volume.
+- **Footstep audibility** — civ/guard footsteps raised from 16→64; player crouch/stair from 24→64 / 16→48 so they're audible at normal in-room distances.
+- **State hygiene** — `occlusionCache`, `filterAlpha`, `filterState`, and stereo pan are all cleared on `TrackStoppedCallback` and re-cleared in `Play()` when a channel is claimed, so stale occluded-sound state can't bleed into the next play.
+- **GAS** — `EmitSound` now uses `audioRange` from `world.json` instead of a hardcoded `500`. New world fields: `soundOcclusionEnabled`, `occlusionDampenRect`, `occlusionDampenStairs`, `occlusionLerpSpeed`, `occlusionMuffleThreshold`, `occlusionMuffleMinHz`, `occlusionMuffleMaxHz`, `soundPanningEnabled`, `soundFilterEnabled`.
+- **Camera pan fixes (rolled in)** — `pancamerareturncount` is now set when `pancamerareturn=true` arrives via `MSG_CAMERA(0,0)` (previously the `World::Tick()` `>0` decrement loop never ran, so the return state stuck forever); the renderer's lerp path now clamps `camera.x/y` to `w/2,h/2` floors after lerping, so walking far left no longer drives `camera.x` negative and makes `IsVisible()` reject the world.
 
 #### Mission / Trigger Scripting Tool (#124, issue #30)
 
@@ -29,6 +51,14 @@ All notable changes to Silencer are documented here.
 #### Loading screen
 
 - **Green gradient progress bar** — loading bar uses the game's green palette (indices 101–113), dark-to-bright left-to-right gradient, 32 px height, dark green background track.
+
+### Game client — bug fixes
+
+- **`ListFiles` stack overflow on missing directory (#139)** — `FindFirstFile` returns `INVALID_HANDLE_VALUE` (= `(HANDLE)-1`), not `NULL`, when the target dir doesn't exist. The truthy `if(dir)` check let the loop body run with an unpopulated `WIN32_FIND_DATA` whose `cFileName` had no terminator, so `sprintf("%s\\%s", directory, info.cFileName)` read past the struct, scanning 0xCC debug-fill bytes until it hit the null inside `directory2` (308 bytes later) and copied that whole run into `fullname[MAX_PATH]` — a ~228-byte stack overflow that clobbered the saved NRVO return-slot pointer at the function's home space. Crash repro: open *Create New Game* without an existing `<datadir>/level/download` directory (it's only created lazily on first map download). Latent since 2014; surfaced now because the spectatable-dialog work shifted the caller's stack just enough that the corrupted slot ended up non-recoverable. Same `if(dir)` pattern fixed in `selectbox.cpp` `ListFiles` helper.
+
+### Docs
+
+- **Progression spec — XP formula** — `CalculateExperience()` weights documented for all 16 stat actions; threshold formula `threshold(N) = 100 × (N+1)`; cumulative `total_xp(N) = 50 × N × (N+1)`; level-0-to-99 milestone table; `xp_remaining` display formula.
 
 ## [v00047] — 2026-05-07
 

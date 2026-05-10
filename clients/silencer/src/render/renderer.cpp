@@ -95,8 +95,16 @@ void Renderer::Draw(Surface * surface, float frametime){
 		int py = localplayer->y + ((localplayer->oldy - localplayer->y) * frametime);
 		camera.x += (Sint16)((px - camera.x) * 0.08f);
 		camera.y += (Sint16)((py - camera.y) * 0.08f);
+		// Clamp to map bounds — same floor as Follow() to prevent IsVisible failures
+		if(camera.x < (int)(camera.w / 2)) camera.x = camera.w / 2;
+		if(camera.y < (int)(camera.h / 2)) camera.y = camera.h / 2;
 		camera.newx = camera.x;
 		camera.newy = camera.y;
+		// Release early if camera has caught up with player
+		if(abs(camera.x - px) < 8 && abs(camera.y - py) < 8){
+			world.pancamerareturn = false;
+			world.pancamerareturncount = 0;
+		}
 	} else if(localplayer){
 		if(localplayer->InBase(world) && !playerinbaseold){
 			localplayer->oldx = localplayer->x;

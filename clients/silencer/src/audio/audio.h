@@ -35,9 +35,21 @@ public:
 	bool enabled;
 	MIX_Mixer *GetMixer(void) { return mixer; }
 
+	struct ChannelDebugInfo {
+		int objectid;
+		float occlusion;
+		float filterAlpha;
+	};
+	ChannelDebugInfo GetChannelDebug(int channel) const {
+		return { channelobject[channel], occlusionCache[channel], filterAlpha[channel] };
+	}
+
 private:
 	static void TrackStoppedCallback(void *userdata, MIX_Track *track);
 	static void MixingFunction(void * udata, Uint8 * stream, int len);
+	static void FilterCallback(void *userdata, MIX_Track *track, const SDL_AudioSpec *spec, float *pcm, int samples);
+
+	float ComputeOcclusion(class Map &map, int lx, int ly, int ex, int ey, float dampenRect, float dampenStairs, float * outFilterFactor = nullptr);
 
 	static const int maxchannels = 128;
 	MIX_Mixer *mixer;
@@ -47,6 +59,9 @@ private:
 	int channelobject[maxchannels];
 	int channelvolume[maxchannels];
 	float effectvolume;
+	float occlusionCache[maxchannels]; // lerped occlusion factor per channel
+	float filterAlpha[maxchannels];    // IIR low-pass coefficient per channel
+	float filterState[maxchannels][4]; // 2-pole IIR history per channel (p1L, p1R, p2L, p2R)
 	Sint16 lastx, lasty;
 	int musicvolume;
 };

@@ -54,6 +54,8 @@ const ActionInfo ACTION_TABLE[(int)Action::Count] = {
 	{ Action::UiDown,         "ui_down",         "UI Down"         },
 	{ Action::UiLeft,         "ui_left",         "UI Left"         },
 	{ Action::UiRight,        "ui_right",        "UI Right"        },
+	{ Action::UiConfirm,      "ui_confirm",      "UI Confirm"      },
+	{ Action::UiCancel,       "ui_cancel",       "UI Cancel"       },
 };
 
 const ActionInfo* FindAction(const std::string& id) {
@@ -584,4 +586,45 @@ const char * KeyMap::GetKeyName(SDL_Scancode sym){
 		case SDL_SCANCODE_0: return "0"; break;
 		default: return "?"; break;
 	}
+}
+
+std::string GamepadShortLabel(const std::string& raw, SDL_GamepadType type) {
+	// Strip trailing axis direction modifier (+/-)
+	std::string base = raw;
+	if(!base.empty() && (base.back() == '+' || base.back() == '-'))
+		base.pop_back();
+
+	static const struct { const char* sdl; const char* xbox; const char* ps; } kTable[] = {
+		{"south",         "A",       "Cross"},
+		{"north",         "Y",       "Tri"},
+		{"east",          "B",       "Circle"},
+		{"west",          "X",       "Square"},
+		{"back",          "Back",    "Select"},
+		{"guide",         "Guide",   "PS"},
+		{"start",         "Menu",    "Options"},
+		{"leftstick",     "LS",      "L3"},
+		{"rightstick",    "RS",      "R3"},
+		{"leftshoulder",  "LB",      "L1"},
+		{"rightshoulder", "RB",      "R1"},
+		{"dpup",          "D-Up",    "D-Up"},
+		{"dpdown",        "D-Dn",    "D-Dn"},
+		{"dpleft",        "D-Lt",    "D-Lt"},
+		{"dpright",       "D-Rt",    "D-Rt"},
+		{"lefttrigger",   "LT",      "L2"},
+		{"righttrigger",  "RT",      "R2"},
+		{"leftx",         "L-X",     "L-X"},
+		{"lefty",         "L-Y",     "L-Y"},
+		{"rightx",        "R-X",     "R-X"},
+		{"righty",        "R-Y",     "R-Y"},
+		{"misc1",         "Share",   "Share"},
+		{"touchpad",      "Touch",   "Touch"},
+	};
+	bool isPs = (type == SDL_GAMEPAD_TYPE_PS3 ||
+	             type == SDL_GAMEPAD_TYPE_PS4 ||
+	             type == SDL_GAMEPAD_TYPE_PS5);
+	for(const auto& e : kTable){
+		if(base == e.sdl)
+			return isPs ? e.ps : e.xbox;
+	}
+	return raw; // unknown: return original (already has suffix stripped)
 }

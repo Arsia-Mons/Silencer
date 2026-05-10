@@ -15,6 +15,30 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: 'v00048',
+    date: '2026-05-09',
+    title: 'Mission scripting, controller support, 2D audio',
+    entries: [
+      {
+        category: 'CLIENT',
+        changes: [
+          'Mission / Trigger Scripting Tool (#124, issue #30) — generic event bus (TRIGGER_ENTER_ZONE, TERMINAL_ACTIVATED, ACTOR_KILLED/DAMAGED, OBJECTIVE_COMPLETE, ITEM_COLLECTED, PLAYER_DIED, ALL_PLAYERS_DIED, TIMER_EXPIRED, GAME_START), action system (OPEN/LOCK/UNLOCK_DOOR, PLAY_SOUND, SHOW_OBJECTIVE, PAN_CAMERA, SPAWN_ACTOR, END_MISSION, DESTROY/MOVE_ACTOR, APPLY_DAMAGE_IN_ZONE, ENABLE/DISABLE_TRIGGER, COMPLETE_OBJECTIVE, SET_FLAG, LOCK/UNLOCK_INPUT) with optional per-action delay, condition system (ALL_OF/ANY_OF, team, objective, player count, health, COUNT_REACHED, FLAG_SET), one-shot vs repeatable, 256-flag runtime store, destructible/collectible actors, MOVE_ACTOR interpolation, zone definitions in the .sil binary, and authority-owned trigger state replicated via MSG_TRIGGER_STATE.',
+          'Camera pan intro — GAME_START fires at tick=0 (reliable, before any player interaction); PAN_CAMERA lerps to a target zone; UNLOCK_INPUT lerps back to the player. Pan state resets in UnloadGame() so the menu renders correctly if the player disconnects mid-pan.',
+          'Designer trigger panel — full TRIGGERS tab in the map designer sidebar: every trigger/condition/action node type, action delay fields, one-shot/repeatable toggle, objective list editor (required/optional), zone tool (canvas draw + cyan dashed outline), actor canvas linking (🎯 button enters crosshair mode), MOVE_ACTOR path preview, drag-to-reorder action rows, PLAY_SOUND dropdown sourced from sound.bin. Serializes the trigger graph into the map file.',
+          'Controller support (#141) — Bluetooth & USB gamepads (Xbox / PS5 / generic HID): SDL3 auto-detect, D-pad/left-stick UI focus nav, A/B confirm/cancel, gamepad keybind profile auto-switches on connect (and persists *-custom forks), Xbox-style defaults in gamepad.json, PlayStation-aware button labels, axis rebind, fire/hit/land rumble. Tutorial hints render gamepad button names; tutorial steps 22–24 no longer freeze.',
+          '2D sound occlusion + low-pass filter + stereo pan (#137, #138) — TestLine ray accumulates dampening per platform crossing (rect × 0.15, stairs × 0.60), per-channel cache lerps to avoid zipper noise. IIR low-pass cutoff (8 kHz → 400 Hz) gated by a separate filter factor and disabled by default until ray accuracy is confirmed. Stereo pan = -(dx/radius)*0.8. Local-player sounds bypass all spatial processing. Footstep volumes raised so they\'re audible at normal in-room distance. EmitSound now honours GAS audioRange instead of a hardcoded 500.',
+          'Loading screen — green gradient progress bar (palette indices 101–113, dark→bright, 32 px, dark green track).',
+        ],
+      },
+      {
+        category: 'CLIENT',
+        changes: [
+          'Fix: ListFiles stack overflow on missing dir (#139) — FindFirstFile returns INVALID_HANDLE_VALUE (not NULL); the truthy if(dir) ran the loop on uninitialised WIN32_FIND_DATA, scanning 0xCC fill until the null in directory2 and copying ~228 bytes past fullname[MAX_PATH], clobbering the NRVO return slot. Repro: open Create New Game with no existing <datadir>/level/download directory. Latent since 2014. Same fix applied in selectbox.cpp.',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v00046',
     date: '2026-05-07',
     title: 'Windows installer + updater fix',

@@ -1497,7 +1497,7 @@ void Player::Tick(World & world){
 					res_bank = 66;
 					res_index = state_i;
 					if(res_index == 3){
-						EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 24);
+						EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 64);
 					}
 				}
 			}
@@ -1511,17 +1511,17 @@ void Player::Tick(World & world){
 					res_bank = 123;
 				}
 				if(res_index == 4){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 24);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 64);
 				}
 				if(res_index == 11){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchR], 24);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchR], 64);
 				}
 			}
 			if(state_i >= 21 && state_i < 25){
 				res_bank = 67;
 				res_index = state_i - 21;
 				if(res_index == 3){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 24);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepCrouchL], 64);
 				}
 				if(input.keymoveleft || input.keymoveright){
 					state_i = -1;
@@ -1543,10 +1543,10 @@ void Player::Tick(World & world){
 					state_i = 25 - 1;
 				}
 				if(res_index == 5){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepStairL], 16);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepStairL], 48);
 				}
 				if(res_index == 15){
-					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepStairR], 16);
+					EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundFootstepStairR], 48);
 				}
 			}
 			//printf("bank: %d  index: %d\n", res_bank, res_index);
@@ -3062,6 +3062,7 @@ bool Player::CheckForGround(World & world, Platform & platform){
 		xv /= 4;
 		FollowGround(*this, world, xv/* - xv2*/);
 		justlandedfromair = true;
+		rumbleLand = true;
 		if(input.keymoveright || input.keymoveleft){
 			state = RUNNING;
 		}else{
@@ -3663,6 +3664,7 @@ Projectile * Player::Fire(World & world, Uint8 direction){
 			}break;
 		}
 		if(projectile){
+			rumbleFire = true;
 			currentprojectileid = projectile->id;
 			projectile->ownerid = id;
 			projectile->x = x;
