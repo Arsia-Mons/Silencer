@@ -31,9 +31,12 @@ runs:
       with:
         path: ${{ github.workspace }}/.vcpkg-cache
         key: vcpkg-${{ runner.os }}-${{ env.IMAGE_VERSION }}-${{ hashFiles('clients/silencer/vcpkg.json') }}
+        # Only fall back within the same runner image. The broader
+        # `vcpkg-${{ runner.os }}-` prefix matches stale single-dash
+        # caches from before IMAGE_VERSION was in the key, which
+        # contain incompatible ABIs and silently restore 0 packages.
         restore-keys: |
           vcpkg-${{ runner.os }}-${{ env.IMAGE_VERSION }}-
-          vcpkg-${{ runner.os }}-
 
     - name: Cache vcpkg tool downloads
       uses: actions/cache@v4
@@ -41,7 +44,7 @@ runs:
         path: C:\vcpkg\downloads\tools
         key: vcpkg-tools-${{ runner.os }}-${{ env.IMAGE_VERSION }}-v1
         restore-keys: |
-          vcpkg-tools-${{ runner.os }}-
+          vcpkg-tools-${{ runner.os }}-${{ env.IMAGE_VERSION }}-
 
     - name: Setup sccache
       uses: mozilla-actions/sccache-action@v0.0.10
