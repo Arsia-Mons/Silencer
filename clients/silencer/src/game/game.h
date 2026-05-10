@@ -104,6 +104,18 @@ public:
 	// entering / leaving the tech-choice surface.
 	void ShowTeamOverlays(bool show);
 
+	// Preview-mode CLI flags. Set by Load() when --preview-screen is
+	// passed; main.cpp dispatches to RunPreview() instead of the normal
+	// Loop. Used by the ui/v2 harness for visual + PPM-diff verification.
+	char preview_screen[64];        // empty = preview mode disabled
+	char preview_impl[16];          // "v2" (default) or "legacy"
+	char dump_ppm_path[256];        // empty = interactive window mode
+	int  preview_scale;             // 1 if unset
+	// Render the requested screen via either the new ui/v2 path or the
+	// legacy widget path, then either dump a PPM (one-shot) or run an
+	// SDL window loop. Defined in src/ui/v2/preview.cpp.
+	int RunPreview();
+
 private:
 	bool Tick(void);
 	// Gameplay-state Tick bodies — one per state. Each lives in its own

@@ -2,6 +2,12 @@ cmake_minimum_required(VERSION 3.16)
 
 project(Silencer)
 
+# Emit build/compile_commands.json so clangd (Zed, VS Code C++ extension,
+# CLion fallback, etc.) can resolve includes for src/ui/v2/ and the rest
+# of the include-dir list below. Pair with the .clangd file at this dir's
+# root, which points clangd at build-unity/ (the recommended preset).
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # nlohmann/json v3.12.0 — vendored header (third_party/nlohmann/json.hpp)
 # Vendored to avoid CMake FetchContent redirect issues with GitHub CDN in CI.
 set(NLOHMANN_JSON_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
@@ -142,6 +148,8 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/panels"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/modals"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/mission_summary"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/v2"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/v2/screens"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/net"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/updater"

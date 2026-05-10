@@ -309,6 +309,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		return -1;
 	}
 
+	if(game.preview_screen[0]){
+		int rc = game.RunPreview();
+#ifdef __ANDROID__
+		exit(rc);
+#endif
+		return rc;
+	}
+
 	float x = 0, y = 0;
 	if(!dedicatedmode){
 		SDL_GetMouseState(&x, &y);

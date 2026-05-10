@@ -1441,6 +1441,20 @@ void Renderer::BlitSurface(Surface * src, Rect * srcrect, Surface * dst, Rect * 
 	BlitSurfaceUpper(src, srcrect, dst, dstrect);
 }
 
+void Renderer::DrawSpriteAt(Surface * target, Uint8 bank, Uint8 index, Sint16 anchor_x, Sint16 anchor_y){
+	if(!target) return;
+	if(bank >= world.resources.spritebank.size()) return;
+	if(index >= world.resources.spritebank[bank].size()) return;
+	Surface * src = world.resources.spritebank[bank][index].get();
+	if(!src) return;
+	Rect dstrect;
+	dstrect.x = anchor_x - world.resources.spriteoffsetx[bank][index];
+	dstrect.y = anchor_y - world.resources.spriteoffsety[bank][index];
+	dstrect.w = src->w;
+	dstrect.h = src->h;
+	BlitSurface(src, NULL, target, &dstrect);
+}
+
 void Renderer::ClipRect(Surface * surface, Rect & rect){
 	int w = surface->w;
 	int h = surface->h;

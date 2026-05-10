@@ -1,0 +1,14 @@
+# clangd config for the Silencer C++ client.
+#
+# Points the language server at the *non-unity* build dir. Unity builds
+# bundle multiple .cpp files into one synthetic .cxx TU, so individual
+# files like src/ui/v2/screens/main_menu.cpp wouldn't get their own
+# entry in compile_commands.json — and clangd would mark every symbol
+# from node.h as undefined.
+#
+# To make clangd happy, configure once:
+#     cmake --preset win-ninja
+# build-unity/ stays as the recommended fast clean-build path
+# (`cmake --preset win-ninja-unity` + `cmake --build --preset win-ninja-unity`).
+CompileFlags:
+  CompilationDatabase: build/

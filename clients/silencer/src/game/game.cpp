@@ -98,6 +98,10 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	paused = false;
 	stepFramesRemaining = 0;
 	stepWallclockDeadlineMs = 0;
+	preview_screen[0] = 0;
+	preview_impl[0] = 0;
+	dump_ppm_path[0] = 0;
+	preview_scale = 1;
 }
 
 Game::~Game(){
@@ -210,6 +214,34 @@ bool Game::Load(char * cmdline){
 				char * portstr = strtok(NULL, " ");
 				if(portstr){
 					lobbyPortOverride = atoi(portstr);
+				}
+			}
+			else if(strcmp(cmdline, "--preview-screen") == 0){
+				char * name = strtok(NULL, " ");
+				if(name){
+					strncpy(preview_screen, name, sizeof(preview_screen) - 1);
+					preview_screen[sizeof(preview_screen) - 1] = 0;
+				}
+			}
+			else if(strcmp(cmdline, "--preview-impl") == 0){
+				char * impl = strtok(NULL, " ");
+				if(impl){
+					strncpy(preview_impl, impl, sizeof(preview_impl) - 1);
+					preview_impl[sizeof(preview_impl) - 1] = 0;
+				}
+			}
+			else if(strcmp(cmdline, "--dump-ppm") == 0){
+				char * path = strtok(NULL, " ");
+				if(path){
+					strncpy(dump_ppm_path, path, sizeof(dump_ppm_path) - 1);
+					dump_ppm_path[sizeof(dump_ppm_path) - 1] = 0;
+				}
+			}
+			else if(strcmp(cmdline, "--preview-scale") == 0){
+				char * s = strtok(NULL, " ");
+				if(s){
+					int n = atoi(s);
+					if(n >= 1 && n <= 8) preview_scale = n;
 				}
 			}
 		}while((cmdline = strtok(0, " ")));

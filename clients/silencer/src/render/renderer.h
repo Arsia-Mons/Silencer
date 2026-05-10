@@ -25,6 +25,12 @@ public:
 	void DrawWorldScaled(Surface * surface, Camera & camera, int recursion, float frametime = 0, int factor = 2);
 	static void BlitSurface(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	void BlitSprite(Object * object, Camera & camera, Surface * dst, Rect * dstrect, Surface * src, Rect * srcrect);
+	// Screen-space sprite blit. Treats (anchor_x, anchor_y) as the logical
+	// anchor; the asset's baked offset (spriteoffsetx/y) is subtracted to
+	// find the top-left, matching the legacy widget-render math. No camera
+	// offset is applied — callers in menu/UI space are responsible for any
+	// camera adjustment they need.
+	void DrawSpriteAt(Surface * target, Uint8 bank, Uint8 index, Sint16 anchor_x, Sint16 anchor_y);
 	static void DrawFilledRectangle(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color);
 	void DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 bank, Uint8 width, bool alpha = false, Uint8 tint = 0, Uint8 brightness = 128, bool rampcolor = false);
 	void DrawTextInput(Surface * surface, TextInput & textinput);
