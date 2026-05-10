@@ -1279,7 +1279,7 @@ void World::HandleDisconnect(Uint8 peerid, bool permanent){
 	if(replay.IsRecording()){
 		replay.WriteDisconnect(peerid);
 	}
-	bool park = (!permanent && mode == AUTHORITY && gameplaystate == INGAME && peerlist[peerid] && peerlist[peerid]->accountid != 0 && !peerlist[peerid]->isbot);
+	bool park = (!permanent && mode == AUTHORITY && gameplaystate == INGAME && peerlist[peerid] && peerlist[peerid]->accountid != 0 && !peerlist[peerid]->isbot && !peerlist[peerid]->observer);
 	for(std::list<Uint16>::iterator i = peerlist[peerid]->controlledlist.begin(); i != peerlist[peerid]->controlledlist.end(); i++){
 		Object * object = GetObjectFromId((*i));
 		if(object){
