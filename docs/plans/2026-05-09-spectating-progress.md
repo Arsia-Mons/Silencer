@@ -139,9 +139,18 @@ controls that let a spectator interact and leave gracefully.
 >          -DSILENCER_LOBBY_HOST=127.0.0.1 -DSILENCER_LOBBY_PORT=15170
 >    cmake --build clients/silencer/build-unity
 >    ```
->    (On Windows in bash, drive cmake through cmd.exe with
->    `vcvars64.bat` from VS2022 BuildTools at
->    `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat`.)
+>    On Windows, MSVC is not on the bash PATH by default — drive
+>    cmake through cmd.exe with `vcvars64.bat`:
+>    ```
+>    cmd.exe /c '"<VS install>\VC\Auxiliary\Build\vcvars64.bat" \
+>              && cmake --build clients/silencer/build-unity'
+>    ```
+>    `<VS install>` is typically one of:
+>    `C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools`,
+>    `...\2022\Community`, `...\2022\Professional`, or
+>    `...\2022\Enterprise`. Probe with
+>    `ls "C:\Program Files (x86)\Microsoft Visual Studio\2022\"` to
+>    find which is installed.
 > 2. Build the lobby: `cd services/lobby && go build -o silencer-lobby.exe .`
 > 3. Run the lobby with an isolated DB so it doesn't trample local
 >    dev state:
@@ -150,12 +159,19 @@ controls that let a spectator interact and leave gracefully.
 >      -game-binary "../../clients/silencer/build-unity/Silencer.exe" \
 >      -db lobby-smoketest.json
 >    ```
-> 4. **Gotcha.** A saved `%APPDATA%/Silencer/config.cfg` from a
->    prior dev session will pin its own `lobbyport` (we saw
->    `60456`) and OVERRIDE the new CMake default. If a freshly-built
->    local client says "couldn't connect," patch `config.cfg`'s
->    `lobbyport`/`lobbyhost` to match the local lobby before
->    relaunching.
+> 4. **Gotcha.** A saved client config from a prior dev session
+>    will pin its own `lobbyport` / `lobbyhost` and OVERRIDE the new
+>    CMake defaults. Locations per platform:
+>    - Windows: `%APPDATA%/Silencer/config.cfg`
+>    - macOS: `~/Library/Application Support/Silencer/config.cfg`
+>    - Linux: `~/.config/silencer/config.cfg`
+>
+>    If a freshly-built local client says "couldn't connect,"
+>    inspect that file first — patch `lobbyport` / `lobbyhost` to
+>    match the local lobby (e.g. `lobbyhost = 127.0.0.1`,
+>    `lobbyport = 15170`) before relaunching. We hit this on
+>    2026-05-10 with a stale `lobbyport = 60456` from an old
+>    experiment.
 >
 > **CLI-agent E2E remains deferred.** The `tests/cli-agent` harness
 > still has no op for driving game creation. Adding one would
