@@ -34,7 +34,12 @@ they're complete on branch.
   [docs/superpowers/specs/2026-05-10-spectating-phase3-design.md](../superpowers/specs/2026-05-10-spectating-phase3-design.md);
   plan at
   [docs/superpowers/plans/2026-05-10-spectating-phase3.md](../superpowers/plans/2026-05-10-spectating-phase3.md).
-- [ ] **Phase 4 — Spectator controls.** Not started.
+- [ ] **Phase 4 — Spectator controls.** Designed, not implemented.
+  Design at [2026-05-10-spectating-phase4.md](2026-05-10-spectating-phase4.md).
+  Scope: ESC quit fix (Phase 3 carryover) + Tab/Shift-Tab cycle +
+  WASD free-cam + hold-jump name overlay + minimap-click follow
+  (optional). Followed player's HUD renders as-is; no
+  world-interacting inputs; realtime only.
 
 ## Phase 3 commits
 
