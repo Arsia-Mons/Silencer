@@ -34,12 +34,14 @@ they're complete on branch.
   [docs/superpowers/specs/2026-05-10-spectating-phase3-design.md](../superpowers/specs/2026-05-10-spectating-phase3-design.md);
   plan at
   [docs/superpowers/plans/2026-05-10-spectating-phase3.md](../superpowers/plans/2026-05-10-spectating-phase3.md).
-- [ ] **Phase 4 — Spectator controls.** Designed, not implemented.
+- [x] **Phase 4 — Spectator controls.** Implemented on branch
+  (compile-verified; three-client manual smoke pending).
   Design at [2026-05-10-spectating-phase4.md](2026-05-10-spectating-phase4.md).
-  Scope: ESC quit fix (Phase 3 carryover) + Tab/Shift-Tab cycle +
-  WASD free-cam + hold-jump name overlay + minimap-click follow
-  (optional). Followed player's HUD renders as-is; no
-  world-interacting inputs; realtime only.
+  Scope landed: ESC quit fix (Phase 3 carryover), Tab/Shift-Tab
+  cycle, WASD free-cam, hold-jump name overlay, followed player's
+  HUD rendered as-is. Minimap-click follow dropped from scope
+  (Tab/Shift-Tab is enough). No world-interacting inputs; realtime
+  only.
 
 ## Phase 3 commits
 
@@ -80,52 +82,87 @@ chat-coercion / disconnect-frees-slot / match-end-teardown
 verification) is still pending; deferred until Phase 4 lands the
 controls that let a spectator interact and leave gracefully.
 
+## Phase 4 commits
+
+On branch `hv/spectator` after `c77622c`:
+
+| SHA | Message |
+|---|---|
+| `314f1e2` | `docs(spectating): phase 4 design — spectator controls` |
+| `8b2e321` | `fix(spectating): allow observers to ESC out of match` (Phase 3 carryover) |
+| `90ec196` | `feat(spectating): add viewedpeerid for camera/HUD focus` |
+| `c023ecd` | `feat(spectating): implement spectator controls` |
+| `e07b30d` | `fix(spectating): drop redundant Smooth() in spectator free-cam branch` |
+
+Compile-verified on macOS via
+`cmake -B clients/silencer/build -S clients/silencer && cmake --build clients/silencer/build`.
+
 ## Handoff prompt
 
 > Branch `hv/spectator` (PR #148) is the umbrella for the entire
-> spectating feature; PR merges when all four phases are in. Phases
-> 1–3 are done on branch; Phase 4 (spectator controls) is the final
-> piece.
+> spectating feature; PR merges when all four phases are in.
+> All four phases are now implemented on branch. Remaining work is
+> the **three-client manual smoke** below, then merge.
 >
-> **Phase 3 result.** Spectator connect/admit/snapshot pipeline
-> works end-to-end. The wire format gained a trailing 1-bit
-> `observer` field on `MSG_CONNECT`; `Peer::observer` is serialized
-> on the peer-list; the AUTHORITY-side `MSG_CONNECT` handler has a
-> third admit branch (rejoin → observer → new player) at
-> `clients/silencer/src/world/world.cpp` around line 356; observer
-> inputs are dropped at the network layer; observer team-chat is
-> coerced to all-chat; observers free their slot immediately on
-> disconnect (no parking); `Game::SpectateGame` mirrors `JoinGame`
-> but passes `observer=true` to `World::Connect`. Manual smoke
-> confirmed the spectator joins and the world renders.
+> **Phase 4 result.** Spectator controls implemented per
+> [`2026-05-10-spectating-phase4.md`](2026-05-10-spectating-phase4.md):
 >
-> **Next up — Phase 4 (spectator controls).** No design doc exists
-> yet; brainstorm first. Out-of-scope items the Phase 3 spec
-> explicitly named that are now in scope for Phase 4:
+> - `World::viewedpeerid` is the new camera/HUD focus peer, mirroring
+>   `localpeerid` for normal players and overridden each tick by the
+>   spectator-controls block for observers. Never serialized; network
+>   identity stays on `localpeerid`. `World::spectator` holds free-cam
+>   state (`freecam`, `camx/y`, `camvx/y`, `holdshowallnames`,
+>   `initialized`).
+> - Spectator-controls block in `clients/silencer/src/game/tick/tick_ingame.cpp`
+>   (after the replay-controls block) gated on `world.IsLocalObserver()`:
+>   default-mode follow picks first living non-AUTHORITY non-observer
+>   peer; Tab/Shift-Tab cycle (edge-triggered); WASD/arrows free-cam
+>   (snaps back on next Tab); hold-jump toggles `holdshowallnames`;
+>   auto-recovery re-picks a peer if the followed one disconnects.
+> - Renderer (`clients/silencer/src/render/renderer.cpp`):
+>   `localplayer = world.GetPeerPlayer(world.viewedpeerid)` at the top
+>   of the camera pass; new free-cam branch reads `spectator.camx/y`;
+>   `DrawHUD` keys off `peerlist[viewedpeerid]` so the followed
+>   player's HUD renders as-is; secret-beam team-highlight uses
+>   `viewedpeerid`; name overlay (line 833) accepts the
+>   `IsLocalObserver() && spectator.holdshowallnames` path.
+> - ESC trap fix (Phase 3 carryover) at
+>   `clients/silencer/src/game/events.cpp:362-378`: observer peers can
+>   advance the quitstate without a `Player`. Chat/buy modal checks
+>   remain for players.
 >
-> - Follow-cam (track a chosen player).
-> - Cycle through players (Tab / Shift-Tab).
-> - Free-cam (manual camera pan; current behavior is free-cam
->   pinned at map center).
-> - Name overlay over each player from the spectator's POV.
-> - HUD policy for spectators (which HUD elements show, hide).
+> **Out of scope, intentionally not added**: spectator-only HUD,
+> ping/mark/door inputs, live rewind/scrub/pause, in-game chat
+> opening for observers (Phase 3 only coerces *sent* observer chat
+> to all-chat; opening the chat interface for observers is a
+> separate ask), spectator count, "X is spectating" indicator to
+> players, per-game spectator cap, minimap-click follow (dropped —
+> Tab cycle is sufficient).
 >
-> **Phase 3 carryover to address in Phase 4.**
+> **Remaining work: three-client manual smoke.**
 >
-> - **ESC trap.** `clients/silencer/src/game/events.cpp:362–373`
->   gates the quitstate advance on a non-null `localplayer`.
->   Observers have no Player, so ESC does nothing — they cannot
->   leave the match gracefully. Allow the quitstate to advance when
->   the local peer has `observer=true`. The `chatinterfaceid` /
->   `buyinterfaceid` checks are irrelevant for observers (no buy /
->   chat modal exists on the observer side).
-> - **Three-client smoke.** Still pending. Once Phase 4's controls
->   let the spectator interact and exit, run the full Section 4
->   smoke from the Phase 3 design spec
->   (`docs/superpowers/specs/2026-05-10-spectating-phase3-design.md`):
->   chat coercion (observer `to=1` → all sees it as all-chat),
->   slot-frees-immediately on observer disconnect, match-end
->   teardown returns spectator to lobby with the players.
+> Set up via the local-smoke recipe below. Verify (closes Phase 3
+> carryover + validates Phase 4):
+>
+> 1. Host creates a game with **Spectatable** on; player joins
+>    normally; spectator joins via the **Spectate** button.
+> 2. Spectator view follows a living player by default (no Tab
+>    needed).
+> 3. `Tab` cycles to next player; `Shift+Tab` cycles previous.
+> 4. `WASD` enters free-cam; `Tab` snaps back to follow.
+> 5. Hold jump → all player names visible; release → hidden.
+> 6. Followed player's HUD (health/fuel/shield/files) renders as-is.
+> 7. `ESC` → confirm returns spectator to lobby; host and player
+>    continue.
+> 8. Spectator types a message — host and player see it as all-chat
+>    regardless of `to` (Phase 3 chat coercion).
+>    *Caveat: opening the chat interface for observers is not wired
+>    in Phase 3/4 — if this step is blocked, mark it deferred and
+>    move on; it is not a Phase 4 regression.*
+> 9. Spectator disconnects abruptly → AUTHORITY frees the slot
+>    immediately (no parking).
+> 10. Match ends naturally → spectator returns to lobby alongside
+>     players.
 >
 > **Reference docs.**
 >
