@@ -69,26 +69,35 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	rightborder->res_bank = 7;
 	rightborder->res_index = 8;
 
-	// Form layout: bank-133 width-6 glyphs (~9px tall) → widget height 14
-	// matches the chat textinput's pairing; yspace 16 keeps a 2px row gap.
-	const int yoffset      = 4;
-	const int yspace       = 16;
+	// Form layout: row spacing matches the map list's 14px lineheight so
+	// labels/values sit on the same vertical rhythm as the right pane.
+	// Outer chrome: the form's bright stroke is inset 4px from the lobby
+	// background's darker decorative strokes, matching the chat panel's
+	// bright(x=15)/dark(x=10) 5px-edge spacing. Dark strokes around this
+	// form sit at x=238 (left) and y=184 (bottom). The right edge already
+	// sits 4px from the map-list chrome's bright stroke at x=403; the top
+	// has no dark stroke nearby.
+	const int yoffset      = 2;
+	const int yspace       = 14;
 	const int rowheight    = 14;
-	const int labelx       = 245;
-	const int valuex       = 320;
-	const int form_left    = 240;
+	// 4px inset from form chrome matches the chat panel's textbox.x=19 vs
+	// chatinterface.x=15. Value column sits 4px past the longest label
+	// ("Spectatable:" = 12 × 6 = 72px).
+	const int labelx       = 247;
+	const int valuex       = 323;
+	const int form_left    = 243;
 	const int form_top     = 87;
-	const int form_width   = 159;
-	const int form_height  = 86;
+	const int form_width   = 156;
+	const int form_height  = 93;
 
 	Overlay * optionstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	optionstext->text = "Game Options";
-	optionstext->textbank = 133;
-	optionstext->textwidth = 6;
-	// Centered over the form border (border center x = form_left + form_width/2),
-	// 12 chars × 6px = 72px wide.
-	optionstext->x = form_left + (form_width - 12 * 6) / 2;
-	optionstext->y = 76;
+	optionstext->textbank = 134;
+	optionstext->textwidth = 8;
+	// Left-aligned to match "Select Map" — sits 2px right of the form
+	// chrome's left bright stroke; y matches Select Map's title row.
+	optionstext->x = form_left + 2;
+	optionstext->y = 70;
 
 	// Bright-green 1px outline around the form viewport, matching the chrome
 	// around the map list. Palette index 220 = the chrome's stroke color
@@ -130,6 +139,7 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	buttonsecurity->height = rowheight;
 	buttonsecurity->textbank = 133;
 	buttonsecurity->textwidth = 6;
+	buttonsecurity->textleftalign = true;
 	strcpy(buttonsecurity->text, "Medium");
 
 	Overlay * minleveltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
@@ -223,6 +233,7 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	spectatablebutton->height = rowheight;
 	spectatablebutton->textbank = 133;
 	spectatablebutton->textwidth = 6;
+	spectatablebutton->textleftalign = true;
 	strcpy(spectatablebutton->text, Config::GetInstance().lastspectatable ? "Yes" : "No");
 
 	Overlay * selectmaptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
@@ -297,7 +308,6 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	formscrollbar->res_index = 9;
 	formscrollbar->scrollpixels = yspace;
 	formscrollbar->scrollposition = 0;
-	formscrollbar->draw = true;
 	formscrollbar->height = form_height;
 	// Sprite offsets are baked for a different layout — undo them here so
 	// the on-screen top-left lands at (383, form_top).
@@ -309,8 +319,9 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	formscrollbar->scrollregiony = form_top;
 	formscrollbar->scrollregionw = form_width;
 	formscrollbar->scrollregionh = form_height;
-	// 6 rows total, 5 visible.
-	formscrollbar->scrollmax = 1;
+	// All 6 rows fit at the tighter spacing — no overflow.
+	formscrollbar->scrollmax = 0;
+	formscrollbar->draw = false;
 
 	Overlay * nametext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	nametext->text = "Game name:";
@@ -395,7 +406,7 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	// scrollbar's position.
 	gamecreateinterface->formscrollbar = formscrollbar->id;
 	gamecreateinterface->scrollviewporttop = form_top + yoffset;
-	gamecreateinterface->scrollviewportrows = 5;
+	gamecreateinterface->scrollviewportrows = 6;
 	gamecreateinterface->scrollrowheight = yspace;
 	for(int i = 0; i < 6; i++){
 		Sint16 rowy = form_top + (yspace * i) + yoffset;

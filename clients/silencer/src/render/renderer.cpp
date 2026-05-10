@@ -842,7 +842,11 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								Sint16 xoff;
 								Sint16 yoff;
 								button->GetTextOffset(world, &xoff, &yoff);
-								DrawText(surface, xoff, yoff, button->text, button->textbank, button->textwidth, true, button->effectcolor, button->effectbrightness);
+								// Sprite-backed buttons alpha-blend text onto
+								// their button face; BNONE has no face, so
+								// render opaque to match nearby plain text.
+								bool alpha = (button->type != Button::BNONE);
+								DrawText(surface, xoff, yoff, button->text, button->textbank, button->textwidth, alpha, button->effectcolor, button->effectbrightness);
 							}
 						}break;
 						case ObjectTypes::SCROLLBAR:{
