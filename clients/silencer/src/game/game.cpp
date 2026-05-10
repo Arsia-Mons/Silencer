@@ -5775,10 +5775,13 @@ void Game::OpenFirstGamepad(){
 	}
 	gamepadstate.connected = (gamepad != nullptr);
 	if(gamepadstate.connected){
-		// Switch to gamepad profile if not already on it.
+		// Auto-switch to the gamepad keybind profile, but only if the current
+		// profile isn't already gamepad-derived (e.g. "gamepad-custom" saved
+		// from a previous session — don't clobber it with the built-in).
 		const char* cur = Config::GetInstance().active_keybind_profile;
 		std::string curStr = (cur && *cur) ? cur : "default";
-		if(curStr != "gamepad"){
+		bool alreadyGamepad = (curStr.find("gamepad") != std::string::npos);
+		if(!alreadyGamepad){
 			prevGamepadProfile = curStr;
 			std::strncpy(Config::GetInstance().active_keybind_profile, "gamepad",
 			             sizeof(Config::GetInstance().active_keybind_profile) - 1);
