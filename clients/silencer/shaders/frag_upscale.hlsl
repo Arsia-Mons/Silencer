@@ -6,8 +6,8 @@ struct VOut {
     float2 uv  : TEXCOORD0;
 };
 
-[[vk::binding(0, 2)]] Texture2D<float4>  scene : register(t0, space2);
-[[vk::binding(1, 2)]] SamplerState       samp  : register(s0, space2);
+Texture2D<float4>  scene : register(t0, space2);
+SamplerState       samp  : register(s0, space2);
 
 float4 frag_upscale(VOut input) : SV_Target {
     return scene.Sample(samp, input.uv);
