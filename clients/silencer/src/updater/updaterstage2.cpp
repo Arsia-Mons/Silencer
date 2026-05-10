@@ -511,6 +511,18 @@ bool Launch(const std::string &zippath) {
         return false;
     }
 
+    // Production-signed binaries have their embedded LC_CODE_SIGNATURE
+    // bound to the bundle's Info.plist (the "Info.plist entries=N" line
+    // in `codesign -dvvv`). Without it, AMFI rejects the binary at
+    // execve() with "The code contains a Team ID, but validating its
+    // signature failed" and SIGKILLs stage-2 before main() — silent,
+    // since the parent's TTY is gone. Mirror Info.plist so the seal
+    // validates. Best-effort: ad-hoc-signed dev builds don't bind it.
+    if (!CopyFile_(install + "/Contents/Info.plist",
+                   stage2_contents + "/Info.plist")) {
+        Logf("copy Info.plist failed (ok for ad-hoc-signed dev builds)");
+    }
+
     // Mirror Frameworks/ from the source bundle so @rpath dylib refs
     // (libSDL3, libSDL3_mixer, libminizip, …) resolve. Local dev builds
     // link against absolute /opt/homebrew paths and have an empty (or
