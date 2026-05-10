@@ -116,10 +116,6 @@ private:
 	void GiveDefaultItems(Player & player);
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
 	void GoToState(Uint8 newstate);
-	Interface * CreateOptionsInterface(void);
-	Interface * CreateOptionsControlsInterface(void);
-	Interface * CreateOptionsDisplayInterface(void);
-	Interface * CreateOptionsAudioInterface(void);
 	Interface * CreateLobbyConnectInterface(void);
 	Interface * CreateLobbyInterface(void);
 	Interface * CreateCharacterInterface(void);
@@ -149,11 +145,6 @@ private:
 	Uint16 mappreviewinterface;
 	Uint16 updateinterface;
 	Updater updater;
-	Overlay * keynameoverlay[6];
-	Button * c1button[6];
-	Button * cobutton[6];
-	Button * c2button[6];
-	Button * presetbutton;
 	void ProcessLobbyConnectInterface(Interface * iface);
 	bool ProcessLobbyInterface(Interface * iface);
 	void ProcessGameSummaryInterface(Interface * iface);
@@ -167,16 +158,6 @@ private:
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".
 	const char * GetActionKeyDisplayName(Action a);
-
-	// Two-key view of an action's bindings used by the controls UI.
-	// See implementation comment in game.cpp for the round-trip rules.
-	struct LegacyView {
-		SDL_Scancode key1 = SDL_SCANCODE_UNKNOWN;
-		SDL_Scancode key2 = SDL_SCANCODE_UNKNOWN;
-		bool         and_ = false;  // true = AND chord; false = OR (or single key)
-	};
-	static LegacyView ViewLegacy(const KeyMap& km, Action a);
-	static void WriteLegacy(KeyMap& km, Action a, SDL_Scancode key1, SDL_Scancode key2, bool and_);
 	KeyMap keymap;
 	GamepadState gamepadstate;
 	SDL_Gamepad * gamepad;
@@ -218,7 +199,6 @@ private:
 	bool modaldialoghasok;
 	bool joininggame;
 	bool deploymessageshown;
-	Uint32 optionscontrolstick;
 	int quitscancode;
 	bool interfaceenterfix;
 	bool fullscreentoggled;

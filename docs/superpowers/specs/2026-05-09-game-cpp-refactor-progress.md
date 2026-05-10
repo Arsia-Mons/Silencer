@@ -32,15 +32,19 @@ Phase 1 complete (all 8 steps landed in one commit per user direction). Verified
 
 Phase 2 landed in one commit (both extractions). `MapDownloader` and `AmbienceMixer` are constructed and own all the moved state; `World` was given `friend class MapDownloader;` and `friend class AmbienceMixer;` so the two collaborators retain the same private-access reach Game had. Verified: clean Release build (only the pre-existing C4804 warning at `IsLiveMultiplayer`). **Suspected regression on the create-game flow** — clicking "Create Game" on the lobby kicks back to the lobby connect screen on at least one user's machine; not yet root-caused. Unity build + interactive lobby smoke test pending.
 
-Phase 3 started — `MainMenuScreen` migrated. `Game::CreateMainMenuInterface` and `Game::ProcessMainMenuInterface` deleted. The MAINMENU case body now does state setup (Disconnect/UnloadGame/palette) and `PushScreen(std::make_unique<MainMenuScreen>())`; button-click handling lives in `MainMenuScreen::Tick`, dispatched by `TickActiveScreen()` at the top of `Game::Tick`. Side effects of this first migration:
+Phase 3 in progress — `MainMenuScreen` + all four options screens migrated. `Game::CreateMainMenuInterface`/`ProcessMainMenuInterface` and `Game::CreateOptions{,Controls,Display,Audio}Interface` deleted. Each `case <STATE>:` body in `Game::Tick` is now `if(stateisnew){ DestroyAllObjects(); PushScreen(make_unique<...>()); stateisnew = false; }`; per-tick logic lives in the screen's `Tick`. Side effects of this first migration:
 - `ScreenContext::GoToState`/`GoBack`/`RequestQuit`/`PushScreen`/`PopScreen`/`ReplaceScreen` are wired (no longer assert-stubs); `ShowModal`/`ShowMessage` still stubs (no consumers yet).
-- `ScreenContext` is a `friend class` of `Game` so it can dispatch to private `GoToState`.
+- New `ScreenContext` actions for the options screens: `LoadActiveKeymap`, `CycleKeybindPreset`, `ForkActiveProfileIfBuiltin`, `SetFullscreen`, `SetScaleFilter`, `KeyName`. They delegate to `Game` via the existing friend grant — no `Game&` accessor leaks into screen code.
+- `ScreenContext` is a `friend class` of `Game` so it can dispatch to private `GoToState` and reach `window`/`renderdevice` for the display actions.
 - `Game::PushScreen`/`PopScreen` sync `currentinterface` so legacy input dispatch (`HandleSDLEvents`, TUI mouse) keeps routing to the active screen's interface.
 - `Game::GoToState` now sets `screenStackPendingTeardown`; `Game::Tick` pops the stack at the next frame's start, so a screen calling `GoToState` from inside its own `Tick` isn't destroyed mid-call.
 - The state enum (`MAINMENU`, `LOBBY`, …) was extracted to `clients/silencer/src/game/game_state.h` so screens can name states without including `game.h`. Existing `game.cpp` callsites are preserved via a file-scope `using namespace GameState;`.
 - `World::GetVersion()` accessor added so `MainMenuScreen::Build` can render the version string without needing `friend class` reach into `World`.
+- `Game::LegacyView`/`Game::ViewLegacy`/`Game::WriteLegacy` deleted — `OptionsControlsScreen` now owns the `LegacyView` round-trip helpers as private statics. `Game` keeps `GetKeyName`/`GetActionKeyDisplayName`/`LoadActiveKeymap`/`CycleKeybindPreset`/`ForkActiveProfileIfBuiltin` because tutorial overlays and `ControlDispatch` consume them too.
+- Per-screen widget pointers (`keynameoverlay`/`c1button`/`cobutton`/`c2button`/`presetbutton`/`optionscontrolstick`) deleted from `Game`; live as members on `OptionsControlsScreen`.
+- Anon-namespace uid enumerators in display/audio screens are file-prefixed (`DSP_BTN_SAVE`, `AUD_BTN_SAVE`) so they don't collide under `SILENCER_UNITY_BUILD` (one merged TU per batch).
 
-Verified: clean Release + unity builds (only the pre-existing C4804 warning); `00_ping` E2E passes. Interactive smoke test of the four main-menu buttons pending.
+Verified: clean Release + unity builds (only the pre-existing C4804 warning); `00_ping`/`10_navigate`/`20_screenshot` E2E pass. Agent-driven smoke through Options → Controls → Display → Audio (with Save/Cancel/Go Back round-trips) confirms all four screens render and dispatch correctly. Interactive smoke (rebind+cycle+save persistence; fullscreen toggle; music toggle persistence) pending.
 
 ---
 
@@ -101,10 +105,10 @@ The migration pattern for each screen:
 - [ ] **`ModalDialog` (in `ui/modals/`).** Add as a `Modal` and route `Game::CreateModalDialog` calls to `ctx.ShowMessage(...)`. Old method stays for now (still called from un-migrated screens). **Smoke:** trigger any modal-dialog path that's already exercised — currently those are only fired from in-lobby code paths. Use `silencer-cli` to inject one if needed for testing.
 - [ ] **`PasswordDialog` (in `ui/modals/`).** Same treatment as ModalDialog. **Smoke:** join a password-protected game.
 - [ ] **`MapPreviewModal` (in `ui/screens/lobby/modals/`).** Same — added as a Modal but old `CreateMapPreview` stays callable until LobbyScreen migrates. **Smoke:** select a map in the game-create flow and confirm the preview shows.
-- [ ] **`OptionsScreen`.** Top-level options menu. **Smoke:** Options → all 3 sub-buttons → back to main menu.
-- [ ] **`OptionsControlsScreen`** — biggest options screen, carries the keybind UI helpers (`LegacyView`, `WriteLegacy`, `GetActionKeyDisplayName`, `GetKeyName`, `CycleKeybindPreset`, `ForkActiveProfileIfBuiltin`). **Smoke:** open Controls, rebind one key, cycle preset, save, back out, reopen, confirm persistence.
-- [ ] **`OptionsDisplayScreen`.** **Smoke:** toggle fullscreen, change resolution if applicable, back out.
-- [ ] **`OptionsAudioScreen`.** **Smoke:** change a volume slider, back out, reopen, confirm value persisted.
+- [x] **`OptionsScreen`.** Top-level options menu. **Smoke:** Options → all 3 sub-buttons → back to main menu — agent-driven via cli (Controls/Display/Audio enter their states; Cancel/Go Back return). Interactive human pass pending.
+- [x] **`OptionsControlsScreen`** — biggest options screen, owns its keybind UI helpers (`LegacyView`/`WriteLegacy` are now private statics on the screen). `GetActionKeyDisplayName`, `GetKeyName`, `LoadActiveKeymap`, `CycleKeybindPreset`, `ForkActiveProfileIfBuiltin` stay on Game (consumed by tutorial overlays + ControlDispatch); the screen reaches them via `ScreenContext::CycleKeybindPreset`/`ForkActiveProfileIfBuiltin`/`LoadActiveKeymap`/`KeyName`. **Smoke:** screen renders identically (Preset, 5 binding rows, scrollbar, Save/Cancel) — agent screenshot matches. Interactive rebind/cycle/save round-trip pending.
+- [x] **`OptionsDisplayScreen`.** Wires fullscreen + smooth-scaling toggles via two new `ScreenContext` actions (`SetFullscreen`, `SetScaleFilter`) so the screen never touches `SDL_Window` or `RenderDevice` directly. **Smoke:** screen renders identically; navigation works. Interactive fullscreen toggle pending.
+- [x] **`OptionsAudioScreen`.** Music toggle drives `Audio::GetInstance()` directly (singleton, no Game reach needed). **Smoke:** screen renders identically; navigation works.
 - [ ] **`UpdateScreen`.** **Smoke:** trigger the updater path (lobby reports out-of-date version); confirm progress bar, completion, stage-2 launch.
 - [ ] **`GameSummaryScreen`.** **Smoke:** finish a game (or use replay/test mode); confirm summary stats render and "back to lobby" works.
 

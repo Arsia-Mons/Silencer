@@ -135,6 +135,7 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/modals"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/main_menu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/options"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/panels"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/modals"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/net"

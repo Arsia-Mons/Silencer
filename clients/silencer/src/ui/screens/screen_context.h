@@ -1,6 +1,7 @@
 #ifndef SCREEN_CONTEXT_H
 #define SCREEN_CONTEXT_H
 
+#include <SDL3/SDL_scancode.h>
 #include <SDL3/SDL_stdinc.h>
 #include <functional>
 #include <memory>
@@ -44,6 +45,21 @@ public:
 	void ReplaceScreen(std::unique_ptr<Screen> s);
 	void ShowModal(std::unique_ptr<Modal> m);
 	void ShowMessage(const char * msg, std::function<void(bool ok)> onClose);
+
+	// Keybind/profile actions used by the controls options screen.
+	void LoadActiveKeymap();
+	void CycleKeybindPreset();
+	void ForkActiveProfileIfBuiltin();
+
+	// Display-side actions used by the display options screen. Touch the
+	// SDL window / renderdevice on Game so screens stay free of platform
+	// handles.
+	void SetFullscreen(bool on);
+	void SetScaleFilter(bool on);
+
+	// Keyname lookup shared with tutorial overlays; kept on Game so screen
+	// callers go through the context rather than reaching for Game.
+	const char * KeyName(SDL_Scancode sc) const;
 
 private:
 	Game & game;
