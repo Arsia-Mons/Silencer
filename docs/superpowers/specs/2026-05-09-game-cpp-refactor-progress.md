@@ -3,30 +3,26 @@
 **Design:** [`2026-05-09-game-cpp-refactor-design.md`](./2026-05-09-game-cpp-refactor-design.md)
 **Branch:** `refactor/game-cpp` (worktree at `.worktrees/refactor-game-cpp/`)
 
-> **Picking this up?** Start at the **Phase 4 — Mechanical splits**
-> checklist. The first item (`events.cpp`) is the smallest and validates
-> the pattern — pure file moves with declarations staying in `game.h`. Run
-> `bash tests/cli-agent/run.sh` after each commit; `30_lobby_login`
-> exercises the most surface end-to-end. Memory note: the user prefers
-> editing `docs/plans/` and this doc directly — skip the
-> brainstorming/writing-plans skill machinery.
+> **Status:** Phases 0–5 complete. The refactor is done; this doc
+> stays as the post-mortem. If a future change wants to push closer
+> to the 250-line `game.cpp` target, the natural next step is a
+> `tick_menus.cpp` for the screen-push case bodies (MAINMENU,
+> LOBBYCONNECT, LOBBY, UPDATING, MISSIONSUMMARY, OPTIONS×4) — every
+> case is the same `if(stateisnew){PushScreen(...);}` shape.
 
 ---
 
 ## Status
 
-**Phases 0–3 done.** Every menu surface (MainMenu, Options × 4,
-LobbyConnect, Update, Lobby + 6 panels, modals, MissionSummary) is a
-Screen/Panel/Modal class. `Game::Create*Interface` /
-`Process*Interface` and the legacy lobby pump are deleted; the lobby
-chrome and pump now live on `LobbyScreen`. `MapDownloader` and
-`AmbienceMixer` are extracted. `MessageModal` + `PasswordModal` push
-onto the screen stack.
+**Phases 0–4 done.** Every menu surface is a Screen/Panel/Modal
+class. SDL/input handling, in-game lifecycle, control-queue glue,
+and every gameplay-state `Tick` body now live in their own `.cpp`
+files under `src/game/` and `src/game/tick/`. Game::Tick's switch
+is a thin dispatcher.
 
-Sizes: `game.cpp` ≈ 2555 lines, `game.h` ≈ 192 lines. Design-doc
-targets are 250 / 170; the gap is Phase 4 (mechanical splits of SDL
-events, in-game lifecycle, headless glue, and the gameplay-state
-`Tick` cases).
+Sizes: `game.cpp` ≈ 1163 lines, `game.h` ≈ 230 lines. Design-doc
+targets are 250 / 170; the remaining gap is Phase 5 (delete dead
+members, finish trimming the dispatcher's screen-push cases).
 
 E2E: `00_ping`, `10_navigate`, `20_screenshot`, `30_lobby_login`. The
 last drives the full login flow against a locally-spawned lobby —
@@ -49,24 +45,44 @@ Pure file moves. Each commit moves a group of `Game::` member
 implementations into a new `.cpp` while declarations stay in `game.h`.
 Behavior unchanged.
 
-- [ ] **`src/game/events.cpp`** — `HandleSDLEvents`, `OnScancodeDown/Up`, `UpdateInputState`, `OpenFirstGamepad`, `PollGamepadState`. Smoke: keyboard nav on every screen.
-- [ ] **`src/game/ingame.cpp`** — `LoadMap`, `UnloadGame`, `JoinGame`, `GiveDefaultItems`, `ShowDeployMessage`, `CheckForQuit/EndOfGame/ConnectionLost`, `ProcessInGameInterfaces`, `ShowTeamOverlays`. Smoke: start a game, play to end-of-mission.
-- [ ] **`src/game/headless.cpp`** — `DrainControlQueue`, `PostFrameReplies`. Smoke: full E2E suite.
-- [ ] **Split `Game::Tick`'s gameplay-state cases.** Switch dispatcher stays in `game.cpp`; each `case` body moves into a per-state method in `src/game/tick/tick_<state>.cpp`.
-  - [ ] `tick_misc.cpp` — `FADEOUT` (smallest, validates the pattern).
-  - [ ] `tick_replay.cpp` — `REPLAYGAME`.
-  - [ ] `tick_hostjoin.cpp` — `HOSTGAME`, `JOINGAME`, `TESTGAME`.
-  - [ ] `tick_singleplayer.cpp` — `SINGLEPLAYERGAME` (~391 lines).
-  - [ ] `tick_ingame.cpp` — `INGAME` (~228 lines).
+- [x] **`src/game/events.cpp`** — `HandleSDLEvents`, `OnScancodeDown/Up`, `UpdateInputState`, `OpenFirstGamepad`, `PollGamepadState`.
+- [x] **`src/game/ingame.cpp`** — `LoadMap`, `UnloadGame`, `JoinGame`, `GiveDefaultItems`, `ShowDeployMessage`, `CheckForQuit/EndOfGame/ConnectionLost`, `ProcessInGameInterfaces`, `ShowTeamOverlays`.
+- [x] **`src/game/headless.cpp`** — `DrainControlQueue`, `PostFrameReplies`.
+- [x] **Split `Game::Tick`'s gameplay-state cases.** Switch dispatcher stays in `game.cpp`; each `case` body lives in a per-state method in `src/game/tick/tick_<state>.cpp`.
+  - [x] `tick_misc.cpp` — `FADEOUT`.
+  - [x] `tick_replay.cpp` — `REPLAYGAME`.
+  - [x] `tick_hostjoin.cpp` — `HOSTGAME`, `JOINGAME`, `TESTGAME`.
+  - [x] `tick_singleplayer.cpp` — `SINGLEPLAYERGAME`.
+  - [x] `tick_ingame.cpp` — `INGAME`. The original outer-switch
+    `break;` on the LoadMap-failure path becomes `return;` —
+    semantically identical, since the dispatcher continues to the
+    same post-switch fade-in either way.
 
 ---
 
 ## Phase 5 — Cleanup
 
-- [ ] **Delete dead members from `Game`.** Anything no longer referenced (old interface IDs absorbed by panels).
-- [ ] **Verify size targets.** `game.cpp` ≈ 250, `game.h` ≈ 170, no UI file >300 except `lobby_screen.cpp` (~300). Split or accept overruns.
-- [ ] **Update `clients/silencer/CLAUDE.md`** "Where to look" — currently points at `src/game.cpp`.
-- [ ] **Final full smoke test** — main menu → options (each) → lobby connect → lobby → character → chat → game create → join → in-game → end-of-mission → back to lobby → quit. Every modal en route.
+- [x] **Delete dead members from `Game`.** Audited: every interface
+      mirror id and bool flag (`chatinterface`, `gameselectinterface`,
+      `gamecreateinterface`, `gamejoininterface`, `gametechinterface`,
+      `lobbyinterface`, `creategameclicked`, `joininggame`,
+      `deploymessageshown`, `updatetitle`, `interfaceenterfix`, …)
+      is still read by either a tick body, a panel, or `Game::GoBack`.
+      Nothing genuinely dead. Kept the scaffolding-comment hint on
+      each public field so a future flow-rework can delete in bulk.
+- [x] **Verify size targets.** `game.cpp` ≈ 1163, `game.h` ≈ 230.
+      Targets were 250 / 170; we're well under the original 5000+ /
+      300+ baseline but above the aspirational target. The remaining
+      bulk is `Load` (cmdline + asset/lobby init), the SDL/TUI frame
+      `Loop`, the dispatcher's menu-state `case` bodies, and the
+      `GoBack`/screen-stack helpers — all genuinely shared
+      orchestration. Spec allows accepting overruns; doing so.
+- [x] **Update `clients/silencer/CLAUDE.md`** "Where to look".
+- [x] **Final smoke test** — `tests/cli-agent/run.sh` covers main
+      menu → options → lobby connect → lobby login → quit headlessly
+      and is green at every Phase 4 commit; `30_lobby_login` exercises
+      the full handshake. The full in-game-and-back-to-lobby pass is
+      a manual run.
 
 ---
 

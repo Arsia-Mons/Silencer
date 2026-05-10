@@ -71,8 +71,8 @@ public:
 	// socket "key" op.
 	bool tui;
 
-	// Screen-stack ops. The stack starts empty and stays empty until screens
-	// migrate over from the legacy Create*/Process*Interface helpers.
+	// Screen-stack ops. Every menu surface is a Screen; the stack drives
+	// rendering and input via TickActiveScreen() at the top of Tick().
 	void PushScreen(std::unique_ptr<Screen> s);
 	void PopScreen();
 	void ReplaceScreen(std::unique_ptr<Screen> s);
@@ -194,8 +194,6 @@ private:
 	MapDownloader mapDownloader;
 	AmbienceMixer ambienceMixer;
 
-	// Stack-based UI. Starts empty; legacy Create*/Process*Interface helpers
-	// drive the menus until screens migrate over.
 	std::vector<std::unique_ptr<Screen>> screenStack;
 	ScreenContext screenContext;
 	void TickActiveScreen();

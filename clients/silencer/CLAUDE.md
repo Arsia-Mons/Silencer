@@ -102,7 +102,11 @@ lambdas read/write it via `ctx.bb<T>(key, default)` / `ctx.bbSet(key, val)`.
 
 - `src/actordef.h` / `src/actordef.cpp` — actor definition system (see above).
 - `src/behaviortree.h` / `src/behaviortree.cpp` — BT interpreter (see above).
-- Top-level state machine (menus, lobby, in-game): `src/game.cpp`.
+- Top-level state machine (menus, lobby, in-game): `src/game/`.
+  `game.cpp` is the dispatcher; `events.cpp` handles SDL input,
+  `ingame.cpp` holds in-game lifecycle, `headless.cpp` glues the
+  control queue, and each gameplay-state Tick body lives in
+  `tick/tick_<state>.cpp`. Menu screens live in `src/ui/screens/`.
 - Simulation loop, socket, peer list, replay: `src/world.cpp`.
 - Rendering: `src/renderer.cpp`, `src/surface.cpp`, `src/sprite.cpp`, `src/palette.cpp`.
 - Audio (skipped in `-s`): `src/audio.cpp`.
