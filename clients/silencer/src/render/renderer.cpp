@@ -563,7 +563,11 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 							}break;
 							case ObjectTypes::SCROLLBAR:{
 								ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-								if(!scrollbar->draw){
+								// Suppress the natural blit when not drawing,
+								// and also when a custom height is set — the
+								// post-blit case below renders the stretched
+								// track itself in that case.
+								if(!scrollbar->draw || scrollbar->height > 0){
 									src = 0;
 								}
 							}break;
@@ -844,28 +848,80 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 						case ObjectTypes::SCROLLBAR:{
 							ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
 							if(scrollbar->draw){
-								Uint8 oldres_index = scrollbar->res_index;
-								scrollbar->res_index = scrollbar->barres_index;
-								src = world.resources.spritebank[object->res_bank][object->res_index].get();
-								float pos = float(scrollbar->scrollposition) / scrollbar->scrollmax;
-								Uint16 scrollbararea = world.resources.spriteheight[object->res_bank][object->res_index];
-								Rect srcrect;
-								srcrect.w = src->w;
-								srcrect.h = scrollbararea - (scrollbar->scrollmax);
-								if(src->h - (scrollbar->scrollmax) < 32){
-									srcrect.h = 32;
+								Uint16 trackh = scrollbar->EffectiveHeight(world);
+								// Stretched track. Pre-blit suppresses the
+								// generic blit when height > 0; render the
+								// track ourselves as a 3-slice: top 16 px and
+								// bottom 16 px (the arrow caps) copy as-is;
+								// the middle band tiles the source's middle
+								// rows to fill, preserving pixel-art detail.
+								if(scrollbar->height > 0){
+									Surface * tracksrc = world.resources.spritebank[object->res_bank][scrollbar->res_index].get();
+									const int cap = 16;
+									if(tracksrc && tracksrc->h > 2 * cap){
+										int srcw = tracksrc->w;
+										int srch = tracksrc->h;
+										int srcmidtop = cap;
+										int srcmidh   = srch - 2 * cap;
+										int dstmidh   = (int)trackh - 2 * cap;
+										if(dstmidh < 0) dstmidh = 0;
+										// Top cap.
+										for(int dy = 0; dy < cap && dy < trackh; dy++){
+											for(int dx = 0; dx < srcw; dx++){
+												Uint8 c = GetPixel(tracksrc, dx, dy);
+												if(c) SetPixel(surface, dstrect.x + dx, dstrect.y + dy, c);
+											}
+										}
+										// Middle band — tile the source middle rows.
+										for(int dy = 0; dy < dstmidh; dy++){
+											int sy = srcmidtop + (dy % srcmidh);
+											for(int dx = 0; dx < srcw; dx++){
+												Uint8 c = GetPixel(tracksrc, dx, sy);
+												if(c) SetPixel(surface, dstrect.x + dx, dstrect.y + cap + dy, c);
+											}
+										}
+										// Bottom cap.
+										for(int dy = 0; dy < cap; dy++){
+											int sy = srch - cap + dy;
+											int dyabs = trackh - cap + dy;
+											if(dyabs < 0) continue;
+											for(int dx = 0; dx < srcw; dx++){
+												Uint8 c = GetPixel(tracksrc, dx, sy);
+												if(c) SetPixel(surface, dstrect.x + dx, dstrect.y + dyabs, c);
+											}
+										}
+									}
 								}
-								srcrect.x = 0;
-								srcrect.y = 0;
-								int dsty = ((scrollbararea - srcrect.h) * (pos));
-								//if(dsty > (scrollbararea - srcrect.h)){
-								//	dsty = (scrollbararea - srcrect.h);
-								//}
-								dstrect.y += dsty;
-								dstrect.x += 1;
-								dstrect.y += 16;
-								BlitSprite(object, camera, surface, &dstrect, src, &srcrect);
-								scrollbar->res_index = oldres_index;
+								// Thumb. Fits between the two 16 px arrow caps;
+								// shrinks as scrollmax grows so it always
+								// represents content fraction. Crop the thumb
+								// sprite from the top.
+								Surface * thumbsrc = world.resources.spritebank[object->res_bank][scrollbar->barres_index].get();
+								if(thumbsrc && scrollbar->scrollmax > 0){
+									const int cap = 16;
+									int available = (int)trackh - 2 * cap;
+									if(available < 1) available = 1;
+									int thumbh = available - (int)scrollbar->scrollmax;
+									if(thumbh > available) thumbh = available;
+									if(thumbh > thumbsrc->h) thumbh = thumbsrc->h;
+									if(thumbh < 16) thumbh = 16;
+									if(thumbh > available) thumbh = available;
+									int travel = available - thumbh;
+									if(travel < 0) travel = 0;
+									float pos = float(scrollbar->scrollposition) / scrollbar->scrollmax;
+									int dsty = int(travel * pos);
+									Rect srcrect;
+									srcrect.x = 0;
+									srcrect.y = 0;
+									srcrect.w = thumbsrc->w;
+									srcrect.h = thumbh;
+									Rect thumbdst;
+									thumbdst.x = dstrect.x + 1;
+									thumbdst.y = dstrect.y + cap + dsty;
+									thumbdst.w = thumbsrc->w;
+									thumbdst.h = thumbh;
+									BlitSurface(thumbsrc, &srcrect, surface, &thumbdst);
+								}
 							}
 						}break;
 						case ObjectTypes::SELECTBOX:{

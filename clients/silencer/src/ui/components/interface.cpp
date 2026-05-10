@@ -28,6 +28,7 @@ Interface::Interface() : Object(ObjectTypes::INTERFACE){
 	objectupscroll = 0;
 	objectdownscroll = 0;
 	mousedown = false;
+	mouseheld = false;
 	issprite = false;
 	iscontrollable = true;
 	modal = false;
@@ -142,6 +143,7 @@ void Interface::ProcessKeyPress(World & world, char ascii){
 
 void Interface::ProcessMousePress(World & world, bool pressed, Uint16 x, Uint16 y){
 	mousedown = pressed;
+	mouseheld = pressed;
 	mousex = x;
 	mousey = y;
 	ActiveChanged(world, this, true);
@@ -185,35 +187,63 @@ void Interface::ActiveChanged(World & world, Interface * callinginterface, bool 
 								}
 							}
 						}
-						if(mousedown){
+						// Drag continuation / release. Sticky regardless of focus
+						// so the thumb keeps following the cursor even if the
+						// mouse leaves the track.
+						if(scrollbar->dragging){
+							if(!mouseheld){
+								scrollbar->dragging = false;
+							}else{
+								scrollbar->ScrollToMouseY(world, mousey);
+							}
+						}
+						if(mousedown && !scrollbar->dragging){
 							if(scrollbar->MouseInside(world, mousex, mousey)){
 								if(scrollbar->MouseInsideUp(world, mousex, mousey)){
 									scrollbar->ScrollUp();
 								}else
 								if(scrollbar->MouseInsideDown(world, mousex, mousey)){
 									scrollbar->ScrollDown();
+								}else
+								if(scrollbar->MouseInsideThumb(world, mousex, mousey)){
+									// Anchor the cursor to its current spot on
+									// the thumb so the thumb doesn't snap when
+									// drag begins. dragoffsety measures from
+									// the top of the *travel* window (track top
+									// + 16 cap), not from the thumb itself —
+									// ScrollToMouseY then converts the cursor
+									// position to a scrollposition that puts
+									// the thumb back under the cursor.
+									Uint16 trackh = scrollbar->EffectiveHeight(world);
+									Sint16 tracky = scrollbar->y - world.resources.spriteoffsety[scrollbar->res_bank][scrollbar->res_index];
+									int available = (int)trackh - 32; if(available < 1) available = 1;
+									int thumbh = available - (int)scrollbar->scrollmax;
+									int thumbsrch = world.resources.spriteheight[scrollbar->res_bank][scrollbar->barres_index];
+									if(thumbh > available) thumbh = available;
+									if(thumbh > thumbsrch) thumbh = thumbsrch;
+									if(thumbh < 16) thumbh = 16;
+									if(thumbh > available) thumbh = available;
+									int travel = available - thumbh; if(travel < 0) travel = 0;
+									float pos = scrollbar->scrollmax ? float(scrollbar->scrollposition) / scrollbar->scrollmax : 0.0f;
+									Sint16 thumbtop = tracky + 16 + Sint16(travel * pos);
+									scrollbar->dragoffsety = (Sint16)mousey - thumbtop;
+									scrollbar->dragging = true;
 								}else{
-									/*Uint16 scrollarea = world.resources.spriteheight[scrollbar->res_bank][scrollbar->barres_index];
-									int scrollbarthickness = scrollarea - (scrollbar->scrollmax);
-									if(scrollbarthickness < 32){
-										scrollbarthickness = 32;
-									}
-									float scrolly = mousey + world.resources.spriteoffsety[scrollbar->res_bank][scrollbar->res_index] - 16;
-									if(scrolly < 0){
-										scrolly = 0;
-									}
-									if(scrolly > scrollarea){
-										scrolly = scrollarea;
-									}
-									scrolly = ((scrolly * 2) / (scrollarea)) - 1;
-									if(scrolly > 1){
-										scrolly = 1;
-									}
-									if(scrolly < -1){
-										scrolly = -1;
-									}
-									scrollbar->scrollposition = abs(scrolly) * scrollbar->scrollmax;*/
- 								}
+									// Click on the track outside the thumb:
+									// jump so the thumb centers on the cursor,
+									// then start dragging from that anchor.
+									Uint16 trackh = scrollbar->EffectiveHeight(world);
+									int available = (int)trackh - 32; if(available < 1) available = 1;
+									int thumbh = available - (int)scrollbar->scrollmax;
+									int thumbsrch = world.resources.spriteheight[scrollbar->res_bank][scrollbar->barres_index];
+									if(thumbh > available) thumbh = available;
+									if(thumbh > thumbsrch) thumbh = thumbsrch;
+									if(thumbh < 16) thumbh = 16;
+									if(thumbh > available) thumbh = available;
+									scrollbar->dragoffsety = thumbh / 2;
+									scrollbar->ScrollToMouseY(world, mousey);
+									scrollbar->dragging = true;
+								}
 							}
 						}
 					}
@@ -224,6 +254,7 @@ void Interface::ActiveChanged(World & world, Interface * callinginterface, bool 
 						break;
 					}
 					iface->mousedown = mousedown;
+					iface->mouseheld = mouseheld;
 					iface->mousewheelup = mousewheelup;
 					iface->mousewheeldown = mousewheeldown;
 					iface->mousex = mousex;

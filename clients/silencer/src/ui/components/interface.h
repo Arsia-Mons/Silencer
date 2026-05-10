@@ -58,8 +58,13 @@ public:
 	bool disabled;
 	SDL_Scancode lastsym;
 	bool modal;
+	// Edge-triggered: true on the frame a mouse-button-down event arrived.
+	// Cleared by ProcessMouseMove so widgets see the press as a one-shot.
 	bool mousedown;
-	
+	// State-tracked: true between button-down and button-up events. Survives
+	// motion events so drag handlers can follow the cursor while held.
+	bool mouseheld;
+
 private:
 	void TabPressed(World & world);
 	void EnterPressed(World & world);

@@ -252,14 +252,19 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	mapscrollbar->scrollregionw = mapselect->width;
 	mapscrollbar->scrollregionh = mapselect->height;
 
-	// Form-row scrollbar. Invisible (draw=false) — chrome would require a
-	// new bank-7 sprite. Wheel-scroll only, mirroring how mapscrollbar
-	// behaves when its list doesn't overflow.
+	// Form-row scrollbar. Sits in the narrow gap between the form's value
+	// column and the map list; uses the variable-height path to stretch the
+	// bank-7 track sprite to the form viewport (5 rows).
 	ScrollBar * formscrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
 	formscrollbar->res_index = 9;
 	formscrollbar->scrollpixels = yspace;
 	formscrollbar->scrollposition = 0;
-	formscrollbar->draw = false;
+	formscrollbar->draw = true;
+	formscrollbar->height = 5 * yspace;
+	// Anchor the track's screen-space top-left at (398, 87). The sprite's
+	// offsets are baked for a different layout, so undo them here.
+	formscrollbar->x = 398 + world.resources.spriteoffsetx[7][9];
+	formscrollbar->y = 87 + world.resources.spriteoffsety[7][9];
 	// Region covers the form's labels + value column so the wheel routes
 	// here whenever the cursor is over Game Options.
 	formscrollbar->scrollregionx = 240;
