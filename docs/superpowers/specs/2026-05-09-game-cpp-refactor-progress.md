@@ -67,6 +67,19 @@ Stage B landed: `CharacterPanel` at `clients/silencer/src/ui/screens/lobby/panel
 
 Verified: clean regular + unity Debug builds (had to re-run `cmake -B build-unity` so GLOB_RECURSE picked up the two new .cpp files). E2E `00_ping`/`10_navigate`/`20_screenshot` pass. Interactive agency-toggle smoke not exercised (same TEXTINPUT/login limitation as Stage A).
 
+Stage C landed alongside an architecture cleanup of the migration scaffolding the user pushed back on. **`ScreenContext` is now a pure subsystem-refs holder** (World, Renderer, Lobby, KeyMap, Updater, AmbienceMixer, SDL_Window/RenderDevice) plus the global state-machine actions (GoToState, GoBack, RequestQuit, PushScreen, PopScreen, ReplaceScreen, ShowModal, ShowMessage). Per-screen / per-panel knowledge no longer lives there. Screens reach Game directly through a new public `ScreenContext::game` ref when they need Game state. To support that without making `Game` a grab bag in turn:
+- `World::IsConnected()` added as a public method (just exposes the `state == CONNECTED` test). The agency-changed branch in `CharacterPanel::Tick` calls `world.IsConnected()` directly, no Game shim.
+- `Game::GetSelectedAgency()` deleted entirely. Outside callers (the lobby pump's joining/create flows) now read `Config::GetInstance().defaultagency`, which is already kept in sync with the toggle widget on every change. `CharacterPanel` reads its own toggles via a private `ReadSelectedAgency` helper to detect transitions (Config can't be used for that — it's the post-update value).
+- `Game::characterinterface` deleted (was only used by `GetSelectedAgency`).
+- `Game::lastchannel` and `Game::chatlinesprinted` deleted. `lastchannel` moved onto the client `Lobby` class (next to the existing `channel`/`channelchanged` state) so `GoBack`, `TickLobbyBody`, and `ChatPanel` all read/write `world.lobby.lastchannel` directly. `chatlinesprinted` was always 0 in practice — replaced with `chatmessages.empty()` checks where it was branched on.
+- All ad-hoc `ScreenContext` shims I'd added during stages A/B (`BuildLegacyLobbyInterface`, `TickLegacyLobbyBody`, `GetSelectedAgency`, `SetCharacterInterfaceId`, `NotifyAgencyChanged`) deleted. Stage A's `LobbyScreen::Build` now does `ctx.game.CreateLobbyInterface()` directly; Stage B's `CharacterPanel::Tick` calls `world.IsConnected()` directly; etc.
+
+`ChatPanel` itself: at `clients/silencer/src/ui/screens/lobby/panels/chat_panel.{h,cpp}`. Owns the chat box (channel name overlay, scrollback textbox, presence textbox, chat input, scrollbar). Build attaches to the lobby parent and sets `parent->activeobject` + `ActiveChanged` — those calls moved out of `Game::CreateLobbyInterface`. Tick walks its own iface objects: drains `world.lobby.chatmessages` into the textbox, rebuilds the presence list when `presencechanged` flips, refreshes the channel-name overlay (and snapshots `world.lobby.lastchannel` on first change), and on `Game::minimized` flashes the OS taskbar/dock via `FLASHWINFO` (Win32) or `RequestUserAttention` (cocoa). `Game::CreateChatInterface` deleted; the chat-related arms in `Game::ProcessLobbyInterface` (TEXTBOX uid 9 + chat scrollback, OVERLAY uid 1 channel, TEXTINPUT chat-send) deleted. The TEXTINPUT arm kept the `enterpressed = false` reset for un-migrated form inputs (game-create, password). Anon-namespace uid enumerators prefixed `CHT_OVL_*` / `CHT_TB_*`.
+
+`Game::lobbyinterface`, `Game::chatinterface`, and `Game::minimized` are public temp scaffolding (panels write/read them; deleted in stage H). `Game::CreateLobbyInterface` and `Game::TickLobbyBody` are public temp scaffolding too (called by LobbyScreen during the migration; deleted in stage H once their bodies are empty).
+
+Verified: clean regular + unity Debug builds. E2E `00_ping`/`10_navigate`/`20_screenshot` pass.
+
 ---
 
 ## Phase 0 — Baseline
@@ -139,7 +152,7 @@ LobbyScreen has 6 panels. Migrate it in stages so the lobby keeps working throug
 
 - [x] **Stage A: land `LobbyScreen` with adapter calls.** `LobbyScreen::Build` calls into the existing `Game::CreateCharacterInterface()`, `Game::CreateChatInterface()`, etc. as before. `LobbyScreen::Tick` calls into the existing `Game::ProcessLobbyInterface()`. The 731-line method stays intact for now — we've just moved the entry point. **Smoke:** full lobby flow — connect, character select, chat, browse games, create game, join game, leave lobby. This is the biggest single smoke-test of the refactor.
 - [x] **Stage B: migrate `CharacterPanel`.** Replace the `Game::CreateCharacterInterface` call inside `LobbyScreen::Build` with `character.Build(ctx, parent)` using the new `CharacterPanel`. Move the panel's process logic out of `Game::ProcessLobbyInterface` into `CharacterPanel::Tick`. Delete `Game::CreateCharacterInterface`. **Smoke:** character select — pick each agency, confirm display updates.
-- [ ] **Stage C: migrate `ChatPanel`.** **Smoke:** type chat messages, confirm they appear; receive messages from another client.
+- [x] **Stage C: migrate `ChatPanel`.** **Smoke:** type chat messages, confirm they appear; receive messages from another client.
 - [ ] **Stage D: migrate `GameSelectPanel`.** **Smoke:** browse server list, refresh, see games appear/disappear.
 - [ ] **Stage E: migrate `GameCreatePanel`.** **Smoke:** open create-game form, enter game name, select map, set parameters, click create; confirm map upload triggers; confirm you land in the lobby of the created game.
 - [ ] **Stage F: migrate `GameJoinPanel`.** **Smoke:** join a game from the list; confirm player roster updates.

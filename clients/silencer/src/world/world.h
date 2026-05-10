@@ -55,6 +55,7 @@ public:
 	void SendInput(void);
 	void SwitchToLocalAuthorityMode(void);
 	bool IsAuthority(void);
+	bool IsConnected() const;
 	void Illuminate(void);
 	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0, bool networked = false, Peer * peer = 0);
 	void ShowStatus(const char * status, Uint8 color = 0, bool networked = false, Peer * peer = 0);

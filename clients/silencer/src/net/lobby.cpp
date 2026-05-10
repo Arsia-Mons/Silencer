@@ -31,6 +31,7 @@ Lobby::Lobby(World * world){
 	presencechanged = false;
 	channelchanged = false;
 	channel[0] = 0;
+	lastchannel[0] = 0;
 	serverip[0] = 0;
 	sockethandle = -1;
 	statupgraded = false;

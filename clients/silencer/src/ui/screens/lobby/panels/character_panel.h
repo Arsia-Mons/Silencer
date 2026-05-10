@@ -3,6 +3,8 @@
 
 #include "panel.h"
 
+class World;
+
 // Character box on the LobbyScreen: username header, agency toggles, and the
 // LEVEL/WINS/LOSSES/XP readouts beneath. Owns the agency-change detection
 // state machine that pushes Config::defaultagency + world.SetAgency on toggle
@@ -16,6 +18,8 @@ public:
 	void Destroy(ScreenContext & ctx) override;
 
 private:
+	Uint8 ReadSelectedAgency(World & world) const;
+
 	// Last agency rendered into the readouts. -1 forces an initial refresh
 	// on first Tick after Build (matches the legacy behavior: case LOBBY:
 	// stateisnew set agencychanged = true to trigger first-frame display).

@@ -56,6 +56,10 @@ public:
 	bool presencechanged;
 	char channel[64];
 	bool channelchanged;
+	// First channel name observed this session, captured by ChatPanel on the
+	// initial channel rename. GoBack rejoins this channel after a game-join
+	// flow ends. Empty until the first channelchanged tick.
+	char lastchannel[64];
 	char serverip[256];
 	bool versionchecked;
 	bool versionok;

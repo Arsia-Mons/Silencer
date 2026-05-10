@@ -3,6 +3,7 @@
 
 #include "screen.h"
 #include "character_panel.h"
+#include "chat_panel.h"
 
 // In-progress migration of the lobby surface out of Game::ProcessLobbyInterface.
 // Build delegates to Game::CreateLobbyInterface() (legacy chrome + un-migrated
@@ -17,6 +18,7 @@ public:
 
 private:
 	CharacterPanel character;
+	ChatPanel chat;
 };
 
 #endif

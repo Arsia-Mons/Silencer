@@ -79,7 +79,6 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	singleplayermessage = 0;
 	updatetitle = true;
 	currentinterface = 0;
-	lastchannel[0] = 0;
 	minimized = false;
 	modaldialoghasok = false;
 	window = 0;
@@ -792,7 +791,6 @@ bool Game::Tick(void){
 				world.Disconnect();
 				renderer.camera.SetPosition(320, 240);
 				lobbyinterface = 0;
-				characterinterface = 0;
 				chatinterface = 0;
 				gameselectinterface = 0;
 				gamecreateinterface = 0;
@@ -859,7 +857,7 @@ bool Game::Tick(void){
 					}
 					world.Disconnect();
 					if(world.lobby.state == Lobby::AUTHENTICATED){
-						world.lobby.JoinChannel(lastchannel);
+						world.lobby.JoinChannel(world.lobby.lastchannel);
 						GoToState(LOBBY);
 					}else{
 						GoToState(MAINMENU);
@@ -1034,7 +1032,7 @@ bool Game::Tick(void){
 					world.Disconnect();
 					if(world.lobby.state == Lobby::AUTHENTICATED){
 						GoToState(LOBBY);
-						world.lobby.JoinChannel(lastchannel);
+						world.lobby.JoinChannel(world.lobby.lastchannel);
 					}else{
 						if(world.replay.IsPlaying()){
 							world.replay.EndPlaying();
@@ -1055,7 +1053,7 @@ bool Game::Tick(void){
 				if(CheckForConnectionLost()){
 					if(world.lobby.state == Lobby::AUTHENTICATED){
 						GoToState(LOBBY);
-						world.lobby.JoinChannel(lastchannel);
+						world.lobby.JoinChannel(world.lobby.lastchannel);
 					}else{
 						GoToState(MAINMENU);
 					}
@@ -2097,7 +2095,7 @@ void Game::JoinGame(LobbyGame & lobbygame, char * password){
 	peer->port = lobbygame.port;
 	sharedstate = 0;
 	world.mode = World::REPLICA;
-	world.Connect(GetSelectedAgency(), world.lobby.accountid, password);
+	world.Connect(Config::GetInstance().defaultagency, world.lobby.accountid, password);
 	joininggame = true;
 }
 
@@ -2111,12 +2109,6 @@ void Game::GoToState(Uint8 newstate){
 	// GoToState in response to a button click) can return safely before its
 	// destructor runs.
 	screenStackPendingTeardown = true;
-}
-
-void Game::SetAgencyIfConnected(Uint8 agency){
-	if(world.state == World::CONNECTED){
-		world.SetAgency(agency);
-	}
 }
 
 void Game::TickLobbyBody(void){
@@ -2164,7 +2156,7 @@ void Game::TickLobbyBody(void){
 				authoritypeer->port = lobbygame->port;
 				sharedstate = 0;
 				currentlobbygameid = lobbygame->id;
-				world.Connect(GetSelectedAgency(), world.lobby.accountid, lobbygame->password);
+				world.Connect(Config::GetInstance().defaultagency, world.lobby.accountid, lobbygame->password);
 				mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
 				joininggame = true;
 			}
@@ -2240,13 +2232,13 @@ void Game::TickLobbyBody(void){
 				mapDownloader.mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
 				mapDownloader.mapjoinstate.store(0, std::memory_order_relaxed);
 				if(mapDownloader.mapjointhread.joinable()) mapDownloader.mapjointhread.detach();
-				world.SetTech(Config::GetInstance().defaulttechchoices[GetSelectedAgency()]);
+				world.SetTech(Config::GetInstance().defaulttechchoices[Config::GetInstance().defaultagency]);
 				gamejoininterface = CreateGameJoinInterface()->id;
 				LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
 				if(lobbygame){
 					char temp[256];
 					ambienceMixer.GetGameChannelName(*lobbygame, temp);
-					strcpy(lastchannel, world.lobby.channel);
+					strcpy(world.lobby.lastchannel, world.lobby.channel);
 					world.lobby.JoinChannel(temp);
 					UpdateLobbyMapName(lobbygame->mapname);
 				}
@@ -2268,7 +2260,6 @@ void Game::TickLobbyBody(void){
 }
 
 Interface * Game::CreateLobbyInterface(void){
-	chatlinesprinted = 0;
 	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	background->res_bank = 7;
 	background->res_index = 1;
@@ -2304,7 +2295,6 @@ Interface * Game::CreateLobbyInterface(void){
 	strcpy(exitbutton->text, "Go Back");
 
 	gameselectinterface = CreateGameSelectInterface()->id;
-	chatinterface = CreateChatInterface()->id;
 
 	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 	iface->AddObject(background->id);
@@ -2312,11 +2302,10 @@ Interface * Game::CreateLobbyInterface(void){
 	iface->AddObject(vertext->id);
 	iface->AddObject(mapnametext->id);
 	iface->AddObject(exitbutton->id);
-	iface->AddObject(chatinterface);
 	iface->AddObject(gameselectinterface);
 	iface->buttonescape = exitbutton->id;
-	iface->activeobject = chatinterface;
-	iface->ActiveChanged(world, iface, false);
+	// Active object + ActiveChanged are set by ChatPanel::Build once it
+	// attaches its interface to this lobby iface.
 	return iface;
 }
 
@@ -2403,76 +2392,6 @@ Interface * Game::CreateGameSelectInterface(void){
 	gameselectinterface->buttonenter = gamejoinbutton->id;
 	gameselectinterface->scrollbar = gamescrollbar->id;
 	return gameselectinterface;
-}
-
-Interface * Game::CreateChatInterface(void){
-	Interface * chatinterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	chatinterface->x = 15;
-	chatinterface->y = 216;
-	chatinterface->width = 368;
-	chatinterface->height = 234;
-	Overlay * chatborder = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	chatborder->res_bank = 7;
-	chatborder->res_index = 11;
-	Overlay * chatinputborder = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	chatinputborder->res_bank = 7;
-	chatinputborder->res_index = 14;
-	Overlay * channeltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	channeltext->uid = 1;
-	channeltext->textbank = 134;
-	channeltext->textwidth = 8;
-	channeltext->x = 15;
-	channeltext->y = 200;
-	TextBox * textbox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
-	textbox->x = 19;
-	textbox->y = 220;
-	textbox->width = 242;
-	textbox->height = 207;
-	textbox->res_bank = 133;
-	textbox->lineheight = 11;
-	textbox->fontwidth = 6;
-	textbox->bottomtotop = true;
-	TextBox * presencebox = (TextBox *)world.CreateObject(ObjectTypes::TEXTBOX);
-	presencebox->x = 267;
-	presencebox->y = 220;
-	presencebox->width = 110;
-	presencebox->height = 207;
-	presencebox->res_bank = 133;
-	presencebox->lineheight = 11;
-	presencebox->fontwidth = 6;
-	presencebox->bottomtotop = false;
-	presencebox->uid = 9;
-	/*for(int i = 0; i < 0; i++){
-		char line[256];
-		sprintf(line, "line %d", i);
-		textbox->AddLine(line);
-	}*/
-	TextInput * chatinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	chatinput->x = 18;
-	chatinput->y = 437;
-	chatinput->width = 360;
-	chatinput->height = 14;
-	chatinput->res_bank = 133;
-	chatinput->fontwidth = 6;
-	chatinput->maxchars = 200;
-	chatinput->maxwidth = 60;
-	chatinput->uid = 1;
-	ScrollBar * chatscrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
-	chatscrollbar->res_index = 12;
-	chatscrollbar->barres_index = 13;
-	chatscrollbar->scrollpixels = textbox->lineheight;
-	chatscrollbar->scrollposition = textbox->scrolled;
-	chatinterface->AddObject(chatborder->id);
-	chatinterface->AddObject(chatinputborder->id);
-	chatinterface->AddObject(channeltext->id);
-	chatinterface->AddObject(textbox->id);
-	chatinterface->AddObject(presencebox->id);
-	chatinterface->AddObject(chatinput->id);
-	chatinterface->AddObject(chatscrollbar->id);
-	chatinterface->AddTabObject(chatinput->id);
-	chatinterface->scrollbar = chatscrollbar->id;
-	//chatinterface->ActiveChanged(&world, chatinterface, false);
-	return chatinterface;
 }
 
 Interface * Game::CreateGameCreateInterface(void){
@@ -3241,7 +3160,7 @@ bool Game::GoBack(void){
 			}
 		}
 		gameselectinterface = CreateGameSelectInterface()->id;
-		world.lobby.JoinChannel(lastchannel);
+		world.lobby.JoinChannel(world.lobby.lastchannel);
 		iface->AddObject(gameselectinterface);
 		currentinterface = iface->id;
 		return true;
@@ -3297,18 +3216,12 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 					}
 				}break;
 				case ObjectTypes::TEXTINPUT:{
+					// Chat input handled by ChatPanel::Tick; this arm just
+					// clears the enterpressed flag for un-migrated textinputs
+					// (game-create form, etc.).
 					TextInput * textinput = static_cast<TextInput *>(object);
-					if(textinput){
-						Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
-						if(chatiface && iface->activeobject == chatiface->activeobject){
-							if(textinput->enterpressed && strlen(textinput->text) > 0){
-								world.lobby.SendChat(world.lobby.channel, textinput->text);
-								textinput->Clear();
-							}
-						}
-						if(textinput->enterpressed){
-							textinput->enterpressed = false;
-						}
+					if(textinput && textinput->enterpressed){
+						textinput->enterpressed = false;
 					}
 				}break;
 				case ObjectTypes::SELECTBOX:{
@@ -3552,108 +3465,10 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 						}
 					}
 				}break;
-				case ObjectTypes::TEXTBOX:{
-					TextBox * textbox = static_cast<TextBox *>(object);
-					if(textbox && textbox->uid == 9){
-						if(world.lobby.presencechanged || !world.lobby.gamesprocessed){
-							textbox->text.clear();
-							textbox->scrolled = 0;
-							struct Row { Uint8 group; std::string label; };
-							std::vector<Row> rows;
-							for(auto & kv : world.lobby.presence){
-								Lobby::PresenceEntry & e = kv.second;
-								Row r;
-								r.label = e.name;
-								r.group = (e.status <= 2) ? e.status : 0;
-								if(e.gameid != 0){
-									LobbyGame * g = world.lobby.GetGameById(e.gameid);
-									if(g){
-										r.label += " [";
-										r.label += g->name;
-										r.label += "]";
-									}
-								}
-								rows.push_back(r);
-							}
-							std::sort(rows.begin(), rows.end(), [](const Row & a, const Row & b){
-								if(a.group != b.group) return a.group < b.group;
-								return a.label < b.label;
-							});
-							Uint8 lastgroup = 255;
-							for(auto & r : rows){
-								if(r.group != lastgroup){
-									const char * header = (r.group == 0) ? "In Lobby" : (r.group == 1) ? "Pregame" : "Playing";
-									textbox->AddText(header, 0, 128 + 32, 0, false);
-									lastgroup = r.group;
-								}
-								textbox->AddText(r.label.c_str(), 0, 128, 2, false);
-							}
-							world.lobby.presencechanged = false;
-						}
-					}else
-					if(textbox){
-						Object * object = world.GetObjectFromId(iface->scrollbar);
-						ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-						if(minimized && world.lobby.chatmessages.size() > chatlinesprinted){
-#ifdef _WIN32
-							HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
-							if(hwnd){
-								FLASHWINFO flashinfo;
-								flashinfo.cbSize = sizeof(flashinfo);
-								flashinfo.hwnd = hwnd;
-								flashinfo.dwFlags = FLASHW_ALL | FLASHW_TIMERNOFG;
-								flashinfo.uCount = 0xFFFFFFFF;
-								flashinfo.dwTimeout = 0;
-								FlashWindowEx(&flashinfo);
-							}
-#endif
-#ifdef __APPLE__
-							RequestUserAttention();
-#endif
-						}
-						bool scroll = false;
-						while(world.lobby.chatmessages.size() > chatlinesprinted){
-							auto message = world.lobby.chatmessages.front();
-							Uint8 color = message[strlen(message.data()) + 1];
-							Uint8 brightness = message[strlen(message.data()) + 2];
-							if(scrollbar && scrollbar->scrollposition == scrollbar->scrollmax){
-								scroll = true;
-							}
-							textbox->AddText(message.data(), color, brightness, 2, scroll);
-							world.lobby.chatmessages.pop_front();
-							if(scrollbar){
-								scrollbar->scrollposition = textbox->scrolled;
-							}
-						}
-						if(scrollbar){
-							textbox->scrolled = scrollbar->scrollposition;
-							if(textbox->text.size() > ceil(float(textbox->height) / textbox->lineheight)){
-								scrollbar->draw = true;
-								scrollbar->scrollmax = textbox->text.size() - ceil(float(textbox->height) / textbox->lineheight);
-							}else{
-								scrollbar->draw = false;
-							}
-						}
-					}
-				}break;
-				case ObjectTypes::OVERLAY:{
-					Overlay * overlay = static_cast<Overlay *>(object);
-					if(overlay){
-						switch(overlay->uid){
-							case 1:{
-								if(world.lobby.channelchanged){
-									if(strlen(lastchannel) == 0){
-										strcpy(lastchannel, world.lobby.channel);
-									}
-									overlay->text = world.lobby.channel;
-									world.lobby.channelchanged = false;
-								}
-							}break;
-						}
-						// Character-panel level/wins/losses/XP overlays handled
-						// by CharacterPanel::Tick.
-					}
-				}break;
+				// Chat presence + scrollback handled by ChatPanel::Tick.
+				// Channel-name overlay (uid 1) handled by ChatPanel::Tick.
+				// Character-panel level/wins/losses/XP overlays handled
+				// by CharacterPanel::Tick.
 				case ObjectTypes::BUTTON:{
 					Button * button = static_cast<Button *>(object);
 					if(button && button->clicked && button->type != Button::BCHECKBOX){
@@ -3681,11 +3496,11 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 																User * user = world.lobby.GetUserInfo(world.lobby.accountid);
 																bool canjoin = true;
 																if(user){
-																	if(lobbygame->minlevel > user->agency[GetSelectedAgency()].level){
+																	if(lobbygame->minlevel > user->agency[Config::GetInstance().defaultagency].level){
 																		canjoin = false;
 																		CreateModalDialog("Your player level is too low");
 																	}else
-																	if(lobbygame->maxlevel < user->agency[GetSelectedAgency()].level){
+																	if(lobbygame->maxlevel < user->agency[Config::GetInstance().defaultagency].level){
 																		canjoin = false;
 																		CreateModalDialog("Your player level is too high");
 																	}
@@ -3989,7 +3804,7 @@ void Game::ProcessGameSummaryInterface(Interface * iface){
 							case 0:{ // continue
 								if(world.lobby.state == Lobby::AUTHENTICATED){
 									GoToState(LOBBY);
-									world.lobby.JoinChannel(lastchannel);
+									world.lobby.JoinChannel(world.lobby.lastchannel);
 								}else{
 									GoToState(MAINMENU);
 								}
@@ -4306,36 +4121,6 @@ void Game::ShowTeamOverlays(bool show){
 			team->ShowOverlays(world, show);
 		}
 	}
-}
-
-Uint8 Game::GetSelectedAgency(void){
-	Interface * characteriface = static_cast<Interface *>(world.GetObjectFromId(characterinterface));
-	for(std::vector<Uint16>::iterator it = characteriface->objects.begin(); it != characteriface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object && object->type == ObjectTypes::TOGGLE){
-			Toggle * toggle = static_cast<Toggle *>(object);
-			if(toggle && toggle->selected){
-				switch(toggle->uid){
-					case 1:
-						return Team::NOXIS;
-					break;
-					case 2:
-						return Team::LAZARUS;
-					break;
-					case 3:
-						return Team::CALIBER;
-					break;
-					case 4:
-						return Team::STATIC;
-					break;
-					case 5:
-						return Team::BLACKROSE;
-					break;
-				}
-			}
-		}
-	}
-	return 0;
 }
 
 void Game::OpenFirstGamepad(){

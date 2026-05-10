@@ -17,10 +17,11 @@ class AmbienceMixer;
 class RenderDevice;
 struct SDL_Window;
 
-// Curated API screens use to talk to Game. Holds refs to subsystems and the
-// state-machine / screen-stack actions Screens are allowed to invoke. No
-// Game& accessor by design — session-specific data lives on the subsystem
-// that owns it semantically.
+// Bag of refs that screens use to reach the global subsystems (World,
+// Renderer, Lobby, Updater, KeyMap, AmbienceMixer, the SDL window /
+// RenderDevice) plus the state-machine / screen-stack actions that touch
+// Game itself. Per-screen behavior lives in the screen, not here — when a
+// screen needs Game state directly, reach through the `game` ref.
 class ScreenContext
 {
 public:
@@ -34,11 +35,12 @@ public:
 	              SDL_Window * & window,
 	              RenderDevice * & renderdevice);
 
-	World &   world;
+	Game &     game;
+	World &    world;
 	Renderer & renderer;
-	Lobby &   lobby;
-	KeyMap &  keymap;
-	Updater & updater;
+	Lobby &    lobby;
+	KeyMap &   keymap;
+	Updater &  updater;
 	AmbienceMixer & ambienceMixer;
 	// Live refs to Game's SDL window + render device. Pointers because both
 	// are nullable in headless / dedicated-server mode and are assigned
@@ -56,26 +58,6 @@ public:
 	void ReplaceScreen(std::unique_ptr<Screen> s);
 	void ShowModal(std::unique_ptr<Modal> m);
 	void ShowMessage(const char * msg, std::function<void(bool ok)> onClose);
-
-	// Stage-A lobby adapter. Delegates to Game::CreateLobbyInterface and the
-	// extracted Game::TickLobbyBody. Replaced piecewise across stages B–H as
-	// each panel migrates onto LobbyScreen.
-	Uint16 BuildLegacyLobbyInterface();
-	void TickLegacyLobbyBody();
-
-	// Selected agency from the character toggles. Reads game.characterinterface
-	// — kept on Game for now because GetSelectedAgency is consumed by the lobby
-	// pump (joining/create flows) and JoinGame, not just by CharacterPanel.
-	Uint8 GetSelectedAgency() const;
-	// CharacterPanel writes back its interface id so legacy code keeps working
-	// during the multi-stage migration. Removed in stage H.
-	void SetCharacterInterfaceId(Uint16 id);
-	// Push an agency change to the live World if a network session is active.
-	// Wraps the World::CONNECTED check so panels don't reach into World privates.
-	void NotifyAgencyChanged(Uint8 agency);
-
-private:
-	Game & game;
 };
 
 #endif

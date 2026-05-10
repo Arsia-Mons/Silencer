@@ -81,6 +81,17 @@ public:
 	KeyMap& GetKeyMap() { return keymap; }
 	const KeyMap& GetKeyMap() const { return keymap; }
 
+	// LobbyScreen + per-panel interop. Public during the multi-stage migration
+	// of Game::Create*Interface / ProcessLobbyInterface onto Screen/Panel
+	// classes — panels reach in via `ScreenContext::game` rather than going
+	// through narrow shim methods. Moves toward fully encapsulating once stage
+	// H lands and the legacy helpers are deleted.
+	Interface * CreateLobbyInterface(void);
+	void TickLobbyBody();
+	Uint16 lobbyinterface;
+	Uint16 chatinterface;
+	bool minimized;
+
 private:
 	bool Tick(void);
 	void Present(void);
@@ -105,9 +116,7 @@ private:
 	void GiveDefaultItems(Player & player);
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
 	void GoToState(Uint8 newstate);
-	Interface * CreateLobbyInterface(void);
 	Interface * CreateGameSelectInterface(void);
-	Interface * CreateChatInterface(void);
 	Interface * CreateGameCreateInterface(void);
 	Interface * CreateGameJoinInterface(void);
 	Interface * CreateGameTechInterface(void);
@@ -116,9 +125,6 @@ private:
 	Interface * CreateMapPreview(const char * filename);
 	void DestroyModalDialog(void);
 	Interface * CreatePasswordDialog(void);
-	Uint16 lobbyinterface;
-	Uint16 characterinterface;
-	Uint16 chatinterface;
 	Uint16 gameselectinterface;
 	Uint16 gamecreateinterface;
 	Uint16 gamejoininterface;
@@ -128,24 +134,13 @@ private:
 	Uint16 passwordinterface;
 	Uint16 mappreviewinterface;
 	Updater updater;
-	// Push a CharacterPanel agency change to the live World if a network
-	// session is in progress. Wraps the World::CONNECTED check which is
-	// gated by World's private friend list.
-	void SetAgencyIfConnected(Uint8 agency);
 	bool ProcessLobbyInterface(Interface * iface);
-	// Per-tick lobby pump: drives ProcessLobbyInterface, the deferred
-	// CreateGame / map-upload state machine, modal teardown, and the
-	// post-create handoff into the joining flow. Called from
-	// LobbyScreen::Tick via ScreenContext::TickLegacyLobbyBody. Stages B–H
-	// migrate the contents onto Panel::Tick methods.
-	void TickLobbyBody();
 	void ProcessGameSummaryInterface(Interface * iface);
 	void UpdateLobbyMapName(const char * name);
 	void UpdateTechInterface(void);
 	void UpdateGameSummaryInterface(void);
 	void AddSummaryLine(TextBox & textbox, const char * name, Uint32 value, bool percentage = false);
 	void ShowTeamOverlays(bool show);
-	Uint8 GetSelectedAgency(void);
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".
 	const char * GetActionKeyDisplayName(Action a);
@@ -171,7 +166,6 @@ private:
 	Uint64 lasttick;
 	Uint16 currentinterface;
 	Uint16 aftermodalinterface;
-	Uint32 chatlinesprinted;
 	Uint16 sharedstate;
 	int oldselecteditem;
 	Uint8 singleplayermessage;
@@ -179,9 +173,7 @@ private:
 	Uint32 currentlobbygameid;
 	Uint32 lastannouncedgameid;
 	Uint8 lastannouncedstatus;
-	char lastchannel[64];
 	bool gamesummaryinfoloaded;
-	bool minimized;
 	bool creategameclicked;
 	bool modaldialoghasok;
 	bool joininggame;

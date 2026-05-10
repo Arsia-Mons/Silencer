@@ -3,8 +3,6 @@
 #include "game.h"
 #include "screen.h"
 #include "modal.h"
-#include "interface.h"
-#include "world.h"
 #include <cassert>
 
 ScreenContext::ScreenContext(Game & game_,
@@ -16,15 +14,15 @@ ScreenContext::ScreenContext(Game & game_,
                              AmbienceMixer & ambienceMixer_,
                              SDL_Window * & window_,
                              RenderDevice * & renderdevice_)
-    : world(world_),
+    : game(game_),
+      world(world_),
       renderer(renderer_),
       lobby(lobby_),
       keymap(keymap_),
       updater(updater_),
       ambienceMixer(ambienceMixer_),
       window(window_),
-      renderdevice(renderdevice_),
-      game(game_)
+      renderdevice(renderdevice_)
 {
 }
 
@@ -36,17 +34,3 @@ void ScreenContext::PopScreen() { game.PopScreen(); }
 void ScreenContext::ReplaceScreen(std::unique_ptr<Screen> s) { game.ReplaceScreen(std::move(s)); }
 void ScreenContext::ShowModal(std::unique_ptr<Modal>) { assert(false && "ScreenContext::ShowModal not wired yet"); }
 void ScreenContext::ShowMessage(const char *, std::function<void(bool)>) { assert(false && "ScreenContext::ShowMessage not wired yet"); }
-
-Uint16 ScreenContext::BuildLegacyLobbyInterface()
-{
-	Interface * iface = game.CreateLobbyInterface();
-	game.lobbyinterface = iface->id;
-	return iface->id;
-}
-
-void ScreenContext::TickLegacyLobbyBody() { game.TickLobbyBody(); }
-
-Uint8 ScreenContext::GetSelectedAgency() const { return game.GetSelectedAgency(); }
-void ScreenContext::SetCharacterInterfaceId(Uint16 id) { game.characterinterface = id; }
-
-void ScreenContext::NotifyAgencyChanged(Uint8 agency) { game.SetAgencyIfConnected(agency); }

@@ -1,6 +1,7 @@
 #include "character_panel.h"
 
 #include "screen_context.h"
+#include "game.h"
 #include "world.h"
 #include "lobby.h"
 #include "config.h"
@@ -147,9 +148,26 @@ void CharacterPanel::Build(ScreenContext & ctx, Interface * parent)
 	if(parent){
 		parent->AddObject(interfaceId);
 	}
-	// Mirror onto Game so legacy code (GetSelectedAgency, lobby pump joining
-	// flow) keeps reading the character iface id directly. Removed in stage H.
-	ctx.SetCharacterInterfaceId(interfaceId);
+}
+
+Uint8 CharacterPanel::ReadSelectedAgency(World & world) const
+{
+	Interface * iface = (Interface *)world.GetObjectFromId(interfaceId);
+	if(!iface) return Config::GetInstance().defaultagency;
+	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
+		Object * object = world.GetObjectFromId(*it);
+		if(!object || object->type != ObjectTypes::TOGGLE) continue;
+		Toggle * toggle = static_cast<Toggle *>(object);
+		if(!toggle->selected) continue;
+		switch(toggle->uid){
+			case CHR_TGL_NOXIS:     return Team::NOXIS;
+			case CHR_TGL_LAZARUS:   return Team::LAZARUS;
+			case CHR_TGL_CALIBER:   return Team::CALIBER;
+			case CHR_TGL_STATIC:    return Team::STATIC;
+			case CHR_TGL_BLACKROSE: return Team::BLACKROSE;
+		}
+	}
+	return Config::GetInstance().defaultagency;
 }
 
 void CharacterPanel::Tick(ScreenContext & ctx)
@@ -158,13 +176,15 @@ void CharacterPanel::Tick(ScreenContext & ctx)
 	Interface * iface = (Interface *)world.GetObjectFromId(interfaceId);
 	if(!iface) return;
 
-	Uint8 selectedagency = ctx.GetSelectedAgency();
+	Uint8 selectedagency = ReadSelectedAgency(world);
 	if((int)selectedagency != oldselectedagency){
 		Config::GetInstance().defaultagency = selectedagency;
 		Config::GetInstance().Save();
 		oldselectedagency = selectedagency;
 		agencychanged = true;
-		ctx.NotifyAgencyChanged(selectedagency);
+		if(world.IsConnected()){
+			world.SetAgency(selectedagency);
+		}
 	}
 
 	if(!agencychanged) return;
