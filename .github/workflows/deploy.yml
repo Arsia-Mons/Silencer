@@ -164,12 +164,11 @@ jobs:
           rm silencer-macos-arm64.zip silencer-windows-x64.zip
 
       - name: Tailscale
-        run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo tailscale up \
-            --authkey='${{ secrets.TS_AUTHKEY }}' \
-            --hostname=gh-runner-${{ github.run_id }} \
-            --advertise-tags=tag:server
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TS_AUTHKEY }}
+          hostname: gh-runner-${{ github.run_id }}
+          args: --advertise-tags=tag:server
 
       - name: Configure SSH
         run: |
