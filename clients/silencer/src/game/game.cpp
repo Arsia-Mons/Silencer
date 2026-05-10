@@ -5403,6 +5403,16 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 						}
 					}
 				}break;
+				case ObjectTypes::TOGGLE:{
+					Toggle * tog = static_cast<Toggle *>(object);
+					if(tog && agencychanged && iface->id == characterinterface && tog->uid == 7){
+						// Agency icon — update sprite to match selected character's agency.
+						User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+						if(user && !user->retrieving){
+							tog->res_index = GetSelectedAgency();
+						}
+					}
+				}break;
 				case ObjectTypes::BUTTON:{
 					Button * button = static_cast<Button *>(object);
 					if(button && button->clicked && button->type != Button::BCHECKBOX){
