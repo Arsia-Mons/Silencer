@@ -15,6 +15,25 @@ export interface ChangelogRelease {
 
 export const CHANGELOG: ChangelogRelease[] = [
   {
+    version: 'v00049',
+    date: '2026-05-10',
+    title: 'macOS auto-updater fix + DMG installer',
+    entries: [
+      {
+        category: 'CLIENT',
+        changes: [
+          'Fix: macOS auto-updater Info.plist seal (#146) — production-signed binaries bind their code signature to the bundle Info.plist. Stage-1 mirrored the binary and Frameworks/ into /tmp/silencer-stage2.app/ but not Info.plist; AMFI rejected the signature at execve() ("Team ID, but validating its signature failed") and SIGKILLed stage-2 before main(), silent under hardened runtime. Now mirrors Info.plist into the stage-2 bundle so AMFI accepts the binary. Same root-cause shape as the earlier Frameworks/ mirror fix.',
+        ],
+      },
+      {
+        category: 'INFRASTRUCTURE',
+        changes: [
+          'macOS DMG installer (#146) — release workflow ships a notarized + stapled DMG alongside the existing zip. The DMG is the user-facing install: Finder shows the drag-to-/Applications affordance, and copying out of it clears quarantine so the app runs from its real path instead of being App-Translocated to a read-only mount (which is what breaks the auto-updater\'s in-place rename when users launch from ~/Downloads/). The zip artifact stays for the in-app updater path (consumed by updaterstage2.cpp, referenced by lobby update.go MacOSURL). Release notes list DMG (recommended) + zip.',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v00048',
     date: '2026-05-09',
     title: 'Mission scripting, controller support, 2D audio',

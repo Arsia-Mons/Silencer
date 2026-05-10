@@ -4,6 +4,16 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00049] — 2026-05-10
+
+### Game client — bug fixes
+
+- **macOS auto-updater Info.plist seal (#146)** — production-signed binaries have their embedded code signature bound to the bundle's `Info.plist` (the `Info.plist entries=N` line in `codesign -dvvv`). Stage-1 mirrored the binary and `Frameworks/` into `/tmp/silencer-stage2.app/` but not `Info.plist`; at `execve()`, AMFI rejected the signature ("The code contains a Team ID, but validating its signature failed") and SIGKILLed stage-2 before `main()`. Silent under hardened runtime since the parent's TTY is gone, so users saw the app close and never restart. Fix mirrors `Info.plist` into the stage-2 bundle so AMFI's execve hook accepts the binary. Same root-cause shape as the earlier `Frameworks/` mirror fix.
+
+### Release / CI
+
+- **macOS DMG installer (#146)** — release workflow now ships a notarized + stapled DMG alongside the existing zip. The DMG is the user-facing install: Finder presents the drag-to-`/Applications` affordance, and an explicit copy out of the DMG clears quarantine so the app runs from its real path instead of being App-Translocated to a read-only mount under `/private/var/folders/.../AppTranslocation/` (which is what breaks the auto-updater's in-place rename when users run `Silencer.app` straight out of `~/Downloads/`). The zip artifact stays for the in-app updater path (consumed by `clients/silencer/src/updater/updaterstage2.cpp` and referenced by `services/lobby/update.go`'s `MacOSURL` field). Release notes list DMG (recommended) + zip, mirroring the Windows pattern.
+
 ## [v00048] — 2026-05-09
 
 ### Game client
