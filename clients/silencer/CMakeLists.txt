@@ -23,6 +23,15 @@ else()
 	file(GLOB_RECURSE sources src/*.cpp src/*.h)
 endif()
 
+# Emscripten / WASM (browser spectator build — see
+# docs/plans/2026-05-10-wasm-spectator.md). curl/minizip-using files
+# stay compiled but their bodies swap to no-op stubs via
+# `#ifdef __EMSCRIPTEN__` (updaterdownload.cpp, updaterzip.cpp,
+# updaterstage2.cpp, actordef.cpp, behaviortree.cpp, mapfetch.cpp). The
+# Updater class, FetchMapFromServer, and FetchActorDefs/FetchBehaviorTrees
+# are referenced from Game, the lobby UI, and the in-game flow, so
+# swapping bodies is less invasive than excluding the files.
+
 # Extra files that get bundled into the .app on macOS (icon + shared/assets/).
 set(bundle_extras "")
 if(APPLE)
@@ -62,6 +71,11 @@ elseif(WIN32)
 	set_target_properties(${SILENCER_TARGET} PROPERTIES OUTPUT_NAME "Silencer")
 	# Embed the application icon (resources.rc references shared/icons/icon.ico).
 	target_sources(${SILENCER_TARGET} PRIVATE resources.rc)
+elseif(EMSCRIPTEN)
+	add_executable(${SILENCER_TARGET} ${sources})
+	# emcc emits silencer.{html,js,wasm,data}; the .html is a generated
+	# shell that hosts <canvas>. We replace it later with our own shell.
+	set_target_properties(${SILENCER_TARGET} PROPERTIES OUTPUT_NAME "silencer" SUFFIX ".html")
 else()
 	add_executable(${SILENCER_TARGET} ${sources})
 endif()
@@ -178,69 +192,135 @@ target_compile_definitions(${SILENCER_TARGET} PRIVATE
 	SILENCER_ADMIN_API_URL="${SILENCER_ADMIN_API_URL}"
 )
 
-find_package(ZLIB REQUIRED)
-find_package(SDL3 REQUIRED)
-find_package(SDL3_mixer REQUIRED)
-find_package(CURL REQUIRED)
-
-# Minizip: prefer vcpkg's CMake CONFIG packages (Windows CI), then fall back
-# to pkg-config for Homebrew/apt. Wrap whichever we find in a single
-# `minizip_dep` interface target so the link sections below don't have to
-# care which source it came from. Fail loudly if none resolves — a silent
-# miss used to slip through and surface as `unzip.h not found`.
-find_package(unofficial-minizip CONFIG QUIET)
-if(NOT unofficial-minizip_FOUND)
-	find_package(minizip CONFIG QUIET)
-endif()
-
-add_library(minizip_dep INTERFACE)
-if(TARGET unofficial::minizip::minizip)
-	target_link_libraries(minizip_dep INTERFACE unofficial::minizip::minizip)
-elseif(TARGET minizip::minizip)
-	target_link_libraries(minizip_dep INTERFACE minizip::minizip)
-else()
-	find_package(PkgConfig REQUIRED)
-	pkg_check_modules(MINIZIP REQUIRED IMPORTED_TARGET minizip)
-	# Homebrew/apt minizip ships headers at <prefix>/include/minizip/unzip.h,
-	# so the pkg-config -I flag alone doesn't let `#include <unzip.h>` resolve.
-	# vcpkg's minizip flattens them into include/ directly, which is why
-	# Windows doesn't hit this.
-	foreach(_dir ${MINIZIP_INCLUDE_DIRS})
-		if(IS_DIRECTORY "${_dir}/minizip")
-			target_include_directories(minizip_dep INTERFACE "${_dir}/minizip")
-		endif()
-	endforeach()
-	target_link_libraries(minizip_dep INTERFACE PkgConfig::MINIZIP)
-endif()
-
-include_directories(${ZLIB_INCLUDE_DIRS})
 include_directories(${NLOHMANN_JSON_INCLUDE_DIR})
 include_directories(${NLOHMANN_JSON_INCLUDE_DIR}/nlohmann)
-find_package(SDL3_mixer REQUIRED CONFIG)
-if(TARGET SDL3_mixer::SDL3_mixer)
-  get_target_property(_sdl3mixer_inc SDL3_mixer::SDL3_mixer INTERFACE_INCLUDE_DIRECTORIES)
-  if(_sdl3mixer_inc)
-    include_directories(${_sdl3mixer_inc})
-  endif()
-endif()
 
-if(APPLE)
-	find_library(COCOA_FRAMEWORK Cocoa)
-	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
-		CURL::libcurl
-		${COCOA_FRAMEWORK})
-elseif(WIN32)
-	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
-		CURL::libcurl ws2_32)
+if(EMSCRIPTEN)
+	# SDL3 and zlib come from Emscripten's ports system via emcc flags;
+	# Emscripten installs sdl3-config.cmake into its sysroot so the CONFIG
+	# find_package picks them up just like on native.
+	target_compile_options(${SILENCER_TARGET} PRIVATE
+		"-sUSE_SDL=3"
+		"-sUSE_ZLIB=1"
+		"--use-port=emdawnwebgpu"
+	)
+	target_link_options(${SILENCER_TARGET} PRIVATE
+		"-sUSE_SDL=3"
+		"-sUSE_ZLIB=1"
+		"--use-port=emdawnwebgpu"
+	)
+	# SDL3_mixer has no Emscripten port — pull source from GitHub. Disable
+	# the audio formats we don't ship (MOD/XM/IT etc.); the game uses IMA
+	# ADPCM (decoded in resources.cpp via SDL3 itself) and MP3 via mpg123.
+	#
+	# The Emscripten SDL3 port ships an sdl3-config.cmake that declares no
+	# version (it's actually 3.4.2, see emsdk's sdl3.py). SDL_mixer 3.2.0
+	# asks for SDL3 >= 3.4.0 and refuses an unversioned config — so we
+	# drop a sibling SDL3ConfigVersion.cmake next to the port's config
+	# that just claims 3.4.2. Lightweight; survives emsdk upgrades because
+	# the port's directory layout is stable across versions.
+	set(_sdl3_port_cmake_dir "$ENV{EMSDK}/upstream/emscripten/cache/sysroot/lib/cmake/SDL3")
+	# CMake's find_package pairs `<lower>-config.cmake` with
+	# `<lower>-config-version.cmake` (and `<Mixed>Config.cmake` with
+	# `<Mixed>ConfigVersion.cmake`). The port ships the lowercase form,
+	# so we drop the lowercase version-suffix sibling.
+	if(EXISTS "${_sdl3_port_cmake_dir}/sdl3-config.cmake" AND NOT EXISTS "${_sdl3_port_cmake_dir}/sdl3-config-version.cmake")
+		file(WRITE "${_sdl3_port_cmake_dir}/sdl3-config-version.cmake"
+"set(PACKAGE_VERSION \"3.4.2\")\n\
+if(\"\${PACKAGE_VERSION}\" VERSION_LESS \"\${PACKAGE_FIND_VERSION}\")\n\
+    set(PACKAGE_VERSION_COMPATIBLE FALSE)\n\
+else()\n\
+    set(PACKAGE_VERSION_COMPATIBLE TRUE)\n\
+    if(\"\${PACKAGE_FIND_VERSION}\" STREQUAL \"\${PACKAGE_VERSION}\")\n\
+        set(PACKAGE_VERSION_EXACT TRUE)\n\
+    endif()\n\
+endif()\n")
+	endif()
+	include(FetchContent)
+	set(SDL3MIXER_VENDORED   ON  CACHE BOOL "" FORCE)
+	set(SDL3MIXER_SAMPLES    OFF CACHE BOOL "" FORCE)
+	set(SDL3MIXER_FLAC       OFF CACHE BOOL "" FORCE)
+	set(SDL3MIXER_OPUS       OFF CACHE BOOL "" FORCE)
+	set(SDL3MIXER_VORBIS     OFF CACHE BOOL "" FORCE)
+	set(SDL3MIXER_GME        OFF CACHE BOOL "" FORCE)
+	set(SDL3MIXER_WAVPACK    OFF CACHE BOOL "" FORCE)
+	set(SDL3MIXER_MOD        OFF CACHE BOOL "" FORCE)
+	set(SDL3MIXER_MIDI       OFF CACHE BOOL "" FORCE)
+	set(SDL3MIXER_MP3        ON  CACHE BOOL "" FORCE)
+	set(SDL3MIXER_MP3_MPG123 ON  CACHE BOOL "" FORCE)
+	FetchContent_Declare(
+		sdl3_mixer
+		GIT_REPOSITORY https://github.com/libsdl-org/SDL_mixer.git
+		GIT_TAG        release-3.2.0
+		GIT_SHALLOW    TRUE
+	)
+	FetchContent_MakeAvailable(sdl3_mixer)
+	target_link_libraries(${SILENCER_TARGET} SDL3_mixer::SDL3_mixer)
+	# zlib_dep stays as the system zlib; minizip, curl, and the system
+	# OpenGL/Cocoa frameworks are not linked — see the source-list filters
+	# above for which subsystems are excluded from the WASM build.
 else()
-	target_link_libraries(${SILENCER_TARGET}
-		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
-		CURL::libcurl)
-endif()
+	find_package(ZLIB REQUIRED)
+	find_package(SDL3 REQUIRED)
+	find_package(SDL3_mixer REQUIRED CONFIG)
+	find_package(CURL REQUIRED)
 
-target_link_libraries(${SILENCER_TARGET} minizip_dep)
+	# Minizip: prefer vcpkg's CMake CONFIG packages (Windows CI), then fall back
+	# to pkg-config for Homebrew/apt. Wrap whichever we find in a single
+	# `minizip_dep` interface target so the link sections below don't have to
+	# care which source it came from. Fail loudly if none resolves — a silent
+	# miss used to slip through and surface as `unzip.h not found`.
+	find_package(unofficial-minizip CONFIG QUIET)
+	if(NOT unofficial-minizip_FOUND)
+		find_package(minizip CONFIG QUIET)
+	endif()
+
+	add_library(minizip_dep INTERFACE)
+	if(TARGET unofficial::minizip::minizip)
+		target_link_libraries(minizip_dep INTERFACE unofficial::minizip::minizip)
+	elseif(TARGET minizip::minizip)
+		target_link_libraries(minizip_dep INTERFACE minizip::minizip)
+	else()
+		find_package(PkgConfig REQUIRED)
+		pkg_check_modules(MINIZIP REQUIRED IMPORTED_TARGET minizip)
+		# Homebrew/apt minizip ships headers at <prefix>/include/minizip/unzip.h,
+		# so the pkg-config -I flag alone doesn't let `#include <unzip.h>` resolve.
+		# vcpkg's minizip flattens them into include/ directly, which is why
+		# Windows doesn't hit this.
+		foreach(_dir ${MINIZIP_INCLUDE_DIRS})
+			if(IS_DIRECTORY "${_dir}/minizip")
+				target_include_directories(minizip_dep INTERFACE "${_dir}/minizip")
+			endif()
+		endforeach()
+		target_link_libraries(minizip_dep INTERFACE PkgConfig::MINIZIP)
+	endif()
+
+	include_directories(${ZLIB_INCLUDE_DIRS})
+	if(TARGET SDL3_mixer::SDL3_mixer)
+		get_target_property(_sdl3mixer_inc SDL3_mixer::SDL3_mixer INTERFACE_INCLUDE_DIRECTORIES)
+		if(_sdl3mixer_inc)
+			include_directories(${_sdl3mixer_inc})
+		endif()
+	endif()
+
+	if(APPLE)
+		find_library(COCOA_FRAMEWORK Cocoa)
+		target_link_libraries(${SILENCER_TARGET}
+			SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+			CURL::libcurl
+			${COCOA_FRAMEWORK})
+	elseif(WIN32)
+		target_link_libraries(${SILENCER_TARGET}
+			SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+			CURL::libcurl ws2_32)
+	else()
+		target_link_libraries(${SILENCER_TARGET}
+			SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+			CURL::libcurl)
+	endif()
+
+	target_link_libraries(${SILENCER_TARGET} minizip_dep)
+endif()
 
 # Dev-build asset staging (Windows/Linux): copy shared/assets/ next to the
 # binary so the runtime fallback (`GetResDir() + "<subdir>/..."` in
@@ -248,8 +328,9 @@ target_link_libraries(${SILENCER_TARGET} minizip_dep)
 # gas/, keybinds/, behaviortrees/, and any future runtime asset subdir;
 # without this every fresh build silently runs with empty GAS/keybind data.
 # macOS bakes assets into the .app bundle directly via the bundle_extras
-# list above, so this branch is no-op there.
-if(NOT APPLE)
+# list above; Emscripten packs assets into the .data sidecar at link time
+# (see the --preload-file flag below), so both are no-op here.
+if(NOT APPLE AND NOT EMSCRIPTEN)
 	add_custom_command(TARGET ${SILENCER_TARGET} POST_BUILD
 		COMMAND ${CMAKE_COMMAND} -E copy_directory
 				"${SILENCER_SHARED_DIR}/assets"
@@ -257,22 +338,59 @@ if(NOT APPLE)
 		COMMENT "Staging shared/assets/ next to ${SILENCER_TARGET}")
 endif()
 
-install(TARGETS "${SILENCER_TARGET}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(DIRECTORY "${SILENCER_SHARED_DIR}/assets/" DESTINATION "${CMAKE_INSTALL_DATADIR}/silencer")
-install(FILES "${SILENCER_SHARED_DIR}/icons/icon_16.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps"   RENAME "silencer.png")
-install(FILES "${SILENCER_SHARED_DIR}/icons/icon_32.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps"   RENAME "silencer.png")
-install(FILES "${SILENCER_SHARED_DIR}/icons/icon_64.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps"   RENAME "silencer.png")
-install(FILES "${SILENCER_SHARED_DIR}/icons/icon_128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "silencer.png")
-install(FILES "silencer.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+if(EMSCRIPTEN)
+	# Browser bundle link flags.
+	#
+	# --preload-file <host-path>@<vfs-path>
+	#     Pack shared/assets/ into silencer.data; emcc generates JS that
+	#     downloads the .data file and populates Emscripten's MEMFS at
+	#     /assets before main() runs. Engineer-facing markdown excluded
+	#     mirrors the macOS bundle filter above.
+	# -sALLOW_MEMORY_GROWTH=1 / -sINITIAL_MEMORY=128MB
+	#     Asset bundle + sprite decoding push heap past the default 16MB.
+	# -sASYNCIFY=1
+	#     The C++ side has synchronous fetch calls (actordefs, behavior
+	#     trees) that Stage 4 will swap for emscripten_fetch; in the
+	#     meantime ASYNCIFY lets us yield from inside C++ if needed.
+	# -sFORCE_FILESYSTEM=1
+	#     Some asset paths use fopen/fread; force MEMFS to be linked even
+	#     when emcc's reachability analysis thinks it's unused.
+	# --shell-file
+	#     Custom HTML shell (see web/spectator/shell.html) hosting the
+	#     <canvas> and the bootloader. Without one, emcc emits a default
+	#     dev-only shell.
+	target_link_options(${SILENCER_TARGET} PRIVATE
+		"-sALLOW_MEMORY_GROWTH=1"
+		"-sINITIAL_MEMORY=128MB"
+		"-sASYNCIFY=1"
+		"-sFORCE_FILESYSTEM=1"
+		"-sEXIT_RUNTIME=0"
+		"-sASSERTIONS=1"
+		"-sNO_DISABLE_EXCEPTION_CATCHING"
+		"--preload-file" "${SILENCER_SHARED_DIR}/assets@/assets"
+	)
+	# Engineer-facing markdown ships with the asset bundle (~6 KB total);
+	# emcc's file-packager --exclude-file doesn't glob the way the
+	# command-line docs imply, and a temp-dir copy is overkill for this.
+endif()
 
-set(CPACK_PACKAGE_NAME "Silencer")
-set(CPACK_PACKAGE_FILE_NAME "silencer")
-set(CPACK_PACKAGE_VERSION "00023")
+if(NOT EMSCRIPTEN)
+	install(TARGETS "${SILENCER_TARGET}" RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION "${CMAKE_INSTALL_BINDIR}")
+	install(DIRECTORY "${SILENCER_SHARED_DIR}/assets/" DESTINATION "${CMAKE_INSTALL_DATADIR}/silencer")
+	install(FILES "${SILENCER_SHARED_DIR}/icons/icon_16.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps"   RENAME "silencer.png")
+	install(FILES "${SILENCER_SHARED_DIR}/icons/icon_32.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps"   RENAME "silencer.png")
+	install(FILES "${SILENCER_SHARED_DIR}/icons/icon_64.png"  DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps"   RENAME "silencer.png")
+	install(FILES "${SILENCER_SHARED_DIR}/icons/icon_128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "silencer.png")
+	install(FILES "silencer.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+
+	set(CPACK_PACKAGE_NAME "Silencer")
+	set(CPACK_PACKAGE_FILE_NAME "silencer")
+	set(CPACK_PACKAGE_VERSION "00023")
+	include(CPack)
+endif()
 
 option(SILENCER_BUILD_TESTS "Build unit tests" OFF)
 if(SILENCER_BUILD_TESTS)
 	enable_testing()
 	add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../tests ${CMAKE_BINARY_DIR}/tests)
 endif()
-
-include(CPack)

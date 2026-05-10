@@ -1,7 +1,11 @@
 #include "os.h"
 
 std::string GetResDir(void){
-#ifdef __linux
+#ifdef __EMSCRIPTEN__
+	// Assets are packed into silencer.data by emcc's --preload-file glue and
+	// mounted at /assets in MEMFS before main() runs.
+	return "/assets/";
+#elif defined(__linux)
 	std::string d[2] = {"/usr/local/share/silencer", "/usr/share/silencer"};
 	for(size_t i = 0; i < 2; i++){
 		struct stat dirinfo;
@@ -34,7 +38,14 @@ std::string GetResDir(void){
 }
 
 std::string GetDataDir(void){
-#ifdef __linux
+#ifdef __EMSCRIPTEN__
+	// MEMFS dir — non-persistent. Stage 7 may swap this for IDBFS so
+	// settings/keybinds survive page reloads. For Stage 1 we just need a
+	// writable scratch path so Config::Save and similar don't fail.
+	std::string d = "/data/";
+	CreateDirectory(d.c_str());
+	return d;
+#elif defined(__linux)
 	// Prefer $HOME so systemd units can redirect the data dir via
 	// Environment=HOME=... without needing to modify pw_dir. Fall back
 	// to pw_dir for sessions where HOME isn't set.
