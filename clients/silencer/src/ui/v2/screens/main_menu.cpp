@@ -8,7 +8,7 @@
 namespace ui {
 namespace v2 {
 
-Node BuildMainMenu(const Context & ctx)
+Node BuildMainMenu(const Context & ctx, const MainMenuHandlers & handlers)
 {
 	std::string version_label = "Silencer v";
 	if(ctx.version) version_label += ctx.version;
@@ -25,10 +25,10 @@ Node BuildMainMenu(const Context & ctx)
 		Sprite(/*bank=*/208, /*index=*/60),
 		Label(version_label, /*font_bank=*/133, /*font_width=*/11)
 			.at(10, (Sint16)(ctx.logical_h - 17)),
-		Button("Tutorial").at(40, -134),
-		Button("Connect To Lobby").at(80, -67),
-		Button("Options").at(40, 0),
-		Button("Exit").at(0, 67),
+		Button("Tutorial").at(40, -134).onClick(handlers.on_tutorial),
+		Button("Connect To Lobby").at(80, -67).onClick(handlers.on_lobby),
+		Button("Options").at(40, 0).onClick(handlers.on_options),
+		Button("Exit").at(0, 67).onClick(handlers.on_exit),
 	});
 }
 

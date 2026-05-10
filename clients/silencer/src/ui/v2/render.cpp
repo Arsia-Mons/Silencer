@@ -1,7 +1,10 @@
 #include "render.h"
 
+#include "button_chrome.h"
 #include "context.h"
+#include "dispatch.h"
 #include "node.h"
+#include "ui_state.h"
 
 #include "renderer.h"
 #include "resources.h"
@@ -11,34 +14,6 @@ namespace ui {
 namespace v2 {
 
 namespace {
-
-// Static chrome facts per ButtonType — mirrors clients/silencer/src/ui/
-// components/button.cpp `Button::SetType` + `Button::GetTextOffset`. Kept
-// inline here (rather than reaching into the legacy Button class) so
-// rendering doesn't depend on Object/World; the standalone preview
-// harness can call Render() with just a Resources and a Surface.
-struct ButtonChrome {
-	Uint8 bank;          // 0xFF = no chrome (B52x21)
-	Uint8 base_index;    // INACTIVE chrome frame
-	int   width;
-	int   height;
-	Uint8 text_bank;
-	Uint8 text_width;
-	int   text_yoff;
-	int   text_xoff_extra;
-};
-
-ButtonChrome ChromeFor(ButtonType type) {
-	switch(type){
-		case ButtonType::B112x33: return {6,    28, 112, 33, 135, 11, 8, 0};
-		case ButtonType::B220x33: return {6,    23, 220, 33, 135, 11, 8, 0};
-		case ButtonType::B196x33: return {6,     7, 196, 33, 135, 11, 8, 0};
-		case ButtonType::B236x27: return {6,     2, 236, 27, 135, 11, 8, 0};
-		case ButtonType::B52x21:  return {0xFF,  0,  52, 21, 133,  7, 8, 1};
-		case ButtonType::B156x21: return {7,    24, 156, 21, 134,  8, 4, 0};
-	}
-	return {6, 7, 196, 33, 135, 11, 8, 0};
-}
 
 void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer & renderer)
 {
@@ -60,27 +35,49 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 
 		case NodeKind::Button: {
 			ButtonChrome c = ChromeFor(n.button_type);
+			bool hovered = ButtonHit(n, ctx);
+
+			// hot_t: 0..1 hover-toward-1, exponentially approached. When
+			// `ctx.state` is NULL (PPM dump path), we snap — keeps the
+			// dump byte-identical to the legacy widget render. The state
+			// path is the interactive preview / live game.
+			float hot_t = hovered ? 1.0f : 0.0f;
+			if(ctx.state && !n.key.empty()){
+				uint64_t id = HashKey(n.key) ^ TAG_HOT;
+				float & slot = ctx.state->AnimSlot(id, 0.0f);
+				slot = Approach(slot, hovered ? 1.0f : 0.0f, /*rate=*/12.0f, ctx.dt);
+				hot_t = slot;
+			}
+
+			// hot_t == 0 → INACTIVE chrome, brightness 128 (matches legacy).
+			// hot_t == 1 → ACTIVE chrome (base + 4), brightness 136
+			//              (matches legacy `effectbrightness = 128 + 4*2`).
+			// Intermediate t ramps the integer res_index across the four
+			// ACTIVATING frames, mirroring legacy `Button::Tick` ACTIVATING.
+			int   step       = (int)(hot_t * 4.0f + 0.0001f);
+			if(step > 4) step = 4;
+			Uint8 res_idx    = (Uint8)(c.base_index + step);
+			Uint8 brightness = (Uint8)(128 + step * 2);
 			if(c.bank != 0xFF){
-				renderer.DrawSpriteAt(&target, c.bank, c.base_index, n.x, n.y);
+				renderer.DrawSpriteAt(&target, c.bank, res_idx, n.x, n.y);
 			}
 			// Text centering math = Button::GetTextOffset, evaluated at
 			// the chrome's anchor offset so the label lands inside the
-			// pill regardless of where the anchor lives in the asset.
+			// pill regardless of where the anchor lives in the asset. Use
+			// the *current* frame's offset to mirror legacy GetTextOffset
+			// (which reads spriteoffsetx[res_bank][res_index]).
 			int text_len = (int)n.text.size();
 			int xoff = (c.width - text_len * c.text_width) / 2 + c.text_xoff_extra;
 			int yoff = c.text_yoff;
 			Sint16 text_x = (Sint16)(n.x + xoff);
 			Sint16 text_y = (Sint16)(n.y + yoff);
 			if(c.bank != 0xFF){
-				text_x = (Sint16)(text_x - ctx.resources.spriteoffsetx[c.bank][c.base_index]);
-				text_y = (Sint16)(text_y - ctx.resources.spriteoffsety[c.bank][c.base_index]);
+				text_x = (Sint16)(text_x - ctx.resources.spriteoffsetx[c.bank][res_idx]);
+				text_y = (Sint16)(text_y - ctx.resources.spriteoffsety[c.bank][res_idx]);
 			}
-			// alpha=true matches the legacy Button label render path
-			// (renderer.cpp:841). Brightness is the INACTIVE default
-			// (128); hover-state ramping lives with the input rewrite.
 			renderer.DrawText(&target, (Uint16)text_x, (Uint16)text_y,
 			                  n.text.c_str(), c.text_bank, c.text_width,
-			                  /*alpha=*/true, /*tint=*/0, /*brightness=*/128);
+			                  /*alpha=*/true, /*tint=*/0, brightness);
 			break;
 		}
 	}

@@ -51,6 +51,15 @@ struct Node {
 	ButtonType button_type = ButtonType::B196x33;
 	std::function<void()> on_click;
 
+	// Stable identity for `UIState` lookups (hover animation phase,
+	// focus, etc.). Empty = "no per-instance state" — fine for
+	// purely visual nodes. The `Button` factory auto-fills this from
+	// the label since labels are unique within a screen; authors
+	// override via `.key("foo")` for cases where the default
+	// collides (e.g. two buttons with identical text in different
+	// panels) or where a non-Button node needs animation.
+	std::string key;
+
 	// Children. Drawn after self in declaration order.
 	std::vector<Node> children;
 
@@ -62,6 +71,7 @@ struct Node {
 
 	Node & at(Sint16 nx, Sint16 ny) { x = nx; y = ny; return *this; }
 	Node & onClick(std::function<void()> handler) { on_click = std::move(handler); return *this; }
+	Node & withKey(std::string k) { key = std::move(k); return *this; }
 };
 
 // ----- Factories -----
@@ -102,8 +112,12 @@ inline Node Label(std::string text, Uint8 font_bank, Uint8 font_width) {
 inline Node Button(std::string text, ButtonType type = ButtonType::B196x33) {
 	Node n;
 	n.kind = NodeKind::Button;
-	n.text = std::move(text);
+	n.text = text;
 	n.button_type = type;
+	// Default key is the label — cheap, unique within a screen for the
+	// usual case, and shows up readably in any state-debug dump.
+	// `withKey()` overrides if the author needs disambiguation.
+	n.key = "btn:" + std::move(text);
 	return n;
 }
 
