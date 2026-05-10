@@ -110,6 +110,17 @@ public:
 
 private:
 	bool Tick(void);
+	// Gameplay-state Tick bodies — one per state. Each lives in its own
+	// src/game/tick/tick_*.cpp file. The switch in Tick() dispatches to
+	// these. Menu/screen states (MAINMENU, LOBBY, OPTIONS*, …) stay inline
+	// in the dispatcher — they're trivial PushScreen wrappers.
+	void TickFadeOut();
+	void TickInGame();
+	void TickSinglePlayerGame();
+	void TickHostGame();
+	void TickJoinGame();
+	void TickTestGame();
+	void TickReplayGame();
 	void Present(void);
 	bool SetupRenderDevice(void);
 	// Edge-triggered scancode handlers. Called from HandleSDLEvents on real
