@@ -3412,6 +3412,9 @@ Interface * Game::CreateSelectAgentInterface(void){
 	iface->AddObject(title->id);
 	iface->AddObject(agentselect->id);
 	iface->AddObject(scrollbar->id);
+	iface->AddTabObject(agentselect->id);
+	iface->activeobject = agentselect->id;
+	iface->ActiveChanged(world, iface, false);
 	iface->scrollbar = scrollbar->id;
 	return iface;
 }
