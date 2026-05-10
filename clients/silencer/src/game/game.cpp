@@ -1028,208 +1028,216 @@ bool Game::Tick(void){
 			}else{
 				if(FadedIn()){
 					PlayMusic(world.resources.menumusic);
-					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-					if(!iface) break;
+					bool navigated = false;
 
 					if(createCharSubState == 0){
 						// SELECT AGENT — handle selectbox selection (Enter key or mouse click)
-						for(auto it = iface->objects.begin(); it != iface->objects.end(); it++){
-							Object * o = world.GetObjectFromId(*it);
-							if(!o) continue;
-							if(o->type == ObjectTypes::SELECTBOX){
-								SelectBox * sb = static_cast<SelectBox *>(o);
-								if(sb->uid != 1) continue;
-								// Sync scrollbar
-								Object * sbobj = world.GetObjectFromId(iface->scrollbar);
-								if(sbobj && sbobj->type == ObjectTypes::SCROLLBAR){
-									ScrollBar * scrollbar = static_cast<ScrollBar *>(sbobj);
-									sb->scrolled = scrollbar->scrollposition;
-								}
-								// Detect click on a list item
-								bool triggered = false;
-								int clickedIndex = -1;
-								if(iface->mousedown){
-									int idx = sb->MouseInside(world, iface->mousex, iface->mousey);
-									if(idx >= 0 && idx == sb->selecteditem){
-										// Already selected — second click / confirm
-										triggered = true;
-										clickedIndex = idx;
-									} else if(idx >= 0){
-										sb->selecteditem = idx;
-									}
-								}
-								if(sb->enterpressed){
-									sb->enterpressed = false;
-									triggered = true;
-									clickedIndex = sb->selecteditem;
-								}
-								if(triggered && clickedIndex >= 0){
-									if(clickedIndex == 0){
-										// Create New Character — go to alias input
-										world.GetAuthorityPeer()->controlledlist.clear();
-										world.DestroyAllObjects();
-										createCharSubState = 1;
-										currentinterface = CreateEnterAliasInterface()->id;
-										world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-									}else{
-										// Existing character selected — select and go to lobby
-										Uint32 charId = sb->IndexToId(clickedIndex);
-										world.lobby.LockMutex();
-										world.lobby.SelectCharacter(charId);
-										world.lobby.UnlockMutex();
-										GoToState(LOBBY);
-									}
-								}
-							}
-						}
-					}else if(createCharSubState == 1){
-						// SILENCER ALIAS — handle Next / Back
-						for(auto it = iface->objects.begin(); it != iface->objects.end(); it++){
-							Object * o = world.GetObjectFromId(*it);
-							if(!o || o->type != ObjectTypes::BUTTON) continue;
-							Button * button = static_cast<Button *>(o);
-							if(button->uid == 20 && button->clicked){ // Next
-								button->clicked = false;
-								memset(createCharTempName, 0, sizeof(createCharTempName));
-								for(auto it2 = iface->objects.begin(); it2 != iface->objects.end(); it2++){
-									Object * o2 = world.GetObjectFromId(*it2);
-									if(o2 && o2->type == ObjectTypes::TEXTINPUT){
-										TextInput * ti = static_cast<TextInput *>(o2);
-										if(ti->uid == 1){
-											strncpy(createCharTempName, ti->text, 16);
-											createCharTempName[16] = 0;
-										}
-									}
-								}
-								if(strlen(createCharTempName) > 0){
-									world.GetAuthorityPeer()->controlledlist.clear();
-									world.DestroyAllObjects();
-									createCharSubState = 2;
-									createCharLastAgencyIdx = -1;
-									currentinterface = CreateSelectAgencyInterface()->id;
-									world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-								}
-							}
-							if(button->uid == 21 && button->clicked){ // Back
-								button->clicked = false;
-								world.GetAuthorityPeer()->controlledlist.clear();
-								world.DestroyAllObjects();
-								createCharSubState = 0;
-								currentinterface = CreateSelectAgentInterface()->id;
-								world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-								Interface * newiface = (Interface *)world.GetObjectFromId(currentinterface);
-								if(newiface){
-									for(auto it2 = newiface->objects.begin(); it2 != newiface->objects.end(); it2++){
-										Object * o2 = world.GetObjectFromId(*it2);
-										if(o2 && o2->type == ObjectTypes::SELECTBOX){
-											SelectBox * sb = static_cast<SelectBox *>(o2);
-											if(sb->uid == 1){
-												sb->AddItem("Create New Character", 0);
-												world.lobby.LockMutex();
-												for(auto & ch : world.lobby.characters)
-													sb->AddItem(ch.name, ch.id);
-												world.lobby.UnlockMutex();
-											}
-										}
-									}
-								}
-							}
-						}
-					}else if(createCharSubState == 2){
-						// SELECT AGENCY — check for creation, handle description updates and buttons
-						world.lobby.LockMutex();
-						bool created = world.lobby.charactersreceived && world.lobby.characters.size() > createCharEnterCount;
-						world.lobby.UnlockMutex();
-						if(created){ GoToState(LOBBY); break; }
-
-						SelectBox * agencyselect = nullptr;
-						TextBox * descbox = nullptr;
-						Overlay * advtext = nullptr;
-						for(auto it = iface->objects.begin(); it != iface->objects.end(); it++){
-							Object * o = world.GetObjectFromId(*it);
-							if(!o) continue;
-							if(o->type == ObjectTypes::SELECTBOX){
-								SelectBox * sb = static_cast<SelectBox *>(o);
-								if(sb->uid == 1){
-									agencyselect = sb;
+						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+						if(iface){
+							for(auto it = iface->objects.begin(); it != iface->objects.end() && !navigated; it++){
+								Object * o = world.GetObjectFromId(*it);
+								if(!o) continue;
+								if(o->type == ObjectTypes::SELECTBOX){
+									SelectBox * sb = static_cast<SelectBox *>(o);
+									if(sb->uid != 1) continue;
 									// Sync scrollbar
 									Object * sbobj = world.GetObjectFromId(iface->scrollbar);
 									if(sbobj && sbobj->type == ObjectTypes::SCROLLBAR){
 										ScrollBar * scrollbar = static_cast<ScrollBar *>(sbobj);
 										sb->scrolled = scrollbar->scrollposition;
 									}
-									// Mouse click selection
+									// Detect click on a list item
+									bool triggered = false;
+									int clickedIndex = -1;
 									if(iface->mousedown){
 										int idx = sb->MouseInside(world, iface->mousex, iface->mousey);
-										if(idx >= 0) sb->selecteditem = idx;
+										if(idx >= 0 && idx == sb->selecteditem){
+											triggered = true;
+											clickedIndex = idx;
+										} else if(idx >= 0){
+											sb->selecteditem = idx;
+										}
+									}
+									if(sb->enterpressed){
+										sb->enterpressed = false;
+										triggered = true;
+										clickedIndex = sb->selecteditem;
+									}
+									if(triggered && clickedIndex >= 0){
+										navigated = true;
+										if(clickedIndex == 0){
+											world.GetAuthorityPeer()->controlledlist.clear();
+											world.DestroyAllObjects();
+											createCharSubState = 1;
+											currentinterface = CreateEnterAliasInterface()->id;
+											world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
+										}else{
+											Uint32 charId = sb->IndexToId(clickedIndex);
+											world.lobby.LockMutex();
+											world.lobby.SelectCharacter(charId);
+											world.lobby.UnlockMutex();
+											GoToState(LOBBY);
+										}
 									}
 								}
 							}
-							if(o->type == ObjectTypes::TEXTBOX){
-								TextBox * tb = static_cast<TextBox *>(o);
-								if(tb->uid == 2) descbox = tb;
-							}
-							if(o->type == ObjectTypes::OVERLAY){
-								Overlay * ov = static_cast<Overlay *>(o);
-								if(ov->uid == 3) advtext = ov;
-							}
 						}
-						// Update right panel when selection changes
-						if(agencyselect && descbox && agencyselect->selecteditem != createCharLastAgencyIdx){
-							createCharLastAgencyIdx = agencyselect->selecteditem;
-							descbox->text.clear();
-							if(advtext) advtext->text = "";
-							switch(createCharLastAgencyIdx){
-								case 0:
-									if(advtext) advtext->text = "Endurance +3    Jump +5";
-									descbox->AddText("The Noxis corporation terraformed the majority of Mars' habitable sectors. Their agents train in bio-sporria rich environments with advanced oxygen processors for enhanced endurance and mobility.");
-									break;
-								case 1:
-									if(advtext) advtext->text = "Shield +3    Hacking +2";
-									descbox->AddText("Lazarus specializes in nano-regeneration technology and black market medical operations. Their agents use adaptive shielding and neural implants to enhance defensive and technical capabilities.");
-									break;
-								case 2:
-									if(advtext) advtext->text = "Contacts +3    Tech Slots +1";
-									descbox->AddText("Caliber is the premier arms manufacturer on Mars, supplying all agencies. Their agents leverage a vast supplier network and customized tech loadouts for superior firepower and adaptability.");
-									break;
-								case 3:
-									if(advtext) advtext->text = "Hacking +3    Tech Slots +1";
-									descbox->AddText("Static operates in the electromagnetic spectrum, specializing in electronic warfare and surveillance. Their agents master jamming, infiltration, and disrupting enemy communications.");
-									break;
-								case 4:
-									if(advtext) advtext->text = "Contacts +5";
-									descbox->AddText("Black Rose is a shadow organization with ties to every faction. Their agents possess the most extensive network of contacts on Mars, enabling access to intelligence and resources from anywhere.");
-									break;
-							}
-						}
-						for(auto it = iface->objects.begin(); it != iface->objects.end(); it++){
-							Object * o = world.GetObjectFromId(*it);
-							if(!o || o->type != ObjectTypes::BUTTON) continue;
-							Button * button = static_cast<Button *>(o);
-							if(button->uid == 20 && button->clicked){ // Create
-								button->clicked = false;
-								Uint8 idx = (agencyselect && agencyselect->selecteditem >= 0) ? (Uint8)agencyselect->selecteditem : 0;
-								world.lobby.LockMutex();
-								world.lobby.CreateCharacter(createCharTempName, idx);
-								world.lobby.UnlockMutex();
-							}
-							if(button->uid == 21 && button->clicked){ // Back
-								button->clicked = false;
-								world.GetAuthorityPeer()->controlledlist.clear();
-								world.DestroyAllObjects();
-								createCharSubState = 1;
-								createCharLastAgencyIdx = -1;
-								currentinterface = CreateEnterAliasInterface()->id;
-								world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-								// Pre-fill name
-								Interface * newiface2 = (Interface *)world.GetObjectFromId(currentinterface);
-								if(newiface2){
-									for(auto it2 = newiface2->objects.begin(); it2 != newiface2->objects.end(); it2++){
+					}
+
+					if(!navigated && createCharSubState == 1){
+						// SILENCER ALIAS — handle Next / Back
+						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+						if(iface){
+							for(auto it = iface->objects.begin(); it != iface->objects.end() && !navigated; it++){
+								Object * o = world.GetObjectFromId(*it);
+								if(!o || o->type != ObjectTypes::BUTTON) continue;
+								Button * button = static_cast<Button *>(o);
+								if(button->uid == 20 && button->clicked){ // Next
+									button->clicked = false;
+									memset(createCharTempName, 0, sizeof(createCharTempName));
+									for(auto it2 = iface->objects.begin(); it2 != iface->objects.end(); it2++){
 										Object * o2 = world.GetObjectFromId(*it2);
 										if(o2 && o2->type == ObjectTypes::TEXTINPUT){
 											TextInput * ti = static_cast<TextInput *>(o2);
 											if(ti->uid == 1){
-												ti->SetText(createCharTempName);
+												strncpy(createCharTempName, ti->text, 16);
+												createCharTempName[16] = 0;
+											}
+										}
+									}
+									if(strlen(createCharTempName) > 0){
+										navigated = true;
+										world.GetAuthorityPeer()->controlledlist.clear();
+										world.DestroyAllObjects();
+										createCharSubState = 2;
+										createCharLastAgencyIdx = -1;
+										currentinterface = CreateSelectAgencyInterface()->id;
+										world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
+									}
+								}
+								if(!navigated && button->uid == 21 && button->clicked){ // Back
+									button->clicked = false;
+									navigated = true;
+									world.GetAuthorityPeer()->controlledlist.clear();
+									world.DestroyAllObjects();
+									createCharSubState = 0;
+									currentinterface = CreateSelectAgentInterface()->id;
+									world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
+									Interface * newiface = (Interface *)world.GetObjectFromId(currentinterface);
+									if(newiface){
+										for(auto it2 = newiface->objects.begin(); it2 != newiface->objects.end(); it2++){
+											Object * o2 = world.GetObjectFromId(*it2);
+											if(o2 && o2->type == ObjectTypes::SELECTBOX){
+												SelectBox * sb = static_cast<SelectBox *>(o2);
+												if(sb->uid == 1){
+													sb->AddItem("Create New Character", 0);
+													world.lobby.LockMutex();
+													for(auto & ch : world.lobby.characters)
+														sb->AddItem(ch.name, ch.id);
+													world.lobby.UnlockMutex();
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+
+					if(!navigated && createCharSubState == 2){
+						// SELECT AGENCY — check for creation, handle description and buttons
+						world.lobby.LockMutex();
+						bool created = world.lobby.charactersreceived && world.lobby.characters.size() > createCharEnterCount;
+						world.lobby.UnlockMutex();
+						if(created){ GoToState(LOBBY); break; }
+
+						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+						if(iface){
+							SelectBox * agencyselect = nullptr;
+							TextBox * descbox = nullptr;
+							Overlay * advtext = nullptr;
+							for(auto it = iface->objects.begin(); it != iface->objects.end(); it++){
+								Object * o = world.GetObjectFromId(*it);
+								if(!o) continue;
+								if(o->type == ObjectTypes::SELECTBOX){
+									SelectBox * sb = static_cast<SelectBox *>(o);
+									if(sb->uid == 1){
+										agencyselect = sb;
+										Object * sbobj = world.GetObjectFromId(iface->scrollbar);
+										if(sbobj && sbobj->type == ObjectTypes::SCROLLBAR){
+											ScrollBar * scrollbar = static_cast<ScrollBar *>(sbobj);
+											sb->scrolled = scrollbar->scrollposition;
+										}
+										if(iface->mousedown){
+											int idx = sb->MouseInside(world, iface->mousex, iface->mousey);
+											if(idx >= 0) sb->selecteditem = idx;
+										}
+									}
+								}
+								if(o->type == ObjectTypes::TEXTBOX){
+									TextBox * tb = static_cast<TextBox *>(o);
+									if(tb->uid == 2) descbox = tb;
+								}
+								if(o->type == ObjectTypes::OVERLAY){
+									Overlay * ov = static_cast<Overlay *>(o);
+									if(ov->uid == 3) advtext = ov;
+								}
+							}
+							// Update right panel when selection changes
+							if(agencyselect && descbox && agencyselect->selecteditem != createCharLastAgencyIdx){
+								createCharLastAgencyIdx = agencyselect->selecteditem;
+								descbox->text.clear();
+								if(advtext) advtext->text = "";
+								switch(createCharLastAgencyIdx){
+									case 0:
+										if(advtext) advtext->text = "Endurance +3    Jump +5";
+										descbox->AddText("The Noxis corporation terraformed the majority of Mars' habitable sectors. Their agents train in bio-sporria rich environments with advanced oxygen processors for enhanced endurance and mobility.");
+										break;
+									case 1:
+										if(advtext) advtext->text = "Shield +3    Hacking +2";
+										descbox->AddText("Lazarus specializes in nano-regeneration technology and black market medical operations. Their agents use adaptive shielding and neural implants to enhance defensive and technical capabilities.");
+										break;
+									case 2:
+										if(advtext) advtext->text = "Contacts +3    Tech Slots +1";
+										descbox->AddText("Caliber is the premier arms manufacturer on Mars, supplying all agencies. Their agents leverage a vast supplier network and customized tech loadouts for superior firepower and adaptability.");
+										break;
+									case 3:
+										if(advtext) advtext->text = "Hacking +3    Tech Slots +1";
+										descbox->AddText("Static operates in the electromagnetic spectrum, specializing in electronic warfare and surveillance. Their agents master jamming, infiltration, and disrupting enemy communications.");
+										break;
+									case 4:
+										if(advtext) advtext->text = "Contacts +5";
+										descbox->AddText("Black Rose is a shadow organization with ties to every faction. Their agents possess the most extensive network of contacts on Mars, enabling access to intelligence and resources from anywhere.");
+										break;
+								}
+							}
+							for(auto it = iface->objects.begin(); it != iface->objects.end() && !navigated; it++){
+								Object * o = world.GetObjectFromId(*it);
+								if(!o || o->type != ObjectTypes::BUTTON) continue;
+								Button * button = static_cast<Button *>(o);
+								if(button->uid == 20 && button->clicked){ // Create
+									button->clicked = false;
+									Uint8 idx = (agencyselect && agencyselect->selecteditem >= 0) ? (Uint8)agencyselect->selecteditem : 0;
+									world.lobby.LockMutex();
+									world.lobby.CreateCharacter(createCharTempName, idx);
+									world.lobby.UnlockMutex();
+								}
+								if(button->uid == 21 && button->clicked){ // Back
+									button->clicked = false;
+									navigated = true;
+									world.GetAuthorityPeer()->controlledlist.clear();
+									world.DestroyAllObjects();
+									createCharSubState = 1;
+									createCharLastAgencyIdx = -1;
+									currentinterface = CreateEnterAliasInterface()->id;
+									world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
+									Interface * newiface2 = (Interface *)world.GetObjectFromId(currentinterface);
+									if(newiface2){
+										for(auto it2 = newiface2->objects.begin(); it2 != newiface2->objects.end(); it2++){
+											Object * o2 = world.GetObjectFromId(*it2);
+											if(o2 && o2->type == ObjectTypes::TEXTINPUT){
+												TextInput * ti = static_cast<TextInput *>(o2);
+												if(ti->uid == 1) ti->SetText(createCharTempName);
 											}
 										}
 									}
