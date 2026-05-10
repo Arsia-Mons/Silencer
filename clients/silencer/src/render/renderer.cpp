@@ -3553,7 +3553,10 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 		
 			// Draw chat
 			
-			if(world.showchat_i || player->chatinterfaceid){
+			// Chat lives on the local peer, not the followed player —
+			// observers (no Player) need it too.
+			Peer * chatpeer = world.peerlist[world.localpeerid];
+			if(chatpeer && (world.showchat_i || chatpeer->chatinterfaceid)){
 				Rect dstrect;
 				dstrect.x = 400;
 				dstrect.y = 280;
@@ -3562,7 +3565,7 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 				DrawMessageBackground(surface, &dstrect);
 				int yoffset = 10;
 				for(int i = 0; i < world.chatlines.size(); i++){
-					if(player->chatinterfaceid && i == 0 && world.chatlines.size() == 5){
+					if(chatpeer->chatinterfaceid && i == 0 && world.chatlines.size() == 5){
 						continue;
 					}
 					char text[36 + 1];
@@ -3572,13 +3575,13 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 					DrawText(surface, dstrect.x + 10, dstrect.y + yoffset, text, 133, 6, false, 0, 136);
 					yoffset += 10;
 				}
-				if(player->chatinterfaceid){
-					Interface * iface = (Interface *)world.GetObjectFromId(player->chatinterfaceid);
+				if(chatpeer->chatinterfaceid){
+					Interface * iface = (Interface *)world.GetObjectFromId(chatpeer->chatinterfaceid);
 					if(iface){
 						TextInput * textinput = (TextInput *)iface->GetObjectWithUid(world, 1);
 						if(textinput){
 							const char * textprepend = "(ALL):";
-							if(player->chatwithteam){
+							if(chatpeer->chatwithteam){
 								textprepend = "(TEAM):";
 							}
 							DrawText(surface, dstrect.x + 10, dstrect.y + yoffset, textprepend, 133, 6, false, 0, 136);

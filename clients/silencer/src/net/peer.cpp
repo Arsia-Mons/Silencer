@@ -19,6 +19,8 @@ Peer::Peer(){
 	totalinputs = 0;
 	disconnected = false;
 	observer = false;
+	chatinterfaceid = 0;
+	chatwithteam = false;
 }
 
 void Peer::Serialize(bool write, Serializer & data){

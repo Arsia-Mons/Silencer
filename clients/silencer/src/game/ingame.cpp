@@ -107,44 +107,47 @@ bool Game::CheckForConnectionLost(void){
 
 void Game::ProcessInGameInterfaces(void){
 	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-	if(localplayer){
-		if(localplayer->buyinterfaceid || localplayer->techinterfaceid){
-			currentinterface = localplayer->buyinterfaceid;
-			if(!currentinterface){
-				currentinterface = localplayer->techinterfaceid;
-			}
-		}else{
-			oldselecteditem = 0;
+	Peer * lp = world.peerlist[world.localpeerid];
+	// Modal routing — chat sits on Peer (so observers without a Player can
+	// still chat); buy/tech sit on Player.
+	if(lp && lp->chatinterfaceid){
+		currentinterface = lp->chatinterfaceid;
+	}else if(localplayer && (localplayer->buyinterfaceid || localplayer->techinterfaceid)){
+		currentinterface = localplayer->buyinterfaceid;
+		if(!currentinterface){
+			currentinterface = localplayer->techinterfaceid;
 		}
-		if(localplayer->chatinterfaceid){
-			currentinterface = localplayer->chatinterfaceid;
-		}
-		if(!localplayer->chatinterfaceid && !localplayer->buyinterfaceid && !localplayer->techinterfaceid){
-			currentinterface = 0;
-		}
-		Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-		if(iface){
-			if(iface->id == localplayer->chatinterfaceid){
-				TextInput * textinput = (TextInput *)iface->GetObjectWithUid(world, 1);
-				if(textinput){
-					if(textinput->tabpressed){
-						localplayer->chatwithteam = !localplayer->chatwithteam;
-						textinput->tabpressed = false;
+	}else{
+		currentinterface = 0;
+		oldselecteditem = 0;
+	}
+	Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+	if(iface){
+		if(lp && iface->id == lp->chatinterfaceid){
+			TextInput * textinput = (TextInput *)iface->GetObjectWithUid(world, 1);
+			if(textinput){
+				if(textinput->tabpressed){
+					// Observers are all-chat only (Phase 3 coerces team-chat
+					// to all on AUTHORITY); don't let Tab toggle into team.
+					if(!lp->observer){
+						lp->chatwithteam = !lp->chatwithteam;
 					}
-					if(textinput->enterpressed){
-						if(strlen(textinput->text) > 0){
-							world.SendChat(localplayer->chatwithteam, textinput->text);
-						}
-						iface->DestroyInterface(world, iface);
-						localplayer->chatinterfaceid = 0;
-					}
-					if(keystate[quitscancode]){
-						iface->DestroyInterface(world, iface);
-						localplayer->chatinterfaceid = 0;
-					}
+					textinput->tabpressed = false;
 				}
-			}else
-			if(iface->id == localplayer->buyinterfaceid || iface->id == localplayer->techinterfaceid){
+				if(textinput->enterpressed){
+					if(strlen(textinput->text) > 0){
+						world.SendChat(lp->chatwithteam, textinput->text);
+					}
+					iface->DestroyInterface(world, iface);
+					lp->chatinterfaceid = 0;
+				}
+				if(keystate[quitscancode]){
+					iface->DestroyInterface(world, iface);
+					lp->chatinterfaceid = 0;
+				}
+			}
+		}else
+		if(localplayer && (iface->id == localplayer->buyinterfaceid || iface->id == localplayer->techinterfaceid)){
 				bool buying = false;
 				if(iface->id == localplayer->buyinterfaceid){
 					buying = true;
@@ -191,7 +194,6 @@ void Game::ProcessInGameInterfaces(void){
 				}
 			}
 		}
-	}
 }
 
 void Game::ShowDeployMessage(void){
