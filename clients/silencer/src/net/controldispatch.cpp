@@ -5,6 +5,7 @@
 #include "button.h"
 #include "toggle.h"
 #include "textbox.h"
+#include "textinput.h"
 #include "selectbox.h"
 #include "objecttypes.h"
 #include "keybinds.h"
@@ -125,6 +126,19 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 					w["uid"] = tb->uid;
 					break;
 				}
+				case ObjectTypes::TEXTINPUT: {
+					TextInput* ti = (TextInput*)o;
+					w["kind"] = "textinput";
+					w["w"] = ti->width; w["h"] = ti->height;
+					w["uid"] = ti->uid;
+					w["password"] = ti->password;
+					// Expose current text so agents can verify what they typed.
+					// Mask password fields — same instinct as a UI: don't echo
+					// secrets back over the control socket.
+					w["text"] = ti->password ? std::string(strlen(ti->text), '*') : std::string(ti->text);
+					w["maxchars"] = ti->maxchars;
+					break;
+				}
 				case ObjectTypes::SELECTBOX: {
 					SelectBox* sb = (SelectBox*)o;
 					w["kind"] = "selectbox";
@@ -192,22 +206,46 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "set_text"){
-		std::string target = cmd.args.value("label", std::string());
-		std::string text   = cmd.args.value("text", std::string());
+		std::string text = cmd.args.value("text", std::string());
 		Uint16 ifid = game.GetCurrentInterfaceId();
 		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
 		if(!iface){ cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface")); return; }
-		Uint64 mask = (1ULL << ObjectTypes::TEXTBOX);
-		Uint16 wid = 0;
-		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
-		if(m != Interface::MATCH_OK){
-			cmd.reply->set_value(Err(cmd.id, m == Interface::MATCH_NOT_FOUND
-				? "WIDGET_NOT_FOUND" : "WIDGET_AMBIGUOUS", target));
+		// Address either by uid (developer-assigned label inside the iface,
+		// stable across runs) or by the existing label/id path. uid wins when
+		// both are passed.
+		Object* target = nullptr;
+		if(cmd.args.contains("uid")){
+			int uid = cmd.args["uid"].get<int>();
+			target = iface->GetObjectWithUid(game.GetWorld(), (Uint8)uid);
+			if(!target){
+				cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
+					"no widget with uid " + std::to_string(uid)));
+				return;
+			}
+		}else{
+			std::string label = cmd.args.value("label", std::string());
+			Uint64 mask = (1ULL << ObjectTypes::TEXTBOX) | (1ULL << ObjectTypes::TEXTINPUT);
+			Uint16 wid = 0;
+			auto m = iface->FindWidgetByLabel(game.GetWorld(), label.c_str(), mask, &wid);
+			if(m != Interface::MATCH_OK){
+				cmd.reply->set_value(Err(cmd.id, m == Interface::MATCH_NOT_FOUND
+					? "WIDGET_NOT_FOUND" : "WIDGET_AMBIGUOUS", label));
+				return;
+			}
+			target = game.GetWorld().GetObjectFromId(wid);
+		}
+		if(target->type == ObjectTypes::TEXTBOX){
+			TextBox* tb = (TextBox*)target;
+			tb->text.clear();
+			tb->AddText(text.c_str());
+		}else if(target->type == ObjectTypes::TEXTINPUT){
+			TextInput* ti = (TextInput*)target;
+			ti->SetText(text.c_str());
+		}else{
+			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
+				"widget is not a textbox or textinput"));
 			return;
 		}
-		TextBox* tb = (TextBox*)game.GetWorld().GetObjectFromId(wid);
-		tb->text.clear();
-		tb->AddText(text.c_str());
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
