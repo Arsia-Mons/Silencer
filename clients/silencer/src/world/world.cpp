@@ -293,6 +293,7 @@ void World::DoNetwork_Authority(void){
 					for(int i = 0; i < passwordsize; i++){
 						data.Get(temp[i]);
 					}
+					bool observerRequest = data.GetBit();
 					bool canjoin = true;
 					if(strcmp(gameinfo.password, temp) != 0){
 						if(!(dedicatedserver.active && accountid == dedicatedserver.accountid)){
@@ -1668,7 +1669,7 @@ unsigned short World::Bind(unsigned short port){
 	return false;
 }
 
-void World::Connect(Uint8 agency, Uint32 accountid, const char * password){
+void World::Connect(Uint8 agency, Uint32 accountid, const char * password, bool observer){
 	AllocateMapData(65535);
 	sockaddr_in addr;
 	addr.sin_addr.s_addr = htonl(GetAuthorityPeer()->ip);
@@ -1688,6 +1689,7 @@ void World::Connect(Uint8 agency, Uint32 accountid, const char * password){
 	for(int i = 0; i < passwordsize; i++){
 		data.Put(password[i]);
 	}
+	data.PutBit(observer);
 	SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
 }
 

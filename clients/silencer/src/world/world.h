@@ -46,7 +46,7 @@ public:
 	const char * GetVersion() const { return version; }
 	bool Listen(unsigned short port = 0);
 	unsigned short Bind(unsigned short port = 0);
-	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0);
+	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0, bool observer = false);
 	void Disconnect(void);
 	Peer * GetAuthorityPeer(void);
 	class Player * GetPeerPlayer(Uint8 peerid);
