@@ -657,17 +657,8 @@ bool Game::Tick(void){
 		}
 		if(world.gameplaystate == World::INLOBBY){
 			mapDownloader.ProcessMapDownload();
-			if(gamejoininterface){
-				Interface * gamejoiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
-				if(gamejoiniface){
-					Button * readybtn = static_cast<Button *>(gamejoiniface->GetObjectWithUid(world, 25));
-					if(readybtn){
-						Peer * localpeer = world.peerlist[world.localpeerid];
-						bool blocked = localpeer && localpeer->ishost && !world.AllPeersDownloadedMap();
-						strcpy(readybtn->text, blocked ? "Waiting..." : "Ready");
-					}
-				}
-			}
+			// Ready-button text refresh ("Waiting..." vs "Ready") moved into
+			// GameJoinPanel::Tick — runs each frame from LobbyScreen::Tick.
 		}
 		/*Peer * localpeer = world.peerlist[world.localpeerid];
 		if(localpeer){
@@ -2205,26 +2196,6 @@ void Game::TickLobbyBody(void){
 		if(world.state == World::CONNECTED && lobbyinterface){
 			Peer * peer = world.peerlist[world.localpeerid];
 			if(peer){
-				if(gameselectinterface){
-					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-					if(lobbyiface){
-						Interface * gameselectiface = static_cast<Interface *>(world.GetObjectFromId(gameselectinterface));
-						if(gameselectiface){
-							gameselectiface->DestroyInterface(world, lobbyiface);
-						}
-					}
-					gameselectinterface = 0;
-				}
-				if(gamecreateinterface){
-					Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-					if(lobbyiface){
-						Interface * gamecreateiface = static_cast<Interface *>(world.GetObjectFromId(gamecreateinterface));
-						if(gamecreateiface){
-							gamecreateiface->DestroyInterface(world, lobbyiface);
-						}
-					}
-					gamecreateinterface = 0;
-				}
 				mapDownloader.mapexistchecked = false;
 				// Invalidate any in-flight server map fetch for the previous
 				// game; the thread will see the stale generation and discard
@@ -2233,7 +2204,15 @@ void Game::TickLobbyBody(void){
 				mapDownloader.mapjoinstate.store(0, std::memory_order_relaxed);
 				if(mapDownloader.mapjointhread.joinable()) mapDownloader.mapjointhread.detach();
 				world.SetTech(Config::GetInstance().defaulttechchoices[Config::GetInstance().defaultagency]);
-				gamejoininterface = CreateGameJoinInterface()->id;
+				// LobbyScreen::ShowGameJoin tears down whichever right-side
+				// panel is active (gameSelect/gameCreate) and builds the
+				// GameJoinPanel onto the lobby iface; mirrors the iface id
+				// onto ctx.game.gamejoininterface for the legacy GoBack /
+				// disconnected-modal paths.
+				LobbyScreen * lobby = screenStack.empty() ? nullptr : dynamic_cast<LobbyScreen *>(screenStack.back().get());
+				if(lobby){
+					lobby->ShowGameJoin(screenContext);
+				}
 				LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
 				if(lobbygame){
 					char temp[256];
@@ -2241,10 +2220,6 @@ void Game::TickLobbyBody(void){
 					strcpy(world.lobby.lastchannel, world.lobby.channel);
 					world.lobby.JoinChannel(temp);
 					UpdateLobbyMapName(lobbygame->mapname);
-				}
-				Interface * lobbyiface = static_cast<Interface *>(world.GetObjectFromId(lobbyinterface));
-				if(lobbyiface){
-					lobbyiface->AddObject(gamejoininterface);
 				}
 			}
 		}
@@ -2304,41 +2279,6 @@ Interface * Game::CreateLobbyInterface(void){
 	// gameselectinterface is added by GameSelectPanel::Build; ChatPanel sets
 	// the lobby iface's activeobject + ActiveChanged when it attaches.
 	return iface;
-}
-
-Interface * Game::CreateGameJoinInterface(void){
-	Interface * gamejoininterface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	gamejoininterface->x = 403;
-	gamejoininterface->y = 87;
-	gamejoininterface->width = 222;
-	gamejoininterface->height = 267;
-	Button * gamestartbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	gamestartbutton->x = 242;
-	gamestartbutton->y = 160;
-	gamestartbutton->SetType(Button::B156x21);
-	gamestartbutton->uid = 25;
-	//if(ishost){
-	//	strcpy(gamestartbutton->text, "Start Game");
-	//}else{
-		strcpy(gamestartbutton->text, "Ready");
-	//}
-	Button * techbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	techbutton->x = 242;
-	techbutton->y = 68;
-	techbutton->SetType(Button::B156x21);
-	techbutton->uid = 27;
-	strcpy(techbutton->text, "Choose Tech");
-	Button * changeteambutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	changeteambutton->x = 242;
-	changeteambutton->y = 100;
-	changeteambutton->SetType(Button::B156x21);
-	changeteambutton->uid = 26;
-	strcpy(changeteambutton->text, "Change Team");
-	gamejoininterface->AddObject(techbutton->id);
-	gamejoininterface->AddObject(changeteambutton->id);
-	gamejoininterface->AddObject(gamestartbutton->id);
-	gamejoininterface->buttonenter = gamestartbutton->id;
-	return gamejoininterface;
 }
 
 Interface * Game::CreateGameTechInterface(void){
@@ -2907,64 +2847,19 @@ bool Game::ProcessLobbyInterface(Interface * iface){
 								}
 							}break;
 							// Join button (uid 20) handled by GameSelectPanel::Tick.
-							case 25:{ // start game/ready
-								if(gamejoininterface){
-									Peer * localpeer = world.peerlist[world.localpeerid];
-									bool ishost = localpeer && localpeer->ishost;
-									if(!ishost || world.AllPeersDownloadedMap()){
-										world.SendReady();
+							// Ready (uid 25), Change Team (uid 26), Choose Tech (uid 27)
+							// handled by GameJoinPanel::Tick.
+							case 28:{ // back to teams (gametech "Back To Teams")
+								if(!gamejoininterface && gametechinterface){
+									button->clicked = false;
+									LobbyScreen * lobby = screenStack.empty() ? nullptr : dynamic_cast<LobbyScreen *>(screenStack.back().get());
+									if(lobby){
+										// ShowGameJoin tears down the
+										// gametech iface (and resets choosingtech /
+										// team overlays) before building the
+										// GameJoinPanel onto the lobby iface.
+										lobby->ShowGameJoin(screenContext);
 									}
-								}
-							}break;
-							case 26:{ // change team
-								if(gamejoininterface){
-									world.ChangeTeam();
-								}
-							}break;
-							case 27:{ // choose tech
-								if(gamejoininterface){
-									Object * object = world.GetObjectFromId(currentinterface);
-									Interface * iface = static_cast<Interface *>(object);
-									Interface * gamejoiniface = static_cast<Interface *>(world.GetObjectFromId(gamejoininterface));
-									if(gamejoiniface){
-										gamejoiniface->DestroyInterface(world, iface);
-									}
-									world.choosingtech = true;
-									ShowTeamOverlays(false);
-									world.RequestPeerList();
-									gamejoininterface = 0;
-									gametechinterface = CreateGameTechInterface()->id;
-									iface->AddObject(gametechinterface);
-									iface->activeobject = gametechinterface;
-									Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
-									if(chatiface){
-										chatiface->activeobject = 0;
-									}
-									currentinterface = iface->id;
-									iface->ActiveChanged(world, iface, false);
-									UpdateTechInterface();
-									return false;
-								}
-							}break;
-							case 28:{ // back to teams
-								if(!gamejoininterface){
-									Object * object = world.GetObjectFromId(currentinterface);
-									Interface * iface = static_cast<Interface *>(object);
-									Interface * gametechiface = static_cast<Interface *>(world.GetObjectFromId(gametechinterface));
-									if(gametechiface){
-										gametechiface->DestroyInterface(world, iface);
-									}
-									gametechinterface = 0;
-									gamejoininterface = CreateGameJoinInterface()->id;
-									iface->AddObject(gamejoininterface);
-									world.choosingtech = false;
-									ShowTeamOverlays(true);
-									iface->activeobject = gamejoininterface;
-									Interface * chatiface = static_cast<Interface *>(world.GetObjectFromId(chatinterface));
-									if(chatiface){
-										chatiface->activeobject = 0;
-									}
-									iface->ActiveChanged(world, iface, false);
 									return false;
 								}
 							}break;

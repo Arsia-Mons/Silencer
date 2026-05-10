@@ -92,6 +92,8 @@ public:
 	Uint16 chatinterface;
 	Uint16 gameselectinterface;
 	Uint16 gamecreateinterface;
+	Uint16 gamejoininterface;       // mirrored by GameJoinPanel; removed in stage H.
+	Uint16 gametechinterface;       // legacy backing for ShowGameTech; removed in stage G.
 	Uint16 mappreviewinterface;
 	Uint16 currentinterface;
 	Uint32 currentlobbygameid;
@@ -101,6 +103,14 @@ public:
 	Interface * CreateModalDialog(const char * message, bool ok = true);
 	Interface * CreatePasswordDialog(void);
 	Interface * CreateMapPreview(const char * filename);
+	// Called from LobbyScreen::ShowGameTech (Stage F backs the tech surface
+	// with the legacy iface; Stage G replaces both with GameTechPanel).
+	Interface * CreateGameTechInterface(void);
+	void UpdateTechInterface(void);
+	// Toggle in-lobby team overlay visibility. Called by ShowGameJoin /
+	// ShowGameTech when entering/leaving the tech-choice surface. Removed
+	// in stage G (folded into the panel).
+	void ShowTeamOverlays(bool show);
 
 private:
 	bool Tick(void);
@@ -125,12 +135,8 @@ private:
 	void ShowDeployMessage(void);
 	void GiveDefaultItems(Player & player);
 	void GoToState(Uint8 newstate);
-	Interface * CreateGameJoinInterface(void);
-	Interface * CreateGameTechInterface(void);
 	Interface * CreateGameSummaryInterface(Stats & stats, Uint8 agency);
 	void DestroyModalDialog(void);
-	Uint16 gamejoininterface;
-	Uint16 gametechinterface;
 	Uint16 gamesummaryinterface;
 	Uint16 modalinterface;
 	Uint16 passwordinterface;
@@ -138,10 +144,8 @@ private:
 	bool ProcessLobbyInterface(Interface * iface);
 	void ProcessGameSummaryInterface(Interface * iface);
 	void UpdateLobbyMapName(const char * name);
-	void UpdateTechInterface(void);
 	void UpdateGameSummaryInterface(void);
 	void AddSummaryLine(TextBox & textbox, const char * name, Uint32 value, bool percentage = false);
-	void ShowTeamOverlays(bool show);
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".
 	const char * GetActionKeyDisplayName(Action a);

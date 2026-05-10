@@ -139,7 +139,15 @@ public:
 	friend class Replay;
 	friend class Audio;
 	friend class TriggerGraph;
-	
+	// Stage F of the game.cpp refactor: LobbyScreen::ShowGameTech calls
+	// World::RequestPeerList from the gametech-view enter path. Removed
+	// in stage G when the call moves into GameTechPanel::Build.
+	friend class LobbyScreen;
+	// GameJoinPanel reads localpeer state (peerlist[localpeerid].ishost,
+	// AllPeersDownloadedMap, gameplaystate) to refresh the Ready button
+	// label, and dispatches SendReady on click.
+	friend class GameJoinPanel;
+
 protected:
 	std::list<class Object *> objectlist;
 	std::list<class Object *> tobjectlist;

@@ -8,6 +8,7 @@
 
 class GameSelectPanel;
 class GameCreatePanel;
+class GameJoinPanel;
 
 // In-progress migration of the lobby surface out of Game::ProcessLobbyInterface.
 // Build delegates to Game::CreateLobbyInterface() (legacy chrome + un-migrated
@@ -25,19 +26,24 @@ public:
 	void Destroy(ScreenContext & ctx) override;
 
 	// Right-side panel swap helpers. Called by panels (GameSelectPanel's
-	// "Create Game" button) and by Game::GoBack when transitioning out of
-	// gamecreate / gamejoin / gametech back to gameselect. Stage D handles
-	// GameSelect; the others still go through legacy Game::Create*Interface.
+	// "Create Game" button, GameJoinPanel's "Choose Tech") and by
+	// Game::GoBack and Game::TickLobbyBody when transitioning between
+	// gameselect / gamecreate / gamejoin / gametech.
+	// ShowGameTech still builds the legacy gametechinterface; Stage G replaces
+	// the body with a GameTechPanel construction.
 	void ShowGameSelect(ScreenContext & ctx);
 	void ShowGameCreate(ScreenContext & ctx);
+	void ShowGameJoin(ScreenContext & ctx);
+	void ShowGameTech(ScreenContext & ctx);
 
 private:
 	CharacterPanel character;
 	ChatPanel chat;
-	// One of gameSelect / gameCreate is active at a time (right-side panel).
-	// Stages F/G will introduce GameJoinPanel and GameTechPanel here too.
+	// One of gameSelect / gameCreate / gameJoin is active at a time
+	// (right-side panel). Stage G adds GameTechPanel to this set.
 	std::unique_ptr<GameSelectPanel> gameSelect;
 	std::unique_ptr<GameCreatePanel> gameCreate;
+	std::unique_ptr<GameJoinPanel>   gameJoin;
 };
 
 #endif
