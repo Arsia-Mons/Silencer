@@ -1744,7 +1744,7 @@ bool Game::Tick(void){
 									for(int ax = 0; ax < SDL_GAMEPAD_AXIS_COUNT && !padFound; ax++){
 										int16_t was = rebindGamepadAxes[ax];
 										int16_t is  = gamepadstate.axes[ax];
-										if(abs(is) > AXIS_DEADZONE * 2 && abs(was) <= AXIS_DEADZONE){
+										if(abs(is) > AXIS_DEADZONE && abs(was) <= AXIS_DEADZONE){
 											padKey.device  = BindingDevice::GamepadAxis;
 											padKey.code    = ax;
 											padKey.axisDir = (is > 0) ? 1 : -1;
@@ -5805,6 +5805,24 @@ void Game::TickGamepadMenuNav(){
 	Interface* iface = (Interface*)world.GetObjectFromId(currentinterface);
 	if(!iface) return;
 
+	// UiCancel (B/Circle) must work even during rebind-wait (disabled=true).
+	// Set lastsym=Escape so the OPTIONSCONTROLS tick picks it up and clears disabled.
+	{
+		bool cancelNow = keymap.IsPressed(Action::UiCancel, keystate, gamepadstate);
+		static bool cancelPrev = false;
+		if(cancelNow && !cancelPrev){
+			if(iface->disabled){
+				iface->lastsym = SDL_SCANCODE_ESCAPE;  // breaks rebind-wait on next tick
+			} else {
+				iface->ProcessKeyPress(world, 0x1B);
+			}
+		}
+		cancelPrev = cancelNow;
+	}
+
+	// Skip nav when interface is disabled (rebind-wait mode).
+	if(iface->disabled) return;
+
 	Uint32 now = SDL_GetTicks();
 
 	// Helper: fire a nav key press with software repeat on held direction.
@@ -5832,27 +5850,20 @@ void Game::TickGamepadMenuNav(){
 	tick(gamepadNavLeft,  Action::UiLeft,  1);
 	tick(gamepadNavRight, Action::UiRight, 2);
 
-	// Confirm (A/Cross) and Cancel (B/Circle) — no repeat, edge-detect only.
-	// UiConfirm fires Enter; UiCancel fires Escape.
-	// If nothing is focused when Confirm is pressed, auto-focus the first item
-	// so the user gets visual feedback before committing.
+	// Confirm (A/Cross) — no repeat, edge-detect only.
+	// If nothing is focused, auto-focus the first item so the user sees where
+	// they are before committing.
 	{
 		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
 		static bool confirmPrev = false;
 		if(confirmNow && !confirmPrev){
 			if(iface->activeobject == 0 && !iface->tabobjects.empty()){
-				iface->ProcessKeyPress(world, 4);  // focus first item via Down; user presses A again to confirm
+				iface->ProcessKeyPress(world, 4);  // focus first item; next A confirms
 			} else {
 				iface->ProcessKeyPress(world, '\n');
 			}
 		}
 		confirmPrev = confirmNow;
-	}
-	{
-		bool cancelNow = keymap.IsPressed(Action::UiCancel, keystate, gamepadstate);
-		static bool cancelPrev = false;
-		if(cancelNow && !cancelPrev) iface->ProcessKeyPress(world, 0x1B);
-		cancelPrev = cancelNow;
 	}
 }
 
