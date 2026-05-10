@@ -322,7 +322,7 @@ bool Game::HandleSDLEvents(void){
 				if(iface){
 					int w, h;
 					SDL_GetWindowSize(window, &w, &h);
-					iface->ProcessMouseMove(world, (float(event.button.x) / w) * 640, (float(event.button.y) / h) * 480);
+					iface->ProcessMouseMove(world, (float(event.motion.x) / w) * 640, (float(event.motion.y) / h) * 480);
 				}
 			}break;
 			case SDL_EVENT_GAMEPAD_ADDED:{

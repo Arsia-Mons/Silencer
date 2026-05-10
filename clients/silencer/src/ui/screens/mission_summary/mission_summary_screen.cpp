@@ -98,7 +98,8 @@ void MissionSummaryScreen::Build(ScreenContext & ctx)
 		}
 		AddSummaryLine(*textbox, "  Shots fired:", stats.weaponfires[i]);
 		AddSummaryLine(*textbox, "  Hits:", stats.weaponhits[i]);
-		AddSummaryLine(*textbox, "  Accuracy:", (Uint32)((float(stats.weaponhits[i]) / stats.weaponfires[i]) * 100), true);
+		Uint32 accuracy = stats.weaponfires[i] ? (Uint32)((float(stats.weaponhits[i]) / stats.weaponfires[i]) * 100) : 0;
+		AddSummaryLine(*textbox, "  Accuracy:", accuracy, true);
 		AddSummaryLine(*textbox, "  Player kills:", stats.playerkillsweapon[i]);
 	}
 	ScrollBar * scrollbar = static_cast<ScrollBar *>(world.CreateObject(ObjectTypes::SCROLLBAR));
