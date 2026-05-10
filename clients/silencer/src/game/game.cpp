@@ -527,6 +527,15 @@ bool Game::Loop(void){
 			}
 		} else {
 			UpdateInputState(world.localinput);
+			// If a rebind slot is waiting for input, zero out gamepad-driven
+			// localinput so button presses don't leak into gameplay/UI actions.
+			if(currentinterface){
+				Interface* rebindIface = (Interface*)world.GetObjectFromId(currentinterface);
+				if(rebindIface && rebindIface->disabled){
+					world.localinput.keyup = world.localinput.keydown =
+					world.localinput.keyleft = world.localinput.keyright = false;
+				}
+			}
 			TickGamepadMenuNav();
 		}
 		world.SendInput();
@@ -5805,22 +5814,8 @@ void Game::TickGamepadMenuNav(){
 	Interface* iface = (Interface*)world.GetObjectFromId(currentinterface);
 	if(!iface) return;
 
-	// UiCancel (B/Circle) must work even during rebind-wait (disabled=true).
-	// Set lastsym=Escape so the OPTIONSCONTROLS tick picks it up and clears disabled.
-	{
-		bool cancelNow = keymap.IsPressed(Action::UiCancel, keystate, gamepadstate);
-		static bool cancelPrev = false;
-		if(cancelNow && !cancelPrev){
-			if(iface->disabled){
-				iface->lastsym = SDL_SCANCODE_ESCAPE;  // breaks rebind-wait on next tick
-			} else {
-				iface->ProcessKeyPress(world, 0x1B);
-			}
-		}
-		cancelPrev = cancelNow;
-	}
-
-	// Skip nav when interface is disabled (rebind-wait mode).
+	// During rebind-wait (iface->disabled=true) the rebind capture code owns
+	// all gamepad input.  Don't let nav/confirm/cancel fire as side effects.
 	if(iface->disabled) return;
 
 	Uint32 now = SDL_GetTicks();
