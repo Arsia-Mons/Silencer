@@ -28,7 +28,6 @@
 #include "modal.h"
 #include "message_modal.h"
 #include "password_modal.h"
-#include "main_menu_screen.h"
 #include "options_screen.h"
 #include "options_controls_screen.h"
 #include "options_display_screen.h"
@@ -37,6 +36,13 @@
 #include "lobby_screen.h"
 #include "update_screen.h"
 #include "mission_summary_screen.h"
+#include "context.h"
+#include "dispatch.h"
+#include "layout.h"
+#include "node.h"
+#include "render.h"
+#include "main_menu.h"
+#include <SDL3/SDL_timer.h>
 #include <algorithm>
 #include <stdio.h>
 
@@ -627,7 +633,13 @@ bool Game::Loop(void){
 	if(!world.dedicatedserver.active){
 		screenbuffer.Clear(0);
 		world.DoNetwork();
-		renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
+		if(state == MAINMENU){
+			// v2 MainMenu owns the frame: declarative tree → Layout → Render.
+			// Bypasses renderer.Draw entirely (no world objects to walk).
+			RenderMainMenuV2();
+		}else{
+			renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
+		}
 #ifdef POSIX
 		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && deploymessageshown){
 			Uint8 buffer[640 * 480 * 3];
@@ -795,14 +807,25 @@ bool Game::Tick(void){
 				UnloadGame();
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<MainMenuScreen>());
+				// v2 MainMenu owns its own rendering + click dispatch
+				// (RenderMainMenuV2 / DispatchMainMenuV2Click); there's
+				// no Screen on the stack, no Interface object, and no
+				// currentinterface routing. Palette + camera setup mirrors
+				// what MainMenuScreen::Build used to do.
+				renderer.palette.SetPalette(1);
+				screenbuffer.Clear(0);
+				SetColors(renderer.palette.GetColors());
+				renderer.camera.SetPosition(320, 240);
+				currentinterface = 0;
+				ui_v2_state = ui::v2::UIState{};
+				ui_v2_last_ticks = 0;
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
-				// Button-click handling lives in MainMenuScreen::Tick, dispatched
-				// by TickActiveScreen() at the top of Game::Tick.
+				// Click handling runs in DispatchMainMenuV2Click, fired from
+				// events.cpp on the SDL mouse-down edge while state==MAINMENU.
 			}
 		}break;
 		case LOBBYCONNECT:{
@@ -1116,6 +1139,66 @@ void Game::ReplaceScreen(std::unique_ptr<Screen> s){
 
 Screen * Game::GetTopScreen() const {
 	return screenStack.empty() ? nullptr : screenStack.back().get();
+}
+
+static ui::v2::MainMenuHandlers BuildMainMenuHandlers(Game * self, ScreenContext & sctx){
+	ui::v2::MainMenuHandlers h;
+	(void)self;
+	// Bound to real state transitions matching the legacy MainMenuScreen::Tick
+	// switch (BTN_TUTORIAL→SINGLEPLAYERGAME, BTN_LOBBY→LOBBYCONNECT,
+	// BTN_OPTIONS→OPTIONS, BTN_EXIT→quit). Reaches GoToState/quit via the
+	// ScreenContext we already own — keeps the surface identical to legacy.
+	h.on_tutorial = [&sctx](){ sctx.GoToState(GameState::SINGLEPLAYERGAME); };
+	h.on_lobby    = [&sctx](){ sctx.GoToState(GameState::LOBBYCONNECT); };
+	h.on_options  = [&sctx](){ sctx.GoToState(GameState::OPTIONS); };
+	h.on_exit     = [&sctx](){ sctx.RequestQuit(); };
+	return h;
+}
+
+bool Game::RenderMainMenuV2(){
+	// Measure dt from wallclock so the hot_t exponential approach behaves
+	// the same on faster/slower machines. Matches preview.cpp's loop.
+	Uint64 now = SDL_GetTicks();
+	float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
+	ui_v2_last_ticks = now;
+
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = ui_v2_mouse_x;
+	ctx.mouse_y = ui_v2_mouse_y;
+	ctx.state   = &ui_v2_state;
+	ctx.dt      = dt;
+
+	ui::v2::MainMenuHandlers handlers = BuildMainMenuHandlers(this, screenContext);
+	screenbuffer.Clear(0);
+	ui_v2_state.BeginFrame();
+	ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
+	ui::v2::Layout(tree, ctx);
+	ui::v2::Render(tree, ctx, screenbuffer, renderer);
+	ui_v2_state.EndFrame();
+	return true;
+}
+
+void Game::DispatchMainMenuV2Click(int logical_x, int logical_y){
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = logical_x;
+	ctx.mouse_y = logical_y;
+	ctx.state   = &ui_v2_state;
+	ui::v2::MainMenuHandlers handlers = BuildMainMenuHandlers(this, screenContext);
+	ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
+	ui::v2::Layout(tree, ctx);
+	ui::v2::DispatchClick(tree, ctx);
 }
 
 void Game::TickActiveScreen(){

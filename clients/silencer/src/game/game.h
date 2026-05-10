@@ -17,12 +17,14 @@
 #include "game_state.h"
 #include "map_downloader.h"
 #include "ambience_mixer.h"
+#include "ui_state.h"
 #include <array>
 #include <memory>
 #include <vector>
 
 class Screen;
 class Modal;
+namespace ui { namespace v2 { struct Node; } }
 
 class Game
 {
@@ -205,6 +207,22 @@ private:
 	std::vector<std::unique_ptr<Screen>> screenStack;
 	ScreenContext screenContext;
 	void TickActiveScreen();
+
+	// ui/v2 state for menu surfaces that have migrated off the Screen stack.
+	// Owns per-button hover-animation slots (hot_t) and gets BeginFrame /
+	// EndFrame'd around each v2 render pass. Mouse position is tracked here
+	// so events.cpp can populate Context.mouse_{x,y} on motion + dispatch.
+	ui::v2::UIState ui_v2_state;
+	int ui_v2_mouse_x = -1;
+	int ui_v2_mouse_y = -1;
+	Uint64 ui_v2_last_ticks = 0;
+	// Render the v2 MainMenu tree into screenbuffer. Called from the
+	// rendering branch in Loop() when state == MAINMENU. Returns true if
+	// it handled the frame (and the caller should skip renderer.Draw).
+	bool RenderMainMenuV2();
+	// Dispatch a mouse-down event to the v2 MainMenu tree. Called from
+	// events.cpp on SDL_EVENT_MOUSE_BUTTON_DOWN when state == MAINMENU.
+	void DispatchMainMenuV2Click(int logical_x, int logical_y);
 	// Set by GoToState; processed at the next Tick() entry to pop screens
 	// safely after the active screen's Tick has returned. Avoids destroying
 	// a screen mid-Tick when a button click triggers a state transition.
