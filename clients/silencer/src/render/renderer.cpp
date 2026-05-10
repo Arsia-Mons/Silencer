@@ -75,7 +75,10 @@ void Renderer::Draw(Surface * surface, float frametime){
 	}
 	SDL_Delay(100);
 	return;*/
-	localplayer = world.GetPeerPlayer(world.localpeerid);
+	// viewedpeerid mirrors localpeerid for normal players and is overridden
+	// by spectator-controls for observers. Renderer always reads through it
+	// so HUD/camera follow the focus peer.
+	localplayer = world.GetPeerPlayer(world.viewedpeerid);
 	// Uncomment this to follow a player when there is no local peer
 	/*if(!localplayer && world.IsAuthority()){
 		for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::PLAYER].begin(); it != world.objectsbytype[ObjectTypes::PLAYER].end(); it++){

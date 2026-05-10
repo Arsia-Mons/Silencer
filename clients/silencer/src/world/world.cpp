@@ -72,6 +72,14 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	pancamerareturncount = 0;
 	pancamerax = 0;
 	pancameray = 0;
+	viewedpeerid = 0;
+	spectator.freecam = false;
+	spectator.camx = 0;
+	spectator.camy = 0;
+	spectator.camvx = 0;
+	spectator.camvy = 0;
+	spectator.holdshowallnames = false;
+	spectator.initialized = false;
 }
 
 World::~World(){
@@ -756,6 +764,7 @@ void World::DoNetwork_Replica(void){
 							if(i == authoritypeer) continue;
 							if(peerlist[i] && peerlist[i]->accountid == lobby.accountid){
 								localpeerid = i;
+								viewedpeerid = i;
 								break;
 							}
 						}
@@ -1717,6 +1726,14 @@ void World::Disconnect(void){
 	ClearSnapshotQueue();
 	ClearMapData();
 	state = IDLE;
+	viewedpeerid = 0;
+	spectator.freecam = false;
+	spectator.camx = 0;
+	spectator.camy = 0;
+	spectator.camvx = 0;
+	spectator.camvy = 0;
+	spectator.holdshowallnames = false;
+	spectator.initialized = false;
 	char data[1];
 	data[0] = MSG_DISCONNECT;
 	if(mode == AUTHORITY){
@@ -1996,10 +2013,16 @@ void World::SwitchToLocalAuthorityMode(void){
 	peercount = 0;
 	authoritypeer = GetAuthorityPeer()->id;
 	localpeerid = authoritypeer;
+	viewedpeerid = localpeerid;
 }
 
 bool World::IsAuthority(void){
 	return mode == AUTHORITY;
+}
+
+bool World::IsLocalObserver(void){
+	Peer * lp = peerlist[localpeerid];
+	return lp && lp->observer;
 }
 
 bool World::IsConnected() const {

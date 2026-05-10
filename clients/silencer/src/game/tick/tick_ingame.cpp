@@ -99,6 +99,7 @@ if(/*!world.map.loaded && */stateisnew){
 			for(int i = 0; i < world.maxpeers; i++){
 				if(world.peerlist[i] && i != world.authoritypeer){
 					world.localpeerid = i;
+					world.viewedpeerid = i;
 					break;
 				}
 			}
@@ -107,6 +108,7 @@ if(/*!world.map.loaded && */stateisnew){
 		world.replay.oldy = world.replay.y;
 		if(world.localinput.keymoveleft || world.localinput.keymoveright || world.localinput.keymoveup || world.localinput.keymovedown){
 			world.localpeerid = world.authoritypeer;
+			world.viewedpeerid = world.authoritypeer;
 			bool inbase = false;
 			if(world.replay.y > world.map.height * 64){
 				inbase = true;
@@ -163,6 +165,7 @@ if(/*!world.map.loaded && */stateisnew){
 			for(int i = world.localpeerid - 1; i > 0; i--){
 				if(world.peerlist[i] && i != world.authoritypeer){
 					world.localpeerid = i;
+					world.viewedpeerid = i;
 					break;
 				}
 			}
@@ -171,6 +174,7 @@ if(/*!world.map.loaded && */stateisnew){
 			for(int i = world.localpeerid + 1; i < world.maxpeers; i++){
 				if(world.peerlist[i] && i != world.authoritypeer){
 					world.localpeerid = i;
+					world.viewedpeerid = i;
 					break;
 				}
 			}
