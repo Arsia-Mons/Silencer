@@ -246,3 +246,58 @@ When picking this up:
 3. Phase 1 is sequential within itself. Phases 2 and 3 can interleave — extract `MapDownloader` whenever it's convenient, doesn't block screen migrations.
 4. **One commit per checkbox.** Resist batching. The whole point is that any single commit can be reverted without breaking the game.
 5. After each commit, run the verification protocol at the top of this doc. Don't tick the box if any of the four steps fails.
+
+---
+
+## Handoff prompt for next agent
+
+You're picking up the `refactor/game-cpp` branch mid-Phase-3. The user is largely AFK — take the lead, validate via the headless CLI, and don't use Game or ScreenContext as a grab bag for screen-specific logic. Memory note in `~/.claude/projects/-Users-hv-repos-Silencer/memory/`: skip the superpowers skill suite (no brainstorming/writing-plans machinery); just edit `docs/plans/` or this progress doc directly when you need to.
+
+### What's already landed
+
+Stages A–E of Phase 3 are committed. The lobby right-side surface is now panel-driven:
+- `ui/screens/lobby/lobby_screen.{h,cpp}` — owns panels by composition, exposes `ShowGameSelect(ctx)` / `ShowGameCreate(ctx)` swap helpers.
+- `ui/screens/lobby/panels/character_panel.{h,cpp}` (value member, always-alive)
+- `ui/screens/lobby/panels/chat_panel.{h,cpp}` (value member, always-alive)
+- `ui/screens/lobby/panels/game_select_panel.{h,cpp}` (`unique_ptr`, swap with gameCreate)
+- `ui/screens/lobby/panels/game_create_panel.{h,cpp}` (`unique_ptr`, swap with gameSelect)
+
+`ScreenContext` carries `World/Renderer/Lobby/KeyMap/Updater/AmbienceMixer/MapDownloader` refs + state-machine actions; it is **not** a junk drawer of per-screen accessors. Panels reach Game directly via `ctx.game.X` for temp scaffolding (members made public during the migration; deleted in Stage H).
+
+`LobbyScreen::Tick` order is **panels first, then `Game::TickLobbyBody()`**, so panel handlers see fresh `button->clicked` / `textinput->enterpressed` flags before the recursive `ProcessLobbyInterface` walk clears them. Don't flip this order back.
+
+### Next checkboxes (in order)
+
+1. **Stage F — `GameJoinPanel`.** Small (~35 LoC). 3 buttons: Ready (uid 25), Change Team (uid 26), Choose Tech (uid 27). The panel is built/torn down by `Game::TickLobbyBody`'s CONNECTED transition (line ~2236) and by `Game::GoBack` (gamejoin/gametech path). You'll want a `LobbyScreen::ShowGameJoin(ctx)` helper, parallel to `ShowGameSelect`/`ShowGameCreate`. The Choose Tech button swaps to `GameTechPanel` — until Stage G that's still legacy `Game::CreateGameTechInterface`. Watch the BUTTON uid 27/28 swap inside `ProcessLobbyInterface` — those need to move out.
+2. **Stage G — `GameTechPanel`.** Bigger (~270 LoC) including `Game::UpdateTechInterface()` (per-tick refresh of tech-slot buttons + team peer overlays). The tech buttons are dynamically generated based on `world.buyableitems` × the local team's agency — keep that loop intact. `UpdateTechInterface` is called from `Game::ProcessLobbyInterface` line ~3186 (the very first line) — that call moves into `GameTechPanel::Tick`.
+3. **Stage H — cleanup.** What should be deletable after F + G:
+   - `Game::CreateGameJoinInterface`, `Game::CreateGameTechInterface`, `Game::UpdateTechInterface`, `Game::UpdateLobbyMapName` (only called from `TickLobbyBody`'s CONNECTED transition).
+   - The remaining `Game::ProcessLobbyInterface` body (it should be only the BUTTON uid 10 GoBack arm + the BUTTON uid 50 modal-OK arm at that point — both can move; uid 50 is modal lifecycle, lifts to Stage Modals).
+   - Public scaffolding members on `Game`: `lobbyinterface`, `chatinterface`, `gameselectinterface`, `gamecreateinterface`, `currentinterface` (move back to private once panels stop touching it), `currentlobbygameid`, `creategameclicked`, `mappreviewinterface`, `minimized`. The methods `CreateLobbyInterface`, `TickLobbyBody`, `JoinGame`, `CreateModalDialog`, `CreatePasswordDialog`, `CreateMapPreview` likewise — once their last caller is migrated.
+   - **Watch for**: the deferred-create state machine in `Game::TickLobbyBody` (lines ~2126–2167) still polls `mapDownloader.mapUploadState` + `world.lobby.creategamestatus`. Reasonable home is in `GameCreatePanel::Tick` (the panel kicked it off), but the `world.Connect` + `joininggame=true` handoff is genuinely Game-state. Decide based on what's left of `TickLobbyBody` after Stage H.
+
+### Other work queued in the spec
+
+- The Modals (`ModalDialog`, `PasswordDialog`, `MapPreviewModal`) — needed before `Game::CreateModalDialog` / `CreatePasswordDialog` / `CreateMapPreview` can be deleted. Wire up `ScreenContext::ShowMessage` (currently asserts) when you do this.
+- `GameSummaryScreen` — straightforward, similar pattern to other screens.
+- Phase 4 mechanical splits (events.cpp, ingame.cpp, headless.cpp, tick_*.cpp) — pure file moves, save for last.
+- Phase 5 cleanup + size-target check.
+
+### Verification
+
+Per stage:
+- Regular Debug build: `cmake --build clients/silencer/build` (warning-clean except the pre-existing C4804 + sprintf-deprecated noise).
+- Unity Debug build: `cmake -B clients/silencer/build-unity -DSILENCER_UNITY_BUILD=ON && cmake --build clients/silencer/build-unity`. **Re-run `cmake -B build-unity` whenever you add a new .cpp file** so `GLOB_RECURSE` picks it up.
+- E2E: `bash tests/cli-agent/e2e/00_ping.sh && bash tests/cli-agent/e2e/10_navigate.sh && bash tests/cli-agent/e2e/20_screenshot.sh`.
+- Headless menu nav smoke: launch with `start_silencer "$PORT"` (helpers in `tests/cli-agent/e2e/lib.sh`), drive with `bun clients/cli/index.ts --port $PORT click --label X`. The CLI cannot drive `TEXTINPUT` widgets, so the actual lobby login flow can't be exercised headlessly — verification rests on builds, E2E, and the per-stage moves being mechanical.
+
+### Open issues to be aware of
+
+- **Stage 2 regression**: "Create Game" button kicked back to LobbyConnect on at least one user's machine. Not yet root-caused. Stage E didn't reproduce or fix it; the deferred-create state machine still lives on `TickLobbyBody`. Worth re-checking after Stage F/G.
+- **`Game::GoBack` after `LOBBYCONNECT` → `MAINMENU` timing race**: there's a multi-frame gap between `wait_for_state MAINMENU` resolving and `case MAINMENU` actually running `PushScreen`. CLI scripts hitting that path need `wait_frames --n 10` or similar. Pre-existing — not Stage D/E.
+
+### Conventions to keep
+
+- Anon-namespace uid enumerators in panel `.cpp` files MUST be file-prefixed (e.g. `GCRT_BTN_*`, `GSEL_OVL_*`) to dodge unity-build collisions when sibling panels merge into one TU.
+- Panel constructors take `LobbyScreen & owner` so they can call `owner.ShowXxx(ctx)` for swaps; this matches what GameSelectPanel/GameCreatePanel do today.
+- Public Game scaffolding gets a comment like *"Removed in stage H."* or names the consumer panel — keep that explicit so cleanup is a search-and-delete pass.
