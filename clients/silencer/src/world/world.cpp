@@ -300,19 +300,24 @@ void World::DoNetwork_Authority(void){
 							canjoin = false;
 						}
 					}
-					if(dedicatedserver.active){
-						if(dedicatedserver.IsBanned(accountid) || peercount >= gameinfo.maxplayers){
-							//printf("banned or too many players\n");
-							canjoin = false;
-						}
-					}
+					// Find a parked peer to rebind, if any. Done before the
+					// maxplayers gate so a rejoiner reclaiming their existing
+					// slot isn't rejected for a full lobby.
 					Peer * rejoinpeer = 0;
-					if(canjoin && accountid != 0){
+					if(accountid != 0){
 						for(unsigned int i = 1; i < maxpeers; i++){
 							if(peerlist[i] && peerlist[i]->disconnected && peerlist[i]->accountid == accountid){
 								rejoinpeer = peerlist[i];
 								break;
 							}
+						}
+					}
+					if(dedicatedserver.active){
+						if(dedicatedserver.IsBanned(accountid)){
+							canjoin = false;
+						}
+						if(!rejoinpeer && peercount >= gameinfo.maxplayers){
+							canjoin = false;
 						}
 					}
 					if(canjoin && gameplaystate == INGAME && !rejoinpeer){
@@ -1951,7 +1956,7 @@ void World::SendPeerList(Uint8 peerid){
 		}
 		for(unsigned int i = 0; i < maxpeers; i++){
 			Peer * peer = peerlist[i];
-			if(peer && i != localpeerid && (!peerid || peerid == peer->id)){
+			if(peer && i != localpeerid && (!peerid || peerid == peer->id) && !peer->disconnected){
 				SendPacket(peer, data.data, data.BitsToBytes(data.offset));
 			}
 		}
