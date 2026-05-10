@@ -495,6 +495,9 @@ void Lobby::DoNetwork(void){
 									}
 									charactersreceived = true;
 								}break;
+							}
+							msgsize = 0;
+						}
 					}else
 					if(ret == 0){
 						Disconnect();
