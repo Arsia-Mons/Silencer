@@ -81,6 +81,22 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["current_interface_id"] = game.GetCurrentInterfaceId();
 		r["frame"] = game.GetFrameCount();
 		r["paused"] = game.paused;
+		// Expose the lobby connection sub-state so test scripts can wait for
+		// AUTHENTICATING before dispatching a Login click — the LobbyConnect
+		// state machine progresses asynchronously through Connect/version
+		// check, and a click before AUTHENTICATING is silently consumed.
+		static const char * lobbyStateNames[] = {
+			"IDLE","WAITING","CONNECTING","RESOLVING","WAITINGFORRESOLVER",
+			"RESOLVED","RESOLVEFAILED","CONNECTIONFAILED","CONNECTED",
+			"CHECKINGVERSION","AUTHENTICATING","AUTHSENT","AUTHENTICATED",
+			"AUTHFAILED","DISCONNECTED"
+		};
+		int ls = (int)game.GetWorld().lobby.state;
+		if(ls >= 0 && ls < (int)(sizeof(lobbyStateNames)/sizeof(lobbyStateNames[0]))){
+			r["lobby_state"] = lobbyStateNames[ls];
+		}else{
+			r["lobby_state"] = "UNKNOWN";
+		}
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}

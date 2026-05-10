@@ -133,6 +133,11 @@ Game::~Game(){
 }
 
 bool Game::Load(char * cmdline){
+	// CLI overrides for the lobby host / port — applied AFTER Config::Load
+	// below so the on-disk config doesn't clobber them. Empty strings / 0
+	// mean "no override; use the config value".
+	char lobbyHostOverride[256] = {0};
+	int  lobbyPortOverride = 0;
 	if((cmdline = strtok(cmdline, " "))){
 		do{
 			if(strncmp(cmdline, "-s", 2) == 0){ // dedicated server
@@ -199,9 +204,29 @@ bool Game::Load(char * cmdline){
 			else if(strcmp(cmdline, "--tui") == 0){
 				tui = true;
 			}
+			else if(strcmp(cmdline, "--lobby-host") == 0){
+				char * host = strtok(NULL, " ");
+				if(host){
+					strncpy(lobbyHostOverride, host, sizeof(lobbyHostOverride) - 1);
+					lobbyHostOverride[sizeof(lobbyHostOverride) - 1] = '\0';
+				}
+			}
+			else if(strcmp(cmdline, "--lobby-port") == 0){
+				char * portstr = strtok(NULL, " ");
+				if(portstr){
+					lobbyPortOverride = atoi(portstr);
+				}
+			}
 		}while((cmdline = strtok(0, " ")));
 	}
 	Config::GetInstance().Load();
+	if(lobbyHostOverride[0]){
+		strncpy(Config::GetInstance().lobbyhost, lobbyHostOverride, sizeof(Config::GetInstance().lobbyhost) - 1);
+		Config::GetInstance().lobbyhost[sizeof(Config::GetInstance().lobbyhost) - 1] = '\0';
+	}
+	if(lobbyPortOverride > 0){
+		Config::GetInstance().lobbyport = lobbyPortOverride;
+	}
 	LoadActiveKeymap(keymap);
 	if(world.dedicatedserver.active){
 		// Dedicated server: SDL3 always initialises the timer subsystem; no flags needed.
