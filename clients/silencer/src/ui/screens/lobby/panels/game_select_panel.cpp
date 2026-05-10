@@ -343,9 +343,40 @@ void GameSelectPanel::Tick(ScreenContext & ctx)
 				}break;
 				case GSEL_BTN_SPECTATE:{
 					button->clicked = false;
-					// Phase 3 wires this to the dedicated-server spectator connect
-					// path. For now Phase 2 only delivers the affordance.
-					ctx.ShowMessage("Spectating coming soon");
+					SelectBox * selectbox = nullptr;
+					for(std::vector<Uint16>::iterator it2 = iface->objects.begin(); it2 != iface->objects.end(); it2++){
+						Object * obj2 = world.GetObjectFromId(*it2);
+						if(obj2 && obj2->type == ObjectTypes::SELECTBOX){
+							selectbox = static_cast<SelectBox *>(obj2);
+							break;
+						}
+					}
+					if(!selectbox) break;
+					if(selectbox->selecteditem == -1){
+						ctx.ShowMessage("No game selected");
+						break;
+					}
+					Uint32 gameid = selectbox->IndexToId(selectbox->selecteditem);
+					if(!gameid) break;
+					LobbyGame * lobbygame = world.lobby.GetGameById(gameid);
+					if(!lobbygame) break;
+					if(!world.IsIdle()) break;
+					ctx.game.currentlobbygameid = lobbygame->id;
+					if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
+						Uint32 gameId = lobbygame->id;
+						ctx.PushScreen(std::make_unique<PasswordModal>(
+							[&ctx, gameId](const char * password){
+								LobbyGame * lg = ctx.world.lobby.GetGameById(gameId);
+								if(lg){
+									char buf[64];
+									std::strncpy(buf, password ? password : "", sizeof(buf) - 1);
+									buf[sizeof(buf) - 1] = '\0';
+									ctx.game.SpectateGame(*lg, buf);
+								}
+							}));
+					}else{
+						ctx.game.SpectateGame(*lobbygame);
+					}
 				}break;
 				case GSEL_BTN_CREATE:{
 					button->clicked = false;
