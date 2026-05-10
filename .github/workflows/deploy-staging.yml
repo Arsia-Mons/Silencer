@@ -210,11 +210,18 @@ jobs:
           sudo systemctl daemon-reload
           sudo systemctl restart silencer-lobby silencer-admin-api silencer-admin-web
 
-          # Smoke checks. Lobby comes up first; admin units pull their
-          # images on first start so give them more time.
-          sleep 3
+          # Smoke checks. Poll each unit; admin units pull Docker images on
+          # first start so they get more attempts than the lobby.
+          for i in 1 2 3 4 5; do
+            sudo systemctl is-active silencer-lobby && break
+            sleep 3
+          done
           sudo systemctl is-active silencer-lobby
-          sleep 15
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            sudo systemctl is-active silencer-admin-api && \
+            sudo systemctl is-active silencer-admin-web && break
+            sleep 3
+          done
           sudo systemctl is-active silencer-admin-api
           sudo systemctl is-active silencer-admin-web
           curl -sf http://127.0.0.1:24080/api/sprites/121/0 > /dev/null
