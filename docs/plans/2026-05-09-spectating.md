@@ -49,14 +49,33 @@ game accepts spectators. Surfaces:
 ### Phase 2 — Server browser: spectatable affordance
 
 The lobby's running-games list (right-side panel of the lobby
-screen) gains a visual indicator on rows that allow spectators, plus
-a way to invoke "join as spectator" distinct from "join as player".
+screen) gains a per-row "Spectate" affordance, surfaced through the
+existing game-select panel
+(`clients/silencer/src/ui/screens/lobby/panels/game_select_panel.cpp`).
 
-**Open questions:**
-- Visual treatment: icon, badge, text label?
-- Show current spectator count on the row?
-- Treatment of full-but-spectatable games vs. spectatable-but-empty.
-- Click action model: separate button, right-click, modal, …?
+**Confirmed:**
+- **Click action model — dual button.** Selecting a row contextually
+  renders up to two buttons at the bottom of the panel: **Join** and
+  **Spectate**. Each button is shown only when permitted for that
+  user/game pair:
+  - **Join** — the user has a slot. Either INLOBBY with player
+    capacity, or INGAME with a parked peer slot matching the user's
+    accountid (the rejoin path from
+    [PR #152](https://github.com/Arsia-Mons/Silencer/pull/152)).
+  - **Spectate** — the game is INGAME *and* has the spectatable
+    flag set. Pre-game lobby (INLOBBY) is not spectatable.
+  - Neither row showing both/either buttons is fine: a non-spectatable
+    INGAME game with no parked slot for the user shows zero buttons.
+- **Lobby surfaces rejoin permission per recipient.** Each running
+  dedicated server reports its parked-peer accountids up to the
+  lobby; the lobby derives a "can-rejoin" bit per recipient on the
+  game-list payload. The client renders Join on INGAME rows from
+  that bit alone — no round-trip to the AUTHORITY.
+- **No row-level visual indicator.** The Spectate button appearing
+  on row click is sufficient signal; no icon/badge/text in the row.
+- **No spectator count.** Deferred to keep Phase 2 minimal.
+- **`buttonenter` default** — Join when both visible; Spectate when
+  only Spectate is visible.
 
 ### Phase 3 — Joining as spectator (any time)
 
@@ -64,35 +83,47 @@ Click → connect to the dedicated server in observer mode → receive
 a snapshot of current world state → render. Joining mid-match is a
 first-class case.
 
-This is the largest engineering item. Surfaces it touches:
+The mid-game connect mechanism is the same one
+[PR #152](https://github.com/Arsia-Mons/Silencer/pull/152)
+introduced for player rejoin: AUTHORITY accepts `MSG_CONNECT` while
+`gameplaystate == INGAME`, the connecting peer is added to the
+shared peer pool, and a `SendGameInfo` + `SendPeerList` round
+serves as the resync handshake (no map download / `MSG_READY`
+step). Spectator-join is a third branch of that accept block.
 
-- **Client connect path.** Today `JoinGame` always picks an agency
-  and joins as a player `REPLICA`. We need a path that skips agency/
-  team selection and flags the local peer as observer.
-- **Lobby protocol.** A way for the lobby to hand a spectator off to
-  a running dedicated server. Could be a new opcode or could reuse
-  the dormant `opConnect=6` slot — design decision.
-- **World/peer model.** Today the world has only `AUTHORITY` /
-  `REPLICA` modes and `Peer` carries `agency` + team data. Need
-  either an observer flag on `Peer` or a third world mode.
-- **Mid-match join path.** Today the connection handshake assumes
-  pre-game lobby (peer-list, map download, `MSG_READY`,
-  `MSG_GAMEINFO`). Spectators need a "snapshot resync from current
-  tick" path. This is engineering work to be designed and built.
-- **Snapshot replication.** Server's snapshot path filters by team/
-  relevance. Needs an observer-aware path.
-- **Peer cap.** `maxpeers = 25` is shared by the player set today.
-  Either spectators count against it or live in a parallel pool.
+**Confirmed (aligned with PR #152):**
+- **Reuse `MSG_CONNECT`.** Connect payload carries an `observer`
+  bit. AUTHORITY's INGAME accept logic gets a third branch:
+  - `accountid` matches a parked peer → rejoin (PR #152).
+  - `observer` bit set + game is spectatable → admit as spectator.
+  - else → reject.
+  No new opcode; the `opConnect=6` repurposing idea is dropped.
+- **`Peer::observer` flag** mirrors `Peer::disconnected` from
+  PR #152. No third world mode — `REPLICA` plus the flag is enough.
+- **Shared `maxpeers = 25` pool.** Spectators consume slots like
+  rejoiners do. Per-game spectator cap (if any) layers on top.
+- **Resync via `SendGameInfo` + `SendPeerList`** — same path PR
+  #152's rejoin uses. No new mid-match handshake to design.
+- **`SendSnapshots` gets an observer-aware branch** in the same
+  shape as PR #152's `disconnected` skip. Filter rules — full
+  state vs. team-relative fog of war — still open.
+- **`HandleDisconnect` for an observer is always permanent.** No
+  parking; the slot frees immediately on leave.
+- **Lobby spectatable flag is authoritative.** No separate
+  "accept spectators" flag on the dedicated server, mirroring how
+  PR #152 has no separate "accept rejoins" flag.
 
-**Open questions:**
+**Client connect path** still needs new work: today `JoinGame`
+always picks an agency and joins as a player REPLICA; the spectator
+path must skip agency/team selection and flip the `observer` bit on
+the outgoing `MSG_CONNECT`.
+
+**Open questions (not addressed by PR #152):**
 - Auth: who can spectate? (anyone, logged-in only, friends-of-host,
   admin-only, …)
 - Per-game spectator cap and where it's enforced.
 - Visibility model: full unfiltered state, or team-relative fog of
   war?
-- Reuse `opConnect=6` or add a new opcode?
-- Does the dedicated server need its own "accept spectators" flag,
-  or is the lobby flag authoritative?
 - Are spectators visible to players in any way (scoreboard count,
   "X is spectating" notice, nothing at all)?
 - Can spectators send chat? Voice?
@@ -133,13 +164,7 @@ sense. Working baseline:
 - **Admin `/dashboard` "LIVE SESSIONS"** is list-only via Socket.IO
   + AMQP `silencer.events`. Unrelated to in-game spectating, noted
   here only because someone might confuse the two.
-- **`opConnect=6`** is reserved/unused per the lobby protocol spec
-  ("server does not currently send or process this opcode"). Not a
-  required slot, just an option if we want to repurpose it.
 
 ## Status
 
-- [ ] Phase 1 — game-creation checkbox
-- [ ] Phase 2 — server browser affordance
-- [ ] Phase 3 — spectator join flow (incl. mid-match join)
-- [ ] Phase 4 — spectator controls
+Tracked in [`2026-05-09-spectating-progress.md`](2026-05-09-spectating-progress.md).
