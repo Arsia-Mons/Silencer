@@ -17,24 +17,36 @@ in the design conversation that produced this library.
 
 ## Shape
 
-- **`node.h`** — `Node` value type + `NodeKind` enum + factories
-  (`Background`, `Sprite`, `Label`, `Button`, `Group`). A screen is
-  a function returning a `Node`; the tree is pure data.
+- **`node.h`** — `Node` value type + `NodeKind` enum + factories.
+  Leaf kinds: `Background`, `Sprite`, `Label`, `Button`, `Group`.
+  Container kinds: `VStack`, `HStack`, `Center`, `Padding`,
+  `Spacer`. A screen is a function returning a `Node`; the tree is
+  pure data.
 - **`context.h`** — `Context` is the bag of inputs a screen depends on
-  (asset catalog, logical dimensions, scale, version string). No
-  `Game`/`World`/`Lobby` refs — screens stay testable in the
-  preview harness.
+  (asset catalog, logical dimensions, scale, version string, mouse,
+  UIState, dt). No `Game`/`World`/`Lobby` refs — screens stay
+  testable in the preview harness.
+- **`layout.h` / `layout.cpp`** — `Layout(root, ctx)` walks the tree
+  and emits a Clay scope per container subtree, then reads back
+  rects via `Clay_GetElementData` into `node.rect_*`. Nodes outside
+  any container subtree are left with `rect_w == 0` so render +
+  dispatch fall through to absolute `.at()` positioning.
 - **`render.h` / `render.cpp`** — `Render(root, ctx, target, renderer)`
-  walks the tree depth-first and blits into `target`. Sprite asset
-  anchor offsets are honored exactly like the legacy widgets so a
-  screen built with the same coords renders the same pixels.
+  walks the tree depth-first and blits into `target`. Buttons inside
+  a Clay subtree use the computed `rect_*`; absolute buttons use
+  `.at()` + sprite anchor (legacy semantics, pixel-identical with
+  the legacy widget render).
+- **`dispatch.{h,cpp}`** — `DispatchClick(root, ctx)` and `ButtonHit`.
+  Hit-test reads `rect_*` for Clay-managed buttons; falls back to
+  the absolute path otherwise. Must call `Layout()` before dispatch
+  so rects exist.
 - **`screens/`** — one file per screen. Each defines a single pure
   `Build*(const Context&)` function returning the tree.
 
-Future containers (`VStack`, `HStack`, `Center`, `Padding`) and the
-Yoga integration land in the PR that ships the first screen using
-them; PR #1 is absolute-positioned only to keep the pixel diff
-trivially verifiable against the live game.
+Container expression is the **preferred** layout style for new
+screens. Absolute `.at()` is the documented escape hatch for screens
+that need pixel-identical legacy parity with a non-container-shaped
+layout (e.g. MainMenu's staggered button positions).
 
 ## Authoring rules
 

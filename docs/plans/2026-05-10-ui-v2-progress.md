@@ -10,36 +10,50 @@ session can pick up cold.
 
 ## Status
 
-- **Current branch:** `hv/layout` (worktree at `.worktrees/hv-layout/`)
-- **CMake `cxx_std_14`** (working state). C++20 was attempted and
-  reverted — see "C++ standard upgrade attempt" below.
-- **PR #1.5 in flight:** Clay layout engine + MainMenu redesign.
-  Clay header vendored at `clients/silencer/third_party/clay/clay.h`
-  (v0.14, 4393 lines). Layout pass + new NodeKinds + MainMenu port
-  not yet implemented.
-- **PR #1** (foundation + mouse interaction + `hot_t` animation) was
-  committed pre-session (commit `afd6b98` "ui/v2 declarative layout
-  library + MainMenu parity") for the foundation, plus follow-on
-  work this session for mouse + animation.
-- **Last verified state:** Windows MSVC unity build green at
-  `cxx_std_14`. v2 vs legacy MainMenu byte-identical PPM dump
-  (will break once Clay redesigns MainMenu — see "Pixel-parity
-  decision" below).
+- **Current branch:** `hv/layout` (worktree at `.worktrees/clay/`)
+- **CMake `cxx_std_20`.** Bumped this session; macOS Apple Clang
+  builds clean with no source changes beyond the cxx flag. Windows
+  MSVC unity build still has an unresolved `std::abs(int)` ambiguity
+  in the unity TU — to be addressed in a follow-up (no Windows-only
+  workaround in tree).
+- **PR #1.5 (this session):** Clay layout engine wired into the
+  build. `clay_impl.cpp` defines `CLAY_IMPLEMENTATION` once;
+  `layout.{h,cpp}` walks the Node tree and emits Clay scopes for
+  container kinds, reading back rects via `Clay_GetElementData`.
+  New container `NodeKind`s: `VStack`, `HStack`, `Center`,
+  `Padding`, `Spacer`. New `Node` fields: `rect_x/y/w/h`, `gap`,
+  `pad`. Chainable `.withGap(n)` / `.withPadding(n)`. Render +
+  dispatch consume `rect_*` when populated (`rect_w > 0`); fall
+  back to absolute `.at()` + sprite-anchor when not.
+- **MainMenu:** kept on the absolute `.at()` path (no Clay
+  containers). Rationale: legacy MainMenu's staggered button
+  positions (per-row x offsets, logo overlapping the center column)
+  are not naturally container-shaped, and the design doc's `.at()`
+  escape hatch is the right tool. **Byte-identical to legacy
+  preserved** — this reverses the prior session's "Pixel-parity
+  decision" carve-out (see below).
+- **PR #1** (foundation + mouse interaction + `hot_t` animation):
+  committed pre-session (commit `afd6b98`).
 
-## Pixel-parity decision (2026-05-10)
+## Pixel-parity decision — REVERSED (2026-05-10)
 
-The "byte-identical PPM as merge gate" rule from the design doc has
-**one explicit carve-out: MainMenu when ported to Clay.** Legacy
-MainMenu has buttons at non-uniform absolute positions (post-chrome-
-offset: roughly (350,154), (390,221), (350,288), (310,355) — slightly
-staggered, not column-aligned), which a clean `Center({VStack({...})})`
-won't reproduce. The user chose to **redesign MainMenu** when porting
-(centered VStack, evenly spaced) and **replace the diff gate with a
-committed reference PPM** the user eyeball-approves once.
+The prior plan was to carve MainMenu out of the byte-identity gate
+and ship a centered VStack redesign. **User reversed this** mid-
+session: "You must be able to match the original placement. If
+clay is not expressive enough for this then it's not a viable
+path." The staggered legacy layout (buttons at chrome-relative
+(350,154), (390,221), (350,288), (310,355) — alternating x offsets
+of 0/+40/0/-40) isn't a natural container shape; expressing it
+through Clay would require floating-with-offset per button, which
+is absolute positioning wearing a costume.
 
-Other screens still ship byte-identical against their legacy
-counterparts — the carve-out is MainMenu-specific because it's our
-guinea pig for Clay.
+Resolution: **MainMenu uses absolute `.at()` per the design doc's
+documented escape hatch** ("screens keep absolute `.at()` when
+faithfully replicating a quirky legacy layout"). Clay is wired in
+and exercised by `Layout()` every frame (with zero scopes emitted
+for the MainMenu subtree), ready for the first screen that has a
+container-natural layout — Options is a likely candidate. Byte-
+identity vs legacy is restored as the MainMenu merge gate.
 
 ## Phases
 
@@ -79,93 +93,70 @@ Phase ordering is a proposal, not a commitment — reorder freely.
 - [ ] Commit + push + open PR (deferred — likely bundle with PR #1.5)
 - [ ] In-session code review (spec + style passes via subagents)
 
-### PR #1.5 — Clay layout + MainMenu redesign (in progress)
+### PR #1.5 — Clay layout wired in (done; PR open)
 
-User chose to land Clay now rather than later, and redesign MainMenu
-in the same chunk (see "Pixel-parity decision" above).
+User chose C++20 to satisfy Clay's cross-platform header gate. Clay
+is wired in and exercised by `Layout()` every frame; MainMenu stays
+on the absolute `.at()` path per the design doc's escape hatch (see
+"Pixel-parity decision — REVERSED" above). First Clay container use
+will land with the first container-shaped screen (Options is a
+likely candidate).
 
 - [x] Vendor Clay v0.14 at
       `clients/silencer/third_party/clay/clay.h` (4393 lines).
-      **Header gate:** Clay's `clay.h` requires C99 / C++20 / MSVC.
-      Windows MSVC at C++14 passes via `_MSC_VER`; macOS / Linux at
-      C++14 fail. See "C++ standard upgrade" decision below.
 - [x] Bulk-rename bare `abs(...)` → `std::abs(...)` across 22
-      legacy `.cpp/.h` files (100 sites). Improves correctness even
-      at C++14, prep for any future standard bump. Files touched:
-      `actors/{bodypart,civilian,guard,player,playerai,robot}.cpp`,
-      `gas/gasloader.h`, `objects/platform.cpp`,
-      `projectiles/{blaster,grenade,laser,plasma,rocket,shrapnel,wall}*.cpp`,
-      `render/{palette,renderer}.cpp`,
-      `ui/components/interface.cpp`,
-      `ui/screens/options/options_controls_screen.cpp`,
-      `world/{hittable,map,world}.cpp`.
-- [ ] **Decide C++ standard.** This is the unblocker for everything
-      below. See "C++ standard upgrade attempt" below for what we
-      learned trying C++20 in the Windows unity build.
-- [ ] `clay_impl.cpp` (or `.c`) defining `CLAY_IMPLEMENTATION` once
-- [ ] Add `clay_impl` source to CMake + include path for
-      `third_party/clay/`
-- [ ] `MeasureSpriteText` callback wiring to sprite-font glyph width
-      (font is fixed-width per bank; cfg.fontId encodes the bank)
-- [ ] New `NodeKind`s: `VStack`, `HStack`, `Center`, `Padding`,
-      `Spacer`. Chainable `.gap(n)`, `.padding(n)`.
-- [ ] `Node` fields: `rect_x/y/w/h` (filled by Layout, read by
-      Render + Dispatch). `rect_w == 0` ⇒ "no layout, fall back to
-      `(x, y)` + `ChromeFor.width/height`" — keeps the absolute
-      `.at()` escape hatch for migrated screens.
-- [ ] `layout.{h,cpp}` — `Layout(root, ctx)` walks tree, emits CLAY
-      scopes per kind, calls `Clay_BeginLayout` / `Clay_EndLayout`,
-      reads back rects via `Clay_GetElementData(id)`.
-- [ ] Render uses computed rects (Sprite/Label/Button); dispatch
-      uses computed rects (`ButtonHit` reads `rect_*` when set).
-- [ ] Port `BuildMainMenu` to `Background → Center → VStack(buttons)`.
-      Logo `Sprite(208, 60)` and version label keep `.at()` (anchor
-      semantics — top-of-screen sprite + bottom-of-screen label).
-- [ ] Capture v2 PPM at 640×480 as the new reference; commit to
-      `clients/silencer/test/golden/main_menu_v2.ppm` (or similar).
-      Eyeball-approve once.
-- [ ] Smoke-test interactive launch + try a window resize (drag the
-      SDL window) to confirm relayout works.
+      legacy `.cpp/.h` files (100 sites).
+- [x] **Decide C++ standard:** C++20. macOS Apple Clang clean with
+      only the cxx flag bumped; Windows MSVC unity build still has
+      the `std::abs(int)` ambiguity from the prior session — to be
+      diagnosed in a follow-up commit. No Windows-only path in tree.
+- [x] `clay_impl.cpp` defining `CLAY_IMPLEMENTATION` once (in
+      `src/ui/v2/`).
+- [x] `third_party/` is already on the include path; sources are
+      `GLOB_RECURSE`d so `clay_impl.cpp` is picked up automatically.
+- [x] `MeasureSpriteText` callback in `layout.cpp` — fixed-width
+      per-glyph advance from `cfg->fontSize`, line height from
+      `cfg->lineHeight`. Wired via `Clay_SetMeasureTextFunction`.
+- [x] New `NodeKind`s: `VStack`, `HStack`, `Center`, `Padding`,
+      `Spacer`. Chainable `.withGap(n)` / `.withPadding(n)`.
+- [x] `Node` fields: `rect_x/y/w/h` filled by Layout, read by
+      Render + Dispatch. `rect_w == 0` ⇒ "no layout, fall back to
+      absolute `.at()` + `ChromeFor.width/height`" — the design
+      doc's documented escape hatch.
+- [x] `layout.{h,cpp}` — `Layout(root, ctx)` walks tree, emits CLAY
+      scopes per container kind, calls `Clay_BeginLayout` /
+      `Clay_EndLayout`, reads back rects via `Clay_GetElementData`.
+      Single per-process arena, `Clay_MinMemorySize()` bytes,
+      malloc'd on first call. IDs use `Clay_GetElementIdWithIndex`
+      with a static base string + per-emit counter.
+- [x] Render uses computed rects (`rect_w > 0`) for Buttons inside
+      Clay subtrees; dispatch's `ButtonHit` reads `rect_*` for hit
+      test on the same condition. Both paths fall back to absolute
+      `.at()` + sprite anchor when `rect_w == 0`.
+- [x] `BuildMainMenu`: kept on absolute `.at()`. Layout runs but
+      emits zero scopes for this tree. Byte-identical to legacy
+      preserved (verified via PPM cmp).
+- [x] Preview wired to call `Layout(tree, ctx)` before both render
+      and dispatch — required since hit-test consults `rect_*`.
+- [x] Smoke-test: interactive launch verified (binary opens, no
+      Clay errors). Window-resize relayout test deferred until a
+      screen actually uses container layout.
 
-#### C++ standard upgrade attempt (2026-05-10)
+#### C++20 bump status
 
-User chose **C++20** to unblock Clay cross-platform without patching
-the vendored header. Attempted, then reverted to C++14 to leave the
-working tree green. What we learned:
+- **macOS (Apple Clang 17):** clean. Only the `cxx_std_14 →
+  cxx_std_20` flip in `CMakeLists.txt:75` was needed. v2 PPM
+  byte-identical before vs after the bump.
+- **Windows MSVC unity build:** still hits the `std::abs(int)`
+  ambiguity from the prior session even after the 100-site
+  `std::abs(...)` qualification. Trigger appears to be header-
+  ordering pollution inside a unity TU (a minimal isolated repro at
+  C++20 builds clean). Not yet diagnosed. **Open follow-up.**
+- **Linux GCC/Clang:** not exercised locally; CI will surface.
 
-- **MSVC C++20 + unity build breaks `std::abs(int)` resolution.**
-  Even with all 100 `abs()` sites qualified to `std::abs(...)`, MSVC
-  reports "ambiguous" against the C global `int abs(int)` (from
-  `corecrt_math.h`) plus `long abs(const long) noexcept` and
-  `__int64 abs(...)` (from `stdlib.h`) AND the std float/double
-  overloads (from `cstdlib`). Notes show 6 candidates; an exact-int
-  match exists but isn't picked.
-- A **minimal isolated repro** (`std::abs((signed)(int_expr))` with
-  `<cstdlib>` + `<math.h>` at C++20) builds clean. So the trigger is
-  something in the unity TU's earlier headers polluting lookup —
-  likely a `using ::abs;` interaction or an SDL3 / vcpkg header. Not
-  diagnosed before pause.
-- Likely sites lurking beyond `abs`: C++20 also tightens warnings on
-  `'>': unsafe use of type 'bool'` (already seen as a warning at
-  `events.cpp:174`), and `volatile` deprecations.
-
-**Continuation must be cross-platform** — no Windows-only path.
-Next session is on macOS (Apple Clang). Two live options:
-
-1. **Push through C++20** (user's original pick). Diagnose the
-   unity-batch interaction that breaks `std::abs(int)` lookup on
-   MSVC, fix it, then sweep any other C++20 strictness issues
-   (`volatile` deprecations, `'>': unsafe use of type 'bool'` at
-   `events.cpp:174`, etc). On macOS Clang the abs problem may not
-   reproduce — diagnose there first; fix may be Clang-trivial and
-   the MSVC fallout addressed in CI separately.
-2. **C++17 + 1-line Clay guard patch.** Verified C++17 builds
-   clean on the Windows unity build (only one pre-existing
-   unrelated warning); macOS Clang at C++17 should be at least as
-   permissive. One-line patch to Clay's `clay.h` adding
-   `|| (defined(__cplusplus) && __cplusplus >= 201703L)` to the
-   guard. Document the diff in `third_party/clay/CLAUDE.md` so
-   future Clay version bumps re-apply it.
+If the MSVC fallout proves intractable, the live fallback is C++17
++ a 1-line patch to Clay's `clay.h` guard, documented in
+`third_party/clay/CLAUDE.md`. Both paths leave macOS+Linux clean.
 
 ### PR #2 — wire v2 MainMenu into the live engine
 
@@ -324,10 +315,9 @@ fc.exe /b v2.ppm legacy.ppm
 Mirror of the design doc's "Open questions" — listed here too so the
 checklist is self-contained:
 
-- **C++ standard upgrade for Clay cross-platform.** Clay needs C99,
-  C++20, or MSVC. C++14 + MSVC works (Windows), C++14 + GCC/Clang
-  fails. Either bump project to C++17/20, or compile Clay impl as
-  C99 in a `.c` file and bridge through a wrapper header.
+- ~~C++ standard upgrade for Clay cross-platform.~~ **Decided
+  2026-05-10: C++20.** macOS clean; Windows MSVC unity build needs
+  follow-up diagnosis on `std::abs(int)` ambiguity.
 - Bake sprite anchor offsets out of asset pipeline? (Affects layout
   primitives' coordinate system. Now that Clay is landing, becomes
   more relevant — Clay-positioned children inherit the anchor mess
@@ -348,94 +338,58 @@ checklist is self-contained:
 > reads only this block + the linked design doc to pick up cold.)*
 
 I'm continuing the **UI v2 declarative layout rewrite** for the
-Silencer client (`clients/silencer/`, C++/SDL3). **Cross-platform
-build is required** — you're on macOS (Apple Clang); the same code
-also has to compile on Windows (MSVC) and Linux (GCC/Clang) via CI.
-Read the design doc at
+Silencer client (`clients/silencer/`, C++20/SDL3). **Cross-platform
+build is non-negotiable** — your environment is macOS (Apple Clang);
+the same code also has to compile on Windows (MSVC) and Linux
+(GCC/Clang) via CI. Read the design doc at
 `docs/plans/2026-05-10-ui-v2-declarative-layout.md` and the progress
 doc at `docs/plans/2026-05-10-ui-v2-progress.md` (this file). The
 "Phases" section is the checklist; "Discovered quirks" is gotcha
 context.
 
-**Current task: continue Clay implementation (PR #1.5).**
+### What's done
 
-### What's in the branch
+Branch `hv/layout` (PR #153). PR #1.5 is **complete on macOS** and
+ready to commit/push. Clay is fully wired in:
 
-Branch `hv/layout` (open PR — `gh pr view` to find it). Two
-just-pushed commits sit on top of the foundation commit `afd6b98`:
+- C++20 (`CMakeLists.txt` `cxx_std_20`). macOS Apple Clang clean.
+- `clay_impl.cpp` defines `CLAY_IMPLEMENTATION` once.
+- `layout.{h,cpp}` walks the Node tree, emits Clay scopes for
+  container kinds, reads back rects via `Clay_GetElementData`.
+  Single per-process arena, lazily initialized.
+- New `NodeKind`s: `VStack`, `HStack`, `Center`, `Padding`, `Spacer`.
+- New `Node` fields: `rect_x/y/w/h`, `gap`, `pad`. Chainable
+  `.withGap(n)` / `.withPadding(n)`.
+- Render + dispatch consume `rect_*` for layout-managed buttons;
+  fall back to absolute `.at()` + sprite-anchor when `rect_w == 0`.
+- `MeasureSpriteText` Clay callback in `layout.cpp`.
+- MainMenu **kept on absolute `.at()` path** — byte-identical to
+  legacy preserved (see "Pixel-parity decision — REVERSED" above
+  for why we did not redesign).
 
-1. **Mouse interaction + `hot_t` hover animation** in v2 preview.
-   New files: `src/ui/v2/dispatch.{h,cpp}`, `button_chrome.h`,
-   `ui_state.h`. Modified: `node.h` (key field), `context.h`
-   (UIState*, mouse_x/y, dt), `render.cpp` (hot_t mapping to chrome
-   res_index + brightness), `preview.cpp` (SDL mouse events,
-   DispatchClick, dt + UIState lifecycle), `screens/main_menu.{h,cpp}`
-   (MainMenuHandlers struct, default Button auto-key to `"btn:" + text`).
-2. **Clay vendored + `abs(...)` → `std::abs(...)` cleanup.** Clay
-   v0.14 single header at `clients/silencer/third_party/clay/clay.h`
-   (4393 lines). `std::abs` qualification across 22 files (100
-   sites) — improves correctness regardless of standard, prep for
-   any future bump.
+### Open follow-ups before merging
 
-`CMakeLists.txt` is at `cxx_std_14` (working state).
+1. **Windows MSVC `std::abs(int)` ambiguity** in the unity build at
+   C++20. Same issue the prior session pre-pause hit; not diagnosed.
+   On macOS the bump is clean. Live fallback: C++17 + 1-line Clay
+   `clay.h` guard patch (documented in the C++20 section above).
+   Address in CI or a follow-up commit before merging.
+2. **Linux build** not exercised locally — CI will surface.
+3. **Commit + push.** The branch has staged changes for clay_impl,
+   layout, node container kinds, render/dispatch rect consumption,
+   main_menu revert, CLAUDE.md/CMakeLists.txt C++20 bump, and this
+   progress doc. Run `git status` to see exactly what's pending.
 
-### Step 0 — pick the C++ standard (UNBLOCKER)
+### Next phase — PR #2 (engine integration)
 
-Clay v0.14's header gate requires C99 / C++20 / MSVC. C++14 + Apple
-Clang **fails** the gate. You can't include `clay.h` until this is
-resolved. **Two options:**
+Replace the live MAINMENU state-handler `PushScreen(MainMenuScreen)`
+with the v2 path; live game renders via v2. Engine owns a `UIState`,
+threaded into `Context`. Then delete `MainMenuScreen` + components
+it was the last user of. See "PR #2" in the Phases section.
 
-- **C++20** (user's original pick). Bump `cxx_std_14 → cxx_std_20`
-  in `CMakeLists.txt`. On macOS Clang this likely Just Works.
-  Caveat: Windows MSVC unity build hits `std::abs(int)` ambiguity
-  in the unity TU even after the cleanup — root cause not
-  diagnosed before pause; minimal isolated repro of `std::abs((signed)
-  expr)` builds clean at C++20, so something in the unity batch's
-  earlier headers poisons lookup. May need a workaround. Verify
-  macOS first; address Windows in CI / a follow-up commit.
-- **C++17 + 1-line Clay guard patch.** C++17 was verified clean on
-  the Windows unity build before pause. Patch `clay.h` line ~32
-  from `(defined(__cplusplus) && __cplusplus >= 202002L)` to
-  `(defined(__cplusplus) && __cplusplus >= 201703L)`. Document the
-  diff in `third_party/clay/CLAUDE.md` so future Clay bumps
-  re-apply. Bump `cxx_std_14 → cxx_std_17`.
-
-Ask user before picking if unclear. Don't pick a Windows-only path.
-
-### Steps 1–N — Clay implementation
-
-Once Clay's gate is satisfied, proceed:
-
-1. `clay_impl.cpp` (or `.c`) defining `CLAY_IMPLEMENTATION` exactly
-   once. Add to CMake sources + add `third_party/clay/` include path
-   in `CMakeLists.txt` next to existing `third_party/` entry.
-2. Add new `NodeKind`s (`VStack`, `HStack`, `Center`, `Padding`,
-   `Spacer`) + `rect_x/y/w/h` fields on `Node` + `.gap(n)` /
-   `.padding(n)` chainables.
-3. `layout.{h,cpp}`: `Layout(Node&, const Context&)` walks tree,
-   emits CLAY scopes per kind, calls `Clay_BeginLayout` /
-   `Clay_EndLayout`, reads back rects via `Clay_GetElementData(id)`
-   into `node.rect_*`. Use FNV-1a hash of `node.key` as Clay's
-   element ID (already have `Hash64` in `ui_state.h`). Init Clay
-   arena once at first call.
-4. `MeasureSpriteText` callback: fixed-width font, returns
-   `{text.length * cfg.fontSize, line_height}`. Wire via
-   `Clay_SetMeasureTextFunction(MeasureSpriteText, &resources)`.
-5. Update `render.cpp` and `dispatch.cpp` to use `node.rect_*` when
-   `rect_w > 0`; fall back to `n.x/n.y` + `ChromeFor.width/height`
-   when not (legacy `.at()` escape hatch — keeps absolute positioning
-   working for migrated screens that need pixel parity).
-6. Port `BuildMainMenu` to `Background → Center → VStack(buttons).gap(N)`.
-   Logo `Sprite(208, 60)` keeps `.at()` (sprite-anchor-driven).
-   Version label keeps `.at(10, ctx.logical_h - 17)` (bottom-left
-   anchored).
-7. **Drop the v2-vs-legacy byte-identity gate for MainMenu** in the
-   preview path (the design intentionally diverges — see "Pixel-
-   parity decision" in this doc). Capture the new v2 PPM at 640×480
-   as `clients/silencer/test/golden/main_menu_v2.ppm`. Get user
-   eyeball-approval.
-8. Smoke-test interactive launch + drag-resize the SDL window to
-   confirm relayout works.
+After that, PR #3+ migrate the remaining screens one at a time;
+screens that have natural container layouts (Options sub-router is a
+likely first candidate) actually exercise the new Clay containers.
 
 ### Quirks to read first
 
@@ -443,22 +397,20 @@ See "Discovered quirks" section. Highlights:
 
 - `UIState::EndFrame` GCs unvisited slots — animation state vanishes
   for hidden nodes (intentional).
-- Render snaps when `ctx.state == NULL` (PPM dumps stay deterministic).
+- Render snaps when `ctx.state == NULL` (PPM dumps deterministic).
 - Button factory auto-keys to `"btn:" + text`. Collisions need
   explicit `.withKey(...)`.
 - Logo bank 208 animation frame, palette 1 index 114 = black is
   intentional (don't mistake for missing render).
+- Clay's `Layout()` is safe to call on any tree — if there are no
+  container nodes, zero Clay scopes get emitted and the tree falls
+  through to the absolute `.at()` path.
 
 ### Build / verify (OS-agnostic)
 
-Repo root has top-level docs and CI workflows; this PR's changes
-live under `clients/silencer/`. From the repo root:
-
 ```bash
-cd clients/silencer
-
-# macOS / Linux
-cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+# macOS / Linux (from repo root)
+cmake -B build -S clients/silencer -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 
 # Windows (PowerShell, MSVC env imported via VsDevCmd.bat — snippet
@@ -467,7 +419,7 @@ cmake --preset win-ninja-unity        # first time / new files
 cmake --build --preset win-ninja-unity --parallel
 ```
 
-The `Silencer` binary runs the v2 preview via:
+Preview / verify:
 
 ```bash
 # macOS:    ./build/Silencer.app/Contents/MacOS/Silencer ...
@@ -476,11 +428,16 @@ The `Silencer` binary runs the v2 preview via:
 
 <binary> --preview-screen main_menu --preview-impl v2
 <binary> --headless --preview-screen main_menu --preview-impl v2 --dump-ppm v2.ppm
+<binary> --headless --preview-screen main_menu --preview-impl legacy --dump-ppm legacy.ppm
+cmp v2.ppm legacy.ppm   # MUST be byte-identical (MainMenu still on .at() path)
 ```
 
 ### User preferences (from memory)
 
-Terse responses, no narrating internal deliberation, lightweight
-plans during refactors, PR before review, don't invent constraints.
-**Cross-platform is non-negotiable** — never propose a Windows-only
-or macOS-only path; the project ships on all three.
+Terse, no narrating internal deliberation, lightweight plans during
+refactors, PR before review, don't invent constraints. **Cross-
+platform is non-negotiable** — never propose a Windows-only or
+macOS-only path. **Pick the right architecture, not a stepping-
+stone we'd later replace** — this is why the prior session's
+MainMenu-redesign carve-out was reversed: forcing a quirky legacy
+layout through containers would have been a costume-wearing hack.

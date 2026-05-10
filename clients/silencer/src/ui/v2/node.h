@@ -16,6 +16,15 @@ enum class NodeKind : Uint8 {
 	              // offset is honored by the renderer (legacy semantics).
 	Label,        // Text drawn at logical (x, y) using a sprite-font bank.
 	Button,       // Pressable widget — chrome + centered label.
+
+	// Container kinds — laid out by the Clay layout pass. Walk emits a
+	// Clay scope per container; descendants get computed rects written
+	// into rect_x/y/w/h, which the render + dispatch passes consume.
+	VStack,       // Children stacked top→bottom, .gap(n) between.
+	HStack,       // Children stacked left→right, .gap(n) between.
+	Center,       // Single-axis "fill available space, center child(ren)".
+	Padding,      // Inset its single child by .padding(n) on all sides.
+	Spacer,       // Empty growable element — pushes siblings apart.
 };
 
 // 1:1 mapping to the legacy Button::Type values.
@@ -60,6 +69,21 @@ struct Node {
 	// panels) or where a non-Button node needs animation.
 	std::string key;
 
+	// Container-only: per-child gap (VStack/HStack) and uniform padding
+	// (Padding). 0 = no gap / no padding. Reserved for future expansion
+	// to {top,right,bottom,left} if uniform proves insufficient.
+	Uint16 gap = 0;
+	Uint16 pad = 0;
+
+	// Layout output. Set by `layout.cpp` for nodes inside a container
+	// subtree. `rect_w == 0` means "not laid out, fall back to (x, y)
+	// + ChromeFor.width/height" — preserves the absolute `.at()`
+	// escape hatch for screens that need pixel-identical legacy parity.
+	Sint16 rect_x = 0;
+	Sint16 rect_y = 0;
+	Uint16 rect_w = 0;
+	Uint16 rect_h = 0;
+
 	// Children. Drawn after self in declaration order.
 	std::vector<Node> children;
 
@@ -72,7 +96,15 @@ struct Node {
 	Node & at(Sint16 nx, Sint16 ny) { x = nx; y = ny; return *this; }
 	Node & onClick(std::function<void()> handler) { on_click = std::move(handler); return *this; }
 	Node & withKey(std::string k) { key = std::move(k); return *this; }
+	Node & withGap(Uint16 g) { gap = g; return *this; }
+	Node & withPadding(Uint16 p) { pad = p; return *this; }
 };
+
+inline bool IsContainer(NodeKind k) {
+	return k == NodeKind::VStack || k == NodeKind::HStack ||
+	       k == NodeKind::Center || k == NodeKind::Padding ||
+	       k == NodeKind::Spacer;
+}
 
 // ----- Factories -----
 
@@ -106,6 +138,41 @@ inline Node Label(std::string text, Uint8 font_bank, Uint8 font_width) {
 	n.text = std::move(text);
 	n.text_bank = font_bank;
 	n.text_width = font_width;
+	return n;
+}
+
+inline Node VStack(std::vector<Node> children) {
+	Node n;
+	n.kind = NodeKind::VStack;
+	n.children = std::move(children);
+	return n;
+}
+
+inline Node HStack(std::vector<Node> children) {
+	Node n;
+	n.kind = NodeKind::HStack;
+	n.children = std::move(children);
+	return n;
+}
+
+inline Node Center(std::vector<Node> children) {
+	Node n;
+	n.kind = NodeKind::Center;
+	n.children = std::move(children);
+	return n;
+}
+
+inline Node Padding(Uint16 amount, std::vector<Node> children) {
+	Node n;
+	n.kind = NodeKind::Padding;
+	n.pad = amount;
+	n.children = std::move(children);
+	return n;
+}
+
+inline Node Spacer() {
+	Node n;
+	n.kind = NodeKind::Spacer;
 	return n;
 }
 

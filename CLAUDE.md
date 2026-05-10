@@ -9,7 +9,7 @@ references opportunistically when you touch surrounding code/docs.
 
 ## Tech stack
 
-- Game client: C++14 / SDL3 / CMake
+- Game client: C++20 / SDL3 / CMake
 - Lobby server: Go (stdlib + `mongo-driver`/`amqp091-go`, both optional)
 - Admin web + API: Bun + TypeScript + oxfmt
 - Infra: Docker Compose, Terraform (AWS)

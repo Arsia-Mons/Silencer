@@ -19,6 +19,13 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 {
 	switch(n.kind){
 		case NodeKind::Group:
+		case NodeKind::VStack:
+		case NodeKind::HStack:
+		case NodeKind::Center:
+		case NodeKind::Padding:
+		case NodeKind::Spacer:
+			// Containers and Group draw nothing of their own. Their
+			// computed rect is consumed by descendant nodes.
 			break;
 
 		case NodeKind::Background:
@@ -58,23 +65,40 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 			if(step > 4) step = 4;
 			Uint8 res_idx    = (Uint8)(c.base_index + step);
 			Uint8 brightness = (Uint8)(128 + step * 2);
-			if(c.bank != 0xFF){
-				renderer.DrawSpriteAt(&target, c.bank, res_idx, n.x, n.y);
+
+			// Two coordinate systems exist:
+			//   - Layout-managed (rect_w > 0): rect_x/rect_y is the chrome's
+			//     screen-pixel top-left. DrawSpriteAt expects an *anchor*,
+			//     and the sprite is drawn at (anchor - baked_offset). So
+			//     anchor = rect_top_left + baked_offset to land the chrome.
+			//   - Absolute (rect_w == 0): n.x/n.y is the anchor directly —
+			//     the legacy `.at()` convention preserved for screens that
+			//     still need pixel-identical parity with the legacy widget.
+			Sint16 anchor_x, anchor_y;
+			Sint16 box_x,    box_y;
+			if(n.rect_w > 0){
+				box_x    = n.rect_x;
+				box_y    = n.rect_y;
+				anchor_x = (Sint16)(box_x + (c.bank != 0xFF ? ctx.resources.spriteoffsetx[c.bank][res_idx] : 0));
+				anchor_y = (Sint16)(box_y + (c.bank != 0xFF ? ctx.resources.spriteoffsety[c.bank][res_idx] : 0));
+			}else{
+				anchor_x = n.x;
+				anchor_y = n.y;
+				box_x = (Sint16)(n.x - (c.bank != 0xFF ? ctx.resources.spriteoffsetx[c.bank][res_idx] : 0));
+				box_y = (Sint16)(n.y - (c.bank != 0xFF ? ctx.resources.spriteoffsety[c.bank][res_idx] : 0));
 			}
-			// Text centering math = Button::GetTextOffset, evaluated at
-			// the chrome's anchor offset so the label lands inside the
-			// pill regardless of where the anchor lives in the asset. Use
-			// the *current* frame's offset to mirror legacy GetTextOffset
-			// (which reads spriteoffsetx[res_bank][res_index]).
+
+			if(c.bank != 0xFF){
+				renderer.DrawSpriteAt(&target, c.bank, res_idx, anchor_x, anchor_y);
+			}
+			// Text centering math (mirrors Button::GetTextOffset). Centered
+			// inside the box, so we compute against the chrome's screen
+			// top-left — no extra anchor-offset correction needed.
 			int text_len = (int)n.text.size();
 			int xoff = (c.width - text_len * c.text_width) / 2 + c.text_xoff_extra;
 			int yoff = c.text_yoff;
-			Sint16 text_x = (Sint16)(n.x + xoff);
-			Sint16 text_y = (Sint16)(n.y + yoff);
-			if(c.bank != 0xFF){
-				text_x = (Sint16)(text_x - ctx.resources.spriteoffsetx[c.bank][res_idx]);
-				text_y = (Sint16)(text_y - ctx.resources.spriteoffsety[c.bank][res_idx]);
-			}
+			Sint16 text_x = (Sint16)(box_x + xoff);
+			Sint16 text_y = (Sint16)(box_y + yoff);
 			renderer.DrawText(&target, (Uint16)text_x, (Uint16)text_y,
 			                  n.text.c_str(), c.text_bank, c.text_width,
 			                  /*alpha=*/true, /*tint=*/0, brightness);

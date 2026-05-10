@@ -13,9 +13,16 @@ Node BuildMainMenu(const Context & ctx, const MainMenuHandlers & handlers)
 	std::string version_label = "Silencer v";
 	if(ctx.version) version_label += ctx.version;
 
-	// Coordinates mirror the legacy MainMenuScreen::Build exactly. Each
-	// Button uses the negative-anchor convention where the rendered pill
-	// ends up at (x + 310, y + 288) for the default B196x33 chrome.
+	// MainMenu uses absolute `.at()` positions matching the legacy
+	// MainMenuScreen exactly. The staggered button arrangement (per-row
+	// horizontal offset, logo overlapping the column on the left) is not
+	// naturally container-shaped, so the design doc's `.at()` escape
+	// hatch is the right tool. The Layout pass detects no containers in
+	// this subtree and writes no rects → render+dispatch fall through to
+	// the absolute path, producing byte-identical output to legacy.
+	//
+	// When containers do land (Options, LobbyConnect, etc.) they emit
+	// Clay scopes and the rect-driven path takes over for those screens.
 	return Background(/*bank=*/6, /*index=*/0, {
 		// Bank 208's animation table (Overlay::Tick case 208) ramps frames
 		// 29..58, holds at 60 for ~1 s, then ramps back. Index 60 is the

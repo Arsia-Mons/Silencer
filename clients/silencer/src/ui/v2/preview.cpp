@@ -23,6 +23,7 @@
 
 #include "context.h"
 #include "dispatch.h"
+#include "layout.h"
 #include "node.h"
 #include "render.h"
 #include "ui_state.h"
@@ -174,6 +175,7 @@ int Game::RunPreview()
 			if(strcmp(preview_screen, "main_menu") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
+				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
 			}else{
@@ -231,6 +233,9 @@ int Game::RunPreview()
 				if(!use_legacy && strcmp(preview_screen, "main_menu") == 0){
 					ui::v2::Context ctx = make_ctx(/*with_state=*/false);
 					ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
+					// Hit-test consults rect_* for layout-managed buttons,
+					// so the same layout pass must run before dispatch.
+					ui::v2::Layout(tree, ctx);
 					ui::v2::DispatchClick(tree, ctx);
 				}
 			}
