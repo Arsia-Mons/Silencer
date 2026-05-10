@@ -136,10 +136,6 @@ void GameSelectPanel::Build(ScreenContext & ctx, Interface * parent)
 	if(parent){
 		parent->AddObject(interfaceId);
 	}
-	// Mirror onto Game so the legacy TickLobbyBody connect transition can
-	// destroy the gameselectinterface on its own when CONNECTED is reached.
-	// Removed in stage H.
-	ctx.game.gameselectinterface = interfaceId;
 }
 
 void GameSelectPanel::Tick(ScreenContext & ctx)
@@ -264,7 +260,7 @@ void GameSelectPanel::Tick(ScreenContext & ctx)
 					}
 					if(!selectbox) break;
 					if(selectbox->selecteditem == -1){
-						ctx.PushScreen(std::make_unique<MessageModal>("No game selected"));
+						ctx.ShowMessage("No game selected");
 						break;
 					}
 					Uint32 gameid = selectbox->IndexToId(selectbox->selecteditem);
@@ -277,10 +273,10 @@ void GameSelectPanel::Tick(ScreenContext & ctx)
 					if(user){
 						if(lobbygame->minlevel > user->agency[Config::GetInstance().defaultagency].level){
 							canjoin = false;
-							ctx.PushScreen(std::make_unique<MessageModal>("Your player level is too low"));
+							ctx.ShowMessage("Your player level is too low");
 						}else if(lobbygame->maxlevel < user->agency[Config::GetInstance().defaultagency].level){
 							canjoin = false;
-							ctx.PushScreen(std::make_unique<MessageModal>("Your player level is too high"));
+							ctx.ShowMessage("Your player level is too high");
 						}
 					}
 					if(!canjoin) break;

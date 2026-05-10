@@ -56,11 +56,18 @@ public:
 	void GoToState(Uint8 newState);
 	void GoBack();
 	void RequestQuit();
+	// Session-side cleanup when a screen leaves a joined game (handled by
+	// Game/World, never by a screen reaching into the world directly).
+	void LeaveJoinedGame();
 	void PushScreen(std::unique_ptr<Screen> s);
 	void PopScreen();
 	void ReplaceScreen(std::unique_ptr<Screen> s);
 	void ShowModal(std::unique_ptr<Modal> m);
-	void ShowMessage(const char * msg, std::function<void(bool ok)> onClose);
+	void ShowMessage(const char * msg, std::function<void()> onClose = nullptr);
+
+	// Switch the renderer's active palette and clear the framebuffer. Called
+	// from Screen::Build by every menu surface that owns its presentation.
+	void ResetPresentation(int paletteIdx);
 };
 
 #endif

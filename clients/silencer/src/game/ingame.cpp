@@ -277,3 +277,20 @@ void Game::ShowTeamOverlays(bool show){
 		}
 	}
 }
+
+void Game::LeaveJoinedGame(){
+	world.Disconnect();
+	world.lobby.gamesprocessed = false;
+	world.lobby.channelchanged = true;
+	world.SwitchToLocalAuthorityMode();
+	sharedstate = 0;
+	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
+		Object * object = *it;
+		if(object->type == ObjectTypes::TEAM){
+			Team * team = static_cast<Team *>(object);
+			team->DestroyOverlays(world);
+			world.MarkDestroyObject(object->id);
+		}
+	}
+	world.lobby.JoinChannel(world.lobby.lastchannel);
+}

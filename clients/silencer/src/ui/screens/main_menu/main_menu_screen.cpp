@@ -2,6 +2,7 @@
 
 #include "screen_context.h"
 #include "game_state.h"
+#include "renderer.h"
 #include "world.h"
 #include "objecttypes.h"
 #include "interface.h"
@@ -23,6 +24,8 @@ enum MainMenuButton : Uint8 {
 void MainMenuScreen::Build(ScreenContext & ctx)
 {
 	World & world = ctx.world;
+	ctx.ResetPresentation(1);
+	ctx.renderer.camera.SetPosition(320, 240);
 
 	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	background->res_bank = 6;

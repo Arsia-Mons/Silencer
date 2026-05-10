@@ -34,6 +34,7 @@ enum LobbyConnectInput : Uint8 {
 void LobbyConnectScreen::Build(ScreenContext & ctx)
 {
 	World & world = ctx.world;
+	ctx.ResetPresentation(2);
 
 	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	background->res_bank = 7;

@@ -13,6 +13,7 @@
 #include "button.h"
 #include "scrollbar.h"
 #include "objecttypes.h"
+#include "renderer.h"
 
 #include <cstdio>
 #include <cstring>
@@ -21,6 +22,8 @@
 void MissionSummaryScreen::Build(ScreenContext & ctx)
 {
 	World & world = ctx.world;
+	ctx.ResetPresentation(1);
+	ctx.renderer.camera.SetPosition(320, 240);
 	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
 	if(!user) return;
 	Stats & stats = user->statscopy;

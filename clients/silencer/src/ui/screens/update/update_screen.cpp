@@ -34,6 +34,7 @@ enum UpdateOverlay : Uint8 {
 void UpdateScreen::Build(ScreenContext & ctx)
 {
 	World & world = ctx.world;
+	ctx.ResetPresentation(2);
 
 	Interface * iface = static_cast<Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
 	// Background (reuse modal-dialog sprite — same one CreateModalDialog uses;

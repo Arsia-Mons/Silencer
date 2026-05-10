@@ -303,7 +303,6 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	if(parent){
 		parent->AddObject(interfaceId);
 	}
-	ctx.game.gamecreateinterface = interfaceId;
 }
 
 void GameCreatePanel::Tick(ScreenContext & ctx)
@@ -349,7 +348,7 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						selectbox->downloadprogress = -1;
 						selectbox->downloaditem[0] = '\0';
 						mapDownloader.dlitemname.clear();
-						ctx.PushScreen(std::make_unique<MessageModal>("Download failed"));
+						ctx.ShowMessage("Download failed");
 					}else{
 						selectbox->downloadprogress = mapDownloader.dlprogress.load();
 					}
@@ -499,22 +498,22 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						if(maxteams <= 0) maxteams = 1;
 
 						if(strlen(gamename) == 0){
-							ctx.PushScreen(std::make_unique<MessageModal>("No game name"));
+							ctx.ShowMessage("No game name");
 							break;
 						}
 						tobject = iface->GetObjectWithUid(world, GCRT_SEL_MAP);
 						if(!tobject){
-							ctx.PushScreen(std::make_unique<MessageModal>("No map selected"));
+							ctx.ShowMessage("No map selected");
 							break;
 						}
 						SelectBox * mapselect = static_cast<SelectBox *>(tobject);
 						if(mapselect->selecteditem < 0){
-							ctx.PushScreen(std::make_unique<MessageModal>("No map selected"));
+							ctx.ShowMessage("No map selected");
 							break;
 						}
 						mapname = mapselect->GetItemName(mapselect->selecteditem);
 						if(mapDownloader.servermaps.count(mapname) > 0){
-							ctx.PushScreen(std::make_unique<MessageModal>("Download the map first"));
+							ctx.ShowMessage("Download the map first");
 							break;
 						}
 						unsigned char maphash[20];

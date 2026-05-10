@@ -65,11 +65,6 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	state = MAINMENU;
 	stateisnew = true;
 	fade_i = 0;
-	lobbyinterface = 0;
-	gamecreateinterface = 0;
-	gamejoininterface = 0;
-	gametechinterface = 0;
-	gameselectinterface = 0;
 	sharedstate = 0;
 	currentlobbygameid = 0;
 	lastannouncedgameid = 0;
@@ -769,11 +764,6 @@ bool Game::Tick(void){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
 				PushScreen(std::make_unique<MainMenuScreen>());
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-				renderer.camera.SetPosition(320, 240);
-				renderer.palette.SetPalette(1);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
@@ -789,11 +779,7 @@ bool Game::Tick(void){
 				world.DestroyAllObjects();
 				world.lobby.ClearGames();
 				world.lobby.state = Lobby::WAITING;
-				renderer.palette.SetPalette(2);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
 				PushScreen(std::make_unique<LobbyConnectScreen>());
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
@@ -807,20 +793,9 @@ bool Game::Tick(void){
 				world.gameplaystate = World::INLOBBY;
 				UnloadGame();
 				world.Disconnect();
-				renderer.camera.SetPosition(320, 240);
-				lobbyinterface = 0;
-				chatinterface = 0;
-				gameselectinterface = 0;
-				gamecreateinterface = 0;
-				gamejoininterface = 0;
-				gametechinterface = 0;
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
-				renderer.palette.SetPalette(2);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
 				PushScreen(std::make_unique<LobbyScreen>());
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
@@ -835,11 +810,7 @@ bool Game::Tick(void){
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				renderer.palette.SetPalette(2);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
 				PushScreen(std::make_unique<UpdateScreen>());
-				world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
@@ -852,10 +823,6 @@ bool Game::Tick(void){
 			if(stateisnew){
 				UnloadGame();
 				world.Disconnect();
-				renderer.camera.SetPosition(320, 240);
-				renderer.palette.SetPalette(1);
-				screenbuffer.Clear(0);
-				SetColors(renderer.palette.GetColors());
 				PushScreen(std::make_unique<MissionSummaryScreen>());
 				stateisnew = false;
 			}else{
@@ -928,43 +895,9 @@ void Game::GoToState(Uint8 newstate){
 }
 
 bool Game::GoBack(void){
-	if(gamejoininterface || gametechinterface){
-		world.Disconnect();
-		LobbyScreen * lobby = screenStack.empty() ? nullptr : dynamic_cast<LobbyScreen *>(screenStack.back().get());
-		if(lobby) lobby->SetMapNameOverlay(world, "");
-		world.lobby.gamesprocessed = false;
-		world.lobby.channelchanged = true;
-		world.SwitchToLocalAuthorityMode();
-		sharedstate = 0;
-		// Destroy the team overlays now that we're leaving the joined-game
-		// surface. ShowGameSelect (via TearDownRightPanels) owns the panel
-		// iface teardown + choosingtech / ShowTeamOverlays(true) reset.
-		for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-			Object * object = *it;
-			if(object->type == ObjectTypes::TEAM){
-				Team * team = static_cast<Team *>(object);
-				team->DestroyOverlays(world);
-				world.MarkDestroyObject(object->id);
-			}
-		}
-		world.lobby.JoinChannel(world.lobby.lastchannel);
-		if(lobby) lobby->ShowGameSelect(screenContext);
-		currentinterface = lobbyinterface;
-		return true;
-	}else
-	if(gamecreateinterface){
-		// LobbyScreen::ShowGameSelect tears down the active gameCreate panel
-		// and rebuilds gameSelect; it also resets ctx.game.gamecreateinterface.
-		world.lobby.gamesprocessed = false;
-		LobbyScreen * lobby = screenStack.empty() ? nullptr : dynamic_cast<LobbyScreen *>(screenStack.back().get());
-		if(lobby){
-			lobby->ShowGameSelect(screenContext);
-		}
-		currentinterface = lobbyinterface;
-		return true;
-	}else{
-		GoToState(MAINMENU);
-	}
+	Screen * top = GetTopScreen();
+	if(top && top->HandleBack(screenContext)) return true;
+	GoToState(MAINMENU);
 	return false;
 }
 
@@ -1132,6 +1065,9 @@ void Game::PushScreen(std::unique_ptr<Screen> s){
 	s->Build(screenContext);
 	screenStack.push_back(std::move(s));
 	currentinterface = screenStack.back()->interfaceId;
+	if(currentinterface){
+		world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
+	}
 }
 
 void Game::PopScreen(){

@@ -88,21 +88,17 @@ public:
 	SDL_Gamepad * GetGamepad() const { return gamepad; }
 
 	// LobbyScreen + per-panel interop. Public so panels can reach in via
-	// `ScreenContext::game`. Mirror ids (gameselectinterface etc.) are written
-	// by the panels as they Build, read by Game::GoBack to decide which lobby
-	// surface is active.
-	Uint16 lobbyinterface;
-	Uint16 chatinterface;
-	Uint16 gameselectinterface;
-	Uint16 gamecreateinterface;
-	Uint16 gamejoininterface;
-	Uint16 gametechinterface;
+	// `ScreenContext::game`.
 	Uint16 currentinterface;
 	Uint32 currentlobbygameid;
 	bool minimized;
 	bool creategameclicked;
 	bool joininggame;
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
+	// Tear down a joined game's session/world state (Disconnect, switch
+	// authority, destroy team overlays, rejoin previous chat channel). UI
+	// concerns (panel swap, map-name overlay) stay on LobbyScreen.
+	void LeaveJoinedGame();
 	// Toggle in-lobby team overlay visibility. Called by LobbyScreen's
 	// right-side panel swaps (ShowGameTech / TearDownRightPanels) when
 	// entering / leaving the tech-choice surface.

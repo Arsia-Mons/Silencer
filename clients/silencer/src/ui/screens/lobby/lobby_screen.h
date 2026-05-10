@@ -25,6 +25,7 @@ public:
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
 	void Destroy(ScreenContext & ctx) override;
+	bool HandleBack(ScreenContext & ctx) override;
 
 	// Right-side panel swap helpers. Called by panels (GameSelectPanel's
 	// "Create Game" button, GameJoinPanel's "Choose Tech", GameTechPanel's

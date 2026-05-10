@@ -106,10 +106,6 @@ void ChatPanel::Build(ScreenContext & ctx, Interface * parent)
 		parent->activeobject = interfaceId;
 		parent->ActiveChanged(world, parent, false);
 	}
-	// Mirror onto Game so the legacy ProcessLobbyInterface walk and the
-	// joining/create flows can still find the chat iface id during the
-	// multi-stage migration. Removed in stage H.
-	ctx.game.chatinterface = interfaceId;
 }
 
 void ChatPanel::Tick(ScreenContext & ctx)

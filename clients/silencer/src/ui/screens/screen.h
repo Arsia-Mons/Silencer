@@ -21,8 +21,12 @@ public:
 	// Tear down widgets. Called on pop/replace.
 	virtual void Destroy(ScreenContext & ctx) = 0;
 
-	// Optional: handle a back/cancel request (esc, right-click). Default = pop.
-	virtual bool HandleBack(ScreenContext & ctx) { (void)ctx; return true; }
+	// Handle a back/cancel request (esc, right-click, "Go Back" button).
+	// Return true if the screen consumed the request internally (e.g. swapped
+	// a sub-panel) so Game should NOT fall through to its default action.
+	// Return false to let Game decide what happens next (typically pop or
+	// transition to MAINMENU).
+	virtual bool HandleBack(ScreenContext & ctx) { (void)ctx; return false; }
 
 	// Modals draw the screen below them; non-modal Screens hide what's beneath.
 	virtual bool IsOverlay() const { return false; }

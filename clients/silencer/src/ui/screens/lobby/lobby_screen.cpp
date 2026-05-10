@@ -13,6 +13,7 @@
 #include "objecttypes.h"
 #include "ambience_mixer.h"
 #include "map_downloader.h"
+#include "renderer.h"
 #include "message_modal.h"
 #include "game_select_panel.h"
 #include "game_create_panel.h"
@@ -51,6 +52,8 @@ LobbyScreen::~LobbyScreen() = default;
 void LobbyScreen::Build(ScreenContext & ctx)
 {
 	World & world = ctx.world;
+	ctx.ResetPresentation(2);
+	ctx.renderer.camera.SetPosition(320, 240);
 
 	Overlay * background = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
 	background->res_bank = 7;
@@ -94,7 +97,6 @@ void LobbyScreen::Build(ScreenContext & ctx)
 	lobbyiface->AddObject(exitbutton->id);
 	lobbyiface->buttonescape = exitbutton->id;
 	interfaceId = lobbyiface->id;
-	ctx.game.lobbyinterface = lobbyiface->id;
 
 	character.Build(ctx, lobbyiface);
 	chat.Build(ctx, lobbyiface);
@@ -142,7 +144,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 
 	// Deferred CreateGame state machine — kicked off by GameCreatePanel; runs
 	// here so it survives the panel teardown that fires on success.
-	if(game.gamecreateinterface){
+	if(gameCreate){
 		int us = mapDownloader.mapUploadState.load(std::memory_order_acquire);
 		if(us == 2){
 			mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
@@ -161,7 +163,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
 			game.creategameclicked = false;
 			DismissProgressModal(ctx);
-			ctx.PushScreen(std::make_unique<MessageModal>("Could not upload map"));
+			ctx.ShowMessage("Could not upload map");
 		}
 		if(world.lobby.creategamestatus == 1){
 			world.lobby.creategamestatus = 0;
@@ -175,11 +177,11 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			world.lobby.creategamestatus = 0;
 			game.creategameclicked = false;
 			DismissProgressModal(ctx);
-			ctx.PushScreen(std::make_unique<MessageModal>("Could not create game"));
+			ctx.ShowMessage("Could not create game");
 		}
 	}
 
-	if(game.gameselectinterface || game.gamecreateinterface){
+	if(gameSelect || gameCreate){
 		// Joining attempt finalisation (success → CONNECTED, failure → IDLE).
 		if(game.joininggame){
 			if(world.state == World::CONNECTED){
@@ -188,7 +190,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			if(world.state == World::IDLE){
 				game.joininggame = false;
 				DismissProgressModal(ctx);
-				ctx.PushScreen(std::make_unique<MessageModal>("Unable to join game"));
+				ctx.ShowMessage("Unable to join game");
 			}
 		}
 		// Spinner text update for the create-game progress modal.
@@ -209,7 +211,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		}
 		// CONNECTED transition — swap in the GameJoinPanel, refresh chat
 		// channel, set the map-name overlay.
-		if(world.state == World::CONNECTED && game.lobbyinterface){
+		if(world.state == World::CONNECTED && interfaceId){
 			Peer * peer = world.peerlist[world.localpeerid];
 			if(peer){
 				mapDownloader.mapexistchecked = false;
@@ -234,11 +236,31 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 
 	// Disconnected-from-game modal: only when in the joined-game surface.
 	if(world.state != World::CONNECTED && !TopIsModal(ctx)){
-		if(game.gamejoininterface || game.gametechinterface){
+		if(gameJoin || gameTech){
 			Game * gamePtr = &game;
-			ctx.PushScreen(std::make_unique<MessageModal>("Disconnected from game", [gamePtr]() { gamePtr->GoBack(); }));
+			ctx.ShowMessage("Disconnected from game", [gamePtr]() { gamePtr->GoBack(); });
 		}
 	}
+}
+
+bool LobbyScreen::HandleBack(ScreenContext & ctx)
+{
+	// Joined-game surfaces (gameJoin / gameTech) → leave the session, drop
+	// the map-name overlay, swap back to the games list.
+	if(gameJoin || gameTech){
+		ctx.LeaveJoinedGame();
+		SetMapNameOverlay(ctx.world, "");
+		ShowGameSelect(ctx);
+		return true;
+	}
+	// Create-game surface → just swap back to games list (no session to leave).
+	if(gameCreate){
+		ctx.world.lobby.gamesprocessed = false;
+		ShowGameSelect(ctx);
+		return true;
+	}
+	// On the games-list surface itself, fall through so Game pops to main menu.
+	return false;
 }
 
 void LobbyScreen::Destroy(ScreenContext & ctx)
@@ -254,7 +276,6 @@ void LobbyScreen::Destroy(ScreenContext & ctx)
 		if(iface) iface->DestroyInterface(ctx.world);
 		interfaceId = 0;
 	}
-	ctx.game.lobbyinterface = 0;
 }
 
 void LobbyScreen::SetMapNameOverlay(World & world, const char * name)
@@ -272,37 +293,24 @@ void LobbyScreen::SetMapNameOverlay(World & world, const char * name)
 	}
 }
 
-// Tear down any active right-side panel + matching mirror id on Game.
-// Called by every Show* swap helper before building the new panel.
+// Tear down whichever right-side panel is currently active. Called by every
+// Show* swap helper before building the new one.
 static void TearDownRightPanels(ScreenContext & ctx, Interface * lobbyiface,
                                 std::unique_ptr<GameSelectPanel> & gameSelect,
                                 std::unique_ptr<GameCreatePanel> & gameCreate,
                                 std::unique_ptr<GameJoinPanel>   & gameJoin,
                                 std::unique_ptr<GameTechPanel>   & gameTech)
 {
-	if(gameSelect){
-		Interface * panelIface = (Interface *)ctx.world.GetObjectFromId(gameSelect->interfaceId);
+	auto destroy = [&](Uint16 id) {
+		Interface * panelIface = (Interface *)ctx.world.GetObjectFromId(id);
 		if(panelIface) panelIface->DestroyInterface(ctx.world, lobbyiface);
-		gameSelect.reset();
-		ctx.game.gameselectinterface = 0;
-	}
-	if(gameCreate){
-		Interface * panelIface = (Interface *)ctx.world.GetObjectFromId(gameCreate->interfaceId);
-		if(panelIface) panelIface->DestroyInterface(ctx.world, lobbyiface);
-		gameCreate.reset();
-		ctx.game.gamecreateinterface = 0;
-	}
-	if(gameJoin){
-		Interface * panelIface = (Interface *)ctx.world.GetObjectFromId(gameJoin->interfaceId);
-		if(panelIface) panelIface->DestroyInterface(ctx.world, lobbyiface);
-		gameJoin.reset();
-		ctx.game.gamejoininterface = 0;
-	}
-	if(gameTech){
-		Interface * panelIface = (Interface *)ctx.world.GetObjectFromId(gameTech->interfaceId);
-		if(panelIface) panelIface->DestroyInterface(ctx.world, lobbyiface);
+	};
+	if(gameSelect){ destroy(gameSelect->interfaceId); gameSelect.reset(); }
+	if(gameCreate){ destroy(gameCreate->interfaceId); gameCreate.reset(); }
+	if(gameJoin)  { destroy(gameJoin->interfaceId);   gameJoin.reset();   }
+	if(gameTech)  {
+		destroy(gameTech->interfaceId);
 		gameTech.reset();
-		ctx.game.gametechinterface = 0;
 		ctx.world.choosingtech = false;
 		ctx.game.ShowTeamOverlays(true);
 	}
@@ -326,8 +334,8 @@ void LobbyScreen::ShowGameCreate(ScreenContext & ctx)
 	gameCreate = std::unique_ptr<GameCreatePanel>(new GameCreatePanel(*this));
 	gameCreate->Build(ctx, lobbyiface);
 
-	lobbyiface->activeobject = ctx.game.gamecreateinterface;
-	Interface * chatiface = (Interface *)ctx.world.GetObjectFromId(ctx.game.chatinterface);
+	lobbyiface->activeobject = gameCreate->interfaceId;
+	Interface * chatiface = (Interface *)ctx.world.GetObjectFromId(chat.interfaceId);
 	if(chatiface){
 		chatiface->activeobject = 0;
 	}
@@ -357,10 +365,9 @@ void LobbyScreen::ShowGameTech(ScreenContext & ctx)
 
 	gameTech = std::unique_ptr<GameTechPanel>(new GameTechPanel(*this));
 	gameTech->Build(ctx, lobbyiface);
-	ctx.game.gametechinterface = gameTech->interfaceId;
 
 	lobbyiface->activeobject = gameTech->interfaceId;
-	Interface * chatiface = (Interface *)ctx.world.GetObjectFromId(ctx.game.chatinterface);
+	Interface * chatiface = (Interface *)ctx.world.GetObjectFromId(chat.interfaceId);
 	if(chatiface){
 		chatiface->activeobject = 0;
 	}

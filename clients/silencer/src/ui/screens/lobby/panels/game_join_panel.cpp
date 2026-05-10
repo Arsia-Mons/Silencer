@@ -59,9 +59,6 @@ void GameJoinPanel::Build(ScreenContext & ctx, Interface * parent)
 	if(parent){
 		parent->AddObject(interfaceId);
 	}
-	// Mirror onto Game so the legacy TickLobbyBody / GoBack paths can still
-	// query and tear down via gamejoininterface. Removed in stage H.
-	ctx.game.gamejoininterface = interfaceId;
 }
 
 void GameJoinPanel::Tick(ScreenContext & ctx)
