@@ -158,7 +158,7 @@ protected:
 	std::list<class Object *> tobjectlist;
 	void SaveSnapshot(Serializer & data, Uint8 peerid);
 	void LoadSnapshot(Serializer & data, bool create = true, Serializer * delta = 0, Uint16 objectid = 0);
-	Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid);
+	Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, bool observer = false);
 	Peer * AddBot(Uint8 agency);
 	LagSimulator lagsimulator;
 	char mapname[256];

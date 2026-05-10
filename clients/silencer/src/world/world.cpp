@@ -354,7 +354,7 @@ void World::DoNetwork_Authority(void){
 						SendGameInfo(rejoinpeer->id);
 						SendPeerList();
 					}else if(canjoin && observerRequest){
-						Peer * newpeer = AddPeer(host, port, agency, accountid);
+						Peer * newpeer = AddPeer(host, port, agency, accountid, true);
 						if(newpeer){
 							newpeer->observer = true;
 							response.PutBit(true);
@@ -938,7 +938,7 @@ void World::DoNetwork_Replica(void){
 	}
 }
 
-Peer * World::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid){
+Peer * World::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, bool observer){
 	Uint8 newpeerid = 0;
 	sockaddr_in addr;
 	addr.sin_addr.s_addr = inet_addr(address);
@@ -959,10 +959,12 @@ Peer * World::AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 
 		newpeer->port = port;
 		newpeer->accountid = accountid;
 		if(peeradded){
-			if(!FindTeamForPeer(*newpeer, agency)){
-				//printf("could not find team for new peer\n");
-				delete newpeer;
-				return 0;
+			if(!observer){
+				if(!FindTeamForPeer(*newpeer, agency)){
+					//printf("could not find team for new peer\n");
+					delete newpeer;
+					return 0;
+				}
 			}
 			peerlist[newpeerid] = newpeer;
 			peercount++;
