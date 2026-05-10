@@ -165,19 +165,22 @@ void Audio::UpdateVolume(World & world, int channel, Sint16 x, Sint16 y, int rad
 	// doesn't clip through the floor platform they're both standing on.
 	int rayYOffset = GASLoader::Get().world.occlusionRayYOffset;
 	float targetOcclusion = 1.0f;
+	float targetFilterOcclusion = 1.0f; // rect-only factor used for filter threshold
 	if(cfg.soundOcclusionEnabled && distVolume > 0.0f && distance > 32.0f){
 		targetOcclusion = ComputeOcclusion(world.map,
 			int(x),          int(y)          - rayYOffset,
 			int(object->x),  int(object->y)  - rayYOffset,
-			cfg.occlusionDampenRect, cfg.occlusionDampenStairs);
+			cfg.occlusionDampenRect, cfg.occlusionDampenStairs,
+			&targetFilterOcclusion);
 	}
 	occlusionCache[channel] += (targetOcclusion - occlusionCache[channel]) * cfg.occlusionLerpSpeed;
 	float occlusion = occlusionCache[channel];
 
-	// Phase 2: per-track IIR low-pass coefficient (applied in FilterCallback)
-	// Disabled by default (soundFilterEnabled=false) until ray accuracy is confirmed.
-	if(cfg.soundFilterEnabled && occlusion < cfg.occlusionMuffleThreshold){
-		float t = occlusion / cfg.occlusionMuffleThreshold;
+	// Phase 2: per-track IIR low-pass coefficient (applied in FilterCallback).
+	// Only solid RECTANGLE walls trigger the muffle filter — staircase crossings
+	// reduce volume but don't muffle frequency (fixed staircase false-positive).
+	if(cfg.soundFilterEnabled && targetFilterOcclusion < cfg.occlusionMuffleThreshold){
+		float t = targetFilterOcclusion / cfg.occlusionMuffleThreshold;
 		float cutoffHz = cfg.occlusionMuffleMinHz + t * (cfg.occlusionMuffleMaxHz - cfg.occlusionMuffleMinHz);
 		float sampleRate = float(mixerspec.freq > 0 ? mixerspec.freq : 44100);
 		filterAlpha[channel] = 1.0f - expf(-2.0f * 3.14159265f * cutoffHz / sampleRate);
@@ -279,8 +282,9 @@ void Audio::SetMusicVolume(int volume){
 	musicvolume = volume;
 }
 
-float Audio::ComputeOcclusion(Map & map, int lx, int ly, int ex, int ey, float dampenRect, float dampenStairs){
+float Audio::ComputeOcclusion(Map & map, int lx, int ly, int ex, int ey, float dampenRect, float dampenStairs, float * outFilterFactor){
 	float factor = 1.0f;
+	float filterFactor = 1.0f; // rect-only: stairs reduce volume but don't muffle frequency
 	int cx = lx, cy = ly;
 	int origdx = ex - lx, origdy = ey - ly;
 
@@ -290,8 +294,13 @@ float Audio::ComputeOcclusion(Map & map, int lx, int ly, int ex, int ey, float d
 			Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN);
 		if(!hit) break;
 
-		factor *= (hit->type & Platform::RECTANGLE) ? dampenRect : dampenStairs;
-		if(factor < 0.001f) return 0.0f;
+		bool isRect = (hit->type & Platform::RECTANGLE) != 0;
+		factor *= isRect ? dampenRect : dampenStairs;
+		if(isRect) filterFactor *= dampenRect;
+		if(factor < 0.001f){
+			if(outFilterFactor) *outFilterFactor = filterFactor;
+			return 0.0f;
+		}
 
 		// Advance 2px past the hit point along the ray direction.
 		int dx = ex - cx, dy = ey - cy;
@@ -304,6 +313,7 @@ float Audio::ComputeOcclusion(Map & map, int lx, int ly, int ex, int ey, float d
 		int rdx = ex - cx, rdy = ey - cy;
 		if(rdx * origdx + rdy * origdy <= 0) break;
 	}
+	if(outFilterFactor) *outFilterFactor = filterFactor;
 	return factor;
 }
 
