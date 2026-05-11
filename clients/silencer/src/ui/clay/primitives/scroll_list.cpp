@@ -92,8 +92,12 @@ void ScrollList(Clay_String id,
 
 	const float rootW = static_cast<float>(opts.width);
 	const float rootH = static_cast<float>(opts.height);
-	const float sbW   = static_cast<float>(opts.scrollbarWidth);
-	const float gap   = static_cast<float>(opts.scrollbarGap);
+	// Mirror the legacy `scrollbar->draw = items.size() > visible` toggle:
+	// the scrollbar only renders when the list actually overflows. The rows
+	// column reclaims the scrollbar's pixels when nothing overflows.
+	const bool  drawSb = scrollMax > 0;
+	const float sbW   = drawSb ? static_cast<float>(opts.scrollbarWidth) : 0.0f;
+	const float gap   = drawSb ? static_cast<float>(opts.scrollbarGap) : 0.0f;
 	float rowsW       = rootW - sbW - gap;
 	if(rowsW < 0.0f) rowsW = 0.0f;
 	const float rowH  = static_cast<float>(opts.lineHeight);
@@ -137,21 +141,24 @@ void ScrollList(Clay_String id,
 			}
 		}
 
-		// Scrollbar.
-		auto * payload = AllocScrollBarPayload(
-			opts.scrollbarBank,
-			opts.scrollbarTrackIndex,
-			opts.scrollbarThumbIndex,
-			scrollPosition,
-			static_cast<Uint16>(scrollMax));
-		auto * ccd = AllocCustomData(
-			silencer::clay_bridge::CustomKind::ScrollBar, payload);
-		CLAY({ .id = CLAY_SIDI(id, 0xFFFF0000u),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(sbW),
-		                       CLAY_SIZING_FIXED(rootH) },
-		       },
-		       .custom = { .customData = ccd } }) {}
+		if(drawSb){
+			// Scrollbar — only emit when overflow exists. Mirrors the
+			// legacy `scrollbar->draw = true/false` toggle.
+			auto * payload = AllocScrollBarPayload(
+				opts.scrollbarBank,
+				opts.scrollbarTrackIndex,
+				opts.scrollbarThumbIndex,
+				scrollPosition,
+				static_cast<Uint16>(scrollMax));
+			auto * ccd = AllocCustomData(
+				silencer::clay_bridge::CustomKind::ScrollBar, payload);
+			CLAY({ .id = CLAY_SIDI(id, 0xFFFF0000u),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_FIXED(sbW),
+			                       CLAY_SIZING_FIXED(rootH) },
+			       },
+			       .custom = { .customData = ccd } }) {}
+		}
 	}
 }
 

@@ -44,6 +44,11 @@ public:
 	Uint8 GetState() const { return state; }
 	Uint16 GetCurrentInterfaceId() const { return currentinterface; }
 	class World& GetWorld() { return world; }
+	// Test/control-dispatch hook: gives ControlDispatch op handlers access
+	// to the ScreenContext so they can invoke screen-side helpers (e.g.
+	// LobbyScreen::ShowGameCreate from a CLI op when there's no widget
+	// path to drive the click). Game-thread only.
+	ScreenContext& GetScreenContext() { return screenContext; }
 	nlohmann::json GetWorldSummary();
 	const Surface& GetScreenBuffer() const { return screenbuffer; }
 	const SDL_Color* GetPaletteColors() const { return palettecolors; }

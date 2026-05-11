@@ -66,6 +66,15 @@
       "pass_check": "Render test with a 30-item list scrolled to a fixed position pixdiff < 2.0 vs baseline. Click-on-row fires on_select with the right index. No lobby references."
     },
     {
+      "id": "P7b",
+      "priority": 7.5,
+      "passes": false,
+      "name": "Fix ScrollList primitive: conditional scrollbar + inner-container parenting",
+      "spec": "Three connected bugs surfaced after P14 GameSelectPanel landed at 1.14% diff. All three live in clients/silencer/src/ui/clay/primitives/scroll_list.{h,cpp} and the Clay bridge -- fix the PRIMITIVE, not the panels. Then re-verify every panel that uses ScrollList: P14 GameSelectPanel for sure; P15 GameCreatePanel uses it for the map list, re-screenshot both and confirm diff stays under their threshold.\n\nBugs:\n\n1. CONDITIONAL SCROLLBAR. scroll_list.cpp lines 140-154 unconditionally emit the scrollbar CLAY element + ScrollBarPayload. Legacy ScrollBar set draw=false when items fit (items.size() <= ceil(height/lineheight)). The primitive already computes scrollMax = max(0, itemCount - visibleLines) (line 89) -- now also SKIP emitting the scrollbar entirely when scrollMax == 0. Match legacy behavior: the rows column keeps its original width whether or not the scrollbar is drawn (legacy reserved the gutter visually but did not draw the track). Verify with itemCount < visibleLines: zero ScrollBar render commands.\n\n2. SPRITE-OFFSET COMPENSATION IN THE BRIDGE. Bank 7 idx 9 (scrollbar track) has a non-zero world.resources.spriteoffsetx[7][9] baked into the sprite -- this is the same gotcha legacy hit with formscrollbar->x = 383 + spriteoffsetx[7][9]. The Clay bridge's ScrollBar CUSTOM dispatch likely blits at Clay's bounding-box origin WITHOUT subtracting that offset, so the rendered sprite lands shifted from where Clay's layout says it lives -- making the scrollbar appear in the chrome's outer margin instead of inside the inner (bright-stroke) container. Audit clay_bridge.cpp ScrollBar case: when dispatching, the sprite's visible top-left must equal boundingBox.{x,y}, regardless of bank/index sprite offsets. Fix: subtract spriteoffsetx[bank][index] and spriteoffsety[bank][index] from the blit dst.\n\n3. VISUAL PARENTING. User observation: the scroll bar is parented to the outer container, but the games would be listed in the inner container with the brighter stroke. Once #2 is fixed the scrollbar's rendered position should match Clay's bounding box, which the panel placed inside the inner-stroke region -- but verify against the legacy gameselect.png baseline that the scrollbar lands AT the right edge of the rows column, INSIDE the bright stroke. If the panel's kListW=214 doesn't leave a visible-but-empty gutter for the inner stroke, the panel may need a slightly narrower rows column. PREFER fixing in the primitive (e.g., respect a scrollbarGap that's pre-set by the panel) over editing panel geometry.\n\nAcceptance:\n- Primitive render test with itemCount=3, visibleLines=10 emits zero ScrollBar render commands.\n- Primitive render test with itemCount=50, visibleLines=10 emits one ScrollBar render command whose Clay bounding box equals the post-blit pixel extent of the visible track on the Surface (i.e., sprite offset compensated).\n- P14 GameSelectPanel re-screenshot diff stays at or below its prior pass result (1.14%).\n- P15 GameCreatePanel re-verification (if it uses ScrollList) within its threshold.\n- Build green.",
+      "pass_check": "Two new primitive tests pass (no-overflow -> 0 scrollbar commands; overflow -> bounded scrollbar). P14 re-verification diff <= P14 prior. P15 re-verification within threshold (if applicable).",
+      "pixdiff_max_pct": 5.0
+    },
+    {
       "id": "P8",
       "priority": 8,
       "name": "ScrollTextBox primitive",
@@ -137,7 +146,7 @@
       "id": "P15",
       "priority": 15,
       "name": "GameCreatePanel in Clay",
-      "passes": false,
+      "passes": true,
       "spec": "Reimplement the game-options form using FormBorder + LabelValueRow + TextInput + BankButton::Inline (security/spectatable cyclers), plus ScrollList for the map list, plus TextInput for the name/password, plus a Create button. Pixdiff target: <5% vs gamecreate.png.",
       "pass_check": "Pixdiff < 5.0% vs baseline. Filling the form + Create kicks off the existing CreateGame flow.",
       "screenshot": "iter-P15.png",

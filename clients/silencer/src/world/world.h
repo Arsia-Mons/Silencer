@@ -155,6 +155,11 @@ public:
 	// World::RequestPeerList from the gametech-view enter path. Removed
 	// in stage G when the call moves into GameTechPanel::Build.
 	friend class LobbyScreen;
+	// LobbyClayScreen seeds world.gameinfo from the lobby's record after a
+	// successful host-side CreateGame (mirrors the legacy gameinfo seeding
+	// in LobbyScreen::Tick). Friend privilege is not inherited from
+	// LobbyScreen so we name the derived class explicitly.
+	friend class LobbyClayScreen;
 	// GameJoinPanel reads localpeer state (peerlist[localpeerid].ishost,
 	// AllPeersDownloadedMap, gameplaystate) to refresh the Ready button
 	// label, and dispatches SendReady on click.

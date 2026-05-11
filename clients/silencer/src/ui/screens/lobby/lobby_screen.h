@@ -35,7 +35,7 @@ public:
 	// surface (no legacy GameSelectPanel rebuild) when the user backs out
 	// of create/join/tech.
 	virtual void ShowGameSelect(ScreenContext & ctx);
-	void ShowGameCreate(ScreenContext & ctx);
+	virtual void ShowGameCreate(ScreenContext & ctx);
 	void ShowGameJoin(ScreenContext & ctx);
 	void ShowGameTech(ScreenContext & ctx);
 

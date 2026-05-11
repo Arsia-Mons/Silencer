@@ -5,6 +5,7 @@
 #include "clay_character_panel.h"
 #include "clay_chat_panel.h"
 #include "clay_game_select_panel.h"
+#include "clay_game_create_panel.h"
 #include <string>
 
 class Surface;
@@ -34,6 +35,7 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void Draw(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void SetMapNameOverlay(class World & world, const char * name) override;
+	bool HandleBack(ScreenContext & ctx) override;
 
 	// Override: when backing out of create/join/tech, tear those panels
 	// down but DO NOT build a legacy GameSelectPanel — the Clay games-list
@@ -41,10 +43,21 @@ public:
 	// are gone.
 	void ShowGameSelect(ScreenContext & ctx) override;
 
+	// Override: tear down any legacy right-side panels and activate the
+	// Clay game-create surface. Sets `gameCreateActive` so Draw emits the
+	// Clay subtree and Tick pumps the create-flow state machine.
+	void ShowGameCreate(ScreenContext & ctx) override;
+
 	// Wired into the Go Back BankButton's onClick proxy. Sets a flag that
 	// Tick consumes on the next frame, mirroring the legacy chrome scan's
 	// "button->clicked → game.GoBack()" edge-detection timing.
 	void NotifyGoBackClicked() { goBackClicked = true; }
+
+	// Friend-of-World helper: seeds `world.gameinfo` from the lobby record
+	// of the newly created game so the host's SendGameInfo path can push
+	// it to the dedicated server. Mirrors LobbyScreen::Tick's host-side
+	// gameinfo seeding. Called from GameCreatePanelTick.
+	void SeedHostGameInfo(class World & world, class LobbyGame & lg);
 
 private:
 	// Per-frame state for the chrome tree. Strings live on the screen so
@@ -71,6 +84,13 @@ private:
 	// + per-frame click flags. Replaces the legacy GameSelectPanel member
 	// (still inherited from LobbyScreen but unBuilt under the Clay path).
 	silencer::ui::lobby_clay::GameSelectPanelState gameSelectState;
+
+	// GameCreate state + active flag. When `gameCreateActive` is true the
+	// Clay panel owns the right column (suppresses the games-list Clay
+	// tree) and the screen's Tick pumps the deferred CreateGame state
+	// machine. The legacy `gameCreate` unique_ptr stays null.
+	silencer::ui::lobby_clay::GameCreatePanelState gameCreateState;
+	bool gameCreateActive = false;
 };
 
 #endif
