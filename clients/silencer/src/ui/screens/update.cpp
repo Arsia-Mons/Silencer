@@ -5,6 +5,7 @@
 #include "layout.h"
 #include "node.h"
 #include "render.h"
+#include "render_commands.h"
 
 #include "game.h"
 #include "game_state.h"
@@ -199,8 +200,15 @@ void UpdateRuntime::Render(Surface & target, ::Renderer & renderer,
 	::ui::v2::EnsureClayContext(ctx);
 	Clay_SetPointerState(Clay_Vector2{ (float)mouse_x, (float)mouse_y }, /*pointer_down=*/false);
 	Clay_UpdateScrollContainers(/*drag=*/false, Clay_Vector2{ 0.0f, 0.0f }, dt);
-	Layout(tree, ctx);
+	Clay_RenderCommandArray cmds = Layout(tree, ctx);
 	::ui::v2::Render(tree, ctx, target, renderer);
+	// Canonical post-migration draw path (P02). Today the Node IR is the
+	// authority for sprite/text content, so the command array carries
+	// only structural rectangles (no fill, no children of TYPE_TEXT/IMAGE) —
+	// DrawRenderCommands is effectively a no-op here. As screens migrate
+	// to direct CLAY() emission in P05+, content moves into `cmds` and
+	// the walker above shrinks until it can be deleted.
+	::ui::DrawRenderCommands(cmds, renderer, target, scale);
 	state_.EndFrame();
 }
 

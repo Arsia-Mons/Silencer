@@ -20,7 +20,12 @@ void EnsureClayContext(const Context & ctx);
 // node's `rect_x/y/w/h` fields. Nodes outside any container subtree are
 // left untouched — render + dispatch fall back to absolute `.at()`
 // positioning when `rect_w == 0`.
-void Layout(Node & root, const Context & ctx);
+//
+// Returns Clay's render-command array for the laid-out frame so the
+// caller can feed it into `ui::DrawRenderCommands` (render_commands.h).
+// Existing call sites that ignore the return value continue to work —
+// the per-Node walker still consumes the same tree via `Render()`.
+Clay_RenderCommandArray Layout(Node & root, const Context & ctx);
 
 }  // namespace v2
 }  // namespace ui

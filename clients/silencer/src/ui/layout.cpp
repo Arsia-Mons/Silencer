@@ -210,7 +210,7 @@ void EnsureClayContext(const Context & ctx) {
 	Clay_SetCurrentContext(g_clay_ctx);
 }
 
-void Layout(Node & root, const Context & ctx) {
+Clay_RenderCommandArray Layout(Node & root, const Context & ctx) {
 	EnsureClayContext(ctx);
 	Clay_SetLayoutDimensions(Clay_Dimensions{ (float)ctx.logical_w, (float)ctx.logical_h });
 	Clay_BeginLayout();
@@ -218,7 +218,7 @@ void Layout(Node & root, const Context & ctx) {
 	LayoutState ls;
 	EmitNode(root, ls, ctx, false);
 
-	(void)Clay_EndLayout();
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
 
 	for(const EmitRecord & r : ls.records){
 		Clay_ElementData ed = Clay_GetElementData(r.id);
@@ -229,6 +229,7 @@ void Layout(Node & root, const Context & ctx) {
 			r.node->rect_h = (Uint16)ed.boundingBox.height;
 		}
 	}
+	return cmds;
 }
 
 }  // namespace v2
