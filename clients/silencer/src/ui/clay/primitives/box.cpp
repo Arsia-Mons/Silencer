@@ -1,14 +1,14 @@
-#include "primitives/rectangle.h"
+#include "primitives/box.h"
 
 namespace silencer::ui::primitives {
 
-void Rectangle(Clay_String id,
-               Uint16 width,
-               Uint16 height,
-               Uint8  fillPaletteColor,
-               Uint8  fillOpacity,
-               Uint8  strokePaletteColor,
-               Uint8  strokeWidth) {
+void Box(Clay_String id,
+         Uint16 width,
+         Uint16 height,
+         Uint8  fillPaletteColor,
+         Uint8  fillOpacity,
+         Uint8  strokePaletteColor,
+         Uint8  strokeWidth) {
 	// Sizing: 0 on either axis means "grow into the parent's available space"
 	// (use inside a flex container). Non-zero is a fixed pixel size.
 	Clay_SizingAxis xSizing = (width == 0)

@@ -1,7 +1,7 @@
-#ifndef SILENCER_UI_CLAY_PRIMITIVES_RECTANGLE_H
-#define SILENCER_UI_CLAY_PRIMITIVES_RECTANGLE_H
+#ifndef SILENCER_UI_CLAY_PRIMITIVES_BOX_H
+#define SILENCER_UI_CLAY_PRIMITIVES_BOX_H
 
-// Screen-agnostic Clay primitive for a flat-colored rectangle with optional
+// Screen-agnostic Clay primitive for a flat-colored box with optional
 // stroke and optional fill opacity.
 //
 // Emits a single CLAY element configured with `.backgroundColor` and
@@ -27,7 +27,7 @@
 //     single ≈50% blend against the underlying pixel. Edge cases — palette
 //     indices < 2 or in the parallax band [226, 256) fall back to a fully
 //     opaque draw because the ramp-position-as-alpha scheme isn't defined
-//     there. Per-pixel iteration: not free; reserve for chrome-scale rects
+//     there. Per-pixel iteration: not free; reserve for chrome-scale boxes
 //     (e.g. lobby panels), not full-screen overlays.
 //   • `strokeWidth == 0` → no stroke emitted. `strokePaletteColor` is
 //     ignored.
@@ -47,13 +47,13 @@
 
 namespace silencer::ui::primitives {
 
-void Rectangle(Clay_String id,
-               Uint16 width,
-               Uint16 height,
-               Uint8  fillPaletteColor,
-               Uint8  fillOpacity,
-               Uint8  strokePaletteColor,
-               Uint8  strokeWidth);
+void Box(Clay_String id,
+         Uint16 width,
+         Uint16 height,
+         Uint8  fillPaletteColor,
+         Uint8  fillOpacity,
+         Uint8  strokePaletteColor,
+         Uint8  strokeWidth);
 
 }  // namespace silencer::ui::primitives
 

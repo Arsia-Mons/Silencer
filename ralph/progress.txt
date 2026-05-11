@@ -75,6 +75,78 @@ below.)
   GetPixel→LUT→SetPixel path when opacity < 255. For chrome-scale
   panels (lobby rectangles ~200x400) this is cheap; don't reach for
   this on full-screen overlays without measuring.
+- **Canonical container primitive is named Box, not Rectangle.**
+  `silencer::ui::primitives::Box(...)` lives at
+  `clients/silencer/src/ui/clay/primitives/box.{h,cpp}`. The test scene
+  is `RunBoxTest` at `box_test.cpp`, control op `clay_box_test`, test
+  harness `tests/lobby-clay/box_test/`. The word "rectangle" still
+  appears where it refers to the geometric shape on screen or to the
+  Clay bridge's RECTANGLE render command — that's about the rendered
+  primitive, not the API name. Future siblings (Row, Column, Stack)
+  follow Box's role-neutral naming convention.
+
+## 2026-05-11T16:45:00Z - C0b Rename Rectangle → Box (canonical UI vocabulary)
+- Pure rename, no behavior change. Pixdiff 0.0000% vs the C0 reference
+  on the renamed `box_test` harness; C1 alpha-blend harness also stays
+  0.0000% after the `Rectangle(` → `Box(` swap in its callsites.
+- `git mv` preserved history for:
+  - `primitives/rectangle.h` → `primitives/box.h`
+  - `primitives/rectangle.cpp` → `primitives/box.cpp`
+  - `rectangle_test.cpp` → `box_test.cpp`
+  - `tests/lobby-clay/rectangle_test/` → `tests/lobby-clay/box_test/`
+- Inside the moved files: header guard
+  `SILENCER_UI_CLAY_PRIMITIVES_RECTANGLE_H` → `..._BOX_H`, function
+  `Rectangle(...)` → `Box(...)`, includes `"primitives/rectangle.h"` →
+  `"primitives/box.h"`, docstring "rectangle" (as a name) → "box".
+  Test scene `CLAY_ID`s renamed (`RectTestRoot` → `BoxTestRoot`,
+  `RectTestRow1/2` → `BoxTestRow1/2`); ID hash differences don't
+  affect pixel output for a single-frame render (Clay element IDs key
+  measure cache / cross-frame state, not layout geometry).
+- External references updated:
+  - `clay_bridge.h` forward decls: `RunRectangleTest` → `RunBoxTest`.
+  - `controldispatch.cpp`: control op `clay_rectangle_test` →
+    `clay_box_test` (the `_alpha_test` op stays at its original name —
+    out of scope for C0b's listed renames).
+  - `rectangle_alpha_test.cpp`: include + `Rectangle(` → `Box(`
+    callsites updated. File name kept (spec only listed the non-alpha
+    test for renaming).
+- `tests/lobby-clay/box_test/run.sh`: updated header comment, the
+  `cli` op name (`clay_rectangle_test` → `clay_box_test`), the OUT
+  tmpfile basename, and the PASS line.
+- CMake refresh: `cmake -B build -S clients/silencer` to pick up the
+  renamed sources via GLOB_RECURSE. Build green.
+- Quality gates: `cmake --build build -j` ✓, `box_test` pixdiff
+  0.0000% ✓, `rectangle_alpha_test` pixdiff 0.0000% ✓,
+  `40_lobby_clay_basic.sh` PASS ✓.
+- Files changed: 4 git-mv'd artifacts + edits to
+  `primitives/box.{h,cpp}`, `box_test.cpp`,
+  `rectangle_alpha_test.cpp`, `clay_bridge.h`, `controldispatch.cpp`,
+  `tests/lobby-clay/box_test/run.sh`.
+- **Learnings for future iterations:**
+  - When a primitive's user-facing name needs renaming, the rename
+    spans 5 surfaces in this codebase: (1) `primitives/<name>.{h,cpp}`,
+    (2) test scene file `<name>_test.cpp`, (3) `clay_bridge.h` forward
+    decl + comment, (4) `controldispatch.cpp` control op string +
+    error messages + function call, (5) `tests/lobby-clay/<name>_test/`
+    dir + the `run.sh` op + tmpfile + PASS lines. Hitting all five is
+    necessary for the cli op + test harness to keep matching.
+  - Header guard rename is easy to miss — both the `#ifndef` line and
+    the `#define` line need updating. `Write`ing the whole file is
+    safer than two separate Edits when the guard is the only thing
+    above includes.
+  - CLAY_ID strings can be renamed freely across single-frame test
+    scenes — Clay uses them as element identity keys for measure
+    cache + per-element state across frames, but the layout
+    computation for the current frame derives geometry from sizing /
+    padding / alignment only. Pixel-identical output preserved.
+  - "Rectangle" as a geometric shape (e.g. "emits a rectangle on
+    screen") and "Rectangle" as the primitive's API name are
+    different. The first stays in docs and code comments
+    (RECTANGLE render command, draw-rectangle semantics); the second
+    is the rename target. The spec's pass_check grep is conservative
+    about this — it allows comment references to the shape.
+
+---
 
 ## 2026-05-11T16:35:00Z - C1 Bridge alpha-blended RECTANGLE fills
 - The bridge's `DispatchRectangle` now reads `backgroundColor.a`. When

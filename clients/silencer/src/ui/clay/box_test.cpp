@@ -1,6 +1,6 @@
-// C0 unit test scene for the Rectangle primitive.
+// C0 unit test scene for the Box primitive.
 //
-// `RunRectangleTest(outPath)` renders four variants in a 2x2 grid (each
+// `RunBoxTest(outPath)` renders four variants in a 2x2 grid (each
 // cell ~240x150 px) into a 640x480 Surface and writes a PNG. Variants:
 //
 //   • Top-left  — stroke-only (no fill).
@@ -8,7 +8,7 @@
 //   • Bot-left  — fill + stroke.
 //   • Bot-right — fill-with-opacity over an existing-color background.
 //     The underlying parent CLAY block has an opaque .backgroundColor;
-//     the inner Rectangle fills the padded area with fillOpacity < 255.
+//     the inner Box fills the padded area with fillOpacity < 255.
 //     Until C1 lands, the bridge treats any non-zero opacity as opaque,
 //     so this currently appears as solid fillPaletteColor on top of the
 //     underlying — the reference reflects that. C1 will refresh the
@@ -16,7 +16,7 @@
 
 #include "clay_bridge.h"
 #include "clay/clay.h"
-#include "primitives/rectangle.h"
+#include "primitives/box.h"
 
 #include "game.h"
 #include "palette.h"
@@ -37,16 +37,16 @@ constexpr Uint8 kUnderlyingFill    = 96;   // dark mid-tone for variant 4
 
 }  // namespace
 
-bool RunRectangleTest(::Game & game, const char * outPath) {
+bool RunBoxTest(::Game & game, const char * outPath) {
 	const int W = 640;
 	const int H = 480;
 	EnsureInitialized(W, H);
 
 	::Clay_BeginLayout();
 
-	using silencer::ui::primitives::Rectangle;
+	using silencer::ui::primitives::Box;
 
-	CLAY({ .id = CLAY_ID("RectTestRoot"),
+	CLAY({ .id = CLAY_ID("BoxTestRoot"),
 	       .layout = {
 	           .sizing  = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
 	           .padding = { /*left=*/60, /*right=*/60,
@@ -54,33 +54,33 @@ bool RunRectangleTest(::Game & game, const char * outPath) {
 	           .childGap = 30,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
-		CLAY({ .id = CLAY_ID("RectTestRow1"),
+		CLAY({ .id = CLAY_ID("BoxTestRow1"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
 		           .childGap = 30,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
-			Rectangle(CLAY_STRING("VStrokeOnly"),
-			          /*width=*/240, /*height=*/150,
-			          /*fillPaletteColor=*/0, /*fillOpacity=*/0,
-			          /*strokePaletteColor=*/kStrokeColor,
-			          /*strokeWidth=*/1);
-			Rectangle(CLAY_STRING("VFillOnly"),
-			          /*width=*/240, /*height=*/150,
-			          /*fillPaletteColor=*/kFillColorA, /*fillOpacity=*/255,
-			          /*strokePaletteColor=*/0, /*strokeWidth=*/0);
+			Box(CLAY_STRING("VStrokeOnly"),
+			    /*width=*/240, /*height=*/150,
+			    /*fillPaletteColor=*/0, /*fillOpacity=*/0,
+			    /*strokePaletteColor=*/kStrokeColor,
+			    /*strokeWidth=*/1);
+			Box(CLAY_STRING("VFillOnly"),
+			    /*width=*/240, /*height=*/150,
+			    /*fillPaletteColor=*/kFillColorA, /*fillOpacity=*/255,
+			    /*strokePaletteColor=*/0, /*strokeWidth=*/0);
 		}
-		CLAY({ .id = CLAY_ID("RectTestRow2"),
+		CLAY({ .id = CLAY_ID("BoxTestRow2"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
 		           .childGap = 30,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
-			Rectangle(CLAY_STRING("VFillStroke"),
-			          /*width=*/240, /*height=*/150,
-			          /*fillPaletteColor=*/kFillColorB, /*fillOpacity=*/255,
-			          /*strokePaletteColor=*/kStrokeColor,
-			          /*strokeWidth=*/1);
+			Box(CLAY_STRING("VFillStroke"),
+			    /*width=*/240, /*height=*/150,
+			    /*fillPaletteColor=*/kFillColorB, /*fillOpacity=*/255,
+			    /*strokePaletteColor=*/kStrokeColor,
+			    /*strokeWidth=*/1);
 			CLAY({ .id = CLAY_ID("V4Underlying"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIXED(240), CLAY_SIZING_FIXED(150) },
@@ -89,12 +89,12 @@ bool RunRectangleTest(::Game & game, const char * outPath) {
 			       .backgroundColor = {
 			           /*r=*/static_cast<float>(kUnderlyingFill),
 			           0.0f, 0.0f, 255.0f } }) {
-				Rectangle(CLAY_STRING("V4Overlay"),
-				          /*width=*/0, /*height=*/0,
-				          /*fillPaletteColor=*/kFillColorA,
-				          /*fillOpacity=*/128,
-				          /*strokePaletteColor=*/0,
-				          /*strokeWidth=*/0);
+				Box(CLAY_STRING("V4Overlay"),
+				    /*width=*/0, /*height=*/0,
+				    /*fillPaletteColor=*/kFillColorA,
+				    /*fillOpacity=*/128,
+				    /*strokePaletteColor=*/0,
+				    /*strokeWidth=*/0);
 			}
 		}
 	}

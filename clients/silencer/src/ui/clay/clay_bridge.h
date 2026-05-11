@@ -281,13 +281,13 @@ bool RunLabelValueRowTest(::Game & game, const char * outPath);
 // `clay_panel_test` control op. Implementation in panel_test.cpp.
 bool RunPanelTest(::Game & game, const char * variant, const char * outPath);
 
-// C0 Rectangle primitive unit test. Renders four variants in a 2x2 grid
+// C0 Box primitive unit test. Renders four variants in a 2x2 grid
 // (stroke-only, fill-only, fill+stroke, fill-with-opacity over an existing
 // color) into a 640x480 Surface and writes it to `outPath`. Invoked by the
-// `clay_rectangle_test` control op. Implementation in rectangle_test.cpp.
-bool RunRectangleTest(::Game & game, const char * outPath);
+// `clay_box_test` control op. Implementation in box_test.cpp.
+bool RunBoxTest(::Game & game, const char * outPath);
 
-// C1 Rectangle alpha-blend smoke test. Renders a fully-opaque rect with a
+// C1 Box alpha-blend smoke test. Renders a fully-opaque rect with a
 // 50%-opaque rect overlapping its right half into a 640x480 Surface and
 // writes it to `outPath`. Exercises the bridge's palette alphaed-LUT path.
 // Invoked by the `clay_rectangle_alpha_test` control op. Implementation in

@@ -1,4 +1,4 @@
-// C1 unit test scene for the Rectangle primitive's alpha-blend bridge path.
+// C1 unit test scene for the Box primitive's alpha-blend bridge path.
 //
 // `RunRectangleAlphaTest(outPath)` renders a fully-opaque red rect with a
 // 50%-opaque blue rect overlapping its right half, into a 640x480 Surface
@@ -13,7 +13,7 @@
 
 #include "clay_bridge.h"
 #include "clay/clay.h"
-#include "primitives/rectangle.h"
+#include "primitives/box.h"
 
 #include "game.h"
 #include "palette.h"
@@ -42,7 +42,7 @@ bool RunRectangleAlphaTest(::Game & game, const char * outPath) {
 
 	::Clay_BeginLayout();
 
-	using silencer::ui::primitives::Rectangle;
+	using silencer::ui::primitives::Box;
 
 	// Full-screen backdrop + two overlapping rects. The blue rect's left
 	// edge lands at the red rect's horizontal midpoint so its left half
@@ -54,7 +54,7 @@ bool RunRectangleAlphaTest(::Game & game, const char * outPath) {
 		CLAY({ .id = CLAY_ID("Backdrop"),
 		       .floating = { .offset = { 0, 0 },
 		                     .attachTo = CLAY_ATTACH_TO_ROOT } }) {
-			Rectangle(CLAY_STRING("VBackdrop"),
+			Box(CLAY_STRING("VBackdrop"),
 			          /*width=*/W, /*height=*/H,
 			          /*fillPaletteColor=*/kBackdrop,
 			          /*fillOpacity=*/255,
@@ -63,7 +63,7 @@ bool RunRectangleAlphaTest(::Game & game, const char * outPath) {
 		CLAY({ .id = CLAY_ID("RedHost"),
 		       .floating = { .offset = { 160, 160 },
 		                     .attachTo = CLAY_ATTACH_TO_ROOT } }) {
-			Rectangle(CLAY_STRING("VRedOpaque"),
+			Box(CLAY_STRING("VRedOpaque"),
 			          /*width=*/320, /*height=*/160,
 			          /*fillPaletteColor=*/kRedColor,
 			          /*fillOpacity=*/255,
@@ -72,7 +72,7 @@ bool RunRectangleAlphaTest(::Game & game, const char * outPath) {
 		CLAY({ .id = CLAY_ID("BlueHost"),
 		       .floating = { .offset = { 320, 160 },
 		                     .attachTo = CLAY_ATTACH_TO_ROOT } }) {
-			Rectangle(CLAY_STRING("VBlueHalf"),
+			Box(CLAY_STRING("VBlueHalf"),
 			          /*width=*/320, /*height=*/160,
 			          /*fillPaletteColor=*/kBlueColor,
 			          /*fillOpacity=*/128,

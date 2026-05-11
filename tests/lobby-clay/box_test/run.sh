@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# C0 Rectangle primitive unit test — drives `clay_rectangle_test` and
+# C0 Box primitive unit test — drives `clay_box_test` and
 # pixdiffs the resulting PNG against the committed reference.
 #
 # Pass bar: < 1.0% pixdiff vs reference.png.
 #
-# Usage:   bash tests/lobby-clay/rectangle_test/run.sh
+# Usage:   bash tests/lobby-clay/box_test/run.sh
 # Updates: rerun with REGEN=1 to overwrite reference.png from the live binary.
 
 set -euo pipefail
@@ -40,10 +40,10 @@ wait_alive "$PORT"
 
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
-OUT="${TMPDIR:-/tmp}/rectangle.$$.png"
+OUT="${TMPDIR:-/tmp}/box.$$.png"
 TMPS+=("$OUT")
 REF="$HERE/reference.png"
-cli --port "$PORT" clay_rectangle_test --out "$OUT" >/dev/null
+cli --port "$PORT" clay_box_test --out "$OUT" >/dev/null
 if [ "${REGEN:-0}" = "1" ]; then
   cp "$OUT" "$REF"
   echo "regenerated $REF"
@@ -59,4 +59,4 @@ if ! awk -v d="$DIFF" 'BEGIN { exit (d + 0 < 1.0) ? 0 : 1 }'; then
   for i in "${!TMPS[@]}"; do [ "${TMPS[$i]}" = "$OUT" ] && unset 'TMPS[i]'; done
   exit 1
 fi
-echo "PASS rectangle_test"
+echo "PASS box_test"
