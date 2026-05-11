@@ -165,6 +165,23 @@ public:
 	// branch in GameSelectPanel::Tick.
 	void LobbyV2GameSelectRow(int index);
 	void LobbyV2GameSelectJoin();
+	// Game-create panel runtime helpers. Click-driven hit-tests live in
+	// DispatchLobbyV2Click; the editing helpers below take typed input from
+	// events.cpp. lobby_create_active_field tracks which of the two text
+	// inputs (0=none, 1=name, 2=password) has caret focus — mirrors the
+	// legacy gamecreate sub-interface's activeobject swap.
+	void LobbyV2CreateAppendChar(char c);
+	void LobbyV2CreateBackspace();
+	void LobbyV2CreateSubmit();          // ENTER → fire Create.
+	void LobbyV2CreateCycleSecurity();   // Off → Low → Medium → High → Off.
+	void LobbyV2CreateCycleMinLevel();   // 0..99 wrap, +1 per click.
+	void LobbyV2CreateCycleMaxLevel();
+	void LobbyV2CreateCycleMaxPlayers(); // 1..24 wrap.
+	void LobbyV2CreateCycleMaxTeams();   // 1..16 wrap.
+	void LobbyV2CreateGame();            // Create button click.
+	void LobbyV2CreateSelectMap(int row);
+	void LobbyV2CreateDownloadMap(int row); // [DL] badge click.
+	bool LobbyV2CreateInputActive() const;
 
 	// v2 modal stack — overlays the underlying state's render and intercepts
 	// mouse / text input when non-empty. Lobby panels (P16g) and any other
@@ -366,6 +383,11 @@ private:
 	// strings, and updates show_scrollbar. Run per-render from
 	// RenderLobbyV2.
 	void RefreshLobbyV2GameSelectState();
+	// Mirror of GameCreatePanel::Tick: polls the in-flight [DL] download
+	// for completion/failure (rebuilds map_items on success), and refreshes
+	// the caret blink. Map-list population itself happens once on
+	// LobbyV2ShowGameCreate. Run per-render from RenderLobbyV2.
+	void RefreshLobbyV2GameCreateState();
 	// Owned heap to keep ui::v2::LobbyState's full type out of game.h —
 	// it transitively includes the v2 panel headers and would pollute
 	// every game.h consumer. Allocated in Game() / freed in ~Game().
@@ -393,6 +415,7 @@ private:
 	char lobby_connect_username[17] = {0};
 	char lobby_connect_password[29] = {0};
 	int  lobby_connect_active_field = 1; // 0 = none, 1 = username, 2 = password
+	int  lobby_create_active_field  = 1; // 0 = none, 1 = name, 2 = password
 	// LobbyConnect status textbox (legacy LobbyConnectScreen pushed a TextBox
 	// object; we keep the same lines here and re-emit each frame as v2
 	// Labels). motdprinted mirrors the legacy bool on LobbyConnectScreen.

@@ -51,20 +51,30 @@ struct GameCreateState {
 	// Selected row index (-1 = none). Legacy MapDownloader::selectedmap is
 	// reset to -1 at Build time and only changes on mouse hover.
 	int selected_map = -1;
+	// Which of the two text inputs has caret focus. Legacy ShowGameCreate
+	// sets activeobject = nametextinput, so name_active=true is the
+	// preview-gate default. The live engine flips between name + password
+	// on click via Game::lobby_create_active_field.
+	bool name_active = true;
+	bool password_active = false;
+	// Caret blink phase — true at preview gate to match the legacy state_i=0
+	// caret rect render.
+	bool caret_visible = true;
+	// Live download overlay: when a [DL] row's underlying map is fetching,
+	// the legacy SelectBox renderer paints a progress bar over the row
+	// instead of the badge. download_item holds the dlname (without the
+	// "[DL] " prefix); download_progress is the latest percent (0..100).
+	// Default download_progress=-1 disables the overlay (preview gate).
+	std::string download_item;
+	int download_progress = -1;
 };
 
 // Game-create right-side panel: chrome border + "Game Options" form
 // (security / level range / player + team caps / map list) on the left,
 // "Select Map" picker on the right, with game name + password inputs and
 // the Create button along the bottom.
-//
-// `name_active` controls whether the name input renders the blinking
-// caret. Legacy flow: ShowGameCreate sets lobbyiface->activeobject =
-// gameCreate->id then ActiveChanged propagates into gameCreate, which
-// has activeobject = nametextinput → nametextinput.showcaret = true.
 Node BuildGameCreatePanel(const Context & ctx, const GameCreateState & state,
-                          const GameCreateHandlers & handlers = {},
-                          bool name_active = true);
+                          const GameCreateHandlers & handlers = {});
 
 }  // namespace v2
 }  // namespace ui

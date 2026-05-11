@@ -3,6 +3,7 @@
 #include "context.h"
 #include "node.h"
 
+#include <cstdio>
 #include <cstring>
 #include <string>
 
@@ -16,9 +17,7 @@ namespace {
 // integer ratio + 1, since the legacy `line > height/lineheight` check
 // fires only AFTER the line=18 draw). For "[DL] " prefixed entries the
 // renderer paints the stripped name, then a 14x11 black box + "DL" badge
-// in the right margin; non-DL entries draw the full text plain. Highlight
-// rect for selecteditem is omitted because legacy seeds selectedmap = -1
-// in Build and only mouse hover updates it (no mouse at preview gate).
+// in the right margin; non-DL entries draw the full text plain.
 void EmitSelectBoxRows(std::vector<Node> & out, const GameCreateState & state)
 {
 	const int sb_x       = 407;
@@ -32,14 +31,36 @@ void EmitSelectBoxRows(std::vector<Node> & out, const GameCreateState & state)
 		const std::string & item = state.map_items[i];
 		int row_y = sb_y + line * lineheight;
 		bool is_dl = (item.size() >= 5 && std::strncmp(item.c_str(), "[DL] ", 5) == 0);
+		// Selection highlight: legacy paints a width × 11 rect at color 180
+		// before drawing the row's text.
+		if((int)i == state.selected_map){
+			out.push_back(FilledRect(/*w=*/sb_width, /*h=*/11, /*color=*/180).at((Sint16)sb_x, (Sint16)row_y));
+		}
 		if(is_dl){
-			// Stripped name on the left.
-			out.push_back(Label(item.substr(5), /*font_bank=*/133, /*font_width=*/6).at((Sint16)sb_x, (Sint16)row_y));
-			// Black backing rect + "DL" badge in the right margin (the
-			// legacy renderer hardcodes color 0 for the rect).
-			int badge_x = sb_x + sb_width - 16;
-			out.push_back(FilledRect(/*w=*/14, /*h=*/11, /*color=*/0).at((Sint16)(badge_x - 1), (Sint16)row_y));
-			out.push_back(Label("DL", /*font_bank=*/133, /*font_width=*/6).at((Sint16)badge_x, (Sint16)row_y));
+			// Live download overlay: legacy renderer paints a progress
+			// rect + percent text on the row whose stripped name matches
+			// the in-flight download.
+			bool downloading = state.download_progress >= 0 &&
+			                   item.size() > 5 &&
+			                   item.compare(5, std::string::npos, state.download_item) == 0;
+			if(downloading){
+				int pct = state.download_progress;
+				int barw = ((sb_width - 2) * pct) / 100;
+				out.push_back(FilledRect(/*w=*/sb_width - 2, /*h=*/11, /*color=*/0).at((Sint16)sb_x, (Sint16)row_y));
+				if(barw > 0){
+					out.push_back(FilledRect(/*w=*/barw, /*h=*/11, /*color=*/180).at((Sint16)sb_x, (Sint16)row_y));
+				}
+				char pctbuf[8]; std::snprintf(pctbuf, sizeof(pctbuf), "%d%%", pct);
+				out.push_back(Label(pctbuf, /*font_bank=*/133, /*font_width=*/6).at((Sint16)(sb_x + 2), (Sint16)row_y));
+			}else{
+				// Stripped name on the left.
+				out.push_back(Label(item.substr(5), /*font_bank=*/133, /*font_width=*/6).at((Sint16)sb_x, (Sint16)row_y));
+				// Black backing rect + "DL" badge in the right margin (the
+				// legacy renderer hardcodes color 0 for the rect).
+				int badge_x = sb_x + sb_width - 16;
+				out.push_back(FilledRect(/*w=*/14, /*h=*/11, /*color=*/0).at((Sint16)(badge_x - 1), (Sint16)row_y));
+				out.push_back(Label("DL", /*font_bank=*/133, /*font_width=*/6).at((Sint16)badge_x, (Sint16)row_y));
+			}
 		}else{
 			out.push_back(Label(item, /*font_bank=*/133, /*font_width=*/6).at((Sint16)sb_x, (Sint16)row_y));
 		}
@@ -50,7 +71,7 @@ void EmitSelectBoxRows(std::vector<Node> & out, const GameCreateState & state)
 }  // namespace
 
 Node BuildGameCreatePanel(const Context & ctx, const GameCreateState & state,
-                          const GameCreateHandlers & handlers, bool name_active)
+                          const GameCreateHandlers & handlers)
 {
 	(void)ctx;
 	std::vector<Node> children;
@@ -105,7 +126,7 @@ Node BuildGameCreatePanel(const Context & ctx, const GameCreateState & state,
 	if(!state.game_name.empty()){
 		children.push_back(Label(state.game_name, /*font_bank=*/133, /*font_width=*/6).at(410, 375));
 	}
-	if(name_active){
+	if(state.name_active && state.caret_visible){
 		// DrawTextInput: caret rect at (x + len*fontwidth, y - 1), 1 wide,
 		// (int)(height * 0.8f) tall, color = caretcolor (default 140).
 		// nametextinput height = 14 → h = 11.
@@ -113,9 +134,16 @@ Node BuildGameCreatePanel(const Context & ctx, const GameCreateState & state,
 		children.push_back(FilledRect(/*w=*/1, /*h=*/11, /*color=*/140).at((Sint16)caret_x, 374));
 	}
 	children.push_back(Label("Password (optional):", /*font_bank=*/134, /*font_width=*/8).at(405, 390));
-	// password input renders nothing at preview gate: text is empty (so
-	// the masked '*' run is empty too) and showcaret stays false because
-	// the iface's activeobject is nametextinput.
+	// Password input — legacy DrawTextInput masks each character to '*'
+	// before drawing. Empty password = nothing to draw.
+	if(!state.password.empty()){
+		std::string masked(state.password.size(), '*');
+		children.push_back(Label(masked, /*font_bank=*/133, /*font_width=*/6).at(410, 405));
+	}
+	if(state.password_active && state.caret_visible){
+		int caret_x = 410 + (int)state.password.size() * 6;
+		children.push_back(FilledRect(/*w=*/1, /*h=*/11, /*color=*/140).at((Sint16)caret_x, 404));
+	}
 
 	// Create button.
 	children.push_back(

@@ -59,7 +59,7 @@ Node BuildLobby(const Context & ctx, const LobbyHandlers & handlers, const Lobby
 				.withRamp());
 	}
 	if(state.active_panel == LobbyActivePanel::GameCreate){
-		children.push_back(BuildGameCreatePanel(ctx, state.game_create, handlers.game_create, /*name_active=*/true));
+		children.push_back(BuildGameCreatePanel(ctx, state.game_create, handlers.game_create));
 	}else if(state.active_panel == LobbyActivePanel::GameJoin){
 		children.push_back(BuildGameJoinPanel(ctx, state.game_join, handlers.game_join));
 	}else if(state.active_panel == LobbyActivePanel::GameSelect){

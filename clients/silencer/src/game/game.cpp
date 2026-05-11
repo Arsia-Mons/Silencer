@@ -2038,6 +2038,8 @@ static ui::v2::LobbyHandlers BuildLobbyV2Handlers(Game * game){
 	h.character.on_select_agency = [game](Uint8 agency){ game->LobbyV2SelectAgency(agency); };
 	h.game_select.on_create = [game](){ game->LobbyV2ShowGameCreate(); };
 	h.game_select.on_join   = [game](){ game->LobbyV2GameSelectJoin(); };
+	h.game_create.on_security_toggle = [game](){ game->LobbyV2CreateCycleSecurity(); };
+	h.game_create.on_create          = [game](){ game->LobbyV2CreateGame(); };
 	return h;
 }
 
@@ -2346,6 +2348,7 @@ bool Game::RenderLobbyV2(){
 	RefreshLobbyV2CharacterState();
 	RefreshLobbyV2ChatState();
 	RefreshLobbyV2GameSelectState();
+	RefreshLobbyV2GameCreateState();
 	ui::v2::LobbyHandlers handlers = BuildLobbyV2Handlers(this);
 	screenbuffer.Clear(0);
 	ui_v2_state.BeginFrame();
@@ -2390,6 +2393,60 @@ void Game::DispatchLobbyV2Click(int logical_x, int logical_y){
 				LobbyV2GameSelectRow(idx);
 				return;
 			}
+		}
+	}
+
+	// Game-create panel hit-tests. The panel has six cycle controls
+	// (security + 4 numeric cycles), two text-input focus boxes (name +
+	// password), the map SelectBox (row select + [DL] badge), and the
+	// Create button (handled by v2 dispatch below).
+	if(ui_v2_lobby_state->active_panel == ui::v2::LobbyActivePanel::GameCreate){
+		const int row_y0 = 93;
+		const int row_dy = 18;
+		// Security cycle button (BNONE @ x=323, w=70, h=20).
+		if(logical_x >= 323 && logical_x < 323 + 70 &&
+		   logical_y >= row_y0 + 0 * row_dy && logical_y < row_y0 + 0 * row_dy + 20){
+			LobbyV2CreateCycleSecurity();
+			return;
+		}
+		// Numeric cycle inputs (legacy TextInput @ x=350, w=20, h=20).
+		auto numeric_row_hit = [&](int row){
+			return logical_x >= 350 && logical_x < 350 + 20 &&
+			       logical_y >= row_y0 + row * row_dy &&
+			       logical_y < row_y0 + row * row_dy + 20;
+		};
+		if(numeric_row_hit(1)){ LobbyV2CreateCycleMinLevel();   return; }
+		if(numeric_row_hit(2)){ LobbyV2CreateCycleMaxLevel();   return; }
+		if(numeric_row_hit(3)){ LobbyV2CreateCycleMaxPlayers(); return; }
+		if(numeric_row_hit(4)){ LobbyV2CreateCycleMaxTeams();   return; }
+		// Map SelectBox @ (407, 89, 214, 265). Use the same row-y math as
+		// game_select; [DL] badge column lives in the right 16px margin.
+		if(logical_y >= 89 && logical_y < 89 + 265 &&
+		   logical_x >= 407 && logical_x < 407 + 214){
+			const ui::v2::GameCreateState & gcs = ui_v2_lobby_state->game_create;
+			int row = ((logical_y - 89) / 14) + gcs.map_scrolled;
+			if(logical_x >= 407 + 214 - 16){
+				LobbyV2CreateDownloadMap(row);
+			}else{
+				LobbyV2CreateSelectMap(row);
+			}
+			return;
+		}
+		// Name text-input focus box (legacy @ x=410, y=375, w=210, h=14).
+		if(logical_x >= 410 && logical_x < 410 + 210 &&
+		   logical_y >= 375 && logical_y < 375 + 14){
+			lobby_create_active_field = 1;
+			ui_v2_lobby_state->game_create.name_active = true;
+			ui_v2_lobby_state->game_create.password_active = false;
+			return;
+		}
+		// Password text-input focus box (legacy @ x=410, y=405, w=210, h=14).
+		if(logical_x >= 410 && logical_x < 410 + 210 &&
+		   logical_y >= 405 && logical_y < 405 + 14){
+			lobby_create_active_field = 2;
+			ui_v2_lobby_state->game_create.name_active = false;
+			ui_v2_lobby_state->game_create.password_active = true;
+			return;
 		}
 	}
 
@@ -2560,8 +2617,249 @@ void Game::LobbyV2ShowGameSelect(){
 	ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameSelect;
 }
 
+// Mirror of GameCreatePanel::Build (clients/silencer/src/ui/screens/lobby/
+// panels/game_create_panel.cpp). Reset all per-panel state to defaults and
+// rebuild the map list from local files + the community map server.
 void Game::LobbyV2ShowGameCreate(){
+	ui::v2::GameCreateState & gcs = ui_v2_lobby_state->game_create;
+	gcs = ui::v2::GameCreateState{};
+	gcs.game_name = Config::GetInstance().defaultgamename;
+	gcs.name_active     = true;
+	gcs.password_active = false;
+	lobby_create_active_field = 1;
+
+	std::vector<std::string> maps;
+	CDResDir();
+	auto local = mapDownloader.ListFiles((GetResDir() + "level").c_str());
+	maps.insert(maps.end(), local.begin(), local.end());
+	CDDataDir();
+	auto downloads = mapDownloader.ListFiles((GetDataDir() + "level/download").c_str());
+	for(auto & d : downloads){
+		if(std::find(maps.begin(), maps.end(), d) == maps.end()) maps.push_back(d);
+	}
+	std::sort(maps.begin(), maps.end());
+	mapDownloader.servermaps.clear();
+	auto serverlist = FetchServerMapList(Config::GetInstance().mapapiurl);
+	for(auto & entry : serverlist){
+		if(std::find(maps.begin(), maps.end(), entry.first) == maps.end()){
+			std::string label = "[DL] " + entry.first;
+			maps.push_back(label);
+			gcs.server_maps.insert(label);
+			mapDownloader.servermaps[label] = entry.second;
+		}
+	}
+	gcs.map_items = std::move(maps);
+	mapDownloader.selectedmap = -1;
+	creategameclicked = false;
+
 	ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameCreate;
+}
+
+// Per-render polling of the in-flight [DL] download + caret blink.
+// Mirrors the dl-completion branch of GameCreatePanel::Tick.
+void Game::RefreshLobbyV2GameCreateState(){
+	ui::v2::GameCreateState & gcs = ui_v2_lobby_state->game_create;
+	gcs.caret_visible = ((Uint32)frames & 31u) < 16u;
+
+	if(!mapDownloader.dlitemname.empty()){
+		int res = mapDownloader.dlresult.load();
+		if(res == 1){
+			// Success — strip the [DL] prefix from the completed entry so
+			// it shows as a regular local map.
+			std::string completed = mapDownloader.dlitemname;
+			mapDownloader.servermaps.erase(completed);
+			gcs.server_maps.erase(completed);
+			for(auto & item : gcs.map_items){
+				if(item == completed){
+					if(item.size() > 5) item = item.substr(5);
+					break;
+				}
+			}
+			gcs.download_item.clear();
+			gcs.download_progress = -1;
+			mapDownloader.dlitemname.clear();
+		}else if(res == -1){
+			gcs.download_item.clear();
+			gcs.download_progress = -1;
+			mapDownloader.dlitemname.clear();
+			ShowV2Message("Download failed");
+		}else{
+			gcs.download_progress = mapDownloader.dlprogress.load();
+		}
+	}
+}
+
+bool Game::LobbyV2CreateInputActive() const {
+	using LAP = ui::v2::LobbyActivePanel;
+	return ui_v2_lobby_state->active_panel == LAP::GameCreate &&
+	       lobby_create_active_field > 0;
+}
+
+void Game::LobbyV2CreateAppendChar(char c){
+	ui::v2::GameCreateState & gcs = ui_v2_lobby_state->game_create;
+	if(c < 0x20 || c > 0x7F) return;
+	if(lobby_create_active_field == 1){
+		// Name input — legacy TextInput::maxchars = 35.
+		if(gcs.game_name.size() >= 35) return;
+		gcs.game_name.push_back(c);
+	}else if(lobby_create_active_field == 2){
+		// Password input — legacy TextInput::maxchars = 20.
+		if(gcs.password.size() >= 20) return;
+		gcs.password.push_back(c);
+	}
+}
+
+void Game::LobbyV2CreateBackspace(){
+	ui::v2::GameCreateState & gcs = ui_v2_lobby_state->game_create;
+	if(lobby_create_active_field == 1 && !gcs.game_name.empty()){
+		gcs.game_name.pop_back();
+	}else if(lobby_create_active_field == 2 && !gcs.password.empty()){
+		gcs.password.pop_back();
+	}
+}
+
+void Game::LobbyV2CreateSubmit(){
+	// ENTER fires the Create button (legacy gamecreateinterface->buttonenter
+	// = gamecreatebutton).
+	LobbyV2CreateGame();
+}
+
+void Game::LobbyV2CreateCycleSecurity(){
+	ui::v2::GameCreateState & gcs = ui_v2_lobby_state->game_create;
+	if(gcs.security_text == "Off")         gcs.security_text = "Low";
+	else if(gcs.security_text == "Low")    gcs.security_text = "Medium";
+	else if(gcs.security_text == "Medium") gcs.security_text = "High";
+	else                                   gcs.security_text = "Off";
+}
+
+namespace {
+void CycleNumeric(std::string & dst, int lo, int hi){
+	int v = std::atoi(dst.c_str());
+	v = (v >= hi) ? lo : (v + 1);
+	dst = std::to_string(v);
+}
+}
+
+void Game::LobbyV2CreateCycleMinLevel()  { CycleNumeric(ui_v2_lobby_state->game_create.min_level_text,   0,  99); }
+void Game::LobbyV2CreateCycleMaxLevel()  { CycleNumeric(ui_v2_lobby_state->game_create.max_level_text,   0,  99); }
+void Game::LobbyV2CreateCycleMaxPlayers(){ CycleNumeric(ui_v2_lobby_state->game_create.max_players_text, 1,  24); }
+void Game::LobbyV2CreateCycleMaxTeams()  { CycleNumeric(ui_v2_lobby_state->game_create.max_teams_text,   1,  16); }
+
+void Game::LobbyV2CreateSelectMap(int row){
+	ui::v2::GameCreateState & gcs = ui_v2_lobby_state->game_create;
+	if(row < 0 || row >= (int)gcs.map_items.size()){
+		gcs.selected_map = -1;
+		mapDownloader.selectedmap = -1;
+		return;
+	}
+	gcs.selected_map = row;
+	mapDownloader.selectedmap = row;
+}
+
+void Game::LobbyV2CreateDownloadMap(int row){
+	ui::v2::GameCreateState & gcs = ui_v2_lobby_state->game_create;
+	if(!mapDownloader.dlitemname.empty()) return;
+	if(row < 0 || row >= (int)gcs.map_items.size()) return;
+	const std::string & item = gcs.map_items[row];
+	auto dlit = mapDownloader.servermaps.find(item);
+	if(dlit == mapDownloader.servermaps.end()) return;
+	const std::string & hex = dlit->second;
+	if(hex.size() != 40) return;
+	unsigned char sha1bytes[20] = {};
+	auto hv = [](char c) -> int {
+		if(c >= '0' && c <= '9') return c - '0';
+		if(c >= 'a' && c <= 'f') return c - 'a' + 10;
+		if(c >= 'A' && c <= 'F') return c - 'A' + 10;
+		return -1;
+	};
+	for(int j = 0; j < 20; j++){
+		int hi = hv(hex[2*j]), lo = hv(hex[2*j+1]);
+		if(hi < 0 || lo < 0) return;
+		sha1bytes[j] = (unsigned char)((hi << 4) | lo);
+	}
+	std::string dlname = item.substr(5);
+	mapDownloader.dlitemname = item;
+	mapDownloader.dlresult.store(0);
+	mapDownloader.dlprogress.store(0);
+	gcs.download_item = dlname;
+	gcs.download_progress = 0;
+	if(mapDownloader.dlthread.joinable()) mapDownloader.dlthread.join();
+	std::string apiURL = Config::GetInstance().mapapiurl;
+	std::atomic<int> * progressPtr = &mapDownloader.dlprogress;
+	std::atomic<int> * resultPtr   = &mapDownloader.dlresult;
+	mapDownloader.dlthread = std::thread([dlname, sha1bytes, apiURL, progressPtr, resultPtr]() mutable {
+		std::string res = FetchMapFromServer(dlname.c_str(), sha1bytes, apiURL.c_str(), progressPtr);
+		resultPtr->store(res.empty() ? -1 : 1);
+	});
+}
+
+// Mirror of GameCreatePanel::Tick's GCRT_BTN_CREATE branch (game_create_panel.cpp:458).
+void Game::LobbyV2CreateGame(){
+	ui::v2::GameCreateState & gcs = ui_v2_lobby_state->game_create;
+	if(creategameclicked) return;
+
+	if(gcs.game_name.empty()){
+		ShowV2Message("No game name");
+		return;
+	}
+	if(gcs.selected_map < 0 || gcs.selected_map >= (int)gcs.map_items.size()){
+		ShowV2Message("No map selected");
+		return;
+	}
+	const std::string & mapname = gcs.map_items[gcs.selected_map];
+	if(gcs.server_maps.count(mapname) > 0){
+		ShowV2Message("Download the map first");
+		return;
+	}
+
+	Uint8 securitylevel = LobbyGame::SECNONE;
+	if(gcs.security_text == "Low")         securitylevel = LobbyGame::SECLOW;
+	else if(gcs.security_text == "Medium") securitylevel = LobbyGame::SECMEDIUM;
+	else if(gcs.security_text == "High")   securitylevel = LobbyGame::SECHIGH;
+
+	Uint8 minlevel   = (Uint8)std::atoi(gcs.min_level_text.c_str());
+	Uint8 maxlevel   = (Uint8)std::atoi(gcs.max_level_text.c_str());
+	Uint8 maxplayers = (Uint8)std::atoi(gcs.max_players_text.c_str());
+	if(maxplayers == 0) maxplayers = 1;
+	Uint8 maxteams   = (Uint8)std::atoi(gcs.max_teams_text.c_str());
+	if(maxteams == 0) maxteams = 1;
+
+	unsigned char maphash[20];
+	mapDownloader.CalculateMapHash(mapDownloader.FindMap(mapname.c_str()).c_str(), &maphash);
+	mapDownloader.pendingCreate.gamename = gcs.game_name;
+	mapDownloader.pendingCreate.mapname  = mapname;
+	mapDownloader.pendingCreate.password = gcs.password;
+	memcpy(mapDownloader.pendingCreate.maphash, maphash, 20);
+	mapDownloader.pendingCreate.securitylevel = securitylevel;
+	mapDownloader.pendingCreate.minlevel      = minlevel;
+	mapDownloader.pendingCreate.maxlevel      = maxlevel;
+	mapDownloader.pendingCreate.maxplayers    = maxplayers;
+	mapDownloader.pendingCreate.maxteams      = maxteams;
+	if(mapDownloader.mapUploadThread.joinable()) mapDownloader.mapUploadThread.detach();
+	uint32_t gen = ++mapDownloader.mapUploadGeneration;
+	std::string mppath = mapDownloader.FindMap(mapname.c_str());
+	std::string dataDir = GetDataDir();
+	bool isBundledMap = dataDir.empty() || mppath.substr(0, dataDir.size()) != dataDir;
+	std::string apiURL = Config::GetInstance().mapapiurl;
+	if(isBundledMap){
+		mapDownloader.mapUploadState.store(2, std::memory_order_release);
+	}else{
+		mapDownloader.mapUploadState.store(1, std::memory_order_relaxed);
+		std::string mapname_str = mapname;
+		std::atomic<int> * uploadStatePtr = &mapDownloader.mapUploadState;
+		std::atomic<uint32_t> * uploadGenPtr = &mapDownloader.mapUploadGeneration;
+		mapDownloader.mapUploadThread = std::thread([mapname_str, mppath, apiURL, gen, uploadStatePtr, uploadGenPtr](){
+			bool ok = UploadMapToServer(mapname_str.c_str(), mppath.c_str(), apiURL.c_str());
+			if(uploadGenPtr->load(std::memory_order_relaxed) != gen) return;
+			uploadStatePtr->store(ok ? 2 : 3, std::memory_order_release);
+		});
+	}
+	creategameclicked = true;
+	std::strncpy(Config::GetInstance().defaultgamename, gcs.game_name.c_str(),
+	             sizeof(Config::GetInstance().defaultgamename) - 1);
+	Config::GetInstance().defaultgamename[sizeof(Config::GetInstance().defaultgamename) - 1] = '\0';
+	Config::GetInstance().Save();
+	ShowV2ProgressMessage("Uploading map...");
 }
 
 void Game::LobbyV2ShowGameJoin(){

@@ -230,6 +230,11 @@ bool Game::HandleSDLEvents(void){
 					// sub-interface is the active object whenever no
 					// modal/right-side panel takes focus.
 					if(!skip) LobbyV2ChatAppendChar(ascii);
+				}else if(state == GameState::LOBBY && LobbyV2CreateInputActive()){
+					// v2 Lobby game-create panel — routes to the active
+					// text input (name or password) per
+					// lobby_create_active_field.
+					if(!skip) LobbyV2CreateAppendChar(ascii);
 				}else{
 					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 					if(iface){
@@ -325,6 +330,15 @@ bool Game::HandleSDLEvents(void){
 					switch(event.key.scancode){
 						case SDL_SCANCODE_BACKSPACE: LobbyV2ChatBackspace(); break;
 						case SDL_SCANCODE_RETURN:    LobbyV2ChatSubmit();    break;
+						default: break;
+					}
+				}
+				// v2 LOBBY game-create panel — same shape, RETURN fires the
+				// Create button (legacy gamecreateinterface->buttonenter).
+				if(state == GameState::LOBBY && LobbyV2CreateInputActive()){
+					switch(event.key.scancode){
+						case SDL_SCANCODE_BACKSPACE: LobbyV2CreateBackspace(); break;
+						case SDL_SCANCODE_RETURN:    LobbyV2CreateSubmit();    break;
 						default: break;
 					}
 				}
