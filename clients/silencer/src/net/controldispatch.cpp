@@ -112,6 +112,43 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
+	if(cmd.op == "clay_bank_button_test"){
+		std::string out = cmd.args.value("out", std::string());
+		std::string variant = cmd.args.value("variant", std::string("chrome"));
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_bank_button_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunBankButtonTest(
+			game, variant.c_str(), out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"bank_button test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		r["variant"] = variant;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_bank_button_check"){
+		silencer::clay_bridge::BankButtonCheckResult res{};
+		bool ok = silencer::clay_bridge::RunBankButtonCheck(game, res);
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"bank_button check failed"));
+			return;
+		}
+		nlohmann::json r;
+		r["clicks_fired_on_press"] = res.clicksFiredOnPress;
+		r["clicks_fired_when_held"] = res.clicksFiredWhenHeld;
+		r["chrome_brightness_hover"] = res.chromeBrightnessHover;
+		r["chrome_brightness_idle"] = res.chromeBrightnessIdle;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
 	if(cmd.op == "state"){
 		nlohmann::json r;
 		r["state"] = Game::StateName(game.GetState());

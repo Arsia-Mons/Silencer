@@ -45,7 +45,7 @@
       "id": "P5",
       "priority": 5,
       "name": "BankButton primitive (3 variants)",
-      "passes": false,
+      "passes": true,
       "spec": "Add clients/silencer/src/ui/clay/primitives/bank_button.{h,cpp}. Variants: BankButton::Chrome (B156x21 sprite chrome with centered text), BankButton::Inline (BNONE — text-only inline, left-align flag), BankButton::Checkbox (BCHECKBOX — toggle sprite). API: `BankButton(label, variant, hovered_out_opt, on_click_callback, user)`. Emits a CLAY element + Clay_OnHover. Pixel-identical to legacy Button rendering for all three variants. No lobby/world references.",
       "pass_check": "Three small render tests — one per variant — all pixdiff < 1.0 vs hand-crafted baselines. Hover state changes the rendered chrome (legacy parity). Click callback fires exactly once per press."
     },

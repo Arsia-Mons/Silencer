@@ -291,11 +291,42 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
 			case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END:
 				if(!g_clipStack.empty()) g_clipStack.pop_back();
 				break;
-			case CLAY_RENDER_COMMAND_TYPE_CUSTOM:
-				// Reserved for primitives in P5+ (button chrome, scrollbar
-				// track, toggle face). The smoke test doesn't exercise this
-				// path; downstream items will switch on ClayCustomData::kind.
+			case CLAY_RENDER_COMMAND_TYPE_CUSTOM: {
+				const auto * ccd = reinterpret_cast<const ClayCustomData *>(
+					c->renderData.custom.customData);
+				if(!ccd) break;
+				switch(ccd->kind){
+					case CustomKind::BankButtonChrome: {
+						const auto * p = reinterpret_cast<const BankButtonChromePayload *>(ccd->payload);
+						if(!p) break;
+						const auto & banks = game.GetWorld().resources.spritebank;
+						if(p->bank >= banks.size()) break;
+						if(p->index >= banks[p->bank].size()) break;
+						Surface * src = banks[p->bank][p->index].get();
+						if(!src) break;
+						int x = static_cast<int>(c->boundingBox.x);
+						int y = static_cast<int>(c->boundingBox.y);
+						int w = src->w;
+						int h = src->h;
+						int cx = x, cy = y, cw = w, ch = h;
+						if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) break;
+						Renderer::Rect dstrect{w, h, x, y};
+						if(p->brightness != 128){
+							Surface * copy = renderer.CreateSurfaceCopy(src);
+							renderer.EffectBrightness(copy, nullptr, p->brightness);
+							Renderer::BlitSurface(copy, nullptr, dst, &dstrect);
+							delete copy;
+						}else{
+							Renderer::BlitSurface(src, nullptr, dst, &dstrect);
+						}
+						break;
+					}
+					case CustomKind::None:
+					default:
+						break;
+				}
 				break;
+			}
 			default:
 				break;
 		}

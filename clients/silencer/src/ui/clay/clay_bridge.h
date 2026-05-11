@@ -59,6 +59,25 @@ bool RunSmoke(::Game & game, const char * outPath);
 // control op. Implementation in bank_text_test.cpp.
 bool RunBankTextTest(::Game & game, const char * outPath);
 
+// P5 BankButton primitive unit test. Renders one of three variants
+// (Chrome / Inline / Checkbox) into a fresh 640x480 Surface and writes it
+// to `outPath`. `variant` is one of "chrome", "inline", "checkbox" — any
+// other value selects "chrome". Invoked by the `clay_bank_button_test`
+// control op. Implementation in bank_button_test.cpp.
+bool RunBankButtonTest(::Game & game, const char * variant, const char * outPath);
+
+// P5 BankButton hover/click parity check. Runs the click + hover logic in
+// the BankButton::Chrome variant against a deterministic pointer-state
+// timeline and reports the results as raw counters in the output struct.
+// No PNG is produced — this complements the render-parity test op.
+struct BankButtonCheckResult {
+	int clicksFiredOnPress;     // Expect 1 — Clay_OnHover fires the proxy on PRESSED_THIS_FRAME.
+	int clicksFiredWhenHeld;    // Expect 0 — held frames don't re-fire the proxy.
+	int chromeBrightnessHover;  // Expect 136 — the CUSTOM payload's brightness when hovered.
+	int chromeBrightnessIdle;   // Expect 128 — the CUSTOM payload's brightness when not hovered.
+};
+bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out);
+
 // Pack a (bank, index) pair into a void* for Clay_ImageElementConfig.imageData.
 // Bank fits in the high 16 bits, index in the low 16. Round-trip via
 // UnpackImage(); decoder lives in clay_bridge.cpp.
@@ -81,12 +100,22 @@ struct BankTextDrawData {
 // Kinds added by primitives that need it (button chrome, scrollbar, toggle).
 enum class CustomKind : Uint8 {
 	None = 0,
-	// Reserved for primitives in P5+ — bridge only switches on these.
+	BankButtonChrome,  // P5: sprite-faced button (B156x21) with brightness effect.
 };
 
 struct ClayCustomData {
 	CustomKind kind;
 	void * payload;
+};
+
+// P5 — payload for CustomKind::BankButtonChrome. The bridge blits
+// world.resources.spritebank[bank][index] at the bbox top-left, applying
+// Renderer::EffectBrightness when brightness != 128 (matches the legacy
+// Button effectbrightness path).
+struct BankButtonChromePayload {
+	Uint8  bank;        // 7 for the B156x21 sprite bank.
+	Uint16 index;       // 24 = B156x21 idle face.
+	Uint8  brightness;  // 128 = neutral; 136 = hovered (legacy ACTIVE state).
 };
 
 }  // namespace silencer::clay_bridge
