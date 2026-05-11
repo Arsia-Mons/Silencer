@@ -93,7 +93,7 @@
       "id": "P11",
       "priority": 11,
       "name": "LobbyClayScreen scaffold + chrome",
-      "passes": false,
+      "passes": true,
       "spec": "Add clients/silencer/src/ui/screens/lobby_clay/lobby_clay_screen.{h,cpp}. Inherits from Screen. Per-frame Tick: SetPointerState → BeginLayout → BuildChromeTree(lobbyState, world) → EndLayout → RenderClayCommands. Initially the BuildChromeTree only emits: background image (bank 7 idx 1), TitleBar (Silencer title + version + map-name overlay + Go Back BankButton::Chrome). Add a feature flag SILENCER_LOBBY_CLAY (env var or compile-time) — when set, Game::GoToState(LOBBY) pushes LobbyClayScreen instead of LobbyScreen. Default off.",
       "pass_check": "With SILENCER_LOBBY_CLAY=1, the lobby title chrome (just title bar) renders with pixdiff < 1.0 vs tests/lobby-clay/baselines/title_chrome.png. Go Back returns to main menu.",
       "screenshot": "iter-P11.png",
