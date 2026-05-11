@@ -62,23 +62,36 @@ struct EmitRecord { Node * node; Clay_ElementId id; };
 
 struct LayoutState {
 	std::vector<EmitRecord> records;
-	uint32_t next_idx = 0;
 };
 
-Clay_ElementId IdFor(LayoutState & ls) {
-	// Single static base string + per-emit index. Different IDs per
-	// emit; we don't lean on Clay's per-ID memory (hover/scroll), so
-	// instability across frames is irrelevant.
-	Clay_String base{};
-	base.isStaticallyAllocated = true;
-	base.length = 8;
-	base.chars  = "ui-v2-id";
-	return Clay_GetElementIdWithIndex(base, ls.next_idx++);
+// Stable Clay ID derivation, in priority order:
+//   1. `n.key` non-empty  → `Clay_GetElementId(key)` (semantic, stable).
+//   2. Top-level root     → `CLAY_ID("ui::v2::Root")` (semantic, stable).
+//   3. Anonymous child    → `CLAY_SIDI_LOCAL("c", local_idx)` — hashed
+//      under the currently open parent. Equivalent to `CLAY_IDI_LOCAL`
+//      with a runtime index; stable across frames so long as the parent
+//      doesn't reorder its children, and the per-parent scoping avoids
+//      collisions between distant subtrees that share a child position.
+//
+// Clay_AUTO_ID is the spiritual goal (source-location hash) but the
+// vendored clay.h here predates that macro; the local-scoped index is
+// the closest idiomatic substitute available.
+Clay_ElementId IdFor(const Node & n, bool is_root, uint32_t local_idx) {
+	if(!n.key.empty()){
+		Clay_String s{};
+		s.length = (int32_t)n.key.size();
+		s.chars  = n.key.c_str();
+		return Clay_GetElementId(s);
+	}
+	if(is_root){
+		return CLAY_ID("ui::v2::Root");
+	}
+	return CLAY_SIDI_LOCAL(CLAY_STRING("c"), local_idx);
 }
 
-Clay_ElementDeclaration BuildDecl(const Node & n, LayoutState & ls) {
+Clay_ElementDeclaration BuildDecl(const Node & n, bool is_root, uint32_t local_idx) {
 	Clay_ElementDeclaration d{};
-	d.id = IdFor(ls);
+	d.id = IdFor(n, is_root, local_idx);
 
 	Clay_LayoutConfig lc{};
 	switch(n.kind){
@@ -166,27 +179,29 @@ Clay_ElementDeclaration BuildDecl(const Node & n, LayoutState & ls) {
 	return d;
 }
 
-void EmitNode(Node & n, LayoutState & ls, const Context & ctx, bool in_managed) {
+void EmitNode(Node & n, LayoutState & ls, const Context & ctx, bool in_managed, bool is_root, uint32_t local_idx) {
 	const bool is_container = IsContainer(n.kind);
 	const bool will_emit    = is_container || in_managed;
 
 	if(!will_emit){
 		// Outside any layout subtree — still descend so nested containers
 		// (e.g. a Center embedded inside a Background) get laid out.
+		uint32_t i = 0;
 		for(Node & child : n.children){
-			EmitNode(child, ls, ctx, false);
+			EmitNode(child, ls, ctx, false, false, i++);
 		}
 		return;
 	}
 
-	Clay_ElementDeclaration d = BuildDecl(n, ls);
+	Clay_ElementDeclaration d = BuildDecl(n, is_root, local_idx);
 	Clay__OpenElement();
 	Clay__ConfigureOpenElement(d);
 
 	ls.records.push_back(EmitRecord{ &n, d.id });
 
+	uint32_t i = 0;
 	for(Node & child : n.children){
-		EmitNode(child, ls, ctx, true);
+		EmitNode(child, ls, ctx, true, false, i++);
 	}
 
 	Clay__CloseElement();
@@ -216,7 +231,7 @@ Clay_RenderCommandArray Layout(Node & root, const Context & ctx) {
 	Clay_BeginLayout();
 
 	LayoutState ls;
-	EmitNode(root, ls, ctx, false);
+	EmitNode(root, ls, ctx, false, true, 0);
 
 	Clay_RenderCommandArray cmds = Clay_EndLayout();
 
