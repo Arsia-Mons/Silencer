@@ -115,7 +115,7 @@ void BuildDemoTree() {
 			                   .padding = CLAY_PADDING_ALL(6),
 			                   .childGap = 3,
 			                   .layoutDirection = CLAY_TOP_TO_BOTTOM },
-			       .border = prim::FormBorder() }) {
+			       .border = prim::FormBorder(/*paletteColor=*/220) }) {
 				prim::BankText(CLAY_STRING("Title variant"),
 				               prim::BankTextVariant::Title,
 				               { .effectColor = 152 });

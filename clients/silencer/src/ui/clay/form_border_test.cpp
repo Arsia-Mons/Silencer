@@ -35,7 +35,7 @@ bool RunFormBorderTest(::Game & game, const char * outPath) {
 		           .sizing = { CLAY_SIZING_FIXED(156),
 		                       CLAY_SIZING_FIXED(93) },
 		       },
-		       .border = silencer::ui::primitives::FormBorder() }) {}
+		       .border = silencer::ui::primitives::FormBorder(/*paletteColor=*/220) }) {}
 	}
 
 	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();

@@ -56,6 +56,10 @@ constexpr int    kFormLeft     = 243;
 constexpr int    kFormTop      = 87;
 constexpr int    kFormWidth    = 156;
 constexpr int    kFormHeight   = 93;
+// Palette index of the lobby chrome's bright-green stroke (sampled from
+// the baked BG sprite (7, 1)). Lives at panel scope until the chrome-via-
+// primitives milestone introduces a shared lobby theme.
+constexpr Uint8  kFormStroke   = 220;
 
 constexpr int    kMapListX     = 407;
 constexpr int    kMapListY     = 89;
@@ -327,7 +331,7 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 	// 1-px form border.
 	CLAY({ .id = CLAY_ID("GCrtFormBorder"),
 	       .layout = { .sizing = { CLAY_SIZING_FIXED(kFormWidth), CLAY_SIZING_FIXED(kFormHeight) } },
-	       .border   = FormBorder(),
+	       .border   = FormBorder(kFormStroke),
 	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kFormLeft, kFormTop } } }) {}
 
 	// Six row labels at labelX, y = form_top + i*yspace + yoffset.
