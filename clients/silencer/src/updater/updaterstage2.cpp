@@ -1,13 +1,4 @@
 #include "updaterstage2.h"
-
-#ifdef __EMSCRIPTEN__
-// Browser builds don't self-update. Stub both entrypoints so call sites
-// in main.cpp and the update screen still link.
-namespace UpdaterStage2 {
-int Run(int, char **) { return 0; }
-bool Launch(const std::string &) { return false; }
-}
-#else
 #include "updaterzip.h"
 
 #include <cstdarg>
@@ -619,5 +610,3 @@ bool Launch(const std::string &zippath) {
 }
 
 } // namespace UpdaterStage2
-
-#endif // !__EMSCRIPTEN__

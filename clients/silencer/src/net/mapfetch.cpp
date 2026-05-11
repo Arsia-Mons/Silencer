@@ -3,27 +3,12 @@
 #include "shared.h"
 #include "os.h"
 #include <SDL3/SDL.h>
+#include <curl/curl.h>
 #include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <vector>
 #include <string>
-
-#ifdef __EMSCRIPTEN__
-// Browser builds don't fetch community maps in Stage 1 — the menu doesn't
-// reach the Create Game / map picker flow. Stage 5 swaps this for
-// emscripten_fetch when in-game spectating needs to pull maps that
-// weren't packed into the preload bundle.
-std::string FetchMapFromServer(const char *, const unsigned char *, const char *, std::atomic<int> *) {
-	return "";
-}
-std::vector<std::pair<std::string, std::string>> FetchServerMapList(const char *) {
-	return {};
-}
-void FetchAndSyncServerMaps(const char *) {}
-bool UploadMapToServer(const char *, const char *, const char *) { return false; }
-#else
-#include <curl/curl.h>
 
 namespace {
 
@@ -330,5 +315,3 @@ bool UploadMapToServer(const char * mapname,
     fprintf(stderr, "[mapfetch] upload %s failed: http=%ld\n", mapname, httpStatus);
     return false;
 }
-
-#endif // !__EMSCRIPTEN__

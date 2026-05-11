@@ -1,9 +1,7 @@
 #include "updaterdownload.h"
+#include <curl/curl.h>
 #include <cstdio>
 #include <cstring>
-#ifndef __EMSCRIPTEN__
-#include <curl/curl.h>
-#endif
 
 bool UpdaterDownload::IsAllowed(const std::string &url) {
     const std::string https = "https://";
@@ -30,23 +28,6 @@ bool UpdaterDownload::IsAllowed(const std::string &url) {
     return false;
 }
 
-#ifdef __EMSCRIPTEN__
-// Browser builds don't ship the updater — there is no on-disk binary to
-// swap. Provide stubs so the Updater class (referenced from Game and
-// several UI screens) still links. Network downloads on the browser go
-// through emscripten_fetch in their own code paths, not here.
-UpdaterDownload::UpdaterDownload() {}
-UpdaterDownload::~UpdaterDownload() {}
-UpdaterDownload::Result UpdaterDownload::Fetch(
-    const std::string &, const std::string &,
-    bool (*)(void *, uint64_t, uint64_t), void *,
-    int *http_status_out, std::string *err_out)
-{
-    if (http_status_out) *http_status_out = 0;
-    if (err_out) *err_out = "updater disabled on browser build";
-    return NETWORK_ERROR;
-}
-#else
 namespace {
 
 struct WriteCtx {
@@ -132,4 +113,3 @@ UpdaterDownload::Result UpdaterDownload::Fetch(
     fprintf(stderr, "[updater] download ok: %s → %s (http=%ld)\n", url.c_str(), outpath.c_str(), http);
     return OK;
 }
-#endif // !__EMSCRIPTEN__

@@ -3,10 +3,8 @@
 #include <fstream>
 #include <stdexcept>
 #include <cstdio>
-#include <string>
-#ifndef __EMSCRIPTEN__
 #include <curl/curl.h>
-#endif
+#include <string>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -176,13 +174,9 @@ int LoadActorDefs(const std::string& dir,
 }
 
 // ---------------------------------------------------------------------------
-// HTTP fetch helpers (curl) — native builds only. The browser-spectator
-// build of Stage 1 doesn't fetch actordefs (the main menu doesn't need
-// them); Stage 5 swaps this for emscripten_fetch when in-game spectating
-// pulls actordefs on demand.
+// HTTP fetch helpers (curl)
 // ---------------------------------------------------------------------------
 
-#ifndef __EMSCRIPTEN__
 namespace {
 
 struct StrBuf {
@@ -215,7 +209,6 @@ static std::string CurlGet(const std::string& url) {
 }
 
 } // namespace
-#endif // !__EMSCRIPTEN__
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -225,13 +218,6 @@ int FetchActorDefs(const char* apiBase,
                    std::unordered_map<std::string, ActorDef>& out) {
 	if (!apiBase || apiBase[0] == '\0') return 0;
 
-#ifdef __EMSCRIPTEN__
-	// Stage 1 of the WASM build doesn't fetch actordefs — the main menu
-	// doesn't reach them. Stage 5 will swap CurlGet for emscripten_fetch
-	// for the in-game case.
-	(void)out;
-	return 0;
-#else
 	// GET /api/actors → JSON array of id strings, e.g. ["player","guard"]
 	std::string listBody = CurlGet(std::string(apiBase) + "/api/actors");
 	if (listBody.empty()) {
@@ -273,5 +259,4 @@ int FetchActorDefs(const char* apiBase,
 		}
 	}
 	return loaded;
-#endif
 }

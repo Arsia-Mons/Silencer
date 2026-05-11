@@ -1,20 +1,13 @@
 #include "shared.h"
 #include "game.h"
-#ifndef __EMSCRIPTEN__
 #include "cocoawrapper.h"
 #include "updaterstage2.h"
-#include "relay.h"
-#endif
 #include <vector>
 #ifdef __APPLE__
 #include "CoreFoundation/CoreFoundation.h"
 #include <mach-o/dyld.h>
 #endif
-#ifdef __EMSCRIPTEN__
-#include <emscripten/emscripten.h>
-#include <emscripten/html5.h>
-#endif
-#if defined(POSIX) && !defined(__EMSCRIPTEN__)
+#ifdef POSIX
 #include <execinfo.h>
 #include <signal.h>
 static void crash_handler(int sig){
@@ -236,33 +229,11 @@ static void CleanupPreviousUpdate(void) {
 int main(int argc, char * argv[]){
 #endif
 
-#if defined(POSIX) && !defined(__EMSCRIPTEN__)
+#ifdef POSIX
 	for(int i = 1; i < argc; i++){
 		if(strcmp(argv[i], "--self-update-stage2") == 0){
 			return UpdaterStage2::Run(argc, argv);
 		}
-	}
-	// --relay <lobbyaddr> <lobbyport> <gameid> [--ws-port=N]
-	// Server-side WASM spectator relay mode (Stage 2 of
-	// docs/plans/2026-05-10-wasm-spectator.md). Headless C++ binary
-	// fans the game's UDP snapshots out over WebSocket to N browser
-	// clients.
-	if(argc >= 2 && strcmp(argv[1], "--relay") == 0){
-		if(argc < 5){
-			fprintf(stderr, "usage: silencer --relay <lobbyaddr> <lobbyport> <gameid> [--ws-port=N]\n");
-			return 2;
-		}
-		const char *lobbyAddr = argv[2];
-		unsigned short lobbyPort = (unsigned short)atoi(argv[3]);
-		Uint32 gameId = (Uint32)strtoul(argv[4], nullptr, 10);
-		unsigned short wsPort = 15174;
-		for(int i = 5; i < argc; i++){
-			if(strncmp(argv[i], "--ws-port=", 10) == 0){
-				wsPort = (unsigned short)atoi(argv[i] + 10);
-			}
-		}
-		Relay relay;
-		return relay.Run(lobbyAddr, lobbyPort, gameId, wsPort);
 	}
 #endif
 
@@ -293,7 +264,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 #endif
 
 	bool dedicatedmode = (cmdline && strncmp(cmdline, "-s", 2) == 0);
-#if defined(POSIX) && !defined(__EMSCRIPTEN__)
+#ifdef POSIX
 	if(dedicatedmode){
 		signal(SIGSEGV, crash_handler);
 		signal(SIGABRT, crash_handler);
@@ -301,9 +272,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 #endif
 
-#ifndef __EMSCRIPTEN__
 	CleanupPreviousUpdate();
-#endif
 #ifdef _WIN32
 	SyncInstalledVersionRegistry();
 #endif
@@ -332,14 +301,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	FSRefMakePath(&ref, (UInt8 *)&apppath, PATH_MAX);*/
 #endif
 
-	// Heap-allocate so the Emscripten main-loop callback can borrow the
-	// pointer past return — when emscripten_set_main_loop_arg is paired
-	// with simulate_infinite_loop=true, control falls back to the JS event
-	// loop and `main()` would unwind a stack-local. Native builds free at
-	// loop exit.
-	Game *game = new Game();
-	if(!game->Load(cmdline)){
-		delete game;
+	Game game;
+	if(!game.Load(cmdline)){
 #ifdef __ANDROID__
 		exit(-1);
 #endif
@@ -351,25 +314,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		SDL_GetMouseState(&x, &y);
 	}
 	srand((int)x + (int)y + (int)time(NULL));
-#ifdef __EMSCRIPTEN__
-	emscripten_set_main_loop_arg([](void * arg){
-		Game * g = static_cast<Game *>(arg);
-		if(!g->HandleSDLEvents() || !g->Loop()){
-			emscripten_cancel_main_loop();
-		}
-	}, game, 0, 1);
-	return 0;
-#else
 	while(1){
-		if(!game->HandleSDLEvents()){
-			delete game;
+		if(!game.HandleSDLEvents()){
 #ifdef __ANDROID__
 			exit(0);
 #endif
 			return 0;
 		}
-		if(!game->Loop()){
-			delete game;
+		if(!game.Loop()){
 #ifdef __ANDROID__
 			exit(0);
 #endif
@@ -380,5 +332,4 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	exit(0);
 #endif
 	return 0;
-#endif
 }
