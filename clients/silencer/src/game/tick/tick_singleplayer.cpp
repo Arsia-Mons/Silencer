@@ -203,7 +203,7 @@ if(player){
 				singleplayermessage = 11;
 				world.message_i = 0;
 			}
-			if(player->buyinterfaceid){
+			if(player->isbuying){
 				singleplayermessage++;
 				world.message_i = 0;
 			}

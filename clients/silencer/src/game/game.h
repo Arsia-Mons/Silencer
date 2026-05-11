@@ -25,7 +25,7 @@
 
 class Screen;
 class Modal;
-namespace ui { namespace v2 { struct Node; struct LobbyState; class Runtime; class ModalStack; class IngameChat; } }
+namespace ui { namespace v2 { struct Node; struct LobbyState; class Runtime; class ModalStack; class IngameChat; class IngameBuy; } }
 
 class Game
 {
@@ -150,6 +150,13 @@ public:
 	// ESCAPE / TAB / BACKSPACE + TEXT_INPUT to it when active. Render path
 	// lives in Renderer::DrawHUD reading World::ingame_chat_*.
 	ui::v2::IngameChat & IngameChatOverlay();
+
+	// v2 in-game buy menu overlay. Replaces the legacy
+	// Player::buyinterfaceid path (the imperative Interface + SelectBox
+	// Object spawn inside Player::Tick). Editing (UP / DOWN / RETURN)
+	// routes through events.cpp KEY_DOWN; render reads Player::isbuying
+	// + Player::buyifacelastitem / buyifacelastscrolled.
+	ui::v2::IngameBuy & IngameBuyOverlay();
 
 	// Preview-mode CLI flags. Set by Load() when --preview-screen is
 	// passed; main.cpp dispatches to RunPreview() instead of the normal
@@ -283,6 +290,10 @@ private:
 	// fields so the legacy renderer HUD path can read them. Heap-allocated
 	// to keep the v2 IngameChat type out of game.h.
 	std::unique_ptr<ui::v2::IngameChat> ui_v2_ingame_chat;
+	// v2 in-game buy menu overlay — like IngameChat above, lives next to
+	// Game and reads Player::isbuying / buyifacelast{item,scrolled} so
+	// the legacy renderer HUD path doesn't need a Game backref.
+	std::unique_ptr<ui::v2::IngameBuy> ui_v2_ingame_buy;
 	// Set by GoToState; processed at the next Tick() entry to pop screens
 	// safely after the active screen's Tick has returned. Avoids destroying
 	// a screen mid-Tick when a button click triggers a state transition.

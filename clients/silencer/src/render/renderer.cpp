@@ -37,6 +37,7 @@
 #include "detonator.h"
 #include "config.h"
 #include <math.h>
+#include <vector>
 
 Renderer::Renderer(World & world) : world(world), camera(640, 480){
 	ambience_r = 0;
@@ -3414,32 +3415,63 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 			// 102:2 buy up arrow
 			// 102:3 buy down array
 			
-			if(player->buyinterfaceid || player->techinterfaceid){
-				Interface * iface = (Interface *)world.GetObjectFromId(player->buyinterfaceid);
-				if(!iface){
-					iface = (Interface *)world.GetObjectFromId(player->techinterfaceid);
-				}
-				if(iface){
+			if(player->isbuying || player->techinterfaceid){
+				// Buy menu uses v2 state (Player::isbuying + buyifacelast*);
+				// tech menu still uses the legacy Interface + SelectBox path
+				// (P19 will port it). Build the visible item list either way
+				// so the rest of the render block stays single-flow.
+				const bool buying = player->isbuying;
+				Interface * iface = buying ? nullptr : (Interface *)world.GetObjectFromId(player->techinterfaceid);
+				SelectBox * selectbox = iface ? (SelectBox *)iface->GetObjectWithUid(world, 1) : nullptr;
+				if(buying || selectbox){
 					dstrect.x = -world.resources.spriteoffsetx[102][0];
 					dstrect.y = -world.resources.spriteoffsety[102][0];
 					BlitSurface(world.resources.spritebank[102][0].get(), 0, surface, &dstrect);
-					
-					SelectBox * selectbox = (SelectBox *)iface->GetObjectWithUid(world, 1);
+
+					// Resolve visible items + selecteditem + scrolled. Buy:
+					// from world.buyableitems filtered by BuyAvailable (same
+					// gate Player::Tick used pre-port). Tech: from the legacy
+					// SelectBox::items deque populated in Player::Tick.
+					std::vector<Uint32> visible_ids;  // buyable item ids in display order
+					std::vector<const char *> visible_names; // for tech path: from selectbox->items
+					unsigned int selecteditem = 0;
+					unsigned int scrolled = 0;
+					if(buying){
+						for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); ++it){
+							BuyableItem * item = *it;
+							if(!item) continue;
+							Peer * peer = player->GetPeer(world);
+							if(!peer || !(peer->techchoices & item->techchoice)) continue;
+							if(item->agencyspecific != -1 && (!team || item->agencyspecific != team->agency)) continue;
+							visible_ids.push_back(item->id);
+							visible_names.push_back(item->name);
+						}
+						selecteditem = (unsigned int)player->buyifacelastitem;
+						scrolled     = (unsigned int)player->buyifacelastscrolled;
+					}else{
+						unsigned int i = 0;
+						for(std::deque<char *>::iterator it = selectbox->items.begin(); it != selectbox->items.end(); ++it, ++i){
+							visible_ids.push_back(selectbox->IndexToId(i));
+							visible_names.push_back(*it);
+						}
+						selecteditem = (unsigned int)selectbox->selecteditem;
+						scrolled     = selectbox->scrolled;
+					}
+
 					unsigned int line = 0;
-					unsigned int i = 0;
-					for(std::deque<char *>::iterator it = selectbox->items.begin(); it != selectbox->items.end(); it++, i++){
-						if(i < selectbox->scrolled){
+					for(unsigned int i = 0; i < visible_ids.size(); ++i){
+						if(i < scrolled){
 							continue;
 						}
 						if(line >= 5){
 							break;
 						}
-						
+
 						int yoffset = line * 25;
-						
+
 						Uint8 brightness = 128;
 
-						if(i == selectbox->selecteditem){
+						if(i == selecteditem){
 							dstrect.x = -world.resources.spriteoffsetx[102][1];
 							dstrect.y = -world.resources.spriteoffsety[102][1] + yoffset;
 							BlitSurface(world.resources.spritebank[102][1].get(), 0, surface, &dstrect);
@@ -3449,16 +3481,16 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 								brightness += 8 - ((state_i % 8) / 1);
 							}
 						}
-						
+
 						BuyableItem * buyableitem = 0;
-						Uint32 id = selectbox->IndexToId(i);
+						Uint32 id = visible_ids[i];
 						for(std::vector<BuyableItem *>::iterator itb = world.buyableitems.begin(); itb != world.buyableitems.end(); itb++){
 							if((*itb)->id == id){
 								buyableitem = (*itb);
 								break;
 							}
 						}
-						
+
 						dstrect.x = -world.resources.spriteoffsetx[buyableitem->res_bank][buyableitem->res_index] + 169;
 						dstrect.y = -world.resources.spriteoffsety[buyableitem->res_bank][buyableitem->res_index] + 139 + yoffset;
 						if(brightness != 128){
@@ -3471,8 +3503,8 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 						}else{
 							BlitSurface(world.resources.spritebank[buyableitem->res_bank][buyableitem->res_index].get(), 0, surface, &dstrect);
 						}
-						
-						char * itemname = (*it);
+
+						const char * itemname = visible_names[i];
 						char temp[64];
 						if(buyableitem->id == World::BUY_GIVE0){
 							Peer * peer = world.peerlist[team->peers[0]];
@@ -3511,7 +3543,7 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 							}
 						}
 						char price[10];
-						if(player->buyinterfaceid){
+						if(buying){
 							if(team && (team->disabledtech & buyableitem->techchoice)){
 								strcpy(price, "DOWN");
 							}else{
@@ -3536,15 +3568,15 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 								}
 							}
 						}
-						DrawText(surface, 222, 145 + yoffset, itemname, 134, 9, false, 0, brightness);
+						DrawText(surface, 222, 145 + yoffset, (char *)itemname, 134, 9, false, 0, brightness);
 						DrawText(surface, 440 - ((strlen(price) * 9) / 2), 145 + yoffset, price, 134, 9, false, 0, brightness);
 						yoffset += 25;
-						
+
 						line++;
 					}
-					
+
 					char text[256];
-					if(player->buyinterfaceid || player->InOwnBase(world)){
+					if(buying || player->InOwnBase(world)){
 						sprintf(text, "Available Credits: %d", player->credits);
 					}else{
 						sprintf(text, "Viruses Available: %d", player->InventoryItemCount(Player::INV_VIRUS));

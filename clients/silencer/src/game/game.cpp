@@ -42,6 +42,7 @@
 #include "lobby_shell.h"
 #include "modal_stack.h"
 #include "ingame_chat.h"
+#include "ingame_buy.h"
 #include "runtime.h"
 #include "lobby_shell.h"
 #include "lobbygame.h"
@@ -118,6 +119,7 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	preview_scale = 1;
 	ui_v2_modal_stack = std::make_unique<ui::v2::ModalStack>(world, ui_v2_mouse_x, ui_v2_mouse_y);
 	ui_v2_ingame_chat = std::make_unique<ui::v2::IngameChat>(world);
+	ui_v2_ingame_buy  = std::make_unique<ui::v2::IngameBuy>(world);
 }
 
 Game::~Game(){
@@ -1322,6 +1324,7 @@ bool Game::DispatchV2ModalKey(int sdl_scancode){     return ui_v2_modal_stack->D
 bool Game::DispatchV2ModalText(char ascii){          return ui_v2_modal_stack->DispatchText(ascii); }
 
 ui::v2::IngameChat & Game::IngameChatOverlay(){ return *ui_v2_ingame_chat; }
+ui::v2::IngameBuy  & Game::IngameBuyOverlay (){ return *ui_v2_ingame_buy;  }
 
 
 void Game::TickActiveScreen(){

@@ -106,65 +106,47 @@ bool Game::CheckForConnectionLost(void){
 }
 
 void Game::ProcessInGameInterfaces(void){
+	// Buy menu has migrated to ui::v2::IngameBuy (cursor on Player, audio
+	// + Submit owned by the overlay). Tech menu still uses the legacy
+	// Interface + SelectBox Object path (P19 will port it).
 	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 	if(localplayer){
-		if(localplayer->buyinterfaceid || localplayer->techinterfaceid){
-			currentinterface = localplayer->buyinterfaceid;
-			if(!currentinterface){
-				currentinterface = localplayer->techinterfaceid;
-			}
+		if(localplayer->techinterfaceid){
+			currentinterface = localplayer->techinterfaceid;
 		}else{
 			oldselecteditem = 0;
-		}
-		if(!localplayer->buyinterfaceid && !localplayer->techinterfaceid){
 			currentinterface = 0;
 		}
 		Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-		if(iface){
-			if(iface->id == localplayer->buyinterfaceid || iface->id == localplayer->techinterfaceid){
-				bool buying = false;
-				if(iface->id == localplayer->buyinterfaceid){
-					buying = true;
+		if(iface && iface->id == localplayer->techinterfaceid){
+			SelectBox * selectbox = (SelectBox *)iface->GetObjectWithUid(world, 1);
+			if(selectbox){
+				if(selectbox->selecteditem != oldselecteditem){
+					Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
+					oldselecteditem = selectbox->selecteditem;
 				}
-				SelectBox * selectbox = (SelectBox *)iface->GetObjectWithUid(world, 1);
-				if(selectbox){
-					if(selectbox->selecteditem != oldselecteditem){
-						Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
-						oldselecteditem = selectbox->selecteditem;
-						if(buying){
-							localplayer->buyifacelastitem = selectbox->selecteditem;
+				if(selectbox->selecteditem >= selectbox->scrolled + 5){
+					selectbox->scrolled = selectbox->selecteditem - 4;
+				}
+				if(selectbox->selecteditem < selectbox->scrolled){
+					selectbox->scrolled = selectbox->selecteditem;
+				}
+				if(selectbox->enterpressed){
+					BuyableItem * buyableitem = 0;
+					for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
+						if((*it)->id == selectbox->IndexToId(selectbox->selecteditem)){
+							buyableitem = (*it);
+							break;
 						}
 					}
-					if(selectbox->selecteditem >= selectbox->scrolled + 5){
-						selectbox->scrolled = selectbox->selecteditem - 4;
-					}
-					if(selectbox->selecteditem < selectbox->scrolled){
-						selectbox->scrolled = selectbox->selecteditem;
-					}
-					if(buying){
-						localplayer->buyifacelastscrolled = selectbox->scrolled;
-					}
-					if(selectbox->enterpressed){
-						BuyableItem * buyableitem = 0;
-						for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
-							if((*it)->id == selectbox->IndexToId(selectbox->selecteditem)){
-								buyableitem = (*it);
-								break;
-							}
+					if(buyableitem){
+						if(localplayer->InOwnBase(world)){
+							localplayer->RepairItem(world, buyableitem->id);
+						}else{
+							localplayer->VirusItem(world, buyableitem->id);
 						}
-						if(buyableitem){
-							if(buying){
-								localplayer->BuyItem(world, buyableitem->id);
-							}else{
-								if(localplayer->InOwnBase(world)){
-									localplayer->RepairItem(world, buyableitem->id);
-								}else{
-									localplayer->VirusItem(world, buyableitem->id);
-								}
-							}
-						}
-						selectbox->enterpressed = false;
 					}
+					selectbox->enterpressed = false;
 				}
 			}
 		}

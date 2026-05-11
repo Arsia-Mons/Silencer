@@ -1,7 +1,7 @@
 #ifndef WORLD_H
 #define WORLD_H
 
-namespace ui { namespace v2 { class LobbyRuntime; } }
+namespace ui { namespace v2 { class LobbyRuntime; class IngameBuy; } }
 
 #include "shared.h"
 #include <list>
@@ -129,6 +129,10 @@ public:
 	
 	friend class Renderer;
 	friend class Game;
+	// v2 in-game overlays reach into World for the local peer id (used to
+	// resolve the local Player whose isbuying / cursor state the overlay
+	// edits).
+	friend class ui::v2::IngameBuy;
 	// v2 lobby runtime: accesses peerlist / state / gameinfo / etc. to
 	// drive the CreateGame state machine, ready handoff, and team /
 	// peer projections. Granular alternative is per-field accessors —

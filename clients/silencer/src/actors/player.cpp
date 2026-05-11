@@ -97,8 +97,8 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	jetpacksoundchannel = -1;
 	flamersoundchannel = -1;
 	chatinterfaceid = 0;
-	buyinterfaceid = 0;
 	techinterfaceid = 0;
+	wasbuying = false;
 	chatwithteam = false;
 	fallingnudge = 0;
 	oldfiles = 0;
@@ -258,7 +258,7 @@ void Player::Tick(World & world){
 	if(ai){
 		ai->Tick(world);
 	}
-	if(input.keychat && !world.ingame_chat_active && !buyinterfaceid && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
+	if(input.keychat && !world.ingame_chat_active && !isbuying && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
 		if(!world.replay.IsPlaying()){
 			// v2 in-game chat overlay (replaces the legacy Interface +
 			// TextInput Object spawn that owned chatinterfaceid). Editing
@@ -518,34 +518,16 @@ void Player::Tick(World & world){
 		}
 	}
 	if(world.GetPeerPlayer(world.localpeerid) == this){
-		if(isbuying && !buyinterfaceid){
-			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-			if(iface){
-				SelectBox * selectbox = (SelectBox *)world.CreateObject(ObjectTypes::SELECTBOX);
-				selectbox->draw = false;
-				selectbox->uid = 1;
-				int i = 0;
-				for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++, i++){
-					if(BuyAvailable(world, (*it)->id)){
-						selectbox->AddItem((*it)->name, (*it)->id);
-					}
-				}
-				selectbox->selecteditem = buyifacelastitem;
-				selectbox->scrolled = buyifacelastscrolled;
-				iface->AddObject(selectbox->id);
-				iface->activeobject = selectbox->id;
-				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundMenuSelect], 96);
-				buyinterfaceid = iface->id;
-			}
-		}else
-		if(!isbuying && buyinterfaceid && !world.replaying){
-			Interface * iface = (Interface *)world.GetObjectFromId(buyinterfaceid);
-			if(iface){
-				iface->DestroyInterface(world, iface);
-			}
-			buyinterfaceid = 0;
+		// v2 in-game buy menu: cursor state lives on this Player
+		// (buyifacelastitem / buyifacelastscrolled — repurposed from
+		// "last position between opens" to live cursor). Activation
+		// is the false->true edge of isbuying. Editing + Submit live
+		// in ui::v2::IngameBuy (routed via events.cpp KEY_DOWN).
+		if(isbuying && !wasbuying && !world.replaying){
+			Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundMenuSelect], 96);
 		}
-		
+		wasbuying = isbuying;
+
 		if(techstationactive && !techinterfaceid){
 			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
 			if(iface){

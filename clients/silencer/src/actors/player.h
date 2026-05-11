@@ -72,9 +72,13 @@ public:
 	Uint16 chatinterfaceid;
 	bool chatwithteam;
 	Sint8 fallingnudge;
-	Uint16 buyinterfaceid;
 	Uint16 techinterfaceid;
 	bool isbuying;
+	// Local-only edge-detect tracker — true when isbuying was true on the
+	// previous Player::Tick. Used to fire IngameBuy::Activate() on the
+	// isbuying false->true edge (replaces the legacy buyinterfaceid==0
+	// guard that gated the one-shot Interface allocation).
+	bool wasbuying;
 	bool techstationactive;
 	Uint8 inventoryitems[4];
 	Uint8 inventoryitemsnum[4];

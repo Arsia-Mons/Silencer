@@ -1,6 +1,7 @@
 #include "game.h"
 #include "runtime.h"
 #include "ingame_chat.h"
+#include "ingame_buy.h"
 #include "audio.h"
 #include "config.h"
 #include "interface.h"
@@ -105,7 +106,7 @@ void Game::UpdateInputState(Input & input){
 				input = zeroinput;
 				interfaceenterfix = true;
 			}
-			if(localplayer->buyinterfaceid || localplayer->techinterfaceid || interfaceenterfix){
+			if(localplayer->isbuying || localplayer->techinterfaceid || interfaceenterfix){
 				Input zeroinput;
 				zeroinput.keyactivate = input.keyactivate;
 				zeroinput.keymoveleft = input.keymoveleft;
@@ -302,6 +303,15 @@ bool Game::HandleSDLEvents(void){
 					IngameChatOverlay().DispatchKey((int)event.key.scancode);
 					break;
 				}
+				if(IngameBuyOverlay().Active()){
+					// In-game buy menu absorbs UP/DOWN (nav) + RETURN (buy)
+					// and swallows the rest so weapon/movement keys don't
+					// fire while the menu is open. Tech menu still routes
+					// through the legacy iface->ProcessKeyPress path below
+					// because techinterfaceid hasn't migrated yet (P19).
+					IngameBuyOverlay().DispatchKey((int)event.key.scancode);
+					break;
+				}
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 				if(iface){
 					iface->lastsym = event.key.scancode;
@@ -426,7 +436,7 @@ bool Game::HandleSDLEvents(void){
 void Game::OnScancodeDown(int sc){
 	if(sc == quitscancode){
 		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-		if(localplayer && !world.ingame_chat_active && !localplayer->buyinterfaceid){
+		if(localplayer && !world.ingame_chat_active && !localplayer->isbuying){
 			if(world.quitstate == 0){
 				world.quitstate = 1;
 			}else
