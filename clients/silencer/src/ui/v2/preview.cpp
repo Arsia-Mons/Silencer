@@ -33,6 +33,7 @@
 #include "options_audio.h"
 #include "options_controls.h"
 #include "lobby_connect.h"
+#include "mission_summary.h"
 
 #include "main_menu_screen.h"
 #include "options_screen.h"
@@ -40,6 +41,7 @@
 #include "options_audio_screen.h"
 #include "options_controls_screen.h"
 #include "lobby_connect_screen.h"
+#include "mission_summary_screen.h"
 #include "renderer.h"
 #include "renderdevice.h"
 #include "resources.h"
@@ -171,6 +173,12 @@ int Game::RunPreview()
 		running = false;
 	};
 
+	ui::v2::MissionSummaryHandlers mission_summary_handlers;
+	mission_summary_handlers.on_done = [&running](){
+		printf("[preview] Done clicked\n");
+		running = false;
+	};
+
 	// `with_state=false` is the dump-PPM path: NULL UIState → render
 	// snaps + dt is ignored, so output stays byte-identical to legacy.
 	auto make_ctx = [&](bool with_state){
@@ -290,6 +298,25 @@ int Game::RunPreview()
 				world.TickObjects();
 				renderer.Draw(&screenbuffer, /*frametime=*/0);
 				screen->Destroy(screenContext);
+			}else if(strcmp(preview_screen, "mission_summary") == 0){
+				// MissionSummaryScreen::Build calls ResetPresentation(1) +
+				// SetPosition(320, 240) itself, but mirror here for safety.
+				renderer.camera.SetPosition(320, 240);
+				auto screen = std::make_unique<MissionSummaryScreen>();
+				screen->Build(screenContext);
+				// One TickObjects() settles B196x33 chrome (Done button)
+				// res_index on its INACTIVE base. Refresh() ran in Build —
+				// at preview gate GetUserInfo just created the User with
+				// retrieving=true, so the upgrade-available banner stays
+				// draw=false and no +1 upgrade buttons (uid 10..15) get
+				// created. The textbox auto-scrolls during AddLine — when
+				// text.size() exceeds height/lineheight=27, scrolled is
+				// set to text.size()-27. After 60 AddLine calls, scrolled
+				// settles at 59-27=32 (the value BEFORE the final
+				// push_back). So the visible window starts at deque[32].
+				world.TickObjects();
+				renderer.Draw(&screenbuffer, /*frametime=*/0);
+				screen->Destroy(screenContext);
 			}else{
 				fprintf(stderr, "[preview] unknown screen '%s' for legacy impl\n", preview_screen);
 				return;
@@ -329,6 +356,12 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "lobby_connect") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildLobbyConnect(ctx, lobby_connect_handlers);
+				ui::v2::Layout(tree, ctx);
+				ui::v2::Render(tree, ctx, screenbuffer, renderer);
+				if(ctx.state) ctx.state->EndFrame();
+			}else if(strcmp(preview_screen, "mission_summary") == 0){
+				if(ctx.state) ctx.state->BeginFrame();
+				ui::v2::Node tree = ui::v2::BuildMissionSummary(ctx, mission_summary_handlers);
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
@@ -410,6 +443,10 @@ int Game::RunPreview()
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby_connect") == 0){
 						ui::v2::Node tree = ui::v2::BuildLobbyConnect(ctx, lobby_connect_handlers);
+						ui::v2::Layout(tree, ctx);
+						ui::v2::DispatchClick(tree, ctx);
+					}else if(strcmp(preview_screen, "mission_summary") == 0){
+						ui::v2::Node tree = ui::v2::BuildMissionSummary(ctx, mission_summary_handlers);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}
