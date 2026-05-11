@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silencer — Spectator</title>
+<link rel="icon" href="/assets/logo.png">
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #050a05;
+    color: #d1fad7;
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    height: 100%;
+  }
+  #shell {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  #header {
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #6ad48b;
+  }
+  #canvas {
+    image-rendering: pixelated;
+    border: 1px solid #2a4a30;
+    background: #000;
+    /* Match the 640x480 native render target; CSS scales to viewport. */
+    width: min(960px, 100vw);
+    height: min(720px, calc(100vw * 3 / 4));
+    max-height: 80vh;
+  }
+  #status {
+    font-size: 12px;
+    color: #6ad48b;
+    min-height: 1em;
+  }
+  #footer {
+    font-size: 11px;
+    color: #4a7050;
+    text-align: center;
+  }
+  /* Browsers block audio until first user gesture — show a one-shot
+     overlay until they click. */
+  #gesture-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 10, 5, 0.92);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    cursor: pointer;
+    z-index: 10;
+  }
+  #gesture-overlay h1 {
+    margin: 0;
+    font-size: 22px;
+    letter-spacing: 0.2em;
+    color: #d1fad7;
+  }
+  #gesture-overlay p {
+    margin: 0;
+    color: #6ad48b;
+    font-size: 13px;
+  }
+  #gesture-overlay button {
+    background: #0a1f10;
+    border: 1px solid #2a4a30;
+    color: #d1fad7;
+    padding: 10px 24px;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  #gesture-overlay button:hover {
+    background: #0f2f18;
+  }
+</style>
+</head>
+<body>
+
+<div id="gesture-overlay">
+  <h1>SILENCER · SPECTATOR</h1>
+  <p>watching live multiplayer matches in your browser</p>
+  <button id="start-btn">CLICK TO START</button>
+</div>
+
+<div id="shell">
+  <div id="header">SILENCER · LIVE</div>
+  <canvas id="canvas" tabindex="-1"></canvas>
+  <div id="status">loading…</div>
+  <div id="footer">connecting to <span id="lobby-host">localhost</span></div>
+</div>
+
+<script>
+// Surface the lobby host the WASM module will connect to. The C++ side
+// reads window.location.hostname directly (Stage 4 Lobby::Connect on
+// Emscripten); we just echo it here for visibility.
+document.getElementById('lobby-host').textContent = window.location.hostname || 'localhost';
+
+const statusEl = document.getElementById('status');
+const overlay = document.getElementById('gesture-overlay');
+const startBtn = document.getElementById('start-btn');
+
+// Emscripten Module config — must exist before silencer.js loads.
+var Module = {
+  canvas: document.getElementById('canvas'),
+  preRun: [],
+  postRun: [],
+  print: (text) => console.log('[wasm]', text),
+  printErr: (text) => console.warn('[wasm]', text),
+  setStatus: (text) => {
+    if (text) statusEl.textContent = text;
+    else statusEl.textContent = '';
+  },
+  totalDependencies: 0,
+  monitorRunDependencies: (left) => {
+    Module.totalDependencies = Math.max(Module.totalDependencies, left);
+    Module.setStatus(left
+      ? `loading… (${Module.totalDependencies - left}/${Module.totalDependencies})`
+      : 'ready');
+  },
+};
+Module.setStatus('loading…');
+
+// Wait for the user gesture before kicking off the WASM load. Audio
+// autoplay policies require this; doing it after gesture also avoids
+// network requests in cases where the visitor closes the tab before
+// engaging.
+function startSilencer() {
+  overlay.style.display = 'none';
+  const s = document.createElement('script');
+  s.src = '/spectate/silencer.js';
+  s.async = true;
+  s.onerror = () => {
+    Module.setStatus('failed to load silencer.js — did you copy the WASM build into web/website/spectate/?');
+  };
+  document.body.appendChild(s);
+}
+startBtn.addEventListener('click', startSilencer);
+overlay.addEventListener('click', (e) => {
+  if (e.target === overlay) startSilencer();
+});
+</script>
+
+</body>
+</html>

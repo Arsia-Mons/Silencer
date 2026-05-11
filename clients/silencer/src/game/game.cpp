@@ -4,6 +4,9 @@
 #include "sdlrendererbackend.h"
 #include "tuibackend.h"
 #include <math.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
 #include "overlay.h"
 #include "interface.h"
 #include "textbox.h"
@@ -784,6 +787,14 @@ bool Game::Tick(void){
 				world.DestroyAllObjects();
 				PushScreen(std::make_unique<MainMenuScreen>());
 				stateisnew = false;
+#ifdef __EMSCRIPTEN__
+				// Browser spectator: skip the main-menu UI. There is no
+				// "create game" / "options" / "single player" on the
+				// website widget — its sole job is to watch a live game.
+				// We bounce straight to LOBBY which auto-connects the
+				// facade WS and auto-spectates the first live game.
+				GoToState(LOBBY);
+#endif
 			}else{
 				if(ambienceMixer.FadedIn()){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
@@ -814,15 +825,51 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
+#ifdef __EMSCRIPTEN__
+				// Browser spectator path. Skip pushing LobbyScreen — its
+				// chat / character / game-create panels are pointless on
+				// a read-only widget and Stage 5 will land a slimmer UI.
+				// For now we run the LOBBY state "headless" and let the
+				// auto-spectate poll below pick a live game and transition
+				// us into JOINGAME.
+				char host[256] = {0};
+				EM_ASM({
+					if(window && window.location && window.location.hostname) {
+						stringToUTF8(window.location.hostname, $0, 256);
+					}
+				}, host);
+				if(host[0] == 0) strcpy(host, "localhost");
+				world.lobby.Connect(host, 0); // facade port is hardcoded to 15173
+#else
 				PushScreen(std::make_unique<LobbyScreen>());
+#endif
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
+#ifdef __EMSCRIPTEN__
+				// Auto-spectate: pick the first INGAME spectatable game
+				// the facade has told us about and call SpectateGame.
+				// `creategameclicked` is being reused as a one-shot guard
+				// so we don't fire SpectateGame on every frame while the
+				// JOINGAME transition is in flight; it's reset in
+				// LeaveJoinedGame.
+				if(!joininggame && world.lobby.state == Lobby::AUTHENTICATED){
+					for(LobbyGame * lg : world.lobby.games){
+						if(lg && lg->spectatable && lg->state == 1 /* INGAME */){
+							SpectateGame(*lg);
+							currentlobbygameid = lg->id;
+							GoToState(JOINGAME);
+							break;
+						}
+					}
+				}
+#else
 				// Lobby pump (state-machine + deferred-create) lives in
 				// LobbyScreen::Tick, dispatched by TickActiveScreen() at the
 				// top of Game::Tick.
+#endif
 			}
 		}break;
 		case UPDATING:{

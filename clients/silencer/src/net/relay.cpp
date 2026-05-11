@@ -10,22 +10,18 @@
 #include "sha1.h"
 #include "../world/serializer.h"
 
-// Hand-rolled HTTP→WebSocket upgrade + binary-frame writer; no third-
-// party dep. RFC 6455 subset that mirrors services/lobby/wsutil.go.
-// The UDP-side spectator handshake hand-builds World::MSG_CONNECT with
-// the observer bit set; the relay never instantiates a World or Lobby
-// (the headless silencer binary in --relay mode wants none of SDL,
-// audio, resources, or world simulation — it's a pure UDP↔WS pump).
+// Hand-rolled HTTP→WebSocket upgrade + binary-frame writer (RFC 6455
+// subset). Mirrors services/lobby/wsutil.go on the Go side.
 
 namespace {
 
 constexpr int kRelayBacklog       = 32;
-constexpr size_t kMaxPendingBytes = 8 * 1024 * 1024; // 8 MB per-client outbox cap
+constexpr size_t kMaxPendingBytes = 8 * 1024 * 1024; // per-client outbox cap
 
-// World::MSG_* enum values mirrored from clients/silencer/src/world/world.h.
-// Hand-copied because pulling in world.h would drag the entire engine into
-// the relay TU. If the enum order ever changes upstream, the build will
-// not catch it — keep these in sync.
+// World::MSG_* enum values mirrored from src/world/world.h. Hand-copied
+// to avoid pulling the entire engine TU into the relay; if the enum
+// order ever changes upstream, the build will not catch it — keep these
+// in sync.
 constexpr Uint8 kMsgConnect    = 0;
 constexpr Uint8 kMsgDisconnect = 4;
 constexpr Uint8 kMsgPing       = 5;
@@ -212,8 +208,6 @@ int Relay::Run(const char *peerHost, unsigned short peerPort,
 						fprintf(stderr, "[relay] AUTHORITY admitted us (first packet, %d bytes)\n",
 						        (int)n);
 					}
-					// Detect MSG_DISCONNECT and exit cleanly. The dedicated server
-					// sends this to all peers when the game ends (world.cpp:1739).
 					if (n >= 1 && udpBuf[0] == kMsgDisconnect) {
 						fprintf(stderr, "[relay] received MSG_DISCONNECT — shutting down\n");
 						return 0;
@@ -236,15 +230,15 @@ int Relay::Run(const char *peerHost, unsigned short peerPort,
 }
 
 void Relay::SendConnectRequest() {
-	// World::Connect equivalent: MSG_CONNECT + agency + accountid +
-	// passwordsize + (password bytes) + 1-bit observer flag.
-	// world.cpp:1702 is the canonical writer; world.cpp:285 the reader.
+	// Wire layout matches World::Connect (src/world/world.cpp):
+	// MSG_CONNECT + agency u8 + accountid u32 + passwordsize u8 +
+	// (password bytes) + observer bit.
 	Serializer data;
 	Uint8 code = kMsgConnect;
 	data.Put(code);
 	Uint8 agency = 0;
 	data.Put(agency);
-	Uint32 accountid = 0; // anonymous spectator — plan §"Auth — anonymous v1"
+	Uint32 accountid = 0; // anonymous spectator
 	data.Put(accountid);
 	Uint8 passwordsize = 0;
 	data.Put(passwordsize);
@@ -255,8 +249,8 @@ void Relay::SendConnectRequest() {
 }
 
 void Relay::SendPing() {
-	// World::SendPing equivalent: MSG_PING + pingid u32. AUTHORITY's reply
-	// is MSG_PONG; we don't care about ping time so we drop the pong.
+	// Mirrors World::SendPing: MSG_PING + pingid u32. AUTHORITY replies
+	// MSG_PONG; we don't track ping time so we drop the pong.
 	Serializer data;
 	Uint8 code = kMsgPing;
 	data.Put(code);

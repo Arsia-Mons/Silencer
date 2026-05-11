@@ -43,8 +43,12 @@ import (
 // Listens on its own address (default :15173); separate from the
 // native TCP lobby port so we can run them side by side.
 type SpectatorFacade struct {
-	hub        *Hub
-	relayBase  string // e.g. "ws://lobby.example.com:15174/relay" — Stage 2 wires this
+	hub *Hub
+	// procManager is used to spawn a `silencer --relay` per game on
+	// first spectate request (Stage 7). Optional: if nil, handleSpectate
+	// falls back to the legacy `relayBase` configured URL hint.
+	proc      *procManager
+	relayBase string // pre-Stage-7 fallback (e.g. ws://lobby.example.com:15174/)
 }
 
 // LobbyGameJSON is the publicly-safe projection of LobbyGame. We strip
@@ -150,12 +154,11 @@ func (c *wsClient) OnDelGame(id uint32) {
 
 // StartSpectatorFacade brings up the HTTP server hosting `/spectate`
 // (WebSocket upgrade). Returns immediately; the server runs in a
-// goroutine. `relayBase` is the prefix used to derive per-game relay
-// URLs in spectate responses — Stage 2 of the WASM project provides
-// the actual relay binary, so until then this just round-trips the
-// hint.
-func StartSpectatorFacade(addr string, hub *Hub, relayBase string) {
-	fac := &SpectatorFacade{hub: hub, relayBase: relayBase}
+// goroutine. `proc` (Stage 7) lets handleSpectate spawn a relay binary
+// on demand per game; if nil we fall back to round-tripping the
+// configured `relayBase` URL hint.
+func StartSpectatorFacade(addr string, hub *Hub, proc *procManager, relayBase string) {
+	fac := &SpectatorFacade{hub: hub, proc: proc, relayBase: relayBase}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/spectate", fac.handle)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -228,11 +231,11 @@ func (f *SpectatorFacade) handle(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleSpectate returns a relay URL for the given gameid. Stage 2 of
-// the WASM project will add a `silencer --relay` mode that the lobby
-// spawns per spectatable game; for now we just hand back the URL the
-// admin configured (or an error if none is set / the game isn't live /
-// spectator mode is off).
+// handleSpectate returns a relay URL for the given gameid. With Stage 7
+// wired (procManager non-nil), we ensure a `silencer --relay` process is
+// running for this game and return its real WS URL. Without procManager
+// (or when binary isn't configured), we fall back to round-tripping the
+// configured `relayBase` URL hint.
 func (f *SpectatorFacade) handleSpectate(c *wsClient, gameID uint32) {
 	if gameID == 0 {
 		c.send(envelope{Type: "error", Code: "BAD_GAMEID", Message: "gameid required"})
@@ -255,8 +258,22 @@ func (f *SpectatorFacade) handleSpectate(c *wsClient, gameID uint32) {
 		c.send(envelope{Type: "error", Code: "NOT_SPECTATABLE", Message: "game is not currently spectatable"})
 		return
 	}
+
+	// Stage 7: spawn-on-demand relay. StartRelay is idempotent — calling
+	// it for an already-running game returns the existing URL.
+	if f.proc != nil {
+		url, err := f.proc.StartRelay(gameID, match.Hostname, match.Port)
+		if err != nil {
+			log.Printf("[wsfacade] StartRelay game=%d: %v", gameID, err)
+			c.send(envelope{Type: "error", Code: "NO_RELAY", Message: err.Error()})
+			return
+		}
+		c.send(envelope{Type: "spectate_url", URL: url, GameID: gameID})
+		return
+	}
+
 	if f.relayBase == "" {
-		c.send(envelope{Type: "error", Code: "NO_RELAY", Message: "relay endpoint not configured (Stage 2 not deployed)"})
+		c.send(envelope{Type: "error", Code: "NO_RELAY", Message: "relay endpoint not configured"})
 		return
 	}
 	url := fmt.Sprintf("%s?gameid=%d", f.relayBase, gameID)

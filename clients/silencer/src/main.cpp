@@ -234,16 +234,8 @@ static void CleanupPreviousUpdate(void) {
 
 #if !defined(__EMSCRIPTEN__)
 // --relay <peer_host> <peer_port> <gameid> [--ws-port=N]
-// Server-side WASM spectator relay mode (Stage 2 of
-// docs/plans/2026-05-10-wasm-spectator.md). Headless C++ binary
-// fans the game's UDP snapshots out over WebSocket to N browser
-// clients. <peer_host>:<peer_port> is the AUTHORITY's (dedicated
-// server's) UDP address; Stage 7 wires lobby spawn-on-demand which
-// passes this from the lobby's tracked LobbyGame.Hostname/Port.
-//
-// Returns -1 if not relay mode (so the host main() falls through to
-// the regular game path). On relay mode, returns the relay process
-// exit code; the host main() forwards it.
+// Returns -1 if not relay mode (fall through to regular game path),
+// otherwise the relay process exit code.
 static int TryRelayMode(int argc, char ** argv){
 	if(argc < 2 || strcmp(argv[1], "--relay") != 0){
 		return -1;

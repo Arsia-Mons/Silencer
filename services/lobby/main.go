@@ -28,7 +28,9 @@ func main() {
 	mapsDir := flag.String("maps-dir", "maps", "directory for community map storage")
 	mapUploadKey := flag.String("map-upload-key", "", "API key required for map uploads (empty = unauthenticated, dev only)")
 	wsFacadeAddr := flag.String("ws-facade-addr", ":15173", "WebSocket spectator facade listen address (empty = disabled). Browsers connect here for the lobby game list + spectate URLs; native clients keep using the TCP -addr port.")
-	relayBase := flag.String("ws-relay-base", "", "Base WebSocket URL the facade hands out for spectate <gameid> commands. Empty until Stage 2 deploys the relay binary; spectate commands then return RELAY_NOT_CONFIGURED.")
+	relayBase := flag.String("ws-relay-base", "", "Pre-Stage-7 fallback: base WebSocket URL the facade returns for spectate <gameid> commands. Ignored when -relay-port-base is set and the relay binary spawns on demand.")
+	relayPortBase := flag.Int("relay-port-base", 25174, "Base TCP port for spectator relay children (game N uses base + N%count). Each spectatable INGAME match gets one relay process spawned by the lobby on first browser ask.")
+	relayPortCount := flag.Int("relay-port-count", 100, "Number of ports in the relay range.")
 	flag.Parse()
 
 	var manifest *UpdateManifest
@@ -90,8 +92,14 @@ func main() {
 	}
 
 	proc := newProcManager(*gameBinary, port, *gamePortBase, *gamePortCount)
+	proc.ConfigureRelay(*relayPortBase, *relayPortCount, *publicAddr)
 	hub := NewHub(store, motd, *publicAddr, proc, events)
-	proc.onExit = hub.GameExited
+	// onExit fires for the dedicated server's exit; we also stop its
+	// relay (if any) so we don't leak relay processes after match end.
+	proc.onExit = func(gid uint32) {
+		hub.GameExited(gid)
+		proc.StopRelay(gid)
+	}
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", *addr)
 	if err != nil {
@@ -128,7 +136,7 @@ func main() {
 	go StartMapAPIServer(*mapAPIAddr, mapStore)
 
 	if *wsFacadeAddr != "" {
-		StartSpectatorFacade(*wsFacadeAddr, hub, *relayBase)
+		StartSpectatorFacade(*wsFacadeAddr, hub, proc, *relayBase)
 	}
 
 	go serveUDP(udpLn, hub)
