@@ -116,34 +116,11 @@ void Game::ProcessInGameInterfaces(void){
 		}else{
 			oldselecteditem = 0;
 		}
-		if(localplayer->chatinterfaceid){
-			currentinterface = localplayer->chatinterfaceid;
-		}
-		if(!localplayer->chatinterfaceid && !localplayer->buyinterfaceid && !localplayer->techinterfaceid){
+		if(!localplayer->buyinterfaceid && !localplayer->techinterfaceid){
 			currentinterface = 0;
 		}
 		Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 		if(iface){
-			if(iface->id == localplayer->chatinterfaceid){
-				TextInput * textinput = (TextInput *)iface->GetObjectWithUid(world, 1);
-				if(textinput){
-					if(textinput->tabpressed){
-						localplayer->chatwithteam = !localplayer->chatwithteam;
-						textinput->tabpressed = false;
-					}
-					if(textinput->enterpressed){
-						if(strlen(textinput->text) > 0){
-							world.SendChat(localplayer->chatwithteam, textinput->text);
-						}
-						iface->DestroyInterface(world, iface);
-						localplayer->chatinterfaceid = 0;
-					}
-					if(keystate[quitscancode]){
-						iface->DestroyInterface(world, iface);
-						localplayer->chatinterfaceid = 0;
-					}
-				}
-			}else
 			if(iface->id == localplayer->buyinterfaceid || iface->id == localplayer->techinterfaceid){
 				bool buying = false;
 				if(iface->id == localplayer->buyinterfaceid){

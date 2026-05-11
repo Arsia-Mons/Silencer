@@ -3555,7 +3555,7 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 		
 			// Draw chat
 			
-			if(world.showchat_i || player->chatinterfaceid){
+			if(world.showchat_i || world.ingame_chat_active){
 				Rect dstrect;
 				dstrect.x = 400;
 				dstrect.y = 280;
@@ -3564,7 +3564,7 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 				DrawMessageBackground(surface, &dstrect);
 				int yoffset = 10;
 				for(int i = 0; i < world.chatlines.size(); i++){
-					if(player->chatinterfaceid && i == 0 && world.chatlines.size() == 5){
+					if(world.ingame_chat_active && i == 0 && world.chatlines.size() == 5){
 						continue;
 					}
 					char text[36 + 1];
@@ -3574,20 +3574,26 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 					DrawText(surface, dstrect.x + 10, dstrect.y + yoffset, text, 133, 6, false, 0, 136);
 					yoffset += 10;
 				}
-				if(player->chatinterfaceid){
-					Interface * iface = (Interface *)world.GetObjectFromId(player->chatinterfaceid);
-					if(iface){
-						TextInput * textinput = (TextInput *)iface->GetObjectWithUid(world, 1);
-						if(textinput){
-							const char * textprepend = "(ALL):";
-							if(player->chatwithteam){
-								textprepend = "(TEAM):";
-							}
-							DrawText(surface, dstrect.x + 10, dstrect.y + yoffset, textprepend, 133, 6, false, 0, 136);
-							textinput->x = dstrect.x + (strlen(textprepend) * 6) + 10;
-							textinput->y = dstrect.y + yoffset;
-							DrawTextInput(surface, *textinput);
-						}
+				if(world.ingame_chat_active){
+					const char * textprepend = world.ingame_chat_with_team ? "(TEAM):" : "(ALL):";
+					DrawText(surface, dstrect.x + 10, dstrect.y + yoffset, textprepend, 133, 6, false, 0, 136);
+					// Visible-window scroll mirrors the legacy TextInput
+					// maxwidth=28 behavior: when the text grows past 28
+					// chars, the prefix shows the last 28.
+					constexpr int kVisibleChars = 28;
+					int len = (int)strlen(world.ingame_chat_text);
+					int scrolled = len > kVisibleChars ? len - kVisibleChars : 0;
+					const char * visible = &world.ingame_chat_text[scrolled];
+					int input_x = dstrect.x + ((int)strlen(textprepend) * 6) + 10;
+					int input_y = dstrect.y + yoffset;
+					DrawText(surface, input_x, input_y, visible, 133, 6, false, 0, 128);
+					// Caret: 1×(int)(height*0.8f)=1×11 rect at end of text,
+					// blinking at state_i%32<16 (mirrors DrawTextInput math
+					// with TextInput::height=14, caretcolor=140).
+					if(state_i % 32 < 16){
+						int caret_x = input_x + ((int)strlen(visible) * 6);
+						int caret_y = input_y - 1;
+						DrawFilledRectangle(surface, caret_x, caret_y, caret_x + 1, caret_y + 11, 140);
 					}
 				}
 			}

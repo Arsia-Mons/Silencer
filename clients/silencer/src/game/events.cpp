@@ -1,5 +1,6 @@
 #include "game.h"
 #include "runtime.h"
+#include "ingame_chat.h"
 #include "audio.h"
 #include "config.h"
 #include "interface.h"
@@ -99,7 +100,7 @@ void Game::UpdateInputState(Input & input){
 			if(interfaceenterfix && !keystate[SDL_SCANCODE_RETURN]){
 				interfaceenterfix = false;
 			}
-			if(localplayer->chatinterfaceid || interfaceenterfix){
+			if(world.ingame_chat_active || interfaceenterfix){
 				Input zeroinput;
 				input = zeroinput;
 				interfaceenterfix = true;
@@ -222,6 +223,10 @@ bool Game::HandleSDLEvents(void){
 					// v2 modal owns text input — append into password buf
 					// (no-op for MESSAGE-kind modals).
 					if(!skip) DispatchV2ModalText((char)ascii);
+				}else if(IngameChatOverlay().Active()){
+					// In-game chat overlay absorbs text input while typing
+					// a chat message.
+					if(!skip) IngameChatOverlay().DispatchText((char)ascii);
 				}else if(active_runtime && !skip && active_runtime->DispatchTextInput((char)ascii)){
 					// Runtime consumed the char (LobbyConnect / Lobby chat /
 					// Lobby game-create active field).
@@ -288,6 +293,13 @@ bool Game::HandleSDLEvents(void){
 					// Active v2 modal absorbs Enter/Esc/Backspace; per-state
 					// editing keys never fire.
 					DispatchV2ModalKey((int)event.key.scancode);
+					break;
+				}
+				if(IngameChatOverlay().Active()){
+					// In-game chat overlay absorbs RETURN/ESC/TAB/BACKSPACE
+					// (and swallows everything else so movement keys don't
+					// fire while typing).
+					IngameChatOverlay().DispatchKey((int)event.key.scancode);
 					break;
 				}
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
@@ -414,7 +426,7 @@ bool Game::HandleSDLEvents(void){
 void Game::OnScancodeDown(int sc){
 	if(sc == quitscancode){
 		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-		if(localplayer && !localplayer->chatinterfaceid && !localplayer->buyinterfaceid){
+		if(localplayer && !world.ingame_chat_active && !localplayer->buyinterfaceid){
 			if(world.quitstate == 0){
 				world.quitstate = 1;
 			}else

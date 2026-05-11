@@ -258,27 +258,14 @@ void Player::Tick(World & world){
 	if(ai){
 		ai->Tick(world);
 	}
-	if(input.keychat && !chatinterfaceid && !buyinterfaceid && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
+	if(input.keychat && !world.ingame_chat_active && !buyinterfaceid && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
 		if(!world.replay.IsPlaying()){
-			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-			if(iface){
-				TextInput * textinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-				if(textinput){
-					textinput->x = 100;
-					textinput->y = 100;
-					textinput->res_bank = 133;
-					textinput->fontwidth = 6;
-					textinput->draw = false;
-					textinput->uid = 1;
-					textinput->maxchars = 100;
-					textinput->maxwidth = 28;
-					//strcpy(textinput->text, "sdfsdf");
-					iface->AddObject(textinput->id);
-					iface->activeobject = textinput->id;
-					iface->ActiveChanged(world, iface, false);
-				}
-				chatinterfaceid = iface->id;
-			}
+			// v2 in-game chat overlay (replaces the legacy Interface +
+			// TextInput Object spawn that owned chatinterfaceid). Editing
+			// + Submit/Cancel/Tab handling lives in ui::v2::IngameChat;
+			// events.cpp routes input there when world.ingame_chat_active.
+			world.ingame_chat_active = true;
+			world.ingame_chat_text[0] = 0;
 		}
 	}
 	if(state_warp){

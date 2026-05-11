@@ -25,7 +25,7 @@
 
 class Screen;
 class Modal;
-namespace ui { namespace v2 { struct Node; struct LobbyState; class Runtime; class ModalStack; } }
+namespace ui { namespace v2 { struct Node; struct LobbyState; class Runtime; class ModalStack; class IngameChat; } }
 
 class Game
 {
@@ -143,6 +143,13 @@ public:
 	void PopV2Modal();
 	bool IsV2ModalActive() const;
 	bool IsV2ProgressModalActive() const;
+
+	// v2 in-game chat input overlay. Replaces the legacy
+	// Player::chatinterfaceid path. Activated when the local player presses
+	// the chat key in-game (see Player::Tick); events.cpp routes RETURN /
+	// ESCAPE / TAB / BACKSPACE + TEXT_INPUT to it when active. Render path
+	// lives in Renderer::DrawHUD reading World::ingame_chat_*.
+	ui::v2::IngameChat & IngameChatOverlay();
 
 	// Preview-mode CLI flags. Set by Load() when --preview-screen is
 	// passed; main.cpp dispatches to RunPreview() instead of the normal
@@ -272,6 +279,10 @@ private:
 	bool DispatchV2ModalKey(int sdl_scancode);
 	bool DispatchV2ModalText(char ascii);
 	std::unique_ptr<ui::v2::ModalStack> ui_v2_modal_stack;
+	// v2 in-game chat overlay — owned here, manipulates World::ingame_chat_*
+	// fields so the legacy renderer HUD path can read them. Heap-allocated
+	// to keep the v2 IngameChat type out of game.h.
+	std::unique_ptr<ui::v2::IngameChat> ui_v2_ingame_chat;
 	// Set by GoToState; processed at the next Tick() entry to pop screens
 	// safely after the active screen's Tick has returned. Avoids destroying
 	// a screen mid-Tick when a button click triggers a state transition.
