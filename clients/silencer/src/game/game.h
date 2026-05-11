@@ -252,6 +252,13 @@ private:
 	bool RenderOptionsControlsV2();
 	void DispatchOptionsControlsV2Click(int logical_x, int logical_y);
 	void TickOptionsControlsV2();
+	// Same shape for UPDATING state. Reads Updater state each frame to
+	// drive button visibility + status/progress text. Tick handles the
+	// STAGING -> UpdaterStage2::Launch transition that legacy
+	// UpdateScreen::Tick owned.
+	bool RenderUpdateV2();
+	void DispatchUpdateV2Click(int logical_x, int logical_y);
+	void TickUpdateV2();
 	// Active rebind slot in legacy uid encoding: row for primary (0..99)
 	// or 100+row for secondary (100..149); -1 = no active capture. When
 	// active, the next key/gamepad input writes back to the KeyMap.
