@@ -115,7 +115,7 @@
       "id": "P13",
       "priority": 13,
       "name": "ChatPanel in Clay",
-      "passes": false,
+      "passes": true,
       "spec": "Reimplement the chat panel using ScrollTextBox (for chat + presence) and TextInput. Auto-scroll on new chat preserved. Channel header updates on channelchanged. Pixdiff target: <5% vs chat.png.",
       "pass_check": "Pixdiff < 5.0% vs baseline. Typing in the chat input and pressing Enter sends to the lobby channel. Scrolling the chat textbox works.",
       "screenshot": "iter-P13.png",

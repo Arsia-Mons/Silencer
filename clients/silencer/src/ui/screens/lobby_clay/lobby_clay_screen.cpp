@@ -14,8 +14,11 @@
 #include "clay_bridge.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
+#include "primitives/scroll_text_box.h"
+#include "primitives/text_input.h"
 #include "primitives/toggle.h"
 #include "clay_character_panel.h"
+#include "clay_chat_panel.h"
 
 #include <SDL3/SDL.h>
 
@@ -27,6 +30,8 @@ using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonVariant;
 using silencer::ui::primitives::BankTextBeginFrame;
 using silencer::ui::primitives::BankButtonBeginFrame;
+using silencer::ui::primitives::ScrollTextBoxBeginFrame;
+using silencer::ui::primitives::TextInputBeginFrame;
 using silencer::ui::primitives::ToggleBeginFrame;
 
 LobbyClayScreen::LobbyClayScreen() = default;
@@ -173,7 +178,14 @@ void LobbyClayScreen::Build(ScreenContext & ctx)
 	// of the Clay subtree. The inherited `character` member's interfaceId
 	// stays 0 so its Tick is a no-op.
 	silencer::ui::lobby_clay::CharacterPanelInit(characterState);
-	chat.Build(ctx, lobbyiface);
+
+	// P13: chat panel runs in Clay. Skip the legacy chat.Build for the
+	// same reason character.Build was skipped — its world Overlay/TextBox
+	// /TextInput/ScrollBar objects would double-render on top of the
+	// Clay subtree. Legacy `chat` member's interfaceId stays 0 → its
+	// Tick (invoked via LobbyScreen::Tick) early-returns harmlessly.
+	silencer::ui::lobby_clay::ChatPanelInit(chatState);
+
 	gameSelect = std::unique_ptr<GameSelectPanel>(new GameSelectPanel(*this));
 	gameSelect->Build(ctx, lobbyiface);
 }
@@ -191,6 +203,9 @@ void LobbyClayScreen::Tick(ScreenContext & ctx)
 	// layout into Config + world. Domain glue (Config::Save, SetAgency)
 	// lives here in the screen — the Toggle primitive only reports clicks.
 	silencer::ui::lobby_clay::CharacterPanelTick(characterState, ctx.world);
+
+	// Drain lobby chat / presence / channel changes into Clay state.
+	silencer::ui::lobby_clay::ChatPanelTick(chatState, ctx.world);
 
 	// Base class drives the rest: panel ticks, deferred CreateGame state
 	// machine, CONNECTED → GameJoin handoff, disconnect detection. The
@@ -216,11 +231,15 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	BankTextBeginFrame();
 	BankButtonBeginFrame();
 	ToggleBeginFrame();
+	ScrollTextBoxBeginFrame();
+	TextInputBeginFrame();
 
 	Clay_BeginLayout();
 	BuildChromeTree(this, version, mapName, ctx.world.resources);
 	silencer::ui::lobby_clay::BuildCharacterPanelTree(
 		characterState, ctx.world, ctx.world.resources);
+	silencer::ui::lobby_clay::BuildChatPanelTree(
+		chatState, ctx.world, ctx.world.resources);
 	Clay_RenderCommandArray cmds = Clay_EndLayout();
 
 	Render(ctx.game, &dst, cmds);

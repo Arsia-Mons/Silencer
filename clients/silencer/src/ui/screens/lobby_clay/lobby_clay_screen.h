@@ -3,6 +3,7 @@
 
 #include "lobby_screen.h"
 #include "clay_character_panel.h"
+#include "clay_chat_panel.h"
 #include <string>
 
 class Surface;
@@ -52,6 +53,12 @@ private:
 	// member (still inherited from LobbyScreen, but unBuilt under the
 	// Clay path so its world-object Tick is a no-op).
 	silencer::ui::lobby_clay::CharacterPanelState characterState;
+
+	// ChatPanel state — chat scrollback + presence list + input buffer +
+	// cached channel name. Replaces the legacy ChatPanel member; the
+	// inherited `chat` member is left unBuilt so its world-object Tick is
+	// a no-op.
+	silencer::ui::lobby_clay::ChatPanelState chatState;
 };
 
 #endif
