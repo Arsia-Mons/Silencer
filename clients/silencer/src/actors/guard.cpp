@@ -342,17 +342,14 @@ void Guard::InitBT(){
 		return BTResult::Success;
 	};
 
-	// PlayAnimation(anim): drive res_bank/res_index from an ActorDef AnimSequence.
+	// PlayAnimation(anim_name): drive res_bank/res_index from an ActorDef AnimSequence.
 	// Returns Running each tick the animation is playing, Success on completion.
 	// Looping animations always return Running.
 	btctx_.actions["PlayAnimation"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
-		std::string anim = ctx.bb<std::string>("anim_name", "");
-		if(anim.empty()){
-			const json& props = ctx.blackboard.count("_node_props") ?
-			    ctx.blackboard.at("_node_props") : json::object();
-			anim = props.value("anim_name", std::string{});
-		}
+		// Read from node props first (static config); fall back to runtime blackboard.
+		std::string anim = ctx.current_node_props.value("anim_name", std::string{});
+		if(anim.empty()) anim = ctx.bb<std::string>("anim_name", "");
 		auto it = world.resources.actordefs.find(ActorDefName(weapon));
 		if(it == world.resources.actordefs.end()) return BTResult::Failure;
 		const AnimSequence* seq = it->second.GetSequence(anim);
@@ -375,7 +372,8 @@ void Guard::InitBT(){
 	// Returns Running while is_shooting is true, Success when shoot completes.
 	btctx_.actions["Shoot"] = [this](BTContext& ctx) -> BTResult {
 		if(!CooledDown(*static_cast<World*>(ctx.userData))) return BTResult::Failure;
-		int dir = ctx.bb<int>("direction", 0);
+		// Read direction from node props (static config).
+		int dir = ctx.current_node_props.value("direction", 0);
 		if(ctx.elapsedTicks() == 0){
 			switch(dir){
 				case 0: state = SHOOTSTANDING;   break;
@@ -413,15 +411,15 @@ void Guard::InitBT(){
 
 	// SetFacing(direction): "left" or "right". One-tick, returns Success.
 	btctx_.actions["SetFacing"] = [this](BTContext& ctx) -> BTResult {
-		std::string dir = ctx.bb<std::string>("direction", "right");
+		std::string dir = ctx.current_node_props.value("direction", std::string{"right"});
 		mirrored = (dir == "left");
 		return BTResult::Success;
 	};
 
 	// SetVelocity(xv, yv): one-tick impulse. Returns Success immediately.
 	btctx_.actions["SetVelocity"] = [this](BTContext& ctx) -> BTResult {
-		xv = (Sint8)ctx.bb<int>("xv", 0);
-		yv = (Sint8)ctx.bb<int>("yv", 0);
+		xv = (Sint8)ctx.current_node_props.value("xv", 0);
+		yv = (Sint8)ctx.current_node_props.value("yv", 0);
 		return BTResult::Success;
 	};
 
@@ -491,10 +489,11 @@ void Guard::InitBT(){
 		return BTResult::Running;
 	};
 
-	// ClimbLadder(dir): "up" or "down". Running until off the ladder.
+	// ClimbLadder(direction): "up" or "down". Running until off the ladder.
 	btctx_.actions["ClimbLadder"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
-		std::string dir = ctx.bb<std::string>("direction", "up");
+		// "direction" is static config — read from node props.
+		std::string dir = ctx.current_node_props.value("direction", std::string{"up"});
 		Platform* ladder = world.map.TestAABB(x-8, y, x+8, y, Platform::LADDER);
 		if(!ladder){
 			is_on_ladder = false;
@@ -512,7 +511,8 @@ void Guard::InitBT(){
 
 	// ClearBlackboardKey(key): clear a blackboard entry and return Success.
 	btctx_.actions["ClearBlackboardKey"] = [this](BTContext& ctx) -> BTResult {
-		std::string key = ctx.bb<std::string>("key", "");
+		// "key" is static config — which bb key to clear.
+		std::string key = ctx.current_node_props.value("key", std::string{});
 		if(!key.empty()) ctx.blackboard.erase(key);
 		return BTResult::Success;
 	};

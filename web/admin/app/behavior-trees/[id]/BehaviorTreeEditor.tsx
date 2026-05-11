@@ -154,11 +154,22 @@ const PALETTE: { group: string; types: BTNodeType[] }[] = [
 ];
 
 const LEAF_ACTIONS = [
-  'Patrol', 'Stand', 'Look',
+  // Movement
+  'Patrol', 'SetFacing', 'SetVelocity', 'MoveTo', 'MoveToTarget', 'ClimbLadder',
+  // Combat
+  'Shoot', 'Crouch', 'Uncrouch',
+  // Animation
+  'PlayAnimation',
+  // Awareness / perception
+  'Look', 'Stand',
+  // Activity conditions
+  'IsAlive', 'IsWalking', 'IsCrouched', 'IsShooting', 'IsOnLadder',
+  'IsAtEdge', 'HasChaseTarget', 'IsPlayerInBase', 'IsPlayerInvisible', 'WasHit',
+  // Utility
+  'ClearBlackboardKey',
+  // Legacy (robot/civilian)
+  'Alert', 'Melee', 'Run', 'Wander', 'Sleep', 'Idle',
   'ShootStanding', 'ShootCrouched', 'ShootUp', 'ShootDown', 'ShootUpAngle', 'ShootDownAngle',
-  'Crouch', 'Uncrouch',
-  'ClimbLadder', 'Alert', 'Melee',
-  'Run', 'Wander', 'Sleep', 'Idle',
 ];
 
 // ── Main editor ───────────────────────────────────────────────────────────────
@@ -419,6 +430,76 @@ export default function BehaviorTreeEditor({ bt: rawBt, onChange }: Props) {
                   style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
                   {LEAF_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
+                {/* Per-action static props */}
+                {(selectedNode.props.action === 'Shoot') && (
+                  <>
+                    <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>DIRECTION</label>
+                    <select value={String(selectedNode.props.direction ?? 0)} onChange={e => updateProp('direction', parseInt(e.target.value))}
+                      style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                      {[['0','Standing'],['1','Crouched'],['2','Up'],['3','Down'],['4','Up-Angle'],['5','Down-Angle'],['6','Ladder-Up'],['7','Ladder-Down']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </>
+                )}
+                {(selectedNode.props.action === 'SetFacing') && (
+                  <>
+                    <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>DIRECTION</label>
+                    <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                      {['left','right'].map(v => (
+                        <button key={v} onClick={() => updateProp('direction', v)}
+                          style={{ flex: 1, padding: '4px 0', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer',
+                            background: selectedNode.props.direction === v ? '#1a3a5c' : '#161b22',
+                            border: `1px solid ${selectedNode.props.direction === v ? '#3b82f6' : '#2d3748'}`,
+                            color: selectedNode.props.direction === v ? '#93c5fd' : '#4a5568' }}>
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {(selectedNode.props.action === 'ClimbLadder') && (
+                  <>
+                    <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>DIRECTION</label>
+                    <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                      {['up','down'].map(v => (
+                        <button key={v} onClick={() => updateProp('direction', v)}
+                          style={{ flex: 1, padding: '4px 0', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer',
+                            background: selectedNode.props.direction === v ? '#1a3a5c' : '#161b22',
+                            border: `1px solid ${selectedNode.props.direction === v ? '#3b82f6' : '#2d3748'}`,
+                            color: selectedNode.props.direction === v ? '#93c5fd' : '#4a5568' }}>
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                {(selectedNode.props.action === 'SetVelocity') && (
+                  <>
+                    <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>XV</label>
+                    <input type="number" step={1} value={Number(selectedNode.props.xv ?? 0)} onChange={e => updateProp('xv', parseInt(e.target.value))}
+                      style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                    <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>YV</label>
+                    <input type="number" step={1} value={Number(selectedNode.props.yv ?? 0)} onChange={e => updateProp('yv', parseInt(e.target.value))}
+                      style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                  </>
+                )}
+                {(selectedNode.props.action === 'PlayAnimation') && (
+                  <>
+                    <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>ANIM NAME</label>
+                    <input value={String(selectedNode.props.anim_name ?? '')} onChange={e => updateProp('anim_name', e.target.value)}
+                      placeholder="idle, walk, shoot…"
+                      style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                  </>
+                )}
+                {(selectedNode.props.action === 'ClearBlackboardKey') && (
+                  <>
+                    <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>KEY TO CLEAR</label>
+                    <select value={String(selectedNode.props.key ?? '')} onChange={e => updateProp('key', e.target.value)}
+                      style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                      <option value="">— select key —</option>
+                      {bt.blackboard.map(k => <option key={k.key} value={k.key}>{k.key}</option>)}
+                    </select>
+                  </>
+                )}
               </>
             )}
 

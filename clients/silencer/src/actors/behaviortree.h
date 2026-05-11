@@ -54,6 +54,9 @@ struct BTContext {
     std::unordered_map<std::string, int> node_ticks;
     // Set by the interpreter to the node id of the currently-executing leaf.
     std::string current_node_id;
+    // Set by the interpreter to the props of the currently-executing leaf node.
+    // Leaf handlers read static configuration from this (e.g. direction, anim_name).
+    json current_node_props;
 
     // Returns how many ticks the current leaf has been in the Running state.
     int elapsedTicks() const {

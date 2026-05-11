@@ -232,6 +232,7 @@ BTResult BehaviorTree::tickLeaf(const Node& n, BTContext& ctx) const {
     auto it = ctx.actions.find(action);
     if (it == ctx.actions.end()) return BTResult::Failure;
     ctx.current_node_id = n.id;
+    ctx.current_node_props = n.props;
     BTResult r = it->second(ctx);
     if (ctx.logFn) ctx.logFn(n.id, "Leaf[" + action + "]", r);
     return r;
