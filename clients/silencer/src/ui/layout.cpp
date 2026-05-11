@@ -5,6 +5,7 @@
 #include "node.h"
 
 #include "clay/clay.h"
+#include "resources.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -236,15 +237,71 @@ Clay_RenderCommandArray Layout(Node & root, const Context & ctx) {
 	Clay_RenderCommandArray cmds = Clay_EndLayout();
 
 	for(const EmitRecord & r : ls.records){
-		Clay_ElementData ed = Clay_GetElementData(r.id);
-		if(ed.found){
-			r.node->rect_x = (Sint16)ed.boundingBox.x;
-			r.node->rect_y = (Sint16)ed.boundingBox.y;
-			r.node->rect_w = (Uint16)ed.boundingBox.width;
-			r.node->rect_h = (Uint16)ed.boundingBox.height;
-		}
+		r.node->clay_id = r.id;
 	}
 	return cmds;
+}
+
+namespace {
+
+// Absolute-path hit-test for a Button whose layout was NOT emitted into
+// Clay (clay_id.id == 0). Chrome top-left = (n.x - sprite_offset_x,
+// n.y - sprite_offset_y) where the offset is the sprite asset's baked
+// anchor offset (zero for chrome-less B52x21). Matches the legacy
+// `Button::MouseInside` semantics that screens with absolute `.at()`
+// positions depend on.
+bool AbsoluteChromeHit(const Node & n, const Context & ctx) {
+	if(ctx.mouse_x < 0 || ctx.mouse_y < 0) return false;
+	ButtonChrome c = ChromeFor(n.button_type);
+	int off_x = 0, off_y = 0;
+	if(c.bank != 0xFF){
+		off_x = ctx.resources.spriteoffsetx[c.bank][c.base_index];
+		off_y = ctx.resources.spriteoffsety[c.bank][c.base_index];
+	}
+	int x1 = n.x - off_x;
+	int y1 = n.y - off_y;
+	int x2 = x1 + c.width;
+	int y2 = y1 + c.height;
+	return ctx.mouse_x > x1 && ctx.mouse_x < x2 &&
+	       ctx.mouse_y > y1 && ctx.mouse_y < y2;
+}
+
+void DispatchInto(const Node & n, const Context & ctx) {
+	if(n.kind == NodeKind::Button && n.on_click){
+		bool hit = false;
+		if(n.clay_id.id != 0){
+			// Layout-managed: read the current bounding box from Clay and
+			// test ctx.mouse_x/y inline. Using Clay_GetElementData here
+			// instead of Clay_PointerOver avoids depending on Clay's
+			// pointer state (which lags by a frame in the dispatch path —
+			// SetPointerState in Render() runs once per frame, while a
+			// mouse-down can fire with a fresher (mouse_x, mouse_y)).
+			// Clay_PointerOver is still the canonical hover query in the
+			// render path (render.cpp), where SetPointerState was just
+			// called for this frame.
+			Clay_ElementData ed = Clay_GetElementData(n.clay_id);
+			if(ed.found && ctx.mouse_x >= 0 && ctx.mouse_y >= 0){
+				int x1 = (int)ed.boundingBox.x;
+				int y1 = (int)ed.boundingBox.y;
+				int x2 = x1 + (int)ed.boundingBox.width;
+				int y2 = y1 + (int)ed.boundingBox.height;
+				hit = ctx.mouse_x > x1 && ctx.mouse_x < x2 &&
+				      ctx.mouse_y > y1 && ctx.mouse_y < y2;
+			}
+		}else{
+			hit = AbsoluteChromeHit(n, ctx);
+		}
+		if(hit) n.on_click();
+	}
+	for(const Node & child : n.children){
+		DispatchInto(child, ctx);
+	}
+}
+
+}  // namespace
+
+void DispatchClicks(const Node & root, const Context & ctx) {
+	DispatchInto(root, ctx);
 }
 
 }  // namespace v2

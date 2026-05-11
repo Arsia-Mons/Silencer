@@ -1,7 +1,7 @@
 #include "options_controls.h"
 
 #include "context.h"
-#include "dispatch.h"
+
 #include "layout.h"
 #include "node.h"
 #include "render.h"
@@ -337,7 +337,7 @@ bool OptionsControlsRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	OptionsControlsState live = ComputeOptionsControlsLive(sctx_, rebind_active_slot_);
 	Node tree = BuildOptionsControls(ctx, handlers, &live);
 	Layout(tree, ctx);
-	DispatchClick(tree, ctx);
+	DispatchClicks(tree, ctx);
 	return true;
 }
 

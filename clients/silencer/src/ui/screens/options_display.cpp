@@ -1,7 +1,7 @@
 #include "options_display.h"
 
 #include "context.h"
-#include "dispatch.h"
+
 #include "layout.h"
 #include "node.h"
 #include "render.h"
@@ -149,7 +149,7 @@ bool OptionsDisplayRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	OptionsDisplayState live = CurrentOptionsDisplay();
 	Node tree = BuildOptionsDisplay(ctx, handlers, &live);
 	Layout(tree, ctx);
-	DispatchClick(tree, ctx);
+	DispatchClicks(tree, ctx);
 	return true;
 }
 

@@ -1,7 +1,7 @@
 #include "lobby_connect.h"
 
 #include "context.h"
-#include "dispatch.h"
+
 #include "layout.h"
 #include "node.h"
 #include "render.h"
@@ -241,7 +241,7 @@ bool LobbyConnectRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	                                    textbox_lines_, frames_);
 	Node tree = BuildLobbyConnect(ctx, handlers, &live);
 	Layout(tree, ctx);
-	DispatchClick(tree, ctx);
+	DispatchClicks(tree, ctx);
 	return true;
 }
 

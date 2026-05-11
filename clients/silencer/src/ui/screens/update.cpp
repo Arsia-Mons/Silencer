@@ -1,7 +1,7 @@
 #include "update.h"
 
 #include "context.h"
-#include "dispatch.h"
+
 #include "layout.h"
 #include "node.h"
 #include "render.h"
@@ -228,7 +228,7 @@ bool UpdateRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	UpdateState live = CurrentUpdate(sctx_.updater);
 	Node tree = BuildUpdate(ctx, handlers, &live);
 	Layout(tree, ctx);
-	DispatchClick(tree, ctx);
+	DispatchClicks(tree, ctx);
 	return true;
 }
 

@@ -1,7 +1,7 @@
 #include "lobby_shell.h"
 
 #include "context.h"
-#include "dispatch.h"
+
 #include "layout.h"
 #include "lobby_character.h"
 #include "lobby_chat.h"
@@ -599,7 +599,7 @@ bool LobbyRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	LobbyHandlers handlers = BuildLobbyHandlers(this);
 	Node tree = BuildLobby(ctx, handlers, state_data_);
 	Layout(tree, ctx);
-	DispatchClick(tree, ctx);
+	DispatchClicks(tree, ctx);
 	return true;
 }
 

@@ -1,7 +1,7 @@
 #include "mission_summary.h"
 
 #include "context.h"
-#include "dispatch.h"
+
 #include "layout.h"
 #include "node.h"
 #include "render.h"
@@ -326,7 +326,7 @@ bool MissionSummaryRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	bool have_state = CurrentMissionSummary(world_, live);
 	Node tree = BuildMissionSummary(ctx, handlers, have_state ? &live : nullptr);
 	Layout(tree, ctx);
-	DispatchClick(tree, ctx);
+	DispatchClicks(tree, ctx);
 	return true;
 }
 

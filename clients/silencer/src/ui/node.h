@@ -2,6 +2,7 @@
 #define SILENCER_UI_V2_NODE_H
 
 #include "shared.h"
+#include "clay/clay.h"
 #include <functional>
 #include <string>
 #include <vector>
@@ -21,8 +22,9 @@ enum class NodeKind : Uint8 {
 	                // + center fill, sized to the layout rect (or .at()+w/h).
 
 	// Container kinds — laid out by the Clay layout pass. Walk emits a
-	// Clay scope per container; descendants get computed rects written
-	// into rect_x/y/w/h, which the render + dispatch passes consume.
+	// Clay scope per container; descendants are queried back through
+	// `Clay_GetElementData(node.clay_id)` for their bounding box, and
+	// hover/click are routed via `Clay_PointerOver(node.clay_id)`.
 	VStack,       // Children stacked top→bottom, .gap(n) between.
 	HStack,       // Children stacked left→right, .gap(n) between.
 	Center,       // Single-axis "fill available space, center child(ren)".
@@ -116,14 +118,15 @@ struct Node {
 	// row toggle text).
 	bool  text_alpha        = false;
 
-	// Layout output. Set by `layout.cpp` for nodes inside a container
-	// subtree. `rect_w == 0` means "not laid out, fall back to (x, y)
-	// + ChromeFor.width/height" — preserves the absolute `.at()`
-	// escape hatch for screens that need pixel-identical legacy parity.
-	Sint16 rect_x = 0;
-	Sint16 rect_y = 0;
-	Uint16 rect_w = 0;
-	Uint16 rect_h = 0;
+	// Clay element id assigned by `layout.cpp` when this node is emitted
+	// into a Clay scope. `clay_id.id == 0` means "not laid out by Clay" —
+	// the render + dispatch paths fall back to the absolute `.at()` +
+	// ChromeFor.width/height path, preserving pixel-identical legacy parity
+	// for screens (e.g. MainMenu) with non-container-shaped layouts. When
+	// non-zero, bounding boxes are queried live via
+	// `Clay_GetElementData(clay_id)` and hover via `Clay_PointerOver(clay_id)`
+	// — no per-Node cached rect.
+	Clay_ElementId clay_id{};
 
 	// Children. Drawn after self in declaration order.
 	std::vector<Node> children;

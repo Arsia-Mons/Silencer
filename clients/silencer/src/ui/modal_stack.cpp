@@ -1,7 +1,6 @@
 #include "modal_stack.h"
 
 #include "context.h"
-#include "dispatch.h"
 #include "layout.h"
 #include "modals/message.h"
 #include "modals/password.h"
@@ -129,7 +128,7 @@ bool ModalStack::DispatchClick(int logical_x, int logical_y,
 		tree = BuildPassword(ctx, top.password_buf, h);
 	}
 	Layout(tree, ctx);
-	::ui::v2::DispatchClick(tree, ctx);
+	::ui::v2::DispatchClicks(tree, ctx);
 	return true;
 }
 

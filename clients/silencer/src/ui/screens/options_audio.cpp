@@ -1,7 +1,7 @@
 #include "options_audio.h"
 
 #include "context.h"
-#include "dispatch.h"
+
 #include "layout.h"
 #include "node.h"
 #include "render.h"
@@ -130,7 +130,7 @@ bool OptionsAudioRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	OptionsAudioState live = CurrentOptionsAudio();
 	Node tree = BuildOptionsAudio(ctx, handlers, &live);
 	Layout(tree, ctx);
-	DispatchClick(tree, ctx);
+	DispatchClicks(tree, ctx);
 	return true;
 }
 

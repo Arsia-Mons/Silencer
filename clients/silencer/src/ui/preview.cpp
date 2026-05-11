@@ -14,7 +14,7 @@
 #include "game.h"
 
 #include "context.h"
-#include "dispatch.h"
+
 #include "layout.h"
 #include "node.h"
 #include "render.h"
@@ -113,8 +113,8 @@ int Game::RunPreview()
 	SetColors(renderer.palette.GetColors());
 
 	// Mouse position in logical 640×480 pixels. -1 = "no mouse this frame"
-	// — Context defaults to this value, and ButtonHit short-circuits, so
-	// the PPM dump path renders without any hover state.
+	// — Context defaults to this value; hover and click hit-tests bail
+	// when mouse_x < 0, so the PPM dump path renders without any hover state.
 	int mouse_x = -1;
 	int mouse_y = -1;
 
@@ -456,33 +456,33 @@ int Game::RunPreview()
 					if(strcmp(preview_screen, "main_menu") == 0){
 						ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "options") == 0){
 						ui::v2::Node tree = ui::v2::BuildOptions(ctx, options_handlers);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "options_display") == 0){
 						ui::v2::Node tree = ui::v2::BuildOptionsDisplay(ctx, options_display_handlers);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "options_audio") == 0){
 						ui::v2::Node tree = ui::v2::BuildOptionsAudio(ctx, options_audio_handlers);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "options_controls") == 0){
 						ui::v2::Node tree = ui::v2::BuildOptionsControls(ctx, options_controls_handlers);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby_connect") == 0){
 						ui::v2::Node tree = ui::v2::BuildLobbyConnect(ctx, lobby_connect_handlers);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby") == 0){
 						ui::v2::LobbyState lobby_state;
 					lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 					ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby_create") == 0){
 						ui::v2::LobbyState lobby_state;
 						lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
@@ -490,44 +490,44 @@ int Game::RunPreview()
 						lobby_state.game_create = compute_game_create_state();
 						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby_join") == 0){
 						ui::v2::LobbyState lobby_state;
 						lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 						lobby_state.active_panel = ui::v2::LobbyActivePanel::GameJoin;
 						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby_select") == 0){
 						ui::v2::LobbyState lobby_state;
 						lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 						lobby_state.active_panel = ui::v2::LobbyActivePanel::GameSelect;
 						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby_tech") == 0){
 						ui::v2::LobbyState lobby_state;
 						lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 						lobby_state.active_panel = ui::v2::LobbyActivePanel::GameTech;
 						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "mission_summary") == 0){
 						ui::v2::Node tree = ui::v2::BuildMissionSummary(ctx, mission_summary_handlers);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "message_modal") == 0){
 						ui::v2::Node tree = ui::v2::BuildMessage(ctx, message_modal_text, /*has_ok=*/true, message_handlers);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "password_modal") == 0){
 						ui::v2::Node tree = ui::v2::BuildPassword(ctx, password_modal_text, password_handlers);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}else if(strcmp(preview_screen, "update") == 0){
 						ui::v2::Node tree = ui::v2::BuildUpdate(ctx, update_handlers);
 						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClick(tree, ctx);
+						ui::v2::DispatchClicks(tree, ctx);
 					}
 			}
 		}

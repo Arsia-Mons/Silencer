@@ -2,11 +2,11 @@
 
 #include "button_chrome.h"
 #include "context.h"
-#include "dispatch.h"
 #include "nine_slice_meta.h"
 #include "node.h"
 #include "ui_state.h"
 
+#include "clay/clay.h"
 #include "renderer.h"
 #include "resources.h"
 #include "surface.h"
@@ -16,13 +16,20 @@ namespace v2 {
 
 namespace {
 
-// Pull the screen-pixel rect for a node. Container layout (rect_w > 0) is
-// preferred; absolute `.at()` + fill_w/fill_h is the fallback. Returns
-// false if neither path gives a non-empty rect.
+// Pull the screen-pixel rect for a node. Container layout (clay_id set)
+// is preferred — bounding box queried live from Clay each frame, no
+// per-Node cache. Absolute `.at()` + fill_w/fill_h is the fallback.
+// Returns false if neither path gives a non-empty rect.
 bool NodeRect(const Node & n, int & x, int & y, int & w, int & h){
-	if(n.rect_w > 0){
-		x = n.rect_x; y = n.rect_y; w = n.rect_w; h = n.rect_h;
-		return w > 0 && h > 0;
+	if(n.clay_id.id != 0){
+		Clay_ElementData ed = Clay_GetElementData(n.clay_id);
+		if(ed.found && ed.boundingBox.width > 0 && ed.boundingBox.height > 0){
+			x = (int)ed.boundingBox.x;
+			y = (int)ed.boundingBox.y;
+			w = (int)ed.boundingBox.width;
+			h = (int)ed.boundingBox.height;
+			return true;
+		}
 	}
 	x = n.x; y = n.y; w = n.fill_w; h = n.fill_h;
 	return w > 0 && h > 0;
@@ -149,7 +156,26 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 
 		case NodeKind::Button: {
 			ButtonChrome c = ChromeFor(n.button_type);
-			bool hovered = ButtonHit(n, ctx);
+			// Hover detection: Clay-native via Clay_PointerOver for
+			// layout-managed buttons (the caller has set Clay's pointer
+			// state in this Render frame); inline chrome-rect math for
+			// absolute `.at()` buttons (mirrors the legacy MouseInside).
+			bool hovered;
+			if(n.clay_id.id != 0){
+				hovered = Clay_PointerOver(n.clay_id);
+			}else if(ctx.mouse_x < 0 || ctx.mouse_y < 0){
+				hovered = false;
+			}else{
+				int off_x = 0, off_y = 0;
+				if(c.bank != 0xFF){
+					off_x = ctx.resources.spriteoffsetx[c.bank][c.base_index];
+					off_y = ctx.resources.spriteoffsety[c.bank][c.base_index];
+				}
+				int hx1 = n.x - off_x, hy1 = n.y - off_y;
+				int hx2 = hx1 + c.width, hy2 = hy1 + c.height;
+				hovered = ctx.mouse_x > hx1 && ctx.mouse_x < hx2 &&
+				          ctx.mouse_y > hy1 && ctx.mouse_y < hy2;
+			}
 
 			// hot_t: 0..1 hover-toward-1, exponentially approached. When
 			// `ctx.state` is NULL (PPM dump path), we snap — keeps the
@@ -174,18 +200,19 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 			Uint8 brightness = (Uint8)(128 + step * 2);
 
 			// Two coordinate systems exist:
-			//   - Layout-managed (rect_w > 0): rect_x/rect_y is the chrome's
-			//     screen-pixel top-left. DrawSpriteAt expects an *anchor*,
-			//     and the sprite is drawn at (anchor - baked_offset). So
-			//     anchor = rect_top_left + baked_offset to land the chrome.
-			//   - Absolute (rect_w == 0): n.x/n.y is the anchor directly —
+			//   - Layout-managed (clay_id set): bounding box top-left is the
+			//     chrome's screen-pixel top-left. DrawSpriteAt expects an
+			//     *anchor*, and the sprite is drawn at (anchor - baked_offset).
+			//     So anchor = box_top_left + baked_offset to land the chrome.
+			//   - Absolute (clay_id == 0): n.x/n.y is the anchor directly —
 			//     the legacy `.at()` convention preserved for screens that
 			//     still need pixel-identical parity with the legacy widget.
 			Sint16 anchor_x, anchor_y;
 			Sint16 box_x,    box_y;
-			if(n.rect_w > 0){
-				box_x    = n.rect_x;
-				box_y    = n.rect_y;
+			int    bx, by, bw, bh;
+			if(n.clay_id.id != 0 && NodeRect(n, bx, by, bw, bh)){
+				box_x    = (Sint16)bx;
+				box_y    = (Sint16)by;
 				anchor_x = (Sint16)(box_x + (c.bank != 0xFF ? ctx.resources.spriteoffsetx[c.bank][res_idx] : 0));
 				anchor_y = (Sint16)(box_y + (c.bank != 0xFF ? ctx.resources.spriteoffsety[c.bank][res_idx] : 0));
 			}else{
@@ -216,8 +243,8 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 
 	// Scroll containers push a scissor for the duration of their subtree.
 	// Empty scissor stack ⇒ no-op so byte-identity holds for every other
-	// node kind. Clay computes the inner rect via rect_*; .at() + fill_w/h
-	// is the absolute fallback.
+	// node kind. Clay's bounding box drives the inner rect when clay_id is
+	// set; .at() + fill_w/h is the absolute fallback.
 	bool pushed_scissor = false;
 	if(n.kind == NodeKind::Scroll){
 		int x, y, w, h;

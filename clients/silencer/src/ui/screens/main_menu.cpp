@@ -1,7 +1,7 @@
 #include "main_menu.h"
 
 #include "context.h"
-#include "dispatch.h"
+
 #include "layout.h"
 #include "node.h"
 #include "render.h"
@@ -114,7 +114,7 @@ bool MainMenuRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	MainMenuHandlers handlers = BuildMainMenuHandlers(sctx_);
 	Node tree = BuildMainMenu(ctx, handlers);
 	Layout(tree, ctx);
-	DispatchClick(tree, ctx);
+	DispatchClicks(tree, ctx);
 	return true;
 }
 

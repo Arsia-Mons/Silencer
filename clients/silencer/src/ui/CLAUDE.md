@@ -25,19 +25,20 @@ A handful of legacy widgets that aren't UI screens still live under
   UIState, dt). No `Game`/`World`/`Lobby` refs — screens stay
   testable in the preview harness.
 - **`layout.h` / `layout.cpp`** — `Layout(root, ctx)` walks the tree
-  and emits a Clay scope per container subtree, then reads back
-  rects via `Clay_GetElementData` into `node.rect_*`. Nodes outside
-  any container subtree are left with `rect_w == 0` so render +
-  dispatch fall through to absolute `.at()` positioning.
+  and emits a Clay scope per container subtree, recording the Clay
+  element id on each emitted node (`node.clay_id`). Nodes outside
+  any container subtree are left with `clay_id.id == 0` so render +
+  dispatch fall through to absolute `.at()` positioning. Also exposes
+  `DispatchClicks(root, ctx)` — fires Button on_click handlers whose
+  bounding box (queried live via `Clay_GetElementData` for layout-managed
+  buttons, or computed from sprite anchor for absolute buttons) contains
+  `ctx.mouse_x/y`.
 - **`render.h` / `render.cpp`** — `Render(root, ctx, target, renderer)`
   walks the tree depth-first and blits into `target`. Buttons inside
-  a Clay subtree use the computed `rect_*`; absolute buttons use
-  `.at()` + sprite anchor (legacy semantics, pixel-identical with
+  a Clay subtree query `Clay_GetElementData(node.clay_id)` for their
+  box and `Clay_PointerOver(node.clay_id)` for hover; absolute buttons
+  use `.at()` + sprite anchor (legacy semantics, pixel-identical with
   the legacy widget render).
-- **`dispatch.{h,cpp}`** — `DispatchClick(root, ctx)` and `ButtonHit`.
-  Hit-test reads `rect_*` for Clay-managed buttons; falls back to
-  the absolute path otherwise. Must call `Layout()` before dispatch
-  so rects exist.
 - **`screens/`** — one file per screen. Each defines a single pure
   `Build*(const Context&)` function returning the tree *and* a
   `<Name>Runtime` class (the engine wire-in). The two live in the same

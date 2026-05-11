@@ -24,7 +24,6 @@
 #include "game.h"
 
 #include "context.h"
-#include "dispatch.h"
 #include "layout.h"
 #include "node.h"
 #include "render.h"
@@ -167,15 +166,14 @@ Rect HandleRect(const Item & it){
 ui::v2::Node BuildItemNode(const Item & it){
 	switch(it.kind){
 		case Kind::Button: {
+			// Storybook items are positioned absolutely on the canvas via
+			// .at() — they don't live inside a Clay container subtree, so
+			// clay_id stays zero and the absolute `.at()` + sprite-anchor
+			// path drives both render and hit-test.
 			ui::v2::Node n = ui::v2::Button(it.text, (ui::v2::ButtonType)it.button_type)
 			    .at((Sint16)it.x, (Sint16)it.y);
 			n.fill_w = (Uint16)it.w; n.fill_h = (Uint16)it.h;
 			if(it.stroke_width > 0) n.stroke((Uint8)it.stroke_color, (Uint8)it.stroke_width);
-			// Layout-managed buttons consume rect_*; setting it here keeps
-			// the chrome anchored at (it.x, it.y) without depending on the
-			// absolute sprite-anchor fallback.
-			n.rect_x = (Sint16)it.x; n.rect_y = (Sint16)it.y;
-			n.rect_w = (Uint16)it.w; n.rect_h = (Uint16)it.h;
 			return n;
 		}
 		case Kind::Label: {
@@ -216,10 +214,11 @@ ui::v2::Node BuildItemNode(const Item & it){
 			       : (it.kind == Kind::Center) ? ui::v2::NodeKind::Center
 			       : (it.kind == Kind::Scroll) ? ui::v2::NodeKind::Scroll
 			                                   : ui::v2::NodeKind::Spacer;
+			// Stroke + NodeRect fall back to (n.x, n.y, n.fill_w, n.fill_h)
+			// when clay_id is zero, so the bordered-box visual is driven
+			// directly by these absolute coordinates — no rect cache needed.
 			n.x = (Sint16)it.x; n.y = (Sint16)it.y;
 			n.fill_w = (Uint16)it.w; n.fill_h = (Uint16)it.h;
-			n.rect_x = (Sint16)it.x; n.rect_y = (Sint16)it.y;
-			n.rect_w = (Uint16)it.w; n.rect_h = (Uint16)it.h;
 			n.gap = (Uint16)it.gap; n.pad = (Uint16)it.pad;
 			Uint8 sw = (Uint8)(it.stroke_width > 0 ? it.stroke_width : 1);
 			n.stroke((Uint8)it.stroke_color, sw);
