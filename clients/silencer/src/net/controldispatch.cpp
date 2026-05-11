@@ -13,6 +13,7 @@
 #include "gasloader.h"
 #include "os.h"
 #include "shared.h"
+#include "clay_bridge.h"
 #include <cstring>
 #include <cstdio>
 #include <fstream>
@@ -72,6 +73,24 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["build"] = __DATE__ " " __TIME__;
 		r["frame"] = game.GetFrameCount();
 		r["paused"] = game.paused;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_bridge_smoke"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_bridge_smoke requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunSmoke(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"smoke render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}

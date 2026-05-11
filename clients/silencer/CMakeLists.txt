@@ -130,6 +130,7 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/objects"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/stations"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/clay"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/panels"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/modals"

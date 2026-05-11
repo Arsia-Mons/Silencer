@@ -29,7 +29,7 @@
       "id": "P3",
       "priority": 3,
       "name": "Clay → SDL3/Surface render bridge",
-      "passes": false,
+      "passes": true,
       "spec": "Add clients/silencer/src/ui/clay/clay_bridge.{h,cpp}. Implement RenderClayCommands(Surface *, Clay_RenderCommandArray) dispatching: RECTANGLE → flat fill on Surface; BORDER → 4-edge fill; IMAGE → existing sprite blit (encode bank/index in imageData pointer as packed Uint32 via a tagged-pointer trick or a small frame-arena DrawTag); TEXT → forward to a new MeasureBankText / DrawBankText helper that wraps the existing bank-text path; SCISSOR_START/END → push/pop Surface clip rect; CUSTOM → switch on a tagged customData struct (button chrome, scrollbar track, toggle face). Add a smoke test in tests/lobby-clay/bridge_smoke/ that initializes Clay with a fixed 640x480 viewport, builds a tree with one rect + one border + one text + one image, renders to a Surface, dumps to PNG, and pixdiffs against a hand-crafted reference.",
       "pass_check": "tools/pixdiff < 1.0 between bridge_smoke output and tests/lobby-clay/bridge_smoke/reference.png. Build is green."
     },

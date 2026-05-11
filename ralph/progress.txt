@@ -15,6 +15,12 @@
 - Dedicated server spawn works end-to-end from a tmp HOME — `services/lobby/proc.go` execs the same `silencer` binary with `-s 127.0.0.1 <port> <gameid> <accountid>`. The child inherits the env and finds assets via the parent binary's `CDResDir` resolution (macOS bundle Resources). Lobby log shows `[proc] spawned dedicated server` followed by `[hub] game N ready` once the child UDP-heartbeats back.
 - gamecreate panel form: name input has uid=5 (GCRT_INPUT_NAME), password uid=6, security button uid=GCRT_BTN_SECURITY, map selectbox uid=4 (GCRT_SEL_MAP). Only the map needs explicit selection in capture — the rest have working defaults.
 - After clicking Create on the gamecreate panel, the client shows an "Uploading map..." progress modal before transitioning to GameJoin. Watch for the "Choose Tech" button in a child interface to detect GameJoin (took ~5–10 s wall-clock in the test env; 200 × 0.1 s polls in capture.sh is safe).
+- `Renderer::Rect` was promoted from private → public so the Clay bridge (and any future external dispatcher) can build dst rects for `Renderer::BlitSurface` without a friend declaration. It's just `{int w,h,x,y}` — nothing to encapsulate.
+- Clay → Surface bridge entry point: `silencer::clay_bridge::Render(Game&, Surface*, Clay_RenderCommandArray)` in `clients/silencer/src/ui/clay/clay_bridge.{h,cpp}`. Conventions: `RECTANGLE`/`BORDER` color = `backgroundColor.r` as palette index (Uint8). `IMAGE` `imageData` = `PackImage(bank, idx)` (helper in clay_bridge.h, packs into `(bank<<16) | idx`). `TEXT` `fontId` = bank, `fontSize` = monospaced cell width, optional `userData` = `BankTextDrawData*` for brightness/colorRamp/alpha. `CUSTOM` `customData` = `ClayCustomData*` with a `CustomKind` enum (P5+ kinds added per primitive). Scissor maintained as a stack — see `g_clipStack` in clay_bridge.cpp.
+- Clay determinism trap: without resetting `Clay_SetPointerState`/`Clay_UpdateScrollContainers`/`Clay_ResetMeasureTextCache` before each `Clay_BeginLayout`, two back-to-back layout passes in the same process produce different render-command geometry (~1.2% pixdiff). `EnsureInitialized` in clay_bridge.cpp does the resets unconditionally; downstream callers (P11+ screens) get this for free.
+- Capture-PNG palette gotcha: `Game::GetPaletteColors()` is the LIVE dynamic palette and the main menu fades it in over ~15 frames (game.cpp:870). For deterministic Clay/UI shots, prefer the static base palette via `renderer.palette.GetColors()` (a non-const SDL_Color*; cast or accept). The smoke op (clay_smoke.cpp) uses the base palette.
+- New include dir wired in CMake: `clients/silencer/src/ui/clay`. Bridge consumers can `#include "clay_bridge.h"` bare — same convention as the other UI subdirs.
+- Custom CLI control op for the bridge smoke test: `cli clay_bridge_smoke --out <path>` (IMMEDIATE phase, registered in net/controldispatch.cpp). Calls `silencer::clay_bridge::RunSmoke` which builds a fixed 4-element tree and writes a 640x480 PNG. Repeatable test harness at `tests/lobby-clay/bridge_smoke/run.sh`.
 
 ## 2026-05-11T00:00:00Z - bootstrap
 - Ralph artifacts created (ralph.sh, RALPH.md, prd.json, progress.txt).
@@ -113,4 +119,38 @@
   - The "Uploading map..." modal is purely a client-side state machine; the lobby sees a fast MSG_NEWGAME the moment the map upload short-circuits for a bundled map (mapUploadState=2). No real upload happens for bundled maps.
   - Map options come from the client's local `shared/assets/level/*.sil` scan, NOT from the lobby's `-maps-dir`. The lobby's maps dir is only for community-uploaded maps via the map-api HTTP server.
   - When inspecting child interfaces for a SPECIFIC panel kind, the canonical pattern is to look for a discriminating button label (e.g., "Create" for gamecreate, "Choose Tech" for gamejoin). The same iface ID is stable as long as the panel isn't destroyed.
+---
+
+
+## 2026-05-11T12:00:00Z - P3 (Clay → SDL3/Surface render bridge) — COMPLETE
+- Implemented `silencer::clay_bridge::Render(Game&, Surface*, Clay_RenderCommandArray)` in `clients/silencer/src/ui/clay/clay_bridge.{h,cpp}`. Dispatches all six Clay render-command types into the existing Surface/Renderer pipeline:
+  - RECTANGLE → `Renderer::DrawFilledRectangle` with palette index from `backgroundColor.r`.
+  - BORDER → 4 thin `DrawFilledRectangle` calls per side (top/bottom span full width, left/right span only the inner gap so corners aren't double-painted).
+  - TEXT → `Renderer::DrawText` with `fontId` as bank, `fontSize` as cell width, `textColor.r` as effect color; optional `BankTextDrawData*` userData carries brightness/colorRamp/alpha.
+  - IMAGE → unpacks `PackImage(bank, idx)` from `imageData`, blits `world.resources.spritebank[bank][idx]` at the bbox top-left using the sprite's natural w/h via `Renderer::BlitSurface`.
+  - SCISSOR_START/END → push/pop a `ClipRect` stack; all subsequent draws are intersected with the top of the stack via `ClipDrawRect`.
+  - CUSTOM → switch on a `ClayCustomData*` tag (kinds reserved for P5+ primitives).
+- Promoted `Renderer::Rect` to public so the bridge can call the existing `Renderer::BlitSurface` static without a friend declaration. Trivial 4-int box; nothing to encapsulate.
+- Added `clients/silencer/src/ui/clay` to the silencer CMake include path so consumers can `#include "clay_bridge.h"` bare.
+- Smoke test:
+  - `silencer::clay_bridge::RunSmoke(Game&, outPath)` in `clay_smoke.cpp` builds a fixed Clay tree (root TOP_TO_BOTTOM column with 4 children — RECT 120x24 idx 200, BORDER 120x24 width 2 idx 220, TEXT "SILENCER" bank 135 fontSize 11 idx 152, IMAGE bank 7 idx 9 sized 8x48 to match the scrollbar-track sprite). Renders to a fresh 640x480 Surface and dumps via `CapturePNG`.
+  - Wired as a JSON-lines control op `cli clay_bridge_smoke --out <path>` (IMMEDIATE phase; HandleImmediate in `net/controldispatch.cpp`).
+  - `tests/lobby-clay/bridge_smoke/run.sh` runs the op and pixdiffs against the committed `reference.png`. Pass bar: < 1.0%. Current diff: 0.0000% (byte-stable across boots).
+- Two determinism fixes were required to hit byte-stability:
+  1. `EnsureInitialized` resets `Clay_SetPointerState({-1,-1}, false)`, `Clay_UpdateScrollContainers(false, ...)`, and `Clay_ResetMeasureTextCache()` before every layout. Without these, two consecutive `RunSmoke` calls in the same process diverge by ~1.2% (the second call's IMAGE element shifts position because the first call left text-cache state that perturbs subsequent layout).
+  2. `RunSmoke` calls `CapturePNG` with `renderer.palette.GetColors()` (static base palette), NOT `game.GetPaletteColors()` (live dynamic palette). The main menu fades its palette in over ~15 frames (game.cpp:870), so the live palette differs at boot time depending on when the smoke op fires.
+- Files changed:
+  - clients/silencer/CMakeLists.txt (include dir for src/ui/clay)
+  - clients/silencer/src/render/renderer.h (Rect → public)
+  - clients/silencer/src/ui/clay/clay_bridge.{h,cpp} (new — bridge)
+  - clients/silencer/src/ui/clay/clay_smoke.cpp (new — smoke scene)
+  - clients/silencer/src/net/controldispatch.cpp (clay_bridge_smoke op)
+  - tests/lobby-clay/bridge_smoke/{reference.png,run.sh,README.md} (new)
+- Pass check: `bash tests/lobby-clay/bridge_smoke/run.sh` → `pixdiff = 0.0000% / PASS`. Build green.
+- **Learnings for future iterations:**
+  - When you need a new Renderer-backed test that captures PNGs from a custom Surface, follow the smoke op pattern: create your own `Surface dst(W, H)`, dispatch into it, then call `renderer.CapturePNG(dst, renderer.palette.GetColors(), out)`. Don't reuse `game.GetScreenBuffer()` — that one's wired up for the live game render path and will mix with whatever the main loop is rendering.
+  - For any Clay-based screen Tick (P11 onward), if you don't carry over hover/scroll/measurement state between frames, you MUST call the three reset functions in `EnsureInitialized` BEFORE `Clay_BeginLayout`. The bridge does this for you, so as long as you go through `EnsureInitialized + BeginLayout + ... + Render`, you get determinism for free.
+  - `IMAGE` blits at the bbox top-left using the SPRITE's natural w/h — Clay layout sizing is informational only (no scaled blit support in the existing pipeline). If you size a Clay IMAGE element wrong, the layout reserves N px but the blit paints sprite-w px starting at the same top-left. Match Clay sizing to the sprite (or accept the mismatch).
+  - `RECTANGLE`/`BORDER` color encoding: ONLY `backgroundColor.r` is read as a palette index (Uint8). G/B/A ignored. So always specify Clay colors as `{ idx, 0, 0, 255 }` — the trailing zeros aren't decorative, they're documentation that the channel is unused.
+  - `tests/lobby-clay/bridge_smoke/run.sh` accepts `REGEN=1` to overwrite `reference.png` from the live binary — use this when you legitimately change the smoke scene (don't reach for it to silence pixdiff failures).
 ---
