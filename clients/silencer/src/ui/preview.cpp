@@ -313,11 +313,17 @@ int Game::RunPreview()
 				Clay_RenderCommandArray cmds = Clay_EndLayout();
 				ui::DrawRenderCommands(cmds, renderer, screenbuffer, ctx.scale);
 			}else if(strcmp(preview_screen, "options_display") == 0){
-				if(ctx.state) ctx.state->BeginFrame();
-				ui::v2::Node tree = ui::v2::BuildOptionsDisplay(ctx, options_display_handlers);
-				ui::v2::Layout(tree, ctx);
-				ui::v2::Render(tree, ctx, screenbuffer, renderer);
-				if(ctx.state) ctx.state->EndFrame();
+				ui::v2::OptionsDisplayState ods_state;
+				ods_state.fullscreen  = Config::GetInstance().fullscreen;
+				ods_state.scalefilter = Config::GetInstance().scalefilter;
+				ui::v2::EnsureClayContext(ctx);
+				Clay_SetPointerState(Clay_Vector2{ (float)ctx.mouse_x, (float)ctx.mouse_y }, false);
+				Clay_UpdateScrollContainers(false, Clay_Vector2{ 0.0f, 0.0f }, ctx.dt);
+				Clay_SetLayoutDimensions(Clay_Dimensions{ (float)ctx.logical_w, (float)ctx.logical_h });
+				Clay_BeginLayout();
+				ui::v2::RenderOptionsDisplay(ctx, options_display_handlers, ods_state);
+				Clay_RenderCommandArray cmds = Clay_EndLayout();
+				ui::DrawRenderCommands(cmds, renderer, screenbuffer, ctx.scale);
 			}else if(strcmp(preview_screen, "options_audio") == 0){
 				ui::v2::EnsureClayContext(ctx);
 				Clay_SetPointerState(Clay_Vector2{ (float)ctx.mouse_x, (float)ctx.mouse_y }, false);
@@ -478,9 +484,15 @@ int Game::RunPreview()
 						(void)Clay_EndLayout();
 						Clay_SetPointerState(Clay_Vector2{ (float)ctx.mouse_x, (float)ctx.mouse_y }, /*pointer_down=*/true);
 					}else if(strcmp(preview_screen, "options_display") == 0){
-						ui::v2::Node tree = ui::v2::BuildOptionsDisplay(ctx, options_display_handlers);
-						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClicks(tree, ctx);
+						ui::v2::OptionsDisplayState ods_state;
+						ods_state.fullscreen  = Config::GetInstance().fullscreen;
+						ods_state.scalefilter = Config::GetInstance().scalefilter;
+						ui::v2::EnsureClayContext(ctx);
+						Clay_SetLayoutDimensions(Clay_Dimensions{ (float)ctx.logical_w, (float)ctx.logical_h });
+						Clay_BeginLayout();
+						ui::v2::RenderOptionsDisplay(ctx, options_display_handlers, ods_state);
+						(void)Clay_EndLayout();
+						Clay_SetPointerState(Clay_Vector2{ (float)ctx.mouse_x, (float)ctx.mouse_y }, /*pointer_down=*/true);
 					}else if(strcmp(preview_screen, "options_audio") == 0){
 						ui::v2::EnsureClayContext(ctx);
 						Clay_SetLayoutDimensions(Clay_Dimensions{ (float)ctx.logical_w, (float)ctx.logical_h });
