@@ -37,7 +37,7 @@
       "id": "P4",
       "priority": 4,
       "name": "BankText primitive",
-      "passes": false,
+      "passes": true,
       "spec": "Add clients/silencer/src/ui/clay/primitives/bank_text.{h,cpp}. Variants: BankText::Title (bank 135 width 11), Heading (134, 8), Body (133, 6), BodySm (133, 7). Optional opts: textColor, effectColor, brightness, colorRamp. The primitive emits CLAY_TEXT with userData carrying these. Bridge's text-rendering path consumes them and produces output pixel-identical to the legacy Overlay text path for the same string+bank+color combination. Write a small unit test that renders 'Silencer' in Title at (15,32) effectcolor=152 (the lobby title) and pixdiffs against a 1-element baseline.",
       "pass_check": "Unit test pixdiff < 0.5%. No reference to lobby/world/Config from bank_text.{h,cpp}."
     },

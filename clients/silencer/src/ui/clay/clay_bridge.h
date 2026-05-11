@@ -52,6 +52,13 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds);
 // clay_smoke.cpp and is invoked by the `clay_bridge_smoke` control op.
 bool RunSmoke(::Game & game, const char * outPath);
 
+// P4 BankText primitive unit test. Renders the lobby title (the literal
+// string "Silencer") via the BankText primitive at (15, 32) using the
+// Title variant + effectColor=152, through the bridge into a fresh 640x480
+// Surface, and writes it to `outPath`. Invoked by the `clay_bank_text_test`
+// control op. Implementation in bank_text_test.cpp.
+bool RunBankTextTest(::Game & game, const char * outPath);
+
 // Pack a (bank, index) pair into a void* for Clay_ImageElementConfig.imageData.
 // Bank fits in the high 16 bits, index in the low 16. Round-trip via
 // UnpackImage(); decoder lives in clay_bridge.cpp.

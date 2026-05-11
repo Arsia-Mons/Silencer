@@ -21,6 +21,9 @@
 - Capture-PNG palette gotcha: `Game::GetPaletteColors()` is the LIVE dynamic palette and the main menu fades it in over ~15 frames (game.cpp:870). For deterministic Clay/UI shots, prefer the static base palette via `renderer.palette.GetColors()` (a non-const SDL_Color*; cast or accept). The smoke op (clay_smoke.cpp) uses the base palette.
 - New include dir wired in CMake: `clients/silencer/src/ui/clay`. Bridge consumers can `#include "clay_bridge.h"` bare — same convention as the other UI subdirs.
 - Custom CLI control op for the bridge smoke test: `cli clay_bridge_smoke --out <path>` (IMMEDIATE phase, registered in net/controldispatch.cpp). Calls `silencer::clay_bridge::RunSmoke` which builds a fixed 4-element tree and writes a 640x480 PNG. Repeatable test harness at `tests/lobby-clay/bridge_smoke/run.sh`.
+- Clay primitives live at `clients/silencer/src/ui/clay/primitives/<name>.{h,cpp}` in `namespace silencer::ui::primitives`. They include `clay_bridge.h` for the BankTextDrawData/ClayCustomData ABI but NEVER `world.h`, `lobby.h`, `config.h`. Variants are explicit enums (no string variants). Per-frame userData payloads come from a fixed-capacity bump arena owned by the primitive TU; caller invokes `<Primitive>BeginFrame()` before `Clay_BeginLayout`. The `src/ui/clay` include dir is on the global include path, so primitives are reachable as `#include "primitives/<name>.h"` from anywhere.
+- Adding a Clay-scene control op for a primitive unit test: 3 changes — declare `Run<Name>Test(Game&, const char*)` in clay_bridge.h, implement in `clients/silencer/src/ui/clay/<name>_test.cpp` (mirror clay_smoke.cpp: Surface(640,480,0), Render(game, &dst, cmds), CapturePNG with `renderer.palette.GetColors()`), and wire the op in net/controldispatch.cpp's HandleImmediate switch. New .cpp files require `cmake -B build -S clients/silencer` to refresh the GLOB_RECURSE source list (build errors with "undefined symbol" → reconfigure, then rebuild).
+- The cli-agent harness (`tests/cli-agent/e2e/lib.sh`) auto-detects the binary at `clients/silencer/build/Silencer.app/...` first. In this worktree the canonical build sits at the worktree-root `build/`, so primitive test run.sh scripts must accept `SILENCER_BIN` overrides — set `SILENCER_BIN=$REPO/build/Silencer.app/Contents/MacOS/Silencer` when the worktree's `clients/silencer/build` is stale or missing.
 
 ## 2026-05-11T00:00:00Z - bootstrap
 - Ralph artifacts created (ralph.sh, RALPH.md, prd.json, progress.txt).
@@ -153,4 +156,23 @@
   - `IMAGE` blits at the bbox top-left using the SPRITE's natural w/h — Clay layout sizing is informational only (no scaled blit support in the existing pipeline). If you size a Clay IMAGE element wrong, the layout reserves N px but the blit paints sprite-w px starting at the same top-left. Match Clay sizing to the sprite (or accept the mismatch).
   - `RECTANGLE`/`BORDER` color encoding: ONLY `backgroundColor.r` is read as a palette index (Uint8). G/B/A ignored. So always specify Clay colors as `{ idx, 0, 0, 255 }` — the trailing zeros aren't decorative, they're documentation that the channel is unused.
   - `tests/lobby-clay/bridge_smoke/run.sh` accepts `REGEN=1` to overwrite `reference.png` from the live binary — use this when you legitimately change the smoke scene (don't reach for it to silence pixdiff failures).
+---
+
+
+## 2026-05-11T12:30:00Z - P4 (BankText primitive) — COMPLETE
+- Added `clients/silencer/src/ui/clay/primitives/bank_text.{h,cpp}`. Free function `BankText(Clay_String, BankTextVariant, BankTextOpts)` in `namespace silencer::ui::primitives`. Variants: Title (bank 135, width 11), Heading (134, 8), Body (133, 6), BodySm (133, 7). Opts: effectColor (palette idx tint), brightness (default 128), colorRamp, drawAlpha. When opts match the bridge defaults (brightness==128 && !colorRamp && !drawAlpha), no userData is allocated and the bridge's NULL-userData fast path is taken; otherwise a `BankTextDrawData` is bump-allocated from a fixed-capacity per-frame arena (1024 entries; caller invokes `BankTextBeginFrame()` before `Clay_BeginLayout`).
+- Primitive holds NO state, references NO lobby/world/Config (just `clay/clay.h`, `shared.h`, and `clay_bridge.h` for the BankTextDrawData ABI).
+- Unit test: `tests/lobby-clay/bank_text_test/run.sh` drives a new `clay_bank_text_test --out <path>` control op (IMMEDIATE phase). The op runs `silencer::clay_bridge::RunBankTextTest` which builds a 640x480 root with `padding = { 15, 0, 32, 0 }` and a single `BankText("Silencer", Title, { effectColor=152 })` child. The lobby title's exact text/bank/width/effectColor.
+- Files changed:
+  - clients/silencer/src/ui/clay/primitives/bank_text.{h,cpp} (new — primitive)
+  - clients/silencer/src/ui/clay/bank_text_test.cpp (new — Clay scene + PNG dump)
+  - clients/silencer/src/ui/clay/clay_bridge.h (added `RunBankTextTest` decl)
+  - clients/silencer/src/net/controldispatch.cpp (added `clay_bank_text_test` op)
+  - tests/lobby-clay/bank_text_test/{run.sh,reference.png,README.md} (new — pixdiff harness + 1-element baseline)
+- Pass check: `bash tests/lobby-clay/bank_text_test/run.sh` → `pixdiff = 0.0000% / PASS bank_text_test`. Build green.
+- **Learnings for future iterations:**
+  - When a primitive emits `CLAY_TEXT`, route any non-default brightness/colorRamp/drawAlpha through a pointer in `Clay_TextElementConfig.userData`. Clay propagates that pointer to the render command's top-level `userData` field — confirmed in clay.h line 2862 (`.userData = textElementConfig->userData`).
+  - Variants are best modeled as a switch in a private `ConfigFor()` helper rather than baked into the enum (e.g. `enum { Title = 135 }`). Keeps the enum readable and lets future variants store more than one int per case.
+  - The fixed-capacity bump arena is the right default for primitive userData payloads: stable pointers, zero allocator overhead, capacity is a tunable header constant. Future primitives (P5 BankButton chrome, P7 ScrollList items) should follow the same `<Primitive>BeginFrame()` reset convention.
+  - `Clay_TextElementConfig.textColor` is a `Clay_Color` (4 floats), but the bridge only reads `.r` as a Uint8 palette index. Always set the other channels to fixed values (0.0/0.0/255.0) so the .r interpretation is the only one carrying signal — it's API contract by the bridge.
 ---
