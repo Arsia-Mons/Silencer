@@ -125,10 +125,36 @@ the same call sites.
 
 ## Verification
 
-- `tests/lobby-clay/baselines/*.png` — captured once from the legacy
-  build (P2) and never re-baselined by the agent.
+The original plan (pixdiff each Clay capture against the immutable
+`tests/lobby-clay/baselines/*.png` committed in P2) couldn't be reached:
+the legacy lobby's animated chrome (agency-icon idle, chat indicators,
+palette fade) makes a frozen baseline non-reproducible even by the
+legacy capture script against itself — re-capturing at a different tick
+phase shows ~25% legacy-vs-self in the chrome strip.
+
+Actual gate: **Clay vs. fresh-legacy, same run.** Each panel test
+(`tests/lobby-clay/<panel>/run.sh`) boots one lobby instance, then runs
+two silencer clients sequentially against it — first legacy (no env
+var), then Clay (`SILENCER_LOBBY_CLAY=1`) — drives both through the
+same milestone-based wait, then pixdiffs the two captures over the
+panel's crop rect.
+
+Determinism trick: after the milestone wait, both clients run
+`cli step --frames N` (typically 30) instead of `wait_frames`.
+`wait_frames` is wall-clock-gated, and legacy vs. Clay render at
+different costs, so the same wall-clock wait elapses different sim-tick
+counts → different `fade_i` → different palette. `step --frames N`
+advances the sim by EXACTLY N catch-up ticks regardless of render cost,
+so both implementations land at the same tick phase.
+
 - `tools/pixdiff/pixdiff a.png b.png` — prints byte-diff % (P1).
-- Per-panel pass bar: **<5%** byte diff against baseline.
+- Per-panel pass bar: **<5%** byte diff, Clay vs. fresh-legacy. P20
+  final sweep: all 7 panels ≤0.63%; P15 GameCreatePanel highest at
+  1.45% in its own iteration's sweep (ScrollList scrollbar render-path
+  divergence accounts for the floor).
+- `tests/lobby-clay/baselines/*.png` are kept as informational
+  artifacts only — they show the expected ~20-37% per-panel diff
+  against any live capture and are not the pass gate.
 - Final pass: `tests/cli-agent/e2e/` regression suite still green.
 
 ## Ralph backlog
@@ -167,3 +193,40 @@ Once the primitives land, migrating other screens (main menu, options,
 mission summary, modals) is a separate Ralph run. The primitives must
 support those screens without modification — that's why P21 dogfoods
 them on a non-lobby surface.
+
+## Next milestone — chrome via Clay primitives (separate effort)
+
+Decision recorded 2026-05-11: after the byte-identical lobby is fully
+done (P12–P21), a **separate** milestone replaces the baked 640×480
+background sprite's structural rectangles with Clay-drawn chrome. The
+goal is reusable, future-friendly panel chrome that any screen can
+compose without baking new sprites.
+
+Shape:
+
+- **Drop the decorative texture** baked inside the BG (circuit
+  boards, planet monitor, photo collage). Panels become flat-colored
+  interiors with stroked borders.
+- **New `Rectangle` primitive** with two main controls:
+  - **Stroke** — color matched as closely as possible to the legacy
+    BG's bright-green panel borders (sample the palette index from
+    the BG sprite at the stroke pixels). Width configurable.
+  - **Background color with opacity** — so panels can render
+    semi-transparent fills over whatever sits behind.
+- **Non-rectangular container shape** — the chat-panel region in the
+  legacy BG is an upside-down L (chat box extends below the character
+  panel to form the L). The Rectangle primitive alone can't express
+  this — open question for the milestone whether to:
+  - compose two Rectangles that visually join,
+  - introduce a `Polygon` / `LShape` primitive,
+  - or rework the lobby so the chat container is a plain rectangle.
+- **Defer the film-strip sphere lights** (top + bottom rows of green
+  dots) — tackle in a follow-up after the rectangle primitives land.
+- **Verification model changes.** Pixdiff-vs-legacy is no longer the
+  gate (we're intentionally changing the visual). Replacement: layout
+  correctness checks (containers land at expected positions/sizes at
+  the target viewport) + visual eyeball + interaction checks already
+  in place.
+- **Out of scope for this milestone**: runtime resizing /
+  web-responsive layouts. The renderer's framebuffer stays at
+  640×480. Treat full responsiveness as yet another later milestone.
