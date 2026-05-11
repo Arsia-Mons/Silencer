@@ -281,6 +281,12 @@ bool Game::HandleSDLEvents(void){
 						iface->ProcessKeyPress(world, ascii);
 					}
 				}
+				// v2 OPTIONSCONTROLS has no Interface on the stack but still
+				// needs the next scancode for the rebind capture state
+				// machine. TickOptionsControlsV2 consumes + clears it.
+				if(state == GameState::OPTIONSCONTROLS && controls_rebind_active_slot >= 0){
+					controls_rebind_pending_scancode = (int)event.key.scancode;
+				}
 			}break;
 			case SDL_EVENT_KEY_UP:{
 				OnScancodeUp(event.key.scancode);
@@ -313,6 +319,8 @@ bool Game::HandleSDLEvents(void){
 						DispatchOptionsDisplayV2Click(lx, ly);
 					}else if(state == GameState::OPTIONSAUDIO){
 						DispatchOptionsAudioV2Click(lx, ly);
+					}else if(state == GameState::OPTIONSCONTROLS){
+						DispatchOptionsControlsV2Click(lx, ly);
 					}else{
 						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 						if(iface){
@@ -323,7 +331,7 @@ bool Game::HandleSDLEvents(void){
 			}break;
 			case SDL_EVENT_MOUSE_BUTTON_UP:{
 				if(event.button.button == SDL_BUTTON_LEFT){
-					if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO){
+					if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS){
 						// v2 fires on mouse-down (matches preview); nothing to
 						// do on mouse-up.
 					}else{
@@ -341,7 +349,7 @@ bool Game::HandleSDLEvents(void){
 				SDL_GetWindowSize(window, &w, &h);
 				int lx = (int)((float(event.motion.x) / w) * 640);
 				int ly = (int)((float(event.motion.y) / h) * 480);
-				if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO){
+				if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS){
 					// Feed v2 render hover styling. Always update; the v2
 					// render pass reads ui_v2_mouse_{x,y} next frame.
 					ui_v2_mouse_x = lx;

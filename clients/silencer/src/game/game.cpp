@@ -45,6 +45,7 @@
 #include "options.h"
 #include "options_display.h"
 #include "options_audio.h"
+#include "options_controls.h"
 #include "audio.h"
 #include "renderdevice.h"
 #include <SDL3/SDL_video.h>
@@ -649,6 +650,8 @@ bool Game::Loop(void){
 			RenderOptionsDisplayV2();
 		}else if(state == OPTIONSAUDIO){
 			RenderOptionsAudioV2();
+		}else if(state == OPTIONSCONTROLS){
+			RenderOptionsControlsV2();
 		}else{
 			renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
 		}
@@ -920,9 +923,23 @@ bool Game::Tick(void){
 		case OPTIONSCONTROLS:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsControlsScreen>());
+				// v2 OptionsControls — no Interface on the stack, no
+				// PushScreen. Render + click dispatch + rebind capture live
+				// in RenderOptionsControlsV2 / DispatchOptionsControlsV2Click
+				// / TickOptionsControlsV2. Palette + camera mirror the
+				// Options router.
+				renderer.palette.SetPalette(1);
+				screenbuffer.Clear(0);
+				SetColors(renderer.palette.GetColors());
+				renderer.camera.SetPosition(320, 240);
+				currentinterface = 0;
+				ui_v2_state = ui::v2::UIState{};
+				ui_v2_last_ticks = 0;
+				controls_rebind_active_slot = -1;
+				controls_rebind_pending_scancode = -1;
 				stateisnew = false;
 			}
+			TickOptionsControlsV2();
 		}break;
 		case OPTIONSDISPLAY:{
 			if(stateisnew){
@@ -1438,6 +1455,288 @@ void Game::DispatchOptionsAudioV2Click(int logical_x, int logical_y){
 	ui::v2::Node tree = ui::v2::BuildOptionsAudio(ctx, handlers, &live);
 	ui::v2::Layout(tree, ctx);
 	ui::v2::DispatchClick(tree, ctx);
+}
+
+namespace {
+
+constexpr int CONTROLS_VISIBLE_ROWS       = 5;
+constexpr Uint32 CONTROLS_REBIND_TIMEOUT  = 72;
+constexpr int CONTROLS_SECONDARY_SLOT_BASE = 100;
+
+bool IsBuiltinKeybindProfile(const std::string & name){
+	return name == "default" || name == "wasd" || name == "gamepad";
+}
+
+// Mirror of OptionsControlsScreen::ViewLegacy — the legacy method is
+// private+static, kept here so we don't need to befriend Game.
+bool BindingsAreAnded(const ActionBindings & ab){
+	if(ab.bindings.empty()) return false;
+	const auto & b0 = ab.bindings[0];
+	return b0.keys.size() >= 2 &&
+	       b0.keys[0].device == BindingDevice::Keyboard &&
+	       b0.keys[1].device == BindingDevice::Keyboard;
+}
+
+std::string ControlsBindingLabel(const KeyMap & km, SDL_Gamepad * pad, Action a, int slot){
+	const auto & ab = km.Get(a);
+	int found = 0;
+	for(const auto & b : ab.bindings){
+		if(b.keys.empty()) continue;
+		if(found == slot){
+			const auto & k = b.keys[0];
+			if(k.device == BindingDevice::Keyboard){
+				return KeyMap::GetKeyName((SDL_Scancode)k.code);
+			}
+			std::string s = Stringify(k);
+			auto colon = s.find(':');
+			std::string raw = (colon != std::string::npos) ? s.substr(colon + 1) : s;
+			return GamepadShortLabel(raw, pad ? SDL_GetGamepadType(pad) : SDL_GAMEPAD_TYPE_UNKNOWN);
+		}
+		found++;
+	}
+	return KeyMap::GetKeyName(SDL_SCANCODE_UNKNOWN);
+}
+
+// Rebuild the keymap entry for one action from a primary/secondary slot
+// view + the OR/AND mode (mirror of OptionsControlsScreen::WriteLegacy).
+void WriteControlsLegacy(KeyMap & km, Action a, SDL_Scancode key1, SDL_Scancode key2, bool and_){
+	auto & ab = km.Get(a);
+	ab.bindings.clear();
+	auto mk = [](SDL_Scancode sc){
+		BindingKey k;
+		k.device  = BindingDevice::Keyboard;
+		k.code    = (int)sc;
+		k.axisDir = 0;
+		return k;
+	};
+	if(key1 == SDL_SCANCODE_UNKNOWN && key2 == SDL_SCANCODE_UNKNOWN) return;
+	if(and_ && key1 != SDL_SCANCODE_UNKNOWN && key2 != SDL_SCANCODE_UNKNOWN){
+		Binding b; b.keys.push_back(mk(key1)); b.keys.push_back(mk(key2));
+		ab.bindings.push_back(std::move(b));
+		return;
+	}
+	if(key1 != SDL_SCANCODE_UNKNOWN){
+		Binding b; b.keys.push_back(mk(key1));
+		ab.bindings.push_back(std::move(b));
+	}
+	if(key2 != SDL_SCANCODE_UNKNOWN){
+		Binding b; b.keys.push_back(mk(key2));
+		ab.bindings.push_back(std::move(b));
+	}
+}
+
+// Existing primary/secondary scancodes for `a`. Used to keep the
+// untouched slot when rebinding just one half of a pair.
+void ControlsCurrentKeys(const KeyMap & km, Action a, SDL_Scancode & key1, SDL_Scancode & key2){
+	key1 = key2 = SDL_SCANCODE_UNKNOWN;
+	const auto & ab = km.Get(a);
+	if(ab.bindings.empty()) return;
+	const auto & b0 = ab.bindings[0];
+	if(b0.keys.size() >= 2 &&
+	   b0.keys[0].device == BindingDevice::Keyboard &&
+	   b0.keys[1].device == BindingDevice::Keyboard){
+		key1 = (SDL_Scancode)b0.keys[0].code;
+		key2 = (SDL_Scancode)b0.keys[1].code;
+		return;
+	}
+	if(!b0.keys.empty() && b0.keys[0].device == BindingDevice::Keyboard){
+		key1 = (SDL_Scancode)b0.keys[0].code;
+	}
+	if(ab.bindings.size() >= 2){
+		const auto & b1 = ab.bindings[1];
+		if(!b1.keys.empty() && b1.keys[0].device == BindingDevice::Keyboard){
+			key2 = (SDL_Scancode)b1.keys[0].code;
+		}
+	}
+}
+
+ui::v2::OptionsControlsState ComputeOptionsControlsState(ScreenContext & sctx, int active_slot_uid){
+	ui::v2::OptionsControlsState s;
+	const KeyMap & km = sctx.keymap;
+	SDL_Gamepad * pad = sctx.game.GetGamepad();
+	s.preset_text = !km.label.empty() ? km.label
+	              : !km.name.empty()  ? km.name
+	              : std::string(Config::GetInstance().active_keybind_profile);
+	for(int i = 0; i < CONTROLS_VISIBLE_ROWS; i++){
+		int row = i;  // scroll_position currently fixed at 0
+		if(row >= (int)Action::Count) break;
+		Action a = ACTION_TABLE[row].action;
+		s.rows[i].keyname = std::string(GetActionInfo(a).label) + ":";
+		s.rows[i].c1_text = ControlsBindingLabel(km, pad, a, 0);
+		s.rows[i].c2_text = ControlsBindingLabel(km, pad, a, 1);
+		s.rows[i].op_text = BindingsAreAnded(km.Get(a)) ? "AND" : "OR";
+		// While a slot in this row is awaiting input, override its text
+		// to "-" (legacy parity).
+		if(active_slot_uid >= 0){
+			if(active_slot_uid < CONTROLS_SECONDARY_SLOT_BASE && active_slot_uid == row){
+				s.rows[i].c1_text = "-";
+			}else if(active_slot_uid >= CONTROLS_SECONDARY_SLOT_BASE &&
+			         (active_slot_uid - CONTROLS_SECONDARY_SLOT_BASE) == row){
+				s.rows[i].c2_text = "-";
+			}
+		}
+	}
+	return s;
+}
+
+}  // namespace
+
+static ui::v2::OptionsControlsHandlers BuildOptionsControlsHandlers(Game * self, ScreenContext & sctx){
+	ui::v2::OptionsControlsHandlers h;
+	h.on_preset = [&sctx](){ CycleKeybindPreset(sctx.keymap); };
+	h.on_save = [&sctx](){
+		const std::string active = Config::GetInstance().active_keybind_profile;
+		if(!IsBuiltinKeybindProfile(active)){
+			sctx.keymap.SaveFile(WritableProfilePath(active));
+		}
+		Config::GetInstance().Save();
+		sctx.GoToState(GameState::OPTIONS);
+	};
+	h.on_cancel = [&sctx](){
+		LoadActiveKeymap(sctx.keymap);
+		Config::GetInstance().Load();
+		sctx.GoToState(GameState::OPTIONS);
+	};
+	h.on_rebind_key = [self](int row, int slot){ self->StartControlsRebind(row, slot); };
+	return h;
+}
+
+void Game::StartControlsRebind(int row, int slot){
+	if(controls_rebind_active_slot >= 0) return;
+	controls_rebind_active_slot = (slot == 0) ? row : (CONTROLS_SECONDARY_SLOT_BASE + row);
+	controls_rebind_start_tick = world.tickcount;
+	controls_rebind_pending_scancode = -1;
+	controls_rebind_gamepad_buttons = gamepadstate.buttons;
+	std::memcpy(controls_rebind_gamepad_axes, gamepadstate.axes,
+	            sizeof(controls_rebind_gamepad_axes));
+}
+
+bool Game::RenderOptionsControlsV2(){
+	Uint64 now = SDL_GetTicks();
+	float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
+	ui_v2_last_ticks = now;
+
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = ui_v2_mouse_x;
+	ctx.mouse_y = ui_v2_mouse_y;
+	ctx.state   = &ui_v2_state;
+	ctx.dt      = dt;
+
+	ui::v2::OptionsControlsHandlers handlers = BuildOptionsControlsHandlers(this, screenContext);
+	ui::v2::OptionsControlsState live = ComputeOptionsControlsState(screenContext, controls_rebind_active_slot);
+	screenbuffer.Clear(0);
+	ui_v2_state.BeginFrame();
+	ui::v2::Node tree = ui::v2::BuildOptionsControls(ctx, handlers, &live);
+	ui::v2::Layout(tree, ctx);
+	ui::v2::Render(tree, ctx, screenbuffer, renderer);
+	ui_v2_state.EndFrame();
+	return true;
+}
+
+void Game::DispatchOptionsControlsV2Click(int logical_x, int logical_y){
+	// Suppress chip clicks while a rebind is in flight — legacy gates this
+	// via iface->disabled; v2 mirrors by skipping dispatch entirely. Save,
+	// Cancel and Preset stay reachable because the user is expected to
+	// finish or time out the capture before navigating away.
+	if(controls_rebind_active_slot >= 0) return;
+
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = logical_x;
+	ctx.mouse_y = logical_y;
+	ctx.state   = &ui_v2_state;
+	ui::v2::OptionsControlsHandlers handlers = BuildOptionsControlsHandlers(this, screenContext);
+	ui::v2::OptionsControlsState live = ComputeOptionsControlsState(screenContext, controls_rebind_active_slot);
+	ui::v2::Node tree = ui::v2::BuildOptionsControls(ctx, handlers, &live);
+	ui::v2::Layout(tree, ctx);
+	ui::v2::DispatchClick(tree, ctx);
+}
+
+void Game::TickOptionsControlsV2(){
+	if(controls_rebind_active_slot < 0) return;
+
+	const int slot_uid = controls_rebind_active_slot;
+	const int row = (slot_uid < CONTROLS_SECONDARY_SLOT_BASE) ? slot_uid
+	                                                          : (slot_uid - CONTROLS_SECONDARY_SLOT_BASE);
+	if(row < 0 || row >= (int)Action::Count){
+		controls_rebind_active_slot = -1;
+		controls_rebind_pending_scancode = -1;
+		return;
+	}
+	const Action a = ACTION_TABLE[row].action;
+
+	// Gamepad capture (only newly-pressed buttons / axes past deadzone).
+	if(gamepadstate.connected){
+		BindingKey padKey{}; bool padFound = false;
+		for(int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT && !padFound; b++){
+			bool was = (controls_rebind_gamepad_buttons >> b) & 1;
+			bool is  = (gamepadstate.buttons >> b) & 1;
+			if(is && !was){
+				padKey.device = BindingDevice::GamepadButton;
+				padKey.code   = b;
+				padKey.axisDir = 0;
+				padFound = true;
+			}
+		}
+		for(int ax = 0; ax < SDL_GAMEPAD_AXIS_COUNT && !padFound; ax++){
+			int16_t was = controls_rebind_gamepad_axes[ax];
+			int16_t is  = gamepadstate.axes[ax];
+			if(std::abs(is) > AXIS_DEADZONE && std::abs(was) <= AXIS_DEADZONE){
+				padKey.device  = BindingDevice::GamepadAxis;
+				padKey.code    = ax;
+				padKey.axisDir = (is > 0) ? 1 : -1;
+				padFound = true;
+			}
+		}
+		if(padFound){
+			ForkActiveProfileIfBuiltin(keymap);
+			auto & ab = keymap.Get(a);
+			Binding binding; binding.keys.push_back(padKey);
+			if(slot_uid < CONTROLS_SECONDARY_SLOT_BASE){
+				if(ab.bindings.empty()) ab.bindings.push_back(binding);
+				else                    ab.bindings[0] = binding;
+			}else{
+				if(ab.bindings.empty()) ab.bindings.push_back(Binding{});
+				if(ab.bindings.size() < 2) ab.bindings.push_back(binding);
+				else                       ab.bindings[1] = binding;
+			}
+			controls_rebind_active_slot = -1;
+			controls_rebind_pending_scancode = -1;
+			return;
+		}
+	}
+
+	// Keyboard scancode or timeout.
+	const bool timed_out = (world.tickcount - controls_rebind_start_tick) > CONTROLS_REBIND_TIMEOUT;
+	if(controls_rebind_pending_scancode >= 0 || timed_out){
+		SDL_Scancode sym = (controls_rebind_pending_scancode >= 0)
+			? (SDL_Scancode)controls_rebind_pending_scancode
+			: SDL_SCANCODE_UNKNOWN;
+		if(timed_out) sym = SDL_SCANCODE_UNKNOWN;
+#ifndef OUYA
+		if(sym == SDL_SCANCODE_ESCAPE) sym = SDL_SCANCODE_UNKNOWN;
+#endif
+		SDL_Scancode key1, key2;
+		ControlsCurrentKeys(keymap, a, key1, key2);
+		const bool and_was = BindingsAreAnded(keymap.Get(a));
+		if(slot_uid < CONTROLS_SECONDARY_SLOT_BASE) key1 = sym;
+		else                                        key2 = sym;
+		ForkActiveProfileIfBuiltin(keymap);
+		WriteControlsLegacy(keymap, a, key1, key2, and_was);
+		controls_rebind_active_slot = -1;
+		controls_rebind_pending_scancode = -1;
+	}
 }
 
 void Game::DispatchMainMenuV2Click(int logical_x, int logical_y){

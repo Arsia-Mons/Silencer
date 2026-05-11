@@ -10,7 +10,9 @@
 namespace ui {
 namespace v2 {
 
-Node BuildOptionsControls(const Context & ctx, const OptionsControlsHandlers & handlers)
+Node BuildOptionsControls(const Context & ctx,
+                          const OptionsControlsHandlers & handlers,
+                          const OptionsControlsState * state)
 {
 	// Title centered at y=14, textbank=135, textwidth=12. Legacy formula:
 	//   x = 320 - (len * textwidth) / 2
@@ -32,16 +34,60 @@ Node BuildOptionsControls(const Context & ctx, const OptionsControlsHandlers & h
 	// Legacy: c1 y = slot*53,        x = -30
 	//         c2 y = slot*53,        x = 120
 	//         keyname/op overlays render no pixels in the static (pre-Tick)
-	//         build state — text is empty for keyname; the OR/AND toggle
-	//         button is BNONE (no chrome) with empty text. Omit both from
-	//         the tree.
-	auto row = [](int i) {
+	//         build state. With `state` we mirror the legacy Tick output:
+	//         keyname Label at (80, 95+slot*53), OR/AND Label centered
+	//         inside the BNONE button rect (40×30 at x=383, y=95+slot*53).
+	auto row = [&](int i) {
 		const int slot = i + 1;
 		const int by = slot * 53;
-		return Group({
-			Button("", ButtonType::B112x33).at(-30, (Sint16)by).withKey("ctrl_c1_" + std::to_string(i)),
-			Button("", ButtonType::B112x33).at( 120, (Sint16)by).withKey("ctrl_c2_" + std::to_string(i)),
-		});
+		const int y  = 95 + slot * 53;
+
+		std::vector<Node> children;
+
+		if(state && !state->rows[i].keyname.empty()){
+			children.push_back(
+				Label(state->rows[i].keyname, /*font_bank=*/134, /*font_width=*/10)
+					.at(80, (Sint16)y));
+		}
+
+		{
+			Node c1 = Button(state ? state->rows[i].c1_text : "", ButtonType::B112x33)
+				.at(-30, (Sint16)by)
+				.withKey("ctrl_c1_" + std::to_string(i));
+			if(handlers.on_rebind_key){
+				auto h = handlers.on_rebind_key;
+				c1.onClick([h, i](){ h(i, 0); });
+			}
+			children.push_back(std::move(c1));
+		}
+
+		// OR/AND text. BNONE button in legacy: width=40, textwidth=9,
+		// no chrome. xoff = (40 - len*9)/2 centers within the 40px box;
+		// yoff = 0 (BNONE not in Button::GetTextOffset switch).
+		// alpha=true mirrors the legacy Button::DrawText code path so
+		// glyph pixels land identically. Click-to-toggle isn't wired
+		// in this iteration (read-only display).
+		if(state && !state->rows[i].op_text.empty()){
+			const std::string & op = state->rows[i].op_text;
+			int xoff = (40 - (int)op.size() * 9) / 2;
+			children.push_back(
+				Label(op, /*font_bank=*/134, /*font_width=*/9)
+					.at((Sint16)(383 + xoff), (Sint16)y)
+					.withAlpha());
+		}
+
+		{
+			Node c2 = Button(state ? state->rows[i].c2_text : "", ButtonType::B112x33)
+				.at(120, (Sint16)by)
+				.withKey("ctrl_c2_" + std::to_string(i));
+			if(handlers.on_rebind_key){
+				auto h = handlers.on_rebind_key;
+				c2.onClick([h, i](){ h(i, 1); });
+			}
+			children.push_back(std::move(c2));
+		}
+
+		return Group(std::move(children));
 	};
 
 	return Background(/*bank=*/6, /*index=*/0, {
@@ -54,7 +100,8 @@ Node BuildOptionsControls(const Context & ctx, const OptionsControlsHandlers & h
 		// Preset row: static "Preset:" label at the same x/y as binding row
 		// labels, cycle button on the right.
 		Label("Preset:", /*font_bank=*/134, /*font_width=*/10).at(80, 95),
-		Button("", ButtonType::B220x33).at((Sint16)preset_x, 0)
+		Button(state ? state->preset_text : std::string(), ButtonType::B220x33)
+			.at((Sint16)preset_x, 0)
 			.withKey("ctrl_preset")
 			.onClick(handlers.on_preset),
 
