@@ -5,6 +5,7 @@
 #include "layout.h"
 #include "node.h"
 #include "render.h"
+#include "theme.h"
 
 #include "game.h"
 #include "game_state.h"
@@ -85,7 +86,9 @@ Node BuildMissionSummary(const Context & ctx, const MissionSummaryHandlers & han
 
 	// Title: "Mission Summary" (15 chars * 12 width = 180; legacy centers
 	// around x=192 → x = 192 - 90 = 102, y = 44).
-	children.push_back(Label("Mission Summary", /*font_bank=*/135, /*font_width=*/12).at(102, 44));
+	children.push_back(Label("Mission Summary",
+	                         /*font_bank=*/(Uint8)::ui::kFontTitle.fontId,
+	                         /*font_width=*/(Uint8)::ui::kFontTitle.fontSize).at(102, 44));
 
 	// XP text: "+ N XP" — text width 15, centered on x=467.
 	{
@@ -93,7 +96,9 @@ Node BuildMissionSummary(const Context & ctx, const MissionSummaryHandlers & han
 		snprintf(xpbuf, sizeof(xpbuf), "+ %d XP", xp);
 		int len = (int)std::char_traits<char>::length(xpbuf);
 		int xp_x = 467 - ((len * 15) / 2);
-		children.push_back(Label(xpbuf, /*font_bank=*/136, /*font_width=*/15).at(xp_x, 45));
+		children.push_back(Label(xpbuf,
+		                         /*font_bank=*/(Uint8)::ui::kFontStat.fontId,
+		                         /*font_width=*/(Uint8)::ui::kFontStat.fontSize).at(xp_x, 45));
 	}
 
 	// "*NEW UPGRADE AVAILABLE*" banner — 23 chars * 6 width = 138, centered on x=467.
@@ -101,7 +106,9 @@ Node BuildMissionSummary(const Context & ctx, const MissionSummaryHandlers & han
 		const char * banner = "*NEW UPGRADE AVAILABLE*";
 		int len = (int)std::char_traits<char>::length(banner);
 		int b_x = 467 - ((len * 6) / 2);
-		children.push_back(Label(banner, /*font_bank=*/133, /*font_width=*/6).at(b_x, 77));
+		children.push_back(Label(banner,
+		                         /*font_bank=*/(Uint8)::ui::kFontBody.fontId,
+		                         /*font_width=*/(Uint8)::ui::kFontBody.fontSize).at(b_x, 77));
 	}
 
 	// Textbox visible window. Each entry is the text rendered at line `i`
