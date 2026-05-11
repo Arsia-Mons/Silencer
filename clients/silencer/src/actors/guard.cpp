@@ -1098,6 +1098,10 @@ void Guard::Tick(World & world){
 				  state_warp = _gd ? _gd->warpTeleportTick : GASLoader::Get().player.warpTeleportTick; }
 				health = maxhealth;
 				shield = maxshield;
+				// Reset BT state on respawn so the tree starts fresh.
+				btctx_.blackboard.clear();
+				btctx_.state.clear();
+				btctx_.node_ticks.clear();
 				break;
 			}
 			if(world.tickcount % GASLoader::Get().gameengine.ticksPerSecond != 0){
