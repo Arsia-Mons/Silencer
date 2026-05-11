@@ -1,12 +1,6 @@
 #include "controldispatch.h"
 #include "game.h"
-#include "interface.h"
 #include "world.h"
-#include "button.h"
-#include "toggle.h"
-#include "textbox.h"
-#include "textinput.h"
-#include "selectbox.h"
 #include "objecttypes.h"
 #include "keybinds.h"
 #include "config.h"
@@ -40,15 +34,6 @@ static ControlReply OkResult(int id, nlohmann::json r){
 	rpl.ok = true;
 	rpl.result = std::move(r);
 	return rpl;
-}
-
-static bool IEq(const char* a, const char* b){
-	if(!a || !b) return false;
-	while(*a && *b){
-		if(std::tolower((unsigned char)*a) != std::tolower((unsigned char)*b)) return false;
-		++a; ++b;
-	}
-	return *a == 0 && *b == 0;
 }
 
 static ControlReply Err(int id, const char* code, const std::string& msg){
@@ -107,207 +92,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	if(cmd.op == "inspect"){
-		Uint16 ifid = cmd.args.value("interface_id", 0);
-		if(ifid == 0) ifid = game.GetCurrentInterfaceId();
-		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(!iface || iface->type != ObjectTypes::INTERFACE){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
-			return;
-		}
-		nlohmann::json widgets = nlohmann::json::array();
-		for(Uint16 oid : iface->objects){
-			Object* o = game.GetWorld().GetObjectFromId(oid);
-			if(!o) continue;
-			nlohmann::json w;
-			w["id"] = oid;
-			w["x"] = o->x; w["y"] = o->y;
-			switch(o->type){
-				case ObjectTypes::BUTTON: {
-					Button* b = (Button*)o;
-					w["kind"] = "button";
-					w["label"] = b->text;
-					w["w"] = b->width; w["h"] = b->height;
-					w["enabled"] = !iface->disabled;
-					break;
-				}
-				case ObjectTypes::TOGGLE: {
-					Toggle* t = (Toggle*)o;
-					w["kind"] = "toggle";
-					w["label"] = t->text;
-					w["w"] = t->width; w["h"] = t->height;
-					w["enabled"] = !iface->disabled;
-					w["selected"] = t->selected;
-					break;
-				}
-				case ObjectTypes::TEXTBOX: {
-					TextBox* tb = (TextBox*)o;
-					w["kind"] = "textbox";
-					w["w"] = tb->width; w["h"] = tb->height;
-					// uid is the developer-assigned identifier; expose it so
-					// agents can disambiguate textboxes (which have no label).
-					w["uid"] = tb->uid;
-					break;
-				}
-				case ObjectTypes::TEXTINPUT: {
-					TextInput* ti = (TextInput*)o;
-					w["kind"] = "textinput";
-					w["w"] = ti->width; w["h"] = ti->height;
-					w["uid"] = ti->uid;
-					w["password"] = ti->password;
-					// Expose current text so agents can verify what they typed.
-					// Mask password fields — same instinct as a UI: don't echo
-					// secrets back over the control socket.
-					w["text"] = ti->password ? std::string(strlen(ti->text), '*') : std::string(ti->text);
-					w["maxchars"] = ti->maxchars;
-					break;
-				}
-				case ObjectTypes::SELECTBOX: {
-					SelectBox* sb = (SelectBox*)o;
-					w["kind"] = "selectbox";
-					w["w"] = sb->width; w["h"] = sb->height;
-					w["selected_index"] = sb->selecteditem;
-					w["uid"] = sb->uid;
-					break;
-				}
-				default:
-					w["kind"] = "other";
-					w["object_type"] = o->type;
-					break;
-			}
-			widgets.push_back(std::move(w));
-		}
-		nlohmann::json r;
-		r["widgets"] = widgets;
-		r["interface_id"] = ifid;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
 	if(cmd.op == "world_state"){
 		cmd.reply->set_value(OkResult(cmd.id, game.GetWorldSummary()));
 		return;
 	}
-	if(cmd.op == "click"){
-		std::string target;
-		if(cmd.args.contains("label")) target = cmd.args["label"].get<std::string>();
-		else if(cmd.args.contains("id")) target = std::to_string(cmd.args["id"].get<int>());
-		if(target.empty()){
-			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "click needs label or id"));
-			return;
-		}
-		Uint16 ifid = game.GetCurrentInterfaceId();
-		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(!iface){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
-			return;
-		}
-		Uint64 mask = (1ULL << ObjectTypes::BUTTON) | (1ULL << ObjectTypes::TOGGLE);
-		Uint16 wid = 0;
-		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
-		if(m == Interface::MATCH_NOT_FOUND){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-				"no widget matches \"" + target + "\""));
-			return;
-		}
-		if(m == Interface::MATCH_AMBIGUOUS){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_AMBIGUOUS",
-				"multiple widgets match \"" + target + "\""));
-			return;
-		}
-		Object* o = game.GetWorld().GetObjectFromId(wid);
-		if(o->type == ObjectTypes::BUTTON){
-			Button* b = (Button*)o;
-			b->Activate(); // existing behavior used by the main menu
-			b->clicked = true;
-		} else if(o->type == ObjectTypes::TOGGLE){
-			Toggle* t = (Toggle*)o;
-			t->selected = !t->selected;
-		}
-		nlohmann::json r;
-		r["widget_id"] = wid;
-		cmd.reply->set_value(OkResult(cmd.id, r));
-		return;
-	}
-	if(cmd.op == "set_text"){
-		std::string text = cmd.args.value("text", std::string());
-		Uint16 ifid = game.GetCurrentInterfaceId();
-		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(!iface){ cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface")); return; }
-		// Address either by uid (developer-assigned label inside the iface,
-		// stable across runs) or by the existing label/id path. uid wins when
-		// both are passed.
-		Object* target = nullptr;
-		if(cmd.args.contains("uid")){
-			int uid = cmd.args["uid"].get<int>();
-			target = iface->GetObjectWithUid(game.GetWorld(), (Uint8)uid);
-			if(!target){
-				cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-					"no widget with uid " + std::to_string(uid)));
-				return;
-			}
-		}else{
-			std::string label = cmd.args.value("label", std::string());
-			Uint64 mask = (1ULL << ObjectTypes::TEXTBOX) | (1ULL << ObjectTypes::TEXTINPUT);
-			Uint16 wid = 0;
-			auto m = iface->FindWidgetByLabel(game.GetWorld(), label.c_str(), mask, &wid);
-			if(m != Interface::MATCH_OK){
-				cmd.reply->set_value(Err(cmd.id, m == Interface::MATCH_NOT_FOUND
-					? "WIDGET_NOT_FOUND" : "WIDGET_AMBIGUOUS", label));
-				return;
-			}
-			target = game.GetWorld().GetObjectFromId(wid);
-		}
-		if(target->type == ObjectTypes::TEXTBOX){
-			TextBox* tb = (TextBox*)target;
-			tb->text.clear();
-			tb->AddText(text.c_str());
-		}else if(target->type == ObjectTypes::TEXTINPUT){
-			TextInput* ti = (TextInput*)target;
-			ti->SetText(text.c_str());
-		}else{
-			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
-				"widget is not a textbox or textinput"));
-			return;
-		}
-		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
-		return;
-	}
-
-	if(cmd.op == "select"){
-		std::string target = cmd.args.value("label", std::string());
-		int idx = cmd.args.value("index", -1);
-		std::string text = cmd.args.value("text", std::string());
-		Uint16 ifid = game.GetCurrentInterfaceId();
-		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(!iface){ cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface")); return; }
-		Uint64 mask = (1ULL << ObjectTypes::SELECTBOX);
-		Uint16 wid = 0;
-		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
-		if(m == Interface::MATCH_NOT_FOUND){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-				"no selectbox matches \"" + target + "\""));
-			return;
-		}
-		if(m == Interface::MATCH_AMBIGUOUS){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_AMBIGUOUS",
-				"multiple selectboxes match \"" + target + "\""));
-			return;
-		}
-		SelectBox* sb = (SelectBox*)game.GetWorld().GetObjectFromId(wid);
-		if(idx < 0 && !text.empty()){
-			for(unsigned int i = 0; i < sb->items.size(); ++i){
-				if(sb->items[i] && IEq(sb->items[i], text.c_str())){ idx = (int)i; break; }
-			}
-		}
-		if(idx < 0 || (unsigned)idx >= sb->items.size()){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", "no such item"));
-			return;
-		}
-		sb->selecteditem = idx;
-		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
-		return;
-	}
-
 	if(cmd.op == "back"){
 		bool went = game.GoBack();
 		nlohmann::json r; r["went_back"] = went;
@@ -368,16 +156,9 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "key needs 'ascii' int or 'key' name/char"));
 			return;
 		}
-		Uint16 ifid = game.GetCurrentInterfaceId();
-		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(iface){
-			iface->ProcessKeyPress(game.GetWorld(), (char)ascii);
-			cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
-			return;
-		}
-		// v2 LOBBY has no legacy Interface — arrow keys cycle the v2 nav
-		// cursor across chat / character / right-panel regions. Mirrors
-		// the keyboard branch in events.cpp's SDL_EVENT_KEY_DOWN.
+		// v2 LOBBY — arrow keys cycle the v2 nav cursor across chat /
+		// character / right-panel regions. Mirrors the keyboard branch in
+		// events.cpp's SDL_EVENT_KEY_DOWN.
 		if(game.GetState() == GameState::LOBBY){
 			if(ascii == 1 || ascii == 3){      // LEFT / UP
 				game.LobbyV2NavPrev();
@@ -390,7 +171,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				return;
 			}
 		}
-		cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
+		cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no key handler for current state"));
 		return;
 	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));

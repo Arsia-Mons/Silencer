@@ -5,13 +5,7 @@
 #include <math.h>
 #include "overlay.h"
 #include "interface.h"
-#include "textbox.h"
-#include "textinput.h"
-#include "button.h"
-#include "toggle.h"
 #include "state.h"
-#include "selectbox.h"
-#include "scrollbar.h"
 #include "os.h"
 #include "team.h"
 #include "player.h"
