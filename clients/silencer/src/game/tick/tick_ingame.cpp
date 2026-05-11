@@ -257,8 +257,10 @@ if(/*!world.map.loaded && */stateisnew){
 				}
 			}
 		}
-		// Cycle next (Tab).
-		if(world.localinput.keynextcam && !prevtick.keynextcam){
+		// Move Right cycles to the next player; Move Left to the previous.
+		// Reusing movement bindings means observers don't need a separate
+		// keybind row — the inputs are unused for them otherwise.
+		if(world.localinput.keymoveright && !prevtick.keymoveright){
 			for(int step = 1; step <= (int)world.maxpeers; step++){
 				int i = (world.viewedpeerid + step) % world.maxpeers;
 				Peer * p = world.peerlist[i];
@@ -267,12 +269,10 @@ if(/*!world.map.loaded && */stateisnew){
 				if(p->observer) continue;
 				if(p->controlledlist.empty()) continue;
 				world.viewedpeerid = (Uint8)i;
-				world.spectator.freecam = false;
 				break;
 			}
 		}
-		// Cycle previous (Shift+Tab -> keyprevcam).
-		if(world.localinput.keyprevcam && !prevtick.keyprevcam){
+		if(world.localinput.keymoveleft && !prevtick.keymoveleft){
 			for(int step = 1; step <= (int)world.maxpeers; step++){
 				int i = ((int)world.viewedpeerid - step + (int)world.maxpeers) % world.maxpeers;
 				Peer * p = world.peerlist[i];
@@ -281,62 +281,12 @@ if(/*!world.map.loaded && */stateisnew){
 				if(p->observer) continue;
 				if(p->controlledlist.empty()) continue;
 				world.viewedpeerid = (Uint8)i;
-				world.spectator.freecam = false;
 				break;
 			}
 		}
-		// Free-cam pan (WASD/arrows). Mirror replay's velocity-clamped model.
-		bool moving = world.localinput.keymoveleft || world.localinput.keymoveright
-			|| world.localinput.keymoveup || world.localinput.keymovedown;
-		if(moving){
-			if(!world.spectator.freecam){
-				Player * fp = world.GetPeerPlayer(world.viewedpeerid);
-				if(fp){
-					world.spectator.camx = fp->x;
-					world.spectator.camy = fp->y;
-				} else {
-					world.spectator.camx = world.map.width * 32;
-					world.spectator.camy = world.map.height * 32;
-				}
-				world.spectator.camvx = 0;
-				world.spectator.camvy = 0;
-				world.spectator.freecam = true;
-			}
-			bool inbase = world.spectator.camy > world.map.height * 64;
-			if(world.localinput.keymoveleft){
-				if(world.spectator.camvx > 0) world.spectator.camvx = 0;
-				world.spectator.camvx -= 3;
-				world.spectator.camx += world.spectator.camvx;
-				if(world.spectator.camx < 320) world.spectator.camx = 320;
-			} else if(world.localinput.keymoveright){
-				if(world.spectator.camvx < 0) world.spectator.camvx = 0;
-				world.spectator.camvx += 3;
-				world.spectator.camx += world.spectator.camvx;
-				int xlim = ((inbase ? world.map.expandedwidth : world.map.width) * 64) - 320;
-				if(world.spectator.camx > xlim) world.spectator.camx = xlim;
-			} else {
-				world.spectator.camvx = 0;
-			}
-			if(world.localinput.keymoveup){
-				if(world.spectator.camvy > 0) world.spectator.camvy = 0;
-				world.spectator.camvy -= 3;
-				world.spectator.camy += world.spectator.camvy;
-				if(world.spectator.camy < 240) world.spectator.camy = 240;
-			} else if(world.localinput.keymovedown){
-				if(world.spectator.camvy < 0) world.spectator.camvy = 0;
-				world.spectator.camvy += 3;
-				world.spectator.camy += world.spectator.camvy;
-				int ylim = ((inbase ? world.map.expandedheight : world.map.height) * 64) - 240;
-				if(world.spectator.camy > ylim) world.spectator.camy = ylim;
-			} else {
-				world.spectator.camvy = 0;
-			}
-		} else {
-			world.spectator.camvx = 0;
-			world.spectator.camvy = 0;
-		}
-		// Hold-jump: show all player names.
-		world.spectator.holdshowallnames = world.localinput.keyjump;
+		// Hold Activate to reveal all player names. Free-cam state/renderer
+		// path is preserved but no input drives it.
+		world.spectator.holdshowallnames = world.localinput.keyactivate;
 	}
 	Peer * localpeer = world.peerlist[world.localpeerid];
 	if(localpeer && world.localpeerid != world.authoritypeer){

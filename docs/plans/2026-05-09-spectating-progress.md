@@ -37,11 +37,12 @@ they're complete on branch.
 - [x] **Phase 4 — Spectator controls.** Implemented on branch
   (compile-verified; three-client manual smoke pending).
   Design at [2026-05-10-spectating-phase4.md](2026-05-10-spectating-phase4.md).
-  Scope landed: ESC quit fix (Phase 3 carryover), Tab/Shift-Tab
-  cycle, WASD free-cam, hold-jump name overlay, followed player's
-  HUD rendered as-is. Minimap-click follow dropped from scope
-  (Tab/Shift-Tab is enough). No world-interacting inputs; realtime
-  only.
+  Scope landed: ESC quit fix (Phase 3 carryover), Move Left/Right
+  cycle prev/next player, hold Activate to reveal all player names,
+  followed player's HUD rendered as-is. Free-cam state and renderer
+  branch are preserved but no input is bound (movement keys
+  moonlight as cycle prev/next instead). Minimap-click follow
+  dropped from scope. No world-interacting inputs; realtime only.
 
 ## Phase 3 commits
 
