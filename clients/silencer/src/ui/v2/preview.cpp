@@ -38,6 +38,7 @@
 #include "mission_summary.h"
 #include "update.h"
 #include "lobby_create.h"
+#include "lobby_join.h"
 #include "modals/message.h"
 #include "modals/password.h"
 
@@ -53,6 +54,7 @@
 #include "password_modal.h"
 #include "lobby_screen.h"
 #include "game_create_panel.h"
+#include "game_join_panel.h"
 #include "map_downloader.h"
 #include "mapfetch.h"
 #include "os.h"
@@ -126,6 +128,7 @@ int Game::RunPreview()
 	const int palette_idx = (strcmp(preview_screen, "lobby_connect") == 0 ||
 	                          strcmp(preview_screen, "lobby") == 0 ||
 	                          strcmp(preview_screen, "lobby_create") == 0 ||
+	                          strcmp(preview_screen, "lobby_join") == 0 ||
 	                          strcmp(preview_screen, "update") == 0) ? 2 : 1;
 	if(!renderer.palette.SetPalette(palette_idx)){
 		fprintf(stderr, "[preview] palette %d load failed\n", palette_idx);
@@ -211,6 +214,9 @@ int Game::RunPreview()
 	};
 	lobby_handlers.game_create.on_security_toggle = [](){ printf("[preview] Security clicked\n"); };
 	lobby_handlers.game_create.on_create          = [](){ printf("[preview] Create clicked\n"); };
+	lobby_handlers.game_join.on_ready       = [](){ printf("[preview] Ready clicked\n"); };
+	lobby_handlers.game_join.on_change_team = [](){ printf("[preview] Change Team clicked\n"); };
+	lobby_handlers.game_join.on_choose_tech = [](){ printf("[preview] Choose Tech clicked\n"); };
 
 	// Helper that mirrors GameCreatePanel::Build's legacy map-list
 	// computation (CDResDir + ListFiles, then CDDataDir + ListFiles, then
@@ -746,6 +752,174 @@ int Game::RunPreview()
 				renderer.Draw(&screenbuffer, /*frametime=*/0);
 				gameCreate->Destroy(screenContext);
 				lobbyiface->DestroyInterface(world);
+			}else if(strcmp(preview_screen, "lobby_join") == 0){
+				// Same chrome+character+chat scaffolding as the "lobby" branch,
+				// then instantiates GameJoinPanel. ShowGameJoin (lobby_screen.cpp
+				// 355-363) does NOT touch chatiface->activeobject and does NOT
+				// re-run lobbyiface->ActiveChanged, so the chat caret stays lit
+				// while the join panel is up. Mirror that here by NOT clearing
+				// chatinterface->activeobject after building the panel.
+				renderer.camera.SetPosition(320, 240);
+				::Overlay * background = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				background->res_bank = 7;
+				background->res_index = 1;
+				::Overlay * toptext = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				toptext->text = "Silencer";
+				toptext->textbank = 135;
+				toptext->textwidth = 11;
+				toptext->effectcolor = 152;
+				toptext->x = 15;
+				toptext->y = 32;
+				::Overlay * vertext = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				vertext->text = "v.";
+				vertext->text += world.GetVersion();
+				vertext->textbank = 133;
+				vertext->textwidth = 6;
+				vertext->effectcolor = 189;
+				vertext->x = 115;
+				vertext->y = 39;
+				::Button * exitbutton = static_cast<::Button *>(world.CreateObject(ObjectTypes::BUTTON));
+				exitbutton->y = 29;
+				exitbutton->x = 473;
+				exitbutton->SetType(::Button::B156x21);
+				exitbutton->uid = 10;
+				strcpy(exitbutton->text, "Go Back");
+				::Interface * lobbyiface = static_cast<::Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
+				lobbyiface->AddObject(background->id);
+				lobbyiface->AddObject(toptext->id);
+				lobbyiface->AddObject(vertext->id);
+				lobbyiface->AddObject(exitbutton->id);
+				lobbyiface->buttonescape = exitbutton->id;
+
+				// Character panel — same as the "lobby" branch.
+				::Interface * characterinterface = static_cast<::Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
+				characterinterface->x = 10;
+				characterinterface->y = 64;
+				characterinterface->width = 217;
+				characterinterface->height = 120;
+				::Overlay * usertext = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				usertext->text = world.lobby.GetLocalUsername();
+				usertext->textbank = 134;
+				usertext->textwidth = 8;
+				usertext->effectcolor = 200;
+				usertext->x = 20;
+				usertext->y = 71;
+				const int statX_lj = 17;
+				int statY_lj = 130;
+				::Overlay * statOverlays_lj[4] = {nullptr, nullptr, nullptr, nullptr};
+				for(int i = 0; i < 4; i++){
+					::Overlay * o = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+					o->uid = (Uint8)(2 + i);
+					o->textbank = 133;
+					o->textwidth = 7;
+					o->effectcolor = 129;
+					o->effectbrightness = 128 + 32;
+					o->textcolorramp = true;
+					o->x = statX_lj;
+					o->y = statY_lj;
+					statY_lj += 13;
+					statOverlays_lj[i] = o;
+				}
+				::Toggle * toggles_lj[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+				for(int i = 0; i < 5; i++){
+					::Toggle * t = static_cast<::Toggle *>(world.CreateObject(ObjectTypes::TOGGLE));
+					t->y = 90;
+					t->x = (Sint16)(20 + i * 42);
+					t->res_bank = 181;
+					t->res_index = (Uint8)i;
+					t->uid = (Uint8)(1 + i);
+					t->set = 1;
+					if((Uint8)i == Config::GetInstance().defaultagency){
+						t->selected = true;
+					}
+					toggles_lj[i] = t;
+				}
+				characterinterface->AddObject(usertext->id);
+				for(int i = 0; i < 4; i++) characterinterface->AddObject(statOverlays_lj[i]->id);
+				for(int i = 0; i < 5; i++) characterinterface->AddObject(toggles_lj[i]->id);
+				lobbyiface->AddObject(characterinterface->id);
+
+				// Chat panel — same as the "lobby" branch.
+				::Interface * chatinterface = static_cast<::Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
+				chatinterface->x = 15;
+				chatinterface->y = 216;
+				chatinterface->width = 368;
+				chatinterface->height = 234;
+				::Overlay * chatborder = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				chatborder->res_bank = 7;
+				chatborder->res_index = 11;
+				::Overlay * chatinputborder = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				chatinputborder->res_bank = 7;
+				chatinputborder->res_index = 14;
+				::Overlay * channeltext = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				channeltext->uid = 1;
+				channeltext->textbank = 134;
+				channeltext->textwidth = 8;
+				channeltext->x = 15;
+				channeltext->y = 200;
+				::TextBox * chattextbox = static_cast<::TextBox *>(world.CreateObject(ObjectTypes::TEXTBOX));
+				chattextbox->x = 19;
+				chattextbox->y = 220;
+				chattextbox->width = 242;
+				chattextbox->height = 207;
+				chattextbox->res_bank = 133;
+				chattextbox->lineheight = 11;
+				chattextbox->fontwidth = 6;
+				chattextbox->bottomtotop = true;
+				::TextBox * presencebox = static_cast<::TextBox *>(world.CreateObject(ObjectTypes::TEXTBOX));
+				presencebox->x = 267;
+				presencebox->y = 220;
+				presencebox->width = 110;
+				presencebox->height = 207;
+				presencebox->res_bank = 133;
+				presencebox->lineheight = 11;
+				presencebox->fontwidth = 6;
+				presencebox->bottomtotop = false;
+				presencebox->uid = 9;
+				::TextInput * chatinput = static_cast<::TextInput *>(world.CreateObject(ObjectTypes::TEXTINPUT));
+				chatinput->x = 18;
+				chatinput->y = 437;
+				chatinput->width = 360;
+				chatinput->height = 14;
+				chatinput->res_bank = 133;
+				chatinput->fontwidth = 6;
+				chatinput->maxchars = 200;
+				chatinput->maxwidth = 60;
+				chatinput->uid = 1;
+				::ScrollBar * chatscrollbar = static_cast<::ScrollBar *>(world.CreateObject(ObjectTypes::SCROLLBAR));
+				chatscrollbar->res_index = 12;
+				chatscrollbar->barres_index = 13;
+				chatscrollbar->scrollpixels = chattextbox->lineheight;
+				chatscrollbar->scrollposition = chattextbox->scrolled;
+				chatinterface->AddObject(chatborder->id);
+				chatinterface->AddObject(chatinputborder->id);
+				chatinterface->AddObject(channeltext->id);
+				chatinterface->AddObject(chattextbox->id);
+				chatinterface->AddObject(presencebox->id);
+				chatinterface->AddObject(chatinput->id);
+				chatinterface->AddObject(chatscrollbar->id);
+				chatinterface->AddTabObject(chatinput->id);
+				chatinterface->scrollbar = chatscrollbar->id;
+				lobbyiface->AddObject(chatinterface->id);
+				lobbyiface->activeobject = chatinterface->id;
+				lobbyiface->ActiveChanged(world, lobbyiface, false);
+
+				// Now instantiate GameJoinPanel. ShowGameJoin's legacy path
+				// only builds the panel — it doesn't touch activeobject —
+				// so the chat caret stays lit (driven by the
+				// chatinterface->AddTabObject + ActiveChanged above).
+				auto owner = std::make_unique<LobbyScreen>();
+				auto gameJoin = std::unique_ptr<GameJoinPanel>(new GameJoinPanel(*owner));
+				gameJoin->Build(screenContext, lobbyiface);
+
+				// One TickObjects() settles the B156x21 chrome on its
+				// INACTIVE base. The panel's Tick (which flips Ready ↔
+				// Waiting...) is intentionally NOT called — the legacy Build
+				// seeds "Ready" so the byte-identical target has "Ready".
+				world.TickObjects();
+				renderer.Draw(&screenbuffer, /*frametime=*/0);
+				gameJoin->Destroy(screenContext);
+				lobbyiface->DestroyInterface(world);
 			}else if(strcmp(preview_screen, "update") == 0){
 				// UpdateScreen reaches from MAINMENU which parked the
 				// camera at (320, 240). ResetPresentation(2) in Build only
@@ -874,6 +1048,15 @@ int Game::RunPreview()
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
+			}else if(strcmp(preview_screen, "lobby_join") == 0){
+				if(ctx.state) ctx.state->BeginFrame();
+				ui::v2::LobbyState lobby_state;
+				lobby_state.selected_agency = Config::GetInstance().defaultagency;
+				lobby_state.active_panel = ui::v2::LobbyActivePanel::GameJoin;
+				ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
+				ui::v2::Layout(tree, ctx);
+				ui::v2::Render(tree, ctx, screenbuffer, renderer);
+				if(ctx.state) ctx.state->EndFrame();
 			}else if(strcmp(preview_screen, "mission_summary") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildMissionSummary(ctx, mission_summary_handlers);
@@ -989,6 +1172,13 @@ int Game::RunPreview()
 						lobby_state.selected_agency = Config::GetInstance().defaultagency;
 						lobby_state.active_panel = ui::v2::LobbyActivePanel::GameCreate;
 						lobby_state.game_create = compute_game_create_state();
+						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
+						ui::v2::Layout(tree, ctx);
+						ui::v2::DispatchClick(tree, ctx);
+					}else if(strcmp(preview_screen, "lobby_join") == 0){
+						ui::v2::LobbyState lobby_state;
+						lobby_state.selected_agency = Config::GetInstance().defaultagency;
+						lobby_state.active_panel = ui::v2::LobbyActivePanel::GameJoin;
 						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
