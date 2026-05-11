@@ -134,19 +134,19 @@ void BuildDemoTree() {
 			prim::LabelValueRow(CLAY_STRING("LVR1"),
 			                    CLAY_STRING("Map:"),
 			                    CLAY_STRING("industrial"),
-			                    { .width = 264,
+			                    { .width = 264, .labelWidth = 72,
 			                      .labelEffectColor = 152,
 			                      .valueEffectColor = 156 });
 			prim::LabelValueRow(CLAY_STRING("LVR2"),
 			                    CLAY_STRING("Players:"),
 			                    CLAY_STRING("4 / 16"),
-			                    { .width = 264,
+			                    { .width = 264, .labelWidth = 72,
 			                      .labelEffectColor = 152,
 			                      .valueEffectColor = 156 });
 			prim::LabelValueRow(CLAY_STRING("LVR3"),
 			                    CLAY_STRING("Security:"),
 			                    CLAY_STRING("Normal"),
-			                    { .width = 264,
+			                    { .width = 264, .labelWidth = 72,
 			                      .labelEffectColor = 152,
 			                      .valueEffectColor = 156 });
 		}
@@ -240,7 +240,8 @@ void BuildDemoTree() {
 			                 /*selectedIndex*/ 4,
 			                 /*scrollPosition*/ 2,
 			                 { .width = 200, .height = 130,
-			                   .textEffectColor = 156 },
+			                   .textEffectColor = 156,
+			                   .scrollbarBank = 7 },
 			                 { /*hoveredOut*/ nullptr,
 			                   /*onSelect  */ &NoOpRowSelect,
 			                   /*user      */ nullptr });

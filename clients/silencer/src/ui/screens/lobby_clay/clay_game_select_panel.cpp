@@ -65,6 +65,11 @@ constexpr int    kBtnSpectateY = 408;
 constexpr int    kBtnCreateX   = 242;
 constexpr int    kBtnCreateY   = 68;
 
+// Sprite bank carrying the lobby chrome's scrollbar art (track idx 9, thumb
+// idx 10). Lives at panel scope until the chrome-via-primitives milestone
+// introduces a shared lobby theme.
+constexpr Uint8  kScrollbarBank = 7;
+
 // Per-frame Clay_String slab holding pointers into state.rows[].name. The
 // std::strings are pointer-stable across BuildGameSelectPanelTree's call
 // (no mutations during layout), so the slab can hand out raw c_str()s
@@ -355,8 +360,6 @@ void BuildGameSelectPanelTree(GameSelectPanelState & state,
 	}
 
 	// Games list ScrollList at (407, 89) size 214 x 265, lineheight 14.
-	// Defaults match the legacy SelectBox + ScrollBar (bank 7 idx 9 track /
-	// idx 10 thumb).
 	const int rowCount = static_cast<int>(state.rows.size());
 	const int slotCount = (rowCount < kMaxRows) ? rowCount : kMaxRows;
 	for(int i = 0; i < slotCount; ++i){
@@ -369,6 +372,7 @@ void BuildGameSelectPanelTree(GameSelectPanelState & state,
 	listOpts.lineHeight     = kListLineH;
 	listOpts.highlightColor = 180;
 	listOpts.textVariant    = BankTextVariant::Body;
+	listOpts.scrollbarBank  = kScrollbarBank;
 
 	CLAY({ .id = CLAY_ID("GSelListWrap"),
 	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,

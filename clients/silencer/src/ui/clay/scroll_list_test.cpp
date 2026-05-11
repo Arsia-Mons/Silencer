@@ -70,7 +70,8 @@ bool RunScrollListTest(::Game & game, const char * outPath) {
 			/*scrollPosition=*/3,
 			{ .width = 200,
 			  .height = 130,
-			  .lineHeight = 13 });
+			  .lineHeight = 13,
+			  .scrollbarBank = 7 });
 	}
 
 	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
@@ -118,7 +119,8 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 				kTestItemCount,
 				/*selectedIndex=*/-1,
 				/*scrollPosition=*/3,
-				{ .width = 200, .height = 130, .lineHeight = 13 },
+				{ .width = 200, .height = 130, .lineHeight = 13,
+				  .scrollbarBank = 7 },
 				{ /*hoveredOut=*/nullptr, onSelect, &sink });
 		}
 		::Clay_EndLayout();
@@ -169,7 +171,8 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 				itemCount,
 				/*selectedIndex=*/-1,
 				/*scrollPosition=*/0,
-				{ .width = 200, .height = 130, .lineHeight = 13 });
+				{ .width = 200, .height = 130, .lineHeight = 13,
+				  .scrollbarBank = 7 });
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
 		int n = 0;

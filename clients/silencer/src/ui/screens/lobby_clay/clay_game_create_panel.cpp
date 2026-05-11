@@ -66,6 +66,10 @@ constexpr int    kMapListY     = 89;
 constexpr Uint16 kMapListW     = 214;
 constexpr Uint16 kMapListH     = 265;
 constexpr Uint8  kMapListLineH = 14;
+// Sprite bank carrying the lobby chrome's scrollbar art (track idx 9, thumb
+// idx 10). Lives at panel scope until the chrome-via-primitives milestone
+// introduces a shared lobby theme.
+constexpr Uint8  kScrollbarBank = 7;
 
 constexpr int    kNameInputX = 410, kNameInputY = 375;
 constexpr Uint16 kNameInputW = 210, kNameInputH = 14;
@@ -422,6 +426,7 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 	listOpts.lineHeight     = kMapListLineH;
 	listOpts.highlightColor = 180;
 	listOpts.textVariant    = BankTextVariant::Body;
+	listOpts.scrollbarBank  = kScrollbarBank;
 	CLAY({ .id = CLAY_ID("GCrtMapListWrap"),
 	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kMapListX, kMapListY } } }) {
 		ScrollList(CLAY_STRING("GCrtMapList"),

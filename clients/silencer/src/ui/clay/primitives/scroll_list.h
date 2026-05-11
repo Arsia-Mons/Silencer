@@ -29,16 +29,16 @@ struct ScrollListOpts {
 	Uint8  lineHeight = 13;  // legacy SelectBox::lineheight default.
 
 	// Selection highlight palette index for the row's full-width bar.
-	Uint8  highlightColor = 180;
+	Uint8  highlightColor = 180;  // generic
 
-	// Text style. Defaults match the legacy lobby list (bank 133 width 6 →
-	// BankText Body, no tint). Override per use site as needed.
-	BankTextVariant textVariant     = BankTextVariant::Body;
+	// Text style. Body variant + no tint are the generic BankText defaults;
+	// override per use site as needed.
+	BankTextVariant textVariant     = BankTextVariant::Body;  // generic
 	Uint8           textEffectColor = 0;
 
-	// Scrollbar sprite + sizing. Bank 7 idx 9 (track) + idx 10 (thumb) are
-	// the legacy ScrollBar defaults.
-	Uint8  scrollbarBank        = 7;
+	// Scrollbar sprite + sizing. The primitive has no opinion on which sprite
+	// bank carries the scrollbar art — the caller must spell it.
+	Uint8  scrollbarBank;
 	Uint16 scrollbarTrackIndex  = 9;
 	Uint16 scrollbarThumbIndex  = 10;
 	Uint16 scrollbarWidth       = 8;
