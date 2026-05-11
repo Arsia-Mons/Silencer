@@ -223,6 +223,10 @@ private:
 	// Dispatch a mouse-down event to the v2 MainMenu tree. Called from
 	// events.cpp on SDL_EVENT_MOUSE_BUTTON_DOWN when state == MAINMENU.
 	void DispatchMainMenuV2Click(int logical_x, int logical_y);
+	// Same shape for OPTIONS state. Rendered + dispatched from the
+	// same Loop/events.cpp call sites as MainMenu.
+	bool RenderOptionsV2();
+	void DispatchOptionsV2Click(int logical_x, int logical_y);
 	// Set by GoToState; processed at the next Tick() entry to pop screens
 	// safely after the active screen's Tick has returned. Avoids destroying
 	// a screen mid-Tick when a button click triggers a state transition.

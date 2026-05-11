@@ -42,6 +42,7 @@
 #include "node.h"
 #include "render.h"
 #include "main_menu.h"
+#include "options.h"
 #include <SDL3/SDL_timer.h>
 #include <algorithm>
 #include <stdio.h>
@@ -637,6 +638,8 @@ bool Game::Loop(void){
 			// v2 MainMenu owns the frame: declarative tree → Layout → Render.
 			// Bypasses renderer.Draw entirely (no world objects to walk).
 			RenderMainMenuV2();
+		}else if(state == OPTIONS){
+			RenderOptionsV2();
 		}else{
 			renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
 		}
@@ -890,7 +893,18 @@ bool Game::Tick(void){
 		case OPTIONS:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				PushScreen(std::make_unique<OptionsScreen>());
+				// v2 OptionsScreen — no Interface on the stack, no
+				// PushScreen. Render + click dispatch live in
+				// RenderOptionsV2 / DispatchOptionsV2Click. Palette + camera
+				// inherit from MAINMENU; re-set defensively in case OPTIONS
+				// is entered from a non-MainMenu path.
+				renderer.palette.SetPalette(1);
+				screenbuffer.Clear(0);
+				SetColors(renderer.palette.GetColors());
+				renderer.camera.SetPosition(320, 240);
+				currentinterface = 0;
+				ui_v2_state = ui::v2::UIState{};
+				ui_v2_last_ticks = 0;
 				stateisnew = false;
 			}
 		}break;
@@ -1182,6 +1196,59 @@ bool Game::RenderMainMenuV2(){
 	ui::v2::Render(tree, ctx, screenbuffer, renderer);
 	ui_v2_state.EndFrame();
 	return true;
+}
+
+static ui::v2::OptionsHandlers BuildOptionsHandlers(ScreenContext & sctx){
+	ui::v2::OptionsHandlers h;
+	h.on_controls = [&sctx](){ sctx.GoToState(GameState::OPTIONSCONTROLS); };
+	h.on_display  = [&sctx](){ sctx.GoToState(GameState::OPTIONSDISPLAY); };
+	h.on_audio    = [&sctx](){ sctx.GoToState(GameState::OPTIONSAUDIO); };
+	h.on_go_back  = [&sctx](){ sctx.GoToState(GameState::MAINMENU); };
+	return h;
+}
+
+bool Game::RenderOptionsV2(){
+	Uint64 now = SDL_GetTicks();
+	float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
+	ui_v2_last_ticks = now;
+
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = ui_v2_mouse_x;
+	ctx.mouse_y = ui_v2_mouse_y;
+	ctx.state   = &ui_v2_state;
+	ctx.dt      = dt;
+
+	ui::v2::OptionsHandlers handlers = BuildOptionsHandlers(screenContext);
+	screenbuffer.Clear(0);
+	ui_v2_state.BeginFrame();
+	ui::v2::Node tree = ui::v2::BuildOptions(ctx, handlers);
+	ui::v2::Layout(tree, ctx);
+	ui::v2::Render(tree, ctx, screenbuffer, renderer);
+	ui_v2_state.EndFrame();
+	return true;
+}
+
+void Game::DispatchOptionsV2Click(int logical_x, int logical_y){
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = logical_x;
+	ctx.mouse_y = logical_y;
+	ctx.state   = &ui_v2_state;
+	ui::v2::OptionsHandlers handlers = BuildOptionsHandlers(screenContext);
+	ui::v2::Node tree = ui::v2::BuildOptions(ctx, handlers);
+	ui::v2::Layout(tree, ctx);
+	ui::v2::DispatchClick(tree, ctx);
 }
 
 void Game::DispatchMainMenuV2Click(int logical_x, int logical_y){
