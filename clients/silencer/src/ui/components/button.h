@@ -25,7 +25,6 @@ public:
 	Uint8 textwidth;
 	char text[32];
 	bool clicked;
-	bool textleftalign;
 	Uint16 width;
 	Uint16 height;
 };

@@ -421,7 +421,6 @@ func TestVector_NewGamePush_Encode(t *testing.T) {
 	w.u8(opNewGame)
 	w.u8(1) // status
 	g.Encode(w)
-	w.u8(0) // can_rejoin — trailing per-recipient bit; 0 in the golden vector
 	got := framePayload(w.b)
 	if !bytes.Equal(got, unhex(t, v.Hex)) {
 		t.Errorf("got %x want %s", got, v.Hex)

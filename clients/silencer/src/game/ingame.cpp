@@ -268,17 +268,6 @@ void Game::JoinGame(LobbyGame & lobbygame, char * password){
 	joininggame = true;
 }
 
-void Game::SpectateGame(LobbyGame & lobbygame, char * password){
-	strcpy(world.mapname, lobbygame.mapname);
-	Peer * peer = world.GetAuthorityPeer();
-	peer->ip = ntohl(inet_addr(lobbygame.hostname));
-	peer->port = lobbygame.port;
-	sharedstate = 0;
-	world.mode = World::REPLICA;
-	world.Connect(Config::GetInstance().defaultagency, world.lobby.accountid, password, true);
-	joininggame = true;
-}
-
 void Game::ShowTeamOverlays(bool show){
 	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 		Object * object = *it;

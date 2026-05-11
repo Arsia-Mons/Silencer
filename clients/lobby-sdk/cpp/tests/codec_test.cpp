@@ -276,7 +276,6 @@ static LobbyGame make_test_game() {
     g.max_players     = 24;
     g.max_teams       = 6;
     g.extra           = 0;
-    g.spectatable     = 0;
     g.port            = 5000;
     return g;
 }
@@ -294,13 +293,11 @@ static void test_newgame_push(const std::string& hex) {
     CHECK_EQ(ev.game.map_name,    std::string("TestServ"));
     CHECK_EQ(ev.game.port,        5000);
     CHECK_EQ(ev.game.security_level, SecurityLevel::Medium);
-    CHECK_EQ(ev.can_rejoin,       0);
 
     Writer w;
     w.u8(OpNewGame);
     w.u8(ev.status);
     encode_lobby_game(w, ev.game);
-    w.u8(ev.can_rejoin);
     CHECK_EQ(to_hex(frame(w.bytes())), hex);
 }
 

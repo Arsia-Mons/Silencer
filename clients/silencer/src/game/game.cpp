@@ -1,7 +1,6 @@
 #include "game.h"
 #include "controldispatch.h"
 #include "sdl3gpubackend.h"
-#include "sdlrendererbackend.h"
 #include "tuibackend.h"
 #include <math.h>
 #include "overlay.h"
@@ -341,15 +340,7 @@ bool Game::SetupRenderDevice(void){
 		renderdevice->SetScaleFilter(false);
 		return true;
 	}
-#ifdef __EMSCRIPTEN__
-	// Emscripten path: SDL3 3.4.x has no WebGPU backend for SDL_GPU yet
-	// (see docs/plans/2026-05-10-wasm-spectator.md). Use SDL_Renderer
-	// (WebGL2 in the browser) with CPU palette remap instead. Stage 5+
-	// will revisit if/when an SDL3 WebGPU backend is available.
-	SDLRendererBackend *backend = new SDLRendererBackend();
-#else
 	SDL3GPUBackend *backend = new SDL3GPUBackend();
-#endif
 	if(!backend->Init(window)){
 		delete backend;
 		return false;
@@ -370,15 +361,6 @@ void Game::LoadProgressCallback(int progress, int totalprogressitems){
 	if(world.dedicatedserver.active){
 		return;
 	}
-#ifdef __EMSCRIPTEN__
-	// During Game::Load we are still inside main() — Emscripten's main loop
-	// isn't established until emscripten_set_main_loop_arg fires below in
-	// main.cpp. Calling SDL_RenderPresent here trips SDL3's
-	// emscripten_set_main_loop_timing path and aborts. The JS bootloader's
-	// "Downloading..." spinner already covers the wait; we just no-op.
-	(void)progress; (void)totalprogressitems;
-	return;
-#else
 	HandleSDLEvents();
 	if(SDL_GetTicks() - lasttick >= 100){
 		int width = 500;
@@ -396,7 +378,6 @@ void Game::LoadProgressCallback(int progress, int totalprogressitems){
 		Present();
 		lasttick = SDL_GetTicks();
 	}
-#endif
 }
 
 void Game::SetColors(SDL_Color * colors){
@@ -1056,28 +1037,6 @@ nlohmann::json Game::GetWorldSummary(){
 	nlohmann::json r;
 	r["map"] = world.gameinfo.mapname;
 	r["peers"] = (int)world.peercount;
-	r["localpeerid"] = (int)world.localpeerid;
-	r["viewedpeerid"] = (int)world.viewedpeerid;
-	r["authoritypeer"] = (int)world.authoritypeer;
-	r["lobby_accountid"] = (unsigned int)world.lobby.accountid;
-	r["is_local_observer"] = world.IsLocalObserver();
-	r["spectator_initialized"] = world.spectator.initialized;
-	r["spectator_freecam"] = world.spectator.freecam;
-	nlohmann::json peerlist = nlohmann::json::array();
-	for(unsigned int i = 0; i < world.maxpeers; i++){
-		Peer * p = world.peerlist[i];
-		if(!p) continue;
-		nlohmann::json pj;
-		pj["id"] = i;
-		pj["accountid"] = (unsigned int)p->accountid;
-		pj["observer"] = p->observer;
-		pj["disconnected"] = p->disconnected;
-		nlohmann::json controlled = nlohmann::json::array();
-		for(Uint16 cid : p->controlledlist) controlled.push_back(cid);
-		pj["controlledlist"] = controlled;
-		peerlist.push_back(std::move(pj));
-	}
-	r["peerlist"] = peerlist;
 	nlohmann::json players = nlohmann::json::array();
 	int objcount = 0;
 	for(auto* o : world.objectlist){

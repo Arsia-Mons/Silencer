@@ -1,15 +1,8 @@
 #include "updaterzip.h"
+#include <unzip.h>
 #include <cstdio>
 #include <cstring>
 #include <sys/stat.h>
-#ifdef __EMSCRIPTEN__
-// Browser builds don't ship the updater. Stub so call sites in Updater
-// still link.
-UpdaterZip::Result UpdaterZip::Extract(const std::string &, const std::string &) {
-    return OPEN_FAIL;
-}
-#else
-#include <unzip.h>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -111,5 +104,3 @@ UpdaterZip::Result UpdaterZip::Extract(const std::string &zippath,
     unzClose(zf);
     return OK;
 }
-
-#endif // !__EMSCRIPTEN__

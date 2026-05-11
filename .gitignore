@@ -3,17 +3,14 @@ build-new/
 build-old/
 build-release/
 build-unity/
-build-wasm/
 clients/silencer/build-release/
 clients/silencer/build-unity/
-clients/silencer/build-wasm/
 test-update-host/
 test-updater.*.log
 update.json
 .vcpkg/
 lobby.json
 services/lobby/lobby
-services/lobby/lobby.exe
 services/lobby/silencer-lobby
 services/lobby/silencer-lobby.exe
 services/lobby/silencer-lobby.exe~

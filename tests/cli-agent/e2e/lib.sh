@@ -4,8 +4,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
-# Cross-platform binary detection: macOS uses an .app bundle. On
-# Windows the win-ninja-unity preset writes to build-unity/.
+# Cross-platform binary detection: macOS uses an .app bundle.
 if [ -z "${SILENCER_BIN:-}" ]; then
   if [ -x "$REPO_ROOT/clients/silencer/build/Silencer.app/Contents/MacOS/Silencer" ]; then
     SILENCER_BIN="$REPO_ROOT/clients/silencer/build/Silencer.app/Contents/MacOS/Silencer"
@@ -13,12 +12,8 @@ if [ -z "${SILENCER_BIN:-}" ]; then
     SILENCER_BIN="$REPO_ROOT/clients/silencer/build/silencer"
   elif [ -x "$REPO_ROOT/clients/silencer/build/Silencer.exe" ]; then
     SILENCER_BIN="$REPO_ROOT/clients/silencer/build/Silencer.exe"
-  elif [ -x "$REPO_ROOT/clients/silencer/build-unity/Silencer.exe" ]; then
-    SILENCER_BIN="$REPO_ROOT/clients/silencer/build-unity/Silencer.exe"
-  elif [ -x "$REPO_ROOT/clients/silencer/build-release/Silencer.exe" ]; then
-    SILENCER_BIN="$REPO_ROOT/clients/silencer/build-release/Silencer.exe"
   else
-    echo "no silencer binary found under clients/silencer/build*/" >&2
+    echo "no silencer binary found under clients/silencer/build/" >&2
     exit 1
   fi
 fi

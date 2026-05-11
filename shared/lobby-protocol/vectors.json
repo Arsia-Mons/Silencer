@@ -116,7 +116,7 @@
     {
       "name": "newgame_push",
       "kind": "NewGame",
-      "hex": "4c0301640000000a000000045465737400123132332e3435362e3738392e302c35303030085465737453657276deadbeefdeadbeefdeadbeefdeadbeefdeadbeef020002006318060000881300",
+      "hex": "4a0301640000000a000000045465737400123132332e3435362e3738392e302c35303030085465737453657276deadbeefdeadbeefdeadbeefdeadbeefdeadbeef02000200631806008813",
       "value": {
         "status": 1,
         "game": {
@@ -135,10 +135,8 @@
           "max_players": 24,
           "max_teams": 6,
           "extra": 0,
-          "spectatable": 0,
           "port": 5000
-        },
-        "can_rejoin": 0
+        }
       }
     },
     {

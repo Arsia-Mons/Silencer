@@ -26,10 +26,6 @@ public:
 	Uint8 maxplayers;
 	Uint8 maxteams;
 	Uint8 extra;
-	bool spectatable;
-	// Set from the trailing byte the lobby appends to MSG_NEWGAME (lobby→client
-	// only). Not part of LobbyGame::Serialize — see lobby.cpp MSG_NEWGAME handler.
-	bool canrejoin;
 	bool loaded;
 	bool mapdownloaded;
 	Uint32 createdtime;

@@ -24,7 +24,6 @@ public:
 	char defaultgamename[64];
 	Uint32 defaulttechchoices[5];
 	char active_keybind_profile[64];
-	bool lastspectatable;
 
 private:
 	bool CompareString(const char * str1, const char * str2);

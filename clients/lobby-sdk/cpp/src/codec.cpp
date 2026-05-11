@@ -124,7 +124,6 @@ void encode_lobby_game(Writer& w, const LobbyGame& g) {
     w.u8(g.max_players);
     w.u8(g.max_teams);
     w.u8(g.extra);
-    w.u8(g.spectatable);
     w.u16_le(g.port);
 }
 
@@ -144,7 +143,6 @@ void decode_lobby_game(Reader& r, LobbyGame& g) {
     g.max_players    = r.u8();
     g.max_teams      = r.u8();
     g.extra          = r.u8();
-    g.spectatable    = r.u8();
     g.port           = r.u16_le();
 }
 
@@ -310,10 +308,6 @@ NewGameEvent decode_new_game(Reader& r) {
     NewGameEvent ev;
     ev.status = r.u8();
     decode_lobby_game(r, ev.game);
-    // Per-recipient can-rejoin bit. Older servers omit it; treat absent as 0.
-    if (r.remaining() >= 1) {
-        ev.can_rejoin = r.u8();
-    }
     return ev;
 }
 

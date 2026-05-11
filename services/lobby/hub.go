@@ -19,19 +19,6 @@ type Hub struct {
 	games   map[uint32]*LobbyGame
 	pending map[uint32]*pendingGame
 	clients map[*Client]struct{}
-
-	subMu       sync.Mutex
-	subscribers map[Subscriber]struct{}
-}
-
-// Subscriber receives game-lifecycle deltas from the Hub. The WebSocket
-// spectator facade implements this to re-emit the lobby protocol to
-// browsers (which can't speak the lobby's raw TCP). Callbacks are
-// invoked outside Hub.mu — implementations may block briefly on I/O,
-// but should fan out to long-running work asynchronously.
-type Subscriber interface {
-	OnNewGame(g *LobbyGame)
-	OnDelGame(id uint32)
 }
 
 type pendingGame struct {
@@ -44,74 +31,15 @@ const pendingTimeout = 30 * time.Second
 
 func NewHub(store *Store, motd, publicAddr string, proc *procManager, events *EventPublisher) *Hub {
 	return &Hub{
-		store:       store,
-		motd:        motd,
-		publicAddr:  publicAddr,
-		proc:        proc,
-		events:      events,
-		nextGID:     1,
-		games:       map[uint32]*LobbyGame{},
-		pending:     map[uint32]*pendingGame{},
-		clients:     map[*Client]struct{}{},
-		subscribers: map[Subscriber]struct{}{},
-	}
-}
-
-// AddSubscriber starts delivering NewGame/DelGame deltas to s. The caller
-// must drain the initial state with Snapshot() first — subscribers only
-// see changes from the point of registration.
-func (h *Hub) AddSubscriber(s Subscriber) {
-	h.subMu.Lock()
-	h.subscribers[s] = struct{}{}
-	h.subMu.Unlock()
-}
-
-// RemoveSubscriber stops delivery to s. Safe to call from inside a
-// subscriber callback (mutex re-entry would deadlock — but the broadcast
-// helpers below snapshot the subscriber set first, so callbacks run
-// after the mutex is released).
-func (h *Hub) RemoveSubscriber(s Subscriber) {
-	h.subMu.Lock()
-	delete(h.subscribers, s)
-	h.subMu.Unlock()
-}
-
-// Snapshot returns the currently-live games (copy). Used by the WS
-// facade to send initial state to a newly-connected browser.
-func (h *Hub) Snapshot() []LobbyGame {
-	h.mu.Lock()
-	out := make([]LobbyGame, 0, len(h.games))
-	for _, g := range h.games {
-		out = append(out, *g)
-	}
-	h.mu.Unlock()
-	return out
-}
-
-// MOTD returns the lobby's MOTD string (for inclusion in WS hello).
-func (h *Hub) MOTD() string { return h.motd }
-
-func (h *Hub) broadcastNewGame(g *LobbyGame) {
-	h.subMu.Lock()
-	subs := make([]Subscriber, 0, len(h.subscribers))
-	for s := range h.subscribers {
-		subs = append(subs, s)
-	}
-	h.subMu.Unlock()
-	for _, s := range subs {
-		s.OnNewGame(g)
-	}
-}
-
-func (h *Hub) broadcastDelGame(id uint32) {
-	h.subMu.Lock()
-	subs := make([]Subscriber, 0, len(h.subscribers))
-	for s := range h.subscribers {
-		subs = append(subs, s)
-	}
-	h.subMu.Unlock()
-	for _, s := range subs {
-		s.OnDelGame(id)
+		store:      store,
+		motd:       motd,
+		publicAddr: publicAddr,
+		proc:       proc,
+		events:     events,
+		nextGID:    1,
+		games:      map[uint32]*LobbyGame{},
+		pending:    map[uint32]*pendingGame{},
+		clients:    map[*Client]struct{}{},
 	}
 }
 
@@ -210,7 +138,6 @@ func (h *Hub) Leave(c *Client) {
 		for _, other := range others {
 			other.sendDelGame(id)
 		}
-		h.broadcastDelGame(id)
 	}
 	if leavingAcct != 0 {
 		for _, other := range others {
@@ -250,7 +177,6 @@ func (h *Hub) GameExited(gameID uint32) {
 	for _, c := range clients {
 		c.sendDelGame(gameID)
 	}
-	h.broadcastDelGame(gameID)
 	if h.events != nil {
 		h.events.Publish("game.ended", gameEndedEvent{GameID: gameID, Timestamp: time.Now().UnixMilli()})
 	}
@@ -347,7 +273,6 @@ func (h *Hub) RequestCreateGame(owner *Client, g *LobbyGame) {
 		for _, other := range others {
 			other.sendDelGame(id)
 		}
-		h.broadcastDelGame(id)
 	}
 	if h.events != nil && len(allDrop) > 0 {
 		now := time.Now().UnixMilli()
@@ -393,7 +318,7 @@ func (h *Hub) failPending(gid uint32, reason string) {
 }
 
 // OnHeartbeat is called from the UDP listener when a dedicated server pings.
-func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uint8, parked []uint32) {
+func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uint8) {
 	h.mu.Lock()
 	if pg, ok := h.pending[gameID]; ok {
 		delete(h.pending, gameID)
@@ -407,7 +332,6 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 		pg.game.Hostname = host + "," + itoa(port)
 		pg.game.Port = port
 		pg.game.State = state
-		pg.game.ParkedAccountIDs = parked
 		h.games[gameID] = pg.game
 
 		others := make([]*Client, 0, len(h.clients))
@@ -422,7 +346,6 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 		for _, c := range others {
 			c.sendNewGame(1, pg.game)
 		}
-		h.broadcastNewGame(pg.game)
 		log.Printf("[hub] game %d ready at %s:%d", gameID, host, port)
 		if h.events != nil {
 			h.events.Publish("game.ready", gameReadyEvent{
@@ -440,9 +363,8 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 		log.Printf("[udp] heartbeat for unknown game %d", gameID)
 		return
 	}
-	changed := g.State != state || !uint32SliceEq(g.ParkedAccountIDs, parked)
+	changed := g.State != state
 	g.State = state
-	g.ParkedAccountIDs = parked
 	snapshot := *g
 	peers := make([]*Client, 0, len(h.clients))
 	if changed {
@@ -454,21 +376,6 @@ func (h *Hub) OnHeartbeat(gameID uint32, sourceIP string, port uint16, state uin
 	for _, c := range peers {
 		c.sendNewGame(1, &snapshot)
 	}
-	if changed {
-		h.broadcastNewGame(&snapshot)
-	}
-}
-
-func uint32SliceEq(a, b []uint32) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 // Chat scopes messages to clients in the same channel.
