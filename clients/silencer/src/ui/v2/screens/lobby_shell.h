@@ -2,6 +2,7 @@
 #define SILENCER_UI_V2_SCREENS_LOBBY_SHELL_H
 
 #include "shared.h"
+#include "lobby_create.h"
 
 #include <functional>
 
@@ -13,6 +14,17 @@ struct Context;
 
 struct LobbyHandlers {
 	std::function<void()> on_go_back;
+	GameCreateHandlers game_create;
+};
+
+// Which right-side panel the lobby is currently displaying. Mirrors the
+// legacy LobbyScreen unique_ptr<> swap (gameSelect / gameCreate /
+// gameJoin / gameTech) — `None` is the chrome-only state used by the
+// initial "lobby" preview before any panel ports landed.
+enum class LobbyActivePanel : Uint8 {
+	None,
+	GameCreate,
+	// GameSelect / GameJoin / GameTech land in P14 / P13 / P15.
 };
 
 // Engine-supplied dynamic state for the lobby chrome + embedded panels.
@@ -22,6 +34,11 @@ struct LobbyState {
 	// Currently-selected agency (Team::NOXIS..Team::BLACKROSE = 0..4),
 	// drives which CharacterPanel toggle renders at full brightness.
 	Uint8 selected_agency = 0;
+	// Which right-side panel is currently active (drives which Build
+	// helper gets composed in BuildLobby + whether the chat caret renders).
+	LobbyActivePanel active_panel = LobbyActivePanel::None;
+	// Per-panel state. Only the field matching `active_panel` is read.
+	GameCreateState game_create;
 };
 
 // Lobby chrome plus the character panel. Remaining panels (chat /

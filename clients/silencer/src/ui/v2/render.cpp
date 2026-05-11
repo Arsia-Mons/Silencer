@@ -51,7 +51,7 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 			// reproduce the previous behavior for unstyled Labels).
 			renderer.DrawText(&target, (Uint16)n.x, (Uint16)n.y,
 			                  n.text.c_str(), n.text_bank, n.text_width,
-			                  /*alpha=*/false, n.effect_color, n.effect_brightness,
+			                  n.text_alpha, n.effect_color, n.effect_brightness,
 			                  n.text_color_ramp);
 			break;
 

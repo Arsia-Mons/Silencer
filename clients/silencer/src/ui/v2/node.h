@@ -88,6 +88,12 @@ struct Node {
 	Uint8 effect_color      = 0;
 	Uint8 effect_brightness = 128;
 	bool  text_color_ramp   = false;
+	// Label-only: when true, glyphs blit through `DrawAlphaed` (palette-blend
+	// vs. dst) rather than the default `BlitSurface` (write src directly).
+	// Required to mirror the legacy `Button::DrawText(... alpha=true)` code
+	// path used by chrome-less BNONE buttons (e.g. game_create's "Security:"
+	// row toggle text).
+	bool  text_alpha        = false;
 
 	// Layout output. Set by `layout.cpp` for nodes inside a container
 	// subtree. `rect_w == 0` means "not laid out, fall back to (x, y)
@@ -115,6 +121,7 @@ struct Node {
 	Node & withColor(Uint8 c) { effect_color = c; return *this; }
 	Node & withBrightness(Uint8 b) { effect_brightness = b; return *this; }
 	Node & withRamp(bool r = true) { text_color_ramp = r; return *this; }
+	Node & withAlpha(bool a = true) { text_alpha = a; return *this; }
 };
 
 inline bool IsContainer(NodeKind k) {

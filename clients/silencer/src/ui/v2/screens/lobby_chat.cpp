@@ -6,14 +6,17 @@
 namespace ui {
 namespace v2 {
 
-Node BuildChatPanel(const Context & ctx)
+Node BuildChatPanel(const Context & ctx, bool chat_active)
 {
 	(void)ctx;
-	return Group({
-		Sprite(/*bank=*/7, /*index=*/11).at(0, 0),
-		Sprite(/*bank=*/7, /*index=*/14).at(0, 0),
-		FilledRect(/*w=*/1, /*h=*/11, /*color=*/140).at(18, 436),
-	});
+	std::vector<Node> children;
+	children.reserve(3);
+	children.push_back(Sprite(/*bank=*/7, /*index=*/11).at(0, 0));
+	children.push_back(Sprite(/*bank=*/7, /*index=*/14).at(0, 0));
+	if(chat_active){
+		children.push_back(FilledRect(/*w=*/1, /*h=*/11, /*color=*/140).at(18, 436));
+	}
+	return Group(std::move(children));
 }
 
 }  // namespace v2
