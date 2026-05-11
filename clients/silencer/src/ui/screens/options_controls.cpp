@@ -1,10 +1,9 @@
 #include "options_controls.h"
 
 #include "context.h"
-
 #include "layout.h"
-#include "node.h"
-#include "render.h"
+#include "render_commands.h"
+#include "theme.h"
 
 #include "config.h"
 #include "game.h"
@@ -18,117 +17,184 @@
 #include "surface.h"
 
 #include <cmath>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <string>
 
 namespace ui {
 namespace v2 {
 
-Node BuildOptionsControls(const Context & ctx,
-                          const OptionsControlsHandlers & handlers,
-                          const OptionsControlsState * state)
-{
-	// Title centered at y=14, textbank=135, textwidth=12. Legacy formula:
-	//   x = 320 - (len * textwidth) / 2
-	// "Configure Controls" = 18 chars → x = 320 - 108 = 212.
-	const std::string title = "Configure Controls";
-	const int title_x = 320 - ((int)title.size() * 12) / 2;
+namespace {
 
-	// Preset button's anchor bakes the chrome-offset delta between
-	// B220x33 (sprite index 23) and B112x33 (sprite index 28). Legacy
-	// math:  x = -30 + spriteoffsetx[6][23] - spriteoffsetx[6][28]
-	// — keeps the visible chrome left edge aligned with the row-0 c1
-	// button (which is B112x33 at x=-30). The v2 absolute `.at()` path
-	// applies the same B220x33 offset at render time, so passing the
-	// same anchor reproduces the legacy chrome top-left pixel-exactly.
-	const int preset_x = -30 + ctx.resources.spriteoffsetx[6][23]
-	                         - ctx.resources.spriteoffsetx[6][28];
+// Frame-local string arena. Same shape as main_menu / options_audio —
+// reset at the top of RenderOptionsControls; buffer survives through
+// Clay_EndLayout. Sized larger because this screen materialises ~30
+// strings per frame (5 rows × {keyname, c1, op, c2} plus chrome).
+constexpr size_t kFrameStringBytes = 1024;
+thread_local char   g_frame_strings[kFrameStringBytes];
+thread_local size_t g_frame_off = 0;
 
-	// Per-row factory. slot = i+1 because the preset row occupies slot 0.
-	// Legacy: c1 y = slot*53,        x = -30
-	//         c2 y = slot*53,        x = 120
-	//         keyname/op overlays render no pixels in the static (pre-Tick)
-	//         build state. With `state` we mirror the legacy Tick output:
-	//         keyname Label at (80, 95+slot*53), OR/AND Label centered
-	//         inside the BNONE button rect (40×30 at x=383, y=95+slot*53).
-	auto row = [&](int i) {
-		const int slot = i + 1;
-		const int by = slot * 53;
-		const int y  = 95 + slot * 53;
+Clay_String FrameStr(const char * s) {
+	size_t n = std::strlen(s);
+	if(g_frame_off + n + 1 > kFrameStringBytes) g_frame_off = 0;
+	char * p = &g_frame_strings[g_frame_off];
+	std::memcpy(p, s, n);
+	p[n] = '\0';
+	g_frame_off += n + 1;
+	Clay_String out{};
+	out.length = (int32_t)n;
+	out.chars  = p;
+	return out;
+}
 
-		std::vector<Node> children;
+void OnButtonClick(Clay_ElementId, Clay_PointerData p, intptr_t user) {
+	if(p.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
+	auto * h = reinterpret_cast<const std::function<void()> *>(user);
+	if(h && *h) (*h)();
+}
 
-		if(state && !state->rows[i].keyname.empty()){
-			children.push_back(
-				Label(state->rows[i].keyname, /*font_bank=*/134, /*font_width=*/10)
-					.at(80, (Sint16)y));
+// Per-button rebind closures, kept thread_local so their addresses
+// stay valid across the Runtime::DispatchMouseDown path that fires
+// Clay_SetPointerState *after* Render returns. Rebound at the top of
+// every RenderOptionsControls call so they always see the latest
+// handlers struct.
+thread_local std::function<void()> g_rebind_handlers[5][2];
+
+void TextLabel(Clay_String s, Clay_TextElementConfig cfg) {
+	CLAY({ .layout = { .sizing = { CLAY_SIZING_FIT(), CLAY_SIZING_FIT() } } }) {
+		CLAY_TEXT(s, CLAY_TEXT_CONFIG(cfg));
+	}
+}
+
+void Button(const char * key, const char * label, const std::function<void()> & handler,
+            float width, float height) {
+	Clay_String key_s   = FrameStr(key);
+	Clay_String label_s = FrameStr(label);
+	CLAY({
+		.id = Clay_GetElementId(key_s),
+		.layout = {
+			.sizing = { CLAY_SIZING_FIXED(width), CLAY_SIZING_FIXED(height) },
+			.childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+		},
+		.backgroundColor = Clay_Hovered() ? ::ui::kColorSelectHi : ::ui::kColorScrollbarFill,
+		.cornerRadius    = ::ui::kCornerSmall,
+	}) {
+		Clay_OnHover(OnButtonClick, (intptr_t)&handler);
+		CLAY_TEXT(label_s, CLAY_TEXT_CONFIG(::ui::kFontHeading));
+	}
+}
+
+}  // namespace
+
+void RenderOptionsControls(const Context & ctx,
+                           const OptionsControlsHandlers & h,
+                           const OptionsControlsState & state) {
+	(void)ctx;
+	g_frame_off = 0;
+
+	// Bind per-button rebind closures (10 of them: 5 rows × {primary, secondary}).
+	for(int i = 0; i < 5; i++){
+		for(int s = 0; s < 2; s++){
+			auto fn  = h.on_rebind_key;
+			int  row = i, slot = s;
+			g_rebind_handlers[i][s] = [fn, row, slot](){ if(fn) fn(row, slot); };
+		}
+	}
+
+	CLAY({
+		.id = CLAY_ID("OptionsControlsRoot"),
+		.layout = {
+			.sizing          = { CLAY_SIZING_GROW(), CLAY_SIZING_GROW() },
+			.padding         = CLAY_PADDING_ALL(12),
+			.childGap        = 8,
+			.childAlignment  = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+			.layoutDirection = CLAY_TOP_TO_BOTTOM,
+		},
+		.backgroundColor = ::ui::kColorPanelBg,
+	}) {
+		TextLabel(FrameStr("Configure Controls"), ::ui::kFontTitle);
+
+		// Preset row: "Preset:" label + cycle button.
+		CLAY({
+			.id = CLAY_ID("OptionsControlsPresetRow"),
+			.layout = {
+				.sizing = { CLAY_SIZING_FIT(), CLAY_SIZING_FIT() },
+				.childGap = 8,
+				.childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+				.layoutDirection = CLAY_LEFT_TO_RIGHT,
+			},
+		}) {
+			TextLabel(FrameStr("Preset:"), ::ui::kFontHeading);
+			Button("ctrl_preset",
+			       state.preset_text.empty() ? "(none)" : state.preset_text.c_str(),
+			       h.on_preset, 220, 33);
 		}
 
-		{
-			Node c1 = Button(state ? state->rows[i].c1_text : "", ButtonType::B112x33)
-				.at(-30, (Sint16)by)
-				.withKey("ctrl_c1_" + std::to_string(i));
-			if(handlers.on_rebind_key){
-				auto h = handlers.on_rebind_key;
-				c1.onClick([h, i](){ h(i, 0); });
+		// Five binding rows. Each row: keyname | c1 | OR/AND | c2.
+		for(int i = 0; i < 5; i++){
+			char row_key[24];
+			std::snprintf(row_key, sizeof(row_key), "ctrl_row_%d", i);
+			char c1_key[24];
+			std::snprintf(c1_key, sizeof(c1_key), "ctrl_c1_%d", i);
+			char c2_key[24];
+			std::snprintf(c2_key, sizeof(c2_key), "ctrl_c2_%d", i);
+
+			CLAY({
+				.id = Clay_GetElementId(FrameStr(row_key)),
+				.layout = {
+					.sizing = { CLAY_SIZING_FIT(), CLAY_SIZING_FIT() },
+					.childGap = 8,
+					.childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+					.layoutDirection = CLAY_LEFT_TO_RIGHT,
+				},
+			}) {
+				// Fixed-width keyname column so c1 aligns across rows.
+				CLAY({
+					.layout = {
+						.sizing = { CLAY_SIZING_FIXED(120), CLAY_SIZING_FIXED(33) },
+						.childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+					},
+				}) {
+					if(!state.rows[i].keyname.empty()){
+						CLAY_TEXT(FrameStr(state.rows[i].keyname.c_str()),
+						          CLAY_TEXT_CONFIG(::ui::kFontHeading));
+					}
+				}
+				Button(c1_key, state.rows[i].c1_text.empty() ? "-" : state.rows[i].c1_text.c_str(),
+				       g_rebind_handlers[i][0], 112, 33);
+				// OR/AND column — fixed width keeps c2 column aligned.
+				CLAY({
+					.layout = {
+						.sizing = { CLAY_SIZING_FIXED(40), CLAY_SIZING_FIXED(33) },
+						.childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+					},
+				}) {
+					if(!state.rows[i].op_text.empty()){
+						CLAY_TEXT(FrameStr(state.rows[i].op_text.c_str()),
+						          CLAY_TEXT_CONFIG(::ui::kFontHeading));
+					}
+				}
+				Button(c2_key, state.rows[i].c2_text.empty() ? "-" : state.rows[i].c2_text.c_str(),
+				       g_rebind_handlers[i][1], 112, 33);
 			}
-			children.push_back(std::move(c1));
 		}
 
-		// OR/AND text. BNONE button in legacy: width=40, textwidth=9,
-		// no chrome. xoff = (40 - len*9)/2 centers within the 40px box;
-		// yoff = 0 (BNONE not in Button::GetTextOffset switch).
-		// alpha=true mirrors the legacy Button::DrawText code path so
-		// glyph pixels land identically. Click-to-toggle isn't wired
-		// in this iteration (read-only display).
-		if(state && !state->rows[i].op_text.empty()){
-			const std::string & op = state->rows[i].op_text;
-			int xoff = (40 - (int)op.size() * 9) / 2;
-			children.push_back(
-				Label(op, /*font_bank=*/134, /*font_width=*/9)
-					.at((Sint16)(383 + xoff), (Sint16)y)
-					.withAlpha());
+		// Save / Cancel.
+		CLAY({
+			.id = CLAY_ID("OptionsControlsActions"),
+			.layout = {
+				.sizing = { CLAY_SIZING_FIT(), CLAY_SIZING_FIT() },
+				.padding = { 0, 0, 8, 0 },
+				.childGap = 8,
+				.layoutDirection = CLAY_LEFT_TO_RIGHT,
+			},
+		}) {
+			Button("ctrl_save",   "Save",   h.on_save,   120, 33);
+			Button("ctrl_cancel", "Cancel", h.on_cancel, 120, 33);
 		}
-
-		{
-			Node c2 = Button(state ? state->rows[i].c2_text : "", ButtonType::B112x33)
-				.at(120, (Sint16)by)
-				.withKey("ctrl_c2_" + std::to_string(i));
-			if(handlers.on_rebind_key){
-				auto h = handlers.on_rebind_key;
-				c2.onClick([h, i](){ h(i, 1); });
-			}
-			children.push_back(std::move(c2));
-		}
-
-		return Group(std::move(children));
-	};
-
-	return Background(/*bank=*/6, /*index=*/0, {
-		// Secondary panel sprite (bank 7 frame 7) layered on top of the
-		// base backdrop. Anchor (0,0) matches the legacy Overlay default.
-		Sprite(7, 7),
-
-		Label(title, /*font_bank=*/135, /*font_width=*/12).at((Sint16)title_x, 14),
-
-		// Preset row: static "Preset:" label at the same x/y as binding row
-		// labels, cycle button on the right.
-		Label("Preset:", /*font_bank=*/134, /*font_width=*/10).at(80, 95),
-		Button(state ? state->preset_text : std::string(), ButtonType::B220x33)
-			.at((Sint16)preset_x, 0)
-			.withKey("ctrl_preset")
-			.onClick(handlers.on_preset),
-
-		row(0),
-		row(1),
-		row(2),
-		row(3),
-		row(4),
-
-		Button("Save")  .at(-200, 117).onClick(handlers.on_save),
-		Button("Cancel").at(  20, 117).onClick(handlers.on_cancel),
-	});
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -249,13 +315,6 @@ OptionsControlsState ComputeOptionsControlsLive(ScreenContext & sctx, int active
 	return s;
 }
 
-}  // namespace
-
-OptionsControlsRuntime::OptionsControlsRuntime(World & world, ScreenContext & sctx)
-	: world_(world), sctx_(sctx) {}
-
-namespace {
-
 OptionsControlsHandlers BuildOptionsControlsHandlers(OptionsControlsRuntime * self, ScreenContext & sctx){
 	OptionsControlsHandlers h;
 	h.on_preset = [&sctx](){ CycleKeybindPreset(sctx.keymap); };
@@ -277,6 +336,9 @@ OptionsControlsHandlers BuildOptionsControlsHandlers(OptionsControlsRuntime * se
 }
 
 }  // namespace
+
+OptionsControlsRuntime::OptionsControlsRuntime(World & world, ScreenContext & sctx)
+	: world_(world), sctx_(sctx) {}
 
 void OptionsControlsRuntime::StartRebind(int row, int slot){
 	if(rebind_active_slot_ >= 0) return;
@@ -300,20 +362,20 @@ void OptionsControlsRuntime::Render(Surface & target, ::Renderer & renderer,
 	};
 	ctx.mouse_x = mouse_x;
 	ctx.mouse_y = mouse_y;
-	ctx.state   = &state_;
 	ctx.dt      = dt;
 
-	OptionsControlsHandlers handlers = BuildOptionsControlsHandlers(this, sctx_);
-	OptionsControlsState live = ComputeOptionsControlsLive(sctx_, rebind_active_slot_);
 	target.Clear(0);
-	state_.BeginFrame();
-	Node tree = BuildOptionsControls(ctx, handlers, &live);
-	::ui::v2::EnsureClayContext(ctx);
+
+	EnsureClayContext(ctx);
 	Clay_SetPointerState(Clay_Vector2{ (float)mouse_x, (float)mouse_y }, /*pointer_down=*/false);
 	Clay_UpdateScrollContainers(/*drag=*/false, Clay_Vector2{ 0.0f, 0.0f }, dt);
-	Layout(tree, ctx);
-	::ui::v2::Render(tree, ctx, target, renderer);
-	state_.EndFrame();
+	Clay_SetLayoutDimensions(Clay_Dimensions{ (float)logical_w, (float)logical_h });
+	Clay_BeginLayout();
+	OptionsControlsHandlers handlers = BuildOptionsControlsHandlers(this, sctx_);
+	OptionsControlsState live = ComputeOptionsControlsLive(sctx_, rebind_active_slot_);
+	RenderOptionsControls(ctx, handlers, live);
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	::ui::DrawRenderCommands(cmds, renderer, target, scale);
 }
 
 bool OptionsControlsRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
@@ -332,12 +394,17 @@ bool OptionsControlsRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	};
 	ctx.mouse_x = mouse_x;
 	ctx.mouse_y = mouse_y;
-	ctx.state   = &state_;
+
+	// Re-lay out so OnHover userData points at `handlers` on this stack
+	// frame; SetPointerState walks the just-finalised tree.
+	EnsureClayContext(ctx);
+	Clay_SetLayoutDimensions(Clay_Dimensions{ (float)logical_w, (float)logical_h });
+	Clay_BeginLayout();
 	OptionsControlsHandlers handlers = BuildOptionsControlsHandlers(this, sctx_);
 	OptionsControlsState live = ComputeOptionsControlsLive(sctx_, rebind_active_slot_);
-	Node tree = BuildOptionsControls(ctx, handlers, &live);
-	Layout(tree, ctx);
-	DispatchClicks(tree, ctx);
+	RenderOptionsControls(ctx, handlers, live);
+	(void)Clay_EndLayout();
+	Clay_SetPointerState(Clay_Vector2{ (float)mouse_x, (float)mouse_y }, /*pointer_down=*/true);
 	return true;
 }
 

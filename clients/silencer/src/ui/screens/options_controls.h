@@ -2,7 +2,6 @@
 #define SILENCER_UI_V2_SCREENS_OPTIONS_CONTROLS_H
 
 #include "runtime.h"
-#include "ui_state.h"
 
 #include <SDL3/SDL_gamepad.h>
 #include <SDL3/SDL_stdinc.h>
@@ -17,7 +16,6 @@ class ScreenContext;
 namespace ui {
 namespace v2 {
 
-struct Node;
 struct Context;
 
 // Per-row text feed (computed engine-side from the active KeyMap + the
@@ -46,15 +44,12 @@ struct OptionsControlsHandlers {
 	std::function<void(int row, int slot)> on_rebind_key;
 };
 
-// Returns the declarative tree for the controls-options sub-screen.
-// When `state == nullptr`, mirrors legacy OptionsControlsScreen::Build
-// (pre-Tick) for the byte-identical PPM gate: all per-row text empty,
-// preset button empty, OR/AND overlays omitted. When `state` is supplied
-// (live engine path), per-row keyname / key labels / OR-AND / preset
-// text render through the state struct.
-Node BuildOptionsControls(const Context & ctx,
-                          const OptionsControlsHandlers & handlers = {},
-                          const OptionsControlsState * state = nullptr);
+// Emits the Configure-Controls screen as direct CLAY() blocks. Reads
+// per-row text from `state` (preset label + 5 binding rows); click
+// dispatch goes through Clay_OnHover registered via the helpers.
+void RenderOptionsControls(const Context & ctx,
+                           const OptionsControlsHandlers & handlers,
+                           const OptionsControlsState & state);
 
 // Engine-side runtime for GameState::OPTIONSCONTROLS. Owns the rebind
 // capture state machine (primary / secondary slot, gamepad button +
@@ -80,7 +75,6 @@ public:
 private:
 	World &         world_;
 	ScreenContext & sctx_;
-	UIState         state_;
 
 	// Active rebind slot in legacy uid encoding: row for primary (0..99)
 	// or 100+row for secondary (100..149); -1 = no active capture.

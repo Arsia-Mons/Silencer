@@ -334,11 +334,22 @@ int Game::RunPreview()
 				Clay_RenderCommandArray cmds = Clay_EndLayout();
 				ui::DrawRenderCommands(cmds, renderer, screenbuffer, ctx.scale);
 			}else if(strcmp(preview_screen, "options_controls") == 0){
-				if(ctx.state) ctx.state->BeginFrame();
-				ui::v2::Node tree = ui::v2::BuildOptionsControls(ctx, options_controls_handlers);
-				ui::v2::Layout(tree, ctx);
-				ui::v2::Render(tree, ctx, screenbuffer, renderer);
-				if(ctx.state) ctx.state->EndFrame();
+				ui::v2::OptionsControlsState live;
+				live.preset_text = "default";
+				for(int i = 0; i < 5; i++){
+					live.rows[i].keyname = std::string("Action ") + (char)('1' + i) + ":";
+					live.rows[i].c1_text = "-";
+					live.rows[i].c2_text = "-";
+					live.rows[i].op_text = "OR";
+				}
+				ui::v2::EnsureClayContext(ctx);
+				Clay_SetPointerState(Clay_Vector2{ (float)ctx.mouse_x, (float)ctx.mouse_y }, false);
+				Clay_UpdateScrollContainers(false, Clay_Vector2{ 0.0f, 0.0f }, ctx.dt);
+				Clay_SetLayoutDimensions(Clay_Dimensions{ (float)ctx.logical_w, (float)ctx.logical_h });
+				Clay_BeginLayout();
+				ui::v2::RenderOptionsControls(ctx, options_controls_handlers, live);
+				Clay_RenderCommandArray cmds = Clay_EndLayout();
+				ui::DrawRenderCommands(cmds, renderer, screenbuffer, ctx.scale);
 			}else if(strcmp(preview_screen, "lobby_connect") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildLobbyConnect(ctx, lobby_connect_handlers);
@@ -501,9 +512,20 @@ int Game::RunPreview()
 						(void)Clay_EndLayout();
 						Clay_SetPointerState(Clay_Vector2{ (float)ctx.mouse_x, (float)ctx.mouse_y }, /*pointer_down=*/true);
 					}else if(strcmp(preview_screen, "options_controls") == 0){
-						ui::v2::Node tree = ui::v2::BuildOptionsControls(ctx, options_controls_handlers);
-						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClicks(tree, ctx);
+						ui::v2::OptionsControlsState live;
+						live.preset_text = "default";
+						for(int i = 0; i < 5; i++){
+							live.rows[i].keyname = std::string("Action ") + (char)('1' + i) + ":";
+							live.rows[i].c1_text = "-";
+							live.rows[i].c2_text = "-";
+							live.rows[i].op_text = "OR";
+						}
+						ui::v2::EnsureClayContext(ctx);
+						Clay_SetLayoutDimensions(Clay_Dimensions{ (float)ctx.logical_w, (float)ctx.logical_h });
+						Clay_BeginLayout();
+						ui::v2::RenderOptionsControls(ctx, options_controls_handlers, live);
+						(void)Clay_EndLayout();
+						Clay_SetPointerState(Clay_Vector2{ (float)ctx.mouse_x, (float)ctx.mouse_y }, /*pointer_down=*/true);
 					}else if(strcmp(preview_screen, "lobby_connect") == 0){
 						ui::v2::Node tree = ui::v2::BuildLobbyConnect(ctx, lobby_connect_handlers);
 						ui::v2::Layout(tree, ctx);
