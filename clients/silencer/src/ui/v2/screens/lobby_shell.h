@@ -61,7 +61,21 @@ struct LobbyState {
 	// Truncated to 25 chars by the live engine to mirror the legacy
 	// SetMapNameOverlay clamp.
 	std::string map_name;
+	// Gamepad / keyboard menu-nav cursor. v2 equivalent of the legacy
+	// Interface->activeobject + tabobjects pair. -1 = no focus (default);
+	// 0 = Character, 1 = Chat, 2 = RightPanel (currently active right-side
+	// panel). LobbyV2NavPrev/Next on Game advance/retreat with wrap; first
+	// press lifts -1 to the first/last region. No rendering is keyed off
+	// this — preview PPMs stay byte-identical regardless of cursor state.
+	int nav_cursor = -1;
 };
+
+// nav_cursor value enum. Stored as int on LobbyState to keep the field
+// trivially serialisable into the JSON-lines control "state" op.
+constexpr int kLobbyNavCount       = 3;
+constexpr int kLobbyNavCharacter   = 0;
+constexpr int kLobbyNavChat        = 1;
+constexpr int kLobbyNavRightPanel  = 2;
 
 // Lobby chrome plus the character panel. Remaining panels (chat /
 // right-side game lists) land in P11+ and get composed in here as they

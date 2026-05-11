@@ -61,6 +61,7 @@ public:
 	static const char* StateName(Uint8 s);
 	Uint8 GetState() const { return state; }
 	Uint16 GetCurrentInterfaceId() const { return currentinterface; }
+	const ui::v2::LobbyState* GetLobbyV2State() const;
 	class World& GetWorld() { return world; }
 	nlohmann::json GetWorldSummary();
 	const Surface& GetScreenBuffer() const { return screenbuffer; }
@@ -196,6 +197,14 @@ public:
 	// descoverlay_anchor->clicked branch).
 	void LobbyV2GameTechToggle(int item_index);
 	void LobbyV2GameTechSelect(int item_index);
+	// Gamepad / keyboard menu-nav helpers. Cycle the lobby's nav_cursor
+	// through Character / Chat / RightPanel (-1 = no focus). First press
+	// from -1 lands on the first / last region depending on direction.
+	// Wired into TickGamepadMenuNav (DPad / left-stick), events.cpp's
+	// SDL_EVENT_KEY_DOWN arrow-key branch (when no text input has focus),
+	// and the "key" control op (for CLI smoke tests).
+	void LobbyV2NavPrev();
+	void LobbyV2NavNext();
 
 	// v2 modal stack — overlays the underlying state's render and intercepts
 	// mouse / text input when non-empty. Lobby panels (P16g) and any other

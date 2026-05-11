@@ -1117,11 +1117,14 @@ void Game::TickGamepadMenuNav(){
 	// Only meaningful when a gamepad is connected and a menu interface is open.
 	if(!gamepadstate.connected) return;
 	Interface* iface = (Interface*)world.GetObjectFromId(currentinterface);
-	if(!iface) return;
+	// v2 LOBBY has no legacy Interface — nav_cursor lives on ui_v2_lobby_state.
+	bool v2_lobby = (!iface && state == LOBBY && ui_v2_lobby_state &&
+	                 !LobbyV2ChatActive() && !LobbyV2CreateInputActive());
+	if(!iface && !v2_lobby) return;
 
 	// During rebind-wait (iface->disabled=true) the rebind capture code owns
 	// all gamepad input.  Don't let nav/confirm/cancel fire as side effects.
-	if(iface->disabled) return;
+	if(iface && iface->disabled) return;
 
 	Uint32 now = SDL_GetTicks();
 
@@ -1133,14 +1136,23 @@ void Game::TickGamepadMenuNav(){
 			dir.nextfire = 0;
 			return;
 		}
+		bool fire = false;
 		if(!dir.held){
 			// First frame held — fire immediately.
 			dir.held     = true;
 			dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
-			iface->ProcessKeyPress(world, ascii);
+			fire = true;
 		} else if(now >= dir.nextfire){
 			// Repeat.
 			dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
+			fire = true;
+		}
+		if(!fire) return;
+		if(v2_lobby){
+			// ascii 1/3 = LEFT/UP -> Prev region; 2/4 = RIGHT/DOWN -> Next.
+			if(ascii == 1 || ascii == 3) LobbyV2NavPrev();
+			else if(ascii == 2 || ascii == 4) LobbyV2NavNext();
+		} else {
 			iface->ProcessKeyPress(world, ascii);
 		}
 	};
@@ -1151,8 +1163,10 @@ void Game::TickGamepadMenuNav(){
 	tick(gamepadNavRight, Action::UiRight, 2);
 
 	// Confirm (A/Cross) — no repeat, edge-detect only.
-	// If nothing is focused, auto-focus the first item so the user sees where
-	// they are before committing.
+	// v2 lobby has no per-region click target wired yet (P16g-2..7 wire
+	// region-internal nav); skip confirm here so a stray A button doesn't
+	// no-op-but-look-broken. Legacy iface path is unchanged.
+	if(!iface) return;
 	{
 		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
 		static bool confirmPrev = false;
@@ -2630,6 +2644,30 @@ void Game::TickLobbyV2(){
 			Game * self = this;
 			ShowV2Message("Disconnected from game", [self](){ self->GoBack(); });
 		}
+	}
+}
+
+const ui::v2::LobbyState* Game::GetLobbyV2State() const {
+	return ui_v2_lobby_state.get();
+}
+
+void Game::LobbyV2NavPrev(){
+	if(!ui_v2_lobby_state) return;
+	int & c = ui_v2_lobby_state->nav_cursor;
+	if(c < 0){
+		c = ui::v2::kLobbyNavCount - 1;
+	}else{
+		c = (c + ui::v2::kLobbyNavCount - 1) % ui::v2::kLobbyNavCount;
+	}
+}
+
+void Game::LobbyV2NavNext(){
+	if(!ui_v2_lobby_state) return;
+	int & c = ui_v2_lobby_state->nav_cursor;
+	if(c < 0){
+		c = 0;
+	}else{
+		c = (c + 1) % ui::v2::kLobbyNavCount;
 	}
 }
 

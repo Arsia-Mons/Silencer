@@ -342,6 +342,20 @@ bool Game::HandleSDLEvents(void){
 						default: break;
 					}
 				}
+				// v2 LOBBY tab-nav arrow keys — cycle nav_cursor between
+				// chat / character / right-panel regions. Only fires when
+				// no text input has focus (otherwise arrow keys would steal
+				// from in-input cursor motion).
+				if(state == GameState::LOBBY && !LobbyV2ChatActive() &&
+				   !LobbyV2CreateInputActive()){
+					switch(event.key.scancode){
+						case SDL_SCANCODE_LEFT:
+						case SDL_SCANCODE_UP:    LobbyV2NavPrev(); break;
+						case SDL_SCANCODE_RIGHT:
+						case SDL_SCANCODE_DOWN:  LobbyV2NavNext(); break;
+						default: break;
+					}
+				}
 			}break;
 			case SDL_EVENT_KEY_UP:{
 				OnScancodeUp(event.key.scancode);

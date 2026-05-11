@@ -13,6 +13,7 @@
 #include "gasloader.h"
 #include "os.h"
 #include "shared.h"
+#include "lobby_shell.h"
 #include <cstring>
 #include <cstdio>
 #include <fstream>
@@ -96,6 +97,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			r["lobby_state"] = lobbyStateNames[ls];
 		}else{
 			r["lobby_state"] = "UNKNOWN";
+		}
+		// v2 LOBBY tab-nav cursor (-1 = no focus, 0 = character, 1 = chat,
+		// 2 = right panel). Exposed so CLI smoke tests can verify the
+		// LobbyV2NavPrev/Next plumbing without owning a window.
+		if(game.GetLobbyV2State()){
+			r["lobby_nav_cursor"] = game.GetLobbyV2State()->nav_cursor;
 		}
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
@@ -363,12 +370,27 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}
 		Uint16 ifid = game.GetCurrentInterfaceId();
 		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(!iface){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
+		if(iface){
+			iface->ProcessKeyPress(game.GetWorld(), (char)ascii);
+			cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 			return;
 		}
-		iface->ProcessKeyPress(game.GetWorld(), (char)ascii);
-		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		// v2 LOBBY has no legacy Interface — arrow keys cycle the v2 nav
+		// cursor across chat / character / right-panel regions. Mirrors
+		// the keyboard branch in events.cpp's SDL_EVENT_KEY_DOWN.
+		if(game.GetState() == GameState::LOBBY){
+			if(ascii == 1 || ascii == 3){      // LEFT / UP
+				game.LobbyV2NavPrev();
+				cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+				return;
+			}
+			if(ascii == 2 || ascii == 4){      // RIGHT / DOWN
+				game.LobbyV2NavNext();
+				cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+				return;
+			}
+		}
+		cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
 		return;
 	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));
