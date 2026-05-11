@@ -44,9 +44,11 @@ struct ScrollTextBoxOpts {
 
 	// Optional sprite-rendered scrollbar on the right. When `showScrollbar`
 	// is false, no scrollbar element is emitted and the rows column fills
-	// the full width.
+	// the full width. `scrollbarBank` is the palette/sprite bank that holds
+	// the track + thumb cells — caller-supplied because the primitive owns
+	// no opinion about lobby vs. world vs. demo chrome sources.
 	bool   showScrollbar       = false;
-	Uint8  scrollbarBank       = 7;
+	Uint8  scrollbarBank;
 	Uint16 scrollbarTrackIndex = 9;
 	Uint16 scrollbarThumbIndex = 10;
 	Uint16 scrollbarWidth      = 8;

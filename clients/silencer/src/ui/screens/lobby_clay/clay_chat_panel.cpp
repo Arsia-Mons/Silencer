@@ -49,6 +49,8 @@ constexpr Uint16 kInputH       = 14;
 constexpr Uint16 kChannelX     = 15;
 constexpr Uint16 kChannelY     = 200;
 constexpr Uint8  kChannelBank  = 134;
+// Sprite bank that holds the lobby's scrollbar track/thumb cells.
+constexpr Uint8  kScrollbarBank = 7;
 
 // Per-frame Clay_String / ScrollTextBoxLine slabs. The std::strings owned
 // by ChatPanelState are pointer-stable across this Build call, so we hand
@@ -252,7 +254,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 	chatOpts.textVariant         = BankTextVariant::Body;  // bank 133 w6
 	chatOpts.origin              = ScrollTextBoxOrigin::BottomUp;
 	chatOpts.showScrollbar       = false;
-	chatOpts.scrollbarBank       = 7;
+	chatOpts.scrollbarBank       = kScrollbarBank;
 	chatOpts.scrollbarTrackIndex = 12;
 	chatOpts.scrollbarThumbIndex = 13;
 	chatOpts.scrollbarWidth      = 0;
