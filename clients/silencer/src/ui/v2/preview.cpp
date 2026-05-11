@@ -34,6 +34,7 @@
 #include "options_controls.h"
 #include "lobby_connect.h"
 #include "mission_summary.h"
+#include "update.h"
 
 #include "main_menu_screen.h"
 #include "options_screen.h"
@@ -42,6 +43,7 @@
 #include "options_controls_screen.h"
 #include "lobby_connect_screen.h"
 #include "mission_summary_screen.h"
+#include "update_screen.h"
 #include "renderer.h"
 #include "renderdevice.h"
 #include "resources.h"
@@ -95,7 +97,8 @@ int Game::RunPreview()
 	// Pick the palette the legacy screen would have loaded via
 	// ResetPresentation. lobby_connect uses palette 2; everything else
 	// migrated so far uses palette 1.
-	const int palette_idx = (strcmp(preview_screen, "lobby_connect") == 0) ? 2 : 1;
+	const int palette_idx = (strcmp(preview_screen, "lobby_connect") == 0 ||
+	                          strcmp(preview_screen, "update") == 0) ? 2 : 1;
 	if(!renderer.palette.SetPalette(palette_idx)){
 		fprintf(stderr, "[preview] palette %d load failed\n", palette_idx);
 		return 4;
@@ -176,6 +179,15 @@ int Game::RunPreview()
 	ui::v2::MissionSummaryHandlers mission_summary_handlers;
 	mission_summary_handlers.on_done = [&running](){
 		printf("[preview] Done clicked\n");
+		running = false;
+	};
+
+	ui::v2::UpdateHandlers update_handlers;
+	update_handlers.on_update   = [](){ printf("[preview] Update clicked\n"); };
+	update_handlers.on_retry    = [](){ printf("[preview] Retry clicked\n"); };
+	update_handlers.on_download = [](){ printf("[preview] Download clicked\n"); };
+	update_handlers.on_cancel   = [&running](){
+		printf("[preview] Cancel clicked\n");
 		running = false;
 	};
 
@@ -298,6 +310,23 @@ int Game::RunPreview()
 				world.TickObjects();
 				renderer.Draw(&screenbuffer, /*frametime=*/0);
 				screen->Destroy(screenContext);
+			}else if(strcmp(preview_screen, "update") == 0){
+				// UpdateScreen reaches from MAINMENU which parked the
+				// camera at (320, 240). ResetPresentation(2) in Build only
+				// swaps palette + clears, no camera change. Mirror here.
+				renderer.camera.SetPosition(320, 240);
+				auto screen = std::make_unique<UpdateScreen>();
+				screen->Build(screenContext);
+				// One TickObjects() settles B156x21 chrome res_index on its
+				// INACTIVE base (24). UpdateScreen::Tick — which gates each
+				// button's draw on Updater state — is intentionally NOT
+				// called: at preview gate all four buttons still draw=true,
+				// with three of them stacking at (161, 230) and their text
+				// stamped on top of each other in objectlist order
+				// (Update, Retry, Download).
+				world.TickObjects();
+				renderer.Draw(&screenbuffer, /*frametime=*/0);
+				screen->Destroy(screenContext);
 			}else if(strcmp(preview_screen, "mission_summary") == 0){
 				// MissionSummaryScreen::Build calls ResetPresentation(1) +
 				// SetPosition(320, 240) itself, but mirror here for safety.
@@ -362,6 +391,12 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "mission_summary") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildMissionSummary(ctx, mission_summary_handlers);
+				ui::v2::Layout(tree, ctx);
+				ui::v2::Render(tree, ctx, screenbuffer, renderer);
+				if(ctx.state) ctx.state->EndFrame();
+			}else if(strcmp(preview_screen, "update") == 0){
+				if(ctx.state) ctx.state->BeginFrame();
+				ui::v2::Node tree = ui::v2::BuildUpdate(ctx, update_handlers);
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
@@ -447,6 +482,10 @@ int Game::RunPreview()
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "mission_summary") == 0){
 						ui::v2::Node tree = ui::v2::BuildMissionSummary(ctx, mission_summary_handlers);
+						ui::v2::Layout(tree, ctx);
+						ui::v2::DispatchClick(tree, ctx);
+					}else if(strcmp(preview_screen, "update") == 0){
+						ui::v2::Node tree = ui::v2::BuildUpdate(ctx, update_handlers);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}
