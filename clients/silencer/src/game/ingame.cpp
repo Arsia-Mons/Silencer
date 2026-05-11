@@ -102,12 +102,6 @@ bool Game::CheckForConnectionLost(void){
 	return false;
 }
 
-void Game::ProcessInGameInterfaces(void){
-	// Buy + tech menus have migrated to ui::v2::IngameBuy / IngameTech
-	// (cursor on Player, audio + Submit owned by the overlays).
-	// P20 will delete this entirely along with Player::*interfaceid fields.
-}
-
 void Game::ShowDeployMessage(void){
 	world.ShowMessage((char *)"STANDBY FOR TEAM DEPLOYMENT", 64, 1);
 	deploymessageshown = false;

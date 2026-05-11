@@ -144,22 +144,18 @@ public:
 	bool IsV2ModalActive() const;
 	bool IsV2ProgressModalActive() const;
 
-	// v2 in-game chat input overlay. Replaces the legacy
-	// Player::chatinterfaceid path. Activated when the local player presses
+	// v2 in-game chat input overlay. Activated when the local player presses
 	// the chat key in-game (see Player::Tick); events.cpp routes RETURN /
 	// ESCAPE / TAB / BACKSPACE + TEXT_INPUT to it when active. Render path
 	// lives in Renderer::DrawHUD reading World::ingame_chat_*.
 	ui::v2::IngameChat & IngameChatOverlay();
 
-	// v2 in-game buy menu overlay. Replaces the legacy
-	// Player::buyinterfaceid path (the imperative Interface + SelectBox
-	// Object spawn inside Player::Tick). Editing (UP / DOWN / RETURN)
-	// routes through events.cpp KEY_DOWN; render reads Player::isbuying
-	// + Player::buyifacelastitem / buyifacelastscrolled.
+	// v2 in-game buy menu overlay. Editing (UP / DOWN / RETURN) routes
+	// through events.cpp KEY_DOWN; render reads Player::isbuying +
+	// Player::buyifacelastitem / buyifacelastscrolled.
 	ui::v2::IngameBuy & IngameBuyOverlay();
 
-	// v2 in-game tech menu overlay. Replaces the legacy
-	// Player::techinterfaceid path. Editing routes through events.cpp
+	// v2 in-game tech menu overlay. Editing routes through events.cpp
 	// KEY_DOWN; render reads Player::techstationactive +
 	// Player::techlastitem / techlastscrolled.
 	ui::v2::IngameTech & IngameTechOverlay();
@@ -210,7 +206,6 @@ private:
 	bool CheckForQuit(void);
 	bool CheckForEndOfGame(void);
 	bool CheckForConnectionLost(void);
-	void ProcessInGameInterfaces(void);
 	void ShowDeployMessage(void);
 	void GiveDefaultItems(Player & player);
 	void GoToState(Uint8 newstate);

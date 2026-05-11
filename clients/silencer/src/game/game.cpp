@@ -717,7 +717,6 @@ bool Game::Tick(void){
 		screenStackPendingTeardown = false;
 	}
 	TickActiveScreen();
-	ProcessInGameInterfaces();
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for

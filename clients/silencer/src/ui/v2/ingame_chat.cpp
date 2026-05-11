@@ -13,9 +13,6 @@ IngameChat::IngameChat(World & world)
 void IngameChat::Activate(){
 	world_.ingame_chat_active = true;
 	world_.ingame_chat_text[0] = 0;
-	// Surface the chat scrollback the same way the legacy
-	// chatinterfaceid path implicitly did via the renderer's
-	// `world.showchat_i || player->chatinterfaceid` predicate.
 }
 
 void IngameChat::Cancel(){

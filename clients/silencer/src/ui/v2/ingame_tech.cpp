@@ -80,7 +80,7 @@ void IngameTech::MoveSelection(int delta){
 	if(p->techlastitem < p->techlastscrolled){
 		p->techlastscrolled = p->techlastitem;
 	}
-	// Selection-change audio (legacy ProcessInGameInterfaces).
+	// Selection-change audio.
 	Audio::GetInstance().Play(world_.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
 }
 

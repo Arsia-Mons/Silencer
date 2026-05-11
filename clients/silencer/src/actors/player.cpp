@@ -93,7 +93,6 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	hacksoundchannel = -1;
 	jetpacksoundchannel = -1;
 	flamersoundchannel = -1;
-	chatinterfaceid = 0;
 	wasbuying = false;
 	wastechstationactive = false;
 	chatwithteam = false;
@@ -259,10 +258,6 @@ void Player::Tick(World & world){
 	}
 	if(input.keychat && !world.ingame_chat_active && !isbuying && !techstationactive && this == world.GetPeerPlayer(world.localpeerid)){
 		if(!world.replay.IsPlaying()){
-			// v2 in-game chat overlay (replaces the legacy Interface +
-			// TextInput Object spawn that owned chatinterfaceid). Editing
-			// + Submit/Cancel/Tab handling lives in ui::v2::IngameChat;
-			// events.cpp routes input there when world.ingame_chat_active.
 			world.ingame_chat_active = true;
 			world.ingame_chat_text[0] = 0;
 		}

@@ -69,7 +69,7 @@ void IngameBuy::MoveSelection(int delta){
 	if(p->buyifacelastitem < p->buyifacelastscrolled){
 		p->buyifacelastscrolled = p->buyifacelastitem;
 	}
-	// Selection-change audio (legacy ProcessInGameInterfaces).
+	// Selection-change audio.
 	Audio::GetInstance().Play(world_.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
 }
 
@@ -94,8 +94,7 @@ bool IngameBuy::DispatchKey(int sdl_scancode){
 		default: break;
 	}
 	// Swallow everything else so movement/fire keys don't leak while the
-	// menu is up (mirrors the old `localplayer->buyinterfaceid` input
-	// blanking in events.cpp).
+	// menu is up.
 	return true;
 }
 

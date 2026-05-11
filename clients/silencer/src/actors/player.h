@@ -69,19 +69,16 @@ public:
 	Uint8 suitcolor;
 	bool rumbleFire = false; // set by Fire(); consumed by Game::TickRumble
 	bool rumbleLand = false; // set on landing; consumed by Game::TickRumble
-	Uint16 chatinterfaceid;
 	bool chatwithteam;
 	Sint8 fallingnudge;
 	bool isbuying;
 	// Local-only edge-detect tracker — true when isbuying was true on the
 	// previous Player::Tick. Used to fire IngameBuy::Activate() on the
-	// isbuying false->true edge (replaces the legacy buyinterfaceid==0
-	// guard that gated the one-shot Interface allocation).
+	// isbuying false->true edge.
 	bool wasbuying;
 	bool techstationactive;
 	// Local-only edge-detect tracker for the techstationactive false->true
-	// transition. Mirrors `wasbuying`. Used to fire IngameTech::Activate()
-	// (replaces the legacy techinterfaceid==0 guard).
+	// transition. Mirrors `wasbuying`. Used to fire IngameTech::Activate().
 	bool wastechstationactive;
 	Uint8 inventoryitems[4];
 	Uint8 inventoryitemsnum[4];

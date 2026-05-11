@@ -108,8 +108,7 @@ public:
 	Uint8 quitstate;
 	std::deque<std::string> chatlines;
 	int showchat_i;
-	// In-game chat input overlay. Replaces the legacy Player::chatinterfaceid /
-	// TextInput Object path (ui::v2::IngameChat manages these on the Game side).
+	// In-game chat input overlay state (managed by ui::v2::IngameChat).
 	bool ingame_chat_active;
 	bool ingame_chat_with_team;
 	char ingame_chat_text[101]; // legacy TextInput maxchars=100
