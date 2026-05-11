@@ -195,7 +195,7 @@
       "id": "P20",
       "priority": 20,
       "name": "Final end-to-end regression sweep",
-      "passes": false,
+      "passes": true,
       "spec": "Run the full tests/cli-agent/e2e/ suite. Re-screenshot all 7 lobby states from the Clay build and pixdiff each against its baseline. Confirm all <5%. Document the result in progress.txt. Send a final DM with all 7 (current, Clay) screenshots inline.",
       "pass_check": "All 7 pixdiffs < 5%. tests/cli-agent/e2e/ green. progress.txt has a final summary entry."
     },
