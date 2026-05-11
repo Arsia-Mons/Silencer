@@ -3,42 +3,142 @@
   "id": "guard",
   "rootId": "root",
   "blackboard": [
-    { "key": "patrol",      "type": "bool", "default": true },
-    { "key": "target_seen", "type": "bool", "default": false }
+    { "key": "patrol",           "type": "bool",   "default": true  },
+    { "key": "target_seen",      "type": "bool",   "default": false },
+    { "key": "chasing_id",       "type": "int",    "default": 0     },
+    { "key": "target_in_base",   "type": "bool",   "default": false },
+    { "key": "target_invisible", "type": "bool",   "default": false },
+    { "key": "was_hit",          "type": "bool",   "default": false },
+    { "key": "health_pct",       "type": "float",  "default": 1.0   },
+    { "key": "ladder_shoot_dir", "type": "int",    "default": 6     }
   ],
   "nodes": {
     "root": {
-      "type": "Selector",
+      "type": "Sequence",
       "label": "Guard AI",
-      "children": ["sel_combat", "leaf_uncrouch", "leaf_chase", "leaf_searchreturn", "seq_patrol", "leaf_stand"],
+      "children": ["leaf_alive", "sel_top"],
+      "props": {}
+    },
+
+    "leaf_alive": { "type": "Leaf", "label": "IsAlive?", "children": [], "props": { "action": "IsAlive" } },
+
+    "sel_top": {
+      "type": "Selector",
+      "label": "Top Selector",
+      "children": ["sel_combat", "sel_ladder_combat", "leaf_uncrouch", "sel_engage", "seq_patrol", "leaf_stand"],
       "props": {}
     },
 
     "sel_combat": {
       "type": "Selector",
-      "label": "Combat",
-      "children": ["leaf_look0", "leaf_look1", "leaf_look2", "leaf_look3", "leaf_look4", "leaf_look5"],
+      "label": "Combat (ground)",
+      "children": ["seq_shoot_forward", "seq_shoot_low_crouched", "seq_crouch_and_shoot", "seq_shoot_up", "seq_shoot_down", "seq_shoot_up_angle", "seq_shoot_down_angle"],
       "props": {}
     },
-    "leaf_look0": { "type": "Leaf", "label": "Look(0) forward",    "children": [], "props": { "action": "Look0" } },
-    "leaf_look1": { "type": "Leaf", "label": "Look(1) low forward","children": [], "props": { "action": "Look1" } },
-    "leaf_look2": { "type": "Leaf", "label": "Look(2) up",         "children": [], "props": { "action": "Look2" } },
-    "leaf_look3": { "type": "Leaf", "label": "Look(3) down",       "children": [], "props": { "action": "Look3" } },
-    "leaf_look4": { "type": "Leaf", "label": "Look(4) up-angle",   "children": [], "props": { "action": "Look4" } },
-    "leaf_look5": { "type": "Leaf", "label": "Look(5) down-angle", "children": [], "props": { "action": "Look5" } },
 
-    "leaf_uncrouch":     { "type": "Leaf", "label": "Uncrouch if idle",      "children": [], "props": { "action": "UncrouchIdle"   } },
-    "leaf_chase":        { "type": "Leaf", "label": "Chase target (patrol)", "children": [], "props": { "action": "Chase"           } },
-    "leaf_searchreturn": { "type": "Leaf", "label": "Search then return",    "children": [], "props": { "action": "SearchAndReturn" } },
+    "seq_shoot_forward": {
+      "type": "Sequence",
+      "label": "Shoot forward",
+      "children": ["leaf_can_see_forward", "leaf_shoot_standing"],
+      "props": {}
+    },
+    "leaf_can_see_forward": { "type": "Leaf", "label": "CanSeeForward", "children": [], "props": { "action": "CanSeeForward" } },
+    "leaf_shoot_standing": { "type": "Leaf", "label": "Shoot(0)", "children": [], "props": { "action": "Shoot", "direction": 0 } },
+
+    "seq_shoot_low_crouched": {
+      "type": "Sequence",
+      "label": "Shoot low (already crouched)",
+      "children": ["leaf_can_see_low", "leaf_is_crouched", "leaf_shoot_crouched"],
+      "props": {}
+    },
+    "leaf_can_see_low":    { "type": "Leaf", "label": "CanSeeLow",   "children": [], "props": { "action": "CanSeeLow"   } },
+    "leaf_is_crouched":    { "type": "Leaf", "label": "IsCrouched?", "children": [], "props": { "action": "IsCrouched"  } },
+    "leaf_shoot_crouched": { "type": "Leaf", "label": "Shoot(1)",    "children": [], "props": { "action": "Shoot", "direction": 1 } },
+
+    "seq_crouch_and_shoot": {
+      "type": "Sequence",
+      "label": "Crouch then shoot low",
+      "children": ["leaf_can_see_low2", "leaf_crouch", "leaf_shoot_crouched2"],
+      "props": {}
+    },
+    "leaf_can_see_low2":    { "type": "Leaf", "label": "CanSeeLow",  "children": [], "props": { "action": "CanSeeLow"  } },
+    "leaf_crouch":          { "type": "Leaf", "label": "Crouch",     "children": [], "props": { "action": "Crouch"     } },
+    "leaf_shoot_crouched2": { "type": "Leaf", "label": "Shoot(1)",   "children": [], "props": { "action": "Shoot", "direction": 1 } },
+
+    "seq_shoot_up": {
+      "type": "Sequence",
+      "label": "Shoot up",
+      "children": ["leaf_can_see_up", "leaf_shoot_up"],
+      "props": {}
+    },
+    "leaf_can_see_up": { "type": "Leaf", "label": "CanSeeUp", "children": [], "props": { "action": "CanSeeUp" } },
+    "leaf_shoot_up":   { "type": "Leaf", "label": "Shoot(2)", "children": [], "props": { "action": "Shoot", "direction": 2 } },
+
+    "seq_shoot_down": {
+      "type": "Sequence",
+      "label": "Shoot down",
+      "children": ["leaf_can_see_down", "leaf_shoot_down"],
+      "props": {}
+    },
+    "leaf_can_see_down": { "type": "Leaf", "label": "CanSeeDown", "children": [], "props": { "action": "CanSeeDown" } },
+    "leaf_shoot_down":   { "type": "Leaf", "label": "Shoot(3)",   "children": [], "props": { "action": "Shoot", "direction": 3 } },
+
+    "seq_shoot_up_angle": {
+      "type": "Sequence",
+      "label": "Shoot up-angle",
+      "children": ["leaf_can_see_up_angle", "leaf_shoot_up_angle"],
+      "props": {}
+    },
+    "leaf_can_see_up_angle": { "type": "Leaf", "label": "CanSeeUpAngle", "children": [], "props": { "action": "CanSeeUpAngle" } },
+    "leaf_shoot_up_angle":   { "type": "Leaf", "label": "Shoot(4)",      "children": [], "props": { "action": "Shoot", "direction": 4 } },
+
+    "seq_shoot_down_angle": {
+      "type": "Sequence",
+      "label": "Shoot down-angle",
+      "children": ["leaf_can_see_down_angle", "leaf_shoot_down_angle"],
+      "props": {}
+    },
+    "leaf_can_see_down_angle": { "type": "Leaf", "label": "CanSeeDownAngle", "children": [], "props": { "action": "CanSeeDownAngle" } },
+    "leaf_shoot_down_angle":   { "type": "Leaf", "label": "Shoot(5)",         "children": [], "props": { "action": "Shoot", "direction": 5 } },
+
+    "sel_ladder_combat": {
+      "type": "Sequence",
+      "label": "Shoot from ladder",
+      "children": ["leaf_on_ladder", "leaf_can_shoot_ladder", "leaf_shoot_ladder"],
+      "props": {}
+    },
+    "leaf_on_ladder":         { "type": "Leaf", "label": "IsOnLadder?",      "children": [], "props": { "action": "IsOnLadder"     } },
+    "leaf_can_shoot_ladder":  { "type": "Leaf", "label": "CanShootFromLadder", "children": [], "props": { "action": "CanShootFromLadder" } },
+    "leaf_shoot_ladder":      { "type": "Leaf", "label": "ShootFromLadder",  "children": [], "props": { "action": "ShootFromLadder" } },
+
+    "leaf_uncrouch": { "type": "Leaf", "label": "Uncrouch if idle", "children": [], "props": { "action": "UncrouchIdle" } },
+
+    "sel_engage": {
+      "type": "Selector",
+      "label": "Engage target",
+      "children": ["seq_chase", "leaf_search"],
+      "props": {}
+    },
+    "seq_chase": {
+      "type": "Sequence",
+      "label": "Chase (patrol only)",
+      "children": ["cond_patrol", "leaf_has_target", "leaf_chase"],
+      "props": {}
+    },
+    "cond_patrol":    { "type": "Condition", "label": "patrol?",         "children": [], "props": { "key": "patrol",     "value": true } },
+    "leaf_has_target":{ "type": "Leaf",      "label": "HasChaseTarget?", "children": [], "props": { "action": "HasChaseTarget"        } },
+    "leaf_chase":     { "type": "Leaf",      "label": "Chase",           "children": [], "props": { "action": "Chase"                 } },
+
+    "leaf_search": { "type": "Leaf", "label": "Search then return", "children": [], "props": { "action": "SearchAndReturn" } },
 
     "seq_patrol": {
       "type": "Sequence",
       "label": "Patrol",
-      "children": ["cond_patrol", "leaf_patrol"],
+      "children": ["cond_patrol2", "leaf_patrol"],
       "props": {}
     },
-    "cond_patrol": { "type": "Condition", "label": "patrol?",    "children": [], "props": { "key": "patrol", "value": true } },
-    "leaf_patrol": { "type": "Leaf",      "label": "Patrol walk","children": [], "props": { "action": "Patrol" } },
+    "cond_patrol2": { "type": "Condition", "label": "patrol?",    "children": [], "props": { "key": "patrol", "value": true } },
+    "leaf_patrol":  { "type": "Leaf",      "label": "Patrol walk","children": [], "props": { "action": "Patrol" } },
 
     "leaf_stand": { "type": "Leaf", "label": "Stand", "children": [], "props": { "action": "Stand" } }
   },
