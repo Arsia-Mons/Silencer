@@ -31,11 +31,13 @@
 #include "options.h"
 #include "options_display.h"
 #include "options_audio.h"
+#include "options_controls.h"
 
 #include "main_menu_screen.h"
 #include "options_screen.h"
 #include "options_display_screen.h"
 #include "options_audio_screen.h"
+#include "options_controls_screen.h"
 #include "renderer.h"
 #include "renderdevice.h"
 #include "resources.h"
@@ -153,6 +155,14 @@ int Game::RunPreview()
 		running = false;
 	};
 
+	ui::v2::OptionsControlsHandlers options_controls_handlers;
+	options_controls_handlers.on_preset = [](){ printf("[preview] Preset clicked\n"); };
+	options_controls_handlers.on_save   = [](){ printf("[preview] Save clicked\n"); };
+	options_controls_handlers.on_cancel = [&running](){
+		printf("[preview] Cancel clicked\n");
+		running = false;
+	};
+
 	// `with_state=false` is the dump-PPM path: NULL UIState → render
 	// snaps + dt is ignored, so output stays byte-identical to legacy.
 	auto make_ctx = [&](bool with_state){
@@ -238,6 +248,20 @@ int Game::RunPreview()
 				world.TickObjects();
 				renderer.Draw(&screenbuffer, /*frametime=*/0);
 				screen->Destroy(screenContext);
+			}else if(strcmp(preview_screen, "options_controls") == 0){
+				// Same camera inheritance as the other options sub-screens
+				// — the live engine arrives here from OptionsScreen.
+				renderer.camera.SetPosition(320, 240);
+				auto screen = std::make_unique<OptionsControlsScreen>();
+				screen->Build(screenContext);
+				// One TickObjects() settles B112x33 / B220x33 / B196x33
+				// chrome res_index on INACTIVE base. The legacy screen Tick
+				// (which fills key labels + OR/AND text from keymap) is
+				// intentionally NOT called — empty labels are the
+				// byte-identical target for the v2 build.
+				world.TickObjects();
+				renderer.Draw(&screenbuffer, /*frametime=*/0);
+				screen->Destroy(screenContext);
 			}else{
 				fprintf(stderr, "[preview] unknown screen '%s' for legacy impl\n", preview_screen);
 				return;
@@ -265,6 +289,12 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "options_audio") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildOptionsAudio(ctx, options_audio_handlers);
+				ui::v2::Layout(tree, ctx);
+				ui::v2::Render(tree, ctx, screenbuffer, renderer);
+				if(ctx.state) ctx.state->EndFrame();
+			}else if(strcmp(preview_screen, "options_controls") == 0){
+				if(ctx.state) ctx.state->BeginFrame();
+				ui::v2::Node tree = ui::v2::BuildOptionsControls(ctx, options_controls_handlers);
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
@@ -338,6 +368,10 @@ int Game::RunPreview()
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "options_audio") == 0){
 						ui::v2::Node tree = ui::v2::BuildOptionsAudio(ctx, options_audio_handlers);
+						ui::v2::Layout(tree, ctx);
+						ui::v2::DispatchClick(tree, ctx);
+					}else if(strcmp(preview_screen, "options_controls") == 0){
+						ui::v2::Node tree = ui::v2::BuildOptionsControls(ctx, options_controls_handlers);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}
