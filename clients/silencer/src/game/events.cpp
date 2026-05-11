@@ -386,8 +386,6 @@ bool Game::HandleSDLEvents(void){
 					}
 					if(active_runtime && active_runtime->DispatchMouseDown(lx, ly)){
 						// Runtime consumed the click.
-					}else if(state == GameState::OPTIONSDISPLAY){
-						DispatchOptionsDisplayV2Click(lx, ly);
 					}else if(state == GameState::OPTIONSAUDIO){
 						DispatchOptionsAudioV2Click(lx, ly);
 					}else if(state == GameState::OPTIONSCONTROLS){

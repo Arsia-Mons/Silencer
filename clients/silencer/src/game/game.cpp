@@ -648,8 +648,6 @@ bool Game::Loop(void){
 			float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
 			ui_v2_last_ticks = now;
 			active_runtime->Render(screenbuffer, renderer, ui_v2_mouse_x, ui_v2_mouse_y, dt);
-		}else if(state == OPTIONSDISPLAY){
-			RenderOptionsDisplayV2();
 		}else if(state == OPTIONSAUDIO){
 			RenderOptionsAudioV2();
 		}else if(state == OPTIONSCONTROLS){
@@ -1001,17 +999,14 @@ bool Game::Tick(void){
 		case OPTIONSDISPLAY:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				// v2 OptionsDisplay — no Interface on the stack, no PushScreen.
-				// Render + click dispatch live in RenderOptionsDisplayV2 /
-				// DispatchOptionsDisplayV2Click. Palette + camera mirror the
-				// Options router.
+				// OptionsDisplayRuntime owns the surface. Palette + camera
+				// mirror the Options router.
 				renderer.palette.SetPalette(1);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
 				renderer.camera.SetPosition(320, 240);
 				currentinterface = 0;
-				ui_v2_state = ui::v2::UIState{};
-				ui_v2_last_ticks = 0;
+				SetRuntime(OPTIONSDISPLAY);
 				stateisnew = false;
 			}
 		}break;
@@ -1280,91 +1275,14 @@ void Game::SetRuntime(Uint8 new_state){
 		case OPTIONS:
 			active_runtime = std::make_unique<ui::v2::OptionsRuntime>(world, screenContext);
 			break;
+		case OPTIONSDISPLAY:
+			active_runtime = std::make_unique<ui::v2::OptionsDisplayRuntime>(world, screenContext);
+			break;
 		default:
 			active_runtime.reset();
 			break;
 	}
 	ui_v2_last_ticks = 0;
-}
-
-static ui::v2::OptionsDisplayHandlers BuildOptionsDisplayHandlers(ScreenContext & sctx){
-	ui::v2::OptionsDisplayHandlers h;
-	h.on_toggle_fullscreen = [&sctx](){
-		Config & cfg = Config::GetInstance();
-		cfg.fullscreen = !cfg.fullscreen;
-		if(sctx.window) SDL_SetWindowFullscreen(sctx.window, cfg.fullscreen);
-	};
-	h.on_toggle_smooth_scaling = [&sctx](){
-		Config & cfg = Config::GetInstance();
-		cfg.scalefilter = !cfg.scalefilter;
-		if(sctx.renderdevice) sctx.renderdevice->SetScaleFilter(cfg.scalefilter);
-	};
-	h.on_save = [&sctx](){
-		Config::GetInstance().Save();
-		sctx.GoToState(GameState::OPTIONS);
-	};
-	h.on_cancel = [&sctx](){
-		Config & cfg = Config::GetInstance();
-		cfg.Load();
-		if(sctx.renderdevice) sctx.renderdevice->SetScaleFilter(cfg.scalefilter);
-		if(sctx.window) SDL_SetWindowFullscreen(sctx.window, cfg.fullscreen);
-		sctx.GoToState(GameState::OPTIONS);
-	};
-	return h;
-}
-
-static ui::v2::OptionsDisplayState CurrentOptionsDisplayState(){
-	ui::v2::OptionsDisplayState s;
-	Config & cfg = Config::GetInstance();
-	s.fullscreen  = cfg.fullscreen;
-	s.scalefilter = cfg.scalefilter;
-	return s;
-}
-
-bool Game::RenderOptionsDisplayV2(){
-	Uint64 now = SDL_GetTicks();
-	float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
-	ui_v2_last_ticks = now;
-
-	ui::v2::Context ctx{
-		world.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
-		/*version=*/world.GetVersion(),
-	};
-	ctx.mouse_x = ui_v2_mouse_x;
-	ctx.mouse_y = ui_v2_mouse_y;
-	ctx.state   = &ui_v2_state;
-	ctx.dt      = dt;
-
-	ui::v2::OptionsDisplayHandlers handlers = BuildOptionsDisplayHandlers(screenContext);
-	ui::v2::OptionsDisplayState live = CurrentOptionsDisplayState();
-	screenbuffer.Clear(0);
-	ui_v2_state.BeginFrame();
-	ui::v2::Node tree = ui::v2::BuildOptionsDisplay(ctx, handlers, &live);
-	ui::v2::Layout(tree, ctx);
-	ui::v2::Render(tree, ctx, screenbuffer, renderer);
-	ui_v2_state.EndFrame();
-	return true;
-}
-
-void Game::DispatchOptionsDisplayV2Click(int logical_x, int logical_y){
-	ui::v2::Context ctx{
-		world.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
-		/*version=*/world.GetVersion(),
-	};
-	ctx.mouse_x = logical_x;
-	ctx.mouse_y = logical_y;
-	ctx.state   = &ui_v2_state;
-	ui::v2::OptionsDisplayHandlers handlers = BuildOptionsDisplayHandlers(screenContext);
-	ui::v2::OptionsDisplayState live = CurrentOptionsDisplayState();
-	ui::v2::Node tree = ui::v2::BuildOptionsDisplay(ctx, handlers, &live);
-	ui::v2::Layout(tree, ctx);
-	ui::v2::DispatchClick(tree, ctx);
 }
 
 static ui::v2::OptionsAudioHandlers BuildOptionsAudioHandlers(ScreenContext & sctx){

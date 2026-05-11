@@ -1,7 +1,13 @@
 #ifndef SILENCER_UI_V2_SCREENS_OPTIONS_DISPLAY_H
 #define SILENCER_UI_V2_SCREENS_OPTIONS_DISPLAY_H
 
+#include "runtime.h"
+#include "ui_state.h"
+
 #include <functional>
+
+class World;
+class ScreenContext;
 
 namespace ui {
 namespace v2 {
@@ -39,6 +45,24 @@ struct OptionsDisplayState {
 // is provided, indicator indices mirror the legacy Tick path:
 //   off = state.x ? 12 : 13;   on = state.x ? 15 : 14;
 Node BuildOptionsDisplay(const Context & ctx, const OptionsDisplayHandlers & handlers = {}, const OptionsDisplayState * state = nullptr);
+
+// Engine-side runtime for GameState::OPTIONSDISPLAY. Constructed by
+// Game::SetRuntime on state entry; reads live Config each frame to
+// drive the off/on indicator sprites.
+class OptionsDisplayRuntime : public Runtime
+{
+public:
+	OptionsDisplayRuntime(World & world, ScreenContext & sctx);
+
+	void Render(Surface & target, ::Renderer & renderer,
+	            int mouse_x, int mouse_y, float dt) override;
+	bool DispatchMouseDown(int mouse_x, int mouse_y) override;
+
+private:
+	World &         world_;
+	ScreenContext & sctx_;
+	UIState         state_;
+};
 
 }  // namespace v2
 }  // namespace ui

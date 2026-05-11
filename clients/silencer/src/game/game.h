@@ -338,12 +338,6 @@ private:
 	// Game (states being migrated one at a time).
 	std::unique_ptr<ui::v2::Runtime> active_runtime;
 	void SetRuntime(Uint8 new_state);
-	// Same shape for OPTIONSDISPLAY state. Live state (Config.fullscreen,
-	// Config.scalefilter) is read inside RenderOptionsDisplayV2 and passed
-	// into BuildOptionsDisplay so the off/on indicator sprites reflect the
-	// current toggle state.
-	bool RenderOptionsDisplayV2();
-	void DispatchOptionsDisplayV2Click(int logical_x, int logical_y);
 	// Same shape for OPTIONSAUDIO state. Indicator sprites reflect
 	// Config.music; handlers toggle via Audio::Pause/ResumeMusic.
 	bool RenderOptionsAudioV2();
