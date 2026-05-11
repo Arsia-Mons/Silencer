@@ -30,7 +30,11 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 
 		case NodeKind::Background:
 		case NodeKind::Sprite:
-			renderer.DrawSpriteAt(&target, n.sprite_bank, n.sprite_index, n.x, n.y);
+			// effect_color / effect_brightness apply per the legacy Object
+			// effect path (e.g. CharacterPanel toggles: effect_color=112,
+			// effect_brightness=32 when unselected). Defaults are no-ops.
+			renderer.DrawSpriteAt(&target, n.sprite_bank, n.sprite_index, n.x, n.y,
+			                     n.effect_color, n.effect_brightness);
 			break;
 
 		case NodeKind::FilledRect:

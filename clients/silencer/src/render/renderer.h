@@ -29,8 +29,10 @@ public:
 	// anchor; the asset's baked offset (spriteoffsetx/y) is subtracted to
 	// find the top-left, matching the legacy widget-render math. No camera
 	// offset is applied — callers in menu/UI space are responsible for any
-	// camera adjustment they need.
-	void DrawSpriteAt(Surface * target, Uint8 bank, Uint8 index, Sint16 anchor_x, Sint16 anchor_y);
+	// camera adjustment they need. effectcolor/effectbrightness mirror the
+	// legacy per-Object effect path (EffectColor when effectcolor!=0, then
+	// EffectBrightness when effectbrightness!=128); defaults are no-ops.
+	void DrawSpriteAt(Surface * target, Uint8 bank, Uint8 index, Sint16 anchor_x, Sint16 anchor_y, Uint8 effectcolor = 0, Uint8 effectbrightness = 128);
 	static void DrawFilledRectangle(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color);
 	void DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 bank, Uint8 width, bool alpha = false, Uint8 tint = 0, Uint8 brightness = 128, bool rampcolor = false);
 	void DrawTextInput(Surface * surface, TextInput & textinput);

@@ -49,10 +49,13 @@
 #include "update_screen.h"
 #include "message_modal.h"
 #include "password_modal.h"
+#include "config.h"
 #include "overlay.h"
 #include "button.h"
 #include "interface.h"
 #include "objecttypes.h"
+#include "team.h"
+#include "toggle.h"
 #include "renderer.h"
 #include "renderdevice.h"
 #include "resources.h"
@@ -381,11 +384,68 @@ int Game::RunPreview()
 				lobbyiface->AddObject(vertext->id);
 				lobbyiface->AddObject(exitbutton->id);
 				lobbyiface->buttonescape = exitbutton->id;
+
+				// Character panel chrome — mirrors CharacterPanel::Build in
+				// clients/silencer/src/ui/screens/lobby/panels/character_panel.cpp.
+				// Username header + LEVEL/WINS/LOSSES/XP overlays are created
+				// but stay empty at preview-gate time (filled in by Tick after
+				// a user-info reply lands) so they don't contribute pixels —
+				// included here only so the legacy interface tree matches
+				// reality. The 5 agency Toggles at (20+i*42, 90) DO render.
+				::Interface * characterinterface = static_cast<::Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
+				characterinterface->x = 10;
+				characterinterface->y = 64;
+				characterinterface->width = 217;
+				characterinterface->height = 120;
+				::Overlay * usertext = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				usertext->text = world.lobby.GetLocalUsername();
+				usertext->textbank = 134;
+				usertext->textwidth = 8;
+				usertext->effectcolor = 200;
+				usertext->x = 20;
+				usertext->y = 71;
+				const int statX = 17;
+				int statY = 130;
+				::Overlay * statOverlays[4] = {nullptr, nullptr, nullptr, nullptr};
+				for(int i = 0; i < 4; i++){
+					::Overlay * o = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+					o->uid = (Uint8)(2 + i);
+					o->textbank = 133;
+					o->textwidth = 7;
+					o->effectcolor = 129;
+					o->effectbrightness = 128 + 32;
+					o->textcolorramp = true;
+					o->x = statX;
+					o->y = statY;
+					statY += 13;
+					statOverlays[i] = o;
+				}
+				::Toggle * toggles[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+				for(int i = 0; i < 5; i++){
+					::Toggle * t = static_cast<::Toggle *>(world.CreateObject(ObjectTypes::TOGGLE));
+					t->y = 90;
+					t->x = (Sint16)(20 + i * 42);
+					t->res_bank = 181;
+					t->res_index = (Uint8)i;
+					t->uid = (Uint8)(1 + i);
+					t->set = 1;
+					if((Uint8)i == Config::GetInstance().defaultagency){
+						t->selected = true;
+					}
+					toggles[i] = t;
+				}
+				characterinterface->AddObject(usertext->id);
+				for(int i = 0; i < 4; i++) characterinterface->AddObject(statOverlays[i]->id);
+				for(int i = 0; i < 5; i++) characterinterface->AddObject(toggles[i]->id);
+				lobbyiface->AddObject(characterinterface->id);
+
 				// One TickObjects() settles the B156x21 Go Back chrome on its
-				// INACTIVE base index. LobbyScreen::Tick is intentionally NOT
-				// called — its work (panel dispatch, deferred CreateGame state
-				// machine, disconnect detection) doesn't contribute to chrome
-				// pixels.
+				// INACTIVE base index and runs Toggle::Tick on the 5 agency
+				// toggles (effectcolor=112; brightness=128 for the selected
+				// one, 32 otherwise). LobbyScreen::Tick / CharacterPanel::Tick
+				// are intentionally NOT called — their work (panel dispatch,
+				// agency-change detection, stat-text refresh) doesn't
+				// contribute to chrome pixels at preview gate.
 				world.TickObjects();
 				renderer.Draw(&screenbuffer, /*frametime=*/0);
 				lobbyiface->DestroyInterface(world);
@@ -501,7 +561,9 @@ int Game::RunPreview()
 				if(ctx.state) ctx.state->EndFrame();
 			}else if(strcmp(preview_screen, "lobby") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
-				ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers);
+				ui::v2::LobbyState lobby_state;
+					lobby_state.selected_agency = Config::GetInstance().defaultagency;
+					ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
@@ -610,7 +672,9 @@ int Game::RunPreview()
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby") == 0){
-						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers);
+						ui::v2::LobbyState lobby_state;
+					lobby_state.selected_agency = Config::GetInstance().defaultagency;
+					ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "mission_summary") == 0){
