@@ -17,8 +17,8 @@ concurrency:
 jobs:
   build-lobby-docker:
     if: github.event_name == 'push' || github.event.pull_request.draft == false
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -44,6 +44,7 @@ jobs:
           context: .
           file: services/lobby/Dockerfile
           push: false
+          platforms: linux/arm64
           cache-from: type=gha,scope=lobby
           cache-to: type=gha,scope=lobby,mode=max
 

@@ -47,11 +47,18 @@ jobs:
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    env:
+      SCCACHE_GHA_ENABLED: "true"
     steps:
       - uses: actions/checkout@v4
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.10
       - name: Configure
         working-directory: clients/lobby-sdk/cpp
-        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+        run: |
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
       - name: Build
         working-directory: clients/lobby-sdk/cpp
         run: cmake --build build --parallel

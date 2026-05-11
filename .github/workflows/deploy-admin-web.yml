@@ -62,12 +62,11 @@ jobs:
           cache-to: type=gha,scope=admin-web,mode=max
 
       - name: Tailscale
-        run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-          sudo tailscale up \
-            --authkey='${{ secrets.TS_AUTHKEY }}' \
-            --hostname=gh-runner-${{ github.run_id }} \
-            --advertise-tags=tag:server
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TS_AUTHKEY }}
+          hostname: gh-runner-${{ github.run_id }}
+          args: --advertise-tags=tag:server
 
       - name: Configure SSH
         run: |
@@ -84,10 +83,14 @@ jobs:
           ssh -i ~/.ssh/deploy \
               -o StrictHostKeyChecking=accept-new \
               -o UserKnownHostsFile=~/.ssh/known_hosts \
-              "ubuntu@$HOST" "
-            set -e
-            echo 'IMAGE=$IMAGE_REF' | sudo tee /etc/silencer/admin-web.image > /dev/null
-            sudo systemctl restart silencer-admin-web
-            sleep 5
-            sudo systemctl is-active silencer-admin-web
-          "
+              "ubuntu@$HOST" bash -s "$IMAGE_REF" << 'REMOTE'
+          set -euo pipefail
+          IMAGE_REF="$1"
+          echo "IMAGE=$IMAGE_REF" | sudo tee /etc/silencer/admin-web.image > /dev/null
+          sudo systemctl restart silencer-admin-web
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            sudo systemctl is-active silencer-admin-web && break
+            sleep 3
+          done
+          sudo systemctl is-active silencer-admin-web
+          REMOTE
