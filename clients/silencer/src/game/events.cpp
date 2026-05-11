@@ -217,11 +217,17 @@ bool Game::HandleSDLEvents(void){
 						skip = true;
 					break;
 				}
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					//iface->lastsym = ascii;
-					if(!skip){
-						iface->ProcessKeyPress(world, ascii);
+				if(state == GameState::LOBBYCONNECT){
+					// v2 LobbyConnect — no Interface to route through; the
+					// active field's buffer lives directly on Game.
+					if(!skip) LobbyConnectAppendChar(ascii);
+				}else{
+					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
+					if(iface){
+						//iface->lastsym = ascii;
+						if(!skip){
+							iface->ProcessKeyPress(world, ascii);
+						}
 					}
 				}
 			}break;
@@ -287,6 +293,17 @@ bool Game::HandleSDLEvents(void){
 				if(state == GameState::OPTIONSCONTROLS && controls_rebind_active_slot >= 0){
 					controls_rebind_pending_scancode = (int)event.key.scancode;
 				}
+				// v2 LOBBYCONNECT also has currentinterface=0 — handle
+				// editing scancodes (BACKSPACE, RETURN, ESCAPE, TAB) directly.
+				if(state == GameState::LOBBYCONNECT){
+					switch(event.key.scancode){
+						case SDL_SCANCODE_BACKSPACE: LobbyConnectBackspace(); break;
+						case SDL_SCANCODE_RETURN:    LobbyConnectSubmit();    break;
+						case SDL_SCANCODE_ESCAPE:    LobbyConnectCancel();    break;
+						case SDL_SCANCODE_TAB:       LobbyConnectCycleField(); break;
+						default: break;
+					}
+				}
 			}break;
 			case SDL_EVENT_KEY_UP:{
 				OnScancodeUp(event.key.scancode);
@@ -325,6 +342,8 @@ bool Game::HandleSDLEvents(void){
 						DispatchUpdateV2Click(lx, ly);
 					}else if(state == GameState::MISSIONSUMMARY){
 						DispatchMissionSummaryV2Click(lx, ly);
+					}else if(state == GameState::LOBBYCONNECT){
+						DispatchLobbyConnectV2Click(lx, ly);
 					}else{
 						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 						if(iface){
@@ -335,7 +354,7 @@ bool Game::HandleSDLEvents(void){
 			}break;
 			case SDL_EVENT_MOUSE_BUTTON_UP:{
 				if(event.button.button == SDL_BUTTON_LEFT){
-					if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY){
+					if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY || state == GameState::LOBBYCONNECT){
 						// v2 fires on mouse-down (matches preview); nothing to
 						// do on mouse-up.
 					}else{
@@ -353,7 +372,7 @@ bool Game::HandleSDLEvents(void){
 				SDL_GetWindowSize(window, &w, &h);
 				int lx = (int)((float(event.motion.x) / w) * 640);
 				int ly = (int)((float(event.motion.y) / h) * 480);
-				if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY){
+				if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY || state == GameState::LOBBYCONNECT){
 					// Feed v2 render hover styling. Always update; the v2
 					// render pass reads ui_v2_mouse_{x,y} next frame.
 					ui_v2_mouse_x = lx;
