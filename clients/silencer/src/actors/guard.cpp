@@ -1,4 +1,5 @@
 #include "guard.h"
+#include "pathfinder.h"
 #include "projectile.h"
 #include "bodypart.h"
 #include "player.h"
@@ -227,28 +228,6 @@ void Guard::InitBT(){
 		return BTResult::Running;
 	};
 
-	btctx_.actions["Patrol"] = [this](BTContext& ctx) -> BTResult {
-		World& world = *static_cast<World*>(ctx.userData);
-		if(state == STANDING || state == LOOKING){
-			state = WALKING;
-			state_i = 0;
-		} else if(state == WALKING){
-			// Patrol owns turnaround at chain ends and the walk-duration timeout.
-			// Both used to live in the WALKING state block; the former fought with
-			// SearchAndReturn writing `mirrored` every tick, wedging guards at walls.
-			if(DistanceToEnd(*this, world) <= world.minwalldistance){
-				mirrored = !mirrored;
-			}
-			const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster");
-			const int dur = gd ? gd->walkingDurationTicks : 240;
-			if(state_i >= dur){
-				state = LOOKING;
-				state_i = 0;
-			}
-		}
-		return BTResult::Success;
-	};
-
 	// SearchAndReturn: non-patrol guard that was alerted (chasing set or bt_walk_ticks_ > 0).
 	// Searches for 600 ticks (10s) oriented toward last known target, then walks back to post.
 	btctx_.actions["SearchAndReturn"] = [this](BTContext& ctx) -> BTResult {
@@ -386,6 +365,105 @@ void Guard::InitBT(){
 		}
 		res_bank  = frame->bank;
 		res_index = frame->index;
+		return BTResult::Running;
+	};
+
+	// SetFacing(direction): "left" or "right". One-tick, returns Success.
+	btctx_.actions["SetFacing"] = [this](BTContext& ctx) -> BTResult {
+		std::string dir = ctx.bb<std::string>("direction", "right");
+		mirrored = (dir == "left");
+		return BTResult::Success;
+	};
+
+	// SetVelocity(xv, yv): one-tick impulse. Returns Success immediately.
+	btctx_.actions["SetVelocity"] = [this](BTContext& ctx) -> BTResult {
+		xv = (Sint8)ctx.bb<int>("xv", 0);
+		yv = (Sint8)ctx.bb<int>("yv", 0);
+		return BTResult::Success;
+	};
+
+	// Patrol(direction): drive xv via FollowGround; turn at platform edges.
+	// Returns Running while walking, Success when duration expires.
+	btctx_.actions["Patrol"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+		if(!is_walking){ state = WALKING; state_i = 0; is_walking = true; }
+		if(DistanceToEnd(*this, world) <= world.minwalldistance) mirrored = !mirrored;
+		xv = gd ? (mirrored ? -gd->speed : gd->speed) : (mirrored ? -speed : speed);
+		FollowGround(*this, world, xv);
+		const int dur = gd ? gd->walkingDurationTicks : 240;
+		if(ctx.elapsedTicks() >= dur){ state = LOOKING; state_i = 0; return BTResult::Success; }
+		return BTResult::Running;
+	};
+
+	// MoveTo(target_x, target_y): walk toward a world position via platform BFS.
+	// Returns Running while en route, Success when within threshold, Failure if unreachable.
+	btctx_.actions["MoveTo"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		int tx = ctx.bb<int>("target_x", x);
+		int ty = ctx.bb<int>("target_y", y);
+		const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+		int threshold = gd ? gd->chaseRangeStop : 16;
+		if(abs(x - tx) <= threshold) return BTResult::Success;
+
+		// Recompute path every 60 ticks or when first entering.
+		const std::string pathKey = ctx.current_node_id + "_path_tick";
+		int lastPlan = ctx.bb<int>(pathKey, -999);
+		if(ctx.elapsedTicks() - lastPlan >= 60){
+			ctx.bbSet(pathKey, ctx.elapsedTicks());
+			Platform* curPlat = world.map.platformids.count(currentplatformid) ?
+			    world.map.platformids.at(currentplatformid) : nullptr;
+			Platform* tgtPlat = world.map.TestAABB(tx-4, ty, tx+4, ty+4, Platform::RECTANGLE);
+			if(curPlat && tgtPlat && curPlat->set && tgtPlat->set && curPlat->set != tgtPlat->set){
+				auto path = Pathfinder::FindPath(world, *curPlat->set, *tgtPlat->set, Pathfinder::LadderCanLink);
+				ctx.bbSet(ctx.current_node_id + "_reachable", !path.empty());
+			}
+		}
+		if(!ctx.bb<bool>(ctx.current_node_id + "_reachable", true)) return BTResult::Failure;
+
+		mirrored = (tx < x);
+		Sint8 spd = gd ? gd->speed : speed;
+		xv = mirrored ? -spd : spd;
+		FollowGround(*this, world, xv);
+		state = WALKING; state_i = 0; is_walking = true;
+		return BTResult::Running;
+	};
+
+	// MoveToTarget: like MoveTo but reads target from bb.target_x/bb.target_y.
+	btctx_.actions["MoveToTarget"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!chasing) return BTResult::Failure;
+		Object* obj = world.GetObjectFromId(chasing);
+		if(!obj){ chasing = 0; return BTResult::Failure; }
+		ctx.bbSet("target_x", (int)obj->x);
+		ctx.bbSet("target_y", (int)obj->y);
+		const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+		int stopRange = gd ? gd->chaseRangeStop : 80;
+		if(abs(x - (int)obj->x) <= stopRange) return BTResult::Success;
+		mirrored = (obj->x < x);
+		Sint8 spd = gd ? gd->speed : speed;
+		xv = mirrored ? -spd : spd;
+		FollowGround(*this, world, xv);
+		state = WALKING; state_i = 0; is_walking = true;
+		return BTResult::Running;
+	};
+
+	// ClimbLadder(dir): "up" or "down". Running until off the ladder.
+	btctx_.actions["ClimbLadder"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		std::string dir = ctx.bb<std::string>("direction", "up");
+		Platform* ladder = world.map.TestAABB(x-8, y, x+8, y, Platform::LADDER);
+		if(!ladder){
+			is_on_ladder = false;
+			return BTResult::Success; // off ladder
+		}
+		const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+		Sint8 climbSpeed = gd ? (Sint8)gd->ladderClimbSpeed : 5;
+		Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+		x = center;
+		xv = 0;
+		yv = (dir == "up") ? -climbSpeed : climbSpeed;
+		state = LADDER; is_on_ladder = true;
 		return BTResult::Running;
 	};
 }
