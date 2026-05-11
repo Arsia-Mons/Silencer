@@ -4,6 +4,7 @@
 #include "lobby_screen.h"
 #include "clay_character_panel.h"
 #include "clay_chat_panel.h"
+#include "clay_game_select_panel.h"
 #include <string>
 
 class Surface;
@@ -34,6 +35,12 @@ public:
 	void Draw(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void SetMapNameOverlay(class World & world, const char * name) override;
 
+	// Override: when backing out of create/join/tech, tear those panels
+	// down but DO NOT build a legacy GameSelectPanel — the Clay games-list
+	// surface is always present and just re-appears once the other panels
+	// are gone.
+	void ShowGameSelect(ScreenContext & ctx) override;
+
 	// Wired into the Go Back BankButton's onClick proxy. Sets a flag that
 	// Tick consumes on the next frame, mirroring the legacy chrome scan's
 	// "button->clicked → game.GoBack()" edge-detection timing.
@@ -59,6 +66,11 @@ private:
 	// inherited `chat` member is left unBuilt so its world-object Tick is
 	// a no-op.
 	silencer::ui::lobby_clay::ChatPanelState chatState;
+
+	// GameSelect state — snapshot of the games list + selection + scroll
+	// + per-frame click flags. Replaces the legacy GameSelectPanel member
+	// (still inherited from LobbyScreen but unBuilt under the Clay path).
+	silencer::ui::lobby_clay::GameSelectPanelState gameSelectState;
 };
 
 #endif

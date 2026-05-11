@@ -30,8 +30,11 @@ public:
 	// Right-side panel swap helpers. Called by panels (GameSelectPanel's
 	// "Create Game" button, GameJoinPanel's "Choose Tech", GameTechPanel's
 	// "Back To Teams") and by Game::GoBack when transitioning between
-	// gameselect / gamecreate / gamejoin / gametech.
-	void ShowGameSelect(ScreenContext & ctx);
+	// gameselect / gamecreate / gamejoin / gametech. `ShowGameSelect` is
+	// virtual so LobbyClayScreen can swap to its Clay-emitted games-list
+	// surface (no legacy GameSelectPanel rebuild) when the user backs out
+	// of create/join/tech.
+	virtual void ShowGameSelect(ScreenContext & ctx);
 	void ShowGameCreate(ScreenContext & ctx);
 	void ShowGameJoin(ScreenContext & ctx);
 	void ShowGameTech(ScreenContext & ctx);

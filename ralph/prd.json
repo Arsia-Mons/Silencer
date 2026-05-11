@@ -126,7 +126,7 @@
       "id": "P14",
       "priority": 14,
       "name": "GameSelectPanel in Clay",
-      "passes": false,
+      "passes": true,
       "spec": "Reimplement the games list + selected-game info block + Join/Spectate/Create buttons using ScrollList + BankText + BankButton. Visibility rules for Join vs Spectate buttons preserved exactly. Pixdiff target: <5% vs gameselect.png.",
       "pass_check": "Pixdiff < 5.0% vs baseline. Clicking Create transitions to the create panel. Selecting a game updates the info block.",
       "screenshot": "iter-P14.png",
