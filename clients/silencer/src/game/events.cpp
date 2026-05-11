@@ -309,6 +309,8 @@ bool Game::HandleSDLEvents(void){
 						DispatchMainMenuV2Click(lx, ly);
 					}else if(state == GameState::OPTIONS){
 						DispatchOptionsV2Click(lx, ly);
+					}else if(state == GameState::OPTIONSDISPLAY){
+						DispatchOptionsDisplayV2Click(lx, ly);
 					}else{
 						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 						if(iface){
@@ -319,7 +321,7 @@ bool Game::HandleSDLEvents(void){
 			}break;
 			case SDL_EVENT_MOUSE_BUTTON_UP:{
 				if(event.button.button == SDL_BUTTON_LEFT){
-					if(state == GameState::MAINMENU || state == GameState::OPTIONS){
+					if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY){
 						// v2 fires on mouse-down (matches preview); nothing to
 						// do on mouse-up.
 					}else{
@@ -337,7 +339,7 @@ bool Game::HandleSDLEvents(void){
 				SDL_GetWindowSize(window, &w, &h);
 				int lx = (int)((float(event.motion.x) / w) * 640);
 				int ly = (int)((float(event.motion.y) / h) * 480);
-				if(state == GameState::MAINMENU || state == GameState::OPTIONS){
+				if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY){
 					// Feed v2 render hover styling. Always update; the v2
 					// render pass reads ui_v2_mouse_{x,y} next frame.
 					ui_v2_mouse_x = lx;
