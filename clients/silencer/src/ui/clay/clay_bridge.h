@@ -237,6 +237,26 @@ struct TextInputCheckResult {
 };
 bool RunTextInputCheck(::Game & game, TextInputCheckResult & out);
 
+// P10 FormBorder primitive unit test. Renders a single 1-px-bordered box
+// (color palette idx 220, sized 156x93) into a 640x480 Surface and writes
+// it to `outPath`. Invoked by the `clay_form_border_test` control op.
+// Implementation in form_border_test.cpp.
+bool RunFormBorderTest(::Game & game, const char * outPath);
+
+// P10 LabelValueRow primitive unit test. Renders three label/value rows
+// stacked vertically (matching the legacy gamecreate form rhythm) into a
+// 640x480 Surface and writes it to `outPath`. Invoked by the
+// `clay_label_value_row_test` control op. Implementation in
+// label_value_row_test.cpp.
+bool RunLabelValueRowTest(::Game & game, const char * outPath);
+
+// P10 Panel primitive unit test. Renders one of two variants
+// (RightChrome with bank 7 idx 8 + title, or LeftBare with title only)
+// into a 640x480 Surface and writes it to `outPath`. `variant` is one of
+// "right" or "bare" — any other value selects "right". Invoked by the
+// `clay_panel_test` control op. Implementation in panel_test.cpp.
+bool RunPanelTest(::Game & game, const char * variant, const char * outPath);
+
 }  // namespace silencer::clay_bridge
 
 #endif

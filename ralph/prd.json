@@ -85,7 +85,7 @@
       "id": "P10",
       "priority": 10,
       "name": "FormBorder, LabelValueRow, Panel primitives",
-      "passes": false,
+      "passes": true,
       "spec": "Add three small composition primitives in clients/silencer/src/ui/clay/primitives/. FormBorder({...children}) emits 1-px stroke (palette idx 220) via Clay .border. LabelValueRow({label, value}) emits a LEFT_TO_RIGHT row with label + value column. Panel({title, chromeVariant, ...children}) emits the bank-7 chrome variant or a left-side bare variant. All three: no lobby/world references; variants are enums.",
       "pass_check": "Render tests for each pixdiff < 1.0 vs baselines."
     },

@@ -39,6 +39,9 @@
 - `CLAY_SIDI(label, index)` accepts a `uint32_t` index — use it to derive per-child stable IDs from a parent's dynamic ID (e.g. row IDs in a list). Avoid integer-promotion narrowing warnings by passing `static_cast<uint32_t>(i)` when `i` is `int`.
 - Per-row click adapters: when each child element of a list needs to dispatch through `Clay_OnHover` with a row index, allocate one `RowAdapter{fn, user, index}` per row from a per-frame bump arena (`kAdapterCapacity = 1024` covers a 30-item list comfortably). The proxy reinterprets the captured `intptr_t` back to `RowAdapter*` and forwards `(user, index)` to the user's callback.
 - Bridge ScrollBar dispatch ports `renderer.cpp:858-933` 3-slice track + thumb rendering into the `CustomKind::ScrollBar` branch. Uses `Renderer::GetPixel`/`SetPixel` for per-pixel track tiling (preserves transparent palette idx 0); thumb is `BlitSurface`d (no per-pixel work). Per-pixel writes are NOT routed through `ClipDrawRect` — instead they consult the active clip rect inline (`inClip` lambda) so per-pixel clipping is correct even with `SCISSOR_START` open. `BlitSurface`'s own clamp covers the thumb path.
+- Composition primitives don't always need an emit function — `FormBorder()` is a header-only inline returning `Clay_BorderElementConfig{ .color = {220,0,0,255}, .width = {1,1,1,1,0} }`. Callers drop it into `.border = FormBorder()` on any CLAY block. This pattern (helper returning a config struct) is cleaner than wrapping with a callback when the primitive's job is purely "supply a style fragment". Use it for any future palette/stroke/sizing presets.
+- A panel/container primitive can paint its background sprite via `.image = PackImage(bank, idx)` on the same CLAY element that has children — Clay's IMAGE render command for the parent fires before children render, so children overlay the chrome. No `.floating` gymnastics needed. The image blit at the bbox top-left uses the sprite's natural size, so size the parent CLAY block to match the sprite's dimensions (legacy bank 7 idx 8 = 222 × 390).
+- `Clay_String` default-construct in a designated initializer is `{ false, 0, nullptr }` (isStaticallyAllocated, length, chars). Use it as the "no value" sentinel for optional `Clay_String` opts fields, then test `opts.field.length > 0` at call time.
 
 ## 2026-05-11T00:00:00Z - bootstrap
 - Ralph artifacts created (ralph.sh, RALPH.md, prd.json, progress.txt).
@@ -316,4 +319,36 @@
   - Per-frame mask-buffer slab pattern: for any primitive that needs to compute a derived string (password mask, formatted number, truncation ellipsis), allocate a fixed-size `char[N]` from a per-frame slab keyed by call order rather than `malloc`-ing inline. 16 slots × 256 chars is plenty for any realistic screen.
   - `numbersOnly` is intentionally NOT used by the primitive's rendering — it's screen-side input-filter policy (which keys to accept in SDL_TEXTINPUT). Documented in the opts struct as a hint; not a violation of "no flags that aren't used", because it's part of the primitive's public contract for the screen's benefit. The legacy `TextInput` widget enforced it in `ProcessKeyPress`, but that's an SDL-routing decision that doesn't belong in the Clay primitive layer.
   - `inactive`+brightness handling: matches legacy's behavior of overriding effectbrightness to 64 when inactive. The primitive resolves this internally (not the caller) because `inactive=true` ALSO suppresses the caret — keeping these two policies co-located avoids the caller forgetting one.
+---
+
+
+## 2026-05-11T15:30:00Z - P10 (FormBorder, LabelValueRow, Panel primitives) — COMPLETE
+- Added three composition primitives in `clients/silencer/src/ui/clay/primitives/`:
+  - `form_border.h` — header-only inline `FormBorder(paletteColor=220)` returning a `Clay_BorderElementConfig` with 1-px width on all sides. Drop into `.border = FormBorder()`.
+  - `label_value_row.{h,cpp}` — `LabelValueRow(id, label, value, opts)` emits a self-contained LTR row CLAY block sized `opts.width × opts.height`, with a fixed-width label column + remainder-width value column. Both columns wrap a `BankText` at `opts.variant`. Reuses `BankTextBeginFrame`'s arena; no own allocations.
+  - `panel.{h,cpp}` — `Panel(id, variant, opts)` emits one sized CLAY block. RightChrome variant sets `.image = PackImage(opts.chromeBank, opts.chromeIndex)` (default bank 7 idx 8); LeftBare emits no image. Optional `opts.title` adds a BankText child overlaid on top of the chrome IMAGE render command.
+- All three primitives include ONLY `clay/clay.h`, `shared.h`, and `primitives/bank_text.h` / `clay_bridge.h` for ABI. Zero references to `world.h`, `lobby.h`, `config.h`, `MapDownloader`, or any other domain header (verified by grep).
+- Variants are explicit enums (`PanelVariant::{LeftBare, RightChrome}`); FormBorder has no variants (one shape); LabelValueRow uses the existing `BankTextVariant` enum for text styling.
+- Bridge unchanged — no new `CustomKind` needed. FormBorder rides Clay's BORDER render path. Panel rides the IMAGE path (already dispatched). LabelValueRow is pure layout + bank-text.
+- Test scenes:
+  - `clay_form_border_test --out <path>` (IMMEDIATE) renders a 156x93 bordered box at root padding (243, 87) — the legacy gamecreate form's outer chrome location.
+  - `clay_label_value_row_test --out <path>` renders three stacked rows (Security/Spectatable/Password) at root padding (247, 90), label column 76 px / value column 80 px, 14 px row height.
+  - `clay_panel_test --variant <right|bare> --out <path>` renders the RightChrome (chrome at (403,87) 222x390 + title "Game Options") or LeftBare (no chrome, just title "Character" at (15,87)) variant.
+- Pinned references under `tests/lobby-clay/{form_border_test,label_value_row_test,panel_test}/`. Pass bar: < 1.0% for all four diffs.
+- Files changed:
+  - clients/silencer/src/ui/clay/primitives/form_border.h (new)
+  - clients/silencer/src/ui/clay/primitives/label_value_row.{h,cpp} (new)
+  - clients/silencer/src/ui/clay/primitives/panel.{h,cpp} (new)
+  - clients/silencer/src/ui/clay/{form_border,label_value_row,panel}_test.cpp (new)
+  - clients/silencer/src/ui/clay/clay_bridge.h (RunFormBorderTest / RunLabelValueRowTest / RunPanelTest decls)
+  - clients/silencer/src/net/controldispatch.cpp (clay_form_border_test, clay_label_value_row_test, clay_panel_test ops)
+  - tests/lobby-clay/form_border_test/{run.sh,reference.png} (new)
+  - tests/lobby-clay/label_value_row_test/{run.sh,reference.png} (new)
+  - tests/lobby-clay/panel_test/{run.sh,reference_right.png,reference_bare.png} (new)
+- Pass check: all three render harnesses → pixdiff 0.0000% (<1.0% threshold). Build green (only pre-existing `Renderer::GetPixel`/`SetPixel` `-Wundefined-inline` warnings from P7 ScrollBar dispatch).
+- **Learnings for future iterations:**
+  - For "pure style fragment" primitives (FormBorder, hypothetical PanelStyle, etc.), prefer a header-only `inline T HelperFn(args)` that returns a Clay config struct over a `void HelperFn(...)` that emits a CLAY block. The caller composes by `.border = FormBorder()` / `.layout = PanelLayout()` etc. — no scoping issues, no per-frame arena needed, no surprises about WHERE in the parent the child is placed.
+  - When a Panel-style primitive needs to combine a sprite-chrome background with overlay content (title, body), use Clay's `.image = PackImage(bank, idx)` ON THE SAME ELEMENT as the children. The bridge emits IMAGE for the parent's bbox-top-left blit FIRST in the command stream (verified: the IMAGE render command is sequenced before child commands at EndLayout), so children naturally overlay. Zero need for `.floating`.
+  - Default-init a `Clay_String` opts field as `{ false, 0, nullptr }` and gate emission on `opts.field.length > 0`. This sidesteps the lack of `std::optional` in plain C++ struct opts patterns and matches Clay's own NULL-string semantics.
+  - All three P10 primitives are exclusively layout/style composition — the bridge needed no new CustomKind. Reach for CUSTOM only when a draw step doesn't fit RECTANGLE/BORDER/TEXT/IMAGE/SCISSOR (e.g., effect-stacked sprites, custom per-pixel work like the scrollbar 3-slice). Composition primitives that wrap existing render-command types are simpler AND faster.
 ---

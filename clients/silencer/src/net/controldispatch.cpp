@@ -285,6 +285,63 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
+	if(cmd.op == "clay_form_border_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_form_border_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunFormBorderTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"form_border test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_label_value_row_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_label_value_row_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunLabelValueRowTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"label_value_row test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_panel_test"){
+		std::string variant = cmd.args.value("variant", std::string("right"));
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_panel_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunPanelTest(
+			game, variant.c_str(), out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"panel test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		r["variant"] = variant;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
 	if(cmd.op == "state"){
 		nlohmann::json r;
 		r["state"] = Game::StateName(game.GetState());
