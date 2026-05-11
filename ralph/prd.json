@@ -187,7 +187,7 @@
       "id": "P19",
       "priority": 19,
       "name": "Make Clay the default lobby; delete legacy lobby files",
-      "passes": false,
+      "passes": true,
       "spec": "Flip the feature flag default to ON. Replace Game::GoToState(LOBBY) call sites to push LobbyClayScreen unconditionally. Delete clients/silencer/src/ui/screens/lobby/{lobby_screen,character_panel,chat_panel,game_select_panel,game_create_panel,game_join_panel,game_tech_panel}.{h,cpp}. Update CMakeLists.txt. The legacy widget components (Button, Toggle, etc.) STAY — they're used by other screens.",
       "pass_check": "Build green. tests/cli-agent/e2e/ regression suite green. All 7 lobby baselines pixdiff < 5%."
     },

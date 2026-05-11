@@ -34,7 +34,7 @@
 #include "options_display_screen.h"
 #include "options_audio_screen.h"
 #include "lobby_connect_screen.h"
-#include "lobby_screen.h"
+#include "lobby_clay_screen.h"
 #include "lobby_clay_screen.h"
 #include "update_screen.h"
 #include "mission_summary_screen.h"
@@ -702,8 +702,8 @@ bool Game::Tick(void){
 		}
 		if(world.gameplaystate == World::INLOBBY){
 			mapDownloader.ProcessMapDownload();
-			// Ready-button text refresh ("Waiting..." vs "Ready") moved into
-			// GameJoinPanel::Tick — runs each frame from LobbyScreen::Tick.
+			// Ready-button text refresh ("Waiting..." vs "Ready") happens
+			// in GameJoinPanelTick — runs each frame from LobbyClayScreen::Tick.
 		}
 		/*Peer * localpeer = world.peerlist[world.localpeerid];
 		if(localpeer){
@@ -809,22 +809,14 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
-				// SILENCER_LOBBY_CLAY=1 opts into the in-progress Clay-driven
-				// lobby (P11+). Treats any non-"0" value as enabled.
-				const char * clayEnv = getenv("SILENCER_LOBBY_CLAY");
-				bool useClay = clayEnv && clayEnv[0] && clayEnv[0] != '0';
-				if(useClay){
-					PushScreen(std::make_unique<LobbyClayScreen>());
-				}else{
-					PushScreen(std::make_unique<LobbyScreen>());
-				}
+				PushScreen(std::make_unique<LobbyClayScreen>());
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 				// Lobby pump (state-machine + deferred-create) lives in
-				// LobbyScreen::Tick, dispatched by TickActiveScreen() at the
+				// LobbyClayScreen::Tick, dispatched by TickActiveScreen() at the
 				// top of Game::Tick.
 			}
 		}break;

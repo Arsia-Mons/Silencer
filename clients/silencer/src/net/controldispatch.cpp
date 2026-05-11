@@ -15,7 +15,7 @@
 #include "shared.h"
 #include "clay_bridge.h"
 #include "clay_inspector.h"
-#include "lobby_screen.h"
+#include "lobby_clay_screen.h"
 #include "screen_context.h"
 #include <cstring>
 #include <cstdio>
@@ -707,20 +707,15 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "lobby_show_panel"){
-		// Drive the lobby's right-side panel swap from a CLI test. The
-		// Clay-migrated lobby exposes its panels as Clay subtrees with no
-		// world Interface objects, so `click --label "Create Game"` can't
-		// reach them. This op routes through `LobbyScreen::ShowGame*`
-		// directly — virtual, so both legacy and Clay overrides work.
+		// Drive the lobby's right-side panel swap from a CLI test. The Clay
+		// lobby exposes its panels as Clay subtrees with no world Interface
+		// objects, so `click --label "Create Game"` can't reach them. This
+		// op routes through `LobbyClayScreen::ShowGame*` directly.
 		Screen * top = game.GetTopScreen();
-		LobbyScreen * lobby = dynamic_cast<LobbyScreen *>(top);
+		LobbyClayScreen * lobby = dynamic_cast<LobbyClayScreen *>(top);
 		if(!lobby){
-			// Walk down the screen stack in case the top is an overlay/modal.
-			lobby = nullptr;
-			// (No deep walk needed — tests drive this immediately after
-			//  wait_for_state LOBBY with no modal pushed.)
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
-				"top screen is not a LobbyScreen"));
+				"top screen is not a LobbyClayScreen"));
 			return;
 		}
 		std::string which = cmd.args.value("panel", std::string());

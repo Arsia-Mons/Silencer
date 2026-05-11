@@ -151,24 +151,13 @@ public:
 	friend class Replay;
 	friend class Audio;
 	friend class TriggerGraph;
-	// Stage F of the game.cpp refactor: LobbyScreen::ShowGameTech calls
-	// World::RequestPeerList from the gametech-view enter path. Removed
-	// in stage G when the call moves into GameTechPanel::Build.
-	friend class LobbyScreen;
-	// LobbyClayScreen seeds world.gameinfo from the lobby's record after a
-	// successful host-side CreateGame (mirrors the legacy gameinfo seeding
-	// in LobbyScreen::Tick). Friend privilege is not inherited from
-	// LobbyScreen so we name the derived class explicitly.
+	// LobbyClayScreen reads/writes World state across the entire lobby
+	// surface: seeds gameinfo from the lobby record after a successful
+	// host-side CreateGame, reads localpeer state to refresh the Ready
+	// button label, calls RequestPeerList/SetTech on the tech-choice
+	// surface, etc. Routes panels' world access through thin pass-through
+	// helpers on the screen rather than friending each Clay panel.
 	friend class LobbyClayScreen;
-	// GameJoinPanel reads localpeer state (peerlist[localpeerid].ishost,
-	// AllPeersDownloadedMap, gameplaystate) to refresh the Ready button
-	// label, and dispatches SendReady on click.
-	friend class GameJoinPanel;
-	// GameTechPanel ports the legacy Game::UpdateTechInterface — reads
-	// peerlist[team peers] to drive the per-peer tech checkbox grid, calls
-	// RequestPeerList when the local-peer slot is empty (recovery for a
-	// dropped peerlist packet).
-	friend class GameTechPanel;
 
 protected:
 	std::list<class Object *> objectlist;

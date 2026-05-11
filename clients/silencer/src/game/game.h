@@ -46,7 +46,7 @@ public:
 	class World& GetWorld() { return world; }
 	// Test/control-dispatch hook: gives ControlDispatch op handlers access
 	// to the ScreenContext so they can invoke screen-side helpers (e.g.
-	// LobbyScreen::ShowGameCreate from a CLI op when there's no widget
+	// LobbyClayScreen::ShowGameCreate from a CLI op when there's no widget
 	// path to drive the click). Game-thread only.
 	ScreenContext& GetScreenContext() { return screenContext; }
 	nlohmann::json GetWorldSummary();
@@ -92,7 +92,7 @@ public:
 	const GamepadState& GetGamepadState() const { return gamepadstate; }
 	SDL_Gamepad * GetGamepad() const { return gamepad; }
 
-	// LobbyScreen + per-panel interop. Public so panels can reach in via
+	// LobbyClayScreen + per-panel interop. Public so panels can reach in via
 	// `ScreenContext::game`.
 	Uint16 currentinterface;
 	Uint32 currentlobbygameid;
@@ -103,11 +103,11 @@ public:
 	void SpectateGame(LobbyGame & lobbygame, char * password = 0);
 	// Tear down a joined game's session/world state (Disconnect, switch
 	// authority, destroy team overlays, rejoin previous chat channel). UI
-	// concerns (panel swap, map-name overlay) stay on LobbyScreen.
+	// concerns (panel swap, map-name overlay) stay on LobbyClayScreen.
 	void LeaveJoinedGame();
-	// Toggle in-lobby team overlay visibility. Called by LobbyScreen's
-	// right-side panel swaps (ShowGameTech / TearDownRightPanels) when
-	// entering / leaving the tech-choice surface.
+	// Toggle in-lobby team overlay visibility. Called by LobbyClayScreen's
+	// right-side panel swaps (ShowGameTech) when entering / leaving the
+	// tech-choice surface.
 	void ShowTeamOverlays(bool show);
 
 private:

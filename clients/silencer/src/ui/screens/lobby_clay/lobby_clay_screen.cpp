@@ -2,18 +2,21 @@
 
 #include "screen_context.h"
 #include "game.h"
+#include "game_state.h"
 #include "world.h"
+#include "lobby.h"
+#include "lobbygame.h"
+#include "serializer.h"
+#include "config.h"
 #include "interface.h"
 #include "objecttypes.h"
 #include "renderer.h"
 #include "resources.h"
 #include "surface.h"
-#include "game_create_panel.h"
-#include "game_join_panel.h"
-#include "game_tech_panel.h"
-#include "lobbygame.h"
+#include "ambience_mixer.h"
+#include "map_downloader.h"
+#include "message_modal.h"
 #include "peer.h"
-#include "serializer.h"
 
 #include "clay/clay.h"
 #include "clay_bridge.h"
@@ -24,16 +27,12 @@
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
 #include "primitives/toggle.h"
-#include "clay_character_panel.h"
-#include "clay_chat_panel.h"
-#include "clay_game_select_panel.h"
-#include "clay_game_create_panel.h"
-#include "clay_game_join_panel.h"
-#include "clay_game_tech_panel.h"
 
 #include <SDL3/SDL.h>
 
+#include <cstring>
 #include <memory>
+#include <string>
 
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
@@ -51,6 +50,25 @@ LobbyClayScreen::~LobbyClayScreen() = default;
 
 namespace
 {
+MessageModal * TopAsProgressModal(ScreenContext & ctx)
+{
+	Screen * top = ctx.game.GetTopScreen();
+	if(!top) return nullptr;
+	MessageModal * m = dynamic_cast<MessageModal *>(top);
+	return (m && m->IsProgress()) ? m : nullptr;
+}
+
+bool TopIsModal(ScreenContext & ctx)
+{
+	Screen * top = ctx.game.GetTopScreen();
+	return top && top->IsOverlay();
+}
+
+void DismissProgressModal(ScreenContext & ctx)
+{
+	if(TopAsProgressModal(ctx)) ctx.PopScreen();
+}
+
 // Trampoline for the Go Back BankButton's onClick. Defers to the screen's
 // per-frame flag so back-routing runs on the next Tick rather than mid-
 // layout (calling Game::GoBack mid-Clay would invalidate the screen we're
@@ -71,8 +89,7 @@ void OnGoBackClicked(void * user)
 // offset (`spriteoffsetx/y`): the legacy renderer subtracts those from the
 // object's screen-space x/y before blitting, but the Clay bridge blits
 // sprite-natively at the bbox top-left. Pre-subtracting the offset in the
-// floating .offset keeps the on-screen pixels byte-identical to the legacy
-// path.
+// floating .offset keeps the on-screen pixels byte-identical.
 void BuildChromeTree(LobbyClayScreen * screen,
                      const std::string & version,
                      const std::string & mapName,
@@ -83,8 +100,6 @@ void BuildChromeTree(LobbyClayScreen * screen,
 	const int W = 640;
 	const int H = 480;
 
-	// Compensate for sprite anchor offsets — matches the legacy
-	// `object->x - spriteoffsetx[bank][index]` formula.
 	const int bgOffX = -resources.spriteoffsetx[7][1];
 	const int bgOffY = -resources.spriteoffsety[7][1];
 	const int btnOffX = 473 - resources.spriteoffsetx[7][24];
@@ -94,7 +109,6 @@ void BuildChromeTree(LobbyClayScreen * screen,
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
 	       } }) {
-		// Fullscreen background sprite (bank 7 idx 1).
 		CLAY({ .id = CLAY_ID("LobbyBg"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
@@ -103,8 +117,6 @@ void BuildChromeTree(LobbyClayScreen * screen,
 		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
 		                     .offset = { (float)bgOffX, (float)bgOffY } } }) {}
 
-		// "Silencer" title at (15, 32). Bank 135 / w11 / eff=152 — matches
-		// LobbyScreen::Build's `toptext` overlay.
 		CLAY({ .id = CLAY_ID("LobbyTitle"),
 		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
 		                     .offset = { 15, 32 } } }) {
@@ -113,8 +125,6 @@ void BuildChromeTree(LobbyClayScreen * screen,
 			         { .effectColor = 152 });
 		}
 
-		// "v.X" version at (115, 39). Bank 133 / w6 / eff=189 — matches
-		// `vertext`.
 		Clay_String verstr;
 		verstr.isStaticallyAllocated = false;
 		verstr.length = (int32_t)version.size();
@@ -127,10 +137,6 @@ void BuildChromeTree(LobbyClayScreen * screen,
 			         { .effectColor = 189 });
 		}
 
-		// Map-name overlay at (180, 32). Bank 135 / w11 / eff=129 /
-		// brightness=160 (128+32) / colorRamp=on — matches `mapnametext`.
-		// Skip emission when empty so the bridge doesn't dispatch a
-		// zero-length text command.
 		if(!mapName.empty()){
 			Clay_String mstr;
 			mstr.isStaticallyAllocated = false;
@@ -147,10 +153,6 @@ void BuildChromeTree(LobbyClayScreen * screen,
 			}
 		}
 
-		// "Go Back" B156x21 chrome button at (473, 29). Matches
-		// `exitbutton`. Offset compensates for spriteoffsetx[7][24]
-		// (the chrome sprite anchor), the same compensation the legacy
-		// renderer applies on the way to BlitSurface.
 		CLAY({ .id = CLAY_ID("LobbyGoBackWrap"),
 		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
 		                     .offset = { (float)btnOffX, (float)btnOffY } } }) {
@@ -178,59 +180,44 @@ void LobbyClayScreen::Build(ScreenContext & ctx)
 	ctx.ResetPresentation(2);
 	ctx.renderer.camera.SetPosition(320, 240);
 
-	// Version string is immutable at runtime — cache once.
 	version  = "v.";
 	version += world.GetVersion();
 	mapName.clear();
 	goBackClicked = false;
 
-	// Parent Interface for the legacy panels. The chrome elements that
-	// LobbyScreen::Build creates here (bg overlay, title, version,
-	// mapname, Go Back button) are NOT created — the Clay tree paints
-	// them in Draw each frame instead.
+	// Parent Interface for child Clay-state inspector registrations. No
+	// world Overlay/Button objects for the chrome — the Clay tree paints
+	// them in Draw each frame.
 	Interface * lobbyiface = static_cast<Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
 	interfaceId = lobbyiface->id;
 
-	// P12: character panel runs in Clay. We deliberately DO NOT call
-	// `character.Build(ctx, lobbyiface)` — that would create the legacy
-	// world Overlay/Toggle objects which would then double-render on top
-	// of the Clay subtree. The inherited `character` member's interfaceId
-	// stays 0 so its Tick is a no-op.
 	silencer::ui::lobby_clay::CharacterPanelInit(characterState);
-
-	// P13: chat panel runs in Clay. Skip the legacy chat.Build for the
-	// same reason character.Build was skipped — its world Overlay/TextBox
-	// /TextInput/ScrollBar objects would double-render on top of the
-	// Clay subtree. Legacy `chat` member's interfaceId stays 0 → its
-	// Tick (invoked via LobbyScreen::Tick) early-returns harmlessly.
 	silencer::ui::lobby_clay::ChatPanelInit(chatState);
-
-	// P14: GameSelect panel runs in Clay. Skip legacy `gameSelect->Build`.
-	// The legacy `gameSelect` unique_ptr stays null; LobbyScreen::Tick's
-	// `if(gameSelect)` and the `gameSelect || gameCreate` gates handle the
-	// null case (the gates that need to fire when there's no right-side
-	// legacy panel are kept alive by gameCreate/gameJoin/gameTech presence
-	// when those panels are active).
 	silencer::ui::lobby_clay::GameSelectPanelInit(gameSelectState);
-
-	// P16: GameJoin panel runs in Clay. Legacy `gameJoin` unique_ptr stays
-	// null; the `gameJoinActive` flag is the equivalent Draw/Tick gate.
 	silencer::ui::lobby_clay::GameJoinPanelInit(gameJoinState);
 	gameJoinActive = false;
-
-	// P17: GameTech panel runs in Clay. Legacy `gameTech` unique_ptr stays
-	// null; `gameTechActive` is the equivalent Draw/Tick gate.
 	silencer::ui::lobby_clay::GameTechPanelInit(gameTechState);
 	gameTechActive = false;
+	gameCreateActive = false;
 }
 
 void LobbyClayScreen::Tick(ScreenContext & ctx)
 {
+	World & world = ctx.world;
+	Game & game = ctx.game;
+
+	// Lobby disconnect → bounce back to the connect screen.
+	if(world.lobby.state == Lobby::DISCONNECTED){
+		world.Disconnect();
+		ctx.GoToState(GameState::LOBBYCONNECT);
+		return;
+	}
+
 	// Chrome Go Back — flag was set by the Clay onClick trampoline on the
-	// previous frame. Consume it before delegating to the base lobby pump.
+	// previous frame. Consume it before pumping anything else.
 	if(goBackClicked){
 		goBackClicked = false;
-		if(ctx.game.GoBack()) return;
+		if(game.GoBack()) return;
 	}
 
 	// Reconcile any agency-toggle click from the previous frame's Clay
@@ -243,18 +230,13 @@ void LobbyClayScreen::Tick(ScreenContext & ctx)
 
 	// Consume the Clay GameSelect panel's per-frame click flags + rebuild
 	// rows on lobby updates. Only active when no other right-side panel
-	// owns the surface — when gameCreateActive/gameJoinActive/legacy
-	// gameJoin/gameTech are live, the games-list Clay tree isn't emitted,
-	// so its click flags can't fire.
-	if(!gameCreate && !gameCreateActive && !gameJoin && !gameJoinActive
-	   && !gameTech && !gameTechActive){
+	// owns the surface.
+	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
 		silencer::ui::lobby_clay::GameSelectPanelTick(
 			gameSelectState, ctx.world, ctx, *this);
 	}
 
-	// Clay GameCreate surface owns its own deferred-create state machine
-	// (mirrors LobbyScreen::Tick's `if(gameCreate)` block + the create-
-	// button kickoff that used to live in GameCreatePanel::Tick).
+	// Clay GameCreate surface owns its own deferred-create state machine.
 	if(gameCreateActive){
 		silencer::ui::lobby_clay::GameCreatePanelTick(
 			gameCreateState, ctx.world, ctx, *this);
@@ -273,21 +255,67 @@ void LobbyClayScreen::Tick(ScreenContext & ctx)
 			gameTechState, ctx.world, ctx, *this);
 	}
 
-	// Base class drives the rest: panel ticks, deferred CreateGame state
-	// machine, CONNECTED → GameJoin handoff, disconnect detection. The
-	// chrome-button scan inside LobbyScreen::Tick finds no Go Back button
-	// in our interface (we didn't create one) and is a harmless no-op.
-	LobbyScreen::Tick(ctx);
+	MapDownloader & mapDownloader = ctx.mapDownloader;
 
-	// Mirror LobbyScreen::Tick's "Disconnected from game" modal trigger.
-	// The base-class check fires only when the legacy gameJoin/gameTech
-	// unique_ptrs are alive; on the Clay path those are always null even
-	// when gameJoinActive/gameTechActive is true, so the modal would
-	// otherwise never fire.
-	if((gameJoinActive || gameTechActive) && ctx.world.state != World::CONNECTED){
-		Screen * top = ctx.game.GetTopScreen();
-		if(!top || !top->IsOverlay()){
-			Game * gamePtr = &ctx.game;
+	// Pre-CONNECTED surfaces (gameselect / gamecreate) — join finalisation,
+	// progress-modal spinner update, auto-dismiss, CONNECTED→GameJoin
+	// transition. Mirrors LobbyScreen::Tick's `if(gameSelect || gameCreate)`
+	// block from before the lobby was Clay-driven.
+	if(!gameJoinActive && !gameTechActive){
+		if(game.joininggame){
+			if(world.state == World::CONNECTED){
+				game.joininggame = false;
+			}
+			if(world.state == World::IDLE){
+				game.joininggame = false;
+				DismissProgressModal(ctx);
+				ctx.ShowMessage("Unable to join game");
+			}
+		}
+		if(MessageModal * progress = TopAsProgressModal(ctx)){
+			std::string text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
+				? "Uploading map" : "Creating game";
+			int dots = (world.tickcount / 4) % 6;
+			if(dots > 3) dots = 6 - dots;
+			for(int i = 0; i < dots; i++) text += ".";
+			progress->SetText(ctx, text);
+		}
+		if(TopAsProgressModal(ctx) && world.lobby.creategamestatus != 100 &&
+		   mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 &&
+		   (world.state == World::CONNECTED || world.state == World::IDLE)){
+			ctx.PopScreen();
+			game.creategameclicked = false;
+		}
+		if(world.state == World::CONNECTED && interfaceId){
+			Peer * peer = world.peerlist[world.localpeerid];
+			if(peer){
+				mapDownloader.mapexistchecked = false;
+				mapDownloader.mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
+				mapDownloader.mapjoinstate.store(0, std::memory_order_relaxed);
+				if(mapDownloader.mapjointhread.joinable()) mapDownloader.mapjointhread.detach();
+				world.SetTech(Config::GetInstance().defaulttechchoices[Config::GetInstance().defaultagency]);
+				ShowGameJoin(ctx);
+				LobbyGame * lobbygame = world.lobby.GetGameById(game.currentlobbygameid);
+				if(lobbygame){
+					char temp[256];
+					ctx.ambienceMixer.GetGameChannelName(*lobbygame, temp);
+					strcpy(world.lobby.lastchannel, world.lobby.channel);
+					world.lobby.JoinChannel(temp);
+					SetMapNameOverlay(world, lobbygame->mapname);
+				}
+			}
+		}
+	}
+
+	mapDownloader.ProcessMapDownload();
+
+	// Disconnect-from-game modal — fires on the joined-game surface
+	// (gameJoinActive || gameTechActive) when the world drops out of
+	// CONNECTED. Mirrors the legacy LobbyScreen::Tick `if(gameJoin || gameTech)`
+	// trigger; the Clay flags are the equivalent gate.
+	if(world.state != World::CONNECTED && !TopIsModal(ctx)){
+		if(gameJoinActive || gameTechActive){
+			Game * gamePtr = &game;
 			ctx.ShowMessage("Disconnected from game", [gamePtr]() { gamePtr->GoBack(); });
 		}
 	}
@@ -295,25 +323,6 @@ void LobbyClayScreen::Tick(ScreenContext & ctx)
 
 void LobbyClayScreen::ShowGameSelect(ScreenContext & ctx)
 {
-	// Tear down whichever legacy right-side panel is currently active. The
-	// games-list Clay surface is always present in Draw and reappears once
-	// these are gone — no legacy `gameSelect = new GameSelectPanel(...)`
-	// rebuild required.
-	Interface * lobbyiface = static_cast<Interface *>(
-		ctx.world.GetObjectFromId(interfaceId));
-	auto destroy = [&](Uint16 id) {
-		Interface * panelIface = static_cast<Interface *>(
-			ctx.world.GetObjectFromId(id));
-		if(panelIface) panelIface->DestroyInterface(ctx.world, lobbyiface);
-	};
-	if(gameCreate){ destroy(gameCreate->interfaceId); gameCreate.reset(); }
-	if(gameJoin)  { destroy(gameJoin->interfaceId);   gameJoin.reset();   }
-	if(gameTech)  {
-		destroy(gameTech->interfaceId);
-		gameTech.reset();
-		ctx.world.choosingtech = false;
-		ctx.game.ShowTeamOverlays(true);
-	}
 	gameCreateActive = false;
 	gameJoinActive   = false;
 	gameTechActive   = false;
@@ -325,25 +334,6 @@ void LobbyClayScreen::ShowGameSelect(ScreenContext & ctx)
 
 void LobbyClayScreen::ShowGameCreate(ScreenContext & ctx)
 {
-	// Tear down any legacy right-side panel that was alive, then activate
-	// the Clay game-create surface. The legacy `gameCreate` unique_ptr
-	// stays null — `gameCreateActive` is the equivalent gate for the Clay
-	// path's Draw + Tick.
-	Interface * lobbyiface = static_cast<Interface *>(
-		ctx.world.GetObjectFromId(interfaceId));
-	auto destroy = [&](Uint16 id) {
-		Interface * panelIface = static_cast<Interface *>(
-			ctx.world.GetObjectFromId(id));
-		if(panelIface) panelIface->DestroyInterface(ctx.world, lobbyiface);
-	};
-	if(gameCreate){ destroy(gameCreate->interfaceId); gameCreate.reset(); }
-	if(gameJoin)  { destroy(gameJoin->interfaceId);   gameJoin.reset();   }
-	if(gameTech)  {
-		destroy(gameTech->interfaceId);
-		gameTech.reset();
-		ctx.world.choosingtech = false;
-		ctx.game.ShowTeamOverlays(true);
-	}
 	silencer::ui::lobby_clay::GameCreatePanelInit(gameCreateState, ctx);
 	gameCreateActive = true;
 	gameJoinActive   = false;
@@ -353,23 +343,6 @@ void LobbyClayScreen::ShowGameCreate(ScreenContext & ctx)
 
 void LobbyClayScreen::ShowGameJoin(ScreenContext & ctx)
 {
-	// Tear down any legacy right-side panel that was alive + clear
-	// gameCreateActive, then activate the Clay GameJoin surface.
-	Interface * lobbyiface = static_cast<Interface *>(
-		ctx.world.GetObjectFromId(interfaceId));
-	auto destroy = [&](Uint16 id) {
-		Interface * panelIface = static_cast<Interface *>(
-			ctx.world.GetObjectFromId(id));
-		if(panelIface) panelIface->DestroyInterface(ctx.world, lobbyiface);
-	};
-	if(gameCreate){ destroy(gameCreate->interfaceId); gameCreate.reset(); }
-	if(gameJoin)  { destroy(gameJoin->interfaceId);   gameJoin.reset();   }
-	if(gameTech)  {
-		destroy(gameTech->interfaceId);
-		gameTech.reset();
-		ctx.world.choosingtech = false;
-		ctx.game.ShowTeamOverlays(true);
-	}
 	silencer::ui::lobby_clay::GameJoinPanelInit(gameJoinState);
 	gameJoinActive   = true;
 	gameCreateActive = false;
@@ -379,28 +352,6 @@ void LobbyClayScreen::ShowGameJoin(ScreenContext & ctx)
 
 void LobbyClayScreen::ShowGameTech(ScreenContext & ctx)
 {
-	// Tear down any legacy right-side panel, clear the other Clay flags,
-	// and activate the Clay GameTech surface. Mirrors the legacy
-	// ShowGameTech's choosingtech + ShowTeamOverlays + RequestPeerList
-	// side effects — those still need to happen even though we're not
-	// building a legacy GameTechPanel.
-	Interface * lobbyiface = static_cast<Interface *>(
-		ctx.world.GetObjectFromId(interfaceId));
-	auto destroy = [&](Uint16 id) {
-		Interface * panelIface = static_cast<Interface *>(
-			ctx.world.GetObjectFromId(id));
-		if(panelIface) panelIface->DestroyInterface(ctx.world, lobbyiface);
-	};
-	if(gameCreate){ destroy(gameCreate->interfaceId); gameCreate.reset(); }
-	if(gameJoin)  { destroy(gameJoin->interfaceId);   gameJoin.reset();   }
-	if(gameTech)  {
-		destroy(gameTech->interfaceId);
-		gameTech.reset();
-		// Reset choosingtech first; the helpers below set it back to true.
-		ctx.world.choosingtech = false;
-		ctx.game.ShowTeamOverlays(true);
-	}
-
 	ctx.world.choosingtech = true;
 	ctx.game.ShowTeamOverlays(false);
 	ctx.world.RequestPeerList();
@@ -418,9 +369,6 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	using namespace silencer::clay_bridge;
 	EnsureInitialized(dst.w, dst.h);
 
-	// Pointer state from SDL. Headless/dedicated mode returns (0, 0) with
-	// no buttons pressed; the Clay onClick callbacks won't fire which is
-	// the same behavior as the legacy mouse path.
 	float mx = 0.f, my = 0.f;
 	Uint32 buttons = SDL_GetMouseState(&mx, &my);
 	bool down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
@@ -440,12 +388,7 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 		characterState, ctx.world, ctx.world.resources);
 	silencer::ui::lobby_clay::BuildChatPanelTree(
 		chatState, ctx.world, ctx.world.resources);
-	// GameSelect tree is mutually exclusive with any right-side panel
-	// (Clay gameCreate/gameJoin or legacy gameJoin/gameTech). When one
-	// of those is active, suppress the games-list emission so it owns
-	// the right column.
-	if(!gameCreate && !gameCreateActive && !gameJoin && !gameJoinActive
-	   && !gameTech && !gameTechActive){
+	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
 		silencer::ui::lobby_clay::BuildGameSelectPanelTree(
 			gameSelectState, ctx.world.resources);
 	}
@@ -464,6 +407,15 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	Clay_RenderCommandArray cmds = Clay_EndLayout();
 
 	Render(ctx.game, &dst, cmds);
+}
+
+void LobbyClayScreen::Destroy(ScreenContext & ctx)
+{
+	if(interfaceId){
+		Interface * iface = static_cast<Interface *>(ctx.world.GetObjectFromId(interfaceId));
+		if(iface) iface->DestroyInterface(ctx.world);
+		interfaceId = 0;
+	}
 }
 
 void LobbyClayScreen::SetMapNameOverlay(World & /*world*/, const char * name)
@@ -525,21 +477,16 @@ void LobbyClayScreen::TechPanelSetTech(World & world, Uint32 techchoices)
 
 bool LobbyClayScreen::HandleBack(ScreenContext & ctx)
 {
-	// Clay GameJoin / GameTech surface → leave the session, drop the
-	// map-name overlay, swap back to the games list. Mirrors
-	// LobbyScreen::HandleBack's `if(gameJoin || gameTech)` branch.
 	if(gameJoinActive || gameTechActive){
 		ctx.LeaveJoinedGame();
 		SetMapNameOverlay(ctx.world, "");
 		ShowGameSelect(ctx);
 		return true;
 	}
-	// Clay GameCreate surface → swap back to games list (mirrors the
-	// legacy LobbyScreen::HandleBack's `if(gameCreate)` branch).
 	if(gameCreateActive){
 		ctx.world.lobby.gamesprocessed = false;
 		ShowGameSelect(ctx);
 		return true;
 	}
-	return LobbyScreen::HandleBack(ctx);
+	return false;
 }

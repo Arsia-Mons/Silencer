@@ -91,7 +91,7 @@ for i in $(seq 1 60); do
   fi
 done
 
-HOME="$SILENCER_HOME" SILENCER_LOBBY_CLAY=1 "$SILENCER_BIN" \
+HOME="$SILENCER_HOME" "$SILENCER_BIN" \
   --headless \
   --control-port "$CTRL_PORT" \
   --lobby-host 127.0.0.1 \
