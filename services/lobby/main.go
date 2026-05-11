@@ -27,6 +27,8 @@ func main() {
 	mapAPIAddr := flag.String("map-api-addr", ":8080", "public HTTP address for the community map API (upload/download)")
 	mapsDir := flag.String("maps-dir", "maps", "directory for community map storage")
 	mapUploadKey := flag.String("map-upload-key", "", "API key required for map uploads (empty = unauthenticated, dev only)")
+	wsFacadeAddr := flag.String("ws-facade-addr", ":15173", "WebSocket spectator facade listen address (empty = disabled). Browsers connect here for the lobby game list + spectate URLs; native clients keep using the TCP -addr port.")
+	relayBase := flag.String("ws-relay-base", "", "Base WebSocket URL the facade hands out for spectate <gameid> commands. Empty until Stage 2 deploys the relay binary; spectate commands then return RELAY_NOT_CONFIGURED.")
 	flag.Parse()
 
 	var manifest *UpdateManifest
@@ -124,6 +126,10 @@ func main() {
 		log.Fatalf("map store: %v", err)
 	}
 	go StartMapAPIServer(*mapAPIAddr, mapStore)
+
+	if *wsFacadeAddr != "" {
+		StartSpectatorFacade(*wsFacadeAddr, hub, *relayBase)
+	}
 
 	go serveUDP(udpLn, hub)
 
