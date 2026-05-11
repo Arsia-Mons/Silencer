@@ -142,6 +142,65 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 
 	out.onSelectFired = fired;
 	out.lastSelectedIndex = lastIndex;
+
+	// P7b — conditional-scrollbar emission probe. Two extra layout passes
+	// with itemCount=3 (fits) and itemCount=50 (overflows), both with
+	// visibleLines = 10 (height=130, lineHeight=13). Count the number of
+	// CUSTOM ScrollBar render commands the primitive emits in each case.
+	auto countAndCaptureScrollbar = [&](int itemCount,
+	                                    int & countOut,
+	                                    Clay_BoundingBox & bboxOut){
+		::Clay_SetPointerState(::Clay_Vector2{-1.0f, -1.0f}, false);
+		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
+		::Clay_ResetMeasureTextCache();
+		silencer::ui::primitives::ScrollListBeginFrame();
+		silencer::ui::primitives::BankTextBeginFrame();
+
+		::Clay_BeginLayout();
+		CLAY({ .id = CLAY_ID("ScrollListOverflowCheckRoot"),
+		       .layout = {
+		           .sizing  = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
+		           .padding = { 50, 0, 50, 0 },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		       } }) {
+			silencer::ui::primitives::ScrollList(
+				CLAY_STRING("overflow_list"),
+				g_items,
+				itemCount,
+				/*selectedIndex=*/-1,
+				/*scrollPosition=*/0,
+				{ .width = 200, .height = 130, .lineHeight = 13 });
+		}
+		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
+		int n = 0;
+		Clay_BoundingBox lastBbox{0, 0, 0, 0};
+		for(int i = 0; i < cmds.length; i++){
+			::Clay_RenderCommand * c = &cmds.internalArray[i];
+			if(c->commandType != CLAY_RENDER_COMMAND_TYPE_CUSTOM) continue;
+			const auto * ccd = reinterpret_cast<const ClayCustomData *>(
+				c->renderData.custom.customData);
+			if(!ccd || ccd->kind != CustomKind::ScrollBar) continue;
+			n++;
+			lastBbox = c->boundingBox;
+		}
+		countOut = n;
+		bboxOut = lastBbox;
+	};
+
+	int noOverflowCount = 0;
+	Clay_BoundingBox noOverflowBbox{};
+	countAndCaptureScrollbar(3, noOverflowCount, noOverflowBbox);
+
+	int overflowCount = 0;
+	Clay_BoundingBox overflowBbox{};
+	countAndCaptureScrollbar(50, overflowCount, overflowBbox);
+
+	out.noOverflowScrollbarCount = noOverflowCount;
+	out.overflowScrollbarCount   = overflowCount;
+	out.overflowScrollbarBboxX   = static_cast<int>(overflowBbox.x);
+	out.overflowScrollbarBboxY   = static_cast<int>(overflowBbox.y);
+	out.overflowScrollbarBboxW   = static_cast<int>(overflowBbox.width);
+	out.overflowScrollbarBboxH   = static_cast<int>(overflowBbox.height);
 	return true;
 }
 

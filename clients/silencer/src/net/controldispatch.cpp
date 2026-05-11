@@ -218,6 +218,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		nlohmann::json r;
 		r["on_select_fired"] = res.onSelectFired;
 		r["last_selected_index"] = res.lastSelectedIndex;
+		r["no_overflow_scrollbar_count"] = res.noOverflowScrollbarCount;
+		r["overflow_scrollbar_count"] = res.overflowScrollbarCount;
+		r["overflow_scrollbar_bbox_x"] = res.overflowScrollbarBboxX;
+		r["overflow_scrollbar_bbox_y"] = res.overflowScrollbarBboxY;
+		r["overflow_scrollbar_bbox_w"] = res.overflowScrollbarBboxW;
+		r["overflow_scrollbar_bbox_h"] = res.overflowScrollbarBboxH;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}

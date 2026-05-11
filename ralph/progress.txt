@@ -69,6 +69,7 @@
 - New CLI op `cli lobby_show_panel --panel select|create|join|tech` drives `LobbyScreen::ShowGame*` (virtual) directly. Reusable for any lobby-right-pane test where the Clay path has no world Interface objects to address via `cli click`. Adds `Game::GetScreenContext()` accessor.
 - Tests that open GameCreatePanel MUST pin `Config::mapapiurl` to either an unreachable URL or the test lobby's local map-api — silencer's default `mapapiurl=https://admin.arsiamons.com` is a real production endpoint whose `FetchServerMapList` response ordering is not stable across consecutive HTTP calls. See `tests/lobby-clay/game_create_panel_test/run.sh`'s `write_config` helper for the pattern (writes `~/Library/Application Support/Silencer/config.cfg` with `mapapiurl=http://127.0.0.1:$MAP_API_PORT`).
 - For row+right-badge legacy patterns (SelectBox's "[DL]" badge in the right margin of remote-map rows), do NOT add a flag to ScrollList. Strip the legacy "[DL] " prefix when filling the per-frame Clay_String slab and accept the missing-badge pixel gap (~16x11 per row). For future "row with right-side metadata", compose plain CLAY rows with a right column instead — ScrollList stays screen-agnostic.
+- Sprite-offset compensation for CUSTOM-dispatched sprites whose bbox is "where the visible rect should land" (not "where the sprite anchor sits") happens INSIDE the bridge dispatch: subtract `world.resources.spriteoffsetx/y[bank][index]` from the blit dst. The ScrollBar dispatcher does this for its track sprite (bank 7 idx 9) so the rendered scrollbar's visible top-left equals `bbox.{x,y}` regardless of the sprite's baked anchor. IMAGE/BankButtonChrome dispatchers stay naive — their callers pre-apply the anchor compensation at the layout level via `.floating.offset = (-spriteoffsetx, -spriteoffsety)`. The two conventions co-exist because Clay's IMAGE element naturally renders at bbox.x (caller's responsibility to position it correctly), whereas the ScrollBar CUSTOM payload conceptually means "render the scrollbar visible inside this rect" — the bridge owns the visible→sprite-coord conversion.
 
 ## 2026-05-11T00:00:00Z - bootstrap
 - Ralph artifacts created (ralph.sh, RALPH.md, prd.json, progress.txt).
@@ -619,3 +620,34 @@
   - `Renderer::DrawText`'s [DL] badge handling is baked into `Renderer::Draw` for SelectBox — the legacy renderer literally strips "[DL] " from the row text and paints "DL" at `selectbox->x + width - 16`. Clay's ScrollList has no equivalent badge column. For pixdiff parity, strip the prefix on display and accept the missing-badge gap (~16x11 px per remote row). For future "row with right-side metadata" patterns, do NOT add a flag to ScrollList — write the screen-side composition as plain CLAY rows with a right column instead.
   - `ScrollList` now auto-suppresses the scrollbar when itemCount fits in the visible area (mirrors legacy `scrollbar->draw = overflow?`). This dropped P14's pixdiff from 1.14% → 0.149% with no API change. Future panels that use ScrollList with sometimes-empty lists get this for free.
 ---
+
+## 2026-05-11T21:30:00Z - P7b (ScrollList fixes: conditional scrollbar + bridge sprite-offset compensation + primitive count check) — COMPLETE
+- Three connected bugs in `clients/silencer/src/ui/clay/primitives/scroll_list.{h,cpp}` + the Clay bridge, per the P7b prd spec.
+- BUG #1 (CONDITIONAL SCROLLBAR): Already fixed inline during P15 — see Codebase Patterns entry "`ScrollList` (P7) auto-suppresses the scrollbar when itemCount ≤ visibleLines". scroll_list.cpp:98 computes `drawSb = scrollMax > 0` and the scrollbar CLAY block at lines 144-161 is gated on `if(drawSb)`. This iteration adds the formal acceptance test: two new layout passes inside `RunScrollListCheck` count CUSTOM ScrollBar render commands at itemCount=3 (visibleLines=10 → 0) and itemCount=50 (visibleLines=10 → 1).
+- BUG #2 (SPRITE-OFFSET COMPENSATION IN THE BRIDGE): Fixed. `clay_bridge.cpp` ScrollBar dispatch now subtracts `world.resources.spriteoffsetx/y[bank][trackIndex]` from the blit dst, so the rendered track's visible top-left equals `boundingBox.{x,y}`. The thumb's `+1` offset is unchanged because it is computed from the (now-compensated) `x`, matching the legacy renderer.cpp:927 pattern (`thumbdst.x = dstrect.x + 1`). Empirical confirmation that `spriteoffsetx[7][9]` is non-zero: the existing `scroll_list_test/reference.png` (which was captured WITHOUT compensation) differs from the post-fix render by 0.33% — small in absolute terms but a real shift of the track sprite. Regenerated the reference so the test asserts the corrected behavior going forward.
+- BUG #3 (VISUAL PARENTING): Resolved as a downstream effect of bug #2. With sprite-offset compensation in place, the Clay ScrollList scrollbar lands at exactly the bbox the panel's layout calls for (e.g., GameSelectPanel's `(407 + rowsW)..(407 + rowsW + 8)` column inside the inner bright stroke of the right chrome). The primitive doesn't need a `scrollbarGap` API change.
+- Primitive acceptance asserts (in `tests/lobby-clay/scroll_list_test/run.sh`):
+  - `no_overflow_scrollbar_count == 0`  (itemCount=3,  visibleLines=10)
+  - `overflow_scrollbar_count    == 1`  (itemCount=50, visibleLines=10)
+  - `overflow_scrollbar_bbox_w  == 8`   (= scrollbarWidth default)
+  - `overflow_scrollbar_bbox_h  == 130` (= ScrollListOpts.height)
+  - Plus the original `on_select_fired == 1`, `last_selected_index == 5`.
+- Files changed:
+  - clients/silencer/src/ui/clay/clay_bridge.cpp (ScrollBar dispatch: subtract `spriteoffsetx/y[bank][trackIndex]` from `x/y` before track render + thumb blit)
+  - clients/silencer/src/ui/clay/clay_bridge.h (new ScrollListCheckResult fields)
+  - clients/silencer/src/ui/clay/scroll_list_test.cpp (`RunScrollListCheck` now runs two extra layout passes and counts CUSTOM ScrollBar commands)
+  - clients/silencer/src/net/controldispatch.cpp (expose new counters in `clay_scroll_list_check` JSON)
+  - tests/lobby-clay/scroll_list_test/{run.sh,reference.png} (asserts + regenerated reference)
+  - ralph/{prd.json,progress.txt} (flip P7b.passes + this entry)
+- Build: `cmake --build build -j` → green (only pre-existing `Renderer::GetPixel`/`SetPixel` `-Wundefined-inline` warnings).
+- Pass check:
+  - `tests/lobby-clay/scroll_list_test/run.sh` → pixdiff 0.0000%, all 6 behavioral asserts PASS.
+  - `tests/lobby-clay/game_select_panel_test/run.sh` → P14 = 0.149% (well at-or-below prior 1.14% pass result) ✓
+  - `tests/lobby-clay/game_create_panel_test/run.sh` → P15 = 1.45% (same as P15 prior) ✓
+- **Learnings for future iterations:**
+  - When a CUSTOM dispatcher's payload represents "render the visible widget inside this bbox" (as opposed to IMAGE's "blit the sprite at this top-left"), the dispatcher OWNS the visible→sprite-coord conversion. For sprites with a non-zero baked anchor (`spriteoffsetx/y`), subtract the anchor from the blit destination so visible-top-left == bbox.{x,y}. Mirrors the legacy renderer.cpp:382 `dstrect.x = obj->x - spriteoffsetx[bank][idx]` pattern, but anchored to the Clay bbox instead of a domain object's logical x.
+  - The convention is per-dispatcher: IMAGE/BankButtonChrome continue to blit at bbox.x (callers pre-apply the offset at the layout level via `.floating.offset = (-spriteoffsetx, -spriteoffsety)`). ScrollBar applies the compensation INSIDE the dispatcher. The split is principled: IMAGE elements are "place this sprite at this top-left"; the ScrollBar CUSTOM is "render a scrollbar visible inside this bbox" — the latter abstracts over the underlying sprite geometry.
+  - Track + thumb in the same custom dispatch: only the track needs explicit offset compensation; the thumb position is COMPUTED RELATIVE to the (already-compensated) track origin (`thumb_dst.x = track_dst.x + 1`), mirroring renderer.cpp:927-928. Future multi-sprite CUSTOM dispatchers should follow the same pattern — compensate the root sprite, derive children's positions from it.
+  - To probe "is this primitive emitting the expected number of a given CUSTOM kind?", scan `Clay_RenderCommandArray` after `Clay_EndLayout()` for `commandType == CLAY_RENDER_COMMAND_TYPE_CUSTOM && customData.kind == K`. No new infrastructure needed; works for any CustomKind. Use for any future "primitive should emit zero/one X" acceptance check.
+---
+

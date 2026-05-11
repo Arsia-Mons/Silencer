@@ -67,11 +67,11 @@ if ! awk -v d="$DIFF" 'BEGIN { exit (d + 0 < 2.0) ? 0 : 1 }'; then
   FAILED=1
 fi
 
-# Click-routing check (no PNG; pure JSON).
+# Click-routing + conditional-scrollbar check (no PNG; pure JSON).
 CHECK=$(cli --port "$PORT" clay_scroll_list_check)
 echo "check = $CHECK"
-read FIRED IDX <<EOF
-$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.on_select_fired,j.last_selected_index].join(' '))" "$CHECK")
+read FIRED IDX NO_OFL_CNT OFL_CNT OFL_W OFL_H <<EOF
+$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.on_select_fired,j.last_selected_index,j.no_overflow_scrollbar_count,j.overflow_scrollbar_count,j.overflow_scrollbar_bbox_w,j.overflow_scrollbar_bbox_h].join(' '))" "$CHECK")
 EOF
 
 assert_eq() {
@@ -82,8 +82,15 @@ assert_eq() {
     echo "PASS: $1 = $2"
   fi
 }
-assert_eq "on_select_fired"      "$FIRED" "1"
-assert_eq "last_selected_index"  "$IDX"   "5"
+assert_eq "on_select_fired"            "$FIRED"      "1"
+assert_eq "last_selected_index"        "$IDX"        "5"
+# P7b — conditional scrollbar emission. itemCount=3, visibleLines=10 → 0
+# scrollbar render commands. itemCount=50, visibleLines=10 → 1 command, and
+# its bbox spans the configured scrollbarWidth (8) × height (130).
+assert_eq "no_overflow_scrollbar_count" "$NO_OFL_CNT" "0"
+assert_eq "overflow_scrollbar_count"    "$OFL_CNT"    "1"
+assert_eq "overflow_scrollbar_bbox_w"   "$OFL_W"      "8"
+assert_eq "overflow_scrollbar_bbox_h"   "$OFL_H"      "130"
 
 if [ "$FAILED" != "0" ]; then
   exit 1

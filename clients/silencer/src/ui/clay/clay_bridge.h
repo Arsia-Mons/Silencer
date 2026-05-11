@@ -201,6 +201,20 @@ bool RunScrollListTest(::Game & game, const char * outPath);
 struct ScrollListCheckResult {
 	int onSelectFired;      // Total number of onSelect invocations across all rows.
 	int lastSelectedIndex;  // Index reported by the most recent onSelect call. -1 if none.
+	// P7b — conditional-scrollbar emission. Two extra layout passes (no
+	// overflow + overflow) count the number of CUSTOM ScrollBar render
+	// commands emitted. Confirms the primitive auto-suppresses the
+	// scrollbar when items fit AND emits exactly one when they don't.
+	int noOverflowScrollbarCount;  // itemCount=3, visibleLines=10  → expect 0.
+	int overflowScrollbarCount;    // itemCount=50, visibleLines=10 → expect 1.
+	// Bbox geometry of the single scrollbar render command in the
+	// overflow scenario. The post-blit visible track on the Surface
+	// must equal this rect (i.e., the bridge applies the sprite-offset
+	// compensation that makes visible-top-left == bbox.x/y).
+	int overflowScrollbarBboxX;
+	int overflowScrollbarBboxY;
+	int overflowScrollbarBboxW;
+	int overflowScrollbarBboxH;
 };
 bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out);
 

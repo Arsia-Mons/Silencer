@@ -353,13 +353,27 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
 					case CustomKind::ScrollBar: {
 						const auto * p = reinterpret_cast<const ScrollBarPayload *>(ccd->payload);
 						if(!p) break;
-						const auto & banks = game.GetWorld().resources.spritebank;
+						const auto & res = game.GetWorld().resources;
+						const auto & banks = res.spritebank;
 						if(p->bank >= banks.size()) break;
 						if(p->trackIndex >= banks[p->bank].size()) break;
 						Surface * track = banks[p->bank][p->trackIndex].get();
 						if(!track) break;
-						int x  = static_cast<int>(c->boundingBox.x);
-						int y  = static_cast<int>(c->boundingBox.y);
+						// Sprite-offset compensation. The scrollbar track and
+						// thumb sprites carry a baked anchor offset
+						// (spriteoffsetx/y[bank][index]) — the legacy renderer
+						// subtracts this before BlitSurface so the visible
+						// top-left lands at the object's logical position
+						// (see game_create_panel.cpp:314 + renderer.cpp:382).
+						// The Clay bridge takes the bbox as "where the visible
+						// scrollbar should land", so we mirror the legacy
+						// subtraction here. Without it, the rendered sprite
+						// lands shifted from Clay's layout (visible at
+						// bbox.x + spriteoffsetx instead of bbox.x).
+						const int trackOffX = res.spriteoffsetx[p->bank][p->trackIndex];
+						const int trackOffY = res.spriteoffsety[p->bank][p->trackIndex];
+						int x  = static_cast<int>(c->boundingBox.x) - trackOffX;
+						int y  = static_cast<int>(c->boundingBox.y) - trackOffY;
 						int bw = static_cast<int>(c->boundingBox.width);
 						int bh = static_cast<int>(c->boundingBox.height);
 						if(bw <= 0 || bh <= 0) break;
