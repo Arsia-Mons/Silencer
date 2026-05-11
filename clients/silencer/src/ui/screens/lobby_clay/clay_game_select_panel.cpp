@@ -2,6 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_bridge.h"
+#include "clay_inspector.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/scroll_list.h"
@@ -383,6 +384,21 @@ void BuildGameSelectPanelTree(GameSelectPanelState & state,
 		                             /*user*/       &state });
 	}
 
+	// Register each row as a clickable list-row widget. Labels point into the
+	// row's std::string which is pointer-stable across this frame.
+	for(int i = 0; i < slotCount; ++i){
+		silencer::ui::clay_inspector::Widget w;
+		w.label = state.rows[i].name.c_str();
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::ListRow;
+		w.x = kListX; w.y = kListY + i * kListLineH;
+		w.w = kListW; w.h = kListLineH;
+		w.onClickRow = &OnRowSelected;
+		w.clickUser  = &state;
+		w.rowIndex   = i;
+		w.selected   = (state.selectedIndex == i);
+		silencer::ui::clay_inspector::Register(w);
+	}
+
 	// Info-block text lines at (405, 358/370/382/394/406), bank 133 / w6.
 	const struct { int y; const std::string * txt; const char * id; } kInfoRows[5] = {
 		{ kInfoNameY,    &state.infoName,     "GSelInfoName" },
@@ -419,6 +435,15 @@ void BuildGameSelectPanelTree(GameSelectPanelState & state,
 		                             /*onClick*/    &OnCreateClicked,
 		                             /*user*/       &state });
 	}
+	{
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Create Game";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+		w.x = kBtnCreateX; w.y = kBtnCreateY; w.w = 156; w.h = 21;
+		w.onClick   = &OnCreateClicked;
+		w.clickUser = &state;
+		silencer::ui::clay_inspector::Register(w);
+	}
 
 	// Spectate button at (436, 408) — visible only when spectatable.
 	if(state.spectateVisible){
@@ -434,6 +459,13 @@ void BuildGameSelectPanelTree(GameSelectPanelState & state,
 			                             /*onClick*/    &OnSpectateClicked,
 			                             /*user*/       &state });
 		}
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Spectate";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+		w.x = kBtnSpectateX; w.y = kBtnSpectateY; w.w = 156; w.h = 21;
+		w.onClick = &OnSpectateClicked;
+		w.clickUser = &state;
+		silencer::ui::clay_inspector::Register(w);
 	}
 
 	// Join button at (436, 430) — visible when joinable.
@@ -450,6 +482,13 @@ void BuildGameSelectPanelTree(GameSelectPanelState & state,
 			                             /*onClick*/    &OnJoinClicked,
 			                             /*user*/       &state });
 		}
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Join Game";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+		w.x = kBtnJoinX; w.y = kBtnJoinY; w.w = 156; w.h = 21;
+		w.onClick = &OnJoinClicked;
+		w.clickUser = &state;
+		silencer::ui::clay_inspector::Register(w);
 	}
 }
 

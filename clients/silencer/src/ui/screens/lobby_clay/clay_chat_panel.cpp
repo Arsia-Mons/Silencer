@@ -2,6 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_bridge.h"
+#include "clay_inspector.h"
 #include "primitives/bank_text.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
@@ -315,6 +316,15 @@ void BuildChatPanelTree(ChatPanelState & state,
 		          TextInputHandle{ /*hoveredOut*/ nullptr,
 		                           /*onEnter*/    nullptr,
 		                           /*user*/       nullptr });
+	}
+	{
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Chat";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::TextInput;
+		w.x = kInputX; w.y = kInputY; w.w = kInputW; w.h = kInputH;
+		w.textBuffer    = state.inputBuffer;
+		w.textBufferLen = (int)sizeof(state.inputBuffer);
+		silencer::ui::clay_inspector::Register(w);
 	}
 
 	(void)world;

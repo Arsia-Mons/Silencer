@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+# Drives the Clay-migrated lobby through gameselect → gamecreate using only
+# `cli click --label` and `cli set_text --label`, ending with a Create.
+# Exercises P18 (CLI inspect compatibility for Clay tree): the Clay panels
+# register their interactive widgets in clay_inspector, and controldispatch
+# routes click / set_text through that registry when the active iface has
+# no matching object.
+set -euo pipefail
+. "$(dirname "$0")/lib.sh"
+
+LOBBY_BIN=""
+for candidate in \
+  "$REPO_ROOT/services/lobby/lobby" \
+  "$REPO_ROOT/services/lobby/lobby.exe" \
+  "$REPO_ROOT/services/lobby/silencer-lobby" \
+  "$REPO_ROOT/services/lobby/silencer-lobby.exe"; do
+  if [ -x "$candidate" ]; then LOBBY_BIN="$candidate"; break; fi
+done
+if [ -z "$LOBBY_BIN" ]; then
+  echo "lobby binary missing under services/lobby/ — build it via 'cd services/lobby && go build'" >&2
+  exit 1
+fi
+
+TMP=$(mktemp -d)
+LOBBY_LOG="$TMP/lobby.log"
+LOBBY_DB="$TMP/lobby.json"
+SILENCER_HOME="$TMP/home"
+mkdir -p "$SILENCER_HOME" "$TMP/maps"
+
+# Pin mapapiurl at a local empty endpoint to avoid hitting production.
+mkdir -p "$SILENCER_HOME/Library/Application Support/Silencer"
+
+LOBBY_PORT=$(pick_port)
+PLAYER_AUTH_PORT=$(pick_port)
+MAP_API_PORT=$(pick_port)
+CTRL_PORT=$(pick_port)
+
+cat > "$SILENCER_HOME/Library/Application Support/Silencer/config.cfg" <<EOF
+mapapiurl=http://127.0.0.1:$MAP_API_PORT
+EOF
+
+SILENCER_VERSION=""
+for d in build build-unity build-release; do
+  cache="$REPO_ROOT/clients/silencer/$d/CMakeCache.txt"
+  if [ -f "$cache" ]; then
+    SILENCER_VERSION=$(awk -F= '/^SILENCER_VERSION:STRING=/{print $2}' "$cache")
+    if [ -n "$SILENCER_VERSION" ]; then break; fi
+  fi
+done
+# Fall back to the worktree-root build/ if clients/silencer/build has no cache.
+if [ -z "$SILENCER_VERSION" ] && [ -f "$REPO_ROOT/build/CMakeCache.txt" ]; then
+  SILENCER_VERSION=$(awk -F= '/^SILENCER_VERSION:STRING=/{print $2}' "$REPO_ROOT/build/CMakeCache.txt")
+fi
+if [ -z "$SILENCER_VERSION" ]; then
+  echo "could not read SILENCER_VERSION from any CMakeCache.txt" >&2
+  exit 1
+fi
+
+cleanup() {
+  if [ -n "${SILENCER_PID:-}" ]; then
+    stop_silencer "$SILENCER_PID" "$CTRL_PORT" || true
+  fi
+  if [ -n "${LOBBY_PID:-}" ]; then
+    kill "$LOBBY_PID" 2>/dev/null || true
+    wait "$LOBBY_PID" 2>/dev/null || true
+  fi
+  rm -rf "$TMP"
+}
+trap cleanup EXIT
+
+"$LOBBY_BIN" \
+  -addr ":$LOBBY_PORT" \
+  -db "$LOBBY_DB" \
+  -version "$SILENCER_VERSION" \
+  -game-binary "$SILENCER_BIN" \
+  -maps-dir "$TMP/maps" \
+  -player-auth-addr ":$PLAYER_AUTH_PORT" \
+  -map-api-addr ":$MAP_API_PORT" \
+  >"$LOBBY_LOG" 2>&1 &
+LOBBY_PID=$!
+
+for i in $(seq 1 60); do
+  if (echo > "/dev/tcp/127.0.0.1/$LOBBY_PORT") 2>/dev/null; then
+    break
+  fi
+  sleep 0.25
+  if [ "$i" = 60 ]; then
+    echo "lobby on :$LOBBY_PORT never came up" >&2
+    cat "$LOBBY_LOG" >&2
+    exit 1
+  fi
+done
+
+HOME="$SILENCER_HOME" SILENCER_LOBBY_CLAY=1 "$SILENCER_BIN" \
+  --headless \
+  --control-port "$CTRL_PORT" \
+  --lobby-host 127.0.0.1 \
+  --lobby-port "$LOBBY_PORT" \
+  >"/tmp/silencer-e2e-$CTRL_PORT.log" 2>&1 &
+SILENCER_PID=$!
+wait_alive "$CTRL_PORT"
+
+wait_for_iface() {
+  for i in $(seq 1 100); do
+    iface=$(cli --port "$CTRL_PORT" state | bun -e \
+      'const t=await new Response(Bun.stdin.stream()).text(); console.log(JSON.parse(t).current_interface_id||0);')
+    if [ "${iface:-0}" != "0" ]; then return 0; fi
+    sleep 0.05
+  done
+  echo "current_interface_id never became non-zero" >&2
+  return 1
+}
+
+wait_for_lobby_state() {
+  local target="$1"
+  for i in $(seq 1 80); do
+    ls=$(cli --port "$CTRL_PORT" state | bun -e \
+      'const t=await new Response(Bun.stdin.stream()).text(); console.log(JSON.parse(t).lobby_state||"");')
+    if [ "$ls" = "$target" ]; then return 0; fi
+    sleep 0.1
+  done
+  echo "lobby_state never became $target (last=$ls)" >&2
+  return 1
+}
+
+cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
+wait_for_iface
+cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
+cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
+wait_for_iface
+
+cli --port "$CTRL_PORT" set_text --uid 1 --text "claybob" >/dev/null
+cli --port "$CTRL_PORT" set_text --uid 2 --text "secret" >/dev/null
+wait_for_lobby_state AUTHENTICATING
+cli --port "$CTRL_PORT" click --label "Login" >/dev/null
+cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
+wait_for_iface
+
+# Drive a few frames so the Clay panels run their first Build pass and
+# register widgets into the inspector.
+cli --port "$CTRL_PORT" step --frames 5 >/dev/null
+
+# inspect should now list Clay widgets including "Create Game".
+got=$(cli --port "$CTRL_PORT" inspect | bun -e \
+  'const t=await new Response(Bun.stdin.stream()).text();
+   const r=JSON.parse(t);
+   const has=(lbl)=>r.widgets.some((w)=>w.label===lbl && w.source==="clay");
+   console.log(has("Create Game") ? "ok" : "missing");')
+if [ "$got" != "ok" ]; then
+  echo "inspect did not surface Clay 'Create Game' widget" >&2
+  cli --port "$CTRL_PORT" inspect >&2 || true
+  exit 1
+fi
+
+# Step from gameselect → gamecreate via the Clay registry path.
+cli --port "$CTRL_PORT" click --label "Create Game" >/dev/null
+cli --port "$CTRL_PORT" step --frames 5 >/dev/null
+
+# inspect should now list the gamecreate widgets ("Create", "Game name").
+got=$(cli --port "$CTRL_PORT" inspect | bun -e \
+  'const t=await new Response(Bun.stdin.stream()).text();
+   const r=JSON.parse(t);
+   const has=(lbl)=>r.widgets.some((w)=>w.label===lbl && w.source==="clay");
+   console.log(has("Create") && has("Game name") ? "ok" : "missing");')
+if [ "$got" != "ok" ]; then
+  echo "inspect did not surface gamecreate Clay widgets" >&2
+  cli --port "$CTRL_PORT" inspect >&2 || true
+  exit 1
+fi
+
+# Set the game name + pick the first map row via Clay set_text / click.
+cli --port "$CTRL_PORT" set_text --label "Game name" --text "ClayTest" >/dev/null
+
+# Locate the first listrow's label (map name) and click it.
+first_map=$(cli --port "$CTRL_PORT" inspect | bun -e \
+  'const t=await new Response(Bun.stdin.stream()).text();
+   const r=JSON.parse(t);
+   const row=r.widgets.find((w)=>w.kind==="listrow" && w.source==="clay" && w.row_index===0);
+   console.log(row && row.label ? row.label : "");')
+if [ -z "$first_map" ]; then
+  echo "no Clay listrow with row_index=0 in inspect" >&2
+  exit 1
+fi
+cli --port "$CTRL_PORT" click --label "$first_map" >/dev/null
+cli --port "$CTRL_PORT" step --frames 5 >/dev/null
+
+# Verify the row got marked selected.
+sel=$(cli --port "$CTRL_PORT" inspect | bun -e \
+  'const t=await new Response(Bun.stdin.stream()).text();
+   const r=JSON.parse(t);
+   const row=r.widgets.find((w)=>w.kind==="listrow" && w.source==="clay" && w.row_index===0);
+   console.log(row && row.selected ? "yes" : "no");')
+if [ "$sel" != "yes" ]; then
+  echo "map row click did not mark the row selected" >&2
+  exit 1
+fi
+
+# Verify the text input now reads "ClayTest".
+name=$(cli --port "$CTRL_PORT" inspect | bun -e \
+  'const t=await new Response(Bun.stdin.stream()).text();
+   const r=JSON.parse(t);
+   const w=r.widgets.find((w)=>w.kind==="textinput" && w.label==="Game name" && w.source==="clay");
+   console.log(w ? (w.text || "") : "");')
+if [ "$name" != "ClayTest" ]; then
+  echo "set_text on Game name did not stick (got: '$name')" >&2
+  exit 1
+fi
+
+# Click Create. The GameCreatePanelTick consumes the flag and runs the legacy
+# CreateGame kickoff (with bundled map → mapUploadState=2 → CreateGame). The
+# client pushes a MessageModal::Progress("Uploading map...") modal.
+cli --port "$CTRL_PORT" click --label "Create" >/dev/null
+
+# Wait a few frames for either the progress modal to push (success path) or
+# an immediate error modal ("No map selected", "Could not create game"). The
+# Clay panel teardown only happens AFTER the Create flow completes, so for
+# this test we just want to confirm Create dispatched without hitting the
+# WIDGET_NOT_FOUND path.
+cli --port "$CTRL_PORT" step --frames 30 >/dev/null
+
+echo "PASS 40_lobby_clay_basic"

@@ -2,6 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_bridge.h"
+#include "clay_inspector.h"
 #include "primitives/bank_button.h"
 
 #include "lobby_clay_screen.h"
@@ -119,6 +120,14 @@ void BuildGameJoinPanelTree(GameJoinPanelState & state,
 		                             /*onClick*/    &OnTechClicked,
 		                             /*user*/       &state });
 	}
+	{
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Choose Tech";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+		w.x = kBtnTechX; w.y = kBtnTechY; w.w = 156; w.h = 21;
+		w.onClick = &OnTechClicked; w.clickUser = &state;
+		silencer::ui::clay_inspector::Register(w);
+	}
 
 	// Change Team button (middle).
 	const int teamOffX = kBtnTeamX - resources.spriteoffsetx[7][24];
@@ -133,6 +142,14 @@ void BuildGameJoinPanelTree(GameJoinPanelState & state,
 		                             /*onClick*/    &OnTeamClicked,
 		                             /*user*/       &state });
 	}
+	{
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Change Team";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+		w.x = kBtnTeamX; w.y = kBtnTeamY; w.w = 156; w.h = 21;
+		w.onClick = &OnTeamClicked; w.clickUser = &state;
+		silencer::ui::clay_inspector::Register(w);
+	}
 
 	// Ready / Waiting... button (bottom). Label is mutated each Tick.
 	const int readyOffX = kBtnReadyX - resources.spriteoffsetx[7][24];
@@ -146,6 +163,14 @@ void BuildGameJoinPanelTree(GameJoinPanelState & state,
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*onClick*/    &OnReadyClicked,
 		                             /*user*/       &state });
+	}
+	{
+		silencer::ui::clay_inspector::Widget w;
+		w.label = state.readyLabel.c_str();
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+		w.x = kBtnReadyX; w.y = kBtnReadyY; w.w = 156; w.h = 21;
+		w.onClick = &OnReadyClicked; w.clickUser = &state;
+		silencer::ui::clay_inspector::Register(w);
 	}
 }
 

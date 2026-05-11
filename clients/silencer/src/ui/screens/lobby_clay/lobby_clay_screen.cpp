@@ -17,6 +17,7 @@
 
 #include "clay/clay.h"
 #include "clay_bridge.h"
+#include "clay_inspector.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/scroll_list.h"
@@ -160,6 +161,13 @@ void BuildChromeTree(LobbyClayScreen * screen,
 			             .onClick = &OnGoBackClicked,
 			             .user = screen });
 		}
+		silencer::ui::clay_inspector::Widget gb;
+		gb.label = "Go Back";
+		gb.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+		gb.x = 473; gb.y = 29; gb.w = 156; gb.h = 21;
+		gb.onClick = &OnGoBackClicked;
+		gb.clickUser = screen;
+		silencer::ui::clay_inspector::Register(gb);
 	}
 }
 }  // namespace
@@ -424,6 +432,7 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	ScrollListBeginFrame();
 	ScrollTextBoxBeginFrame();
 	TextInputBeginFrame();
+	silencer::ui::clay_inspector::BeginFrame();
 
 	Clay_BeginLayout();
 	BuildChromeTree(this, version, mapName, ctx.world.resources);

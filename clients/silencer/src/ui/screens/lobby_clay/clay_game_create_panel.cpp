@@ -2,6 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_bridge.h"
+#include "clay_inspector.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/form_border.h"
@@ -417,13 +418,22 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 		                             /*onClick*/    &OnSecurityClicked,
 		                             /*user*/       &state });
 	}
+	{
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Security";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+		w.x = kValueX; w.y = kFormTop + kYOffset; w.w = 60; w.h = kRowHeight;
+		w.onClick   = &OnSecurityClicked;
+		w.clickUser = &state;
+		silencer::ui::clay_inspector::Register(w);
+	}
 
 	// Min/Max Level, Max Players, Max Teams (TextInput, numbersOnly).
-	const struct { const char * id; int y; char * buf; } kTextInputs[4] = {
-		{ "GCrtMinLevel",   kFormTop + (kYSpace * 1) + kYOffset, state.minLevel },
-		{ "GCrtMaxLevel",   kFormTop + (kYSpace * 2) + kYOffset, state.maxLevel },
-		{ "GCrtMaxPlayers", kFormTop + (kYSpace * 3) + kYOffset, state.maxPlayers },
-		{ "GCrtMaxTeams",   kFormTop + (kYSpace * 4) + kYOffset, state.maxTeams },
+	const struct { const char * id; const char * label; int y; char * buf; int cap; } kTextInputs[4] = {
+		{ "GCrtMinLevel",   "Min Level",   kFormTop + (kYSpace * 1) + kYOffset, state.minLevel,   (int)sizeof(state.minLevel) },
+		{ "GCrtMaxLevel",   "Max Level",   kFormTop + (kYSpace * 2) + kYOffset, state.maxLevel,   (int)sizeof(state.maxLevel) },
+		{ "GCrtMaxPlayers", "Max Players", kFormTop + (kYSpace * 3) + kYOffset, state.maxPlayers, (int)sizeof(state.maxPlayers) },
+		{ "GCrtMaxTeams",   "Max Teams",   kFormTop + (kYSpace * 4) + kYOffset, state.maxTeams,   (int)sizeof(state.maxTeams) },
 	};
 	for(int i = 0; i < 4; ++i){
 		Clay_String wrapId;
@@ -449,6 +459,13 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 			inputId.chars  = idStr.c_str();
 			TextInput(inputId, kTextInputs[i].buf, opts, {});
 		}
+		silencer::ui::clay_inspector::Widget w;
+		w.label = kTextInputs[i].label;
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::TextInput;
+		w.x = kValueX; w.y = kTextInputs[i].y; w.w = 20; w.h = kRowHeight;
+		w.textBuffer    = kTextInputs[i].buf;
+		w.textBufferLen = kTextInputs[i].cap;
+		silencer::ui::clay_inspector::Register(w);
 	}
 
 	// Spectatable cycler (BankButton::Inline).
@@ -462,6 +479,16 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*onClick*/    &OnSpectatableClicked,
 		                             /*user*/       &state });
+	}
+	{
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Spectatable";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+		w.x = kValueX; w.y = kFormTop + (kYSpace * 5) + kYOffset; w.w = 30; w.h = kRowHeight;
+		w.onClick = &OnSpectatableClicked;
+		w.clickUser = &state;
+		w.selected = state.spectatable;
+		silencer::ui::clay_inspector::Register(w);
 	}
 
 	// "Select Map" header + map ScrollList.
@@ -513,6 +540,21 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 		                             /*user*/       &state });
 	}
 
+	// Register each map row as a clickable list-row. Use the post-strip
+	// display string (matches the visible label and what the test will pass).
+	for(int i = 0; i < slotCount; ++i){
+		silencer::ui::clay_inspector::Widget w;
+		w.label = g_mapSlab[i].chars;
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::ListRow;
+		w.x = kMapListX; w.y = kMapListY + i * kMapListLineH;
+		w.w = kMapListW; w.h = kMapListLineH;
+		w.onClickRow = &OnMapRowSelected;
+		w.clickUser  = &state;
+		w.rowIndex   = i;
+		w.selected   = (state.mapSelectedIndex == i);
+		silencer::ui::clay_inspector::Register(w);
+	}
+
 	// Game name label + input.
 	CLAY({ .id = CLAY_ID("GCrtNameLabelWrap"),
 	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
@@ -532,6 +574,15 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 		opts.brightness  = 128;
 		opts.showCaret   = false;
 		TextInput(CLAY_STRING("GCrtNameInput"), state.name, opts, {});
+	}
+	{
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Game name";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::TextInput;
+		w.x = kNameInputX; w.y = kNameInputY; w.w = kNameInputW; w.h = kNameInputH;
+		w.textBuffer    = state.name;
+		w.textBufferLen = (int)sizeof(state.name);
+		silencer::ui::clay_inspector::Register(w);
 	}
 
 	// Password label + input.
@@ -555,6 +606,16 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 		opts.showCaret   = false;
 		TextInput(CLAY_STRING("GCrtPwInput"), state.password, opts, {});
 	}
+	{
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Password";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::TextInput;
+		w.x = kPwInputX; w.y = kPwInputY; w.w = kPwInputW; w.h = kPwInputH;
+		w.textBuffer    = state.password;
+		w.textBufferLen = (int)sizeof(state.password);
+		w.isPassword    = true;
+		silencer::ui::clay_inspector::Register(w);
+	}
 
 	// Create button (Chrome variant).
 	const int createOffX = kCreateBtnX - resources.spriteoffsetx[7][24];
@@ -568,6 +629,15 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*onClick*/    &OnCreateClicked,
 		                             /*user*/       &state });
+	}
+	{
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Create";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+		w.x = kCreateBtnX; w.y = kCreateBtnY; w.w = 156; w.h = 21;
+		w.onClick = &OnCreateClicked;
+		w.clickUser = &state;
+		silencer::ui::clay_inspector::Register(w);
 	}
 }
 

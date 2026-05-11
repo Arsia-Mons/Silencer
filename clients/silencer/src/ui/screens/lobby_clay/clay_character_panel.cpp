@@ -2,6 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_bridge.h"
+#include "clay_inspector.h"
 #include "primitives/bank_text.h"
 #include "primitives/toggle.h"
 
@@ -42,6 +43,9 @@ const AgencyDef kAgencies[5] = {
 	{ "CharTglStatic",    3, Team::STATIC },
 	{ "CharTglBlackrose", 4, Team::BLACKROSE },
 };
+
+// Inspector labels — one per agency, in the same order as kAgencies.
+const char * kAgencyLabels[5] = { "Noxis", "Lazarus", "Caliber", "Static", "Blackrose" };
 
 // Per-frame click adapters: each toggle's onClick gets (state*, agency)
 // via a stable per-row record allocated from this fixed-capacity arena.
@@ -201,6 +205,17 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 			                     .onClick    = &OnAgencyClicked,
 			                     .user       = &g_adapters[i] });
 		}
+
+		silencer::ui::clay_inspector::Widget w;
+		w.label = kAgencyLabels[i];
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::Toggle;
+		w.x = tx; w.y = baseY;
+		w.w = spriteW > 0 ? spriteW : (Uint16)16;
+		w.h = spriteH > 0 ? spriteH : (Uint16)16;
+		w.onClick   = &OnAgencyClicked;
+		w.clickUser = &g_adapters[i];
+		w.selected  = (state.selectedAgency == def.agency);
+		silencer::ui::clay_inspector::Register(w);
 	}
 
 	// LEVEL / WINS / LOSSES / XP — bank 133 / w7 / eff=129, brightness

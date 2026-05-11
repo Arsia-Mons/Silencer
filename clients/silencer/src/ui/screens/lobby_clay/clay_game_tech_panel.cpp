@@ -2,6 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_bridge.h"
+#include "clay_inspector.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/toggle.h"
@@ -244,6 +245,14 @@ void BuildGameTechPanelTree(GameTechPanelState & state,
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*onClick*/    &OnBackClicked,
 		                             /*user*/       &state });
+	}
+	{
+		silencer::ui::clay_inspector::Widget w;
+		w.label = "Back To Teams";
+		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+		w.x = kBtnBackX; w.y = kBtnBackY; w.w = 156; w.h = 21;
+		w.onClick = &OnBackClicked; w.clickUser = &state;
+		silencer::ui::clay_inspector::Register(w);
 	}
 
 	// Tech slots left text (bank 133/w6/eff=129/brightness=144/colorRamp).

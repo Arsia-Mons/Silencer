@@ -179,7 +179,7 @@
       "id": "P18",
       "priority": 18,
       "name": "CLI inspect compatibility for Clay tree",
-      "passes": false,
+      "passes": true,
       "spec": "The CLI `inspect` op walks the active Interface's objects and emits {id, kind, label, x, y, w, h}. For LobbyClayScreen there's no Interface — add a parallel path: every Clay element with a stable ID + a registered 'inspectable' tag in userData is emitted as a widget by the screen's custom inspect hook. Buttons, toggles, text inputs, list rows must all be addressable by `cli click --label X` and `cli set_text --label X --text Y`.",
       "pass_check": "tests/cli-agent/e2e/test_lobby_basic.sh (a new test) drives the lobby through gameselect → gamecreate using only `cli click --label` and `cli set_text --label` and ends with a Create. Green."
     },

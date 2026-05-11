@@ -14,6 +14,7 @@
 #include "os.h"
 #include "shared.h"
 #include "clay_bridge.h"
+#include "clay_inspector.h"
 #include "lobby_screen.h"
 #include "screen_context.h"
 #include <cstring>
@@ -445,6 +446,41 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			}
 			widgets.push_back(std::move(w));
 		}
+		// Clay screens have no Interface objects, so the iface walk above is
+		// empty for them. Surface registered Clay widgets (from the most
+		// recent Build pass) alongside the legacy widgets so clients see a
+		// unified view. Tagged with `"source": "clay"` to disambiguate.
+		for(const auto & cw : silencer::ui::clay_inspector::All()){
+			nlohmann::json w;
+			w["source"] = "clay";
+			w["x"] = cw.x; w["y"] = cw.y;
+			w["w"] = cw.w; w["h"] = cw.h;
+			if(cw.label) w["label"] = cw.label;
+			using K = silencer::ui::clay_inspector::WidgetKind;
+			switch(cw.kind){
+				case K::Button:    w["kind"] = "button"; break;
+				case K::Toggle:
+					w["kind"] = "toggle";
+					w["selected"] = cw.selected;
+					break;
+				case K::TextInput:
+					w["kind"] = "textinput";
+					w["password"] = cw.isPassword;
+					if(cw.textBuffer){
+						w["text"] = cw.isPassword
+							? std::string(strlen(cw.textBuffer), '*')
+							: std::string(cw.textBuffer);
+						w["maxchars"] = cw.textBufferLen;
+					}
+					break;
+				case K::ListRow:
+					w["kind"] = "listrow";
+					w["row_index"] = cw.rowIndex;
+					w["selected"] = cw.selected;
+					break;
+			}
+			widgets.push_back(std::move(w));
+		}
 		nlohmann::json r;
 		r["widgets"] = widgets;
 		r["interface_id"] = ifid;
@@ -465,79 +501,138 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}
 		Uint16 ifid = game.GetCurrentInterfaceId();
 		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
+		if(iface){
+			Uint64 mask = (1ULL << ObjectTypes::BUTTON) | (1ULL << ObjectTypes::TOGGLE);
+			Uint16 wid = 0;
+			auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
+			if(m == Interface::MATCH_OK){
+				Object* o = game.GetWorld().GetObjectFromId(wid);
+				if(o->type == ObjectTypes::BUTTON){
+					Button* b = (Button*)o;
+					b->Activate();
+					b->clicked = true;
+				} else if(o->type == ObjectTypes::TOGGLE){
+					Toggle* t = (Toggle*)o;
+					t->selected = !t->selected;
+				}
+				nlohmann::json r;
+				r["widget_id"] = wid;
+				cmd.reply->set_value(OkResult(cmd.id, r));
+				return;
+			}
+			if(m == Interface::MATCH_AMBIGUOUS){
+				cmd.reply->set_value(Err(cmd.id, "WIDGET_AMBIGUOUS",
+					"multiple widgets match \"" + target + "\""));
+				return;
+			}
+			// MATCH_NOT_FOUND falls through to the Clay registry lookup below.
+		}
+		// Clay screens: registry lookup by label. Buttons / Toggles / ListRows
+		// dispatch the registered callback synchronously — same effect as
+		// Clay_OnHover firing on a real press.
+		const auto * cw = silencer::ui::clay_inspector::FindByLabel(target.c_str());
+		if(cw){
+			using K = silencer::ui::clay_inspector::WidgetKind;
+			if(cw->kind == K::Button || cw->kind == K::Toggle){
+				if(cw->onClick) cw->onClick(cw->clickUser);
+				nlohmann::json r;
+				r["source"] = "clay";
+				cmd.reply->set_value(OkResult(cmd.id, r));
+				return;
+			}
+			if(cw->kind == K::ListRow){
+				if(cw->onClickRow) cw->onClickRow(cw->clickUser, cw->rowIndex);
+				nlohmann::json r;
+				r["source"] = "clay";
+				r["row_index"] = cw->rowIndex;
+				cmd.reply->set_value(OkResult(cmd.id, r));
+				return;
+			}
+			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
+				"clay widget \"" + target + "\" is not clickable"));
+			return;
+		}
 		if(!iface){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
 			return;
 		}
-		Uint64 mask = (1ULL << ObjectTypes::BUTTON) | (1ULL << ObjectTypes::TOGGLE);
-		Uint16 wid = 0;
-		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
-		if(m == Interface::MATCH_NOT_FOUND){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-				"no widget matches \"" + target + "\""));
-			return;
-		}
-		if(m == Interface::MATCH_AMBIGUOUS){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_AMBIGUOUS",
-				"multiple widgets match \"" + target + "\""));
-			return;
-		}
-		Object* o = game.GetWorld().GetObjectFromId(wid);
-		if(o->type == ObjectTypes::BUTTON){
-			Button* b = (Button*)o;
-			b->Activate(); // existing behavior used by the main menu
-			b->clicked = true;
-		} else if(o->type == ObjectTypes::TOGGLE){
-			Toggle* t = (Toggle*)o;
-			t->selected = !t->selected;
-		}
-		nlohmann::json r;
-		r["widget_id"] = wid;
-		cmd.reply->set_value(OkResult(cmd.id, r));
+		cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
+			"no widget matches \"" + target + "\""));
 		return;
 	}
 	if(cmd.op == "set_text"){
 		std::string text = cmd.args.value("text", std::string());
 		Uint16 ifid = game.GetCurrentInterfaceId();
 		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(!iface){ cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface")); return; }
-		// Address either by uid (developer-assigned label inside the iface,
-		// stable across runs) or by the existing label/id path. uid wins when
-		// both are passed.
-		Object* target = nullptr;
-		if(cmd.args.contains("uid")){
-			int uid = cmd.args["uid"].get<int>();
-			target = iface->GetObjectWithUid(game.GetWorld(), (Uint8)uid);
-			if(!target){
-				cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-					"no widget with uid " + std::to_string(uid)));
+		if(iface){
+			// Address either by uid (developer-assigned label inside the iface,
+			// stable across runs) or by the existing label/id path. uid wins when
+			// both are passed.
+			Object* target = nullptr;
+			if(cmd.args.contains("uid")){
+				int uid = cmd.args["uid"].get<int>();
+				target = iface->GetObjectWithUid(game.GetWorld(), (Uint8)uid);
+				if(!target){
+					cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
+						"no widget with uid " + std::to_string(uid)));
+					return;
+				}
+			}else if(cmd.args.contains("label")){
+				std::string label = cmd.args["label"].get<std::string>();
+				Uint64 mask = (1ULL << ObjectTypes::TEXTBOX) | (1ULL << ObjectTypes::TEXTINPUT);
+				Uint16 wid = 0;
+				auto m = iface->FindWidgetByLabel(game.GetWorld(), label.c_str(), mask, &wid);
+				if(m == Interface::MATCH_OK){
+					target = game.GetWorld().GetObjectFromId(wid);
+				}else if(m == Interface::MATCH_AMBIGUOUS){
+					cmd.reply->set_value(Err(cmd.id, "WIDGET_AMBIGUOUS", label));
+					return;
+				}
+				// MATCH_NOT_FOUND falls through to Clay registry below.
+			}
+			if(target){
+				if(target->type == ObjectTypes::TEXTBOX){
+					TextBox* tb = (TextBox*)target;
+					tb->text.clear();
+					tb->AddText(text.c_str());
+				}else if(target->type == ObjectTypes::TEXTINPUT){
+					TextInput* ti = (TextInput*)target;
+					ti->SetText(text.c_str());
+				}else{
+					cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
+						"widget is not a textbox or textinput"));
+					return;
+				}
+				cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 				return;
 			}
-		}else{
-			std::string label = cmd.args.value("label", std::string());
-			Uint64 mask = (1ULL << ObjectTypes::TEXTBOX) | (1ULL << ObjectTypes::TEXTINPUT);
-			Uint16 wid = 0;
-			auto m = iface->FindWidgetByLabel(game.GetWorld(), label.c_str(), mask, &wid);
-			if(m != Interface::MATCH_OK){
-				cmd.reply->set_value(Err(cmd.id, m == Interface::MATCH_NOT_FOUND
-					? "WIDGET_NOT_FOUND" : "WIDGET_AMBIGUOUS", label));
-				return;
-			}
-			target = game.GetWorld().GetObjectFromId(wid);
 		}
-		if(target->type == ObjectTypes::TEXTBOX){
-			TextBox* tb = (TextBox*)target;
-			tb->text.clear();
-			tb->AddText(text.c_str());
-		}else if(target->type == ObjectTypes::TEXTINPUT){
-			TextInput* ti = (TextInput*)target;
-			ti->SetText(text.c_str());
-		}else{
-			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
-				"widget is not a textbox or textinput"));
+		// Clay registry fallback — label-only (Clay text inputs don't have
+		// numeric uids).
+		if(cmd.args.contains("label")){
+			std::string label = cmd.args["label"].get<std::string>();
+			const auto * cw = silencer::ui::clay_inspector::FindByLabel(label.c_str());
+			if(cw && cw->kind == silencer::ui::clay_inspector::WidgetKind::TextInput
+			   && cw->textBuffer && cw->textBufferLen > 0){
+				int cap = cw->textBufferLen - 1;
+				int n = (int)text.size();
+				if(n > cap) n = cap;
+				std::memcpy(cw->textBuffer, text.data(), n);
+				cw->textBuffer[n] = '\0';
+				nlohmann::json r;
+				r["source"] = "clay";
+				cmd.reply->set_value(OkResult(cmd.id, r));
+				return;
+			}
+			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", label));
 			return;
 		}
-		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		if(!iface){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface"));
+			return;
+		}
+		cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+			"set_text needs label or uid"));
 		return;
 	}
 
