@@ -1,11 +1,9 @@
 #include "update.h"
 
 #include "context.h"
-
 #include "layout.h"
-#include "node.h"
-#include "render.h"
 #include "render_commands.h"
+#include "theme.h"
 
 #include "game.h"
 #include "game_state.h"
@@ -18,64 +16,101 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
 
 namespace ui {
 namespace v2 {
 
-Node BuildUpdate(const Context & ctx, const UpdateHandlers & handlers,
-                 const UpdateState * state)
-{
+namespace {
+
+// Frame-local string arena. Same shape as main_menu / options / options_audio
+// — reset at the top of RenderUpdate; buffer survives through Clay_EndLayout.
+constexpr size_t kFrameStringBytes = 512;
+thread_local char   g_frame_strings[kFrameStringBytes];
+thread_local size_t g_frame_off = 0;
+
+Clay_String FrameStr(const char * s) {
+	size_t n = std::strlen(s);
+	if(g_frame_off + n + 1 > kFrameStringBytes) g_frame_off = 0;
+	char * p = &g_frame_strings[g_frame_off];
+	std::memcpy(p, s, n);
+	p[n] = '\0';
+	g_frame_off += n + 1;
+	Clay_String out{};
+	out.length = (int32_t)n;
+	out.chars  = p;
+	return out;
+}
+
+void OnButtonClick(Clay_ElementId, Clay_PointerData p, intptr_t user) {
+	if(p.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
+	auto * h = reinterpret_cast<const std::function<void()> *>(user);
+	if(h && *h) (*h)();
+}
+
+void MenuButton(const char * key, const char * label, const std::function<void()> & handler) {
+	Clay_String key_s   = FrameStr(key);
+	Clay_String label_s = FrameStr(label);
+	CLAY({
+		.id = Clay_GetElementId(key_s),
+		.layout = {
+			.sizing = { CLAY_SIZING_FIXED(196), CLAY_SIZING_FIXED(33) },
+			.childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+		},
+		.backgroundColor = Clay_Hovered() ? ::ui::kColorSelectHi : ::ui::kColorScrollbarFill,
+		.cornerRadius    = ::ui::kCornerSmall,
+	}) {
+		Clay_OnHover(OnButtonClick, (intptr_t)&handler);
+		CLAY_TEXT(label_s, CLAY_TEXT_CONFIG(::ui::kFontTitle));
+	}
+}
+
+}  // namespace
+
+void RenderUpdate(const Context & ctx, const UpdateHandlers & h,
+                  const UpdateState & state) {
 	(void)ctx;
-	// Mirrors UpdateScreen::Build (clients/silencer/src/ui/screens/update/
-	// update_screen.cpp). At preview gate (state == nullptr) the legacy
-	// post-Build pre-Tick state renders:
-	//   - background overlay sprite (bank=40, idx=4) at (0, 0)
-	//   - status/progress overlays contribute no pixels (empty text)
-	//   - all four B156x21 buttons draw because Tick — which gates draw on
-	//     Updater state — hasn't run. Three of them stack at (161, 230)
-	//     with their texts ("Update", "Retry", "Download") stamped on top
-	//     of each other in objectlist order; cancel sits alone at (322, 230).
-	if(state == nullptr){
-		return Background(/*bank=*/40, /*index=*/4, {
-			Button("Update",   ButtonType::B156x21).at(161, 230).onClick(handlers.on_update),
-			Button("Cancel",   ButtonType::B156x21).at(322, 230).onClick(handlers.on_cancel),
-			Button("Retry",    ButtonType::B156x21).at(161, 230).onClick(handlers.on_retry),
-			Button("Download", ButtonType::B156x21).at(161, 230).onClick(handlers.on_download),
-		});
+	g_frame_off = 0;
+
+	CLAY({
+		.id = CLAY_ID("UpdateRoot"),
+		.layout = {
+			.sizing          = { CLAY_SIZING_GROW(), CLAY_SIZING_GROW() },
+			.childGap        = 8,
+			.childAlignment  = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+			.layoutDirection = CLAY_TOP_TO_BOTTOM,
+		},
+		.backgroundColor = ::ui::kColorPanelBg,
+	}) {
+		if(!state.status_text.empty()){
+			CLAY({ .id = CLAY_ID("UpdateStatus") }) {
+				CLAY_TEXT(FrameStr(state.status_text.c_str()),
+				          CLAY_TEXT_CONFIG(::ui::kFontHeading));
+			}
+		}
+		if(!state.progress_text.empty()){
+			CLAY({ .id = CLAY_ID("UpdateProgress") }) {
+				CLAY_TEXT(FrameStr(state.progress_text.c_str()),
+				          CLAY_TEXT_CONFIG(::ui::kFontHeading));
+			}
+		}
+		switch(state.left){
+			case UpdateState::LeftButton::Update:
+				MenuButton("update", "Update", h.on_update);
+			break;
+			case UpdateState::LeftButton::Retry:
+				MenuButton("retry", "Retry", h.on_retry);
+			break;
+			case UpdateState::LeftButton::Download:
+				MenuButton("download", "Download", h.on_download);
+			break;
+			case UpdateState::LeftButton::None: break;
+		}
+		if(state.show_cancel){
+			MenuButton("cancel", "Cancel", h.on_cancel);
+		}
 	}
-	// Live path: render only the buttons UpdateScreen::Tick gates as
-	// active. Status/progress overlays use textbank=134, textwidth=8,
-	// recentered each frame around x=320.
-	std::vector<Node> children;
-	switch(state->left){
-		case UpdateState::LeftButton::Update:
-			children.push_back(Button("Update", ButtonType::B156x21)
-				.at(161, 230).onClick(handlers.on_update));
-		break;
-		case UpdateState::LeftButton::Retry:
-			children.push_back(Button("Retry", ButtonType::B156x21)
-				.at(161, 230).onClick(handlers.on_retry));
-		break;
-		case UpdateState::LeftButton::Download:
-			children.push_back(Button("Download", ButtonType::B156x21)
-				.at(161, 230).onClick(handlers.on_download));
-		break;
-		case UpdateState::LeftButton::None: break;
-	}
-	if(state->show_cancel){
-		children.push_back(Button("Cancel", ButtonType::B156x21)
-			.at(322, 230).onClick(handlers.on_cancel));
-	}
-	if(!state->status_text.empty()){
-		int x = 320 - (int)((state->status_text.length() * 8) / 2);
-		children.push_back(Label(state->status_text, /*bank=*/134, /*width=*/8).at(x, 200));
-	}
-	if(!state->progress_text.empty()){
-		int x = 320 - (int)((state->progress_text.length() * 8) / 2);
-		children.push_back(Label(state->progress_text, /*bank=*/134, /*width=*/8).at(x, 215));
-	}
-	return Background(/*bank=*/40, /*index=*/4, std::move(children));
 }
 
 // -----------------------------------------------------------------------------
@@ -189,27 +224,20 @@ void UpdateRuntime::Render(Surface & target, ::Renderer & renderer,
 	};
 	ctx.mouse_x = mouse_x;
 	ctx.mouse_y = mouse_y;
-	ctx.state   = &state_;
 	ctx.dt      = dt;
 
-	UpdateHandlers handlers = BuildUpdateHandlers(sctx_, sctx_.updater);
-	UpdateState live = CurrentUpdate(sctx_.updater);
 	target.Clear(0);
-	state_.BeginFrame();
-	Node tree = BuildUpdate(ctx, handlers, &live);
-	::ui::v2::EnsureClayContext(ctx);
+
+	EnsureClayContext(ctx);
 	Clay_SetPointerState(Clay_Vector2{ (float)mouse_x, (float)mouse_y }, /*pointer_down=*/false);
 	Clay_UpdateScrollContainers(/*drag=*/false, Clay_Vector2{ 0.0f, 0.0f }, dt);
-	Clay_RenderCommandArray cmds = Layout(tree, ctx);
-	::ui::v2::Render(tree, ctx, target, renderer);
-	// Canonical post-migration draw path (P02). Today the Node IR is the
-	// authority for sprite/text content, so the command array carries
-	// only structural rectangles (no fill, no children of TYPE_TEXT/IMAGE) —
-	// DrawRenderCommands is effectively a no-op here. As screens migrate
-	// to direct CLAY() emission in P05+, content moves into `cmds` and
-	// the walker above shrinks until it can be deleted.
+	Clay_SetLayoutDimensions(Clay_Dimensions{ (float)logical_w, (float)logical_h });
+	Clay_BeginLayout();
+	UpdateHandlers handlers = BuildUpdateHandlers(sctx_, sctx_.updater);
+	UpdateState live = CurrentUpdate(sctx_.updater);
+	RenderUpdate(ctx, handlers, live);
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
 	::ui::DrawRenderCommands(cmds, renderer, target, scale);
-	state_.EndFrame();
 }
 
 bool UpdateRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
@@ -223,12 +251,17 @@ bool UpdateRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	};
 	ctx.mouse_x = mouse_x;
 	ctx.mouse_y = mouse_y;
-	ctx.state   = &state_;
+
+	// Re-lay out so OnHover userData points at `handlers` on this stack frame;
+	// the prior Render frame's tree captured a now-destroyed handlers struct.
+	EnsureClayContext(ctx);
+	Clay_SetLayoutDimensions(Clay_Dimensions{ (float)logical_w, (float)logical_h });
+	Clay_BeginLayout();
 	UpdateHandlers handlers = BuildUpdateHandlers(sctx_, sctx_.updater);
 	UpdateState live = CurrentUpdate(sctx_.updater);
-	Node tree = BuildUpdate(ctx, handlers, &live);
-	Layout(tree, ctx);
-	DispatchClicks(tree, ctx);
+	RenderUpdate(ctx, handlers, live);
+	(void)Clay_EndLayout();
+	Clay_SetPointerState(Clay_Vector2{ (float)mouse_x, (float)mouse_y }, /*pointer_down=*/true);
 	return true;
 }
 

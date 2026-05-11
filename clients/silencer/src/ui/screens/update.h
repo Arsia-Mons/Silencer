@@ -2,7 +2,6 @@
 #define SILENCER_UI_V2_SCREENS_UPDATE_H
 
 #include "runtime.h"
-#include "ui_state.h"
 
 #include <functional>
 #include <string>
@@ -13,7 +12,6 @@ class ScreenContext;
 namespace ui {
 namespace v2 {
 
-struct Node;
 struct Context;
 
 struct UpdateHandlers {
@@ -23,11 +21,7 @@ struct UpdateHandlers {
 	std::function<void()> on_download;
 };
 
-// Live engine state derived from Updater::GetState() each frame. When
-// `state == nullptr` BuildUpdate emits the post-Build pre-Tick layout
-// (all four buttons stacked + empty status/progress overlays) — that is
-// the byte-identical preview gate target. When non-null, only the
-// visible button(s) + status/progress labels render.
+// Live engine state derived from Updater::GetState() each frame.
 struct UpdateState {
 	enum class LeftButton { None, Update, Retry, Download };
 	LeftButton left = LeftButton::None;
@@ -36,8 +30,11 @@ struct UpdateState {
 	std::string progress_text;
 };
 
-Node BuildUpdate(const Context & ctx, const UpdateHandlers & handlers = {},
-                 const UpdateState * state = nullptr);
+// Emits the update screen's CLAY() tree directly. Caller drives
+// Clay_BeginLayout / EndLayout; `handlers` must outlive Clay_EndLayout —
+// Clay_OnHover captures pointers into it as callback userData.
+void RenderUpdate(const Context & ctx, const UpdateHandlers & handlers,
+                  const UpdateState & state);
 
 // Engine-side runtime for GameState::UPDATING. Reads Updater state
 // each frame; Tick() handles the STAGING -> UpdaterStage2::Launch
@@ -57,7 +54,6 @@ public:
 private:
 	World &         world_;
 	ScreenContext & sctx_;
-	UIState         state_;
 };
 
 }  // namespace v2
