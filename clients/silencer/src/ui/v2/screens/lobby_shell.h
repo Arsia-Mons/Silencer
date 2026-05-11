@@ -5,6 +5,7 @@
 #include "lobby_create.h"
 #include "lobby_join.h"
 #include "lobby_select.h"
+#include "lobby_tech.h"
 
 #include <functional>
 
@@ -19,6 +20,7 @@ struct LobbyHandlers {
 	GameCreateHandlers game_create;
 	GameJoinHandlers game_join;
 	GameSelectHandlers game_select;
+	GameTechHandlers game_tech;
 };
 
 // Which right-side panel the lobby is currently displaying. Mirrors the
@@ -30,7 +32,7 @@ enum class LobbyActivePanel : Uint8 {
 	GameCreate,
 	GameJoin,
 	GameSelect,
-	// GameTech lands in P15.
+	GameTech,
 };
 
 // Engine-supplied dynamic state for the lobby chrome + embedded panels.
@@ -47,6 +49,7 @@ struct LobbyState {
 	GameCreateState game_create;
 	GameJoinState game_join;
 	GameSelectState game_select;
+	GameTechState game_tech;
 };
 
 // Lobby chrome plus the character panel. Remaining panels (chat /

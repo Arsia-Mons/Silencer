@@ -6,6 +6,7 @@
 #include "lobby_create.h"
 #include "lobby_join.h"
 #include "lobby_select.h"
+#include "lobby_tech.h"
 #include "node.h"
 
 #include <string>
@@ -52,6 +53,8 @@ Node BuildLobby(const Context & ctx, const LobbyHandlers & handlers, const Lobby
 		children.push_back(BuildGameJoinPanel(ctx, state.game_join, handlers.game_join));
 	}else if(state.active_panel == LobbyActivePanel::GameSelect){
 		children.push_back(BuildGameSelectPanel(ctx, state.game_select, handlers.game_select));
+	}else if(state.active_panel == LobbyActivePanel::GameTech){
+		children.push_back(BuildGameTechPanel(ctx, state.game_tech, handlers.game_tech));
 	}
 	return Background(/*bank=*/7, /*index=*/1, std::move(children));
 }
