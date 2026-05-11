@@ -27,40 +27,69 @@ std::string SummaryLine(const char * name, unsigned int value, bool percentage =
 	return s;
 }
 
+unsigned int Accuracy(unsigned int fires, unsigned int hits)
+{
+	if(!fires) return 0;
+	return (unsigned int)((float(hits) / fires) * 100);
+}
+
 }  // namespace
 
-Node BuildMissionSummary(const Context & ctx, const MissionSummaryHandlers & handlers)
+Node BuildMissionSummary(const Context & ctx, const MissionSummaryHandlers & handlers,
+                         const MissionSummaryState * state)
 {
 	(void)ctx;
 	// Mirrors MissionSummaryScreen::Build. At preview-gate state (post-Build,
 	// after Refresh(), pre-Tick) the rendered pixels are:
 	//   - Two background sprites (bank=6 idx=0, bank=7 idx=5)
 	//   - "Mission Summary" title (bank=135, width=12) at (102, 44).
-	//   - "+ 0 XP" XP text (bank=136, width=15) at (422, 45) — stats default
-	//     to zero so CalculateExperience() returns 0.
+	//   - "+ N XP" XP text (bank=136, width=15) centered on x=467, y=45.
 	//   - Textbox lines. The legacy textbox auto-scrolls in AddLine: after
 	//     all 60 AddLine calls, `scrolled = text.size()-27` captured before
 	//     the final push_back = 59-27 = 32. The visible window therefore
 	//     starts at deque[32] ("  Shaped:") and renders 28 lines through
 	//     deque[59] ("  Player kills:") at y = 92 + i*11.
 	//   - 6 "Current X Level:" left labels at (390, 97+i*46) bank=133 width=6
-	//   - 6 level values "3","0","0","3","0","0" (Noxis agency default
-	//     upgrades from shared/assets/gas/agencies.json) at (550, 97+i*46).
-	//   - "Done" Button (B196x33) at anchor (62, 100).
-	// Omitted (no pixels at preview gate):
-	//   - "*NEW UPGRADE AVAILABLE*" banner (draw=false — Refresh only flips
-	//     it true when upgradeavailable, which requires !user->retrieving;
-	//     GetUserInfo() in preview just created the user with retrieving=true).
-	//   - Upgrade buttons uid 10..15 (not created for the same reason).
-	//   - ScrollBar (draw=false default; never flipped here).
+	//   - 6 level values at x = 556 - text.length()*6, same y.
+	//   - "*NEW UPGRADE AVAILABLE*" banner at (467 - 23*6/2, 77) bank=133
+	//     width=6 when state->show_banner.
+	//   - Upgrade B196x33 buttons at (62, -180 + i*46) when state->show_upgrade[i].
+	//   - "Done" B196x33 button at anchor (62, 100).
+	const bool live = (state != nullptr);
+	const unsigned int s_shaped       = live ? state->shaped       : 0;
+	const unsigned int s_flare        = live ? state->flare        : 0;
+	const unsigned int s_poison_flare = live ? state->poison_flare : 0;
+	const unsigned int s_neutron      = live ? state->neutron      : 0;
+	const unsigned int * s_fires = live ? state->weapon_fires : nullptr;
+	const unsigned int * s_hits  = live ? state->weapon_hits  : nullptr;
+	const unsigned int * s_kills = live ? state->weapon_kills : nullptr;
+	const int xp = live ? state->xp : 0;
+	static const int default_levels[6] = {3, 0, 0, 3, 0, 0};
+	const int * levels = live ? state->levels : default_levels;
+	const bool show_banner = live ? state->show_banner : false;
+
 	std::vector<Node> children;
 
 	// Title: "Mission Summary" (15 chars * 12 width = 180; legacy centers
 	// around x=192 → x = 192 - 90 = 102, y = 44).
 	children.push_back(Label("Mission Summary", /*font_bank=*/135, /*font_width=*/12).at(102, 44));
 
-	// XP text: "+ 0 XP" — len 6, width 15 → x = 467 - (6*15)/2 = 422.
-	children.push_back(Label("+ 0 XP", /*font_bank=*/136, /*font_width=*/15).at(422, 45));
+	// XP text: "+ N XP" — text width 15, centered on x=467.
+	{
+		char xpbuf[24];
+		snprintf(xpbuf, sizeof(xpbuf), "+ %d XP", xp);
+		int len = (int)std::char_traits<char>::length(xpbuf);
+		int xp_x = 467 - ((len * 15) / 2);
+		children.push_back(Label(xpbuf, /*font_bank=*/136, /*font_width=*/15).at(xp_x, 45));
+	}
+
+	// "*NEW UPGRADE AVAILABLE*" banner — 23 chars * 6 width = 138, centered on x=467.
+	if(show_banner){
+		const char * banner = "*NEW UPGRADE AVAILABLE*";
+		int len = (int)std::char_traits<char>::length(banner);
+		int b_x = 467 - ((len * 6) / 2);
+		children.push_back(Label(banner, /*font_bank=*/133, /*font_width=*/6).at(b_x, 77));
+	}
 
 	// Textbox visible window. Each entry is the text rendered at line `i`
 	// (y = 92 + i*11). Lines with no glyphs (blanks, deque[36]/[42]/[48]/
@@ -70,40 +99,26 @@ Node BuildMissionSummary(const Context & ctx, const MissionSummaryHandlers & han
 		return Label(s, /*font_bank=*/133, /*font_width=*/6).at(89, 92 + line * 11);
 	};
 	int line = 0;
-	children.push_back(tb_label(SummaryLine("  Shaped:", 0), line++));        // deque[32]
-	children.push_back(tb_label(SummaryLine("  Flare:", 0), line++));         // [33]
-	children.push_back(tb_label(SummaryLine("  Poison Flare:", 0), line++));  // [34]
-	children.push_back(tb_label(SummaryLine("  Neutron:", 0), line++));       // [35]
-	line++;                                                                    // [36] blank
-	children.push_back(tb_label("Blaster", line++));                          // [37]
-	children.push_back(tb_label(SummaryLine("  Shots fired:", 0), line++));   // [38]
-	children.push_back(tb_label(SummaryLine("  Hits:", 0), line++));          // [39]
-	children.push_back(tb_label(SummaryLine("  Accuracy:", 0, true), line++));// [40]
-	children.push_back(tb_label(SummaryLine("  Player kills:", 0), line++));  // [41]
-	line++;                                                                    // [42] blank
-	children.push_back(tb_label("Laser", line++));                            // [43]
-	children.push_back(tb_label(SummaryLine("  Shots fired:", 0), line++));   // [44]
-	children.push_back(tb_label(SummaryLine("  Hits:", 0), line++));          // [45]
-	children.push_back(tb_label(SummaryLine("  Accuracy:", 0, true), line++));// [46]
-	children.push_back(tb_label(SummaryLine("  Player kills:", 0), line++));  // [47]
-	line++;                                                                    // [48] blank
-	children.push_back(tb_label("Rocket", line++));                           // [49]
-	children.push_back(tb_label(SummaryLine("  Shots fired:", 0), line++));   // [50]
-	children.push_back(tb_label(SummaryLine("  Hits:", 0), line++));          // [51]
-	children.push_back(tb_label(SummaryLine("  Accuracy:", 0, true), line++));// [52]
-	children.push_back(tb_label(SummaryLine("  Player kills:", 0), line++));  // [53]
-	line++;                                                                    // [54] blank
-	children.push_back(tb_label("Flamer", line++));                           // [55]
-	children.push_back(tb_label(SummaryLine("  Shots fired:", 0), line++));   // [56]
-	children.push_back(tb_label(SummaryLine("  Hits:", 0), line++));          // [57]
-	children.push_back(tb_label(SummaryLine("  Accuracy:", 0, true), line++));// [58]
-	children.push_back(tb_label(SummaryLine("  Player kills:", 0), line++));  // [59]
+	children.push_back(tb_label(SummaryLine("  Shaped:", s_shaped), line++));              // deque[32]
+	children.push_back(tb_label(SummaryLine("  Flare:", s_flare), line++));                // [33]
+	children.push_back(tb_label(SummaryLine("  Poison Flare:", s_poison_flare), line++));  // [34]
+	children.push_back(tb_label(SummaryLine("  Neutron:", s_neutron), line++));            // [35]
+	line++;                                                                                 // [36] blank
+	static const char * weapon_names[4] = {"Blaster", "Laser", "Rocket", "Flamer"};
+	for(int w = 0; w < 4; w++){
+		const unsigned int fires = s_fires ? s_fires[w] : 0;
+		const unsigned int hits  = s_hits  ? s_hits[w]  : 0;
+		const unsigned int kills = s_kills ? s_kills[w] : 0;
+		children.push_back(tb_label(weapon_names[w], line++));                              // name
+		children.push_back(tb_label(SummaryLine("  Shots fired:", fires), line++));
+		children.push_back(tb_label(SummaryLine("  Hits:", hits), line++));
+		children.push_back(tb_label(SummaryLine("  Accuracy:", Accuracy(fires, hits), true), line++));
+		children.push_back(tb_label(SummaryLine("  Player kills:", kills), line++));
+		if(w < 3) line++;                                                                   // blank between
+	}
 
-	// 6 "Current X Level:" left labels + level values. Refresh() at preview
-	// gate sets each level overlay text from agency[0] (statsagency=0 default,
-	// Noxis): endurance=3, shield=0, jetpack=0, techslots=3, hacking=0,
-	// contacts=0. Level text x = 556 - text.length()*6 = 550 for all
-	// single-digit values.
+	// 6 "Current X Level:" left labels + level values. Level text x =
+	// 556 - text.length()*6.
 	static const char * level_labels[6] = {
 		"Current Endurance Level:",
 		"Current Shield Level:",
@@ -112,11 +127,41 @@ Node BuildMissionSummary(const Context & ctx, const MissionSummaryHandlers & han
 		"Current Hacking Level:",
 		"Current Contacts Level:",
 	};
-	static const char * level_values[6] = { "3", "0", "0", "3", "0", "0" };
 	for(int i = 0; i < 6; i++){
 		int y = 97 + i * 46;
 		children.push_back(Label(level_labels[i], /*font_bank=*/133, /*font_width=*/6).at(390, y));
-		children.push_back(Label(level_values[i], /*font_bank=*/133, /*font_width=*/6).at(550, y));
+		char numbuf[16];
+		snprintf(numbuf, sizeof(numbuf), "%d", levels[i]);
+		int len = (int)std::char_traits<char>::length(numbuf);
+		int lvl_x = 556 - len * 6;
+		children.push_back(Label(numbuf, /*font_bank=*/133, /*font_width=*/6).at(lvl_x, y));
+	}
+
+	// Upgrade buttons (uid 10..15 in legacy). B196x33 at (62, -180 + i*46).
+	// Text strings padded to 12 chars for legacy chrome-centering parity.
+	if(live){
+		static const char * upgrade_texts[6] = {
+			"+1 Endurance",
+			"+1 Shield   ",
+			"+1 Jetpack  ",
+			"+1 Tech Slot",
+			"+1 Hacking  ",
+			"+1 Contacts ",
+		};
+		for(int i = 0; i < 6; i++){
+			if(!state->show_upgrade[i]) continue;
+			std::function<void()> on_click;
+			if(handlers.on_upgrade){
+				auto cb = handlers.on_upgrade;
+				on_click = [cb, i](){ cb(i); };
+			}
+			children.push_back(
+				Button(upgrade_texts[i], ButtonType::B196x33)
+					.at(62, -180 + i * 46)
+					.withKey(std::string("ms_up:") + std::to_string(i))
+					.onClick(std::move(on_click))
+			);
+		}
 	}
 
 	// "Done" button — B196x33 at anchor (62, 100). uid=0; live engine wiring

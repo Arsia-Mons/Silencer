@@ -48,6 +48,7 @@
 #include "options_audio.h"
 #include "options_controls.h"
 #include "update.h"
+#include "mission_summary.h"
 #include "audio.h"
 #include "renderdevice.h"
 #include <SDL3/SDL_video.h>
@@ -656,6 +657,8 @@ bool Game::Loop(void){
 			RenderOptionsControlsV2();
 		}else if(state == UPDATING){
 			RenderUpdateV2();
+		}else if(state == MISSIONSUMMARY){
+			RenderMissionSummaryV2();
 		}else{
 			renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
 		}
@@ -908,7 +911,20 @@ bool Game::Tick(void){
 			if(stateisnew){
 				UnloadGame();
 				world.Disconnect();
-				PushScreen(std::make_unique<MissionSummaryScreen>());
+				// v2 MissionSummary — no PushScreen. Palette 1 + camera
+				// (320, 240) mirror MissionSummaryScreen::Build.
+				renderer.palette.SetPalette(1);
+				screenbuffer.Clear(0);
+				SetColors(renderer.palette.GetColors());
+				renderer.camera.SetPosition(320, 240);
+				currentinterface = 0;
+				ui_v2_state = ui::v2::UIState{};
+				ui_v2_last_ticks = 0;
+				// Ensure the lobby has a User record for our accountid so
+				// CurrentMissionSummaryState's GetUserInfo() returns non-null
+				// (legacy Build called this; it lazily creates a retrieving
+				// User the first time around).
+				world.lobby.GetUserInfo(world.lobby.accountid);
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
@@ -1626,6 +1642,127 @@ void Game::TickUpdateV2(){
 	}
 	fprintf(stderr, "[updater] UpdaterStage2::Launch failed; returning to main menu\n");
 	screenContext.GoToState(GameState::MAINMENU);
+}
+
+static ui::v2::MissionSummaryHandlers BuildMissionSummaryHandlers(ScreenContext & sctx){
+	ui::v2::MissionSummaryHandlers h;
+	h.on_done = [&sctx](){
+		World & w = sctx.world;
+		if(w.lobby.state == Lobby::AUTHENTICATED){
+			sctx.GoToState(GameState::LOBBY);
+			w.lobby.JoinChannel(w.lobby.lastchannel);
+		}else{
+			sctx.GoToState(GameState::MAINMENU);
+		}
+	};
+	h.on_upgrade = [&sctx](int slot){
+		World & w = sctx.world;
+		User * user = w.lobby.GetUserInfo(w.lobby.accountid);
+		if(!user) return;
+		w.lobby.UpgradeStat(user->statsagency, (Uint8)slot);
+	};
+	return h;
+}
+
+// Mirrors MissionSummaryScreen::Refresh — builds the live state from
+// world.lobby.GetUserInfo(). Returns false when user info hasn't arrived
+// yet; caller should fall back to a null State (matches legacy's
+// pre-Refresh appearance: build-time defaults, no banner, no upgrade
+// buttons). The legacy build path also clears statupgraded after each
+// successful Refresh; we do that here.
+static bool CurrentMissionSummaryState(World & world, ui::v2::MissionSummaryState & out){
+	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+	if(!user) return false;
+	Stats & st = user->statscopy;
+	out.shaped       = st.shapedthrown;
+	out.flare        = st.flaresthrown;
+	out.poison_flare = st.poisonflaresthrown;
+	out.neutron      = st.neutronsthrown;
+	for(int i = 0; i < 4; i++){
+		out.weapon_fires[i] = st.weaponfires[i];
+		out.weapon_hits[i]  = st.weaponhits[i];
+		out.weapon_kills[i] = st.playerkillsweapon[i];
+	}
+	out.xp = (int)st.CalculateExperience();
+	auto & ag = user->agency[user->statsagency];
+	out.levels[0] = ag.endurance;
+	out.levels[1] = ag.shield;
+	out.levels[2] = ag.jetpack;
+	out.levels[3] = ag.techslots;
+	out.levels[4] = ag.hacking;
+	out.levels[5] = ag.contacts;
+	if(user->retrieving){
+		out.show_banner = false;
+		for(int i = 0; i < 6; i++) out.show_upgrade[i] = false;
+		return true;
+	}
+	int totalbonusupgrades = ag.endurance + ag.shield + ag.jetpack + ag.techslots + ag.hacking + ag.contacts;
+	bool slot_room[6] = {
+		ag.endurance < ag.maxendurance,
+		ag.shield    < ag.maxshield,
+		ag.jetpack   < ag.maxjetpack,
+		ag.techslots < ag.maxtechslots,
+		ag.hacking   < ag.maxhacking,
+		ag.contacts  < ag.maxcontacts,
+	};
+	int maxupgrades = ag.level;
+	int cap = user->TotalUpgradePointsPossible(user->statsagency);
+	if(maxupgrades > cap) maxupgrades = cap;
+	bool upgradeavailable = (totalbonusupgrades - ag.defaultbonuses) < maxupgrades;
+	out.show_banner = upgradeavailable;
+	for(int i = 0; i < 6; i++) out.show_upgrade[i] = upgradeavailable && slot_room[i];
+	// Consume the upgrade-ack flag — legacy MissionSummaryScreen::Tick
+	// cleared this after each Refresh; no other consumer reads it.
+	world.lobby.statupgraded = false;
+	return true;
+}
+
+bool Game::RenderMissionSummaryV2(){
+	Uint64 now = SDL_GetTicks();
+	float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
+	ui_v2_last_ticks = now;
+
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = ui_v2_mouse_x;
+	ctx.mouse_y = ui_v2_mouse_y;
+	ctx.state   = &ui_v2_state;
+	ctx.dt      = dt;
+
+	ui::v2::MissionSummaryHandlers handlers = BuildMissionSummaryHandlers(screenContext);
+	ui::v2::MissionSummaryState live;
+	bool have_state = CurrentMissionSummaryState(world, live);
+	screenbuffer.Clear(0);
+	ui_v2_state.BeginFrame();
+	ui::v2::Node tree = ui::v2::BuildMissionSummary(ctx, handlers, have_state ? &live : nullptr);
+	ui::v2::Layout(tree, ctx);
+	ui::v2::Render(tree, ctx, screenbuffer, renderer);
+	ui_v2_state.EndFrame();
+	return true;
+}
+
+void Game::DispatchMissionSummaryV2Click(int logical_x, int logical_y){
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = logical_x;
+	ctx.mouse_y = logical_y;
+	ctx.state   = &ui_v2_state;
+	ui::v2::MissionSummaryHandlers handlers = BuildMissionSummaryHandlers(screenContext);
+	ui::v2::MissionSummaryState live;
+	bool have_state = CurrentMissionSummaryState(world, live);
+	ui::v2::Node tree = ui::v2::BuildMissionSummary(ctx, handlers, have_state ? &live : nullptr);
+	ui::v2::Layout(tree, ctx);
+	ui::v2::DispatchClick(tree, ctx);
 }
 
 namespace {

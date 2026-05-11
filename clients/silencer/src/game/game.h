@@ -259,6 +259,14 @@ private:
 	bool RenderUpdateV2();
 	void DispatchUpdateV2Click(int logical_x, int logical_y);
 	void TickUpdateV2();
+	// Same shape for MISSIONSUMMARY state. Reads world.lobby.GetUserInfo /
+	// statscopy / agency each frame to drive XP, textbox stats, level
+	// values, banner, and upgrade-button visibility. Tick handles the
+	// statupgraded poll (Refresh re-fires when the server confirms an
+	// upgrade) and the initial !infoLoaded latch — no explicit work needs
+	// to happen here since each render rebuilds from live data.
+	bool RenderMissionSummaryV2();
+	void DispatchMissionSummaryV2Click(int logical_x, int logical_y);
 	// Active rebind slot in legacy uid encoding: row for primary (0..99)
 	// or 100+row for secondary (100..149); -1 = no active capture. When
 	// active, the next key/gamepad input writes back to the KeyMap.
