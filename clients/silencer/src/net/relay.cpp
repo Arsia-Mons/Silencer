@@ -23,11 +23,17 @@ constexpr size_t kMaxPendingBytes = 8 * 1024 * 1024; // per-client outbox cap
 // order ever changes upstream, the build will not catch it — keep these
 // in sync.
 constexpr Uint8 kMsgConnect    = 0;
+constexpr Uint8 kMsgPeerlist   = 3;
 constexpr Uint8 kMsgDisconnect = 4;
 constexpr Uint8 kMsgPing       = 5;
+constexpr Uint8 kMsgGameinfo   = 7;
 
 constexpr int kPingIntervalMs        = 1000;  // safely under any reasonable peertimeout
 constexpr int kConnectRetryIntervalMs = 500;  // until AUTHORITY admits us
+// Periodic MSG_PEERLIST request so newly-attached browser WS clients
+// see a fresh peerlist within this window — the AUTHORITY only
+// broadcasts it on peer admit/disconnect, which races our WS attach.
+constexpr int kPeerlistRefreshIntervalMs = 500;
 
 const char *kMagicGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
@@ -175,6 +181,7 @@ int Relay::Run(const char *peerHost, unsigned short peerPort,
 	SendConnectRequest();
 	unsigned long long lastPing = NowMs();
 	unsigned long long lastConnectRetry = NowMs();
+	unsigned long long lastPeerlistRefresh = NowMs();
 
 	// --- Main loop -------------------------------------------------------
 	unsigned char udpBuf[16384];
@@ -212,6 +219,16 @@ int Relay::Run(const char *peerHost, unsigned short peerPort,
 						fprintf(stderr, "[relay] received MSG_DISCONNECT — shutting down\n");
 						return 0;
 					}
+					// Stash bootstrap messages so newly-attaching WS clients
+					// can be replayed them.
+					if (n >= 1) {
+						switch (udpBuf[0]) {
+						case kMsgConnect:  lastConnect.assign(udpBuf, udpBuf + n);  break;
+						case kMsgGameinfo: lastGameinfo.assign(udpBuf, udpBuf + n); break;
+						case kMsgPeerlist: lastPeerlist.assign(udpBuf, udpBuf + n); break;
+						default: break;
+						}
+					}
 					Broadcast(udpBuf, (size_t)n);
 				}
 			}
@@ -226,7 +243,23 @@ int Relay::Run(const char *peerHost, unsigned short peerPort,
 			lastPing = now;
 			SendPing();
 		}
+		if (admitted && now - lastPeerlistRefresh >= (unsigned long long)kPeerlistRefreshIntervalMs) {
+			lastPeerlistRefresh = now;
+			SendPeerlistRequest();
+		}
 	}
+}
+
+void Relay::SendPeerlistRequest() {
+	// Single-byte MSG_PEERLIST request — AUTHORITY responds with the
+	// current peer list. The reply gets forwarded verbatim to all
+	// currently-connected WS clients, so browser tabs that attached
+	// after AUTHORITY's admit-time broadcast still bootstrap their
+	// peer list (which they need before MSG_SNAPSHOT processing
+	// unblocks on the World::CONNECTING → CONNECTED transition).
+	Uint8 code = kMsgPeerlist;
+	sendto(udpSock, (const char *)&code, 1, 0,
+	       (sockaddr *)&peerAddr, sizeof(peerAddr));
 }
 
 void Relay::SendConnectRequest() {
@@ -279,7 +312,39 @@ bool Relay::AcceptOne(int sock) {
 	std::lock_guard<std::mutex> g(clientsMu);
 	clients.push_back(wc);
 	fprintf(stderr, "[relay] client connected (now %zu)\n", clients.size());
+
+	// Replay the AUTHORITY's bootstrap messages so the new client doesn't
+	// have to wait for the next peer admit/disconnect to bootstrap its
+	// World state.
+	if (!lastConnect.empty()) {
+		SendFrameTo(*wc, lastConnect.data(), lastConnect.size());
+	}
+	if (!lastGameinfo.empty()) {
+		SendFrameTo(*wc, lastGameinfo.data(), lastGameinfo.size());
+	}
+	if (!lastPeerlist.empty()) {
+		SendFrameTo(*wc, lastPeerlist.data(), lastPeerlist.size());
+	}
 	return true;
+}
+
+void Relay::SendFrameTo(WSClient &c, const unsigned char *bytes, size_t len) {
+	std::vector<unsigned char> frame;
+	frame.reserve(len + 10);
+	frame.push_back(0x82); // FIN | binary
+	if (len < 126) {
+		frame.push_back((unsigned char)len);
+	} else if (len <= 0xFFFF) {
+		frame.push_back(126);
+		frame.push_back((unsigned char)(len >> 8));
+		frame.push_back((unsigned char)len);
+	} else {
+		frame.push_back(127);
+		for (int i = 7; i >= 0; i--) frame.push_back((unsigned char)(len >> (i * 8)));
+	}
+	frame.insert(frame.end(), bytes, bytes + len);
+	c.sendBuf.insert(c.sendBuf.end(), frame.begin(), frame.end());
+	DrainOutbox(c);
 }
 
 bool Relay::DoHandshake(int sock) {

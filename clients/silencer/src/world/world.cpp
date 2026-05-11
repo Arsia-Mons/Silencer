@@ -806,6 +806,25 @@ void World::DoNetwork_Replica(void){
 							}
 						}
 					}
+#ifdef __EMSCRIPTEN__
+					// Browser spectator: the relay sent MSG_CONNECT to the
+					// AUTHORITY before our WS attached, so the response
+					// (carrying our localpeerid) never reached us. The
+					// accountid fallback above can't match either — the
+					// relay uses anonymous (0). Pick whichever non-authority
+					// peer has the observer flag set; there is exactly one
+					// observer slot per relay process and we're it.
+					if(localpeerid == authoritypeer){
+						for(unsigned int i = 0; i < maxpeers; i++){
+							if(i == authoritypeer) continue;
+							if(peerlist[i] && peerlist[i]->observer){
+								localpeerid = i;
+								viewedpeerid = i;
+								break;
+							}
+						}
+					}
+#endif
 					Peer * localpeer = peerlist[localpeerid];
 					if(localpeer && localpeer->ishost && !GetAuthorityPeer()->gameinfoloaded && gameinfo.loaded){
 						SendGameInfo(GetAuthorityPeer()->id);

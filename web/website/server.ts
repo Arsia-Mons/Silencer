@@ -29,7 +29,21 @@ Bun.serve({
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url);
+    const t0 = Date.now();
+    const log = (status: number) => {
+      console.log(`${new Date().toISOString()} ${req.method} ${url.pathname} -> ${status} (${Date.now() - t0}ms)`);
+    };
     let pathname = decodeURIComponent(url.pathname);
+
+    // Force trailing slash for directories that we'd otherwise serve an
+    // index.html for. Without this the browser resolves relative URLs in
+    // the served HTML against the parent dir (e.g. /spectate's data fetch
+    // resolves silencer.data → /silencer.data instead of /spectate/...).
+    if (pathname === "/spectate") {
+      log(301);
+      return new Response(null, { status: 301, headers: { Location: "/spectate/" } });
+    }
+
     if (pathname === "/" || pathname.endsWith("/")) pathname += "index.html";
 
     const safePath = normalize(join(ROOT, pathname));
@@ -39,20 +53,34 @@ Bun.serve({
 
     const f = Bun.file(safePath);
     if (await f.exists()) {
+      log(200);
       return new Response(f);
+    }
+
+    // Fallback: if the requested path is a directory, serve its index.html.
+    const indexPath = normalize(join(safePath, "index.html"));
+    if (indexPath.startsWith(ROOT)) {
+      const idx = Bun.file(indexPath);
+      if (await idx.exists()) {
+        log(200);
+        return new Response(idx);
+      }
     }
 
     if (isWasmAsset(pathname)) {
       const name = pathname.slice("/spectate/".length);
       const wasmFile = Bun.file(join(WASM_BUILD_DIR, name));
       if (await wasmFile.exists()) {
+        log(200);
         return new Response(wasmFile);
       }
+      log(404);
       return new Response(
         `${name} not built — run\n  cd clients/silencer && emcmake cmake -S . -B build-wasm && emmake make -j -C build-wasm\nfrom a shell with emsdk activated.`,
         { status: 404 },
       );
     }
+    log(404);
     return new Response("Not found", { status: 404 });
   },
 });

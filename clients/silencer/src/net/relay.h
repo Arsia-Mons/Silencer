@@ -43,6 +43,7 @@ private:
 
 	void SendConnectRequest();
 	void SendPing();
+	void SendPeerlistRequest();
 
 	int listenSock = -1;
 	std::mutex clientsMu;
@@ -52,6 +53,16 @@ private:
 	sockaddr_in peerAddr{};   // AUTHORITY's UDP host:port
 	Uint32 gameId = 0;        // logging only
 	bool admitted = false;    // set on first datagram back from AUTHORITY
+
+	// Bootstrap messages from AUTHORITY (MSG_CONNECT response, MSG_GAMEINFO,
+	// MSG_PEERLIST). AUTHORITY only sends these on observer admit, well
+	// before a browser WS attaches to us. We keep the most recent copy of
+	// each and replay them whenever a fresh WS client connects so it can
+	// bootstrap its World state without waiting for the next admit.
+	std::vector<unsigned char> lastConnect;
+	std::vector<unsigned char> lastGameinfo;
+	std::vector<unsigned char> lastPeerlist;
+	void SendFrameTo(WSClient &c, const unsigned char *bytes, size_t len);
 };
 
 #endif

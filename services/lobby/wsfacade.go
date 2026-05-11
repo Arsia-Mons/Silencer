@@ -35,6 +35,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -259,10 +260,16 @@ func (f *SpectatorFacade) handleSpectate(c *wsClient, gameID uint32) {
 		return
 	}
 
-	// Stage 7: spawn-on-demand relay. StartRelay is idempotent — calling
-	// it for an already-running game returns the existing URL.
+	// Spawn-on-demand relay. StartRelay is idempotent — calling it for
+	// an already-running game returns the existing URL.
 	if f.proc != nil {
-		url, err := f.proc.StartRelay(gameID, match.Hostname, match.Port)
+		// LobbyGame.Hostname is "ip,port" (legacy concat from heartbeats).
+		// Split on the comma so the relay's inet_addr gets dotted-decimal.
+		peerHost := match.Hostname
+		if i := strings.IndexByte(peerHost, ','); i >= 0 {
+			peerHost = peerHost[:i]
+		}
+		url, err := f.proc.StartRelay(gameID, peerHost, match.Port)
 		if err != nil {
 			log.Printf("[wsfacade] StartRelay game=%d: %v", gameID, err)
 			c.send(envelope{Type: "error", Code: "NO_RELAY", Message: err.Error()})

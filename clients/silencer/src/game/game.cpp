@@ -283,7 +283,14 @@ bool Game::Load(char * cmdline){
 			//SDL_EnableUNICODE(true);
 			//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 			//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
+#ifdef __EMSCRIPTEN__
+			// Never SDL_WINDOW_FULLSCREEN in the browser — the widget is
+			// embedded in a page and the canvas size is controlled by the
+			// host HTML/CSS.
+			window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, 0);
+#else
 			window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+#endif
 			SDL_StartTextInput(window);
 			if(!SetupRenderDevice()){
 				printf("Could not initialize GPU render device\n");
@@ -760,6 +767,10 @@ bool Game::Tick(void){
 		if(!headless) SDL_ShowCursor();
 	}
 
+#ifndef __EMSCRIPTEN__
+	// Alt+Enter fullscreen toggle. In the browser the widget is
+	// embedded; the host page owns the layout so we don't take over the
+	// viewport.
 	if(!headless && window){
 		if(keystate[SDL_SCANCODE_RALT] && keystate[SDL_SCANCODE_RETURN]){
 			if(!fullscreentoggled){
@@ -774,6 +785,7 @@ bool Game::Tick(void){
 			fullscreentoggled = false;
 		}
 	}
+#endif
 	
 	switch(state){
 		case FADEOUT: TickFadeOut(); break;
@@ -851,16 +863,21 @@ bool Game::Tick(void){
 #ifdef __EMSCRIPTEN__
 				// Auto-spectate: pick the first INGAME spectatable game
 				// the facade has told us about and call SpectateGame.
-				// `creategameclicked` is being reused as a one-shot guard
-				// so we don't fire SpectateGame on every frame while the
-				// JOINGAME transition is in flight; it's reset in
-				// LeaveJoinedGame.
+				// `joininggame` is the one-shot guard so we don't fire on
+				// every frame while we wait for snapshots.
+				//
+				// We stay in LOBBY state — do NOT GoToState(JOINGAME). The
+				// native JOINGAME tick is for single-player "join the test
+				// game" setup (hardcoded mapname, fresh MSG_CONNECT, object
+				// wipe) and would clobber the spectator's relay handshake.
+				// Instead, the shared-state detection at the top of Tick()
+				// will pick up the State object from the snapshot stream
+				// and transition us straight to INGAME.
 				if(!joininggame && world.lobby.state == Lobby::AUTHENTICATED){
 					for(LobbyGame * lg : world.lobby.games){
 						if(lg && lg->spectatable && lg->state == 1 /* INGAME */){
 							SpectateGame(*lg);
 							currentlobbygameid = lg->id;
-							GoToState(JOINGAME);
 							break;
 						}
 					}

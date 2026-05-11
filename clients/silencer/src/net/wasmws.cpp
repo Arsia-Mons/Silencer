@@ -73,16 +73,14 @@ bool WasmWS::SendBinary(const unsigned char *bytes, size_t len) {
 	return rc >= 0;
 }
 
-int WasmWS::OnOpen(int /*eventType*/, const void * /*e*/, void *userData) {
+bool WasmWS::OnOpen(int /*eventType*/, const EmscriptenWebSocketOpenEvent * /*e*/, void *userData) {
 	WasmWS *self = static_cast<WasmWS *>(userData);
 	self->state = STATE_OPEN;
-	return EM_TRUE;
+	return true;
 }
 
-int WasmWS::OnMessage(int /*eventType*/, const void *e, void *userData) {
+bool WasmWS::OnMessage(int /*eventType*/, const EmscriptenWebSocketMessageEvent *m, void *userData) {
 	WasmWS *self = static_cast<WasmWS *>(userData);
-	const EmscriptenWebSocketMessageEvent *m =
-	    static_cast<const EmscriptenWebSocketMessageEvent *>(e);
 	if (m->isText) {
 		// data is a null-terminated UTF-8 string; numBytes includes the null.
 		const char *s = reinterpret_cast<const char *>(m->data);
@@ -93,19 +91,19 @@ int WasmWS::OnMessage(int /*eventType*/, const void *e, void *userData) {
 		const unsigned char *bytes = static_cast<const unsigned char *>(m->data);
 		self->binaryQueue.emplace_back(bytes, bytes + m->numBytes);
 	}
-	return EM_TRUE;
+	return true;
 }
 
-int WasmWS::OnClose(int /*eventType*/, const void * /*e*/, void *userData) {
+bool WasmWS::OnClose(int /*eventType*/, const EmscriptenWebSocketCloseEvent * /*e*/, void *userData) {
 	WasmWS *self = static_cast<WasmWS *>(userData);
 	self->state = STATE_CLOSED;
-	return EM_TRUE;
+	return true;
 }
 
-int WasmWS::OnError(int /*eventType*/, const void * /*e*/, void *userData) {
+bool WasmWS::OnError(int /*eventType*/, const EmscriptenWebSocketErrorEvent * /*e*/, void *userData) {
 	WasmWS *self = static_cast<WasmWS *>(userData);
 	self->state = STATE_FAILED;
-	return EM_TRUE;
+	return true;
 }
 
 #endif // __EMSCRIPTEN__

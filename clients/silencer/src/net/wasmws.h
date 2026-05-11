@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <emscripten/websocket.h>
 
 class WasmWS {
 public:
@@ -59,10 +60,10 @@ private:
 	std::vector<std::vector<unsigned char>> binaryQueue;
 	std::vector<std::string> textQueue;
 
-	static int OnOpen(int eventType, const void *e, void *userData);
-	static int OnMessage(int eventType, const void *e, void *userData);
-	static int OnClose(int eventType, const void *e, void *userData);
-	static int OnError(int eventType, const void *e, void *userData);
+	static bool OnOpen(int eventType, const EmscriptenWebSocketOpenEvent *e, void *userData);
+	static bool OnMessage(int eventType, const EmscriptenWebSocketMessageEvent *e, void *userData);
+	static bool OnClose(int eventType, const EmscriptenWebSocketCloseEvent *e, void *userData);
+	static bool OnError(int eventType, const EmscriptenWebSocketErrorEvent *e, void *userData);
 };
 
 #endif // __EMSCRIPTEN__
