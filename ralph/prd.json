@@ -157,7 +157,7 @@
       "id": "P16",
       "priority": 16,
       "name": "GameJoinPanel in Clay",
-      "passes": false,
+      "passes": true,
       "spec": "Three stacked BankButton::Chrome buttons (Choose Tech / Change Team / Ready) with the per-frame 'Waiting...' label rewrite when blocked. Pixdiff target: <5% vs gamejoin.png.",
       "pass_check": "Pixdiff < 5.0% vs baseline. Ready button label updates correctly when host is waiting on peers.",
       "screenshot": "iter-P16.png",

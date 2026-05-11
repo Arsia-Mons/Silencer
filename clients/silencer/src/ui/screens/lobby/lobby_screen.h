@@ -36,8 +36,8 @@ public:
 	// of create/join/tech.
 	virtual void ShowGameSelect(ScreenContext & ctx);
 	virtual void ShowGameCreate(ScreenContext & ctx);
-	void ShowGameJoin(ScreenContext & ctx);
-	void ShowGameTech(ScreenContext & ctx);
+	virtual void ShowGameJoin(ScreenContext & ctx);
+	virtual void ShowGameTech(ScreenContext & ctx);
 
 	// Update the map-name overlay (uid 8) on the lobby chrome — called by the
 	// CONNECTED→GameJoin handoff and by Game::GoBack when leaving a game.

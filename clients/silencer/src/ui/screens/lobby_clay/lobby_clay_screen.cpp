@@ -12,6 +12,7 @@
 #include "game_join_panel.h"
 #include "game_tech_panel.h"
 #include "lobbygame.h"
+#include "peer.h"
 #include "serializer.h"
 
 #include "clay/clay.h"
@@ -26,6 +27,7 @@
 #include "clay_chat_panel.h"
 #include "clay_game_select_panel.h"
 #include "clay_game_create_panel.h"
+#include "clay_game_join_panel.h"
 
 #include <SDL3/SDL.h>
 
@@ -201,6 +203,11 @@ void LobbyClayScreen::Build(ScreenContext & ctx)
 	// legacy panel are kept alive by gameCreate/gameJoin/gameTech presence
 	// when those panels are active).
 	silencer::ui::lobby_clay::GameSelectPanelInit(gameSelectState);
+
+	// P16: GameJoin panel runs in Clay. Legacy `gameJoin` unique_ptr stays
+	// null; the `gameJoinActive` flag is the equivalent Draw/Tick gate.
+	silencer::ui::lobby_clay::GameJoinPanelInit(gameJoinState);
+	gameJoinActive = false;
 }
 
 void LobbyClayScreen::Tick(ScreenContext & ctx)
@@ -222,9 +229,10 @@ void LobbyClayScreen::Tick(ScreenContext & ctx)
 
 	// Consume the Clay GameSelect panel's per-frame click flags + rebuild
 	// rows on lobby updates. Only active when no other right-side panel
-	// owns the surface — when gameCreateActive/gameJoin/gameTech are live,
-	// the games-list Clay tree isn't emitted, so its click flags can't fire.
-	if(!gameCreate && !gameCreateActive && !gameJoin && !gameTech){
+	// owns the surface — when gameCreateActive/gameJoinActive/legacy
+	// gameJoin/gameTech are live, the games-list Clay tree isn't emitted,
+	// so its click flags can't fire.
+	if(!gameCreate && !gameCreateActive && !gameJoin && !gameJoinActive && !gameTech){
 		silencer::ui::lobby_clay::GameSelectPanelTick(
 			gameSelectState, ctx.world, ctx, *this);
 	}
@@ -237,11 +245,29 @@ void LobbyClayScreen::Tick(ScreenContext & ctx)
 			gameCreateState, ctx.world, ctx, *this);
 	}
 
+	// Clay GameJoin surface — Ready label rewrite + button click dispatch.
+	if(gameJoinActive){
+		silencer::ui::lobby_clay::GameJoinPanelTick(
+			gameJoinState, ctx.world, ctx, *this);
+	}
+
 	// Base class drives the rest: panel ticks, deferred CreateGame state
 	// machine, CONNECTED → GameJoin handoff, disconnect detection. The
 	// chrome-button scan inside LobbyScreen::Tick finds no Go Back button
 	// in our interface (we didn't create one) and is a harmless no-op.
 	LobbyScreen::Tick(ctx);
+
+	// Mirror LobbyScreen::Tick's "Disconnected from game" modal trigger.
+	// The base-class check fires only when the legacy gameJoin/gameTech
+	// unique_ptrs are alive; on the Clay path those are always null even
+	// when gameJoinActive is true, so the modal would otherwise never fire.
+	if(gameJoinActive && ctx.world.state != World::CONNECTED){
+		Screen * top = ctx.game.GetTopScreen();
+		if(!top || !top->IsOverlay()){
+			Game * gamePtr = &ctx.game;
+			ctx.ShowMessage("Disconnected from game", [gamePtr]() { gamePtr->GoBack(); });
+		}
+	}
 }
 
 void LobbyClayScreen::ShowGameSelect(ScreenContext & ctx)
@@ -266,6 +292,7 @@ void LobbyClayScreen::ShowGameSelect(ScreenContext & ctx)
 		ctx.game.ShowTeamOverlays(true);
 	}
 	gameCreateActive = false;
+	gameJoinActive   = false;
 	// Force the games-list to re-snapshot from world.lobby on the next Tick
 	// — the legacy ShowGameSelect re-created the SelectBox which similarly
 	// flipped gamesprocessed back to false via the panel's first-pass walk.
@@ -295,7 +322,44 @@ void LobbyClayScreen::ShowGameCreate(ScreenContext & ctx)
 	}
 	silencer::ui::lobby_clay::GameCreatePanelInit(gameCreateState, ctx);
 	gameCreateActive = true;
+	gameJoinActive   = false;
 	ctx.game.currentinterface = interfaceId;
+}
+
+void LobbyClayScreen::ShowGameJoin(ScreenContext & ctx)
+{
+	// Tear down any legacy right-side panel that was alive + clear
+	// gameCreateActive, then activate the Clay GameJoin surface.
+	Interface * lobbyiface = static_cast<Interface *>(
+		ctx.world.GetObjectFromId(interfaceId));
+	auto destroy = [&](Uint16 id) {
+		Interface * panelIface = static_cast<Interface *>(
+			ctx.world.GetObjectFromId(id));
+		if(panelIface) panelIface->DestroyInterface(ctx.world, lobbyiface);
+	};
+	if(gameCreate){ destroy(gameCreate->interfaceId); gameCreate.reset(); }
+	if(gameJoin)  { destroy(gameJoin->interfaceId);   gameJoin.reset();   }
+	if(gameTech)  {
+		destroy(gameTech->interfaceId);
+		gameTech.reset();
+		ctx.world.choosingtech = false;
+		ctx.game.ShowTeamOverlays(true);
+	}
+	silencer::ui::lobby_clay::GameJoinPanelInit(gameJoinState);
+	gameJoinActive   = true;
+	gameCreateActive = false;
+	ctx.game.currentinterface = interfaceId;
+}
+
+void LobbyClayScreen::ShowGameTech(ScreenContext & ctx)
+{
+	// P17 will migrate the GameTech surface to Clay. Until then, clear
+	// gameJoinActive so the Clay GameJoin tree stops emitting, then fall
+	// through to the legacy ShowGameTech which builds a legacy
+	// GameTechPanel under the same parent Interface.
+	gameJoinActive   = false;
+	gameCreateActive = false;
+	LobbyScreen::ShowGameTech(ctx);
 }
 
 void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
@@ -326,15 +390,20 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	silencer::ui::lobby_clay::BuildChatPanelTree(
 		chatState, ctx.world, ctx.world.resources);
 	// GameSelect tree is mutually exclusive with any right-side panel
-	// (Clay gameCreate or legacy gameJoin/gameTech). When one of those is
-	// active, suppress the games-list emission so it owns the right column.
-	if(!gameCreate && !gameCreateActive && !gameJoin && !gameTech){
+	// (Clay gameCreate/gameJoin or legacy gameJoin/gameTech). When one
+	// of those is active, suppress the games-list emission so it owns
+	// the right column.
+	if(!gameCreate && !gameCreateActive && !gameJoin && !gameJoinActive && !gameTech){
 		silencer::ui::lobby_clay::BuildGameSelectPanelTree(
 			gameSelectState, ctx.world.resources);
 	}
 	if(gameCreateActive){
 		silencer::ui::lobby_clay::BuildGameCreatePanelTree(
 			gameCreateState, ctx.world.resources);
+	}
+	if(gameJoinActive){
+		silencer::ui::lobby_clay::BuildGameJoinPanelTree(
+			gameJoinState, ctx.world.resources);
 	}
 	Clay_RenderCommandArray cmds = Clay_EndLayout();
 
@@ -353,8 +422,42 @@ void LobbyClayScreen::SeedHostGameInfo(World & world, LobbyGame & lg)
 	world.gameinfo.Serialize(Serializer::READ, data);
 }
 
+bool LobbyClayScreen::JoinPanelInLobby(World & world) const
+{
+	return world.gameplaystate == World::INLOBBY;
+}
+
+bool LobbyClayScreen::JoinPanelReadyBlocked(World & world) const
+{
+	Peer * localpeer = world.peerlist[world.localpeerid];
+	return localpeer && localpeer->ishost && !world.AllPeersDownloadedMap();
+}
+
+void LobbyClayScreen::JoinPanelSendReady(World & world)
+{
+	Peer * localpeer = world.peerlist[world.localpeerid];
+	bool ishost = localpeer && localpeer->ishost;
+	if(!ishost || world.AllPeersDownloadedMap()){
+		world.SendReady();
+	}
+}
+
+void LobbyClayScreen::JoinPanelChangeTeam(World & world)
+{
+	world.ChangeTeam();
+}
+
 bool LobbyClayScreen::HandleBack(ScreenContext & ctx)
 {
+	// Clay GameJoin surface → leave the session, drop the map-name
+	// overlay, swap back to the games list. Mirrors LobbyScreen::HandleBack's
+	// `if(gameJoin || gameTech)` branch.
+	if(gameJoinActive){
+		ctx.LeaveJoinedGame();
+		SetMapNameOverlay(ctx.world, "");
+		ShowGameSelect(ctx);
+		return true;
+	}
 	// Clay GameCreate surface → swap back to games list (mirrors the
 	// legacy LobbyScreen::HandleBack's `if(gameCreate)` branch).
 	if(gameCreateActive){

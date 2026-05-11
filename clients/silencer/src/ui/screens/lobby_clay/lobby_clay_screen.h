@@ -6,6 +6,7 @@
 #include "clay_chat_panel.h"
 #include "clay_game_select_panel.h"
 #include "clay_game_create_panel.h"
+#include "clay_game_join_panel.h"
 #include <string>
 
 class Surface;
@@ -48,6 +49,16 @@ public:
 	// Clay subtree and Tick pumps the create-flow state machine.
 	void ShowGameCreate(ScreenContext & ctx) override;
 
+	// Override: tear down legacy right-side panels + clear gameCreateActive
+	// and activate the Clay game-join surface. Sets `gameJoinActive` so
+	// Draw emits the Clay subtree and Tick pumps the panel.
+	void ShowGameJoin(ScreenContext & ctx) override;
+
+	// Override: clear `gameJoinActive` then fall through to the legacy
+	// ShowGameTech (which builds the legacy GameTechPanel). P17 migrates
+	// the GameTech surface to Clay; until then we keep the legacy path.
+	void ShowGameTech(ScreenContext & ctx) override;
+
 	// Wired into the Go Back BankButton's onClick proxy. Sets a flag that
 	// Tick consumes on the next frame, mirroring the legacy chrome scan's
 	// "button->clicked → game.GoBack()" edge-detection timing.
@@ -58,6 +69,15 @@ public:
 	// it to the dedicated server. Mirrors LobbyScreen::Tick's host-side
 	// gameinfo seeding. Called from GameCreatePanelTick.
 	void SeedHostGameInfo(class World & world, class LobbyGame & lg);
+
+	// Friend-of-World helpers used by the Clay GameJoin panel. The free
+	// function in clay_game_join_panel.cpp cannot reach World's private
+	// peerlist/localpeerid/AllPeersDownloadedMap/SendReady/ChangeTeam, so
+	// the panel routes those calls through these member methods.
+	bool JoinPanelInLobby(class World & world) const;
+	bool JoinPanelReadyBlocked(class World & world) const;
+	void JoinPanelSendReady(class World & world);
+	void JoinPanelChangeTeam(class World & world);
 
 private:
 	// Per-frame state for the chrome tree. Strings live on the screen so
@@ -91,6 +111,12 @@ private:
 	// machine. The legacy `gameCreate` unique_ptr stays null.
 	silencer::ui::lobby_clay::GameCreatePanelState gameCreateState;
 	bool gameCreateActive = false;
+
+	// GameJoin state + active flag. When `gameJoinActive` is true the Clay
+	// panel owns the right column (suppresses the games-list Clay tree and
+	// the GameCreate tree). The legacy `gameJoin` unique_ptr stays null.
+	silencer::ui::lobby_clay::GameJoinPanelState gameJoinState;
+	bool gameJoinActive = false;
 };
 
 #endif
