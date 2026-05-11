@@ -43,7 +43,7 @@
     {
       "id": "C2",
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "name": "Document lobby BG rectangle coordinates",
       "spec": "Visually inspect `/tmp/lobby_bg.png` (regenerate via the Python decoder if missing — see RALPH.md appendix). Identify every distinct bright-green stroked rectangle in the chrome (NOT the decorative texture inside them, NOT the film-strip sphere lights). Expected: roughly 4–6 rectangles — outer frame, title bar strip, character panel area, chat panel area (NOTE: chat may be an upside-down-L overlapping character — call that out), right pane area. Maybe a top-right decorative rect.\n\nFor each rectangle, record: (id-name, x, y, width, height, stroke palette index sampled from the sprite at a stroke pixel). Commit as `docs/plans/lobby-chrome-rectangles.md`. Include a short note on the upside-down-L topology with your recommendation (compose two Boxes vs. polygon primitive vs. rework). This document is the reference for C3–C6.",
       "pass_check": "docs/plans/lobby-chrome-rectangles.md exists and lists ≥4 rectangles with coordinates + stroke color sampled from the actual sprite. The upside-down-L is discussed if applicable."
