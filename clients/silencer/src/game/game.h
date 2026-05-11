@@ -338,10 +338,6 @@ private:
 	// Game (states being migrated one at a time).
 	std::unique_ptr<ui::v2::Runtime> active_runtime;
 	void SetRuntime(Uint8 new_state);
-	// Same shape for OPTIONSAUDIO state. Indicator sprites reflect
-	// Config.music; handlers toggle via Audio::Pause/ResumeMusic.
-	bool RenderOptionsAudioV2();
-	void DispatchOptionsAudioV2Click(int logical_x, int logical_y);
 	// Same shape for OPTIONSCONTROLS state. Per-row text + preset text
 	// derive from KeyMap each frame; clicking a key chip arms a rebind
 	// capture state machine ticked by TickOptionsControlsV2.

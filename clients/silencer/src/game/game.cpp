@@ -648,8 +648,6 @@ bool Game::Loop(void){
 			float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
 			ui_v2_last_ticks = now;
 			active_runtime->Render(screenbuffer, renderer, ui_v2_mouse_x, ui_v2_mouse_y, dt);
-		}else if(state == OPTIONSAUDIO){
-			RenderOptionsAudioV2();
 		}else if(state == OPTIONSCONTROLS){
 			RenderOptionsControlsV2();
 		}else if(state == UPDATING){
@@ -1013,17 +1011,14 @@ bool Game::Tick(void){
 		case OPTIONSAUDIO:{
 			if(stateisnew){
 				world.DestroyAllObjects();
-				// v2 OptionsAudio — no Interface on the stack, no PushScreen.
-				// Render + click dispatch live in RenderOptionsAudioV2 /
-				// DispatchOptionsAudioV2Click. Palette + camera mirror the
-				// Options router.
+				// OptionsAudioRuntime owns the surface. Palette + camera
+				// mirror the Options router.
 				renderer.palette.SetPalette(1);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
 				renderer.camera.SetPosition(320, 240);
 				currentinterface = 0;
-				ui_v2_state = ui::v2::UIState{};
-				ui_v2_last_ticks = 0;
+				SetRuntime(OPTIONSAUDIO);
 				stateisnew = false;
 			}
 		}break;
@@ -1278,91 +1273,14 @@ void Game::SetRuntime(Uint8 new_state){
 		case OPTIONSDISPLAY:
 			active_runtime = std::make_unique<ui::v2::OptionsDisplayRuntime>(world, screenContext);
 			break;
+		case OPTIONSAUDIO:
+			active_runtime = std::make_unique<ui::v2::OptionsAudioRuntime>(world, screenContext);
+			break;
 		default:
 			active_runtime.reset();
 			break;
 	}
 	ui_v2_last_ticks = 0;
-}
-
-static ui::v2::OptionsAudioHandlers BuildOptionsAudioHandlers(ScreenContext & sctx){
-	ui::v2::OptionsAudioHandlers h;
-	h.on_toggle_music = [](){
-		Config & cfg = Config::GetInstance();
-		cfg.music = !cfg.music;
-		if(cfg.music){
-			Audio::GetInstance().ResumeMusic();
-		}else{
-			Audio::GetInstance().PauseMusic();
-		}
-	};
-	h.on_save = [&sctx](){
-		Config::GetInstance().Save();
-		sctx.GoToState(GameState::OPTIONS);
-	};
-	h.on_cancel = [&sctx](){
-		Config & cfg = Config::GetInstance();
-		cfg.Load();
-		if(cfg.music){
-			Audio::GetInstance().ResumeMusic();
-		}else{
-			Audio::GetInstance().PauseMusic();
-		}
-		sctx.GoToState(GameState::OPTIONS);
-	};
-	return h;
-}
-
-static ui::v2::OptionsAudioState CurrentOptionsAudioState(){
-	ui::v2::OptionsAudioState s;
-	s.music = Config::GetInstance().music;
-	return s;
-}
-
-bool Game::RenderOptionsAudioV2(){
-	Uint64 now = SDL_GetTicks();
-	float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
-	ui_v2_last_ticks = now;
-
-	ui::v2::Context ctx{
-		world.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
-		/*version=*/world.GetVersion(),
-	};
-	ctx.mouse_x = ui_v2_mouse_x;
-	ctx.mouse_y = ui_v2_mouse_y;
-	ctx.state   = &ui_v2_state;
-	ctx.dt      = dt;
-
-	ui::v2::OptionsAudioHandlers handlers = BuildOptionsAudioHandlers(screenContext);
-	ui::v2::OptionsAudioState live = CurrentOptionsAudioState();
-	screenbuffer.Clear(0);
-	ui_v2_state.BeginFrame();
-	ui::v2::Node tree = ui::v2::BuildOptionsAudio(ctx, handlers, &live);
-	ui::v2::Layout(tree, ctx);
-	ui::v2::Render(tree, ctx, screenbuffer, renderer);
-	ui_v2_state.EndFrame();
-	return true;
-}
-
-void Game::DispatchOptionsAudioV2Click(int logical_x, int logical_y){
-	ui::v2::Context ctx{
-		world.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
-		/*version=*/world.GetVersion(),
-	};
-	ctx.mouse_x = logical_x;
-	ctx.mouse_y = logical_y;
-	ctx.state   = &ui_v2_state;
-	ui::v2::OptionsAudioHandlers handlers = BuildOptionsAudioHandlers(screenContext);
-	ui::v2::OptionsAudioState live = CurrentOptionsAudioState();
-	ui::v2::Node tree = ui::v2::BuildOptionsAudio(ctx, handlers, &live);
-	ui::v2::Layout(tree, ctx);
-	ui::v2::DispatchClick(tree, ctx);
 }
 
 static ui::v2::UpdateHandlers BuildUpdateHandlers(ScreenContext & sctx, Updater & updater){

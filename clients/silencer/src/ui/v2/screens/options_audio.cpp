@@ -1,7 +1,19 @@
 #include "options_audio.h"
 
 #include "context.h"
+#include "dispatch.h"
+#include "layout.h"
 #include "node.h"
+#include "render.h"
+
+#include "audio.h"
+#include "config.h"
+#include "game.h"
+#include "game_state.h"
+#include "screen_context.h"
+#include "world.h"
+#include "renderer.h"
+#include "surface.h"
 
 #include <string>
 
@@ -33,6 +45,88 @@ Node BuildOptionsAudio(const Context & ctx, const OptionsAudioHandlers & handler
 		Button("Save")  .at(-200, 117).onClick(handlers.on_save),
 		Button("Cancel").at(  20, 117).onClick(handlers.on_cancel),
 	});
+}
+
+// -----------------------------------------------------------------------------
+// OptionsAudioRuntime — engine wire-in for GameState::OPTIONSAUDIO.
+// -----------------------------------------------------------------------------
+
+namespace {
+
+OptionsAudioHandlers BuildOptionsAudioHandlers(ScreenContext & sctx){
+	OptionsAudioHandlers h;
+	h.on_toggle_music = [](){
+		Config & cfg = Config::GetInstance();
+		cfg.music = !cfg.music;
+		if(cfg.music) Audio::GetInstance().ResumeMusic();
+		else          Audio::GetInstance().PauseMusic();
+	};
+	h.on_save = [&sctx](){
+		Config::GetInstance().Save();
+		sctx.GoToState(GameState::OPTIONS);
+	};
+	h.on_cancel = [&sctx](){
+		Config & cfg = Config::GetInstance();
+		cfg.Load();
+		if(cfg.music) Audio::GetInstance().ResumeMusic();
+		else          Audio::GetInstance().PauseMusic();
+		sctx.GoToState(GameState::OPTIONS);
+	};
+	return h;
+}
+
+OptionsAudioState CurrentOptionsAudio(){
+	OptionsAudioState s;
+	s.music = Config::GetInstance().music;
+	return s;
+}
+
+}  // namespace
+
+OptionsAudioRuntime::OptionsAudioRuntime(World & world, ScreenContext & sctx)
+	: world_(world), sctx_(sctx) {}
+
+void OptionsAudioRuntime::Render(Surface & target, ::Renderer & renderer,
+                                  int mouse_x, int mouse_y, float dt){
+	Context ctx{
+		world_.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world_.GetVersion(),
+	};
+	ctx.mouse_x = mouse_x;
+	ctx.mouse_y = mouse_y;
+	ctx.state   = &state_;
+	ctx.dt      = dt;
+
+	OptionsAudioHandlers handlers = BuildOptionsAudioHandlers(sctx_);
+	OptionsAudioState live = CurrentOptionsAudio();
+	target.Clear(0);
+	state_.BeginFrame();
+	Node tree = BuildOptionsAudio(ctx, handlers, &live);
+	Layout(tree, ctx);
+	::ui::v2::Render(tree, ctx, target, renderer);
+	state_.EndFrame();
+}
+
+bool OptionsAudioRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
+	Context ctx{
+		world_.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world_.GetVersion(),
+	};
+	ctx.mouse_x = mouse_x;
+	ctx.mouse_y = mouse_y;
+	ctx.state   = &state_;
+	OptionsAudioHandlers handlers = BuildOptionsAudioHandlers(sctx_);
+	OptionsAudioState live = CurrentOptionsAudio();
+	Node tree = BuildOptionsAudio(ctx, handlers, &live);
+	Layout(tree, ctx);
+	DispatchClick(tree, ctx);
+	return true;
 }
 
 }  // namespace v2

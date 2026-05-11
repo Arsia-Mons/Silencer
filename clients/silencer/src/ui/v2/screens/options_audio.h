@@ -1,7 +1,13 @@
 #ifndef SILENCER_UI_V2_SCREENS_OPTIONS_AUDIO_H
 #define SILENCER_UI_V2_SCREENS_OPTIONS_AUDIO_H
 
+#include "runtime.h"
+#include "ui_state.h"
+
 #include <functional>
+
+class World;
+class ScreenContext;
 
 namespace ui {
 namespace v2 {
@@ -30,6 +36,22 @@ struct OptionsAudioState {
 // the legacy Tick path:
 //   off = state.music ? 12 : 13;   on = state.music ? 15 : 14;
 Node BuildOptionsAudio(const Context & ctx, const OptionsAudioHandlers & handlers = {}, const OptionsAudioState * state = nullptr);
+
+// Engine-side runtime for GameState::OPTIONSAUDIO.
+class OptionsAudioRuntime : public Runtime
+{
+public:
+	OptionsAudioRuntime(World & world, ScreenContext & sctx);
+
+	void Render(Surface & target, ::Renderer & renderer,
+	            int mouse_x, int mouse_y, float dt) override;
+	bool DispatchMouseDown(int mouse_x, int mouse_y) override;
+
+private:
+	World &         world_;
+	ScreenContext & sctx_;
+	UIState         state_;
+};
 
 }  // namespace v2
 }  // namespace ui
