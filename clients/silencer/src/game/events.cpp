@@ -223,17 +223,8 @@ bool Game::HandleSDLEvents(void){
 					// (no-op for MESSAGE-kind modals).
 					if(!skip) DispatchV2ModalText((char)ascii);
 				}else if(active_runtime && !skip && active_runtime->DispatchTextInput((char)ascii)){
-					// Runtime consumed the char (e.g. LobbyConnect active field).
-				}else if(state == GameState::LOBBY && LobbyV2ChatActive()){
-					// v2 Lobby chat input — buffer lives on Game; the chat
-					// sub-interface is the active object whenever no
-					// modal/right-side panel takes focus.
-					if(!skip) LobbyV2ChatAppendChar(ascii);
-				}else if(state == GameState::LOBBY && LobbyV2CreateInputActive()){
-					// v2 Lobby game-create panel — routes to the active
-					// text input (name or password) per
-					// lobby_create_active_field.
-					if(!skip) LobbyV2CreateAppendChar(ascii);
+					// Runtime consumed the char (LobbyConnect / Lobby chat /
+					// Lobby game-create active field).
 				}else{
 					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 					if(iface){
@@ -307,40 +298,9 @@ bool Game::HandleSDLEvents(void){
 					}
 				}
 				// v2 runtimes can handle scancodes (rebind capture,
-				// LobbyConnect editing keys, etc.). Routed via active_runtime.
+				// LobbyConnect editing keys, Lobby chat/create editing,
+				// Lobby arrow-key nav). Routed via active_runtime.
 				if(active_runtime) active_runtime->DispatchKeyDown((int)event.key.scancode);
-				// v2 LOBBY chat input — BACKSPACE / RETURN edit the chat
-				// buffer when chat is the active sub-interface.
-				if(state == GameState::LOBBY && LobbyV2ChatActive()){
-					switch(event.key.scancode){
-						case SDL_SCANCODE_BACKSPACE: LobbyV2ChatBackspace(); break;
-						case SDL_SCANCODE_RETURN:    LobbyV2ChatSubmit();    break;
-						default: break;
-					}
-				}
-				// v2 LOBBY game-create panel — same shape, RETURN fires the
-				// Create button (legacy gamecreateinterface->buttonenter).
-				if(state == GameState::LOBBY && LobbyV2CreateInputActive()){
-					switch(event.key.scancode){
-						case SDL_SCANCODE_BACKSPACE: LobbyV2CreateBackspace(); break;
-						case SDL_SCANCODE_RETURN:    LobbyV2CreateSubmit();    break;
-						default: break;
-					}
-				}
-				// v2 LOBBY tab-nav arrow keys — cycle nav_cursor between
-				// chat / character / right-panel regions. Only fires when
-				// no text input has focus (otherwise arrow keys would steal
-				// from in-input cursor motion).
-				if(state == GameState::LOBBY && !LobbyV2ChatActive() &&
-				   !LobbyV2CreateInputActive()){
-					switch(event.key.scancode){
-						case SDL_SCANCODE_LEFT:
-						case SDL_SCANCODE_UP:    LobbyV2NavPrev(); break;
-						case SDL_SCANCODE_RIGHT:
-						case SDL_SCANCODE_DOWN:  LobbyV2NavNext(); break;
-						default: break;
-					}
-				}
 			}break;
 			case SDL_EVENT_KEY_UP:{
 				OnScancodeUp(event.key.scancode);
@@ -370,8 +330,6 @@ bool Game::HandleSDLEvents(void){
 					}
 					if(active_runtime && active_runtime->DispatchMouseDown(lx, ly)){
 						// Runtime consumed the click.
-					}else if(state == GameState::LOBBY){
-						DispatchLobbyV2Click(lx, ly);
 					}else{
 						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 						if(iface){

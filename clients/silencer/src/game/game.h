@@ -109,6 +109,10 @@ public:
 	// Const accessor for read-only state queries.
 	const class World & GetWorldConst() const { return world; }
 
+	// Active v2 runtime accessor. Returns nullptr when no runtime is
+	// instantiated (states not yet migrated, or between transitions).
+	ui::v2::Runtime * GetActiveRuntime() const { return active_runtime.get(); }
+
 	// LobbyScreen + per-panel interop. Public so panels can reach in via
 	// `ScreenContext::game`.
 	Uint16 currentinterface;
@@ -126,71 +130,18 @@ public:
 	// entering / leaving the tech-choice surface.
 	void ShowTeamOverlays(bool show);
 
-	// LobbyScreen-equivalent right-side panel swap helpers + Go Back. Public
-	// so v2 click handlers + per-panel items (P16g-2..7) can call them.
-	void LobbyV2HandleBack();
-	void LobbyV2ShowGameSelect();
-	void LobbyV2ShowGameCreate();
-	void LobbyV2ShowGameJoin();
-	void LobbyV2ShowGameTech();
-	// Mirror of legacy CharacterPanel::Tick agency-change branch: persist
-	// to Config + push to the connected world.
-	void LobbyV2SelectAgency(Uint8 agency);
-	// Chat panel input routing helpers — called from events.cpp's
-	// TEXT_INPUT and KEY_DOWN branches when state == LOBBY and the chat
-	// sub-interface is the lobby's active object. Mirrors legacy
-	// TextInput::ProcessKeyPress branches plus ChatPanel::Tick's
-	// enterpressed -> SendChat handoff.
+	// Thin wrappers forwarding to the active LobbyRuntime — used by
+	// events.cpp (text input + key routing) and controldispatch.cpp
+	// (CLI smoke tests). Safe to call any time: no-ops / null returns
+	// when the engine isn't in LOBBY or no runtime is instantiated.
+	bool LobbyV2ChatActive() const;
 	void LobbyV2ChatAppendChar(char c);
 	void LobbyV2ChatBackspace();
 	void LobbyV2ChatSubmit();
-	// True when the chat sub-interface is the lobby's active object —
-	// matches BuildLobby's chat_active derivation. Read by events.cpp
-	// to decide whether keys / text route to the chat input.
-	bool LobbyV2ChatActive() const;
-	// Game-select panel runtime helpers — set selected row from a
-	// SelectBox-area click; attempt to join the currently selected game
-	// (level checks + password modal handoff). Mirrors GSEL_BTN_JOIN
-	// branch in GameSelectPanel::Tick.
-	void LobbyV2GameSelectRow(int index);
-	void LobbyV2GameSelectJoin();
-	// Game-create panel runtime helpers. Click-driven hit-tests live in
-	// DispatchLobbyV2Click; the editing helpers below take typed input from
-	// events.cpp. lobby_create_active_field tracks which of the two text
-	// inputs (0=none, 1=name, 2=password) has caret focus — mirrors the
-	// legacy gamecreate sub-interface's activeobject swap.
+	bool LobbyV2CreateInputActive() const;
 	void LobbyV2CreateAppendChar(char c);
 	void LobbyV2CreateBackspace();
-	void LobbyV2CreateSubmit();          // ENTER → fire Create.
-	void LobbyV2CreateCycleSecurity();   // Off → Low → Medium → High → Off.
-	void LobbyV2CreateCycleMinLevel();   // 0..99 wrap, +1 per click.
-	void LobbyV2CreateCycleMaxLevel();
-	void LobbyV2CreateCycleMaxPlayers(); // 1..24 wrap.
-	void LobbyV2CreateCycleMaxTeams();   // 1..16 wrap.
-	void LobbyV2CreateGame();            // Create button click.
-	void LobbyV2CreateSelectMap(int row);
-	void LobbyV2CreateDownloadMap(int row); // [DL] badge click.
-	bool LobbyV2CreateInputActive() const;
-	// Game-join panel runtime helpers. Ready: SendReady unless local peer
-	// is host and a peer is still downloading the map (mirrors
-	// GameJoinPanel::Tick's GJN_BTN_READY branch). Change Team: world.
-	// ChangeTeam. Choose Tech reuses LobbyV2ShowGameTech.
-	void LobbyV2GameJoinReady();
-	void LobbyV2GameJoinChangeTeam();
-	// Game-tech panel runtime helpers. Toggle: flips local-peer's
-	// techchoice for the visible-row item index (mirrors the BCHECKBOX
-	// clicked branch in GameTechPanel::Tick — guarded by usability + cost
-	// fits the remaining slots). Select: surfaces the item's name +
-	// description in the bottom-of-panel readout (mirrors the
-	// descoverlay_anchor->clicked branch).
-	void LobbyV2GameTechToggle(int item_index);
-	void LobbyV2GameTechSelect(int item_index);
-	// Gamepad / keyboard menu-nav helpers. Cycle the lobby's nav_cursor
-	// through Character / Chat / RightPanel (-1 = no focus). First press
-	// from -1 lands on the first / last region depending on direction.
-	// Wired into TickGamepadMenuNav (DPad / left-stick), events.cpp's
-	// SDL_EVENT_KEY_DOWN arrow-key branch (when no text input has focus),
-	// and the "key" control op (for CLI smoke tests).
+	void LobbyV2CreateSubmit();
 	void LobbyV2NavPrev();
 	void LobbyV2NavNext();
 
@@ -326,47 +277,6 @@ private:
 	// Game (states being migrated one at a time).
 	std::unique_ptr<ui::v2::Runtime> active_runtime;
 	void SetRuntime(Uint8 new_state);
-	// Same shape for LOBBY state. Owns the right-side panel-swap state
-	// (active_panel, map_name) and runs the legacy LobbyScreen::Tick state
-	// machine (deferred CreateGame, joininggame finalize, progress modal,
-	// CONNECTED -> GameJoin handoff, ProcessMapDownload, disconnect modal).
-	// Panel-internal click handlers are wired by the panel-specific items
-	// (P16g-2..P16g-7).
-	bool RenderLobbyV2();
-	void DispatchLobbyV2Click(int logical_x, int logical_y);
-	void TickLobbyV2();
-	void RefreshLobbyV2CharacterState();
-	// Drains world.lobby.chatmessages into the v2 chat scrollback,
-	// rebuilds the presence list when world.lobby.presencechanged is
-	// set, and updates the channel name overlay when
-	// world.lobby.channelchanged is set. Mirrors ChatPanel::Tick's three
-	// dynamic branches. Run from RenderLobbyV2 (per-frame, like the
-	// character refresh) so the side-effects on world.lobby are
-	// idempotent.
-	void RefreshLobbyV2ChatState();
-	// Mirror of GameSelectPanel::Tick: rebuilds the games[] list from
-	// world.lobby when !gamesprocessed, computes selected-game overlay
-	// strings, and updates show_scrollbar. Run per-render from
-	// RenderLobbyV2.
-	void RefreshLobbyV2GameSelectState();
-	// Mirror of GameCreatePanel::Tick: polls the in-flight [DL] download
-	// for completion/failure (rebuilds map_items on success), and refreshes
-	// the caret blink. Map-list population itself happens once on
-	// LobbyV2ShowGameCreate. Run per-render from RenderLobbyV2.
-	void RefreshLobbyV2GameCreateState();
-	// Mirror of GameJoinPanel::Tick: derives the Ready button's
-	// "Waiting..." label from host status + AllPeersDownloadedMap when
-	// world.gameplaystate == INLOBBY. Run per-render from RenderLobbyV2.
-	void RefreshLobbyV2GameJoinState();
-	// Mirror of GameTechPanel::Tick: derives slots-left counter, per-row
-	// checkbox state, per-other-peer column headers, and tech name +
-	// description from world.buyableitems / world.peerlist / world.lobby.
-	// Run per-render from RenderLobbyV2.
-	void RefreshLobbyV2GameTechState();
-	// Owned heap to keep ui::v2::LobbyState's full type out of game.h —
-	// it transitively includes the v2 panel headers and would pollute
-	// every game.h consumer. Allocated in Game() / freed in ~Game().
-	std::unique_ptr<ui::v2::LobbyState> ui_v2_lobby_state;
 	// v2 modal stack render + dispatch hooks. RenderV2ModalOverlay() blits
 	// the top modal on top of whatever the per-state render already drew;
 	// DispatchV2Modal* return true when the event was consumed so the per-
@@ -377,7 +287,6 @@ private:
 	bool DispatchV2ModalKey(int sdl_scancode);
 	bool DispatchV2ModalText(char ascii);
 	std::vector<V2ModalEntry> ui_v2_modal_stack;
-	int  lobby_create_active_field  = 1; // 0 = none, 1 = name, 2 = password
 	// Set by GoToState; processed at the next Tick() entry to pop screens
 	// safely after the active screen's Tick has returned. Avoids destroying
 	// a screen mid-Tick when a button click triggers a state transition.

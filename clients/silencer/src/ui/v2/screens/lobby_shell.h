@@ -1,6 +1,9 @@
 #ifndef SILENCER_UI_V2_SCREENS_LOBBY_SHELL_H
 #define SILENCER_UI_V2_SCREENS_LOBBY_SHELL_H
 
+#include "runtime.h"
+#include "ui_state.h"
+
 #include "shared.h"
 #include "lobby_character.h"
 #include "lobby_chat.h"
@@ -11,6 +14,10 @@
 
 #include <functional>
 #include <string>
+
+class World;
+class ScreenContext;
+class Game;
 
 namespace ui {
 namespace v2 {
@@ -82,6 +89,73 @@ constexpr int kLobbyNavRightPanel  = 2;
 // do.
 Node BuildLobby(const Context & ctx, const LobbyHandlers & handlers = {},
                 const LobbyState & state = {});
+
+// Engine-side runtime for GameState::LOBBY. Owns the LobbyState struct
+// + per-panel refresh helpers + the (deferred CreateGame / joining /
+// progress / CONNECTED transition / disconnect) Tick state machine.
+// Public methods are called by events.cpp (chat / create input
+// routing, nav cursor) and controldispatch.cpp (CLI smoke tests).
+class LobbyRuntime : public Runtime
+{
+public:
+	LobbyRuntime(World & world, ScreenContext & sctx, Game & game);
+
+	void Render(Surface & target, ::Renderer & renderer,
+	            int mouse_x, int mouse_y, float dt) override;
+	bool DispatchMouseDown(int mouse_x, int mouse_y) override;
+	bool DispatchKeyDown(int sdl_scancode) override;
+	bool DispatchTextInput(char ascii) override;
+	void Tick() override;
+
+	const LobbyState & GetState() const { return state_data_; }
+
+	// Public surface (matches the legacy Game::LobbyV2* method names).
+	void HandleBack();
+	void ShowGameSelect();
+	void ShowGameCreate();
+	void ShowGameJoin();
+	void ShowGameTech();
+	void SelectAgency(Uint8 agency);
+	bool ChatActive() const;
+	void ChatAppendChar(char c);
+	void ChatBackspace();
+	void ChatSubmit();
+	void GameSelectRow(int index);
+	void GameSelectJoin();
+	bool CreateInputActive() const;
+	void CreateAppendChar(char c);
+	void CreateBackspace();
+	void CreateSubmit();
+	void CreateCycleSecurity();
+	void CreateCycleMinLevel();
+	void CreateCycleMaxLevel();
+	void CreateCycleMaxPlayers();
+	void CreateCycleMaxTeams();
+	void CreateGame();
+	void CreateSelectMap(int row);
+	void CreateDownloadMap(int row);
+	void GameJoinReady();
+	void GameJoinChangeTeam();
+	void GameTechToggle(int item_index);
+	void GameTechSelect(int item_index);
+	void NavPrev();
+	void NavNext();
+
+private:
+	void RefreshCharacter();
+	void RefreshChat();
+	void RefreshGameSelect();
+	void RefreshGameCreate();
+	void RefreshGameJoin();
+	void RefreshGameTech();
+
+	World &         world_;
+	ScreenContext & sctx_;
+	Game &          game_;
+	UIState         state_;
+	LobbyState      state_data_;
+	int             create_active_field_ = 1;  // 0=none, 1=name, 2=password
+};
 
 }  // namespace v2
 }  // namespace ui

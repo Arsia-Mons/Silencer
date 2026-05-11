@@ -1,6 +1,8 @@
 #ifndef WORLD_H
 #define WORLD_H
 
+namespace ui { namespace v2 { class LobbyRuntime; } }
+
 #include "shared.h"
 #include <list>
 #include <map>
@@ -122,6 +124,11 @@ public:
 	
 	friend class Renderer;
 	friend class Game;
+	// v2 lobby runtime: accesses peerlist / state / gameinfo / etc. to
+	// drive the CreateGame state machine, ready handoff, and team /
+	// peer projections. Granular alternative is per-field accessors —
+	// promoting them is a separate cleanup.
+	friend class ::ui::v2::LobbyRuntime;
 	friend class MapDownloader;
 	friend class AmbienceMixer;
 	friend class Team;
