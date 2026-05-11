@@ -164,7 +164,14 @@ const LEAF_ACTIONS = [
 // ── Main editor ───────────────────────────────────────────────────────────────
 interface Props { bt: BehaviorTree; onChange: (bt: BehaviorTree) => void; }
 
-export default function BehaviorTreeEditor({ bt, onChange }: Props) {
+export default function BehaviorTreeEditor({ bt: rawBt, onChange }: Props) {
+  // Normalize — guard against files loaded without all fields (e.g. wrong folder opened).
+  const bt: BehaviorTree = {
+    ...rawBt,
+    blackboard: rawBt.blackboard ?? [],
+    nodes: rawBt.nodes ?? {},
+    positions: rawBt.positions ?? {},
+  };
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);

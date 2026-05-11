@@ -33,7 +33,20 @@ export async function loadFilesIntoStore(files: FileList): Promise<void> {
       .filter(f => f.name.endsWith('.json'))
       .map(f =>
         f.text().then(text => {
-          try { store.set(f.name.slice(0, -5), JSON.parse(text) as BehaviorTree); }
+          try {
+            const parsed = JSON.parse(text);
+            // Skip files that don't look like behavior trees.
+            if (!parsed || typeof parsed !== 'object' || !parsed.nodes) return;
+            const bt: BehaviorTree = {
+              version: parsed.version ?? 1,
+              id: parsed.id ?? f.name.slice(0, -5),
+              blackboard: Array.isArray(parsed.blackboard) ? parsed.blackboard : [],
+              rootId: parsed.rootId ?? 'root',
+              nodes: parsed.nodes ?? {},
+              positions: parsed.positions ?? {},
+            };
+            store.set(f.name.slice(0, -5), bt);
+          }
           catch { /* skip invalid JSON */ }
         })
       )
