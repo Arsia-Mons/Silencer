@@ -159,6 +159,12 @@ public:
 	// matches BuildLobby's chat_active derivation. Read by events.cpp
 	// to decide whether keys / text route to the chat input.
 	bool LobbyV2ChatActive() const;
+	// Game-select panel runtime helpers — set selected row from a
+	// SelectBox-area click; attempt to join the currently selected game
+	// (level checks + password modal handoff). Mirrors GSEL_BTN_JOIN
+	// branch in GameSelectPanel::Tick.
+	void LobbyV2GameSelectRow(int index);
+	void LobbyV2GameSelectJoin();
 
 	// v2 modal stack — overlays the underlying state's render and intercepts
 	// mouse / text input when non-empty. Lobby panels (P16g) and any other
@@ -355,6 +361,11 @@ private:
 	// character refresh) so the side-effects on world.lobby are
 	// idempotent.
 	void RefreshLobbyV2ChatState();
+	// Mirror of GameSelectPanel::Tick: rebuilds the games[] list from
+	// world.lobby when !gamesprocessed, computes selected-game overlay
+	// strings, and updates show_scrollbar. Run per-render from
+	// RenderLobbyV2.
+	void RefreshLobbyV2GameSelectState();
 	// Owned heap to keep ui::v2::LobbyState's full type out of game.h —
 	// it transitively includes the v2 panel headers and would pollute
 	// every game.h consumer. Allocated in Game() / freed in ~Game().

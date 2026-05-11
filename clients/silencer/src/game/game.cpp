@@ -2036,6 +2036,8 @@ static ui::v2::LobbyHandlers BuildLobbyV2Handlers(Game * game){
 	ui::v2::LobbyHandlers h;
 	h.on_go_back = [game](){ game->LobbyV2HandleBack(); };
 	h.character.on_select_agency = [game](Uint8 agency){ game->LobbyV2SelectAgency(agency); };
+	h.game_select.on_create = [game](){ game->LobbyV2ShowGameCreate(); };
+	h.game_select.on_join   = [game](){ game->LobbyV2GameSelectJoin(); };
 	return h;
 }
 
@@ -2170,6 +2172,133 @@ void Game::RefreshLobbyV2ChatState(){
 	cs.caret_visible = ((Uint32)frames & 31u) < 16u;
 }
 
+// Port of GameSelectPanel::Tick (clients/silencer/src/ui/screens/lobby/
+// panels/game_select_panel.cpp). Rebuilds the v2 games list from
+// world.lobby.games when !gamesprocessed (mirrors legacy AddItem/DeleteItem
+// reconcile), then computes the selected-game overlay snapshot.
+void Game::RefreshLobbyV2GameSelectState(){
+	ui::v2::GameSelectState & gs = ui_v2_lobby_state->game_select;
+
+	// Mirror legacy "items.size() > ceil(height/lineheight)" scrollbar gate.
+	const int max_visible_rows = 265 / 14;  // 18
+
+	if(!world.lobby.gamesprocessed){
+		// Drop entries whose lobby record is gone, preserving order +
+		// selection of survivors.
+		size_t write = 0;
+		int new_selected = -1;
+		Uint32 selected_id = (gs.selected_index >= 0 && gs.selected_index < (int)gs.games.size())
+			? gs.games[gs.selected_index].id : 0;
+		for(size_t r = 0; r < gs.games.size(); r++){
+			if(world.lobby.GetGameById(gs.games[r].id)){
+				if(write != r) gs.games[write] = std::move(gs.games[r]);
+				if(gs.games[write].id == selected_id) new_selected = (int)write;
+				write++;
+			}
+		}
+		gs.games.resize(write);
+		gs.selected_index = new_selected;
+
+		// Append new lobby games.
+		for(LobbyGame * lobbygame : world.lobby.games){
+			bool found = false;
+			for(auto & row : gs.games){
+				if(row.id == lobbygame->id){ found = true; break; }
+			}
+			if(found) continue;
+			ui::v2::GameSelectGame row;
+			row.id = lobbygame->id;
+			// Legacy SelectBox::AddItem dups via strdup(text); the
+			// renderer reads it through DrawText. Match legacy without
+			// the [DL] prefix (this panel never prefixes — that's the
+			// game-create map list).
+			row.name = lobbygame->name;
+			row.passworded = (strlen(lobbygame->password) > 0);
+			row.accountid = lobbygame->accountid;
+			row.mapname = lobbygame->mapname;
+			User * creator = world.lobby.GetUserInfo(lobbygame->accountid);
+			if(creator) row.creator_name = creator->name;
+			row.securitylevel = lobbygame->securitylevel;
+			row.minlevel = lobbygame->minlevel;
+			row.maxlevel = lobbygame->maxlevel;
+			row.maxplayers = lobbygame->maxplayers;
+			row.maxteams = lobbygame->maxteams;
+			gs.games.push_back(std::move(row));
+		}
+
+		world.lobby.gamesprocessed = true;
+	}else{
+		// Keep creator_name fresh once user info arrives even if the
+		// !gamesprocessed branch already ran — legacy reads through
+		// GetUserInfo each Tick.
+		for(auto & row : gs.games){
+			if(!row.creator_name.empty()) continue;
+			User * creator = world.lobby.GetUserInfo(row.accountid);
+			if(creator) row.creator_name = creator->name;
+		}
+	}
+
+	// Clamp selection to current list bounds.
+	if(gs.selected_index >= (int)gs.games.size()) gs.selected_index = -1;
+
+	// Show scrollbar when games overflow the visible window.
+	gs.show_scrollbar = (int)gs.games.size() > max_visible_rows;
+	// Clamp scroll. Without scroll input wiring this typically stays 0
+	// at runtime; resilient if a future iteration plumbs scroll input.
+	const int scrollmax = std::max(0, (int)gs.games.size() - max_visible_rows);
+	if(gs.scrolled > scrollmax) gs.scrolled = (Uint16)scrollmax;
+}
+
+void Game::LobbyV2GameSelectRow(int index){
+	ui::v2::GameSelectState & gs = ui_v2_lobby_state->game_select;
+	if(index < 0 || index >= (int)gs.games.size()){
+		gs.selected_index = -1;
+		return;
+	}
+	gs.selected_index = index;
+}
+
+// Mirror of GameSelectPanel::Tick's GSEL_BTN_JOIN branch (game_select_panel.cpp:251).
+void Game::LobbyV2GameSelectJoin(){
+	ui::v2::GameSelectState & gs = ui_v2_lobby_state->game_select;
+	if(gs.selected_index < 0 || gs.selected_index >= (int)gs.games.size()){
+		ShowV2Message("No game selected");
+		return;
+	}
+	Uint32 gameid = gs.games[gs.selected_index].id;
+	if(!gameid) return;
+	LobbyGame * lobbygame = world.lobby.GetGameById(gameid);
+	if(!lobbygame) return;
+	if(!world.IsIdle()) return;
+	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+	if(user){
+		if(lobbygame->minlevel > user->agency[Config::GetInstance().defaultagency].level){
+			ShowV2Message("Your player level is too low");
+			return;
+		}
+		if(lobbygame->maxlevel < user->agency[Config::GetInstance().defaultagency].level){
+			ShowV2Message("Your player level is too high");
+			return;
+		}
+	}
+	currentlobbygameid = lobbygame->id;
+	if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
+		Game * self = this;
+		Uint32 gid = lobbygame->id;
+		ShowV2PasswordModal([self, gid](const std::string & password){
+			LobbyGame * lg = self->GetWorld().lobby.GetGameById(gid);
+			if(lg){
+				char buf[64];
+				std::strncpy(buf, password.c_str(), sizeof(buf) - 1);
+				buf[sizeof(buf) - 1] = '\0';
+				self->JoinGame(*lg, buf);
+			}
+		});
+	}else{
+		JoinGame(*lobbygame);
+	}
+}
+
 void Game::LobbyV2ChatAppendChar(char c){
 	ui::v2::ChatPanelState & cs = ui_v2_lobby_state->chat;
 	// Mirror TextInput::ProcessKeyPress: maxchars=200 cap, scroll once
@@ -2216,6 +2345,7 @@ bool Game::RenderLobbyV2(){
 
 	RefreshLobbyV2CharacterState();
 	RefreshLobbyV2ChatState();
+	RefreshLobbyV2GameSelectState();
 	ui::v2::LobbyHandlers handlers = BuildLobbyV2Handlers(this);
 	screenbuffer.Clear(0);
 	ui_v2_state.BeginFrame();
@@ -2243,6 +2373,23 @@ void Game::DispatchLobbyV2Click(int logical_x, int logical_y){
 		if(logical_x >= x1 && logical_x < x2 && logical_y >= y1 && logical_y < y2){
 			LobbyV2SelectAgency(idx);
 			return;
+		}
+	}
+
+	// Game-select panel row hit-test. SelectBox occupies (407, 89,
+	// 214, 265); each visible row is 14px tall starting at y=89, mapping
+	// (logical_y - 89) / 14 + scrolled -> item index. Mirrors
+	// SelectBox::MouseInside without the sprite-offset terms (the legacy
+	// SelectBox has no res sprite, so offsets are zero).
+	if(ui_v2_lobby_state->active_panel == ui::v2::LobbyActivePanel::GameSelect){
+		const ui::v2::GameSelectState & gs = ui_v2_lobby_state->game_select;
+		if(logical_x >= 407 && logical_x < 407 + 214 - 16 &&
+		   logical_y >= 89  && logical_y < 89 + 265){
+			int idx = ((logical_y - 89) / 14) + gs.scrolled;
+			if(idx >= 0 && idx < (int)gs.games.size()){
+				LobbyV2GameSelectRow(idx);
+				return;
+			}
 		}
 	}
 
@@ -2404,6 +2551,12 @@ void Game::LobbyV2HandleBack(){
 }
 
 void Game::LobbyV2ShowGameSelect(){
+	// Mirror legacy: GameSelectPanel is freshly constructed on each
+	// ShowGameSelect, so SelectBox::selecteditem (initialised to -1)
+	// resets. Drop our selection + force a rebuild on next render.
+	ui_v2_lobby_state->game_select.selected_index = -1;
+	ui_v2_lobby_state->game_select.scrolled = 0;
+	world.lobby.gamesprocessed = false;
 	ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameSelect;
 }
 
