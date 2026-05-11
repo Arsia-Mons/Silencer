@@ -196,6 +196,9 @@ void UpdateRuntime::Render(Surface & target, ::Renderer & renderer,
 	target.Clear(0);
 	state_.BeginFrame();
 	Node tree = BuildUpdate(ctx, handlers, &live);
+	::ui::v2::EnsureClayContext(ctx);
+	Clay_SetPointerState(Clay_Vector2{ (float)mouse_x, (float)mouse_y }, /*pointer_down=*/false);
+	Clay_UpdateScrollContainers(/*drag=*/false, Clay_Vector2{ 0.0f, 0.0f }, dt);
 	Layout(tree, ctx);
 	::ui::v2::Render(tree, ctx, target, renderer);
 	state_.EndFrame();

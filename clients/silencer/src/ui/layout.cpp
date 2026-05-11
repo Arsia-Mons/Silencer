@@ -36,20 +36,6 @@ Clay_Dimensions MeasureSpriteText(Clay_StringSlice text, Clay_TextElementConfig 
 	return Clay_Dimensions{ w, h };
 }
 
-void EnsureInit(const Context & ctx) {
-	if(g_initialized) return;
-	uint32_t need = Clay_MinMemorySize();
-	g_arena_mem = (char *)std::malloc(need);
-	Clay_Arena arena = Clay_CreateArenaWithCapacityAndMemory(need, g_arena_mem);
-	Clay_ErrorHandler eh{};
-	eh.errorHandlerFunction = ClayError;
-	g_clay_ctx = Clay_Initialize(arena,
-	                             Clay_Dimensions{ (float)ctx.logical_w, (float)ctx.logical_h },
-	                             eh);
-	Clay_SetMeasureTextFunction(MeasureSpriteText, nullptr);
-	g_initialized = true;
-}
-
 // ----- Clay sizing/layout helpers -----
 // Implemented as plain functions rather than relying on Clay's macro
 // helpers (CLAY_SIZING_FIT() etc.) — empty variadic macro args are
@@ -208,20 +194,24 @@ void EmitNode(Node & n, LayoutState & ls, const Context & ctx, bool in_managed) 
 
 }  // namespace
 
-void BeforeLayout(const Context & ctx, float scroll_dy) {
-	EnsureInit(ctx);
+void EnsureClayContext(const Context & ctx) {
+	if(!g_initialized){
+		uint32_t need = Clay_MinMemorySize();
+		g_arena_mem = (char *)std::malloc(need);
+		Clay_Arena arena = Clay_CreateArenaWithCapacityAndMemory(need, g_arena_mem);
+		Clay_ErrorHandler eh{};
+		eh.errorHandlerFunction = ClayError;
+		g_clay_ctx = Clay_Initialize(arena,
+		                             Clay_Dimensions{ (float)ctx.logical_w, (float)ctx.logical_h },
+		                             eh);
+		Clay_SetMeasureTextFunction(MeasureSpriteText, nullptr);
+		g_initialized = true;
+	}
 	Clay_SetCurrentContext(g_clay_ctx);
-	// Caller doesn't track button state here; the storybook fires
-	// DispatchClick directly on mousedown and doesn't need Clay's
-	// hover/down distinction for any current widget.
-	Clay_Vector2 pos{ (float)ctx.mouse_x, (float)ctx.mouse_y };
-	Clay_SetPointerState(pos, /*pointer_down=*/false);
-	Clay_UpdateScrollContainers(/*drag=*/false, Clay_Vector2{ 0.0f, scroll_dy }, ctx.dt);
 }
 
 void Layout(Node & root, const Context & ctx) {
-	EnsureInit(ctx);
-	Clay_SetCurrentContext(g_clay_ctx);
+	EnsureClayContext(ctx);
 	Clay_SetLayoutDimensions(Clay_Dimensions{ (float)ctx.logical_w, (float)ctx.logical_h });
 	Clay_BeginLayout();
 
