@@ -53,7 +53,7 @@
       "id": "P6",
       "priority": 6,
       "name": "Toggle primitive",
-      "passes": false,
+      "passes": true,
       "spec": "Add clients/silencer/src/ui/clay/primitives/toggle.{h,cpp}. API: `Toggle(spriteBank, spriteIndex, selected, on_select_callback)`. Mutually-exclusive group behavior is the CALLER's job (caller passes which one is selected; on_select tells caller to mark this index). No global 'set' state. Pixel-identical to legacy Toggle.",
       "pass_check": "Render test pixdiff < 1.0 vs baseline; on_select fires with the right index. No lobby references."
     },

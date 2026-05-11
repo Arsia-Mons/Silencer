@@ -321,6 +321,35 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
 						}
 						break;
 					}
+					case CustomKind::ToggleSprite: {
+						const auto * p = reinterpret_cast<const TogglePayload *>(ccd->payload);
+						if(!p) break;
+						const auto & banks = game.GetWorld().resources.spritebank;
+						if(p->bank >= banks.size()) break;
+						if(p->index >= banks[p->bank].size()) break;
+						Surface * src = banks[p->bank][p->index].get();
+						if(!src) break;
+						int x = static_cast<int>(c->boundingBox.x);
+						int y = static_cast<int>(c->boundingBox.y);
+						int w = src->w;
+						int h = src->h;
+						int cx = x, cy = y, cw = w, ch = h;
+						if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) break;
+						Renderer::Rect dstrect{w, h, x, y};
+						bool needsCopy = (p->effectColor != 0) || (p->brightness != 128);
+						if(needsCopy){
+							Surface * copy = renderer.CreateSurfaceCopy(src);
+							if(p->effectColor != 0)
+								renderer.EffectColor(copy, nullptr, p->effectColor);
+							if(p->brightness != 128)
+								renderer.EffectBrightness(copy, nullptr, p->brightness);
+							Renderer::BlitSurface(copy, nullptr, dst, &dstrect);
+							delete copy;
+						}else{
+							Renderer::BlitSurface(src, nullptr, dst, &dstrect);
+						}
+						break;
+					}
 					case CustomKind::None:
 					default:
 						break;

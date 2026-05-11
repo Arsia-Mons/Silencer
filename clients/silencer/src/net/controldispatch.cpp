@@ -149,6 +149,44 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
+	if(cmd.op == "clay_toggle_test"){
+		std::string out = cmd.args.value("out", std::string());
+		std::string state = cmd.args.value("state", std::string("unselected"));
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_toggle_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunToggleTest(
+			game, state.c_str(), out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"toggle test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		r["state"] = state;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_toggle_check"){
+		silencer::clay_bridge::ToggleCheckResult res{};
+		bool ok = silencer::clay_bridge::RunToggleCheck(game, res);
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"toggle check failed"));
+			return;
+		}
+		nlohmann::json r;
+		r["clicks_toggle_0"] = res.clicksToggle0;
+		r["clicks_toggle_1"] = res.clicksToggle1;
+		r["clicks_toggle_2"] = res.clicksToggle2;
+		r["selected_brightness"] = res.selectedBrightness;
+		r["unselected_brightness"] = res.unselectedBrightness;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
 	if(cmd.op == "state"){
 		nlohmann::json r;
 		r["state"] = Game::StateName(game.GetState());

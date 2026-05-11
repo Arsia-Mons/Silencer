@@ -78,6 +78,26 @@ struct BankButtonCheckResult {
 };
 bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out);
 
+// P6 Toggle primitive unit test. Renders one Toggle (bank 181 idx 0,
+// effectColor=112) with the given selected state into a 640x480 Surface
+// and writes it to `outPath`. `state` must be "selected" or "unselected"
+// (any other value picks "unselected"). Invoked by the `clay_toggle_test`
+// control op. Implementation in toggle_test.cpp.
+bool RunToggleTest(::Game & game, const char * state, const char * outPath);
+
+// P6 Toggle click-routing check. Lays out three Toggles in a row, each
+// with a distinct `user` pointer. Drives the pointer through a press
+// timeline over the middle toggle and reports which toggle's callback
+// fired and how many times. No PNG produced.
+struct ToggleCheckResult {
+	int clicksToggle0;       // Expect 0.
+	int clicksToggle1;       // Expect 1.
+	int clicksToggle2;       // Expect 0.
+	int selectedBrightness;  // Expect 128 — the selected toggle's payload brightness.
+	int unselectedBrightness;// Expect 32  — an unselected toggle's payload brightness.
+};
+bool RunToggleCheck(::Game & game, ToggleCheckResult & out);
+
 // Pack a (bank, index) pair into a void* for Clay_ImageElementConfig.imageData.
 // Bank fits in the high 16 bits, index in the low 16. Round-trip via
 // UnpackImage(); decoder lives in clay_bridge.cpp.
@@ -101,6 +121,7 @@ struct BankTextDrawData {
 enum class CustomKind : Uint8 {
 	None = 0,
 	BankButtonChrome,  // P5: sprite-faced button (B156x21) with brightness effect.
+	ToggleSprite,      // P6: sprite-faced radio with effectColor + brightness.
 };
 
 struct ClayCustomData {
@@ -116,6 +137,18 @@ struct BankButtonChromePayload {
 	Uint8  bank;        // 7 for the B156x21 sprite bank.
 	Uint16 index;       // 24 = B156x21 idle face.
 	Uint8  brightness;  // 128 = neutral; 136 = hovered (legacy ACTIVE state).
+};
+
+// P6 — payload for CustomKind::ToggleSprite. The bridge blits
+// world.resources.spritebank[bank][index] at the bbox top-left. Mirrors
+// the legacy Toggle render path: EffectColor applied first when non-zero,
+// then EffectBrightness when != 128. Both steps allocate a per-call
+// surface copy so the source sprite is not mutated.
+struct TogglePayload {
+	Uint8  bank;
+	Uint16 index;
+	Uint8  effectColor;  // 0 = no tint.
+	Uint8  brightness;   // 128 = neutral.
 };
 
 }  // namespace silencer::clay_bridge
