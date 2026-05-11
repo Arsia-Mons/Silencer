@@ -66,7 +66,7 @@ else()
 	add_executable(${SILENCER_TARGET} ${sources})
 endif()
 
-target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_14)
+target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_20)
 
 if(WIN32)
 	# Strip <winsock.h> (and other legacy subsystems) out of <windows.h>.

@@ -1,0 +1,42 @@
+## Codebase Patterns
+
+(populated by iterations — one-liners only, learnings the next iteration must not re-derive)
+- Clay 0.14 requires C++20 (`__cplusplus >= 202002L`); silencer's CMake bumps `cxx_std_14` → `cxx_std_20`.
+- `clay.h` lives at `clients/silencer/third_party/clay/clay.h`; include as `#include "clay/clay.h"` since `third_party/` is on the include path (CMakeLists.txt:118).
+- `CLAY_IMPLEMENTATION` is defined in exactly one TU: `clients/silencer/src/ui/clay/clay_init.cpp`. Picked up automatically by the `src/*.cpp` GLOB_RECURSE.
+- macOS binary lives at `build/Silencer.app/Contents/MacOS/Silencer`; verify Clay symbols with `nm <bin> | grep _Clay_`.
+
+## 2026-05-11T00:00:00Z - bootstrap
+- Ralph artifacts created (ralph.sh, RALPH.md, prd.json, progress.txt).
+- Design doc at docs/plans/2026-05-11-lobby-clay-refactor.md is the authoritative spec.
+- Primitive home: clients/silencer/src/ui/clay/primitives/ (no lobby dir).
+- Lobby screen home: clients/silencer/src/ui/screens/lobby_clay/.
+- Baselines (immovable): tests/lobby-clay/baselines/.
+- Pixdiff tool: tools/pixdiff/.
+- Demo (dogfood): tools/clay-demo/.
+- **Learnings for future iterations:**
+  - Read docs/plans/2026-05-11-lobby-clay-refactor.md every iteration; rules in "Primitive design rules" section are load-bearing.
+  - Five sins to avoid: lobby vocab in a primitive, primitive owning state, primitive referencing world/lobby/Config, variants-as-strings, primitive with >3 bool flags.
+  - clay-ui skill at /Users/hv/.claude/skills/clay-ui has canonical idioms — re-read when touching Clay code.
+  - Bridge dispatches Clay render commands into existing Surface/sprite-bank routines; no new renderer.
+---
+
+## 2026-05-11T10:00:00Z - P0 (Vendor clay.h and wire it into CMake)
+- Vendored Clay 0.14 (upstream tag-sha b25a31c) at clients/silencer/third_party/clay/clay.h + VERSION pin.
+- Added clients/silencer/src/ui/clay/clay_init.cpp — single TU that defines CLAY_IMPLEMENTATION.
+- Bumped clients/silencer/CMakeLists.txt cxx_std_14 → cxx_std_20 (Clay rejects pre-C++20).
+- Did NOT call Clay_Initialize from main yet — header-only smoke compile only.
+- Files changed:
+  - clients/silencer/CMakeLists.txt
+  - clients/silencer/third_party/clay/{clay.h,VERSION}
+  - clients/silencer/src/ui/clay/clay_init.cpp
+  - docs/plans/2026-05-11-lobby-clay-refactor.md (seed)
+  - ralph/{RALPH.md,prd.json,progress.txt,ralph.sh} (seed)
+- Build: `cmake --build build -j` → green.
+- Symbol check: `nm build/Silencer.app/Contents/MacOS/Silencer | grep _Clay_Initialize` → `T _Clay_Initialize`.
+- **Learnings for future iterations:**
+  - Don't try to "include clay.h" from arbitrary other TUs without `CLAY_IMPLEMENTATION` — only `clay_init.cpp` defines it. Other TUs just include the header for declarations.
+  - The CMake `third_party/` include dir already exists (line 118); no new include-dir lines needed for Clay consumers.
+  - C++20 bump is repo-wide for the silencer target. If a TU was relying on C++14-specific quirks, surface here; nothing did in this iteration.
+---
+
