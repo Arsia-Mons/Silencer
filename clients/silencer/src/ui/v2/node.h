@@ -81,6 +81,14 @@ struct Node {
 	Uint16 fill_h = 0;
 	Uint8  fill_color = 0;
 
+	// Label-only: effect color / brightness / ramp passed to
+	// `Renderer::DrawText`. Defaults match the legacy Overlay-text path
+	// (effectcolor=0, effectbrightness=128, textcolorramp=false), so
+	// untouched Labels render identically to before this field set existed.
+	Uint8 effect_color      = 0;
+	Uint8 effect_brightness = 128;
+	bool  text_color_ramp   = false;
+
 	// Layout output. Set by `layout.cpp` for nodes inside a container
 	// subtree. `rect_w == 0` means "not laid out, fall back to (x, y)
 	// + ChromeFor.width/height" — preserves the absolute `.at()`
@@ -104,6 +112,9 @@ struct Node {
 	Node & withKey(std::string k) { key = std::move(k); return *this; }
 	Node & withGap(Uint16 g) { gap = g; return *this; }
 	Node & withPadding(Uint16 p) { pad = p; return *this; }
+	Node & withColor(Uint8 c) { effect_color = c; return *this; }
+	Node & withBrightness(Uint8 b) { effect_brightness = b; return *this; }
+	Node & withRamp(bool r = true) { text_color_ramp = r; return *this; }
 };
 
 inline bool IsContainer(NodeKind k) {

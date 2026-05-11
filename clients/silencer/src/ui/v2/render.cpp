@@ -41,10 +41,14 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 			break;
 
 		case NodeKind::Label:
-			// Defaults match the legacy Overlay-text path:
-			// alpha=false, tint=0, brightness=128, rampcolor=false.
+			// alpha=false matches the legacy Overlay-text path; color /
+			// brightness / ramp come from the Node fields (defaults
+			// effect_color=0, effect_brightness=128, text_color_ramp=false
+			// reproduce the previous behavior for unstyled Labels).
 			renderer.DrawText(&target, (Uint16)n.x, (Uint16)n.y,
-			                  n.text.c_str(), n.text_bank, n.text_width);
+			                  n.text.c_str(), n.text_bank, n.text_width,
+			                  /*alpha=*/false, n.effect_color, n.effect_brightness,
+			                  n.text_color_ramp);
 			break;
 
 		case NodeKind::Button: {

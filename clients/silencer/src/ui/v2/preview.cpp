@@ -33,6 +33,7 @@
 #include "options_audio.h"
 #include "options_controls.h"
 #include "lobby_connect.h"
+#include "lobby_shell.h"
 #include "mission_summary.h"
 #include "update.h"
 #include "modals/message.h"
@@ -48,6 +49,10 @@
 #include "update_screen.h"
 #include "message_modal.h"
 #include "password_modal.h"
+#include "overlay.h"
+#include "button.h"
+#include "interface.h"
+#include "objecttypes.h"
 #include "renderer.h"
 #include "renderdevice.h"
 #include "resources.h"
@@ -103,6 +108,7 @@ int Game::RunPreview()
 	// ResetPresentation. lobby_connect uses palette 2; everything else
 	// migrated so far uses palette 1.
 	const int palette_idx = (strcmp(preview_screen, "lobby_connect") == 0 ||
+	                          strcmp(preview_screen, "lobby") == 0 ||
 	                          strcmp(preview_screen, "update") == 0) ? 2 : 1;
 	if(!renderer.palette.SetPalette(palette_idx)){
 		fprintf(stderr, "[preview] palette %d load failed\n", palette_idx);
@@ -178,6 +184,12 @@ int Game::RunPreview()
 	lobby_connect_handlers.on_login  = [](){ printf("[preview] Login clicked\n"); };
 	lobby_connect_handlers.on_cancel = [&running](){
 		printf("[preview] Cancel clicked\n");
+		running = false;
+	};
+
+	ui::v2::LobbyHandlers lobby_handlers;
+	lobby_handlers.on_go_back = [&running](){
+		printf("[preview] Go Back clicked\n");
 		running = false;
 	};
 
@@ -331,6 +343,52 @@ int Game::RunPreview()
 				world.TickObjects();
 				renderer.Draw(&screenbuffer, /*frametime=*/0);
 				screen->Destroy(screenContext);
+			}else if(strcmp(preview_screen, "lobby") == 0){
+				// Lobby chrome-only preview. The real LobbyScreen::Build also
+				// constructs character / chat / gameSelect panels — those are
+				// separate items (P10–P15), so inline only the chrome here so
+				// the byte-identical PPM target matches the v2 BuildLobby.
+				renderer.camera.SetPosition(320, 240);
+				::Overlay * background = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				background->res_bank = 7;
+				background->res_index = 1;
+				::Overlay * toptext = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				toptext->text = "Silencer";
+				toptext->textbank = 135;
+				toptext->textwidth = 11;
+				toptext->effectcolor = 152;
+				toptext->x = 15;
+				toptext->y = 32;
+				::Overlay * vertext = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				vertext->text = "v.";
+				vertext->text += world.GetVersion();
+				vertext->textbank = 133;
+				vertext->textwidth = 6;
+				vertext->effectcolor = 189;
+				vertext->x = 115;
+				vertext->y = 39;
+				// mapnametext (uid 8) has empty text at preview gate → no
+				// pixels. Skip creating it.
+				::Button * exitbutton = static_cast<::Button *>(world.CreateObject(ObjectTypes::BUTTON));
+				exitbutton->y = 29;
+				exitbutton->x = 473;
+				exitbutton->SetType(::Button::B156x21);
+				exitbutton->uid = 10;
+				strcpy(exitbutton->text, "Go Back");
+				::Interface * lobbyiface = static_cast<::Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
+				lobbyiface->AddObject(background->id);
+				lobbyiface->AddObject(toptext->id);
+				lobbyiface->AddObject(vertext->id);
+				lobbyiface->AddObject(exitbutton->id);
+				lobbyiface->buttonescape = exitbutton->id;
+				// One TickObjects() settles the B156x21 Go Back chrome on its
+				// INACTIVE base index. LobbyScreen::Tick is intentionally NOT
+				// called — its work (panel dispatch, deferred CreateGame state
+				// machine, disconnect detection) doesn't contribute to chrome
+				// pixels.
+				world.TickObjects();
+				renderer.Draw(&screenbuffer, /*frametime=*/0);
+				lobbyiface->DestroyInterface(world);
 			}else if(strcmp(preview_screen, "update") == 0){
 				// UpdateScreen reaches from MAINMENU which parked the
 				// camera at (320, 240). ResetPresentation(2) in Build only
@@ -441,6 +499,12 @@ int Game::RunPreview()
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
+			}else if(strcmp(preview_screen, "lobby") == 0){
+				if(ctx.state) ctx.state->BeginFrame();
+				ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers);
+				ui::v2::Layout(tree, ctx);
+				ui::v2::Render(tree, ctx, screenbuffer, renderer);
+				if(ctx.state) ctx.state->EndFrame();
 			}else if(strcmp(preview_screen, "mission_summary") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildMissionSummary(ctx, mission_summary_handlers);
@@ -543,6 +607,10 @@ int Game::RunPreview()
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby_connect") == 0){
 						ui::v2::Node tree = ui::v2::BuildLobbyConnect(ctx, lobby_connect_handlers);
+						ui::v2::Layout(tree, ctx);
+						ui::v2::DispatchClick(tree, ctx);
+					}else if(strcmp(preview_screen, "lobby") == 0){
+						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "mission_summary") == 0){
