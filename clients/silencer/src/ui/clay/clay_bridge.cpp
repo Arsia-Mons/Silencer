@@ -435,6 +435,38 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
 						}
 						break;
 					}
+					case CustomKind::TextInput: {
+						const auto * p = reinterpret_cast<const TextInputPayload *>(ccd->payload);
+						if(!p) break;
+						if(!p->text) break;
+						int x = static_cast<int>(c->boundingBox.x);
+						int y = static_cast<int>(c->boundingBox.y);
+						// Mirrors Renderer::DrawTextInput (renderer.cpp:1835).
+						// DrawText at (x, y), then caret bar at
+						// (x + textLen*fontWidth, y - 1) if showCaret.
+						renderer.DrawText(dst,
+						                  static_cast<Uint16>(x),
+						                  static_cast<Uint16>(y),
+						                  p->text,
+						                  p->bank,
+						                  p->fontWidth,
+						                  /*centered=*/false,
+						                  p->effectColor,
+						                  p->brightness,
+						                  /*colorRamp=*/false);
+						if(p->showCaret){
+							int cx = x + static_cast<int>(p->textLen) *
+							             static_cast<int>(p->fontWidth);
+							int cy = y - 1;
+							int cw = 1;
+							int ch = static_cast<int>(p->caretHeight);
+							int rx = cx, ry = cy, rw = cw, rh = ch;
+							if(ClipDrawRect(dst->w, dst->h, rx, ry, rw, rh))
+								Renderer::DrawFilledRectangle(
+									dst, rx, ry, rx + rw, ry + rh, p->caretColor);
+						}
+						break;
+					}
 					case CustomKind::None:
 					default:
 						break;

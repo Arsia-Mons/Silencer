@@ -252,6 +252,39 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
+	if(cmd.op == "clay_text_input_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_text_input_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunTextInputTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"text_input test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_text_input_check"){
+		silencer::clay_bridge::TextInputCheckResult res{};
+		bool ok = silencer::clay_bridge::RunTextInputCheck(game, res);
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"text_input check failed"));
+			return;
+		}
+		nlohmann::json r;
+		r["on_enter_fired_for_newline"] = res.onEnterFiredForNewline;
+		r["on_enter_fired_for_letter"] = res.onEnterFiredForLetter;
+		r["password_mask_applied_len"] = res.passwordMaskAppliedLen;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
 	if(cmd.op == "state"){
 		nlohmann::json r;
 		r["state"] = Game::StateName(game.GetState());

@@ -123,6 +123,7 @@ enum class CustomKind : Uint8 {
 	BankButtonChrome,  // P5: sprite-faced button (B156x21) with brightness effect.
 	ToggleSprite,      // P6: sprite-faced radio with effectColor + brightness.
 	ScrollBar,         // P7: sprite-faced vertical scrollbar (3-slice track + thumb).
+	TextInput,         // P9: bank-text field with optional blinking caret.
 };
 
 struct ClayCustomData {
@@ -167,6 +168,26 @@ struct ScrollBarPayload {
 	Uint16 scrollMax;       // 0 = thumb at top, no travel.
 };
 
+// P9 — payload for CustomKind::TextInput. The bridge calls
+// Renderer::DrawText with the supplied text/bank/fontWidth and, when
+// `showCaret` is true, draws a 1-px-wide vertical bar at
+// (bbox.x + textLen*fontWidth, bbox.y - 1) with height `caretHeight` and
+// palette index `caretColor`. Mirrors `Renderer::DrawTextInput` in
+// renderer.cpp:1835. Caller is responsible for password-masking the text
+// (the primitive does this) and for resolving the blink phase + focus
+// state into the single `showCaret` bool.
+struct TextInputPayload {
+	const char * text;        // NUL-terminated displayable text.
+	Uint16       textLen;     // Pre-computed length (avoids strlen in bridge).
+	Uint8        bank;        // 135 by default.
+	Uint8        fontWidth;   // Cell width in px.
+	Uint8        effectColor; // Text tint palette index. 0 = no tint.
+	Uint8        brightness;  // Resolved by primitive (64 when inactive).
+	Uint8        caretColor;  // Palette index for the caret bar.
+	Uint8        caretHeight; // Pre-computed (height * 0.8).
+	bool         showCaret;
+};
+
 // P7 ScrollList primitive unit test. Renders a 30-item list scrolled to
 // a fixed position (scrollPosition=3, selectedIndex=8) into a 640x480
 // Surface and writes it to `outPath`. Invoked by the
@@ -198,6 +219,23 @@ struct ScrollTextBoxCheckResult {
 	Uint16 atBottomOverflow_prevPos;  // Expect 6: prev 10 lines pos=5 (at max=5), now 11 lines (max=6).
 };
 bool RunScrollTextBoxCheck(::Game & game, ScrollTextBoxCheckResult & out);
+
+// P9 TextInput primitive unit test. Renders one focused TextInput
+// (text "Player1", caret visible, bank 135 fontWidth 9) into a 640x480
+// Surface and writes it to `outPath`. Invoked by the
+// `clay_text_input_test` control op. Implementation in
+// text_input_test.cpp.
+bool RunTextInputTest(::Game & game, const char * outPath);
+
+// P9 TextInput dispatch-key check. Verifies that
+// `TextInputDispatchKey(handle, '\n')` invokes onEnter exactly once and
+// `TextInputDispatchKey(handle, 'x')` does not. No PNG produced.
+struct TextInputCheckResult {
+	int onEnterFiredForNewline;  // Expect 1.
+	int onEnterFiredForLetter;   // Expect 0.
+	int passwordMaskAppliedLen;  // Expect 8 — emitted text length for password variant.
+};
+bool RunTextInputCheck(::Game & game, TextInputCheckResult & out);
 
 }  // namespace silencer::clay_bridge
 

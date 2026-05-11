@@ -77,7 +77,7 @@
       "id": "P9",
       "priority": 9,
       "name": "TextInput primitive",
-      "passes": false,
+      "passes": true,
       "spec": "Add clients/silencer/src/ui/clay/primitives/text_input.{h,cpp}. API: `TextInput(text_in_out, opts: { password, numbersOnly, maxChars, fontWidth, width }, on_enter_callback)`. SDL text input integration stays as today — primitive just reads the text buffer and emits the visual. Pixel-identical to legacy TextInput.",
       "pass_check": "Render test pixdiff < 1.0 vs baseline. Typing a key adds it to the buffer (via SDL_TEXTINPUT routed by the screen). Enter fires the callback. No lobby references."
     },
