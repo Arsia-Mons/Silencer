@@ -368,6 +368,49 @@ void Guard::InitBT(){
 		return BTResult::Running;
 	};
 
+	// Shoot(direction): trigger a shoot state and block until anim completes.
+	// direction: 0=standing, 1=crouched, 2=up, 3=down, 4=up-angle, 5=down-angle,
+	//            6=ladder-up, 7=ladder-down
+	// On first tick: transitions to SHOOT* state (state machine drives anim+Fire).
+	// Returns Running while is_shooting is true, Success when shoot completes.
+	btctx_.actions["Shoot"] = [this](BTContext& ctx) -> BTResult {
+		if(!CooledDown(*static_cast<World*>(ctx.userData))) return BTResult::Failure;
+		int dir = ctx.bb<int>("direction", 0);
+		if(ctx.elapsedTicks() == 0){
+			switch(dir){
+				case 0: state = SHOOTSTANDING;   break;
+				case 1: state = SHOOTCROUCHED;    break;
+				case 2: state = SHOOTUP;          break;
+				case 3: state = SHOOTDOWN;        break;
+				case 4: state = SHOOTUPANGLE;     break;
+				case 5: state = SHOOTDOWNANGLE;   break;
+				case 6: state = SHOOTLADDERUP;    break;
+				case 7: state = SHOOTLADDERDOWN;  break;
+				default: state = SHOOTSTANDING;   break;
+			}
+			state_i = 0;
+			is_shooting = true;
+			shoot_direction = (uint8_t)dir;
+		}
+		if(is_shooting) return BTResult::Running;
+		return BTResult::Success;
+	};
+
+	// Crouch: enter CROUCHING state and wait until fully crouched (CROUCHED).
+	btctx_.actions["Crouch"] = [this](BTContext&) -> BTResult {
+		if(is_crouched) return BTResult::Success;
+		if(!is_crouching){ state = CROUCHING; state_i = 0; is_crouching = true; }
+		return BTResult::Running;
+	};
+
+	// Uncrouch: enter UNCROUCHING state and wait until standing.
+	btctx_.actions["Uncrouch"] = [this](BTContext&) -> BTResult {
+		if(!is_crouching && !is_crouched) return BTResult::Success;
+		if(state != UNCROUCHING){ state = UNCROUCHING; state_i = 0; }
+		if(!is_crouching && !is_crouched) return BTResult::Success;
+		return BTResult::Running;
+	};
+
 	// SetFacing(direction): "left" or "right". One-tick, returns Success.
 	btctx_.actions["SetFacing"] = [this](BTContext& ctx) -> BTResult {
 		std::string dir = ctx.bb<std::string>("direction", "right");
