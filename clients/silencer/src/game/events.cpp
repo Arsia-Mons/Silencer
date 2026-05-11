@@ -222,10 +222,8 @@ bool Game::HandleSDLEvents(void){
 					// v2 modal owns text input — append into password buf
 					// (no-op for MESSAGE-kind modals).
 					if(!skip) DispatchV2ModalText((char)ascii);
-				}else if(state == GameState::LOBBYCONNECT){
-					// v2 LobbyConnect — no Interface to route through; the
-					// active field's buffer lives directly on Game.
-					if(!skip) LobbyConnectAppendChar(ascii);
+				}else if(active_runtime && !skip && active_runtime->DispatchTextInput((char)ascii)){
+					// Runtime consumed the char (e.g. LobbyConnect active field).
 				}else if(state == GameState::LOBBY && LobbyV2ChatActive()){
 					// v2 Lobby chat input — buffer lives on Game; the chat
 					// sub-interface is the active object whenever no
@@ -308,20 +306,9 @@ bool Game::HandleSDLEvents(void){
 						iface->ProcessKeyPress(world, ascii);
 					}
 				}
-				// v2 runtimes can latch the next scancode (e.g. OPTIONSCONTROLS
-				// rebind capture). Routed via active_runtime->DispatchKeyDown.
+				// v2 runtimes can handle scancodes (rebind capture,
+				// LobbyConnect editing keys, etc.). Routed via active_runtime.
 				if(active_runtime) active_runtime->DispatchKeyDown((int)event.key.scancode);
-				// v2 LOBBYCONNECT also has currentinterface=0 — handle
-				// editing scancodes (BACKSPACE, RETURN, ESCAPE, TAB) directly.
-				if(state == GameState::LOBBYCONNECT){
-					switch(event.key.scancode){
-						case SDL_SCANCODE_BACKSPACE: LobbyConnectBackspace(); break;
-						case SDL_SCANCODE_RETURN:    LobbyConnectSubmit();    break;
-						case SDL_SCANCODE_ESCAPE:    LobbyConnectCancel();    break;
-						case SDL_SCANCODE_TAB:       LobbyConnectCycleField(); break;
-						default: break;
-					}
-				}
 				// v2 LOBBY chat input — BACKSPACE / RETURN edit the chat
 				// buffer when chat is the active sub-interface.
 				if(state == GameState::LOBBY && LobbyV2ChatActive()){
@@ -383,8 +370,6 @@ bool Game::HandleSDLEvents(void){
 					}
 					if(active_runtime && active_runtime->DispatchMouseDown(lx, ly)){
 						// Runtime consumed the click.
-					}else if(state == GameState::LOBBYCONNECT){
-						DispatchLobbyConnectV2Click(lx, ly);
 					}else if(state == GameState::LOBBY){
 						DispatchLobbyV2Click(lx, ly);
 					}else{

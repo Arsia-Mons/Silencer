@@ -106,14 +106,7 @@ public:
 	const GamepadState& GetGamepadState() const { return gamepadstate; }
 	SDL_Gamepad * GetGamepad() const { return gamepad; }
 
-	// LobbyConnect login (ENTER / Login button) — sends credentials when
-	// the lobby is in AUTHENTICATING. Public so a file-static handler
-	// factory can wire it from a lambda.
-	void LobbyConnectSubmit();
-	// LobbyConnect cancel (ESC / Cancel button) — returns to MAINMENU.
-	void LobbyConnectCancel();
-	// Const accessor for read-only state queries (file-static helpers that
-	// need to peek at lobby state without holding a non-const Game ref).
+	// Const accessor for read-only state queries.
 	const class World & GetWorldConst() const { return world; }
 
 	// LobbyScreen + per-panel interop. Public so panels can reach in via
@@ -333,15 +326,6 @@ private:
 	// Game (states being migrated one at a time).
 	std::unique_ptr<ui::v2::Runtime> active_runtime;
 	void SetRuntime(Uint8 new_state);
-	// Same shape for LOBBYCONNECT state. Owns the username/password input
-	// buffers + textbox status lines (the LobbyConnectScreen-equivalent
-	// state machine that pushes "Connecting to ...", "Authenticated", etc.
-	// runs in TickLobbyConnectV2 — peer of MainMenu/Options*). Text input
-	// arrives via events.cpp's TEXT_INPUT / KEY_DOWN routing branches when
-	// state == LOBBYCONNECT.
-	bool RenderLobbyConnectV2();
-	void DispatchLobbyConnectV2Click(int logical_x, int logical_y);
-	void TickLobbyConnectV2();
 	// Same shape for LOBBY state. Owns the right-side panel-swap state
 	// (active_panel, map_name) and runs the legacy LobbyScreen::Tick state
 	// machine (deferred CreateGame, joininggame finalize, progress modal,
@@ -393,25 +377,7 @@ private:
 	bool DispatchV2ModalKey(int sdl_scancode);
 	bool DispatchV2ModalText(char ascii);
 	std::vector<V2ModalEntry> ui_v2_modal_stack;
-	// Text input routing helpers — called from events.cpp's TEXT_INPUT and
-	// KEY_DOWN branches when state == LOBBYCONNECT. Append / backspace /
-	// tab-cycle the active input buffer. No-op while the inputs are
-	// display-inactive (post-AUTHSENT). Submit / Cancel are public above.
-	void LobbyConnectAppendChar(char c);
-	void LobbyConnectBackspace();
-	void LobbyConnectCycleField();
-	// LobbyConnect per-state fields. Public so events.cpp can write directly
-	// (currentinterface is 0 in LOBBYCONNECT — there's no Interface to route
-	// SDL events through).
-	char lobby_connect_username[17] = {0};
-	char lobby_connect_password[29] = {0};
-	int  lobby_connect_active_field = 1; // 0 = none, 1 = username, 2 = password
 	int  lobby_create_active_field  = 1; // 0 = none, 1 = name, 2 = password
-	// LobbyConnect status textbox (legacy LobbyConnectScreen pushed a TextBox
-	// object; we keep the same lines here and re-emit each frame as v2
-	// Labels). motdprinted mirrors the legacy bool on LobbyConnectScreen.
-	std::vector<std::string> lobby_connect_textbox_lines;
-	bool lobby_connect_motdprinted = false;
 	// Set by GoToState; processed at the next Tick() entry to pop screens
 	// safely after the active screen's Tick has returned. Avoids destroying
 	// a screen mid-Tick when a button click triggers a state transition.

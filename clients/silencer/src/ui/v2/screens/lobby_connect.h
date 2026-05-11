@@ -1,9 +1,15 @@
 #ifndef SILENCER_UI_V2_SCREENS_LOBBY_CONNECT_H
 #define SILENCER_UI_V2_SCREENS_LOBBY_CONNECT_H
 
+#include "runtime.h"
+#include "ui_state.h"
+
 #include <functional>
 #include <string>
 #include <vector>
+
+class World;
+class ScreenContext;
 
 namespace ui {
 namespace v2 {
@@ -32,6 +38,43 @@ struct LobbyConnectState {
 };
 
 Node BuildLobbyConnect(const Context & ctx, const LobbyConnectHandlers & handlers = {}, const LobbyConnectState * state = nullptr);
+
+// Engine-side runtime for GameState::LOBBYCONNECT. Owns the username +
+// password input buffers + textbox status lines + caret-blink phase.
+// Tick() runs the legacy LobbyConnectScreen::Tick state machine
+// (Connecting -> CheckingVersion -> Authenticating -> Authenticated).
+// DispatchKeyDown handles BACKSPACE / RETURN / ESCAPE / TAB editing;
+// DispatchTextInput appends typed chars into the active buffer.
+class LobbyConnectRuntime : public Runtime
+{
+public:
+	LobbyConnectRuntime(World & world, ScreenContext & sctx);
+
+	void Render(Surface & target, ::Renderer & renderer,
+	            int mouse_x, int mouse_y, float dt) override;
+	bool DispatchMouseDown(int mouse_x, int mouse_y) override;
+	bool DispatchKeyDown(int sdl_scancode) override;
+	bool DispatchTextInput(char ascii) override;
+	void Tick() override;
+
+private:
+	void Submit();
+	void Cancel();
+	void CycleField();
+	void AppendChar(char c);
+	void Backspace();
+
+	World &         world_;
+	ScreenContext & sctx_;
+	UIState         state_;
+
+	char        username_[17] = {0};
+	char        password_[29] = {0};
+	int         active_field_ = 1;     // 0 = none, 1 = username, 2 = password
+	std::vector<std::string> textbox_lines_;
+	bool        motd_printed_ = false;
+	unsigned    frames_ = 0;           // local caret-blink counter
+};
 
 }  // namespace v2
 }  // namespace ui

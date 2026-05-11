@@ -648,8 +648,6 @@ bool Game::Loop(void){
 			float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
 			ui_v2_last_ticks = now;
 			active_runtime->Render(screenbuffer, renderer, ui_v2_mouse_x, ui_v2_mouse_y, dt);
-		}else if(state == LOBBYCONNECT){
-			RenderLobbyConnectV2();
 		}else if(state == LOBBY){
 			RenderLobbyV2();
 		}else{
@@ -849,27 +847,22 @@ bool Game::Tick(void){
 				world.DestroyAllObjects();
 				world.lobby.ClearGames();
 				world.lobby.state = Lobby::WAITING;
-				// v2 LobbyConnect — no PushScreen. Palette 2 + camera mirror
-				// LobbyConnectScreen::Build's ResetPresentation(2). Input
-				// state + textbox lines reset on entry.
+				// LobbyConnectRuntime owns the surface, input buffers,
+				// textbox lines, and lobby state machine. Palette 2 +
+				// camera mirror LobbyConnectScreen::Build's
+				// ResetPresentation(2).
 				renderer.palette.SetPalette(2);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
 				renderer.camera.SetPosition(320, 240);
 				currentinterface = 0;
-				ui_v2_state = ui::v2::UIState{};
-				ui_v2_last_ticks = 0;
-				lobby_connect_username[0] = '\0';
-				lobby_connect_password[0] = '\0';
-				lobby_connect_active_field = 1;
-				lobby_connect_textbox_lines.clear();
-				lobby_connect_motdprinted = false;
+				SetRuntime(LOBBYCONNECT);
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
-				TickLobbyConnectV2();
+				if(active_runtime) active_runtime->Tick();
 			}
 		}break;
 		case LOBBY:{
@@ -1269,234 +1262,14 @@ void Game::SetRuntime(Uint8 new_state){
 		case MISSIONSUMMARY:
 			active_runtime = std::make_unique<ui::v2::MissionSummaryRuntime>(world, screenContext);
 			break;
+		case LOBBYCONNECT:
+			active_runtime = std::make_unique<ui::v2::LobbyConnectRuntime>(world, screenContext);
+			break;
 		default:
 			active_runtime.reset();
 			break;
 	}
 	ui_v2_last_ticks = 0;
-}
-
-static ui::v2::LobbyConnectHandlers BuildLobbyConnectHandlers(Game * self){
-	ui::v2::LobbyConnectHandlers h;
-	h.on_login  = [self](){ self->LobbyConnectSubmit(); };
-	h.on_cancel = [self](){ self->LobbyConnectCancel(); };
-	return h;
-}
-
-void Game::LobbyConnectCancel(){
-	screenContext.GoToState(GameState::MAINMENU);
-}
-
-void Game::LobbyConnectSubmit(){
-	// Mirrors LobbyConnectScreen::Tick's LBY_BTN_LOGIN handler.
-	if(world.lobby.state == Lobby::AUTHENTICATING){
-		world.lobby.SetLocalUsername(lobby_connect_username);
-		world.lobby.SendCredentials(lobby_connect_username, lobby_connect_password);
-		world.lobby.state = Lobby::AUTHSENT;
-	}
-}
-
-void Game::LobbyConnectCycleField(){
-	lobby_connect_active_field = (lobby_connect_active_field == 1) ? 2 : 1;
-}
-
-void Game::LobbyConnectAppendChar(char c){
-	if(world.lobby.state == Lobby::AUTHSENT) return;
-	if(lobby_connect_active_field == 1){
-		size_t len = strlen(lobby_connect_username);
-		if(len < sizeof(lobby_connect_username) - 1){
-			lobby_connect_username[len]   = c;
-			lobby_connect_username[len+1] = '\0';
-		}
-	}else if(lobby_connect_active_field == 2){
-		size_t len = strlen(lobby_connect_password);
-		if(len < sizeof(lobby_connect_password) - 1){
-			lobby_connect_password[len]   = c;
-			lobby_connect_password[len+1] = '\0';
-		}
-	}
-}
-
-void Game::LobbyConnectBackspace(){
-	if(world.lobby.state == Lobby::AUTHSENT) return;
-	if(lobby_connect_active_field == 1){
-		size_t len = strlen(lobby_connect_username);
-		if(len > 0) lobby_connect_username[len-1] = '\0';
-	}else if(lobby_connect_active_field == 2){
-		size_t len = strlen(lobby_connect_password);
-		if(len > 0) lobby_connect_password[len-1] = '\0';
-	}
-}
-
-static ui::v2::LobbyConnectState CurrentLobbyConnectState(const Game & g,
-	const char * username, const char * password, int active_field,
-	const std::vector<std::string> & lines, int frames){
-	ui::v2::LobbyConnectState s;
-	s.username     = username;
-	s.password     = password;
-	s.active_field = active_field;
-	// AUTHSENT = "Sending credentials" — legacy disables both TextInputs while
-	// waiting on the server's response (effectbrightness=64 in DrawTextInput).
-	s.inactive     = (g.GetWorldConst().lobby.state == Lobby::AUTHSENT);
-	// 24 fps legacy blink: state_i % 32 < 16. Use Game::frames since it ticks
-	// at the same rate.
-	s.caret_visible = ((frames & 31) < 16);
-	s.textbox_lines = lines;
-	return s;
-}
-
-bool Game::RenderLobbyConnectV2(){
-	Uint64 now = SDL_GetTicks();
-	float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
-	ui_v2_last_ticks = now;
-
-	ui::v2::Context ctx{
-		world.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
-		/*version=*/world.GetVersion(),
-	};
-	ctx.mouse_x = ui_v2_mouse_x;
-	ctx.mouse_y = ui_v2_mouse_y;
-	ctx.state   = &ui_v2_state;
-	ctx.dt      = dt;
-
-	ui::v2::LobbyConnectHandlers handlers = BuildLobbyConnectHandlers(this);
-	ui::v2::LobbyConnectState live = CurrentLobbyConnectState(*this,
-		lobby_connect_username, lobby_connect_password, lobby_connect_active_field,
-		lobby_connect_textbox_lines, frames);
-	screenbuffer.Clear(0);
-	ui_v2_state.BeginFrame();
-	ui::v2::Node tree = ui::v2::BuildLobbyConnect(ctx, handlers, &live);
-	ui::v2::Layout(tree, ctx);
-	ui::v2::Render(tree, ctx, screenbuffer, renderer);
-	ui_v2_state.EndFrame();
-	return true;
-}
-
-void Game::DispatchLobbyConnectV2Click(int logical_x, int logical_y){
-	// Hit-test the username/password input rects directly to swap active field
-	// — Buttons handle Login/Cancel via the v2 dispatch pass.
-	// Username box: x=[275, 275+180), y=[293, 293+14)
-	// Password box: x=[275, 275+180), y=[320, 320+14)
-	if(world.lobby.state != Lobby::AUTHSENT){
-		if(logical_x >= 275 && logical_x < 275 + 180){
-			if(logical_y >= 293 && logical_y < 293 + 14){
-				lobby_connect_active_field = 1;
-			}else if(logical_y >= 320 && logical_y < 320 + 14){
-				lobby_connect_active_field = 2;
-			}
-		}
-	}
-	ui::v2::Context ctx{
-		world.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
-		/*version=*/world.GetVersion(),
-	};
-	ctx.mouse_x = logical_x;
-	ctx.mouse_y = logical_y;
-	ctx.state   = &ui_v2_state;
-	ui::v2::LobbyConnectHandlers handlers = BuildLobbyConnectHandlers(this);
-	ui::v2::LobbyConnectState live = CurrentLobbyConnectState(*this,
-		lobby_connect_username, lobby_connect_password, lobby_connect_active_field,
-		lobby_connect_textbox_lines, frames);
-	ui::v2::Node tree = ui::v2::BuildLobbyConnect(ctx, handlers, &live);
-	ui::v2::Layout(tree, ctx);
-	ui::v2::DispatchClick(tree, ctx);
-}
-
-void Game::TickLobbyConnectV2(){
-	// Mirrors LobbyConnectScreen::Tick. Gate on ambience-fade-in so the
-	// "Connecting to ..." line doesn't print before the music crossfade lands.
-	if(!ambienceMixer.FadedIn()) return;
-	auto push_line = [this](const char * s){ lobby_connect_textbox_lines.emplace_back(s); };
-	world.lobby.LockMutex();
-	switch(world.lobby.state){
-		case Lobby::CONNECTING:
-		case Lobby::WAITINGFORRESOLVER:
-		case Lobby::AUTHSENT:
-		case Lobby::IDLE:
-		break;
-		case Lobby::WAITING:{
-			char line[128];
-			snprintf(line, sizeof(line), "Connecting to %s:%d", Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
-			push_line(line);
-			world.lobby.Connect(Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
-		}break;
-		case Lobby::RESOLVING:
-			push_line("Resolving hostname...");
-			world.lobby.state = Lobby::WAITINGFORRESOLVER;
-		break;
-		case Lobby::RESOLVEFAILED:
-			push_line("Could not resolve hostname");
-			world.lobby.state = Lobby::IDLE;
-		break;
-		case Lobby::RESOLVED:
-			push_line("Hostname resolved");
-			world.lobby.Connect(Config::GetInstance().lobbyhost, Config::GetInstance().lobbyport);
-		break;
-		case Lobby::CONNECTED:
-			push_line("Connected");
-			push_line("Checking version...");
-			world.lobby.SendVersion();
-			world.lobby.state = Lobby::CHECKINGVERSION;
-		break;
-		case Lobby::CHECKINGVERSION:
-			if(world.lobby.versionchecked){
-				if(world.lobby.versionok){
-					push_line("Software version is current");
-					world.lobby.state = Lobby::AUTHENTICATING;
-				}else{
-					if(world.lobby.updateavailable){
-						updater.PresentUpdate(world.lobby.updateurl, world.lobby.updatesha256);
-						world.lobby.Disconnect();
-						world.lobby.state = Lobby::IDLE;
-						world.lobby.UnlockMutex();
-						screenContext.GoToState(GameState::UPDATING);
-						return;
-					}else{
-						push_line("Software is out of date");
-						push_line("Get latest version at:");
-						push_line("https://github.com/Arsia-Mons/Silencer");
-						world.lobby.Disconnect();
-						world.lobby.state = Lobby::IDLE;
-					}
-				}
-			}
-		break;
-		case Lobby::AUTHENTICATING:
-		break;
-		case Lobby::AUTHFAILED:
-			push_line("Authentication failed");
-			if(strlen(world.lobby.failmessage) > 0) push_line(world.lobby.failmessage);
-			world.lobby.state = Lobby::AUTHENTICATING;
-		break;
-		case Lobby::AUTHENTICATED:
-			push_line("Authenticated");
-			world.lobby.UnlockMutex();
-			screenContext.GoToState(GameState::LOBBY);
-			return;
-		case Lobby::CONNECTIONFAILED:
-			push_line("Connection failed");
-			world.lobby.state = Lobby::IDLE;
-		break;
-		case Lobby::DISCONNECTED:
-			push_line("Disconnected");
-			world.lobby.state = Lobby::IDLE;
-		break;
-	}
-	if(world.lobby.motdreceived && !lobby_connect_motdprinted){
-		char * line = strtok(world.lobby.motd, "\n");
-		while(line != 0){
-			push_line(line);
-			line = strtok(NULL, "\n");
-		}
-		lobby_connect_motdprinted = true;
-	}
-	world.lobby.UnlockMutex();
 }
 
 // Lobby v2 handlers — chrome Go Back is the only wired callback at P16g-1;
