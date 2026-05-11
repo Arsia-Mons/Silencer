@@ -49,6 +49,18 @@ struct BTContext {
     // Debug: when set, called on every leaf/condition result
     std::function<void(const std::string& nodeId, const std::string& nodeType, BTResult)> logFn;
 
+    // Per-node tick counter — incremented each tick a node returns Running,
+    // reset to 0 on Success or Failure. Leaf actions read this via elapsedTicks().
+    std::unordered_map<std::string, int> node_ticks;
+    // Set by the interpreter to the node id of the currently-executing leaf.
+    std::string current_node_id;
+
+    // Returns how many ticks the current leaf has been in the Running state.
+    int elapsedTicks() const {
+        auto it = node_ticks.find(current_node_id);
+        return it == node_ticks.end() ? 0 : it->second;
+    }
+
     // Helper to read a blackboard value with a typed default
     template<typename T>
     T bb(const std::string& key, T def = T{}) const {

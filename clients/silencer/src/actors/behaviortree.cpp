@@ -41,19 +41,26 @@ BTResult BehaviorTree::tickNode(const std::string& id, BTContext& ctx) const {
     if (it == nodes_.end()) return BTResult::Failure;
     const Node& n = it->second;
 
-    if (n.type == "Selector")       return tickSelector(n, ctx);
-    if (n.type == "Sequence")       return tickSequence(n, ctx);
-    if (n.type == "Parallel")       return tickParallel(n, ctx);
-    if (n.type == "RandomSelector") return tickRandomSelector(n, ctx);
-    if (n.type == "Inverter")       return tickInverter(n, ctx);
-    if (n.type == "Cooldown")       return tickCooldown(n, ctx);
-    if (n.type == "Repeat")         return tickRepeat(n, ctx);
-    if (n.type == "Timeout")        return tickTimeout(n, ctx);
-    if (n.type == "ForceSuccess")   return tickForceSuccess(n, ctx);
-    if (n.type == "Wait")           return tickWait(n, ctx);
-    if (n.type == "Leaf")           return tickLeaf(n, ctx);
-    if (n.type == "Condition")      return tickCondition(n, ctx);
-    return BTResult::Failure;
+    BTResult r;
+    if      (n.type == "Selector")       r = tickSelector(n, ctx);
+    else if (n.type == "Sequence")       r = tickSequence(n, ctx);
+    else if (n.type == "Parallel")       r = tickParallel(n, ctx);
+    else if (n.type == "RandomSelector") r = tickRandomSelector(n, ctx);
+    else if (n.type == "Inverter")       r = tickInverter(n, ctx);
+    else if (n.type == "Cooldown")       r = tickCooldown(n, ctx);
+    else if (n.type == "Repeat")         r = tickRepeat(n, ctx);
+    else if (n.type == "Timeout")        r = tickTimeout(n, ctx);
+    else if (n.type == "ForceSuccess")   r = tickForceSuccess(n, ctx);
+    else if (n.type == "Wait")           r = tickWait(n, ctx);
+    else if (n.type == "Leaf")           r = tickLeaf(n, ctx);
+    else if (n.type == "Condition")      r = tickCondition(n, ctx);
+    else                                 r = BTResult::Failure;
+
+    if (r == BTResult::Running)
+        ctx.node_ticks[id]++;
+    else
+        ctx.node_ticks.erase(id);
+    return r;
 }
 
 // RandomSelector: shuffle children each tick, then behave like Selector
@@ -224,6 +231,7 @@ BTResult BehaviorTree::tickLeaf(const Node& n, BTContext& ctx) const {
     std::string action = n.props.value("action", std::string{});
     auto it = ctx.actions.find(action);
     if (it == ctx.actions.end()) return BTResult::Failure;
+    ctx.current_node_id = n.id;
     BTResult r = it->second(ctx);
     if (ctx.logFn) ctx.logFn(n.id, "Leaf[" + action + "]", r);
     return r;
