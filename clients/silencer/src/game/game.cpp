@@ -24,7 +24,6 @@
 #include "actordef.h"
 #include "behaviortree.h"
 #include "gasloader.h"
-#include "screen.h"
 #include "updaterstage2.h"
 #include "context.h"
 #include "dispatch.h"
@@ -115,7 +114,6 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	stepFramesRemaining = 0;
 	stepWallclockDeadlineMs = 0;
 	preview_screen[0] = 0;
-	preview_impl[0] = 0;
 	dump_ppm_path[0] = 0;
 	preview_scale = 1;
 	ui_v2_modal_stack = std::make_unique<ui::v2::ModalStack>(world, ui_v2_mouse_x, ui_v2_mouse_y);
@@ -241,13 +239,6 @@ bool Game::Load(char * cmdline){
 				if(name){
 					strncpy(preview_screen, name, sizeof(preview_screen) - 1);
 					preview_screen[sizeof(preview_screen) - 1] = 0;
-				}
-			}
-			else if(strcmp(cmdline, "--preview-impl") == 0){
-				char * impl = strtok(NULL, " ");
-				if(impl){
-					strncpy(preview_impl, impl, sizeof(preview_impl) - 1);
-					preview_impl[sizeof(preview_impl) - 1] = 0;
 				}
 			}
 			else if(strcmp(cmdline, "--dump-ppm") == 0){
@@ -729,11 +720,6 @@ bool Game::Loop(void){
 }
 
 bool Game::Tick(void){
-	if(screenStackPendingTeardown){
-		while(!screenStack.empty()) PopScreen();
-		screenStackPendingTeardown = false;
-	}
-	TickActiveScreen();
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for
@@ -1042,15 +1028,9 @@ void Game::GoToState(Uint8 newstate){
 	fade_i = 0;
 	stateisnew = true;
 	nextstateprocessed = false;
-	// Defer the teardown so the active screen's Tick (which may have called
-	// GoToState in response to a button click) can return safely before its
-	// destructor runs.
-	screenStackPendingTeardown = true;
 }
 
 bool Game::GoBack(void){
-	Screen * top = GetTopScreen();
-	if(top && top->HandleBack(screenContext)) return true;
 	GoToState(MAINMENU);
 	return false;
 }
@@ -1228,32 +1208,6 @@ bool Game::IsLiveMultiplayer() const {
 	return (world.peercount > 1) && (world.gameplaystate == World::INGAME);
 }
 
-void Game::PushScreen(std::unique_ptr<Screen> s){
-	if(!s) return;
-	s->Build(screenContext);
-	screenStack.push_back(std::move(s));
-	currentinterface = screenStack.back()->interfaceId;
-	if(currentinterface){
-		world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-	}
-}
-
-void Game::PopScreen(){
-	if(screenStack.empty()) return;
-	screenStack.back()->Destroy(screenContext);
-	screenStack.pop_back();
-	currentinterface = screenStack.empty() ? 0 : screenStack.back()->interfaceId;
-}
-
-void Game::ReplaceScreen(std::unique_ptr<Screen> s){
-	PopScreen();
-	PushScreen(std::move(s));
-}
-
-Screen * Game::GetTopScreen() const {
-	return screenStack.empty() ? nullptr : screenStack.back().get();
-}
-
 // Thin wrappers forwarding to the active LobbyRuntime. Safe to call any
 // time; if the engine isn't currently in LOBBY (or the runtime hasn't
 // been instantiated yet) they're no-ops / null returns. Inline static
@@ -1352,17 +1306,3 @@ bool Game::DispatchV2ModalText(char ascii){          return ui_v2_modal_stack->D
 ui::v2::IngameChat & Game::IngameChatOverlay(){ return *ui_v2_ingame_chat; }
 ui::v2::IngameBuy  & Game::IngameBuyOverlay (){ return *ui_v2_ingame_buy;  }
 ui::v2::IngameTech & Game::IngameTechOverlay(){ return *ui_v2_ingame_tech; }
-
-
-void Game::TickActiveScreen(){
-	if(screenStack.empty()) return;
-	// Tick the topmost non-overlay plus every overlay stacked above it. Modals
-	// are overlays — the screen beneath continues to tick (and run its
-	// per-frame state polling) while the modal is up. Input dispatch is
-	// blocked by `currentinterface` already pointing at the topmost iface.
-	int start = (int)screenStack.size() - 1;
-	while(start > 0 && screenStack[start]->IsOverlay()) --start;
-	for(size_t i = (size_t)start; i < screenStack.size(); ++i){
-		screenStack[i]->Tick(screenContext);
-	}
-}

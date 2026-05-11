@@ -23,8 +23,6 @@
 #include <string>
 #include <vector>
 
-class Screen;
-class Modal;
 namespace ui { namespace v2 { struct Node; struct LobbyState; class Runtime; class ModalStack; class IngameChat; class IngameBuy; class IngameTech; } }
 
 class Game
@@ -75,13 +73,6 @@ public:
 	// socket "key" op.
 	bool tui;
 
-	// Screen-stack ops. Every menu surface is a Screen; the stack drives
-	// rendering and input via TickActiveScreen() at the top of Tick().
-	void PushScreen(std::unique_ptr<Screen> s);
-	void PopScreen();
-	void ReplaceScreen(std::unique_ptr<Screen> s);
-	Screen * GetTopScreen() const;
-
 	// Keybind access for ControlDispatch.
 	KeyMap& GetKeyMap() { return keymap; }
 	const KeyMap& GetKeyMap() const { return keymap; }
@@ -98,7 +89,7 @@ public:
 	// instantiated (states not yet migrated, or between transitions).
 	ui::v2::Runtime * GetActiveRuntime() const { return active_runtime.get(); }
 
-	// LobbyScreen + per-panel interop. Public so panels can reach in via
+	// Per-state state surfaced for v2 Runtimes that need to reach in via
 	// `ScreenContext::game`.
 	Uint16 currentinterface;
 	Uint32 currentlobbygameid;
@@ -107,12 +98,10 @@ public:
 	bool joininggame;
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
 	// Tear down a joined game's session/world state (Disconnect, switch
-	// authority, destroy team overlays, rejoin previous chat channel). UI
-	// concerns (panel swap, map-name overlay) stay on LobbyScreen.
+	// authority, destroy team overlays, rejoin previous chat channel).
 	void LeaveJoinedGame();
-	// Toggle in-lobby team overlay visibility. Called by LobbyScreen's
-	// right-side panel swaps (ShowGameTech / TearDownRightPanels) when
-	// entering / leaving the tech-choice surface.
+	// Toggle in-lobby team overlay visibility. Called by the lobby Runtime
+	// when entering / leaving the tech-choice surface.
 	void ShowTeamOverlays(bool show);
 
 	// Thin wrappers forwarding to the active LobbyRuntime — used by
@@ -164,12 +153,10 @@ public:
 	// passed; main.cpp dispatches to RunPreview() instead of the normal
 	// Loop. Used by the ui/v2 harness for visual + PPM-diff verification.
 	char preview_screen[64];        // empty = preview mode disabled
-	char preview_impl[16];          // "v2" (default) or "legacy"
 	char dump_ppm_path[256];        // empty = interactive window mode
 	int  preview_scale;             // 1 if unset
-	// Render the requested screen via either the new ui/v2 path or the
-	// legacy widget path, then either dump a PPM (one-shot) or run an
-	// SDL window loop. Defined in src/ui/v2/preview.cpp.
+	// Render the requested screen, then either dump a PPM (one-shot) or
+	// run an SDL window loop. Defined in src/ui/v2/preview.cpp.
 	int RunPreview();
 	// Interactive component storybook — palette + canvas + properties
 	// panel for the ui/v2 primitives. Launched via `--preview-screen
@@ -181,7 +168,7 @@ private:
 	// Gameplay-state Tick bodies — one per state. Each lives in its own
 	// src/game/tick/tick_*.cpp file. The switch in Tick() dispatches to
 	// these. Menu/screen states (MAINMENU, LOBBY, OPTIONS*, …) stay inline
-	// in the dispatcher — they're trivial PushScreen wrappers.
+	// in the dispatcher — they switch the active v2 Runtime via SetRuntime.
 	void TickFadeOut();
 	void TickInGame();
 	void TickSinglePlayerGame();
@@ -261,9 +248,7 @@ private:
 	MapDownloader mapDownloader;
 	AmbienceMixer ambienceMixer;
 
-	std::vector<std::unique_ptr<Screen>> screenStack;
 	ScreenContext screenContext;
-	void TickActiveScreen();
 
 	// ui/v2 state for menu surfaces that have migrated off the Screen stack.
 	// Owns per-button hover-animation slots (hot_t) and gets BeginFrame /
@@ -298,10 +283,6 @@ private:
 	// v2 in-game tech menu overlay — sibling to IngameBuy. Reads
 	// Player::techstationactive + Player::techlastitem / techlastscrolled.
 	std::unique_ptr<ui::v2::IngameTech> ui_v2_ingame_tech;
-	// Set by GoToState; processed at the next Tick() entry to pop screens
-	// safely after the active screen's Tick has returned. Avoids destroying
-	// a screen mid-Tick when a button click triggers a state transition.
-	bool screenStackPendingTeardown = false;
 
 	// Profile to restore when a gamepad disconnects.  Stays empty when the
 	// active profile was already "gamepad" before the pad was connected.
