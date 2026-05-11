@@ -29,9 +29,11 @@
 #include "ui_state.h"
 #include "main_menu.h"
 #include "options.h"
+#include "options_display.h"
 
 #include "main_menu_screen.h"
 #include "options_screen.h"
+#include "options_display_screen.h"
 #include "renderer.h"
 #include "renderdevice.h"
 #include "resources.h"
@@ -132,6 +134,15 @@ int Game::RunPreview()
 		running = false;
 	};
 
+	ui::v2::OptionsDisplayHandlers options_display_handlers;
+	options_display_handlers.on_toggle_fullscreen     = [](){ printf("[preview] Fullscreen clicked\n"); };
+	options_display_handlers.on_toggle_smooth_scaling = [](){ printf("[preview] Smooth Scaling clicked\n"); };
+	options_display_handlers.on_save                  = [](){ printf("[preview] Save clicked\n"); };
+	options_display_handlers.on_cancel                = [&running](){
+		printf("[preview] Cancel clicked\n");
+		running = false;
+	};
+
 	// `with_state=false` is the dump-PPM path: NULL UIState → render
 	// snaps + dt is ignored, so output stays byte-identical to legacy.
 	auto make_ctx = [&](bool with_state){
@@ -194,6 +205,22 @@ int Game::RunPreview()
 				world.TickObjects();
 				renderer.Draw(&screenbuffer, /*frametime=*/0);
 				screen->Destroy(screenContext);
+			}else if(strcmp(preview_screen, "options_display") == 0){
+				// Same camera inheritance situation as OptionsScreen —
+				// the live engine arrives here from OptionsScreen, which
+				// inherited (320, 240) from MainMenu.
+				renderer.camera.SetPosition(320, 240);
+				auto screen = std::make_unique<OptionsDisplayScreen>();
+				screen->Build(screenContext);
+				// Button chrome (B220x33 + B196x33) settles on its
+				// INACTIVE base_index after one tick. The legacy
+				// screen Tick (which updates the off/on indicators
+				// from Config) is intentionally NOT called — the
+				// build-time defaults (off=12, on=14) are the
+				// byte-identical target for the v2 build.
+				world.TickObjects();
+				renderer.Draw(&screenbuffer, /*frametime=*/0);
+				screen->Destroy(screenContext);
 			}else{
 				fprintf(stderr, "[preview] unknown screen '%s' for legacy impl\n", preview_screen);
 				return;
@@ -209,6 +236,12 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "options") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildOptions(ctx, options_handlers);
+				ui::v2::Layout(tree, ctx);
+				ui::v2::Render(tree, ctx, screenbuffer, renderer);
+				if(ctx.state) ctx.state->EndFrame();
+			}else if(strcmp(preview_screen, "options_display") == 0){
+				if(ctx.state) ctx.state->BeginFrame();
+				ui::v2::Node tree = ui::v2::BuildOptionsDisplay(ctx, options_display_handlers);
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
@@ -274,6 +307,10 @@ int Game::RunPreview()
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "options") == 0){
 						ui::v2::Node tree = ui::v2::BuildOptions(ctx, options_handlers);
+						ui::v2::Layout(tree, ctx);
+						ui::v2::DispatchClick(tree, ctx);
+					}else if(strcmp(preview_screen, "options_display") == 0){
+						ui::v2::Node tree = ui::v2::BuildOptionsDisplay(ctx, options_display_handlers);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}
