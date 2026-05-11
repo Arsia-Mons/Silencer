@@ -24,3 +24,27 @@ Uint8 * Surface::GetPixels(void){
 	}
 	return pixels.data();
 }
+
+void Surface::PushScissor(int x, int y, int sw, int sh){
+	ScissorRect r{x, y, x + sw, y + sh};
+	if(!scissorstack.empty()){
+		const ScissorRect & top = scissorstack.back();
+		if(r.x1 < top.x1) r.x1 = top.x1;
+		if(r.y1 < top.y1) r.y1 = top.y1;
+		if(r.x2 > top.x2) r.x2 = top.x2;
+		if(r.y2 > top.y2) r.y2 = top.y2;
+	}
+	if(r.x2 < r.x1) r.x2 = r.x1;
+	if(r.y2 < r.y1) r.y2 = r.y1;
+	scissorstack.push_back(r);
+}
+
+void Surface::PopScissor(void){
+	if(!scissorstack.empty()) scissorstack.pop_back();
+}
+
+bool Surface::ActiveScissor(ScissorRect & out) const {
+	if(scissorstack.empty()) return false;
+	out = scissorstack.back();
+	return true;
+}

@@ -123,6 +123,24 @@ Clay_ElementDeclaration BuildDecl(const Node & n, LayoutState & ls) {
 			lc.sizing.width  = SizingGrow();
 			lc.sizing.height = SizingGrow();
 			break;
+		case NodeKind::Scroll: {
+			// Clay drives the scroll offset via Clip's childOffset; the
+			// render path consumes it via the surface scissor stack. The
+			// fixed sizing comes from fill_w/h — Scroll containers always
+			// have a finite scroll viewport.
+			if(n.fill_w > 0){
+				lc.sizing.width  = SizingFixed((float)n.fill_w);
+				lc.sizing.height = SizingFixed((float)n.fill_h);
+			}else{
+				lc.sizing.width  = SizingGrow();
+				lc.sizing.height = SizingGrow();
+			}
+			Clay_ClipElementConfig clip{};
+			clip.vertical = true;
+			clip.childOffset = Clay_GetScrollOffset();
+			d.clip = clip;
+			break;
+		}
 		case NodeKind::Button: {
 			ButtonChrome c = ChromeFor(n.button_type);
 			lc.sizing.width  = SizingFixed((float)c.width);
@@ -189,6 +207,17 @@ void EmitNode(Node & n, LayoutState & ls, const Context & ctx, bool in_managed) 
 }
 
 }  // namespace
+
+void BeforeLayout(const Context & ctx, float scroll_dy) {
+	EnsureInit(ctx);
+	Clay_SetCurrentContext(g_clay_ctx);
+	// Caller doesn't track button state here; the storybook fires
+	// DispatchClick directly on mousedown and doesn't need Clay's
+	// hover/down distinction for any current widget.
+	Clay_Vector2 pos{ (float)ctx.mouse_x, (float)ctx.mouse_y };
+	Clay_SetPointerState(pos, /*pointer_down=*/false);
+	Clay_UpdateScrollContainers(/*drag=*/false, Clay_Vector2{ 0.0f, scroll_dy }, ctx.dt);
+}
 
 void Layout(Node & root, const Context & ctx) {
 	EnsureInit(ctx);

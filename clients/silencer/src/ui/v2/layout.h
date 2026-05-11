@@ -18,6 +18,14 @@ struct Context;
 // is rebuild-every-frame so there is no retained tree to invalidate.
 void Layout(Node & root, const Context & ctx);
 
+// Apply pointer state + scroll-wheel deltas to Clay before the next Layout()
+// pass. Call once per frame from the interactive caller. `scroll_dy` is the
+// signed wheel-delta in logical pixels for this frame (0 if no event). The
+// `dt` field on `ctx` drives Clay's momentum scrolling — callers passing
+// dt=0 (PPM-dump path) get instant-snap scrolling, which is fine since
+// scroll only fires from explicit user input.
+void BeforeLayout(const Context & ctx, float scroll_dy);
+
 }  // namespace v2
 }  // namespace ui
 

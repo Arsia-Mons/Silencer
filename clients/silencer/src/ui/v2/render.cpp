@@ -93,8 +93,10 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 		case NodeKind::Center:
 		case NodeKind::Padding:
 		case NodeKind::Spacer:
+		case NodeKind::Scroll:
 			// Containers and Group draw nothing of their own. Their
-			// computed rect is consumed by descendant nodes.
+			// computed rect is consumed by descendant nodes. Scroll
+			// pushes a scissor below before recursing into children.
 			break;
 
 		case NodeKind::Background:
@@ -199,9 +201,24 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 		}
 	}
 
+	// Scroll containers push a scissor for the duration of their subtree.
+	// Empty scissor stack ⇒ no-op so byte-identity holds for every other
+	// node kind. Clay computes the inner rect via rect_*; .at() + fill_w/h
+	// is the absolute fallback.
+	bool pushed_scissor = false;
+	if(n.kind == NodeKind::Scroll){
+		int x, y, w, h;
+		if(NodeRect(n, x, y, w, h)){
+			target.PushScissor(x, y, w, h);
+			pushed_scissor = true;
+		}
+	}
+
 	for(const Node & child : n.children){
 		RenderNode(child, ctx, target, renderer);
 	}
+
+	if(pushed_scissor) target.PopScissor();
 }
 
 }  // namespace

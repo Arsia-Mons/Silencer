@@ -28,6 +28,9 @@ enum class NodeKind : Uint8 {
 	Center,       // Single-axis "fill available space, center child(ren)".
 	Padding,      // Inset its single child by .padding(n) on all sides.
 	Spacer,       // Empty growable element — pushes siblings apart.
+	Scroll,       // Clipping container with a scroll offset — Clay drives
+	              // the offset, render path consumes it via the surface
+	              // scissor stack.
 };
 
 // 1:1 mapping to the legacy Button::Type values.
@@ -139,7 +142,7 @@ struct Node {
 inline bool IsContainer(NodeKind k) {
 	return k == NodeKind::VStack || k == NodeKind::HStack ||
 	       k == NodeKind::Center || k == NodeKind::Padding ||
-	       k == NodeKind::Spacer;
+	       k == NodeKind::Spacer  || k == NodeKind::Scroll;
 }
 
 // ----- Factories -----
@@ -209,6 +212,15 @@ inline Node Padding(Uint16 amount, std::vector<Node> children) {
 inline Node Spacer() {
 	Node n;
 	n.kind = NodeKind::Spacer;
+	return n;
+}
+
+inline Node Scroll(std::vector<Node> children, Uint16 w = 0, Uint16 h = 0) {
+	Node n;
+	n.kind     = NodeKind::Scroll;
+	n.fill_w   = w;
+	n.fill_h   = h;
+	n.children = std::move(children);
 	return n;
 }
 

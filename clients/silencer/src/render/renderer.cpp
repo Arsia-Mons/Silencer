@@ -1577,6 +1577,31 @@ bool Renderer::BlitSurfaceUpper(Surface * src, Rect * srcrect, Surface * dst, Re
 	if(dy > 0){
 		h -= dy;
 	}
+	// Scissor clip (ui/v2 Scroll). Empty stack ⇒ no-op so byte-identity of
+	// every screen that doesn't push a scissor is preserved.
+	Surface::ScissorRect scr;
+	if(dst->ActiveScissor(scr)){
+		int dx2 = scr.x1 - dstrect->x;
+		if(dx2 > 0){
+			w -= dx2;
+			dstrect->x += dx2;
+			srcx += dx2;
+		}
+		dx2 = dstrect->x + w - scr.x2;
+		if(dx2 > 0){
+			w -= dx2;
+		}
+		int dy2 = scr.y1 - dstrect->y;
+		if(dy2 > 0){
+			h -= dy2;
+			dstrect->y += dy2;
+			srcy += dy2;
+		}
+		dy2 = dstrect->y + h - scr.y2;
+		if(dy2 > 0){
+			h -= dy2;
+		}
+	}
 	if(w > 0 && h > 0){
 		Rect sr;
 		sr.x = srcx;
@@ -2164,12 +2189,18 @@ void Renderer::DrawBrightened(Surface * src, Rect * srcrect, Surface * dst, Rect
 }
 
 void Renderer::DrawAlphaed(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect){
+	// Scissor clip (ui/v2 Scroll). Empty stack ⇒ no-op.
+	Surface::ScissorRect scr;
+	bool clip = dst && dst->ActiveScissor(scr);
 	for(int y = 0; y < src->h; y++){
 		for(int x = 0; x < src->w; x++){
+			int dx = dstrect->x + x;
+			int dy = dstrect->y + y;
+			if(clip && (dx < scr.x1 || dx >= scr.x2 || dy < scr.y1 || dy >= scr.y2)) continue;
 			Uint8 srcpixel = GetPixel(src, x, y);
-			Uint8 color = palette.Alpha(srcpixel, GetPixel(dst, dstrect->x + x, dstrect->y + y));
+			Uint8 color = palette.Alpha(srcpixel, GetPixel(dst, dx, dy));
 			if(srcpixel){
-				SetPixel(dst, dstrect->x + x, dstrect->y + y, color);
+				SetPixel(dst, dx, dy, color);
 			}
 		}
 	}
@@ -3763,6 +3794,14 @@ void Renderer::DrawLine(Surface * surface, int x1, int y1, int x2, int y2, Uint8
 }
 
 void Renderer::DrawFilledRectangle(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color){
+	// Scissor clip (ui/v2 Scroll). Empty stack ⇒ no-op.
+	Surface::ScissorRect scr;
+	if(surface && surface->ActiveScissor(scr)){
+		if(x1 < scr.x1) x1 = scr.x1;
+		if(y1 < scr.y1) y1 = scr.y1;
+		if(x2 > scr.x2) x2 = scr.x2;
+		if(y2 > scr.y2) y2 = scr.y2;
+	}
 	for(int x = x1; x < x2; x++){
 		for(int y = y1; y < y2; y++){
 			SetPixel(surface, x, y, color);
