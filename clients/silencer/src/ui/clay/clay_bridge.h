@@ -281,6 +281,12 @@ bool RunLabelValueRowTest(::Game & game, const char * outPath);
 // `clay_panel_test` control op. Implementation in panel_test.cpp.
 bool RunPanelTest(::Game & game, const char * variant, const char * outPath);
 
+// C0 Rectangle primitive unit test. Renders four variants in a 2x2 grid
+// (stroke-only, fill-only, fill+stroke, fill-with-opacity over an existing
+// color) into a 640x480 Surface and writes it to `outPath`. Invoked by the
+// `clay_rectangle_test` control op. Implementation in rectangle_test.cpp.
+bool RunRectangleTest(::Game & game, const char * outPath);
+
 }  // namespace silencer::clay_bridge
 
 #endif

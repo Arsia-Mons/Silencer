@@ -1,211 +1,76 @@
 {
   "items": [
     {
-      "id": "P0",
+      "id": "C0",
       "priority": 0,
-      "name": "Vendor clay.h and wire it into CMake",
       "passes": true,
-      "spec": "Drop the latest stable clay.h (single-header, Nic Barker) into clients/silencer/third_party/clay/clay.h. Pin the version in third_party/clay/VERSION. Add the include path to clients/silencer/CMakeLists.txt. Add a tiny smoke source clients/silencer/src/ui/clay/clay_init.cpp that defines CLAY_IMPLEMENTATION exactly once (header-only, no extern C issues with C++). Do NOT initialize Clay yet from main — just verify the project still builds.",
-      "pass_check": "cmake --build build -j succeeds; nm build/.../Silencer | grep -q Clay_Initialize (or platform equivalent)."
+      "name": "Rectangle primitive (stroke + fill + opacity)",
+      "spec": "Add `clients/silencer/src/ui/clay/primitives/rectangle.{h,cpp}` — screen-agnostic Clay helper for a flat-colored rectangle with optional stroke and optional fill opacity. API shape (final names yours; spirit of the constraints binding):\n\n- Take ALL color/width values as REQUIRED parameters (compile-time, not opts-struct defaults) — match the precedent set by commit 63c779d. No lobby-coupled defaults.\n- Knobs: fillPaletteColor (Uint8 or 'no fill' sentinel), fillOpacity (0.0–1.0 or palette-alpha-index), strokePaletteColor (Uint8 or 'no stroke'), strokeWidth (Uint8, fixed 1 px is fine for now if you want to simplify), plus sizing (caller-provided width/height OR sized-by-parent if used inside a flex container).\n- The primitive emits ONE Clay element with `.backgroundColor` and `.border` configured from the params. No CUSTOM render command unless opacity-blending requires it (see C1).\n- Add a render test at `clients/silencer/src/ui/clay/rectangle_test.cpp` that renders 4 variants: stroke-only, fill-only, fill+stroke, fill-with-opacity-over-an-existing-color. Wired through the JSON-lines control op pattern used by other primitive tests.\n- Test references at `tests/lobby-clay/rectangle_test/` (reference.png + run.sh).",
+      "pass_check": "cmake --build build -j green. tests/lobby-clay/rectangle_test/run.sh PASS. Header + impl have no #include of world.h/lobby.h/config.h/MapDownloader. Compiler refuses callers that forget to pass color or stroke params."
     },
     {
-      "id": "P1",
+      "id": "C1",
       "priority": 1,
-      "name": "Pixel-diff CLI tool",
-      "passes": true,
-      "spec": "Add tools/pixdiff/ with a single C++ source pixdiff.cpp that uses stb_image (already vendored at clients/silencer/third_party/stb_image_write.h — fetch stb_image.h from the same upstream). Usage: `pixdiff <a.png> <b.png>` prints a single floating-point percent in [0,100] to stdout, exit 0 always (caller checks the value). Build via a small standalone CMakeLists.txt in tools/pixdiff/ so it doesn't depend on the main game. The percent is byte_diff_bytes * 100 / total_bytes across the raw RGBA buffer; mismatched dimensions print 100.0.",
-      "pass_check": "tools/pixdiff/build/pixdiff tests/lobby-clay/fixtures/identical_a.png tests/lobby-clay/fixtures/identical_b.png prints 0.0; tools/pixdiff/build/pixdiff tests/lobby-clay/fixtures/identical_a.png tests/lobby-clay/fixtures/totally_different.png prints >50.0. Fixtures are tiny (16x16) PNGs that the agent generates with a one-shot script and commits."
+      "passes": false,
+      "name": "Bridge: alpha-blended rectangle fills via palette alphaed LUT",
+      "spec": "The current Clay bridge dispatches RECTANGLE by writing a single palette index per pixel — no alpha. For C0's `fillOpacity`, the bridge must route to the renderer's existing palette-blend path. Read `clients/silencer/src/render/palette.cpp` (look for `alphaed`) to understand the LUT: `alphaed[palette][src*256 + dst]` returns the blended palette index. Each rectangle pixel at opacity α maps to `alphaed[…][srcColor*256 + dstColor]` with α as the LUT bank selector (or, simpler first cut: pick one alpha level for now, e.g. 50%, and document that opacity is currently quantized to that single level — full N-level alpha can come later if needed).\n\nExtend the bridge in `clients/silencer/src/ui/clay/clay_bridge.cpp`. If the simplest path is a new CustomKind (e.g. `CustomKind::FillBlend`) that the Rectangle primitive routes through when `fillOpacity < 1.0`, that's fine — but prefer just enhancing the existing RECTANGLE dispatch to read the userData for an optional opacity hint.\n\nAdd a smoke test: a fully-opaque red rect underneath a 50%-opaque blue rect should produce a known mid-tone palette index in the overlap region. Pixdiff against a hand-crafted reference < 0.5%.",
+      "pass_check": "Build green. Existing `rectangle_test` from C0 still passes. New `tests/lobby-clay/rectangle_alpha_test/run.sh` PASS with pixdiff < 0.5% vs reference.png."
     },
     {
-      "id": "P2",
+      "id": "C2",
       "priority": 2,
-      "name": "Capture lobby baseline screenshots from the legacy build",
-      "passes": true,
-      "spec": "Build the CURRENT (legacy) lobby. Boot headless via tests/cli-agent/e2e/lib.sh. Take baseline screenshots of: title_chrome.png (just the title bar visible — game state right after entering lobby, no game selected), character.png (zoomed/cropped or full-frame — pick one and stick with it), chat.png, gameselect.png, gamecreate.png, gamejoin.png (requires creating + joining a fake game; use the lobby fake-player CLI if available, otherwise script a minimal 1-player join), gametech.png. Commit them to tests/lobby-clay/baselines/. These are the immovable references for the rest of the run.",
-      "pass_check": "All 7 PNGs exist under tests/lobby-clay/baselines/, are 640x480 (or whatever the headless framebuffer is), and are non-empty.",
-      "screenshot_recipe": "See spec — each baseline has its own navigation path. Document the navigation in tests/lobby-clay/baselines/README.md so future iterations can reproduce."
+      "passes": false,
+      "name": "Document lobby BG rectangle coordinates",
+      "spec": "Visually inspect `/tmp/lobby_bg.png` (regenerate via the Python decoder if missing — see RALPH.md appendix). Identify every distinct bright-green stroked rectangle in the chrome (NOT the decorative texture inside them, NOT the film-strip sphere lights). Expected: roughly 4–6 rectangles — outer frame, title bar strip, character panel area, chat panel area (NOTE: chat may be an upside-down-L overlapping character — call that out), right pane area. Maybe a top-right decorative rect.\n\nFor each rectangle, record: (id-name, x, y, width, height, stroke palette index sampled from the sprite at a stroke pixel). Commit as `docs/plans/lobby-chrome-rectangles.md`. Include a short note on the upside-down-L topology with your recommendation (compose two rects vs. polygon primitive vs. rework). This document is the reference for C3–C6.",
+      "pass_check": "docs/plans/lobby-chrome-rectangles.md exists and lists ≥4 rectangles with coordinates + stroke color sampled from the actual sprite. The upside-down-L is discussed if applicable."
     },
     {
-      "id": "P3",
+      "id": "C3",
       "priority": 3,
-      "name": "Clay → SDL3/Surface render bridge",
-      "passes": true,
-      "spec": "Add clients/silencer/src/ui/clay/clay_bridge.{h,cpp}. Implement RenderClayCommands(Surface *, Clay_RenderCommandArray) dispatching: RECTANGLE → flat fill on Surface; BORDER → 4-edge fill; IMAGE → existing sprite blit (encode bank/index in imageData pointer as packed Uint32 via a tagged-pointer trick or a small frame-arena DrawTag); TEXT → forward to a new MeasureBankText / DrawBankText helper that wraps the existing bank-text path; SCISSOR_START/END → push/pop Surface clip rect; CUSTOM → switch on a tagged customData struct (button chrome, scrollbar track, toggle face). Add a smoke test in tests/lobby-clay/bridge_smoke/ that initializes Clay with a fixed 640x480 viewport, builds a tree with one rect + one border + one text + one image, renders to a Surface, dumps to PNG, and pixdiffs against a hand-crafted reference.",
-      "pass_check": "tools/pixdiff < 1.0 between bridge_smoke output and tests/lobby-clay/bridge_smoke/reference.png. Build is green."
+      "passes": false,
+      "name": "Outer frame + title bar rectangles (chrome relocated via flex)",
+      "spec": "Using the Rectangle primitive (C0) and the coordinates from C2, emit two Clay-drawn rectangles: an outer frame around the working area and a title bar strip across the top. The existing TitleBar chrome elements (title text 'Silencer', version 'v.X', map-name overlay, Go Back BankButton) currently live as four separate `floating @ROOT (x, y)` elements in `clients/silencer/src/ui/screens/lobby_clay/lobby_clay_screen.cpp` (search `LobbyTitle`, `LobbyVer`, `LobbyMapName`, `LobbyGoBackWrap`). Relocate them INSIDE the new title bar rectangle using flex layout — `LEFT_TO_RIGHT`, gaps, alignment. Don't keep `floating @ROOT` for title-bar elements after this iteration.\n\nThe LobbyBg sprite STAYS emitted underneath in this iteration (so misalignment between your new rectangles and the baked ones is visible). Don't drop it yet — that's C7.\n\nPicking exact pixel coords: aim to match the baked rectangle positions to within ~2 px on each edge so the chrome looks coherent during the transition. The Rectangle stroke color comes from C2's documented sample.",
+      "pass_check": "Build green. tests/cli-agent/e2e/40_lobby_clay_basic.sh green. Clay inspector dump shows new elements `LobbyOuterFrame` and `LobbyTitleBar` with the title/version/mapname/GoBack as children of LobbyTitleBar (not floating @ROOT). Screenshot DM'd."
     },
     {
-      "id": "P4",
+      "id": "C4",
       "priority": 4,
-      "name": "BankText primitive",
-      "passes": true,
-      "spec": "Add clients/silencer/src/ui/clay/primitives/bank_text.{h,cpp}. Variants: BankText::Title (bank 135 width 11), Heading (134, 8), Body (133, 6), BodySm (133, 7). Optional opts: textColor, effectColor, brightness, colorRamp. The primitive emits CLAY_TEXT with userData carrying these. Bridge's text-rendering path consumes them and produces output pixel-identical to the legacy Overlay text path for the same string+bank+color combination. Write a small unit test that renders 'Silencer' in Title at (15,32) effectcolor=152 (the lobby title) and pixdiffs against a 1-element baseline.",
-      "pass_check": "Unit test pixdiff < 0.5%. No reference to lobby/world/Config from bank_text.{h,cpp}."
+      "passes": false,
+      "name": "Character panel rectangle (subtree flex-laid-out inside)",
+      "spec": "Emit a Rectangle for the character panel area using C2's coords. The character panel subtree currently builds in `clay_character_panel.cpp` with every element `floating @ROOT (x, y)` (search `CharUserWrap`, `CharToggle`, `CharStat`). Relocate them INSIDE the new Rectangle using flex layout. Keep the existing primitive composition (BankText, Toggle × 5, BankText × 4); only the positioning model changes.\n\nThe LobbyBg sprite still STAYS underneath this iteration.",
+      "pass_check": "Build green. 40_lobby_clay_basic.sh green. Clay inspector shows `LobbyCharacterRect` with the character subtree as descendants (not @ROOT). Toggling an agency still persists + updates stats. Screenshot DM'd."
     },
     {
-      "id": "P5",
+      "id": "C5",
       "priority": 5,
-      "name": "BankButton primitive (3 variants)",
-      "passes": true,
-      "spec": "Add clients/silencer/src/ui/clay/primitives/bank_button.{h,cpp}. Variants: BankButton::Chrome (B156x21 sprite chrome with centered text), BankButton::Inline (BNONE — text-only inline, left-align flag), BankButton::Checkbox (BCHECKBOX — toggle sprite). API: `BankButton(label, variant, hovered_out_opt, on_click_callback, user)`. Emits a CLAY element + Clay_OnHover. Pixel-identical to legacy Button rendering for all three variants. No lobby/world references.",
-      "pass_check": "Three small render tests — one per variant — all pixdiff < 1.0 vs hand-crafted baselines. Hover state changes the rendered chrome (legacy parity). Click callback fires exactly once per press."
+      "passes": false,
+      "name": "Chat panel rectangle (subtree flex-laid-out inside; resolve L-shape)",
+      "spec": "Emit a Rectangle for the chat panel area. The chat region in the BG may be an upside-down-L — per C2's analysis, either (a) compose two rectangles that visually join into the L, or (b) leave passes=false with an obstacle entry asking for human input. Prefer (a) if a clean composition is possible.\n\nRelocate the chat subtree (`clay_chat_panel.cpp` — search `ChatBorder`, `ChatChannelWrap`, `ChatBoxWrap`, `ChatPresWrap`, `ChatInputWrap`) inside the new rectangle(s) via flex. Keep existing primitive use (ScrollTextBox × 2, TextInput, BankText). Note: `ChatBorder` and `ChatInputBorder` were IMAGE elements pointing at legacy chrome sprites (bank 7 idx 11 and 14) — those become redundant once your Rectangle primitive is doing the chrome. Remove them from the tree.\n\nLobbyBg still STAYS underneath this iteration.",
+      "pass_check": "Build green. 40_lobby_clay_basic.sh green. Chat works end-to-end (typing + enter sends; presence list renders). Clay inspector shows `LobbyChatRect` (and `LobbyChatRectAnnex` or similar if you composed an L). Screenshot DM'd. If the L is unresolvable, passes stays false with a documented obstacle."
     },
     {
-      "id": "P6",
+      "id": "C6",
       "priority": 6,
-      "name": "Toggle primitive",
-      "passes": true,
-      "spec": "Add clients/silencer/src/ui/clay/primitives/toggle.{h,cpp}. API: `Toggle(spriteBank, spriteIndex, selected, on_select_callback)`. Mutually-exclusive group behavior is the CALLER's job (caller passes which one is selected; on_select tells caller to mark this index). No global 'set' state. Pixel-identical to legacy Toggle.",
-      "pass_check": "Render test pixdiff < 1.0 vs baseline; on_select fires with the right index. No lobby references."
+      "passes": false,
+      "name": "Right pane rectangle (variant subtree inside)",
+      "spec": "Emit a Rectangle for the right pane area. The right pane is variant-based: one of `BuildGameSelectPanelTree`, `BuildGameCreatePanelTree`, `BuildGameJoinPanelTree`, `BuildGameTechPanelTree` emits inside it at any given time (mutually exclusive). Each panel currently uses `floating @ROOT (x, y)` for its child elements (search `GSel`, `GCrt`, `GJoin`, `GTech`).\n\nRelocate ALL FOUR variant subtrees inside the new Rectangle via flex layout. Each is its own refactor. Keep existing primitive composition. The previous IMAGE-based right-pane border (bank 7 idx 8 — emitted as `GSelRightBorder` and equivalents) becomes redundant — remove.\n\nLobbyBg still STAYS underneath this iteration. This is the largest iteration of the milestone — budget accordingly. If any one of the four variants is blocked, leave passes=false with a documented obstacle and the other variants partially done in a commit.",
+      "pass_check": "Build green. 40_lobby_clay_basic.sh green. All four right-pane variants navigable (default → GameSelect, Create Game → GameCreate, Choose Tech → GameTech, etc.). Clay inspector shows `LobbyRightRect` with the active variant's subtree as descendants. Screenshot DM'd."
     },
     {
-      "id": "P7",
+      "id": "C7",
       "priority": 7,
-      "name": "ScrollList primitive",
-      "passes": true,
-      "spec": "Add clients/silencer/src/ui/clay/primitives/scroll_list.{h,cpp}. API: `ScrollList(items: span<string>, selectedIndex_in_out, scrollPosition_in_out, lineHeight, height, on_select_callback)`. Internally emits the row column + a Clay-managed scroll container OR a custom-rendered scrollbar matching the legacy art (bank 7 idx 9 track). Mouse wheel and click-on-row supported via Clay_Hovered + Clay_OnHover. Pixel-identical to legacy SelectBox+ScrollBar.",
-      "pass_check": "Render test with a 30-item list scrolled to a fixed position pixdiff < 2.0 vs baseline. Click-on-row fires on_select with the right index. No lobby references."
+      "passes": false,
+      "name": "Drop LobbyBg sprite from the Clay tree",
+      "spec": "Remove the `LobbyBg` IMAGE element (bank 7 idx 1) from the lobby's Clay tree (search `LobbyBg` in `lobby_clay_screen.cpp`). The visual goes from `baked chrome under Clay rectangles` to `Clay rectangles alone`. Decorative texture (circuit boards, planet monitor, photo collage) disappears — that's intentional.\n\nIf you need a background color behind the panels to avoid a stark black (e.g., to mirror the legacy dark-grey-ish behind-chrome), set a `.backgroundColor` on the LobbyRoot — but do NOT introduce a new sprite. Flat color only.",
+      "pass_check": "Build green. 40_lobby_clay_basic.sh green. Clay inspector shows NO `LobbyBg` element. Screenshot DM'd — should show only the Clay-drawn rectangles + panel content, no decorative texture."
     },
     {
-      "id": "P7b",
-      "priority": 7.5,
-      "passes": true,
-      "name": "Fix ScrollList primitive: conditional scrollbar + inner-container parenting",
-      "spec": "Three connected bugs surfaced after P14 GameSelectPanel landed at 1.14% diff. All three live in clients/silencer/src/ui/clay/primitives/scroll_list.{h,cpp} and the Clay bridge -- fix the PRIMITIVE, not the panels. Then re-verify every panel that uses ScrollList: P14 GameSelectPanel for sure; P15 GameCreatePanel uses it for the map list, re-screenshot both and confirm diff stays under their threshold.\n\nBugs:\n\n1. CONDITIONAL SCROLLBAR. scroll_list.cpp lines 140-154 unconditionally emit the scrollbar CLAY element + ScrollBarPayload. Legacy ScrollBar set draw=false when items fit (items.size() <= ceil(height/lineheight)). The primitive already computes scrollMax = max(0, itemCount - visibleLines) (line 89) -- now also SKIP emitting the scrollbar entirely when scrollMax == 0. Match legacy behavior: the rows column keeps its original width whether or not the scrollbar is drawn (legacy reserved the gutter visually but did not draw the track). Verify with itemCount < visibleLines: zero ScrollBar render commands.\n\n2. SPRITE-OFFSET COMPENSATION IN THE BRIDGE. Bank 7 idx 9 (scrollbar track) has a non-zero world.resources.spriteoffsetx[7][9] baked into the sprite -- this is the same gotcha legacy hit with formscrollbar->x = 383 + spriteoffsetx[7][9]. The Clay bridge's ScrollBar CUSTOM dispatch likely blits at Clay's bounding-box origin WITHOUT subtracting that offset, so the rendered sprite lands shifted from where Clay's layout says it lives -- making the scrollbar appear in the chrome's outer margin instead of inside the inner (bright-stroke) container. Audit clay_bridge.cpp ScrollBar case: when dispatching, the sprite's visible top-left must equal boundingBox.{x,y}, regardless of bank/index sprite offsets. Fix: subtract spriteoffsetx[bank][index] and spriteoffsety[bank][index] from the blit dst.\n\n3. VISUAL PARENTING. User observation: the scroll bar is parented to the outer container, but the games would be listed in the inner container with the brighter stroke. Once #2 is fixed the scrollbar's rendered position should match Clay's bounding box, which the panel placed inside the inner-stroke region -- but verify against the legacy gameselect.png baseline that the scrollbar lands AT the right edge of the rows column, INSIDE the bright stroke. If the panel's kListW=214 doesn't leave a visible-but-empty gutter for the inner stroke, the panel may need a slightly narrower rows column. PREFER fixing in the primitive (e.g., respect a scrollbarGap that's pre-set by the panel) over editing panel geometry.\n\nAcceptance:\n- Primitive render test with itemCount=3, visibleLines=10 emits zero ScrollBar render commands.\n- Primitive render test with itemCount=50, visibleLines=10 emits one ScrollBar render command whose Clay bounding box equals the post-blit pixel extent of the visible track on the Surface (i.e., sprite offset compensated).\n- P14 GameSelectPanel re-screenshot diff stays at or below its prior pass result (1.14%).\n- P15 GameCreatePanel re-verification (if it uses ScrollList) within its threshold.\n- Build green.",
-      "pass_check": "Two new primitive tests pass (no-overflow -> 0 scrollbar commands; overflow -> bounded scrollbar). P14 re-verification diff <= P14 prior. P15 re-verification within threshold (if applicable).",
-      "pixdiff_max_pct": 5.0
-    },
-    {
-      "id": "P8",
+      "id": "C8",
       "priority": 8,
-      "name": "ScrollTextBox primitive",
-      "passes": true,
-      "spec": "Add clients/silencer/src/ui/clay/primitives/scroll_text_box.{h,cpp}. API: `ScrollTextBox(lines: span<TextLine>, scrollPosition_in_out, lineHeight, fontWidth, height, opts: { bottomToTop, autoScrollOnAppend })`. TextLine is { string, color, brightness, indent }. Pixel-identical to legacy TextBox. No lobby references.",
-      "pass_check": "Render test pixdiff < 2.0 vs baseline. Auto-scroll behavior preserved when caller appends to lines and the scrollbar was at the bottom. No lobby references."
-    },
-    {
-      "id": "P9",
-      "priority": 9,
-      "name": "TextInput primitive",
-      "passes": true,
-      "spec": "Add clients/silencer/src/ui/clay/primitives/text_input.{h,cpp}. API: `TextInput(text_in_out, opts: { password, numbersOnly, maxChars, fontWidth, width }, on_enter_callback)`. SDL text input integration stays as today — primitive just reads the text buffer and emits the visual. Pixel-identical to legacy TextInput.",
-      "pass_check": "Render test pixdiff < 1.0 vs baseline. Typing a key adds it to the buffer (via SDL_TEXTINPUT routed by the screen). Enter fires the callback. No lobby references."
-    },
-    {
-      "id": "P10",
-      "priority": 10,
-      "name": "FormBorder, LabelValueRow, Panel primitives",
-      "passes": true,
-      "spec": "Add three small composition primitives in clients/silencer/src/ui/clay/primitives/. FormBorder({...children}) emits 1-px stroke (palette idx 220) via Clay .border. LabelValueRow({label, value}) emits a LEFT_TO_RIGHT row with label + value column. Panel({title, chromeVariant, ...children}) emits the bank-7 chrome variant or a left-side bare variant. All three: no lobby/world references; variants are enums.",
-      "pass_check": "Render tests for each pixdiff < 1.0 vs baselines."
-    },
-    {
-      "id": "P11",
-      "priority": 11,
-      "name": "LobbyClayScreen scaffold + chrome",
-      "passes": true,
-      "spec": "Add clients/silencer/src/ui/screens/lobby_clay/lobby_clay_screen.{h,cpp}. Inherits from Screen. Per-frame Tick: SetPointerState → BeginLayout → BuildChromeTree(lobbyState, world) → EndLayout → RenderClayCommands. Initially the BuildChromeTree only emits: background image (bank 7 idx 1), TitleBar (Silencer title + version + map-name overlay + Go Back BankButton::Chrome). Add a feature flag SILENCER_LOBBY_CLAY (env var or compile-time) — when set, Game::GoToState(LOBBY) pushes LobbyClayScreen instead of LobbyScreen. Default off.",
-      "pass_check": "With SILENCER_LOBBY_CLAY=1, the lobby title chrome (just title bar) renders with pixdiff < 1.0 vs tests/lobby-clay/baselines/title_chrome.png. Go Back returns to main menu.",
-      "screenshot": "iter-P11.png",
-      "pixdiff_baseline": "tests/lobby-clay/baselines/title_chrome.png",
-      "pixdiff_max_pct": 1.0
-    },
-    {
-      "id": "P12",
-      "priority": 12,
-      "name": "CharacterPanel in Clay",
-      "passes": true,
-      "spec": "Reimplement the always-on character panel as a Clay subtree inside lobby_clay/character_panel.{h,cpp} consuming the primitives. State (selected agency, stats) lives in LobbyState. Selecting an agency calls Config::Save() + World::SetAgency exactly like today (domain glue lives in the SCREEN, not the primitive). Pixdiff target: <5% vs character.png baseline.",
-      "pass_check": "Pixdiff < 5.0% vs baseline. Selecting each of the 5 agencies persists and updates the stats label region.",
-      "screenshot": "iter-P12.png",
-      "pixdiff_baseline": "tests/lobby-clay/baselines/character.png",
-      "pixdiff_max_pct": 5.0
-    },
-    {
-      "id": "P13",
-      "priority": 13,
-      "name": "ChatPanel in Clay",
-      "passes": true,
-      "spec": "Reimplement the chat panel using ScrollTextBox (for chat + presence) and TextInput. Auto-scroll on new chat preserved. Channel header updates on channelchanged. Pixdiff target: <5% vs chat.png.",
-      "pass_check": "Pixdiff < 5.0% vs baseline. Typing in the chat input and pressing Enter sends to the lobby channel. Scrolling the chat textbox works.",
-      "screenshot": "iter-P13.png",
-      "pixdiff_baseline": "tests/lobby-clay/baselines/chat.png",
-      "pixdiff_max_pct": 5.0
-    },
-    {
-      "id": "P14",
-      "priority": 14,
-      "name": "GameSelectPanel in Clay",
-      "passes": true,
-      "spec": "Reimplement the games list + selected-game info block + Join/Spectate/Create buttons using ScrollList + BankText + BankButton. Visibility rules for Join vs Spectate buttons preserved exactly. Pixdiff target: <5% vs gameselect.png.",
-      "pass_check": "Pixdiff < 5.0% vs baseline. Clicking Create transitions to the create panel. Selecting a game updates the info block.",
-      "screenshot": "iter-P14.png",
-      "pixdiff_baseline": "tests/lobby-clay/baselines/gameselect.png",
-      "pixdiff_max_pct": 5.0
-    },
-    {
-      "id": "P15",
-      "priority": 15,
-      "name": "GameCreatePanel in Clay",
-      "passes": true,
-      "spec": "Reimplement the game-options form using FormBorder + LabelValueRow + TextInput + BankButton::Inline (security/spectatable cyclers), plus ScrollList for the map list, plus TextInput for the name/password, plus a Create button. Pixdiff target: <5% vs gamecreate.png.",
-      "pass_check": "Pixdiff < 5.0% vs baseline. Filling the form + Create kicks off the existing CreateGame flow.",
-      "screenshot": "iter-P15.png",
-      "pixdiff_baseline": "tests/lobby-clay/baselines/gamecreate.png",
-      "pixdiff_max_pct": 5.0
-    },
-    {
-      "id": "P16",
-      "priority": 16,
-      "name": "GameJoinPanel in Clay",
-      "passes": true,
-      "spec": "Three stacked BankButton::Chrome buttons (Choose Tech / Change Team / Ready) with the per-frame 'Waiting...' label rewrite when blocked. Pixdiff target: <5% vs gamejoin.png.",
-      "pass_check": "Pixdiff < 5.0% vs baseline. Ready button label updates correctly when host is waiting on peers.",
-      "screenshot": "iter-P16.png",
-      "pixdiff_baseline": "tests/lobby-clay/baselines/gamejoin.png",
-      "pixdiff_max_pct": 5.0
-    },
-    {
-      "id": "P17",
-      "priority": 17,
-      "name": "GameTechPanel in Clay",
-      "passes": true,
-      "spec": "Reimplement the tech grid (3 peer cols + local col), tech name/description block, slots-left counter, and Back to Teams button. Pixdiff target: <5% vs gametech.png.",
-      "pass_check": "Pixdiff < 5.0% vs baseline. Toggling a tech checkbox calls SetTech with the right value.",
-      "screenshot": "iter-P17.png",
-      "pixdiff_baseline": "tests/lobby-clay/baselines/gametech.png",
-      "pixdiff_max_pct": 5.0
-    },
-    {
-      "id": "P18",
-      "priority": 18,
-      "name": "CLI inspect compatibility for Clay tree",
-      "passes": true,
-      "spec": "The CLI `inspect` op walks the active Interface's objects and emits {id, kind, label, x, y, w, h}. For LobbyClayScreen there's no Interface — add a parallel path: every Clay element with a stable ID + a registered 'inspectable' tag in userData is emitted as a widget by the screen's custom inspect hook. Buttons, toggles, text inputs, list rows must all be addressable by `cli click --label X` and `cli set_text --label X --text Y`.",
-      "pass_check": "tests/cli-agent/e2e/test_lobby_basic.sh (a new test) drives the lobby through gameselect → gamecreate using only `cli click --label` and `cli set_text --label` and ends with a Create. Green."
-    },
-    {
-      "id": "P19",
-      "priority": 19,
-      "name": "Make Clay the default lobby; delete legacy lobby files",
-      "passes": true,
-      "spec": "Flip the feature flag default to ON. Replace Game::GoToState(LOBBY) call sites to push LobbyClayScreen unconditionally. Delete clients/silencer/src/ui/screens/lobby/{lobby_screen,character_panel,chat_panel,game_select_panel,game_create_panel,game_join_panel,game_tech_panel}.{h,cpp}. Update CMakeLists.txt. The legacy widget components (Button, Toggle, etc.) STAY — they're used by other screens.",
-      "pass_check": "Build green. tests/cli-agent/e2e/ regression suite green. All 7 lobby baselines pixdiff < 5%."
-    },
-    {
-      "id": "P20",
-      "priority": 20,
-      "name": "Final end-to-end regression sweep",
-      "passes": true,
-      "spec": "Run the full tests/cli-agent/e2e/ suite. Re-screenshot all 7 lobby states from the Clay build and pixdiff each against its baseline. Confirm all <5%. Document the result in progress.txt. Send a final DM with all 7 (current, Clay) screenshots inline.",
-      "pass_check": "All 7 pixdiffs < 5%. tests/cli-agent/e2e/ green. progress.txt has a final summary entry."
-    },
-    {
-      "id": "P21",
-      "priority": 21,
-      "name": "Dogfood primitives in a non-lobby demo",
-      "passes": true,
-      "spec": "Add tools/clay-demo/ — a small standalone source file that initializes Clay with a 640x480 viewport and uses every primitive at least once (BankText all 4 variants, BankButton all 3 variants, Toggle, ScrollList, ScrollTextBox, TextInput, FormBorder, LabelValueRow, Panel both chrome variants). Builds as a separate target. The demo MUST NOT include any lobby headers — if it doesn't compile without lobby_clay/*, the primitives have a hidden coupling and the agent must fix the primitive, not the demo. Capture a screenshot of the demo and commit it to tools/clay-demo/screenshot.png as proof.",
-      "pass_check": "tools/clay-demo/build/clay_demo runs and produces a PNG. The binary does not link against any clients/silencer/src/ui/screens/lobby_clay/ symbol. Screenshot is committed."
+      "passes": false,
+      "name": "Final visual + functional sweep",
+      "spec": "End-to-end pass:\n- Re-screenshot all four right-pane states (gameSelect / gameCreate / gameJoin / gameTech) and one of the always-on left states (character panel filled in).\n- Run the full `tests/cli-agent/e2e/` suite (NOT just 40_lobby_clay_basic.sh — also 30_lobby_login, etc.).\n- Document outcomes in `progress.txt` (final summary entry).\n- Send a final DM with all 5 screenshots attached.\n\nNothing new is implemented in this iteration; it's a regression sweep + visual checkpoint.",
+      "pass_check": "All 5 tests/cli-agent/e2e/*.sh scripts pass. Five lobby screenshots committed under `tests/lobby-clay/chrome-final/` (or similar). Final DM sent with all 5 attached. progress.txt has a final entry."
     }
   ]
 }

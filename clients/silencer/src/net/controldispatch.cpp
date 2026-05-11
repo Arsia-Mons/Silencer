@@ -332,6 +332,24 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
+	if(cmd.op == "clay_rectangle_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_rectangle_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunRectangleTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"rectangle test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
 	if(cmd.op == "clay_panel_test"){
 		std::string variant = cmd.args.value("variant", std::string("right"));
 		std::string out = cmd.args.value("out", std::string());
