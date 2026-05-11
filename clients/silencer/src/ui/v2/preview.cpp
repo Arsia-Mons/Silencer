@@ -35,6 +35,7 @@
 #include "lobby_connect.h"
 #include "mission_summary.h"
 #include "update.h"
+#include "modals/message.h"
 
 #include "main_menu_screen.h"
 #include "options_screen.h"
@@ -44,6 +45,7 @@
 #include "lobby_connect_screen.h"
 #include "mission_summary_screen.h"
 #include "update_screen.h"
+#include "message_modal.h"
 #include "renderer.h"
 #include "renderdevice.h"
 #include "resources.h"
@@ -55,6 +57,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <string>
 
 #ifndef SILENCER_VERSION
 #define SILENCER_VERSION "00000"
@@ -188,6 +191,13 @@ int Game::RunPreview()
 	update_handlers.on_download = [](){ printf("[preview] Download clicked\n"); };
 	update_handlers.on_cancel   = [&running](){
 		printf("[preview] Cancel clicked\n");
+		running = false;
+	};
+
+	const std::string message_modal_text = "Test message";
+	ui::v2::MessageHandlers message_handlers;
+	message_handlers.on_ok = [&running](){
+		printf("[preview] OK clicked\n");
 		running = false;
 	};
 
@@ -327,6 +337,21 @@ int Game::RunPreview()
 				world.TickObjects();
 				renderer.Draw(&screenbuffer, /*frametime=*/0);
 				screen->Destroy(screenContext);
+			}else if(strcmp(preview_screen, "message_modal") == 0){
+				// MessageModal is normally pushed on top of another screen.
+				// Standalone it draws onto the cleared screenbuffer (palette
+				// 0 = transparent of the menu palette). Camera inherited from
+				// MainMenu/Options chain — same convention as the other
+				// post-MainMenu previews.
+				renderer.camera.SetPosition(320, 240);
+				auto modal = std::make_unique<MessageModal>(message_modal_text);
+				modal->Build(screenContext);
+				// One TickObjects() settles the B156x21 OK button chrome on
+				// its INACTIVE base. MessageModal::Tick — which gates on
+				// okbutton->clicked — is intentionally NOT called.
+				world.TickObjects();
+				renderer.Draw(&screenbuffer, /*frametime=*/0);
+				modal->Destroy(screenContext);
 			}else if(strcmp(preview_screen, "mission_summary") == 0){
 				// MissionSummaryScreen::Build calls ResetPresentation(1) +
 				// SetPosition(320, 240) itself, but mirror here for safety.
@@ -391,6 +416,12 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "mission_summary") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildMissionSummary(ctx, mission_summary_handlers);
+				ui::v2::Layout(tree, ctx);
+				ui::v2::Render(tree, ctx, screenbuffer, renderer);
+				if(ctx.state) ctx.state->EndFrame();
+			}else if(strcmp(preview_screen, "message_modal") == 0){
+				if(ctx.state) ctx.state->BeginFrame();
+				ui::v2::Node tree = ui::v2::BuildMessage(ctx, message_modal_text, /*has_ok=*/true, message_handlers);
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
@@ -482,6 +513,10 @@ int Game::RunPreview()
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "mission_summary") == 0){
 						ui::v2::Node tree = ui::v2::BuildMissionSummary(ctx, mission_summary_handlers);
+						ui::v2::Layout(tree, ctx);
+						ui::v2::DispatchClick(tree, ctx);
+					}else if(strcmp(preview_screen, "message_modal") == 0){
+						ui::v2::Node tree = ui::v2::BuildMessage(ctx, message_modal_text, /*has_ok=*/true, message_handlers);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "update") == 0){
