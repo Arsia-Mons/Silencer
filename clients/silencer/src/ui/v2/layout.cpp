@@ -137,6 +137,7 @@ Clay_ElementDeclaration BuildDecl(const Node & n, LayoutState & ls) {
 		}
 		case NodeKind::Sprite:
 		case NodeKind::Background:
+		case NodeKind::FilledRect:
 		case NodeKind::Group:
 			// These kinds don't naturally appear inside a layout-managed
 			// subtree today. Treat as zero-sized passthrough so the

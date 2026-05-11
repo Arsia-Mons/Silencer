@@ -32,12 +32,14 @@
 #include "options_display.h"
 #include "options_audio.h"
 #include "options_controls.h"
+#include "lobby_connect.h"
 
 #include "main_menu_screen.h"
 #include "options_screen.h"
 #include "options_display_screen.h"
 #include "options_audio_screen.h"
 #include "options_controls_screen.h"
+#include "lobby_connect_screen.h"
 #include "renderer.h"
 #include "renderdevice.h"
 #include "resources.h"
@@ -88,13 +90,12 @@ int Game::RunPreview()
 	const bool use_legacy = (strcmp(preview_impl, "legacy") == 0);
 	const char * impl_name = use_legacy ? "legacy" : "v2";
 
-	// Both impls render at logical 640×480. Palette 1 is the menu palette
-	// the live game uses for MAINMENU; v2 callers expect it set before
-	// render, legacy MainMenuScreen::Build sets it via ResetPresentation
-	// but doing it up front is harmless and keeps the dump deterministic
-	// even if Build later changes (or v2 forgets to switch).
-	if(!renderer.palette.SetPalette(1)){
-		fprintf(stderr, "[preview] palette 1 (menu) load failed\n");
+	// Pick the palette the legacy screen would have loaded via
+	// ResetPresentation. lobby_connect uses palette 2; everything else
+	// migrated so far uses palette 1.
+	const int palette_idx = (strcmp(preview_screen, "lobby_connect") == 0) ? 2 : 1;
+	if(!renderer.palette.SetPalette(palette_idx)){
+		fprintf(stderr, "[preview] palette %d load failed\n", palette_idx);
 		return 4;
 	}
 	SetColors(renderer.palette.GetColors());
@@ -159,6 +160,13 @@ int Game::RunPreview()
 	options_controls_handlers.on_preset = [](){ printf("[preview] Preset clicked\n"); };
 	options_controls_handlers.on_save   = [](){ printf("[preview] Save clicked\n"); };
 	options_controls_handlers.on_cancel = [&running](){
+		printf("[preview] Cancel clicked\n");
+		running = false;
+	};
+
+	ui::v2::LobbyConnectHandlers lobby_connect_handlers;
+	lobby_connect_handlers.on_login  = [](){ printf("[preview] Login clicked\n"); };
+	lobby_connect_handlers.on_cancel = [&running](){
 		printf("[preview] Cancel clicked\n");
 		running = false;
 	};
@@ -262,6 +270,26 @@ int Game::RunPreview()
 				world.TickObjects();
 				renderer.Draw(&screenbuffer, /*frametime=*/0);
 				screen->Destroy(screenContext);
+			}else if(strcmp(preview_screen, "lobby_connect") == 0){
+				// Camera inherited from MainMenu/Options chain — same as
+				// the other post-MainMenu screens. ResetPresentation(2) in
+				// the legacy Build only switches palette + clears, no
+				// camera change.
+				renderer.camera.SetPosition(320, 240);
+				auto screen = std::make_unique<LobbyConnectScreen>();
+				screen->Build(screenContext);
+				// One TickObjects() settles the Login/Cancel B52x21 buttons
+				// on INACTIVE base (effectbrightness=128). The legacy
+				// LobbyConnectScreen::Tick is intentionally NOT called: it
+				// gates on ambienceMixer.FadedIn() and would mutate the
+				// textbox + lobby state, neither of which contribute to
+				// the byte-identical target. The build-time
+				// iface->ActiveChanged(mouse=false) already set
+				// showcaret=true on the active username input, which
+				// renderer.Draw consumes to draw the caret rect.
+				world.TickObjects();
+				renderer.Draw(&screenbuffer, /*frametime=*/0);
+				screen->Destroy(screenContext);
 			}else{
 				fprintf(stderr, "[preview] unknown screen '%s' for legacy impl\n", preview_screen);
 				return;
@@ -295,6 +323,12 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "options_controls") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildOptionsControls(ctx, options_controls_handlers);
+				ui::v2::Layout(tree, ctx);
+				ui::v2::Render(tree, ctx, screenbuffer, renderer);
+				if(ctx.state) ctx.state->EndFrame();
+			}else if(strcmp(preview_screen, "lobby_connect") == 0){
+				if(ctx.state) ctx.state->BeginFrame();
+				ui::v2::Node tree = ui::v2::BuildLobbyConnect(ctx, lobby_connect_handlers);
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
@@ -372,6 +406,10 @@ int Game::RunPreview()
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "options_controls") == 0){
 						ui::v2::Node tree = ui::v2::BuildOptionsControls(ctx, options_controls_handlers);
+						ui::v2::Layout(tree, ctx);
+						ui::v2::DispatchClick(tree, ctx);
+					}else if(strcmp(preview_screen, "lobby_connect") == 0){
+						ui::v2::Node tree = ui::v2::BuildLobbyConnect(ctx, lobby_connect_handlers);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}

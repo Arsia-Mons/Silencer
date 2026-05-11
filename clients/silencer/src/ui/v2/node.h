@@ -16,6 +16,7 @@ enum class NodeKind : Uint8 {
 	              // offset is honored by the renderer (legacy semantics).
 	Label,        // Text drawn at logical (x, y) using a sprite-font bank.
 	Button,       // Pressable widget — chrome + centered label.
+	FilledRect,   // Solid color rectangle (palette index) at (x, y) sized w×h.
 
 	// Container kinds — laid out by the Clay layout pass. Walk emits a
 	// Clay scope per container; descendants get computed rects written
@@ -74,6 +75,11 @@ struct Node {
 	// to {top,right,bottom,left} if uniform proves insufficient.
 	Uint16 gap = 0;
 	Uint16 pad = 0;
+
+	// FilledRect-only: pixel dimensions + palette color index.
+	Uint16 fill_w = 0;
+	Uint16 fill_h = 0;
+	Uint8  fill_color = 0;
 
 	// Layout output. Set by `layout.cpp` for nodes inside a container
 	// subtree. `rect_w == 0` means "not laid out, fall back to (x, y)
@@ -173,6 +179,15 @@ inline Node Padding(Uint16 amount, std::vector<Node> children) {
 inline Node Spacer() {
 	Node n;
 	n.kind = NodeKind::Spacer;
+	return n;
+}
+
+inline Node FilledRect(Uint16 w, Uint16 h, Uint8 color) {
+	Node n;
+	n.kind = NodeKind::FilledRect;
+	n.fill_w = w;
+	n.fill_h = h;
+	n.fill_color = color;
 	return n;
 }
 

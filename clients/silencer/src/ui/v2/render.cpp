@@ -33,6 +33,13 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 			renderer.DrawSpriteAt(&target, n.sprite_bank, n.sprite_index, n.x, n.y);
 			break;
 
+		case NodeKind::FilledRect:
+			renderer.DrawFilledRectangle(&target, n.x, n.y,
+			                             n.x + (int)n.fill_w,
+			                             n.y + (int)n.fill_h,
+			                             n.fill_color);
+			break;
+
 		case NodeKind::Label:
 			// Defaults match the legacy Overlay-text path:
 			// alpha=false, tint=0, brightness=128, rampcolor=false.
