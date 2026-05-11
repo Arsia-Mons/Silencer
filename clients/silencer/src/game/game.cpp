@@ -35,6 +35,7 @@
 #include "options_audio_screen.h"
 #include "lobby_connect_screen.h"
 #include "lobby_screen.h"
+#include "lobby_clay_screen.h"
 #include "update_screen.h"
 #include "mission_summary_screen.h"
 #include <algorithm>
@@ -595,6 +596,19 @@ bool Game::Loop(void){
 	if(!world.dedicatedserver.active){
 		screenbuffer.Clear(0);
 		world.DoNetwork();
+		// Render-phase hook for screens that draw via Clay (e.g. LobbyClayScreen):
+		// emit background + chrome BEFORE the world walk so its widgets (panels,
+		// modals) overlay correctly. Iterates from the topmost non-overlay screen
+		// upward — matches TickActiveScreen() so a modal can still own its own
+		// background if it ever needs one.
+		if(!screenStack.empty()){
+			int start = (int)screenStack.size() - 1;
+			while(start > 0 && screenStack[start]->IsOverlay()) --start;
+			float ft = 1 - (float(tickcheck - lasttick) / wait);
+			for(size_t i = (size_t)start; i < screenStack.size(); ++i){
+				screenStack[i]->Draw(screenContext, screenbuffer, ft);
+			}
+		}
 		renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
 #ifdef POSIX
 		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && deploymessageshown){
@@ -795,7 +809,15 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
-				PushScreen(std::make_unique<LobbyScreen>());
+				// SILENCER_LOBBY_CLAY=1 opts into the in-progress Clay-driven
+				// lobby (P11+). Treats any non-"0" value as enabled.
+				const char * clayEnv = getenv("SILENCER_LOBBY_CLAY");
+				bool useClay = clayEnv && clayEnv[0] && clayEnv[0] != '0';
+				if(useClay){
+					PushScreen(std::make_unique<LobbyClayScreen>());
+				}else{
+					PushScreen(std::make_unique<LobbyScreen>());
+				}
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){

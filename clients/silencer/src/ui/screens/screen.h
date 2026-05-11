@@ -4,6 +4,7 @@
 #include <SDL3/SDL_stdinc.h>
 
 class ScreenContext;
+class Surface;
 
 // Top-level UI surface bound to a Game state. One Screen is active at a time
 // (plus modals stacked on top). Lifecycle is owned by Game's screenStack.
@@ -17,6 +18,16 @@ public:
 
 	// Called once per Game::Tick while the screen is on top of the stack.
 	virtual void Tick(ScreenContext & ctx) = 0;
+
+	// Render-phase hook. Called from the game's render loop AFTER the
+	// screenbuffer is cleared and BEFORE Renderer::Draw walks the world.
+	// Screens that emit a Clay tree dispatch its render commands here so
+	// Clay-painted pixels are drawn first (background image, chrome) and
+	// the world-object walk (panels, interfaces) overlays on top. Default
+	// no-op; legacy widget-based screens render entirely via the world
+	// walk and don't need to override.
+	virtual void Draw(ScreenContext & ctx, Surface & dst, float frametime)
+	{ (void)ctx; (void)dst; (void)frametime; }
 
 	// Tear down widgets. Called on pop/replace.
 	virtual void Destroy(ScreenContext & ctx) = 0;

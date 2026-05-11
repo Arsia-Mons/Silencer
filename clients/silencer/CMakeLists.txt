@@ -142,6 +142,7 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/panels"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/modals"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby_clay"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/mission_summary"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/net"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game"

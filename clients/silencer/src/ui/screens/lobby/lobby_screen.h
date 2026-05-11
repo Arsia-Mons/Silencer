@@ -38,9 +38,14 @@ public:
 
 	// Update the map-name overlay (uid 8) on the lobby chrome — called by the
 	// CONNECTED→GameJoin handoff and by Game::GoBack when leaving a game.
-	void SetMapNameOverlay(class World & world, const char * name);
+	// Virtual so LobbyClayScreen can route this into its own per-frame Clay
+	// state instead of mutating a world Overlay object.
+	virtual void SetMapNameOverlay(class World & world, const char * name);
 
-private:
+protected:
+	// Accessible to LobbyClayScreen so it can build the legacy panels under
+	// its own parent Interface and tear them down on Destroy without
+	// duplicating the swap logic.
 	CharacterPanel character;
 	ChatPanel chat;
 	// One of gameSelect / gameCreate / gameJoin / gameTech is active at a
