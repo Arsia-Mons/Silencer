@@ -48,6 +48,7 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 
 void Guard::InitBT(){
 	bt_ = BehaviorTreeLibrary::instance().get("guard");
+
 	if(!bt_) return;
 
 	// Shared helper: update chasing id + play alert sound on first detection.
@@ -378,9 +379,14 @@ void Guard::InitBT(){
 	// calls Fire() directly from embedded animation tables. Does NOT write to state.
 	// direction: 0=standing, 1=crouched, 2=up, 3=down, 4=up-angle, 5=down-angle,
 	//            6=ladder-up, 7=ladder-down
+	//
+	// Cooldown behaviour: when CooledDown() fails the guard stands still and waits
+	// (returns Running) rather than returning Failure.  This matches the legacy state
+	// machine which set state=STANDING while on cooldown.  LOS is re-checked each tick
+	// during the wait; if the target disappears the leaf returns Failure so the tree can
+	// fall through to Chase/Search.
 	btctx_.actions["Shoot"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
-		if(!CooledDown(world)) return BTResult::Failure;
 		int dir = ctx.current_node_props.value("direction", 0);
 		if(dir < 0 || dir > 7) dir = 0;
 
@@ -401,18 +407,42 @@ void Guard::InitBT(){
 			{ 197, FRAMES_SHORT, 12, 6 },  // 7: ladder-down
 		};
 		const ShootSpec& sp = SPECS[dir];
-		int tick = ctx.elapsedTicks();
-		if(tick == 0){
-			is_shooting = true;
-			shoot_direction = (uint8_t)dir;
+
+		// stk tracks animation progress separately from elapsedTicks().
+		// stk == -1 means we're waiting for cooldown; stk >= 0 is the animation frame.
+		const std::string stkKey = ctx.current_node_id + "_stk";
+		int stk = -1;
+		auto kit = ctx.state.find(stkKey);
+		if(kit != ctx.state.end()) stk = kit->second.get<int>();
+
+		if(stk < 0){
+			// Waiting for cooldown — stand still each tick.
+			if(!CooledDown(world)){
+				// Re-check LOS; if target gone, give up so Chase can run.
+				if(!Look(world, dir)) {
+					ctx.state.erase(stkKey);
+					return BTResult::Failure;
+				}
+				xv = 0;
+				is_shooting = false;
+				res_bank  = 59; res_index = 0;
+				ctx.state[stkKey] = -1;
+				return BTResult::Running;
+			}
+			// Cooldown cleared — start animation.
+			stk = 0;
 		}
-		if(tick == sp.fire_at) Fire(world, dir);
-		if(tick >= sp.count){
+
+		if(stk == 0){ is_shooting = true; shoot_direction = (uint8_t)dir; yv = 0; }
+		if(stk == sp.fire_at) Fire(world, dir);
+		if(stk >= sp.count){
+			ctx.state.erase(stkKey);
 			is_shooting = false;
 			return BTResult::Success;
 		}
+		ctx.state[stkKey] = stk + 1;
 		res_bank  = sp.bank;
-		res_index = sp.frames[tick];
+		res_index = sp.frames[stk];
 		return BTResult::Running;
 	};
 
@@ -661,23 +691,42 @@ void Guard::InitBT(){
 	};
 
 	// ShootFromLadder: shoots in the direction stored by CanShootFromLadder.
+	// Waits (Running) when on cooldown, re-checking LOS; falls back (Failure) if target gone.
 	btctx_.actions["ShootFromLadder"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
-		if(!CooledDown(world)) return BTResult::Failure;
 		int dir = ctx.bb<int>("ladder_shoot_dir", 6);
 		static const int FRAMES_SHORT[] = {0,1,2,3,4,5,6,7,8,3,2,1};
 		int bank = (dir == 6) ? 196 : 197;
-		int tick = ctx.elapsedTicks();
-		if(tick == 0){ is_shooting = true; shoot_direction = (uint8_t)dir; yv = 0; }
-		if(tick == 6) Fire(world, dir);
-		if(tick >= 12){
+
+		const std::string stkKey = ctx.current_node_id + "_stk";
+		int stk = -1;
+		auto kit = ctx.state.find(stkKey);
+		if(kit != ctx.state.end()) stk = kit->second.get<int>();
+
+		if(stk < 0){
+			if(!CooledDown(world)){
+				if(!Look(world, dir)){
+					ctx.state.erase(stkKey);
+					return BTResult::Failure;
+				}
+				ctx.state[stkKey] = -1;
+				return BTResult::Running;
+			}
+			stk = 0;
+		}
+
+		if(stk == 0){ is_shooting = true; shoot_direction = (uint8_t)dir; yv = 0; }
+		if(stk == 6) Fire(world, dir);
+		if(stk >= 12){
+			ctx.state.erase(stkKey);
 			is_shooting = false;
 			const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster");
 			yv = (dir == 6) ? -(gd ? gd->ladderClimbSpeed : 5) : (gd ? gd->ladderClimbSpeed : 5);
 			return BTResult::Success;
 		}
-		res_bank = bank;
-		res_index = FRAMES_SHORT[tick];
+		ctx.state[stkKey] = stk + 1;
+		res_bank  = bank;
+		res_index = FRAMES_SHORT[stk];
 		return BTResult::Running;
 	};
 
