@@ -207,7 +207,7 @@ Shape:
 - **Drop the decorative texture** baked inside the BG (circuit
   boards, planet monitor, photo collage). Panels become flat-colored
   interiors with stroked borders.
-- **New `Rectangle` primitive** with two main controls:
+- **New `Box` primitive** with two main controls:
   - **Stroke** — color matched as closely as possible to the legacy
     BG's bright-green panel borders (sample the palette index from
     the BG sprite at the stroke pixels). Width configurable.
