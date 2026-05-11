@@ -2,7 +2,6 @@
 #define SILENCER_UI_V2_SCREENS_OPTIONS_AUDIO_H
 
 #include "runtime.h"
-#include "ui_state.h"
 
 #include <functional>
 
@@ -12,7 +11,6 @@ class ScreenContext;
 namespace ui {
 namespace v2 {
 
-struct Node;
 struct Context;
 
 struct OptionsAudioHandlers {
@@ -21,23 +19,13 @@ struct OptionsAudioHandlers {
 	std::function<void()> on_cancel;
 };
 
-// Live state driving the off/on indicator sprite indices. Passed by the
-// engine render path so the indicators reflect Config; preview leaves this
-// nullptr to keep the build-time defaults (12, 14) and a byte-identical
-// PPM diff against legacy's pre-Tick state.
-struct OptionsAudioState {
-	bool music = false;
-};
+// Emits the audio-options CLAY() tree directly. `music_on` flips the
+// toggle button's label. Caller drives Clay_BeginLayout / EndLayout;
+// `handlers` must outlive Clay_EndLayout — Clay_OnHover captures
+// pointers into it as callback userData.
+void RenderOptionsAudio(const Context & ctx, const OptionsAudioHandlers & handlers,
+                        bool music_on);
 
-// Returns the declarative tree for the audio-options sub-screen. Mirrors
-// legacy OptionsAudioScreen::Build (clients/silencer/src/ui/screens/options/
-// options_audio_screen.cpp) so rendered output is byte-identical at scale=1
-// when `state` is null. When `state` is provided, indicator indices mirror
-// the legacy Tick path:
-//   off = state.music ? 12 : 13;   on = state.music ? 15 : 14;
-Node BuildOptionsAudio(const Context & ctx, const OptionsAudioHandlers & handlers = {}, const OptionsAudioState * state = nullptr);
-
-// Engine-side runtime for GameState::OPTIONSAUDIO.
 class OptionsAudioRuntime : public Runtime
 {
 public:
@@ -52,7 +40,6 @@ public:
 private:
 	World &         world_;
 	ScreenContext & sctx_;
-	UIState         state_;
 };
 
 }  // namespace v2

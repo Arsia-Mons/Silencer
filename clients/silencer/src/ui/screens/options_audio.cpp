@@ -1,10 +1,9 @@
 #include "options_audio.h"
 
 #include "context.h"
-
 #include "layout.h"
-#include "node.h"
-#include "render.h"
+#include "render_commands.h"
+#include "theme.h"
 
 #include "audio.h"
 #include "config.h"
@@ -15,36 +14,78 @@
 #include "renderer.h"
 #include "surface.h"
 
-#include <string>
+#include <cstring>
 
 namespace ui {
 namespace v2 {
 
-Node BuildOptionsAudio(const Context & ctx, const OptionsAudioHandlers & handlers, const OptionsAudioState * state)
-{
+namespace {
+
+// Frame-local string arena. Same shape as main_menu / options — reset
+// at the top of RenderOptionsAudio; buffer survives through Clay_EndLayout.
+constexpr size_t kFrameStringBytes = 256;
+thread_local char   g_frame_strings[kFrameStringBytes];
+thread_local size_t g_frame_off = 0;
+
+Clay_String FrameStr(const char * s) {
+	size_t n = std::strlen(s);
+	if(g_frame_off + n + 1 > kFrameStringBytes) g_frame_off = 0;
+	char * p = &g_frame_strings[g_frame_off];
+	std::memcpy(p, s, n);
+	p[n] = '\0';
+	g_frame_off += n + 1;
+	Clay_String out{};
+	out.length = (int32_t)n;
+	out.chars  = p;
+	return out;
+}
+
+void OnButtonClick(Clay_ElementId, Clay_PointerData p, intptr_t user) {
+	if(p.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
+	auto * h = reinterpret_cast<const std::function<void()> *>(user);
+	if(h && *h) (*h)();
+}
+
+void MenuButton(const char * key, const char * label, const std::function<void()> & handler) {
+	Clay_String key_s   = FrameStr(key);
+	Clay_String label_s = FrameStr(label);
+	CLAY({
+		.id = Clay_GetElementId(key_s),
+		.layout = {
+			.sizing = { CLAY_SIZING_FIXED(196), CLAY_SIZING_FIXED(33) },
+			.childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+		},
+		.backgroundColor = Clay_Hovered() ? ::ui::kColorSelectHi : ::ui::kColorScrollbarFill,
+		.cornerRadius    = ::ui::kCornerSmall,
+	}) {
+		Clay_OnHover(OnButtonClick, (intptr_t)&handler);
+		CLAY_TEXT(label_s, CLAY_TEXT_CONFIG(::ui::kFontTitle));
+	}
+}
+
+}  // namespace
+
+void RenderOptionsAudio(const Context & ctx, const OptionsAudioHandlers & h, bool music_on) {
 	(void)ctx;
-	const std::string title = "Audio Options";
-	const int title_x = 320 - ((int)title.size() * 12) / 2;
+	g_frame_off = 0;
 
-	auto row = [](int i, const char * label, std::function<void()> handler, int off_idx, int on_idx) {
-		const int by = 50 + i * 53;
-		const int oy = 137 + i * 53;
-		return Group({
-			Button(label, ButtonType::B220x33).at(100, (Sint16)by).onClick(std::move(handler)),
-			Sprite(6, off_idx).at(420, (Sint16)oy),
-			Sprite(6, on_idx).at(450, (Sint16)oy),
-		});
-	};
-
-	const int mu_off = state ? (state->music ? 12 : 13) : 12;
-	const int mu_on  = state ? (state->music ? 15 : 14) : 14;
-
-	return Background(/*bank=*/6, /*index=*/0, {
-		Label(title, /*font_bank=*/135, /*font_width=*/12).at((Sint16)title_x, 14),
-		row(0, "Music", handlers.on_toggle_music, mu_off, mu_on),
-		Button("Save")  .at(-200, 117).onClick(handlers.on_save),
-		Button("Cancel").at(  20, 117).onClick(handlers.on_cancel),
-	});
+	CLAY({
+		.id = CLAY_ID("OptionsAudioRoot"),
+		.layout = {
+			.sizing          = { CLAY_SIZING_GROW(), CLAY_SIZING_GROW() },
+			.childGap        = 8,
+			.childAlignment  = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+			.layoutDirection = CLAY_TOP_TO_BOTTOM,
+		},
+		.backgroundColor = ::ui::kColorPanelBg,
+	}) {
+		CLAY({ .id = CLAY_ID("OptionsAudioTitle") }) {
+			CLAY_TEXT(FrameStr("Audio Options"), CLAY_TEXT_CONFIG(::ui::kFontTitle));
+		}
+		MenuButton("music",  music_on ? "Music: On" : "Music: Off", h.on_toggle_music);
+		MenuButton("save",   "Save",                                h.on_save);
+		MenuButton("cancel", "Cancel",                              h.on_cancel);
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -75,12 +116,6 @@ OptionsAudioHandlers BuildOptionsAudioHandlers(ScreenContext & sctx){
 	return h;
 }
 
-OptionsAudioState CurrentOptionsAudio(){
-	OptionsAudioState s;
-	s.music = Config::GetInstance().music;
-	return s;
-}
-
 }  // namespace
 
 OptionsAudioRuntime::OptionsAudioRuntime(World & world, ScreenContext & sctx)
@@ -98,20 +133,19 @@ void OptionsAudioRuntime::Render(Surface & target, ::Renderer & renderer,
 	};
 	ctx.mouse_x = mouse_x;
 	ctx.mouse_y = mouse_y;
-	ctx.state   = &state_;
 	ctx.dt      = dt;
 
-	OptionsAudioHandlers handlers = BuildOptionsAudioHandlers(sctx_);
-	OptionsAudioState live = CurrentOptionsAudio();
 	target.Clear(0);
-	state_.BeginFrame();
-	Node tree = BuildOptionsAudio(ctx, handlers, &live);
-	::ui::v2::EnsureClayContext(ctx);
+
+	EnsureClayContext(ctx);
 	Clay_SetPointerState(Clay_Vector2{ (float)mouse_x, (float)mouse_y }, /*pointer_down=*/false);
 	Clay_UpdateScrollContainers(/*drag=*/false, Clay_Vector2{ 0.0f, 0.0f }, dt);
-	Layout(tree, ctx);
-	::ui::v2::Render(tree, ctx, target, renderer);
-	state_.EndFrame();
+	Clay_SetLayoutDimensions(Clay_Dimensions{ (float)logical_w, (float)logical_h });
+	Clay_BeginLayout();
+	OptionsAudioHandlers handlers = BuildOptionsAudioHandlers(sctx_);
+	RenderOptionsAudio(ctx, handlers, Config::GetInstance().music);
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	::ui::DrawRenderCommands(cmds, renderer, target, scale);
 }
 
 bool OptionsAudioRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
@@ -125,12 +159,17 @@ bool OptionsAudioRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	};
 	ctx.mouse_x = mouse_x;
 	ctx.mouse_y = mouse_y;
-	ctx.state   = &state_;
+
+	// Re-lay out so OnHover userData points at `handlers` on this stack
+	// frame; the prior Render frame's tree captured a now-destroyed
+	// handlers struct. SetPointerState walks the just-finalised tree.
+	EnsureClayContext(ctx);
+	Clay_SetLayoutDimensions(Clay_Dimensions{ (float)logical_w, (float)logical_h });
+	Clay_BeginLayout();
 	OptionsAudioHandlers handlers = BuildOptionsAudioHandlers(sctx_);
-	OptionsAudioState live = CurrentOptionsAudio();
-	Node tree = BuildOptionsAudio(ctx, handlers, &live);
-	Layout(tree, ctx);
-	DispatchClicks(tree, ctx);
+	RenderOptionsAudio(ctx, handlers, Config::GetInstance().music);
+	(void)Clay_EndLayout();
+	Clay_SetPointerState(Clay_Vector2{ (float)mouse_x, (float)mouse_y }, /*pointer_down=*/true);
 	return true;
 }
 
