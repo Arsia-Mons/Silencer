@@ -1,7 +1,13 @@
 #ifndef SILENCER_UI_V2_SCREENS_MISSION_SUMMARY_H
 #define SILENCER_UI_V2_SCREENS_MISSION_SUMMARY_H
 
+#include "runtime.h"
+#include "ui_state.h"
+
 #include <functional>
+
+class World;
+class ScreenContext;
 
 namespace ui {
 namespace v2 {
@@ -43,6 +49,23 @@ struct MissionSummaryState {
 
 Node BuildMissionSummary(const Context & ctx, const MissionSummaryHandlers & handlers = {},
                          const MissionSummaryState * state = nullptr);
+
+// Engine-side runtime for GameState::MISSIONSUMMARY. Builds the live
+// state from world.lobby.GetUserInfo(accountid) each frame.
+class MissionSummaryRuntime : public Runtime
+{
+public:
+	MissionSummaryRuntime(World & world, ScreenContext & sctx);
+
+	void Render(Surface & target, ::Renderer & renderer,
+	            int mouse_x, int mouse_y, float dt) override;
+	bool DispatchMouseDown(int mouse_x, int mouse_y) override;
+
+private:
+	World &         world_;
+	ScreenContext & sctx_;
+	UIState         state_;
+};
 
 }  // namespace v2
 }  // namespace ui

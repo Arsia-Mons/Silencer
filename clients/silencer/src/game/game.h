@@ -333,14 +333,6 @@ private:
 	// Game (states being migrated one at a time).
 	std::unique_ptr<ui::v2::Runtime> active_runtime;
 	void SetRuntime(Uint8 new_state);
-	// Same shape for MISSIONSUMMARY state. Reads world.lobby.GetUserInfo /
-	// statscopy / agency each frame to drive XP, textbox stats, level
-	// values, banner, and upgrade-button visibility. Tick handles the
-	// statupgraded poll (Refresh re-fires when the server confirms an
-	// upgrade) and the initial !infoLoaded latch — no explicit work needs
-	// to happen here since each render rebuilds from live data.
-	bool RenderMissionSummaryV2();
-	void DispatchMissionSummaryV2Click(int logical_x, int logical_y);
 	// Same shape for LOBBYCONNECT state. Owns the username/password input
 	// buffers + textbox status lines (the LobbyConnectScreen-equivalent
 	// state machine that pushes "Connecting to ...", "Authenticated", etc.

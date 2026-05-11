@@ -1,7 +1,20 @@
 #include "mission_summary.h"
 
 #include "context.h"
+#include "dispatch.h"
+#include "layout.h"
 #include "node.h"
+#include "render.h"
+
+#include "game.h"
+#include "game_state.h"
+#include "lobby.h"
+#include "screen_context.h"
+#include "stats.h"
+#include "user.h"
+#include "world.h"
+#include "renderer.h"
+#include "surface.h"
 
 #include <cstdio>
 #include <string>
@@ -174,6 +187,135 @@ Node BuildMissionSummary(const Context & ctx, const MissionSummaryHandlers & han
 		Sprite(/*bank=*/7, /*index=*/5),
 		Group(std::move(children)),
 	});
+}
+
+// -----------------------------------------------------------------------------
+// MissionSummaryRuntime — engine wire-in for GameState::MISSIONSUMMARY.
+// -----------------------------------------------------------------------------
+
+namespace {
+
+MissionSummaryHandlers BuildMissionSummaryHandlers(ScreenContext & sctx){
+	MissionSummaryHandlers h;
+	h.on_done = [&sctx](){
+		World & w = sctx.world;
+		if(w.lobby.state == Lobby::AUTHENTICATED){
+			sctx.GoToState(GameState::LOBBY);
+			w.lobby.JoinChannel(w.lobby.lastchannel);
+		}else{
+			sctx.GoToState(GameState::MAINMENU);
+		}
+	};
+	h.on_upgrade = [&sctx](int slot){
+		World & w = sctx.world;
+		User * user = w.lobby.GetUserInfo(w.lobby.accountid);
+		if(!user) return;
+		w.lobby.UpgradeStat(user->statsagency, (Uint8)slot);
+	};
+	return h;
+}
+
+// Mirrors MissionSummaryScreen::Refresh — builds the live state from
+// world.lobby.GetUserInfo(). Returns false when user info hasn't arrived
+// yet; caller should fall back to a null State (matches legacy's
+// pre-Refresh appearance: build-time defaults, no banner, no upgrade
+// buttons). The legacy build path also clears statupgraded after each
+// successful Refresh; we do that here.
+bool CurrentMissionSummary(World & world, MissionSummaryState & out){
+	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+	if(!user) return false;
+	Stats & st = user->statscopy;
+	out.shaped       = st.shapedthrown;
+	out.flare        = st.flaresthrown;
+	out.poison_flare = st.poisonflaresthrown;
+	out.neutron      = st.neutronsthrown;
+	for(int i = 0; i < 4; i++){
+		out.weapon_fires[i] = st.weaponfires[i];
+		out.weapon_hits[i]  = st.weaponhits[i];
+		out.weapon_kills[i] = st.playerkillsweapon[i];
+	}
+	out.xp = (int)st.CalculateExperience();
+	auto & ag = user->agency[user->statsagency];
+	out.levels[0] = ag.endurance;
+	out.levels[1] = ag.shield;
+	out.levels[2] = ag.jetpack;
+	out.levels[3] = ag.techslots;
+	out.levels[4] = ag.hacking;
+	out.levels[5] = ag.contacts;
+	if(user->retrieving){
+		out.show_banner = false;
+		for(int i = 0; i < 6; i++) out.show_upgrade[i] = false;
+		return true;
+	}
+	int totalbonusupgrades = ag.endurance + ag.shield + ag.jetpack + ag.techslots + ag.hacking + ag.contacts;
+	bool slot_room[6] = {
+		ag.endurance < ag.maxendurance,
+		ag.shield    < ag.maxshield,
+		ag.jetpack   < ag.maxjetpack,
+		ag.techslots < ag.maxtechslots,
+		ag.hacking   < ag.maxhacking,
+		ag.contacts  < ag.maxcontacts,
+	};
+	int maxupgrades = ag.level;
+	int cap = user->TotalUpgradePointsPossible(user->statsagency);
+	if(maxupgrades > cap) maxupgrades = cap;
+	bool upgradeavailable = (totalbonusupgrades - ag.defaultbonuses) < maxupgrades;
+	out.show_banner = upgradeavailable;
+	for(int i = 0; i < 6; i++) out.show_upgrade[i] = upgradeavailable && slot_room[i];
+	// Consume the upgrade-ack flag — legacy MissionSummaryScreen::Tick
+	// cleared this after each Refresh; no other consumer reads it.
+	world.lobby.statupgraded = false;
+	return true;
+}
+
+}  // namespace
+
+MissionSummaryRuntime::MissionSummaryRuntime(World & world, ScreenContext & sctx)
+	: world_(world), sctx_(sctx) {}
+
+void MissionSummaryRuntime::Render(Surface & target, ::Renderer & renderer,
+                                    int mouse_x, int mouse_y, float dt){
+	Context ctx{
+		world_.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world_.GetVersion(),
+	};
+	ctx.mouse_x = mouse_x;
+	ctx.mouse_y = mouse_y;
+	ctx.state   = &state_;
+	ctx.dt      = dt;
+
+	MissionSummaryHandlers handlers = BuildMissionSummaryHandlers(sctx_);
+	MissionSummaryState live;
+	bool have_state = CurrentMissionSummary(world_, live);
+	target.Clear(0);
+	state_.BeginFrame();
+	Node tree = BuildMissionSummary(ctx, handlers, have_state ? &live : nullptr);
+	Layout(tree, ctx);
+	::ui::v2::Render(tree, ctx, target, renderer);
+	state_.EndFrame();
+}
+
+bool MissionSummaryRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
+	Context ctx{
+		world_.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world_.GetVersion(),
+	};
+	ctx.mouse_x = mouse_x;
+	ctx.mouse_y = mouse_y;
+	ctx.state   = &state_;
+	MissionSummaryHandlers handlers = BuildMissionSummaryHandlers(sctx_);
+	MissionSummaryState live;
+	bool have_state = CurrentMissionSummary(world_, live);
+	Node tree = BuildMissionSummary(ctx, handlers, have_state ? &live : nullptr);
+	Layout(tree, ctx);
+	DispatchClick(tree, ctx);
+	return true;
 }
 
 }  // namespace v2
