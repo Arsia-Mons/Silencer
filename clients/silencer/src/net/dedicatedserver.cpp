@@ -1,8 +1,10 @@
 #include "dedicatedserver.h"
 #include "world.h"
 #include "team.h"
+#include "peer.h"
 #include "../gas/gasloader.h"
 #include <algorithm>
+#include <vector>
 
 DedicatedServer::DedicatedServer(){
 	active = false;
@@ -67,6 +69,22 @@ void DedicatedServer::SendHeartBeat(World & world, Uint8 state){
 	data.Put(gameid);
 	data.Put(world.boundport);
 	data.Put(state);
+	// Parked-peer accountids — lobby derives a per-recipient can-rejoin bit
+	// for the game-list payload so clients can offer "Join" on INGAME rows
+	// they previously disconnected from.
+	std::vector<Uint32> parked;
+	for(int i = 1; i < world.maxpeers; i++){
+		Peer * p = world.peerlist[i];
+		if(p && p->disconnected && p->accountid != 0 && !p->isbot){
+			parked.push_back(p->accountid);
+		}
+	}
+	Uint8 parkedcount = (Uint8)parked.size();
+	data.Put(parkedcount);
+	for(size_t i = 0; i < parked.size(); i++){
+		Uint32 acct = parked[i];
+		data.Put(acct);
+	}
 	sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(lobbyport);

@@ -7,6 +7,9 @@
 #ifdef __linux
 #define POSIX
 #endif
+#ifdef __EMSCRIPTEN__
+#define POSIX
+#endif
 
 #define SDL_MAIN_HANDLED
 #include <SDL3/SDL.h>

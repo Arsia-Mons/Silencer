@@ -67,6 +67,7 @@ public:
 		std::string gamename, mapname, password;
 		unsigned char maphash[20];
 		Uint8 securitylevel, minlevel, maxlevel, maxplayers, maxteams;
+		bool spectatable;
 	} pendingCreate;
 
 private:

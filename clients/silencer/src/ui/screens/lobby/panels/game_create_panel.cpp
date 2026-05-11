@@ -35,8 +35,9 @@ namespace
 // Prefixed to dodge anonymous-namespace collisions when SILENCER_UNITY_BUILD
 // merges this TU with sibling lobby panel .cpp files.
 enum GameCreateButton : Uint8 {
-	GCRT_BTN_SECURITY = 40,
-	GCRT_BTN_CREATE   = 35,
+	GCRT_BTN_SECURITY    = 40,
+	GCRT_BTN_CREATE      = 35,
+	GCRT_BTN_SPECTATABLE = 45,
 };
 enum GameCreateInput : Uint8 {
 	GCRT_INPUT_NAME      = 5,
@@ -68,46 +69,92 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	rightborder->res_bank = 7;
 	rightborder->res_index = 8;
 
+	// Form layout: row spacing matches the map list's 14px lineheight so
+	// labels/values sit on the same vertical rhythm as the right pane.
+	// Outer chrome: the form's bright stroke is inset 4px from the lobby
+	// background's darker decorative strokes, matching the chat panel's
+	// bright(x=15)/dark(x=10) 5px-edge spacing. Dark strokes around this
+	// form sit at x=238 (left) and y=184 (bottom). The right edge already
+	// sits 4px from the map-list chrome's bright stroke at x=403; the top
+	// has no dark stroke nearby.
+	const int yoffset      = 2;
+	const int yspace       = 14;
+	const int rowheight    = 14;
+	// 4px inset from form chrome matches the chat panel's textbox.x=19 vs
+	// chatinterface.x=15. Value column sits 4px past the longest label
+	// ("Spectatable:" = 12 × 6 = 72px).
+	const int labelx       = 247;
+	const int valuex       = 323;
+	const int form_left    = 243;
+	const int form_top     = 87;
+	const int form_width   = 156;
+	const int form_height  = 93;
+
 	Overlay * optionstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	optionstext->text = "Game Options";
 	optionstext->textbank = 134;
 	optionstext->textwidth = 8;
-	optionstext->x = 272;
+	// Left-aligned to match "Select Map" — sits 2px right of the form
+	// chrome's left bright stroke; y matches Select Map's title row.
+	optionstext->x = form_left + 2;
 	optionstext->y = 70;
 
-	int yoffset = 6;
-	int yspace = 18;
+	// Bright-green 1px outline around the form viewport, matching the chrome
+	// around the map list. Palette index 220 = the chrome's stroke color
+	// (sampled directly from sprite (7,8) pixels). The right stroke at
+	// x=form_left+form_width-1 (=398) aligns with the darker decorative
+	// stroke at x=398 baked into the lobby background.
+	Overlay * formborder = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	formborder->x = form_left;
+	formborder->y = form_top;
+	formborder->customspritew = form_width;
+	formborder->customspriteh = form_height;
+	formborder->customsprite.assign(formborder->customspritew * formborder->customspriteh, 0);
+	{
+		const Uint8 strokeColor = 220;
+		int bw = formborder->customspritew;
+		int bh = formborder->customspriteh;
+		for(int px = 0; px < bw; px++){
+			formborder->customsprite[px] = strokeColor;
+			formborder->customsprite[(bh - 1) * bw + px] = strokeColor;
+		}
+		for(int py = 0; py < bh; py++){
+			formborder->customsprite[py * bw] = strokeColor;
+			formborder->customsprite[py * bw + (bw - 1)] = strokeColor;
+		}
+	}
 
 	Overlay * securitytext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	securitytext->text = "Security:";
-	securitytext->textbank = 134;
-	securitytext->textwidth = 8;
-	securitytext->x = 245;
-	securitytext->y = 87 + (yspace * 0) + yoffset;
+	securitytext->textbank = 133;
+	securitytext->textwidth = 6;
+	securitytext->x = labelx;
+	securitytext->y = form_top + (yspace * 0) + yoffset;
 	Button * buttonsecurity = (Button *)world.CreateObject(ObjectTypes::BUTTON);
 	buttonsecurity->SetType(Button::BNONE);
-	buttonsecurity->x = 323;
-	buttonsecurity->y = 87 + (yspace * 0) + yoffset;
+	buttonsecurity->x = valuex;
+	buttonsecurity->y = form_top + (yspace * 0) + yoffset;
 	buttonsecurity->uid = GCRT_BTN_SECURITY;
-	buttonsecurity->width = 70;
-	buttonsecurity->height = 20;
-	buttonsecurity->textbank = 134;
-	buttonsecurity->textwidth = 9;
+	buttonsecurity->width = 40;
+	buttonsecurity->height = rowheight;
+	buttonsecurity->textbank = 133;
+	buttonsecurity->textwidth = 6;
+	buttonsecurity->textleftalign = true;
 	strcpy(buttonsecurity->text, "Medium");
 
 	Overlay * minleveltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	minleveltext->text = "Min Level:";
-	minleveltext->textbank = 134;
-	minleveltext->textwidth = 8;
-	minleveltext->x = 245;
-	minleveltext->y = 87 + (yspace * 1) + yoffset;
+	minleveltext->textbank = 133;
+	minleveltext->textwidth = 6;
+	minleveltext->x = labelx;
+	minleveltext->y = form_top + (yspace * 1) + yoffset;
 	TextInput * minlevelinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	minlevelinput->x = 350;
-	minlevelinput->y = 87 + (yspace * 1) + yoffset;
+	minlevelinput->x = valuex;
+	minlevelinput->y = form_top + (yspace * 1) + yoffset;
 	minlevelinput->width = 20;
-	minlevelinput->height = 20;
-	minlevelinput->res_bank = 134;
-	minlevelinput->fontwidth = 8;
+	minlevelinput->height = rowheight;
+	minlevelinput->res_bank = 133;
+	minlevelinput->fontwidth = 6;
 	minlevelinput->maxchars = 2;
 	minlevelinput->maxwidth = 50;
 	minlevelinput->uid = GCRT_INPUT_MINLEVEL;
@@ -116,17 +163,17 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 
 	Overlay * maxleveltext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	maxleveltext->text = "Max Level:";
-	maxleveltext->textbank = 134;
-	maxleveltext->textwidth = 8;
-	maxleveltext->x = 245;
-	maxleveltext->y = 87 + (yspace * 2) + yoffset;
+	maxleveltext->textbank = 133;
+	maxleveltext->textwidth = 6;
+	maxleveltext->x = labelx;
+	maxleveltext->y = form_top + (yspace * 2) + yoffset;
 	TextInput * maxlevelinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	maxlevelinput->x = 350;
-	maxlevelinput->y = 87 + (yspace * 2) + yoffset;
+	maxlevelinput->x = valuex;
+	maxlevelinput->y = form_top + (yspace * 2) + yoffset;
 	maxlevelinput->width = 20;
-	maxlevelinput->height = 20;
-	maxlevelinput->res_bank = 134;
-	maxlevelinput->fontwidth = 8;
+	maxlevelinput->height = rowheight;
+	maxlevelinput->res_bank = 133;
+	maxlevelinput->fontwidth = 6;
 	maxlevelinput->maxchars = 2;
 	maxlevelinput->maxwidth = 50;
 	maxlevelinput->uid = GCRT_INPUT_MAXLEVEL;
@@ -135,17 +182,17 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 
 	Overlay * maxplayerstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	maxplayerstext->text = "Max Players:";
-	maxplayerstext->textbank = 134;
-	maxplayerstext->textwidth = 8;
-	maxplayerstext->x = 245;
-	maxplayerstext->y = 87 + (yspace * 3) + yoffset;
+	maxplayerstext->textbank = 133;
+	maxplayerstext->textwidth = 6;
+	maxplayerstext->x = labelx;
+	maxplayerstext->y = form_top + (yspace * 3) + yoffset;
 	TextInput * maxplayersinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	maxplayersinput->x = 350;
-	maxplayersinput->y = 87 + (yspace * 3) + yoffset;
+	maxplayersinput->x = valuex;
+	maxplayersinput->y = form_top + (yspace * 3) + yoffset;
 	maxplayersinput->width = 20;
-	maxplayersinput->height = 20;
-	maxplayersinput->res_bank = 134;
-	maxplayersinput->fontwidth = 8;
+	maxplayersinput->height = rowheight;
+	maxplayersinput->res_bank = 133;
+	maxplayersinput->fontwidth = 6;
 	maxplayersinput->maxchars = 2;
 	maxplayersinput->maxwidth = 50;
 	maxplayersinput->uid = GCRT_INPUT_PLAYERS;
@@ -154,22 +201,40 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 
 	Overlay * maxteamstext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	maxteamstext->text = "Max Teams:";
-	maxteamstext->textbank = 134;
-	maxteamstext->textwidth = 8;
-	maxteamstext->x = 245;
-	maxteamstext->y = 87 + (yspace * 4) + yoffset;
+	maxteamstext->textbank = 133;
+	maxteamstext->textwidth = 6;
+	maxteamstext->x = labelx;
+	maxteamstext->y = form_top + (yspace * 4) + yoffset;
 	TextInput * maxteamsinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-	maxteamsinput->x = 350;
-	maxteamsinput->y = 87 + (yspace * 4) + yoffset;
+	maxteamsinput->x = valuex;
+	maxteamsinput->y = form_top + (yspace * 4) + yoffset;
 	maxteamsinput->width = 20;
-	maxteamsinput->height = 20;
-	maxteamsinput->res_bank = 134;
-	maxteamsinput->fontwidth = 8;
+	maxteamsinput->height = rowheight;
+	maxteamsinput->res_bank = 133;
+	maxteamsinput->fontwidth = 6;
 	maxteamsinput->maxchars = 2;
 	maxteamsinput->maxwidth = 50;
 	maxteamsinput->uid = GCRT_INPUT_TEAMS;
 	maxteamsinput->numbersonly = true;
 	maxteamsinput->SetText("6");
+
+	Overlay * spectatabletext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
+	spectatabletext->text = "Spectatable:";
+	spectatabletext->textbank = 133;
+	spectatabletext->textwidth = 6;
+	spectatabletext->x = labelx;
+	spectatabletext->y = form_top + (yspace * 5) + yoffset;
+	Button * spectatablebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
+	spectatablebutton->SetType(Button::BNONE);
+	spectatablebutton->x = valuex;
+	spectatablebutton->y = form_top + (yspace * 5) + yoffset;
+	spectatablebutton->uid = GCRT_BTN_SPECTATABLE;
+	spectatablebutton->width = 20;
+	spectatablebutton->height = rowheight;
+	spectatablebutton->textbank = 133;
+	spectatablebutton->textwidth = 6;
+	spectatablebutton->textleftalign = true;
+	strcpy(spectatablebutton->text, Config::GetInstance().lastspectatable ? "Yes" : "No");
 
 	Overlay * selectmaptext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	selectmaptext->text = "Select Map";
@@ -221,9 +286,42 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	ScrollBar * mapscrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
 	mapscrollbar->res_index = 9;
 	mapscrollbar->scrollpixels = mapselect->lineheight;
-	mapscrollbar->scrollposition = mapselect->scrolled;
-	mapscrollbar->scrollmax = mapselect->items.size();
 	mapscrollbar->scrollposition = 0;
+	{
+		int visible = (int)std::ceil(float(mapselect->height) / mapselect->lineheight);
+		int overflow = (int)mapselect->items.size() - visible;
+		mapscrollbar->scrollmax = overflow > 0 ? overflow : 0;
+	}
+	// Restrict map-list wheel events to the right pane so they don't fire
+	// when the user is wheeling over the form on the left.
+	mapscrollbar->scrollregionx = mapselect->x;
+	mapscrollbar->scrollregiony = mapselect->y;
+	mapscrollbar->scrollregionw = mapselect->width;
+	mapscrollbar->scrollregionh = mapselect->height;
+
+	// Form-row scrollbar. Anchored so its right edge (x=398) coincides with
+	// the form border's right stroke, which itself sits on top of the lobby
+	// background's darker decorative stroke at x=398. The track sprite is
+	// 16px wide, so its top-left lands at x=383. The variable-height path
+	// stretches the bank-7 track sprite to span the full form viewport.
+	ScrollBar * formscrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
+	formscrollbar->res_index = 9;
+	formscrollbar->scrollpixels = yspace;
+	formscrollbar->scrollposition = 0;
+	formscrollbar->height = form_height;
+	// Sprite offsets are baked for a different layout — undo them here so
+	// the on-screen top-left lands at (383, form_top).
+	formscrollbar->x = 383 + world.resources.spriteoffsetx[7][9];
+	formscrollbar->y = form_top + world.resources.spriteoffsety[7][9];
+	// Region matches the form border so the wheel routes here whenever
+	// the cursor is anywhere over Game Options (not the map list).
+	formscrollbar->scrollregionx = form_left;
+	formscrollbar->scrollregiony = form_top;
+	formscrollbar->scrollregionw = form_width;
+	formscrollbar->scrollregionh = form_height;
+	// All 6 rows fit at the tighter spacing — no overflow.
+	formscrollbar->scrollmax = 0;
+	formscrollbar->draw = false;
 
 	Overlay * nametext = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
 	nametext->text = "Game name:";
@@ -269,6 +367,7 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	strcpy(gamecreatebutton->text, "Create");
 
 	gamecreateinterface->AddObject(rightborder->id);
+	gamecreateinterface->AddObject(formborder->id);
 	gamecreateinterface->AddObject(optionstext->id);
 	gamecreateinterface->AddObject(securitytext->id);
 	gamecreateinterface->AddObject(buttonsecurity->id);
@@ -280,9 +379,12 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	gamecreateinterface->AddObject(maxplayersinput->id);
 	gamecreateinterface->AddObject(maxteamstext->id);
 	gamecreateinterface->AddObject(maxteamsinput->id);
+	gamecreateinterface->AddObject(spectatabletext->id);
+	gamecreateinterface->AddObject(spectatablebutton->id);
 	gamecreateinterface->AddObject(selectmaptext->id);
 	gamecreateinterface->AddObject(mapselect->id);
 	gamecreateinterface->AddObject(mapscrollbar->id);
+	gamecreateinterface->AddObject(formscrollbar->id);
 	gamecreateinterface->AddObject(nametext->id);
 	gamecreateinterface->AddObject(nametextinput->id);
 	gamecreateinterface->AddObject(passwordtext->id);
@@ -299,6 +401,30 @@ void GameCreatePanel::Build(ScreenContext & ctx, Interface * parent)
 	gamecreateinterface->buttonenter = gamecreatebutton->id;
 	gamecreateinterface->activeobject = nametextinput->id;
 
+	// Form scroll registry: each row's two child objects (label + value
+	// widget) are translated and shown/hidden together based on the form
+	// scrollbar's position.
+	gamecreateinterface->formscrollbar = formscrollbar->id;
+	gamecreateinterface->scrollviewporttop = form_top + yoffset;
+	gamecreateinterface->scrollviewportrows = 6;
+	gamecreateinterface->scrollrowheight = yspace;
+	for(int i = 0; i < 6; i++){
+		Sint16 rowy = form_top + (yspace * i) + yoffset;
+		Uint16 lblid = 0;
+		Uint16 valid = 0;
+		switch(i){
+			case 0: lblid = securitytext->id;    valid = buttonsecurity->id;    break;
+			case 1: lblid = minleveltext->id;    valid = minlevelinput->id;     break;
+			case 2: lblid = maxleveltext->id;    valid = maxlevelinput->id;     break;
+			case 3: lblid = maxplayerstext->id;  valid = maxplayersinput->id;   break;
+			case 4: lblid = maxteamstext->id;    valid = maxteamsinput->id;     break;
+			case 5: lblid = spectatabletext->id; valid = spectatablebutton->id; break;
+		}
+		gamecreateinterface->AddFormScrollRow(lblid, rowy);
+		gamecreateinterface->AddFormScrollRow(valid, rowy);
+	}
+	gamecreateinterface->ApplyFormScroll(world);
+
 	interfaceId = gamecreateinterface->id;
 	if(parent){
 		parent->AddObject(interfaceId);
@@ -311,6 +437,10 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 	MapDownloader & mapDownloader = ctx.mapDownloader;
 	Interface * iface = (Interface *)world.GetObjectFromId(interfaceId);
 	if(!iface) return;
+
+	// Mirror the SelectBox/ScrollBar per-frame sync pattern below: read the
+	// form scrollbar's position and translate registered rows accordingly.
+	iface->ApplyFormScroll(world);
 
 	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
 		Object * object = world.GetObjectFromId(*it);
@@ -328,6 +458,11 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						scrollbar->scrollmax = selectbox->items.size() - std::ceil(float(selectbox->height) / selectbox->lineheight);
 					}else{
 						scrollbar->draw = false;
+						scrollbar->scrollmax = 0;
+						if(scrollbar->scrollposition > 0){
+							scrollbar->scrollposition = 0;
+							selectbox->scrolled = 0;
+						}
 					}
 				}
 
@@ -455,6 +590,13 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 							strcpy(button->text, "Off");
 						}
 					}break;
+					case GCRT_BTN_SPECTATABLE:{
+						button->clicked = false;
+						bool nowOn = strcmp(button->text, "No") == 0;
+						strcpy(button->text, nowOn ? "Yes" : "No");
+						Config::GetInstance().lastspectatable = nowOn;
+						Config::GetInstance().Save();
+					}break;
 					case GCRT_BTN_CREATE:{
 						button->clicked = false;
 						if(ctx.game.creategameclicked) break;
@@ -496,6 +638,12 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						tobject = iface->GetObjectWithUid(world, GCRT_INPUT_TEAMS);
 						if(tobject) maxteams = atoi(static_cast<TextInput *>(tobject)->text);
 						if(maxteams <= 0) maxteams = 1;
+						bool spectatable = true;
+						tobject = iface->GetObjectWithUid(world, GCRT_BTN_SPECTATABLE);
+						if(tobject){
+							Button * sbutton = static_cast<Button *>(tobject);
+							spectatable = strcmp(sbutton->text, "No") != 0;
+						}
 
 						if(strlen(gamename) == 0){
 							ctx.ShowMessage("No game name");
@@ -527,6 +675,7 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						mapDownloader.pendingCreate.maxlevel      = maxlevel;
 						mapDownloader.pendingCreate.maxplayers    = maxplayers;
 						mapDownloader.pendingCreate.maxteams      = maxteams;
+						mapDownloader.pendingCreate.spectatable   = spectatable;
 						if(mapDownloader.mapUploadThread.joinable()) mapDownloader.mapUploadThread.detach();
 						uint32_t gen = ++mapDownloader.mapUploadGeneration;
 						std::string mppath = mapDownloader.FindMap(mapname);
@@ -546,6 +695,7 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 								uploadStatePtr->store(ok ? 2 : 3, std::memory_order_release);
 							});
 						}
+						world.lobby.creategamestatus = 0;
 						ctx.game.creategameclicked = true;
 						strcpy(Config::GetInstance().defaultgamename, gamename);
 						Config::GetInstance().Save();
