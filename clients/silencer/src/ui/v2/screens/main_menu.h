@@ -1,7 +1,13 @@
 #ifndef SILENCER_UI_V2_SCREENS_MAIN_MENU_H
 #define SILENCER_UI_V2_SCREENS_MAIN_MENU_H
 
+#include "runtime.h"
+#include "ui_state.h"
+
 #include <functional>
+
+class World;
+class ScreenContext;
 
 namespace ui {
 namespace v2 {
@@ -26,6 +32,25 @@ struct MainMenuHandlers {
 // main_menu_screen.cpp) so the rendered output is byte-identical at
 // scale=1; the preview harness verifies this with PPM diff.
 Node BuildMainMenu(const Context & ctx, const MainMenuHandlers & handlers = {});
+
+// Engine-side runtime: owns the UIState slot for the main-menu surface,
+// builds the tree each frame via BuildMainMenu, and routes mouse-down
+// clicks through DispatchClick. Constructed by Game::SetRuntime when
+// the engine enters GameState::MAINMENU; destroyed on exit.
+class MainMenuRuntime : public Runtime
+{
+public:
+	MainMenuRuntime(World & world, ScreenContext & sctx);
+
+	void Render(Surface & target, ::Renderer & renderer,
+	            int mouse_x, int mouse_y, float dt) override;
+	bool DispatchMouseDown(int mouse_x, int mouse_y) override;
+
+private:
+	World &         world_;
+	ScreenContext & sctx_;
+	UIState         state_;
+};
 
 }  // namespace v2
 }  // namespace ui

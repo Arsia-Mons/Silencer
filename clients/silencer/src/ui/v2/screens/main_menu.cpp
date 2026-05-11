@@ -1,7 +1,17 @@
 #include "main_menu.h"
 
 #include "context.h"
+#include "dispatch.h"
+#include "layout.h"
 #include "node.h"
+#include "render.h"
+
+#include "game.h"
+#include "game_state.h"
+#include "screen_context.h"
+#include "world.h"
+#include "renderer.h"
+#include "surface.h"
 
 #include <string>
 
@@ -37,6 +47,70 @@ Node BuildMainMenu(const Context & ctx, const MainMenuHandlers & handlers)
 		Button("Options").at(40, 0).onClick(handlers.on_options),
 		Button("Exit").at(0, 67).onClick(handlers.on_exit),
 	});
+}
+
+// -----------------------------------------------------------------------------
+// MainMenuRuntime — engine wire-in for GameState::MAINMENU.
+// -----------------------------------------------------------------------------
+
+namespace {
+
+MainMenuHandlers BuildMainMenuHandlers(ScreenContext & sctx){
+	MainMenuHandlers h;
+	// Bound to real state transitions matching the legacy MainMenuScreen::Tick
+	// switch (BTN_TUTORIAL→SINGLEPLAYERGAME, BTN_LOBBY→LOBBYCONNECT,
+	// BTN_OPTIONS→OPTIONS, BTN_EXIT→quit).
+	h.on_tutorial = [&sctx](){ sctx.GoToState(GameState::SINGLEPLAYERGAME); };
+	h.on_lobby    = [&sctx](){ sctx.GoToState(GameState::LOBBYCONNECT); };
+	h.on_options  = [&sctx](){ sctx.GoToState(GameState::OPTIONS); };
+	h.on_exit     = [&sctx](){ sctx.RequestQuit(); };
+	return h;
+}
+
+}  // namespace
+
+MainMenuRuntime::MainMenuRuntime(World & world, ScreenContext & sctx)
+	: world_(world), sctx_(sctx) {}
+
+void MainMenuRuntime::Render(Surface & target, ::Renderer & renderer,
+                              int mouse_x, int mouse_y, float dt){
+	Context ctx{
+		world_.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world_.GetVersion(),
+	};
+	ctx.mouse_x = mouse_x;
+	ctx.mouse_y = mouse_y;
+	ctx.state   = &state_;
+	ctx.dt      = dt;
+
+	MainMenuHandlers handlers = BuildMainMenuHandlers(sctx_);
+	target.Clear(0);
+	state_.BeginFrame();
+	Node tree = BuildMainMenu(ctx, handlers);
+	Layout(tree, ctx);
+	::ui::v2::Render(tree, ctx, target, renderer);
+	state_.EndFrame();
+}
+
+bool MainMenuRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
+	Context ctx{
+		world_.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world_.GetVersion(),
+	};
+	ctx.mouse_x = mouse_x;
+	ctx.mouse_y = mouse_y;
+	ctx.state   = &state_;
+	MainMenuHandlers handlers = BuildMainMenuHandlers(sctx_);
+	Node tree = BuildMainMenu(ctx, handlers);
+	Layout(tree, ctx);
+	DispatchClick(tree, ctx);
+	return true;
 }
 
 }  // namespace v2

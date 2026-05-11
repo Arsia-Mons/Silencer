@@ -42,6 +42,7 @@
 #include "lobby_shell.h"
 #include "modals/message.h"
 #include "modals/password.h"
+#include "runtime.h"
 #include "lobbygame.h"
 #include "serializer.h"
 #include "audio.h"
@@ -640,10 +641,13 @@ bool Game::Loop(void){
 	if(!world.dedicatedserver.active){
 		screenbuffer.Clear(0);
 		world.DoNetwork();
-		if(state == MAINMENU){
-			// v2 MainMenu owns the frame: declarative tree → Layout → Render.
+		if(active_runtime){
+			// Runtime owns the frame: declarative tree → Layout → Render.
 			// Bypasses renderer.Draw entirely (no world objects to walk).
-			RenderMainMenuV2();
+			Uint64 now = SDL_GetTicks();
+			float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
+			ui_v2_last_ticks = now;
+			active_runtime->Render(screenbuffer, renderer, ui_v2_mouse_x, ui_v2_mouse_y, dt);
 		}else if(state == OPTIONS){
 			RenderOptionsV2();
 		}else if(state == OPTIONSDISPLAY){
@@ -833,25 +837,22 @@ bool Game::Tick(void){
 				UnloadGame();
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				// v2 MainMenu owns its own rendering + click dispatch
-				// (RenderMainMenuV2 / DispatchMainMenuV2Click); there's
-				// no Screen on the stack, no Interface object, and no
-				// currentinterface routing. Palette + camera setup mirrors
-				// what MainMenuScreen::Build used to do.
+				// v2 MainMenuRuntime owns the surface: render, click
+				// dispatch, and per-button hot_t animation. Palette +
+				// camera setup mirrors what MainMenuScreen::Build used
+				// to do.
 				renderer.palette.SetPalette(1);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
 				renderer.camera.SetPosition(320, 240);
 				currentinterface = 0;
-				ui_v2_state = ui::v2::UIState{};
-				ui_v2_last_ticks = 0;
+				SetRuntime(MAINMENU);
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
-				// Click handling runs in DispatchMainMenuV2Click, fired from
-				// events.cpp on the SDL mouse-down edge while state==MAINMENU.
+				if(active_runtime) active_runtime->Tick();
 			}
 		}break;
 		case LOBBYCONNECT:{
@@ -1276,47 +1277,16 @@ Screen * Game::GetTopScreen() const {
 	return screenStack.empty() ? nullptr : screenStack.back().get();
 }
 
-static ui::v2::MainMenuHandlers BuildMainMenuHandlers(Game * self, ScreenContext & sctx){
-	ui::v2::MainMenuHandlers h;
-	(void)self;
-	// Bound to real state transitions matching the legacy MainMenuScreen::Tick
-	// switch (BTN_TUTORIAL→SINGLEPLAYERGAME, BTN_LOBBY→LOBBYCONNECT,
-	// BTN_OPTIONS→OPTIONS, BTN_EXIT→quit). Reaches GoToState/quit via the
-	// ScreenContext we already own — keeps the surface identical to legacy.
-	h.on_tutorial = [&sctx](){ sctx.GoToState(GameState::SINGLEPLAYERGAME); };
-	h.on_lobby    = [&sctx](){ sctx.GoToState(GameState::LOBBYCONNECT); };
-	h.on_options  = [&sctx](){ sctx.GoToState(GameState::OPTIONS); };
-	h.on_exit     = [&sctx](){ sctx.RequestQuit(); };
-	return h;
-}
-
-bool Game::RenderMainMenuV2(){
-	// Measure dt from wallclock so the hot_t exponential approach behaves
-	// the same on faster/slower machines. Matches preview.cpp's loop.
-	Uint64 now = SDL_GetTicks();
-	float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
-	ui_v2_last_ticks = now;
-
-	ui::v2::Context ctx{
-		world.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
-		/*version=*/world.GetVersion(),
-	};
-	ctx.mouse_x = ui_v2_mouse_x;
-	ctx.mouse_y = ui_v2_mouse_y;
-	ctx.state   = &ui_v2_state;
-	ctx.dt      = dt;
-
-	ui::v2::MainMenuHandlers handlers = BuildMainMenuHandlers(this, screenContext);
-	screenbuffer.Clear(0);
-	ui_v2_state.BeginFrame();
-	ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
-	ui::v2::Layout(tree, ctx);
-	ui::v2::Render(tree, ctx, screenbuffer, renderer);
-	ui_v2_state.EndFrame();
-	return true;
+void Game::SetRuntime(Uint8 new_state){
+	switch(new_state){
+		case MAINMENU:
+			active_runtime = std::make_unique<ui::v2::MainMenuRuntime>(world, screenContext);
+			break;
+		default:
+			active_runtime.reset();
+			break;
+	}
+	ui_v2_last_ticks = 0;
 }
 
 static ui::v2::OptionsHandlers BuildOptionsHandlers(ScreenContext & sctx){
@@ -3461,23 +3431,6 @@ void Game::TickOptionsControlsV2(){
 		controls_rebind_active_slot = -1;
 		controls_rebind_pending_scancode = -1;
 	}
-}
-
-void Game::DispatchMainMenuV2Click(int logical_x, int logical_y){
-	ui::v2::Context ctx{
-		world.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
-		/*version=*/world.GetVersion(),
-	};
-	ctx.mouse_x = logical_x;
-	ctx.mouse_y = logical_y;
-	ctx.state   = &ui_v2_state;
-	ui::v2::MainMenuHandlers handlers = BuildMainMenuHandlers(this, screenContext);
-	ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
-	ui::v2::Layout(tree, ctx);
-	ui::v2::DispatchClick(tree, ctx);
 }
 
 void Game::ShowV2Message(const std::string & text, std::function<void()> on_close){

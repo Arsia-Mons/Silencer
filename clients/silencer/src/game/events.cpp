@@ -1,4 +1,5 @@
 #include "game.h"
+#include "runtime.h"
 #include "audio.h"
 #include "config.h"
 #include "interface.h"
@@ -383,10 +384,8 @@ bool Game::HandleSDLEvents(void){
 						DispatchV2ModalClick(lx, ly);
 						break;
 					}
-					if(state == GameState::MAINMENU){
-						// v2 MainMenu owns its own dispatch; no Interface to
-						// route through (currentinterface is 0 in MAINMENU now).
-						DispatchMainMenuV2Click(lx, ly);
+					if(active_runtime && active_runtime->DispatchMouseDown(lx, ly)){
+						// Runtime consumed the click.
 					}else if(state == GameState::OPTIONS){
 						DispatchOptionsV2Click(lx, ly);
 					}else if(state == GameState::OPTIONSDISPLAY){

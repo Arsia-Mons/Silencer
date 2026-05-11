@@ -25,7 +25,7 @@
 
 class Screen;
 class Modal;
-namespace ui { namespace v2 { struct Node; struct LobbyState; } }
+namespace ui { namespace v2 { struct Node; struct LobbyState; class Runtime; } }
 
 // Live-engine v2 modal entry. Overlays the underlying state's v2 (or legacy)
 // render. The stack is rendered + dispatched independently of any per-state
@@ -332,15 +332,14 @@ private:
 	int ui_v2_mouse_x = -1;
 	int ui_v2_mouse_y = -1;
 	Uint64 ui_v2_last_ticks = 0;
-	// Render the v2 MainMenu tree into screenbuffer. Called from the
-	// rendering branch in Loop() when state == MAINMENU. Returns true if
-	// it handled the frame (and the caller should skip renderer.Draw).
-	bool RenderMainMenuV2();
-	// Dispatch a mouse-down event to the v2 MainMenu tree. Called from
-	// events.cpp on SDL_EVENT_MOUSE_BUTTON_DOWN when state == MAINMENU.
-	void DispatchMainMenuV2Click(int logical_x, int logical_y);
-	// Same shape for OPTIONS state. Rendered + dispatched from the
-	// same Loop/events.cpp call sites as MainMenu.
+	// Per-engine-state Runtime — owns its Node tree, UIState, and
+	// state struct. Swapped on state transition in SetRuntime(). Null
+	// when the current state still uses the legacy per-state path on
+	// Game (states being migrated one at a time).
+	std::unique_ptr<ui::v2::Runtime> active_runtime;
+	void SetRuntime(Uint8 new_state);
+	// Rendered + dispatched from the same Loop/events.cpp call sites
+	// as MainMenu.
 	bool RenderOptionsV2();
 	void DispatchOptionsV2Click(int logical_x, int logical_y);
 	// Same shape for OPTIONSDISPLAY state. Live state (Config.fullscreen,
