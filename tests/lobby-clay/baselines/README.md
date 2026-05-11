@@ -7,17 +7,17 @@ re-baseline once the Clay path is being measured.
 
 ## Current state (P2)
 
-Five of seven baselines are captured:
+All seven baselines captured:
 
-| Baseline             | Status   | Source state                                             |
-|----------------------|----------|----------------------------------------------------------|
-| `title_chrome.png`   | captured | default lobby frame right after LOBBY-state entry        |
-| `character.png`      | captured | same frame as `title_chrome.png` (always-on left col)    |
-| `chat.png`           | captured | same frame as `title_chrome.png` (always-on left col)    |
-| `gameselect.png`     | captured | same frame as `title_chrome.png` (default right pane)    |
-| `gamecreate.png`     | captured | after clicking "Create Game" on the GameSelect panel     |
-| `gamejoin.png`       | DEFERRED | requires a successful CreateGame round-trip              |
-| `gametech.png`       | DEFERRED | requires GameJoin reachable + click "Choose Tech"        |
+| Baseline             | Source state                                                     |
+|----------------------|------------------------------------------------------------------|
+| `title_chrome.png`   | default lobby frame right after LOBBY-state entry                |
+| `character.png`      | same frame as `title_chrome.png` (always-on left col)            |
+| `chat.png`           | same frame as `title_chrome.png` (always-on left col)            |
+| `gameselect.png`     | same frame as `title_chrome.png` (default right pane)            |
+| `gamecreate.png`     | after clicking "Create Game" on the GameSelect panel             |
+| `gamejoin.png`       | after a successful CreateGame round-trip (GameJoinPanel rendered)|
+| `gametech.png`       | after clicking "Choose Tech" on the GameJoinPanel                |
 
 `title_chrome`, `character`, `chat`, and `gameselect` all share the
 same source frame — the default lobby state. Each Clay panel
@@ -40,38 +40,6 @@ The script boots a local lobby on an ephemeral port + a headless
 silencer pointing at it, logs in as a synthetic user, and writes the
 PNGs into this directory.
 
-## Why two baselines are deferred
-
-`gamejoin.png` and `gametech.png` are reachable only after the lobby
-spawns a dedicated server (`silencer -s …`) and the client's
-deferred-CreateGame state machine receives an OK. Reaching that
-state through the CLI hit two blockers during P2:
-
-1. **CLI string coercion bug.** `cli set_text --label <id>` and
-   `cli select --label <id>` coerce a purely-numeric `<id>`
-   argument to a JSON number. The C++ control dispatch
-   (`clients/silencer/src/net/controldispatch.cpp`) does
-   `args["label"].get<std::string>()` and throws `type_error 302`,
-   which terminates the silencer process. This blocks the only
-   path to nested-interface widgets — `set_text/select --label
-   <global-id>` — because the gamecreate panel's name input + map
-   selectbox live in a child interface and aren't reachable through
-   `--uid` (which is iface-local).
-2. **Dedicated server asset path.** Even if the form is filled, the
-   dedicated server process spawned by `services/lobby/proc.go`
-   inherits the test environment, and its asset-resolution path
-   (`CDResDir` chdir into the bundle's `Contents/Resources`) has not
-   been verified to find the chosen map under those conditions. The
-   spawn-and-heartbeat round trip needs to be exercised end-to-end
-   before the client UI transitions to GameJoin.
-
-Fix the CLI coercion first (whitelist `label` in
-`STRING_FLAGS.set_text` and `STRING_FLAGS.select` in
-`clients/cli/index.ts`); then drive a real Create flow with the form
-pre-filled and confirm the dedicated server starts and heartbeats.
-After that, the two remaining captures slot into `capture.sh` after
-the gamecreate screenshot.
-
 ## Navigation paths captured
 
 ```
@@ -85,8 +53,19 @@ MainMenu
                     walk into child interfaces — see capture.sh)
                       →  GameCreatePanel
                           └─ screenshot (gamecreate)
-                          └─ [TODO] fill name + select map + click Create
-                                →  GameJoinPanel  (gamejoin)
+                          └─ select map (selectbox uid=4, addressed
+                             by global object id via FindWidgetByLabel
+                             numeric-string path) + click "Create"
+                                →  Uploading-map progress modal →
+                                   dedicated `silencer -s` spawn →
+                                   GameJoinPanel
+                                     └─ screenshot (gamejoin)
                                      └─ click "Choose Tech"
-                                          →  GameTechPanel (gametech)
+                                          →  GameTechPanel
+                                              └─ screenshot (gametech)
 ```
+
+The "Create" path depends on the CLI string-label fix in
+`clients/cli/index.ts` (`STRING_FLAGS_NO_SUBOP`) — without it, a
+purely-numeric `--label <global-id>` is coerced to a JSON number and
+the silencer's `args["label"].get<std::string>()` throws and aborts.

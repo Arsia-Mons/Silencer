@@ -20,7 +20,7 @@
       "id": "P2",
       "priority": 2,
       "name": "Capture lobby baseline screenshots from the legacy build",
-      "passes": false,
+      "passes": true,
       "spec": "Build the CURRENT (legacy) lobby. Boot headless via tests/cli-agent/e2e/lib.sh. Take baseline screenshots of: title_chrome.png (just the title bar visible — game state right after entering lobby, no game selected), character.png (zoomed/cropped or full-frame — pick one and stick with it), chat.png, gameselect.png, gamecreate.png, gamejoin.png (requires creating + joining a fake game; use the lobby fake-player CLI if available, otherwise script a minimal 1-player join), gametech.png. Commit them to tests/lobby-clay/baselines/. These are the immovable references for the rest of the run.",
       "pass_check": "All 7 PNGs exist under tests/lobby-clay/baselines/, are 640x480 (or whatever the headless framebuffer is), and are non-empty.",
       "screenshot_recipe": "See spec — each baseline has its own navigation path. Document the navigation in tests/lobby-clay/baselines/README.md so future iterations can reproduce."

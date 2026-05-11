@@ -166,22 +166,81 @@ click_by_label_recursive "Create Game"
 cli --port "$CTRL_PORT" wait_frames --n 10 >/dev/null
 cli --port "$CTRL_PORT" screenshot --out "$OUT_DIR/gamecreate.png" >/dev/null
 
-# NOTE: gamejoin.png / gametech.png are NOT captured here yet — they
-# require a successful CreateGame round-trip (dedicated server spawn
-# + UDP heartbeat). Two blockers identified during P2:
-#   (1) cli set_text/select --label coerces a purely-numeric string
-#       arg to a JSON number, and the C++ control dispatch's
-#       `args["label"].get<std::string>()` throws type_error 302
-#       (silencer crashes with libc++abi terminate). This must be
-#       fixed before any nested-iface widget can be addressed by
-#       global object id.
-#   (2) The dedicated server process spawned by services/lobby/proc.go
-#       needs to find its map assets when launched out of $TMP. Path
-#       resolution for the spawned child needs verification.
-# Until both are fixed, the two baselines remain uncaptured.
+# Drive the create-game flow → GameJoinPanel.
+#
+# The legacy GameCreatePanel validates:
+#   - non-empty game name (default "New Game" is pre-filled),
+#   - selectbox uid=4 (GCRT_SEL_MAP) has selecteditem >= 0.
+# On success it sends MSG_NEWGAME, the lobby spawns a dedicated
+# silencer -s process, and the client transitions to GameJoinPanel
+# (where the buttons "Ready" / "Change Team" / "Choose Tech" appear).
+#
+# Map selectbox has label=null, so we address it by global object id
+# via the FindWidgetByLabel numeric-string path. Requires the CLI
+# fix that keeps `--label <numeric>` as a string instead of a JSON
+# number (see clients/cli/index.ts STRING_FLAGS_NO_SUBOP).
+find_gamecreate_iface() {
+  local children
+  children=$(cli --port "$CTRL_PORT" inspect \
+    | jq -r '.widgets[] | select(.kind=="other" and .object_type==1) | .id')
+  for child in $children; do
+    local cnt
+    cnt=$(cli --port "$CTRL_PORT" inspect --interface-id "$child" \
+      | jq '.widgets | map(select(.kind=="button" and (.label|ascii_downcase=="create"))) | length')
+    if [ "$cnt" -gt 0 ]; then echo "$child"; return 0; fi
+  done
+  return 1
+}
+
+GAMECREATE_IFACE=$(find_gamecreate_iface)
+if [ -z "${GAMECREATE_IFACE:-}" ]; then
+  echo "could not locate gamecreate child interface" >&2; exit 1
+fi
+MAP_SELECTBOX_ID=$(cli --port "$CTRL_PORT" inspect --interface-id "$GAMECREATE_IFACE" \
+  | jq -r '.widgets[] | select(.kind=="selectbox" and .uid==4) | .id' | head -n1)
+CREATE_BTN_ID=$(cli --port "$CTRL_PORT" inspect --interface-id "$GAMECREATE_IFACE" \
+  | jq -r '.widgets[] | select(.kind=="button" and (.label|ascii_downcase=="create")) | .id' | head -n1)
+if [ -z "$MAP_SELECTBOX_ID" ] || [ -z "$CREATE_BTN_ID" ]; then
+  echo "missing map selectbox or Create button in gamecreate panel" >&2; exit 1
+fi
+
+cli --port "$CTRL_PORT" select --label "$MAP_SELECTBOX_ID" --index 0 >/dev/null
+cli --port "$CTRL_PORT" wait_frames --n 5 >/dev/null
+cli --port "$CTRL_PORT" click --id "$CREATE_BTN_ID" >/dev/null
+
+# Wait up to ~20s for the GameJoinPanel to render. The dedicated
+# server has to spawn, load assets, and heartbeat before the client
+# leaves the "Uploading map..." progress modal.
+wait_for_join_panel() {
+  for i in $(seq 1 200); do
+    local children hit
+    children=$(cli --port "$CTRL_PORT" inspect \
+      | jq -r '.widgets[] | select(.kind=="other" and .object_type==1) | .id')
+    for child in $children; do
+      hit=$(cli --port "$CTRL_PORT" inspect --interface-id "$child" \
+        | jq -r '.widgets[] | select(.kind=="button" and (.label|ascii_downcase=="choose tech")) | .id' \
+        | head -n1)
+      if [ -n "$hit" ]; then echo "$hit"; return 0; fi
+    done
+    sleep 0.1
+  done
+  return 1
+}
+
+CHOOSE_TECH_ID=$(wait_for_join_panel)
+if [ -z "${CHOOSE_TECH_ID:-}" ]; then
+  echo "GameJoinPanel never appeared (Choose Tech button not found)" >&2; exit 1
+fi
+cli --port "$CTRL_PORT" wait_frames --n 10 >/dev/null
+cli --port "$CTRL_PORT" screenshot --out "$OUT_DIR/gamejoin.png" >/dev/null
+
+# Click Choose Tech → GameTechPanel.
+cli --port "$CTRL_PORT" click --id "$CHOOSE_TECH_ID" >/dev/null
+cli --port "$CTRL_PORT" wait_frames --n 15 >/dev/null
+cli --port "$CTRL_PORT" screenshot --out "$OUT_DIR/gametech.png" >/dev/null
 
 echo "captured baselines:"
-for f in title_chrome character chat gameselect gamecreate; do
+for f in title_chrome character chat gameselect gamecreate gamejoin gametech; do
   if [ -s "$OUT_DIR/$f.png" ]; then
     size=$(stat -f '%z' "$OUT_DIR/$f.png" 2>/dev/null || stat -c '%s' "$OUT_DIR/$f.png")
     echo "  $f.png ($size bytes)"
@@ -190,4 +249,3 @@ for f in title_chrome character chat gameselect gamecreate; do
     exit 1
   fi
 done
-echo "DEFERRED: gamejoin.png, gametech.png — see comment above and README.md"

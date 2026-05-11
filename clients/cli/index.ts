@@ -115,6 +115,17 @@ const STRING_FLAGS: Record<string, Record<string, Set<string>>> = {
     tail: new Set(["as"]),
   },
 };
+// Per-op (no subop): flags whose values must stay strings. Used for
+// game-control ops that don't take a subop. `set_text --label 12345`
+// with a purely-numeric global object id would otherwise be encoded
+// as a JSON number, and the C++ handler's
+// `args["label"].get<std::string>()` would throw `type_error 302`
+// and abort the silencer process.
+const STRING_FLAGS_NO_SUBOP: Record<string, Set<string>> = {
+  click: new Set(["label"]),
+  set_text: new Set(["label"]),
+  select: new Set(["label"]),
+};
 // Bindings within VARIADIC_FLAGS that accept comma-separated chord syntax:
 // `--bindings KEY:Up,KEY:Left` becomes JSON `[["KEY:Up","KEY:Left"]]` (an
 // AND-chord) instead of `["KEY:Up","KEY:Left"]` (two OR'd singles).
@@ -145,7 +156,9 @@ function parseArgs(argv: string[]): {
       const key = a.slice(2).replace(/-/g, "_");
       const variadic = op && subop && VARIADIC_FLAGS[op]?.[subop]?.has(key);
       const chordSplit = op && subop && CHORD_SPLIT_FLAGS[op]?.[subop]?.has(key);
-      const stringOnly = op && subop && STRING_FLAGS[op]?.[subop]?.has(key);
+      const stringOnly =
+        (op && subop && STRING_FLAGS[op]?.[subop]?.has(key)) ||
+        (op && !subop && STRING_FLAGS_NO_SUBOP[op]?.has(key));
       if (variadic) {
         // Consume every following non-flag token as a list element. If the
         // flag accepts comma-chord syntax, a token like "KEY:Up,KEY:Left"

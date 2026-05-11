@@ -9,9 +9,12 @@
 - `stb_image.h` lives at `tools/pixdiff/stb_image.h` (v2.30, fetched from nothings/stb master). Do not copy it elsewhere — if another tool needs it, point its include path at `tools/pixdiff/`.
 - pixdiff metric is byte-level equality count over the RGBA buffer (mismatched pixels weighted equally regardless of distance). Same-size mismatched dims short-circuit to 100.0.
 - The lobby renders panels in CHILD interfaces nested under the screen's top-level iface. `cli inspect`/`click --label`/`set_text --uid` only see the CURRENT iface's direct objects; to address a nested widget you must (a) `inspect` the parent and find children with `kind="other"` + `object_type==1` (INTERFACE), (b) `inspect --interface-id N` on each, (c) `click --id N` (which routes through `FindWidgetByLabel`'s numeric path → global `world.GetObjectFromId`).
-- KNOWN BUG: `cli set_text --label <numeric>` and `cli select --label <numeric>` coerce the arg to a JSON number. The silencer's `args["label"].get<std::string>()` throws `type_error 302` and aborts the process. To address nested-iface textinputs/selectboxes by global id, the CLI needs `label` whitelisted in `STRING_FLAGS.set_text` + `STRING_FLAGS.select` (clients/cli/index.ts:97).
-- Default game name in `Config::defaultgamename` is empty on a fresh HOME; the Create button bails with "No game name". Form must be pre-filled before Create.
-- Two baselines (gamejoin.png, gametech.png) need a successful CreateGame round-trip; the dedicated-server spawn path via services/lobby/proc.go has not been verified end-to-end in the test environment yet.
+- `cli set_text --label <id>` / `cli select --label <id>` keep numeric label args as strings via `STRING_FLAGS_NO_SUBOP` (clients/cli/index.ts). Without that, Bun's parser turns "12345" into a JS number and silencer's `args["label"].get<std::string>()` throws `type_error 302` and aborts. Same pattern works for any future game-control op that takes a numeric label.
+- `Interface::FindWidgetByLabel` (interface.cpp:781) interprets purely-numeric label strings as direct Uint16 global object ids — short-circuits to `world.GetObjectFromId`. So `cli click/set_text/select --label <ID>` (with the CLI string fix) bypasses the per-iface object scan and reaches widgets in any iface.
+- The default game name from `nametextinput->SetText(Config::defaultgamename)` is `"New Game"` on a fresh HOME (set by the silencer's first idle Save). Subsequent runs preserve whatever was last typed. The Create button only bails when the textinput is literally empty.
+- Dedicated server spawn works end-to-end from a tmp HOME — `services/lobby/proc.go` execs the same `silencer` binary with `-s 127.0.0.1 <port> <gameid> <accountid>`. The child inherits the env and finds assets via the parent binary's `CDResDir` resolution (macOS bundle Resources). Lobby log shows `[proc] spawned dedicated server` followed by `[hub] game N ready` once the child UDP-heartbeats back.
+- gamecreate panel form: name input has uid=5 (GCRT_INPUT_NAME), password uid=6, security button uid=GCRT_BTN_SECURITY, map selectbox uid=4 (GCRT_SEL_MAP). Only the map needs explicit selection in capture — the rest have working defaults.
+- After clicking Create on the gamecreate panel, the client shows an "Uploading map..." progress modal before transitioning to GameJoin. Watch for the "Choose Tech" button in a child interface to detect GameJoin (took ~5–10 s wall-clock in the test env; 200 × 0.1 s polls in capture.sh is safe).
 
 ## 2026-05-11T00:00:00Z - bootstrap
 - Ralph artifacts created (ralph.sh, RALPH.md, prd.json, progress.txt).
@@ -89,4 +92,25 @@
   - The lobby uses NESTED interfaces (parent lobbyiface owns child panels as objects). `cli` ops with no `--interface-id` only see the parent. Use the recursive walker in `find_button_id` / `find_widget_in_children` (in `capture.sh`) as the template for any future lobby automation that targets panel-internal widgets.
   - `find_button_id`/`click_by_label_recursive` in `capture.sh` are reusable patterns — copy them when writing P11+ scaffold tests that need to click panel buttons.
   - The gamecreate.png byte size drifted ~600 bytes between runs (188751 → 188188). Probably some chat-text / timer redraw on the gameselect→gamecreate transition. Keep this in mind when sizing pixdiff thresholds; do NOT assume baselines are pixel-stable across capture runs.
+---
+
+
+## 2026-05-11T11:30:00Z - P2 (Capture lobby baseline screenshots) — COMPLETE
+- Fixed the CLI numeric-label coercion bug. Added `STRING_FLAGS_NO_SUBOP` map in clients/cli/index.ts so `set_text/select/click --label <numeric>` keeps the value as a string. Without this, the C++ control dispatch's `args["label"].get<std::string>()` aborts the silencer with `nlohmann::type_error 302`.
+- Verified the dedicated-server spawn path works end-to-end in the test env: lobby execs `silencer -s 127.0.0.1 <port> <gameid> <accountid>` and the child binds, loads assets via the same `CDResDir` path, and UDP-heartbeats back to the lobby. No code changes needed for assets — the child inherits the env from the parent CLI process.
+- Extended tests/lobby-clay/baselines/capture.sh to drive the create-game flow: locate the GameCreate child interface, address the map selectbox (uid=4) by its global object id via the CLI's numeric-label path, `select --index 0`, `click Create`, wait for the "Choose Tech" button to appear in any child interface (signals GameJoin reached), screenshot gamejoin, click "Choose Tech", screenshot gametech.
+- All 7 baselines now exist under tests/lobby-clay/baselines/ at 640x480: title_chrome, character, chat, gameselect, gamecreate, gamejoin, gametech.
+- Files changed:
+  - clients/cli/index.ts (STRING_FLAGS_NO_SUBOP + stringOnly fallback)
+  - tests/lobby-clay/baselines/capture.sh (extended with gamejoin/gametech captures)
+  - tests/lobby-clay/baselines/README.md (status table + nav paths)
+  - tests/lobby-clay/baselines/gamejoin.png (new)
+  - tests/lobby-clay/baselines/gametech.png (new)
+- Pass check: all 7 PNGs exist, non-empty, 640x480 ✓
+- **Learnings for future iterations:**
+  - The CLI string-label fix is the unblock for ALL future panel automation that needs to address nested-iface widgets by global id. The fix is the recommended "Adding a game-control command" path from clients/cli/CLAUDE.md, just for op-only (no subop) flags.
+  - Reusable pattern in capture.sh: `wait_for_join_panel` polls top-level child interfaces for a button-label match every 100 ms. Copy this when a future iteration needs to wait for any state transition that produces a new child iface.
+  - The "Uploading map..." modal is purely a client-side state machine; the lobby sees a fast MSG_NEWGAME the moment the map upload short-circuits for a bundled map (mapUploadState=2). No real upload happens for bundled maps.
+  - Map options come from the client's local `shared/assets/level/*.sil` scan, NOT from the lobby's `-maps-dir`. The lobby's maps dir is only for community-uploaded maps via the map-api HTTP server.
+  - When inspecting child interfaces for a SPECIFIC panel kind, the canonical pattern is to look for a discriminating button label (e.g., "Create" for gamecreate, "Choose Tech" for gamejoin). The same iface ID is stable as long as the panel isn't destroyed.
 ---
