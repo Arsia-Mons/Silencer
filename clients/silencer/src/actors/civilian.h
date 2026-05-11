@@ -27,6 +27,12 @@ private:
 	Uint8 state_i;
 	const BehaviorTree* bt_;
 	BTContext btctx_;
+
+	// Activity flags — synced from state each tick.
+	bool is_walking  = false;
+	bool is_running  = false;
+	bool is_dying    = false;
+	bool is_dead     = false;
 };
 
 #endif

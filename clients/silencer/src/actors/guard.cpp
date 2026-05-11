@@ -362,6 +362,32 @@ void Guard::InitBT(){
 	btctx_.actions["Stand"] = [this](BTContext&) -> BTResult {
 		return BTResult::Success;
 	};
+
+	// PlayAnimation(anim): drive res_bank/res_index from an ActorDef AnimSequence.
+	// Returns Running each tick the animation is playing, Success on completion.
+	// Looping animations always return Running.
+	btctx_.actions["PlayAnimation"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		std::string anim = ctx.bb<std::string>("anim_name", "");
+		if(anim.empty()){
+			const json& props = ctx.blackboard.count("_node_props") ?
+			    ctx.blackboard.at("_node_props") : json::object();
+			anim = props.value("anim_name", std::string{});
+		}
+		auto it = world.resources.actordefs.find(ActorDefName(weapon));
+		if(it == world.resources.actordefs.end()) return BTResult::Failure;
+		const AnimSequence* seq = it->second.GetSequence(anim);
+		if(!seq) return BTResult::Failure;
+		int tick = ctx.elapsedTicks();
+		const FrameDef* frame = seq->Resolve(tick);
+		if(!frame){
+			// Past end of non-looping sequence — done.
+			return BTResult::Success;
+		}
+		res_bank  = frame->bank;
+		res_index = frame->index;
+		return BTResult::Running;
+	};
 }
 
 void Guard::Serialize(bool write, Serializer & data, Serializer * old){
@@ -401,6 +427,7 @@ void Guard::Tick(World & world){
 	if(state != DYING && state != DEAD && state != DYINGEXPLODE){
 		if(bt_){
 			btctx_.userData = &world;
+			btctx_.dt = 1.0f / GASLoader::Get().gameengine.ticksPerSecond;
 			btctx_.bbSet("patrol", (bool)patrol);
 			btctx_.bbSet("target_seen", false);
 			bt_->tick(btctx_);
@@ -934,6 +961,26 @@ void Guard::Tick(World & world){
 			}
 		}
 	}
+	// Sync activity flags from state for BT conditions and Phase 9 migration.
+	is_walking       = (state == WALKING);
+	is_crouching     = (state == CROUCHING || state == CROUCHED);
+	is_crouched      = (state == CROUCHED);
+	is_shooting      = (state == SHOOTSTANDING || state == SHOOTCROUCHED ||
+	                    state == SHOOTUP || state == SHOOTDOWN ||
+	                    state == SHOOTUPANGLE || state == SHOOTDOWNANGLE ||
+	                    state == SHOOTLADDERUP || state == SHOOTLADDERDOWN);
+	is_on_ladder     = (state == LADDER);
+	is_hit           = (state == HIT);
+	is_dying         = (state == DYING || state == DYINGEXPLODE);
+	is_dead          = (state == DEAD);
+	if(state == SHOOTSTANDING)      shoot_direction = 0;
+	else if(state == SHOOTUP)       shoot_direction = 1;
+	else if(state == SHOOTDOWN)     shoot_direction = 2;
+	else if(state == SHOOTUPANGLE)  shoot_direction = 3;
+	else if(state == SHOOTDOWNANGLE) shoot_direction = 4;
+	else if(state == SHOOTLADDERUP)  shoot_direction = 5;
+	else if(state == SHOOTLADDERDOWN) shoot_direction = 6;
+
 	state_i++;
 }
 

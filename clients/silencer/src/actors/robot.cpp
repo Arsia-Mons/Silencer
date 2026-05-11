@@ -417,9 +417,17 @@ void Robot::Tick(World & world){
 	if (!bt_) InitBT();
 	if (bt_ && (state == ASLEEP || state == WALKING)) {
 		btctx_.userData = &world;
+		btctx_.dt = 1.0f / GASLoader::Get().gameengine.ticksPerSecond;
 		btctx_.bbSet("patrol", (bool)patrol);
 		bt_->tick(btctx_);
 	}
+
+	// Sync activity flags from state so BT conditions and network can read them.
+	is_walking  = (state == WALKING);
+	is_shooting = (state == SHOOTING);
+	is_asleep   = (state == ASLEEP || state == SLEEPING);
+	is_dying    = (state == DYING);
+	is_dead     = (state == DEAD);
 
 	if(damaging){
 		damaging++;

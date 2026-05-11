@@ -217,6 +217,11 @@ void Civilian::Tick(World & world){
 			}
 		}break;
 	}
+	// Sync activity flags from state.
+	is_walking = (state == WALKING);
+	is_running = (state == RUNNING);
+	is_dying   = (state == DYINGFORWARD || state == DYINGBACKWARD || state == DYINGEXPLODE);
+	is_dead    = (state == DEAD);
 	state_i++;
 }
 

@@ -27,14 +27,20 @@ private:
 	enum {NEW, SLEEPING, ASLEEP, AWAKENING, WALKING, SHOOTING, DYING, DEAD};
 	Uint8 state;
 	Uint8 state_i;
-	Uint16 maxhealth;
-	Uint16 maxshield;
+	Uint16 maxshield; // Hittable tracks maxhealth; robot tracks maxshield separately for respawn
 	Uint8 respawnseconds;
 	Uint8 shootcooldown;
 	int soundchannel;
 	const BehaviorTree* bt_ = nullptr;
 	BTContext btctx_;
 	int bt_walk_ticks_ = 0; // non-serialized patrol timer for BT (state_i is Uint8, too small)
+
+	// Activity flags — synced from state each tick.
+	bool is_walking   = false;
+	bool is_shooting  = false;
+	bool is_asleep    = false;
+	bool is_dying     = false;
+	bool is_dead      = false;
 };
 
 #endif
