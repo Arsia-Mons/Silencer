@@ -2,6 +2,7 @@
 #include "runtime.h"
 #include "ingame_chat.h"
 #include "ingame_buy.h"
+#include "ingame_tech.h"
 #include "audio.h"
 #include "config.h"
 #include "interface.h"
@@ -106,7 +107,7 @@ void Game::UpdateInputState(Input & input){
 				input = zeroinput;
 				interfaceenterfix = true;
 			}
-			if(localplayer->isbuying || localplayer->techinterfaceid || interfaceenterfix){
+			if(localplayer->isbuying || localplayer->techstationactive || interfaceenterfix){
 				Input zeroinput;
 				zeroinput.keyactivate = input.keyactivate;
 				zeroinput.keymoveleft = input.keymoveleft;
@@ -306,10 +307,14 @@ bool Game::HandleSDLEvents(void){
 				if(IngameBuyOverlay().Active()){
 					// In-game buy menu absorbs UP/DOWN (nav) + RETURN (buy)
 					// and swallows the rest so weapon/movement keys don't
-					// fire while the menu is open. Tech menu still routes
-					// through the legacy iface->ProcessKeyPress path below
-					// because techinterfaceid hasn't migrated yet (P19).
+					// fire while the menu is open.
 					IngameBuyOverlay().DispatchKey((int)event.key.scancode);
+					break;
+				}
+				if(IngameTechOverlay().Active()){
+					// In-game tech menu absorbs UP/DOWN (nav) + RETURN
+					// (repair / virus) and swallows the rest.
+					IngameTechOverlay().DispatchKey((int)event.key.scancode);
 					break;
 				}
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);

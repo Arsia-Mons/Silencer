@@ -72,7 +72,6 @@ public:
 	Uint16 chatinterfaceid;
 	bool chatwithteam;
 	Sint8 fallingnudge;
-	Uint16 techinterfaceid;
 	bool isbuying;
 	// Local-only edge-detect tracker — true when isbuying was true on the
 	// previous Player::Tick. Used to fire IngameBuy::Activate() on the
@@ -80,11 +79,21 @@ public:
 	// guard that gated the one-shot Interface allocation).
 	bool wasbuying;
 	bool techstationactive;
+	// Local-only edge-detect tracker for the techstationactive false->true
+	// transition. Mirrors `wasbuying`. Used to fire IngameTech::Activate()
+	// (replaces the legacy techinterfaceid==0 guard).
+	bool wastechstationactive;
 	Uint8 inventoryitems[4];
 	Uint8 inventoryitemsnum[4];
 	Uint8 currentinventoryitem;
 	int buyifacelastitem;
 	int buyifacelastscrolled;
+	// Live cursor + scroll for the v2 IngameTech overlay. Reset to 0 on
+	// the techstationactive↑ edge (IngameTech::Activate) — tech menu does
+	// not preserve position across opens (mirrors legacy SelectBox ctor
+	// which reset selecteditem/scrolled each spawn).
+	int techlastitem;
+	int techlastscrolled;
 	Uint8 disguised;
 	bool hasdepositor;
 	class PlayerAI * ai;

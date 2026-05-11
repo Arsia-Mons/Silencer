@@ -25,7 +25,7 @@
 
 class Screen;
 class Modal;
-namespace ui { namespace v2 { struct Node; struct LobbyState; class Runtime; class ModalStack; class IngameChat; class IngameBuy; } }
+namespace ui { namespace v2 { struct Node; struct LobbyState; class Runtime; class ModalStack; class IngameChat; class IngameBuy; class IngameTech; } }
 
 class Game
 {
@@ -157,6 +157,12 @@ public:
 	// routes through events.cpp KEY_DOWN; render reads Player::isbuying
 	// + Player::buyifacelastitem / buyifacelastscrolled.
 	ui::v2::IngameBuy & IngameBuyOverlay();
+
+	// v2 in-game tech menu overlay. Replaces the legacy
+	// Player::techinterfaceid path. Editing routes through events.cpp
+	// KEY_DOWN; render reads Player::techstationactive +
+	// Player::techlastitem / techlastscrolled.
+	ui::v2::IngameTech & IngameTechOverlay();
 
 	// Preview-mode CLI flags. Set by Load() when --preview-screen is
 	// passed; main.cpp dispatches to RunPreview() instead of the normal
@@ -294,6 +300,9 @@ private:
 	// Game and reads Player::isbuying / buyifacelast{item,scrolled} so
 	// the legacy renderer HUD path doesn't need a Game backref.
 	std::unique_ptr<ui::v2::IngameBuy> ui_v2_ingame_buy;
+	// v2 in-game tech menu overlay — sibling to IngameBuy. Reads
+	// Player::techstationactive + Player::techlastitem / techlastscrolled.
+	std::unique_ptr<ui::v2::IngameTech> ui_v2_ingame_tech;
 	// Set by GoToState; processed at the next Tick() entry to pop screens
 	// safely after the active screen's Tick has returned. Avoids destroying
 	// a screen mid-Tick when a button click triggers a state transition.

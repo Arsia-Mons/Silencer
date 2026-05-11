@@ -3415,25 +3415,21 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 			// 102:2 buy up arrow
 			// 102:3 buy down array
 			
-			if(player->isbuying || player->techinterfaceid){
-				// Buy menu uses v2 state (Player::isbuying + buyifacelast*);
-				// tech menu still uses the legacy Interface + SelectBox path
-				// (P19 will port it). Build the visible item list either way
-				// so the rest of the render block stays single-flow.
+			if(player->isbuying || player->techstationactive){
+				// Buy + tech menus both use v2 state on Player (isbuying /
+				// techstationactive + per-menu live cursor fields).
 				const bool buying = player->isbuying;
-				Interface * iface = buying ? nullptr : (Interface *)world.GetObjectFromId(player->techinterfaceid);
-				SelectBox * selectbox = iface ? (SelectBox *)iface->GetObjectWithUid(world, 1) : nullptr;
-				if(buying || selectbox){
+				{
 					dstrect.x = -world.resources.spriteoffsetx[102][0];
 					dstrect.y = -world.resources.spriteoffsety[102][0];
 					BlitSurface(world.resources.spritebank[102][0].get(), 0, surface, &dstrect);
 
 					// Resolve visible items + selecteditem + scrolled. Buy:
-					// from world.buyableitems filtered by BuyAvailable (same
-					// gate Player::Tick used pre-port). Tech: from the legacy
-					// SelectBox::items deque populated in Player::Tick.
+					// from world.buyableitems filtered by peer.techchoices +
+					// team.agency. Tech: from world.buyableitems filtered by
+					// InOwnBase ? team->disabledtech : otherteam->GetAvailableTech.
 					std::vector<Uint32> visible_ids;  // buyable item ids in display order
-					std::vector<const char *> visible_names; // for tech path: from selectbox->items
+					std::vector<const char *> visible_names;
 					unsigned int selecteditem = 0;
 					unsigned int scrolled = 0;
 					if(buying){
@@ -3449,13 +3445,21 @@ void Renderer::DrawHUD(Surface * surface, float frametime){
 						selecteditem = (unsigned int)player->buyifacelastitem;
 						scrolled     = (unsigned int)player->buyifacelastscrolled;
 					}else{
-						unsigned int i = 0;
-						for(std::deque<char *>::iterator it = selectbox->items.begin(); it != selectbox->items.end(); ++it, ++i){
-							visible_ids.push_back(selectbox->IndexToId(i));
-							visible_names.push_back(*it);
+						const bool in_own_base = player->InOwnBase(world);
+						Team * other_team = in_own_base ? nullptr : player->TeamOfCurrentBase(world);
+						for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); ++it){
+							BuyableItem * item = *it;
+							if(!item) continue;
+							if(in_own_base){
+								if(!team || !(item->techchoice & team->disabledtech)) continue;
+							}else{
+								if(!other_team || !(item->techchoice & other_team->GetAvailableTech(world))) continue;
+							}
+							visible_ids.push_back(item->id);
+							visible_names.push_back(item->name);
 						}
-						selecteditem = (unsigned int)selectbox->selecteditem;
-						scrolled     = selectbox->scrolled;
+						selecteditem = (unsigned int)player->techlastitem;
+						scrolled     = (unsigned int)player->techlastscrolled;
 					}
 
 					unsigned int line = 0;

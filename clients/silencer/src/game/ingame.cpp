@@ -2,11 +2,8 @@
 #include "audio.h"
 #include "config.h"
 #include "gasloader.h"
-#include "interface.h"
 #include "player.h"
-#include "selectbox.h"
 #include "team.h"
-#include "textinput.h"
 #include "world.h"
 #include <cstring>
 
@@ -106,51 +103,9 @@ bool Game::CheckForConnectionLost(void){
 }
 
 void Game::ProcessInGameInterfaces(void){
-	// Buy menu has migrated to ui::v2::IngameBuy (cursor on Player, audio
-	// + Submit owned by the overlay). Tech menu still uses the legacy
-	// Interface + SelectBox Object path (P19 will port it).
-	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-	if(localplayer){
-		if(localplayer->techinterfaceid){
-			currentinterface = localplayer->techinterfaceid;
-		}else{
-			oldselecteditem = 0;
-			currentinterface = 0;
-		}
-		Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-		if(iface && iface->id == localplayer->techinterfaceid){
-			SelectBox * selectbox = (SelectBox *)iface->GetObjectWithUid(world, 1);
-			if(selectbox){
-				if(selectbox->selecteditem != oldselecteditem){
-					Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
-					oldselecteditem = selectbox->selecteditem;
-				}
-				if(selectbox->selecteditem >= selectbox->scrolled + 5){
-					selectbox->scrolled = selectbox->selecteditem - 4;
-				}
-				if(selectbox->selecteditem < selectbox->scrolled){
-					selectbox->scrolled = selectbox->selecteditem;
-				}
-				if(selectbox->enterpressed){
-					BuyableItem * buyableitem = 0;
-					for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
-						if((*it)->id == selectbox->IndexToId(selectbox->selecteditem)){
-							buyableitem = (*it);
-							break;
-						}
-					}
-					if(buyableitem){
-						if(localplayer->InOwnBase(world)){
-							localplayer->RepairItem(world, buyableitem->id);
-						}else{
-							localplayer->VirusItem(world, buyableitem->id);
-						}
-					}
-					selectbox->enterpressed = false;
-				}
-			}
-		}
-	}
+	// Buy + tech menus have migrated to ui::v2::IngameBuy / IngameTech
+	// (cursor on Player, audio + Submit owned by the overlays).
+	// P20 will delete this entirely along with Player::*interfaceid fields.
 }
 
 void Game::ShowDeployMessage(void){

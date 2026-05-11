@@ -18,9 +18,6 @@
 #include "healmachine.h"
 #include "creditmachine.h"
 #include "secretreturn.h"
-#include "interface.h"
-#include "textinput.h"
-#include "selectbox.h"
 #include "inventorystation.h"
 #include "techstation.h"
 #include "detonator.h"
@@ -97,8 +94,8 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	jetpacksoundchannel = -1;
 	flamersoundchannel = -1;
 	chatinterfaceid = 0;
-	techinterfaceid = 0;
 	wasbuying = false;
+	wastechstationactive = false;
 	chatwithteam = false;
 	fallingnudge = 0;
 	oldfiles = 0;
@@ -123,6 +120,8 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	oldgrenadelistsize = 0;
 	buyifacelastitem = 0;
 	buyifacelastscrolled = 0;
+	techlastitem = 0;
+	techlastscrolled = 0;
 	justjumpedfromladder = false;
 	currentprojectileid = 0;
 	ishittable = true;
@@ -258,7 +257,7 @@ void Player::Tick(World & world){
 	if(ai){
 		ai->Tick(world);
 	}
-	if(input.keychat && !world.ingame_chat_active && !isbuying && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
+	if(input.keychat && !world.ingame_chat_active && !isbuying && !techstationactive && this == world.GetPeerPlayer(world.localpeerid)){
 		if(!world.replay.IsPlaying()){
 			// v2 in-game chat overlay (replaces the legacy Interface +
 			// TextInput Object spawn that owned chatinterfaceid). Editing
@@ -528,41 +527,16 @@ void Player::Tick(World & world){
 		}
 		wasbuying = isbuying;
 
-		if(techstationactive && !techinterfaceid){
-			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-			if(iface){
-				Team * team = GetTeam(world);
-				SelectBox * selectbox = (SelectBox *)world.CreateObject(ObjectTypes::SELECTBOX);
-				selectbox->draw = false;
-				selectbox->uid = 1;
-				int i = 0;
-				for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++, i++){
-					BuyableItem * buyableitem = *it;
-					if(InOwnBase(world)){
-						if(team && buyableitem->techchoice & team->disabledtech){
-							selectbox->AddItem((*it)->name, (*it)->id);
-						}
-					}else{
-						Team * otherteam = TeamOfCurrentBase(world);
-						if(otherteam && buyableitem->techchoice & otherteam->GetAvailableTech(world)){
-							selectbox->AddItem((*it)->name, (*it)->id);
-						}
-					}
-				}
-				selectbox->selecteditem = 0;
-				iface->AddObject(selectbox->id);
-				iface->activeobject = selectbox->id;
-				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundMenuSelect], 96);
-				techinterfaceid = iface->id;
-			}
-		}else
-		if(!techstationactive && techinterfaceid && !world.replaying){
-			Interface * iface = (Interface *)world.GetObjectFromId(techinterfaceid);
-			if(iface){
-				iface->DestroyInterface(world, iface);
-			}
-			techinterfaceid = 0;
+		// v2 in-game tech menu: cursor state lives on this Player
+		// (techlastitem / techlastscrolled). Activation is the false->true
+		// edge of techstationactive. Editing + Submit live in
+		// ui::v2::IngameTech (routed via events.cpp KEY_DOWN).
+		if(techstationactive && !wastechstationactive && !world.replaying){
+			techlastitem = 0;
+			techlastscrolled = 0;
+			Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundMenuSelect], 96);
 		}
+		wastechstationactive = techstationactive;
 	}
 	if(fuel < maxfuel){
 		if(!fuellow){
