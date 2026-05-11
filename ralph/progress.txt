@@ -84,6 +84,103 @@ below.)
   Clay bridge's RECTANGLE render command — that's about the rendered
   primitive, not the API name. Future siblings (Row, Column, Stack)
   follow Box's role-neutral naming convention.
+- **Box halo stroke routes through `CustomKind::BoxStroke`** when
+  any halo width > 0. Otherwise the no-halo path emits the stroke via
+  Clay's native `.border` (cheap). The CUSTOM dispatch in the bridge
+  draws concentric inset rings — outer halo bands first, primary
+  stroke next, inner halo bands last — each ring's thickness equal to
+  its `<thing>HaloWidth` param. Total stroke thickness (and effective
+  content inset) = outerHaloWidth + strokeWidth + innerHaloWidth.
+  Lobby-canonical halo palette: primary 216, outer 75 (1 px), inner 77
+  (1 px). C2 finalizes per-rectangle picks.
+- **`BoxBeginFrame()` arena reset is REQUIRED for halo callers** but
+  optional for no-halo callers — the no-halo path skips the arena
+  entirely (Clay's `.border` carries everything). Pattern: scene calls
+  `BoxBeginFrame()` once before `Clay_BeginLayout()`, then any number
+  of Box() calls with non-zero halos.
+
+## 2026-05-11T17:30:00Z - C0c Box stroke halos (multi-tone outer + inner rings)
+- Extended the Box primitive API with four required halo params:
+  `strokeOuterHaloColor`, `strokeOuterHaloWidth`, `strokeInnerHaloColor`,
+  `strokeInnerHaloWidth`. Final signature is 10 positional params; all
+  required (no defaults — matches 63c779d precedent).
+- Bridge routing: when both halo widths are zero, the Box keeps using
+  Clay's native `.border` path (cheap). When EITHER halo width is
+  non-zero, the Box drops `.border` and emits `.custom` with a
+  `CustomKind::BoxStroke` payload. The bridge then renders concentric
+  inset rings: outer halo bands first (at the box's outer edge), then
+  the primary stroke, then the inner halo bands. Each ring is a
+  filled-rect-outline of its width, drawn through `ClipDrawRect` so the
+  scissor stack still applies.
+- New `BoxBeginFrame()` exit point resets the per-frame BoxStrokePayload
+  + ClayCustomData arenas (64 slots each). Halo-using scenes call it
+  once before `Clay_BeginLayout()`; no-halo scenes can skip it.
+- Halo color sampling: ran `/tmp/inspect_lobby_stroke.py` + a more
+  thorough multi-edge scan (`/tmp/inspect_lobby_stroke2.py`) against
+  `/tmp/lobby_bg.png`. Primary stroke is consistently idx 216 across
+  every clean lobby rectangle edge. The dark-green outer halo is most
+  often idx 74/75 (rgb 8,40,8); the dark-green inner halo is most
+  often idx 77. The spec's suggested idx 81 for inner appears as well
+  but less consistently — both are close-family greens. I went with
+  outer=75, inner=77 as the canonical halo defaults; C2 finalizes
+  per-rectangle picks in `docs/plans/lobby-chrome-rectangles.md`.
+- box_test scene now has THREE rows + a 5th halo variant. The
+  reference.png was regenerated (the new 5th row didn't exist before).
+  Variants 1-4 are byte-identical to the C1-era render aside from
+  layout repacking (3 rows × 220px boxes instead of 2 rows × 240px) —
+  the geometry change made the layout fit five variants in 640×480.
+- New `box_halo_test` scene + harness: single Box at 400×300, no fill,
+  canonical halo params, against flat black backdrop. This is the
+  visual proof of the chrome look without baked sprites. Reference
+  regen'd; pixdiff 0.0000% on verify.
+- Files changed:
+  - `clients/silencer/src/ui/clay/primitives/box.{h,cpp}` — 4 new
+    halo params; new `BoxBeginFrame()`; routing into CustomKind::BoxStroke
+    when any halo width > 0.
+  - `clients/silencer/src/ui/clay/clay_bridge.{h,cpp}` — new
+    `BoxStrokePayload` struct, new `CustomKind::BoxStroke` enum value,
+    new dispatch branch with concentric-ring rendering helper.
+  - `clients/silencer/src/ui/clay/box_test.cpp` — 5th halo variant
+    added; existing 4 variants migrated to 10-arg signature.
+  - `clients/silencer/src/ui/clay/rectangle_alpha_test.cpp` — 3
+    callsites updated to the 10-arg signature (halos all zero).
+  - `clients/silencer/src/ui/clay/box_halo_test.cpp` — new test scene.
+  - `clients/silencer/src/net/controldispatch.cpp` — new
+    `clay_box_halo_test` control op.
+  - `tests/lobby-clay/box_test/reference.png` — regen'd (added row 3).
+  - `tests/lobby-clay/box_halo_test/{run.sh,reference.png}` — new harness.
+- Quality gates: build green ✓, box_test PASS @ 0.0000% ✓,
+  box_halo_test PASS @ 0.0000% ✓, rectangle_alpha_test PASS @ 0.0000% ✓,
+  40_lobby_clay_basic PASS ✓.
+- **Learnings for future iterations:**
+  - Concentric-ring drawing: a single Clay CUSTOM render command can
+    draw an arbitrary number of nested rect outlines without needing
+    extra Clay elements. The bbox is supplied by Clay; the bridge
+    iterates the rings in the CUSTOM dispatch. Cleaner than emitting
+    one Clay child per ring (which would force separate Clay layout
+    decisions for each).
+  - When extending a primitive's API with new REQUIRED params, the
+    de-lobby-defaults rule (63c779d) means every existing caller has
+    to be touched. For Box that meant box_test.cpp (4 callsites),
+    rectangle_alpha_test.cpp (3 callsites) — small blast radius
+    because C3+ haven't introduced lobby-side callers yet. Doing the
+    rename + the halo extension before the lobby integration was the
+    right ordering — adding 6 params after lobby relocation would
+    have meant 20+ callsites to update.
+  - Per-frame arena pattern with optional reset: when only SOME
+    callsites need the arena (here: halo-using ones), let the
+    BeginFrame() be optional and document the conditional contract in
+    the header. No-halo callers (which is everyone in C1 era) get a
+    zero-cost path. The arena reset only matters when scenes actually
+    use halos in their layout.
+  - For sampling palette indices at sub-pixel resolution, the
+    `/tmp/inspect_lobby_stroke*.py` scripts decode the source sprite
+    bin straight rather than reading the rendered PNG. This is robust
+    against any rendering surprises (palette quantization, alpha
+    quirks) and is the canonical way to confirm a "what palette index
+    is this pixel" question against the legacy art.
+
+---
 
 ## 2026-05-11T16:45:00Z - C0b Rename Rectangle → Box (canonical UI vocabulary)
 - Pure rename, no behavior change. Pixdiff 0.0000% vs the C0 reference

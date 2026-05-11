@@ -29,8 +29,40 @@
 //     opaque draw because the ramp-position-as-alpha scheme isn't defined
 //     there. Per-pixel iteration: not free; reserve for chrome-scale boxes
 //     (e.g. lobby panels), not full-screen overlays.
-//   • `strokeWidth == 0` → no stroke emitted. `strokePaletteColor` is
-//     ignored.
+//   • `strokeWidth == 0` → no primary stroke. Halos still render if their
+//     widths are non-zero (rings sit immediately adjacent — there's just no
+//     bright primary in between).
+//
+// Stroke halos:
+//
+//   The lobby BG sprite's bright primary stroke (palette idx 216) is
+//   bracketed by 1-px dark-green bands on either side (idx ~75 outside,
+//   ~77 inside). When the BG sprite is dropped (C7) those bands vanish
+//   and the bare 1-px stroke looks naked against flat black. The four
+//   halo params let callers recreate the depth procedurally without
+//   re-baking texture:
+//
+//   • `strokeOuterHaloColor` + `strokeOuterHaloWidth` → 1..N px ring
+//     immediately OUTSIDE the primary stroke (at the box's outer edge).
+//   • `strokeInnerHaloColor` + `strokeInnerHaloWidth` → 1..N px ring
+//     immediately INSIDE the primary stroke.
+//
+//   All four halo params are REQUIRED. Zero-width halos render nothing
+//   (the color is ignored). When BOTH halo widths are zero, the primitive
+//   falls through to Clay's native `.border` path (cheap; no CUSTOM
+//   command). When ANY halo width is non-zero, the bridge routes the
+//   whole stroke through `CustomKind::BoxStroke` — concentric inset
+//   rectangles drawn outer-most first (outer halo bands → primary stroke →
+//   inner halo bands), each ring `<width>` pixels thick.
+//
+//   Lobby canonical values (sampled from `/tmp/lobby_bg.png`; C2 doc
+//   tunes the final per-rectangle picks): primary=216, outer=75 w=1,
+//   inner=77 w=1.
+//
+//   Halo-enabled callers MUST invoke `BoxBeginFrame()` once per layout
+//   pass before any `Clay_BeginLayout()` to reset the per-frame payload
+//   arena. No-halo callers can skip it — the no-halo path doesn't touch
+//   the arena.
 //
 // Sizing:
 //
@@ -38,14 +70,17 @@
 //     the parent flex container).
 //   • `height == 0` → CLAY_SIZING_GROW(0) on the vertical axis.
 //   • Non-zero values → CLAY_SIZING_FIXED(value).
-//
-// The primitive has no per-frame arena and no BeginFrame entry point;
-// every parameter lives on the stack across the CLAY emit.
 
 #include "clay/clay.h"
 #include "shared.h"
 
 namespace silencer::ui::primitives {
+
+// Reset the Box primitive's per-frame BoxStroke payload arena. Call once
+// per frame, before `Clay_BeginLayout()`. Safe to call multiple times;
+// resets are idempotent. No-halo Box calls don't touch the arena, so
+// scenes that never use halos can skip this entirely.
+void BoxBeginFrame();
 
 void Box(Clay_String id,
          Uint16 width,
@@ -53,7 +88,11 @@ void Box(Clay_String id,
          Uint8  fillPaletteColor,
          Uint8  fillOpacity,
          Uint8  strokePaletteColor,
-         Uint8  strokeWidth);
+         Uint8  strokeWidth,
+         Uint8  strokeOuterHaloColor,
+         Uint8  strokeOuterHaloWidth,
+         Uint8  strokeInnerHaloColor,
+         Uint8  strokeInnerHaloWidth);
 
 }  // namespace silencer::ui::primitives
 

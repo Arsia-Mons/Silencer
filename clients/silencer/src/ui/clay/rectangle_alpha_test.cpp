@@ -58,7 +58,9 @@ bool RunRectangleAlphaTest(::Game & game, const char * outPath) {
 			          /*width=*/W, /*height=*/H,
 			          /*fillPaletteColor=*/kBackdrop,
 			          /*fillOpacity=*/255,
-			          /*strokePaletteColor=*/0, /*strokeWidth=*/0);
+			          /*strokePaletteColor=*/0, /*strokeWidth=*/0,
+		          /*strokeOuterHaloColor=*/0, /*strokeOuterHaloWidth=*/0,
+		          /*strokeInnerHaloColor=*/0, /*strokeInnerHaloWidth=*/0);
 		}
 		CLAY({ .id = CLAY_ID("RedHost"),
 		       .floating = { .offset = { 160, 160 },
@@ -67,7 +69,9 @@ bool RunRectangleAlphaTest(::Game & game, const char * outPath) {
 			          /*width=*/320, /*height=*/160,
 			          /*fillPaletteColor=*/kRedColor,
 			          /*fillOpacity=*/255,
-			          /*strokePaletteColor=*/0, /*strokeWidth=*/0);
+			          /*strokePaletteColor=*/0, /*strokeWidth=*/0,
+		          /*strokeOuterHaloColor=*/0, /*strokeOuterHaloWidth=*/0,
+		          /*strokeInnerHaloColor=*/0, /*strokeInnerHaloWidth=*/0);
 		}
 		CLAY({ .id = CLAY_ID("BlueHost"),
 		       .floating = { .offset = { 320, 160 },
@@ -76,7 +80,9 @@ bool RunRectangleAlphaTest(::Game & game, const char * outPath) {
 			          /*width=*/320, /*height=*/160,
 			          /*fillPaletteColor=*/kBlueColor,
 			          /*fillOpacity=*/128,
-			          /*strokePaletteColor=*/0, /*strokeWidth=*/0);
+			          /*strokePaletteColor=*/0, /*strokeWidth=*/0,
+		          /*strokeOuterHaloColor=*/0, /*strokeOuterHaloWidth=*/0,
+		          /*strokeInnerHaloColor=*/0, /*strokeInnerHaloWidth=*/0);
 		}
 	}
 

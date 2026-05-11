@@ -134,6 +134,7 @@ enum class CustomKind : Uint8 {
 	ToggleSprite,      // P6: sprite-faced radio with effectColor + brightness.
 	ScrollBar,         // P7: sprite-faced vertical scrollbar (3-slice track + thumb).
 	TextInput,         // P9: bank-text field with optional blinking caret.
+	BoxStroke,         // C0c: multi-tone halo stroke (concentric rings) for the Box primitive.
 };
 
 struct ClayCustomData {
@@ -196,6 +197,22 @@ struct TextInputPayload {
 	Uint8        caretColor;  // Palette index for the caret bar.
 	Uint8        caretHeight; // Pre-computed (height * 0.8).
 	bool         showCaret;
+};
+
+// C0c — payload for CustomKind::BoxStroke. The bridge renders concentric
+// inset rectangles around the box's bounding box: outer halo first (at the
+// outer edge), then the primary stroke, then the inner halo. Each "ring"
+// is `<width>` pixels thick (0 = skip that band). Total stroke thickness
+// (and content inset) = outerHaloWidth + strokeWidth + innerHaloWidth.
+// Mirrors the legacy lobby BG's bright-primary-bracketed-by-dark-greens
+// stroke look without re-baking texture.
+struct BoxStrokePayload {
+	Uint8 strokeColor;
+	Uint8 strokeWidth;
+	Uint8 outerHaloColor;
+	Uint8 outerHaloWidth;
+	Uint8 innerHaloColor;
+	Uint8 innerHaloWidth;
 };
 
 // P7 ScrollList primitive unit test. Renders a 30-item list scrolled to
@@ -286,6 +303,13 @@ bool RunPanelTest(::Game & game, const char * variant, const char * outPath);
 // color) into a 640x480 Surface and writes it to `outPath`. Invoked by the
 // `clay_box_test` control op. Implementation in box_test.cpp.
 bool RunBoxTest(::Game & game, const char * outPath);
+
+// C0c Box halo render test. Renders a single Box with the lobby's
+// canonical halo params (primary stroke + outer + inner halos) against a
+// flat black background into a 640x480 Surface and writes it to `outPath`.
+// Invoked by the `clay_box_halo_test` control op. Implementation in
+// box_halo_test.cpp.
+bool RunBoxHaloTest(::Game & game, const char * outPath);
 
 // C1 Box alpha-blend smoke test. Renders a fully-opaque rect with a
 // 50%-opaque rect overlapping its right half into a 640x480 Surface and

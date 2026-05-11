@@ -489,6 +489,58 @@ void Render(::Resources & resources, ::Renderer & renderer,
 						}
 						break;
 					}
+					case CustomKind::BoxStroke: {
+						const auto * p = reinterpret_cast<const BoxStrokePayload *>(ccd->payload);
+						if(!p) break;
+						int bx = static_cast<int>(c->boundingBox.x);
+						int by = static_cast<int>(c->boundingBox.y);
+						int bw = static_cast<int>(c->boundingBox.width);
+						int bh = static_cast<int>(c->boundingBox.height);
+						if(bw <= 0 || bh <= 0) break;
+						// Draw a single 1-px-thick outline ring at the given inset
+						// from the box's outer edge. Clipped against the active
+						// scissor stack.
+						auto drawRing = [&](int inset, int thickness, Uint8 color){
+							int rx = bx + inset;
+							int ry = by + inset;
+							int rw = bw - 2 * inset;
+							int rh = bh - 2 * inset;
+							if(rw <= 0 || rh <= 0) return;
+							int t = thickness;
+							if(t * 2 > rw) t = rw / 2;
+							if(t * 2 > rh) t = rh / 2;
+							if(t < 1) return;
+							// Top edge.
+							{ int x=rx, y=ry, w=rw, h=t;
+							  if(ClipDrawRect(dst->w, dst->h, x, y, w, h))
+								Renderer::DrawFilledRectangle(dst, x, y, x+w, y+h, color); }
+							// Bottom edge.
+							{ int x=rx, y=ry+rh-t, w=rw, h=t;
+							  if(ClipDrawRect(dst->w, dst->h, x, y, w, h))
+								Renderer::DrawFilledRectangle(dst, x, y, x+w, y+h, color); }
+							// Left edge (skip corners already covered by top/bottom).
+							{ int x=rx, y=ry+t, w=t, h=rh-2*t;
+							  if(h > 0 && ClipDrawRect(dst->w, dst->h, x, y, w, h))
+								Renderer::DrawFilledRectangle(dst, x, y, x+w, y+h, color); }
+							// Right edge.
+							{ int x=rx+rw-t, y=ry+t, w=t, h=rh-2*t;
+							  if(h > 0 && ClipDrawRect(dst->w, dst->h, x, y, w, h))
+								Renderer::DrawFilledRectangle(dst, x, y, x+w, y+h, color); }
+						};
+						int inset = 0;
+						if(p->outerHaloWidth > 0){
+							drawRing(inset, p->outerHaloWidth, p->outerHaloColor);
+							inset += p->outerHaloWidth;
+						}
+						if(p->strokeWidth > 0){
+							drawRing(inset, p->strokeWidth, p->strokeColor);
+							inset += p->strokeWidth;
+						}
+						if(p->innerHaloWidth > 0){
+							drawRing(inset, p->innerHaloWidth, p->innerHaloColor);
+						}
+						break;
+					}
 					case CustomKind::TextInput: {
 						const auto * p = reinterpret_cast<const TextInputPayload *>(ccd->payload);
 						if(!p) break;
