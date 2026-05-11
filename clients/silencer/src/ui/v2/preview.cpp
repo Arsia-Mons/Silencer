@@ -33,6 +33,7 @@
 #include "options_audio.h"
 #include "options_controls.h"
 #include "lobby_connect.h"
+#include "lobby_chat.h"
 #include "lobby_shell.h"
 #include "mission_summary.h"
 #include "update.h"
@@ -56,6 +57,9 @@
 #include "objecttypes.h"
 #include "team.h"
 #include "toggle.h"
+#include "textbox.h"
+#include "textinput.h"
+#include "scrollbar.h"
 #include "renderer.h"
 #include "renderdevice.h"
 #include "resources.h"
@@ -438,6 +442,78 @@ int Game::RunPreview()
 				for(int i = 0; i < 4; i++) characterinterface->AddObject(statOverlays[i]->id);
 				for(int i = 0; i < 5; i++) characterinterface->AddObject(toggles[i]->id);
 				lobbyiface->AddObject(characterinterface->id);
+
+				// Chat panel — mirrors ChatPanel::Build in
+				// clients/silencer/src/ui/screens/lobby/panels/chat_panel.cpp.
+				// Channel-name overlay, scrollback / presence textboxes and the
+				// chat input all stay empty at preview-gate time so they emit
+				// no text pixels; the chat input gets showcaret=true (set by
+				// the parent->ActiveChanged below) which renders the caret
+				// rect. Scrollbar->draw defaults to false → no scrollbar
+				// pixels.
+				::Interface * chatinterface = static_cast<::Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
+				chatinterface->x = 15;
+				chatinterface->y = 216;
+				chatinterface->width = 368;
+				chatinterface->height = 234;
+				::Overlay * chatborder = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				chatborder->res_bank = 7;
+				chatborder->res_index = 11;
+				::Overlay * chatinputborder = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				chatinputborder->res_bank = 7;
+				chatinputborder->res_index = 14;
+				::Overlay * channeltext = static_cast<::Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
+				channeltext->uid = 1;
+				channeltext->textbank = 134;
+				channeltext->textwidth = 8;
+				channeltext->x = 15;
+				channeltext->y = 200;
+				::TextBox * chattextbox = static_cast<::TextBox *>(world.CreateObject(ObjectTypes::TEXTBOX));
+				chattextbox->x = 19;
+				chattextbox->y = 220;
+				chattextbox->width = 242;
+				chattextbox->height = 207;
+				chattextbox->res_bank = 133;
+				chattextbox->lineheight = 11;
+				chattextbox->fontwidth = 6;
+				chattextbox->bottomtotop = true;
+				::TextBox * presencebox = static_cast<::TextBox *>(world.CreateObject(ObjectTypes::TEXTBOX));
+				presencebox->x = 267;
+				presencebox->y = 220;
+				presencebox->width = 110;
+				presencebox->height = 207;
+				presencebox->res_bank = 133;
+				presencebox->lineheight = 11;
+				presencebox->fontwidth = 6;
+				presencebox->bottomtotop = false;
+				presencebox->uid = 9;
+				::TextInput * chatinput = static_cast<::TextInput *>(world.CreateObject(ObjectTypes::TEXTINPUT));
+				chatinput->x = 18;
+				chatinput->y = 437;
+				chatinput->width = 360;
+				chatinput->height = 14;
+				chatinput->res_bank = 133;
+				chatinput->fontwidth = 6;
+				chatinput->maxchars = 200;
+				chatinput->maxwidth = 60;
+				chatinput->uid = 1;
+				::ScrollBar * chatscrollbar = static_cast<::ScrollBar *>(world.CreateObject(ObjectTypes::SCROLLBAR));
+				chatscrollbar->res_index = 12;
+				chatscrollbar->barres_index = 13;
+				chatscrollbar->scrollpixels = chattextbox->lineheight;
+				chatscrollbar->scrollposition = chattextbox->scrolled;
+				chatinterface->AddObject(chatborder->id);
+				chatinterface->AddObject(chatinputborder->id);
+				chatinterface->AddObject(channeltext->id);
+				chatinterface->AddObject(chattextbox->id);
+				chatinterface->AddObject(presencebox->id);
+				chatinterface->AddObject(chatinput->id);
+				chatinterface->AddObject(chatscrollbar->id);
+				chatinterface->AddTabObject(chatinput->id);
+				chatinterface->scrollbar = chatscrollbar->id;
+				lobbyiface->AddObject(chatinterface->id);
+				lobbyiface->activeobject = chatinterface->id;
+				lobbyiface->ActiveChanged(world, lobbyiface, false);
 
 				// One TickObjects() settles the B156x21 Go Back chrome on its
 				// INACTIVE base index and runs Toggle::Tick on the 5 agency

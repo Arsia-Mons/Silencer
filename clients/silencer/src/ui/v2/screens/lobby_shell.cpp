@@ -2,6 +2,7 @@
 
 #include "context.h"
 #include "lobby_character.h"
+#include "lobby_chat.h"
 #include "node.h"
 
 #include <string>
@@ -13,9 +14,9 @@ Node BuildLobby(const Context & ctx, const LobbyHandlers & handlers, const Lobby
 {
 	// Mirrors LobbyScreen::Build (clients/silencer/src/ui/screens/lobby/
 	// lobby_screen.cpp). Sub-panels are ported one at a time — character
-	// landed with P10, chat/game_select/etc. follow in P11+. The map-name
-	// overlay (uid 8) has empty text at preview gate and renders nothing,
-	// so it is omitted here.
+	// landed with P10, chat with P11, game_select/etc. follow in P12+. The
+	// map-name overlay (uid 8) has empty text at preview gate and renders
+	// nothing, so it is omitted here.
 	std::string version_label = "v.";
 	if(ctx.version) version_label += ctx.version;
 	return Background(/*bank=*/7, /*index=*/1, {
@@ -29,6 +30,7 @@ Node BuildLobby(const Context & ctx, const LobbyHandlers & handlers, const Lobby
 			.at(473, 29)
 			.onClick(handlers.on_go_back),
 		BuildCharacterPanel(ctx, state.selected_agency),
+		BuildChatPanel(ctx),
 	});
 }
 
