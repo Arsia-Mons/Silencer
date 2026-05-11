@@ -41,7 +41,22 @@ in the design conversation that produced this library.
   the absolute path otherwise. Must call `Layout()` before dispatch
   so rects exist.
 - **`screens/`** — one file per screen. Each defines a single pure
-  `Build*(const Context&)` function returning the tree.
+  `Build*(const Context&)` function returning the tree *and* a
+  `<Name>Runtime` class (the engine wire-in). The two live in the same
+  TU because they're tightly coupled: the Runtime calls `Build*` each
+  frame, and the preview harness calls `Build*` standalone.
+- **`runtime.h`** — abstract `Runtime` base. `Game` holds a
+  `std::unique_ptr<Runtime> active_runtime` and swaps it on state
+  transition via `SetRuntime(GameState)`. Per-frame, Game's render
+  branch delegates to `active_runtime->Render(...)`; events.cpp routes
+  mouse / keyboard / text input through `DispatchMouseDown` /
+  `DispatchKeyDown` / `DispatchTextInput`. `Tick()` advances state
+  machines (lobby networking, rebind capture, update STAGING, etc.).
+- **`modal_stack.{h,cpp}`** — `ModalStack` owns the v2 message /
+  progress / password overlay stack. Rendered on top of any active
+  runtime; intercepts mouse / key / text input when non-empty. Game
+  keeps thin Show*/Pop*/Dispatch* wrappers since external callers
+  (screen_context, lobby panels) use them by name.
 
 Container expression is the **preferred** layout style for new
 screens. Absolute `.at()` is the documented escape hatch for screens
