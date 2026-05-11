@@ -122,6 +122,10 @@ public:
 	// legacy widget path, then either dump a PPM (one-shot) or run an
 	// SDL window loop. Defined in src/ui/v2/preview.cpp.
 	int RunPreview();
+	// Interactive component storybook — palette + canvas + properties
+	// panel for the ui/v2 primitives. Launched via `--preview-screen
+	// storybook`. Defined in src/ui/v2/storybook.cpp.
+	int RunStorybook();
 
 private:
 	bool Tick(void);

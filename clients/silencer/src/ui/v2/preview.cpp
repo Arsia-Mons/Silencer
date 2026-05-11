@@ -123,6 +123,12 @@ static bool DumpPPM(const Surface & buf, const SDL_Color * palette, const char *
 
 int Game::RunPreview()
 {
+	// Storybook is a self-contained interactive playground — bail out
+	// early so we don't have to weave its UI through the per-screen
+	// dispatch below. Lives in src/ui/v2/storybook.cpp.
+	if(strcmp(preview_screen, "storybook") == 0){
+		return RunStorybook();
+	}
 	const bool use_legacy = (strcmp(preview_impl, "legacy") == 0);
 	const char * impl_name = use_legacy ? "legacy" : "v2";
 
