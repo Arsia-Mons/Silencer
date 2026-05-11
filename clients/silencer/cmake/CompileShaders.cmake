@@ -61,18 +61,22 @@ find_program(SILENCER_DXC
 )
 
 # Detect SPIRV codegen support. dxc without -DENABLE_SPIRV_CODEGEN prints
-# "error: SPIR-V CodeGen not available". The probe runs `-spirv -help` and
-# greps for the `-fspv-` family of flags, which only appear when the build
-# includes SPIRV.
+# "error: SPIR-V CodeGen not available" when -spirv is passed. The Windows
+# SDK build of dxc lists `-fspv-` flags in `-help` (documented) but rejects
+# them at compile time, so we can't rely on the help text — we have to
+# actually invoke a SPIRV codegen and see if it errors.
 set(SILENCER_DXC_SPIRV FALSE)
 if(SILENCER_DXC)
+    # Trivial null-body PS we can throw at dxc to check the SPIRV path.
+    set(_probe_src "${CMAKE_BINARY_DIR}/CMakeFiles/silencer_dxc_spirv_probe.hlsl")
+    file(WRITE "${_probe_src}" "float4 main() : SV_Target { return 0; }\n")
     execute_process(
-        COMMAND "${SILENCER_DXC}" -help
-        OUTPUT_VARIABLE _dxc_help
-        ERROR_VARIABLE  _dxc_help_err
-        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND "${SILENCER_DXC}" -nologo -spirv -T ps_6_0 -E main "${_probe_src}"
+        OUTPUT_QUIET
+        ERROR_VARIABLE _dxc_probe_err
+        RESULT_VARIABLE _dxc_probe_rc
     )
-    if("${_dxc_help}" MATCHES "-fspv-" OR "${_dxc_help_err}" MATCHES "-fspv-")
+    if(_dxc_probe_rc EQUAL 0)
         set(SILENCER_DXC_SPIRV TRUE)
     endif()
 endif()

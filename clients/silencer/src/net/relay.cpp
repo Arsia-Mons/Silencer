@@ -7,18 +7,44 @@
 #include <cstring>
 #include <thread>
 
-// Stage 2 relay implementation. Hand-rolled HTTP→WebSocket upgrade +
-// binary frame writer; no third-party dep. Mirrors the Go-side
-// services/lobby/wsutil.go logic (same RFC 6455 subset).
-
 #include "sha1.h"
+#include "../world/serializer.h"
+
+// Hand-rolled HTTP→WebSocket upgrade + binary-frame writer; no third-
+// party dep. RFC 6455 subset that mirrors services/lobby/wsutil.go.
+// The UDP-side spectator handshake hand-builds World::MSG_CONNECT with
+// the observer bit set; the relay never instantiates a World or Lobby
+// (the headless silencer binary in --relay mode wants none of SDL,
+// audio, resources, or world simulation — it's a pure UDP↔WS pump).
 
 namespace {
 
 constexpr int kRelayBacklog       = 32;
 constexpr size_t kMaxPendingBytes = 8 * 1024 * 1024; // 8 MB per-client outbox cap
 
+// World::MSG_* enum values mirrored from clients/silencer/src/world/world.h.
+// Hand-copied because pulling in world.h would drag the entire engine into
+// the relay TU. If the enum order ever changes upstream, the build will
+// not catch it — keep these in sync.
+constexpr Uint8 kMsgConnect    = 0;
+constexpr Uint8 kMsgDisconnect = 4;
+constexpr Uint8 kMsgPing       = 5;
+
+constexpr int kPingIntervalMs        = 1000;  // safely under any reasonable peertimeout
+constexpr int kConnectRetryIntervalMs = 500;  // until AUTHORITY admits us
+
 const char *kMagicGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+// Windows Winsock uses WSAEWOULDBLOCK (10035), not POSIX EWOULDBLOCK (140).
+// shared.h aliases errno → WSAGetLastError() on Win, so compare against the
+// Winsock value there.
+#ifdef _WIN32
+constexpr int kWouldBlock = WSAEWOULDBLOCK;
+typedef int relay_ssize_t;
+#else
+constexpr int kWouldBlock = EWOULDBLOCK;
+typedef ssize_t relay_ssize_t;
+#endif
 
 // Base64 of the SHA-1 of (key + magic). Tiny inlined encoder because
 // the rest of the codebase doesn't need one anywhere else.
@@ -43,7 +69,7 @@ bool ReadLine(int sock, std::string &out, size_t cap) {
 	out.clear();
 	char c;
 	while (out.size() < cap) {
-		ssize_t n = recv(sock, &c, 1, 0);
+		relay_ssize_t n = recv(sock, &c, 1, 0);
 		if (n <= 0) return false;
 		if (c == '\n') {
 			if (!out.empty() && out.back() == '\r') out.pop_back();
@@ -57,9 +83,9 @@ bool ReadLine(int sock, std::string &out, size_t cap) {
 bool SendAll(int sock, const void *data, size_t len) {
 	const char *p = (const char *)data;
 	while (len > 0) {
-		ssize_t n = send(sock, p, len, 0);
+		relay_ssize_t n = send(sock, p, (int)len, 0);
 		if (n <= 0) {
-			if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+			if (n < 0 && (errno == kWouldBlock)) {
 				std::this_thread::sleep_for(std::chrono::milliseconds(1));
 				continue;
 			}
@@ -71,11 +97,18 @@ bool SendAll(int sock, const void *data, size_t len) {
 	return true;
 }
 
+unsigned long long NowMs() {
+	using namespace std::chrono;
+	return (unsigned long long)duration_cast<milliseconds>(
+	    steady_clock::now().time_since_epoch()).count();
+}
+
 } // namespace
 
 Relay::Relay()  = default;
 Relay::~Relay() {
 	if (listenSock >= 0) closesocket(listenSock);
+	if (udpSock >= 0) closesocket(udpSock);
 	std::lock_guard<std::mutex> g(clientsMu);
 	for (auto *c : clients) {
 		if (c->sock >= 0) closesocket(c->sock);
@@ -83,14 +116,45 @@ Relay::~Relay() {
 	}
 }
 
-int Relay::Run(const char *lobbyAddr, unsigned short lobbyPort,
-               Uint32 gameId, unsigned short wsPort) {
-	(void)lobbyAddr; (void)lobbyPort;
+int Relay::Run(const char *peerHost, unsigned short peerPort,
+               Uint32 gameIdIn, unsigned short wsPort) {
+	gameId = gameIdIn;
 
-	// --- Listen socket ---------------------------------------------------
+	// --- AUTHORITY peer address ------------------------------------------
+	peerAddr.sin_family      = AF_INET;
+	peerAddr.sin_port        = htons(peerPort);
+	peerAddr.sin_addr.s_addr = inet_addr(peerHost);
+	if (peerAddr.sin_addr.s_addr == INADDR_NONE) {
+		fprintf(stderr, "[relay] bad peer host '%s' (must be dotted-decimal IPv4)\n",
+		        peerHost);
+		return 1;
+	}
+
+	// --- UDP socket to AUTHORITY -----------------------------------------
+	udpSock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	if (udpSock < 0) {
+		fprintf(stderr, "[relay] udp socket: %s\n", strerror(errno));
+		return 1;
+	}
+	{
+		unsigned long iomode = 1;
+		ioctl(udpSock, FIONBIO, &iomode);
+	}
+	{
+		sockaddr_in bindAddr{};
+		bindAddr.sin_family      = AF_INET;
+		bindAddr.sin_addr.s_addr = INADDR_ANY;
+		bindAddr.sin_port        = 0;
+		if (bind(udpSock, (sockaddr *)&bindAddr, sizeof(bindAddr)) != 0) {
+			fprintf(stderr, "[relay] udp bind: %s\n", strerror(errno));
+			return 1;
+		}
+	}
+
+	// --- WS listen socket ------------------------------------------------
 	listenSock = socket(AF_INET, SOCK_STREAM, 0);
 	if (listenSock < 0) {
-		fprintf(stderr, "[relay] socket: %s\n", strerror(errno));
+		fprintf(stderr, "[relay] tcp socket: %s\n", strerror(errno));
 		return 1;
 	}
 	int yes = 1;
@@ -101,44 +165,106 @@ int Relay::Run(const char *lobbyAddr, unsigned short lobbyPort,
 	addr.sin_addr.s_addr = INADDR_ANY;
 	addr.sin_port        = htons(wsPort);
 	if (bind(listenSock, (sockaddr *)&addr, sizeof(addr)) != 0) {
-		fprintf(stderr, "[relay] bind :%u: %s\n", wsPort, strerror(errno));
+		fprintf(stderr, "[relay] tcp bind :%u: %s\n", wsPort, strerror(errno));
 		return 1;
 	}
 	if (listen(listenSock, kRelayBacklog) != 0) {
 		fprintf(stderr, "[relay] listen: %s\n", strerror(errno));
 		return 1;
 	}
-	fprintf(stderr, "[relay] game=%u listening on ws://0.0.0.0:%u/\n",
-	        (unsigned)gameId, (unsigned)wsPort);
+	fprintf(stderr, "[relay] game=%u listening on ws://0.0.0.0:%u/ (peer=%s:%u)\n",
+	        (unsigned)gameId, (unsigned)wsPort, peerHost, (unsigned)peerPort);
 
-	// --- Accept + heartbeat loop -----------------------------------------
-	// Stage 2 stub: until PR #148 Phase 3 lands the spectator-peer UDP
-	// path, we just emit a synthetic 4-byte heartbeat every 250ms so
-	// browsers can confirm the WS pipe works end-to-end.
-	auto lastBeat = std::chrono::steady_clock::now();
+	// --- Initial spectator handshake -------------------------------------
+	SendConnectRequest();
+	unsigned long long lastPing = NowMs();
+	unsigned long long lastConnectRetry = NowMs();
+
+	// --- Main loop -------------------------------------------------------
+	unsigned char udpBuf[16384];
 	while (true) {
 		fd_set rfds;
 		FD_ZERO(&rfds);
 		FD_SET(listenSock, &rfds);
+		FD_SET(udpSock, &rfds);
+		int maxFd = listenSock > udpSock ? listenSock : udpSock;
 		timeval tv{0, 50 * 1000};
-		int maxFd = listenSock;
-		if (select(maxFd + 1, &rfds, nullptr, nullptr, &tv) > 0) {
+		int sel = select(maxFd + 1, &rfds, nullptr, nullptr, &tv);
+		if (sel > 0) {
 			if (FD_ISSET(listenSock, &rfds)) AcceptOne(listenSock);
+			if (FD_ISSET(udpSock, &rfds)) {
+				sockaddr_in src{};
+				socklen_t srclen = sizeof(src);
+				while (true) {
+					relay_ssize_t n = recvfrom(udpSock, (char *)udpBuf, sizeof(udpBuf),
+					                           0, (sockaddr *)&src, &srclen);
+					if (n <= 0) break;
+					// Only forward bytes from the AUTHORITY peer. (Stray traffic
+					// from elsewhere shouldn't happen on a freshly bound ephemeral
+					// port, but defense-in-depth: dropping unexpected senders
+					// keeps the WS stream noise-free.)
+					if (src.sin_addr.s_addr != peerAddr.sin_addr.s_addr ||
+					    src.sin_port != peerAddr.sin_port) {
+						continue;
+					}
+					if (!admitted) {
+						admitted = true;
+						fprintf(stderr, "[relay] AUTHORITY admitted us (first packet, %d bytes)\n",
+						        (int)n);
+					}
+					// Detect MSG_DISCONNECT and exit cleanly. The dedicated server
+					// sends this to all peers when the game ends (world.cpp:1739).
+					if (n >= 1 && udpBuf[0] == kMsgDisconnect) {
+						fprintf(stderr, "[relay] received MSG_DISCONNECT — shutting down\n");
+						return 0;
+					}
+					Broadcast(udpBuf, (size_t)n);
+				}
+			}
 		}
 
-		auto now = std::chrono::steady_clock::now();
-		if (now - lastBeat >= std::chrono::milliseconds(250)) {
-			lastBeat = now;
-			static unsigned int seq = 0;
-			seq++;
-			unsigned char beat[8] = {
-			    'B', 'E', 'A', 'T',
-			    (unsigned char)(seq), (unsigned char)(seq >> 8),
-			    (unsigned char)(seq >> 16), (unsigned char)(seq >> 24),
-			};
-			Broadcast(beat, sizeof(beat));
+		unsigned long long now = NowMs();
+		if (!admitted && now - lastConnectRetry >= (unsigned long long)kConnectRetryIntervalMs) {
+			lastConnectRetry = now;
+			SendConnectRequest();
+		}
+		if (admitted && now - lastPing >= (unsigned long long)kPingIntervalMs) {
+			lastPing = now;
+			SendPing();
 		}
 	}
+}
+
+void Relay::SendConnectRequest() {
+	// World::Connect equivalent: MSG_CONNECT + agency + accountid +
+	// passwordsize + (password bytes) + 1-bit observer flag.
+	// world.cpp:1702 is the canonical writer; world.cpp:285 the reader.
+	Serializer data;
+	Uint8 code = kMsgConnect;
+	data.Put(code);
+	Uint8 agency = 0;
+	data.Put(agency);
+	Uint32 accountid = 0; // anonymous spectator — plan §"Auth — anonymous v1"
+	data.Put(accountid);
+	Uint8 passwordsize = 0;
+	data.Put(passwordsize);
+	data.PutBit(true); // observer
+
+	sendto(udpSock, data.data, (int)Serializer::BitsToBytes(data.offset), 0,
+	       (sockaddr *)&peerAddr, sizeof(peerAddr));
+}
+
+void Relay::SendPing() {
+	// World::SendPing equivalent: MSG_PING + pingid u32. AUTHORITY's reply
+	// is MSG_PONG; we don't care about ping time so we drop the pong.
+	Serializer data;
+	Uint8 code = kMsgPing;
+	data.Put(code);
+	Uint32 pingid = (Uint32)NowMs();
+	data.Put(pingid);
+
+	sendto(udpSock, data.data, (int)Serializer::BitsToBytes(data.offset), 0,
+	       (sockaddr *)&peerAddr, sizeof(peerAddr));
 }
 
 bool Relay::AcceptOne(int sock) {
@@ -246,10 +372,11 @@ void Relay::Broadcast(const unsigned char *bytes, size_t len) {
 
 void Relay::DrainOutbox(WSClient &c) {
 	while (!c.sendBuf.empty()) {
-		ssize_t n = send(c.sock, (const char *)c.sendBuf.data(), c.sendBuf.size(), 0);
+		relay_ssize_t n = send(c.sock, (const char *)c.sendBuf.data(),
+		                       (int)c.sendBuf.size(), 0);
 		if (n > 0) {
 			c.sendBuf.erase(c.sendBuf.begin(), c.sendBuf.begin() + n);
-		} else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+		} else if (n < 0 && errno == kWouldBlock) {
 			return; // try again next broadcast
 		} else {
 			c.dead = true;

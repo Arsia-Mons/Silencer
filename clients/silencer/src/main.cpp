@@ -232,6 +232,44 @@ static void CleanupPreviousUpdate(void) {
 #endif
 }
 
+#if !defined(__EMSCRIPTEN__)
+// --relay <peer_host> <peer_port> <gameid> [--ws-port=N]
+// Server-side WASM spectator relay mode (Stage 2 of
+// docs/plans/2026-05-10-wasm-spectator.md). Headless C++ binary
+// fans the game's UDP snapshots out over WebSocket to N browser
+// clients. <peer_host>:<peer_port> is the AUTHORITY's (dedicated
+// server's) UDP address; Stage 7 wires lobby spawn-on-demand which
+// passes this from the lobby's tracked LobbyGame.Hostname/Port.
+//
+// Returns -1 if not relay mode (so the host main() falls through to
+// the regular game path). On relay mode, returns the relay process
+// exit code; the host main() forwards it.
+static int TryRelayMode(int argc, char ** argv){
+	if(argc < 2 || strcmp(argv[1], "--relay") != 0){
+		return -1;
+	}
+	if(argc < 5){
+		fprintf(stderr, "usage: silencer --relay <peer_host> <peer_port> <gameid> [--ws-port=N]\n");
+		return 2;
+	}
+#ifdef _WIN32
+	WSADATA wsaData;
+	WSAStartup(MAKEWORD(2, 2), &wsaData);
+#endif
+	const char *peerHost = argv[2];
+	unsigned short peerPort = (unsigned short)atoi(argv[3]);
+	Uint32 gameId = (Uint32)strtoul(argv[4], nullptr, 10);
+	unsigned short wsPort = 15174;
+	for(int i = 5; i < argc; i++){
+		if(strncmp(argv[i], "--ws-port=", 10) == 0){
+			wsPort = (unsigned short)atoi(argv[i] + 10);
+		}
+	}
+	Relay relay;
+	return relay.Run(peerHost, peerPort, gameId, wsPort);
+}
+#endif
+
 #ifdef POSIX
 int main(int argc, char * argv[]){
 #endif
@@ -242,27 +280,9 @@ int main(int argc, char * argv[]){
 			return UpdaterStage2::Run(argc, argv);
 		}
 	}
-	// --relay <lobbyaddr> <lobbyport> <gameid> [--ws-port=N]
-	// Server-side WASM spectator relay mode (Stage 2 of
-	// docs/plans/2026-05-10-wasm-spectator.md). Headless C++ binary
-	// fans the game's UDP snapshots out over WebSocket to N browser
-	// clients.
-	if(argc >= 2 && strcmp(argv[1], "--relay") == 0){
-		if(argc < 5){
-			fprintf(stderr, "usage: silencer --relay <lobbyaddr> <lobbyport> <gameid> [--ws-port=N]\n");
-			return 2;
-		}
-		const char *lobbyAddr = argv[2];
-		unsigned short lobbyPort = (unsigned short)atoi(argv[3]);
-		Uint32 gameId = (Uint32)strtoul(argv[4], nullptr, 10);
-		unsigned short wsPort = 15174;
-		for(int i = 5; i < argc; i++){
-			if(strncmp(argv[i], "--ws-port=", 10) == 0){
-				wsPort = (unsigned short)atoi(argv[i] + 10);
-			}
-		}
-		Relay relay;
-		return relay.Run(lobbyAddr, lobbyPort, gameId, wsPort);
+	{
+		int relayrc = TryRelayMode(argc, argv);
+		if(relayrc >= 0) return relayrc;
 	}
 #endif
 
@@ -289,6 +309,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 		// into orphan tokens, and stage-2 saw empty --install-dir / --relaunch
 		// values.
 		return UpdaterStage2::Run(__argc, __argv);
+	}
+	{
+		int relayrc = TryRelayMode(__argc, __argv);
+		if(relayrc >= 0) return relayrc;
 	}
 #endif
 
