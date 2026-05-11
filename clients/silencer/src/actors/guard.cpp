@@ -509,6 +509,59 @@ void Guard::InitBT(){
 		state = LADDER; is_on_ladder = true;
 		return BTResult::Running;
 	};
+
+	// ClearBlackboardKey(key): clear a blackboard entry and return Success.
+	btctx_.actions["ClearBlackboardKey"] = [this](BTContext& ctx) -> BTResult {
+		std::string key = ctx.bb<std::string>("key", "");
+		if(!key.empty()) ctx.blackboard.erase(key);
+		return BTResult::Success;
+	};
+
+	// ── Condition leaf nodes ────────────────────────────────────────────────
+	// Each returns Success if the condition is true, Failure otherwise.
+
+	btctx_.actions["IsAlive"] = [this](BTContext&) -> BTResult {
+		return (health > 0 && !is_dead && !is_dying) ? BTResult::Success : BTResult::Failure;
+	};
+
+	btctx_.actions["IsWalking"] = [this](BTContext&) -> BTResult {
+		return is_walking ? BTResult::Success : BTResult::Failure;
+	};
+
+	btctx_.actions["IsCrouched"] = [this](BTContext&) -> BTResult {
+		return is_crouched ? BTResult::Success : BTResult::Failure;
+	};
+
+	btctx_.actions["IsShooting"] = [this](BTContext&) -> BTResult {
+		return is_shooting ? BTResult::Success : BTResult::Failure;
+	};
+
+	btctx_.actions["IsOnLadder"] = [this](BTContext&) -> BTResult {
+		return is_on_ladder ? BTResult::Success : BTResult::Failure;
+	};
+
+	btctx_.actions["IsAtEdge"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		return (DistanceToEnd(*this, world) <= world.minwalldistance) ?
+		    BTResult::Success : BTResult::Failure;
+	};
+
+	btctx_.actions["HasChaseTarget"] = [this](BTContext&) -> BTResult {
+		return chasing ? BTResult::Success : BTResult::Failure;
+	};
+
+	btctx_.actions["IsPlayerInBase"] = [this](BTContext& ctx) -> BTResult {
+		if(!chasing) return BTResult::Failure;
+		return ctx.bb<bool>("target_in_base", false) ? BTResult::Success : BTResult::Failure;
+	};
+
+	btctx_.actions["IsPlayerInvisible"] = [this](BTContext& ctx) -> BTResult {
+		return ctx.bb<bool>("target_invisible", false) ? BTResult::Success : BTResult::Failure;
+	};
+
+	btctx_.actions["WasHit"] = [this](BTContext& ctx) -> BTResult {
+		return ctx.bb<bool>("was_hit", false) ? BTResult::Success : BTResult::Failure;
+	};
 }
 
 void Guard::Serialize(bool write, Serializer & data, Serializer * old){
@@ -551,7 +604,25 @@ void Guard::Tick(World & world){
 			btctx_.dt = 1.0f / GASLoader::Get().gameengine.ticksPerSecond;
 			btctx_.bbSet("patrol", (bool)patrol);
 			btctx_.bbSet("target_seen", false);
+			// Update blackboard with chase-target awareness data.
+			if(chasing){
+				Object* tgt = world.GetObjectFromId(chasing);
+				btctx_.bbSet("chasing_id", (int)chasing);
+				if(tgt){
+					btctx_.bbSet("last_seen_x", (int)tgt->x);
+					btctx_.bbSet("last_seen_y", (int)tgt->y);
+					if(tgt->type == ObjectTypes::PLAYER){
+						Player* p = static_cast<Player*>(tgt);
+						btctx_.bbSet("target_in_base",    (bool)p->InBase(world));
+						btctx_.bbSet("target_invisible",  (bool)p->IsInvisible(world));
+					}
+				}
+			} else {
+				btctx_.bbSet("chasing_id", 0);
+			}
 			bt_->tick(btctx_);
+			// Clear one-shot hit event after BT has seen it.
+			btctx_.blackboard.erase("was_hit");
 		} else {
 		do{
 			if((found = Look(world, 0))){
@@ -1112,11 +1183,15 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		state = HIT;
 		state_i = 0;
 	}
+	// Write hit event to blackboard so BT can react.
+	btctx_.bbSet("was_hit", true);
+	btctx_.bbSet("health_pct", health > 0 ? (float)health / (float)(maxhealth > 0 ? maxhealth : 1) : 0.0f);
 	// Non-patrol guard hit by player: alert so SearchAndReturn activates
-	if(bt_ && !patrol && health > 0 && !chasing){
+	if(!patrol && health > 0 && !chasing){
 		Object* owner = world.GetObjectFromId(projectile.ownerid);
 		if(owner && owner->type == ObjectTypes::PLAYER){
 			chasing = owner->id;
+			btctx_.bbSet("chasing_id", (int)chasing);
 		}
 	}
 	if(health == 0 && state != DYING && state != DYINGEXPLODE && state != DEAD){
