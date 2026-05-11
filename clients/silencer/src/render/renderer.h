@@ -5,7 +5,6 @@
 #include "resources.h"
 #include "palette.h"
 #include "camera.h"
-#include "textinput.h"
 #include "surface.h"
 #include <cmath>
 #include <vector>
@@ -48,7 +47,6 @@ public:
 	                       int dst_x, int dst_y, int scale = 1);
 	static void DrawFilledRectangle(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color, int scale = 1);
 	void DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 bank, Uint8 width, bool alpha = false, Uint8 tint = 0, Uint8 brightness = 128, bool rampcolor = false, int scale = 1);
-	void DrawTextInput(Surface * surface, TextInput & textinput);
 	void DrawTinyText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 tint = 0, Uint8 brightness = 128);
 	void DrawShadow(Surface * surface, Camera & camera, Object * object);
 	void DrawRain(Surface * surface, Camera & camera, float frametime = 0);

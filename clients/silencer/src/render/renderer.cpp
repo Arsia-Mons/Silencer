@@ -5,11 +5,6 @@
 #include "platformset.h"
 #include "resources.h"
 #include "objecttypes.h"
-#include "button.h"
-#include "textbox.h"
-#include "textinput.h"
-#include "selectbox.h"
-#include "scrollbar.h"
 #include "team.h"
 #include "player.h"
 #include "civilian.h"
@@ -27,7 +22,6 @@
 #include "techstation.h"
 #include "teambillboard.h"
 #include "overlay.h"
-#include "toggle.h"
 #include "pickup.h"
 #include "warper.h"
 #include "fixedcannon.h"
@@ -589,12 +583,6 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								}
 								EffectBrightness(effectsurface, 0, shrapnel->GetBrightness());
 							}break;
-							case ObjectTypes::SCROLLBAR:{
-								ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-								if(!scrollbar->draw){
-									src = 0;
-								}
-							}break;
 							case ObjectTypes::HEALMACHINE:{
 								HealMachine * healmachine = static_cast<HealMachine *>(object);
 								src = 0;
@@ -858,121 +846,6 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 										DrawText(surface, player->x + camera.GetXOffset() - ((strlen(username) * 6) / 2), player->y + camera.GetYOffset() - 80, username, 133, 6);
 									}
 								}
-							}
-						}break;
-						case ObjectTypes::BUTTON:{
-							Button * button = static_cast<Button *>(object);
-							if(button->text[0]){
-								Sint16 xoff;
-								Sint16 yoff;
-								button->GetTextOffset(world, &xoff, &yoff);
-								DrawText(surface, xoff, yoff, button->text, button->textbank, button->textwidth, true, button->effectcolor, button->effectbrightness);
-							}
-						}break;
-						case ObjectTypes::SCROLLBAR:{
-							ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-							if(scrollbar->draw){
-								Uint8 oldres_index = scrollbar->res_index;
-								scrollbar->res_index = scrollbar->barres_index;
-								src = world.resources.spritebank[object->res_bank][object->res_index].get();
-								float pos = float(scrollbar->scrollposition) / scrollbar->scrollmax;
-								Uint16 scrollbararea = world.resources.spriteheight[object->res_bank][object->res_index];
-								Rect srcrect;
-								srcrect.w = src->w;
-								srcrect.h = scrollbararea - (scrollbar->scrollmax);
-								if(src->h - (scrollbar->scrollmax) < 32){
-									srcrect.h = 32;
-								}
-								srcrect.x = 0;
-								srcrect.y = 0;
-								int dsty = ((scrollbararea - srcrect.h) * (pos));
-								//if(dsty > (scrollbararea - srcrect.h)){
-								//	dsty = (scrollbararea - srcrect.h);
-								//}
-								dstrect.y += dsty;
-								dstrect.x += 1;
-								dstrect.y += 16;
-								BlitSprite(object, camera, surface, &dstrect, src, &srcrect);
-								scrollbar->res_index = oldres_index;
-							}
-						}break;
-						case ObjectTypes::SELECTBOX:{
-							SelectBox * selectbox = static_cast<SelectBox *>(object);
-							unsigned int line = 0;
-							unsigned int i = 0;
-							for(std::deque<char *>::iterator it = selectbox->items.begin(); it != selectbox->items.end(); it++, i++){
-								if(i < selectbox->scrolled){
-									continue;
-								}
-								if(line > selectbox->height / selectbox->lineheight){
-									break;
-								}
-								char * text = (*it);
-								int row_y = selectbox->y + (line * selectbox->lineheight);
-								bool isdl = (strncmp(text, "[DL] ", 5) == 0);
-								if(i == selectbox->selecteditem){
-									Rect dstrect;
-									dstrect.x = selectbox->x;
-									dstrect.y = row_y;
-									dstrect.w = selectbox->width;
-									dstrect.h = 11;
-									DrawFilledRectangle(surface, dstrect.x, dstrect.y, dstrect.x + dstrect.w, dstrect.y + dstrect.h, 180);
-								}
-								if(isdl){
-									bool downloading = (selectbox->downloadprogress >= 0 &&
-									                    strcmp(text + 5, selectbox->downloaditem) == 0);
-									if(downloading){
-										int pct = selectbox->downloadprogress;
-										int barw = ((selectbox->width - 2) * pct) / 100;
-										DrawFilledRectangle(surface, selectbox->x, row_y, selectbox->x + selectbox->width - 2, row_y + 11, 0);
-										if(barw > 0) DrawFilledRectangle(surface, selectbox->x, row_y, selectbox->x + barw, row_y + 11, 180);
-										char pctstr[8]; snprintf(pctstr, sizeof(pctstr), "%d%%", pct);
-										DrawText(surface, selectbox->x + 2, row_y, pctstr, 133, 6);
-									}else{
-										DrawText(surface, selectbox->x, row_y, text + 5, 133, 6);
-										int bx = selectbox->x + selectbox->width - 16;
-										DrawFilledRectangle(surface, bx - 1, row_y, bx + 13, row_y + 11, 0);
-										DrawText(surface, bx, row_y, "DL", 133, 6);
-									}
-								}else{
-									DrawText(surface, selectbox->x, row_y, text, 133, 6);
-								}
-								line++;
-							}
-						}break;
-						case ObjectTypes::TEXTINPUT:{
-							TextInput * textinput = static_cast<TextInput *>(object);
-							DrawTextInput(surface, *textinput);
-						}break;
-						case ObjectTypes::TEXTBOX:{
-							TextBox * textbox = static_cast<TextBox *>(object);
-							unsigned int line = 0;
-							unsigned int i = 0;
-							for(auto it = textbox->text.begin(); it != textbox->text.end(); it++, i++){
-								if(i < textbox->scrolled){
-									continue;
-								}
-								int y = textbox->y + (line * textbox->lineheight);
-								if(line > textbox->height / textbox->lineheight){
-									break;
-								}
-								if(textbox->bottomtotop){
-									int size = (textbox->text.size() * textbox->lineheight);
-									if(size > textbox->height){
-										size = (ceil(float(textbox->height) / textbox->lineheight)) * textbox->lineheight;
-									}
-									y += (textbox->height - size);
-								}
-								Uint8 color = (*it)[strlen(it->data()) + 1];
-								Uint8 brightness = (*it)[strlen(it->data()) + 2];
-								DrawText(surface, textbox->x, y, it->data(), textbox->res_bank, textbox->fontwidth, false, color, brightness);
-								line++;
-							}
-						}break;
-						case ObjectTypes::TOGGLE:{
-							Toggle * toggle = static_cast<Toggle *>(object);
-							if(toggle->text[0]){
-								DrawText(surface, toggle->x - ((strlen(toggle->text) * 9) / 2), toggle->y, toggle->text, 134, 9);
 							}
 						}break;
 						case ObjectTypes::HEALMACHINE:{
@@ -1969,30 +1842,6 @@ void Renderer::DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text
 				}
 			}
 		}
-	}
-}
-
-void Renderer::DrawTextInput(Surface * surface, TextInput & textinput){
-	char * text = &textinput.text[textinput.scrolled];
-	char password[256];
-	if(textinput.password){
-		memset(password, '*', strlen(text));
-		password[strlen(text)] = 0;
-		text = password;
-	}
-	Uint8 effectbrightness = textinput.effectbrightness;
-	if(textinput.inactive){
-		effectbrightness = 64;
-	}
-	DrawText(surface, textinput.x, textinput.y, text, textinput.res_bank, textinput.fontwidth, false, textinput.effectcolor, effectbrightness);
-	if(!textinput.inactive && textinput.showcaret && state_i % 32 < 16){
-		Rect dstrect;
-		dstrect.x = textinput.x + (strlen(text) * textinput.fontwidth);
-		dstrect.y = textinput.y - 1;
-		dstrect.w = 1;
-		dstrect.h = textinput.height * 0.8f;
-		DrawFilledRectangle(surface, dstrect.x, dstrect.y, dstrect.x + dstrect.w, dstrect.y + dstrect.h, textinput.caretcolor);
-		//SDL_FillRect(surface, &dstrect, textinput.caretcolor);
 	}
 }
 

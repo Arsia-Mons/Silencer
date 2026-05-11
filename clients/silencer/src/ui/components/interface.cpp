@@ -1,12 +1,6 @@
 #include "interface.h"
-#include "button.h"
-#include "toggle.h"
-#include "textinput.h"
-#include "scrollbar.h"
-#include "selectbox.h"
-#include "overlay.h"
-#include "../gas/gasloader.h"
 #include <algorithm>
+#include <cstring>
 
 Interface::Interface() : Object(ObjectTypes::INTERFACE){
 	activeobject = 0;
@@ -63,8 +57,7 @@ void Interface::ProcessKeyPress(World & world, char ascii){
 	if(disabled){
 		return;
 	}
-	char key = ascii;
-	switch(key){
+	switch(ascii){
 		case '\t':
 			TabPressed(world);
 		break;
@@ -86,23 +79,6 @@ void Interface::ProcessKeyPress(World & world, char ascii){
 		case 4:
 			DownPressed(world);
 		break;
-	}
-	Object * object = world.GetObjectFromId(activeobject);
-	if(object){
-		switch(object->type){
-			case ObjectTypes::INTERFACE:{
-				Interface * iface = static_cast<Interface *>(object);
-				if(iface){
-					iface->ProcessKeyPress(world, ascii);
-				}
-			}break;
-			case ObjectTypes::TEXTINPUT:{
-				TextInput * textinput = static_cast<TextInput *>(object);
-				if(textinput){
-					textinput->ProcessKeyPress(key);
-				}
-			}break;
-		}
 	}
 }
 
@@ -131,243 +107,11 @@ void Interface::ProcessMouseWheelDown(World & world){
 }
 
 void Interface::ActiveChanged(World & world, Interface * callinginterface, bool mouse){
-	if(disabled){
-		return;
-	}
-	for(std::vector<Uint16>::iterator it = objects.begin(); it != objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object){
-			switch(object->type){
-				case ObjectTypes::SCROLLBAR:{
-					ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-					if(scrollbar){
-						if(world.GetObjectFromId(callinginterface->activeobject) == this || callinginterface == this){
-							if(mousewheelup){
-								scrollbar->ScrollUp();
-							}
-							if(mousewheeldown){
-								scrollbar->ScrollDown();
-							}
-						}
-						if(mousedown){
-							if(scrollbar->MouseInside(world, mousex, mousey)){
-								if(scrollbar->MouseInsideUp(world, mousex, mousey)){
-									scrollbar->ScrollUp();
-								}else
-								if(scrollbar->MouseInsideDown(world, mousex, mousey)){
-									scrollbar->ScrollDown();
-								}else{
-									/*Uint16 scrollarea = world.resources.spriteheight[scrollbar->res_bank][scrollbar->barres_index];
-									int scrollbarthickness = scrollarea - (scrollbar->scrollmax);
-									if(scrollbarthickness < 32){
-										scrollbarthickness = 32;
-									}
-									float scrolly = mousey + world.resources.spriteoffsety[scrollbar->res_bank][scrollbar->res_index] - 16;
-									if(scrolly < 0){
-										scrolly = 0;
-									}
-									if(scrolly > scrollarea){
-										scrolly = scrollarea;
-									}
-									scrolly = ((scrolly * 2) / (scrollarea)) - 1;
-									if(scrolly > 1){
-										scrolly = 1;
-									}
-									if(scrolly < -1){
-										scrolly = -1;
-									}
-									scrollbar->scrollposition = std::abs(scrolly) * scrollbar->scrollmax;*/
- 								}
-							}
-						}
-					}
-				}break;
-				case ObjectTypes::INTERFACE:{
-					Interface * iface = static_cast<Interface *>(object);
-					if(callinginterface && callinginterface->modal){
-						break;
-					}
-					iface->mousedown = mousedown;
-					iface->mousewheelup = mousewheelup;
-					iface->mousewheeldown = mousewheeldown;
-					iface->mousex = mousex;
-					iface->mousey = mousey;
-					if(mousedown){
-						if(mousex < iface->x + iface->width && mousex > iface->x && mousey < iface->y + iface->height && mousey > iface->y){
-							activeobject = iface->id;
-							iface->activeobject = iface->oldactiveobject;
-							for(std::vector<Uint16>::iterator it = objects.begin(); it != objects.end(); it++){
-								Object * object = world.GetObjectFromId(*it);
-								if(object){
-									if(object->type == ObjectTypes::INTERFACE){
-										Interface * iface = static_cast<Interface *>(object);
-										if(iface){
-											if(iface->id != activeobject){
-												if(iface->activeobject){
-													iface->oldactiveobject = iface->activeobject;
-													iface->activeobject = 0;
-												}
-												iface->ActiveChanged(world, this, mouse);
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-					iface->ActiveChanged(world, this, mouse);
-				}break;
-				case ObjectTypes::SELECTBOX:{
-					SelectBox * selectbox = static_cast<SelectBox *>(object);
-					if(selectbox){
-						if(mouse && mousedown){
-							int index = selectbox->MouseInside(world, mousex, mousey);
-							if(index >= 0){
-								selectbox->selecteditem = index;
-							}
-						}
-					}
-				}break;
-				case ObjectTypes::OVERLAY:{
-					Overlay * overlay = static_cast<Overlay *>(object);
-					if(overlay){
-						if(mouse && mousedown){
-							if(overlay->MouseInside(world, mousex, mousey)){
-								overlay->clicked = true;
-							}
-						}
-					}
-				}break;
-				case ObjectTypes::BUTTON:{
-					Button * button = static_cast<Button *>(object);
-					if(button){
-						// Hidden buttons (draw=false) must not hit-test — otherwise
-						// clicking on a stack of overlapping buttons triggers the
-						// invisible ones too.
-						if(!button->draw){
-							break;
-						}
-						if(mouse){
-							if(button->MouseInside(world, mousex, mousey)){
-								if((button->state == Button::INACTIVE || button->state == Button::DEACTIVATING)){
-									button->Activate();
-								}
-								if(mousedown){
-									button->clicked = true;
-								}
-							}else{
-								button->Deactivate();
-							}
-						}else{
-							if(button->id == activeobject && (button->state == Button::INACTIVE || button->state == Button::DEACTIVATING)){
-								button->Activate();
-							}
-							if(button->id != activeobject){
-								button->Deactivate();
-							}
-						}
-					}
-				}break;
-				case ObjectTypes::TEXTINPUT:{
-					TextInput * textinput = static_cast<TextInput *>(object);
-					if(textinput){
-						if(mouse && mousedown){
-							int index = textinput->MouseInside(mousex, mousey);
-							if(index != -1){
-								activeobject = textinput->id;
-								//textinput->SetCaretPosition(index);
-#ifdef __ANDROID__
-								JNIEnv * env;
-								jvm->GetEnv((void **)&env, JNI_VERSION_1_6);
-								jclass cls = env->FindClass("com/silencer/game/Silencer");
-								jmethodID show = env->GetStaticMethodID(cls, "showKeyboard", "()V");
-								env->CallStaticVoidMethod(cls, show);
-								env->DeleteLocalRef(cls);
-#endif
-							}
-						}
-						if(activeobject == textinput->id){
-							textinput->showcaret = true;
-						}else{
-							textinput->showcaret = false;
-						}
-					}
-				}break;
-				case ObjectTypes::TOGGLE:{
-					Toggle * toggle = static_cast<Toggle *>(object);
-					if(toggle){
-						if(mouse){
-							if(toggle->MouseInside(world, mousex, mousey) && mousedown){
-								toggle->selected = true;
-								activeobject = toggle->id;
-							}
-						}else{
-							if(toggle->id == activeobject){
-								toggle->selected = true;
-							}
-						}
-						if(toggle->selected && toggle->set){
-							for(std::vector<Uint16>::iterator it = objects.begin(); it != objects.end(); it++){
-								Object * object = world.GetObjectFromId(*it);
-								if(object){
-									if(object->type == ObjectTypes::TOGGLE){
-										Toggle * toggle2 = static_cast<Toggle *>(object);
-										if(toggle2){
-											if(toggle2->set == toggle->set && toggle2->id != toggle->id){
-												toggle2->selected = false;
-											}
-										}
-									}
-								}
-							}
-						}
-					}
-				}break;
-			}
-		}
-	}
 	mousewheeldown = false;
 	mousewheelup = false;
 }
 
 Object * Interface::GetObjectWithUid(World & world, Uint8 uid){
-	for(std::vector<Uint16>::iterator it = objects.begin(); it != objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object){
-			if(object->type == ObjectTypes::BUTTON){
-				Button * button = static_cast<Button *>(object);
-				if(button){
-					if(button->uid == uid){
-						return object;
-					}
-				}
-			}else
-			if(object->type == ObjectTypes::TEXTINPUT){
-				TextInput * textinput = static_cast<TextInput *>(object);
-				if(textinput){
-					if(textinput->uid == uid){
-						return object;
-					}
-				}
-			}else
-			if(object->type == ObjectTypes::SELECTBOX){
-				SelectBox * selectbox = static_cast<SelectBox *>(object);
-				if(selectbox){
-					if(selectbox->uid == uid){
-						return object;
-					}
-				}
-			}else
-			if(object->type == ObjectTypes::OVERLAY){
-				Overlay * overlay = static_cast<Overlay *>(object);
-				if(overlay){
-					if(overlay->uid == uid){
-						return object;
-					}
-				}
-			}
-		}
-	}
 	return 0;
 }
 
@@ -383,11 +127,6 @@ void Interface::DestroyInterface(World & world, Interface * parentinterface){
 	for(std::vector<Uint16>::iterator it = objects.begin(); it != objects.end(); it++){
 		Object * object = world.GetObjectFromId(*it);
 		if(object){
-			if(object->type == ObjectTypes::INTERFACE){
-				Interface * iface = static_cast<Interface *>(object);
-				iface->DestroyInterface(world, this);
-				it = objects.begin();
-			}
 			world.MarkDestroyObject(object->id);
 		}
 	}
@@ -530,63 +269,17 @@ void Interface::TabPressed(World & world){
 }
 
 void Interface::EnterPressed(World & world){
-	for(std::vector<Uint16>::iterator it = objects.begin(); it != objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object){
-			switch(object->type){
-				case ObjectTypes::BUTTON:{
-					Button * button = static_cast<Button *>(object);
-					if(button){
-						if(button->id == activeobject || button->id == buttonenter){
-							button->clicked = true;
-						}
-					}
-				}break;
-				case ObjectTypes::SELECTBOX:{
-					SelectBox * selectbox = static_cast<SelectBox *>(object);
-					if(selectbox){
-						if(selectbox->id == activeobject){
-							selectbox->enterpressed = true;
-						}
-					}
-				}
-			}
-		}
-	}
 }
 
 void Interface::EscapePressed(World & world){
-	for(std::vector<Uint16>::iterator it = objects.begin(); it != objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(object){
-			if(object->type == ObjectTypes::BUTTON){
-				Button * button = static_cast<Button *>(object);
-				if(button){
-					if(button->id == buttonescape){
-						button->clicked = true;
-					}
-				}
-			}
-		}
-	}
 }
 
 void Interface::LeftPressed(World & world){
-	Object * object = world.GetObjectFromId(activeobject);
-	if(object && object->type == ObjectTypes::SELECTBOX){
-		
-	}else{
-		Prev(world);
-	}
+	Prev(world);
 }
 
 void Interface::RightPressed(World & world){
-	Object * object = world.GetObjectFromId(activeobject);
-	if(object && object->type == ObjectTypes::SELECTBOX){
-		
-	}else{
-		Next(world);
-	}
+	Next(world);
 }
 
 void Interface::UpPressed(World & world){
@@ -598,141 +291,44 @@ void Interface::DownPressed(World & world){
 }
 
 void Interface::Prev(World & world){
-	bool gotonext = true;
-	if(activeobject == objectupscroll){
-		ScrollBar * scrollbar = (ScrollBar *)world.GetObjectFromId(Interface::scrollbar);
-		if(scrollbar){
-			scrollbar->ScrollUp();
-			if(scrollbar->scrollposition == 0){
-				gotonext = true;
-			}else{
-				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundUIClick]);
-				gotonext = false;
-			}
-		}
-	}
-	Object * object = world.GetObjectFromId(activeobject);
-	if(object && object->type == ObjectTypes::SELECTBOX){
-		SelectBox * selectbox = static_cast<SelectBox *>(object);
-		if(selectbox){
-			if(selectbox->selecteditem > 0){
-				selectbox->selecteditem--;
-			}
-		}
-	}
-	if(gotonext){
-		std::vector<Uint16>::reverse_iterator it = std::find(tabobjects.rbegin(), tabobjects.rend(), activeobject);
-		if(it != tabobjects.rend()){
-			it++;
-			if(it == tabobjects.rend()){
-				it = tabobjects.rbegin();
-			}
-			if(it != tabobjects.rend()){
-				activeobject = (*it);
-			}
-		}else{
+	std::vector<Uint16>::reverse_iterator it = std::find(tabobjects.rbegin(), tabobjects.rend(), activeobject);
+	if(it != tabobjects.rend()){
+		it++;
+		if(it == tabobjects.rend()){
 			it = tabobjects.rbegin();
-			if(it != tabobjects.rend()){
-				activeobject = (*it);
-			}
 		}
-		ActiveChanged(world, this, false);
+		if(it != tabobjects.rend()){
+			activeobject = (*it);
+		}
+	}else{
+		it = tabobjects.rbegin();
+		if(it != tabobjects.rend()){
+			activeobject = (*it);
+		}
 	}
+	ActiveChanged(world, this, false);
 }
 
 void Interface::Next(World & world){
-	bool gotonext = true;
-	if(activeobject == objectdownscroll){
-		ScrollBar * scrollbar = (ScrollBar *)world.GetObjectFromId(Interface::scrollbar);
-		if(scrollbar){
-			scrollbar->ScrollDown();
-			if(scrollbar->scrollposition == scrollbar->scrollmax){
-				gotonext = true;
-			}else{
-				Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundUIClick]);
-				gotonext = false;
-			}
-		}
-	}
-	Object * object = world.GetObjectFromId(activeobject);
-	if(object && object->type == ObjectTypes::SELECTBOX){
-		SelectBox * selectbox = static_cast<SelectBox *>(object);
-		if(selectbox){
-			if(selectbox->selecteditem < selectbox->items.size() - 1){
-				selectbox->selecteditem++;
-			}
-		}
-	}
-	if(gotonext){
-		std::vector<Uint16>::iterator it = std::find(tabobjects.begin(), tabobjects.end(), activeobject);
-		if(it != tabobjects.end()){
-			it++;
-			if(it == tabobjects.end()){
-				it = tabobjects.begin();
-			}
-			if(it != tabobjects.end()){
-				activeobject = (*it);
-			}
-		}else{
+	std::vector<Uint16>::iterator it = std::find(tabobjects.begin(), tabobjects.end(), activeobject);
+	if(it != tabobjects.end()){
+		it++;
+		if(it == tabobjects.end()){
 			it = tabobjects.begin();
-			if(it != tabobjects.end()){
-				activeobject = (*it);
-			}
 		}
-		ActiveChanged(world, this, false);
+		if(it != tabobjects.end()){
+			activeobject = (*it);
+		}
+	}else{
+		it = tabobjects.begin();
+		if(it != tabobjects.end()){
+			activeobject = (*it);
+		}
 	}
-}
-#include "textbox.h"
-#include <cctype>
-#include <cstdlib>
-#include <cstring>
-
-static bool IEq(const char* a, const char* b){
-	if(!a || !b) return false;
-	while(*a && *b){
-		if(std::tolower((unsigned char)*a) != std::tolower((unsigned char)*b)) return false;
-		++a; ++b;
-	}
-	return *a == 0 && *b == 0;
-}
-
-static const char* LabelOf(Object* o){
-	if(!o) return nullptr;
-	switch(o->type){
-		case ObjectTypes::BUTTON: return ((Button*)o)->text;
-		case ObjectTypes::TOGGLE: return ((Toggle*)o)->text;
-		default: return nullptr;
-	}
+	ActiveChanged(world, this, false);
 }
 
 Interface::WidgetMatch Interface::FindWidgetByLabel(World& world,
 	const char* labelOrId, Uint64 wantedTypes, Uint16* outId) const {
-	if(!labelOrId || !*labelOrId) return MATCH_NOT_FOUND;
-	// Numeric ID path: caller passed a literal Uint16.
-	char* endp = nullptr;
-	long asnum = std::strtol(labelOrId, &endp, 10);
-	if(endp && *endp == 0 && asnum > 0 && asnum <= 0xFFFF){
-		Object* o = world.GetObjectFromId((Uint16)asnum);
-		if(o && (wantedTypes == 0 || (wantedTypes & (1ULL << o->type)))){
-			*outId = (Uint16)asnum;
-			return MATCH_OK;
-		}
-		return MATCH_NOT_FOUND;
-	}
-	int hits = 0;
-	Uint16 firstHit = 0;
-	for(Uint16 oid : objects){
-		Object* o = world.GetObjectFromId(oid);
-		if(!o) continue;
-		if(wantedTypes != 0 && !(wantedTypes & (1ULL << o->type))) continue;
-		const char* label = LabelOf(o);
-		if(label && IEq(label, labelOrId)){
-			if(hits == 0) firstHit = oid;
-			++hits;
-		}
-	}
-	if(hits == 0) return MATCH_NOT_FOUND;
-	if(hits > 1)  return MATCH_AMBIGUOUS;
-	*outId = firstHit;
-	return MATCH_OK;
+	return MATCH_NOT_FOUND;
 }
