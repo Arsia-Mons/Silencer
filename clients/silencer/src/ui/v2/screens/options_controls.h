@@ -1,8 +1,18 @@
 #ifndef SILENCER_UI_V2_SCREENS_OPTIONS_CONTROLS_H
 #define SILENCER_UI_V2_SCREENS_OPTIONS_CONTROLS_H
 
+#include "runtime.h"
+#include "ui_state.h"
+
+#include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_stdinc.h>
+
+#include <cstdint>
 #include <functional>
 #include <string>
+
+class World;
+class ScreenContext;
 
 namespace ui {
 namespace v2 {
@@ -45,6 +55,39 @@ struct OptionsControlsHandlers {
 Node BuildOptionsControls(const Context & ctx,
                           const OptionsControlsHandlers & handlers = {},
                           const OptionsControlsState * state = nullptr);
+
+// Engine-side runtime for GameState::OPTIONSCONTROLS. Owns the rebind
+// capture state machine (primary / secondary slot, gamepad button +
+// axis snapshot, pending scancode). DispatchKeyDown latches the next
+// SDL scancode while a slot is armed; Tick() commits + clears.
+class OptionsControlsRuntime : public Runtime
+{
+public:
+	OptionsControlsRuntime(World & world, ScreenContext & sctx);
+
+	void Render(Surface & target, ::Renderer & renderer,
+	            int mouse_x, int mouse_y, float dt) override;
+	bool DispatchMouseDown(int mouse_x, int mouse_y) override;
+	bool DispatchKeyDown(int sdl_scancode) override;
+	void Tick() override;
+
+	// Called from BuildHandlers' on_rebind_key when the user clicks a
+	// key chip. Arms the capture state machine for the next Tick.
+	void StartRebind(int row, int slot);
+
+private:
+	World &         world_;
+	ScreenContext & sctx_;
+	UIState         state_;
+
+	// Active rebind slot in legacy uid encoding: row for primary (0..99)
+	// or 100+row for secondary (100..149); -1 = no active capture.
+	int      rebind_active_slot_      = -1;
+	uint32_t rebind_start_tick_       = 0;
+	int      rebind_pending_scancode_ = -1;
+	uint32_t rebind_gamepad_buttons_  = 0;
+	int16_t  rebind_gamepad_axes_[SDL_GAMEPAD_AXIS_COUNT] = {};
+};
 
 }  // namespace v2
 }  // namespace ui

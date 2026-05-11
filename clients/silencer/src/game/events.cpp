@@ -308,12 +308,9 @@ bool Game::HandleSDLEvents(void){
 						iface->ProcessKeyPress(world, ascii);
 					}
 				}
-				// v2 OPTIONSCONTROLS has no Interface on the stack but still
-				// needs the next scancode for the rebind capture state
-				// machine. TickOptionsControlsV2 consumes + clears it.
-				if(state == GameState::OPTIONSCONTROLS && controls_rebind_active_slot >= 0){
-					controls_rebind_pending_scancode = (int)event.key.scancode;
-				}
+				// v2 runtimes can latch the next scancode (e.g. OPTIONSCONTROLS
+				// rebind capture). Routed via active_runtime->DispatchKeyDown.
+				if(active_runtime) active_runtime->DispatchKeyDown((int)event.key.scancode);
 				// v2 LOBBYCONNECT also has currentinterface=0 — handle
 				// editing scancodes (BACKSPACE, RETURN, ESCAPE, TAB) directly.
 				if(state == GameState::LOBBYCONNECT){
@@ -386,8 +383,6 @@ bool Game::HandleSDLEvents(void){
 					}
 					if(active_runtime && active_runtime->DispatchMouseDown(lx, ly)){
 						// Runtime consumed the click.
-					}else if(state == GameState::OPTIONSCONTROLS){
-						DispatchOptionsControlsV2Click(lx, ly);
 					}else if(state == GameState::UPDATING){
 						DispatchUpdateV2Click(lx, ly);
 					}else if(state == GameState::MISSIONSUMMARY){

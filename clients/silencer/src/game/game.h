@@ -106,11 +106,6 @@ public:
 	const GamepadState& GetGamepadState() const { return gamepadstate; }
 	SDL_Gamepad * GetGamepad() const { return gamepad; }
 
-	// Arm a key-rebind capture for the v2 OPTIONSCONTROLS path. slot=0
-	// rebinds the primary chip, slot=1 the secondary. No-op if a capture
-	// is already in flight. Consumed by TickOptionsControlsV2.
-	void StartControlsRebind(int row, int slot);
-
 	// LobbyConnect login (ENTER / Login button) — sends credentials when
 	// the lobby is in AUTHENTICATING. Public so a file-static handler
 	// factory can wire it from a lambda.
@@ -338,12 +333,6 @@ private:
 	// Game (states being migrated one at a time).
 	std::unique_ptr<ui::v2::Runtime> active_runtime;
 	void SetRuntime(Uint8 new_state);
-	// Same shape for OPTIONSCONTROLS state. Per-row text + preset text
-	// derive from KeyMap each frame; clicking a key chip arms a rebind
-	// capture state machine ticked by TickOptionsControlsV2.
-	bool RenderOptionsControlsV2();
-	void DispatchOptionsControlsV2Click(int logical_x, int logical_y);
-	void TickOptionsControlsV2();
 	// Same shape for UPDATING state. Reads Updater state each frame to
 	// drive button visibility + status/progress text. Tick handles the
 	// STAGING -> UpdaterStage2::Launch transition that legacy
@@ -438,14 +427,6 @@ private:
 	// Labels). motdprinted mirrors the legacy bool on LobbyConnectScreen.
 	std::vector<std::string> lobby_connect_textbox_lines;
 	bool lobby_connect_motdprinted = false;
-	// Active rebind slot in legacy uid encoding: row for primary (0..99)
-	// or 100+row for secondary (100..149); -1 = no active capture. When
-	// active, the next key/gamepad input writes back to the KeyMap.
-	int           controls_rebind_active_slot = -1;
-	Uint32        controls_rebind_start_tick = 0;
-	int           controls_rebind_pending_scancode = -1;  // -1 = none, else SDL_Scancode
-	uint32_t      controls_rebind_gamepad_buttons = 0;
-	int16_t       controls_rebind_gamepad_axes[SDL_GAMEPAD_AXIS_COUNT] = {};
 	// Set by GoToState; processed at the next Tick() entry to pop screens
 	// safely after the active screen's Tick has returned. Avoids destroying
 	// a screen mid-Tick when a button click triggers a state transition.
