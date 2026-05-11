@@ -24,9 +24,9 @@
 namespace silencer::ui::primitives {
 
 struct LabelValueRowOpts {
-	Uint16          width            = 156;   // Total row width (px).
-	Uint16          height           = 14;    // Total row height (px). Matches legacy 14-px label rhythm.
-	Uint16          labelWidth       = 72;    // Label column width (px). Value column grows to fill remainder.
+	Uint16          width;                    // Total row width (px). Required — primitive carries no opinion on form size.
+	Uint16          height           = 14;    // Total row height (px). Sized for a single BankText cell.
+	Uint16          labelWidth;               // Label column width (px). Required — caller sizes for its longest label. Value column fills (width - labelWidth).
 	BankTextVariant variant          = BankTextVariant::Body;
 	Uint8           labelEffectColor = 0;     // 0 = no tint.
 	Uint8           labelBrightness  = 128;
