@@ -167,6 +167,7 @@ export function encodeLobbyGame(w: Writer, g: LobbyGame): void {
     w.u8(g.maxPlayers);
     w.u8(g.maxTeams);
     w.u8(g.extra);
+    w.u8(g.spectatable);
     w.u16Le(g.port);
 }
 
@@ -186,11 +187,12 @@ export function decodeLobbyGame(r: Reader): LobbyGame {
     const maxPlayers = r.u8();
     const maxTeams = r.u8();
     const extra = r.u8();
+    const spectatable = r.u8();
     const port = r.u16Le();
     return {
         id, accountId, name, password, hostname, mapName, mapHash,
         players, state, securityLevel, minLevel, maxLevel,
-        maxPlayers, maxTeams, extra, port,
+        maxPlayers, maxTeams, extra, spectatable, port,
     };
 }
 
@@ -348,7 +350,9 @@ export function decodeChatPush(r: Reader): ChatMessage {
 export function decodeNewGame(r: Reader): NewGameEvent {
     const status = r.u8();
     const game = decodeLobbyGame(r);
-    return { status, game };
+    // Per-recipient can-rejoin bit. Older servers omit it; treat absent as 0.
+    const canRejoin = r.remaining >= 1 ? r.u8() : 0;
+    return { status, game, canRejoin };
 }
 
 export const decodeDelGame = (r: Reader): number => r.u32Le();

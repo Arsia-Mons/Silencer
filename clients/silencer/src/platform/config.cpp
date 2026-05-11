@@ -36,6 +36,7 @@ void Config::Save(void){
 		sprintf(temp, "%d", defaulttechchoices[3]); WriteString(file, "defaulttechchoices3", temp);
 		sprintf(temp, "%d", defaulttechchoices[4]); WriteString(file, "defaulttechchoices4", temp);
 		WriteString(file, "active_keybind_profile", active_keybind_profile);
+		WriteString(file, "lastspectatable", lastspectatable ? "1" : "0");
 		SDL_CloseIO(file);
 	}
 }
@@ -67,6 +68,7 @@ bool Config::Load(void){
 				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaulttechchoices3")){ defaulttechchoices[3] = atoi(data); }
 				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "defaulttechchoices4")){ defaulttechchoices[4] = atoi(data); }
 				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "active_keybind_profile")){ ReadString(data, active_keybind_profile, sizeof(active_keybind_profile)); }
+				ReadString(variable, vardata, sizeof(vardata)); if(CompareString(vardata, "lastspectatable")){ if(atoi(data) == 0){ lastspectatable = false; }else{ lastspectatable = true; } }
 			}
 		}
 		SDL_CloseIO(file);
@@ -96,6 +98,7 @@ void Config::LoadDefaults(void){
 	defaulttechchoices[3] = World::BUY_LASER | World::BUY_ROCKET;
 	defaulttechchoices[4] = World::BUY_LASER | World::BUY_ROCKET;
 	strcpy(active_keybind_profile, "default");
+	lastspectatable = true;
 }
 
 bool Config::CompareString(const char * str1, const char * str2){

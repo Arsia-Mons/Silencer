@@ -11,6 +11,7 @@ update.json
 .vcpkg/
 lobby.json
 services/lobby/lobby
+services/lobby/lobby.exe
 services/lobby/silencer-lobby
 services/lobby/silencer-lobby.exe
 services/lobby/silencer-lobby.exe~

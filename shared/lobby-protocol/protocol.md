@@ -144,12 +144,20 @@ u8     brightness    (0–255, default 128)
 
 **Push** (`S → C`):
 ```
-u8           status   (1 = success / advertise existing, 2 = create failed)
+u8           status     (1 = success / advertise existing, 2 = create failed)
 LobbyGame    game
+u8           can_rejoin (1 = recipient has a parked-peer slot on this
+                        game's dedicated server; 0 = no rejoin path)
 ```
 A push where `game.account_id == self.account_id` AND `status == 2`
 means "your CreateGame request failed" (e.g. heartbeat timeout from
 the spawned dedicated). Otherwise it's a normal advertisement.
+
+`can_rejoin` is per-recipient: the lobby derives it by checking whether
+the recipient's `account_id` matches one of the dedicated server's
+parked-peer accountids (reported via the UDP heartbeat — see below).
+For backward compat, decoders MUST treat absence of the trailing byte
+as `can_rejoin = 0`.
 
 ### `opDelGame` (4)
 
@@ -337,6 +345,7 @@ u8     max_level
 u8     max_players
 u8     max_teams
 u8     extra
+u8     spectatable    (0 = no spectators, 1 = accepts spectators; password gate applies equally)
 u16    port
 ```
 
@@ -350,7 +359,15 @@ u8     0x00           (constant, "heartbeat" tag)
 u32    game_id
 u16    port
 u8     state
+u8     parked_count   (optional; recipients of pre-rejoin servers
+                      treat absence as 0)
+u32[]  parked_accts   (parked_count entries; accountids of peers
+                      that disconnected mid-game and are eligible
+                      to rejoin)
 ```
+
+`parked_accts` feeds the per-recipient `can_rejoin` bit on the
+`opNewGame` push.
 
 ## Limits & constants
 

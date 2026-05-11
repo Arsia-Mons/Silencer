@@ -69,6 +69,7 @@ export const LOBBY_HANDLERS: Record<string, Handler> = {
           maxLevel: 0,
           securityLevel: 0,
           extra: 0,
+          spectatable: 0,
           players: 0,
           state: 0,
           accountId: 0,

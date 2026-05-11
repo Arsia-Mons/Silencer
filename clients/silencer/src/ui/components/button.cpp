@@ -8,6 +8,7 @@ Button::Button() : Object(ObjectTypes::BUTTON){
 	state = INACTIVE;
 	state_i = 0;
 	clicked = false;
+	textleftalign = false;
 	SetType(B196x33);
 	uid = 0;
 	text[0] = 0;
@@ -177,7 +178,7 @@ bool Button::MouseInside(World & world, Uint16 mousex, Uint16 mousey){
 }
 
 void Button::GetTextOffset(World & world, Sint16 * x, Sint16 * y){
-	int xoff = int((width - (strlen(text) * textwidth)) / 2);
+	int xoff = textleftalign ? 0 : int((width - (strlen(text) * textwidth)) / 2);
 	int yoff = 0;
 	switch(type){
 		case B112x33:
