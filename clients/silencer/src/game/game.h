@@ -233,6 +233,10 @@ private:
 	// current toggle state.
 	bool RenderOptionsDisplayV2();
 	void DispatchOptionsDisplayV2Click(int logical_x, int logical_y);
+	// Same shape for OPTIONSAUDIO state. Indicator sprites reflect
+	// Config.music; handlers toggle via Audio::Pause/ResumeMusic.
+	bool RenderOptionsAudioV2();
+	void DispatchOptionsAudioV2Click(int logical_x, int logical_y);
 	// Set by GoToState; processed at the next Tick() entry to pop screens
 	// safely after the active screen's Tick has returned. Avoids destroying
 	// a screen mid-Tick when a button click triggers a state transition.
