@@ -5,6 +5,9 @@
 - `clay.h` lives at `clients/silencer/third_party/clay/clay.h`; include as `#include "clay/clay.h"` since `third_party/` is on the include path (CMakeLists.txt:118).
 - `CLAY_IMPLEMENTATION` is defined in exactly one TU: `clients/silencer/src/ui/clay/clay_init.cpp`. Picked up automatically by the `src/*.cpp` GLOB_RECURSE.
 - macOS binary lives at `build/Silencer.app/Contents/MacOS/Silencer`; verify Clay symbols with `nm <bin> | grep _Clay_`.
+- `tools/pixdiff` is a standalone CMake project; configure with `cmake -S tools/pixdiff -B tools/pixdiff/build`, build with `cmake --build tools/pixdiff/build -j`. Binary at `tools/pixdiff/build/pixdiff`. Sibling target `gen_fixtures <dir>` regenerates the 16x16 test PNGs.
+- `stb_image.h` lives at `tools/pixdiff/stb_image.h` (v2.30, fetched from nothings/stb master). Do not copy it elsewhere — if another tool needs it, point its include path at `tools/pixdiff/`.
+- pixdiff metric is byte-level equality count over the RGBA buffer (mismatched pixels weighted equally regardless of distance). Same-size mismatched dims short-circuit to 100.0.
 
 ## 2026-05-11T00:00:00Z - bootstrap
 - Ralph artifacts created (ralph.sh, RALPH.md, prd.json, progress.txt).
@@ -40,3 +43,25 @@
   - C++20 bump is repo-wide for the silencer target. If a TU was relying on C++14-specific quirks, surface here; nothing did in this iteration.
 ---
 
+
+## 2026-05-11T10:30:00Z - P1 (Pixel-diff CLI tool)
+- Added tools/pixdiff/ — standalone CMake project with two targets:
+  - `pixdiff <a.png> <b.png>` — prints byte-diff % (forced RGBA load, mismatched dims → 100.0).
+  - `gen_fixtures <dir>` — one-shot generator for the 16x16 test PNGs.
+- Vendored stb_image.h v2.30 at tools/pixdiff/stb_image.h (matches existing stb_image_write.h v1.16 in the silencer third_party tree).
+- Generated and committed 3 fixtures: tests/lobby-clay/fixtures/{identical_a,identical_b,totally_different}.png.
+- Files changed:
+  - tools/pixdiff/pixdiff.cpp
+  - tools/pixdiff/gen_fixtures.cpp
+  - tools/pixdiff/CMakeLists.txt
+  - tools/pixdiff/stb_image.h (vendored)
+  - tests/lobby-clay/fixtures/{identical_a,identical_b,totally_different}.png
+- Pass check:
+  - `pixdiff identical_a.png identical_b.png` → 0.0000 (target 0.0) ✓
+  - `pixdiff identical_a.png totally_different.png` → 75.0000 (target >50.0) ✓
+- Main silencer build still green (unchanged TU set).
+- **Learnings for future iterations:**
+  - The pixdiff metric is byte-equality, NOT perceptual. A 1-LSB shift in every byte counts the same as a wildly different image. Future panel-level pixdiffs should design their content + baselines around this — anti-aliased shifts may eat the budget faster than you expect.
+  - `gen_fixtures` is committed as source so any future iteration can regenerate fixtures deterministically; it's NOT wired into CI.
+  - When a new third_party header is needed, prefer placing it next to the consumer (e.g. `tools/pixdiff/stb_image.h`) rather than the silencer third_party tree, to keep tool boundaries clean.
+---

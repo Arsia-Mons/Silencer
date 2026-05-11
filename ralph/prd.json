@@ -12,7 +12,7 @@
       "id": "P1",
       "priority": 1,
       "name": "Pixel-diff CLI tool",
-      "passes": false,
+      "passes": true,
       "spec": "Add tools/pixdiff/ with a single C++ source pixdiff.cpp that uses stb_image (already vendored at clients/silencer/third_party/stb_image_write.h — fetch stb_image.h from the same upstream). Usage: `pixdiff <a.png> <b.png>` prints a single floating-point percent in [0,100] to stdout, exit 0 always (caller checks the value). Build via a small standalone CMakeLists.txt in tools/pixdiff/ so it doesn't depend on the main game. The percent is byte_diff_bytes * 100 / total_bytes across the raw RGBA buffer; mismatched dimensions print 100.0.",
       "pass_check": "tools/pixdiff/build/pixdiff tests/lobby-clay/fixtures/identical_a.png tests/lobby-clay/fixtures/identical_b.png prints 0.0; tools/pixdiff/build/pixdiff tests/lobby-clay/fixtures/identical_a.png tests/lobby-clay/fixtures/totally_different.png prints >50.0. Fixtures are tiny (16x16) PNGs that the agent generates with a one-shot script and commits."
     },
