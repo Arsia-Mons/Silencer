@@ -32,17 +32,22 @@ public:
 	// camera adjustment they need. effectcolor/effectbrightness mirror the
 	// legacy per-Object effect path (EffectColor when effectcolor!=0, then
 	// EffectBrightness when effectbrightness!=128); defaults are no-ops.
-	void DrawSpriteAt(Surface * target, Uint8 bank, Uint8 index, Sint16 anchor_x, Sint16 anchor_y, Uint8 effectcolor = 0, Uint8 effectbrightness = 128);
+	// `scale` (Path B): when >1, both the anchor coords (logical pixels) and
+	// the sprite dimensions are multiplied — each src pixel writes to a
+	// scale×scale block in the destination (true nearest-neighbor pixel
+	// doubling, no filtering). Default 1 preserves legacy byte-identity.
+	void DrawSpriteAt(Surface * target, Uint8 bank, Uint8 index, Sint16 anchor_x, Sint16 anchor_y, Uint8 effectcolor = 0, Uint8 effectbrightness = 128, int scale = 1);
 	// Blit a sub-rect of sprite[bank][index] at (dst_x, dst_y). Used by the
 	// ui/v2 NineSliceFrame primitive to lift corner / edge / center pixels
 	// out of a single chrome sprite and tile them across an arbitrary rect.
 	// No baked sprite anchor is applied — (dst_x, dst_y) is the destination
-	// top-left in screen-pixel space.
+	// top-left in screen-pixel space. `scale` mirrors DrawSpriteAt's Path B
+	// semantics: dst position and dimensions multiply by scale.
 	void DrawSpriteSubRect(Surface * target, Uint8 bank, Uint8 index,
 	                       int src_x, int src_y, int src_w, int src_h,
-	                       int dst_x, int dst_y);
-	static void DrawFilledRectangle(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color);
-	void DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 bank, Uint8 width, bool alpha = false, Uint8 tint = 0, Uint8 brightness = 128, bool rampcolor = false);
+	                       int dst_x, int dst_y, int scale = 1);
+	static void DrawFilledRectangle(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color, int scale = 1);
+	void DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 bank, Uint8 width, bool alpha = false, Uint8 tint = 0, Uint8 brightness = 128, bool rampcolor = false, int scale = 1);
 	void DrawTextInput(Surface * surface, TextInput & textinput);
 	void DrawTinyText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 tint = 0, Uint8 brightness = 128);
 	void DrawShadow(Surface * surface, Camera & camera, Object * object);
@@ -84,6 +89,15 @@ public:
 	static void BlitSurfaceFast(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	static void BlitSurfaceRLE(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	static void BlitSurfaceRLEClipped(int w, Uint8 * srcbuf, Rect * srcrect, Surface * dst, Rect * dstrect);
+	// Path B: nearest-neighbor scaled blit. Each src pixel writes a
+	// scale×scale block at (dst_x, dst_y) + sx*scale, sy*scale. Transparent
+	// index 0 is preserved. Honors dst's scissor stack and clips to dst
+	// bounds. Caller passes the unscaled src rect (or null for the whole
+	// surface) and the scaled dst position; this fn handles the multiply.
+	// scale<=1 falls through to the existing BlitSurface path so byte-
+	// identity is preserved for the (default) scale=1 case.
+	static void BlitSurfaceScaled(Surface * src, Rect * srcrect, Surface * dst, int dst_x, int dst_y, int scale);
+	void DrawAlphaedScaled(Surface * src, Surface * dst, int dst_x, int dst_y, int scale);
 	struct DynOccluder { int x1, y1, x2, y2; };
 	void DrawLight(Surface * surface, Surface * src, Rect * Rect, Sint32 lightWorldX = 0, Sint32 lightWorldY = 0, Sint32 cameraOffX = 0, Sint32 cameraOffY = 0, const std::vector<Map::ShadowZone> * zones = nullptr, Uint8 colorIndex = 0, float lumScale = 1.0f, const Uint8 * mask = nullptr, const std::vector<DynOccluder> * dynoccluders = nullptr);
 	void DrawLightRadial(Surface * surface, int screenX, int screenY, int radius, Sint32 lightWorldX, Sint32 lightWorldY, Sint32 cameraOffX, Sint32 cameraOffY, const Uint8 * mask, int diam, Uint8 colorIndex, float lumScale, const std::vector<DynOccluder> * dynoccluders);

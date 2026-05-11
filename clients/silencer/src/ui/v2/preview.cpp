@@ -318,6 +318,17 @@ int Game::RunPreview()
 	// caller passes false; the interactive loop passes true so animations
 	// advance and stale IDs get GC'd at end of frame.
 	auto render_once = [&](bool with_state){
+		// Preview byte-identity gate runs at preview_scale=1 (640×480). When
+		// the user passes --preview-scale N >1 the v2 path needs a buffer
+		// large enough to hold scale-multiplied sprite blits — match the
+		// live engine's Path B sizing here so visual scale-N captures work.
+		// Legacy paths stay 640×480 (legacy renderer can't scale), so any
+		// cross-impl PPM diff at scale>1 would mismatch by design.
+		const int want_w = use_legacy ? 640 : (640 * preview_scale);
+		const int want_h = use_legacy ? 480 : (480 * preview_scale);
+		if(screenbuffer.w != want_w || screenbuffer.h != want_h){
+			screenbuffer.Resize(want_w, want_h);
+		}
 		screenbuffer.Clear(0);
 		if(use_legacy){
 			if(strcmp(preview_screen, "main_menu") == 0){

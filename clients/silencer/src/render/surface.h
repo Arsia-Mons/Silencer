@@ -10,6 +10,12 @@ public:
 	Surface();
 	Surface(int w, int h, Uint8 clearcolor = 0);
 	void Clear(Uint8 color);
+	// Resize the pixel buffer in place. Pixels are not preserved — caller is
+	// expected to redraw. Used by Game::Loop to keep `screenbuffer` matched to
+	// the live SDL window dims while a v2 runtime is active (Path B
+	// pixel-doubling), and to shrink back to 640×480 when the world renderer
+	// (which assumes a 640×480 surface) takes over again.
+	void Resize(int w, int h);
 	Uint8 * GetPixels(void);
 	int w;
 	int h;

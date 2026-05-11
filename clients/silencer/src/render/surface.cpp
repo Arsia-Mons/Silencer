@@ -17,6 +17,15 @@ void Surface::Clear(Uint8 color){
 	memset(pixels.data(), color, w * h);
 }
 
+void Surface::Resize(int new_w, int new_h){
+	if(new_w == w && new_h == h) return;
+	w = new_w;
+	h = new_h;
+	pixels.assign((size_t)w * (size_t)h, 0);
+	rlepixels.clear();
+	scissorstack.clear();
+}
+
 Uint8 * Surface::GetPixels(void){
 	if(pixels.size() == 0){
 		pixels.resize(w * h);

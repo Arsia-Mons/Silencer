@@ -1469,7 +1469,7 @@ void Renderer::BlitSurface(Surface * src, Rect * srcrect, Surface * dst, Rect * 
 	BlitSurfaceUpper(src, srcrect, dst, dstrect);
 }
 
-void Renderer::DrawSpriteAt(Surface * target, Uint8 bank, Uint8 index, Sint16 anchor_x, Sint16 anchor_y, Uint8 effectcolor, Uint8 effectbrightness){
+void Renderer::DrawSpriteAt(Surface * target, Uint8 bank, Uint8 index, Sint16 anchor_x, Sint16 anchor_y, Uint8 effectcolor, Uint8 effectbrightness, int scale){
 	if(!target) return;
 	if(bank >= world.resources.spritebank.size()) return;
 	if(index >= world.resources.spritebank[bank].size()) return;
@@ -1485,26 +1485,131 @@ void Renderer::DrawSpriteAt(Surface * target, Uint8 bank, Uint8 index, Sint16 an
 		EffectBrightness(effectsurface, 0, effectbrightness);
 	}
 	if(effectsurface) src = effectsurface;
-	Rect dstrect;
-	dstrect.x = anchor_x - world.resources.spriteoffsetx[bank][index];
-	dstrect.y = anchor_y - world.resources.spriteoffsety[bank][index];
-	dstrect.w = src->w;
-	dstrect.h = src->h;
-	BlitSurface(src, NULL, target, &dstrect);
+	int dst_x = (int)anchor_x - (int)world.resources.spriteoffsetx[bank][index];
+	int dst_y = (int)anchor_y - (int)world.resources.spriteoffsety[bank][index];
+	if(scale <= 1){
+		Rect dstrect;
+		dstrect.x = dst_x;
+		dstrect.y = dst_y;
+		dstrect.w = src->w;
+		dstrect.h = src->h;
+		BlitSurface(src, NULL, target, &dstrect);
+	}else{
+		BlitSurfaceScaled(src, NULL, target, dst_x * scale, dst_y * scale, scale);
+	}
 	if(effectsurface) delete effectsurface;
 }
 
 void Renderer::DrawSpriteSubRect(Surface * target, Uint8 bank, Uint8 index,
                                  int src_x, int src_y, int src_w, int src_h,
-                                 int dst_x, int dst_y){
+                                 int dst_x, int dst_y, int scale){
 	if(!target) return;
 	if(bank >= world.resources.spritebank.size()) return;
 	if(index >= world.resources.spritebank[bank].size()) return;
 	Surface * src = world.resources.spritebank[bank][index].get();
 	if(!src) return;
 	Rect srcrect{src_w, src_h, src_x, src_y};
-	Rect dstrect{src_w, src_h, dst_x, dst_y};
-	BlitSurface(src, &srcrect, target, &dstrect);
+	if(scale <= 1){
+		Rect dstrect{src_w, src_h, dst_x, dst_y};
+		BlitSurface(src, &srcrect, target, &dstrect);
+	}else{
+		BlitSurfaceScaled(src, &srcrect, target, dst_x * scale, dst_y * scale, scale);
+	}
+}
+
+void Renderer::BlitSurfaceScaled(Surface * src, Rect * srcrect, Surface * dst, int dst_x, int dst_y, int scale){
+	if(!src || !dst) return;
+	if(scale <= 1){
+		Rect dr;
+		if(srcrect){
+			dr.x = dst_x; dr.y = dst_y; dr.w = srcrect->w; dr.h = srcrect->h;
+			BlitSurface(src, srcrect, dst, &dr);
+		}else{
+			dr.x = dst_x; dr.y = dst_y; dr.w = src->w; dr.h = src->h;
+			BlitSurface(src, NULL, dst, &dr);
+		}
+		return;
+	}
+	int sx0 = 0, sy0 = 0, sw = src->w, sh = src->h;
+	if(srcrect){
+		sx0 = srcrect->x; sy0 = srcrect->y;
+		sw = srcrect->w;  sh = srcrect->h;
+	}
+	if(sx0 < 0){ sw += sx0; sx0 = 0; }
+	if(sy0 < 0){ sh += sy0; sy0 = 0; }
+	if(sx0 + sw > src->w) sw = src->w - sx0;
+	if(sy0 + sh > src->h) sh = src->h - sy0;
+	if(sw <= 0 || sh <= 0) return;
+	Surface::ScissorRect scr;
+	bool has_scissor = dst->ActiveScissor(scr);
+	int dst_min_x = 0, dst_min_y = 0;
+	int dst_max_x = dst->w, dst_max_y = dst->h;
+	if(has_scissor){
+		if(scr.x1 > dst_min_x) dst_min_x = scr.x1;
+		if(scr.y1 > dst_min_y) dst_min_y = scr.y1;
+		if(scr.x2 < dst_max_x) dst_max_x = scr.x2;
+		if(scr.y2 < dst_max_y) dst_max_y = scr.y2;
+	}
+	const Uint8 * src_pix = src->pixels.data();
+	Uint8 * dst_pix = dst->pixels.data();
+	int src_w_total = src->w;
+	int dst_w_total = dst->w;
+	for(int sy = 0; sy < sh; sy++){
+		int src_row = (sy0 + sy) * src_w_total + sx0;
+		int dy_base = dst_y + sy * scale;
+		for(int sx = 0; sx < sw; sx++){
+			Uint8 c = src_pix[src_row + sx];
+			if(!c) continue;
+			int dx_base = dst_x + sx * scale;
+			for(int oy = 0; oy < scale; oy++){
+				int yy = dy_base + oy;
+				if(yy < dst_min_y || yy >= dst_max_y) continue;
+				Uint8 * row = dst_pix + yy * dst_w_total;
+				for(int ox = 0; ox < scale; ox++){
+					int xx = dx_base + ox;
+					if(xx < dst_min_x || xx >= dst_max_x) continue;
+					row[xx] = c;
+				}
+			}
+		}
+	}
+}
+
+void Renderer::DrawAlphaedScaled(Surface * src, Surface * dst, int dst_x, int dst_y, int scale){
+	if(!src || !dst) return;
+	if(scale <= 1){
+		Rect dr{src->w, src->h, dst_x, dst_y};
+		DrawAlphaed(src, 0, dst, &dr);
+		return;
+	}
+	Surface::ScissorRect scr;
+	bool has_scissor = dst->ActiveScissor(scr);
+	int dst_min_x = 0, dst_min_y = 0;
+	int dst_max_x = dst->w, dst_max_y = dst->h;
+	if(has_scissor){
+		if(scr.x1 > dst_min_x) dst_min_x = scr.x1;
+		if(scr.y1 > dst_min_y) dst_min_y = scr.y1;
+		if(scr.x2 < dst_max_x) dst_max_x = scr.x2;
+		if(scr.y2 < dst_max_y) dst_max_y = scr.y2;
+	}
+	for(int sy = 0; sy < src->h; sy++){
+		for(int sx = 0; sx < src->w; sx++){
+			Uint8 srcpixel = GetPixel(src, sx, sy);
+			if(!srcpixel) continue;
+			int dx_base = dst_x + sx * scale;
+			int dy_base = dst_y + sy * scale;
+			for(int oy = 0; oy < scale; oy++){
+				int yy = dy_base + oy;
+				if(yy < dst_min_y || yy >= dst_max_y) continue;
+				for(int ox = 0; ox < scale; ox++){
+					int xx = dx_base + ox;
+					if(xx < dst_min_x || xx >= dst_max_x) continue;
+					Uint8 dpix = GetPixel(dst, xx, yy);
+					SetPixel(dst, xx, yy, palette.Alpha(srcpixel, dpix));
+				}
+			}
+		}
+	}
 }
 
 void Renderer::ClipRect(Surface * surface, Rect & rect){
@@ -1811,7 +1916,7 @@ void Renderer::BlitSprite(Object * object, Camera & camera, Surface * dst, Rect 
 	}
 }
 
-void Renderer::DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 bank, Uint8 width, bool alpha, Uint8 color, Uint8 brightness, bool rampcolor){
+void Renderer::DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 bank, Uint8 width, bool alpha, Uint8 color, Uint8 brightness, bool rampcolor, int scale){
 	Uint16 xc = 0;
 	for(unsigned int i = 0; i < strlen(text); i++){
 		if(text[i] == ' ' || text[i] == '\xA0' /* nbsp */){
@@ -1838,19 +1943,28 @@ void Renderer::DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text
 						EffectBrightness(glyph, 0, brightness);
 					}
 				}
-				Rect dstrect;
-				dstrect.x = x + xc;
-				dstrect.y = y;
-				dstrect.w = surface->w;
-				dstrect.h = surface->h;
-				xc += width;
-				if(alpha){
-					DrawAlphaed(glyph, 0, surface, &dstrect);
+				if(scale <= 1){
+					Rect dstrect;
+					dstrect.x = x + xc;
+					dstrect.y = y;
+					dstrect.w = surface->w;
+					dstrect.h = surface->h;
+					if(alpha){
+						DrawAlphaed(glyph, 0, surface, &dstrect);
+					}else{
+						BlitSurface(glyph, 0, surface, &dstrect);
+					}
 				}else{
-					BlitSurface(glyph, 0, surface, &dstrect);
+					int dx = ((int)x + (int)xc) * scale;
+					int dy = (int)y * scale;
+					if(alpha){
+						DrawAlphaedScaled(glyph, surface, dx, dy, scale);
+					}else{
+						BlitSurfaceScaled(glyph, NULL, surface, dx, dy, scale);
+					}
 				}
+				xc += width;
 				if(es){
-					//SDL_FreeSurface(es);
 					delete es;
 				}
 			}
@@ -3862,7 +3976,10 @@ void Renderer::DrawLine(Surface * surface, int x1, int y1, int x2, int y2, Uint8
 	DrawFilledRectangle(surface, x, y, x + thickness, y + thickness, color);
 }
 
-void Renderer::DrawFilledRectangle(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color){
+void Renderer::DrawFilledRectangle(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color, int scale){
+	if(scale > 1){
+		x1 *= scale; y1 *= scale; x2 *= scale; y2 *= scale;
+	}
 	// Scissor clip (ui/v2 Scroll). Empty stack ⇒ no-op.
 	Surface::ScissorRect scr;
 	if(surface && surface->ActiveScissor(scr)){

@@ -645,6 +645,20 @@ bool Game::Loop(void){
 	ControlDispatch::TickWaits(*this);
 	world.DoNetwork();
 	if(!world.dedicatedserver.active){
+		// Path B: when a v2 runtime owns the frame, the screenbuffer must match
+		// the SDL window dims so pixel-doubled sprite blits land within bounds.
+		// When the world renderer owns the frame (INGAME / SINGLEPLAYERGAME /
+		// replay), shrink back to 640×480 — its math + camera assume that size
+		// and a wider buffer would leave the world rendered into the upper-left.
+		if(active_runtime && window){
+			int ww = 0, wh = 0;
+			SDL_GetWindowSize(window, &ww, &wh);
+			if(ww > 0 && wh > 0 && (ww != screenbuffer.w || wh != screenbuffer.h)){
+				screenbuffer.Resize(ww, wh);
+			}
+		}else if(!active_runtime && (screenbuffer.w != 640 || screenbuffer.h != 480)){
+			screenbuffer.Resize(640, 480);
+		}
 		screenbuffer.Clear(0);
 		world.DoNetwork();
 		if(active_runtime){
