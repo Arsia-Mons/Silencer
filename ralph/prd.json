@@ -69,7 +69,7 @@
       "id": "P8",
       "priority": 8,
       "name": "ScrollTextBox primitive",
-      "passes": false,
+      "passes": true,
       "spec": "Add clients/silencer/src/ui/clay/primitives/scroll_text_box.{h,cpp}. API: `ScrollTextBox(lines: span<TextLine>, scrollPosition_in_out, lineHeight, fontWidth, height, opts: { bottomToTop, autoScrollOnAppend })`. TextLine is { string, color, brightness, indent }. Pixel-identical to legacy TextBox. No lobby references.",
       "pass_check": "Render test pixdiff < 2.0 vs baseline. Auto-scroll behavior preserved when caller appends to lines and the scrollbar was at the bottom. No lobby references."
     },

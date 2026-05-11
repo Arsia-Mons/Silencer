@@ -183,6 +183,22 @@ struct ScrollListCheckResult {
 };
 bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out);
 
+// P8 ScrollTextBox primitive unit test. Renders a 6-line text box (no
+// scrollbar, top-down origin) into a 640x480 Surface and writes it to
+// `outPath`. Invoked by the `clay_scroll_text_box_test` control op.
+// Implementation in scroll_text_box_test.cpp.
+bool RunScrollTextBoxTest(::Game & game, const char * outPath);
+
+// P8 ScrollTextBox auto-scroll helper check. Verifies the canonical
+// "stay pinned to the bottom on append" computation across three
+// scenarios. No PNG produced.
+struct ScrollTextBoxCheckResult {
+	Uint16 atBottom_prevPos;          // Expect 1: prev 5 lines (max=0), now 6 lines (max=1).
+	Uint16 notAtBottom_prevPos;       // Expect 0: prev 10 lines pos=0 (not at max=5), now 11 lines — stays put.
+	Uint16 atBottomOverflow_prevPos;  // Expect 6: prev 10 lines pos=5 (at max=5), now 11 lines (max=6).
+};
+bool RunScrollTextBoxCheck(::Game & game, ScrollTextBoxCheckResult & out);
+
 }  // namespace silencer::clay_bridge
 
 #endif

@@ -219,6 +219,39 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
+	if(cmd.op == "clay_scroll_text_box_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_scroll_text_box_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunScrollTextBoxTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"scroll_text_box test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_scroll_text_box_check"){
+		silencer::clay_bridge::ScrollTextBoxCheckResult res{};
+		bool ok = silencer::clay_bridge::RunScrollTextBoxCheck(game, res);
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"scroll_text_box check failed"));
+			return;
+		}
+		nlohmann::json r;
+		r["at_bottom_prev_pos"] = res.atBottom_prevPos;
+		r["not_at_bottom_prev_pos"] = res.notAtBottom_prevPos;
+		r["at_bottom_overflow_prev_pos"] = res.atBottomOverflow_prevPos;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
 	if(cmd.op == "state"){
 		nlohmann::json r;
 		r["state"] = Game::StateName(game.GetState());
