@@ -3,7 +3,6 @@
 #include "interface.h"
 #include "player.h"
 #include "team.h"
-#include "textinput.h"
 #include "world.h"
 #include <stdio.h>
 
@@ -338,33 +337,6 @@ if(/*!world.map.loaded && */stateisnew){
 		}
 		// Hold-jump: show all player names.
 		world.spectator.holdshowallnames = world.localinput.keyjump;
-	}
-	// Chat-open. Lives here (not Player::Tick) so observers without a
-	// Player can open chat too. Lazily gated on local-peer state.
-	{
-		Peer * cp = world.peerlist[world.localpeerid];
-		Player * lpl = world.GetPeerPlayer(world.localpeerid);
-		bool buytechblocked = lpl && (lpl->buyinterfaceid || lpl->techinterfaceid);
-		if(cp && world.localinput.keychat && !cp->chatinterfaceid && !buytechblocked && !world.replay.IsPlaying()){
-			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-			if(iface){
-				TextInput * textinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
-				if(textinput){
-					textinput->x = 100;
-					textinput->y = 100;
-					textinput->res_bank = 133;
-					textinput->fontwidth = 6;
-					textinput->draw = false;
-					textinput->uid = 1;
-					textinput->maxchars = 100;
-					textinput->maxwidth = 28;
-					iface->AddObject(textinput->id);
-					iface->activeobject = textinput->id;
-					iface->ActiveChanged(world, iface, false);
-				}
-				cp->chatinterfaceid = iface->id;
-			}
-		}
 	}
 	Peer * localpeer = world.peerlist[world.localpeerid];
 	if(localpeer && world.localpeerid != world.authoritypeer){

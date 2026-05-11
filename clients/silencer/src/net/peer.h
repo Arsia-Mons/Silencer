@@ -25,12 +25,6 @@ public:
 	bool observer;
 	std::list<Uint16> controlledlist;
 
-	// Local-user chat modal state. Only the local peer's value is ever set;
-	// stored here (not on Player) so observers — who have no Player — can
-	// also open chat. Not serialized.
-	Uint16 chatinterfaceid;
-	bool chatwithteam;
-
 	// local only
 	unsigned short port;
 	unsigned long ip;

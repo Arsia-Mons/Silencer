@@ -96,8 +96,10 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	hacksoundchannel = -1;
 	jetpacksoundchannel = -1;
 	flamersoundchannel = -1;
+	chatinterfaceid = 0;
 	buyinterfaceid = 0;
 	techinterfaceid = 0;
+	chatwithteam = false;
 	fallingnudge = 0;
 	oldfiles = 0;
 	effecthackingcontinue = 0;
@@ -256,8 +258,29 @@ void Player::Tick(World & world){
 	if(ai){
 		ai->Tick(world);
 	}
-	// Chat-open moved to Game::TickInGame so observers (no Player) can also
-	// open chat. See clients/silencer/src/game/tick/tick_ingame.cpp.
+	if(input.keychat && !chatinterfaceid && !buyinterfaceid && !techinterfaceid && this == world.GetPeerPlayer(world.localpeerid)){
+		if(!world.replay.IsPlaying()){
+			Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
+			if(iface){
+				TextInput * textinput = (TextInput *)world.CreateObject(ObjectTypes::TEXTINPUT);
+				if(textinput){
+					textinput->x = 100;
+					textinput->y = 100;
+					textinput->res_bank = 133;
+					textinput->fontwidth = 6;
+					textinput->draw = false;
+					textinput->uid = 1;
+					textinput->maxchars = 100;
+					textinput->maxwidth = 28;
+					//strcpy(textinput->text, "sdfsdf");
+					iface->AddObject(textinput->id);
+					iface->activeobject = textinput->id;
+					iface->ActiveChanged(world, iface, false);
+				}
+				chatinterfaceid = iface->id;
+			}
+		}
+	}
 	if(state_warp){
 		if(state_warp == 2){
 			//draw = false;

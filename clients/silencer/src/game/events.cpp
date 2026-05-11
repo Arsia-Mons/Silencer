@@ -98,6 +98,11 @@ void Game::UpdateInputState(Input & input){
 			if(interfaceenterfix && !keystate[SDL_SCANCODE_RETURN]){
 				interfaceenterfix = false;
 			}
+			if(localplayer->chatinterfaceid || interfaceenterfix){
+				Input zeroinput;
+				input = zeroinput;
+				interfaceenterfix = true;
+			}
 			if(localplayer->buyinterfaceid || localplayer->techinterfaceid || interfaceenterfix){
 				Input zeroinput;
 				zeroinput.keyactivate = input.keyactivate;
@@ -106,17 +111,6 @@ void Game::UpdateInputState(Input & input){
 				input = zeroinput;
 				interfaceenterfix = true;
 			}
-		}
-	}
-	// Chat-open zeroes input regardless of whether the local peer has a
-	// Player (observers can chat too). Done outside the if(localplayer)
-	// gate above.
-	if(!world.replay.IsPlaying()){
-		Peer * lp = world.peerlist[world.localpeerid];
-		if(lp && lp->chatinterfaceid){
-			Input zeroinput;
-			input = zeroinput;
-			interfaceenterfix = true;
 		}
 	}
 }
@@ -370,9 +364,8 @@ void Game::OnScancodeDown(int sc){
 		Peer * lp = world.peerlist[world.localpeerid];
 		bool isobserver = lp && lp->observer;
 		Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-		bool chatopen = lp && lp->chatinterfaceid;
-		bool playerok = localplayer && !chatopen && !localplayer->buyinterfaceid;
-		if((isobserver && !chatopen) || playerok){
+		bool playerok = localplayer && !localplayer->chatinterfaceid && !localplayer->buyinterfaceid;
+		if(isobserver || playerok){
 			if(world.quitstate == 0){
 				world.quitstate = 1;
 			}else
