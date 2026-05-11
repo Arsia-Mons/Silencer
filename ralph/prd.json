@@ -61,7 +61,7 @@
       "id": "P7",
       "priority": 7,
       "name": "ScrollList primitive",
-      "passes": false,
+      "passes": true,
       "spec": "Add clients/silencer/src/ui/clay/primitives/scroll_list.{h,cpp}. API: `ScrollList(items: span<string>, selectedIndex_in_out, scrollPosition_in_out, lineHeight, height, on_select_callback)`. Internally emits the row column + a Clay-managed scroll container OR a custom-rendered scrollbar matching the legacy art (bank 7 idx 9 track). Mouse wheel and click-on-row supported via Clay_Hovered + Clay_OnHover. Pixel-identical to legacy SelectBox+ScrollBar.",
       "pass_check": "Render test with a 30-item list scrolled to a fixed position pixdiff < 2.0 vs baseline. Click-on-row fires on_select with the right index. No lobby references."
     },

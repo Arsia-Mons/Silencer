@@ -122,6 +122,7 @@ enum class CustomKind : Uint8 {
 	None = 0,
 	BankButtonChrome,  // P5: sprite-faced button (B156x21) with brightness effect.
 	ToggleSprite,      // P6: sprite-faced radio with effectColor + brightness.
+	ScrollBar,         // P7: sprite-faced vertical scrollbar (3-slice track + thumb).
 };
 
 struct ClayCustomData {
@@ -150,6 +151,37 @@ struct TogglePayload {
 	Uint8  effectColor;  // 0 = no tint.
 	Uint8  brightness;   // 128 = neutral.
 };
+
+// P7 — payload for CustomKind::ScrollBar. The bridge renders the
+// scrollbar over the CUSTOM element's bounding box: bank 7 idx 9 (default
+// track) is 3-sliced — top 16 px and bottom 16 px cap the track, the
+// middle band tiles the source's middle rows to fill `bbox.height`. The
+// thumb (bank 7 idx 10 by default) is cropped from the top to fit between
+// the caps; its travel within the track is `scrollPosition / scrollMax`
+// (clamped). Mirrors `Renderer::renderer.cpp` lines 858-933.
+struct ScrollBarPayload {
+	Uint8  bank;
+	Uint16 trackIndex;
+	Uint16 thumbIndex;
+	Uint16 scrollPosition;  // in same units as scrollMax.
+	Uint16 scrollMax;       // 0 = thumb at top, no travel.
+};
+
+// P7 ScrollList primitive unit test. Renders a 30-item list scrolled to
+// a fixed position (scrollPosition=3, selectedIndex=8) into a 640x480
+// Surface and writes it to `outPath`. Invoked by the
+// `clay_scroll_list_test` control op. Implementation in
+// scroll_list_test.cpp.
+bool RunScrollListTest(::Game & game, const char * outPath);
+
+// P7 ScrollList click-routing check. Lays out a 30-item list and drives
+// a press timeline over the bbox of row index 5 (visible because
+// scrollPosition=3). Reports which row index's onSelect callback fired.
+struct ScrollListCheckResult {
+	int onSelectFired;      // Total number of onSelect invocations across all rows.
+	int lastSelectedIndex;  // Index reported by the most recent onSelect call. -1 if none.
+};
+bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out);
 
 }  // namespace silencer::clay_bridge
 

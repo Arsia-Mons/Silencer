@@ -187,6 +187,38 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
+	if(cmd.op == "clay_scroll_list_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_scroll_list_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunScrollListTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"scroll_list test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_scroll_list_check"){
+		silencer::clay_bridge::ScrollListCheckResult res{};
+		bool ok = silencer::clay_bridge::RunScrollListCheck(game, res);
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"scroll_list check failed"));
+			return;
+		}
+		nlohmann::json r;
+		r["on_select_fired"] = res.onSelectFired;
+		r["last_selected_index"] = res.lastSelectedIndex;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
 	if(cmd.op == "state"){
 		nlohmann::json r;
 		r["state"] = Game::StateName(game.GetState());

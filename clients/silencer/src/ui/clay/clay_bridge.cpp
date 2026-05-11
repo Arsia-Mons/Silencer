@@ -350,6 +350,91 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
 						}
 						break;
 					}
+					case CustomKind::ScrollBar: {
+						const auto * p = reinterpret_cast<const ScrollBarPayload *>(ccd->payload);
+						if(!p) break;
+						const auto & banks = game.GetWorld().resources.spritebank;
+						if(p->bank >= banks.size()) break;
+						if(p->trackIndex >= banks[p->bank].size()) break;
+						Surface * track = banks[p->bank][p->trackIndex].get();
+						if(!track) break;
+						int x  = static_cast<int>(c->boundingBox.x);
+						int y  = static_cast<int>(c->boundingBox.y);
+						int bw = static_cast<int>(c->boundingBox.width);
+						int bh = static_cast<int>(c->boundingBox.height);
+						if(bw <= 0 || bh <= 0) break;
+						// Coarse outside-clip cull; per-pixel writes below pass
+						// through the clip stack via the SetPixel calls.
+						int cx = x, cy = y, cw = bw, ch = bh;
+						if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) break;
+						// Render 3-slice track. Mirrors renderer.cpp:867-902.
+						const int cap = 16;
+						int trackh = bh;
+						int srcw   = track->w;
+						int srch   = track->h;
+						if(srch > 2 * cap){
+							int srcmidtop = cap;
+							int srcmidh   = srch - 2 * cap;
+							int dstmidh   = trackh - 2 * cap;
+							if(dstmidh < 0) dstmidh = 0;
+							ClipRect clip;
+							CurrentClip(dst->w, dst->h, clip);
+							auto inClip = [&](int px, int py){
+								return px >= clip.x && py >= clip.y &&
+								       px < clip.x + clip.w && py < clip.y + clip.h;
+							};
+							// Top cap.
+							for(int dy = 0; dy < cap && dy < trackh; dy++){
+								for(int dx = 0; dx < srcw; dx++){
+									Uint8 col = Renderer::GetPixel(track, dx, dy);
+									if(col && inClip(x + dx, y + dy))
+										Renderer::SetPixel(dst, x + dx, y + dy, col);
+								}
+							}
+							// Middle band — tile source middle rows.
+							for(int dy = 0; dy < dstmidh; dy++){
+								int sy = srcmidtop + (dy % srcmidh);
+								for(int dx = 0; dx < srcw; dx++){
+									Uint8 col = Renderer::GetPixel(track, dx, sy);
+									if(col && inClip(x + dx, y + cap + dy))
+										Renderer::SetPixel(dst, x + dx, y + cap + dy, col);
+								}
+							}
+							// Bottom cap.
+							for(int dy = 0; dy < cap; dy++){
+								int sy    = srch - cap + dy;
+								int dyabs = trackh - cap + dy;
+								if(dyabs < 0) continue;
+								for(int dx = 0; dx < srcw; dx++){
+									Uint8 col = Renderer::GetPixel(track, dx, sy);
+									if(col && inClip(x + dx, y + dyabs))
+										Renderer::SetPixel(dst, x + dx, y + dyabs, col);
+								}
+							}
+						}
+						// Thumb (renderer.cpp:908-933). Cropped from the top.
+						if(p->thumbIndex >= banks[p->bank].size()) break;
+						Surface * thumb = banks[p->bank][p->thumbIndex].get();
+						if(thumb && p->scrollMax > 0){
+							int available = trackh - 2 * cap;
+							if(available < 1) available = 1;
+							int thumbh = available - static_cast<int>(p->scrollMax);
+							if(thumbh > available) thumbh = available;
+							if(thumbh > thumb->h) thumbh = thumb->h;
+							if(thumbh < 16) thumbh = 16;
+							if(thumbh > available) thumbh = available;
+							int travel = available - thumbh;
+							if(travel < 0) travel = 0;
+							float pos = static_cast<float>(p->scrollPosition) /
+							            static_cast<float>(p->scrollMax);
+							int dsty = static_cast<int>(travel * pos);
+							Renderer::Rect srcrect{thumb->w, thumbh, 0, 0};
+							Renderer::Rect thumbdst{thumb->w, thumbh,
+							                        x + 1, y + cap + dsty};
+							Renderer::BlitSurface(thumb, &srcrect, dst, &thumbdst);
+						}
+						break;
+					}
 					case CustomKind::None:
 					default:
 						break;
