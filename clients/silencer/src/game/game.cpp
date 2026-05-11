@@ -2040,6 +2040,9 @@ static ui::v2::LobbyHandlers BuildLobbyV2Handlers(Game * game){
 	h.game_select.on_join   = [game](){ game->LobbyV2GameSelectJoin(); };
 	h.game_create.on_security_toggle = [game](){ game->LobbyV2CreateCycleSecurity(); };
 	h.game_create.on_create          = [game](){ game->LobbyV2CreateGame(); };
+	h.game_join.on_ready             = [game](){ game->LobbyV2GameJoinReady(); };
+	h.game_join.on_change_team       = [game](){ game->LobbyV2GameJoinChangeTeam(); };
+	h.game_join.on_choose_tech       = [game](){ game->LobbyV2ShowGameTech(); };
 	return h;
 }
 
@@ -2349,6 +2352,7 @@ bool Game::RenderLobbyV2(){
 	RefreshLobbyV2ChatState();
 	RefreshLobbyV2GameSelectState();
 	RefreshLobbyV2GameCreateState();
+	RefreshLobbyV2GameJoinState();
 	ui::v2::LobbyHandlers handlers = BuildLobbyV2Handlers(this);
 	screenbuffer.Clear(0);
 	ui_v2_state.BeginFrame();
@@ -2863,7 +2867,42 @@ void Game::LobbyV2CreateGame(){
 }
 
 void Game::LobbyV2ShowGameJoin(){
+	// Mirror of legacy TearDownRightPanels' gameTech branch: when leaving the
+	// tech-choice surface, restore in-lobby team overlays. Idempotent if no
+	// TEAM objects exist yet (CONNECTED-transition entry path runs before
+	// teams spawn).
+	if(world.choosingtech){
+		world.choosingtech = false;
+		ShowTeamOverlays(true);
+	}
+	ui_v2_lobby_state->game_join = ui::v2::GameJoinState{};
 	ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameJoin;
+}
+
+// Mirrors GameJoinPanel::Tick's per-frame Ready-label derivation
+// (game_join_panel.cpp:73). Only updates while world.gameplaystate ==
+// INLOBBY — outside that window the legacy panel leaves the label as
+// last seeded ("Ready" by Build).
+void Game::RefreshLobbyV2GameJoinState(){
+	if(ui_v2_lobby_state->active_panel != ui::v2::LobbyActivePanel::GameJoin) return;
+	if(world.gameplaystate != World::INLOBBY) return;
+	Peer * localpeer = world.peerlist[world.localpeerid];
+	bool blocked = localpeer && localpeer->ishost && !world.AllPeersDownloadedMap();
+	ui_v2_lobby_state->game_join.waiting = blocked;
+}
+
+// Mirror of GJN_BTN_READY branch (game_join_panel.cpp:88). Host clients
+// must wait until every peer has the map; non-hosts can ready any time.
+void Game::LobbyV2GameJoinReady(){
+	Peer * localpeer = world.peerlist[world.localpeerid];
+	bool ishost = localpeer && localpeer->ishost;
+	if(!ishost || world.AllPeersDownloadedMap()){
+		world.SendReady();
+	}
+}
+
+void Game::LobbyV2GameJoinChangeTeam(){
+	world.ChangeTeam();
 }
 
 void Game::LobbyV2ShowGameTech(){

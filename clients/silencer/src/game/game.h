@@ -182,6 +182,12 @@ public:
 	void LobbyV2CreateSelectMap(int row);
 	void LobbyV2CreateDownloadMap(int row); // [DL] badge click.
 	bool LobbyV2CreateInputActive() const;
+	// Game-join panel runtime helpers. Ready: SendReady unless local peer
+	// is host and a peer is still downloading the map (mirrors
+	// GameJoinPanel::Tick's GJN_BTN_READY branch). Change Team: world.
+	// ChangeTeam. Choose Tech reuses LobbyV2ShowGameTech.
+	void LobbyV2GameJoinReady();
+	void LobbyV2GameJoinChangeTeam();
 
 	// v2 modal stack — overlays the underlying state's render and intercepts
 	// mouse / text input when non-empty. Lobby panels (P16g) and any other
@@ -388,6 +394,10 @@ private:
 	// the caret blink. Map-list population itself happens once on
 	// LobbyV2ShowGameCreate. Run per-render from RenderLobbyV2.
 	void RefreshLobbyV2GameCreateState();
+	// Mirror of GameJoinPanel::Tick: derives the Ready button's
+	// "Waiting..." label from host status + AllPeersDownloadedMap when
+	// world.gameplaystate == INLOBBY. Run per-render from RenderLobbyV2.
+	void RefreshLobbyV2GameJoinState();
 	// Owned heap to keep ui::v2::LobbyState's full type out of game.h —
 	// it transitively includes the v2 panel headers and would pollute
 	// every game.h consumer. Allocated in Game() / freed in ~Game().
