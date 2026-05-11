@@ -1,10 +1,8 @@
 #include "mission_summary.h"
 
 #include "context.h"
-
 #include "layout.h"
-#include "node.h"
-#include "render.h"
+#include "render_commands.h"
 #include "theme.h"
 
 #include "game.h"
@@ -18,27 +16,59 @@
 #include "surface.h"
 
 #include <cstdio>
+#include <cstring>
+#include <functional>
 #include <string>
-#include <vector>
 
 namespace ui {
 namespace v2 {
 
 namespace {
 
-// Mirrors MissionSummaryScreen::AddSummaryLine. Pads `name` with spaces so
-// the result is exactly maxchars (180 / fontwidth=6 = 30) chars, with the
-// value text right-justified at the end.
-std::string SummaryLine(const char * name, unsigned int value, bool percentage = false)
-{
-	char valuetext[16];
-	snprintf(valuetext, sizeof(valuetext), "%u%s", value, percentage ? "%" : " ");
-	const int maxchars = 30;
-	int used = (int)std::char_traits<char>::length(name) + (int)std::char_traits<char>::length(valuetext);
-	std::string s = name;
-	for(int i = 0; i < maxchars - used; i++) s += " ";
-	s += valuetext;
-	return s;
+constexpr size_t kFrameStringBytes = 4096;
+thread_local char   g_frame_strings[kFrameStringBytes];
+thread_local size_t g_frame_off = 0;
+
+Clay_String FrameStr(const char * s) {
+	size_t n = std::strlen(s);
+	if(g_frame_off + n + 1 > kFrameStringBytes) g_frame_off = 0;
+	char * p = &g_frame_strings[g_frame_off];
+	std::memcpy(p, s, n);
+	p[n] = '\0';
+	g_frame_off += n + 1;
+	Clay_String out{};
+	out.length = (int32_t)n;
+	out.chars  = p;
+	return out;
+}
+
+void OnButtonClick(Clay_ElementId, Clay_PointerData p, intptr_t user) {
+	if(p.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
+	auto * h = reinterpret_cast<const std::function<void()> *>(user);
+	if(h && *h) (*h)();
+}
+
+// Per-slot upgrade closures. Same pattern as options_controls — thread_local
+// addresses outlive the DispatchMouseDown stack frame that fires SetPointerState
+// after Render returns. Rebound every frame at the top of RenderMissionSummary.
+thread_local std::function<void()> g_upgrade_handlers[6];
+
+void Button(const char * key, const char * label, const std::function<void()> & handler,
+            float width, float height) {
+	Clay_String key_s   = FrameStr(key);
+	Clay_String label_s = FrameStr(label);
+	CLAY({
+		.id = Clay_GetElementId(key_s),
+		.layout = {
+			.sizing = { CLAY_SIZING_FIXED(width), CLAY_SIZING_FIXED(height) },
+			.childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+		},
+		.backgroundColor = Clay_Hovered() ? ::ui::kColorSelectHi : ::ui::kColorScrollbarFill,
+		.cornerRadius    = ::ui::kCornerSmall,
+	}) {
+		Clay_OnHover(OnButtonClick, (intptr_t)&handler);
+		CLAY_TEXT(label_s, CLAY_TEXT_CONFIG(::ui::kFontHeading));
+	}
 }
 
 unsigned int Accuracy(unsigned int fires, unsigned int hits)
@@ -47,153 +77,155 @@ unsigned int Accuracy(unsigned int fires, unsigned int hits)
 	return (unsigned int)((float(hits) / fires) * 100);
 }
 
+void StatLine(const char * name, unsigned int value, bool percentage = false) {
+	char buf[64];
+	std::snprintf(buf, sizeof(buf), "%s %u%s", name, value, percentage ? "%" : "");
+	CLAY({ .layout = { .sizing = { CLAY_SIZING_FIT(), CLAY_SIZING_FIT() } } }) {
+		CLAY_TEXT(FrameStr(buf), CLAY_TEXT_CONFIG(::ui::kFontBody));
+	}
+}
+
+void PlainLine(const char * s, const Clay_TextElementConfig & font) {
+	CLAY({ .layout = { .sizing = { CLAY_SIZING_FIT(), CLAY_SIZING_FIT() } } }) {
+		CLAY_TEXT(FrameStr(s), CLAY_TEXT_CONFIG(font));
+	}
+}
+
 }  // namespace
 
-Node BuildMissionSummary(const Context & ctx, const MissionSummaryHandlers & handlers,
-                         const MissionSummaryState * state)
-{
+void RenderMissionSummary(const Context & ctx, const MissionSummaryHandlers & handlers,
+                          const MissionSummaryState & state) {
 	(void)ctx;
-	// Mirrors MissionSummaryScreen::Build. At preview-gate state (post-Build,
-	// after Refresh(), pre-Tick) the rendered pixels are:
-	//   - Two background sprites (bank=6 idx=0, bank=7 idx=5)
-	//   - "Mission Summary" title (bank=135, width=12) at (102, 44).
-	//   - "+ N XP" XP text (bank=136, width=15) centered on x=467, y=45.
-	//   - Textbox lines. The legacy textbox auto-scrolls in AddLine: after
-	//     all 60 AddLine calls, `scrolled = text.size()-27` captured before
-	//     the final push_back = 59-27 = 32. The visible window therefore
-	//     starts at deque[32] ("  Shaped:") and renders 28 lines through
-	//     deque[59] ("  Player kills:") at y = 92 + i*11.
-	//   - 6 "Current X Level:" left labels at (390, 97+i*46) bank=133 width=6
-	//   - 6 level values at x = 556 - text.length()*6, same y.
-	//   - "*NEW UPGRADE AVAILABLE*" banner at (467 - 23*6/2, 77) bank=133
-	//     width=6 when state->show_banner.
-	//   - Upgrade B196x33 buttons at (62, -180 + i*46) when state->show_upgrade[i].
-	//   - "Done" B196x33 button at anchor (62, 100).
-	const bool live = (state != nullptr);
-	const unsigned int s_shaped       = live ? state->shaped       : 0;
-	const unsigned int s_flare        = live ? state->flare        : 0;
-	const unsigned int s_poison_flare = live ? state->poison_flare : 0;
-	const unsigned int s_neutron      = live ? state->neutron      : 0;
-	const unsigned int * s_fires = live ? state->weapon_fires : nullptr;
-	const unsigned int * s_hits  = live ? state->weapon_hits  : nullptr;
-	const unsigned int * s_kills = live ? state->weapon_kills : nullptr;
-	const int xp = live ? state->xp : 0;
-	static const int default_levels[6] = {3, 0, 0, 3, 0, 0};
-	const int * levels = live ? state->levels : default_levels;
-	const bool show_banner = live ? state->show_banner : false;
+	g_frame_off = 0;
 
-	std::vector<Node> children;
-
-	// Title: "Mission Summary" (15 chars * 12 width = 180; legacy centers
-	// around x=192 → x = 192 - 90 = 102, y = 44).
-	children.push_back(Label("Mission Summary",
-	                         /*font_bank=*/(Uint8)::ui::kFontTitle.fontId,
-	                         /*font_width=*/(Uint8)::ui::kFontTitle.fontSize).at(102, 44));
-
-	// XP text: "+ N XP" — text width 15, centered on x=467.
-	{
-		char xpbuf[24];
-		snprintf(xpbuf, sizeof(xpbuf), "+ %d XP", xp);
-		int len = (int)std::char_traits<char>::length(xpbuf);
-		int xp_x = 467 - ((len * 15) / 2);
-		children.push_back(Label(xpbuf,
-		                         /*font_bank=*/(Uint8)::ui::kFontStat.fontId,
-		                         /*font_width=*/(Uint8)::ui::kFontStat.fontSize).at(xp_x, 45));
-	}
-
-	// "*NEW UPGRADE AVAILABLE*" banner — 23 chars * 6 width = 138, centered on x=467.
-	if(show_banner){
-		const char * banner = "*NEW UPGRADE AVAILABLE*";
-		int len = (int)std::char_traits<char>::length(banner);
-		int b_x = 467 - ((len * 6) / 2);
-		children.push_back(Label(banner,
-		                         /*font_bank=*/(Uint8)::ui::kFontBody.fontId,
-		                         /*font_width=*/(Uint8)::ui::kFontBody.fontSize).at(b_x, 77));
-	}
-
-	// Textbox visible window. Each entry is the text rendered at line `i`
-	// (y = 92 + i*11). Lines with no glyphs (blanks, deque[36]/[42]/[48]/
-	// [54]) emit a Label with empty text — DrawText short-circuits on
-	// strlen=0, so we skip those.
-	auto tb_label = [](const std::string & s, int line) {
-		return Label(s, /*font_bank=*/133, /*font_width=*/6).at(89, 92 + line * 11);
-	};
-	int line = 0;
-	children.push_back(tb_label(SummaryLine("  Shaped:", s_shaped), line++));              // deque[32]
-	children.push_back(tb_label(SummaryLine("  Flare:", s_flare), line++));                // [33]
-	children.push_back(tb_label(SummaryLine("  Poison Flare:", s_poison_flare), line++));  // [34]
-	children.push_back(tb_label(SummaryLine("  Neutron:", s_neutron), line++));            // [35]
-	line++;                                                                                 // [36] blank
-	static const char * weapon_names[4] = {"Blaster", "Laser", "Rocket", "Flamer"};
-	for(int w = 0; w < 4; w++){
-		const unsigned int fires = s_fires ? s_fires[w] : 0;
-		const unsigned int hits  = s_hits  ? s_hits[w]  : 0;
-		const unsigned int kills = s_kills ? s_kills[w] : 0;
-		children.push_back(tb_label(weapon_names[w], line++));                              // name
-		children.push_back(tb_label(SummaryLine("  Shots fired:", fires), line++));
-		children.push_back(tb_label(SummaryLine("  Hits:", hits), line++));
-		children.push_back(tb_label(SummaryLine("  Accuracy:", Accuracy(fires, hits), true), line++));
-		children.push_back(tb_label(SummaryLine("  Player kills:", kills), line++));
-		if(w < 3) line++;                                                                   // blank between
-	}
-
-	// 6 "Current X Level:" left labels + level values. Level text x =
-	// 556 - text.length()*6.
-	static const char * level_labels[6] = {
-		"Current Endurance Level:",
-		"Current Shield Level:",
-		"Current Jetpack Level:",
-		"Current Tech Slot Level:",
-		"Current Hacking Level:",
-		"Current Contacts Level:",
-	};
+	// Bind upgrade closures so OnHover userData has stable addresses.
 	for(int i = 0; i < 6; i++){
-		int y = 97 + i * 46;
-		children.push_back(Label(level_labels[i], /*font_bank=*/133, /*font_width=*/6).at(390, y));
-		char numbuf[16];
-		snprintf(numbuf, sizeof(numbuf), "%d", levels[i]);
-		int len = (int)std::char_traits<char>::length(numbuf);
-		int lvl_x = 556 - len * 6;
-		children.push_back(Label(numbuf, /*font_bank=*/133, /*font_width=*/6).at(lvl_x, y));
+		auto cb = handlers.on_upgrade;
+		int slot = i;
+		g_upgrade_handlers[i] = [cb, slot](){ if(cb) cb(slot); };
 	}
 
-	// Upgrade buttons (uid 10..15 in legacy). B196x33 at (62, -180 + i*46).
-	// Text strings padded to 12 chars for legacy chrome-centering parity.
-	if(live){
-		static const char * upgrade_texts[6] = {
-			"+1 Endurance",
-			"+1 Shield   ",
-			"+1 Jetpack  ",
-			"+1 Tech Slot",
-			"+1 Hacking  ",
-			"+1 Contacts ",
-		};
-		for(int i = 0; i < 6; i++){
-			if(!state->show_upgrade[i]) continue;
-			std::function<void()> on_click;
-			if(handlers.on_upgrade){
-				auto cb = handlers.on_upgrade;
-				on_click = [cb, i](){ cb(i); };
-			}
-			children.push_back(
-				Button(upgrade_texts[i], ButtonType::B196x33)
-					.at(62, -180 + i * 46)
-					.withKey(std::string("ms_up:") + std::to_string(i))
-					.onClick(std::move(on_click))
-			);
+	CLAY({
+		.id = CLAY_ID("MissionSummaryRoot"),
+		.layout = {
+			.sizing          = { CLAY_SIZING_GROW(), CLAY_SIZING_GROW() },
+			.padding         = CLAY_PADDING_ALL(12),
+			.childGap        = 8,
+			.childAlignment  = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+			.layoutDirection = CLAY_TOP_TO_BOTTOM,
+		},
+		.backgroundColor = ::ui::kColorPanelBg,
+	}) {
+		PlainLine("Mission Summary", ::ui::kFontTitle);
+
+		{
+			char xpbuf[32];
+			std::snprintf(xpbuf, sizeof(xpbuf), "+ %d XP", state.xp);
+			PlainLine(xpbuf, ::ui::kFontStat);
 		}
+
+		if(state.show_banner){
+			PlainLine("*NEW UPGRADE AVAILABLE*", ::ui::kFontBody);
+		}
+
+		// Body section: textbox on the left, levels + upgrade chips on the right.
+		CLAY({
+			.id = CLAY_ID("MissionSummaryBody"),
+			.layout = {
+				.sizing = { CLAY_SIZING_FIT(), CLAY_SIZING_FIT() },
+				.childGap = 24,
+				.childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP },
+				.layoutDirection = CLAY_LEFT_TO_RIGHT,
+			},
+		}) {
+			// Stats textbox column.
+			CLAY({
+				.id = CLAY_ID("MissionSummaryStats"),
+				.layout = {
+					.sizing = { CLAY_SIZING_FIXED(280), CLAY_SIZING_FIT() },
+					.childGap = 2,
+					.childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP },
+					.layoutDirection = CLAY_TOP_TO_BOTTOM,
+				},
+			}) {
+				StatLine("Shaped:",       state.shaped);
+				StatLine("Flare:",        state.flare);
+				StatLine("Poison Flare:", state.poison_flare);
+				StatLine("Neutron:",      state.neutron);
+
+				static const char * weapon_names[4] = {"Blaster", "Laser", "Rocket", "Flamer"};
+				for(int w = 0; w < 4; w++){
+					PlainLine(weapon_names[w], ::ui::kFontBody);
+					StatLine("  Shots fired:", state.weapon_fires[w]);
+					StatLine("  Hits:",        state.weapon_hits[w]);
+					StatLine("  Accuracy:",    Accuracy(state.weapon_fires[w], state.weapon_hits[w]), true);
+					StatLine("  Player kills:", state.weapon_kills[w]);
+				}
+			}
+
+			// Levels column: 6 rows, each "Foo: N" plus an optional Upgrade button.
+			CLAY({
+				.id = CLAY_ID("MissionSummaryLevels"),
+				.layout = {
+					.sizing = { CLAY_SIZING_FIT(), CLAY_SIZING_FIT() },
+					.childGap = 6,
+					.childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP },
+					.layoutDirection = CLAY_TOP_TO_BOTTOM,
+				},
+			}) {
+				static const char * level_labels[6] = {
+					"Endurance",
+					"Shield",
+					"Jetpack",
+					"Tech Slot",
+					"Hacking",
+					"Contacts",
+				};
+				static const char * upgrade_labels[6] = {
+					"+1 Endurance",
+					"+1 Shield",
+					"+1 Jetpack",
+					"+1 Tech Slot",
+					"+1 Hacking",
+					"+1 Contacts",
+				};
+				static const char * upgrade_keys[6] = {
+					"ms_up:0", "ms_up:1", "ms_up:2", "ms_up:3", "ms_up:4", "ms_up:5",
+				};
+				for(int i = 0; i < 6; i++){
+					char row_key[24];
+					std::snprintf(row_key, sizeof(row_key), "ms_lvl_%d", i);
+					CLAY({
+						.id = Clay_GetElementId(FrameStr(row_key)),
+						.layout = {
+							.sizing = { CLAY_SIZING_FIT(), CLAY_SIZING_FIXED(33) },
+							.childGap = 8,
+							.childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+							.layoutDirection = CLAY_LEFT_TO_RIGHT,
+						},
+					}) {
+						char rowbuf[64];
+						std::snprintf(rowbuf, sizeof(rowbuf), "%s Level: %d", level_labels[i], state.levels[i]);
+						CLAY({
+							.layout = {
+								.sizing = { CLAY_SIZING_FIXED(200), CLAY_SIZING_FIXED(33) },
+								.childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+							},
+						}) {
+							CLAY_TEXT(FrameStr(rowbuf), CLAY_TEXT_CONFIG(::ui::kFontBody));
+						}
+						if(state.show_upgrade[i]){
+							Button(upgrade_keys[i], upgrade_labels[i], g_upgrade_handlers[i], 160, 33);
+						}
+					}
+				}
+			}
+		}
+
+		// Done button.
+		static const std::function<void()> noop;
+		Button("ms_done", "Done", handlers.on_done ? handlers.on_done : noop, 196, 33);
 	}
-
-	// "Done" button — B196x33 at anchor (62, 100). uid=0; live engine wiring
-	// maps this to GoToState(LOBBY) or MAINMENU depending on lobby state.
-	children.push_back(
-		Button("Done", ButtonType::B196x33).at(62, 100).onClick(handlers.on_done)
-	);
-
-	return Background(/*bank=*/6, /*index=*/0, {
-		Sprite(/*bank=*/7, /*index=*/5),
-		Group(std::move(children)),
-	});
 }
 
 // -----------------------------------------------------------------------------
@@ -222,15 +254,14 @@ MissionSummaryHandlers BuildMissionSummaryHandlers(ScreenContext & sctx){
 	return h;
 }
 
-// Mirrors MissionSummaryScreen::Refresh — builds the live state from
-// world.lobby.GetUserInfo(). Returns false when user info hasn't arrived
-// yet; caller should fall back to a null State (matches legacy's
-// pre-Refresh appearance: build-time defaults, no banner, no upgrade
-// buttons). The legacy build path also clears statupgraded after each
-// successful Refresh; we do that here.
-bool CurrentMissionSummary(World & world, MissionSummaryState & out){
+// Mirrors MissionSummaryScreen::Refresh — builds live state from
+// world.lobby.GetUserInfo(). Returns default-constructed state when user
+// info hasn't arrived yet (matches legacy's pre-Refresh appearance:
+// build-time defaults, no banner, no upgrade buttons).
+MissionSummaryState CurrentMissionSummary(World & world){
+	MissionSummaryState out;
 	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
-	if(!user) return false;
+	if(!user) return out;
 	Stats & st = user->statscopy;
 	out.shaped       = st.shapedthrown;
 	out.flare        = st.flaresthrown;
@@ -249,11 +280,7 @@ bool CurrentMissionSummary(World & world, MissionSummaryState & out){
 	out.levels[3] = ag.techslots;
 	out.levels[4] = ag.hacking;
 	out.levels[5] = ag.contacts;
-	if(user->retrieving){
-		out.show_banner = false;
-		for(int i = 0; i < 6; i++) out.show_upgrade[i] = false;
-		return true;
-	}
+	if(user->retrieving) return out;
 	int totalbonusupgrades = ag.endurance + ag.shield + ag.jetpack + ag.techslots + ag.hacking + ag.contacts;
 	bool slot_room[6] = {
 		ag.endurance < ag.maxendurance,
@@ -269,10 +296,9 @@ bool CurrentMissionSummary(World & world, MissionSummaryState & out){
 	bool upgradeavailable = (totalbonusupgrades - ag.defaultbonuses) < maxupgrades;
 	out.show_banner = upgradeavailable;
 	for(int i = 0; i < 6; i++) out.show_upgrade[i] = upgradeavailable && slot_room[i];
-	// Consume the upgrade-ack flag — legacy MissionSummaryScreen::Tick
-	// cleared this after each Refresh; no other consumer reads it.
+	// Mirror legacy MissionSummaryScreen::Tick — clears the upgrade-ack flag.
 	world.lobby.statupgraded = false;
-	return true;
+	return out;
 }
 
 }  // namespace
@@ -292,21 +318,20 @@ void MissionSummaryRuntime::Render(Surface & target, ::Renderer & renderer,
 	};
 	ctx.mouse_x = mouse_x;
 	ctx.mouse_y = mouse_y;
-	ctx.state   = &state_;
 	ctx.dt      = dt;
 
-	MissionSummaryHandlers handlers = BuildMissionSummaryHandlers(sctx_);
-	MissionSummaryState live;
-	bool have_state = CurrentMissionSummary(world_, live);
 	target.Clear(0);
-	state_.BeginFrame();
-	Node tree = BuildMissionSummary(ctx, handlers, have_state ? &live : nullptr);
-	::ui::v2::EnsureClayContext(ctx);
+
+	EnsureClayContext(ctx);
 	Clay_SetPointerState(Clay_Vector2{ (float)mouse_x, (float)mouse_y }, /*pointer_down=*/false);
 	Clay_UpdateScrollContainers(/*drag=*/false, Clay_Vector2{ 0.0f, 0.0f }, dt);
-	Layout(tree, ctx);
-	::ui::v2::Render(tree, ctx, target, renderer);
-	state_.EndFrame();
+	Clay_SetLayoutDimensions(Clay_Dimensions{ (float)logical_w, (float)logical_h });
+	Clay_BeginLayout();
+	MissionSummaryHandlers handlers = BuildMissionSummaryHandlers(sctx_);
+	MissionSummaryState live = CurrentMissionSummary(world_);
+	RenderMissionSummary(ctx, handlers, live);
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	::ui::DrawRenderCommands(cmds, renderer, target, scale);
 }
 
 bool MissionSummaryRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
@@ -320,13 +345,15 @@ bool MissionSummaryRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
 	};
 	ctx.mouse_x = mouse_x;
 	ctx.mouse_y = mouse_y;
-	ctx.state   = &state_;
+
+	EnsureClayContext(ctx);
+	Clay_SetLayoutDimensions(Clay_Dimensions{ (float)logical_w, (float)logical_h });
+	Clay_BeginLayout();
 	MissionSummaryHandlers handlers = BuildMissionSummaryHandlers(sctx_);
-	MissionSummaryState live;
-	bool have_state = CurrentMissionSummary(world_, live);
-	Node tree = BuildMissionSummary(ctx, handlers, have_state ? &live : nullptr);
-	Layout(tree, ctx);
-	DispatchClicks(tree, ctx);
+	MissionSummaryState live = CurrentMissionSummary(world_);
+	RenderMissionSummary(ctx, handlers, live);
+	(void)Clay_EndLayout();
+	Clay_SetPointerState(Clay_Vector2{ (float)mouse_x, (float)mouse_y }, /*pointer_down=*/true);
 	return true;
 }
 
