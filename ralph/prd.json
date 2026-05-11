@@ -168,7 +168,7 @@
       "id": "P17",
       "priority": 17,
       "name": "GameTechPanel in Clay",
-      "passes": false,
+      "passes": true,
       "spec": "Reimplement the tech grid (3 peer cols + local col), tech name/description block, slots-left counter, and Back to Teams button. Pixdiff target: <5% vs gametech.png.",
       "pass_check": "Pixdiff < 5.0% vs baseline. Toggling a tech checkbox calls SetTech with the right value.",
       "screenshot": "iter-P17.png",

@@ -7,6 +7,7 @@
 #include "clay_game_select_panel.h"
 #include "clay_game_create_panel.h"
 #include "clay_game_join_panel.h"
+#include "clay_game_tech_panel.h"
 #include <string>
 
 class Surface;
@@ -54,9 +55,12 @@ public:
 	// Draw emits the Clay subtree and Tick pumps the panel.
 	void ShowGameJoin(ScreenContext & ctx) override;
 
-	// Override: clear `gameJoinActive` then fall through to the legacy
-	// ShowGameTech (which builds the legacy GameTechPanel). P17 migrates
-	// the GameTech surface to Clay; until then we keep the legacy path.
+	// Override: tear down any legacy right-side panels + clear
+	// gameJoin/gameCreate Clay flags and activate the Clay GameTech
+	// surface. Sets `gameTechActive` so Draw emits the Clay subtree and
+	// Tick pumps the panel. Mirrors the legacy ShowGameTech's
+	// `choosingtech = true` + `ShowTeamOverlays(false)` + RequestPeerList
+	// side effects.
 	void ShowGameTech(ScreenContext & ctx) override;
 
 	// Wired into the Go Back BankButton's onClick proxy. Sets a flag that
@@ -78,6 +82,16 @@ public:
 	bool JoinPanelReadyBlocked(class World & world) const;
 	void JoinPanelSendReady(class World & world);
 	void JoinPanelChangeTeam(class World & world);
+
+	// Friend-of-World helpers used by the Clay GameTech panel. Namespace-
+	// scope free functions can't reach World's private peerlist /
+	// localpeerid / RequestPeerList / SetTech, so the panel routes them
+	// through these member methods (same pattern as the JoinPanel*
+	// pass-throughs above).
+	Uint8 TechPanelLocalPeerId(class World & world) const;
+	class Peer * TechPanelPeer(class World & world, Uint8 peerid) const;
+	void TechPanelRequestPeerList(class World & world);
+	void TechPanelSetTech(class World & world, Uint32 techchoices);
 
 private:
 	// Per-frame state for the chrome tree. Strings live on the screen so
@@ -117,6 +131,13 @@ private:
 	// the GameCreate tree). The legacy `gameJoin` unique_ptr stays null.
 	silencer::ui::lobby_clay::GameJoinPanelState gameJoinState;
 	bool gameJoinActive = false;
+
+	// GameTech state + active flag. When `gameTechActive` is true the Clay
+	// panel owns the right column. ShowGameTech also sets
+	// `world.choosingtech = true` + hides the team overlays (mirrors the
+	// legacy ShowGameTech side effects).
+	silencer::ui::lobby_clay::GameTechPanelState gameTechState;
+	bool gameTechActive = false;
 };
 
 #endif
