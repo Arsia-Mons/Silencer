@@ -38,8 +38,8 @@ namespace silencer::ui::primitives {
 struct TextInputOpts {
 	Uint16 widthPx     = 90;    // bbox width (legacy `width`).
 	Uint16 heightPx    = 19;    // bbox height (legacy `height`).
-	Uint8  fontBank    = 135;   // legacy default.
-	Uint8  fontWidth   = 9;     // legacy default (cell width).
+	Uint8  fontBank;            // caller-supplied; the primitive doesn't
+	Uint8  fontWidth;           // know which bank/cell width is canonical.
 	bool   password    = false; // render text as '*' chars.
 	bool   numbersOnly = false; // screen-side input filter hint; primitive ignores.
 	bool   inactive    = false; // dims to brightness 64; suppresses caret.

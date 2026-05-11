@@ -98,7 +98,7 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 		silencer::ui::primitives::TextInput(
 			CLAY_STRING("pw_input"),
 			"hunter12",
-			{ .password = true });
+			{ .fontBank = 135, .fontWidth = 9, .password = true });
 	}
 	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
 
