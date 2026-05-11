@@ -362,6 +362,7 @@ if(EMSCRIPTEN)
 	target_link_options(${SILENCER_TARGET} PRIVATE
 		"-sALLOW_MEMORY_GROWTH=1"
 		"-sINITIAL_MEMORY=128MB"
+		"-sSTACK_SIZE=8MB"
 		"-sASYNCIFY=1"
 		"-sFORCE_FILESYSTEM=1"
 		"-sEXIT_RUNTIME=0"
@@ -369,6 +370,10 @@ if(EMSCRIPTEN)
 		"-sNO_DISABLE_EXCEPTION_CATCHING"
 		"--preload-file" "${SILENCER_SHARED_DIR}/assets@/assets"
 	)
+	# Stack size: Emscripten's 64KB default overflows on the first call to
+	# Resources::LoadSprites, which has an 88KB `header2[]` stack allocation
+	# (plus other locals). 8MB matches the SDL_GPU examples convention and
+	# leaves headroom for deep call stacks during gameplay later.
 	# Engineer-facing markdown ships with the asset bundle (~6 KB total);
 	# emcc's file-packager --exclude-file doesn't glob the way the
 	# command-line docs imply, and a temp-dir copy is overkill for this.

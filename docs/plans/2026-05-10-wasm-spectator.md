@@ -1,6 +1,8 @@
 # WASM browser spectator
 
-**Status:** Tracking — design locked, implementation not started
+**Status:** Stage 1 done (renders main menu in browser). Render-target
+section revised below — SDL3 has no WebGPU backend upstream, so the
+browser build uses SDL_Renderer over WebGL2 instead.
 **Date:** 2026-05-10
 
 ## Goal
@@ -26,10 +28,21 @@ paths considered" below.
 - **Spectator inputs are local-only.** Tab/WASD/follow-cycle/etc. drive
   camera and follow-target state inside the browser; nothing flows back
   to the relay. WebSocket from relay → browser stays read-only.
-- **Render target — SDL3 GPU on WebGPU.** Adds an HLSL→SPIRV codegen
-  path to the existing shader build (Vulkan SDK's `dxc`). The HLSL
-  sources already carry `[[vk::binding]]` annotations for it. Full
-  feature parity with native, including the particle compute shader.
+- **Render target — SDL_Renderer over WebGL2** (revised 2026-05-10).
+  The original plan was SDL3 GPU on WebGPU, but SDL3 3.4.x upstream
+  has no `gpu/webgpu/` backend (only D3D12, Metal, Vulkan); the
+  closed PR #12046 (klukaszek/SDL) targets older SDL3 3.2.1, doesn't
+  match our 3.4 baseline, and was never merged. We pivot to the
+  SDL_Renderer 2D API for the browser only — it picks GLES2 (WebGL2)
+  in the browser and has been stable for years. The native build
+  keeps SDL_GPU on D3D12/Metal/Vulkan; SPIRV codegen still lands
+  (committed) so the future SDL3-WebGPU path stays open.
+- **Browser render uses CPU palette remap** (revised). Indexed
+  framebuffer + per-frame palette remap to RGBA in C++ → SDL_Texture
+  streaming upload → SDL_RenderTexture stretch to canvas. At 640×480
+  the per-frame cost is ~1 ms — negligible. The native fragment-shader
+  remap stays for SDL_GPU paths. Lights and particles will need a CPU
+  port for the WebGL2 path when Stage 5+ needs them (deferred).
 - **Audio — SDL3_mixer's emscripten port → WebAudio.** Both ADPCM
   (`sound.bin`) and MP3 (`CLOSER2.mp3`) work. Standard "click to enable
   sound" first-gesture UX for browser autoplay policy.
@@ -141,16 +154,35 @@ Seven stages. Stages 1, 2, and 3 are independent and can run in
 parallel. Stage 4 needs all three. Stages 5 and 6 follow Stage 4.
 Stage 7 closes out the project.
 
-### Stage 1 — Emscripten foundation
+### Stage 1 — Emscripten foundation ✅ DONE
 
-Add an Emscripten build path to the client. Add HLSL→SPIRV shader
-codegen using Vulkan SDK's `dxc`. Produce a WASM bundle that loads in
-a browser and renders the main menu using SDL3 GPU on WebGPU. No
-networking, no gameplay.
+Add an Emscripten build path to the client. Produce a WASM bundle
+that loads in a browser and renders the main menu. No networking, no
+gameplay.
 
-**Proves:** SDL3 GPU's emscripten backend actually works with our
-shader pipeline. This is the single biggest unknown in the project, so
-it goes first.
+**Outcome (2026-05-10):** Menu renders in a browser via SDL_Renderer
++ WebGL2. Three commits landed on `hv/wasm`:
+
+- `dc89f45` — HLSL→SPIRV codegen + ShaderBundle SPIRV field
+  (groundwork; not consumed in Stage 1 due to the pivot, but
+  preserved for a future SDL3-WebGPU backend).
+- `9365baa` — Emscripten build target: SDL3+zlib emcc ports,
+  FetchContent SDL_mixer 3.2.0, --preload-file glue, main-loop
+  adapter, curl/minizip-using files stubbed.
+- *(this commit)* — Pivot to SDL_Renderer. New `SDLRendererBackend`
+  (CPU palette remap + SDL_Texture streaming + SDL_RenderTexture).
+  `Game::SetupRenderDevice` picks it when `__EMSCRIPTEN__`. 8MB
+  emscripten stack (default 64KB overflows on `LoadSprites`'s
+  88KB header buffer). `Game::LoadProgressCallback` no-ops on
+  browser (calling SDL_RenderPresent during loading aborts because
+  the main loop isn't established yet).
+
+**De-risked finding:** SDL3 GPU on WebGPU doesn't ship upstream. The
+SDL3 3.4 emcc port has `gpu/*.c` (the dispatcher) but no backend
+under `gpu/{vulkan,d3d12,metal}`. We pivoted to the well-supported
+SDL_Renderer + WebGL2 path. If/when an SDL3 WebGPU backend lands,
+the committed SPIRV codegen and `ShaderBundle::spirv` plumbing slot
+straight in.
 
 ### Stage 2 — Relay binary mode
 
@@ -218,8 +250,10 @@ preload assets (CDN). Embed the widget in `web/website/`.
 ## Risks and de-risking moves
 
 1. **SDL3 GPU emscripten / WebGPU compatibility with our shader
-   pipeline.** De-risked by Stage 1 going first. If it doesn't work,
-   we know before any other stage starts.
+   pipeline.** De-risked by Stage 1 going first — and the answer was
+   *it doesn't work yet*: SDL3 upstream has no WebGPU backend. We
+   pivoted to SDL_Renderer + WebGL2 for the browser only; native
+   keeps SDL_GPU. See Stage 1 outcome above.
 2. **Embedded WebSocket library choice.** Decided early in Stage 2;
    mitigated by sticking to well-known libraries with cross-platform
    build support.
