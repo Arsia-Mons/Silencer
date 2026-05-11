@@ -24,19 +24,15 @@
 #include "message_modal.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstring>
-#include <memory>
 #include <string>
 #include <thread>
 #include <vector>
 
 using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextOpts;
 using silencer::ui::primitives::BankTextVariant;
 using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonOpts;
 using silencer::ui::primitives::BankButtonVariant;
 using silencer::ui::primitives::FormBorder;
 using silencer::ui::primitives::ScrollList;
@@ -50,8 +46,7 @@ namespace silencer::ui::lobby_clay {
 
 namespace {
 
-// Legacy GameCreatePanel coordinates — copied verbatim from
-// game_create_panel.cpp so the on-screen geometry matches one-for-one.
+// Legacy GameCreatePanel coordinates — pixel-identical to the legacy panel.
 constexpr int    kYOffset      = 2;
 constexpr int    kYSpace       = 14;
 constexpr int    kRowHeight    = 14;
@@ -62,82 +57,83 @@ constexpr int    kFormTop      = 87;
 constexpr int    kFormWidth    = 156;
 constexpr int    kFormHeight   = 93;
 
-constexpr int    kOptionsTitleX = kFormLeft + 2;
-constexpr int    kOptionsTitleY = 70;
+constexpr int    kMapListX     = 407;
+constexpr int    kMapListY     = 89;
+constexpr Uint16 kMapListW     = 214;
+constexpr Uint16 kMapListH     = 265;
+constexpr Uint8  kMapListLineH = 14;
 
-// Map list block (right column of the right pane).
-constexpr int    kSelectMapTitleX = 405;
-constexpr int    kSelectMapTitleY = 70;
-constexpr int    kMapListX        = 407;
-constexpr int    kMapListY        = 89;
-constexpr Uint16 kMapListW        = 214;
-constexpr Uint16 kMapListH        = 265;
-constexpr Uint8  kMapListLineH    = 14;
+constexpr int    kNameInputX = 410, kNameInputY = 375;
+constexpr Uint16 kNameInputW = 210, kNameInputH = 14;
+constexpr int    kPwInputX   = 410, kPwInputY   = 405;
+constexpr Uint16 kPwInputW   = 210, kPwInputH   = 14;
 
-// Game name + password block (bottom of the right pane).
-constexpr int    kNameLabelX = 405;
-constexpr int    kNameLabelY = 360;
-constexpr int    kNameInputX = 410;
-constexpr int    kNameInputY = 375;
-constexpr Uint16 kNameInputW = 210;
-constexpr Uint16 kNameInputH = 14;
-constexpr int    kPwLabelX = 405;
-constexpr int    kPwLabelY = 390;
-constexpr int    kPwInputX = 410;
-constexpr int    kPwInputY = 405;
-constexpr Uint16 kPwInputW = 210;
-constexpr Uint16 kPwInputH = 14;
+constexpr int    kCreateBtnX = 436, kCreateBtnY = 430;
 
-constexpr int    kCreateBtnX = 436;
-constexpr int    kCreateBtnY = 430;
-
-// Per-frame slabs / file-scope click adapters. Same conventions as the
-// sibling Clay panels: small fixed-size arrays overwritten in place each
-// frame.
+// Per-frame slab for the map list display strings.
 constexpr int kMaxMapRows = 1024;
 Clay_String g_mapSlab[kMaxMapRows];
 
-Clay_String FromStd(const std::string & s) {
-	Clay_String cs;
-	cs.isStaticallyAllocated = false;
-	cs.length = static_cast<int32_t>(s.size());
-	cs.chars  = s.c_str();
-	return cs;
-}
-
 Clay_String FromCStr(const char * s) {
-	Clay_String cs;
-	cs.isStaticallyAllocated = false;
-	cs.length = static_cast<int32_t>(strlen(s));
-	cs.chars  = s;
-	return cs;
+	return Clay_String{ false, static_cast<int32_t>(strlen(s)), s };
 }
 
-void OnSecurityClicked(void * user) {
-	auto * state = static_cast<GameCreatePanelState *>(user);
-	if(state) state->securityClicked = true;
+Clay_String StaticId(const char * s) {
+	return Clay_String{ true, static_cast<int32_t>(strlen(s)), s };
 }
-void OnSpectatableClicked(void * user) {
-	auto * state = static_cast<GameCreatePanelState *>(user);
-	if(state) state->spectatableClicked = true;
-}
-void OnCreateClicked(void * user) {
-	auto * state = static_cast<GameCreatePanelState *>(user);
-	if(state) state->createClicked = true;
-}
+
+void OnSecurityClicked(void * user)    { static_cast<GameCreatePanelState *>(user)->securityClicked    = true; }
+void OnSpectatableClicked(void * user) { static_cast<GameCreatePanelState *>(user)->spectatableClicked = true; }
+void OnCreateClicked(void * user)      { static_cast<GameCreatePanelState *>(user)->createClicked      = true; }
 void OnMapRowSelected(void * user, int index) {
-	auto * state = static_cast<GameCreatePanelState *>(user);
-	if(state) state->mapRowClickedIndex = index;
+	static_cast<GameCreatePanelState *>(user)->mapRowClickedIndex = index;
 }
 
 const char * SecurityLabel(Uint8 idx) {
 	switch(idx){
 		case 0:  return "Off";
 		case 1:  return "Low";
-		case 2:  return "Medium";
 		case 3:  return "High";
-		default: return "Medium";
+		default: return "Medium";  // 2 + fallback
 	}
+}
+
+void RegisterButton(const char * label, int x, int y, int w, int h,
+                    void (*onClick)(void *), void * user, bool selected = false) {
+	silencer::ui::clay_inspector::Widget reg;
+	reg.label     = label;
+	reg.kind      = silencer::ui::clay_inspector::WidgetKind::Button;
+	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
+	reg.onClick   = onClick;
+	reg.clickUser = user;
+	reg.selected  = selected;
+	silencer::ui::clay_inspector::Register(reg);
+}
+
+void RegisterTextInput(const char * label, int x, int y, int w, int h,
+                       char * buf, int cap, bool isPassword = false) {
+	silencer::ui::clay_inspector::Widget reg;
+	reg.label         = label;
+	reg.kind          = silencer::ui::clay_inspector::WidgetKind::TextInput;
+	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
+	reg.textBuffer    = buf;
+	reg.textBufferLen = cap;
+	reg.isPassword    = isPassword;
+	silencer::ui::clay_inspector::Register(reg);
+}
+
+void RegisterListRow(const char * label, int x, int y, int w, int h,
+                     void (*onClickRow)(void *, int), void * user,
+                     int rowIndex, bool selected) {
+	silencer::ui::clay_inspector::Widget reg;
+	reg.label      = label;
+	reg.kind       = silencer::ui::clay_inspector::WidgetKind::ListRow;
+	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
+	reg.onClickRow = onClickRow;
+	reg.clickUser  = user;
+	reg.rowIndex   = rowIndex;
+	reg.selected   = selected;
+	silencer::ui::clay_inspector::Register(reg);
 }
 
 void BuildMapList(GameCreatePanelState & state, ScreenContext & ctx) {
@@ -150,28 +146,15 @@ void BuildMapList(GameCreatePanelState & state, ScreenContext & ctx) {
 	CDDataDir();
 	files = mapDownloader.ListFiles((GetDataDir() + "level/download").c_str());
 	for(auto & f : files){
-		if(std::find(maps.begin(), maps.end(), f) == maps.end()){
-			maps.push_back(f);
-		}
+		if(std::find(maps.begin(), maps.end(), f) == maps.end()) maps.push_back(f);
 	}
 	std::sort(maps.begin(), maps.end());
-	for(auto & m : maps){
-		state.maps.push_back(m);
-	}
+	for(auto & m : maps) state.maps.push_back(m);
 	mapDownloader.servermaps.clear();
-	auto serverlist = FetchServerMapList(Config::GetInstance().mapapiurl);
-	for(auto & entry : serverlist){
-		bool alreadylocal = std::find(maps.begin(), maps.end(), entry.first) != maps.end();
-		if(!alreadylocal){
-			// Match the legacy SelectBox display: stash the "[DL] " sentinel
-			// in mapDownloader.servermaps under the same key the legacy uses
-			// (lookups in the Create flow depend on it) but render only the
-			// bare map name in the list. The legacy renderer specifically
-			// strips the "[DL] " prefix and paints a right-margin "DL" badge
-			// — for Clay we render the bare name and accept the missing badge
-			// pixels (one ~16x11 strip per remote row). The state.maps slot
-			// keeps the legacy "[DL] " key so the create-button flow can
-			// detect remote-only rows via servermaps lookup.
+	// Remote-only maps get a "[DL] " prefix key so the Create flow can detect
+	// them via servermaps lookup; the row renderer strips the prefix for display.
+	for(auto & entry : FetchServerMapList(Config::GetInstance().mapapiurl)){
+		if(std::find(maps.begin(), maps.end(), entry.first) == maps.end()){
 			std::string label = "[DL] " + entry.first;
 			state.maps.push_back(label);
 			mapDownloader.servermaps[label] = entry.second;
@@ -184,9 +167,7 @@ void BuildMapList(GameCreatePanelState & state, ScreenContext & ctx) {
 void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx) {
 	state = GameCreatePanelState{};
 	state.spectatable = Config::GetInstance().lastspectatable;
-	std::strncpy(state.name,
-	             Config::GetInstance().defaultgamename,
-	             sizeof(state.name) - 1);
+	std::strncpy(state.name, Config::GetInstance().defaultgamename, sizeof(state.name) - 1);
 	state.name[sizeof(state.name) - 1] = '\0';
 	BuildMapList(state, ctx);
 	ctx.mapDownloader.selectedmap = -1;
@@ -200,13 +181,11 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	MapDownloader & mapDownloader = ctx.mapDownloader;
 	Game & game = ctx.game;
 
-	// Apply any row click from the previous frame.
 	if(state.mapRowClickedIndex >= 0){
 		state.mapSelectedIndex = state.mapRowClickedIndex;
 		mapDownloader.selectedmap = state.mapRowClickedIndex;
 		state.mapRowClickedIndex = -1;
 	}
-
 	if(state.securityClicked){
 		state.securityClicked = false;
 		state.securityIndex = static_cast<Uint8>((state.securityIndex + 1) % 4);
@@ -219,10 +198,8 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	}
 
 	// Deferred CreateGame state machine — mirrors LobbyScreen::Tick's
-	// `if(gameCreate){ ... }` block. Runs continuously while the Clay
-	// GameCreate surface is active so the upload+CreateGame handshake can
-	// complete even after the user has visually left the form to wait on
-	// the progress modal.
+	// `if(gameCreate)` block so the upload+CreateGame handshake completes
+	// even while the user is waiting on the progress modal.
 	int us = mapDownloader.mapUploadState.load(std::memory_order_acquire);
 	if(us == 2){
 		mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
@@ -251,7 +228,6 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		game.creategameclicked = false;
 		LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
 		if(lobbygame){
-			// Mirrors LobbyScreen::Tick's host-side gameinfo seeding.
 			owner.SeedHostGameInfo(world, *lobbygame);
 			game.JoinGame(*lobbygame, lobbygame->password);
 			mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
@@ -266,184 +242,134 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		ctx.ShowMessage("Could not create game");
 	}
 
-	// Create-button kickoff — mirrors GameCreatePanel::Tick's GCRT_BTN_CREATE
-	// switch case.
-	if(state.createClicked){
-		state.createClicked = false;
-		if(game.creategameclicked) return;
+	// Create-button kickoff — mirrors GameCreatePanel::Tick's GCRT_BTN_CREATE case.
+	if(!state.createClicked) return;
+	state.createClicked = false;
+	if(game.creategameclicked) return;
 
-		const char * gamename = state.name;
-		const char * password = (strlen(state.password) > 0) ? state.password : nullptr;
-		Uint8 securitylevel = LobbyGame::SECNONE;
-		switch(state.securityIndex){
-			case 1: securitylevel = LobbyGame::SECLOW; break;
-			case 2: securitylevel = LobbyGame::SECMEDIUM; break;
-			case 3: securitylevel = LobbyGame::SECHIGH; break;
-		}
-		Uint8 minlevel   = static_cast<Uint8>(atoi(state.minLevel));
-		Uint8 maxlevel   = static_cast<Uint8>(atoi(state.maxLevel));
-		Uint8 maxplayers = static_cast<Uint8>(atoi(state.maxPlayers));
-		if(maxplayers <= 0) maxplayers = 1;
-		Uint8 maxteams = static_cast<Uint8>(atoi(state.maxTeams));
-		if(maxteams <= 0) maxteams = 1;
-		bool spectatable = state.spectatable;
-
-		if(strlen(gamename) == 0){
-			ctx.ShowMessage("No game name");
-			return;
-		}
-		if(state.mapSelectedIndex < 0 || state.mapSelectedIndex >= (int)state.maps.size()){
-			ctx.ShowMessage("No map selected");
-			return;
-		}
-		std::string mapname = state.maps[state.mapSelectedIndex];
-		if(mapDownloader.servermaps.count(mapname) > 0){
-			ctx.ShowMessage("Download the map first");
-			return;
-		}
-		unsigned char maphash[20];
-		mapDownloader.CalculateMapHash(mapDownloader.FindMap(mapname.c_str()).c_str(), &maphash);
-		mapDownloader.pendingCreate.gamename = gamename;
-		mapDownloader.pendingCreate.mapname  = mapname;
-		mapDownloader.pendingCreate.password = password ? password : "";
-		memcpy(mapDownloader.pendingCreate.maphash, maphash, 20);
-		mapDownloader.pendingCreate.securitylevel = securitylevel;
-		mapDownloader.pendingCreate.minlevel      = minlevel;
-		mapDownloader.pendingCreate.maxlevel      = maxlevel;
-		mapDownloader.pendingCreate.maxplayers    = maxplayers;
-		mapDownloader.pendingCreate.maxteams      = maxteams;
-		mapDownloader.pendingCreate.spectatable   = spectatable;
-		if(mapDownloader.mapUploadThread.joinable()) mapDownloader.mapUploadThread.detach();
-		uint32_t gen = ++mapDownloader.mapUploadGeneration;
-		std::string mppath = mapDownloader.FindMap(mapname.c_str());
-		std::string dataDir = GetDataDir();
-		bool isBundledMap = dataDir.empty() || mppath.substr(0, dataDir.size()) != dataDir;
-		std::string apiURL = Config::GetInstance().mapapiurl;
-		if(isBundledMap){
-			mapDownloader.mapUploadState.store(2, std::memory_order_release);
-		}else{
-			mapDownloader.mapUploadState.store(1, std::memory_order_relaxed);
-			std::string mapname_str(mapname);
-			std::atomic<int> * uploadStatePtr = &mapDownloader.mapUploadState;
-			std::atomic<uint32_t> * uploadGenPtr = &mapDownloader.mapUploadGeneration;
-			mapDownloader.mapUploadThread = std::thread([mapname_str, mppath, apiURL, gen, uploadStatePtr, uploadGenPtr](){
-				bool ok = UploadMapToServer(mapname_str.c_str(), mppath.c_str(), apiURL.c_str());
-				if(uploadGenPtr->load(std::memory_order_relaxed) != gen) return;
-				uploadStatePtr->store(ok ? 2 : 3, std::memory_order_release);
-			});
-		}
-		world.lobby.creategamestatus = 0;
-		game.creategameclicked = true;
-		std::strncpy(Config::GetInstance().defaultgamename, gamename, sizeof(Config::GetInstance().defaultgamename) - 1);
-		Config::GetInstance().defaultgamename[sizeof(Config::GetInstance().defaultgamename) - 1] = '\0';
-		Config::GetInstance().Save();
-		ctx.PushScreen(MessageModal::Progress("Uploading map..."));
+	if(strlen(state.name) == 0){ ctx.ShowMessage("No game name"); return; }
+	if(state.mapSelectedIndex < 0 || state.mapSelectedIndex >= (int)state.maps.size()){
+		ctx.ShowMessage("No map selected"); return;
 	}
+	std::string mapname = state.maps[state.mapSelectedIndex];
+	if(mapDownloader.servermaps.count(mapname) > 0){
+		ctx.ShowMessage("Download the map first"); return;
+	}
+
+	Uint8 securitylevel = LobbyGame::SECNONE;
+	switch(state.securityIndex){
+		case 1: securitylevel = LobbyGame::SECLOW;    break;
+		case 2: securitylevel = LobbyGame::SECMEDIUM; break;
+		case 3: securitylevel = LobbyGame::SECHIGH;   break;
+	}
+	Uint8 maxplayers = static_cast<Uint8>(atoi(state.maxPlayers)); if(maxplayers <= 0) maxplayers = 1;
+	Uint8 maxteams   = static_cast<Uint8>(atoi(state.maxTeams));   if(maxteams   <= 0) maxteams   = 1;
+
+	unsigned char maphash[20];
+	mapDownloader.CalculateMapHash(mapDownloader.FindMap(mapname.c_str()).c_str(), &maphash);
+	auto & pc = mapDownloader.pendingCreate;
+	pc.gamename      = state.name;
+	pc.mapname       = mapname;
+	pc.password      = state.password;
+	memcpy(pc.maphash, maphash, 20);
+	pc.securitylevel = securitylevel;
+	pc.minlevel      = static_cast<Uint8>(atoi(state.minLevel));
+	pc.maxlevel      = static_cast<Uint8>(atoi(state.maxLevel));
+	pc.maxplayers    = maxplayers;
+	pc.maxteams      = maxteams;
+	pc.spectatable   = state.spectatable;
+
+	if(mapDownloader.mapUploadThread.joinable()) mapDownloader.mapUploadThread.detach();
+	uint32_t gen = ++mapDownloader.mapUploadGeneration;
+	std::string mppath = mapDownloader.FindMap(mapname.c_str());
+	std::string dataDir = GetDataDir();
+	bool isBundledMap = dataDir.empty() || mppath.substr(0, dataDir.size()) != dataDir;
+	if(isBundledMap){
+		mapDownloader.mapUploadState.store(2, std::memory_order_release);
+	}else{
+		mapDownloader.mapUploadState.store(1, std::memory_order_relaxed);
+		std::string apiURL = Config::GetInstance().mapapiurl;
+		std::atomic<int> * uploadStatePtr     = &mapDownloader.mapUploadState;
+		std::atomic<uint32_t> * uploadGenPtr  = &mapDownloader.mapUploadGeneration;
+		mapDownloader.mapUploadThread = std::thread([mapname, mppath, apiURL, gen, uploadStatePtr, uploadGenPtr](){
+			bool ok = UploadMapToServer(mapname.c_str(), mppath.c_str(), apiURL.c_str());
+			if(uploadGenPtr->load(std::memory_order_relaxed) != gen) return;
+			uploadStatePtr->store(ok ? 2 : 3, std::memory_order_release);
+		});
+	}
+	world.lobby.creategamestatus = 0;
+	game.creategameclicked = true;
+	std::strncpy(Config::GetInstance().defaultgamename, state.name, sizeof(Config::GetInstance().defaultgamename) - 1);
+	Config::GetInstance().defaultgamename[sizeof(Config::GetInstance().defaultgamename) - 1] = '\0';
+	Config::GetInstance().Save();
+	ctx.PushScreen(MessageModal::Progress("Uploading map..."));
 }
 
 void BuildGameCreatePanelTree(GameCreatePanelState & state,
                               Resources & resources) {
-	// Right border chrome sprite (bank 7 idx 8) — legacy positions an
-	// Overlay at (0, 0) with the renderer subtracting spriteoffsetx/y
-	// before BlitSurface. Mirror by floating at (-spriteoffsetx, -spriteoffsety).
+	// Right border chrome sprite (bank 7 idx 8) — float at -spriteoffset to
+	// match the legacy renderer's Overlay positioning.
 	const Uint16 borderW = resources.spritewidth[7][8];
 	const Uint16 borderH = resources.spriteheight[7][8];
-	const int borderX = 0 - resources.spriteoffsetx[7][8];
-	const int borderY = 0 - resources.spriteoffsety[7][8];
+	const int borderX = -resources.spriteoffsetx[7][8];
+	const int borderY = -resources.spriteoffsety[7][8];
 	CLAY({ .id = CLAY_ID("GCrtRightBorder"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(borderW)),
-	                       CLAY_SIZING_FIXED(static_cast<float>(borderH)) },
-	       },
+	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)borderW), CLAY_SIZING_FIXED((float)borderH) } },
 	       .image    = { .imageData = silencer::clay_bridge::PackImage(7, 8) },
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { static_cast<float>(borderX),
-	                                   static_cast<float>(borderY) } } }) {}
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { (float)borderX, (float)borderY } } }) {}
 
 	// "Game Options" header (left of form).
 	CLAY({ .id = CLAY_ID("GCrtOptionsTitleWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kOptionsTitleX, kOptionsTitleY } } }) {
-		BankText(CLAY_STRING("Game Options"),
-		         BankTextVariant::Heading,
-		         {});
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kFormLeft + 2, 70 } } }) {
+		BankText(CLAY_STRING("Game Options"), BankTextVariant::Heading, {});
 	}
 
-	// 1-px form border at (form_left, form_top) sized (form_width, form_height).
+	// 1-px form border.
 	CLAY({ .id = CLAY_ID("GCrtFormBorder"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(kFormWidth),
-	                       CLAY_SIZING_FIXED(kFormHeight) },
-	       },
+	       .layout = { .sizing = { CLAY_SIZING_FIXED(kFormWidth), CLAY_SIZING_FIXED(kFormHeight) } },
 	       .border   = FormBorder(),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kFormLeft, kFormTop } } }) {}
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kFormLeft, kFormTop } } }) {}
 
-	// Six rows: Security, Min Level, Max Level, Max Players, Max Teams,
-	// Spectatable. Each row has a Body label at labelX and a value widget
-	// at valueX, both at y = form_top + i*yspace + yoffset.
-	struct LabelRow { int y; const char * label; const char * id; };
-	const LabelRow kLabels[6] = {
-		{ kFormTop + (kYSpace * 0) + kYOffset, "Security:",    "GCrtLblSec"    },
-		{ kFormTop + (kYSpace * 1) + kYOffset, "Min Level:",   "GCrtLblMinL"   },
-		{ kFormTop + (kYSpace * 2) + kYOffset, "Max Level:",   "GCrtLblMaxL"   },
-		{ kFormTop + (kYSpace * 3) + kYOffset, "Max Players:", "GCrtLblMaxP"   },
-		{ kFormTop + (kYSpace * 4) + kYOffset, "Max Teams:",   "GCrtLblMaxT"   },
-		{ kFormTop + (kYSpace * 5) + kYOffset, "Spectatable:", "GCrtLblSpect"  },
+	// Six row labels at labelX, y = form_top + i*yspace + yoffset.
+	struct LabelRow { const char * label; const char * id; };
+	constexpr LabelRow kLabels[6] = {
+		{ "Security:",    "GCrtLblSec"   },
+		{ "Min Level:",   "GCrtLblMinL"  },
+		{ "Max Level:",   "GCrtLblMaxL"  },
+		{ "Max Players:", "GCrtLblMaxP"  },
+		{ "Max Teams:",   "GCrtLblMaxT"  },
+		{ "Spectatable:", "GCrtLblSpect" },
 	};
 	for(int i = 0; i < 6; ++i){
-		Clay_String labelId;
-		labelId.isStaticallyAllocated = true;
-		labelId.length = static_cast<int32_t>(strlen(kLabels[i].id));
-		labelId.chars  = kLabels[i].id;
-		CLAY({ .id = CLAY_SID(labelId),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset   = { kLabelX, (float)kLabels[i].y } } }) {
-			BankText(FromCStr(kLabels[i].label),
-			         BankTextVariant::Body,
-			         {});
+		const float y = (float)(kFormTop + kYSpace * i + kYOffset);
+		CLAY({ .id = CLAY_SID(StaticId(kLabels[i].id)),
+		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kLabelX, y } } }) {
+			BankText(FromCStr(kLabels[i].label), BankTextVariant::Body, {});
 		}
 	}
 
-	// Row values.
-	// Security cycler (BankButton::Inline).
+	// Row 0: Security cycler.
+	const float secY = (float)(kFormTop + kYOffset);
 	CLAY({ .id = CLAY_ID("GCrtSecValWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kValueX,
-	                                   (float)(kFormTop + kYOffset) } } }) {
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kValueX, secY } } }) {
 		BankButton(FromCStr(SecurityLabel(state.securityIndex)),
-		           BankButtonVariant::Inline,
-		           {},
-		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*onClick*/    &OnSecurityClicked,
-		                             /*user*/       &state });
+		           BankButtonVariant::Inline, {},
+		           BankButtonHandle{ nullptr, &OnSecurityClicked, &state });
 	}
-	{
-		silencer::ui::clay_inspector::Widget w;
-		w.label = "Security";
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
-		w.x = kValueX; w.y = kFormTop + kYOffset; w.w = 60; w.h = kRowHeight;
-		w.onClick   = &OnSecurityClicked;
-		w.clickUser = &state;
-		silencer::ui::clay_inspector::Register(w);
-	}
+	RegisterButton("Security", kValueX, (int)secY, 60, kRowHeight, &OnSecurityClicked, &state);
 
-	// Min/Max Level, Max Players, Max Teams (TextInput, numbersOnly).
-	const struct { const char * id; const char * label; int y; char * buf; int cap; } kTextInputs[4] = {
-		{ "GCrtMinLevel",   "Min Level",   kFormTop + (kYSpace * 1) + kYOffset, state.minLevel,   (int)sizeof(state.minLevel) },
-		{ "GCrtMaxLevel",   "Max Level",   kFormTop + (kYSpace * 2) + kYOffset, state.maxLevel,   (int)sizeof(state.maxLevel) },
-		{ "GCrtMaxPlayers", "Max Players", kFormTop + (kYSpace * 3) + kYOffset, state.maxPlayers, (int)sizeof(state.maxPlayers) },
-		{ "GCrtMaxTeams",   "Max Teams",   kFormTop + (kYSpace * 4) + kYOffset, state.maxTeams,   (int)sizeof(state.maxTeams) },
+	// Rows 1-4: Min/Max Level, Max Players, Max Teams (TextInput, numbersOnly).
+	struct NumInput { const char * id; const char * label; int row; char * buf; int cap; };
+	const NumInput kTextInputs[4] = {
+		{ "GCrtMinLevel",   "Min Level",   1, state.minLevel,   (int)sizeof(state.minLevel)   },
+		{ "GCrtMaxLevel",   "Max Level",   2, state.maxLevel,   (int)sizeof(state.maxLevel)   },
+		{ "GCrtMaxPlayers", "Max Players", 3, state.maxPlayers, (int)sizeof(state.maxPlayers) },
+		{ "GCrtMaxTeams",   "Max Teams",   4, state.maxTeams,   (int)sizeof(state.maxTeams)   },
 	};
-	for(int i = 0; i < 4; ++i){
-		Clay_String wrapId;
-		wrapId.isStaticallyAllocated = true;
-		wrapId.length = static_cast<int32_t>(strlen(kTextInputs[i].id));
-		wrapId.chars  = kTextInputs[i].id;
-		CLAY({ .id = CLAY_SID(wrapId),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset   = { kValueX,
-		                                   (float)kTextInputs[i].y } } }) {
+	for(const auto & ti : kTextInputs){
+		const int y = kFormTop + kYSpace * ti.row + kYOffset;
+		CLAY({ .id = CLAY_SID(StaticId(ti.id)),
+		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kValueX, (float)y } } }) {
 			TextInputOpts opts;
 			opts.widthPx     = 20;
 			opts.heightPx    = kRowHeight;
@@ -452,73 +378,39 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 			opts.brightness  = 128;
 			opts.numbersOnly = true;
 			opts.showCaret   = false;
-			std::string idStr = std::string("Input_") + kTextInputs[i].id;
-			Clay_String inputId;
-			inputId.isStaticallyAllocated = false;
-			inputId.length = static_cast<int32_t>(idStr.size());
-			inputId.chars  = idStr.c_str();
-			TextInput(inputId, kTextInputs[i].buf, opts, {});
+			std::string idStr = std::string("Input_") + ti.id;
+			TextInput(Clay_String{ false, (int32_t)idStr.size(), idStr.c_str() },
+			          ti.buf, opts, {});
 		}
-		silencer::ui::clay_inspector::Widget w;
-		w.label = kTextInputs[i].label;
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::TextInput;
-		w.x = kValueX; w.y = kTextInputs[i].y; w.w = 20; w.h = kRowHeight;
-		w.textBuffer    = kTextInputs[i].buf;
-		w.textBufferLen = kTextInputs[i].cap;
-		silencer::ui::clay_inspector::Register(w);
+		RegisterTextInput(ti.label, kValueX, y, 20, kRowHeight, ti.buf, ti.cap);
 	}
 
-	// Spectatable cycler (BankButton::Inline).
+	// Row 5: Spectatable cycler.
+	const int spectY = kFormTop + kYSpace * 5 + kYOffset;
 	CLAY({ .id = CLAY_ID("GCrtSpectValWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kValueX,
-	                                   (float)(kFormTop + (kYSpace * 5) + kYOffset) } } }) {
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kValueX, (float)spectY } } }) {
 		BankButton(FromCStr(state.spectatable ? "Yes" : "No"),
-		           BankButtonVariant::Inline,
-		           {},
-		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*onClick*/    &OnSpectatableClicked,
-		                             /*user*/       &state });
+		           BankButtonVariant::Inline, {},
+		           BankButtonHandle{ nullptr, &OnSpectatableClicked, &state });
 	}
-	{
-		silencer::ui::clay_inspector::Widget w;
-		w.label = "Spectatable";
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
-		w.x = kValueX; w.y = kFormTop + (kYSpace * 5) + kYOffset; w.w = 30; w.h = kRowHeight;
-		w.onClick = &OnSpectatableClicked;
-		w.clickUser = &state;
-		w.selected = state.spectatable;
-		silencer::ui::clay_inspector::Register(w);
-	}
+	RegisterButton("Spectatable", kValueX, spectY, 30, kRowHeight,
+	               &OnSpectatableClicked, &state, /*selected*/ state.spectatable);
 
 	// "Select Map" header + map ScrollList.
 	CLAY({ .id = CLAY_ID("GCrtSelectMapTitleWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kSelectMapTitleX, kSelectMapTitleY } } }) {
-		BankText(CLAY_STRING("Select Map"),
-		         BankTextVariant::Heading,
-		         {});
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { 405, 70 } } }) {
+		BankText(CLAY_STRING("Select Map"), BankTextVariant::Heading, {});
 	}
 
-	const int rowCount = static_cast<int>(state.maps.size());
-	const int slotCount = (rowCount < kMaxMapRows) ? rowCount : kMaxMapRows;
+	const int slotCount = std::min((int)state.maps.size(), kMaxMapRows);
 	for(int i = 0; i < slotCount; ++i){
-		// Mirror the legacy SelectBox row display: strip the "[DL] " sentinel
-		// so the row text shows only the bare map name. The legacy renderer
-		// also paints a "DL" badge in the right margin — we omit it here
-		// (~16x11 pixels per remote row of expected diff).
+		// Strip the "[DL] " sentinel for display; legacy paints a "DL" badge in
+		// the right margin which we omit (~16x11 expected diff per remote row).
 		const std::string & raw = state.maps[i];
 		const char * txt = raw.c_str();
 		size_t len = raw.size();
-		if(len >= 5 && std::memcmp(txt, "[DL] ", 5) == 0){
-			txt += 5;
-			len -= 5;
-		}
-		Clay_String cs;
-		cs.isStaticallyAllocated = false;
-		cs.length = static_cast<int32_t>(len);
-		cs.chars  = txt;
-		g_mapSlab[i] = cs;
+		if(len >= 5 && std::memcmp(txt, "[DL] ", 5) == 0){ txt += 5; len -= 5; }
+		g_mapSlab[i] = Clay_String{ false, (int32_t)len, txt };
 	}
 	ScrollListOpts listOpts;
 	listOpts.width          = kMapListW;
@@ -527,118 +419,60 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 	listOpts.highlightColor = 180;
 	listOpts.textVariant    = BankTextVariant::Body;
 	CLAY({ .id = CLAY_ID("GCrtMapListWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kMapListX, kMapListY } } }) {
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kMapListX, kMapListY } } }) {
 		ScrollList(CLAY_STRING("GCrtMapList"),
-		           g_mapSlab,
-		           slotCount,
-		           state.mapSelectedIndex,
-		           state.mapScrollPos,
+		           g_mapSlab, slotCount,
+		           state.mapSelectedIndex, state.mapScrollPos,
 		           listOpts,
-		           ScrollListHandle{ /*hoveredOut*/ nullptr,
-		                             /*onSelect*/   &OnMapRowSelected,
-		                             /*user*/       &state });
+		           ScrollListHandle{ nullptr, &OnMapRowSelected, &state });
 	}
-
-	// Register each map row as a clickable list-row. Use the post-strip
-	// display string (matches the visible label and what the test will pass).
 	for(int i = 0; i < slotCount; ++i){
-		silencer::ui::clay_inspector::Widget w;
-		w.label = g_mapSlab[i].chars;
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::ListRow;
-		w.x = kMapListX; w.y = kMapListY + i * kMapListLineH;
-		w.w = kMapListW; w.h = kMapListLineH;
-		w.onClickRow = &OnMapRowSelected;
-		w.clickUser  = &state;
-		w.rowIndex   = i;
-		w.selected   = (state.mapSelectedIndex == i);
-		silencer::ui::clay_inspector::Register(w);
+		RegisterListRow(g_mapSlab[i].chars,
+		                kMapListX, kMapListY + i * kMapListLineH,
+		                kMapListW, kMapListLineH,
+		                &OnMapRowSelected, &state, i,
+		                /*selected*/ state.mapSelectedIndex == i);
 	}
 
-	// Game name label + input.
+	// Game name + password labels and inputs (Heading label, 210x14 Body input).
 	CLAY({ .id = CLAY_ID("GCrtNameLabelWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kNameLabelX, kNameLabelY } } }) {
-		BankText(CLAY_STRING("Game name:"),
-		         BankTextVariant::Heading,
-		         {});
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { 405, 360 } } }) {
+		BankText(CLAY_STRING("Game name:"), BankTextVariant::Heading, {});
 	}
-	CLAY({ .id = CLAY_ID("GCrtNameInputWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kNameInputX, kNameInputY } } }) {
-		TextInputOpts opts;
-		opts.widthPx     = kNameInputW;
-		opts.heightPx    = kNameInputH;
-		opts.fontBank    = 133;
-		opts.fontWidth   = 6;
-		opts.brightness  = 128;
-		opts.showCaret   = false;
-		TextInput(CLAY_STRING("GCrtNameInput"), state.name, opts, {});
-	}
-	{
-		silencer::ui::clay_inspector::Widget w;
-		w.label = "Game name";
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::TextInput;
-		w.x = kNameInputX; w.y = kNameInputY; w.w = kNameInputW; w.h = kNameInputH;
-		w.textBuffer    = state.name;
-		w.textBufferLen = (int)sizeof(state.name);
-		silencer::ui::clay_inspector::Register(w);
-	}
-
-	// Password label + input.
 	CLAY({ .id = CLAY_ID("GCrtPwLabelWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kPwLabelX, kPwLabelY } } }) {
-		BankText(CLAY_STRING("Password (optional):"),
-		         BankTextVariant::Heading,
-		         {});
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { 405, 390 } } }) {
+		BankText(CLAY_STRING("Password (optional):"), BankTextVariant::Heading, {});
 	}
+	TextInputOpts bodyInput;
+	bodyInput.widthPx    = kNameInputW;
+	bodyInput.heightPx   = kNameInputH;
+	bodyInput.fontBank   = 133;
+	bodyInput.fontWidth  = 6;
+	bodyInput.brightness = 128;
+	bodyInput.showCaret  = false;
+	CLAY({ .id = CLAY_ID("GCrtNameInputWrap"),
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kNameInputX, kNameInputY } } }) {
+		TextInput(CLAY_STRING("GCrtNameInput"), state.name, bodyInput, {});
+	}
+	RegisterTextInput("Game name", kNameInputX, kNameInputY, kNameInputW, kNameInputH,
+	                  state.name, (int)sizeof(state.name));
+	bodyInput.password = true;
 	CLAY({ .id = CLAY_ID("GCrtPwInputWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kPwInputX, kPwInputY } } }) {
-		TextInputOpts opts;
-		opts.widthPx     = kPwInputW;
-		opts.heightPx    = kPwInputH;
-		opts.fontBank    = 133;
-		opts.fontWidth   = 6;
-		opts.password    = true;
-		opts.brightness  = 128;
-		opts.showCaret   = false;
-		TextInput(CLAY_STRING("GCrtPwInput"), state.password, opts, {});
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kPwInputX, kPwInputY } } }) {
+		TextInput(CLAY_STRING("GCrtPwInput"), state.password, bodyInput, {});
 	}
-	{
-		silencer::ui::clay_inspector::Widget w;
-		w.label = "Password";
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::TextInput;
-		w.x = kPwInputX; w.y = kPwInputY; w.w = kPwInputW; w.h = kPwInputH;
-		w.textBuffer    = state.password;
-		w.textBufferLen = (int)sizeof(state.password);
-		w.isPassword    = true;
-		silencer::ui::clay_inspector::Register(w);
-	}
+	RegisterTextInput("Password", kPwInputX, kPwInputY, kPwInputW, kPwInputH,
+	                  state.password, (int)sizeof(state.password), /*isPassword*/ true);
 
 	// Create button (Chrome variant).
 	const int createOffX = kCreateBtnX - resources.spriteoffsetx[7][24];
 	const int createOffY = kCreateBtnY - resources.spriteoffsety[7][24];
 	CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { (float)createOffX, (float)createOffY } } }) {
-		BankButton(CLAY_STRING("Create"),
-		           BankButtonVariant::Chrome,
-		           {},
-		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*onClick*/    &OnCreateClicked,
-		                             /*user*/       &state });
+	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { (float)createOffX, (float)createOffY } } }) {
+		BankButton(CLAY_STRING("Create"), BankButtonVariant::Chrome, {},
+		           BankButtonHandle{ nullptr, &OnCreateClicked, &state });
 	}
-	{
-		silencer::ui::clay_inspector::Widget w;
-		w.label = "Create";
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
-		w.x = kCreateBtnX; w.y = kCreateBtnY; w.w = 156; w.h = 21;
-		w.onClick = &OnCreateClicked;
-		w.clickUser = &state;
-		silencer::ui::clay_inspector::Register(w);
-	}
+	RegisterButton("Create", kCreateBtnX, kCreateBtnY, 156, 21, &OnCreateClicked, &state);
 }
 
 }  // namespace silencer::ui::lobby_clay
