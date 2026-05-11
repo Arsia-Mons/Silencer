@@ -98,6 +98,124 @@ below.)
   entirely (Clay's `.border` carries everything). Pattern: scene calls
   `BoxBeginFrame()` once before `Clay_BeginLayout()`, then any number
   of Box() calls with non-zero halos.
+- **Headless test scenes default to startup palette 0** — palette
+  block 2 (the lobby palette) is NOT auto-loaded by control-op
+  rendering. Test scenes that visually mimic the lobby chrome must
+  call `game.GetRenderer().palette.SetPalette(2)` BEFORE `Render(...)`
+  and restore to `SetPalette(0)` after (so subsequent control ops in
+  the same daemon session see their expected colors). Without this,
+  idx 216 reads as red instead of the lobby's bright green, idx
+  75/77 as muted off-tones instead of dark greens — palette-shifted
+  output that doesn't match the legacy BG art.
+- **Visual stroke rect ≠ panel interface rect.** A legacy `*_panel.cpp`
+  file declares an `Interface` rect (e.g. chat panel at
+  (15, 216, 368, 234)) but the actual visible chrome stroke rectangle
+  in the BG sprite is offset OUTWARD — chat-box stroke is at
+  (10, 195, 378, 260). Stroke is 5 px outset on left/right/bottom and
+  21 px outset on top (the top extra is the channel-header band).
+  When pulling chrome coords from legacy panel `Interface` decls,
+  always cross-check by scanning the BG decoder output for the
+  primary stroke (idx 216) runs at the expected axes — the panel
+  interior coords WILL be wrong.
+- **Cross-panel halo anomalies on shared edges.** Where two
+  rectangles' chromes touch (e.g. chat-box right edge abutting
+  character panel left edge), the halo palette indices at offsets
+  ±1 from the primary stroke differ from the rectangle's "clean"
+  edges. The canonical halo pick is the clean-edge sampling, not
+  the abutting-edge sampling. Note the anomaly in
+  `docs/plans/lobby-chrome-rectangles.md` rather than averaging it
+  into the canonical value.
+
+## 2026-05-11T17:55:00Z - C0d Box vs legacy chat-box parity (side-by-side DM)
+- Validated C0c's Box halo API against the most prominent legacy chrome
+  rectangle (the chat-box outer frame) by rendering both side-by-side
+  and DM'ing to the user for visual sign-off.
+- **Coordinate discovery.** The spec's "x=15, y=216, w=368, h=234" from
+  the legacy `chat_panel.cpp` Interface declaration is the panel
+  INTERIOR rect — NOT the visible stroke rect. Scanning
+  `/tmp/lobby_bg.png` for runs of palette idx 216 located the actual
+  stroke at (10, 195, 378, 260) — 5 px outset on left/right/bottom and
+  21 px outset on top. The top has an extra band for the channel
+  header sprite. The parity scene uses the visual rect, not the
+  interior rect, since that's what we're matching pixel-for-pixel.
+- **Halo sampling.** `/tmp/sample_chat_box_halo.py` aggregates the
+  palette index at offsets ±1..±4 from primary across all four edges
+  (sample script committed to /tmp — companion to
+  `/tmp/inspect_lobby_stroke{,2}.py`). Left + bottom + top edges show
+  the canonical pattern: primary 216 (23/23 hits), outer halo 74/75
+  at -1, inner halo 77 at +1, background 114 past the halos. Right
+  edge is anomalous (outer 90, inner 66) — the character panel's
+  chrome abuts the chat-box right edge in the BG. Canonical pick is
+  the clean-edge values: 75 outer, 77 inner — matches C0c's default.
+- **Palette gotcha.** First render came out with red strokes because
+  the headless control-op test starts in palette 0 (the default), not
+  palette 2 (the lobby palette block that decodes idx 216 as bright
+  green). Fixed by `SetPalette(2)` before render + `SetPalette(0)`
+  restore after. Added a top-level pattern doc-string for this.
+- **Side-by-side composer.** `/tmp/crop_lobby_chat_box.py` crops the
+  legacy BG at (4, 189, 394, 461) → 390×272. `/tmp/compose_parity_dm.py`
+  stitches the two 390×272 PNGs into a 781×294 image with white
+  separator and LEGACY/CLAY BOX labels. The compose script is
+  agnostic to the underlying scene — reuse for future per-rectangle
+  parity DMs by changing the source-PNG paths.
+- **Self-assessment of parity (NOT a visual sign-off — that's the
+  user's call):** The Clay Box's stroke geometry, primary color, and
+  halo bands match the legacy stroke closely on left/bottom/top
+  edges. The legacy interior shows the decorative texture
+  (circuit-board, planet monitor, photo collage) which the chrome
+  milestone intentionally drops — the Clay side is flat black inside.
+  The right edge of the legacy chrome shows the cross-panel halo
+  anomaly noted above; if the user wants per-edge halo overrides we'd
+  need to extend the Box API (e.g. `*HaloColorRight` overrides), but
+  the spec implies one-color-per-halo and we don't yet have a
+  rectangle that NEEDS per-edge variation — chat-box's right edge is
+  the only known case and it's caused by the neighbor, not by the
+  chat-box rectangle itself. Likely user feedback: "good enough, ship
+  it" OR "make the inner halo a hair brighter."
+- **Files changed:**
+  - `clients/silencer/src/ui/clay/box_parity_chat_test.cpp` — new
+    scene; loads palette 2, renders one 378×260 Box with canonical
+    halo params inside a 6 px margin (390×272 final).
+  - `clients/silencer/src/ui/clay/clay_bridge.h` — forward decl for
+    `RunBoxParityChatTest`.
+  - `clients/silencer/src/net/controldispatch.cpp` — new
+    `clay_box_parity_chat` control op handler.
+  - `docs/plans/lobby-chrome-rectangles.md` — new doc stub seeded
+    with the chat-box row. C2 extends with all remaining rectangles.
+- **Out-of-tree artifacts** (in `/tmp/`, not committed):
+  `crop_lobby_chat_box.py`, `compose_parity_dm.py`,
+  `sample_chat_box_halo.py`, `find_chat_box_outline.py`,
+  `find_top_edge.py`, `legacy_chat_box.png`, `clay_chat_box.png`,
+  `box_chat_parity.png`. Future iterations regenerate via the
+  CMD-line recipe documented in `lobby-chrome-rectangles.md`.
+- **Quality gates:** build green ✓, 40_lobby_clay_basic e2e PASS ✓.
+  No new pixdiff harness for this iteration — it IS the visual diff.
+- **DM sent:** "stroke=216, outerHalo=75 (1px), innerHalo=77 (1px),
+  rect 378x260 @ (10,195) · LEGACY interior texture intentionally
+  dropped — only the chrome stroke is being compared" + attachment
+  `/tmp/ralph-shots/iter-C0d.png`.
+- **Learnings for future iterations:**
+  - When a spec gives rect coords from a legacy `Interface` decl,
+    those are interior coords. The visible stroke rect is OUTSIDE
+    the interface by a small inset (typically 5 px on each side, with
+    a possible header band of ~21 px at the top). Always cross-check
+    via BG decoder + idx 216 search, don't take the interface decl
+    at face value.
+  - When a test scene renders chrome that's supposed to mimic the
+    lobby, the palette has to be set to block 2. Without this, idx
+    216 reads as the wrong color. Add `SetPalette(2)` / `SetPalette(0)`
+    bookends to the scene fn. Future chrome scenes (C3+) will likely
+    want this even for testing-rendered-against-flat-bg cases, since
+    the canonical halo idx values are palette-2-relative.
+  - The cropper + composer Python scripts at `/tmp/` are reusable
+    templates for future per-rectangle parity DMs. Pattern:
+    decode-bg → crop legacy → render Clay → compose. The compose
+    script doesn't care about which rectangle — just feed it two PNGs.
+  - "Parity validation" iterations don't need a committed
+    reference.png or pixdiff harness — the DM IS the deliverable.
+    Don't over-engineer them with test infra they don't need.
+
+---
 
 ## 2026-05-11T17:30:00Z - C0c Box stroke halos (multi-tone outer + inner rings)
 - Extended the Box primitive API with four required halo params:

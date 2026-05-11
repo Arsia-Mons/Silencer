@@ -311,6 +311,15 @@ bool RunBoxTest(::Game & game, const char * outPath);
 // box_halo_test.cpp.
 bool RunBoxHaloTest(::Game & game, const char * outPath);
 
+// C0d Box vs legacy chat-box parity scene. Renders a single Box at the
+// chat-box's visual stroke dimensions (378x260) inside a 6 px black
+// margin (final 390x272). Output aligns byte-for-byte with the legacy
+// crop produced by `/tmp/crop_lobby_chat_box.py` for the side-by-side
+// DM. Halo params hard-coded from sampling the legacy stroke. Invoked
+// by the `clay_box_parity_chat` control op. Implementation in
+// box_parity_chat_test.cpp.
+bool RunBoxParityChatTest(::Game & game, const char * outPath);
+
 // C1 Box alpha-blend smoke test. Renders a fully-opaque rect with a
 // 50%-opaque rect overlapping its right half into a 640x480 Surface and
 // writes it to `outPath`. Exercises the bridge's palette alphaed-LUT path.
