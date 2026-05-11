@@ -283,16 +283,17 @@ void GameSelectPanel::Tick(ScreenContext & ctx)
 					ctx.game.currentlobbygameid = lobbygame->id;
 					if(strlen(lobbygame->password) > 0 && lobbygame->accountid != world.lobby.accountid){
 						Uint32 gameId = lobbygame->id;
-						ctx.PushScreen(std::make_unique<PasswordModal>(
-							[&ctx, gameId](const char * password){
-								LobbyGame * lg = ctx.world.lobby.GetGameById(gameId);
+						ScreenContext * sctx = &ctx;
+						ctx.game.ShowV2PasswordModal(
+							[sctx, gameId](const std::string & password){
+								LobbyGame * lg = sctx->world.lobby.GetGameById(gameId);
 								if(lg){
 									char buf[64];
-									std::strncpy(buf, password ? password : "", sizeof(buf) - 1);
+									std::strncpy(buf, password.c_str(), sizeof(buf) - 1);
 									buf[sizeof(buf) - 1] = '\0';
-									ctx.game.JoinGame(*lg, buf);
+									sctx->game.JoinGame(*lg, buf);
 								}
-							}));
+							});
 					}else{
 						ctx.game.JoinGame(*lobbygame);
 					}

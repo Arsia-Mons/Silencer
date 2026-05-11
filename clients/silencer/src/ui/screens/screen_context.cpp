@@ -38,11 +38,13 @@ void ScreenContext::PushScreen(std::unique_ptr<Screen> s) { game.PushScreen(std:
 void ScreenContext::PopScreen() { game.PopScreen(); }
 void ScreenContext::ReplaceScreen(std::unique_ptr<Screen> s) { game.ReplaceScreen(std::move(s)); }
 void ScreenContext::ShowModal(std::unique_ptr<Modal> m) {
+	// MessageModal / PasswordModal callers should use game.ShowV2Message /
+	// game.ShowV2PasswordModal directly — kept for the legacy Screen path.
 	game.PushScreen(std::unique_ptr<Screen>(static_cast<Screen *>(m.release())));
 }
 
 void ScreenContext::ShowMessage(const char * msg, std::function<void()> onClose) {
-	game.PushScreen(std::make_unique<MessageModal>(msg ? msg : "", std::move(onClose)));
+	game.ShowV2Message(msg ? std::string(msg) : std::string(), std::move(onClose));
 }
 
 void ScreenContext::ResetPresentation(int paletteIdx) {

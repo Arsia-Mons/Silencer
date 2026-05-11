@@ -549,7 +549,7 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 						ctx.game.creategameclicked = true;
 						strcpy(Config::GetInstance().defaultgamename, gamename);
 						Config::GetInstance().Save();
-						ctx.PushScreen(MessageModal::Progress("Uploading map..."));
+						ctx.game.ShowV2ProgressMessage("Uploading map...");
 					}break;
 				}
 			}break;

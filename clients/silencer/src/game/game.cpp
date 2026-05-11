@@ -49,10 +49,13 @@
 #include "update.h"
 #include "mission_summary.h"
 #include "lobby_connect.h"
+#include "modals/message.h"
+#include "modals/password.h"
 #include "audio.h"
 #include "renderdevice.h"
 #include <SDL3/SDL_video.h>
 #include <SDL3/SDL_timer.h>
+#include <SDL3/SDL_scancode.h>
 #include <algorithm>
 #include <stdio.h>
 
@@ -664,6 +667,9 @@ bool Game::Loop(void){
 		}else{
 			renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
 		}
+		// v2 modal overlay — top of stack draws on top of whatever the
+		// per-state path produced. Empty stack is a no-op.
+		RenderV2ModalOverlay();
 #ifdef POSIX
 		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && deploymessageshown){
 			Uint8 buffer[640 * 480 * 3];
@@ -2302,6 +2308,178 @@ void Game::DispatchMainMenuV2Click(int logical_x, int logical_y){
 	ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
 	ui::v2::Layout(tree, ctx);
 	ui::v2::DispatchClick(tree, ctx);
+}
+
+void Game::ShowV2Message(const std::string & text, std::function<void()> on_close){
+	V2ModalEntry m;
+	m.kind = V2ModalEntry::MESSAGE;
+	m.text = text;
+	m.has_ok = true;
+	m.on_close = std::move(on_close);
+	ui_v2_modal_stack.push_back(std::move(m));
+}
+
+void Game::ShowV2ProgressMessage(const std::string & text){
+	V2ModalEntry m;
+	m.kind = V2ModalEntry::MESSAGE;
+	m.text = text;
+	m.has_ok = false;
+	ui_v2_modal_stack.push_back(std::move(m));
+}
+
+void Game::ShowV2PasswordModal(std::function<void(const std::string &)> on_submit){
+	V2ModalEntry m;
+	m.kind = V2ModalEntry::PASSWORD;
+	m.on_submit = std::move(on_submit);
+	ui_v2_modal_stack.push_back(std::move(m));
+}
+
+void Game::SetV2ProgressText(const std::string & text){
+	if(ui_v2_modal_stack.empty()) return;
+	ui_v2_modal_stack.back().text = text;
+}
+
+void Game::PopV2Modal(){
+	if(ui_v2_modal_stack.empty()) return;
+	ui_v2_modal_stack.pop_back();
+}
+
+bool Game::IsV2ProgressModalActive() const {
+	if(ui_v2_modal_stack.empty()) return false;
+	const V2ModalEntry & top = ui_v2_modal_stack.back();
+	return top.kind == V2ModalEntry::MESSAGE && !top.has_ok;
+}
+
+void Game::RenderV2ModalOverlay(){
+	if(ui_v2_modal_stack.empty()) return;
+	const V2ModalEntry & top = ui_v2_modal_stack.back();
+
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = ui_v2_mouse_x;
+	ctx.mouse_y = ui_v2_mouse_y;
+	ctx.state   = &ui_v2_state;
+
+	ui::v2::Node tree;
+	if(top.kind == V2ModalEntry::MESSAGE){
+		ui::v2::MessageHandlers h;
+		// The handler captures the top entry's index — pop first, then fire
+		// the user callback so PopV2Modal can be called from inside it.
+		h.on_ok = [this](){
+			auto cb = ui_v2_modal_stack.empty() ? std::function<void()>{} : std::move(ui_v2_modal_stack.back().on_close);
+			PopV2Modal();
+			if(cb) cb();
+		};
+		tree = ui::v2::BuildMessage(ctx, top.text, top.has_ok, h);
+	}else{
+		ui::v2::PasswordHandlers h;
+		h.on_submit = [this](const std::string & captured){
+			auto cb = ui_v2_modal_stack.empty() ? std::function<void(const std::string &)>{} : std::move(ui_v2_modal_stack.back().on_submit);
+			PopV2Modal();
+			if(cb) cb(captured);
+		};
+		tree = ui::v2::BuildPassword(ctx, top.password_buf, h);
+	}
+	ui::v2::Layout(tree, ctx);
+	ui::v2::Render(tree, ctx, screenbuffer, renderer);
+}
+
+bool Game::DispatchV2ModalClick(int logical_x, int logical_y){
+	if(ui_v2_modal_stack.empty()) return false;
+	const V2ModalEntry & top = ui_v2_modal_stack.back();
+
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = logical_x;
+	ctx.mouse_y = logical_y;
+	ctx.state   = &ui_v2_state;
+
+	ui::v2::Node tree;
+	if(top.kind == V2ModalEntry::MESSAGE){
+		ui::v2::MessageHandlers h;
+		h.on_ok = [this](){
+			auto cb = ui_v2_modal_stack.empty() ? std::function<void()>{} : std::move(ui_v2_modal_stack.back().on_close);
+			PopV2Modal();
+			if(cb) cb();
+		};
+		tree = ui::v2::BuildMessage(ctx, top.text, top.has_ok, h);
+	}else{
+		ui::v2::PasswordHandlers h;
+		h.on_submit = [this](const std::string & captured){
+			auto cb = ui_v2_modal_stack.empty() ? std::function<void(const std::string &)>{} : std::move(ui_v2_modal_stack.back().on_submit);
+			PopV2Modal();
+			if(cb) cb(captured);
+		};
+		tree = ui::v2::BuildPassword(ctx, top.password_buf, h);
+	}
+	ui::v2::Layout(tree, ctx);
+	ui::v2::DispatchClick(tree, ctx);
+	return true;
+}
+
+bool Game::DispatchV2ModalKey(int sdl_scancode){
+	if(ui_v2_modal_stack.empty()) return false;
+	V2ModalEntry & top = ui_v2_modal_stack.back();
+	switch(sdl_scancode){
+		case SDL_SCANCODE_RETURN:{
+			if(top.kind == V2ModalEntry::MESSAGE){
+				if(top.has_ok){
+					auto cb = std::move(top.on_close);
+					PopV2Modal();
+					if(cb) cb();
+				}
+			}else{
+				std::string captured = top.password_buf;
+				auto cb = std::move(top.on_submit);
+				PopV2Modal();
+				if(cb) cb(captured);
+			}
+			return true;
+		}
+		case SDL_SCANCODE_ESCAPE:{
+			// MESSAGE with OK + PASSWORD both dismiss on ESC. Progress (has_ok=false)
+			// has no user-driven dismiss path — caller pops when its work finishes.
+			if(top.kind == V2ModalEntry::MESSAGE && !top.has_ok) return true;
+			if(top.kind == V2ModalEntry::MESSAGE){
+				auto cb = std::move(top.on_close);
+				PopV2Modal();
+				if(cb) cb();
+			}else{
+				PopV2Modal();
+			}
+			return true;
+		}
+		case SDL_SCANCODE_BACKSPACE:{
+			if(top.kind == V2ModalEntry::PASSWORD && !top.password_buf.empty()){
+				top.password_buf.pop_back();
+			}
+			return true;
+		}
+		default: break;
+	}
+	// Always swallow keys while a modal is up — the underlying state
+	// shouldn't receive them.
+	return true;
+}
+
+bool Game::DispatchV2ModalText(char ascii){
+	if(ui_v2_modal_stack.empty()) return false;
+	V2ModalEntry & top = ui_v2_modal_stack.back();
+	if(top.kind == V2ModalEntry::PASSWORD){
+		// Mirror legacy TextInput maxchars=20 cap (password_modal.cpp:47).
+		if(top.password_buf.size() < 20) top.password_buf.push_back(ascii);
+	}
+	return true;
 }
 
 void Game::TickActiveScreen(){

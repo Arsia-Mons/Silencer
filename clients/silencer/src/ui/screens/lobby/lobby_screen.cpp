@@ -27,23 +27,21 @@
 
 namespace
 {
-MessageModal * TopAsProgressModal(ScreenContext & ctx)
+bool IsProgressModalActive(ScreenContext & ctx)
 {
-	Screen * top = ctx.game.GetTopScreen();
-	if(!top) return nullptr;
-	MessageModal * m = dynamic_cast<MessageModal *>(top);
-	return (m && m->IsProgress()) ? m : nullptr;
+	return ctx.game.IsV2ProgressModalActive();
 }
 
-bool TopIsModal(ScreenContext & ctx)
+bool IsAnyModalActive(ScreenContext & ctx)
 {
+	if(ctx.game.IsV2ModalActive()) return true;
 	Screen * top = ctx.game.GetTopScreen();
 	return top && top->IsOverlay();
 }
 
 void DismissProgressModal(ScreenContext & ctx)
 {
-	if(TopAsProgressModal(ctx)) ctx.PopScreen();
+	if(ctx.game.IsV2ProgressModalActive()) ctx.game.PopV2Modal();
 }
 }
 
@@ -203,19 +201,19 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			}
 		}
 		// Spinner text update for the create-game progress modal.
-		if(MessageModal * progress = TopAsProgressModal(ctx)){
+		if(IsProgressModalActive(ctx)){
 			std::string text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
 				? "Uploading map" : "Creating game";
 			int dots = (world.tickcount / 4) % 6;
 			if(dots > 3) dots = 6 - dots;
 			for(int i = 0; i < dots; i++) text += ".";
-			progress->SetText(ctx, text);
+			ctx.game.SetV2ProgressText(text);
 		}
 		// Auto-dismiss the progress modal once the create flow has settled.
-		if(TopAsProgressModal(ctx) && world.lobby.creategamestatus != 100 &&
+		if(IsProgressModalActive(ctx) && world.lobby.creategamestatus != 100 &&
 		   mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 &&
 		   (world.state == World::CONNECTED || world.state == World::IDLE)){
-			ctx.PopScreen();
+			ctx.game.PopV2Modal();
 			game.creategameclicked = false;
 		}
 		// CONNECTED transition — swap in the GameJoinPanel, refresh chat
@@ -244,7 +242,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	mapDownloader.ProcessMapDownload();
 
 	// Disconnected-from-game modal: only when in the joined-game surface.
-	if(world.state != World::CONNECTED && !TopIsModal(ctx)){
+	if(world.state != World::CONNECTED && !IsAnyModalActive(ctx)){
 		if(gameJoin || gameTech){
 			Game * gamePtr = &game;
 			ctx.ShowMessage("Disconnected from game", [gamePtr]() { gamePtr->GoBack(); });

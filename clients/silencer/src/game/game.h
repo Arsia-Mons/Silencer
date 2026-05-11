@@ -27,6 +27,21 @@ class Screen;
 class Modal;
 namespace ui { namespace v2 { struct Node; } }
 
+// Live-engine v2 modal entry. Overlays the underlying state's v2 (or legacy)
+// render. The stack is rendered + dispatched independently of any per-state
+// path so a modal can be shown from any state. Mirrors what the legacy
+// MessageModal / PasswordModal classes provided through the Screen stack —
+// the v2 tree is rebuilt each frame from the current Text / password buffer.
+struct V2ModalEntry {
+	enum Kind { MESSAGE, PASSWORD };
+	Kind                                       kind         = MESSAGE;
+	std::string                                text;          // MESSAGE: body / PASSWORD: prompt
+	bool                                       has_ok       = true;
+	std::string                                password_buf;  // PASSWORD only
+	std::function<void()>                      on_close;      // MESSAGE on-OK callback
+	std::function<void(const std::string &)>   on_submit;     // PASSWORD on-OK callback
+};
+
 class Game
 {
 public:
@@ -121,6 +136,18 @@ public:
 	// right-side panel swaps (ShowGameTech / TearDownRightPanels) when
 	// entering / leaving the tech-choice surface.
 	void ShowTeamOverlays(bool show);
+
+	// v2 modal stack — overlays the underlying state's render and intercepts
+	// mouse / text input when non-empty. Lobby panels (P16g) and any other
+	// caller that needs to surface a confirmation / progress / password
+	// prompt without owning a legacy Screen subclass push entries here.
+	void ShowV2Message(const std::string & text, std::function<void()> on_close = {});
+	void ShowV2ProgressMessage(const std::string & text);  // No OK button — caller pops.
+	void ShowV2PasswordModal(std::function<void(const std::string &)> on_submit);
+	void SetV2ProgressText(const std::string & text);      // Updates text on top of stack.
+	void PopV2Modal();
+	bool IsV2ModalActive() const { return !ui_v2_modal_stack.empty(); }
+	bool IsV2ProgressModalActive() const;
 
 	// Preview-mode CLI flags. Set by Load() when --preview-screen is
 	// passed; main.cpp dispatches to RunPreview() instead of the normal
@@ -287,6 +314,16 @@ private:
 	bool RenderLobbyConnectV2();
 	void DispatchLobbyConnectV2Click(int logical_x, int logical_y);
 	void TickLobbyConnectV2();
+	// v2 modal stack render + dispatch hooks. RenderV2ModalOverlay() blits
+	// the top modal on top of whatever the per-state render already drew;
+	// DispatchV2Modal* return true when the event was consumed so the per-
+	// state path can be skipped. SDL types are forward-declared to keep the
+	// game.h dependency surface unchanged for non-event callers.
+	void RenderV2ModalOverlay();
+	bool DispatchV2ModalClick(int logical_x, int logical_y);
+	bool DispatchV2ModalKey(int sdl_scancode);
+	bool DispatchV2ModalText(char ascii);
+	std::vector<V2ModalEntry> ui_v2_modal_stack;
 	// Text input routing helpers — called from events.cpp's TEXT_INPUT and
 	// KEY_DOWN branches when state == LOBBYCONNECT. Append / backspace /
 	// tab-cycle the active input buffer. No-op while the inputs are

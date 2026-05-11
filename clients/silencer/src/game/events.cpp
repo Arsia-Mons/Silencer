@@ -217,7 +217,11 @@ bool Game::HandleSDLEvents(void){
 						skip = true;
 					break;
 				}
-				if(state == GameState::LOBBYCONNECT){
+				if(IsV2ModalActive()){
+					// v2 modal owns text input — append into password buf
+					// (no-op for MESSAGE-kind modals).
+					if(!skip) DispatchV2ModalText((char)ascii);
+				}else if(state == GameState::LOBBYCONNECT){
 					// v2 LobbyConnect — no Interface to route through; the
 					// active field's buffer lives directly on Game.
 					if(!skip) LobbyConnectAppendChar(ascii);
@@ -280,6 +284,12 @@ bool Game::HandleSDLEvents(void){
 						}
 					}break;
 				}
+				if(IsV2ModalActive()){
+					// Active v2 modal absorbs Enter/Esc/Backspace; per-state
+					// editing keys never fire.
+					DispatchV2ModalKey((int)event.key.scancode);
+					break;
+				}
 				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 				if(iface){
 					iface->lastsym = event.key.scancode;
@@ -326,6 +336,11 @@ bool Game::HandleSDLEvents(void){
 					SDL_GetWindowSize(window, &w, &h);
 					int lx = (int)((float(event.button.x) / w) * 640);
 					int ly = (int)((float(event.button.y) / h) * 480);
+					if(IsV2ModalActive()){
+						// v2 modal intercepts clicks before any per-state path.
+						DispatchV2ModalClick(lx, ly);
+						break;
+					}
 					if(state == GameState::MAINMENU){
 						// v2 MainMenu owns its own dispatch; no Interface to
 						// route through (currentinterface is 0 in MAINMENU now).
@@ -354,6 +369,12 @@ bool Game::HandleSDLEvents(void){
 			}break;
 			case SDL_EVENT_MOUSE_BUTTON_UP:{
 				if(event.button.button == SDL_BUTTON_LEFT){
+					if(IsV2ModalActive()){
+						// v2 modal absorbed the mouse-down; mirror by absorbing
+						// the mouse-up too so the underlying iface doesn't see
+						// a stale up event.
+						break;
+					}
 					if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY || state == GameState::LOBBYCONNECT){
 						// v2 fires on mouse-down (matches preview); nothing to
 						// do on mouse-up.
@@ -372,9 +393,10 @@ bool Game::HandleSDLEvents(void){
 				SDL_GetWindowSize(window, &w, &h);
 				int lx = (int)((float(event.motion.x) / w) * 640);
 				int ly = (int)((float(event.motion.y) / h) * 480);
-				if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY || state == GameState::LOBBYCONNECT){
+				if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY || state == GameState::LOBBYCONNECT || IsV2ModalActive()){
 					// Feed v2 render hover styling. Always update; the v2
-					// render pass reads ui_v2_mouse_{x,y} next frame.
+					// render pass reads ui_v2_mouse_{x,y} next frame. Also
+					// applies whenever a v2 modal is overlaid on a non-v2 state.
 					ui_v2_mouse_x = lx;
 					ui_v2_mouse_y = ly;
 				}else{
