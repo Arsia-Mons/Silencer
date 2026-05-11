@@ -71,6 +71,10 @@
 - Sprite-offset compensation for CUSTOM-dispatched sprites whose bbox is "where the visible rect should land" (not "where the sprite anchor sits") happens INSIDE the bridge dispatch: subtract `world.resources.spriteoffsetx/y[bank][index]` from the blit dst. The ScrollBar dispatcher does this for its track sprite (bank 7 idx 9) so the rendered scrollbar's visible top-left equals `bbox.{x,y}` regardless of the sprite's baked anchor. IMAGE/BankButtonChrome dispatchers stay naive — their callers pre-apply the anchor compensation at the layout level via `.floating.offset = (-spriteoffsetx, -spriteoffsety)`. The two conventions co-exist because Clay's IMAGE element naturally renders at bbox.x (caller's responsibility to position it correctly), whereas the ScrollBar CUSTOM payload conceptually means "render the scrollbar visible inside this rect" — the bridge owns the visible→sprite-coord conversion.
 - Clay screens expose interactive widgets to the CLI control dispatch via the per-frame `silencer::ui::clay_inspector` registry (clay_inspector.h). Each Clay panel's `Build*Tree` calls `Register({label, kind, x, y, w, h, ...callback/buffer})` for buttons / toggles / textinputs / listrows it emits; `LobbyClayScreen::Draw` calls `clay_inspector::BeginFrame()` to reset before the BuildTree pass. `controldispatch.cpp`'s `inspect` appends `{"source": "clay", ...}` widgets after the legacy iface walk; `click --label` / `set_text --label` fall through to `FindByLabel` on legacy MATCH_NOT_FOUND. Click invokes the registered callback directly (same trampoline Clay_OnHover would fire); set_text writes the panel state's char buffer in place. Same pattern reusable for any future Clay screen.
 - `tests/cli-agent/e2e/lib.sh` prefers the worktree-root `build/Silencer.app/...` over `clients/silencer/build/...` as of P20. The latter is a long-tail relic from pre-worktree checkouts and may be a stale binary that silently breaks Clay-only tests (the stale binary linked the legacy LobbyScreen even after P19 deleted the source). Per-test scripts no longer need an explicit `SILENCER_BIN=...` override before sourcing lib.sh, though it's still good practice for primitives that want to be explicit about which build is under test.
+- `silencer::clay_bridge::Render` now has two overloads (as of P21): the primary `Render(Resources&, Renderer&, Surface*, cmds)` is Game-free — used by the standalone clay-demo. A thin `Render(Game&, ...)` wrapper forwards to it for in-silencer callers. Any future tooling that wants to drive the bridge without a full Game lifecycle should use the Resources/Renderer overload directly.
+- `Resources::Load*` takes `Game *` (nullable) instead of `Game &` (as of P21). When `game == nullptr` the progress callback is suppressed. Lets a standalone tool call `world.resources.LoadSprites(nullptr)` without needing a Game instance. Existing in-silencer call site (`game.cpp::Init`) passes `this`.
+- `SILENCER_HAVE_LOBBY_CLAY=1` is a compile-time define set by the main silencer cmake target. `clay_demo` does NOT define it. `game.cpp` and `net/controldispatch.cpp` gate their LobbyClayScreen references on this define, so the demo target's compile pass elides them entirely. Result: the demo binary doesn't link any lobby_clay symbol (verified with `nm clay_demo | grep lobby_clay` → 0 matches). Future tooling that needs a screen-less silencer build can reuse this define.
+- The `clay_demo` cmake target (in `clients/silencer/CMakeLists.txt`) reuses silencer's source list filtered by REGEX exclusion (`/src/main\\.cpp$`, `/src/ui/screens/lobby_clay/`) plus its own `tools/clay-demo/main.cpp`. Output lands at `tools/clay-demo/build/clay_demo` via `RUNTIME_OUTPUT_DIRECTORY`. `tools/clay-demo/CMakeLists.txt` is a thin dispatcher that `add_subdirectory`'s silencer so consumers can build the demo from `tools/clay-demo/` directly if they prefer.
 
 ## 2026-05-11T00:00:00Z - bootstrap
 - Ralph artifacts created (ralph.sh, RALPH.md, prd.json, progress.txt).
@@ -831,4 +835,48 @@
   - The committed `tests/lobby-clay/baselines/*.png` are FROZEN evidence from the pre-P19 legacy palette-fade phase. Any Clay-vs-baseline pixdiff will show ~25-37% (palette-fade phase drift) regardless of implementation correctness; this is documented and acknowledged. Verification shape is Clay-vs-fresh-run-Clay reference (per P11 cookbook), not Clay-vs-frozen-baseline. The committed baselines remain useful as informational anchors (eyes-on diff to a known reference) but are not pass gates.
   - After P19 deletes the legacy lobby and per-panel run.sh scripts capture two Clay runs (no legacy run to compare against), the per-panel pixdiff degenerates to "does the same binary render deterministically twice in a row" — trivially yes (≤ 0.6%). The pass gate's design intent ("Clay matches legacy at <5%") was satisfied at the P12-P17 migration boundary when legacy still existed; after P19, the test still has value as a determinism check + visual smoke test, but doesn't gate against legacy regressions anymore. A future cleanup could either delete these scripts or repurpose them against a committed reference rendered offline — explicitly out of scope for the lobby→Clay refactor.
   - "Final regression sweep" iterations on this kind of refactor should explicitly verify the suite-level runner (`bash tests/cli-agent/run.sh`) and not just per-test scripts. Suite-level runners typically have a `--continue-on-failure` shape that masks isolated test failures; the per-iteration pattern of "this panel passes individually so we're done" can hide environment-level bugs (like binary-resolution drift) that only the full suite exercises.
+---
+
+
+## 2026-05-12T01:00:00Z - P21 (Dogfood primitives in a non-lobby demo) — COMPLETE
+- Built `tools/clay-demo/main.cpp` — a standalone 640x480 demo that exercises every Clay primitive without including any lobby header. Renders:
+  - `BankText` all 4 variants (Title, Heading, Body, BodySm).
+  - `BankButton` all 3 variants (Chrome "Create Game" + Inline "Security" + Checkbox x2 toggling on/off).
+  - `Toggle` x2 (bank 7 idx 18 with selectedBrightness 128 / unselectedBrightness 64).
+  - `TextInput` x2 (plain "Player4" with caret + password-masked "secret").
+  - `ScrollList` (16 maps, scrollPosition=2, selectedIndex=4 → "junction" highlighted, scrollbar visible).
+  - `ScrollTextBox` (5 chat lines, BottomUp origin).
+  - `FormBorder` (1-px palette-220 stroke around the 4-variant BankText demo).
+  - `LabelValueRow` x3 (Map/Players/Security form-row rhythm).
+  - `Panel` both variants (`LeftBare` titled "Primitives" + `RightChrome` titled "RightChrome" with bank 7 idx 8 sprite).
+- Bridge & Resources refactor (the enabling work):
+  - Added `silencer::clay_bridge::Render(Resources&, Renderer&, Surface*, cmds)` as the primary overload. The pre-existing `Render(Game&, …)` is now a thin wrapper that forwards. Both wires through the same `DispatchImage`/`DispatchCustom` paths — payload + sprite-lookup logic unchanged, only the parameter type traveled.
+  - `Resources::Load`/`LoadSprites`/`LoadTiles`/`LoadSounds` now take `Game *` instead of `Game &`; null progress callback is suppressed. Sole in-silencer call site (`game.cpp::Init`) passes `this`.
+  - Added compile-time switch `SILENCER_HAVE_LOBBY_CLAY=1` defined by the silencer target. `game.cpp` (`#include "lobby_clay_screen.h"` + the `PushScreen(std::make_unique<LobbyClayScreen>())` instantiation) and `net/controldispatch.cpp` (`lobby_show_panel` op + its `dynamic_cast<LobbyClayScreen *>`) gate on this define. clay_demo does not define it.
+- cmake wiring: `clients/silencer/CMakeLists.txt` declares `add_executable(clay_demo ...)` reusing silencer's source list with REGEX-filtered exclusions for `src/main.cpp` and `src/ui/screens/lobby_clay/`. Output is forced to `tools/clay-demo/build/clay_demo` via `RUNTIME_OUTPUT_DIRECTORY`. `tools/clay-demo/CMakeLists.txt` is a thin entry point (add_subdirectory of silencer).
+- Demo init path: SDL_INIT_VIDEO with `SDL_VIDEO_DRIVER=dummy`, own implementations of `CDResDir`/`CDDataDir` (the demo searches a small list of relative paths + the `CLAY_DEMO_ASSETS` env var), `World w(false); Renderer r(w); r.palette.Load(); w.resources.LoadSprites(nullptr)`. Then `EnsureInitialized(640, 480)`, `BuildDemoTree()`, `Render(w.resources, r, &dst, cmds)`, `r.CapturePNG(...)`.
+- Files changed:
+  - clients/silencer/CMakeLists.txt (+ clay_demo target, + SILENCER_HAVE_LOBBY_CLAY define on silencer target)
+  - clients/silencer/src/ui/clay/clay_bridge.{h,cpp} (Resources/Renderer overload + retained Game wrapper)
+  - clients/silencer/src/resources/resources.{h,cpp} (Game* nullable callback)
+  - clients/silencer/src/game/game.cpp (SILENCER_HAVE_LOBBY_CLAY gates on include + PushScreen)
+  - clients/silencer/src/net/controldispatch.cpp (SILENCER_HAVE_LOBBY_CLAY gates on include + lobby_show_panel op)
+  - tools/clay-demo/main.cpp (new — demo source)
+  - tools/clay-demo/CMakeLists.txt (new — thin dispatcher)
+  - tools/clay-demo/screenshot.png (new — committed proof artifact)
+  - ralph/{prd.json,progress.txt} (flip P21.passes + this entry)
+- Build: `cmake -B build -S clients/silencer && cmake --build build -j` → both `silencer` and `clay_demo` targets green. No new warnings.
+- Pass check:
+  - `tools/clay-demo/build/clay_demo` exists, runs, writes a 640x480 PNG. ✓
+  - `nm tools/clay-demo/build/clay_demo | grep -i lobby_clay` → 0 matches. ✓
+  - `nm tools/clay-demo/build/clay_demo | grep -i "ShowGameCreate\|ShowGameTech\|ShowGameJoin\|ShowGameSelect"` → 0 matches. ✓
+  - `tools/clay-demo/screenshot.png` committed. ✓
+  - Main silencer build still passes (clay_bridge wrapper, Game* refactor, and define gating all green).
+- **Learnings for future iterations:**
+  - The "primitives are screen-agnostic" property is testable as a link-time gate: build a target that GLOB-excludes the consumer screen tree + the same `#ifdef` gate keeps non-screen callers from accidentally importing screen symbols. Replicate this shape (gate define + filtered cmake target) for any future "prove this is reusable" milestone (main-menu Clay, options Clay, etc.).
+  - `clay_bridge::Render` taking `(Resources&, Renderer&)` instead of `(Game&)` is the canonical entry point for any future tool that wants to render Clay scenes without a full Game lifecycle. The Game& wrapper is a convenience inside silencer, not the API boundary.
+  - For a demo binary that reuses silencer's source tree, the smallest viable cmake delta is: filter the same `sources` list by REGEX, then `add_executable` with that filtered list + your own main. SDL3 / zlib / curl / minizip dependencies stay identical. Don't try to mint a parallel cmake project with its own find_package calls — the duplication is brittle and the linker errors are unhelpful.
+  - World's constructor in headless contexts is cheap (UDP socket creation + GAS-default reads) — no SDL audio needed, no GAS load needed. The demo runs World(false) + Renderer(world) + palette.Load() + LoadSprites(nullptr) and that's enough to drive the full Clay bridge.
+  - `Resources::LoadSprites(nullptr)` skips the load-progress callback — useful any time a non-Game tool needs sprite data. `LoadTiles`/`LoadSounds` got the same nullable callback shape for symmetry; sounds are particularly expensive so a no-sound tool can skip the load entirely instead of paying for it.
+  - `extern "C"` on a function whose silencer-side declaration in `shared.h` lacks the linkage qualifier is a hard compile error ("declaration of 'X' has a different language linkage"). When stubbing functions in a demo TU, mirror the existing declaration's linkage — silencer's `CDResDir`/`CDDataDir` are C++-linkage.
 ---

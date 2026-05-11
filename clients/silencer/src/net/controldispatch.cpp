@@ -15,7 +15,9 @@
 #include "shared.h"
 #include "clay_bridge.h"
 #include "clay_inspector.h"
+#ifdef SILENCER_HAVE_LOBBY_CLAY
 #include "lobby_clay_screen.h"
+#endif
 #include "screen_context.h"
 #include <cstring>
 #include <cstdio>
@@ -706,6 +708,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		HandleGas(game, cmd);
 		return;
 	}
+#ifdef SILENCER_HAVE_LOBBY_CLAY
 	if(cmd.op == "lobby_show_panel"){
 		// Drive the lobby's right-side panel swap from a CLI test. The Clay
 		// lobby exposes its panels as Clay subtrees with no world Interface
@@ -732,6 +735,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 		return;
 	}
+#endif
 	if(cmd.op == "key"){
 		// Edge-triggered key event for the current interface. Mirrors the SDL
 		// SDL_EVENT_KEY_DOWN → ascii translation in HandleSDLEvents — magic

@@ -203,7 +203,7 @@
       "id": "P21",
       "priority": 21,
       "name": "Dogfood primitives in a non-lobby demo",
-      "passes": false,
+      "passes": true,
       "spec": "Add tools/clay-demo/ — a small standalone source file that initializes Clay with a 640x480 viewport and uses every primitive at least once (BankText all 4 variants, BankButton all 3 variants, Toggle, ScrollList, ScrollTextBox, TextInput, FormBorder, LabelValueRow, Panel both chrome variants). Builds as a separate target. The demo MUST NOT include any lobby headers — if it doesn't compile without lobby_clay/*, the primitives have a hidden coupling and the agent must fix the primitive, not the demo. Capture a screenshot of the demo and commit it to tools/clay-demo/screenshot.png as proof.",
       "pass_check": "tools/clay-demo/build/clay_demo runs and produces a PNG. The binary does not link against any clients/silencer/src/ui/screens/lobby_clay/ symbol. Screenshot is committed."
     }

@@ -34,8 +34,9 @@
 #include "options_display_screen.h"
 #include "options_audio_screen.h"
 #include "lobby_connect_screen.h"
+#ifdef SILENCER_HAVE_LOBBY_CLAY
 #include "lobby_clay_screen.h"
-#include "lobby_clay_screen.h"
+#endif
 #include "update_screen.h"
 #include "mission_summary_screen.h"
 #include <algorithm>
@@ -295,7 +296,7 @@ bool Game::Load(char * cmdline){
 		// so the palette is always populated by the time a screenshot is captured.
 	}
 	printf("Loading resources...\n");
-	if(!world.resources.Load(*this, world.dedicatedserver.active)){
+	if(!world.resources.Load(this, world.dedicatedserver.active)){
 		printf("Could not load resources\n");
 		return false;
 	}
@@ -809,7 +810,9 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
+#ifdef SILENCER_HAVE_LOBBY_CLAY
 				PushScreen(std::make_unique<LobbyClayScreen>());
+#endif
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){

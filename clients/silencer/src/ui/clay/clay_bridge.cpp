@@ -187,14 +187,14 @@ void DispatchText(::Renderer & renderer,
 	                  buf, bank, width, alpha, color, brightness, colorRamp);
 }
 
-void DispatchImage(::Game & game,
+void DispatchImage(::Resources & resources,
                    Surface * dst,
                    const ::Clay_BoundingBox & bb,
                    const ::Clay_ImageRenderData & data) {
 	Uint8 bank;
 	Uint16 index;
 	UnpackImage(data.imageData, bank, index);
-	const auto & banks = game.GetWorld().resources.spritebank;
+	const auto & banks = resources.spritebank;
 	if(bank >= banks.size()) return;
 	if(index >= banks[bank].size()) return;
 	Surface * src = banks[bank][index].get();
@@ -250,10 +250,10 @@ void EnsureInitialized(int width, int height) {
 	::Clay_ResetMeasureTextCache();
 }
 
-void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
+void Render(::Resources & resources, ::Renderer & renderer,
+            Surface * dst, ::Clay_RenderCommandArray cmds) {
 	g_clipStack.clear();
 	if(!dst) return;
-	::Renderer & renderer = game.GetRenderer();
 	for(int i = 0; i < cmds.length; i++){
 		::Clay_RenderCommand * c = &cmds.internalArray[i];
 		switch(c->commandType){
@@ -268,7 +268,7 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
 				             c->renderData.text, c->userData);
 				break;
 			case CLAY_RENDER_COMMAND_TYPE_IMAGE:
-				DispatchImage(game, dst, c->boundingBox, c->renderData.image);
+				DispatchImage(resources, dst, c->boundingBox, c->renderData.image);
 				break;
 			case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
 				ClipRect r;
@@ -299,7 +299,7 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
 					case CustomKind::BankButtonChrome: {
 						const auto * p = reinterpret_cast<const BankButtonChromePayload *>(ccd->payload);
 						if(!p) break;
-						const auto & banks = game.GetWorld().resources.spritebank;
+						const auto & banks = resources.spritebank;
 						if(p->bank >= banks.size()) break;
 						if(p->index >= banks[p->bank].size()) break;
 						Surface * src = banks[p->bank][p->index].get();
@@ -324,7 +324,7 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
 					case CustomKind::ToggleSprite: {
 						const auto * p = reinterpret_cast<const TogglePayload *>(ccd->payload);
 						if(!p) break;
-						const auto & banks = game.GetWorld().resources.spritebank;
+						const auto & banks = resources.spritebank;
 						if(p->bank >= banks.size()) break;
 						if(p->index >= banks[p->bank].size()) break;
 						Surface * src = banks[p->bank][p->index].get();
@@ -353,7 +353,7 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
 					case CustomKind::ScrollBar: {
 						const auto * p = reinterpret_cast<const ScrollBarPayload *>(ccd->payload);
 						if(!p) break;
-						const auto & res = game.GetWorld().resources;
+						const auto & res = resources;
 						const auto & banks = res.spritebank;
 						if(p->bank >= banks.size()) break;
 						if(p->trackIndex >= banks[p->bank].size()) break;
@@ -491,6 +491,10 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
 				break;
 		}
 	}
+}
+
+void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds) {
+	Render(game.GetWorld().resources, game.GetRenderer(), dst, cmds);
 }
 
 }  // namespace silencer::clay_bridge

@@ -175,6 +175,7 @@ target_compile_definitions(${SILENCER_TARGET} PRIVATE
 	SILENCER_VERSION="${SILENCER_VERSION}"
 	SILENCER_MAP_API_URL="${SILENCER_MAP_API_URL}"
 	SILENCER_ADMIN_API_URL="${SILENCER_ADMIN_API_URL}"
+	SILENCER_HAVE_LOBBY_CLAY=1
 )
 
 find_package(ZLIB REQUIRED)
@@ -273,5 +274,76 @@ if(SILENCER_BUILD_TESTS)
 	enable_testing()
 	add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../tests ${CMAKE_BINARY_DIR}/tests)
 endif()
+
+# clay-demo target (P21) — dogfood pass that proves the Clay primitives in
+# `src/ui/clay/primitives/` are screen-agnostic by linking them into a
+# non-lobby executable. Source list = silencer sources MINUS `src/main.cpp`
+# and `src/ui/screens/lobby_clay/*`. The `SILENCER_HAVE_LOBBY_CLAY` define
+# is NOT set, so `game.cpp` and `controldispatch.cpp` compile their
+# lobby-clay references out. Result: the binary does not link against any
+# `clients/silencer/src/ui/screens/lobby_clay/` symbol (P21 pass_check).
+set(clay_demo_sources ${sources})
+list(FILTER clay_demo_sources EXCLUDE REGEX "/src/main\\.cpp$")
+list(FILTER clay_demo_sources EXCLUDE REGEX "/src/ui/screens/lobby_clay/")
+list(APPEND clay_demo_sources
+	"${CMAKE_CURRENT_SOURCE_DIR}/../../tools/clay-demo/main.cpp")
+add_executable(clay_demo ${clay_demo_sources})
+target_compile_features(clay_demo PUBLIC cxx_std_20)
+target_compile_definitions(clay_demo PRIVATE
+	SILENCER_LOBBY_HOST="${SILENCER_LOBBY_HOST}"
+	SILENCER_LOBBY_PORT=${SILENCER_LOBBY_PORT}
+	SILENCER_VERSION="${SILENCER_VERSION}"
+	SILENCER_MAP_API_URL="${SILENCER_MAP_API_URL}"
+	SILENCER_ADMIN_API_URL="${SILENCER_ADMIN_API_URL}"
+)
+add_dependencies(clay_demo silencer_shaders)
+target_include_directories(clay_demo PRIVATE
+	"${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated"
+	"${CMAKE_CURRENT_SOURCE_DIR}/third_party"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/platform"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/render"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/audio"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/input"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/world"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/actors"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/projectiles"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/objects"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/stations"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui/clay"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui/panels"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui/modals"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/main_menu"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/options"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby_connect"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/update"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/mission_summary"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/net"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/game"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/updater"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/gas"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/events"
+)
+if(APPLE)
+	target_link_libraries(clay_demo
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		CURL::libcurl ${COCOA_FRAMEWORK})
+elseif(WIN32)
+	target_link_libraries(clay_demo
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		CURL::libcurl ws2_32)
+else()
+	target_link_libraries(clay_demo
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		CURL::libcurl)
+endif()
+target_link_libraries(clay_demo minizip_dep)
+set_target_properties(clay_demo PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY
+		"${CMAKE_CURRENT_SOURCE_DIR}/../../tools/clay-demo/build")
 
 include(CPack)

@@ -32,6 +32,8 @@
 
 class Game;
 class Surface;
+class Resources;
+class Renderer;
 
 namespace silencer::clay_bridge {
 
@@ -41,9 +43,17 @@ namespace silencer::clay_bridge {
 void EnsureInitialized(int width, int height);
 
 // Walks `cmds` and dispatches each command to the matching Renderer
-// primitive, writing into `dst`. Game gives the bridge both the Renderer
-// instance (for DrawText / DrawFilledRectangle / BlitSurface) and the World's
-// Resources (for sprite-bank lookups).
+// primitive, writing into `dst`. Resources supplies sprite-bank lookups
+// (IMAGE / CUSTOM dispatch); Renderer supplies the actual draw routines
+// (DrawText / EffectBrightness / etc.). Game-free entry point — used by
+// the standalone clay-demo tool. Inside the silencer binary, callers
+// typically use the `Render(Game&, ...)` thin wrapper below.
+void Render(::Resources & resources, ::Renderer & renderer,
+            Surface * dst, ::Clay_RenderCommandArray cmds);
+
+// Convenience wrapper inside the silencer binary — pulls Resources +
+// Renderer out of the Game and forwards. Identical behavior to the
+// primary overload above.
 void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds);
 
 // Runs the P3 smoke scene (one rect + one border + one text + one image)
