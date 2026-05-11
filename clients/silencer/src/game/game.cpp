@@ -653,7 +653,10 @@ bool Game::Loop(void){
 			Uint64 now = SDL_GetTicks();
 			float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
 			ui_v2_last_ticks = now;
-			active_runtime->Render(screenbuffer, renderer, ui_v2_mouse_x, ui_v2_mouse_y, dt);
+			int logical_w, logical_h, scale;
+			Renderer::ComputeUIDims(window, logical_w, logical_h, scale);
+			active_runtime->Render(screenbuffer, renderer, ui_v2_mouse_x, ui_v2_mouse_y, dt,
+			                       logical_w, logical_h, scale);
 		}else{
 			renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
 		}
@@ -1319,8 +1322,16 @@ void Game::SetV2ProgressText(const std::string & text){                         
 void Game::PopV2Modal(){                                                              ui_v2_modal_stack->Pop(); }
 bool Game::IsV2ModalActive() const         { return ui_v2_modal_stack && ui_v2_modal_stack->Active(); }
 bool Game::IsV2ProgressModalActive() const { return ui_v2_modal_stack && ui_v2_modal_stack->ProgressActive(); }
-void Game::RenderV2ModalOverlay(){                          ui_v2_modal_stack->RenderOverlay(screenbuffer, renderer); }
-bool Game::DispatchV2ModalClick(int lx, int ly){     return ui_v2_modal_stack->DispatchClick(lx, ly); }
+void Game::RenderV2ModalOverlay(){
+	int logical_w, logical_h, scale;
+	Renderer::ComputeUIDims(window, logical_w, logical_h, scale);
+	ui_v2_modal_stack->RenderOverlay(screenbuffer, renderer, logical_w, logical_h, scale);
+}
+bool Game::DispatchV2ModalClick(int lx, int ly){
+	int logical_w, logical_h, scale;
+	Renderer::ComputeUIDims(window, logical_w, logical_h, scale);
+	return ui_v2_modal_stack->DispatchClick(lx, ly, logical_w, logical_h, scale);
+}
 bool Game::DispatchV2ModalKey(int sdl_scancode){     return ui_v2_modal_stack->DispatchKey(sdl_scancode); }
 bool Game::DispatchV2ModalText(char ascii){          return ui_v2_modal_stack->DispatchText(ascii); }
 

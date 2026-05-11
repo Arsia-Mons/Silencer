@@ -103,6 +103,18 @@ public:
 	void DrawMessageBackground(Surface * surface, Rect * dstrect);
 	Uint8 GetAmbienceLevel(void);
 	bool CapturePNG(const class Surface & buf, const SDL_Color * palette, const char * path);
+
+	// Path B responsive-UI helpers. ChooseScale maps the current window
+	// height to an integer ui_scale (1 for <720, 2 for 720-1439, 3 for
+	// 1440-2159, 4 for 2160+). ComputeUIDims pulls the actual window
+	// size via SDL_GetWindowSize and divides by the chosen scale to
+	// produce the logical pixel dimensions screens lay out in. A null
+	// SDL_Window* (headless / dedicated / preview --dump-ppm) falls
+	// back to the legacy fixed 640x480 / scale=1 so byte-identical PPM
+	// gates keep passing.
+	static int ChooseScale(int window_h);
+	static void ComputeUIDims(struct SDL_Window * window, int & logical_w, int & logical_h, int & scale);
+
 	Camera camera;
 	Palette palette;
 

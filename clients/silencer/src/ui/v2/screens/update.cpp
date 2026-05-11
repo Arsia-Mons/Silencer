@@ -177,12 +177,13 @@ UpdateRuntime::UpdateRuntime(World & world, ScreenContext & sctx)
 	: world_(world), sctx_(sctx) {}
 
 void UpdateRuntime::Render(Surface & target, ::Renderer & renderer,
-                            int mouse_x, int mouse_y, float dt){
+                            int mouse_x, int mouse_y, float dt,
+                              int logical_w, int logical_h, int scale){
 	Context ctx{
 		world_.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
+		/*logical_w=*/logical_w,
+		/*logical_h=*/logical_h,
+		/*scale=*/scale,
 		/*version=*/world_.GetVersion(),
 	};
 	ctx.mouse_x = mouse_x;
@@ -200,12 +201,13 @@ void UpdateRuntime::Render(Surface & target, ::Renderer & renderer,
 	state_.EndFrame();
 }
 
-bool UpdateRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
+bool UpdateRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
+                                int logical_w, int logical_h, int scale){
 	Context ctx{
 		world_.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
+		/*logical_w=*/logical_w,
+		/*logical_h=*/logical_h,
+		/*scale=*/scale,
 		/*version=*/world_.GetVersion(),
 	};
 	ctx.mouse_x = mouse_x;

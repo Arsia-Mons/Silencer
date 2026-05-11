@@ -183,12 +183,13 @@ void LobbyConnectRuntime::Backspace(){
 }
 
 void LobbyConnectRuntime::Render(Surface & target, ::Renderer & renderer,
-                                  int mouse_x, int mouse_y, float dt){
+                                  int mouse_x, int mouse_y, float dt,
+                              int logical_w, int logical_h, int scale){
 	Context ctx{
 		world_.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
+		/*logical_w=*/logical_w,
+		/*logical_h=*/logical_h,
+		/*scale=*/scale,
 		/*version=*/world_.GetVersion(),
 	};
 	ctx.mouse_x = mouse_x;
@@ -207,7 +208,8 @@ void LobbyConnectRuntime::Render(Surface & target, ::Renderer & renderer,
 	state_.EndFrame();
 }
 
-bool LobbyConnectRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
+bool LobbyConnectRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
+                                int logical_w, int logical_h, int scale){
 	// Hit-test the username/password input rects directly to swap active field
 	// — Buttons handle Login/Cancel via the v2 dispatch pass.
 	// Username box: x=[275, 275+180), y=[293, 293+14)
@@ -223,9 +225,9 @@ bool LobbyConnectRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
 	}
 	Context ctx{
 		world_.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
+		/*logical_w=*/logical_w,
+		/*logical_h=*/logical_h,
+		/*scale=*/scale,
 		/*version=*/world_.GetVersion(),
 	};
 	ctx.mouse_x = mouse_x;

@@ -101,8 +101,10 @@ public:
 	LobbyRuntime(World & world, ScreenContext & sctx, Game & game);
 
 	void Render(Surface & target, ::Renderer & renderer,
-	            int mouse_x, int mouse_y, float dt) override;
-	bool DispatchMouseDown(int mouse_x, int mouse_y) override;
+	            int mouse_x, int mouse_y, float dt,
+	            int logical_w, int logical_h, int scale) override;
+	bool DispatchMouseDown(int mouse_x, int mouse_y,
+	                       int logical_w, int logical_h, int scale) override;
 	bool DispatchKeyDown(int sdl_scancode) override;
 	bool DispatchTextInput(char ascii) override;
 	void Tick() override;

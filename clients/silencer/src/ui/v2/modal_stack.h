@@ -46,11 +46,13 @@ public:
 
 	// Overlay render: blits the top modal on top of whatever the per-
 	// state render already drew. No-op when stack is empty.
-	void RenderOverlay(Surface & target, ::Renderer & renderer);
+	void RenderOverlay(Surface & target, ::Renderer & renderer,
+	                   int logical_w, int logical_h, int scale);
 
 	// Event dispatch: return true when the modal absorbed the event so
 	// the underlying state's path is skipped.
-	bool DispatchClick(int logical_x, int logical_y);
+	bool DispatchClick(int logical_x, int logical_y,
+	                   int logical_w, int logical_h, int scale);
 	bool DispatchKey(int sdl_scancode);
 	bool DispatchText(char ascii);
 

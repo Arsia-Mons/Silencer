@@ -56,15 +56,16 @@ bool ModalStack::ProgressActive() const {
 	return top.kind == MESSAGE && !top.has_ok;
 }
 
-void ModalStack::RenderOverlay(Surface & target, ::Renderer & renderer){
+void ModalStack::RenderOverlay(Surface & target, ::Renderer & renderer,
+                                int logical_w, int logical_h, int scale){
 	if(stack_.empty()) return;
 	const Entry & top = stack_.back();
 
 	Context ctx{
 		world_.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
+		/*logical_w=*/logical_w,
+		/*logical_h=*/logical_h,
+		/*scale=*/scale,
 		/*version=*/world_.GetVersion(),
 	};
 	ctx.mouse_x = mouse_x_;
@@ -93,15 +94,16 @@ void ModalStack::RenderOverlay(Surface & target, ::Renderer & renderer){
 	::ui::v2::Render(tree, ctx, target, renderer);
 }
 
-bool ModalStack::DispatchClick(int logical_x, int logical_y){
+bool ModalStack::DispatchClick(int logical_x, int logical_y,
+                                int logical_w, int logical_h, int scale){
 	if(stack_.empty()) return false;
 	const Entry & top = stack_.back();
 
 	Context ctx{
 		world_.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
+		/*logical_w=*/logical_w,
+		/*logical_h=*/logical_h,
+		/*scale=*/scale,
 		/*version=*/world_.GetVersion(),
 	};
 	ctx.mouse_x = logical_x;

@@ -39,6 +39,33 @@
 #include <math.h>
 #include <vector>
 
+int Renderer::ChooseScale(int window_h){
+	if(window_h < 720) return 1;
+	if(window_h < 1440) return 2;
+	if(window_h < 2160) return 3;
+	return 4;
+}
+
+void Renderer::ComputeUIDims(SDL_Window * window, int & logical_w, int & logical_h, int & scale){
+	if(!window){
+		logical_w = 640;
+		logical_h = 480;
+		scale     = 1;
+		return;
+	}
+	int ww = 0, wh = 0;
+	SDL_GetWindowSize(window, &ww, &wh);
+	if(ww <= 0 || wh <= 0){
+		logical_w = 640;
+		logical_h = 480;
+		scale     = 1;
+		return;
+	}
+	scale     = ChooseScale(wh);
+	logical_w = ww / scale;
+	logical_h = wh / scale;
+}
+
 Renderer::Renderer(World & world) : world(world), camera(640, 480){
 	ambience_r = 0;
 	ex = 0;

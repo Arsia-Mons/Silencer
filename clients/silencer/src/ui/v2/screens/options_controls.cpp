@@ -289,12 +289,13 @@ void OptionsControlsRuntime::StartRebind(int row, int slot){
 }
 
 void OptionsControlsRuntime::Render(Surface & target, ::Renderer & renderer,
-                                     int mouse_x, int mouse_y, float dt){
+                                     int mouse_x, int mouse_y, float dt,
+                              int logical_w, int logical_h, int scale){
 	Context ctx{
 		world_.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
+		/*logical_w=*/logical_w,
+		/*logical_h=*/logical_h,
+		/*scale=*/scale,
 		/*version=*/world_.GetVersion(),
 	};
 	ctx.mouse_x = mouse_x;
@@ -312,7 +313,8 @@ void OptionsControlsRuntime::Render(Surface & target, ::Renderer & renderer,
 	state_.EndFrame();
 }
 
-bool OptionsControlsRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
+bool OptionsControlsRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
+                                int logical_w, int logical_h, int scale){
 	// Suppress chip clicks while a rebind is in flight (legacy iface->disabled
 	// gate). Save / Cancel / Preset stay reachable because the user is expected
 	// to finish or time out the capture before navigating away.
@@ -320,9 +322,9 @@ bool OptionsControlsRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
 
 	Context ctx{
 		world_.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
+		/*logical_w=*/logical_w,
+		/*logical_h=*/logical_h,
+		/*scale=*/scale,
 		/*version=*/world_.GetVersion(),
 	};
 	ctx.mouse_x = mouse_x;

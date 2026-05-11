@@ -450,12 +450,13 @@ void LobbyRuntime::RefreshGameTech(){
 }
 
 void LobbyRuntime::Render(Surface & target, ::Renderer & renderer,
-                          int mouse_x, int mouse_y, float dt){
+                          int mouse_x, int mouse_y, float dt,
+                              int logical_w, int logical_h, int scale){
 	Context ctx{
 		world_.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
+		/*logical_w=*/logical_w,
+		/*logical_h=*/logical_h,
+		/*scale=*/scale,
 		/*version=*/world_.GetVersion(),
 	};
 	ctx.mouse_x = mouse_x;
@@ -478,7 +479,8 @@ void LobbyRuntime::Render(Surface & target, ::Renderer & renderer,
 	state_.EndFrame();
 }
 
-bool LobbyRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
+bool LobbyRuntime::DispatchMouseDown(int mouse_x, int mouse_y,
+                                int logical_w, int logical_h, int scale){
 	// Character-panel agency toggles. Bank 181, indices 0..4 at (20 + i*42, 90).
 	for(int i = 0; i < 5; i++){
 		Sint16 anchor_x = (Sint16)(20 + i * 42);
@@ -583,9 +585,9 @@ bool LobbyRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
 
 	Context ctx{
 		world_.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
+		/*logical_w=*/logical_w,
+		/*logical_h=*/logical_h,
+		/*scale=*/scale,
 		/*version=*/world_.GetVersion(),
 	};
 	ctx.mouse_x = mouse_x;

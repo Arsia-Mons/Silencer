@@ -18,14 +18,22 @@ public:
 
 	// Per-frame: build the Node tree, run Layout, Render into target.
 	// dt is wallclock seconds since last call. mouse_{x,y} are logical
-	// coords (-1 if no mouse this frame).
+	// coords (-1 if no mouse this frame). logical_w/h/scale are the
+	// current responsive UI dimensions (Path B); the caller computes
+	// them via Renderer::ComputeUIDims and passes them in.
 	virtual void Render(Surface & target, Renderer & renderer,
-	                    int mouse_x, int mouse_y, float dt) = 0;
+	                    int mouse_x, int mouse_y, float dt,
+	                    int logical_w, int logical_h, int scale) = 0;
 
 	// Per-event: return true if the event was consumed (Game stops
 	// routing it further). Mouse coords are logical; for keyboard /
 	// text input the runtime decides what it cares about.
-	virtual bool DispatchMouseDown(int mouse_x, int mouse_y) { (void)mouse_x; (void)mouse_y; return false; }
+	virtual bool DispatchMouseDown(int mouse_x, int mouse_y,
+	                               int logical_w, int logical_h, int scale) {
+		(void)mouse_x; (void)mouse_y;
+		(void)logical_w; (void)logical_h; (void)scale;
+		return false;
+	}
 	virtual bool DispatchKeyDown(int sdl_scancode)            { (void)sdl_scancode; return false; }
 	virtual bool DispatchTextInput(char ascii)                { (void)ascii; return false; }
 

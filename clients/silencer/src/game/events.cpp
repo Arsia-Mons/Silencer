@@ -1,4 +1,5 @@
 #include "game.h"
+#include "renderer.h"
 #include "runtime.h"
 #include "ingame_chat.h"
 #include "ingame_buy.h"
@@ -355,7 +356,9 @@ bool Game::HandleSDLEvents(void){
 						DispatchV2ModalClick(lx, ly);
 						break;
 					}
-					if(active_runtime && active_runtime->DispatchMouseDown(lx, ly)){
+					int logical_w, logical_h, scale;
+					Renderer::ComputeUIDims(window, logical_w, logical_h, scale);
+					if(active_runtime && active_runtime->DispatchMouseDown(lx, ly, logical_w, logical_h, scale)){
 						// Runtime consumed the click.
 					}else{
 						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
