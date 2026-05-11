@@ -184,34 +184,52 @@ SDL_Renderer + WebGL2 path. If/when an SDL3 WebGPU backend lands,
 the committed SPIRV codegen and `ShaderBundle::spirv` plumbing slot
 straight in.
 
-### Stage 2 — Relay binary mode
+### Stage 2 — Relay binary mode 🟡 SCAFFOLD LANDED (PR #148 Phase 3 blocks completion)
 
-New `silencer --relay <lobbyaddr> <lobbyport> <gameid>` mode that
-joins a game as a passive spectator peer (existing UDP code), embeds a
-WebSocket server, and fans snapshot bytes out to connected WS clients
-without interpreting them. Lobby spawns one relay per spectatable
-INGAME game.
+New `silencer --relay <lobbyaddr> <lobbyport> <gameid> [--ws-port=N]`
+mode lands as commit `92b4490`. Scaffold includes:
 
-Decide the embedded WebSocket library here. Candidates include
-`uwebsockets` (header-driven, MIT, modern) and `libwebsockets` (older,
-battle-tested). Pick based on cross-platform build ergonomics — the
-relay only needs to run on Linux in production but should build on
-dev hosts too.
+- Binary mode parser in `main.cpp` — gated on POSIX && !EMSCRIPTEN
+  (browsers can't host a relay).
+- Hand-rolled HTTP→WebSocket upgrade + binary-frame writer in
+  `src/net/relay.{h,cpp}` (~270 LOC, RFC 6455 subset, no third-party
+  dep — mirrors the Go `services/lobby/wsutil.go` we wrote for
+  Stage 3). The WS-library question in the original design is now
+  answered by precedent: hand-roll, same shape both sides.
+- Per-client outbox with 8 MB cap. A slow spectator drops frames
+  rather than stall the broadcast (the design's stated
+  backpressure policy).
 
-**Verify:** `websocat` against the relay; observe snapshot bytes match
-what a native peer would receive over UDP.
+**What's stubbed:** the relay currently emits a synthetic 4-byte
+`BEAT<seq u32>` keepalive every 250 ms so end-to-end WS wiring can
+be smoke-tested. The real game-side ingest — joining a peer mesh as
+a passive spectator, decoding snapshots, forwarding them — waits on
+PR #148 Phase 3 to land the spectator-peer handshake natively.
+Once Phase 3 ships, the relay's run-loop swaps the BEAT generator
+for a `Peer::ReadSnapshot` style consumer.
 
-### Stage 3 — Lobby WebSocket facade
+**Verify (today):**
+  silencer --relay 127.0.0.1 25170 99 --ws-port=25174
+  # bun WS client at ws://localhost:25174/ receives BEAT @ 4 Hz
 
-New WS endpoint on `services/lobby/` that speaks enough of the lobby
-protocol over WebSocket: game list (with `spectatable`/`can_rejoin`
-bits), push updates, a `spectate <gameid>` command that returns a
-relay URL. Native TCP path untouched.
+### Stage 3 — Lobby WebSocket facade ✅ DONE
 
-**Verify:** `websocat` + payload inspector; confirm parity with what a
-native client would receive over TCP for the same lobby events.
+Commit `56b3319`. New WS endpoint on `services/lobby/` (separate port,
+default `:15173`) speaks JSON envelopes the browser can consume:
 
-### Stage 4 — WASM networking substitution
+- `hello` with MOTD + initial game-list snapshot
+- `newgame` / `delgame` deltas pushed in real time via a new
+  `Hub.Subscriber` interface
+- `spectate <gameid>` command → `spectate_url` (the relay base from
+  `-ws-relay-base`) or `NO_RELAY` / `NOT_SPECTATABLE` / `NO_SUCH_GAME`
+  error envelope
+
+Hand-rolled RFC 6455 in `wsutil.go`, no new Go dependency. Native
+lobby TCP path is untouched.
+
+**Verify (today):** smoke test in commit message.
+
+### Stage 4 — WASM networking substitution 🚫 BLOCKED (PR #148 Phase 3)
 
 Abstract the raw socket calls in `world.cpp` and `lobby.cpp` behind a
 thin transport interface. Native builds keep `sendto`/`recvfrom` and
@@ -219,18 +237,39 @@ raw TCP; Emscripten builds use WebSocket to the relay and to the lobby
 facade respectively. Wire the WASM widget through to render gameplay
 from relay snapshots.
 
+**Why it's blocked:** the world.cpp half of the transport refactor
+needs to know what a spectator peer's send/recv contract looks like.
+PR #148 Phase 3 defines that contract — until it lands, we'd be
+guessing at the wire format the relay should emit.
+
+**Lobby half (lobby.cpp) is partially unblocked.** The facade is
+ready; lobby.cpp could be refactored to use a `LobbyTransport`
+interface (TCP native, WebSocket emscripten) on its own. Decided to
+defer until both halves can land together — the refactor cost is
+similar whether we touch one file or two, and a partial split
+leaves the code in two states (one refactored, one not).
+
 **Verify:** native dedicated server → relay → WASM widget → renders
 the live game. End-to-end smoke. Native E2E tests stay green
 (non-negotiable: the transport refactor must not regress native).
 
-### Stage 5 — Lobby UI in browser + auto-spectate
+### Stage 5 — Lobby UI in browser + auto-spectate 🚫 BLOCKED on Stage 4
 
 WASM widget renders the existing lobby panel UI from the WS facade's
 state stream. Auto-spectate logic: pick a live spectatable game after
 idle delay; transition back to lobby view on match end. Finalize the
 asset pipeline (preload bundle contents, async-fetch paths).
 
-### Stage 6 — Spectator inputs + camera
+**Path that unblocks part of this without waiting for Stage 4:** a
+JS-side WebSocket bridge could populate `Lobby::games` from the
+facade's JSON envelopes via Emscripten `EM_JS` / `cwrap`, bypassing
+the C++ `Lobby` state machine entirely on the browser. The existing
+C++ UI then renders the game list with no further changes. This is
+the right cut if/when we want a browser preview before Phase 3
+ships. Not yet attempted — see "Stage 5 alternative path" at the
+bottom of this doc.
+
+### Stage 6 — Spectator inputs + camera 🚫 BLOCKED on PR #148 Phase 4
 
 SDL3 emscripten keyboard/mouse input wired through. Camera follow,
 cycle (Tab / Shift-Tab), free-cam (WASD/arrows), hold-for-names.
@@ -241,11 +280,41 @@ Inherits whatever PR #148 Phase 4 ships natively.
 land partial (e.g. just default follow-cam) ahead of native Phase 4
 if needed.
 
-### Stage 7 — Production deploy + website embed
+### Stage 7 — Production deploy + website embed 🚫 NOT STARTED
 
 Containerize the relay binary. Lobby spawns relays in production the
-same way it spawns dedicated servers. Static-host the WASM bundle and
-preload assets (CDN). Embed the widget in `web/website/`.
+same way it spawns dedicated servers (see `services/lobby/proc.go` —
+add a `RelayStart` path mirroring `Start`). Static-host the WASM
+bundle and preload assets (CDN). Embed the widget in `web/website/`.
+
+The lobby's relay-spawn entrypoint should be triggered by the
+WebSocket facade's `spectate <gameid>` handler: ensure a relay is
+running for that gameid (start one if not), return its URL. Today
+the handler returns the configured `-ws-relay-base` plus
+`?gameid=N` as a hint — once spawn-on-demand is wired, it should
+also kick off the relay process.
+
+## Stage 5 alternative path (JS bridge)
+
+If we want a browser preview of the lobby browser before Stage 4
+unblocks, a small JS module can bridge the existing JSON facade to
+the C++ `Lobby` state. Sketch:
+
+1. Custom HTML shell loads `spectator-bridge.js` before `silencer.js`.
+2. Bridge opens `ws://<lobbyhost>:15173/spectate`, parses
+   envelopes, and calls `Module.ccall("LobbyBrowserAddGame", ...)`
+   per `newgame` envelope. New `extern "C" EMSCRIPTEN_KEEPALIVE`
+   functions in `lobby.cpp` push games into `Lobby::games` directly
+   (skipping the auth state machine).
+3. Force `Lobby::state = AUTHENTICATED` and `Lobby::accountid = 1`
+   so the lobby browser UI renders without a login flow.
+4. Disable the LobbyConnect screen on emscripten — auto-advance
+   from main menu → lobby browser.
+
+This sidesteps the lobby.cpp transport refactor entirely. The cost
+is a parallel ingress path the C++ code doesn't know about; later
+Stage 4 work would supersede it. Worth it if a near-term demo
+matters; skip if Stage 4 is imminent.
 
 ## Risks and de-risking moves
 
@@ -317,9 +386,11 @@ recording requirements influence relay design.
 
 - **PR #148 spectating** — `docs/plans/2026-05-09-spectating.md`.
   Phases 3 and 4 (joining as spectator natively + spectator controls)
-  must land for WASM Stage 6 to inherit the spectator code paths.
-  WASM Stages 1-5 are independent and can proceed in parallel with
-  PR #148's remaining phases.
+  must land for WASM Stages 2 (real game ingest), 4 (transport
+  refactor of world.cpp), and 6 (spectator controls) to complete.
+  Stages 1, 3, and the Stage 2 scaffold are already in. Re-evaluate
+  Stage 4 splitting once Phase 3 ships — the lobby half might be
+  doable independently if a near-term demo is wanted.
 - **Monorepo restructure** — `docs/plans/2026-04-25-monorepo-restructure.md`.
   May shift directory paths for `services/lobby/`,
   `clients/silencer/`, and `web/website/`. This document is
@@ -341,30 +412,40 @@ recording requirements influence relay design.
 
 ## Where to pick up
 
-Implementation has not started. **Begin with Stage 1.**
+Stages 1, 3 are done. Stage 2 scaffold is in (BEAT keepalive
+placeholder; real ingest gated on PR #148 Phase 3). Stages 4, 5, 6
+are blocked on PR #148 Phase 3/4. Stage 7 is ops work that can
+start anytime.
 
 Concretely: a fresh agent session continuing this work should:
 
-1. Read this document end to end.
+1. Read this document end to end (status board in Stages section).
 2. Read `docs/plans/2026-05-09-spectating.md` for native spectator
    context.
 3. Read `clients/silencer/CLAUDE.md` for the C++ client conventions.
 4. Read `clients/silencer/CMakeLists.txt` and
    `clients/silencer/cmake/CompileShaders.cmake` to understand the
    current build.
-5. Start Stage 1: add an Emscripten build path; add HLSL→SPIRV codegen
-   using Vulkan SDK's `dxc` (the comment block at the top of
-   `CompileShaders.cmake` already notes this as the future path).
-   Target: a WASM build that renders the main menu in a browser.
+5. Build the WASM bundle (`cd clients/silencer && emcmake cmake -S .
+   -B build-wasm && emmake make -j8 -C build-wasm`) and verify the
+   main menu renders at `http://localhost:8765/silencer.html` after
+   `python3 -m http.server 8765` from `build-wasm/`. Needs
+   `~/emsdk/emsdk_env.sh` sourced and `$VULKAN_SDK` set (for the
+   committed shaders to regenerate if HLSL changes).
+6. When PR #148 Phase 3 lands: swap the relay's BEAT keepalive for
+   real spectator-peer ingest. See `src/net/relay.cpp` Run loop.
+7. After Phase 3 lands, do Stage 4 transport refactor in one
+   sweep — both `lobby.cpp` and `world.cpp` together.
 
-Open implementation questions (not blocking Stage 1):
+Resolved implementation questions:
 
-- Embedded WebSocket library for the relay (decide in Stage 2).
-- Wire format of the lobby WebSocket facade — binary protocol mirroring
-  the TCP path, or a more browser-friendly JSON envelope (decide in
-  Stage 3).
-- Lazy vs eager relay spawning per game (lobby ops question; decide in
-  Stage 7).
+- **Embedded WebSocket library:** hand-rolled, no third-party dep
+  (both Go `services/lobby/wsutil.go` and C++ `src/net/relay.cpp`).
+- **Lobby WS wire format:** JSON envelopes for spectator facade,
+  binary frames for relay snapshots. Both implemented.
+- **Lazy vs eager relay spawning:** still open — Stage 7. The
+  `/spectate <gameid>` handler today just returns the configured
+  base URL; spawn-on-demand or pre-spawn is a deploy-time decision.
 
 ## Handoff prompt
 
