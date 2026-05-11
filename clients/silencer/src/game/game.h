@@ -333,13 +333,6 @@ private:
 	// Game (states being migrated one at a time).
 	std::unique_ptr<ui::v2::Runtime> active_runtime;
 	void SetRuntime(Uint8 new_state);
-	// Same shape for UPDATING state. Reads Updater state each frame to
-	// drive button visibility + status/progress text. Tick handles the
-	// STAGING -> UpdaterStage2::Launch transition that legacy
-	// UpdateScreen::Tick owned.
-	bool RenderUpdateV2();
-	void DispatchUpdateV2Click(int logical_x, int logical_y);
-	void TickUpdateV2();
 	// Same shape for MISSIONSUMMARY state. Reads world.lobby.GetUserInfo /
 	// statscopy / agency each frame to drive XP, textbox stats, level
 	// values, banner, and upgrade-button visibility. Tick handles the

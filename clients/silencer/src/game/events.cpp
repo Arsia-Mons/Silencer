@@ -383,8 +383,6 @@ bool Game::HandleSDLEvents(void){
 					}
 					if(active_runtime && active_runtime->DispatchMouseDown(lx, ly)){
 						// Runtime consumed the click.
-					}else if(state == GameState::UPDATING){
-						DispatchUpdateV2Click(lx, ly);
 					}else if(state == GameState::MISSIONSUMMARY){
 						DispatchMissionSummaryV2Click(lx, ly);
 					}else if(state == GameState::LOBBYCONNECT){

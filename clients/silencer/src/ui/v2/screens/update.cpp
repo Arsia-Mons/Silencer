@@ -1,7 +1,23 @@
 #include "update.h"
 
 #include "context.h"
+#include "dispatch.h"
+#include "layout.h"
 #include "node.h"
+#include "render.h"
+
+#include "game.h"
+#include "game_state.h"
+#include "screen_context.h"
+#include "updater.h"
+#include "updaterstage2.h"
+#include "world.h"
+#include "renderer.h"
+#include "surface.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <string>
 
 namespace ui {
 namespace v2 {
@@ -59,6 +75,171 @@ Node BuildUpdate(const Context & ctx, const UpdateHandlers & handlers,
 		children.push_back(Label(state->progress_text, /*bank=*/134, /*width=*/8).at(x, 215));
 	}
 	return Background(/*bank=*/40, /*index=*/4, std::move(children));
+}
+
+// -----------------------------------------------------------------------------
+// UpdateRuntime — engine wire-in for GameState::UPDATING.
+// -----------------------------------------------------------------------------
+
+namespace {
+
+UpdateHandlers BuildUpdateHandlers(ScreenContext & sctx, Updater & updater){
+	UpdateHandlers h;
+	h.on_update = [&updater](){
+		if(updater.GetState() == Updater::PROMPTING){
+			updater.Consent();
+		}
+	};
+	h.on_cancel = [&sctx, &updater](){
+		Updater::State us = updater.GetState();
+		if(us == Updater::PROMPTING || us == Updater::DOWNLOADING || us == Updater::FAILED){
+			if(us == Updater::DOWNLOADING){
+				updater.Cancel();
+			}
+			sctx.GoToState(GameState::MAINMENU);
+		}
+	};
+	h.on_retry = [&updater](){
+		if(updater.GetState() == Updater::FAILED && updater.GetRetryCount() < 3){
+			updater.Retry();
+		}
+	};
+	h.on_download = [&sctx, &updater](){
+		if(updater.GetState() == Updater::FAILED && updater.GetRetryCount() >= 3){
+			std::string url = updater.GetDownloadURL();
+#ifdef _WIN32
+			std::string cmd = "start \"\" \"" + url + "\"";
+#elif defined(__APPLE__)
+			std::string cmd = "open '" + url + "'";
+#else
+			std::string cmd = "xdg-open '" + url + "' &";
+#endif
+			system(cmd.c_str());
+			sctx.GoToState(GameState::MAINMENU);
+		}
+	};
+	return h;
+}
+
+UpdateState CurrentUpdate(Updater & updater){
+	UpdateState s;
+	Updater::State us = updater.GetState();
+	switch(us){
+		case Updater::PROMPTING:
+			s.left = UpdateState::LeftButton::Update;
+			s.show_cancel = true;
+			s.status_text = "An update is required to play online.";
+		break;
+		case Updater::DOWNLOADING:{
+			s.left = UpdateState::LeftButton::None;
+			s.show_cancel = true;
+			char buf[32];
+			std::snprintf(buf, sizeof(buf), "%d%%", int(updater.GetProgress() * 100));
+			s.status_text = buf;
+			int width = int(updater.GetProgress() * 20.0f);
+			std::string bar = "[";
+			for(int i = 0; i < 20; i++){
+				bar += (i < width) ? "=" : " ";
+			}
+			bar += "]";
+			s.progress_text = bar;
+		}break;
+		case Updater::VERIFYING:
+			s.left = UpdateState::LeftButton::None;
+			s.show_cancel = true;
+			s.status_text = "Verifying...";
+		break;
+		case Updater::STAGING:
+			s.left = UpdateState::LeftButton::None;
+			s.show_cancel = true;
+			s.status_text = "Restarting...";
+		break;
+		case Updater::FAILED:{
+			s.show_cancel = true;
+			s.status_text = updater.GetErrorMessage();
+			s.left = (updater.GetRetryCount() < 3)
+				? UpdateState::LeftButton::Retry
+				: UpdateState::LeftButton::Download;
+		}break;
+		case Updater::IDLE:
+		case Updater::DONE:
+		default:
+			s.left = UpdateState::LeftButton::None;
+			s.show_cancel = true;
+		break;
+	}
+	return s;
+}
+
+}  // namespace
+
+UpdateRuntime::UpdateRuntime(World & world, ScreenContext & sctx)
+	: world_(world), sctx_(sctx) {}
+
+void UpdateRuntime::Render(Surface & target, ::Renderer & renderer,
+                            int mouse_x, int mouse_y, float dt){
+	Context ctx{
+		world_.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world_.GetVersion(),
+	};
+	ctx.mouse_x = mouse_x;
+	ctx.mouse_y = mouse_y;
+	ctx.state   = &state_;
+	ctx.dt      = dt;
+
+	UpdateHandlers handlers = BuildUpdateHandlers(sctx_, sctx_.updater);
+	UpdateState live = CurrentUpdate(sctx_.updater);
+	target.Clear(0);
+	state_.BeginFrame();
+	Node tree = BuildUpdate(ctx, handlers, &live);
+	Layout(tree, ctx);
+	::ui::v2::Render(tree, ctx, target, renderer);
+	state_.EndFrame();
+}
+
+bool UpdateRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
+	Context ctx{
+		world_.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world_.GetVersion(),
+	};
+	ctx.mouse_x = mouse_x;
+	ctx.mouse_y = mouse_y;
+	ctx.state   = &state_;
+	UpdateHandlers handlers = BuildUpdateHandlers(sctx_, sctx_.updater);
+	UpdateState live = CurrentUpdate(sctx_.updater);
+	Node tree = BuildUpdate(ctx, handlers, &live);
+	Layout(tree, ctx);
+	DispatchClick(tree, ctx);
+	return true;
+}
+
+void UpdateRuntime::Tick(){
+	// Mirror UpdateScreen::Tick's STAGING branch: on STAGING, spawn the
+	// stage-2 child; on success flag the Updater so Game::Loop returns
+	// false next tick and ~Game tears down SDL/audio cleanly before the
+	// new process opens the device (avoids audible pop).
+	Updater & updater = sctx_.updater;
+	if(updater.GetState() != Updater::STAGING) return;
+	std::string zippath =
+#ifdef _WIN32
+		std::string(std::getenv("TEMP") ? std::getenv("TEMP") : ".") + "\\silencer-update.zip";
+#else
+		"/tmp/silencer-update.zip";
+#endif
+	std::fprintf(stderr, "[updater] UpdateRuntime::Tick invoking UpdaterStage2::Launch with zip=%s\n",
+		zippath.c_str());
+	if(UpdaterStage2::Launch(zippath)){
+		updater.MarkStage2Spawned();
+		return;
+	}
+	std::fprintf(stderr, "[updater] UpdaterStage2::Launch failed; returning to main menu\n");
+	sctx_.GoToState(GameState::MAINMENU);
 }
 
 }  // namespace v2

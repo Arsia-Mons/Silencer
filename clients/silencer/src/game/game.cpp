@@ -648,8 +648,6 @@ bool Game::Loop(void){
 			float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
 			ui_v2_last_ticks = now;
 			active_runtime->Render(screenbuffer, renderer, ui_v2_mouse_x, ui_v2_mouse_y, dt);
-		}else if(state == UPDATING){
-			RenderUpdateV2();
 		}else if(state == MISSIONSUMMARY){
 			RenderMissionSummaryV2();
 		}else if(state == LOBBYCONNECT){
@@ -910,23 +908,20 @@ bool Game::Tick(void){
 			if(stateisnew){
 				world.GetAuthorityPeer()->controlledlist.clear();
 				world.DestroyAllObjects();
-				// v2 UpdateScreen — no PushScreen. Palette 2 mirrors the
-				// legacy ResetPresentation(2) call in UpdateScreen::Build.
+				// UpdateRuntime owns the surface + STAGING transition.
+				// Palette 2 mirrors the legacy ResetPresentation(2) call.
 				renderer.palette.SetPalette(2);
 				screenbuffer.Clear(0);
 				SetColors(renderer.palette.GetColors());
 				renderer.camera.SetPosition(320, 240);
 				currentinterface = 0;
-				ui_v2_state = ui::v2::UIState{};
-				ui_v2_last_ticks = 0;
+				SetRuntime(UPDATING);
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
-				// STAGING -> UpdaterStage2::Launch transition (legacy
-				// UpdateScreen::Tick owned this).
-				TickUpdateV2();
+				if(active_runtime) active_runtime->Tick();
 			}
 		}break;
 		case INGAME: TickInGame(); break;
@@ -1272,167 +1267,14 @@ void Game::SetRuntime(Uint8 new_state){
 		case OPTIONSCONTROLS:
 			active_runtime = std::make_unique<ui::v2::OptionsControlsRuntime>(world, screenContext);
 			break;
+		case UPDATING:
+			active_runtime = std::make_unique<ui::v2::UpdateRuntime>(world, screenContext);
+			break;
 		default:
 			active_runtime.reset();
 			break;
 	}
 	ui_v2_last_ticks = 0;
-}
-
-static ui::v2::UpdateHandlers BuildUpdateHandlers(ScreenContext & sctx, Updater & updater){
-	ui::v2::UpdateHandlers h;
-	h.on_update = [&updater](){
-		if(updater.GetState() == Updater::PROMPTING){
-			updater.Consent();
-		}
-	};
-	h.on_cancel = [&sctx, &updater](){
-		Updater::State us = updater.GetState();
-		if(us == Updater::PROMPTING || us == Updater::DOWNLOADING || us == Updater::FAILED){
-			if(us == Updater::DOWNLOADING){
-				updater.Cancel();
-			}
-			sctx.GoToState(GameState::MAINMENU);
-		}
-	};
-	h.on_retry = [&updater](){
-		if(updater.GetState() == Updater::FAILED && updater.GetRetryCount() < 3){
-			updater.Retry();
-		}
-	};
-	h.on_download = [&sctx, &updater](){
-		if(updater.GetState() == Updater::FAILED && updater.GetRetryCount() >= 3){
-			std::string url = updater.GetDownloadURL();
-#ifdef _WIN32
-			std::string cmd = "start \"\" \"" + url + "\"";
-#elif defined(__APPLE__)
-			std::string cmd = "open '" + url + "'";
-#else
-			std::string cmd = "xdg-open '" + url + "' &";
-#endif
-			system(cmd.c_str());
-			sctx.GoToState(GameState::MAINMENU);
-		}
-	};
-	return h;
-}
-
-static ui::v2::UpdateState CurrentUpdateState(Updater & updater){
-	ui::v2::UpdateState s;
-	Updater::State us = updater.GetState();
-	switch(us){
-		case Updater::PROMPTING:
-			s.left = ui::v2::UpdateState::LeftButton::Update;
-			s.show_cancel = true;
-			s.status_text = "An update is required to play online.";
-		break;
-		case Updater::DOWNLOADING:{
-			s.left = ui::v2::UpdateState::LeftButton::None;
-			s.show_cancel = true;
-			char buf[32];
-			snprintf(buf, sizeof(buf), "%d%%", int(updater.GetProgress() * 100));
-			s.status_text = buf;
-			int width = int(updater.GetProgress() * 20.0f);
-			std::string bar = "[";
-			for(int i = 0; i < 20; i++){
-				bar += (i < width) ? "=" : " ";
-			}
-			bar += "]";
-			s.progress_text = bar;
-		}break;
-		case Updater::VERIFYING:
-			s.left = ui::v2::UpdateState::LeftButton::None;
-			s.show_cancel = true;
-			s.status_text = "Verifying...";
-		break;
-		case Updater::STAGING:
-			s.left = ui::v2::UpdateState::LeftButton::None;
-			s.show_cancel = true;
-			s.status_text = "Restarting...";
-		break;
-		case Updater::FAILED:{
-			s.show_cancel = true;
-			s.status_text = updater.GetErrorMessage();
-			s.left = (updater.GetRetryCount() < 3)
-				? ui::v2::UpdateState::LeftButton::Retry
-				: ui::v2::UpdateState::LeftButton::Download;
-		}break;
-		case Updater::IDLE:
-		case Updater::DONE:
-		default:
-			s.left = ui::v2::UpdateState::LeftButton::None;
-			s.show_cancel = true;
-		break;
-	}
-	return s;
-}
-
-bool Game::RenderUpdateV2(){
-	Uint64 now = SDL_GetTicks();
-	float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
-	ui_v2_last_ticks = now;
-
-	ui::v2::Context ctx{
-		world.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
-		/*version=*/world.GetVersion(),
-	};
-	ctx.mouse_x = ui_v2_mouse_x;
-	ctx.mouse_y = ui_v2_mouse_y;
-	ctx.state   = &ui_v2_state;
-	ctx.dt      = dt;
-
-	ui::v2::UpdateHandlers handlers = BuildUpdateHandlers(screenContext, updater);
-	ui::v2::UpdateState live = CurrentUpdateState(updater);
-	screenbuffer.Clear(0);
-	ui_v2_state.BeginFrame();
-	ui::v2::Node tree = ui::v2::BuildUpdate(ctx, handlers, &live);
-	ui::v2::Layout(tree, ctx);
-	ui::v2::Render(tree, ctx, screenbuffer, renderer);
-	ui_v2_state.EndFrame();
-	return true;
-}
-
-void Game::DispatchUpdateV2Click(int logical_x, int logical_y){
-	ui::v2::Context ctx{
-		world.resources,
-		/*logical_w=*/640,
-		/*logical_h=*/480,
-		/*scale=*/1,
-		/*version=*/world.GetVersion(),
-	};
-	ctx.mouse_x = logical_x;
-	ctx.mouse_y = logical_y;
-	ctx.state   = &ui_v2_state;
-	ui::v2::UpdateHandlers handlers = BuildUpdateHandlers(screenContext, updater);
-	ui::v2::UpdateState live = CurrentUpdateState(updater);
-	ui::v2::Node tree = ui::v2::BuildUpdate(ctx, handlers, &live);
-	ui::v2::Layout(tree, ctx);
-	ui::v2::DispatchClick(tree, ctx);
-}
-
-void Game::TickUpdateV2(){
-	// Mirror UpdateScreen::Tick's STAGING branch: on STAGING, spawn the
-	// stage-2 child; on success flag the Updater so Game::Loop returns
-	// false next tick and ~Game tears down SDL/audio cleanly before the
-	// new process opens the device (avoids audible pop).
-	if(updater.GetState() != Updater::STAGING) return;
-	std::string zippath =
-#ifdef _WIN32
-		std::string(getenv("TEMP") ? getenv("TEMP") : ".") + "\\silencer-update.zip";
-#else
-		"/tmp/silencer-update.zip";
-#endif
-	fprintf(stderr, "[updater] Game::TickUpdateV2 invoking UpdaterStage2::Launch with zip=%s\n",
-		zippath.c_str());
-	if(UpdaterStage2::Launch(zippath)){
-		updater.MarkStage2Spawned();
-		return;
-	}
-	fprintf(stderr, "[updater] UpdaterStage2::Launch failed; returning to main menu\n");
-	screenContext.GoToState(GameState::MAINMENU);
 }
 
 static ui::v2::MissionSummaryHandlers BuildMissionSummaryHandlers(ScreenContext & sctx){
