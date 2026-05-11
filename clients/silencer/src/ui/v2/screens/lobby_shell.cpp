@@ -44,7 +44,7 @@ Node BuildLobby(const Context & ctx, const LobbyHandlers & handlers, const Lobby
 		Button("Go Back", ButtonType::B156x21)
 			.at(473, 29)
 			.onClick(handlers.on_go_back),
-		BuildCharacterPanel(ctx, state.selected_agency),
+		BuildCharacterPanel(ctx, state.character),
 		BuildChatPanel(ctx, chat_active),
 	};
 	// Map-name overlay (uid 8 in the legacy). Empty at preview gate /

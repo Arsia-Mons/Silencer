@@ -914,7 +914,7 @@ bool Game::Tick(void){
 				ui_v2_last_ticks = 0;
 				*ui_v2_lobby_state = ui::v2::LobbyState{};
 				ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameSelect;
-				ui_v2_lobby_state->selected_agency = Config::GetInstance().defaultagency;
+				ui_v2_lobby_state->character.selected_agency = Config::GetInstance().defaultagency;
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
@@ -2035,7 +2035,31 @@ void Game::TickLobbyConnectV2(){
 static ui::v2::LobbyHandlers BuildLobbyV2Handlers(Game * game){
 	ui::v2::LobbyHandlers h;
 	h.on_go_back = [game](){ game->LobbyV2HandleBack(); };
+	h.character.on_select_agency = [game](Uint8 agency){ game->LobbyV2SelectAgency(agency); };
 	return h;
+}
+
+// Refresh the character panel's username + LEVEL/WINS/LOSSES/XP texts from
+// the live lobby state. Mirrors CharacterPanel::Tick's overlay refresh —
+// safe to call every frame because the v2 builder rebuilds the tree.
+void Game::RefreshLobbyV2CharacterState(){
+	ui::v2::CharacterPanelState & cs = ui_v2_lobby_state->character;
+	cs.username = world.lobby.GetLocalUsername();
+	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
+	if(user && !user->retrieving){
+		Uint8 a = cs.selected_agency;
+		cs.level_text  = "LEVEL: "  + std::to_string(user->agency[a].level);
+		cs.wins_text   = "WINS: "   + std::to_string(user->agency[a].wins);
+		cs.losses_text = "LOSSES: " + std::to_string(user->agency[a].losses);
+		int lvl = user->agency[a].level;
+		int remaining = 100 * (lvl + 1) - (int)user->agency[a].xptonextlevel;
+		cs.xp_text = "XP TO NEXT LEVEL: " + std::to_string(remaining);
+	}else{
+		cs.level_text.clear();
+		cs.wins_text.clear();
+		cs.losses_text.clear();
+		cs.xp_text.clear();
+	}
 }
 
 bool Game::RenderLobbyV2(){
@@ -2055,6 +2079,7 @@ bool Game::RenderLobbyV2(){
 	ctx.state   = &ui_v2_state;
 	ctx.dt      = dt;
 
+	RefreshLobbyV2CharacterState();
 	ui::v2::LobbyHandlers handlers = BuildLobbyV2Handlers(this);
 	screenbuffer.Clear(0);
 	ui_v2_state.BeginFrame();
@@ -2066,6 +2091,25 @@ bool Game::RenderLobbyV2(){
 }
 
 void Game::DispatchLobbyV2Click(int logical_x, int logical_y){
+	// Hit-test the 5 character-panel agency toggles before falling
+	// through to the v2 tree dispatch. Toggles aren't a v2 NodeKind;
+	// the legacy Toggle::MouseInside math reads sprite anchor + size
+	// from the resources atlas — mirror it here. Bank 181, indices 0..4
+	// at (20 + i*42, 90).
+	for(int i = 0; i < 5; i++){
+		Sint16 anchor_x = (Sint16)(20 + i * 42);
+		Sint16 anchor_y = 90;
+		Uint8 idx = (Uint8)i;
+		int x1 = anchor_x - world.resources.spriteoffsetx[181][idx];
+		int y1 = anchor_y - world.resources.spriteoffsety[181][idx];
+		int x2 = x1 + world.resources.spritewidth[181][idx];
+		int y2 = y1 + world.resources.spriteheight[181][idx];
+		if(logical_x >= x1 && logical_x < x2 && logical_y >= y1 && logical_y < y2){
+			LobbyV2SelectAgency(idx);
+			return;
+		}
+	}
+
 	ui::v2::Context ctx{
 		world.resources,
 		/*logical_w=*/640,
@@ -2240,6 +2284,17 @@ void Game::LobbyV2ShowGameTech(){
 	ShowTeamOverlays(false);
 	world.RequestPeerList();
 	ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameTech;
+}
+
+void Game::LobbyV2SelectAgency(Uint8 agency){
+	if(agency >= 5) return;
+	if(ui_v2_lobby_state->character.selected_agency == agency) return;
+	ui_v2_lobby_state->character.selected_agency = agency;
+	Config::GetInstance().defaultagency = agency;
+	Config::GetInstance().Save();
+	if(world.IsConnected()){
+		world.SetAgency(agency);
+	}
 }
 
 namespace {

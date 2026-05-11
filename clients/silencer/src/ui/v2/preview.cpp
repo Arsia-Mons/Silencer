@@ -1391,7 +1391,7 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "lobby") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::LobbyState lobby_state;
-					lobby_state.selected_agency = Config::GetInstance().defaultagency;
+					lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 					ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
@@ -1399,7 +1399,7 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "lobby_create") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::LobbyState lobby_state;
-				lobby_state.selected_agency = Config::GetInstance().defaultagency;
+				lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 				lobby_state.active_panel = ui::v2::LobbyActivePanel::GameCreate;
 				lobby_state.game_create = compute_game_create_state();
 				ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
@@ -1409,7 +1409,7 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "lobby_join") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::LobbyState lobby_state;
-				lobby_state.selected_agency = Config::GetInstance().defaultagency;
+				lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 				lobby_state.active_panel = ui::v2::LobbyActivePanel::GameJoin;
 				ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 				ui::v2::Layout(tree, ctx);
@@ -1418,7 +1418,7 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "lobby_select") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::LobbyState lobby_state;
-				lobby_state.selected_agency = Config::GetInstance().defaultagency;
+				lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 				lobby_state.active_panel = ui::v2::LobbyActivePanel::GameSelect;
 				ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 				ui::v2::Layout(tree, ctx);
@@ -1427,7 +1427,7 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "lobby_tech") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::LobbyState lobby_state;
-				lobby_state.selected_agency = Config::GetInstance().defaultagency;
+				lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 				lobby_state.active_panel = ui::v2::LobbyActivePanel::GameTech;
 				ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 				ui::v2::Layout(tree, ctx);
@@ -1539,13 +1539,13 @@ int Game::RunPreview()
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby") == 0){
 						ui::v2::LobbyState lobby_state;
-					lobby_state.selected_agency = Config::GetInstance().defaultagency;
+					lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 					ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby_create") == 0){
 						ui::v2::LobbyState lobby_state;
-						lobby_state.selected_agency = Config::GetInstance().defaultagency;
+						lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 						lobby_state.active_panel = ui::v2::LobbyActivePanel::GameCreate;
 						lobby_state.game_create = compute_game_create_state();
 						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
@@ -1553,21 +1553,21 @@ int Game::RunPreview()
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby_join") == 0){
 						ui::v2::LobbyState lobby_state;
-						lobby_state.selected_agency = Config::GetInstance().defaultagency;
+						lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 						lobby_state.active_panel = ui::v2::LobbyActivePanel::GameJoin;
 						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby_select") == 0){
 						ui::v2::LobbyState lobby_state;
-						lobby_state.selected_agency = Config::GetInstance().defaultagency;
+						lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 						lobby_state.active_panel = ui::v2::LobbyActivePanel::GameSelect;
 						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "lobby_tech") == 0){
 						ui::v2::LobbyState lobby_state;
-						lobby_state.selected_agency = Config::GetInstance().defaultagency;
+						lobby_state.character.selected_agency = Config::GetInstance().defaultagency;
 						lobby_state.active_panel = ui::v2::LobbyActivePanel::GameTech;
 						ui::v2::Node tree = ui::v2::BuildLobby(ctx, lobby_handlers, lobby_state);
 						ui::v2::Layout(tree, ctx);

@@ -144,6 +144,9 @@ public:
 	void LobbyV2ShowGameCreate();
 	void LobbyV2ShowGameJoin();
 	void LobbyV2ShowGameTech();
+	// Mirror of legacy CharacterPanel::Tick agency-change branch: persist
+	// to Config + push to the connected world.
+	void LobbyV2SelectAgency(Uint8 agency);
 
 	// v2 modal stack — overlays the underlying state's render and intercepts
 	// mouse / text input when non-empty. Lobby panels (P16g) and any other
@@ -331,6 +334,7 @@ private:
 	bool RenderLobbyV2();
 	void DispatchLobbyV2Click(int logical_x, int logical_y);
 	void TickLobbyV2();
+	void RefreshLobbyV2CharacterState();
 	// Owned heap to keep ui::v2::LobbyState's full type out of game.h —
 	// it transitively includes the v2 panel headers and would pollute
 	// every game.h consumer. Allocated in Game() / freed in ~Game().
