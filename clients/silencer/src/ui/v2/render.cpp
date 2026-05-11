@@ -3,6 +3,7 @@
 #include "button_chrome.h"
 #include "context.h"
 #include "dispatch.h"
+#include "nine_slice_meta.h"
 #include "node.h"
 #include "ui_state.h"
 
@@ -14,6 +15,74 @@ namespace ui {
 namespace v2 {
 
 namespace {
+
+// Pull the screen-pixel rect for a node. Container layout (rect_w > 0) is
+// preferred; absolute `.at()` + fill_w/fill_h is the fallback. Returns
+// false if neither path gives a non-empty rect.
+bool NodeRect(const Node & n, int & x, int & y, int & w, int & h){
+	if(n.rect_w > 0){
+		x = n.rect_x; y = n.rect_y; w = n.rect_w; h = n.rect_h;
+		return w > 0 && h > 0;
+	}
+	x = n.x; y = n.y; w = n.fill_w; h = n.fill_h;
+	return w > 0 && h > 0;
+}
+
+// Draw a 9-slice border around (dst_x, dst_y, dst_w, dst_h). Corner pieces
+// are blitted 1:1; edges are tiled along their axis; the center is tiled
+// across the remaining area. Tiling is pixel-perfect — no stretching, so
+// pixel-art crispness is preserved at any size.
+void DrawNineSlice(const Resources & res, Renderer & renderer, Surface & target,
+                   Uint8 bank, Uint8 index, int dst_x, int dst_y, int dst_w, int dst_h)
+{
+	if(bank >= res.spritewidth.size()) return;
+	if(index >= res.spritewidth[bank].size()) return;
+	int sw = (int)res.spritewidth[bank][index];
+	int sh = (int)res.spriteheight[bank][index];
+	if(sw <= 0 || sh <= 0) return;
+
+	NineSliceMeta m{};
+	(void)LookupNineSlice(bank, index, m);
+	int cl = m.corner_l, cr = m.corner_r, ct = m.corner_t, cb = m.corner_b;
+	if(cl + cr >= sw){ cl = sw / 2; cr = sw - cl; }
+	if(ct + cb >= sh){ ct = sh / 2; cb = sh - ct; }
+	int inner_sw = sw - cl - cr;
+	int inner_sh = sh - ct - cb;
+	if(inner_sw < 1) inner_sw = 1;
+	if(inner_sh < 1) inner_sh = 1;
+
+	// Corners (1:1).
+	renderer.DrawSpriteSubRect(&target, bank, index, 0,         0,         cl, ct, dst_x,                dst_y);
+	renderer.DrawSpriteSubRect(&target, bank, index, sw - cr,   0,         cr, ct, dst_x + dst_w - cr,   dst_y);
+	renderer.DrawSpriteSubRect(&target, bank, index, 0,         sh - cb,   cl, cb, dst_x,                dst_y + dst_h - cb);
+	renderer.DrawSpriteSubRect(&target, bank, index, sw - cr,   sh - cb,   cr, cb, dst_x + dst_w - cr,   dst_y + dst_h - cb);
+
+	// Top / bottom edges (tile horizontally).
+	int inner_dw = dst_w - cl - cr;
+	int inner_dh = dst_h - ct - cb;
+	for(int xo = 0; xo < inner_dw; xo += inner_sw){
+		int tile_w = (xo + inner_sw <= inner_dw) ? inner_sw : (inner_dw - xo);
+		renderer.DrawSpriteSubRect(&target, bank, index, cl, 0,       tile_w, ct, dst_x + cl + xo, dst_y);
+		renderer.DrawSpriteSubRect(&target, bank, index, cl, sh - cb, tile_w, cb, dst_x + cl + xo, dst_y + dst_h - cb);
+	}
+	// Left / right edges (tile vertically).
+	for(int yo = 0; yo < inner_dh; yo += inner_sh){
+		int tile_h = (yo + inner_sh <= inner_dh) ? inner_sh : (inner_dh - yo);
+		renderer.DrawSpriteSubRect(&target, bank, index, 0,       ct, cl, tile_h, dst_x,             dst_y + ct + yo);
+		renderer.DrawSpriteSubRect(&target, bank, index, sw - cr, ct, cr, tile_h, dst_x + dst_w - cr, dst_y + ct + yo);
+	}
+	// Center fill.
+	if(m.has_center){
+		for(int yo = 0; yo < inner_dh; yo += inner_sh){
+			int tile_h = (yo + inner_sh <= inner_dh) ? inner_sh : (inner_dh - yo);
+			for(int xo = 0; xo < inner_dw; xo += inner_sw){
+				int tile_w = (xo + inner_sw <= inner_dw) ? inner_sw : (inner_dw - xo);
+				renderer.DrawSpriteSubRect(&target, bank, index, cl, ct, tile_w, tile_h,
+				                           dst_x + cl + xo, dst_y + ct + yo);
+			}
+		}
+	}
+}
 
 void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer & renderer)
 {
@@ -43,6 +112,15 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 			                             n.y + (int)n.fill_h,
 			                             n.fill_color);
 			break;
+
+		case NodeKind::NineSliceFrame: {
+			int x, y, w, h;
+			if(NodeRect(n, x, y, w, h)){
+				DrawNineSlice(ctx.resources, renderer, target,
+				              n.nine_bank, n.nine_index, x, y, w, h);
+			}
+			break;
+		}
 
 		case NodeKind::Label:
 			// alpha=false matches the legacy Overlay-text path; color /

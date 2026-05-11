@@ -1466,6 +1466,19 @@ void Renderer::DrawSpriteAt(Surface * target, Uint8 bank, Uint8 index, Sint16 an
 	if(effectsurface) delete effectsurface;
 }
 
+void Renderer::DrawSpriteSubRect(Surface * target, Uint8 bank, Uint8 index,
+                                 int src_x, int src_y, int src_w, int src_h,
+                                 int dst_x, int dst_y){
+	if(!target) return;
+	if(bank >= world.resources.spritebank.size()) return;
+	if(index >= world.resources.spritebank[bank].size()) return;
+	Surface * src = world.resources.spritebank[bank][index].get();
+	if(!src) return;
+	Rect srcrect{src_w, src_h, src_x, src_y};
+	Rect dstrect{src_w, src_h, dst_x, dst_y};
+	BlitSurface(src, &srcrect, target, &dstrect);
+}
+
 void Renderer::ClipRect(Surface * surface, Rect & rect){
 	int w = surface->w;
 	int h = surface->h;

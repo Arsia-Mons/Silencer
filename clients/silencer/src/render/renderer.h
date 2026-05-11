@@ -33,6 +33,14 @@ public:
 	// legacy per-Object effect path (EffectColor when effectcolor!=0, then
 	// EffectBrightness when effectbrightness!=128); defaults are no-ops.
 	void DrawSpriteAt(Surface * target, Uint8 bank, Uint8 index, Sint16 anchor_x, Sint16 anchor_y, Uint8 effectcolor = 0, Uint8 effectbrightness = 128);
+	// Blit a sub-rect of sprite[bank][index] at (dst_x, dst_y). Used by the
+	// ui/v2 NineSliceFrame primitive to lift corner / edge / center pixels
+	// out of a single chrome sprite and tile them across an arbitrary rect.
+	// No baked sprite anchor is applied — (dst_x, dst_y) is the destination
+	// top-left in screen-pixel space.
+	void DrawSpriteSubRect(Surface * target, Uint8 bank, Uint8 index,
+	                       int src_x, int src_y, int src_w, int src_h,
+	                       int dst_x, int dst_y);
 	static void DrawFilledRectangle(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color);
 	void DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 bank, Uint8 width, bool alpha = false, Uint8 tint = 0, Uint8 brightness = 128, bool rampcolor = false);
 	void DrawTextInput(Surface * surface, TextInput & textinput);

@@ -135,6 +135,18 @@ Clay_ElementDeclaration BuildDecl(const Node & n, LayoutState & ls) {
 			lc.sizing.height = SizingFixed(17.0f);
 			break;
 		}
+		case NodeKind::NineSliceFrame: {
+			// Fixed size when fill_w/h is set (typical absolute path); fit
+			// when used as a wrapping container.
+			if(n.fill_w > 0){
+				lc.sizing.width  = SizingFixed((float)n.fill_w);
+				lc.sizing.height = SizingFixed((float)n.fill_h);
+			}else{
+				lc.sizing.width  = SizingFit();
+				lc.sizing.height = SizingFit();
+			}
+			break;
+		}
 		case NodeKind::Sprite:
 		case NodeKind::Background:
 		case NodeKind::FilledRect:

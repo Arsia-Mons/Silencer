@@ -17,6 +17,8 @@ enum class NodeKind : Uint8 {
 	Label,        // Text drawn at logical (x, y) using a sprite-font bank.
 	Button,       // Pressable widget — chrome + centered label.
 	FilledRect,   // Solid color rectangle (palette index) at (x, y) sized w×h.
+	NineSliceFrame, // Sprite-based 9-slice container — corners + tiled edges
+	                // + center fill, sized to the layout rect (or .at()+w/h).
 
 	// Container kinds — laid out by the Clay layout pass. Walk emits a
 	// Clay scope per container; descendants get computed rects written
@@ -76,10 +78,19 @@ struct Node {
 	Uint16 gap = 0;
 	Uint16 pad = 0;
 
-	// FilledRect-only: pixel dimensions + palette color index.
+	// FilledRect / NineSliceFrame: pixel dimensions used when no container
+	// subtree has set rect_*. NineSliceFrame uses these to size its box on
+	// the absolute `.at()` path; FilledRect uses them as it always has.
+	// Defaults to (0, 0) so empty values are harmless.
 	Uint16 fill_w = 0;
 	Uint16 fill_h = 0;
 	Uint8  fill_color = 0;
+
+	// NineSliceFrame-only: which chrome sprite to slice. (bank, index) keys
+	// into the NineSliceMeta table for the corner sizes; the renderer reads
+	// `spritewidth[bank][index]` for the source dimensions.
+	Uint8  nine_bank  = 0;
+	Uint8  nine_index = 0;
 
 	// Label-only: effect color / brightness / ramp passed to
 	// `Renderer::DrawText`. Defaults match the legacy Overlay-text path
@@ -122,6 +133,7 @@ struct Node {
 	Node & withBrightness(Uint8 b) { effect_brightness = b; return *this; }
 	Node & withRamp(bool r = true) { text_color_ramp = r; return *this; }
 	Node & withAlpha(bool a = true) { text_alpha = a; return *this; }
+	Node & withSize(Uint16 w, Uint16 h) { fill_w = w; fill_h = h; return *this; }
 };
 
 inline bool IsContainer(NodeKind k) {
@@ -197,6 +209,17 @@ inline Node Padding(Uint16 amount, std::vector<Node> children) {
 inline Node Spacer() {
 	Node n;
 	n.kind = NodeKind::Spacer;
+	return n;
+}
+
+inline Node NineSliceFrame(Uint8 bank, Uint8 index, Uint16 w = 0, Uint16 h = 0, std::vector<Node> children = {}) {
+	Node n;
+	n.kind        = NodeKind::NineSliceFrame;
+	n.nine_bank   = bank;
+	n.nine_index  = index;
+	n.fill_w      = w;
+	n.fill_h      = h;
+	n.children    = std::move(children);
 	return n;
 }
 
