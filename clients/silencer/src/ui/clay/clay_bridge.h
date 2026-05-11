@@ -287,6 +287,13 @@ bool RunPanelTest(::Game & game, const char * variant, const char * outPath);
 // `clay_rectangle_test` control op. Implementation in rectangle_test.cpp.
 bool RunRectangleTest(::Game & game, const char * outPath);
 
+// C1 Rectangle alpha-blend smoke test. Renders a fully-opaque rect with a
+// 50%-opaque rect overlapping its right half into a 640x480 Surface and
+// writes it to `outPath`. Exercises the bridge's palette alphaed-LUT path.
+// Invoked by the `clay_rectangle_alpha_test` control op. Implementation in
+// rectangle_alpha_test.cpp.
+bool RunRectangleAlphaTest(::Game & game, const char * outPath);
+
 }  // namespace silencer::clay_bridge
 
 #endif

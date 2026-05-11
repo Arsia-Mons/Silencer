@@ -59,9 +59,73 @@ below.)
   only works on string literals at the call site.
 - **Per-element opacity** rides on `backgroundColor.a` (0..255). Clay
   gates RECTANGLE emit on `a > 0`, so `a == 0` doubles as the "no fill"
-  sentinel. Alpha values 1..254 are pass-through to the bridge; the bridge
-  currently ignores them (treats as opaque) — extending to honor them is
-  the C1 milestone and needs no API change in the Rectangle primitive.
+  sentinel. Alpha values 1..254 are honored by the bridge via the
+  palette alphaed LUT (one-cut: quantized to ≈50%). 255 stays on the
+  fast `DrawFilledRectangle` path.
+- **Palette alphaed LUT** at `palette.cpp` `Calculate`. `alphaed[i*256+j]`
+  blends src palette index `i` over dst palette index `j` at an alpha
+  encoded by `i`'s low nibble: `((i-2)%16)/16`. Levels > 0.5 collapse to
+  fully opaque, so usable intermediate alphas are 0..8/16 → 0..50%. The
+  LUT is ONLY populated for src/dst in `[2, 226)` — entries with src or
+  dst at 0/1 or in the parallax band [226, 256) read back as 0
+  (memset-zero from Load). Translucent rects over a palette-0
+  background therefore render as 0; smoke tests must use a non-zero
+  backdrop to see the blue/red blend.
+- **Translucent RECTANGLE perf**: the bridge takes a per-pixel
+  GetPixel→LUT→SetPixel path when opacity < 255. For chrome-scale
+  panels (lobby rectangles ~200x400) this is cheap; don't reach for
+  this on full-screen overlays without measuring.
+
+## 2026-05-11T16:35:00Z - C1 Bridge alpha-blended RECTANGLE fills
+- The bridge's `DispatchRectangle` now reads `backgroundColor.a`. When
+  the alpha is 255, the fast `Renderer::DrawFilledRectangle` path stays
+  — byte-identical behavior with C0. When the alpha is 1..254, the
+  bridge walks each pixel inside the bbox and writes
+  `palette.Alpha(AlphaSrcIndex(color, opacity), dstPixel)`. The signature
+  of `DispatchRectangle` now takes a `Renderer&` so it can reach
+  `renderer.palette`. The `Render(Resources&, Renderer&, ...)` overload
+  threads it through unchanged at the call site.
+- `AlphaSrcIndex(color, opacity)` constructs the LUT src index from a
+  caller-supplied palette color and the desired alpha. First-cut
+  quantization: any non-255 opacity routes to ramp position 8 (≈50%).
+  Edge cases — palette indices < 2 or ≥ 256-30 fall back to the input
+  color so the LUT's unpopulated regions don't read back as 0 silently;
+  callers that need translucency in those bands have to extend the LUT
+  first (out of scope for C1).
+- New test scene at `clients/silencer/src/ui/clay/rectangle_alpha_test.cpp`:
+  full-screen backdrop (palette idx 7) with a fully-opaque red rect
+  (idx 164) and a 50%-opaque blue rect (idx 132) overlapping its right
+  half. Three regions: pure red on backdrop, red+blue overlap blend,
+  pure blue on backdrop. Reference shows the LUT-driven mid-tone in the
+  overlap.
+- Control op `clay_rectangle_alpha_test` wired in `controldispatch.cpp`
+  next to `clay_rectangle_test`. CLI passes through (`cli --port $PORT
+  clay_rectangle_alpha_test --out path.png`).
+- Test harness at `tests/lobby-clay/rectangle_alpha_test/{run.sh,reference.png}`
+  with pass bar < 0.5% pixdiff. Verified at 0.0000%.
+- C0 reference.png regenerated — variant 4 (fill-with-opacity over an
+  existing-color background) now shows the actual alpha-blended midtone
+  instead of the placeholder solid fill from the C0-era bridge. C0 test
+  remains green.
+- 40_lobby_clay_basic.sh still green — no regression on the lobby flow.
+- Files changed: `clay_bridge.{h,cpp}` (alpha path + decl), `primitives/
+  rectangle.h` (header docs), new `rectangle_alpha_test.cpp`, new test
+  harness, refreshed C0 `reference.png`, `controldispatch.cpp` (new op).
+- **Learnings for future iterations:**
+  - The palette alphaed LUT's "alpha encoded in src low nibble" scheme
+    means there is no single canonical "src palette index" for color C
+    at alpha α — you construct it from C's color ramp base + α's level
+    index. Document this in any future primitive that needs alpha.
+  - `alphaed[i*256+j]` is unpopulated for j in {0, 1} or j ≥ 226. Any
+    smoke test for translucent rects MUST use a backdrop palette index
+    inside [2, 226) — palette 0 is a black hole.
+  - When a primitive's bridge dispatch needs the palette, threading
+    `Renderer&` through the dispatch helper is fine — the existing
+    Render() entry points already carry it, and the static
+    `DrawFilledRectangle` / `GetPixel` / `SetPixel` calls compose
+    naturally.
+
+---
 
 ## 2026-05-11T16:22:00Z - C0 Rectangle primitive
 - New primitive `silencer::ui::primitives::Rectangle(id, w, h, fillColor,

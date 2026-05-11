@@ -20,11 +20,15 @@
 //   • `fillOpacity == 0`  → no fill emitted (Clay skips the RECTANGLE
 //     command). `fillPaletteColor` is ignored.
 //   • `fillOpacity == 255`→ fully opaque fill in `fillPaletteColor`.
-//   • Intermediate `fillOpacity` (1..254) → reserved for the C1 milestone
-//     (palette alpha-blend LUT routing in the bridge). Until C1 lands the
-//     bridge treats any non-zero opacity as fully opaque. The opacity
-//     value is still carried on the render command so C1 can pick it up
-//     without an API change here.
+//   • Intermediate `fillOpacity` (1..254) → bridge routes each pixel through
+//     the palette's alphaed LUT (`palette.cpp` `Calculate` / `Alpha`). The
+//     LUT collapses any "alpha > 0.5" position to fully opaque, so this
+//     first-cut implementation quantizes ALL intermediate opacities to a
+//     single ≈50% blend against the underlying pixel. Edge cases — palette
+//     indices < 2 or in the parallax band [226, 256) fall back to a fully
+//     opaque draw because the ramp-position-as-alpha scheme isn't defined
+//     there. Per-pixel iteration: not free; reserve for chrome-scale rects
+//     (e.g. lobby panels), not full-screen overlays.
 //   • `strokeWidth == 0` → no stroke emitted. `strokePaletteColor` is
 //     ignored.
 //

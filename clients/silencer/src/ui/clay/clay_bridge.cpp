@@ -1,6 +1,7 @@
 #include "clay_bridge.h"
 
 #include "game.h"
+#include "palette.h"
 #include "renderer.h"
 #include "resources.h"
 #include "surface.h"
@@ -91,7 +92,29 @@ void UnpackImage(void * p, Uint8 & bank, Uint16 & index) {
 	index = static_cast<Uint16>(v & 0xFFFFu);
 }
 
-void DispatchRectangle(Surface * dst,
+// Construct a "low-nibble alpha" src palette index for the alphaed LUT.
+// The palette's `alphaed[i*256+j]` table is keyed on a src index whose color
+// ramp position (low 4 bits of (i-2)) encodes the desired alpha — alpha = 0
+// at ramp position 0, alpha ≈ 50% at ramp position 8, fully opaque src at
+// ramp positions 9..15 (the LUT collapses these to 1.0). See
+// palette.cpp:159-191 (`Palette::Calculate`). For colors outside the
+// standard ramp range [2, 226) — i.e., the reserved low entries 0..1 and
+// the parallax band [226, 256) — the ramp construction isn't meaningful;
+// fall back to the original color (caller gets fully-opaque draw, matching
+// the pre-C1 behavior for those edge cases).
+//
+// First-cut quantization: any non-zero, non-255 opacity routes to ramp
+// position 8 (≈50%). Full 0..15-level alpha is left for a future iteration
+// if it becomes needed — the LUT supports it without code changes here.
+Uint8 AlphaSrcIndex(Uint8 color, Uint8 /*opacity255*/) {
+	if(color < 2) return color;
+	if(color >= 256 - 30) return color;
+	int rampBase = ((color - 2) / 16) * 16 + 2;
+	return static_cast<Uint8>(rampBase + 8);
+}
+
+void DispatchRectangle(::Renderer & renderer,
+                       Surface * dst,
                        const ::Clay_BoundingBox & bb,
                        const ::Clay_RectangleRenderData & data) {
 	int x = static_cast<int>(bb.x);
@@ -100,8 +123,24 @@ void DispatchRectangle(Surface * dst,
 	int h = static_cast<int>(bb.height);
 	if(w <= 0 || h <= 0) return;
 	if(!ClipDrawRect(dst->w, dst->h, x, y, w, h)) return;
-	Uint8 color = static_cast<Uint8>(data.backgroundColor.r);
-	Renderer::DrawFilledRectangle(dst, x, y, x + w, y + h, color);
+	Uint8 color   = static_cast<Uint8>(data.backgroundColor.r);
+	Uint8 opacity = static_cast<Uint8>(data.backgroundColor.a);
+	if(opacity == 255){
+		Renderer::DrawFilledRectangle(dst, x, y, x + w, y + h, color);
+		return;
+	}
+	// Translucent fill: route each pixel through the palette's alphaed LUT.
+	// The LUT collapses any "alpha > 0.5" ramp position to fully opaque, so
+	// the practical intermediate level is ≈50%. Document this quantization
+	// in the Rectangle primitive's header.
+	Uint8 src = AlphaSrcIndex(color, opacity);
+	for(int py = y; py < y + h; py++){
+		for(int px = x; px < x + w; px++){
+			Uint8 d       = Renderer::GetPixel(dst, px, py);
+			Uint8 blended = renderer.palette.Alpha(src, d);
+			Renderer::SetPixel(dst, px, py, blended);
+		}
+	}
 }
 
 void DispatchBorder(Surface * dst,
@@ -258,7 +297,8 @@ void Render(::Resources & resources, ::Renderer & renderer,
 		::Clay_RenderCommand * c = &cmds.internalArray[i];
 		switch(c->commandType){
 			case CLAY_RENDER_COMMAND_TYPE_RECTANGLE:
-				DispatchRectangle(dst, c->boundingBox, c->renderData.rectangle);
+				DispatchRectangle(renderer, dst, c->boundingBox,
+				                  c->renderData.rectangle);
 				break;
 			case CLAY_RENDER_COMMAND_TYPE_BORDER:
 				DispatchBorder(dst, c->boundingBox, c->renderData.border);
