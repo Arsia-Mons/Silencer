@@ -5,6 +5,7 @@
 #include "lobby_chat.h"
 #include "lobby_create.h"
 #include "lobby_join.h"
+#include "lobby_select.h"
 #include "node.h"
 
 #include <string>
@@ -25,10 +26,12 @@ Node BuildLobby(const Context & ctx, const LobbyHandlers & handlers, const Lobby
 	// Chat caret is ON only when the chat sub-interface is the lobby's
 	// active object. Legacy ShowGameCreate / ShowGameTech clear
 	// chatiface->activeobject + re-run ActiveChanged → caret flips off.
-	// ShowGameJoin does NOT touch chatiface->activeobject (lobby_screen.cpp
-	// 355-363), so the chat caret stays lit while the join panel is up.
+	// ShowGameJoin / ShowGameSelect do NOT touch chatiface->activeobject
+	// (lobby_screen.cpp 328-335 / 355-363), so the chat caret stays lit
+	// while those panels are up.
 	const bool chat_active = (state.active_panel == LobbyActivePanel::None ||
-	                          state.active_panel == LobbyActivePanel::GameJoin);
+	                          state.active_panel == LobbyActivePanel::GameJoin ||
+	                          state.active_panel == LobbyActivePanel::GameSelect);
 
 	std::vector<Node> children = {
 		Label("Silencer", /*font_bank=*/135, /*font_width=*/11)
@@ -47,6 +50,8 @@ Node BuildLobby(const Context & ctx, const LobbyHandlers & handlers, const Lobby
 		children.push_back(BuildGameCreatePanel(ctx, state.game_create, handlers.game_create, /*name_active=*/true));
 	}else if(state.active_panel == LobbyActivePanel::GameJoin){
 		children.push_back(BuildGameJoinPanel(ctx, state.game_join, handlers.game_join));
+	}else if(state.active_panel == LobbyActivePanel::GameSelect){
+		children.push_back(BuildGameSelectPanel(ctx, state.game_select, handlers.game_select));
 	}
 	return Background(/*bank=*/7, /*index=*/1, std::move(children));
 }
