@@ -259,6 +259,8 @@ void BuildDemoTree() {
 				prim::Panel(CLAY_STRING("RightChromeDemo"),
 				            prim::PanelVariant::RightChrome,
 				            { .width  = 222, .height = 100,
+				              .chromeBank  = 7,  // Legacy lobby right-pane chrome.
+				              .chromeIndex = 8,
 				              .title  = CLAY_STRING("RightChrome"),
 				              .titleEffectColor = 152,
 				              .titlePadLeft = 8,

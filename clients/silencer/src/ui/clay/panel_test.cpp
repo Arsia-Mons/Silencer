@@ -65,6 +65,8 @@ bool RunPanelTest(::Game & game, const char * variant, const char * outPath) {
 			panelVariant,
 			{ .width        = panelW,
 			  .height       = panelH,
+			  .chromeBank   = 7,  // Legacy lobby right-pane chrome.
+			  .chromeIndex  = 8,
 			  .title        = title,
 			  .titleVariant = silencer::ui::primitives::BankTextVariant::Heading,
 			  .titlePadLeft = 2,
