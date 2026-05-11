@@ -36,6 +36,7 @@
 #include "mission_summary.h"
 #include "update.h"
 #include "modals/message.h"
+#include "modals/password.h"
 
 #include "main_menu_screen.h"
 #include "options_screen.h"
@@ -46,6 +47,7 @@
 #include "mission_summary_screen.h"
 #include "update_screen.h"
 #include "message_modal.h"
+#include "password_modal.h"
 #include "renderer.h"
 #include "renderdevice.h"
 #include "resources.h"
@@ -201,6 +203,15 @@ int Game::RunPreview()
 		running = false;
 	};
 
+	// Password modal preview state: empty text matches the post-Build,
+	// pre-user-input state the legacy modal renders at preview-gate time.
+	std::string password_modal_text;
+	ui::v2::PasswordHandlers password_handlers;
+	password_handlers.on_submit = [&running](const std::string & captured){
+		printf("[preview] Password submitted: '%s'\n", captured.c_str());
+		running = false;
+	};
+
 	// `with_state=false` is the dump-PPM path: NULL UIState → render
 	// snaps + dt is ignored, so output stays byte-identical to legacy.
 	auto make_ctx = [&](bool with_state){
@@ -337,6 +348,23 @@ int Game::RunPreview()
 				world.TickObjects();
 				renderer.Draw(&screenbuffer, /*frametime=*/0);
 				screen->Destroy(screenContext);
+			}else if(strcmp(preview_screen, "password_modal") == 0){
+				// PasswordModal mirrors MessageModal's camera convention —
+				// inherits (320, 240) from the MainMenu/Options chain. Mirror
+				// for the standalone preview.
+				renderer.camera.SetPosition(320, 240);
+				auto modal = std::make_unique<PasswordModal>(
+				    [](const char *){ /* no-op for preview gate */ });
+				modal->Build(screenContext);
+				// One TickObjects() settles the B156x21 OK button chrome on
+				// its INACTIVE base. The legacy Tick gates on
+				// okbutton->clicked and is intentionally NOT called.
+				// iface->ActiveChanged(mouse=false) ran in Build → the
+				// password input has showcaret=true; renderer.Draw emits the
+				// caret rect at (210, 242) since state_i % 32 < 16.
+				world.TickObjects();
+				renderer.Draw(&screenbuffer, /*frametime=*/0);
+				modal->Destroy(screenContext);
 			}else if(strcmp(preview_screen, "message_modal") == 0){
 				// MessageModal is normally pushed on top of another screen.
 				// Standalone it draws onto the cleared screenbuffer (palette
@@ -422,6 +450,12 @@ int Game::RunPreview()
 			}else if(strcmp(preview_screen, "message_modal") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildMessage(ctx, message_modal_text, /*has_ok=*/true, message_handlers);
+				ui::v2::Layout(tree, ctx);
+				ui::v2::Render(tree, ctx, screenbuffer, renderer);
+				if(ctx.state) ctx.state->EndFrame();
+			}else if(strcmp(preview_screen, "password_modal") == 0){
+				if(ctx.state) ctx.state->BeginFrame();
+				ui::v2::Node tree = ui::v2::BuildPassword(ctx, password_modal_text, password_handlers);
 				ui::v2::Layout(tree, ctx);
 				ui::v2::Render(tree, ctx, screenbuffer, renderer);
 				if(ctx.state) ctx.state->EndFrame();
@@ -517,6 +551,10 @@ int Game::RunPreview()
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "message_modal") == 0){
 						ui::v2::Node tree = ui::v2::BuildMessage(ctx, message_modal_text, /*has_ok=*/true, message_handlers);
+						ui::v2::Layout(tree, ctx);
+						ui::v2::DispatchClick(tree, ctx);
+					}else if(strcmp(preview_screen, "password_modal") == 0){
+						ui::v2::Node tree = ui::v2::BuildPassword(ctx, password_modal_text, password_handlers);
 						ui::v2::Layout(tree, ctx);
 						ui::v2::DispatchClick(tree, ctx);
 					}else if(strcmp(preview_screen, "update") == 0){
