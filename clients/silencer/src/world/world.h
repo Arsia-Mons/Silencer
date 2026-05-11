@@ -22,6 +22,11 @@
 #include "replay.h"
 #include "TriggerGraph.h"
 
+#ifdef __EMSCRIPTEN__
+#include "../net/wasmws.h"
+#include <string>
+#endif
+
 class World
 {
 public:
@@ -284,6 +289,21 @@ private:
 	bool currentmapdataend;
 	bool showteamcolors;
 	bool showplayerlist;
+
+#ifdef __EMSCRIPTEN__
+public:
+	// Stage 4 WASM transport: the browser-side spectator client has no UDP
+	// socket of its own — it receives the AUTHORITY's snapshot byte stream
+	// over WebSocket from a server-side `silencer --relay` process. The URL
+	// is handed to us by the lobby's spectator facade in response to
+	// {"type":"spectate","gameid":N}; Game::SpectateGame calls
+	// OpenRelayWS() with the URL just before transitioning into the
+	// CONNECTING state. DoNetwork_Replica then drains binary frames out of
+	// `relayWS` instead of recvfrom().
+	void OpenRelayWS(const char *url);
+	void CloseRelayWS();
+	WasmWS relayWS;
+#endif
 };
 
 #endif

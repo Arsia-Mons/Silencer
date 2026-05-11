@@ -10,6 +10,10 @@
 #include <memory>
 #include <string>
 
+#ifdef __EMSCRIPTEN__
+#include "wasmws.h"
+#endif
+
 class Lobby
 {
 public:
@@ -74,6 +78,27 @@ public:
 	// "Welcome, <name>" line.
 	void SetLocalUsername(const char * name);
 	const char * GetLocalUsername() const { return localusername; }
+
+#ifdef __EMSCRIPTEN__
+	// Stage 4 WASM transport. Browser builds replace the lobby's TCP
+	// binary protocol with JSON envelopes from services/lobby/wsfacade.go
+	// (the read-only Stage 3 spectator facade). The state machine here
+	// short-circuits: no opVersion handshake, no opAuth, no channel
+	// flow — we just consume {hello,newgame,delgame,spectate_url,error}
+	// envelopes and populate `games` so the lobby browser UI can render.
+	// `RequestSpectate` is the one outbound command this side supports.
+	WasmWS facadeWS;
+	void RequestSpectate(Uint32 gameid);
+	// Stash of the relay URL returned by the most recent spectate
+	// command, so Game::SpectateGame can pick it up after submitting the
+	// request and waiting one DoNetwork tick.
+	std::string pendingSpectateURL;
+	Uint32 pendingSpectateGameID = 0;
+private:
+	void WasmDoNetwork();
+	void WasmHandleEnvelope(const std::string &json);
+public:
+#endif
 
 private:
 	char localusername[17];

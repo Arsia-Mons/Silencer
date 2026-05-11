@@ -270,6 +270,27 @@ void Game::JoinGame(LobbyGame & lobbygame, char * password){
 
 void Game::SpectateGame(LobbyGame & lobbygame, char * password){
 	strcpy(world.mapname, lobbygame.mapname);
+#ifdef __EMSCRIPTEN__
+	// Browser spectator. We don't sendto MSG_CONNECT ourselves — the
+	// server-side `silencer --relay` already did that handshake against
+	// the AUTHORITY. Our path is: ask the lobby facade for this game's
+	// relay URL, then open a WebSocket to it. Snapshot bytes start
+	// flowing into world.relayWS and DoNetwork_Replica picks them up.
+	//
+	// The relay URL doesn't return synchronously; we kick the request
+	// here and let TickJoinGame poll Lobby::pendingSpectateURL until the
+	// facade sends `spectate_url`. OpenRelayWS gets called from the
+	// poller once the URL is in hand.
+	(void)password;
+	world.lobby.RequestSpectate(lobbygame.id);
+	sharedstate = 0;
+	world.mode = World::REPLICA;
+	// World::Connect on Emscripten is a no-op MSG_CONNECT but does flip
+	// the state machine to CONNECTING; the snapshot stream will lift us
+	// to CONNECTED once MSG_PEERLIST arrives over relayWS.
+	world.Connect(Config::GetInstance().defaultagency, world.lobby.accountid, nullptr, true);
+	joininggame = true;
+#else
 	Peer * peer = world.GetAuthorityPeer();
 	peer->ip = ntohl(inet_addr(lobbygame.hostname));
 	peer->port = lobbygame.port;
@@ -277,6 +298,7 @@ void Game::SpectateGame(LobbyGame & lobbygame, char * password){
 	world.mode = World::REPLICA;
 	world.Connect(Config::GetInstance().defaultagency, world.lobby.accountid, password, true);
 	joininggame = true;
+#endif
 }
 
 void Game::ShowTeamOverlays(bool show){

@@ -20,9 +20,19 @@
 
 World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio::GetInstance()){
 	this->mode = mode;
+#ifdef __EMSCRIPTEN__
+	// Browsers can't open UDP. The replica path on Emscripten reads
+	// snapshot bytes from a relay WebSocket instead — see
+	// World::OpenRelayWS + DoNetwork_Replica's __EMSCRIPTEN__ branch.
+	// We still allocate a dummy sockethandle so members like
+	// lagsimulator (which stashes a SOCKET *) and SendPacket's
+	// guards don't UB on uninitialised state.
+	sockethandle = -1;
+#else
 	sockethandle = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 	unsigned long iomode = 1;
     ioctl(sockethandle, FIONBIO, &iomode);
+#endif
 	currentid = 1;
 	memset(peerlist, 0, sizeof(peerlist));
 	peercount = 0;
@@ -84,8 +94,10 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 
 World::~World(){
 	Disconnect();
+#ifndef __EMSCRIPTEN__
     shutdown(sockethandle, SHUT_RDWR);
     closesocket(sockethandle);
+#endif
 	for(std::vector<BuyableItem *>::iterator it = buyableitems.begin(); it != buyableitems.end(); it++){
 		delete (*it);
 	}
@@ -708,20 +720,44 @@ void World::DoNetwork_Replica(void){
 	if(!peerlist[authoritypeer]){
 		return;
 	}
+#ifndef __EMSCRIPTEN__
+	// On Emscripten we never send anything back to the relay (the relay
+	// keeps the AUTHORITY's peer entry alive via its own MSG_PING — the
+	// browser is read-only by design). Skip the keepalive ping path so
+	// SendPacket never has to no-op a sendto().
 	if(SDL_GetTicks() - lastpingsent >= (Uint32)GASLoader::Get().gameengine.pingIntervalMs){
 		SendPing();
 	}
+#endif
 	Serializer data(10000); // hopefully snapshots dont get larger than this
+#ifndef __EMSCRIPTEN__
 	sockaddr_in senderaddr;
 	socklen_t senderaddrsize = sizeof(senderaddr);
+#endif
 	Peer * peer = 0;
 	int received;
+#ifdef __EMSCRIPTEN__
+	// Browser side: pop binary frames the relay forwarded. Each frame is
+	// one verbatim AUTHORITY UDP datagram, so the dispatch below sees
+	// exactly the bytes World::SendSnapshots produced on the host. The
+	// relay only forwards bytes from the AUTHORITY's UDP source — there
+	// is no other source on this socket, so we always credit
+	// peerlist[authoritypeer].
+	std::vector<unsigned char> frame;
+	while(relayWS.PopBinary(frame)){
+		received = (int)frame.size();
+		if(received <= 0 || (size_t)received > data.size) continue;
+		memcpy(data.data, frame.data(), (size_t)received);
+		peer = peerlist[authoritypeer];
+		if(peer) peer->lastpacket = SDL_GetTicks();
+#else
 	while((received = recvfrom(sockethandle, data.data, data.size, 0, (sockaddr *)&senderaddr, &senderaddrsize)) > 0){
 		//printf("received data from %s:%d\n", inet_ntoa(senderaddr.sin_addr), ntohs(senderaddr.sin_port));
 		if(peerlist[authoritypeer]->ip == ntohl(senderaddr.sin_addr.s_addr) && peerlist[authoritypeer]->port == ntohs(senderaddr.sin_port)){
 			peer = peerlist[authoritypeer];
 			peer->lastpacket = SDL_GetTicks();
 		}
+#endif
 		data.offset = received * 8;
 		data.readoffset = 0;
 		totalbytesread += received;
@@ -1238,6 +1274,13 @@ void World::SendPacket(Peer * peer, char * data, unsigned int size){
 	if(replay.IsPlaying()){
 		return;
 	}
+#ifdef __EMSCRIPTEN__
+	// Browser spectator is read-only — the WS pipe back to the relay is
+	// never used to send game-protocol packets. Anything callers try to
+	// emit (SendPing, SendChat, MSG_EXISTS replies, etc.) silently drops.
+	(void)peer; (void)data; (void)size;
+	return;
+#else
 	if(peer){
 		if(lagsimulator.Active() && gameplaystate == INGAME){
 			lagsimulator.QueuePacket(peer, data, size);
@@ -1252,6 +1295,7 @@ void World::SendPacket(Peer * peer, char * data, unsigned int size){
 			}
 		}
 	}
+#endif
 }
 
 void World::SwitchToMode(bool newmode){
@@ -1684,6 +1728,14 @@ bool World::Listen(unsigned short port){
 }
 
 unsigned short World::Bind(unsigned short port){
+#ifdef __EMSCRIPTEN__
+	// No UDP socket to bind. Pretend success so Listen() / mode switches
+	// don't bail; the boundport value is irrelevant in spectator-only
+	// browser mode (we never advertise it to anyone).
+	(void)port;
+	boundport = 0;
+	return 1;
+#else
 	sockaddr_in recvaddr;
 	recvaddr.sin_family = AF_INET;
 	recvaddr.sin_port = htons(port);
@@ -1697,10 +1749,27 @@ unsigned short World::Bind(unsigned short port){
 		return boundport;
 	}
 	return false;
+#endif
 }
 
 void World::Connect(Uint8 agency, Uint32 accountid, const char * password, bool observer){
 	AllocateMapData(65535);
+#ifdef __EMSCRIPTEN__
+	// Browser spectator: there is no outbound MSG_CONNECT — the relay
+	// did that handshake server-side on our behalf the moment its WS
+	// upgrade completed (see clients/silencer/src/net/relay.cpp,
+	// Relay::SendConnectRequest). All we need to do here is move the
+	// state machine into CONNECTING and let the snapshot stream that
+	// will already start flowing through relayWS lift us into CONNECTED
+	// once a MSG_PEERLIST arrives in DoNetwork_Replica.
+	(void)agency; (void)accountid; (void)password; (void)observer;
+	SwitchToMode(REPLICA);
+	state = CONNECTING;
+	messagetype = 0;
+	authoritypeer = 0;
+	GetAuthorityPeer()->lastpacket = SDL_GetTicks();
+	return;
+#else
 	sockaddr_in addr;
 	addr.sin_addr.s_addr = htonl(GetAuthorityPeer()->ip);
 	//printf("sending connect request with agency %d, accountid %d to %s:%d\n", agency, accountid, inet_ntoa(addr.sin_addr), GetAuthorityPeer()->port);
@@ -1721,6 +1790,7 @@ void World::Connect(Uint8 agency, Uint32 accountid, const char * password, bool 
 	}
 	data.PutBit(observer);
 	SendPacket(GetAuthorityPeer(), data.data, data.BitsToBytes(data.offset));
+#endif
 }
 
 void World::Disconnect(void){
@@ -2890,3 +2960,14 @@ Object * World::TestIncr(int x1, int y1, int x2, int y2, int * xv, int * yv, std
 	}
 	return 0;
 }
+
+#ifdef __EMSCRIPTEN__
+void World::OpenRelayWS(const char *url){
+	relayWS.Close();
+	relayWS.Open(url);
+}
+
+void World::CloseRelayWS(){
+	relayWS.Close();
+}
+#endif

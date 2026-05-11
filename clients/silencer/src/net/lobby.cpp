@@ -2,6 +2,12 @@
 #include "sha1.h"
 #include "world.h"
 
+#ifdef __EMSCRIPTEN__
+#include <nlohmann/json.hpp>
+#include <cstdio>
+#include <cstring>
+#endif
+
 // MSG_VERSION request now carries a trailing platform byte so the lobby
 // can pick the right download URL when it rejects us. Values mirror
 // server/protocol.go::Platform.
@@ -61,6 +67,43 @@ Lobby::~Lobby(){
 }
 
 void Lobby::Connect(const char * host, unsigned short port){
+#ifdef __EMSCRIPTEN__
+	// Browser builds talk to the lobby's spectator facade (Stage 3) over
+	// WebSocket instead of the binary TCP protocol. The facade exposes
+	// the read-only game list + a `spectate` command and is anonymous —
+	// no opVersion handshake, no opAuth, no channel join. We fast-forward
+	// the state machine all the way to AUTHENTICATED and let the lobby
+	// browser UI render straight from the JSON pushes we'll receive in
+	// WasmDoNetwork.
+	//
+	// The port we got from `host`/`port` is the native TCP port (517 / 15170)
+	// — the facade listens on its own port (default :15173). We assume
+	// the operator co-locates them on the same host; in practice the
+	// /spectate page passes the right hostname and we pick :15173 here.
+	motdreceived = true;
+	versionchecked = true;
+	versionok = true;
+	updateavailable = false;
+	motd[0] = 0;
+	failmessage[0] = 0;
+	char url[512];
+	const unsigned short facadePort = 15173;
+	snprintf(url, sizeof(url), "ws://%s:%u/spectate", host, (unsigned)facadePort);
+	(void)port;
+	fprintf(stderr, "[lobby] (wasm) connecting to facade %s\n", url);
+	facadeWS.Close();
+	if(!facadeWS.Open(url)){
+		fprintf(stderr, "[lobby] (wasm) facade open failed\n");
+		state = CONNECTIONFAILED;
+		return;
+	}
+	// Pretend we authed. The lobby browser UI just needs `games`
+	// populated and `state == AUTHENTICATED` to render rows.
+	state = AUTHENTICATED;
+	accountid = 1; // bot-range placeholder; spectator has no real identity
+	gamesprocessed = false;
+	return;
+#else
 	LockMutex();
 	motdreceived = false;
 	versionchecked = false;
@@ -89,6 +132,7 @@ void Lobby::Connect(const char * host, unsigned short port){
 		ResolveHostname(host);
 	}
 	UnlockMutex();
+#endif
 }
 
 void Lobby::Disconnect(void){
@@ -101,12 +145,20 @@ void Lobby::Disconnect(void){
 	sendbufferoffset = 0;
 	presence.clear();
 	presencechanged = true;
+#ifdef __EMSCRIPTEN__
+	facadeWS.Close();
+#else
     shutdown(sockethandle, SHUT_RDWR);
     closesocket(sockethandle);
 	sockethandle = -1;
+#endif
 }
 
 void Lobby::DoNetwork(void){
+#ifdef __EMSCRIPTEN__
+	WasmDoNetwork();
+	return;
+#endif
 	if(state == IDLE || state == WAITING || sockethandle == -1){
 		return;
 	}
@@ -726,3 +778,127 @@ int Lobby::ResolveThreadFunc(void * param){
 	}
 	return 0;
 }
+
+#ifdef __EMSCRIPTEN__
+
+void Lobby::RequestSpectate(Uint32 gameid){
+	if(!facadeWS.IsOpen()) return;
+	pendingSpectateGameID = gameid;
+	pendingSpectateURL.clear();
+	nlohmann::json j = {{"type","spectate"},{"gameid", gameid}};
+	facadeWS.SendText(j.dump());
+}
+
+void Lobby::WasmDoNetwork(){
+	if(facadeWS.IsDead() && state == AUTHENTICATED){
+		state = DISCONNECTED;
+		return;
+	}
+	std::string frame;
+	while(facadeWS.PopText(frame)){
+		WasmHandleEnvelope(frame);
+	}
+}
+
+void Lobby::WasmHandleEnvelope(const std::string &payload){
+	using nlohmann::json;
+	json j;
+	try {
+		j = json::parse(payload);
+	} catch (const json::exception &e) {
+		fprintf(stderr, "[lobby] (wasm) bad envelope: %s\n", e.what());
+		return;
+	}
+	std::string type = j.value("type", std::string());
+
+	auto decodeGame = [](const json &g, LobbyGame *out){
+		out->id           = g.value("id", 0u);
+		out->accountid    = g.value("account_id", 0u);
+		auto cp = [&](const char *src, char *dst, size_t cap){
+			std::string s = g.value(src, std::string());
+			if(s.size() >= cap) s.resize(cap - 1);
+			memset(dst, 0, cap);
+			memcpy(dst, s.data(), s.size());
+		};
+		cp("name",     out->name,     sizeof(out->name));
+		cp("hostname", out->hostname, sizeof(out->hostname));
+		cp("map_name", out->mapname,  sizeof(out->mapname));
+		out->players       = (Uint8)g.value("players", 0);
+		out->state         = (Uint8)g.value("state", 0);
+		out->securitylevel = (Uint8)g.value("security_level", 0);
+		out->minlevel      = (Uint8)g.value("min_level", 0);
+		out->maxlevel      = (Uint8)g.value("max_level", 99);
+		out->maxplayers    = (Uint8)g.value("max_players", 24);
+		out->maxteams      = (Uint8)g.value("max_teams", 6);
+		out->extra         = (Uint8)g.value("extra", 0);
+		out->spectatable   = g.value("spectatable", 0) != 0;
+		out->port          = (unsigned short)g.value("port", 0);
+		out->password[0]   = 0; // facade strips passwords
+		out->canrejoin     = false;
+		out->loaded        = true;
+		// map_hash arrives hex-encoded; lobby browser UI ignores it, so we leave the bytes zeroed.
+		memset(out->maphash, 0, sizeof(out->maphash));
+		out->createdtime   = SDL_GetTicks();
+	};
+
+	if(type == "hello"){
+		// Initial snapshot of currently-live games.
+		ClearGames();
+		if(j.contains("games") && j["games"].is_array()){
+			for(const auto &g : j["games"]){
+				LobbyGame * lg = new LobbyGame;
+				decodeGame(g, lg);
+				games.push_back(lg);
+			}
+		}
+		gamesprocessed = false;
+		std::string motdtext = j.value("motd", std::string());
+		if(motdtext.size() >= sizeof(motd)) motdtext.resize(sizeof(motd) - 1);
+		memcpy(motd, motdtext.data(), motdtext.size());
+		motd[motdtext.size()] = 0;
+		motdreceived = true;
+	} else if(type == "newgame"){
+		if(j.contains("game")){
+			LobbyGame * lg = new LobbyGame;
+			decodeGame(j["game"], lg);
+			// Replace by id if it's already there.
+			for(std::list<LobbyGame *>::iterator it = games.begin(); it != games.end(); ){
+				if((*it)->id == lg->id){
+					delete *it;
+					it = games.erase(it);
+				}else{
+					++it;
+				}
+			}
+			games.push_back(lg);
+			gamesprocessed = false;
+		}
+	} else if(type == "delgame"){
+		Uint32 id = j.value("id", 0u);
+		for(std::list<LobbyGame *>::iterator it = games.begin(); it != games.end(); ++it){
+			if((*it)->id == id){
+				delete *it;
+				games.erase(it);
+				gamesprocessed = false;
+				break;
+			}
+		}
+	} else if(type == "spectate_url"){
+		pendingSpectateGameID = j.value("gameid", 0u);
+		pendingSpectateURL    = j.value("url", std::string());
+		fprintf(stderr, "[lobby] (wasm) spectate_url game=%u url=%s\n",
+		        (unsigned)pendingSpectateGameID, pendingSpectateURL.c_str());
+		if(world && !pendingSpectateURL.empty()){
+			world->OpenRelayWS(pendingSpectateURL.c_str());
+		}
+	} else if(type == "error"){
+		std::string code    = j.value("code", std::string());
+		std::string message = j.value("message", std::string());
+		fprintf(stderr, "[lobby] (wasm) facade error: code=%s msg=%s\n",
+		        code.c_str(), message.c_str());
+		pendingSpectateGameID = 0;
+		pendingSpectateURL.clear();
+	}
+}
+
+#endif // __EMSCRIPTEN__

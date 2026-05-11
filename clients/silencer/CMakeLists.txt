@@ -376,6 +376,11 @@ if(EMSCRIPTEN)
 		"-sEXIT_RUNTIME=0"
 		"-sASSERTIONS=1"
 		"-sNO_DISABLE_EXCEPTION_CATCHING"
+		# Stage 4: pull in Emscripten's WebSocket implementation so
+		# emscripten_websocket_new / send / set_*_callback resolve at
+		# link time. Used by src/net/wasmws.cpp for both the lobby
+		# facade (text frames) and the relay (binary frames).
+		"-lwebsocket.js"
 		"--preload-file" "${SILENCER_SHARED_DIR}/assets@/assets"
 	)
 	# Stack size: Emscripten's 64KB default overflows on the first call to
