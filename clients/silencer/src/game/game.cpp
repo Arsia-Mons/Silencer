@@ -1037,6 +1037,28 @@ nlohmann::json Game::GetWorldSummary(){
 	nlohmann::json r;
 	r["map"] = world.gameinfo.mapname;
 	r["peers"] = (int)world.peercount;
+	r["localpeerid"] = (int)world.localpeerid;
+	r["viewedpeerid"] = (int)world.viewedpeerid;
+	r["authoritypeer"] = (int)world.authoritypeer;
+	r["lobby_accountid"] = (unsigned int)world.lobby.accountid;
+	r["is_local_observer"] = world.IsLocalObserver();
+	r["spectator_initialized"] = world.spectator.initialized;
+	r["spectator_freecam"] = world.spectator.freecam;
+	nlohmann::json peerlist = nlohmann::json::array();
+	for(unsigned int i = 0; i < world.maxpeers; i++){
+		Peer * p = world.peerlist[i];
+		if(!p) continue;
+		nlohmann::json pj;
+		pj["id"] = i;
+		pj["accountid"] = (unsigned int)p->accountid;
+		pj["observer"] = p->observer;
+		pj["disconnected"] = p->disconnected;
+		nlohmann::json controlled = nlohmann::json::array();
+		for(Uint16 cid : p->controlledlist) controlled.push_back(cid);
+		pj["controlledlist"] = controlled;
+		peerlist.push_back(std::move(pj));
+	}
+	r["peerlist"] = peerlist;
 	nlohmann::json players = nlohmann::json::array();
 	int objcount = 0;
 	for(auto* o : world.objectlist){

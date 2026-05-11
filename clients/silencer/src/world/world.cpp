@@ -733,6 +733,7 @@ void World::DoNetwork_Replica(void){
 				if(peer){
 					if(data.GetBit()){
 						data.Get(localpeerid);
+						viewedpeerid = localpeerid;
 						//printf("we are connected, our peer id is %d\n", localpeerid);
 						RequestPeerList();
 					}else{
@@ -2447,6 +2448,7 @@ Object * World::GetObjectFromId(Uint16 id){
 void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 	if(mode == AUTHORITY){
 		Player * player = GetPeerPlayer(peerid);
+		bool isobserver = peerlist[peerid] && peerlist[peerid]->observer;
 		Serializer ** oldsnapshotptr = &oldsnapshots[peerid][tickcount % maxoldsnapshots];
 		Serializer ** deltasnapshotptr = &oldsnapshots[peerid][peerlist[peerid]->lasttick % maxoldsnapshots];
 		if(tickcount - peerlist[peerid]->lasttick >= maxoldsnapshots){
@@ -2517,7 +2519,7 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 			
 			// Write all new objects
 			for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
-				if((*i)->RequiresAuthority() && RelevantToPlayer(player, (*i))){
+				if((*i)->RequiresAuthority() && (isobserver || RelevantToPlayer(player, (*i)))){
 					(*i)->Serialize(Serializer::WRITE, **oldsnapshotptr);
 					if(oldobjects.find((*i)->id) == oldobjects.end()){
 						data.PutBit(0);
@@ -2529,7 +2531,7 @@ void World::SaveSnapshot(Serializer & data, Uint8 peerid){
 		}else{
 			// Write all relevant objects, no delta compression
 			for(std::list<Object *>::iterator i = objectlist.begin(); i != objectlist.end(); i++){
-				if((*i)->RequiresAuthority() && RelevantToPlayer(player, (*i))){
+				if((*i)->RequiresAuthority() && (isobserver || RelevantToPlayer(player, (*i)))){
 					(*i)->Serialize(Serializer::WRITE, **oldsnapshotptr);
 					data.PutBit(0);
 					(*i)->Serialize(Serializer::WRITE, data);

@@ -695,6 +695,7 @@ void GameCreatePanel::Tick(ScreenContext & ctx)
 								uploadStatePtr->store(ok ? 2 : 3, std::memory_order_release);
 							});
 						}
+						world.lobby.creategamestatus = 0;
 						ctx.game.creategameclicked = true;
 						strcpy(Config::GetInstance().defaultgamename, gamename);
 						Config::GetInstance().Save();
