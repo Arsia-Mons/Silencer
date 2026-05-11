@@ -147,6 +147,18 @@ public:
 	// Mirror of legacy CharacterPanel::Tick agency-change branch: persist
 	// to Config + push to the connected world.
 	void LobbyV2SelectAgency(Uint8 agency);
+	// Chat panel input routing helpers — called from events.cpp's
+	// TEXT_INPUT and KEY_DOWN branches when state == LOBBY and the chat
+	// sub-interface is the lobby's active object. Mirrors legacy
+	// TextInput::ProcessKeyPress branches plus ChatPanel::Tick's
+	// enterpressed -> SendChat handoff.
+	void LobbyV2ChatAppendChar(char c);
+	void LobbyV2ChatBackspace();
+	void LobbyV2ChatSubmit();
+	// True when the chat sub-interface is the lobby's active object —
+	// matches BuildLobby's chat_active derivation. Read by events.cpp
+	// to decide whether keys / text route to the chat input.
+	bool LobbyV2ChatActive() const;
 
 	// v2 modal stack — overlays the underlying state's render and intercepts
 	// mouse / text input when non-empty. Lobby panels (P16g) and any other
@@ -335,6 +347,14 @@ private:
 	void DispatchLobbyV2Click(int logical_x, int logical_y);
 	void TickLobbyV2();
 	void RefreshLobbyV2CharacterState();
+	// Drains world.lobby.chatmessages into the v2 chat scrollback,
+	// rebuilds the presence list when world.lobby.presencechanged is
+	// set, and updates the channel name overlay when
+	// world.lobby.channelchanged is set. Mirrors ChatPanel::Tick's three
+	// dynamic branches. Run from RenderLobbyV2 (per-frame, like the
+	// character refresh) so the side-effects on world.lobby are
+	// idempotent.
+	void RefreshLobbyV2ChatState();
 	// Owned heap to keep ui::v2::LobbyState's full type out of game.h —
 	// it transitively includes the v2 panel headers and would pollute
 	// every game.h consumer. Allocated in Game() / freed in ~Game().

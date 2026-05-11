@@ -3,6 +3,7 @@
 
 #include "shared.h"
 #include "lobby_character.h"
+#include "lobby_chat.h"
 #include "lobby_create.h"
 #include "lobby_join.h"
 #include "lobby_select.h"
@@ -47,6 +48,10 @@ struct LobbyState {
 	LobbyActivePanel active_panel = LobbyActivePanel::None;
 	// Character panel state (selected agency + username + stat readouts).
 	CharacterPanelState character;
+	// Chat panel state (channel name, scrollback, presence, input).
+	// Always rendered (the chat panel sits in the lobby chrome alongside
+	// the right-side panel swap).
+	ChatPanelState chat;
 	// Per-panel state. Only the field matching `active_panel` is read.
 	GameCreateState game_create;
 	GameJoinState game_join;

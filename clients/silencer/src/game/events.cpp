@@ -225,6 +225,11 @@ bool Game::HandleSDLEvents(void){
 					// v2 LobbyConnect — no Interface to route through; the
 					// active field's buffer lives directly on Game.
 					if(!skip) LobbyConnectAppendChar(ascii);
+				}else if(state == GameState::LOBBY && LobbyV2ChatActive()){
+					// v2 Lobby chat input — buffer lives on Game; the chat
+					// sub-interface is the active object whenever no
+					// modal/right-side panel takes focus.
+					if(!skip) LobbyV2ChatAppendChar(ascii);
 				}else{
 					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 					if(iface){
@@ -311,6 +316,15 @@ bool Game::HandleSDLEvents(void){
 						case SDL_SCANCODE_RETURN:    LobbyConnectSubmit();    break;
 						case SDL_SCANCODE_ESCAPE:    LobbyConnectCancel();    break;
 						case SDL_SCANCODE_TAB:       LobbyConnectCycleField(); break;
+						default: break;
+					}
+				}
+				// v2 LOBBY chat input — BACKSPACE / RETURN edit the chat
+				// buffer when chat is the active sub-interface.
+				if(state == GameState::LOBBY && LobbyV2ChatActive()){
+					switch(event.key.scancode){
+						case SDL_SCANCODE_BACKSPACE: LobbyV2ChatBackspace(); break;
+						case SDL_SCANCODE_RETURN:    LobbyV2ChatSubmit();    break;
 						default: break;
 					}
 				}

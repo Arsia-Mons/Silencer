@@ -2039,6 +2039,12 @@ static ui::v2::LobbyHandlers BuildLobbyV2Handlers(Game * game){
 	return h;
 }
 
+bool Game::LobbyV2ChatActive() const {
+	using LAP = ui::v2::LobbyActivePanel;
+	const LAP p = ui_v2_lobby_state->active_panel;
+	return p == LAP::None || p == LAP::GameJoin || p == LAP::GameSelect;
+}
+
 // Refresh the character panel's username + LEVEL/WINS/LOSSES/XP texts from
 // the live lobby state. Mirrors CharacterPanel::Tick's overlay refresh —
 // safe to call every frame because the v2 builder rebuilds the tree.
@@ -2062,6 +2068,135 @@ void Game::RefreshLobbyV2CharacterState(){
 	}
 }
 
+// Mirror of ChatPanel::Tick (clients/silencer/src/ui/screens/lobby/panels/
+// chat_panel.cpp). Updates the v2 chat scrollback / presence / channel
+// state from world.lobby. Side-effects on world.lobby are idempotent
+// (presencechanged / channelchanged latches are cleared on consume).
+void Game::RefreshLobbyV2ChatState(){
+	ui::v2::ChatPanelState & cs = ui_v2_lobby_state->chat;
+
+	// Channel-name overlay.
+	if(world.lobby.channelchanged){
+		if(world.lobby.lastchannel[0] == '\0'){
+			strcpy(world.lobby.lastchannel, world.lobby.channel);
+		}
+		cs.channel_name = world.lobby.channel;
+		world.lobby.channelchanged = false;
+	}
+
+	// Drain incoming chat into the scrollback. Each message is a
+	// vector<char> with [text\0][color][brightness] layout — see
+	// Lobby's MSG_CHAT handler.
+	bool any = false;
+	while(!world.lobby.chatmessages.empty()){
+		auto & message = world.lobby.chatmessages.front();
+		const char * text = message.data();
+		size_t tlen = strlen(text);
+		Uint8 color = (Uint8)message[tlen + 1];
+		Uint8 brightness = (Uint8)message[tlen + 2];
+		// Mirror legacy TextBox::AddLine width clamp: max chars =
+		// width / fontwidth = 242 / 6 = 40.
+		const size_t maxchars = 242 / 6;
+		std::string s(text, std::min(tlen, maxchars));
+		ui::v2::ChatLine cl{std::move(s), color, brightness};
+		cs.chat_lines.push_back(std::move(cl));
+		// Mirror TextBox::maxlines = 256.
+		if(cs.chat_lines.size() > 256){
+			cs.chat_lines.pop_front();
+		}
+		world.lobby.chatmessages.pop_front();
+		any = true;
+	}
+	if(any){
+		// Auto-scroll to bottom (mirrors AddText(scroll=true) -> AddLine
+		// scrolled = size - height/lineheight).
+		const Uint16 visible = 207 / 11;
+		if(cs.chat_lines.size() > visible){
+			cs.chat_scrolled = (Uint16)(cs.chat_lines.size() - visible);
+		}else{
+			cs.chat_scrolled = 0;
+		}
+	}
+
+	// Presence list — rebuild on change. Mirrors the !gamesprocessed ||
+	// presencechanged trigger in ChatPanel::Tick.
+	if(world.lobby.presencechanged || !world.lobby.gamesprocessed){
+		cs.presence_lines.clear();
+		struct Row { Uint8 group; std::string label; };
+		std::vector<Row> rows;
+		rows.reserve(world.lobby.presence.size());
+		for(auto & kv : world.lobby.presence){
+			Lobby::PresenceEntry & e = kv.second;
+			Row r;
+			r.label = e.name;
+			r.group = (e.status <= 2) ? e.status : 0;
+			if(e.gameid != 0){
+				LobbyGame * g = world.lobby.GetGameById(e.gameid);
+				if(g){
+					r.label += " [";
+					r.label += g->name;
+					r.label += "]";
+				}
+			}
+			rows.push_back(std::move(r));
+		}
+		std::sort(rows.begin(), rows.end(), [](const Row & a, const Row & b){
+			if(a.group != b.group) return a.group < b.group;
+			return a.label < b.label;
+		});
+		const size_t maxchars = 110 / 6;
+		Uint8 lastgroup = 255;
+		for(auto & r : rows){
+			if(r.group != lastgroup){
+				const char * header = (r.group == 0) ? "In Lobby" : (r.group == 1) ? "Pregame" : "Playing";
+				ui::v2::ChatLine cl;
+				cl.text = header;
+				cl.color = 0;
+				cl.brightness = 128 + 32;
+				cs.presence_lines.push_back(std::move(cl));
+				lastgroup = r.group;
+			}
+			ui::v2::ChatLine cl;
+			cl.text = "  " + r.label;  // legacy AddText indent=2 -> "\n  "
+			if(cl.text.size() > maxchars) cl.text.resize(maxchars);
+			cl.color = 0;
+			cl.brightness = 128;
+			cs.presence_lines.push_back(std::move(cl));
+		}
+		world.lobby.presencechanged = false;
+	}
+
+	// Caret blink — mirror renderer.cpp:1846's `state_i % 32 < 16` gate.
+	cs.caret_visible = ((Uint32)frames & 31u) < 16u;
+}
+
+void Game::LobbyV2ChatAppendChar(char c){
+	ui::v2::ChatPanelState & cs = ui_v2_lobby_state->chat;
+	// Mirror TextInput::ProcessKeyPress: maxchars=200 cap, scroll once
+	// length exceeds maxwidth+scrolled (maxwidth=60).
+	if(c < 0x20 || c > 0x7F) return;
+	if(cs.chat_input.size() >= 200) return;
+	if(cs.chat_input.size() >= (size_t)(60 + cs.chat_input_scrolled)){
+		cs.chat_input_scrolled++;
+	}
+	cs.chat_input.push_back(c);
+}
+
+void Game::LobbyV2ChatBackspace(){
+	ui::v2::ChatPanelState & cs = ui_v2_lobby_state->chat;
+	if(cs.chat_input.empty()) return;
+	cs.chat_input.pop_back();
+	if(cs.chat_input_scrolled > 0) cs.chat_input_scrolled--;
+}
+
+void Game::LobbyV2ChatSubmit(){
+	ui::v2::ChatPanelState & cs = ui_v2_lobby_state->chat;
+	if(cs.chat_input.empty()) return;
+	world.lobby.SendChat(world.lobby.channel, cs.chat_input.c_str());
+	cs.chat_input.clear();
+	cs.chat_input_scrolled = 0;
+}
+
 bool Game::RenderLobbyV2(){
 	Uint64 now = SDL_GetTicks();
 	float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
@@ -2080,6 +2215,7 @@ bool Game::RenderLobbyV2(){
 	ctx.dt      = dt;
 
 	RefreshLobbyV2CharacterState();
+	RefreshLobbyV2ChatState();
 	ui::v2::LobbyHandlers handlers = BuildLobbyV2Handlers(this);
 	screenbuffer.Clear(0);
 	ui_v2_state.BeginFrame();

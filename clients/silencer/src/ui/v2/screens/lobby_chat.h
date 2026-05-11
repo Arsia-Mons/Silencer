@@ -3,34 +3,61 @@
 
 #include "shared.h"
 
+#include <deque>
+#include <string>
+#include <vector>
+
 namespace ui {
 namespace v2 {
 
 struct Node;
 struct Context;
 
-// Chat panel: two chrome sprites (bank 7 idx 11 = scrollback/presence
-// border, bank 7 idx 14 = chat input border) plus the chat input caret.
+// One coloured line in the chat scrollback or presence textbox. Mirrors
+// the trailing color/brightness bytes the legacy TextBox::AddLine packs
+// into each std::vector<char>.
+struct ChatLine {
+	std::string text;
+	Uint8 color = 0;
+	Uint8 brightness = 128;
+};
+
+// Engine-supplied dynamic state for the chat panel (channel name overlay,
+// scrollback, presence list, chat input). All fields default to empty so
+// the preview-gate render stays byte-identical with the legacy preview.
+struct ChatPanelState {
+	// Channel-name overlay (legacy uid 1, bank 134, fontwidth 8).
+	std::string channel_name;
+	// Scrollback. Mirrors the legacy TextBox::text deque + scrolled
+	// offset semantics: render only entries with index >= scrolled,
+	// stop after height/lineheight rows. bottomtotop math uses the
+	// FULL deque size — so we pass the full snapshot here and let the
+	// builder apply both scrolled and the bottomtotop offset.
+	std::deque<ChatLine> chat_lines;
+	Uint16 chat_scrolled = 0;
+	// Presence list (legacy uid 9 textbox, bottomtotop=false). Re-built
+	// in TickLobbyV2 whenever world.lobby.presencechanged is set.
+	std::vector<ChatLine> presence_lines;
+	// Chat input — full typed string + visible-window offset that
+	// mirrors TextInput::scrolled (advances when length >= maxwidth+scrolled).
+	std::string chat_input;
+	Uint16 chat_input_scrolled = 0;
+	// Caret blink phase. True at preview gate (legacy state_i=0 → 0%32<16
+	// is true) so the default keeps preview byte-identical.
+	bool caret_visible = true;
+};
+
+// Chat panel: chrome (bank 7 idx 11 + 14) + channel-name overlay +
+// scrollback + presence list + chat input + caret.
 //
-// At preview-gate time the channel-name overlay, scrollback textbox,
-// presence textbox and chat input itself all have empty text and
-// contribute no pixels. The scrollbar's `draw` flag defaults to false
-// (ScrollBar::ScrollBar) and the legacy renderer short-circuits with
-// src=0, so it contributes no pixels either.
-//
-// The chat input is the active object of the chat sub-interface — the
-// parent LobbyScreen calls Interface::ActiveChanged(mouse=false) after
-// chat.Build, which sets showcaret=true on it. The renderer's
-// state_i % 32 < 16 gate is true at frame 0, so the caret rect renders.
-// FilledRect(1, 11, 140) at (18, 436) mirrors DrawTextInput's rect:
-// width=1, height=(int)(14 * 0.8)=11, color=textinput.caretcolor=140.
-//
-// `chat_active` controls whether the caret rect is emitted. When the lobby
-// shell switches focus to a right-side panel (e.g. game_create), the legacy
-// flow clears chatiface->activeobject and re-runs ActiveChanged, which
-// flips chatinput->showcaret to false → no caret. Mirror that by passing
-// false here when the chat sub-interface isn't the lobby's active object.
-Node BuildChatPanel(const Context & ctx, bool chat_active = true);
+// `chat_active` controls whether the chat input is the active object of
+// the lobby's sub-interface. When false (right-side panel like
+// game_create owns focus), the input text dims and the caret rect is
+// suppressed. Mirrors the legacy ShowGameCreate/ShowGameTech ->
+// chatiface->activeobject = 0 -> ActiveChanged -> chatinput.showcaret = false
+// chain. Default true for the standalone preview.
+Node BuildChatPanel(const Context & ctx, const ChatPanelState & state = {},
+                    bool chat_active = true);
 
 }  // namespace v2
 }  // namespace ui

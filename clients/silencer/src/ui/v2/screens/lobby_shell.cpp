@@ -45,7 +45,7 @@ Node BuildLobby(const Context & ctx, const LobbyHandlers & handlers, const Lobby
 			.at(473, 29)
 			.onClick(handlers.on_go_back),
 		BuildCharacterPanel(ctx, state.character),
-		BuildChatPanel(ctx, chat_active),
+		BuildChatPanel(ctx, state.chat, chat_active),
 	};
 	// Map-name overlay (uid 8 in the legacy). Empty at preview gate /
 	// preview-gate state — emit only when the live engine has filled it
