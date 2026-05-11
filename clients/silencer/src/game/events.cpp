@@ -347,23 +347,31 @@ bool Game::HandleSDLEvents(void){
 			}break;
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:{
 				if(event.button.button == SDL_BUTTON_LEFT){
-					int w, h;
-					SDL_GetWindowSize(window, &w, &h);
-					int lx = (int)((float(event.button.x) / w) * 640);
-					int ly = (int)((float(event.button.y) / h) * 480);
-					if(IsV2ModalActive()){
-						// v2 modal intercepts clicks before any per-state path.
-						DispatchV2ModalClick(lx, ly);
-						break;
-					}
 					int logical_w, logical_h, scale;
 					Renderer::ComputeUIDims(window, logical_w, logical_h, scale);
-					if(active_runtime && active_runtime->DispatchMouseDown(lx, ly, logical_w, logical_h, scale)){
+					// v2 logical coords = pixel coords / scale. Matches the
+					// Path B renderer (P22) which blits sprites at integer
+					// scale into a window-sized screenbuffer.
+					int lx_v2 = (int)(event.button.x / scale);
+					int ly_v2 = (int)(event.button.y / scale);
+					if(IsV2ModalActive()){
+						// v2 modal intercepts clicks before any per-state path.
+						DispatchV2ModalClick(lx_v2, ly_v2);
+						break;
+					}
+					if(active_runtime && active_runtime->DispatchMouseDown(lx_v2, ly_v2, logical_w, logical_h, scale)){
 						// Runtime consumed the click.
 					}else{
+						// Legacy iface renders into a fixed 640x480 screenbuffer
+						// that SDL stretches to the window — map window pixels
+						// back to 640x480 logical space.
+						int w, h;
+						SDL_GetWindowSize(window, &w, &h);
+						int lx_legacy = (int)((float(event.button.x) / w) * 640);
+						int ly_legacy = (int)((float(event.button.y) / h) * 480);
 						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 						if(iface){
-							iface->ProcessMousePress(world, true, (float)lx, (float)ly);
+							iface->ProcessMousePress(world, true, (float)lx_legacy, (float)ly_legacy);
 						}
 					}
 				}
@@ -390,17 +398,19 @@ bool Game::HandleSDLEvents(void){
 				}
 			}break;
 			case SDL_EVENT_MOUSE_MOTION:{
-				int w, h;
-				SDL_GetWindowSize(window, &w, &h);
-				int lx = (int)((float(event.motion.x) / w) * 640);
-				int ly = (int)((float(event.motion.y) / h) * 480);
 				if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY || state == GameState::LOBBYCONNECT || state == GameState::LOBBY || IsV2ModalActive()){
 					// Feed v2 render hover styling. Always update; the v2
 					// render pass reads ui_v2_mouse_{x,y} next frame. Also
 					// applies whenever a v2 modal is overlaid on a non-v2 state.
-					ui_v2_mouse_x = lx;
-					ui_v2_mouse_y = ly;
+					int logical_w, logical_h, scale;
+					Renderer::ComputeUIDims(window, logical_w, logical_h, scale);
+					ui_v2_mouse_x = (int)(event.motion.x / scale);
+					ui_v2_mouse_y = (int)(event.motion.y / scale);
 				}else{
+					int w, h;
+					SDL_GetWindowSize(window, &w, &h);
+					int lx = (int)((float(event.motion.x) / w) * 640);
+					int ly = (int)((float(event.motion.y) / h) * 480);
 					Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 					if(iface){
 						iface->ProcessMouseMove(world, (float)lx, (float)ly);
