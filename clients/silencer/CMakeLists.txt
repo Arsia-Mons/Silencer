@@ -31,6 +31,14 @@ endif()
 # Updater class, FetchMapFromServer, and FetchActorDefs/FetchBehaviorTrees
 # are referenced from Game, the lobby UI, and the in-game flow, so
 # swapping bodies is less invasive than excluding the files.
+#
+# relay.cpp is server-only — it binds a TCP listen socket for browser
+# WebSocket connections. The browser is its consumer, not its host,
+# so we drop it from the WASM source list. No call sites in the
+# browser code reference Relay, so excluding it is clean.
+if(EMSCRIPTEN)
+	list(FILTER sources EXCLUDE REGEX "/src/net/relay\\.(cpp|h)$")
+endif()
 
 # Extra files that get bundled into the .app on macOS (icon + shared/assets/).
 set(bundle_extras "")

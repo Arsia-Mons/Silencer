@@ -3,6 +3,7 @@
 #ifndef __EMSCRIPTEN__
 #include "cocoawrapper.h"
 #include "updaterstage2.h"
+#include "relay.h"
 #endif
 #include <vector>
 #ifdef __APPLE__
@@ -240,6 +241,28 @@ int main(int argc, char * argv[]){
 		if(strcmp(argv[i], "--self-update-stage2") == 0){
 			return UpdaterStage2::Run(argc, argv);
 		}
+	}
+	// --relay <lobbyaddr> <lobbyport> <gameid> [--ws-port=N]
+	// Server-side WASM spectator relay mode (Stage 2 of
+	// docs/plans/2026-05-10-wasm-spectator.md). Headless C++ binary
+	// fans the game's UDP snapshots out over WebSocket to N browser
+	// clients.
+	if(argc >= 2 && strcmp(argv[1], "--relay") == 0){
+		if(argc < 5){
+			fprintf(stderr, "usage: silencer --relay <lobbyaddr> <lobbyport> <gameid> [--ws-port=N]\n");
+			return 2;
+		}
+		const char *lobbyAddr = argv[2];
+		unsigned short lobbyPort = (unsigned short)atoi(argv[3]);
+		Uint32 gameId = (Uint32)strtoul(argv[4], nullptr, 10);
+		unsigned short wsPort = 15174;
+		for(int i = 5; i < argc; i++){
+			if(strncmp(argv[i], "--ws-port=", 10) == 0){
+				wsPort = (unsigned short)atoi(argv[i] + 10);
+			}
+		}
+		Relay relay;
+		return relay.Run(lobbyAddr, lobbyPort, gameId, wsPort);
 	}
 #endif
 
