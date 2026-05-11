@@ -338,10 +338,6 @@ private:
 	// Game (states being migrated one at a time).
 	std::unique_ptr<ui::v2::Runtime> active_runtime;
 	void SetRuntime(Uint8 new_state);
-	// Rendered + dispatched from the same Loop/events.cpp call sites
-	// as MainMenu.
-	bool RenderOptionsV2();
-	void DispatchOptionsV2Click(int logical_x, int logical_y);
 	// Same shape for OPTIONSDISPLAY state. Live state (Config.fullscreen,
 	// Config.scalefilter) is read inside RenderOptionsDisplayV2 and passed
 	// into BuildOptionsDisplay so the off/on indicator sprites reflect the

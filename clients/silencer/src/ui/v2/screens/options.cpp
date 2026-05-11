@@ -1,7 +1,17 @@
 #include "options.h"
 
 #include "context.h"
+#include "dispatch.h"
+#include "layout.h"
 #include "node.h"
+#include "render.h"
+
+#include "game.h"
+#include "game_state.h"
+#include "screen_context.h"
+#include "world.h"
+#include "renderer.h"
+#include "surface.h"
 
 namespace ui {
 namespace v2 {
@@ -23,6 +33,67 @@ Node BuildOptions(const Context & ctx, const OptionsHandlers & handlers)
 		Button("Audio")   .at(-89,  -38).onClick(handlers.on_audio),
 		Button("Go Back") .at(-89,   15).onClick(handlers.on_go_back),
 	});
+}
+
+// -----------------------------------------------------------------------------
+// OptionsRuntime — engine wire-in for GameState::OPTIONS.
+// -----------------------------------------------------------------------------
+
+namespace {
+
+OptionsHandlers BuildOptionsHandlers(ScreenContext & sctx){
+	OptionsHandlers h;
+	h.on_controls = [&sctx](){ sctx.GoToState(GameState::OPTIONSCONTROLS); };
+	h.on_display  = [&sctx](){ sctx.GoToState(GameState::OPTIONSDISPLAY); };
+	h.on_audio    = [&sctx](){ sctx.GoToState(GameState::OPTIONSAUDIO); };
+	h.on_go_back  = [&sctx](){ sctx.GoToState(GameState::MAINMENU); };
+	return h;
+}
+
+}  // namespace
+
+OptionsRuntime::OptionsRuntime(World & world, ScreenContext & sctx)
+	: world_(world), sctx_(sctx) {}
+
+void OptionsRuntime::Render(Surface & target, ::Renderer & renderer,
+                             int mouse_x, int mouse_y, float dt){
+	Context ctx{
+		world_.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world_.GetVersion(),
+	};
+	ctx.mouse_x = mouse_x;
+	ctx.mouse_y = mouse_y;
+	ctx.state   = &state_;
+	ctx.dt      = dt;
+
+	OptionsHandlers handlers = BuildOptionsHandlers(sctx_);
+	target.Clear(0);
+	state_.BeginFrame();
+	Node tree = BuildOptions(ctx, handlers);
+	Layout(tree, ctx);
+	::ui::v2::Render(tree, ctx, target, renderer);
+	state_.EndFrame();
+}
+
+bool OptionsRuntime::DispatchMouseDown(int mouse_x, int mouse_y){
+	Context ctx{
+		world_.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world_.GetVersion(),
+	};
+	ctx.mouse_x = mouse_x;
+	ctx.mouse_y = mouse_y;
+	ctx.state   = &state_;
+	OptionsHandlers handlers = BuildOptionsHandlers(sctx_);
+	Node tree = BuildOptions(ctx, handlers);
+	Layout(tree, ctx);
+	DispatchClick(tree, ctx);
+	return true;
 }
 
 }  // namespace v2
