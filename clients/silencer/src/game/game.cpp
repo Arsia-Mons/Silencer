@@ -2043,6 +2043,9 @@ static ui::v2::LobbyHandlers BuildLobbyV2Handlers(Game * game){
 	h.game_join.on_ready             = [game](){ game->LobbyV2GameJoinReady(); };
 	h.game_join.on_change_team       = [game](){ game->LobbyV2GameJoinChangeTeam(); };
 	h.game_join.on_choose_tech       = [game](){ game->LobbyV2ShowGameTech(); };
+	h.game_tech.on_back_to_teams     = [game](){ game->LobbyV2ShowGameJoin(); };
+	h.game_tech.on_toggle_tech       = [game](int idx){ game->LobbyV2GameTechToggle(idx); };
+	h.game_tech.on_select_tech       = [game](int idx){ game->LobbyV2GameTechSelect(idx); };
 	return h;
 }
 
@@ -2353,6 +2356,7 @@ bool Game::RenderLobbyV2(){
 	RefreshLobbyV2GameSelectState();
 	RefreshLobbyV2GameCreateState();
 	RefreshLobbyV2GameJoinState();
+	RefreshLobbyV2GameTechState();
 	ui::v2::LobbyHandlers handlers = BuildLobbyV2Handlers(this);
 	screenbuffer.Clear(0);
 	ui_v2_state.BeginFrame();
@@ -2451,6 +2455,45 @@ void Game::DispatchLobbyV2Click(int logical_x, int logical_y){
 			ui_v2_lobby_state->game_create.name_active = false;
 			ui_v2_lobby_state->game_create.password_active = true;
 			return;
+		}
+	}
+
+	// Game-tech panel hit-tests. The 13x13 BCHECKBOX in column 3 (local
+	// peer) is interactive — toggling fires LobbyV2GameTechToggle. The
+	// per-row tech-name label (col 3, ~150x10) is the description-anchor
+	// hover/click — firing LobbyV2GameTechSelect.
+	if(ui_v2_lobby_state->active_panel == ui::v2::LobbyActivePanel::GameTech){
+		const auto & gs = ui_v2_lobby_state->game_tech;
+		// Local-peer column lives at x = 410 + 3*14 = 452, w = 13, h = 13.
+		// Rows step every 13px starting at y = 125.
+		const int local_box_x  = 452;
+		const int local_box_w  = 13;
+		const int local_box_h  = 13;
+		const int row_y0       = 125;
+		const int row_dy       = 13;
+		// Tech-name label (col 3) lives at x = 467 (425 + 3*14), y =
+		// 127 + ipos*13. Width is the rendered label length; legacy hit
+		// box is the Overlay::MouseInside which uses sprite anchor, but
+		// the v2 Label has no sprite — approximate with the label's
+		// pixel length (text width is 6).
+		const int label_x      = 467;
+		const int label_y_off  = 2;
+		const int label_h      = 8;
+		for(size_t r = 0; r < gs.items.size(); r++){
+			int box_y = row_y0 + (int)r * row_dy;
+			if(logical_x >= local_box_x && logical_x < local_box_x + local_box_w &&
+			   logical_y >= box_y       && logical_y < box_y + local_box_h){
+				LobbyV2GameTechToggle((int)r);
+				return;
+			}
+			int lab_y = box_y + label_y_off;
+			int lab_w = (int)gs.items[r].label.size() * 6;
+			if(lab_w > 0 &&
+			   logical_x >= label_x && logical_x < label_x + lab_w &&
+			   logical_y >= lab_y   && logical_y < lab_y + label_h){
+				LobbyV2GameTechSelect((int)r);
+				return;
+			}
 		}
 	}
 
@@ -2909,7 +2952,194 @@ void Game::LobbyV2ShowGameTech(){
 	world.choosingtech = true;
 	ShowTeamOverlays(false);
 	world.RequestPeerList();
+	// Reset the v2 panel state — clears any leftover tech-name / desc /
+	// per-row data from a previous visit (mirrors the legacy
+	// ShowGameTech path that destroys + reconstructs GameTechPanel).
+	ui_v2_lobby_state->game_tech = ui::v2::GameTechState{};
 	ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameTech;
+}
+
+// Mirror of GameTechPanel::Tick (clients/silencer/src/ui/screens/lobby/
+// panels/game_tech_panel.cpp). Rebuilds slots-left, per-row checkbox
+// state, peer-column headers, and the selected-tech name/description
+// from world.buyableitems / world.peerlist / world.lobby. Run per-render
+// from RenderLobbyV2 so the v2 build sees current data each frame.
+void Game::RefreshLobbyV2GameTechState(){
+	if(ui_v2_lobby_state->active_panel != ui::v2::LobbyActivePanel::GameTech) return;
+	ui::v2::GameTechState & gs = ui_v2_lobby_state->game_tech;
+
+	int techslotsleft = 0;
+	Peer * localpeer = world.peerlist[world.localpeerid];
+	Team * team = world.GetPeerTeam(world.localpeerid);
+
+	// Slots-left counter (legacy uid 70). Recover from missing peerlist
+	// packet by re-requesting on a 12-tick cadence when localpeer is
+	// unknown — mirrors the legacy fallback.
+	if(localpeer){
+		User * user = world.lobby.GetUserInfo(localpeer->accountid);
+		if(user && team){
+			techslotsleft = user->agency[team->agency].techslots - world.TechSlotsUsed(*localpeer);
+			gs.slots_left_text = "Tech slots left: " + std::to_string(techslotsleft);
+		}else{
+			gs.slots_left_text.clear();
+		}
+	}else{
+		gs.slots_left_text.clear();
+		if(world.tickcount % 12 == 0){
+			world.RequestPeerList();
+		}
+	}
+
+	if(!team){
+		gs.items.clear();
+		for(int i = 0; i < 3; i++) gs.peer_cols[i] = ui::v2::GameTechPeerCol{};
+		return;
+	}
+
+	// Build the visible-row item list once (filter mirrors GameTechPanel::
+	// Build). The same iteration order is used for the peer columns below
+	// so per-peer index alignment matches the legacy 110+30*x+i uid scheme.
+	struct VisibleItem { BuyableItem * item; int local_button_idx; };
+	std::vector<VisibleItem> visible;
+	visible.reserve(world.buyableitems.size());
+	int b = 0;
+	for(auto * buyableitem : world.buyableitems){
+		if(buyableitem->techslots){
+			if(buyableitem->agencyspecific == -1 || buyableitem->agencyspecific == team->agency){
+				visible.push_back({buyableitem, b});
+			}
+			b++;
+		}
+	}
+
+	gs.items.assign(visible.size(), ui::v2::GameTechItem{});
+
+	// Per-row label for the local-peer (col 3) column.
+	for(size_t r = 0; r < visible.size(); r++){
+		BuyableItem * buyableitem = visible[r].item;
+		gs.items[r].label = std::string(buyableitem->name) + " (" +
+		                    std::to_string(buyableitem->techslots) + ")";
+	}
+
+	// Walk the team peers; for each, project per-item checkbox state into
+	// the visible-row column matching the legacy column index (peerindex
+	// for non-local peers; col 3 for the local peer).
+	int peerindex = 0;
+	for(int i = 0; i < 4; i++){
+		Peer * peer = world.peerlist[team->peers[i]];
+		User * user = peer ? world.lobby.GetUserInfo(peer->accountid) : nullptr;
+		bool draw = (i < team->numpeers);
+		bool is_local = (team->peers[i] == world.localpeerid);
+		int col = is_local ? 3 : peerindex;
+		// Header overlay for non-local peers (col 0..2). Local peer (col
+		// 3) has no header.
+		if(!is_local && peerindex < 3){
+			ui::v2::GameTechPeerCol & ph = gs.peer_cols[peerindex];
+			ph.draw = draw;
+			if(draw && user){
+				ph.name = user->name;
+				ph.name_x = (Sint16)(375 - (ph.name.length() * 6));
+			}else{
+				ph.name.clear();
+				ph.name_x = 0;
+			}
+		}
+		// Per-row checkbox state in this column.
+		for(size_t r = 0; r < visible.size(); r++){
+			BuyableItem * buyableitem = visible[r].item;
+			ui::v2::GameTechItem & row = gs.items[r];
+			row.draw[col]    = draw;
+			bool checked = peer && (peer->techchoices & buyableitem->techchoice);
+			row.checked[col] = checked;
+			if(is_local){
+				bool usable = true;
+				if(buyableitem->techslots <= techslotsleft || checked){
+					// Either it fits in remaining slots, or already
+					// owned (so we can toggle it off).
+					usable = true;
+				}else{
+					usable = false;
+				}
+				row.local_usable = usable;
+				row.bright[col]  = usable ? (Uint8)64 : (Uint8)128;
+			}else{
+				row.bright[col] = 64;
+			}
+		}
+		if(!is_local){
+			peerindex++;
+		}
+	}
+}
+
+// Mirror of the BCHECKBOX clicked branch in GameTechPanel::Tick
+// (game_tech_panel.cpp:230..245). Toggles the local-peer's techchoice for
+// the visible-row item — guarded by usability so over-budget toggles are
+// silently ignored (matches the legacy `effectbrightness == 128` gate).
+void Game::LobbyV2GameTechToggle(int item_index){
+	if(ui_v2_lobby_state->active_panel != ui::v2::LobbyActivePanel::GameTech) return;
+	auto & gs = ui_v2_lobby_state->game_tech;
+	if(item_index < 0 || item_index >= (int)gs.items.size()) return;
+	if(!gs.items[item_index].local_usable) return;
+	Team * team = world.GetPeerTeam(world.localpeerid);
+	if(!team) return;
+	// Re-resolve the BuyableItem from the same filter the refresh used.
+	int seen = 0;
+	for(auto * buyableitem : world.buyableitems){
+		if(!buyableitem->techslots) continue;
+		if(buyableitem->agencyspecific != -1 && buyableitem->agencyspecific != team->agency){
+			continue;
+		}
+		if(seen == item_index){
+			Peer * lp = world.peerlist[world.localpeerid];
+			if(lp){
+				world.SetTech(lp->techchoices ^ buyableitem->techchoice);
+				Config::GetInstance().defaulttechchoices[team->agency] =
+					lp->techchoices ^ buyableitem->techchoice;
+				Config::GetInstance().Save();
+			}
+			return;
+		}
+		seen++;
+	}
+}
+
+// Mirror of the descoverlay_anchor->clicked branch in GameTechPanel::Tick
+// (game_tech_panel.cpp:248..275). Sets the bottom-of-panel tech-name and
+// 8-line description from the item's BuyableItem fields.
+void Game::LobbyV2GameTechSelect(int item_index){
+	if(ui_v2_lobby_state->active_panel != ui::v2::LobbyActivePanel::GameTech) return;
+	auto & gs = ui_v2_lobby_state->game_tech;
+	if(item_index < 0 || item_index >= (int)gs.items.size()) return;
+	Team * team = world.GetPeerTeam(world.localpeerid);
+	if(!team) return;
+	int seen = 0;
+	for(auto * buyableitem : world.buyableitems){
+		if(!buyableitem->techslots) continue;
+		if(buyableitem->agencyspecific != -1 && buyableitem->agencyspecific != team->agency){
+			continue;
+		}
+		if(seen == item_index){
+			gs.tech_name_text = std::string("-") + buyableitem->name + "-";
+			// Centred at panel midpoint x = 401 + 116; sprite font width 8.
+			gs.tech_name_x = (Sint16)(401 + (116 - ((gs.tech_name_text.length() * 8) / 2)));
+			char desc[1024];
+			std::strncpy(desc, buyableitem->description, sizeof(desc) - 1);
+			desc[sizeof(desc) - 1] = '\0';
+			int linenum = 0;
+			char * descline = std::strtok(desc, "\n");
+			while(descline && linenum < 8){
+				gs.tech_desc_lines[linenum] = descline;
+				linenum++;
+				descline = std::strtok(nullptr, "\n");
+			}
+			for(int j = linenum; j < 8; j++){
+				gs.tech_desc_lines[j].clear();
+			}
+			return;
+		}
+		seen++;
+	}
 }
 
 void Game::LobbyV2SelectAgency(Uint8 agency){

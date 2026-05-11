@@ -188,6 +188,14 @@ public:
 	// ChangeTeam. Choose Tech reuses LobbyV2ShowGameTech.
 	void LobbyV2GameJoinReady();
 	void LobbyV2GameJoinChangeTeam();
+	// Game-tech panel runtime helpers. Toggle: flips local-peer's
+	// techchoice for the visible-row item index (mirrors the BCHECKBOX
+	// clicked branch in GameTechPanel::Tick — guarded by usability + cost
+	// fits the remaining slots). Select: surfaces the item's name +
+	// description in the bottom-of-panel readout (mirrors the
+	// descoverlay_anchor->clicked branch).
+	void LobbyV2GameTechToggle(int item_index);
+	void LobbyV2GameTechSelect(int item_index);
 
 	// v2 modal stack — overlays the underlying state's render and intercepts
 	// mouse / text input when non-empty. Lobby panels (P16g) and any other
@@ -398,6 +406,11 @@ private:
 	// "Waiting..." label from host status + AllPeersDownloadedMap when
 	// world.gameplaystate == INLOBBY. Run per-render from RenderLobbyV2.
 	void RefreshLobbyV2GameJoinState();
+	// Mirror of GameTechPanel::Tick: derives slots-left counter, per-row
+	// checkbox state, per-other-peer column headers, and tech name +
+	// description from world.buyableitems / world.peerlist / world.lobby.
+	// Run per-render from RenderLobbyV2.
+	void RefreshLobbyV2GameTechState();
 	// Owned heap to keep ui::v2::LobbyState's full type out of game.h —
 	// it transitively includes the v2 panel headers and would pollute
 	// every game.h consumer. Allocated in Game() / freed in ~Game().
