@@ -2,6 +2,7 @@
 #define LOBBY_CLAY_SCREEN_H
 
 #include "lobby_screen.h"
+#include "clay_character_panel.h"
 #include <string>
 
 class Surface;
@@ -45,6 +46,12 @@ private:
 	std::string version;
 	std::string mapName;
 	bool goBackClicked = false;
+
+	// CharacterPanel state — agency selection persisted via Config +
+	// World::SetAgency on change. Replaces the legacy CharacterPanel
+	// member (still inherited from LobbyScreen, but unBuilt under the
+	// Clay path so its world-object Tick is a no-op).
+	silencer::ui::lobby_clay::CharacterPanelState characterState;
 };
 
 #endif

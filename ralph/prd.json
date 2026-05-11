@@ -104,7 +104,7 @@
       "id": "P12",
       "priority": 12,
       "name": "CharacterPanel in Clay",
-      "passes": false,
+      "passes": true,
       "spec": "Reimplement the always-on character panel as a Clay subtree inside lobby_clay/character_panel.{h,cpp} consuming the primitives. State (selected agency, stats) lives in LobbyState. Selecting an agency calls Config::Save() + World::SetAgency exactly like today (domain glue lives in the SCREEN, not the primitive). Pixdiff target: <5% vs character.png baseline.",
       "pass_check": "Pixdiff < 5.0% vs baseline. Selecting each of the 5 agencies persists and updates the stats label region.",
       "screenshot": "iter-P12.png",

@@ -14,6 +14,8 @@
 #include "clay_bridge.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
+#include "primitives/toggle.h"
+#include "clay_character_panel.h"
 
 #include <SDL3/SDL.h>
 
@@ -25,6 +27,7 @@ using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonVariant;
 using silencer::ui::primitives::BankTextBeginFrame;
 using silencer::ui::primitives::BankButtonBeginFrame;
+using silencer::ui::primitives::ToggleBeginFrame;
 
 LobbyClayScreen::LobbyClayScreen() = default;
 LobbyClayScreen::~LobbyClayScreen() = default;
@@ -164,7 +167,12 @@ void LobbyClayScreen::Build(ScreenContext & ctx)
 	Interface * lobbyiface = static_cast<Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
 	interfaceId = lobbyiface->id;
 
-	character.Build(ctx, lobbyiface);
+	// P12: character panel runs in Clay. We deliberately DO NOT call
+	// `character.Build(ctx, lobbyiface)` — that would create the legacy
+	// world Overlay/Toggle objects which would then double-render on top
+	// of the Clay subtree. The inherited `character` member's interfaceId
+	// stays 0 so its Tick is a no-op.
+	silencer::ui::lobby_clay::CharacterPanelInit(characterState);
 	chat.Build(ctx, lobbyiface);
 	gameSelect = std::unique_ptr<GameSelectPanel>(new GameSelectPanel(*this));
 	gameSelect->Build(ctx, lobbyiface);
@@ -178,6 +186,11 @@ void LobbyClayScreen::Tick(ScreenContext & ctx)
 		goBackClicked = false;
 		if(ctx.game.GoBack()) return;
 	}
+
+	// Reconcile any agency-toggle click from the previous frame's Clay
+	// layout into Config + world. Domain glue (Config::Save, SetAgency)
+	// lives here in the screen — the Toggle primitive only reports clicks.
+	silencer::ui::lobby_clay::CharacterPanelTick(characterState, ctx.world);
 
 	// Base class drives the rest: panel ticks, deferred CreateGame state
 	// machine, CONNECTED → GameJoin handoff, disconnect detection. The
@@ -202,9 +215,12 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 
 	BankTextBeginFrame();
 	BankButtonBeginFrame();
+	ToggleBeginFrame();
 
 	Clay_BeginLayout();
 	BuildChromeTree(this, version, mapName, ctx.world.resources);
+	silencer::ui::lobby_clay::BuildCharacterPanelTree(
+		characterState, ctx.world, ctx.world.resources);
 	Clay_RenderCommandArray cmds = Clay_EndLayout();
 
 	Render(ctx.game, &dst, cmds);
