@@ -95,6 +95,13 @@ struct Node {
 	Uint8  nine_bank  = 0;
 	Uint8  nine_index = 0;
 
+	// Stroke modifier: code-drawn 4-rim rectangle around the node's rect.
+	// `stroke_width == 0` ⇒ no stroke (the default — no per-frame cost for
+	// nodes that don't opt in). Coexists with sprite chrome / NineSliceFrame;
+	// either or both can be set per node.
+	Uint8  stroke_color = 0;
+	Uint8  stroke_width = 0;
+
 	// Label-only: effect color / brightness / ramp passed to
 	// `Renderer::DrawText`. Defaults match the legacy Overlay-text path
 	// (effectcolor=0, effectbrightness=128, textcolorramp=false), so
@@ -137,6 +144,7 @@ struct Node {
 	Node & withRamp(bool r = true) { text_color_ramp = r; return *this; }
 	Node & withAlpha(bool a = true) { text_alpha = a; return *this; }
 	Node & withSize(Uint16 w, Uint16 h) { fill_w = w; fill_h = h; return *this; }
+	Node & stroke(Uint8 color, Uint8 width = 1) { stroke_color = color; stroke_width = width; return *this; }
 };
 
 inline bool IsContainer(NodeKind k) {

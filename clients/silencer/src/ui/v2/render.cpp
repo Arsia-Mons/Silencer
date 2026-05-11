@@ -28,6 +28,18 @@ bool NodeRect(const Node & n, int & x, int & y, int & w, int & h){
 	return w > 0 && h > 0;
 }
 
+// Draw a 4-rim rect (code-drawn .stroke() modifier). Each rim is a filled
+// rectangle of `width` thickness inset against the box.
+void DrawStrokeRects(Renderer & renderer, Surface & target, int x, int y, int w, int h, Uint8 color, int width){
+	if(width <= 0 || w <= 0 || h <= 0) return;
+	if(width > w) width = w;
+	if(width > h) width = h;
+	renderer.DrawFilledRectangle(&target, x,             y,             x + w,         y + width,     color); // top
+	renderer.DrawFilledRectangle(&target, x,             y + h - width, x + w,         y + h,         color); // bottom
+	renderer.DrawFilledRectangle(&target, x,             y + width,     x + width,     y + h - width, color); // left
+	renderer.DrawFilledRectangle(&target, x + w - width, y + width,     x + w,         y + h - width, color); // right
+}
+
 // Draw a 9-slice border around (dst_x, dst_y, dst_w, dst_h). Corner pieces
 // are blitted 1:1; edges are tiled along their axis; the center is tiled
 // across the remaining area. Tiling is pixel-perfect — no stretching, so
@@ -219,6 +231,17 @@ void RenderNode(const Node & n, const Context & ctx, Surface & target, Renderer 
 	}
 
 	if(pushed_scissor) target.PopScissor();
+
+	// Stroke modifier — drawn AFTER children so it sits on top of any chrome
+	// the children rendered (matches CSS semantics: borders cover content).
+	// Default stroke_width=0 ⇒ no-op so byte-identity holds for every node
+	// that doesn't opt in.
+	if(n.stroke_width > 0){
+		int x, y, w, h;
+		if(NodeRect(n, x, y, w, h)){
+			DrawStrokeRects(renderer, target, x, y, w, h, n.stroke_color, n.stroke_width);
+		}
+	}
 }
 
 }  // namespace
