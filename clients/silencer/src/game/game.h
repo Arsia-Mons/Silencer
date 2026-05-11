@@ -25,7 +25,7 @@
 
 class Screen;
 class Modal;
-namespace ui { namespace v2 { struct Node; } }
+namespace ui { namespace v2 { struct Node; struct LobbyState; } }
 
 // Live-engine v2 modal entry. Overlays the underlying state's v2 (or legacy)
 // render. The stack is rendered + dispatched independently of any per-state
@@ -136,6 +136,14 @@ public:
 	// right-side panel swaps (ShowGameTech / TearDownRightPanels) when
 	// entering / leaving the tech-choice surface.
 	void ShowTeamOverlays(bool show);
+
+	// LobbyScreen-equivalent right-side panel swap helpers + Go Back. Public
+	// so v2 click handlers + per-panel items (P16g-2..7) can call them.
+	void LobbyV2HandleBack();
+	void LobbyV2ShowGameSelect();
+	void LobbyV2ShowGameCreate();
+	void LobbyV2ShowGameJoin();
+	void LobbyV2ShowGameTech();
 
 	// v2 modal stack — overlays the underlying state's render and intercepts
 	// mouse / text input when non-empty. Lobby panels (P16g) and any other
@@ -314,6 +322,19 @@ private:
 	bool RenderLobbyConnectV2();
 	void DispatchLobbyConnectV2Click(int logical_x, int logical_y);
 	void TickLobbyConnectV2();
+	// Same shape for LOBBY state. Owns the right-side panel-swap state
+	// (active_panel, map_name) and runs the legacy LobbyScreen::Tick state
+	// machine (deferred CreateGame, joininggame finalize, progress modal,
+	// CONNECTED -> GameJoin handoff, ProcessMapDownload, disconnect modal).
+	// Panel-internal click handlers are wired by the panel-specific items
+	// (P16g-2..P16g-7).
+	bool RenderLobbyV2();
+	void DispatchLobbyV2Click(int logical_x, int logical_y);
+	void TickLobbyV2();
+	// Owned heap to keep ui::v2::LobbyState's full type out of game.h —
+	// it transitively includes the v2 panel headers and would pollute
+	// every game.h consumer. Allocated in Game() / freed in ~Game().
+	std::unique_ptr<ui::v2::LobbyState> ui_v2_lobby_state;
 	// v2 modal stack render + dispatch hooks. RenderV2ModalOverlay() blits
 	// the top modal on top of whatever the per-state render already drew;
 	// DispatchV2Modal* return true when the event was consumed so the per-

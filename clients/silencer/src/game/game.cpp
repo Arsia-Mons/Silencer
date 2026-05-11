@@ -49,8 +49,11 @@
 #include "update.h"
 #include "mission_summary.h"
 #include "lobby_connect.h"
+#include "lobby_shell.h"
 #include "modals/message.h"
 #include "modals/password.h"
+#include "lobbygame.h"
+#include "serializer.h"
 #include "audio.h"
 #include "renderdevice.h"
 #include <SDL3/SDL_video.h>
@@ -121,6 +124,7 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	preview_impl[0] = 0;
 	dump_ppm_path[0] = 0;
 	preview_scale = 1;
+	ui_v2_lobby_state = std::make_unique<ui::v2::LobbyState>();
 }
 
 Game::~Game(){
@@ -664,6 +668,8 @@ bool Game::Loop(void){
 			RenderMissionSummaryV2();
 		}else if(state == LOBBYCONNECT){
 			RenderLobbyConnectV2();
+		}else if(state == LOBBY){
+			RenderLobbyV2();
 		}else{
 			renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
 		}
@@ -895,15 +901,26 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
-				PushScreen(std::make_unique<LobbyScreen>());
+				// v2 LobbyScreen — no PushScreen. Palette 2 + camera
+				// (320, 240) mirror LobbyScreen::Build's ResetPresentation(2)
+				// + camera.SetPosition. Default panel is GameSelect (the
+				// legacy Build creates gameSelect on construction).
+				renderer.palette.SetPalette(2);
+				screenbuffer.Clear(0);
+				SetColors(renderer.palette.GetColors());
+				renderer.camera.SetPosition(320, 240);
+				currentinterface = 0;
+				ui_v2_state = ui::v2::UIState{};
+				ui_v2_last_ticks = 0;
+				*ui_v2_lobby_state = ui::v2::LobbyState{};
+				ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameSelect;
+				ui_v2_lobby_state->selected_agency = Config::GetInstance().defaultagency;
 				stateisnew = false;
 			}else{
 				if(ambienceMixer.FadedIn()){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
-				// Lobby pump (state-machine + deferred-create) lives in
-				// LobbyScreen::Tick, dispatched by TickActiveScreen() at the
-				// top of Game::Tick.
+				TickLobbyV2();
 			}
 		}break;
 		case UPDATING:{
@@ -2009,6 +2026,220 @@ void Game::TickLobbyConnectV2(){
 		lobby_connect_motdprinted = true;
 	}
 	world.lobby.UnlockMutex();
+}
+
+// Lobby v2 handlers — chrome Go Back is the only wired callback at P16g-1;
+// per-panel callbacks (P16g-2..7) reuse the LobbyHandlers struct's nested
+// fields. Defaulted-empty std::function entries are safe to dispatch — the
+// v2 dispatch pass guards on `if(on_click)`.
+static ui::v2::LobbyHandlers BuildLobbyV2Handlers(Game * game){
+	ui::v2::LobbyHandlers h;
+	h.on_go_back = [game](){ game->LobbyV2HandleBack(); };
+	return h;
+}
+
+bool Game::RenderLobbyV2(){
+	Uint64 now = SDL_GetTicks();
+	float dt = (ui_v2_last_ticks == 0) ? 0.0f : (float)(now - ui_v2_last_ticks) / 1000.0f;
+	ui_v2_last_ticks = now;
+
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = ui_v2_mouse_x;
+	ctx.mouse_y = ui_v2_mouse_y;
+	ctx.state   = &ui_v2_state;
+	ctx.dt      = dt;
+
+	ui::v2::LobbyHandlers handlers = BuildLobbyV2Handlers(this);
+	screenbuffer.Clear(0);
+	ui_v2_state.BeginFrame();
+	ui::v2::Node tree = ui::v2::BuildLobby(ctx, handlers, *ui_v2_lobby_state);
+	ui::v2::Layout(tree, ctx);
+	ui::v2::Render(tree, ctx, screenbuffer, renderer);
+	ui_v2_state.EndFrame();
+	return true;
+}
+
+void Game::DispatchLobbyV2Click(int logical_x, int logical_y){
+	ui::v2::Context ctx{
+		world.resources,
+		/*logical_w=*/640,
+		/*logical_h=*/480,
+		/*scale=*/1,
+		/*version=*/world.GetVersion(),
+	};
+	ctx.mouse_x = logical_x;
+	ctx.mouse_y = logical_y;
+	ctx.state   = &ui_v2_state;
+	ui::v2::LobbyHandlers handlers = BuildLobbyV2Handlers(this);
+	ui::v2::Node tree = ui::v2::BuildLobby(ctx, handlers, *ui_v2_lobby_state);
+	ui::v2::Layout(tree, ctx);
+	ui::v2::DispatchClick(tree, ctx);
+}
+
+// Port of LobbyScreen::Tick (clients/silencer/src/ui/screens/lobby/
+// lobby_screen.cpp:106). Panel ::Tick calls deferred to P16g-2..7 — the
+// v2 panels are static at P16g-1 (preview-gate rendering only).
+void Game::TickLobbyV2(){
+	using LAP = ui::v2::LobbyActivePanel;
+	ui::v2::LobbyState & ls = *ui_v2_lobby_state;
+
+	// Lobby disconnect -> bounce back to the connect screen.
+	if(world.lobby.state == Lobby::DISCONNECTED){
+		world.Disconnect();
+		screenContext.GoToState(GameState::LOBBYCONNECT);
+		return;
+	}
+
+	// Deferred CreateGame state machine — kicked off by GameCreatePanel; runs
+	// here so it survives the panel teardown that fires on success.
+	if(ls.active_panel == LAP::GameCreate){
+		int us = mapDownloader.mapUploadState.load(std::memory_order_acquire);
+		if(us == 2){
+			mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
+			const char * pw = mapDownloader.pendingCreate.password.empty() ? nullptr : mapDownloader.pendingCreate.password.c_str();
+			world.lobby.CreateGame(
+				mapDownloader.pendingCreate.gamename.c_str(),
+				mapDownloader.pendingCreate.mapname.c_str(),
+				mapDownloader.pendingCreate.maphash,
+				pw,
+				mapDownloader.pendingCreate.securitylevel,
+				mapDownloader.pendingCreate.minlevel,
+				mapDownloader.pendingCreate.maxlevel,
+				mapDownloader.pendingCreate.maxplayers,
+				mapDownloader.pendingCreate.maxteams);
+		}else if(us == 3){
+			mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
+			creategameclicked = false;
+			if(IsV2ProgressModalActive()) PopV2Modal();
+			ShowV2Message("Could not upload map");
+		}
+		if(world.lobby.creategamestatus == 1){
+			world.lobby.creategamestatus = 0;
+			LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
+			if(lobbygame){
+				// Populate world.gameinfo from the lobby's record so the host can
+				// SendGameInfo to the dedicated server.
+				Serializer data;
+				lobbygame->Serialize(Serializer::WRITE, data);
+				world.gameinfo.Serialize(Serializer::READ, data);
+				JoinGame(*lobbygame, lobbygame->password);
+				mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
+				currentlobbygameid = lobbygame->id;
+			}
+		}else if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0){
+			world.lobby.creategamestatus = 0;
+			creategameclicked = false;
+			if(IsV2ProgressModalActive()) PopV2Modal();
+			ShowV2Message("Could not create game");
+		}
+	}
+
+	if(ls.active_panel == LAP::GameSelect || ls.active_panel == LAP::GameCreate){
+		// Joining attempt finalisation (success -> CONNECTED, failure -> IDLE).
+		if(joininggame){
+			if(world.state == World::CONNECTED){
+				joininggame = false;
+			}
+			if(world.state == World::IDLE){
+				joininggame = false;
+				if(IsV2ProgressModalActive()) PopV2Modal();
+				ShowV2Message("Unable to join game");
+			}
+		}
+		// Spinner text update for the create-game progress modal.
+		if(IsV2ProgressModalActive()){
+			std::string text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
+				? "Uploading map" : "Creating game";
+			int dots = (world.tickcount / 4) % 6;
+			if(dots > 3) dots = 6 - dots;
+			for(int i = 0; i < dots; i++) text += ".";
+			SetV2ProgressText(text);
+		}
+		// Auto-dismiss the progress modal once the create flow has settled.
+		if(IsV2ProgressModalActive() && world.lobby.creategamestatus != 100 &&
+		   mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 &&
+		   (world.state == World::CONNECTED || world.state == World::IDLE)){
+			PopV2Modal();
+			creategameclicked = false;
+		}
+		// CONNECTED transition — swap in the GameJoinPanel, refresh chat
+		// channel, set the map-name overlay.
+		if(world.state == World::CONNECTED){
+			Peer * peer = world.peerlist[world.localpeerid];
+			if(peer){
+				mapDownloader.mapexistchecked = false;
+				mapDownloader.mapjoingeneration.fetch_add(1, std::memory_order_relaxed);
+				mapDownloader.mapjoinstate.store(0, std::memory_order_relaxed);
+				if(mapDownloader.mapjointhread.joinable()) mapDownloader.mapjointhread.detach();
+				world.SetTech(Config::GetInstance().defaulttechchoices[Config::GetInstance().defaultagency]);
+				LobbyV2ShowGameJoin();
+				LobbyGame * lobbygame = world.lobby.GetGameById(currentlobbygameid);
+				if(lobbygame){
+					char temp[256];
+					ambienceMixer.GetGameChannelName(*lobbygame, temp);
+					strcpy(world.lobby.lastchannel, world.lobby.channel);
+					world.lobby.JoinChannel(temp);
+					ls.map_name = std::string(lobbygame->mapname).substr(0, 25);
+				}
+			}
+		}
+	}
+
+	mapDownloader.ProcessMapDownload();
+
+	// Disconnected-from-game modal: only when in the joined-game surface.
+	if(world.state != World::CONNECTED && !IsV2ModalActive()){
+		if(ls.active_panel == LAP::GameJoin || ls.active_panel == LAP::GameTech){
+			Game * self = this;
+			ShowV2Message("Disconnected from game", [self](){ self->GoBack(); });
+		}
+	}
+}
+
+void Game::LobbyV2HandleBack(){
+	using LAP = ui::v2::LobbyActivePanel;
+	ui::v2::LobbyState & ls = *ui_v2_lobby_state;
+	// Joined-game surfaces -> leave the session, drop the map-name overlay,
+	// swap back to the games list.
+	if(ls.active_panel == LAP::GameJoin || ls.active_panel == LAP::GameTech){
+		LeaveJoinedGame();
+		ls.map_name.clear();
+		LobbyV2ShowGameSelect();
+		return;
+	}
+	// Create-game surface -> just swap back to games list.
+	if(ls.active_panel == LAP::GameCreate){
+		world.lobby.gamesprocessed = false;
+		LobbyV2ShowGameSelect();
+		return;
+	}
+	// On the games-list surface -> pop to MAINMENU.
+	GoToState(MAINMENU);
+}
+
+void Game::LobbyV2ShowGameSelect(){
+	ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameSelect;
+}
+
+void Game::LobbyV2ShowGameCreate(){
+	ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameCreate;
+}
+
+void Game::LobbyV2ShowGameJoin(){
+	ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameJoin;
+}
+
+void Game::LobbyV2ShowGameTech(){
+	world.choosingtech = true;
+	ShowTeamOverlays(false);
+	world.RequestPeerList();
+	ui_v2_lobby_state->active_panel = ui::v2::LobbyActivePanel::GameTech;
 }
 
 namespace {

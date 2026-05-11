@@ -8,6 +8,7 @@
 #include "lobby_tech.h"
 
 #include <functional>
+#include <string>
 
 namespace ui {
 namespace v2 {
@@ -50,6 +51,10 @@ struct LobbyState {
 	GameJoinState game_join;
 	GameSelectState game_select;
 	GameTechState game_tech;
+	// Map-name overlay (legacy LobbyScreen uid 8). Empty = no label.
+	// Truncated to 25 chars by the live engine to mirror the legacy
+	// SetMapNameOverlay clamp.
+	std::string map_name;
 };
 
 // Lobby chrome plus the character panel. Remaining panels (chat /

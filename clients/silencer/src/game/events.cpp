@@ -359,6 +359,8 @@ bool Game::HandleSDLEvents(void){
 						DispatchMissionSummaryV2Click(lx, ly);
 					}else if(state == GameState::LOBBYCONNECT){
 						DispatchLobbyConnectV2Click(lx, ly);
+					}else if(state == GameState::LOBBY){
+						DispatchLobbyV2Click(lx, ly);
 					}else{
 						Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
 						if(iface){
@@ -375,7 +377,7 @@ bool Game::HandleSDLEvents(void){
 						// a stale up event.
 						break;
 					}
-					if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY || state == GameState::LOBBYCONNECT){
+					if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY || state == GameState::LOBBYCONNECT || state == GameState::LOBBY){
 						// v2 fires on mouse-down (matches preview); nothing to
 						// do on mouse-up.
 					}else{
@@ -393,7 +395,7 @@ bool Game::HandleSDLEvents(void){
 				SDL_GetWindowSize(window, &w, &h);
 				int lx = (int)((float(event.motion.x) / w) * 640);
 				int ly = (int)((float(event.motion.y) / h) * 480);
-				if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY || state == GameState::LOBBYCONNECT || IsV2ModalActive()){
+				if(state == GameState::MAINMENU || state == GameState::OPTIONS || state == GameState::OPTIONSDISPLAY || state == GameState::OPTIONSAUDIO || state == GameState::OPTIONSCONTROLS || state == GameState::UPDATING || state == GameState::MISSIONSUMMARY || state == GameState::LOBBYCONNECT || state == GameState::LOBBY || IsV2ModalActive()){
 					// Feed v2 render hover styling. Always update; the v2
 					// render pass reads ui_v2_mouse_{x,y} next frame. Also
 					// applies whenever a v2 modal is overlaid on a non-v2 state.

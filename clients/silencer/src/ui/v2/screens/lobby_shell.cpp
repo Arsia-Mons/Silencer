@@ -47,6 +47,17 @@ Node BuildLobby(const Context & ctx, const LobbyHandlers & handlers, const Lobby
 		BuildCharacterPanel(ctx, state.selected_agency),
 		BuildChatPanel(ctx, chat_active),
 	};
+	// Map-name overlay (uid 8 in the legacy). Empty at preview gate /
+	// preview-gate state — emit only when the live engine has filled it
+	// in (after CONNECTED → game-join handoff).
+	if(!state.map_name.empty()){
+		children.push_back(
+			Label(state.map_name, /*font_bank=*/135, /*font_width=*/11)
+				.at(180, 32)
+				.withColor(129)
+				.withBrightness(128 + 32)
+				.withRamp());
+	}
 	if(state.active_panel == LobbyActivePanel::GameCreate){
 		children.push_back(BuildGameCreatePanel(ctx, state.game_create, handlers.game_create, /*name_active=*/true));
 	}else if(state.active_panel == LobbyActivePanel::GameJoin){
