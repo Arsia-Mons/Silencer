@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 project(Silencer)
 
 # Emit build/compile_commands.json so clangd (Zed, VS Code C++ extension,
-# CLion fallback, etc.) can resolve includes for src/ui/v2/ and the rest
+# CLion fallback, etc.) can resolve includes for src/ui/ and the rest
 # of the include-dir list below. Pair with the .clangd file at this dir's
 # root, which points clangd at build-unity/ (the recommended preset).
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -137,19 +137,8 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/stations"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/panels"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/modals"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/main_menu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/options"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby_connect"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/update"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/panels"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/modals"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/mission_summary"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/v2"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/v2/screens"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/modals"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/net"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/updater"

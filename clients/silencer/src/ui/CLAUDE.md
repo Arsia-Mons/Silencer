@@ -1,19 +1,17 @@
-# `ui/v2/` — declarative UI library
+# `ui/` — declarative UI library
 
-Greenfield replacement for the imperative widget tree in `ui/components/`,
-`ui/screens/`, `ui/panels/`, `ui/modals/`. Ships side-by-side with the
-legacy code while screens migrate one at a time. The legacy directories
-get deleted as their last user moves over.
+Clay-backed declarative UI for the Silencer client. All menus,
+modals, and in-game overlays render through this library; the legacy
+imperative widget tree (`Object` subclasses in `world.objectlist`,
+hand-positioned with sprite-anchor coordinates, polled per-frame for
+`clicked` flags) was removed in P24–P26.
 
-## Why it exists
-
-The legacy widgets are `Object` subclasses in `world.objectlist`,
-hand-positioned with sprite-anchor-relative integer coordinates, polled
-each frame for `clicked` flags. Coding agents struggle to author them
-correctly: silent `uid` collisions, magic `res_bank` integers, dual
-`objects`/`tabobjects` lists, manual text-centering math, and
-forget-`clicked = false` re-fire bugs are routine. Documented in detail
-in the design conversation that produced this library.
+A handful of legacy widgets that aren't UI screens still live under
+`components/` — `overlay` (in-game world labels), `teambillboard`
+(team displays), `interface` (gutted shell kept only for its static
+`WordWrap` helper used by `world.cpp` and `textbox.cpp`), and `stats`
+(per-match player data, misplaced — used by `peer.h` / `user.h` /
+`mission_summary.cpp`, due for relocation).
 
 ## Shape
 
@@ -45,6 +43,10 @@ in the design conversation that produced this library.
   `<Name>Runtime` class (the engine wire-in). The two live in the same
   TU because they're tightly coupled: the Runtime calls `Build*` each
   frame, and the preview harness calls `Build*` standalone.
+  `screen_context.{h,cpp}` (the engine-side bridge passed into
+  `Build*`) lives here too.
+- **`modals/`** — v2 message + password modals. Same Build/Runtime
+  shape as screens.
 - **`runtime.h`** — abstract `Runtime` base. `Game` holds a
   `std::unique_ptr<Runtime> active_runtime` and swaps it on state
   transition via `SetRuntime(GameState)`. Per-frame, Game's render
@@ -57,6 +59,10 @@ in the design conversation that produced this library.
   runtime; intercepts mouse / key / text input when non-empty. Game
   keeps thin Show*/Pop*/Dispatch* wrappers since external callers
   (screen_context, lobby panels) use them by name.
+- **`ingame_chat.{h,cpp}` / `ingame_buy.{h,cpp}` / `ingame_tech.{h,cpp}`** —
+  in-game overlays composed on top of INGAME (not state-owned, so
+  they don't go through `SetRuntime`). Each owns its own state +
+  render + dispatch.
 
 Container expression is the **preferred** layout style for new
 screens. Absolute `.at()` is the documented escape hatch for screens
@@ -73,13 +79,18 @@ layout (e.g. MainMenu's staggered button positions).
 - **Don't `using namespace ui::v2;`** in a TU that also includes
   legacy engine headers — `ui::v2::Sprite` / `Button` / etc. share
   names with engine classes (`::Sprite`, `::Button`). Qualified
-  calls or `using ui::v2::Button;` per name are fine.
+  calls or `using ui::v2::Button;` per name are fine. (The
+  `ui::v2` namespace is a relic of the side-by-side migration; not
+  worth churning every TU to drop the `v2` segment.)
+- Adding a new screen: drop `screens/<name>.{h,cpp}` (Build factory
+  + `<Name>Runtime` class) and add one case to `Game::SetRuntime`.
+  Preview / PPM-diff support: extend `preview.cpp` with a
+  `<name>` `--preview-screen` branch.
 
-## Status
+## Preview harness
 
-- PR #1: skeleton + `BuildMainMenu` declared and pixel-equivalent to
-  `MainMenuScreen::Build` (verification harness pending in chunk 2).
-- PR #1 chunk 2: standalone preview harness (separate executable
-  target sharing the engine's render primitives) + PPM diff tool.
-- PR #2+: per-screen migrations; engine-side widget classes deleted
-  as their last user moves.
+`preview.cpp` (entered via `Game::RunPreview`) renders any registered
+screen to PPM or an interactive SDL window. Used by the dev loop and
+the (now-retired) byte-identical PPM gate against legacy. Storybook
+(`storybook.cpp`) is an interactive component playground, launched
+via `--preview-screen storybook`.

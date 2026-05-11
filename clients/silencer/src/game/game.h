@@ -154,11 +154,11 @@ public:
 	char dump_ppm_path[256];        // empty = interactive window mode
 	int  preview_scale;             // 1 if unset
 	// Render the requested screen, then either dump a PPM (one-shot) or
-	// run an SDL window loop. Defined in src/ui/v2/preview.cpp.
+	// run an SDL window loop. Defined in src/ui/preview.cpp.
 	int RunPreview();
 	// Interactive component storybook — palette + canvas + properties
-	// panel for the ui/v2 primitives. Launched via `--preview-screen
-	// storybook`. Defined in src/ui/v2/storybook.cpp.
+	// panel for the ui/ primitives. Launched via `--preview-screen
+	// storybook`. Defined in src/ui/storybook.cpp.
 	int RunStorybook();
 
 private:

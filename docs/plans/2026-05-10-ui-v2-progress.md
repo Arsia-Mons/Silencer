@@ -2,6 +2,15 @@
 
 **Companion design doc:** [2026-05-10-ui-v2-declarative-layout.md](2026-05-10-ui-v2-declarative-layout.md).
 
+> **Migration complete (2026-05-11).** Every screen, modal, and
+> in-game overlay runs on the v2 declarative library backed by Clay.
+> The legacy `ui/components/{button,scrollbar,selectbox,textbox,textinput,toggle}`,
+> `ui/screens/<area>/<name>_screen.{h,cpp}`, `ui/modals/`, and
+> `ui/panels/` directories were deleted in P24–P26. The library was
+> renamed `src/ui/v2/` → `src/ui/` in P27 (this doc retains its
+> historical phrasing). The C++ namespace stays `ui::v2` — not worth
+> the churn to drop the `v2` segment from every TU.
+
 This doc is **mutable**. Each session updates the checklist below and
 rewrites the "Handoff prompt" section at the bottom so the next
 session can pick up cold.
@@ -215,14 +224,16 @@ unless the user explicitly OKs a redesign for it too.
 
 ### Cleanup PR (after all screens migrated)
 
-- [ ] Delete `clients/silencer/src/ui/components/`
-- [ ] Delete `clients/silencer/src/ui/panels/`
-- [ ] Delete `clients/silencer/src/ui/modals/`
-- [ ] Delete `clients/silencer/src/ui/screens/` (legacy implementations)
-- [ ] Delete widget-type `switch` arms in `interface.cpp` and
-      `renderer.cpp`
-- [ ] Retire `Game::currentinterface` global if no remaining use
-- [ ] Rename `src/ui/v2/` → `src/ui/`
+- [x] Delete legacy `clients/silencer/src/ui/components/{button,scrollbar,selectbox,textbox,textinput,toggle}` (P24).
+      `interface.{h,cpp}` retained as gutted shell for `WordWrap` static; `overlay`,
+      `teambillboard`, `stats` remain (in-game world objects / misplaced player struct).
+- [x] Delete `clients/silencer/src/ui/panels/` (no such dir survived to P26 — was rolled into screens/lobby).
+- [x] Delete `clients/silencer/src/ui/modals/` legacy (P26).
+- [x] Delete `clients/silencer/src/ui/screens/` legacy implementations (P26); kept `screen_context.{h,cpp}`.
+- [x] Delete widget-type `switch` arms in `interface.cpp` and `renderer.cpp` (P25).
+- [x] Retire `Game::currentinterface` global if no remaining use (still alive — used by v2 lobby's
+      tab-input tracking; kept as `Uint16` slot, no legacy widget surface left).
+- [x] Rename `src/ui/v2/` → `src/ui/` (P27).
 
 ## Discovered quirks (worth remembering)
 
