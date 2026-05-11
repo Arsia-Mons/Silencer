@@ -18,6 +18,7 @@
 #include "layout.h"
 #include "node.h"
 #include "render.h"
+#include "render_commands.h"
 #include "ui_state.h"
 #include "main_menu.h"
 #include "options.h"
@@ -294,11 +295,14 @@ int Game::RunPreview()
 		{
 			ui::v2::Context ctx = make_ctx(with_state);
 			if(strcmp(preview_screen, "main_menu") == 0){
-				if(ctx.state) ctx.state->BeginFrame();
-				ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
-				ui::v2::Layout(tree, ctx);
-				ui::v2::Render(tree, ctx, screenbuffer, renderer);
-				if(ctx.state) ctx.state->EndFrame();
+				ui::v2::EnsureClayContext(ctx);
+				Clay_SetPointerState(Clay_Vector2{ (float)ctx.mouse_x, (float)ctx.mouse_y }, false);
+				Clay_UpdateScrollContainers(false, Clay_Vector2{ 0.0f, 0.0f }, ctx.dt);
+				Clay_SetLayoutDimensions(Clay_Dimensions{ (float)ctx.logical_w, (float)ctx.logical_h });
+				Clay_BeginLayout();
+				ui::v2::RenderMainMenu(ctx, handlers);
+				Clay_RenderCommandArray cmds = Clay_EndLayout();
+				ui::DrawRenderCommands(cmds, renderer, screenbuffer, ctx.scale);
 			}else if(strcmp(preview_screen, "options") == 0){
 				if(ctx.state) ctx.state->BeginFrame();
 				ui::v2::Node tree = ui::v2::BuildOptions(ctx, options_handlers);
@@ -454,9 +458,12 @@ int Game::RunPreview()
 					// Hit-test consults rect_* for layout-managed buttons,
 					// so the same layout pass must run before dispatch.
 					if(strcmp(preview_screen, "main_menu") == 0){
-						ui::v2::Node tree = ui::v2::BuildMainMenu(ctx, handlers);
-						ui::v2::Layout(tree, ctx);
-						ui::v2::DispatchClicks(tree, ctx);
+						ui::v2::EnsureClayContext(ctx);
+						Clay_SetLayoutDimensions(Clay_Dimensions{ (float)ctx.logical_w, (float)ctx.logical_h });
+						Clay_BeginLayout();
+						ui::v2::RenderMainMenu(ctx, handlers);
+						(void)Clay_EndLayout();
+						Clay_SetPointerState(Clay_Vector2{ (float)ctx.mouse_x, (float)ctx.mouse_y }, /*pointer_down=*/true);
 					}else if(strcmp(preview_screen, "options") == 0){
 						ui::v2::Node tree = ui::v2::BuildOptions(ctx, options_handlers);
 						ui::v2::Layout(tree, ctx);
