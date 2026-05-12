@@ -411,6 +411,24 @@ void Guard::InitBT(){
 		return BTResult::Success;
 	};
 
+	// StandIdle: hold standing pose for standingDurationTicks, then return Success.
+	btctx_.actions["StandIdle"] = [this](BTContext& ctx) -> BTResult {
+		const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+		const int dur = gd ? gd->standingDurationTicks : 48;
+		if(ctx.elapsedTicks() >= dur) return BTResult::Success;
+		return BTResult::Running;
+	};
+
+	// LookScan: flip mirrored on tick 0, play 24-tick scan animation (res_bank 69),
+	// then return Success. Matches legacy LOOKING state behaviour.
+	btctx_.actions["LookScan"] = [this](BTContext& ctx) -> BTResult {
+		if(ctx.elapsedTicks() == 0) mirrored = !mirrored;
+		res_bank  = 69;
+		res_index = std::min(ctx.elapsedTicks() / 4, 5);
+		if(ctx.elapsedTicks() >= 24) return BTResult::Success;
+		return BTResult::Running;
+	};
+
 	// PlayAnimation(anim_name): drive res_bank/res_index from an ActorDef AnimSequence.
 	// Returns Running each tick the animation is playing, Success on completion.
 	// Looping animations always return Running.

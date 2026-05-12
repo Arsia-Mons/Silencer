@@ -25,7 +25,7 @@
     "sel_top": {
       "type": "Selector",
       "label": "Top Selector",
-      "children": ["sel_combat", "sel_ladder_combat", "leaf_uncrouch", "sel_engage", "seq_patrol", "leaf_stand"],
+      "children": ["sel_combat", "sel_ladder_combat", "leaf_uncrouch", "sel_engage", "seq_patrol", "seq_idle_scan"],
       "props": {}
     },
 
@@ -136,11 +136,20 @@
     "seq_patrol": {
       "type": "Sequence",
       "label": "Patrol",
-      "children": ["cond_patrol2", "leaf_patrol"],
+      "children": ["cond_patrol2", "leaf_patrol", "leaf_stand_idle", "leaf_look_scan"],
       "props": {}
     },
     "cond_patrol2": { "type": "Condition", "label": "patrol?",    "children": [], "props": { "key": "patrol", "value": true } },
     "leaf_patrol":  { "type": "Leaf",      "label": "Patrol walk","children": [], "props": { "action": "Patrol" } },
+
+    "seq_idle_scan": {
+      "type": "Sequence",
+      "label": "Stand then scan",
+      "children": ["leaf_stand_idle", "leaf_look_scan"],
+      "props": {}
+    },
+    "leaf_stand_idle": { "type": "Leaf", "label": "StandIdle", "children": [], "props": { "action": "StandIdle" } },
+    "leaf_look_scan":  { "type": "Leaf", "label": "LookScan",  "children": [], "props": { "action": "LookScan"  } },
 
     "leaf_stand": { "type": "Leaf", "label": "Stand", "children": [], "props": { "action": "Stand" } }
   },
