@@ -413,6 +413,7 @@ void Guard::InitBT(){
 
 	// StandIdle: hold standing pose for standingDurationTicks, then return Success.
 	btctx_.actions["StandIdle"] = [this](BTContext& ctx) -> BTResult {
+		xv = 0;
 		const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
 		const int dur = gd ? gd->standingDurationTicks : 48;
 		if(ctx.elapsedTicks() >= dur) return BTResult::Success;
@@ -423,6 +424,7 @@ void Guard::InitBT(){
 	// Does NOT flip mirrored — legacy LOOKING only flipped when a player was detected,
 	// which the BT's CanSee* leaves already handle.
 	btctx_.actions["LookScan"] = [this](BTContext& ctx) -> BTResult {
+		xv = 0;
 		res_bank  = 69;
 		res_index = std::min(ctx.elapsedTicks() / 4, 5);
 		if(ctx.elapsedTicks() >= 24) return BTResult::Success;
