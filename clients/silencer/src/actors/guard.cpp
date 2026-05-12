@@ -1549,6 +1549,72 @@ state_i++;
 return;
 }
 
+// LADDER: vertical movement + platform detection (mirrored from non-BT path)
+if(state == LADDER || state == SHOOTLADDERUP || state == SHOOTLADDERDOWN){
+if(state == SHOOTLADDERUP){
+yv = 0;
+if(state_i == 6) Fire(world, 6);
+if(state_i == 9) state_i = 13;
+if(state_i >= 16){
+state = LADDER;
+{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); yv = -(_gls ? _gls->ladderClimbSpeed : 5); }
+state_i = -1;
+}
+res_bank = 196;
+res_index = state_i > 8 ? 8 - (state_i - 8) : state_i;
+is_on_ladder = true;
+state_i++;
+return;
+}
+if(state == SHOOTLADDERDOWN){
+yv = 0;
+if(state_i == 6) Fire(world, 7);
+if(state_i == 9) state_i = 13;
+if(state_i >= 16){
+state = LADDER;
+{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); yv = (_gls ? _gls->ladderClimbSpeed : 5); }
+state_i = -1;
+}
+res_bank = 197;
+res_index = state_i > 8 ? 8 - (state_i - 8) : state_i;
+is_on_ladder = true;
+state_i++;
+return;
+}
+// state == LADDER
+xv = 0;
+{
+int xe = 0, ye = yv;
+Platform* platform = world.map.TestIncr(x, y, x, y, &xe, &ye, Platform::RECTANGLE | Platform::STAIRSUP | Platform::STAIRSDOWN);
+Platform* curladder = world.map.TestAABB(x, y + yv, x, y + yv, Platform::LADDER);
+if(!curladder){
+if(platform){
+currentplatformid = platform->id;
+y = platform->XtoY(x);
+state = STANDING;
+state_i = -1;
+is_on_ladder = false;
+state_i++;
+return;
+} else {
+yv = -yv;
+}
+}
+// Allow shooting from ladder (same priority as non-BT path)
+if(state_hit == 0 || [&]{ const EnemyDef* _g = GASLoader::Get().GetEnemyDef("guard-blaster"); return state_hit % (_g?_g->meleeCycleTicks:32) >= (_g?_g->meleeDelayTicks:10); }()){
+if(Look(world, 6) && CooledDown(world)){ state = SHOOTLADDERUP; state_i = -1; is_on_ladder = true; state_i++; return; }
+if(Look(world, 7) && CooledDown(world)){ state = SHOOTLADDERDOWN; state_i = -1; is_on_ladder = true; state_i++; return; }
+}
+if(state_i >= 20) state_i = 0;
+y += yv;
+}
+res_bank = 62;
+res_index = state_i;
+is_on_ladder = true;
+state_i++;
+return;
+}
+
 // Default idle animation — BT leaves override below
 res_bank  = 59;
 res_index = 0;
