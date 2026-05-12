@@ -1694,11 +1694,6 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	// Write hit event to blackboard so BT can react.
 	btctx_.bbSet("was_hit", true);
 	btctx_.bbSet("health_pct", health > 0 ? (float)health / (float)(maxhealth > 0 ? maxhealth : 1) : 0.0f);
-	// Turn toward whoever shot us (patrol guards only — non-patrol guards use SearchAndReturn).
-	if(patrol && health > 0){
-		Object* shooter = world.GetObjectFromId(projectile.ownerid);
-		if(shooter) mirrored = (shooter->x < x);
-	}
 	// Non-patrol guard hit by player: alert so SearchAndReturn activates
 	if(!patrol && health > 0 && !chasing){
 		Object* owner = world.GetObjectFromId(projectile.ownerid);
