@@ -69,7 +69,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.22'
+          go-version: '1.24'
           cache-dependency-path: services/lobby/go.sum
 
       - name: Install C++ build deps
@@ -229,13 +229,8 @@ jobs:
               sleep 3
             done
             sudo systemctl is-active silencer-lobby
-          "
 
-      - name: Prune old releases (keep last 3)
-        env:
-          HOST: ${{ vars.DEPLOY_HOST }}
-        run: |
-          ssh -i ~/.ssh/deploy ubuntu@$HOST "
+            # Prune to last 3 releases.
             cd /opt/silencer/releases
             ls -1t | tail -n +4 | xargs -r sudo rm -rf
           "
