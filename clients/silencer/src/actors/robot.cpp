@@ -6,28 +6,27 @@
 #include "plume.h"
 #include "gasloader.h"
 
-Robot::Robot() : Object(ObjectTypes::ROBOT){
+Robot::Robot() : Object(ObjectTypes::ROBOT) {
 	requiresauthority = true;
-	state = NEW;
+	state   = NEW;
 	state_i = 0;
-	res_bank = 47;
+	res_bank  = 47;
 	res_index = 0;
 	const EnemyDef* r = GASLoader::Get().GetEnemyDef("robot");
-	maxhealth = r ? r->health : 200;
-	health    = maxhealth;
-	maxshield = r ? r->shield : 400;
-	shield    = maxshield;
-	renderpass = 2;
-	ishittable = true;
-	isbipedal = true;
-	isphysical = true;
-	{ const EnemyDef* _rd = GASLoader::Get().GetEnemyDef("robot");
-	  snapshotinterval = _rd ? _rd->snapshotInterval : 48; }
-	respawnseconds = r ? r->respawnSeconds : 45;
-	virusplanter = 0;
-	damaging = 0;
-	soundchannel = -1;
-	patrol = false;
+	maxhealth        = r ? r->health          : 200;
+	health           = maxhealth;
+	maxshield        = r ? r->shield          : 400;
+	shield           = maxshield;
+	snapshotinterval = r ? r->snapshotInterval : 48;
+	respawnseconds   = r ? r->respawnSeconds   : 45;
+	renderpass    = 2;
+	ishittable    = true;
+	isbipedal     = true;
+	isphysical    = true;
+	virusplanter  = 0;
+	damaging      = 0;
+	soundchannel  = -1;
+	patrol        = false;
 	shootcooldown = 0;
 }
 
@@ -63,17 +62,19 @@ void Robot::InitBT() {
 	// Always returns Failure so the Selector continues to Patrol (orient + move each tick).
 	btctx_.actions["LookSides"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
-		if (bt_walk_ticks_ >= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->searchTicks : 600)) return BTResult::Failure; // ReturnToSpawn handles orientation
+		const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+		if (bt_walk_ticks_ >= (rd ? rd->searchTicks : 600)) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
-		if (Look(world, 2)) { mirrored = true; }
-		else if (Look(world, 1)) { mirrored = false; }
+		if (Look(world, 2))      mirrored = true;
+		else if (Look(world, 1)) mirrored = false;
 		return BTResult::Failure;
 	};
 
 	// MeleeCheck: only from WALKING, throttled to every 40 ticks.
 	btctx_.actions["MeleeCheck"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
-		if (state_i % (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->meleeCheckInterval : 40) != 0) return BTResult::Failure;
+		const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+		if (state_i % (rd ? rd->meleeCheckInterval : 40) != 0) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
 		int x1, y1, x2, y2;
 		GetAABB(world.resources, &x1, &y1, &x2, &y2);
@@ -106,7 +107,8 @@ void Robot::InitBT() {
 		}
 		if (meleed) {
 			StopAmbience();
-			{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundFire.empty()) ? rd->soundFire : "!laserew.wav"], 64); }
+			const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+			EmitSound(world, world.resources.soundbank[(rd && !rd->soundFire.empty()) ? rd->soundFire : "!laserew.wav"], 64);
 			return BTResult::Success;
 		}
 		return BTResult::Failure;
@@ -116,9 +118,11 @@ void Robot::InitBT() {
 	btctx_.actions["Patrol"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
-		{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); xv = mirrored ? -(_gd ? _gd->speed : 4) : (_gd ? _gd->speed : 4); }
+		const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+		xv = mirrored ? -(rd ? rd->speed : 4) : (rd ? rd->speed : 4);
 		FollowGround(*this, world, xv);
-		{ int d = DistanceToEnd(*this, world); if(d >= 0 && d <= world.minwalldistance) mirrored = !mirrored; }
+		int d = DistanceToEnd(*this, world);
+		if (d >= 0 && d <= world.minwalldistance) mirrored = !mirrored;
 		return BTResult::Success;
 	};
 
@@ -138,11 +142,12 @@ void Robot::InitBT() {
 		// Orient toward spawn, drive movement directly — Patrol must not run during return.
 		mirrored = (signed(originalx) < signed(x));
 		if (abs(signed(x) - signed(originalx)) <= (_rd ? _rd->returnProximity : 20)) {
-			state = SLEEPING;
+			state   = SLEEPING;
 			state_i = -1;
 			return BTResult::Success;
 		}
-		{ const Sint8 spd = _rd ? _rd->speed : 4; xv = mirrored ? -spd : spd; }
+		const Sint8 spd = _rd ? _rd->speed : 4;
+		xv = mirrored ? -spd : spd;
 		FollowGround(*this, world, xv);
 		return BTResult::Running; // Running keeps Patrol from running this tick
 	};
@@ -202,7 +207,7 @@ void Robot::InitBT() {
 	};
 }
 
-void Robot::Serialize(bool write, Serializer & data, Serializer * old){
+void Robot::Serialize(bool write, Serializer& data, Serializer* old) {
 	Object::Serialize(write, data, old);
 	data.Serialize(write, state, old);
 	data.Serialize(write, state_i, old);
@@ -212,131 +217,125 @@ void Robot::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, shootcooldown, old);
 }
 
-void Robot::Tick(World & world){
+void Robot::Tick(World& world) {
 	Hittable::Tick(*this, world);
 	Bipedal::Tick(*this, world);
-	if(shootcooldown){
-		shootcooldown++;
-	}
-	{ const EnemyDef* _ramb = GASLoader::Get().GetEnemyDef("robot");
-	  if(state != DEAD && rand() % (_ramb ? _ramb->ambientSoundIntervalTicks : 360) == 0){
+
+	if (shootcooldown) shootcooldown++;
+
+	const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+
+	if (state != DEAD && rand() % (rd ? rd->ambientSoundIntervalTicks : 360) == 0) {
 		StopAmbience();
-		EmitSound(world, world.resources.soundbank[(_ramb && !_ramb->soundActivate.empty()) ? _ramb->soundActivate : "airlokj.wav"], 64);
-	  }
+		EmitSound(world, world.resources.soundbank[(rd && !rd->soundActivate.empty()) ? rd->soundActivate : "airlokj.wav"], 64);
 	}
+
 	InitBT();
-	{
-	// ── BT path ───────────────────────────────────────────────────────────────
+
 	if (state == WALKING) bt_walk_ticks_++;
-	else bt_walk_ticks_ = 0;
+	else                   bt_walk_ticks_ = 0;
 
 	// NEW: find starting platform on spawn
-	if(state == NEW) {
+	if (state == NEW) {
 		draw = true;
 		currentplatformid = 0;
-		if(FindCurrentPlatform(*this, world)){
-			state = patrol ? WALKING : ASLEEP;
+		if (FindCurrentPlatform(*this, world)) {
+			state   = patrol ? WALKING : ASLEEP;
 			state_i = -1;
 		} else {
 			yv += world.gravity;
-			if(yv > world.maxyvelocity) yv = world.maxyvelocity;
+			if (yv > world.maxyvelocity) yv = world.maxyvelocity;
 		}
 		state_i++; return;
 	}
 
 	// DEAD: respawn countdown
-	if(state == DEAD) {
+	if (state == DEAD) {
 		StopAmbience();
-		collidable = false;
+		collidable   = false;
 		virusplanter = 0;
 		res_bank = 48; res_index = 15;
-		if(state_i > 1) draw = false;
+		if (state_i > 1) draw = false;
 		is_dead = true; is_dying = false; is_walking = false;
-		if(state_i >= respawnseconds) {
-			state = NEW; x = originalx; y = originaly;
-			state_i = -1;
+		if (state_i >= respawnseconds) {
+			state      = NEW; x = originalx; y = originaly;
+			state_i    = -1;
 			state_warp = GASLoader::Get().player.warpTeleportTick;
 			health = maxhealth; shield = maxshield;
 		} else {
-			if(world.tickcount % GASLoader::Get().gameengine.ticksPerSecond != 0) state_i--;
+			if (world.tickcount % GASLoader::Get().gameengine.ticksPerSecond != 0) state_i--;
 		}
 		state_i++; return;
 	}
 
 	// DYING: death animation, pickup drop, plasma explosion
-	if(state == DYING) {
-		if(state_i == 0) {
-			PickUp * pickup = (PickUp *)world.CreateObject(ObjectTypes::PICKUP);
-			if(pickup){
-				pickup->type = PickUp::FILES;
-				{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); pickup->quantity = _gd ? _gd->deathDropFiles : 250; }
-				pickup->x = x; pickup->y = y - 1;
-				{ const EnemyDef* _gd2 = GASLoader::Get().GetEnemyDef("robot");
-				  pickup->xv = (world.Random() % (2 * (_gd2 ? _gd2->deathDropXVRange : 4) + 1)) - (_gd2 ? _gd2->deathDropXVRange : 4);
-				  pickup->yv = -(_gd2 ? _gd2->deathDropYV : 15); }
+	if (state == DYING) {
+		if (state_i == 0) {
+			PickUp* pickup = (PickUp*)world.CreateObject(ObjectTypes::PICKUP);
+			if (pickup) {
+				pickup->type     = PickUp::FILES;
+				pickup->quantity = rd ? rd->deathDropFiles : 250;
+				pickup->x        = x; pickup->y = y - 1;
+				pickup->xv       = (world.Random() % (2 * (rd ? rd->deathDropXVRange : 4) + 1)) - (rd ? rd->deathDropXVRange : 4);
+				pickup->yv       = -(rd ? rd->deathDropYV : 15);
 			}
 		}
-		if(state_i % 2 == 0 && state_i >= 5) {
-			Plume * plume = (Plume *)world.CreateObject(ObjectTypes::PLUME);
-			if(plume){
+		if (state_i % 2 == 0 && state_i >= 5) {
+			Plume* plume = (Plume*)world.CreateObject(ObjectTypes::PLUME);
+			if (plume) {
 				plume->type = 4;
-				plume->xv = (rand() % 17) - 8 + (xv * 8);
-				plume->yv = (rand() % 17) - 8 + (yv * 8);
+				plume->xv   = (rand() % 17) - 8 + (xv * 8);
+				plume->yv   = (rand() % 17) - 8 + (yv * 8);
 				plume->SetPosition(x + (rand() % 39) - 19, y - 5);
 				plume->state_i = 0;
 			}
 		}
-		if(state_i == 4 * 2) {
+		if (state_i == 4 * 2) {
 			StopAmbience();
-			{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128); }
+			EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128);
 		}
 		collidable = false;
-		{ const EnemyDef* _rdd = GASLoader::Get().GetEnemyDef("robot");
-		  if(state_i >= (_rdd ? _rdd->deathExplosionDelayTicks : 96)) {
-			{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128); }
+		if (state_i >= (rd ? rd->deathExplosionDelayTicks : 96)) {
+			EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128);
 			Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
 			Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
 			Sint8 ys[]  = {0, 0, 0, 0, 0, 0, 0, 0};
-			for(int i = 0; i < 6; i++){
-				PlasmaProjectile * pp = (PlasmaProjectile *)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
-				if(pp){ pp->large=false; pp->x=x; pp->y=y-1+ys[i]; pp->ownerid=id; pp->xv=xvs[i]; pp->yv=yvs[i]; }
+			for (int i = 0; i < 6; i++) {
+				PlasmaProjectile* pp = (PlasmaProjectile*)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
+				if (pp) { pp->large = false; pp->x = x; pp->y = y - 1 + ys[i]; pp->ownerid = id; pp->xv = xvs[i]; pp->yv = yvs[i]; }
 			}
 			state = DEAD; state_i = -1;
-		  }
 		}
-		if(state != DEAD) { res_bank = 48; res_index = std::min(state_i / 2, 15); }
+		if (state != DEAD) { res_bank = 48; res_index = std::min(state_i / 2, 15); }
 		is_dying = true; is_dead = false; is_walking = false;
 		state_i++; return;
 	}
 
 	// ASLEEP: manage ambient sound; BT WakeUp handles wakeup detection.
-	if(state == ASLEEP) {
-		if(soundchannel == -1) {
-			const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+	if (state == ASLEEP) {
+		if (soundchannel == -1)
 			soundchannel = EmitSound(world, world.resources.soundbank[(rd && !rd->soundAmbient.empty()) ? rd->soundAmbient : "wndloope.wav"], 32, true);
-		}
 		res_bank = 47; res_index = 0;
 	}
 
 	// WALKING: animation and footstep sounds; BT Patrol/MeleeCheck/etc. handle movement.
-	if(state == WALKING) {
-		res_bank = 45;
+	if (state == WALKING) {
+		res_bank  = 45;
 		res_index = state_i % 20;
-		if(state_i % 20 == 1) {
+		if (state_i % 20 == 1) {
 			StopAmbience();
-			{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveRight.empty()) ? rd->soundMoveRight : "robot3r.wav"], 48); }
+			EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveRight.empty()) ? rd->soundMoveRight : "robot3r.wav"], 48);
 		}
-		if(state_i % 20 == 10) {
+		if (state_i % 20 == 10) {
 			StopAmbience();
-			{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveLeft.empty()) ? rd->soundMoveLeft : "robot3l.wav"], 48); }
+			EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveLeft.empty()) ? rd->soundMoveLeft : "robot3l.wav"], 48);
 		}
 	}
 
 	btctx_.userData = &world;
-	btctx_.dt = 1.0f / GASLoader::Get().gameengine.ticksPerSecond;
+	btctx_.dt       = 1.0f / GASLoader::Get().gameengine.ticksPerSecond;
 	btctx_.bbSet("patrol", (bool)patrol);
 	bt_->tick(btctx_);
-	}
 
 	// Sync activity flags from state so BT conditions and network can read them.
 	is_walking  = (state == WALKING);
@@ -345,37 +344,35 @@ void Robot::Tick(World & world){
 	is_dying    = (state == DYING);
 	is_dead     = (state == DEAD);
 
-	if(damaging){
+	if (damaging) {
 		damaging++;
-		{ const EnemyDef* _rd = GASLoader::Get().GetEnemyDef("robot");
-		  if(damaging > (_rd ? _rd->meleeHitDuration : 24)){ damaging = 0; } }
+		if (damaging > (rd ? rd->meleeHitDuration : 24)) damaging = 0;
 	}
 	state_i++;
 }
 
-void Robot::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
+void Robot::HandleHit(World& world, Uint8 x, Uint8 y, Object& projectile) {
 	Hittable::HandleHit(*this, world, x, y, projectile);
-	if(health == 0 && state != DYING && state != DEAD){
-		state = DYING;
-		xv = 0;
+	if (health == 0 && state != DYING && state != DEAD) {
+		state   = DYING;
+		xv      = 0;
 		state_i = 0;
-		Object * owner = world.GetObjectFromId(projectile.ownerid);
-		if(owner && owner->type == ObjectTypes::PLAYER){
-			Player * player = static_cast<Player *>(owner);
-			Peer * peer = player->GetPeer(world);
-			if(peer){
-				peer->stats.robotskilled++;
-			}
+		Object* owner = world.GetObjectFromId(projectile.ownerid);
+		if (owner && owner->type == ObjectTypes::PLAYER) {
+			Player* player = static_cast<Player*>(owner);
+			Peer*   peer   = player->GetPeer(world);
+			if (peer) peer->stats.robotskilled++;
 		}
 	} else if (health > 0 && (state == ASLEEP || state == SLEEPING)) {
 		StopAmbience();
-		{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMelee.empty()) ? rd->soundMelee : "robotarm.wav"], 128); }
-		state = AWAKENING;
+		const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+		EmitSound(world, world.resources.soundbank[(rd && !rd->soundMelee.empty()) ? rd->soundMelee : "robotarm.wav"], 128);
+		state   = AWAKENING;
 		state_i = -1;
 	}
 }
 
-bool Robot::ImplantVirus(Uint16 teamid){
+bool Robot::ImplantVirus(Uint16 teamid) {
 	if(!virusplanter || virusplanter != teamid){
 		virusplanter = teamid;
 		return true;
@@ -383,7 +380,7 @@ bool Robot::ImplantVirus(Uint16 teamid){
 	return false;
 }
 
-bool Robot::Look(World & world, Uint8 direction){
+bool Robot::Look(World& world, Uint8 direction) {
 	// 0: forward target
 	// 1: forward
 	// 2: backward
@@ -476,7 +473,7 @@ bool Robot::Look(World & world, Uint8 direction){
 	return false;
 }
 
-void Robot::StopAmbience(void){
+void Robot::StopAmbience() {
 	if(soundchannel != -1){
 		const EnemyDef* _rd = GASLoader::Get().GetEnemyDef("robot");
 		Audio::GetInstance().Stop(soundchannel, _rd ? _rd->audioFadeAmbientMs : 800);
@@ -484,7 +481,7 @@ void Robot::StopAmbience(void){
 	soundchannel = -1;
 }
 
-void Robot::Melee(Object & object, World & world){
+void Robot::Melee(Object& object, World& world) {
 	damaging = 1;
 	const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
 	Object damageprojectile(ObjectTypes::FLAREPROJECTILE);
