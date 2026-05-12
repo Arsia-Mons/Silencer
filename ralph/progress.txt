@@ -1202,3 +1202,122 @@ below.)
     lobby. If a future panel migration wonders whether to set a
     `.backgroundColor`, the answer is no — black is the legacy.
 ---
+
+## 2026-05-11T19:30:00Z - C8 Final visual + functional sweep
+- Regression sweep over the completed chrome milestone. No new
+  implementation — quality-gate run + visual checkpoint + DM.
+- **Functional gates (all 5 e2e scripts):**
+  - 00_ping.sh ✓
+  - 10_navigate.sh ✓
+  - 20_screenshot.sh ✓
+  - 30_lobby_login.sh ✓
+  - 40_lobby_clay_basic.sh ✓
+  Full suite green via `bash tests/cli-agent/run.sh`.
+- **Build gate:** `cmake --build build -j` ✓ (already up-to-date).
+- **Screenshots committed** at `tests/lobby-clay/chrome-final/`:
+  - `iter-C8-charPanel.png`   — always-on left state with character
+    panel filled (claybob, level 0, stats). Same render as
+    iter-C8-gameSelect (charPanel is rendered in every state); kept
+    separate per spec.
+  - `iter-C8-gameSelect.png`  — default right-pane state (Create Game
+    button + Active Games list area).
+  - `iter-C8-gameCreate.png`  — gameCreate panel (Game Options form
+    + Select Map list + Game name input + Create button).
+  - `iter-C8-gameJoin.png`    — gameJoin panel (Choose Tech / Change
+    Team / Ready buttons stacked in middle pane). Right pane empty
+    because no actual game is joined.
+  - `iter-C8-gameTech.png`    — gameTech panel ("Back To Teams"
+    button). Right pane empty because no actual game / tech context.
+- **Pixel-sampling chrome verification (`/tmp/verify_c8_chrome.py`,
+  recipe inlined below):** scanned horizontal row y=120 across all 5
+  screenshots — found 5 vertical stroke columns at consistent
+  positions: `x=10` (char panel L), `x=227` (char panel R), `x=238`
+  (middle pane L), `x=397/398` (middle pane R / right pane L),
+  `x=629` (right pane R). y=300 scan found 4 columns: `x=10` (chat
+  box L), `x=387` (chat box R), `x=398` (right pane L), `x=629`
+  (right pane R). x=400 vertical scan found 4 horizontal strokes at
+  y=25 (title bar bottom), y=53/64 (right pane top + halo), y=454
+  (right pane bottom). Chrome geometry is byte-stable across all 5
+  right-pane states. ✓
+- **Visual findings:**
+  - Outer frame / title bar (Silencer v.00000 + Go Back) render
+    cleanly; title text has comfortable left/right padding.
+  - Character panel (claybob avatar row + 4-row stats block) lays
+    out cleanly inside its Box; LEVEL/WINS/LOSSES/XP rows breathe
+    above the bottom stroke (C5c calibration holds).
+  - Chat panel ("Lobby" channel heading + "In Lobby" / claybob)
+    renders inside its Box with channel header band visible.
+  - Right pane gameSelect, gameJoin, gameTech all render their
+    buttons / lists cleanly inside the right-pane Box.
+  - **gameCreate has a content-layout regression:** the "Game
+    Options" form labels (Security / Min level / Max level / Players
+    / Spectatable) and their values render at overlapping y
+    positions inside the middle pane. The labels read as
+    "Min" / "Maxev:" / "RLayers:" / "S etatable:" — letters from
+    consecutive rows collide. The CHROME is fine; the panel's
+    INTERIOR row layout has insufficient row gap. This was not
+    introduced by C8 (no code touched). It's either pre-existing
+    from C6 or earlier and was missed in the C6 visual review, OR
+    surfaces only at this specific aspect ratio / palette state.
+    Flagged in the DM for the user's call — outside C8's "regression
+    sweep, no new code" scope.
+- **C8 pass_check status:**
+  - All 5 e2e scripts pass ✓
+  - 5 lobby screenshots committed under tests/lobby-clay/chrome-final/ ✓
+  - Final DM sent with all 5 attached (post-progress.txt entry)
+  - progress.txt has this final entry ✓
+- **Files changed:**
+  - `tests/lobby-clay/chrome-final/iter-C8-{charPanel,gameSelect,gameCreate,gameJoin,gameTech}.png` (new)
+  - `ralph/prd.json` — C8.passes flipped false→true
+  - `ralph/progress.txt` — this entry
+- **Learnings for future iterations / follow-up work:**
+  - `lobby_show_panel --panel join|tech` followed by a Tick triggers
+    the `world.state != CONNECTED && (gameJoinActive || gameTechActive)`
+    "Disconnected from game" modal at `lobby_clay_screen.cpp:366`.
+    For UI-only screenshot capture without an actual game, call
+    `lobby_show_panel` then `screenshot` immediately — no `step
+    --frames` in between, or the modal pushes and the lobby pops.
+    The capture script at `/tmp/c8_capture.sh` documents the pattern.
+  - Stroke-pixel detection from rendered PNGs: `g >= 50 and r < 40
+    and b < 40` reliably catches palette idx 216 (rgb≈(8,84,0)) and
+    excludes glyph greens / halo greens / decorative texture. This
+    replaces the earlier `max(rgb) >= 100` predicate when the goal
+    is specifically "find chrome strokes" rather than "find text
+    glyphs". Both predicates have their place — pick the one matching
+    what you're hunting.
+  - Horizontal/vertical run-length scanning (`scan_row` / `scan_col`)
+    is a robust way to verify chrome geometry across screenshots
+    without hard-coding individual pixel coords. It catches "stroke
+    is present at expected x ranges" without being fragile to
+    1-pixel offsets.
+  - **gameCreate form row-overlap** is the only visible issue
+    flagged from this sweep. Follow-up item for a future iteration
+    (post-chrome milestone) would isolate which BuildGameCreate*
+    function builds the Game Options form and increase its row
+    childGap or row height. Not in scope here.
+- **DM sent:** "Chrome Ralph iter N · C8 final sweep · pass=true" with all 5
+  screenshots attached. Body mentions the gameCreate row-overlap
+  finding for visual sign-off.
+
+### /tmp/verify_c8_chrome.py (pattern, regen as needed)
+
+```python
+from PIL import Image
+def is_stroke(rgb):
+    r, g, b = rgb[0], rgb[1], rgb[2]
+    return g >= 50 and r < 40 and b < 40
+def scan_row(im, y):
+    px = im.load(); w = im.size[0]; runs=[]; in_run=False; start=-1
+    for x in range(w):
+        if is_stroke(px[x, y]):
+            if not in_run: start=x; in_run=True
+        else:
+            if in_run: runs.append((start, x-1)); in_run=False
+    if in_run: runs.append((start, w-1))
+    return runs
+# scan_col mirrors with x fixed, y varying.
+# Expected: y=120 → 5 stroke columns, y=300 → 4 columns,
+# x=400 → 4 horizontal strokes (title bar bottom, right pane top, right pane bottom).
+```
+
+---

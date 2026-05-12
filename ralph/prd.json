@@ -107,7 +107,7 @@
     {
       "id": "C8",
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "name": "Final visual + functional sweep",
       "spec": "End-to-end pass:\n- Re-screenshot all four right-pane states (gameSelect / gameCreate / gameJoin / gameTech) and one of the always-on left states (character panel filled in).\n- Run the full `tests/cli-agent/e2e/` suite (NOT just 40_lobby_clay_basic.sh — also 30_lobby_login, etc.).\n- Document outcomes in `progress.txt` (final summary entry).\n- Send a final DM with all 5 screenshots attached.\n\nNothing new is implemented in this iteration; it's a regression sweep + visual checkpoint.",
       "pass_check": "All 5 tests/cli-agent/e2e/*.sh scripts pass. Five lobby screenshots committed under `tests/lobby-clay/chrome-final/` (or similar). Final DM sent with all 5 attached. progress.txt has a final entry."
