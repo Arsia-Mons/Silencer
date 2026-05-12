@@ -39,20 +39,14 @@ namespace silencer::ui::lobby_clay {
 
 namespace {
 
-// Legacy GameSelectPanel coordinates — copied verbatim from
-// game_select_panel.cpp so the on-screen geometry matches one-for-one.
+// Legacy on-screen coords kept ONLY for inspector hit-rect registration —
+// dispatch is label-based; the rect is a fallback for geometric hit-testing.
 constexpr int    kListX        = 407;
 constexpr int    kListY        = 89;
 constexpr Uint16 kListW        = 214;
 constexpr Uint16 kListH        = 265;
 constexpr Uint8  kListLineH    = 14;
-constexpr int    kHeaderX      = 405;
-constexpr int    kHeaderY      = 70;
 constexpr int    kInfoX        = 405;
-// Legacy y-coords (uid→y): NAME=1@358, MAP=2@370, INFO=3@382 ("<Sec> Security
-// <spaces>*PASSWORD LOCK*"), CREATOR=4@394, LIMITS=5@406 ("MinLv:.. MaxTm:..").
-// Yes — the legacy enum names INFO/LIMITS are inverted relative to which row
-// they actually populate. We follow the y-coord positioning, not the names.
 constexpr int    kInfoNameY    = 358;
 constexpr int    kInfoMapY     = 370;
 constexpr int    kInfoSecY     = 382;
@@ -65,21 +59,31 @@ constexpr int    kBtnSpectateY = 408;
 constexpr int    kBtnCreateX   = 242;
 constexpr int    kBtnCreateY   = 68;
 
-// Sprite bank carrying the lobby chrome's scrollbar art (track idx 9, thumb
-// idx 10). Lives at panel scope until the chrome-via-primitives milestone
-// introduces a shared lobby theme.
 constexpr Uint8  kScrollbarBank = 7;
 
-// Per-frame Clay_String slab holding pointers into state.rows[].name. The
-// std::strings are pointer-stable across BuildGameSelectPanelTree's call
-// (no mutations during layout), so the slab can hand out raw c_str()s
-// without copying.
+// LobbyRightUpperBox interior layout knobs. Box at (238, 64, 160x121) with
+// 1-px border. Create Game button at screen (242, 68) → padLeft=4, padTop=4.
+constexpr uint16_t kUpperBtnPadLeft = 4;
+constexpr uint16_t kUpperBtnPadTop  = 4;
+
+// LobbyRightTallBox interior layout knobs. Box at (398, 64, 232x391) with
+// 1-px border. Successive children stack TOP_TO_BOTTOM; per-row padTop
+// reproduces legacy y-positions.
+constexpr uint16_t kTallHeadingPadLeft = 7;   // screen x=405 - box x=398
+constexpr uint16_t kTallHeadingPadTop  = 6;   // screen y=70 - box y=64
+constexpr uint16_t kTallListPadLeft    = 9;   // screen x=407 - box x=398
+constexpr uint16_t kTallListPadTop     = 4;   // 89 - (64 + 6 + 15)
+constexpr uint16_t kTallInfoBlockPadTop  = 4; // 358 - (89 + 265)
+constexpr uint16_t kTallInfoPadLeft      = 7; // screen x=405 - box x=398
+constexpr uint16_t kTallInfoRowH         = 12;// 12-px stride between info rows
+constexpr uint16_t kTallButtonPadLeft = 38;   // screen x=436 - box x=398
+constexpr uint16_t kTallButtonRowH    = 21;
+constexpr uint16_t kTallSpectatePadTop = 2;   // small gap below info block
+constexpr uint16_t kTallJoinPadTop     = 1;   // 430 - 408 - 21 = 1
+
 constexpr int kMaxRows = 256;
 Clay_String g_itemSlab[kMaxRows];
 
-// Click adapters — three button slots + state pointer for the row select
-// callback. Allocated as file-scope arrays overwritten in place each frame
-// (same pattern as character panel's 5-element adapter array).
 GameSelectPanelState * g_state = nullptr;
 
 void OnRowSelected(void * user, int index) {
@@ -112,11 +116,10 @@ Clay_String FromStd(const std::string & s) {
 	return cs;
 }
 
-// Rebuild rows from world.lobby.games. Mirrors the legacy "delete missing
-// ids, append unknown ids" two-pass loop, but here we just rebuild from
-// scratch each time gamesprocessed flips — selectedIndex tracks the
-// previously-selected gameid across rebuilds so the user's selection is
-// preserved when the lobby pushes an update.
+Clay_String StaticId(const char * s) {
+	return Clay_String{ true, static_cast<int32_t>(strlen(s)), s };
+}
+
 void RebuildRows(GameSelectPanelState & state, World & world) {
 	Uint32 prevSelectedId = 0;
 	if(state.selectedIndex >= 0 && state.selectedIndex < (int)state.rows.size()){
@@ -130,7 +133,6 @@ void RebuildRows(GameSelectPanelState & state, World & world) {
 		r.gameid = lg->id;
 		state.rows.push_back(std::move(r));
 	}
-	// Restore selection by gameid.
 	state.selectedIndex = -1;
 	if(prevSelectedId != 0){
 		for(size_t i = 0; i < state.rows.size(); ++i){
@@ -140,7 +142,6 @@ void RebuildRows(GameSelectPanelState & state, World & world) {
 			}
 		}
 	}
-	// Clamp scroll.
 	const int visible = kListH / kListLineH;
 	int maxScroll = static_cast<int>(state.rows.size()) - visible;
 	if(maxScroll < 0) maxScroll = 0;
@@ -212,9 +213,6 @@ void RecomputeInfoBlock(GameSelectPanelState & state, World & world) {
 	}
 }
 
-// Mirrors the legacy "Join" case in GameSelectPanel::Tick. Returns false
-// when join was blocked by a level check (caller already showed the
-// message); true on a normal dispatch or no-op.
 void HandleJoinClick(GameSelectPanelState & state, World & world, ScreenContext & ctx) {
 	LobbyGame * lobbygame = GetSelectedGame(state, world);
 	if(!lobbygame){
@@ -277,6 +275,17 @@ void HandleSpectateClick(GameSelectPanelState & state, World & world, ScreenCont
 	}
 }
 
+void RegisterButton(const char * label, int x, int y,
+                    void (*onClick)(void *), void * user) {
+	silencer::ui::clay_inspector::Widget w;
+	w.label = label;
+	w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.x = x; w.y = y; w.w = 156; w.h = 21;
+	w.onClick   = onClick;
+	w.clickUser = user;
+	silencer::ui::clay_inspector::Register(w);
+}
+
 }  // namespace
 
 void GameSelectPanelInit(GameSelectPanelState & state) {
@@ -305,7 +314,6 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 		world.lobby.gamesprocessed = true;
 	}
 
-	// Apply any row click from last frame's Clay layout.
 	if(state.rowClickedIndex >= 0){
 		state.selectedIndex = state.rowClickedIndex;
 		state.rowClickedIndex = -1;
@@ -316,7 +324,7 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 	if(state.createClicked){
 		state.createClicked = false;
 		owner.ShowGameCreate(ctx);
-		return;  // Build was torn down — don't touch state below.
+		return;
 	}
 	if(state.joinClicked){
 		state.joinClicked = false;
@@ -328,38 +336,40 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 	}
 }
 
-void BuildGameSelectPanelTree(GameSelectPanelState & state,
+void BuildGameSelectUpperTree(GameSelectPanelState & state,
                               Resources & resources) {
+	(void)resources;
 	g_state = &state;
 
-	// Right border chrome (bank 7 idx 8). Legacy creates this as an Overlay
-	// at (0, 0); the renderer subtracts spriteoffsetx/y before BlitSurface.
-	// Mirror by floating at (-spriteoffsetx, -spriteoffsety) so the Clay
-	// bridge's natural top-left blit lands at the same pixels.
-	const Uint16 borderW = resources.spritewidth[7][8];
-	const Uint16 borderH = resources.spriteheight[7][8];
-	const int borderX = 0 - resources.spriteoffsetx[7][8];
-	const int borderY = 0 - resources.spriteoffsety[7][8];
-	CLAY({ .id = CLAY_ID("GSelRightBorder"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(borderW)),
-	                       CLAY_SIZING_FIXED(static_cast<float>(borderH)) },
-	       },
-	       .image    = { .imageData = silencer::clay_bridge::PackImage(7, 8) },
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { static_cast<float>(borderX),
-	                                   static_cast<float>(borderY) } } }) {}
+	// Create Game button — single flex child of the Upper box.
+	CLAY({ .id = CLAY_ID("GSelBtnCreateWrap"),
+	       .layout = { .padding = { kUpperBtnPadLeft, 0,
+	                                kUpperBtnPadTop,  0 } } }) {
+		BankButton(CLAY_STRING("Create Game"),
+		           BankButtonVariant::Chrome,
+		           BankButtonOpts{},
+		           BankButtonHandle{ /*hoveredOut*/ nullptr,
+		                             /*onClick*/    &OnCreateClicked,
+		                             /*user*/       &state });
+	}
+	RegisterButton("Create Game", kBtnCreateX, kBtnCreateY,
+	               &OnCreateClicked, &state);
+}
 
-	// "Active Games" header at (405, 70), bank 134 / w8.
+void BuildGameSelectTallTree(GameSelectPanelState & state,
+                             Resources & resources) {
+	(void)resources;
+
+	// "Active Games" heading at top of Tall box.
 	CLAY({ .id = CLAY_ID("GSelHeaderWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kHeaderX, kHeaderY } } }) {
+	       .layout = { .padding = { kTallHeadingPadLeft, 0,
+	                                kTallHeadingPadTop,  0 } } }) {
 		BankText(CLAY_STRING("Active Games"),
 		         BankTextVariant::Heading,
 		         {});
 	}
 
-	// Games list ScrollList at (407, 89) size 214 x 265, lineheight 14.
+	// Games list ScrollList.
 	const int rowCount = static_cast<int>(state.rows.size());
 	const int slotCount = (rowCount < kMaxRows) ? rowCount : kMaxRows;
 	for(int i = 0; i < slotCount; ++i){
@@ -375,8 +385,8 @@ void BuildGameSelectPanelTree(GameSelectPanelState & state,
 	listOpts.scrollbarBank  = kScrollbarBank;
 
 	CLAY({ .id = CLAY_ID("GSelListWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { kListX, kListY } } }) {
+	       .layout = { .padding = { kTallListPadLeft, 0,
+	                                kTallListPadTop,  0 } } }) {
 		ScrollList(CLAY_STRING("GSelList"),
 		           g_itemSlab,
 		           slotCount,
@@ -388,8 +398,6 @@ void BuildGameSelectPanelTree(GameSelectPanelState & state,
 		                             /*user*/       &state });
 	}
 
-	// Register each row as a clickable list-row widget. Labels point into the
-	// row's std::string which is pointer-stable across this frame.
 	for(int i = 0; i < slotCount; ++i){
 		silencer::ui::clay_inspector::Widget w;
 		w.label = state.rows[i].name.c_str();
@@ -403,59 +411,47 @@ void BuildGameSelectPanelTree(GameSelectPanelState & state,
 		silencer::ui::clay_inspector::Register(w);
 	}
 
-	// Info-block text lines at (405, 358/370/382/394/406), bank 133 / w6.
-	const struct { int y; const std::string * txt; const char * id; } kInfoRows[5] = {
-		{ kInfoNameY,    &state.infoName,     "GSelInfoName" },
-		{ kInfoMapY,     &state.infoMap,      "GSelInfoMap" },
-		{ kInfoSecY,     &state.infoSecurity, "GSelInfoSec" },
-		{ kInfoCreatorY, &state.infoCreator,  "GSelInfoCreator" },
-		{ kInfoLimitsY,  &state.infoLimits,   "GSelInfoLimits" },
-	};
-	for(int i = 0; i < 5; ++i){
-		if(kInfoRows[i].txt->empty()) continue;
-		Clay_String wrapId;
-		wrapId.isStaticallyAllocated = true;
-		wrapId.length = static_cast<int32_t>(strlen(kInfoRows[i].id));
-		wrapId.chars  = kInfoRows[i].id;
-		CLAY({ .id = CLAY_SID(wrapId),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset   = { kInfoX, (float)kInfoRows[i].y } } }) {
-			BankText(FromStd(*kInfoRows[i].txt),
-			         BankTextVariant::Body,
-			         {});
+	// Info-block group: 5 fixed-height row slots stacked TOP_TO_BOTTOM.
+	// Each slot is height=12 so the layout doesn't reflow when text appears
+	// or disappears. The first slot pads down from the list bottom.
+	CLAY({ .id = CLAY_ID("GSelInfoBlock"),
+	       .layout = {
+	           .padding = { kTallInfoPadLeft, 0,
+	                        kTallInfoBlockPadTop, 0 },
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	       } }) {
+		const struct { const std::string * txt; const char * id; } kInfoRows[5] = {
+			{ &state.infoName,     "GSelInfoName" },
+			{ &state.infoMap,      "GSelInfoMap" },
+			{ &state.infoSecurity, "GSelInfoSec" },
+			{ &state.infoCreator,  "GSelInfoCreator" },
+			{ &state.infoLimits,   "GSelInfoLimits" },
+		};
+		for(int i = 0; i < 5; ++i){
+			CLAY({ .id = CLAY_SID(StaticId(kInfoRows[i].id)),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_FIXED(kTallInfoRowH) },
+			       } }) {
+				if(!kInfoRows[i].txt->empty()){
+					BankText(FromStd(*kInfoRows[i].txt),
+					         BankTextVariant::Body,
+					         {});
+				}
+			}
 		}
 	}
 
-	// Create Game button at (242, 68) — always visible.
-	const int createOffX = kBtnCreateX - resources.spriteoffsetx[7][24];
-	const int createOffY = kBtnCreateY - resources.spriteoffsety[7][24];
-	CLAY({ .id = CLAY_ID("GSelBtnCreateWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { (float)createOffX, (float)createOffY } } }) {
-		BankButton(CLAY_STRING("Create Game"),
-		           BankButtonVariant::Chrome,
-		           BankButtonOpts{},
-		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*onClick*/    &OnCreateClicked,
-		                             /*user*/       &state });
-	}
-	{
-		silencer::ui::clay_inspector::Widget w;
-		w.label = "Create Game";
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
-		w.x = kBtnCreateX; w.y = kBtnCreateY; w.w = 156; w.h = 21;
-		w.onClick   = &OnCreateClicked;
-		w.clickUser = &state;
-		silencer::ui::clay_inspector::Register(w);
-	}
-
-	// Spectate button at (436, 408) — visible only when spectatable.
-	if(state.spectateVisible){
-		const int spectateOffX = kBtnSpectateX - resources.spriteoffsetx[7][24];
-		const int spectateOffY = kBtnSpectateY - resources.spriteoffsety[7][24];
-		CLAY({ .id = CLAY_ID("GSelBtnSpectateWrap"),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset   = { (float)spectateOffX, (float)spectateOffY } } }) {
+	// Spectate button — fixed-height slot so the Join slot below sits at a
+	// stable y regardless of visibility.
+	CLAY({ .id = CLAY_ID("GSelBtnSpectateWrap"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_FIXED(kTallButtonRowH) },
+	           .padding = { kTallButtonPadLeft, 0,
+	                        kTallSpectatePadTop, 0 },
+	       } }) {
+		if(state.spectateVisible){
 			BankButton(CLAY_STRING("Spectate"),
 			           BankButtonVariant::Chrome,
 			           BankButtonOpts{},
@@ -463,22 +459,19 @@ void BuildGameSelectPanelTree(GameSelectPanelState & state,
 			                             /*onClick*/    &OnSpectateClicked,
 			                             /*user*/       &state });
 		}
-		silencer::ui::clay_inspector::Widget w;
-		w.label = "Spectate";
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
-		w.x = kBtnSpectateX; w.y = kBtnSpectateY; w.w = 156; w.h = 21;
-		w.onClick = &OnSpectateClicked;
-		w.clickUser = &state;
-		silencer::ui::clay_inspector::Register(w);
+	}
+	if(state.spectateVisible){
+		RegisterButton("Spectate", kBtnSpectateX, kBtnSpectateY,
+		               &OnSpectateClicked, &state);
 	}
 
-	// Join button at (436, 430) — visible when joinable.
-	if(state.joinVisible){
-		const int joinOffX = kBtnJoinX - resources.spriteoffsetx[7][24];
-		const int joinOffY = kBtnJoinY - resources.spriteoffsety[7][24];
-		CLAY({ .id = CLAY_ID("GSelBtnJoinWrap"),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset   = { (float)joinOffX, (float)joinOffY } } }) {
+	// Join button.
+	CLAY({ .id = CLAY_ID("GSelBtnJoinWrap"),
+	       .layout = {
+	           .padding = { kTallButtonPadLeft, 0,
+	                        kTallJoinPadTop, 0 },
+	       } }) {
+		if(state.joinVisible){
 			BankButton(CLAY_STRING("Join Game"),
 			           BankButtonVariant::Chrome,
 			           BankButtonOpts{},
@@ -486,13 +479,10 @@ void BuildGameSelectPanelTree(GameSelectPanelState & state,
 			                             /*onClick*/    &OnJoinClicked,
 			                             /*user*/       &state });
 		}
-		silencer::ui::clay_inspector::Widget w;
-		w.label = "Join Game";
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
-		w.x = kBtnJoinX; w.y = kBtnJoinY; w.w = 156; w.h = 21;
-		w.onClick = &OnJoinClicked;
-		w.clickUser = &state;
-		silencer::ui::clay_inspector::Register(w);
+	}
+	if(state.joinVisible){
+		RegisterButton("Join Game", kBtnJoinX, kBtnJoinY,
+		               &OnJoinClicked, &state);
 	}
 }
 

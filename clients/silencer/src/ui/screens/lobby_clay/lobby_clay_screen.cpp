@@ -92,6 +92,22 @@ constexpr int kChromeOuterH  = 430;   // y = 25..454
 constexpr int kTitleBarH     = 29;    // y = 25..53
 constexpr Uint8 kChromeStrokeColor = 216;  // C2 canonical lobby chrome primary
 
+// Right-pane chrome — the upside-down-L (C2 docs), composed of two side-by-
+// side Boxes that share the column at x=398. The Upper box covers the wide
+// upper area to the right of the title bar; the Tall box covers the main
+// game-info / player-list pane down to the panel-row bottom. Both float @ROOT
+// and host the active variant's subtree as flex children. Per the per-file
+// "≤ 1 floating" rule for panel files, all variant subtrees emit children
+// (no floating) into these screen-level chrome containers.
+constexpr int kRightUpperX = 238;
+constexpr int kRightUpperY = 64;
+constexpr int kRightUpperW = 160;
+constexpr int kRightUpperH = 121;
+constexpr int kRightTallX  = 398;
+constexpr int kRightTallY  = 64;
+constexpr int kRightTallW  = 232;
+constexpr int kRightTallH  = 391;
+
 // Emits the lobby chrome:
 //   • LobbyClayRoot — fullscreen 640x480, carries the LobbyBg image
 //     (bank 7 idx 1) as its own .image. C7 drops the image; the Clay
@@ -423,21 +439,62 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 		characterState, ctx.world, ctx.world.resources);
 	silencer::ui::lobby_clay::BuildChatPanelTree(
 		chatState, ctx.world, ctx.world.resources);
-	if(!gameCreateActive && !gameJoinActive && !gameTechActive){
-		silencer::ui::lobby_clay::BuildGameSelectPanelTree(
-			gameSelectState, ctx.world.resources);
-	}
-	if(gameCreateActive){
-		silencer::ui::lobby_clay::BuildGameCreatePanelTree(
-			gameCreateState, ctx.world.resources);
-	}
-	if(gameJoinActive){
-		silencer::ui::lobby_clay::BuildGameJoinPanelTree(
-			gameJoinState, ctx.world.resources);
-	}
-	if(gameTechActive){
-		silencer::ui::lobby_clay::BuildGameTechPanelTree(
-			gameTechState, ctx.world, ctx.world.resources, *this);
+
+	// LobbyRightUpperBox — chrome wrapper hosting the active variant's
+	// upper-pane subtree as flex children. ROOT-attached at (238, 64); inner
+	// children carry NO floating configs (the per-file "≤ 1 floating" rule
+	// stays satisfied for the variant panel files).
+	{
+		using silencer::ui::primitives::FormBorder;
+		CLAY({ .id = CLAY_ID("LobbyRightUpperBox"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED((float)kRightUpperW),
+		                       CLAY_SIZING_FIXED((float)kRightUpperH) },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		       },
+		       .border = FormBorder(kChromeStrokeColor),
+		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
+		                     .offset   = { (float)kRightUpperX,
+		                                   (float)kRightUpperY } } }) {
+			if(gameCreateActive){
+				silencer::ui::lobby_clay::BuildGameCreateUpperTree(
+					gameCreateState, ctx.world.resources);
+			}else if(gameJoinActive){
+				silencer::ui::lobby_clay::BuildGameJoinUpperTree(
+					gameJoinState, ctx.world.resources);
+			}else if(gameTechActive){
+				silencer::ui::lobby_clay::BuildGameTechUpperTree(
+					gameTechState, ctx.world, ctx.world.resources, *this);
+			}else{
+				silencer::ui::lobby_clay::BuildGameSelectUpperTree(
+					gameSelectState, ctx.world.resources);
+			}
+		}
+
+		CLAY({ .id = CLAY_ID("LobbyRightTallBox"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED((float)kRightTallW),
+		                       CLAY_SIZING_FIXED((float)kRightTallH) },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		       },
+		       .border = FormBorder(kChromeStrokeColor),
+		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
+		                     .offset   = { (float)kRightTallX,
+		                                   (float)kRightTallY } } }) {
+			if(gameCreateActive){
+				silencer::ui::lobby_clay::BuildGameCreateTallTree(
+					gameCreateState, ctx.world.resources);
+			}else if(gameJoinActive){
+				silencer::ui::lobby_clay::BuildGameJoinTallTree(
+					gameJoinState, ctx.world.resources);
+			}else if(gameTechActive){
+				silencer::ui::lobby_clay::BuildGameTechTallTree(
+					gameTechState, ctx.world, ctx.world.resources, *this);
+			}else{
+				silencer::ui::lobby_clay::BuildGameSelectTallTree(
+					gameSelectState, ctx.world.resources);
+			}
+		}
 	}
 	Clay_RenderCommandArray cmds = Clay_EndLayout();
 

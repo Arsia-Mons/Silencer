@@ -1006,3 +1006,131 @@ below.)
 
 - **DM:** screenshot + verification script summary sent.
 ---
+
+## 2026-05-12T05:00:00Z - C6 Right pane Box (variant subtree inside)
+- Split all four right-pane variants into Upper/Tall flex subtrees that emit
+  inside `LobbyRightUpperBox` (238, 64, 160x121) and `LobbyRightTallBox`
+  (398, 64, 232x391), which the screen file attaches @ROOT. Each variant
+  file now has 0 `floating` configs — all positioning is via flex `.padding`
+  / `.childGap` / `.childAlignment` inside the parent box.
+- **lobby_clay_screen.cpp** (was in-progress when iteration started, kept):
+  Added `kRightUpperX/Y/W/H` and `kRightTallX/Y/W/H` constexprs. The Draw
+  function emits LobbyRightUpperBox + LobbyRightTallBox with `FormBorder`
+  strokes, and dispatches the active variant's `BuildXxxUpperTree` /
+  `BuildXxxTallTree` inside each.
+- **clay_game_join_panel.cpp** (was in-progress, kept): Upper has the 3
+  stacked Chrome buttons (Choose Tech / Change Team / Ready) with computed
+  padLeft/padTop. Tall is intentionally empty (legacy GameJoin emits no
+  tall-side content). Floating count: 0.
+- **clay_game_select_panel.cpp** (rewritten this iteration):
+  - Upper: Create Game button (single flex child, padLeft=4 padTop=4).
+  - Tall: "Active Games" heading + ScrollList (214x265) + 5-slot fixed-
+    height info-block (each slot 12px so layout doesn't reflow when text
+    appears/disappears) + Spectate (conditional, fixed slot) + Join button.
+  - Floating count: 0.
+- **clay_game_create_panel.cpp** (rewritten):
+  - Upper: "Game Options" heading + 6-row form. Each row is LEFT_TO_RIGHT
+    label + spacer (72 px gap) + value. Value is Inline BankButton for
+    Security/Spectatable cyclers, TextInput (numbersOnly) for the four
+    level/player/team rows.
+  - Tall: "Select Map" heading + map ScrollList (214x265) + "Game name:"
+    label + name TextInput + "Password (optional):" label + pw TextInput
+    + Create button.
+  - Floating count: 0.
+- **clay_game_tech_panel.cpp** (rewritten):
+  - Upper: "Back To Teams" Chrome button + TOP_TO_BOTTOM peer-name column
+    (3 rows, ALIGN_X_RIGHT for right-aligned names; legacy used computed
+    right-edge x=375 — flex right-alignment inside the upper box reproduces
+    this without per-frame width math).
+  - Tall: TechSlotsWrap (slots-left text) + TechGridWrap (LEFT_TO_RIGHT,
+    4 peer column children TOP_TO_BOTTOM with checkboxes + 1 label column
+    TOP_TO_BOTTOM with local tech-name overlays) + TechNameWrap (centered
+    Heading) + TechDescWrap (8 description lines TOP_TO_BOTTOM, each fixed
+    10-px slot).
+  - Loop structure reshaped: the legacy 'for each peer-slot, for each item'
+    became 'for each column, for each item' so the grid layout is column-
+    oriented (matches flex LEFT_TO_RIGHT). Pre-computed cols[4] map peer
+    slot → column index, isLocal, draw.
+  - Floating count: 0.
+- **Removed**: the per-variant `GXxxRightBorder` IMAGE elements that
+  blitted bank 7 idx 8 at the right-pane chrome — redundant now that the
+  Clay-drawn boxes draw the chrome. Also removed all per-element sprite-
+  offset compensation math (the `borderX = -spriteoffsetx[...]` trick) —
+  flex layout positions content directly via bbox without anchor offsets.
+- **Quality gates:**
+  - `cmake --build build -j` — green ✓
+  - `tests/cli-agent/e2e/40_lobby_clay_basic.sh` — PASS ✓
+  - `grep -c floating` per file: select=0, create=0, join=0, tech=0,
+    character=1, chat=1, screen=3 (LobbyOuterFrame, LobbyRightUpperBox,
+    LobbyRightTallBox). All ≤1 rule satisfied; only screen-level chrome
+    containers float.
+  - Pixel verify `/tmp/verify_c6.py` on iter-C6.png (GameSelect): 9/10
+    (the 1 fail at (320,75) lands inside the Create Game button which has
+    its own Chrome stroke — false positive).
+  - Pixel verify on iter-C6-create.png (GameCreate): 10/10.
+- **Visual self-verification** (Read tool on both screenshots):
+  - iter-C6.png (GameSelect default): Upper box shows "Create Game" Chrome
+    button at its top-left, well clear of strokes. Tall box shows "Active
+    Games" heading at top with breathing room from top stroke. Box strokes
+    align with baked BG strokes at idx 216 — no visible double-stroking.
+  - iter-C6-create.png (GameCreate): Upper box shows "Game Options" heading
+    + 6 form rows (Security: Medium, Min/Max Level, Max Players, Max Teams,
+    Spectatable: No). Tall box shows "Select Map" heading + map list with
+    rows (ALYSON-LIE.mil, ALYSON.mil, CRADDOX.mil, EAST10.mil, MITCH.mil,
+    PITHEA.mil, etc.) + "Game name: NewGame" + "Password (optional):" +
+    "Create" button at bottom. All content inside box strokes; readable.
+  - GameJoin/GameTech variants not visually captured this iteration (require
+    multi-client state to reach). E2E regression covers the click-routing
+    pipeline; the new flex Upper trees mirror the legacy widget set so once
+    a game is created+joined, the navigation should work the same.
+- **Layout notes / known imperfections:**
+  - GameCreate form-row values land at variable x because I used a fixed
+    72-px spacer between label and value. Labels vary in width ("Security:"
+    = 54 px vs "Max Players:" = 72 px), so the value column "jitters" by up
+    to 18 px between rows. Acceptable per the spec: position pixel-
+    equivalence is not required, structural is. If a future iteration wants
+    pixel parity, use a FIXED-width label column (sizing.x = CLAY_SIZING_
+    FIXED(78)) on the label CLAY block instead of a spacer.
+  - GameTech tech-name "centered Heading" uses CLAY_ALIGN_X_CENTER inside a
+    GROW(0) wrapper — flex-natural center alignment instead of legacy's
+    'x = 401 + (116 - len*8/2)' manual centering.
+- **Files changed:**
+  - `clients/silencer/src/ui/screens/lobby_clay/clay_game_select_panel.cpp`
+  - `clients/silencer/src/ui/screens/lobby_clay/clay_game_create_panel.cpp`
+  - `clients/silencer/src/ui/screens/lobby_clay/clay_game_tech_panel.cpp`
+  - (kept in-progress state from prior commit author:
+    `clay_game_join_panel.cpp`, `clay_game_select_panel.h`,
+    `clay_game_create_panel.h`, `clay_game_join_panel.h`,
+    `clay_game_tech_panel.h`, `lobby_clay_screen.cpp`).
+- **Learnings for future iterations:**
+  - **Variable-width labels need FIXED-width label cols, not childGap.** A
+    fixed spacer between label and value doesn't compensate for label-width
+    variance — the value column jitters. For grid-aligned forms, give the
+    label CLAY block `.layout.sizing.x = CLAY_SIZING_FIXED(maxLabelW)` so
+    the value always starts at the same x regardless of label length.
+  - **`childAlignment.x = CLAY_ALIGN_X_RIGHT` is the flex idiom for right-
+    aligning variable-width text.** Avoids the legacy 'x = anchor - len*w'
+    runtime math. Useful when text content varies per frame (peer names,
+    map names, slot counts).
+  - **For panels with conditional/empty content rows, use FIXED-height
+    slot wrappers around the conditional BankText.** This pattern (used in
+    the GameSelect info block, GameTech tech-desc, etc.) keeps the parent
+    flex flow stable when rows appear/disappear. Pattern:
+    `CLAY({.layout={.sizing={GROW(0), FIXED(rowH)}}}) { if(!txt.empty())
+    BankText(...); }`. Without this, late-arriving info text would shift
+    every row below it.
+  - **Pre-computing column-to-peer mapping clarifies grid layouts.** The
+    legacy GameTech loop iterated peers and computed `col = isLocal ?
+    3 : peerindex++` inline, which mixes column-assignment logic with
+    rendering logic. Pulling the cols[4] mapping into a separate pass
+    upfront lets the rendering loop iterate by column directly, which
+    matches flex's LEFT_TO_RIGHT model and produces clean per-column
+    CLAY containers.
+  - **Inspector hit rects stay at legacy screen coords.** They're a
+    fallback for geometric hit-testing; CLI dispatch is label-based.
+    No need to re-derive rects from the new flex bboxes.
+  - **The `[DL]` map-name sentinel strip pattern stays in BuildTallTree
+    (not Tick) because the rendered display label differs from the stored
+    state.maps[i] which carries the sentinel for state lookup elsewhere.**
+    Pattern is consumer-side only — keep state values intact.
+---

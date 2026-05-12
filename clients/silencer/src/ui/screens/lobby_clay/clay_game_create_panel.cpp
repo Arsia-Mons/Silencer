@@ -5,7 +5,6 @@
 #include "clay_inspector.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
-#include "primitives/form_border.h"
 #include "primitives/scroll_list.h"
 #include "primitives/text_input.h"
 
@@ -34,7 +33,6 @@ using silencer::ui::primitives::BankTextVariant;
 using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonHandle;
 using silencer::ui::primitives::BankButtonVariant;
-using silencer::ui::primitives::FormBorder;
 using silencer::ui::primitives::ScrollList;
 using silencer::ui::primitives::ScrollListHandle;
 using silencer::ui::primitives::ScrollListOpts;
@@ -46,39 +44,47 @@ namespace silencer::ui::lobby_clay {
 
 namespace {
 
-// Legacy GameCreatePanel coordinates — pixel-identical to the legacy panel.
-constexpr int    kYOffset      = 2;
+// Legacy on-screen coords kept ONLY for inspector hit-rect registration.
 constexpr int    kYSpace       = 14;
 constexpr int    kRowHeight    = 14;
-constexpr int    kLabelX       = 247;
 constexpr int    kValueX       = 323;
 constexpr int    kFormLeft     = 243;
 constexpr int    kFormTop      = 87;
-constexpr int    kFormWidth    = 156;
-constexpr int    kFormHeight   = 93;
-// Palette index of the lobby chrome's bright-green stroke (sampled from
-// the baked BG sprite (7, 1)). Lives at panel scope until the chrome-via-
-// primitives milestone introduces a shared lobby theme.
-constexpr Uint8  kFormStroke   = 220;
-
 constexpr int    kMapListX     = 407;
 constexpr int    kMapListY     = 89;
 constexpr Uint16 kMapListW     = 214;
 constexpr Uint16 kMapListH     = 265;
 constexpr Uint8  kMapListLineH = 14;
-// Sprite bank carrying the lobby chrome's scrollbar art (track idx 9, thumb
-// idx 10). Lives at panel scope until the chrome-via-primitives milestone
-// introduces a shared lobby theme.
 constexpr Uint8  kScrollbarBank = 7;
-
 constexpr int    kNameInputX = 410, kNameInputY = 375;
 constexpr Uint16 kNameInputW = 210, kNameInputH = 14;
 constexpr int    kPwInputX   = 410, kPwInputY   = 405;
 constexpr Uint16 kPwInputW   = 210, kPwInputH   = 14;
-
 constexpr int    kCreateBtnX = 436, kCreateBtnY = 430;
 
-// Per-frame slab for the map list display strings.
+// LobbyRightUpperBox interior layout knobs. Box at (238, 64, 160x121).
+constexpr uint16_t kUpperHeadingPadLeft = 7;  // 245 - 238
+constexpr uint16_t kUpperHeadingPadTop  = 6;  // 70 - 64
+constexpr uint16_t kUpperFormPadLeft    = 5;  // 243 - 238
+constexpr uint16_t kUpperFormPadTop     = 2;  // 87 - (64 + 6 + 15)
+constexpr uint16_t kUpperFormRowH       = 14;
+constexpr uint16_t kUpperFormLabelPadLeft = 4;  // 247 - 243
+constexpr uint16_t kUpperFormValueGap    = 72;  // label takes ~12 chars × 6 = 72 → value starts near x=323
+
+// LobbyRightTallBox interior layout knobs. Box at (398, 64, 232x391).
+constexpr uint16_t kTallHeadingPadLeft = 7;   // 405 - 398
+constexpr uint16_t kTallHeadingPadTop  = 6;   // 70 - 64
+constexpr uint16_t kTallMapListPadLeft = 9;   // 407 - 398
+constexpr uint16_t kTallMapListPadTop  = 4;   // 89 - (64 + 6 + 15)
+constexpr uint16_t kTallNameLabelPadLeft = 7; // 405 - 398
+constexpr uint16_t kTallNameLabelPadTop  = 6; // 360 - (89 + 265)
+constexpr uint16_t kTallInputPadLeft     = 12;// 410 - 398
+constexpr uint16_t kTallInputPadTop      = 0; // 375 - (360 + 15)
+constexpr uint16_t kTallPwLabelPadTop    = 1; // 390 - (375 + 14)
+constexpr uint16_t kTallPwInputPadTop    = 0; // 405 - (390 + 15)
+constexpr uint16_t kTallCreatePadLeft    = 38;// 436 - 398
+constexpr uint16_t kTallCreatePadTop     = 11;// 430 - (405 + 14)
+
 constexpr int kMaxMapRows = 1024;
 Clay_String g_mapSlab[kMaxMapRows];
 
@@ -102,7 +108,7 @@ const char * SecurityLabel(Uint8 idx) {
 		case 0:  return "Off";
 		case 1:  return "Low";
 		case 3:  return "High";
-		default: return "Medium";  // 2 + fallback
+		default: return "Medium";
 	}
 }
 
@@ -159,8 +165,6 @@ void BuildMapList(GameCreatePanelState & state, ScreenContext & ctx) {
 	std::sort(maps.begin(), maps.end());
 	for(auto & m : maps) state.maps.push_back(m);
 	mapDownloader.servermaps.clear();
-	// Remote-only maps get a "[DL] " prefix key so the Create flow can detect
-	// them via servermaps lookup; the row renderer strips the prefix for display.
 	for(auto & entry : FetchServerMapList(Config::GetInstance().mapapiurl)){
 		if(std::find(maps.begin(), maps.end(), entry.first) == maps.end()){
 			std::string label = "[DL] " + entry.first;
@@ -205,9 +209,6 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		Config::GetInstance().Save();
 	}
 
-	// Deferred CreateGame state machine — mirrors LobbyScreen::Tick's
-	// `if(gameCreate)` block so the upload+CreateGame handshake completes
-	// even while the user is waiting on the progress modal.
 	int us = mapDownloader.mapUploadState.load(std::memory_order_acquire);
 	if(us == 2){
 		mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
@@ -250,7 +251,6 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 		ctx.ShowMessage("Could not create game");
 	}
 
-	// Create-button kickoff — mirrors GameCreatePanel::Tick's GCRT_BTN_CREATE case.
 	if(!state.createClicked) return;
 	state.createClicked = false;
 	if(game.creategameclicked) return;
@@ -313,107 +313,107 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	ctx.PushScreen(MessageModal::Progress("Uploading map..."));
 }
 
-void BuildGameCreatePanelTree(GameCreatePanelState & state,
+void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Resources & resources) {
-	// Right border chrome sprite (bank 7 idx 8) — float at -spriteoffset to
-	// match the legacy renderer's Overlay positioning.
-	const Uint16 borderW = resources.spritewidth[7][8];
-	const Uint16 borderH = resources.spriteheight[7][8];
-	const int borderX = -resources.spriteoffsetx[7][8];
-	const int borderY = -resources.spriteoffsety[7][8];
-	CLAY({ .id = CLAY_ID("GCrtRightBorder"),
-	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)borderW), CLAY_SIZING_FIXED((float)borderH) } },
-	       .image    = { .imageData = silencer::clay_bridge::PackImage(7, 8) },
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { (float)borderX, (float)borderY } } }) {}
+	(void)resources;
 
-	// "Game Options" header (left of form).
+	// "Game Options" heading at top.
 	CLAY({ .id = CLAY_ID("GCrtOptionsTitleWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kFormLeft + 2, 70 } } }) {
-		BankText(CLAY_STRING("Game Options"), BankTextVariant::Heading, {});
+	       .layout = { .padding = { kUpperHeadingPadLeft, 0,
+	                                kUpperHeadingPadTop,  0 } } }) {
+		BankText(CLAY_STRING("Game Options"),
+		         BankTextVariant::Heading, {});
 	}
 
-	// 1-px form border.
-	CLAY({ .id = CLAY_ID("GCrtFormBorder"),
-	       .layout = { .sizing = { CLAY_SIZING_FIXED(kFormWidth), CLAY_SIZING_FIXED(kFormHeight) } },
-	       .border   = FormBorder(kFormStroke),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kFormLeft, kFormTop } } }) {}
-
-	// Six row labels at labelX, y = form_top + i*yspace + yoffset.
+	// 6-row form: each row is LEFT_TO_RIGHT (label + value), fixed height.
 	struct LabelRow { const char * label; const char * id; };
 	constexpr LabelRow kLabels[6] = {
-		{ "Security:",    "GCrtLblSec"   },
-		{ "Min Level:",   "GCrtLblMinL"  },
-		{ "Max Level:",   "GCrtLblMaxL"  },
-		{ "Max Players:", "GCrtLblMaxP"  },
-		{ "Max Teams:",   "GCrtLblMaxT"  },
-		{ "Spectatable:", "GCrtLblSpect" },
+		{ "Security:",    "GCrtRowSec"   },
+		{ "Min Level:",   "GCrtRowMinL"  },
+		{ "Max Level:",   "GCrtRowMaxL"  },
+		{ "Max Players:", "GCrtRowMaxP"  },
+		{ "Max Teams:",   "GCrtRowMaxT"  },
+		{ "Spectatable:", "GCrtRowSpect" },
 	};
+
+	struct NumInput { const char * id; const char * label; char * buf; int cap; };
+	NumInput kTextInputs[4] = {
+		{ "GCrtMinLevel",   "Min Level",   state.minLevel,   (int)sizeof(state.minLevel)   },
+		{ "GCrtMaxLevel",   "Max Level",   state.maxLevel,   (int)sizeof(state.maxLevel)   },
+		{ "GCrtMaxPlayers", "Max Players", state.maxPlayers, (int)sizeof(state.maxPlayers) },
+		{ "GCrtMaxTeams",   "Max Teams",   state.maxTeams,   (int)sizeof(state.maxTeams)   },
+	};
+
+	// First row needs padTop from heading bottom; rest stack contiguous.
 	for(int i = 0; i < 6; ++i){
-		const float y = (float)(kFormTop + kYSpace * i + kYOffset);
+		const uint16_t rowPadTop = (i == 0) ? kUpperFormPadTop : 0;
 		CLAY({ .id = CLAY_SID(StaticId(kLabels[i].id)),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kLabelX, y } } }) {
-			BankText(FromCStr(kLabels[i].label), BankTextVariant::Body, {});
+		       .layout = {
+		           .sizing = { CLAY_SIZING_GROW(0),
+		                       CLAY_SIZING_FIXED(kUpperFormRowH) },
+		           .padding = { kUpperFormPadLeft, 0, rowPadTop, 0 },
+		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+		       } }) {
+			// Label column.
+			CLAY({ .id = CLAY_SID(StaticId((std::string("Lbl_") + kLabels[i].id).c_str())),
+			       .layout = { .padding = { kUpperFormLabelPadLeft, 0, 0, 0 } } }) {
+				BankText(FromCStr(kLabels[i].label),
+				         BankTextVariant::Body, {});
+			}
+			// Spacer to push value rightward.
+			CLAY({ .id = CLAY_SID(StaticId((std::string("Spc_") + kLabels[i].id).c_str())),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_FIXED(kUpperFormValueGap),
+			                       CLAY_SIZING_FIXED(0) },
+			       } }) {}
+			// Value column.
+			if(i == 0){
+				BankButton(FromCStr(SecurityLabel(state.securityIndex)),
+				           BankButtonVariant::Inline, {},
+				           BankButtonHandle{ nullptr, &OnSecurityClicked, &state });
+				RegisterButton("Security", kValueX, kFormTop + 2, 60, kRowHeight,
+				               &OnSecurityClicked, &state);
+			}else if(i == 5){
+				BankButton(FromCStr(state.spectatable ? "Yes" : "No"),
+				           BankButtonVariant::Inline, {},
+				           BankButtonHandle{ nullptr, &OnSpectatableClicked, &state });
+				RegisterButton("Spectatable", kValueX, kFormTop + 5*kYSpace + 2, 30, kRowHeight,
+				               &OnSpectatableClicked, &state, state.spectatable);
+			}else{
+				NumInput & ti = kTextInputs[i - 1];
+				TextInputOpts opts;
+				opts.widthPx     = 20;
+				opts.heightPx    = kRowHeight;
+				opts.fontBank    = 133;
+				opts.fontWidth   = 6;
+				opts.brightness  = 128;
+				opts.numbersOnly = true;
+				opts.showCaret   = false;
+				std::string idStr = std::string("Input_") + ti.id;
+				TextInput(Clay_String{ false, (int32_t)idStr.size(), idStr.c_str() },
+				          ti.buf, opts, {});
+				const int y = kFormTop + i * kYSpace + 2;
+				RegisterTextInput(ti.label, kValueX, y, 20, kRowHeight, ti.buf, ti.cap);
+			}
 		}
 	}
+}
 
-	// Row 0: Security cycler.
-	const float secY = (float)(kFormTop + kYOffset);
-	CLAY({ .id = CLAY_ID("GCrtSecValWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kValueX, secY } } }) {
-		BankButton(FromCStr(SecurityLabel(state.securityIndex)),
-		           BankButtonVariant::Inline, {},
-		           BankButtonHandle{ nullptr, &OnSecurityClicked, &state });
-	}
-	RegisterButton("Security", kValueX, (int)secY, 60, kRowHeight, &OnSecurityClicked, &state);
+void BuildGameCreateTallTree(GameCreatePanelState & state,
+                             Resources & resources) {
+	(void)resources;
 
-	// Rows 1-4: Min/Max Level, Max Players, Max Teams (TextInput, numbersOnly).
-	struct NumInput { const char * id; const char * label; int row; char * buf; int cap; };
-	const NumInput kTextInputs[4] = {
-		{ "GCrtMinLevel",   "Min Level",   1, state.minLevel,   (int)sizeof(state.minLevel)   },
-		{ "GCrtMaxLevel",   "Max Level",   2, state.maxLevel,   (int)sizeof(state.maxLevel)   },
-		{ "GCrtMaxPlayers", "Max Players", 3, state.maxPlayers, (int)sizeof(state.maxPlayers) },
-		{ "GCrtMaxTeams",   "Max Teams",   4, state.maxTeams,   (int)sizeof(state.maxTeams)   },
-	};
-	for(const auto & ti : kTextInputs){
-		const int y = kFormTop + kYSpace * ti.row + kYOffset;
-		CLAY({ .id = CLAY_SID(StaticId(ti.id)),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kValueX, (float)y } } }) {
-			TextInputOpts opts;
-			opts.widthPx     = 20;
-			opts.heightPx    = kRowHeight;
-			opts.fontBank    = 133;
-			opts.fontWidth   = 6;
-			opts.brightness  = 128;
-			opts.numbersOnly = true;
-			opts.showCaret   = false;
-			std::string idStr = std::string("Input_") + ti.id;
-			TextInput(Clay_String{ false, (int32_t)idStr.size(), idStr.c_str() },
-			          ti.buf, opts, {});
-		}
-		RegisterTextInput(ti.label, kValueX, y, 20, kRowHeight, ti.buf, ti.cap);
-	}
-
-	// Row 5: Spectatable cycler.
-	const int spectY = kFormTop + kYSpace * 5 + kYOffset;
-	CLAY({ .id = CLAY_ID("GCrtSpectValWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kValueX, (float)spectY } } }) {
-		BankButton(FromCStr(state.spectatable ? "Yes" : "No"),
-		           BankButtonVariant::Inline, {},
-		           BankButtonHandle{ nullptr, &OnSpectatableClicked, &state });
-	}
-	RegisterButton("Spectatable", kValueX, spectY, 30, kRowHeight,
-	               &OnSpectatableClicked, &state, /*selected*/ state.spectatable);
-
-	// "Select Map" header + map ScrollList.
+	// "Select Map" heading at top.
 	CLAY({ .id = CLAY_ID("GCrtSelectMapTitleWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { 405, 70 } } }) {
-		BankText(CLAY_STRING("Select Map"), BankTextVariant::Heading, {});
+	       .layout = { .padding = { kTallHeadingPadLeft, 0,
+	                                kTallHeadingPadTop,  0 } } }) {
+		BankText(CLAY_STRING("Select Map"),
+		         BankTextVariant::Heading, {});
 	}
 
+	// Map ScrollList.
 	const int slotCount = std::min((int)state.maps.size(), kMaxMapRows);
 	for(int i = 0; i < slotCount; ++i){
-		// Strip the "[DL] " sentinel for display; legacy paints a "DL" badge in
-		// the right margin which we omit (~16x11 expected diff per remote row).
 		const std::string & raw = state.maps[i];
 		const char * txt = raw.c_str();
 		size_t len = raw.size();
@@ -428,7 +428,8 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 	listOpts.textVariant    = BankTextVariant::Body;
 	listOpts.scrollbarBank  = kScrollbarBank;
 	CLAY({ .id = CLAY_ID("GCrtMapListWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kMapListX, kMapListY } } }) {
+	       .layout = { .padding = { kTallMapListPadLeft, 0,
+	                                kTallMapListPadTop,  0 } } }) {
 		ScrollList(CLAY_STRING("GCrtMapList"),
 		           g_mapSlab, slotCount,
 		           state.mapSelectedIndex, state.mapScrollPos,
@@ -440,17 +441,15 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 		                kMapListX, kMapListY + i * kMapListLineH,
 		                kMapListW, kMapListLineH,
 		                &OnMapRowSelected, &state, i,
-		                /*selected*/ state.mapSelectedIndex == i);
+		                state.mapSelectedIndex == i);
 	}
 
-	// Game name + password labels and inputs (Heading label, 210x14 Body input).
+	// "Game name:" label.
 	CLAY({ .id = CLAY_ID("GCrtNameLabelWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { 405, 360 } } }) {
-		BankText(CLAY_STRING("Game name:"), BankTextVariant::Heading, {});
-	}
-	CLAY({ .id = CLAY_ID("GCrtPwLabelWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { 405, 390 } } }) {
-		BankText(CLAY_STRING("Password (optional):"), BankTextVariant::Heading, {});
+	       .layout = { .padding = { kTallNameLabelPadLeft, 0,
+	                                kTallNameLabelPadTop,  0 } } }) {
+		BankText(CLAY_STRING("Game name:"),
+		         BankTextVariant::Heading, {});
 	}
 	TextInputOpts bodyInput;
 	bodyInput.widthPx    = kNameInputW;
@@ -460,28 +459,41 @@ void BuildGameCreatePanelTree(GameCreatePanelState & state,
 	bodyInput.brightness = 128;
 	bodyInput.showCaret  = false;
 	CLAY({ .id = CLAY_ID("GCrtNameInputWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kNameInputX, kNameInputY } } }) {
-		TextInput(CLAY_STRING("GCrtNameInput"), state.name, bodyInput, {});
+	       .layout = { .padding = { kTallInputPadLeft, 0,
+	                                kTallInputPadTop,  0 } } }) {
+		TextInput(CLAY_STRING("GCrtNameInput"),
+		          state.name, bodyInput, {});
 	}
 	RegisterTextInput("Game name", kNameInputX, kNameInputY, kNameInputW, kNameInputH,
 	                  state.name, (int)sizeof(state.name));
+
+	// "Password (optional):" label.
+	CLAY({ .id = CLAY_ID("GCrtPwLabelWrap"),
+	       .layout = { .padding = { kTallNameLabelPadLeft, 0,
+	                                kTallPwLabelPadTop, 0 } } }) {
+		BankText(CLAY_STRING("Password (optional):"),
+		         BankTextVariant::Heading, {});
+	}
 	bodyInput.password = true;
 	CLAY({ .id = CLAY_ID("GCrtPwInputWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { kPwInputX, kPwInputY } } }) {
-		TextInput(CLAY_STRING("GCrtPwInput"), state.password, bodyInput, {});
+	       .layout = { .padding = { kTallInputPadLeft, 0,
+	                                kTallPwInputPadTop, 0 } } }) {
+		TextInput(CLAY_STRING("GCrtPwInput"),
+		          state.password, bodyInput, {});
 	}
 	RegisterTextInput("Password", kPwInputX, kPwInputY, kPwInputW, kPwInputH,
-	                  state.password, (int)sizeof(state.password), /*isPassword*/ true);
+	                  state.password, (int)sizeof(state.password), true);
 
-	// Create button (Chrome variant).
-	const int createOffX = kCreateBtnX - resources.spriteoffsetx[7][24];
-	const int createOffY = kCreateBtnY - resources.spriteoffsety[7][24];
+	// Create button.
 	CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT, .offset = { (float)createOffX, (float)createOffY } } }) {
-		BankButton(CLAY_STRING("Create"), BankButtonVariant::Chrome, {},
+	       .layout = { .padding = { kTallCreatePadLeft, 0,
+	                                kTallCreatePadTop, 0 } } }) {
+		BankButton(CLAY_STRING("Create"),
+		           BankButtonVariant::Chrome, {},
 		           BankButtonHandle{ nullptr, &OnCreateClicked, &state });
 	}
-	RegisterButton("Create", kCreateBtnX, kCreateBtnY, 156, 21, &OnCreateClicked, &state);
+	RegisterButton("Create", kCreateBtnX, kCreateBtnY, 156, 21,
+	               &OnCreateClicked, &state);
 }
 
 }  // namespace silencer::ui::lobby_clay

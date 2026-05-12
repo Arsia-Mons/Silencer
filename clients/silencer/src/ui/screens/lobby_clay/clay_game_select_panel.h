@@ -74,10 +74,19 @@ void GameSelectPanelTick(GameSelectPanelState & state,
                          ScreenContext & ctx,
                          LobbyClayScreen & owner);
 
-// Emits the Clay subtree. Must be called inside an open Clay layout pass
-// AFTER BankTextBeginFrame() + BankButtonBeginFrame() + ScrollListBeginFrame().
-void BuildGameSelectPanelTree(GameSelectPanelState & state,
+// Emits the upper-pane subtree (Create Game button). Must be called inside
+// the LobbyRightUpperBox CLAY block; emits flex children only (no floating).
+// BeginFrame requirements: BankButtonBeginFrame.
+void BuildGameSelectUpperTree(GameSelectPanelState & state,
                               Resources & resources);
+
+// Emits the tall-pane subtree ("Active Games" header + games list +
+// info-block + Spectate/Join buttons). Must be called inside the
+// LobbyRightTallBox CLAY block; emits flex children only.
+// BeginFrame requirements: BankTextBeginFrame, BankButtonBeginFrame,
+// ScrollListBeginFrame.
+void BuildGameSelectTallTree(GameSelectPanelState & state,
+                             Resources & resources);
 
 }  // namespace silencer::ui::lobby_clay
 

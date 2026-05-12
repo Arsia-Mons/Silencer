@@ -46,12 +46,23 @@ void GameTechPanelTick(GameTechPanelState & state,
                        ScreenContext & ctx,
                        LobbyClayScreen & owner);
 
-// Emits the Clay subtree. Must be called inside an open Clay layout pass
-// AFTER BankTextBeginFrame() + BankButtonBeginFrame() + ToggleBeginFrame().
-void BuildGameTechPanelTree(GameTechPanelState & state,
+// Emits the upper-pane subtree ("Back To Teams" button + 3 right-aligned
+// peer-name labels). Called inside the LobbyRightUpperBox CLAY block; flex
+// children only (no floating).
+// BeginFrame requirements: BankTextBeginFrame, BankButtonBeginFrame.
+void BuildGameTechUpperTree(GameTechPanelState & state,
                             World & world,
                             Resources & resources,
                             LobbyClayScreen & owner);
+
+// Emits the tall-pane subtree (slots-left text + 4-column tech-choice grid +
+// centered tech-name heading + 8 description lines). Called inside the
+// LobbyRightTallBox CLAY block; flex children only.
+// BeginFrame requirements: BankTextBeginFrame, ToggleBeginFrame.
+void BuildGameTechTallTree(GameTechPanelState & state,
+                           World & world,
+                           Resources & resources,
+                           LobbyClayScreen & owner);
 
 }  // namespace silencer::ui::lobby_clay
 

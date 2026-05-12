@@ -20,14 +20,29 @@ namespace silencer::ui::lobby_clay {
 
 namespace {
 
-// Legacy GameJoinPanel coordinates — copied verbatim from
-// game_join_panel.cpp so the on-screen geometry matches one-for-one.
+// Legacy on-screen coords kept ONLY for inspector hit-rect registration —
+// dispatch is label-based; the rect is a fallback for geometric hit-testing.
 constexpr int kBtnTechX  = 242;
 constexpr int kBtnTechY  = 68;
 constexpr int kBtnTeamX  = 242;
 constexpr int kBtnTeamY  = 100;
 constexpr int kBtnReadyX = 242;
 constexpr int kBtnReadyY = 160;
+constexpr int kBtnW      = 156;
+constexpr int kBtnH      = 21;
+
+// LobbyRightUpperBox interior layout knobs. Box at (238, 64, 160, 121) with
+// 1-px stroke → interior origin (239, 65). Buttons land at:
+//   Tech:  (242, 68)  → padLeft=3, padTop=3
+//   Team:  (242, 100) → padTop = 100 - (65+3+21) = 11
+//   Ready: (242, 160) → padTop = 160 - (65+3+21+11+21) = 39
+// All TOP_TO_BOTTOM wrappers carry padLeft=3 to align under the box's left
+// stroke. Last button bottom y = 160+21 = 181, box bottom stroke at y=184 →
+// 3 px clearance.
+constexpr uint16_t kBtnPadLeft   = 3;
+constexpr uint16_t kBtnTechPadTop  = 3;
+constexpr uint16_t kBtnTeamPadTop  = 11;
+constexpr uint16_t kBtnReadyPadTop = 39;
 
 void OnReadyClicked(void * user) {
 	auto * state = static_cast<GameJoinPanelState *>(user);
@@ -52,6 +67,17 @@ Clay_String FromStd(const std::string & s) {
 	return cs;
 }
 
+void RegisterButton(const char * label, int x, int y,
+                    void (*onClick)(void *), void * user) {
+	silencer::ui::clay_inspector::Widget w;
+	w.label = label;
+	w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.x = x; w.y = y; w.w = kBtnW; w.h = kBtnH;
+	w.onClick   = onClick;
+	w.clickUser = user;
+	silencer::ui::clay_inspector::Register(w);
+}
+
 }  // namespace
 
 void GameJoinPanelInit(GameJoinPanelState & state) {
@@ -62,11 +88,6 @@ void GameJoinPanelTick(GameJoinPanelState & state,
                        World & world,
                        ScreenContext & ctx,
                        LobbyClayScreen & owner) {
-	// Per-frame Ready-button label. Mirrors GameJoinPanel::Tick's
-	// `if(world.gameplaystate == INLOBBY)` block. The blocked check routes
-	// through `owner` because World's peerlist/localpeerid/
-	// AllPeersDownloadedMap are private and only friended classes can read
-	// them — namespace-scope functions can't.
 	if(owner.JoinPanelInLobby(world)){
 		state.readyLabel = owner.JoinPanelReadyBlocked(world) ? "Waiting..." : "Ready";
 	}else{
@@ -88,31 +109,13 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 	}
 }
 
-void BuildGameJoinPanelTree(GameJoinPanelState & state,
+void BuildGameJoinUpperTree(GameJoinPanelState & state,
                             Resources & resources) {
-	// Right border chrome sprite (bank 7 idx 8) — same layout as the other
-	// right-pane panels (legacy positions an Overlay at (0, 0) with the
-	// renderer subtracting spriteoffsetx/y).
-	const Uint16 borderW = resources.spritewidth[7][8];
-	const Uint16 borderH = resources.spriteheight[7][8];
-	const int borderX = 0 - resources.spriteoffsetx[7][8];
-	const int borderY = 0 - resources.spriteoffsety[7][8];
-	CLAY({ .id = CLAY_ID("GJoinRightBorder"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(borderW)),
-	                       CLAY_SIZING_FIXED(static_cast<float>(borderH)) },
-	       },
-	       .image    = { .imageData = silencer::clay_bridge::PackImage(7, 8) },
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { static_cast<float>(borderX),
-	                                   static_cast<float>(borderY) } } }) {}
+	(void)resources;
 
-	// Choose Tech button (top).
-	const int techOffX = kBtnTechX - resources.spriteoffsetx[7][24];
-	const int techOffY = kBtnTechY - resources.spriteoffsety[7][24];
+	// Choose Tech (top button).
 	CLAY({ .id = CLAY_ID("GJoinBtnTechWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { (float)techOffX, (float)techOffY } } }) {
+	       .layout = { .padding = { kBtnPadLeft, 0, kBtnTechPadTop, 0 } } }) {
 		BankButton(CLAY_STRING("Choose Tech"),
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
@@ -120,21 +123,11 @@ void BuildGameJoinPanelTree(GameJoinPanelState & state,
 		                             /*onClick*/    &OnTechClicked,
 		                             /*user*/       &state });
 	}
-	{
-		silencer::ui::clay_inspector::Widget w;
-		w.label = "Choose Tech";
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
-		w.x = kBtnTechX; w.y = kBtnTechY; w.w = 156; w.h = 21;
-		w.onClick = &OnTechClicked; w.clickUser = &state;
-		silencer::ui::clay_inspector::Register(w);
-	}
+	RegisterButton("Choose Tech", kBtnTechX, kBtnTechY, &OnTechClicked, &state);
 
-	// Change Team button (middle).
-	const int teamOffX = kBtnTeamX - resources.spriteoffsetx[7][24];
-	const int teamOffY = kBtnTeamY - resources.spriteoffsety[7][24];
+	// Change Team (middle button).
 	CLAY({ .id = CLAY_ID("GJoinBtnTeamWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { (float)teamOffX, (float)teamOffY } } }) {
+	       .layout = { .padding = { kBtnPadLeft, 0, kBtnTeamPadTop, 0 } } }) {
 		BankButton(CLAY_STRING("Change Team"),
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
@@ -142,21 +135,11 @@ void BuildGameJoinPanelTree(GameJoinPanelState & state,
 		                             /*onClick*/    &OnTeamClicked,
 		                             /*user*/       &state });
 	}
-	{
-		silencer::ui::clay_inspector::Widget w;
-		w.label = "Change Team";
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
-		w.x = kBtnTeamX; w.y = kBtnTeamY; w.w = 156; w.h = 21;
-		w.onClick = &OnTeamClicked; w.clickUser = &state;
-		silencer::ui::clay_inspector::Register(w);
-	}
+	RegisterButton("Change Team", kBtnTeamX, kBtnTeamY, &OnTeamClicked, &state);
 
-	// Ready / Waiting... button (bottom). Label is mutated each Tick.
-	const int readyOffX = kBtnReadyX - resources.spriteoffsetx[7][24];
-	const int readyOffY = kBtnReadyY - resources.spriteoffsety[7][24];
+	// Ready / Waiting... (bottom button). Label flips per Tick.
 	CLAY({ .id = CLAY_ID("GJoinBtnReadyWrap"),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { (float)readyOffX, (float)readyOffY } } }) {
+	       .layout = { .padding = { kBtnPadLeft, 0, kBtnReadyPadTop, 0 } } }) {
 		BankButton(FromStd(state.readyLabel),
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
@@ -168,10 +151,19 @@ void BuildGameJoinPanelTree(GameJoinPanelState & state,
 		silencer::ui::clay_inspector::Widget w;
 		w.label = state.readyLabel.c_str();
 		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
-		w.x = kBtnReadyX; w.y = kBtnReadyY; w.w = 156; w.h = 21;
+		w.x = kBtnReadyX; w.y = kBtnReadyY; w.w = kBtnW; w.h = kBtnH;
 		w.onClick = &OnReadyClicked; w.clickUser = &state;
 		silencer::ui::clay_inspector::Register(w);
 	}
+}
+
+void BuildGameJoinTallTree(GameJoinPanelState & state,
+                           Resources & resources) {
+	// GameJoin has no tall-pane content — the legacy panel only emitted the
+	// 3 stacked buttons in the upper area. The LobbyRightTallBox renders as
+	// empty chrome (just the 1-px stroke) when GameJoin is active.
+	(void)state;
+	(void)resources;
 }
 
 }  // namespace silencer::ui::lobby_clay

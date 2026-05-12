@@ -66,11 +66,21 @@ void GameCreatePanelTick(GameCreatePanelState & state,
                          ScreenContext & ctx,
                          LobbyClayScreen & owner);
 
-// Emits the Clay subtree. Must be called inside an open Clay layout pass
-// AFTER BankTextBeginFrame() + BankButtonBeginFrame() + ScrollListBeginFrame()
-// + TextInputBeginFrame().
-void BuildGameCreatePanelTree(GameCreatePanelState & state,
+// Emits the upper-pane subtree ("Game Options" heading + 6-row form: security
+// cycler, min/max level, max players, max teams, spectatable). Called inside
+// the LobbyRightUpperBox CLAY block; flex children only (no floating).
+// BeginFrame requirements: BankTextBeginFrame, BankButtonBeginFrame,
+// TextInputBeginFrame.
+void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Resources & resources);
+
+// Emits the tall-pane subtree ("Select Map" heading + map list + game-name +
+// password inputs + Create button). Called inside the LobbyRightTallBox CLAY
+// block; flex children only.
+// BeginFrame requirements: BankTextBeginFrame, BankButtonBeginFrame,
+// ScrollListBeginFrame, TextInputBeginFrame.
+void BuildGameCreateTallTree(GameCreatePanelState & state,
+                             Resources & resources);
 
 }  // namespace silencer::ui::lobby_clay
 
