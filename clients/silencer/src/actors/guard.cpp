@@ -1662,6 +1662,7 @@ Object * Guard::Look(World & world, Uint8 direction){
 }
 
 void Guard::Fire(World & world, Uint8 direction){
+	if(!world.IsAuthority()) return;
 	Object * projectile = 0;
 	switch(weapon){
 		case 0:{
