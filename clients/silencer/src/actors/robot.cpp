@@ -47,8 +47,11 @@ void Robot::InitBT() {
 	};
 
 	// LookForward: only from WALKING — long-range forward shoot ray.
+	// Skips the shot if shootcooldown is active (let other nodes run instead).
 	btctx_.actions["LookForward"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
+		const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+		if (shootcooldown && shootcooldown < (rd ? rd->shootCooldownCap : 50)) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
 		if (!Look(world, 0)) return BTResult::Failure;
 		state = SHOOTING;
@@ -115,7 +118,7 @@ void Robot::InitBT() {
 		World& world = *static_cast<World*>(ctx.userData);
 		{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); xv = mirrored ? -(_gd ? _gd->speed : 4) : (_gd ? _gd->speed : 4); }
 		FollowGround(*this, world, xv);
-		if (DistanceToEnd(*this, world) <= world.minwalldistance) mirrored = !mirrored;
+		{ int d = DistanceToEnd(*this, world); if(d >= 0 && d <= world.minwalldistance) mirrored = !mirrored; }
 		return BTResult::Success;
 	};
 
@@ -139,6 +142,60 @@ void Robot::InitBT() {
 			return BTResult::Success;
 		}
 		return BTResult::Failure; // not at spawn yet — Patrol will move us
+	};
+
+	// Shoot: drives 36-tick shoot animation (res_bank=46), fires rocket at frame 11.
+	// Only runs from SHOOTING state (LookForward sets it). Returns Success when done.
+	btctx_.actions["Shoot"] = [this](BTContext& ctx) -> BTResult {
+		if (state != SHOOTING) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		int tick = ctx.elapsedTicks();
+		const int total = 36;
+		res_bank  = 46;
+		res_index = tick < 18 ? tick : (total - tick - 1);
+		if (tick == 11) {
+			RocketProjectile* rp = (RocketProjectile*)world.CreateObject(ObjectTypes::ROCKETPROJECTILE);
+			if (rp) {
+				rp->FromSecurity();
+				rp->ownerid = id;
+				const EnemyDef* grd = GASLoader::Get().GetEnemyDef("robot");
+				const int rox = grd ? grd->rocketOffsetX   : 70;
+				const int roy = grd ? grd->rocketOffsetY   : 60;
+				const int rxv = grd ? grd->rocketLaunchXv  : 25;
+				rp->y = y - roy;
+				if (mirrored) { rp->x = x - rox; rp->xv = -rxv; }
+				else          { rp->x = x + rox; rp->xv =  rxv; }
+				shootcooldown = 1;
+			}
+		}
+		if (tick >= total - 1) { state = WALKING; state_i = 0; return BTResult::Success; }
+		return BTResult::Running;
+	};
+
+	// WakeAnim: plays 15-tick wake-up animation (res_bank=47, frames 0→14) then transitions to WALKING.
+	// Fires wake sound on tick 0. Handles both BT-triggered and HandleHit-triggered AWAKENING.
+	btctx_.actions["WakeAnim"] = [this](BTContext& ctx) -> BTResult {
+		if (state != AWAKENING) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		if (ctx.elapsedTicks() == 0) {
+			StopAmbience();
+			const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+			EmitSound(world, world.resources.soundbank[(rd && !rd->soundMelee.empty()) ? rd->soundMelee : "robotarm.wav"], 128);
+		}
+		res_bank  = 47;
+		res_index = std::min(ctx.elapsedTicks(), 14);
+		if (ctx.elapsedTicks() >= 15) { state = WALKING; state_i = 0; return BTResult::Success; }
+		return BTResult::Running;
+	};
+
+	// SleepAnim: plays 15-tick sleep animation (res_bank=47, frames 14→0) then transitions to ASLEEP.
+	// Runs after ReturnToSpawn sets state=SLEEPING.
+	btctx_.actions["SleepAnim"] = [this](BTContext& ctx) -> BTResult {
+		if (state != SLEEPING) return BTResult::Failure;
+		res_bank  = 47;
+		res_index = 14 - std::min(ctx.elapsedTicks(), 14);
+		if (ctx.elapsedTicks() >= 15) { state = ASLEEP; state_i = 0; return BTResult::Success; }
+		return BTResult::Running;
 	};
 }
 
@@ -182,13 +239,15 @@ void Robot::Tick(World & world){
 			}
 		}break;
 		case SLEEPING:{
-			if(state_i >= 15){
-				state = ASLEEP;
-				state_i = -1;
-				break;
+			if(!bt_){
+				if(state_i >= 15){
+					state = ASLEEP;
+					state_i = -1;
+					break;
+				}
+				res_bank = 47;
+				res_index = 14 - state_i;
 			}
-			res_bank = 47;
-			res_index = 14 - state_i;
 		}break;
 		case ASLEEP:{
 			if(soundchannel == -1){
@@ -206,17 +265,19 @@ void Robot::Tick(World & world){
 			}
 		}break;
 		case AWAKENING:{
-			if(state_i == 0){
-				StopAmbience();
-				{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMelee.empty()) ? rd->soundMelee : "robotarm.wav"], 128); }
+			if(!bt_){
+				if(state_i == 0){
+					StopAmbience();
+					{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundMelee.empty()) ? rd->soundMelee : "robotarm.wav"], 128); }
+				}
+				if(state_i >= 15){
+					state = WALKING;
+					state_i = -1;
+					break;
+				}
+				res_bank = 47;
+				res_index = state_i;
 			}
-			if(state_i >= 15){
-				state = WALKING;
-				state_i = -1;
-				break;
-			}
-			res_bank = 47;
-			res_index = state_i;
 		}break;
 		case WALKING:{
 			if(state_i > 240){
@@ -293,43 +354,45 @@ void Robot::Tick(World & world){
 			}
 		}break;
 		case SHOOTING:{
-			if(state_i >= 18 * 2){
-				state = WALKING;
-				state_i = -1;
-				break;
-			}
-			res_bank = 46;
-			if(state_i < 18){
-				res_index = state_i;
-			}else{
-				res_index = (18 * 2) - state_i - 1;
-			}
-			if(state_i == 0){
-				if(Look(world, 0)){
-					if(shootcooldown < ([](){ const EnemyDef* _g = GASLoader::Get().GetEnemyDef("robot"); return _g ? _g->shootCooldownCap : 50; }()) && shootcooldown){
-						state_i--;
+			if(!bt_){
+				if(state_i >= 18 * 2){
+					state = WALKING;
+					state_i = -1;
+					break;
+				}
+				res_bank = 46;
+				if(state_i < 18){
+					res_index = state_i;
+				}else{
+					res_index = (18 * 2) - state_i - 1;
+				}
+				if(state_i == 0){
+					if(Look(world, 0)){
+						if(shootcooldown < ([](){ const EnemyDef* _g = GASLoader::Get().GetEnemyDef("robot"); return _g ? _g->shootCooldownCap : 50; }()) && shootcooldown){
+							state_i--;
+						}
 					}
 				}
-			}
-			if(state_i == 11){
-				RocketProjectile * rocketprojectile = (RocketProjectile *)world.CreateObject(ObjectTypes::ROCKETPROJECTILE);
-				if(rocketprojectile){
-					rocketprojectile->FromSecurity();
-					rocketprojectile->ownerid = id;
-					{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("robot");
-					  const int _rox = _grd ? _grd->rocketOffsetX : 70;
-					  const int _roy = _grd ? _grd->rocketOffsetY : 60;
-					  rocketprojectile->y = y - _roy;
-					  if(mirrored){
-						rocketprojectile->x = x - _rox;
-						rocketprojectile->xv = -(_grd ? _grd->rocketLaunchXv : 25);
-					  }else{
-						rocketprojectile->x = x + _rox;
-						rocketprojectile->xv = (_grd ? _grd->rocketLaunchXv : 25);
-					  }
+				if(state_i == 11){
+					RocketProjectile * rocketprojectile = (RocketProjectile *)world.CreateObject(ObjectTypes::ROCKETPROJECTILE);
+					if(rocketprojectile){
+						rocketprojectile->FromSecurity();
+						rocketprojectile->ownerid = id;
+						{ const EnemyDef* _grd = GASLoader::Get().GetEnemyDef("robot");
+						  const int _rox = _grd ? _grd->rocketOffsetX : 70;
+						  const int _roy = _grd ? _grd->rocketOffsetY : 60;
+						  rocketprojectile->y = y - _roy;
+						  if(mirrored){
+							rocketprojectile->x = x - _rox;
+							rocketprojectile->xv = -(_grd ? _grd->rocketLaunchXv : 25);
+						  }else{
+							rocketprojectile->x = x + _rox;
+							rocketprojectile->xv = (_grd ? _grd->rocketLaunchXv : 25);
+						  }
+						}
 					}
+					shootcooldown = 1;
 				}
-				shootcooldown = 1;
 			}
 		}break;
 		case DYING:{
@@ -413,9 +476,9 @@ void Robot::Tick(World & world){
 		}break;
 	}
 
-	// BT drives decisions in ASLEEP and WALKING only.
+	// BT drives all living states; NEW/DYING/DEAD are handled by the state machine above.
 	if (!bt_) InitBT();
-	if (bt_ && (state == ASLEEP || state == WALKING)) {
+	if (bt_ && state != NEW && state != DYING && state != DEAD) {
 		btctx_.userData = &world;
 		btctx_.dt = 1.0f / GASLoader::Get().gameengine.ticksPerSecond;
 		btctx_.bbSet("patrol", (bool)patrol);
