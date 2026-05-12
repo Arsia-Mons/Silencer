@@ -34,15 +34,122 @@ void Robot::InitBT() {
 	bt_ = BehaviorTreeLibrary::instance().get("robot");
 	if (!bt_) return;
 
-	// WakeUp: only fires from ASLEEP — look both sides, awaken if target found.
+	// New: handles NEW state — fall to platform, then transition to ASLEEP or WALKING.
+	btctx_.actions["New"] = [this](BTContext& ctx) -> BTResult {
+		if (state != NEW) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		draw = true;
+		currentplatformid = 0;
+		if (FindCurrentPlatform(*this, world)) {
+			state   = patrol ? WALKING : ASLEEP;
+			state_i = -1;
+			return BTResult::Success;
+		}
+		yv += world.gravity;
+		if (yv > world.maxyvelocity) yv = world.maxyvelocity;
+		return BTResult::Running;
+	};
+
+	// Dying: death animation, pickup drop, plasma explosion — transitions to DEAD.
+	btctx_.actions["Dying"] = [this](BTContext& ctx) -> BTResult {
+		if (state != DYING) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+		res_bank  = 48;
+		res_index = std::min(state_i / 2, 15);
+		if (state_i == 0) {
+			PickUp* pickup = (PickUp*)world.CreateObject(ObjectTypes::PICKUP);
+			if (pickup) {
+				pickup->type     = PickUp::FILES;
+				pickup->quantity = rd ? rd->deathDropFiles : 250;
+				pickup->x        = x; pickup->y = y - 1;
+				pickup->xv       = (world.Random() % (2 * (rd ? rd->deathDropXVRange : 4) + 1)) - (rd ? rd->deathDropXVRange : 4);
+				pickup->yv       = -(rd ? rd->deathDropYV : 15);
+			}
+		}
+		if (state_i % 2 == 0 && state_i >= 5) {
+			Plume* plume = (Plume*)world.CreateObject(ObjectTypes::PLUME);
+			if (plume) {
+				plume->type = 4;
+				plume->xv   = (rand() % 17) - 8 + (xv * 8);
+				plume->yv   = (rand() % 17) - 8 + (yv * 8);
+				plume->SetPosition(x + (rand() % 39) - 19, y - 5);
+				plume->state_i = 0;
+			}
+		}
+		if (state_i == 4 * 2) {
+			StopAmbience();
+			EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128);
+		}
+		collidable = false;
+		if (state_i >= (rd ? rd->deathExplosionDelayTicks : 96)) {
+			EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128);
+			Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
+			Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
+			Sint8 ys[]  = {0, 0, 0, 0, 0, 0, 0, 0};
+			for (int i = 0; i < 6; i++) {
+				PlasmaProjectile* pp = (PlasmaProjectile*)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
+				if (pp) { pp->large = false; pp->x = x; pp->y = y - 1 + ys[i]; pp->ownerid = id; pp->xv = xvs[i]; pp->yv = yvs[i]; }
+			}
+			state   = DEAD;
+			state_i = -1;
+			return BTResult::Success;
+		}
+		return BTResult::Running;
+	};
+
+	// Dead: respawn countdown — transitions to NEW when timer expires.
+	btctx_.actions["Dead"] = [this](BTContext& ctx) -> BTResult {
+		if (state != DEAD) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		StopAmbience();
+		collidable   = false;
+		virusplanter = 0;
+		res_bank = 48; res_index = 15;
+		if (state_i > 1) draw = false;
+		if (state_i >= respawnseconds) {
+			state      = NEW; x = originalx; y = originaly;
+			state_i    = -1;
+			state_warp = GASLoader::Get().player.warpTeleportTick;
+			health = maxhealth; shield = maxshield;
+			return BTResult::Success;
+		}
+		if (world.tickcount % GASLoader::Get().gameengine.ticksPerSecond != 0) state_i--;
+		return BTResult::Running;
+	};
+
+	// WakeUp: owns ASLEEP state — sets animation/sound, looks both sides.
+	// Returns Running while dormant; Success when target found (transitions to AWAKENING).
 	btctx_.actions["WakeUp"] = [this](BTContext& ctx) -> BTResult {
 		if (state != ASLEEP) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
-		bool found = Look(world, 1) || Look(world, 2);
-		if (!found) return BTResult::Failure;
-		state = AWAKENING;
+		const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+		if (soundchannel == -1)
+			soundchannel = EmitSound(world, world.resources.soundbank[(rd && !rd->soundAmbient.empty()) ? rd->soundAmbient : "wndloope.wav"], 32, true);
+		res_bank = 47; res_index = 0;
+		if (!Look(world, 1) && !Look(world, 2)) return BTResult::Running;
+		state   = AWAKENING;
 		state_i = -1;
 		return BTResult::Success;
+	};
+
+	// WalkAnim: sets walking animation and footstep sounds each WALKING tick.
+	// Returns Failure so the Selector continues to behaviour leaves.
+	btctx_.actions["WalkAnim"] = [this](BTContext& ctx) -> BTResult {
+		if (state != WALKING) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+		res_bank  = 45;
+		res_index = state_i % 20;
+		if (state_i % 20 == 1) {
+			StopAmbience();
+			EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveRight.empty()) ? rd->soundMoveRight : "robot3r.wav"], 48);
+		}
+		if (state_i % 20 == 10) {
+			StopAmbience();
+			EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveLeft.empty()) ? rd->soundMoveLeft : "robot3l.wav"], 48);
+		}
+		return BTResult::Failure;
 	};
 
 	// LookForward: only from WALKING — long-range forward shoot ray.
@@ -231,113 +338,16 @@ void Robot::Tick(World& world) {
 	}
 
 	InitBT();
+	if (!bt_) { state_i++; return; }
 
 	if (state == WALKING) bt_walk_ticks_++;
 	else                   bt_walk_ticks_ = 0;
-
-	// NEW: find starting platform on spawn
-	if (state == NEW) {
-		draw = true;
-		currentplatformid = 0;
-		if (FindCurrentPlatform(*this, world)) {
-			state   = patrol ? WALKING : ASLEEP;
-			state_i = -1;
-		} else {
-			yv += world.gravity;
-			if (yv > world.maxyvelocity) yv = world.maxyvelocity;
-		}
-		state_i++; return;
-	}
-
-	// DEAD: respawn countdown
-	if (state == DEAD) {
-		StopAmbience();
-		collidable   = false;
-		virusplanter = 0;
-		res_bank = 48; res_index = 15;
-		if (state_i > 1) draw = false;
-		is_dead = true; is_dying = false; is_walking = false;
-		if (state_i >= respawnseconds) {
-			state      = NEW; x = originalx; y = originaly;
-			state_i    = -1;
-			state_warp = GASLoader::Get().player.warpTeleportTick;
-			health = maxhealth; shield = maxshield;
-		} else {
-			if (world.tickcount % GASLoader::Get().gameengine.ticksPerSecond != 0) state_i--;
-		}
-		state_i++; return;
-	}
-
-	// DYING: death animation, pickup drop, plasma explosion
-	if (state == DYING) {
-		if (state_i == 0) {
-			PickUp* pickup = (PickUp*)world.CreateObject(ObjectTypes::PICKUP);
-			if (pickup) {
-				pickup->type     = PickUp::FILES;
-				pickup->quantity = rd ? rd->deathDropFiles : 250;
-				pickup->x        = x; pickup->y = y - 1;
-				pickup->xv       = (world.Random() % (2 * (rd ? rd->deathDropXVRange : 4) + 1)) - (rd ? rd->deathDropXVRange : 4);
-				pickup->yv       = -(rd ? rd->deathDropYV : 15);
-			}
-		}
-		if (state_i % 2 == 0 && state_i >= 5) {
-			Plume* plume = (Plume*)world.CreateObject(ObjectTypes::PLUME);
-			if (plume) {
-				plume->type = 4;
-				plume->xv   = (rand() % 17) - 8 + (xv * 8);
-				plume->yv   = (rand() % 17) - 8 + (yv * 8);
-				plume->SetPosition(x + (rand() % 39) - 19, y - 5);
-				plume->state_i = 0;
-			}
-		}
-		if (state_i == 4 * 2) {
-			StopAmbience();
-			EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128);
-		}
-		collidable = false;
-		if (state_i >= (rd ? rd->deathExplosionDelayTicks : 96)) {
-			EmitSound(world, world.resources.soundbank[(rd && !rd->soundDeath.empty()) ? rd->soundDeath : "seekexp1.wav"], 128);
-			Sint8 xvs[] = {-14, 14, -10, 10, -10, 10};
-			Sint8 yvs[] = {-25, -25, -10, -10, -5, -5};
-			Sint8 ys[]  = {0, 0, 0, 0, 0, 0, 0, 0};
-			for (int i = 0; i < 6; i++) {
-				PlasmaProjectile* pp = (PlasmaProjectile*)world.CreateObject(ObjectTypes::PLASMAPROJECTILE);
-				if (pp) { pp->large = false; pp->x = x; pp->y = y - 1 + ys[i]; pp->ownerid = id; pp->xv = xvs[i]; pp->yv = yvs[i]; }
-			}
-			state = DEAD; state_i = -1;
-		}
-		if (state != DEAD) { res_bank = 48; res_index = std::min(state_i / 2, 15); }
-		is_dying = true; is_dead = false; is_walking = false;
-		state_i++; return;
-	}
-
-	// ASLEEP: manage ambient sound; BT WakeUp handles wakeup detection.
-	if (state == ASLEEP) {
-		if (soundchannel == -1)
-			soundchannel = EmitSound(world, world.resources.soundbank[(rd && !rd->soundAmbient.empty()) ? rd->soundAmbient : "wndloope.wav"], 32, true);
-		res_bank = 47; res_index = 0;
-	}
-
-	// WALKING: animation and footstep sounds; BT Patrol/MeleeCheck/etc. handle movement.
-	if (state == WALKING) {
-		res_bank  = 45;
-		res_index = state_i % 20;
-		if (state_i % 20 == 1) {
-			StopAmbience();
-			EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveRight.empty()) ? rd->soundMoveRight : "robot3r.wav"], 48);
-		}
-		if (state_i % 20 == 10) {
-			StopAmbience();
-			EmitSound(world, world.resources.soundbank[(rd && !rd->soundMoveLeft.empty()) ? rd->soundMoveLeft : "robot3l.wav"], 48);
-		}
-	}
 
 	btctx_.userData = &world;
 	btctx_.dt       = 1.0f / GASLoader::Get().gameengine.ticksPerSecond;
 	btctx_.bbSet("patrol", (bool)patrol);
 	bt_->tick(btctx_);
 
-	// Sync activity flags from state so BT conditions and network can read them.
 	is_walking  = (state == WALKING);
 	is_shooting = (state == SHOOTING);
 	is_asleep   = (state == ASLEEP || state == SLEEPING);

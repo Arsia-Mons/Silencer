@@ -9,12 +9,16 @@
     "root": {
       "type": "Selector",
       "label": "Robot AI",
-      "children": ["leaf_wake_anim", "leaf_wakeup", "seq_shoot", "leaf_melee", "leaf_looksides", "leaf_returntospawn", "leaf_sleep_anim", "leaf_patrol"],
+      "children": ["leaf_new", "leaf_dying", "leaf_dead", "leaf_wake_anim", "leaf_wakeup", "leaf_walk_anim", "seq_shoot", "leaf_melee", "leaf_looksides", "leaf_returntospawn", "leaf_sleep_anim", "leaf_patrol"],
       "props": {}
     },
 
-    "leaf_wake_anim":     { "type": "Leaf", "label": "Wake animation",     "children": [], "props": { "action": "WakeAnim"       } },
-    "leaf_wakeup":        { "type": "Leaf", "label": "Wake up (detect)",   "children": [], "props": { "action": "WakeUp"          } },
+    "leaf_new":       { "type": "Leaf", "label": "Platform find",      "children": [], "props": { "action": "New"          } },
+    "leaf_dying":     { "type": "Leaf", "label": "Death animation",    "children": [], "props": { "action": "Dying"        } },
+    "leaf_dead":      { "type": "Leaf", "label": "Respawn wait",       "children": [], "props": { "action": "Dead"         } },
+    "leaf_wake_anim": { "type": "Leaf", "label": "Wake animation",     "children": [], "props": { "action": "WakeAnim"     } },
+    "leaf_wakeup":    { "type": "Leaf", "label": "Wake up (detect)",   "children": [], "props": { "action": "WakeUp"       } },
+    "leaf_walk_anim": { "type": "Leaf", "label": "Walk animation",     "children": [], "props": { "action": "WalkAnim"     } },
 
     "seq_shoot": {
       "type": "Sequence",
