@@ -10,7 +10,8 @@
     { "key": "target_invisible", "type": "bool",   "default": false },
     { "key": "was_hit",          "type": "bool",   "default": false },
     { "key": "health_pct",       "type": "float",  "default": 1.0   },
-    { "key": "ladder_shoot_dir", "type": "int",    "default": 6     }
+    { "key": "ladder_shoot_dir", "type": "int",    "default": 6     },
+    { "key": "hit_pursue_dir",   "type": "int",    "default": 0     }
   ],
   "nodes": {
     "root": {
@@ -25,7 +26,7 @@
     "sel_top": {
       "type": "Selector",
       "label": "Top Selector",
-      "children": ["sel_combat", "sel_ladder_combat", "leaf_uncrouch", "sel_engage", "seq_patrol", "seq_idle_scan"],
+      "children": ["sel_combat", "sel_ladder_combat", "leaf_uncrouch", "seq_pursue_hit", "sel_engage", "seq_patrol", "seq_idle_scan"],
       "props": {}
     },
 
@@ -151,7 +152,15 @@
     "leaf_stand_idle": { "type": "Leaf", "label": "StandIdle", "children": [], "props": { "action": "StandIdle" } },
     "leaf_look_scan":  { "type": "Leaf", "label": "LookScan",  "children": [], "props": { "action": "LookScan"  } },
 
-    "leaf_stand": { "type": "Leaf", "label": "Stand", "children": [], "props": { "action": "Stand" } }
+    "leaf_stand": { "type": "Leaf", "label": "Stand", "children": [], "props": { "action": "Stand" } },
+
+    "seq_pursue_hit": {
+      "type": "Sequence",
+      "label": "Pursue hit direction",
+      "children": ["leaf_pursue_hit"],
+      "props": {}
+    },
+    "leaf_pursue_hit": { "type": "Leaf", "label": "PursueHitDirection", "children": [], "props": { "action": "PursueHitDirection" } }
   },
   "positions": {}
 }

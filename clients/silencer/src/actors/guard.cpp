@@ -885,6 +885,35 @@ void Guard::InitBT(){
 	btctx_.actions["WasHit"] = [this](BTContext& ctx) -> BTResult {
 		return ctx.bb<bool>("was_hit", false) ? BTResult::Success : BTResult::Failure;
 	};
+
+	// Pursue the direction the guard was shot from. Runs until the guard reaches a
+	// platform edge, acquires a chase target, or the timeout expires.
+	btctx_.actions["PursueHitDirection"] = [this](BTContext& ctx) -> BTResult {
+		int dir = ctx.bb<int>("hit_pursue_dir", 0);
+		if (dir == 0) return BTResult::Failure;
+		if (chasing) { ctx.bbSet("hit_pursue_dir", 0); return BTResult::Failure; }
+		World& world = *static_cast<World*>(ctx.userData);
+		const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster");
+		const int timeout = gd && gd->searchTimeoutTicks > 0 ? gd->searchTimeoutTicks / 2 : 300;
+		if (ctx.elapsedTicks() >= timeout) {
+			ctx.bbSet("hit_pursue_dir", 0);
+			return BTResult::Failure;
+		}
+		if (state != WALKING) { state = WALKING; state_i = 0; }
+		mirrored = (dir < 0); // dir<0 → shot came from left → face left
+		int edgeDist = DistanceToEnd(*this, world);
+		if (edgeDist >= 0 && edgeDist <= world.minwalldistance) {
+			ctx.bbSet("hit_pursue_dir", 0);
+			return BTResult::Failure;
+		}
+		is_walking = true;
+		res_bank   = 60;
+		res_index  = ctx.elapsedTicks() % 19;
+		Sint8 spd = gd ? gd->speed : speed;
+		xv = mirrored ? -spd : spd;
+		FollowGround(*this, world, xv);
+		return BTResult::Running;
+	};
 }
 
 void Guard::Serialize(bool write, Serializer & data, Serializer * old){
@@ -1694,6 +1723,9 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	// Write hit event to blackboard so BT can react.
 	btctx_.bbSet("was_hit", true);
 	btctx_.bbSet("health_pct", health > 0 ? (float)health / (float)(maxhealth > 0 ? maxhealth : 1) : 0.0f);
+	// Record which side the shot came from so PursueHitDirection can walk toward it.
+	// Use this->x (world coords) — param x is the impact percentage, not world position.
+	btctx_.bbSet("hit_pursue_dir", (signed(projectile.x) < signed(this->x)) ? -1 : 1);
 	// Non-patrol guard hit by player: alert so SearchAndReturn activates
 	if(!patrol && health > 0 && !chasing){
 		Object* owner = world.GetObjectFromId(projectile.ownerid);
