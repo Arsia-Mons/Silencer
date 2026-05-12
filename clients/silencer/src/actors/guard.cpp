@@ -225,7 +225,8 @@ void Guard::InitBT(){
 			// Climb ladder if target is on a meaningfully different vertical level.
 			int ydiff = signed(obj->y) - signed(y);
 			// At a platform edge facing the target — turn around instead of walking off.
-			if(state == WALKING && DistanceToEnd(*this, world) <= world.minwalldistance){
+			int edgeDist = DistanceToEnd(*this, world);
+			if(state == WALKING && edgeDist >= 0 && edgeDist <= world.minwalldistance){
 				bool target_on_wall_side = mirrored ? (signed(obj->x) <= signed(x)) : (signed(obj->x) >= signed(x));
 				if(target_on_wall_side){ chasing = 0; return BTResult::Failure; }
 			}
@@ -289,7 +290,8 @@ void Guard::InitBT(){
 					// <=80px: keep current direction to avoid oscillation
 					// Blocked at the platform-chain end facing the target — give up the chase
 					// instead of pressing into the wall for the full search timeout.
-					if (state == WALKING && DistanceToEnd(*this, world) <= world.minwalldistance) {
+					int edgeDist = DistanceToEnd(*this, world);
+					if (state == WALKING && edgeDist >= 0 && edgeDist <= world.minwalldistance) {
 						bool target_on_wall_side = mirrored ? (signed(obj->x) <= signed(x)) : (signed(obj->x) >= signed(x));
 						if (target_on_wall_side) {
 							chasing = 0;
@@ -342,7 +344,8 @@ void Guard::InitBT(){
 			mirrored = (signed(originalx) < signed(x));
 			// Blocked at the platform-chain end on the way home — accept current
 			// position as "home enough" rather than wedging at the wall.
-			if (state == WALKING && DistanceToEnd(*this, world) <= world.minwalldistance) {
+			int homeDist = DistanceToEnd(*this, world);
+			if (state == WALKING && homeDist >= 0 && homeDist <= world.minwalldistance) {
 				chasing = 0;
 				bt_walk_ticks_ = 0;
 				state = STANDING;
