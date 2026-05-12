@@ -224,6 +224,11 @@ void Guard::InitBT(){
 			}
 			// Climb ladder if target is on a meaningfully different vertical level.
 			int ydiff = signed(obj->y) - signed(y);
+			// At a platform edge facing the target — turn around instead of walking off.
+			if(state == WALKING && DistanceToEnd(*this, world) <= world.minwalldistance){
+				bool target_on_wall_side = mirrored ? (signed(obj->x) <= signed(x)) : (signed(obj->x) >= signed(x));
+				if(target_on_wall_side){ chasing = 0; return BTResult::Failure; }
+			}
 			{ const EnemyDef* _gg = GASLoader::Get().GetEnemyDef("guard-blaster");
 			if(abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
 				Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
@@ -684,6 +689,16 @@ void Guard::InitBT(){
 		World& world = *static_cast<World*>(ctx.userData);
 		Object* f = Look(world, 3);
 		if(!f) return BTResult::Failure;
+		// If the player is significantly below AND there's a downward ladder at the guard's
+		// feet, yield to Chase so the guard follows rather than just shooting from the top.
+		{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("guard-blaster");
+		  int ydiff = signed(f->y) - signed(y);
+		  int thresh = _gd ? _gd->ladderYThreshold : 48;
+		  if(ydiff > thresh && bt_ladder_cooldown_ == 0){
+			Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
+			if(ladder && signed(ladder->y2) > signed(y)) return BTResult::Failure;
+		  }
+		}
 		updateChasing(f, world);
 		return BTResult::Success;
 	};
