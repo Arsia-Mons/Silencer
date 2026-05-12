@@ -59,12 +59,13 @@
     "seq_crouch_and_shoot": {
       "type": "Sequence",
       "label": "Crouch then shoot low",
-      "children": ["leaf_can_see_low2", "leaf_crouch", "leaf_shoot_crouched2"],
+      "children": ["leaf_can_see_low2", "leaf_is_not_crouched2", "leaf_crouch", "leaf_shoot_crouched2"],
       "props": {}
     },
-    "leaf_can_see_low2":    { "type": "Leaf", "label": "CanSeeLow",  "children": [], "props": { "action": "CanSeeLow"  } },
-    "leaf_crouch":          { "type": "Leaf", "label": "Crouch",     "children": [], "props": { "action": "Crouch"     } },
-    "leaf_shoot_crouched2": { "type": "Leaf", "label": "Shoot(1)",   "children": [], "props": { "action": "Shoot", "direction": 1 } },
+    "leaf_can_see_low2":     { "type": "Leaf", "label": "CanSeeLow",     "children": [], "props": { "action": "CanSeeLow"     } },
+    "leaf_is_not_crouched2": { "type": "Leaf", "label": "IsNotCrouched?","children": [], "props": { "action": "IsNotCrouched"  } },
+    "leaf_crouch":           { "type": "Leaf", "label": "Crouch",        "children": [], "props": { "action": "Crouch"        } },
+    "leaf_shoot_crouched2":  { "type": "Leaf", "label": "Shoot(1)",      "children": [], "props": { "action": "Shoot", "direction": 1 } },
 
     "seq_shoot_up": {
       "type": "Sequence",

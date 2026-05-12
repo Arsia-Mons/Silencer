@@ -153,6 +153,10 @@ Player::Player() : Object(ObjectTypes::PLAYER){
 	hurtboxvalid = false;
 };
 
+bool Player::IsCrouched() const {
+	return state == CROUCHED || state == CROUCHEDSHOOT ||
+	       state == CROUCHING || state == CROUCHEDTHROWING;
+}
 void Player::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
 	int oldoffset = data.offset;

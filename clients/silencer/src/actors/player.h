@@ -44,6 +44,7 @@ public:
 	void UnDeploy(void);
 	bool CanExhaustInputQueue(World & world, int queuesize);
 	Peer * GetPeer(World & world);
+	bool IsCrouched() const;
 	enum {INV_NONE, INV_HEALTHPACK, INV_LAZARUSTRACT, INV_SECURITYPASS, INV_VIRUS,
 		INV_POISON, INV_NEUTRONBOMB, INV_EMPBOMB, INV_SHAPEDBOMB, INV_PLASMABOMB, INV_PLASMADET,
 		INV_FIXEDCANNON, INV_FLARE, INV_POISONFLARE, INV_BASEDOOR, INV_CAMERA};

@@ -222,18 +222,27 @@ void Guard::InitBT(){
 			} else {
 				state = WALKING;
 			}
-			Platform* ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
-			if(ladder){
-				Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-				if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
-					if(ladder->y2 == obj->y && y != obj->y && ladder->y2 > y){
-						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = _gls ? _gls->ladderClimbSpeed : 5; state = LADDER; state_i = 0; }
-					}
-					if(ladder->y1 == obj->y && y != obj->y && ladder->y1 < y){
-						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = -(_gls ? _gls->ladderClimbSpeed : 5); state = LADDER; state_i = 0; }
+			// Climb ladder if target is on a meaningfully different vertical level.
+			int ydiff = signed(obj->y) - signed(y);
+			{ const EnemyDef* _gg = GASLoader::Get().GetEnemyDef("guard-blaster");
+			if(abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
+				Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
+				if(ladder && state == WALKING){
+					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+					if(abs(signed(center) - signed(x)) <= (_gg?_gg->ladderXTolerance:8)){
+						if(ydiff < 0 && signed(ladder->y1) < signed(y)){
+							// player above, ladder goes up
+							x = center; yv = -(_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
+							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
+						} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
+							// player below, ladder goes down
+							x = center; yv = (_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
+							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
+						}
 					}
 				}
 			}
+			} // _gg scope
 		}
 		is_walking = true;
 		res_bank   = 60;
@@ -642,6 +651,9 @@ void Guard::InitBT(){
 		World& world = *static_cast<World*>(ctx.userData);
 		Object* f = Look(world, 0);
 		if(!f) return BTResult::Failure;
+		// Reject targets more than 40px above/below the guard's feet — let up/down/angle
+		// sequences handle those so the correct diagonal animation plays.
+		if(abs((int)f->y - (int)y) > 40) return BTResult::Failure;
 		updateChasing(f, world);
 		return BTResult::Success;
 	};
@@ -650,6 +662,12 @@ void Guard::InitBT(){
 		World& world = *static_cast<World*>(ctx.userData);
 		Object* f = Look(world, 1);
 		if(!f) return BTResult::Failure;
+		// Only crouch-shoot at players who are actually crouched.
+		// Look(1) ray at y-37 intersects standing players too, so gate on player state.
+		if(f->type == ObjectTypes::PLAYER){
+			if(!static_cast<Player*>(f)->IsCrouched())
+				return BTResult::Failure;
+		}
 		updateChasing(f, world);
 		return BTResult::Success;
 	};
