@@ -431,31 +431,6 @@ void Guard::InitBT(){
 		return BTResult::Running;
 	};
 
-	// AlertTurn: scan AABB for nearby projectiles. If found, flip mirrored toward the
-	// threat so the next Patrol step moves in that direction. Always returns Failure so
-	// the Selector continues to seq_patrol — this is a pure direction side-effect.
-	// Cooldown of 60 ticks after each trigger prevents re-flipping while the guard walks.
-	btctx_.actions["AlertTurn"] = [this](BTContext& ctx) -> BTResult {
-		if(is_shooting || state == CROUCHING || state == CROUCHED || state == SHOOTCROUCHED) return BTResult::Failure;
-		int cooldown = ctx.bb<int>("alert_cooldown", 0);
-		if(cooldown > 0) { ctx.bbSet("alert_cooldown", cooldown - 1); return BTResult::Failure; }
-		World& world = *static_cast<World*>(ctx.userData);
-		std::vector<Uint8> types = {
-			ObjectTypes::BLASTERPROJECTILE, ObjectTypes::LASERPROJECTILE,
-			ObjectTypes::ROCKETPROJECTILE,  ObjectTypes::FLAMERPROJECTILE,
-			ObjectTypes::PLASMAPROJECTILE,  ObjectTypes::WALLPROJECTILE,
-			ObjectTypes::FLAREPROJECTILE
-		};
-		const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard");
-		int dx = gd ? gd->threatDetectX : 150;
-		int dy = gd ? gd->threatDetectY : 100;
-		std::vector<Object*> objects = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
-		if(objects.empty()) return BTResult::Failure;
-		mirrored = (objects[0]->x < x); // face toward the incoming projectile
-		ctx.bbSet("alert_cooldown", 60); // suppress re-trigger for ~2s so patrol can stabilize
-		return BTResult::Failure; // let Selector fall through to patrol in new direction
-	};
-
 	// PlayAnimation(anim_name): drive res_bank/res_index from an ActorDef AnimSequence.
 	// Returns Running each tick the animation is playing, Success on completion.
 	// Looping animations always return Running.
@@ -1719,6 +1694,11 @@ void Guard::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	// Write hit event to blackboard so BT can react.
 	btctx_.bbSet("was_hit", true);
 	btctx_.bbSet("health_pct", health > 0 ? (float)health / (float)(maxhealth > 0 ? maxhealth : 1) : 0.0f);
+	// Turn toward whoever shot us (patrol guards only — non-patrol guards use SearchAndReturn).
+	if(patrol && health > 0){
+		Object* shooter = world.GetObjectFromId(projectile.ownerid);
+		if(shooter) mirrored = (shooter->x < x);
+	}
 	// Non-patrol guard hit by player: alert so SearchAndReturn activates
 	if(!patrol && health > 0 && !chasing){
 		Object* owner = world.GetObjectFromId(projectile.ownerid);
