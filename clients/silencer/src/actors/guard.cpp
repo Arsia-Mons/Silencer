@@ -233,9 +233,10 @@ void Guard::InitBT(){
 			if(abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0 && state == WALKING){
 				// Search 60px ahead in the direction of travel.
 				Sint16 srch = 60;
+				Sint16 lyt = ydiff > 0 ? 1 : -1; // +1 pixel below for down, -1 for up (matches player)
 				Platform* ladder = world.map.TestAABB(
-					mirrored ? x - srch : x - 8, y,
-					mirrored ? x + 8   : x + srch, y,
+					mirrored ? x - srch : x - 8, y + lyt,
+					mirrored ? x + 8   : x + srch, y + lyt,
 					Platform::LADDER);
 				if(ladder){
 					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
@@ -262,6 +263,7 @@ void Guard::InitBT(){
 			if(!hasLadderAhead && edgeDist >= 0 && edgeDist <= world.minwalldistance){
 				bool target_on_wall_side = mirrored ? (signed(obj->x) <= signed(x)) : (signed(obj->x) >= signed(x));
 				if(target_on_wall_side){ chasing = 0; return BTResult::Failure; }
+				else { mirrored = !mirrored; } // target is behind us at edge — turn around
 			}
 		}
 		is_walking = true;
@@ -308,9 +310,10 @@ void Guard::InitBT(){
 					{ const EnemyDef* _gg = GASLoader::Get().GetEnemyDef("guard-blaster");
 					if(abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0 && state == WALKING){
 						Sint16 srch = 60;
+						Sint16 lyt = ydiff > 0 ? 1 : -1;
 						Platform* ladder = world.map.TestAABB(
-							mirrored ? x - srch : x - 8, y,
-							mirrored ? x + 8   : x + srch, y,
+							mirrored ? x - srch : x - 8, y + lyt,
+							mirrored ? x + 8   : x + srch, y + lyt,
 							Platform::LADDER);
 						if(ladder){
 							Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
