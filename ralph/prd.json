@@ -59,7 +59,7 @@
     {
       "id": "C4",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "name": "Character panel Box (subtree flex-laid-out inside)",
       "spec": "Emit a Box for the character panel area using C2's coords. The character panel subtree currently builds in `clay_character_panel.cpp` with every element `floating @ROOT (x, y)` (search `CharUserWrap`, `CharToggle`, `CharStat`). Relocate them INSIDE the new Box using flex layout. Keep the existing primitive composition (BankText, Toggle × 5, BankText × 4); only the positioning model changes.\n\nThe LobbyBg sprite still STAYS underneath this iteration.",
       "pass_check": "Build green. 40_lobby_clay_basic.sh green. Clay inspector shows `LobbyCharacterBox` with the character subtree as descendants (not @ROOT). Toggling an agency still persists + updates stats. Screenshot DM'd."

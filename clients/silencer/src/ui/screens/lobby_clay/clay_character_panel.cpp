@@ -4,6 +4,7 @@
 #include "clay_bridge.h"
 #include "clay_inspector.h"
 #include "primitives/bank_text.h"
+#include "primitives/form_border.h"
 #include "primitives/toggle.h"
 
 #include "config.h"
@@ -19,6 +20,7 @@
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextOpts;
 using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::FormBorder;
 using silencer::ui::primitives::Toggle;
 using silencer::ui::primitives::ToggleHandle;
 using silencer::ui::primitives::ToggleOpts;
@@ -88,14 +90,32 @@ constexpr BankTextOpts kStatsOpts{ /*effectColor*/ 129,
                                    /*colorRamp*/   true,
                                    /*drawAlpha*/   false };
 
-void EmitFloating(int x, int y, Clay_String id, void (*body)(void *), void * user) {
-	(void)id;
-	(void)body;
-	(void)user;
-	// Helper not used — kept here as a comment of intent. Actual emission
-	// happens inline below to keep the CLAY macros + closures readable.
-	(void)x; (void)y;
-}
+// LobbyCharacterBox geometry — matches the C2-documented "Top-left status
+// panel" rectangle in the baked BG (docs/plans/lobby-chrome-rectangles.md).
+// The Box floats @ ROOT at the legacy sprite coord; its children lay out
+// via flex (TOP_TO_BOTTOM with per-row padding) so the username / toggles
+// / stats positions emerge from layout rather than from absolute @ROOT
+// offsets.
+constexpr int   kBoxX             = 10;
+constexpr int   kBoxY             = 64;
+constexpr int   kBoxW             = 218;
+constexpr int   kBoxH             = 121;
+constexpr Uint8 kBoxStrokeColor   = 216;
+// Inside-box layout knobs — derived from the legacy on-screen widget coords:
+//   username @ (20, 71), toggle row @ y=90, stat rows @ y=130/143/156/169.
+// With box border=1 + padding={left=6, top=6} the content top-left lands
+// at (17, 71). The username wrapper adds left=3 → text at (20, 71). The
+// toggle row wrapper adds left=3 + top=4 → first toggle at (20, 86+4=90).
+// Stats wrapper adds top=24 → first stat at (17, 106+24=130). Bank-133
+// height=11 + childGap=2 yields stat rows at 130 / 143 / 156 / 169.
+constexpr int kBoxPadLeft       = 6;
+constexpr int kBoxPadTop        = 6;
+constexpr int kUserPadLeft      = 3;
+constexpr int kToggleRowPadLeft = 3;
+constexpr int kToggleRowPadTop  = 4;
+constexpr int kToggleGap        = 26;  // 42 stride − 16 sprite = 26
+constexpr int kStatsPadTop      = 24;
+constexpr int kStatsChildGap    = 2;
 
 }  // namespace
 
@@ -148,97 +168,114 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 		g_stats.xp.clear();
 	}
 
-	// Username header — bank 134 / w8 / eff=200 at (20, 71). Heading
-	// variant matches the (bank 134, w8) tuple.
-	CLAY({ .id = CLAY_ID("CharUserWrap"),
+	// LobbyCharacterBox — Clay-drawn chrome around the character widgets.
+	// Children lay out via TOP_TO_BOTTOM flex (username, toggle row, stats
+	// column) inside the box; positions emerge from the per-row padding
+	// constants above, not from floating @ ROOT.
+	CLAY({ .id = CLAY_ID("LobbyCharacterBox"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED(kBoxW),
+	                       CLAY_SIZING_FIXED(kBoxH) },
+	           .padding = { /*left=*/(uint16_t)kBoxPadLeft, /*right=*/0,
+	                        /*top=*/(uint16_t)kBoxPadTop,  /*bottom=*/0 },
+	           .childGap = 0,
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	       },
+	       .border = FormBorder(kBoxStrokeColor),
 	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { 20, 71 } } }) {
-		BankText(FromStd(g_stats.username),
-		         BankTextVariant::Heading,
-		         { .effectColor = 200 });
-	}
+	                     .offset   = { (float)kBoxX, (float)kBoxY } } }) {
 
-	// Five agency toggles in a horizontal strip, base x = 20, dy = 0,
-	// xmargin = 42, baseline y = 90. Each toggle's offset compensates
-	// for the sprite anchor (spriteoffsetx/y[181][i]) so the rendered
-	// pixels land at the legacy Overlay/Sprite path's coordinates.
-	const int xmargin = 42;
-	const int baseY   = 90;
-	for(int i = 0; i < 5; ++i){
-		const AgencyDef & def = kAgencies[i];
-		const int tx = 20 + i * xmargin;
-		const int ox = tx     - resources.spriteoffsetx[181][def.spriteIndex];
-		const int oy = baseY  - resources.spriteoffsety[181][def.spriteIndex];
-
-		g_adapters[i].state  = &state;
-		g_adapters[i].agency = def.agency;
-
-		const Uint16 spriteW = resources.spritewidth[181][def.spriteIndex];
-		const Uint16 spriteH = resources.spriteheight[181][def.spriteIndex];
-
-		Clay_String wrapId;
-		wrapId.isStaticallyAllocated = true;
-		wrapId.length = static_cast<int32_t>(strlen(def.id));
-		wrapId.chars  = def.id;
-		// Suffix the inner toggle id so the wrap and the toggle's own
-		// CLAY block have distinct hashes. (CLAY_STRING_ARG would copy
-		// — we want pointer-stable static literals here.)
-		static const char kInnerSfx[5][8] = { "Tgl0", "Tgl1", "Tgl2", "Tgl3", "Tgl4" };
-		Clay_String innerId;
-		innerId.isStaticallyAllocated = true;
-		innerId.length = 4;
-		innerId.chars  = kInnerSfx[i];
-
-		CLAY({ .id = CLAY_SID(wrapId),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset   = { (float)ox, (float)oy } } }) {
-			Toggle(innerId,
-			       /*spriteBank=*/  181,
-			       /*spriteIndex=*/ def.spriteIndex,
-			       /*selected=*/    state.selectedAgency == def.agency,
-			       ToggleOpts{ .width  = spriteW > 0 ? spriteW : (Uint16)16,
-			                   .height = spriteH > 0 ? spriteH : (Uint16)16,
-			                   .effectColor          = 112,
-			                   .selectedBrightness   = 128,
-			                   .unselectedBrightness = 32 },
-			       ToggleHandle{ .hoveredOut = nullptr,
-			                     .onClick    = &OnAgencyClicked,
-			                     .user       = &g_adapters[i] });
+		// Username header — bank 134 / w8 / eff=200. Lands at content y=71.
+		CLAY({ .id = CLAY_ID("CharUserWrap"),
+		       .layout = { .padding = { (uint16_t)kUserPadLeft, 0, 0, 0 } } }) {
+			BankText(FromStd(g_stats.username),
+			         BankTextVariant::Heading,
+			         { .effectColor = 200 });
 		}
 
-		silencer::ui::clay_inspector::Widget w;
-		w.label = kAgencyLabels[i];
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::Toggle;
-		w.x = tx; w.y = baseY;
-		w.w = spriteW > 0 ? spriteW : (Uint16)16;
-		w.h = spriteH > 0 ? spriteH : (Uint16)16;
-		w.onClick   = &OnAgencyClicked;
-		w.clickUser = &g_adapters[i];
-		w.selected  = (state.selectedAgency == def.agency);
-		silencer::ui::clay_inspector::Register(w);
-	}
+		// Five agency toggles in a horizontal strip. With LEFT_TO_RIGHT
+		// + childGap=26 and 16-px-wide toggle sprites the on-screen
+		// stride is 42 px, matching the legacy `xmargin` exactly.
+		CLAY({ .id = CLAY_ID("CharToggleRow"),
+		       .layout = {
+		           .padding = { (uint16_t)kToggleRowPadLeft, 0,
+		                        (uint16_t)kToggleRowPadTop,  0 },
+		           .childGap = (uint16_t)kToggleGap,
+		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+		       } }) {
+			for(int i = 0; i < 5; ++i){
+				const AgencyDef & def = kAgencies[i];
+				g_adapters[i].state  = &state;
+				g_adapters[i].agency = def.agency;
 
-	// LEVEL / WINS / LOSSES / XP — bank 133 / w7 / eff=129, brightness
-	// 160 (128+32), ramp on. Positions (17, 130) / (17, 143) / (17, 156)
-	// / (17, 169) match the legacy Overlay coordinates one-for-one.
-	const struct { int y; const std::string * txt; const char * id; } kStatsRows[4] = {
-		{ 130, &g_stats.level,  "CharStatLvl" },
-		{ 143, &g_stats.wins,   "CharStatWin" },
-		{ 156, &g_stats.losses, "CharStatLoss" },
-		{ 169, &g_stats.xp,     "CharStatXp" },
-	};
-	for(int i = 0; i < 4; ++i){
-		if(kStatsRows[i].txt->empty()) continue;
-		Clay_String wrapId;
-		wrapId.isStaticallyAllocated = true;
-		wrapId.length = static_cast<int32_t>(strlen(kStatsRows[i].id));
-		wrapId.chars  = kStatsRows[i].id;
-		CLAY({ .id = CLAY_SID(wrapId),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset   = { 17, (float)kStatsRows[i].y } } }) {
-			BankText(FromStd(*kStatsRows[i].txt),
-			         BankTextVariant::BodySm,
-			         kStatsOpts);
+				const Uint16 spriteW = resources.spritewidth[181][def.spriteIndex];
+				const Uint16 spriteH = resources.spriteheight[181][def.spriteIndex];
+
+				Clay_String tglId;
+				tglId.isStaticallyAllocated = true;
+				tglId.length = static_cast<int32_t>(strlen(def.id));
+				tglId.chars  = def.id;
+
+				Toggle(tglId,
+				       /*spriteBank=*/  181,
+				       /*spriteIndex=*/ def.spriteIndex,
+				       /*selected=*/    state.selectedAgency == def.agency,
+				       ToggleOpts{ .width  = spriteW > 0 ? spriteW : (Uint16)16,
+				                   .height = spriteH > 0 ? spriteH : (Uint16)16,
+				                   .effectColor          = 112,
+				                   .selectedBrightness   = 128,
+				                   .unselectedBrightness = 32 },
+				       ToggleHandle{ .hoveredOut = nullptr,
+				                     .onClick    = &OnAgencyClicked,
+				                     .user       = &g_adapters[i] });
+
+				// Inspector hit rect uses the legacy on-screen coords so
+				// label-keyed CLI clicks keep working without depending on
+				// the flex-derived bbox being byte-identical. The CLAY
+				// inspector dispatch is label-based; the rect is only used
+				// when geometric hit-testing is requested.
+				const int tx = 20 + i * 42;
+				silencer::ui::clay_inspector::Widget w;
+				w.label = kAgencyLabels[i];
+				w.kind  = silencer::ui::clay_inspector::WidgetKind::Toggle;
+				w.x = tx; w.y = 90;
+				w.w = spriteW > 0 ? spriteW : (Uint16)16;
+				w.h = spriteH > 0 ? spriteH : (Uint16)16;
+				w.onClick   = &OnAgencyClicked;
+				w.clickUser = &g_adapters[i];
+				w.selected  = (state.selectedAgency == def.agency);
+				silencer::ui::clay_inspector::Register(w);
+			}
+		}
+
+		// LEVEL / WINS / LOSSES / XP — bank 133 / w7 / eff=129,
+		// brightness 160 (128+32), ramp on. TOP_TO_BOTTOM flex stacks
+		// the four rows at y=130 / 143 / 156 / 169 from the wrapper's
+		// 24-px top padding + bank-133 height (11) + childGap (2).
+		CLAY({ .id = CLAY_ID("CharStats"),
+		       .layout = {
+		           .padding = { 0, 0, (uint16_t)kStatsPadTop, 0 },
+		           .childGap = (uint16_t)kStatsChildGap,
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		       } }) {
+			const struct { const std::string * txt; const char * id; } kStatsRows[4] = {
+				{ &g_stats.level,  "CharStatLvl" },
+				{ &g_stats.wins,   "CharStatWin" },
+				{ &g_stats.losses, "CharStatLoss" },
+				{ &g_stats.xp,     "CharStatXp" },
+			};
+			for(int i = 0; i < 4; ++i){
+				if(kStatsRows[i].txt->empty()) continue;
+				Clay_String wrapId;
+				wrapId.isStaticallyAllocated = true;
+				wrapId.length = static_cast<int32_t>(strlen(kStatsRows[i].id));
+				wrapId.chars  = kStatsRows[i].id;
+				CLAY({ .id = CLAY_SID(wrapId) }) {
+					BankText(FromStd(*kStatsRows[i].txt),
+					         BankTextVariant::BodySm,
+					         kStatsOpts);
+				}
+			}
 		}
 	}
 }

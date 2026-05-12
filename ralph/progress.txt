@@ -642,3 +642,71 @@ below.)
     If a future iteration switches inspector dispatch to hit-test,
     update the rect to match the flex-derived bbox.
 ---
+
+## 2026-05-12T01:30:00Z - C4 Character panel Box (subtree flex-laid-out inside)
+- Emitted `LobbyCharacterBox` at the C2 "Top-left status panel" rect
+  (10, 64, 218, 121) with `FormBorder(216)`. Relocated the entire
+  character subtree (username header + 5 agency toggles + 4 stat rows)
+  INSIDE the Box as flex children. No more `floating @ ROOT (x, y)`
+  on the character widgets — positions emerge from layout.
+- Inside-box layout: TOP_TO_BOTTOM with box padding {left=6, top=6}.
+  Three child wrappers stacked:
+    1. `CharUserWrap` — padding-left=3 → username heading at (20, 71).
+    2. `CharToggleRow` — LEFT_TO_RIGHT, padding {left=3, top=4},
+       childGap=26 → 5 toggles stride 42 starting at (20, 90).
+    3. `CharStats` — TOP_TO_BOTTOM, padding-top=24, childGap=2
+       → 4 BodySm stats at y=130 / 143 / 156 / 169 (bank-133 height=11).
+  These constants are the legacy on-screen widget coords expressed
+  as flex offsets — same visual positions, different positioning
+  model.
+- Dropped per-toggle and per-stat wrappers (legacy used a `CLAY({.id,
+  .floating})` shim around each Toggle + each stat BankText). Toggle's
+  own CLAY block carries the per-row id directly now (`CharTglNoxis`
+  etc.); stat rows still use a `CLAY({.id})` shim only because empty
+  rows are skipped via `continue` — the wrapper is the natural place
+  to anchor that.
+- Dropped sprite-anchor compensation for the agency toggles. Bridge's
+  CustomKind::ToggleSprite path blits at `boundingBox.{x,y}` directly
+  (no `spriteoffsetx[bank][idx]` add), so flex bbox = sprite top-left.
+  The legacy `ox = tx - spriteoffsetx` math was harmless when sprite
+  offsets are 0 (which bank 181 idx 0..4 are) but irrelevant to the
+  Toggle path either way.
+- Inspector hit-rects for the 5 toggles kept at the legacy screen
+  coords (`(20 + i*42, 90, spriteW, spriteH)`). The flex-derived
+  on-screen positions land at ~the same pixels; CLI dispatch is
+  label-based so this doesn't need to be byte-identical.
+- LobbyBg sprite still under (C7 drops it). The new Box's 1-px
+  primary stroke at idx 216 lands on top of the baked stroke pixels
+  for the rect — no double-render artifact, halos still deferred to
+  C7.
+- **Files changed:**
+  - `clients/silencer/src/ui/screens/lobby_clay/clay_character_panel.cpp`
+    — `BuildCharacterPanelTree` rewritten. Added `#include
+    "primitives/form_border.h"` and `using FormBorder`. Added
+    file-scope `constexpr` layout knobs. Removed unused `EmitFloating`
+    helper.
+- **Quality gates:** build green ✓, 40_lobby_clay_basic.sh PASS ✓,
+  agency toggling still flows through `OnAgencyClicked` →
+  `CharacterPanelTick` → `Config::Save` + `world.SetAgency`.
+- **Screenshot:** `/tmp/ralph-shots/iter-C4.png` shows the lobby with
+  the character Box stroked at the expected rect, username "claybob"
+  at top, 5 agency toggles in a row beneath, and the 4 stats (LEVEL,
+  WINS, LOSSES, XP TO NEXT LEVEL) stacked below. Right pane + chat
+  panel still legacy (C5/C6 in subsequent iterations).
+- **Learnings for future iterations:**
+  - Flex layout with `padding.top` + variant-row-height tables (bank
+    133 = 11, bank 134 = 15) reproduces fixed-y legacy coords cleanly.
+    The childGap math: `legacy_y_stride - bank_height` (e.g. 13-px
+    stride - 11-px bank-133 = childGap=2). When porting another
+    panel, look up `BankTextHeight()` in `clay_bridge.cpp` first.
+  - `Toggle` already wraps its sprite in its own CLAY block with
+    `CLAY_SID(id)` and FIXED sizing — callers no longer need an outer
+    `CLAY({.id, .floating})` shim. The legacy character panel's
+    wrap-around-Toggle pattern was an artifact of needing `floating
+    @ ROOT` for absolute positioning; with flex layout, it's
+    redundant.
+  - The Toggle primitive's CUSTOM render path does NOT apply
+    `spriteoffsetx/y` (verified at `clay_bridge.cpp:364`). Don't
+    add anchor compensation for toggles regardless of layout mode.
+    Distinct from IMAGE-kind renders which DO apply offsets.
+---
