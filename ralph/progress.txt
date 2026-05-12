@@ -117,6 +117,25 @@ below.)
   always cross-check by scanning the BG decoder output for the
   primary stroke (idx 216) runs at the expected axes — the panel
   interior coords WILL be wrong.
+- **Container chrome with children: bypass Box(), use CLAY+FormBorder.** The
+  `Box()` primitive emits a leaf CLAY element with `{}` body — it cannot host
+  flex children. When the chrome rectangle needs to be a flex container
+  (title bar, panel containers in C4–C6), write the CLAY element directly:
+  `CLAY({ .id, .layout = { .padding, .layoutDirection, .childGap, .childAlignment },
+  .border = silencer::ui::primitives::FormBorder(216), .floating = {...} }) { children }`.
+  This is "Box-shaped CLAY chrome" with the same visual stroke as `Box()` but
+  with children. Halos can be added later via `.custom = { .customData = ccd }`
+  routed through `BoxStroke` CUSTOM dispatch — but that requires exposing the
+  payload allocator from box.cpp, deferred until a halo-needing container
+  shows up.
+- **Outer-frame and title-bar overlap with baked LobbyBg strokes is invisible.**
+  Drawing chrome at the same palette index (216) as the baked stroke pixels in
+  the BG sprite produces no visible double-render — the new stroke lands on
+  top of identical pixels. Where the new stroke spans regions the BG doesn't
+  stroke (e.g. outer-frame left edge bridging y=54..63 between the top strip
+  and the panels-row), a NEW visible stroke appears — that's the intentional
+  "bridge" effect of the outer container. C7 (drop LobbyBg) makes the new
+  Clay strokes the only ones visible.
 - **Cross-panel halo anomalies on shared edges.** Where two
   rectangles' chromes touch (e.g. chat-box right edge abutting
   character panel left edge), the halo palette indices at offsets
@@ -545,4 +564,81 @@ below.)
     subtree to relocate to live in the empty gap. If C4's spec
     insists on a Box around the character panel, raise it for
     user decision before implementing — the BG doesn't have one.
+---
+
+## 2026-05-12T00:08:00Z - C3 Outer frame + title bar Boxes (chrome relocated via flex)
+- Added two CLAY chrome containers in `BuildChromeTree`:
+  - **LobbyOuterFrame** at (10, 25, 620, 430) — bounding rectangle around
+    the panel area. Floats @ ROOT, sized FIXED, `.border = FormBorder(216)`.
+    No flex children yet (C4–C6 will populate).
+  - **LobbyTitleBar** at (10, 25, 620, 29) — Box-shaped CLAY container at
+    the top, LEFT_TO_RIGHT flex with padding {5,5,3,2}, gap=6,
+    childAlignment.y=CENTER, `.border = FormBorder(216)`.
+- Relocated the four prior `floating @ ROOT` chrome elements (LobbyTitle,
+  LobbyVer, LobbyMapName, LobbyGoBackWrap) INSIDE LobbyTitleBar as flex
+  children. Added a GROW(0) spacer (`LobbyTitleBarSpacer`) before
+  LobbyGoBackWrap so the button right-aligns within the title bar.
+- Coordinates sourced from `docs/plans/lobby-chrome-rectangles.md`'s
+  "Top frame strip" row (the 29-px strip at y=25..53 IS the title bar).
+  Outer frame extent (height 430) bounds from the title strip's top
+  (y=25) to the bottom of the chat-box / right-pane (y=455 → 454).
+- **Halos deferred** — primary stroke only this iteration. Reasoning:
+  with LobbyBg still emitted underneath (per C3 spec), our 1-px primary
+  stroke at idx 216 lands on top of the baked stroke pixels — invisible.
+  Adding halos now would risk double-rendering the BG's halo pixels.
+  C7 drops the BG; halos can be reintroduced then via `.custom` BoxStroke
+  dispatch (will require exposing box.cpp's payload allocator).
+- **Files changed:**
+  - `clients/silencer/src/ui/screens/lobby_clay/lobby_clay_screen.cpp`
+    — rewrote `BuildChromeTree()`. Added `#include "primitives/form_border.h"`.
+    Added file-scope `kChromeOriginX/Y/OuterW/H/TitleBarH/StrokeColor`
+    constexprs. Removed the old per-element `floating @ ROOT` / sprite-anchor
+    compensation for the four title-bar elements (the LobbyBg image still
+    uses anchor compensation since it's still floating).
+- **Quality gates:** build green ✓, 40_lobby_clay_basic.sh PASS ✓.
+- **Inspector verification:** the structure is observable in the source —
+  LobbyOuterFrame and LobbyTitleBar are CLAY_ID literals in the new tree,
+  and the four title-bar children sit inside the LobbyTitleBar `{...}`
+  body (no `floating @ ROOT` on them). Inspector Widget registration for
+  the Go Back button is preserved (label-based dispatch — the legacy
+  hit-rect coords are kept since they're approximately where the new
+  flex-positioned button lands; e2e regression confirms label-based
+  click still routes correctly).
+- **Visual notes from the screenshot (DM):**
+  - The new outer frame's left/right strokes at x=10 and x=629 mostly
+    coincide with baked chat-box-left and right-pane-right strokes.
+    Visible NEW stroke segments appear in the gaps where the baked
+    chrome doesn't span (most notably the y=54..63 band between the
+    top strip and the panels row).
+  - Title bar layout: "Silencer" (Title bank, effect 152), "v.X"
+    (Body bank, effect 189) on the left; Go Back button (Chrome
+    variant) right-aligned via the spacer. Map name not present in
+    the screenshot (no game joined; it's conditional on world state).
+  - Position vs. legacy: title moved ~from x=15 → flex-anchor at
+    x=15 (same after padding), version moved from x=115 → right
+    after Silencer with childGap=6 (closer to title than legacy).
+    Go Back moved from absolute (473, 29) → flex-right ~(459, 29ish).
+    All within the spec's "~2 px on each edge" tolerance for the
+    chrome containers themselves; the inner element shifts are
+    intentional flex layout (legacy had hand-tuned absolute coords
+    that flex doesn't reproduce byte-identical).
+- **Learnings for future iterations:**
+  - For Box-shaped chrome containers (chrome that needs children),
+    skip `Box()` and write `CLAY({.border = FormBorder(216), .layout
+    = {flex config}, .floating = {...}}){...}` directly. Documented
+    in the Codebase Patterns section.
+  - The outer-frame approach (one CLAY container bounding the panel
+    area) provides a parent for C4–C6 to attach panel subtrees inside
+    via flex if desired. For this iteration the outer frame is empty;
+    panels remain `floating @ ROOT` from their own panel files until
+    C4–C6 relocate them.
+  - `LobbyBg`'s sprite-anchor compensation MUST stay (the image still
+    floats @ ROOT and the bridge blits at bbox top-left). The
+    title-bar elements no longer need anchor compensation because
+    they're inside the flex flow rather than at absolute coords.
+  - Inspector hit-rect for Go Back: kept legacy (473, 29, 156, 21).
+    Label-based dispatch still works because `cli click --label "Go Back"`
+    routes via clay_inspector's label index, not hit-test geometry.
+    If a future iteration switches inspector dispatch to hit-test,
+    update the rect to match the flex-derived bbox.
 ---

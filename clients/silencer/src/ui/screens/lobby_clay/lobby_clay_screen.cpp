@@ -23,6 +23,7 @@
 #include "clay_inspector.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
+#include "primitives/form_border.h"
 #include "primitives/scroll_list.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
@@ -79,31 +80,52 @@ void OnGoBackClicked(void * user)
 	if(screen) screen->NotifyGoBackClicked();
 }
 
-// Emits the lobby chrome — fullscreen background image (bank 7 idx 1), the
-// "Silencer" title, "v.X" version string, optional map-name overlay, and
-// the Go Back button. All chrome elements (except the bg image, which
-// covers the whole layout) are floating with attachTo=ROOT so their
-// positions match the legacy Overlay x/y screen coordinates exactly.
+// Lobby chrome geometry — derived from the baked LobbyBg sprite. The outer
+// frame spans the panel-area bounding box (top of the title strip down to the
+// bottom of the chat-box / right pane). The title bar matches the BG's "top
+// frame strip" rectangle (C2: lobby-chrome-rectangles.md). LobbyBg is still
+// emitted underneath this iteration — C7 drops it.
+constexpr int kChromeOriginX = 10;
+constexpr int kChromeOriginY = 25;
+constexpr int kChromeOuterW  = 620;   // x = 10..629
+constexpr int kChromeOuterH  = 430;   // y = 25..454
+constexpr int kTitleBarH     = 29;    // y = 25..53
+constexpr Uint8 kChromeStrokeColor = 216;  // C2 canonical lobby chrome primary
+
+// Emits the lobby chrome:
+//   • Fullscreen LobbyBg image (bank 7 idx 1) — still drawn this iteration.
+//   • LobbyOuterFrame — Box-shaped CLAY container, primary stroke matching the
+//     baked chrome, sized to bound the panel area. No flex children yet
+//     (C4–C6 relocate panel subtrees inside it).
+//   • LobbyTitleBar — Box-shaped CLAY container, LEFT_TO_RIGHT flex, holds
+//     title / version / mapname / Go Back button as children. Replaces the
+//     prior `floating @ ROOT` placement of those four elements.
+//
+// Both Box containers float @ ROOT for absolute pixel positioning so this
+// iteration leaves the panel screens (which still float @ ROOT for their own
+// positioning) undisturbed. The CHILDREN of the title bar lay out via flex,
+// not floating — that's the load-bearing structural change. Halos are
+// deferred to C7; with LobbyBg still under, the primary stroke at the
+// canonical idx 216 lands on top of the baked stroke pixels, no double-render
+// artifact.
 //
 // Sprite-element positions COMPENSATE for the resource's per-frame anchor
-// offset (`spriteoffsetx/y`): the legacy renderer subtracts those from the
-// object's screen-space x/y before blitting, but the Clay bridge blits
-// sprite-natively at the bbox top-left. Pre-subtracting the offset in the
-// floating .offset keeps the on-screen pixels byte-identical.
+// offset (`spriteoffsetx/y`) for the LobbyBg image. The Go Back button and
+// text elements no longer need anchor compensation because they live inside
+// the title bar's flex flow rather than at absolute screen coordinates.
 void BuildChromeTree(LobbyClayScreen * screen,
                      const std::string & version,
                      const std::string & mapName,
                      Resources & resources)
 {
 	using namespace silencer::clay_bridge;
+	using silencer::ui::primitives::FormBorder;
 
 	const int W = 640;
 	const int H = 480;
 
 	const int bgOffX = -resources.spriteoffsetx[7][1];
 	const int bgOffY = -resources.spriteoffsety[7][1];
-	const int btnOffX = 473 - resources.spriteoffsetx[7][24];
-	const int btnOffY = 29  - resources.spriteoffsety[7][24];
 
 	CLAY({ .id = CLAY_ID("LobbyClayRoot"),
 	       .layout = {
@@ -117,52 +139,82 @@ void BuildChromeTree(LobbyClayScreen * screen,
 		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
 		                     .offset = { (float)bgOffX, (float)bgOffY } } }) {}
 
-		CLAY({ .id = CLAY_ID("LobbyTitle"),
+		CLAY({ .id = CLAY_ID("LobbyOuterFrame"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(kChromeOuterW),
+		                       CLAY_SIZING_FIXED(kChromeOuterH) },
+		       },
+		       .border = FormBorder(kChromeStrokeColor),
 		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset = { 15, 32 } } }) {
-			BankText(CLAY_STRING("Silencer"),
-			         BankTextVariant::Title,
-			         { .effectColor = 152 });
-		}
+		                     .offset = { (float)kChromeOriginX,
+		                                 (float)kChromeOriginY } } }) {}
 
-		Clay_String verstr;
-		verstr.isStaticallyAllocated = false;
-		verstr.length = (int32_t)version.size();
-		verstr.chars  = version.c_str();
-		CLAY({ .id = CLAY_ID("LobbyVer"),
+		CLAY({ .id = CLAY_ID("LobbyTitleBar"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(kChromeOuterW),
+		                       CLAY_SIZING_FIXED(kTitleBarH) },
+		           .padding = { /*left=*/5, /*right=*/5,
+		                        /*top=*/3, /*bottom=*/2 },
+		           .childGap = 6,
+		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+		           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+		       },
+		       .border = FormBorder(kChromeStrokeColor),
 		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset = { 115, 39 } } }) {
-			BankText(verstr,
-			         BankTextVariant::Body,
-			         { .effectColor = 189 });
-		}
-
-		if(!mapName.empty()){
-			Clay_String mstr;
-			mstr.isStaticallyAllocated = false;
-			mstr.length = (int32_t)mapName.size();
-			mstr.chars  = mapName.c_str();
-			CLAY({ .id = CLAY_ID("LobbyMapName"),
-			       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-			                     .offset = { 180, 32 } } }) {
-				BankText(mstr,
+		                     .offset = { (float)kChromeOriginX,
+		                                 (float)kChromeOriginY } } }) {
+			CLAY({ .id = CLAY_ID("LobbyTitle") }) {
+				BankText(CLAY_STRING("Silencer"),
 				         BankTextVariant::Title,
-				         { .effectColor = 129,
-				           .brightness  = 160,
-				           .colorRamp   = true });
+				         { .effectColor = 152 });
+			}
+
+			Clay_String verstr;
+			verstr.isStaticallyAllocated = false;
+			verstr.length = (int32_t)version.size();
+			verstr.chars  = version.c_str();
+			CLAY({ .id = CLAY_ID("LobbyVer") }) {
+				BankText(verstr,
+				         BankTextVariant::Body,
+				         { .effectColor = 189 });
+			}
+
+			if(!mapName.empty()){
+				Clay_String mstr;
+				mstr.isStaticallyAllocated = false;
+				mstr.length = (int32_t)mapName.size();
+				mstr.chars  = mapName.c_str();
+				CLAY({ .id = CLAY_ID("LobbyMapName") }) {
+					BankText(mstr,
+					         BankTextVariant::Title,
+					         { .effectColor = 129,
+					           .brightness  = 160,
+					           .colorRamp   = true });
+				}
+			}
+
+			// Push the Go Back button to the right edge of the title bar.
+			CLAY({ .id = CLAY_ID("LobbyTitleBarSpacer"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_FIXED(0) },
+			       } }) {}
+
+			CLAY({ .id = CLAY_ID("LobbyGoBackWrap") }) {
+				BankButton(CLAY_STRING("Go Back"),
+				           BankButtonVariant::Chrome,
+				           {},
+				           { .hoveredOut = nullptr,
+				             .onClick = &OnGoBackClicked,
+				             .user = screen });
 			}
 		}
 
-		CLAY({ .id = CLAY_ID("LobbyGoBackWrap"),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset = { (float)btnOffX, (float)btnOffY } } }) {
-			BankButton(CLAY_STRING("Go Back"),
-			           BankButtonVariant::Chrome,
-			           {},
-			           { .hoveredOut = nullptr,
-			             .onClick = &OnGoBackClicked,
-			             .user = screen });
-		}
+		// Inspector registration uses the legacy on-screen rect for click
+		// routing. The button's actual flex-derived bbox lands in roughly the
+		// same neighborhood (right-aligned in the title bar at y=25..53);
+		// the inspector hit rect doesn't need to be byte-identical to the
+		// rendered button — it's the label-based dispatch that matters.
 		silencer::ui::clay_inspector::Widget gb;
 		gb.label = "Go Back";
 		gb.kind = silencer::ui::clay_inspector::WidgetKind::Button;

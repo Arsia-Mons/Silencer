@@ -51,7 +51,7 @@
     {
       "id": "C3",
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "name": "Outer frame + title bar Boxes (chrome relocated via flex)",
       "spec": "Using the Box primitive (post-C0b) and the coordinates from C2, emit two Clay-drawn Boxes: an outer frame around the working area and a title bar strip across the top. The existing TitleBar chrome elements (title text 'Silencer', version 'v.X', map-name overlay, Go Back BankButton) currently live as four separate `floating @ROOT (x, y)` elements in `clients/silencer/src/ui/screens/lobby_clay/lobby_clay_screen.cpp` (search `LobbyTitle`, `LobbyVer`, `LobbyMapName`, `LobbyGoBackWrap`). Relocate them INSIDE the new title bar Box using flex layout — `LEFT_TO_RIGHT`, gaps, alignment. Don't keep `floating @ROOT` for title-bar elements after this iteration.\n\nThe LobbyBg sprite STAYS emitted underneath in this iteration (so misalignment between your new Boxes and the baked chrome is visible). Don't drop it yet — that's C7.\n\nPicking exact pixel coords: aim to match the baked rectangle positions to within ~2 px on each edge so the chrome looks coherent during the transition. The Box stroke color comes from C2's documented sample.",
       "pass_check": "Build green. tests/cli-agent/e2e/40_lobby_clay_basic.sh green. Clay inspector dump shows new elements `LobbyOuterFrame` and `LobbyTitleBar` with the title/version/mapname/GoBack as children of LobbyTitleBar (not floating @ROOT). Screenshot DM'd."
