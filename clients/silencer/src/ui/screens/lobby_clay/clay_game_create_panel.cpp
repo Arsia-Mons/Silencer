@@ -62,14 +62,13 @@ constexpr int    kPwInputX   = 410, kPwInputY   = 405;
 constexpr Uint16 kPwInputW   = 210, kPwInputH   = 14;
 constexpr int    kCreateBtnX = 436, kCreateBtnY = 430;
 
-// LobbyRightUpperBox interior layout knobs. Box at (238, 64, 160x121).
-constexpr uint16_t kUpperHeadingPadLeft = 7;  // 245 - 238
-constexpr uint16_t kUpperHeadingPadTop  = 6;  // 70 - 64
-constexpr uint16_t kUpperFormPadLeft    = 5;  // 243 - 238
-constexpr uint16_t kUpperFormPadTop     = 2;  // 87 - (64 + 6 + 15)
+// LobbyRightUpperBox interior layout knobs.
+constexpr uint16_t kUpperHeadingPadLeft = 6;
+constexpr uint16_t kUpperHeadingPadTop  = 6;
+constexpr uint16_t kUpperFormRowPadX    = 6;
+constexpr uint16_t kUpperFormChildGap   = 6;
+constexpr uint16_t kUpperFormPadTop     = 2;
 constexpr uint16_t kUpperFormRowH       = 14;
-constexpr uint16_t kUpperFormLabelPadLeft = 4;  // 247 - 243
-constexpr uint16_t kUpperFormValueGap    = 72;  // label takes ~12 chars × 6 = 72 → value starts near x=323
 
 // LobbyRightTallBox interior layout knobs. Box at (398, 64, 232x391).
 constexpr uint16_t kTallHeadingPadLeft = 7;   // 405 - 398
@@ -345,27 +344,30 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 	};
 
 	// First row needs padTop from heading bottom; rest stack contiguous.
+	// Row shape: GROW label on the left, FIT value pinned to the right by the
+	// label's GROW absorbing the remaining row width. childGap separates them.
 	for(int i = 0; i < 6; ++i){
 		const uint16_t rowPadTop = (i == 0) ? kUpperFormPadTop : 0;
 		CLAY({ .id = CLAY_SID(StaticId(kLabels[i].id)),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0),
 		                       CLAY_SIZING_FIXED(kUpperFormRowH) },
-		           .padding = { kUpperFormPadLeft, 0, rowPadTop, 0 },
+		           .padding = { kUpperFormRowPadX, kUpperFormRowPadX,
+		                        rowPadTop, 0 },
+		           .childGap = kUpperFormChildGap,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+		           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
 		       } }) {
-			// Label column.
+			// Label fills remaining width — value FITs on the right.
 			CLAY({ .id = CLAY_SID(StaticId((std::string("Lbl_") + kLabels[i].id).c_str())),
-			       .layout = { .padding = { kUpperFormLabelPadLeft, 0, 0, 0 } } }) {
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_FIXED(kUpperFormRowH) },
+			           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+			       } }) {
 				BankText(FromCStr(kLabels[i].label),
 				         BankTextVariant::Body, {});
 			}
-			// Spacer to push value rightward.
-			CLAY({ .id = CLAY_SID(StaticId((std::string("Spc_") + kLabels[i].id).c_str())),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIXED(kUpperFormValueGap),
-			                       CLAY_SIZING_FIXED(0) },
-			       } }) {}
 			// Value column.
 			if(i == 0){
 				BankButton(FromCStr(SecurityLabel(state.securityIndex)),
