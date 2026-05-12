@@ -222,33 +222,45 @@ void Guard::InitBT(){
 			} else {
 				state = WALKING;
 			}
-			// Climb ladder if target is on a meaningfully different vertical level.
+
 			int ydiff = signed(obj->y) - signed(y);
-			// At a platform edge facing the target — turn around instead of walking off.
 			int edgeDist = DistanceToEnd(*this, world);
-			if(state == WALKING && edgeDist >= 0 && edgeDist <= world.minwalldistance){
-				bool target_on_wall_side = mirrored ? (signed(obj->x) <= signed(x)) : (signed(obj->x) >= signed(x));
-				if(target_on_wall_side){ chasing = 0; return BTResult::Failure; }
-			}
+			bool hasLadderAhead = false;
+
+			// Check for ladder toward target. Search a wide swath ahead so we find it
+			// before the edge bail (edgeDist=35) prevents us from reaching it.
 			{ const EnemyDef* _gg = GASLoader::Get().GetEnemyDef("guard-blaster");
-			if(abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
-				Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
-				if(ladder && state == WALKING){
+			if(abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0 && state == WALKING){
+				// Search 60px ahead in the direction of travel.
+				Sint16 srch = 60;
+				Platform* ladder = world.map.TestAABB(
+					mirrored ? x - srch : x - 8, y,
+					mirrored ? x + 8   : x + srch, y,
+					Platform::LADDER);
+				if(ladder){
 					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-					if(abs(signed(center) - signed(x)) <= (_gg?_gg->ladderXTolerance:8)){
-						if(ydiff < 0 && signed(ladder->y1) < signed(y)){
-							// player above, ladder goes up
-							x = center; yv = -(_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
-							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
-						} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
-							// player below, ladder goes down
-							x = center; yv = (_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
-							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
+					bool goesDown = (ydiff > 0 && signed(ladder->y2) > signed(y));
+					bool goesUp   = (ydiff < 0 && signed(ladder->y1) < signed(y));
+					if(goesDown || goesUp){
+						hasLadderAhead = true;
+						int tol = _gg ? _gg->ladderXTolerance : 8;
+						if(abs(signed(center) - signed(x)) <= tol){
+							// Close enough — enter ladder.
+							if(goesDown){ x=center; yv=_gg?_gg->ladderClimbSpeed:5; state=LADDER; state_i=0; }
+							else         { x=center; yv=-(_gg?_gg->ladderClimbSpeed:5); state=LADDER; state_i=0; }
+							{ const EnemyDef* gd=GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_=gd?gd->ladderCooldown:120; }
 						}
+						// else: keep walking toward ladder — edge bail below is suppressed
 					}
 				}
 			}
 			} // _gg scope
+
+			// Edge bail: only when no ladder opportunity ahead.
+			if(!hasLadderAhead && edgeDist >= 0 && edgeDist <= world.minwalldistance){
+				bool target_on_wall_side = mirrored ? (signed(obj->x) <= signed(x)) : (signed(obj->x) >= signed(x));
+				if(target_on_wall_side){ chasing = 0; return BTResult::Failure; }
+			}
 		}
 		is_walking = true;
 		res_bank   = 60;
