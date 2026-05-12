@@ -1594,6 +1594,14 @@ y = platform->XtoY(x);
 state = STANDING;
 state_i = -1;
 is_on_ladder = false;
+yv = 0;
+// Reset crouched flags and BT sequence memory so the guard shoots from
+// the correct height (standing/crouched) after exiting the ladder.
+// Matches non-BT path which syncs all flags from state each tick.
+is_crouched  = false;
+is_crouching = false;
+btctx_.state.clear();
+btctx_.node_ticks.clear();
 state_i++;
 return;
 } else {
