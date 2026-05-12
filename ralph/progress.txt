@@ -144,6 +144,40 @@ below.)
   the abutting-edge sampling. Note the anomaly in
   `docs/plans/lobby-chrome-rectangles.md` rather than averaging it
   into the canonical value.
+- **Lobby palette fade-in is 16 ticks; capture screenshots at frame ≥ 30.**
+  `Game::Tick` (`game.cpp:885-893`) runs a per-state palette fade-in: each
+  Tick the displayed palette is darkened by `(15-fade_i)*8` brightness units
+  until `fade_i` reaches 16. `GoToState` resets `fade_i=0` (game.cpp:905), so
+  every state transition (incl. enter LOBBY) starts from black and ramps in
+  over 16 ticks. A screenshot taken via `cli step --frames 5` captures
+  ~31% brightness — the BG looks dim, panels look correct but the photo
+  reads as "regression". Use `cli step --frames 30` (or any value ≥ 16)
+  before any visual screenshot, OR poll the state and only screenshot once
+  observed brightness is stable (mean RGB across the full image plateaus).
+  This is the actual root cause of the C5b "BG dimness" report — not
+  anything in the panel migration. Same trap will bite any subsequent
+  iteration's screenshot capture.
+- **Distinguish stroke pixels from glyph pixels via max(RGB), not green
+  channel.** Lobby chrome stroke (palette idx 216) renders at peak max(RGB)
+  ≈ 84 pre-display gamma. Bank-text glyph cores: BodySm at max=184, Title
+  effect=152 at max=152, Heading green at max=124. A `max(rgb) >= 100`
+  threshold reliably captures glyph pixels and skips strokes / halos / BG
+  decorative texture. A green-channel-only predicate matches both stroke AND
+  green text and produces wildly wrong text extents — the lobby title
+  "Silencer" renders RED (R=152, G=28) and is invisible to a green-channel
+  finder. The verification script at `/tmp/verify_lobby_layout.py`
+  documents the canonical predicate.
+- **Stat-row position is empirical, NOT padTop+toggle-bottom.** In flex
+  TOP_TO_BOTTOM, Clay places `CharStats` content y at toggle-row-bottom +
+  `kStatsPadTop`, but bank-133 BodySm glyph rendering offsets ~3 px below
+  the bbox y. So the actual rendered y of the first stat row = padTop +
+  ~119 + 3. The "padTop=24 → first stat at y=130" math in the C4 progress
+  note was wrong by 13 px (it landed at y=143). C5c calibrates from the
+  CLAY render-command dump: `kStatsPadTop=11` lands stats at the legacy
+  y=130/143/156/169 with the XP row's last scanline at y≈180, 4 px clear
+  of the box's y=184 bottom stroke. Future panel migrations: dump CLAY
+  bboxes (env-gate fprintf in clay_bridge.cpp Render or use the inspector)
+  rather than computing positions from per-element padding math.
 
 ## 2026-05-11T17:55:00Z - C0d Box vs legacy chat-box parity (side-by-side DM)
 - Validated C0c's Box halo API against the most prominent legacy chrome
@@ -881,4 +915,94 @@ below.)
     outer-box padding can DOUBLE-shift content unless the inner constants
     are reduced. For C5b only padBottom was added (no inner constant
     competed for the bottom), so no inner adjustment was needed.
+---
+## 2026-05-11T18:45:00Z - C5c Fix C5b "regressions" — diagnose + tune + verify
+- Spec named three issues to fix: (1) character box ~50 px shorter than
+  declared; (2) BG renders dimmer than C4/C5; (3) verification didn't
+  catch (1)+(2). Diagnosis showed (1) and (2) were FALSE POSITIVES from
+  the spec author's screenshot misreading — but a real, related issue
+  did exist: stat rows render 13 px below their legacy positions, with
+  the XP row spilling visibly past the box's bottom stroke.
+
+- **Issue 1 ("box ~50 px shorter") — FALSE.** Direct pixel scan of
+  `iter-C5b.png` shows the character box stroke at y=64..184 (full
+  declared 121 px). Confirmed via the CLAY render-command dump:
+  `BORDER id=3127203028 bbox=(10,64,218x121)` — exactly the declared
+  size. The spec author misread the screenshot.
+
+- **Issue 2 ("BG dimmer in C5b vs C5") — FALSE; root cause is screenshot
+  timing during palette fade-in.** Reproduced the dimness with C5-era
+  panel files restored verbatim (same code as `iter-C5.png` capture):
+  still dim at ~3.5 mean RGB. Discovered the per-state palette fade-in
+  loop in `Game::Tick` (`game.cpp:885-893`) — `fade_i` increments
+  0..16 per Tick after every state transition, scaling palette
+  brightness by `fade_i*8`. Verified empirically: mean RGB at frame=1
+  was 0.58, frame=5 was 4.29 (matches `iter-C5b.png`'s 4.29 exactly),
+  frame=10 was 11.52, frame=30+ stable at 11.52 (matches `iter-C5.png`'s
+  11.52 exactly). The C5b screenshot used `cli step --frames 5` which
+  captures mid-fade. The C5 screenshot must have used a longer step
+  (or wallclock delay) and got post-fade. Codebase Pattern doc updated
+  with this trap.
+
+- **Issue 3 (verification didn't catch the imaginary issues) —
+  reframed as: write a stronger verification anyway.** Wrote
+  `/tmp/verify_lobby_layout.py` per spec with three categorical checks:
+  (A) box stroke bbox discovery scans for chrome-stroke pixels around
+  expected corners and asserts each rendered edge within 1 px of
+  documented; (B) text-inside-parent containment uses a calibrated
+  glyph-detector (`max(rgb) >= 100` — captures stat text, title text,
+  heading text) and asserts each named text element's pixel extent sits
+  inside its parent box; (C) BG brightness parity vs `iter-C5.png`
+  baseline (>= 90% mean RGB). All checks PASS with the C5c output.
+
+- **REAL fix: stat rows + box bottom-padding.** With `kStatsPadTop=24`
+  + `kBoxPadBottom=5` (C5b), CLAY dump showed stats at
+  y=143/156/169/182 — XP bbox y=182 ends y=193, 9 px BELOW the box's
+  y=184 bottom stroke. Visually the XP row text crashes through the
+  stroke. Reduced `kStatsPadTop` from 24→11 and `kBoxPadBottom` from
+  5→0 in `clay_character_panel.cpp`. New CLAY positions:
+  y=130/143/156/169 — XP bbox y=169 ends y=180, 4 px clear of stroke.
+  Visual verification confirms.
+
+- **Why padTop changed by 13:** stat-row y = `kStatsPadTop` + 116
+  (toggle row bottom) + ~3 (BankText baseline offset, bank 133). C4's
+  progress note "padTop=24 → first stat at y=130" forgot to subtract
+  the 13 px error in the synthesised math; the CLAY dump is the
+  authoritative source for actual rendered positions.
+
+- **Files changed:**
+  - `clients/silencer/src/ui/screens/lobby_clay/clay_character_panel.cpp`
+    — `kStatsPadTop`: 24→11, `kBoxPadBottom`: 5→0, comment block
+    rewritten to document the empirical-from-CLAY-bbox calibration.
+
+- **Quality gates:**
+  - `cmake --build build -j` — green ✓
+  - `tests/cli-agent/e2e/40_lobby_clay_basic.sh` — PASS ✓
+  - `python3 /tmp/verify_lobby_layout.py /tmp/ralph-shots/iter-C5c.png`
+    exit 0 ✓ (4 boxes + 7 text containments + brightness parity)
+  - Mean RGB iter-C5c.png = 11.55 vs iter-C5.png 11.52 (100.28% — the
+    Clay strokes are very slightly brighter than the C5 baseline because
+    the C5b chat-box top stroke now aligns with its baked counterpart
+    at idx 216 rather than offset).
+
+- **Visual self-verification (Read tool on iter-C5c.png):**
+  1. Are all four character stat rows visibly INSIDE the character
+     box's bottom stroke? **YES** — LEVEL/WINS/LOSSES/XP all sit
+     clearly above the bottom green stroke. XP row ends ~7 px clear.
+  2. Is the chat box's left + right + bottom strokes clearly visible
+     (not faded into darkness)? **YES** — chat box stroke is fully
+     bright on all sides.
+  3. Is the BG decorative texture (circuits, planet) clearly visible
+     behind the panels? **YES** — planet monitor, circuit boards, and
+     the sphere lights at bottom render at full brightness.
+  4. Anything else weird? **No** — composition matches expectations.
+     Right pane still uses the legacy sprite-based chrome (C6 territory).
+
+- **Screenshot capture protocol updated:** `/tmp/lobby_screenshot.sh`
+  changed `cli step --frames 5` → `--frames 30` to clear the 16-step
+  palette fade-in. Future iterations should use a similar value (or
+  poll until brightness plateaus) before screenshotting. NOT a
+  committed file — Ralph iteration helpers live in /tmp.
+
+- **DM:** screenshot + verification script summary sent.
 ---

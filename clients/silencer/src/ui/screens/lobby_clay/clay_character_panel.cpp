@@ -101,21 +101,23 @@ constexpr int   kBoxY             = 64;
 constexpr int   kBoxW             = 218;
 constexpr int   kBoxH             = 121;
 constexpr Uint8 kBoxStrokeColor   = 216;
-// Inside-box layout knobs — derived from the legacy on-screen widget coords:
-//   username @ (20, 71), toggle row @ y=90, stat rows @ y=130/143/156/169.
-// With box border=1 + padding={left=6, top=6} the content top-left lands
-// at (17, 71). The username wrapper adds left=3 → text at (20, 71). The
-// toggle row wrapper adds left=3 + top=4 → first toggle at (20, 86+4=90).
-// Stats wrapper adds top=24 → first stat at (17, 106+24=130). Bank-133
-// height=11 + childGap=2 yields stat rows at 130 / 143 / 156 / 169.
+// Inside-box layout knobs — calibrated against the actual rendered Clay
+// bboxes (CLAY render-command dump), not the pre-flex legacy widget coords.
+// In practice Clay places the CharStats content y at toggle-row-bottom +
+// padTop, and BankText's bank-133 glyphs render with a ~3 px top inset
+// inside their 11 px bbox. So stats LAND at y=padTop+116+3+(row*13). With
+// padTop=11 stats land at y=130/143/156/169 — XP last scanline at y≈180,
+// 4 px clear of the box's y=184 bottom stroke. Earlier C5b used padTop=24
+// which pushed stats to 143/156/169/182 — XP bbox y=182 ends y=193,
+// 9 px BELOW the bottom stroke (spills visibly).
 constexpr int kBoxPadLeft       = 6;
 constexpr int kBoxPadTop        = 6;
-constexpr int kBoxPadBottom     = 5;   // legacy XP row ends at y=180; box bottom stroke at y=185
+constexpr int kBoxPadBottom     = 0;
 constexpr int kUserPadLeft      = 3;
 constexpr int kToggleRowPadLeft = 3;
 constexpr int kToggleRowPadTop  = 4;
 constexpr int kToggleGap        = 26;  // 42 stride − 16 sprite = 26
-constexpr int kStatsPadTop      = 24;
+constexpr int kStatsPadTop      = 11;
 constexpr int kStatsChildGap    = 2;
 
 }  // namespace
