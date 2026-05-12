@@ -118,7 +118,8 @@ void Robot::InitBT() {
 		World& world = *static_cast<World*>(ctx.userData);
 		{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); xv = mirrored ? -(_gd ? _gd->speed : 4) : (_gd ? _gd->speed : 4); }
 		FollowGround(*this, world, xv);
-		{ int d = DistanceToEnd(*this, world); if(d >= 0 && d <= world.minwalldistance) mirrored = !mirrored; }
+		// Only flip at walls during patrol — not when returning to spawn (ReturnToSpawn owns orientation then).
+		if (patrol) { int d = DistanceToEnd(*this, world); if(d >= 0 && d <= world.minwalldistance) mirrored = !mirrored; }
 		return BTResult::Success;
 	};
 
