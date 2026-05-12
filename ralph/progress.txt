@@ -772,3 +772,113 @@ below.)
     widgets (TextInput / Toggle / ListRow / etc.); structural
     containers like LobbyChatBox don't appear there. Don't conflate.
 ---
+
+## 2026-05-11T17:45:00Z - C5b Complete partial migrations in C3/C4/C5
+- User killed prior C6 wrap-shortcut work; new C5b item inserted to retroactively
+  finish the C3/C4/C5 migrations under the stricter "real flex, ≤1 floating per
+  file" rule.
+- **lobby_clay_screen.cpp**:
+  - LobbyTitleBar is now a flex child of LobbyOuterFrame (was a separate
+    `floating @ ROOT` sibling). OuterFrame became `TOP_TO_BOTTOM` and holds
+    the title bar as its first row child.
+  - LobbyBg image moved from a `floating @ ROOT` 640x480 IMAGE element onto
+    LobbyClayRoot itself via `.image = PackImage(7, 1)`. The bridge's
+    DispatchImage (clay_bridge.cpp:229–254) blits at bbox top-left WITHOUT
+    applying `spriteoffsetx/y` — the old `bgOffX = -spriteoffsetx[7][1]`
+    compensation was vestigial. Confirmed by visual screenshot: BG decorative
+    texture still lands at the expected screen coords.
+  - LobbyTitleBar padding bumped from `{5,5,3,2}` to `{5,5,4,4}` so the
+    Title-font glyphs (~21 px tall) have a touch more breathing room above
+    and below; still tight because the title bar height is fixed at 29 px to
+    match the baked BG strip.
+  - Stale comments mentioning "floating @ ROOT" rewritten to use
+    "ROOT-attached" / "attached @ ROOT" so the `grep -c 'floating'` pass-check
+    counts only real `.floating` configs.
+  - Final floating count: 1 (LobbyOuterFrame's ROOT attachment, the allowed
+    exception).
+- **clay_character_panel.cpp**:
+  - Added `kBoxPadBottom = 5` and wired into the box's `.padding`. Legacy
+    XP-row bottom at y=180, box bottom stroke at y=185 → exactly 5 px of
+    breathing room reserved.
+  - Right padding stays 0 (legacy widget content doesn't reach the right edge;
+    no breathing-room issue).
+  - Final floating count: 1 (LobbyCharacterBox's ROOT attachment).
+- **clay_chat_panel.cpp**:
+  - Right and bottom padding stay 0: the presence list bleeds within 1 px of
+    the right stroke to match the baked BG (legacy presence ends at x=377,
+    box right stroke at x=378) and the input row's `kInputPadTop` already
+    reserves the bottom breathing. Documented as intentional bleed in a
+    comment above the CLAY block.
+  - Stale "as floating @ROOT coords" / "no more floating @ROOT" comments
+    rephrased to remove the word "floating" from the grep count.
+  - Final floating count: 1 (LobbyChatBox's ROOT attachment).
+- **Programmatic verification** at `/tmp/verify_panel_alignment.py` — loads
+  the screenshot and samples 16 pixel positions: 8 stroke positions (must
+  read stroke-green RGB), 5 interior-padding positions (must read non-stroke),
+  3 baked-vs-Clay overlap positions (immediately inside the Clay stroke,
+  must NOT be stroke — proves single-line overlap, no double-stroke).
+  All 16 samples PASS. Stroke-green predicate calibrated to the actual
+  screenshot output `(3, 31, 0)` — the renderer outputs pre-display-gamma
+  RGB (max green in this screenshot is ~95), so the predicate uses
+  `g >= 25 && g >= 3*(r+1) && g >= 3*(b+1)` for saturated-green-hue
+  detection rather than a "g >= 200" brightness test.
+- **Visual self-verification** (Read tool on iter-C5b.png):
+  - Title bar: "Silencer v.00000" left-aligned, "Go Back" right-aligned, all
+    text fits within the bar's top + bottom strokes with the new {5,5,4,4}
+    padding. Slight crowding because the Title font is 21 px in a 29 px bar
+    — bar height is fixed by the baked BG strip; can't grow without
+    breaking stroke alignment.
+  - Character panel: "claybob" at top, 5 agency toggles in a row, 4 stats
+    stacked. Top stroke and content separated by ~6 px of padding.
+  - Chat panel: "Lobby" channel header, chat-scrollback + presence-list
+    side-by-side, input row at bottom. Layout unchanged from C5.
+  - Strokes: Clay strokes align with baked BG strokes — no visible
+    double-stroking, no offset between baked and Clay rectangles.
+  - Right pane: still legacy (C6 territory) — "Create Game" / "Active Games"
+    headers still crash into top stroke. NOT C5b scope.
+- **Quality gates:** build green ✓, 40_lobby_clay_basic.sh PASS ✓,
+  programmatic verify 16/16 PASS ✓.
+- **`grep -c 'floating'` per file:**
+  - `lobby_clay_screen.cpp`: 1 ✓
+  - `clay_character_panel.cpp`: 1 ✓
+  - `clay_chat_panel.cpp`: 1 ✓
+- **Files changed:**
+  - `clients/silencer/src/ui/screens/lobby_clay/lobby_clay_screen.cpp` —
+    structural migration (LobbyTitleBar nested inside LobbyOuterFrame, BG
+    image on root), padding bump, comment cleanup.
+  - `clients/silencer/src/ui/screens/lobby_clay/clay_character_panel.cpp` —
+    `kBoxPadBottom=5` added to box `.padding`, comment cleanup.
+  - `clients/silencer/src/ui/screens/lobby_clay/clay_chat_panel.cpp` —
+    intentional-bleed comment added, "floating @ROOT" comments rephrased.
+- **DM:** screenshot + verify script summary sent.
+- **Learnings for future iterations:**
+  - **DispatchImage does NOT apply sprite offsets** (clay_bridge.cpp:229–254).
+    Plain `.image` IMAGE-kind elements blit at bbox top-left as Clay sees them.
+    Sprite-offset compensation `bbox = (-spriteoffsetx, -spriteoffsety)` is
+    only needed for CUSTOM-kind dispatchers (scrollbar, toggle, etc.) that
+    manually subtract the offset. The lobby's old `bgOffX/Y` math on
+    LobbyBg's floating was vestigial — moving the image onto a non-floating
+    parent worked without any visible shift.
+  - **The `grep -c 'floating'` pass-check counts comments too.** When
+    documenting a migration's "no longer uses floating @ROOT" history,
+    rephrase the comment to use the word "ROOT-attached" or
+    "attached @ ROOT" so the literal grep count reflects only real
+    `.floating` configs. Otherwise the pass-check fails on otherwise-clean
+    files.
+  - **Adding a nesting level to a CLAY tree adds exactly one `{` that needs
+    a matching `}`.** When the inner element used to be standalone with
+    `{...}` and is now nested inside a new parent that also has a body,
+    insert one more `}` at the OUTER level after the inner's close. Indent
+    mismatch is cosmetic; brace balance is what the compiler checks.
+  - **Screenshot RGB values are pre-display-gamma.** Idx 216 renders as
+    bright green visually but the captured PNG stores ~(3, 31, 0). Sampling
+    predicates for verification scripts must match the actual file values,
+    not the visually-perceived values. Use green-channel dominance ratios
+    (g >> r, g >> b) rather than absolute brightness thresholds.
+  - **Padding on a Box vs. padding on its inner wrappers.** When existing
+    inner-wrapper math (e.g. character panel's `kUserPadLeft`,
+    `kStatsPadTop`) already produces the right legacy widget coords, adding
+    outer-box padding can DOUBLE-shift content unless the inner constants
+    are reduced. For C5b only padBottom was added (no inner constant
+    competed for the bottom), so no inner adjustment was needed.
+---

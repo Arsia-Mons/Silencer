@@ -34,9 +34,8 @@ namespace {
 
 // Chat panel widget dimensions — preserved from the legacy chat_panel.cpp
 // Build. The X/Y origins are now DERIVED from the LobbyChatBox flex layout
-// (see kBox*/kChannelWrap*/kBodyPad*/kInput* below) rather than spelled
-// as floating @ROOT coords, but the widget extents below are still
-// authoritative inputs to the layout math.
+// (see kBox*/kChannelWrap*/kBodyPad*/kInput* below); widget extents are
+// still authoritative inputs to the layout math.
 constexpr Uint16 kChatW        = 242;
 constexpr Uint16 kChatH        = 207;
 constexpr Uint16 kPresW        = 110;
@@ -227,10 +226,10 @@ void BuildChatPanelTree(ChatPanelState & state,
                         Resources & resources) {
 	// LobbyChatBox — Clay-drawn chrome around the chat region. Replaces
 	// the legacy `ChatBorder` (bank 7 idx 11) and `ChatInputBorder` (bank
-	// 7 idx 14) IMAGE sprites that were stamped at (-spriteoffsetx,
-	// -spriteoffsety). The Box's flex layout positions the channel
-	// header, the chat-scrollback / presence-list body row, and the
-	// chat input — no more floating @ROOT for the chat subtree.
+	// 7 idx 14) IMAGE sprites. The Box's flex layout positions the
+	// channel header, the chat-scrollback / presence-list body row, and
+	// the chat input via padding + childGap; no inner element positions
+	// itself absolutely.
 	(void)resources;
 
 	// Prepare slabs + opts BEFORE the CLAY block so the inside of the
@@ -273,6 +272,10 @@ void BuildChatPanelTree(ChatPanelState & state,
 	inOpts.showCaret   = false;
 	inOpts.inactive    = false;
 
+	// Right/bottom padding stay 0: the presence list bleeds within 1 px of
+	// the right stroke to match the baked BG (legacy presence ends at x=377,
+	// box right stroke at x=378); the input row bleeds within ~4 px of the
+	// bottom stroke (handled by kInputPadTop accounting).
 	CLAY({ .id = CLAY_ID("LobbyChatBox"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)kBoxW),

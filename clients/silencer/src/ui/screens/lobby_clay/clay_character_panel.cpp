@@ -110,6 +110,7 @@ constexpr Uint8 kBoxStrokeColor   = 216;
 // height=11 + childGap=2 yields stat rows at 130 / 143 / 156 / 169.
 constexpr int kBoxPadLeft       = 6;
 constexpr int kBoxPadTop        = 6;
+constexpr int kBoxPadBottom     = 5;   // legacy XP row ends at y=180; box bottom stroke at y=185
 constexpr int kUserPadLeft      = 3;
 constexpr int kToggleRowPadLeft = 3;
 constexpr int kToggleRowPadTop  = 4;
@@ -170,14 +171,17 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 
 	// LobbyCharacterBox — Clay-drawn chrome around the character widgets.
 	// Children lay out via TOP_TO_BOTTOM flex (username, toggle row, stats
-	// column) inside the box; positions emerge from the per-row padding
-	// constants above, not from floating @ ROOT.
+	// column) inside the box. Box's outer .padding gives the username text
+	// breathing room from the top stroke; padBottom matches so the XP row
+	// breathes from the bottom stroke. Right padding stays 0 because no
+	// content abuts the right edge.
 	CLAY({ .id = CLAY_ID("LobbyCharacterBox"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(kBoxW),
 	                       CLAY_SIZING_FIXED(kBoxH) },
 	           .padding = { /*left=*/(uint16_t)kBoxPadLeft, /*right=*/0,
-	                        /*top=*/(uint16_t)kBoxPadTop,  /*bottom=*/0 },
+	                        /*top=*/(uint16_t)kBoxPadTop,
+	                        /*bottom=*/(uint16_t)kBoxPadBottom },
 	           .childGap = 0,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       },

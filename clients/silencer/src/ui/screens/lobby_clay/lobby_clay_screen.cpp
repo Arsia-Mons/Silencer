@@ -82,9 +82,9 @@ void OnGoBackClicked(void * user)
 
 // Lobby chrome geometry — derived from the baked LobbyBg sprite. The outer
 // frame spans the panel-area bounding box (top of the title strip down to the
-// bottom of the chat-box / right pane). The title bar matches the BG's "top
-// frame strip" rectangle (C2: lobby-chrome-rectangles.md). LobbyBg is still
-// emitted underneath this iteration — C7 drops it.
+// bottom of the chat-box / right pane). The title bar is the first child of
+// the outer frame (TOP_TO_BOTTOM flex). C7 drops the baked LobbyBg, leaving
+// only the Clay-drawn strokes.
 constexpr int kChromeOriginX = 10;
 constexpr int kChromeOriginY = 25;
 constexpr int kChromeOuterW  = 620;   // x = 10..629
@@ -93,30 +93,23 @@ constexpr int kTitleBarH     = 29;    // y = 25..53
 constexpr Uint8 kChromeStrokeColor = 216;  // C2 canonical lobby chrome primary
 
 // Emits the lobby chrome:
-//   • Fullscreen LobbyBg image (bank 7 idx 1) — still drawn this iteration.
-//   • LobbyOuterFrame — Box-shaped CLAY container, primary stroke matching the
-//     baked chrome, sized to bound the panel area. No flex children yet
-//     (C4–C6 relocate panel subtrees inside it).
-//   • LobbyTitleBar — Box-shaped CLAY container, LEFT_TO_RIGHT flex, holds
-//     title / version / mapname / Go Back button as children. Replaces the
-//     prior `floating @ ROOT` placement of those four elements.
+//   • LobbyClayRoot — fullscreen 640x480, carries the LobbyBg image
+//     (bank 7 idx 1) as its own .image. C7 drops the image; the Clay
+//     strokes become the only chrome.
+//   • LobbyOuterFrame — Box-shaped CLAY container, attached @ ROOT at the
+//     panel-area top-left. TOP_TO_BOTTOM flex; the title bar is the first
+//     child. Panel subtrees (character/chat/right-pane) still attach
+//     separately to ROOT until their own iterations move them in.
+//   • LobbyTitleBar — flex child of LobbyOuterFrame. LEFT_TO_RIGHT row
+//     holding title / version / mapname / Go Back button.
 //
-// Both Box containers float @ ROOT for absolute pixel positioning so this
-// iteration leaves the panel screens (which still float @ ROOT for their own
-// positioning) undisturbed. The CHILDREN of the title bar lay out via flex,
-// not floating — that's the load-bearing structural change. Halos are
-// deferred to C7; with LobbyBg still under, the primary stroke at the
-// canonical idx 216 lands on top of the baked stroke pixels, no double-render
-// artifact.
-//
-// Sprite-element positions COMPENSATE for the resource's per-frame anchor
-// offset (`spriteoffsetx/y`) for the LobbyBg image. The Go Back button and
-// text elements no longer need anchor compensation because they live inside
-// the title bar's flex flow rather than at absolute screen coordinates.
+// LobbyOuterFrame is the ONE allowed ROOT-attached chrome wrapper in this
+// file (C5b rule). Every inner child positions via flex padding / gap /
+// alignment.
 void BuildChromeTree(LobbyClayScreen * screen,
                      const std::string & version,
                      const std::string & mapName,
-                     Resources & resources)
+                     Resources & /*resources*/)
 {
 	using namespace silencer::clay_bridge;
 	using silencer::ui::primitives::FormBorder;
@@ -124,45 +117,34 @@ void BuildChromeTree(LobbyClayScreen * screen,
 	const int W = 640;
 	const int H = 480;
 
-	const int bgOffX = -resources.spriteoffsetx[7][1];
-	const int bgOffY = -resources.spriteoffsety[7][1];
-
 	CLAY({ .id = CLAY_ID("LobbyClayRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
-	       } }) {
-		CLAY({ .id = CLAY_ID("LobbyBg"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
-		       },
-		       .image = { .imageData = PackImage(7, 1) },
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset = { (float)bgOffX, (float)bgOffY } } }) {}
+	       },
+	       .image = { .imageData = PackImage(7, 1) } }) {
 
 		CLAY({ .id = CLAY_ID("LobbyOuterFrame"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(kChromeOuterW),
 		                       CLAY_SIZING_FIXED(kChromeOuterH) },
-		       },
-		       .border = FormBorder(kChromeStrokeColor),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset = { (float)kChromeOriginX,
-		                                 (float)kChromeOriginY } } }) {}
-
-		CLAY({ .id = CLAY_ID("LobbyTitleBar"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kChromeOuterW),
-		                       CLAY_SIZING_FIXED(kTitleBarH) },
-		           .padding = { /*left=*/5, /*right=*/5,
-		                        /*top=*/3, /*bottom=*/2 },
-		           .childGap = 6,
-		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-		           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .border = FormBorder(kChromeStrokeColor),
 		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
 		                     .offset = { (float)kChromeOriginX,
 		                                 (float)kChromeOriginY } } }) {
+
+			CLAY({ .id = CLAY_ID("LobbyTitleBar"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_FIXED(kChromeOuterW),
+			                       CLAY_SIZING_FIXED(kTitleBarH) },
+			           .padding = { /*left=*/5, /*right=*/5,
+			                        /*top=*/4, /*bottom=*/4 },
+			           .childGap = 6,
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+			           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+			       },
+			       .border = FormBorder(kChromeStrokeColor) }) {
 			CLAY({ .id = CLAY_ID("LobbyTitle") }) {
 				BankText(CLAY_STRING("Silencer"),
 				         BankTextVariant::Title,
@@ -209,6 +191,7 @@ void BuildChromeTree(LobbyClayScreen * screen,
 				             .user = screen });
 			}
 		}
+	}
 
 		// Inspector registration uses the legacy on-screen rect for click
 		// routing. The button's actual flex-derived bbox lands in roughly the
