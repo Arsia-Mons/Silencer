@@ -186,11 +186,20 @@ void Guard::InitBT(){
 	};
 
 	// UncrouchIdle: uncrouch when guard has lost sight of target while crouched.
+	// Returns Failure immediately if not crouched (allows sel_top to fall through to Chase/Patrol).
 	btctx_.actions["UncrouchIdle"] = [this](BTContext& ctx) -> BTResult {
-		if(ctx.bb<bool>("target_seen")) return BTResult::Failure;
-		if(state == CROUCHED){ state = UNCROUCHING; state_i = 0; return BTResult::Running; }
-		if(state == UNCROUCHING) return BTResult::Running;
-		return BTResult::Failure;
+		if(!is_crouched && !is_crouching) return BTResult::Failure;
+		xv = 0;
+		int tick = ctx.elapsedTicks();
+		int frame = 9 - tick;
+		res_bank  = 158;
+		res_index = frame > 0 ? frame : 0;
+		if(tick >= 9){
+			is_crouched  = false;
+			is_crouching = false;
+			return BTResult::Success;
+		}
+		return BTResult::Running;
 	};
 
 	// Chase: walk toward the chasing target. Only when patrol=true.
@@ -444,6 +453,10 @@ void Guard::InitBT(){
 		if(stk >= sp.count){
 			ctx.state.erase(stkKey);
 			is_shooting = false;
+			// Hold the last frame of the appropriate idle so the 1-tick Success return
+			// doesn't revert to the default res_bank=59 (standing) set before the BT tick.
+			if(dir == 1){ res_bank = 158; res_index = 9; }
+			else         { res_bank = sp.bank; res_index = 0; }
 			return BTResult::Success;
 		}
 		ctx.state[stkKey] = stk + 1;
