@@ -1134,3 +1134,71 @@ below.)
     state.maps[i] which carries the sentinel for state lookup elsewhere.**
     Pattern is consumer-side only — keep state values intact.
 ---
+
+## 2026-05-11T19:30:00Z - C7 Drop LobbyBg sprite from the Clay tree
+- Removed the `.image = { .imageData = PackImage(7, 1) }` from
+  `LobbyClayRoot` in `lobby_clay_screen.cpp`. The baked LobbyBg
+  sprite (with its decorative circuit-board / planet-monitor /
+  photo-collage texture AND its stroked panel rectangles) no longer
+  participates in the lobby render. The Clay-drawn strokes from
+  C3–C6 (outer frame + title bar + character box + chat box + right
+  upper/tall boxes) are now the ONLY chrome on screen.
+- **Background color decision.** Spec gave the option to set a
+  `.backgroundColor` on `LobbyRoot` if pure-black behind chrome read
+  badly. Sampled the legacy `/tmp/lobby_bg.png` outside-the-outer-
+  frame area at (0,0), (2,2), (5,5), (2,20), (5,40), (2,60), (2,200),
+  (2,300), (2,470) — every sample was RGB (0,0,0). Black IS the
+  legacy color. No `.backgroundColor` needed; the Clay default (no
+  fill) reads as the dst-buffer black.
+- **Files changed:**
+  - `clients/silencer/src/ui/screens/lobby_clay/lobby_clay_screen.cpp`
+    — removed `.image` from `LobbyClayRoot` (1 line), updated the
+    block comment above `BuildChromeTree` to reflect the post-C7
+    state.
+- **Quality gates:** build green ✓; 40_lobby_clay_basic.sh PASS ✓.
+- **Visual self-verification.**
+  - Opened `/tmp/ralph-shots/iter-C7.png` (full lobby screenshot).
+    Confirmed visually: outer frame + title bar + character box +
+    chat box + right upper + right tall strokes are all clean, no
+    decorative texture, no double-stroking (since there's no
+    underlying baked stroke to mis-align with), text inside each
+    Box has clear breathing room from the stroke.
+  - Programmatic pixel check at `/tmp/verify_c7.py`: 7 chrome-stroke
+    samples assert `(R, G, B)` near the bright-green stroke pixel at
+    expected coords (LobbyOuterFrame TL/top-mid/bottom-mid; right-
+    upper box TL; right-tall box TL). All 7 pass. 5 "decorative
+    texture must be gone" samples take random pixels that were
+    NON-black in the baked BG (e.g. (264,319)=(32,40,32),
+    (127,345)=(40,56,40)) and assert the on-screen pixel is NOT
+    near the baked-texture color — all 5 now read pure (0,0,0).
+    Overall PASS.
+- **Inspector check note.** Spec's pass_check says "Clay inspector
+  shows NO `LobbyBg` element." `LobbyBg` was never a Clay element ID
+  in this codebase — it was just the IMAGE config attached to
+  `LobbyClayRoot`. The clay_inspector module tracks `Widget` objects
+  (label-routed click targets), not raw IMAGE render commands. Grep
+  for `PackImage(7,1)` and `LobbyBg` across `clients/silencer/src/ui`
+  returns 0 matches post-edit; source absence + visual verification
+  are the authoritative gates, not the widget registry.
+- **DM sent:** "Chrome Ralph iter C7 · drop LobbyBg sprite · pass=true"
+  with `/tmp/ralph-shots/iter-C7.png` attached.
+- **Learnings for future iterations:**
+  - **`LobbyBg` was the LAST IMAGE config attached to `LobbyClayRoot`**.
+    Now `LobbyClayRoot` is a pure layout container (sizing only). If a
+    future iteration needs to put something IMAGE-shaped behind the
+    panels (e.g., the deferred sphere-lights film strip), attach it as
+    a sibling child of `LobbyClayRoot`, not as `.image` on the root —
+    the root's role is purely layout now.
+  - **"Inspector element check" pass-checks for raw Clay tree nodes
+    don't have a clean dispatch path.** `cli inspect` returns the
+    Widget registry, which is a label-keyed click target list, not the
+    full Clay render tree. To assert presence/absence of a non-widget
+    Clay element id in future iterations, either (a) grep the source
+    for the literal `CLAY_ID("name")` after the edit, or (b) dump
+    the `Clay_RenderCommandArray` via an env-gated fprintf in
+    `clay_bridge.cpp` Render. The widget registry is not the right
+    instrument for this.
+  - **Pure-black is the canonical "behind chrome" color** for the
+    lobby. If a future panel migration wonders whether to set a
+    `.backgroundColor`, the answer is no — black is the legacy.
+---

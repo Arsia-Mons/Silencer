@@ -109,9 +109,9 @@ constexpr int kRightTallW  = 232;
 constexpr int kRightTallH  = 391;
 
 // Emits the lobby chrome:
-//   • LobbyClayRoot — fullscreen 640x480, carries the LobbyBg image
-//     (bank 7 idx 1) as its own .image. C7 drops the image; the Clay
-//     strokes become the only chrome.
+//   • LobbyClayRoot — fullscreen 640x480. C7 dropped the baked LobbyBg
+//     image; the legacy outside-chrome area was pure-black anyway, so no
+//     backgroundColor is needed. The Clay strokes are now the only chrome.
 //   • LobbyOuterFrame — Box-shaped CLAY container, attached @ ROOT at the
 //     panel-area top-left. TOP_TO_BOTTOM flex; the title bar is the first
 //     child. Panel subtrees (character/chat/right-pane) still attach
@@ -136,8 +136,7 @@ void BuildChromeTree(LobbyClayScreen * screen,
 	CLAY({ .id = CLAY_ID("LobbyClayRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
-	       },
-	       .image = { .imageData = PackImage(7, 1) } }) {
+	       } }) {
 
 		CLAY({ .id = CLAY_ID("LobbyOuterFrame"),
 		       .layout = {

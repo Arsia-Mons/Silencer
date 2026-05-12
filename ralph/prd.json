@@ -99,7 +99,7 @@
     {
       "id": "C7",
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "name": "Drop LobbyBg sprite from the Clay tree",
       "spec": "Remove the `LobbyBg` IMAGE element (bank 7 idx 1) from the lobby's Clay tree (search `LobbyBg` in `lobby_clay_screen.cpp`). The visual goes from `baked chrome under Clay Boxes` to `Clay Boxes alone`. Decorative texture (circuit boards, planet monitor, photo collage) disappears — that's intentional.\n\nIf you need a background color behind the panels to avoid a stark black (e.g., to mirror the legacy dark-grey-ish behind-chrome), set a `.backgroundColor` on the LobbyRoot — but do NOT introduce a new sprite. Flat color only.",
       "pass_check": "Build green. 40_lobby_clay_basic.sh green. Clay inspector shows NO `LobbyBg` element. Screenshot DM'd — should show only the Clay-drawn Boxes + panel content, no decorative texture."
