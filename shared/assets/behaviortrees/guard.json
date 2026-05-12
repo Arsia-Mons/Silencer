@@ -10,7 +10,8 @@
     { "key": "target_invisible", "type": "bool",   "default": false },
     { "key": "was_hit",          "type": "bool",   "default": false },
     { "key": "health_pct",       "type": "float",  "default": 1.0   },
-    { "key": "ladder_shoot_dir", "type": "int",    "default": 6     }
+    { "key": "ladder_shoot_dir", "type": "int",    "default": 6     },
+    { "key": "alert_cooldown",   "type": "int",    "default": 0     }
   ],
   "nodes": {
     "root": {

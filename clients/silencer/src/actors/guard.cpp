@@ -434,8 +434,11 @@ void Guard::InitBT(){
 	// AlertTurn: scan AABB for nearby projectiles. If found, flip mirrored toward the
 	// threat so the next Patrol step moves in that direction. Always returns Failure so
 	// the Selector continues to seq_patrol — this is a pure direction side-effect.
+	// Cooldown of 60 ticks after each trigger prevents re-flipping while the guard walks.
 	btctx_.actions["AlertTurn"] = [this](BTContext& ctx) -> BTResult {
 		if(is_shooting || state == CROUCHING || state == CROUCHED || state == SHOOTCROUCHED) return BTResult::Failure;
+		int cooldown = ctx.bb<int>("alert_cooldown", 0);
+		if(cooldown > 0) { ctx.bbSet("alert_cooldown", cooldown - 1); return BTResult::Failure; }
 		World& world = *static_cast<World*>(ctx.userData);
 		std::vector<Uint8> types = {
 			ObjectTypes::BLASTERPROJECTILE, ObjectTypes::LASERPROJECTILE,
@@ -448,10 +451,8 @@ void Guard::InitBT(){
 		int dy = gd ? gd->threatDetectY : 100;
 		std::vector<Object*> objects = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
 		if(objects.empty()) return BTResult::Failure;
-		// Don't override direction when guard is at a wall — Patrol's flip takes priority.
-		int d = DistanceToEnd(*this, world);
-		if(d >= 0 && d <= world.minwalldistance) return BTResult::Failure;
 		mirrored = (objects[0]->x < x); // face toward the incoming projectile
+		ctx.bbSet("alert_cooldown", 60); // suppress re-trigger for ~2s so patrol can stabilize
 		return BTResult::Failure; // let Selector fall through to patrol in new direction
 	};
 
