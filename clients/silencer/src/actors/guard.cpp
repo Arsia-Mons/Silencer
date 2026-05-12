@@ -229,6 +229,10 @@ void Guard::InitBT(){
 		is_walking = true;
 		res_bank   = 60;
 		res_index  = ctx.elapsedTicks() % 19;
+		{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+		  Sint8 spd = gd ? gd->speed : speed;
+		  xv = mirrored ? -spd : spd;
+		  FollowGround(*this, world, xv); }
 		return BTResult::Running;
 	};
 
@@ -425,7 +429,9 @@ void Guard::InitBT(){
 				}
 				xv = 0;
 				is_shooting = false;
-				res_bank  = 59; res_index = 0;
+				// Use crouched idle when shooting dir=1 (crouched), standing idle otherwise.
+				if(dir == 1){ res_bank = 158; res_index = 9; }
+				else         { res_bank = 59;  res_index = 0; }
 				ctx.state[stkKey] = -1;
 				return BTResult::Running;
 			}
@@ -743,6 +749,10 @@ void Guard::InitBT(){
 
 	btctx_.actions["IsCrouched"] = [this](BTContext&) -> BTResult {
 		return is_crouched ? BTResult::Success : BTResult::Failure;
+	};
+
+	btctx_.actions["IsNotCrouched"] = [this](BTContext&) -> BTResult {
+		return !is_crouched ? BTResult::Success : BTResult::Failure;
 	};
 
 	btctx_.actions["IsShooting"] = [this](BTContext&) -> BTResult {

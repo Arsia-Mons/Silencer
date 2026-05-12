@@ -39,11 +39,12 @@
     "seq_shoot_forward": {
       "type": "Sequence",
       "label": "Shoot forward",
-      "children": ["leaf_can_see_forward", "leaf_shoot_standing"],
+      "children": ["leaf_can_see_forward", "leaf_is_not_crouched", "leaf_shoot_standing"],
       "props": {}
     },
-    "leaf_can_see_forward": { "type": "Leaf", "label": "CanSeeForward", "children": [], "props": { "action": "CanSeeForward" } },
-    "leaf_shoot_standing": { "type": "Leaf", "label": "Shoot(0)", "children": [], "props": { "action": "Shoot", "direction": 0 } },
+    "leaf_can_see_forward":  { "type": "Leaf", "label": "CanSeeForward",  "children": [], "props": { "action": "CanSeeForward"  } },
+    "leaf_is_not_crouched":  { "type": "Leaf", "label": "IsNotCrouched?", "children": [], "props": { "action": "IsNotCrouched"  } },
+    "leaf_shoot_standing":   { "type": "Leaf", "label": "Shoot(0)",       "children": [], "props": { "action": "Shoot", "direction": 0 } },
 
     "seq_shoot_low_crouched": {
       "type": "Sequence",
