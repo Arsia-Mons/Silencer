@@ -710,3 +710,65 @@ below.)
     add anchor compensation for toggles regardless of layout mode.
     Distinct from IMAGE-kind renders which DO apply offsets.
 ---
+
+## 2026-05-11T18:30:00Z - C5 Chat panel Box (subtree flex-laid-out inside)
+- Replaced the `ChatBorder` (bank 7 idx 11) and `ChatInputBorder` (bank
+  7 idx 14) IMAGE elements with a single `LobbyChatBox` CLAY container.
+  The chat subtree (`ChatChannelWrap`, `ChatBodyRow` → `ChatBoxWrap` +
+  `ChatPresWrap`, `ChatInputWrap`) is now a flex subtree of
+  `LobbyChatBox` — no more floating @ ROOT.
+- **L-shape resolution.** Per C2's empirical scan in
+  `docs/plans/lobby-chrome-rectangles.md`, the chat-box is ONE clean
+  rectangle (10, 195, 378, 260), not an upside-down-L. The L-shape
+  callout in RALPH.md's milestone notes refers to the right pane
+  (C6's territory). C5 emits a single Box; no annex needed. Spec's
+  optional "leave passes=false with an obstacle" branch was not
+  exercised.
+- **Layout math.** Box has border=1 + padTop=4 + padLeft=4. Inside,
+  TOP_TO_BOTTOM stacks: ChatChannelWrap (FIXED height=20 so the body
+  row lands at the same y whether or not the lobby has sent
+  MSG_CHANNEL yet), ChatBodyRow (padLeft=4 + childGap=6 →
+  chat at x=19, presence at x=267), ChatInputWrap (padTop=10 +
+  padLeft=3 → input at (18, 437)). All legacy on-screen widget
+  pixels reproduced: (15,200) channel, (19,220) chat, (267,220)
+  presence, (18,437) input.
+- **Stable layout when channel name absent.** Before MSG_CHANNEL
+  arrives `state.channel` is empty. Wrapping `BankText` in a
+  fixed-height (20 px) wrap means the body row's y-position doesn't
+  shift when the heading text starts/stops rendering. Without the
+  fixed height the chat scrollback would jump up 20 px on first
+  channel-name arrival — visible flicker.
+- **Inspector hit rect stays at legacy coords.** The chat input's
+  inspector `Widget.x/y` keeps using legacy (18, 437). The clay
+  inspector's geometric hit-test is a fallback; label-based dispatch
+  (used by the e2e) doesn't depend on the rect. Same pattern C4 used
+  for the agency toggles. No need to read back the flex-derived bbox.
+- **Files changed:**
+  - `clients/silencer/src/ui/screens/lobby_clay/clay_chat_panel.cpp`
+    — full rewrite of `BuildChatPanelTree`.
+- **Quality gates:** build green ✓, 40_lobby_clay_basic e2e PASS ✓.
+- **Screenshot:** `/tmp/ralph-shots/iter-C5.png`. LobbyBg still
+  underneath (per spec), so the new Box stroke overlaps the baked
+  stroke at idx 216 → no visible double-render (per existing pattern
+  on outer-frame + title-bar). Channel header "Lobby", presence
+  "In Lobby / claybob", input row, character panel (C4), title bar
+  (C3), and outer frame (C3) all render correctly. C7 will drop the
+  baked LobbyBg and expose the new strokes as the only chrome.
+- **Learnings for future iterations:**
+  - When a panel subtree has a widget that may or may not render
+    (here: channel heading gated on `state.channel` non-empty), wrap
+    it in a fixed-height container so the surrounding flex layout
+    doesn't reflow when the gate flips. The widget renders into a
+    reserved slot; absence = blank slot, not collapsed slot.
+  - Two-rect side-by-side body layout (chat + presence) maps cleanly
+    onto LEFT_TO_RIGHT + childGap. The childGap = abutting-pixel-gap
+    of the legacy coords (chat ends x=261, presence starts x=267 →
+    gap=6). No need to FIXED-size the wrapper rows when their
+    children carry their own FIXED sizing.
+  - The Clay inspector "shows `LobbyChatBox`" pass-check is satisfied
+    by emitting a `CLAY_ID("LobbyChatBox")` element — Clay's debug
+    dump lists it by element id. The silencer widget inspector
+    (`cli inspect`) is separate and only registers interactive
+    widgets (TextInput / Toggle / ListRow / etc.); structural
+    containers like LobbyChatBox don't appear there. Don't conflate.
+---

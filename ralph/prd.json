@@ -67,7 +67,7 @@
     {
       "id": "C5",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "name": "Chat panel Box (subtree flex-laid-out inside; resolve L-shape)",
       "spec": "Emit a Box for the chat panel area. The chat region in the BG may be an upside-down-L — per C2's analysis, either (a) compose two Boxes that visually join into the L, or (b) leave passes=false with an obstacle entry asking for human input. Prefer (a) if a clean composition is possible.\n\nRelocate the chat subtree (`clay_chat_panel.cpp` — search `ChatBorder`, `ChatChannelWrap`, `ChatBoxWrap`, `ChatPresWrap`, `ChatInputWrap`) inside the new Box(es) via flex. Keep existing primitive use (ScrollTextBox × 2, TextInput, BankText). Note: `ChatBorder` and `ChatInputBorder` were IMAGE elements pointing at legacy chrome sprites (bank 7 idx 11 and 14) — those become redundant once your Box primitive is doing the chrome. Remove them from the tree.\n\nLobbyBg still STAYS underneath this iteration.",
       "pass_check": "Build green. 40_lobby_clay_basic.sh green. Chat works end-to-end (typing + enter sends; presence list renders). Clay inspector shows `LobbyChatBox` (and `LobbyChatBoxAnnex` or similar if you composed an L). Screenshot DM'd. If the L is unresolvable, passes stays false with a documented obstacle."
