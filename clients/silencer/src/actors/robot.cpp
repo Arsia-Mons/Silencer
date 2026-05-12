@@ -118,16 +118,12 @@ void Robot::InitBT() {
 		World& world = *static_cast<World*>(ctx.userData);
 		{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); xv = mirrored ? -(_gd ? _gd->speed : 4) : (_gd ? _gd->speed : 4); }
 		FollowGround(*this, world, xv);
-		// Suppress wall-flip only during return-to-spawn — ReturnToSpawn owns orientation then.
-		// During search phase and normal patrol, flip as usual.
-		{ const EnemyDef* _gd2 = GASLoader::Get().GetEnemyDef("robot");
-		  const int _stout = _gd2 && _gd2->searchTicks > 0 ? _gd2->searchTicks : 600;
-		  bool returning = !patrol && bt_walk_ticks_ >= _stout;
-		  if (!returning) { int d = DistanceToEnd(*this, world); if(d >= 0 && d <= world.minwalldistance) mirrored = !mirrored; } }
+		{ int d = DistanceToEnd(*this, world); if(d >= 0 && d <= world.minwalldistance) mirrored = !mirrored; }
 		return BTResult::Success;
 	};
 
 	// ReturnToSpawn: after search phase (!patrol, searchTicks from GAS), walk back to spawn and sleep.
+	// Owns its own movement (returns Running) so Patrol never clobbers mirrored during return.
 	// If a target is spotted en-route, reset the search timer and resume hunting.
 	btctx_.actions["ReturnToSpawn"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
@@ -139,14 +135,16 @@ void Robot::InitBT() {
 			bt_walk_ticks_ = 0; // target spotted — reset and keep hunting
 			return BTResult::Failure;
 		}
-		// Orient toward spawn and let Patrol move us there
+		// Orient toward spawn, drive movement directly — Patrol must not run during return.
 		mirrored = (signed(originalx) < signed(x));
-		if (abs(signed(x) - signed(originalx)) <= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->returnProximity : 20)) {
+		if (abs(signed(x) - signed(originalx)) <= (_rd ? _rd->returnProximity : 20)) {
 			state = SLEEPING;
 			state_i = -1;
 			return BTResult::Success;
 		}
-		return BTResult::Failure; // not at spawn yet — Patrol will move us
+		{ const Sint8 spd = _rd ? _rd->speed : 4; xv = mirrored ? -spd : spd; }
+		FollowGround(*this, world, xv);
+		return BTResult::Running; // Running keeps Patrol from running this tick
 	};
 
 	// Shoot: drives 36-tick shoot animation (res_bank=46), fires rocket at frame 11.
