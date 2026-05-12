@@ -226,6 +226,8 @@ void Robot::InitBT() {
 		if (state != WALKING) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
 		const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot");
+		if (bt_walk_ticks_ >= (rd ? rd->searchTicks : 600))
+			fprintf(stderr, "[robot#%u] PATROL FIRING DURING RETURN PHASE! bt_walk_ticks_=%d\n", id, bt_walk_ticks_);
 		xv = mirrored ? -(rd ? rd->speed : 4) : (rd ? rd->speed : 4);
 		FollowGround(*this, world, xv);
 		int d = DistanceToEnd(*this, world);
@@ -248,6 +250,8 @@ void Robot::InitBT() {
 		}
 		// Orient toward spawn, drive movement directly — Patrol must not run during return.
 		mirrored = (signed(originalx) < signed(x));
+		fprintf(stderr, "[robot#%u] ReturnToSpawn PRE: x=%d originalx=%d mirrored=%d xv=%d cpid=%d\n",
+		        id, (int)x, (int)originalx, (int)mirrored, (int)xv, (int)currentplatformid);
 		if (abs(signed(x) - signed(originalx)) <= (_rd ? _rd->returnProximity : 20)) {
 			state   = SLEEPING;
 			state_i = -1;
@@ -255,7 +259,9 @@ void Robot::InitBT() {
 		}
 		const Sint8 spd = _rd ? _rd->speed : 4;
 		xv = mirrored ? -spd : spd;
+		int prex = x;
 		FollowGround(*this, world, xv);
+		fprintf(stderr, "[robot#%u] ReturnToSpawn POST: prex=%d x=%d xv=%d\n", id, prex, (int)x, (int)xv);
 		return BTResult::Running; // Running keeps Patrol from running this tick
 	};
 
@@ -347,6 +353,12 @@ void Robot::Tick(World& world) {
 	btctx_.dt       = 1.0f / GASLoader::Get().gameengine.ticksPerSecond;
 	btctx_.bbSet("patrol", (bool)patrol);
 	bt_->tick(btctx_);
+
+	// DEBUG: print final mirrored/xv after BT when in return phase
+	if (state == WALKING && bt_walk_ticks_ >= (rd ? rd->searchTicks : 600)) {
+		fprintf(stderr, "[robot#%u] POST-BT: x=%d mirrored=%d xv=%d bt_walk_ticks_=%d\n",
+		        id, (int)x, (int)mirrored, (int)xv, bt_walk_ticks_);
+	}
 
 	is_walking  = (state == WALKING);
 	is_shooting = (state == SHOOTING);
