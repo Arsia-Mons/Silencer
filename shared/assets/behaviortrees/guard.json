@@ -25,7 +25,7 @@
     "sel_top": {
       "type": "Selector",
       "label": "Top Selector",
-      "children": ["sel_combat", "sel_ladder_combat", "leaf_uncrouch", "sel_engage", "seq_patrol", "seq_idle_scan"],
+      "children": ["sel_combat", "sel_ladder_combat", "leaf_uncrouch", "sel_engage", "leaf_alert_turn", "seq_patrol", "seq_idle_scan"],
       "props": {}
     },
 
@@ -132,6 +132,8 @@
     "leaf_chase":     { "type": "Leaf",      "label": "Chase",           "children": [], "props": { "action": "Chase"                 } },
 
     "leaf_search": { "type": "Leaf", "label": "Search then return", "children": [], "props": { "action": "SearchAndReturn" } },
+
+    "leaf_alert_turn": { "type": "Leaf", "label": "AlertTurn", "children": [], "props": { "action": "AlertTurn" } },
 
     "seq_patrol": {
       "type": "Sequence",

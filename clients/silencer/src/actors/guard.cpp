@@ -431,6 +431,27 @@ void Guard::InitBT(){
 		return BTResult::Running;
 	};
 
+	// AlertTurn: scan AABB for nearby projectiles. If found, flip mirrored toward the
+	// threat so the next Patrol step moves in that direction. Always returns Failure so
+	// the Selector continues to seq_patrol — this is a pure direction side-effect.
+	btctx_.actions["AlertTurn"] = [this](BTContext& ctx) -> BTResult {
+		if(is_shooting || state == CROUCHING || state == CROUCHED || state == SHOOTCROUCHED) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		std::vector<Uint8> types = {
+			ObjectTypes::BLASTERPROJECTILE, ObjectTypes::LASERPROJECTILE,
+			ObjectTypes::ROCKETPROJECTILE,  ObjectTypes::FLAMERPROJECTILE,
+			ObjectTypes::PLASMAPROJECTILE,  ObjectTypes::WALLPROJECTILE,
+			ObjectTypes::FLAREPROJECTILE
+		};
+		const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard");
+		int dx = gd ? gd->threatDetectX : 150;
+		int dy = gd ? gd->threatDetectY : 100;
+		std::vector<Object*> objects = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
+		if(objects.empty()) return BTResult::Failure;
+		mirrored = (objects[0]->x < x); // face toward the incoming projectile
+		return BTResult::Failure; // let Selector fall through to patrol in new direction
+	};
+
 	// PlayAnimation(anim_name): drive res_bank/res_index from an ActorDef AnimSequence.
 	// Returns Running each tick the animation is playing, Success on completion.
 	// Looping animations always return Running.
