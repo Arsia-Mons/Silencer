@@ -187,9 +187,9 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 	           .childGap = 0,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       },
-	       .border = FormBorder(kBoxStrokeColor),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { (float)kBoxX, (float)kBoxY } } }) {
+	       .floating = { .offset   = { (float)kBoxX, (float)kBoxY },
+	                     .attachTo = CLAY_ATTACH_TO_ROOT },
+	       .border = FormBorder(kBoxStrokeColor) }) {
 
 		// Username header — bank 134 / w8 / eff=200. Lands at content y=71.
 		CLAY({ .id = CLAY_ID("CharUserWrap"),

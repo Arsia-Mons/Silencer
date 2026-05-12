@@ -285,9 +285,9 @@ void BuildChatPanelTree(ChatPanelState & state,
 	           .childGap = 0,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       },
-	       .border = FormBorder(kBoxStrokeColor),
-	       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-	                     .offset   = { (float)kBoxX, (float)kBoxY } } }) {
+	       .floating = { .offset   = { (float)kBoxX, (float)kBoxY },
+	                     .attachTo = CLAY_ATTACH_TO_ROOT },
+	       .border = FormBorder(kBoxStrokeColor) }) {
 
 		// Channel-header band — fixed height so the body row lands at
 		// y=220 whether or not the channel name has arrived from the

@@ -240,8 +240,8 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 	           .padding = { kUpperPeerColPadLeft, 4,
 	                        kUpperPeerColPadTop, 0 },
 	           .childGap = kUpperPeerRowGap,
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	           .childAlignment = { .x = CLAY_ALIGN_X_RIGHT },
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		for(int i = 0; i < 3; ++i){
 			char idBuf[24];

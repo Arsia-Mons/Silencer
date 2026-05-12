@@ -6,6 +6,11 @@
 #include "plume.h"
 #include "gasloader.h"
 
+// MSVC's <cstdlib> overload set has no exact int match (it pulls in
+// long/__int64/double/float/long double overloads), so `abs(int_expr)` is
+// ambiguous when the unity batch or transitive headers bring those in.
+static inline int IAbs(int v) { return v < 0 ? -v : v; }
+
 Robot::Robot() : Object(ObjectTypes::ROBOT){
 	requiresauthority = true;
 	state = NEW;
@@ -133,7 +138,7 @@ void Robot::InitBT() {
 		}
 		// Orient toward spawn and let Patrol move us there
 		mirrored = (signed(originalx) < signed(x));
-		if (abs(signed(x) - signed(originalx)) <= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->returnProximity : 20)) {
+		if (IAbs(signed(x) - signed(originalx)) <= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->returnProximity : 20)) {
 			state = SLEEPING;
 			state_i = -1;
 			return BTResult::Success;

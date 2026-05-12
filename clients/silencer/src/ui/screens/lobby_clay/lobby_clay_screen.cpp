@@ -144,10 +144,10 @@ void BuildChromeTree(LobbyClayScreen * screen,
 		                       CLAY_SIZING_FIXED(kChromeOuterH) },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
-		       .border = FormBorder(kChromeStrokeColor),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset = { (float)kChromeOriginX,
-		                                 (float)kChromeOriginY } } }) {
+		       .floating = { .offset = { (float)kChromeOriginX,
+		                                 (float)kChromeOriginY },
+		                     .attachTo = CLAY_ATTACH_TO_ROOT },
+		       .border = FormBorder(kChromeStrokeColor) }) {
 
 			CLAY({ .id = CLAY_ID("LobbyTitleBar"),
 			       .layout = {
@@ -156,8 +156,8 @@ void BuildChromeTree(LobbyClayScreen * screen,
 			           .padding = { /*left=*/5, /*right=*/5,
 			                        /*top=*/4, /*bottom=*/4 },
 			           .childGap = 6,
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       },
 			       .border = FormBorder(kChromeStrokeColor) }) {
 			CLAY({ .id = CLAY_ID("LobbyTitle") }) {
@@ -451,10 +451,10 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 		                       CLAY_SIZING_FIXED((float)kRightUpperH) },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
-		       .border = FormBorder(kChromeStrokeColor),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset   = { (float)kRightUpperX,
-		                                   (float)kRightUpperY } } }) {
+		       .floating = { .offset   = { (float)kRightUpperX,
+		                                   (float)kRightUpperY },
+		                     .attachTo = CLAY_ATTACH_TO_ROOT },
+		       .border = FormBorder(kChromeStrokeColor) }) {
 			if(gameCreateActive){
 				silencer::ui::lobby_clay::BuildGameCreateUpperTree(
 					gameCreateState, ctx.world.resources);
@@ -476,10 +476,10 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 		                       CLAY_SIZING_FIXED((float)kRightTallH) },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
-		       .border = FormBorder(kChromeStrokeColor),
-		       .floating = { .attachTo = CLAY_ATTACH_TO_ROOT,
-		                     .offset   = { (float)kRightTallX,
-		                                   (float)kRightTallY } } }) {
+		       .floating = { .offset   = { (float)kRightTallX,
+		                                   (float)kRightTallY },
+		                     .attachTo = CLAY_ATTACH_TO_ROOT },
+		       .border = FormBorder(kChromeStrokeColor) }) {
 			if(gameCreateActive){
 				silencer::ui::lobby_clay::BuildGameCreateTallTree(
 					gameCreateState, ctx.world.resources);

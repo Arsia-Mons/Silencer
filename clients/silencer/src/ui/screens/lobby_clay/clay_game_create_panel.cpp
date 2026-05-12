@@ -355,8 +355,8 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 		           .padding = { kUpperFormRowPadX, kUpperFormRowPadX,
 		                        rowPadTop, 0 },
 		           .childGap = kUpperFormChildGap,
-		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
 			// Label fills remaining width — value FITs on the right.
 			CLAY({ .id = CLAY_SID(StaticId((std::string("Lbl_") + kLabels[i].id).c_str())),

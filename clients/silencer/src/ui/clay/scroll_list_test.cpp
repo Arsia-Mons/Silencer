@@ -84,8 +84,8 @@ bool RunScrollListTest(::Game & game, const char * outPath) {
 }
 
 bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
-	const int W = 640;
-	const int H = 480;
+	constexpr int W = 640;
+	constexpr int H = 480;
 	EnsureInitialized(W, H);
 	BuildItems();
 

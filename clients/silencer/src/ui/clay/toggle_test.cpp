@@ -87,8 +87,8 @@ bool RunToggleTest(::Game & game, const char * stateName, const char * outPath) 
 // proxy (Clay 0.14 invokes the registered hover callbacks during
 // Clay_SetPointerState using the PREVIOUS frame's pointer state).
 bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
-	const int W = 640;
-	const int H = 480;
+	constexpr int W = 640;
+	constexpr int H = 480;
 	EnsureInitialized(W, H);
 
 	int counts[3] = {0, 0, 0};

@@ -93,8 +93,8 @@ bool RunBankButtonTest(::Game & game, const char * variantName, const char * out
 // "button held down" window) — the API contract is "exactly once per
 // press", not "fires on the same frame as the press input edge".
 bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
-	const int W = 640;
-	const int H = 480;
+	constexpr int W = 640;
+	constexpr int H = 480;
 	EnsureInitialized(W, H);
 
 	int clickCount = 0;
