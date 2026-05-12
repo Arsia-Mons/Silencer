@@ -1,34 +1,38 @@
 {
   "version": 1,
   "id": "civilian-flee",
-  "blackboard": [
-    { "key": "threat_nearby", "type": "bool",  "default": false }
-  ],
+  "blackboard": [],
   "rootId": "root",
   "nodes": {
     "root": {
       "type": "Selector",
       "label": "Civilian AI",
-      "children": ["seq_flee", "leaf_wander"],
+      "children": ["seq_flee", "leaf_return_to_walk", "leaf_wander"],
       "props": {}
     },
     "seq_flee": {
       "type": "Sequence",
       "label": "Flee on Threat",
-      "children": ["cond_threat", "leaf_run"],
+      "children": ["leaf_threat_look", "leaf_run"],
       "props": {}
     },
-    "cond_threat": {
-      "type": "Condition",
-      "label": "threat_nearby?",
+    "leaf_threat_look": {
+      "type": "Leaf",
+      "label": "ThreatLook",
       "children": [],
-      "props": { "key": "threat_nearby", "op": "==", "value": true }
+      "props": { "action": "ThreatLook" }
     },
     "leaf_run": {
       "type": "Leaf",
       "label": "Run",
       "children": [],
       "props": { "action": "Run" }
+    },
+    "leaf_return_to_walk": {
+      "type": "Leaf",
+      "label": "ReturnToWalk",
+      "children": [],
+      "props": { "action": "ReturnToWalk" }
     },
     "leaf_wander": {
       "type": "Leaf",
@@ -39,3 +43,4 @@
   },
   "positions": {}
 }
+

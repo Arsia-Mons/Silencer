@@ -19,7 +19,6 @@ public:
 	static const Uint8 defaultsuitcolor = (7 << 4) + 11;
 
 private:
-	bool Look(World & world);
 	bool CheckTractVictim(World & world);
 	void InitBT();
 	enum {NEW, STANDING, WALKING, RUNNING, DYINGFORWARD, DYINGBACKWARD, DYINGEXPLODE, DEAD};
