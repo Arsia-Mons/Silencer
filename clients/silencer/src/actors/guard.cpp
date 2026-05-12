@@ -448,6 +448,9 @@ void Guard::InitBT(){
 		int dy = gd ? gd->threatDetectY : 100;
 		std::vector<Object*> objects = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
 		if(objects.empty()) return BTResult::Failure;
+		// Don't override direction when guard is at a wall — Patrol's flip takes priority.
+		int d = DistanceToEnd(*this, world);
+		if(d >= 0 && d <= world.minwalldistance) return BTResult::Failure;
 		mirrored = (objects[0]->x < x); // face toward the incoming projectile
 		return BTResult::Failure; // let Selector fall through to patrol in new direction
 	};
