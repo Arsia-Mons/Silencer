@@ -244,8 +244,10 @@ void Guard::InitBT(){
 					if(goesDown || goesUp){
 						hasLadderAhead = true;
 						int tol = _gg ? _gg->ladderXTolerance : 8;
-						if(abs(signed(center) - signed(x)) <= tol){
-							// Close enough — enter ladder.
+						// At the platform edge the guard is clamped — snap to center and enter.
+						bool atEdge = edgeDist >= 0 && edgeDist <= world.minwalldistance;
+						if(abs(signed(center) - signed(x)) <= tol || atEdge){
+							// Close enough (or at edge) — snap and enter ladder.
 							if(goesDown){ x=center; yv=_gg?_gg->ladderClimbSpeed:5; state=LADDER; state_i=0; }
 							else         { x=center; yv=-(_gg?_gg->ladderClimbSpeed:5); state=LADDER; state_i=0; }
 							{ const EnemyDef* gd=GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_=gd?gd->ladderCooldown:120; }
@@ -299,38 +301,42 @@ void Guard::InitBT(){
 					if (dist > ([]{ const EnemyDef* _g = GASLoader::Get().GetEnemyDef("guard-blaster"); return _g ? _g->chaseRangeStop : 80; }())) {
 						mirrored = (obj->x < x); // orient toward target
 					}
-					// <=80px: keep current direction to avoid oscillation
-					// Blocked at the platform-chain end facing the target — give up the chase
-					// instead of pressing into the wall for the full search timeout.
-					int edgeDist = DistanceToEnd(*this, world);
-					if (state == WALKING && edgeDist >= 0 && edgeDist <= world.minwalldistance) {
-						bool target_on_wall_side = mirrored ? (signed(obj->x) <= signed(x)) : (signed(obj->x) >= signed(x));
-						if (target_on_wall_side) {
-							chasing = 0;
-							return BTResult::Running;
-						}
-					}
-					// Climb ladder toward target if on a meaningfully different level
+					// Check ladder BEFORE edge bail — player may be below a ladder at the edge.
 					int ydiff = signed(obj->y) - signed(y);
+					int edgeDist = DistanceToEnd(*this, world);
+					bool hasLadderAhead = false;
 					{ const EnemyDef* _gg = GASLoader::Get().GetEnemyDef("guard-blaster");
-					if(abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
-						Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
-						if(ladder && state == WALKING){
+					if(abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0 && state == WALKING){
+						Sint16 srch = 60;
+						Platform* ladder = world.map.TestAABB(
+							mirrored ? x - srch : x - 8, y,
+							mirrored ? x + 8   : x + srch, y,
+							Platform::LADDER);
+						if(ladder){
 							Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-							if(abs(signed(center) - signed(x)) <= (_gg?_gg->ladderXTolerance:8)){
-								if(ydiff < 0 && signed(ladder->y1) < signed(y)){
-									// player above, ladder goes up
-									x = center; yv = -(_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
-									{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
-								} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
-									// player below, ladder goes down
-									x = center; yv = (_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
+							bool goesDown = (ydiff > 0 && signed(ladder->y2) > signed(y));
+							bool goesUp   = (ydiff < 0 && signed(ladder->y1) < signed(y));
+							if(goesDown || goesUp){
+								hasLadderAhead = true;
+								int tol = _gg ? _gg->ladderXTolerance : 8;
+								bool atEdge = edgeDist >= 0 && edgeDist <= world.minwalldistance;
+								if(abs(signed(center) - signed(x)) <= tol || atEdge){
+									if(goesDown){ x=center; yv=_gg?_gg->ladderClimbSpeed:5; state=LADDER; state_i=0; }
+									else         { x=center; yv=-(_gg?_gg->ladderClimbSpeed:5); state=LADDER; state_i=0; }
 									{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
 								}
 							}
 						}
 					}
 					} // _gg scope
+					// Blocked at the platform-chain end facing the target (no ladder) — give up chase.
+					if (!hasLadderAhead && state == WALKING && edgeDist >= 0 && edgeDist <= world.minwalldistance) {
+						bool target_on_wall_side = mirrored ? (signed(obj->x) <= signed(x)) : (signed(obj->x) >= signed(x));
+						if (target_on_wall_side) {
+							chasing = 0;
+							return BTResult::Running;
+						}
+					}
 				} else {
 					chasing = 0; // target gone or dead
 				}
