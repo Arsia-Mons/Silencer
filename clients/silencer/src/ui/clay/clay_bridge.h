@@ -213,6 +213,13 @@ struct BoxStrokePayload {
 	Uint8 outerHaloWidth;
 	Uint8 innerHaloColor;
 	Uint8 innerHaloWidth;
+	Uint8 haloOpacity;       // 255 = solid, < 255 = alpha-blended via palette LUT
+	// Bitmask of which sides receive the full stripe (primary + halos).
+	// Bits: 1=top, 2=right, 4=bottom, 8=left. 0xF = all four sides.
+	// Suppressing a side (clearing its bit) draws nothing on that edge —
+	// used to decompose L-shapes / non-rectangular chrome composed of
+	// adjacent boxes with internal edges hidden.
+	Uint8 sides;
 };
 
 // P7 ScrollList primitive unit test. Renders a 30-item list scrolled to

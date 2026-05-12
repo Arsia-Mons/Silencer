@@ -22,19 +22,6 @@
 
 namespace silencer::clay_bridge {
 
-namespace {
-
-// Canonical lobby chrome halo palette indices, sampled from
-// /tmp/lobby_bg.png at multiple clean rectangle edges:
-//   • primary stroke (idx 216, rgb 8,84,0)  — the bright green
-//   • outer halo    (idx 75,  rgb 8,40,8)   — dark green one ring out
-//   • inner halo    (idx 77,  similar dark) — dark green one ring in
-constexpr Uint8 kHaloPrimary = 216;
-constexpr Uint8 kHaloOuter   = 75;
-constexpr Uint8 kHaloInner   = 77;
-
-}  // namespace
-
 bool RunBoxHaloTest(::Game & game, const char * outPath) {
 	const int W = 640;
 	const int H = 480;
@@ -42,6 +29,7 @@ bool RunBoxHaloTest(::Game & game, const char * outPath) {
 
 	using silencer::ui::primitives::Box;
 	using silencer::ui::primitives::BoxBeginFrame;
+	namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 
 	BoxBeginFrame();
 	::Clay_BeginLayout();
@@ -52,13 +40,12 @@ bool RunBoxHaloTest(::Game & game, const char * outPath) {
 	           .padding = { /*left=*/120, /*right=*/120,
 	                        /*top=*/90,   /*bottom=*/90 },
 	       } }) {
-		Box(CLAY_STRING("HaloBox"),
-		    /*width=*/400, /*height=*/300,
-		    /*fillPaletteColor=*/0, /*fillOpacity=*/0,
-		    /*strokePaletteColor=*/kHaloPrimary,
-		    /*strokeWidth=*/1,
-		    /*strokeOuterHaloColor=*/kHaloOuter, /*strokeOuterHaloWidth=*/1,
-		    /*strokeInnerHaloColor=*/kHaloInner, /*strokeInnerHaloWidth=*/1);
+		CLAY(Box(BoxVariants::Chrome, {
+		         .id = CLAY_ID("HaloBox"),
+		         .layout = {
+		             .sizing = { CLAY_SIZING_FIXED(400), CLAY_SIZING_FIXED(300) },
+		         },
+		     })) {}
 	}
 
 	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();

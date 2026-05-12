@@ -23,19 +23,6 @@ namespace silencer::clay_bridge {
 
 namespace {
 
-// Sampled from /tmp/lobby_bg.png at all four edges of the chat-box outer
-// stroke (visual rect at (10, 195, 378, 260) — i.e. NOT the panel's
-// internal interface rect, which is (15, 216, 368, 234)). Primary idx
-// 216 was unanimous (23/23 sample points). Outer/inner halo are the
-// dominant non-stroke neighbors at offset ±1 on the LEFT and BOTTOM
-// edges (74/77). The RIGHT edge halo is anomalous (66 inner, 90 outer)
-// — likely a sprite-adjacency artifact where the character panel
-// touches the chat-box. The canonical pick is left/bottom — those are
-// the chat-box's "clean" edges.
-constexpr Uint8 kHaloPrimary = 216;
-constexpr Uint8 kHaloOuter   = 75;
-constexpr Uint8 kHaloInner   = 77;
-
 // Visual rect dimensions in the legacy BG (see comment above).
 constexpr int kChatBoxW = 378;
 constexpr int kChatBoxH = 260;
@@ -60,6 +47,7 @@ bool RunBoxParityChatTest(::Game & game, const char * outPath) {
 
 	using silencer::ui::primitives::Box;
 	using silencer::ui::primitives::BoxBeginFrame;
+	namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 
 	BoxBeginFrame();
 	::Clay_BeginLayout();
@@ -70,13 +58,11 @@ bool RunBoxParityChatTest(::Game & game, const char * outPath) {
 	           .padding = { /*left=*/kMargin, /*right=*/kMargin,
 	                        /*top=*/kMargin, /*bottom=*/kMargin },
 	       } }) {
-		Box(CLAY_STRING("ParityChatBox"),
-		    /*width=*/kChatBoxW, /*height=*/kChatBoxH,
-		    /*fillPaletteColor=*/0, /*fillOpacity=*/0,
-		    /*strokePaletteColor=*/kHaloPrimary,
-		    /*strokeWidth=*/1,
-		    /*strokeOuterHaloColor=*/kHaloOuter, /*strokeOuterHaloWidth=*/1,
-		    /*strokeInnerHaloColor=*/kHaloInner, /*strokeInnerHaloWidth=*/1);
+		CLAY(Box(BoxVariants::Chrome, {
+		         .id = CLAY_ID("ParityChatBox"),
+		         .layout = { .sizing = { CLAY_SIZING_FIXED(kChatBoxW),
+		                                 CLAY_SIZING_FIXED(kChatBoxH) } },
+		     })) {}
 	}
 
 	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();

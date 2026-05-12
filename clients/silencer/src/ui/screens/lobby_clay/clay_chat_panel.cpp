@@ -4,7 +4,7 @@
 #include "clay_bridge.h"
 #include "clay_inspector.h"
 #include "primitives/bank_text.h"
-#include "primitives/form_border.h"
+#include "primitives/box.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
 
@@ -18,7 +18,8 @@
 
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
-using silencer::ui::primitives::FormBorder;
+using silencer::ui::primitives::Box;
+namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 using silencer::ui::primitives::ScrollTextBox;
 using silencer::ui::primitives::ScrollTextBoxLine;
 using silencer::ui::primitives::ScrollTextBoxOpts;
@@ -57,7 +58,6 @@ constexpr int   kBoxX             = 10;
 constexpr int   kBoxY             = 195;
 constexpr int   kBoxW             = 378;
 constexpr int   kBoxH             = 260;
-constexpr Uint8 kBoxStrokeColor   = 216;
 // Inside-box layout knobs — derived from the legacy on-screen widget coords:
 //   channel @ (15, 200), chat @ (19, 220), presence @ (267, 220), input @ (18, 437).
 // Box has border=1 + pad{left=4,top=4} → content top-left lands at (15, 200).
@@ -276,18 +276,19 @@ void BuildChatPanelTree(ChatPanelState & state,
 	// the right stroke to match the baked BG (legacy presence ends at x=377,
 	// box right stroke at x=378); the input row bleeds within ~4 px of the
 	// bottom stroke (handled by kInputPadTop accounting).
-	CLAY({ .id = CLAY_ID("LobbyChatBox"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED((float)kBoxW),
-	                       CLAY_SIZING_FIXED((float)kBoxH) },
-	           .padding = { /*left=*/(uint16_t)kBoxPadLeft, /*right=*/0,
-	                        /*top=*/(uint16_t)kBoxPadTop,  /*bottom=*/0 },
-	           .childGap = 0,
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       },
-	       .floating = { .offset   = { (float)kBoxX, (float)kBoxY },
-	                     .attachTo = CLAY_ATTACH_TO_ROOT },
-	       .border = FormBorder(kBoxStrokeColor) }) {
+	CLAY(Box(BoxVariants::Chrome, {
+	         .id = CLAY_ID("LobbyChatBox"),
+	         .layout = {
+	             .sizing = { CLAY_SIZING_FIXED((float)kBoxW),
+	                         CLAY_SIZING_FIXED((float)kBoxH) },
+	             .padding = { /*left=*/(uint16_t)kBoxPadLeft, /*right=*/0,
+	                          /*top=*/(uint16_t)kBoxPadTop,  /*bottom=*/0 },
+	             .childGap = 0,
+	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	         },
+	         .floating = { .offset   = { (float)kBoxX, (float)kBoxY },
+	                       .attachTo = CLAY_ATTACH_TO_ROOT },
+	     })) {
 
 		// Channel-header band — fixed height so the body row lands at
 		// y=220 whether or not the channel name has arrived from the

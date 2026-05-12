@@ -43,6 +43,7 @@ bool RunRectangleAlphaTest(::Game & game, const char * outPath) {
 	::Clay_BeginLayout();
 
 	using silencer::ui::primitives::Box;
+	namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 
 	// Full-screen backdrop + two overlapping rects. The blue rect's left
 	// edge lands at the red rect's horizontal midpoint so its left half
@@ -51,39 +52,24 @@ bool RunRectangleAlphaTest(::Game & game, const char * outPath) {
 	// backdrop.
 	CLAY({ .id = CLAY_ID("RectAlphaRoot"),
 	       .layout = { .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) } } }) {
-		CLAY({ .id = CLAY_ID("Backdrop"),
-		       .floating = { .offset = { 0, 0 },
-		                     .attachTo = CLAY_ATTACH_TO_ROOT } }) {
-			Box(CLAY_STRING("VBackdrop"),
-			          /*width=*/W, /*height=*/H,
-			          /*fillPaletteColor=*/kBackdrop,
-			          /*fillOpacity=*/255,
-			          /*strokePaletteColor=*/0, /*strokeWidth=*/0,
-		          /*strokeOuterHaloColor=*/0, /*strokeOuterHaloWidth=*/0,
-		          /*strokeInnerHaloColor=*/0, /*strokeInnerHaloWidth=*/0);
-		}
-		CLAY({ .id = CLAY_ID("RedHost"),
-		       .floating = { .offset = { 160, 160 },
-		                     .attachTo = CLAY_ATTACH_TO_ROOT } }) {
-			Box(CLAY_STRING("VRedOpaque"),
-			          /*width=*/320, /*height=*/160,
-			          /*fillPaletteColor=*/kRedColor,
-			          /*fillOpacity=*/255,
-			          /*strokePaletteColor=*/0, /*strokeWidth=*/0,
-		          /*strokeOuterHaloColor=*/0, /*strokeOuterHaloWidth=*/0,
-		          /*strokeInnerHaloColor=*/0, /*strokeInnerHaloWidth=*/0);
-		}
-		CLAY({ .id = CLAY_ID("BlueHost"),
-		       .floating = { .offset = { 320, 160 },
-		                     .attachTo = CLAY_ATTACH_TO_ROOT } }) {
-			Box(CLAY_STRING("VBlueHalf"),
-			          /*width=*/320, /*height=*/160,
-			          /*fillPaletteColor=*/kBlueColor,
-			          /*fillOpacity=*/128,
-			          /*strokePaletteColor=*/0, /*strokeWidth=*/0,
-		          /*strokeOuterHaloColor=*/0, /*strokeOuterHaloWidth=*/0,
-		          /*strokeInnerHaloColor=*/0, /*strokeInnerHaloWidth=*/0);
-		}
+		CLAY(Box(BoxVariants::None, {
+		         .id = CLAY_ID("VBackdrop"),
+		         .layout = { .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) } },
+		         .backgroundColor = { (float)kBackdrop, 0.0f, 0.0f, 255.0f },
+		         .floating = { .offset = { 0, 0 }, .attachTo = CLAY_ATTACH_TO_ROOT },
+		     })) {}
+		CLAY(Box(BoxVariants::None, {
+		         .id = CLAY_ID("VRedOpaque"),
+		         .layout = { .sizing = { CLAY_SIZING_FIXED(320), CLAY_SIZING_FIXED(160) } },
+		         .backgroundColor = { (float)kRedColor, 0.0f, 0.0f, 255.0f },
+		         .floating = { .offset = { 160, 160 }, .attachTo = CLAY_ATTACH_TO_ROOT },
+		     })) {}
+		CLAY(Box(BoxVariants::None, {
+		         .id = CLAY_ID("VBlueHalf"),
+		         .layout = { .sizing = { CLAY_SIZING_FIXED(320), CLAY_SIZING_FIXED(160) } },
+		         .backgroundColor = { (float)kBlueColor, 0.0f, 0.0f, 128.0f },
+		         .floating = { .offset = { 320, 160 }, .attachTo = CLAY_ATTACH_TO_ROOT },
+		     })) {}
 	}
 
 	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();

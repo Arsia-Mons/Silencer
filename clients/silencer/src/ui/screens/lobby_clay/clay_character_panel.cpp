@@ -4,7 +4,7 @@
 #include "clay_bridge.h"
 #include "clay_inspector.h"
 #include "primitives/bank_text.h"
-#include "primitives/form_border.h"
+#include "primitives/box.h"
 #include "primitives/toggle.h"
 
 #include "config.h"
@@ -20,7 +20,8 @@
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextOpts;
 using silencer::ui::primitives::BankTextVariant;
-using silencer::ui::primitives::FormBorder;
+using silencer::ui::primitives::Box;
+namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 using silencer::ui::primitives::Toggle;
 using silencer::ui::primitives::ToggleHandle;
 using silencer::ui::primitives::ToggleOpts;
@@ -100,7 +101,6 @@ constexpr int   kBoxX             = 10;
 constexpr int   kBoxY             = 64;
 constexpr int   kBoxW             = 218;
 constexpr int   kBoxH             = 121;
-constexpr Uint8 kBoxStrokeColor   = 216;
 // Inside-box layout knobs — calibrated against the actual rendered Clay
 // bboxes (CLAY render-command dump), not the pre-flex legacy widget coords.
 // In practice Clay places the CharStats content y at toggle-row-bottom +
@@ -177,19 +177,20 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 	// breathing room from the top stroke; padBottom matches so the XP row
 	// breathes from the bottom stroke. Right padding stays 0 because no
 	// content abuts the right edge.
-	CLAY({ .id = CLAY_ID("LobbyCharacterBox"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(kBoxW),
-	                       CLAY_SIZING_FIXED(kBoxH) },
-	           .padding = { /*left=*/(uint16_t)kBoxPadLeft, /*right=*/0,
-	                        /*top=*/(uint16_t)kBoxPadTop,
-	                        /*bottom=*/(uint16_t)kBoxPadBottom },
-	           .childGap = 0,
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       },
-	       .floating = { .offset   = { (float)kBoxX, (float)kBoxY },
-	                     .attachTo = CLAY_ATTACH_TO_ROOT },
-	       .border = FormBorder(kBoxStrokeColor) }) {
+	CLAY(Box(BoxVariants::Chrome, {
+	         .id = CLAY_ID("LobbyCharacterBox"),
+	         .layout = {
+	             .sizing = { CLAY_SIZING_FIXED(kBoxW),
+	                         CLAY_SIZING_FIXED(kBoxH) },
+	             .padding = { /*left=*/(uint16_t)kBoxPadLeft, /*right=*/0,
+	                          /*top=*/(uint16_t)kBoxPadTop,
+	                          /*bottom=*/(uint16_t)kBoxPadBottom },
+	             .childGap = 0,
+	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	         },
+	         .floating = { .offset   = { (float)kBoxX, (float)kBoxY },
+	                       .attachTo = CLAY_ATTACH_TO_ROOT },
+	     })) {
 
 		// Username header — bank 134 / w8 / eff=200. Lands at content y=71.
 		CLAY({ .id = CLAY_ID("CharUserWrap"),

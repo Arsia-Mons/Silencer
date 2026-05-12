@@ -32,14 +32,10 @@ constexpr Uint8 kStrokeColor       = 17;   // bright-green-ish family
 constexpr Uint8 kFillColorA        = 220;  // form-row default elsewhere
 constexpr Uint8 kFillColorB        = 152;  // title tint
 constexpr Uint8 kUnderlyingFill    = 96;   // dark mid-tone for variant 4
-// C0c halo test colors — the canonical lobby chrome palette sampled from
-// /tmp/lobby_bg.png. The lobby-canonical values get finalized in C2's
-// `lobby-chrome-rectangles.md`; these are the same family, used here to
-// exercise the BoxStroke render path with visually-distinct halos against
-// the test scene's dark backdrop.
+// Halo test palette indices — sampled from the legacy lobby BG sprite.
 constexpr Uint8 kHaloPrimary       = 216;  // bright lobby-frame green
-constexpr Uint8 kHaloOuter         = 75;   // dark green (rgb 8,40,8)
-constexpr Uint8 kHaloInner         = 77;   // close-dark green (sampled most often inside)
+constexpr Uint8 kHaloOuter         = 75;   // dark green (rgb ~8, 40, 8)
+constexpr Uint8 kHaloInner         = 77;   // close-dark green
 
 }  // namespace
 
@@ -50,6 +46,33 @@ bool RunBoxTest(::Game & game, const char * outPath) {
 
 	using silencer::ui::primitives::Box;
 	using silencer::ui::primitives::BoxBeginFrame;
+	using silencer::ui::primitives::BoxStrokeStyle;
+
+	// Per-variant stroke styles. Test scenes spell these out (no
+	// `BoxVariants::*` lookup) because each row deliberately exercises
+	// a non-canonical configuration (outer-only halo, inner-only halo,
+	// etc.) that no design-system variant should encode. Halo bands
+	// share the primary color; only their width and the shared opacity
+	// vary across variants.
+	const BoxStrokeStyle plain{
+		/*strokeColor=*/kStrokeColor, /*strokeWidth=*/1,
+	};
+	const BoxStrokeStyle noStroke{};
+	const BoxStrokeStyle haloOuterOnly{
+		/*strokeColor=*/kHaloPrimary, /*strokeWidth=*/1,
+		/*outerHaloColor=*/kHaloOuter, /*outerHaloWidth=*/1,
+		/*innerHaloColor=*/0, /*innerHaloWidth=*/0,
+	};
+	const BoxStrokeStyle haloInnerOnly{
+		/*strokeColor=*/kHaloPrimary, /*strokeWidth=*/1,
+		/*outerHaloColor=*/0, /*outerHaloWidth=*/0,
+		/*innerHaloColor=*/kHaloInner, /*innerHaloWidth=*/1,
+	};
+	const BoxStrokeStyle haloBoth{
+		/*strokeColor=*/kHaloPrimary, /*strokeWidth=*/1,
+		/*outerHaloColor=*/kHaloOuter, /*outerHaloWidth=*/1,
+		/*innerHaloColor=*/kHaloInner, /*innerHaloWidth=*/1,
+	};
 
 	BoxBeginFrame();
 	::Clay_BeginLayout();
@@ -68,19 +91,15 @@ bool RunBoxTest(::Game & game, const char * outPath) {
 		           .childGap = 20,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
-			Box(CLAY_STRING("VStrokeOnly"),
-			    /*width=*/220, /*height=*/120,
-			    /*fillPaletteColor=*/0, /*fillOpacity=*/0,
-			    /*strokePaletteColor=*/kStrokeColor,
-			    /*strokeWidth=*/1,
-			    /*strokeOuterHaloColor=*/0, /*strokeOuterHaloWidth=*/0,
-			    /*strokeInnerHaloColor=*/0, /*strokeInnerHaloWidth=*/0);
-			Box(CLAY_STRING("VFillOnly"),
-			    /*width=*/220, /*height=*/120,
-			    /*fillPaletteColor=*/kFillColorA, /*fillOpacity=*/255,
-			    /*strokePaletteColor=*/0, /*strokeWidth=*/0,
-			    /*strokeOuterHaloColor=*/0, /*strokeOuterHaloWidth=*/0,
-			    /*strokeInnerHaloColor=*/0, /*strokeInnerHaloWidth=*/0);
+			CLAY(Box(plain, {
+			         .id = CLAY_ID("VStrokeOnly"),
+			         .layout = { .sizing = { CLAY_SIZING_FIXED(220), CLAY_SIZING_FIXED(120) } },
+			     })) {}
+			CLAY(Box(noStroke, {
+			         .id = CLAY_ID("VFillOnly"),
+			         .layout = { .sizing = { CLAY_SIZING_FIXED(220), CLAY_SIZING_FIXED(120) } },
+			         .backgroundColor = { (float)kFillColorA, 0.0f, 0.0f, 255.0f },
+			     })) {}
 		}
 		CLAY({ .id = CLAY_ID("BoxTestRow2"),
 		       .layout = {
@@ -88,13 +107,11 @@ bool RunBoxTest(::Game & game, const char * outPath) {
 		           .childGap = 20,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
-			Box(CLAY_STRING("VFillStroke"),
-			    /*width=*/220, /*height=*/120,
-			    /*fillPaletteColor=*/kFillColorB, /*fillOpacity=*/255,
-			    /*strokePaletteColor=*/kStrokeColor,
-			    /*strokeWidth=*/1,
-			    /*strokeOuterHaloColor=*/0, /*strokeOuterHaloWidth=*/0,
-			    /*strokeInnerHaloColor=*/0, /*strokeInnerHaloWidth=*/0);
+			CLAY(Box(plain, {
+			         .id = CLAY_ID("VFillStroke"),
+			         .layout = { .sizing = { CLAY_SIZING_FIXED(220), CLAY_SIZING_FIXED(120) } },
+			         .backgroundColor = { (float)kFillColorB, 0.0f, 0.0f, 255.0f },
+			     })) {}
 			CLAY({ .id = CLAY_ID("V4Underlying"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIXED(220), CLAY_SIZING_FIXED(120) },
@@ -103,14 +120,11 @@ bool RunBoxTest(::Game & game, const char * outPath) {
 			       .backgroundColor = {
 			           /*r=*/static_cast<float>(kUnderlyingFill),
 			           0.0f, 0.0f, 255.0f } }) {
-				Box(CLAY_STRING("V4Overlay"),
-				    /*width=*/0, /*height=*/0,
-				    /*fillPaletteColor=*/kFillColorA,
-				    /*fillOpacity=*/128,
-				    /*strokePaletteColor=*/0,
-				    /*strokeWidth=*/0,
-				    /*strokeOuterHaloColor=*/0, /*strokeOuterHaloWidth=*/0,
-				    /*strokeInnerHaloColor=*/0, /*strokeInnerHaloWidth=*/0);
+				CLAY(Box(noStroke, {
+				         .id = CLAY_ID("V4Overlay"),
+				         .layout = { .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) } },
+				         .backgroundColor = { (float)kFillColorA, 0.0f, 0.0f, 128.0f },
+				     })) {}
 			}
 		}
 		// Variant 5 — halos exercise the BoxStroke custom-render path.
@@ -121,27 +135,18 @@ bool RunBoxTest(::Game & game, const char * outPath) {
 		           .childGap = 20,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
-			Box(CLAY_STRING("VHaloOuter"),
-			    /*width=*/170, /*height=*/140,
-			    /*fillPaletteColor=*/0, /*fillOpacity=*/0,
-			    /*strokePaletteColor=*/kHaloPrimary,
-			    /*strokeWidth=*/1,
-			    /*strokeOuterHaloColor=*/kHaloOuter, /*strokeOuterHaloWidth=*/1,
-			    /*strokeInnerHaloColor=*/0,          /*strokeInnerHaloWidth=*/0);
-			Box(CLAY_STRING("VHaloInner"),
-			    /*width=*/170, /*height=*/140,
-			    /*fillPaletteColor=*/0, /*fillOpacity=*/0,
-			    /*strokePaletteColor=*/kHaloPrimary,
-			    /*strokeWidth=*/1,
-			    /*strokeOuterHaloColor=*/0,          /*strokeOuterHaloWidth=*/0,
-			    /*strokeInnerHaloColor=*/kHaloInner, /*strokeInnerHaloWidth=*/1);
-			Box(CLAY_STRING("VHaloBoth"),
-			    /*width=*/170, /*height=*/140,
-			    /*fillPaletteColor=*/0, /*fillOpacity=*/0,
-			    /*strokePaletteColor=*/kHaloPrimary,
-			    /*strokeWidth=*/1,
-			    /*strokeOuterHaloColor=*/kHaloOuter, /*strokeOuterHaloWidth=*/1,
-			    /*strokeInnerHaloColor=*/kHaloInner, /*strokeInnerHaloWidth=*/1);
+			CLAY(Box(haloOuterOnly, {
+			         .id = CLAY_ID("VHaloOuter"),
+			         .layout = { .sizing = { CLAY_SIZING_FIXED(170), CLAY_SIZING_FIXED(140) } },
+			     })) {}
+			CLAY(Box(haloInnerOnly, {
+			         .id = CLAY_ID("VHaloInner"),
+			         .layout = { .sizing = { CLAY_SIZING_FIXED(170), CLAY_SIZING_FIXED(140) } },
+			     })) {}
+			CLAY(Box(haloBoth, {
+			         .id = CLAY_ID("VHaloBoth"),
+			         .layout = { .sizing = { CLAY_SIZING_FIXED(170), CLAY_SIZING_FIXED(140) } },
+			     })) {}
 		}
 	}
 

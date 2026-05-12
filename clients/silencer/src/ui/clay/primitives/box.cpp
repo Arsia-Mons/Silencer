@@ -6,8 +6,6 @@ namespace silencer::ui::primitives {
 
 namespace {
 
-// Per-frame payload arena. Sized for chrome-scale use (one Box per panel
-// times a handful of halo-using scenes per frame is well under 64).
 constexpr int kPayloadCapacity = 64;
 silencer::clay_bridge::BoxStrokePayload g_payloads[kPayloadCapacity];
 int g_payloadCount = 0;
@@ -17,17 +15,17 @@ silencer::clay_bridge::ClayCustomData g_customData[kCustomDataCapacity];
 int g_customDataCount = 0;
 
 silencer::clay_bridge::BoxStrokePayload *
-AllocPayload(Uint8 strokeColor, Uint8 strokeWidth,
-             Uint8 outerHaloColor, Uint8 outerHaloWidth,
-             Uint8 innerHaloColor, Uint8 innerHaloWidth) {
+AllocPayload(const BoxStrokeStyle & s) {
 	if(g_payloadCount >= kPayloadCapacity) return nullptr;
 	auto * p = &g_payloads[g_payloadCount++];
-	p->strokeColor     = strokeColor;
-	p->strokeWidth     = strokeWidth;
-	p->outerHaloColor  = outerHaloColor;
-	p->outerHaloWidth  = outerHaloWidth;
-	p->innerHaloColor  = innerHaloColor;
-	p->innerHaloWidth  = innerHaloWidth;
+	p->strokeColor    = s.strokeColor;
+	p->strokeWidth    = s.strokeWidth;
+	p->outerHaloColor = s.outerHaloColor;
+	p->outerHaloWidth = s.outerHaloWidth;
+	p->innerHaloColor = s.innerHaloColor;
+	p->innerHaloWidth = s.innerHaloWidth;
+	p->haloOpacity    = s.haloOpacity;
+	p->sides          = s.sides;
 	return p;
 }
 
@@ -47,78 +45,41 @@ void BoxBeginFrame() {
 	g_customDataCount = 0;
 }
 
-void Box(Clay_String id,
-         Uint16 width,
-         Uint16 height,
-         Uint8  fillPaletteColor,
-         Uint8  fillOpacity,
-         Uint8  strokePaletteColor,
-         Uint8  strokeWidth,
-         Uint8  strokeOuterHaloColor,
-         Uint8  strokeOuterHaloWidth,
-         Uint8  strokeInnerHaloColor,
-         Uint8  strokeInnerHaloWidth) {
-	// Sizing: 0 on either axis means "grow into the parent's available space"
-	// (use inside a flex container). Non-zero is a fixed pixel size.
-	Clay_SizingAxis xSizing = (width == 0)
-		? CLAY_SIZING_GROW(0)
-		: CLAY_SIZING_FIXED(static_cast<float>(width));
-	Clay_SizingAxis ySizing = (height == 0)
-		? CLAY_SIZING_GROW(0)
-		: CLAY_SIZING_FIXED(static_cast<float>(height));
-
-	// Fill: Clay only emits a RECTANGLE render command when
-	// `.backgroundColor.a > 0`. Set alpha to the requested opacity (which
-	// the C1 bridge routes through the palette alpha-blend LUT).
-	// `.r` carries the palette index for the bridge.
-	Clay_Color bg{
-		/*r=*/static_cast<float>(fillPaletteColor),
-		/*g=*/0.0f,
-		/*b=*/0.0f,
-		/*a=*/static_cast<float>(fillOpacity),
-	};
-
-	bool haveHalos = (strokeOuterHaloWidth > 0) || (strokeInnerHaloWidth > 0);
+Clay_ElementDeclaration Box(BoxStrokeStyle style, Clay_ElementDeclaration extras) {
+	bool haveHalos = (style.outerHaloWidth > 0) || (style.innerHaloWidth > 0);
 
 	if(haveHalos){
-		// Route the entire stroke (primary + halos) through CustomKind::BoxStroke
-		// so the bridge can render concentric rings. Skip .border — the CUSTOM
-		// command supplies the stroke.
-		auto * payload = AllocPayload(
-			strokePaletteColor, strokeWidth,
-			strokeOuterHaloColor, strokeOuterHaloWidth,
-			strokeInnerHaloColor, strokeInnerHaloWidth);
-		auto * ccd = AllocCustomData(
+		// Route the entire stroke (primary + halos) through
+		// CustomKind::BoxStroke so the bridge renders concentric rings.
+		// Native .border stays untouched — the CUSTOM command supplies
+		// the stroke.
+		auto * payload = AllocPayload(style);
+		auto * ccd     = AllocCustomData(
 			silencer::clay_bridge::CustomKind::BoxStroke, payload);
-		CLAY({
-			.id = Clay_GetElementId(id),
-			.layout = { .sizing = { xSizing, ySizing } },
-			.backgroundColor = bg,
-			.custom = { .customData = ccd },
-		}) {}
-		return;
+		extras.custom.customData = ccd;
+		return extras;
 	}
 
-	// No halos: Clay's native .border emit (cheap; no CUSTOM dispatch).
-	// strokeWidth==0 disables the border entirely.
-	Clay_BorderElementConfig border{
-		.color = {
-			/*r=*/static_cast<float>(strokePaletteColor),
+	if(style.strokeWidth > 0){
+		// No halos → Clay's native .border path (cheap; no CUSTOM
+		// dispatch). Per-side widths come from the side mask; suppressed
+		// sides get width 0. The bridge reads palette idx from `.r`.
+		Uint8 sides = style.sides ? style.sides : BoxSides::All;
+		Uint16 w = style.strokeWidth;
+		extras.border.color = {
+			/*r=*/static_cast<float>(style.strokeColor),
 			/*g=*/0.0f, /*b=*/0.0f, /*a=*/255.0f,
-		},
-		.width = {
-			/*left=*/strokeWidth, /*right=*/strokeWidth,
-			/*top=*/strokeWidth, /*bottom=*/strokeWidth,
+		};
+		extras.border.width = {
+			/*left=*/  (sides & BoxSides::Left)   ? w : (Uint16)0,
+			/*right=*/ (sides & BoxSides::Right)  ? w : (Uint16)0,
+			/*top=*/   (sides & BoxSides::Top)    ? w : (Uint16)0,
+			/*bottom=*/(sides & BoxSides::Bottom) ? w : (Uint16)0,
 			/*betweenChildren=*/0,
-		},
-	};
+		};
+	}
 
-	CLAY({
-		.id = Clay_GetElementId(id),
-		.layout = { .sizing = { xSizing, ySizing } },
-		.backgroundColor = bg,
-		.border = border,
-	}) {}
+	return extras;
 }
 
 }  // namespace silencer::ui::primitives

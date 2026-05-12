@@ -21,7 +21,7 @@
 
 #include "primitives/bank_button.h"
 #include "primitives/bank_text.h"
-#include "primitives/form_border.h"
+#include "primitives/box.h"
 #include "primitives/label_value_row.h"
 #include "primitives/panel.h"
 #include "primitives/scroll_list.h"
@@ -94,7 +94,7 @@ void BuildDemoTree() {
 	                    .layoutDirection = CLAY_LEFT_TO_RIGHT },
 	       .backgroundColor = { 0, 0, 0, 255 } }) {
 		// LEFT COLUMN — Panel(LeftBare) demonstrating header text,
-		// LabelValueRow, FormBorder, BankText all 4 variants.
+		// LabelValueRow, Box(Plain), BankText all 4 variants.
 		CLAY({ .id     = CLAY_ID("LeftCol"),
 		       .layout = { .sizing  = { CLAY_SIZING_FIXED(280), CLAY_SIZING_FIXED(464) },
 		                   .padding = CLAY_PADDING_ALL(0),
@@ -109,13 +109,14 @@ void BuildDemoTree() {
 			              .titlePadLeft = 8,
 			              .titlePadTop  = 4 });
 
-			// FormBorder demo block — small bordered rect with body text.
-			CLAY({ .id     = CLAY_ID("FormBorderDemo"),
-			       .layout = { .sizing = { CLAY_SIZING_FIXED(264), CLAY_SIZING_FIXED(74) },
-			                   .padding = CLAY_PADDING_ALL(6),
-			                   .childGap = 3,
-			                   .layoutDirection = CLAY_TOP_TO_BOTTOM },
-			       .border = prim::FormBorder(/*paletteColor=*/220) }) {
+			// Box(Plain)-style demo block — small bordered rect with body text.
+			CLAY(prim::Box(prim::BoxStrokeStyle{ /*strokeColor=*/220, /*strokeWidth=*/1 }, {
+			         .id     = CLAY_ID("BoxPlainDemo"),
+			         .layout = { .sizing = { CLAY_SIZING_FIXED(264), CLAY_SIZING_FIXED(74) },
+			                     .padding = CLAY_PADDING_ALL(6),
+			                     .childGap = 3,
+			                     .layoutDirection = CLAY_TOP_TO_BOTTOM },
+			     })) {
 				prim::BankText(CLAY_STRING("Title variant"),
 				               prim::BankTextVariant::Title,
 				               { .effectColor = 152 });

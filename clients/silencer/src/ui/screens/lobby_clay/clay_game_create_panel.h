@@ -2,9 +2,9 @@
 #define SILENCER_UI_LOBBY_CLAY_GAME_CREATE_PANEL_H
 
 // Screen-side Clay reimplementation of the lobby GameCreatePanel — the
-// game-options form on the right pane. Composes Panel/FormBorder +
-// LabelValueRow + TextInput + BankButton::Inline (security/spectatable
-// cyclers) + ScrollList (map list) + BankButton::Chrome (Create).
+// game-options form on the right pane. Composes Panel + LabelValueRow +
+// TextInput + BankButton::Inline (security/spectatable cyclers) +
+// ScrollList (map list) + BankButton::Chrome (Create).
 //
 // Domain glue (CreateGame kickoff, Config persistence, async map upload)
 // lives in the screen-side GameCreatePanelTick. Primitives stay screen-

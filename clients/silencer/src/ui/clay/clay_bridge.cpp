@@ -497,47 +497,125 @@ void Render(::Resources & resources, ::Renderer & renderer,
 						int bw = static_cast<int>(c->boundingBox.width);
 						int bh = static_cast<int>(c->boundingBox.height);
 						if(bw <= 0 || bh <= 0) break;
-						// Draw a single 1-px-thick outline ring at the given inset
-						// from the box's outer edge. Clipped against the active
-						// scissor stack.
-						auto drawRing = [&](int inset, int thickness, Uint8 color){
-							int rx = bx + inset;
-							int ry = by + inset;
-							int rw = bw - 2 * inset;
-							int rh = bh - 2 * inset;
-							if(rw <= 0 || rh <= 0) return;
+						// Per-side mask (1=top, 2=right, 4=bottom, 8=left).
+						// 0 falls back to all four sides for back-compat.
+						Uint8 sides = p->sides ? p->sides : 0xF;
+						bool sTop    = (sides & 0x1) != 0;
+						bool sRight  = (sides & 0x2) != 0;
+						bool sBottom = (sides & 0x4) != 0;
+						bool sLeft   = (sides & 0x8) != 0;
+						// Draw the active sides of a 1-band ring at the
+						// given concentric `inset` from the bbox edge.
+						// Inset is asymmetric: bands only inset on sides
+						// that have a perpendicular stripe to make room
+						// for. A suppressed side lets the parallel
+						// stripe extend to the bbox edge, so adjacent
+						// rectangular Boxes meeting at a shared edge
+						// (e.g. the lobby right-pane L-shape) join with
+						// no gap and no overlap.
+						// Fill a stripe at (x, y, w, h) with `color`. When
+						// `opacity` is 255 it's a solid fill; otherwise blend
+						// the color against the underlying pixel so the same
+						// palette entry reads as a dimmer band (the legacy
+						// chrome's halo bands are alpha-blended copies of the
+						// primary, not separate palette indices).
+						//
+						// Fast path: the palette's alphaed LUT covers
+						// `dst ∈ [2, 226)`. Outside that range — notably the
+						// lobby's pure-black backdrop at idx 0 — fall back to
+						// computing the blend in RGB and resolving via
+						// ClosestMatch. Per-pixel cost; reserved for chrome.
+						auto fillStripe = [&](int x, int y, int w, int h, Uint8 color, Uint8 opacity){
+							if(w <= 0 || h <= 0) return;
+							if(!ClipDrawRect(dst->w, dst->h, x, y, w, h)) return;
+							if(opacity == 255){
+								Renderer::DrawFilledRectangle(dst, x, y, x+w, y+h, color);
+								return;
+							}
+							Uint8 srcLUT = AlphaSrcIndex(color, opacity);
+							SDL_Color * colors = renderer.palette.GetColors();
+							SDL_Color srcRgb = colors[color];
+							const float alpha = 0.5f;  // matches LUT quantization
+							// Cache the math fallback per-dst — most chrome
+							// halos draw over uniform backdrop pixels so we
+							// only resolve ClosestMatch a couple of times.
+							Uint8 fallbackCache[256];
+							bool   fallbackCached[256] = {false};
+							for(int py = y; py < y + h; py++){
+								for(int px = x; px < x + w; px++){
+									Uint8 d = Renderer::GetPixel(dst, px, py);
+									Uint8 blended;
+									if(d >= 2 && d < 226){
+										blended = renderer.palette.Alpha(srcLUT, d);
+									}else if(fallbackCached[d]){
+										blended = fallbackCache[d];
+									}else{
+										// Inline RGB lerp — `Palette::Alpha(SDL_Color,...)`
+										// is private. Mirrors palette.cpp:442-447.
+										SDL_Color dstRgb = colors[d];
+										SDL_Color rgb;
+										rgb.r = (Uint8)(srcRgb.r * alpha + dstRgb.r * (1.0f - alpha));
+										rgb.g = (Uint8)(srcRgb.g * alpha + dstRgb.g * (1.0f - alpha));
+										rgb.b = (Uint8)(srcRgb.b * alpha + dstRgb.b * (1.0f - alpha));
+										rgb.a = 255;
+										blended = renderer.palette.ClosestMatch(rgb);
+										fallbackCache[d]  = blended;
+										fallbackCached[d] = true;
+									}
+									Renderer::SetPixel(dst, px, py, blended);
+								}
+							}
+						};
+						auto drawRing = [&](int inset, int thickness, Uint8 color, Uint8 opacity){
 							int t = thickness;
-							if(t * 2 > rw) t = rw / 2;
-							if(t * 2 > rh) t = rh / 2;
 							if(t < 1) return;
-							// Top edge.
-							{ int x=rx, y=ry, w=rw, h=t;
-							  if(ClipDrawRect(dst->w, dst->h, x, y, w, h))
-								Renderer::DrawFilledRectangle(dst, x, y, x+w, y+h, color); }
-							// Bottom edge.
-							{ int x=rx, y=ry+rh-t, w=rw, h=t;
-							  if(ClipDrawRect(dst->w, dst->h, x, y, w, h))
-								Renderer::DrawFilledRectangle(dst, x, y, x+w, y+h, color); }
-							// Left edge (skip corners already covered by top/bottom).
-							{ int x=rx, y=ry+t, w=t, h=rh-2*t;
-							  if(h > 0 && ClipDrawRect(dst->w, dst->h, x, y, w, h))
-								Renderer::DrawFilledRectangle(dst, x, y, x+w, y+h, color); }
-							// Right edge.
-							{ int x=rx+rw-t, y=ry+t, w=t, h=rh-2*t;
-							  if(h > 0 && ClipDrawRect(dst->w, dst->h, x, y, w, h))
-								Renderer::DrawFilledRectangle(dst, x, y, x+w, y+h, color); }
+							if(t * 2 > bw) t = bw / 2;
+							if(t * 2 > bh) t = bh / 2;
+							if(t < 1) return;
+							int leftInset   = sLeft   ? inset : 0;
+							int rightInset  = sRight  ? inset : 0;
+							int topInset    = sTop    ? inset : 0;
+							int bottomInset = sBottom ? inset : 0;
+							// Top stripe.
+							if(sTop){
+								int x = bx + leftInset;
+								int y = by + inset;
+								int w = bw - leftInset - rightInset;
+								fillStripe(x, y, w, t, color, opacity);
+							}
+							// Bottom stripe.
+							if(sBottom){
+								int x = bx + leftInset;
+								int y = by + bh - inset - t;
+								int w = bw - leftInset - rightInset;
+								fillStripe(x, y, w, t, color, opacity);
+							}
+							// Vertical edges. y range skips cells owned by
+							// active perpendicular sides; suppressed sides
+							// don't subtract anything.
+							int vy0 = by + topInset    + (sTop    ? t : 0);
+							int vy1 = by + bh - bottomInset - (sBottom ? t : 0);
+							int vh  = vy1 - vy0;
+							if(sLeft && vh > 0){
+								int x = bx + inset;
+								fillStripe(x, vy0, t, vh, color, opacity);
+							}
+							if(sRight && vh > 0){
+								int x = bx + bw - inset - t;
+								fillStripe(x, vy0, t, vh, color, opacity);
+							}
 						};
 						int inset = 0;
 						if(p->outerHaloWidth > 0){
-							drawRing(inset, p->outerHaloWidth, p->outerHaloColor);
+							drawRing(inset, p->outerHaloWidth, p->outerHaloColor, p->haloOpacity);
 							inset += p->outerHaloWidth;
 						}
 						if(p->strokeWidth > 0){
-							drawRing(inset, p->strokeWidth, p->strokeColor);
+							drawRing(inset, p->strokeWidth, p->strokeColor, 255);
 							inset += p->strokeWidth;
 						}
 						if(p->innerHaloWidth > 0){
-							drawRing(inset, p->innerHaloWidth, p->innerHaloColor);
+							drawRing(inset, p->innerHaloWidth, p->innerHaloColor, p->haloOpacity);
 						}
 						break;
 					}

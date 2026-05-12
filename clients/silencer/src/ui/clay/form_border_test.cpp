@@ -1,14 +1,16 @@
-// P10 unit test scene for the FormBorder primitive.
+// Unit test scene for Box's plain (no-halo) stroke path.
 //
-// `RunFormBorderTest(outPath)` renders a single CLAY block sized 156x93
+// `RunFormBorderTest(outPath)` renders a single Box sized 156x93
 // (matching the legacy gamecreate form's outer chrome) at root padding
-// (243, 87) with `.border = FormBorder()` (1-px palette idx 220 stroke)
-// into a 640x480 Surface and writes a PNG. The committed reference at
-// tests/lobby-clay/form_border_test/reference.png is the pinned baseline.
+// (243, 87) with a 1-px palette idx 220 stroke into a 640x480 Surface
+// and writes a PNG. The committed reference at
+// tests/lobby-clay/form_border_test/reference.png is the pinned baseline;
+// the rendered output is byte-identical to the pre-Box `FormBorder`
+// helper this test used to exercise (same `.border` render commands).
 
 #include "clay_bridge.h"
 #include "clay/clay.h"
-#include "primitives/form_border.h"
+#include "primitives/box.h"
 
 #include "game.h"
 #include "palette.h"
@@ -22,6 +24,9 @@ bool RunFormBorderTest(::Game & game, const char * outPath) {
 	const int H = 480;
 	EnsureInitialized(W, H);
 
+	using silencer::ui::primitives::Box;
+	using silencer::ui::primitives::BoxStrokeStyle;
+
 	::Clay_BeginLayout();
 
 	CLAY({ .id = CLAY_ID("FormBorderTestRoot"),
@@ -30,12 +35,13 @@ bool RunFormBorderTest(::Game & game, const char * outPath) {
 	           .padding = { /*left=*/243, /*right=*/0,
 	                        /*top=*/87, /*bottom=*/0 },
 	       } }) {
-		CLAY({ .id = CLAY_ID("FormBorderBox"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(156),
-		                       CLAY_SIZING_FIXED(93) },
-		       },
-		       .border = silencer::ui::primitives::FormBorder(/*paletteColor=*/220) }) {}
+		CLAY(Box(BoxStrokeStyle{ /*strokeColor=*/220, /*strokeWidth=*/1 }, {
+		         .id = CLAY_ID("FormBorderBox"),
+		         .layout = {
+		             .sizing = { CLAY_SIZING_FIXED(156),
+		                         CLAY_SIZING_FIXED(93) },
+		         },
+		     })) {}
 	}
 
 	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();

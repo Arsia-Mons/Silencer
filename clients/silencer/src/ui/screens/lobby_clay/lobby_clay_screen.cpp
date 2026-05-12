@@ -23,7 +23,7 @@
 #include "clay_inspector.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
-#include "primitives/form_border.h"
+#include "primitives/box.h"
 #include "primitives/scroll_list.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
@@ -41,6 +41,10 @@ using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonVariant;
 using silencer::ui::primitives::BankTextBeginFrame;
 using silencer::ui::primitives::BankButtonBeginFrame;
+using silencer::ui::primitives::Box;
+using silencer::ui::primitives::BoxBeginFrame;
+namespace BoxVariants = silencer::ui::primitives::BoxVariants;
+namespace BoxSides    = silencer::ui::primitives::BoxSides;
 using silencer::ui::primitives::ScrollListBeginFrame;
 using silencer::ui::primitives::ScrollTextBoxBeginFrame;
 using silencer::ui::primitives::TextInputBeginFrame;
@@ -80,25 +84,24 @@ void OnGoBackClicked(void * user)
 	if(screen) screen->NotifyGoBackClicked();
 }
 
-// Lobby chrome geometry — derived from the baked LobbyBg sprite. The outer
-// frame spans the panel-area bounding box (top of the title strip down to the
-// bottom of the chat-box / right pane). The title bar is the first child of
-// the outer frame (TOP_TO_BOTTOM flex). C7 drops the baked LobbyBg, leaving
-// only the Clay-drawn strokes.
-constexpr int kChromeOriginX = 10;
-constexpr int kChromeOriginY = 25;
-constexpr int kChromeOuterW  = 620;   // x = 10..629
-constexpr int kChromeOuterH  = 430;   // y = 25..454
-constexpr int kTitleBarH     = 29;    // y = 25..53
-constexpr Uint8 kChromeStrokeColor = 216;  // C2 canonical lobby chrome primary
+// Lobby chrome geometry — sampled from the baked LobbyBg sprite and
+// documented in docs/plans/lobby-chrome-rectangles.md. The lobby chrome
+// is five disjoint rectangles (TopStrip + TitleBar/CharacterPanel +
+// ChatBox + Right-UpExt + Right-Tall) rather than one wrapping outer
+// frame — the legacy BG has no all-encompassing outline.
+constexpr int kTopStripX = 10;
+constexpr int kTopStripY = 25;
+constexpr int kTopStripW = 620;       // x = 10..629
+constexpr int kTopStripH = 29;        // y = 25..53
 
-// Right-pane chrome — the upside-down-L (C2 docs), composed of two side-by-
-// side Boxes that share the column at x=398. The Upper box covers the wide
-// upper area to the right of the title bar; the Tall box covers the main
-// game-info / player-list pane down to the panel-row bottom. Both float @ROOT
-// and host the active variant's subtree as flex children. Per the per-file
-// "≤ 1 floating" rule for panel files, all variant subtrees emit children
-// (no floating) into these screen-level chrome containers.
+// Right-pane geometry — the upside-down-L. Chrome is decomposed into
+// three sibling Boxes with per-side strokes so the L-perimeter renders
+// with no internal joint at x=398, y=64..185 (see Draw()). The variant
+// subtrees flow inside two pure layout containers covering the legacy
+// panel-area rects (RightUpper + RightTall); chrome is rendered as
+// separate ROOT-attached overlays. Both containers and chrome attach
+// @ROOT, so the per-file "≤ 1 floating" rule for panel files is
+// trivially satisfied — all variant-side children are non-floating.
 constexpr int kRightUpperX = 238;
 constexpr int kRightUpperY = 64;
 constexpr int kRightUpperW = 160;
@@ -112,23 +115,18 @@ constexpr int kRightTallH  = 391;
 //   • LobbyClayRoot — fullscreen 640x480. C7 dropped the baked LobbyBg
 //     image; the legacy outside-chrome area was pure-black anyway, so no
 //     backgroundColor is needed. The Clay strokes are now the only chrome.
-//   • LobbyOuterFrame — Box-shaped CLAY container, attached @ ROOT at the
-//     panel-area top-left. TOP_TO_BOTTOM flex; the title bar is the first
-//     child. Panel subtrees (character/chat/right-pane) still attach
-//     separately to ROOT until their own iterations move them in.
-//   • LobbyTitleBar — flex child of LobbyOuterFrame. LEFT_TO_RIGHT row
-//     holding title / version / mapname / Go Back button.
+//   • LobbyTitleBar — top status strip (10, 25, 620, 29). Attached @ ROOT;
+//     holds title / version / mapname / Go Back button as flex children.
 //
-// LobbyOuterFrame is the ONE allowed ROOT-attached chrome wrapper in this
-// file (C5b rule). Every inner child positions via flex padding / gap /
-// alignment.
+// The character / chat / right-pane chrome rectangles attach to ROOT in
+// their own panel files. There is no all-encompassing outer frame — the
+// legacy BG has none.
 void BuildChromeTree(LobbyClayScreen * screen,
                      const std::string & version,
                      const std::string & mapName,
                      Resources & /*resources*/)
 {
 	using namespace silencer::clay_bridge;
-	using silencer::ui::primitives::FormBorder;
 
 	const int W = 640;
 	const int H = 480;
@@ -138,28 +136,20 @@ void BuildChromeTree(LobbyClayScreen * screen,
 	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
 	       } }) {
 
-		CLAY({ .id = CLAY_ID("LobbyOuterFrame"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kChromeOuterW),
-		                       CLAY_SIZING_FIXED(kChromeOuterH) },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .floating = { .offset = { (float)kChromeOriginX,
-		                                 (float)kChromeOriginY },
-		                     .attachTo = CLAY_ATTACH_TO_ROOT },
-		       .border = FormBorder(kChromeStrokeColor) }) {
-
-			CLAY({ .id = CLAY_ID("LobbyTitleBar"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIXED(kChromeOuterW),
-			                       CLAY_SIZING_FIXED(kTitleBarH) },
-			           .padding = { /*left=*/5, /*right=*/5,
-			                        /*top=*/4, /*bottom=*/4 },
-			           .childGap = 6,
-			           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			       },
-			       .border = FormBorder(kChromeStrokeColor) }) {
+		CLAY(Box(BoxVariants::Chrome, {
+		         .id = CLAY_ID("LobbyTitleBar"),
+		         .layout = {
+		             .sizing = { CLAY_SIZING_FIXED(kTopStripW),
+		                         CLAY_SIZING_FIXED(kTopStripH) },
+		             .padding = { /*left=*/5, /*right=*/5,
+		                          /*top=*/4, /*bottom=*/4 },
+		             .childGap = 6,
+		             .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+		             .layoutDirection = CLAY_LEFT_TO_RIGHT,
+		         },
+		         .floating = { .offset = { (float)kTopStripX, (float)kTopStripY },
+		                       .attachTo = CLAY_ATTACH_TO_ROOT },
+		     })) {
 			CLAY({ .id = CLAY_ID("LobbyTitle") }) {
 				BankText(CLAY_STRING("Silencer"),
 				         BankTextVariant::Title,
@@ -206,7 +196,6 @@ void BuildChromeTree(LobbyClayScreen * screen,
 				             .user = screen });
 			}
 		}
-	}
 
 		// Inspector registration uses the legacy on-screen rect for click
 		// routing. The button's actual flex-derived bbox lands in roughly the
@@ -426,6 +415,7 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 
 	BankTextBeginFrame();
 	BankButtonBeginFrame();
+	BoxBeginFrame();
 	ToggleBeginFrame();
 	ScrollListBeginFrame();
 	ScrollTextBoxBeginFrame();
@@ -439,12 +429,57 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	silencer::ui::lobby_clay::BuildChatPanelTree(
 		chatState, ctx.world, ctx.world.resources);
 
-	// LobbyRightUpperBox — chrome wrapper hosting the active variant's
-	// upper-pane subtree as flex children. ROOT-attached at (238, 64); inner
-	// children carry NO floating configs (the per-file "≤ 1 floating" rule
-	// stays satisfied for the variant panel files).
+	// Right pane = upside-down-L. Decomposed into three chrome rectangles
+	// whose perimeter traces the L without any internal stroke at the
+	// joint column x=398, y=64..185:
+	//   • UpExt    (238, 64, 160, 121) — sides Top|Left|Bottom
+	//   • TallTop  (398, 64, 232, 121) — sides Top|Right
+	//   • TallBot  (398, 185, 232, 270) — sides Left|Right|Bottom
+	// The variant subtrees still flow inside two pure layout containers
+	// (LobbyRightUpperBox / LobbyRightTallBox) at the legacy coords so the
+	// per-panel layout code doesn't have to know about the chrome split.
 	{
-		using silencer::ui::primitives::FormBorder;
+		// L-perimeter chrome — three sibling Boxes with per-side strokes.
+		auto upExt = BoxVariants::Chrome;
+		upExt.sides = BoxSides::Top | BoxSides::Left | BoxSides::Bottom;
+		CLAY(Box(upExt, {
+		         .id = CLAY_ID("LobbyRightUpExtChrome"),
+		         .layout = { .sizing = { CLAY_SIZING_FIXED((float)kRightUpperW),
+		                                 CLAY_SIZING_FIXED((float)kRightUpperH) } },
+		         .floating = { .offset   = { (float)kRightUpperX, (float)kRightUpperY },
+		                       .attachTo = CLAY_ATTACH_TO_ROOT },
+		     })) {}
+
+		auto tallTop = BoxVariants::Chrome;
+		tallTop.sides = BoxSides::Top | BoxSides::Right;
+		CLAY(Box(tallTop, {
+		         .id = CLAY_ID("LobbyRightTallTopChrome"),
+		         .layout = { .sizing = { CLAY_SIZING_FIXED((float)kRightTallW),
+		                                 CLAY_SIZING_FIXED((float)kRightUpperH) } },
+		         .floating = { .offset   = { (float)kRightTallX, (float)kRightTallY },
+		                       .attachTo = CLAY_ATTACH_TO_ROOT },
+		     })) {}
+
+		auto tallBot = BoxVariants::Chrome;
+		tallBot.sides = BoxSides::Left | BoxSides::Right | BoxSides::Bottom;
+		// TallBot's top edge overlaps TallTop's bottom row (UpperY+UpperH-1)
+		// by 1 pixel so the outer-halo band turns the L-bend corner at
+		// (RightTallX, UpperY+UpperH-1). Without this, the inner-corner
+		// pixel falls in TallTop's bottom-left — which has no chrome
+		// (sides=Top|Right) — leaving a 1-px diagonal step.
+		const float tallBotY = (float)(kRightTallY + kRightUpperH - 1);
+		const float tallBotH = (float)(kRightTallH - kRightUpperH + 1);
+		CLAY(Box(tallBot, {
+		         .id = CLAY_ID("LobbyRightTallBotChrome"),
+		         .layout = { .sizing = { CLAY_SIZING_FIXED((float)kRightTallW),
+		                                 CLAY_SIZING_FIXED(tallBotH) } },
+		         .floating = { .offset   = { (float)kRightTallX, tallBotY },
+		                       .attachTo = CLAY_ATTACH_TO_ROOT },
+		     })) {}
+
+		// Layout containers — no chrome, just host the active variant's
+		// subtree at the legacy panel-area coordinates. The variant panel
+		// files attach all their children flex-inside (no extra floating).
 		CLAY({ .id = CLAY_ID("LobbyRightUpperBox"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED((float)kRightUpperW),
@@ -453,8 +488,7 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 		       },
 		       .floating = { .offset   = { (float)kRightUpperX,
 		                                   (float)kRightUpperY },
-		                     .attachTo = CLAY_ATTACH_TO_ROOT },
-		       .border = FormBorder(kChromeStrokeColor) }) {
+		                     .attachTo = CLAY_ATTACH_TO_ROOT } }) {
 			if(gameCreateActive){
 				silencer::ui::lobby_clay::BuildGameCreateUpperTree(
 					gameCreateState, ctx.world.resources);
@@ -478,8 +512,7 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 		       },
 		       .floating = { .offset   = { (float)kRightTallX,
 		                                   (float)kRightTallY },
-		                     .attachTo = CLAY_ATTACH_TO_ROOT },
-		       .border = FormBorder(kChromeStrokeColor) }) {
+		                     .attachTo = CLAY_ATTACH_TO_ROOT } }) {
 			if(gameCreateActive){
 				silencer::ui::lobby_clay::BuildGameCreateTallTree(
 					gameCreateState, ctx.world.resources);
