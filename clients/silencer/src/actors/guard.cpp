@@ -338,6 +338,10 @@ void Guard::InitBT(){
 			is_walking = true;
 			res_bank   = 60;
 			res_index  = ctx.elapsedTicks() % 19;
+			{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+			  Sint8 spd = gd ? gd->speed : speed;
+			  xv = mirrored ? -spd : spd;
+			  FollowGround(*this, world, xv); }
 			return BTResult::Running;
 		}
 		} // _sg scope
@@ -387,6 +391,10 @@ void Guard::InitBT(){
 		is_walking = true;
 		res_bank   = 60;
 		res_index  = ctx.elapsedTicks() % 19;
+		{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
+		  Sint8 spd = gd ? gd->speed : speed;
+		  xv = mirrored ? -spd : spd;
+		  FollowGround(*this, world, xv); }
 		return BTResult::Running;
 	};
 
@@ -546,7 +554,7 @@ void Guard::InitBT(){
 		World& world = *static_cast<World*>(ctx.userData);
 		const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
 		is_walking = true;
-		if(DistanceToEnd(*this, world) <= world.minwalldistance) mirrored = !mirrored;
+		{ int d = DistanceToEnd(*this, world); if(d >= 0 && d <= world.minwalldistance) mirrored = !mirrored; }
 		Sint8 spd = gd ? gd->speed : speed;
 		xv = mirrored ? -spd : spd;
 		FollowGround(*this, world, xv);
