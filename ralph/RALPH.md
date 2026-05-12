@@ -144,6 +144,77 @@ For pre-lobby items (Rectangle primitive smoke test, bridge alpha
 support test) screenshot the relevant test scene PNG instead — there
 will always be a visual artifact to attach.
 
+## Visual self-verification — NOT OPTIONAL
+
+Build + e2e + Clay-inspector descendants checks are NECESSARY but NOT
+SUFFICIENT for any panel-migration item (C3–C7). A panel can compile,
+pass e2e, and have all children registered under the right parent
+element ID — and still ship visibly broken (text crashing into the
+stroke; new Clay-drawn stroke offset from the baked BG stroke; flex
+children mispositioned). Past iterations have flipped `passes=true` on
+visually broken panels because the inspector said "child present."
+
+Before flipping `passes=true` on a panel-migration item, you MUST:
+
+1. **Open the screenshot** at `/tmp/ralph-shots/iter-<ID>.png` (use
+   the `Read` tool on the PNG — it renders the image for you to
+   visually inspect).
+2. **Verify text breathing room.** For each text element inside a
+   Box, the text must sit ≥ 4 px inside the Box's stroke. Text
+   crashing against the stroke is a fail.
+3. **Verify stroke overlay.** During the C3–C6 transition phase, the
+   LobbyBg sprite (with baked rectangles) is still emitted UNDERNEATH
+   the new Clay-drawn Boxes. The Clay Box strokes MUST align with
+   the baked strokes to within 1 px so they read as a single visible
+   stroke, not two slightly-misaligned outlines. If you see double-
+   stroking in your screenshot, your Box's coords are wrong.
+4. **Programmatic pixel-sample verification.** Write a small Python
+   script that loads the screenshot and samples specific (x, y)
+   positions to ASSERT pixel values. Examples:
+   - At (Box_x + 2, Box_y + Box_h/2), expect palette idx 216
+     (stroke color, confirming the stroke is where Clay says it is).
+   - At (Box_x + 8, Box_y + 8), expect a NON-stroke palette index
+     (confirming text/content has padding from the corner).
+   - At (chrome_baked_stroke_x, chrome_baked_stroke_y), expect idx
+     216 (confirming the baked stroke is still where it was — the
+     overlay matches).
+   The script prints PASS/FAIL per sample + a summary. Run it.
+   Include the output in your progress.txt entry.
+5. **If ANY of steps 2–4 fail**, leave `passes=false` and document
+   the obstacle. Do not flip the flag and pile to the next item — a
+   visually broken panel cascades: every subsequent panel that
+   composes with it inherits the brokenness.
+
+## Anti-pattern: wrap-shortcut migration
+
+A previously-killed in-flight iteration was about to ship this code:
+
+```cpp
+CLAY({ .id = CLAY_ID("LobbyRightChromeUpper"), ... }) {
+    BuildGameSelectPanelTree(...);  // panel still uses floating @ROOT inside
+}
+```
+
+That wraps the existing `floating @ROOT (x, y)` subtree in a parent
+Clay element so the inspector sees the children as nested descendants
+of the wrapper. **It does not migrate to flex.** Children continue
+positioning via absolute coords, the wrapper's `.padding` is ignored
+by floating children, and the layout is unchanged.
+
+This is forbidden. If you find yourself reaching for "just wrap it"
+to make a pass-check pass, STOP — the pass-check is checking for
+something you haven't actually done. Each child element inside a
+migrated panel must:
+
+- NOT have a `.floating = { ... }` config of its own (exception: true
+  floating overlays like tooltips/modals/dropdowns — document each).
+- Position via the parent Box's `.layout` (padding, childGap,
+  childAlignment) and its own non-floating sizing.
+
+Sanity check: after migration, `grep -c "floating" <panel>.cpp` should
+return ≤ 1 (the parent Box's own floating attachment to ROOT, if any).
+Inner children should have no `floating` configs.
+
 ## Critical design rules (from the design doc)
 
 1. **No new lobby vocabulary in the `Rectangle` primitive.** It takes
