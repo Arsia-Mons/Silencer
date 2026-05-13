@@ -30,6 +30,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -92,47 +93,111 @@ constexpr uint16_t kRootPadTop = 25;
 constexpr uint16_t kRootPadBottom = 25;
 constexpr uint16_t kRegionGap = 10;
 constexpr uint16_t kTitleBarH = 29;
+constexpr uint16_t kTitleBarMapH = 48;
 constexpr uint16_t kCharacterW = 218;
 constexpr uint16_t kUpperH = 121;
 constexpr uint16_t kRightTallW = 232;
+constexpr uint16_t kRightTallH = 391;
+constexpr uint16_t kNarrowBreakpointW = 560;
+constexpr uint16_t kNarrowChatMinH = 88;
+
+bool UseNarrowLayout(int surfaceW)
+{
+	return surfaceW < kNarrowBreakpointW;
+}
+
+uint16_t TitleBarHeight(bool narrow, const std::string & mapName)
+{
+	return (narrow && !mapName.empty()) ? kTitleBarMapH : kTitleBarH;
+}
 
 void BuildTitleBarTree(LobbyClayScreen * screen,
                        const std::string & version,
-                       const std::string & mapName)
+                       const std::string & mapName,
+                       bool narrow,
+                       int surfaceW)
 {
+	const uint16_t titleH = TitleBarHeight(narrow, mapName);
 	CLAY(Box(BoxVariants::Chrome, {
 	         .id = CLAY_ID("LobbyTitleBar"),
-	         .layout = {
-	             .sizing = { CLAY_SIZING_GROW(0),
-	                         CLAY_SIZING_FIXED(kTitleBarH) },
+		         .layout = {
+		             .sizing = { CLAY_SIZING_GROW(0),
+		                         CLAY_SIZING_FIXED((float)titleH) },
 	             .padding = { 5, 5, 4, 4 },
-	             .childGap = 6,
+	             .childGap = narrow ? static_cast<uint16_t>(1)
+	                                : static_cast<uint16_t>(6),
 	             .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
-	             .layoutDirection = CLAY_LEFT_TO_RIGHT,
+	             .layoutDirection = narrow ? CLAY_TOP_TO_BOTTOM
+	                                       : CLAY_LEFT_TO_RIGHT,
 	         },
 	     })) {
-		CLAY({ .id = CLAY_ID("LobbyTitle") }) {
-			BankText(CLAY_STRING("Silencer"),
-			         BankTextVariant::Title,
-			         { .effectColor = 152 });
-		}
+		auto buildTitleRow = [&]() {
+			CLAY({ .id = CLAY_ID("LobbyTitleRow"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_FIXED(21) },
+			           .childGap = 6,
+			           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+			       } }) {
+				CLAY({ .id = CLAY_ID("LobbyTitle") }) {
+					BankText(CLAY_STRING("Silencer"),
+					         BankTextVariant::Title,
+					         { .effectColor = 152 });
+				}
 
-		Clay_String verstr;
-		verstr.isStaticallyAllocated = false;
-		verstr.length = (int32_t)version.size();
-		verstr.chars  = version.c_str();
-		CLAY({ .id = CLAY_ID("LobbyVer") }) {
-			BankText(verstr,
-			         BankTextVariant::Body,
-			         { .effectColor = 189 });
-		}
+				Clay_String verstr;
+				verstr.isStaticallyAllocated = false;
+				verstr.length = (int32_t)version.size();
+				verstr.chars  = version.c_str();
+				CLAY({ .id = CLAY_ID("LobbyVer") }) {
+					BankText(verstr,
+					         BankTextVariant::Body,
+					         { .effectColor = 189 });
+				}
 
-		if(!mapName.empty()){
+				if(!narrow && !mapName.empty()){
+					Clay_String mstr;
+					mstr.isStaticallyAllocated = false;
+					mstr.length = (int32_t)mapName.size();
+					mstr.chars  = mapName.c_str();
+					CLAY({ .id = CLAY_ID("LobbyMapName") }) {
+						BankText(mstr,
+						         BankTextVariant::Title,
+						         { .effectColor = 129,
+						           .brightness  = 160,
+						           .colorRamp   = true });
+					}
+				}
+
+				CLAY({ .id = CLAY_ID("LobbyTitleBarSpacer"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_GROW(0),
+				                       CLAY_SIZING_FIXED(0) },
+				       } }) {}
+
+				CLAY({ .id = CLAY_ID("LobbyGoBackWrap") }) {
+					BankButton(CLAY_STRING("Go Back"),
+					           BankButtonVariant::Chrome,
+					           {},
+					           { .hoveredOut = nullptr,
+					             .onClick = &OnGoBackClicked,
+					             .user = screen });
+				}
+			}
+		};
+		buildTitleRow();
+
+		if(narrow && !mapName.empty()){
 			Clay_String mstr;
 			mstr.isStaticallyAllocated = false;
 			mstr.length = (int32_t)mapName.size();
 			mstr.chars  = mapName.c_str();
-			CLAY({ .id = CLAY_ID("LobbyMapName") }) {
+			CLAY({ .id = CLAY_ID("LobbyMapNameNarrow"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_FIXED(15) },
+			       } }) {
 				BankText(mstr,
 				         BankTextVariant::Title,
 				         { .effectColor = 129,
@@ -140,29 +205,14 @@ void BuildTitleBarTree(LobbyClayScreen * screen,
 				           .colorRamp   = true });
 			}
 		}
-
-		CLAY({ .id = CLAY_ID("LobbyTitleBarSpacer"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_FIXED(0) },
-		       } }) {}
-
-		CLAY({ .id = CLAY_ID("LobbyGoBackWrap") }) {
-			BankButton(CLAY_STRING("Go Back"),
-			           BankButtonVariant::Chrome,
-			           {},
-			           { .hoveredOut = nullptr,
-			             .onClick = &OnGoBackClicked,
-			             .user = screen });
-		}
 	}
 
-	// Automation compatibility only. The rendered button is laid out by
-	// the title bar's flex row; this rect is not layout authority.
 	silencer::ui::clay_inspector::Widget gb;
 	gb.label = "Go Back";
 	gb.kind = silencer::ui::clay_inspector::WidgetKind::Button;
-	gb.x = 473; gb.y = 29; gb.w = 156; gb.h = 21;
+	gb.x = std::max(0, surfaceW - (int)kRootPadX - 5 - 156);
+	gb.y = kRootPadTop + 4;
+	gb.w = 156; gb.h = 21;
 	gb.onClick = &OnGoBackClicked;
 	gb.clickUser = screen;
 	silencer::ui::clay_inspector::Register(gb);
@@ -355,6 +405,14 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
+	const bool narrow = UseNarrowLayout(dst.w);
+	const uint16_t titleBarH = TitleBarHeight(narrow, mapName);
+	const int bodyH = std::max(0, dst.h - (int)kRootPadTop - (int)kRootPadBottom
+	                              - (int)titleBarH - (int)kRegionGap);
+	const int narrowTallFit = bodyH - ((int)kUpperH * 2)
+	                        - ((int)kRegionGap * 3) - (int)kNarrowChatMinH;
+	const int narrowTallH = std::max(0, std::min((int)kRightTallH, narrowTallFit));
+
 	ctx.BeginClayFrame(dst);
 
 	BankTextBeginFrame();
@@ -375,29 +433,111 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	           .childGap = kRegionGap,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
-		BuildTitleBarTree(this, version, mapName);
+		BuildTitleBarTree(this, version, mapName, narrow, dst.w);
 
 		CLAY({ .id = CLAY_ID("LobbyBody"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0),
 		                       CLAY_SIZING_GROW(0) },
 		           .childGap = kRegionGap,
-		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-		       } }) {
-			CLAY({ .id = CLAY_ID("LobbyLeftMiddleStack"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_GROW(0) },
-			           .childGap = kRegionGap,
-			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-			       } }) {
-				CLAY({ .id = CLAY_ID("LobbyUpperRow"),
+		           .layoutDirection = narrow ? CLAY_TOP_TO_BOTTOM
+		                                     : CLAY_LEFT_TO_RIGHT,
+		       },
+		       .clip = { .horizontal = true, .vertical = true },
+		     }) {
+			if(narrow){
+				CLAY(Box(BoxVariants::Chrome, {
+				         .id = CLAY_ID("LobbyCharacterBox"),
+				         .layout = {
+				             .sizing = { CLAY_SIZING_GROW(0),
+				                         CLAY_SIZING_FIXED(kUpperH) },
+				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+				         },
+				         .clip = { .horizontal = true, .vertical = true },
+				     })) {
+					silencer::ui::lobby_clay::BuildCharacterPanelTree(
+						characterState, ctx.world, ctx.world.resources);
+				}
+
+				CLAY(Box(BoxVariants::Chrome, {
+				         .id = CLAY_ID("LobbyRightUpperBox"),
+				         .layout = {
+				             .sizing = { CLAY_SIZING_GROW(0),
+				                         CLAY_SIZING_FIXED(kUpperH) },
+				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+				         },
+				         .clip = { .horizontal = true, .vertical = true },
+				     })) {
+					if(gameCreateActive){
+						silencer::ui::lobby_clay::BuildGameCreateUpperTree(
+							gameCreateState, ctx.world.resources);
+					}else if(gameJoinActive){
+						silencer::ui::lobby_clay::BuildGameJoinUpperTree(
+							gameJoinState, ctx.world.resources);
+					}else if(gameTechActive){
+						silencer::ui::lobby_clay::BuildGameTechUpperTree(
+							gameTechState, ctx.world, ctx.world.resources, *this);
+					}else{
+						silencer::ui::lobby_clay::BuildGameSelectUpperTree(
+							gameSelectState, ctx.world.resources);
+					}
+				}
+
+				CLAY(Box(BoxVariants::Chrome, {
+				         .id = CLAY_ID("LobbyRightTallBox"),
+				         .layout = {
+				             .sizing = { CLAY_SIZING_GROW(0),
+				                         CLAY_SIZING_FIXED((float)narrowTallH) },
+				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+				         },
+				         .clip = { .horizontal = true, .vertical = true },
+				     })) {
+					if(gameCreateActive){
+						silencer::ui::lobby_clay::BuildGameCreateTallTree(
+							gameCreateState, ctx.world.resources);
+					}else if(gameJoinActive){
+						silencer::ui::lobby_clay::BuildGameJoinTallTree(
+							gameJoinState, ctx.world.resources);
+					}else if(gameTechActive){
+						silencer::ui::lobby_clay::BuildGameTechTallTree(
+							gameTechState, ctx.world, ctx.world.resources, *this);
+					}else{
+						silencer::ui::lobby_clay::BuildGameSelectTallTree(
+							gameSelectState, ctx.world.resources);
+					}
+				}
+
+				CLAY(Box(BoxVariants::Chrome, {
+				         .id = CLAY_ID("LobbyChatBox"),
+				         .layout = {
+				             .sizing = { CLAY_SIZING_GROW(0),
+				                         CLAY_SIZING_GROW(0) },
+				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+				         },
+				         .clip = { .horizontal = true, .vertical = true },
+				     })) {
+					silencer::ui::lobby_clay::BuildChatPanelTree(
+						chatState, ctx.world, ctx.world.resources);
+				}
+			}else{
+				CLAY({ .id = CLAY_ID("LobbyLeftMiddleStack"),
 				       .layout = {
 				           .sizing = { CLAY_SIZING_GROW(0),
-				                       CLAY_SIZING_FIXED(kUpperH) },
+				                       CLAY_SIZING_GROW(0) },
 				           .childGap = kRegionGap,
-				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-				       } }) {
+				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+				       },
+				       .clip = { .horizontal = true, .vertical = true },
+				     }) {
+					CLAY({ .id = CLAY_ID("LobbyUpperRow"),
+					       .layout = {
+					           .sizing = { CLAY_SIZING_GROW(0),
+					                       CLAY_SIZING_FIXED(kUpperH) },
+					           .childGap = kRegionGap,
+					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+					       },
+					       .clip = { .horizontal = true, .vertical = true },
+					     }) {
 					CLAY(Box(BoxVariants::Chrome, {
 					         .id = CLAY_ID("LobbyCharacterBox"),
 					         .layout = {
@@ -405,6 +545,7 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 					                         CLAY_SIZING_GROW(0) },
 					             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					         },
+					         .clip = { .horizontal = true, .vertical = true },
 					     })) {
 						silencer::ui::lobby_clay::BuildCharacterPanelTree(
 							characterState, ctx.world, ctx.world.resources);
@@ -417,6 +558,7 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 					                         CLAY_SIZING_GROW(0) },
 					             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					         },
+					         .clip = { .horizontal = true, .vertical = true },
 					     })) {
 						if(gameCreateActive){
 							silencer::ui::lobby_clay::BuildGameCreateUpperTree(
@@ -441,32 +583,35 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 				                         CLAY_SIZING_GROW(0) },
 				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				         },
+				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
 					silencer::ui::lobby_clay::BuildChatPanelTree(
 						chatState, ctx.world, ctx.world.resources);
 				}
-			}
+				}
 
-			CLAY(Box(BoxVariants::Chrome, {
-			         .id = CLAY_ID("LobbyRightTallBox"),
-			         .layout = {
-			             .sizing = { CLAY_SIZING_FIXED(kRightTallW),
-			                         CLAY_SIZING_GROW(0) },
-			             .layoutDirection = CLAY_TOP_TO_BOTTOM,
-			         },
-			     })) {
-				if(gameCreateActive){
-					silencer::ui::lobby_clay::BuildGameCreateTallTree(
-						gameCreateState, ctx.world.resources);
-				}else if(gameJoinActive){
-					silencer::ui::lobby_clay::BuildGameJoinTallTree(
-						gameJoinState, ctx.world.resources);
-				}else if(gameTechActive){
-					silencer::ui::lobby_clay::BuildGameTechTallTree(
-						gameTechState, ctx.world, ctx.world.resources, *this);
-				}else{
-					silencer::ui::lobby_clay::BuildGameSelectTallTree(
-						gameSelectState, ctx.world.resources);
+				CLAY(Box(BoxVariants::Chrome, {
+				         .id = CLAY_ID("LobbyRightTallBox"),
+				         .layout = {
+				             .sizing = { CLAY_SIZING_FIXED(kRightTallW),
+				                         CLAY_SIZING_GROW(0) },
+				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+				         },
+				         .clip = { .horizontal = true, .vertical = true },
+				     })) {
+					if(gameCreateActive){
+						silencer::ui::lobby_clay::BuildGameCreateTallTree(
+							gameCreateState, ctx.world.resources);
+					}else if(gameJoinActive){
+						silencer::ui::lobby_clay::BuildGameJoinTallTree(
+							gameJoinState, ctx.world.resources);
+					}else if(gameTechActive){
+						silencer::ui::lobby_clay::BuildGameTechTallTree(
+							gameTechState, ctx.world, ctx.world.resources, *this);
+					}else{
+						silencer::ui::lobby_clay::BuildGameSelectTallTree(
+							gameSelectState, ctx.world.resources);
+					}
 				}
 			}
 		}
