@@ -209,3 +209,12 @@ void MainMenuScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
 }
+
+bool MainMenuScreen::HandleKeyPress(ScreenContext & ctx, char ascii)
+{
+	if(ascii == 0x1B){
+		ctx.RequestQuit();
+		return true;
+	}
+	return Screen::HandleKeyPress(ctx, ascii);
+}

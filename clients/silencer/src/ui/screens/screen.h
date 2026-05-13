@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_scancode.h>
+#include "clay_inspector.h"
 
 class ScreenContext;
 class Surface;
@@ -43,11 +44,27 @@ public:
 	virtual bool HandleTextInput(ScreenContext & ctx, char ascii)
 	{ (void)ctx; (void)ascii; return false; }
 	virtual bool HandleKeyPress(ScreenContext & ctx, char ascii)
-	{ (void)ctx; (void)ascii; return false; }
+	{
+		(void)ctx;
+		switch(ascii){
+			case '\t':
+			case 4:
+				return silencer::ui::clay_inspector::FocusNextInteractive();
+			case 3:
+				return silencer::ui::clay_inspector::FocusPreviousInteractive();
+			case '\n':
+				return silencer::ui::clay_inspector::ActivateFocused();
+			default:
+				return silencer::ui::clay_inspector::DispatchKeyPress(ascii);
+		}
+	}
 	virtual bool HandleScancodeDown(ScreenContext & ctx, SDL_Scancode scancode)
 	{ (void)ctx; (void)scancode; return false; }
 	virtual bool HandleMousePress(ScreenContext & ctx, bool pressed, Uint16 x, Uint16 y)
-	{ (void)ctx; (void)pressed; (void)x; (void)y; return false; }
+	{
+		(void)ctx;
+		return pressed ? silencer::ui::clay_inspector::InvokeAt(x, y) : false;
+	}
 	virtual bool HandleMouseMove(ScreenContext & ctx, Uint16 x, Uint16 y)
 	{ (void)ctx; (void)x; (void)y; return false; }
 

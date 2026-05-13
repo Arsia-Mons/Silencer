@@ -534,9 +534,7 @@ bool LobbyConnectScreen::HandleMousePress(ScreenContext & ctx,
 {
 	(void)ctx;
 	if(!pressed) return false;
-	if(silencer::ui::clay_inspector::FocusTextInputAt(x, y)) return true;
-	silencer::ui::clay_inspector::ClearFocus();
-	return false;
+	return silencer::ui::clay_inspector::InvokeAt(x, y);
 }
 
 void LobbyConnectScreen::NotifyLoginClicked()

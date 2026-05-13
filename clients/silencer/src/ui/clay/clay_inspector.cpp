@@ -35,7 +35,6 @@ FocusRef & Focus() {
 
 bool MatchesFocus(const Widget & w) {
 	const FocusRef & f = Focus();
-	if(w.kind != WidgetKind::TextInput) return false;
 	if(f.uid >= 0 && w.uid == f.uid) return true;
 	return f.uid < 0 && !f.label.empty() && w.label && IEq(w.label, f.label.c_str());
 }
@@ -56,6 +55,37 @@ void SetFocus(const Widget & w) {
 	FocusRef & f = Focus();
 	f.uid = w.uid;
 	f.label = w.label ? w.label : "";
+}
+
+bool IsInteractive(const Widget & w) {
+	if(w.inactive) return false;
+	return w.kind == WidgetKind::Button ||
+	       w.kind == WidgetKind::Toggle ||
+	       w.kind == WidgetKind::ListRow ||
+	       w.kind == WidgetKind::TextInput;
+}
+
+bool Invoke(const Widget & w) {
+	if(w.inactive) return false;
+	switch(w.kind){
+		case WidgetKind::Button:
+		case WidgetKind::Toggle:
+			if(w.onClick){
+				w.onClick(w.clickUser);
+				return true;
+			}
+			return false;
+		case WidgetKind::ListRow:
+			if(w.onClickRow){
+				w.onClickRow(w.clickUser, w.rowIndex);
+				return true;
+			}
+			return false;
+		case WidgetKind::TextInput:
+			SetFocus(w);
+			return true;
+	}
+	return false;
 }
 
 bool AppendChar(Widget const & w, char ascii) {
@@ -183,11 +213,11 @@ bool DispatchKeyPress(char ascii) {
 	const Widget * w = FocusedWidget();
 	switch(ascii){
 		case '\b':
-			return w ? Backspace(*w) : false;
+			return (w && w->kind == WidgetKind::TextInput) ? Backspace(*w) : false;
 		case '\t':
 			return FocusNext();
 		case '\n':
-			if(w && !w->inactive){
+			if(w && w->kind == WidgetKind::TextInput && !w->inactive){
 				if(w->onEnter) w->onEnter(w->enterUser);
 				return true;
 			}
@@ -198,6 +228,61 @@ bool DispatchKeyPress(char ascii) {
 		default:
 			return false;
 	}
+}
+
+bool InvokeAt(int x, int y) {
+	const auto & v = Registry();
+	for(auto it = v.rbegin(); it != v.rend(); ++it){
+		if(IsInteractive(*it) && PointIn(*it, x, y)){
+			SetFocus(*it);
+			return Invoke(*it);
+		}
+	}
+	ClearFocus();
+	return false;
+}
+
+bool FocusNextInteractive() {
+	const auto & v = Registry();
+	std::vector<const Widget *> items;
+	for(const auto & w : v){
+		if(IsInteractive(w)) items.push_back(&w);
+	}
+	if(items.empty()) return false;
+	int current = -1;
+	for(int i = 0; i < static_cast<int>(items.size()); i++){
+		if(MatchesFocus(*items[i])){
+			current = i;
+			break;
+		}
+	}
+	SetFocus(*items[(current + 1) % static_cast<int>(items.size())]);
+	return true;
+}
+
+bool FocusPreviousInteractive() {
+	const auto & v = Registry();
+	std::vector<const Widget *> items;
+	for(const auto & w : v){
+		if(IsInteractive(w)) items.push_back(&w);
+	}
+	if(items.empty()) return false;
+	int current = 0;
+	for(int i = 0; i < static_cast<int>(items.size()); i++){
+		if(MatchesFocus(*items[i])){
+			current = i;
+			break;
+		}
+	}
+	int next = current - 1;
+	if(next < 0) next = static_cast<int>(items.size()) - 1;
+	SetFocus(*items[next]);
+	return true;
+}
+
+bool ActivateFocused() {
+	const Widget * w = FocusedWidget();
+	return w ? Invoke(*w) : false;
 }
 
 }  // namespace silencer::ui::clay_inspector

@@ -74,6 +74,10 @@ bool IsTextInputFocused(int uid);
 void ClearFocus();
 bool DispatchTextInput(char ascii);
 bool DispatchKeyPress(char ascii);
+bool InvokeAt(int x, int y);
+bool FocusNextInteractive();
+bool FocusPreviousInteractive();
+bool ActivateFocused();
 
 }  // namespace silencer::ui::clay_inspector
 
