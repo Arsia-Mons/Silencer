@@ -475,17 +475,7 @@ Clay_RenderCommandArray Game::EndClientUiFrame() {
 }
 
 void Game::BuildVisibleClientUi(Surface& surface, float frametime) {
-	if(!screenStack.empty()){
-		int start = (int)screenStack.size() - 1;
-		while(start > 0 && screenStack[start]->IsOverlay()) --start;
-		for(size_t i = (size_t)start; i < screenStack.size(); ++i){
-			if(i > (size_t)start && screenStack[i]->IsOverlay()){
-				clientUi.Automation().BeginFrame();
-			}
-			screenStack[i]->BuildUi(screenContext, surface, frametime);
-		}
-	}
-
+	clientUi.BuildVisibleScreens(screenContext, surface, frametime);
 	if(world.map.loaded){
 		silencer::client_ui::BuildInGameHudUi(renderer, world, &surface, frametime);
 		silencer::client_ui::BuildInGameOverlaysUi(renderer, world, &surface);
@@ -493,7 +483,7 @@ void Game::BuildVisibleClientUi(Surface& surface, float frametime) {
 }
 
 void Game::RenderClientUiFrame(Surface& surface, float frametime) {
-	if(screenStack.empty() && !world.map.loaded){
+	if(!clientUi.HasScreens() && !world.map.loaded){
 		return;
 	}
 
@@ -800,11 +790,8 @@ bool Game::Loop(void){
 }
 
 bool Game::Tick(void){
-	if(screenStackPendingTeardown){
-		while(!screenStack.empty()) PopScreen();
-		screenStackPendingTeardown = false;
-	}
-	TickActiveScreen();
+	clientUi.ClearScreensIfRequested(screenContext);
+	clientUi.TickVisibleScreens(screenContext);
 	UpdateInGameOverlayState();
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
@@ -922,7 +909,7 @@ bool Game::Tick(void){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 				// Button-click handling lives in MainMenuScreen::Tick, dispatched
-				// by TickActiveScreen() at the top of Game::Tick.
+				// by ClientUi's navigation stack at the top of Game::Tick.
 			}
 		}break;
 		case LOBBYCONNECT:{
@@ -956,8 +943,8 @@ bool Game::Tick(void){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 				// Lobby pump (state-machine + deferred-create) lives in
-				// LobbyScreen::Tick, dispatched by TickActiveScreen() at the
-				// top of Game::Tick.
+				// LobbyScreen::Tick, dispatched by ClientUi's navigation stack
+				// at the top of Game::Tick.
 			}
 		}break;
 		case UPDATING:{
@@ -1045,7 +1032,7 @@ void Game::GoToState(Uint8 newstate){
 	// Defer the teardown so the active screen's Tick (which may have called
 	// GoToState in response to a button click) can return safely before its
 	// destructor runs.
-	screenStackPendingTeardown = true;
+	clientUi.RequestClearScreens();
 	silencer::ui::automation::BeginFrame();
 }
 
@@ -1235,35 +1222,17 @@ bool Game::IsLiveMultiplayer() const {
 }
 
 void Game::PushScreen(std::unique_ptr<Screen> s){
-	if(!s) return;
-	s->Build(screenContext);
-	screenStack.push_back(std::move(s));
+	clientUi.PushScreen(std::move(s), screenContext);
 }
 
 void Game::PopScreen(){
-	if(screenStack.empty()) return;
-	screenStack.back()->Destroy(screenContext);
-	screenStack.pop_back();
+	clientUi.PopScreen(screenContext);
 }
 
 void Game::ReplaceScreen(std::unique_ptr<Screen> s){
-	PopScreen();
-	PushScreen(std::move(s));
+	clientUi.ReplaceScreen(std::move(s), screenContext);
 }
 
 Screen * Game::GetTopScreen() const {
-	return screenStack.empty() ? nullptr : screenStack.back().get();
-}
-
-void Game::TickActiveScreen(){
-	if(screenStack.empty()) return;
-	// Tick the topmost non-overlay plus every overlay stacked above it. Modals
-	// are overlays — the screen beneath continues to tick (and run its
-	// per-frame state polling) while the modal is up. Input dispatch routes
-	// directly through the top screen's Clay handlers.
-	int start = (int)screenStack.size() - 1;
-	while(start > 0 && screenStack[start]->IsOverlay()) --start;
-	for(size_t i = (size_t)start; i < screenStack.size(); ++i){
-		screenStack[i]->Tick(screenContext);
-	}
+	return clientUi.TopScreen();
 }

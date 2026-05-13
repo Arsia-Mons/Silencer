@@ -52,8 +52,7 @@ public:
 	SDL_Window * & window;
 	RenderDevice * & renderdevice;
 
-	// State-machine + screen-stack actions. ShowModal / ShowMessage are still
-	// stubs — wired up when the first screen needs them.
+		// State-machine + client UI navigation actions.
 	void GoToState(Uint8 newState);
 	void GoBack();
 	void RequestQuit();

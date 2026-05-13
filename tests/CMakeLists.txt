@@ -20,6 +20,7 @@ set(TEST_SRC
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/text_input.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/toggle.cpp
     ${CMAKE_SOURCE_DIR}/src/client/ui/ClientUi.cpp
+    ${CMAKE_SOURCE_DIR}/src/client/ui/navigation/ScreenStack.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updatersha256.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updaterdownload.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updaterzip.cpp
@@ -35,6 +36,7 @@ target_include_directories(silencer_tests PRIVATE
     ${CMAKE_SOURCE_DIR}/src/client
     ${CMAKE_SOURCE_DIR}/src/updater
     ${CMAKE_SOURCE_DIR}/src/render
+    ${CMAKE_SOURCE_DIR}/src/client/ui/screens
 )
 
 add_test(NAME silencer_tests COMMAND silencer_tests)

@@ -6,16 +6,19 @@ server spawned by the Go lobby in `services/lobby/`.
 
 Build with the local `CMakeLists.txt` (`cmake -B build && cmake --build build`)
 — see top-level `README.md` for platform notes and the
-`-DSILENCER_LOBBY_*` knobs in *Gotchas* below. Source layout under
-`src/` is flat: ~158 files, `.cpp` paired with `.h`, no subdirectories.
+`-DSILENCER_LOBBY_*` knobs in *Gotchas* below. Source under `src/` is now
+organized by concern (`game/`, `render/`, `client/ui/`, `ui/`, etc.); keep new
+files in the owning concern instead of reviving the old flat layout.
 
 ## Client UI dogma
 
-`ClientUi` is the only production owner of visible UI composition.
-`Game::RenderClientUiFrame` collects the `UiInputState`, begins one
-`ClientUi`/`ClayService` frame, asks active screens, modals, HUD, and overlays
-to declare UI, ends the frame once, drains actions, and renders one command
-stream through the Clay compositor.
+`ClientUi` is the only production owner of visible UI composition and
+screen/modal navigation. `Game::RenderClientUiFrame` collects the
+`UiInputState`, begins one `ClientUi`/`ClayService` frame, asks active screens,
+modals, HUD, and overlays to declare UI, ends the frame once, drains actions,
+and renders one command stream through the Clay compositor. Navigation mechanics
+live in `src/client/ui/navigation/ScreenStack`; `Game` may request transitions
+but must not store or traverse the stack itself.
 
 Rules:
 
@@ -33,6 +36,9 @@ Rules:
   screen, modal, HUD block, or overlay block.
 - Modal overlays clear automation metadata before their own `BuildUi`, so the
   top modal owns keyboard/CLI focus while lower visual layers can still render.
+- Keep `ScreenStack` as the real single-stack owner for screens and modal
+  overlays. Add a separate modal stack only if real modal semantics are being
+  extracted, not as a placeholder.
 
 Run `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` after UI ownership
 changes; it guards this boundary.
@@ -134,8 +140,8 @@ lambdas read/write it via `ctx.bb<T>(key, default)` / `ctx.bbSet(key, val)`.
   `game.cpp` is the dispatcher; `events.cpp` handles SDL input,
   `ingame.cpp` holds in-game lifecycle, `headless.cpp` glues the
   control queue, and each gameplay-state Tick body lives in
-  `tick/tick_<state>.cpp`. `Game::RenderClientUiFrame` owns the one
-  production Clay frame.
+  `tick/tick_<state>.cpp`. `Game::RenderClientUiFrame` starts the one
+  production Clay frame; `ClientUi` owns visible UI navigation.
 - Simulation loop, socket, peer list, replay: `src/world.cpp`.
 - Rendering: `src/render/renderer.cpp`, `src/render/surface.cpp`,
   `src/render/sprite.cpp`, `src/render/palette.cpp`. Renderer is not a UI
@@ -144,7 +150,8 @@ lambdas read/write it via `ctx.bb<T>(key, default)` / `ctx.bbSet(key, val)`.
 - Generic Clay runtime/primitives: `src/ui/runtime`, `src/ui/primitives`,
   `src/ui/design`.
 - Silencer-specific UI surfaces: `src/client/ui/screens`,
-  `src/client/ui/modals`, and `src/client/ui/hud`.
+  `src/client/ui/modals`, `src/client/ui/hud`, and
+  `src/client/ui/navigation`.
 - Projectiles: `src/*projectile.cpp` + `src/shrapnel.cpp`.
 - Stations: `src/healmachine.cpp`, `src/creditmachine.cpp`,
   `src/inventorystation.cpp`, `src/techstation.cpp`, `src/walldefense.cpp`,

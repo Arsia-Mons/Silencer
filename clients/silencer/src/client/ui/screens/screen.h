@@ -9,7 +9,7 @@ class ScreenContext;
 class Surface;
 
 // Top-level UI surface bound to a Game state. One Screen is active at a time
-// (plus modals stacked on top). Lifecycle is owned by Game's screenStack.
+// (plus modals stacked on top). Lifecycle is owned by ClientUi's ScreenStack.
 class Screen
 {
 public:
@@ -18,7 +18,7 @@ public:
 	// Initialize screen-owned UI state. Called once on push.
 	virtual void Build(ScreenContext & ctx) = 0;
 
-	// Called once per Game::Tick while the screen is on top of the stack.
+	// Called once per frame while the screen is on top of the UI stack.
 	virtual void Tick(ScreenContext & ctx) = 0;
 
 	// Declare this screen's UI into the current ClientUi frame. Screens do not

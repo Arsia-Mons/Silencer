@@ -72,4 +72,9 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/client/ui" \
   "$REPO_ROOT/clients/silencer/src/game"
 
+fail_if_match \
+  "\\bscreenStack\\b|\\bTickActiveScreen\\b" \
+  "$REPO_ROOT/clients/silencer/src/game/game.cpp" \
+  "$REPO_ROOT/clients/silencer/src/game/game.h"
+
 echo "PASS 60_ui_architecture_boundaries"

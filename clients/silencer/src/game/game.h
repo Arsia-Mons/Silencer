@@ -79,8 +79,9 @@ public:
 	// socket "key" op.
 	bool tui;
 
-	// Screen-stack ops. Every menu surface is a Screen; the stack drives
-	// rendering and input via TickActiveScreen() at the top of Tick().
+	// Client UI navigation requests. ClientUi owns the stack mechanics; Game
+	// exposes these narrow wrappers for state transitions, screens, and control
+	// socket handlers.
 	void PushScreen(std::unique_ptr<Screen> s);
 	void PopScreen();
 	void ReplaceScreen(std::unique_ptr<Screen> s);
@@ -212,13 +213,7 @@ private:
 	MapDownloader mapDownloader;
 	AmbienceMixer ambienceMixer;
 
-	std::vector<std::unique_ptr<Screen>> screenStack;
 	ScreenContext screenContext;
-	void TickActiveScreen();
-	// Set by GoToState; processed at the next Tick() entry to pop screens
-	// safely after the active screen's Tick has returned. Avoids destroying
-	// a screen mid-Tick when a button click triggers a state transition.
-	bool screenStackPendingTeardown = false;
 
 	// Profile to restore when a gamepad disconnects.  Stays empty when the
 	// active profile was already "gamepad" before the pad was connected.
