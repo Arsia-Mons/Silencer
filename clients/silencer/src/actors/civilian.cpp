@@ -110,44 +110,33 @@ void Civilian::InitBT(){
 		return CheckTractVictim(world) ? BTResult::Success : BTResult::Failure;
 	};
 
-	// ThreatLook: scan AABB for projectiles; orient mirrored away from threat. Success = threat found.
-	btctx_.actions["ThreatLook"] = [this](BTContext& ctx) -> BTResult {
-		World& world = *static_cast<World*>(ctx.userData);
-		std::vector<Uint8> types = {
-			ObjectTypes::BLASTERPROJECTILE, ObjectTypes::LASERPROJECTILE,
-			ObjectTypes::ROCKETPROJECTILE,  ObjectTypes::FLAMERPROJECTILE,
-			ObjectTypes::PLASMAPROJECTILE,  ObjectTypes::WALLPROJECTILE,
-			ObjectTypes::FLAREPROJECTILE
-		};
-		const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
-		int dx = cd ? cd->threatDetectX : 200;
-		int dy = cd ? cd->threatDetectY : 100;
-		std::vector<Object*> objects = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
-		if(objects.empty()) return BTResult::Failure;
-		mirrored = (objects[0]->x > x);
-		return BTResult::Success;
-	};
-
-	// Run: enter RUNNING state.
-	btctx_.actions["Run"] = [this](BTContext&) -> BTResult {
-		if(state != RUNNING){ state = RUNNING; state_i = -1; }
-		return BTResult::Success;
-	};
-
-	// ReturnToWalk: after runDurationTicks in RUNNING with no threat, return to WALKING.
-	btctx_.actions["ReturnToWalk"] = [this](BTContext&) -> BTResult {
-		if(state != RUNNING) return BTResult::Failure;
-		const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
-		if(state_i < (cd ? cd->runDurationTicks : 150)) return BTResult::Failure;
-		state = WALKING; state_i = -1;
-		return BTResult::Success;
-	};
-
-	// RunMove: RUNNING movement and animation. Returns Running to keep Selector here.
+	// RunMove: enter RUNNING if walking near a projectile threat; do RUNNING movement;
+	// return to WALKING after runDurationTicks. Returns Running while running, Failure otherwise.
 	btctx_.actions["RunMove"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
+		// Detect threat and enter RUNNING from WALKING
+		if(state == WALKING){
+			std::vector<Uint8> types = {
+				ObjectTypes::BLASTERPROJECTILE, ObjectTypes::LASERPROJECTILE,
+				ObjectTypes::ROCKETPROJECTILE,  ObjectTypes::FLAMERPROJECTILE,
+				ObjectTypes::PLASMAPROJECTILE,  ObjectTypes::WALLPROJECTILE,
+				ObjectTypes::FLAREPROJECTILE
+			};
+			const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
+			int dx = cd ? cd->threatDetectX : 200;
+			int dy = cd ? cd->threatDetectY : 100;
+			std::vector<Object*> threats = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
+			if(!threats.empty()){
+				mirrored = (threats[0]->x > x);
+				state = RUNNING; state_i = -1;
+			}
+		}
 		if(state != RUNNING) return BTResult::Failure;
+		// Exit RUNNING after runDurationTicks
 		const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
+		int runDuration = cd ? cd->runDurationTicks : 150;
+		if(state_i >= runDuration){ state = WALKING; state_i = -1; return BTResult::Failure; }
+		// RUNNING movement
 		int bonus = cd ? cd->runSpeedBonus : 5;
 		xv = (mirrored ? -1 : 1) * (bonus + speed);
 		res_bank = 123; res_index = state_i % 15;
@@ -190,11 +179,6 @@ void Civilian::InitBT(){
 		xv = mirrored ? -speed : speed;
 		FollowGround(*this, world, xv);
 		return BTResult::Running;
-	};
-
-	// Wander: civilian keeps walking — nothing to do.
-	btctx_.actions["Wander"] = [](BTContext&) -> BTResult {
-		return BTResult::Success;
 	};
 }
 

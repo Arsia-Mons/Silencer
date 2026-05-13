@@ -7,7 +7,7 @@
     "root": {
       "type": "Selector",
       "label": "Civilian AI",
-      "children": ["leaf_new", "leaf_dying_forward", "leaf_dying_backward", "leaf_dying_explode", "leaf_dead", "leaf_tract_check", "seq_flee", "leaf_return_to_walk", "leaf_run_move", "leaf_stand_anim", "leaf_walk_move"],
+      "children": ["leaf_new", "leaf_dying_forward", "leaf_dying_backward", "leaf_dying_explode", "leaf_dead", "leaf_tract_check", "leaf_run_move", "leaf_stand_anim", "leaf_walk_move"],
       "props": {}
     },
     "leaf_new": {
@@ -45,30 +45,6 @@
       "label": "TractCheck",
       "children": [],
       "props": { "action": "TractCheck" }
-    },
-    "seq_flee": {
-      "type": "Sequence",
-      "label": "Flee on Threat",
-      "children": ["leaf_threat_look", "leaf_run"],
-      "props": {}
-    },
-    "leaf_threat_look": {
-      "type": "Leaf",
-      "label": "ThreatLook",
-      "children": [],
-      "props": { "action": "ThreatLook" }
-    },
-    "leaf_run": {
-      "type": "Leaf",
-      "label": "Run",
-      "children": [],
-      "props": { "action": "Run" }
-    },
-    "leaf_return_to_walk": {
-      "type": "Leaf",
-      "label": "ReturnToWalk",
-      "children": [],
-      "props": { "action": "ReturnToWalk" }
     },
     "leaf_run_move": {
       "type": "Leaf",
