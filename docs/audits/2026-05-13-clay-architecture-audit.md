@@ -34,16 +34,17 @@ Silencer-specific screens moved under `clients/silencer/src/client/ui`, generic
 Clay primitives/runtime live under `clients/silencer/src/ui`, and the work added
 real screenshot/parity and CLI-driven test coverage.
 
-After the follow-up integration pass, the central runtime shortcuts called out
-below are resolved for real screens and modals: production screen layout now
-enters Clay through `ClientUi` / `ClayService`, pointer/wheel/gamepad UI input
-is collected into `UiInputState`, typed interaction actions are emitted and
-drained after layout, and `clay_inspector` has been removed in favor of
-`UiAutomationRegistry`.
+After the follow-up integration passes, production UI composition has a single
+owner: `Game::RenderClientUiFrame` begins one `ClientUi` / `ClayService` frame,
+screens/modals/HUD/overlays declare into it, and the Clay compositor renders one
+command stream after the world frame. Pointer/wheel/gamepad UI input is collected
+into `UiInputState`, typed interaction actions are drained after layout, and
+`clay_inspector` has been removed in favor of `UiAutomationRegistry`.
 
-The remaining architectural gaps are narrower: Clay HUD drawing still lives in
-`Renderer`, several screens are still large raw Clay layouts, the generic toolkit
-boundary remains debatable, and root-level process artifacts still need cleanup.
+The remaining architectural gaps are narrower: several screens are still large
+raw Clay layouts, the generic toolkit boundary remains debatable, and the HUD
+still has some privileged friend access into `World`/`Player` while those domain
+read models are being separated.
 
 ## What Was Faithful
 
@@ -72,7 +73,7 @@ boundary remains debatable, and root-level process artifacts still need cleanup.
 
 4. Visual and automation verification were taken seriously.
 
-   The work added `tools/pixdiff`, `tests/lobby-clay`, and CLI E2E coverage for
+   The work added `tools/pixdiff`, `tests/lobby-ui`, and CLI E2E coverage for
    keyboard navigation, scrolling, password modal behavior, directional navigation,
    resize screenshots, in-game overlays, and architecture boundaries.
 
@@ -87,12 +88,11 @@ into `UiInputState`, `ClayService::beginFrame` to run the Clay lifecycle,
 callbacks to emit typed actions, and controllers to drain those actions after
 layout.
 
-The production screen path now owns that lifecycle through `Game`:
-`ScreenContext::BeginClayFrame` prepares a per-frame `UiInputState`,
-`ScreenContext::BeginClayLayout` enters `ClientUi::BeginFrame`,
-`ClientUi` delegates to `ClayService`, and `ClayService` calls the Clay frame
-lifecycle in order through `ClayBridgeFrameBackend`. Screens and modals no
-longer call `Clay_BeginLayout` or `Clay_EndLayout` directly.
+The production path now owns that lifecycle through `Game::RenderClientUiFrame`:
+`Game` prepares a per-frame `UiInputState`, enters `ClientUi::BeginFrame`,
+asks visible screens/modals/HUD/overlays to run `BuildUi`/builder hooks,
+then ends and renders a single Clay command stream. Screens and modals no longer
+call `Clay_BeginLayout`, `Clay_EndLayout`, or `clay_bridge::Render` directly.
 
 `EnsureInitialized` no longer resets pointer state, wheel deltas are collected
 from `SDL_EVENT_MOUSE_WHEEL`, and gamepad menu navigation is stored on the
@@ -104,39 +104,35 @@ screen layouts are still being decomposed.
 Evidence:
 
 - Plan: `architecture-goal.md:186` through `architecture-goal.md:208`.
-- Production frame setup: `clients/silencer/src/game/game.cpp:397`.
-- Screen adapter: `clients/silencer/src/client/ui/screens/screen_context.cpp:57`.
+- Production frame setup: `clients/silencer/src/game/game.cpp:498`.
+- Screen declaration hook: `clients/silencer/src/client/ui/screens/screen.h:24`.
 - Clay backend: `clients/silencer/src/client/ui/ClayBridgeFrameBackend.cpp:11`.
 - Runtime lifecycle: `clients/silencer/src/ui/runtime/ClayService.cpp:8`.
 - Typed action queue: `clients/silencer/src/ui/runtime/UiAutomationRegistry.cpp:152`.
 
 ### High: Clay HUD Rendering Still Lives Inside `Renderer`
 
+Status: resolved by the central `ClientUi` ownership pass.
+
 The plan explicitly says not to fold Clay into the existing monolithic
 `Renderer`, and not to make it another responsibility inside `Renderer::Draw` or
-`Renderer::DrawHUD`.
+`Renderer::DrawHUD`. `Renderer` no longer exposes `DrawHud*Clay` APIs, no longer
+declares HUD Clay layout, and no longer calls in-game UI from inside
+`Renderer::Draw`.
 
-The migration moved some HUD orchestration into `client/ui/hud`, but `Renderer`
-still exposes and implements several Clay-specific HUD drawing methods. Those
-methods call Clay directly and render UI fragments from inside `renderer.cpp`.
+HUD and overlay UI now live under `clients/silencer/src/client/ui/hud` and
+declare into the same `ClientUi` frame as screens and modals. System-camera
+insets and minimap pixels still use renderer primitives for world/pixel drawing,
+but their surrounding UI composition belongs to the client UI layer.
 
 Evidence:
 
 - Plan: `architecture-goal.md:235` through `architecture-goal.md:251`.
-- Renderer still owns Clay HUD APIs: `clients/silencer/src/render/renderer.h:81`.
-- Renderer still declares Clay layout: `clients/silencer/src/render/renderer.cpp:2697`.
-- Renderer draw path calls in-game UI from inside `Renderer::Draw`:
-  `clients/silencer/src/render/renderer.cpp:262`.
-- Client HUD then calls those renderer Clay methods:
-  `clients/silencer/src/client/ui/hud/InGameHud.cpp:238`.
-
-Impact: this preserves the renderer/UI coupling the plan was trying to remove.
-It also creates a confusing ownership split: some HUD layout lives in
-`client/ui/hud`, while lower-level HUD UI layout still lives in `Renderer`.
-
-Recommendation: move these `DrawHud*Clay` layout functions out of `Renderer`
-into a client UI HUD renderer/compositor layer. `Renderer` should provide
-primitive drawing/resource operations, not own HUD UI element trees.
+- Central render pass: `clients/silencer/src/game/game.cpp:498`.
+- HUD builder: `clients/silencer/src/client/ui/hud/InGameHud.cpp:819`.
+- Overlay builder: `clients/silencer/src/client/ui/hud/InGameOverlays.cpp:386`.
+- Renderer boundary guard:
+  `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh:65`.
 
 ### High: Domain-Level Names Encode The Framework
 
@@ -274,24 +270,14 @@ image/text token abstractions.
 
 ### Low: Root-Level Process Artifacts Leaked Into The Migration Commit
 
-The migration commit added `prompt.md` and the `ralph/` directory. These appear
-to be agent/process artifacts rather than runtime code, architecture docs, or
-normal repo tooling.
+Status: resolved by `9d1e427 Remove Clay agent process artifacts`.
+
+The migration commit added `prompt.md` and the `ralph/` directory. Those agent
+process artifacts have since been removed from the branch.
 
 Evidence:
 
-- `prompt.md`
-- `ralph/RALPH.md`
-- `ralph/prd.json`
-- `ralph/progress.txt`
-- `ralph/ralph.sh`
-
-Impact: not a runtime bug, but it adds root-level noise and makes it harder for
-future engineers to distinguish official architecture from agent scaffolding.
-
-Recommendation: move durable strategy into `docs/plans` or `docs/audits`, move
-agent-only workflow files under a clearly named tooling area if they must stay,
-or remove them before merging.
+- Commit: `9d1e427 Remove Clay agent process artifacts`.
 
 ## Shortcut Summary
 
@@ -301,7 +287,7 @@ shortcuts. Current status:
 - Screens are now routed through the central `ClientUi` / `ClayService` frame
   path.
 - Automation now uses `UiAutomationRegistry`; the separate inspector is gone.
-- Renderer coupling was reduced but not removed.
+- Renderer no longer owns Clay HUD layout or exposes `Draw*Clay` HUD APIs.
 - Framework names have been removed from the lobby application-layer domain
   concepts.
 - Large raw Clay screen files were accepted, with a CMake skip around unity-build
@@ -311,7 +297,7 @@ shortcuts. Current status:
 
 1. [x] Rename domain-level Clay names out of `client/ui`: lobby folder, classes,
    namespaces, CMake symbols, tests, and control-socket text.
-2. [ ] Move `Renderer::DrawHud*Clay` methods out of `Renderer` and into
+2. [x] Move `Renderer::DrawHud*Clay` methods out of `Renderer` and into
    `client/ui/hud` or a dedicated UI presentation adapter.
 3. [x] Decide whether `ClayService`/`ClientUi` is the real runtime. If yes, route
    all screens through it and delete duplicate per-screen lifecycle plumbing.
@@ -320,12 +306,12 @@ shortcuts. Current status:
 5. [x] Wire real wheel/trackpad and gamepad UI input into a central `UiInputState`.
 6. [ ] Extract the largest raw Clay screen sections into domain components and
    reusable design primitives.
-7. [ ] Move or remove root-level process artifacts (`prompt.md`, `ralph/`) before
+7. [x] Move or remove root-level process artifacts (`prompt.md`, `ralph/`) before
    treating this branch as clean architecture.
 
 ## Bottom Line
 
-The central Clay screen runtime is now wired into the game/engine path instead
-of sitting beside it. The branch still should not be considered architecturally
-complete until renderer-owned HUD Clay code and the largest raw screen layouts
-are cleaned up.
+The central Clay runtime is now the production UI owner for screens, modals,
+HUD, and overlays. The branch should now be treated as a real implementation
+path, with the remaining cleanup focused on decomposing large raw Clay layouts
+and tightening domain read-model boundaries rather than fixing frame ownership.

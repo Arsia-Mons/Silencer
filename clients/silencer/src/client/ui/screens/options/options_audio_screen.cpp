@@ -142,7 +142,6 @@ void OptionsAudioScreen::Build(ScreenContext & ctx)
 	musicClicked = false;
 	saveClicked = false;
 	cancelClicked = false;
-	silencer::ui::automation::BeginFrame();
 	const Surface& surface = ctx.game.GetScreenBuffer();
 	RegisterWidgets(this, surface.w, surface.h);
 }
@@ -170,19 +169,14 @@ void OptionsAudioScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void OptionsAudioScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-	ctx.BeginClayFrame(dst);
 
-	BankButtonBeginFrame();
-	BankTextBeginFrame();
-	silencer::ui::automation::BeginFrame();
 
 	Config & cfg = Config::GetInstance();
-	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("OptionsAudioRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -216,8 +210,6 @@ void OptionsAudioScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
-	Render(ctx.game, &dst, cmds);
 	RegisterWidgets(this, dst.w, dst.h);
 }
 

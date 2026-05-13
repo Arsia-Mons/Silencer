@@ -9,9 +9,17 @@ set(TEST_SRC
     updater_sm_test.cpp
     control_widget_test.cpp
     ui_architecture_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/runtime/clay_init.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/ClayService.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiAutomationRegistry.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/Button.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/primitives/bank_button.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/primitives/bank_text.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/primitives/box.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/primitives/scroll_list.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/primitives/scroll_text_box.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/primitives/text_input.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/primitives/toggle.cpp
     ${CMAKE_SOURCE_DIR}/src/client/ui/ClientUi.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updatersha256.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updaterdownload.cpp
@@ -20,13 +28,14 @@ set(TEST_SRC
 )
 
 add_executable(silencer_tests ${TEST_SRC})
-target_compile_features(silencer_tests PUBLIC cxx_std_14)
+target_compile_features(silencer_tests PUBLIC cxx_std_20)
 target_include_directories(silencer_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/ui
     ${CMAKE_SOURCE_DIR}/src/client
     ${CMAKE_SOURCE_DIR}/src/updater
+    ${CMAKE_SOURCE_DIR}/src/render
 )
 
 add_test(NAME silencer_tests COMMAND silencer_tests)

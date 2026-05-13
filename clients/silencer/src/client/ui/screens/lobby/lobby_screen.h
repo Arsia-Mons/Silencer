@@ -24,7 +24,7 @@ public:
 
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
-	void Draw(ScreenContext & ctx, Surface & dst, float frametime) override;
+	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleBack(ScreenContext & ctx) override;
 

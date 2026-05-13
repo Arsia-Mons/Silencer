@@ -25,11 +25,16 @@
 class Renderer;
 class Surface;
 class World;
+class Player;
+class Team;
 namespace silencer {
 namespace client_ui {
 class InGameOverlayRenderer;
-void DrawInGameHud(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
-void DrawInGameOverlays(::Renderer& renderer, ::World& world, ::Surface* surface);
+void BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
+void BuildInGameOverlaysUi(::Renderer& renderer, ::World& world, ::Surface* surface);
+void BuildHudSecretSprites(::World& world, ::Surface* surface, ::Team* team, int yoffset, Uint8 phase);
+int BuildHudTeams(::World& world, ::Surface* surface, Uint8 phase);
+Uint8 BuildHudStatusSprites(::Renderer& renderer, ::World& world, ::Surface* surface, ::Player* player, Uint8 phase);
 }
 }
 
@@ -163,8 +168,11 @@ public:
 	friend class Audio;
 	friend class TriggerGraph;
 	friend class silencer::client_ui::InGameOverlayRenderer;
-	friend void silencer::client_ui::DrawInGameHud(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
-	friend void silencer::client_ui::DrawInGameOverlays(::Renderer& renderer, ::World& world, ::Surface* surface);
+	friend void silencer::client_ui::BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
+	friend void silencer::client_ui::BuildInGameOverlaysUi(::Renderer& renderer, ::World& world, ::Surface* surface);
+	friend void silencer::client_ui::BuildHudSecretSprites(::World& world, ::Surface* surface, ::Team* team, int yoffset, Uint8 phase);
+	friend int silencer::client_ui::BuildHudTeams(::World& world, ::Surface* surface, Uint8 phase);
+	friend Uint8 silencer::client_ui::BuildHudStatusSprites(::Renderer& renderer, ::World& world, ::Surface* surface, ::Player* player, Uint8 phase);
 	// LobbyScreen reads/writes World state across the entire lobby
 	// surface: seeds gameinfo from the lobby record after a successful
 	// host-side CreateGame, reads localpeer state to refresh the Ready

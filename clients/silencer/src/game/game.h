@@ -146,8 +146,10 @@ private:
 	void PrepareClientUiFrame(Surface& surface);
 	void BeginPreparedClientUiFrame();
 	Clay_RenderCommandArray EndClientUiFrame();
+	void RenderClientUiFrame(Surface& surface, float frametime);
 	void ResetUiFrameDeltas();
 	void DispatchPreparedUiNavActions();
+	void BuildVisibleClientUi(Surface& surface, float frametime);
 	silencer::ui::UiInputState BuildUiInputState(Surface& surface);
 	Updater updater;
 	// Display name for the first key bound to an action; "(unbound)" if none.

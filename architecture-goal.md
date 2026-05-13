@@ -183,6 +183,21 @@ game-agnostic pieces belong under `src/ui/primitives`.
 
 Clay should run once per UI frame and declare the complete visible UI tree.
 
+Production dogma after the ownership cleanup:
+
+- `Game::RenderClientUiFrame` is the only production entry point that begins,
+  ends, drains, and renders a Clay UI frame.
+- `ClientUi` / `ClayService` own the Clay lifecycle and primitive frame-store
+  resets. Screens, modals, HUD, and overlays only declare UI into the active
+  frame.
+- `Screen::BuildUi` is a declaration hook, not a render hook. It must not call
+  `Clay_BeginLayout`, `Clay_EndLayout`, `Clay_SetPointerState`,
+  `clay_bridge::EnsureInitialized`, or `clay_bridge::Render`.
+- In-game HUD and overlays are client UI surfaces, not renderer methods.
+  `Renderer` must not expose `Draw*Clay` APIs or own Clay layout.
+- The Clay compositor is the only bridge that consumes render commands and
+  calls renderer/palette/surface primitives.
+
 Required lifecycle:
 
 1. Platform/event code collects raw SDL input, text input, mouse position,

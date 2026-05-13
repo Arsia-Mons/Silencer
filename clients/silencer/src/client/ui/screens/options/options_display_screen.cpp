@@ -144,7 +144,6 @@ void OptionsDisplayScreen::Build(ScreenContext & ctx)
 	smoothScalingClicked = false;
 	saveClicked = false;
 	cancelClicked = false;
-	silencer::ui::automation::BeginFrame();
 	const Surface& surface = ctx.game.GetScreenBuffer();
 	RegisterWidgets(this, surface.w, surface.h);
 }
@@ -179,19 +178,14 @@ void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void OptionsDisplayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-	ctx.BeginClayFrame(dst);
 
-	BankButtonBeginFrame();
-	BankTextBeginFrame();
-	silencer::ui::automation::BeginFrame();
 
 	Config & cfg = Config::GetInstance();
-	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("OptionsDisplayRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -235,8 +229,6 @@ void OptionsDisplayScreen::Draw(ScreenContext & ctx, Surface & dst, float framet
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
-	Render(ctx.game, &dst, cmds);
 	RegisterWidgets(this, dst.w, dst.h);
 }
 

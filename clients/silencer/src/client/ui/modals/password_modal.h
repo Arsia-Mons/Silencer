@@ -15,7 +15,7 @@ public:
 
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
-	void Draw(ScreenContext & ctx, Surface & dst, float frametime) override;
+	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleTextInput(ScreenContext & ctx, char ascii) override;
 	bool HandleKeyPress(ScreenContext & ctx, char ascii) override;

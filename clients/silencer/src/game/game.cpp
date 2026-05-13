@@ -26,6 +26,9 @@
 #include "options_display_screen.h"
 #include "options_audio_screen.h"
 #include "lobby_connect_screen.h"
+#include "client/ui/hud/InGameHud.h"
+#include "client/ui/hud/InGameOverlays.h"
+#include "clay_ui_compositor.h"
 #include "runtime/UiAutomationRegistry.h"
 #ifdef SILENCER_HAVE_LOBBY_UI
 #include "lobby_screen.h"
@@ -467,11 +470,41 @@ void Game::BeginPreparedClientUiFrame() {
 
 Clay_RenderCommandArray Game::EndClientUiFrame() {
 	clientUi.EndFrame();
-	// Screen-local callbacks still own state changes during this migration pass,
-	// but interactions now emit typed actions that are drained after layout.
+	// Callbacks route through existing screen controllers; typed actions drain
+	// after layout so automation and input share the same frame boundary.
 	(void)clientUi.DrainActions();
 	hasPreparedUiInput = false;
 	return uiClayBackend.Commands();
+}
+
+void Game::BuildVisibleClientUi(Surface& surface, float frametime) {
+	if(!screenStack.empty()){
+		int start = (int)screenStack.size() - 1;
+		while(start > 0 && screenStack[start]->IsOverlay()) --start;
+		for(size_t i = (size_t)start; i < screenStack.size(); ++i){
+			if(i > (size_t)start && screenStack[i]->IsOverlay()){
+				clientUi.Automation().BeginFrame();
+			}
+			screenStack[i]->BuildUi(screenContext, surface, frametime);
+		}
+	}
+
+	if(world.map.loaded){
+		silencer::client_ui::BuildInGameHudUi(renderer, world, &surface, frametime);
+		silencer::client_ui::BuildInGameOverlaysUi(renderer, world, &surface);
+	}
+}
+
+void Game::RenderClientUiFrame(Surface& surface, float frametime) {
+	if(screenStack.empty() && !world.map.loaded){
+		return;
+	}
+
+	PrepareClientUiFrame(surface);
+	BeginPreparedClientUiFrame();
+	BuildVisibleClientUi(surface, frametime);
+	Clay_RenderCommandArray cmds = EndClientUiFrame();
+	silencer::clay_bridge::Render(*this, &surface, cmds);
 }
 
 void Game::ResetUiFrameDeltas() {
@@ -713,20 +746,9 @@ bool Game::Loop(void){
 	if(!world.dedicatedserver.active){
 		screenbuffer.Clear(0);
 		world.DoNetwork();
-		// Render-phase hook for screens that draw via Clay (e.g. LobbyScreen):
-		// emit background + chrome BEFORE the world walk so its widgets (panels,
-		// modals) overlay correctly. Iterates from the topmost non-overlay screen
-		// upward — matches TickActiveScreen() so a modal can still own its own
-		// background if it ever needs one.
-		if(!screenStack.empty()){
-			int start = (int)screenStack.size() - 1;
-			while(start > 0 && screenStack[start]->IsOverlay()) --start;
-			float ft = 1 - (float(tickcheck - lasttick) / wait);
-			for(size_t i = (size_t)start; i < screenStack.size(); ++i){
-				screenStack[i]->Draw(screenContext, screenbuffer, ft);
-			}
-		}
-		renderer.Draw(&screenbuffer, 1 - (float(tickcheck - lasttick) / wait));
+		float ft = 1 - (float(tickcheck - lasttick) / wait);
+		renderer.Draw(&screenbuffer, ft);
+		RenderClientUiFrame(screenbuffer, ft);
 #ifdef POSIX
 		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && deploymessageshown){
 			std::vector<Uint8> buffer(screenbuffer.w * screenbuffer.h * 3);

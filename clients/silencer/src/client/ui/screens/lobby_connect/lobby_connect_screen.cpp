@@ -227,7 +227,6 @@ void LobbyConnectScreen::Build(ScreenContext & ctx)
 	username[0] = '\0';
 	password[0] = '\0';
 
-	silencer::ui::automation::BeginFrame();
 	const Surface& surface = ctx.game.GetScreenBuffer();
 	RegisterWidgets(this, username, password, surface.w, surface.h, false);
 	silencer::ui::automation::FocusTextInputByUid(LBY_INPUT_USERNAME);
@@ -361,18 +360,13 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void LobbyConnectScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-	ctx.BeginClayFrame(dst);
 
-	BankTextBeginFrame();
-	ScrollTextBoxBeginFrame();
-	TextInputBeginFrame();
 	g_clickAdapterCount = 0;
-	silencer::ui::automation::BeginFrame();
 
 	int lineCount = FillLogSlab(logLines);
 	Uint16 scroll = 0;
@@ -387,7 +381,6 @@ void LobbyConnectScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 		silencer::ui::automation::IsTextInputFocused(LBY_INPUT_PASSWORD);
 	const bool blink = ((SDL_GetTicks() / 250) % 2) == 0;
 
-	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("LobbyConnectRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -490,9 +483,7 @@ void LobbyConnectScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
 
-	Render(ctx.game, &dst, cmds);
 	RegisterWidgets(this, username, password, dst.w, dst.h, inactive);
 }
 

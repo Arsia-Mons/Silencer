@@ -140,7 +140,6 @@ void UpdateScreen::Build(ScreenContext & ctx)
 	cancelClicked = false;
 	retryClicked = false;
 	downloadClicked = false;
-	silencer::ui::automation::BeginFrame();
 	const Surface& surface = ctx.game.GetScreenBuffer();
 	RegisterWidgets(this, surface.w, surface.h, ctx.updater.GetState(), ctx.updater.GetRetryCount());
 }
@@ -200,22 +199,17 @@ void UpdateScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void UpdateScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-	ctx.BeginClayFrame(dst);
 
-	BankButtonBeginFrame();
-	BankTextBeginFrame();
-	silencer::ui::automation::BeginFrame();
 
 	std::string status = StatusText(ctx);
 	std::string progress = ProgressText(ctx);
 	Updater::State ustate = ctx.updater.GetState();
 
-	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("UpdateRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -260,8 +254,6 @@ void UpdateScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
-	Render(ctx.game, &dst, cmds);
 	RegisterWidgets(this, dst.w, dst.h, ustate, ctx.updater.GetRetryCount());
 }
 

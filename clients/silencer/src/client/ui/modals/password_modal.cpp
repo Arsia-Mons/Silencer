@@ -81,7 +81,6 @@ void PasswordModal::Build(ScreenContext & ctx)
 	(void)ctx;
 	okClicked = false;
 	password[0] = '\0';
-	silencer::ui::automation::BeginFrame();
 	const Surface& surface = ctx.game.GetScreenBuffer();
 	RegisterWidgets(this, password, surface.w, surface.h);
 	silencer::ui::automation::FocusTextInputByUid(kPasswordUid);
@@ -97,22 +96,16 @@ void PasswordModal::Tick(ScreenContext & ctx)
 	if(cb) cb(captured.c_str());
 }
 
-void PasswordModal::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-	ctx.BeginClayFrame(dst);
 
-	BankButtonBeginFrame();
-	BankTextBeginFrame();
-	TextInputBeginFrame();
-	silencer::ui::automation::BeginFrame();
 
 	bool focused = silencer::ui::automation::IsTextInputFocused(kPasswordUid);
 	bool blink = ((SDL_GetTicks() / 250) % 2) == 0;
 
-	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("PasswordModalRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -144,8 +137,6 @@ void PasswordModal::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 			           BankButtonHandle{ nullptr, &OkClicked, this });
 		}
 	}
-	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
-	Render(ctx.game, &dst, cmds);
 	RegisterWidgets(this, password, dst.w, dst.h);
 }
 

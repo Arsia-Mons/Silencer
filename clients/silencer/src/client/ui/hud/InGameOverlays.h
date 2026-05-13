@@ -7,7 +7,7 @@ class World;
 namespace silencer {
 namespace client_ui {
 
-void DrawInGameOverlays(Renderer& renderer, World& world, Surface* surface);
+void BuildInGameOverlaysUi(Renderer& renderer, World& world, Surface* surface);
 
 }  // namespace client_ui
 }  // namespace silencer

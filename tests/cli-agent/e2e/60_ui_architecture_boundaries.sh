@@ -44,20 +44,32 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/ui" \
   --glob '!third_party/**'
 
-if rg -n "SDL_GetMouseState|Clay_SetPointerState\\(\\{ mx" \
-  "$REPO_ROOT/clients/silencer/src/client/ui" \
-  --glob '!**/screen_context.cpp'; then
-  echo "screen UI must use ScreenContext::BeginClayFrame for native pointer setup" >&2
+if rg -n "SDL_GetMouseState" \
+  "$REPO_ROOT/clients/silencer/src/client/ui"; then
+  echo "client UI must not collect SDL pointer state directly" >&2
   exit 1
 fi
 
 fail_if_match \
-  "Clay_(BeginLayout|EndLayout)[[:space:]]*\\(" \
+  "Clay_(BeginLayout|EndLayout|SetPointerState)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
-  "$REPO_ROOT/clients/silencer/src/client/ui/modals"
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/hud"
 
 fail_if_match \
-  "Draw(BuyTech|Chat)OverlayClay|InGame(BuyTech|Chat)Root" \
-  "$REPO_ROOT/clients/silencer/src/render"
+  "clay_bridge::(EnsureInitialized|Render)[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/hud"
+
+fail_if_match \
+  "Draw[A-Za-z0-9_]*Clay|BuildInGameHudUi|BuildInGameOverlaysUi|client/ui/hud|Clay_BeginLayout|Clay_EndLayout|Clay_SetPointerState|clay_bridge" \
+  "$REPO_ROOT/clients/silencer/src/render/renderer.cpp" \
+  "$REPO_ROOT/clients/silencer/src/render/renderer.h"
+
+fail_if_match \
+  "BeginClayFrame|BeginClayLayout|EndClayFrame" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/game"
 
 echo "PASS 60_ui_architecture_boundaries"

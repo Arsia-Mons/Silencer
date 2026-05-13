@@ -21,12 +21,10 @@ public:
 	// Called once per Game::Tick while the screen is on top of the stack.
 	virtual void Tick(ScreenContext & ctx) = 0;
 
-	// Render-phase hook. Called from the game's render loop AFTER the
-	// screenbuffer is cleared and BEFORE Renderer::Draw walks the world.
-	// Screens that emit a Clay tree dispatch its render commands here so
-	// Clay-painted pixels are drawn first (background image, chrome) before
-	// Renderer::Draw handles game-world content. Default no-op.
-	virtual void Draw(ScreenContext & ctx, Surface & dst, float frametime)
+	// Declare this screen's UI into the current ClientUi frame. Screens do not
+	// begin/end Clay, render Clay commands, or reset primitive arenas; ClientUi
+	// owns the frame lifecycle for every visible UI surface.
+	virtual void BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 	{ (void)ctx; (void)dst; (void)frametime; }
 
 	// Tear down screen-owned UI state. Called on pop/replace.

@@ -8,7 +8,7 @@ class OptionsDisplayScreen : public Screen
 public:
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
-	void Draw(ScreenContext & ctx, Surface & dst, float frametime) override;
+	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
 
 	void NotifyFullscreenClicked() { fullscreenClicked = true; }

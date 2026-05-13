@@ -84,7 +84,6 @@ void OptionsScreen::Build(ScreenContext & ctx)
 	displayClicked = false;
 	audioClicked = false;
 
-	silencer::ui::automation::BeginFrame();
 	RegisterOptionsButtons(this);
 }
 
@@ -112,17 +111,13 @@ void OptionsScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void OptionsScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+void OptionsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-	ctx.BeginClayFrame(dst);
 
-	BankButtonBeginFrame();
-	silencer::ui::automation::BeginFrame();
 
-	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("OptionsRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -147,9 +142,7 @@ void OptionsScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 			           BankButtonHandle{ nullptr, &OnGoBackClicked, this });
 		}
 	}
-	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
 
-	Render(ctx.game, &dst, cmds);
 	RegisterOptionsButtons(this);
 }
 

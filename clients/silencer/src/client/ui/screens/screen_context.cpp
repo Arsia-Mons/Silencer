@@ -52,13 +52,3 @@ void ScreenContext::ResetPresentation(int paletteIdx) {
 	game.screenbuffer.Clear(0);
 	game.SetColors(renderer.palette.GetColors());
 }
-
-void ScreenContext::BeginClayFrame(Surface & surface) {
-	game.PrepareClientUiFrame(surface);
-}
-
-void ScreenContext::BeginClayLayout() { game.BeginPreparedClientUiFrame(); }
-
-Clay_RenderCommandArray ScreenContext::EndClayFrame() {
-	return game.EndClientUiFrame();
-}

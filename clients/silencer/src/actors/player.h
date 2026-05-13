@@ -13,12 +13,16 @@
 #include <vector>
 
 class BuyableItem;
+class Player;
 class Renderer;
 class Surface;
 class World;
 namespace silencer {
 namespace client_ui {
-void DrawInGameHud(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
+void BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
+void BuildHudSecretProgress(::Surface* surface, ::Player* player, int yoffset, int secretprogress, Uint8 phase);
+int BuildHudTeams(::World& world, ::Surface* surface, Uint8 phase);
+Uint8 BuildHudStatusSprites(::Renderer& renderer, ::World& world, ::Surface* surface, ::Player* player, Uint8 phase);
 }
 }
 
@@ -107,7 +111,10 @@ public:
 	friend class Game;
 	friend class PlayerAI;
 	friend class Projectile;
-	friend void silencer::client_ui::DrawInGameHud(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
+	friend void silencer::client_ui::BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
+	friend void silencer::client_ui::BuildHudSecretProgress(::Surface* surface, ::Player* player, int yoffset, int secretprogress, Uint8 phase);
+	friend int silencer::client_ui::BuildHudTeams(::World& world, ::Surface* surface, Uint8 phase);
+	friend Uint8 silencer::client_ui::BuildHudStatusSprites(::Renderer& renderer, ::World& world, ::Surface* surface, ::Player* player, Uint8 phase);
 
 private:
 	bool CheckForBaseExit(World & world);

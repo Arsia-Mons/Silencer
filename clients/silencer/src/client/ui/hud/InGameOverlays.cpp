@@ -161,9 +161,6 @@ void InGameOverlayRenderer::DrawMessage(Renderer& renderer, World& world, Surfac
 		}
 	}
 	if(glyphs.empty()) return;
-	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
-	Clay_SetPointerState({-1.0f, -1.0f}, false);
-	Clay_BeginLayout();
 	CLAY({ .id = CLAY_ID("InGameMessageRoot"), .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		for(size_t i = 0; i < glyphs.size(); ++i) {
 			MessageGlyph& glyph = glyphs[i];
@@ -177,8 +174,6 @@ void InGameOverlayRenderer::DrawMessage(Renderer& renderer, World& world, Surfac
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
-	silencer::clay_bridge::Render(world.resources, renderer, surface, cmds);
 }
 
 void InGameOverlayRenderer::DrawStatus(Renderer& renderer, World& world, Surface* surface) {
@@ -205,9 +200,6 @@ void InGameOverlayRenderer::DrawStatus(Renderer& renderer, World& world, Surface
 		liney -= 10;
 	}
 	if(lines.empty()) return;
-	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
-	Clay_SetPointerState({-1.0f, -1.0f}, false);
-	Clay_BeginLayout();
 	CLAY({ .id = CLAY_ID("InGameStatusRoot"), .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		for(size_t i = 0; i < lines.size(); ++i) {
 			StatusLine& line = lines[i];
@@ -221,8 +213,6 @@ void InGameOverlayRenderer::DrawStatus(Renderer& renderer, World& world, Surface
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
-	silencer::clay_bridge::Render(world.resources, renderer, surface, cmds);
 }
 
 void InGameOverlayRenderer::DrawTopMessage(Renderer& renderer, World& world, Surface* surface) {
@@ -234,9 +224,6 @@ void InGameOverlayRenderer::DrawTopMessage(Renderer& renderer, World& world, Sur
 	std::memset(textmax, 0, sizeof(textmax));
 	std::strncpy(textmax, text, maxlength);
 	std::string topText(textmax);
-	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
-	Clay_SetPointerState({-1.0f, -1.0f}, false);
-	Clay_BeginLayout();
 	CLAY({ .id = CLAY_ID("InGameTopMessageRoot"), .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		CLAY(FloatingTextElement("InGameTopMessage", 200, 10, 245, 12)) {
 			CLAY_TEXT(StringFromStd(topText), CLAY_TEXT_CONFIG({
@@ -246,8 +233,6 @@ void InGameOverlayRenderer::DrawTopMessage(Renderer& renderer, World& world, Sur
 			}));
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
-	silencer::clay_bridge::Render(world.resources, renderer, surface, cmds);
 }
 
 void InGameOverlayRenderer::DrawQuitPrompt(Renderer& renderer, World& world, Surface* surface) {
@@ -257,9 +242,6 @@ void InGameOverlayRenderer::DrawQuitPrompt(Renderer& renderer, World& world, Sur
 	std::string text = "Hit Enter To Quit";
 #endif
 	const int width = (int)text.size() * 16;
-	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
-	Clay_SetPointerState({-1.0f, -1.0f}, false);
-	Clay_BeginLayout();
 	CLAY({ .id = CLAY_ID("QuitPromptRoot"), .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		CLAY(FloatingTextElement("QuitPromptText", (surface->w - width) / 2, 200, width, 24)) {
 			CLAY_TEXT(StringFromStd(text), CLAY_TEXT_CONFIG({
@@ -269,8 +251,6 @@ void InGameOverlayRenderer::DrawQuitPrompt(Renderer& renderer, World& world, Sur
 			}));
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
-	silencer::clay_bridge::Render(world.resources, renderer, surface, cmds);
 }
 
 void InGameOverlayRenderer::DrawPlayerList(Renderer& renderer, World& world, Surface* surface) {
@@ -326,11 +306,6 @@ void InGameOverlayRenderer::DrawPlayerList(Renderer& renderer, World& world, Sur
 	if(rows.empty()) return;
 
 	using namespace silencer::ui::primitives;
-	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
-	Clay_SetPointerState({-1.0f, -1.0f}, false);
-	BankTextBeginFrame();
-	OverlaysBeginFrame();
-	Clay_BeginLayout();
 
 	CLAY({ .id = CLAY_ID("PlayerListRoot"),
 	       .layout = {
@@ -394,8 +369,6 @@ void InGameOverlayRenderer::DrawPlayerList(Renderer& renderer, World& world, Sur
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
-	silencer::clay_bridge::Render(world.resources, renderer, surface, cmds);
 }
 
 void InGameOverlayRenderer::DrawAll(Renderer& renderer, World& world, Surface* surface) {
@@ -410,7 +383,8 @@ void InGameOverlayRenderer::DrawAll(Renderer& renderer, World& world, Surface* s
 	}
 }
 
-void DrawInGameOverlays(Renderer& renderer, World& world, Surface* surface) {
+void BuildInGameOverlaysUi(Renderer& renderer, World& world, Surface* surface) {
+	OverlaysBeginFrame();
 	InGameOverlayRenderer::DrawAll(renderer, world, surface);
 }
 

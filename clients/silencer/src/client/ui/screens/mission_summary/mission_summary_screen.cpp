@@ -178,7 +178,6 @@ void MissionSummaryScreen::Build(ScreenContext & ctx)
 	scrollDelta = 0;
 	scrollPosition = 0;
 	Refresh(ctx);
-	silencer::ui::automation::BeginFrame();
 	const Surface& surface = ctx.game.GetScreenBuffer();
 	RegisterWidgets(this, surface.w, surface.h, upgradesAvailable);
 }
@@ -218,23 +217,17 @@ void MissionSummaryScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void MissionSummaryScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-	ctx.BeginClayFrame(dst);
 
-	BankButtonBeginFrame();
-	BankTextBeginFrame();
-	ScrollTextBoxBeginFrame();
 	g_upgradeClickCount = 0;
-	silencer::ui::automation::BeginFrame();
 
 	int lineCount = FillSummarySlab(summaryLines);
 	std::string xp = "+ " + std::to_string(experience) + " XP";
 
-	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("MissionSummaryRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -329,8 +322,6 @@ void MissionSummaryScreen::Draw(ScreenContext & ctx, Surface & dst, float framet
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
-	Render(ctx.game, &dst, cmds);
 	RegisterWidgets(this, dst.w, dst.h, upgradesAvailable);
 }
 

@@ -344,7 +344,6 @@ void OptionsControlsScreen::Build(ScreenContext & ctx)
 	cancelClicked = false;
 	scrollDelta = 0;
 	operatorClickedRow = -1;
-	silencer::ui::automation::BeginFrame();
 	const Surface& surface = ctx.game.GetScreenBuffer();
 	RegisterWidgets(this, surface.w);
 }
@@ -481,16 +480,13 @@ bool OptionsControlsScreen::HandleScancodeDown(ScreenContext & ctx, SDL_Scancode
 	return true;
 }
 
-void OptionsControlsScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-	ctx.BeginClayFrame(dst);
 
-	BankTextBeginFrame();
 	g_adapterCount = 0;
-	silencer::ui::automation::BeginFrame();
 
 	std::string presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
 	                       : !ctx.keymap.name.empty() ? ctx.keymap.name
@@ -520,7 +516,6 @@ void OptionsControlsScreen::Draw(ScreenContext & ctx, Surface & dst, float frame
 		rebindingSecondary[i] = (rebindRow == row && rebindSlot == 1);
 	}
 
-	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("OptionsControlsRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -616,8 +611,6 @@ void OptionsControlsScreen::Draw(ScreenContext & ctx, Surface & dst, float frame
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
-	Render(ctx.game, &dst, cmds);
 	RegisterWidgets(this, dst.w);
 }
 

@@ -58,7 +58,7 @@ constexpr int kInspectorInputY   = 437;
 // Per-frame Clay_String / ScrollTextBoxLine slabs. The std::strings owned
 // by ChatPanelState are pointer-stable across this Build call, so we hand
 // out raw c_str()s into them; the slabs themselves only need to outlive
-// Clay_EndLayout.
+// the central ClientUi frame end.
 constexpr int kMaxLines = 256;
 ScrollTextBoxLine g_chatSlab[kMaxLines];
 ScrollTextBoxLine g_presSlab[kMaxLines];

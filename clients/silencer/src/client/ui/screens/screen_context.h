@@ -2,7 +2,6 @@
 #define SCREEN_CONTEXT_H
 
 #include <SDL3/SDL_stdinc.h>
-#include "clay/clay.h"
 #include <functional>
 #include <memory>
 
@@ -71,11 +70,8 @@ public:
 	// from Screen::Build by every menu surface that owns its presentation.
 	void ResetPresentation(int paletteIdx);
 
-	// Begin the shared Clay frame setup for screen/menu UI. Keeps native
-	// pointer collection and Clay layout dimensions in one coordinate space.
-	void BeginClayFrame(Surface & surface);
-	void BeginClayLayout();
-	Clay_RenderCommandArray EndClayFrame();
+	// Clay frame ownership lives in Game/ClientUi. Screens declare UI through
+	// Screen::BuildUi only; they must not begin/end or render Clay directly.
 };
 
 #endif

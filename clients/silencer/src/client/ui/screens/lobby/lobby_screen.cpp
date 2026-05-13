@@ -401,7 +401,7 @@ void LobbyScreen::ShowGameTech(ScreenContext & ctx)
 	gameCreateActive = false;
 }
 
-void LobbyScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
@@ -413,18 +413,8 @@ void LobbyScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	                        - ((int)kRegionGap * 3) - (int)kNarrowChatMinH;
 	const int narrowTallH = std::max(0, std::min((int)kRightTallH, narrowTallFit));
 
-	ctx.BeginClayFrame(dst);
 
-	BankTextBeginFrame();
-	BankButtonBeginFrame();
-	BoxBeginFrame();
-	ToggleBeginFrame();
-	ScrollListBeginFrame();
-	ScrollTextBoxBeginFrame();
-	TextInputBeginFrame();
-	silencer::ui::automation::BeginFrame();
 
-	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("LobbyRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -616,9 +606,7 @@ void LobbyScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
 
-	Render(ctx.game, &dst, cmds);
 }
 
 void LobbyScreen::Destroy(ScreenContext & ctx)

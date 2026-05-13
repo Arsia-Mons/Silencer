@@ -138,7 +138,6 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 	optionsClicked = false;
 	exitClicked = false;
 
-	silencer::ui::automation::BeginFrame();
 	const Surface & screenbuffer = ctx.game.GetScreenBuffer();
 	RegisterMainMenuButtons(ComputeButtonLayout(screenbuffer.w, screenbuffer.h),
 	                        this);
@@ -168,22 +167,17 @@ void MainMenuScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void MainMenuScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-	ctx.BeginClayFrame(dst);
 
-	BankTextBeginFrame();
-	BankButtonBeginFrame();
-	silencer::ui::automation::BeginFrame();
 
 	std::string version = "Silencer v";
 	version += ctx.world.GetVersion();
 	const MainMenuButtonLayout buttons = ComputeButtonLayout(dst.w, dst.h);
 
-	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("MainMenuRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -242,9 +236,7 @@ void MainMenuScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 			           BankButtonHandle{ nullptr, &MainMenuExitClicked, this });
 		}
 	}
-	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
 
-	Render(ctx.game, &dst, cmds);
 
 	RegisterMainMenuButtons(buttons, this);
 }

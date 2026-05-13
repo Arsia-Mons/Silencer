@@ -78,13 +78,7 @@ public:
 	void DrawBackground(Surface * surface, Camera & camera, bool drawluminance = true);
 	void DrawForeground(Surface * surface, Camera & camera);
 	void DrawForegroundLuminance(Surface * surface, Camera & camera);
-	void DrawHudSystemCameraFrameClay(Surface * surface, Uint8 bank, Uint16 index, Uint8 offsetBank, int logicalY);
-	int DrawHudTeamsClay(Surface * surface);
-	Uint8 DrawHudStatusSpritesClay(Surface * surface, Player * player);
-	void DrawHudReadoutsClay(Surface * surface, Player * player, Uint8 currentammo);
-	void DrawHudSecretSpritesClay(Surface * surface, Team * team, int yoffset);
-	void DrawHudTraceTimeClay(Surface * surface, Uint8 tracetime);
-	void DrawHudSecretProgressClay(Surface * surface, Player * player, int yoffset, int secretprogress);
+		Uint8 GetHudAnimationPhase(void) const { return state_i; }
 	Uint8 GetAmbienceLevel(void);
 	bool CapturePNG(const class Surface & buf, const SDL_Color * palette, const char * path);
 	Camera camera;

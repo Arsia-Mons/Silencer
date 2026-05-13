@@ -9,6 +9,34 @@ Build with the local `CMakeLists.txt` (`cmake -B build && cmake --build build`)
 `-DSILENCER_LOBBY_*` knobs in *Gotchas* below. Source layout under
 `src/` is flat: ~158 files, `.cpp` paired with `.h`, no subdirectories.
 
+## Client UI dogma
+
+`ClientUi` is the only production owner of visible UI composition.
+`Game::RenderClientUiFrame` collects the `UiInputState`, begins one
+`ClientUi`/`ClayService` frame, asks active screens, modals, HUD, and overlays
+to declare UI, ends the frame once, drains actions, and renders one command
+stream through the Clay compositor.
+
+Rules:
+
+- Screens and modals implement `Screen::BuildUi`; they only declare UI into the
+  current frame. They must not call `Clay_BeginLayout`, `Clay_EndLayout`,
+  `Clay_SetPointerState`, `clay_bridge::EnsureInitialized`, or
+  `clay_bridge::Render`.
+- HUD and overlays live under `src/client/ui/hud` and follow the same rule:
+  build UI into the current `ClientUi` frame. Do not add `Draw*Clay` methods to
+  `Renderer`.
+- `Renderer` owns world/pixel drawing primitives only. It must not own Clay
+  layout or UI screen/HUD composition.
+- Primitive frame arenas reset once in `ClientUi::BeginFrame`. Do not reset
+  `BankTextBeginFrame`, `BankButtonBeginFrame`, `BoxBeginFrame`, etc. inside a
+  screen, modal, HUD block, or overlay block.
+- Modal overlays clear automation metadata before their own `BuildUi`, so the
+  top modal owns keyboard/CLI focus while lower visual layers can still render.
+
+Run `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` after UI ownership
+changes; it guards this boundary.
+
 ## Object hierarchy
 
 `Object` is mixin multiple inheritance of five bases — `Sprite`,
@@ -106,18 +134,17 @@ lambdas read/write it via `ctx.bb<T>(key, default)` / `ctx.bbSet(key, val)`.
   `game.cpp` is the dispatcher; `events.cpp` handles SDL input,
   `ingame.cpp` holds in-game lifecycle, `headless.cpp` glues the
   control queue, and each gameplay-state Tick body lives in
-  `tick/tick_<state>.cpp`. Menu screens live in `src/ui/screens/`.
+  `tick/tick_<state>.cpp`. `Game::RenderClientUiFrame` owns the one
+  production Clay frame.
 - Simulation loop, socket, peer list, replay: `src/world.cpp`.
-- Rendering: `src/renderer.cpp`, `src/surface.cpp`, `src/sprite.cpp`, `src/palette.cpp`.
+- Rendering: `src/render/renderer.cpp`, `src/render/surface.cpp`,
+  `src/render/sprite.cpp`, `src/render/palette.cpp`. Renderer is not a UI
+  owner; it supplies world/pixel drawing primitives used by the Clay compositor.
 - Audio (skipped in `-s`): `src/audio.cpp`.
-- UI widgets: `src/ui/components/` (`interface`, `button`, `textbox`,
-  `textinput`, `selectbox`, `scrollbar`, `toggle`, `overlay`, …).
-- UI screens / modals / panels: `src/ui/screens/`, `src/ui/modals/`,
-  `src/ui/screens/<name>/panels/`. **Before touching any UI code,
-  read [`../../shared/skills/silencer-ui/SKILL.md`](../../shared/skills/silencer-ui/SKILL.md)**
-  (loaded via `.claude/skills/editing-silencer-ui`) — the widget
-  system has no defaults, no event delivery, and several non-obvious
-  conventions that bite new code.
+- Generic Clay runtime/primitives: `src/ui/runtime`, `src/ui/primitives`,
+  `src/ui/design`.
+- Silencer-specific UI surfaces: `src/client/ui/screens`,
+  `src/client/ui/modals`, and `src/client/ui/hud`.
 - Projectiles: `src/*projectile.cpp` + `src/shrapnel.cpp`.
 - Stations: `src/healmachine.cpp`, `src/creditmachine.cpp`,
   `src/inventorystation.cpp`, `src/techstation.cpp`, `src/walldefense.cpp`,
