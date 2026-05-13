@@ -127,7 +127,10 @@ void Civilian::InitBT(){
 			int dx = cd ? cd->threatDetectX : 200;
 			int dy = cd ? cd->threatDetectY : 100;
 			std::vector<Object*> threats = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
-			fprintf(stderr, "[civ#%d] state=%d state_i=%d threats=%d\n", id, state, state_i, (int)threats.size());
+			// debug: scan wider area with no type filter to count any objects
+			std::vector<Uint8> alltypes;
+			auto allnearby = world.TestAABB(x - 2000, y - 2000, x + 2000, y + 2000, alltypes);
+			fprintf(stderr, "[civ#%d] x=%d y=%d threats=%d allobjs_2000=%d\n", id, x, y, (int)threats.size(), (int)allnearby.size());
 			if(!threats.empty()){
 				mirrored = (threats[0]->x > x);
 				if(state != RUNNING){ fprintf(stderr, "[civ#%d] WALKING→RUNNING\n", id); state = RUNNING; state_i = -1; }
