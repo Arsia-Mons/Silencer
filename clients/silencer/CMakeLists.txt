@@ -95,7 +95,7 @@ if(SILENCER_UNITY_BUILD)
 		file(GLOB_RECURSE _mm_sources src/*.mm)
 		set_source_files_properties(${_mm_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 	endif()
-	# The Clay primitives and the lobby_clay panels each use an anonymous
+	# The Clay primitives and the lobby panels each use an anonymous
 	# namespace with a shared vocabulary (`g_payloads`, `g_customData`,
 	# `kPayloadCapacity`, `AllocCustomData`, `FromStd`, `kScrollbarBank`,
 	# `OnCreateClicked`, …). Anonymous namespaces re-open in the same
@@ -111,7 +111,7 @@ if(SILENCER_UNITY_BUILD)
 		src/ui/primitives/*.cpp
 		src/ui/runtime/*.cpp
 		src/render/clay_ui_tests/*.cpp
-		src/client/ui/screens/lobby_clay/*.cpp)
+		src/client/ui/screens/lobby/*.cpp)
 	set_source_files_properties(${_clay_unsafe_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
@@ -156,7 +156,7 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/options"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby_connect"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/update"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby_clay"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/mission_summary"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/net"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
@@ -192,7 +192,7 @@ target_compile_definitions(${SILENCER_TARGET} PRIVATE
 	SILENCER_VERSION="${SILENCER_VERSION}"
 	SILENCER_MAP_API_URL="${SILENCER_MAP_API_URL}"
 	SILENCER_ADMIN_API_URL="${SILENCER_ADMIN_API_URL}"
-	SILENCER_HAVE_LOBBY_CLAY=1
+	SILENCER_HAVE_LOBBY_UI=1
 )
 
 find_package(ZLIB REQUIRED)
@@ -295,13 +295,13 @@ endif()
 # clay-demo target (P21) — dogfood pass that proves the Clay primitives in
 # `src/ui/primitives/` are screen-agnostic by linking them into a
 # non-lobby executable. Source list = silencer sources MINUS `src/main.cpp`
-# and `src/client/ui/screens/lobby_clay/*`. The `SILENCER_HAVE_LOBBY_CLAY` define
+# and `src/client/ui/screens/lobby/*`. The `SILENCER_HAVE_LOBBY_UI` define
 # is NOT set, so `game.cpp` and `controldispatch.cpp` compile their
-# lobby-clay references out. Result: the binary does not link against any
-# `clients/silencer/src/client/ui/screens/lobby_clay/` symbol (P21 pass_check).
+# lobby-ui references out. Result: the binary does not link against any
+# `clients/silencer/src/client/ui/screens/lobby/` symbol (P21 pass_check).
 set(clay_demo_sources ${sources})
 list(FILTER clay_demo_sources EXCLUDE REGEX "/src/main\\.cpp$")
-list(FILTER clay_demo_sources EXCLUDE REGEX "/src/client/ui/screens/lobby_clay/")
+list(FILTER clay_demo_sources EXCLUDE REGEX "/src/client/ui/screens/lobby/")
 list(APPEND clay_demo_sources
 	"${CMAKE_CURRENT_SOURCE_DIR}/../../tools/clay-demo/main.cpp")
 add_executable(clay_demo ${clay_demo_sources})

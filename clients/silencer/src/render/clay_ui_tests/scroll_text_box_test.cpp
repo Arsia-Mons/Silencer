@@ -2,7 +2,7 @@
 //
 // `RunScrollTextBoxTest(outPath)` renders one ScrollTextBox (6 lines, no
 // scroll, top-down origin) into a 640x480 Surface and writes a PNG. The
-// committed reference at tests/lobby-clay/scroll_text_box_test/
+// committed reference at tests/lobby-ui/scroll_text_box_test/
 // reference.png is the pinned baseline.
 //
 // `RunScrollTextBoxCheck(out)` verifies the screen-side auto-scroll helper:

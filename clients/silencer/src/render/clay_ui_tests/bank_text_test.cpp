@@ -4,7 +4,7 @@
 // BankText(Title, "Silencer", effectColor=152) positioned at (15, 32) via
 // padding. Runs it through silencer::clay_bridge::Render into a fresh
 // Surface and writes the result as PNG. The committed reference at
-// tests/lobby-clay/bank_text_test/reference.png is the pinned baseline; the
+// tests/lobby-ui/bank_text_test/reference.png is the pinned baseline; the
 // run.sh harness pixdiffs against it.
 //
 // Invoked via the JSON-lines control op `clay_bank_text_test` (immediate

@@ -10,8 +10,8 @@
 #include "clay_inspector.h"
 #include "screen.h"
 #include "password_modal.h"
-#ifdef SILENCER_HAVE_LOBBY_CLAY
-#include "lobby_clay_screen.h"
+#ifdef SILENCER_HAVE_LOBBY_UI
+#include "lobby_screen.h"
 #endif
 #include "screen_context.h"
 #include <cctype>
@@ -789,17 +789,17 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		HandleGas(game, cmd);
 		return;
 	}
-#ifdef SILENCER_HAVE_LOBBY_CLAY
+#ifdef SILENCER_HAVE_LOBBY_UI
 	if(cmd.op == "lobby_show_panel"){
-		// Drive the lobby's right-side panel swap from a CLI test. The Clay
-		// lobby exposes its panels as Clay subtrees with no world Interface
-		// objects, so `click --label "Create Game"` can't reach them. This
-		// op routes through `LobbyClayScreen::ShowGame*` directly.
+		// Drive the lobby's right-side panel swap from a CLI test. The lobby
+		// exposes these panels without world Interface objects, so
+		// `click --label "Create Game"` can't reach them. This
+		// op routes through `LobbyScreen::ShowGame*` directly.
 		Screen * top = game.GetTopScreen();
-		LobbyClayScreen * lobby = dynamic_cast<LobbyClayScreen *>(top);
+		LobbyScreen * lobby = dynamic_cast<LobbyScreen *>(top);
 		if(!lobby){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
-				"top screen is not a LobbyClayScreen"));
+				"top screen is not a LobbyScreen"));
 			return;
 		}
 		std::string which = cmd.args.value("panel", std::string());

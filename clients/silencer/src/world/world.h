@@ -165,13 +165,13 @@ public:
 	friend class silencer::client_ui::InGameOverlayRenderer;
 	friend void silencer::client_ui::DrawInGameHud(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
 	friend void silencer::client_ui::DrawInGameOverlays(::Renderer& renderer, ::World& world, ::Surface* surface);
-	// LobbyClayScreen reads/writes World state across the entire lobby
+	// LobbyScreen reads/writes World state across the entire lobby
 	// surface: seeds gameinfo from the lobby record after a successful
 	// host-side CreateGame, reads localpeer state to refresh the Ready
 	// button label, calls RequestPeerList/SetTech on the tech-choice
 	// surface, etc. Routes panels' world access through thin pass-through
-	// helpers on the screen rather than friending each Clay panel.
-	friend class LobbyClayScreen;
+	// helpers on the screen rather than friending each panel.
+	friend class LobbyScreen;
 
 protected:
 	std::list<class Object *> objectlist;

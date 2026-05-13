@@ -113,53 +113,53 @@ Render commands carry app-side `userData` allocated in a frame arena
 
 ## Integration boundary
 
-`LobbyClayScreen : public Screen` plugs into `Game::PushScreen` like any
+`LobbyScreen : public Screen` plugs into `Game::PushScreen` like any
 other screen. Its `Tick` runs the Clay layout pass + dispatches render
 commands. It owns a `LobbyState` struct directly; no `World::CreateObject`
 calls for UI.
 
 The existing `Screen` base class, `Game::PushScreen / GoBack`, and
 `MessageModal` overlays stay. `LobbyScreen` (the legacy class) is
-deleted; `Game::ReplaceScreen(new LobbyClayScreen())` replaces it at
+deleted; `Game::ReplaceScreen(new LobbyScreen())` replaces it at
 the same call sites.
 
 ## Verification
 
-The original plan (pixdiff each Clay capture against the immutable
-`tests/lobby-clay/baselines/*.png` committed in P2) couldn't be reached:
+The original plan (pixdiff each migrated UI capture against the immutable
+`tests/lobby-ui/baselines/*.png` committed in P2) couldn't be reached:
 the legacy lobby's animated chrome (agency-icon idle, chat indicators,
 palette fade) makes a frozen baseline non-reproducible even by the
 legacy capture script against itself — re-capturing at a different tick
 phase shows ~25% legacy-vs-self in the chrome strip.
 
-Actual gate: **Clay vs. fresh-legacy, same run.** Each panel test
-(`tests/lobby-clay/<panel>/run.sh`) boots one lobby instance, then runs
+Actual gate: **migrated UI vs. fresh-legacy, same run.** Each panel test
+(`tests/lobby-ui/<panel>/run.sh`) boots one lobby instance, then runs
 two silencer clients sequentially against it — first legacy (no env
-var), then Clay (`SILENCER_LOBBY_CLAY=1`) — drives both through the
+var), then the migrated UI — drives both through the
 same milestone-based wait, then pixdiffs the two captures over the
 panel's crop rect.
 
 Determinism trick: after the milestone wait, both clients run
 `cli step --frames N` (typically 30) instead of `wait_frames`.
-`wait_frames` is wall-clock-gated, and legacy vs. Clay render at
+`wait_frames` is wall-clock-gated, and legacy vs. migrated UI render at
 different costs, so the same wall-clock wait elapses different sim-tick
 counts → different `fade_i` → different palette. `step --frames N`
 advances the sim by EXACTLY N catch-up ticks regardless of render cost,
 so both implementations land at the same tick phase.
 
 - `tools/pixdiff/pixdiff a.png b.png` — prints byte-diff % (P1).
-- Per-panel pass bar: **<5%** byte diff, Clay vs. fresh-legacy. P20
+- Per-panel pass bar: **<5%** byte diff, migrated UI vs. fresh-legacy. P20
   final sweep: all 7 panels ≤0.63%; P15 GameCreatePanel highest at
   1.45% in its own iteration's sweep (ScrollList scrollbar render-path
   divergence accounts for the floor).
-- `tests/lobby-clay/baselines/*.png` are kept as informational
+- `tests/lobby-ui/baselines/*.png` are kept as informational
   artifacts only — they show the expected ~20-37% per-panel diff
   against any live capture and are not the pass gate.
 - Final pass: `tests/cli-agent/e2e/` regression suite still green.
 
 ## Ralph backlog
 
-See `ralph/prd.json` for the full sequenced list. Sketch:
+Implementation sequence sketch:
 
 1. Vendor `clay.h` + CMake wiring.
 2. `tools/pixdiff` (stb_image).
@@ -172,7 +172,7 @@ See `ralph/prd.json` for the full sequenced list. Sketch:
 9. `ScrollTextBox`.
 10. `TextInput`.
 11. `LabelValueRow` + `FormBorder` + `Panel`.
-12. `LobbyClayScreen` chrome (title bar, background, Go Back).
+12. `LobbyScreen` chrome (title bar, background, Go Back).
 13. `CharacterPanel` Clay.
 14. `ChatPanel` Clay.
 15. `GameSelectPanel` Clay.

@@ -3,7 +3,7 @@
 // `RunTextInputTest(outPath)` renders one focused TextInput (text
 // "Player1", caret visible, bank 135 fontWidth 9, brightness 128) into
 // a 640x480 Surface and writes a PNG. The committed reference at
-// tests/lobby-clay/text_input_test/reference.png is the pinned baseline.
+// tests/lobby-ui/text_input_test/reference.png is the pinned baseline.
 //
 // `RunTextInputCheck(out)` verifies the screen-side dispatch helper:
 //   • '\n' fires onEnter exactly once.

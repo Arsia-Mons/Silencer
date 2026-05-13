@@ -2,7 +2,7 @@
 //
 // `RunScrollListTest(outPath)` renders one ScrollList (30 items,
 // selectedIndex=8, scrollPosition=3) into a 640x480 Surface and writes a
-// PNG. The committed reference at tests/lobby-clay/scroll_list_test/
+// PNG. The committed reference at tests/lobby-ui/scroll_list_test/
 // reference.png is the pinned baseline.
 //
 // `RunScrollListCheck(out)` lays out a 10-item list and drives a press

@@ -3,7 +3,7 @@
 // `RunToggleTest(state, outPath)` renders ONE Toggle (bank 181 idx 0 —
 // the legacy noxis agency icon) with the requested selected state into a
 // fresh 640x480 Surface and writes a PNG. Two committed references under
-// tests/lobby-clay/toggle_test/ are the pinned baselines.
+// tests/lobby-ui/toggle_test/ are the pinned baselines.
 //
 // `RunToggleCheck(out)` drives a click timeline against a row of three
 // Toggles and reports which one's callback fired plus the brightness

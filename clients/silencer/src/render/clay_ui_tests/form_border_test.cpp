@@ -4,7 +4,7 @@
 // (matching the legacy gamecreate form's outer chrome) at root padding
 // (243, 87) with a 1-px palette idx 220 stroke into a 640x480 Surface
 // and writes a PNG. The committed reference at
-// tests/lobby-clay/form_border_test/reference.png is the pinned baseline;
+// tests/lobby-ui/form_border_test/reference.png is the pinned baseline;
 // the rendered output is byte-identical to the pre-Box `FormBorder`
 // helper this test used to exercise (same `.border` render commands).
 

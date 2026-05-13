@@ -2,7 +2,7 @@
 //
 // Renders ONE variant (Chrome / Inline / Checkbox) into a fresh 640x480
 // Surface and writes the result as PNG. Three committed references under
-// tests/lobby-clay/bank_button_test/ are the pinned baselines; the run.sh
+// tests/lobby-ui/bank_button_test/ are the pinned baselines; the run.sh
 // harness pixdiffs each variant separately.
 //
 // Invoked via the JSON-lines control op `clay_bank_button_test` (immediate

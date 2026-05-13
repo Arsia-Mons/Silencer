@@ -27,8 +27,8 @@
 #include "options_audio_screen.h"
 #include "lobby_connect_screen.h"
 #include "clay_inspector.h"
-#ifdef SILENCER_HAVE_LOBBY_CLAY
-#include "lobby_clay_screen.h"
+#ifdef SILENCER_HAVE_LOBBY_UI
+#include "lobby_screen.h"
 #endif
 #include "update_screen.h"
 #include "mission_summary_screen.h"
@@ -582,7 +582,7 @@ bool Game::Loop(void){
 	if(!world.dedicatedserver.active){
 		screenbuffer.Clear(0);
 		world.DoNetwork();
-		// Render-phase hook for screens that draw via Clay (e.g. LobbyClayScreen):
+		// Render-phase hook for screens that draw via Clay (e.g. LobbyScreen):
 		// emit background + chrome BEFORE the world walk so its widgets (panels,
 		// modals) overlay correctly. Iterates from the topmost non-overlay screen
 		// upward — matches TickActiveScreen() so a modal can still own its own
@@ -689,7 +689,7 @@ bool Game::Tick(void){
 		if(world.gameplaystate == World::INLOBBY){
 			mapDownloader.ProcessMapDownload();
 			// Ready-button text refresh ("Waiting..." vs "Ready") happens
-			// in GameJoinPanelTick — runs each frame from LobbyClayScreen::Tick.
+			// in GameJoinPanelTick — runs each frame from LobbyScreen::Tick.
 		}
 		/*Peer * localpeer = world.peerlist[world.localpeerid];
 		if(localpeer){
@@ -795,8 +795,8 @@ bool Game::Tick(void){
 				world.Disconnect();
 				world.choosingtech = false;
 				world.lobby.channelchanged = true;
-#ifdef SILENCER_HAVE_LOBBY_CLAY
-				PushScreen(std::make_unique<LobbyClayScreen>());
+#ifdef SILENCER_HAVE_LOBBY_UI
+				PushScreen(std::make_unique<LobbyScreen>());
 #endif
 				stateisnew = false;
 			}else{
@@ -804,7 +804,7 @@ bool Game::Tick(void){
 					ambienceMixer.PlayMusic(world.resources.menumusic);
 				}
 				// Lobby pump (state-machine + deferred-create) lives in
-				// LobbyClayScreen::Tick, dispatched by TickActiveScreen() at the
+				// LobbyScreen::Tick, dispatched by TickActiveScreen() at the
 				// top of Game::Tick.
 			}
 		}break;

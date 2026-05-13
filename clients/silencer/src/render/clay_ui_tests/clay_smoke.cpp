@@ -3,7 +3,7 @@
 // Builds a tiny deterministic Clay tree exercising RECTANGLE, BORDER, TEXT,
 // and IMAGE commands, runs it through silencer::clay_bridge::Render, and
 // dumps the result to PNG. The committed reference at
-// tests/lobby-clay/bridge_smoke/reference.png is the pinned baseline; the
+// tests/lobby-ui/bridge_smoke/reference.png is the pinned baseline; the
 // run.sh harness pixdiffs against it.
 //
 // Invoked via the JSON-lines control op `clay_bridge_smoke` (immediate

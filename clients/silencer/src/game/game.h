@@ -42,7 +42,7 @@ public:
 	class World& GetWorld() { return world; }
 	// Test/control-dispatch hook: gives ControlDispatch op handlers access
 	// to the ScreenContext so they can invoke screen-side helpers (e.g.
-	// LobbyClayScreen::ShowGameCreate from a CLI op when there's no widget
+	// LobbyScreen::ShowGameCreate from a CLI op when there's no widget
 	// path to drive the click). Game-thread only.
 	ScreenContext& GetScreenContext() { return screenContext; }
 	nlohmann::json GetWorldSummary();
@@ -91,7 +91,7 @@ public:
 	const GamepadState& GetGamepadState() const { return gamepadstate; }
 	SDL_Gamepad * GetGamepad() const { return gamepad; }
 
-	// LobbyClayScreen + per-panel interop. Public so panels can reach in via
+	// LobbyScreen + per-panel interop. Public so panels can reach in via
 	// `ScreenContext::game`.
 	Uint32 currentlobbygameid;
 	bool minimized;
@@ -101,7 +101,7 @@ public:
 	void SpectateGame(LobbyGame & lobbygame, char * password = 0);
 	// Tear down a joined game's session/world state (Disconnect, switch
 	// authority, destroy team overlays, rejoin previous chat channel). UI
-	// concerns (panel swap, map-name overlay) stay on LobbyClayScreen.
+	// concerns (panel swap, map-name overlay) stay on LobbyScreen.
 	void LeaveJoinedGame();
 private:
 	bool Tick(void);
