@@ -21,6 +21,7 @@ public:
 
 	void BeginFrame(const silencer::ui::UiInputState& input);
 	std::vector<silencer::ui::UiRenderCommand> EndFrame();
+	void DispatchInput(ScreenContext& ctx, const silencer::ui::UiInputState& input);
 	std::vector<silencer::ui::UiAction> DrainActions();
 	const silencer::ui::UiAutomationRegistry& Automation() const { return automation_; }
 	silencer::ui::UiAutomationRegistry& Automation() { return automation_; }

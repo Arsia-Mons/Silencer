@@ -12,6 +12,7 @@
 #include "clay/clay.h"
 #include "primitives/bank_button.h"
 #include "primitives/bank_text.h"
+#include "runtime/UiAutomationRegistry.h"
 
 #include "game.h"
 #include "palette.h"
@@ -126,6 +127,8 @@ bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
 				{ /*hoveredOut=*/nullptr, /*onClick=*/onClick, /*user=*/&clickCount });
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
+		silencer::ui::DispatchUiActions(
+			silencer::ui::automation::DrainActions());
 
 		Uint8 brightness = 0;
 		for(int i = 0; i < cmds.length; i++){

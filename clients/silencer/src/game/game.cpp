@@ -87,10 +87,6 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 #endif
 	fullscreentoggled = false;
 	replayfile = 0;
-	tui_prev_mouse_x = 0;
-	tui_prev_mouse_y = 0;
-	tui_prev_mouse_down = false;
-	tui_have_prev_mouse = false;
 	controlPort = 0;
 	tuiInputPort = 0;
 	headless = false;
@@ -364,47 +360,41 @@ void Game::AddUiWheelDelta(float x, float y) {
 	uiWheelY += y;
 }
 
-void Game::AddUiNavAction(silencer::ui::UiNavAction action) {
+bool Game::HasUiInputTarget() {
+	if(GetTopScreen()) return true;
+	Player * player = world.GetPeerPlayer(world.localpeerid);
+	return player && (player->chatActive || player->isbuying || player->techstationactive);
+}
+
+void Game::QueueUiTextInput(char ascii) {
+	uiTextInput.push_back(ascii);
+}
+
+void Game::QueueUiNavAction(silencer::ui::UiNavAction action) {
 	uiNavActions.push_back(action);
 }
 
-static bool UiNavActionToAscii(silencer::ui::UiNavAction action, char& ascii) {
-	switch(action){
-		case silencer::ui::UiNavAction::FocusNext:
-		case silencer::ui::UiNavAction::NextSection:
-			ascii = '\t';
-			return true;
-		case silencer::ui::UiNavAction::FocusPrevious:
-		case silencer::ui::UiNavAction::PreviousSection:
-		case silencer::ui::UiNavAction::Up:
-			ascii = 3;
-			return true;
-		case silencer::ui::UiNavAction::Down:
-			ascii = 4;
-			return true;
-		case silencer::ui::UiNavAction::Left:
-			ascii = 1;
-			return true;
-		case silencer::ui::UiNavAction::Right:
-			ascii = 2;
-			return true;
-		case silencer::ui::UiNavAction::Confirm:
-			ascii = '\n';
-			return true;
-		case silencer::ui::UiNavAction::Cancel:
-			ascii = 0x1B;
-			return true;
-	}
-	return false;
+void Game::AddUiRawKeyDown(int keyCode) {
+	uiRawKeyDownCodes.push_back(keyCode);
 }
 
-static silencer::ui::UiNavAction UiNavActionFromAscii(Uint8 ascii) {
-	switch(ascii){
-		case 1: return silencer::ui::UiNavAction::Left;
-		case 2: return silencer::ui::UiNavAction::Right;
-		case 3: return silencer::ui::UiNavAction::Up;
-		default: return silencer::ui::UiNavAction::Down;
+void Game::QueueUiPointerWindowEvent(float windowX, float windowY, bool pressed, bool released) {
+	float sx = windowX;
+	float sy = windowY;
+	if(window){
+		int windowW = 0;
+		int windowH = 0;
+		SDL_GetWindowSize(window, &windowW, &windowH);
+		if(windowW > 0 && windowH > 0){
+			sx = (windowX / static_cast<float>(windowW)) * static_cast<float>(screenbuffer.w);
+			sy = (windowY / static_cast<float>(windowH)) * static_cast<float>(screenbuffer.h);
+		}
 	}
+	uiPointerX = sx;
+	uiPointerY = sy;
+	uiHavePointerPosition = true;
+	if(pressed) uiPointerPressed = true;
+	if(released) uiPointerReleased = true;
 }
 
 silencer::ui::UiInputState Game::BuildUiInputState(Surface& surface) {
@@ -429,36 +419,29 @@ silencer::ui::UiInputState Game::BuildUiInputState(Surface& surface) {
 			my = (my / static_cast<float>(windowH)) * static_cast<float>(surface.h);
 		}
 	}
+	if(uiHavePointerPosition){
+		mx = uiPointerX;
+		my = uiPointerY;
+	}
+
+	bool effectiveDown = down || uiPointerPressed;
 
 	input.pointer.x = mx;
 	input.pointer.y = my;
-	input.pointer.down = down;
-	input.pointer.pressed = down && !uiPointerWasDown;
-	input.pointer.released = !down && uiPointerWasDown;
+	input.pointer.down = effectiveDown;
+	input.pointer.pressed = uiPointerPressed || (effectiveDown && !uiPointerWasDown);
+	input.pointer.released = (!uiPointerPressed && uiPointerReleased) || (!effectiveDown && uiPointerWasDown);
 	input.pointer.wheelX = uiWheelX;
 	input.pointer.wheelY = uiWheelY;
+	input.textInput = uiTextInput;
 	input.navActions = uiNavActions;
+	input.rawKeyDownCodes = uiRawKeyDownCodes;
 	return input;
 }
 
 void Game::PrepareClientUiFrame(Surface& surface) {
 	preparedUiInput = BuildUiInputState(surface);
 	hasPreparedUiInput = true;
-	DispatchPreparedUiNavActions();
-}
-
-void Game::DispatchPreparedUiNavActions() {
-	if(hasDispatchedPreparedUiNav) return;
-	Screen * top = GetTopScreen();
-	if(top) {
-		for(auto action : preparedUiInput.navActions) {
-			char ascii = 0;
-			if(UiNavActionToAscii(action, ascii)) {
-				top->HandleKeyPress(screenContext, ascii);
-			}
-		}
-		hasDispatchedPreparedUiNav = true;
-	}
 }
 
 void Game::BeginPreparedClientUiFrame() {
@@ -492,18 +475,27 @@ void Game::RenderClientUiFrame(Surface& surface, float frametime) {
 	BuildVisibleClientUi(surface, frametime);
 	Clay_RenderCommandArray cmds = EndClientUiFrame();
 	silencer::clay_bridge::Render(*this, &surface, cmds);
+	if(!DispatchInGameUiInput(preparedUiInput)){
+		clientUi.DispatchInput(screenContext, preparedUiInput);
+	}
 	silencer::ui::DispatchUiActions(clientUi.DrainActions());
 }
 
 void Game::ResetUiFrameDeltas() {
 	uiWheelX = 0.0f;
 	uiWheelY = 0.0f;
+	uiTextInput.clear();
 	uiNavActions.clear();
-	hasDispatchedPreparedUiNav = false;
+	uiRawKeyDownCodes.clear();
+	uiPointerPressed = false;
+	uiPointerReleased = false;
+	uiHavePointerPosition = false;
 	uiPointerWasDown = preparedUiInput.pointer.down;
 	preparedUiInput.pointer.wheelX = 0.0f;
 	preparedUiInput.pointer.wheelY = 0.0f;
+	preparedUiInput.textInput.clear();
 	preparedUiInput.navActions.clear();
+	preparedUiInput.rawKeyDownCodes.clear();
 }
 
 void Game::Present(void){
@@ -612,8 +604,8 @@ bool Game::Loop(void){
 		//   - action snapshot   → ORed on top so programmatic / CLI clients
 		//                          can drive Input fields directly without
 		//                          knowing the keymap.
-		// Edge events (menu nav, text input) still arrive via the control
-		// socket "key" op and bypass this path entirely.
+		// Edge events (menu nav, text input) arrive as normalized per-frame
+		// UI input and are dispatched by ClientUi after layout.
 		if(tui){
 			Uint8 newkeystate[SDL_SCANCODE_COUNT];
 			if(inputserver.LatestScancodes(newkeystate)){
@@ -674,22 +666,6 @@ bool Game::Loop(void){
 				world.localinput.mousex    = mx;
 				world.localinput.mousey    = my;
 				world.localinput.mousedown = md;
-				Screen * top = GetTopScreen();
-				bool moved = !tui_have_prev_mouse ||
-				             mx != tui_prev_mouse_x ||
-				             my != tui_prev_mouse_y;
-				bool downChanged = !tui_have_prev_mouse ||
-				                   md != tui_prev_mouse_down;
-				if(top && moved){
-					top->HandleMouseMove(screenContext, mx, my);
-				}
-				if(top && downChanged){
-					top->HandleMousePress(screenContext, md, mx, my);
-				}
-				tui_prev_mouse_x    = mx;
-				tui_prev_mouse_y    = my;
-				tui_prev_mouse_down = md;
-				tui_have_prev_mouse = true;
 			}
 		} else {
 			UpdateInputState(world.localinput);
@@ -1072,14 +1048,14 @@ void Game::TickRumble(){
 void Game::TickGamepadMenuNav(){
 	if(!gamepadstate.connected) return;
 	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-	bool inGameMenu = localplayer && (localplayer->isbuying || localplayer->techstationactive);
+	bool inGameUi = localplayer && (localplayer->chatActive || localplayer->isbuying || localplayer->techstationactive);
 	Screen * top = GetTopScreen();
-	if(!top && !inGameMenu) return;
+	if(!top && !inGameUi) return;
 
 	Uint32 now = SDL_GetTicks();
 
 	// Helper: fire a nav key press with software repeat on held direction.
-	auto tick = [&](GamepadNavDir& dir, Action action, Uint8 ascii){
+	auto tick = [&](GamepadNavDir& dir, Action action, silencer::ui::UiNavAction navAction){
 		bool pressed = keymap.IsPressed(action, keystate, gamepadstate);
 		if(!pressed){
 			dir.held    = false;
@@ -1090,33 +1066,36 @@ void Game::TickGamepadMenuNav(){
 			// First frame held — fire immediately.
 			dir.held     = true;
 			dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
-			if(inGameMenu) HandleInGameMenuKey((char)ascii);
-			else AddUiNavAction(UiNavActionFromAscii(ascii));
+			QueueUiNavAction(navAction);
 		} else if(now >= dir.nextfire){
 			// Repeat.
 			dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
-			if(inGameMenu) HandleInGameMenuKey((char)ascii);
-			else AddUiNavAction(UiNavActionFromAscii(ascii));
+			QueueUiNavAction(navAction);
 		}
 	};
 
-	tick(gamepadNavUp,    Action::UiUp,    3);
-	tick(gamepadNavDown,  Action::UiDown,  4);
-	tick(gamepadNavLeft,  Action::UiLeft,  1);
-	tick(gamepadNavRight, Action::UiRight, 2);
+	tick(gamepadNavUp,    Action::UiUp,    silencer::ui::UiNavAction::Up);
+	tick(gamepadNavDown,  Action::UiDown,  silencer::ui::UiNavAction::Down);
+	tick(gamepadNavLeft,  Action::UiLeft,  silencer::ui::UiNavAction::Left);
+	tick(gamepadNavRight, Action::UiRight, silencer::ui::UiNavAction::Right);
 
 	// Confirm (A/Cross) is edge-triggered; directional nav handles repeat.
 	{
 		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
 		static bool confirmPrev = false;
 		if(confirmNow && !confirmPrev){
-			if(inGameMenu){
-				HandleInGameMenuKey('\n');
-			}else{
-				AddUiNavAction(silencer::ui::UiNavAction::Confirm);
-			}
+			QueueUiNavAction(silencer::ui::UiNavAction::Confirm);
 		}
 		confirmPrev = confirmNow;
+	}
+
+	{
+		bool cancelNow = keymap.IsPressed(Action::UiCancel, keystate, gamepadstate);
+		static bool cancelPrev = false;
+		if(cancelNow && !cancelPrev){
+			QueueUiNavAction(silencer::ui::UiNavAction::Cancel);
+		}
+		cancelPrev = cancelNow;
 	}
 }
 

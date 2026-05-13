@@ -124,56 +124,124 @@ void Game::UpdateInGameOverlayState(void){
 				if(selected < scrolled) scrolled = selected;
 				if(scrolled < 0) scrolled = 0;
 			}
-		}else{
-			oldselecteditem = 0;
 		}
 	}
 }
 
-bool Game::HandleInGameMenuKey(char ascii){
+namespace {
+
+bool ChatAllowsChar(char ascii) {
+	if(ascii < 0x20 || ascii > 0x7E) return false;
+	switch(ascii){
+		case '[':
+		case '\\':
+		case ']':
+		case '^':
+		case '_':
+		case '`':
+		case '{':
+		case '|':
+		case '}':
+		case '~':
+			return false;
+	}
+	return true;
+}
+
+bool IsBuyTechAction(silencer::ui::UiNavAction action) {
+	return action == silencer::ui::UiNavAction::Up ||
+	       action == silencer::ui::UiNavAction::Down ||
+	       action == silencer::ui::UiNavAction::Confirm ||
+	       action == silencer::ui::UiNavAction::Cancel;
+}
+
+}  // namespace
+
+bool Game::DispatchInGameUiInput(const silencer::ui::UiInputState& input) {
 	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-	if(!localplayer || (!localplayer->isbuying && !localplayer->techstationactive)){
-		return false;
-	}
-	std::vector<BuyableItem *> items;
-	bool tech = localplayer->techstationactive;
-	localplayer->CollectBuyMenuItems(world, tech, items);
-	if(items.empty()){
-		return true;
-	}
-	int & selected = localplayer->isbuying ? localplayer->buyifacelastitem : localplayer->techifacelastitem;
-	int & scrolled = localplayer->isbuying ? localplayer->buyifacelastscrolled : localplayer->techifacelastscrolled;
-	if(selected < 0) selected = 0;
-	if(selected >= (int)items.size()) selected = (int)items.size() - 1;
-	int old = selected;
-	if(ascii == 3){
-		if(selected > 0) selected--;
-	}else if(ascii == 4){
-		if(selected < (int)items.size() - 1) selected++;
-	}else if(ascii == '\n'){
-		BuyableItem * buyableitem = items[selected];
-		if(localplayer->isbuying){
-			localplayer->BuyItem(world, buyableitem->id);
-		}else if(localplayer->InOwnBase(world)){
-			localplayer->RepairItem(world, buyableitem->id);
-		}else{
-			localplayer->VirusItem(world, buyableitem->id);
+	if(!localplayer) return false;
+
+	if(localplayer->chatActive){
+		for(char ascii : input.textInput){
+			if(!ChatAllowsChar(ascii)) continue;
+			size_t len = std::strlen(localplayer->chatText);
+			if(len < sizeof(localplayer->chatText) - 1){
+				localplayer->chatText[len] = ascii;
+				localplayer->chatText[len + 1] = '\0';
+			}
+		}
+		for(auto action : input.navActions){
+			switch(action){
+				case silencer::ui::UiNavAction::FocusNext:
+				case silencer::ui::UiNavAction::NextSection:
+					localplayer->chatwithteam = !localplayer->chatwithteam;
+					break;
+				case silencer::ui::UiNavAction::Backspace:{
+					size_t len = std::strlen(localplayer->chatText);
+					if(len > 0) localplayer->chatText[len - 1] = '\0';
+				}break;
+				case silencer::ui::UiNavAction::Confirm:
+					if(std::strlen(localplayer->chatText) > 0){
+						world.SendChat(localplayer->chatwithteam, localplayer->chatText);
+					}
+					localplayer->chatText[0] = '\0';
+					localplayer->chatActive = false;
+					break;
+				case silencer::ui::UiNavAction::Cancel:
+					localplayer->chatText[0] = '\0';
+					localplayer->chatActive = false;
+					break;
+				default:
+					break;
+			}
 		}
 		return true;
-	}else if(ascii == 0x1B){
-		localplayer->isbuying = false;
-		localplayer->techstationactive = false;
-		return true;
-	}else{
-		return false;
 	}
-	if(selected != old){
-		Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
+
+	if(!localplayer->isbuying && !localplayer->techstationactive) return false;
+
+	for(auto action : input.navActions){
+		if(!IsBuyTechAction(action)) continue;
+		std::vector<BuyableItem *> items;
+		bool tech = localplayer->techstationactive;
+		localplayer->CollectBuyMenuItems(world, tech, items);
+		if(items.empty()) return true;
+
+		int & selected = localplayer->isbuying ? localplayer->buyifacelastitem : localplayer->techifacelastitem;
+		int & scrolled = localplayer->isbuying ? localplayer->buyifacelastscrolled : localplayer->techifacelastscrolled;
+		if(selected < 0) selected = 0;
+		if(selected >= static_cast<int>(items.size())) selected = static_cast<int>(items.size()) - 1;
+		int old = selected;
+
+		if(action == silencer::ui::UiNavAction::Up){
+			if(selected > 0) selected--;
+		}else if(action == silencer::ui::UiNavAction::Down){
+			if(selected < static_cast<int>(items.size()) - 1) selected++;
+		}else if(action == silencer::ui::UiNavAction::Confirm){
+			BuyableItem * buyableitem = items[selected];
+			if(localplayer->isbuying){
+				localplayer->BuyItem(world, buyableitem->id);
+			}else if(localplayer->InOwnBase(world)){
+				localplayer->RepairItem(world, buyableitem->id);
+			}else{
+				localplayer->VirusItem(world, buyableitem->id);
+			}
+			continue;
+		}else if(action == silencer::ui::UiNavAction::Cancel){
+			localplayer->isbuying = false;
+			localplayer->techstationactive = false;
+			continue;
+		}
+
+		if(selected != old){
+			Audio::GetInstance().Play(
+				world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown],
+				64);
+		}
+		if(selected >= scrolled + 5) scrolled = selected - 4;
+		if(selected < scrolled) scrolled = selected;
+		if(scrolled < 0) scrolled = 0;
 	}
-	if(selected >= scrolled + 5) scrolled = selected - 4;
-	if(selected < scrolled) scrolled = selected;
-	if(scrolled < 0) scrolled = 0;
-	oldselecteditem = selected;
 	return true;
 }
 

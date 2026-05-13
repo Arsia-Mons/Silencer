@@ -1,6 +1,7 @@
 #include "client/ui/ClientUi.h"
 
 #include "screen.h"
+#include "screen_context.h"
 
 #include <utility>
 
@@ -21,6 +22,24 @@ void ToggleBeginFrame();
 namespace silencer {
 namespace client_ui {
 
+namespace {
+
+bool MovesFocusForward(silencer::ui::UiNavAction action) {
+	return action == silencer::ui::UiNavAction::FocusNext ||
+	       action == silencer::ui::UiNavAction::Down ||
+	       action == silencer::ui::UiNavAction::Right ||
+	       action == silencer::ui::UiNavAction::NextSection;
+}
+
+bool MovesFocusBackward(silencer::ui::UiNavAction action) {
+	return action == silencer::ui::UiNavAction::FocusPrevious ||
+	       action == silencer::ui::UiNavAction::Up ||
+	       action == silencer::ui::UiNavAction::Left ||
+	       action == silencer::ui::UiNavAction::PreviousSection;
+}
+
+}  // namespace
+
 ClientUi::ClientUi(silencer::ui::ClayService& clay)
 	: clay_(clay), automation_(silencer::ui::ActiveUiAutomationRegistry()) {}
 
@@ -39,6 +58,50 @@ void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 
 std::vector<silencer::ui::UiRenderCommand> ClientUi::EndFrame() {
 	return clay_.EndFrame();
+}
+
+void ClientUi::DispatchInput(ScreenContext& ctx, const silencer::ui::UiInputState& input) {
+	Screen * top = screens_.Top();
+	if(top){
+		bool capturedRawKey = false;
+		for(int keyCode : input.rawKeyDownCodes){
+			if(top->CaptureRawKeyDown(ctx, keyCode)) capturedRawKey = true;
+		}
+		if(capturedRawKey) return;
+	}
+
+	if(input.pointer.pressed){
+		if(!automation_.FocusTextInputAt(
+			   static_cast<int>(input.pointer.x),
+			   static_cast<int>(input.pointer.y))){
+			automation_.ClearFocus();
+		}
+	}
+
+	for(char ascii : input.textInput){
+		automation_.DispatchTextInput(ascii);
+	}
+
+	for(auto action : input.navActions){
+		bool handled = false;
+		if(action == silencer::ui::UiNavAction::Backspace){
+			handled = automation_.BackspaceFocusedText();
+		}else if(MovesFocusForward(action)){
+			handled = automation_.FocusNextInteractive();
+		}else if(MovesFocusBackward(action)){
+			handled = automation_.FocusPreviousInteractive();
+		}else if(action == silencer::ui::UiNavAction::Confirm){
+			handled = automation_.SubmitFocusedText();
+			if(!handled) handled = automation_.ActivateFocused();
+		}else if(action == silencer::ui::UiNavAction::Cancel){
+			if(automation_.HasFocus()) automation_.ClearFocus();
+		}
+
+		if(!handled && top){
+			handled = top->HandleUiAction(ctx, action);
+		}
+		(void)handled;
+	}
 }
 
 std::vector<silencer::ui::UiAction> ClientUi::DrainActions() {

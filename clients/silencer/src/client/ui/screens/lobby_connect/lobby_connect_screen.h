@@ -13,9 +13,7 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
-	bool HandleTextInput(ScreenContext & ctx, char ascii) override;
-	bool HandleKeyPress(ScreenContext & ctx, char ascii) override;
-	bool HandleMousePress(ScreenContext & ctx, bool pressed, Uint16 x, Uint16 y) override;
+	bool HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action) override;
 
 	void NotifyLoginClicked();
 	void NotifyCancelClicked();

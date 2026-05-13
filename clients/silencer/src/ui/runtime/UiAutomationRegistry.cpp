@@ -208,6 +208,10 @@ bool UiAutomationRegistry::IsTextInputFocused(int uid) const {
 	return widget && widget->uid == uid;
 }
 
+bool UiAutomationRegistry::HasFocus() const {
+	return FocusedWidget() != nullptr;
+}
+
 void UiAutomationRegistry::ClearFocus() {
 	focusedUid_ = -1;
 	focusedLabel_.clear();
@@ -239,39 +243,25 @@ bool UiAutomationRegistry::DispatchTextInput(char ascii) {
 	return true;
 }
 
-bool UiAutomationRegistry::DispatchKeyPress(char ascii) {
+bool UiAutomationRegistry::BackspaceFocusedText() {
 	const UiAutomationWidget * widget = FocusedWidget();
-	switch(ascii){
-		case '\b':
-			if(!widget || widget->kind != UiAutomationWidgetKind::TextInput ||
-			   !widget->textBuffer || widget->textBufferLen <= 0 || widget->inactive){
-				return false;
-			}
-			{
-				int len = static_cast<int>(std::strlen(widget->textBuffer));
-				if(len > 0) widget->textBuffer[len - 1] = '\0';
-			}
-			QueueAction(UiActionKind::SetText, *widget, widget->textBuffer);
-			return true;
-		case 2:
-		case '\t':
-		case 4:
-			return FocusNextInteractive();
-		case 1:
-		case 3:
-			return FocusPreviousInteractive();
-		case '\n':
-			if(widget && widget->kind == UiAutomationWidgetKind::TextInput && !widget->inactive){
-				QueueAction(UiActionKind::Activate, *widget, widget->textBuffer);
-				return true;
-			}
-			return false;
-		case 0x1B:
-			ClearFocus();
-			return false;
-		default:
-			return false;
+	if(!widget || widget->kind != UiAutomationWidgetKind::TextInput ||
+	   !widget->textBuffer || widget->textBufferLen <= 0 || widget->inactive){
+		return false;
 	}
+	int len = static_cast<int>(std::strlen(widget->textBuffer));
+	if(len > 0) widget->textBuffer[len - 1] = '\0';
+	QueueAction(UiActionKind::SetText, *widget, widget->textBuffer);
+	return true;
+}
+
+bool UiAutomationRegistry::SubmitFocusedText() {
+	const UiAutomationWidget * widget = FocusedWidget();
+	if(widget && widget->kind == UiAutomationWidgetKind::TextInput && !widget->inactive){
+		QueueAction(UiActionKind::Activate, *widget, widget->textBuffer);
+		return true;
+	}
+	return false;
 }
 
 bool UiAutomationRegistry::InvokeAt(int x, int y) {
@@ -375,9 +365,11 @@ const Widget* FindByUid(int uid) { return ActiveUiAutomationRegistry().FindWidge
 bool FocusTextInputAt(int x, int y) { return ActiveUiAutomationRegistry().FocusTextInputAt(x, y); }
 bool FocusTextInputByUid(int uid) { return ActiveUiAutomationRegistry().FocusTextInputByUid(uid); }
 bool IsTextInputFocused(int uid) { return ActiveUiAutomationRegistry().IsTextInputFocused(uid); }
+bool HasFocus() { return ActiveUiAutomationRegistry().HasFocus(); }
 void ClearFocus() { ActiveUiAutomationRegistry().ClearFocus(); }
 bool DispatchTextInput(char ascii) { return ActiveUiAutomationRegistry().DispatchTextInput(ascii); }
-bool DispatchKeyPress(char ascii) { return ActiveUiAutomationRegistry().DispatchKeyPress(ascii); }
+bool BackspaceFocusedText() { return ActiveUiAutomationRegistry().BackspaceFocusedText(); }
+bool SubmitFocusedText() { return ActiveUiAutomationRegistry().SubmitFocusedText(); }
 bool InvokeAt(int x, int y) { return ActiveUiAutomationRegistry().InvokeAt(x, y); }
 bool FocusNextInteractive() { return ActiveUiAutomationRegistry().FocusNextInteractive(); }
 bool FocusPreviousInteractive() { return ActiveUiAutomationRegistry().FocusPreviousInteractive(); }

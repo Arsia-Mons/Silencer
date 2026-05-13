@@ -77,4 +77,9 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/game/game.cpp" \
   "$REPO_ROOT/clients/silencer/src/game/game.h"
 
+fail_if_match \
+  "Handle(TextInput|KeyPress|ScancodeDown|MousePress|MouseMove)|DispatchKeyPress|DispatchPreparedUiNavActions|UiNavActionToAscii|DispatchChatKey|HandleInGameMenuKey" \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**'
+
 echo "PASS 60_ui_architecture_boundaries"

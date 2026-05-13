@@ -4,6 +4,7 @@
 #include "ui/runtime/ClayService.h"
 
 #include <sstream>
+#include <string>
 
 namespace {
 
@@ -141,4 +142,35 @@ TEST_CASE("UiAutomationRegistry queues typed actions for interactive widgets") {
 	silencer::ui::DispatchUiActions(actions);
 	CHECK(clicks == 1);
 	CHECK(registry.DrainActions().empty());
+}
+
+TEST_CASE("UiAutomationRegistry edits focused text through typed methods") {
+	silencer::ui::UiAutomationRegistry registry;
+	registry.BeginFrame();
+
+	int submits = 0;
+	auto onEnter = [](void * user) {
+		++*static_cast<int *>(user);
+	};
+	char buffer[8] = "ab";
+	silencer::ui::UiAutomationWidget widget;
+	widget.label = "Name";
+	widget.kind = silencer::ui::UiAutomationWidgetKind::TextInput;
+	widget.uid = 7;
+	widget.textBuffer = buffer;
+	widget.textBufferLen = static_cast<int>(sizeof(buffer));
+	widget.onEnter = onEnter;
+	widget.enterUser = &submits;
+	registry.RegisterWidget(widget);
+
+	REQUIRE(registry.FocusTextInputByUid(7));
+	(void)registry.DrainActions();
+	CHECK(registry.DispatchTextInput('c'));
+	CHECK(std::string(buffer) == "abc");
+	CHECK(registry.BackspaceFocusedText());
+	CHECK(std::string(buffer) == "ab");
+	CHECK(registry.SubmitFocusedText());
+
+	silencer::ui::DispatchUiActions(registry.DrainActions());
+	CHECK(submits == 1);
 }

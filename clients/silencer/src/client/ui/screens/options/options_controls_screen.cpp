@@ -481,10 +481,10 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-bool OptionsControlsScreen::HandleScancodeDown(ScreenContext & ctx, SDL_Scancode scancode)
+bool OptionsControlsScreen::CaptureRawKeyDown(ScreenContext & ctx, int keyCode)
 {
 	if(rebindRow < 0) return false;
-	FinishKeyboardRebind(ctx, scancode);
+	FinishKeyboardRebind(ctx, static_cast<SDL_Scancode>(keyCode));
 	return true;
 }
 

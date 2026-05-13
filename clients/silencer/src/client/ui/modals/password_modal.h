@@ -17,8 +17,7 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
-	bool HandleTextInput(ScreenContext & ctx, char ascii) override;
-	bool HandleKeyPress(ScreenContext & ctx, char ascii) override;
+	bool HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action) override;
 
 	void NotifyOkClicked() { okClicked = true; }
 

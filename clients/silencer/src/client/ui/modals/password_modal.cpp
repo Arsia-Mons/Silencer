@@ -146,17 +146,10 @@ void PasswordModal::Destroy(ScreenContext & ctx)
 	silencer::ui::automation::ClearFocus();
 }
 
-bool PasswordModal::HandleTextInput(ScreenContext & ctx, char ascii)
+bool PasswordModal::HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action)
 {
 	(void)ctx;
-	return silencer::ui::automation::DispatchTextInput(ascii);
-}
-
-bool PasswordModal::HandleKeyPress(ScreenContext & ctx, char ascii)
-{
-	(void)ctx;
-	if(silencer::ui::automation::DispatchKeyPress(ascii)) return true;
-	if(ascii == '\n'){
+	if(action == silencer::ui::UiNavAction::Confirm){
 		okClicked = true;
 		return true;
 	}

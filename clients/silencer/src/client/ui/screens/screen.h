@@ -2,8 +2,7 @@
 #define SCREEN_H
 
 #include <SDL3/SDL_stdinc.h>
-#include <SDL3/SDL_scancode.h>
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInputState.h"
 
 class ScreenContext;
 class Surface;
@@ -37,39 +36,15 @@ public:
 	// transition to MAINMENU).
 	virtual bool HandleBack(ScreenContext & ctx) { (void)ctx; return false; }
 
-	// Optional input hooks for Clay-driven screens. Screens consume here and
-	// keep their state in caller-owned buffers/callbacks.
-	virtual bool HandleTextInput(ScreenContext & ctx, char ascii)
-	{ (void)ctx; (void)ascii; return false; }
-	virtual bool HandleKeyPress(ScreenContext & ctx, char ascii)
-	{
-		(void)ctx;
-		switch(ascii){
-			case 2:
-			case '\t':
-			case 4:
-				return silencer::ui::automation::FocusNextInteractive();
-			case 1:
-			case 3:
-				return silencer::ui::automation::FocusPreviousInteractive();
-			case '\n':
-				return silencer::ui::automation::ActivateFocused();
-			default:
-				return silencer::ui::automation::DispatchKeyPress(ascii);
-		}
-	}
-	virtual bool HandleScancodeDown(ScreenContext & ctx, SDL_Scancode scancode)
-	{ (void)ctx; (void)scancode; return false; }
-	virtual bool HandleMousePress(ScreenContext & ctx, bool pressed, Uint16 x, Uint16 y)
-	{
-		(void)ctx;
-		if(!pressed) return false;
-		if(silencer::ui::automation::FocusTextInputAt(x, y)) return true;
-		silencer::ui::automation::ClearFocus();
-		return false;
-	}
-	virtual bool HandleMouseMove(ScreenContext & ctx, Uint16 x, Uint16 y)
-	{ (void)ctx; (void)x; (void)y; return false; }
+	// Semantic UI input fallback. Device-specific input is normalized by
+	// ClientUi before it reaches screens.
+	virtual bool HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action)
+	{ (void)ctx; (void)action; return false; }
+
+	// Narrow escape hatch for controls rebinding. Normal UI navigation must not
+	// use raw key codes.
+	virtual bool CaptureRawKeyDown(ScreenContext & ctx, int keyCode)
+	{ (void)ctx; (void)keyCode; return false; }
 
 	// Modals draw the screen below them; non-modal Screens hide what's beneath.
 	virtual bool IsOverlay() const { return false; }

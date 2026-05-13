@@ -17,7 +17,7 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
-	bool HandleScancodeDown(ScreenContext & ctx, SDL_Scancode scancode) override;
+	bool CaptureRawKeyDown(ScreenContext & ctx, int keyCode) override;
 
 	void NotifyPresetClicked() { presetClicked = true; }
 	void NotifySaveClicked() { saveClicked = true; }

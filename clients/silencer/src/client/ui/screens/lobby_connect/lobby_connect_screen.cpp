@@ -501,33 +501,18 @@ void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 	silencer::ui::automation::ClearFocus();
 }
 
-bool LobbyConnectScreen::HandleTextInput(ScreenContext & ctx, char ascii)
+bool LobbyConnectScreen::HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action)
 {
 	(void)ctx;
-	return silencer::ui::automation::DispatchTextInput(ascii);
-}
-
-bool LobbyConnectScreen::HandleKeyPress(ScreenContext & ctx, char ascii)
-{
-	(void)ctx;
-	if(silencer::ui::automation::DispatchKeyPress(ascii)) return true;
-	if(ascii == '\n'){
+	if(action == silencer::ui::UiNavAction::Confirm){
 		loginClicked = true;
 		return true;
 	}
-	if(ascii == 0x1B){
+	if(action == silencer::ui::UiNavAction::Cancel){
 		cancelClicked = true;
 		return true;
 	}
 	return false;
-}
-
-bool LobbyConnectScreen::HandleMousePress(ScreenContext & ctx,
-                                          bool pressed,
-                                          Uint16 x,
-                                          Uint16 y)
-{
-	return Screen::HandleMousePress(ctx, pressed, x, y);
 }
 
 void LobbyConnectScreen::NotifyLoginClicked()

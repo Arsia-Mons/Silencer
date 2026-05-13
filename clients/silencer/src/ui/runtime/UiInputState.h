@@ -15,6 +15,7 @@ enum class UiNavAction {
 	Right,
 	Confirm,
 	Cancel,
+	Backspace,
 	NextSection,
 	PreviousSection,
 };
@@ -36,6 +37,7 @@ struct UiInputState {
 	UiPointerState pointer;
 	std::string textInput;
 	std::vector<UiNavAction> navActions;
+	std::vector<int> rawKeyDownCodes;
 
 	bool HasWindow() const { return width > 0 && height > 0; }
 };

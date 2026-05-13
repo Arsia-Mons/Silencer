@@ -74,7 +74,7 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 	const int H = 480;
 	EnsureInitialized(W, H);
 
-	// Registry routing — verify '\n' queues onEnter for the post-layout
+	// Registry routing — verify submit queues onEnter for the post-layout
 	// action dispatcher and text input does not.
 	silencer::ui::UiAutomationRegistry registry;
 	registry.BeginFrame();
@@ -90,7 +90,7 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 	registry.FocusTextInputByUid(9);
 
 	g_enterCount = 0;
-	registry.DispatchKeyPress('\n');
+	registry.SubmitFocusedText();
 	silencer::ui::DispatchUiActions(registry.DrainActions());
 	out.onEnterFiredForNewline = g_enterCount;
 

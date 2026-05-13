@@ -56,7 +56,6 @@ public:
 	Renderer& GetRenderer() { return renderer; }
 	bool ResizeRenderSurface(int width, int height);
 	bool IsLiveMultiplayer() const;
-	bool HandleInGameMenuKey(char ascii);
 	bool GoBack(void);
 	struct PendingWait {
 		ControlCommand cmd;
@@ -75,8 +74,8 @@ public:
 	// TUI mode: audio enabled, no SDL window/events, frames stream to a TS
 	// frontend over TCP via TUIBackend. Input arrives via the dedicated binary
 	// input channel (InputServer, --tui-input-port) rather than SDL keyboard
-	// polling. Edge-triggered key events for menu nav still use the control
-	// socket "key" op.
+	// polling. Edge-triggered key events from the control socket are queued
+	// into the same normalized UI input state as SDL events.
 	bool tui;
 
 	// Client UI navigation requests. ClientUi owns the stack mechanics; Game
@@ -86,6 +85,9 @@ public:
 	void PopScreen();
 	void ReplaceScreen(std::unique_ptr<Screen> s);
 	Screen * GetTopScreen() const;
+	bool HasUiInputTarget();
+	void QueueUiTextInput(char ascii);
+	void QueueUiNavAction(silencer::ui::UiNavAction action);
 
 	// Keybind access for ControlDispatch.
 	KeyMap& GetKeyMap() { return keymap; }
@@ -143,15 +145,16 @@ private:
 	void GiveDefaultItems(Player & player);
 	void GoToState(Uint8 newstate);
 	void AddUiWheelDelta(float x, float y);
-	void AddUiNavAction(silencer::ui::UiNavAction action);
+	void AddUiRawKeyDown(int keyCode);
+	void QueueUiPointerWindowEvent(float windowX, float windowY, bool pressed, bool released);
 	void PrepareClientUiFrame(Surface& surface);
 	void BeginPreparedClientUiFrame();
 	Clay_RenderCommandArray EndClientUiFrame();
 	void RenderClientUiFrame(Surface& surface, float frametime);
 	void ResetUiFrameDeltas();
-	void DispatchPreparedUiNavActions();
 	void BuildVisibleClientUi(Surface& surface, float frametime);
 	silencer::ui::UiInputState BuildUiInputState(Surface& surface);
+	bool DispatchInGameUiInput(const silencer::ui::UiInputState& input);
 	Updater updater;
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".
@@ -178,16 +181,21 @@ private:
 	silencer::client_ui::ClientUi clientUi;
 	silencer::ui::UiInputState preparedUiInput;
 	bool hasPreparedUiInput = false;
-	bool hasDispatchedPreparedUiNav = false;
 	float uiWheelX = 0.0f;
 	float uiWheelY = 0.0f;
+	std::string uiTextInput;
 	std::vector<silencer::ui::UiNavAction> uiNavActions;
+	std::vector<int> uiRawKeyDownCodes;
+	bool uiPointerPressed = false;
+	bool uiPointerReleased = false;
+	bool uiHavePointerPosition = false;
+	float uiPointerX = 0.0f;
+	float uiPointerY = 0.0f;
 	bool uiPointerWasDown = false;
 	int frames;
 	int fps;
 	Uint64 lasttick;
 	Uint16 sharedstate;
-	int oldselecteditem;
 	Uint8 singleplayermessage;
 	bool updatetitle;
 	Uint32 lastannouncedgameid;
@@ -199,12 +207,6 @@ private:
 	char * replayfile;
 	ControlServer controlserver;
 	InputServer inputserver;
-	// TUI mouse edge-detection state. Tracks the last (x, y, down) so
-	// control clients drive the same screen-level mouse hooks as SDL.
-	Uint16 tui_prev_mouse_x;
-	Uint16 tui_prev_mouse_y;
-	bool   tui_prev_mouse_down;
-	bool   tui_have_prev_mouse;
 	void DrainControlQueue();
 	void PostFrameReplies();
 

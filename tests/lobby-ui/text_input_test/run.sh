@@ -3,7 +3,7 @@
 # (one focused TextInput with caret, bank 135 fontWidth 9, text
 # "Player1") and pixdiffs the resulting PNG against the committed
 # reference. Then drives `clay_text_input_check` once for the
-# dispatch-key + password-mask checks.
+# typed-submit + password-mask checks.
 #
 # Pass bar (render):     < 1.0% pixdiff vs reference.png.
 # Pass bar (behavioral): on_enter_fired_for_newline==1,
@@ -69,7 +69,7 @@ if ! awk -v d="$DIFF" 'BEGIN { exit (d + 0 < 1.0) ? 0 : 1 }'; then
   FAILED=1
 fi
 
-# Dispatch-key + password-mask check (no PNG; pure JSON).
+# Typed-submit + password-mask check (no PNG; pure JSON).
 CHECK=$(cli --port "$PORT" clay_text_input_check)
 echo "check = $CHECK"
 read NL_FIRED LTR_FIRED PW_LEN <<EOF

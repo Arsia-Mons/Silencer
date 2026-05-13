@@ -4,7 +4,7 @@
 # LobbyConnect → fill username/password → Login → LOBBY → Go Back →
 # MainMenu. Exercises LobbyScreen end-to-end (chrome, character/chat
 # panels, lobby pump, GoBack), the Lobby Go service's TCP auth path, and
-# the CLI's set_text-on-TEXTINPUT support.
+# the normalized CLI key-to-text path.
 set -euo pipefail
 . "$(dirname "$0")/lib.sh"
 

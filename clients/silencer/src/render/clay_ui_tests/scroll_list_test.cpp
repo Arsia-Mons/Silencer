@@ -15,6 +15,7 @@
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
 #include "primitives/scroll_list.h"
+#include "runtime/UiAutomationRegistry.h"
 
 #include "game.h"
 #include "palette.h"
@@ -124,6 +125,8 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 				{ /*hoveredOut=*/nullptr, onSelect, &sink });
 		}
 		::Clay_EndLayout();
+		silencer::ui::DispatchUiActions(
+			silencer::ui::automation::DrainActions());
 	};
 
 	// Press over row index 5: at scrollPosition=3, row 5 is the 3rd visible

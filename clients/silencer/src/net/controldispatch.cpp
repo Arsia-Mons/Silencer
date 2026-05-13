@@ -79,6 +79,41 @@ static bool LabelEquals(const char * a, const char * b){
 	return *a == '\0' && *b == '\0';
 }
 
+static bool QueueControlKey(Game& game, int ascii){
+	switch(ascii){
+		case 1:
+			game.QueueUiNavAction(silencer::ui::UiNavAction::Left);
+			return true;
+		case 2:
+			game.QueueUiNavAction(silencer::ui::UiNavAction::Right);
+			return true;
+		case 3:
+			game.QueueUiNavAction(silencer::ui::UiNavAction::Up);
+			return true;
+		case 4:
+			game.QueueUiNavAction(silencer::ui::UiNavAction::Down);
+			return true;
+		case '\t':
+			game.QueueUiNavAction(silencer::ui::UiNavAction::FocusNext);
+			return true;
+		case '\n':
+			game.QueueUiNavAction(silencer::ui::UiNavAction::Confirm);
+			return true;
+		case 0x1B:
+			game.QueueUiNavAction(silencer::ui::UiNavAction::Cancel);
+			return true;
+		case '\b':
+			game.QueueUiNavAction(silencer::ui::UiNavAction::Backspace);
+			return true;
+		default:
+			if(ascii >= 0x20 && ascii <= 0x7E){
+				game.QueueUiTextInput(static_cast<char>(ascii));
+				return true;
+			}
+			return false;
+	}
+}
+
 // Forward decl for the keybind sub-dispatcher implemented at the bottom of
 // this file. Lives in the same TU because it only ever reads/mutates Game's
 // KeyMap and Config; no other consumers.
@@ -826,11 +861,9 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	}
 #endif
 	if(cmd.op == "key"){
-		// Edge-triggered key event for the active screen. Mirrors the SDL
-		// SDL_EVENT_KEY_DOWN → ascii translation in HandleSDLEvents — magic
-		// values 1-4 = LEFT/RIGHT/UP/DOWN, '\t'/'\n'/0x1B/'\b' = TAB/ENTER/
-		// ESCAPE/BACKSPACE — and printable chars pass through to text inputs.
-		// Used by the TUI client (no SDL events) to drive menu nav.
+		// Edge-triggered key event for the active UI. The external CLI keeps
+		// its legacy ascii/name surface, but Game stores normalized text/nav
+		// input for ClientUi to dispatch after layout.
 		int ascii = -1;
 		if(cmd.args.contains("ascii") && cmd.args["ascii"].is_number()){
 			ascii = cmd.args["ascii"].get<int>();
@@ -850,24 +883,11 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "key needs 'ascii' int or 'key' name/char"));
 			return;
 		}
-		Screen * top = game.GetTopScreen();
-		if(top){
-			bool handled = false;
-			if(ascii >= 0x20 && ascii <= 0x7E){
-				handled = top->HandleTextInput(game.GetScreenContext(), (char)ascii);
-			}else{
-				handled = top->HandleKeyPress(game.GetScreenContext(), (char)ascii);
-			}
-			if(handled){
-				cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
-				return;
-			}
-		}
-		if(game.HandleInGameMenuKey((char)ascii)){
+		if(game.HasUiInputTarget() && QueueControlKey(game, ascii)){
 			cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 			return;
 		}
-		cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no clay key handler"));
+		cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no normalized UI input target"));
 		return;
 	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));

@@ -246,11 +246,11 @@ void MainMenuScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
-bool MainMenuScreen::HandleKeyPress(ScreenContext & ctx, char ascii)
+bool MainMenuScreen::HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action)
 {
-	if(ascii == 0x1B){
+	if(action == silencer::ui::UiNavAction::Cancel){
 		ctx.RequestQuit();
 		return true;
 	}
-	return Screen::HandleKeyPress(ctx, ascii);
+	return false;
 }

@@ -27,7 +27,9 @@ if (!password || password.kind !== "textinput" || !password.password || !ok || l
 }
 '
 
-cli --port "$PORT" set_text --label Password --text swordfish >/dev/null
+for ch in s w o r d f i s h; do
+  cli --port "$PORT" key --key "$ch" >/dev/null
+done
 cli --port "$PORT" key --key enter >/dev/null
 cli --port "$PORT" wait_frames --n 2 >/dev/null
 cli --port "$PORT" password_modal_result | bun -e '

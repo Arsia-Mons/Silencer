@@ -17,6 +17,7 @@
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
 #include "primitives/toggle.h"
+#include "runtime/UiAutomationRegistry.h"
 
 #include "game.h"
 #include "palette.h"
@@ -132,6 +133,8 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 				{ nullptr, onClick, &counts[2] });
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
+		silencer::ui::DispatchUiActions(
+			silencer::ui::automation::DrainActions());
 
 		selBr = 0;
 		unselBr = 0;

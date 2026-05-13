@@ -2,7 +2,6 @@
 #include "audio.h"
 #include "config.h"
 #include "player.h"
-#include "screen.h"
 #include "world.h"
 #include <cstring>
 
@@ -40,59 +39,6 @@ static const struct { Action a; InputField field; } INPUT_FIELDS[] = {
 	{ Action::UiLeft,        [](Input& i) -> bool& { return i.keyleft;          } },
 	{ Action::UiRight,       [](Input& i) -> bool& { return i.keyright;         } },
 };
-
-static bool ChatAllowsChar(char ascii){
-	if(ascii < 0x20 || ascii > 0x7F) return false;
-	switch(ascii){
-		case '[':
-		case '\\':
-		case ']':
-		case '^':
-		case '_':
-		case '`':
-		case '{':
-		case '|':
-		case '}':
-		case '~':
-			return false;
-	}
-	return true;
-}
-
-static bool DispatchChatKey(World & world, Player & player, char ascii){
-	if(!player.chatActive) return false;
-	if(ascii == '\t'){
-		player.chatwithteam = !player.chatwithteam;
-		return true;
-	}
-	if(ascii == '\b'){
-		size_t len = std::strlen(player.chatText);
-		if(len > 0) player.chatText[len - 1] = '\0';
-		return true;
-	}
-	if(ascii == '\n'){
-		if(std::strlen(player.chatText) > 0){
-			world.SendChat(player.chatwithteam, player.chatText);
-		}
-		player.chatText[0] = '\0';
-		player.chatActive = false;
-		return true;
-	}
-	if(ascii == 0x1B){
-		player.chatText[0] = '\0';
-		player.chatActive = false;
-		return true;
-	}
-	if(ChatAllowsChar(ascii)){
-		size_t len = std::strlen(player.chatText);
-		if(len < sizeof(player.chatText) - 1){
-			player.chatText[len] = ascii;
-			player.chatText[len + 1] = '\0';
-		}
-		return true;
-	}
-	return false;
-}
 
 void Game::UpdateInputState(Input & input){
 	float mousex;
@@ -273,125 +219,66 @@ bool Game::HandleSDLEvents(void){
 						skip = true;
 					break;
 				}
-				Screen * top = GetTopScreen();
-				if(top && !skip && top->HandleTextInput(screenContext, ascii)){
-					break;
-				}
-				Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-				if(localplayer && !skip && DispatchChatKey(world, *localplayer, ascii)){
-					break;
-				}
+				if(!skip) QueueUiTextInput(ascii);
 			}break;
 			case SDL_EVENT_KEY_DOWN:{
 				OnScancodeDown(event.key.scancode);
 				keystate[event.key.scancode] = true;
-				{
-					Screen * top = GetTopScreen();
-					if(top && top->HandleScancodeDown(screenContext, event.key.scancode)){
-						break;
-					}
-				}
-			bool skip = true;
-			Uint8 ascii;
-			switch(event.key.scancode){
+				AddUiRawKeyDown(event.key.scancode);
+				switch(event.key.scancode){
 					case SDL_SCANCODE_LEFT:
-						ascii = 1;
-						skip = false;
+						QueueUiNavAction(silencer::ui::UiNavAction::Left);
 					break;
 					case SDL_SCANCODE_RIGHT:
-						ascii = 2;
-						skip = false;
+						QueueUiNavAction(silencer::ui::UiNavAction::Right);
 					break;
 					case SDL_SCANCODE_UP:
-						ascii = 3;
-						skip = false;
+						QueueUiNavAction(silencer::ui::UiNavAction::Up);
 					break;
 					case SDL_SCANCODE_DOWN:
-						ascii = 4;
-						skip = false;
+						QueueUiNavAction(silencer::ui::UiNavAction::Down);
 					break;
 					case SDL_SCANCODE_BACKSPACE:
-						ascii = '\b';
-						skip = false;
+						QueueUiNavAction(silencer::ui::UiNavAction::Backspace);
 					break;
 					case SDL_SCANCODE_TAB:
-						ascii = '\t';
-						skip = false;
+						QueueUiNavAction(silencer::ui::UiNavAction::FocusNext);
 					break;
 					case SDL_SCANCODE_RETURN:
-						ascii = '\n';
-						skip = false;
+						QueueUiNavAction(silencer::ui::UiNavAction::Confirm);
 					break;
 					case SDL_SCANCODE_ESCAPE:
-						ascii = 0x1B;
-						skip = false;
+						QueueUiNavAction(silencer::ui::UiNavAction::Cancel);
 					break;
 					default:{
 						if(keymap.IsPressed(Action::MoveUp, keystate, gamepadstate)){
-							ascii = 3;
-							skip = false;
+							QueueUiNavAction(silencer::ui::UiNavAction::Up);
 						}
 						if(keymap.IsPressed(Action::MoveDown, keystate, gamepadstate)){
-							ascii = 4;
-							skip = false;
+							QueueUiNavAction(silencer::ui::UiNavAction::Down);
 						}
 					}break;
-				}
-				Screen * top = GetTopScreen();
-				if(top && !skip && top->HandleKeyPress(screenContext, ascii)){
-					break;
-				}
-				Player * localplayer = world.GetPeerPlayer(world.localpeerid);
-				if(localplayer && !skip && DispatchChatKey(world, *localplayer, (char)ascii)){
-					break;
-				}
-				if(!skip && HandleInGameMenuKey((char)ascii)){
-					break;
 				}
 			}break;
 			case SDL_EVENT_KEY_UP:{
 				OnScancodeUp(event.key.scancode);
 				keystate[event.key.scancode] = false;
-				}break;
-				case SDL_EVENT_MOUSE_WHEEL:{
-					AddUiWheelDelta(event.wheel.x, event.wheel.y);
-				}break;
+			}break;
+			case SDL_EVENT_MOUSE_WHEEL:{
+				AddUiWheelDelta(event.wheel.x, event.wheel.y);
+			}break;
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:{
 				if(event.button.button == SDL_BUTTON_LEFT){
-					Screen * top = GetTopScreen();
-					int w, h;
-					SDL_GetWindowSize(window, &w, &h);
-					const Surface& uiSurface = GetScreenBuffer();
-					Uint16 sx = static_cast<Uint16>((float(event.button.x) / w) * uiSurface.w);
-					Uint16 sy = static_cast<Uint16>((float(event.button.y) / h) * uiSurface.h);
-					if(top && top->HandleMousePress(screenContext, true, sx, sy)){
-						break;
-					}
+					QueueUiPointerWindowEvent(event.button.x, event.button.y, true, false);
 				}
 			}break;
 			case SDL_EVENT_MOUSE_BUTTON_UP:{
 				if(event.button.button == SDL_BUTTON_LEFT){
-					Screen * top = GetTopScreen();
-					int w, h;
-					SDL_GetWindowSize(window, &w, &h);
-					const Surface& uiSurface = GetScreenBuffer();
-					Uint16 sx = static_cast<Uint16>((float(event.button.x) / w) * uiSurface.w);
-					Uint16 sy = static_cast<Uint16>((float(event.button.y) / h) * uiSurface.h);
-					if(top && top->HandleMousePress(screenContext, false, sx, sy)){
-						break;
-					}
+					QueueUiPointerWindowEvent(event.button.x, event.button.y, false, true);
 				}
 			}break;
 			case SDL_EVENT_MOUSE_MOTION:{
-				Screen * top = GetTopScreen();
-				int w, h;
-				SDL_GetWindowSize(window, &w, &h);
-				const Surface& uiSurface = GetScreenBuffer();
-				Uint16 sx = static_cast<Uint16>((float(event.motion.x) / w) * uiSurface.w);
-				Uint16 sy = static_cast<Uint16>((float(event.motion.y) / h) * uiSurface.h);
-				if(top && top->HandleMouseMove(screenContext, sx, sy)){
-					break;
-				}
+				QueueUiPointerWindowEvent(event.motion.x, event.motion.y, false, false);
 			}break;
 			case SDL_EVENT_GAMEPAD_ADDED:{
 				// SDL3 doesn't auto-open gamepads; without this, a pad plugged
