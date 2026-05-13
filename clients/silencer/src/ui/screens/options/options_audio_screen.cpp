@@ -93,8 +93,8 @@ void ToggleIndicator(Clay_String id, bool selected)
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIXED(16) },
 	           .childGap = kIndicatorGap,
-	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
 		CLAY({ .id = CLAY_SIDI(id, 3),
 		       .layout = {
@@ -119,8 +119,8 @@ void ToggleRow(Clay_String label,
 	CLAY({ .id = CLAY_SID(label),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kRowH) },
-	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
 		BankButton(label, BankButtonVariant::Chrome, {},
 		           BankButtonHandle{ nullptr, onClick, screen });
@@ -190,8 +190,8 @@ void OptionsAudioScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
 	                       CLAY_SIZING_FIXED((float)dst.h) },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 	           .padding = { 0, 0, 80, 0 },
+	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 	       },
 	       .image = { .imageData = PackImage(6, 0) } }) {
 		CLAY({ .id = CLAY_ID("OptionsAudioPanel"),
@@ -201,8 +201,8 @@ void OptionsAudioScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 		           .padding = { kPanelPadX, kPanelPadX,
 		                        kPanelPadY, kPanelPadY },
 		           .childGap = 22,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
 			BankText(CLAY_STRING("Audio Options"), BankTextVariant::Title, {});
 			ToggleRow(CLAY_STRING("Music"), cfg.music, &OnMusicClicked, this);

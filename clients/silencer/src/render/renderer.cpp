@@ -4124,8 +4124,8 @@ void Renderer::DrawPlayerList(Surface * surface){
 							CLAY({ .id = CLAY_IDI("PlayerListPeerRow", (teamIndex * 8) + peerIndex),
 							       .layout = {
 								       .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(12) },
-								       .layoutDirection = CLAY_LEFT_TO_RIGHT,
 								       .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+								       .layoutDirection = CLAY_LEFT_TO_RIGHT,
 							       } }) {
 								CLAY({ .id = CLAY_IDI("PlayerListPeerName", (teamIndex * 8) + peerIndex),
 								       .layout = {

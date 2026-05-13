@@ -528,8 +528,8 @@ void OptionsControlsScreen::Draw(ScreenContext & ctx, Surface & dst, float frame
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
 	                       CLAY_SIZING_FIXED((float)dst.h) },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 	           .padding = { 0, 0, 34, 0 },
+	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 	       },
 	       .image = { .imageData = PackImage(6, 0) } }) {
 		CLAY({ .id = CLAY_ID("OptionsControlsPanel"),
@@ -539,16 +539,16 @@ void OptionsControlsScreen::Draw(ScreenContext & ctx, Surface & dst, float frame
 		           .padding = { kPanelPadX, kPanelPadX,
 		                        kPanelPadY, kPanelPadY },
 		           .childGap = 12,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(7, 7) } }) {
 			BankText(CLAY_STRING("Configure Controls"), BankTextVariant::Title, {});
 			CLAY({ .id = CLAY_ID("ControlsPresetRow"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kRowH) },
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
 				CLAY({ .id = CLAY_ID("PresetLabel"),
 				       .layout = {
@@ -574,8 +574,8 @@ void OptionsControlsScreen::Draw(ScreenContext & ctx, Surface & dst, float frame
 					       .layout = {
 					           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kRowH) },
 					           .childGap = 12,
-					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					       } }) {
 						CLAY({ .id = CLAY_IDI("ControlsAction", (uint32_t)i),
 						       .layout = {

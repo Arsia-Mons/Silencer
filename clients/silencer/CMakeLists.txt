@@ -312,6 +312,15 @@ target_compile_definitions(clay_demo PRIVATE
 	SILENCER_MAP_API_URL="${SILENCER_MAP_API_URL}"
 	SILENCER_ADMIN_API_URL="${SILENCER_ADMIN_API_URL}"
 )
+if(WIN32)
+	target_compile_definitions(clay_demo PRIVATE WIN32_LEAN_AND_MEAN)
+endif()
+if(MSVC)
+	target_compile_options(clay_demo PRIVATE $<$<CONFIG:Debug>:/Z7>)
+	target_compile_options(clay_demo PRIVATE
+		"/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/msvc_snprintf_compat.h")
+	target_compile_definitions(clay_demo PRIVATE NOMINMAX)
+endif()
 add_dependencies(clay_demo silencer_shaders)
 target_include_directories(clay_demo PRIVATE
 	"${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated"

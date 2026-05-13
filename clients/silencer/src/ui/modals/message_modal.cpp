@@ -117,8 +117,8 @@ void MessageModal::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 		           .padding = { kDialogPadX, kDialogPadX,
 		                        kDialogPadY, kDialogPadY },
 		           .childGap = 18,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(40, 4) } }) {
 			BankText(FromStd(message), BankTextVariant::Heading, {});

@@ -405,8 +405,8 @@ void LobbyConnectScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 		           .padding = { kPanelPadX, kPanelPadX,
 		                        kPanelPadY, kPanelPadY },
 		           .childGap = 14,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(7, 2) } }) {
 			ScrollTextBox(CLAY_STRING("LobbyConnectLog"),
@@ -430,9 +430,9 @@ void LobbyConnectScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 				           .sizing = { CLAY_SIZING_GROW(0),
 				                       CLAY_SIZING_FIXED(20) },
 				           .childGap = 12,
-				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 				           .childAlignment = { CLAY_ALIGN_X_LEFT,
 				                               CLAY_ALIGN_Y_CENTER },
+				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 				       } }) {
 					CLAY({ .id = CLAY_ID("LobbyConnectUsernameLabel"),
 					       .layout = {
@@ -458,9 +458,9 @@ void LobbyConnectScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 				           .sizing = { CLAY_SIZING_GROW(0),
 				                       CLAY_SIZING_FIXED(20) },
 				           .childGap = 12,
-				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 				           .childAlignment = { CLAY_ALIGN_X_LEFT,
 				                               CLAY_ALIGN_Y_CENTER },
+				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 				       } }) {
 					CLAY({ .id = CLAY_ID("LobbyConnectPasswordLabel"),
 					       .layout = {

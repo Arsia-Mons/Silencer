@@ -244,8 +244,8 @@ void MissionSummaryScreen::Draw(ScreenContext & ctx, Surface & dst, float framet
 	                       CLAY_SIZING_FIXED((float)dst.h) },
 	           .padding = { kRootPadX, kRootPadX, kRootPadY, kRootPadY },
 	           .childGap = 42,
-	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       },
 	       .image = { .imageData = PackImage(6, 0) } }) {
 		CLAY({ .id = CLAY_ID("MissionSummaryPanel"),
@@ -254,8 +254,8 @@ void MissionSummaryScreen::Draw(ScreenContext & ctx, Surface & dst, float framet
 		                       CLAY_SIZING_FIXED(390) },
 		           .padding = { 26, 20, 20, 20 },
 		           .childGap = 12,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(7, 5) } }) {
 			BankText(CLAY_STRING("Mission Summary"), BankTextVariant::Title, {});
@@ -276,8 +276,8 @@ void MissionSummaryScreen::Draw(ScreenContext & ctx, Surface & dst, float framet
 				CLAY({ .id = CLAY_ID("MissionSummaryScrollControls"),
 				       .layout = {
 				           .sizing = { CLAY_SIZING_FIXED(34), CLAY_SIZING_FIXED(kSummaryH) },
-				           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 				           .childGap = 20,
+				           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				       } }) {
 					BankButton(CLAY_STRING("Up"), BankButtonVariant::Inline, {},
@@ -295,8 +295,8 @@ void MissionSummaryScreen::Draw(ScreenContext & ctx, Surface & dst, float framet
 		                       CLAY_SIZING_FIXED(390) },
 		           .padding = { 12, 12, 6, 0 },
 		           .childGap = 16,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
 			BankText(FromStd(xp), BankTextVariant::Title, {});
 			if(upgradeBanner){
@@ -310,8 +310,8 @@ void MissionSummaryScreen::Draw(ScreenContext & ctx, Surface & dst, float framet
 				       .layout = {
 				           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(30) },
 				           .childGap = 8,
-				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 				           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 				       } }) {
 					CLAY({ .id = CLAY_IDI("UpgradeLabel", (uint32_t)i),
 					       .layout = {

@@ -128,8 +128,8 @@ void PasswordModal::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 		                       CLAY_SIZING_FIXED(kDialogH) },
 		           .padding = { 34, 34, 30, 24 },
 		           .childGap = 16,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(40, 2) } }) {
 			BankText(CLAY_STRING("This game requires a password"),
