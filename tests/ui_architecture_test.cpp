@@ -74,25 +74,19 @@ TEST_CASE("ClayService uses the required central frame lifecycle order") {
 	CHECK(backend.calls[5] == "EndLayout");
 }
 
-TEST_CASE("ClientUi registers stable automation metadata without mutating state during layout") {
+TEST_CASE("ClientUi owns the frame lifecycle without demo-screen metadata") {
 	RecordingClayBackend backend;
 	silencer::ui::ClayService clay(backend);
-	silencer::client_ui::ClientUiState state;
-	silencer::client_ui::ClientUi clientUi(clay, state);
+	silencer::client_ui::ClientUi clientUi(clay);
 	silencer::ui::UiInputState input;
 	input.width = 640;
 	input.height = 480;
 
-	auto commands = clientUi.BuildFrame(input);
+	clientUi.BeginFrame(input);
+	auto commands = clientUi.EndFrame();
 
 	REQUIRE(commands.size() == 1);
-	const auto& elements = clientUi.Automation().Elements();
-	REQUIRE(elements.size() == 2);
-	CHECK(elements[0].id == "main_menu.connect");
-	CHECK(elements[0].label == "Connect");
-	CHECK(elements[0].kind == silencer::ui::UiElementKind::Button);
-	CHECK(elements[1].id == "main_menu.options");
-	CHECK(elements[1].label == "Options");
+	CHECK(clientUi.Automation().Elements().empty());
 	CHECK(clientUi.DrainActions().empty());
 }
 
@@ -136,12 +130,15 @@ TEST_CASE("UiAutomationRegistry queues typed actions for interactive widgets") {
 	registry.RegisterWidget(widget);
 
 	CHECK(registry.InvokeAt(12, 22));
-	CHECK(clicks == 1);
+	CHECK(clicks == 0);
 
 	auto actions = registry.DrainActions();
 	REQUIRE(actions.size() == 1);
 	CHECK(actions[0].kind == silencer::ui::UiActionKind::Activate);
 	CHECK(actions[0].id == "42");
 	CHECK(actions[0].value == "Connect");
+	CHECK(actions[0].onClick != nullptr);
+	silencer::ui::DispatchUiActions(actions);
+	CHECK(clicks == 1);
 	CHECK(registry.DrainActions().empty());
 }

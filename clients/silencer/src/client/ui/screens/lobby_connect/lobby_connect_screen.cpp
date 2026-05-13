@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cstdint>
+#include <string>
 
 namespace
 {
@@ -66,6 +67,7 @@ ScrollTextBoxLine g_logSlab[kMaxLogLines];
 struct ClickAdapter {
 	void (*fn)(void *);
 	void * user;
+	std::string id;
 };
 
 constexpr int kClickAdapterCapacity = 16;
@@ -82,12 +84,18 @@ Clay_String FromStd(const std::string & s)
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
 }
 
-ClickAdapter * AllocClickAdapter(void (*fn)(void *), void * user)
+std::string ToStd(Clay_String text)
+{
+	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
+}
+
+ClickAdapter * AllocClickAdapter(void (*fn)(void *), void * user, Clay_String id)
 {
 	if(g_clickAdapterCount >= kClickAdapterCapacity) return nullptr;
 	auto * a = &g_clickAdapters[g_clickAdapterCount++];
 	a->fn = fn;
 	a->user = user;
+	a->id = ToStd(id);
 	return a;
 }
 
@@ -95,7 +103,7 @@ void ClickProxy(::Clay_ElementId, ::Clay_PointerData data, std::intptr_t userPtr
 {
 	if(data.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
 	auto * a = reinterpret_cast<ClickAdapter *>(userPtr);
-	if(a && a->fn) a->fn(a->user);
+	if(a && a->fn) silencer::ui::automation::QueueClick(a->id, a->fn, a->user);
 }
 
 void LoginClicked(void * user)
@@ -121,7 +129,7 @@ void SmallButton(Clay_String label, void (*onClick)(void *), void * user)
 	       } }) {
 		bool hovered = ::Clay_Hovered();
 		if(onClick){
-			auto * a = AllocClickAdapter(onClick, user);
+			auto * a = AllocClickAdapter(onClick, user, label);
 			if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
 		}
 		BankText(label, BankTextVariant::BodySm,
@@ -519,9 +527,7 @@ bool LobbyConnectScreen::HandleMousePress(ScreenContext & ctx,
                                           Uint16 x,
                                           Uint16 y)
 {
-	(void)ctx;
-	if(!pressed) return false;
-	return silencer::ui::automation::InvokeAt(x, y);
+	return Screen::HandleMousePress(ctx, pressed, x, y);
 }
 
 void LobbyConnectScreen::NotifyLoginClicked()

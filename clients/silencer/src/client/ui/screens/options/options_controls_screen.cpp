@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <utility>
 
 namespace
 {
@@ -42,6 +43,7 @@ struct ClickAdapter {
 	void * user;
 	int arg0;
 	int arg1;
+	std::string id;
 };
 
 constexpr int kAdapterCapacity = 192;
@@ -58,7 +60,12 @@ Clay_String FromStd(const std::string & s)
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
 }
 
-ClickAdapter * AllocAdapter(void (*fn)(void *), void * user, int arg0 = 0, int arg1 = 0)
+std::string ToStd(Clay_String text)
+{
+	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
+}
+
+ClickAdapter * AllocAdapter(void (*fn)(void *), void * user, int arg0 = 0, int arg1 = 0, std::string id = {})
 {
 	if(g_adapterCount >= kAdapterCapacity) return nullptr;
 	auto * a = &g_adapters[g_adapterCount++];
@@ -66,6 +73,7 @@ ClickAdapter * AllocAdapter(void (*fn)(void *), void * user, int arg0 = 0, int a
 	a->user = user;
 	a->arg0 = arg0;
 	a->arg1 = arg1;
+	a->id = std::move(id);
 	return a;
 }
 
@@ -73,7 +81,7 @@ void ClickProxy(::Clay_ElementId, ::Clay_PointerData data, std::intptr_t userPtr
 {
 	if(data.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
 	auto * a = reinterpret_cast<ClickAdapter *>(userPtr);
-	if(a && a->fn) a->fn(a->user);
+	if(a && a->fn) silencer::ui::automation::QueueClick(a->id, a->fn, a->user);
 }
 
 void PresetClicked(void * user)
@@ -193,7 +201,7 @@ void ButtonElement(Clay_String id,
 	       .image = { .imageData = silencer::clay_bridge::PackImage(6, imageIndex) } }) {
 		bool hovered = ::Clay_Hovered();
 		if(onClick){
-			auto * a = AllocAdapter(onClick, user);
+			auto * a = AllocAdapter(onClick, user, 0, 0, ToStd(id));
 			if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
 		}
 		BankText(text, textVariant,
@@ -217,7 +225,7 @@ void TextButton(Clay_String id,
 	       } }) {
 		bool hovered = ::Clay_Hovered();
 		if(onClick){
-			auto * a = AllocAdapter(onClick, user);
+			auto * a = AllocAdapter(onClick, user, 0, 0, ToStd(id));
 			if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
 		}
 		BankText(text, BankTextVariant::Heading,

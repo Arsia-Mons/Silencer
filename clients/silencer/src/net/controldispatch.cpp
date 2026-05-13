@@ -575,14 +575,19 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		if(cw){
 			using K = silencer::ui::automation::WidgetKind;
 			if(cw->kind == K::Button || cw->kind == K::Toggle){
-				if(cw->onClick) cw->onClick(cw->clickUser);
+				if(cw->onClick){
+					silencer::ui::automation::QueueClick(target, cw->onClick, cw->clickUser);
+				}
 				nlohmann::json r;
 				r["source"] = "clay";
 				cmd.reply->set_value(OkResult(cmd.id, r));
 				return;
 			}
 			if(cw->kind == K::ListRow){
-				if(cw->onClickRow) cw->onClickRow(cw->clickUser, cw->rowIndex);
+				if(cw->onClickRow){
+					silencer::ui::automation::QueueRowSelect(
+						target, cw->rowIndex, cw->onClickRow, cw->clickUser);
+				}
 				nlohmann::json r;
 				r["source"] = "clay";
 				r["row_index"] = cw->rowIndex;
@@ -709,9 +714,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 		if(hit->onClickRow){
-			hit->onClickRow(hit->clickUser, hit->rowIndex);
+			silencer::ui::automation::QueueRowSelect(
+				hit->label ? hit->label : "", hit->rowIndex,
+				hit->onClickRow, hit->clickUser);
 		}else if(hit->onClick){
-			hit->onClick(hit->clickUser);
+			silencer::ui::automation::QueueClick(
+				hit->label ? hit->label : "", hit->onClick, hit->clickUser);
 		}else{
 			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
 				"selected clay row is not invokable"));
@@ -744,7 +752,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 		for(int i = 0; i < amount; ++i){
-			cw->onClick(cw->clickUser);
+			silencer::ui::automation::QueueClick(label, cw->onClick, cw->clickUser);
 		}
 		nlohmann::json r;
 		r["source"] = "clay";

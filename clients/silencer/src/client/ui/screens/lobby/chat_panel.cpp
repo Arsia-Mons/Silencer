@@ -294,9 +294,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 			TextInput(CLAY_STRING("ChatInput"),
 			          state.inputBuffer,
 			          inOpts,
-			          TextInputHandle{ /*hoveredOut*/ nullptr,
-			                           /*onEnter*/    nullptr,
-			                           /*user*/       nullptr });
+			          TextInputHandle{ /*hoveredOut*/ nullptr });
 		}
 	}
 

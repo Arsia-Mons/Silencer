@@ -2,8 +2,10 @@
 
 #include "bank_text.h"
 #include "clay_ui_payloads.h"
+#include "runtime/UiAutomationRegistry.h"
 
 #include <cstdint>
+#include <string>
 
 namespace silencer::ui::primitives {
 
@@ -16,6 +18,7 @@ namespace {
 struct ClickAdapter {
 	BankButtonClickFn fn;
 	void *            user;
+	std::string       id;
 };
 
 constexpr int kAdapterCapacity = 256;
@@ -30,11 +33,16 @@ constexpr int kCustomDataCapacity = 256;
 silencer::clay_bridge::ClayCustomData g_customData[kCustomDataCapacity];
 int g_customDataCount = 0;
 
-ClickAdapter * AllocAdapter(BankButtonClickFn fn, void * user) {
+std::string ToStd(Clay_String text) {
+	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
+}
+
+ClickAdapter * AllocAdapter(BankButtonClickFn fn, void * user, Clay_String id) {
 	if(g_adapterCount >= kAdapterCapacity) return nullptr;
 	auto * a = &g_adapters[g_adapterCount++];
 	a->fn = fn;
 	a->user = user;
+	a->id = ToStd(id);
 	return a;
 }
 
@@ -62,7 +70,7 @@ void ClickProxy(::Clay_ElementId /*id*/,
                 std::intptr_t userPtr) {
 	if(data.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
 	auto * a = reinterpret_cast<ClickAdapter *>(userPtr);
-	if(a && a->fn) a->fn(a->user);
+	if(a && a->fn) silencer::ui::automation::QueueClick(a->id, a->fn, a->user);
 }
 
 }  // namespace
@@ -99,7 +107,7 @@ void BankButton(Clay_String label,
 				if(payload) payload->brightness = hovered ? 136 : 128;
 				if(handle.hoveredOut) *handle.hoveredOut = hovered;
 				if(handle.onClick){
-					auto * a = AllocAdapter(handle.onClick, handle.user);
+					auto * a = AllocAdapter(handle.onClick, handle.user, label);
 					if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
 				}
 				BankText(label,
@@ -118,7 +126,7 @@ void BankButton(Clay_String label,
 				bool hovered = ::Clay_Hovered();
 				if(handle.hoveredOut) *handle.hoveredOut = hovered;
 				if(handle.onClick){
-					auto * a = AllocAdapter(handle.onClick, handle.user);
+					auto * a = AllocAdapter(handle.onClick, handle.user, label);
 					if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
 				}
 				Uint8 brightness = opts.textBrightness;
@@ -141,7 +149,7 @@ void BankButton(Clay_String label,
 				bool hovered = ::Clay_Hovered();
 				if(handle.hoveredOut) *handle.hoveredOut = hovered;
 				if(handle.onClick){
-					auto * a = AllocAdapter(handle.onClick, handle.user);
+					auto * a = AllocAdapter(handle.onClick, handle.user, label);
 					if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
 				}
 			}

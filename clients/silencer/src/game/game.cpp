@@ -56,7 +56,7 @@ using namespace GameState;
 
 Game::Game() : renderer(world), screenbuffer(640, 480),
                uiClayService(uiClayBackend),
-               clientUi(uiClayService, clientUiState),
+               clientUi(uiClayService),
                mapDownloader(world),
                ambienceMixer(world, renderer, mapDownloader, fade_i),
                screenContext(*this, world, renderer, world.lobby, keymap, updater, ambienceMixer, mapDownloader, window, renderdevice){
@@ -470,9 +470,6 @@ void Game::BeginPreparedClientUiFrame() {
 
 Clay_RenderCommandArray Game::EndClientUiFrame() {
 	clientUi.EndFrame();
-	// Callbacks route through existing screen controllers; typed actions drain
-	// after layout so automation and input share the same frame boundary.
-	(void)clientUi.DrainActions();
 	hasPreparedUiInput = false;
 	return uiClayBackend.Commands();
 }
@@ -505,6 +502,7 @@ void Game::RenderClientUiFrame(Surface& surface, float frametime) {
 	BuildVisibleClientUi(surface, frametime);
 	Clay_RenderCommandArray cmds = EndClientUiFrame();
 	silencer::clay_bridge::Render(*this, &surface, cmds);
+	silencer::ui::DispatchUiActions(clientUi.DrainActions());
 }
 
 void Game::ResetUiFrameDeltas() {

@@ -161,9 +161,9 @@ bool RunScrollTextBoxCheck(::Game & game, ScrollTextBoxCheckResult & out);
 // text_input_test.cpp.
 bool RunTextInputTest(::Game & game, const char * outPath);
 
-// P9 TextInput dispatch-key check. Verifies that
-// `TextInputDispatchKey(handle, '\n')` invokes onEnter exactly once and
-// `TextInputDispatchKey(handle, 'x')` does not. No PNG produced.
+// P9 TextInput action-drain check. Verifies that registry Enter queues
+// onEnter for the shared action dispatcher and normal text input does not.
+// No PNG produced.
 struct TextInputCheckResult {
 	int onEnterFiredForNewline;  // Expect 1.
 	int onEnterFiredForLetter;   // Expect 0.

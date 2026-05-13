@@ -5,9 +5,9 @@
 // a 640x480 Surface and writes a PNG. The committed reference at
 // tests/lobby-ui/text_input_test/reference.png is the pinned baseline.
 //
-// `RunTextInputCheck(out)` verifies the screen-side dispatch helper:
-//   • '\n' fires onEnter exactly once.
-//   • 'x' (a non-routing character) does not fire onEnter.
+// `RunTextInputCheck(out)` verifies the registry/action-drain path:
+//   • '\n' queues onEnter and the shared dispatcher fires it exactly once.
+//   • 'x' text input does not fire onEnter.
 //   • The password variant masks rendered glyphs (asserted via the
 //     emitted CUSTOM payload's textLen).
 //
@@ -17,6 +17,7 @@
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
 #include "primitives/text_input.h"
+#include "runtime/UiAutomationRegistry.h"
 
 #include "game.h"
 #include "palette.h"
@@ -73,18 +74,29 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 	const int H = 480;
 	EnsureInitialized(W, H);
 
-	using silencer::ui::primitives::TextInputDispatchKey;
-	using silencer::ui::primitives::TextInputHandle;
+	// Registry routing — verify '\n' queues onEnter for the post-layout
+	// action dispatcher and text input does not.
+	silencer::ui::UiAutomationRegistry registry;
+	registry.BeginFrame();
+	char inputBuffer[16] = "";
+	silencer::ui::UiAutomationWidget widget;
+	widget.label = "TextInputCheck";
+	widget.kind = silencer::ui::UiAutomationWidgetKind::TextInput;
+	widget.uid = 9;
+	widget.textBuffer = inputBuffer;
+	widget.textBufferLen = static_cast<int>(sizeof(inputBuffer));
+	widget.onEnter = OnEnter;
+	registry.RegisterWidget(widget);
+	registry.FocusTextInputByUid(9);
 
-	// Dispatch-key routing — verify '\n' fires onEnter, 'x' does not.
 	g_enterCount = 0;
-	TextInputHandle handle{};
-	handle.onEnter = OnEnter;
-	TextInputDispatchKey(handle, '\n');
+	registry.DispatchKeyPress('\n');
+	silencer::ui::DispatchUiActions(registry.DrainActions());
 	out.onEnterFiredForNewline = g_enterCount;
 
 	g_enterCount = 0;
-	TextInputDispatchKey(handle, 'x');
+	registry.DispatchTextInput('x');
+	silencer::ui::DispatchUiActions(registry.DrainActions());
 	out.onEnterFiredForLetter = g_enterCount;
 
 	// Password masking — emit a password variant, run a layout pass,

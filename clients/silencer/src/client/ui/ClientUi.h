@@ -1,7 +1,5 @@
 #pragma once
 
-#include "client/ui/ClientUiState.h"
-#include "ui/primitives/Button.h"
 #include "ui/runtime/ClayService.h"
 #include "ui/runtime/UiAutomationRegistry.h"
 
@@ -10,20 +8,16 @@ namespace client_ui {
 
 class ClientUi {
 public:
-	ClientUi(silencer::ui::ClayService& clay, ClientUiState& state);
+	explicit ClientUi(silencer::ui::ClayService& clay);
 
 	void BeginFrame(const silencer::ui::UiInputState& input);
 	std::vector<silencer::ui::UiRenderCommand> EndFrame();
-	std::vector<silencer::ui::UiRenderCommand> BuildFrame(const silencer::ui::UiInputState& input);
 	std::vector<silencer::ui::UiAction> DrainActions();
 	const silencer::ui::UiAutomationRegistry& Automation() const { return automation_; }
 	silencer::ui::UiAutomationRegistry& Automation() { return automation_; }
 
 private:
-	void BuildMainMenu();
-
 	silencer::ui::ClayService& clay_;
-	ClientUiState& state_;
 	silencer::ui::UiAutomationRegistry& automation_;
 };
 

@@ -100,12 +100,4 @@ void TextInput(Clay_String id,
 	}
 }
 
-bool TextInputDispatchKey(const TextInputHandle & handle, char ch) {
-	if(ch == '\n' || ch == '\r'){
-		if(handle.onEnter) handle.onEnter(handle.user);
-		return true;
-	}
-	return false;
-}
-
 }  // namespace silencer::ui::primitives

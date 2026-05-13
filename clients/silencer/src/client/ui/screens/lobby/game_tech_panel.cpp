@@ -97,12 +97,17 @@ void OnRowToggleClicked(void * user) {
 	if(a && a->state) a->state->toggleClickedItemIndex = a->itemIndex;
 }
 
+void OnDescClicked(void * user) {
+	auto * a = static_cast<ClickAdapter *>(user);
+	if(a && a->state) a->state->descClickedItemIndex = a->itemIndex;
+}
+
 void DescClickProxy(::Clay_ElementId /*id*/,
                     ::Clay_PointerData data,
                     std::intptr_t userPtr) {
 	if(data.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
 	auto * a = reinterpret_cast<ClickAdapter *>(userPtr);
-	if(a && a->state) a->state->descClickedItemIndex = a->itemIndex;
+	if(a && a->state) silencer::ui::automation::QueueClick("GTechDescription", &OnDescClicked, a);
 }
 
 void OnBackClicked(void * user) {

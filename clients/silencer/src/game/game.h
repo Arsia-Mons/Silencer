@@ -174,7 +174,6 @@ private:
 	Surface screenbuffer;
 	silencer::client_ui::ClayBridgeFrameBackend uiClayBackend;
 	silencer::ui::ClayService uiClayService;
-	silencer::client_ui::ClientUiState clientUiState;
 	silencer::client_ui::ClientUi clientUi;
 	silencer::ui::UiInputState preparedUiInput;
 	bool hasPreparedUiInput = false;

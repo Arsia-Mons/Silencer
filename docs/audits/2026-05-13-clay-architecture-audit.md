@@ -41,6 +41,12 @@ command stream after the world frame. Pointer/wheel/gamepad UI input is collecte
 into `UiInputState`, typed interaction actions are drained after layout, and
 `clay_inspector` has been removed in favor of `UiAutomationRegistry`.
 
+That statement is about frame ownership, not final navigation ownership. The
+desired end state is still a coherent client UI layer that owns screen/modal
+navigation. `Game::screenStack` is the current real navigation owner, but it
+should be treated as extraction source material, not the permanent architecture.
+Do not reintroduce the deleted `ClientUiState` stub as a temporary bridge.
+
 The remaining architectural gaps are narrower: several screens are still large
 raw Clay layouts, the generic toolkit boundary remains debatable, and the HUD
 still has some privileged friend access into `World`/`Player` while those domain
@@ -184,6 +190,35 @@ Evidence:
 - Control socket lookup: `clients/silencer/src/net/controldispatch.cpp:607`.
 - Boundary guard: `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh:29`.
 
+### Medium: Client UI Navigation Ownership Is Still In `Game`
+
+Status: open. See the single current handoff section at the end of this doc.
+
+The architecture goal's client UI shape lists `ClientUiState`,
+`ClientUiActions`, `navigation/ScreenStack`, and `navigation/ModalStack` under
+`clients/silencer/src/client/ui`. That is the correct desired direction: client
+UI should own UI-session state and screen/modal navigation. However, the deleted
+`clients/silencer/src/client/ui/ClientUiState.h` was not a correct unfinished
+version of that architecture. It only held `ScreenId activeScreen` and
+`focusedElementId`, and `ClientUi::BuildFrame` only used it to build a fake
+two-button main menu path. Restoring or wiring that file would reintroduce a
+parallel enum router beside the real screen stack.
+
+Evidence:
+
+- Desired client UI shape: `architecture-goal.md:130` through
+  `architecture-goal.md:145`.
+- Current real owner: `clients/silencer/src/game/game.h:82` through
+  `clients/silencer/src/game/game.h:87`.
+- Current push/pop/replace mechanics:
+  `clients/silencer/src/game/game.cpp:1237` through
+  `clients/silencer/src/game/game.cpp:1255`.
+- Current visible UI traversal:
+  `clients/silencer/src/game/game.cpp:477` through
+  `clients/silencer/src/game/game.cpp:486`.
+- Deleted stub shape:
+  `clients/silencer/src/client/ui/ClientUiState.h` before deletion.
+
 ### Medium: The Input Contract Is Only Partially Implemented
 
 Status: resolved for the central Clay screen path; renderer-owned HUD Clay
@@ -237,11 +272,7 @@ Evidence:
 
 Impact: this is a maintainability shortcut. It got screens migrated, but the
 current files are hard to reason about and brittle under build-system changes.
-
-Recommendation: extract domain components and composition helpers at the nearest
-useful level: lobby chrome, lobby title bar, panel shell, option rows, HUD status
-bars, chat overlay, buy/tech menu rows. Also replace repeated anonymous
-namespace arena names with uniquely scoped storage or small reusable stores.
+See the single current handoff section for the active cleanup order.
 
 ### Medium: Generic Toolkit Is Not As Generic As The Plan Says
 
@@ -261,12 +292,8 @@ Evidence:
 
 Impact: this may be an acceptable Silencer-specific design-system layer, but it
 is not a fully generic UI toolkit. Naming it generic while embedding renderer
-payload policy makes the boundary less honest.
-
-Recommendation: either rename/scope these as Silencer design primitives
-(`src/ui/design` or `src/client/ui/common`) or keep only renderer-agnostic
-primitive APIs in `src/ui/primitives` and hide payload details behind generic
-image/text token abstractions.
+payload policy makes the boundary less honest. See the single current handoff
+section for the active cleanup order.
 
 ### Low: Root-Level Process Artifacts Leaked Into The Migration Commit
 
@@ -279,39 +306,57 @@ Evidence:
 
 - Commit: `9d1e427 Remove Clay agent process artifacts`.
 
-## Shortcut Summary
+## Current Handoff Instructions
 
-The original shortcuts were not "bad code" in isolation; they were delivery
-shortcuts. Current status:
+This is the only handoff section. Update it in place as the most recent state;
+do not append historical handoffs after each attempt.
 
-- Screens are now routed through the central `ClientUi` / `ClayService` frame
-  path.
-- Automation now uses `UiAutomationRegistry`; the separate inspector is gone.
-- Renderer no longer owns Clay HUD layout or exposes `Draw*Clay` HUD APIs.
-- Framework names have been removed from the lobby application-layer domain
-  concepts.
-- Large raw Clay screen files were accepted, with a CMake skip around unity-build
-  collisions instead of fixing the structure.
+Backlog audit:
 
-## Recommended Cleanup Order
+- [x] Domain-level Clay names are out of `client/ui`: lobby folder, classes,
+  namespaces, CMake symbols, tests, and control-socket text use product/domain
+  names.
+- [x] Renderer no longer owns Clay HUD layout or exposes `Draw*Clay` HUD APIs.
+- [x] `ClientUi` / `ClayService` are the production frame runtime; screens,
+  modals, HUD, and overlays declare into one frame.
+- [x] `clay_inspector` is gone; automation uses `UiAutomationRegistry`.
+- [x] Wheel/trackpad and gamepad UI input flow into `UiInputState`.
+- [x] The fake `ClientUiState` / `BuildFrame` demo path is gone. Keep it gone.
+- [ ] `Game::screenStack` still owns real screen/modal navigation. This is the
+  next architectural backlog item.
+- [ ] Large raw Clay screen files still need decomposition into domain
+  components and reusable design primitives.
+- [ ] The generic toolkit boundary is still not fully honest because several
+  `src/ui/primitives` APIs embed Silencer sprite/font/palette payload policy.
 
-1. [x] Rename domain-level Clay names out of `client/ui`: lobby folder, classes,
-   namespaces, CMake symbols, tests, and control-socket text.
-2. [x] Move `Renderer::DrawHud*Clay` methods out of `Renderer` and into
-   `client/ui/hud` or a dedicated UI presentation adapter.
-3. [x] Decide whether `ClayService`/`ClientUi` is the real runtime. If yes, route
-   all screens through it and delete duplicate per-screen lifecycle plumbing.
-4. [x] Replace `clay_inspector` with `UiAutomationRegistry` or make it a compatibility
-   adapter over the real registry.
-5. [x] Wire real wheel/trackpad and gamepad UI input into a central `UiInputState`.
-6. [ ] Extract the largest raw Clay screen sections into domain components and
-   reusable design primitives.
-7. [x] Move or remove root-level process artifacts (`prompt.md`, `ralph/`) before
-   treating this branch as clean architecture.
+Next implementation checklist:
 
-## Bottom Line
+1. Extract `Game::screenStack` into a real
+   `clients/silencer/src/client/ui/navigation/ScreenStack`.
+2. Move the existing push/pop/replace/top/overlay traversal semantics, not a
+   simplified `ScreenId activeScreen` enum.
+3. Let `ClientUi` own that navigation/session layer directly, or own a real
+   `ClientUiState` aggregate that contains it. `ClientUiState` is acceptable
+   only if it owns real UI-session state.
+4. Add `ModalStack` only if extracting real modal semantics from the current
+   stack. Do not add a placeholder stack.
+5. Keep `Game` as gameplay/lobby/render-loop orchestrator. It may request UI
+   transitions, but it should not remain the final owner of screen/modal stack
+   mechanics.
+6. Do not leave two routing systems alive. Update all callers in the same pass;
+   no compatibility shim where both `Game::screenStack` and a client UI stack can
+   route screens.
+7. After navigation ownership is extracted, decompose large raw Clay files at the
+   nearest useful domain boundary: lobby chrome/title bar/panel shell, option
+   rows, HUD status bars, chat overlay, buy/tech menu rows.
+8. Resolve the toolkit boundary by either naming Silencer-specific primitives as
+   design-system primitives or hiding payload details behind renderer-agnostic
+   token APIs.
+9. Verify with `cmake --build clients/silencer/build --target silencer
+   silencer_tests -j 8`, `clients/silencer/build/tests/silencer_tests`, and the
+   focused CLI E2E scripts for navigation, scrolling, modals, resize screenshots,
+   in-game overlays, and architecture boundaries.
 
-The central Clay runtime is now the production UI owner for screens, modals,
-HUD, and overlays. The branch should now be treated as a real implementation
-path, with the remaining cleanup focused on decomposing large raw Clay layouts
-and tightening domain read-model boundaries rather than fixing frame ownership.
+Bottom line: the central Clay runtime is now the production frame owner. The
+next correct step is not another temporary state shim; it is extracting real
+screen/modal navigation ownership from `Game` into the client UI layer.

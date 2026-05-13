@@ -21,9 +21,8 @@
 // `brightness` to 64 (matches legacy effectbrightness handling) and
 // suppresses the caret. `numbersOnly` is documented here but is purely
 // a screen-side input-filter hint — the primitive ignores it for
-// rendering. `onEnter` in the handle is fired by the screen via
-// `TextInputDispatchKey(handle, '\n')` when SDL reports Enter; the
-// primitive itself does not route SDL events.
+// rendering. Enter handling is screen/controller-owned through
+// UiAutomationRegistry; the primitive itself does not route SDL events.
 //
 // Memory: each call may allocate a small per-frame TextInputPayload + a
 // ClayCustomData header + up to 256 chars of mask buffer from fixed-
@@ -49,12 +48,8 @@ struct TextInputOpts {
 	bool   showCaret   = false; // caller pre-resolves blink AND focus.
 };
 
-using TextInputEnterFn = void (*)(void * user);
-
 struct TextInputHandle {
 	bool *           hoveredOut;  // Optional. Written each frame if non-null.
-	TextInputEnterFn onEnter;     // Optional. Fired by TextInputDispatchKey('\n').
-	void *           user;        // Forwarded to onEnter.
 };
 
 // Resets the per-frame payload + custom-data + mask-buffer arenas. Call
@@ -70,13 +65,6 @@ void TextInput(Clay_String id,
                const char * text,
                TextInputOpts opts = {},
                TextInputHandle handle = {});
-
-// Screen-side dispatch helper. Routes a typed character to the input's
-// onEnter callback for '\n' / '\r'. Returns true if the key was
-// consumed (Enter), false otherwise (caller appends to the buffer).
-// Lives next to the primitive because every screen needs the same
-// "Enter fires onEnter, everything else passes through" routing.
-bool TextInputDispatchKey(const TextInputHandle & handle, char ch);
 
 }  // namespace silencer::ui::primitives
 

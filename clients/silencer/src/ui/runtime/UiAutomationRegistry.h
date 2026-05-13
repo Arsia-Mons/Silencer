@@ -89,6 +89,7 @@ public:
 	bool FocusNextInteractive();
 	bool FocusPreviousInteractive();
 	bool ActivateFocused();
+	void QueueAction(UiAction action);
 	std::vector<UiAction> DrainActions();
 
 private:
@@ -126,6 +127,10 @@ bool InvokeAt(int x, int y);
 bool FocusNextInteractive();
 bool FocusPreviousInteractive();
 bool ActivateFocused();
+void QueueAction(UiAction action);
+void QueueClick(std::string id, void (*onClick)(void *), void * user);
+void QueueRowSelect(std::string id, int rowIndex, void (*onClickRow)(void *, int), void * user);
+void QueueTextEnter(std::string id, const char * value, void (*onEnter)(void *), void * user);
 std::vector<UiAction> DrainActions();
 
 }  // namespace automation

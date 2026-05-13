@@ -163,6 +163,19 @@ void UiAutomationRegistry::QueueAction(UiActionKind kind,
 	else if(widget.label) action.id = widget.label;
 	if(value) action.value = value;
 	else if(widget.label) action.value = widget.label;
+	if(kind == UiActionKind::Activate){
+		if(widget.kind == UiAutomationWidgetKind::TextInput){
+			action.onEnter = widget.onEnter;
+			action.enterUser = widget.enterUser;
+		}else{
+			action.onClick = widget.onClick;
+			action.clickUser = widget.clickUser;
+		}
+	}else if(kind == UiActionKind::Select && widget.kind == UiAutomationWidgetKind::ListRow){
+		action.onClickRow = widget.onClickRow;
+		action.clickUser = widget.clickUser;
+		action.rowIndex = widget.rowIndex;
+	}
 	actions_.Push(std::move(action));
 }
 
@@ -250,7 +263,6 @@ bool UiAutomationRegistry::DispatchKeyPress(char ascii) {
 		case '\n':
 			if(widget && widget->kind == UiAutomationWidgetKind::TextInput && !widget->inactive){
 				QueueAction(UiActionKind::Activate, *widget, widget->textBuffer);
-				if(widget->onEnter) widget->onEnter(widget->enterUser);
 				return true;
 			}
 			return false;
@@ -270,18 +282,10 @@ bool UiAutomationRegistry::InvokeAt(int x, int y) {
 				case UiAutomationWidgetKind::Button:
 				case UiAutomationWidgetKind::Toggle:
 					QueueAction(UiActionKind::Activate, *it, nullptr);
-					if(it->onClick){
-						it->onClick(it->clickUser);
-						return true;
-					}
-					return false;
+					return it->onClick != nullptr;
 				case UiAutomationWidgetKind::ListRow:
 					QueueAction(UiActionKind::Select, *it, nullptr);
-					if(it->onClickRow){
-						it->onClickRow(it->clickUser, it->rowIndex);
-						return true;
-					}
-					return false;
+					return it->onClickRow != nullptr;
 				case UiAutomationWidgetKind::TextInput:
 					QueueAction(UiActionKind::Select, *it, it->textBuffer ? it->textBuffer : "");
 					return true;
@@ -337,23 +341,19 @@ bool UiAutomationRegistry::ActivateFocused() {
 		case UiAutomationWidgetKind::Button:
 		case UiAutomationWidgetKind::Toggle:
 			QueueAction(UiActionKind::Activate, *widget, nullptr);
-			if(widget->onClick){
-				widget->onClick(widget->clickUser);
-				return true;
-			}
-			return false;
+			return widget->onClick != nullptr;
 		case UiAutomationWidgetKind::ListRow:
 			QueueAction(UiActionKind::Select, *widget, nullptr);
-			if(widget->onClickRow){
-				widget->onClickRow(widget->clickUser, widget->rowIndex);
-				return true;
-			}
-			return false;
+			return widget->onClickRow != nullptr;
 		case UiAutomationWidgetKind::TextInput:
 			QueueAction(UiActionKind::Select, *widget, widget->textBuffer ? widget->textBuffer : "");
 			return true;
 	}
 	return false;
+}
+
+void UiAutomationRegistry::QueueAction(UiAction action) {
+	actions_.Push(std::move(action));
 }
 
 std::vector<UiAction> UiAutomationRegistry::DrainActions() {
@@ -382,6 +382,35 @@ bool InvokeAt(int x, int y) { return ActiveUiAutomationRegistry().InvokeAt(x, y)
 bool FocusNextInteractive() { return ActiveUiAutomationRegistry().FocusNextInteractive(); }
 bool FocusPreviousInteractive() { return ActiveUiAutomationRegistry().FocusPreviousInteractive(); }
 bool ActivateFocused() { return ActiveUiAutomationRegistry().ActivateFocused(); }
+void QueueAction(UiAction action) { ActiveUiAutomationRegistry().QueueAction(std::move(action)); }
+void QueueClick(std::string id, void (*onClick)(void *), void * user) {
+	UiAction action;
+	action.kind = UiActionKind::Activate;
+	action.id = std::move(id);
+	action.value = action.id;
+	action.onClick = onClick;
+	action.clickUser = user;
+	ActiveUiAutomationRegistry().QueueAction(std::move(action));
+}
+void QueueRowSelect(std::string id, int rowIndex, void (*onClickRow)(void *, int), void * user) {
+	UiAction action;
+	action.kind = UiActionKind::Select;
+	action.id = std::move(id);
+	action.value = std::to_string(rowIndex);
+	action.onClickRow = onClickRow;
+	action.clickUser = user;
+	action.rowIndex = rowIndex;
+	ActiveUiAutomationRegistry().QueueAction(std::move(action));
+}
+void QueueTextEnter(std::string id, const char * value, void (*onEnter)(void *), void * user) {
+	UiAction action;
+	action.kind = UiActionKind::Activate;
+	action.id = std::move(id);
+	action.value = value ? value : "";
+	action.onEnter = onEnter;
+	action.enterUser = user;
+	ActiveUiAutomationRegistry().QueueAction(std::move(action));
+}
 std::vector<UiAction> DrainActions() { return ActiveUiAutomationRegistry().DrainActions(); }
 
 }  // namespace automation

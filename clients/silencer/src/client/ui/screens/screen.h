@@ -63,7 +63,10 @@ public:
 	virtual bool HandleMousePress(ScreenContext & ctx, bool pressed, Uint16 x, Uint16 y)
 	{
 		(void)ctx;
-		return pressed ? silencer::ui::automation::InvokeAt(x, y) : false;
+		if(!pressed) return false;
+		if(silencer::ui::automation::FocusTextInputAt(x, y)) return true;
+		silencer::ui::automation::ClearFocus();
+		return false;
 	}
 	virtual bool HandleMouseMove(ScreenContext & ctx, Uint16 x, Uint16 y)
 	{ (void)ctx; (void)x; (void)y; return false; }
