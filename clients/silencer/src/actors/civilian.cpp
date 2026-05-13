@@ -4,7 +4,6 @@
 #include "player.h"
 #include "plasmaprojectile.h"
 #include "gasloader.h"
-#include "gasloader.h"
 
 Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 	requiresauthority = true;
@@ -26,8 +25,90 @@ Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 }
 
 void Civilian::InitBT(){
+	if(bt_) return;
 	bt_ = BehaviorTreeLibrary::instance().get("civilian");
 	if(!bt_) return;
+
+	// New: find starting platform, then transition to WALKING.
+	btctx_.actions["New"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(state != NEW) return BTResult::Failure;
+		if(FindCurrentPlatform(*this, world)){ state = WALKING; state_i = -1; }
+		return BTResult::Running;
+	};
+
+	// DyingForward: 15-tick forward death animation → DEAD.
+	btctx_.actions["DyingForward"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(state != DYINGFORWARD) return BTResult::Failure;
+		tractteamid = 0;
+		collidable = false;
+		if(ctx.elapsedTicks() == 0){
+			const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
+			static const EnemyDef _ced;
+			const std::string* hurts[] = {
+				gd ? &gd->soundHurt1 : &_ced.soundHurt1,
+				gd ? &gd->soundHurt2 : &_ced.soundHurt2,
+				gd ? &gd->soundHurt3 : &_ced.soundHurt3
+			};
+			EmitSound(world, world.resources.soundbank[*hurts[rand() % 3]], 128);
+		}
+		if(ctx.elapsedTicks() >= 14){ state = DEAD; state_i = -1; }
+		else { FollowGround(*this, world, xv); res_bank = 126; res_index = ctx.elapsedTicks(); }
+		return BTResult::Running;
+	};
+
+	// DyingBackward: 15-tick backward death animation → DEAD.
+	btctx_.actions["DyingBackward"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(state != DYINGBACKWARD) return BTResult::Failure;
+		tractteamid = 0;
+		collidable = false;
+		if(ctx.elapsedTicks() == 0){
+			const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
+			static const EnemyDef _ced;
+			const std::string* hurts[] = {
+				gd ? &gd->soundHurt1 : &_ced.soundHurt1,
+				gd ? &gd->soundHurt2 : &_ced.soundHurt2,
+				gd ? &gd->soundHurt3 : &_ced.soundHurt3
+			};
+			EmitSound(world, world.resources.soundbank[*hurts[rand() % 3]], 128);
+		}
+		if(ctx.elapsedTicks() >= 14){ state = DEAD; state_i = -1; }
+		else { FollowGround(*this, world, xv); res_bank = 125; res_index = ctx.elapsedTicks(); }
+		return BTResult::Running;
+	};
+
+	// DyingExplode: instant draw hide → DEAD.
+	btctx_.actions["DyingExplode"] = [this](BTContext&) -> BTResult {
+		if(state != DYINGEXPLODE) return BTResult::Failure;
+		tractteamid = 0;
+		draw = false;
+		state = DEAD; state_i = -1;
+		return BTResult::Running;
+	};
+
+	// Dead: wait deadRespawnTicks, then respawn as WALKING.
+	btctx_.actions["Dead"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(state != DEAD) return BTResult::Failure;
+		collidable = false;
+		const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
+		int drt = cd ? cd->deadRespawnTicks : 100;
+		if(ctx.elapsedTicks() >= drt){
+			draw = true; collidable = true;
+			state = WALKING;
+			state_warp = cd ? cd->warpTeleportTick : GASLoader::Get().player.warpTeleportTick;
+			state_i = -1;
+		}
+		return BTResult::Running;
+	};
+
+	// TractCheck: if tracted and hostile player overlaps, explode. Failure = no victim.
+	btctx_.actions["TractCheck"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		return CheckTractVictim(world) ? BTResult::Success : BTResult::Failure;
+	};
 
 	// ThreatLook: scan AABB for projectiles; orient mirrored away from threat. Success = threat found.
 	btctx_.actions["ThreatLook"] = [this](BTContext& ctx) -> BTResult {
@@ -42,7 +123,7 @@ void Civilian::InitBT(){
 		int dx = cd ? cd->threatDetectX : 200;
 		int dy = cd ? cd->threatDetectY : 100;
 		std::vector<Object*> objects = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
-		if (objects.empty()) return BTResult::Failure;
+		if(objects.empty()) return BTResult::Failure;
 		mirrored = (objects[0]->x > x);
 		return BTResult::Success;
 	};
@@ -62,6 +143,55 @@ void Civilian::InitBT(){
 		return BTResult::Success;
 	};
 
+	// RunMove: RUNNING movement and animation. Returns Running to keep Selector here.
+	btctx_.actions["RunMove"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(state != RUNNING) return BTResult::Failure;
+		const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
+		int bonus = cd ? cd->runSpeedBonus : 5;
+		xv = (mirrored ? -1 : 1) * (bonus + speed);
+		res_bank = 123; res_index = state_i % 15;
+		{
+			auto it = world.resources.actordefs.find("civilian");
+			if(it != world.resources.actordefs.end()){
+				auto* seq = it->second.GetSequence("RUNNING");
+				std::string snd; int vol;
+				if(seq && seq->GetFrameSoundByIndex(state_i % 15, snd, vol))
+					EmitSound(world, world.resources.soundbank[snd], vol);
+			}
+		}
+		if(DistanceToEnd(*this, world) <= world.minwalldistance) mirrored = !mirrored;
+		FollowGround(*this, world, xv);
+		return BTResult::Running;
+	};
+
+	// StandAnim: STANDING idle animation. Returns Running to keep Selector here.
+	btctx_.actions["StandAnim"] = [this](BTContext&) -> BTResult {
+		if(state != STANDING) return BTResult::Failure;
+		res_bank = 121; res_index = state_i % 10;
+		return BTResult::Running;
+	};
+
+	// WalkMove: WALKING movement and animation. Returns Running to keep Selector here.
+	btctx_.actions["WalkMove"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(state != WALKING) return BTResult::Failure;
+		res_bank = 122; res_index = state_i % 20;
+		{
+			auto it = world.resources.actordefs.find("civilian");
+			if(it != world.resources.actordefs.end()){
+				auto* seq = it->second.GetSequence("WALKING");
+				std::string snd; int vol;
+				if(seq && seq->GetFrameSoundByIndex(state_i % 20, snd, vol))
+					EmitSound(world, world.resources.soundbank[snd], vol);
+			}
+		}
+		if(DistanceToEnd(*this, world) <= world.minwalldistance) mirrored = !mirrored;
+		xv = mirrored ? -speed : speed;
+		FollowGround(*this, world, xv);
+		return BTResult::Running;
+	};
+
 	// Wander: civilian keeps walking — nothing to do.
 	btctx_.actions["Wander"] = [](BTContext&) -> BTResult {
 		return BTResult::Success;
@@ -79,128 +209,10 @@ void Civilian::Tick(World & world){
 	Hittable::Tick(*this, world);
 	Bipedal::Tick(*this, world);
 	InitBT();
-
-	// NEW: find starting platform
-	if(state == NEW){
-		if(FindCurrentPlatform(*this, world)){
-			state = WALKING;
-			state_i = -1;
-		}
-		state_i++; return;
-	}
-
-	// DYINGFORWARD: forward death animation → DEAD
-	if(state == DYINGFORWARD){
-		tractteamid = 0;
-		if(state_i == 0){
-			const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
-			static const EnemyDef _ced;
-			const std::string* hurts[] = {
-				gd ? &gd->soundHurt1 : &_ced.soundHurt1,
-				gd ? &gd->soundHurt2 : &_ced.soundHurt2,
-				gd ? &gd->soundHurt3 : &_ced.soundHurt3
-			};
-			EmitSound(world, world.resources.soundbank[*hurts[rand() % 3]], 128);
-		}
-		collidable = false;
-		if(state_i >= 14){ state = DEAD; state_i = -1; }
-		else { FollowGround(*this, world, xv); res_bank = 126; res_index = state_i; }
-		is_dying = true; is_dead = false; is_walking = false; is_running = false;
-		state_i++; return;
-	}
-
-	// DYINGBACKWARD: backward death animation → DEAD
-	if(state == DYINGBACKWARD){
-		tractteamid = 0;
-		if(state_i == 0){
-			const EnemyDef* gd = GASLoader::Get().GetEnemyDef("civilian");
-			static const EnemyDef _ced;
-			const std::string* hurts[] = {
-				gd ? &gd->soundHurt1 : &_ced.soundHurt1,
-				gd ? &gd->soundHurt2 : &_ced.soundHurt2,
-				gd ? &gd->soundHurt3 : &_ced.soundHurt3
-			};
-			EmitSound(world, world.resources.soundbank[*hurts[rand() % 3]], 128);
-		}
-		collidable = false;
-		if(state_i >= 14){ state = DEAD; state_i = -1; }
-		else { FollowGround(*this, world, xv); res_bank = 125; res_index = state_i; }
-		is_dying = true; is_dead = false; is_walking = false; is_running = false;
-		state_i++; return;
-	}
-
-	// DYINGEXPLODE: instant → DEAD
-	if(state == DYINGEXPLODE){
-		tractteamid = 0;
-		draw = false;
-		state = DEAD; state_i = -1;
-		is_dying = true; is_dead = false; is_walking = false; is_running = false;
-		state_i++; return;
-	}
-
-	// DEAD: respawn after deadRespawnTicks
-	if(state == DEAD){
-		collidable = false;
-		const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
-		int drt = cd ? cd->deadRespawnTicks : 100;
-		if(state_i >= drt){
-			draw = true; collidable = true;
-			state = WALKING;
-			state_warp = cd ? cd->warpTeleportTick : GASLoader::Get().player.warpTeleportTick;
-			state_i = -1;
-		}
-		is_dead = true; is_dying = false; is_walking = false; is_running = false;
-		state_i++; return;
-	}
-
-	// STANDING: idle animation
-	if(state == STANDING){
-		if(CheckTractVictim(world)){ state_i++; return; }
-		res_bank = 121; res_index = state_i % 10;
-	}
-
-	// WALKING: movement and animation
-	if(state == WALKING){
-		if(CheckTractVictim(world)){ state_i++; return; }
-		res_bank = 122; res_index = state_i % 20;
-		{
-			auto it = world.resources.actordefs.find("civilian");
-			if(it != world.resources.actordefs.end()){
-				auto* seq = it->second.GetSequence("WALKING");
-				std::string snd; int vol;
-				if(seq && seq->GetFrameSoundByIndex(state_i % 20, snd, vol))
-					EmitSound(world, world.resources.soundbank[snd], vol);
-			}
-		}
-		if(DistanceToEnd(*this, world) <= world.minwalldistance) mirrored = !mirrored;
-		xv = mirrored ? -speed : speed;
-		FollowGround(*this, world, xv);
-	}
-
-	// RUNNING: fast movement and animation
-	if(state == RUNNING){
-		if(CheckTractVictim(world)){ state_i++; return; }
-		const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
-		int bonus = cd ? cd->runSpeedBonus : 5;
-		xv = (mirrored ? -1 : 1) * (bonus + speed);
-		res_bank = 123; res_index = state_i % 15;
-		{
-			auto it = world.resources.actordefs.find("civilian");
-			if(it != world.resources.actordefs.end()){
-				auto* seq = it->second.GetSequence("RUNNING");
-				std::string snd; int vol;
-				if(seq && seq->GetFrameSoundByIndex(state_i % 15, snd, vol))
-					EmitSound(world, world.resources.soundbank[snd], vol);
-			}
-		}
-		if(DistanceToEnd(*this, world) <= world.minwalldistance) mirrored = !mirrored;
-		FollowGround(*this, world, xv);
-	}
-
+	if(!bt_){ state_i++; return; }
 	btctx_.userData = &world;
 	btctx_.dt = 1.0f / GASLoader::Get().gameengine.ticksPerSecond;
 	bt_->tick(btctx_);
-
 	is_walking = (state == WALKING);
 	is_running = (state == RUNNING);
 	is_dying   = (state == DYINGFORWARD || state == DYINGBACKWARD || state == DYINGEXPLODE);

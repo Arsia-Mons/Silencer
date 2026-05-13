@@ -1,14 +1,50 @@
 {
   "version": 1,
-  "id": "civilian-flee",
+  "id": "civilian",
   "blackboard": [],
   "rootId": "root",
   "nodes": {
     "root": {
       "type": "Selector",
       "label": "Civilian AI",
-      "children": ["seq_flee", "leaf_return_to_walk", "leaf_wander"],
+      "children": ["leaf_new", "leaf_dying_forward", "leaf_dying_backward", "leaf_dying_explode", "leaf_dead", "leaf_tract_check", "seq_flee", "leaf_return_to_walk", "leaf_run_move", "leaf_stand_anim", "leaf_walk_move"],
       "props": {}
+    },
+    "leaf_new": {
+      "type": "Leaf",
+      "label": "New",
+      "children": [],
+      "props": { "action": "New" }
+    },
+    "leaf_dying_forward": {
+      "type": "Leaf",
+      "label": "DyingForward",
+      "children": [],
+      "props": { "action": "DyingForward" }
+    },
+    "leaf_dying_backward": {
+      "type": "Leaf",
+      "label": "DyingBackward",
+      "children": [],
+      "props": { "action": "DyingBackward" }
+    },
+    "leaf_dying_explode": {
+      "type": "Leaf",
+      "label": "DyingExplode",
+      "children": [],
+      "props": { "action": "DyingExplode" }
+    },
+    "leaf_dead": {
+      "type": "Leaf",
+      "label": "Dead",
+      "children": [],
+      "props": { "action": "Dead" }
+    },
+    "leaf_tract_check": {
+      "type": "Leaf",
+      "label": "TractCheck",
+      "children": [],
+      "props": { "action": "TractCheck" }
     },
     "seq_flee": {
       "type": "Sequence",
@@ -34,11 +70,23 @@
       "children": [],
       "props": { "action": "ReturnToWalk" }
     },
-    "leaf_wander": {
+    "leaf_run_move": {
       "type": "Leaf",
-      "label": "Wander",
+      "label": "RunMove",
       "children": [],
-      "props": { "action": "Wander" }
+      "props": { "action": "RunMove" }
+    },
+    "leaf_stand_anim": {
+      "type": "Leaf",
+      "label": "StandAnim",
+      "children": [],
+      "props": { "action": "StandAnim" }
+    },
+    "leaf_walk_move": {
+      "type": "Leaf",
+      "label": "WalkMove",
+      "children": [],
+      "props": { "action": "WalkMove" }
     }
   },
   "positions": {}
