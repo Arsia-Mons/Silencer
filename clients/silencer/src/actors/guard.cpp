@@ -9,6 +9,11 @@
 #include "gasloader.h"
 #include <math.h>
 
+// MSVC's <cstdlib> overload set has no exact int match (it pulls in
+// long/__int64/double/float/long double overloads), so `abs(int_expr)` is
+// ambiguous when the unity batch or transitive headers bring those in.
+static inline int IAbs(int v) { return v < 0 ? -v : v; }
+
 static const char* ActorDefName(Uint8 weapon) {
 	switch (weapon) {
 		case 1:  return "guard-laser";
@@ -214,7 +219,7 @@ void Guard::InitBT(){
 			Platform* ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
 			if(ladder){
 				Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-				if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
+				if(IAbs(signed(center) - x) <= abs(ceil(float(xv)))){
 					if(ladder->y2 == obj->y && y != obj->y && ladder->y2 > y){
 						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = _gls ? _gls->ladderClimbSpeed : 5; state = LADDER; state_i = 0; }
 					}
@@ -272,7 +277,7 @@ void Guard::InitBT(){
 							return BTResult::Running;
 						}
 					}
-					int dist = abs(signed(obj->x) - signed(x));
+					int dist = IAbs(signed(obj->x) - signed(x));
 					if (dist > ([]{ const EnemyDef* _g = GASLoader::Get().GetEnemyDef("guard-blaster"); return _g ? _g->chaseRangeStop : 80; }())) {
 						mirrored = (obj->x < x); // orient toward target
 					}
@@ -293,7 +298,7 @@ void Guard::InitBT(){
 						Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
 						if(ladder && state == WALKING){
 							Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-							if(abs(signed(center) - signed(x)) <= (_gg?_gg->ladderXTolerance:8)){
+							if(IAbs(signed(center) - signed(x)) <= (_gg?_gg->ladderXTolerance:8)){
 								if(ydiff < 0 && signed(ladder->y1) < signed(y)){
 									// player above, ladder goes up
 									x = center; yv = -(_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
@@ -317,7 +322,7 @@ void Guard::InitBT(){
 		// Return-to-post phase: face toward spawn, climb ladders back if needed
 		if (state == STANDING || state == LOOKING) { state = WALKING; state_i = 0; }
 		{ const EnemyDef* _ggr = GASLoader::Get().GetEnemyDef("guard-blaster");
-		if (abs(signed(x) - signed(originalx)) <= (_ggr?_ggr->patrolReturnProximity:20)) {
+		if (IAbs(signed(x) - signed(originalx)) <= (_ggr?_ggr->patrolReturnProximity:20)) {
 			chasing = 0;
 			bt_walk_ticks_ = 0;
 			state = STANDING;
@@ -343,7 +348,7 @@ void Guard::InitBT(){
 				Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
 				if(ladder && state == WALKING){
 					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-					if(abs(signed(center) - signed(x)) <= (_ggr?_ggr->ladderXTolerance:8)){
+					if(IAbs(signed(center) - signed(x)) <= (_ggr?_ggr->ladderXTolerance:8)){
 						if(ydiff < 0 && signed(ladder->y1) < signed(y)){
 							x = center; yv = -(_ggr ? _ggr->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
 							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
@@ -916,7 +921,7 @@ void Guard::Tick(World & world){
 				Platform * ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
 				if(ladder){
 					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-					if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
+					if(IAbs(signed(center) - x) <= abs(ceil(float(xv)))){
 						if(ladder->y2 == object->y && y != object->y && ladder->y2 > y){
 							x = center;
 							{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); yv = _gls ? _gls->ladderClimbSpeed : 5; }

@@ -5,7 +5,6 @@
 #include "resources.h"
 #include "palette.h"
 #include "camera.h"
-#include "textinput.h"
 #include "surface.h"
 #include <cmath>
 #include <vector>
@@ -13,10 +12,12 @@
 
 class Renderer
 {
-private:
+public:
+	// Public so external dispatchers (e.g. the Clay-to-Surface bridge in
+	// src/ui/runtime/) can call BlitSurface / ClipRect without a friend
+	// declaration. Just a 4-int box; nothing to encapsulate.
 	struct Rect { int w, h, x, y; };
 
-public:
 	Renderer(class World & world);
 	void Tick(void);
 	void Draw(Surface * surface, float frametime = 0);
@@ -27,17 +28,12 @@ public:
 	void BlitSprite(Object * object, Camera & camera, Surface * dst, Rect * dstrect, Surface * src, Rect * srcrect);
 	static void DrawFilledRectangle(Surface * surface, int x1, int y1, int x2, int y2, Uint8 color);
 	void DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 bank, Uint8 width, bool alpha = false, Uint8 tint = 0, Uint8 brightness = 128, bool rampcolor = false);
-	void DrawTextInput(Surface * surface, TextInput & textinput);
-	void DrawTinyText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 tint = 0, Uint8 brightness = 128);
 	void DrawShadow(Surface * surface, Camera & camera, Object * object);
 	void DrawRain(Surface * surface, Camera & camera, float frametime = 0);
 	void DrawRainPuddles(Surface * surface, Camera & camera);
 	static inline void SetPixel(Surface * surface, unsigned int x, unsigned int y, Uint8 color);
 	static inline Uint8 GetPixel(Surface * surface, unsigned int x, unsigned int y);
 	void DrawDebug(Surface * surface);
-	void DrawMessage(Surface * surface);
-	void DrawStatus(Surface * surface);
-	void DrawTopMessage(Surface * surface);
 	static void DrawScaled(Surface * src, Rect * srcrect, Surface *dst, Rect * dstrect, int factor = 2);
 	static void DrawCheckered(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
 	void DrawColored(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
@@ -82,9 +78,13 @@ public:
 	void DrawBackground(Surface * surface, Camera & camera, bool drawluminance = true);
 	void DrawForeground(Surface * surface, Camera & camera);
 	void DrawForegroundLuminance(Surface * surface, Camera & camera);
-	void DrawHUD(Surface * surface, float frametime = 0);
-	void DrawPlayerList(Surface * surface);
-	void DrawMessageBackground(Surface * surface, Rect * dstrect);
+	void DrawHudSystemCameraFrameClay(Surface * surface, Uint8 bank, Uint16 index, Uint8 offsetBank, int logicalY);
+	int DrawHudTeamsClay(Surface * surface);
+	Uint8 DrawHudStatusSpritesClay(Surface * surface, Player * player);
+	void DrawHudReadoutsClay(Surface * surface, Player * player, Uint8 currentammo);
+	void DrawHudSecretSpritesClay(Surface * surface, Team * team, int yoffset);
+	void DrawHudTraceTimeClay(Surface * surface, Uint8 tracetime);
+	void DrawHudSecretProgressClay(Surface * surface, Player * player, int yoffset, int secretprogress);
 	Uint8 GetAmbienceLevel(void);
 	bool CapturePNG(const class Surface & buf, const SDL_Color * palette, const char * path);
 	Camera camera;

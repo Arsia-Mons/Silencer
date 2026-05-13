@@ -1,15 +1,13 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+#include "client/ui/hud/InGameHud.h"
+#include "client/ui/hud/InGameOverlays.h"
 #include "renderer.h"
 #include "sprite.h"
 #include "platformset.h"
 #include "resources.h"
 #include "objecttypes.h"
-#include "button.h"
-#include "textbox.h"
-#include "textinput.h"
-#include "selectbox.h"
-#include "scrollbar.h"
+#include "buyableitem.h"
 #include "team.h"
 #include "player.h"
 #include "civilian.h"
@@ -27,7 +25,6 @@
 #include "techstation.h"
 #include "teambillboard.h"
 #include "overlay.h"
-#include "toggle.h"
 #include "pickup.h"
 #include "warper.h"
 #include "fixedcannon.h"
@@ -36,7 +33,17 @@
 #include "wallprojectile.h"
 #include "detonator.h"
 #include "config.h"
+#include "clay_ui_compositor.h"
+#include "primitives/bank_text.h"
+#include "primitives/box.h"
 #include <math.h>
+#include <string>
+
+namespace {
+Clay_String ClayStringFromStd(const std::string & text);
+Clay_ElementDeclaration HudFloatingTextElement(const char * id, int x, int y, int w, int h);
+Clay_ElementDeclaration HudFloatingTextElementI(const char * id, uint32_t index, int x, int y, int w, int h);
+}
 
 Renderer::Renderer(World & world) : world(world), camera(640, 480){
 	ambience_r = 0;
@@ -52,6 +59,10 @@ Renderer::Renderer(World & world) : world(world), camera(640, 480){
 }
 	
 void Renderer::Draw(Surface * surface, float frametime){
+	if(surface){
+		camera.w = surface->w;
+		camera.h = surface->h;
+	}
 	// FPS tracking
 	Uint32 now = SDL_GetTicks();
 	fpsFrameCount++;
@@ -249,22 +260,9 @@ void Renderer::Draw(Surface * surface, float frametime){
 	//}
 
 	if(world.map.loaded){
-		DrawHUD(surface, frametime);
+		silencer::client_ui::DrawInGameHud(*this, world, surface, frametime);
 		//DrawDebug(surface);
-		DrawStatus(surface);
-		DrawTopMessage(surface);
-		DrawMessage(surface);
-		if(world.showplayerlist){
-			DrawPlayerList(surface);
-		}
-	}
-	if(world.quitstate == 1 || world.quitstate == 2){
-#ifdef OUYA
-		const char * text = "Hit O To QUIT";
-#else
-		const char * text = "Hit Enter To Quit";
-#endif
-		DrawText(surface, (640 - (strlen(text) * 16)) / 2, 200, (char *)text, 136, 16, false, 202);
+		silencer::client_ui::DrawInGameOverlays(*this, world, surface);
 	}
 }
 
@@ -566,16 +564,6 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								}
 								EffectBrightness(effectsurface, 0, shrapnel->GetBrightness());
 							}break;
-							case ObjectTypes::SCROLLBAR:{
-								ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-								// Suppress the natural blit when not drawing,
-								// and also when a custom height is set — the
-								// post-blit case below renders the stretched
-								// track itself in that case.
-								if(!scrollbar->draw || scrollbar->height > 0){
-									src = 0;
-								}
-							}break;
 							case ObjectTypes::HEALMACHINE:{
 								HealMachine * healmachine = static_cast<HealMachine *>(object);
 								src = 0;
@@ -839,177 +827,6 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 										DrawText(surface, player->x + camera.GetXOffset() - ((strlen(username) * 6) / 2), player->y + camera.GetYOffset() - 80, username, 133, 6);
 									}
 								}
-							}
-						}break;
-						case ObjectTypes::BUTTON:{
-							Button * button = static_cast<Button *>(object);
-							if(button->text[0]){
-								Sint16 xoff;
-								Sint16 yoff;
-								button->GetTextOffset(world, &xoff, &yoff);
-								// Sprite-backed buttons alpha-blend text onto
-								// their button face; BNONE has no face, so
-								// render opaque to match nearby plain text.
-								bool alpha = (button->type != Button::BNONE);
-								DrawText(surface, xoff, yoff, button->text, button->textbank, button->textwidth, alpha, button->effectcolor, button->effectbrightness);
-							}
-						}break;
-						case ObjectTypes::SCROLLBAR:{
-							ScrollBar * scrollbar = static_cast<ScrollBar *>(object);
-							if(scrollbar->draw){
-								Uint16 trackh = scrollbar->EffectiveHeight(world);
-								// Stretched track. Pre-blit suppresses the
-								// generic blit when height > 0; render the
-								// track ourselves as a 3-slice: top 16 px and
-								// bottom 16 px (the arrow caps) copy as-is;
-								// the middle band tiles the source's middle
-								// rows to fill, preserving pixel-art detail.
-								if(scrollbar->height > 0){
-									Surface * tracksrc = world.resources.spritebank[object->res_bank][scrollbar->res_index].get();
-									const int cap = 16;
-									if(tracksrc && tracksrc->h > 2 * cap){
-										int srcw = tracksrc->w;
-										int srch = tracksrc->h;
-										int srcmidtop = cap;
-										int srcmidh   = srch - 2 * cap;
-										int dstmidh   = (int)trackh - 2 * cap;
-										if(dstmidh < 0) dstmidh = 0;
-										// Top cap.
-										for(int dy = 0; dy < cap && dy < trackh; dy++){
-											for(int dx = 0; dx < srcw; dx++){
-												Uint8 c = GetPixel(tracksrc, dx, dy);
-												if(c) SetPixel(surface, dstrect.x + dx, dstrect.y + dy, c);
-											}
-										}
-										// Middle band — tile the source middle rows.
-										for(int dy = 0; dy < dstmidh; dy++){
-											int sy = srcmidtop + (dy % srcmidh);
-											for(int dx = 0; dx < srcw; dx++){
-												Uint8 c = GetPixel(tracksrc, dx, sy);
-												if(c) SetPixel(surface, dstrect.x + dx, dstrect.y + cap + dy, c);
-											}
-										}
-										// Bottom cap.
-										for(int dy = 0; dy < cap; dy++){
-											int sy = srch - cap + dy;
-											int dyabs = trackh - cap + dy;
-											if(dyabs < 0) continue;
-											for(int dx = 0; dx < srcw; dx++){
-												Uint8 c = GetPixel(tracksrc, dx, sy);
-												if(c) SetPixel(surface, dstrect.x + dx, dstrect.y + dyabs, c);
-											}
-										}
-									}
-								}
-								// Thumb. Fits between the two 16 px arrow caps;
-								// shrinks as scrollmax grows so it always
-								// represents content fraction. Crop the thumb
-								// sprite from the top.
-								Surface * thumbsrc = world.resources.spritebank[object->res_bank][scrollbar->barres_index].get();
-								if(thumbsrc && scrollbar->scrollmax > 0){
-									const int cap = 16;
-									int available = (int)trackh - 2 * cap;
-									if(available < 1) available = 1;
-									int thumbh = available - (int)scrollbar->scrollmax;
-									if(thumbh > available) thumbh = available;
-									if(thumbh > thumbsrc->h) thumbh = thumbsrc->h;
-									if(thumbh < 16) thumbh = 16;
-									if(thumbh > available) thumbh = available;
-									int travel = available - thumbh;
-									if(travel < 0) travel = 0;
-									float pos = float(scrollbar->scrollposition) / scrollbar->scrollmax;
-									int dsty = int(travel * pos);
-									Rect srcrect;
-									srcrect.x = 0;
-									srcrect.y = 0;
-									srcrect.w = thumbsrc->w;
-									srcrect.h = thumbh;
-									Rect thumbdst;
-									thumbdst.x = dstrect.x + 1;
-									thumbdst.y = dstrect.y + cap + dsty;
-									thumbdst.w = thumbsrc->w;
-									thumbdst.h = thumbh;
-									BlitSurface(thumbsrc, &srcrect, surface, &thumbdst);
-								}
-							}
-						}break;
-						case ObjectTypes::SELECTBOX:{
-							SelectBox * selectbox = static_cast<SelectBox *>(object);
-							unsigned int line = 0;
-							unsigned int i = 0;
-							for(std::deque<char *>::iterator it = selectbox->items.begin(); it != selectbox->items.end(); it++, i++){
-								if(i < selectbox->scrolled){
-									continue;
-								}
-								if(line > selectbox->height / selectbox->lineheight){
-									break;
-								}
-								char * text = (*it);
-								int row_y = selectbox->y + (line * selectbox->lineheight);
-								bool isdl = (strncmp(text, "[DL] ", 5) == 0);
-								if(i == selectbox->selecteditem){
-									Rect dstrect;
-									dstrect.x = selectbox->x;
-									dstrect.y = row_y;
-									dstrect.w = selectbox->width;
-									dstrect.h = 11;
-									DrawFilledRectangle(surface, dstrect.x, dstrect.y, dstrect.x + dstrect.w, dstrect.y + dstrect.h, 180);
-								}
-								if(isdl){
-									bool downloading = (selectbox->downloadprogress >= 0 &&
-									                    strcmp(text + 5, selectbox->downloaditem) == 0);
-									if(downloading){
-										int pct = selectbox->downloadprogress;
-										int barw = ((selectbox->width - 2) * pct) / 100;
-										DrawFilledRectangle(surface, selectbox->x, row_y, selectbox->x + selectbox->width - 2, row_y + 11, 0);
-										if(barw > 0) DrawFilledRectangle(surface, selectbox->x, row_y, selectbox->x + barw, row_y + 11, 180);
-										char pctstr[8]; snprintf(pctstr, sizeof(pctstr), "%d%%", pct);
-										DrawText(surface, selectbox->x + 2, row_y, pctstr, 133, 6);
-									}else{
-										DrawText(surface, selectbox->x, row_y, text + 5, 133, 6);
-										int bx = selectbox->x + selectbox->width - 16;
-										DrawFilledRectangle(surface, bx - 1, row_y, bx + 13, row_y + 11, 0);
-										DrawText(surface, bx, row_y, "DL", 133, 6);
-									}
-								}else{
-									DrawText(surface, selectbox->x, row_y, text, 133, 6);
-								}
-								line++;
-							}
-						}break;
-						case ObjectTypes::TEXTINPUT:{
-							TextInput * textinput = static_cast<TextInput *>(object);
-							DrawTextInput(surface, *textinput);
-						}break;
-						case ObjectTypes::TEXTBOX:{
-							TextBox * textbox = static_cast<TextBox *>(object);
-							unsigned int line = 0;
-							unsigned int i = 0;
-							for(auto it = textbox->text.begin(); it != textbox->text.end(); it++, i++){
-								if(i < textbox->scrolled){
-									continue;
-								}
-								int y = textbox->y + (line * textbox->lineheight);
-								if(line > textbox->height / textbox->lineheight){
-									break;
-								}
-								if(textbox->bottomtotop){
-									int size = (textbox->text.size() * textbox->lineheight);
-									if(size > textbox->height){
-										size = (ceil(float(textbox->height) / textbox->lineheight)) * textbox->lineheight;
-									}
-									y += (textbox->height - size);
-								}
-								Uint8 color = (*it)[strlen(it->data()) + 1];
-								Uint8 brightness = (*it)[strlen(it->data()) + 2];
-								DrawText(surface, textbox->x, y, it->data(), textbox->res_bank, textbox->fontwidth, false, color, brightness);
-								line++;
-							}
-						}break;
-						case ObjectTypes::TOGGLE:{
-							Toggle * toggle = static_cast<Toggle *>(object);
-							if(toggle->text[0]){
-								DrawText(surface, toggle->x - ((strlen(toggle->text) * 9) / 2), toggle->y, toggle->text, 134, 9);
 							}
 						}break;
 						case ObjectTypes::HEALMACHINE:{
@@ -1832,48 +1649,6 @@ void Renderer::DrawText(Surface * surface, Uint16 x, Uint16 y, const char * text
 	}
 }
 
-void Renderer::DrawTextInput(Surface * surface, TextInput & textinput){
-	char * text = &textinput.text[textinput.scrolled];
-	char password[256];
-	if(textinput.password){
-		memset(password, '*', strlen(text));
-		password[strlen(text)] = 0;
-		text = password;
-	}
-	Uint8 effectbrightness = textinput.effectbrightness;
-	if(textinput.inactive){
-		effectbrightness = 64;
-	}
-	DrawText(surface, textinput.x, textinput.y, text, textinput.res_bank, textinput.fontwidth, false, textinput.effectcolor, effectbrightness);
-	if(!textinput.inactive && textinput.showcaret && state_i % 32 < 16){
-		Rect dstrect;
-		dstrect.x = textinput.x + (strlen(text) * textinput.fontwidth);
-		dstrect.y = textinput.y - 1;
-		dstrect.w = 1;
-		dstrect.h = textinput.height * 0.8f;
-		DrawFilledRectangle(surface, dstrect.x, dstrect.y, dstrect.x + dstrect.w, dstrect.y + dstrect.h, textinput.caretcolor);
-		//SDL_FillRect(surface, &dstrect, textinput.caretcolor);
-	}
-}
-
-void Renderer::DrawTinyText(Surface * surface, Uint16 x, Uint16 y, const char * text, Uint8 tint, Uint8 brightness){
-	int width = strlen(text) * 4;
-	for(int i = 0; i < strlen(text); i++){
-		if(text[i] == '1'){
-			width -= 1;
-		}
-	}
-	for(int i = 0, j = 0; i < strlen(text); i++, j += 4){
-		char ch[2];
-		ch[0] = text[i];
-		ch[1] = 0;
-		DrawText(surface, x - (width / 2) + j, y, ch, 132, 4, false, tint, brightness);
-		if(ch[0] == '1'){
-			j -= 1;
-		}
-	}
-}
-
 void Renderer::DrawShadow(Surface * surface, Camera & camera, Object * object){
 	unsigned int width = world.resources.spritewidth[object->res_bank][object->res_index];
 	int x = object->x;
@@ -1988,131 +1763,6 @@ void Renderer::DrawDebug(Surface * surface){
 				}
 			}*/
 		}
-	}
-}
-
-void Renderer::DrawMessage(Surface * surface){
-	if(!world.message_i){
-		return;
-	}
-	int linelength = strlen(world.message);
-	char * newline = strchr(world.message, '\n');
-	if(newline){
-		linelength = newline - world.message;
-	}
-	int liney = 60;
-	Uint8 color = 208;
-	int textwidth = 11;
-	int textbank = 135;
-	int lineheight = 20;
-	switch(world.messagetype){
-		case 1: // deploy message
-			color = 128;
-			liney = 190;
-			textbank = 134;
-			textwidth = 10;
-		break;
-		case 2: // secret picked up
-			color = 128;
-		break;
-		case 3: // secret dropped
-			color = 192;
-		break;
-		case 4: // neutron activated (red)
-			color = 153;
-		break;
-		case 10: // won
-			color = 224;
-		break;
-		case 11: // lost
-			color = 153;
-		break;
-		case 20: // connection lost
-			color = 153;
-			liney = 200;
-		break;
-	}
-	int nextline = linelength;
-	int line = 0;
-	for(int i = 0; i < strlen(world.message); i++){
-		if(i >= world.message_i){
-			break;
-		}
-		Uint8 brightness = 128;
-		if(world.messagetype < 10){
-			if(world.message_i - world.messagetime + 8 >= 0){
-				brightness -= (world.message_i - world.messagetime + 8) * 8;
-			}
-			if(world.message_i % 32 >= 16){
-				brightness += ((16 - (world.message_i % 16)) * 2);
-			}else{
-				brightness += ((world.message_i % 16) * 2);
-			}
-		}
-		if(world.message_i - i <= 5){
-			brightness += 40 - ((world.message_i - i) * 8);
-		}
-		char temp[2];
-		temp[0] = world.message[i];
-		temp[1] = 0;
-		if(world.messagetype >= 10){
-			if(line == 0){
-				textbank = 136;
-				textwidth = 25;
-			}else{
-				textwidth = 13;
-				textbank = 135;
-			}
-		}
-		Uint8 brightness2 = (int(brightness) - 64) < 8 ? 8 : brightness - 64;
-		DrawText(surface, ((640 - (linelength * textwidth)) / 2) + (textwidth * (linelength - nextline)) + 1, liney + 1, temp, textbank, textwidth, false, color, brightness2);
-		DrawText(surface, ((640 - (linelength * textwidth)) / 2) + (textwidth * (linelength - nextline)), liney, temp, textbank, textwidth, false, color, brightness);
-		nextline--;
-		if(nextline < 0){
-			linelength = strlen(&world.message[i + 1]);
-			char * newline = strchr(&world.message[i + 1], '\n');
-			if(newline){
-				linelength = newline - &world.message[i + 1];
-			}
-			nextline = linelength;
-			if(line == 0 && world.messagetype >= 10){
-				liney += 40;
-			}else{
-				liney += lineheight;
-			}
-			line++;
-		}
-	}
-}
-
-void Renderer::DrawStatus(Surface * surface){
-	int liney = 0;
-	for(std::deque<char *>::iterator it = world.statusmessages.begin(); it != world.statusmessages.end(); it++){
-		char * text = *it;
-		char * time = &text[strlen(text) + 1];
-		char * color = &text[strlen(text) + 2];
-		Uint8 brightness = 128;
-		if(*time <= 16){
-			brightness -= (16 - *time) * 8;
-		}
-		Uint8 brightness2 = (int(brightness) - 64) < 8 ? 8 : brightness - 64;
-		DrawText(surface, (640 - (strlen(text) * 7)) / 2 + 1, 370 + liney + 1, text, 133, 7, false, *color, brightness2);
-		DrawText(surface, (640 - (strlen(text) * 7)) / 2, 370 + liney, text, 133, 7, false, *color, brightness);
-		liney -= 10;
-	}
-}
-
-void Renderer::DrawTopMessage(Surface * surface){
-	if(world.topmessage_i){
-		char * text = world.topmessage;
-		if(world.topmessage_i / 2 > 24){
-			text = &world.topmessage[(world.topmessage_i / 2) - 24];
-		}
-		const int maxlength = 35;
-		char textmax[maxlength + 1];
-		memset(textmax, 0, sizeof(textmax));
-		strncpy(textmax, text, maxlength);
-		DrawText(surface, 200, 10, textmax, 133, 7);
 	}
 }
 
@@ -2959,761 +2609,791 @@ void Renderer::DrawForegroundLuminance(Surface * surface, Camera & camera){
 	}
 }
 
-void Renderer::DrawHUD(Surface * surface, float frametime){
-	Player * player = 0;
-	// Drive HUD from the focus peer (viewedpeerid) so spectators see the
-	// followed player's health/fuel/shield/files as-is.
-	Peer * peer = world.peerlist[world.viewedpeerid];
-	if(peer){
-		for(std::list<Uint16>::iterator it = peer->controlledlist.begin(); it != peer->controlledlist.end(); it++){
-			Object * object = world.GetObjectFromId(*it);
-			if(object){
-				if(object->type == ObjectTypes::PLAYER){
-					player = static_cast<Player *>(object);
-				}
-			}
-		}
-	}
-	Rect dstrect;
-	
-	if(localplayer){
-		// Draw main status bar
-		
-		// Draw system 1, system 2 screens
-		// 135x44
-		
-		if(world.systemcameraactive[0]){
-			dstrect.x = -world.resources.spriteoffsetx[95][2];
-			dstrect.y = -world.resources.spriteoffsety[92][2] + 381;
-			BlitSurface(world.resources.spritebank[95][2].get(), 0, surface, &dstrect);
-			
-			Surface systemscreen(135, 44, 1);
-			Camera camera(135 * 2, 44 * 2);
-			Object * followobject = world.GetObjectFromId(world.systemcamerafollow[0]);
-			int px = 0;
-			int py = 0;
-			if(followobject){
-				py = followobject->y + ((followobject->oldy - followobject->y) * frametime);
-				px = followobject->x + ((followobject->oldx - followobject->x) * frametime);
-			}
-			camera.Follow(world, px + world.systemcamerax[0], py + world.systemcameray[0], 0, 0, 0, 0);
-			DrawWorldScaled(&systemscreen, camera, 3, frametime);
-			EffectRampColor(&systemscreen, 0, 190);
-			dstrect.x = 5;
-			dstrect.y = 349;
-			BlitSurface(&systemscreen, 0, surface, &dstrect);
-		}
-		if(world.systemcameraactive[1]){
-			dstrect.x = -world.resources.spriteoffsetx[95][11];
-			dstrect.y = -world.resources.spriteoffsety[92][11] + 318;
-			BlitSurface(world.resources.spritebank[95][11].get(), 0, surface, &dstrect);
-			
-			Surface systemscreen(135, 44, 1);
-			Camera camera(135 * 2, 44 * 2);
-			Object * followobject = world.GetObjectFromId(world.systemcamerafollow[1]);
-			int px = 0;
-			int py = 0;
-			if(followobject){
-				px = followobject->x + ((followobject->oldx - followobject->x) * frametime);
-				py = followobject->y + ((followobject->oldy - followobject->y) * frametime);
-				if(followobject->type == ObjectTypes::DETONATOR){
-					Detonator * detonator = static_cast<Detonator *>(followobject);
-					if(detonator->HasDetonated() && py < detonator->lowestypos){
-						py = detonator->lowestypos;
-					}
-				}
-			}
-			camera.Follow(world, px + world.systemcamerax[1], py + world.systemcameray[1], 0, 0, 0, 0);
-			DrawWorldScaled(&systemscreen, camera, 3, frametime);
-			EffectRampColor(&systemscreen, 0, 190);
-			dstrect.x = 500;
-			dstrect.y = 348;
-			BlitSurface(&systemscreen, 0, surface, &dstrect);
-		}
-		//
+namespace {
 
-		
-		dstrect.x = 235;
-		dstrect.y = 419;
-		BlitSurface(&world.map.minimap.surface, 0, surface, &dstrect);
-		dstrect.x = -world.resources.spriteoffsetx[94][0];
-		dstrect.y = -world.resources.spriteoffsety[94][0];
-		BlitSurface(world.resources.spritebank[94][0].get(), 0, surface, &dstrect);
-		if(player){
-			if(player->fuellow){
-				dstrect.x = -world.resources.spriteoffsetx[95][8];
-				dstrect.y = -world.resources.spriteoffsety[95][8];
-				BlitSurface(world.resources.spritebank[95][8].get(), 0, surface, &dstrect);
-			}
-			Rect srcrect;
-			srcrect.x = 0;
-			srcrect.y = 0;
-			srcrect.w = (((float)player->fuel/player->maxfuel) * world.resources.spritebank[95][6]->w);
-			srcrect.h = world.resources.spritebank[95][6]->h;
-			dstrect.x = -world.resources.spriteoffsetx[95][6];
-			dstrect.y = -world.resources.spriteoffsety[95][6];
-			BlitSurface(world.resources.spritebank[95][6].get(), &srcrect, surface, &dstrect);
-			dstrect.x = -world.resources.spriteoffsetx[95][5];
-			dstrect.y = -world.resources.spriteoffsety[95][5];
-			BlitSurface(world.resources.spritebank[95][5].get(), 0, surface, &dstrect);
-			srcrect.w = world.resources.spritebank[95][0]->w;
-			srcrect.h = world.resources.spritebank[95][0]->h;
-			srcrect.y = srcrect.h - (((float)player->health/player->maxhealth) * srcrect.h);
-			dstrect.x = -world.resources.spriteoffsetx[95][0];
-			dstrect.y = -world.resources.spriteoffsety[95][0];
-			dstrect.y += srcrect.y;
-			BlitSurface(world.resources.spritebank[95][0].get(), &srcrect, surface, &dstrect);
-			srcrect.w = world.resources.spritebank[95][1]->w;
-			srcrect.h = world.resources.spritebank[95][1]->h;
-			srcrect.y = srcrect.h - (((float)player->shield/player->maxshield) * srcrect.h);
-			if(srcrect.y < 0){
-				srcrect.y = 0;
-			}
-			dstrect.x = -world.resources.spriteoffsetx[95][1];
-			dstrect.y = -world.resources.spriteoffsety[95][1];
-			dstrect.y += srcrect.y;
-			if(player->shield > player->maxshield){
-				Surface * effectsurface = CreateSurfaceCopy(world.resources.spritebank[95][1].get());
-				Uint8 brightness = 136;
-				Uint8 time = 6;
-				if(state_i % (time * 2) < time){
-					brightness += (state_i % time) * 2;
-				}else{
-					brightness += (time - (state_i % time)) * 2;
-				}
-				EffectBrightness(effectsurface, 0, brightness);
-				BlitSurface(effectsurface, &srcrect, surface, &dstrect);
-				delete effectsurface;
-			}else{
-				BlitSurface(world.resources.spritebank[95][1].get(), &srcrect, surface, &dstrect);
-			}
-			if(player->poisonedby){
-				dstrect.x = 183;
-				dstrect.y = 453;
-				BlitSurface(world.resources.spritebank[97][5].get(), 0, surface, &dstrect);
-			}
-			srcrect.y = 0;
-			srcrect.w = (((float)player->files/player->maxfiles) * world.resources.spritebank[95][7]->w);
-			srcrect.h = world.resources.spritebank[95][7]->h;
-			dstrect.x = -world.resources.spriteoffsetx[95][7];
-			dstrect.y = -world.resources.spriteoffsety[95][7];
-			BlitSurface(world.resources.spritebank[95][7].get(), &srcrect, surface, &dstrect);
-			srcrect.w = surface->w;
-			srcrect.h = surface->h;
-			Uint8 currentammo = 0;
-			switch(player->currentweapon){
-				case 0:
-					currentammo = 99;
-					dstrect.x = -world.resources.spriteoffsetx[96][1];
-					dstrect.y = -world.resources.spriteoffsety[96][1];
-					BlitSurface(world.resources.spritebank[96][1].get(), &srcrect, surface, &dstrect);
-					dstrect.x = -world.resources.spriteoffsetx[96][5];
-					dstrect.y = -world.resources.spriteoffsety[96][5];
-					BlitSurface(world.resources.spritebank[96][5].get(), &srcrect, surface, &dstrect);
-				break;
-				case 1:
-					currentammo = player->laserammo;
-					dstrect.x = -world.resources.spriteoffsetx[96][2];
-					dstrect.y = -world.resources.spriteoffsety[96][2];
-					BlitSurface(world.resources.spritebank[96][2].get(), &srcrect, surface, &dstrect);
-					dstrect.x = -world.resources.spriteoffsetx[96][6];
-					dstrect.y = -world.resources.spriteoffsety[96][6];
-					BlitSurface(world.resources.spritebank[96][6].get(), &srcrect, surface, &dstrect);
-				break;
-				case 2:
-					currentammo = player->rocketammo;
-					dstrect.x = -world.resources.spriteoffsetx[96][3];
-					dstrect.y = -world.resources.spriteoffsety[96][3];
-					BlitSurface(world.resources.spritebank[96][3].get(), &srcrect, surface, &dstrect);
-					dstrect.x = -world.resources.spriteoffsetx[96][7];
-					dstrect.y = -world.resources.spriteoffsety[96][7];
-					BlitSurface(world.resources.spritebank[96][7].get(), &srcrect, surface, &dstrect);
-				break;
-				case 3:
-					currentammo = player->flamerammo;
-					dstrect.x = -world.resources.spriteoffsetx[96][4];
-					dstrect.y = -world.resources.spriteoffsety[96][4];
-					BlitSurface(world.resources.spritebank[96][4].get(), &srcrect, surface, &dstrect);
-					dstrect.x = -world.resources.spriteoffsetx[96][8];
-					dstrect.y = -world.resources.spriteoffsety[96][8];
-					BlitSurface(world.resources.spritebank[96][8].get(), &srcrect, surface, &dstrect);
-				break;
-			}
-			dstrect.x = -world.resources.spriteoffsetx[96][0];
-			dstrect.y = -world.resources.spriteoffsety[96][0] + (player->currentweapon * 14);
-			BlitSurface(world.resources.spritebank[96][0].get(), &srcrect, surface, &dstrect);
-			
-			char ammo[64] = "";
-			sprintf(ammo, "%s%d", currentammo < 10 ? " " : "", currentammo);
-			DrawText(surface, 117, 457, ammo, 135, 12, true);
-			strcpy(ammo, "99");
-			DrawTinyText(surface, 10, 414, ammo);
-			if(player->laserammo > 0){
-				sprintf(ammo, "%s%d", player->laserammo < 10 ? " " : "", player->laserammo);
-				DrawTinyText(surface, 10, 428, ammo);
-			}
-			if(player->rocketammo > 0){
-				sprintf(ammo, "%s%d", player->rocketammo < 10 ? " " : "", player->rocketammo);
-				DrawTinyText(surface, 10, 442, ammo);
-			}
-			if(player->flamerammo > 0){
-				sprintf(ammo, "%s%d", player->flamerammo < 10 ? " " : "", player->flamerammo);
-				DrawTinyText(surface, 10, 456, ammo);
-			}
-			char credits[64] = "";
-			sprintf(credits, "%d", player->credits);
-			DrawText(surface, 572, 456, credits, 135, 12, false, 202);
-			
-			if(player->health && (float)player->health / player->maxhealth <= 0.5 && state_i % 8 <= 3){
-				dstrect.x = -world.resources.spriteoffsetx[95][3];
-				dstrect.y = -world.resources.spriteoffsety[95][3];
-				BlitSurface(world.resources.spritebank[95][3].get(), &srcrect, surface, &dstrect);
-			}
-			char health[64] = "";
-			sprintf(health, "%d", player->health);
-			DrawTinyText(surface, 158, 463, health, 161);
-			
-			if(player->shield && (float)player->shield / player->maxshield <= 0.5 && state_i % 8 <= 3){
-				dstrect.x = -world.resources.spriteoffsetx[95][4];
-				dstrect.y = -world.resources.spriteoffsety[95][4];
-				BlitSurface(world.resources.spritebank[95][4].get(), &srcrect, surface, &dstrect);
-			}
-			char shield[64] = "";
-			sprintf(shield, "%d", player->shield);
-			DrawTinyText(surface, 481, 463, shield, 202);
-			
-			// Draw inventory
-			
-			dstrect.x = -world.resources.spriteoffsetx[94][2];
-			dstrect.y = -world.resources.spriteoffsety[94][2];
-			BlitSurface(world.resources.spritebank[94][2].get(), 0, surface, &dstrect);
-			
-			int xoffsets[] = {612, 584, 556, 528};
-			int yoffsets[] = {13, 13, 11, 7};
-			for(int i = 0; i < 4; i++){
-				Uint8 invindex = InvIdToResIndex(player->inventoryitems[i]);
-				const char * invletter = InvIdToLetter(player->inventoryitems[i]);
-				dstrect.x = -world.resources.spriteoffsetx[97][invindex] + xoffsets[i];
-				dstrect.y = -world.resources.spriteoffsety[97][invindex] + yoffsets[i];
-				if(player->currentinventoryitem == i){
-					BlitSurface(world.resources.spritebank[97][invindex].get(), 0, surface, &dstrect);
-					DrawTinyText(surface, xoffsets[i], yoffsets[i], invletter);
-				}else{
-					if(world.resources.spritebank[97][invindex]){
-						Surface * effectsurface = CreateSurfaceCopy(world.resources.spritebank[97][invindex].get());
-						EffectBrightness(effectsurface, 0, 32);
-						BlitSurface(effectsurface, 0, surface, &dstrect);
-						delete effectsurface;
-						DrawTinyText(surface, xoffsets[i], yoffsets[i], invletter, 0, 32);
-					}
-				}
-				
-				if(player->inventoryitemsnum[i] > 1){
-					char text[10];
-					sprintf(text, "%d", player->inventoryitemsnum[i]);
-					DrawText(surface, xoffsets[i] + 20, yoffsets[i] + 20, text, 132, 6);
-				}
-			}
-		
-
-			
-			// Draw teams
-			
-			std::vector<Team *> teams;
-			for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
-				teams.push_back(static_cast<Team *>(world.GetObjectFromId((*it))));
-			}
-			if(teams.size() == 1){
-				dstrect.x = -world.resources.spriteoffsetx[94][1];
-				dstrect.y = -world.resources.spriteoffsety[94][1];
-				BlitSurface(world.resources.spritebank[94][1].get(), 0, surface, &dstrect);
-			}else{
-				dstrect.x = -world.resources.spriteoffsetx[103][0];
-				dstrect.y = -world.resources.spriteoffsety[103][0] - 133 + ((teams.size() - 1) * 20);
-				BlitSurface(world.resources.spritebank[103][0].get(), 0, surface, &dstrect);
-				dstrect.x = -world.resources.spriteoffsetx[103][1];
-				dstrect.y = -world.resources.spriteoffsety[103][1];
-				BlitSurface(world.resources.spritebank[103][1].get(), 0, surface, &dstrect);
-			}
-			int teamyoffset = 5;
-			for(std::vector<Team *>::iterator it = teams.begin(); it != teams.end(); it++){
-				Team * team = *it;
-				dstrect.x = 5;
-				dstrect.y = teamyoffset + 1;
-				Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[181][team->agency].get());
-				EffectTeamColor(newsurface, 0, team->GetColor(), false, true);
-				{ // silhouette outline: transparent pixels touching a visible pixel → white
-					int sw = newsurface->w, sh = newsurface->h;
-					std::vector<Uint8> orig(sw * sh);
-					for(int py = 0; py < sh; py++)
-						for(int px = 0; px < sw; px++)
-							orig[py*sw + px] = GetPixel(newsurface, px, py);
-					for(int py = 0; py < sh; py++){
-						for(int px = 0; px < sw; px++){
-							if(orig[py*sw + px]) continue;
-							if((px > 0    && orig[py*sw + px-1]) ||
-							   (px < sw-1 && orig[py*sw + px+1]) ||
-							   (py > 0    && orig[(py-1)*sw + px]) ||
-							   (py < sh-1 && orig[(py+1)*sw + px]))
-								SetPixel(newsurface, px, py, 17);
-						}
-					}
-				}
-				DrawScaled(newsurface, 0, surface, &dstrect);
-				delete newsurface;
-				for(int i = 0; i < team->numpeers; i++){
-					if(world.peerlist[team->peers[i]]){
-						Player * player = world.GetPeerPlayer(world.peerlist[team->peers[i]]->id);
-						if(player){
-							Uint8 index = (player->state == Player::DEAD || player->state == Player::DYING ? 8 : 4);
-							dstrect.x = -world.resources.spriteoffsetx[103][index + i] + 25 + (17 * i);
-							dstrect.y = -world.resources.spriteoffsety[103][index + i] + teamyoffset;
-							if(player->InBase(world) || player->hassecret){
-								Surface * effectsurface = CreateSurfaceCopy(world.resources.spritebank[103][index + i].get());
-								Uint8 plus = 0;
-								Uint8 time = 4;
-								Uint8 shift = 2;
-								Uint8 color = 210;
-								if(player->hassecret){
-									time = 8;
-									color = 114;
-									shift = 0;
-								}
-								if((state_i >> shift) % (time * 2) < time){
-									plus += ((state_i >> shift) % time);
-								}else{
-									plus += time - ((state_i >> shift) % time);
-								}
-								EffectRampColorPlus(effectsurface, 0, color, plus);
-								BlitSurface(effectsurface, 0, surface, &dstrect);
-								delete effectsurface;
-							}else{
-								BlitSurface(world.resources.spritebank[103][index + i].get(), 0, surface, &dstrect);
-							}
-						}
-					}
-				}
-				int playerswithsecret = 0;
-				for(int i = 0; i < team->numpeers; i++){
-					Peer * peer = world.peerlist[team->peers[i]];
-					if(peer){
-						Player * peerplayer = world.GetPeerPlayer(peer->id);
-						if(peerplayer && peerplayer->hassecret){
-							playerswithsecret++;
-						}
-					}
-				}
-				for(int i = 0; i < 3; i++){
-					Uint8 index = team->secrets > i ? 2 : 3;
-					Uint8 color = 0;
-					if(index == 3 && playerswithsecret > i - team->secrets && world.tickcount % 12 < 6){
-						index = 2;
-					}
-					if(team->beamingterminalid && team->secrets == i && index == 3){
-						color = 224;
-						index = 3;
-					}
-					dstrect.x = -world.resources.spriteoffsetx[103][index] - (9 * (3 - i)) + 11;
-					dstrect.y = -world.resources.spriteoffsety[103][index] + teamyoffset;
-					Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[103][index].get());
-					if(color){
-						EffectRampColor(newsurface, 0, color);
-					}
-					BlitSurface(newsurface, 0, surface, &dstrect);
-					delete newsurface;
-				}
-				teamyoffset += 20;
-			}
-			
-			
-			// Draw secrets
-			
-			Team * team = player->GetTeam(world);
-			
-			if(team && team->basedoorid){
-				int secretprogress = team->secretprogress;
-				
-				int yoffset = 60;
-				if(teams.size() >= 3){
-					yoffset += (teams.size() * 20) - 65;
-				}
-				if(!team->beamingterminalid){
-					int lineheight = 13;
-					dstrect.x = -world.resources.spriteoffsetx[187][0];
-					dstrect.y = -world.resources.spriteoffsety[187][0] + yoffset;
-					BlitSurface(world.resources.spritebank[187][0].get(), 0, surface, &dstrect);
-					Uint8 color = 0;
-					Uint8 brightness = 136;
-					const char * names[] = {"Guv Net", "OS", "Protocol", "Cypher Lock 1", "Cypher Lock 2", "Cypher Lock 3", "Header", "Schedule", "Location"};
-					for(int i = 0; i < sizeof(names) / sizeof(char *); i++){
-						secretprogress -= 20;
-						if(secretprogress < ((player->state == Player::HACKING && player->state_i == 16 && state_i % 16 < 8) ? -20 : 0)){
-							color = 114;
-							brightness = 96;
-						}
-						DrawText(surface, 10, 54 + (i * lineheight) + yoffset, (char *)names[i], 133, 6, false, color, brightness);
-					}
-				}else{
-					dstrect.x = -world.resources.spriteoffsetx[187][1];
-					dstrect.y = -world.resources.spriteoffsety[187][1] + yoffset;
-					BlitSurface(world.resources.spritebank[187][1].get(), 0, surface, &dstrect);
-				}
-				if(world.highlightsecrets){
-					Surface * effectsurface = CreateSurfaceCopy(world.resources.spritebank[86][2].get());
-					Uint8 brightness = 120;
-					if(state_i % 32 < 16){
-						brightness += (state_i % 16);
-					}else{
-						brightness += 16 - (state_i % 16);
-					}
-					EffectBrightness(effectsurface, 0, brightness);
-					dstrect.x = -world.resources.spriteoffsetx[86][2];
-					dstrect.y = -world.resources.spriteoffsety[86][2] + yoffset;
-					BlitSurface(effectsurface, 0, surface, &dstrect);
-					delete effectsurface;
-				}
-				if(world.highlightminimap){
-					Surface * effectsurface = CreateSurfaceCopy(world.resources.spritebank[86][1].get());
-					Uint8 brightness = 120;
-					if(state_i % 32 < 16){
-						brightness += (state_i % 16);
-					}else{
-						brightness += 16 - (state_i % 16);
-					}
-					EffectBrightness(effectsurface, 0, brightness);
-					dstrect.x = -world.resources.spriteoffsetx[86][1];
-					dstrect.y = -world.resources.spriteoffsety[86][1];
-					BlitSurface(effectsurface, 0, surface, &dstrect);
-					delete effectsurface;
-				}
-			}
-			
-			Uint8 tracetime = 0;
-			if(team && team->beamingterminalid){
-				Terminal * terminal = static_cast<Terminal *>(world.GetObjectFromId(team->beamingterminalid));
-				if(terminal){
-					if(terminal->tracetime > 0){
-						tracetime = terminal->tracetime;
-					}
-				}
-			}
-			if(player->tracetime > 0){
-				tracetime = player->tracetime;
-			}
-			if(tracetime > 0){
-				char temp[256];
-				sprintf(temp, "Government Trace Time: %d", tracetime);
-				DrawText(surface, 20, 350, temp, 133, 6, false, 0, 136);
-			}
-			
-			// Draw buy interface
-			// 102:0 buy background
-			// 102:1 buy highlight
-			// 102:2 buy up arrow
-			// 102:3 buy down array
-			
-			if(player->buyinterfaceid || player->techinterfaceid){
-				Interface * iface = (Interface *)world.GetObjectFromId(player->buyinterfaceid);
-				if(!iface){
-					iface = (Interface *)world.GetObjectFromId(player->techinterfaceid);
-				}
-				if(iface){
-					dstrect.x = -world.resources.spriteoffsetx[102][0];
-					dstrect.y = -world.resources.spriteoffsety[102][0];
-					BlitSurface(world.resources.spritebank[102][0].get(), 0, surface, &dstrect);
-					
-					SelectBox * selectbox = (SelectBox *)iface->GetObjectWithUid(world, 1);
-					unsigned int line = 0;
-					unsigned int i = 0;
-					for(std::deque<char *>::iterator it = selectbox->items.begin(); it != selectbox->items.end(); it++, i++){
-						if(i < selectbox->scrolled){
-							continue;
-						}
-						if(line >= 5){
-							break;
-						}
-						
-						int yoffset = line * 25;
-						
-						Uint8 brightness = 128;
-
-						if(i == selectbox->selecteditem){
-							dstrect.x = -world.resources.spriteoffsetx[102][1];
-							dstrect.y = -world.resources.spriteoffsety[102][1] + yoffset;
-							BlitSurface(world.resources.spritebank[102][1].get(), 0, surface, &dstrect);
-							if(state_i % 16 >= 8){
-								brightness += ((state_i % 8) / 1);
-							}else{
-								brightness += 8 - ((state_i % 8) / 1);
-							}
-						}
-						
-						BuyableItem * buyableitem = 0;
-						Uint32 id = selectbox->IndexToId(i);
-						for(std::vector<BuyableItem *>::iterator itb = world.buyableitems.begin(); itb != world.buyableitems.end(); itb++){
-							if((*itb)->id == id){
-								buyableitem = (*itb);
-								break;
-							}
-						}
-						
-						dstrect.x = -world.resources.spriteoffsetx[buyableitem->res_bank][buyableitem->res_index] + 169;
-						dstrect.y = -world.resources.spriteoffsety[buyableitem->res_bank][buyableitem->res_index] + 139 + yoffset;
-						if(brightness != 128){
-							if(world.resources.spritebank[buyableitem->res_bank][buyableitem->res_index]){
-								Surface * effectsurface = CreateSurfaceCopy(world.resources.spritebank[buyableitem->res_bank][buyableitem->res_index].get());
-								EffectBrightness(effectsurface, 0, brightness);
-								BlitSurface(effectsurface, 0, surface, &dstrect);
-								delete effectsurface;
-							}
-						}else{
-							BlitSurface(world.resources.spritebank[buyableitem->res_bank][buyableitem->res_index].get(), 0, surface, &dstrect);
-						}
-						
-						char * itemname = (*it);
-						char temp[64];
-						if(buyableitem->id == World::BUY_GIVE0){
-							Peer * peer = world.peerlist[team->peers[0]];
-							if(peer){
-								User * user = world.lobby.GetUserInfo(peer->accountid);
-								strcpy(temp, itemname);
-								strcat(temp, user->name);
-								itemname = temp;
-							}
-						}else
-						if(buyableitem->id == World::BUY_GIVE1){
-							Peer * peer = world.peerlist[team->peers[1]];
-							if(peer){
-								User * user = world.lobby.GetUserInfo(peer->accountid);
-								strcpy(temp, itemname);
-								strcat(temp, user->name);
-								itemname = temp;
-							}
-						}else
-						if(buyableitem->id == World::BUY_GIVE2){
-							Peer * peer = world.peerlist[team->peers[2]];
-							if(peer){
-								User * user = world.lobby.GetUserInfo(peer->accountid);
-								strcpy(temp, itemname);
-								strcat(temp, user->name);
-								itemname = temp;
-							}
-						}else
-						if(buyableitem->id == World::BUY_GIVE3){
-							Peer * peer = world.peerlist[team->peers[3]];
-							if(peer){
-								User * user = world.lobby.GetUserInfo(peer->accountid);
-								strcpy(temp, itemname);
-								strcat(temp, user->name);
-								itemname = temp;
-							}
-						}
-						char price[10];
-						if(player->buyinterfaceid){
-							if(team && (team->disabledtech & buyableitem->techchoice)){
-								strcpy(price, "DOWN");
-							}else{
-								sprintf(price, "%d", buyableitem->price);
-							}
-						}else{
-							if(!player->InOwnBase(world)){
-								BaseDoor * basedoor = static_cast<BaseDoor *>(world.GetObjectFromId(player->basedoorentering));
-								if(basedoor){
-									Team * otherteam = static_cast<Team *>(world.GetObjectFromId(basedoor->teamid));
-									if(otherteam && otherteam->disabledtech & buyableitem->techchoice){
-										strcpy(price, "DOWN");
-									}else{
-										sprintf(price, "%d", buyableitem->repairprice);
-									}
-								}
-							}else{
-								if(team && team->disabledtech & buyableitem->techchoice){
-									sprintf(price, "%d", buyableitem->repairprice);
-								}else{
-									strcpy(price, "UP");
-								}
-							}
-						}
-						DrawText(surface, 222, 145 + yoffset, itemname, 134, 9, false, 0, brightness);
-						DrawText(surface, 440 - ((strlen(price) * 9) / 2), 145 + yoffset, price, 134, 9, false, 0, brightness);
-						yoffset += 25;
-						
-						line++;
-					}
-					
-					char text[256];
-					if(player->buyinterfaceid || player->InOwnBase(world)){
-						sprintf(text, "Available Credits: %d", player->credits);
-					}else{
-						sprintf(text, "Viruses Available: %d", player->InventoryItemCount(Player::INV_VIRUS));
-					}
-					DrawText(surface, 320 - ((strlen(text) * 9) / 2), 275, text, 134, 9);
-				}
-			}
-		
-			// Draw chat
-			
-			if(world.showchat_i || player->chatinterfaceid){
-				Rect dstrect;
-				dstrect.x = 400;
-				dstrect.y = 280;
-				dstrect.w = 231;
-				dstrect.h = 30;
-				DrawMessageBackground(surface, &dstrect);
-				int yoffset = 10;
-				for(int i = 0; i < world.chatlines.size(); i++){
-					if(player->chatinterfaceid && i == 0 && world.chatlines.size() == 5){
-						continue;
-					}
-					char text[36 + 1];
-					memset(text, 0, sizeof(text) - 1);
-					strncpy(text, world.chatlines[i].c_str(), sizeof(text));
-					text[36] = 0;
-					DrawText(surface, dstrect.x + 10, dstrect.y + yoffset, text, 133, 6, false, 0, 136);
-					yoffset += 10;
-				}
-				if(player->chatinterfaceid){
-					Interface * iface = (Interface *)world.GetObjectFromId(player->chatinterfaceid);
-					if(iface){
-						TextInput * textinput = (TextInput *)iface->GetObjectWithUid(world, 1);
-						if(textinput){
-							const char * textprepend = "(ALL):";
-							if(player->chatwithteam){
-								textprepend = "(TEAM):";
-							}
-							DrawText(surface, dstrect.x + 10, dstrect.y + yoffset, textprepend, 133, 6, false, 0, 136);
-							textinput->x = dstrect.x + (strlen(textprepend) * 6) + 10;
-							textinput->y = dstrect.y + yoffset;
-							DrawTextInput(surface, *textinput);
-						}
-					}
-				}
-			}
-			
-		}
-		
-	}
+Clay_String ClayStringFromStd(const std::string & text){
+	return Clay_String{
+		.isStaticallyAllocated = false,
+		.length = static_cast<int32_t>(text.size()),
+		.chars = text.c_str(),
+	};
 }
 
-void Renderer::DrawPlayerList(Surface * surface){
-	std::vector<Team *> teams;
-	int yoffset = 0;
-	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
-		teams.push_back(static_cast<Team *>(world.GetObjectFromId(*it)));
+Clay_String ClayStringFromCString(const char * text){
+	return Clay_String{
+		.isStaticallyAllocated = true,
+		.length = static_cast<int32_t>(strlen(text)),
+		.chars = text,
+	};
+}
+
+constexpr int kSpritePayloadCapacity = 128;
+silencer::clay_bridge::SpritePayload g_spritePayloads[kSpritePayloadCapacity];
+silencer::clay_bridge::ClayCustomData g_spriteCustomData[kSpritePayloadCapacity];
+int g_spritePayloadCount = 0;
+
+constexpr int kTeamEmblemPayloadCapacity = 16;
+silencer::clay_bridge::TeamEmblemPayload g_teamEmblemPayloads[kTeamEmblemPayloadCapacity];
+silencer::clay_bridge::ClayCustomData g_teamEmblemCustomData[kTeamEmblemPayloadCapacity];
+int g_teamEmblemPayloadCount = 0;
+
+void SpriteBeginFrame(){
+	g_spritePayloadCount = 0;
+	g_teamEmblemPayloadCount = 0;
+}
+
+silencer::clay_bridge::ClayCustomData * AllocSpriteCustomData(silencer::clay_bridge::SpritePayload payload){
+	if(g_spritePayloadCount >= kSpritePayloadCapacity) return nullptr;
+	g_spritePayloads[g_spritePayloadCount] = payload;
+	g_spriteCustomData[g_spritePayloadCount] = {
+		silencer::clay_bridge::CustomKind::Sprite,
+		&g_spritePayloads[g_spritePayloadCount],
+	};
+	return &g_spriteCustomData[g_spritePayloadCount++];
+}
+
+silencer::clay_bridge::ClayCustomData * AllocTeamEmblemCustomData(silencer::clay_bridge::TeamEmblemPayload payload){
+	if(g_teamEmblemPayloadCount >= kTeamEmblemPayloadCapacity) return nullptr;
+	g_teamEmblemPayloads[g_teamEmblemPayloadCount] = payload;
+	g_teamEmblemCustomData[g_teamEmblemPayloadCount] = {
+		silencer::clay_bridge::CustomKind::TeamEmblem,
+		&g_teamEmblemPayloads[g_teamEmblemPayloadCount],
+	};
+	return &g_teamEmblemCustomData[g_teamEmblemPayloadCount++];
+}
+
+Clay_ElementDeclaration HudFloatingTextElement(const char * id, int x, int y, int w, int h){
+	Clay_String idString{
+		.isStaticallyAllocated = false,
+		.length = static_cast<int32_t>(strlen(id)),
+		.chars = id,
+	};
+	return {
+		.id = Clay_GetElementId(idString),
+		.layout = {
+			.sizing = { CLAY_SIZING_FIXED((float)w), CLAY_SIZING_FIXED((float)h) },
+			.childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP },
+		},
+		.floating = {
+			.offset = { (float)x, (float)y },
+			.attachTo = CLAY_ATTACH_TO_ROOT,
+		},
+	};
+}
+
+Clay_ElementDeclaration HudFloatingTextElementI(const char * id, uint32_t index, int x, int y, int w, int h){
+	Clay_ElementDeclaration decl = HudFloatingTextElement(id, x, y, w, h);
+	Clay_String idString{
+		.isStaticallyAllocated = false,
+		.length = static_cast<int32_t>(strlen(id)),
+		.chars = id,
+	};
+	decl.id = Clay_GetElementIdWithIndex(idString, index);
+	return decl;
+}
+
+}
+
+void Renderer::DrawHudSystemCameraFrameClay(Surface * surface, Uint8 bank, Uint16 index, Uint8 offsetBank, int logicalY){
+	if(bank >= world.resources.spritebank.size()) return;
+	if(index >= world.resources.spritebank[bank].size()) return;
+	Surface * sprite = world.resources.spritebank[bank][index].get();
+	if(!sprite) return;
+	int x = -world.resources.spriteoffsetx[bank][index];
+	int y = -world.resources.spriteoffsety[offsetBank][index] + logicalY;
+
+	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
+	Clay_SetPointerState({-1.0f, -1.0f}, false);
+	SpriteBeginFrame();
+	Clay_BeginLayout();
+
+	CLAY({ .id = CLAY_IDI("HudSystemCameraFrameRoot", index),
+	       .layout = {
+		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
+	       } }) {
+		CLAY({ .id = CLAY_IDI("HudSystemCameraFrame", index),
+		       .layout = {
+			       .sizing = { CLAY_SIZING_FIXED((float)sprite->w), CLAY_SIZING_FIXED((float)sprite->h) },
+		       },
+		       .floating = {
+			       .offset = { (float)x, (float)y },
+			       .attachTo = CLAY_ATTACH_TO_ROOT,
+		       },
+		       .custom = { .customData = AllocSpriteCustomData({
+			       bank,
+			       index,
+			       0,
+			       0,
+			       0,
+			       0,
+			       0,
+			       128,
+			       0,
+			       0,
+		       }) },
+		}) {}
 	}
-	//DrawFilledRectangle(surface, 50, 50, 640 - 50, 50 + 10 + (teams.size() * 58), 0);
-	for(int y = 50; y < 50 + 10 + (teams.size() * 58); y++){
-		for(int x = 50 + (y % 2); x < 640 - 50; x += 2){
-			SetPixel(surface, x, y, 0);
+
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	silencer::clay_bridge::Render(world.resources, *this, surface, cmds);
+}
+
+void Renderer::DrawHudReadoutsClay(Surface * surface, Player * player, Uint8 currentammo){
+	if(!player){
+		return;
+	}
+
+	std::string currentAmmo = std::string(currentammo < 10 ? " " : "") + std::to_string(currentammo);
+	std::string blasterAmmo = "99";
+	std::string laserAmmo = player->laserammo > 0
+		? std::string(player->laserammo < 10 ? " " : "") + std::to_string(player->laserammo)
+		: "";
+	std::string rocketAmmo = player->rocketammo > 0
+		? std::string(player->rocketammo < 10 ? " " : "") + std::to_string(player->rocketammo)
+		: "";
+	std::string flamerAmmo = player->flamerammo > 0
+		? std::string(player->flamerammo < 10 ? " " : "") + std::to_string(player->flamerammo)
+		: "";
+	std::string credits = std::to_string(player->credits);
+	std::string health = std::to_string(player->health);
+	std::string shield = std::to_string(player->shield);
+	std::string inventoryCounts[4];
+	for(int i = 0; i < 4; ++i){
+		if(player->inventoryitemsnum[i] > 1){
+			inventoryCounts[i] = std::to_string(player->inventoryitemsnum[i]);
 		}
 	}
-	for(std::vector<Team *>::iterator it = teams.begin(); it != teams.end(); it++){
-		Team * team = *it;
-		Surface * newsurface = CreateSurfaceCopy(world.resources.spritebank[181][team->agency].get());
-		EffectTeamColor(newsurface, 0, team->GetColor(), false, true);
-		{ // silhouette outline: transparent pixels touching a visible pixel → white
-			int sw = newsurface->w, sh = newsurface->h;
-			std::vector<Uint8> orig(sw * sh);
-			for(int py = 0; py < sh; py++)
-				for(int px = 0; px < sw; px++)
-					orig[py*sw + px] = GetPixel(newsurface, px, py);
-			for(int py = 0; py < sh; py++){
-				for(int px = 0; px < sw; px++){
-					if(orig[py*sw + px]) continue;
-					if((px > 0    && orig[py*sw + px-1]) ||
-					   (px < sw-1 && orig[py*sw + px+1]) ||
-					   (py > 0    && orig[(py-1)*sw + px]) ||
-					   (py < sh-1 && orig[(py+1)*sw + px]))
-						SetPixel(newsurface, px, py, 17);
-				}
+
+	auto string = [](const std::string & text) {
+		return Clay_String{
+			.isStaticallyAllocated = false,
+			.length = static_cast<int32_t>(text.size()),
+			.chars = text.c_str(),
+		};
+	};
+	auto emitText = [&](const char * id, int x, int y, int w, int h,
+	                    const std::string & text, Uint8 bank, Uint8 width,
+	                    Uint8 color) {
+		if(text.empty()) return;
+		CLAY(HudFloatingTextElement(id, x, y, w, h)) {
+			CLAY_TEXT(string(text), CLAY_TEXT_CONFIG({
+				.userData = nullptr,
+				.textColor = { (float)color, 0, 0, 255 },
+				.fontId = bank,
+				.fontSize = width,
+			}));
+		}
+	};
+	silencer::clay_bridge::BankTextDrawData alphaText{128, false, true};
+	auto emitAlphaText = [&](const char * id, int x, int y, int w, int h,
+	                         const std::string & text, Uint8 bank, Uint8 width,
+	                         Uint8 color) {
+		if(text.empty()) return;
+		CLAY(HudFloatingTextElement(id, x, y, w, h)) {
+			CLAY_TEXT(string(text), CLAY_TEXT_CONFIG({
+				.userData = &alphaText,
+				.textColor = { (float)color, 0, 0, 255 },
+				.fontId = bank,
+				.fontSize = width,
+			}));
+		}
+	};
+
+	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
+	Clay_SetPointerState({-1.0f, -1.0f}, false);
+	silencer::ui::primitives::BankTextBeginFrame();
+	Clay_BeginLayout();
+
+	CLAY({ .id = CLAY_ID("InGameHudReadoutsRoot"),
+	       .layout = {
+		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
+	       } }) {
+		emitAlphaText("HudCurrentAmmo", 117, 457, 40, 18, currentAmmo, 135, 12, 0);
+		emitText("HudBlasterAmmo", 4, 414, 20, 8, blasterAmmo, 132, 4, 0);
+		emitText("HudLaserAmmo", 4, 428, 20, 8, laserAmmo, 132, 4, 0);
+		emitText("HudRocketAmmo", 4, 442, 20, 8, rocketAmmo, 132, 4, 0);
+		emitText("HudFlamerAmmo", 4, 456, 20, 8, flamerAmmo, 132, 4, 0);
+		emitText("HudCredits", 572, 456, 60, 18, credits, 135, 12, 202);
+		emitText("HudHealth", 152, 463, 26, 8, health, 132, 4, 161);
+		emitText("HudShield", 475, 463, 26, 8, shield, 132, 4, 202);
+		const int xoffsets[] = {612, 584, 556, 528};
+		const int yoffsets[] = {13, 13, 11, 7};
+		emitText("HudInventoryCount0", xoffsets[0] + 20, yoffsets[0] + 20, 32, 10, inventoryCounts[0], 132, 6, 0);
+		emitText("HudInventoryCount1", xoffsets[1] + 20, yoffsets[1] + 20, 32, 10, inventoryCounts[1], 132, 6, 0);
+		emitText("HudInventoryCount2", xoffsets[2] + 20, yoffsets[2] + 20, 32, 10, inventoryCounts[2], 132, 6, 0);
+		emitText("HudInventoryCount3", xoffsets[3] + 20, yoffsets[3] + 20, 32, 10, inventoryCounts[3], 132, 6, 0);
+	}
+
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	silencer::clay_bridge::Render(world.resources, *this, surface, cmds);
+}
+
+void Renderer::DrawHudTraceTimeClay(Surface * surface, Uint8 tracetime){
+	std::string text = "Government Trace Time: " + std::to_string(tracetime);
+	silencer::clay_bridge::BankTextDrawData textData{136, false, false};
+
+	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
+	Clay_SetPointerState({-1.0f, -1.0f}, false);
+	Clay_BeginLayout();
+
+	CLAY({ .id = CLAY_ID("InGameHudTraceRoot"),
+	       .layout = {
+		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
+	       } }) {
+		CLAY(HudFloatingTextElement("HudTraceTime", 20, 350, 180, 12)) {
+			CLAY_TEXT(ClayStringFromStd(text), CLAY_TEXT_CONFIG({
+				.userData = &textData,
+				.textColor = { 0, 0, 0, 255 },
+				.fontId = 133,
+				.fontSize = 6,
+			}));
+		}
+	}
+
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	silencer::clay_bridge::Render(world.resources, *this, surface, cmds);
+}
+
+void Renderer::DrawHudSecretSpritesClay(Surface * surface, Team * team, int yoffset){
+	if(!team){
+		return;
+	}
+	struct SpriteSpec {
+		int x;
+		int y;
+		Uint8 bank;
+		Uint16 index;
+		Uint8 brightness;
+	};
+	std::vector<SpriteSpec> sprites;
+	auto addSprite = [&](int x, int y, Uint8 bank, Uint16 index, Uint8 brightness = 128) {
+		sprites.push_back(SpriteSpec{x, y, bank, index, brightness});
+	};
+	auto spriteWidth = [&](Uint8 bank, Uint16 index) -> int {
+		if(bank >= world.resources.spritebank.size()) return 0;
+		if(index >= world.resources.spritebank[bank].size()) return 0;
+		Surface * sprite = world.resources.spritebank[bank][index].get();
+		return sprite ? sprite->w : 0;
+	};
+	auto spriteHeight = [&](Uint8 bank, Uint16 index) -> int {
+		if(bank >= world.resources.spritebank.size()) return 0;
+		if(index >= world.resources.spritebank[bank].size()) return 0;
+		Surface * sprite = world.resources.spritebank[bank][index].get();
+		return sprite ? sprite->h : 0;
+	};
+	auto spriteX = [&](Uint8 bank, Uint16 index, int logicalX = 0) -> int {
+		return logicalX - world.resources.spriteoffsetx[bank][index];
+	};
+	auto spriteY = [&](Uint8 bank, Uint16 index, int logicalY = 0) -> int {
+		return logicalY - world.resources.spriteoffsety[bank][index];
+	};
+
+	Uint16 backgroundIndex = team->beamingterminalid ? 1 : 0;
+	addSprite(spriteX(187, backgroundIndex), spriteY(187, backgroundIndex, yoffset), 187, backgroundIndex);
+
+	Uint8 highlightBrightness = 120;
+	if(state_i % 32 < 16){
+		highlightBrightness += (state_i % 16);
+	}else{
+		highlightBrightness += 16 - (state_i % 16);
+	}
+	if(world.highlightsecrets){
+		addSprite(spriteX(86, 2), spriteY(86, 2, yoffset), 86, 2, highlightBrightness);
+	}
+	if(world.highlightminimap){
+		addSprite(spriteX(86, 1), spriteY(86, 1), 86, 1, highlightBrightness);
+	}
+
+	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
+	Clay_SetPointerState({-1.0f, -1.0f}, false);
+	SpriteBeginFrame();
+	Clay_BeginLayout();
+
+	CLAY({ .id = CLAY_ID("InGameHudSecretSpritesRoot"),
+	       .layout = {
+		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
+	       } }) {
+		for(unsigned int i = 0; i < sprites.size(); ++i){
+			const SpriteSpec & s = sprites[i];
+			int w = spriteWidth(s.bank, s.index);
+			int h = spriteHeight(s.bank, s.index);
+			if(w <= 0 || h <= 0) continue;
+			CLAY({ .id = CLAY_IDI("HudSecretSpriteWrap", i),
+			       .layout = {
+				       .sizing = { CLAY_SIZING_FIXED((float)w), CLAY_SIZING_FIXED((float)h) },
+			       },
+			       .floating = {
+				       .offset = { (float)s.x, (float)s.y },
+				       .attachTo = CLAY_ATTACH_TO_ROOT,
+			       },
+			}) {
+				CLAY({ .id = CLAY_IDI("HudSecretSprite", i),
+				       .layout = {
+					       .sizing = { CLAY_SIZING_FIXED((float)w), CLAY_SIZING_FIXED((float)h) },
+				       },
+				       .custom = { .customData = AllocSpriteCustomData({
+					       s.bank,
+					       s.index,
+					       0,
+					       0,
+					       0,
+					       0,
+					       0,
+					       s.brightness,
+					       0,
+					       0,
+				       }) },
+				}) {}
 			}
 		}
-		Rect dstrect;
-		dstrect.x = 50 + 10;
-		dstrect.y = 50 + 10 + yoffset + 10;
-		BlitSurface(newsurface, 0, surface, &dstrect);
-		dstrect.y -= 10;
-		delete newsurface;
+	}
+
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	silencer::clay_bridge::Render(world.resources, *this, surface, cmds);
+}
+
+void Renderer::DrawHudSecretProgressClay(Surface * surface, Player * player, int yoffset, int secretprogress){
+	static const char * names[] = {
+		"Guv Net", "OS", "Protocol", "Cypher Lock 1", "Cypher Lock 2",
+		"Cypher Lock 3", "Header", "Schedule", "Location",
+	};
+	silencer::clay_bridge::BankTextDrawData textData[9];
+	Uint8 color[9];
+	Uint8 effectColor = 0;
+	Uint8 brightness = 136;
+	for(int i = 0; i < 9; ++i){
+		secretprogress -= 20;
+		if(secretprogress < ((player->state == Player::HACKING && player->state_i == 16 && state_i % 16 < 8) ? -20 : 0)){
+			effectColor = 114;
+			brightness = 96;
+		}
+		color[i] = effectColor;
+		textData[i] = { brightness, false, false };
+	}
+
+	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
+	Clay_SetPointerState({-1.0f, -1.0f}, false);
+	Clay_BeginLayout();
+
+	CLAY({ .id = CLAY_ID("InGameHudSecretRoot"),
+	       .layout = {
+		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
+	       } }) {
+		for(int i = 0; i < 9; ++i){
+			CLAY({ .id = CLAY_IDI("HudSecretProgressLine", (uint32_t)i),
+			       .layout = {
+				       .sizing = { CLAY_SIZING_FIXED(110), CLAY_SIZING_FIXED(12) },
+			       },
+			       .floating = {
+				       .offset = { 10, (float)(54 + (i * 13) + yoffset) },
+				       .attachTo = CLAY_ATTACH_TO_ROOT,
+			       },
+			}) {
+				CLAY_TEXT(ClayStringFromCString(names[i]), CLAY_TEXT_CONFIG({
+					.userData = &textData[i],
+					.textColor = { (float)color[i], 0, 0, 255 },
+					.fontId = 133,
+					.fontSize = 6,
+				}));
+			}
+		}
+	}
+
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	silencer::clay_bridge::Render(world.resources, *this, surface, cmds);
+}
+
+int Renderer::DrawHudTeamsClay(Surface * surface){
+	std::vector<Team *> teams;
+	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++){
+		Team * team = static_cast<Team *>(world.GetObjectFromId((*it)));
+		if(team){
+			teams.push_back(team);
+		}
+	}
+	if(teams.empty()){
+		return 0;
+	}
+
+	struct SpriteSpec {
+		int x;
+		int y;
+		Uint8 bank;
+		Uint16 index;
+		Uint8 rampColor;
+		Uint8 rampPlus;
+	};
+	std::vector<SpriteSpec> sprites;
+	auto addSprite = [&](int x, int y, Uint8 bank, Uint16 index,
+	                     Uint8 rampColor = 0, Uint8 rampPlus = 0) {
+		sprites.push_back(SpriteSpec{x, y, bank, index, rampColor, rampPlus});
+	};
+	auto spriteWidth = [&](Uint8 bank, Uint16 index) -> int {
+		if(bank >= world.resources.spritebank.size()) return 0;
+		if(index >= world.resources.spritebank[bank].size()) return 0;
+		Surface * sprite = world.resources.spritebank[bank][index].get();
+		return sprite ? sprite->w : 0;
+	};
+	auto spriteHeight = [&](Uint8 bank, Uint16 index) -> int {
+		if(bank >= world.resources.spritebank.size()) return 0;
+		if(index >= world.resources.spritebank[bank].size()) return 0;
+		Surface * sprite = world.resources.spritebank[bank][index].get();
+		return sprite ? sprite->h : 0;
+	};
+	auto spriteX = [&](Uint8 bank, Uint16 index, int logicalX = 0) -> int {
+		return logicalX - world.resources.spriteoffsetx[bank][index];
+	};
+	auto spriteY = [&](Uint8 bank, Uint16 index, int logicalY = 0) -> int {
+		return logicalY - world.resources.spriteoffsety[bank][index];
+	};
+
+	if(teams.size() == 1){
+		addSprite(spriteX(94, 1), spriteY(94, 1), 94, 1);
+	}else{
+		addSprite(spriteX(103, 0), spriteY(103, 0, -133 + ((int)teams.size() - 1) * 20), 103, 0);
+		addSprite(spriteX(103, 1), spriteY(103, 1), 103, 1);
+	}
+
+	int teamyoffset = 5;
+	for(std::vector<Team *>::iterator it = teams.begin(); it != teams.end(); ++it){
+		Team * team = *it;
 		for(int i = 0; i < team->numpeers; i++){
 			if(world.peerlist[team->peers[i]]){
-				Peer * peer = world.peerlist[team->peers[i]];
-				if(peer){
-					Player * player = world.GetPeerPlayer(peer->id);
-					if(player){
-						int yoffset2 = ((4 - team->numpeers) * 12) / 2;
-						//DrawFilledRectangle(surface, 50 + 40 + 5, dstrect.y + yoffset2 + (i * 12), 640 - 50 - 10, dstrect.y + yoffset2 + ((i + 1) * 12), i % 2 == 0 ? 116 : 115);
-						int textx = dstrect.x + 40;
-						int texty = dstrect.y + yoffset2 + (i * 12) + 1;
-						User * user = world.lobby.GetUserInfo(peer->accountid);
-						char displayname[120];
-						if(peer->isbot){
-							snprintf(displayname, sizeof(displayname), "%s [BOT]", user->name);
-						}else{
-							snprintf(displayname, sizeof(displayname), "%s", user->name);
+				Player * peerplayer = world.GetPeerPlayer(world.peerlist[team->peers[i]]->id);
+				if(peerplayer){
+					Uint8 index = (peerplayer->state == Player::DEAD || peerplayer->state == Player::DYING ? 8 : 4);
+					Uint8 rampColor = 0;
+					Uint8 rampPlus = 0;
+					if(peerplayer->InBase(world) || peerplayer->hassecret){
+						Uint8 time = 4;
+						Uint8 shift = 2;
+						rampColor = 210;
+						if(peerplayer->hassecret){
+							time = 8;
+							rampColor = 114;
+							shift = 0;
 						}
-						DrawText(surface, textx, texty, displayname, 133, 6);
-						char text[100];
-						sprintf(text, "L:%d    E:%d  S:%d  J:%d  H:%d  C:%d", user->agency[team->agency].level, user->agency[team->agency].endurance, user->agency[team->agency].shield, user->agency[team->agency].jetpack, user->agency[team->agency].hacking, user->agency[team->agency].contacts);
-						DrawText(surface, 640 - 50 - 10 - ((strlen(text) + 1) * 6), texty, text, 133, 6);
+						if((state_i >> shift) % (time * 2) < time){
+							rampPlus += ((state_i >> shift) % time);
+						}else{
+							rampPlus += time - ((state_i >> shift) % time);
+						}
 					}
+					addSprite(spriteX(103, index + i, 25 + (17 * i)),
+					          spriteY(103, index + i, teamyoffset),
+					          103, index + i, rampColor, rampPlus);
 				}
 			}
 		}
-		yoffset += 58;
+
+		int playerswithsecret = 0;
+		for(int i = 0; i < team->numpeers; i++){
+			Peer * peer = world.peerlist[team->peers[i]];
+			if(peer){
+				Player * peerplayer = world.GetPeerPlayer(peer->id);
+				if(peerplayer && peerplayer->hassecret){
+					playerswithsecret++;
+				}
+			}
+		}
+		for(int i = 0; i < 3; i++){
+			Uint8 index = team->secrets > i ? 2 : 3;
+			Uint8 color = 0;
+			if(index == 3 && playerswithsecret > i - team->secrets && world.tickcount % 12 < 6){
+				index = 2;
+			}
+			if(team->beamingterminalid && team->secrets == i && index == 3){
+				color = 224;
+				index = 3;
+			}
+			addSprite(spriteX(103, index, -(9 * (3 - i)) + 11),
+			          spriteY(103, index, teamyoffset),
+			          103, index, color);
+		}
+		teamyoffset += 20;
 	}
+
+	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
+	Clay_SetPointerState({-1.0f, -1.0f}, false);
+	SpriteBeginFrame();
+	Clay_BeginLayout();
+
+	CLAY({ .id = CLAY_ID("InGameHudTeamsRoot"),
+	       .layout = {
+		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
+	       } }) {
+		for(unsigned int i = 0; i < sprites.size(); ++i){
+			const SpriteSpec & s = sprites[i];
+			int w = spriteWidth(s.bank, s.index);
+			int h = spriteHeight(s.bank, s.index);
+			if(w <= 0 || h <= 0) continue;
+			CLAY({ .id = CLAY_IDI("HudTeamSpriteWrap", i),
+			       .layout = {
+				       .sizing = { CLAY_SIZING_FIXED((float)w), CLAY_SIZING_FIXED((float)h) },
+			       },
+			       .floating = {
+				       .offset = { (float)s.x, (float)s.y },
+				       .attachTo = CLAY_ATTACH_TO_ROOT,
+			       },
+			}) {
+				CLAY({ .id = CLAY_IDI("HudTeamSprite", i),
+				       .layout = {
+					       .sizing = { CLAY_SIZING_FIXED((float)w), CLAY_SIZING_FIXED((float)h) },
+				       },
+				       .custom = { .customData = AllocSpriteCustomData({
+					       s.bank,
+					       s.index,
+					       0,
+					       0,
+					       0,
+					       0,
+					       0,
+					       128,
+					       s.rampColor,
+					       s.rampPlus,
+				       }) },
+				}) {}
+			}
+		}
+		int yoffset = 5;
+		for(unsigned int i = 0; i < teams.size(); ++i){
+			Team * team = teams[i];
+			Surface * emblem = nullptr;
+			if(181 < world.resources.spritebank.size() &&
+			   team->agency < world.resources.spritebank[181].size()){
+				emblem = world.resources.spritebank[181][team->agency].get();
+			}
+			int w = emblem ? emblem->w * 2 : 32;
+			int h = emblem ? emblem->h * 2 : 32;
+			CLAY({ .id = CLAY_IDI("HudTeamEmblem", i),
+			       .layout = {
+				       .sizing = { CLAY_SIZING_FIXED((float)w), CLAY_SIZING_FIXED((float)h) },
+			       },
+			       .floating = {
+				       .offset = { 5, (float)(yoffset + 1) },
+				       .attachTo = CLAY_ATTACH_TO_ROOT,
+			       },
+			       .custom = { .customData = AllocTeamEmblemCustomData({
+				       181,
+				       team->agency,
+				       team->GetColor(),
+				       17,
+				       true,
+			       }) },
+			}) {}
+			yoffset += 20;
+		}
+	}
+
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	silencer::clay_bridge::Render(world.resources, *this, surface, cmds);
+	return (int)teams.size();
 }
 
-void Renderer::DrawMessageBackground(Surface * surface, Rect * dstrect){
-	// 188 is chat window.  0-topleft 1-top 2-topright 3-left 4-center 5-right 6-bottomleft 7-bottom 8-bottomright
-	Rect dstrect2;
-	Rect srcrect;
-	srcrect.x = 0;
-	srcrect.y = 0;
-	srcrect.w = 0;
-	srcrect.h = 0;
-	int x = 0;
-	int y = 0;
+Uint8 Renderer::DrawHudStatusSpritesClay(Surface * surface, Player * player){
+	Uint8 currentammo = 0;
+	if(!player){
+		return currentammo;
+	}
 
-	dstrect2.x = -world.resources.spriteoffsetx[188][0] + dstrect->x;
-	dstrect2.y = -world.resources.spriteoffsety[188][0] + dstrect->y;
-	BlitSurface(world.resources.spritebank[188][0].get(), 0, surface, &dstrect2);
-	x += world.resources.spritewidth[188][0];
-	while(x < dstrect->w - world.resources.spritewidth[188][2]){
-		dstrect2.x = -world.resources.spriteoffsetx[188][1] + dstrect->x + x;
-		dstrect2.y = -world.resources.spriteoffsety[188][1] + dstrect->y;
-		srcrect.w = dstrect->w - x - 36;
-		if(srcrect.w > world.resources.spritewidth[188][1]){
-			srcrect.w = world.resources.spritewidth[188][1];
-		}
-		srcrect.h = world.resources.spriteheight[188][1];
-		BlitSurface(world.resources.spritebank[188][1].get(), &srcrect, surface, &dstrect2);
-		x += srcrect.w;
+	struct SpriteSpec {
+		const char * id;
+		int x;
+		int y;
+		Uint8 bank;
+		Uint16 index;
+		int srcX;
+		int srcY;
+		int srcW;
+		int srcH;
+		Uint8 brightness;
+	};
+	std::vector<SpriteSpec> sprites;
+	auto addSprite = [&](const char * id, int x, int y, Uint8 bank, Uint16 index,
+	                     int srcX = 0, int srcY = 0, int srcW = 0, int srcH = 0,
+	                     Uint8 brightness = 128) {
+		sprites.push_back(SpriteSpec{id, x, y, bank, index, srcX, srcY, srcW, srcH, brightness});
+	};
+	auto spriteWidth = [&](Uint8 bank, Uint16 index) -> int {
+		if(bank >= world.resources.spritebank.size()) return 0;
+		if(index >= world.resources.spritebank[bank].size()) return 0;
+		Surface * sprite = world.resources.spritebank[bank][index].get();
+		return sprite ? sprite->w : 0;
+	};
+	auto spriteHeight = [&](Uint8 bank, Uint16 index) -> int {
+		if(bank >= world.resources.spritebank.size()) return 0;
+		if(index >= world.resources.spritebank[bank].size()) return 0;
+		Surface * sprite = world.resources.spritebank[bank][index].get();
+		return sprite ? sprite->h : 0;
+	};
+	auto spriteX = [&](Uint8 bank, Uint16 index, int logicalX = 0) -> int {
+		return logicalX - world.resources.spriteoffsetx[bank][index];
+	};
+	auto spriteY = [&](Uint8 bank, Uint16 index, int logicalY = 0) -> int {
+		return logicalY - world.resources.spriteoffsety[bank][index];
+	};
+
+	addSprite("HudMinimapFrame", spriteX(94, 0), spriteY(94, 0), 94, 0);
+	if(player->fuellow){
+		addSprite("HudFuelLow", spriteX(95, 8), spriteY(95, 8), 95, 8);
 	}
-	dstrect2.x = -world.resources.spriteoffsetx[188][2] + dstrect->x + dstrect->w - 36;// - world.resources.spritewidth[188][2];
-	dstrect2.y = -world.resources.spriteoffsety[188][2] + dstrect->y;
-	BlitSurface(world.resources.spritebank[188][2].get(), 0, surface, &dstrect2);
-	
-	x = 0;
-	y = dstrect->h;
-	
-	dstrect2.x = -world.resources.spriteoffsetx[188][6] + dstrect->x;
-	dstrect2.y = -world.resources.spriteoffsety[188][6] + dstrect->y + y;
-	BlitSurface(world.resources.spritebank[188][6].get(), 0, surface, &dstrect2);
-	x += world.resources.spritewidth[188][6];
-	while(x < dstrect->w - world.resources.spritewidth[188][8]){
-		dstrect2.x = -world.resources.spriteoffsetx[188][7] + dstrect->x + x;
-		dstrect2.y = -world.resources.spriteoffsety[188][7] + dstrect->y + y;
-		srcrect.w = dstrect->w - x - 36;
-		if(srcrect.w > world.resources.spritewidth[188][7]){
-			srcrect.w = world.resources.spritewidth[188][7];
+	int fuelW = (int)(((float)player->fuel / player->maxfuel) * spriteWidth(95, 6));
+	addSprite("HudFuelBar", spriteX(95, 6), spriteY(95, 6), 95, 6, 0, 0, fuelW, spriteHeight(95, 6));
+	addSprite("HudFuelMask", spriteX(95, 5), spriteY(95, 5), 95, 5);
+
+	int healthH = spriteHeight(95, 0);
+	int healthY = healthH - (int)(((float)player->health / player->maxhealth) * healthH);
+	addSprite("HudHealthBar", spriteX(95, 0), spriteY(95, 0) + healthY, 95, 0,
+	          0, healthY, spriteWidth(95, 0), healthH - healthY);
+
+	int shieldH = spriteHeight(95, 1);
+	int shieldY = shieldH - (int)(((float)player->shield / player->maxshield) * shieldH);
+	if(shieldY < 0) shieldY = 0;
+	Uint8 shieldBrightness = 128;
+	if(player->shield > player->maxshield){
+		shieldBrightness = 136;
+		Uint8 time = 6;
+		if(state_i % (time * 2) < time){
+			shieldBrightness += (state_i % time) * 2;
+		}else{
+			shieldBrightness += (time - (state_i % time)) * 2;
 		}
-		srcrect.h = world.resources.spriteheight[188][7];
-		BlitSurface(world.resources.spritebank[188][7].get(), &srcrect, surface, &dstrect2);
-		x += srcrect.w;
 	}
-	dstrect2.x = -world.resources.spriteoffsetx[188][8] + dstrect->x + dstrect->w - 36;// - world.resources.spritewidth[188][8];
-	dstrect2.y = -world.resources.spriteoffsety[188][8] + dstrect->y + y;
-	BlitSurface(world.resources.spritebank[188][8].get(), 0, surface, &dstrect2);
+	addSprite("HudShieldBar", spriteX(95, 1), spriteY(95, 1) + shieldY, 95, 1,
+	          0, shieldY, spriteWidth(95, 1), shieldH - shieldY, shieldBrightness);
+
+	if(player->poisonedby){
+		addSprite("HudPoisoned", 183, 453, 97, 5);
+	}
+	int filesW = (int)(((float)player->files / player->maxfiles) * spriteWidth(95, 7));
+	addSprite("HudFilesBar", spriteX(95, 7), spriteY(95, 7), 95, 7, 0, 0, filesW, spriteHeight(95, 7));
+
+	Uint16 weaponFace = 1;
+	Uint16 weaponGlow = 5;
+	switch(player->currentweapon){
+		case 0: currentammo = 99; weaponFace = 1; weaponGlow = 5; break;
+		case 1: currentammo = player->laserammo; weaponFace = 2; weaponGlow = 6; break;
+		case 2: currentammo = player->rocketammo; weaponFace = 3; weaponGlow = 7; break;
+		case 3: currentammo = player->flamerammo; weaponFace = 4; weaponGlow = 8; break;
+	}
+	addSprite("HudWeaponFace", spriteX(96, weaponFace), spriteY(96, weaponFace), 96, weaponFace);
+	addSprite("HudWeaponGlow", spriteX(96, weaponGlow), spriteY(96, weaponGlow), 96, weaponGlow);
+	addSprite("HudWeaponSelector", spriteX(96, 0), spriteY(96, 0) + (player->currentweapon * 14), 96, 0);
+	if(player->health && (float)player->health / player->maxhealth <= 0.5 && state_i % 8 <= 3){
+		addSprite("HudHealthWarn", spriteX(95, 3), spriteY(95, 3), 95, 3);
+	}
+	if(player->shield && (float)player->shield / player->maxshield <= 0.5 && state_i % 8 <= 3){
+		addSprite("HudShieldWarn", spriteX(95, 4), spriteY(95, 4), 95, 4);
+	}
+	addSprite("HudInventoryFrame", spriteX(94, 2), spriteY(94, 2), 94, 2);
+
+	const int xoffsets[] = {612, 584, 556, 528};
+	const int yoffsets[] = {13, 13, 11, 7};
+	Uint8 inventoryIndex[4];
+	Uint8 inventoryBrightness[4];
+	const char * inventoryLetter[4];
+	for(int i = 0; i < 4; ++i){
+		inventoryIndex[i] = InvIdToResIndex(player->inventoryitems[i]);
+		inventoryLetter[i] = InvIdToLetter(player->inventoryitems[i]);
+		inventoryBrightness[i] = player->currentinventoryitem == i ? 128 : 32;
+	}
+
+	silencer::clay_bridge::BankTextDrawData letterData[4];
+	for(int i = 0; i < 4; ++i){
+		letterData[i] = { inventoryBrightness[i], false, false };
+	}
+
+	silencer::clay_bridge::EnsureInitialized(surface->w, surface->h);
+	Clay_SetPointerState({-1.0f, -1.0f}, false);
+	SpriteBeginFrame();
+	Clay_BeginLayout();
+
+	CLAY({ .id = CLAY_ID("InGameHudStatusSpritesRoot"),
+	       .layout = {
+		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
+	       } }) {
+		for(unsigned int i = 0; i < sprites.size(); ++i){
+			const SpriteSpec & s = sprites[i];
+			int w = s.srcW > 0 ? s.srcW : spriteWidth(s.bank, s.index);
+			int h = s.srcH > 0 ? s.srcH : spriteHeight(s.bank, s.index);
+			if(w <= 0 || h <= 0) continue;
+			CLAY(HudFloatingTextElement(s.id, s.x, s.y, w, h)) {
+				CLAY({ .id = CLAY_IDI("HudStatusSprite", i),
+				       .layout = {
+					       .sizing = { CLAY_SIZING_FIXED((float)w), CLAY_SIZING_FIXED((float)h) },
+				       },
+				       .custom = { .customData = AllocSpriteCustomData({
+					       s.bank,
+					       s.index,
+					       (Sint16)s.srcX,
+					       (Sint16)s.srcY,
+					       (Sint16)s.srcW,
+					       (Sint16)s.srcH,
+					       0,
+					       s.brightness,
+					       0,
+					       0,
+				       }) },
+				}) {}
+			}
+		}
+		for(int i = 0; i < 4; ++i){
+			Uint8 invindex = inventoryIndex[i];
+			int x = spriteX(97, invindex, xoffsets[i]);
+			int y = spriteY(97, invindex, yoffsets[i]);
+			int w = spriteWidth(97, invindex);
+			int h = spriteHeight(97, invindex);
+			if(w > 0 && h > 0){
+				CLAY({ .id = CLAY_IDI("HudInventoryIconWrap", (uint32_t)i),
+				       .layout = {
+					       .sizing = { CLAY_SIZING_FIXED((float)w), CLAY_SIZING_FIXED((float)h) },
+				       },
+				       .floating = {
+					       .offset = { (float)x, (float)y },
+					       .attachTo = CLAY_ATTACH_TO_ROOT,
+				       },
+				}) {
+					CLAY({ .id = CLAY_IDI("HudInventoryIcon", (uint32_t)i),
+					       .layout = {
+						       .sizing = { CLAY_SIZING_FIXED((float)w), CLAY_SIZING_FIXED((float)h) },
+					       },
+					       .custom = { .customData = AllocSpriteCustomData({
+						       97,
+						       invindex,
+						       0,
+						       0,
+						       0,
+						       0,
+						       0,
+						       inventoryBrightness[i],
+						       0,
+						       0,
+					       }) },
+					}) {}
+				}
+			}
+			CLAY({ .id = CLAY_IDI("HudInventoryLetter", (uint32_t)i),
+			       .layout = {
+				       .sizing = { CLAY_SIZING_FIXED(8), CLAY_SIZING_FIXED(8) },
+			       },
+			       .floating = {
+				       .offset = { (float)(xoffsets[i] - 2), (float)yoffsets[i] },
+				       .attachTo = CLAY_ATTACH_TO_ROOT,
+			       },
+			}) {
+				CLAY_TEXT(ClayStringFromCString(inventoryLetter[i]), CLAY_TEXT_CONFIG({
+					.userData = &letterData[i],
+					.textColor = { 0, 0, 0, 255 },
+					.fontId = 132,
+					.fontSize = 4,
+				}));
+			}
+		}
+	}
+
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	silencer::clay_bridge::Render(world.resources, *this, surface, cmds);
+	return currentammo;
 }
 
 Uint8 Renderer::GetAmbienceLevel(void){

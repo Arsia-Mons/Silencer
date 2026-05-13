@@ -1,18 +1,20 @@
 #include "controldispatch.h"
 #include "game.h"
-#include "interface.h"
 #include "world.h"
-#include "button.h"
-#include "toggle.h"
-#include "textbox.h"
-#include "textinput.h"
-#include "selectbox.h"
-#include "objecttypes.h"
 #include "keybinds.h"
 #include "config.h"
 #include "gasloader.h"
 #include "os.h"
 #include "shared.h"
+#include "clay_ui_compositor.h"
+#include "clay_inspector.h"
+#include "screen.h"
+#include "password_modal.h"
+#ifdef SILENCER_HAVE_LOBBY_CLAY
+#include "lobby_clay_screen.h"
+#endif
+#include "screen_context.h"
+#include <cctype>
 #include <cstring>
 #include <cstdio>
 #include <fstream>
@@ -25,6 +27,11 @@
 #endif
 
 namespace ControlDispatch {
+
+namespace {
+std::string g_controlPasswordModalValue;
+bool g_controlPasswordModalSubmitted = false;
+}
 
 ControlCommand::Phase PhaseFor(const std::string& op) {
 	if(op == "screenshot") return ControlCommand::POST_RENDER;
@@ -41,13 +48,16 @@ static ControlReply OkResult(int id, nlohmann::json r){
 	return rpl;
 }
 
-static bool IEq(const char* a, const char* b){
-	if(!a || !b) return false;
-	while(*a && *b){
-		if(std::tolower((unsigned char)*a) != std::tolower((unsigned char)*b)) return false;
-		++a; ++b;
-	}
-	return *a == 0 && *b == 0;
+static bool StateNeedsScreen(const std::string& state){
+	return state == "MAINMENU" ||
+	       state == "LOBBYCONNECT" ||
+	       state == "LOBBY" ||
+	       state == "UPDATING" ||
+	       state == "MISSIONSUMMARY" ||
+	       state == "OPTIONS" ||
+	       state == "OPTIONSCONTROLS" ||
+	       state == "OPTIONSDISPLAY" ||
+	       state == "OPTIONSAUDIO";
 }
 
 static ControlReply Err(int id, const char* code, const std::string& msg){
@@ -57,6 +67,16 @@ static ControlReply Err(int id, const char* code, const std::string& msg){
 	rpl.code = code;
 	rpl.error = msg;
 	return rpl;
+}
+
+static bool LabelEquals(const char * a, const char * b){
+	if(!a || !b) return false;
+	while(*a && *b){
+		if(std::tolower((unsigned char)*a) != std::tolower((unsigned char)*b)) return false;
+		++a;
+		++b;
+	}
+	return *a == '\0' && *b == '\0';
 }
 
 // Forward decl for the keybind sub-dispatcher implemented at the bottom of
@@ -75,10 +95,372 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
+	if(cmd.op == "resize"){
+		int width = cmd.args.value("w", cmd.args.value("width", 0));
+		int height = cmd.args.value("h", cmd.args.value("height", 0));
+		if(width < 1 || height < 1){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"resize requires --w <pixels> --h <pixels>"));
+			return;
+		}
+		if(!game.ResizeRenderSurface(width, height)){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL", "resize failed"));
+			return;
+		}
+		nlohmann::json r;
+		r["width"] = game.GetScreenBuffer().w;
+		r["height"] = game.GetScreenBuffer().h;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_bridge_smoke"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_bridge_smoke requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunSmoke(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"smoke render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_bank_text_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_bank_text_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunBankTextTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"bank_text test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_bank_button_test"){
+		std::string out = cmd.args.value("out", std::string());
+		std::string variant = cmd.args.value("variant", std::string("chrome"));
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_bank_button_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunBankButtonTest(
+			game, variant.c_str(), out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"bank_button test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		r["variant"] = variant;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_bank_button_check"){
+		silencer::clay_bridge::BankButtonCheckResult res{};
+		bool ok = silencer::clay_bridge::RunBankButtonCheck(game, res);
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"bank_button check failed"));
+			return;
+		}
+		nlohmann::json r;
+		r["clicks_fired_on_press"] = res.clicksFiredOnPress;
+		r["clicks_fired_when_held"] = res.clicksFiredWhenHeld;
+		r["chrome_brightness_hover"] = res.chromeBrightnessHover;
+		r["chrome_brightness_idle"] = res.chromeBrightnessIdle;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_toggle_test"){
+		std::string out = cmd.args.value("out", std::string());
+		std::string state = cmd.args.value("state", std::string("unselected"));
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_toggle_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunToggleTest(
+			game, state.c_str(), out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"toggle test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		r["state"] = state;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_toggle_check"){
+		silencer::clay_bridge::ToggleCheckResult res{};
+		bool ok = silencer::clay_bridge::RunToggleCheck(game, res);
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"toggle check failed"));
+			return;
+		}
+		nlohmann::json r;
+		r["clicks_toggle_0"] = res.clicksToggle0;
+		r["clicks_toggle_1"] = res.clicksToggle1;
+		r["clicks_toggle_2"] = res.clicksToggle2;
+		r["selected_brightness"] = res.selectedBrightness;
+		r["unselected_brightness"] = res.unselectedBrightness;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_scroll_list_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_scroll_list_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunScrollListTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"scroll_list test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_scroll_list_check"){
+		silencer::clay_bridge::ScrollListCheckResult res{};
+		bool ok = silencer::clay_bridge::RunScrollListCheck(game, res);
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"scroll_list check failed"));
+			return;
+		}
+		nlohmann::json r;
+		r["on_select_fired"] = res.onSelectFired;
+		r["last_selected_index"] = res.lastSelectedIndex;
+		r["no_overflow_scrollbar_count"] = res.noOverflowScrollbarCount;
+		r["overflow_scrollbar_count"] = res.overflowScrollbarCount;
+		r["overflow_scrollbar_bbox_x"] = res.overflowScrollbarBboxX;
+		r["overflow_scrollbar_bbox_y"] = res.overflowScrollbarBboxY;
+		r["overflow_scrollbar_bbox_w"] = res.overflowScrollbarBboxW;
+		r["overflow_scrollbar_bbox_h"] = res.overflowScrollbarBboxH;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_scroll_text_box_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_scroll_text_box_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunScrollTextBoxTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"scroll_text_box test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_scroll_text_box_check"){
+		silencer::clay_bridge::ScrollTextBoxCheckResult res{};
+		bool ok = silencer::clay_bridge::RunScrollTextBoxCheck(game, res);
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"scroll_text_box check failed"));
+			return;
+		}
+		nlohmann::json r;
+		r["at_bottom_prev_pos"] = res.atBottom_prevPos;
+		r["not_at_bottom_prev_pos"] = res.notAtBottom_prevPos;
+		r["at_bottom_overflow_prev_pos"] = res.atBottomOverflow_prevPos;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_text_input_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_text_input_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunTextInputTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"text_input test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_text_input_check"){
+		silencer::clay_bridge::TextInputCheckResult res{};
+		bool ok = silencer::clay_bridge::RunTextInputCheck(game, res);
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"text_input check failed"));
+			return;
+		}
+		nlohmann::json r;
+		r["on_enter_fired_for_newline"] = res.onEnterFiredForNewline;
+		r["on_enter_fired_for_letter"] = res.onEnterFiredForLetter;
+		r["password_mask_applied_len"] = res.passwordMaskAppliedLen;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_form_border_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_form_border_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunFormBorderTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"form_border test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_label_value_row_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_label_value_row_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunLabelValueRowTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"label_value_row test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_box_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_box_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunBoxTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"box test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_box_halo_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_box_halo_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunBoxHaloTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"box halo test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_box_parity_chat"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_box_parity_chat requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunBoxParityChatTest(game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"box parity chat render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_rectangle_alpha_test"){
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_rectangle_alpha_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunRectangleAlphaTest(
+			game, out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"rectangle alpha test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "clay_panel_test"){
+		std::string variant = cmd.args.value("variant", std::string("right"));
+		std::string out = cmd.args.value("out", std::string());
+		if(out.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
+				"clay_panel_test requires --out <path>"));
+			return;
+		}
+		bool ok = silencer::clay_bridge::RunPanelTest(
+			game, variant.c_str(), out.c_str());
+		if(!ok){
+			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
+				"panel test render failed (PNG write): " + out));
+			return;
+		}
+		nlohmann::json r;
+		r["path"] = out;
+		r["variant"] = variant;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
 	if(cmd.op == "state"){
 		nlohmann::json r;
 		r["state"] = Game::StateName(game.GetState());
-		r["current_interface_id"] = game.GetCurrentInterfaceId();
 		r["frame"] = game.GetFrameCount();
 		r["paused"] = game.paused;
 		// Expose the lobby connection sub-state so test scripts can wait for
@@ -101,83 +483,84 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "inspect"){
-		Uint16 ifid = cmd.args.value("interface_id", 0);
-		if(ifid == 0) ifid = game.GetCurrentInterfaceId();
-		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(!iface || iface->type != ObjectTypes::INTERFACE){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
-			return;
-		}
 		nlohmann::json widgets = nlohmann::json::array();
-		for(Uint16 oid : iface->objects){
-			Object* o = game.GetWorld().GetObjectFromId(oid);
-			if(!o) continue;
+		for(const auto & cw : silencer::ui::clay_inspector::All()){
 			nlohmann::json w;
-			w["id"] = oid;
-			w["x"] = o->x; w["y"] = o->y;
-			switch(o->type){
-				case ObjectTypes::BUTTON: {
-					Button* b = (Button*)o;
-					w["kind"] = "button";
-					w["label"] = b->text;
-					w["w"] = b->width; w["h"] = b->height;
-					w["enabled"] = !iface->disabled;
-					break;
-				}
-				case ObjectTypes::TOGGLE: {
-					Toggle* t = (Toggle*)o;
+			w["source"] = "clay";
+			w["x"] = cw.x; w["y"] = cw.y;
+			w["w"] = cw.w; w["h"] = cw.h;
+			if(cw.label) w["label"] = cw.label;
+			if(cw.uid >= 0) w["uid"] = cw.uid;
+			using K = silencer::ui::clay_inspector::WidgetKind;
+			switch(cw.kind){
+				case K::Button:    w["kind"] = "button"; break;
+				case K::Toggle:
 					w["kind"] = "toggle";
-					w["label"] = t->text;
-					w["w"] = t->width; w["h"] = t->height;
-					w["enabled"] = !iface->disabled;
-					w["selected"] = t->selected;
+					w["selected"] = cw.selected;
 					break;
-				}
-				case ObjectTypes::TEXTBOX: {
-					TextBox* tb = (TextBox*)o;
-					w["kind"] = "textbox";
-					w["w"] = tb->width; w["h"] = tb->height;
-					// uid is the developer-assigned identifier; expose it so
-					// agents can disambiguate textboxes (which have no label).
-					w["uid"] = tb->uid;
-					break;
-				}
-				case ObjectTypes::TEXTINPUT: {
-					TextInput* ti = (TextInput*)o;
+				case K::TextInput:
 					w["kind"] = "textinput";
-					w["w"] = ti->width; w["h"] = ti->height;
-					w["uid"] = ti->uid;
-					w["password"] = ti->password;
-					// Expose current text so agents can verify what they typed.
-					// Mask password fields — same instinct as a UI: don't echo
-					// secrets back over the control socket.
-					w["text"] = ti->password ? std::string(strlen(ti->text), '*') : std::string(ti->text);
-					w["maxchars"] = ti->maxchars;
+					w["password"] = cw.isPassword;
+					if(cw.textBuffer){
+						w["text"] = cw.isPassword
+							? std::string(strlen(cw.textBuffer), '*')
+							: std::string(cw.textBuffer);
+						w["maxchars"] = cw.textBufferLen;
+					}
 					break;
-				}
-				case ObjectTypes::SELECTBOX: {
-					SelectBox* sb = (SelectBox*)o;
-					w["kind"] = "selectbox";
-					w["w"] = sb->width; w["h"] = sb->height;
-					w["selected_index"] = sb->selecteditem;
-					w["uid"] = sb->uid;
-					break;
-				}
-				default:
-					w["kind"] = "other";
-					w["object_type"] = o->type;
+				case K::ListRow:
+					w["kind"] = "listrow";
+					w["row_index"] = cw.rowIndex;
+					w["selected"] = cw.selected;
 					break;
 			}
 			widgets.push_back(std::move(w));
 		}
+		if(widgets.empty()){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no clay widgets"));
+			return;
+		}
 		nlohmann::json r;
 		r["widgets"] = widgets;
-		r["interface_id"] = ifid;
+		r["interface_id"] = 0;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
 	if(cmd.op == "world_state"){
 		cmd.reply->set_value(OkResult(cmd.id, game.GetWorldSummary()));
+		return;
+	}
+	if(cmd.op == "show_password_modal"){
+		g_controlPasswordModalValue.clear();
+		g_controlPasswordModalSubmitted = false;
+		game.PushScreen(std::make_unique<PasswordModal>([](const char * password) {
+			g_controlPasswordModalValue = password ? password : "";
+			g_controlPasswordModalSubmitted = true;
+		}));
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+	if(cmd.op == "password_modal_result"){
+		nlohmann::json r;
+		r["submitted"] = g_controlPasswordModalSubmitted;
+		r["value"] = g_controlPasswordModalValue;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "ingame_ui_mode"){
+		std::string mode = cmd.args.value("mode", std::string());
+		if(mode.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+				"ingame_ui_mode needs --mode clear|status|chat|buy|tech|playerlist|all"));
+			return;
+		}
+		nlohmann::json r = game.ConfigureInGameUiForControl(mode);
+		if(!r.value("ok", false)){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				r.value("error", std::string("in-game UI mode unavailable"))));
+			return;
+		}
+		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
 	if(cmd.op == "click"){
@@ -188,116 +571,186 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "click needs label or id"));
 			return;
 		}
-		Uint16 ifid = game.GetCurrentInterfaceId();
-		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(!iface){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
+		const auto * cw = silencer::ui::clay_inspector::FindByLabel(target.c_str());
+		if(cw){
+			using K = silencer::ui::clay_inspector::WidgetKind;
+			if(cw->kind == K::Button || cw->kind == K::Toggle){
+				if(cw->onClick) cw->onClick(cw->clickUser);
+				nlohmann::json r;
+				r["source"] = "clay";
+				cmd.reply->set_value(OkResult(cmd.id, r));
+				return;
+			}
+			if(cw->kind == K::ListRow){
+				if(cw->onClickRow) cw->onClickRow(cw->clickUser, cw->rowIndex);
+				nlohmann::json r;
+				r["source"] = "clay";
+				r["row_index"] = cw->rowIndex;
+				cmd.reply->set_value(OkResult(cmd.id, r));
+				return;
+			}
+			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
+				"clay widget \"" + target + "\" is not clickable"));
 			return;
 		}
-		Uint64 mask = (1ULL << ObjectTypes::BUTTON) | (1ULL << ObjectTypes::TOGGLE);
-		Uint16 wid = 0;
-		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
-		if(m == Interface::MATCH_NOT_FOUND){
+		cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
+			"no widget matches \"" + target + "\""));
+		return;
+	}
+	if(cmd.op == "click_at"){
+		if(!cmd.args.contains("x") || !cmd.args.contains("y")){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "click_at needs x and y"));
+			return;
+		}
+		int x = cmd.args["x"].get<int>();
+		int y = cmd.args["y"].get<int>();
+		if(!silencer::ui::clay_inspector::InvokeAt(x, y)){
 			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-				"no widget matches \"" + target + "\""));
+				"no clickable clay widget at point"));
 			return;
-		}
-		if(m == Interface::MATCH_AMBIGUOUS){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_AMBIGUOUS",
-				"multiple widgets match \"" + target + "\""));
-			return;
-		}
-		Object* o = game.GetWorld().GetObjectFromId(wid);
-		if(o->type == ObjectTypes::BUTTON){
-			Button* b = (Button*)o;
-			b->Activate(); // existing behavior used by the main menu
-			b->clicked = true;
-		} else if(o->type == ObjectTypes::TOGGLE){
-			Toggle* t = (Toggle*)o;
-			t->selected = !t->selected;
 		}
 		nlohmann::json r;
-		r["widget_id"] = wid;
+		r["source"] = "clay";
+		r["x"] = x;
+		r["y"] = y;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
 	if(cmd.op == "set_text"){
 		std::string text = cmd.args.value("text", std::string());
-		Uint16 ifid = game.GetCurrentInterfaceId();
-		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(!iface){ cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface")); return; }
-		// Address either by uid (developer-assigned label inside the iface,
-		// stable across runs) or by the existing label/id path. uid wins when
-		// both are passed.
-		Object* target = nullptr;
+		const auto * cw = static_cast<const silencer::ui::clay_inspector::Widget *>(nullptr);
 		if(cmd.args.contains("uid")){
 			int uid = cmd.args["uid"].get<int>();
-			target = iface->GetObjectWithUid(game.GetWorld(), (Uint8)uid);
-			if(!target){
-				cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-					"no widget with uid " + std::to_string(uid)));
-				return;
+			int count = 0;
+			for(const auto & candidate : silencer::ui::clay_inspector::All()){
+				if(candidate.uid == uid
+				   && candidate.kind == silencer::ui::clay_inspector::WidgetKind::TextInput){
+					cw = &candidate;
+					count++;
+				}
 			}
-		}else{
-			std::string label = cmd.args.value("label", std::string());
-			Uint64 mask = (1ULL << ObjectTypes::TEXTBOX) | (1ULL << ObjectTypes::TEXTINPUT);
-			Uint16 wid = 0;
-			auto m = iface->FindWidgetByLabel(game.GetWorld(), label.c_str(), mask, &wid);
-			if(m != Interface::MATCH_OK){
-				cmd.reply->set_value(Err(cmd.id, m == Interface::MATCH_NOT_FOUND
-					? "WIDGET_NOT_FOUND" : "WIDGET_AMBIGUOUS", label));
-				return;
-			}
-			target = game.GetWorld().GetObjectFromId(wid);
+			if(count != 1) cw = nullptr;
+		}else if(cmd.args.contains("label")){
+			std::string label = cmd.args["label"].get<std::string>();
+			cw = silencer::ui::clay_inspector::FindByLabel(label.c_str());
 		}
-		if(target->type == ObjectTypes::TEXTBOX){
-			TextBox* tb = (TextBox*)target;
-			tb->text.clear();
-			tb->AddText(text.c_str());
-		}else if(target->type == ObjectTypes::TEXTINPUT){
-			TextInput* ti = (TextInput*)target;
-			ti->SetText(text.c_str());
-		}else{
+		if(cw){
+			if(cw->kind == silencer::ui::clay_inspector::WidgetKind::TextInput
+			   && cw->textBuffer && cw->textBufferLen > 0){
+				int cap = cw->textBufferLen - 1;
+				int n = (int)text.size();
+				if(n > cap) n = cap;
+				std::memcpy(cw->textBuffer, text.data(), n);
+				cw->textBuffer[n] = '\0';
+				nlohmann::json r;
+				r["source"] = "clay";
+				cmd.reply->set_value(OkResult(cmd.id, r));
+				return;
+			}
 			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
-				"widget is not a textbox or textinput"));
+				"clay widget is not a textinput"));
 			return;
 		}
-		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		if(cmd.args.contains("label")){
+			std::string label = cmd.args["label"].get<std::string>();
+			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", label));
+			return;
+		}
+		if(cmd.args.contains("uid")){
+			int uid = cmd.args["uid"].get<int>();
+			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
+				"no clay widget with uid " + std::to_string(uid)));
+			return;
+		}
+		cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+			"set_text needs label or uid"));
 		return;
 	}
 
 	if(cmd.op == "select"){
-		std::string target = cmd.args.value("label", std::string());
-		int idx = cmd.args.value("index", -1);
-		std::string text = cmd.args.value("text", std::string());
-		Uint16 ifid = game.GetCurrentInterfaceId();
-		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(!iface){ cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no interface")); return; }
-		Uint64 mask = (1ULL << ObjectTypes::SELECTBOX);
-		Uint16 wid = 0;
-		auto m = iface->FindWidgetByLabel(game.GetWorld(), target.c_str(), mask, &wid);
-		if(m == Interface::MATCH_NOT_FOUND){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
-				"no selectbox matches \"" + target + "\""));
-			return;
-		}
-		if(m == Interface::MATCH_AMBIGUOUS){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_AMBIGUOUS",
-				"multiple selectboxes match \"" + target + "\""));
-			return;
-		}
-		SelectBox* sb = (SelectBox*)game.GetWorld().GetObjectFromId(wid);
-		if(idx < 0 && !text.empty()){
-			for(unsigned int i = 0; i < sb->items.size(); ++i){
-				if(sb->items[i] && IEq(sb->items[i], text.c_str())){ idx = (int)i; break; }
+		const auto & widgets = silencer::ui::clay_inspector::All();
+		const auto * hit = static_cast<const silencer::ui::clay_inspector::Widget *>(nullptr);
+		int count = 0;
+		if(cmd.args.contains("index")){
+			int index = cmd.args["index"].get<int>();
+			for(const auto & candidate : widgets){
+				if(candidate.kind == silencer::ui::clay_inspector::WidgetKind::ListRow
+				   && candidate.rowIndex == index){
+					hit = &candidate;
+					count++;
+				}
 			}
-		}
-		if(idx < 0 || (unsigned)idx >= sb->items.size()){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", "no such item"));
+		}else if(cmd.args.contains("label")){
+			std::string label = cmd.args["label"].get<std::string>();
+			for(const auto & candidate : widgets){
+				if(candidate.kind == silencer::ui::clay_inspector::WidgetKind::ListRow
+				   && LabelEquals(candidate.label, label.c_str())){
+					hit = &candidate;
+					count++;
+				}
+			}
+		}else if(cmd.args.contains("text")){
+			std::string text = cmd.args["text"].get<std::string>();
+			for(const auto & candidate : widgets){
+				if(candidate.kind == silencer::ui::clay_inspector::WidgetKind::ListRow
+				   && LabelEquals(candidate.label, text.c_str())){
+					hit = &candidate;
+					count++;
+				}
+			}
+		}else{
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+				"select needs --index, --label, or --text"));
 			return;
 		}
-		sb->selecteditem = idx;
-		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		if(count != 1 || !hit){
+			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
+				"no unique clay list row matches select target"));
+			return;
+		}
+		if(hit->onClickRow){
+			hit->onClickRow(hit->clickUser, hit->rowIndex);
+		}else if(hit->onClick){
+			hit->onClick(hit->clickUser);
+		}else{
+			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
+				"selected clay row is not invokable"));
+			return;
+		}
+		nlohmann::json r;
+		r["source"] = "clay";
+		r["row_index"] = hit->rowIndex;
+		if(hit->label) r["label"] = hit->label;
+		cmd.reply->set_value(OkResult(cmd.id, r));
+		return;
+	}
+	if(cmd.op == "scroll"){
+		std::string label = cmd.args.value("label", std::string());
+		int amount = cmd.args.value("amount", 1);
+		if(label.empty()){
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+				"scroll needs --label for a Clay scroll control"));
+			return;
+		}
+		if(amount < 1) amount = 1;
+		const auto * cw = silencer::ui::clay_inspector::FindByLabel(label.c_str());
+		if(!cw){
+			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", label));
+			return;
+		}
+		if(cw->kind != silencer::ui::clay_inspector::WidgetKind::Button || !cw->onClick){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
+				"scroll target is not a Clay scroll button"));
+			return;
+		}
+		for(int i = 0; i < amount; ++i){
+			cw->onClick(cw->clickUser);
+		}
+		nlohmann::json r;
+		r["source"] = "clay";
+		r["label"] = label;
+		r["amount"] = amount;
+		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
 
@@ -336,8 +789,36 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		HandleGas(game, cmd);
 		return;
 	}
+#ifdef SILENCER_HAVE_LOBBY_CLAY
+	if(cmd.op == "lobby_show_panel"){
+		// Drive the lobby's right-side panel swap from a CLI test. The Clay
+		// lobby exposes its panels as Clay subtrees with no world Interface
+		// objects, so `click --label "Create Game"` can't reach them. This
+		// op routes through `LobbyClayScreen::ShowGame*` directly.
+		Screen * top = game.GetTopScreen();
+		LobbyClayScreen * lobby = dynamic_cast<LobbyClayScreen *>(top);
+		if(!lobby){
+			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
+				"top screen is not a LobbyClayScreen"));
+			return;
+		}
+		std::string which = cmd.args.value("panel", std::string());
+		ScreenContext & ctx = game.GetScreenContext();
+		if(which == "create")      lobby->ShowGameCreate(ctx);
+		else if(which == "select") lobby->ShowGameSelect(ctx);
+		else if(which == "join")   lobby->ShowGameJoin(ctx);
+		else if(which == "tech")   lobby->ShowGameTech(ctx);
+		else{
+			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
+				"lobby_show_panel needs --panel select|create|join|tech"));
+			return;
+		}
+		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		return;
+	}
+#endif
 	if(cmd.op == "key"){
-		// Edge-triggered key event for the current interface. Mirrors the SDL
+		// Edge-triggered key event for the active screen. Mirrors the SDL
 		// SDL_EVENT_KEY_DOWN → ascii translation in HandleSDLEvents — magic
 		// values 1-4 = LEFT/RIGHT/UP/DOWN, '\t'/'\n'/0x1B/'\b' = TAB/ENTER/
 		// ESCAPE/BACKSPACE — and printable chars pass through to text inputs.
@@ -361,14 +842,24 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "key needs 'ascii' int or 'key' name/char"));
 			return;
 		}
-		Uint16 ifid = game.GetCurrentInterfaceId();
-		Interface* iface = (Interface*)game.GetWorld().GetObjectFromId(ifid);
-		if(!iface){
-			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no current interface"));
+		Screen * top = game.GetTopScreen();
+		if(top){
+			bool handled = false;
+			if(ascii >= 0x20 && ascii <= 0x7E){
+				handled = top->HandleTextInput(game.GetScreenContext(), (char)ascii);
+			}else{
+				handled = top->HandleKeyPress(game.GetScreenContext(), (char)ascii);
+			}
+			if(handled){
+				cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+				return;
+			}
+		}
+		if(game.HandleInGameMenuKey((char)ascii)){
+			cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
 			return;
 		}
-		iface->ProcessKeyPress(game.GetWorld(), (char)ascii);
-		cmd.reply->set_value(OkResult(cmd.id, nlohmann::json::object()));
+		cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no clay key handler"));
 		return;
 	}
 	cmd.reply->set_value(Err(cmd.id, "UNKNOWN_OP", "unknown op: " + cmd.op));
@@ -426,7 +917,8 @@ void TickWaits(Game& game){
 		} else if(w.cmd.op == "wait_ms"){
 			if(now >= w.deadline_ms) done = true;
 		} else if(w.cmd.op == "wait_for_state"){
-			if(w.wait_state == Game::StateName(game.GetState())){
+			if(w.wait_state == Game::StateName(game.GetState()) &&
+			   (!StateNeedsScreen(w.wait_state) || game.GetTopScreen())){
 				w.cmd.reply->set_value(OkResult(w.cmd.id, nlohmann::json::object()));
 				it = v.erase(it); continue;
 			}

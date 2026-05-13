@@ -8,6 +8,11 @@ set(TEST_SRC
     updater_zip_test.cpp
     updater_sm_test.cpp
     control_widget_test.cpp
+    ui_architecture_test.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/runtime/ClayService.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiAutomationRegistry.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/primitives/Button.cpp
+    ${CMAKE_SOURCE_DIR}/src/client/ui/ClientUi.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updatersha256.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updaterdownload.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updaterzip.cpp
@@ -19,6 +24,8 @@ target_compile_features(silencer_tests PUBLIC cxx_std_14)
 target_include_directories(silencer_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/ui
+    ${CMAKE_SOURCE_DIR}/src/client
     ${CMAKE_SOURCE_DIR}/src/updater
 )
 

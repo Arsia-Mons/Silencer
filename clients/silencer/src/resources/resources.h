@@ -15,10 +15,13 @@ class Resources
 {
 public:
 	Resources();
-	bool Load(class Game & game, bool dedicatedserver = false);
-	bool LoadSprites(class Game & game, bool dedicatedserver = false);
-	bool LoadTiles(class Game & game, bool dedicatedserver = false);
-	bool LoadSounds(class Game & game, bool dedicatedserver = false);
+	// `game` may be null — when null, the progress callback is suppressed.
+	// The demo target (tools/clay-demo/) passes null to avoid pulling in a
+	// full Game instance just to load sprites.
+	bool Load(class Game * game, bool dedicatedserver = false);
+	bool LoadSprites(class Game * game, bool dedicatedserver = false);
+	bool LoadTiles(class Game * game, bool dedicatedserver = false);
+	bool LoadSounds(class Game * game, bool dedicatedserver = false);
 	void UnloadSounds(void);
 	std::vector<std::vector<std::shared_ptr<Surface> > > spritebank;
 	std::vector<std::vector<std::shared_ptr<Surface> > > tilebank;

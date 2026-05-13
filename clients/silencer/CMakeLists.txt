@@ -66,7 +66,7 @@ else()
 	add_executable(${SILENCER_TARGET} ${sources})
 endif()
 
-target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_14)
+target_compile_features(${SILENCER_TARGET} PUBLIC cxx_std_20)
 
 if(WIN32)
 	# Strip <winsock.h> (and other legacy subsystems) out of <windows.h>.
@@ -95,6 +95,24 @@ if(SILENCER_UNITY_BUILD)
 		file(GLOB_RECURSE _mm_sources src/*.mm)
 		set_source_files_properties(${_mm_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 	endif()
+	# The Clay primitives and the lobby_clay panels each use an anonymous
+	# namespace with a shared vocabulary (`g_payloads`, `g_customData`,
+	# `kPayloadCapacity`, `AllocCustomData`, `FromStd`, `kScrollbarBank`,
+	# `OnCreateClicked`, …). Anonymous namespaces re-open in the same
+	# translation unit, so concatenating two of these into one jumbo TU
+	# produces redefinition errors on every shared symbol — and the
+	# panel files also bring `TextInput` / `Box` / etc. into the global
+	# namespace via `using`, which trips sibling screen TUs in the same
+	# batch (e.g. lobby_connect_screen.cpp's `TextInput * passwordinput`
+	# becomes ambiguous). Until the per-file arenas + `using` decls are
+	# refactored into uniquely-scoped storage, build these as individual
+	# TUs.
+	file(GLOB _clay_unsafe_sources
+		src/ui/primitives/*.cpp
+		src/ui/runtime/*.cpp
+		src/render/clay_ui_tests/*.cpp
+		src/client/ui/screens/lobby_clay/*.cpp)
+	set_source_files_properties(${_clay_unsafe_sources} PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 endif()
 
 # Compile HLSL → DXIL bytecode headers for the SDL3 GPU backend. macOS keeps
@@ -130,18 +148,16 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/objects"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/stations"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/components"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/panels"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/modals"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/main_menu"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/options"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby_connect"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/update"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/panels"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/lobby/modals"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/screens/mission_summary"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/runtime"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/modals"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/main_menu"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/options"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby_connect"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/update"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby_clay"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/mission_summary"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/net"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/updater"
@@ -176,6 +192,7 @@ target_compile_definitions(${SILENCER_TARGET} PRIVATE
 	SILENCER_VERSION="${SILENCER_VERSION}"
 	SILENCER_MAP_API_URL="${SILENCER_MAP_API_URL}"
 	SILENCER_ADMIN_API_URL="${SILENCER_ADMIN_API_URL}"
+	SILENCER_HAVE_LOBBY_CLAY=1
 )
 
 find_package(ZLIB REQUIRED)
@@ -274,5 +291,84 @@ if(SILENCER_BUILD_TESTS)
 	enable_testing()
 	add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../tests ${CMAKE_BINARY_DIR}/tests)
 endif()
+
+# clay-demo target (P21) — dogfood pass that proves the Clay primitives in
+# `src/ui/primitives/` are screen-agnostic by linking them into a
+# non-lobby executable. Source list = silencer sources MINUS `src/main.cpp`
+# and `src/client/ui/screens/lobby_clay/*`. The `SILENCER_HAVE_LOBBY_CLAY` define
+# is NOT set, so `game.cpp` and `controldispatch.cpp` compile their
+# lobby-clay references out. Result: the binary does not link against any
+# `clients/silencer/src/client/ui/screens/lobby_clay/` symbol (P21 pass_check).
+set(clay_demo_sources ${sources})
+list(FILTER clay_demo_sources EXCLUDE REGEX "/src/main\\.cpp$")
+list(FILTER clay_demo_sources EXCLUDE REGEX "/src/client/ui/screens/lobby_clay/")
+list(APPEND clay_demo_sources
+	"${CMAKE_CURRENT_SOURCE_DIR}/../../tools/clay-demo/main.cpp")
+add_executable(clay_demo ${clay_demo_sources})
+target_compile_features(clay_demo PUBLIC cxx_std_20)
+target_compile_definitions(clay_demo PRIVATE
+	SILENCER_LOBBY_HOST="${SILENCER_LOBBY_HOST}"
+	SILENCER_LOBBY_PORT=${SILENCER_LOBBY_PORT}
+	SILENCER_VERSION="${SILENCER_VERSION}"
+	SILENCER_MAP_API_URL="${SILENCER_MAP_API_URL}"
+	SILENCER_ADMIN_API_URL="${SILENCER_ADMIN_API_URL}"
+)
+if(WIN32)
+	target_compile_definitions(clay_demo PRIVATE WIN32_LEAN_AND_MEAN)
+endif()
+if(MSVC)
+	target_compile_options(clay_demo PRIVATE $<$<CONFIG:Debug>:/Z7>)
+	target_compile_options(clay_demo PRIVATE
+		"/FI${CMAKE_CURRENT_SOURCE_DIR}/cmake/msvc_snprintf_compat.h")
+	target_compile_definitions(clay_demo PRIVATE NOMINMAX)
+endif()
+add_dependencies(clay_demo silencer_shaders)
+target_include_directories(clay_demo PRIVATE
+	"${CMAKE_CURRENT_SOURCE_DIR}/shaders/generated"
+	"${CMAKE_CURRENT_SOURCE_DIR}/third_party"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/platform"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/render"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/audio"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/input"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/world"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/actors"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/projectiles"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/objects"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/stations"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/ui/runtime"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/modals"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/main_menu"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/options"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/lobby_connect"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/update"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/mission_summary"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/net"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/game"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/updater"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/gas"
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/events"
+)
+if(APPLE)
+	target_link_libraries(clay_demo
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		CURL::libcurl ${COCOA_FRAMEWORK})
+elseif(WIN32)
+	target_link_libraries(clay_demo
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		CURL::libcurl ws2_32)
+else()
+	target_link_libraries(clay_demo
+		SDL3::SDL3 SDL3_mixer::SDL3_mixer ${ZLIB_LIBRARY}
+		CURL::libcurl)
+endif()
+target_link_libraries(clay_demo minizip_dep)
+set_target_properties(clay_demo PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY
+		"${CMAKE_CURRENT_SOURCE_DIR}/../../tools/clay-demo/build")
 
 include(CPack)

@@ -6,10 +6,6 @@
 #include "input.h"
 #include "keybinds.h"
 #include "state.h"
-#include "interface.h"
-#include "button.h"
-#include "overlay.h"
-#include "textbox.h"
 #include "updater.h"
 #include "controlserver.h"
 #include "inputserver.h"
@@ -19,6 +15,7 @@
 #include "ambience_mixer.h"
 #include <array>
 #include <memory>
+#include <string>
 #include <vector>
 
 class Screen;
@@ -42,13 +39,20 @@ public:
 	int GetFrameCount() const { return frames; }
 	static const char* StateName(Uint8 s);
 	Uint8 GetState() const { return state; }
-	Uint16 GetCurrentInterfaceId() const { return currentinterface; }
 	class World& GetWorld() { return world; }
+	// Test/control-dispatch hook: gives ControlDispatch op handlers access
+	// to the ScreenContext so they can invoke screen-side helpers (e.g.
+	// LobbyClayScreen::ShowGameCreate from a CLI op when there's no widget
+	// path to drive the click). Game-thread only.
+	ScreenContext& GetScreenContext() { return screenContext; }
 	nlohmann::json GetWorldSummary();
+	nlohmann::json ConfigureInGameUiForControl(const std::string& mode);
 	const Surface& GetScreenBuffer() const { return screenbuffer; }
 	const SDL_Color* GetPaletteColors() const { return palettecolors; }
 	Renderer& GetRenderer() { return renderer; }
+	bool ResizeRenderSurface(int width, int height);
 	bool IsLiveMultiplayer() const;
+	bool HandleInGameMenuKey(char ascii);
 	bool GoBack(void);
 	struct PendingWait {
 		ControlCommand cmd;
@@ -87,9 +91,8 @@ public:
 	const GamepadState& GetGamepadState() const { return gamepadstate; }
 	SDL_Gamepad * GetGamepad() const { return gamepad; }
 
-	// LobbyScreen + per-panel interop. Public so panels can reach in via
+	// LobbyClayScreen + per-panel interop. Public so panels can reach in via
 	// `ScreenContext::game`.
-	Uint16 currentinterface;
 	Uint32 currentlobbygameid;
 	bool minimized;
 	bool creategameclicked;
@@ -98,13 +101,8 @@ public:
 	void SpectateGame(LobbyGame & lobbygame, char * password = 0);
 	// Tear down a joined game's session/world state (Disconnect, switch
 	// authority, destroy team overlays, rejoin previous chat channel). UI
-	// concerns (panel swap, map-name overlay) stay on LobbyScreen.
+	// concerns (panel swap, map-name overlay) stay on LobbyClayScreen.
 	void LeaveJoinedGame();
-	// Toggle in-lobby team overlay visibility. Called by LobbyScreen's
-	// right-side panel swaps (ShowGameTech / TearDownRightPanels) when
-	// entering / leaving the tech-choice surface.
-	void ShowTeamOverlays(bool show);
-
 private:
 	bool Tick(void);
 	// Gameplay-state Tick bodies — one per state. Each lives in its own
@@ -135,7 +133,7 @@ private:
 	bool CheckForQuit(void);
 	bool CheckForEndOfGame(void);
 	bool CheckForConnectionLost(void);
-	void ProcessInGameInterfaces(void);
+	void UpdateInGameOverlayState(void);
 	void ShowDeployMessage(void);
 	void GiveDefaultItems(Player & player);
 	void GoToState(Uint8 newstate);
@@ -176,9 +174,8 @@ private:
 	char * replayfile;
 	ControlServer controlserver;
 	InputServer inputserver;
-	// TUI mouse edge-detection state. Tracks the last (x, y, down) we
-	// applied so the TUI loop can synthesize ProcessMousePress / Move
-	// calls on transitions, mirroring HandleSDLEvents on native.
+	// TUI mouse edge-detection state. Tracks the last (x, y, down) so
+	// control clients drive the same screen-level mouse hooks as SDL.
 	Uint16 tui_prev_mouse_x;
 	Uint16 tui_prev_mouse_y;
 	bool   tui_prev_mouse_down;

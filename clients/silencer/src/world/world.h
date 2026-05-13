@@ -22,6 +22,17 @@
 #include "replay.h"
 #include "TriggerGraph.h"
 
+class Renderer;
+class Surface;
+class World;
+namespace silencer {
+namespace client_ui {
+class InGameOverlayRenderer;
+void DrawInGameHud(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
+void DrawInGameOverlays(::Renderer& renderer, ::World& world, ::Surface* surface);
+}
+}
+
 class World
 {
 public:
@@ -151,19 +162,16 @@ public:
 	friend class Replay;
 	friend class Audio;
 	friend class TriggerGraph;
-	// Stage F of the game.cpp refactor: LobbyScreen::ShowGameTech calls
-	// World::RequestPeerList from the gametech-view enter path. Removed
-	// in stage G when the call moves into GameTechPanel::Build.
-	friend class LobbyScreen;
-	// GameJoinPanel reads localpeer state (peerlist[localpeerid].ishost,
-	// AllPeersDownloadedMap, gameplaystate) to refresh the Ready button
-	// label, and dispatches SendReady on click.
-	friend class GameJoinPanel;
-	// GameTechPanel ports the legacy Game::UpdateTechInterface — reads
-	// peerlist[team peers] to drive the per-peer tech checkbox grid, calls
-	// RequestPeerList when the local-peer slot is empty (recovery for a
-	// dropped peerlist packet).
-	friend class GameTechPanel;
+	friend class silencer::client_ui::InGameOverlayRenderer;
+	friend void silencer::client_ui::DrawInGameHud(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
+	friend void silencer::client_ui::DrawInGameOverlays(::Renderer& renderer, ::World& world, ::Surface* surface);
+	// LobbyClayScreen reads/writes World state across the entire lobby
+	// surface: seeds gameinfo from the lobby record after a successful
+	// host-side CreateGame, reads localpeer state to refresh the Ready
+	// button label, calls RequestPeerList/SetTech on the tech-choice
+	// surface, etc. Routes panels' world access through thin pass-through
+	// helpers on the screen rather than friending each Clay panel.
+	friend class LobbyClayScreen;
 
 protected:
 	std::list<class Object *> objectlist;

@@ -20,7 +20,6 @@ void Game::TickHostGame(){
 		world.gameinfo.accountid = 1;
 		world.dedicatedserver.active = true;
 		world.dedicatedserver.accountid = 1;
-		currentinterface = 0;
 		State * newsharedstateobject = static_cast<State *>(world.CreateObject(ObjectTypes::STATE));
 		sharedstate = newsharedstateobject->id;
 		newsharedstateobject->state = 0;
@@ -99,7 +98,6 @@ void Game::TickJoinGame(){
 		mapDownloader.LoadMapData(mapDownloader.FindMap(world.gameinfo.mapname, &world.gameinfo.maphash).c_str());
 		//printf("map data: %d %d\n", world.currentmapdatalength, world.currentmapdatamax);
 		Audio::GetInstance().StopMusic();
-		currentinterface = 0;
 		world.DestroyAllObjects();
 		stateisnew = false;
 	}else{
@@ -116,7 +114,6 @@ void Game::TickTestGame(){
 		world.GetAuthorityPeer()->controlledlist.clear();
 		world.DestroyAllObjects();
 		world.gameplaystate = World::INGAME;
-		currentinterface = 0;
 		Audio::GetInstance().StopMusic();
 		world.GetAuthorityPeer()->techchoices = 0xffffffff;//World::BUY_LASER | World::BUY_ROCKET;
 		Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);

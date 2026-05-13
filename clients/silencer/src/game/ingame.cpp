@@ -1,14 +1,15 @@
 #include "game.h"
 #include "audio.h"
+#include "basedoor.h"
+#include "buyableitem.h"
 #include "config.h"
 #include "gasloader.h"
-#include "interface.h"
+#include "objecttypes.h"
 #include "player.h"
-#include "selectbox.h"
 #include "team.h"
-#include "textinput.h"
 #include "world.h"
 #include <cstring>
+#include <vector>
 
 bool Game::LoadMap(const char * name){
 	if(!world.map.Load(name, world)){
@@ -105,93 +106,175 @@ bool Game::CheckForConnectionLost(void){
 	return false;
 }
 
-void Game::ProcessInGameInterfaces(void){
+void Game::UpdateInGameOverlayState(void){
 	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 	if(localplayer){
-		if(localplayer->buyinterfaceid || localplayer->techinterfaceid){
-			currentinterface = localplayer->buyinterfaceid;
-			if(!currentinterface){
-				currentinterface = localplayer->techinterfaceid;
+		if(localplayer->isbuying || localplayer->techstationactive){
+			std::vector<BuyableItem *> items;
+			localplayer->CollectBuyMenuItems(world, localplayer->techstationactive, items);
+			int & selected = localplayer->isbuying ? localplayer->buyifacelastitem : localplayer->techifacelastitem;
+			int & scrolled = localplayer->isbuying ? localplayer->buyifacelastscrolled : localplayer->techifacelastscrolled;
+			if(items.empty()){
+				selected = 0;
+				scrolled = 0;
+			}else{
+				if(selected < 0) selected = 0;
+				if(selected >= (int)items.size()) selected = (int)items.size() - 1;
+				if(selected >= scrolled + 5) scrolled = selected - 4;
+				if(selected < scrolled) scrolled = selected;
+				if(scrolled < 0) scrolled = 0;
 			}
 		}else{
 			oldselecteditem = 0;
 		}
-		if(localplayer->chatinterfaceid){
-			currentinterface = localplayer->chatinterfaceid;
+	}
+}
+
+bool Game::HandleInGameMenuKey(char ascii){
+	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+	if(!localplayer || (!localplayer->isbuying && !localplayer->techstationactive)){
+		return false;
+	}
+	std::vector<BuyableItem *> items;
+	bool tech = localplayer->techstationactive;
+	localplayer->CollectBuyMenuItems(world, tech, items);
+	if(items.empty()){
+		return true;
+	}
+	int & selected = localplayer->isbuying ? localplayer->buyifacelastitem : localplayer->techifacelastitem;
+	int & scrolled = localplayer->isbuying ? localplayer->buyifacelastscrolled : localplayer->techifacelastscrolled;
+	if(selected < 0) selected = 0;
+	if(selected >= (int)items.size()) selected = (int)items.size() - 1;
+	int old = selected;
+	if(ascii == 3){
+		if(selected > 0) selected--;
+	}else if(ascii == 4){
+		if(selected < (int)items.size() - 1) selected++;
+	}else if(ascii == '\n'){
+		BuyableItem * buyableitem = items[selected];
+		if(localplayer->isbuying){
+			localplayer->BuyItem(world, buyableitem->id);
+		}else if(localplayer->InOwnBase(world)){
+			localplayer->RepairItem(world, buyableitem->id);
+		}else{
+			localplayer->VirusItem(world, buyableitem->id);
 		}
-		if(!localplayer->chatinterfaceid && !localplayer->buyinterfaceid && !localplayer->techinterfaceid){
-			currentinterface = 0;
+		return true;
+	}else if(ascii == 0x1B){
+		localplayer->isbuying = false;
+		localplayer->techstationactive = false;
+		return true;
+	}else{
+		return false;
+	}
+	if(selected != old){
+		Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
+	}
+	if(selected >= scrolled + 5) scrolled = selected - 4;
+	if(selected < scrolled) scrolled = selected;
+	if(scrolled < 0) scrolled = 0;
+	oldselecteditem = selected;
+	return true;
+}
+
+nlohmann::json Game::ConfigureInGameUiForControl(const std::string& mode) {
+	nlohmann::json r;
+	r["mode"] = mode;
+	r["ok"] = false;
+
+	Player * player = world.GetPeerPlayer(world.viewedpeerid);
+	if(!player){
+		r["error"] = "no viewed player";
+		return r;
+	}
+
+	auto clear = [&]() {
+		player->chatActive = false;
+		player->chatText[0] = '\0';
+		player->isbuying = false;
+		player->techstationactive = false;
+		world.showchat_i = 0;
+		world.showplayerlist = false;
+	};
+
+	if(mode == "clear"){
+		clear();
+		r["ok"] = true;
+		return r;
+	}
+
+	if(mode != "status") clear();
+	if(mode == "chat" || mode == "all"){
+		player->chatActive = true;
+		player->chatwithteam = false;
+		std::strncpy(player->chatText, "clay chat smoke", sizeof(player->chatText) - 1);
+		player->chatText[sizeof(player->chatText) - 1] = '\0';
+		world.showchat_i = GASLoader::Get().gameengine.chatDisplayTicks;
+	}
+	if(mode == "buy" || mode == "all"){
+		player->isbuying = true;
+		player->buyifacelastitem = 0;
+		player->buyifacelastscrolled = 0;
+	}
+	if(mode == "tech" || mode == "all"){
+		Team * team = player->GetTeam(world);
+		if(!team && !world.objectsbytype[ObjectTypes::TEAM].empty()){
+			team = static_cast<Team *>(world.GetObjectFromId(world.objectsbytype[ObjectTypes::TEAM][0]));
 		}
-		Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-		if(iface){
-			if(iface->id == localplayer->chatinterfaceid){
-				TextInput * textinput = (TextInput *)iface->GetObjectWithUid(world, 1);
-				if(textinput){
-					if(textinput->tabpressed){
-						localplayer->chatwithteam = !localplayer->chatwithteam;
-						textinput->tabpressed = false;
-					}
-					if(textinput->enterpressed){
-						if(strlen(textinput->text) > 0){
-							world.SendChat(localplayer->chatwithteam, textinput->text);
-						}
-						iface->DestroyInterface(world, iface);
-						localplayer->chatinterfaceid = 0;
-					}
-					if(keystate[quitscancode]){
-						iface->DestroyInterface(world, iface);
-						localplayer->chatinterfaceid = 0;
-					}
-				}
-			}else
-			if(iface->id == localplayer->buyinterfaceid || iface->id == localplayer->techinterfaceid){
-				bool buying = false;
-				if(iface->id == localplayer->buyinterfaceid){
-					buying = true;
-				}
-				SelectBox * selectbox = (SelectBox *)iface->GetObjectWithUid(world, 1);
-				if(selectbox){
-					if(selectbox->selecteditem != oldselecteditem){
-						Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
-						oldselecteditem = selectbox->selecteditem;
-						if(buying){
-							localplayer->buyifacelastitem = selectbox->selecteditem;
-						}
-					}
-					if(selectbox->selecteditem >= selectbox->scrolled + 5){
-						selectbox->scrolled = selectbox->selecteditem - 4;
-					}
-					if(selectbox->selecteditem < selectbox->scrolled){
-						selectbox->scrolled = selectbox->selecteditem;
-					}
-					if(buying){
-						localplayer->buyifacelastscrolled = selectbox->scrolled;
-					}
-					if(selectbox->enterpressed){
-						BuyableItem * buyableitem = 0;
-						for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
-							if((*it)->id == selectbox->IndexToId(selectbox->selecteditem)){
-								buyableitem = (*it);
-								break;
-							}
-						}
-						if(buyableitem){
-							if(buying){
-								localplayer->BuyItem(world, buyableitem->id);
-							}else{
-								if(localplayer->InOwnBase(world)){
-									localplayer->RepairItem(world, buyableitem->id);
-								}else{
-									localplayer->VirusItem(world, buyableitem->id);
-								}
-							}
-						}
-						selectbox->enterpressed = false;
-					}
+		if(!team){
+			team = static_cast<Team *>(world.CreateObject(ObjectTypes::TEAM));
+			if(team){
+				team->agency = Team::NOXIS;
+				team->number = 0;
+				team->color = ((8 << 4) + 13);
+			}
+		}
+		if(team){
+			player->teamid = team->id;
+			team->AddPeer(world.localpeerid);
+		}
+		BaseDoor * door = nullptr;
+		if(team){
+			team->disabledtech = 0xffffffff;
+			door = static_cast<BaseDoor *>(world.GetObjectFromId(team->basedoorid));
+			for(Uint16 objectid : world.objectsbytype[ObjectTypes::BASEDOOR]){
+				auto * candidate = static_cast<BaseDoor *>(world.GetObjectFromId(objectid));
+				if(candidate && candidate->teamid == team->id){
+					door = candidate;
+					break;
 				}
 			}
 		}
+		if(door){
+			player->basedoorentering = door->id;
+		}
+		if(team){
+			int baseY = ((world.map.height + 10) * 64) + (team->number * 26 * 64) + 64;
+			player->y = static_cast<Sint16>(baseY);
+		}
+		player->techstationactive = true;
+		player->techifacelastitem = 0;
+		player->techifacelastscrolled = 0;
 	}
+	if(mode == "playerlist" || mode == "all"){
+		world.showplayerlist = true;
+	}
+
+	std::vector<BuyableItem *> buyItems;
+	std::vector<BuyableItem *> techItems;
+	player->CollectBuyMenuItems(world, false, buyItems);
+	player->CollectBuyMenuItems(world, true, techItems);
+	r["ok"] = true;
+	r["chat_active"] = player->chatActive;
+	r["buy_active"] = player->isbuying;
+	r["tech_active"] = player->techstationactive;
+	r["show_chat_ticks"] = world.showchat_i;
+	r["show_player_list"] = world.showplayerlist;
+	r["buy_item_count"] = static_cast<int>(buyItems.size());
+	r["tech_item_count"] = static_cast<int>(techItems.size());
+	r["buy_selected_index"] = player->buyifacelastitem;
+	r["tech_selected_index"] = player->techifacelastitem;
+	return r;
 }
 
 void Game::ShowDeployMessage(void){
@@ -279,16 +362,6 @@ void Game::SpectateGame(LobbyGame & lobbygame, char * password){
 	joininggame = true;
 }
 
-void Game::ShowTeamOverlays(bool show){
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-		Object * object = *it;
-		if(object->type == ObjectTypes::TEAM){
-			Team * team = static_cast<Team *>(object);
-			team->ShowOverlays(world, show);
-		}
-	}
-}
-
 void Game::LeaveJoinedGame(){
 	world.Disconnect();
 	world.lobby.gamesprocessed = false;
@@ -298,8 +371,6 @@ void Game::LeaveJoinedGame(){
 	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 		Object * object = *it;
 		if(object->type == ObjectTypes::TEAM){
-			Team * team = static_cast<Team *>(object);
-			team->DestroyOverlays(world);
 			world.MarkDestroyObject(object->id);
 		}
 	}

@@ -1,0 +1,26 @@
+#ifndef OPTIONS_DISPLAY_SCREEN_H
+#define OPTIONS_DISPLAY_SCREEN_H
+
+#include "screen.h"
+
+class OptionsDisplayScreen : public Screen
+{
+public:
+	void Build(ScreenContext & ctx) override;
+	void Tick(ScreenContext & ctx) override;
+	void Draw(ScreenContext & ctx, Surface & dst, float frametime) override;
+	void Destroy(ScreenContext & ctx) override;
+
+	void NotifyFullscreenClicked() { fullscreenClicked = true; }
+	void NotifySmoothScalingClicked() { smoothScalingClicked = true; }
+	void NotifySaveClicked() { saveClicked = true; }
+	void NotifyCancelClicked() { cancelClicked = true; }
+
+private:
+	bool fullscreenClicked = false;
+	bool smoothScalingClicked = false;
+	bool saveClicked = false;
+	bool cancelClicked = false;
+};
+
+#endif
