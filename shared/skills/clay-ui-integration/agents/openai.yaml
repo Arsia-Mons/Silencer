@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clay UI Integration"
+  short_description: "Implement Clay UI correctly in renderer-agnostic applications."
+  default_prompt: "Use this skill to design or audit a Clay UI integration with correct lifecycle, input, scrolling, text measurement, IDs, render command dispatch, and backend boundaries."
