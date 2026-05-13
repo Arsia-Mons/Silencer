@@ -114,26 +114,26 @@ void Civilian::InitBT(){
 	// return to WALKING after runDurationTicks. Returns Running while running, Failure otherwise.
 	btctx_.actions["RunMove"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
-		// Detect threat and enter RUNNING from WALKING
-		if(state == WALKING){
+		const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
+		// Check for threats every tick — updates flee direction and triggers RUNNING from WALKING.
+		// Matches original: ThreatLook re-ran every tick after the movement block.
+		if(state == WALKING || state == RUNNING){
 			std::vector<Uint8> types = {
 				ObjectTypes::BLASTERPROJECTILE, ObjectTypes::LASERPROJECTILE,
 				ObjectTypes::ROCKETPROJECTILE,  ObjectTypes::FLAMERPROJECTILE,
 				ObjectTypes::PLASMAPROJECTILE,  ObjectTypes::WALLPROJECTILE,
 				ObjectTypes::FLAREPROJECTILE
 			};
-			const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
 			int dx = cd ? cd->threatDetectX : 200;
 			int dy = cd ? cd->threatDetectY : 100;
 			std::vector<Object*> threats = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
 			if(!threats.empty()){
 				mirrored = (threats[0]->x > x);
-				state = RUNNING; state_i = -1;
+				if(state != RUNNING){ state = RUNNING; state_i = -1; }
 			}
 		}
 		if(state != RUNNING) return BTResult::Failure;
 		// Exit RUNNING after runDurationTicks
-		const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
 		int runDuration = cd ? cd->runDurationTicks : 150;
 		if(state_i >= runDuration){ state = WALKING; state_i = -1; return BTResult::Failure; }
 		// RUNNING movement
