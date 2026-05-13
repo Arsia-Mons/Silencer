@@ -9,7 +9,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_button.h"
 
 #include <SDL3/SDL.h>
@@ -53,13 +53,13 @@ void RegisterButton(const char * label,
                     void (*onClick)(void *),
                     OptionsScreen * screen)
 {
-	silencer::ui::clay_inspector::Widget w;
+	silencer::ui::automation::Widget w;
 	w.label = label;
-	w.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
 	w.onClick = onClick;
 	w.clickUser = screen;
-	silencer::ui::clay_inspector::Register(w);
+	silencer::ui::automation::Register(w);
 }
 
 void RegisterOptionsButtons(OptionsScreen * screen)
@@ -84,7 +84,7 @@ void OptionsScreen::Build(ScreenContext & ctx)
 	displayClicked = false;
 	audioClicked = false;
 
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 	RegisterOptionsButtons(this);
 }
 
@@ -120,9 +120,9 @@ void OptionsScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	ctx.BeginClayFrame(dst);
 
 	BankButtonBeginFrame();
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 
-	Clay_BeginLayout();
+	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("OptionsRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -147,7 +147,7 @@ void OptionsScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 			           BankButtonHandle{ nullptr, &OnGoBackClicked, this });
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
 
 	Render(ctx.game, &dst, cmds);
 	RegisterOptionsButtons(this);

@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/toggle.h"
 
@@ -202,16 +202,16 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 				// inspector dispatch is label-based; the rect is only used
 				// when geometric hit-testing is requested.
 				const int tx = 20 + i * 42;
-				silencer::ui::clay_inspector::Widget w;
+				silencer::ui::automation::Widget w;
 				w.label = kAgencyLabels[i];
-				w.kind  = silencer::ui::clay_inspector::WidgetKind::Toggle;
+				w.kind  = silencer::ui::automation::WidgetKind::Toggle;
 				w.x = tx; w.y = 90;
 				w.w = spriteW > 0 ? spriteW : (Uint16)16;
 				w.h = spriteH > 0 ? spriteH : (Uint16)16;
 				w.onClick   = &OnAgencyClicked;
 				w.clickUser = &g_adapters[i];
 				w.selected  = (state.selectedAgency == def.agency);
-				silencer::ui::clay_inspector::Register(w);
+				silencer::ui::automation::Register(w);
 			}
 		}
 

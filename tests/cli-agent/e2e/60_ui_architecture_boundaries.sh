@@ -26,9 +26,16 @@ fail_if_path_exists "clients/silencer/src/ui/modals"
 fail_if_path_exists "clients/silencer/src/ui/panels"
 fail_if_path_exists "clients/silencer/src/ui/screens"
 fail_if_path_exists "clients/silencer/src/ui/clay"
+fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.h"
+fail_if_path_exists "clients/silencer/src/ui/runtime/clay_inspector.cpp"
 
 fail_if_match \
   "\\b(currentinterface|ProcessInGameInterfaces|Interface \\*|new Interface|ui/components|ui/modals|ui/panels|ui/screens)\\b" \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**'
+
+fail_if_match \
+  "clay_inspector" \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
 
@@ -43,6 +50,11 @@ if rg -n "SDL_GetMouseState|Clay_SetPointerState\\(\\{ mx" \
   echo "screen UI must use ScreenContext::BeginClayFrame for native pointer setup" >&2
   exit 1
 fi
+
+fail_if_match \
+  "Clay_(BeginLayout|EndLayout)[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
+  "$REPO_ROOT/clients/silencer/src/client/ui/modals"
 
 fail_if_match \
   "Draw(BuyTech|Chat)OverlayClay|InGame(BuyTech|Chat)Root" \

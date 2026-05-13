@@ -26,7 +26,7 @@
 #include "options_display_screen.h"
 #include "options_audio_screen.h"
 #include "lobby_connect_screen.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #ifdef SILENCER_HAVE_LOBBY_UI
 #include "lobby_screen.h"
 #endif
@@ -52,6 +52,8 @@ using namespace GameState;
 #endif
 
 Game::Game() : renderer(world), screenbuffer(640, 480),
+               uiClayService(uiClayBackend),
+               clientUi(uiClayService, clientUiState),
                mapDownloader(world),
                ambienceMixer(world, renderer, mapDownloader, fade_i),
                screenContext(*this, world, renderer, world.lobby, keymap, updater, ambienceMixer, mapDownloader, window, renderdevice){
@@ -354,6 +356,135 @@ bool Game::ResizeRenderSurface(int width, int height){
 	return true;
 }
 
+void Game::AddUiWheelDelta(float x, float y) {
+	uiWheelX += x;
+	uiWheelY += y;
+}
+
+void Game::AddUiNavAction(silencer::ui::UiNavAction action) {
+	uiNavActions.push_back(action);
+}
+
+static bool UiNavActionToAscii(silencer::ui::UiNavAction action, char& ascii) {
+	switch(action){
+		case silencer::ui::UiNavAction::FocusNext:
+		case silencer::ui::UiNavAction::NextSection:
+			ascii = '\t';
+			return true;
+		case silencer::ui::UiNavAction::FocusPrevious:
+		case silencer::ui::UiNavAction::PreviousSection:
+		case silencer::ui::UiNavAction::Up:
+			ascii = 3;
+			return true;
+		case silencer::ui::UiNavAction::Down:
+			ascii = 4;
+			return true;
+		case silencer::ui::UiNavAction::Left:
+			ascii = 1;
+			return true;
+		case silencer::ui::UiNavAction::Right:
+			ascii = 2;
+			return true;
+		case silencer::ui::UiNavAction::Confirm:
+			ascii = '\n';
+			return true;
+		case silencer::ui::UiNavAction::Cancel:
+			ascii = 0x1B;
+			return true;
+	}
+	return false;
+}
+
+static silencer::ui::UiNavAction UiNavActionFromAscii(Uint8 ascii) {
+	switch(ascii){
+		case 1: return silencer::ui::UiNavAction::Left;
+		case 2: return silencer::ui::UiNavAction::Right;
+		case 3: return silencer::ui::UiNavAction::Up;
+		default: return silencer::ui::UiNavAction::Down;
+	}
+}
+
+silencer::ui::UiInputState Game::BuildUiInputState(Surface& surface) {
+	silencer::ui::UiInputState input;
+	input.width = surface.w;
+	input.height = surface.h;
+	input.deltaTimeSeconds = static_cast<float>(GASLoader::Get().gameengine.tickIntervalMs) / 1000.0f;
+	if(input.deltaTimeSeconds <= 0.0f) input.deltaTimeSeconds = 1.0f / 60.0f;
+
+	float mx = static_cast<float>(world.localinput.mousex);
+	float my = static_cast<float>(world.localinput.mousey);
+	bool down = world.localinput.mousedown;
+
+	if(window){
+		Uint32 buttons = SDL_GetMouseState(&mx, &my);
+		down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
+		int windowW = 0;
+		int windowH = 0;
+		SDL_GetWindowSize(window, &windowW, &windowH);
+		if(windowW > 0 && windowH > 0){
+			mx = (mx / static_cast<float>(windowW)) * static_cast<float>(surface.w);
+			my = (my / static_cast<float>(windowH)) * static_cast<float>(surface.h);
+		}
+	}
+
+	input.pointer.x = mx;
+	input.pointer.y = my;
+	input.pointer.down = down;
+	input.pointer.pressed = down && !uiPointerWasDown;
+	input.pointer.released = !down && uiPointerWasDown;
+	input.pointer.wheelX = uiWheelX;
+	input.pointer.wheelY = uiWheelY;
+	input.navActions = uiNavActions;
+	return input;
+}
+
+void Game::PrepareClientUiFrame(Surface& surface) {
+	preparedUiInput = BuildUiInputState(surface);
+	hasPreparedUiInput = true;
+	DispatchPreparedUiNavActions();
+}
+
+void Game::DispatchPreparedUiNavActions() {
+	if(hasDispatchedPreparedUiNav) return;
+	Screen * top = GetTopScreen();
+	if(top) {
+		for(auto action : preparedUiInput.navActions) {
+			char ascii = 0;
+			if(UiNavActionToAscii(action, ascii)) {
+				top->HandleKeyPress(screenContext, ascii);
+			}
+		}
+		hasDispatchedPreparedUiNav = true;
+	}
+}
+
+void Game::BeginPreparedClientUiFrame() {
+	if(!hasPreparedUiInput) {
+		PrepareClientUiFrame(screenbuffer);
+	}
+	clientUi.BeginFrame(preparedUiInput);
+}
+
+Clay_RenderCommandArray Game::EndClientUiFrame() {
+	clientUi.EndFrame();
+	// Screen-local callbacks still own state changes during this migration pass,
+	// but interactions now emit typed actions that are drained after layout.
+	(void)clientUi.DrainActions();
+	hasPreparedUiInput = false;
+	return uiClayBackend.Commands();
+}
+
+void Game::ResetUiFrameDeltas() {
+	uiWheelX = 0.0f;
+	uiWheelY = 0.0f;
+	uiNavActions.clear();
+	hasDispatchedPreparedUiNav = false;
+	uiPointerWasDown = preparedUiInput.pointer.down;
+	preparedUiInput.pointer.wheelX = 0.0f;
+	preparedUiInput.pointer.wheelY = 0.0f;
+	preparedUiInput.navActions.clear();
+}
+
 void Game::Present(void){
 	if(renderdevice){
 		renderdevice->UploadFrame(screenbuffer.pixels.data(), screenbuffer.w, screenbuffer.h);
@@ -628,6 +759,7 @@ bool Game::Loop(void){
 		if(tui && renderdevice && !renderdevice->IsAlive()){
 			quitRequested = true;
 		}
+		ResetUiFrameDeltas();
 		// SDL3GPUBackend's swapchain Present blocks on vsync (~16 ms) so the
 		// non-TUI loop self-throttles. TUIBackend writes to a TCP socket that
 		// never blocks the engine, so without an explicit cap the loop runs
@@ -894,7 +1026,7 @@ void Game::GoToState(Uint8 newstate){
 	// GoToState in response to a button click) can return safely before its
 	// destructor runs.
 	screenStackPendingTeardown = true;
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 }
 
 bool Game::GoBack(void){
@@ -952,12 +1084,12 @@ void Game::TickGamepadMenuNav(){
 			dir.held     = true;
 			dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
 			if(inGameMenu) HandleInGameMenuKey((char)ascii);
-			else top->HandleKeyPress(screenContext, (char)ascii);
+			else AddUiNavAction(UiNavActionFromAscii(ascii));
 		} else if(now >= dir.nextfire){
 			// Repeat.
 			dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
 			if(inGameMenu) HandleInGameMenuKey((char)ascii);
-			else top->HandleKeyPress(screenContext, (char)ascii);
+			else AddUiNavAction(UiNavActionFromAscii(ascii));
 		}
 	};
 
@@ -966,9 +1098,7 @@ void Game::TickGamepadMenuNav(){
 	tick(gamepadNavLeft,  Action::UiLeft,  1);
 	tick(gamepadNavRight, Action::UiRight, 2);
 
-	// Confirm (A/Cross) — no repeat, edge-detect only.
-	// If nothing is focused, auto-focus the first item so the user sees where
-	// they are before committing.
+	// Confirm (A/Cross) is edge-triggered; directional nav handles repeat.
 	{
 		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
 		static bool confirmPrev = false;
@@ -976,7 +1106,7 @@ void Game::TickGamepadMenuNav(){
 			if(inGameMenu){
 				HandleInGameMenuKey('\n');
 			}else{
-				top->HandleKeyPress(screenContext, '\n');
+				AddUiNavAction(silencer::ui::UiNavAction::Confirm);
 			}
 		}
 		confirmPrev = confirmNow;

@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/toggle.h"
@@ -226,12 +226,12 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 		                             /*onClick*/    &OnBackClicked,
 		                             /*user*/       &state });
 	}
-	silencer::ui::clay_inspector::Widget w;
+	silencer::ui::automation::Widget w;
 	w.label = "Back To Teams";
-	w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.kind  = silencer::ui::automation::WidgetKind::Button;
 	w.x = kBtnBackX; w.y = kBtnBackY; w.w = 156; w.h = 21;
 	w.onClick = &OnBackClicked; w.clickUser = &state;
-	silencer::ui::clay_inspector::Register(w);
+	silencer::ui::automation::Register(w);
 
 	// Peer name labels — right-aligned column. ALIGN_X_RIGHT inside a
 	// grow-width wrapper aligns each name to the wrapper's right edge.

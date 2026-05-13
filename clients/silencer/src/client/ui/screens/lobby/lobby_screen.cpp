@@ -19,7 +19,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/box.h"
@@ -207,15 +207,15 @@ void BuildTitleBarTree(LobbyScreen * screen,
 		}
 	}
 
-	silencer::ui::clay_inspector::Widget gb;
+	silencer::ui::automation::Widget gb;
 	gb.label = "Go Back";
-	gb.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+	gb.kind = silencer::ui::automation::WidgetKind::Button;
 	gb.x = std::max(0, surfaceW - (int)kRootPadX - 5 - 156);
 	gb.y = kRootPadTop + 4;
 	gb.w = 156; gb.h = 21;
 	gb.onClick = &OnGoBackClicked;
 	gb.clickUser = screen;
-	silencer::ui::clay_inspector::Register(gb);
+	silencer::ui::automation::Register(gb);
 }
 }  // namespace
 
@@ -422,9 +422,9 @@ void LobbyScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	ScrollListBeginFrame();
 	ScrollTextBoxBeginFrame();
 	TextInputBeginFrame();
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 
-	Clay_BeginLayout();
+	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("LobbyRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -616,7 +616,7 @@ void LobbyScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
 
 	Render(ctx.game, &dst, cmds);
 }

@@ -10,7 +10,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_button.h"
 #include "primitives/bank_text.h"
 
@@ -71,13 +71,13 @@ void RegisterButton(const char * label,
                     void (*onClick)(void *),
                     UpdateScreen * screen)
 {
-	silencer::ui::clay_inspector::Widget w;
+	silencer::ui::automation::Widget w;
 	w.label = label;
-	w.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
 	w.onClick = onClick;
 	w.clickUser = screen;
-	silencer::ui::clay_inspector::Register(w);
+	silencer::ui::automation::Register(w);
 }
 
 void RegisterWidgets(UpdateScreen * screen, int surfaceW, int surfaceH, Updater::State state, int retryCount)
@@ -140,7 +140,7 @@ void UpdateScreen::Build(ScreenContext & ctx)
 	cancelClicked = false;
 	retryClicked = false;
 	downloadClicked = false;
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 	const Surface& surface = ctx.game.GetScreenBuffer();
 	RegisterWidgets(this, surface.w, surface.h, ctx.updater.GetState(), ctx.updater.GetRetryCount());
 }
@@ -209,13 +209,13 @@ void UpdateScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 
 	BankButtonBeginFrame();
 	BankTextBeginFrame();
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 
 	std::string status = StatusText(ctx);
 	std::string progress = ProgressText(ctx);
 	Updater::State ustate = ctx.updater.GetState();
 
-	Clay_BeginLayout();
+	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("UpdateRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -260,7 +260,7 @@ void UpdateScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
 	Render(ctx.game, &dst, cmds);
 	RegisterWidgets(this, dst.w, dst.h, ustate, ctx.updater.GetRetryCount());
 }

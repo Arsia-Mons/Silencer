@@ -2,7 +2,7 @@
 # Drives the migrated lobby through gameselect → gamecreate using only
 # `cli click --label` and `cli set_text --label`, ending with a Create.
 # Exercises P18 (CLI inspect compatibility for Clay tree): the Clay panels
-# register their interactive widgets in clay_inspector, and controldispatch
+# register their interactive widgets in UiAutomationRegistry, and controldispatch
 # routes click / set_text through that registry when the active iface has
 # no matching object.
 set -euo pipefail

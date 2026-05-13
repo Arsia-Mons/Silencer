@@ -114,3 +114,34 @@ TEST_CASE("UiAutomationRegistry supports id and case-insensitive label lookup") 
 	CHECK(registry.FindByLabel("connect") != nullptr);
 	CHECK(registry.FindByLabel("missing") == nullptr);
 }
+
+TEST_CASE("UiAutomationRegistry queues typed actions for interactive widgets") {
+	silencer::ui::UiAutomationRegistry registry;
+	registry.BeginFrame();
+
+	int clicks = 0;
+	auto onClick = [](void * user) {
+		++*static_cast<int *>(user);
+	};
+	silencer::ui::UiAutomationWidget widget;
+	widget.label = "Connect";
+	widget.kind = silencer::ui::UiAutomationWidgetKind::Button;
+	widget.uid = 42;
+	widget.x = 10;
+	widget.y = 20;
+	widget.w = 80;
+	widget.h = 30;
+	widget.onClick = onClick;
+	widget.clickUser = &clicks;
+	registry.RegisterWidget(widget);
+
+	CHECK(registry.InvokeAt(12, 22));
+	CHECK(clicks == 1);
+
+	auto actions = registry.DrainActions();
+	REQUIRE(actions.size() == 1);
+	CHECK(actions[0].kind == silencer::ui::UiActionKind::Activate);
+	CHECK(actions[0].id == "42");
+	CHECK(actions[0].value == "Connect");
+	CHECK(registry.DrainActions().empty());
+}

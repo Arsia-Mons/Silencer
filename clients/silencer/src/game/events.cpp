@@ -352,9 +352,10 @@ bool Game::HandleSDLEvents(void){
 			case SDL_EVENT_KEY_UP:{
 				OnScancodeUp(event.key.scancode);
 				keystate[event.key.scancode] = false;
-			}break;
-			case SDL_EVENT_MOUSE_WHEEL:{
-			}break;
+				}break;
+				case SDL_EVENT_MOUSE_WHEEL:{
+					AddUiWheelDelta(event.wheel.x, event.wheel.y);
+				}break;
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:{
 				if(event.button.button == SDL_BUTTON_LEFT){
 					Screen * top = GetTopScreen();

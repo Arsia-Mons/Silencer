@@ -13,6 +13,10 @@
 #include "game_state.h"
 #include "map_downloader.h"
 #include "ambience_mixer.h"
+#include "client/ui/ClayBridgeFrameBackend.h"
+#include "client/ui/ClientUi.h"
+#include "clay/clay.h"
+#include "ui/runtime/UiInputState.h"
 #include <array>
 #include <memory>
 #include <string>
@@ -137,6 +141,14 @@ private:
 	void ShowDeployMessage(void);
 	void GiveDefaultItems(Player & player);
 	void GoToState(Uint8 newstate);
+	void AddUiWheelDelta(float x, float y);
+	void AddUiNavAction(silencer::ui::UiNavAction action);
+	void PrepareClientUiFrame(Surface& surface);
+	void BeginPreparedClientUiFrame();
+	Clay_RenderCommandArray EndClientUiFrame();
+	void ResetUiFrameDeltas();
+	void DispatchPreparedUiNavActions();
+	silencer::ui::UiInputState BuildUiInputState(Surface& surface);
 	Updater updater;
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".
@@ -158,6 +170,17 @@ private:
 	RenderDevice * renderdevice;
 	SDL_Color palettecolors[256]; // CPU copy — for ffmpeg replay pixel export
 	Surface screenbuffer;
+	silencer::client_ui::ClayBridgeFrameBackend uiClayBackend;
+	silencer::ui::ClayService uiClayService;
+	silencer::client_ui::ClientUiState clientUiState;
+	silencer::client_ui::ClientUi clientUi;
+	silencer::ui::UiInputState preparedUiInput;
+	bool hasPreparedUiInput = false;
+	bool hasDispatchedPreparedUiNav = false;
+	float uiWheelX = 0.0f;
+	float uiWheelY = 0.0f;
+	std::vector<silencer::ui::UiNavAction> uiNavActions;
+	bool uiPointerWasDown = false;
 	int frames;
 	int fps;
 	Uint64 lasttick;

@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/scroll_list.h"
@@ -277,13 +277,13 @@ void HandleSpectateClick(GameSelectPanelState & state, World & world, ScreenCont
 
 void RegisterButton(const char * label, int x, int y,
                     void (*onClick)(void *), void * user) {
-	silencer::ui::clay_inspector::Widget w;
+	silencer::ui::automation::Widget w;
 	w.label = label;
-	w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.kind  = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
 	w.onClick   = onClick;
 	w.clickUser = user;
-	silencer::ui::clay_inspector::Register(w);
+	silencer::ui::automation::Register(w);
 }
 
 }  // namespace
@@ -399,16 +399,16 @@ void BuildGameSelectTallTree(GameSelectPanelState & state,
 	}
 
 	for(int i = 0; i < slotCount; ++i){
-		silencer::ui::clay_inspector::Widget w;
+		silencer::ui::automation::Widget w;
 		w.label = state.rows[i].name.c_str();
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::ListRow;
+		w.kind  = silencer::ui::automation::WidgetKind::ListRow;
 		w.x = kListX; w.y = kListY + i * kListLineH;
 		w.w = kListW; w.h = kListLineH;
 		w.onClickRow = &OnRowSelected;
 		w.clickUser  = &state;
 		w.rowIndex   = i;
 		w.selected   = (state.selectedIndex == i);
-		silencer::ui::clay_inspector::Register(w);
+		silencer::ui::automation::Register(w);
 	}
 
 	// Info-block group: 5 fixed-height row slots stacked TOP_TO_BOTTOM.

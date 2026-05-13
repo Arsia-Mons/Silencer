@@ -9,7 +9,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_button.h"
 #include "primitives/bank_text.h"
 
@@ -99,13 +99,13 @@ void RegisterButton(const char * label,
                     void (*onClick)(void *),
                     MainMenuScreen * screen)
 {
-	silencer::ui::clay_inspector::Widget w;
+	silencer::ui::automation::Widget w;
 	w.label = label;
-	w.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
 	w.onClick = onClick;
 	w.clickUser = screen;
-	silencer::ui::clay_inspector::Register(w);
+	silencer::ui::automation::Register(w);
 }
 
 void RegisterMainMenuButtons(const MainMenuButtonLayout & layout,
@@ -138,7 +138,7 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 	optionsClicked = false;
 	exitClicked = false;
 
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 	const Surface & screenbuffer = ctx.game.GetScreenBuffer();
 	RegisterMainMenuButtons(ComputeButtonLayout(screenbuffer.w, screenbuffer.h),
 	                        this);
@@ -177,13 +177,13 @@ void MainMenuScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 
 	BankTextBeginFrame();
 	BankButtonBeginFrame();
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 
 	std::string version = "Silencer v";
 	version += ctx.world.GetVersion();
 	const MainMenuButtonLayout buttons = ComputeButtonLayout(dst.w, dst.h);
 
-	Clay_BeginLayout();
+	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("MainMenuRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -242,7 +242,7 @@ void MainMenuScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 			           BankButtonHandle{ nullptr, &MainMenuExitClicked, this });
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
 
 	Render(ctx.game, &dst, cmds);
 

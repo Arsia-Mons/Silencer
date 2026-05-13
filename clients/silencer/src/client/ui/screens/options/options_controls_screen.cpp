@@ -8,7 +8,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_text.h"
 
 #include <SDL3/SDL.h>
@@ -129,17 +129,17 @@ void RegisterButton(const char * label,
                     void * user,
                     int rowIndex = -1)
 {
-	silencer::ui::clay_inspector::Widget widget;
+	silencer::ui::automation::Widget widget;
 	widget.label = label;
 	widget.kind = rowIndex >= 0
-		? silencer::ui::clay_inspector::WidgetKind::ListRow
-		: silencer::ui::clay_inspector::WidgetKind::Button;
+		? silencer::ui::automation::WidgetKind::ListRow
+		: silencer::ui::automation::WidgetKind::Button;
 	widget.x = x; widget.y = y; widget.w = w; widget.h = h;
 	widget.onClick = onClick;
 	widget.clickUser = user;
 	widget.onClickRow = nullptr;
 	widget.rowIndex = rowIndex;
-	silencer::ui::clay_inspector::Register(widget);
+	silencer::ui::automation::Register(widget);
 }
 
 void RegisterWidgets(OptionsControlsScreen * screen, int surfaceW)
@@ -344,7 +344,7 @@ void OptionsControlsScreen::Build(ScreenContext & ctx)
 	cancelClicked = false;
 	scrollDelta = 0;
 	operatorClickedRow = -1;
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 	const Surface& surface = ctx.game.GetScreenBuffer();
 	RegisterWidgets(this, surface.w);
 }
@@ -490,7 +490,7 @@ void OptionsControlsScreen::Draw(ScreenContext & ctx, Surface & dst, float frame
 
 	BankTextBeginFrame();
 	g_adapterCount = 0;
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 
 	std::string presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
 	                       : !ctx.keymap.name.empty() ? ctx.keymap.name
@@ -520,7 +520,7 @@ void OptionsControlsScreen::Draw(ScreenContext & ctx, Surface & dst, float frame
 		rebindingSecondary[i] = (rebindRow == row && rebindSlot == 1);
 	}
 
-	Clay_BeginLayout();
+	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("OptionsControlsRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -616,7 +616,7 @@ void OptionsControlsScreen::Draw(ScreenContext & ctx, Surface & dst, float frame
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
 	Render(ctx.game, &dst, cmds);
 	RegisterWidgets(this, dst.w);
 }

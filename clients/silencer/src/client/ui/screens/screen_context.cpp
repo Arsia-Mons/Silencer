@@ -6,10 +6,6 @@
 #include "modal.h"
 #include "message_modal.h"
 #include "surface.h"
-#include "clay/clay.h"
-#include "clay_ui_compositor.h"
-
-#include <SDL3/SDL_mouse.h>
 
 #include <cassert>
 
@@ -58,11 +54,11 @@ void ScreenContext::ResetPresentation(int paletteIdx) {
 }
 
 void ScreenContext::BeginClayFrame(Surface & surface) {
-	silencer::clay_bridge::EnsureInitialized(surface.w, surface.h);
+	game.PrepareClientUiFrame(surface);
+}
 
-	float mx = 0.f;
-	float my = 0.f;
-	Uint32 buttons = SDL_GetMouseState(&mx, &my);
-	bool down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
-	Clay_SetPointerState({ mx, my }, down);
+void ScreenContext::BeginClayLayout() { game.BeginPreparedClientUiFrame(); }
+
+Clay_RenderCommandArray ScreenContext::EndClayFrame() {
+	return game.EndClientUiFrame();
 }

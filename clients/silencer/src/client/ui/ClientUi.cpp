@@ -4,18 +4,26 @@ namespace silencer {
 namespace client_ui {
 
 ClientUi::ClientUi(silencer::ui::ClayService& clay, ClientUiState& state)
-	: clay_(clay), state_(state) {}
+	: clay_(clay), state_(state), automation_(silencer::ui::ActiveUiAutomationRegistry()) {}
 
-std::vector<silencer::ui::UiRenderCommand> ClientUi::BuildFrame(const silencer::ui::UiInputState& input) {
+void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	clay_.BeginFrame(input, automation_);
-	if(state_.activeScreen == ScreenId::MainMenu) {
-		BuildMainMenu();
-	}
+}
+
+std::vector<silencer::ui::UiRenderCommand> ClientUi::EndFrame() {
 	return clay_.EndFrame();
 }
 
+std::vector<silencer::ui::UiRenderCommand> ClientUi::BuildFrame(const silencer::ui::UiInputState& input) {
+	BeginFrame(input);
+	if(state_.activeScreen == ScreenId::MainMenu) {
+		BuildMainMenu();
+	}
+	return EndFrame();
+}
+
 std::vector<silencer::ui::UiAction> ClientUi::DrainActions() {
-	return actions_.Drain();
+	return automation_.DrainActions();
 }
 
 void ClientUi::BuildMainMenu() {

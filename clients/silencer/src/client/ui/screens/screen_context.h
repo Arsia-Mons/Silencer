@@ -2,6 +2,7 @@
 #define SCREEN_CONTEXT_H
 
 #include <SDL3/SDL_stdinc.h>
+#include "clay/clay.h"
 #include <functional>
 #include <memory>
 
@@ -73,6 +74,8 @@ public:
 	// Begin the shared Clay frame setup for screen/menu UI. Keeps native
 	// pointer collection and Clay layout dimensions in one coordinate space.
 	void BeginClayFrame(Surface & surface);
+	void BeginClayLayout();
+	Clay_RenderCommandArray EndClayFrame();
 };
 
 #endif

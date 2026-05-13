@@ -17,8 +17,12 @@ game/web engineering perspective.
 
 Verification run during this audit:
 
-- `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` passed.
+- `cmake --build build --target silencer_tests -j 8` passed.
+- `build/tests/silencer_tests` passed.
 - `ctest --test-dir build --output-on-failure` passed.
+- `cmake --build clients/silencer/build --target silencer -j 8` passed
+  with existing `sprintf` deprecation warnings.
+- `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` passed.
 - `ctest --test-dir clients/silencer/build --output-on-failure -R ui_architecture`
   found no tests because that build tree has no registered test entries.
 
@@ -30,12 +34,16 @@ Silencer-specific screens moved under `clients/silencer/src/client/ui`, generic
 Clay primitives/runtime live under `clients/silencer/src/ui`, and the work added
 real screenshot/parity and CLI-driven test coverage.
 
-It is not yet faithful to the architecture as a system. The migration appears to
-have taken practical shortcuts to get surfaces rendering and tests passing:
-production screens mostly bypass the planned central `ClayService` / `UiInputState`
-/ typed action queue path, automation uses a separate global `clay_inspector`,
-some Clay HUD drawing still lives inside `Renderer`, and several domain-level
-folders/classes are named after Clay instead of the game concern.
+After the follow-up integration pass, the central runtime shortcuts called out
+below are resolved for real screens and modals: production screen layout now
+enters Clay through `ClientUi` / `ClayService`, pointer/wheel/gamepad UI input
+is collected into `UiInputState`, typed interaction actions are emitted and
+drained after layout, and `clay_inspector` has been removed in favor of
+`UiAutomationRegistry`.
+
+The remaining architectural gaps are narrower: Clay HUD drawing still lives in
+`Renderer`, several screens are still large raw Clay layouts, the generic toolkit
+boundary remains debatable, and root-level process artifacts still need cleanup.
 
 ## What Was Faithful
 
@@ -72,32 +80,35 @@ folders/classes are named after Clay instead of the game concern.
 
 ### High: Production UI Bypasses The Planned Central UI Runtime
 
+Status: resolved by the follow-up integration pass.
+
 The plan requires platform/event code to collect input, `ClientUi` to convert it
 into `UiInputState`, `ClayService::beginFrame` to run the Clay lifecycle,
 callbacks to emit typed actions, and controllers to drain those actions after
 layout.
 
-The code has pieces of that architecture, but they are not the production path.
-`ClayService::BeginFrame` performs the intended ordered lifecycle, and `ClientUi`
-calls it, but `ClientUi` is not referenced outside `clients/silencer/src/client/ui`
-and tests. Real screens call `ScreenContext::BeginClayFrame`, which only calls
-`EnsureInitialized`, polls SDL mouse state, and sets pointer state. The screens
-then call `Clay_BeginLayout` and `Clay_EndLayout` directly.
+The production screen path now owns that lifecycle through `Game`:
+`ScreenContext::BeginClayFrame` prepares a per-frame `UiInputState`,
+`ScreenContext::BeginClayLayout` enters `ClientUi::BeginFrame`,
+`ClientUi` delegates to `ClayService`, and `ClayService` calls the Clay frame
+lifecycle in order through `ClayBridgeFrameBackend`. Screens and modals no
+longer call `Clay_BeginLayout` or `Clay_EndLayout` directly.
+
+`EnsureInitialized` no longer resets pointer state, wheel deltas are collected
+from `SDL_EVENT_MOUSE_WHEEL`, and gamepad menu navigation is stored on the
+central `UiInputState` before being dispatched for the active UI frame.
+Interactions now queue typed `UiAction`s in `UiAutomationRegistry`; the current
+screen callbacks remain the compatibility controller path while the larger raw
+screen layouts are still being decomposed.
 
 Evidence:
 
 - Plan: `architecture-goal.md:186` through `architecture-goal.md:208`.
-- Intended implementation exists: `clients/silencer/src/ui/runtime/ClayService.cpp:8`.
-- Production shortcut: `clients/silencer/src/client/ui/screens/screen_context.cpp:60`.
-- Unused shell: `clients/silencer/src/client/ui/ClientUi.cpp:9`.
-- Mouse wheel is not wired: `clients/silencer/src/game/events.cpp:356`.
-
-Impact: the code passes some UI tests but has two UI runtimes: the planned one
-and the one screens actually use. Wheel/trackpad scrolling, typed action
-draining, and central input normalization are especially weak.
-
-Recommendation: make `ClientUi`/`ClayService` the production UI frame owner, or
-delete that architecture and update the plan. Do not keep both.
+- Production frame setup: `clients/silencer/src/game/game.cpp:397`.
+- Screen adapter: `clients/silencer/src/client/ui/screens/screen_context.cpp:57`.
+- Clay backend: `clients/silencer/src/client/ui/ClayBridgeFrameBackend.cpp:11`.
+- Runtime lifecycle: `clients/silencer/src/ui/runtime/ClayService.cpp:8`.
+- Typed action queue: `clients/silencer/src/ui/runtime/UiAutomationRegistry.cpp:152`.
 
 ### High: Clay HUD Rendering Still Lives Inside `Renderer`
 
@@ -131,95 +142,78 @@ primitive drawing/resource operations, not own HUD UI element trees.
 
 Status: resolved after the lobby/domain renaming pass.
 
-The most obvious naming smell is the lobby. The plan's target hierarchy names
-the domain concern as `screens/lobby/`, but the implementation uses
+The original naming smell was the lobby. The plan's target hierarchy named the
+domain concern as `screens/lobby/`, while the migration snapshot used
 `screens/lobby_clay/`, `LobbyClayScreen`, `clay_game_create_panel.cpp`,
 `clay_game_select_panel.cpp`, `SILENCER_HAVE_LOBBY_CLAY`, and CLI operations
-that mention `LobbyClayScreen`.
+that mentioned `LobbyClayScreen`.
+
+Those application-layer names have since been moved back to domain names such
+as `screens/lobby/`, `LobbyScreen`, `game_create_panel.cpp`,
+`game_select_panel.cpp`, and `SILENCER_HAVE_LOBBY_UI`.
 
 Evidence:
 
 - Plan target: `architecture-goal.md:153` through `architecture-goal.md:157`.
-- Current folder: `clients/silencer/src/client/ui/screens/lobby_clay`.
-- Current class: `clients/silencer/src/client/ui/screens/lobby_clay/lobby_clay_screen.h:22`.
-- CMake bakes the framework name into build policy:
+- Current folder: `clients/silencer/src/client/ui/screens/lobby`.
+- Current class: `clients/silencer/src/client/ui/screens/lobby/lobby_screen.h:22`.
+- CMake now uses the domain-oriented symbol:
   `clients/silencer/CMakeLists.txt:98` and `clients/silencer/CMakeLists.txt:114`.
-- Control socket error names the implementation, not the domain:
+- Control socket now names the domain screen:
   `clients/silencer/src/net/controldispatch.cpp:792`.
 
-Impact: this makes Clay a permanent product concept in the application layer.
-From a game-client architecture perspective, the screen is the lobby, not the
-Clay lobby. A future UI library swap, renderer change, or second UI backend
-would require renaming product-level concepts.
-
-Recommendation: rename application-layer files/classes/namespaces to domain
-names: `screens/lobby/`, `LobbyScreen`, `GameCreatePanel`, `GameSelectPanel`,
-`GameTechPanel`. Keep Clay in low-level adapter names only where the file truly
-bridges Clay render commands.
+Result: Clay is no longer a permanent product concept in the lobby application
+layer. Keep future framework names in low-level adapter names only where the file
+truly bridges Clay render commands.
 
 ### Medium: Automation Uses A Parallel Global Inspector Instead Of The Planned Metadata Registry
+
+Status: resolved by the follow-up integration pass.
 
 The plan asks for a Clay-aware automation registry where primitives register
 stable metadata and control socket operations route through that registry and
 typed UI actions.
 
-The implementation has `UiAutomationRegistry`, but production screens primarily
-use `silencer::ui::clay_inspector`, a global per-frame registry of hand-authored
-labels, rectangles, and callbacks. The inspector stores optional legacy `uid`s
-and invokes callbacks directly. Several screens manually compute inspector
-rectangles separately from the Clay layout. The control socket has a special
-`lobby_show_panel` escape hatch because normal click routing cannot reach some
-panel swaps.
+The separate `clay_inspector` runtime was removed. Production screen widgets now
+register through `UiAutomationRegistry`; the `silencer::ui::automation`
+namespace is a thin compatibility surface over the active registry. The registry
+now exposes widget metadata, focus/text/input dispatch, click dispatch, and a
+typed `UiAction` queue that is drained after the Clay layout frame.
 
 Evidence:
 
 - Plan: `architecture-goal.md:325` through `architecture-goal.md:342`.
-- Planned registry exists: `clients/silencer/src/ui/runtime/UiAutomationRegistry.h:38`.
-- Production registry: `clients/silencer/src/ui/runtime/clay_inspector.h:4`.
-- Global storage: `clients/silencer/src/ui/runtime/clay_inspector.cpp:12`.
-- Manual main menu registration: `clients/silencer/src/client/ui/screens/main_menu/main_menu_screen.cpp:96`.
-- Special control-socket bypass: `clients/silencer/src/net/controldispatch.cpp:792`.
-
-Impact: automation works, but the registry is not the single source of truth
-from primitives/layout. This risks stale bounds, label ambiguity, missing stable
-IDs, and direct mutation paths that bypass typed UI intents.
-
-Recommendation: collapse `clay_inspector` into `UiAutomationRegistry` or make it
-a thin adapter over that registry. Register metadata from primitives/components
-where possible, and use stable IDs as the primary route, with labels as a
-convenience layer.
+- Registry implementation: `clients/silencer/src/ui/runtime/UiAutomationRegistry.cpp:58`.
+- Compatibility namespace: `clients/silencer/src/ui/runtime/UiAutomationRegistry.cpp:366`.
+- Control socket lookup: `clients/silencer/src/net/controldispatch.cpp:607`.
+- Boundary guard: `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh:29`.
 
 ### Medium: The Input Contract Is Only Partially Implemented
+
+Status: resolved for the central Clay screen path; renderer-owned HUD Clay
+fragments remain outside this path until the HUD renderer cleanup happens.
 
 The plan requires full mouse, keyboard, and gamepad navigation, including wheel
 or trackpad scrolling and modal focus behavior. The code covers some keyboard
 and CLI-equivalent navigation, but actual input normalization is incomplete.
 
-Mouse wheel events are empty. `UiInputState` contains wheel fields and
-`ClayService` can feed `Clay_UpdateScrollContainers`, but that path is not used
-by production screens. Gamepad state is polled for gameplay actions, and some
-keyboard event handling checks keymap actions, but there is no clear edge-driven
-UI navigation stream for gamepad confirm/cancel/focus movement independent of
-keyboard events.
+Mouse position/down state, pointer edges, wheel deltas, frame dimensions, frame
+time, and gamepad UI nav actions now flow into `UiInputState`.
+`ClayService::BeginFrame` feeds pointer and wheel state into Clay before layout.
+Gamepad directional navigation and confirm are collected by `TickGamepadMenuNav`
+and dispatched through the prepared UI input for the active screen frame.
 
 Evidence:
 
 - Plan: `architecture-goal.md:210` through `architecture-goal.md:214`.
 - Required verification: `architecture-goal.md:414` through
   `architecture-goal.md:431`.
-- Wheel event stub: `clients/silencer/src/game/events.cpp:356`.
+- Input collection: `clients/silencer/src/game/game.cpp:397`.
+- Wheel events: `clients/silencer/src/game/events.cpp:356`.
+- Gamepad nav collection: `clients/silencer/src/game/game.cpp:1040`.
+- Clay input feed: `clients/silencer/src/ui/runtime/ClayService.cpp:8`.
 - UI nav action type exists: `clients/silencer/src/ui/runtime/UiInputState.h:9`.
-- Default screen focus is global inspector based:
-  `clients/silencer/src/client/ui/screens/screen.h:46`.
-
-Impact: "gamepad-equivalent" tests can pass through CLI key names while real
-controller navigation remains weaker than the contract. Wheel/trackpad scrolling
-is a direct gap.
-
-Recommendation: define a real `UiInput` stream from SDL/TUI/control input,
-including pointer, wheel, text, confirm/cancel, focus next/previous, directional
-navigation, and section changes. Feed it through the central UI runtime every
-rendered UI frame.
+- Focus/key dispatch: `clients/silencer/src/ui/runtime/UiAutomationRegistry.cpp:214`.
 
 ### Medium: Screen Files Are Still Large Raw Clay Layouts
 
@@ -229,8 +223,8 @@ should read as composed primitives, not as large raw Clay config blocks.
 The current code has many screen-local raw `CLAY({ ... })` trees and per-file
 helper state. The largest examples are:
 
-- `clients/silencer/src/client/ui/screens/lobby_clay/lobby_clay_screen.cpp`: 700 lines.
-- `clients/silencer/src/client/ui/screens/lobby_clay/clay_game_tech_panel.cpp`: 505 lines.
+- `clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp`: 700 lines.
+- `clients/silencer/src/client/ui/screens/lobby/game_tech_panel.cpp`: 505 lines.
 - `clients/silencer/src/client/ui/screens/options/options_controls_screen.cpp`: 627 lines.
 - `clients/silencer/src/client/ui/hud/InGameHud.cpp`: 408 lines.
 - `clients/silencer/src/client/ui/hud/InGameOverlays.cpp`: 418 lines.
@@ -301,14 +295,15 @@ or remove them before merging.
 
 ## Shortcut Summary
 
-The main shortcuts were not "bad code" in isolation; they were delivery shortcuts:
+The original shortcuts were not "bad code" in isolation; they were delivery
+shortcuts. Current status:
 
-- Screens were migrated directly to Clay before the central UI system became the
-  real production path.
-- Automation was made to work through a global inspector rather than through the
-  planned first-class metadata/action registry.
+- Screens are now routed through the central `ClientUi` / `ClayService` frame
+  path.
+- Automation now uses `UiAutomationRegistry`; the separate inspector is gone.
 - Renderer coupling was reduced but not removed.
-- Framework names were left in application-layer domain concepts.
+- Framework names have been removed from the lobby application-layer domain
+  concepts.
 - Large raw Clay screen files were accepted, with a CMake skip around unity-build
   collisions instead of fixing the structure.
 
@@ -318,11 +313,11 @@ The main shortcuts were not "bad code" in isolation; they were delivery shortcut
    namespaces, CMake symbols, tests, and control-socket text.
 2. [ ] Move `Renderer::DrawHud*Clay` methods out of `Renderer` and into
    `client/ui/hud` or a dedicated UI presentation adapter.
-3. [ ] Decide whether `ClayService`/`ClientUi` is the real runtime. If yes, route
+3. [x] Decide whether `ClayService`/`ClientUi` is the real runtime. If yes, route
    all screens through it and delete duplicate per-screen lifecycle plumbing.
-4. [ ] Replace `clay_inspector` with `UiAutomationRegistry` or make it a compatibility
+4. [x] Replace `clay_inspector` with `UiAutomationRegistry` or make it a compatibility
    adapter over the real registry.
-5. [ ] Wire real wheel/trackpad and gamepad UI input into a central `UiInputState`.
+5. [x] Wire real wheel/trackpad and gamepad UI input into a central `UiInputState`.
 6. [ ] Extract the largest raw Clay screen sections into domain components and
    reusable design primitives.
 7. [ ] Move or remove root-level process artifacts (`prompt.md`, `ralph/`) before
@@ -330,7 +325,7 @@ The main shortcuts were not "bad code" in isolation; they were delivery shortcut
 
 ## Bottom Line
 
-The migration achieved a large practical UI replacement, but it should not be
-considered architecturally complete. It is a solid intermediate port with
-working Clay surfaces and tests, not yet the clean game-client UI architecture
-described in the plan.
+The central Clay screen runtime is now wired into the game/engine path instead
+of sitting beside it. The branch still should not be considered architecturally
+complete until renderer-owned HUD Clay code and the largest raw screen layouts
+are cleaned up.

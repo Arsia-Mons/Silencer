@@ -13,7 +13,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
@@ -137,14 +137,14 @@ void RegisterButton(const char * label,
                     void (*onClick)(void *),
                     LobbyConnectScreen * screen)
 {
-	silencer::ui::clay_inspector::Widget w;
+	silencer::ui::automation::Widget w;
 	w.label = label;
-	w.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.uid = uid;
 	w.x = x; w.y = y; w.w = kButtonW; w.h = kButtonH;
 	w.onClick = onClick;
 	w.clickUser = screen;
-	silencer::ui::clay_inspector::Register(w);
+	silencer::ui::automation::Register(w);
 }
 
 void RegisterInput(const char * label,
@@ -158,9 +158,9 @@ void RegisterInput(const char * label,
                    void (*onEnter)(void *),
                    void * enterUser)
 {
-	silencer::ui::clay_inspector::Widget w;
+	silencer::ui::automation::Widget w;
 	w.label = label;
-	w.kind = silencer::ui::clay_inspector::WidgetKind::TextInput;
+	w.kind = silencer::ui::automation::WidgetKind::TextInput;
 	w.uid = uid;
 	w.x = x; w.y = y; w.w = kInputW; w.h = kInputH;
 	w.textBuffer = buffer;
@@ -169,7 +169,7 @@ void RegisterInput(const char * label,
 	w.inactive = inactive;
 	w.onEnter = onEnter;
 	w.enterUser = enterUser;
-	silencer::ui::clay_inspector::Register(w);
+	silencer::ui::automation::Register(w);
 }
 
 void RegisterWidgets(LobbyConnectScreen * screen,
@@ -227,10 +227,10 @@ void LobbyConnectScreen::Build(ScreenContext & ctx)
 	username[0] = '\0';
 	password[0] = '\0';
 
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 	const Surface& surface = ctx.game.GetScreenBuffer();
 	RegisterWidgets(this, username, password, surface.w, surface.h, false);
-	silencer::ui::clay_inspector::FocusTextInputByUid(LBY_INPUT_USERNAME);
+	silencer::ui::automation::FocusTextInputByUid(LBY_INPUT_USERNAME);
 }
 
 void LobbyConnectScreen::Tick(ScreenContext & ctx)
@@ -372,7 +372,7 @@ void LobbyConnectScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 	ScrollTextBoxBeginFrame();
 	TextInputBeginFrame();
 	g_clickAdapterCount = 0;
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 
 	int lineCount = FillLogSlab(logLines);
 	Uint16 scroll = 0;
@@ -382,12 +382,12 @@ void LobbyConnectScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 	}
 	bool inactive = ctx.world.lobby.state == Lobby::AUTHSENT;
 	const bool usernameFocused =
-		silencer::ui::clay_inspector::IsTextInputFocused(LBY_INPUT_USERNAME);
+		silencer::ui::automation::IsTextInputFocused(LBY_INPUT_USERNAME);
 	const bool passwordFocused =
-		silencer::ui::clay_inspector::IsTextInputFocused(LBY_INPUT_PASSWORD);
+		silencer::ui::automation::IsTextInputFocused(LBY_INPUT_PASSWORD);
 	const bool blink = ((SDL_GetTicks() / 250) % 2) == 0;
 
-	Clay_BeginLayout();
+	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("LobbyConnectRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -490,7 +490,7 @@ void LobbyConnectScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 			}
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
 
 	Render(ctx.game, &dst, cmds);
 	RegisterWidgets(this, username, password, dst.w, dst.h, inactive);
@@ -499,19 +499,19 @@ void LobbyConnectScreen::Draw(ScreenContext & ctx, Surface & dst, float frametim
 void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
-	silencer::ui::clay_inspector::ClearFocus();
+	silencer::ui::automation::ClearFocus();
 }
 
 bool LobbyConnectScreen::HandleTextInput(ScreenContext & ctx, char ascii)
 {
 	(void)ctx;
-	return silencer::ui::clay_inspector::DispatchTextInput(ascii);
+	return silencer::ui::automation::DispatchTextInput(ascii);
 }
 
 bool LobbyConnectScreen::HandleKeyPress(ScreenContext & ctx, char ascii)
 {
 	(void)ctx;
-	if(silencer::ui::clay_inspector::DispatchKeyPress(ascii)) return true;
+	if(silencer::ui::automation::DispatchKeyPress(ascii)) return true;
 	if(ascii == '\n'){
 		loginClicked = true;
 		return true;
@@ -530,7 +530,7 @@ bool LobbyConnectScreen::HandleMousePress(ScreenContext & ctx,
 {
 	(void)ctx;
 	if(!pressed) return false;
-	return silencer::ui::clay_inspector::InvokeAt(x, y);
+	return silencer::ui::automation::InvokeAt(x, y);
 }
 
 void LobbyConnectScreen::NotifyLoginClicked()

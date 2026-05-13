@@ -7,7 +7,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_button.h"
 #include "primitives/bank_text.h"
 #include "primitives/text_input.h"
@@ -43,9 +43,9 @@ void RegisterWidgets(PasswordModal * modal, char * buffer, int surfaceW, int sur
 {
 	const int dialogX = (surfaceW - kDialogW) / 2;
 	const int dialogY = (surfaceH - kDialogH) / 2;
-	silencer::ui::clay_inspector::Widget input;
+	silencer::ui::automation::Widget input;
 	input.label = "Password";
-	input.kind = silencer::ui::clay_inspector::WidgetKind::TextInput;
+	input.kind = silencer::ui::automation::WidgetKind::TextInput;
 	input.uid = kPasswordUid;
 	input.x = dialogX + (kDialogW - kInputW) / 2;
 	input.y = dialogY + 64;
@@ -56,17 +56,17 @@ void RegisterWidgets(PasswordModal * modal, char * buffer, int surfaceW, int sur
 	input.isPassword = true;
 	input.onEnter = &OkClicked;
 	input.enterUser = modal;
-	silencer::ui::clay_inspector::Register(input);
+	silencer::ui::automation::Register(input);
 
-	silencer::ui::clay_inspector::Widget ok;
+	silencer::ui::automation::Widget ok;
 	ok.label = "OK";
-	ok.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+	ok.kind = silencer::ui::automation::WidgetKind::Button;
 	ok.x = dialogX + (kDialogW - 156) / 2;
 	ok.y = dialogY + 92;
 	ok.w = 156; ok.h = 21;
 	ok.onClick = &OkClicked;
 	ok.clickUser = modal;
-	silencer::ui::clay_inspector::Register(ok);
+	silencer::ui::automation::Register(ok);
 	(void)surfaceH;
 }
 }
@@ -81,10 +81,10 @@ void PasswordModal::Build(ScreenContext & ctx)
 	(void)ctx;
 	okClicked = false;
 	password[0] = '\0';
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 	const Surface& surface = ctx.game.GetScreenBuffer();
 	RegisterWidgets(this, password, surface.w, surface.h);
-	silencer::ui::clay_inspector::FocusTextInputByUid(kPasswordUid);
+	silencer::ui::automation::FocusTextInputByUid(kPasswordUid);
 }
 
 void PasswordModal::Tick(ScreenContext & ctx)
@@ -107,12 +107,12 @@ void PasswordModal::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	BankButtonBeginFrame();
 	BankTextBeginFrame();
 	TextInputBeginFrame();
-	silencer::ui::clay_inspector::BeginFrame();
+	silencer::ui::automation::BeginFrame();
 
-	bool focused = silencer::ui::clay_inspector::IsTextInputFocused(kPasswordUid);
+	bool focused = silencer::ui::automation::IsTextInputFocused(kPasswordUid);
 	bool blink = ((SDL_GetTicks() / 250) % 2) == 0;
 
-	Clay_BeginLayout();
+	ctx.BeginClayLayout();
 	CLAY({ .id = CLAY_ID("PasswordModalRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
@@ -144,7 +144,7 @@ void PasswordModal::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 			           BankButtonHandle{ nullptr, &OkClicked, this });
 		}
 	}
-	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	Clay_RenderCommandArray cmds = ctx.EndClayFrame();
 	Render(ctx.game, &dst, cmds);
 	RegisterWidgets(this, password, dst.w, dst.h);
 }
@@ -152,19 +152,19 @@ void PasswordModal::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 void PasswordModal::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
-	silencer::ui::clay_inspector::ClearFocus();
+	silencer::ui::automation::ClearFocus();
 }
 
 bool PasswordModal::HandleTextInput(ScreenContext & ctx, char ascii)
 {
 	(void)ctx;
-	return silencer::ui::clay_inspector::DispatchTextInput(ascii);
+	return silencer::ui::automation::DispatchTextInput(ascii);
 }
 
 bool PasswordModal::HandleKeyPress(ScreenContext & ctx, char ascii)
 {
 	(void)ctx;
-	if(silencer::ui::clay_inspector::DispatchKeyPress(ascii)) return true;
+	if(silencer::ui::automation::DispatchKeyPress(ascii)) return true;
 	if(ascii == '\n'){
 		okClicked = true;
 		return true;

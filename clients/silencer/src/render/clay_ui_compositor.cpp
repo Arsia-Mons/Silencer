@@ -301,14 +301,9 @@ void EnsureInitialized(int width, int height) {
 			g_lastH = height;
 		}
 	}
-	// Reset per-frame inputs so two back-to-back layout passes from the same
-	// process produce byte-identical render commands. Clay's internal pointer
-	// + scroll + text-cache state is otherwise carried forward and produces
-	// non-deterministic geometry on repeated calls (observed: 1.2% pixdiff
-	// between consecutive smoke renders without these resets).
-	::Clay_SetPointerState(::Clay_Vector2{-1.0f, -1.0f}, false);
-	::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
-	::Clay_ResetMeasureTextCache();
+	// Input is now owned by ClientUi/ClayService. Initialization must not reset
+	// pointer or scroll state; Clay needs continuity across frames to report
+	// pressed, held, released, and wheel behavior correctly.
 }
 
 void Render(::Resources & resources, ::Renderer & renderer,

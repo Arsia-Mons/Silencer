@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/scroll_list.h"
@@ -97,40 +97,40 @@ const char * SecurityLabel(Uint8 idx) {
 
 void RegisterButton(const char * label, int x, int y, int w, int h,
                     void (*onClick)(void *), void * user, bool selected = false) {
-	silencer::ui::clay_inspector::Widget reg;
+	silencer::ui::automation::Widget reg;
 	reg.label     = label;
-	reg.kind      = silencer::ui::clay_inspector::WidgetKind::Button;
+	reg.kind      = silencer::ui::automation::WidgetKind::Button;
 	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
 	reg.onClick   = onClick;
 	reg.clickUser = user;
 	reg.selected  = selected;
-	silencer::ui::clay_inspector::Register(reg);
+	silencer::ui::automation::Register(reg);
 }
 
 void RegisterTextInput(const char * label, int x, int y, int w, int h,
                        char * buf, int cap, bool isPassword = false) {
-	silencer::ui::clay_inspector::Widget reg;
+	silencer::ui::automation::Widget reg;
 	reg.label         = label;
-	reg.kind          = silencer::ui::clay_inspector::WidgetKind::TextInput;
+	reg.kind          = silencer::ui::automation::WidgetKind::TextInput;
 	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
 	reg.textBuffer    = buf;
 	reg.textBufferLen = cap;
 	reg.isPassword    = isPassword;
-	silencer::ui::clay_inspector::Register(reg);
+	silencer::ui::automation::Register(reg);
 }
 
 void RegisterListRow(const char * label, int x, int y, int w, int h,
                      void (*onClickRow)(void *, int), void * user,
                      int rowIndex, bool selected) {
-	silencer::ui::clay_inspector::Widget reg;
+	silencer::ui::automation::Widget reg;
 	reg.label      = label;
-	reg.kind       = silencer::ui::clay_inspector::WidgetKind::ListRow;
+	reg.kind       = silencer::ui::automation::WidgetKind::ListRow;
 	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
 	reg.onClickRow = onClickRow;
 	reg.clickUser  = user;
 	reg.rowIndex   = rowIndex;
 	reg.selected   = selected;
-	silencer::ui::clay_inspector::Register(reg);
+	silencer::ui::automation::Register(reg);
 }
 
 void BuildMapList(GameCreatePanelState & state, ScreenContext & ctx) {

@@ -7,7 +7,7 @@
 #include "os.h"
 #include "shared.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "screen.h"
 #include "password_modal.h"
 #ifdef SILENCER_HAVE_LOBBY_UI
@@ -484,14 +484,14 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	}
 	if(cmd.op == "inspect"){
 		nlohmann::json widgets = nlohmann::json::array();
-		for(const auto & cw : silencer::ui::clay_inspector::All()){
+		for(const auto & cw : silencer::ui::automation::All()){
 			nlohmann::json w;
 			w["source"] = "clay";
 			w["x"] = cw.x; w["y"] = cw.y;
 			w["w"] = cw.w; w["h"] = cw.h;
 			if(cw.label) w["label"] = cw.label;
 			if(cw.uid >= 0) w["uid"] = cw.uid;
-			using K = silencer::ui::clay_inspector::WidgetKind;
+			using K = silencer::ui::automation::WidgetKind;
 			switch(cw.kind){
 				case K::Button:    w["kind"] = "button"; break;
 				case K::Toggle:
@@ -571,9 +571,9 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "click needs label or id"));
 			return;
 		}
-		const auto * cw = silencer::ui::clay_inspector::FindByLabel(target.c_str());
+		const auto * cw = silencer::ui::automation::FindByLabel(target.c_str());
 		if(cw){
-			using K = silencer::ui::clay_inspector::WidgetKind;
+			using K = silencer::ui::automation::WidgetKind;
 			if(cw->kind == K::Button || cw->kind == K::Toggle){
 				if(cw->onClick) cw->onClick(cw->clickUser);
 				nlohmann::json r;
@@ -604,7 +604,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}
 		int x = cmd.args["x"].get<int>();
 		int y = cmd.args["y"].get<int>();
-		if(!silencer::ui::clay_inspector::InvokeAt(x, y)){
+		if(!silencer::ui::automation::InvokeAt(x, y)){
 			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
 				"no clickable clay widget at point"));
 			return;
@@ -618,13 +618,13 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	}
 	if(cmd.op == "set_text"){
 		std::string text = cmd.args.value("text", std::string());
-		const auto * cw = static_cast<const silencer::ui::clay_inspector::Widget *>(nullptr);
+		const auto * cw = static_cast<const silencer::ui::automation::Widget *>(nullptr);
 		if(cmd.args.contains("uid")){
 			int uid = cmd.args["uid"].get<int>();
 			int count = 0;
-			for(const auto & candidate : silencer::ui::clay_inspector::All()){
+			for(const auto & candidate : silencer::ui::automation::All()){
 				if(candidate.uid == uid
-				   && candidate.kind == silencer::ui::clay_inspector::WidgetKind::TextInput){
+				   && candidate.kind == silencer::ui::automation::WidgetKind::TextInput){
 					cw = &candidate;
 					count++;
 				}
@@ -632,10 +632,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			if(count != 1) cw = nullptr;
 		}else if(cmd.args.contains("label")){
 			std::string label = cmd.args["label"].get<std::string>();
-			cw = silencer::ui::clay_inspector::FindByLabel(label.c_str());
+			cw = silencer::ui::automation::FindByLabel(label.c_str());
 		}
 		if(cw){
-			if(cw->kind == silencer::ui::clay_inspector::WidgetKind::TextInput
+			if(cw->kind == silencer::ui::automation::WidgetKind::TextInput
 			   && cw->textBuffer && cw->textBufferLen > 0){
 				int cap = cw->textBufferLen - 1;
 				int n = (int)text.size();
@@ -668,13 +668,13 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	}
 
 	if(cmd.op == "select"){
-		const auto & widgets = silencer::ui::clay_inspector::All();
-		const auto * hit = static_cast<const silencer::ui::clay_inspector::Widget *>(nullptr);
+		const auto & widgets = silencer::ui::automation::All();
+		const auto * hit = static_cast<const silencer::ui::automation::Widget *>(nullptr);
 		int count = 0;
 		if(cmd.args.contains("index")){
 			int index = cmd.args["index"].get<int>();
 			for(const auto & candidate : widgets){
-				if(candidate.kind == silencer::ui::clay_inspector::WidgetKind::ListRow
+				if(candidate.kind == silencer::ui::automation::WidgetKind::ListRow
 				   && candidate.rowIndex == index){
 					hit = &candidate;
 					count++;
@@ -683,7 +683,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}else if(cmd.args.contains("label")){
 			std::string label = cmd.args["label"].get<std::string>();
 			for(const auto & candidate : widgets){
-				if(candidate.kind == silencer::ui::clay_inspector::WidgetKind::ListRow
+				if(candidate.kind == silencer::ui::automation::WidgetKind::ListRow
 				   && LabelEquals(candidate.label, label.c_str())){
 					hit = &candidate;
 					count++;
@@ -692,7 +692,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}else if(cmd.args.contains("text")){
 			std::string text = cmd.args["text"].get<std::string>();
 			for(const auto & candidate : widgets){
-				if(candidate.kind == silencer::ui::clay_inspector::WidgetKind::ListRow
+				if(candidate.kind == silencer::ui::automation::WidgetKind::ListRow
 				   && LabelEquals(candidate.label, text.c_str())){
 					hit = &candidate;
 					count++;
@@ -733,12 +733,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 		if(amount < 1) amount = 1;
-		const auto * cw = silencer::ui::clay_inspector::FindByLabel(label.c_str());
+		const auto * cw = silencer::ui::automation::FindByLabel(label.c_str());
 		if(!cw){
 			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", label));
 			return;
 		}
-		if(cw->kind != silencer::ui::clay_inspector::WidgetKind::Button || !cw->onClick){
+		if(cw->kind != silencer::ui::automation::WidgetKind::Button || !cw->onClick){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
 				"scroll target is not a Clay scroll button"));
 			return;

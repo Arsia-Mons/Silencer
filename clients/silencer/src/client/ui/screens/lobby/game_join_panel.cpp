@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "clay_inspector.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_button.h"
 
 #include "lobby_screen.h"
@@ -69,13 +69,13 @@ Clay_String FromStd(const std::string & s) {
 
 void RegisterButton(const char * label, int x, int y,
                     void (*onClick)(void *), void * user) {
-	silencer::ui::clay_inspector::Widget w;
+	silencer::ui::automation::Widget w;
 	w.label = label;
-	w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.kind  = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = kBtnW; w.h = kBtnH;
 	w.onClick   = onClick;
 	w.clickUser = user;
-	silencer::ui::clay_inspector::Register(w);
+	silencer::ui::automation::Register(w);
 }
 
 }  // namespace
@@ -148,12 +148,12 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 		                             /*user*/       &state });
 	}
 	{
-		silencer::ui::clay_inspector::Widget w;
+		silencer::ui::automation::Widget w;
 		w.label = state.readyLabel.c_str();
-		w.kind  = silencer::ui::clay_inspector::WidgetKind::Button;
+		w.kind  = silencer::ui::automation::WidgetKind::Button;
 		w.x = kBtnReadyX; w.y = kBtnReadyY; w.w = kBtnW; w.h = kBtnH;
 		w.onClick = &OnReadyClicked; w.clickUser = &state;
-		silencer::ui::clay_inspector::Register(w);
+		silencer::ui::automation::Register(w);
 	}
 }
 

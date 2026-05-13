@@ -1,5 +1,7 @@
 #pragma once
 
+#include "runtime/UiActionQueue.h"
+
 #include <string>
 #include <vector>
 
@@ -15,6 +17,13 @@ enum class UiElementKind {
 	Tab,
 	Slider,
 	Progress,
+};
+
+enum class UiAutomationWidgetKind {
+	Button,
+	Toggle,
+	TextInput,
+	ListRow,
 };
 
 struct UiRect {
@@ -35,17 +44,91 @@ struct UiElementMetadata {
 	bool selected = false;
 };
 
+struct UiAutomationWidget {
+	const char * label = nullptr;
+	UiAutomationWidgetKind kind = UiAutomationWidgetKind::Button;
+	int uid = -1;
+	int x = 0, y = 0, w = 0, h = 0;
+
+	void (*onClick)(void * user) = nullptr;
+	void * clickUser = nullptr;
+
+	void (*onClickRow)(void * user, int index) = nullptr;
+	int rowIndex = -1;
+
+	bool selected = false;
+
+	char * textBuffer = nullptr;
+	int textBufferLen = 0;
+	bool isPassword = false;
+	bool inactive = false;
+	bool numbersOnly = false;
+	void (*onEnter)(void * user) = nullptr;
+	void * enterUser = nullptr;
+};
+
 class UiAutomationRegistry {
 public:
 	void BeginFrame();
 	void Register(UiElementMetadata metadata);
+	void RegisterWidget(UiAutomationWidget widget);
 	const std::vector<UiElementMetadata>& Elements() const;
+	const std::vector<UiAutomationWidget>& Widgets() const;
 	const UiElementMetadata* FindById(const std::string& id) const;
 	const UiElementMetadata* FindByLabel(const std::string& label) const;
+	const UiAutomationWidget* FindWidgetByLabel(const char * label) const;
+	const UiAutomationWidget* FindWidgetByUid(int uid) const;
+
+	bool FocusTextInputAt(int x, int y);
+	bool FocusTextInputByUid(int uid);
+	bool IsTextInputFocused(int uid) const;
+	void ClearFocus();
+	bool DispatchTextInput(char ascii);
+	bool DispatchKeyPress(char ascii);
+	bool InvokeAt(int x, int y);
+	bool FocusNextInteractive();
+	bool FocusPreviousInteractive();
+	bool ActivateFocused();
+	std::vector<UiAction> DrainActions();
 
 private:
+	bool MatchesFocus(const UiAutomationWidget& widget) const;
+	const UiAutomationWidget* FocusedWidget() const;
+	void SetFocus(const UiAutomationWidget& widget);
+	void QueueAction(UiActionKind kind, const UiAutomationWidget& widget, const char * value);
+
 	std::vector<UiElementMetadata> elements_;
+	std::vector<UiAutomationWidget> widgets_;
+	UiActionQueue actions_;
+	int focusedUid_ = -1;
+	std::string focusedLabel_;
 };
+
+UiAutomationRegistry& ActiveUiAutomationRegistry();
+
+namespace automation {
+
+using WidgetKind = UiAutomationWidgetKind;
+using Widget = UiAutomationWidget;
+
+void BeginFrame();
+void Register(const Widget& widget);
+const std::vector<Widget>& All();
+const Widget* FindByLabel(const char * label);
+const Widget* FindByUid(int uid);
+bool FocusTextInputAt(int x, int y);
+bool FocusTextInputByUid(int uid);
+bool IsTextInputFocused(int uid);
+void ClearFocus();
+bool DispatchTextInput(char ascii);
+bool DispatchKeyPress(char ascii);
+bool InvokeAt(int x, int y);
+bool FocusNextInteractive();
+bool FocusPreviousInteractive();
+bool ActivateFocused();
+std::vector<UiAction> DrainActions();
+
+}  // namespace automation
 
 }  // namespace ui
 }  // namespace silencer
