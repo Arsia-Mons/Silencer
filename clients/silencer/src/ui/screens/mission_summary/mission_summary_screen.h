@@ -3,7 +3,10 @@
 
 #include "screen.h"
 
-class TextBox;
+#include <array>
+#include <string>
+#include <vector>
+
 class Stats;
 
 // End-of-mission stats screen with optional upgrade buttons. Owns the
@@ -15,13 +18,28 @@ class MissionSummaryScreen : public Screen
 public:
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
+	void Draw(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
+
+	void NotifyDoneClicked() { doneClicked = true; }
+	void NotifyUpgradeClicked(int index);
+	void NotifyScrollUpClicked() { scrollDelta--; }
+	void NotifyScrollDownClicked() { scrollDelta++; }
 
 private:
 	void Refresh(ScreenContext & ctx);
-	static void AddSummaryLine(TextBox & textbox, const char * name, Uint32 value, bool percentage = false);
+	void AddSummaryLine(const char * name, Uint32 value, bool percentage = false);
 
 	bool infoLoaded = false;
+	bool doneClicked = false;
+	int upgradeClicked = -1;
+	int scrollDelta = 0;
+	int scrollPosition = 0;
+	bool upgradeBanner = false;
+	int experience = 0;
+	std::vector<std::string> summaryLines;
+	std::array<int, 6> levels = {};
+	std::array<bool, 6> upgradesAvailable = {};
 };
 
 #endif

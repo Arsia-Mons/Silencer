@@ -3,9 +3,9 @@
 
 // Screen-agnostic Clay primitive for paletted bank-font text input fields.
 //
-// Pixel-identical visual to the legacy `TextInput` widget (renderer.cpp
-// `DrawTextInput`): DrawText at the bbox top-left + an optional 1-px
-// vertical caret bar at (textLen * fontWidth, -1) of the bbox.
+// Pixel-identical visual to the legacy `TextInput` widget: DrawText at the
+// bbox top-left + an optional 1-px vertical caret bar at
+// (textLen * fontWidth, -1) of the bbox.
 //
 // The primitive owns no state and references no lobby/world/Config:
 //

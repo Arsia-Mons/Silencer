@@ -3,36 +3,251 @@
 #include "screen_context.h"
 #include "game.h"
 #include "game_state.h"
-#include "world.h"
-#include "objecttypes.h"
-#include "interface.h"
-#include "button.h"
-#include "overlay.h"
-#include "scrollbar.h"
 #include "config.h"
+#include "surface.h"
 
+#include "clay/clay.h"
+#include "clay_bridge.h"
+#include "clay_inspector.h"
+#include "primitives/bank_text.h"
+
+#include <SDL3/SDL.h>
+
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 
 namespace
 {
-constexpr int VISIBLE_ROWS = 5;
-constexpr int PRIMARY_SLOT_BASE   = 0;    // uids 0..99   = primary key buttons
-constexpr int SECONDARY_SLOT_BASE = 100;  // uids 100..149 = secondary key buttons
-constexpr int OR_AND_TOGGLE_BASE  = 150;  // uids 150..199 = OR/AND toggle
-constexpr int SAVE_BTN_UID    = 200;
-constexpr int CANCEL_BTN_UID  = 201;
-constexpr int PRESET_BTN_UID  = 250;
-constexpr int REBIND_TIMEOUT_TICKS = 72;
+using silencer::ui::primitives::BankText;
+using silencer::ui::primitives::BankTextBeginFrame;
+using silencer::ui::primitives::BankTextVariant;
 
-// Mirrors the screen-private "is this a built-in profile?" predicate used by
-// keybinds.cpp's ForkActiveProfileIfBuiltin. Kept renamed to dodge file-static
-// collision under SILENCER_UNITY_BUILD (keybinds.cpp has a `static
-// IsBuiltinProfile`).
+constexpr int VISIBLE_ROWS = 5;
+constexpr int REBIND_TIMEOUT_TICKS = 72;
+constexpr uint16_t kPanelW = 540;
+constexpr uint16_t kPanelPadX = 20;
+constexpr uint16_t kPanelPadY = 24;
+constexpr uint16_t kRowH = 40;
+constexpr uint16_t kRowGap = 8;
+constexpr uint16_t kActionNameW = 168;
+constexpr uint16_t kKeyButtonW = 112;
+constexpr uint16_t kKeyButtonH = 33;
+constexpr uint16_t kOperatorW = 45;
+constexpr uint16_t kActionGap = 12;
+
+struct ClickAdapter {
+	void (*fn)(void *);
+	void * user;
+	int arg0;
+	int arg1;
+};
+
+constexpr int kAdapterCapacity = 192;
+ClickAdapter g_adapters[kAdapterCapacity];
+int g_adapterCount = 0;
+
+Clay_String FromCStr(const char * s)
+{
+	return Clay_String{ false, static_cast<int32_t>(std::strlen(s)), s };
+}
+
+Clay_String FromStd(const std::string & s)
+{
+	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
+}
+
+ClickAdapter * AllocAdapter(void (*fn)(void *), void * user, int arg0 = 0, int arg1 = 0)
+{
+	if(g_adapterCount >= kAdapterCapacity) return nullptr;
+	auto * a = &g_adapters[g_adapterCount++];
+	a->fn = fn;
+	a->user = user;
+	a->arg0 = arg0;
+	a->arg1 = arg1;
+	return a;
+}
+
+void ClickProxy(::Clay_ElementId, ::Clay_PointerData data, std::intptr_t userPtr)
+{
+	if(data.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
+	auto * a = reinterpret_cast<ClickAdapter *>(userPtr);
+	if(a && a->fn) a->fn(a->user);
+}
+
+void PresetClicked(void * user)
+{
+	auto * screen = static_cast<OptionsControlsScreen *>(user);
+	if(screen) screen->NotifyPresetClicked();
+}
+
+void SaveClicked(void * user)
+{
+	auto * screen = static_cast<OptionsControlsScreen *>(user);
+	if(screen) screen->NotifySaveClicked();
+}
+
+void CancelClicked(void * user)
+{
+	auto * screen = static_cast<OptionsControlsScreen *>(user);
+	if(screen) screen->NotifyCancelClicked();
+}
+
+void ScrollUpClicked(void * user)
+{
+	auto * screen = static_cast<OptionsControlsScreen *>(user);
+	if(screen) screen->NotifyScrollUpClicked();
+}
+
+void ScrollDownClicked(void * user)
+{
+	auto * screen = static_cast<OptionsControlsScreen *>(user);
+	if(screen) screen->NotifyScrollDownClicked();
+}
+
+void BindClicked(void * user)
+{
+	auto * a = static_cast<ClickAdapter *>(user);
+	auto * screen = a ? static_cast<OptionsControlsScreen *>(a->user) : nullptr;
+	if(screen) screen->NotifyBindClicked(a->arg0, a->arg1);
+}
+
+void OperatorClicked(void * user)
+{
+	auto * a = static_cast<ClickAdapter *>(user);
+	auto * screen = a ? static_cast<OptionsControlsScreen *>(a->user) : nullptr;
+	if(screen) screen->NotifyOperatorClicked(a->arg0);
+}
+
+void RegisterButton(const char * label,
+                    int x,
+                    int y,
+                    int w,
+                    int h,
+                    void (*onClick)(void *),
+                    void * user,
+                    int rowIndex = -1)
+{
+	silencer::ui::clay_inspector::Widget widget;
+	widget.label = label;
+	widget.kind = rowIndex >= 0
+		? silencer::ui::clay_inspector::WidgetKind::ListRow
+		: silencer::ui::clay_inspector::WidgetKind::Button;
+	widget.x = x; widget.y = y; widget.w = w; widget.h = h;
+	widget.onClick = onClick;
+	widget.clickUser = user;
+	widget.onClickRow = nullptr;
+	widget.rowIndex = rowIndex;
+	silencer::ui::clay_inspector::Register(widget);
+}
+
+void RegisterWidgets(OptionsControlsScreen * screen, int surfaceW)
+{
+	const int panelX = (surfaceW - kPanelW) / 2;
+	const int panelY = 34;
+	const int x = panelX + kPanelPadX;
+	int y = panelY + kPanelPadY + 34;
+	RegisterButton("Preset", x + kActionNameW, y, 220, 33, &PresetClicked, screen);
+	y += kRowH + kRowGap;
+	for(int i = 0; i < VISIBLE_ROWS; i++){
+		RegisterButton("Primary binding", x + kActionNameW, y + 4, kKeyButtonW,
+		               kKeyButtonH, &BindClicked, screen, i);
+		RegisterButton("Binding operator", x + kActionNameW + kKeyButtonW + 12,
+		               y + 4, kOperatorW, kKeyButtonH, &OperatorClicked, screen, i);
+		RegisterButton("Secondary binding",
+		               x + kActionNameW + kKeyButtonW + 12 + kOperatorW + 12,
+		               y + 4, kKeyButtonW, kKeyButtonH, &BindClicked, screen, i);
+		y += kRowH + kRowGap;
+	}
+	RegisterButton("Scroll Up", panelX + kPanelW - 42, panelY + 92, 24, 24,
+	               &ScrollUpClicked, screen);
+	RegisterButton("Scroll Down", panelX + kPanelW - 42, panelY + 280, 24, 24,
+	               &ScrollDownClicked, screen);
+	RegisterButton("Save", panelX + 102, panelY + 338, 156, 21, &SaveClicked, screen);
+	RegisterButton("Cancel", panelX + 282, panelY + 338, 156, 21, &CancelClicked, screen);
+}
+
 bool IsBuiltinKeybindProfile(const std::string & name)
 {
 	return name == "default" || name == "wasd" || name == "gamepad";
+}
+
+void ButtonElement(Clay_String id,
+                   Clay_String text,
+                   uint16_t width,
+                   uint16_t height,
+                   uint16_t imageIndex,
+                   BankTextVariant textVariant,
+                   void (*onClick)(void *),
+                   void * user)
+{
+	CLAY({ .id = CLAY_SID(id),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(width)),
+	                       CLAY_SIZING_FIXED(static_cast<float>(height)) },
+	           .padding = { 0, 0,
+	                        static_cast<uint16_t>(height > 25 ? 8 : 4), 0 },
+	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+	       },
+	       .image = { .imageData = silencer::clay_bridge::PackImage(6, imageIndex) } }) {
+		bool hovered = ::Clay_Hovered();
+		if(onClick){
+			auto * a = AllocAdapter(onClick, user);
+			if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
+		}
+		BankText(text, textVariant,
+		         { .brightness = hovered ? static_cast<Uint8>(136)
+		                                  : static_cast<Uint8>(128) });
+	}
+}
+
+void TextButton(Clay_String id,
+                Clay_String text,
+                uint16_t width,
+                uint16_t height,
+                void (*onClick)(void *),
+                void * user)
+{
+	CLAY({ .id = CLAY_SID(id),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(width)),
+	                       CLAY_SIZING_FIXED(static_cast<float>(height)) },
+	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+	       } }) {
+		bool hovered = ::Clay_Hovered();
+		if(onClick){
+			auto * a = AllocAdapter(onClick, user);
+			if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
+		}
+		BankText(text, BankTextVariant::Heading,
+		         { .brightness = hovered ? static_cast<Uint8>(136)
+		                                  : static_cast<Uint8>(128) });
+	}
+}
+
+void RowActionButton(Clay_String id,
+                     const std::string & text,
+                     int row,
+                     int slot,
+                     bool rebinding,
+                     OptionsControlsScreen * screen)
+{
+	std::string display = rebinding ? "-" : text;
+	auto * adapter = AllocAdapter(&BindClicked, screen, row, slot);
+	ButtonElement(id, FromStd(display), kKeyButtonW, kKeyButtonH, 28,
+	              BankTextVariant::Title, adapter ? &BindClicked : nullptr,
+	              adapter);
+}
+
+void RowOperatorButton(Clay_String id,
+                       const char * text,
+                       int row,
+                       OptionsControlsScreen * screen)
+{
+	auto * adapter = AllocAdapter(&OperatorClicked, screen, row, 0);
+	TextButton(id, FromCStr(text), kOperatorW, kKeyButtonH,
+	           adapter ? &OperatorClicked : nullptr, adapter);
 }
 }
 
@@ -111,309 +326,302 @@ std::string OptionsControlsScreen::GetBindingLabel(ScreenContext & ctx, Action a
 	return KeyMap::GetKeyName(SDL_SCANCODE_UNKNOWN);
 }
 
+int OptionsControlsScreen::MaxScroll() const
+{
+	int max = (int)Action::Count - VISIBLE_ROWS;
+	return max < 0 ? 0 : max;
+}
+
 void OptionsControlsScreen::Build(ScreenContext & ctx)
 {
-	World & world = ctx.world;
+	ctx.ResetPresentation(1);
+	ctx.renderer.camera.SetPosition(320, 240);
+	scrollPosition = 0;
+	rebindRow = -1;
+	rebindSlot = -1;
+	presetClicked = false;
+	saveClicked = false;
+	cancelClicked = false;
+	scrollDelta = 0;
+	operatorClickedRow = -1;
+	silencer::ui::clay_inspector::BeginFrame();
+	RegisterWidgets(this, 640);
+}
 
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 6;
-	background->res_index = 0;
+void OptionsControlsScreen::NotifyBindClicked(int row, int slot)
+{
+	int absolute = scrollPosition + row;
+	if(absolute < 0 || absolute >= (int)Action::Count) return;
+	rebindRow = absolute;
+	rebindSlot = slot;
+}
 
-	Overlay * background2 = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background2->res_bank = 7;
-	background2->res_index = 7;
+void OptionsControlsScreen::NotifyOperatorClicked(int row)
+{
+	int absolute = scrollPosition + row;
+	if(absolute < 0 || absolute >= (int)Action::Count) return;
+	operatorClickedRow = absolute;
+}
 
-	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	title->text = "Configure Controls";
-	title->textbank = 135;
-	title->textwidth = 12;
-	title->x = 320 - ((title->text.length() * title->textwidth) / 2);
-	title->y = 14;
+void OptionsControlsScreen::FinishKeyboardRebind(ScreenContext & ctx, SDL_Scancode sym)
+{
+	if(rebindRow < 0 || rebindRow >= (int)Action::Count) return;
+#ifndef OUYA
+	if(sym == SDL_SCANCODE_ESCAPE) sym = SDL_SCANCODE_UNKNOWN;
+#endif
+	Action a = ACTION_TABLE[rebindRow].action;
+	LegacyView v = ViewLegacy(ctx.keymap, a);
+	if(rebindSlot == 0) v.key1 = sym; else v.key2 = sym;
+	ForkActiveProfileIfBuiltin(ctx.keymap);
+	WriteLegacy(ctx.keymap, a, v.key1, v.key2, v.and_);
+	rebindRow = -1;
+	rebindSlot = -1;
+}
 
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-
-	// Preset cycle row. Static "Preset:" label on the left at the same x/y as
-	// binding row labels; cycle button on the right carrying the profile name.
-	// B220x33 keeps the same vertical sprite anchor as the (now-shifted)
-	// binding row buttons (B112x33), so y=0 places it where row 0 used to
-	// render. The visible button is left-aligned with c1button[0]; both render
-	// with bank-6 sprites but at different indices, so we add the sprite-offset
-	// delta (B220x33 res_index 23 vs B112x33 res_index 28) to c1's obj-space x
-	// — see resources.cpp:66 for the header read.
-	Overlay * presetlabel = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	presetlabel->text = "Preset:";
-	presetlabel->textbank  = 134;
-	presetlabel->textwidth = 10;
-	presetlabel->x = 80;
-	presetlabel->y = 95;
-
-	presetbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	presetbutton->SetType(Button::B220x33);
-	presetbutton->x = -30 + (world.resources.spriteoffsetx[6][23] - world.resources.spriteoffsetx[6][28]);
-	presetbutton->y = 0;
-	presetbutton->uid = PRESET_BTN_UID;
-	strcpy(presetbutton->text, "");
-	iface->AddObject(presetbutton->id);
-	iface->AddTabObject(presetbutton->id);
-
-	for(int i = 0; i < VISIBLE_ROWS; i++){
-		int slot = i + 1;  // visual row index — preset takes slot 0
-
-		Overlay * name = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		keynameoverlay[i] = name;
-		name->textbank = 134;
-		name->textwidth = 10;
-		name->x = 80;
-		name->y = 95 + (slot * 53);
-
-		Button * c1 = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		c1button[i] = c1;
-		c1->SetType(Button::B112x33);
-		c1->y = 0 + (slot * 53);
-		c1->x = -30;
-		c1->uid = PRIMARY_SLOT_BASE + i;
-		strcpy(c1->text, "");
-		iface->AddObject(c1->id);
-		iface->AddTabObject(c1->id);
-
-		Button * op = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		cobutton[i] = op;
-		op->SetType(Button::BNONE);
-		op->y = 95 + (slot * 53);
-		op->x = 383;
-		op->uid = OR_AND_TOGGLE_BASE + i;
-		op->width = 40;
-		op->height = 30;
-		op->textbank = 134;
-		op->textwidth = 9;
-		strcpy(op->text, "");
-		iface->AddObject(op->id);
-
-		Button * c2 = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		c2button[i] = c2;
-		c2->SetType(Button::B112x33);
-		c2->y = 0 + (slot * 53);
-		c2->x = 120;
-		c2->uid = SECONDARY_SLOT_BASE + i;
-		strcpy(c2->text, "");
-		iface->AddObject(c2->id);
-		iface->AddTabObject(c2->id);
+void OptionsControlsScreen::FinishGamepadRebind(ScreenContext & ctx)
+{
+	if(rebindRow < 0 || rebindRow >= (int)Action::Count) return;
+	const GamepadState & gp = ctx.game.GetGamepadState();
+	if(!gp.connected) return;
+	BindingKey padKey{};
+	bool found = false;
+	for(int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT && !found; b++){
+		bool was = (rebindGamepadButtons >> b) & 1;
+		bool is = (gp.buttons >> b) & 1;
+		if(is && !was){
+			padKey.device = BindingDevice::GamepadButton;
+			padKey.code = b;
+			padKey.axisDir = 0;
+			found = true;
+		}
 	}
-	iface->objectupscroll = c1button[0]->id;
-	iface->objectdownscroll = c2button[VISIBLE_ROWS - 1]->id;
-
-	ScrollBar * scrollbar = (ScrollBar *)world.CreateObject(ObjectTypes::SCROLLBAR);
-	scrollbar->res_index = 9;
-	scrollbar->scrollpixels = 53;
-	scrollbar->scrollposition = 0;
-	scrollbar->scrollmax = (int)Action::Count - VISIBLE_ROWS;
-	iface->AddObject(scrollbar->id);
-	iface->scrollbar = scrollbar->id;
-
-	Button * savebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	savebutton->y = 117;
-	savebutton->x = -200;
-	savebutton->uid = SAVE_BTN_UID;
-	strcpy(savebutton->text, "Save");
-	iface->AddObject(savebutton->id);
-	iface->AddTabObject(savebutton->id);
-
-	Button * cancelbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	cancelbutton->y = 117;
-	cancelbutton->x = 20;
-	cancelbutton->uid = CANCEL_BTN_UID;
-	strcpy(cancelbutton->text, "Cancel");
-	iface->AddObject(cancelbutton->id);
-	iface->AddTabObject(cancelbutton->id);
-
-	iface->activeobject = 0;
-	iface->buttonenter = savebutton->id;
-	iface->buttonescape = cancelbutton->id;
-
-	interfaceId = iface->id;
+	for(int ax = 0; ax < SDL_GAMEPAD_AXIS_COUNT && !found; ax++){
+		int16_t was = rebindGamepadAxes[ax];
+		int16_t is = gp.axes[ax];
+		if(std::abs(is) > AXIS_DEADZONE && std::abs(was) <= AXIS_DEADZONE){
+			padKey.device = BindingDevice::GamepadAxis;
+			padKey.code = ax;
+			padKey.axisDir = (is > 0) ? 1 : -1;
+			found = true;
+		}
+	}
+	if(!found) return;
+	ForkActiveProfileIfBuiltin(ctx.keymap);
+	auto & ab = ctx.keymap.Get(ACTION_TABLE[rebindRow].action);
+	Binding binding;
+	binding.keys.push_back(padKey);
+	if(rebindSlot == 0){
+		if(ab.bindings.empty()) ab.bindings.push_back(binding);
+		else ab.bindings[0] = binding;
+	}else{
+		if(ab.bindings.empty()) ab.bindings.push_back(Binding{});
+		if(ab.bindings.size() < 2) ab.bindings.push_back(binding);
+		else ab.bindings[1] = binding;
+	}
+	rebindRow = -1;
+	rebindSlot = -1;
 }
 
 void OptionsControlsScreen::Tick(ScreenContext & ctx)
 {
-	World & world = ctx.world;
-	KeyMap & keymap = ctx.keymap;
-	Interface * iface = (Interface *)world.GetObjectFromId(interfaceId);
-	if(!iface) return;
-	ScrollBar * scrollbar = (ScrollBar *)world.GetObjectFromId(iface->scrollbar);
-
-	if(!iface->disabled && scrollbar){
-		for(int i = 0; i < VISIBLE_ROWS; i++){
-			int row = i + scrollbar->scrollposition;
-			if(row < 0 || row >= (int)Action::Count) continue;
-			Action a = ACTION_TABLE[row].action;
-			keynameoverlay[i]->text = std::string(GetActionInfo(a).label) + ":";
-			std::string lbl0 = GetBindingLabel(ctx, a, 0);
-			std::string lbl1 = GetBindingLabel(ctx, a, 1);
-			strncpy(c1button[i]->text, lbl0.c_str(), sizeof(c1button[i]->text) - 1);
-			c1button[i]->text[sizeof(c1button[i]->text) - 1] = 0;
-			strncpy(c2button[i]->text, lbl1.c_str(), sizeof(c2button[i]->text) - 1);
-			c2button[i]->text[sizeof(c2button[i]->text) - 1] = 0;
-		}
-		// Preset button text reflects the active profile's label.
-		// The static "Preset:" overlay to its left supplies the noun.
-		std::string presetText = !keymap.label.empty() ? keymap.label
-		                       : !keymap.name.empty()  ? keymap.name
-		                       : std::string(Config::GetInstance().active_keybind_profile);
-		if(presetText.size() >= sizeof(presetbutton->text)){
-			presetText.resize(sizeof(presetbutton->text) - 1);
-		}
-		strcpy(presetbutton->text, presetText.c_str());
+	if(scrollDelta != 0){
+		scrollPosition = std::max(0, std::min(MaxScroll(), scrollPosition + scrollDelta));
+		scrollDelta = 0;
 	}
-
-	iface->buttonenter = SAVE_BTN_UID;
-	for(Uint16 oid : iface->objects){
-		Object * object = world.GetObjectFromId(oid);
-		if(!object || object->type != ObjectTypes::BUTTON) continue;
-		Button * button = static_cast<Button *>(object);
-
-		if(button->state == Button::ACTIVE || button->state == Button::ACTIVATING){
-			if((button->uid >= 0 && button->uid < SAVE_BTN_UID) || button->uid == PRESET_BTN_UID){
-				iface->buttonenter = button->id;
-			}
-		}
-
-		// OR/AND toggle text follows the active binding shape every tick.
-		if(button->uid >= OR_AND_TOGGLE_BASE && button->uid < SAVE_BTN_UID && scrollbar){
-			int row = button->uid - OR_AND_TOGGLE_BASE + scrollbar->scrollposition;
-			if(row >= 0 && row < (int)Action::Count){
-				Action a = ACTION_TABLE[row].action;
-				strcpy(button->text, ViewLegacy(keymap, a).and_ ? "AND" : "OR");
-			}
-		}
-
-		// Capture the next keypress for whichever key-slot button was clicked
-		// and put the UI back into edit mode. iface->disabled gates the rest of
-		// the UI while we wait for input.
-		if(button->uid >= PRIMARY_SLOT_BASE && button->uid < OR_AND_TOGGLE_BASE && scrollbar){
-			const GamepadState & gp = ctx.game.GetGamepadState();
-			// First: check for newly-pressed gamepad button/axis during rebind wait.
-			if(iface->disabled && button->state == Button::ACTIVE && gp.connected){
-				int slot = button->uid;
-				int row  = (slot < SECONDARY_SLOT_BASE ? slot : slot - SECONDARY_SLOT_BASE) + scrollbar->scrollposition;
-				BindingKey padKey{}; bool padFound = false;
-				for(int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT && !padFound; b++){
-					bool was = (rebindGamepadButtons >> b) & 1;
-					bool is  = (gp.buttons >> b) & 1;
-					if(is && !was){
-						padKey.device = BindingDevice::GamepadButton;
-						padKey.code   = b; padKey.axisDir = 0;
-						padFound = true;
-					}
-				}
-				for(int ax = 0; ax < SDL_GAMEPAD_AXIS_COUNT && !padFound; ax++){
-					int16_t was = rebindGamepadAxes[ax];
-					int16_t is  = gp.axes[ax];
-					if(std::abs(is) > AXIS_DEADZONE && std::abs(was) <= AXIS_DEADZONE){
-						padKey.device  = BindingDevice::GamepadAxis;
-						padKey.code    = ax;
-						padKey.axisDir = (is > 0) ? 1 : -1;
-						padFound = true;
-					}
-				}
-				if(padFound && row >= 0 && row < (int)Action::Count){
-					ForkActiveProfileIfBuiltin(ctx.keymap);
-					auto & ab = keymap.Get(ACTION_TABLE[row].action);
-					Binding binding; binding.keys.push_back(padKey);
-					if(slot < SECONDARY_SLOT_BASE){
-						if(ab.bindings.empty()) ab.bindings.push_back(binding);
-						else ab.bindings[0] = binding;
-					} else {
-						if(ab.bindings.empty()) ab.bindings.push_back(Binding{});
-						if(ab.bindings.size() < 2) ab.bindings.push_back(binding);
-						else ab.bindings[1] = binding;
-					}
-					std::string label = Stringify(padKey);
-					auto colon = label.find(':');
-					if(colon != std::string::npos) label = label.substr(colon + 1);
-					strncpy(button->text, label.c_str(), sizeof(button->text) - 1);
-					button->text[sizeof(button->text) - 1] = 0;
-					iface->disabled = false;
-				}
-			}
-			if(iface->disabled && button->state == Button::ACTIVE &&
-			   (iface->lastsym != SDL_SCANCODE_UNKNOWN || world.tickcount - optionscontrolstick > REBIND_TIMEOUT_TICKS)){
-				int slot = button->uid;     // 0..99 = primary; 100..149 = secondary
-				int row  = (slot < SECONDARY_SLOT_BASE ? slot : slot - SECONDARY_SLOT_BASE) + scrollbar->scrollposition;
-				SDL_Scancode sym = iface->lastsym;
-				if(world.tickcount - optionscontrolstick > REBIND_TIMEOUT_TICKS){
-					sym = SDL_SCANCODE_UNKNOWN;
-				}
-#ifndef OUYA
-				if(sym == SDL_SCANCODE_ESCAPE){
-					sym = SDL_SCANCODE_UNKNOWN;
-				}
-#endif
-				strcpy(button->text, KeyMap::GetKeyName(sym));
-				if(row >= 0 && row < (int)Action::Count){
-					Action a = ACTION_TABLE[row].action;
-					LegacyView v = ViewLegacy(keymap, a);
-					if(slot < SECONDARY_SLOT_BASE) v.key1 = sym; else v.key2 = sym;
-					ForkActiveProfileIfBuiltin(ctx.keymap);
-					WriteLegacy(keymap, a, v.key1, v.key2, v.and_);
-				}
-				iface->disabled = false;
-			}
-		}
-
-		if(!button->clicked) continue;
-
-		if(button->uid >= PRIMARY_SLOT_BASE && button->uid < OR_AND_TOGGLE_BASE){
-			strcpy(button->text, "-");
-			iface->disabled = true;
-			optionscontrolstick = world.tickcount;
-			iface->lastsym = SDL_SCANCODE_UNKNOWN;
-			// Snapshot the gamepad state so the capture branch above only
-			// reacts to buttons/axes pressed *after* the rebind started.
+	if(presetClicked){
+		presetClicked = false;
+		CycleKeybindPreset(ctx.keymap);
+	}
+	if(operatorClickedRow >= 0 && operatorClickedRow < (int)Action::Count){
+		Action a = ACTION_TABLE[operatorClickedRow].action;
+		LegacyView v = ViewLegacy(ctx.keymap, a);
+		v.and_ = !v.and_;
+		ForkActiveProfileIfBuiltin(ctx.keymap);
+		WriteLegacy(ctx.keymap, a, v.key1, v.key2, v.and_);
+		operatorClickedRow = -1;
+	}
+	if(rebindRow >= 0){
+		if(optionscontrolstick == 0){
+			optionscontrolstick = ctx.world.tickcount;
 			const GamepadState & gp = ctx.game.GetGamepadState();
 			rebindGamepadButtons = gp.buttons;
 			memcpy(rebindGamepadAxes, gp.axes, sizeof(rebindGamepadAxes));
 		}
+		FinishGamepadRebind(ctx);
+		if(rebindRow >= 0 &&
+		   ctx.world.tickcount - optionscontrolstick > REBIND_TIMEOUT_TICKS){
+			FinishKeyboardRebind(ctx, SDL_SCANCODE_UNKNOWN);
+		}
+	}else{
+		optionscontrolstick = 0;
+	}
+	if(saveClicked){
+		saveClicked = false;
+		const std::string active = Config::GetInstance().active_keybind_profile;
+		if(!IsBuiltinKeybindProfile(active)){
+			ctx.keymap.SaveFile(WritableProfilePath(active));
+		}
+		Config::GetInstance().Save();
+		ctx.GoToState(GameState::OPTIONS);
+		return;
+	}
+	if(cancelClicked){
+		cancelClicked = false;
+		LoadActiveKeymap(ctx.keymap);
+		Config::GetInstance().Load();
+		ctx.GoToState(GameState::OPTIONS);
+	}
+}
 
-		if(button->uid >= OR_AND_TOGGLE_BASE && button->uid < SAVE_BTN_UID && scrollbar){
-			int row = button->uid - OR_AND_TOGGLE_BASE + scrollbar->scrollposition;
-			if(row >= 0 && row < (int)Action::Count){
-				Action a = ACTION_TABLE[row].action;
-				LegacyView v = ViewLegacy(keymap, a);
-				v.and_ = !v.and_;
-				ForkActiveProfileIfBuiltin(ctx.keymap);
-				WriteLegacy(keymap, a, v.key1, v.key2, v.and_);
+bool OptionsControlsScreen::HandleScancodeDown(ScreenContext & ctx, SDL_Scancode scancode)
+{
+	if(rebindRow < 0) return false;
+	FinishKeyboardRebind(ctx, scancode);
+	return true;
+}
+
+void OptionsControlsScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+{
+	(void)frametime;
+	using namespace silencer::clay_bridge;
+
+	EnsureInitialized(dst.w, dst.h);
+	float mx = 0.f, my = 0.f;
+	Uint32 buttons = SDL_GetMouseState(&mx, &my);
+	Clay_SetPointerState({ mx, my },
+	                      (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0);
+
+	BankTextBeginFrame();
+	g_adapterCount = 0;
+	silencer::ui::clay_inspector::BeginFrame();
+
+	std::string presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
+	                       : !ctx.keymap.name.empty() ? ctx.keymap.name
+	                       : std::string(Config::GetInstance().active_keybind_profile);
+	std::string actionLabels[VISIBLE_ROWS];
+	std::string primaryLabels[VISIBLE_ROWS];
+	std::string secondaryLabels[VISIBLE_ROWS];
+	std::string operatorLabels[VISIBLE_ROWS];
+	std::string primaryIds[VISIBLE_ROWS];
+	std::string secondaryIds[VISIBLE_ROWS];
+	std::string operatorIds[VISIBLE_ROWS];
+	bool rebindingPrimary[VISIBLE_ROWS] = {};
+	bool rebindingSecondary[VISIBLE_ROWS] = {};
+	for(int i = 0; i < VISIBLE_ROWS; i++){
+		int row = scrollPosition + i;
+		if(row >= (int)Action::Count) break;
+		Action action = ACTION_TABLE[row].action;
+		LegacyView v = ViewLegacy(ctx.keymap, action);
+		actionLabels[i] = std::string(GetActionInfo(action).label) + ":";
+		primaryLabels[i] = GetBindingLabel(ctx, action, 0);
+		secondaryLabels[i] = GetBindingLabel(ctx, action, 1);
+		operatorLabels[i] = v.and_ ? "AND" : "OR";
+		primaryIds[i] = "Primary" + std::to_string(i);
+		secondaryIds[i] = "Secondary" + std::to_string(i);
+		operatorIds[i] = "Operator" + std::to_string(i);
+		rebindingPrimary[i] = (rebindRow == row && rebindSlot == 0);
+		rebindingSecondary[i] = (rebindRow == row && rebindSlot == 1);
+	}
+
+	Clay_BeginLayout();
+	CLAY({ .id = CLAY_ID("OptionsControlsRoot"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
+	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+	           .padding = { 0, 0, 34, 0 },
+	       },
+	       .image = { .imageData = PackImage(6, 0) } }) {
+		CLAY({ .id = CLAY_ID("OptionsControlsPanel"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(kPanelW),
+		                       CLAY_SIZING_FIT(0) },
+		           .padding = { kPanelPadX, kPanelPadX,
+		                        kPanelPadY, kPanelPadY },
+		           .childGap = 12,
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+		       },
+		       .image = { .imageData = PackImage(7, 7) } }) {
+			BankText(CLAY_STRING("Configure Controls"), BankTextVariant::Title, {});
+			CLAY({ .id = CLAY_ID("ControlsPresetRow"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kRowH) },
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+			           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+			       } }) {
+				CLAY({ .id = CLAY_ID("PresetLabel"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_FIXED(kActionNameW),
+				                       CLAY_SIZING_FIT(0) },
+				       } }) {
+					BankText(CLAY_STRING("Preset:"), BankTextVariant::Heading, {});
+				}
+				ButtonElement(CLAY_STRING("PresetButton"), FromStd(presetText), 220, 33,
+				              23, BankTextVariant::Title, &PresetClicked, this);
+			}
+
+			CLAY({ .id = CLAY_ID("ControlsRows"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
+			           .childGap = kRowGap,
+			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+			       } }) {
+				for(int i = 0; i < VISIBLE_ROWS; i++){
+					int row = scrollPosition + i;
+					if(row >= (int)Action::Count) break;
+					CLAY({ .id = CLAY_IDI("ControlsRow", (uint32_t)i),
+					       .layout = {
+					           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kRowH) },
+					           .childGap = 12,
+					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+					           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+					       } }) {
+						CLAY({ .id = CLAY_IDI("ControlsAction", (uint32_t)i),
+						       .layout = {
+						           .sizing = { CLAY_SIZING_FIXED(kActionNameW),
+						                       CLAY_SIZING_FIT(0) },
+						       } }) {
+							BankText(FromStd(actionLabels[i]), BankTextVariant::Heading, {});
+						}
+						RowActionButton(FromStd(primaryIds[i]),
+						                primaryLabels[i], i, 0, rebindingPrimary[i], this);
+						RowOperatorButton(FromStd(operatorIds[i]),
+						                  operatorLabels[i].c_str(), i, this);
+						RowActionButton(FromStd(secondaryIds[i]),
+						                secondaryLabels[i], i, 1, rebindingSecondary[i], this);
+					}
+				}
+			}
+
+			CLAY({ .id = CLAY_ID("ControlsScrollRow"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
+			           .childGap = 20,
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+			       } }) {
+				TextButton(CLAY_STRING("ScrollUp"), CLAY_STRING("Up"), 60, 24,
+				           &ScrollUpClicked, this);
+				TextButton(CLAY_STRING("ScrollDown"), CLAY_STRING("Down"), 80, 24,
+				           &ScrollDownClicked, this);
+			}
+
+			CLAY({ .id = CLAY_ID("ControlsActions"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
+			           .childGap = kActionGap,
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+			       } }) {
+				ButtonElement(CLAY_STRING("Save"), CLAY_STRING("Save"), 156, 21, 24,
+				              BankTextVariant::Heading, &SaveClicked, this);
+				ButtonElement(CLAY_STRING("Cancel"), CLAY_STRING("Cancel"), 156, 21, 24,
+				              BankTextVariant::Heading, &CancelClicked, this);
 			}
 		}
-
-		if(button->uid == PRESET_BTN_UID){
-			CycleKeybindPreset(ctx.keymap);
-		}
-
-		switch(button->uid){
-			case SAVE_BTN_UID:{
-				// Persist the live keymap to the active profile's writable file,
-				// then save the rest of Config (which is now just the
-				// active_keybind_profile pointer plus graphics/audio/network).
-				// Skip writing built-ins — any edit forks via
-				// ForkActiveProfileIfBuiltin, so a built-in name here means
-				// cycle-only (no edits) and shouldn't shadow the on-disk
-				// built-in with a copy.
-				const std::string active = Config::GetInstance().active_keybind_profile;
-				if(!IsBuiltinKeybindProfile(active)){
-					keymap.SaveFile(WritableProfilePath(active));
-				}
-				Config::GetInstance().Save();
-				ctx.GoToState(GameState::OPTIONS);
-			}break;
-			case CANCEL_BTN_UID:{
-				// Reload the keymap from disk so any in-UI edits are discarded.
-				LoadActiveKeymap(ctx.keymap);
-				Config::GetInstance().Load();
-				ctx.GoToState(GameState::OPTIONS);
-			}break;
-		}
-		button->clicked = false;
 	}
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	Render(ctx.game, &dst, cmds);
+	RegisterWidgets(this, dst.w);
 }
 
 void OptionsControlsScreen::Destroy(ScreenContext & ctx)

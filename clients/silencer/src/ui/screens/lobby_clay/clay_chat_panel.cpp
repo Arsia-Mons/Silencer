@@ -4,7 +4,6 @@
 #include "clay_bridge.h"
 #include "clay_inspector.h"
 #include "primitives/bank_text.h"
-#include "primitives/box.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
 
@@ -18,8 +17,6 @@
 
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
-using silencer::ui::primitives::Box;
-namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 using silencer::ui::primitives::ScrollTextBox;
 using silencer::ui::primitives::ScrollTextBoxLine;
 using silencer::ui::primitives::ScrollTextBoxOpts;
@@ -48,32 +45,10 @@ constexpr Uint16 kInputH       = 14;
 // Sprite bank that holds the lobby's scrollbar track/thumb cells.
 constexpr Uint8  kScrollbarBank = 7;
 
-// LobbyChatBox geometry — matches the C2-documented "Chat-box outer frame"
-// rectangle in the baked BG (docs/plans/lobby-chrome-rectangles.md).
-// The Box floats @ ROOT at the legacy stroke origin; its children lay out
-// via flex (TOP_TO_BOTTOM: channel header → body row → input) so the
-// channel-text / chat-scrollback / presence-list / input positions
-// emerge from layout rather than from absolute @ROOT offsets.
-constexpr int   kBoxX             = 10;
-constexpr int   kBoxY             = 195;
-constexpr int   kBoxW             = 378;
-constexpr int   kBoxH             = 260;
-// Inside-box layout knobs — derived from the legacy on-screen widget coords:
-//   channel @ (15, 200), chat @ (19, 220), presence @ (267, 220), input @ (18, 437).
-// Box has border=1 + pad{left=4,top=4} → content top-left lands at (15, 200).
-// Channel header wrapper is FIXED height 20 so the body row starts at y=220
-// regardless of whether the channel name has arrived yet (lobby may not
-// have sent MSG_CHANNEL before the first Build). Body row has padLeft=4 so
-// chat lands at x=19; childGap=6 places presence at x=19+242+6=267. Input
-// wrapper has padTop=10 so it lands at y=220+207+10=437 and padLeft=3 so
-// it lands at x=18.
-constexpr int kBoxPadLeft        = 4;
-constexpr int kBoxPadTop         = 4;
-constexpr int kChannelWrapH      = 20;
-constexpr int kBodyPadLeft       = 4;
-constexpr int kBodyChildGap      = 6;
-constexpr int kInputPadLeft      = 3;
-constexpr int kInputPadTop       = 10;
+constexpr uint16_t kPanelPad       = 6;
+constexpr uint16_t kChannelWrapH   = 20;
+constexpr uint16_t kBodyChildGap   = 6;
+constexpr uint16_t kInputPadTop    = 10;
 // Legacy on-screen coords kept ONLY for inspector hit-rect registration —
 // the CLAY inspector dispatch is label-based; the rect is used as a
 // fallback for geometric hit-testing and for human-readable layout dumps.
@@ -224,12 +199,8 @@ void ChatPanelTick(ChatPanelState & state, World & world) {
 void BuildChatPanelTree(ChatPanelState & state,
                         World & world,
                         Resources & resources) {
-	// LobbyChatBox — Clay-drawn chrome around the chat region. Replaces
-	// the legacy `ChatBorder` (bank 7 idx 11) and `ChatInputBorder` (bank
-	// 7 idx 14) IMAGE sprites. The Box's flex layout positions the
-	// channel header, the chat-scrollback / presence-list body row, and
-	// the chat input via padding + childGap; no inner element positions
-	// itself absolutely.
+	// The lobby shell supplies LobbyChatBox chrome. This component is only
+	// the chat content tree: channel header, scrollback/presence row, input.
 	(void)resources;
 
 	// Prepare slabs + opts BEFORE the CLAY block so the inside of the
@@ -272,27 +243,15 @@ void BuildChatPanelTree(ChatPanelState & state,
 	inOpts.showCaret   = false;
 	inOpts.inactive    = false;
 
-	// Right/bottom padding stay 0: the presence list bleeds within 1 px of
-	// the right stroke to match the baked BG (legacy presence ends at x=377,
-	// box right stroke at x=378); the input row bleeds within ~4 px of the
-	// bottom stroke (handled by kInputPadTop accounting).
-	CLAY(Box(BoxVariants::Chrome, {
-	         .id = CLAY_ID("LobbyChatBox"),
-	         .layout = {
-	             .sizing = { CLAY_SIZING_FIXED((float)kBoxW),
-	                         CLAY_SIZING_FIXED((float)kBoxH) },
-	             .padding = { /*left=*/(uint16_t)kBoxPadLeft, /*right=*/0,
-	                          /*top=*/(uint16_t)kBoxPadTop,  /*bottom=*/0 },
-	             .childGap = 0,
-	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	         },
-	         .floating = { .offset   = { (float)kBoxX, (float)kBoxY },
-	                       .attachTo = CLAY_ATTACH_TO_ROOT },
-	     })) {
+	CLAY({ .id = CLAY_ID("ChatPanelContent"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
+	           .padding = { kPanelPad, kPanelPad, kPanelPad, kPanelPad },
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	       } }) {
 
 		// Channel-header band — fixed height so the body row lands at
-		// y=220 whether or not the channel name has arrived from the
-		// lobby. When empty the wrap is just blank space.
+		// a stable offset whether or not the channel name has arrived.
 		CLAY({ .id = CLAY_ID("ChatChannelWrap"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0),
@@ -305,13 +264,10 @@ void BuildChatPanelTree(ChatPanelState & state,
 			}
 		}
 
-		// Body row — chat scrollback + presence list side-by-side. The
-		// row's padLeft=4 + childGap=6 reproduces the legacy x-offsets
-		// (chat at 19, presence at 267).
+		// Body row — chat scrollback + presence list side-by-side.
 		CLAY({ .id = CLAY_ID("ChatBodyRow"),
 		       .layout = {
-		           .padding = { (uint16_t)kBodyPadLeft, 0, 0, 0 },
-		           .childGap = (uint16_t)kBodyChildGap,
+		           .childGap = kBodyChildGap,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
 			CLAY({ .id = CLAY_ID("ChatBoxWrap") }) {
@@ -330,12 +286,10 @@ void BuildChatPanelTree(ChatPanelState & state,
 			}
 		}
 
-		// Input row — padTop=10 + padLeft=3 lands the 360x14 input at
-		// the legacy (18, 437) on-screen pixel.
+		// Input row.
 		CLAY({ .id = CLAY_ID("ChatInputWrap"),
 		       .layout = {
-		           .padding = { (uint16_t)kInputPadLeft, 0,
-		                        (uint16_t)kInputPadTop,  0 },
+		           .padding = { 0, 0, kInputPadTop, 0 },
 		       } }) {
 			TextInput(CLAY_STRING("ChatInput"),
 			          state.inputBuffer,

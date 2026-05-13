@@ -8,7 +8,19 @@ class MainMenuScreen : public Screen
 public:
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
+	void Draw(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
+
+	void NotifyTutorialClicked() { tutorialClicked = true; }
+	void NotifyLobbyClicked() { lobbyClicked = true; }
+	void NotifyOptionsClicked() { optionsClicked = true; }
+	void NotifyExitClicked() { exitClicked = true; }
+
+private:
+	bool tutorialClicked = false;
+	bool lobbyClicked = false;
+	bool optionsClicked = false;
+	bool exitClicked = false;
 };
 
 #endif

@@ -2,245 +2,185 @@
 
 #include "screen_context.h"
 #include "game_state.h"
-#include "world.h"
-#include "objecttypes.h"
-#include "interface.h"
-#include "button.h"
-#include "overlay.h"
+#include "game.h"
+#include "renderer.h"
+#include "surface.h"
 #include "updater.h"
 #include "updaterstage2.h"
 
+#include "clay/clay.h"
+#include "clay_bridge.h"
+#include "clay_inspector.h"
+#include "primitives/bank_button.h"
+#include "primitives/bank_text.h"
+
+#include <SDL3/SDL.h>
+
 #include <cstdio>
 #include <cstdlib>
-#include <cstring>
 #include <string>
 
 namespace
 {
-// Prefixed to dodge anonymous-namespace collisions when SILENCER_UNITY_BUILD
-// merges this TU with sibling screen .cpp files.
-enum UpdateButton : Uint16 {
-	UPD_BTN_UPDATE   = 250,
-	UPD_BTN_CANCEL   = 251,
-	UPD_BTN_RETRY    = 252,
-	UPD_BTN_DOWNLOAD = 253,
-};
-enum UpdateOverlay : Uint8 {
-	UPD_OVERLAY_STATUS   = 1,
-	UPD_OVERLAY_PROGRESS = 2,
-};
+using silencer::ui::primitives::BankButton;
+using silencer::ui::primitives::BankButtonBeginFrame;
+using silencer::ui::primitives::BankButtonHandle;
+using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::BankText;
+using silencer::ui::primitives::BankTextBeginFrame;
+using silencer::ui::primitives::BankTextVariant;
+
+constexpr uint16_t kDialogW = 352;
+constexpr uint16_t kDialogH = 178;
+constexpr uint16_t kDialogPadX = 34;
+constexpr uint16_t kDialogPadY = 42;
+constexpr uint16_t kButtonGap = 6;
+
+Clay_String FromStd(const std::string & s)
+{
+	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
+}
+
+void OnUpdateClicked(void * user)
+{
+	auto * screen = static_cast<UpdateScreen *>(user);
+	if(screen) screen->NotifyUpdateClicked();
+}
+
+void OnCancelClicked(void * user)
+{
+	auto * screen = static_cast<UpdateScreen *>(user);
+	if(screen) screen->NotifyCancelClicked();
+}
+
+void OnRetryClicked(void * user)
+{
+	auto * screen = static_cast<UpdateScreen *>(user);
+	if(screen) screen->NotifyRetryClicked();
+}
+
+void OnDownloadClicked(void * user)
+{
+	auto * screen = static_cast<UpdateScreen *>(user);
+	if(screen) screen->NotifyDownloadClicked();
+}
+
+void RegisterButton(const char * label,
+                    int x,
+                    int y,
+                    void (*onClick)(void *),
+                    UpdateScreen * screen)
+{
+	silencer::ui::clay_inspector::Widget w;
+	w.label = label;
+	w.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.x = x; w.y = y; w.w = 156; w.h = 21;
+	w.onClick = onClick;
+	w.clickUser = screen;
+	silencer::ui::clay_inspector::Register(w);
+}
+
+void RegisterWidgets(UpdateScreen * screen, int surfaceW, int surfaceH, Updater::State state, int retryCount)
+{
+	const int dialogX = (surfaceW - kDialogW) / 2;
+	const int dialogY = (surfaceH - kDialogH) / 2;
+	const int buttonY = dialogY + kDialogH - kDialogPadY - 21;
+	const int leftX = dialogX + (kDialogW - (156 * 2 + kButtonGap)) / 2;
+	const int rightX = leftX + 156 + kButtonGap;
+	if(state == Updater::PROMPTING){
+		RegisterButton("Update", leftX, buttonY, &OnUpdateClicked, screen);
+	}else if(state == Updater::FAILED && retryCount < 3){
+		RegisterButton("Retry", leftX, buttonY, &OnRetryClicked, screen);
+	}else if(state == Updater::FAILED){
+		RegisterButton("Download", leftX, buttonY, &OnDownloadClicked, screen);
+	}
+	if(state == Updater::PROMPTING || state == Updater::DOWNLOADING || state == Updater::FAILED){
+		RegisterButton("Cancel", rightX, buttonY, &OnCancelClicked, screen);
+	}
+}
+
+std::string StatusText(ScreenContext & ctx)
+{
+	switch(ctx.updater.GetState()){
+		case Updater::PROMPTING:
+			return "An update is required to play online.";
+		case Updater::DOWNLOADING:{
+			char buf[32];
+			snprintf(buf, sizeof(buf), "%d%%", int(ctx.updater.GetProgress() * 100));
+			return buf;
+		}
+		case Updater::VERIFYING:
+			return "Verifying...";
+		case Updater::STAGING:
+			return "Restarting...";
+		case Updater::FAILED:
+			return ctx.updater.GetErrorMessage();
+		case Updater::IDLE:
+		case Updater::DONE:
+		default:
+			return "";
+	}
+}
+
+std::string ProgressText(ScreenContext & ctx)
+{
+	if(ctx.updater.GetState() != Updater::DOWNLOADING) return "";
+	int width = int(ctx.updater.GetProgress() * 20.0f);
+	std::string bar = "[";
+	for(int i = 0; i < 20; i++) bar += (i < width) ? "=" : " ";
+	bar += "]";
+	return bar;
+}
 }
 
 void UpdateScreen::Build(ScreenContext & ctx)
 {
-	World & world = ctx.world;
 	ctx.ResetPresentation(2);
-
-	Interface * iface = static_cast<Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
-	// Background (reuse modal-dialog sprite — same one CreateModalDialog uses;
-	// its baked-in offsets center it, so no x/y needed).
-	Overlay * background = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	background->renderpass = 3;
-	background->res_bank = 40;
-	background->res_index = 4;
-	// Status line (mutated each frame; x re-centered in Tick since text length
-	// varies with state).
-	Overlay * status = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	status->renderpass = 3;
-	status->text = "";
-	status->textbank = 134;
-	status->textwidth = 8;
-	status->x = 320;
-	status->y = 200;
-	status->uid = UPD_OVERLAY_STATUS;
-	// Progress bar (sized by Tick while DOWNLOADING).
-	Overlay * progress = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	progress->renderpass = 3;
-	progress->text = "";
-	progress->textbank = 134;
-	progress->textwidth = 8;
-	progress->x = 320;
-	progress->y = 215;
-	progress->uid = UPD_OVERLAY_PROGRESS;
-	// Action buttons — UPD_BTN_UPDATE/RETRY/DOWNLOAD share the left slot;
-	// exactly one is visible based on Updater state. UPD_BTN_CANCEL is always
-	// on the right. Two B156x21 side-by-side centered on x=320 (mirrors
-	// horizontal pair in LobbyConnectScreen, scaled up).
-	Button * updatebutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	updatebutton->renderpass = 3;
-	updatebutton->x = 161;
-	updatebutton->y = 230;
-	updatebutton->SetType(Button::B156x21);
-	updatebutton->uid = UPD_BTN_UPDATE;
-	strcpy(updatebutton->text, "Update");
-	Button * cancelbutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	cancelbutton->renderpass = 3;
-	cancelbutton->x = 322;
-	cancelbutton->y = 230;
-	cancelbutton->SetType(Button::B156x21);
-	cancelbutton->uid = UPD_BTN_CANCEL;
-	strcpy(cancelbutton->text, "Cancel");
-	Button * retrybutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	retrybutton->renderpass = 3;
-	retrybutton->x = 161;
-	retrybutton->y = 230;
-	retrybutton->SetType(Button::B156x21);
-	retrybutton->uid = UPD_BTN_RETRY;
-	strcpy(retrybutton->text, "Retry");
-	Button * openbutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-	openbutton->renderpass = 3;
-	openbutton->x = 161;
-	openbutton->y = 230;
-	openbutton->SetType(Button::B156x21);
-	openbutton->uid = UPD_BTN_DOWNLOAD;
-	strcpy(openbutton->text, "Download");
-	iface->AddObject(background->id);
-	iface->AddObject(status->id);
-	iface->AddObject(progress->id);
-	iface->AddObject(updatebutton->id);
-	iface->AddObject(cancelbutton->id);
-	iface->AddObject(retrybutton->id);
-	iface->AddObject(openbutton->id);
-	iface->modal = true;
-
-	interfaceId = iface->id;
+	updateClicked = false;
+	cancelClicked = false;
+	retryClicked = false;
+	downloadClicked = false;
+	silencer::ui::clay_inspector::BeginFrame();
+	RegisterWidgets(this, 640, 480, ctx.updater.GetState(), ctx.updater.GetRetryCount());
 }
 
 void UpdateScreen::Tick(ScreenContext & ctx)
 {
-	World & world = ctx.world;
-	Interface * iface = static_cast<Interface *>(world.GetObjectFromId(interfaceId));
-	if(!iface) return;
-
 	Updater::State ustate = ctx.updater.GetState();
-	// Pass 1: update status/progress overlays and button visibility.
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(!object){
-			continue;
-		}
-		if(object->type == ObjectTypes::OVERLAY){
-			Overlay * overlay = static_cast<Overlay *>(object);
-			if(overlay->uid == UPD_OVERLAY_STATUS){
-				switch(ustate){
-					case Updater::PROMPTING:
-						overlay->text = "An update is required to play online.";
-					break;
-					case Updater::DOWNLOADING:{
-						char buf[32];
-						snprintf(buf, sizeof(buf), "%d%%", int(ctx.updater.GetProgress() * 100));
-						overlay->text = buf;
-					}break;
-					case Updater::VERIFYING:
-						overlay->text = "Verifying...";
-					break;
-					case Updater::STAGING:
-						overlay->text = "Restarting...";
-					break;
-					case Updater::FAILED:
-						overlay->text = ctx.updater.GetErrorMessage();
-					break;
-					case Updater::IDLE:
-					case Updater::DONE:
-					default:
-						overlay->text = "";
-					break;
-				}
-				overlay->x = 320 - ((overlay->text.length() * overlay->textwidth) / 2);
-			}else if(overlay->uid == UPD_OVERLAY_PROGRESS){
-				// Simple textual progress indicator for now; real bar rendering
-				// can be introduced later without re-touching the state wiring.
-				if(ustate == Updater::DOWNLOADING){
-					int width = int(ctx.updater.GetProgress() * 20.0f);
-					std::string bar = "[";
-					for(int i = 0; i < 20; i++){
-						bar += (i < width) ? "=" : " ";
-					}
-					bar += "]";
-					overlay->text = bar;
-				}else{
-					overlay->text = "";
-				}
-				overlay->x = 320 - ((overlay->text.length() * overlay->textwidth) / 2);
-			}
-		}else if(object->type == ObjectTypes::BUTTON){
-			Button * button = static_cast<Button *>(object);
-			bool active = false;
-			switch(button->uid){
-				case UPD_BTN_UPDATE:
-					active = (ustate == Updater::PROMPTING);
-				break;
-				case UPD_BTN_CANCEL:
-					active = (ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED);
-				break;
-				case UPD_BTN_RETRY:
-					active = (ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3);
-				break;
-				case UPD_BTN_DOWNLOAD:
-					active = (ustate == Updater::FAILED && ctx.updater.GetRetryCount() >= 3);
-				break;
-				default:
-					continue;
-			}
-			// UPD_BTN_UPDATE/RETRY/DOWNLOAD overlap (same x/y); only the active
-			// one draws. UPD_BTN_CANCEL always draws; the click handler below
-			// guards by ustate so stale clicks during VERIFYING/STAGING are
-			// no-ops. Don't touch button->state here — Interface::Tick owns
-			// hover activation, and fighting it causes the hover sound to spam
-			// every frame the mouse isn't over the button.
-			button->draw = active || (button->uid == UPD_BTN_CANCEL);
+	if(updateClicked){
+		updateClicked = false;
+		if(ustate == Updater::PROMPTING) ctx.updater.Consent();
+	}
+	if(cancelClicked){
+		cancelClicked = false;
+		if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
+			if(ustate == Updater::DOWNLOADING) ctx.updater.Cancel();
+			ctx.GoToState(GameState::MAINMENU);
+			return;
 		}
 	}
-	// Pass 2: dispatch button clicks.
-	for(std::vector<Uint16>::iterator it = iface->objects.begin(); it != iface->objects.end(); it++){
-		Object * object = world.GetObjectFromId(*it);
-		if(!object || object->type != ObjectTypes::BUTTON){
-			continue;
+	if(retryClicked){
+		retryClicked = false;
+		if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3){
+			ctx.updater.Retry();
 		}
-		Button * button = static_cast<Button *>(object);
-		if(!button->clicked){
-			continue;
-		}
-		switch(button->uid){
-			case UPD_BTN_UPDATE:{
-				if(ustate == Updater::PROMPTING){
-					ctx.updater.Consent();
-				}
-			}break;
-			case UPD_BTN_CANCEL:{
-				if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
-					if(ustate == Updater::DOWNLOADING){
-						ctx.updater.Cancel();
-					}
-					ctx.GoToState(GameState::MAINMENU);
-				}
-			}break;
-			case UPD_BTN_RETRY:{
-				if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3){
-					ctx.updater.Retry();
-				}
-			}break;
-			case UPD_BTN_DOWNLOAD:{
-				if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() >= 3){
-					std::string url = ctx.updater.GetDownloadURL();
+	}
+	if(downloadClicked){
+		downloadClicked = false;
+		if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() >= 3){
+			std::string url = ctx.updater.GetDownloadURL();
 #ifdef _WIN32
-					std::string cmd = "start \"\" \"" + url + "\"";
+			std::string cmd = "start \"\" \"" + url + "\"";
 #elif defined(__APPLE__)
-					std::string cmd = "open '" + url + "'";
+			std::string cmd = "open '" + url + "'";
 #else
-					std::string cmd = "xdg-open '" + url + "' &";
+			std::string cmd = "xdg-open '" + url + "' &";
 #endif
-					system(cmd.c_str());
-					ctx.GoToState(GameState::MAINMENU);
-				}
-			}break;
+			system(cmd.c_str());
+			ctx.GoToState(GameState::MAINMENU);
+			return;
 		}
-		button->clicked = false;
 	}
-	// If the updater reached STAGING, spawn the stage-2 child. On success,
-	// flag the Updater so Game::Loop returns false next tick and main()
-	// unwinds — that lets ~Game tear down SDL/audio cleanly before the new
-	// process opens the device (skipping it produces an audible pop).
 	if(ctx.updater.GetState() == Updater::STAGING){
 		std::string zippath =
 #ifdef _WIN32
@@ -249,7 +189,7 @@ void UpdateScreen::Tick(ScreenContext & ctx)
 			"/tmp/silencer-update.zip";
 #endif
 		fprintf(stderr, "[updater] UpdateScreen invoking UpdaterStage2::Launch with zip=%s\n",
-			zippath.c_str());
+		        zippath.c_str());
 		if(UpdaterStage2::Launch(zippath)){
 			ctx.updater.MarkStage2Spawned();
 			return;
@@ -257,6 +197,75 @@ void UpdateScreen::Tick(ScreenContext & ctx)
 		fprintf(stderr, "[updater] UpdaterStage2::Launch failed; returning to main menu\n");
 		ctx.GoToState(GameState::MAINMENU);
 	}
+}
+
+void UpdateScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+{
+	(void)frametime;
+	using namespace silencer::clay_bridge;
+
+	EnsureInitialized(dst.w, dst.h);
+	float mx = 0.f, my = 0.f;
+	Uint32 buttons = SDL_GetMouseState(&mx, &my);
+	Clay_SetPointerState({ mx, my },
+	                      (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0);
+
+	BankButtonBeginFrame();
+	BankTextBeginFrame();
+	silencer::ui::clay_inspector::BeginFrame();
+
+	std::string status = StatusText(ctx);
+	std::string progress = ProgressText(ctx);
+	Updater::State ustate = ctx.updater.GetState();
+
+	Clay_BeginLayout();
+	CLAY({ .id = CLAY_ID("UpdateRoot"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
+	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+	       } }) {
+		CLAY({ .id = CLAY_ID("UpdateDialog"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(kDialogW),
+		                       CLAY_SIZING_FIXED(kDialogH) },
+		           .padding = { kDialogPadX, kDialogPadX,
+		                        kDialogPadY, kDialogPadY },
+		           .childGap = 12,
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+		       },
+		       .image = { .imageData = PackImage(40, 4) } }) {
+			BankText(FromStd(status), BankTextVariant::Heading, {});
+			if(!progress.empty()){
+				BankText(FromStd(progress), BankTextVariant::Heading, {});
+			}
+			CLAY({ .id = CLAY_ID("UpdateActions"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
+			           .childGap = kButtonGap,
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+			       } }) {
+				if(ustate == Updater::PROMPTING){
+					BankButton(CLAY_STRING("Update"), BankButtonVariant::Chrome, {},
+					           BankButtonHandle{ nullptr, &OnUpdateClicked, this });
+				}else if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3){
+					BankButton(CLAY_STRING("Retry"), BankButtonVariant::Chrome, {},
+					           BankButtonHandle{ nullptr, &OnRetryClicked, this });
+				}else if(ustate == Updater::FAILED){
+					BankButton(CLAY_STRING("Download"), BankButtonVariant::Chrome, {},
+					           BankButtonHandle{ nullptr, &OnDownloadClicked, this });
+				}
+				if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
+					BankButton(CLAY_STRING("Cancel"), BankButtonVariant::Chrome, {},
+					           BankButtonHandle{ nullptr, &OnCancelClicked, this });
+				}
+			}
+		}
+	}
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	Render(ctx.game, &dst, cmds);
+	RegisterWidgets(this, dst.w, dst.h, ustate, ctx.updater.GetRetryCount());
 }
 
 void UpdateScreen::Destroy(ScreenContext & ctx)

@@ -20,19 +20,20 @@ public:
 
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
+	void Draw(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
 
 	bool IsProgress() const { return !hasOk; }
 	void SetText(ScreenContext & ctx, const std::string & text);
+	void NotifyOkClicked() { okClicked = true; }
 
 private:
 	MessageModal(std::string message, bool ok, std::function<void()> onClose);
 
 	std::string message;
 	bool hasOk;
+	bool okClicked = false;
 	std::function<void()> onClose;
-	Uint16 textOverlayId = 0;
-	Uint16 okButtonId = 0;
 };
 
 #endif

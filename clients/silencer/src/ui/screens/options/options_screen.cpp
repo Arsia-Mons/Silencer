@@ -2,88 +2,160 @@
 
 #include "screen_context.h"
 #include "game_state.h"
+#include "game.h"
+#include "renderer.h"
 #include "world.h"
-#include "objecttypes.h"
-#include "interface.h"
-#include "button.h"
-#include "overlay.h"
+#include "surface.h"
 
-#include <cstring>
+#include "clay/clay.h"
+#include "clay_bridge.h"
+#include "clay_inspector.h"
+#include "primitives/bank_button.h"
 
-namespace
+#include <SDL3/SDL.h>
+
+namespace {
+
+using silencer::ui::primitives::BankButton;
+using silencer::ui::primitives::BankButtonBeginFrame;
+using silencer::ui::primitives::BankButtonHandle;
+using silencer::ui::primitives::BankButtonVariant;
+
+constexpr uint16_t kButtonGap = 12;
+
+void OnGoBackClicked(void * user)
 {
-enum OptionsButton : Uint8 {
-	BTN_GO_BACK  = 0,
-	BTN_CONTROLS = 1,
-	BTN_DISPLAY  = 2,
-	BTN_AUDIO    = 3,
-};
+	auto * screen = static_cast<OptionsScreen *>(user);
+	if(screen) screen->NotifyGoBackClicked();
 }
+
+void OnControlsClicked(void * user)
+{
+	auto * screen = static_cast<OptionsScreen *>(user);
+	if(screen) screen->NotifyControlsClicked();
+}
+
+void OnDisplayClicked(void * user)
+{
+	auto * screen = static_cast<OptionsScreen *>(user);
+	if(screen) screen->NotifyDisplayClicked();
+}
+
+void OnAudioClicked(void * user)
+{
+	auto * screen = static_cast<OptionsScreen *>(user);
+	if(screen) screen->NotifyAudioClicked();
+}
+
+void RegisterButton(const char * label,
+                    int x,
+                    int y,
+                    void (*onClick)(void *),
+                    OptionsScreen * screen)
+{
+	silencer::ui::clay_inspector::Widget w;
+	w.label = label;
+	w.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.x = x; w.y = y; w.w = 156; w.h = 21;
+	w.onClick = onClick;
+	w.clickUser = screen;
+	silencer::ui::clay_inspector::Register(w);
+}
+
+void RegisterOptionsButtons(OptionsScreen * screen)
+{
+	RegisterButton("Controls", 242, 160, &OnControlsClicked, screen);
+	RegisterButton("Display", 242, 193, &OnDisplayClicked, screen);
+	RegisterButton("Audio", 242, 226, &OnAudioClicked, screen);
+	RegisterButton("Go Back", 242, 259, &OnGoBackClicked, screen);
+}
+
+}  // namespace
 
 void OptionsScreen::Build(ScreenContext & ctx)
 {
-	World & world = ctx.world;
+	ctx.ResetPresentation(1);
+	ctx.renderer.camera.SetPosition(320, 240);
 
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 6;
-	background->res_index = 0;
+	// Clay owns all visible options-menu structure and hit targets.
 
-	Button * controlsbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	controlsbutton->y = -142;
-	controlsbutton->x = -89;
-	controlsbutton->uid = BTN_CONTROLS;
-	strcpy(controlsbutton->text, "Controls");
+	goBackClicked = false;
+	controlsClicked = false;
+	displayClicked = false;
+	audioClicked = false;
 
-	Button * displaybutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	displaybutton->y = -90;
-	displaybutton->x = -89;
-	displaybutton->uid = BTN_DISPLAY;
-	strcpy(displaybutton->text, "Display");
-
-	Button * audiobutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	audiobutton->y = -38;
-	audiobutton->x = -89;
-	audiobutton->uid = BTN_AUDIO;
-	strcpy(audiobutton->text, "Audio");
-
-	Button * gobackbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	gobackbutton->y = 15;
-	gobackbutton->x = -89;
-	gobackbutton->uid = BTN_GO_BACK;
-	strcpy(gobackbutton->text, "Go Back");
-
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-	iface->AddObject(controlsbutton->id);
-	iface->AddObject(displaybutton->id);
-	iface->AddObject(audiobutton->id);
-	iface->AddObject(gobackbutton->id);
-	iface->AddTabObject(controlsbutton->id);
-	iface->AddTabObject(displaybutton->id);
-	iface->AddTabObject(audiobutton->id);
-	iface->AddTabObject(gobackbutton->id);
-	iface->activeobject = 0;
-	iface->buttonescape = gobackbutton->id;
-
-	interfaceId = iface->id;
+	silencer::ui::clay_inspector::BeginFrame();
+	RegisterOptionsButtons(this);
 }
 
 void OptionsScreen::Tick(ScreenContext & ctx)
 {
-	Interface * iface = (Interface *)ctx.world.GetObjectFromId(interfaceId);
-	if(!iface) return;
-	for(Uint16 oid : iface->objects){
-		Object * object = ctx.world.GetObjectFromId(oid);
-		if(!object || object->type != ObjectTypes::BUTTON) continue;
-		Button * button = static_cast<Button *>(object);
-		if(!button->clicked) continue;
-		switch(button->uid){
-			case BTN_GO_BACK:  ctx.GoToState(GameState::MAINMENU);       break;
-			case BTN_CONTROLS: ctx.GoToState(GameState::OPTIONSCONTROLS); break;
-			case BTN_DISPLAY:  ctx.GoToState(GameState::OPTIONSDISPLAY);  break;
-			case BTN_AUDIO:    ctx.GoToState(GameState::OPTIONSAUDIO);    break;
-		}
-		button->clicked = false;
+	if(goBackClicked){
+		goBackClicked = false;
+		ctx.GoToState(GameState::MAINMENU);
+		return;
 	}
+	if(controlsClicked){
+		controlsClicked = false;
+		ctx.GoToState(GameState::OPTIONSCONTROLS);
+		return;
+	}
+	if(displayClicked){
+		displayClicked = false;
+		ctx.GoToState(GameState::OPTIONSDISPLAY);
+		return;
+	}
+	if(audioClicked){
+		audioClicked = false;
+		ctx.GoToState(GameState::OPTIONSAUDIO);
+		return;
+	}
+}
+
+void OptionsScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+{
+	(void)frametime;
+	using namespace silencer::clay_bridge;
+
+	EnsureInitialized(dst.w, dst.h);
+
+	float mx = 0.f, my = 0.f;
+	Uint32 buttons = SDL_GetMouseState(&mx, &my);
+	bool down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
+	Clay_SetPointerState({ mx, my }, down);
+
+	BankButtonBeginFrame();
+	silencer::ui::clay_inspector::BeginFrame();
+
+	Clay_BeginLayout();
+	CLAY({ .id = CLAY_ID("OptionsRoot"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
+	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+	       },
+	       .image = { .imageData = PackImage(6, 0) } }) {
+		CLAY({ .id = CLAY_ID("OptionsButtonColumn"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(156),
+		                       CLAY_SIZING_FIT(0) },
+		           .childGap = kButtonGap,
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		       } }) {
+			BankButton(CLAY_STRING("Controls"), BankButtonVariant::Chrome, {},
+			           BankButtonHandle{ nullptr, &OnControlsClicked, this });
+			BankButton(CLAY_STRING("Display"), BankButtonVariant::Chrome, {},
+			           BankButtonHandle{ nullptr, &OnDisplayClicked, this });
+			BankButton(CLAY_STRING("Audio"), BankButtonVariant::Chrome, {},
+			           BankButtonHandle{ nullptr, &OnAudioClicked, this });
+			BankButton(CLAY_STRING("Go Back"), BankButtonVariant::Chrome, {},
+			           BankButtonHandle{ nullptr, &OnGoBackClicked, this });
+		}
+	}
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+
+	Render(ctx.game, &dst, cmds);
+	RegisterOptionsButtons(this);
 }
 
 void OptionsScreen::Destroy(ScreenContext & ctx)

@@ -2,6 +2,7 @@
 #define SCREEN_H
 
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_scancode.h>
 
 class ScreenContext;
 class Surface;
@@ -13,7 +14,7 @@ class Screen
 public:
 	virtual ~Screen() = default;
 
-	// Build widgets and add the root Interface to world. Called once on push.
+	// Initialize screen-owned UI state. Called once on push.
 	virtual void Build(ScreenContext & ctx) = 0;
 
 	// Called once per Game::Tick while the screen is on top of the stack.
@@ -22,14 +23,12 @@ public:
 	// Render-phase hook. Called from the game's render loop AFTER the
 	// screenbuffer is cleared and BEFORE Renderer::Draw walks the world.
 	// Screens that emit a Clay tree dispatch its render commands here so
-	// Clay-painted pixels are drawn first (background image, chrome) and
-	// the world-object walk (panels, interfaces) overlays on top. Default
-	// no-op; legacy widget-based screens render entirely via the world
-	// walk and don't need to override.
+	// Clay-painted pixels are drawn first (background image, chrome) before
+	// Renderer::Draw handles game-world content. Default no-op.
 	virtual void Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	{ (void)ctx; (void)dst; (void)frametime; }
 
-	// Tear down widgets. Called on pop/replace.
+	// Tear down screen-owned UI state. Called on pop/replace.
 	virtual void Destroy(ScreenContext & ctx) = 0;
 
 	// Handle a back/cancel request (esc, right-click, "Go Back" button).
@@ -39,10 +38,21 @@ public:
 	// transition to MAINMENU).
 	virtual bool HandleBack(ScreenContext & ctx) { (void)ctx; return false; }
 
+	// Optional input hooks for Clay-driven screens. Screens consume here and
+	// keep their state in caller-owned buffers/callbacks.
+	virtual bool HandleTextInput(ScreenContext & ctx, char ascii)
+	{ (void)ctx; (void)ascii; return false; }
+	virtual bool HandleKeyPress(ScreenContext & ctx, char ascii)
+	{ (void)ctx; (void)ascii; return false; }
+	virtual bool HandleScancodeDown(ScreenContext & ctx, SDL_Scancode scancode)
+	{ (void)ctx; (void)scancode; return false; }
+	virtual bool HandleMousePress(ScreenContext & ctx, bool pressed, Uint16 x, Uint16 y)
+	{ (void)ctx; (void)pressed; (void)x; (void)y; return false; }
+	virtual bool HandleMouseMove(ScreenContext & ctx, Uint16 x, Uint16 y)
+	{ (void)ctx; (void)x; (void)y; return false; }
+
 	// Modals draw the screen below them; non-modal Screens hide what's beneath.
 	virtual bool IsOverlay() const { return false; }
-
-	Uint16 interfaceId = 0;
 };
 
 #endif

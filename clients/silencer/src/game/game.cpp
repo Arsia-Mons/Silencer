@@ -3,15 +3,7 @@
 #include "sdl3gpubackend.h"
 #include "tuibackend.h"
 #include <math.h>
-#include "overlay.h"
-#include "interface.h"
-#include "textbox.h"
-#include "textinput.h"
-#include "button.h"
-#include "toggle.h"
 #include "state.h"
-#include "selectbox.h"
-#include "scrollbar.h"
 #include "os.h"
 #include "team.h"
 #include "player.h"
@@ -34,6 +26,7 @@
 #include "options_display_screen.h"
 #include "options_audio_screen.h"
 #include "lobby_connect_screen.h"
+#include "clay_inspector.h"
 #ifdef SILENCER_HAVE_LOBBY_CLAY
 #include "lobby_clay_screen.h"
 #endif
@@ -76,7 +69,6 @@ Game::Game() : renderer(world), screenbuffer(640, 480),
 	gamepad = nullptr;
 	singleplayermessage = 0;
 	updatetitle = true;
-	currentinterface = 0;
 	minimized = false;
 	window = 0;
 	renderdevice = nullptr;
@@ -520,25 +512,17 @@ bool Game::Loop(void){
 				world.localinput.mousex    = mx;
 				world.localinput.mousey    = my;
 				world.localinput.mousedown = md;
-				// Edge-detect transitions and dispatch to the current
-				// interface — mirrors HandleSDLEvents' SDL_EVENT_MOUSE_*
-				// handlers (game.cpp ~6275). Without this the menu UI
-				// never sees the mouse, since iface state is driven by
-				// ProcessMousePress / ProcessMouseMove rather than
-				// world.localinput reads.
-				Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-				if(iface){
-					bool moved = !tui_have_prev_mouse ||
-					             mx != tui_prev_mouse_x ||
-					             my != tui_prev_mouse_y;
-					bool downChanged = !tui_have_prev_mouse ||
-					                   md != tui_prev_mouse_down;
-					if(moved){
-						iface->ProcessMouseMove(world, mx, my);
-					}
-					if(downChanged){
-						iface->ProcessMousePress(world, md, mx, my);
-					}
+				Screen * top = GetTopScreen();
+				bool moved = !tui_have_prev_mouse ||
+				             mx != tui_prev_mouse_x ||
+				             my != tui_prev_mouse_y;
+				bool downChanged = !tui_have_prev_mouse ||
+				                   md != tui_prev_mouse_down;
+				if(top && moved){
+					top->HandleMouseMove(screenContext, mx, my);
+				}
+				if(top && downChanged){
+					top->HandleMousePress(screenContext, md, mx, my);
 				}
 				tui_prev_mouse_x    = mx;
 				tui_prev_mouse_y    = my;
@@ -547,15 +531,6 @@ bool Game::Loop(void){
 			}
 		} else {
 			UpdateInputState(world.localinput);
-			// If a rebind slot is waiting for input, zero out gamepad-driven
-			// localinput so button presses don't leak into gameplay/UI actions.
-			if(currentinterface){
-				Interface* rebindIface = (Interface*)world.GetObjectFromId(currentinterface);
-				if(rebindIface && rebindIface->disabled){
-					world.localinput.keyup = world.localinput.keydown =
-					world.localinput.keyleft = world.localinput.keyright = false;
-				}
-			}
 			TickGamepadMenuNav();
 		}
 		world.SendInput();
@@ -909,6 +884,7 @@ void Game::GoToState(Uint8 newstate){
 	// GoToState in response to a button click) can return safely before its
 	// destructor runs.
 	screenStackPendingTeardown = true;
+	silencer::ui::clay_inspector::BeginFrame();
 }
 
 bool Game::GoBack(void){
@@ -945,14 +921,11 @@ void Game::TickRumble(){
 
 
 void Game::TickGamepadMenuNav(){
-	// Only meaningful when a gamepad is connected and a menu interface is open.
 	if(!gamepadstate.connected) return;
-	Interface* iface = (Interface*)world.GetObjectFromId(currentinterface);
-	if(!iface) return;
-
-	// During rebind-wait (iface->disabled=true) the rebind capture code owns
-	// all gamepad input.  Don't let nav/confirm/cancel fire as side effects.
-	if(iface->disabled) return;
+	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+	bool inGameMenu = localplayer && (localplayer->isbuying || localplayer->techstationactive);
+	Screen * top = GetTopScreen();
+	if(!top && !inGameMenu) return;
 
 	Uint32 now = SDL_GetTicks();
 
@@ -968,11 +941,13 @@ void Game::TickGamepadMenuNav(){
 			// First frame held — fire immediately.
 			dir.held     = true;
 			dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
-			iface->ProcessKeyPress(world, ascii);
+			if(inGameMenu) HandleInGameMenuKey((char)ascii);
+			else top->HandleKeyPress(screenContext, (char)ascii);
 		} else if(now >= dir.nextfire){
 			// Repeat.
 			dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
-			iface->ProcessKeyPress(world, ascii);
+			if(inGameMenu) HandleInGameMenuKey((char)ascii);
+			else top->HandleKeyPress(screenContext, (char)ascii);
 		}
 	};
 
@@ -988,10 +963,10 @@ void Game::TickGamepadMenuNav(){
 		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
 		static bool confirmPrev = false;
 		if(confirmNow && !confirmPrev){
-			if(iface->activeobject == 0 && !iface->tabobjects.empty()){
-				iface->ProcessKeyPress(world, 4);  // focus first item; next A confirms
-			} else {
-				iface->ProcessKeyPress(world, '\n');
+			if(inGameMenu){
+				HandleInGameMenuKey('\n');
+			}else{
+				top->HandleKeyPress(screenContext, '\n');
 			}
 		}
 		confirmPrev = confirmNow;
@@ -1103,17 +1078,12 @@ void Game::PushScreen(std::unique_ptr<Screen> s){
 	if(!s) return;
 	s->Build(screenContext);
 	screenStack.push_back(std::move(s));
-	currentinterface = screenStack.back()->interfaceId;
-	if(currentinterface){
-		world.GetAuthorityPeer()->controlledlist.push_back(currentinterface);
-	}
 }
 
 void Game::PopScreen(){
 	if(screenStack.empty()) return;
 	screenStack.back()->Destroy(screenContext);
 	screenStack.pop_back();
-	currentinterface = screenStack.empty() ? 0 : screenStack.back()->interfaceId;
 }
 
 void Game::ReplaceScreen(std::unique_ptr<Screen> s){
@@ -1129,8 +1099,8 @@ void Game::TickActiveScreen(){
 	if(screenStack.empty()) return;
 	// Tick the topmost non-overlay plus every overlay stacked above it. Modals
 	// are overlays — the screen beneath continues to tick (and run its
-	// per-frame state polling) while the modal is up. Input dispatch is
-	// blocked by `currentinterface` already pointing at the topmost iface.
+	// per-frame state polling) while the modal is up. Input dispatch routes
+	// directly through the top screen's Clay handlers.
 	int start = (int)screenStack.size() - 1;
 	while(start > 0 && screenStack[start]->IsOverlay()) --start;
 	for(size_t i = (size_t)start; i < screenStack.size(); ++i){

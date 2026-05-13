@@ -1,14 +1,13 @@
 #include "game.h"
 #include "audio.h"
+#include "buyableitem.h"
 #include "config.h"
 #include "gasloader.h"
-#include "interface.h"
 #include "player.h"
-#include "selectbox.h"
 #include "team.h"
-#include "textinput.h"
 #include "world.h"
 #include <cstring>
+#include <vector>
 
 bool Game::LoadMap(const char * name){
 	if(!world.map.Load(name, world)){
@@ -108,90 +107,74 @@ bool Game::CheckForConnectionLost(void){
 void Game::ProcessInGameInterfaces(void){
 	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 	if(localplayer){
-		if(localplayer->buyinterfaceid || localplayer->techinterfaceid){
-			currentinterface = localplayer->buyinterfaceid;
-			if(!currentinterface){
-				currentinterface = localplayer->techinterfaceid;
+		if(localplayer->isbuying || localplayer->techstationactive){
+			std::vector<BuyableItem *> items;
+			localplayer->CollectBuyMenuItems(world, localplayer->techstationactive, items);
+			int & selected = localplayer->isbuying ? localplayer->buyifacelastitem : localplayer->techifacelastitem;
+			int & scrolled = localplayer->isbuying ? localplayer->buyifacelastscrolled : localplayer->techifacelastscrolled;
+			if(items.empty()){
+				selected = 0;
+				scrolled = 0;
+			}else{
+				if(selected < 0) selected = 0;
+				if(selected >= (int)items.size()) selected = (int)items.size() - 1;
+				if(selected >= scrolled + 5) scrolled = selected - 4;
+				if(selected < scrolled) scrolled = selected;
+				if(scrolled < 0) scrolled = 0;
 			}
 		}else{
 			oldselecteditem = 0;
 		}
-		if(localplayer->chatinterfaceid){
-			currentinterface = localplayer->chatinterfaceid;
-		}
-		if(!localplayer->chatinterfaceid && !localplayer->buyinterfaceid && !localplayer->techinterfaceid){
-			currentinterface = 0;
-		}
-		Interface * iface = (Interface *)world.GetObjectFromId(currentinterface);
-		if(iface){
-			if(iface->id == localplayer->chatinterfaceid){
-				TextInput * textinput = (TextInput *)iface->GetObjectWithUid(world, 1);
-				if(textinput){
-					if(textinput->tabpressed){
-						localplayer->chatwithteam = !localplayer->chatwithteam;
-						textinput->tabpressed = false;
-					}
-					if(textinput->enterpressed){
-						if(strlen(textinput->text) > 0){
-							world.SendChat(localplayer->chatwithteam, textinput->text);
-						}
-						iface->DestroyInterface(world, iface);
-						localplayer->chatinterfaceid = 0;
-					}
-					if(keystate[quitscancode]){
-						iface->DestroyInterface(world, iface);
-						localplayer->chatinterfaceid = 0;
-					}
-				}
-			}else
-			if(iface->id == localplayer->buyinterfaceid || iface->id == localplayer->techinterfaceid){
-				bool buying = false;
-				if(iface->id == localplayer->buyinterfaceid){
-					buying = true;
-				}
-				SelectBox * selectbox = (SelectBox *)iface->GetObjectWithUid(world, 1);
-				if(selectbox){
-					if(selectbox->selecteditem != oldselecteditem){
-						Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
-						oldselecteditem = selectbox->selecteditem;
-						if(buying){
-							localplayer->buyifacelastitem = selectbox->selecteditem;
-						}
-					}
-					if(selectbox->selecteditem >= selectbox->scrolled + 5){
-						selectbox->scrolled = selectbox->selecteditem - 4;
-					}
-					if(selectbox->selecteditem < selectbox->scrolled){
-						selectbox->scrolled = selectbox->selecteditem;
-					}
-					if(buying){
-						localplayer->buyifacelastscrolled = selectbox->scrolled;
-					}
-					if(selectbox->enterpressed){
-						BuyableItem * buyableitem = 0;
-						for(std::vector<BuyableItem *>::iterator it = world.buyableitems.begin(); it != world.buyableitems.end(); it++){
-							if((*it)->id == selectbox->IndexToId(selectbox->selecteditem)){
-								buyableitem = (*it);
-								break;
-							}
-						}
-						if(buyableitem){
-							if(buying){
-								localplayer->BuyItem(world, buyableitem->id);
-							}else{
-								if(localplayer->InOwnBase(world)){
-									localplayer->RepairItem(world, buyableitem->id);
-								}else{
-									localplayer->VirusItem(world, buyableitem->id);
-								}
-							}
-						}
-						selectbox->enterpressed = false;
-					}
-				}
-			}
+		if(!localplayer->chatActive && !localplayer->isbuying && !localplayer->techstationactive){
 		}
 	}
+}
+
+bool Game::HandleInGameMenuKey(char ascii){
+	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
+	if(!localplayer || (!localplayer->isbuying && !localplayer->techstationactive)){
+		return false;
+	}
+	std::vector<BuyableItem *> items;
+	bool tech = localplayer->techstationactive;
+	localplayer->CollectBuyMenuItems(world, tech, items);
+	if(items.empty()){
+		return true;
+	}
+	int & selected = localplayer->isbuying ? localplayer->buyifacelastitem : localplayer->techifacelastitem;
+	int & scrolled = localplayer->isbuying ? localplayer->buyifacelastscrolled : localplayer->techifacelastscrolled;
+	if(selected < 0) selected = 0;
+	if(selected >= (int)items.size()) selected = (int)items.size() - 1;
+	int old = selected;
+	if(ascii == 3){
+		if(selected > 0) selected--;
+	}else if(ascii == 4){
+		if(selected < (int)items.size() - 1) selected++;
+	}else if(ascii == '\n'){
+		BuyableItem * buyableitem = items[selected];
+		if(localplayer->isbuying){
+			localplayer->BuyItem(world, buyableitem->id);
+		}else if(localplayer->InOwnBase(world)){
+			localplayer->RepairItem(world, buyableitem->id);
+		}else{
+			localplayer->VirusItem(world, buyableitem->id);
+		}
+		return true;
+	}else if(ascii == 0x1B){
+		localplayer->isbuying = false;
+		localplayer->techstationactive = false;
+		return true;
+	}else{
+		return false;
+	}
+	if(selected != old){
+		Audio::GetInstance().Play(world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown], 64);
+	}
+	if(selected >= scrolled + 5) scrolled = selected - 4;
+	if(selected < scrolled) scrolled = selected;
+	if(scrolled < 0) scrolled = 0;
+	oldselecteditem = selected;
+	return true;
 }
 
 void Game::ShowDeployMessage(void){
@@ -279,16 +262,6 @@ void Game::SpectateGame(LobbyGame & lobbygame, char * password){
 	joininggame = true;
 }
 
-void Game::ShowTeamOverlays(bool show){
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-		Object * object = *it;
-		if(object->type == ObjectTypes::TEAM){
-			Team * team = static_cast<Team *>(object);
-			team->ShowOverlays(world, show);
-		}
-	}
-}
-
 void Game::LeaveJoinedGame(){
 	world.Disconnect();
 	world.lobby.gamesprocessed = false;
@@ -298,8 +271,6 @@ void Game::LeaveJoinedGame(){
 	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
 		Object * object = *it;
 		if(object->type == ObjectTypes::TEAM){
-			Team * team = static_cast<Team *>(object);
-			team->DestroyOverlays(world);
 			world.MarkDestroyObject(object->id);
 		}
 	}

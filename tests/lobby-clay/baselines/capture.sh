@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Captures the seven lobby baselines from the LEGACY build by driving the
-# headless silencer through the CLI. Outputs into the script's directory.
+# Captures the seven lobby Clay baselines by driving headless Silencer through
+# the CLI. Outputs into the script's directory.
 #
 # Requires:
 #   - clients/silencer/build/Silencer.app (or platform equivalent)
@@ -81,48 +81,18 @@ HOME="$SILENCER_HOME" "$SILENCER_BIN" \
 SILENCER_PID=$!
 wait_alive "$CTRL_PORT"
 
-wait_for_iface() {
+wait_for_widget() {
+  local label="$1"
   for i in $(seq 1 100); do
-    iface=$(cli --port "$CTRL_PORT" state | bun -e \
-      'const t=await new Response(Bun.stdin.stream()).text(); console.log(JSON.parse(t).current_interface_id||0);')
-    [ "${iface:-0}" != "0" ] && return 0
+    found=$(cli --port "$CTRL_PORT" inspect | LABEL="$label" bun -e \
+      'const t=await new Response(Bun.stdin.stream()).text();
+       const r=JSON.parse(t);
+       const label=process.env.LABEL;
+       console.log(r.widgets.some((w)=>w.label===label) ? "yes" : "no");' 2>/dev/null || echo no)
+    [ "$found" = "yes" ] && return 0
     sleep 0.05
   done
   return 1
-}
-
-# Lobby panels live in child interfaces nested under the screen's
-# top-level interface. `click --label` only searches the current
-# interface, so to click a panel button we walk into each child
-# interface via `inspect --interface-id` and click by --id (which
-# resolves through the world object table, not the iface's objects).
-# Prints the button's global object id to stdout, or empty on miss.
-find_button_id() {
-  local label="$1"
-  # object_type=1 is INTERFACE (clients/silencer/src/actors/objecttypes.h)
-  local children
-  children=$(cli --port "$CTRL_PORT" inspect \
-    | jq -r '.widgets[] | select(.kind=="other" and .object_type==1) | .id')
-  for child in $children; do
-    local hit
-    hit=$(cli --port "$CTRL_PORT" inspect --interface-id "$child" \
-      | jq -r --arg L "$label" \
-        '.widgets[] | select(.kind=="button" and (.label|ascii_downcase)==($L|ascii_downcase)) | .id' \
-      | head -n1)
-    if [ -n "$hit" ]; then echo "$hit"; return 0; fi
-  done
-  return 1
-}
-
-click_by_label_recursive() {
-  local label="$1"
-  local id
-  id=$(find_button_id "$label" || true)
-  if [ -z "$id" ]; then
-    echo "WIDGET_NOT_FOUND (recursive): $label" >&2
-    return 1
-  fi
-  cli --port "$CTRL_PORT" click --id "$id" >/dev/null
 }
 
 wait_for_lobby_state() {
@@ -138,16 +108,16 @@ wait_for_lobby_state() {
 
 # MainMenu → LobbyConnect → Login → LOBBY
 cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
-wait_for_iface
+wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
-wait_for_iface
+wait_for_widget "Login"
 cli --port "$CTRL_PORT" set_text --uid 1 --text "alice" >/dev/null
 cli --port "$CTRL_PORT" set_text --uid 2 --text "secret" >/dev/null
 wait_for_lobby_state AUTHENTICATING
 cli --port "$CTRL_PORT" click --label "Login" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
-wait_for_iface
+wait_for_widget "Create Game"
 
 # Let the lobby pump a few frames so panel content stabilizes.
 cli --port "$CTRL_PORT" wait_frames --n 30 >/dev/null
@@ -161,81 +131,18 @@ cp "$OUT_DIR/title_chrome.png" "$OUT_DIR/character.png"
 cp "$OUT_DIR/title_chrome.png" "$OUT_DIR/chat.png"
 cp "$OUT_DIR/title_chrome.png" "$OUT_DIR/gameselect.png"
 
-# Click "Create Game" → GameCreatePanel
-click_by_label_recursive "Create Game"
+# Show GameCreatePanel.
+cli --port "$CTRL_PORT" lobby_show_panel --panel create >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 10 >/dev/null
 cli --port "$CTRL_PORT" screenshot --out "$OUT_DIR/gamecreate.png" >/dev/null
 
-# Drive the create-game flow → GameJoinPanel.
-#
-# The legacy GameCreatePanel validates:
-#   - non-empty game name (default "New Game" is pre-filled),
-#   - selectbox uid=4 (GCRT_SEL_MAP) has selecteditem >= 0.
-# On success it sends MSG_NEWGAME, the lobby spawns a dedicated
-# silencer -s process, and the client transitions to GameJoinPanel
-# (where the buttons "Ready" / "Change Team" / "Choose Tech" appear).
-#
-# Map selectbox has label=null, so we address it by global object id
-# via the FindWidgetByLabel numeric-string path. Requires the CLI
-# fix that keeps `--label <numeric>` as a string instead of a JSON
-# number (see clients/cli/index.ts STRING_FLAGS_NO_SUBOP).
-find_gamecreate_iface() {
-  local children
-  children=$(cli --port "$CTRL_PORT" inspect \
-    | jq -r '.widgets[] | select(.kind=="other" and .object_type==1) | .id')
-  for child in $children; do
-    local cnt
-    cnt=$(cli --port "$CTRL_PORT" inspect --interface-id "$child" \
-      | jq '.widgets | map(select(.kind=="button" and (.label|ascii_downcase=="create"))) | length')
-    if [ "$cnt" -gt 0 ]; then echo "$child"; return 0; fi
-  done
-  return 1
-}
-
-GAMECREATE_IFACE=$(find_gamecreate_iface)
-if [ -z "${GAMECREATE_IFACE:-}" ]; then
-  echo "could not locate gamecreate child interface" >&2; exit 1
-fi
-MAP_SELECTBOX_ID=$(cli --port "$CTRL_PORT" inspect --interface-id "$GAMECREATE_IFACE" \
-  | jq -r '.widgets[] | select(.kind=="selectbox" and .uid==4) | .id' | head -n1)
-CREATE_BTN_ID=$(cli --port "$CTRL_PORT" inspect --interface-id "$GAMECREATE_IFACE" \
-  | jq -r '.widgets[] | select(.kind=="button" and (.label|ascii_downcase=="create")) | .id' | head -n1)
-if [ -z "$MAP_SELECTBOX_ID" ] || [ -z "$CREATE_BTN_ID" ]; then
-  echo "missing map selectbox or Create button in gamecreate panel" >&2; exit 1
-fi
-
-cli --port "$CTRL_PORT" select --label "$MAP_SELECTBOX_ID" --index 0 >/dev/null
-cli --port "$CTRL_PORT" wait_frames --n 5 >/dev/null
-cli --port "$CTRL_PORT" click --id "$CREATE_BTN_ID" >/dev/null
-
-# Wait up to ~20s for the GameJoinPanel to render. The dedicated
-# server has to spawn, load assets, and heartbeat before the client
-# leaves the "Uploading map..." progress modal.
-wait_for_join_panel() {
-  for i in $(seq 1 200); do
-    local children hit
-    children=$(cli --port "$CTRL_PORT" inspect \
-      | jq -r '.widgets[] | select(.kind=="other" and .object_type==1) | .id')
-    for child in $children; do
-      hit=$(cli --port "$CTRL_PORT" inspect --interface-id "$child" \
-        | jq -r '.widgets[] | select(.kind=="button" and (.label|ascii_downcase=="choose tech")) | .id' \
-        | head -n1)
-      if [ -n "$hit" ]; then echo "$hit"; return 0; fi
-    done
-    sleep 0.1
-  done
-  return 1
-}
-
-CHOOSE_TECH_ID=$(wait_for_join_panel)
-if [ -z "${CHOOSE_TECH_ID:-}" ]; then
-  echo "GameJoinPanel never appeared (Choose Tech button not found)" >&2; exit 1
-fi
+# Show GameJoinPanel.
+cli --port "$CTRL_PORT" lobby_show_panel --panel join >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 10 >/dev/null
 cli --port "$CTRL_PORT" screenshot --out "$OUT_DIR/gamejoin.png" >/dev/null
 
-# Click Choose Tech → GameTechPanel.
-cli --port "$CTRL_PORT" click --id "$CHOOSE_TECH_ID" >/dev/null
+# Show GameTechPanel.
+cli --port "$CTRL_PORT" lobby_show_panel --panel tech >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 15 >/dev/null
 cli --port "$CTRL_PORT" screenshot --out "$OUT_DIR/gametech.png" >/dev/null
 

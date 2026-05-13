@@ -3,6 +3,7 @@
 
 #include "modal.h"
 #include <functional>
+#include <string>
 
 // Modal that prompts the user for a password (single text input + OK button).
 // On submit (OK click or Enter), the modal pops itself and forwards the
@@ -14,12 +15,17 @@ public:
 
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
+	void Draw(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
+	bool HandleTextInput(ScreenContext & ctx, char ascii) override;
+	bool HandleKeyPress(ScreenContext & ctx, char ascii) override;
+
+	void NotifyOkClicked() { okClicked = true; }
 
 private:
 	std::function<void(const char *)> onSubmit;
-	Uint16 inputId = 0;
-	Uint16 okButtonId = 0;
+	bool okClicked = false;
+	char password[21] = {};
 };
 
 #endif

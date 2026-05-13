@@ -8,7 +8,6 @@
 #include "lobbygame.h"
 #include "serializer.h"
 #include "config.h"
-#include "interface.h"
 #include "objecttypes.h"
 #include "renderer.h"
 #include "resources.h"
@@ -84,132 +83,89 @@ void OnGoBackClicked(void * user)
 	if(screen) screen->NotifyGoBackClicked();
 }
 
-// Lobby chrome geometry — sampled from the baked LobbyBg sprite and
-// documented in docs/plans/lobby-chrome-rectangles.md. The lobby chrome
-// is five disjoint rectangles (TopStrip + TitleBar/CharacterPanel +
-// ChatBox + Right-UpExt + Right-Tall) rather than one wrapping outer
-// frame — the legacy BG has no all-encompassing outline.
-constexpr int kTopStripX = 10;
-constexpr int kTopStripY = 25;
-constexpr int kTopStripW = 620;       // x = 10..629
-constexpr int kTopStripH = 29;        // y = 25..53
+// Lobby layout metrics are expressed as region proportions in the
+// game's current virtual framebuffer. The numbers preserve the legacy
+// 640x480 composition at the default size, but the tree is a real flex
+// hierarchy: title row, body row, left/middle stack, right tall pane.
+constexpr uint16_t kRootPadX = 10;
+constexpr uint16_t kRootPadTop = 25;
+constexpr uint16_t kRootPadBottom = 25;
+constexpr uint16_t kRegionGap = 10;
+constexpr uint16_t kTitleBarH = 29;
+constexpr uint16_t kCharacterW = 218;
+constexpr uint16_t kUpperH = 121;
+constexpr uint16_t kRightTallW = 232;
 
-// Right-pane geometry — the upside-down-L. Chrome is decomposed into
-// three sibling Boxes with per-side strokes so the L-perimeter renders
-// with no internal joint at x=398, y=64..185 (see Draw()). The variant
-// subtrees flow inside two pure layout containers covering the legacy
-// panel-area rects (RightUpper + RightTall); chrome is rendered as
-// separate ROOT-attached overlays. Both containers and chrome attach
-// @ROOT, so the per-file "≤ 1 floating" rule for panel files is
-// trivially satisfied — all variant-side children are non-floating.
-constexpr int kRightUpperX = 238;
-constexpr int kRightUpperY = 64;
-constexpr int kRightUpperW = 160;
-constexpr int kRightUpperH = 121;
-constexpr int kRightTallX  = 398;
-constexpr int kRightTallY  = 64;
-constexpr int kRightTallW  = 232;
-constexpr int kRightTallH  = 391;
-
-// Emits the lobby chrome:
-//   • LobbyClayRoot — fullscreen 640x480. C7 dropped the baked LobbyBg
-//     image; the legacy outside-chrome area was pure-black anyway, so no
-//     backgroundColor is needed. The Clay strokes are now the only chrome.
-//   • LobbyTitleBar — top status strip (10, 25, 620, 29). Attached @ ROOT;
-//     holds title / version / mapname / Go Back button as flex children.
-//
-// The character / chat / right-pane chrome rectangles attach to ROOT in
-// their own panel files. There is no all-encompassing outer frame — the
-// legacy BG has none.
-void BuildChromeTree(LobbyClayScreen * screen,
-                     const std::string & version,
-                     const std::string & mapName,
-                     Resources & /*resources*/)
+void BuildTitleBarTree(LobbyClayScreen * screen,
+                       const std::string & version,
+                       const std::string & mapName)
 {
-	using namespace silencer::clay_bridge;
+	CLAY(Box(BoxVariants::Chrome, {
+	         .id = CLAY_ID("LobbyTitleBar"),
+	         .layout = {
+	             .sizing = { CLAY_SIZING_GROW(0),
+	                         CLAY_SIZING_FIXED(kTitleBarH) },
+	             .padding = { 5, 5, 4, 4 },
+	             .childGap = 6,
+	             .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+	             .layoutDirection = CLAY_LEFT_TO_RIGHT,
+	         },
+	     })) {
+		CLAY({ .id = CLAY_ID("LobbyTitle") }) {
+			BankText(CLAY_STRING("Silencer"),
+			         BankTextVariant::Title,
+			         { .effectColor = 152 });
+		}
 
-	const int W = 640;
-	const int H = 480;
+		Clay_String verstr;
+		verstr.isStaticallyAllocated = false;
+		verstr.length = (int32_t)version.size();
+		verstr.chars  = version.c_str();
+		CLAY({ .id = CLAY_ID("LobbyVer") }) {
+			BankText(verstr,
+			         BankTextVariant::Body,
+			         { .effectColor = 189 });
+		}
 
-	CLAY({ .id = CLAY_ID("LobbyClayRoot"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
-	       } }) {
-
-		CLAY(Box(BoxVariants::Chrome, {
-		         .id = CLAY_ID("LobbyTitleBar"),
-		         .layout = {
-		             .sizing = { CLAY_SIZING_FIXED(kTopStripW),
-		                         CLAY_SIZING_FIXED(kTopStripH) },
-		             .padding = { /*left=*/5, /*right=*/5,
-		                          /*top=*/4, /*bottom=*/4 },
-		             .childGap = 6,
-		             .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
-		             .layoutDirection = CLAY_LEFT_TO_RIGHT,
-		         },
-		         .floating = { .offset = { (float)kTopStripX, (float)kTopStripY },
-		                       .attachTo = CLAY_ATTACH_TO_ROOT },
-		     })) {
-			CLAY({ .id = CLAY_ID("LobbyTitle") }) {
-				BankText(CLAY_STRING("Silencer"),
+		if(!mapName.empty()){
+			Clay_String mstr;
+			mstr.isStaticallyAllocated = false;
+			mstr.length = (int32_t)mapName.size();
+			mstr.chars  = mapName.c_str();
+			CLAY({ .id = CLAY_ID("LobbyMapName") }) {
+				BankText(mstr,
 				         BankTextVariant::Title,
-				         { .effectColor = 152 });
-			}
-
-			Clay_String verstr;
-			verstr.isStaticallyAllocated = false;
-			verstr.length = (int32_t)version.size();
-			verstr.chars  = version.c_str();
-			CLAY({ .id = CLAY_ID("LobbyVer") }) {
-				BankText(verstr,
-				         BankTextVariant::Body,
-				         { .effectColor = 189 });
-			}
-
-			if(!mapName.empty()){
-				Clay_String mstr;
-				mstr.isStaticallyAllocated = false;
-				mstr.length = (int32_t)mapName.size();
-				mstr.chars  = mapName.c_str();
-				CLAY({ .id = CLAY_ID("LobbyMapName") }) {
-					BankText(mstr,
-					         BankTextVariant::Title,
-					         { .effectColor = 129,
-					           .brightness  = 160,
-					           .colorRamp   = true });
-				}
-			}
-
-			// Push the Go Back button to the right edge of the title bar.
-			CLAY({ .id = CLAY_ID("LobbyTitleBarSpacer"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_FIXED(0) },
-			       } }) {}
-
-			CLAY({ .id = CLAY_ID("LobbyGoBackWrap") }) {
-				BankButton(CLAY_STRING("Go Back"),
-				           BankButtonVariant::Chrome,
-				           {},
-				           { .hoveredOut = nullptr,
-				             .onClick = &OnGoBackClicked,
-				             .user = screen });
+				         { .effectColor = 129,
+				           .brightness  = 160,
+				           .colorRamp   = true });
 			}
 		}
 
-		// Inspector registration uses the legacy on-screen rect for click
-		// routing. The button's actual flex-derived bbox lands in roughly the
-		// same neighborhood (right-aligned in the title bar at y=25..53);
-		// the inspector hit rect doesn't need to be byte-identical to the
-		// rendered button — it's the label-based dispatch that matters.
-		silencer::ui::clay_inspector::Widget gb;
-		gb.label = "Go Back";
-		gb.kind = silencer::ui::clay_inspector::WidgetKind::Button;
-		gb.x = 473; gb.y = 29; gb.w = 156; gb.h = 21;
-		gb.onClick = &OnGoBackClicked;
-		gb.clickUser = screen;
-		silencer::ui::clay_inspector::Register(gb);
+		CLAY({ .id = CLAY_ID("LobbyTitleBarSpacer"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_GROW(0),
+		                       CLAY_SIZING_FIXED(0) },
+		       } }) {}
+
+		CLAY({ .id = CLAY_ID("LobbyGoBackWrap") }) {
+			BankButton(CLAY_STRING("Go Back"),
+			           BankButtonVariant::Chrome,
+			           {},
+			           { .hoveredOut = nullptr,
+			             .onClick = &OnGoBackClicked,
+			             .user = screen });
+		}
 	}
+
+	// Automation compatibility only. The rendered button is laid out by
+	// the title bar's flex row; this rect is not layout authority.
+	silencer::ui::clay_inspector::Widget gb;
+	gb.label = "Go Back";
+	gb.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+	gb.x = 473; gb.y = 29; gb.w = 156; gb.h = 21;
+	gb.onClick = &OnGoBackClicked;
+	gb.clickUser = screen;
+	silencer::ui::clay_inspector::Register(gb);
 }
 }  // namespace
 
@@ -224,11 +180,8 @@ void LobbyClayScreen::Build(ScreenContext & ctx)
 	mapName.clear();
 	goBackClicked = false;
 
-	// Parent Interface for child Clay-state inspector registrations. No
-	// world Overlay/Button objects for the chrome — the Clay tree paints
-	// them in Draw each frame.
-	Interface * lobbyiface = static_cast<Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
-	interfaceId = lobbyiface->id;
+	// Clay owns the lobby UI scene. There is intentionally no retained
+	// Interface/Object widget graph for this screen.
 
 	silencer::ui::lobby_clay::CharacterPanelInit(characterState);
 	silencer::ui::lobby_clay::ChatPanelInit(chatState);
@@ -325,7 +278,7 @@ void LobbyClayScreen::Tick(ScreenContext & ctx)
 			ctx.PopScreen();
 			game.creategameclicked = false;
 		}
-		if(world.state == World::CONNECTED && interfaceId){
+		if(world.state == World::CONNECTED){
 			Peer * peer = world.peerlist[world.localpeerid];
 			if(peer){
 				mapDownloader.mapexistchecked = false;
@@ -377,7 +330,6 @@ void LobbyClayScreen::ShowGameCreate(ScreenContext & ctx)
 	gameCreateActive = true;
 	gameJoinActive   = false;
 	gameTechActive   = false;
-	ctx.game.currentinterface = interfaceId;
 }
 
 void LobbyClayScreen::ShowGameJoin(ScreenContext & ctx)
@@ -386,20 +338,17 @@ void LobbyClayScreen::ShowGameJoin(ScreenContext & ctx)
 	gameJoinActive   = true;
 	gameCreateActive = false;
 	gameTechActive   = false;
-	ctx.game.currentinterface = interfaceId;
 }
 
 void LobbyClayScreen::ShowGameTech(ScreenContext & ctx)
 {
 	ctx.world.choosingtech = true;
-	ctx.game.ShowTeamOverlays(false);
 	ctx.world.RequestPeerList();
 
 	silencer::ui::lobby_clay::GameTechPanelInit(gameTechState);
 	gameTechActive   = true;
 	gameJoinActive   = false;
 	gameCreateActive = false;
-	ctx.game.currentinterface = interfaceId;
 }
 
 void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
@@ -423,108 +372,107 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 	silencer::ui::clay_inspector::BeginFrame();
 
 	Clay_BeginLayout();
-	BuildChromeTree(this, version, mapName, ctx.world.resources);
-	silencer::ui::lobby_clay::BuildCharacterPanelTree(
-		characterState, ctx.world, ctx.world.resources);
-	silencer::ui::lobby_clay::BuildChatPanelTree(
-		chatState, ctx.world, ctx.world.resources);
+	CLAY({ .id = CLAY_ID("LobbyClayRoot"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
+	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .padding = { kRootPadX, kRootPadX, kRootPadTop, kRootPadBottom },
+	           .childGap = kRegionGap,
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	       } }) {
+		BuildTitleBarTree(this, version, mapName);
 
-	// Right pane = upside-down-L. Decomposed into three chrome rectangles
-	// whose perimeter traces the L without any internal stroke at the
-	// joint column x=398, y=64..185:
-	//   • UpExt    (238, 64, 160, 121) — sides Top|Left|Bottom
-	//   • TallTop  (398, 64, 232, 121) — sides Top|Right
-	//   • TallBot  (398, 185, 232, 270) — sides Left|Right|Bottom
-	// The variant subtrees still flow inside two pure layout containers
-	// (LobbyRightUpperBox / LobbyRightTallBox) at the legacy coords so the
-	// per-panel layout code doesn't have to know about the chrome split.
-	{
-		// L-perimeter chrome — three sibling Boxes with per-side strokes.
-		auto upExt = BoxVariants::Chrome;
-		upExt.sides = BoxSides::Top | BoxSides::Left | BoxSides::Bottom;
-		CLAY(Box(upExt, {
-		         .id = CLAY_ID("LobbyRightUpExtChrome"),
-		         .layout = { .sizing = { CLAY_SIZING_FIXED((float)kRightUpperW),
-		                                 CLAY_SIZING_FIXED((float)kRightUpperH) } },
-		         .floating = { .offset   = { (float)kRightUpperX, (float)kRightUpperY },
-		                       .attachTo = CLAY_ATTACH_TO_ROOT },
-		     })) {}
-
-		auto tallTop = BoxVariants::Chrome;
-		tallTop.sides = BoxSides::Top | BoxSides::Right;
-		CLAY(Box(tallTop, {
-		         .id = CLAY_ID("LobbyRightTallTopChrome"),
-		         .layout = { .sizing = { CLAY_SIZING_FIXED((float)kRightTallW),
-		                                 CLAY_SIZING_FIXED((float)kRightUpperH) } },
-		         .floating = { .offset   = { (float)kRightTallX, (float)kRightTallY },
-		                       .attachTo = CLAY_ATTACH_TO_ROOT },
-		     })) {}
-
-		auto tallBot = BoxVariants::Chrome;
-		tallBot.sides = BoxSides::Left | BoxSides::Right | BoxSides::Bottom;
-		// TallBot's top edge overlaps TallTop's bottom row (UpperY+UpperH-1)
-		// by 1 pixel so the outer-halo band turns the L-bend corner at
-		// (RightTallX, UpperY+UpperH-1). Without this, the inner-corner
-		// pixel falls in TallTop's bottom-left — which has no chrome
-		// (sides=Top|Right) — leaving a 1-px diagonal step.
-		const float tallBotY = (float)(kRightTallY + kRightUpperH - 1);
-		const float tallBotH = (float)(kRightTallH - kRightUpperH + 1);
-		CLAY(Box(tallBot, {
-		         .id = CLAY_ID("LobbyRightTallBotChrome"),
-		         .layout = { .sizing = { CLAY_SIZING_FIXED((float)kRightTallW),
-		                                 CLAY_SIZING_FIXED(tallBotH) } },
-		         .floating = { .offset   = { (float)kRightTallX, tallBotY },
-		                       .attachTo = CLAY_ATTACH_TO_ROOT },
-		     })) {}
-
-		// Layout containers — no chrome, just host the active variant's
-		// subtree at the legacy panel-area coordinates. The variant panel
-		// files attach all their children flex-inside (no extra floating).
-		CLAY({ .id = CLAY_ID("LobbyRightUpperBox"),
+		CLAY({ .id = CLAY_ID("LobbyBody"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED((float)kRightUpperW),
-		                       CLAY_SIZING_FIXED((float)kRightUpperH) },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .floating = { .offset   = { (float)kRightUpperX,
-		                                   (float)kRightUpperY },
-		                     .attachTo = CLAY_ATTACH_TO_ROOT } }) {
-			if(gameCreateActive){
-				silencer::ui::lobby_clay::BuildGameCreateUpperTree(
-					gameCreateState, ctx.world.resources);
-			}else if(gameJoinActive){
-				silencer::ui::lobby_clay::BuildGameJoinUpperTree(
-					gameJoinState, ctx.world.resources);
-			}else if(gameTechActive){
-				silencer::ui::lobby_clay::BuildGameTechUpperTree(
-					gameTechState, ctx.world, ctx.world.resources, *this);
-			}else{
-				silencer::ui::lobby_clay::BuildGameSelectUpperTree(
-					gameSelectState, ctx.world.resources);
+		           .sizing = { CLAY_SIZING_GROW(0),
+		                       CLAY_SIZING_GROW(0) },
+		           .childGap = kRegionGap,
+		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+		       } }) {
+			CLAY({ .id = CLAY_ID("LobbyLeftMiddleStack"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_GROW(0) },
+			           .childGap = kRegionGap,
+			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+			       } }) {
+				CLAY({ .id = CLAY_ID("LobbyUpperRow"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_GROW(0),
+				                       CLAY_SIZING_FIXED(kUpperH) },
+				           .childGap = kRegionGap,
+				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+				       } }) {
+					CLAY(Box(BoxVariants::Chrome, {
+					         .id = CLAY_ID("LobbyCharacterBox"),
+					         .layout = {
+					             .sizing = { CLAY_SIZING_FIXED(kCharacterW),
+					                         CLAY_SIZING_GROW(0) },
+					             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+					         },
+					     })) {
+						silencer::ui::lobby_clay::BuildCharacterPanelTree(
+							characterState, ctx.world, ctx.world.resources);
+					}
+
+					CLAY(Box(BoxVariants::Chrome, {
+					         .id = CLAY_ID("LobbyRightUpperBox"),
+					         .layout = {
+					             .sizing = { CLAY_SIZING_GROW(0),
+					                         CLAY_SIZING_GROW(0) },
+					             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+					         },
+					     })) {
+						if(gameCreateActive){
+							silencer::ui::lobby_clay::BuildGameCreateUpperTree(
+								gameCreateState, ctx.world.resources);
+						}else if(gameJoinActive){
+							silencer::ui::lobby_clay::BuildGameJoinUpperTree(
+								gameJoinState, ctx.world.resources);
+						}else if(gameTechActive){
+							silencer::ui::lobby_clay::BuildGameTechUpperTree(
+								gameTechState, ctx.world, ctx.world.resources, *this);
+						}else{
+							silencer::ui::lobby_clay::BuildGameSelectUpperTree(
+								gameSelectState, ctx.world.resources);
+						}
+					}
+				}
+
+				CLAY(Box(BoxVariants::Chrome, {
+				         .id = CLAY_ID("LobbyChatBox"),
+				         .layout = {
+				             .sizing = { CLAY_SIZING_GROW(0),
+				                         CLAY_SIZING_GROW(0) },
+				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+				         },
+				     })) {
+					silencer::ui::lobby_clay::BuildChatPanelTree(
+						chatState, ctx.world, ctx.world.resources);
+				}
 			}
-		}
 
-		CLAY({ .id = CLAY_ID("LobbyRightTallBox"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED((float)kRightTallW),
-		                       CLAY_SIZING_FIXED((float)kRightTallH) },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .floating = { .offset   = { (float)kRightTallX,
-		                                   (float)kRightTallY },
-		                     .attachTo = CLAY_ATTACH_TO_ROOT } }) {
-			if(gameCreateActive){
-				silencer::ui::lobby_clay::BuildGameCreateTallTree(
-					gameCreateState, ctx.world.resources);
-			}else if(gameJoinActive){
-				silencer::ui::lobby_clay::BuildGameJoinTallTree(
-					gameJoinState, ctx.world.resources);
-			}else if(gameTechActive){
-				silencer::ui::lobby_clay::BuildGameTechTallTree(
-					gameTechState, ctx.world, ctx.world.resources, *this);
-			}else{
-				silencer::ui::lobby_clay::BuildGameSelectTallTree(
-					gameSelectState, ctx.world.resources);
+			CLAY(Box(BoxVariants::Chrome, {
+			         .id = CLAY_ID("LobbyRightTallBox"),
+			         .layout = {
+			             .sizing = { CLAY_SIZING_FIXED(kRightTallW),
+			                         CLAY_SIZING_GROW(0) },
+			             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+			         },
+			     })) {
+				if(gameCreateActive){
+					silencer::ui::lobby_clay::BuildGameCreateTallTree(
+						gameCreateState, ctx.world.resources);
+				}else if(gameJoinActive){
+					silencer::ui::lobby_clay::BuildGameJoinTallTree(
+						gameJoinState, ctx.world.resources);
+				}else if(gameTechActive){
+					silencer::ui::lobby_clay::BuildGameTechTallTree(
+						gameTechState, ctx.world, ctx.world.resources, *this);
+				}else{
+					silencer::ui::lobby_clay::BuildGameSelectTallTree(
+						gameSelectState, ctx.world.resources);
+				}
 			}
 		}
 	}
@@ -535,11 +483,7 @@ void LobbyClayScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
 
 void LobbyClayScreen::Destroy(ScreenContext & ctx)
 {
-	if(interfaceId){
-		Interface * iface = static_cast<Interface *>(ctx.world.GetObjectFromId(interfaceId));
-		if(iface) iface->DestroyInterface(ctx.world);
-		interfaceId = 0;
-	}
+	(void)ctx;
 }
 
 void LobbyClayScreen::SetMapNameOverlay(World & /*world*/, const char * name)

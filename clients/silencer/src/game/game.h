@@ -6,10 +6,6 @@
 #include "input.h"
 #include "keybinds.h"
 #include "state.h"
-#include "interface.h"
-#include "button.h"
-#include "overlay.h"
-#include "textbox.h"
 #include "updater.h"
 #include "controlserver.h"
 #include "inputserver.h"
@@ -42,7 +38,6 @@ public:
 	int GetFrameCount() const { return frames; }
 	static const char* StateName(Uint8 s);
 	Uint8 GetState() const { return state; }
-	Uint16 GetCurrentInterfaceId() const { return currentinterface; }
 	class World& GetWorld() { return world; }
 	// Test/control-dispatch hook: gives ControlDispatch op handlers access
 	// to the ScreenContext so they can invoke screen-side helpers (e.g.
@@ -54,6 +49,7 @@ public:
 	const SDL_Color* GetPaletteColors() const { return palettecolors; }
 	Renderer& GetRenderer() { return renderer; }
 	bool IsLiveMultiplayer() const;
+	bool HandleInGameMenuKey(char ascii);
 	bool GoBack(void);
 	struct PendingWait {
 		ControlCommand cmd;
@@ -94,7 +90,6 @@ public:
 
 	// LobbyClayScreen + per-panel interop. Public so panels can reach in via
 	// `ScreenContext::game`.
-	Uint16 currentinterface;
 	Uint32 currentlobbygameid;
 	bool minimized;
 	bool creategameclicked;
@@ -105,11 +100,6 @@ public:
 	// authority, destroy team overlays, rejoin previous chat channel). UI
 	// concerns (panel swap, map-name overlay) stay on LobbyClayScreen.
 	void LeaveJoinedGame();
-	// Toggle in-lobby team overlay visibility. Called by LobbyClayScreen's
-	// right-side panel swaps (ShowGameTech) when entering / leaving the
-	// tech-choice surface.
-	void ShowTeamOverlays(bool show);
-
 private:
 	bool Tick(void);
 	// Gameplay-state Tick bodies — one per state. Each lives in its own
@@ -181,9 +171,8 @@ private:
 	char * replayfile;
 	ControlServer controlserver;
 	InputServer inputserver;
-	// TUI mouse edge-detection state. Tracks the last (x, y, down) we
-	// applied so the TUI loop can synthesize ProcessMousePress / Move
-	// calls on transitions, mirroring HandleSDLEvents on native.
+	// TUI mouse edge-detection state. Tracks the last (x, y, down) so
+	// control clients drive the same screen-level mouse hooks as SDL.
 	Uint16 tui_prev_mouse_x;
 	Uint16 tui_prev_mouse_y;
 	bool   tui_prev_mouse_down;

@@ -1,6 +1,5 @@
 #include "game.h"
 #include "audio.h"
-#include "interface.h"
 #include "player.h"
 #include "team.h"
 #include "world.h"
@@ -10,19 +9,6 @@ using namespace GameState;
 
 void Game::TickInGame(){
 if(/*!world.map.loaded && */stateisnew){
-	for(std::list<Object *>::iterator it = world.objectlist.begin(); it != world.objectlist.end(); it++){
-		Object * object = *it;
-		switch(object->type){
-			case ObjectTypes::TEAM:{
-				Team * team = static_cast<Team *>(object);
-				team->DestroyOverlays(world);
-			}break;
-			case ObjectTypes::INTERFACE:{
-				Interface * iface = static_cast<Interface *>(object);
-				iface->DestroyInterface(world, iface);
-			}break;
-		}
-	}
 	screenbuffer.Clear(0);
 	//char mapname[7 + 256];
 	//sprintf(mapname, "level/%s", world.gameinfo.mapname);
@@ -81,7 +67,6 @@ if(/*!world.map.loaded && */stateisnew){
 		}
 	}
 	world.SendPeerList();
-	currentinterface = 0;
 	renderer.palette.SetPalette(0);
 	renderer.palette.SetParallaxColors(world.map.parallax);
 	screenbuffer.Clear(0);

@@ -1,7 +1,9 @@
 #include "clay_inspector.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cstring>
+#include <string>
 
 namespace silencer::ui::clay_inspector {
 
@@ -19,6 +21,90 @@ bool IEq(const char * a, const char * b) {
 		++a; ++b;
 	}
 	return *a == 0 && *b == 0;
+}
+
+struct FocusRef {
+	int uid = -1;
+	std::string label;
+};
+
+FocusRef & Focus() {
+	static FocusRef f;
+	return f;
+}
+
+bool MatchesFocus(const Widget & w) {
+	const FocusRef & f = Focus();
+	if(w.kind != WidgetKind::TextInput) return false;
+	if(f.uid >= 0 && w.uid == f.uid) return true;
+	return f.uid < 0 && !f.label.empty() && w.label && IEq(w.label, f.label.c_str());
+}
+
+bool PointIn(const Widget & w, int x, int y) {
+	return x >= w.x && y >= w.y && x < w.x + w.w && y < w.y + w.h;
+}
+
+const Widget * FocusedWidget() {
+	const auto & v = Registry();
+	for(const auto & w : v){
+		if(MatchesFocus(w)) return &w;
+	}
+	return nullptr;
+}
+
+void SetFocus(const Widget & w) {
+	FocusRef & f = Focus();
+	f.uid = w.uid;
+	f.label = w.label ? w.label : "";
+}
+
+bool AppendChar(Widget const & w, char ascii) {
+	if(!w.textBuffer || w.textBufferLen <= 0 || w.inactive) return false;
+	if(w.numbersOnly && (ascii < '0' || ascii > '9')) return false;
+	if(ascii < 0x20 || ascii > 0x7E) return false;
+	switch(ascii){
+		case '[':
+		case '\\':
+		case ']':
+		case '^':
+		case '_':
+		case '`':
+		case '{':
+		case '|':
+		case '}':
+		case '~':
+			return false;
+	}
+	int len = static_cast<int>(std::strlen(w.textBuffer));
+	if(len >= w.textBufferLen - 1) return true;
+	w.textBuffer[len] = ascii;
+	w.textBuffer[len + 1] = '\0';
+	return true;
+}
+
+bool Backspace(Widget const & w) {
+	if(!w.textBuffer || w.textBufferLen <= 0 || w.inactive) return false;
+	int len = static_cast<int>(std::strlen(w.textBuffer));
+	if(len > 0) w.textBuffer[len - 1] = '\0';
+	return true;
+}
+
+bool FocusNext() {
+	const auto & v = Registry();
+	std::vector<const Widget *> inputs;
+	for(const auto & w : v){
+		if(w.kind == WidgetKind::TextInput && !w.inactive) inputs.push_back(&w);
+	}
+	if(inputs.empty()) return false;
+	int current = -1;
+	for(int i = 0; i < static_cast<int>(inputs.size()); i++){
+		if(MatchesFocus(*inputs[i])){
+			current = i;
+			break;
+		}
+	}
+	SetFocus(*inputs[(current + 1) % static_cast<int>(inputs.size())]);
+	return true;
 }
 
 }  // namespace
@@ -41,6 +127,77 @@ const Widget * FindByLabel(const char * label) {
 		}
 	}
 	return count == 1 ? hit : nullptr;
+}
+
+const Widget * FindByUid(int uid) {
+	const auto & v = Registry();
+	const Widget * hit = nullptr;
+	int count = 0;
+	for(const auto & w : v){
+		if(w.uid == uid){
+			hit = &w;
+			++count;
+		}
+	}
+	return count == 1 ? hit : nullptr;
+}
+
+bool FocusTextInputAt(int x, int y) {
+	const auto & v = Registry();
+	for(auto it = v.rbegin(); it != v.rend(); ++it){
+		if(it->kind == WidgetKind::TextInput && !it->inactive && PointIn(*it, x, y)){
+			SetFocus(*it);
+			return true;
+		}
+	}
+	return false;
+}
+
+bool FocusTextInputByUid(int uid) {
+	const auto & v = Registry();
+	for(const auto & w : v){
+		if(w.kind == WidgetKind::TextInput && w.uid == uid && !w.inactive){
+			SetFocus(w);
+			return true;
+		}
+	}
+	return false;
+}
+
+bool IsTextInputFocused(int uid) {
+	const Widget * w = FocusedWidget();
+	return w && w->uid == uid;
+}
+
+void ClearFocus() {
+	Focus().uid = -1;
+	Focus().label.clear();
+}
+
+bool DispatchTextInput(char ascii) {
+	const Widget * w = FocusedWidget();
+	return w ? AppendChar(*w, ascii) : false;
+}
+
+bool DispatchKeyPress(char ascii) {
+	const Widget * w = FocusedWidget();
+	switch(ascii){
+		case '\b':
+			return w ? Backspace(*w) : false;
+		case '\t':
+			return FocusNext();
+		case '\n':
+			if(w && !w->inactive){
+				if(w->onEnter) w->onEnter(w->enterUser);
+				return true;
+			}
+			return false;
+		case 0x1B:
+			ClearFocus();
+			return false;
+		default:
+			return false;
+	}
 }
 
 }  // namespace silencer::ui::clay_inspector

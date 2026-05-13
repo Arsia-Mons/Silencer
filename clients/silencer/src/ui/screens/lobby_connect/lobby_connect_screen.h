@@ -3,17 +3,34 @@
 
 #include "screen.h"
 
+#include <string>
+#include <vector>
+
 class LobbyConnectScreen : public Screen
 {
 public:
 	void Build(ScreenContext & ctx) override;
 	void Tick(ScreenContext & ctx) override;
+	void Draw(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
+	bool HandleTextInput(ScreenContext & ctx, char ascii) override;
+	bool HandleKeyPress(ScreenContext & ctx, char ascii) override;
+	bool HandleMousePress(ScreenContext & ctx, bool pressed, Uint16 x, Uint16 y) override;
+
+	void NotifyLoginClicked();
+	void NotifyCancelClicked();
 
 private:
+	void AppendLog(const char * text);
+
 	// Reset on entry; flipped to true after the first MOTD render so the
 	// banner doesn't re-print every tick. Migrated from Game::motdprinted.
 	bool motdprinted = false;
+	bool loginClicked = false;
+	bool cancelClicked = false;
+	std::vector<std::string> logLines;
+	char username[17] = {};
+	char password[29] = {};
 };
 
 #endif

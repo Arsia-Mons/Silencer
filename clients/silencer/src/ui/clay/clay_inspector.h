@@ -26,6 +26,7 @@ enum class WidgetKind : Uint8 {
 struct Widget {
 	const char * label = nullptr;  // pointer-stable for at least this frame.
 	WidgetKind kind   = WidgetKind::Button;
+	int uid = -1;                  // optional legacy automation id.
 	int x = 0, y = 0, w = 0, h = 0;
 
 	// Button / Toggle invocation.
@@ -43,6 +44,10 @@ struct Widget {
 	char * textBuffer = nullptr;
 	int textBufferLen = 0;   // capacity including null terminator.
 	bool isPassword = false;
+	bool inactive = false;
+	bool numbersOnly = false;
+	void (*onEnter)(void * user) = nullptr;
+	void * enterUser = nullptr;
 };
 
 // Called by Clay screens at the top of every Build pass (immediately after
@@ -58,6 +63,17 @@ const std::vector<Widget> & All();
 // Case-insensitive label lookup. Returns nullptr if no match (or ambiguous —
 // callers that need to distinguish must use All() and count themselves).
 const Widget * FindByLabel(const char * label);
+const Widget * FindByUid(int uid);
+
+// Shared focus + text mutation for Clay text inputs. Uses the per-frame
+// registry as the canonical list of focusable text fields; screens own the
+// buffers and refresh them when registering widgets.
+bool FocusTextInputAt(int x, int y);
+bool FocusTextInputByUid(int uid);
+bool IsTextInputFocused(int uid);
+void ClearFocus();
+bool DispatchTextInput(char ascii);
+bool DispatchKeyPress(char ascii);
 
 }  // namespace silencer::ui::clay_inspector
 

@@ -4,7 +4,6 @@
 #include "clay_bridge.h"
 #include "clay_inspector.h"
 #include "primitives/bank_text.h"
-#include "primitives/box.h"
 #include "primitives/toggle.h"
 
 #include "config.h"
@@ -20,8 +19,6 @@
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextOpts;
 using silencer::ui::primitives::BankTextVariant;
-using silencer::ui::primitives::Box;
-namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 using silencer::ui::primitives::Toggle;
 using silencer::ui::primitives::ToggleHandle;
 using silencer::ui::primitives::ToggleOpts;
@@ -91,33 +88,9 @@ constexpr BankTextOpts kStatsOpts{ /*effectColor*/ 129,
                                    /*colorRamp*/   true,
                                    /*drawAlpha*/   false };
 
-// LobbyCharacterBox geometry — matches the C2-documented "Top-left status
-// panel" rectangle in the baked BG (docs/plans/lobby-chrome-rectangles.md).
-// The Box floats @ ROOT at the legacy sprite coord; its children lay out
-// via flex (TOP_TO_BOTTOM with per-row padding) so the username / toggles
-// / stats positions emerge from layout rather than from absolute @ROOT
-// offsets.
-constexpr int   kBoxX             = 10;
-constexpr int   kBoxY             = 64;
-constexpr int   kBoxW             = 218;
-constexpr int   kBoxH             = 121;
-// Inside-box layout knobs — calibrated against the actual rendered Clay
-// bboxes (CLAY render-command dump), not the pre-flex legacy widget coords.
-// In practice Clay places the CharStats content y at toggle-row-bottom +
-// padTop, and BankText's bank-133 glyphs render with a ~3 px top inset
-// inside their 11 px bbox. So stats LAND at y=padTop+116+3+(row*13). With
-// padTop=11 stats land at y=130/143/156/169 — XP last scanline at y≈180,
-// 4 px clear of the box's y=184 bottom stroke. Earlier C5b used padTop=24
-// which pushed stats to 143/156/169/182 — XP bbox y=182 ends y=193,
-// 9 px BELOW the bottom stroke (spills visibly).
-constexpr int kBoxPadLeft       = 6;
-constexpr int kBoxPadTop        = 6;
-constexpr int kBoxPadBottom     = 0;
-constexpr int kUserPadLeft      = 3;
-constexpr int kToggleRowPadLeft = 3;
-constexpr int kToggleRowPadTop  = 4;
-constexpr int kToggleGap        = 26;  // 42 stride − 16 sprite = 26
-constexpr int kStatsPadTop      = 11;
+constexpr uint16_t kPanelPad       = 6;
+constexpr uint16_t kToggleGap      = 26;
+constexpr uint16_t kStatsPadTop    = 10;
 constexpr int kStatsChildGap    = 2;
 
 }  // namespace
@@ -171,43 +144,30 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 		g_stats.xp.clear();
 	}
 
-	// LobbyCharacterBox — Clay-drawn chrome around the character widgets.
-	// Children lay out via TOP_TO_BOTTOM flex (username, toggle row, stats
-	// column) inside the box. Box's outer .padding gives the username text
-	// breathing room from the top stroke; padBottom matches so the XP row
-	// breathes from the bottom stroke. Right padding stays 0 because no
-	// content abuts the right edge.
-	CLAY(Box(BoxVariants::Chrome, {
-	         .id = CLAY_ID("LobbyCharacterBox"),
-	         .layout = {
-	             .sizing = { CLAY_SIZING_FIXED(kBoxW),
-	                         CLAY_SIZING_FIXED(kBoxH) },
-	             .padding = { /*left=*/(uint16_t)kBoxPadLeft, /*right=*/0,
-	                          /*top=*/(uint16_t)kBoxPadTop,
-	                          /*bottom=*/(uint16_t)kBoxPadBottom },
-	             .childGap = 0,
-	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	         },
-	         .floating = { .offset   = { (float)kBoxX, (float)kBoxY },
-	                       .attachTo = CLAY_ATTACH_TO_ROOT },
-	     })) {
+	// The parent LobbyCharacterBox is supplied by the lobby shell. This
+	// function emits only content, so Clay owns a single scene graph instead
+	// of a Box nested inside another Box or root-attached legacy coordinates.
+	CLAY({ .id = CLAY_ID("CharacterPanelContent"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
+	           .padding = { kPanelPad, kPanelPad, kPanelPad, kPanelPad },
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	       } }) {
 
 		// Username header — bank 134 / w8 / eff=200. Lands at content y=71.
-		CLAY({ .id = CLAY_ID("CharUserWrap"),
-		       .layout = { .padding = { (uint16_t)kUserPadLeft, 0, 0, 0 } } }) {
+		CLAY({ .id = CLAY_ID("CharUserWrap") }) {
 			BankText(FromStd(g_stats.username),
 			         BankTextVariant::Heading,
 			         { .effectColor = 200 });
 		}
 
-		// Five agency toggles in a horizontal strip. With LEFT_TO_RIGHT
-		// + childGap=26 and 16-px-wide toggle sprites the on-screen
-		// stride is 42 px, matching the legacy `xmargin` exactly.
+		// Five agency toggles in a horizontal strip. The toggles have
+		// intrinsic sprite sizes; the row uses gap/alignment instead of
+		// absolute screen positions.
 		CLAY({ .id = CLAY_ID("CharToggleRow"),
 		       .layout = {
-		           .padding = { (uint16_t)kToggleRowPadLeft, 0,
-		                        (uint16_t)kToggleRowPadTop,  0 },
-		           .childGap = (uint16_t)kToggleGap,
+		           .padding = { 0, 0, 4, 0 },
+		           .childGap = kToggleGap,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
 			for(int i = 0; i < 5; ++i){
@@ -256,12 +216,10 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 		}
 
 		// LEVEL / WINS / LOSSES / XP — bank 133 / w7 / eff=129,
-		// brightness 160 (128+32), ramp on. TOP_TO_BOTTOM flex stacks
-		// the four rows at y=130 / 143 / 156 / 169 from the wrapper's
-		// 24-px top padding + bank-133 height (11) + childGap (2).
+		// brightness 160 (128+32), ramp on.
 		CLAY({ .id = CLAY_ID("CharStats"),
 		       .layout = {
-		           .padding = { 0, 0, (uint16_t)kStatsPadTop, 0 },
+		           .padding = { 0, 0, kStatsPadTop, 0 },
 		           .childGap = (uint16_t)kStatsChildGap,
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {

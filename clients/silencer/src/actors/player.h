@@ -10,7 +10,9 @@
 #include "pickup.h"
 #include "playerai.h"
 #include "actordef.h"
+#include <vector>
 
+class BuyableItem;
 class Player : public Object
 {
 public:
@@ -44,6 +46,7 @@ public:
 	void UnDeploy(void);
 	bool CanExhaustInputQueue(World & world, int queuesize);
 	Peer * GetPeer(World & world);
+	void CollectBuyMenuItems(World & world, bool tech, std::vector<BuyableItem *> & items);
 	enum {INV_NONE, INV_HEALTHPACK, INV_LAZARUSTRACT, INV_SECURITYPASS, INV_VIRUS,
 		INV_POISON, INV_NEUTRONBOMB, INV_EMPBOMB, INV_SHAPEDBOMB, INV_PLASMABOMB, INV_PLASMADET,
 		INV_FIXEDCANNON, INV_FLARE, INV_POISONFLARE, INV_BASEDOOR, INV_CAMERA};
@@ -69,11 +72,10 @@ public:
 	Uint8 suitcolor;
 	bool rumbleFire = false; // set by Fire(); consumed by Game::TickRumble
 	bool rumbleLand = false; // set on landing; consumed by Game::TickRumble
-	Uint16 chatinterfaceid;
+	bool chatActive;
+	char chatText[101];
 	bool chatwithteam;
 	Sint8 fallingnudge;
-	Uint16 buyinterfaceid;
-	Uint16 techinterfaceid;
 	bool isbuying;
 	bool techstationactive;
 	Uint8 inventoryitems[4];
@@ -81,6 +83,8 @@ public:
 	Uint8 currentinventoryitem;
 	int buyifacelastitem;
 	int buyifacelastscrolled;
+	int techifacelastitem;
+	int techifacelastscrolled;
 	Uint8 disguised;
 	bool hasdepositor;
 	class PlayerAI * ai;

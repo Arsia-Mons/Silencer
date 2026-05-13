@@ -135,6 +135,8 @@ enum class CustomKind : Uint8 {
 	ScrollBar,         // P7: sprite-faced vertical scrollbar (3-slice track + thumb).
 	TextInput,         // P9: bank-text field with optional blinking caret.
 	BoxStroke,         // C0c: multi-tone halo stroke (concentric rings) for the Box primitive.
+	Sprite,            // Generic paletted sprite with optional crop/effects.
+	TeamEmblem,        // Team-colored agency emblem, including legacy UI outline.
 };
 
 struct ClayCustomData {
@@ -164,6 +166,30 @@ struct TogglePayload {
 	Uint8  brightness;   // 128 = neutral.
 };
 
+// Generic sprite payload for game-HUD and in-game overlays. Unlike IMAGE,
+// this path can crop and apply the same palette effects as legacy renderer
+// code while keeping layout ownership in Clay.
+struct SpritePayload {
+	Uint8  bank;
+	Uint16 index;
+	Sint16 srcX;
+	Sint16 srcY;
+	Sint16 srcW;         // <= 0 means natural source width.
+	Sint16 srcH;         // <= 0 means natural source height.
+	Uint8  effectColor;  // 0 = no EffectColor.
+	Uint8  brightness;   // 128 = neutral.
+	Uint8  rampColor;    // 0 = no EffectRampColor/Plus.
+	Uint8  rampPlus;     // 0 = EffectRampColor, >0 = EffectRampColorPlus.
+};
+
+struct TeamEmblemPayload {
+	Uint8  bank;
+	Uint16 index;
+	Uint8  teamColor;
+	Uint8  outlineColor;
+	bool   scaled;
+};
+
 // P7 — payload for CustomKind::ScrollBar. The bridge renders the
 // scrollbar over the CUSTOM element's bounding box: bank 7 idx 9 (default
 // track) is 3-sliced — top 16 px and bottom 16 px cap the track, the
@@ -183,10 +209,9 @@ struct ScrollBarPayload {
 // Renderer::DrawText with the supplied text/bank/fontWidth and, when
 // `showCaret` is true, draws a 1-px-wide vertical bar at
 // (bbox.x + textLen*fontWidth, bbox.y - 1) with height `caretHeight` and
-// palette index `caretColor`. Mirrors `Renderer::DrawTextInput` in
-// renderer.cpp:1835. Caller is responsible for password-masking the text
-// (the primitive does this) and for resolving the blink phase + focus
-// state into the single `showCaret` bool.
+// palette index `caretColor`. Caller is responsible for password-masking
+// the text (the primitive does this) and for resolving the blink phase +
+// focus state into the single `showCaret` bool.
 struct TextInputPayload {
 	const char * text;        // NUL-terminated displayable text.
 	Uint16       textLen;     // Pre-computed length (avoids strlen in bridge).

@@ -17,7 +17,6 @@ if(stateisnew){
 	world.DestroyAllObjects();
 	world.gameplaystate = World::INGAME;
 	world.intutorialmode = true;
-	currentinterface = 0;
 	world.GetAuthorityPeer()->techchoices = World::BUY_LASER | World::BUY_ROCKET;
 	//world.Listen(23456);
 	Team * team = (Team *)world.CreateObject(ObjectTypes::TEAM);
@@ -203,7 +202,7 @@ if(player){
 				singleplayermessage = 11;
 				world.message_i = 0;
 			}
-			if(player->buyinterfaceid){
+			if(player->isbuying){
 				singleplayermessage++;
 				world.message_i = 0;
 			}

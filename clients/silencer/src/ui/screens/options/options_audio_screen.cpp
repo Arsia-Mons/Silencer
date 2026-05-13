@@ -2,27 +2,36 @@
 
 #include "screen_context.h"
 #include "game_state.h"
-#include "world.h"
-#include "objecttypes.h"
-#include "interface.h"
-#include "button.h"
-#include "overlay.h"
+#include "game.h"
+#include "renderer.h"
+#include "surface.h"
 #include "config.h"
 #include "audio.h"
 
-#include <cstring>
+#include "clay/clay.h"
+#include "clay_bridge.h"
+#include "clay_inspector.h"
+#include "primitives/bank_button.h"
+#include "primitives/bank_text.h"
+
+#include <SDL3/SDL.h>
 
 namespace
 {
-// Prefix every uid so anon-namespace enumerators don't collide with the
-// display/controls screens under SILENCER_UNITY_BUILD (one merged TU).
-enum AudioUid : Uint8 {
-	AUD_BTN_MUSIC = 0,
-	AUD_OVL_OFF   = 20,
-	AUD_OVL_ON    = 40,
-	AUD_BTN_SAVE  = 200,
-	AUD_BTN_CANCEL = 201,
-};
+using silencer::ui::primitives::BankButton;
+using silencer::ui::primitives::BankButtonBeginFrame;
+using silencer::ui::primitives::BankButtonHandle;
+using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::BankText;
+using silencer::ui::primitives::BankTextBeginFrame;
+using silencer::ui::primitives::BankTextVariant;
+
+constexpr uint16_t kPanelW = 420;
+constexpr uint16_t kPanelPadX = 24;
+constexpr uint16_t kPanelPadY = 32;
+constexpr uint16_t kRowH = 33;
+constexpr uint16_t kIndicatorGap = 10;
+constexpr uint16_t kActionGap = 12;
 
 void ApplyMusicSetting(bool on)
 {
@@ -32,122 +41,187 @@ void ApplyMusicSetting(bool on)
 		Audio::GetInstance().PauseMusic();
 	}
 }
+
+void OnMusicClicked(void * user)
+{
+	auto * screen = static_cast<OptionsAudioScreen *>(user);
+	if(screen) screen->NotifyMusicClicked();
+}
+
+void OnSaveClicked(void * user)
+{
+	auto * screen = static_cast<OptionsAudioScreen *>(user);
+	if(screen) screen->NotifySaveClicked();
+}
+
+void OnCancelClicked(void * user)
+{
+	auto * screen = static_cast<OptionsAudioScreen *>(user);
+	if(screen) screen->NotifyCancelClicked();
+}
+
+void RegisterButton(const char * label,
+                    int x,
+                    int y,
+                    void (*onClick)(void *),
+                    OptionsAudioScreen * screen)
+{
+	silencer::ui::clay_inspector::Widget w;
+	w.label = label;
+	w.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.x = x; w.y = y; w.w = 156; w.h = 21;
+	w.onClick = onClick;
+	w.clickUser = screen;
+	silencer::ui::clay_inspector::Register(w);
+}
+
+void RegisterWidgets(OptionsAudioScreen * screen, int surfaceW, int /*surfaceH*/)
+{
+	const int panelX = (surfaceW - kPanelW) / 2;
+	const int panelY = 80;
+	const int rowX = panelX + kPanelPadX;
+	const int rowY = panelY + kPanelPadY + 42;
+	const int actionY = rowY + kRowH + 30;
+	RegisterButton("Music", rowX, rowY + 6, &OnMusicClicked, screen);
+	RegisterButton("Save", panelX + 48, actionY, &OnSaveClicked, screen);
+	RegisterButton("Cancel", panelX + 216, actionY, &OnCancelClicked, screen);
+}
+
+void ToggleIndicator(Clay_String id, bool selected)
+{
+	CLAY({ .id = CLAY_SIDI(id, 2),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIXED(16) },
+	           .childGap = kIndicatorGap,
+	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+	       } }) {
+		CLAY({ .id = CLAY_SIDI(id, 3),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(20), CLAY_SIZING_FIXED(16) },
+		       },
+		       .image = { .imageData = silencer::clay_bridge::PackImage(
+		                     6, selected ? 12 : 13) } }) {}
+		CLAY({ .id = CLAY_SIDI(id, 4),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(20), CLAY_SIZING_FIXED(16) },
+		       },
+		       .image = { .imageData = silencer::clay_bridge::PackImage(
+		                     6, selected ? 15 : 14) } }) {}
+	}
+}
+
+void ToggleRow(Clay_String label,
+               bool selected,
+               void (*onClick)(void *),
+               OptionsAudioScreen * screen)
+{
+	CLAY({ .id = CLAY_SID(label),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kRowH) },
+	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+	       } }) {
+		BankButton(label, BankButtonVariant::Chrome, {},
+		           BankButtonHandle{ nullptr, onClick, screen });
+		CLAY({ .id = CLAY_SIDI(label, 1),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
+		           .childAlignment = { CLAY_ALIGN_X_RIGHT, CLAY_ALIGN_Y_CENTER },
+		       } }) {
+			ToggleIndicator(label, selected);
+		}
+	}
+}
 }
 
 void OptionsAudioScreen::Build(ScreenContext & ctx)
 {
-	World & world = ctx.world;
-
-	Overlay * background = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	background->res_bank = 6;
-	background->res_index = 0;
-
-	Overlay * title = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-	title->text = "Audio Options";
-	title->textbank = 135;
-	title->textwidth = 12;
-	title->x = 320 - ((title->text.length() * title->textwidth) / 2);
-	title->y = 14;
-
-	Interface * iface = (Interface *)world.CreateObject(ObjectTypes::INTERFACE);
-
-	const char * names[] = {"Music"};
-	for(int i = 0; i < 1; i++){
-		Button * c1button = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-		c1button->SetType(Button::B220x33);
-		c1button->y = 50 + (i * 53);
-		c1button->x = 100;
-		c1button->uid = i;
-		strcpy(c1button->text, names[i]);
-		iface->AddObject(c1button->id);
-		iface->AddTabObject(c1button->id);
-
-		Overlay * off = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		off->y = 137 + (i * 53);
-		off->x = 420;
-		off->res_bank = 6;
-		off->res_index = 12;
-		off->uid = AUD_OVL_OFF + i;
-		iface->AddObject(off->id);
-
-		Overlay * on = (Overlay *)world.CreateObject(ObjectTypes::OVERLAY);
-		on->y = 137 + (i * 53);
-		on->x = 450;
-		on->res_bank = 6;
-		on->res_index = 14;
-		on->uid = AUD_OVL_ON + i;
-		iface->AddObject(on->id);
-	}
-
-	Button * savebutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	savebutton->y = 117;
-	savebutton->x = -200;
-	savebutton->uid = AUD_BTN_SAVE;
-	strcpy(savebutton->text, "Save");
-	iface->AddObject(savebutton->id);
-	iface->AddTabObject(savebutton->id);
-
-	Button * cancelbutton = (Button *)world.CreateObject(ObjectTypes::BUTTON);
-	cancelbutton->y = 117;
-	cancelbutton->x = 20;
-	cancelbutton->uid = AUD_BTN_CANCEL;
-	strcpy(cancelbutton->text, "Cancel");
-	iface->AddObject(cancelbutton->id);
-	iface->AddTabObject(cancelbutton->id);
-
-	iface->activeobject = 0;
-	iface->buttonenter = savebutton->id;
-	iface->buttonescape = cancelbutton->id;
-
-	interfaceId = iface->id;
+	ctx.ResetPresentation(1);
+	ctx.renderer.camera.SetPosition(320, 240);
+	musicClicked = false;
+	saveClicked = false;
+	cancelClicked = false;
+	silencer::ui::clay_inspector::BeginFrame();
+	RegisterWidgets(this, 640, 480);
 }
 
 void OptionsAudioScreen::Tick(ScreenContext & ctx)
 {
-	Interface * iface = (Interface *)ctx.world.GetObjectFromId(interfaceId);
-	if(!iface) return;
-	iface->buttonenter = AUD_BTN_SAVE;
-	for(Uint16 oid : iface->objects){
-		Object * object = ctx.world.GetObjectFromId(oid);
-		if(!object) continue;
-		if(object->type == ObjectTypes::OVERLAY){
-			Overlay * overlay = static_cast<Overlay *>(object);
-			switch(overlay->uid){
-				case AUD_OVL_OFF:
-					overlay->res_index = Config::GetInstance().music ? 12 : 13;
-					break;
-				case AUD_OVL_ON:
-					overlay->res_index = Config::GetInstance().music ? 15 : 14;
-					break;
+	if(musicClicked){
+		musicClicked = false;
+		Config & cfg = Config::GetInstance();
+		cfg.music = !cfg.music;
+		ApplyMusicSetting(cfg.music);
+	}
+	if(saveClicked){
+		saveClicked = false;
+		Config::GetInstance().Save();
+		ctx.GoToState(GameState::OPTIONS);
+		return;
+	}
+	if(cancelClicked){
+		cancelClicked = false;
+		Config & cfg = Config::GetInstance();
+		cfg.Load();
+		ApplyMusicSetting(cfg.music);
+		ctx.GoToState(GameState::OPTIONS);
+	}
+}
+
+void OptionsAudioScreen::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+{
+	(void)frametime;
+	using namespace silencer::clay_bridge;
+
+	EnsureInitialized(dst.w, dst.h);
+	float mx = 0.f, my = 0.f;
+	Uint32 buttons = SDL_GetMouseState(&mx, &my);
+	Clay_SetPointerState({ mx, my },
+	                      (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0);
+
+	BankButtonBeginFrame();
+	BankTextBeginFrame();
+	silencer::ui::clay_inspector::BeginFrame();
+
+	Config & cfg = Config::GetInstance();
+	Clay_BeginLayout();
+	CLAY({ .id = CLAY_ID("OptionsAudioRoot"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
+	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+	           .padding = { 0, 0, 80, 0 },
+	       },
+	       .image = { .imageData = PackImage(6, 0) } }) {
+		CLAY({ .id = CLAY_ID("OptionsAudioPanel"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(kPanelW),
+		                       CLAY_SIZING_FIT(0) },
+		           .padding = { kPanelPadX, kPanelPadX,
+		                        kPanelPadY, kPanelPadY },
+		           .childGap = 22,
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+		       } }) {
+			BankText(CLAY_STRING("Audio Options"), BankTextVariant::Title, {});
+			ToggleRow(CLAY_STRING("Music"), cfg.music, &OnMusicClicked, this);
+			CLAY({ .id = CLAY_ID("OptionsAudioActions"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
+			           .childGap = kActionGap,
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+			       } }) {
+				BankButton(CLAY_STRING("Save"), BankButtonVariant::Chrome, {},
+				           BankButtonHandle{ nullptr, &OnSaveClicked, this });
+				BankButton(CLAY_STRING("Cancel"), BankButtonVariant::Chrome, {},
+				           BankButtonHandle{ nullptr, &OnCancelClicked, this });
 			}
-		}else if(object->type == ObjectTypes::BUTTON){
-			Button * button = static_cast<Button *>(object);
-			if(button->state == Button::ACTIVE || button->state == Button::ACTIVATING){
-				if(button->uid >= 0 && button->uid < 200){
-					iface->buttonenter = button->id;
-				}
-			}
-			if(!button->clicked) continue;
-			switch(button->uid){
-				case AUD_BTN_MUSIC:{
-					Config & cfg = Config::GetInstance();
-					cfg.music = !cfg.music;
-					ApplyMusicSetting(cfg.music);
-				}break;
-				case AUD_BTN_SAVE:{
-					Config::GetInstance().Save();
-					ctx.GoToState(GameState::OPTIONS);
-				}break;
-				case AUD_BTN_CANCEL:{
-					Config & cfg = Config::GetInstance();
-					cfg.Load();
-					ApplyMusicSetting(cfg.music);
-					ctx.GoToState(GameState::OPTIONS);
-				}break;
-			}
-			button->clicked = false;
 		}
 	}
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	Render(ctx.game, &dst, cmds);
+	RegisterWidgets(this, dst.w, dst.h);
 }
 
 void OptionsAudioScreen::Destroy(ScreenContext & ctx)

@@ -17,8 +17,8 @@ class Surface;
 // string, map-name overlay, "Go Back" button) is emitted as a Clay tree each
 // frame and dispatched by the bridge into the screenbuffer in Screen::Draw.
 // The four right-side panels and the always-on character + chat panels are
-// likewise Clay subtrees driven by per-screen state structs — no world
-// Overlay/Button/TextInput objects are created for any lobby UI.
+// likewise Clay subtrees driven by per-screen state structs — no retained
+// world UI objects are created for any lobby UI.
 class LobbyClayScreen : public Screen
 {
 public:
@@ -103,7 +103,7 @@ private:
 	bool gameJoinActive = false;
 
 	// GameTech state + active flag. ShowGameTech also sets
-	// `world.choosingtech = true` + hides the team overlays.
+	// `world.choosingtech = true`.
 	silencer::ui::lobby_clay::GameTechPanelState gameTechState;
 	bool gameTechActive = false;
 };

@@ -95,18 +95,18 @@ for i in $(seq 1 60); do
   fi
 done
 
-wait_for_iface() {
-  local port="$1"
+wait_for_widget() {
+  local port="$1" label="$2"
   for i in $(seq 1 100); do
-    iface=$(cli --port "$port" state | bun -e \
-      'const t=await new Response(Bun.stdin.stream()).text(); console.log(JSON.parse(t).current_interface_id||0);')
-    [ "${iface:-0}" != "0" ] && return 0
+    found=$(cli --port "$port" inspect | LABEL="$label" bun -e 'const t=await new Response(Bun.stdin.stream()).text(); const r=JSON.parse(t); const label=process.env.LABEL; console.log(r.widgets.some((w)=>w.label===label) ? "yes" : "no");' 2>/dev/null || echo no)
+    [ "$found" = "yes" ] && return 0
     sleep 0.05
   done
   return 1
 }
 
 wait_for_lobby_state() {
+
   local port="$1" target="$2"
   for i in $(seq 1 80); do
     ls=$(cli --port "$port" state | bun -e \
@@ -120,16 +120,16 @@ wait_for_lobby_state() {
 drive_to_lobby() {
   local port="$1" user="$2"
   cli --port "$port" wait_for_state --state MAINMENU --timeout-ms 15000
-  wait_for_iface "$port"
+  wait_for_widget "$port" "Connect To Lobby"
   cli --port "$port" click --label "Connect To Lobby" >/dev/null
   cli --port "$port" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
-  wait_for_iface "$port"
+  wait_for_widget "$port" "Login"
   cli --port "$port" set_text --uid 1 --text "$user" >/dev/null
   cli --port "$port" set_text --uid 2 --text "secret" >/dev/null
   wait_for_lobby_state "$port" AUTHENTICATING
   cli --port "$port" click --label "Login" >/dev/null
   cli --port "$port" wait_for_state --state LOBBY --timeout-ms 15000
-  wait_for_iface "$port"
+  wait_for_widget "$port" "Create Game"
   cli --port "$port" wait_frames --n 60 >/dev/null
   cli --port "$port" step --frames 30 >/dev/null
 }

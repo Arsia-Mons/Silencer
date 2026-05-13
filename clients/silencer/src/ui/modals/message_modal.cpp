@@ -2,13 +2,59 @@
 
 #include "screen_context.h"
 #include "game.h"
-#include "world.h"
-#include "interface.h"
-#include "overlay.h"
-#include "button.h"
-#include "objecttypes.h"
+#include "renderer.h"
+#include "surface.h"
 
-#include <cstring>
+#include "clay/clay.h"
+#include "clay_bridge.h"
+#include "clay_inspector.h"
+#include "primitives/bank_button.h"
+#include "primitives/bank_text.h"
+
+#include <SDL3/SDL.h>
+
+namespace
+{
+using silencer::ui::primitives::BankButton;
+using silencer::ui::primitives::BankButtonBeginFrame;
+using silencer::ui::primitives::BankButtonHandle;
+using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::BankText;
+using silencer::ui::primitives::BankTextBeginFrame;
+using silencer::ui::primitives::BankTextVariant;
+
+constexpr uint16_t kDialogW = 352;
+constexpr uint16_t kDialogH = 178;
+constexpr uint16_t kDialogPadX = 34;
+constexpr uint16_t kDialogPadY = 44;
+
+Clay_String FromStd(const std::string & s)
+{
+	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
+}
+
+void OkClicked(void * user)
+{
+	auto * modal = static_cast<MessageModal *>(user);
+	if(modal) modal->NotifyOkClicked();
+}
+
+void RegisterWidgets(MessageModal * modal, int surfaceW, int surfaceH, bool hasOk)
+{
+	if(!hasOk) return;
+	const int dialogX = (surfaceW - kDialogW) / 2;
+	const int dialogY = (surfaceH - kDialogH) / 2;
+	silencer::ui::clay_inspector::Widget w;
+	w.label = "OK";
+	w.kind = silencer::ui::clay_inspector::WidgetKind::Button;
+	w.x = dialogX + (kDialogW - 156) / 2;
+	w.y = dialogY + kDialogH - kDialogPadY - 21;
+	w.w = 156; w.h = 21;
+	w.onClick = &OkClicked;
+	w.clickUser = modal;
+	silencer::ui::clay_inspector::Register(w);
+}
+}
 
 MessageModal::MessageModal(std::string message_, std::function<void()> onClose_)
     : message(std::move(message_)), hasOk(true), onClose(std::move(onClose_))
@@ -27,65 +73,73 @@ std::unique_ptr<MessageModal> MessageModal::Progress(std::string message)
 
 void MessageModal::Build(ScreenContext & ctx)
 {
-	World & world = ctx.world;
-	Overlay * background = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	background->renderpass = 3;
-	background->res_bank = 40;
-	background->res_index = 4;
-
-	Overlay * text = static_cast<Overlay *>(world.CreateObject(ObjectTypes::OVERLAY));
-	text->renderpass = 3;
-	text->text = message;
-	text->textbank = 134;
-	text->textwidth = 8;
-	text->x = 320 - ((int)(text->text.length() * text->textwidth) / 2);
-	text->y = hasOk ? 200 : 218;
-	textOverlayId = text->id;
-
-	Interface * dialog = static_cast<Interface *>(world.CreateObject(ObjectTypes::INTERFACE));
-	if(hasOk){
-		Button * okbutton = static_cast<Button *>(world.CreateObject(ObjectTypes::BUTTON));
-		okbutton->renderpass = 3;
-		okbutton->x = 242;
-		okbutton->y = 230;
-		okbutton->SetType(Button::B156x21);
-		okbutton->uid = 1;
-		strcpy(okbutton->text, "OK");
-		dialog->AddObject(okbutton->id);
-		dialog->buttonenter = okbutton->id;
-		okButtonId = okbutton->id;
-	}
-	dialog->AddObject(background->id);
-	dialog->AddObject(text->id);
-	dialog->modal = true;
-	interfaceId = dialog->id;
+	(void)ctx;
+	okClicked = false;
+	silencer::ui::clay_inspector::BeginFrame();
+	RegisterWidgets(this, 640, 480, hasOk);
 }
 
 void MessageModal::Tick(ScreenContext & ctx)
 {
-	if(!hasOk || !okButtonId) return;
-	Button * okbutton = static_cast<Button *>(ctx.world.GetObjectFromId(okButtonId));
-	if(okbutton && okbutton->clicked){
-		okbutton->clicked = false;
-		auto cb = std::move(onClose);
-		ctx.PopScreen();
-		// `this` is destroyed past PopScreen; invoke the user callback last.
-		if(cb) cb();
+	if(!hasOk || !okClicked) return;
+	okClicked = false;
+	auto cb = std::move(onClose);
+	ctx.PopScreen();
+	if(cb) cb();
+}
+
+void MessageModal::Draw(ScreenContext & ctx, Surface & dst, float frametime)
+{
+	(void)frametime;
+	using namespace silencer::clay_bridge;
+
+	EnsureInitialized(dst.w, dst.h);
+	float mx = 0.f, my = 0.f;
+	Uint32 buttons = SDL_GetMouseState(&mx, &my);
+	Clay_SetPointerState({ mx, my },
+	                      (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0);
+
+	BankButtonBeginFrame();
+	BankTextBeginFrame();
+	silencer::ui::clay_inspector::BeginFrame();
+
+	Clay_BeginLayout();
+	CLAY({ .id = CLAY_ID("MessageModalRoot"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
+	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+	       } }) {
+		CLAY({ .id = CLAY_ID("MessageModalDialog"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(kDialogW),
+		                       CLAY_SIZING_FIXED(kDialogH) },
+		           .padding = { kDialogPadX, kDialogPadX,
+		                        kDialogPadY, kDialogPadY },
+		           .childGap = 18,
+		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
+		       },
+		       .image = { .imageData = PackImage(40, 4) } }) {
+			BankText(FromStd(message), BankTextVariant::Heading, {});
+			if(hasOk){
+				BankButton(CLAY_STRING("OK"), BankButtonVariant::Chrome, {},
+				           BankButtonHandle{ nullptr, &OkClicked, this });
+			}
+		}
 	}
+	Clay_RenderCommandArray cmds = Clay_EndLayout();
+	Render(ctx.game, &dst, cmds);
+	RegisterWidgets(this, dst.w, dst.h, hasOk);
 }
 
 void MessageModal::Destroy(ScreenContext & ctx)
 {
-	if(interfaceId){
-		Interface * iface = static_cast<Interface *>(ctx.world.GetObjectFromId(interfaceId));
-		if(iface) iface->DestroyInterface(ctx.world);
-		interfaceId = 0;
-	}
+	(void)ctx;
 }
 
 void MessageModal::SetText(ScreenContext & ctx, const std::string & text)
 {
-	if(!textOverlayId) return;
-	Overlay * overlay = static_cast<Overlay *>(ctx.world.GetObjectFromId(textOverlayId));
-	if(overlay) overlay->text = text;
+	(void)ctx;
+	message = text;
 }

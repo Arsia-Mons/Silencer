@@ -100,14 +100,19 @@ HOME="$SILENCER_HOME" "$SILENCER_BIN" \
 SILENCER_PID=$!
 wait_alive "$CTRL_PORT"
 
-wait_for_iface() {
+wait_for_widget() {
+  local label="$1"
   for i in $(seq 1 100); do
-    iface=$(cli --port "$CTRL_PORT" state | bun -e \
-      'const t=await new Response(Bun.stdin.stream()).text(); console.log(JSON.parse(t).current_interface_id||0);')
-    if [ "${iface:-0}" != "0" ]; then return 0; fi
+    found=$(cli --port "$CTRL_PORT" inspect | LABEL="$label" bun -e \
+      'const t=await new Response(Bun.stdin.stream()).text();
+       const r=JSON.parse(t);
+       const label=process.env.LABEL;
+       console.log(r.widgets.some((w)=>w.label===label) ? "yes" : "no");' 2>/dev/null || echo no)
+    if [ "$found" = "yes" ]; then return 0; fi
     sleep 0.05
   done
-  echo "current_interface_id never became non-zero" >&2
+  echo "widget '$label' never appeared" >&2
+  cli --port "$CTRL_PORT" inspect >&2 || true
   return 1
 }
 
@@ -124,17 +129,17 @@ wait_for_lobby_state() {
 }
 
 cli --port "$CTRL_PORT" wait_for_state --state MAINMENU --timeout-ms 15000
-wait_for_iface
+wait_for_widget "Connect To Lobby"
 cli --port "$CTRL_PORT" click --label "Connect To Lobby" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBYCONNECT --timeout-ms 5000
-wait_for_iface
+wait_for_widget "Login"
 
 cli --port "$CTRL_PORT" set_text --uid 1 --text "claybob" >/dev/null
 cli --port "$CTRL_PORT" set_text --uid 2 --text "secret" >/dev/null
 wait_for_lobby_state AUTHENTICATING
 cli --port "$CTRL_PORT" click --label "Login" >/dev/null
 cli --port "$CTRL_PORT" wait_for_state --state LOBBY --timeout-ms 15000
-wait_for_iface
+wait_for_widget "Create Game"
 
 # Drive a few frames so the Clay panels run their first Build pass and
 # register widgets into the inspector.

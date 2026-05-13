@@ -62,27 +62,11 @@ constexpr int    kPwInputX   = 410, kPwInputY   = 405;
 constexpr Uint16 kPwInputW   = 210, kPwInputH   = 14;
 constexpr int    kCreateBtnX = 436, kCreateBtnY = 430;
 
-// LobbyRightUpperBox interior layout knobs.
-constexpr uint16_t kUpperHeadingPadLeft = 6;
-constexpr uint16_t kUpperHeadingPadTop  = 6;
-constexpr uint16_t kUpperFormRowPadX    = 6;
-constexpr uint16_t kUpperFormChildGap   = 6;
-constexpr uint16_t kUpperFormPadTop     = 2;
-constexpr uint16_t kUpperFormRowH       = 14;
-
-// LobbyRightTallBox interior layout knobs. Box at (398, 64, 232x391).
-constexpr uint16_t kTallHeadingPadLeft = 7;   // 405 - 398
-constexpr uint16_t kTallHeadingPadTop  = 6;   // 70 - 64
-constexpr uint16_t kTallMapListPadLeft = 9;   // 407 - 398
-constexpr uint16_t kTallMapListPadTop  = 4;   // 89 - (64 + 6 + 15)
-constexpr uint16_t kTallNameLabelPadLeft = 7; // 405 - 398
-constexpr uint16_t kTallNameLabelPadTop  = 6; // 360 - (89 + 265)
-constexpr uint16_t kTallInputPadLeft     = 12;// 410 - 398
-constexpr uint16_t kTallInputPadTop      = 0; // 375 - (360 + 15)
-constexpr uint16_t kTallPwLabelPadTop    = 1; // 390 - (375 + 14)
-constexpr uint16_t kTallPwInputPadTop    = 0; // 405 - (390 + 15)
-constexpr uint16_t kTallCreatePadLeft    = 38;// 436 - 398
-constexpr uint16_t kTallCreatePadTop     = 11;// 430 - (405 + 14)
+constexpr uint16_t kPanelPad        = 6;
+constexpr uint16_t kFormRowH        = 14;
+constexpr uint16_t kFormRowGap      = 3;
+constexpr uint16_t kFormColumnGap   = 6;
+constexpr uint16_t kTallSectionGap  = 4;
 
 constexpr int kMaxMapRows = 1024;
 Clay_String g_mapSlab[kMaxMapRows];
@@ -316,86 +300,82 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Resources & resources) {
 	(void)resources;
 
-	// "Game Options" heading at top.
-	CLAY({ .id = CLAY_ID("GCrtOptionsTitleWrap"),
-	       .layout = { .padding = { kUpperHeadingPadLeft, 0,
-	                                kUpperHeadingPadTop,  0 } } }) {
-		BankText(CLAY_STRING("Game Options"),
-		         BankTextVariant::Heading, {});
-	}
+	CLAY({ .id = CLAY_ID("GCrtOptionsContent"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
+	           .padding = { kPanelPad, kPanelPad, kPanelPad, kPanelPad },
+	           .childGap = kFormRowGap,
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	       } }) {
+		CLAY({ .id = CLAY_ID("GCrtOptionsTitleWrap") }) {
+			BankText(CLAY_STRING("Game Options"),
+			         BankTextVariant::Heading, {});
+		}
 
-	// 6-row form: each row is LEFT_TO_RIGHT (label + value), fixed height.
-	struct LabelRow { const char * label; const char * id; };
-	constexpr LabelRow kLabels[6] = {
-		{ "Security:",    "GCrtRowSec"   },
-		{ "Min Level:",   "GCrtRowMinL"  },
-		{ "Max Level:",   "GCrtRowMaxL"  },
-		{ "Max Players:", "GCrtRowMaxP"  },
-		{ "Max Teams:",   "GCrtRowMaxT"  },
-		{ "Spectatable:", "GCrtRowSpect" },
-	};
+		struct LabelRow { const char * label; const char * id; };
+		constexpr LabelRow kLabels[6] = {
+			{ "Security:",    "GCrtRowSec"   },
+			{ "Min Level:",   "GCrtRowMinL"  },
+			{ "Max Level:",   "GCrtRowMaxL"  },
+			{ "Max Players:", "GCrtRowMaxP"  },
+			{ "Max Teams:",   "GCrtRowMaxT"  },
+			{ "Spectatable:", "GCrtRowSpect" },
+		};
 
-	struct NumInput { const char * id; const char * label; char * buf; int cap; };
-	NumInput kTextInputs[4] = {
-		{ "GCrtMinLevel",   "Min Level",   state.minLevel,   (int)sizeof(state.minLevel)   },
-		{ "GCrtMaxLevel",   "Max Level",   state.maxLevel,   (int)sizeof(state.maxLevel)   },
-		{ "GCrtMaxPlayers", "Max Players", state.maxPlayers, (int)sizeof(state.maxPlayers) },
-		{ "GCrtMaxTeams",   "Max Teams",   state.maxTeams,   (int)sizeof(state.maxTeams)   },
-	};
+		struct NumInput { const char * id; const char * label; char * buf; int cap; };
+		NumInput kTextInputs[4] = {
+			{ "GCrtMinLevel",   "Min Level",   state.minLevel,   (int)sizeof(state.minLevel)   },
+			{ "GCrtMaxLevel",   "Max Level",   state.maxLevel,   (int)sizeof(state.maxLevel)   },
+			{ "GCrtMaxPlayers", "Max Players", state.maxPlayers, (int)sizeof(state.maxPlayers) },
+			{ "GCrtMaxTeams",   "Max Teams",   state.maxTeams,   (int)sizeof(state.maxTeams)   },
+		};
 
-	// First row needs padTop from heading bottom; rest stack contiguous.
-	// Row shape: GROW label on the left, FIT value pinned to the right by the
-	// label's GROW absorbing the remaining row width. childGap separates them.
-	for(int i = 0; i < 6; ++i){
-		const uint16_t rowPadTop = (i == 0) ? kUpperFormPadTop : 0;
-		CLAY({ .id = CLAY_SID(StaticId(kLabels[i].id)),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_FIXED(kUpperFormRowH) },
-		           .padding = { kUpperFormRowPadX, kUpperFormRowPadX,
-		                        rowPadTop, 0 },
-		           .childGap = kUpperFormChildGap,
-		           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
-		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-		       } }) {
-			// Label fills remaining width — value FITs on the right.
-			CLAY({ .id = CLAY_SID(StaticId((std::string("Lbl_") + kLabels[i].id).c_str())),
+		for(int i = 0; i < 6; ++i){
+			CLAY({ .id = CLAY_SID(StaticId(kLabels[i].id)),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_FIXED(kUpperFormRowH) },
+			                       CLAY_SIZING_FIXED(kFormRowH) },
+			           .childGap = kFormColumnGap,
 			           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				BankText(FromCStr(kLabels[i].label),
-				         BankTextVariant::Body, {});
-			}
-			// Value column.
-			if(i == 0){
-				BankButton(FromCStr(SecurityLabel(state.securityIndex)),
-				           BankButtonVariant::Inline, {},
-				           BankButtonHandle{ nullptr, &OnSecurityClicked, &state });
-				RegisterButton("Security", kValueX, kFormTop + 2, 60, kRowHeight,
-				               &OnSecurityClicked, &state);
-			}else if(i == 5){
-				BankButton(FromCStr(state.spectatable ? "Yes" : "No"),
-				           BankButtonVariant::Inline, {},
-				           BankButtonHandle{ nullptr, &OnSpectatableClicked, &state });
-				RegisterButton("Spectatable", kValueX, kFormTop + 5*kYSpace + 2, 30, kRowHeight,
-				               &OnSpectatableClicked, &state, state.spectatable);
-			}else{
-				NumInput & ti = kTextInputs[i - 1];
-				TextInputOpts opts;
-				opts.widthPx     = 20;
-				opts.heightPx    = kRowHeight;
-				opts.fontBank    = 133;
-				opts.fontWidth   = 6;
-				opts.brightness  = 128;
-				opts.numbersOnly = true;
-				opts.showCaret   = false;
-				std::string idStr = std::string("Input_") + ti.id;
-				TextInput(Clay_String{ false, (int32_t)idStr.size(), idStr.c_str() },
-				          ti.buf, opts, {});
-				const int y = kFormTop + i * kYSpace + 2;
-				RegisterTextInput(ti.label, kValueX, y, 20, kRowHeight, ti.buf, ti.cap);
+				CLAY({ .id = CLAY_SIDI(CLAY_STRING("GCrtRowLabel"), (uint32_t)i),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_GROW(0),
+				                       CLAY_SIZING_FIXED(kFormRowH) },
+				           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+				       } }) {
+					BankText(FromCStr(kLabels[i].label),
+					         BankTextVariant::Body, {});
+				}
+				if(i == 0){
+					BankButton(FromCStr(SecurityLabel(state.securityIndex)),
+					           BankButtonVariant::Inline, {},
+					           BankButtonHandle{ nullptr, &OnSecurityClicked, &state });
+					RegisterButton("Security", kValueX, kFormTop + 2, 60, kRowHeight,
+					               &OnSecurityClicked, &state);
+				}else if(i == 5){
+					BankButton(FromCStr(state.spectatable ? "Yes" : "No"),
+					           BankButtonVariant::Inline, {},
+					           BankButtonHandle{ nullptr, &OnSpectatableClicked, &state });
+					RegisterButton("Spectatable", kValueX, kFormTop + 5*kYSpace + 2, 30, kRowHeight,
+					               &OnSpectatableClicked, &state, state.spectatable);
+				}else{
+					NumInput & ti = kTextInputs[i - 1];
+					TextInputOpts opts;
+					opts.widthPx     = 20;
+					opts.heightPx    = kRowHeight;
+					opts.fontBank    = 133;
+					opts.fontWidth   = 6;
+					opts.brightness  = 128;
+					opts.numbersOnly = true;
+					opts.showCaret   = false;
+					std::string idStr = std::string("Input_") + ti.id;
+					TextInput(Clay_String{ false, (int32_t)idStr.size(), idStr.c_str() },
+					          ti.buf, opts, {});
+					const int y = kFormTop + i * kYSpace + 2;
+					RegisterTextInput(ti.label, kValueX, y, 20, kRowHeight, ti.buf, ti.cap);
+				}
 			}
 		}
 	}
@@ -405,97 +385,87 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
                              Resources & resources) {
 	(void)resources;
 
-	// "Select Map" heading at top.
-	CLAY({ .id = CLAY_ID("GCrtSelectMapTitleWrap"),
-	       .layout = { .padding = { kTallHeadingPadLeft, 0,
-	                                kTallHeadingPadTop,  0 } } }) {
-		BankText(CLAY_STRING("Select Map"),
-		         BankTextVariant::Heading, {});
-	}
+	CLAY({ .id = CLAY_ID("GCrtTallContent"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
+	           .padding = { kPanelPad, kPanelPad, kPanelPad, kPanelPad },
+	           .childGap = kTallSectionGap,
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	       } }) {
+		CLAY({ .id = CLAY_ID("GCrtSelectMapTitleWrap") }) {
+			BankText(CLAY_STRING("Select Map"),
+			         BankTextVariant::Heading, {});
+		}
 
-	// Map ScrollList.
-	const int slotCount = std::min((int)state.maps.size(), kMaxMapRows);
-	for(int i = 0; i < slotCount; ++i){
-		const std::string & raw = state.maps[i];
-		const char * txt = raw.c_str();
-		size_t len = raw.size();
-		if(len >= 5 && std::memcmp(txt, "[DL] ", 5) == 0){ txt += 5; len -= 5; }
-		g_mapSlab[i] = Clay_String{ false, (int32_t)len, txt };
-	}
-	ScrollListOpts listOpts;
-	listOpts.width          = kMapListW;
-	listOpts.height         = kMapListH;
-	listOpts.lineHeight     = kMapListLineH;
-	listOpts.highlightColor = 180;
-	listOpts.textVariant    = BankTextVariant::Body;
-	listOpts.scrollbarBank  = kScrollbarBank;
-	CLAY({ .id = CLAY_ID("GCrtMapListWrap"),
-	       .layout = { .padding = { kTallMapListPadLeft, 0,
-	                                kTallMapListPadTop,  0 } } }) {
-		ScrollList(CLAY_STRING("GCrtMapList"),
-		           g_mapSlab, slotCount,
-		           state.mapSelectedIndex, state.mapScrollPos,
-		           listOpts,
-		           ScrollListHandle{ nullptr, &OnMapRowSelected, &state });
-	}
-	for(int i = 0; i < slotCount; ++i){
-		RegisterListRow(g_mapSlab[i].chars,
-		                kMapListX, kMapListY + i * kMapListLineH,
-		                kMapListW, kMapListLineH,
-		                &OnMapRowSelected, &state, i,
-		                state.mapSelectedIndex == i);
-	}
+		const int slotCount = std::min((int)state.maps.size(), kMaxMapRows);
+		for(int i = 0; i < slotCount; ++i){
+			const std::string & raw = state.maps[i];
+			const char * txt = raw.c_str();
+			size_t len = raw.size();
+			if(len >= 5 && std::memcmp(txt, "[DL] ", 5) == 0){ txt += 5; len -= 5; }
+			g_mapSlab[i] = Clay_String{ false, (int32_t)len, txt };
+		}
+		ScrollListOpts listOpts;
+		listOpts.width          = kMapListW;
+		listOpts.height         = kMapListH;
+		listOpts.lineHeight     = kMapListLineH;
+		listOpts.highlightColor = 180;
+		listOpts.textVariant    = BankTextVariant::Body;
+		listOpts.scrollbarBank  = kScrollbarBank;
+		CLAY({ .id = CLAY_ID("GCrtMapListWrap") }) {
+			ScrollList(CLAY_STRING("GCrtMapList"),
+			           g_mapSlab, slotCount,
+			           state.mapSelectedIndex, state.mapScrollPos,
+			           listOpts,
+			           ScrollListHandle{ nullptr, &OnMapRowSelected, &state });
+		}
+		for(int i = 0; i < slotCount; ++i){
+			RegisterListRow(g_mapSlab[i].chars,
+			                kMapListX, kMapListY + i * kMapListLineH,
+			                kMapListW, kMapListLineH,
+			                &OnMapRowSelected, &state, i,
+			                state.mapSelectedIndex == i);
+		}
 
-	// "Game name:" label.
-	CLAY({ .id = CLAY_ID("GCrtNameLabelWrap"),
-	       .layout = { .padding = { kTallNameLabelPadLeft, 0,
-	                                kTallNameLabelPadTop,  0 } } }) {
-		BankText(CLAY_STRING("Game name:"),
-		         BankTextVariant::Heading, {});
-	}
-	TextInputOpts bodyInput;
-	bodyInput.widthPx    = kNameInputW;
-	bodyInput.heightPx   = kNameInputH;
-	bodyInput.fontBank   = 133;
-	bodyInput.fontWidth  = 6;
-	bodyInput.brightness = 128;
-	bodyInput.showCaret  = false;
-	CLAY({ .id = CLAY_ID("GCrtNameInputWrap"),
-	       .layout = { .padding = { kTallInputPadLeft, 0,
-	                                kTallInputPadTop,  0 } } }) {
-		TextInput(CLAY_STRING("GCrtNameInput"),
-		          state.name, bodyInput, {});
-	}
-	RegisterTextInput("Game name", kNameInputX, kNameInputY, kNameInputW, kNameInputH,
-	                  state.name, (int)sizeof(state.name));
+		CLAY({ .id = CLAY_ID("GCrtNameLabelWrap") }) {
+			BankText(CLAY_STRING("Game name:"),
+			         BankTextVariant::Heading, {});
+		}
+		TextInputOpts bodyInput;
+		bodyInput.widthPx    = kNameInputW;
+		bodyInput.heightPx   = kNameInputH;
+		bodyInput.fontBank   = 133;
+		bodyInput.fontWidth  = 6;
+		bodyInput.brightness = 128;
+		bodyInput.showCaret  = false;
+		CLAY({ .id = CLAY_ID("GCrtNameInputWrap") }) {
+			TextInput(CLAY_STRING("GCrtNameInput"),
+			          state.name, bodyInput, {});
+		}
+		RegisterTextInput("Game name", kNameInputX, kNameInputY, kNameInputW, kNameInputH,
+		                  state.name, (int)sizeof(state.name));
 
-	// "Password (optional):" label.
-	CLAY({ .id = CLAY_ID("GCrtPwLabelWrap"),
-	       .layout = { .padding = { kTallNameLabelPadLeft, 0,
-	                                kTallPwLabelPadTop, 0 } } }) {
-		BankText(CLAY_STRING("Password (optional):"),
-		         BankTextVariant::Heading, {});
-	}
-	bodyInput.password = true;
-	CLAY({ .id = CLAY_ID("GCrtPwInputWrap"),
-	       .layout = { .padding = { kTallInputPadLeft, 0,
-	                                kTallPwInputPadTop, 0 } } }) {
-		TextInput(CLAY_STRING("GCrtPwInput"),
-		          state.password, bodyInput, {});
-	}
-	RegisterTextInput("Password", kPwInputX, kPwInputY, kPwInputW, kPwInputH,
-	                  state.password, (int)sizeof(state.password), true);
+		CLAY({ .id = CLAY_ID("GCrtPwLabelWrap") }) {
+			BankText(CLAY_STRING("Password (optional):"),
+			         BankTextVariant::Heading, {});
+		}
+		bodyInput.password = true;
+		CLAY({ .id = CLAY_ID("GCrtPwInputWrap") }) {
+			TextInput(CLAY_STRING("GCrtPwInput"),
+			          state.password, bodyInput, {});
+		}
+		RegisterTextInput("Password", kPwInputX, kPwInputY, kPwInputW, kPwInputH,
+		                  state.password, (int)sizeof(state.password), true);
 
-	// Create button.
-	CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
-	       .layout = { .padding = { kTallCreatePadLeft, 0,
-	                                kTallCreatePadTop, 0 } } }) {
-		BankButton(CLAY_STRING("Create"),
-		           BankButtonVariant::Chrome, {},
-		           BankButtonHandle{ nullptr, &OnCreateClicked, &state });
+		CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
+		       .layout = { .childAlignment = { .x = CLAY_ALIGN_X_CENTER } } }) {
+			BankButton(CLAY_STRING("Create"),
+			           BankButtonVariant::Chrome, {},
+			           BankButtonHandle{ nullptr, &OnCreateClicked, &state });
+		}
+		RegisterButton("Create", kCreateBtnX, kCreateBtnY, 156, 21,
+		               &OnCreateClicked, &state);
 	}
-	RegisterButton("Create", kCreateBtnX, kCreateBtnY, 156, 21,
-	               &OnCreateClicked, &state);
 }
 
 }  // namespace silencer::ui::lobby_clay

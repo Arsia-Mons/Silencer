@@ -254,6 +254,28 @@ void DispatchImage(::Resources & resources,
 	Renderer::BlitSurface(src, nullptr, dst, &dstrect);
 }
 
+void OutlineVisiblePixels(::Renderer & renderer, Surface * surface, Uint8 color) {
+	int sw = surface->w;
+	int sh = surface->h;
+	std::vector<Uint8> original(sw * sh);
+	for(int py = 0; py < sh; py++){
+		for(int px = 0; px < sw; px++){
+			original[py * sw + px] = renderer.GetPixel(surface, px, py);
+		}
+	}
+	for(int py = 0; py < sh; py++){
+		for(int px = 0; px < sw; px++){
+			if(original[py * sw + px]) continue;
+			if((px > 0 && original[py * sw + px - 1]) ||
+			   (px < sw - 1 && original[py * sw + px + 1]) ||
+			   (py > 0 && original[(py - 1) * sw + px]) ||
+			   (py < sh - 1 && original[(py + 1) * sw + px])){
+				renderer.SetPixel(surface, px, py, color);
+			}
+		}
+	}
+}
+
 }  // namespace
 
 void EnsureInitialized(int width, int height) {
@@ -388,6 +410,81 @@ void Render(::Resources & resources, ::Renderer & renderer,
 						}else{
 							Renderer::BlitSurface(src, nullptr, dst, &dstrect);
 						}
+						break;
+					}
+					case CustomKind::Sprite: {
+						const auto * p = reinterpret_cast<const SpritePayload *>(ccd->payload);
+						if(!p) break;
+						const auto & banks = resources.spritebank;
+						if(p->bank >= banks.size()) break;
+						if(p->index >= banks[p->bank].size()) break;
+						Surface * src = banks[p->bank][p->index].get();
+						if(!src) break;
+						Renderer::Rect srcrect{
+							p->srcW > 0 ? p->srcW : src->w,
+							p->srcH > 0 ? p->srcH : src->h,
+							p->srcX,
+							p->srcY,
+						};
+						if(srcrect.x < 0) srcrect.x = 0;
+						if(srcrect.y < 0) srcrect.y = 0;
+						if(srcrect.x + srcrect.w > src->w) srcrect.w = src->w - srcrect.x;
+						if(srcrect.y + srcrect.h > src->h) srcrect.h = src->h - srcrect.y;
+						if(srcrect.w <= 0 || srcrect.h <= 0) break;
+						Renderer::Rect dstrect{
+							srcrect.w,
+							srcrect.h,
+							static_cast<int>(c->boundingBox.x),
+							static_cast<int>(c->boundingBox.y),
+						};
+						int cx = dstrect.x, cy = dstrect.y, cw = dstrect.w, ch = dstrect.h;
+						if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) break;
+						bool needsCopy = (p->effectColor != 0) || (p->rampColor != 0) || (p->brightness != 128);
+						if(needsCopy){
+							Surface * copy = renderer.CreateSurfaceCopy(src);
+							if(p->effectColor != 0)
+								renderer.EffectColor(copy, nullptr, p->effectColor);
+							if(p->rampColor != 0){
+								if(p->rampPlus != 0){
+									renderer.EffectRampColorPlus(copy, nullptr, p->rampColor, p->rampPlus);
+								}else{
+									renderer.EffectRampColor(copy, nullptr, p->rampColor);
+								}
+							}
+							if(p->brightness != 128)
+								renderer.EffectBrightness(copy, nullptr, p->brightness);
+							Renderer::BlitSurface(copy, &srcrect, dst, &dstrect);
+							delete copy;
+						}else{
+							Renderer::BlitSurface(src, &srcrect, dst, &dstrect);
+						}
+						break;
+					}
+					case CustomKind::TeamEmblem: {
+						const auto * p = reinterpret_cast<const TeamEmblemPayload *>(ccd->payload);
+						if(!p) break;
+						const auto & banks = resources.spritebank;
+						if(p->bank >= banks.size()) break;
+						if(p->index >= banks[p->bank].size()) break;
+						Surface * src = banks[p->bank][p->index].get();
+						if(!src) break;
+						int scale = p->scaled ? 2 : 1;
+						int x = static_cast<int>(c->boundingBox.x);
+						int y = static_cast<int>(c->boundingBox.y);
+						int w = src->w * scale;
+						int h = src->h * scale;
+						int cx = x, cy = y, cw = w, ch = h;
+						if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) break;
+						Surface * copy = renderer.CreateSurfaceCopy(src);
+						renderer.EffectTeamColor(copy, nullptr, p->teamColor, false, true);
+						OutlineVisiblePixels(renderer, copy, p->outlineColor);
+						Renderer::Rect dstrect{w, h, x, y};
+						if(p->scaled){
+							Renderer::DrawScaled(copy, nullptr, dst, &dstrect);
+						}else{
+							Renderer::BlitSurface(copy, nullptr, dst, &dstrect);
+						}
+						delete copy;
 						break;
 					}
 					case CustomKind::ScrollBar: {
@@ -625,7 +722,6 @@ void Render(::Resources & resources, ::Renderer & renderer,
 						if(!p->text) break;
 						int x = static_cast<int>(c->boundingBox.x);
 						int y = static_cast<int>(c->boundingBox.y);
-						// Mirrors Renderer::DrawTextInput (renderer.cpp:1835).
 						// DrawText at (x, y), then caret bar at
 						// (x + textLen*fontWidth, y - 1) if showCaret.
 						renderer.DrawText(dst,
