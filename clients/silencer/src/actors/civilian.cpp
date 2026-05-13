@@ -127,9 +127,10 @@ void Civilian::InitBT(){
 			int dx = cd ? cd->threatDetectX : 200;
 			int dy = cd ? cd->threatDetectY : 100;
 			std::vector<Object*> threats = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
+			fprintf(stderr, "[civ#%d] state=%d state_i=%d threats=%d\n", id, state, state_i, (int)threats.size());
 			if(!threats.empty()){
 				mirrored = (threats[0]->x > x);
-				if(state != RUNNING){ state = RUNNING; state_i = -1; }
+				if(state != RUNNING){ fprintf(stderr, "[civ#%d] WALKING→RUNNING\n", id); state = RUNNING; state_i = -1; }
 			}
 		}
 		if(state != RUNNING) return BTResult::Failure;
