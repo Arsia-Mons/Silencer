@@ -64,8 +64,9 @@ re-run `deploy.yml` (or `publish-npm`) after the npm side is fixed.
 Branch protection treats a workflow that's filtered out at `on:`
 as "Expected — Waiting for status to be reported" and blocks
 merge forever. So the five required CI builds always trigger; a
-gate step (`dorny/paths-filter@v3` for allowlists, a `git diff`
-shell step for the macOS/Windows denylist) sets
+gate step (`dorny/paths-filter@v3` for allowlists, the composite
+`.github/actions/check-client-changes` action for the
+macOS/Windows/Linux denylist) sets
 `steps.changes.outputs.relevant`, and every real step is
 `if: steps.changes.outputs.relevant == 'true'`. Skipped *steps*
 inside a running job still let the job report success — that's
@@ -73,3 +74,10 @@ what unblocks merges. Don't move filters back to `on:` without
 also dropping the check from branch protection.
 
 Deploys aren't required checks, so they keep `on: paths` filters.
+
+## deploy-staging.yml job structure
+
+`build-native` (ARM64 lobby + dedicated server) runs in parallel
+with `build-docker-api` and `build-docker-web` (the two admin
+Docker images). All three feed `deploy`. The Docker jobs are split
+so admin-api and admin-web build concurrently instead of serially.
