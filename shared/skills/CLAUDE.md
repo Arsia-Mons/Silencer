@@ -26,6 +26,11 @@ before relying on the skill's content.
   required-fields, anchor-offset coords, polled `clicked` flags,
   `objects`/`tabobjects` lists, `Destroy` cleanup, in-game popups in
   `Player::Tick`). Harness path: `.claude/skills/editing-silencer-ui`.
+- `visual-regression-journeys/` — capture every reachable UI surface on the
+  current branch and a baseline git ref, build side-by-side composites, and
+  diff. Catches regressions invisible to unit tests, E2E scripts, and
+  architecture-boundary tests (e.g. garbled text from string-arena lifetime
+  bugs). Harness path: `.claude/skills/e2e-visual-regression`.
 
 ## Adding a skill
 
