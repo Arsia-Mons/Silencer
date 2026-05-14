@@ -272,8 +272,8 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
-      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undoRef.current(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redoRef.current(); }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -293,6 +293,9 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     setCanUndo(historyIdxRef.current > 0);
     setCanRedo(true);
     onChange(prev);
+    const { nodes, edges } = btToFlow(prev);
+    setRfNodes(nodes);
+    setRfEdges(edges);
   }
 
   function redo() {
@@ -302,7 +305,16 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     setCanUndo(true);
     setCanRedo(historyIdxRef.current < historyRef.current.length - 1);
     onChange(next);
+    const { nodes, edges } = btToFlow(next);
+    setRfNodes(nodes);
+    setRfEdges(edges);
   }
+
+  // Stable refs so the keydown listener always calls the latest undo/redo
+  const undoRef = useRef(undo);
+  const redoRef = useRef(redo);
+  undoRef.current = undo;
+  redoRef.current = redo;
 
   // When ReactFlow removes edges (user clicks edge → Delete), sync children arrays in BT data.
   const handleEdgesChange = useCallback((changes: Parameters<typeof onEdgesChange>[0]) => {
