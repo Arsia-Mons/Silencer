@@ -27,17 +27,6 @@ class Surface;
 class World;
 class Player;
 class Team;
-namespace silencer {
-namespace client_ui {
-class InGameUiController;
-class InGameOverlayRenderer;
-void BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
-void BuildInGameOverlaysUi(::Renderer& renderer, ::World& world, ::Surface* surface);
-void BuildHudSecretSprites(::World& world, ::Surface* surface, ::Team* team, int yoffset, Uint8 phase);
-int BuildHudTeams(::World& world, ::Surface* surface, Uint8 phase);
-Uint8 BuildHudStatusSprites(::Renderer& renderer, ::World& world, ::Surface* surface, ::Player* player, Uint8 phase);
-}
-}
 
 class World
 {
@@ -77,8 +66,34 @@ public:
 	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0, bool observer = false);
 	void Disconnect(void);
 	Peer * GetAuthorityPeer(void);
+	Peer * GetPeer(Uint8 peerid);
+	Uint8 GetLocalPeerId() const { return localpeerid; }
 	class Player * GetPeerPlayer(Uint8 peerid);
 	Team * GetPeerTeam(Uint8 peerid);
+
+	// In-game UI session flags. Paired with the public mutable showchat_i.
+	bool IsShowingPlayerList() const { return showplayerlist; }
+	void SetShowingPlayerList(bool show) { showplayerlist = show; }
+
+	// Decorative HUD highlights (set by gameplay; read by HUD).
+	bool ShouldHighlightSecrets() const { return highlightsecrets; }
+	bool ShouldHighlightMinimap() const { return highlightminimap; }
+
+	// In-game messages (timed overlays).
+	const char * GetMessageText() const { return message; }
+	Uint8 GetMessageProgress() const { return message_i; }
+	Uint8 GetMessageType() const { return messagetype; }
+	Uint8 GetMessageTime() const { return messagetime; }
+	const char * GetTopMessageText() const { return topmessage; }
+	Uint8 GetTopMessageProgress() const { return topmessage_i; }
+
+	// System-camera insets (two slots).
+	bool IsSystemCameraActive(int slot) const { return systemcameraactive[slot]; }
+	Uint16 GetSystemCameraFollowId(int slot) const { return systemcamerafollow[slot]; }
+	Sint16 GetSystemCameraX(int slot) const { return systemcamerax[slot]; }
+	Sint16 GetSystemCameraY(int slot) const { return systemcameray[slot]; }
+
+	const std::vector<Uint16> & GetObjectsByType(Uint8 type) const { return objectsbytype[type]; }
 	bool FindTeamForPeer(Peer & peer, Uint8 agency, int start = 0);
 	void SendInput(void);
 	void SwitchToLocalAuthorityMode(void);
@@ -168,13 +183,6 @@ public:
 	friend class Replay;
 	friend class Audio;
 	friend class TriggerGraph;
-	friend class silencer::client_ui::InGameUiController;
-	friend class silencer::client_ui::InGameOverlayRenderer;
-	friend void silencer::client_ui::BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
-	friend void silencer::client_ui::BuildInGameOverlaysUi(::Renderer& renderer, ::World& world, ::Surface* surface);
-	friend void silencer::client_ui::BuildHudSecretSprites(::World& world, ::Surface* surface, ::Team* team, int yoffset, Uint8 phase);
-	friend int silencer::client_ui::BuildHudTeams(::World& world, ::Surface* surface, Uint8 phase);
-	friend Uint8 silencer::client_ui::BuildHudStatusSprites(::Renderer& renderer, ::World& world, ::Surface* surface, ::Player* player, Uint8 phase);
 	// LobbyScreen reads/writes World state across the entire lobby
 	// surface: seeds gameinfo from the lobby record after a successful
 	// host-side CreateGame, reads localpeer state to refresh the Ready

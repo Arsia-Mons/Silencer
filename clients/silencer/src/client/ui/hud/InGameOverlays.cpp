@@ -1,35 +1,21 @@
 #include "client/ui/hud/InGameOverlays.h"
 
-#include "objecttypes.h"
-#include "player.h"
-#include "primitives/bank_text.h"
-#include "render/renderer.h"
-#include "surface.h"
-#include "team.h"
+#include "client/ui/hud/HudPayloadArena.h"
+#include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
-#include "user.h"
-#include "world.h"
+#include "primitives/bank_text.h"
+#include "render/clay_ui_payloads.h"
+#include "render/renderer.h"
+#include "resources.h"
+#include "surface.h"
 
 #include <cstdio>
 #include <cstring>
-#include <deque>
 #include <string>
 #include <vector>
 
 namespace silencer {
 namespace client_ui {
-
-class InGameOverlayRenderer {
-public:
-	static void DrawAll(Renderer& renderer, World& world, Surface* surface);
-
-private:
-	static void DrawMessage(Renderer& renderer, World& world, Surface* surface);
-	static void DrawStatus(Renderer& renderer, World& world, Surface* surface);
-	static void DrawTopMessage(Renderer& renderer, World& world, Surface* surface);
-	static void DrawQuitPrompt(Renderer& renderer, World& world, Surface* surface);
-	static void DrawPlayerList(Renderer& renderer, World& world, Surface* surface);
-};
 
 namespace {
 
@@ -71,29 +57,11 @@ Clay_ElementDeclaration FloatingTextElementI(const char* id, uint32_t index, int
 	return decl;
 }
 
-constexpr int kTeamEmblemPayloadCapacity = 16;
-silencer::clay_bridge::TeamEmblemPayload g_teamEmblemPayloads[kTeamEmblemPayloadCapacity];
-silencer::clay_bridge::ClayCustomData g_teamEmblemCustomData[kTeamEmblemPayloadCapacity];
-int g_teamEmblemPayloadCount = 0;
+void DrawMessage(const HudView& view, Surface* surface) {
+	const InGameMessageView& msg = view.message;
+	if(!msg.message_i) return;
+	if(msg.message.empty()) return;
 
-void OverlaysBeginFrame() {
-	g_teamEmblemPayloadCount = 0;
-}
-
-silencer::clay_bridge::ClayCustomData* AllocTeamEmblemCustomData(silencer::clay_bridge::TeamEmblemPayload payload) {
-	if(g_teamEmblemPayloadCount >= kTeamEmblemPayloadCapacity) return nullptr;
-	g_teamEmblemPayloads[g_teamEmblemPayloadCount] = payload;
-	g_teamEmblemCustomData[g_teamEmblemPayloadCount] = {
-		silencer::clay_bridge::CustomKind::TeamEmblem,
-		&g_teamEmblemPayloads[g_teamEmblemPayloadCount],
-	};
-	return &g_teamEmblemCustomData[g_teamEmblemPayloadCount++];
-}
-
-}  // namespace
-
-void InGameOverlayRenderer::DrawMessage(Renderer& renderer, World& world, Surface* surface) {
-	if(!world.message_i) return;
 	struct MessageGlyph {
 		std::string text;
 		int x;
@@ -104,16 +72,18 @@ void InGameOverlayRenderer::DrawMessage(Renderer& renderer, World& world, Surfac
 		silencer::clay_bridge::BankTextDrawData draw;
 	};
 	std::vector<MessageGlyph> glyphs;
-	glyphs.reserve(std::strlen(world.message) * 2);
-	int linelength = std::strlen(world.message);
-	char* newline = std::strchr(world.message, '\n');
-	if(newline) linelength = newline - world.message;
+	const char* text = msg.message.c_str();
+	int totalLen = (int)msg.message.size();
+	glyphs.reserve(totalLen * 2);
+	int linelength = totalLen;
+	const char* newline = std::strchr(text, '\n');
+	if(newline) linelength = (int)(newline - text);
 	int liney = 60;
 	Uint8 color = 208;
 	int textwidth = 11;
 	int textbank = 135;
 	int lineheight = 20;
-	switch(world.messagetype) {
+	switch(msg.messagetype) {
 		case 1: color = 128; liney = 190; textbank = 134; textwidth = 10; break;
 		case 2: color = 128; break;
 		case 3: color = 192; break;
@@ -124,20 +94,20 @@ void InGameOverlayRenderer::DrawMessage(Renderer& renderer, World& world, Surfac
 	}
 	int nextline = linelength;
 	int line = 0;
-	for(int i = 0; i < (int)std::strlen(world.message); i++) {
-		if(i >= world.message_i) break;
+	for(int i = 0; i < totalLen; i++) {
+		if(i >= msg.message_i) break;
 		Uint8 brightness = 128;
-		if(world.messagetype < 10) {
-			if(world.message_i - world.messagetime + 8 >= 0) brightness -= (world.message_i - world.messagetime + 8) * 8;
-			if(world.message_i % 32 >= 16) {
-				brightness += ((16 - (world.message_i % 16)) * 2);
+		if(msg.messagetype < 10) {
+			if(msg.message_i - msg.messagetime + 8 >= 0) brightness -= (msg.message_i - msg.messagetime + 8) * 8;
+			if(msg.message_i % 32 >= 16) {
+				brightness += ((16 - (msg.message_i % 16)) * 2);
 			}else{
-				brightness += ((world.message_i % 16) * 2);
+				brightness += ((msg.message_i % 16) * 2);
 			}
 		}
-		if(world.message_i - i <= 5) brightness += 40 - ((world.message_i - i) * 8);
-		char temp[2] = { world.message[i], 0 };
-		if(world.messagetype >= 10) {
+		if(msg.message_i - i <= 5) brightness += 40 - ((msg.message_i - i) * 8);
+		char temp[2] = { text[i], 0 };
+		if(msg.messagetype >= 10) {
 			if(line == 0) {
 				textbank = 136;
 				textwidth = 25;
@@ -152,16 +122,17 @@ void InGameOverlayRenderer::DrawMessage(Renderer& renderer, World& world, Surfac
 		glyphs.push_back({temp, x, liney, (Uint8)textbank, (Uint8)textwidth, color, {brightness, false, false}});
 		nextline--;
 		if(nextline < 0) {
-			linelength = std::strlen(&world.message[i + 1]);
-			char* nextNewline = std::strchr(&world.message[i + 1], '\n');
-			if(nextNewline) linelength = nextNewline - &world.message[i + 1];
+			linelength = (int)std::strlen(&text[i + 1]);
+			const char* nextNewline = std::strchr(&text[i + 1], '\n');
+			if(nextNewline) linelength = (int)(nextNewline - &text[i + 1]);
 			nextline = linelength;
-			liney += (line == 0 && world.messagetype >= 10) ? 40 : lineheight;
+			liney += (line == 0 && msg.messagetype >= 10) ? 40 : lineheight;
 			line++;
 		}
 	}
 	if(glyphs.empty()) return;
-	CLAY({ .id = CLAY_ID("InGameMessageRoot"), .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
+	CLAY({ .id = CLAY_ID("InGameMessageRoot"),
+	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		for(size_t i = 0; i < glyphs.size(); ++i) {
 			MessageGlyph& glyph = glyphs[i];
 			CLAY(FloatingTextElementI("InGameMessageGlyph", (uint32_t)i, glyph.x, glyph.y, glyph.width, 20)) {
@@ -176,7 +147,7 @@ void InGameOverlayRenderer::DrawMessage(Renderer& renderer, World& world, Surfac
 	}
 }
 
-void InGameOverlayRenderer::DrawStatus(Renderer& renderer, World& world, Surface* surface) {
+void DrawStatus(const HudView& view, Surface* surface) {
 	struct StatusLine {
 		std::string text;
 		int x;
@@ -185,22 +156,20 @@ void InGameOverlayRenderer::DrawStatus(Renderer& renderer, World& world, Surface
 		silencer::clay_bridge::BankTextDrawData draw;
 	};
 	std::vector<StatusLine> lines;
-	lines.reserve(world.statusmessages.size() * 2);
+	lines.reserve(view.statusMessages.size() * 2);
 	int liney = 0;
-	for(std::deque<char*>::iterator it = world.statusmessages.begin(); it != world.statusmessages.end(); it++) {
-		char* text = *it;
-		char* time = &text[std::strlen(text) + 1];
-		char* color = &text[std::strlen(text) + 2];
+	for(const InGameStatusLineView& src : view.statusMessages) {
 		Uint8 brightness = 128;
-		if(*time <= 16) brightness -= (16 - *time) * 8;
+		if(src.time <= 16) brightness -= (16 - src.time) * 8;
 		Uint8 brightness2 = (int(brightness) - 64) < 8 ? 8 : brightness - 64;
-		const int x = (surface->w - (std::strlen(text) * 7)) / 2;
-		lines.push_back({text, x + 1, 370 + liney + 1, (Uint8)*color, {brightness2, false, false}});
-		lines.push_back({text, x, 370 + liney, (Uint8)*color, {brightness, false, false}});
+		const int x = (surface->w - ((int)src.text.size() * 7)) / 2;
+		lines.push_back({src.text, x + 1, 370 + liney + 1, src.color, {brightness2, false, false}});
+		lines.push_back({src.text, x, 370 + liney, src.color, {brightness, false, false}});
 		liney -= 10;
 	}
 	if(lines.empty()) return;
-	CLAY({ .id = CLAY_ID("InGameStatusRoot"), .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
+	CLAY({ .id = CLAY_ID("InGameStatusRoot"),
+	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		for(size_t i = 0; i < lines.size(); ++i) {
 			StatusLine& line = lines[i];
 			CLAY(FloatingTextElementI("InGameStatusLine", (uint32_t)i, line.x, line.y, (int)line.text.size() * 7, 12)) {
@@ -215,16 +184,26 @@ void InGameOverlayRenderer::DrawStatus(Renderer& renderer, World& world, Surface
 	}
 }
 
-void InGameOverlayRenderer::DrawTopMessage(Renderer& renderer, World& world, Surface* surface) {
-	if(!world.topmessage_i) return;
-	char* text = world.topmessage;
-	if(world.topmessage_i / 2 > 24) text = &world.topmessage[(world.topmessage_i / 2) - 24];
+void DrawTopMessage(const HudView& view, Surface* surface) {
+	const InGameTopMessageView& msg = view.topMessage;
+	if(!msg.topmessage_i) return;
+	if(msg.text.empty()) return;
+
+	const char* text = msg.text.c_str();
+	int progress = msg.topmessage_i;
+	int slen = (int)msg.text.size();
+	int start = 0;
+	if(progress / 2 > 24){
+		start = (progress / 2) - 24;
+		if(start > slen) start = slen;
+	}
 	const int maxlength = 35;
 	char textmax[maxlength + 1];
 	std::memset(textmax, 0, sizeof(textmax));
-	std::strncpy(textmax, text, maxlength);
+	std::strncpy(textmax, text + start, maxlength);
 	std::string topText(textmax);
-	CLAY({ .id = CLAY_ID("InGameTopMessageRoot"), .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
+	CLAY({ .id = CLAY_ID("InGameTopMessageRoot"),
+	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		CLAY(FloatingTextElement("InGameTopMessage", 200, 10, 245, 12)) {
 			CLAY_TEXT(StringFromStd(topText), CLAY_TEXT_CONFIG({
 				.textColor = { 0, 0, 0, 255 },
@@ -235,14 +214,15 @@ void InGameOverlayRenderer::DrawTopMessage(Renderer& renderer, World& world, Sur
 	}
 }
 
-void InGameOverlayRenderer::DrawQuitPrompt(Renderer& renderer, World& world, Surface* surface) {
+void DrawQuitPrompt(const HudView& /*view*/, Surface* surface) {
 #ifdef OUYA
 	std::string text = "Hit O To QUIT";
 #else
 	std::string text = "Hit Enter To Quit";
 #endif
 	const int width = (int)text.size() * 16;
-	CLAY({ .id = CLAY_ID("QuitPromptRoot"), .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
+	CLAY({ .id = CLAY_ID("QuitPromptRoot"),
+	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		CLAY(FloatingTextElement("QuitPromptText", (surface->w - width) / 2, 200, width, 24)) {
 			CLAY_TEXT(StringFromStd(text), CLAY_TEXT_CONFIG({
 				.textColor = { 202, 0, 0, 255 },
@@ -253,57 +233,14 @@ void InGameOverlayRenderer::DrawQuitPrompt(Renderer& renderer, World& world, Sur
 	}
 }
 
-void InGameOverlayRenderer::DrawPlayerList(Renderer& renderer, World& world, Surface* surface) {
-	struct PeerRow {
-		std::string displayName;
-		std::string stats;
-	};
-	struct TeamRow {
-		Uint8 agency;
-		Uint8 color;
-		int emblemW;
-		int emblemH;
-		std::vector<PeerRow> peers;
-	};
-	std::vector<TeamRow> rows;
-	for(std::vector<Uint16>::iterator it = world.objectsbytype[ObjectTypes::TEAM].begin(); it != world.objectsbytype[ObjectTypes::TEAM].end(); it++) {
-		Team* team = static_cast<Team*>(world.GetObjectFromId(*it));
-		if(!team) continue;
-		Surface* emblem = nullptr;
-		if(181 < world.resources.spritebank.size() && team->agency < world.resources.spritebank[181].size()) {
-			emblem = world.resources.spritebank[181][team->agency].get();
-		}
-		TeamRow row;
-		row.agency = team->agency;
-		row.color = team->GetColor();
-		row.emblemW = emblem ? emblem->w * 2 : 32;
-		row.emblemH = emblem ? emblem->h * 2 : 32;
-		for(int i = 0; i < team->numpeers; i++) {
-			Peer* peer = world.peerlist[team->peers[i]];
-			if(!peer) continue;
-			Player* player = world.GetPeerPlayer(peer->id);
-			User* user = world.lobby.GetUserInfo(peer->accountid);
-			if(player && user) {
-				char displayname[120];
-				if(peer->isbot) {
-					std::snprintf(displayname, sizeof(displayname), "%s [BOT]", user->name);
-				}else{
-					std::snprintf(displayname, sizeof(displayname), "%s", user->name);
-				}
-				char stats[100];
-				std::snprintf(stats, sizeof(stats), "L:%d    E:%d  S:%d  J:%d  H:%d  C:%d",
-				              user->agency[team->agency].level,
-				              user->agency[team->agency].endurance,
-				              user->agency[team->agency].shield,
-				              user->agency[team->agency].jetpack,
-				              user->agency[team->agency].hacking,
-				              user->agency[team->agency].contacts);
-				row.peers.push_back(PeerRow{displayname, stats});
-			}
-		}
-		rows.push_back(row);
+void DrawPlayerList(const HudView& view, Surface* surface) {
+	if(view.teams.empty()) return;
+	// Skip empty player-list (no peer rows means nothing to render).
+	bool anyPeers = false;
+	for(const TeamHudView& team : view.teams){
+		if(!team.playerListPeers.empty()){ anyPeers = true; break; }
 	}
-	if(rows.empty()) return;
+	if(!anyPeers) return;
 
 	using namespace silencer::ui::primitives;
 
@@ -315,14 +252,14 @@ void InGameOverlayRenderer::DrawPlayerList(Renderer& renderer, World& world, Sur
 	       } }) {
 		CLAY({ .id = CLAY_ID("PlayerListPanel"),
 		       .layout = {
-			       .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED((float)(10 + (rows.size() * 58))) },
+			       .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED((float)(10 + (view.teams.size() * 58))) },
 			       .padding = { 10, 10, 10, 0 },
 			       .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .backgroundColor = { 0, 0, 0, 128 },
 		}) {
-			for(unsigned int teamIndex = 0; teamIndex < rows.size(); ++teamIndex) {
-				const TeamRow& row = rows[teamIndex];
+			for(unsigned int teamIndex = 0; teamIndex < view.teams.size(); ++teamIndex) {
+				const TeamHudView& team = view.teams[teamIndex];
 				CLAY({ .id = CLAY_IDI("PlayerListTeamRow", teamIndex),
 				       .layout = {
 					       .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(58) },
@@ -334,11 +271,11 @@ void InGameOverlayRenderer::DrawPlayerList(Renderer& renderer, World& world, Sur
 						       .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
 					       } }) {
 						CLAY({ .id = CLAY_IDI("PlayerListTeamEmblem", teamIndex),
-						       .layout = { .sizing = { CLAY_SIZING_FIXED((float)row.emblemW), CLAY_SIZING_FIXED((float)row.emblemH) } },
-						       .custom = { .customData = AllocTeamEmblemCustomData({181, row.agency, row.color, 17, true}) },
+						       .layout = { .sizing = { CLAY_SIZING_FIXED((float)team.emblemW), CLAY_SIZING_FIXED((float)team.emblemH) } },
+						       .custom = { .customData = AllocTeamEmblemCustomData({181, team.agency, team.color, 17, true}) },
 						}) {}
 					}
-					int yoffset = ((4 - (int)row.peers.size()) * 12) / 2;
+					int yoffset = ((4 - (int)team.playerListPeers.size()) * 12) / 2;
 					if(yoffset < 0) yoffset = 0;
 					CLAY({ .id = CLAY_IDI("PlayerListPeerColumn", teamIndex),
 					       .layout = {
@@ -346,8 +283,13 @@ void InGameOverlayRenderer::DrawPlayerList(Renderer& renderer, World& world, Sur
 						       .padding = { 0, 0, (uint16_t)yoffset, 0 },
 						       .layoutDirection = CLAY_TOP_TO_BOTTOM,
 					       } }) {
-						for(unsigned int peerIndex = 0; peerIndex < row.peers.size(); ++peerIndex) {
-							const PeerRow& peer = row.peers[peerIndex];
+						for(unsigned int peerIndex = 0; peerIndex < team.playerListPeers.size(); ++peerIndex) {
+							const TeamPeerView& peer = team.playerListPeers[peerIndex];
+							char stats[100];
+							std::snprintf(stats, sizeof(stats), "L:%d    E:%d  S:%d  J:%d  H:%d  C:%d",
+							              peer.agencyLevel, peer.agencyEndurance, peer.agencyShield,
+							              peer.agencyJetpack, peer.agencyHacking, peer.agencyContacts);
+							std::string statsString = stats;
 							CLAY({ .id = CLAY_IDI("PlayerListPeerRow", (teamIndex * 8) + peerIndex),
 							       .layout = {
 								       .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(12) },
@@ -359,8 +301,8 @@ void InGameOverlayRenderer::DrawPlayerList(Renderer& renderer, World& world, Sur
 									BankText(StringFromStd(peer.displayName), BankTextVariant::Body);
 								}
 								CLAY({ .id = CLAY_IDI("PlayerListPeerStats", (teamIndex * 8) + peerIndex),
-								       .layout = { .sizing = { CLAY_SIZING_FIXED((float)((peer.stats.size() + 1) * 6)), CLAY_SIZING_FIT(0) } } }) {
-									BankText(StringFromStd(peer.stats), BankTextVariant::Body);
+								       .layout = { .sizing = { CLAY_SIZING_FIXED((float)((statsString.size() + 1) * 6)), CLAY_SIZING_FIT(0) } } }) {
+									BankText(StringFromStd(statsString), BankTextVariant::Body);
 								}
 							}
 						}
@@ -371,21 +313,20 @@ void InGameOverlayRenderer::DrawPlayerList(Renderer& renderer, World& world, Sur
 	}
 }
 
-void InGameOverlayRenderer::DrawAll(Renderer& renderer, World& world, Surface* surface) {
-	DrawStatus(renderer, world, surface);
-	DrawTopMessage(renderer, world, surface);
-	DrawMessage(renderer, world, surface);
-	if(world.showplayerlist) {
-		DrawPlayerList(renderer, world, surface);
-	}
-	if(world.quitstate == 1 || world.quitstate == 2) {
-		DrawQuitPrompt(renderer, world, surface);
-	}
-}
+}  // namespace
 
-void BuildInGameOverlaysUi(Renderer& renderer, World& world, Surface* surface) {
-	OverlaysBeginFrame();
-	InGameOverlayRenderer::DrawAll(renderer, world, surface);
+void BuildInGameOverlaysUi(Renderer& /*renderer*/, const Resources& /*resources*/,
+                           const HudView& view, Surface* surface) {
+	if(!view.mapLoaded) return;
+	DrawStatus(view, surface);
+	DrawTopMessage(view, surface);
+	DrawMessage(view, surface);
+	if(view.showPlayerList){
+		DrawPlayerList(view, surface);
+	}
+	if(view.quitState == 1 || view.quitState == 2){
+		DrawQuitPrompt(view, surface);
+	}
 }
 
 }  // namespace client_ui

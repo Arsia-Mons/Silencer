@@ -179,6 +179,7 @@ private:
 	void RenderClientUiFrame(Surface& surface, float frametime);
 	void ResetUiFrameDeltas();
 	void BuildVisibleClientUi(Surface& surface, float frametime);
+	void DrawInGameWorldInsets(Surface& surface, float frametime);
 	Updater updater;
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".

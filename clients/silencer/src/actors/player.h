@@ -17,15 +17,6 @@ class Player;
 class Renderer;
 class Surface;
 class World;
-namespace silencer {
-namespace client_ui {
-class InGameUiController;
-void BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
-void BuildHudSecretProgress(::Surface* surface, ::Player* player, int yoffset, int secretprogress, Uint8 phase);
-int BuildHudTeams(::World& world, ::Surface* surface, Uint8 phase);
-Uint8 BuildHudStatusSprites(::Renderer& renderer, ::World& world, ::Surface* surface, ::Player* player, Uint8 phase);
-}
-}
 
 class Player : public Object
 {
@@ -61,6 +52,14 @@ public:
 	bool CanExhaustInputQueue(World & world, int queuesize);
 	Peer * GetPeer(World & world);
 	void CollectBuyMenuItems(World & world, bool tech, std::vector<BuyableItem *> & items);
+	Uint8 GetState() const { return state; }
+	Uint8 GetStateProgress() const { return state_i; }
+	Uint8 GetTraceTime() const { return tracetime; }
+	Uint16 GetPoisonedBy() const { return poisonedby; }
+	Uint16 GetTeamId() const { return teamid; }
+	void SetTeamId(Uint16 newId) { teamid = newId; }
+	Uint16 GetBaseDoorEntering() const { return basedoorentering; }
+	void SetBaseDoorEntering(Uint16 id) { basedoorentering = id; }
 	enum {INV_NONE, INV_HEALTHPACK, INV_LAZARUSTRACT, INV_SECURITYPASS, INV_VIRUS,
 		INV_POISON, INV_NEUTRONBOMB, INV_EMPBOMB, INV_SHAPEDBOMB, INV_PLASMABOMB, INV_PLASMADET,
 		INV_FIXEDCANNON, INV_FLARE, INV_POISONFLARE, INV_BASEDOOR, INV_CAMERA};
@@ -112,11 +111,6 @@ public:
 	friend class Game;
 	friend class PlayerAI;
 	friend class Projectile;
-	friend class silencer::client_ui::InGameUiController;
-	friend void silencer::client_ui::BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
-	friend void silencer::client_ui::BuildHudSecretProgress(::Surface* surface, ::Player* player, int yoffset, int secretprogress, Uint8 phase);
-	friend int silencer::client_ui::BuildHudTeams(::World& world, ::Surface* surface, Uint8 phase);
-	friend Uint8 silencer::client_ui::BuildHudStatusSprites(::Renderer& renderer, ::World& world, ::Surface* surface, ::Player* player, Uint8 phase);
 
 private:
 	bool CheckForBaseExit(World & world);

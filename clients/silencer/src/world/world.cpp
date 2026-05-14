@@ -1798,6 +1798,11 @@ Peer * World::GetAuthorityPeer(void){
 	return peerlist[authoritypeer];
 }
 
+Peer * World::GetPeer(Uint8 peerid){
+	if(peerid >= maxpeers) return 0;
+	return peerlist[peerid];
+}
+
 Player * World::GetPeerPlayer(Uint8 peerid){
 	Object * object = 0;
 	Player * player = 0;

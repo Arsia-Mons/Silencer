@@ -1,13 +1,18 @@
 #pragma once
 
 class Renderer;
+class Resources;
 class Surface;
-class World;
 
 namespace silencer {
 namespace client_ui {
 
-void BuildInGameOverlaysUi(Renderer& renderer, World& world, Surface* surface);
+struct HudView;
+
+void BuildInGameOverlaysUi(Renderer& renderer,
+                           const Resources& resources,
+                           const HudView& view,
+                           Surface* surface);
 
 }  // namespace client_ui
 }  // namespace silencer

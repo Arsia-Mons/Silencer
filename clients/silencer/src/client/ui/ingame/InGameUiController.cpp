@@ -179,7 +179,7 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 	InGameUiControlResult result;
 	result.mode = mode;
 
-	Player * player = world_.GetPeerPlayer(world_.viewedpeerid);
+	Player * player = world_.GetPeerPlayer(world_.viewedpeerid);  // viewedpeerid is public
 	if(!player){
 		result.error = "no viewed player";
 		return result;
@@ -195,7 +195,7 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 		result.buyActive = player->isbuying;
 		result.techActive = player->techstationactive;
 		result.showChatTicks = world_.showchat_i;
-		result.showPlayerList = world_.showplayerlist;
+		result.showPlayerList = world_.IsShowingPlayerList();
 		result.buyItemCount = static_cast<int>(buyItems.size());
 		result.techItemCount = static_cast<int>(techItems.size());
 		result.buySelectedIndex = player->buyifacelastitem;
@@ -208,7 +208,7 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 		player->isbuying = false;
 		player->techstationactive = false;
 		world_.showchat_i = 0;
-		world_.showplayerlist = false;
+		world_.SetShowingPlayerList(false);
 	};
 
 	if(mode == InGameUiControlMode::Clear){
@@ -232,8 +232,9 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 	}
 	if(mode == InGameUiControlMode::Tech || mode == InGameUiControlMode::All){
 		Team * team = player->GetTeam(world_);
-		if(!team && !world_.objectsbytype[ObjectTypes::TEAM].empty()){
-			team = static_cast<Team *>(world_.GetObjectFromId(world_.objectsbytype[ObjectTypes::TEAM][0]));
+		const std::vector<Uint16> & teams = world_.GetObjectsByType(ObjectTypes::TEAM);
+		if(!team && !teams.empty()){
+			team = static_cast<Team *>(world_.GetObjectFromId(teams[0]));
 		}
 		if(!team){
 			team = static_cast<Team *>(world_.CreateObject(ObjectTypes::TEAM));
@@ -244,14 +245,14 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 			}
 		}
 		if(team){
-			player->teamid = team->id;
-			team->AddPeer(world_.localpeerid);
+			player->SetTeamId(team->id);
+			team->AddPeer(world_.GetLocalPeerId());
 		}
 		BaseDoor * door = nullptr;
 		if(team){
 			team->disabledtech = 0xffffffff;
 			door = static_cast<BaseDoor *>(world_.GetObjectFromId(team->basedoorid));
-			for(Uint16 objectid : world_.objectsbytype[ObjectTypes::BASEDOOR]){
+			for(Uint16 objectid : world_.GetObjectsByType(ObjectTypes::BASEDOOR)){
 				auto * candidate = static_cast<BaseDoor *>(world_.GetObjectFromId(objectid));
 				if(candidate && candidate->teamid == team->id){
 					door = candidate;
@@ -260,7 +261,7 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 			}
 		}
 		if(door){
-			player->basedoorentering = door->id;
+			player->SetBaseDoorEntering(door->id);
 		}
 		if(team){
 			int baseY = ((world_.map.height + 10) * 64) + (team->number * 26 * 64) + 64;
@@ -271,7 +272,7 @@ InGameUiControlResult InGameUiController::ConfigureForControl(InGameUiControlMod
 		player->techifacelastscrolled = 0;
 	}
 	if(mode == InGameUiControlMode::PlayerList || mode == InGameUiControlMode::All){
-		world_.showplayerlist = true;
+		world_.SetShowingPlayerList(true);
 	}
 
 	populate();

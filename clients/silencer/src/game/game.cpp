@@ -26,8 +26,12 @@
 #include "options_display_screen.h"
 #include "options_audio_screen.h"
 #include "lobby_connect_screen.h"
+#include "camera.h"
+#include "detonator.h"
+#include "objecttypes.h"
 #include "client/ui/hud/InGameHud.h"
 #include "client/ui/hud/InGameOverlays.h"
+#include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiAutomationRegistry.h"
 #ifdef SILENCER_HAVE_LOBBY_UI
@@ -397,9 +401,51 @@ Clay_RenderCommandArray Game::EndClientUiFrame() {
 void Game::BuildVisibleClientUi(Surface& surface, float frametime) {
 	clientUi.BuildVisibleScreens(screenContext, surface, frametime);
 	if(world.map.loaded){
-		silencer::client_ui::BuildInGameHudUi(renderer, world, &surface, frametime);
-		silencer::client_ui::BuildInGameOverlaysUi(renderer, world, &surface);
+		// Drive the system-camera insets + minimap blit from Game (renderer
+		// owns world/pixel drawing; HUD owns Clay layout only). Then build
+		// the HUD/overlay Clay declarations from the snapshot view.
+		DrawInGameWorldInsets(surface, frametime);
+		silencer::client_ui::HudView hudView =
+			silencer::client_ui::BuildHudView(world);
+		silencer::client_ui::BuildInGameHudUi(renderer, world.resources, hudView, &surface);
+		silencer::client_ui::BuildInGameOverlaysUi(renderer, world.resources, hudView, &surface);
 	}
+}
+
+void Game::DrawInGameWorldInsets(Surface& surface, float frametime) {
+	Player * localplayer = world.GetPeerPlayer(world.GetLocalPeerId());
+	if(!localplayer) return;
+	Renderer::Rect dstrect;
+	for(int slot = 0; slot < 2; ++slot){
+		if(!world.IsSystemCameraActive(slot)) continue;
+		Surface systemscreen(135, 44, 1);
+		Camera camera(135 * 2, 44 * 2);
+		Object * followobject = world.GetObjectFromId(world.GetSystemCameraFollowId(slot));
+		int px = 0;
+		int py = 0;
+		if(followobject){
+			px = followobject->x + ((followobject->oldx - followobject->x) * frametime);
+			py = followobject->y + ((followobject->oldy - followobject->y) * frametime);
+			if(slot == 1 && followobject->type == ObjectTypes::DETONATOR){
+				Detonator * detonator = static_cast<Detonator*>(followobject);
+				if(detonator->HasDetonated() && py < detonator->lowestypos){
+					py = detonator->lowestypos;
+				}
+			}
+		}
+		camera.Follow(world,
+		              px + world.GetSystemCameraX(slot),
+		              py + world.GetSystemCameraY(slot),
+		              0, 0, 0, 0);
+		renderer.DrawWorldScaled(&systemscreen, camera, 3, frametime);
+		renderer.EffectRampColor(&systemscreen, 0, 190);
+		dstrect.x = (slot == 0) ? 5 : 500;
+		dstrect.y = (slot == 0) ? 349 : 348;
+		Renderer::BlitSurface(&systemscreen, 0, &surface, &dstrect);
+	}
+	dstrect.x = 235;
+	dstrect.y = 419;
+	Renderer::BlitSurface(&world.map.minimap.surface, 0, &surface, &dstrect);
 }
 
 void Game::RenderClientUiFrame(Surface& surface, float frametime) {
