@@ -1,13 +1,5 @@
 #include "game_create_panel.h"
 
-#include "clay/clay.h"
-#include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
-#include "primitives/bank_text.h"
-#include "primitives/bank_button.h"
-#include "primitives/scroll_list.h"
-#include "primitives/text_input.h"
-
 #include "lobby_screen.h"
 #include "screen_context.h"
 #include "game.h"
@@ -17,7 +9,6 @@
 #include "screen.h"
 #include "config.h"
 #include "os.h"
-#include "resources.h"
 #include "map_downloader.h"
 #include "mapfetch.h"
 #include "message_modal.h"
@@ -28,48 +19,10 @@
 #include <thread>
 #include <vector>
 
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonVariant;
-using silencer::ui::primitives::ScrollList;
-using silencer::ui::primitives::ScrollListHandle;
-using silencer::ui::primitives::ScrollListOpts;
-using silencer::ui::primitives::TextInput;
-using silencer::ui::primitives::TextInputHandle;
-using silencer::ui::primitives::TextInputOpts;
-
 namespace silencer::client_ui::lobby {
 
 namespace {
 
-// Legacy on-screen coords kept ONLY for inspector hit-rect registration.
-constexpr int    kYSpace       = 14;
-constexpr int    kRowHeight    = 14;
-constexpr int    kValueX       = 323;
-constexpr int    kFormLeft     = 243;
-constexpr int    kFormTop      = 87;
-constexpr int    kMapListX     = 407;
-constexpr int    kMapListY     = 89;
-constexpr Uint16 kMapListW     = 214;
-constexpr Uint16 kMapListH     = 265;
-constexpr Uint8  kMapListLineH = 14;
-constexpr Uint8  kScrollbarBank = 7;
-constexpr int    kNameInputX = 410, kNameInputY = 375;
-constexpr Uint16 kNameInputW = 210, kNameInputH = 14;
-constexpr int    kPwInputX   = 410, kPwInputY   = 405;
-constexpr Uint16 kPwInputW   = 210, kPwInputH   = 14;
-constexpr int    kCreateBtnX = 436, kCreateBtnY = 430;
-
-constexpr uint16_t kPanelPad        = 6;
-constexpr uint16_t kFormRowH        = 14;
-constexpr uint16_t kFormRowGap      = 3;
-constexpr uint16_t kFormColumnGap   = 6;
-constexpr uint16_t kTallSectionGap  = 4;
-
-constexpr int kMaxMapRows = 1024;
-Clay_String g_mapSlab[kMaxMapRows];
 constexpr const char * kActionSecurity = "lobby.game_create.security";
 constexpr const char * kActionSpectatable = "lobby.game_create.spectatable";
 constexpr const char * kActionCreate = "lobby.game_create.create";
@@ -80,23 +33,6 @@ constexpr const char * kActionMaxPlayers = "lobby.game_create.max_players";
 constexpr const char * kActionMaxTeams = "lobby.game_create.max_teams";
 constexpr const char * kActionName = "lobby.game_create.name";
 constexpr const char * kActionPassword = "lobby.game_create.password";
-
-Clay_String FromCStr(const char * s) {
-	return Clay_String{ false, static_cast<int32_t>(strlen(s)), s };
-}
-
-Clay_String StaticId(const char * s) {
-	return Clay_String{ true, static_cast<int32_t>(strlen(s)), s };
-}
-
-const char * SecurityLabel(Uint8 idx) {
-	switch(idx){
-		case 0:  return "Off";
-		case 1:  return "Low";
-		case 3:  return "High";
-		default: return "Medium";
-	}
-}
 
 bool StartsWith(const std::string & value, const char * prefix) {
 	const size_t n = std::strlen(prefix);
@@ -110,44 +46,6 @@ void CopyUiText(char * dst, int dstLen, const std::string & value)
 	if(n > dstLen - 1) n = dstLen - 1;
 	std::memcpy(dst, value.data(), n);
 	dst[n] = '\0';
-}
-
-void RegisterButton(const char * label, const char * actionId,
-                    int x, int y, int w, int h, bool selected = false) {
-	silencer::ui::automation::Widget reg;
-	reg.id        = actionId;
-	reg.labelText = label;
-	reg.kind      = silencer::ui::automation::WidgetKind::Button;
-	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	reg.selected  = selected;
-	silencer::ui::automation::Register(reg);
-}
-
-void RegisterTextInput(const char * label, const char * actionId,
-                       int x, int y, int w, int h,
-                       char * buf, int cap, bool isPassword = false) {
-	silencer::ui::automation::Widget reg;
-	reg.id            = actionId;
-	reg.labelText     = label;
-	reg.kind          = silencer::ui::automation::WidgetKind::TextInput;
-	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	reg.value         = buf ? buf : "";
-	reg.maxLength     = cap > 0 ? cap - 1 : 0;
-	reg.isPassword    = isPassword;
-	silencer::ui::automation::Register(reg);
-}
-
-void RegisterListRow(const char * label, const std::string & actionId,
-                     int x, int y, int w, int h,
-                     int index, bool selected) {
-	silencer::ui::automation::Widget reg;
-	reg.id         = actionId;
-	reg.labelText  = label ? label : "";
-	reg.kind       = silencer::ui::automation::WidgetKind::ListRow;
-	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	reg.index      = index;
-	reg.selected   = selected;
-	silencer::ui::automation::Register(reg);
 }
 
 void BuildMapList(GameCreatePanelState & state, ScreenContext & ctx) {
@@ -362,182 +260,6 @@ bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
 		return true;
 	}
 	return false;
-}
-
-void BuildGameCreateUpperTree(GameCreatePanelState & state,
-                              Resources & resources) {
-	(void)resources;
-
-	CLAY({ .id = CLAY_ID("GCrtOptionsContent"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
-	           .padding = { kPanelPad, kPanelPad, kPanelPad, kPanelPad },
-	           .childGap = kFormRowGap,
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
-		CLAY({ .id = CLAY_ID("GCrtOptionsTitleWrap") }) {
-			BankText(CLAY_STRING("Game Options"),
-			         BankTextVariant::Heading, {});
-		}
-
-		struct LabelRow { const char * label; const char * id; };
-		constexpr LabelRow kLabels[6] = {
-			{ "Security:",    "GCrtRowSec"   },
-			{ "Min Level:",   "GCrtRowMinL"  },
-			{ "Max Level:",   "GCrtRowMaxL"  },
-			{ "Max Players:", "GCrtRowMaxP"  },
-			{ "Max Teams:",   "GCrtRowMaxT"  },
-			{ "Spectatable:", "GCrtRowSpect" },
-		};
-
-		struct NumInput { const char * id; const char * label; const char * actionId; char * buf; int cap; };
-		NumInput kTextInputs[4] = {
-			{ "GCrtMinLevel",   "Min Level",   kActionMinLevel,   state.minLevel,   (int)sizeof(state.minLevel)   },
-			{ "GCrtMaxLevel",   "Max Level",   kActionMaxLevel,   state.maxLevel,   (int)sizeof(state.maxLevel)   },
-			{ "GCrtMaxPlayers", "Max Players", kActionMaxPlayers, state.maxPlayers, (int)sizeof(state.maxPlayers) },
-			{ "GCrtMaxTeams",   "Max Teams",   kActionMaxTeams,   state.maxTeams,   (int)sizeof(state.maxTeams)   },
-		};
-
-		for(int i = 0; i < 6; ++i){
-			CLAY({ .id = CLAY_SID(StaticId(kLabels[i].id)),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_FIXED(kFormRowH) },
-			           .childGap = kFormColumnGap,
-			           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			       } }) {
-				CLAY({ .id = CLAY_SIDI(CLAY_STRING("GCrtRowLabel"), (uint32_t)i),
-				       .layout = {
-				           .sizing = { CLAY_SIZING_GROW(0),
-				                       CLAY_SIZING_FIXED(kFormRowH) },
-				           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
-				       } }) {
-					BankText(FromCStr(kLabels[i].label),
-					         BankTextVariant::Body, {});
-				}
-				if(i == 0){
-					BankButton(FromCStr(SecurityLabel(state.securityIndex)),
-					           BankButtonVariant::Inline, {},
-					           BankButtonHandle{ nullptr, kActionSecurity });
-					RegisterButton("Security", kActionSecurity,
-					               kValueX, kFormTop + 2, 60, kRowHeight);
-				}else if(i == 5){
-					BankButton(FromCStr(state.spectatable ? "Yes" : "No"),
-					           BankButtonVariant::Inline, {},
-					           BankButtonHandle{ nullptr, kActionSpectatable });
-					RegisterButton("Spectatable", kActionSpectatable,
-					               kValueX, kFormTop + 5*kYSpace + 2, 30, kRowHeight,
-					               state.spectatable);
-				}else{
-					NumInput & ti = kTextInputs[i - 1];
-					TextInputOpts opts;
-					opts.widthPx     = 20;
-					opts.heightPx    = kRowHeight;
-					opts.fontBank    = 133;
-					opts.fontWidth   = 6;
-					opts.brightness  = 128;
-					opts.numbersOnly = true;
-					opts.showCaret   = false;
-					std::string idStr = std::string("Input_") + ti.id;
-					TextInput(Clay_String{ false, (int32_t)idStr.size(), idStr.c_str() },
-					          ti.buf, opts, {});
-					const int y = kFormTop + i * kYSpace + 2;
-					RegisterTextInput(ti.label, ti.actionId,
-					                  kValueX, y, 20, kRowHeight, ti.buf, ti.cap);
-				}
-			}
-		}
-	}
-}
-
-void BuildGameCreateTallTree(GameCreatePanelState & state,
-                             Resources & resources) {
-	(void)resources;
-
-	CLAY({ .id = CLAY_ID("GCrtTallContent"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
-	           .padding = { kPanelPad, kPanelPad, kPanelPad, kPanelPad },
-	           .childGap = kTallSectionGap,
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
-		CLAY({ .id = CLAY_ID("GCrtSelectMapTitleWrap") }) {
-			BankText(CLAY_STRING("Select Map"),
-			         BankTextVariant::Heading, {});
-		}
-
-		const int slotCount = std::min((int)state.maps.size(), kMaxMapRows);
-		for(int i = 0; i < slotCount; ++i){
-			const std::string & raw = state.maps[i];
-			const char * txt = raw.c_str();
-			size_t len = raw.size();
-			if(len >= 5 && std::memcmp(txt, "[DL] ", 5) == 0){ txt += 5; len -= 5; }
-			g_mapSlab[i] = Clay_String{ false, (int32_t)len, txt };
-		}
-		ScrollListOpts listOpts;
-		listOpts.width          = kMapListW;
-		listOpts.height         = kMapListH;
-		listOpts.lineHeight     = kMapListLineH;
-		listOpts.highlightColor = 180;
-		listOpts.textVariant    = BankTextVariant::Body;
-		listOpts.scrollbarBank  = kScrollbarBank;
-		CLAY({ .id = CLAY_ID("GCrtMapListWrap") }) {
-			ScrollList(CLAY_STRING("GCrtMapList"),
-			           g_mapSlab, slotCount,
-			           state.mapSelectedIndex, state.mapScrollPos,
-			           listOpts,
-			           ScrollListHandle{ nullptr, kActionMapPrefix });
-		}
-		for(int i = 0; i < slotCount; ++i){
-			RegisterListRow(g_mapSlab[i].chars,
-			                std::string(kActionMapPrefix) + "." + std::to_string(i),
-			                kMapListX, kMapListY + i * kMapListLineH,
-			                kMapListW, kMapListLineH,
-			                i,
-			                state.mapSelectedIndex == i);
-		}
-
-		CLAY({ .id = CLAY_ID("GCrtNameLabelWrap") }) {
-			BankText(CLAY_STRING("Game name:"),
-			         BankTextVariant::Heading, {});
-		}
-		TextInputOpts bodyInput;
-		bodyInput.widthPx    = kNameInputW;
-		bodyInput.heightPx   = kNameInputH;
-		bodyInput.fontBank   = 133;
-		bodyInput.fontWidth  = 6;
-		bodyInput.brightness = 128;
-		bodyInput.showCaret  = false;
-		CLAY({ .id = CLAY_ID("GCrtNameInputWrap") }) {
-			TextInput(CLAY_STRING("GCrtNameInput"),
-			          state.name, bodyInput, {});
-		}
-		RegisterTextInput("Game name", kActionName,
-		                  kNameInputX, kNameInputY, kNameInputW, kNameInputH,
-		                  state.name, (int)sizeof(state.name));
-
-		CLAY({ .id = CLAY_ID("GCrtPwLabelWrap") }) {
-			BankText(CLAY_STRING("Password (optional):"),
-			         BankTextVariant::Heading, {});
-		}
-		bodyInput.password = true;
-		CLAY({ .id = CLAY_ID("GCrtPwInputWrap") }) {
-			TextInput(CLAY_STRING("GCrtPwInput"),
-			          state.password, bodyInput, {});
-		}
-		RegisterTextInput("Password", kActionPassword,
-		                  kPwInputX, kPwInputY, kPwInputW, kPwInputH,
-		                  state.password, (int)sizeof(state.password), true);
-
-		CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
-		       .layout = { .childAlignment = { .x = CLAY_ALIGN_X_CENTER } } }) {
-			BankButton(CLAY_STRING("Create"),
-			           BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionCreate });
-		}
-		RegisterButton("Create", kActionCreate, kCreateBtnX, kCreateBtnY, 156, 21);
-	}
 }
 
 }  // namespace silencer::client_ui::lobby
