@@ -229,7 +229,10 @@ void Guard::InitBT(){
 
 	btctx_.actions["Patrol"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
-		if(state == STANDING || state == LOOKING){
+		if(state == LOOKING){
+			// Let the LOOKING animation complete; state handler transitions LOOKING→STANDING.
+			return BTResult::Running;
+		} else if(state == STANDING){
 			state = WALKING;
 			state_i = 0;
 		} else if(state == WALKING){
