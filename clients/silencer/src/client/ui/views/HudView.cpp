@@ -240,6 +240,8 @@ void PopulateBuyTech(HudView& out, ::World& world, ::Player* player) {
 
 HudView BuildHudView(const ::World& worldConst) {
 	HudView view;
+	// World::GetPeer and World::GetObjectFromId are not yet const-correct;
+	// the access here remains read-only. Drop the cast once those getters are.
 	::World& world = const_cast<::World&>(worldConst);
 
 	view.mapLoaded = world.map.loaded;
