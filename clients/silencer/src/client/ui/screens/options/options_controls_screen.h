@@ -20,33 +20,8 @@ public:
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
-	// Two-key view of an action's bindings. The on-disk model is
-	// OR-of-AND with arbitrary list size; the UI shows a fixed
-	// primary/secondary slot pair plus an OR/AND toggle. The two
-	// helpers round-trip the shapes losslessly:
-	//
-	//   bindings = []                 → key1=UNK, key2=UNK
-	//   bindings = [[k1]]             → key1=k1,  key2=UNK
-	//   bindings = [[k1], [k2]]       → key1=k1,  key2=k2,  AND=false
-	//   bindings = [[k1, k2]]         → key1=k1,  key2=k2,  AND=true
-	//
-	// CLI-set bindings of other shapes (mouse, gamepad, >2 keys) survive
-	// a render but get clobbered on UI edit. Power-users use the CLI.
-	struct LegacyView {
-		SDL_Scancode key1 = SDL_SCANCODE_UNKNOWN;
-		SDL_Scancode key2 = SDL_SCANCODE_UNKNOWN;
-		bool         and_ = false;
-	};
-	static LegacyView ViewLegacy(const KeyMap & km, Action a);
-	static void WriteLegacy(KeyMap & km, Action a, SDL_Scancode key1, SDL_Scancode key2, bool and_);
-
-	// Display label for the slot-th binding of an action. Handles
-	// keyboard, gamepad button, and gamepad axis bindings — keyboard-only
-	// rendering would show "(unbound)" for any pad-rebound action.
-	std::string GetBindingLabel(ScreenContext & ctx, Action a, int slot) const;
-
-	void FinishKeyboardRebind(ScreenContext & ctx, SDL_Scancode sym);
-	void FinishBindingRebind(ScreenContext & ctx, const silencer::ui::UiBindingInput & input);
+	// Two-slot rebind state machine + label resolution lives in
+	// controls_rebind_capture.{h,cpp}; these stay as the per-frame state.
 	void BeginRebindFromVisibleRow(int row, int slot);
 	void ToggleOperatorFromVisibleRow(int row);
 	int MaxScroll() const;
