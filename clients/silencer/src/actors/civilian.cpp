@@ -112,32 +112,49 @@ void Civilian::InitBT(){
 
 	// RunMove: flee from nearby players who are actively firing; do RUNNING movement;
 	// return to WALKING after runDurationTicks. Returns Running while running, Failure otherwise.
+	// RunMove: detect nearby shooting players → flee at running speed for runDurationTicks.
+	// Matches original state machine 1:1:
+	//   - WALKING: if threat nearby, transition to RUNNING and return immediately
+	//     (state_i=-1=255 as Uint8; Tick's state_i++ wraps to 0 so first RUNNING tick starts clean)
+	//   - RUNNING: update flee direction each tick, move at run speed, exit after runDurationTicks
 	btctx_.actions["RunMove"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
 		const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
-		// Scan for nearby players with weaponfirecool > 0 (they fired recently).
-		// This is reliable: player persists in tobjectlist and weaponfirecool stays set
-		// for fireDelay ticks after a shot, unlike fast projectiles that move through
-		// the detection radius within a single tick.
-		if(state == WALKING || state == RUNNING){
-			std::vector<Uint8> types = { ObjectTypes::PLAYER };
-			int dx = cd ? cd->threatDetectX : 200;
-			int dy = cd ? cd->threatDetectY : 100;
-			std::vector<Object*> players = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
+		int dx = cd ? cd->threatDetectX : 200;
+		int dy = cd ? cd->threatDetectY : 100;
+		std::vector<Uint8> ptypes = { ObjectTypes::PLAYER };
+
+		if(state == WALKING){
+			// Scan for nearby players who are actively firing.
+			std::vector<Object*> players = world.TestAABB(x - dx, y - dy, x + dx, y + dy, ptypes);
 			for(Object* obj : players){
 				Player* player = static_cast<Player*>(obj);
 				if(player->IsShooting()){
-					mirrored = (player->x > x);
-					if(state != RUNNING){ state = RUNNING; state_i = -1; }
-					break;
+					mirrored = (player->x > x); // flee away from shooter
+					state = RUNNING;
+					state_i = (Uint8)-1; // Tick++ wraps to 0; first RUNNING tick is clean
+					return BTResult::Running; // skip duration check this tick
 				}
 			}
+			return BTResult::Failure;
 		}
+
 		if(state != RUNNING) return BTResult::Failure;
-		// Exit RUNNING after runDurationTicks
+
+		// Update flee direction while running (matches original Look() during RUNNING).
+		{
+			std::vector<Object*> players = world.TestAABB(x - dx, y - dy, x + dx, y + dy, ptypes);
+			for(Object* obj : players){
+				Player* player = static_cast<Player*>(obj);
+				if(player->IsShooting()){ mirrored = (player->x > x); break; }
+			}
+		}
+
+		// Exit RUNNING after runDurationTicks.
 		int runDuration = cd ? cd->runDurationTicks : 150;
-		if(state_i >= runDuration){ state = WALKING; state_i = -1; return BTResult::Failure; }
-		// RUNNING movement
+		if(state_i >= runDuration){ state = WALKING; state_i = (Uint8)-1; return BTResult::Failure; }
+
+		// RUNNING movement and animation.
 		int bonus = cd ? cd->runSpeedBonus : 5;
 		xv = (mirrored ? -1 : 1) * (bonus + speed);
 		res_bank = 123; res_index = state_i % 15;
