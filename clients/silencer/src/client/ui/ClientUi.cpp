@@ -1,5 +1,6 @@
 #include "client/ui/ClientUi.h"
 
+#include "client/ui/hud/HudPayloadArena.h"
 #include "screen.h"
 #include "screen_context.h"
 #include "runtime/UiInputRouter.h"
@@ -16,6 +17,7 @@ ClientUi::~ClientUi() = default;
 
 void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	frameCtx_.BeginFrame();
+	silencer::client_ui::HudPayloadBeginFrame();
 	clay_.BeginFrame(input, automation_);
 }
 

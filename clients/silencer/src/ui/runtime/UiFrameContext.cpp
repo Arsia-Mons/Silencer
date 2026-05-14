@@ -7,7 +7,6 @@
 #include "ui/primitives/scroll_text_box.h"
 #include "ui/primitives/text_input.h"
 #include "ui/primitives/toggle.h"
-#include "client/ui/hud/HudPayloadArena.h"
 
 namespace silencer {
 namespace ui {
@@ -23,7 +22,6 @@ void UiFrameContext::BeginFrame() {
 	silencer::ui::primitives::ScrollTextBoxBeginFrame();
 	silencer::ui::primitives::TextInputBeginFrame();
 	silencer::ui::primitives::ToggleBeginFrame();
-	silencer::client_ui::HudPayloadBeginFrame();
 }
 
 }  // namespace ui
