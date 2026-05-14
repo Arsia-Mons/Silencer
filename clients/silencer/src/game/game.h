@@ -15,6 +15,8 @@
 #include "ambience_mixer.h"
 #include "client/ui/ClayBridgeFrameBackend.h"
 #include "client/ui/ClientUi.h"
+#include "client/ui/ClientUiInput.h"
+#include "client/ui/ingame/InGameUiController.h"
 #include "clay/clay.h"
 #include "ui/runtime/UiInputState.h"
 #include <array>
@@ -49,11 +51,40 @@ public:
 	// LobbyScreen::ShowGameCreate from a CLI op when there's no widget
 	// path to drive the click). Game-thread only.
 	ScreenContext& GetScreenContext() { return screenContext; }
-	nlohmann::json GetWorldSummary();
-	nlohmann::json ConfigureInGameUiForControl(const std::string& mode);
+	struct WorldPeerSummary {
+		int id = 0;
+		unsigned int accountId = 0;
+		bool observer = false;
+		bool disconnected = false;
+		std::vector<int> controlledList;
+	};
+	struct WorldPlayerSummary {
+		int id = 0;
+		int hp = 0;
+		int x = 0;
+		int y = 0;
+	};
+	struct WorldSummary {
+		std::string map;
+		int peers = 0;
+		int localPeerId = 0;
+		int viewedPeerId = 0;
+		int authorityPeer = 0;
+		unsigned int lobbyAccountId = 0;
+		bool isLocalObserver = false;
+		bool spectatorInitialized = false;
+		bool spectatorFreecam = false;
+		std::vector<WorldPeerSummary> peerList;
+		std::vector<WorldPlayerSummary> players;
+		int objectsCount = 0;
+	};
+	WorldSummary GetWorldSummary();
 	const Surface& GetScreenBuffer() const { return screenbuffer; }
 	const SDL_Color* GetPaletteColors() const { return palettecolors; }
 	Renderer& GetRenderer() { return renderer; }
+	silencer::client_ui::ClientUiInput& UiInput() { return clientUiInput; }
+	const silencer::client_ui::ClientUiInput& UiInput() const { return clientUiInput; }
+	silencer::client_ui::InGameUiController& InGameUi() { return inGameUiController; }
 	bool ResizeRenderSurface(int width, int height);
 	bool IsLiveMultiplayer() const;
 	bool GoBack(void);
@@ -86,8 +117,6 @@ public:
 	void ReplaceScreen(std::unique_ptr<Screen> s);
 	Screen * GetTopScreen() const;
 	bool HasUiInputTarget();
-	void QueueUiTextInput(char ascii);
-	void QueueUiNavAction(silencer::ui::UiNavAction action);
 
 	// Keybind access for ControlDispatch.
 	KeyMap& GetKeyMap() { return keymap; }
@@ -132,6 +161,7 @@ private:
 	// debug toggles, etc. working identically in both paths.
 	void OnScancodeDown(int scancode);
 	void OnScancodeUp(int scancode);
+	void QueueUiKeyboardInputForScancode(int scancode);
 	static Uint32 TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval);
 	void SetColors(SDL_Color * colors);
 	void UpdateInputState(Input & input);
@@ -140,21 +170,15 @@ private:
 	bool CheckForQuit(void);
 	bool CheckForEndOfGame(void);
 	bool CheckForConnectionLost(void);
-	void UpdateInGameOverlayState(void);
 	void ShowDeployMessage(void);
 	void GiveDefaultItems(Player & player);
 	void GoToState(Uint8 newstate);
-	void AddUiWheelDelta(float x, float y);
-	void AddUiRawKeyDown(int keyCode);
-	void QueueUiPointerWindowEvent(float windowX, float windowY, bool pressed, bool released);
 	void PrepareClientUiFrame(Surface& surface);
 	void BeginPreparedClientUiFrame();
 	Clay_RenderCommandArray EndClientUiFrame();
 	void RenderClientUiFrame(Surface& surface, float frametime);
 	void ResetUiFrameDeltas();
 	void BuildVisibleClientUi(Surface& surface, float frametime);
-	silencer::ui::UiInputState BuildUiInputState(Surface& surface);
-	bool DispatchInGameUiActions(const std::vector<silencer::ui::UiAction>& actions);
 	Updater updater;
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".
@@ -179,19 +203,10 @@ private:
 	silencer::client_ui::ClayBridgeFrameBackend uiClayBackend;
 	silencer::ui::ClayService uiClayService;
 	silencer::client_ui::ClientUi clientUi;
+	silencer::client_ui::ClientUiInput clientUiInput;
+	silencer::client_ui::InGameUiController inGameUiController;
 	silencer::ui::UiInputState preparedUiInput;
 	bool hasPreparedUiInput = false;
-	float uiWheelX = 0.0f;
-	float uiWheelY = 0.0f;
-	std::string uiTextInput;
-	std::vector<silencer::ui::UiNavAction> uiNavActions;
-	std::vector<int> uiRawKeyDownCodes;
-	bool uiPointerPressed = false;
-	bool uiPointerReleased = false;
-	bool uiHavePointerPosition = false;
-	float uiPointerX = 0.0f;
-	float uiPointerY = 0.0f;
-	bool uiPointerWasDown = false;
 	int frames;
 	int fps;
 	Uint64 lasttick;

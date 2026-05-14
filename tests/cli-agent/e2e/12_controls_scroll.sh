@@ -31,6 +31,32 @@ for (const label of ["Preset", "Scroll Down", "Cancel"]) {
 }
 '
 
+primary="$(cli --port "$PORT" inspect | bun -e '
+const text = await new Response(Bun.stdin.stream()).text();
+const response = JSON.parse(text);
+const widget = (response.widgets ?? []).find((w) => w.id === "options_controls.primary.0");
+if (!widget) {
+  console.error("missing primary binding widget");
+  process.exit(1);
+}
+console.log(`${Math.floor(widget.x + widget.w / 2)} ${Math.floor(widget.y + widget.h / 2)}`);
+')"
+read -r primary_x primary_y <<< "$primary"
+cli --port "$PORT" click_at --x "$primary_x" --y "$primary_y" >/dev/null
+cli --port "$PORT" wait_frames --n 1 >/dev/null
+cli --port "$PORT" key --key x >/dev/null
+cli --port "$PORT" wait_frames --n 2 >/dev/null
+cli --port "$PORT" keybind get --action move_up | bun -e '
+const text = await new Response(Bun.stdin.stream()).text();
+const response = JSON.parse(text);
+const result = response.result ?? response;
+const bindings = JSON.stringify(result.bindings ?? []);
+if (!bindings.includes("KEY:X")) {
+  console.error(`controls rebind did not capture KEY:X: ${bindings}`);
+  process.exit(1);
+}
+'
+
 before="$OUT_DIR/controls-before.png"
 after="$OUT_DIR/controls-after.png"
 cli --port "$PORT" screenshot --out "$before" >/dev/null

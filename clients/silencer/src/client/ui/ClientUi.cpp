@@ -47,20 +47,17 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 	ScreenContext& ctx,
 	const silencer::ui::UiInputState& input) {
 	Screen * top = screens_.Top();
-	if(top){
-		bool capturedRawKey = false;
-		for(int keyCode : input.rawKeyDownCodes){
-			if(top->CaptureRawKeyDown(ctx, keyCode)) capturedRawKey = true;
-		}
-		if(capturedRawKey) return std::vector<silencer::ui::UiAction>();
-	}
-
 	silencer::ui::UiInputRouter router(automation_);
 	std::vector<silencer::ui::UiAction> actions = router.Route(input);
 	if(!top) return actions;
 	std::vector<silencer::ui::UiAction> unhandled;
 	for(const silencer::ui::UiAction& action : actions){
-		if(top && top->HandleUiIntent(ctx, action)) continue;
+		if(top && top->HandleUiIntent(ctx, action)){
+			if(action.kind == silencer::ui::UiActionKind::CaptureBinding){
+				return std::vector<silencer::ui::UiAction>();
+			}
+			continue;
+		}
 		unhandled.push_back(action);
 	}
 	return unhandled;

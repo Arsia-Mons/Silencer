@@ -40,6 +40,17 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
+  'nlohmann::json|#include[[:space:]]*[<"]nlohmann/json[.]hpp[>"]' \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime" \
+  --glob '!third_party/**'
+
+fail_if_match \
+  'nlohmann::json[[:space:]]+(Game::)?GetWorldSummary|nlohmann::json[[:space:]]+(InGameUiController::)?ConfigureForControl' \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**'
+
+fail_if_match \
   '#include "(game|world|player|lobby|lobbygame|team|buyableitem|weapon|renderer|surface)[.]h"' \
   "$REPO_ROOT/clients/silencer/src/ui" \
   --glob '!third_party/**'
@@ -85,6 +96,18 @@ fail_if_match \
 fail_if_match \
   "DispatchInGameUiInput|Clay_OnHover" \
   "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**'
+
+fail_if_match \
+  "rawKeyDownCodes|CaptureRawKeyDown|BuildUiInputState|QueueUiTextInput|QueueUiNavAction|AddUiRawKeyDown|AddUiWheelDelta|QueueUiPointerWindowEvent|DispatchInGameUiActions|ConfigureInGameUiForControl" \
+  "$REPO_ROOT/clients/silencer/src" \
+  "$REPO_ROOT/tests/ui_architecture_test.cpp" \
+  --glob '!third_party/**'
+
+fail_if_match \
+  "automation::(QueueAction|InvokeAt|DispatchTextInput|BackspaceFocusedText|SubmitFocusedText|CancelFocused|ActivateFocused)" \
+  "$REPO_ROOT/clients/silencer/src" \
+  "$REPO_ROOT/tests/ui_architecture_test.cpp" \
   --glob '!third_party/**'
 
 fail_if_match \

@@ -486,6 +486,11 @@ bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui:
 	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText &&
 	   (action.id == kActionUsername || action.id == kActionPassword)){
+		if(action.id == kActionUsername){
+			CopyUiText(username, static_cast<int>(sizeof(username)), action.value);
+		}else{
+			CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
+		}
 		loginClicked = true;
 		return true;
 	}

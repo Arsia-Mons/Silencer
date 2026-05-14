@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "runtime/UiActionQueue.h"
+
 namespace silencer {
 namespace ui {
 
@@ -37,7 +39,8 @@ struct UiInputState {
 	UiPointerState pointer;
 	std::string textInput;
 	std::vector<UiNavAction> navActions;
-	std::vector<int> rawKeyDownCodes;
+	std::vector<UiBindingInput> bindingInputs;
+	std::vector<UiAutomationCommand> automationCommands;
 
 	bool HasWindow() const { return width > 0 && height > 0; }
 };

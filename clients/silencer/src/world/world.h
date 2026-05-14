@@ -29,6 +29,7 @@ class Player;
 class Team;
 namespace silencer {
 namespace client_ui {
+class InGameUiController;
 class InGameOverlayRenderer;
 void BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
 void BuildInGameOverlaysUi(::Renderer& renderer, ::World& world, ::Surface* surface);
@@ -167,6 +168,7 @@ public:
 	friend class Replay;
 	friend class Audio;
 	friend class TriggerGraph;
+	friend class silencer::client_ui::InGameUiController;
 	friend class silencer::client_ui::InGameOverlayRenderer;
 	friend void silencer::client_ui::BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
 	friend void silencer::client_ui::BuildInGameOverlaysUi(::Renderer& renderer, ::World& world, ::Surface* surface);

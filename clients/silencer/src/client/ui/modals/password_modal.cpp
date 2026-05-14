@@ -158,8 +158,12 @@ bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAc
 		CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
 		return true;
 	}
-	if((action.kind == silencer::ui::UiActionKind::SubmitText && action.id == kActionPassword) ||
-	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == kActionOk)){
+	if(action.kind == silencer::ui::UiActionKind::SubmitText && action.id == kActionPassword){
+		CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
+		okClicked = true;
+		return true;
+	}
+	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == kActionOk){
 		okClicked = true;
 		return true;
 	}

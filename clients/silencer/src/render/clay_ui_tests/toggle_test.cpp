@@ -18,6 +18,7 @@
 #include "clay/clay.h"
 #include "primitives/toggle.h"
 #include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInputRouter.h"
 
 #include "game.h"
 #include "palette.h"
@@ -25,6 +26,7 @@
 #include "surface.h"
 
 #include <cstring>
+#include <vector>
 
 namespace silencer::clay_bridge {
 
@@ -133,10 +135,21 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
 		silencer::ui::ActiveUiAutomationRegistry().ResolveClayBoundsFromClay();
+		std::vector<silencer::ui::UiAction> actions;
 		if(pressed){
-			silencer::ui::automation::InvokeAt(static_cast<int>(px), static_cast<int>(py));
+			silencer::ui::UiInputState input;
+			input.width = W;
+			input.height = H;
+			input.pointer.x = px;
+			input.pointer.y = py;
+			input.pointer.down = down;
+			input.pointer.pressed = true;
+			silencer::ui::UiInputRouter router(silencer::ui::ActiveUiAutomationRegistry());
+			actions = router.Route(input);
+		}else{
+			actions = silencer::ui::automation::DrainActions();
 		}
-		for(const auto & action : silencer::ui::automation::DrainActions()){
+		for(const auto & action : actions){
 			if(action.kind != silencer::ui::UiActionKind::Activate) continue;
 			if(action.id == "test.toggle.0") counts[0]++;
 			else if(action.id == "test.toggle.1") counts[1]++;

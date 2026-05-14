@@ -1,7 +1,9 @@
 #include "doctest.h"
 
 #include "client/ui/ClientUi.h"
+#include "client/ui/ClientUiInput.h"
 #include "ui/runtime/ClayService.h"
+#include "ui/runtime/UiInputRouter.h"
 
 #include <sstream>
 #include <string>
@@ -169,4 +171,77 @@ TEST_CASE("UiAutomationRegistry edits focused text through typed methods") {
 	CHECK(actions[0].kind == silencer::ui::UiActionKind::SubmitText);
 	CHECK(actions[0].id == "profile.name");
 	CHECK(actions[0].value == "ab");
+}
+
+TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
+	silencer::client_ui::ClientUiInput input;
+	input.QueuePointerWindowEvent(50.0f, 25.0f, 200, 100, 640, 480, true, false);
+	input.AddWheelDelta(0.0f, -3.0f);
+	input.QueueTextInput('x');
+	input.QueueNavAction(silencer::ui::UiNavAction::Confirm);
+	input.QueueBindingKeyDown(44);
+
+	silencer::ui::UiAction action;
+	action.kind = silencer::ui::UiActionKind::Activate;
+	action.id = "main_menu.connect";
+	input.QueueAutomationAction(action);
+
+	auto frame = input.BuildFrame(640, 480, 0.0f);
+	CHECK(frame.pointer.x == 160.0f);
+	CHECK(frame.pointer.y == 120.0f);
+	CHECK(frame.pointer.down);
+	CHECK(frame.pointer.pressed);
+	CHECK(frame.pointer.wheelY == -3.0f);
+	CHECK(frame.textInput == "x");
+	REQUIRE(frame.navActions.size() == 1);
+	CHECK(frame.navActions[0] == silencer::ui::UiNavAction::Confirm);
+	REQUIRE(frame.bindingInputs.size() == 1);
+	CHECK(frame.bindingInputs[0].code == 44);
+	REQUIRE(frame.automationCommands.size() == 1);
+	CHECK(frame.automationCommands[0].action.id == "main_menu.connect");
+
+	input.EndFrame();
+	frame = input.BuildFrame(640, 480, 1.0f / 60.0f);
+	CHECK(frame.pointer.down);
+	CHECK(!frame.pointer.pressed);
+	CHECK(frame.pointer.wheelY == 0.0f);
+	CHECK(frame.textInput.empty());
+	CHECK(frame.navActions.empty());
+	CHECK(frame.bindingInputs.empty());
+	CHECK(frame.automationCommands.empty());
+}
+
+TEST_CASE("UiInputRouter routes automation commands and binding capture through typed actions") {
+	silencer::ui::UiAutomationRegistry registry;
+	registry.BeginFrame();
+
+	silencer::ui::UiAutomationWidget widget;
+	widget.id = "main_menu.connect";
+	widget.labelText = "Connect";
+	widget.kind = silencer::ui::UiAutomationWidgetKind::Button;
+	widget.x = 10;
+	widget.y = 20;
+	widget.w = 80;
+	widget.h = 30;
+	registry.RegisterWidget(widget);
+
+	silencer::ui::UiInputState input;
+	silencer::ui::UiAutomationCommand click;
+	click.kind = silencer::ui::UiAutomationCommandKind::InvokeAt;
+	click.x = 12;
+	click.y = 22;
+	input.automationCommands.push_back(click);
+
+	silencer::ui::UiBindingInput binding;
+	binding.kind = silencer::ui::UiBindingInputKind::KeyboardKeyDown;
+	binding.code = 44;
+	input.bindingInputs.push_back(binding);
+
+	silencer::ui::UiInputRouter router(registry);
+	auto actions = router.Route(input);
+	REQUIRE(actions.size() == 2);
+	CHECK(actions[0].kind == silencer::ui::UiActionKind::Activate);
+	CHECK(actions[0].id == "main_menu.connect");
+	CHECK(actions[1].kind == silencer::ui::UiActionKind::CaptureBinding);
+	CHECK(actions[1].binding.code == 44);
 }

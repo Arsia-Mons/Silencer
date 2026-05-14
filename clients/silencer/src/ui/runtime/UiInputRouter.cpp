@@ -28,10 +28,26 @@ UiInputRouter::UiInputRouter(UiAutomationRegistry& registry)
 	: registry_(registry) {}
 
 std::vector<UiAction> UiInputRouter::Route(const UiInputState& input) {
+	for(const UiAutomationCommand& command : input.automationCommands){
+		if(command.kind == UiAutomationCommandKind::InvokeAt){
+			registry_.InvokeAt(command.x, command.y);
+		}else{
+			registry_.QueueAction(command.action);
+		}
+	}
+
 	if(input.pointer.pressed){
 		registry_.InvokeAt(
 			static_cast<int>(input.pointer.x),
 			static_cast<int>(input.pointer.y));
+	}
+
+	for(const UiBindingInput& binding : input.bindingInputs){
+		UiAction action;
+		action.kind = UiActionKind::CaptureBinding;
+		action.id = "ui.capture_binding";
+		action.binding = binding;
+		registry_.QueueAction(action);
 	}
 
 	for(char ascii : input.textInput){

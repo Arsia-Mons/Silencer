@@ -10,6 +10,7 @@
 #include "runtime/UiAutomationRegistry.h"
 #include "screen.h"
 #include "password_modal.h"
+#include <SDL3/SDL_keyboard.h>
 #ifdef SILENCER_HAVE_LOBBY_UI
 #include "lobby_screen.h"
 #endif
@@ -70,6 +71,119 @@ static ControlReply Err(int id, const char* code, const std::string& msg){
 	return rpl;
 }
 
+static const char * ModeName(silencer::client_ui::InGameUiControlMode mode){
+	using Mode = silencer::client_ui::InGameUiControlMode;
+	switch(mode){
+		case Mode::Clear: return "clear";
+		case Mode::Status: return "status";
+		case Mode::Chat: return "chat";
+		case Mode::Buy: return "buy";
+		case Mode::Tech: return "tech";
+		case Mode::PlayerList: return "playerlist";
+		case Mode::All: return "all";
+	}
+	return "status";
+}
+
+static bool ParseMode(
+	const std::string& value,
+	silencer::client_ui::InGameUiControlMode& mode){
+	using Mode = silencer::client_ui::InGameUiControlMode;
+	if(value == "clear"){
+		mode = Mode::Clear;
+		return true;
+	}
+	if(value == "status"){
+		mode = Mode::Status;
+		return true;
+	}
+	if(value == "chat"){
+		mode = Mode::Chat;
+		return true;
+	}
+	if(value == "buy"){
+		mode = Mode::Buy;
+		return true;
+	}
+	if(value == "tech"){
+		mode = Mode::Tech;
+		return true;
+	}
+	if(value == "playerlist"){
+		mode = Mode::PlayerList;
+		return true;
+	}
+	if(value == "all"){
+		mode = Mode::All;
+		return true;
+	}
+	return false;
+}
+
+static nlohmann::json InGameUiControlResultToJson(
+	const silencer::client_ui::InGameUiControlResult& result){
+	nlohmann::json r;
+	r["mode"] = ModeName(result.mode);
+	r["ok"] = result.available;
+	if(!result.available){
+		if(!result.error.empty()) r["error"] = result.error;
+		return r;
+	}
+	if(result.mode == silencer::client_ui::InGameUiControlMode::Clear){
+		return r;
+	}
+	r["chat_active"] = result.chatActive;
+	r["buy_active"] = result.buyActive;
+	r["tech_active"] = result.techActive;
+	r["show_chat_ticks"] = result.showChatTicks;
+	r["show_player_list"] = result.showPlayerList;
+	r["buy_item_count"] = result.buyItemCount;
+	r["tech_item_count"] = result.techItemCount;
+	r["buy_selected_index"] = result.buySelectedIndex;
+	r["tech_selected_index"] = result.techSelectedIndex;
+	return r;
+}
+
+static nlohmann::json WorldSummaryToJson(const Game::WorldSummary& summary){
+	nlohmann::json r;
+	r["map"] = summary.map;
+	r["peers"] = summary.peers;
+	r["localpeerid"] = summary.localPeerId;
+	r["viewedpeerid"] = summary.viewedPeerId;
+	r["authoritypeer"] = summary.authorityPeer;
+	r["lobby_accountid"] = summary.lobbyAccountId;
+	r["is_local_observer"] = summary.isLocalObserver;
+	r["spectator_initialized"] = summary.spectatorInitialized;
+	r["spectator_freecam"] = summary.spectatorFreecam;
+
+	nlohmann::json peerlist = nlohmann::json::array();
+	for(const Game::WorldPeerSummary& peer : summary.peerList){
+		nlohmann::json p;
+		p["id"] = peer.id;
+		p["accountid"] = peer.accountId;
+		p["observer"] = peer.observer;
+		p["disconnected"] = peer.disconnected;
+		nlohmann::json controlled = nlohmann::json::array();
+		for(int id : peer.controlledList) controlled.push_back(id);
+		p["controlledlist"] = controlled;
+		peerlist.push_back(std::move(p));
+	}
+	r["peerlist"] = peerlist;
+
+	nlohmann::json players = nlohmann::json::array();
+	for(const Game::WorldPlayerSummary& player : summary.players){
+		nlohmann::json p;
+		p["id"] = player.id;
+		p["hp"] = player.hp;
+		p["x"] = player.x;
+		p["y"] = player.y;
+		players.push_back(std::move(p));
+	}
+	r["players"] = players;
+	r["objects_count"] = summary.objectsCount;
+	return r;
+}
+
 static bool LabelEquals(const char * a, const char * b){
 	if(!a || !b) return false;
 	while(*a && *b){
@@ -100,7 +214,30 @@ static const silencer::ui::automation::Widget * FindWidgetTarget(const std::stri
 	return count == 1 ? hit : nullptr;
 }
 
-static void QueueWidgetAction(const silencer::ui::automation::Widget& widget,
+static bool PointInWidget(const silencer::ui::automation::Widget& widget, int x, int y){
+	return x >= widget.x && y >= widget.y
+	    && x < widget.x + widget.w && y < widget.y + widget.h;
+}
+
+static bool IsInteractiveWidget(const silencer::ui::automation::Widget& widget){
+	using K = silencer::ui::automation::WidgetKind;
+	return !widget.inactive &&
+	       (widget.kind == K::Button ||
+	        widget.kind == K::Toggle ||
+	        widget.kind == K::ListRow ||
+	        widget.kind == K::TextInput);
+}
+
+static const silencer::ui::automation::Widget * FindWidgetAt(int x, int y){
+	const auto & widgets = silencer::ui::automation::All();
+	for(auto it = widgets.rbegin(); it != widgets.rend(); ++it){
+		if(IsInteractiveWidget(*it) && PointInWidget(*it, x, y)) return &*it;
+	}
+	return nullptr;
+}
+
+static void QueueWidgetAction(Game& game,
+                              const silencer::ui::automation::Widget& widget,
                               silencer::ui::UiActionKind kind,
                               const std::string & value = std::string(),
                               int amount = 0){
@@ -112,38 +249,52 @@ static void QueueWidgetAction(const silencer::ui::automation::Widget& widget,
 	action.value = value;
 	action.index = widget.index;
 	action.amount = amount;
-	silencer::ui::automation::QueueAction(std::move(action));
+	game.UiInput().QueueAutomationAction(std::move(action));
 }
 
 static bool QueueControlKey(Game& game, int ascii){
 	switch(ascii){
 		case 1:
-			game.QueueUiNavAction(silencer::ui::UiNavAction::Left);
+			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_LEFT);
+			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Left);
 			return true;
 		case 2:
-			game.QueueUiNavAction(silencer::ui::UiNavAction::Right);
+			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_RIGHT);
+			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Right);
 			return true;
 		case 3:
-			game.QueueUiNavAction(silencer::ui::UiNavAction::Up);
+			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_UP);
+			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Up);
 			return true;
 		case 4:
-			game.QueueUiNavAction(silencer::ui::UiNavAction::Down);
+			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_DOWN);
+			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Down);
 			return true;
 		case '\t':
-			game.QueueUiNavAction(silencer::ui::UiNavAction::FocusNext);
+			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_TAB);
+			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::FocusNext);
 			return true;
 		case '\n':
-			game.QueueUiNavAction(silencer::ui::UiNavAction::Confirm);
+			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_RETURN);
+			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Confirm);
 			return true;
 		case 0x1B:
-			game.QueueUiNavAction(silencer::ui::UiNavAction::Cancel);
+			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_ESCAPE);
+			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Cancel);
 			return true;
 		case '\b':
-			game.QueueUiNavAction(silencer::ui::UiNavAction::Backspace);
+			game.UiInput().QueueBindingKeyDown(SDL_SCANCODE_BACKSPACE);
+			game.UiInput().QueueNavAction(silencer::ui::UiNavAction::Backspace);
 			return true;
 		default:
 			if(ascii >= 0x20 && ascii <= 0x7E){
-				game.QueueUiTextInput(static_cast<char>(ascii));
+				SDL_Keymod mod = SDL_KMOD_NONE;
+				SDL_Scancode scancode =
+					SDL_GetScancodeFromKey(static_cast<SDL_Keycode>(ascii), &mod);
+				if(scancode != SDL_SCANCODE_UNKNOWN){
+					game.UiInput().QueueBindingKeyDown(scancode);
+				}
+				game.UiInput().QueueTextInput(static_cast<char>(ascii));
 				return true;
 			}
 			return false;
@@ -597,7 +748,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		return;
 	}
 	if(cmd.op == "world_state"){
-		cmd.reply->set_value(OkResult(cmd.id, game.GetWorldSummary()));
+		cmd.reply->set_value(OkResult(cmd.id, WorldSummaryToJson(game.GetWorldSummary())));
 		return;
 	}
 	if(cmd.op == "show_password_modal"){
@@ -619,18 +770,22 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	}
 	if(cmd.op == "ingame_ui_mode"){
 		std::string mode = cmd.args.value("mode", std::string());
-		if(mode.empty()){
+		silencer::client_ui::InGameUiControlMode controlMode;
+		if(mode.empty() || !ParseMode(mode, controlMode)){
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST",
 				"ingame_ui_mode needs --mode clear|status|chat|buy|tech|playerlist|all"));
 			return;
 		}
-		nlohmann::json r = game.ConfigureInGameUiForControl(mode);
-		if(!r.value("ok", false)){
+		silencer::client_ui::InGameUiControlResult result =
+			game.InGameUi().ConfigureForControl(controlMode);
+		if(!result.available){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE",
-				r.value("error", std::string("in-game UI mode unavailable"))));
+				result.error.empty()
+					? std::string("in-game UI mode unavailable")
+					: result.error));
 			return;
 		}
-		cmd.reply->set_value(OkResult(cmd.id, r));
+		cmd.reply->set_value(OkResult(cmd.id, InGameUiControlResultToJson(result)));
 		return;
 	}
 	if(cmd.op == "click"){
@@ -645,7 +800,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		if(cw){
 			using K = silencer::ui::automation::WidgetKind;
 			if(cw->kind == K::Button || cw->kind == K::Toggle){
-				QueueWidgetAction(*cw, silencer::ui::UiActionKind::Activate,
+				QueueWidgetAction(game, *cw, silencer::ui::UiActionKind::Activate,
 				                  WidgetLabel(*cw) ? WidgetLabel(*cw) : "");
 				nlohmann::json r;
 				r["source"] = "clay";
@@ -653,7 +808,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				return;
 			}
 			if(cw->kind == K::ListRow){
-				QueueWidgetAction(*cw, silencer::ui::UiActionKind::Select,
+				QueueWidgetAction(game, *cw, silencer::ui::UiActionKind::Select,
 				                  WidgetLabel(*cw) ? WidgetLabel(*cw) : "");
 				nlohmann::json r;
 				r["source"] = "clay";
@@ -676,11 +831,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}
 		int x = cmd.args["x"].get<int>();
 		int y = cmd.args["y"].get<int>();
-		if(!silencer::ui::automation::InvokeAt(x, y)){
+		if(!FindWidgetAt(x, y)){
 			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
 				"no clickable clay widget at point"));
 			return;
 		}
+		game.UiInput().QueueAutomationInvokeAt(x, y);
 		nlohmann::json r;
 		r["source"] = "clay";
 		r["x"] = x;
@@ -711,7 +867,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				int cap = cw->maxLength;
 				int n = (int)text.size();
 				if(cap > 0 && n > cap) n = cap;
-				QueueWidgetAction(*cw, silencer::ui::UiActionKind::SetText,
+				QueueWidgetAction(game, *cw, silencer::ui::UiActionKind::SetText,
 				                  text.substr(0, static_cast<size_t>(n)));
 				nlohmann::json r;
 				r["source"] = "clay";
@@ -779,7 +935,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				"no unique clay list row matches select target"));
 			return;
 		}
-		QueueWidgetAction(*hit, silencer::ui::UiActionKind::Select,
+		QueueWidgetAction(game, *hit, silencer::ui::UiActionKind::Select,
 		                  WidgetLabel(*hit) ? WidgetLabel(*hit) : "");
 		nlohmann::json r;
 		r["source"] = "clay";
@@ -808,7 +964,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 		for(int i = 0; i < amount; ++i){
-			QueueWidgetAction(*cw, silencer::ui::UiActionKind::Activate,
+			QueueWidgetAction(game, *cw, silencer::ui::UiActionKind::Activate,
 			                  WidgetLabel(*cw) ? WidgetLabel(*cw) : "");
 		}
 		nlohmann::json r;

@@ -17,7 +17,6 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
-	bool CaptureRawKeyDown(ScreenContext & ctx, int keyCode) override;
 	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
@@ -47,7 +46,7 @@ private:
 	std::string GetBindingLabel(ScreenContext & ctx, Action a, int slot) const;
 
 	void FinishKeyboardRebind(ScreenContext & ctx, SDL_Scancode sym);
-	void FinishGamepadRebind(ScreenContext & ctx);
+	void FinishBindingRebind(ScreenContext & ctx, const silencer::ui::UiBindingInput & input);
 	void BeginRebindFromVisibleRow(int row, int slot);
 	void ToggleOperatorFromVisibleRow(int row);
 	int MaxScroll() const;
@@ -61,12 +60,6 @@ private:
 	bool cancelClicked = false;
 	int scrollDelta = 0;
 	int operatorClickedRow = -1;
-
-	// Gamepad input snapshot taken when a rebind slot is activated. Used
-	// to distinguish "held at rebind start" from "newly pressed during
-	// rebind" so a button held since menu entry doesn't auto-fill the slot.
-	uint32_t rebindGamepadButtons = 0;
-	int16_t  rebindGamepadAxes[SDL_GAMEPAD_AXIS_COUNT] = {};
 };
 
 #endif

@@ -57,6 +57,7 @@ using namespace GameState;
 Game::Game() : renderer(world), screenbuffer(640, 480),
                uiClayService(uiClayBackend),
                clientUi(uiClayService),
+               inGameUiController(world),
                mapDownloader(world),
                ambienceMixer(world, renderer, mapDownloader, fade_i),
                screenContext(*this, world, renderer, world.lobby, keymap, updater, ambienceMixer, mapDownloader, window, renderdevice){
@@ -355,92 +356,28 @@ bool Game::ResizeRenderSurface(int width, int height){
 	return true;
 }
 
-void Game::AddUiWheelDelta(float x, float y) {
-	uiWheelX += x;
-	uiWheelY += y;
-}
-
 bool Game::HasUiInputTarget() {
 	if(GetTopScreen()) return true;
-	Player * player = world.GetPeerPlayer(world.localpeerid);
-	return player && (player->chatActive || player->isbuying || player->techstationactive);
+	return inGameUiController.HasInputTarget(world.localpeerid);
 }
 
-void Game::QueueUiTextInput(char ascii) {
-	uiTextInput.push_back(ascii);
-}
-
-void Game::QueueUiNavAction(silencer::ui::UiNavAction action) {
-	uiNavActions.push_back(action);
-}
-
-void Game::AddUiRawKeyDown(int keyCode) {
-	uiRawKeyDownCodes.push_back(keyCode);
-}
-
-void Game::QueueUiPointerWindowEvent(float windowX, float windowY, bool pressed, bool released) {
-	float sx = windowX;
-	float sy = windowY;
-	if(window){
-		int windowW = 0;
-		int windowH = 0;
-		SDL_GetWindowSize(window, &windowW, &windowH);
-		if(windowW > 0 && windowH > 0){
-			sx = (windowX / static_cast<float>(windowW)) * static_cast<float>(screenbuffer.w);
-			sy = (windowY / static_cast<float>(windowH)) * static_cast<float>(screenbuffer.h);
-		}
-	}
-	uiPointerX = sx;
-	uiPointerY = sy;
-	uiHavePointerPosition = true;
-	if(pressed) uiPointerPressed = true;
-	if(released) uiPointerReleased = true;
-}
-
-silencer::ui::UiInputState Game::BuildUiInputState(Surface& surface) {
-	silencer::ui::UiInputState input;
-	input.width = surface.w;
-	input.height = surface.h;
-	input.deltaTimeSeconds = static_cast<float>(GASLoader::Get().gameengine.tickIntervalMs) / 1000.0f;
-	if(input.deltaTimeSeconds <= 0.0f) input.deltaTimeSeconds = 1.0f / 60.0f;
-
+void Game::PrepareClientUiFrame(Surface& surface) {
 	float mx = static_cast<float>(world.localinput.mousex);
 	float my = static_cast<float>(world.localinput.mousey);
 	bool down = world.localinput.mousedown;
-
 	if(window){
 		Uint32 buttons = SDL_GetMouseState(&mx, &my);
 		down = (buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT)) != 0;
 		int windowW = 0;
 		int windowH = 0;
 		SDL_GetWindowSize(window, &windowW, &windowH);
-		if(windowW > 0 && windowH > 0){
-			mx = (mx / static_cast<float>(windowW)) * static_cast<float>(surface.w);
-			my = (my / static_cast<float>(windowH)) * static_cast<float>(surface.h);
-		}
+		clientUiInput.SetPolledWindowPointer(mx, my, down, windowW, windowH, surface.w, surface.h);
+	}else{
+		clientUiInput.SetPolledSurfacePointer(mx, my, down);
 	}
-	if(uiHavePointerPosition){
-		mx = uiPointerX;
-		my = uiPointerY;
-	}
-
-	bool effectiveDown = down || uiPointerPressed;
-
-	input.pointer.x = mx;
-	input.pointer.y = my;
-	input.pointer.down = effectiveDown;
-	input.pointer.pressed = uiPointerPressed || (effectiveDown && !uiPointerWasDown);
-	input.pointer.released = (!uiPointerPressed && uiPointerReleased) || (!effectiveDown && uiPointerWasDown);
-	input.pointer.wheelX = uiWheelX;
-	input.pointer.wheelY = uiWheelY;
-	input.textInput = uiTextInput;
-	input.navActions = uiNavActions;
-	input.rawKeyDownCodes = uiRawKeyDownCodes;
-	return input;
-}
-
-void Game::PrepareClientUiFrame(Surface& surface) {
-	preparedUiInput = BuildUiInputState(surface);
+	float deltaTimeSeconds =
+		static_cast<float>(GASLoader::Get().gameengine.tickIntervalMs) / 1000.0f;
+	preparedUiInput = clientUiInput.BuildFrame(surface.w, surface.h, deltaTimeSeconds);
 	hasPreparedUiInput = true;
 }
 
@@ -478,25 +415,18 @@ void Game::RenderClientUiFrame(Surface& surface, float frametime) {
 	std::vector<silencer::ui::UiAction> unhandledUiActions =
 		clientUi.DispatchInput(screenContext, preparedUiInput);
 	if(!clientUi.HasScreens() && world.map.loaded){
-		DispatchInGameUiActions(unhandledUiActions);
+		inGameUiController.ApplyActions(world.localpeerid, unhandledUiActions);
 	}
 }
 
 void Game::ResetUiFrameDeltas() {
-	uiWheelX = 0.0f;
-	uiWheelY = 0.0f;
-	uiTextInput.clear();
-	uiNavActions.clear();
-	uiRawKeyDownCodes.clear();
-	uiPointerPressed = false;
-	uiPointerReleased = false;
-	uiHavePointerPosition = false;
-	uiPointerWasDown = preparedUiInput.pointer.down;
+	clientUiInput.EndFrame();
 	preparedUiInput.pointer.wheelX = 0.0f;
 	preparedUiInput.pointer.wheelY = 0.0f;
 	preparedUiInput.textInput.clear();
 	preparedUiInput.navActions.clear();
-	preparedUiInput.rawKeyDownCodes.clear();
+	preparedUiInput.bindingInputs.clear();
+	preparedUiInput.automationCommands.clear();
 }
 
 void Game::Present(void){
@@ -610,6 +540,7 @@ bool Game::Loop(void){
 		if(tui){
 			Uint8 newkeystate[SDL_SCANCODE_COUNT];
 			if(inputserver.LatestScancodes(newkeystate)){
+				std::vector<int> pressedScancodes;
 				// Edge-detect: feed press/release transitions through the
 				// same handlers the SDL path uses, so the in-game ESC
 				// quitstate machine, F1 player-list, debug overlay etc.
@@ -618,10 +549,17 @@ bool Game::Loop(void){
 					bool was = keystate[sc] != 0;
 					bool now = newkeystate[sc] != 0;
 					if(was == now) continue;
-					if(now) OnScancodeDown(sc);
-					else    OnScancodeUp(sc);
+					if(now){
+						OnScancodeDown(sc);
+						pressedScancodes.push_back(sc);
+					}else{
+						OnScancodeUp(sc);
+					}
 				}
 				memcpy(keystate, newkeystate, sizeof(keystate));
+				for(int sc : pressedScancodes){
+					QueueUiKeyboardInputForScancode(sc);
+				}
 			}
 			UpdateInputState(world.localinput);
 			Input action;
@@ -670,6 +608,9 @@ bool Game::Loop(void){
 			}
 		} else {
 			UpdateInputState(world.localinput);
+			clientUiInput.CaptureGamepadBindingEdges(
+				gamepadstate.buttons, gamepadstate.axes,
+				SDL_GAMEPAD_AXIS_COUNT, AXIS_DEADZONE);
 			TickGamepadMenuNav();
 		}
 		world.SendInput();
@@ -769,7 +710,7 @@ bool Game::Loop(void){
 bool Game::Tick(void){
 	clientUi.ClearScreensIfRequested(screenContext);
 	clientUi.TickVisibleScreens(screenContext);
-	UpdateInGameOverlayState();
+	inGameUiController.UpdateOverlayState(world.localpeerid);
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
 			// 0 = main lobby, 1 = pregame (game-specific lobby, waiting for
@@ -1067,11 +1008,11 @@ void Game::TickGamepadMenuNav(){
 			// First frame held — fire immediately.
 			dir.held     = true;
 			dir.nextfire = now + GAMEPAD_NAV_DELAY_MS;
-			QueueUiNavAction(navAction);
+			clientUiInput.QueueNavAction(navAction);
 		} else if(now >= dir.nextfire){
 			// Repeat.
 			dir.nextfire = now + GAMEPAD_NAV_REPEAT_MS;
-			QueueUiNavAction(navAction);
+			clientUiInput.QueueNavAction(navAction);
 		}
 	};
 
@@ -1085,7 +1026,7 @@ void Game::TickGamepadMenuNav(){
 		bool confirmNow = keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate);
 		static bool confirmPrev = false;
 		if(confirmNow && !confirmPrev){
-			QueueUiNavAction(silencer::ui::UiNavAction::Confirm);
+			clientUiInput.QueueNavAction(silencer::ui::UiNavAction::Confirm);
 		}
 		confirmPrev = confirmNow;
 	}
@@ -1094,7 +1035,7 @@ void Game::TickGamepadMenuNav(){
 		bool cancelNow = keymap.IsPressed(Action::UiCancel, keystate, gamepadstate);
 		static bool cancelPrev = false;
 		if(cancelNow && !cancelPrev){
-			QueueUiNavAction(silencer::ui::UiNavAction::Cancel);
+			clientUiInput.QueueNavAction(silencer::ui::UiNavAction::Cancel);
 		}
 		cancelPrev = cancelNow;
 	}
@@ -1152,49 +1093,43 @@ const char* Game::StateName(Uint8 s){
 	}
 }
 
-nlohmann::json Game::GetWorldSummary(){
-	nlohmann::json r;
-	r["map"] = world.gameinfo.mapname;
-	r["peers"] = (int)world.peercount;
-	r["localpeerid"] = (int)world.localpeerid;
-	r["viewedpeerid"] = (int)world.viewedpeerid;
-	r["authoritypeer"] = (int)world.authoritypeer;
-	r["lobby_accountid"] = (unsigned int)world.lobby.accountid;
-	r["is_local_observer"] = world.IsLocalObserver();
-	r["spectator_initialized"] = world.spectator.initialized;
-	r["spectator_freecam"] = world.spectator.freecam;
-	nlohmann::json peerlist = nlohmann::json::array();
+Game::WorldSummary Game::GetWorldSummary(){
+	WorldSummary summary;
+	summary.map = world.gameinfo.mapname;
+	summary.peers = static_cast<int>(world.peercount);
+	summary.localPeerId = static_cast<int>(world.localpeerid);
+	summary.viewedPeerId = static_cast<int>(world.viewedpeerid);
+	summary.authorityPeer = static_cast<int>(world.authoritypeer);
+	summary.lobbyAccountId = static_cast<unsigned int>(world.lobby.accountid);
+	summary.isLocalObserver = world.IsLocalObserver();
+	summary.spectatorInitialized = world.spectator.initialized;
+	summary.spectatorFreecam = world.spectator.freecam;
 	for(unsigned int i = 0; i < world.maxpeers; i++){
 		Peer * p = world.peerlist[i];
 		if(!p) continue;
-		nlohmann::json pj;
-		pj["id"] = i;
-		pj["accountid"] = (unsigned int)p->accountid;
-		pj["observer"] = p->observer;
-		pj["disconnected"] = p->disconnected;
-		nlohmann::json controlled = nlohmann::json::array();
-		for(Uint16 cid : p->controlledlist) controlled.push_back(cid);
-		pj["controlledlist"] = controlled;
-		peerlist.push_back(std::move(pj));
+		WorldPeerSummary peer;
+		peer.id = static_cast<int>(i);
+		peer.accountId = static_cast<unsigned int>(p->accountid);
+		peer.observer = p->observer;
+		peer.disconnected = p->disconnected;
+		for(Uint16 cid : p->controlledlist){
+			peer.controlledList.push_back(static_cast<int>(cid));
+		}
+		summary.peerList.push_back(std::move(peer));
 	}
-	r["peerlist"] = peerlist;
-	nlohmann::json players = nlohmann::json::array();
-	int objcount = 0;
 	for(auto* o : world.objectlist){
-		++objcount;
+		++summary.objectsCount;
 		if(o && o->type == ObjectTypes::PLAYER){
 			Player* p = (Player*)o;
-			nlohmann::json pj;
-			pj["id"] = p->id;
-			pj["hp"] = (int)p->health;
-			pj["x"] = (int)p->x;
-			pj["y"] = (int)p->y;
-			players.push_back(std::move(pj));
+			WorldPlayerSummary player;
+			player.id = static_cast<int>(p->id);
+			player.hp = static_cast<int>(p->health);
+			player.x = static_cast<int>(p->x);
+			player.y = static_cast<int>(p->y);
+			summary.players.push_back(player);
 		}
 	}
-	r["players"] = players;
-	r["objects_count"] = objcount;
-	return r;
+	return summary;
 }
 
 bool Game::IsLiveMultiplayer() const {

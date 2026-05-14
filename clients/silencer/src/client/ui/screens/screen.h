@@ -48,11 +48,6 @@ public:
 		return false;
 	}
 
-	// Narrow escape hatch for controls rebinding. Normal UI navigation must not
-	// use raw key codes.
-	virtual bool CaptureRawKeyDown(ScreenContext & ctx, int keyCode)
-	{ (void)ctx; (void)keyCode; return false; }
-
 	// Modals draw the screen below them; non-modal Screens hide what's beneath.
 	virtual bool IsOverlay() const { return false; }
 };

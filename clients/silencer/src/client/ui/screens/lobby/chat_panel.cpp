@@ -215,6 +215,7 @@ bool ChatPanelHandleUiIntent(ChatPanelState & state,
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText){
+		CopyUiText(state.inputBuffer, static_cast<int>(sizeof(state.inputBuffer)), action.value);
 		if(std::strlen(state.inputBuffer) > 0){
 			world.lobby.SendChat(world.lobby.channel, state.inputBuffer);
 			state.inputBuffer[0] = '\0';

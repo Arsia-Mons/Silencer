@@ -345,34 +345,29 @@ void OptionsControlsScreen::FinishKeyboardRebind(ScreenContext & ctx, SDL_Scanco
 	rebindSlot = -1;
 }
 
-void OptionsControlsScreen::FinishGamepadRebind(ScreenContext & ctx)
+void OptionsControlsScreen::FinishBindingRebind(ScreenContext & ctx,
+                                                const silencer::ui::UiBindingInput & input)
 {
 	if(rebindRow < 0 || rebindRow >= (int)Action::Count) return;
-	const GamepadState & gp = ctx.game.GetGamepadState();
-	if(!gp.connected) return;
+
+	if(input.kind == silencer::ui::UiBindingInputKind::KeyboardKeyDown){
+		FinishKeyboardRebind(ctx, static_cast<SDL_Scancode>(input.code));
+		return;
+	}
+
 	BindingKey padKey{};
-	bool found = false;
-	for(int b = 0; b < SDL_GAMEPAD_BUTTON_COUNT && !found; b++){
-		bool was = (rebindGamepadButtons >> b) & 1;
-		bool is = (gp.buttons >> b) & 1;
-		if(is && !was){
-			padKey.device = BindingDevice::GamepadButton;
-			padKey.code = b;
-			padKey.axisDir = 0;
-			found = true;
-		}
+	if(input.kind == silencer::ui::UiBindingInputKind::GamepadButtonDown){
+		padKey.device = BindingDevice::GamepadButton;
+		padKey.code = input.code;
+		padKey.axisDir = 0;
+	}else if(input.kind == silencer::ui::UiBindingInputKind::GamepadAxisMoved){
+		padKey.device = BindingDevice::GamepadAxis;
+		padKey.code = input.code;
+		padKey.axisDir = static_cast<int8_t>(input.axisDir < 0 ? -1 : 1);
+	}else{
+		return;
 	}
-	for(int ax = 0; ax < SDL_GAMEPAD_AXIS_COUNT && !found; ax++){
-		int16_t was = rebindGamepadAxes[ax];
-		int16_t is = gp.axes[ax];
-		if(std::abs(is) > AXIS_DEADZONE && std::abs(was) <= AXIS_DEADZONE){
-			padKey.device = BindingDevice::GamepadAxis;
-			padKey.code = ax;
-			padKey.axisDir = (is > 0) ? 1 : -1;
-			found = true;
-		}
-	}
-	if(!found) return;
+
 	ForkActiveProfileIfBuiltin(ctx.keymap);
 	auto & ab = ctx.keymap.Get(ACTION_TABLE[rebindRow].action);
 	Binding binding;
@@ -410,11 +405,7 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx)
 	if(rebindRow >= 0){
 		if(optionscontrolstick == 0){
 			optionscontrolstick = ctx.world.tickcount;
-			const GamepadState & gp = ctx.game.GetGamepadState();
-			rebindGamepadButtons = gp.buttons;
-			memcpy(rebindGamepadAxes, gp.axes, sizeof(rebindGamepadAxes));
 		}
-		FinishGamepadRebind(ctx);
 		if(rebindRow >= 0 &&
 		   ctx.world.tickcount - optionscontrolstick > REBIND_TIMEOUT_TICKS){
 			FinishKeyboardRebind(ctx, SDL_SCANCODE_UNKNOWN);
@@ -440,16 +431,14 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-bool OptionsControlsScreen::CaptureRawKeyDown(ScreenContext & ctx, int keyCode)
-{
-	if(rebindRow < 0) return false;
-	FinishKeyboardRebind(ctx, static_cast<SDL_Scancode>(keyCode));
-	return true;
-}
-
 bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
 	(void)ctx;
+	if(action.kind == silencer::ui::UiActionKind::CaptureBinding){
+		if(rebindRow < 0) return false;
+		FinishBindingRebind(ctx, action.binding);
+		return true;
+	}
 	if(action.kind == silencer::ui::UiActionKind::Cancel){
 		cancelClicked = true;
 		return true;

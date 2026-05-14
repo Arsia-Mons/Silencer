@@ -4,6 +4,7 @@
 #include "player.h"
 #include "world.h"
 #include <cstring>
+#include <vector>
 
 // Captureless lambdas decay to function pointers, so this table costs nothing
 // at runtime vs. the old hand-written cascade. New actions get one row here
@@ -201,66 +202,47 @@ bool Game::HandleSDLEvents(void){
 			}break;
 			case SDL_EVENT_TEXT_INPUT:{
 				char ascii = event.text.text[0] & 0x7F;
-				if(ascii >= 0x20 && ascii <= 0x7E) QueueUiTextInput(ascii);
+				clientUiInput.QueueTextInput(ascii);
 			}break;
 			case SDL_EVENT_KEY_DOWN:{
 				OnScancodeDown(event.key.scancode);
 				keystate[event.key.scancode] = true;
-				AddUiRawKeyDown(event.key.scancode);
-				switch(event.key.scancode){
-					case SDL_SCANCODE_LEFT:
-						QueueUiNavAction(silencer::ui::UiNavAction::Left);
-					break;
-					case SDL_SCANCODE_RIGHT:
-						QueueUiNavAction(silencer::ui::UiNavAction::Right);
-					break;
-					case SDL_SCANCODE_UP:
-						QueueUiNavAction(silencer::ui::UiNavAction::Up);
-					break;
-					case SDL_SCANCODE_DOWN:
-						QueueUiNavAction(silencer::ui::UiNavAction::Down);
-					break;
-					case SDL_SCANCODE_BACKSPACE:
-						QueueUiNavAction(silencer::ui::UiNavAction::Backspace);
-					break;
-					case SDL_SCANCODE_TAB:
-						QueueUiNavAction(silencer::ui::UiNavAction::FocusNext);
-					break;
-					case SDL_SCANCODE_RETURN:
-						QueueUiNavAction(silencer::ui::UiNavAction::Confirm);
-					break;
-					case SDL_SCANCODE_ESCAPE:
-						QueueUiNavAction(silencer::ui::UiNavAction::Cancel);
-					break;
-					default:{
-						if(keymap.IsPressed(Action::MoveUp, keystate, gamepadstate)){
-							QueueUiNavAction(silencer::ui::UiNavAction::Up);
-						}
-						if(keymap.IsPressed(Action::MoveDown, keystate, gamepadstate)){
-							QueueUiNavAction(silencer::ui::UiNavAction::Down);
-						}
-					}break;
-				}
+				QueueUiKeyboardInputForScancode(event.key.scancode);
 			}break;
 			case SDL_EVENT_KEY_UP:{
 				OnScancodeUp(event.key.scancode);
 				keystate[event.key.scancode] = false;
 			}break;
 			case SDL_EVENT_MOUSE_WHEEL:{
-				AddUiWheelDelta(event.wheel.x, event.wheel.y);
+				clientUiInput.AddWheelDelta(event.wheel.x, event.wheel.y);
 			}break;
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:{
 				if(event.button.button == SDL_BUTTON_LEFT){
-					QueueUiPointerWindowEvent(event.button.x, event.button.y, true, false);
+					int windowW = 0;
+					int windowH = 0;
+					SDL_GetWindowSize(window, &windowW, &windowH);
+					clientUiInput.QueuePointerWindowEvent(
+						event.button.x, event.button.y, windowW, windowH,
+						screenbuffer.w, screenbuffer.h, true, false);
 				}
 			}break;
 			case SDL_EVENT_MOUSE_BUTTON_UP:{
 				if(event.button.button == SDL_BUTTON_LEFT){
-					QueueUiPointerWindowEvent(event.button.x, event.button.y, false, true);
+					int windowW = 0;
+					int windowH = 0;
+					SDL_GetWindowSize(window, &windowW, &windowH);
+					clientUiInput.QueuePointerWindowEvent(
+						event.button.x, event.button.y, windowW, windowH,
+						screenbuffer.w, screenbuffer.h, false, true);
 				}
 			}break;
 			case SDL_EVENT_MOUSE_MOTION:{
-				QueueUiPointerWindowEvent(event.motion.x, event.motion.y, false, false);
+				int windowW = 0;
+				int windowH = 0;
+				SDL_GetWindowSize(window, &windowW, &windowH);
+				clientUiInput.QueuePointerWindowEvent(
+					event.motion.x, event.motion.y, windowW, windowH,
+					screenbuffer.w, screenbuffer.h, false, false);
 			}break;
 			case SDL_EVENT_GAMEPAD_ADDED:{
 				// SDL3 doesn't auto-open gamepads; without this, a pad plugged
@@ -294,6 +276,70 @@ bool Game::HandleSDLEvents(void){
 		}
 	}
 	return true;
+}
+
+void Game::QueueUiKeyboardInputForScancode(int sc){
+	clientUiInput.QueueBindingKeyDown(sc);
+	std::vector<silencer::ui::UiNavAction> queued;
+	auto queue = [&](silencer::ui::UiNavAction action){
+		for(auto existing : queued){
+			if(existing == action) return;
+		}
+		clientUiInput.QueueNavAction(action);
+		queued.push_back(action);
+	};
+
+	switch(sc){
+		case SDL_SCANCODE_LEFT:
+			queue(silencer::ui::UiNavAction::Left);
+		break;
+		case SDL_SCANCODE_RIGHT:
+			queue(silencer::ui::UiNavAction::Right);
+		break;
+		case SDL_SCANCODE_UP:
+			queue(silencer::ui::UiNavAction::Up);
+		break;
+		case SDL_SCANCODE_DOWN:
+			queue(silencer::ui::UiNavAction::Down);
+		break;
+		case SDL_SCANCODE_BACKSPACE:
+			queue(silencer::ui::UiNavAction::Backspace);
+		break;
+		case SDL_SCANCODE_TAB:
+			if(keystate[SDL_SCANCODE_LSHIFT] || keystate[SDL_SCANCODE_RSHIFT]){
+				queue(silencer::ui::UiNavAction::FocusPrevious);
+			}else{
+				queue(silencer::ui::UiNavAction::FocusNext);
+			}
+		break;
+		case SDL_SCANCODE_RETURN:
+			queue(silencer::ui::UiNavAction::Confirm);
+		break;
+		case SDL_SCANCODE_ESCAPE:
+			queue(silencer::ui::UiNavAction::Cancel);
+		break;
+		default:
+		break;
+	}
+
+	if(keymap.IsPressed(Action::UiUp, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Up);
+	}
+	if(keymap.IsPressed(Action::UiDown, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Down);
+	}
+	if(keymap.IsPressed(Action::UiLeft, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Left);
+	}
+	if(keymap.IsPressed(Action::UiRight, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Right);
+	}
+	if(keymap.IsPressed(Action::UiConfirm, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Confirm);
+	}
+	if(keymap.IsPressed(Action::UiCancel, keystate, gamepadstate)){
+		queue(silencer::ui::UiNavAction::Cancel);
+	}
 }
 
 void Game::OnScancodeDown(int sc){

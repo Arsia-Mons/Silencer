@@ -19,6 +19,7 @@ class Surface;
 class World;
 namespace silencer {
 namespace client_ui {
+class InGameUiController;
 void BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
 void BuildHudSecretProgress(::Surface* surface, ::Player* player, int yoffset, int secretprogress, Uint8 phase);
 int BuildHudTeams(::World& world, ::Surface* surface, Uint8 phase);
@@ -111,6 +112,7 @@ public:
 	friend class Game;
 	friend class PlayerAI;
 	friend class Projectile;
+	friend class silencer::client_ui::InGameUiController;
 	friend void silencer::client_ui::BuildInGameHudUi(::Renderer& renderer, ::World& world, ::Surface* surface, float frametime);
 	friend void silencer::client_ui::BuildHudSecretProgress(::Surface* surface, ::Player* player, int yoffset, int secretprogress, Uint8 phase);
 	friend int silencer::client_ui::BuildHudTeams(::World& world, ::Surface* surface, Uint8 phase);
