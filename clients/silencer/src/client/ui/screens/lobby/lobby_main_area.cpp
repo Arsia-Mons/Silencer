@@ -1,0 +1,221 @@
+#include "lobby_main_area.h"
+
+#include "clay/clay.h"
+#include "clay_ui_compositor.h"
+#include "primitives/box.h"
+
+#include "character_panel.h"
+#include "chat_panel.h"
+#include "game_select_panel.h"
+#include "game_create_panel.h"
+#include "game_join_panel.h"
+#include "game_tech_panel.h"
+#include "lobby_screen.h"
+
+#include "world.h"
+
+#include <algorithm>
+#include <cstdint>
+
+namespace silencer::client_ui::lobby {
+
+namespace {
+
+using silencer::ui::primitives::Box;
+namespace BoxVariants = silencer::ui::primitives::BoxVariants;
+
+constexpr uint16_t kRegionGap = 10;
+constexpr uint16_t kCharacterW = 218;
+constexpr uint16_t kUpperH = 121;
+constexpr uint16_t kRightTallW = 232;
+constexpr uint16_t kRightTallH = 391;
+constexpr uint16_t kNarrowChatMinH = 88;
+
+void BuildRightUpperContents(LobbyMainAreaPanels & panels,
+                             World & world,
+                             Resources & resources,
+                             LobbyScreen & owner) {
+	if(panels.gameCreateActive){
+		BuildGameCreateUpperTree(panels.gameCreate, resources);
+	}else if(panels.gameJoinActive){
+		BuildGameJoinUpperTree(panels.gameJoin, resources);
+	}else if(panels.gameTechActive){
+		BuildGameTechUpperTree(panels.gameTech, world, resources, owner);
+	}else{
+		BuildGameSelectUpperTree(panels.gameSelect, resources);
+	}
+}
+
+void BuildRightTallContents(LobbyMainAreaPanels & panels,
+                            World & world,
+                            Resources & resources,
+                            LobbyScreen & owner) {
+	if(panels.gameCreateActive){
+		BuildGameCreateTallTree(panels.gameCreate, resources);
+	}else if(panels.gameJoinActive){
+		BuildGameJoinTallTree(panels.gameJoin, resources);
+	}else if(panels.gameTechActive){
+		BuildGameTechTallTree(panels.gameTech, world, resources, owner);
+	}else{
+		BuildGameSelectTallTree(panels.gameSelect, resources);
+	}
+}
+
+void BuildNarrowBody(LobbyMainAreaPanels & panels,
+                     World & world,
+                     Resources & resources,
+                     LobbyScreen & owner,
+                     int narrowTallH) {
+	CLAY(Box(BoxVariants::Chrome, {
+	         .id = CLAY_ID("LobbyCharacterBox"),
+	         .layout = {
+	             .sizing = { CLAY_SIZING_GROW(0),
+	                         CLAY_SIZING_FIXED(kUpperH) },
+	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	         },
+	         .clip = { .horizontal = true, .vertical = true },
+	     })) {
+		BuildCharacterPanelTree(panels.character, world, resources);
+	}
+
+	CLAY(Box(BoxVariants::Chrome, {
+	         .id = CLAY_ID("LobbyRightUpperBox"),
+	         .layout = {
+	             .sizing = { CLAY_SIZING_GROW(0),
+	                         CLAY_SIZING_FIXED(kUpperH) },
+	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	         },
+	         .clip = { .horizontal = true, .vertical = true },
+	     })) {
+		BuildRightUpperContents(panels, world, resources, owner);
+	}
+
+	CLAY(Box(BoxVariants::Chrome, {
+	         .id = CLAY_ID("LobbyRightTallBox"),
+	         .layout = {
+	             .sizing = { CLAY_SIZING_GROW(0),
+	                         CLAY_SIZING_FIXED((float)narrowTallH) },
+	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	         },
+	         .clip = { .horizontal = true, .vertical = true },
+	     })) {
+		BuildRightTallContents(panels, world, resources, owner);
+	}
+
+	CLAY(Box(BoxVariants::Chrome, {
+	         .id = CLAY_ID("LobbyChatBox"),
+	         .layout = {
+	             .sizing = { CLAY_SIZING_GROW(0),
+	                         CLAY_SIZING_GROW(0) },
+	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	         },
+	         .clip = { .horizontal = true, .vertical = true },
+	     })) {
+		BuildChatPanelTree(panels.chat, world, resources);
+	}
+}
+
+void BuildWideBody(LobbyMainAreaPanels & panels,
+                   World & world,
+                   Resources & resources,
+                   LobbyScreen & owner) {
+	CLAY({ .id = CLAY_ID("LobbyLeftMiddleStack"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_GROW(0) },
+	           .childGap = kRegionGap,
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	       },
+	       .clip = { .horizontal = true, .vertical = true },
+	     }) {
+		CLAY({ .id = CLAY_ID("LobbyUpperRow"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_GROW(0),
+		                       CLAY_SIZING_FIXED(kUpperH) },
+		           .childGap = kRegionGap,
+		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+		       },
+		       .clip = { .horizontal = true, .vertical = true },
+		     }) {
+			CLAY(Box(BoxVariants::Chrome, {
+			         .id = CLAY_ID("LobbyCharacterBox"),
+			         .layout = {
+			             .sizing = { CLAY_SIZING_FIXED(kCharacterW),
+			                         CLAY_SIZING_GROW(0) },
+			             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+			         },
+			         .clip = { .horizontal = true, .vertical = true },
+			     })) {
+				BuildCharacterPanelTree(panels.character, world, resources);
+			}
+
+			CLAY(Box(BoxVariants::Chrome, {
+			         .id = CLAY_ID("LobbyRightUpperBox"),
+			         .layout = {
+			             .sizing = { CLAY_SIZING_GROW(0),
+			                         CLAY_SIZING_GROW(0) },
+			             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+			         },
+			         .clip = { .horizontal = true, .vertical = true },
+			     })) {
+				BuildRightUpperContents(panels, world, resources, owner);
+			}
+		}
+
+		CLAY(Box(BoxVariants::Chrome, {
+		         .id = CLAY_ID("LobbyChatBox"),
+		         .layout = {
+		             .sizing = { CLAY_SIZING_GROW(0),
+		                         CLAY_SIZING_GROW(0) },
+		             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		         },
+		         .clip = { .horizontal = true, .vertical = true },
+		     })) {
+			BuildChatPanelTree(panels.chat, world, resources);
+		}
+	}
+
+	CLAY(Box(BoxVariants::Chrome, {
+	         .id = CLAY_ID("LobbyRightTallBox"),
+	         .layout = {
+	             .sizing = { CLAY_SIZING_FIXED(kRightTallW),
+	                         CLAY_SIZING_GROW(0) },
+	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	         },
+	         .clip = { .horizontal = true, .vertical = true },
+	     })) {
+		BuildRightTallContents(panels, world, resources, owner);
+	}
+}
+
+}  // namespace
+
+void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
+                        World & world,
+                        Resources & resources,
+                        LobbyScreen & owner,
+                        bool narrow,
+                        int bodyH) {
+	const int narrowTallFit = bodyH - ((int)kUpperH * 2)
+	                        - ((int)kRegionGap * 3) - (int)kNarrowChatMinH;
+	const int narrowTallH = std::max(0, std::min((int)kRightTallH, narrowTallFit));
+
+	CLAY({ .id = CLAY_ID("LobbyBody"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_GROW(0) },
+	           .childGap = kRegionGap,
+	           .layoutDirection = narrow ? CLAY_TOP_TO_BOTTOM
+	                                     : CLAY_LEFT_TO_RIGHT,
+	       },
+	       .clip = { .horizontal = true, .vertical = true },
+	     }) {
+		if(narrow){
+			BuildNarrowBody(panels, world, resources, owner, narrowTallH);
+		}else{
+			BuildWideBody(panels, world, resources, owner);
+		}
+	}
+}
+
+}  // namespace silencer::client_ui::lobby
