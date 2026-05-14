@@ -583,10 +583,19 @@ void Guard::InitBT(){
 		World& world = *static_cast<World*>(ctx.userData);
 		const EnemyDef* gd = GASLoader::Get().GetEnemyDef(ActorDefName(weapon));
 		is_walking = true;
-		{ int d = DistanceToEnd(*this, world); if(d >= 0 && d <= world.minwalldistance) mirrored = !mirrored; }
 		Sint8 spd = gd ? gd->speed : speed;
 		xv = mirrored ? -spd : spd;
 		FollowGround(*this, world, xv);
+		// Edge-triggered turnaround: flip mirrored only on the first tick entering the
+		// edge zone to prevent oscillation (speed < minwalldistance means level flip).
+		{
+			const std::string ek = ctx.current_node_id + "_edge";
+			int d = DistanceToEnd(*this, world);
+			bool atEdge = (d >= 0 && d <= world.minwalldistance);
+			bool wasAtEdge = ctx.state.count(ek) ? ctx.state[ek].get<int>() != 0 : false;
+			if(atEdge && !wasAtEdge) mirrored = !mirrored;
+			ctx.state[ek] = atEdge ? 1 : 0;
+		}
 		int frame = ctx.elapsedTicks() % 19;
 		res_bank  = 60;
 		res_index = frame;
@@ -600,7 +609,10 @@ void Guard::InitBT(){
 			}
 		}
 		const int dur = gd ? gd->walkingDurationTicks : 240;
-		if(ctx.elapsedTicks() >= dur) return BTResult::Success;
+		if(ctx.elapsedTicks() >= dur){
+			ctx.state.erase(ctx.current_node_id + "_edge");
+			return BTResult::Success;
+		}
 		return BTResult::Running;
 	};
 
