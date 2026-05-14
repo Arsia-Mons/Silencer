@@ -345,26 +345,46 @@ Backlog audit:
 - [x] The fake `ClientUiState` / `BuildFrame` demo path is gone. Keep it gone.
 - [x] Real screen/modal navigation ownership moved from `Game` into
   `ClientUi` / `navigation/ScreenStack`; `Game` has transition wrappers only.
-- [ ] Large raw Clay screen files still need decomposition into domain
-  components and reusable design primitives.
-- [ ] The generic toolkit boundary is still not fully honest because several
-  `src/ui/primitives` APIs embed Silencer sprite/font/palette payload policy.
+- [x] Per-frame primitive and HUD payload arenas reset through a single
+  `UiFrameContext::BeginFrame()` owned by `ClientUi`. No primitive `BeginFrame`
+  is called from inside a screen, modal, HUD, or overlay block.
+- [x] `friend class silencer::client_ui::InGameUiController;` removed from
+  `world.h`. HUD/overlays consume `HudView` populated once per frame in
+  `Game::RenderClientUiFrame`. HUD layer no longer includes `world.h`,
+  `player.h`, `team.h`, `lobby.h`, or other gameplay headers.
+- [x] Large raw Clay screen files decomposed at natural domain seams:
+  - `InGameHud.cpp` 1050 → 69 lines, split into 7 focused sub-builders.
+  - `InGameOverlays.cpp` 392 → 252 (chat + buy/tech + player-list extracted).
+  - `lobby_screen.cpp` 708 → 133 (chrome / main area / controller split).
+  - `game_tech_panel.cpp` 515 → 257 (tree grid + selected panel).
+  - `game_select_panel.cpp` 487 → 263 (layout extracted).
+  - `game_create_panel.cpp` 543 → 265 (options + map form extracted).
+  - `chat_panel.cpp` 345 → 162 (layout extracted).
+  - `options_controls_screen.cpp` 618 → 236 (keybind list + rebind capture).
+  Every file in `client/ui/hud/`, `screens/lobby/`, `screens/options/` is now
+  ≤ 300 lines.
+- [x] Input contract documented and enforced. Single SDL→UI collection point
+  (`game/events.cpp`), single dispatch site (`ClientUi::DispatchInput`).
+  `Screen` has no `OnTextInput` / `OnKey` virtuals. `UiInputState` carries
+  three channels (`textInput`, `navActions`, `bindingInputs`); a fourth raw
+  `keyEvents` channel is intentionally not added because no consumer needs
+  it. `60_ui_architecture_boundaries.sh` now forbids `SDL_EVENT_KEY_*` /
+  `SDL_PollEvent` under `client/ui/` and `ui/runtime/`.
+- [x] The user explicitly accepted Silencer-specific knowledge living in
+  `src/ui/primitives` (bank text, bank buttons, sprite-backed toggles).
+  This is now a deliberate design choice documented in
+  `clients/silencer/CLAUDE.md`, not an oversight. The toolkit boundary is
+  honest in its current form.
 
-Next implementation checklist:
+References for the completion work:
 
-1. Decompose large raw Clay files at the
-   nearest useful domain boundary: lobby chrome/title bar/panel shell, option
-   rows, HUD status bars, chat overlay, buy/tech menu rows.
-2. Resolve the toolkit boundary by either naming Silencer-specific primitives as
-   design-system primitives or hiding payload details behind renderer-agnostic
-   token APIs.
-3. Normalize text/key input so `UiInputState` is the durable input contract
-   instead of a mix of central state plus screen compatibility hooks.
-4. Verify with `cmake --build build --target silencer
-   silencer_tests -j 8`, `build/tests/silencer_tests`, and the
-   focused CLI E2E scripts for navigation, scrolling, modals, resize screenshots,
-   in-game overlays, and architecture boundaries.
+- Design: `docs/superpowers/specs/2026-05-14-clay-ui-architecture-completion-design.md`.
+- Plan: `docs/superpowers/plans/2026-05-14-clay-ui-architecture-completion.md`.
+- Independent final audit (verdict: Faithful) executed against `hv/clay-ui-migration`
+  after all moves landed.
 
-Bottom line: the central Clay runtime and real screen/modal navigation are now
-owned by the client UI layer. The next correct step is decomposing the largest
-raw Clay surfaces and making the generic/design-system boundary honest.
+Bottom line: the Clay UI architecture refactor is closed. The next correct
+work item is unrelated to this audit — likely Move 5's deferred
+capture-binding gating (low priority) or a broader audit of `World`'s
+remaining `friend` declarations and 2800-line gameplay files
+(out-of-scope for this UI refactor).
