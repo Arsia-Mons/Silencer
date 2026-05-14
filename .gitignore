@@ -55,3 +55,4 @@ __pycache__/
 
 clients/silencer/build_test/
 clients/silencer/installer/Output/
+tools/refactor-baselines/
