@@ -141,8 +141,9 @@ void Civilian::InitBT(){
 
 		if(state != RUNNING) return BTResult::Failure;
 
-		// Update flee direction while running (matches original Look() during RUNNING).
-		{
+		// Update flee direction while running, but only when clear of walls.
+		// If near a wall, DistanceToEnd will bounce mirrored below; don't override it.
+		if(DistanceToEnd(*this, world) > world.minwalldistance){
 			std::vector<Object*> players = world.TestAABB(x - dx, y - dy, x + dx, y + dy, ptypes);
 			for(Object* obj : players){
 				Player* player = static_cast<Player*>(obj);
