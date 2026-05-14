@@ -5,6 +5,7 @@ import ReactFlow, {
   Background,
   Controls,
   Handle,
+  MiniMap,
   Position,
   useEdgesState,
   useNodesState,
@@ -168,6 +169,35 @@ const NPC_ACTIONS: Record<string, string[]> = {
 // All actions merged for unknown NPC types
 const ALL_ACTIONS = [...new Set([...Object.values(NPC_ACTIONS).flat()])].sort();
 
+const ACTION_DESC: Record<string, string> = {
+  // Guard
+  Look0: 'Scan & shoot: forward (standing)',
+  Look1: 'Scan & shoot: low (crouched)',
+  Look2: 'Scan & shoot: upward',
+  Look3: 'Scan & shoot: downward',
+  Look4: 'Scan & shoot: up-angle',
+  Look5: 'Scan & shoot: down-angle',
+  UncrouchIdle: 'Stand up from crouch and idle',
+  Chase: 'Run toward last known player position',
+  Patrol: 'Walk patrol route; stop to look around periodically',
+  SearchAndReturn: 'Search last known position then return to spawn',
+  Stand: 'Stand in place (idle)',
+  // Civilian
+  Run: 'Flee from threat at run speed',
+  Wander: 'Wander randomly within spawn area',
+  WakeUp: 'Play wake-up animation then become active',
+  LookForward: 'Look straight ahead (idle animation)',
+  LookSides: 'Look side to side (alert animation)',
+  MeleeCheck: 'Check if player is in melee range; attack if so',
+  ReturnToSpawn: 'Walk back to spawn point',
+  // Generic leaves
+  PlayAnim: 'Play a sprite bank animation (bank, frames, loop)',
+  EmitSound: 'Play a named sound from the world soundbank',
+  SetFacing: 'Set entity facing direction (left / right / flip)',
+  SetBlackboard: 'Write a constant value to a blackboard key',
+  RandomChance: 'Succeed with probability = chance (0.0–1.0)',
+};
+
 const LOOK_DIRECTIONS: { value: number; label: string }[] = [
   { value: 0, label: '0 — Forward (standing)' },
   { value: 1, label: '1 — Low (crouched)' },
@@ -301,6 +331,9 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     if (!parentNode) return;
     if (parentNode.children.includes(params.target)) return; // already connected
 
+    // Leaf, Condition, Wait cannot have children
+    if (['Leaf', 'Condition', 'Wait'].includes(parentNode.type)) return;
+
     const isDecorator = ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'].includes(parentNode.type);
     if (isDecorator && parentNode.children.length >= 1) return;
 
@@ -313,7 +346,14 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     };
     pushToHistory(updated);
     onChange(updated);
-    setRfEdges(es => addEdge({ ...params, type: 'smoothstep', style: { stroke: '#4a5568', strokeWidth: 2 } }, es));
+    setRfEdges(es => addEdge({
+      ...params,
+      type: 'smoothstep',
+      style: { stroke: '#4a5568', strokeWidth: 2 },
+      label: String(parentNode.children.length + 1),
+      labelStyle: { fill: '#718096', fontSize: 10 },
+      labelBgStyle: { fill: '#0d1117' },
+    }, es));
   }, [onChange]);
 
   function autoLayout() {
@@ -383,6 +423,29 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     setRfNodes(ns => ns.filter(n => n.id !== selectedNodeId));
     setRfEdges(es => es.filter(e => e.source !== selectedNodeId && e.target !== selectedNodeId));
     setSelectedNodeId(null);
+  }
+
+  function duplicateSelectedNode() {
+    if (!selectedNodeId) return;
+    const cur = btRef.current;
+    const src = cur.nodes[selectedNodeId];
+    if (!src) return;
+    const newId = `${src.type.toLowerCase()}_${uid()}`;
+    const srcPos = cur.positions?.[selectedNodeId] ?? { x: 100, y: 100 };
+    const newPos = { x: srcPos.x + 40, y: srcPos.y + 40 };
+    const newNode: BTNode = { ...src, children: [] }; // no children copy
+    const updated: BehaviorTree = {
+      ...cur,
+      nodes: { ...cur.nodes, [newId]: newNode },
+      positions: { ...cur.positions, [newId]: newPos },
+    };
+    pushToHistory(updated);
+    onChange(updated);
+    setRfNodes(ns => [...ns, {
+      id: newId, type: 'btNode', position: newPos,
+      data: { type: src.type, label: src.label, subtitle: nodeSubtitle(src) },
+    }]);
+    setSelectedNodeId(newId);
   }
 
   const selectedNode = selectedNodeId ? bt.nodes[selectedNodeId] : null;
@@ -507,6 +570,12 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
               {validateMsg}
             </div>
           )}
+          {selectedNodeId && (
+            <button onClick={duplicateSelectedNode}
+              style={{ display: 'block', width: '100%', marginTop: 8, padding: '5px 8px', background: '#0d1a2a', border: '1px solid #1e3a5f', color: '#60a5fa', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: 1 }}>
+              ⎘ DUPLICATE
+            </button>
+          )}
           {selectedNodeId && selectedNodeId !== bt.rootId && (
             <button onClick={deleteSelectedNode}
               style={{ display: 'block', width: '100%', marginTop: 8, padding: '5px 8px', background: '#1a0000', border: '1px solid #7f1d1d', color: '#f87171', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: 1 }}>
@@ -569,6 +638,11 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
         >
           <Background color="#1a1f2e" gap={20} />
           <Controls style={{ background: '#161b22', border: '1px solid #2d3748' }} />
+          <MiniMap
+            nodeColor={n => TYPE_COLOR[(n.data as { type: string }).type] ?? '#718096'}
+            style={{ background: '#0d1117', border: '1px solid #2d3748' }}
+            maskColor="rgba(0,0,0,0.7)"
+          />
         </ReactFlow>
       </div>
 
@@ -636,10 +710,15 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
               <>
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>ACTION</label>
                 <select value={String(selectedNode.props.action ?? '')} onChange={e => updateProp('action', e.target.value)}
-                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
                   <option value="">— select action —</option>
                   {leafActions.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
+                {String(selectedNode.props.action ?? '') && ACTION_DESC[String(selectedNode.props.action ?? '')] && (
+                  <div style={{ color: '#4a5568', fontSize: 9, fontFamily: 'monospace', lineHeight: 1.5, marginBottom: 8, fontStyle: 'italic' }}>
+                    {ACTION_DESC[String(selectedNode.props.action ?? '')]}
+                  </div>
+                )}
 
                 {/* Generic extra props (all props except action) */}
                 {(() => {
@@ -788,10 +867,21 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                   {bt.blackboard.map(k => <option key={k.key} value={k.key}>{k.key}</option>)}
                 </select>
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>OPERATOR</label>
-                <select value={String(selectedNode.props.op ?? '==')} onChange={e => updateProp('op', e.target.value)}
-                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
-                  {['==', '!=', '>', '<', '>=', '<='].map(op => <option key={op} value={op}>{op}</option>)}
-                </select>
+                {(() => {
+                  const bbEntry = bt.blackboard.find(k => k.key === selectedNode.props.key);
+                  const kType = bbEntry?.type ?? 'string';
+                  const ops = (kType === 'bool' || kType === 'string') ? ['==', '!='] : ['==', '!=', '>', '<', '>=', '<='];
+                  const currentOp = String(selectedNode.props.op ?? '==');
+                  if (!ops.includes(currentOp)) {
+                    setTimeout(() => updateProp('op', '=='), 0);
+                  }
+                  return (
+                    <select value={ops.includes(currentOp) ? currentOp : '=='} onChange={e => updateProp('op', e.target.value)}
+                      style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
+                      {ops.map(op => <option key={op} value={op}>{op}</option>)}
+                    </select>
+                  );
+                })()}
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>VALUE</label>
                 {(() => {
                   const bbEntry = bt.blackboard.find(k => k.key === selectedNode.props.key);
