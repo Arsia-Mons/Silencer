@@ -8,6 +8,8 @@ import ReactFlow, {
   Position,
   useEdgesState,
   useNodesState,
+  useReactFlow,
+  ReactFlowProvider,
   type Connection,
   type Edge,
   type Node,
@@ -154,32 +156,17 @@ const PALETTE: { group: string; types: BTNodeType[] }[] = [
   { group: 'LEAF',      types: ['Leaf', 'Condition', 'Wait'] },
 ];
 
-// All registered leaf actions (guard + civilian + robot), matching exact C++ action names.
-const LEAF_ACTIONS = [
-  // ── Guard ─────────────────────────────────────────────────────────
-  // Look0-5: scan + shoot in the given direction (0=Forward,1=Low,2=Up,3=Down,4=UpAngle,5=DownAngle)
-  'Look0', 'Look1', 'Look2', 'Look3', 'Look4', 'Look5',
-  'UncrouchIdle',    // crouch→stand when nothing to do
-  'Chase',           // pursue last-seen player
-  'SearchAndReturn', // sweep search zone then return to patrol origin
-  'Stand',           // idle standing animation
-  // ── Civilian ──────────────────────────────────────────────────────
-  'Run',             // flee movement
-  'Wander',          // random wander
-  'WakeUp',          // wake-from-idle animation
-  'LookForward',     // look scan forward
-  'LookSides',       // look scan left + right
-  'MeleeCheck',      // check for melee range enemy
-  // ── Shared ────────────────────────────────────────────────────────
-  'Patrol',          // patrol along current platform
-  'ReturnToSpawn',   // walk back to spawn point
-  // ── Generic data-driven (all NPCs, configure via props) ───────────
-  'SetBlackboard',   // write key/value to blackboard
-  'RandomChance',    // succeed with probability `chance` (0.0–1.0)
-  'PlayAnim',        // drive animation: bank, frames, loop
-  'EmitSound',       // play a sound: sound (filename), volume
-  'SetFacing',       // flip direction: dir = left | right | flip
-];
+// ── Leaf action lists per NPC type ───────────────────────────────────────────
+const GENERIC_ACTIONS = ['SetBlackboard', 'RandomChance', 'PlayAnim', 'EmitSound', 'SetFacing'];
+
+const NPC_ACTIONS: Record<string, string[]> = {
+  guard:    ['Look0', 'Look1', 'Look2', 'Look3', 'Look4', 'Look5', 'UncrouchIdle', 'Chase', 'Patrol', 'SearchAndReturn', 'Stand', ...GENERIC_ACTIONS],
+  civilian: ['Run', 'Wander', 'WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'ReturnToSpawn', ...GENERIC_ACTIONS],
+  robot:    ['WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'Patrol', 'ReturnToSpawn', ...GENERIC_ACTIONS],
+};
+
+// All actions merged for unknown NPC types
+const ALL_ACTIONS = [...new Set([...Object.values(NPC_ACTIONS).flat()])].sort();
 
 const LOOK_DIRECTIONS: { value: number; label: string }[] = [
   { value: 0, label: '0 — Forward (standing)' },
@@ -209,7 +196,11 @@ const NODE_DESC: Record<string, string> = {
 // ── Main editor ───────────────────────────────────────────────────────────────
 interface Props { bt: BehaviorTree; onChange: (bt: BehaviorTree) => void; }
 
-export default function BehaviorTreeEditor({ bt, onChange }: Props) {
+export default function BehaviorTreeEditor(props: Props) {
+  return <ReactFlowProvider><BehaviorTreeEditorInner {...props} /></ReactFlowProvider>;
+}
+
+function BehaviorTreeEditorInner({ bt, onChange }: Props) {
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
   const rfEdgesRef = useRef(rfEdges);
@@ -218,6 +209,14 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
   const [validateMsg, setValidateMsg] = useState<string | null>(null);
   const btRef = useRef(bt);
   btRef.current = bt;
+
+  const rfInstance = useReactFlow();
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const historyRef = useRef<BehaviorTree[]>([]);
+  const historyIdxRef = useRef(-1);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const leafActions = useMemo(() => NPC_ACTIONS[bt.id.toLowerCase()] ?? ALL_ACTIONS, [bt.id]);
 
   // Asset catalogs for PlayAnim / EmitSound dropdowns
   const [spriteBanks, setSpriteBanks] = useState<{ bank: number; frames: number }[]>([]);
@@ -233,6 +232,47 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     setRfNodes(nodes);
     setRfEdges(edges);
   }, [bt.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    historyRef.current = [bt];
+    historyIdxRef.current = 0;
+    setCanUndo(false);
+    setCanRedo(false);
+  }, [bt.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redo(); }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function pushToHistory(newBt: BehaviorTree) {
+    historyRef.current = [...historyRef.current.slice(0, historyIdxRef.current + 1), newBt].slice(-50);
+    historyIdxRef.current = historyRef.current.length - 1;
+    setCanUndo(historyIdxRef.current > 0);
+    setCanRedo(false);
+  }
+
+  function undo() {
+    if (historyIdxRef.current <= 0) return;
+    historyIdxRef.current -= 1;
+    const prev = historyRef.current[historyIdxRef.current];
+    setCanUndo(historyIdxRef.current > 0);
+    setCanRedo(true);
+    onChange(prev);
+  }
+
+  function redo() {
+    if (historyIdxRef.current >= historyRef.current.length - 1) return;
+    historyIdxRef.current += 1;
+    const next = historyRef.current[historyIdxRef.current];
+    setCanUndo(true);
+    setCanRedo(historyIdxRef.current < historyRef.current.length - 1);
+    onChange(next);
+  }
 
   // When ReactFlow removes edges (user clicks edge → Delete), sync children arrays in BT data.
   const handleEdgesChange = useCallback((changes: Parameters<typeof onEdgesChange>[0]) => {
@@ -250,6 +290,7 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
         nodes[source] = { ...nodes[source], children: nodes[source].children.filter(c => c !== target) };
       }
     }
+    pushToHistory({ ...cur, nodes });
     onChange({ ...cur, nodes });
   }, [onEdgesChange, onChange]);
 
@@ -270,6 +311,7 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
         [params.source]: { ...parentNode, children: [...parentNode.children, params.target] },
       },
     };
+    pushToHistory(updated);
     onChange(updated);
     setRfEdges(es => addEdge({ ...params, type: 'smoothstep', style: { stroke: '#4a5568', strokeWidth: 2 } }, es));
   }, [onChange]);
@@ -279,7 +321,9 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     setRfNodes(laid);
     const positions: Record<string, { x: number; y: number }> = {};
     laid.forEach(n => { positions[n.id] = n.position; });
-    onChange({ ...btRef.current, positions });
+    const newBt = { ...btRef.current, positions };
+    pushToHistory(newBt);
+    onChange(newBt);
   }
 
   function validate(): string | null {
@@ -311,15 +355,17 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     return dfs(cur.rootId);
   }
 
-  function addNode(type: BTNodeType) {
+  function addNodeAt(type: BTNodeType, position: { x: number; y: number }) {
     const id = `${type.toLowerCase()}_${uid()}`;
     const node: BTNode = { type, label: type, children: [], props: {} };
-    onChange({ ...btRef.current, nodes: { ...btRef.current.nodes, [id]: node } });
-    setRfNodes(ns => [...ns, {
-      id, type: 'btNode',
-      position: { x: 100 + Math.random() * 200, y: 100 + Math.random() * 200 },
-      data: { type, label: type, subtitle: '' },
-    }]);
+    const updated = { ...btRef.current, nodes: { ...btRef.current.nodes, [id]: node }, positions: { ...btRef.current.positions, [id]: position } };
+    pushToHistory(updated);
+    onChange(updated);
+    setRfNodes(ns => [...ns, { id, type: 'btNode', position, data: { type, label: type, subtitle: '' } }]);
+  }
+
+  function addNode(type: BTNodeType) {
+    addNodeAt(type, { x: 100 + Math.random() * 300, y: 100 + Math.random() * 300 });
   }
 
   function deleteSelectedNode() {
@@ -332,6 +378,7 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     for (const n of Object.values(nodes)) {
       n.children = n.children.filter((c: string) => c !== selectedNodeId);
     }
+    pushToHistory({ ...cur, nodes });
     onChange({ ...cur, nodes });
     setRfNodes(ns => ns.filter(n => n.id !== selectedNodeId));
     setRfEdges(es => es.filter(e => e.source !== selectedNodeId && e.target !== selectedNodeId));
@@ -347,6 +394,7 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
       ...cur,
       nodes: { ...cur.nodes, [selectedNodeId]: { ...cur.nodes[selectedNodeId], ...patch } },
     };
+    pushToHistory(updated);
     onChange(updated);
     setRfNodes(ns => ns.map(n => n.id === selectedNodeId
       ? { ...n, data: { ...n.data, label: patch.label ?? n.data.label, subtitle: nodeSubtitle(updated.nodes[selectedNodeId]) } }
@@ -365,7 +413,9 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     // Auto-generate a unique key name
     let n = cur.blackboard.length + 1;
     while (cur.blackboard.some(k => k.key === `key_${n}`)) n++;
-    onChange({ ...cur, blackboard: [...cur.blackboard, { key: `key_${n}`, type: 'bool', default: false }] });
+    const newBt = { ...cur, blackboard: [...cur.blackboard, { key: `key_${n}`, type: 'bool' as const, default: false }] };
+    pushToHistory(newBt);
+    onChange(newBt);
   }
 
   function updateBBKey(idx: number, patch: Partial<BBKey>) {
@@ -375,11 +425,15 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
       patch.default = patch.type === 'bool' ? false : patch.type === 'string' ? '' : 0;
     }
     bb[idx] = { ...bb[idx], ...patch };
-    onChange({ ...bt, blackboard: bb });
+    const newBt = { ...bt, blackboard: bb };
+    pushToHistory(newBt);
+    onChange(newBt);
   }
 
   function removeBBKey(idx: number) {
-    onChange({ ...bt, blackboard: bt.blackboard.filter((_, i) => i !== idx) });
+    const newBt = { ...bt, blackboard: bt.blackboard.filter((_, i) => i !== idx) };
+    pushToHistory(newBt);
+    onChange(newBt);
   }
 
   // How many Condition nodes reference a given blackboard key
@@ -407,7 +461,13 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
           <div key={group} style={{ marginBottom: 12 }}>
             <div style={{ color: '#4a5568', fontSize: 9, letterSpacing: 2, marginBottom: 4 }}>{group}</div>
             {types.map(t => (
-              <button key={t} onClick={() => addNode(t)}
+              <button key={t}
+                draggable
+                onDragStart={e => {
+                  e.dataTransfer.setData('application/bt-node-type', t);
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
+                onClick={() => addNode(t)}
                 style={{
                   display: 'block', width: '100%', marginBottom: 4, padding: '5px 8px',
                   background: '#161b22', border: `1px solid ${TYPE_COLOR[t]}44`,
@@ -427,6 +487,16 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
             style={{ display: 'block', width: '100%', padding: '5px 8px', background: '#161b22', border: '1px solid #2d3748', color: '#a0aec0', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: 1, marginBottom: 4 }}>
             AUTO LAYOUT
           </button>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+            <button onClick={undo} disabled={!canUndo}
+              style={{ flex: 1, padding: '5px 4px', background: '#161b22', border: '1px solid #2d3748', color: canUndo ? '#a0aec0' : '#2d3748', fontSize: 10, fontFamily: 'monospace', cursor: canUndo ? 'pointer' : 'default', letterSpacing: 1 }}>
+              ↩ UNDO
+            </button>
+            <button onClick={redo} disabled={!canRedo}
+              style={{ flex: 1, padding: '5px 4px', background: '#161b22', border: '1px solid #2d3748', color: canRedo ? '#a0aec0' : '#2d3748', fontSize: 10, fontFamily: 'monospace', cursor: canRedo ? 'pointer' : 'default', letterSpacing: 1 }}>
+              ↪ REDO
+            </button>
+          </div>
           <button
             onClick={() => { const e = validate(); setValidateMsg(e ?? '✓ Valid'); }}
             style={{ display: 'block', width: '100%', padding: '5px 8px', background: '#161b22', border: '1px solid #2d3748', color: '#a0aec0', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: 1 }}>
@@ -447,7 +517,19 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
       </div>
 
       {/* Canvas */}
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div
+        ref={reactFlowWrapper}
+        style={{ flex: 1, position: 'relative' }}
+        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+        onDrop={e => {
+          e.preventDefault();
+          const type = e.dataTransfer.getData('application/bt-node-type') as BTNodeType;
+          if (!type) return;
+          const bounds = reactFlowWrapper.current!.getBoundingClientRect();
+          const pos = rfInstance.project({ x: e.clientX - bounds.left, y: e.clientY - bounds.top });
+          addNodeAt(type, pos);
+        }}
+      >
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
@@ -483,15 +565,43 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
               </div>
             )}
 
-            {/* Child count for composites */}
-            {['Selector','Sequence','Parallel','RandomSelector'].includes(selectedNode.type) && (
-              <div style={{ color: '#718096', fontSize: 10, marginBottom: 8 }}>
-                {selectedNode.children.length} child{selectedNode.children.length !== 1 ? 'ren' : ''}
-                {selectedNode.children.length > 0 && (
-                  <span style={{ color: '#4a5568', marginLeft: 4 }}>
-                    [{selectedNode.children.map((c, i) => `${i+1}:${c}`).join(', ')}]
-                  </span>
-                )}
+            {/* Children ordered list for composites */}
+            {['Selector','Sequence','Parallel','RandomSelector'].includes(selectedNode.type) && selectedNode.children.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#718096', fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>
+                  CHILDREN ({selectedNode.children.length}) — order matters
+                </div>
+                {selectedNode.children.map((cid, i) => {
+                  const childNode = bt.nodes[cid];
+                  return (
+                    <div key={cid} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                      <span style={{ color: '#4a5568', fontSize: 9, fontFamily: 'monospace', minWidth: 14 }}>{i + 1}.</span>
+                      <span style={{ flex: 1, color: '#a0aec0', fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {childNode?.label ?? cid}
+                      </span>
+                      <button
+                        disabled={i === 0}
+                        onClick={() => {
+                          const kids = [...selectedNode.children];
+                          [kids[i - 1], kids[i]] = [kids[i], kids[i - 1]];
+                          updateSelectedNode({ children: kids });
+                        }}
+                        style={{ background: 'none', border: '1px solid #2d3748', color: i === 0 ? '#2d3748' : '#718096', fontSize: 10, cursor: i === 0 ? 'default' : 'pointer', padding: '1px 4px', lineHeight: 1, flexShrink: 0 }}>
+                        ↑
+                      </button>
+                      <button
+                        disabled={i === selectedNode.children.length - 1}
+                        onClick={() => {
+                          const kids = [...selectedNode.children];
+                          [kids[i], kids[i + 1]] = [kids[i + 1], kids[i]];
+                          updateSelectedNode({ children: kids });
+                        }}
+                        style={{ background: 'none', border: '1px solid #2d3748', color: i === selectedNode.children.length - 1 ? '#2d3748' : '#718096', fontSize: 10, cursor: i === selectedNode.children.length - 1 ? 'default' : 'pointer', padding: '1px 4px', lineHeight: 1, flexShrink: 0 }}>
+                        ↓
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -505,7 +615,7 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
                 <select value={String(selectedNode.props.action ?? '')} onChange={e => updateProp('action', e.target.value)}
                   style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
                   <option value="">— select action —</option>
-                  {LEAF_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
+                  {leafActions.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
 
                 {/* Generic extra props (all props except action) */}
@@ -560,6 +670,15 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
                             );
                           })}
                         </div>
+                        {Number(selectedNode.props.bank ?? 0) > 0 && (
+                          <div style={{ marginBottom: 8, textAlign: 'center' }}>
+                            <img
+                              src={`${API}/sprites/${selectedNode.props.bank}/0`}
+                              alt={`bank ${selectedNode.props.bank} frame 0`}
+                              style={{ maxWidth: '100%', imageRendering: 'pixelated', border: '1px solid #2d3748', background: '#161b22' }}
+                            />
+                          </div>
+                        )}
                       </>)}
 
                       {/* EmitSound knobs */}
@@ -717,12 +836,30 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
               </>
             )}
 
+            {selectedNode.type === 'Parallel' && (
+              <>
+                <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>
+                  THRESHOLD (children that must succeed; 0 = all)
+                </label>
+                <input type="number" value={Number(selectedNode.props.threshold ?? 0)} min={0} step={1}
+                  onChange={e => updateProp('threshold', parseInt(e.target.value))}
+                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 2, boxSizing: 'border-box' }} />
+                <div style={{ color: '#4a5568', fontSize: 9, marginBottom: 8 }}>
+                  0 means all {selectedNode.children.length} children must succeed
+                </div>
+              </>
+            )}
+
             <div style={{ color: '#4a5568', fontSize: 10, letterSpacing: 1, marginTop: 4 }}>
               ID: {selectedNodeId}
               {selectedNodeId === bt.rootId && <span style={{ color: '#f59e0b', marginLeft: 4 }}>(root)</span>}
             </div>
             {selectedNodeId !== bt.rootId && (
-              <button onClick={() => onChange({ ...btRef.current, rootId: selectedNodeId! })}
+              <button onClick={() => {
+                const newBt = { ...btRef.current, rootId: selectedNodeId! };
+                pushToHistory(newBt);
+                onChange(newBt);
+              }}
                 style={{ display: 'block', width: '100%', marginTop: 6, padding: '4px 8px', background: '#1c1400', border: '1px solid #78350f', color: '#f59e0b', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: 1 }}>
                 ★ SET AS ROOT
               </button>
