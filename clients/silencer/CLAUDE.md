@@ -40,6 +40,52 @@ Rules:
   overlays. Add a separate modal stack only if real modal semantics are being
   extracted, not as a placeholder.
 
+### Input contract
+
+There is exactly one path from SDL events to UI screens:
+
+1. **Collection (single site):** `src/game/events.cpp` is the only place that
+   consumes raw SDL events (`SDL_EVENT_KEY_DOWN`/`_UP`, `SDL_EVENT_TEXT_INPUT`,
+   mouse, wheel, gamepad). It pushes everything into `clientUiInput`
+   (`ClientUiInput`). No other file under `src/` calls `SDL_PollEvent` or
+   reads SDL key events.
+2. **Composition (single site):** `Game::RenderClientUiFrame` builds the
+   per-frame `UiInputState` (`preparedUiInput`) from `clientUiInput`.
+   `Game::ResetUiFrameDeltas` clears the queues at end of frame.
+3. **Dispatch (single site):** `ClientUi::DispatchInput` hands `UiInputState`
+   to `UiInputRouter::Route`, which translates pointer/text/nav/binding into
+   typed `UiAction`s queued on `UiAutomationRegistry`. Screens consume those
+   actions in `Screen::HandleUiIntent` (per the existing virtual). Screens
+   must NOT implement `OnTextInput` or `OnKey` virtuals — those don't exist.
+
+`UiInputState` carries three input channels (`src/ui/runtime/UiInputState.h`):
+
+- `textInput` — typed ASCII characters from `SDL_EVENT_TEXT_INPUT`. Routed to
+  the focused text widget via `DispatchTextInput`.
+- `navActions` — semantic `UiNavAction` enums (Up/Down/Left/Right/Confirm/
+  Cancel/Backspace/FocusNext/FocusPrevious/NextSection/PreviousSection).
+  This is the channel screens read for keyboard/gamepad navigation.
+- `bindingInputs` — raw scancode / gamepad-button / gamepad-axis edges, used
+  only by the keybind capture flow (`controls_rebind_capture.cpp`). The
+  router emits a `CaptureBinding` action per edge; the registry no-ops it
+  unless a screen is in capture mode.
+
+There is intentionally no fourth "raw key event" channel — every keypress is
+either text, nav, or a binding edge.
+
+### Gameplay shortcut keys
+
+A few function keys (F1 scoreboard, F2 team-color toggle, F4 music pause,
+F5 reshuffle music, F9 debug overlay, quit) are gameplay state changes, not
+UI navigation. They are read directly in `events.cpp` `OnScancodeDown`/
+`OnScancodeUp` and mutate `World` via its public setters
+(`SetShowingPlayerList`, `SetShowingTeamColors`, etc.). They intentionally
+bypass the `UiInputState` → `UiAction` path: routing them through a typed-
+action layer would require a controller bridging UI input and world state
+for no real benefit. New keys that toggle world/gameplay state should follow
+the same pattern; new keys that affect a UI screen should go through
+`navActions`.
+
 Run `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` after UI ownership
 changes; it guards this boundary.
 

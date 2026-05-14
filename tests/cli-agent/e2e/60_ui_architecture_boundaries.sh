@@ -61,6 +61,15 @@ if rg -n "SDL_GetMouseState" \
   exit 1
 fi
 
+# Raw SDL event consumption belongs in the platform/event layer (game/).
+# client/ui and ui/runtime must consume the typed UiInputState only.
+if rg -n "SDL_EVENT_KEY_DOWN|SDL_EVENT_KEY_UP|SDL_KEYDOWN|SDL_KEYUP|SDL_PollEvent" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime"; then
+  echo "client UI and ui/runtime must not consume raw SDL key events" >&2
+  exit 1
+fi
+
 fail_if_match \
   "Clay_(BeginLayout|EndLayout|SetPointerState)[[:space:]]*\\(" \
   "$REPO_ROOT/clients/silencer/src/client/ui/screens" \
