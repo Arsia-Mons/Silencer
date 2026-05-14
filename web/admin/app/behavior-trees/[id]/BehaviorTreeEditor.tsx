@@ -540,7 +540,24 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
           onNodeClick={(_, n) => setSelectedNodeId(n.id)}
           onPaneClick={() => setSelectedNodeId(null)}
           onNodeDragStop={(_, n) => {
-            onChange({ ...btRef.current, positions: { ...btRef.current.positions, [n.id]: n.position } });
+            const cur = btRef.current;
+            const updatedPositions = { ...cur.positions, [n.id]: n.position };
+            // Re-sort parent's children by x position so dragging left/right changes execution order
+            const parentEntry = Object.entries(cur.nodes).find(([, node]) =>
+              ['Selector', 'Sequence', 'Parallel', 'RandomSelector'].includes(node.type) && node.children.includes(n.id)
+            );
+            let updatedNodes = cur.nodes;
+            if (parentEntry) {
+              const [parentId, parent] = parentEntry;
+              const getX = (id: string) => {
+                const pos = updatedPositions[id] ?? rfNodes.find(rn => rn.id === id)?.position;
+                return pos?.x ?? 0;
+              };
+              const sortedChildren = [...parent.children].sort((a, b) => getX(a) - getX(b));
+              updatedNodes = { ...cur.nodes, [parentId]: { ...parent, children: sortedChildren } };
+            }
+            pushToHistory({ ...cur, nodes: updatedNodes, positions: updatedPositions });
+            onChange({ ...cur, nodes: updatedNodes, positions: updatedPositions });
           }}
           fitView
         >
