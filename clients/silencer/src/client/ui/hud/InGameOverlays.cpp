@@ -1,6 +1,6 @@
 #include "client/ui/hud/InGameOverlays.h"
 
-#include "client/ui/hud/overlay_player_list.h"
+#include "client/ui/hud/hud_player_list_overlay.h"
 #include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
 #include "render/clay_ui_payloads.h"

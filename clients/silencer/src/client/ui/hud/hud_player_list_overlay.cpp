@@ -1,4 +1,4 @@
-#include "client/ui/hud/overlay_player_list.h"
+#include "client/ui/hud/hud_player_list_overlay.h"
 
 #include "clay/clay.h"
 #include "client/ui/hud/HudPayloadArena.h"
