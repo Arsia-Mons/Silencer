@@ -153,13 +153,54 @@ const PALETTE: { group: string; types: BTNodeType[] }[] = [
   { group: 'LEAF',      types: ['Leaf', 'Condition', 'Wait'] },
 ];
 
+// All registered leaf actions (guard + civilian + robot).
+// Shoot direction values: 0=Forward 1=Low 2=Up 3=Down 4=UpAngle 5=DownAngle 6=LadderUp 7=LadderDown
 const LEAF_ACTIONS = [
-  'Patrol', 'Stand', 'Look',
-  'ShootStanding', 'ShootCrouched', 'ShootUp', 'ShootDown', 'ShootUpAngle', 'ShootDownAngle',
-  'Crouch', 'Uncrouch',
-  'ClimbLadder', 'Alert', 'Melee',
-  'Run', 'Wander', 'Sleep', 'Idle',
+  // ── Guard — conditions ────────────────────────────────────────────
+  'IsAlive', 'IsWalking', 'IsCrouched', 'IsNotCrouched', 'IsShooting',
+  'IsOnLadder', 'IsAtEdge', 'WasHit', 'HasChaseTarget', 'IsPlayerInBase', 'IsPlayerInvisible',
+  // ── Guard — LOS checks ────────────────────────────────────────────
+  'CanSeeForward', 'CanSeeLow', 'CanSeeUp', 'CanSeeDown', 'CanSeeUpAngle', 'CanSeeDownAngle',
+  'CanShootFromLadder',
+  // ── Guard — combat ────────────────────────────────────────────────
+  'Shoot', 'ShootFromLadder',
+  // ── Guard — movement / posture ────────────────────────────────────
+  'Patrol', 'Chase', 'SearchAndReturn', 'PursueHitDirection',
+  'Crouch', 'UncrouchIdle', 'StandIdle', 'LookScan',
+  // ── Civilian ─────────────────────────────────────────────────────
+  'RunMove',
+  // ── Robot ─────────────────────────────────────────────────────────
+  'WakeAnim', 'SleepAnim', 'ReturnToSpawn',
+  // ── Generic / shared ──────────────────────────────────────────────
+  'Stand', 'Idle', 'MoveTo', 'Alert', 'Wander',
 ];
+
+const SHOOT_DIRECTIONS: { value: number; label: string }[] = [
+  { value: 0, label: '0 — Forward (standing)' },
+  { value: 1, label: '1 — Low (crouched)' },
+  { value: 2, label: '2 — Up' },
+  { value: 3, label: '3 — Down' },
+  { value: 4, label: '4 — Up-angle' },
+  { value: 5, label: '5 — Down-angle' },
+  { value: 6, label: '6 — Ladder up' },
+  { value: 7, label: '7 — Ladder down' },
+];
+
+// Semantics shown in the inspector when a composite/decorator/leaf is selected.
+const NODE_DESC: Record<string, string> = {
+  Selector:       'Tries children left→right. Returns Success on the first child that succeeds, Failure if all fail. Reactive: re-evaluates from child[0] every tick.',
+  Sequence:       'Runs children left→right. Returns Failure on the first child that fails, Success only when all children succeed.',
+  Parallel:       'Ticks all children every tick simultaneously. Returns Success when all succeed, Failure when any fail.',
+  RandomSelector: 'Like Selector but shuffles children order each tick.',
+  Inverter:       'Inverts child result: Success↔Failure. Running passes through.',
+  Cooldown:       'Blocks child for DURATION seconds after the child returns Success.',
+  Repeat:         'Re-runs child COUNT times (0 = infinite). Returns Failure if child ever fails.',
+  Timeout:        'Runs child; if it is still Running after DURATION seconds, returns Failure.',
+  ForceSuccess:   'Runs child; always returns Success regardless of child result.',
+  Wait:           'Returns Running for DURATION seconds, then Success.',
+  Leaf:           'Dispatches to a named C++ action handler registered via btctx_.actions["Name"].',
+  Condition:      'Reads a blackboard key and compares it to a literal value. Returns Success if the comparison is true.',
+};
 
 // ── Main editor ───────────────────────────────────────────────────────────────
 interface Props { bt: BehaviorTree; onChange: (bt: BehaviorTree) => void; }
@@ -398,9 +439,29 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
         {/* Node config */}
         {selectedNode ? (
           <div style={{ padding: '12px 10px', borderBottom: '1px solid #2d3748' }}>
-            <div style={{ color: TYPE_COLOR[selectedNode.type], fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>
-              {selectedNode.type.toUpperCase()}
+            <div style={{ color: TYPE_COLOR[selectedNode.type], fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>
+              {TYPE_SYMBOL[selectedNode.type]} {selectedNode.type.toUpperCase()}
             </div>
+
+            {/* Semantic description */}
+            {NODE_DESC[selectedNode.type] && (
+              <div style={{ color: '#4a5568', fontSize: 9, lineHeight: 1.5, marginBottom: 8, fontFamily: 'monospace' }}>
+                {NODE_DESC[selectedNode.type]}
+              </div>
+            )}
+
+            {/* Child count for composites */}
+            {['Selector','Sequence','Parallel','RandomSelector'].includes(selectedNode.type) && (
+              <div style={{ color: '#718096', fontSize: 10, marginBottom: 8 }}>
+                {selectedNode.children.length} child{selectedNode.children.length !== 1 ? 'ren' : ''}
+                {selectedNode.children.length > 0 && (
+                  <span style={{ color: '#4a5568', marginLeft: 4 }}>
+                    [{selectedNode.children.map((c, i) => `${i+1}:${c}`).join(', ')}]
+                  </span>
+                )}
+              </div>
+            )}
+
             <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>LABEL</label>
             <input value={selectedNode.label} onChange={e => updateSelectedNode({ label: e.target.value })}
               style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
@@ -410,8 +471,44 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>ACTION</label>
                 <select value={String(selectedNode.props.action ?? '')} onChange={e => updateProp('action', e.target.value)}
                   style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                  <option value="">— select action —</option>
                   {LEAF_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
+
+                {/* Shoot direction */}
+                {selectedNode.props.action === 'Shoot' && (
+                  <>
+                    <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>DIRECTION</label>
+                    <select value={Number(selectedNode.props.direction ?? 0)} onChange={e => updateProp('direction', parseInt(e.target.value))}
+                      style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                      {SHOOT_DIRECTIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                    </select>
+                  </>
+                )}
+
+                {/* Generic extra props (all props except action + direction for Shoot) */}
+                {(() => {
+                  const reserved = new Set(['action', ...(selectedNode.props.action === 'Shoot' ? ['direction'] : [])]);
+                  const extraKeys = Object.keys(selectedNode.props).filter(k => !reserved.has(k));
+                  return extraKeys.length > 0 ? (
+                    <>
+                      <div style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, marginBottom: 4 }}>EXTRA PROPS</div>
+                      {extraKeys.map(k => (
+                        <div key={k} style={{ display: 'flex', gap: 4, marginBottom: 4, alignItems: 'center' }}>
+                          <span style={{ color: '#718096', fontSize: 9, fontFamily: 'monospace', flexShrink: 0, minWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis' }}>{k}</span>
+                          <input value={String(selectedNode.props[k])}
+                            onChange={e => updateProp(k, isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value))}
+                            style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '3px 5px', fontSize: 10, fontFamily: 'monospace', minWidth: 0 }} />
+                          <button onClick={() => {
+                            const p = { ...selectedNode.props };
+                            delete p[k];
+                            updateSelectedNode({ props: p });
+                          }} style={{ background: 'none', border: 'none', color: '#4a5568', cursor: 'pointer', fontSize: 12, padding: '0 2px', flexShrink: 0 }}>✕</button>
+                        </div>
+                      ))}
+                    </>
+                  ) : null;
+                })()}
               </>
             )}
 
@@ -495,10 +592,16 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
               </>
             )}
 
-            <div style={{ color: '#4a5568', fontSize: 10, letterSpacing: 1 }}>
+            <div style={{ color: '#4a5568', fontSize: 10, letterSpacing: 1, marginTop: 4 }}>
               ID: {selectedNodeId}
-              {selectedNodeId === bt.rootId && ' (root)'}
+              {selectedNodeId === bt.rootId && <span style={{ color: '#f59e0b', marginLeft: 4 }}>(root)</span>}
             </div>
+            {selectedNodeId !== bt.rootId && (
+              <button onClick={() => onChange({ ...btRef.current, rootId: selectedNodeId! })}
+                style={{ display: 'block', width: '100%', marginTop: 6, padding: '4px 8px', background: '#1c1400', border: '1px solid #78350f', color: '#f59e0b', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: 1 }}>
+                ★ SET AS ROOT
+              </button>
+            )}
           </div>
         ) : (
           <div style={{ padding: '12px 10px', borderBottom: '1px solid #2d3748', color: '#4a5568', fontSize: 10 }}>
