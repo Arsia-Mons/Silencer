@@ -74,6 +74,8 @@ public:
 	// In-game UI session flags. Paired with the public mutable showchat_i.
 	bool IsShowingPlayerList() const { return showplayerlist; }
 	void SetShowingPlayerList(bool show) { showplayerlist = show; }
+	bool IsShowingTeamColors() const { return showteamcolors; }
+	void SetShowingTeamColors(bool show) { showteamcolors = show; }
 
 	// Decorative HUD highlights (set by gameplay; read by HUD).
 	bool ShouldHighlightSecrets() const { return highlightsecrets; }

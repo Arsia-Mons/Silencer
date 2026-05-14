@@ -358,10 +358,10 @@ void Game::OnScancodeDown(int sc){
 		}
 	}
 	if(sc == SDL_SCANCODE_F1){
-		world.showplayerlist = true;
+		world.SetShowingPlayerList(true);
 	}
 	if(sc == SDL_SCANCODE_F2){
-		world.showteamcolors = !world.showteamcolors;
+		world.SetShowingTeamColors(!world.IsShowingTeamColors());
 	}
 	if(sc == SDL_SCANCODE_F5){
 		ambienceMixer.LoadRandomGameMusic();
@@ -394,6 +394,6 @@ void Game::OnScancodeUp(int sc){
 		}
 	}
 	if(sc == SDL_SCANCODE_F1){
-		world.showplayerlist = false;
+		world.SetShowingPlayerList(false);
 	}
 }
