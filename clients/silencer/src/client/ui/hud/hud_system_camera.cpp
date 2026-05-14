@@ -10,7 +10,7 @@
 namespace silencer {
 namespace client_ui {
 
-void BuildHudSystemCameraFrame(const Resources& resources, Surface* surface,
+void BuildHudSystemCameraFrame(Surface* surface, const Resources& resources,
                                Uint8 bank, Uint16 index, Uint8 offsetBank,
                                int logicalY) {
 	if(bank >= resources.spritebank.size()) return;

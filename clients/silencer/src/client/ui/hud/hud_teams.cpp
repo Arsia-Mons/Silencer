@@ -13,8 +13,8 @@
 namespace silencer {
 namespace client_ui {
 
-int BuildHudTeams(const Resources& resources, Surface* surface,
-                  const HudView& view, Uint8 phase) {
+int BuildHudTeams(const HudView& view, Surface* surface,
+                  const Resources& resources, Uint8 phase) {
 	if(view.teams.empty()) return 0;
 
 	struct SpriteSpec { int x; int y; Uint8 bank; Uint16 index; Uint8 rampColor; Uint8 rampPlus; };

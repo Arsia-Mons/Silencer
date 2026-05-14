@@ -14,8 +14,8 @@ struct TeamHudView;
 // The vertical team strip: per-team peer-state sprites, secret-slot sprites,
 // and the agency emblem. Returns the number of teams rendered (used by the
 // caller to position the secret-progress overlay).
-int BuildHudTeams(const Resources& resources, Surface* surface,
-                  const HudView& view, Uint8 phase);
+int BuildHudTeams(const HudView& view, Surface* surface,
+                  const Resources& resources, Uint8 phase);
 
 // Linear lookup by team id. Used by the composition function to find the team
 // that owns the viewed player.

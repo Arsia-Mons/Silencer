@@ -15,8 +15,8 @@ struct PlayerHudView;
 // weapon face/glow/selector, and the four inventory icons + letters. Returns
 // the ammo count of the currently-selected weapon, which the readout overlay
 // then renders as the large `currentAmmo` number.
-Uint8 BuildHudStatusSprites(Renderer& renderer, const Resources& resources,
-                            Surface* surface, const PlayerHudView& player,
+Uint8 BuildHudStatusSprites(const PlayerHudView& player, Surface* surface,
+                            const Resources& resources, Renderer& renderer,
                             Uint8 phase);
 
 }  // namespace client_ui

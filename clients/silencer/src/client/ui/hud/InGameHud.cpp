@@ -26,26 +26,26 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 	Uint8 phase = renderer.GetHudAnimationPhase();
 
 	if(view.systemCamera[0].active){
-		BuildHudSystemCameraFrame(resources, surface, 95, 2, 92, 381);
+		BuildHudSystemCameraFrame(surface, resources, 95, 2, 92, 381);
 	}
 	if(view.systemCamera[1].active){
-		BuildHudSystemCameraFrame(resources, surface, 95, 11, 92, 318);
+		BuildHudSystemCameraFrame(surface, resources, 95, 11, 92, 318);
 	}
 
 	if(!player.valid) return;
 
-	Uint8 currentammo = BuildHudStatusSprites(renderer, resources, surface, player, phase);
-	BuildHudReadouts(player, currentammo, surface);
+	Uint8 currentammo = BuildHudStatusSprites(player, surface, resources, renderer, phase);
+	BuildHudReadouts(player, surface, currentammo);
 
-	int teamCount = BuildHudTeams(resources, surface, view, phase);
+	int teamCount = BuildHudTeams(view, surface, resources, phase);
 	const TeamHudView* team = FindTeamById(view, player.teamId);
 
 	if(team && team->baseDoorId){
 		int yoffset = 60;
 		if(teamCount >= 3) yoffset += (teamCount * 20) - 65;
-		BuildHudSecretSprites(resources, surface, view, *team, yoffset, phase);
+		BuildHudSecretSprites(view, surface, resources, *team, yoffset, phase);
 		if(!team->beamingTerminalId){
-			BuildHudSecretProgress(surface, player, yoffset, team->secretProgress, phase);
+			BuildHudSecretProgress(player, surface, yoffset, team->secretProgress, phase);
 		}
 	}
 
@@ -54,10 +54,10 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 		tracetime = team->beamingTerminalTraceTime;
 	}
 	if(player.tracetime > 0) tracetime = player.tracetime;
-	if(tracetime > 0) BuildHudTraceTime(tracetime, surface);
+	if(tracetime > 0) BuildHudTraceTime(surface, tracetime);
 
 	if(view.buyTech.visible){
-		BuildBuyTechOverlay(surface, view.buyTech);
+		BuildBuyTechOverlay(view.buyTech, surface);
 	}
 
 	if(view.showChatTicks || player.chatActive){

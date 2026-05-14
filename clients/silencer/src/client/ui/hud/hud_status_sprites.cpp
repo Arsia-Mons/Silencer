@@ -14,8 +14,8 @@
 namespace silencer {
 namespace client_ui {
 
-Uint8 BuildHudStatusSprites(Renderer& renderer, const Resources& resources,
-                            Surface* surface, const PlayerHudView& player,
+Uint8 BuildHudStatusSprites(const PlayerHudView& player, Surface* surface,
+                            const Resources& resources, Renderer& renderer,
                             Uint8 phase) {
 	Uint8 currentammo = 0;
 

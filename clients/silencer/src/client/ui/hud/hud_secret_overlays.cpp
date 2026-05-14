@@ -14,8 +14,8 @@
 namespace silencer {
 namespace client_ui {
 
-void BuildHudSecretSprites(const Resources& resources, Surface* surface,
-                           const HudView& view, const TeamHudView& team,
+void BuildHudSecretSprites(const HudView& view, Surface* surface,
+                           const Resources& resources, const TeamHudView& team,
                            int yoffset, Uint8 phase) {
 	struct SpriteSpec { int x; int y; Uint8 bank; Uint16 index; Uint8 brightness; };
 	std::vector<SpriteSpec> sprites;
@@ -69,7 +69,7 @@ void BuildHudSecretSprites(const Resources& resources, Surface* surface,
 	}
 }
 
-void BuildHudSecretProgress(Surface* surface, const PlayerHudView& player,
+void BuildHudSecretProgress(const PlayerHudView& player, Surface* surface,
                             int yoffset, int secretprogress, Uint8 phase) {
 	static const char* names[] = {
 		"Guv Net", "OS", "Protocol", "Cypher Lock 1", "Cypher Lock 2",

@@ -12,11 +12,11 @@ struct PlayerHudView;
 // HUD text overlays: ammo readouts, credits, health/shield numbers, inventory
 // counts. `currentammo` is the value picked by BuildHudStatusSprites for the
 // currently-selected weapon.
-void BuildHudReadouts(const PlayerHudView& player, Uint8 currentammo,
-                      Surface* surface);
+void BuildHudReadouts(const PlayerHudView& player, Surface* surface,
+                      Uint8 currentammo);
 
 // "Government Trace Time: NNN" debug-style line shown when a trace is active.
-void BuildHudTraceTime(Uint8 tracetime, Surface* surface);
+void BuildHudTraceTime(Surface* surface, Uint8 tracetime);
 
 }  // namespace client_ui
 }  // namespace silencer

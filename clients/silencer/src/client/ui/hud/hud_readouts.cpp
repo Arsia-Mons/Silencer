@@ -11,7 +11,7 @@
 namespace silencer {
 namespace client_ui {
 
-void BuildHudReadouts(const PlayerHudView& player, Uint8 currentammo, Surface* surface) {
+void BuildHudReadouts(const PlayerHudView& player, Surface* surface, Uint8 currentammo) {
 	std::string currentAmmo = std::string(currentammo < 10 ? " " : "") + std::to_string(currentammo);
 	std::string blasterAmmo = "99";
 	std::string laserAmmo = player.laserAmmo > 0
@@ -89,7 +89,7 @@ void BuildHudReadouts(const PlayerHudView& player, Uint8 currentammo, Surface* s
 	}
 }
 
-void BuildHudTraceTime(Uint8 tracetime, Surface* surface) {
+void BuildHudTraceTime(Surface* surface, Uint8 tracetime) {
 	std::string text = "Government Trace Time: " + std::to_string(tracetime);
 	silencer::clay_bridge::BankTextDrawData textData{136, false, false};
 	CLAY({ .id = CLAY_ID("InGameHudTraceRoot"),

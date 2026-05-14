@@ -9,7 +9,7 @@ struct BuyTechOverlayView;
 
 // Modal-style center panel listing buyable items (or tech, depending on the
 // origin station). The viewed player's row selection drives focus.
-void BuildBuyTechOverlay(Surface* surface, const BuyTechOverlayView& view);
+void BuildBuyTechOverlay(const BuyTechOverlayView& view, Surface* surface);
 
 }  // namespace client_ui
 }  // namespace silencer

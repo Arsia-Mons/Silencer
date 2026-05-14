@@ -15,7 +15,7 @@
 namespace silencer {
 namespace client_ui {
 
-void BuildBuyTechOverlay(Surface* surface, const BuyTechOverlayView& view) {
+void BuildBuyTechOverlay(const BuyTechOverlayView& view, Surface* surface) {
 	if(view.rows.empty()) return;
 
 	using namespace silencer::ui::primitives;
