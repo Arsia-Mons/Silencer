@@ -28,11 +28,19 @@ Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 void Civilian::InitBT(){
 	bt_ = BehaviorTreeLibrary::instance().get("civilian");
 	if(!bt_) return;
-	btctx_.actions["Run"] = [this](BTContext&) -> BTResult {
+	btctx_.actions["Run"] = [this](BTContext& ctx) -> BTResult {
+		if(ctx.props){
+			int bonus = ctx.props->value("speedBonus", -1);
+			if(bonus >= 0) ctx.bbSet("bt_run_speed_bonus", bonus);
+		}
 		if(state != RUNNING){ state = RUNNING; state_i = (Uint8)-1; }
 		return BTResult::Success;
 	};
-	btctx_.actions["Wander"] = [](BTContext&) -> BTResult {
+	btctx_.actions["Wander"] = [this](BTContext& ctx) -> BTResult {
+		if(ctx.props){
+			int spd = ctx.props->value("speed", -1);
+			if(spd >= 0) ctx.bbSet("bt_walk_speed", spd);
+		}
 		return BTResult::Success;
 	};
 }
@@ -104,7 +112,7 @@ void Civilian::Tick(World & world){
 			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = mirrored ? false : true;
 			}
-			xv = mirrored ? -speed : speed;
+			xv = (mirrored ? -1 : 1) * btctx_.bb<int>("bt_walk_speed", speed);
 			FollowGround(*this, world, xv);
 			if(state_i % 10 == 0){
 				if(!bt_) InitBT();
@@ -129,7 +137,7 @@ void Civilian::Tick(World & world){
 				break;
 			  }
 			}
-			{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("civilian"); int _bonus = _gd ? _gd->runSpeedBonus : 5; xv = (mirrored ? -1 : 1) * (_bonus + speed); }
+			{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("civilian"); int _bonus = btctx_.bb<int>("bt_run_speed_bonus", _gd ? _gd->runSpeedBonus : 5); xv = (mirrored ? -1 : 1) * (_bonus + speed); }
 			res_bank = 123;
 			res_index = state_i % 15;
 			// play per-frame sounds defined in actordefs/civilian.json
