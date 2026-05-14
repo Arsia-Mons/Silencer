@@ -88,7 +88,17 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
-  "\\bon(Click|ClickRow|Enter)\\b|clickUser|enterUser|rowIndex" \
-  "$REPO_ROOT/clients/silencer/src/ui/runtime/UiActionQueue.h"
+  "\\bHandleUiAction\\b" \
+  "$REPO_ROOT/clients/silencer/src/client/ui"
+
+fail_if_match \
+  "\\bonClick\\b|\\bonClickRow\\b|\\bonEnter\\b|clickUser|enterUser|rowIndex|textBuffer|textBufferLen|DispatchAction|DispatchActions|DispatchUiActions|QueueClick|QueueRowSelect|QueueTextEnter|Notify[A-Za-z]*Clicked" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime" \
+  "$REPO_ROOT/clients/silencer/src/ui/primitives" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/net/controldispatch.cpp" \
+  "$REPO_ROOT/clients/silencer/src/render/clay_ui_tests" \
+  "$REPO_ROOT/tests/ui_architecture_test.cpp" \
+  --glob '!third_party/**'
 
 echo "PASS 60_ui_architecture_boundaries"

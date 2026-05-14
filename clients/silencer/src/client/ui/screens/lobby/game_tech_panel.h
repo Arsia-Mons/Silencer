@@ -11,6 +11,7 @@
 // screen-side GameTechPanelTick. Primitives stay screen-agnostic.
 
 #include "shared.h"
+#include "runtime/UiActionQueue.h"
 
 #include <array>
 #include <string>
@@ -23,7 +24,7 @@ class LobbyScreen;
 namespace silencer::client_ui::lobby {
 
 struct GameTechPanelState {
-	// Per-frame click flags. Set by widget onClick adapters; consumed by Tick.
+	// Per-frame click flags. Set by typed widget intents; consumed by Tick.
 	bool backClicked = false;
 	// -1 = no click this frame; otherwise the buyableitems[idx] index.
 	int  toggleClickedItemIndex = -1;
@@ -45,6 +46,8 @@ void GameTechPanelTick(GameTechPanelState & state,
                        World & world,
                        ScreenContext & ctx,
                        LobbyScreen & owner);
+bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
+                                 const silencer::ui::UiAction & action);
 
 // Emits the upper-pane subtree ("Back To Teams" button + 3 right-aligned
 // peer-name labels). Called inside the LobbyRightUpperBox CLAY block; flex

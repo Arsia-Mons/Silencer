@@ -18,14 +18,7 @@ public:
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool CaptureRawKeyDown(ScreenContext & ctx, int keyCode) override;
-
-	void NotifyPresetClicked() { presetClicked = true; }
-	void NotifySaveClicked() { saveClicked = true; }
-	void NotifyCancelClicked() { cancelClicked = true; }
-	void NotifyScrollUpClicked() { scrollDelta--; }
-	void NotifyScrollDownClicked() { scrollDelta++; }
-	void NotifyBindClicked(int row, int slot);
-	void NotifyOperatorClicked(int row);
+	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
 	// Two-key view of an action's bindings. The on-disk model is
@@ -55,6 +48,8 @@ private:
 
 	void FinishKeyboardRebind(ScreenContext & ctx, SDL_Scancode sym);
 	void FinishGamepadRebind(ScreenContext & ctx);
+	void BeginRebindFromVisibleRow(int row, int slot);
+	void ToggleOperatorFromVisibleRow(int row);
 	int MaxScroll() const;
 
 	int scrollPosition = 0;

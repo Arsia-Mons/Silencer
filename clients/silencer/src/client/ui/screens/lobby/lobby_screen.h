@@ -27,6 +27,7 @@ public:
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
 	bool HandleBack(ScreenContext & ctx) override;
+	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 	// Map-name overlay (uid 8 on the legacy chrome) — written by the
 	// CONNECTED→GameJoin handoff and cleared by HandleBack.
@@ -39,11 +40,6 @@ public:
 	void ShowGameCreate(ScreenContext & ctx);
 	void ShowGameJoin(ScreenContext & ctx);
 	void ShowGameTech(ScreenContext & ctx);
-
-	// Wired into the Go Back BankButton's onClick proxy. Sets a flag that
-	// Tick consumes on the next frame, mirroring the legacy chrome scan's
-	// "button->clicked → game.GoBack()" edge-detection timing.
-	void NotifyGoBackClicked() { goBackClicked = true; }
 
 	// Friend-of-World helper: seeds `world.gameinfo` from the lobby record
 	// of the newly created game so the host's SendGameInfo path can push

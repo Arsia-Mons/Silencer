@@ -49,16 +49,13 @@ void RegisterRowWidget(Clay_String id,
                        int index,
                        bool selected,
                        ScrollListHandle handle) {
-	if(!handle.onSelect) return;
+	if(!handle.actionId || !*handle.actionId) return;
 	silencer::ui::automation::Widget widget;
-	widget.id = ToStd(id) + "." + std::to_string(index);
+	widget.id = std::string(handle.actionId) + "." + std::to_string(index);
 	widget.labelText = ToStd(label);
-	widget.label = widget.labelText.c_str();
 	widget.kind = UiAutomationWidgetKind::ListRow;
-	widget.rowIndex = index;
+	widget.index = index;
 	widget.selected = selected;
-	widget.onClickRow = handle.onSelect;
-	widget.clickUser = handle.user;
 	widget.clayId = CLAY_SIDI(id, static_cast<uint32_t>(index + 1));
 	widget.hasClayId = true;
 	silencer::ui::automation::Register(widget);

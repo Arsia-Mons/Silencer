@@ -9,6 +9,7 @@
 // lives here in the screen; primitives stay screen-agnostic.
 
 #include "shared.h"
+#include "runtime/UiActionQueue.h"
 
 #include <string>
 #include <vector>
@@ -32,7 +33,7 @@ struct GameSelectPanelState {
 	int    selectedIndex = -1;  // -1 = no selection.
 	Uint16 scrollPos     = 0;
 
-	// Per-frame click flags. Set by widget onClick adapters; consumed
+	// Per-frame click flags. Set by typed widget intents; consumed
 	// once by GameSelectPanelTick on the next frame.
 	bool   joinClicked     = false;
 	bool   spectateClicked = false;
@@ -72,6 +73,8 @@ void GameSelectPanelTick(GameSelectPanelState & state,
                          World & world,
                          ScreenContext & ctx,
                          LobbyScreen & owner);
+bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
+                                   const silencer::ui::UiAction & action);
 
 // Emits the upper-pane subtree (Create Game button). Must be called inside
 // the LobbyRightUpperBox CLAY block; emits flex children only (no floating).

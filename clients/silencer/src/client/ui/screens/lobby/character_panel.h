@@ -10,6 +10,7 @@
 // screen-agnostic.
 
 #include "shared.h"
+#include "runtime/UiActionQueue.h"
 
 class World;
 class Resources;
@@ -18,7 +19,7 @@ namespace silencer::client_ui::lobby {
 
 struct CharacterPanelState {
 	// Currently-selected agency (Team::NOXIS .. Team::BLACKROSE). Mirrors
-	// Config::defaultagency; toggle onClicks mutate this field, and Tick
+	// Config::defaultagency; typed toggle intents mutate this field, and Tick
 	// reconciles into Config + world.SetAgency on change.
 	Uint8 selectedAgency = 0;
 	// Last selectedAgency reflected into Config + world. -1 forces a first-
@@ -32,6 +33,8 @@ void CharacterPanelInit(CharacterPanelState & state);
 // Reconcile any selectedAgency change with Config + world. Called once per
 // LobbyScreen::Tick.
 void CharacterPanelTick(CharacterPanelState & state, World & world);
+bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
+                                  const silencer::ui::UiAction & action);
 
 // Emit the panel subtree. Must be called inside an open Clay layout pass,
 // after BankTextBeginFrame() + ToggleBeginFrame() have been invoked.

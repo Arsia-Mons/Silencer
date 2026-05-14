@@ -83,29 +83,14 @@ constexpr uint16_t kTallJoinPadTop     = 1;   // 430 - 408 - 21 = 1
 
 constexpr int kMaxRows = 256;
 Clay_String g_itemSlab[kMaxRows];
+constexpr const char * kActionCreate = "lobby.game_select.create";
+constexpr const char * kActionJoin = "lobby.game_select.join";
+constexpr const char * kActionSpectate = "lobby.game_select.spectate";
+constexpr const char * kActionRowPrefix = "lobby.game_select.row";
 
-GameSelectPanelState * g_state = nullptr;
-
-void OnRowSelected(void * user, int index) {
-	auto * state = static_cast<GameSelectPanelState *>(user);
-	if(state){
-		state->rowClickedIndex = index;
-	}
-}
-
-void OnJoinClicked(void * user) {
-	auto * state = static_cast<GameSelectPanelState *>(user);
-	if(state) state->joinClicked = true;
-}
-
-void OnSpectateClicked(void * user) {
-	auto * state = static_cast<GameSelectPanelState *>(user);
-	if(state) state->spectateClicked = true;
-}
-
-void OnCreateClicked(void * user) {
-	auto * state = static_cast<GameSelectPanelState *>(user);
-	if(state) state->createClicked = true;
+bool StartsWith(const std::string & value, const char * prefix) {
+	const size_t n = std::strlen(prefix);
+	return value.size() >= n && value.compare(0, n, prefix) == 0;
 }
 
 Clay_String FromStd(const std::string & s) {
@@ -275,14 +260,12 @@ void HandleSpectateClick(GameSelectPanelState & state, World & world, ScreenCont
 	}
 }
 
-void RegisterButton(const char * label, int x, int y,
-                    void (*onClick)(void *), void * user) {
+void RegisterButton(const char * label, const char * actionId, int x, int y) {
 	silencer::ui::automation::Widget w;
-	w.label = label;
+	w.id = actionId;
+	w.labelText = label;
 	w.kind  = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	w.onClick   = onClick;
-	w.clickUser = user;
 	silencer::ui::automation::Register(w);
 }
 
@@ -336,10 +319,33 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 	}
 }
 
+bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
+                                   const silencer::ui::UiAction & action) {
+	if(action.kind == silencer::ui::UiActionKind::Activate){
+		if(action.id == kActionCreate){
+			state.createClicked = true;
+			return true;
+		}
+		if(action.id == kActionJoin){
+			state.joinClicked = true;
+			return true;
+		}
+		if(action.id == kActionSpectate){
+			state.spectateClicked = true;
+			return true;
+		}
+	}
+	if(action.kind == silencer::ui::UiActionKind::Select &&
+	   StartsWith(action.id, kActionRowPrefix)){
+		state.rowClickedIndex = action.index;
+		return true;
+	}
+	return false;
+}
+
 void BuildGameSelectUpperTree(GameSelectPanelState & state,
                               Resources & resources) {
 	(void)resources;
-	g_state = &state;
 
 	// Create Game button — single flex child of the Upper box.
 	CLAY({ .id = CLAY_ID("GSelBtnCreateWrap"),
@@ -349,11 +355,9 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*onClick*/    &OnCreateClicked,
-		                             /*user*/       &state });
+		                             /*actionId*/   kActionCreate });
 	}
-	RegisterButton("Create Game", kBtnCreateX, kBtnCreateY,
-	               &OnCreateClicked, &state);
+	RegisterButton("Create Game", kActionCreate, kBtnCreateX, kBtnCreateY);
 }
 
 void BuildGameSelectTallTree(GameSelectPanelState & state,
@@ -394,19 +398,17 @@ void BuildGameSelectTallTree(GameSelectPanelState & state,
 		           state.scrollPos,
 		           listOpts,
 		           ScrollListHandle{ /*hoveredOut*/ nullptr,
-		                             /*onSelect*/   &OnRowSelected,
-		                             /*user*/       &state });
+		                             /*actionId*/   kActionRowPrefix });
 	}
 
 	for(int i = 0; i < slotCount; ++i){
 		silencer::ui::automation::Widget w;
-		w.label = state.rows[i].name.c_str();
+		w.id = std::string(kActionRowPrefix) + "." + std::to_string(i);
+		w.labelText = state.rows[i].name;
 		w.kind  = silencer::ui::automation::WidgetKind::ListRow;
 		w.x = kListX; w.y = kListY + i * kListLineH;
 		w.w = kListW; w.h = kListLineH;
-		w.onClickRow = &OnRowSelected;
-		w.clickUser  = &state;
-		w.rowIndex   = i;
+		w.index = i;
 		w.selected   = (state.selectedIndex == i);
 		silencer::ui::automation::Register(w);
 	}
@@ -456,13 +458,11 @@ void BuildGameSelectTallTree(GameSelectPanelState & state,
 			           BankButtonVariant::Chrome,
 			           BankButtonOpts{},
 			           BankButtonHandle{ /*hoveredOut*/ nullptr,
-			                             /*onClick*/    &OnSpectateClicked,
-			                             /*user*/       &state });
+			                             /*actionId*/   kActionSpectate });
 		}
 	}
 	if(state.spectateVisible){
-		RegisterButton("Spectate", kBtnSpectateX, kBtnSpectateY,
-		               &OnSpectateClicked, &state);
+		RegisterButton("Spectate", kActionSpectate, kBtnSpectateX, kBtnSpectateY);
 	}
 
 	// Join button.
@@ -476,13 +476,11 @@ void BuildGameSelectTallTree(GameSelectPanelState & state,
 			           BankButtonVariant::Chrome,
 			           BankButtonOpts{},
 			           BankButtonHandle{ /*hoveredOut*/ nullptr,
-			                             /*onClick*/    &OnJoinClicked,
-			                             /*user*/       &state });
+			                             /*actionId*/   kActionJoin });
 		}
 	}
 	if(state.joinVisible){
-		RegisterButton("Join Game", kBtnJoinX, kBtnJoinY,
-		               &OnJoinClicked, &state);
+		RegisterButton("Join Game", kActionJoin, kBtnJoinX, kBtnJoinY);
 	}
 }
 

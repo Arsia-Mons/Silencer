@@ -199,7 +199,15 @@ bool Game::DispatchInGameUiActions(const std::vector<silencer::ui::UiAction>& ac
 		if(localplayer->chatActive &&
 		   (action.id == "ingame.chat" || action.id == "ingame.chat.channel")){
 			handled = true;
-			if(action.kind == silencer::ui::UiActionKind::SubmitText){
+			if(action.kind == silencer::ui::UiActionKind::SetText &&
+			   action.id == "ingame.chat"){
+				int n = static_cast<int>(action.value.size());
+				if(n > static_cast<int>(sizeof(localplayer->chatText)) - 1){
+					n = static_cast<int>(sizeof(localplayer->chatText)) - 1;
+				}
+				std::memcpy(localplayer->chatText, action.value.data(), n);
+				localplayer->chatText[n] = '\0';
+			}else if(action.kind == silencer::ui::UiActionKind::SubmitText){
 				if(std::strlen(localplayer->chatText) > 0){
 					world.SendChat(localplayer->chatwithteam, localplayer->chatText);
 				}

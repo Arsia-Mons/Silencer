@@ -36,36 +36,16 @@ constexpr int kMenuButtonH = 21;
 constexpr int kMenuButtonCount = 4;
 constexpr int kMenuButtonTotalH =
 	kMenuButtonCount * kMenuButtonH + (kMenuButtonCount - 1) * kButtonGap;
+constexpr const char * kActionTutorial = "main_menu.tutorial";
+constexpr const char * kActionLobby = "main_menu.lobby";
+constexpr const char * kActionOptions = "main_menu.options";
+constexpr const char * kActionExit = "main_menu.exit";
 
 struct MainMenuButtonLayout
 {
 	int x = 0;
 	int y = 0;
 };
-
-void MainMenuTutorialClicked(void * user)
-{
-	auto * screen = static_cast<MainMenuScreen *>(user);
-	if(screen) screen->NotifyTutorialClicked();
-}
-
-void MainMenuLobbyClicked(void * user)
-{
-	auto * screen = static_cast<MainMenuScreen *>(user);
-	if(screen) screen->NotifyLobbyClicked();
-}
-
-void MainMenuOptionsClicked(void * user)
-{
-	auto * screen = static_cast<MainMenuScreen *>(user);
-	if(screen) screen->NotifyOptionsClicked();
-}
-
-void MainMenuExitClicked(void * user)
-{
-	auto * screen = static_cast<MainMenuScreen *>(user);
-	if(screen) screen->NotifyExitClicked();
-}
 
 Clay_String FromStd(const std::string & s)
 {
@@ -94,34 +74,27 @@ MainMenuButtonLayout ComputeButtonLayout(int width, int height)
 }
 
 void RegisterButton(const char * label,
+                    const char * actionId,
                     int x,
-                    int y,
-                    void (*onClick)(void *),
-                    MainMenuScreen * screen)
+                    int y)
 {
 	silencer::ui::automation::Widget w;
-	w.label = label;
+	w.id = actionId;
+	w.labelText = label;
 	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	w.onClick = onClick;
-	w.clickUser = screen;
 	silencer::ui::automation::Register(w);
 }
 
-void RegisterMainMenuButtons(const MainMenuButtonLayout & layout,
-                             MainMenuScreen * screen)
+void RegisterMainMenuButtons(const MainMenuButtonLayout & layout)
 {
-	RegisterButton("Tutorial", layout.x, layout.y,
-	               &MainMenuTutorialClicked, screen);
-	RegisterButton("Connect To Lobby", layout.x,
-	               layout.y + kMenuButtonH + kButtonGap,
-	               &MainMenuLobbyClicked, screen);
-	RegisterButton("Options", layout.x,
-	               layout.y + (kMenuButtonH + kButtonGap) * 2,
-	               &MainMenuOptionsClicked, screen);
-	RegisterButton("Exit", layout.x,
-	               layout.y + (kMenuButtonH + kButtonGap) * 3,
-	               &MainMenuExitClicked, screen);
+	RegisterButton("Tutorial", kActionTutorial, layout.x, layout.y);
+	RegisterButton("Connect To Lobby", kActionLobby, layout.x,
+	               layout.y + kMenuButtonH + kButtonGap);
+	RegisterButton("Options", kActionOptions, layout.x,
+	               layout.y + (kMenuButtonH + kButtonGap) * 2);
+	RegisterButton("Exit", kActionExit, layout.x,
+	               layout.y + (kMenuButtonH + kButtonGap) * 3);
 }
 }
 
@@ -139,8 +112,7 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 	exitClicked = false;
 
 	const Surface & screenbuffer = ctx.game.GetScreenBuffer();
-	RegisterMainMenuButtons(ComputeButtonLayout(screenbuffer.w, screenbuffer.h),
-	                        this);
+	RegisterMainMenuButtons(ComputeButtonLayout(screenbuffer.w, screenbuffer.h));
 }
 
 void MainMenuScreen::Tick(ScreenContext & ctx)
@@ -227,18 +199,18 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 		           .attachTo = CLAY_ATTACH_TO_ROOT,
 		       } }) {
 			BankButton(CLAY_STRING("Tutorial"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, &MainMenuTutorialClicked, this });
+			           BankButtonHandle{ nullptr, kActionTutorial });
 			BankButton(CLAY_STRING("Connect To Lobby"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, &MainMenuLobbyClicked, this });
+			           BankButtonHandle{ nullptr, kActionLobby });
 			BankButton(CLAY_STRING("Options"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, &MainMenuOptionsClicked, this });
+			           BankButtonHandle{ nullptr, kActionOptions });
 			BankButton(CLAY_STRING("Exit"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, &MainMenuExitClicked, this });
+			           BankButtonHandle{ nullptr, kActionExit });
 		}
 	}
 
 
-	RegisterMainMenuButtons(buttons, this);
+	RegisterMainMenuButtons(buttons);
 }
 
 void MainMenuScreen::Destroy(ScreenContext & ctx)
@@ -246,10 +218,27 @@ void MainMenuScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
-bool MainMenuScreen::HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action)
+bool MainMenuScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	if(action == silencer::ui::UiNavAction::Cancel){
+	if(action.kind == silencer::ui::UiActionKind::Cancel){
 		ctx.RequestQuit();
+		return true;
+	}
+	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+	if(action.id == kActionTutorial){
+		tutorialClicked = true;
+		return true;
+	}
+	if(action.id == kActionLobby){
+		lobbyClicked = true;
+		return true;
+	}
+	if(action.id == kActionOptions){
+		optionsClicked = true;
+		return true;
+	}
+	if(action.id == kActionExit){
+		exitClicked = true;
 		return true;
 	}
 	return false;

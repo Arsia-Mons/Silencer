@@ -6,8 +6,8 @@
 // tests/lobby-ui/text_input_test/reference.png is the pinned baseline.
 //
 // `RunTextInputCheck(out)` verifies the registry/action-drain path:
-//   • '\n' queues onEnter and the shared dispatcher fires it exactly once.
-//   • 'x' text input does not fire onEnter.
+//   • Enter queues SubmitText exactly once.
+//   • text input queues SetText but not SubmitText.
 //   • The password variant masks rendered glyphs (asserted via the
 //     emitted CUSTOM payload's textLen).
 //
@@ -27,14 +27,6 @@
 #include <cstring>
 
 namespace silencer::clay_bridge {
-
-namespace {
-
-int g_enterCount = 0;
-
-void OnEnter(void * /*user*/) { g_enterCount++; }
-
-}  // namespace
 
 bool RunTextInputTest(::Game & game, const char * outPath) {
 	const int W = 640;
@@ -74,30 +66,37 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 	const int H = 480;
 	EnsureInitialized(W, H);
 
-	// Registry routing — verify submit queues onEnter for the post-layout
-	// action dispatcher and text input does not.
+	// Registry routing — verify submit queues a typed action and text input
+	// does not submit.
 	silencer::ui::UiAutomationRegistry registry;
 	registry.BeginFrame();
-	char inputBuffer[16] = "";
 	silencer::ui::UiAutomationWidget widget;
-	widget.label = "TextInputCheck";
+	widget.id = "test.text_input.name";
+	widget.labelText = "TextInputCheck";
 	widget.kind = silencer::ui::UiAutomationWidgetKind::TextInput;
 	widget.uid = 9;
-	widget.textBuffer = inputBuffer;
-	widget.textBufferLen = static_cast<int>(sizeof(inputBuffer));
-	widget.onEnter = OnEnter;
+	widget.maxLength = 15;
 	registry.RegisterWidget(widget);
 	registry.FocusTextInputByUid(9);
 
-	g_enterCount = 0;
 	registry.SubmitFocusedText();
-	silencer::ui::DispatchUiActions(registry, registry.DrainActions());
-	out.onEnterFiredForNewline = g_enterCount;
+	int submitActions = 0;
+	for(const auto & action : registry.DrainActions()){
+		if(action.kind == silencer::ui::UiActionKind::SubmitText &&
+		   action.id == "test.text_input.name"){
+			submitActions++;
+		}
+	}
+	out.submitActionsForEnter = submitActions;
 
-	g_enterCount = 0;
 	registry.DispatchTextInput('x');
-	silencer::ui::DispatchUiActions(registry, registry.DrainActions());
-	out.onEnterFiredForLetter = g_enterCount;
+	submitActions = 0;
+	for(const auto & action : registry.DrainActions()){
+		if(action.kind == silencer::ui::UiActionKind::SubmitText){
+			submitActions++;
+		}
+	}
+	out.submitActionsForText = submitActions;
 
 	// Password masking — emit a password variant, run a layout pass,
 	// and probe the CUSTOM payload for the masked text length.

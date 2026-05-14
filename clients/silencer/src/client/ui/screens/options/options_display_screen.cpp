@@ -34,58 +34,36 @@ constexpr uint16_t kRowH = 33;
 constexpr uint16_t kRowGap = 20;
 constexpr uint16_t kIndicatorGap = 10;
 constexpr uint16_t kActionGap = 12;
-
-void OnFullscreenClicked(void * user)
-{
-	auto * screen = static_cast<OptionsDisplayScreen *>(user);
-	if(screen) screen->NotifyFullscreenClicked();
-}
-
-void OnSmoothScalingClicked(void * user)
-{
-	auto * screen = static_cast<OptionsDisplayScreen *>(user);
-	if(screen) screen->NotifySmoothScalingClicked();
-}
-
-void OnSaveClicked(void * user)
-{
-	auto * screen = static_cast<OptionsDisplayScreen *>(user);
-	if(screen) screen->NotifySaveClicked();
-}
-
-void OnCancelClicked(void * user)
-{
-	auto * screen = static_cast<OptionsDisplayScreen *>(user);
-	if(screen) screen->NotifyCancelClicked();
-}
+constexpr const char * kActionFullscreen = "options_display.fullscreen";
+constexpr const char * kActionSmoothScaling = "options_display.smooth_scaling";
+constexpr const char * kActionSave = "options_display.save";
+constexpr const char * kActionCancel = "options_display.cancel";
 
 void RegisterButton(const char * label,
+                    const char * actionId,
                     int x,
-                    int y,
-                    void (*onClick)(void *),
-                    OptionsDisplayScreen * screen)
+                    int y)
 {
 	silencer::ui::automation::Widget w;
-	w.label = label;
+	w.id = actionId;
+	w.labelText = label;
 	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	w.onClick = onClick;
-	w.clickUser = screen;
 	silencer::ui::automation::Register(w);
 }
 
-void RegisterWidgets(OptionsDisplayScreen * screen, int surfaceW, int surfaceH)
+void RegisterWidgets(int surfaceW, int surfaceH)
 {
 	const int panelX = (surfaceW - kPanelW) / 2;
 	const int panelY = 80;
 	const int rowX = panelX + kPanelPadX;
 	const int rowY = panelY + kPanelPadY + 42;
 	const int actionY = rowY + (kRowH + kRowGap) * 2 + 8;
-	RegisterButton("Fullscreen", rowX, rowY + 6, &OnFullscreenClicked, screen);
-	RegisterButton("Smooth Scaling", rowX, rowY + kRowH + kRowGap + 6,
-	               &OnSmoothScalingClicked, screen);
-	RegisterButton("Save", panelX + 48, actionY, &OnSaveClicked, screen);
-	RegisterButton("Cancel", panelX + 216, actionY, &OnCancelClicked, screen);
+	RegisterButton("Fullscreen", kActionFullscreen, rowX, rowY + 6);
+	RegisterButton("Smooth Scaling", kActionSmoothScaling,
+	               rowX, rowY + kRowH + kRowGap + 6);
+	RegisterButton("Save", kActionSave, panelX + 48, actionY);
+	RegisterButton("Cancel", kActionCancel, panelX + 216, actionY);
 }
 
 void ToggleIndicator(Clay_String id, bool selected)
@@ -114,8 +92,7 @@ void ToggleIndicator(Clay_String id, bool selected)
 
 void ToggleRow(Clay_String label,
                bool selected,
-               void (*onClick)(void *),
-               OptionsDisplayScreen * screen)
+               const char * actionId)
 {
 	CLAY({ .id = CLAY_SID(label),
 	       .layout = {
@@ -124,7 +101,7 @@ void ToggleRow(Clay_String label,
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
 		BankButton(label, BankButtonVariant::Chrome, {},
-		           BankButtonHandle{ nullptr, onClick, screen });
+		           BankButtonHandle{ nullptr, actionId });
 		CLAY({ .id = CLAY_SIDI(label, 1),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
@@ -145,7 +122,7 @@ void OptionsDisplayScreen::Build(ScreenContext & ctx)
 	saveClicked = false;
 	cancelClicked = false;
 	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(this, surface.w, surface.h);
+	RegisterWidgets(surface.w, surface.h);
 }
 
 void OptionsDisplayScreen::Tick(ScreenContext & ctx)
@@ -212,9 +189,9 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       } }) {
 				ToggleRow(CLAY_STRING("Fullscreen"), cfg.fullscreen,
-				          &OnFullscreenClicked, this);
+				          kActionFullscreen);
 				ToggleRow(CLAY_STRING("Smooth Scaling"), cfg.scalefilter,
-				          &OnSmoothScalingClicked, this);
+				          kActionSmoothScaling);
 			}
 			CLAY({ .id = CLAY_ID("OptionsDisplayActions"),
 			       .layout = {
@@ -223,16 +200,43 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
 				BankButton(CLAY_STRING("Save"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, &OnSaveClicked, this });
+				           BankButtonHandle{ nullptr, kActionSave });
 				BankButton(CLAY_STRING("Cancel"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, &OnCancelClicked, this });
+				           BankButtonHandle{ nullptr, kActionCancel });
 			}
 		}
 	}
-	RegisterWidgets(this, dst.w, dst.h);
+	RegisterWidgets(dst.w, dst.h);
 }
 
 void OptionsDisplayScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+}
+
+bool OptionsDisplayScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+{
+	(void)ctx;
+	if(action.kind == silencer::ui::UiActionKind::Cancel){
+		cancelClicked = true;
+		return true;
+	}
+	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+	if(action.id == kActionFullscreen){
+		fullscreenClicked = true;
+		return true;
+	}
+	if(action.id == kActionSmoothScaling){
+		smoothScalingClicked = true;
+		return true;
+	}
+	if(action.id == kActionSave){
+		saveClicked = true;
+		return true;
+	}
+	if(action.id == kActionCancel){
+		cancelClicked = true;
+		return true;
+	}
+	return false;
 }

@@ -43,21 +43,9 @@ constexpr uint16_t kBtnPadLeft   = 3;
 constexpr uint16_t kBtnTechPadTop  = 3;
 constexpr uint16_t kBtnTeamPadTop  = 11;
 constexpr uint16_t kBtnReadyPadTop = 39;
-
-void OnReadyClicked(void * user) {
-	auto * state = static_cast<GameJoinPanelState *>(user);
-	if(state) state->readyClicked = true;
-}
-
-void OnTeamClicked(void * user) {
-	auto * state = static_cast<GameJoinPanelState *>(user);
-	if(state) state->teamClicked = true;
-}
-
-void OnTechClicked(void * user) {
-	auto * state = static_cast<GameJoinPanelState *>(user);
-	if(state) state->techClicked = true;
-}
+constexpr const char * kActionTech = "lobby.game_join.choose_tech";
+constexpr const char * kActionTeam = "lobby.game_join.change_team";
+constexpr const char * kActionReady = "lobby.game_join.ready";
 
 Clay_String FromStd(const std::string & s) {
 	Clay_String cs;
@@ -67,14 +55,12 @@ Clay_String FromStd(const std::string & s) {
 	return cs;
 }
 
-void RegisterButton(const char * label, int x, int y,
-                    void (*onClick)(void *), void * user) {
+void RegisterButton(const char * label, const char * actionId, int x, int y) {
 	silencer::ui::automation::Widget w;
-	w.label = label;
+	w.id = actionId;
+	w.labelText = label;
 	w.kind  = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = kBtnW; w.h = kBtnH;
-	w.onClick   = onClick;
-	w.clickUser = user;
 	silencer::ui::automation::Register(w);
 }
 
@@ -109,6 +95,24 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 	}
 }
 
+bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
+                                 const silencer::ui::UiAction & action) {
+	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+	if(action.id == kActionTech){
+		state.techClicked = true;
+		return true;
+	}
+	if(action.id == kActionTeam){
+		state.teamClicked = true;
+		return true;
+	}
+	if(action.id == kActionReady){
+		state.readyClicked = true;
+		return true;
+	}
+	return false;
+}
+
 void BuildGameJoinUpperTree(GameJoinPanelState & state,
                             Resources & resources) {
 	(void)resources;
@@ -120,10 +124,9 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*onClick*/    &OnTechClicked,
-		                             /*user*/       &state });
+		                             /*actionId*/   kActionTech });
 	}
-	RegisterButton("Choose Tech", kBtnTechX, kBtnTechY, &OnTechClicked, &state);
+	RegisterButton("Choose Tech", kActionTech, kBtnTechX, kBtnTechY);
 
 	// Change Team (middle button).
 	CLAY({ .id = CLAY_ID("GJoinBtnTeamWrap"),
@@ -132,10 +135,9 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*onClick*/    &OnTeamClicked,
-		                             /*user*/       &state });
+		                             /*actionId*/   kActionTeam });
 	}
-	RegisterButton("Change Team", kBtnTeamX, kBtnTeamY, &OnTeamClicked, &state);
+	RegisterButton("Change Team", kActionTeam, kBtnTeamX, kBtnTeamY);
 
 	// Ready / Waiting... (bottom button). Label flips per Tick.
 	CLAY({ .id = CLAY_ID("GJoinBtnReadyWrap"),
@@ -144,15 +146,14 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*onClick*/    &OnReadyClicked,
-		                             /*user*/       &state });
+		                             /*actionId*/   kActionReady });
 	}
 	{
 		silencer::ui::automation::Widget w;
-		w.label = state.readyLabel.c_str();
+		w.id = kActionReady;
+		w.labelText = state.readyLabel;
 		w.kind  = silencer::ui::automation::WidgetKind::Button;
 		w.x = kBtnReadyX; w.y = kBtnReadyY; w.w = kBtnW; w.h = kBtnH;
-		w.onClick = &OnReadyClicked; w.clickUser = &state;
 		silencer::ui::automation::Register(w);
 	}
 }

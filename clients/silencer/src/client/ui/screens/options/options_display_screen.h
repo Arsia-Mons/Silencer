@@ -10,11 +10,7 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
-
-	void NotifyFullscreenClicked() { fullscreenClicked = true; }
-	void NotifySmoothScalingClicked() { smoothScalingClicked = true; }
-	void NotifySaveClicked() { saveClicked = true; }
-	void NotifyCancelClicked() { cancelClicked = true; }
+	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
 	bool fullscreenClicked = false;

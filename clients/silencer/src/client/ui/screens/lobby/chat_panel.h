@@ -10,6 +10,7 @@
 // to `world.lobby.SendChat`. The primitives stay screen-agnostic.
 
 #include "shared.h"
+#include "runtime/UiActionQueue.h"
 
 #include <string>
 #include <vector>
@@ -42,6 +43,9 @@ void ChatPanelInit(ChatPanelState & state);
 // presencechanged, caches channel name on channelchanged. Mirrors legacy
 // ChatPanel::Tick.
 void ChatPanelTick(ChatPanelState & state, World & world);
+bool ChatPanelHandleUiIntent(ChatPanelState & state,
+                             World & world,
+                             const silencer::ui::UiAction & action);
 
 // Emits the panel subtree. Must be called inside an open Clay layout pass
 // AFTER BankTextBeginFrame() + ScrollTextBoxBeginFrame() + TextInputBeginFrame().

@@ -13,10 +13,7 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
-	bool HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action) override;
-
-	void NotifyLoginClicked();
-	void NotifyCancelClicked();
+	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
 	void AppendLog(const char * text);

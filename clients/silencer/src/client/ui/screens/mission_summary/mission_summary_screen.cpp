@@ -45,6 +45,10 @@ constexpr uint16_t kSummaryW = 180;
 constexpr uint16_t kSummaryH = 300;
 constexpr uint8_t kLineH = 11;
 constexpr int kMaxSummaryLines = 256;
+constexpr const char * kActionDone = "mission_summary.done";
+constexpr const char * kActionScrollUp = "mission_summary.scroll_up";
+constexpr const char * kActionScrollDown = "mission_summary.scroll_down";
+constexpr const char * kActionUpgradePrefix = "mission_summary.upgrade.";
 ScrollTextBoxLine g_summarySlab[kMaxSummaryLines];
 
 const char * kUpgradeLabels[6] = {
@@ -75,62 +79,30 @@ Clay_String FromCStr(const char * s)
 	return Clay_String{ false, static_cast<int32_t>(std::strlen(s)), s };
 }
 
-void DoneClicked(void * user)
+bool StartsWith(const std::string & value, const char * prefix)
 {
-	auto * screen = static_cast<MissionSummaryScreen *>(user);
-	if(screen) screen->NotifyDoneClicked();
+	const size_t n = std::strlen(prefix);
+	return value.size() >= n && value.compare(0, n, prefix) == 0;
 }
 
-struct UpgradeClick {
-	MissionSummaryScreen * screen;
-	int index;
-};
-
-constexpr int kUpgradeClickCapacity = 12;
-UpgradeClick g_upgradeClicks[kUpgradeClickCapacity];
-int g_upgradeClickCount = 0;
-
-UpgradeClick * AllocUpgradeClick(MissionSummaryScreen * screen, int index)
+int SuffixInt(const std::string & value, const char * prefix)
 {
-	if(g_upgradeClickCount >= kUpgradeClickCapacity) return nullptr;
-	auto * c = &g_upgradeClicks[g_upgradeClickCount++];
-	c->screen = screen;
-	c->index = index;
-	return c;
-}
-
-void UpgradeClicked(void * user)
-{
-	auto * c = static_cast<UpgradeClick *>(user);
-	if(c && c->screen) c->screen->NotifyUpgradeClicked(c->index);
-}
-
-void ScrollUpClicked(void * user)
-{
-	auto * screen = static_cast<MissionSummaryScreen *>(user);
-	if(screen) screen->NotifyScrollUpClicked();
-}
-
-void ScrollDownClicked(void * user)
-{
-	auto * screen = static_cast<MissionSummaryScreen *>(user);
-	if(screen) screen->NotifyScrollDownClicked();
+	if(!StartsWith(value, prefix)) return -1;
+	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
 void RegisterButton(const char * label,
+                    const std::string & actionId,
                     int x,
                     int y,
                     int w,
-                    int h,
-                    void (*onClick)(void *),
-                    void * user)
+                    int h)
 {
 	silencer::ui::automation::Widget widget;
-	widget.label = label;
+	widget.id = actionId;
+	widget.labelText = label;
 	widget.kind = silencer::ui::automation::WidgetKind::Button;
 	widget.x = x; widget.y = y; widget.w = w; widget.h = h;
-	widget.onClick = onClick;
-	widget.clickUser = user;
 	silencer::ui::automation::Register(widget);
 }
 
@@ -141,15 +113,15 @@ void RegisterWidgets(MissionSummaryScreen * screen,
 {
 	const int rootX = (surfaceW - (kLeftW + kRightW + 42)) / 2;
 	const int rootY = kRootPadY;
-	RegisterButton("Done", rootX + 34, rootY + 360, 156, 21, &DoneClicked, screen);
-	RegisterButton("Scroll Up", rootX + 202, rootY + 86, 28, 24, &ScrollUpClicked, screen);
-	RegisterButton("Scroll Down", rootX + 202, rootY + 330, 28, 24, &ScrollDownClicked, screen);
+	(void)screen;
+	RegisterButton("Done", kActionDone, rootX + 34, rootY + 360, 156, 21);
+	RegisterButton("Scroll Up", kActionScrollUp, rootX + 202, rootY + 86, 28, 24);
+	RegisterButton("Scroll Down", kActionScrollDown, rootX + 202, rootY + 330, 28, 24);
 	for(int i = 0; i < 6; i++){
 		if(!upgrades[i]) continue;
-		auto * click = AllocUpgradeClick(screen, i);
-		RegisterButton(kUpgradeLabels[i], rootX + kLeftW + 56,
-		               rootY + 108 + i * 46, 156, 21,
-		               click ? &UpgradeClicked : nullptr, click);
+		RegisterButton(kUpgradeLabels[i],
+		               std::string(kActionUpgradePrefix) + std::to_string(i),
+		               rootX + kLeftW + 56, rootY + 108 + i * 46, 156, 21);
 	}
 	(void)surfaceH;
 }
@@ -222,9 +194,6 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-
-	g_upgradeClickCount = 0;
-
 	int lineCount = FillSummarySlab(summaryLines);
 	std::string xp = "+ " + std::to_string(experience) + " XP";
 
@@ -271,13 +240,13 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				       } }) {
 					BankButton(CLAY_STRING("Up"), BankButtonVariant::Inline, {},
-					           BankButtonHandle{ nullptr, &ScrollUpClicked, this });
+					           BankButtonHandle{ nullptr, kActionScrollUp });
 					BankButton(CLAY_STRING("Down"), BankButtonVariant::Inline, {},
-					           BankButtonHandle{ nullptr, &ScrollDownClicked, this });
+					           BankButtonHandle{ nullptr, kActionScrollDown });
 				}
 			}
 			BankButton(CLAY_STRING("Done"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, &DoneClicked, this });
+			           BankButtonHandle{ nullptr, kActionDone });
 		}
 		CLAY({ .id = CLAY_ID("MissionSummaryUpgrades"),
 		       .layout = {
@@ -313,11 +282,9 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 					BankText(FromStd(level), BankTextVariant::Body, {});
 				}
 				if(upgradesAvailable[i]){
-					auto * click = AllocUpgradeClick(this, i);
+					std::string actionId = std::string(kActionUpgradePrefix) + std::to_string(i);
 					BankButton(FromCStr(kUpgradeLabels[i]), BankButtonVariant::Chrome, {},
-					           BankButtonHandle{ nullptr,
-					                             click ? &UpgradeClicked : nullptr,
-					                             click });
+					           BankButtonHandle{ nullptr, actionId.c_str() });
 				}
 			}
 		}
@@ -330,9 +297,29 @@ void MissionSummaryScreen::Destroy(ScreenContext & ctx)
 	(void)ctx;
 }
 
-void MissionSummaryScreen::NotifyUpgradeClicked(int index)
+bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
-	upgradeClicked = index;
+	(void)ctx;
+	if(action.kind == silencer::ui::UiActionKind::Cancel ||
+	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == kActionDone)){
+		doneClicked = true;
+		return true;
+	}
+	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+	if(action.id == kActionScrollUp){
+		scrollDelta--;
+		return true;
+	}
+	if(action.id == kActionScrollDown){
+		scrollDelta++;
+		return true;
+	}
+	int upgrade = SuffixInt(action.id, kActionUpgradePrefix);
+	if(upgrade >= 0 && upgrade < 6){
+		upgradeClicked = upgrade;
+		return true;
+	}
+	return false;
 }
 
 void MissionSummaryScreen::Refresh(ScreenContext & ctx)

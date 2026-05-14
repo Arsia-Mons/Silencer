@@ -37,18 +37,14 @@ constexpr uint16_t kKeyButtonW = 112;
 constexpr uint16_t kKeyButtonH = 33;
 constexpr uint16_t kOperatorW = 45;
 constexpr uint16_t kActionGap = 12;
-
-struct ClickAdapter {
-	void (*fn)(void *);
-	void * user;
-	int arg0;
-	int arg1;
-	std::string id;
-};
-
-constexpr int kAdapterCapacity = 192;
-ClickAdapter g_adapters[kAdapterCapacity];
-int g_adapterCount = 0;
+constexpr const char * kActionPreset = "options_controls.preset";
+constexpr const char * kActionSave = "options_controls.save";
+constexpr const char * kActionCancel = "options_controls.cancel";
+constexpr const char * kActionScrollUp = "options_controls.scroll_up";
+constexpr const char * kActionScrollDown = "options_controls.scroll_down";
+constexpr const char * kActionPrimaryPrefix = "options_controls.primary.";
+constexpr const char * kActionSecondaryPrefix = "options_controls.secondary.";
+constexpr const char * kActionOperatorPrefix = "options_controls.operator.";
 
 Clay_String FromCStr(const char * s)
 {
@@ -74,81 +70,30 @@ std::string AutomationLabel(Clay_String id, Clay_String text)
 	return ToStd(text);
 }
 
-ClickAdapter * AllocAdapter(void (*fn)(void *), void * user, int arg0 = 0, int arg1 = 0, std::string id = {})
+bool StartsWith(const std::string & value, const char * prefix)
 {
-	if(g_adapterCount >= kAdapterCapacity) return nullptr;
-	auto * a = &g_adapters[g_adapterCount++];
-	a->fn = fn;
-	a->user = user;
-	a->arg0 = arg0;
-	a->arg1 = arg1;
-	a->id = std::move(id);
-	return a;
+	const size_t n = std::strlen(prefix);
+	return value.size() >= n && value.compare(0, n, prefix) == 0;
 }
 
-void PresetClicked(void * user)
+int SuffixInt(const std::string & value, const char * prefix)
 {
-	auto * screen = static_cast<OptionsControlsScreen *>(user);
-	if(screen) screen->NotifyPresetClicked();
-}
-
-void SaveClicked(void * user)
-{
-	auto * screen = static_cast<OptionsControlsScreen *>(user);
-	if(screen) screen->NotifySaveClicked();
-}
-
-void CancelClicked(void * user)
-{
-	auto * screen = static_cast<OptionsControlsScreen *>(user);
-	if(screen) screen->NotifyCancelClicked();
-}
-
-void ScrollUpClicked(void * user)
-{
-	auto * screen = static_cast<OptionsControlsScreen *>(user);
-	if(screen) screen->NotifyScrollUpClicked();
-}
-
-void ScrollDownClicked(void * user)
-{
-	auto * screen = static_cast<OptionsControlsScreen *>(user);
-	if(screen) screen->NotifyScrollDownClicked();
-}
-
-void BindClicked(void * user)
-{
-	auto * a = static_cast<ClickAdapter *>(user);
-	auto * screen = a ? static_cast<OptionsControlsScreen *>(a->user) : nullptr;
-	if(screen) screen->NotifyBindClicked(a->arg0, a->arg1);
-}
-
-void OperatorClicked(void * user)
-{
-	auto * a = static_cast<ClickAdapter *>(user);
-	auto * screen = a ? static_cast<OptionsControlsScreen *>(a->user) : nullptr;
-	if(screen) screen->NotifyOperatorClicked(a->arg0);
+	if(!StartsWith(value, prefix)) return -1;
+	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
 void RegisterButton(const char * label,
+                    const std::string & actionId,
                     int x,
                     int y,
                     int w,
-                    int h,
-                    void (*onClick)(void *),
-                    void * user,
-                    int rowIndex = -1)
+                    int h)
 {
 	silencer::ui::automation::Widget widget;
-	widget.label = label;
-	widget.kind = rowIndex >= 0
-		? silencer::ui::automation::WidgetKind::ListRow
-		: silencer::ui::automation::WidgetKind::Button;
+	widget.id = actionId;
+	widget.labelText = label;
+	widget.kind = silencer::ui::automation::WidgetKind::Button;
 	widget.x = x; widget.y = y; widget.w = w; widget.h = h;
-	widget.onClick = onClick;
-	widget.clickUser = user;
-	widget.onClickRow = nullptr;
-	widget.rowIndex = rowIndex;
 	silencer::ui::automation::Register(widget);
 }
 
@@ -158,24 +103,28 @@ void RegisterWidgets(OptionsControlsScreen * screen, int surfaceW)
 	const int panelY = 34;
 	const int x = panelX + kPanelPadX;
 	int y = panelY + kPanelPadY + 34;
-	RegisterButton("Preset", x + kActionNameW, y, 220, 33, &PresetClicked, screen);
+	(void)screen;
+	RegisterButton("Preset", kActionPreset, x + kActionNameW, y, 220, 33);
 	y += kRowH + kRowGap;
 	for(int i = 0; i < VISIBLE_ROWS; i++){
-		RegisterButton("Primary binding", x + kActionNameW, y + 4, kKeyButtonW,
-		               kKeyButtonH, &BindClicked, screen, i);
-		RegisterButton("Binding operator", x + kActionNameW + kKeyButtonW + 12,
-		               y + 4, kOperatorW, kKeyButtonH, &OperatorClicked, screen, i);
+		const std::string row = std::to_string(i);
+		RegisterButton("Primary binding", std::string(kActionPrimaryPrefix) + row,
+		               x + kActionNameW, y + 4, kKeyButtonW, kKeyButtonH);
+		RegisterButton("Binding operator", std::string(kActionOperatorPrefix) + row,
+		               x + kActionNameW + kKeyButtonW + 12,
+		               y + 4, kOperatorW, kKeyButtonH);
 		RegisterButton("Secondary binding",
+		               std::string(kActionSecondaryPrefix) + row,
 		               x + kActionNameW + kKeyButtonW + 12 + kOperatorW + 12,
-		               y + 4, kKeyButtonW, kKeyButtonH, &BindClicked, screen, i);
+		               y + 4, kKeyButtonW, kKeyButtonH);
 		y += kRowH + kRowGap;
 	}
-	RegisterButton("Scroll Up", panelX + kPanelW - 42, panelY + 92, 24, 24,
-	               &ScrollUpClicked, screen);
-	RegisterButton("Scroll Down", panelX + kPanelW - 42, panelY + 280, 24, 24,
-	               &ScrollDownClicked, screen);
-	RegisterButton("Save", panelX + 102, panelY + 338, 156, 21, &SaveClicked, screen);
-	RegisterButton("Cancel", panelX + 282, panelY + 338, 156, 21, &CancelClicked, screen);
+	RegisterButton("Scroll Up", kActionScrollUp,
+	               panelX + kPanelW - 42, panelY + 92, 24, 24);
+	RegisterButton("Scroll Down", kActionScrollDown,
+	               panelX + kPanelW - 42, panelY + 280, 24, 24);
+	RegisterButton("Save", kActionSave, panelX + 102, panelY + 338, 156, 21);
+	RegisterButton("Cancel", kActionCancel, panelX + 282, panelY + 338, 156, 21);
 }
 
 bool IsBuiltinKeybindProfile(const std::string & name)
@@ -189,17 +138,13 @@ void ButtonElement(Clay_String id,
                    uint16_t height,
                    uint16_t imageIndex,
                    BankTextVariant textVariant,
-                   void (*onClick)(void *),
-                   void * user)
+                   const char * actionId)
 {
-	if(onClick){
+	if(actionId && *actionId){
 		silencer::ui::automation::Widget widget;
-		widget.id = ToStd(id);
+		widget.id = actionId;
 		widget.labelText = AutomationLabel(id, text);
-		widget.label = widget.labelText.c_str();
 		widget.kind = silencer::ui::automation::WidgetKind::Button;
-		widget.onClick = onClick;
-		widget.clickUser = user;
 		widget.clayId = CLAY_SID(id);
 		widget.hasClayId = true;
 		silencer::ui::automation::Register(widget);
@@ -224,17 +169,13 @@ void TextButton(Clay_String id,
                 Clay_String text,
                 uint16_t width,
                 uint16_t height,
-                void (*onClick)(void *),
-                void * user)
+                const char * actionId)
 {
-	if(onClick){
+	if(actionId && *actionId){
 		silencer::ui::automation::Widget widget;
-		widget.id = ToStd(id);
+		widget.id = actionId;
 		widget.labelText = AutomationLabel(id, text);
-		widget.label = widget.labelText.c_str();
 		widget.kind = silencer::ui::automation::WidgetKind::Button;
-		widget.onClick = onClick;
-		widget.clickUser = user;
 		widget.clayId = CLAY_SID(id);
 		widget.hasClayId = true;
 		silencer::ui::automation::Register(widget);
@@ -259,11 +200,12 @@ void RowActionButton(Clay_String id,
                      bool rebinding,
                      OptionsControlsScreen * screen)
 {
+	(void)screen;
 	std::string display = rebinding ? "-" : text;
-	auto * adapter = AllocAdapter(&BindClicked, screen, row, slot);
+	std::string actionId = std::string(slot == 0 ? kActionPrimaryPrefix : kActionSecondaryPrefix)
+	                     + std::to_string(row);
 	ButtonElement(id, FromStd(display), kKeyButtonW, kKeyButtonH, 28,
-	              BankTextVariant::Title, adapter ? &BindClicked : nullptr,
-	              adapter);
+	              BankTextVariant::Title, actionId.c_str());
 }
 
 void RowOperatorButton(Clay_String id,
@@ -271,9 +213,10 @@ void RowOperatorButton(Clay_String id,
                        int row,
                        OptionsControlsScreen * screen)
 {
-	auto * adapter = AllocAdapter(&OperatorClicked, screen, row, 0);
+	(void)screen;
+	std::string actionId = std::string(kActionOperatorPrefix) + std::to_string(row);
 	TextButton(id, FromCStr(text), kOperatorW, kKeyButtonH,
-	           adapter ? &OperatorClicked : nullptr, adapter);
+	           actionId.c_str());
 }
 }
 
@@ -372,7 +315,7 @@ void OptionsControlsScreen::Build(ScreenContext & ctx)
 	operatorClickedRow = -1;
 }
 
-void OptionsControlsScreen::NotifyBindClicked(int row, int slot)
+void OptionsControlsScreen::BeginRebindFromVisibleRow(int row, int slot)
 {
 	int absolute = scrollPosition + row;
 	if(absolute < 0 || absolute >= (int)Action::Count) return;
@@ -380,7 +323,7 @@ void OptionsControlsScreen::NotifyBindClicked(int row, int slot)
 	rebindSlot = slot;
 }
 
-void OptionsControlsScreen::NotifyOperatorClicked(int row)
+void OptionsControlsScreen::ToggleOperatorFromVisibleRow(int row)
 {
 	int absolute = scrollPosition + row;
 	if(absolute < 0 || absolute >= (int)Action::Count) return;
@@ -504,13 +447,57 @@ bool OptionsControlsScreen::CaptureRawKeyDown(ScreenContext & ctx, int keyCode)
 	return true;
 }
 
+bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+{
+	(void)ctx;
+	if(action.kind == silencer::ui::UiActionKind::Cancel){
+		cancelClicked = true;
+		return true;
+	}
+	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+	if(action.id == kActionPreset){
+		presetClicked = true;
+		return true;
+	}
+	if(action.id == kActionSave){
+		saveClicked = true;
+		return true;
+	}
+	if(action.id == kActionCancel){
+		cancelClicked = true;
+		return true;
+	}
+	if(action.id == kActionScrollUp){
+		scrollDelta--;
+		return true;
+	}
+	if(action.id == kActionScrollDown){
+		scrollDelta++;
+		return true;
+	}
+	int row = SuffixInt(action.id, kActionPrimaryPrefix);
+	if(row >= 0){
+		BeginRebindFromVisibleRow(row, 0);
+		return true;
+	}
+	row = SuffixInt(action.id, kActionSecondaryPrefix);
+	if(row >= 0){
+		BeginRebindFromVisibleRow(row, 1);
+		return true;
+	}
+	row = SuffixInt(action.id, kActionOperatorPrefix);
+	if(row >= 0){
+		ToggleOperatorFromVisibleRow(row);
+		return true;
+	}
+	return false;
+}
+
 void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-
-	g_adapterCount = 0;
 
 	std::string presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
 	                       : !ctx.keymap.name.empty() ? ctx.keymap.name
@@ -574,7 +561,7 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 					BankText(CLAY_STRING("Preset:"), BankTextVariant::Heading, {});
 				}
 				ButtonElement(CLAY_STRING("PresetButton"), FromStd(presetText), 220, 33,
-				              23, BankTextVariant::Title, &PresetClicked, this);
+				              23, BankTextVariant::Title, kActionPreset);
 			}
 
 			CLAY({ .id = CLAY_ID("ControlsRows"),
@@ -617,9 +604,9 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
 				TextButton(CLAY_STRING("ScrollUp"), CLAY_STRING("Up"), 60, 24,
-				           &ScrollUpClicked, this);
+				           kActionScrollUp);
 				TextButton(CLAY_STRING("ScrollDown"), CLAY_STRING("Down"), 80, 24,
-				           &ScrollDownClicked, this);
+				           kActionScrollDown);
 			}
 
 			CLAY({ .id = CLAY_ID("ControlsActions"),
@@ -629,9 +616,9 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
 				ButtonElement(CLAY_STRING("Save"), CLAY_STRING("Save"), 156, 21, 24,
-				              BankTextVariant::Heading, &SaveClicked, this);
+				              BankTextVariant::Heading, kActionSave);
 				ButtonElement(CLAY_STRING("Cancel"), CLAY_STRING("Cancel"), 156, 21, 24,
-				              BankTextVariant::Heading, &CancelClicked, this);
+				              BankTextVariant::Heading, kActionCancel);
 			}
 		}
 	}

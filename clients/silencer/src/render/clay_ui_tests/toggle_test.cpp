@@ -81,7 +81,7 @@ bool RunToggleTest(::Game & game, const char * stateName, const char * outPath) 
 // Click-routing check. Lays out three toggles in a horizontal row. Only
 // toggle 1 is "selected" (so its payload brightness should be 128, the
 // other two should be 32). Presses inside toggle 1's bbox and verifies
-// exactly its onClick fires.
+// exactly its typed action is emitted.
 //
 // Timeline mirrors RunBankButtonCheck: 5 frames, hover -> press -> press
 // dispatch -> held. The registry/router contract is exactly one action per
@@ -92,9 +92,6 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 	EnsureInitialized(W, H);
 
 	int counts[3] = {0, 0, 0};
-	auto onClick = +[](void * user) {
-		(*static_cast<int *>(user))++;
-	};
 
 	// Per-frame: drives pointer state, lays out the row, returns the
 	// (selectedBrightness, unselectedBrightness) seen in the emitted
@@ -122,24 +119,29 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 				CLAY_STRING("t0"), 181, 0, /*selected=*/false,
 				{ .width = 24, .height = 24, .effectColor = 112,
 				  .selectedBrightness = 128, .unselectedBrightness = 32 },
-				{ /*hoveredOut=*/nullptr, onClick, &counts[0] });
+				{ /*hoveredOut=*/nullptr, /*actionId=*/"test.toggle.0" });
 			silencer::ui::primitives::Toggle(
 				CLAY_STRING("t1"), 181, 1, /*selected=*/true,
 				{ .width = 24, .height = 24, .effectColor = 112,
 				  .selectedBrightness = 128, .unselectedBrightness = 32 },
-				{ nullptr, onClick, &counts[1] });
+				{ nullptr, "test.toggle.1" });
 			silencer::ui::primitives::Toggle(
 				CLAY_STRING("t2"), 181, 2, /*selected=*/false,
 				{ .width = 24, .height = 24, .effectColor = 112,
 				  .selectedBrightness = 128, .unselectedBrightness = 32 },
-				{ nullptr, onClick, &counts[2] });
+				{ nullptr, "test.toggle.2" });
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
 		silencer::ui::ActiveUiAutomationRegistry().ResolveClayBoundsFromClay();
 		if(pressed){
 			silencer::ui::automation::InvokeAt(static_cast<int>(px), static_cast<int>(py));
 		}
-		silencer::ui::DispatchUiActions(silencer::ui::automation::DrainActions());
+		for(const auto & action : silencer::ui::automation::DrainActions()){
+			if(action.kind != silencer::ui::UiActionKind::Activate) continue;
+			if(action.id == "test.toggle.0") counts[0]++;
+			else if(action.id == "test.toggle.1") counts[1]++;
+			else if(action.id == "test.toggle.2") counts[2]++;
+		}
 		wasDown = down;
 
 		selBr = 0;

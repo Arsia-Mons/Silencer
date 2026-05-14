@@ -20,11 +20,7 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
-
-	void NotifyDoneClicked() { doneClicked = true; }
-	void NotifyUpgradeClicked(int index);
-	void NotifyScrollUpClicked() { scrollDelta--; }
-	void NotifyScrollDownClicked() { scrollDelta++; }
+	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
 	void Refresh(ScreenContext & ctx);

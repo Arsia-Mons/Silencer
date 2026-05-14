@@ -11,15 +11,13 @@
 //
 // Mutually-exclusive group behavior is the CALLER's job:
 //   - caller passes `selected` per toggle (true for one, false for the rest);
-//   - caller passes a distinct `user` per toggle so its onClick callback
-//     can identify which one was clicked.
+//   - caller handles the stable action ID emitted for the chosen toggle.
 // No global `set` integer, no shared state. The primitive references no
 // lobby / world / Config types.
 //
-// Memory: each call allocates up to one ClickAdapter + one TogglePayload
-// + one ClayCustomData header from fixed-capacity bump arenas. Callers
-// MUST invoke ToggleBeginFrame() once per layout pass before
-// Clay_BeginLayout.
+// Memory: each call allocates up to one TogglePayload + one ClayCustomData
+// header from fixed-capacity bump arenas. Callers MUST invoke
+// ToggleBeginFrame() once per layout pass before Clay_BeginLayout.
 
 #include "clay/clay.h"
 #include "shared.h"
@@ -42,12 +40,9 @@ struct ToggleOpts {
 	Uint8 unselectedBrightness = 128;
 };
 
-using ToggleClickFn = void (*)(void * user);
-
 struct ToggleHandle {
-	bool *         hoveredOut;  // Optional. Written each frame if non-null.
-	ToggleClickFn  onClick;     // Optional. Routed through UiAutomationRegistry.
-	void *         user;        // Forwarded to onClick.
+	bool *      hoveredOut;  // Optional. Written each frame if non-null.
+	const char * actionId;   // Optional stable UiAction id registered for input routing.
 };
 
 // Resets the per-frame click-adapter + payload arenas. Call once before

@@ -10,6 +10,7 @@
 // GameJoinPanelTick. Primitives stay screen-agnostic.
 
 #include "shared.h"
+#include "runtime/UiActionQueue.h"
 
 #include <string>
 
@@ -21,7 +22,7 @@ class LobbyScreen;
 namespace silencer::client_ui::lobby {
 
 struct GameJoinPanelState {
-	// Per-frame click flags. Set by widget onClick adapters; consumed once
+	// Per-frame click flags. Set by typed widget intents; consumed once
 	// by GameJoinPanelTick on the next frame.
 	bool readyClicked = false;
 	bool teamClicked  = false;
@@ -44,6 +45,8 @@ void GameJoinPanelTick(GameJoinPanelState & state,
                        World & world,
                        ScreenContext & ctx,
                        LobbyScreen & owner);
+bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
+                                 const silencer::ui::UiAction & action);
 
 // Emits the upper-pane subtree (Choose Tech / Change Team / Ready buttons,
 // stacked vertically). Must be called inside the LobbyRightUpperBox CLAY

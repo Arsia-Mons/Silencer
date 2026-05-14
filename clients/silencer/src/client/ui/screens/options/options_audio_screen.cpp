@@ -32,6 +32,9 @@ constexpr uint16_t kPanelPadY = 32;
 constexpr uint16_t kRowH = 33;
 constexpr uint16_t kIndicatorGap = 10;
 constexpr uint16_t kActionGap = 12;
+constexpr const char * kActionMusic = "options_audio.music";
+constexpr const char * kActionSave = "options_audio.save";
+constexpr const char * kActionCancel = "options_audio.cancel";
 
 void ApplyMusicSetting(bool on)
 {
@@ -42,49 +45,29 @@ void ApplyMusicSetting(bool on)
 	}
 }
 
-void OnMusicClicked(void * user)
-{
-	auto * screen = static_cast<OptionsAudioScreen *>(user);
-	if(screen) screen->NotifyMusicClicked();
-}
-
-void OnSaveClicked(void * user)
-{
-	auto * screen = static_cast<OptionsAudioScreen *>(user);
-	if(screen) screen->NotifySaveClicked();
-}
-
-void OnCancelClicked(void * user)
-{
-	auto * screen = static_cast<OptionsAudioScreen *>(user);
-	if(screen) screen->NotifyCancelClicked();
-}
-
 void RegisterButton(const char * label,
+                    const char * actionId,
                     int x,
-                    int y,
-                    void (*onClick)(void *),
-                    OptionsAudioScreen * screen)
+                    int y)
 {
 	silencer::ui::automation::Widget w;
-	w.label = label;
+	w.id = actionId;
+	w.labelText = label;
 	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	w.onClick = onClick;
-	w.clickUser = screen;
 	silencer::ui::automation::Register(w);
 }
 
-void RegisterWidgets(OptionsAudioScreen * screen, int surfaceW, int /*surfaceH*/)
+void RegisterWidgets(int surfaceW, int /*surfaceH*/)
 {
 	const int panelX = (surfaceW - kPanelW) / 2;
 	const int panelY = 80;
 	const int rowX = panelX + kPanelPadX;
 	const int rowY = panelY + kPanelPadY + 42;
 	const int actionY = rowY + kRowH + 30;
-	RegisterButton("Music", rowX, rowY + 6, &OnMusicClicked, screen);
-	RegisterButton("Save", panelX + 48, actionY, &OnSaveClicked, screen);
-	RegisterButton("Cancel", panelX + 216, actionY, &OnCancelClicked, screen);
+	RegisterButton("Music", kActionMusic, rowX, rowY + 6);
+	RegisterButton("Save", kActionSave, panelX + 48, actionY);
+	RegisterButton("Cancel", kActionCancel, panelX + 216, actionY);
 }
 
 void ToggleIndicator(Clay_String id, bool selected)
@@ -113,8 +96,7 @@ void ToggleIndicator(Clay_String id, bool selected)
 
 void ToggleRow(Clay_String label,
                bool selected,
-               void (*onClick)(void *),
-               OptionsAudioScreen * screen)
+               const char * actionId)
 {
 	CLAY({ .id = CLAY_SID(label),
 	       .layout = {
@@ -123,7 +105,7 @@ void ToggleRow(Clay_String label,
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
 		BankButton(label, BankButtonVariant::Chrome, {},
-		           BankButtonHandle{ nullptr, onClick, screen });
+		           BankButtonHandle{ nullptr, actionId });
 		CLAY({ .id = CLAY_SIDI(label, 1),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
@@ -143,7 +125,7 @@ void OptionsAudioScreen::Build(ScreenContext & ctx)
 	saveClicked = false;
 	cancelClicked = false;
 	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(this, surface.w, surface.h);
+	RegisterWidgets(surface.w, surface.h);
 }
 
 void OptionsAudioScreen::Tick(ScreenContext & ctx)
@@ -196,7 +178,7 @@ void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
 			BankText(CLAY_STRING("Audio Options"), BankTextVariant::Title, {});
-			ToggleRow(CLAY_STRING("Music"), cfg.music, &OnMusicClicked, this);
+			ToggleRow(CLAY_STRING("Music"), cfg.music, kActionMusic);
 			CLAY({ .id = CLAY_ID("OptionsAudioActions"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
@@ -204,16 +186,39 @@ void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
 				BankButton(CLAY_STRING("Save"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, &OnSaveClicked, this });
+				           BankButtonHandle{ nullptr, kActionSave });
 				BankButton(CLAY_STRING("Cancel"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, &OnCancelClicked, this });
+				           BankButtonHandle{ nullptr, kActionCancel });
 			}
 		}
 	}
-	RegisterWidgets(this, dst.w, dst.h);
+	RegisterWidgets(dst.w, dst.h);
 }
 
 void OptionsAudioScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+}
+
+bool OptionsAudioScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+{
+	(void)ctx;
+	if(action.kind == silencer::ui::UiActionKind::Cancel){
+		cancelClicked = true;
+		return true;
+	}
+	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+	if(action.id == kActionMusic){
+		musicClicked = true;
+		return true;
+	}
+	if(action.id == kActionSave){
+		saveClicked = true;
+		return true;
+	}
+	if(action.id == kActionCancel){
+		cancelClicked = true;
+		return true;
+	}
+	return false;
 }

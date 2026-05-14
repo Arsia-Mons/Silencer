@@ -74,7 +74,7 @@ bool RunBankButtonTest(::Game & game, const char * variantName, const char * out
 
 // Programmatic hover + click parity check. No PNG produced — this validates
 // the behavioral half of the P5 pass_check (hover changes chrome brightness,
-// click callback fires exactly once per press).
+// and one typed action is emitted per press).
 //
 // Timeline (all on the Chrome variant):
 //   Frame 1: pointer = (-1, -1), down=false → idle (warm hit-test cache).
@@ -91,10 +91,7 @@ bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
 	constexpr int H = 480;
 	EnsureInitialized(W, H);
 
-	int clickCount = 0;
-	auto onClick = +[](void * user) {
-		(*static_cast<int *>(user))++;
-	};
+	int actionCount = 0;
 
 	// Helper: one layout pass with a fixed pointer state. Returns the
 	// brightness embedded in the (only) BankButtonChrome custom payload, or
@@ -120,14 +117,19 @@ bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
 				CLAY_STRING("Create Game"),
 				silencer::ui::primitives::BankButtonVariant::Chrome,
 				{},
-				{ /*hoveredOut=*/nullptr, /*onClick=*/onClick, /*user=*/&clickCount });
+				{ /*hoveredOut=*/nullptr, /*actionId=*/"test.bank_button.create" });
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
 		silencer::ui::ActiveUiAutomationRegistry().ResolveClayBoundsFromClay();
 		if(pressed){
 			silencer::ui::automation::InvokeAt(static_cast<int>(px), static_cast<int>(py));
 		}
-		silencer::ui::DispatchUiActions(silencer::ui::automation::DrainActions());
+		for(const auto & action : silencer::ui::automation::DrainActions()){
+			if(action.kind == silencer::ui::UiActionKind::Activate &&
+			   action.id == "test.bank_button.create"){
+				actionCount++;
+			}
+		}
 		wasDown = down;
 
 		Uint8 brightness = 0;
@@ -153,16 +155,16 @@ bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
 
 	// Frame 2: hover only.
 	Uint8 hoverBrightness = runOneFrame(px, py, false);
-	int clicksBeforePress = clickCount;
+	int clicksBeforePress = actionCount;
 
 	// Frames 3-4: press transition + dispatch frame.
 	runOneFrame(px, py, true);
 	runOneFrame(px, py, true);
-	int clicksAfterPressWindow = clickCount;
+	int clicksAfterPressWindow = actionCount;
 
 	// Frame 5: still held — no additional fire.
 	runOneFrame(px, py, true);
-	int clicksAfterHeld = clickCount;
+	int clicksAfterHeld = actionCount;
 
 	out.chromeBrightnessIdle = idleBrightness;
 	out.chromeBrightnessHover = hoverBrightness;

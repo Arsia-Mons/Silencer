@@ -2,11 +2,11 @@
 # P7 ScrollList primitive unit test — drives `clay_scroll_list_test` once
 # (30-item list, selectedIndex=8, scrollPosition=3) and pixdiffs the
 # resulting PNG against the committed reference. Then drives
-# `clay_scroll_list_check` once for click-routing parity (press over
-# row 5 fires onSelect exactly once with index=5).
+# `clay_scroll_list_check` once for action-routing parity (press over
+# row 5 emits Select exactly once with index=5).
 #
 # Pass bar (render):     < 2.0% pixdiff vs reference.png.
-# Pass bar (behavioral): on_select_fired == 1, last_selected_index == 5.
+# Pass bar (behavioral): select_actions == 1, last_selected_index == 5.
 #
 # Usage:   bash tests/lobby-ui/scroll_list_test/run.sh
 # Updates: rerun with REGEN=1 to overwrite reference.png from the live
@@ -71,7 +71,7 @@ fi
 CHECK=$(cli --port "$PORT" clay_scroll_list_check)
 echo "check = $CHECK"
 read FIRED IDX NO_OFL_CNT OFL_CNT OFL_W OFL_H <<EOF
-$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.on_select_fired,j.last_selected_index,j.no_overflow_scrollbar_count,j.overflow_scrollbar_count,j.overflow_scrollbar_bbox_w,j.overflow_scrollbar_bbox_h].join(' '))" "$CHECK")
+$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.select_actions,j.last_selected_index,j.no_overflow_scrollbar_count,j.overflow_scrollbar_count,j.overflow_scrollbar_bbox_w,j.overflow_scrollbar_bbox_h].join(' '))" "$CHECK")
 EOF
 
 assert_eq() {
@@ -82,7 +82,7 @@ assert_eq() {
     echo "PASS: $1 = $2"
   fi
 }
-assert_eq "on_select_fired"            "$FIRED"      "1"
+assert_eq "select_actions"             "$FIRED"      "1"
 assert_eq "last_selected_index"        "$IDX"        "5"
 # P7b — conditional scrollbar emission. itemCount=3, visibleLines=10 → 0
 # scrollbar render commands. itemCount=50, visibleLines=10 → 1 command, and

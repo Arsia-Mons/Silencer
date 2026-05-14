@@ -5,16 +5,13 @@
 // sprite-rendered scrollbar on the right. Replaces the legacy SelectBox +
 // ScrollBar pair.
 //
-// Inputs are immutable. Selection routes through UiAutomationRegistry:
-//   - onSelect(user, index) runs when the input router activates a row.
-// The caller owns `selectedIndex` and `scrollPosition`; the primitive only
-// reads them.
+// Inputs are immutable. Selection routes through UiAutomationRegistry as a
+// typed UiAction with the row index. The caller owns `selectedIndex` and
+// `scrollPosition`; the primitive only reads them.
 //
 // Memory: each call allocates one ScrollBar payload + one ClayCustomData
-// header + (up to `itemCount`) row click adapters from fixed-capacity
-// bump arenas. Callers MUST invoke ScrollListBeginFrame() once per layout
-// pass before Clay_BeginLayout. Allocations beyond arena capacity fall
-// back to non-interactive rows (no click dispatch).
+// header from fixed-capacity bump arenas. Callers MUST invoke
+// ScrollListBeginFrame() once per layout pass before Clay_BeginLayout.
 
 #include "clay/clay.h"
 #include "primitives/bank_text.h"
@@ -45,12 +42,9 @@ struct ScrollListOpts {
 	Uint16 scrollbarGap         = 0;  // px between rows column and scrollbar.
 };
 
-using ScrollListSelectFn = void (*)(void * user, int index);
-
 struct ScrollListHandle {
-	bool *              hoveredOut;  // Optional. Written each frame if non-null.
-	ScrollListSelectFn  onSelect;    // Optional. Routed through UiAutomationRegistry.
-	void *              user;        // Forwarded to onSelect.
+	bool *      hoveredOut;  // Optional. Written each frame if non-null.
+	const char * actionId;   // Optional row action ID prefix registered for input routing.
 };
 
 // Resets the per-frame click-adapter + payload arenas. Call once before

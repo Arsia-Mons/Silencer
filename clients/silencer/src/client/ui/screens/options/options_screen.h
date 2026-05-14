@@ -10,11 +10,7 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
-
-	void NotifyGoBackClicked() { goBackClicked = true; }
-	void NotifyControlsClicked() { controlsClicked = true; }
-	void NotifyDisplayClicked() { displayClicked = true; }
-	void NotifyAudioClicked() { audioClicked = true; }
+	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
 	bool goBackClicked = false;

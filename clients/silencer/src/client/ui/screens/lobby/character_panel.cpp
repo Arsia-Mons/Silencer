@@ -32,33 +32,21 @@ namespace {
 // bank-181 indices, so render-time pixel layout is unchanged.
 struct AgencyDef {
 	const char * id;
+	const char * actionId;
 	Uint16 spriteIndex;
 	Uint8  agency;
 };
 
 const AgencyDef kAgencies[5] = {
-	{ "CharTglNoxis",     0, Team::NOXIS },
-	{ "CharTglLazarus",   1, Team::LAZARUS },
-	{ "CharTglCaliber",   2, Team::CALIBER },
-	{ "CharTglStatic",    3, Team::STATIC },
-	{ "CharTglBlackrose", 4, Team::BLACKROSE },
+	{ "CharTglNoxis",     "lobby.character.agency.noxis",     0, Team::NOXIS },
+	{ "CharTglLazarus",   "lobby.character.agency.lazarus",   1, Team::LAZARUS },
+	{ "CharTglCaliber",   "lobby.character.agency.caliber",   2, Team::CALIBER },
+	{ "CharTglStatic",    "lobby.character.agency.static",    3, Team::STATIC },
+	{ "CharTglBlackrose", "lobby.character.agency.blackrose", 4, Team::BLACKROSE },
 };
 
 // Inspector labels — one per agency, in the same order as kAgencies.
 const char * kAgencyLabels[5] = { "Noxis", "Lazarus", "Caliber", "Static", "Blackrose" };
-
-// Per-frame click adapters: each toggle's onClick gets (state*, agency)
-// via a stable per-row record allocated from this fixed-capacity arena.
-struct AgencyClickAdapter {
-	CharacterPanelState * state;
-	Uint8 agency;
-};
-AgencyClickAdapter g_adapters[5];
-
-void OnAgencyClicked(void * user) {
-	auto * a = static_cast<AgencyClickAdapter *>(user);
-	if(a && a->state) a->state->selectedAgency = a->agency;
-}
 
 // Per-frame text buffers. The layout pass keeps pointers to these for the
 // duration of the layout, so they MUST live past BuildCharacterPanelTree's
@@ -109,6 +97,18 @@ void CharacterPanelTick(CharacterPanelState & state, World & world) {
 			world.SetAgency(state.selectedAgency);
 		}
 	}
+}
+
+bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
+                                  const silencer::ui::UiAction & action) {
+	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+	for(const AgencyDef & def : kAgencies){
+		if(action.id == def.actionId){
+			state.selectedAgency = def.agency;
+			return true;
+		}
+	}
+	return false;
 }
 
 void BuildCharacterPanelTree(CharacterPanelState & state,
@@ -172,9 +172,6 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 		       } }) {
 			for(int i = 0; i < 5; ++i){
 				const AgencyDef & def = kAgencies[i];
-				g_adapters[i].state  = &state;
-				g_adapters[i].agency = def.agency;
-
 				const Uint16 spriteW = resources.spritewidth[181][def.spriteIndex];
 				const Uint16 spriteH = resources.spriteheight[181][def.spriteIndex];
 
@@ -193,8 +190,7 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 				                   .selectedBrightness   = 128,
 				                   .unselectedBrightness = 32 },
 				       ToggleHandle{ .hoveredOut = nullptr,
-				                     .onClick    = &OnAgencyClicked,
-				                     .user       = &g_adapters[i] });
+				                     .actionId   = def.actionId });
 
 				// Inspector hit rect uses the legacy on-screen coords so
 				// label-keyed CLI clicks keep working without depending on
@@ -203,13 +199,12 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 				// when geometric hit-testing is requested.
 				const int tx = 20 + i * 42;
 				silencer::ui::automation::Widget w;
-				w.label = kAgencyLabels[i];
+				w.id = def.actionId;
+				w.labelText = kAgencyLabels[i];
 				w.kind  = silencer::ui::automation::WidgetKind::Toggle;
 				w.x = tx; w.y = 90;
 				w.w = spriteW > 0 ? spriteW : (Uint16)16;
 				w.h = spriteH > 0 ? spriteH : (Uint16)16;
-				w.onClick   = &OnAgencyClicked;
-				w.clickUser = &g_adapters[i];
 				w.selected  = (state.selectedAgency == def.agency);
 				silencer::ui::automation::Register(w);
 			}

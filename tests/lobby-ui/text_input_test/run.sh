@@ -6,8 +6,8 @@
 # typed-submit + password-mask checks.
 #
 # Pass bar (render):     < 1.0% pixdiff vs reference.png.
-# Pass bar (behavioral): on_enter_fired_for_newline==1,
-#                        on_enter_fired_for_letter==0,
+# Pass bar (behavioral): submit_actions_for_enter==1,
+#                        submit_actions_for_text==0,
 #                        password_mask_applied_len==8.
 #
 # Usage:   bash tests/lobby-ui/text_input_test/run.sh
@@ -72,8 +72,8 @@ fi
 # Typed-submit + password-mask check (no PNG; pure JSON).
 CHECK=$(cli --port "$PORT" clay_text_input_check)
 echo "check = $CHECK"
-read NL_FIRED LTR_FIRED PW_LEN <<EOF
-$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.on_enter_fired_for_newline,j.on_enter_fired_for_letter,j.password_mask_applied_len].join(' '))" "$CHECK")
+read ENTER_SUBMITS TEXT_SUBMITS PW_LEN <<EOF
+$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.submit_actions_for_enter,j.submit_actions_for_text,j.password_mask_applied_len].join(' '))" "$CHECK")
 EOF
 
 assert_eq() {
@@ -84,8 +84,8 @@ assert_eq() {
     echo "PASS: $1 = $2"
   fi
 }
-assert_eq "on_enter_fired_for_newline" "$NL_FIRED"  "1"
-assert_eq "on_enter_fired_for_letter"  "$LTR_FIRED" "0"
+assert_eq "submit_actions_for_enter" "$ENTER_SUBMITS" "1"
+assert_eq "submit_actions_for_text"  "$TEXT_SUBMITS"  "0"
 assert_eq "password_mask_applied_len"  "$PW_LEN"    "8"
 
 if [ "$FAILED" != "0" ]; then

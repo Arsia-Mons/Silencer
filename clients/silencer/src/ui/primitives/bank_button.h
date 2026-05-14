@@ -11,15 +11,15 @@
 //   Checkbox  bank 7 idx 19/18    (none)            13 x 13     BCHECKBOX
 //
 // The primitive owns no state and references no lobby/world/Config. State
-// (checkbox selected, currently-hovered, callback bookkeeping) is supplied
+// (checkbox selected, currently-hovered, action ID bookkeeping) is supplied
 // by the caller via opts + handle. The caller is responsible for tracking
 // "was this hovered last frame?" if it cares; the primitive only reports
 // the current frame's hover via the optional `hoveredOut` field.
 //
-// Memory: each call may allocate up to two small per-frame structs (a click
-// adapter and, for Chrome, a chrome payload + a ClayCustomData header) from
-// a fixed-capacity bump arena. Callers MUST invoke BankButtonBeginFrame()
-// once per layout pass before Clay_BeginLayout to reset the arena.
+// Memory: each call may allocate up to one chrome payload + one ClayCustomData
+// header from a fixed-capacity bump arena. Callers MUST invoke
+// BankButtonBeginFrame() once per layout pass before Clay_BeginLayout to reset
+// the arena.
 
 #include "clay/clay.h"
 #include "shared.h"
@@ -38,12 +38,9 @@ struct BankButtonOpts {
 	Uint8  textBrightness = 128; // Inline only override. Chrome/Checkbox derive from hover.
 };
 
-using BankButtonClickFn = void (*)(void * user);
-
 struct BankButtonHandle {
-	bool *              hoveredOut;  // Optional. Written each frame if non-null.
-	BankButtonClickFn   onClick;     // Optional. Routed through UiAutomationRegistry.
-	void *              user;        // Forwarded to onClick.
+	bool *      hoveredOut;  // Optional. Written each frame if non-null.
+	const char * actionId;   // Optional stable UiAction id registered for input routing.
 };
 
 // Resets the per-frame click-adapter + chrome-payload + ClayCustomData

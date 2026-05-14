@@ -4,7 +4,7 @@
 # click-routing + per-state brightness check.
 #
 # Pass bar (render):     < 1.0% pixdiff per state vs committed reference.
-# Pass bar (behavioral): toggle 1's onClick fires exactly once on the
+# Pass bar (behavioral): toggle 1 emits exactly one Activate action on the
 #                        press window over its bbox; toggles 0 and 2 do
 #                        not fire; selected payload brightness == 128;
 #                        unselected payload brightness == 32.

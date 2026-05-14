@@ -62,6 +62,10 @@ constexpr uint16_t kButtonGap = 5;
 constexpr uint16_t kButtonW = 52;
 constexpr uint16_t kButtonH = 21;
 constexpr int kMaxLogLines = 128;
+constexpr const char * kActionUsername = "lobby_connect.username";
+constexpr const char * kActionPassword = "lobby_connect.password";
+constexpr const char * kActionLogin = "lobby_connect.login";
+constexpr const char * kActionCancel = "lobby_connect.cancel";
 ScrollTextBoxLine g_logSlab[kMaxLogLines];
 
 Clay_String FromCStr(const char * s)
@@ -79,32 +83,24 @@ std::string ToStd(Clay_String text)
 	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
 }
 
-void LoginClicked(void * user)
+void CopyUiText(char * dst, int dstLen, const std::string & value)
 {
-	auto * screen = static_cast<LobbyConnectScreen *>(user);
-	if(screen) screen->NotifyLoginClicked();
+	if(!dst || dstLen <= 0) return;
+	int n = static_cast<int>(value.size());
+	if(n > dstLen - 1) n = dstLen - 1;
+	std::memcpy(dst, value.data(), n);
+	dst[n] = '\0';
 }
 
-void CancelClicked(void * user)
+void SmallButton(Clay_String label, const char * actionId)
 {
-	auto * screen = static_cast<LobbyConnectScreen *>(user);
-	if(screen) screen->NotifyCancelClicked();
-}
-
-void SmallButton(Clay_String label, void (*onClick)(void *), void * user)
-{
-	if(onClick){
-		silencer::ui::automation::Widget widget;
-		widget.id = ToStd(label);
-		widget.labelText = widget.id;
-		widget.label = widget.labelText.c_str();
-		widget.kind = silencer::ui::automation::WidgetKind::Button;
-		widget.onClick = onClick;
-		widget.clickUser = user;
-		widget.clayId = CLAY_SID(label);
-		widget.hasClayId = true;
-		silencer::ui::automation::Register(widget);
-	}
+	silencer::ui::automation::Widget widget;
+	widget.id = actionId;
+	widget.labelText = ToStd(label);
+	widget.kind = silencer::ui::automation::WidgetKind::Button;
+	widget.clayId = CLAY_SID(label);
+	widget.hasClayId = true;
+	silencer::ui::automation::Register(widget);
 	CLAY({ .id = CLAY_SID(label),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(kButtonW),
@@ -120,45 +116,40 @@ void SmallButton(Clay_String label, void (*onClick)(void *), void * user)
 }
 
 void RegisterButton(const char * label,
+                    const char * actionId,
                     int uid,
                     int x,
-                    int y,
-                    void (*onClick)(void *),
-                    LobbyConnectScreen * screen)
+                    int y)
 {
 	silencer::ui::automation::Widget w;
-	w.id = label;
-	w.label = label;
+	w.id = actionId;
+	w.labelText = label;
 	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.uid = uid;
 	w.x = x; w.y = y; w.w = kButtonW; w.h = kButtonH;
-	w.onClick = onClick;
-	w.clickUser = screen;
 	silencer::ui::automation::Register(w);
 }
 
 void RegisterInput(const char * label,
+                   const char * actionId,
                    int uid,
                    int x,
                    int y,
                    char * buffer,
                    int bufferLen,
                    bool password,
-                   bool inactive,
-                   void (*onEnter)(void *),
-                   void * enterUser)
+                   bool inactive)
 {
 	silencer::ui::automation::Widget w;
-	w.label = label;
+	w.id = actionId;
+	w.labelText = label;
 	w.kind = silencer::ui::automation::WidgetKind::TextInput;
 	w.uid = uid;
 	w.x = x; w.y = y; w.w = kInputW; w.h = kInputH;
-	w.textBuffer = buffer;
-	w.textBufferLen = bufferLen;
+	w.value = buffer ? buffer : "";
+	w.maxLength = bufferLen > 0 ? bufferLen - 1 : 0;
 	w.isPassword = password;
 	w.inactive = inactive;
-	w.onEnter = onEnter;
-	w.enterUser = enterUser;
 	silencer::ui::automation::Register(w);
 }
 
@@ -179,14 +170,13 @@ void RegisterWidgets(LobbyConnectScreen * screen,
 	const int buttonsX = panelX + (kPanelW - (kButtonW * 2 + kButtonGap)) / 2;
 	const int buttonsY = formY + 20 + kFormGap + 20 + 14;
 
-	RegisterInput("Username", LBY_INPUT_USERNAME, inputX, usernameY,
-	              username, 17, false, inactive, &LoginClicked, screen);
-	RegisterInput("Password", LBY_INPUT_PASSWORD, inputX, passwordY,
-	              password, 29, true, inactive, &LoginClicked, screen);
-	RegisterButton("Login", LBY_BTN_LOGIN, buttonsX, buttonsY,
-	               &LoginClicked, screen);
-	RegisterButton("Cancel", LBY_BTN_CANCEL, buttonsX + kButtonW + kButtonGap,
-	               buttonsY, &CancelClicked, screen);
+	RegisterInput("Username", kActionUsername, LBY_INPUT_USERNAME, inputX, usernameY,
+	              username, 17, false, inactive);
+	RegisterInput("Password", kActionPassword, LBY_INPUT_PASSWORD, inputX, passwordY,
+	              password, 29, true, inactive);
+	RegisterButton("Login", kActionLogin, LBY_BTN_LOGIN, buttonsX, buttonsY);
+	RegisterButton("Cancel", kActionCancel, LBY_BTN_CANCEL, buttonsX + kButtonW + kButtonGap,
+	               buttonsY);
 }
 
 int FillLogSlab(const std::vector<std::string> & lines)
@@ -465,8 +455,8 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 			           .childGap = kButtonGap,
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				SmallButton(CLAY_STRING("Login"), &LoginClicked, this);
-				SmallButton(CLAY_STRING("Cancel"), &CancelClicked, this);
+				SmallButton(CLAY_STRING("Login"), kActionLogin);
+				SmallButton(CLAY_STRING("Cancel"), kActionCancel);
 			}
 		}
 	}
@@ -480,28 +470,35 @@ void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 	silencer::ui::automation::ClearFocus();
 }
 
-bool LobbyConnectScreen::HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action)
+bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
 	(void)ctx;
-	if(action == silencer::ui::UiNavAction::Confirm){
+	if(action.kind == silencer::ui::UiActionKind::SetText){
+		if(action.id == kActionUsername){
+			CopyUiText(username, static_cast<int>(sizeof(username)), action.value);
+			return true;
+		}
+		if(action.id == kActionPassword){
+			CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
+			return true;
+		}
+		return false;
+	}
+	if(action.kind == silencer::ui::UiActionKind::SubmitText &&
+	   (action.id == kActionUsername || action.id == kActionPassword)){
 		loginClicked = true;
 		return true;
 	}
-	if(action == silencer::ui::UiNavAction::Cancel){
+	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == kActionLogin){
+		loginClicked = true;
+		return true;
+	}
+	if((action.kind == silencer::ui::UiActionKind::Activate && action.id == kActionCancel) ||
+	   action.kind == silencer::ui::UiActionKind::Cancel){
 		cancelClicked = true;
 		return true;
 	}
 	return false;
-}
-
-void LobbyConnectScreen::NotifyLoginClicked()
-{
-	loginClicked = true;
-}
-
-void LobbyConnectScreen::NotifyCancelClicked()
-{
-	cancelClicked = true;
 }
 
 void LobbyConnectScreen::AppendLog(const char * text)

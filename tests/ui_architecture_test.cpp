@@ -114,32 +114,24 @@ TEST_CASE("UiAutomationRegistry queues typed actions for interactive widgets") {
 	silencer::ui::UiAutomationRegistry registry;
 	registry.BeginFrame();
 
-	int clicks = 0;
-	auto onClick = [](void * user) {
-		++*static_cast<int *>(user);
-	};
 	silencer::ui::UiAutomationWidget widget;
-	widget.label = "Connect";
+	widget.id = "main_menu.connect";
+	widget.labelText = "Connect";
 	widget.kind = silencer::ui::UiAutomationWidgetKind::Button;
 	widget.uid = 42;
 	widget.x = 10;
 	widget.y = 20;
 	widget.w = 80;
 	widget.h = 30;
-	widget.onClick = onClick;
-	widget.clickUser = &clicks;
 	registry.RegisterWidget(widget);
 
 	CHECK(registry.InvokeAt(12, 22));
-	CHECK(clicks == 0);
 
 	auto actions = registry.DrainActions();
 	REQUIRE(actions.size() == 1);
 	CHECK(actions[0].kind == silencer::ui::UiActionKind::Activate);
-	CHECK(actions[0].id == "42");
+	CHECK(actions[0].id == "main_menu.connect");
 	CHECK(actions[0].value == "Connect");
-	silencer::ui::DispatchUiActions(registry, actions);
-	CHECK(clicks == 1);
 	CHECK(registry.DrainActions().empty());
 }
 
@@ -147,29 +139,34 @@ TEST_CASE("UiAutomationRegistry edits focused text through typed methods") {
 	silencer::ui::UiAutomationRegistry registry;
 	registry.BeginFrame();
 
-	int submits = 0;
-	auto onEnter = [](void * user) {
-		++*static_cast<int *>(user);
-	};
-	char buffer[8] = "ab";
 	silencer::ui::UiAutomationWidget widget;
-	widget.label = "Name";
+	widget.id = "profile.name";
+	widget.labelText = "Name";
 	widget.kind = silencer::ui::UiAutomationWidgetKind::TextInput;
 	widget.uid = 7;
-	widget.textBuffer = buffer;
-	widget.textBufferLen = static_cast<int>(sizeof(buffer));
-	widget.onEnter = onEnter;
-	widget.enterUser = &submits;
+	widget.value = "ab";
+	widget.maxLength = 7;
 	registry.RegisterWidget(widget);
 
 	REQUIRE(registry.FocusTextInputByUid(7));
 	(void)registry.DrainActions();
 	CHECK(registry.DispatchTextInput('c'));
-	CHECK(std::string(buffer) == "abc");
-	CHECK(registry.BackspaceFocusedText());
-	CHECK(std::string(buffer) == "ab");
-	CHECK(registry.SubmitFocusedText());
+	auto actions = registry.DrainActions();
+	REQUIRE(actions.size() == 1);
+	CHECK(actions[0].kind == silencer::ui::UiActionKind::SetText);
+	CHECK(actions[0].id == "profile.name");
+	CHECK(actions[0].value == "abc");
 
-	silencer::ui::DispatchUiActions(registry, registry.DrainActions());
-	CHECK(submits == 1);
+	CHECK(registry.BackspaceFocusedText());
+	actions = registry.DrainActions();
+	REQUIRE(actions.size() == 1);
+	CHECK(actions[0].kind == silencer::ui::UiActionKind::SetText);
+	CHECK(actions[0].value == "ab");
+
+	CHECK(registry.SubmitFocusedText());
+	actions = registry.DrainActions();
+	REQUIRE(actions.size() == 1);
+	CHECK(actions[0].kind == silencer::ui::UiActionKind::SubmitText);
+	CHECK(actions[0].id == "profile.name");
+	CHECK(actions[0].value == "ab");
 }

@@ -70,6 +70,16 @@ constexpr uint16_t kTallSectionGap  = 4;
 
 constexpr int kMaxMapRows = 1024;
 Clay_String g_mapSlab[kMaxMapRows];
+constexpr const char * kActionSecurity = "lobby.game_create.security";
+constexpr const char * kActionSpectatable = "lobby.game_create.spectatable";
+constexpr const char * kActionCreate = "lobby.game_create.create";
+constexpr const char * kActionMapPrefix = "lobby.game_create.map";
+constexpr const char * kActionMinLevel = "lobby.game_create.min_level";
+constexpr const char * kActionMaxLevel = "lobby.game_create.max_level";
+constexpr const char * kActionMaxPlayers = "lobby.game_create.max_players";
+constexpr const char * kActionMaxTeams = "lobby.game_create.max_teams";
+constexpr const char * kActionName = "lobby.game_create.name";
+constexpr const char * kActionPassword = "lobby.game_create.password";
 
 Clay_String FromCStr(const char * s) {
 	return Clay_String{ false, static_cast<int32_t>(strlen(s)), s };
@@ -77,13 +87,6 @@ Clay_String FromCStr(const char * s) {
 
 Clay_String StaticId(const char * s) {
 	return Clay_String{ true, static_cast<int32_t>(strlen(s)), s };
-}
-
-void OnSecurityClicked(void * user)    { static_cast<GameCreatePanelState *>(user)->securityClicked    = true; }
-void OnSpectatableClicked(void * user) { static_cast<GameCreatePanelState *>(user)->spectatableClicked = true; }
-void OnCreateClicked(void * user)      { static_cast<GameCreatePanelState *>(user)->createClicked      = true; }
-void OnMapRowSelected(void * user, int index) {
-	static_cast<GameCreatePanelState *>(user)->mapRowClickedIndex = index;
 }
 
 const char * SecurityLabel(Uint8 idx) {
@@ -95,40 +98,54 @@ const char * SecurityLabel(Uint8 idx) {
 	}
 }
 
-void RegisterButton(const char * label, int x, int y, int w, int h,
-                    void (*onClick)(void *), void * user, bool selected = false) {
+bool StartsWith(const std::string & value, const char * prefix) {
+	const size_t n = std::strlen(prefix);
+	return value.size() >= n && value.compare(0, n, prefix) == 0;
+}
+
+void CopyUiText(char * dst, int dstLen, const std::string & value)
+{
+	if(!dst || dstLen <= 0) return;
+	int n = static_cast<int>(value.size());
+	if(n > dstLen - 1) n = dstLen - 1;
+	std::memcpy(dst, value.data(), n);
+	dst[n] = '\0';
+}
+
+void RegisterButton(const char * label, const char * actionId,
+                    int x, int y, int w, int h, bool selected = false) {
 	silencer::ui::automation::Widget reg;
-	reg.label     = label;
+	reg.id        = actionId;
+	reg.labelText = label;
 	reg.kind      = silencer::ui::automation::WidgetKind::Button;
 	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	reg.onClick   = onClick;
-	reg.clickUser = user;
 	reg.selected  = selected;
 	silencer::ui::automation::Register(reg);
 }
 
-void RegisterTextInput(const char * label, int x, int y, int w, int h,
+void RegisterTextInput(const char * label, const char * actionId,
+                       int x, int y, int w, int h,
                        char * buf, int cap, bool isPassword = false) {
 	silencer::ui::automation::Widget reg;
-	reg.label         = label;
+	reg.id            = actionId;
+	reg.labelText     = label;
 	reg.kind          = silencer::ui::automation::WidgetKind::TextInput;
 	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	reg.textBuffer    = buf;
-	reg.textBufferLen = cap;
+	reg.value         = buf ? buf : "";
+	reg.maxLength     = cap > 0 ? cap - 1 : 0;
 	reg.isPassword    = isPassword;
 	silencer::ui::automation::Register(reg);
 }
 
-void RegisterListRow(const char * label, int x, int y, int w, int h,
-                     void (*onClickRow)(void *, int), void * user,
-                     int rowIndex, bool selected) {
+void RegisterListRow(const char * label, const std::string & actionId,
+                     int x, int y, int w, int h,
+                     int index, bool selected) {
 	silencer::ui::automation::Widget reg;
-	reg.label      = label;
+	reg.id         = actionId;
+	reg.labelText  = label ? label : "";
 	reg.kind       = silencer::ui::automation::WidgetKind::ListRow;
 	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	reg.onClickRow = onClickRow;
-	reg.clickUser  = user;
-	reg.rowIndex   = rowIndex;
+	reg.index      = index;
 	reg.selected   = selected;
 	silencer::ui::automation::Register(reg);
 }
@@ -296,6 +313,57 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 	ctx.PushScreen(MessageModal::Progress("Uploading map..."));
 }
 
+bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
+                                   const silencer::ui::UiAction & action) {
+	if(action.kind == silencer::ui::UiActionKind::SetText){
+		if(action.id == kActionMinLevel){
+			CopyUiText(state.minLevel, static_cast<int>(sizeof(state.minLevel)), action.value);
+			return true;
+		}
+		if(action.id == kActionMaxLevel){
+			CopyUiText(state.maxLevel, static_cast<int>(sizeof(state.maxLevel)), action.value);
+			return true;
+		}
+		if(action.id == kActionMaxPlayers){
+			CopyUiText(state.maxPlayers, static_cast<int>(sizeof(state.maxPlayers)), action.value);
+			return true;
+		}
+		if(action.id == kActionMaxTeams){
+			CopyUiText(state.maxTeams, static_cast<int>(sizeof(state.maxTeams)), action.value);
+			return true;
+		}
+		if(action.id == kActionName){
+			CopyUiText(state.name, static_cast<int>(sizeof(state.name)), action.value);
+			return true;
+		}
+		if(action.id == kActionPassword){
+			CopyUiText(state.password, static_cast<int>(sizeof(state.password)), action.value);
+			return true;
+		}
+		return false;
+	}
+	if(action.kind == silencer::ui::UiActionKind::Activate){
+		if(action.id == kActionSecurity){
+			state.securityClicked = true;
+			return true;
+		}
+		if(action.id == kActionSpectatable){
+			state.spectatableClicked = true;
+			return true;
+		}
+		if(action.id == kActionCreate){
+			state.createClicked = true;
+			return true;
+		}
+	}
+	if(action.kind == silencer::ui::UiActionKind::Select &&
+	   StartsWith(action.id, kActionMapPrefix)){
+		state.mapRowClickedIndex = action.index;
+		return true;
+	}
+	return false;
+}
+
 void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Resources & resources) {
 	(void)resources;
@@ -322,12 +390,12 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 			{ "Spectatable:", "GCrtRowSpect" },
 		};
 
-		struct NumInput { const char * id; const char * label; char * buf; int cap; };
+		struct NumInput { const char * id; const char * label; const char * actionId; char * buf; int cap; };
 		NumInput kTextInputs[4] = {
-			{ "GCrtMinLevel",   "Min Level",   state.minLevel,   (int)sizeof(state.minLevel)   },
-			{ "GCrtMaxLevel",   "Max Level",   state.maxLevel,   (int)sizeof(state.maxLevel)   },
-			{ "GCrtMaxPlayers", "Max Players", state.maxPlayers, (int)sizeof(state.maxPlayers) },
-			{ "GCrtMaxTeams",   "Max Teams",   state.maxTeams,   (int)sizeof(state.maxTeams)   },
+			{ "GCrtMinLevel",   "Min Level",   kActionMinLevel,   state.minLevel,   (int)sizeof(state.minLevel)   },
+			{ "GCrtMaxLevel",   "Max Level",   kActionMaxLevel,   state.maxLevel,   (int)sizeof(state.maxLevel)   },
+			{ "GCrtMaxPlayers", "Max Players", kActionMaxPlayers, state.maxPlayers, (int)sizeof(state.maxPlayers) },
+			{ "GCrtMaxTeams",   "Max Teams",   kActionMaxTeams,   state.maxTeams,   (int)sizeof(state.maxTeams)   },
 		};
 
 		for(int i = 0; i < 6; ++i){
@@ -351,15 +419,16 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 				if(i == 0){
 					BankButton(FromCStr(SecurityLabel(state.securityIndex)),
 					           BankButtonVariant::Inline, {},
-					           BankButtonHandle{ nullptr, &OnSecurityClicked, &state });
-					RegisterButton("Security", kValueX, kFormTop + 2, 60, kRowHeight,
-					               &OnSecurityClicked, &state);
+					           BankButtonHandle{ nullptr, kActionSecurity });
+					RegisterButton("Security", kActionSecurity,
+					               kValueX, kFormTop + 2, 60, kRowHeight);
 				}else if(i == 5){
 					BankButton(FromCStr(state.spectatable ? "Yes" : "No"),
 					           BankButtonVariant::Inline, {},
-					           BankButtonHandle{ nullptr, &OnSpectatableClicked, &state });
-					RegisterButton("Spectatable", kValueX, kFormTop + 5*kYSpace + 2, 30, kRowHeight,
-					               &OnSpectatableClicked, &state, state.spectatable);
+					           BankButtonHandle{ nullptr, kActionSpectatable });
+					RegisterButton("Spectatable", kActionSpectatable,
+					               kValueX, kFormTop + 5*kYSpace + 2, 30, kRowHeight,
+					               state.spectatable);
 				}else{
 					NumInput & ti = kTextInputs[i - 1];
 					TextInputOpts opts;
@@ -374,7 +443,8 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 					TextInput(Clay_String{ false, (int32_t)idStr.size(), idStr.c_str() },
 					          ti.buf, opts, {});
 					const int y = kFormTop + i * kYSpace + 2;
-					RegisterTextInput(ti.label, kValueX, y, 20, kRowHeight, ti.buf, ti.cap);
+					RegisterTextInput(ti.label, ti.actionId,
+					                  kValueX, y, 20, kRowHeight, ti.buf, ti.cap);
 				}
 			}
 		}
@@ -417,13 +487,14 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 			           g_mapSlab, slotCount,
 			           state.mapSelectedIndex, state.mapScrollPos,
 			           listOpts,
-			           ScrollListHandle{ nullptr, &OnMapRowSelected, &state });
+			           ScrollListHandle{ nullptr, kActionMapPrefix });
 		}
 		for(int i = 0; i < slotCount; ++i){
 			RegisterListRow(g_mapSlab[i].chars,
+			                std::string(kActionMapPrefix) + "." + std::to_string(i),
 			                kMapListX, kMapListY + i * kMapListLineH,
 			                kMapListW, kMapListLineH,
-			                &OnMapRowSelected, &state, i,
+			                i,
 			                state.mapSelectedIndex == i);
 		}
 
@@ -442,7 +513,8 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 			TextInput(CLAY_STRING("GCrtNameInput"),
 			          state.name, bodyInput, {});
 		}
-		RegisterTextInput("Game name", kNameInputX, kNameInputY, kNameInputW, kNameInputH,
+		RegisterTextInput("Game name", kActionName,
+		                  kNameInputX, kNameInputY, kNameInputW, kNameInputH,
 		                  state.name, (int)sizeof(state.name));
 
 		CLAY({ .id = CLAY_ID("GCrtPwLabelWrap") }) {
@@ -454,17 +526,17 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 			TextInput(CLAY_STRING("GCrtPwInput"),
 			          state.password, bodyInput, {});
 		}
-		RegisterTextInput("Password", kPwInputX, kPwInputY, kPwInputW, kPwInputH,
+		RegisterTextInput("Password", kActionPassword,
+		                  kPwInputX, kPwInputY, kPwInputW, kPwInputH,
 		                  state.password, (int)sizeof(state.password), true);
 
 		CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
 		       .layout = { .childAlignment = { .x = CLAY_ALIGN_X_CENTER } } }) {
 			BankButton(CLAY_STRING("Create"),
 			           BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, &OnCreateClicked, &state });
+			           BankButtonHandle{ nullptr, kActionCreate });
 		}
-		RegisterButton("Create", kCreateBtnX, kCreateBtnY, 156, 21,
-		               &OnCreateClicked, &state);
+		RegisterButton("Create", kActionCreate, kCreateBtnX, kCreateBtnY, 156, 21);
 	}
 }
 

@@ -10,12 +10,7 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
-	bool HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action) override;
-
-	void NotifyTutorialClicked() { tutorialClicked = true; }
-	void NotifyLobbyClicked() { lobbyClicked = true; }
-	void NotifyOptionsClicked() { optionsClicked = true; }
-	void NotifyExitClicked() { exitClicked = true; }
+	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
 	bool tutorialClicked = false;

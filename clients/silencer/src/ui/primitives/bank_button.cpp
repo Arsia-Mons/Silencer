@@ -49,15 +49,12 @@ void RegisterButtonWidget(Clay_String label,
                           UiAutomationWidgetKind kind,
                           BankButtonHandle handle,
                           bool selected) {
-	if(!handle.onClick) return;
+	if(!handle.actionId || !*handle.actionId) return;
 	silencer::ui::automation::Widget widget;
-	widget.id = ToStd(label);
-	widget.labelText = widget.id;
-	widget.label = widget.labelText.c_str();
+	widget.id = handle.actionId;
+	widget.labelText = ToStd(label);
 	widget.kind = kind;
 	widget.selected = selected;
-	widget.onClick = handle.onClick;
-	widget.clickUser = handle.user;
 	widget.clayId = CLAY_SID(label);
 	widget.hasClayId = true;
 	silencer::ui::automation::Register(widget);

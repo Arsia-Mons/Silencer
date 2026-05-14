@@ -54,6 +54,7 @@ constexpr uint16_t kInputPadTop    = 10;
 // fallback for geometric hit-testing and for human-readable layout dumps.
 constexpr int kInspectorInputX   = 18;
 constexpr int kInspectorInputY   = 437;
+constexpr const char * kActionInput = "lobby.chat.input";
 
 // Per-frame Clay_String / ScrollTextBoxLine slabs. The std::strings owned
 // by ChatPanelState are pointer-stable across this Build call, so we hand
@@ -139,6 +140,15 @@ void RebuildPresence(ChatPanelState & state, World & world) {
 	}
 }
 
+void CopyUiText(char * dst, int dstLen, const std::string & value)
+{
+	if(!dst || dstLen <= 0) return;
+	int n = static_cast<int>(value.size());
+	if(n > dstLen - 1) n = dstLen - 1;
+	std::memcpy(dst, value.data(), n);
+	dst[n] = '\0';
+}
+
 }  // namespace
 
 void ChatPanelInit(ChatPanelState & state) {
@@ -194,6 +204,24 @@ void ChatPanelTick(ChatPanelState & state, World & world) {
 
 		world.lobby.chatmessages.pop_front();
 	}
+}
+
+bool ChatPanelHandleUiIntent(ChatPanelState & state,
+                             World & world,
+                             const silencer::ui::UiAction & action) {
+	if(action.id != kActionInput) return false;
+	if(action.kind == silencer::ui::UiActionKind::SetText){
+		CopyUiText(state.inputBuffer, static_cast<int>(sizeof(state.inputBuffer)), action.value);
+		return true;
+	}
+	if(action.kind == silencer::ui::UiActionKind::SubmitText){
+		if(std::strlen(state.inputBuffer) > 0){
+			world.lobby.SendChat(world.lobby.channel, state.inputBuffer);
+			state.inputBuffer[0] = '\0';
+		}
+		return true;
+	}
+	return action.kind == silencer::ui::UiActionKind::Select;
 }
 
 void BuildChatPanelTree(ChatPanelState & state,
@@ -300,12 +328,13 @@ void BuildChatPanelTree(ChatPanelState & state,
 
 	{
 		silencer::ui::automation::Widget w;
-		w.label = "Chat";
+		w.id = kActionInput;
+		w.labelText = "Chat";
 		w.kind  = silencer::ui::automation::WidgetKind::TextInput;
 		w.x = kInspectorInputX; w.y = kInspectorInputY;
 		w.w = kInputW; w.h = kInputH;
-		w.textBuffer    = state.inputBuffer;
-		w.textBufferLen = (int)sizeof(state.inputBuffer);
+		w.value = state.inputBuffer;
+		w.maxLength = static_cast<int>(sizeof(state.inputBuffer)) - 1;
 		silencer::ui::automation::Register(w);
 	}
 

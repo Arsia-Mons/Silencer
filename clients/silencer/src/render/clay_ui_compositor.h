@@ -115,12 +115,12 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out);
 // scroll_list_test.cpp.
 bool RunScrollListTest(::Game & game, const char * outPath);
 
-// P7 ScrollList click-routing check. Lays out a 30-item list and drives
+// P7 ScrollList action-routing check. Lays out a 30-item list and drives
 // a press timeline over the bbox of row index 5 (visible because
-// scrollPosition=3). Reports which row index's onSelect callback fired.
+// scrollPosition=3). Reports which row index's Select action was emitted.
 struct ScrollListCheckResult {
-	int onSelectFired;      // Total number of onSelect invocations across all rows.
-	int lastSelectedIndex;  // Index reported by the most recent onSelect call. -1 if none.
+	int selectActions;      // Total number of Select actions across all rows.
+	int lastSelectedIndex;  // Index reported by the most recent Select action. -1 if none.
 	// P7b — conditional-scrollbar emission. Two extra layout passes (no
 	// overflow + overflow) count the number of CUSTOM ScrollBar render
 	// commands emitted. Confirms the primitive auto-suppresses the
@@ -161,12 +161,12 @@ bool RunScrollTextBoxCheck(::Game & game, ScrollTextBoxCheckResult & out);
 // text_input_test.cpp.
 bool RunTextInputTest(::Game & game, const char * outPath);
 
-// P9 TextInput action-drain check. Verifies that registry Enter queues
-// onEnter for the shared action dispatcher and normal text input does not.
+// P9 TextInput action-drain check. Verifies that registry Enter queues a
+// SubmitText action and normal text input does not.
 // No PNG produced.
 struct TextInputCheckResult {
-	int onEnterFiredForNewline;  // Expect 1.
-	int onEnterFiredForLetter;   // Expect 0.
+	int submitActionsForEnter;  // Expect 1.
+	int submitActionsForText;   // Expect 0.
 	int passwordMaskAppliedLen;  // Expect 8 — emitted text length for password variant.
 };
 bool RunTextInputCheck(::Game & game, TextInputCheckResult & out);

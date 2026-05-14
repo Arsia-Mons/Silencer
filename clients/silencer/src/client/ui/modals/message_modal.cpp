@@ -27,31 +27,26 @@ constexpr uint16_t kDialogW = 352;
 constexpr uint16_t kDialogH = 178;
 constexpr uint16_t kDialogPadX = 34;
 constexpr uint16_t kDialogPadY = 44;
+constexpr const char * kActionOk = "message_modal.ok";
 
 Clay_String FromStd(const std::string & s)
 {
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
 }
 
-void OkClicked(void * user)
-{
-	auto * modal = static_cast<MessageModal *>(user);
-	if(modal) modal->NotifyOkClicked();
-}
-
 void RegisterWidgets(MessageModal * modal, int surfaceW, int surfaceH, bool hasOk)
 {
+	(void)modal;
 	if(!hasOk) return;
 	const int dialogX = (surfaceW - kDialogW) / 2;
 	const int dialogY = (surfaceH - kDialogH) / 2;
 	silencer::ui::automation::Widget w;
-	w.label = "OK";
+	w.id = kActionOk;
+	w.labelText = "OK";
 	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.x = dialogX + (kDialogW - 156) / 2;
 	w.y = dialogY + kDialogH - kDialogPadY - 21;
 	w.w = 156; w.h = 21;
-	w.onClick = &OkClicked;
-	w.clickUser = modal;
 	silencer::ui::automation::Register(w);
 }
 }
@@ -115,7 +110,7 @@ void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 			BankText(FromStd(message), BankTextVariant::Heading, {});
 			if(hasOk){
 				BankButton(CLAY_STRING("OK"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, &OkClicked, this });
+				           BankButtonHandle{ nullptr, kActionOk });
 			}
 		}
 	}
@@ -125,6 +120,18 @@ void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 void MessageModal::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+}
+
+bool MessageModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+{
+	(void)ctx;
+	if(!hasOk) return false;
+	if(action.kind == silencer::ui::UiActionKind::Cancel ||
+	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == kActionOk)){
+		okClicked = true;
+		return true;
+	}
+	return false;
 }
 
 void MessageModal::SetText(ScreenContext & ctx, const std::string & text)

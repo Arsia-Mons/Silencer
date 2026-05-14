@@ -61,7 +61,6 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 	std::vector<silencer::ui::UiAction> unhandled;
 	for(const silencer::ui::UiAction& action : actions){
 		if(top && top->HandleUiIntent(ctx, action)) continue;
-		if(automation_.DispatchAction(action)) continue;
 		unhandled.push_back(action);
 	}
 	return unhandled;

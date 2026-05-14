@@ -11,6 +11,7 @@
 // agnostic.
 
 #include "shared.h"
+#include "runtime/UiActionQueue.h"
 
 #include <string>
 #include <vector>
@@ -42,7 +43,7 @@ struct GameCreatePanelState {
 	int    mapSelectedIndex = -1;
 	Uint16 mapScrollPos     = 0;
 
-	// Per-frame click flags. Set by widget onClick adapters; consumed once
+	// Per-frame click flags. Set by typed widget intents; consumed once
 	// by GameCreatePanelTick on the next frame.
 	bool securityClicked    = false;
 	bool spectatableClicked = false;
@@ -65,6 +66,8 @@ void GameCreatePanelTick(GameCreatePanelState & state,
                          World & world,
                          ScreenContext & ctx,
                          LobbyScreen & owner);
+bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
+                                   const silencer::ui::UiAction & action);
 
 // Emits the upper-pane subtree ("Game Options" heading + 6-row form: security
 // cycler, min/max level, max players, max teams, spectatable). Called inside

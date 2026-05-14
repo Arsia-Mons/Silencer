@@ -44,15 +44,12 @@ AllocCustomData(silencer::clay_bridge::CustomKind kind, void * payload) {
 void RegisterToggleWidget(Clay_String id,
                           bool selected,
                           ToggleHandle handle) {
-	if(!handle.onClick) return;
+	if(!handle.actionId || !*handle.actionId) return;
 	silencer::ui::automation::Widget widget;
-	widget.id = ToStd(id);
-	widget.labelText = widget.id;
-	widget.label = widget.labelText.c_str();
+	widget.id = handle.actionId;
+	widget.labelText = ToStd(id);
 	widget.kind = UiAutomationWidgetKind::Toggle;
 	widget.selected = selected;
-	widget.onClick = handle.onClick;
-	widget.clickUser = handle.user;
 	widget.clayId = CLAY_SID(id);
 	widget.hasClayId = true;
 	silencer::ui::automation::Register(widget);

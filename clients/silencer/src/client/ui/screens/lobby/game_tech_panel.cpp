@@ -20,6 +20,7 @@
 #include "game.h"
 
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -58,6 +59,9 @@ constexpr Uint8 kCheckboxOn   = 18;
 constexpr Uint8 kCheckboxOff  = 19;
 constexpr int kCheckboxW      = 13;
 constexpr int kCheckboxH      = 13;
+constexpr const char * kActionBack = "lobby.game_tech.back";
+constexpr const char * kActionTogglePrefix = "lobby.game_tech.toggle.";
+constexpr const char * kActionDescriptionPrefix = "lobby.game_tech.description.";
 
 // LobbyRightUpperBox interior layout knobs. Box at (238, 64, 160x121).
 constexpr uint16_t kUpperBackPadLeft = 4;   // screen 242 - box 238
@@ -80,32 +84,10 @@ constexpr uint16_t kTallDescPadTop     = 5;   // 370 - (350 + 15)
 constexpr uint16_t kTallDescRowGap     = 0;   // body height 11, desc stride 10 → tight (clip below)
 
 constexpr int kMaxRows = 32;
-struct ClickAdapter {
-	GameTechPanelState * state;
-	int itemIndex;
-};
-ClickAdapter g_toggleAdapters[kMaxRows];
-ClickAdapter g_descAdapters[kMaxRows];
-
 std::string g_rowLabels[kMaxRows];
 
 char g_localToggleIdBuf [kMaxRows][16];
 char g_remoteToggleIdBuf[3 * kMaxRows][16];
-
-void OnRowToggleClicked(void * user) {
-	auto * a = static_cast<ClickAdapter *>(user);
-	if(a && a->state) a->state->toggleClickedItemIndex = a->itemIndex;
-}
-
-void OnDescClicked(void * user) {
-	auto * a = static_cast<ClickAdapter *>(user);
-	if(a && a->state) a->state->descClickedItemIndex = a->itemIndex;
-}
-
-void OnBackClicked(void * user) {
-	auto * s = static_cast<GameTechPanelState *>(user);
-	if(s) s->backClicked = true;
-}
 
 Clay_String FromStd(const std::string & s) {
 	Clay_String cs;
@@ -113,6 +95,16 @@ Clay_String FromStd(const std::string & s) {
 	cs.length = static_cast<int32_t>(s.size());
 	cs.chars  = s.c_str();
 	return cs;
+}
+
+bool StartsWith(const std::string & value, const char * prefix) {
+	const size_t n = std::strlen(prefix);
+	return value.size() >= n && value.compare(0, n, prefix) == 0;
+}
+
+int SuffixInt(const std::string & value, const char * prefix) {
+	if(!StartsWith(value, prefix)) return -1;
+	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
 }  // namespace
@@ -204,6 +196,26 @@ void GameTechPanelTick(GameTechPanelState & state,
 	}
 }
 
+bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
+                                 const silencer::ui::UiAction & action) {
+	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+	if(action.id == kActionBack){
+		state.backClicked = true;
+		return true;
+	}
+	int index = SuffixInt(action.id, kActionTogglePrefix);
+	if(index >= 0){
+		state.toggleClickedItemIndex = index;
+		return true;
+	}
+	index = SuffixInt(action.id, kActionDescriptionPrefix);
+	if(index >= 0){
+		state.descClickedItemIndex = index;
+		return true;
+	}
+	return false;
+}
+
 void BuildGameTechUpperTree(GameTechPanelState & state,
                             World & world,
                             Resources & resources,
@@ -220,14 +232,13 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*onClick*/    &OnBackClicked,
-		                             /*user*/       &state });
+		                             /*actionId*/   kActionBack });
 	}
 	silencer::ui::automation::Widget w;
-	w.label = "Back To Teams";
+	w.id = kActionBack;
+	w.labelText = "Back To Teams";
 	w.kind  = silencer::ui::automation::WidgetKind::Button;
 	w.x = kBtnBackX; w.y = kBtnBackY; w.w = 156; w.h = 21;
-	w.onClick = &OnBackClicked; w.clickUser = &state;
 	silencer::ui::automation::Register(w);
 
 	// Peer name labels — right-aligned column. ALIGN_X_RIGHT inside a
@@ -362,8 +373,6 @@ void BuildGameTechTallTree(GameTechPanelState & state,
 						tOpts.unselectedBrightness = brightness;
 
 						if(ca.isLocal && localAdapter < kMaxRows){
-							g_toggleAdapters[localAdapter].state = &state;
-							g_toggleAdapters[localAdapter].itemIndex = static_cast<int>(bIdx);
 							std::snprintf(g_localToggleIdBuf[localAdapter],
 							              sizeof(g_localToggleIdBuf[localAdapter]),
 							              "GTechBoxL%d", static_cast<int>(bIdx));
@@ -371,11 +380,12 @@ void BuildGameTechTallTree(GameTechPanelState & state,
 							innerId.isStaticallyAllocated = false;
 							innerId.length = (int32_t)std::strlen(g_localToggleIdBuf[localAdapter]);
 							innerId.chars  = g_localToggleIdBuf[localAdapter];
+							std::string actionId =
+								std::string(kActionTogglePrefix) + std::to_string(static_cast<int>(bIdx));
 							Toggle(innerId,
 							       kCheckboxBank, boxIdx, selected, tOpts,
 							       ToggleHandle{ /*hoveredOut*/ nullptr,
-							                     /*onClick*/    &OnRowToggleClicked,
-							                     /*user*/       &g_toggleAdapters[localAdapter] });
+							                     /*actionId*/   actionId.c_str() });
 							localAdapter++;
 						}else{
 							const int slot = (col * kMaxRows) + static_cast<int>(bIdx);
@@ -433,15 +443,10 @@ void BuildGameTechTallTree(GameTechPanelState & state,
 							g_rowLabels[rowLabelSlot] += std::to_string(item->techslots);
 							g_rowLabels[rowLabelSlot] += ")";
 
-							g_descAdapters[rowLabelSlot].state = &state;
-							g_descAdapters[rowLabelSlot].itemIndex = static_cast<int>(bIdx);
 							silencer::ui::automation::Widget desc;
-							desc.id = "GTechDescription." + std::to_string(static_cast<int>(bIdx));
+							desc.id = std::string(kActionDescriptionPrefix) + std::to_string(static_cast<int>(bIdx));
 							desc.labelText = g_rowLabels[rowLabelSlot];
-							desc.label = desc.labelText.c_str();
 							desc.kind = silencer::ui::automation::WidgetKind::Button;
-							desc.onClick = &OnDescClicked;
-							desc.clickUser = &g_descAdapters[rowLabelSlot];
 							desc.clayId = CLAY_SIDI(CLAY_STRING("GTechRowLbl"),
 							                         static_cast<uint32_t>(bIdx));
 							desc.hasClayId = true;

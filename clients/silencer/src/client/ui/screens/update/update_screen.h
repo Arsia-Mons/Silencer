@@ -10,11 +10,7 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
-
-	void NotifyUpdateClicked() { updateClicked = true; }
-	void NotifyCancelClicked() { cancelClicked = true; }
-	void NotifyRetryClicked() { retryClicked = true; }
-	void NotifyDownloadClicked() { downloadClicked = true; }
+	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 private:
 	bool updateClicked = false;

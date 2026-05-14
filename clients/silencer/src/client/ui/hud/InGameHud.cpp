@@ -143,8 +143,6 @@ Clay_String ClayStringFromStd(const std::string& text) {
 		Uint8 brightness;
 	};
 
-	void InGameNoop(void *) {}
-
 	void BuildHudSystemCameraFrame(World& world, Surface* surface,
 	                               Uint8 bank, Uint16 index, Uint8 offsetBank,
 	                               int logicalY) {
@@ -717,9 +715,8 @@ Clay_String ClayStringFromStd(const std::string& text) {
 					silencer::ui::automation::Widget widget;
 					widget.id = "ingame.buytech.row." + std::to_string(row.index);
 					widget.labelText = row.name;
-					widget.label = widget.labelText.c_str();
 					widget.kind = silencer::ui::automation::WidgetKind::ListRow;
-					widget.rowIndex = row.index;
+					widget.index = row.index;
 					widget.selected = row.selected;
 					widget.clayId = rowClayId;
 					widget.hasClayId = true;
@@ -810,19 +807,19 @@ Clay_String ClayStringFromStd(const std::string& text) {
 		if(player->chatActive){
 			silencer::ui::automation::Widget chat;
 			chat.id = "ingame.chat";
-			chat.label = "In-game chat";
+			chat.labelText = "In-game chat";
 			chat.kind = silencer::ui::automation::WidgetKind::TextInput;
 			chat.uid = 9000;
-			chat.textBuffer = player->chatText;
-			chat.textBufferLen = static_cast<int>(sizeof(player->chatText));
+			chat.value = player->chatText;
+			chat.maxLength = static_cast<int>(sizeof(player->chatText)) - 1;
 			chat.clayId = CLAY_ID("InGameChatPanel");
 			chat.hasClayId = true;
-			chat.onCancel = &InGameNoop;
+			chat.cancelOnEscape = true;
 			silencer::ui::automation::Register(chat);
 
 			silencer::ui::automation::Widget channel;
 			channel.id = "ingame.chat.channel";
-			channel.label = player->chatwithteam ? "Team chat" : "All chat";
+			channel.labelText = player->chatwithteam ? "Team chat" : "All chat";
 			channel.kind = silencer::ui::automation::WidgetKind::Toggle;
 			channel.selected = player->chatwithteam;
 			channel.clayId = CLAY_ID("InGameChatPanel");

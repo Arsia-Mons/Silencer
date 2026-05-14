@@ -18,6 +18,7 @@
 #include <cstring>
 #include <cstdio>
 #include <fstream>
+#include <utility>
 #ifdef _WIN32
 #include <direct.h>
 #define MKDIR(p) _mkdir(p)
@@ -80,8 +81,38 @@ static bool LabelEquals(const char * a, const char * b){
 }
 
 static const char * WidgetLabel(const silencer::ui::automation::Widget& widget){
-	if(!widget.labelText.empty()) return widget.labelText.c_str();
-	return widget.label;
+	return widget.labelText.empty() ? nullptr : widget.labelText.c_str();
+}
+
+static const silencer::ui::automation::Widget * FindWidgetTarget(const std::string & target){
+	const silencer::ui::automation::Widget * hit = nullptr;
+	int count = 0;
+	for(const auto & candidate : silencer::ui::automation::All()){
+		bool matches = candidate.id == target;
+		const char * label = WidgetLabel(candidate);
+		if(!matches && label) matches = LabelEquals(label, target.c_str());
+		if(!matches && candidate.uid >= 0) matches = std::to_string(candidate.uid) == target;
+		if(matches){
+			hit = &candidate;
+			count++;
+		}
+	}
+	return count == 1 ? hit : nullptr;
+}
+
+static void QueueWidgetAction(const silencer::ui::automation::Widget& widget,
+                              silencer::ui::UiActionKind kind,
+                              const std::string & value = std::string(),
+                              int amount = 0){
+	silencer::ui::UiAction action;
+	action.kind = kind;
+	action.id = !widget.id.empty()
+		? widget.id
+		: (WidgetLabel(widget) ? std::string(WidgetLabel(widget)) : std::string());
+	action.value = value;
+	action.index = widget.index;
+	action.amount = amount;
+	silencer::ui::automation::QueueAction(std::move(action));
 }
 
 static bool QueueControlKey(Game& game, int ascii){
@@ -291,7 +322,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 		nlohmann::json r;
-		r["on_select_fired"] = res.onSelectFired;
+		r["select_actions"] = res.selectActions;
 		r["last_selected_index"] = res.lastSelectedIndex;
 		r["no_overflow_scrollbar_count"] = res.noOverflowScrollbarCount;
 		r["overflow_scrollbar_count"] = res.overflowScrollbarCount;
@@ -362,8 +393,8 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 		nlohmann::json r;
-		r["on_enter_fired_for_newline"] = res.onEnterFiredForNewline;
-		r["on_enter_fired_for_letter"] = res.onEnterFiredForLetter;
+		r["submit_actions_for_enter"] = res.submitActionsForEnter;
+		r["submit_actions_for_text"] = res.submitActionsForText;
 		r["password_mask_applied_len"] = res.passwordMaskAppliedLen;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
@@ -527,6 +558,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		for(const auto & cw : silencer::ui::automation::All()){
 			nlohmann::json w;
 			w["source"] = "clay";
+			if(!cw.id.empty()) w["id"] = cw.id;
 			w["x"] = cw.x; w["y"] = cw.y;
 			w["w"] = cw.w; w["h"] = cw.h;
 			if(WidgetLabel(cw)) w["label"] = WidgetLabel(cw);
@@ -541,16 +573,14 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				case K::TextInput:
 					w["kind"] = "textinput";
 					w["password"] = cw.isPassword;
-					if(cw.textBuffer){
-						w["text"] = cw.isPassword
-							? std::string(strlen(cw.textBuffer), '*')
-							: std::string(cw.textBuffer);
-						w["maxchars"] = cw.textBufferLen;
-					}
+					w["text"] = cw.isPassword
+						? std::string(cw.value.size(), '*')
+						: cw.value;
+					w["maxchars"] = cw.maxLength;
 					break;
 				case K::ListRow:
 					w["kind"] = "listrow";
-					w["row_index"] = cw.rowIndex;
+					w["row_index"] = cw.index;
 					w["selected"] = cw.selected;
 					break;
 			}
@@ -611,22 +641,23 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "BAD_REQUEST", "click needs label or id"));
 			return;
 		}
-		const auto * cw = silencer::ui::automation::FindByLabel(target.c_str());
+		const auto * cw = FindWidgetTarget(target);
 		if(cw){
 			using K = silencer::ui::automation::WidgetKind;
 			if(cw->kind == K::Button || cw->kind == K::Toggle){
-				silencer::ui::automation::QueueClick(target, cw->onClick, cw->clickUser);
+				QueueWidgetAction(*cw, silencer::ui::UiActionKind::Activate,
+				                  WidgetLabel(*cw) ? WidgetLabel(*cw) : "");
 				nlohmann::json r;
 				r["source"] = "clay";
 				cmd.reply->set_value(OkResult(cmd.id, r));
 				return;
 			}
 			if(cw->kind == K::ListRow){
-				silencer::ui::automation::QueueRowSelect(
-					target, cw->rowIndex, cw->onClickRow, cw->clickUser);
+				QueueWidgetAction(*cw, silencer::ui::UiActionKind::Select,
+				                  WidgetLabel(*cw) ? WidgetLabel(*cw) : "");
 				nlohmann::json r;
 				r["source"] = "clay";
-				r["row_index"] = cw->rowIndex;
+				r["row_index"] = cw->index;
 				cmd.reply->set_value(OkResult(cmd.id, r));
 				return;
 			}
@@ -676,13 +707,12 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cw = silencer::ui::automation::FindByLabel(label.c_str());
 		}
 		if(cw){
-			if(cw->kind == silencer::ui::automation::WidgetKind::TextInput
-			   && cw->textBuffer && cw->textBufferLen > 0){
-				int cap = cw->textBufferLen - 1;
+			if(cw->kind == silencer::ui::automation::WidgetKind::TextInput){
+				int cap = cw->maxLength;
 				int n = (int)text.size();
-				if(n > cap) n = cap;
-				std::memcpy(cw->textBuffer, text.data(), n);
-				cw->textBuffer[n] = '\0';
+				if(cap > 0 && n > cap) n = cap;
+				QueueWidgetAction(*cw, silencer::ui::UiActionKind::SetText,
+				                  text.substr(0, static_cast<size_t>(n)));
 				nlohmann::json r;
 				r["source"] = "clay";
 				cmd.reply->set_value(OkResult(cmd.id, r));
@@ -716,7 +746,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			int index = cmd.args["index"].get<int>();
 			for(const auto & candidate : widgets){
 				if(candidate.kind == silencer::ui::automation::WidgetKind::ListRow
-				   && candidate.rowIndex == index){
+				   && candidate.index == index){
 					hit = &candidate;
 					count++;
 				}
@@ -749,12 +779,11 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				"no unique clay list row matches select target"));
 			return;
 		}
-		silencer::ui::automation::QueueRowSelect(
-			!hit->id.empty() ? hit->id : (WidgetLabel(*hit) ? WidgetLabel(*hit) : ""),
-			hit->rowIndex, hit->onClickRow, hit->clickUser);
+		QueueWidgetAction(*hit, silencer::ui::UiActionKind::Select,
+		                  WidgetLabel(*hit) ? WidgetLabel(*hit) : "");
 		nlohmann::json r;
 		r["source"] = "clay";
-		r["row_index"] = hit->rowIndex;
+		r["row_index"] = hit->index;
 		if(WidgetLabel(*hit)) r["label"] = WidgetLabel(*hit);
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
@@ -773,13 +802,14 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", label));
 			return;
 		}
-		if(cw->kind != silencer::ui::automation::WidgetKind::Button || !cw->onClick){
+		if(cw->kind != silencer::ui::automation::WidgetKind::Button){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
 				"scroll target is not a Clay scroll button"));
 			return;
 		}
 		for(int i = 0; i < amount; ++i){
-			silencer::ui::automation::QueueClick(label, cw->onClick, cw->clickUser);
+			QueueWidgetAction(*cw, silencer::ui::UiActionKind::Activate,
+			                  WidgetLabel(*cw) ? WidgetLabel(*cw) : "");
 		}
 		nlohmann::json r;
 		r["source"] = "clay";

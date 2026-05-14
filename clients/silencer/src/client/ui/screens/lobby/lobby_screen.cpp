@@ -74,16 +74,6 @@ void DismissProgressModal(ScreenContext & ctx)
 	if(TopAsProgressModal(ctx)) ctx.PopScreen();
 }
 
-// Trampoline for the Go Back BankButton's onClick. Defers to the screen's
-// per-frame flag so back-routing runs on the next Tick rather than mid-
-// layout (calling Game::GoBack mid-Clay would invalidate the screen we're
-// currently dispatching commands for).
-void OnGoBackClicked(void * user)
-{
-	auto * screen = static_cast<LobbyScreen *>(user);
-	if(screen) screen->NotifyGoBackClicked();
-}
-
 // Lobby layout metrics are expressed as region proportions in the
 // game's current virtual framebuffer. The numbers preserve the legacy
 // 640x480 composition at the default size, but the tree is a real flex
@@ -100,6 +90,7 @@ constexpr uint16_t kRightTallW = 232;
 constexpr uint16_t kRightTallH = 391;
 constexpr uint16_t kNarrowBreakpointW = 560;
 constexpr uint16_t kNarrowChatMinH = 88;
+constexpr const char * kActionGoBack = "lobby.go_back";
 
 bool UseNarrowLayout(int surfaceW)
 {
@@ -117,6 +108,7 @@ void BuildTitleBarTree(LobbyScreen * screen,
                        bool narrow,
                        int surfaceW)
 {
+	(void)screen;
 	const uint16_t titleH = TitleBarHeight(narrow, mapName);
 	CLAY(Box(BoxVariants::Chrome, {
 	         .id = CLAY_ID("LobbyTitleBar"),
@@ -181,8 +173,7 @@ void BuildTitleBarTree(LobbyScreen * screen,
 					           BankButtonVariant::Chrome,
 					           {},
 					           { .hoveredOut = nullptr,
-					             .onClick = &OnGoBackClicked,
-					             .user = screen });
+					             .actionId = kActionGoBack });
 				}
 			}
 		};
@@ -208,13 +199,12 @@ void BuildTitleBarTree(LobbyScreen * screen,
 	}
 
 	silencer::ui::automation::Widget gb;
-	gb.label = "Go Back";
+	gb.id = kActionGoBack;
+	gb.labelText = "Go Back";
 	gb.kind = silencer::ui::automation::WidgetKind::Button;
 	gb.x = std::max(0, surfaceW - (int)kRootPadX - 5 - 156);
 	gb.y = kRootPadTop + 4;
 	gb.w = 156; gb.h = 21;
-	gb.onClick = &OnGoBackClicked;
-	gb.clickUser = screen;
 	silencer::ui::automation::Register(gb);
 }
 }  // namespace
@@ -255,8 +245,8 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 		return;
 	}
 
-	// Chrome Go Back — flag was set by the button onClick trampoline on the
-	// previous frame. Consume it before pumping anything else.
+	// Chrome Go Back — flag was set by a typed button intent on the previous
+	// frame. Consume it before pumping anything else.
 	if(goBackClicked){
 		goBackClicked = false;
 		if(game.GoBack()) return;
@@ -685,4 +675,34 @@ bool LobbyScreen::HandleBack(ScreenContext & ctx)
 		return true;
 	}
 	return false;
+}
+
+bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+{
+	if(action.kind == silencer::ui::UiActionKind::Cancel){
+		if(HandleBack(ctx)) return true;
+		goBackClicked = true;
+		return true;
+	}
+	if(action.kind == silencer::ui::UiActionKind::Activate &&
+	   action.id == kActionGoBack){
+		goBackClicked = true;
+		return true;
+	}
+	if(silencer::client_ui::lobby::CharacterPanelHandleUiIntent(characterState, action)){
+		return true;
+	}
+	if(silencer::client_ui::lobby::ChatPanelHandleUiIntent(chatState, ctx.world, action)){
+		return true;
+	}
+	if(gameCreateActive){
+		return silencer::client_ui::lobby::GameCreatePanelHandleUiIntent(gameCreateState, action);
+	}
+	if(gameJoinActive){
+		return silencer::client_ui::lobby::GameJoinPanelHandleUiIntent(gameJoinState, action);
+	}
+	if(gameTechActive){
+		return silencer::client_ui::lobby::GameTechPanelHandleUiIntent(gameTechState, action);
+	}
+	return silencer::client_ui::lobby::GameSelectPanelHandleUiIntent(gameSelectState, action);
 }

@@ -49,30 +49,19 @@ struct UiElementMetadata {
 struct UiAutomationWidget {
 	std::string id;
 	std::string labelText;
-	const char * label = nullptr;
 	UiAutomationWidgetKind kind = UiAutomationWidgetKind::Button;
 	int uid = -1;
 	int x = 0, y = 0, w = 0, h = 0;
 	Clay_ElementId clayId{};
 	bool hasClayId = false;
-
-	void (*onClick)(void * user) = nullptr;
-	void * clickUser = nullptr;
-
-	void (*onClickRow)(void * user, int index) = nullptr;
-	int rowIndex = -1;
-
+	int index = -1;
 	bool selected = false;
-
-	char * textBuffer = nullptr;
-	int textBufferLen = 0;
+	std::string value;
+	int maxLength = 0;
 	bool isPassword = false;
 	bool inactive = false;
 	bool numbersOnly = false;
-	void (*onEnter)(void * user) = nullptr;
-	void * enterUser = nullptr;
-	void (*onCancel)(void * user) = nullptr;
-	void * cancelUser = nullptr;
+	bool cancelOnEscape = false;
 };
 
 class UiAutomationRegistry {
@@ -105,13 +94,12 @@ public:
 	bool ActivateFocused();
 	void QueueAction(UiAction action);
 	std::vector<UiAction> DrainActions();
-	bool DispatchAction(const UiAction& action);
-	void DispatchActions(const std::vector<UiAction>& actions);
 	void ResolveClayBoundsFromClay();
 
 private:
 	bool MatchesFocus(const UiAutomationWidget& widget) const;
 	const UiAutomationWidget* FocusedWidget() const;
+	UiAutomationWidget* FocusedWidget();
 	void SetFocus(const UiAutomationWidget& widget);
 	void QueueAction(UiActionKind kind, const UiAutomationWidget& widget, const char * value);
 	void RefreshElementState();
@@ -151,15 +139,9 @@ bool FocusPreviousInteractive();
 bool FocusDirectional(UiNavAction action);
 bool ActivateFocused();
 void QueueAction(UiAction action);
-void QueueClick(std::string id, void (*onClick)(void *), void * user);
-void QueueRowSelect(std::string id, int rowIndex, void (*onClickRow)(void *, int), void * user);
-void QueueTextEnter(std::string id, const char * value, void (*onEnter)(void *), void * user);
 std::vector<UiAction> DrainActions();
 
 }  // namespace automation
-
-void DispatchUiActions(UiAutomationRegistry& registry, const std::vector<UiAction>& actions);
-void DispatchUiActions(const std::vector<UiAction>& actions);
 
 }  // namespace ui
 }  // namespace silencer

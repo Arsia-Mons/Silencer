@@ -22,10 +22,10 @@ public:
 	void Tick(ScreenContext & ctx) override;
 	void BuildUi(ScreenContext & ctx, Surface & dst, float frametime) override;
 	void Destroy(ScreenContext & ctx) override;
+	bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action) override;
 
 	bool IsProgress() const { return !hasOk; }
 	void SetText(ScreenContext & ctx, const std::string & text);
-	void NotifyOkClicked() { okClicked = true; }
 
 private:
 	MessageModal(std::string message, bool ok, std::function<void()> onClose);

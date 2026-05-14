@@ -22,52 +22,30 @@ using silencer::ui::primitives::BankButtonHandle;
 using silencer::ui::primitives::BankButtonVariant;
 
 constexpr uint16_t kButtonGap = 12;
-
-void OnGoBackClicked(void * user)
-{
-	auto * screen = static_cast<OptionsScreen *>(user);
-	if(screen) screen->NotifyGoBackClicked();
-}
-
-void OnControlsClicked(void * user)
-{
-	auto * screen = static_cast<OptionsScreen *>(user);
-	if(screen) screen->NotifyControlsClicked();
-}
-
-void OnDisplayClicked(void * user)
-{
-	auto * screen = static_cast<OptionsScreen *>(user);
-	if(screen) screen->NotifyDisplayClicked();
-}
-
-void OnAudioClicked(void * user)
-{
-	auto * screen = static_cast<OptionsScreen *>(user);
-	if(screen) screen->NotifyAudioClicked();
-}
+constexpr const char * kActionControls = "options.controls";
+constexpr const char * kActionDisplay = "options.display";
+constexpr const char * kActionAudio = "options.audio";
+constexpr const char * kActionBack = "options.back";
 
 void RegisterButton(const char * label,
+                    const char * actionId,
                     int x,
-                    int y,
-                    void (*onClick)(void *),
-                    OptionsScreen * screen)
+                    int y)
 {
 	silencer::ui::automation::Widget w;
-	w.label = label;
+	w.id = actionId;
+	w.labelText = label;
 	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	w.onClick = onClick;
-	w.clickUser = screen;
 	silencer::ui::automation::Register(w);
 }
 
-void RegisterOptionsButtons(OptionsScreen * screen)
+void RegisterOptionsButtons()
 {
-	RegisterButton("Controls", 242, 160, &OnControlsClicked, screen);
-	RegisterButton("Display", 242, 193, &OnDisplayClicked, screen);
-	RegisterButton("Audio", 242, 226, &OnAudioClicked, screen);
-	RegisterButton("Go Back", 242, 259, &OnGoBackClicked, screen);
+	RegisterButton("Controls", kActionControls, 242, 160);
+	RegisterButton("Display", kActionDisplay, 242, 193);
+	RegisterButton("Audio", kActionAudio, 242, 226);
+	RegisterButton("Go Back", kActionBack, 242, 259);
 }
 
 }  // namespace
@@ -84,7 +62,7 @@ void OptionsScreen::Build(ScreenContext & ctx)
 	displayClicked = false;
 	audioClicked = false;
 
-	RegisterOptionsButtons(this);
+	RegisterOptionsButtons();
 }
 
 void OptionsScreen::Tick(ScreenContext & ctx)
@@ -133,20 +111,47 @@ void OptionsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
 			BankButton(CLAY_STRING("Controls"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, &OnControlsClicked, this });
+			           BankButtonHandle{ nullptr, kActionControls });
 			BankButton(CLAY_STRING("Display"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, &OnDisplayClicked, this });
+			           BankButtonHandle{ nullptr, kActionDisplay });
 			BankButton(CLAY_STRING("Audio"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, &OnAudioClicked, this });
+			           BankButtonHandle{ nullptr, kActionAudio });
 			BankButton(CLAY_STRING("Go Back"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, &OnGoBackClicked, this });
+			           BankButtonHandle{ nullptr, kActionBack });
 		}
 	}
 
-	RegisterOptionsButtons(this);
+	RegisterOptionsButtons();
 }
 
 void OptionsScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+}
+
+bool OptionsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+{
+	if(action.kind == silencer::ui::UiActionKind::Cancel){
+		goBackClicked = true;
+		return true;
+	}
+	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+	if(action.id == kActionControls){
+		controlsClicked = true;
+		return true;
+	}
+	if(action.id == kActionDisplay){
+		displayClicked = true;
+		return true;
+	}
+	if(action.id == kActionAudio){
+		audioClicked = true;
+		return true;
+	}
+	if(action.id == kActionBack){
+		goBackClicked = true;
+		return true;
+	}
+	(void)ctx;
+	return false;
 }

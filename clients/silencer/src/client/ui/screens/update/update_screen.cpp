@@ -35,52 +35,30 @@ constexpr uint16_t kDialogH = 178;
 constexpr uint16_t kDialogPadX = 34;
 constexpr uint16_t kDialogPadY = 42;
 constexpr uint16_t kButtonGap = 6;
+constexpr const char * kActionUpdate = "update.update";
+constexpr const char * kActionCancel = "update.cancel";
+constexpr const char * kActionRetry = "update.retry";
+constexpr const char * kActionDownload = "update.download";
 
 Clay_String FromStd(const std::string & s)
 {
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
 }
 
-void OnUpdateClicked(void * user)
-{
-	auto * screen = static_cast<UpdateScreen *>(user);
-	if(screen) screen->NotifyUpdateClicked();
-}
-
-void OnCancelClicked(void * user)
-{
-	auto * screen = static_cast<UpdateScreen *>(user);
-	if(screen) screen->NotifyCancelClicked();
-}
-
-void OnRetryClicked(void * user)
-{
-	auto * screen = static_cast<UpdateScreen *>(user);
-	if(screen) screen->NotifyRetryClicked();
-}
-
-void OnDownloadClicked(void * user)
-{
-	auto * screen = static_cast<UpdateScreen *>(user);
-	if(screen) screen->NotifyDownloadClicked();
-}
-
 void RegisterButton(const char * label,
+                    const char * actionId,
                     int x,
-                    int y,
-                    void (*onClick)(void *),
-                    UpdateScreen * screen)
+                    int y)
 {
 	silencer::ui::automation::Widget w;
-	w.label = label;
+	w.id = actionId;
+	w.labelText = label;
 	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	w.onClick = onClick;
-	w.clickUser = screen;
 	silencer::ui::automation::Register(w);
 }
 
-void RegisterWidgets(UpdateScreen * screen, int surfaceW, int surfaceH, Updater::State state, int retryCount)
+void RegisterWidgets(int surfaceW, int surfaceH, Updater::State state, int retryCount)
 {
 	const int dialogX = (surfaceW - kDialogW) / 2;
 	const int dialogY = (surfaceH - kDialogH) / 2;
@@ -88,14 +66,14 @@ void RegisterWidgets(UpdateScreen * screen, int surfaceW, int surfaceH, Updater:
 	const int leftX = dialogX + (kDialogW - (156 * 2 + kButtonGap)) / 2;
 	const int rightX = leftX + 156 + kButtonGap;
 	if(state == Updater::PROMPTING){
-		RegisterButton("Update", leftX, buttonY, &OnUpdateClicked, screen);
+		RegisterButton("Update", kActionUpdate, leftX, buttonY);
 	}else if(state == Updater::FAILED && retryCount < 3){
-		RegisterButton("Retry", leftX, buttonY, &OnRetryClicked, screen);
+		RegisterButton("Retry", kActionRetry, leftX, buttonY);
 	}else if(state == Updater::FAILED){
-		RegisterButton("Download", leftX, buttonY, &OnDownloadClicked, screen);
+		RegisterButton("Download", kActionDownload, leftX, buttonY);
 	}
 	if(state == Updater::PROMPTING || state == Updater::DOWNLOADING || state == Updater::FAILED){
-		RegisterButton("Cancel", rightX, buttonY, &OnCancelClicked, screen);
+		RegisterButton("Cancel", kActionCancel, rightX, buttonY);
 	}
 }
 
@@ -141,7 +119,7 @@ void UpdateScreen::Build(ScreenContext & ctx)
 	retryClicked = false;
 	downloadClicked = false;
 	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(this, surface.w, surface.h, ctx.updater.GetState(), ctx.updater.GetRetryCount());
+	RegisterWidgets(surface.w, surface.h, ctx.updater.GetState(), ctx.updater.GetRetryCount());
 }
 
 void UpdateScreen::Tick(ScreenContext & ctx)
@@ -239,25 +217,52 @@ void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 			       } }) {
 				if(ustate == Updater::PROMPTING){
 					BankButton(CLAY_STRING("Update"), BankButtonVariant::Chrome, {},
-					           BankButtonHandle{ nullptr, &OnUpdateClicked, this });
+					           BankButtonHandle{ nullptr, kActionUpdate });
 				}else if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3){
 					BankButton(CLAY_STRING("Retry"), BankButtonVariant::Chrome, {},
-					           BankButtonHandle{ nullptr, &OnRetryClicked, this });
+					           BankButtonHandle{ nullptr, kActionRetry });
 				}else if(ustate == Updater::FAILED){
 					BankButton(CLAY_STRING("Download"), BankButtonVariant::Chrome, {},
-					           BankButtonHandle{ nullptr, &OnDownloadClicked, this });
+					           BankButtonHandle{ nullptr, kActionDownload });
 				}
 				if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
 					BankButton(CLAY_STRING("Cancel"), BankButtonVariant::Chrome, {},
-					           BankButtonHandle{ nullptr, &OnCancelClicked, this });
+					           BankButtonHandle{ nullptr, kActionCancel });
 				}
 			}
 		}
 	}
-	RegisterWidgets(this, dst.w, dst.h, ustate, ctx.updater.GetRetryCount());
+	RegisterWidgets(dst.w, dst.h, ustate, ctx.updater.GetRetryCount());
 }
 
 void UpdateScreen::Destroy(ScreenContext & ctx)
 {
 	(void)ctx;
+}
+
+bool UpdateScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+{
+	(void)ctx;
+	if(action.kind == silencer::ui::UiActionKind::Cancel){
+		cancelClicked = true;
+		return true;
+	}
+	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
+	if(action.id == kActionUpdate){
+		updateClicked = true;
+		return true;
+	}
+	if(action.id == kActionCancel){
+		cancelClicked = true;
+		return true;
+	}
+	if(action.id == kActionRetry){
+		retryClicked = true;
+		return true;
+	}
+	if(action.id == kActionDownload){
+		downloadClicked = true;
+		return true;
+	}
+	return false;
 }

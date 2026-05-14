@@ -32,40 +32,44 @@ constexpr uint16_t kDialogH = 148;
 constexpr uint16_t kInputW = 180;
 constexpr uint16_t kInputH = 14;
 constexpr int kPasswordUid = 1;
+constexpr const char * kActionPassword = "password_modal.password";
+constexpr const char * kActionOk = "password_modal.ok";
 
-void OkClicked(void * user)
+void CopyUiText(char * dst, int dstLen, const std::string & value)
 {
-	auto * modal = static_cast<PasswordModal *>(user);
-	if(modal) modal->NotifyOkClicked();
+	if(!dst || dstLen <= 0) return;
+	int n = static_cast<int>(value.size());
+	if(n > dstLen - 1) n = dstLen - 1;
+	std::memcpy(dst, value.data(), n);
+	dst[n] = '\0';
 }
 
 void RegisterWidgets(PasswordModal * modal, char * buffer, int surfaceW, int surfaceH)
 {
+	(void)modal;
 	const int dialogX = (surfaceW - kDialogW) / 2;
 	const int dialogY = (surfaceH - kDialogH) / 2;
 	silencer::ui::automation::Widget input;
-	input.label = "Password";
+	input.id = kActionPassword;
+	input.labelText = "Password";
 	input.kind = silencer::ui::automation::WidgetKind::TextInput;
 	input.uid = kPasswordUid;
 	input.x = dialogX + (kDialogW - kInputW) / 2;
 	input.y = dialogY + 64;
 	input.w = kInputW;
 	input.h = kInputH;
-	input.textBuffer = buffer;
-	input.textBufferLen = 21;
+	input.value = buffer ? buffer : "";
+	input.maxLength = 20;
 	input.isPassword = true;
-	input.onEnter = &OkClicked;
-	input.enterUser = modal;
 	silencer::ui::automation::Register(input);
 
 	silencer::ui::automation::Widget ok;
-	ok.label = "OK";
+	ok.id = kActionOk;
+	ok.labelText = "OK";
 	ok.kind = silencer::ui::automation::WidgetKind::Button;
 	ok.x = dialogX + (kDialogW - 156) / 2;
 	ok.y = dialogY + 92;
 	ok.w = 156; ok.h = 21;
-	ok.onClick = &OkClicked;
-	ok.clickUser = modal;
 	silencer::ui::automation::Register(ok);
 	(void)surfaceH;
 }
@@ -134,7 +138,7 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 				  .password = true,
 				  .showCaret = focused && blink });
 			BankButton(CLAY_STRING("OK"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, &OkClicked, this });
+			           BankButtonHandle{ nullptr, kActionOk });
 		}
 	}
 	RegisterWidgets(this, password, dst.w, dst.h);
@@ -146,10 +150,16 @@ void PasswordModal::Destroy(ScreenContext & ctx)
 	silencer::ui::automation::ClearFocus();
 }
 
-bool PasswordModal::HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action)
+bool PasswordModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
 {
 	(void)ctx;
-	if(action == silencer::ui::UiNavAction::Confirm){
+	if(action.kind == silencer::ui::UiActionKind::SetText &&
+	   action.id == kActionPassword){
+		CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
+		return true;
+	}
+	if((action.kind == silencer::ui::UiActionKind::SubmitText && action.id == kActionPassword) ||
+	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == kActionOk)){
 		okClicked = true;
 		return true;
 	}

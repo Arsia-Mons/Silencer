@@ -7,7 +7,7 @@
 //
 // `RunScrollListCheck(out)` lays out a 10-item list and drives a press
 // timeline over the bbox of a known visible row, asserting that exactly
-// one onSelect call fires with the correct index.
+// one Select action is emitted with the correct index.
 //
 // Invoked via the JSON-lines control ops `clay_scroll_list_test` and
 // `clay_scroll_list_check`.
@@ -92,13 +92,6 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 
 	int fired = 0;
 	int lastIndex = -1;
-	struct Sink { int * fired; int * lastIndex; };
-	Sink sink{&fired, &lastIndex};
-	auto onSelect = +[](void * user, int index) {
-		auto * s = static_cast<Sink *>(user);
-		(*s->fired)++;
-		*s->lastIndex = index;
-	};
 
 	bool wasDown = false;
 	auto runFrame = [&](float px, float py, bool down) {
@@ -125,14 +118,20 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 				/*scrollPosition=*/3,
 				{ .width = 200, .height = 130, .lineHeight = 13,
 				  .scrollbarBank = 7 },
-				{ /*hoveredOut=*/nullptr, onSelect, &sink });
+				{ /*hoveredOut=*/nullptr, /*actionId=*/"test.scroll_list.row" });
 		}
 		::Clay_EndLayout();
 		silencer::ui::ActiveUiAutomationRegistry().ResolveClayBoundsFromClay();
 		if(pressed){
 			silencer::ui::automation::InvokeAt(static_cast<int>(px), static_cast<int>(py));
 		}
-		silencer::ui::DispatchUiActions(silencer::ui::automation::DrainActions());
+		for(const auto & action : silencer::ui::automation::DrainActions()){
+			if(action.kind == silencer::ui::UiActionKind::Select &&
+			   action.id.find("test.scroll_list.row.") == 0){
+				fired++;
+				lastIndex = action.index;
+			}
+		}
 		wasDown = down;
 	};
 
@@ -152,7 +151,7 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 	// Frame 5: still held — no additional fire.
 	runFrame(px, py, true);
 
-	out.onSelectFired = fired;
+	out.selectActions = fired;
 	out.lastSelectedIndex = lastIndex;
 
 	// P7b — conditional-scrollbar emission probe. Two extra layout passes
