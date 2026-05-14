@@ -140,6 +140,47 @@ void Robot::InitBT() {
 		}
 		return BTResult::Failure; // not at spawn yet — Patrol will move us
 	};
+
+	// ── Generic data-driven leaves ────────────────────────────────────────────
+	btctx_.actions["SetBlackboard"] = [](BTContext& ctx) -> BTResult {
+		if(!ctx.props || !ctx.props->contains("key") || !ctx.props->contains("value"))
+			return BTResult::Failure;
+		ctx.bbSet(ctx.props->value("key", std::string{}), (*ctx.props)["value"]);
+		return BTResult::Success;
+	};
+	btctx_.actions["RandomChance"] = [](BTContext& ctx) -> BTResult {
+		float chance = ctx.props ? ctx.props->value("chance", 0.5f) : 0.5f;
+		return ((float)rand() / (float)RAND_MAX) < chance ? BTResult::Success : BTResult::Failure;
+	};
+	btctx_.actions["PlayAnim"] = [this](BTContext& ctx) -> BTResult {
+		if(!ctx.props) return BTResult::Failure;
+		int bank   = ctx.props->value("bank",   0);
+		int frames = ctx.props->value("frames", 1);
+		bool loop  = ctx.props->value("loop",   true);
+		res_bank  = bank;
+		res_index = loop ? (state_i % std::max(frames, 1))
+		                 : std::min((int)state_i, std::max(frames - 1, 0));
+		if(!loop && state_i >= frames) return BTResult::Success;
+		return BTResult::Running;
+	};
+	btctx_.actions["EmitSound"] = [this](BTContext& ctx) -> BTResult {
+		if(!ctx.props) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		std::string snd = ctx.props->value("sound", std::string{});
+		int vol = ctx.props->value("volume", 100);
+		if(snd.empty()) return BTResult::Failure;
+		auto it = world.resources.soundbank.find(snd);
+		if(it == world.resources.soundbank.end()) return BTResult::Failure;
+		EmitSound(world, it->second, vol);
+		return BTResult::Success;
+	};
+	btctx_.actions["SetFacing"] = [this](BTContext& ctx) -> BTResult {
+		std::string dir = ctx.props ? ctx.props->value("dir", std::string{"flip"}) : "flip";
+		if(dir == "left")       mirrored = true;
+		else if(dir == "right") mirrored = false;
+		else                    mirrored = !mirrored;
+		return BTResult::Success;
+	};
 }
 
 void Robot::Serialize(bool write, Serializer & data, Serializer * old){

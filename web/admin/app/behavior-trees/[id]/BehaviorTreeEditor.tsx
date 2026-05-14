@@ -172,6 +172,12 @@ const LEAF_ACTIONS = [
   // ── Shared ────────────────────────────────────────────────────────
   'Patrol',          // patrol along current platform
   'ReturnToSpawn',   // walk back to spawn point
+  // ── Generic data-driven (all NPCs, configure via props) ───────────
+  'SetBlackboard',   // write key/value to blackboard
+  'RandomChance',    // succeed with probability `chance` (0.0–1.0)
+  'PlayAnim',        // drive animation: bank, frames, loop
+  'EmitSound',       // play a sound: sound (filename), volume
+  'SetFacing',       // flip direction: dir = left | right | flip
 ];
 
 const LOOK_DIRECTIONS: { value: number; label: string }[] = [
@@ -495,26 +501,116 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
 
                 {/* Generic extra props (all props except action) */}
                 {(() => {
-                  const reserved = new Set(['action']);
+                  const action = String(selectedNode.props.action ?? '');
+                  // Known props handled by dedicated UI below — exclude from generic editor
+                  const knownProps: Record<string, string[]> = {
+                    PlayAnim:      ['bank', 'frames', 'loop'],
+                    EmitSound:     ['sound', 'volume'],
+                    SetFacing:     ['dir'],
+                    RandomChance:  ['chance'],
+                    SetBlackboard: ['key', 'value'],
+                  };
+                  const reserved = new Set(['action', ...(knownProps[action] ?? [])]);
                   const extraKeys = Object.keys(selectedNode.props).filter(k => !reserved.has(k));
-                  return extraKeys.length > 0 ? (
+
+                  return (
                     <>
-                      <div style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, marginBottom: 4 }}>EXTRA PROPS</div>
-                      {extraKeys.map(k => (
-                        <div key={k} style={{ display: 'flex', gap: 4, marginBottom: 4, alignItems: 'center' }}>
-                          <span style={{ color: '#718096', fontSize: 9, fontFamily: 'monospace', flexShrink: 0, minWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis' }}>{k}</span>
-                          <input value={String(selectedNode.props[k])}
-                            onChange={e => updateProp(k, isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value))}
-                            style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '3px 5px', fontSize: 10, fontFamily: 'monospace', minWidth: 0 }} />
-                          <button onClick={() => {
-                            const p = { ...selectedNode.props };
-                            delete p[k];
-                            updateSelectedNode({ props: p });
-                          }} style={{ background: 'none', border: 'none', color: '#4a5568', cursor: 'pointer', fontSize: 12, padding: '0 2px', flexShrink: 0 }}>✕</button>
+                      {/* PlayAnim knobs */}
+                      {action === 'PlayAnim' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>BANK</label>
+                        <input type="number" min={0} step={1} value={Number(selectedNode.props.bank ?? 0)}
+                          onChange={e => updateProp('bank', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>FRAMES</label>
+                        <input type="number" min={1} step={1} value={Number(selectedNode.props.frames ?? 1)}
+                          onChange={e => updateProp('frames', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>LOOP</label>
+                        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                          {[true, false].map(v => {
+                            const cur = selectedNode.props.loop !== false;
+                            const active = v ? cur : !cur;
+                            return (
+                              <button key={String(v)} onClick={() => updateProp('loop', v)}
+                                style={{ flex: 1, padding: '4px 0', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer',
+                                  background: active ? '#14532d' : '#161b22',
+                                  border: `1px solid ${active ? '#22c55e' : '#2d3748'}`,
+                                  color: active ? '#22c55e' : '#4a5568' }}>
+                                {String(v)}
+                              </button>
+                            );
+                          })}
                         </div>
-                      ))}
+                      </>)}
+
+                      {/* EmitSound knobs */}
+                      {action === 'EmitSound' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>SOUND (filename)</label>
+                        <input value={String(selectedNode.props.sound ?? '')} onChange={e => updateProp('sound', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>VOLUME (0–128)</label>
+                        <input type="number" min={0} max={128} step={1} value={Number(selectedNode.props.volume ?? 100)}
+                          onChange={e => updateProp('volume', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* SetFacing knobs */}
+                      {action === 'SetFacing' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>DIRECTION</label>
+                        <select value={String(selectedNode.props.dir ?? 'flip')} onChange={e => updateProp('dir', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                          {['flip', 'left', 'right'].map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </>)}
+
+                      {/* RandomChance knobs */}
+                      {action === 'RandomChance' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>CHANCE (0.0–1.0)</label>
+                        <input type="number" min={0} max={1} step={0.05} value={Number(selectedNode.props.chance ?? 0.5)}
+                          onChange={e => updateProp('chance', parseFloat(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* SetBlackboard knobs */}
+                      {action === 'SetBlackboard' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>KEY</label>
+                        <select value={String(selectedNode.props.key ?? '')} onChange={e => updateProp('key', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
+                          <option value="">— select key —</option>
+                          {bt.blackboard.map(k => <option key={k.key} value={k.key}>{k.key} ({k.type})</option>)}
+                        </select>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>VALUE</label>
+                        <input value={String(selectedNode.props.value ?? '')}
+                          onChange={e => {
+                            const raw = e.target.value;
+                            const bb = bt.blackboard.find(k => k.key === selectedNode.props.key);
+                            const v = bb?.type === 'bool' ? (raw === 'true') : bb?.type === 'int' ? parseInt(raw) : bb?.type === 'float' ? parseFloat(raw) : raw;
+                            updateProp('value', isNaN(v as number) ? raw : v);
+                          }}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* Remaining unknown props */}
+                      {extraKeys.length > 0 && (
+                        <>
+                          <div style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, marginBottom: 4 }}>EXTRA PROPS</div>
+                          {extraKeys.map(k => (
+                            <div key={k} style={{ display: 'flex', gap: 4, marginBottom: 4, alignItems: 'center' }}>
+                              <span style={{ color: '#718096', fontSize: 9, fontFamily: 'monospace', flexShrink: 0, minWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis' }}>{k}</span>
+                              <input value={String(selectedNode.props[k])}
+                                onChange={e => updateProp(k, isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value))}
+                                style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '3px 5px', fontSize: 10, fontFamily: 'monospace', minWidth: 0 }} />
+                              <button onClick={() => {
+                                const p = { ...selectedNode.props };
+                                delete p[k];
+                                updateSelectedNode({ props: p });
+                              }} style={{ background: 'none', border: 'none', color: '#4a5568', cursor: 'pointer', fontSize: 12, padding: '0 2px', flexShrink: 0 }}>✕</button>
+                            </div>
+                          ))}
+                        </>
+                      )}
                     </>
-                  ) : null;
+                  );
                 })()}
               </>
             )}
