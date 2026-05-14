@@ -107,7 +107,7 @@ function uid() {
 function nodeSubtitle(node: BTNode): string {
   if (node.type === 'Condition') {
     const p = node.props;
-    return `${p.key} ${p.op} ${JSON.stringify(p.value)}`;
+    return `${p.key} ${p.op ?? '=='} ${JSON.stringify(p.value)}`;
   }
   if (node.type === 'Leaf') return String(node.props.action ?? '');
   if (node.type === 'Cooldown') return `${node.props.duration ?? '?'}s`;
@@ -153,37 +153,34 @@ const PALETTE: { group: string; types: BTNodeType[] }[] = [
   { group: 'LEAF',      types: ['Leaf', 'Condition', 'Wait'] },
 ];
 
-// All registered leaf actions (guard + civilian + robot).
-// Shoot direction values: 0=Forward 1=Low 2=Up 3=Down 4=UpAngle 5=DownAngle 6=LadderUp 7=LadderDown
+// All registered leaf actions (guard + civilian + robot), matching exact C++ action names.
 const LEAF_ACTIONS = [
-  // ── Guard — conditions ────────────────────────────────────────────
-  'IsAlive', 'IsWalking', 'IsCrouched', 'IsNotCrouched', 'IsShooting',
-  'IsOnLadder', 'IsAtEdge', 'WasHit', 'HasChaseTarget', 'IsPlayerInBase', 'IsPlayerInvisible',
-  // ── Guard — LOS checks ────────────────────────────────────────────
-  'CanSeeForward', 'CanSeeLow', 'CanSeeUp', 'CanSeeDown', 'CanSeeUpAngle', 'CanSeeDownAngle',
-  'CanShootFromLadder',
-  // ── Guard — combat ────────────────────────────────────────────────
-  'Shoot', 'ShootFromLadder',
-  // ── Guard — movement / posture ────────────────────────────────────
-  'Patrol', 'Chase', 'SearchAndReturn', 'PursueHitDirection',
-  'Crouch', 'UncrouchIdle', 'StandIdle', 'LookScan',
-  // ── Civilian ─────────────────────────────────────────────────────
-  'RunMove',
-  // ── Robot ─────────────────────────────────────────────────────────
-  'WakeAnim', 'SleepAnim', 'ReturnToSpawn',
-  // ── Generic / shared ──────────────────────────────────────────────
-  'Stand', 'Idle', 'MoveTo', 'Alert', 'Wander',
+  // ── Guard ─────────────────────────────────────────────────────────
+  // Look0-5: scan + shoot in the given direction (0=Forward,1=Low,2=Up,3=Down,4=UpAngle,5=DownAngle)
+  'Look0', 'Look1', 'Look2', 'Look3', 'Look4', 'Look5',
+  'UncrouchIdle',    // crouch→stand when nothing to do
+  'Chase',           // pursue last-seen player
+  'SearchAndReturn', // sweep search zone then return to patrol origin
+  'Stand',           // idle standing animation
+  // ── Civilian ──────────────────────────────────────────────────────
+  'Run',             // flee movement
+  'Wander',          // random wander
+  'WakeUp',          // wake-from-idle animation
+  'LookForward',     // look scan forward
+  'LookSides',       // look scan left + right
+  'MeleeCheck',      // check for melee range enemy
+  // ── Shared ────────────────────────────────────────────────────────
+  'Patrol',          // patrol along current platform
+  'ReturnToSpawn',   // walk back to spawn point
 ];
 
-const SHOOT_DIRECTIONS: { value: number; label: string }[] = [
+const LOOK_DIRECTIONS: { value: number; label: string }[] = [
   { value: 0, label: '0 — Forward (standing)' },
   { value: 1, label: '1 — Low (crouched)' },
   { value: 2, label: '2 — Up' },
   { value: 3, label: '3 — Down' },
   { value: 4, label: '4 — Up-angle' },
   { value: 5, label: '5 — Down-angle' },
-  { value: 6, label: '6 — Ladder up' },
-  { value: 7, label: '7 — Ladder down' },
 ];
 
 // Semantics shown in the inspector when a composite/decorator/leaf is selected.
@@ -198,7 +195,7 @@ const NODE_DESC: Record<string, string> = {
   Timeout:        'Runs child; if it is still Running after DURATION seconds, returns Failure.',
   ForceSuccess:   'Runs child; always returns Success regardless of child result.',
   Wait:           'Returns Running for DURATION seconds, then Success.',
-  Leaf:           'Dispatches to a named C++ action handler registered via btctx_.actions["Name"].',
+  Leaf:           'Dispatches to a named C++ action handler. Look0–Look5 scan + shoot in direction 0–5 (Forward/Low/Up/Down/UpAngle/DownAngle).',
   Condition:      'Reads a blackboard key and compares it to a literal value. Returns Success if the comparison is true.',
 };
 
@@ -208,6 +205,8 @@ interface Props { bt: BehaviorTree; onChange: (bt: BehaviorTree) => void; }
 export default function BehaviorTreeEditor({ bt, onChange }: Props) {
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
+  const rfEdgesRef = useRef(rfEdges);
+  rfEdgesRef.current = rfEdges;
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [validateMsg, setValidateMsg] = useState<string | null>(null);
   const btRef = useRef(bt);
@@ -219,6 +218,25 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     setRfNodes(nodes);
     setRfEdges(edges);
   }, [bt.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When ReactFlow removes edges (user clicks edge → Delete), sync children arrays in BT data.
+  const handleEdgesChange = useCallback((changes: Parameters<typeof onEdgesChange>[0]) => {
+    onEdgesChange(changes);
+    const removals = changes.filter(c => c.type === 'remove');
+    if (removals.length === 0) return;
+    const edgeMap = new Map(rfEdgesRef.current.map(e => [e.id, e]));
+    const cur = btRef.current;
+    const nodes = { ...cur.nodes };
+    for (const rm of removals) {
+      const edge = edgeMap.get((rm as { id: string }).id);
+      if (!edge) continue;
+      const { source, target } = edge;
+      if (nodes[source]) {
+        nodes[source] = { ...nodes[source], children: nodes[source].children.filter(c => c !== target) };
+      }
+    }
+    onChange({ ...cur, nodes });
+  }, [onEdgesChange, onChange]);
 
   const onConnect = useCallback((params: Connection) => {
     if (!params.source || !params.target) return;
@@ -419,7 +437,7 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
           nodes={rfNodes}
           edges={rfEdges}
           onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
           nodeTypes={NODE_TYPES}
           onNodeClick={(_, n) => setSelectedNodeId(n.id)}
@@ -475,20 +493,9 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
                   {LEAF_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
 
-                {/* Shoot direction */}
-                {selectedNode.props.action === 'Shoot' && (
-                  <>
-                    <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>DIRECTION</label>
-                    <select value={Number(selectedNode.props.direction ?? 0)} onChange={e => updateProp('direction', parseInt(e.target.value))}
-                      style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
-                      {SHOOT_DIRECTIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
-                    </select>
-                  </>
-                )}
-
-                {/* Generic extra props (all props except action + direction for Shoot) */}
+                {/* Generic extra props (all props except action) */}
                 {(() => {
-                  const reserved = new Set(['action', ...(selectedNode.props.action === 'Shoot' ? ['direction'] : [])]);
+                  const reserved = new Set(['action']);
                   const extraKeys = Object.keys(selectedNode.props).filter(k => !reserved.has(k));
                   return extraKeys.length > 0 ? (
                     <>
