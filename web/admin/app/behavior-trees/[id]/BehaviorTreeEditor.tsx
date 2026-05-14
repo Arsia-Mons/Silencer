@@ -555,6 +555,12 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
               };
               const sortedChildren = [...parent.children].sort((a, b) => getX(a) - getX(b));
               updatedNodes = { ...cur.nodes, [parentId]: { ...parent, children: sortedChildren } };
+              // Relabel edges from this parent to reflect new child order
+              setRfEdges(es => es.map(e => {
+                if (e.source !== parentId) return e;
+                const newIdx = sortedChildren.indexOf(e.target);
+                return newIdx === -1 ? e : { ...e, label: String(newIdx + 1) };
+              }));
             }
             pushToHistory({ ...cur, nodes: updatedNodes, positions: updatedPositions });
             onChange({ ...cur, nodes: updatedNodes, positions: updatedPositions });
