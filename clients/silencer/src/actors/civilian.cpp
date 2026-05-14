@@ -110,30 +110,27 @@ void Civilian::InitBT(){
 		return CheckTractVictim(world) ? BTResult::Success : BTResult::Failure;
 	};
 
-	// RunMove: enter RUNNING if walking near a projectile threat; do RUNNING movement;
+	// RunMove: flee from nearby players who are actively firing; do RUNNING movement;
 	// return to WALKING after runDurationTicks. Returns Running while running, Failure otherwise.
 	btctx_.actions["RunMove"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
 		const EnemyDef* cd = GASLoader::Get().GetEnemyDef("civilian");
-		// Check for threats every tick — updates flee direction and triggers RUNNING from WALKING.
-		// Matches original: ThreatLook re-ran every tick after the movement block.
+		// Scan for nearby players with weaponfirecool > 0 (they fired recently).
+		// This is reliable: player persists in tobjectlist and weaponfirecool stays set
+		// for fireDelay ticks after a shot, unlike fast projectiles that move through
+		// the detection radius within a single tick.
 		if(state == WALKING || state == RUNNING){
-			std::vector<Uint8> types = {
-				ObjectTypes::BLASTERPROJECTILE, ObjectTypes::LASERPROJECTILE,
-				ObjectTypes::ROCKETPROJECTILE,  ObjectTypes::FLAMERPROJECTILE,
-				ObjectTypes::PLASMAPROJECTILE,  ObjectTypes::WALLPROJECTILE,
-				ObjectTypes::FLAREPROJECTILE
-			};
+			std::vector<Uint8> types = { ObjectTypes::PLAYER };
 			int dx = cd ? cd->threatDetectX : 200;
 			int dy = cd ? cd->threatDetectY : 100;
-			std::vector<Object*> threats = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
-			// debug: scan wider area with no type filter to count any objects
-			std::vector<Uint8> alltypes;
-			auto allnearby = world.TestAABB(x - 2000, y - 2000, x + 2000, y + 2000, alltypes);
-			fprintf(stderr, "[civ#%d] x=%d y=%d threats=%d allobjs_2000=%d\n", id, x, y, (int)threats.size(), (int)allnearby.size());
-			if(!threats.empty()){
-				mirrored = (threats[0]->x > x);
-				if(state != RUNNING){ fprintf(stderr, "[civ#%d] WALKING→RUNNING\n", id); state = RUNNING; state_i = -1; }
+			std::vector<Object*> players = world.TestAABB(x - dx, y - dy, x + dx, y + dy, types);
+			for(Object* obj : players){
+				Player* player = static_cast<Player*>(obj);
+				if(player->IsShooting()){
+					mirrored = (player->x > x);
+					if(state != RUNNING){ state = RUNNING; state_i = -1; }
+					break;
+				}
 			}
 		}
 		if(state != RUNNING) return BTResult::Failure;

@@ -157,6 +157,7 @@ bool Player::IsCrouched() const {
 	return state == CROUCHED || state == CROUCHEDSHOOT ||
 	       state == CROUCHING || state == CROUCHEDTHROWING;
 }
+bool Player::IsShooting() const { return weaponfirecool > 0; }
 void Player::Serialize(bool write, Serializer & data, Serializer * old){
 	Object::Serialize(write, data, old);
 	int oldoffset = data.offset;
