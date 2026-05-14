@@ -15,6 +15,7 @@ import ReactFlow, {
 } from 'reactflow';
 import dagre from 'dagre';
 import type { BehaviorTree, BTNode, BTNodeType, BBKey } from '../../../lib/api';
+import { API, apiFetch } from '../../../lib/api';
 
 // ── Node colours by type ──────────────────────────────────────────────────────
 const TYPE_COLOR: Record<string, string> = {
@@ -217,6 +218,14 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
   const [validateMsg, setValidateMsg] = useState<string | null>(null);
   const btRef = useRef(bt);
   btRef.current = bt;
+
+  // Asset catalogs for PlayAnim / EmitSound dropdowns
+  const [spriteBanks, setSpriteBanks] = useState<{ bank: number; frames: number }[]>([]);
+  const [soundNames, setSoundNames] = useState<string[]>([]);
+  useEffect(() => {
+    fetch(`${API}/sprites`).then(r => r.json()).then((d: { bank: number; frames: number }[]) => setSpriteBanks(d)).catch(() => {});
+    apiFetch('/sounds').then((d) => setSoundNames((d as { name: string }[]).map(s => s.name).sort())).catch(() => {});
+  }, []);
 
   // Sync BT → ReactFlow
   useEffect(() => {
@@ -518,10 +527,20 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
                       {/* PlayAnim knobs */}
                       {action === 'PlayAnim' && (<>
                         <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>BANK</label>
-                        <input type="number" min={0} step={1} value={Number(selectedNode.props.bank ?? 0)}
-                          onChange={e => updateProp('bank', parseInt(e.target.value))}
-                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
-                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>FRAMES</label>
+                        <select value={Number(selectedNode.props.bank ?? 0)}
+                          onChange={e => {
+                            const bank = parseInt(e.target.value);
+                            const entry = spriteBanks.find(b => b.bank === bank);
+                            updateProp('bank', bank);
+                            if (entry) updateProp('frames', entry.frames);
+                          }}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
+                          <option value={0}>— select bank —</option>
+                          {spriteBanks.map(b => (
+                            <option key={b.bank} value={b.bank}>Bank {b.bank} ({b.frames} frames)</option>
+                          ))}
+                        </select>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>FRAMES (auto-filled from bank)</label>
                         <input type="number" min={1} step={1} value={Number(selectedNode.props.frames ?? 1)}
                           onChange={e => updateProp('frames', parseInt(e.target.value))}
                           style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
@@ -545,9 +564,12 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
 
                       {/* EmitSound knobs */}
                       {action === 'EmitSound' && (<>
-                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>SOUND (filename)</label>
-                        <input value={String(selectedNode.props.sound ?? '')} onChange={e => updateProp('sound', e.target.value)}
-                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>SOUND</label>
+                        <select value={String(selectedNode.props.sound ?? '')} onChange={e => updateProp('sound', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
+                          <option value="">— select sound —</option>
+                          {soundNames.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
                         <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>VOLUME (0–128)</label>
                         <input type="number" min={0} max={128} step={1} value={Number(selectedNode.props.volume ?? 100)}
                           onChange={e => updateProp('volume', parseInt(e.target.value))}
