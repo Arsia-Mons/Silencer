@@ -4,6 +4,32 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00050] — 2026-05-12
+
+### Game client
+
+#### Spectator (#156)
+
+- **Phase 1 — Spectatable flag** — per-game `spectatable` bit added to the lobby wire protocol, surfaced as a toggle in the Create Game UI and persisted via `Config::lastspectatable`. Server browser plumbs the new `can_rejoin` bit alongside it.
+- **Phase 3 — Native observer joins** — `Peer::observer` flag on the wire; AUTHORITY admits observers in `MSG_CONNECT` without consuming a player slot. Observers free their slot on disconnect, and observer chat fans out to everyone.
+- **Phase 4 — Spectator camera + controls** — `viewedpeerid` drives camera and HUD focus; free-cam, cycle-target, and Activate-names bindings rebound for spectators. ESC exits the match cleanly. Joiner-camera, visibility, and create-game guard fixes folded in.
+- **Scrollable Game Options form** — variable-height scrollbar with drag support, plus font and padding fixes so longer option lists fit the panel.
+
+#### Rejoin mid-game (#152)
+
+- **Parked-peer rejoin** — `HandleDisconnect` parks the peer instead of evicting them while AUTHORITY + INGAME + real accountid (not bot, not permanent kick). The `Player` object stays alive in the world, retaining team, tech choices, credits, inventory, weapons, ammo, and snapshot history. `UnDeploy()` still runs so the body disappears while the player is gone.
+- **MSG_CONNECT in INGAME** — AUTHORITY now accepts reconnects whose accountid matches a parked peer, rebinding ip/port and resuming. Brand-new joiners mid-game stay rejected — this is rejoin, not join-in-progress. `MSG_KICK` carries `permanent=true` so kicks remain terminal.
+- **Sweep hygiene** — peer-timeout sweep and `SendSnapshots` skip parked peers; on rejoin the player redeploys at a deploy station like a normal life with all state intact.
+
+#### Game.cpp refactor foundation (#140)
+
+- **Screen / Panel / Modal infrastructure** — base classes plus a `ScreenContext` (curated subsystem refs + state-machine actions, all stubbed) lay groundwork for breaking up the 6,544-line `Game` god-class. No behavior change in this PR; the screen stack starts empty and every menu still flows through the existing `Game::Create*Interface` / `Process*Interface` helpers. Screens migrate over the new tier in follow-up work.
+- **Widget primitives moved to `src/ui/components/`** — `button`, `interface`, `overlay`, `scrollbar`, `selectbox`, `stats`, `teambillboard`, `textbox`, `textinput`, `toggle`. Bare-filename includes still resolve via the updated CMake include path.
+
+### Game client — bug fixes
+
+- **`world.gameinfo` on create-game (#147)** — regression from #140. The post-create handler in `LobbyScreen::Tick` dropped the `lobbygame → world.gameinfo` Serialize roundtrip, leaving `world.gameinfo.loaded = false` on the host. The `world.cpp:709` gate (`ishost && !gameinfoloaded && gameinfo.loaded`) never fired, so the host never sent `MSG_GAMEINFO` to the dedicated server, `AllPeersLoadedGameInfo()` stayed false forever, and Ready never advanced to INGAME. Fix re-adds the Serialize roundtrip before `JoinGame` in the create-game path.
+
 ## [v00049] — 2026-05-10
 
 ### Game client — bug fixes

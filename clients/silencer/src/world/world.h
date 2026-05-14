@@ -33,6 +33,17 @@ public:
 	Uint32 pancamerareturncount; // ticks remaining in return pan; releases input at 0
 	Sint16 pancamerax;
 	Sint16 pancameray;
+	// Camera/HUD focus peer. Equals localpeerid for normal players; overridden
+	// each tick by the spectator-controls block when the local peer is an
+	// observer. Purely client-local; never serialized.
+	Uint8 viewedpeerid;
+	struct SpectatorView {
+		bool freecam;
+		int camx, camy;
+		int camvx, camvy;
+		bool holdshowallnames;
+		bool initialized; // becomes true once default-mode follow has picked a peer
+	} spectator;
 	class Object * CreateObject(Uint8 type, Uint16 id = 0);
 	Object * GetObjectFromId(Uint16 id);
 	void MarkDestroyObject(Uint16 id);
@@ -46,7 +57,7 @@ public:
 	const char * GetVersion() const { return version; }
 	bool Listen(unsigned short port = 0);
 	unsigned short Bind(unsigned short port = 0);
-	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0);
+	void Connect(Uint8 agency, Uint32 accountid, const char * password = 0, bool observer = false);
 	void Disconnect(void);
 	Peer * GetAuthorityPeer(void);
 	class Player * GetPeerPlayer(Uint8 peerid);
@@ -57,6 +68,7 @@ public:
 	bool IsAuthority(void);
 	bool IsConnected() const;
 	bool IsIdle() const;
+	bool IsLocalObserver(void);
 	void Illuminate(void);
 	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0, bool networked = false, Peer * peer = 0);
 	void ShowStatus(const char * status, Uint8 color = 0, bool networked = false, Peer * peer = 0);
@@ -158,7 +170,7 @@ protected:
 	std::list<class Object *> tobjectlist;
 	void SaveSnapshot(Serializer & data, Uint8 peerid);
 	void LoadSnapshot(Serializer & data, bool create = true, Serializer * delta = 0, Uint16 objectid = 0);
-	Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid);
+	Peer * AddPeer(char * address, unsigned short port, Uint8 agency, Uint32 accountid, bool observer = false);
 	Peer * AddBot(Uint8 agency);
 	LagSimulator lagsimulator;
 	char mapname[256];

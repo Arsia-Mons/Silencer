@@ -99,6 +99,7 @@ if(/*!world.map.loaded && */stateisnew){
 			for(int i = 0; i < world.maxpeers; i++){
 				if(world.peerlist[i] && i != world.authoritypeer){
 					world.localpeerid = i;
+					world.viewedpeerid = i;
 					break;
 				}
 			}
@@ -107,6 +108,7 @@ if(/*!world.map.loaded && */stateisnew){
 		world.replay.oldy = world.replay.y;
 		if(world.localinput.keymoveleft || world.localinput.keymoveright || world.localinput.keymoveup || world.localinput.keymovedown){
 			world.localpeerid = world.authoritypeer;
+			world.viewedpeerid = world.authoritypeer;
 			bool inbase = false;
 			if(world.replay.y > world.map.height * 64){
 				inbase = true;
@@ -163,6 +165,7 @@ if(/*!world.map.loaded && */stateisnew){
 			for(int i = world.localpeerid - 1; i > 0; i--){
 				if(world.peerlist[i] && i != world.authoritypeer){
 					world.localpeerid = i;
+					world.viewedpeerid = i;
 					break;
 				}
 			}
@@ -171,6 +174,7 @@ if(/*!world.map.loaded && */stateisnew){
 			for(int i = world.localpeerid + 1; i < world.maxpeers; i++){
 				if(world.peerlist[i] && i != world.authoritypeer){
 					world.localpeerid = i;
+					world.viewedpeerid = i;
 					break;
 				}
 			}
@@ -193,6 +197,96 @@ if(/*!world.map.loaded && */stateisnew){
 			world.replay.EndPlaying();
 			GoToState(MAINMENU);
 		}
+	}
+	// Spectator controls. Mirrors the replay block above but reads from
+	// localinput edges and writes to World::viewedpeerid + World::spectator,
+	// not localpeerid (network identity stays put for observers).
+	if(world.IsLocalObserver()){
+		Input & prevtick = world.localinputhistory[(world.tickcount - 1) % world.maxlocalinputhistory];
+		// Default-mode follow: first applicable tick after a candidate exists.
+		if(!world.spectator.initialized){
+			Uint8 picked = world.viewedpeerid;
+			bool found = false;
+			for(int i = 0; i < (int)world.maxpeers; i++){
+				Peer * p = world.peerlist[i];
+				if(!p) continue;
+				if(i == (int)world.authoritypeer) continue;
+				if(p->observer) continue;
+				if(p->controlledlist.empty()) continue;
+				Player * pl = world.GetPeerPlayer((Uint8)i);
+				if(pl && pl->state != Player::DEAD){
+					picked = (Uint8)i;
+					found = true;
+					break;
+				}
+			}
+			if(!found){
+				for(int i = 0; i < (int)world.maxpeers; i++){
+					Peer * p = world.peerlist[i];
+					if(!p) continue;
+					if(i == (int)world.authoritypeer) continue;
+					if(p->observer) continue;
+					if(p->controlledlist.empty()) continue;
+					picked = (Uint8)i;
+					found = true;
+					break;
+				}
+			}
+			if(found){
+				world.viewedpeerid = picked;
+				world.spectator.initialized = true;
+			}
+		}
+		// If currently-followed peer became invalid (disconnected, lost
+		// its Player), auto-step to the next valid candidate so the
+		// spectator's view doesn't freeze.
+		if(world.spectator.initialized && !world.spectator.freecam){
+			Peer * cur = world.peerlist[world.viewedpeerid];
+			bool stale = !cur || cur->observer || cur->controlledlist.empty()
+				|| world.viewedpeerid == (Uint8)world.authoritypeer;
+			if(stale){
+				for(int step = 1; step <= (int)world.maxpeers; step++){
+					int i = (world.viewedpeerid + step) % world.maxpeers;
+					Peer * p = world.peerlist[i];
+					if(!p) continue;
+					if(i == (int)world.authoritypeer) continue;
+					if(p->observer) continue;
+					if(p->controlledlist.empty()) continue;
+					world.viewedpeerid = (Uint8)i;
+					break;
+				}
+			}
+		}
+		// Move Right cycles to the next player; Move Left to the previous.
+		// Reusing movement bindings means observers don't need a separate
+		// keybind row — the inputs are unused for them otherwise.
+		if(world.localinput.keymoveright && !prevtick.keymoveright){
+			for(int step = 1; step <= (int)world.maxpeers; step++){
+				int i = (world.viewedpeerid + step) % world.maxpeers;
+				Peer * p = world.peerlist[i];
+				if(!p) continue;
+				if(i == (int)world.authoritypeer) continue;
+				if(p->observer) continue;
+				if(p->controlledlist.empty()) continue;
+				world.viewedpeerid = (Uint8)i;
+				break;
+			}
+		}
+		if(world.localinput.keymoveleft && !prevtick.keymoveleft){
+			for(int step = 1; step <= (int)world.maxpeers; step++){
+				int i = ((int)world.viewedpeerid - step + (int)world.maxpeers) % world.maxpeers;
+				Peer * p = world.peerlist[i];
+				if(!p) continue;
+				if(i == (int)world.authoritypeer) continue;
+				if(p->observer) continue;
+				if(p->controlledlist.empty()) continue;
+				world.viewedpeerid = (Uint8)i;
+				break;
+			}
+		}
+		// Hold Activate to reveal all player names. Free-cam state/renderer
+		// path is preserved but no input drives it.
+		world.spectator.holdshowallnames = world.localinput.keyactivate;
 	}
 	Peer * localpeer = world.peerlist[world.localpeerid];
 	if(localpeer && world.localpeerid != world.authoritypeer){

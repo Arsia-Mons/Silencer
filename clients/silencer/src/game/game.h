@@ -95,6 +95,7 @@ public:
 	bool creategameclicked;
 	bool joininggame;
 	void JoinGame(LobbyGame & lobbygame, char * password = 0);
+	void SpectateGame(LobbyGame & lobbygame, char * password = 0);
 	// Tear down a joined game's session/world state (Disconnect, switch
 	// authority, destroy team overlays, rejoin previous chat channel). UI
 	// concerns (panel swap, map-name overlay) stay on LobbyScreen.

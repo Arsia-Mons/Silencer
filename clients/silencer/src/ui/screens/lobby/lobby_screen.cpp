@@ -159,15 +159,17 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 				mapDownloader.pendingCreate.minlevel,
 				mapDownloader.pendingCreate.maxlevel,
 				mapDownloader.pendingCreate.maxplayers,
-				mapDownloader.pendingCreate.maxteams);
+				mapDownloader.pendingCreate.maxteams,
+				mapDownloader.pendingCreate.spectatable);
 		}else if(us == 3){
 			mapDownloader.mapUploadState.store(0, std::memory_order_relaxed);
 			game.creategameclicked = false;
 			DismissProgressModal(ctx);
 			ctx.ShowMessage("Could not upload map");
 		}
-		if(world.lobby.creategamestatus == 1){
+		if(world.lobby.creategamestatus == 1 && game.creategameclicked){
 			world.lobby.creategamestatus = 0;
+			game.creategameclicked = false;
 			LobbyGame * lobbygame = world.lobby.GetGameById(world.lobby.createdgameid);
 			if(lobbygame){
 				// Populate world.gameinfo from the lobby's record so the host can
@@ -182,7 +184,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 				mapDownloader.LoadMapData(mapDownloader.FindMap(lobbygame->mapname, &lobbygame->maphash).c_str());
 				game.currentlobbygameid = lobbygame->id;
 			}
-		}else if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0){
+		}else if(world.lobby.creategamestatus != 100 && world.lobby.creategamestatus != 0 && game.creategameclicked){
 			world.lobby.creategamestatus = 0;
 			game.creategameclicked = false;
 			DismissProgressModal(ctx);
