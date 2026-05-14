@@ -5,19 +5,18 @@
 #include "runtime/UiAutomationRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
-#include "primitives/toggle.h"
 
 #include "lobby_screen.h"
 #include "screen_context.h"
+#include "tech_selected_panel.h"
+#include "tech_tree_grid.h"
 #include "world.h"
 #include "lobby.h"
-#include "resources.h"
 #include "team.h"
 #include "peer.h"
 #include "user.h"
 #include "buyableitem.h"
 #include "config.h"
-#include "game.h"
 
 #include <cstdint>
 #include <cstdlib>
@@ -30,9 +29,6 @@ using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonHandle;
 using silencer::ui::primitives::BankButtonOpts;
 using silencer::ui::primitives::BankButtonVariant;
-using silencer::ui::primitives::Toggle;
-using silencer::ui::primitives::ToggleHandle;
-using silencer::ui::primitives::ToggleOpts;
 
 namespace silencer::client_ui::lobby {
 
@@ -41,53 +37,20 @@ namespace {
 // Legacy on-screen coords retained ONLY for inspector hit-rect registration.
 constexpr int kBtnBackX  = 242;
 constexpr int kBtnBackY  = 68;
-constexpr int kSlotsX    = 455;
-constexpr int kSlotsY    = 100;
-constexpr int kColX0     = 410;
-constexpr int kColW      = 14;
-constexpr int kRowY0     = 125;
-constexpr int kRowH      = 13;
-constexpr int kLocalCol  = 3;
-constexpr int kTechNameY = 350;
-constexpr int kDescX     = 405;
-constexpr int kDescY0    = 370;
-constexpr int kDescLH    = 10;
-constexpr int kLocalNameX0    = 425;
-constexpr int kLocalNameY0    = 127;
-constexpr Uint8 kCheckboxBank = 7;
-constexpr Uint8 kCheckboxOn   = 18;
-constexpr Uint8 kCheckboxOff  = 19;
-constexpr int kCheckboxW      = 13;
-constexpr int kCheckboxH      = 13;
 constexpr const char * kActionBack = "lobby.game_tech.back";
 constexpr const char * kActionTogglePrefix = "lobby.game_tech.toggle.";
 constexpr const char * kActionDescriptionPrefix = "lobby.game_tech.description.";
 
 // LobbyRightUpperBox interior layout knobs. Box at (238, 64, 160x121).
-constexpr uint16_t kUpperBackPadLeft = 4;   // screen 242 - box 238
-constexpr uint16_t kUpperBackPadTop  = 4;   // screen 68  - box 64
+constexpr uint16_t kUpperBackPadLeft = 4;
+constexpr uint16_t kUpperBackPadTop  = 4;
 constexpr uint16_t kUpperPeerColPadLeft = 4;
-constexpr uint16_t kUpperPeerColPadTop  = 7;   // gap after back button (68 + 21 = 89; first peer at 112 → 23 gap)
-constexpr uint16_t kUpperPeerRowGap     = 5;   // peer name stride is 16; body height 11 → gap 5
+constexpr uint16_t kUpperPeerColPadTop  = 7;
+constexpr uint16_t kUpperPeerRowGap     = 5;
 
 // LobbyRightTallBox interior layout knobs. Box at (398, 64, 232x391).
-constexpr uint16_t kTallSlotsPadLeft   = 57;  // screen 455 - box 398
-constexpr uint16_t kTallSlotsPadTop    = 36;  // screen 100 - box 64
-constexpr uint16_t kTallGridPadLeft    = 12;  // screen 410 - box 398
-constexpr uint16_t kTallGridPadTop     = 14;  // 125 - (64 + 36 + 11)
-constexpr uint16_t kTallGridColGap     = 1;   // col stride 14, checkbox 13 → 1
-constexpr uint16_t kTallLabelColGap    = 2;   // 467 - (452 + 13) = 2
-constexpr uint16_t kTallLabelRowPadTop = 2;   // legacy local label y = checkbox y + 2
-constexpr uint16_t kTallTechNamePadTop = 16;  // gap from grid bottom to centered heading at y=350
-constexpr uint16_t kTallDescPadLeft    = 7;   // screen 405 - box 398
-constexpr uint16_t kTallDescPadTop     = 5;   // 370 - (350 + 15)
-constexpr uint16_t kTallDescRowGap     = 0;   // body height 11, desc stride 10 → tight (clip below)
-
-constexpr int kMaxRows = 32;
-std::string g_rowLabels[kMaxRows];
-
-char g_localToggleIdBuf [kMaxRows][16];
-char g_remoteToggleIdBuf[3 * kMaxRows][16];
+constexpr uint16_t kTallSlotsPadLeft   = 57;
+constexpr uint16_t kTallSlotsPadTop    = 36;
 
 Clay_String FromStd(const std::string & s) {
 	Clay_String cs;
@@ -287,229 +250,8 @@ void BuildGameTechTallTree(GameTechPanelState & state,
 		}
 	}
 
-	const Uint8 localid = owner.TechPanelLocalPeerId(world);
-	Team * team = world.GetPeerTeam(localid);
-
-	// Tech grid — 4 column-TOP_TO_BOTTOM children + a label-column for the
-	// local peer. Layout strictly inside the tall box via flex padding.
-	CLAY({ .id = CLAY_ID("GTechGridWrap"),
-	       .layout = {
-	           .padding = { kTallGridPadLeft, 0,
-	                        kTallGridPadTop,  0 },
-	           .childGap = kTallGridColGap,
-	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-	       } }) {
-		if(team){
-			// Discover which legacy `col` each team-peer-slot maps to (the
-			// legacy iteration assigns peerindex++ for non-local peers; the
-			// local peer always lands in column kLocalCol=3). Build a
-			// peer-slot ordering keyed by col 0..3.
-			struct ColAssign { int peerSlot; bool draw; bool isLocal; };
-			ColAssign cols[4] = { {-1,false,false}, {-1,false,false},
-			                       {-1,false,false}, {-1,false,false} };
-			int peerindex = 0;
-			for(int i = 0; i < 4; i++){
-				const bool isLocal = (team->peers[i] == localid);
-				const bool draw    = (i < team->numpeers);
-				const int  col     = isLocal ? kLocalCol : peerindex;
-				if(!isLocal) peerindex++;
-				if(col >= 0 && col < 4){
-					cols[col].peerSlot = i;
-					cols[col].draw     = draw;
-					cols[col].isLocal  = isLocal;
-				}
-			}
-
-			int localAdapter = 0;
-			int rowLabelSlot = 0;
-
-			for(int col = 0; col < 4; ++col){
-				char colIdBuf[24];
-				std::snprintf(colIdBuf, sizeof(colIdBuf), "GTechCol%d", col);
-				Clay_String colId;
-				colId.isStaticallyAllocated = false;
-				colId.length = (int32_t)std::strlen(colIdBuf);
-				colId.chars  = colIdBuf;
-
-				CLAY({ .id = CLAY_SID(colId),
-				       .layout = {
-				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-				       } }) {
-					if(!cols[col].draw) continue;
-					const ColAssign & ca = cols[col];
-					Peer * peer = owner.TechPanelPeer(world, team->peers[ca.peerSlot]);
-
-					int techslotsleft = 0;
-					if(ca.isLocal && peer){
-						User * user = world.lobby.GetUserInfo(peer->accountid);
-						if(user){
-							techslotsleft = user->agency[team->agency].techslots
-							              - world.TechSlotsUsed(*peer);
-						}
-					}
-
-					for(size_t bIdx = 0; bIdx < world.buyableitems.size(); bIdx++){
-						BuyableItem * item = world.buyableitems[bIdx];
-						if(!item->techslots) continue;
-						if(item->agencyspecific != -1
-						   && item->agencyspecific != team->agency){
-							continue;
-						}
-
-						const bool selected = peer && (peer->techchoices & item->techchoice);
-						bool interactable = false;
-						if(ca.isLocal){
-							interactable = (item->techslots <= techslotsleft)
-							            || (peer && (peer->techchoices & item->techchoice));
-						}
-						const Uint8 brightness = ca.isLocal && interactable ? 128 : 64;
-						const Uint8 boxIdx = selected ? kCheckboxOn : kCheckboxOff;
-
-						ToggleOpts tOpts{};
-						tOpts.width  = kCheckboxW;
-						tOpts.height = kCheckboxH;
-						tOpts.effectColor = 0;
-						tOpts.selectedBrightness   = brightness;
-						tOpts.unselectedBrightness = brightness;
-
-						if(ca.isLocal && localAdapter < kMaxRows){
-							std::snprintf(g_localToggleIdBuf[localAdapter],
-							              sizeof(g_localToggleIdBuf[localAdapter]),
-							              "GTechBoxL%d", static_cast<int>(bIdx));
-							Clay_String innerId;
-							innerId.isStaticallyAllocated = false;
-							innerId.length = (int32_t)std::strlen(g_localToggleIdBuf[localAdapter]);
-							innerId.chars  = g_localToggleIdBuf[localAdapter];
-							std::string actionId =
-								std::string(kActionTogglePrefix) + std::to_string(static_cast<int>(bIdx));
-							Toggle(innerId,
-							       kCheckboxBank, boxIdx, selected, tOpts,
-							       ToggleHandle{ /*hoveredOut*/ nullptr,
-							                     /*actionId*/   actionId.c_str() });
-							localAdapter++;
-						}else{
-							const int slot = (col * kMaxRows) + static_cast<int>(bIdx);
-							if(slot >= 0 && slot < static_cast<int>(sizeof(g_remoteToggleIdBuf)
-							                                       / sizeof(g_remoteToggleIdBuf[0]))){
-								std::snprintf(g_remoteToggleIdBuf[slot],
-								              sizeof(g_remoteToggleIdBuf[slot]),
-								              "GTBR%d_%d", col, static_cast<int>(bIdx));
-								Clay_String innerId;
-								innerId.isStaticallyAllocated = false;
-								innerId.length = (int32_t)std::strlen(g_remoteToggleIdBuf[slot]);
-								innerId.chars  = g_remoteToggleIdBuf[slot];
-								Toggle(innerId,
-								       kCheckboxBank, boxIdx, selected, tOpts,
-								       ToggleHandle{});
-							}
-						}
-					}
-				}
-			}
-
-			// Local-peer tech-name label column.
-			CLAY({ .id = CLAY_ID("GTechLocalLabels"),
-			       .layout = {
-			           .padding = { kTallLabelColGap, 0,
-			                        kTallLabelRowPadTop, 0 },
-			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-			       } }) {
-				const int localColSlot = 3;
-				const ColAssign & lc = cols[localColSlot];
-				if(lc.draw){
-					Peer * peer = owner.TechPanelPeer(world, team->peers[lc.peerSlot]);
-					int techslotsleft = 0;
-					if(peer){
-						User * user = world.lobby.GetUserInfo(peer->accountid);
-						if(user){
-							techslotsleft = user->agency[team->agency].techslots
-							              - world.TechSlotsUsed(*peer);
-						}
-					}
-					for(size_t bIdx = 0; bIdx < world.buyableitems.size(); bIdx++){
-						BuyableItem * item = world.buyableitems[bIdx];
-						if(!item->techslots) continue;
-						if(item->agencyspecific != -1
-						   && item->agencyspecific != team->agency){
-							continue;
-						}
-						bool interactable = (item->techslots <= techslotsleft)
-						                 || (peer && (peer->techchoices & item->techchoice));
-						const Uint8 brightness = interactable ? 128 : 64;
-
-						if(rowLabelSlot < kMaxRows){
-							g_rowLabels[rowLabelSlot] = item->name;
-							g_rowLabels[rowLabelSlot] += " (";
-							g_rowLabels[rowLabelSlot] += std::to_string(item->techslots);
-							g_rowLabels[rowLabelSlot] += ")";
-
-							silencer::ui::automation::Widget desc;
-							desc.id = std::string(kActionDescriptionPrefix) + std::to_string(static_cast<int>(bIdx));
-							desc.labelText = g_rowLabels[rowLabelSlot];
-							desc.kind = silencer::ui::automation::WidgetKind::Button;
-							desc.clayId = CLAY_SIDI(CLAY_STRING("GTechRowLbl"),
-							                         static_cast<uint32_t>(bIdx));
-							desc.hasClayId = true;
-							silencer::ui::automation::Register(desc);
-
-							CLAY({ .id = CLAY_SIDI(CLAY_STRING("GTechRowLbl"),
-							                       static_cast<uint32_t>(bIdx)),
-							       .layout = {
-							           .sizing = { CLAY_SIZING_GROW(0),
-							                       CLAY_SIZING_FIXED(kRowH) },
-							       } }) {
-								BankText(FromStd(g_rowLabels[rowLabelSlot]),
-								         BankTextVariant::Body,
-								         { .brightness = brightness });
-							}
-							rowLabelSlot++;
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// Centered tech-name heading. ALIGN_X_CENTER in a grow wrapper sized to
-	// the legacy 232-wide tall pane.
-	CLAY({ .id = CLAY_ID("GTechNameWrap"),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0),
-	                       CLAY_SIZING_FIXED(15) },
-	           .padding = { 0, 0, kTallTechNamePadTop, 0 },
-	           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
-	       } }) {
-		if(!state.techNameStr.empty()){
-			BankText(FromStd(state.techNameStr),
-			         BankTextVariant::Heading, {});
-		}
-	}
-
-	// 8 description lines.
-	CLAY({ .id = CLAY_ID("GTechDescWrap"),
-	       .layout = {
-	           .padding = { kTallDescPadLeft, 0,
-	                        kTallDescPadTop,  0 },
-	           .childGap = kTallDescRowGap,
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
-		for(int i = 0; i < 8; ++i){
-			CLAY({ .id = CLAY_SIDI(CLAY_STRING("GTechDescLine"),
-			                       static_cast<uint32_t>(i)),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_FIXED(kDescLH) },
-			       } }) {
-				if(!state.techDescLines[i].empty()){
-					BankText(FromStd(state.techDescLines[i]),
-					         BankTextVariant::Body,
-					         { .effectColor = 129,
-					           .brightness  = static_cast<Uint8>(128 + 16),
-					           .colorRamp   = true });
-				}
-			}
-		}
-	}
+	BuildTechTreeGrid(world, owner);
+	BuildTechSelectedPanel(state);
 }
 
 }  // namespace silencer::client_ui::lobby
