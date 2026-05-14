@@ -141,15 +141,9 @@ void Civilian::InitBT(){
 
 		if(state != RUNNING) return BTResult::Failure;
 
-		// Update flee direction while running, but only when clear of walls.
-		// If near a wall, DistanceToEnd will bounce mirrored below; don't override it.
-		if(DistanceToEnd(*this, world) > world.minwalldistance){
-			std::vector<Object*> players = world.TestAABB(x - dx, y - dy, x + dx, y + dy, ptypes);
-			for(Object* obj : players){
-				Player* player = static_cast<Player*>(obj);
-				if(player->IsShooting()){ mirrored = (player->x > x); break; }
-			}
-		}
+		// Once RUNNING, don't rescan for shooter direction — lock the flee direction set
+		// at trigger time and let wall bounces (DistanceToEnd below) handle redirection.
+
 
 		// Exit RUNNING after runDurationTicks.
 		int runDuration = cd ? cd->runDurationTicks : 150;
