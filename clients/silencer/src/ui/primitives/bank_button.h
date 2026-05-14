@@ -42,7 +42,7 @@ using BankButtonClickFn = void (*)(void * user);
 
 struct BankButtonHandle {
 	bool *              hoveredOut;  // Optional. Written each frame if non-null.
-	BankButtonClickFn   onClick;     // Optional. Fires once per PRESSED_THIS_FRAME.
+	BankButtonClickFn   onClick;     // Optional. Routed through UiAutomationRegistry.
 	void *              user;        // Forwarded to onClick.
 };
 

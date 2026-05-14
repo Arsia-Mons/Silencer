@@ -4,7 +4,6 @@
 #include "clay_ui_payloads.h"
 #include "runtime/UiAutomationRegistry.h"
 
-#include <cstdint>
 #include <string>
 
 namespace silencer::ui::primitives {
@@ -14,16 +13,6 @@ namespace {
 // Per-frame bump arenas for the three transient payload types attached to
 // BankButton elements. Pointer-stable for the duration of one Clay layout
 // pass (Clay captures the pointers into render commands at EndLayout).
-
-struct ClickAdapter {
-	BankButtonClickFn fn;
-	void *            user;
-	std::string       id;
-};
-
-constexpr int kAdapterCapacity = 256;
-ClickAdapter g_adapters[kAdapterCapacity];
-int g_adapterCount = 0;
 
 constexpr int kChromePayloadCapacity = 256;
 silencer::clay_bridge::BankButtonChromePayload g_chromePayloads[kChromePayloadCapacity];
@@ -35,15 +24,6 @@ int g_customDataCount = 0;
 
 std::string ToStd(Clay_String text) {
 	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
-}
-
-ClickAdapter * AllocAdapter(BankButtonClickFn fn, void * user, Clay_String id) {
-	if(g_adapterCount >= kAdapterCapacity) return nullptr;
-	auto * a = &g_adapters[g_adapterCount++];
-	a->fn = fn;
-	a->user = user;
-	a->id = ToStd(id);
-	return a;
 }
 
 silencer::clay_bridge::BankButtonChromePayload *
@@ -65,18 +45,27 @@ AllocCustomData(silencer::clay_bridge::CustomKind kind, void * payload) {
 	return c;
 }
 
-void ClickProxy(::Clay_ElementId /*id*/,
-                ::Clay_PointerData data,
-                std::intptr_t userPtr) {
-	if(data.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
-	auto * a = reinterpret_cast<ClickAdapter *>(userPtr);
-	if(a && a->fn) silencer::ui::automation::QueueClick(a->id, a->fn, a->user);
+void RegisterButtonWidget(Clay_String label,
+                          UiAutomationWidgetKind kind,
+                          BankButtonHandle handle,
+                          bool selected) {
+	if(!handle.onClick) return;
+	silencer::ui::automation::Widget widget;
+	widget.id = ToStd(label);
+	widget.labelText = widget.id;
+	widget.label = widget.labelText.c_str();
+	widget.kind = kind;
+	widget.selected = selected;
+	widget.onClick = handle.onClick;
+	widget.clickUser = handle.user;
+	widget.clayId = CLAY_SID(label);
+	widget.hasClayId = true;
+	silencer::ui::automation::Register(widget);
 }
 
 }  // namespace
 
 void BankButtonBeginFrame() {
-	g_adapterCount = 0;
 	g_chromePayloadCount = 0;
 	g_customDataCount = 0;
 }
@@ -106,10 +95,7 @@ void BankButton(Clay_String label,
 				bool hovered = ::Clay_Hovered();
 				if(payload) payload->brightness = hovered ? 136 : 128;
 				if(handle.hoveredOut) *handle.hoveredOut = hovered;
-				if(handle.onClick){
-					auto * a = AllocAdapter(handle.onClick, handle.user, label);
-					if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
-				}
+				RegisterButtonWidget(label, UiAutomationWidgetKind::Button, handle, opts.selected);
 				BankText(label,
 				         BankTextVariant::Heading,
 				         { .effectColor = opts.effectColor,
@@ -125,10 +111,7 @@ void BankButton(Clay_String label,
 			       } }) {
 				bool hovered = ::Clay_Hovered();
 				if(handle.hoveredOut) *handle.hoveredOut = hovered;
-				if(handle.onClick){
-					auto * a = AllocAdapter(handle.onClick, handle.user, label);
-					if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
-				}
+				RegisterButtonWidget(label, UiAutomationWidgetKind::Button, handle, opts.selected);
 				Uint8 brightness = opts.textBrightness;
 				if(brightness == 128 && hovered) brightness = 136;
 				BankText(label,
@@ -148,10 +131,7 @@ void BankButton(Clay_String label,
 			                    silencer::clay_bridge::PackImage(7, idx) } }) {
 				bool hovered = ::Clay_Hovered();
 				if(handle.hoveredOut) *handle.hoveredOut = hovered;
-				if(handle.onClick){
-					auto * a = AllocAdapter(handle.onClick, handle.user, label);
-					if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
-				}
+				RegisterButtonWidget(label, UiAutomationWidgetKind::Toggle, handle, opts.selected);
 			}
 			break;
 		}

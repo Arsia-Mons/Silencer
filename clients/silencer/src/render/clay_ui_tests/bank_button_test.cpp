@@ -83,16 +83,9 @@ bool RunBankButtonTest(::Game & game, const char * variantName, const char * out
 //   Frame 4: pointer = inside button, down=true  → press dispatched here.
 //   Frame 5: pointer = inside button, down=true  → held; no additional fire.
 //
-// Why three "down" frames are needed for one click: Clay 0.14 invokes
-// Clay_OnHover during Clay_SetPointerState using the *previous* frame's
-// pointer state against the *previous* frame's element hashmap. So the
-// PRESSED_THIS_FRAME state set at the end of frame 3 isn't read by the
-// onHoverFunction dispatch until frame 4's SetPointerState call. After
-// that, frame 5 reads PRESSED (steady held state) and does not re-fire.
-//
 // clicksFiredOnPress reports total clicks across frames 3-5 (the entire
-// "button held down" window) — the API contract is "exactly once per
-// press", not "fires on the same frame as the press input edge".
+// "button held down" window). The registry/router contract is exactly once
+// per press edge.
 bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
 	constexpr int W = 640;
 	constexpr int H = 480;
@@ -106,10 +99,13 @@ bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
 	// Helper: one layout pass with a fixed pointer state. Returns the
 	// brightness embedded in the (only) BankButtonChrome custom payload, or
 	// 0 if none was found.
+	bool wasDown = false;
 	auto runOneFrame = [&](float px, float py, bool down) -> Uint8 {
+		const bool pressed = down && !wasDown;
 		::Clay_SetPointerState(::Clay_Vector2{px, py}, down);
 		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 		::Clay_ResetMeasureTextCache();
+		silencer::ui::automation::BeginFrame();
 		silencer::ui::primitives::BankTextBeginFrame();
 		silencer::ui::primitives::BankButtonBeginFrame();
 
@@ -127,8 +123,12 @@ bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
 				{ /*hoveredOut=*/nullptr, /*onClick=*/onClick, /*user=*/&clickCount });
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
-		silencer::ui::DispatchUiActions(
-			silencer::ui::automation::DrainActions());
+		silencer::ui::ActiveUiAutomationRegistry().ResolveClayBoundsFromClay();
+		if(pressed){
+			silencer::ui::automation::InvokeAt(static_cast<int>(px), static_cast<int>(py));
+		}
+		silencer::ui::DispatchUiActions(silencer::ui::automation::DrainActions());
+		wasDown = down;
 
 		Uint8 brightness = 0;
 		for(int i = 0; i < cmds.length; i++){

@@ -64,16 +64,6 @@ constexpr uint16_t kButtonH = 21;
 constexpr int kMaxLogLines = 128;
 ScrollTextBoxLine g_logSlab[kMaxLogLines];
 
-struct ClickAdapter {
-	void (*fn)(void *);
-	void * user;
-	std::string id;
-};
-
-constexpr int kClickAdapterCapacity = 16;
-ClickAdapter g_clickAdapters[kClickAdapterCapacity];
-int g_clickAdapterCount = 0;
-
 Clay_String FromCStr(const char * s)
 {
 	return Clay_String{ false, static_cast<int32_t>(std::strlen(s)), s };
@@ -87,23 +77,6 @@ Clay_String FromStd(const std::string & s)
 std::string ToStd(Clay_String text)
 {
 	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
-}
-
-ClickAdapter * AllocClickAdapter(void (*fn)(void *), void * user, Clay_String id)
-{
-	if(g_clickAdapterCount >= kClickAdapterCapacity) return nullptr;
-	auto * a = &g_clickAdapters[g_clickAdapterCount++];
-	a->fn = fn;
-	a->user = user;
-	a->id = ToStd(id);
-	return a;
-}
-
-void ClickProxy(::Clay_ElementId, ::Clay_PointerData data, std::intptr_t userPtr)
-{
-	if(data.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
-	auto * a = reinterpret_cast<ClickAdapter *>(userPtr);
-	if(a && a->fn) silencer::ui::automation::QueueClick(a->id, a->fn, a->user);
 }
 
 void LoginClicked(void * user)
@@ -120,6 +93,18 @@ void CancelClicked(void * user)
 
 void SmallButton(Clay_String label, void (*onClick)(void *), void * user)
 {
+	if(onClick){
+		silencer::ui::automation::Widget widget;
+		widget.id = ToStd(label);
+		widget.labelText = widget.id;
+		widget.label = widget.labelText.c_str();
+		widget.kind = silencer::ui::automation::WidgetKind::Button;
+		widget.onClick = onClick;
+		widget.clickUser = user;
+		widget.clayId = CLAY_SID(label);
+		widget.hasClayId = true;
+		silencer::ui::automation::Register(widget);
+	}
 	CLAY({ .id = CLAY_SID(label),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(kButtonW),
@@ -128,10 +113,6 @@ void SmallButton(Clay_String label, void (*onClick)(void *), void * user)
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 	       } }) {
 		bool hovered = ::Clay_Hovered();
-		if(onClick){
-			auto * a = AllocClickAdapter(onClick, user, label);
-			if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
-		}
 		BankText(label, BankTextVariant::BodySm,
 		         { .brightness = hovered ? static_cast<Uint8>(136)
 		                                  : static_cast<Uint8>(128) });
@@ -146,6 +127,7 @@ void RegisterButton(const char * label,
                     LobbyConnectScreen * screen)
 {
 	silencer::ui::automation::Widget w;
+	w.id = label;
 	w.label = label;
 	w.kind = silencer::ui::automation::WidgetKind::Button;
 	w.uid = uid;
@@ -372,9 +354,6 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
-
-
-	g_clickAdapterCount = 0;
 
 	int lineCount = FillLogSlab(logLines);
 	Uint16 scroll = 0;

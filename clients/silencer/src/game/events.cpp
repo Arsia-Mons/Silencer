@@ -201,25 +201,7 @@ bool Game::HandleSDLEvents(void){
 			}break;
 			case SDL_EVENT_TEXT_INPUT:{
 				char ascii = event.text.text[0] & 0x7F;
-				bool skip = true;
-				if(ascii >= 0x20 && ascii <= 0x7F){
-					skip = false;
-				}
-				switch(ascii){
-					case '[':
-					case '\\':
-					case ']':
-					case '^':
-					case '_':
-					case '`':
-					case '{':
-					case '|':
-					case '}':
-					case '~':
-						skip = true;
-					break;
-				}
-				if(!skip) QueueUiTextInput(ascii);
+				if(ascii >= 0x20 && ascii <= 0x7E) QueueUiTextInput(ascii);
 			}break;
 			case SDL_EVENT_KEY_DOWN:{
 				OnScancodeDown(event.key.scancode);

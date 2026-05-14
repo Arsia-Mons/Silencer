@@ -82,4 +82,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src" \
   --glob '!third_party/**'
 
+fail_if_match \
+  "DispatchInGameUiInput|Clay_OnHover" \
+  "$REPO_ROOT/clients/silencer/src" \
+  --glob '!third_party/**'
+
+fail_if_match \
+  "\\bon(Click|ClickRow|Enter)\\b|clickUser|enterUser|rowIndex" \
+  "$REPO_ROOT/clients/silencer/src/ui/runtime/UiActionQueue.h"
+
 echo "PASS 60_ui_architecture_boundaries"

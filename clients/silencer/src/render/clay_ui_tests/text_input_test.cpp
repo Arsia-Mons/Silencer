@@ -91,12 +91,12 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 
 	g_enterCount = 0;
 	registry.SubmitFocusedText();
-	silencer::ui::DispatchUiActions(registry.DrainActions());
+	silencer::ui::DispatchUiActions(registry, registry.DrainActions());
 	out.onEnterFiredForNewline = g_enterCount;
 
 	g_enterCount = 0;
 	registry.DispatchTextInput('x');
-	silencer::ui::DispatchUiActions(registry.DrainActions());
+	silencer::ui::DispatchUiActions(registry, registry.DrainActions());
 	out.onEnterFiredForLetter = g_enterCount;
 
 	// Password masking — emit a password variant, run a layout pass,

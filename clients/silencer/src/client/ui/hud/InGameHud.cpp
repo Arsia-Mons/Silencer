@@ -16,6 +16,7 @@
 #include "terminal.h"
 #include "ui/primitives/bank_text.h"
 #include "ui/primitives/box.h"
+#include "ui/runtime/UiAutomationRegistry.h"
 #include "user.h"
 #include "world.h"
 
@@ -135,11 +136,14 @@ Clay_String ClayStringFromStd(const std::string& text) {
 
 	struct BuyTechRow {
 		BuyableItem* item;
+		int index;
 		std::string name;
 		std::string price;
 		bool selected;
 		Uint8 brightness;
 	};
+
+	void InGameNoop(void *) {}
 
 	void BuildHudSystemCameraFrame(World& world, Surface* surface,
 	                               Uint8 bank, Uint16 index, Uint8 offsetBank,
@@ -709,7 +713,21 @@ Clay_String ClayStringFromStd(const std::string& text) {
 			})) {
 				for(unsigned int i = 0; i < rows.size(); ++i) {
 					const BuyTechRow& row = rows[i];
-					CLAY({ .id = CLAY_IDI("InGameBuyTechRow", i),
+					const Clay_ElementId rowClayId = CLAY_IDI("InGameBuyTechRow", row.index);
+					silencer::ui::automation::Widget widget;
+					widget.id = "ingame.buytech.row." + std::to_string(row.index);
+					widget.labelText = row.name;
+					widget.label = widget.labelText.c_str();
+					widget.kind = silencer::ui::automation::WidgetKind::ListRow;
+					widget.rowIndex = row.index;
+					widget.selected = row.selected;
+					widget.clayId = rowClayId;
+					widget.hasClayId = true;
+					silencer::ui::automation::Register(widget);
+					if(row.selected){
+						silencer::ui::automation::FocusWidgetById(widget.id);
+					}
+					CLAY({ .id = CLAY_IDI("InGameBuyTechRow", row.index),
 					       .layout = {
 						       .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(25) },
 						       .padding = { 6, 8, 2, 2 },
@@ -789,6 +807,32 @@ Clay_String ClayStringFromStd(const std::string& text) {
 
 		int panelH = 22 + ((int)lines.size() * 10);
 		if(panelH < 42) panelH = 42;
+		if(player->chatActive){
+			silencer::ui::automation::Widget chat;
+			chat.id = "ingame.chat";
+			chat.label = "In-game chat";
+			chat.kind = silencer::ui::automation::WidgetKind::TextInput;
+			chat.uid = 9000;
+			chat.textBuffer = player->chatText;
+			chat.textBufferLen = static_cast<int>(sizeof(player->chatText));
+			chat.clayId = CLAY_ID("InGameChatPanel");
+			chat.hasClayId = true;
+			chat.onCancel = &InGameNoop;
+			silencer::ui::automation::Register(chat);
+
+			silencer::ui::automation::Widget channel;
+			channel.id = "ingame.chat.channel";
+			channel.label = player->chatwithteam ? "Team chat" : "All chat";
+			channel.kind = silencer::ui::automation::WidgetKind::Toggle;
+			channel.selected = player->chatwithteam;
+			channel.clayId = CLAY_ID("InGameChatPanel");
+			channel.hasClayId = true;
+			silencer::ui::automation::Register(channel);
+
+			if(!silencer::ui::automation::HasFocus()){
+				silencer::ui::automation::FocusWidgetById("ingame.chat");
+			}
+		}
 
 		CLAY({ .id = CLAY_ID("InGameChatRoot"),
 		       .layout = {
@@ -984,6 +1028,7 @@ void BuildInGameHudUi(Renderer& renderer, World& world, Surface* surface, float 
 					bool selected = i == selecteditem;
 					rows.push_back(BuyTechRow{
 						item,
+						i,
 						itemName(item),
 						itemPrice(item),
 						selected,

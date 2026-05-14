@@ -102,14 +102,6 @@ void OnDescClicked(void * user) {
 	if(a && a->state) a->state->descClickedItemIndex = a->itemIndex;
 }
 
-void DescClickProxy(::Clay_ElementId /*id*/,
-                    ::Clay_PointerData data,
-                    std::intptr_t userPtr) {
-	if(data.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
-	auto * a = reinterpret_cast<ClickAdapter *>(userPtr);
-	if(a && a->state) silencer::ui::automation::QueueClick("GTechDescription", &OnDescClicked, a);
-}
-
 void OnBackClicked(void * user) {
 	auto * s = static_cast<GameTechPanelState *>(user);
 	if(s) s->backClicked = true;
@@ -443,6 +435,17 @@ void BuildGameTechTallTree(GameTechPanelState & state,
 
 							g_descAdapters[rowLabelSlot].state = &state;
 							g_descAdapters[rowLabelSlot].itemIndex = static_cast<int>(bIdx);
+							silencer::ui::automation::Widget desc;
+							desc.id = "GTechDescription." + std::to_string(static_cast<int>(bIdx));
+							desc.labelText = g_rowLabels[rowLabelSlot];
+							desc.label = desc.labelText.c_str();
+							desc.kind = silencer::ui::automation::WidgetKind::Button;
+							desc.onClick = &OnDescClicked;
+							desc.clickUser = &g_descAdapters[rowLabelSlot];
+							desc.clayId = CLAY_SIDI(CLAY_STRING("GTechRowLbl"),
+							                         static_cast<uint32_t>(bIdx));
+							desc.hasClayId = true;
+							silencer::ui::automation::Register(desc);
 
 							CLAY({ .id = CLAY_SIDI(CLAY_STRING("GTechRowLbl"),
 							                       static_cast<uint32_t>(bIdx)),
@@ -450,9 +453,6 @@ void BuildGameTechTallTree(GameTechPanelState & state,
 							           .sizing = { CLAY_SIZING_GROW(0),
 							                       CLAY_SIZING_FIXED(kRowH) },
 							       } }) {
-								::Clay_OnHover(DescClickProxy,
-								               reinterpret_cast<std::intptr_t>(
-								                   &g_descAdapters[rowLabelSlot]));
 								BankText(FromStd(g_rowLabels[rowLabelSlot]),
 								         BankTextVariant::Body,
 								         { .brightness = brightness });

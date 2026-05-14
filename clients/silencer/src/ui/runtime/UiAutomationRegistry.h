@@ -1,6 +1,8 @@
 #pragma once
 
+#include "clay/clay.h"
 #include "runtime/UiActionQueue.h"
+#include "runtime/UiInputState.h"
 
 #include <string>
 #include <vector>
@@ -45,10 +47,14 @@ struct UiElementMetadata {
 };
 
 struct UiAutomationWidget {
+	std::string id;
+	std::string labelText;
 	const char * label = nullptr;
 	UiAutomationWidgetKind kind = UiAutomationWidgetKind::Button;
 	int uid = -1;
 	int x = 0, y = 0, w = 0, h = 0;
+	Clay_ElementId clayId{};
+	bool hasClayId = false;
 
 	void (*onClick)(void * user) = nullptr;
 	void * clickUser = nullptr;
@@ -65,6 +71,8 @@ struct UiAutomationWidget {
 	bool numbersOnly = false;
 	void (*onEnter)(void * user) = nullptr;
 	void * enterUser = nullptr;
+	void (*onCancel)(void * user) = nullptr;
+	void * cancelUser = nullptr;
 };
 
 class UiAutomationRegistry {
@@ -78,27 +86,35 @@ public:
 	const UiElementMetadata* FindByLabel(const std::string& label) const;
 	const UiAutomationWidget* FindWidgetByLabel(const char * label) const;
 	const UiAutomationWidget* FindWidgetByUid(int uid) const;
+	const UiAutomationWidget* FindWidgetById(const std::string& id) const;
 
 	bool FocusTextInputAt(int x, int y);
 	bool FocusTextInputByUid(int uid);
+	bool FocusWidgetById(const std::string& id);
 	bool IsTextInputFocused(int uid) const;
 	bool HasFocus() const;
 	void ClearFocus();
 	bool DispatchTextInput(char ascii);
 	bool BackspaceFocusedText();
 	bool SubmitFocusedText();
+	bool CancelFocused();
 	bool InvokeAt(int x, int y);
 	bool FocusNextInteractive();
 	bool FocusPreviousInteractive();
+	bool FocusDirectional(UiNavAction action);
 	bool ActivateFocused();
 	void QueueAction(UiAction action);
 	std::vector<UiAction> DrainActions();
+	bool DispatchAction(const UiAction& action);
+	void DispatchActions(const std::vector<UiAction>& actions);
+	void ResolveClayBoundsFromClay();
 
 private:
 	bool MatchesFocus(const UiAutomationWidget& widget) const;
 	const UiAutomationWidget* FocusedWidget() const;
 	void SetFocus(const UiAutomationWidget& widget);
 	void QueueAction(UiActionKind kind, const UiAutomationWidget& widget, const char * value);
+	void RefreshElementState();
 
 	std::vector<UiElementMetadata> elements_;
 	std::vector<UiAutomationWidget> widgets_;
@@ -121,15 +137,18 @@ const Widget* FindByLabel(const char * label);
 const Widget* FindByUid(int uid);
 bool FocusTextInputAt(int x, int y);
 bool FocusTextInputByUid(int uid);
+bool FocusWidgetById(const std::string& id);
 bool IsTextInputFocused(int uid);
 bool HasFocus();
 void ClearFocus();
 bool DispatchTextInput(char ascii);
 bool BackspaceFocusedText();
 bool SubmitFocusedText();
+bool CancelFocused();
 bool InvokeAt(int x, int y);
 bool FocusNextInteractive();
 bool FocusPreviousInteractive();
+bool FocusDirectional(UiNavAction action);
 bool ActivateFocused();
 void QueueAction(UiAction action);
 void QueueClick(std::string id, void (*onClick)(void *), void * user);
@@ -138,6 +157,9 @@ void QueueTextEnter(std::string id, const char * value, void (*onEnter)(void *),
 std::vector<UiAction> DrainActions();
 
 }  // namespace automation
+
+void DispatchUiActions(UiAutomationRegistry& registry, const std::vector<UiAction>& actions);
+void DispatchUiActions(const std::vector<UiAction>& actions);
 
 }  // namespace ui
 }  // namespace silencer

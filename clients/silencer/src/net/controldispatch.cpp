@@ -79,6 +79,11 @@ static bool LabelEquals(const char * a, const char * b){
 	return *a == '\0' && *b == '\0';
 }
 
+static const char * WidgetLabel(const silencer::ui::automation::Widget& widget){
+	if(!widget.labelText.empty()) return widget.labelText.c_str();
+	return widget.label;
+}
+
 static bool QueueControlKey(Game& game, int ascii){
 	switch(ascii){
 		case 1:
@@ -524,7 +529,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			w["source"] = "clay";
 			w["x"] = cw.x; w["y"] = cw.y;
 			w["w"] = cw.w; w["h"] = cw.h;
-			if(cw.label) w["label"] = cw.label;
+			if(WidgetLabel(cw)) w["label"] = WidgetLabel(cw);
 			if(cw.uid >= 0) w["uid"] = cw.uid;
 			using K = silencer::ui::automation::WidgetKind;
 			switch(cw.kind){
@@ -610,19 +615,15 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		if(cw){
 			using K = silencer::ui::automation::WidgetKind;
 			if(cw->kind == K::Button || cw->kind == K::Toggle){
-				if(cw->onClick){
-					silencer::ui::automation::QueueClick(target, cw->onClick, cw->clickUser);
-				}
+				silencer::ui::automation::QueueClick(target, cw->onClick, cw->clickUser);
 				nlohmann::json r;
 				r["source"] = "clay";
 				cmd.reply->set_value(OkResult(cmd.id, r));
 				return;
 			}
 			if(cw->kind == K::ListRow){
-				if(cw->onClickRow){
-					silencer::ui::automation::QueueRowSelect(
-						target, cw->rowIndex, cw->onClickRow, cw->clickUser);
-				}
+				silencer::ui::automation::QueueRowSelect(
+					target, cw->rowIndex, cw->onClickRow, cw->clickUser);
 				nlohmann::json r;
 				r["source"] = "clay";
 				r["row_index"] = cw->rowIndex;
@@ -724,7 +725,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			std::string label = cmd.args["label"].get<std::string>();
 			for(const auto & candidate : widgets){
 				if(candidate.kind == silencer::ui::automation::WidgetKind::ListRow
-				   && LabelEquals(candidate.label, label.c_str())){
+				   && LabelEquals(WidgetLabel(candidate), label.c_str())){
 					hit = &candidate;
 					count++;
 				}
@@ -733,7 +734,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			std::string text = cmd.args["text"].get<std::string>();
 			for(const auto & candidate : widgets){
 				if(candidate.kind == silencer::ui::automation::WidgetKind::ListRow
-				   && LabelEquals(candidate.label, text.c_str())){
+				   && LabelEquals(WidgetLabel(candidate), text.c_str())){
 					hit = &candidate;
 					count++;
 				}
@@ -748,22 +749,13 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				"no unique clay list row matches select target"));
 			return;
 		}
-		if(hit->onClickRow){
-			silencer::ui::automation::QueueRowSelect(
-				hit->label ? hit->label : "", hit->rowIndex,
-				hit->onClickRow, hit->clickUser);
-		}else if(hit->onClick){
-			silencer::ui::automation::QueueClick(
-				hit->label ? hit->label : "", hit->onClick, hit->clickUser);
-		}else{
-			cmd.reply->set_value(Err(cmd.id, "WRONG_TYPE",
-				"selected clay row is not invokable"));
-			return;
-		}
+		silencer::ui::automation::QueueRowSelect(
+			!hit->id.empty() ? hit->id : (WidgetLabel(*hit) ? WidgetLabel(*hit) : ""),
+			hit->rowIndex, hit->onClickRow, hit->clickUser);
 		nlohmann::json r;
 		r["source"] = "clay";
 		r["row_index"] = hit->rowIndex;
-		if(hit->label) r["label"] = hit->label;
+		if(WidgetLabel(*hit)) r["label"] = WidgetLabel(*hit);
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}

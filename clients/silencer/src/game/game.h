@@ -154,7 +154,7 @@ private:
 	void ResetUiFrameDeltas();
 	void BuildVisibleClientUi(Surface& surface, float frametime);
 	silencer::ui::UiInputState BuildUiInputState(Surface& surface);
-	bool DispatchInGameUiInput(const silencer::ui::UiInputState& input);
+	bool DispatchInGameUiActions(const std::vector<silencer::ui::UiAction>& actions);
 	Updater updater;
 	// Display name for the first key bound to an action; "(unbound)" if none.
 	// Used by tutorial overlays that say "press %s to fire".

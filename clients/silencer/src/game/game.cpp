@@ -475,10 +475,11 @@ void Game::RenderClientUiFrame(Surface& surface, float frametime) {
 	BuildVisibleClientUi(surface, frametime);
 	Clay_RenderCommandArray cmds = EndClientUiFrame();
 	silencer::clay_bridge::Render(*this, &surface, cmds);
-	if(!DispatchInGameUiInput(preparedUiInput)){
+	std::vector<silencer::ui::UiAction> unhandledUiActions =
 		clientUi.DispatchInput(screenContext, preparedUiInput);
+	if(!clientUi.HasScreens() && world.map.loaded){
+		DispatchInGameUiActions(unhandledUiActions);
 	}
-	silencer::ui::DispatchUiActions(clientUi.DrainActions());
 }
 
 void Game::ResetUiFrameDeltas() {

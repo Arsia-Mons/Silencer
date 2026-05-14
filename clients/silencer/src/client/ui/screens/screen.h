@@ -2,6 +2,7 @@
 #define SCREEN_H
 
 #include <SDL3/SDL_stdinc.h>
+#include "runtime/UiActionQueue.h"
 #include "runtime/UiInputState.h"
 
 class ScreenContext;
@@ -40,6 +41,18 @@ public:
 	// ClientUi before it reaches screens.
 	virtual bool HandleUiAction(ScreenContext & ctx, silencer::ui::UiNavAction action)
 	{ (void)ctx; (void)action; return false; }
+
+	// Typed UI intent emitted by the runtime input router. Widget activation
+	// normally resolves through UiAutomationRegistry; screens use this for
+	// semantic fallbacks such as cancel/back.
+	virtual bool HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)
+	{
+		if(action.kind == silencer::ui::UiActionKind::Cancel){
+			return HandleUiAction(ctx, silencer::ui::UiNavAction::Cancel);
+		}
+		(void)ctx;
+		return false;
+	}
 
 	// Narrow escape hatch for controls rebinding. Normal UI navigation must not
 	// use raw key codes.

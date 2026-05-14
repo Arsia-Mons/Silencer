@@ -65,6 +65,15 @@ std::string ToStd(Clay_String text)
 	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
 }
 
+std::string AutomationLabel(Clay_String id, Clay_String text)
+{
+	std::string idText = ToStd(id);
+	if(idText == "PresetButton") return "Preset";
+	if(idText == "ScrollUp") return "Scroll Up";
+	if(idText == "ScrollDown") return "Scroll Down";
+	return ToStd(text);
+}
+
 ClickAdapter * AllocAdapter(void (*fn)(void *), void * user, int arg0 = 0, int arg1 = 0, std::string id = {})
 {
 	if(g_adapterCount >= kAdapterCapacity) return nullptr;
@@ -75,13 +84,6 @@ ClickAdapter * AllocAdapter(void (*fn)(void *), void * user, int arg0 = 0, int a
 	a->arg1 = arg1;
 	a->id = std::move(id);
 	return a;
-}
-
-void ClickProxy(::Clay_ElementId, ::Clay_PointerData data, std::intptr_t userPtr)
-{
-	if(data.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
-	auto * a = reinterpret_cast<ClickAdapter *>(userPtr);
-	if(a && a->fn) silencer::ui::automation::QueueClick(a->id, a->fn, a->user);
 }
 
 void PresetClicked(void * user)
@@ -190,6 +192,18 @@ void ButtonElement(Clay_String id,
                    void (*onClick)(void *),
                    void * user)
 {
+	if(onClick){
+		silencer::ui::automation::Widget widget;
+		widget.id = ToStd(id);
+		widget.labelText = AutomationLabel(id, text);
+		widget.label = widget.labelText.c_str();
+		widget.kind = silencer::ui::automation::WidgetKind::Button;
+		widget.onClick = onClick;
+		widget.clickUser = user;
+		widget.clayId = CLAY_SID(id);
+		widget.hasClayId = true;
+		silencer::ui::automation::Register(widget);
+	}
 	CLAY({ .id = CLAY_SID(id),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(width)),
@@ -200,10 +214,6 @@ void ButtonElement(Clay_String id,
 	       },
 	       .image = { .imageData = silencer::clay_bridge::PackImage(6, imageIndex) } }) {
 		bool hovered = ::Clay_Hovered();
-		if(onClick){
-			auto * a = AllocAdapter(onClick, user, 0, 0, ToStd(id));
-			if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
-		}
 		BankText(text, textVariant,
 		         { .brightness = hovered ? static_cast<Uint8>(136)
 		                                  : static_cast<Uint8>(128) });
@@ -217,6 +227,18 @@ void TextButton(Clay_String id,
                 void (*onClick)(void *),
                 void * user)
 {
+	if(onClick){
+		silencer::ui::automation::Widget widget;
+		widget.id = ToStd(id);
+		widget.labelText = AutomationLabel(id, text);
+		widget.label = widget.labelText.c_str();
+		widget.kind = silencer::ui::automation::WidgetKind::Button;
+		widget.onClick = onClick;
+		widget.clickUser = user;
+		widget.clayId = CLAY_SID(id);
+		widget.hasClayId = true;
+		silencer::ui::automation::Register(widget);
+	}
 	CLAY({ .id = CLAY_SID(id),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(width)),
@@ -224,10 +246,6 @@ void TextButton(Clay_String id,
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 	       } }) {
 		bool hovered = ::Clay_Hovered();
-		if(onClick){
-			auto * a = AllocAdapter(onClick, user, 0, 0, ToStd(id));
-			if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
-		}
 		BankText(text, BankTextVariant::Heading,
 		         { .brightness = hovered ? static_cast<Uint8>(136)
 		                                  : static_cast<Uint8>(128) });
@@ -352,8 +370,6 @@ void OptionsControlsScreen::Build(ScreenContext & ctx)
 	cancelClicked = false;
 	scrollDelta = 0;
 	operatorClickedRow = -1;
-	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(this, surface.w);
 }
 
 void OptionsControlsScreen::NotifyBindClicked(int row, int slot)
@@ -619,7 +635,6 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 			}
 		}
 	}
-	RegisterWidgets(this, dst.w);
 }
 
 void OptionsControlsScreen::Destroy(ScreenContext & ctx)

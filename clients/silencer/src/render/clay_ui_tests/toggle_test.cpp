@@ -83,10 +83,9 @@ bool RunToggleTest(::Game & game, const char * stateName, const char * outPath) 
 // other two should be 32). Presses inside toggle 1's bbox and verifies
 // exactly its onClick fires.
 //
-// Timeline mirrors RunBankButtonCheck: 5 frames, hover → press → press
-// dispatch → held. The dispatch frame is where Clay_OnHover fires the
-// proxy (Clay 0.14 invokes the registered hover callbacks during
-// Clay_SetPointerState using the PREVIOUS frame's pointer state).
+// Timeline mirrors RunBankButtonCheck: 5 frames, hover -> press -> press
+// dispatch -> held. The registry/router contract is exactly one action per
+// press edge.
 bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 	constexpr int W = 640;
 	constexpr int H = 480;
@@ -101,11 +100,14 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 	// (selectedBrightness, unselectedBrightness) seen in the emitted
 	// CUSTOM payloads. Brightnesses are returned via out-params so the
 	// caller only consults them on a "settled" frame.
+	bool wasDown = false;
 	auto runFrame = [&](float px, float py, bool down,
 	                    int & selBr, int & unselBr) {
+		const bool pressed = down && !wasDown;
 		::Clay_SetPointerState(::Clay_Vector2{px, py}, down);
 		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 		::Clay_ResetMeasureTextCache();
+		silencer::ui::automation::BeginFrame();
 		silencer::ui::primitives::ToggleBeginFrame();
 
 		::Clay_BeginLayout();
@@ -133,8 +135,12 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 				{ nullptr, onClick, &counts[2] });
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
-		silencer::ui::DispatchUiActions(
-			silencer::ui::automation::DrainActions());
+		silencer::ui::ActiveUiAutomationRegistry().ResolveClayBoundsFromClay();
+		if(pressed){
+			silencer::ui::automation::InvokeAt(static_cast<int>(px), static_cast<int>(py));
+		}
+		silencer::ui::DispatchUiActions(silencer::ui::automation::DrainActions());
+		wasDown = down;
 
 		selBr = 0;
 		unselBr = 0;

@@ -46,7 +46,7 @@ using ToggleClickFn = void (*)(void * user);
 
 struct ToggleHandle {
 	bool *         hoveredOut;  // Optional. Written each frame if non-null.
-	ToggleClickFn  onClick;     // Optional. Fires once per PRESSED_THIS_FRAME.
+	ToggleClickFn  onClick;     // Optional. Routed through UiAutomationRegistry.
 	void *         user;        // Forwarded to onClick.
 };
 

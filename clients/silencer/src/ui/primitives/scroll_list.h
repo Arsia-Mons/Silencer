@@ -5,8 +5,8 @@
 // sprite-rendered scrollbar on the right. Replaces the legacy SelectBox +
 // ScrollBar pair.
 //
-// Inputs are immutable. Mutations flow back through callbacks:
-//   - onSelect(user, index) — fires when the user presses on a row.
+// Inputs are immutable. Selection routes through UiAutomationRegistry:
+//   - onSelect(user, index) runs when the input router activates a row.
 // The caller owns `selectedIndex` and `scrollPosition`; the primitive only
 // reads them.
 //
@@ -49,7 +49,7 @@ using ScrollListSelectFn = void (*)(void * user, int index);
 
 struct ScrollListHandle {
 	bool *              hoveredOut;  // Optional. Written each frame if non-null.
-	ScrollListSelectFn  onSelect;    // Optional. Fires once per row PRESSED_THIS_FRAME.
+	ScrollListSelectFn  onSelect;    // Optional. Routed through UiAutomationRegistry.
 	void *              user;        // Forwarded to onSelect.
 };
 

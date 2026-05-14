@@ -21,7 +21,11 @@ void ClayService::BeginFrame(const UiInputState& input, UiAutomationRegistry& au
 std::vector<UiRenderCommand> ClayService::EndFrame() {
 	if(!inFrame_) return std::vector<UiRenderCommand>();
 	inFrame_ = false;
-	return backend_.EndLayout();
+	std::vector<UiRenderCommand> commands = backend_.EndLayout();
+	if(frame_.automation){
+		frame_.automation->ResolveClayBoundsFromClay();
+	}
+	return commands;
 }
 
 }  // namespace ui

@@ -12,6 +12,8 @@ set(TEST_SRC
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/clay_init.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/ClayService.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiAutomationRegistry.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiInputRouter.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiTextPolicy.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/bank_button.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/bank_text.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/box.cpp

@@ -7,6 +7,7 @@
 #include "objecttypes.h"
 #include "player.h"
 #include "team.h"
+#include "runtime/UiAutomationRegistry.h"
 #include "world.h"
 #include <cstring>
 #include <vector>
@@ -130,119 +131,114 @@ void Game::UpdateInGameOverlayState(void){
 
 namespace {
 
-bool ChatAllowsChar(char ascii) {
-	if(ascii < 0x20 || ascii > 0x7E) return false;
-	switch(ascii){
-		case '[':
-		case '\\':
-		case ']':
-		case '^':
-		case '_':
-		case '`':
-		case '{':
-		case '|':
-		case '}':
-		case '~':
-			return false;
-	}
-	return true;
+bool StartsWith(const std::string& value, const char * prefix) {
+	return value.compare(0, std::strlen(prefix), prefix) == 0;
 }
 
-bool IsBuyTechAction(silencer::ui::UiNavAction action) {
-	return action == silencer::ui::UiNavAction::Up ||
-	       action == silencer::ui::UiNavAction::Down ||
-	       action == silencer::ui::UiNavAction::Confirm ||
-	       action == silencer::ui::UiNavAction::Cancel;
+void ClampBuyTechSelection(Player& player, World& world) {
+	std::vector<BuyableItem *> items;
+	bool tech = player.techstationactive;
+	player.CollectBuyMenuItems(world, tech, items);
+	int & selected = player.isbuying ? player.buyifacelastitem : player.techifacelastitem;
+	int & scrolled = player.isbuying ? player.buyifacelastscrolled : player.techifacelastscrolled;
+	if(items.empty()){
+		selected = 0;
+		scrolled = 0;
+		return;
+	}
+	if(selected < 0) selected = 0;
+	if(selected >= static_cast<int>(items.size())) selected = static_cast<int>(items.size()) - 1;
+	if(selected >= scrolled + 5) scrolled = selected - 4;
+	if(selected < scrolled) scrolled = selected;
+	if(scrolled < 0) scrolled = 0;
+}
+
+void SelectBuyTechRow(Player& player, World& world, int index) {
+	std::vector<BuyableItem *> items;
+	bool tech = player.techstationactive;
+	player.CollectBuyMenuItems(world, tech, items);
+	if(items.empty()) return;
+	if(index < 0) index = 0;
+	if(index >= static_cast<int>(items.size())) index = static_cast<int>(items.size()) - 1;
+	int & selected = player.isbuying ? player.buyifacelastitem : player.techifacelastitem;
+	if(selected != index){
+		Audio::GetInstance().Play(
+			world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown],
+			64);
+	}
+	selected = index;
+	ClampBuyTechSelection(player, world);
+}
+
+void ActivateBuyTechSelection(Player& player, World& world) {
+	std::vector<BuyableItem *> items;
+	bool tech = player.techstationactive;
+	player.CollectBuyMenuItems(world, tech, items);
+	if(items.empty()) return;
+	int & selected = player.isbuying ? player.buyifacelastitem : player.techifacelastitem;
+	if(selected < 0) selected = 0;
+	if(selected >= static_cast<int>(items.size())) selected = static_cast<int>(items.size()) - 1;
+	BuyableItem * buyableitem = items[selected];
+	if(player.isbuying){
+		player.BuyItem(world, buyableitem->id);
+	}else if(player.InOwnBase(world)){
+		player.RepairItem(world, buyableitem->id);
+	}else{
+		player.VirusItem(world, buyableitem->id);
+	}
 }
 
 }  // namespace
 
-bool Game::DispatchInGameUiInput(const silencer::ui::UiInputState& input) {
+bool Game::DispatchInGameUiActions(const std::vector<silencer::ui::UiAction>& actions) {
 	Player * localplayer = world.GetPeerPlayer(world.localpeerid);
 	if(!localplayer) return false;
 
-	if(localplayer->chatActive){
-		for(char ascii : input.textInput){
-			if(!ChatAllowsChar(ascii)) continue;
-			size_t len = std::strlen(localplayer->chatText);
-			if(len < sizeof(localplayer->chatText) - 1){
-				localplayer->chatText[len] = ascii;
-				localplayer->chatText[len + 1] = '\0';
-			}
-		}
-		for(auto action : input.navActions){
-			switch(action){
-				case silencer::ui::UiNavAction::FocusNext:
-				case silencer::ui::UiNavAction::NextSection:
+	bool handled = false;
+	for(const silencer::ui::UiAction& action : actions){
+		if(localplayer->chatActive &&
+		   (action.id == "ingame.chat" || action.id == "ingame.chat.channel")){
+			handled = true;
+			if(action.kind == silencer::ui::UiActionKind::SubmitText){
+				if(std::strlen(localplayer->chatText) > 0){
+					world.SendChat(localplayer->chatwithteam, localplayer->chatText);
+				}
+				localplayer->chatText[0] = '\0';
+				localplayer->chatActive = false;
+			}else if(action.kind == silencer::ui::UiActionKind::Cancel){
+				localplayer->chatText[0] = '\0';
+				localplayer->chatActive = false;
+			}else if(action.kind == silencer::ui::UiActionKind::Navigate ||
+			         action.kind == silencer::ui::UiActionKind::Activate){
+				if(action.id == "ingame.chat.channel"){
 					localplayer->chatwithteam = !localplayer->chatwithteam;
-					break;
-				case silencer::ui::UiNavAction::Backspace:{
-					size_t len = std::strlen(localplayer->chatText);
-					if(len > 0) localplayer->chatText[len - 1] = '\0';
-				}break;
-				case silencer::ui::UiNavAction::Confirm:
-					if(std::strlen(localplayer->chatText) > 0){
-						world.SendChat(localplayer->chatwithteam, localplayer->chatText);
-					}
-					localplayer->chatText[0] = '\0';
-					localplayer->chatActive = false;
-					break;
-				case silencer::ui::UiNavAction::Cancel:
-					localplayer->chatText[0] = '\0';
-					localplayer->chatActive = false;
-					break;
-				default:
-					break;
-			}
-		}
-		return true;
-	}
-
-	if(!localplayer->isbuying && !localplayer->techstationactive) return false;
-
-	for(auto action : input.navActions){
-		if(!IsBuyTechAction(action)) continue;
-		std::vector<BuyableItem *> items;
-		bool tech = localplayer->techstationactive;
-		localplayer->CollectBuyMenuItems(world, tech, items);
-		if(items.empty()) return true;
-
-		int & selected = localplayer->isbuying ? localplayer->buyifacelastitem : localplayer->techifacelastitem;
-		int & scrolled = localplayer->isbuying ? localplayer->buyifacelastscrolled : localplayer->techifacelastscrolled;
-		if(selected < 0) selected = 0;
-		if(selected >= static_cast<int>(items.size())) selected = static_cast<int>(items.size()) - 1;
-		int old = selected;
-
-		if(action == silencer::ui::UiNavAction::Up){
-			if(selected > 0) selected--;
-		}else if(action == silencer::ui::UiNavAction::Down){
-			if(selected < static_cast<int>(items.size()) - 1) selected++;
-		}else if(action == silencer::ui::UiNavAction::Confirm){
-			BuyableItem * buyableitem = items[selected];
-			if(localplayer->isbuying){
-				localplayer->BuyItem(world, buyableitem->id);
-			}else if(localplayer->InOwnBase(world)){
-				localplayer->RepairItem(world, buyableitem->id);
-			}else{
-				localplayer->VirusItem(world, buyableitem->id);
+					silencer::ui::automation::FocusWidgetById("ingame.chat");
+				}
 			}
 			continue;
-		}else if(action == silencer::ui::UiNavAction::Cancel){
+		}
+
+		if((localplayer->isbuying || localplayer->techstationactive) &&
+		   StartsWith(action.id, "ingame.buytech.row.")){
+			handled = true;
+			if(action.index >= 0){
+				SelectBuyTechRow(*localplayer, world, action.index);
+			}
+			if(action.kind == silencer::ui::UiActionKind::Select &&
+			   action.value != "focus_next" && action.value != "focus_previous"){
+				ActivateBuyTechSelection(*localplayer, world);
+			}
+			continue;
+		}
+
+		if((localplayer->isbuying || localplayer->techstationactive) &&
+		   action.kind == silencer::ui::UiActionKind::Cancel){
 			localplayer->isbuying = false;
 			localplayer->techstationactive = false;
-			continue;
+			handled = true;
 		}
-
-		if(selected != old){
-			Audio::GetInstance().Play(
-				world.resources.soundbank[GASLoader::Get().player.soundRoundCountdown],
-				64);
-		}
-		if(selected >= scrolled + 5) scrolled = selected - 4;
-		if(selected < scrolled) scrolled = selected;
-		if(scrolled < 0) scrolled = 0;
 	}
-	return true;
+	return handled;
 }
 
 nlohmann::json Game::ConfigureInGameUiForControl(const std::string& mode) {

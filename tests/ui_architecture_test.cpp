@@ -138,8 +138,7 @@ TEST_CASE("UiAutomationRegistry queues typed actions for interactive widgets") {
 	CHECK(actions[0].kind == silencer::ui::UiActionKind::Activate);
 	CHECK(actions[0].id == "42");
 	CHECK(actions[0].value == "Connect");
-	CHECK(actions[0].onClick != nullptr);
-	silencer::ui::DispatchUiActions(actions);
+	silencer::ui::DispatchUiActions(registry, actions);
 	CHECK(clicks == 1);
 	CHECK(registry.DrainActions().empty());
 }
@@ -171,6 +170,6 @@ TEST_CASE("UiAutomationRegistry edits focused text through typed methods") {
 	CHECK(std::string(buffer) == "ab");
 	CHECK(registry.SubmitFocusedText());
 
-	silencer::ui::DispatchUiActions(registry.DrainActions());
+	silencer::ui::DispatchUiActions(registry, registry.DrainActions());
 	CHECK(submits == 1);
 }

@@ -100,10 +100,13 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 		*s->lastIndex = index;
 	};
 
+	bool wasDown = false;
 	auto runFrame = [&](float px, float py, bool down) {
+		const bool pressed = down && !wasDown;
 		::Clay_SetPointerState(::Clay_Vector2{px, py}, down);
 		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 		::Clay_ResetMeasureTextCache();
+		silencer::ui::automation::BeginFrame();
 		silencer::ui::primitives::ScrollListBeginFrame();
 		silencer::ui::primitives::BankTextBeginFrame();
 
@@ -125,8 +128,12 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 				{ /*hoveredOut=*/nullptr, onSelect, &sink });
 		}
 		::Clay_EndLayout();
-		silencer::ui::DispatchUiActions(
-			silencer::ui::automation::DrainActions());
+		silencer::ui::ActiveUiAutomationRegistry().ResolveClayBoundsFromClay();
+		if(pressed){
+			silencer::ui::automation::InvokeAt(static_cast<int>(px), static_cast<int>(py));
+		}
+		silencer::ui::DispatchUiActions(silencer::ui::automation::DrainActions());
+		wasDown = down;
 	};
 
 	// Press over row index 5: at scrollPosition=3, row 5 is the 3rd visible

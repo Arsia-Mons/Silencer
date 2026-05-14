@@ -10,20 +10,6 @@ namespace silencer::ui::primitives {
 
 namespace {
 
-// Per-row click adapter. We need one allocation per row so the proxy
-// callback can route to the right index — Clay_OnHover threads a single
-// void* through to the proxy.
-struct RowAdapter {
-	ScrollListSelectFn fn;
-	void *             user;
-	int                index;
-	std::string        id;
-};
-
-constexpr int kAdapterCapacity = 1024;
-RowAdapter g_adapters[kAdapterCapacity];
-int g_adapterCount = 0;
-
 constexpr int kPayloadCapacity = 64;
 silencer::clay_bridge::ScrollBarPayload g_payloads[kPayloadCapacity];
 int g_payloadCount = 0;
@@ -34,16 +20,6 @@ int g_customDataCount = 0;
 
 std::string ToStd(Clay_String text) {
 	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
-}
-
-RowAdapter * AllocAdapter(ScrollListSelectFn fn, void * user, int index, Clay_String id) {
-	if(g_adapterCount >= kAdapterCapacity) return nullptr;
-	auto * a = &g_adapters[g_adapterCount++];
-	a->fn = fn;
-	a->user = user;
-	a->index = index;
-	a->id = ToStd(id);
-	return a;
 }
 
 silencer::clay_bridge::ScrollBarPayload *
@@ -68,18 +44,29 @@ AllocCustomData(silencer::clay_bridge::CustomKind kind, void * payload) {
 	return c;
 }
 
-void ClickProxy(::Clay_ElementId /*id*/,
-                ::Clay_PointerData data,
-                std::intptr_t userPtr) {
-	if(data.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
-	auto * a = reinterpret_cast<RowAdapter *>(userPtr);
-	if(a && a->fn) silencer::ui::automation::QueueRowSelect(a->id, a->index, a->fn, a->user);
+void RegisterRowWidget(Clay_String id,
+                       const Clay_String& label,
+                       int index,
+                       bool selected,
+                       ScrollListHandle handle) {
+	if(!handle.onSelect) return;
+	silencer::ui::automation::Widget widget;
+	widget.id = ToStd(id) + "." + std::to_string(index);
+	widget.labelText = ToStd(label);
+	widget.label = widget.labelText.c_str();
+	widget.kind = UiAutomationWidgetKind::ListRow;
+	widget.rowIndex = index;
+	widget.selected = selected;
+	widget.onClickRow = handle.onSelect;
+	widget.clickUser = handle.user;
+	widget.clayId = CLAY_SIDI(id, static_cast<uint32_t>(index + 1));
+	widget.hasClayId = true;
+	silencer::ui::automation::Register(widget);
 }
 
 }  // namespace
 
 void ScrollListBeginFrame() {
-	g_adapterCount = 0;
 	g_payloadCount = 0;
 	g_customDataCount = 0;
 }
@@ -138,11 +125,7 @@ void ScrollList(Clay_String id,
 				       },
 				       .backgroundColor = { static_cast<float>(bgIdx),
 				                            0.0f, 0.0f, 255.0f } }) {
-					if(handle.onSelect){
-						auto * a = AllocAdapter(handle.onSelect, handle.user, i, id);
-						if(a) ::Clay_OnHover(ClickProxy,
-						                    reinterpret_cast<std::intptr_t>(a));
-					}
+					RegisterRowWidget(id, items[i], i, isSelected, handle);
 					BankText(items[i], opts.textVariant,
 					         { .effectColor = opts.textEffectColor });
 				}

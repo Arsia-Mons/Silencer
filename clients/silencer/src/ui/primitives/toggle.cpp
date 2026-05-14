@@ -3,22 +3,11 @@
 #include "clay_ui_payloads.h"
 #include "runtime/UiAutomationRegistry.h"
 
-#include <cstdint>
 #include <string>
 
 namespace silencer::ui::primitives {
 
 namespace {
-
-struct ClickAdapter {
-	ToggleClickFn fn;
-	void *        user;
-	std::string   id;
-};
-
-constexpr int kAdapterCapacity = 256;
-ClickAdapter g_adapters[kAdapterCapacity];
-int g_adapterCount = 0;
 
 constexpr int kPayloadCapacity = 256;
 silencer::clay_bridge::TogglePayload g_payloads[kPayloadCapacity];
@@ -30,15 +19,6 @@ int g_customDataCount = 0;
 
 std::string ToStd(Clay_String text) {
 	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
-}
-
-ClickAdapter * AllocAdapter(ToggleClickFn fn, void * user, Clay_String id) {
-	if(g_adapterCount >= kAdapterCapacity) return nullptr;
-	auto * a = &g_adapters[g_adapterCount++];
-	a->fn = fn;
-	a->user = user;
-	a->id = ToStd(id);
-	return a;
 }
 
 silencer::clay_bridge::TogglePayload *
@@ -61,18 +41,26 @@ AllocCustomData(silencer::clay_bridge::CustomKind kind, void * payload) {
 	return c;
 }
 
-void ClickProxy(::Clay_ElementId /*id*/,
-                ::Clay_PointerData data,
-                std::intptr_t userPtr) {
-	if(data.state != CLAY_POINTER_DATA_PRESSED_THIS_FRAME) return;
-	auto * a = reinterpret_cast<ClickAdapter *>(userPtr);
-	if(a && a->fn) silencer::ui::automation::QueueClick(a->id, a->fn, a->user);
+void RegisterToggleWidget(Clay_String id,
+                          bool selected,
+                          ToggleHandle handle) {
+	if(!handle.onClick) return;
+	silencer::ui::automation::Widget widget;
+	widget.id = ToStd(id);
+	widget.labelText = widget.id;
+	widget.label = widget.labelText.c_str();
+	widget.kind = UiAutomationWidgetKind::Toggle;
+	widget.selected = selected;
+	widget.onClick = handle.onClick;
+	widget.clickUser = handle.user;
+	widget.clayId = CLAY_SID(id);
+	widget.hasClayId = true;
+	silencer::ui::automation::Register(widget);
 }
 
 }  // namespace
 
 void ToggleBeginFrame() {
-	g_adapterCount = 0;
 	g_payloadCount = 0;
 	g_customDataCount = 0;
 }
@@ -100,10 +88,7 @@ void Toggle(Clay_String id,
 	       .custom = { .customData = ccd } }) {
 		bool hovered = ::Clay_Hovered();
 		if(handle.hoveredOut) *handle.hoveredOut = hovered;
-		if(handle.onClick){
-			auto * a = AllocAdapter(handle.onClick, handle.user, id);
-			if(a) ::Clay_OnHover(ClickProxy, reinterpret_cast<std::intptr_t>(a));
-		}
+		RegisterToggleWidget(id, selected, handle);
 	}
 }
 

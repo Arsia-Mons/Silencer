@@ -81,7 +81,7 @@ bool RunBankButtonTest(::Game & game, const char * variant, const char * outPath
 // timeline and reports the results as raw counters in the output struct.
 // No PNG is produced — this complements the render-parity test op.
 struct BankButtonCheckResult {
-	int clicksFiredOnPress;     // Expect 1 — Clay_OnHover fires the proxy on PRESSED_THIS_FRAME.
+	int clicksFiredOnPress;     // Expect 1 action on the press edge.
 	int clicksFiredWhenHeld;    // Expect 0 — held frames don't re-fire the proxy.
 	int chromeBrightnessHover;  // Expect 136 — the CUSTOM payload's brightness when hovered.
 	int chromeBrightnessIdle;   // Expect 128 — the CUSTOM payload's brightness when not hovered.
