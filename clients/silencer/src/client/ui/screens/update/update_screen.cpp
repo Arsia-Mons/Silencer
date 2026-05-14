@@ -23,11 +23,9 @@
 namespace
 {
 using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonBeginFrame;
 using silencer::ui::primitives::BankButtonHandle;
 using silencer::ui::primitives::BankButtonVariant;
 using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextBeginFrame;
 using silencer::ui::primitives::BankTextVariant;
 
 constexpr uint16_t kDialogW = 352;

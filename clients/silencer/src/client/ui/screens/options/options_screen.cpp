@@ -17,7 +17,6 @@
 namespace {
 
 using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonBeginFrame;
 using silencer::ui::primitives::BankButtonHandle;
 using silencer::ui::primitives::BankButtonVariant;
 

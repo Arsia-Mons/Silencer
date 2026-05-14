@@ -2,6 +2,7 @@
 
 #include "ui/runtime/ClayService.h"
 #include "ui/runtime/UiAutomationRegistry.h"
+#include "ui/runtime/UiFrameContext.h"
 #include "client/ui/navigation/ScreenStack.h"
 
 #include <memory>
@@ -37,6 +38,7 @@ public:
 	void BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime);
 
 private:
+	silencer::ui::UiFrameContext frameCtx_;
 	silencer::ui::ClayService& clay_;
 	silencer::ui::UiAutomationRegistry& automation_;
 	ScreenStack screens_;

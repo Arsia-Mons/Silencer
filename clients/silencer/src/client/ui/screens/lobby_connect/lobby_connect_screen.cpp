@@ -28,14 +28,11 @@
 namespace
 {
 using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextBeginFrame;
 using silencer::ui::primitives::BankTextVariant;
 using silencer::ui::primitives::ScrollTextBox;
-using silencer::ui::primitives::ScrollTextBoxBeginFrame;
 using silencer::ui::primitives::ScrollTextBoxLine;
 using silencer::ui::primitives::ScrollTextBoxOpts;
 using silencer::ui::primitives::ScrollTextBoxOrigin;
-using silencer::ui::primitives::TextInputBeginFrame;
 
 // Prefixed to dodge anonymous-namespace collisions when SILENCER_UNITY_BUILD
 // merges this TU with sibling screen .cpp files (other screens already use

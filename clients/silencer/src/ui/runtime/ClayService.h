@@ -24,7 +24,7 @@ public:
 	virtual std::vector<UiRenderCommand> EndLayout() = 0;
 };
 
-struct UiFrameContext {
+struct ClayFrameState {
 	UiInputState input;
 	UiAutomationRegistry* automation = nullptr;
 };
@@ -35,11 +35,11 @@ public:
 
 	void BeginFrame(const UiInputState& input, UiAutomationRegistry& automation);
 	std::vector<UiRenderCommand> EndFrame();
-	const UiFrameContext& Frame() const { return frame_; }
+	const ClayFrameState& Frame() const { return frame_; }
 
 private:
 	ClayFrameBackend& backend_;
-	UiFrameContext frame_;
+	ClayFrameState frame_;
 	bool inFrame_ = false;
 };
 

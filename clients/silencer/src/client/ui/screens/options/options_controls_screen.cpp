@@ -22,7 +22,6 @@
 namespace
 {
 using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextBeginFrame;
 using silencer::ui::primitives::BankTextVariant;
 
 constexpr int VISIBLE_ROWS = 5;

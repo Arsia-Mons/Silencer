@@ -12,6 +12,7 @@ set(TEST_SRC
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/clay_init.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/ClayService.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiAutomationRegistry.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiFrameContext.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiInputRouter.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiTextPolicy.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/bank_button.cpp
@@ -23,6 +24,7 @@ set(TEST_SRC
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/toggle.cpp
     ${CMAKE_SOURCE_DIR}/src/client/ui/ClientUi.cpp
     ${CMAKE_SOURCE_DIR}/src/client/ui/ClientUiInput.cpp
+    ${CMAKE_SOURCE_DIR}/src/client/ui/hud/HudPayloadArena.cpp
     ${CMAKE_SOURCE_DIR}/src/client/ui/navigation/ScreenStack.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updatersha256.cpp
     ${CMAKE_SOURCE_DIR}/src/updater/updaterdownload.cpp
