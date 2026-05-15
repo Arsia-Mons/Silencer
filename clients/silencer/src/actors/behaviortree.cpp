@@ -33,6 +33,7 @@ BehaviorTree BehaviorTree::fromJson(const json& j) {
 // ── BehaviorTree::tick ────────────────────────────────────────────────────────
 BTResult BehaviorTree::tick(BTContext& ctx) const {
     if (rootId_.empty()) return BTResult::Failure;
+    ctx.nodeResults.clear();
     return tickNode(rootId_, ctx);
 }
 
@@ -41,23 +42,54 @@ BTResult BehaviorTree::tickNode(const std::string& id, BTContext& ctx) const {
     if (it == nodes_.end()) return BTResult::Failure;
     const Node& n = it->second;
 
-    if (n.type == "Selector")       return tickSelector(n, ctx);
-    if (n.type == "Sequence")       return tickSequence(n, ctx);
-    if (n.type == "Parallel")       return tickParallel(n, ctx);
-    if (n.type == "RandomSelector") return tickRandomSelector(n, ctx);
-    if (n.type == "Inverter")       return tickInverter(n, ctx);
-    if (n.type == "Cooldown")       return tickCooldown(n, ctx);
-    if (n.type == "Repeat")         return tickRepeat(n, ctx);
-    if (n.type == "Timeout")        return tickTimeout(n, ctx);
-    if (n.type == "ForceSuccess")   return tickForceSuccess(n, ctx);
-    if (n.type == "Wait")           return tickWait(n, ctx);
-    if (n.type == "Leaf")           return tickLeaf(n, ctx);
-    if (n.type == "Condition")      return tickCondition(n, ctx);
-    return BTResult::Failure;
+    BTResult r;
+    if (n.type == "Selector")       r = tickSelector(n, ctx);
+    else if (n.type == "Sequence")       r = tickSequence(n, ctx);
+    else if (n.type == "Parallel")       r = tickParallel(n, ctx);
+    else if (n.type == "RandomSelector") r = tickRandomSelector(n, ctx);
+    else if (n.type == "Inverter")       r = tickInverter(n, ctx);
+    else if (n.type == "Cooldown")       r = tickCooldown(n, ctx);
+    else if (n.type == "Repeat")         r = tickRepeat(n, ctx);
+    else if (n.type == "Timeout")        r = tickTimeout(n, ctx);
+    else if (n.type == "ForceSuccess")   r = tickForceSuccess(n, ctx);
+    else if (n.type == "Wait")           r = tickWait(n, ctx);
+    else if (n.type == "Leaf")           r = tickLeaf(n, ctx);
+    else if (n.type == "Condition")      r = tickCondition(n, ctx);
+    else if (n.type == "SubTree")        r = tickSubTree(n, ctx);
+    else                                 r = BTResult::Failure;
+
+    ctx.nodeResults[id] = (int)r;
+    return r;
 }
 
-// RandomSelector: shuffle children each tick, then behave like Selector
+// RandomSelector: if a "weights" array prop is present, do weighted sampling;
+// otherwise shuffle children uniformly (original behaviour).
 BTResult BehaviorTree::tickRandomSelector(const Node& n, BTContext& ctx) const {
+    if (n.children.empty()) return BTResult::Failure;
+
+    if (n.props.contains("weights") && n.props["weights"].is_array()) {
+        const auto& w = n.props["weights"];
+        // Build cumulative weight table (missing entries default to 1.0)
+        std::vector<float> cum(n.children.size());
+        float total = 0.0f;
+        for (size_t i = 0; i < n.children.size(); ++i) {
+            float wi = (i < w.size()) ? w[i].get<float>() : 1.0f;
+            total += wi;
+            cum[i] = total;
+        }
+        // Pick a random point in [0, total)
+        float pick = ((float)rand() / ((float)RAND_MAX + 1.0f)) * total;
+        for (size_t i = 0; i < n.children.size(); ++i) {
+            if (pick < cum[i]) {
+                BTResult r = tickNode(n.children[i], ctx);
+                if (r == BTResult::Success || r == BTResult::Running) return r;
+                break; // RandomSelector picks ONE — stop after the chosen child
+            }
+        }
+        return BTResult::Failure;
+    }
+
+    // Uniform shuffle
     std::vector<size_t> order(n.children.size());
     for (size_t i = 0; i < order.size(); ++i) order[i] = i;
     for (size_t i = order.size(); i > 1; --i) {
@@ -254,6 +286,26 @@ BTResult BehaviorTree::tickCondition(const Node& n, BTContext& ctx) const {
     }
     BTResult r = result ? BTResult::Success : BTResult::Failure;
     if (ctx.logFn) ctx.logFn(n.id, "Cond[" + key + op + val.dump() + "]", r);
+    return r;
+}
+
+// SubTree: tick another BT by ID (from BehaviorTreeLibrary) with the same context.
+// Props: tree_id (string) — ID of the target tree.
+// Recursion guard: tracks currently active sub-tree IDs in ctx.state; returns
+// Failure immediately if the same tree_id is already on the stack.
+BTResult BehaviorTree::tickSubTree(const Node& n, BTContext& ctx) const {
+    std::string treeId = n.props.value("tree_id", std::string{});
+    if (treeId.empty()) return BTResult::Failure;
+
+    std::string guardKey = "__subtree_active_" + treeId;
+    if (ctx.state.count(guardKey)) return BTResult::Failure; // recursion detected
+
+    const BehaviorTree* sub = BehaviorTreeLibrary::instance().get(treeId);
+    if (!sub) return BTResult::Failure;
+
+    ctx.state[guardKey] = true;
+    BTResult r = sub->tick(ctx);
+    ctx.state.erase(guardKey);
     return r;
 }
 

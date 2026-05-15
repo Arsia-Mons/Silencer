@@ -555,7 +555,7 @@ void Guard::Tick(World & world){
 				btctx_.bbSet("dist_to_target", dist);
 			}
 			bt_->tick(btctx_);
-			BTDebug::broadcast("guard", id, btctx_.blackboard);
+			BTDebug::broadcast("guard", id, btctx_.blackboard, btctx_.nodeResults);
 		} else {
 		do{
 			if((found = Look(world, 0))){

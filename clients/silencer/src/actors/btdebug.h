@@ -24,7 +24,8 @@ struct BTDebug {
     // call.  Safe to call every tick; cheap when no client is connected.
     static void broadcast(const std::string& actorType,
                           unsigned           actorId,
-                          const std::unordered_map<std::string, json>& blackboard);
+                          const std::unordered_map<std::string, json>& blackboard,
+                          const std::unordered_map<std::string, int>&  nodeResults);
 
     // Close the listen socket and all client connections (call on shutdown).
     static void shutdown();

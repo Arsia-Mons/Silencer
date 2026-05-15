@@ -509,7 +509,7 @@ void Robot::Tick(World & world){
 		}
 		btctx_.bbSet("dist_to_target", -1);
 		bt_->tick(btctx_);
-		BTDebug::broadcast("robot", id, btctx_.blackboard);
+		BTDebug::broadcast("robot", id, btctx_.blackboard, btctx_.nodeResults);
 	}
 
 	if(damaging){

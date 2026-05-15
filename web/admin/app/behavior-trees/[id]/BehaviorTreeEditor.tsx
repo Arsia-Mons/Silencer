@@ -54,8 +54,13 @@ const TYPE_SYMBOL: Record<string, string> = {
 };
 
 // ── Custom node ───────────────────────────────────────────────────────────────
+// liveResult: 0=Success, 1=Failure, 2=Running, undefined=not visited
 function BTNodeComponent({ data, selected }: NodeProps) {
   const color = TYPE_COLOR[data.type] ?? '#6b7280';
+  const lr: number | undefined = (data as { liveResult?: number }).liveResult;
+  const liveColor  = lr === 0 ? '#22c55e' : lr === 1 ? '#ef4444' : lr === 2 ? '#f59e0b' : undefined;
+  const borderColor = selected ? color : liveColor ?? '#2d3748';
+  const isRunning   = lr === 2;
   return (
     <>
       <style>{`
@@ -63,21 +68,28 @@ function BTNodeComponent({ data, selected }: NodeProps) {
           0%,100% { box-shadow: 0 0 0 0 ${color}66; }
           50%      { box-shadow: 0 0 0 6px ${color}00; }
         }
+        @keyframes btRunning {
+          0%,100% { box-shadow: 0 0 0 0 #f59e0b88; }
+          50%      { box-shadow: 0 0 0 8px #f59e0b00; }
+        }
       `}</style>
       <Handle type="target" position={Position.Top} style={{ background: color, border: 'none', width: 8, height: 8 }} />
       <div style={{
-        background: '#0d1117',
-        border: `2px solid ${selected ? color : '#2d3748'}`,
+        background: liveColor ? `${liveColor}11` : '#0d1117',
+        border: `2px solid ${borderColor}`,
         borderRadius: 6,
         padding: '6px 12px',
         minWidth: 120,
         textAlign: 'center',
         cursor: 'pointer',
-        animation: selected ? 'btPulse 1.2s ease-in-out infinite' : 'none',
-        transition: 'border-color 0.15s',
+        animation: isRunning ? 'btRunning 0.8s ease-in-out infinite' : selected ? 'btPulse 1.2s ease-in-out infinite' : 'none',
+        transition: 'border-color 0.1s, background 0.1s',
       }}>
         <div style={{ color, fontSize: 11, fontWeight: 700, letterSpacing: 2, marginBottom: 2 }}>
           {TYPE_SYMBOL[data.type]} {data.type.toUpperCase()}
+          {liveColor && <span style={{ marginLeft: 5, fontSize: 9, color: liveColor, verticalAlign: 'middle' }}>
+            {lr === 0 ? '✓' : lr === 1 ? '✗' : '…'}
+          </span>}
         </div>
         <div style={{ color: '#e2e8f0', fontSize: 12, fontFamily: 'monospace' }}>{data.label}</div>
         {data.subtitle && (
@@ -266,28 +278,65 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     apiFetch('/sounds').then((d) => setSoundNames((d as { name: string }[]).map(s => s.name).sort())).catch(() => {});
   }, []);
 
-  // Live blackboard from game via ws://localhost:9339
-  type LiveBB = { type: string; id: number; blackboard: Record<string, unknown> } | null;
-  const [liveBB, setLiveBB] = useState<LiveBB>(null);
+  // Live blackboard + node results from game via ws://localhost:9339
+  type LiveMsg = { type: string; id: number; blackboard: Record<string, unknown>; nodeResults: Record<string, number> };
+  const [liveActors, setLiveActors] = useState<Record<string, LiveMsg>>({});
+  const [selectedActor, setSelectedActor] = useState<string>('');
   const [wsConnected, setWsConnected] = useState(false);
+  const liveActorsRef = useRef<Record<string, LiveMsg>>({});
+
+  // Apply node results from the selected actor onto the ReactFlow canvas
+  const applyLiveResults = useCallback((actors: Record<string, LiveMsg>, actorKey: string) => {
+    const msg = actors[actorKey];
+    setRfNodes(prev => prev.map(n => ({
+      ...n,
+      data: { ...n.data, liveResult: msg ? msg.nodeResults[n.id] : undefined },
+    })));
+  }, []);
+
   useEffect(() => {
     let ws: WebSocket | null = null;
     let dead = false;
+    let flushTimer: ReturnType<typeof setInterval>;
     function connect() {
       if (dead) return;
       try {
         ws = new WebSocket('ws://localhost:9339');
-        ws.onopen  = () => setWsConnected(true);
-        ws.onclose = () => { setWsConnected(false); if (!dead) setTimeout(connect, 2000); };
+        ws.onopen  = () => { setWsConnected(true); flushTimer = setInterval(flush, 100); };
+        ws.onclose = () => {
+          setWsConnected(false);
+          clearInterval(flushTimer);
+          liveActorsRef.current = {};
+          setLiveActors({});
+          if (!dead) setTimeout(connect, 2000);
+        };
         ws.onerror = () => ws?.close();
         ws.onmessage = (e) => {
-          try { setLiveBB(JSON.parse(e.data as string) as LiveBB); } catch { /* ignore */ }
+          try {
+            const msg = JSON.parse(e.data as string) as LiveMsg;
+            const key = `${msg.type}#${msg.id}`;
+            liveActorsRef.current = { ...liveActorsRef.current, [key]: msg };
+          } catch { /* ignore */ }
         };
       } catch { /* WS not available */ }
     }
+    function flush() {
+      const actors = liveActorsRef.current;
+      setLiveActors(actors);
+      setSelectedActor(prev => {
+        const key = prev && actors[prev] ? prev : Object.keys(actors)[0] ?? '';
+        applyLiveResults(actors, key);
+        return key;
+      });
+    }
     connect();
-    return () => { dead = true; ws?.close(); };
+    return () => { dead = true; ws?.close(); clearInterval(flushTimer); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-apply live results when selected actor changes
+  useEffect(() => {
+    applyLiveResults(liveActors, selectedActor);
+  }, [selectedActor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync BT → ReactFlow
   useEffect(() => {
@@ -1265,22 +1314,34 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
               Start the game to stream live blackboard data.
             </div>
           )}
-          {wsConnected && !liveBB && (
+          {wsConnected && Object.keys(liveActors).length === 0 && (
             <div style={{ color: '#4a5568', fontSize: 9 }}>Connected — waiting for first tick…</div>
           )}
-          {liveBB && (
+          {Object.keys(liveActors).length > 0 && (
             <>
-              <div style={{ color: '#a78bfa', fontSize: 9, marginBottom: 6, letterSpacing: 1 }}>
-                {liveBB.type} #{liveBB.id}
-              </div>
-              {Object.entries(liveBB.blackboard).sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 4 }}>
-                  <span style={{ color: '#718096', fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0, maxWidth: '55%' }}>{k}</span>
-                  <span style={{ color: '#e2e8f0', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {JSON.stringify(v)}
-                  </span>
-                </div>
-              ))}
+              <select value={selectedActor} onChange={e => setSelectedActor(e.target.value)}
+                style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                {Object.keys(liveActors).sort().map(k => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+              {liveActors[selectedActor] && (
+                <>
+                  <div style={{ color: '#4a5568', fontSize: 9, marginBottom: 6, letterSpacing: 1 }}>
+                    <span style={{ color: '#22c55e' }}>■</span> success&nbsp;&nbsp;
+                    <span style={{ color: '#ef4444' }}>■</span> failure&nbsp;&nbsp;
+                    <span style={{ color: '#f59e0b' }}>■</span> running
+                  </div>
+                  {Object.entries(liveActors[selectedActor].blackboard).sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => (
+                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 4 }}>
+                      <span style={{ color: '#718096', fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0, maxWidth: '55%' }}>{k}</span>
+                      <span style={{ color: '#e2e8f0', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {JSON.stringify(v)}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              )}
             </>
           )}
         </div>

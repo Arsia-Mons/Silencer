@@ -142,7 +142,8 @@ static void pumpConnections() {
 // ── Public API ────────────────────────────────────────────────────────────────
 void BTDebug::broadcast(const std::string& actorType,
                         unsigned           actorId,
-                        const std::unordered_map<std::string, json>& blackboard) {
+                        const std::unordered_map<std::string, json>& blackboard,
+                        const std::unordered_map<std::string, int>&  nodeResults) {
     lazyInit();
     if (s_listen == (SOCKET)-1) return;
 
@@ -155,6 +156,9 @@ void BTDebug::broadcast(const std::string& actorType,
     json bb     = json::object();
     for (auto& kv : blackboard) bb[kv.first] = kv.second;
     out["blackboard"] = std::move(bb);
+    json nr = json::object();
+    for (auto& kv : nodeResults) nr[kv.first] = kv.second;
+    out["nodeResults"] = std::move(nr);
     std::string payload = out.dump();
 
     std::vector<SOCKET> alive;

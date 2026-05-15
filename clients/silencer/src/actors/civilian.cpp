@@ -204,7 +204,7 @@ void Civilian::Tick(World & world){
 					btctx_.bbSet("dist_to_target", -1);
 					btctx_.bbSet("threat_nearby", Look(world));
 					bt_->tick(btctx_);
-					BTDebug::broadcast("civilian", id, btctx_.blackboard);
+					BTDebug::broadcast("civilian", id, btctx_.blackboard, btctx_.nodeResults);
 				}else{
 					Look(world);
 				}
