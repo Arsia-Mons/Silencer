@@ -122,6 +122,7 @@ void Robot::InitBT() {
 
 	// ReturnToSpawn: after search phase (!patrol, searchTicks from GAS), walk back to spawn and sleep.
 	// If a target is spotted en-route, reset the search timer and resume hunting.
+	// Drives its own movement (returns Running) so Patrol's wall-flip can't override our facing.
 	btctx_.actions["ReturnToSpawn"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		if (patrol) return BTResult::Failure;
@@ -132,14 +133,17 @@ void Robot::InitBT() {
 			bt_walk_ticks_ = 0; // target spotted — reset and keep hunting
 			return BTResult::Failure;
 		}
-		// Orient toward spawn and let Patrol move us there
 		mirrored = (signed(originalx) < signed(x));
-		if (abs(signed(x) - signed(originalx)) <= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->returnProximity : 20)) {
+		if (abs(signed(x) - signed(originalx)) <= (_rd ? _rd->returnProximity : 20)) {
 			state = SLEEPING;
 			state_i = -1;
 			return BTResult::Success;
 		}
-		return BTResult::Failure; // not at spawn yet — Patrol will move us
+		// Move toward spawn directly — don't fall through to Patrol which would
+		// flip mirrored at platform edges and send the robot the wrong way.
+		xv = mirrored ? -(Sint8)speed : (Sint8)speed;
+		FollowGround(*this, world, xv);
+		return BTResult::Running;
 	};
 
 	// ── Generic data-driven leaves ────────────────────────────────────────────
