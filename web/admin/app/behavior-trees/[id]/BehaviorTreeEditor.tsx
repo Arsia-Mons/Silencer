@@ -158,10 +158,10 @@ const PALETTE: { group: string; types: BTNodeType[] }[] = [
 ];
 
 // ── Leaf action lists per NPC type ───────────────────────────────────────────
-const GENERIC_ACTIONS = ['SetBlackboard', 'RandomChance', 'PlayAnim', 'EmitSound', 'SetFacing'];
+const GENERIC_ACTIONS = ['SetBlackboard', 'RandomChance', 'PlayAnim', 'EmitSound', 'SetFacing', 'SetSpeed', 'ApplyVelocity', 'CheckGround'];
 
 const NPC_ACTIONS: Record<string, string[]> = {
-  guard:    ['Look0', 'Look1', 'Look2', 'Look3', 'Look4', 'Look5', 'UncrouchIdle', 'Chase', 'Patrol', 'SearchAndReturn', 'Stand', ...GENERIC_ACTIONS],
+  guard:    ['Look0', 'Look1', 'Look2', 'Look3', 'Look4', 'Look5', 'UncrouchIdle', 'Chase', 'Patrol', 'SearchAndReturn', 'Stand', 'SpawnProjectile', 'Raycast', ...GENERIC_ACTIONS],
   civilian: ['Run', 'Wander', 'WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'ReturnToSpawn', ...GENERIC_ACTIONS],
   robot:    ['WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'Patrol', 'ReturnToSpawn', ...GENERIC_ACTIONS],
 };
@@ -196,6 +196,12 @@ const ACTION_DESC: Record<string, string> = {
   SetFacing: 'Set entity facing direction (left / right / flip)',
   SetBlackboard: 'Write a constant value to a blackboard key',
   RandomChance: 'Succeed with probability = chance (0.0–1.0)',
+  SetSpeed: 'Override movement speed (Uint8); affects patrol and chase velocity',
+  ApplyVelocity: 'Directly set xv and/or yv on the actor this tick',
+  CheckGround: 'Write grounded state (yv==0) to blackboard key; succeeds if grounded',
+  // Guard-only
+  SpawnProjectile: 'Fire a projectile in direction 0–5 (same directions as Look0–5)',
+  Raycast: 'Cast a horizontal ray in facing direction; write hit bool to result_key',
 };
 
 const LOOK_DIRECTIONS: { value: number; label: string }[] = [
@@ -737,11 +743,16 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                   const action = String(selectedNode.props.action ?? '');
                   // Known props handled by dedicated UI below — exclude from generic editor
                   const knownProps: Record<string, string[]> = {
-                    PlayAnim:      ['bank', 'frames', 'loop'],
-                    EmitSound:     ['sound', 'volume'],
-                    SetFacing:     ['dir'],
-                    RandomChance:  ['chance'],
-                    SetBlackboard: ['key', 'value'],
+                    PlayAnim:        ['bank', 'frames', 'loop'],
+                    EmitSound:       ['sound', 'volume'],
+                    SetFacing:       ['dir'],
+                    RandomChance:    ['chance'],
+                    SetBlackboard:   ['key', 'value'],
+                    SetSpeed:        ['speed'],
+                    ApplyVelocity:   ['xv', 'yv'],
+                    SpawnProjectile: ['direction'],
+                    CheckGround:     ['key'],
+                    Raycast:         ['range', 'result_key'],
                   };
                   const reserved = new Set(['action', ...(knownProps[action] ?? [])]);
                   const extraKeys = Object.keys(selectedNode.props).filter(k => !reserved.has(k));
@@ -845,6 +856,58 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                           style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
                       </>)}
 
+                      {/* SetSpeed knobs */}
+                      {action === 'SetSpeed' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>SPEED</label>
+                        <input type="number" min={1} max={20} step={1} value={Number(selectedNode.props.speed ?? 5)}
+                          onChange={e => updateProp('speed', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* ApplyVelocity knobs */}
+                      {action === 'ApplyVelocity' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>XV</label>
+                        <input type="number" min={-20} max={20} step={1} value={Number(selectedNode.props.xv ?? 0)}
+                          onChange={e => updateProp('xv', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>YV</label>
+                        <input type="number" min={-20} max={20} step={1} value={Number(selectedNode.props.yv ?? 0)}
+                          onChange={e => updateProp('yv', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* SpawnProjectile knobs */}
+                      {action === 'SpawnProjectile' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>DIRECTION</label>
+                        <select value={Number(selectedNode.props.direction ?? 0)} onChange={e => updateProp('direction', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                          <option value={0}>0 — Forward (standing)</option>
+                          <option value={1}>1 — Low (crouched)</option>
+                          <option value={2}>2 — Up</option>
+                          <option value={3}>3 — Down</option>
+                          <option value={4}>4 — Up-angle</option>
+                          <option value={5}>5 — Down-angle</option>
+                        </select>
+                      </>)}
+
+                      {/* CheckGround knobs */}
+                      {action === 'CheckGround' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>RESULT KEY</label>
+                        <input value={String(selectedNode.props.key ?? 'on_ground')} onChange={e => updateProp('key', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* Raycast knobs */}
+                      {action === 'Raycast' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>RANGE (px)</label>
+                        <input type="number" min={10} max={1000} step={10} value={Number(selectedNode.props.range ?? 200)}
+                          onChange={e => updateProp('range', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>RESULT KEY</label>
+                        <input value={String(selectedNode.props.result_key ?? 'ray_hit')} onChange={e => updateProp('result_key', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
                       {/* Remaining unknown props */}
                       {extraKeys.length > 0 && (
                         <>
@@ -878,6 +941,9 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                   <option value="">— select key —</option>
                   {bt.blackboard.map(k => <option key={k.key} value={k.key}>{k.key}</option>)}
                 </select>
+                <div style={{ color: '#4a5568', fontSize: 9, fontFamily: 'monospace', lineHeight: 1.6, marginBottom: 6 }}>
+                  AUTO (written each tick): health_pct · dist_to_target · on_ladder · state_name · on_ground (CheckGround)
+                </div>
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>OPERATOR</label>
                 {(() => {
                   const bbEntry = bt.blackboard.find(k => k.key === selectedNode.props.key);
