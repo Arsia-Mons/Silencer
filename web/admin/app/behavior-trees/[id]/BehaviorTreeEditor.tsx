@@ -286,18 +286,13 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
   const liveActorsRef = useRef<Record<string, LiveMsg>>({});
 
   // Apply node results from the selected actor onto the ReactFlow canvas
-  const applyLiveResults = useCallback((actors: Record<string, LiveMsg>, actorKey: string) => {
-    const msg = actors[actorKey];
-    setRfNodes(prev => prev.map(n => ({
-      ...n,
-      data: { ...n.data, liveResult: msg ? msg.nodeResults[n.id] : undefined },
-    })));
-  }, []);
+  const selectedActorRef = useRef('');
 
   useEffect(() => {
     let ws: WebSocket | null = null;
     let dead = false;
     let flushTimer: ReturnType<typeof setInterval>;
+
     function connect() {
       if (dead) return;
       try {
@@ -308,6 +303,9 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
           clearInterval(flushTimer);
           liveActorsRef.current = {};
           setLiveActors({});
+          selectedActorRef.current = '';
+          setSelectedActor('');
+          setRfNodes(prev => prev.map(n => ({ ...n, data: { ...n.data, liveResult: undefined } })));
           if (!dead) setTimeout(connect, 2000);
         };
         ws.onerror = () => ws?.close();
@@ -315,28 +313,44 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
           try {
             const msg = JSON.parse(e.data as string) as LiveMsg;
             const key = `${msg.type}#${msg.id}`;
-            liveActorsRef.current = { ...liveActorsRef.current, [key]: msg };
+            liveActorsRef.current[key] = msg;
           } catch { /* ignore */ }
         };
       } catch { /* WS not available */ }
     }
+
     function flush() {
       const actors = liveActorsRef.current;
-      setLiveActors(actors);
-      setSelectedActor(prev => {
-        const key = prev && actors[prev] ? prev : Object.keys(actors)[0] ?? '';
-        applyLiveResults(actors, key);
-        return key;
-      });
+      // Pick actor: keep current if still alive, else first available
+      let key = selectedActorRef.current;
+      if (!key || !actors[key]) key = Object.keys(actors)[0] ?? '';
+      if (key !== selectedActorRef.current) {
+        selectedActorRef.current = key;
+        setSelectedActor(key);
+      }
+      setLiveActors({ ...actors });
+      // Apply node result colors directly to canvas
+      const msg = key ? actors[key] : null;
+      setRfNodes(prev => prev.map(n => ({
+        ...n,
+        data: { ...n.data, liveResult: msg ? msg.nodeResults[n.id] : undefined },
+      })));
     }
+
     connect();
     return () => { dead = true; ws?.close(); clearInterval(flushTimer); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Re-apply live results when selected actor changes
-  useEffect(() => {
-    applyLiveResults(liveActors, selectedActor);
-  }, [selectedActor]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Re-apply when user manually switches actor
+  function switchActor(key: string) {
+    selectedActorRef.current = key;
+    setSelectedActor(key);
+    const msg = liveActorsRef.current[key];
+    setRfNodes(prev => prev.map(n => ({
+      ...n,
+      data: { ...n.data, liveResult: msg ? msg.nodeResults[n.id] : undefined },
+    })));
+  }
 
   // Sync BT → ReactFlow
   useEffect(() => {
@@ -1319,7 +1333,7 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
           )}
           {Object.keys(liveActors).length > 0 && (
             <>
-              <select value={selectedActor} onChange={e => setSelectedActor(e.target.value)}
+              <select value={selectedActor} onChange={e => switchActor(e.target.value)}
                 style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
                 {Object.keys(liveActors).sort().map(k => (
                   <option key={k} value={k}>{k}</option>
