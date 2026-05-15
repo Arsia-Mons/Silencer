@@ -442,6 +442,7 @@ void Guard::InitBT(){
 	btctx_.actions["SpawnProjectile"] = [this](BTContext& ctx) -> BTResult {
 		if (!ctx.props || !ctx.userData) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
+		if (!CooledDown(world)) return BTResult::Failure;
 		int dir = ctx.props->value("direction", 0);
 		Fire(world, (Uint8)dir);
 		return BTResult::Success;

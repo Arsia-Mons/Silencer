@@ -3,15 +3,71 @@
   "id": "guard",
   "rootId": "root",
   "blackboard": [
-    { "key": "patrol",      "type": "bool", "default": true },
-    { "key": "target_seen", "type": "bool", "default": false }
+    { "key": "patrol",          "type": "bool",   "default": true  },
+    { "key": "target_seen",     "type": "bool",   "default": false },
+    { "key": "health_pct",      "type": "float",  "default": 1.0   },
+    { "key": "dist_to_target",  "type": "int",    "default": -1    },
+    { "key": "close_shot_hit",  "type": "bool",   "default": false }
   ],
   "nodes": {
     "root": {
       "type": "Selector",
       "label": "Guard AI",
-      "children": ["sel_combat", "leaf_uncrouch", "leaf_chase", "leaf_searchreturn", "seq_patrol", "leaf_stand"],
+      "children": [
+        "seq_low_health",
+        "seq_close_shot",
+        "sel_combat",
+        "leaf_uncrouch",
+        "leaf_chase",
+        "leaf_searchreturn",
+        "seq_patrol",
+        "leaf_stand"
+      ],
       "props": {}
+    },
+
+    "seq_low_health": {
+      "type": "Sequence",
+      "label": "Low-health flee (AC2 + AC4)",
+      "children": ["cond_low_hp", "leaf_speedup", "leaf_searchreturn"],
+      "props": {}
+    },
+    "cond_low_hp": {
+      "type": "Condition",
+      "label": "health_pct < 0.3?",
+      "children": [],
+      "props": { "key": "health_pct", "op": "<", "value": 0.3 }
+    },
+    "leaf_speedup": {
+      "type": "Leaf",
+      "label": "Speed boost (flee)",
+      "children": [],
+      "props": { "action": "SetSpeed", "speed": 8 }
+    },
+
+    "seq_close_shot": {
+      "type": "Sequence",
+      "label": "Close-range SpawnProjectile (AC1 + AC3)",
+      "children": ["cond_has_target", "cond_close_range", "leaf_spawn_proj"],
+      "props": {}
+    },
+    "cond_has_target": {
+      "type": "Condition",
+      "label": "dist_to_target > 0?",
+      "children": [],
+      "props": { "key": "dist_to_target", "op": ">", "value": 0 }
+    },
+    "cond_close_range": {
+      "type": "Condition",
+      "label": "dist_to_target < 150?",
+      "children": [],
+      "props": { "key": "dist_to_target", "op": "<", "value": 150 }
+    },
+    "leaf_spawn_proj": {
+      "type": "Leaf",
+      "label": "SpawnProjectile forward",
+      "children": [],
+      "props": { "action": "SpawnProjectile", "direction": 0 }
     },
 
     "sel_combat": {
