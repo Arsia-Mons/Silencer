@@ -468,6 +468,7 @@ static void LoadEnemies(const std::string& dir, std::vector<EnemyDef>& out,
             e.warpTeleportTick = ej.value("warpTeleportTick", e.warpTeleportTick);
             e.runDurationTicks = ej.value("runDurationTicks",  e.runDurationTicks);
             e.deadRespawnTicks = ej.value("deadRespawnTicks",  e.deadRespawnTicks);
+            e.behaviorTree     = ej.value("behaviorTree",      std::string{});
             if (ej.contains("lookBoxes") && ej["lookBoxes"].is_array()) {
                 for (const auto& lb : ej["lookBoxes"]) {
                     int dir = lb.value("dir", -1);

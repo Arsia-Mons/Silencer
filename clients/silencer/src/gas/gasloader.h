@@ -432,6 +432,7 @@ struct EnemyDef {
     int runDurationTicks  = 150;  // civilian: ticks in RUNNING state before reverting
     int deadRespawnTicks  = 100;  // civilian: ticks in DEAD state before respawning
     std::map<int, GuardLookBox> lookBoxes; // guard: vision AABB per direction index
+    std::string behaviorTree = "";         // override BT asset ID (empty = use class default)
 };
 
 // ---- Ability ---------------------------------------------------------------
