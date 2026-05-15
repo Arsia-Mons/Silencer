@@ -218,6 +218,8 @@ void Robot::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, virusplanter, old);
 	data.Serialize(write, patrol, old);
 	data.Serialize(write, shootcooldown, old);
+	data.Serialize(write, originalx, old);
+	data.Serialize(write, originaly, old);
 }
 
 void Robot::Tick(World & world){

@@ -480,6 +480,8 @@ void Guard::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, chasing, old);
 	data.Serialize(write, weapon, old);
 	data.Serialize(write, patrol, old);
+	data.Serialize(write, originalx, old);
+	data.Serialize(write, originaly, old);
 }
 
 void Guard::Tick(World & world){
