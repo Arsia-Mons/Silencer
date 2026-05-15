@@ -34,6 +34,7 @@ const TYPE_COLOR: Record<string, string> = {
   Wait:           '#94a3b8', // slate
   Leaf:           '#22c55e', // green
   Condition:      '#f97316', // orange
+  SubTree:        '#a78bfa', // violet
 };
 
 const TYPE_SYMBOL: Record<string, string> = {
@@ -49,6 +50,7 @@ const TYPE_SYMBOL: Record<string, string> = {
   Wait:           '◷',
   Leaf:           '▶',
   Condition:      '◆',
+  SubTree:        '⬡',
 };
 
 // ── Custom node ───────────────────────────────────────────────────────────────
@@ -114,6 +116,7 @@ function nodeSubtitle(node: BTNode): string {
     return `${p.key} ${p.op ?? '=='} ${JSON.stringify(p.value)}`;
   }
   if (node.type === 'Leaf') return String(node.props.action ?? '');
+  if (node.type === 'SubTree') return String(node.props.tree_id ?? '?');
   if (node.type === 'Cooldown') return `${node.props.duration ?? '?'}s`;
   if (node.type === 'Repeat') return `×${node.props.count ?? '∞'}`;
   if (node.type === 'Timeout') return `timeout ${node.props.duration ?? '?'}s`;
@@ -154,7 +157,7 @@ function btToFlow(bt: BehaviorTree): { nodes: Node[]; edges: Edge[] } {
 const PALETTE: { group: string; types: BTNodeType[] }[] = [
   { group: 'COMPOSITE', types: ['Selector', 'Sequence', 'Parallel', 'RandomSelector'] },
   { group: 'DECORATOR', types: ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'] },
-  { group: 'LEAF',      types: ['Leaf', 'Condition', 'Wait'] },
+  { group: 'LEAF',      types: ['Leaf', 'Condition', 'Wait', 'SubTree'] },
 ];
 
 // ── Leaf action lists per NPC type ───────────────────────────────────────────
@@ -218,7 +221,7 @@ const NODE_DESC: Record<string, string> = {
   Selector:       'Tries children left→right. Returns Success on the first child that succeeds, Failure if all fail. Reactive: re-evaluates from child[0] every tick.',
   Sequence:       'Runs children left→right. Returns Failure on the first child that fails, Success only when all children succeed.',
   Parallel:       'Ticks all children every tick simultaneously. Returns Success when all succeed, Failure when any fail.',
-  RandomSelector: 'Like Selector but shuffles children order each tick.',
+  RandomSelector: 'Like Selector but picks one child randomly each tick. If a "weights" array prop is set, children are sampled proportionally by weight.',
   Inverter:       'Inverts child result: Success↔Failure. Running passes through.',
   Cooldown:       'Blocks child for DURATION seconds after the child returns Success.',
   Repeat:         'Re-runs child COUNT times (0 = infinite). Returns Failure if child ever fails.',
@@ -227,6 +230,7 @@ const NODE_DESC: Record<string, string> = {
   Wait:           'Returns Running for DURATION seconds, then Success.',
   Leaf:           'Dispatches to a named C++ action handler. Look0–Look5 scan + shoot in direction 0–5 (Forward/Low/Up/Down/UpAngle/DownAngle).',
   Condition:      'Reads a blackboard key and compares it to a literal value. Returns Success if the comparison is true.',
+  SubTree:        'Ticks another behavior tree by ID (from shared/assets/behaviortrees/). Props: tree_id — the filename stem of the target tree.',
 };
 
 // ── Main editor ───────────────────────────────────────────────────────────────
@@ -349,8 +353,8 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     if (!parentNode) return;
     if (parentNode.children.includes(params.target)) return; // already connected
 
-    // Leaf, Condition, Wait cannot have children
-    if (['Leaf', 'Condition', 'Wait'].includes(parentNode.type)) return;
+    // Leaf, Condition, Wait, SubTree cannot have children
+    if (['Leaf', 'Condition', 'Wait', 'SubTree'].includes(parentNode.type)) return;
 
     const isDecorator = ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'].includes(parentNode.type);
     if (isDecorator && parentNode.children.length >= 1) return;
@@ -391,7 +395,7 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     for (const [pid, node] of Object.entries(cur.nodes)) {
       const isDecorator = ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'].includes(node.type);
       if (isDecorator && node.children.length !== 1) return `Decorator "${pid}" must have exactly 1 child`;
-      const isLeaf = ['Leaf', 'Condition', 'Wait'].includes(node.type);
+      const isLeaf = ['Leaf', 'Condition', 'Wait', 'SubTree'].includes(node.type);
       if (isLeaf && node.children.length > 0) return `${node.type} "${pid}" must have 0 children`;
       for (const cid of node.children) {
         parentCount[cid] = (parentCount[cid] ?? 0) + 1;
@@ -1037,6 +1041,60 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                   style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 2, boxSizing: 'border-box' }} />
                 <div style={{ color: '#4a5568', fontSize: 9, marginBottom: 8 }}>
                   0 means all {selectedNode.children.length} children must succeed
+                </div>
+              </>
+            )}
+
+            {selectedNode.type === 'SubTree' && (
+              <>
+                <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>TREE ID</label>
+                <input type="text" value={String(selectedNode.props.tree_id ?? '')}
+                  onChange={e => updateProp('tree_id', e.target.value)}
+                  placeholder="e.g. guard-rocket"
+                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                <div style={{ color: '#4a5568', fontSize: 9, marginBottom: 8 }}>
+                  Filename stem of the target tree in shared/assets/behaviortrees/
+                </div>
+              </>
+            )}
+
+            {selectedNode.type === 'RandomSelector' && selectedNode.children.length > 0 && (
+              <>
+                <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>
+                  WEIGHTS (one per child; leave blank for uniform)
+                </label>
+                {selectedNode.children.map((childId, i) => {
+                  const weights: Array<number | null> = Array.isArray(selectedNode.props.weights)
+                    ? (selectedNode.props.weights as Array<number | null>)
+                    : [];
+                  const w = weights[i] ?? null;
+                  return (
+                    <div key={childId} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                      <span style={{ color: '#4a5568', fontSize: 9, width: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        child {i + 1}
+                      </span>
+                      <input type="number" min={0} step={0.1} value={w === null ? '' : w}
+                        placeholder="1"
+                        onChange={e => {
+                          const next: (number | null)[] = Array.isArray(selectedNode.props.weights)
+                            ? [...(selectedNode.props.weights as number[])]
+                            : new Array(selectedNode.children.length).fill(null);
+                          while (next.length < selectedNode.children.length) next.push(null);
+                          const v = e.target.value === '' ? null : parseFloat(e.target.value);
+                          next[i] = v;
+                          const allNull = next.every(x => x === null);
+                          if (allNull) {
+                            updateProp('weights', undefined);
+                          } else {
+                            updateProp('weights', next.map(x => x ?? 1));
+                          }
+                        }}
+                        style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '3px 5px', fontSize: 11, fontFamily: 'monospace', boxSizing: 'border-box' }} />
+                    </div>
+                  );
+                })}
+                <div style={{ color: '#4a5568', fontSize: 9, marginTop: 4, marginBottom: 8 }}>
+                  With weights: ONE child is sampled per tick (weighted random). Without: all children tried in random order.
                 </div>
               </>
             )}

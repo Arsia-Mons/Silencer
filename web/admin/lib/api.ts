@@ -149,7 +149,7 @@ export const deleteActor  = (id: string): Promise<unknown>      => apiFetch(`/ac
 export type BTNodeType =
   | 'Selector' | 'Sequence' | 'Parallel' | 'RandomSelector'
   | 'Inverter' | 'Cooldown' | 'Repeat' | 'Timeout' | 'ForceSuccess'
-  | 'Wait' | 'Leaf' | 'Condition';
+  | 'Wait' | 'Leaf' | 'Condition' | 'SubTree';
 
 export interface BTNode {
   type: BTNodeType;
