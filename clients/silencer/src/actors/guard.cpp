@@ -229,7 +229,10 @@ void Guard::InitBT(){
 
 	btctx_.actions["Patrol"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
-		if(state == STANDING || state == LOOKING){
+		if(state == LOOKING){
+			// Let the LOOKING animation complete; state handler transitions LOOKING→STANDING.
+			return BTResult::Running;
+		} else if(state == STANDING){
 			state = WALKING;
 			state_i = 0;
 		} else if(state == WALKING){
@@ -360,6 +363,64 @@ void Guard::InitBT(){
 	};
 
 	btctx_.actions["Stand"] = [this](BTContext&) -> BTResult {
+		return BTResult::Success;
+	};
+
+	// ── Generic data-driven leaves ────────────────────────────────────────────
+	// These require no C++ changes to use — configure entirely from BT JSON props.
+
+	// SetBlackboard: write any value to the blackboard from the tree.
+	// Props: key (string), value (any JSON value)
+	btctx_.actions["SetBlackboard"] = [](BTContext& ctx) -> BTResult {
+		if(!ctx.props || !ctx.props->contains("key") || !ctx.props->contains("value"))
+			return BTResult::Failure;
+		ctx.bbSet(ctx.props->value("key", std::string{}), (*ctx.props)["value"]);
+		return BTResult::Success;
+	};
+
+	// RandomChance: succeeds with probability `chance` (0.0–1.0).
+	// Props: chance (float, default 0.5)
+	btctx_.actions["RandomChance"] = [](BTContext& ctx) -> BTResult {
+		float chance = ctx.props ? ctx.props->value("chance", 0.5f) : 0.5f;
+		return ((float)rand() / (float)RAND_MAX) < chance ? BTResult::Success : BTResult::Failure;
+	};
+
+	// PlayAnim: drives res_bank/res_index from BT props — no new C++ state needed.
+	// Props: bank (int), frames (int), loop (bool, default true)
+	// Returns Running while playing; Success when a non-looping clip finishes.
+	btctx_.actions["PlayAnim"] = [this](BTContext& ctx) -> BTResult {
+		if(!ctx.props) return BTResult::Failure;
+		int bank   = ctx.props->value("bank",   0);
+		int frames = ctx.props->value("frames", 1);
+		bool loop  = ctx.props->value("loop",   true);
+		res_bank  = bank;
+		res_index = loop ? (state_i % std::max(frames, 1))
+		                 : std::min((int)state_i, std::max(frames - 1, 0));
+		if(!loop && state_i >= frames) return BTResult::Success;
+		return BTResult::Running;
+	};
+
+	// EmitSound: play a named sound from the world soundbank.
+	// Props: sound (string filename), volume (int, default 100)
+	btctx_.actions["EmitSound"] = [this](BTContext& ctx) -> BTResult {
+		if(!ctx.props) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		std::string snd = ctx.props->value("sound", std::string{});
+		int vol = ctx.props->value("volume", 100);
+		if(snd.empty()) return BTResult::Failure;
+		auto it = world.resources.soundbank.find(snd);
+		if(it == world.resources.soundbank.end()) return BTResult::Failure;
+		EmitSound(world, it->second, vol);
+		return BTResult::Success;
+	};
+
+	// SetFacing: control the mirrored flag from the tree.
+	// Props: dir = "left" | "right" | "flip" (default)
+	btctx_.actions["SetFacing"] = [this](BTContext& ctx) -> BTResult {
+		std::string dir = ctx.props ? ctx.props->value("dir", std::string{"flip"}) : "flip";
+		if(dir == "left")       mirrored = true;
+		else if(dir == "right") mirrored = false;
+		else                    mirrored = !mirrored;
 		return BTResult::Success;
 	};
 }

@@ -28,13 +28,13 @@
       "type": "Leaf",
       "label": "Run",
       "children": [],
-      "props": { "action": "Run" }
+      "props": { "action": "Run", "speedBonus": 5 }
     },
     "leaf_wander": {
       "type": "Leaf",
       "label": "Wander",
       "children": [],
-      "props": { "action": "Wander" }
+      "props": { "action": "Wander", "speed": 4 }
     }
   },
   "positions": {}
