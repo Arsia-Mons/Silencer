@@ -1,4 +1,5 @@
 #include "guard.h"
+#include "btdebug.h"
 #include "projectile.h"
 #include "bodypart.h"
 #include "player.h"
@@ -46,7 +47,9 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 }
 
 void Guard::InitBT(){
-	bt_ = BehaviorTreeLibrary::instance().get("guard");
+	const EnemyDef* r = GASLoader::Get().GetEnemyDef("guard-blaster");
+	std::string treeId = (r && !r->behaviorTree.empty()) ? r->behaviorTree : "guard";
+	bt_ = BehaviorTreeLibrary::instance().get(treeId);
 	if(!bt_) return;
 
 	// Shared helper: update chasing id + play alert sound on first detection.
@@ -552,6 +555,7 @@ void Guard::Tick(World & world){
 				btctx_.bbSet("dist_to_target", dist);
 			}
 			bt_->tick(btctx_);
+			BTDebug::broadcast("guard", id, btctx_.blackboard);
 		} else {
 		do{
 			if((found = Look(world, 0))){

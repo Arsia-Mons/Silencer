@@ -266,6 +266,29 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     apiFetch('/sounds').then((d) => setSoundNames((d as { name: string }[]).map(s => s.name).sort())).catch(() => {});
   }, []);
 
+  // Live blackboard from game via ws://localhost:9339
+  type LiveBB = { type: string; id: number; blackboard: Record<string, unknown> } | null;
+  const [liveBB, setLiveBB] = useState<LiveBB>(null);
+  const [wsConnected, setWsConnected] = useState(false);
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let dead = false;
+    function connect() {
+      if (dead) return;
+      try {
+        ws = new WebSocket('ws://localhost:9339');
+        ws.onopen  = () => setWsConnected(true);
+        ws.onclose = () => { setWsConnected(false); if (!dead) setTimeout(connect, 2000); };
+        ws.onerror = () => ws?.close();
+        ws.onmessage = (e) => {
+          try { setLiveBB(JSON.parse(e.data as string) as LiveBB); } catch { /* ignore */ }
+        };
+      } catch { /* WS not available */ }
+    }
+    connect();
+    return () => { dead = true; ws?.close(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Sync BT → ReactFlow
   useEffect(() => {
     const { nodes, edges } = btToFlow(bt);
@@ -1226,6 +1249,41 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
           })}
         </div>
       </div>
+
+        {/* Live blackboard (ws://localhost:9339) */}
+        <div style={{ padding: '12px 10px', borderTop: '1px solid #2d3748' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ color: '#718096', fontSize: 10, letterSpacing: 2 }}>LIVE BLACKBOARD</div>
+            <div style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: wsConnected ? '#22c55e' : '#4a5568',
+              boxShadow: wsConnected ? '0 0 4px #22c55e' : 'none',
+            }} title={wsConnected ? 'connected' : 'waiting for game on port 9339'} />
+          </div>
+          {!wsConnected && (
+            <div style={{ color: '#4a5568', fontSize: 9 }}>
+              Start the game to stream live blackboard data.
+            </div>
+          )}
+          {wsConnected && !liveBB && (
+            <div style={{ color: '#4a5568', fontSize: 9 }}>Connected — waiting for first tick…</div>
+          )}
+          {liveBB && (
+            <>
+              <div style={{ color: '#a78bfa', fontSize: 9, marginBottom: 6, letterSpacing: 1 }}>
+                {liveBB.type} #{liveBB.id}
+              </div>
+              {Object.entries(liveBB.blackboard).sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 4 }}>
+                  <span style={{ color: '#718096', fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0, maxWidth: '55%' }}>{k}</span>
+                  <span style={{ color: '#e2e8f0', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {JSON.stringify(v)}
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
     </div>
   );
 }

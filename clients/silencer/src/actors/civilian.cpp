@@ -1,4 +1,5 @@
 #include "civilian.h"
+#include "btdebug.h"
 #include "projectile.h"
 #include "bodypart.h"
 #include "player.h"
@@ -26,7 +27,9 @@ Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 }
 
 void Civilian::InitBT(){
-	bt_ = BehaviorTreeLibrary::instance().get("civilian");
+	const EnemyDef* c = GASLoader::Get().GetEnemyDef("civilian");
+	std::string treeId = (c && !c->behaviorTree.empty()) ? c->behaviorTree : "civilian";
+	bt_ = BehaviorTreeLibrary::instance().get(treeId);
 	if(!bt_) return;
 	btctx_.actions["Run"] = [this](BTContext& ctx) -> BTResult {
 		if(ctx.props){
@@ -201,6 +204,7 @@ void Civilian::Tick(World & world){
 					btctx_.bbSet("dist_to_target", -1);
 					btctx_.bbSet("threat_nearby", Look(world));
 					bt_->tick(btctx_);
+					BTDebug::broadcast("civilian", id, btctx_.blackboard);
 				}else{
 					Look(world);
 				}

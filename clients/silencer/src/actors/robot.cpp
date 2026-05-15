@@ -1,4 +1,5 @@
 #include "robot.h"
+#include "btdebug.h"
 #include "rocketprojectile.h"
 #include "plasmaprojectile.h"
 #include "player.h"
@@ -33,7 +34,9 @@ Robot::Robot() : Object(ObjectTypes::ROBOT){
 }
 
 void Robot::InitBT() {
-	bt_ = BehaviorTreeLibrary::instance().get("robot");
+	const EnemyDef* r = GASLoader::Get().GetEnemyDef("robot");
+	std::string treeId = (r && !r->behaviorTree.empty()) ? r->behaviorTree : "robot";
+	bt_ = BehaviorTreeLibrary::instance().get(treeId);
 	if (!bt_) return;
 
 	// WakeUp: only fires from ASLEEP — look both sides, awaken if target found.
@@ -506,6 +509,7 @@ void Robot::Tick(World & world){
 		}
 		btctx_.bbSet("dist_to_target", -1);
 		bt_->tick(btctx_);
+		BTDebug::broadcast("robot", id, btctx_.blackboard);
 	}
 
 	if(damaging){
