@@ -17,7 +17,7 @@
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
 #include "primitives/text_input.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 
 #include "game.h"
 #include "palette.h"
@@ -68,15 +68,15 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 
 	// Registry routing — verify submit queues a typed action and text input
 	// does not submit.
-	silencer::ui::UiAutomationRegistry registry;
+	silencer::ui::UiInteractionRegistry registry;
 	registry.BeginFrame();
-	silencer::ui::UiAutomationWidget widget;
+	silencer::ui::UiInteractable widget;
 	widget.id = "test.text_input.name";
 	widget.labelText = "TextInputCheck";
-	widget.kind = silencer::ui::UiAutomationWidgetKind::TextInput;
+	widget.kind = silencer::ui::UiInteractableKind::TextInput;
 	widget.uid = 9;
 	widget.maxLength = 15;
-	registry.RegisterWidget(widget);
+	registry.RegisterInteractable(widget);
 	registry.FocusTextInputByUid(9);
 
 	registry.SubmitFocusedText();

@@ -21,6 +21,10 @@ class Resources;
 class ScreenContext;
 class LobbyScreen;
 
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
+
 namespace silencer::client_ui::lobby {
 
 struct GameTechPanelState {
@@ -56,7 +60,8 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 void BuildGameTechUpperTree(GameTechPanelState & state,
                             World & world,
                             Resources & resources,
-                            LobbyScreen & owner);
+                            LobbyScreen & owner,
+                            silencer::ui::UiInteractionRegistry& interactions);
 
 // Emits the tall-pane subtree (slots-left text + 4-column tech-choice grid +
 // centered tech-name heading + 8 description lines). Called inside the
@@ -65,7 +70,8 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 void BuildGameTechTallTree(GameTechPanelState & state,
                            World & world,
                            Resources & resources,
-                           LobbyScreen & owner);
+                           LobbyScreen & owner,
+                           silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

@@ -5,6 +5,9 @@ class Resources;
 class Surface;
 
 namespace silencer {
+namespace ui {
+class UiInteractionRegistry;
+}
 namespace client_ui {
 
 struct HudView;
@@ -12,7 +15,8 @@ struct HudView;
 void BuildInGameHudUi(Renderer& renderer,
                       const Resources& resources,
                       const HudView& view,
-                      Surface* surface);
+                      Surface* surface,
+                      silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace client_ui
 }  // namespace silencer

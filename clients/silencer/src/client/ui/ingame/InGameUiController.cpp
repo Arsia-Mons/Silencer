@@ -7,7 +7,7 @@
 #include "objecttypes.h"
 #include "player.h"
 #include "team.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "world.h"
 
 #include <cstring>
@@ -110,7 +110,8 @@ void InGameUiController::UpdateOverlayState(int localPeerId) {
 
 bool InGameUiController::ApplyActions(
 	int localPeerId,
-	const std::vector<silencer::ui::UiAction>& actions) {
+	const std::vector<silencer::ui::UiAction>& actions,
+	silencer::ui::UiInteractionRegistry& interactions) {
 	Player * localplayer = world_.GetPeerPlayer(localPeerId);
 	if(!localplayer) return false;
 
@@ -146,7 +147,7 @@ bool InGameUiController::ApplyActions(
 			         action.kind == silencer::ui::UiActionKind::Activate){
 				if(action.id == "ingame.chat.channel"){
 					localplayer->chatwithteam = !localplayer->chatwithteam;
-					silencer::ui::automation::FocusWidgetById("ingame.chat");
+					interactions.FocusInteractableById("ingame.chat");
 				}
 			}
 			continue;

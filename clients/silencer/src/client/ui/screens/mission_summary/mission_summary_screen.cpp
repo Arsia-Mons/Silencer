@@ -12,7 +12,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_button.h"
 #include "primitives/bank_text.h"
 #include "primitives/scroll_text_box.h"
@@ -96,32 +96,35 @@ void RegisterButton(const char * label,
                     int x,
                     int y,
                     int w,
-                    int h)
+                    int h,
+                    silencer::ui::UiInteractionRegistry& interactions)
 {
-	silencer::ui::automation::Widget widget;
+	silencer::ui::UiInteractable widget;
 	widget.id = actionId;
 	widget.labelText = label;
-	widget.kind = silencer::ui::automation::WidgetKind::Button;
+	widget.kind = silencer::ui::UiInteractableKind::Button;
 	widget.x = x; widget.y = y; widget.w = w; widget.h = h;
-	silencer::ui::automation::Register(widget);
+	interactions.RegisterInteractable(widget);
 }
 
 void RegisterWidgets(MissionSummaryScreen * screen,
                      int surfaceW,
                      int surfaceH,
-                     const std::array<bool, 6> & upgrades)
+                     const std::array<bool, 6> & upgrades,
+                     silencer::ui::UiInteractionRegistry& interactions)
 {
 	const int rootX = (surfaceW - (kLeftW + kRightW + 42)) / 2;
 	const int rootY = kRootPadY;
 	(void)screen;
-	RegisterButton("Done", kActionDone, rootX + 34, rootY + 360, 156, 21);
-	RegisterButton("Scroll Up", kActionScrollUp, rootX + 202, rootY + 86, 28, 24);
-	RegisterButton("Scroll Down", kActionScrollDown, rootX + 202, rootY + 330, 28, 24);
+	RegisterButton("Done", kActionDone, rootX + 34, rootY + 360, 156, 21, interactions);
+	RegisterButton("Scroll Up", kActionScrollUp, rootX + 202, rootY + 86, 28, 24, interactions);
+	RegisterButton("Scroll Down", kActionScrollDown, rootX + 202, rootY + 330, 28, 24, interactions);
 	for(int i = 0; i < 6; i++){
 		if(!upgrades[i]) continue;
 		RegisterButton(kUpgradeLabels[i],
 		               std::string(kActionUpgradePrefix) + std::to_string(i),
-		               rootX + kLeftW + 56, rootY + 108 + i * 46, 156, 21);
+		               rootX + kLeftW + 56, rootY + 108 + i * 46, 156, 21,
+		               interactions);
 	}
 	(void)surfaceH;
 }
@@ -151,7 +154,8 @@ void MissionSummaryScreen::Build(ScreenContext & ctx)
 	scrollPosition = 0;
 	Refresh(ctx);
 	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(this, surface.w, surface.h, upgradesAvailable);
+	RegisterWidgets(this, surface.w, surface.h, upgradesAvailable,
+	                ctx.game.UiInteractions());
 }
 
 void MissionSummaryScreen::Tick(ScreenContext & ctx)
@@ -189,7 +193,7 @@ void MissionSummaryScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
+void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
@@ -240,13 +244,13 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				       } }) {
 					BankButton(CLAY_STRING("Up"), BankButtonVariant::Inline, {},
-					           BankButtonHandle{ nullptr, kActionScrollUp });
+					           BankButtonHandle{ nullptr, kActionScrollUp, &interactions });
 					BankButton(CLAY_STRING("Down"), BankButtonVariant::Inline, {},
-					           BankButtonHandle{ nullptr, kActionScrollDown });
+					           BankButtonHandle{ nullptr, kActionScrollDown, &interactions });
 				}
 			}
 			BankButton(CLAY_STRING("Done"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionDone });
+			           BankButtonHandle{ nullptr, kActionDone, &interactions });
 		}
 		CLAY({ .id = CLAY_ID("MissionSummaryUpgrades"),
 		       .layout = {
@@ -284,12 +288,12 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 				if(upgradesAvailable[i]){
 					std::string actionId = std::string(kActionUpgradePrefix) + std::to_string(i);
 					BankButton(FromCStr(kUpgradeLabels[i]), BankButtonVariant::Chrome, {},
-					           BankButtonHandle{ nullptr, actionId.c_str() });
+					           BankButtonHandle{ nullptr, actionId.c_str(), &interactions });
 				}
 			}
 		}
 	}
-	RegisterWidgets(this, dst.w, dst.h, upgradesAvailable);
+	RegisterWidgets(this, dst.w, dst.h, upgradesAvailable, interactions);
 }
 
 void MissionSummaryScreen::Destroy(ScreenContext & ctx)

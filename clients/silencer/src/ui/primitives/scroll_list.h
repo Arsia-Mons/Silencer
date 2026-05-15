@@ -5,7 +5,7 @@
 // sprite-rendered scrollbar on the right. Replaces the legacy SelectBox +
 // ScrollBar pair.
 //
-// Inputs are immutable. Selection routes through UiAutomationRegistry as a
+// Inputs are immutable. Selection routes through UiInteractionRegistry as a
 // typed UiAction with the row index. The caller owns `selectedIndex` and
 // `scrollPosition`; the primitive only reads them.
 //
@@ -16,6 +16,10 @@
 #include "clay/clay.h"
 #include "primitives/bank_text.h"
 #include "shared.h"
+
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
 
 namespace silencer::ui::primitives {
 
@@ -43,8 +47,9 @@ struct ScrollListOpts {
 };
 
 struct ScrollListHandle {
-	bool *      hoveredOut;  // Optional. Written each frame if non-null.
-	const char * actionId;   // Optional row action ID prefix registered for input routing.
+	bool *      hoveredOut;    // Optional. Written each frame if non-null.
+	const char * actionId;     // Optional row action ID prefix registered for input routing.
+	UiInteractionRegistry * interactions;  // Required when actionId is set.
 };
 
 // Resets the per-frame click-adapter + payload arenas. Call once before

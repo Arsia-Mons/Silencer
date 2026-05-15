@@ -15,8 +15,8 @@ public:
 	void QueueTextInput(char ascii);
 	void QueueNavAction(silencer::ui::UiNavAction action);
 	void QueueBindingKeyDown(int keyCode);
-	void QueueAutomationAction(silencer::ui::UiAction action);
-	void QueueAutomationInvokeAt(int x, int y);
+	void QueueControlAction(silencer::ui::UiAction action);
+	void QueueControlPointerPress(int x, int y);
 
 	void QueuePointerWindowEvent(float windowX,
 	                             float windowY,
@@ -59,7 +59,7 @@ private:
 	std::string textInput_;
 	std::vector<silencer::ui::UiNavAction> navActions_;
 	std::vector<silencer::ui::UiBindingInput> bindingInputs_;
-	std::vector<silencer::ui::UiAutomationCommand> automationCommands_;
+	std::vector<silencer::ui::UiControlCommand> controlCommands_;
 
 	bool havePointerPosition_ = false;
 	float pointerX_ = 0.0f;

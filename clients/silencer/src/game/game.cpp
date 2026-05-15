@@ -33,7 +33,7 @@
 #include "client/ui/hud/InGameOverlays.h"
 #include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #ifdef SILENCER_HAVE_LOBBY_UI
 #include "lobby_screen.h"
 #endif
@@ -407,7 +407,8 @@ void Game::BuildVisibleClientUi(Surface& surface, float frametime) {
 		DrawInGameWorldInsets(surface, frametime);
 		silencer::client_ui::HudView hudView =
 			silencer::client_ui::BuildHudView(world);
-		silencer::client_ui::BuildInGameHudUi(renderer, world.resources, hudView, &surface);
+		silencer::client_ui::BuildInGameHudUi(
+			renderer, world.resources, hudView, &surface, clientUi.Interactions());
 		silencer::client_ui::BuildInGameOverlaysUi(renderer, world.resources, hudView, &surface);
 	}
 }
@@ -461,7 +462,8 @@ void Game::RenderClientUiFrame(Surface& surface, float frametime) {
 	std::vector<silencer::ui::UiAction> unhandledUiActions =
 		clientUi.DispatchInput(screenContext, preparedUiInput);
 	if(!clientUi.HasScreens() && world.map.loaded){
-		inGameUiController.ApplyActions(world.localpeerid, unhandledUiActions);
+		inGameUiController.ApplyActions(
+			world.localpeerid, unhandledUiActions, clientUi.Interactions());
 	}
 }
 
@@ -472,7 +474,7 @@ void Game::ResetUiFrameDeltas() {
 	preparedUiInput.textInput.clear();
 	preparedUiInput.navActions.clear();
 	preparedUiInput.bindingInputs.clear();
-	preparedUiInput.automationCommands.clear();
+	preparedUiInput.controlCommands.clear();
 }
 
 void Game::Present(void){
@@ -997,7 +999,7 @@ void Game::GoToState(Uint8 newstate){
 	// GoToState in response to a button click) can return safely before its
 	// destructor runs.
 	clientUi.RequestClearScreens();
-	silencer::ui::automation::BeginFrame();
+	clientUi.Interactions().BeginFrame();
 }
 
 bool Game::GoBack(void){

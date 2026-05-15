@@ -10,7 +10,7 @@ class Surface;
 
 namespace silencer {
 namespace ui {
-class UiAutomationRegistry;
+class UiInteractionRegistry;
 }
 namespace client_ui {
 
@@ -34,7 +34,7 @@ public:
 	void BuildVisible(ScreenContext& ctx,
 	                  Surface& dst,
 	                  float frametime,
-	                  silencer::ui::UiAutomationRegistry& automation);
+	                  silencer::ui::UiInteractionRegistry& interactions);
 
 private:
 	std::size_t VisibleStart() const;

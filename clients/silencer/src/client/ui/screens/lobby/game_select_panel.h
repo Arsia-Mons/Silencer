@@ -19,6 +19,10 @@ class Resources;
 class ScreenContext;
 class LobbyScreen;
 
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
+
 namespace silencer::client_ui::lobby {
 
 struct GameSelectPanelState {
@@ -80,7 +84,8 @@ bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
 // the LobbyRightUpperBox CLAY block; emits flex children only (no floating).
 // BeginFrame requirements: BankButtonBeginFrame.
 void BuildGameSelectUpperTree(GameSelectPanelState & state,
-                              Resources & resources);
+                              Resources & resources,
+                              silencer::ui::UiInteractionRegistry& interactions);
 
 // Emits the tall-pane subtree ("Active Games" header + games list +
 // info-block + Spectate/Join buttons). Must be called inside the
@@ -88,7 +93,8 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
 // BeginFrame requirements: BankTextBeginFrame, BankButtonBeginFrame,
 // ScrollListBeginFrame.
 void BuildGameSelectTallTree(GameSelectPanelState & state,
-                             Resources & resources);
+                             Resources & resources,
+                             silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

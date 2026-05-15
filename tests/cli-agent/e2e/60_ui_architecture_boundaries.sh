@@ -114,7 +114,7 @@ fail_if_match \
   --glob '!third_party/**'
 
 fail_if_match \
-  "automation::(QueueAction|InvokeAt|DispatchTextInput|BackspaceFocusedText|SubmitFocusedText|CancelFocused|ActivateFocused)" \
+  "UiAutomation|ActiveUiInteractionRegistry|automation::" \
   "$REPO_ROOT/clients/silencer/src" \
   "$REPO_ROOT/tests/ui_architecture_test.cpp" \
   --glob '!third_party/**'

@@ -12,7 +12,7 @@
 #include "clay/clay.h"
 #include "primitives/bank_button.h"
 #include "primitives/bank_text.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "runtime/UiInputRouter.h"
 
 #include "game.h"
@@ -94,6 +94,7 @@ bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
 	EnsureInitialized(W, H);
 
 	int actionCount = 0;
+	silencer::ui::UiInteractionRegistry interactions;
 
 	// Helper: one layout pass with a fixed pointer state. Returns the
 	// brightness embedded in the (only) BankButtonChrome custom payload, or
@@ -104,7 +105,7 @@ bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
 		::Clay_SetPointerState(::Clay_Vector2{px, py}, down);
 		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 		::Clay_ResetMeasureTextCache();
-		silencer::ui::automation::BeginFrame();
+		interactions.BeginFrame();
 		silencer::ui::primitives::BankTextBeginFrame();
 		silencer::ui::primitives::BankButtonBeginFrame();
 
@@ -119,10 +120,12 @@ bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
 				CLAY_STRING("Create Game"),
 				silencer::ui::primitives::BankButtonVariant::Chrome,
 				{},
-				{ /*hoveredOut=*/nullptr, /*actionId=*/"test.bank_button.create" });
+				{ /*hoveredOut=*/nullptr,
+				  /*actionId=*/"test.bank_button.create",
+				  /*interactions=*/&interactions });
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
-		silencer::ui::ActiveUiAutomationRegistry().ResolveClayBoundsFromClay();
+		interactions.ResolveClayBoundsFromClay();
 		std::vector<silencer::ui::UiAction> actions;
 		if(pressed){
 			silencer::ui::UiInputState input;
@@ -132,10 +135,10 @@ bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out) {
 			input.pointer.y = py;
 			input.pointer.down = down;
 			input.pointer.pressed = true;
-			silencer::ui::UiInputRouter router(silencer::ui::ActiveUiAutomationRegistry());
+			silencer::ui::UiInputRouter router(interactions);
 			actions = router.Route(input);
 		}else{
-			actions = silencer::ui::automation::DrainActions();
+			actions = interactions.DrainActions();
 		}
 		for(const auto & action : actions){
 			if(action.kind == silencer::ui::UiActionKind::Activate &&

@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_button.h"
 
 #include "lobby_screen.h"
@@ -55,13 +55,17 @@ Clay_String FromStd(const std::string & s) {
 	return cs;
 }
 
-void RegisterButton(const char * label, const char * actionId, int x, int y) {
-	silencer::ui::automation::Widget w;
+void RegisterButton(silencer::ui::UiInteractionRegistry& interactions,
+                    const char * label,
+                    const char * actionId,
+                    int x,
+                    int y) {
+	silencer::ui::UiInteractable w;
 	w.id = actionId;
 	w.labelText = label;
-	w.kind  = silencer::ui::automation::WidgetKind::Button;
+	w.kind  = silencer::ui::UiInteractableKind::Button;
 	w.x = x; w.y = y; w.w = kBtnW; w.h = kBtnH;
-	silencer::ui::automation::Register(w);
+	interactions.RegisterInteractable(w);
 }
 
 }  // namespace
@@ -114,7 +118,8 @@ bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
 }
 
 void BuildGameJoinUpperTree(GameJoinPanelState & state,
-                            Resources & resources) {
+                            Resources & resources,
+                            silencer::ui::UiInteractionRegistry& interactions) {
 	(void)resources;
 
 	// Choose Tech (top button).
@@ -124,9 +129,10 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   kActionTech });
+		                             /*actionId*/   kActionTech,
+		                             /*interactions*/ &interactions });
 	}
-	RegisterButton("Choose Tech", kActionTech, kBtnTechX, kBtnTechY);
+	RegisterButton(interactions, "Choose Tech", kActionTech, kBtnTechX, kBtnTechY);
 
 	// Change Team (middle button).
 	CLAY({ .id = CLAY_ID("GJoinBtnTeamWrap"),
@@ -135,9 +141,10 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   kActionTeam });
+		                             /*actionId*/   kActionTeam,
+		                             /*interactions*/ &interactions });
 	}
-	RegisterButton("Change Team", kActionTeam, kBtnTeamX, kBtnTeamY);
+	RegisterButton(interactions, "Change Team", kActionTeam, kBtnTeamX, kBtnTeamY);
 
 	// Ready / Waiting... (bottom button). Label flips per Tick.
 	CLAY({ .id = CLAY_ID("GJoinBtnReadyWrap"),
@@ -146,25 +153,28 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   kActionReady });
+		                             /*actionId*/   kActionReady,
+		                             /*interactions*/ &interactions });
 	}
 	{
-		silencer::ui::automation::Widget w;
+		silencer::ui::UiInteractable w;
 		w.id = kActionReady;
 		w.labelText = state.readyLabel;
-		w.kind  = silencer::ui::automation::WidgetKind::Button;
+		w.kind  = silencer::ui::UiInteractableKind::Button;
 		w.x = kBtnReadyX; w.y = kBtnReadyY; w.w = kBtnW; w.h = kBtnH;
-		silencer::ui::automation::Register(w);
+		interactions.RegisterInteractable(w);
 	}
 }
 
 void BuildGameJoinTallTree(GameJoinPanelState & state,
-                           Resources & resources) {
+                           Resources & resources,
+                           silencer::ui::UiInteractionRegistry& interactions) {
 	// GameJoin has no tall-pane content — the legacy panel only emitted the
 	// 3 stacked buttons in the upper area. The LobbyRightTallBox renders as
 	// empty chrome (just the 1-px stroke) when GameJoin is active.
 	(void)state;
 	(void)resources;
+	(void)interactions;
 }
 
 }  // namespace silencer::client_ui::lobby

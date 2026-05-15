@@ -40,7 +40,7 @@ struct UiInputState {
 	std::string textInput;
 	std::vector<UiNavAction> navActions;
 	std::vector<UiBindingInput> bindingInputs;
-	std::vector<UiAutomationCommand> automationCommands;
+	std::vector<UiControlCommand> controlCommands;
 
 	bool HasWindow() const { return width > 0 && height > 0; }
 };

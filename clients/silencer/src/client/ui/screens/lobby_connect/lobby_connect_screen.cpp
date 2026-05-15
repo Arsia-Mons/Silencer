@@ -13,7 +13,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
@@ -89,15 +89,17 @@ void CopyUiText(char * dst, int dstLen, const std::string & value)
 	dst[n] = '\0';
 }
 
-void SmallButton(Clay_String label, const char * actionId)
+void SmallButton(Clay_String label,
+                 const char * actionId,
+                 silencer::ui::UiInteractionRegistry& interactions)
 {
-	silencer::ui::automation::Widget widget;
+	silencer::ui::UiInteractable widget;
 	widget.id = actionId;
 	widget.labelText = ToStd(label);
-	widget.kind = silencer::ui::automation::WidgetKind::Button;
+	widget.kind = silencer::ui::UiInteractableKind::Button;
 	widget.clayId = CLAY_SID(label);
 	widget.hasClayId = true;
-	silencer::ui::automation::Register(widget);
+	interactions.RegisterInteractable(widget);
 	CLAY({ .id = CLAY_SID(label),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(kButtonW),
@@ -116,15 +118,16 @@ void RegisterButton(const char * label,
                     const char * actionId,
                     int uid,
                     int x,
-                    int y)
+                    int y,
+                    silencer::ui::UiInteractionRegistry& interactions)
 {
-	silencer::ui::automation::Widget w;
+	silencer::ui::UiInteractable w;
 	w.id = actionId;
 	w.labelText = label;
-	w.kind = silencer::ui::automation::WidgetKind::Button;
+	w.kind = silencer::ui::UiInteractableKind::Button;
 	w.uid = uid;
 	w.x = x; w.y = y; w.w = kButtonW; w.h = kButtonH;
-	silencer::ui::automation::Register(w);
+	interactions.RegisterInteractable(w);
 }
 
 void RegisterInput(const char * label,
@@ -135,19 +138,20 @@ void RegisterInput(const char * label,
                    char * buffer,
                    int bufferLen,
                    bool password,
-                   bool inactive)
+                   bool inactive,
+                   silencer::ui::UiInteractionRegistry& interactions)
 {
-	silencer::ui::automation::Widget w;
+	silencer::ui::UiInteractable w;
 	w.id = actionId;
 	w.labelText = label;
-	w.kind = silencer::ui::automation::WidgetKind::TextInput;
+	w.kind = silencer::ui::UiInteractableKind::TextInput;
 	w.uid = uid;
 	w.x = x; w.y = y; w.w = kInputW; w.h = kInputH;
 	w.value = buffer ? buffer : "";
 	w.maxLength = bufferLen > 0 ? bufferLen - 1 : 0;
 	w.isPassword = password;
 	w.inactive = inactive;
-	silencer::ui::automation::Register(w);
+	interactions.RegisterInteractable(w);
 }
 
 void RegisterWidgets(LobbyConnectScreen * screen,
@@ -155,7 +159,8 @@ void RegisterWidgets(LobbyConnectScreen * screen,
                      char * password,
                      int surfaceW,
                      int surfaceH,
-                     bool inactive)
+                     bool inactive,
+                     silencer::ui::UiInteractionRegistry& interactions)
 {
 	const int panelX = (surfaceW - kPanelW) / 2;
 	const int panelY = (surfaceH - kPanelH) / 2;
@@ -168,12 +173,12 @@ void RegisterWidgets(LobbyConnectScreen * screen,
 	const int buttonsY = formY + 20 + kFormGap + 20 + 14;
 
 	RegisterInput("Username", kActionUsername, LBY_INPUT_USERNAME, inputX, usernameY,
-	              username, 17, false, inactive);
+	              username, 17, false, inactive, interactions);
 	RegisterInput("Password", kActionPassword, LBY_INPUT_PASSWORD, inputX, passwordY,
-	              password, 29, true, inactive);
-	RegisterButton("Login", kActionLogin, LBY_BTN_LOGIN, buttonsX, buttonsY);
+	              password, 29, true, inactive, interactions);
+	RegisterButton("Login", kActionLogin, LBY_BTN_LOGIN, buttonsX, buttonsY, interactions);
 	RegisterButton("Cancel", kActionCancel, LBY_BTN_CANCEL, buttonsX + kButtonW + kButtonGap,
-	               buttonsY);
+	               buttonsY, interactions);
 }
 
 int FillLogSlab(const std::vector<std::string> & lines)
@@ -205,8 +210,9 @@ void LobbyConnectScreen::Build(ScreenContext & ctx)
 	password[0] = '\0';
 
 	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(this, username, password, surface.w, surface.h, false);
-	silencer::ui::automation::FocusTextInputByUid(LBY_INPUT_USERNAME);
+	RegisterWidgets(this, username, password, surface.w, surface.h, false,
+	                ctx.game.UiInteractions());
+	ctx.game.UiInteractions().FocusTextInputByUid(LBY_INPUT_USERNAME);
 }
 
 void LobbyConnectScreen::Tick(ScreenContext & ctx)
@@ -337,7 +343,7 @@ void LobbyConnectScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
+void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
@@ -350,9 +356,9 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 	}
 	bool inactive = ctx.world.lobby.state == Lobby::AUTHSENT;
 	const bool usernameFocused =
-		silencer::ui::automation::IsTextInputFocused(LBY_INPUT_USERNAME);
+		interactions.IsTextInputFocused(LBY_INPUT_USERNAME);
 	const bool passwordFocused =
-		silencer::ui::automation::IsTextInputFocused(LBY_INPUT_PASSWORD);
+		interactions.IsTextInputFocused(LBY_INPUT_PASSWORD);
 	const bool blink = ((SDL_GetTicks() / 250) % 2) == 0;
 
 	CLAY({ .id = CLAY_ID("LobbyConnectRoot"),
@@ -452,19 +458,18 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 			           .childGap = kButtonGap,
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				SmallButton(CLAY_STRING("Login"), kActionLogin);
-				SmallButton(CLAY_STRING("Cancel"), kActionCancel);
+				SmallButton(CLAY_STRING("Login"), kActionLogin, interactions);
+				SmallButton(CLAY_STRING("Cancel"), kActionCancel, interactions);
 			}
 		}
 	}
 
-	RegisterWidgets(this, username, password, dst.w, dst.h, inactive);
+	RegisterWidgets(this, username, password, dst.w, dst.h, inactive, interactions);
 }
 
 void LobbyConnectScreen::Destroy(ScreenContext & ctx)
 {
-	(void)ctx;
-	silencer::ui::automation::ClearFocus();
+	ctx.game.UiInteractions().ClearFocus();
 }
 
 bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAction & action)

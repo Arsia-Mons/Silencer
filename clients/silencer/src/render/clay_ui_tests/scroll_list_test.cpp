@@ -15,7 +15,7 @@
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
 #include "primitives/scroll_list.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "runtime/UiInputRouter.h"
 
 #include "game.h"
@@ -94,6 +94,7 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 
 	int fired = 0;
 	int lastIndex = -1;
+	silencer::ui::UiInteractionRegistry interactions;
 
 	bool wasDown = false;
 	auto runFrame = [&](float px, float py, bool down) {
@@ -101,7 +102,7 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 		::Clay_SetPointerState(::Clay_Vector2{px, py}, down);
 		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 		::Clay_ResetMeasureTextCache();
-		silencer::ui::automation::BeginFrame();
+		interactions.BeginFrame();
 		silencer::ui::primitives::ScrollListBeginFrame();
 		silencer::ui::primitives::BankTextBeginFrame();
 
@@ -120,10 +121,12 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 				/*scrollPosition=*/3,
 				{ .width = 200, .height = 130, .lineHeight = 13,
 				  .scrollbarBank = 7 },
-				{ /*hoveredOut=*/nullptr, /*actionId=*/"test.scroll_list.row" });
+				{ /*hoveredOut=*/nullptr,
+				  /*actionId=*/"test.scroll_list.row",
+				  /*interactions=*/&interactions });
 		}
 		::Clay_EndLayout();
-		silencer::ui::ActiveUiAutomationRegistry().ResolveClayBoundsFromClay();
+		interactions.ResolveClayBoundsFromClay();
 		std::vector<silencer::ui::UiAction> actions;
 		if(pressed){
 			silencer::ui::UiInputState input;
@@ -133,10 +136,10 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 			input.pointer.y = py;
 			input.pointer.down = down;
 			input.pointer.pressed = true;
-			silencer::ui::UiInputRouter router(silencer::ui::ActiveUiAutomationRegistry());
+			silencer::ui::UiInputRouter router(interactions);
 			actions = router.Route(input);
 		}else{
-			actions = silencer::ui::automation::DrainActions();
+			actions = interactions.DrainActions();
 		}
 		for(const auto & action : actions){
 			if(action.kind == silencer::ui::UiActionKind::Select &&

@@ -22,7 +22,7 @@
 // suppresses the caret. `numbersOnly` is documented here but is purely
 // a screen-side input-filter hint — the primitive ignores it for
 // rendering. Enter handling is screen/controller-owned through
-// UiAutomationRegistry; the primitive itself does not route SDL events.
+// UiInteractionRegistry; the primitive itself does not route SDL events.
 //
 // Memory: each call may allocate a small per-frame TextInputPayload + a
 // ClayCustomData header + up to 256 chars of mask buffer from fixed-

@@ -18,6 +18,10 @@
 class World;
 class Resources;
 
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
+
 namespace silencer::client_ui::lobby {
 
 struct ChatLine {
@@ -51,7 +55,8 @@ bool ChatPanelHandleUiIntent(ChatPanelState & state,
 // AFTER BankTextBeginFrame() + ScrollTextBoxBeginFrame() + TextInputBeginFrame().
 void BuildChatPanelTree(ChatPanelState & state,
                         World & world,
-                        Resources & resources);
+                        Resources & resources,
+                        silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

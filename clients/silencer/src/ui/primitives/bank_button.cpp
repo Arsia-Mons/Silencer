@@ -2,7 +2,7 @@
 
 #include "bank_text.h"
 #include "clay_ui_payloads.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 
 #include <string>
 
@@ -46,18 +46,18 @@ AllocCustomData(silencer::clay_bridge::CustomKind kind, void * payload) {
 }
 
 void RegisterButtonWidget(Clay_String label,
-                          UiAutomationWidgetKind kind,
+                          UiInteractableKind kind,
                           BankButtonHandle handle,
                           bool selected) {
-	if(!handle.actionId || !*handle.actionId) return;
-	silencer::ui::automation::Widget widget;
+	if(!handle.interactions || !handle.actionId || !*handle.actionId) return;
+	silencer::ui::UiInteractable widget;
 	widget.id = handle.actionId;
 	widget.labelText = ToStd(label);
 	widget.kind = kind;
 	widget.selected = selected;
 	widget.clayId = CLAY_SID(label);
 	widget.hasClayId = true;
-	silencer::ui::automation::Register(widget);
+	handle.interactions->RegisterInteractable(widget);
 }
 
 }  // namespace
@@ -92,7 +92,7 @@ void BankButton(Clay_String label,
 				bool hovered = ::Clay_Hovered();
 				if(payload) payload->brightness = hovered ? 136 : 128;
 				if(handle.hoveredOut) *handle.hoveredOut = hovered;
-				RegisterButtonWidget(label, UiAutomationWidgetKind::Button, handle, opts.selected);
+				RegisterButtonWidget(label, UiInteractableKind::Button, handle, opts.selected);
 				BankText(label,
 				         BankTextVariant::Heading,
 				         { .effectColor = opts.effectColor,
@@ -108,7 +108,7 @@ void BankButton(Clay_String label,
 			       } }) {
 				bool hovered = ::Clay_Hovered();
 				if(handle.hoveredOut) *handle.hoveredOut = hovered;
-				RegisterButtonWidget(label, UiAutomationWidgetKind::Button, handle, opts.selected);
+				RegisterButtonWidget(label, UiInteractableKind::Button, handle, opts.selected);
 				Uint8 brightness = opts.textBrightness;
 				if(brightness == 128 && hovered) brightness = 136;
 				BankText(label,
@@ -128,7 +128,7 @@ void BankButton(Clay_String label,
 			                    silencer::clay_bridge::PackImage(7, idx) } }) {
 				bool hovered = ::Clay_Hovered();
 				if(handle.hoveredOut) *handle.hoveredOut = hovered;
-				RegisterButtonWidget(label, UiAutomationWidgetKind::Toggle, handle, opts.selected);
+				RegisterButtonWidget(label, UiInteractableKind::Toggle, handle, opts.selected);
 			}
 			break;
 		}

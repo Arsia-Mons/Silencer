@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 
@@ -182,7 +182,8 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 void BuildGameTechUpperTree(GameTechPanelState & state,
                             World & world,
                             Resources & resources,
-                            LobbyScreen & owner) {
+                            LobbyScreen & owner,
+                            silencer::ui::UiInteractionRegistry& interactions) {
 	(void)world;
 	(void)resources;
 	(void)owner;
@@ -195,14 +196,15 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   kActionBack });
+		                             /*actionId*/   kActionBack,
+		                             /*interactions*/ &interactions });
 	}
-	silencer::ui::automation::Widget w;
+	silencer::ui::UiInteractable w;
 	w.id = kActionBack;
 	w.labelText = "Back To Teams";
-	w.kind  = silencer::ui::automation::WidgetKind::Button;
+	w.kind  = silencer::ui::UiInteractableKind::Button;
 	w.x = kBtnBackX; w.y = kBtnBackY; w.w = 156; w.h = 21;
-	silencer::ui::automation::Register(w);
+	interactions.RegisterInteractable(w);
 
 	// Peer name labels — right-aligned column. ALIGN_X_RIGHT inside a
 	// grow-width wrapper aligns each name to the wrapper's right edge.
@@ -234,7 +236,8 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 void BuildGameTechTallTree(GameTechPanelState & state,
                            World & world,
                            Resources & resources,
-                           LobbyScreen & owner) {
+                           LobbyScreen & owner,
+                           silencer::ui::UiInteractionRegistry& interactions) {
 	(void)resources;
 
 	// "Tech slots left: N" — bank 133/w6/eff=129/brightness=144/colorRamp.
@@ -250,7 +253,7 @@ void BuildGameTechTallTree(GameTechPanelState & state,
 		}
 	}
 
-	BuildTechTreeGrid(world, owner);
+	BuildTechTreeGrid(world, owner, interactions);
 	BuildTechSelectedPanel(state);
 }
 

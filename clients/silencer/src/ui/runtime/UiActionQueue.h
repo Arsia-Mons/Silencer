@@ -39,13 +39,13 @@ struct UiAction {
 	UiBindingInput binding;
 };
 
-enum class UiAutomationCommandKind {
+enum class UiControlCommandKind {
 	Action,
-	InvokeAt,
+	PointerPress,
 };
 
-struct UiAutomationCommand {
-	UiAutomationCommandKind kind = UiAutomationCommandKind::Action;
+struct UiControlCommand {
+	UiControlCommandKind kind = UiControlCommandKind::Action;
 	UiAction action;
 	int x = 0;
 	int y = 0;

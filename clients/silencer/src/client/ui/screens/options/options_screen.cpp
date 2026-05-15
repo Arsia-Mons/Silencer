@@ -9,7 +9,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_button.h"
 
 #include <SDL3/SDL.h>
@@ -29,22 +29,23 @@ constexpr const char * kActionBack = "options.back";
 void RegisterButton(const char * label,
                     const char * actionId,
                     int x,
-                    int y)
+                    int y,
+                    silencer::ui::UiInteractionRegistry& interactions)
 {
-	silencer::ui::automation::Widget w;
+	silencer::ui::UiInteractable w;
 	w.id = actionId;
 	w.labelText = label;
-	w.kind = silencer::ui::automation::WidgetKind::Button;
+	w.kind = silencer::ui::UiInteractableKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	silencer::ui::automation::Register(w);
+	interactions.RegisterInteractable(w);
 }
 
-void RegisterOptionsButtons()
+void RegisterOptionsButtons(silencer::ui::UiInteractionRegistry& interactions)
 {
-	RegisterButton("Controls", kActionControls, 242, 160);
-	RegisterButton("Display", kActionDisplay, 242, 193);
-	RegisterButton("Audio", kActionAudio, 242, 226);
-	RegisterButton("Go Back", kActionBack, 242, 259);
+	RegisterButton("Controls", kActionControls, 242, 160, interactions);
+	RegisterButton("Display", kActionDisplay, 242, 193, interactions);
+	RegisterButton("Audio", kActionAudio, 242, 226, interactions);
+	RegisterButton("Go Back", kActionBack, 242, 259, interactions);
 }
 
 }  // namespace
@@ -61,7 +62,7 @@ void OptionsScreen::Build(ScreenContext & ctx)
 	displayClicked = false;
 	audioClicked = false;
 
-	RegisterOptionsButtons();
+	RegisterOptionsButtons(ctx.game.UiInteractions());
 }
 
 void OptionsScreen::Tick(ScreenContext & ctx)
@@ -88,7 +89,7 @@ void OptionsScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void OptionsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
+void OptionsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
@@ -110,17 +111,17 @@ void OptionsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
 			BankButton(CLAY_STRING("Controls"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionControls });
+			           BankButtonHandle{ nullptr, kActionControls, &interactions });
 			BankButton(CLAY_STRING("Display"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionDisplay });
+			           BankButtonHandle{ nullptr, kActionDisplay, &interactions });
 			BankButton(CLAY_STRING("Audio"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionAudio });
+			           BankButtonHandle{ nullptr, kActionAudio, &interactions });
 			BankButton(CLAY_STRING("Go Back"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionBack });
+			           BankButtonHandle{ nullptr, kActionBack, &interactions });
 		}
 	}
 
-	RegisterOptionsButtons();
+	RegisterOptionsButtons(interactions);
 }
 
 void OptionsScreen::Destroy(ScreenContext & ctx)

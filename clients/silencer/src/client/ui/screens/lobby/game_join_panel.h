@@ -19,6 +19,10 @@ class Resources;
 class ScreenContext;
 class LobbyScreen;
 
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
+
 namespace silencer::client_ui::lobby {
 
 struct GameJoinPanelState {
@@ -53,13 +57,15 @@ bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
 // block; emits flex children only (no floating). Caller's BeginFrame
 // requirements: BankButtonBeginFrame.
 void BuildGameJoinUpperTree(GameJoinPanelState & state,
-                            Resources & resources);
+                            Resources & resources,
+                            silencer::ui::UiInteractionRegistry& interactions);
 
 // Emits the tall-pane subtree (currently empty for GameJoin — the variant
 // has no tall-area content). Must be called inside the LobbyRightTallBox
 // CLAY block.
 void BuildGameJoinTallTree(GameJoinPanelState & state,
-                           Resources & resources);
+                           Resources & resources,
+                           silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

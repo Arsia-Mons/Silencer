@@ -1,7 +1,7 @@
 #include "scroll_list.h"
 
 #include "clay_ui_payloads.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 
 #include <cstdint>
 #include <string>
@@ -49,16 +49,16 @@ void RegisterRowWidget(Clay_String id,
                        int index,
                        bool selected,
                        ScrollListHandle handle) {
-	if(!handle.actionId || !*handle.actionId) return;
-	silencer::ui::automation::Widget widget;
+	if(!handle.interactions || !handle.actionId || !*handle.actionId) return;
+	silencer::ui::UiInteractable widget;
 	widget.id = std::string(handle.actionId) + "." + std::to_string(index);
 	widget.labelText = ToStd(label);
-	widget.kind = UiAutomationWidgetKind::ListRow;
+	widget.kind = UiInteractableKind::ListRow;
 	widget.index = index;
 	widget.selected = selected;
 	widget.clayId = CLAY_SIDI(id, static_cast<uint32_t>(index + 1));
 	widget.hasClayId = true;
-	silencer::ui::automation::Register(widget);
+	handle.interactions->RegisterInteractable(widget);
 }
 
 }  // namespace

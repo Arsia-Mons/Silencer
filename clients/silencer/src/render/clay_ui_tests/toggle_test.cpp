@@ -17,7 +17,7 @@
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
 #include "primitives/toggle.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "runtime/UiInputRouter.h"
 
 #include "game.h"
@@ -94,6 +94,7 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 	EnsureInitialized(W, H);
 
 	int counts[3] = {0, 0, 0};
+	silencer::ui::UiInteractionRegistry interactions;
 
 	// Per-frame: drives pointer state, lays out the row, returns the
 	// (selectedBrightness, unselectedBrightness) seen in the emitted
@@ -106,7 +107,7 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 		::Clay_SetPointerState(::Clay_Vector2{px, py}, down);
 		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 		::Clay_ResetMeasureTextCache();
-		silencer::ui::automation::BeginFrame();
+		interactions.BeginFrame();
 		silencer::ui::primitives::ToggleBeginFrame();
 
 		::Clay_BeginLayout();
@@ -121,20 +122,22 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 				CLAY_STRING("t0"), 181, 0, /*selected=*/false,
 				{ .width = 24, .height = 24, .effectColor = 112,
 				  .selectedBrightness = 128, .unselectedBrightness = 32 },
-				{ /*hoveredOut=*/nullptr, /*actionId=*/"test.toggle.0" });
+				{ /*hoveredOut=*/nullptr,
+				  /*actionId=*/"test.toggle.0",
+				  /*interactions=*/&interactions });
 			silencer::ui::primitives::Toggle(
 				CLAY_STRING("t1"), 181, 1, /*selected=*/true,
 				{ .width = 24, .height = 24, .effectColor = 112,
 				  .selectedBrightness = 128, .unselectedBrightness = 32 },
-				{ nullptr, "test.toggle.1" });
+				{ nullptr, "test.toggle.1", &interactions });
 			silencer::ui::primitives::Toggle(
 				CLAY_STRING("t2"), 181, 2, /*selected=*/false,
 				{ .width = 24, .height = 24, .effectColor = 112,
 				  .selectedBrightness = 128, .unselectedBrightness = 32 },
-				{ nullptr, "test.toggle.2" });
+				{ nullptr, "test.toggle.2", &interactions });
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
-		silencer::ui::ActiveUiAutomationRegistry().ResolveClayBoundsFromClay();
+		interactions.ResolveClayBoundsFromClay();
 		std::vector<silencer::ui::UiAction> actions;
 		if(pressed){
 			silencer::ui::UiInputState input;
@@ -144,10 +147,10 @@ bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {
 			input.pointer.y = py;
 			input.pointer.down = down;
 			input.pointer.pressed = true;
-			silencer::ui::UiInputRouter router(silencer::ui::ActiveUiAutomationRegistry());
+			silencer::ui::UiInputRouter router(interactions);
 			actions = router.Route(input);
 		}else{
-			actions = silencer::ui::automation::DrainActions();
+			actions = interactions.DrainActions();
 		}
 		for(const auto & action : actions){
 			if(action.kind != silencer::ui::UiActionKind::Activate) continue;

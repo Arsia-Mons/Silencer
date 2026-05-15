@@ -7,7 +7,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_button.h"
 #include "primitives/bank_text.h"
 
@@ -32,20 +32,24 @@ Clay_String FromStd(const std::string & s)
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
 }
 
-void RegisterWidgets(MessageModal * modal, int surfaceW, int surfaceH, bool hasOk)
+void RegisterWidgets(MessageModal * modal,
+                     int surfaceW,
+                     int surfaceH,
+                     bool hasOk,
+                     silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)modal;
 	if(!hasOk) return;
 	const int dialogX = (surfaceW - kDialogW) / 2;
 	const int dialogY = (surfaceH - kDialogH) / 2;
-	silencer::ui::automation::Widget w;
+	silencer::ui::UiInteractable w;
 	w.id = kActionOk;
 	w.labelText = "OK";
-	w.kind = silencer::ui::automation::WidgetKind::Button;
+	w.kind = silencer::ui::UiInteractableKind::Button;
 	w.x = dialogX + (kDialogW - 156) / 2;
 	w.y = dialogY + kDialogH - kDialogPadY - 21;
 	w.w = 156; w.h = 21;
-	silencer::ui::automation::Register(w);
+	interactions.RegisterInteractable(w);
 }
 }
 
@@ -69,7 +73,7 @@ void MessageModal::Build(ScreenContext & ctx)
 	(void)ctx;
 	okClicked = false;
 	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(this, surface.w, surface.h, hasOk);
+	RegisterWidgets(this, surface.w, surface.h, hasOk, ctx.game.UiInteractions());
 }
 
 void MessageModal::Tick(ScreenContext & ctx)
@@ -81,7 +85,7 @@ void MessageModal::Tick(ScreenContext & ctx)
 	if(cb) cb();
 }
 
-void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
+void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
@@ -108,11 +112,11 @@ void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 			BankText(FromStd(message), BankTextVariant::Heading, {});
 			if(hasOk){
 				BankButton(CLAY_STRING("OK"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, kActionOk });
+				           BankButtonHandle{ nullptr, kActionOk, &interactions });
 			}
 		}
 	}
-	RegisterWidgets(this, dst.w, dst.h, hasOk);
+	RegisterWidgets(this, dst.w, dst.h, hasOk, interactions);
 }
 
 void MessageModal::Destroy(ScreenContext & ctx)

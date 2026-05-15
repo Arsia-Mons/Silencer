@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/text_input.h"
@@ -59,33 +59,36 @@ const char * SecurityLabel(Uint8 idx) {
 }
 
 void RegisterButton(const char * label, const char * actionId,
-                    int x, int y, int w, int h, bool selected = false) {
-	silencer::ui::automation::Widget reg;
+                    int x, int y, int w, int h, bool selected,
+                    silencer::ui::UiInteractionRegistry& interactions) {
+	silencer::ui::UiInteractable reg;
 	reg.id        = actionId;
 	reg.labelText = label;
-	reg.kind      = silencer::ui::automation::WidgetKind::Button;
+	reg.kind      = silencer::ui::UiInteractableKind::Button;
 	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
 	reg.selected  = selected;
-	silencer::ui::automation::Register(reg);
+	interactions.RegisterInteractable(reg);
 }
 
 void RegisterTextInput(const char * label, const char * actionId,
                        int x, int y, int w, int h,
-                       char * buf, int cap) {
-	silencer::ui::automation::Widget reg;
+                       char * buf, int cap,
+                       silencer::ui::UiInteractionRegistry& interactions) {
+	silencer::ui::UiInteractable reg;
 	reg.id            = actionId;
 	reg.labelText     = label;
-	reg.kind          = silencer::ui::automation::WidgetKind::TextInput;
+	reg.kind          = silencer::ui::UiInteractableKind::TextInput;
 	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
 	reg.value         = buf ? buf : "";
 	reg.maxLength     = cap > 0 ? cap - 1 : 0;
-	silencer::ui::automation::Register(reg);
+	interactions.RegisterInteractable(reg);
 }
 
 void BuildOptionRow(GameCreatePanelState & state, int i,
                     const char * rowId, const char * label,
                     const char * id, const char * actionId,
-                    char * buf, int cap) {
+                    char * buf, int cap,
+                    silencer::ui::UiInteractionRegistry& interactions) {
 	CLAY({ .id = CLAY_SID(StaticId(rowId)),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
@@ -105,16 +108,16 @@ void BuildOptionRow(GameCreatePanelState & state, int i,
 		if(i == 0){
 			BankButton(FromCStr(SecurityLabel(state.securityIndex)),
 			           BankButtonVariant::Inline, {},
-			           BankButtonHandle{ nullptr, kActionSecurity });
+			           BankButtonHandle{ nullptr, kActionSecurity, &interactions });
 			RegisterButton("Security", kActionSecurity,
-			               kValueX, kFormTop + 2, 60, kRowHeight);
+			               kValueX, kFormTop + 2, 60, kRowHeight, false, interactions);
 		}else if(i == 5){
 			BankButton(FromCStr(state.spectatable ? "Yes" : "No"),
 			           BankButtonVariant::Inline, {},
-			           BankButtonHandle{ nullptr, kActionSpectatable });
+			           BankButtonHandle{ nullptr, kActionSpectatable, &interactions });
 			RegisterButton("Spectatable", kActionSpectatable,
 			               kValueX, kFormTop + 5*kYSpace + 2, 30, kRowHeight,
-			               state.spectatable);
+			               state.spectatable, interactions);
 		}else{
 			TextInputOpts opts;
 			opts.widthPx     = 20;
@@ -128,7 +131,7 @@ void BuildOptionRow(GameCreatePanelState & state, int i,
 			TextInput(Clay_String{ false, (int32_t)idStr.size(), idStr.c_str() },
 			          buf, opts, {});
 			const int y = kFormTop + i * kYSpace + 2;
-			RegisterTextInput(label, actionId, kValueX, y, 20, kRowHeight, buf, cap);
+			RegisterTextInput(label, actionId, kValueX, y, 20, kRowHeight, buf, cap, interactions);
 		}
 	}
 }
@@ -136,7 +139,8 @@ void BuildOptionRow(GameCreatePanelState & state, int i,
 }  // namespace
 
 void BuildGameCreateUpperTree(GameCreatePanelState & state,
-                              Resources & resources) {
+                              Resources & resources,
+                              silencer::ui::UiInteractionRegistry& interactions) {
 	(void)resources;
 
 	CLAY({ .id = CLAY_ID("GCrtOptionsContent"),
@@ -176,7 +180,8 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 			               ti ? ti->id : "",
 			               ti ? ti->actionId : "",
 			               ti ? ti->buf : nullptr,
-			               ti ? ti->cap : 0);
+			               ti ? ti->cap : 0,
+			               interactions);
 		}
 	}
 }

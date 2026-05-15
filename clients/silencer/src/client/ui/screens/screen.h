@@ -8,6 +8,12 @@
 class ScreenContext;
 class Surface;
 
+namespace silencer {
+namespace ui {
+class UiInteractionRegistry;
+}
+}
+
 // Top-level UI surface bound to a Game state. One Screen is active at a time
 // (plus modals stacked on top). Lifecycle is owned by ClientUi's ScreenStack.
 class Screen
@@ -24,8 +30,11 @@ public:
 	// Declare this screen's UI into the current ClientUi frame. Screens do not
 	// begin/end Clay, render Clay commands, or reset primitive arenas; ClientUi
 	// owns the frame lifecycle for every visible UI surface.
-	virtual void BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
-	{ (void)ctx; (void)dst; (void)frametime; }
+	virtual void BuildUi(ScreenContext & ctx,
+	                     Surface & dst,
+	                     float frametime,
+	                     silencer::ui::UiInteractionRegistry& interactions)
+	{ (void)ctx; (void)dst; (void)frametime; (void)interactions; }
 
 	// Tear down screen-owned UI state. Called on pop/replace.
 	virtual void Destroy(ScreenContext & ctx) = 0;

@@ -49,7 +49,7 @@ navigation through `client/ui/navigation/ScreenStack`; `Game` only exposes
 narrow transition wrappers for the state machine, screens, and control socket.
 Pointer/wheel/gamepad UI input is collected into `UiInputState`, typed
 interaction actions are drained after layout, and `clay_inspector` has been
-removed in favor of `UiAutomationRegistry`.
+removed in favor of `UiInteractionRegistry`.
 
 No placeholder `ClientUiState` or `ModalStack` was added. Modal behavior still
 uses the real existing single-stack overlay semantics via `Screen::IsOverlay()`.
@@ -111,7 +111,7 @@ call `Clay_BeginLayout`, `Clay_EndLayout`, or `clay_bridge::Render` directly.
 `EnsureInitialized` no longer resets pointer state, wheel deltas are collected
 from `SDL_EVENT_MOUSE_WHEEL`, and gamepad menu navigation is stored on the
 central `UiInputState` before being dispatched for the active UI frame.
-Interactions now queue typed `UiAction`s in `UiAutomationRegistry`; the current
+Interactions now queue typed `UiAction`s in `UiInteractionRegistry`; the current
 screen callbacks remain the compatibility controller path while the larger raw
 screen layouts are still being decomposed.
 
@@ -122,7 +122,7 @@ Evidence:
 - Screen declaration hook: `clients/silencer/src/client/ui/screens/screen.h:24`.
 - Clay backend: `clients/silencer/src/client/ui/ClayBridgeFrameBackend.cpp:11`.
 - Runtime lifecycle: `clients/silencer/src/ui/runtime/ClayService.cpp:8`.
-- Typed action queue: `clients/silencer/src/ui/runtime/UiAutomationRegistry.cpp:152`.
+- Typed action queue: `clients/silencer/src/ui/runtime/UiInteractionRegistry.cpp:152`.
 
 ### High: Clay HUD Rendering Still Lives Inside `Renderer`
 
@@ -186,17 +186,16 @@ stable metadata and control socket operations route through that registry and
 typed UI actions.
 
 The separate `clay_inspector` runtime was removed. Production screen widgets now
-register through `UiAutomationRegistry`; the `silencer::ui::automation`
-namespace is a thin compatibility surface over the active registry. The registry
+register through the frame-owned `UiInteractionRegistry`, and the old
+`silencer::ui::automation` compatibility surface has been deleted. The registry
 now exposes widget metadata, focus/text/input dispatch, click dispatch, and a
 typed `UiAction` queue that is drained after the Clay layout frame.
 
 Evidence:
 
 - Plan: `architecture-goal.md:325` through `architecture-goal.md:342`.
-- Registry implementation: `clients/silencer/src/ui/runtime/UiAutomationRegistry.cpp:58`.
-- Compatibility namespace: `clients/silencer/src/ui/runtime/UiAutomationRegistry.cpp:366`.
-- Control socket lookup: `clients/silencer/src/net/controldispatch.cpp:607`.
+- Registry implementation: `clients/silencer/src/ui/runtime/UiInteractionRegistry.cpp:58`.
+- Control socket lookup: `clients/silencer/src/net/controldispatch.cpp:201`.
 - Boundary guard: `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh:29`.
 
 ### Medium: Client UI Navigation Ownership
@@ -265,7 +264,7 @@ Evidence:
 - Gamepad nav collection: `clients/silencer/src/game/game.cpp:1081`.
 - Clay input feed: `clients/silencer/src/ui/runtime/ClayService.cpp:8`.
 - UI nav action type exists: `clients/silencer/src/ui/runtime/UiInputState.h:9`.
-- Focus/key dispatch: `clients/silencer/src/ui/runtime/UiAutomationRegistry.cpp:214`.
+- Focus/key dispatch: `clients/silencer/src/ui/runtime/UiInteractionRegistry.cpp:214`.
 
 ### Medium: Screen Files Are Still Large Raw Clay Layouts
 
@@ -340,7 +339,7 @@ Backlog audit:
 - [x] Renderer no longer owns Clay HUD layout or exposes `Draw*Clay` HUD APIs.
 - [x] `ClientUi` / `ClayService` are the production frame runtime; screens,
   modals, HUD, and overlays declare into one frame.
-- [x] `clay_inspector` is gone; automation uses `UiAutomationRegistry`.
+- [x] `clay_inspector` is gone; automation uses `UiInteractionRegistry`.
 - [x] Wheel/trackpad and gamepad UI input flow into `UiInputState`.
 - [x] The fake `ClientUiState` / `BuildFrame` demo path is gone. Keep it gone.
 - [x] Real screen/modal navigation ownership moved from `Game` into

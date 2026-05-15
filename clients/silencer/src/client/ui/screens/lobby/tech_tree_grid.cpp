@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/toggle.h"
 
@@ -60,7 +60,9 @@ Clay_String FromStd(const std::string & s) {
 
 }  // namespace
 
-void BuildTechTreeGrid(World & world, LobbyScreen & owner) {
+void BuildTechTreeGrid(World & world,
+                       LobbyScreen & owner,
+                       silencer::ui::UiInteractionRegistry& interactions) {
 	const Uint8 localid = owner.TechPanelLocalPeerId(world);
 	Team * team = world.GetPeerTeam(localid);
 
@@ -157,7 +159,8 @@ void BuildTechTreeGrid(World & world, LobbyScreen & owner) {
 							Toggle(innerId,
 							       kCheckboxBank, boxIdx, selected, tOpts,
 							       ToggleHandle{ /*hoveredOut*/ nullptr,
-							                     /*actionId*/   actionId.c_str() });
+							                     /*actionId*/   actionId.c_str(),
+							                     /*interactions*/ &interactions });
 							localAdapter++;
 						}else{
 							const int slot = (col * kMaxRows) + static_cast<int>(bIdx);
@@ -215,14 +218,14 @@ void BuildTechTreeGrid(World & world, LobbyScreen & owner) {
 							g_rowLabels[rowLabelSlot] += std::to_string(item->techslots);
 							g_rowLabels[rowLabelSlot] += ")";
 
-							silencer::ui::automation::Widget desc;
+							silencer::ui::UiInteractable desc;
 							desc.id = std::string(kActionDescriptionPrefix) + std::to_string(static_cast<int>(bIdx));
 							desc.labelText = g_rowLabels[rowLabelSlot];
-							desc.kind = silencer::ui::automation::WidgetKind::Button;
+							desc.kind = silencer::ui::UiInteractableKind::Button;
 							desc.clayId = CLAY_SIDI(CLAY_STRING("GTechRowLbl"),
 							                         static_cast<uint32_t>(bIdx));
 							desc.hasClayId = true;
-							silencer::ui::automation::Register(desc);
+							interactions.RegisterInteractable(desc);
 
 							CLAY({ .id = CLAY_SIDI(CLAY_STRING("GTechRowLbl"),
 							                       static_cast<uint32_t>(bIdx)),

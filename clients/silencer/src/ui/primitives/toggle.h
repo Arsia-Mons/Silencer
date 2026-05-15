@@ -22,6 +22,10 @@
 #include "clay/clay.h"
 #include "shared.h"
 
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
+
 namespace silencer::ui::primitives {
 
 struct ToggleOpts {
@@ -41,8 +45,9 @@ struct ToggleOpts {
 };
 
 struct ToggleHandle {
-	bool *      hoveredOut;  // Optional. Written each frame if non-null.
-	const char * actionId;   // Optional stable UiAction id registered for input routing.
+	bool *      hoveredOut;    // Optional. Written each frame if non-null.
+	const char * actionId;     // Optional stable UiAction id registered for input routing.
+	UiInteractionRegistry * interactions;  // Required when actionId is set.
 };
 
 // Resets the per-frame click-adapter + payload arenas. Call once before

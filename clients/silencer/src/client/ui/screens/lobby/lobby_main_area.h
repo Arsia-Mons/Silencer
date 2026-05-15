@@ -9,6 +9,10 @@ class World;
 class Resources;
 class LobbyScreen;
 
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
+
 namespace silencer::client_ui::lobby {
 
 struct CharacterPanelState;
@@ -37,7 +41,8 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         Resources & resources,
                         LobbyScreen & owner,
                         bool narrow,
-                        int bodyH);
+                        int bodyH,
+                        silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

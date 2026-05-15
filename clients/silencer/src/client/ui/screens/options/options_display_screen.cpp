@@ -10,7 +10,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_button.h"
 #include "primitives/bank_text.h"
 
@@ -40,28 +40,32 @@ constexpr const char * kActionCancel = "options_display.cancel";
 void RegisterButton(const char * label,
                     const char * actionId,
                     int x,
-                    int y)
+                    int y,
+                    silencer::ui::UiInteractionRegistry& interactions)
 {
-	silencer::ui::automation::Widget w;
+	silencer::ui::UiInteractable w;
 	w.id = actionId;
 	w.labelText = label;
-	w.kind = silencer::ui::automation::WidgetKind::Button;
+	w.kind = silencer::ui::UiInteractableKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	silencer::ui::automation::Register(w);
+	interactions.RegisterInteractable(w);
 }
 
-void RegisterWidgets(int surfaceW, int surfaceH)
+void RegisterWidgets(int surfaceW,
+                     int surfaceH,
+                     silencer::ui::UiInteractionRegistry& interactions)
 {
 	const int panelX = (surfaceW - kPanelW) / 2;
 	const int panelY = 80;
 	const int rowX = panelX + kPanelPadX;
 	const int rowY = panelY + kPanelPadY + 42;
 	const int actionY = rowY + (kRowH + kRowGap) * 2 + 8;
-	RegisterButton("Fullscreen", kActionFullscreen, rowX, rowY + 6);
+	RegisterButton("Fullscreen", kActionFullscreen, rowX, rowY + 6, interactions);
 	RegisterButton("Smooth Scaling", kActionSmoothScaling,
-	               rowX, rowY + kRowH + kRowGap + 6);
-	RegisterButton("Save", kActionSave, panelX + 48, actionY);
-	RegisterButton("Cancel", kActionCancel, panelX + 216, actionY);
+	               rowX, rowY + kRowH + kRowGap + 6, interactions);
+	RegisterButton("Save", kActionSave, panelX + 48, actionY, interactions);
+	RegisterButton("Cancel", kActionCancel, panelX + 216, actionY, interactions);
+	(void)surfaceH;
 }
 
 void ToggleIndicator(Clay_String id, bool selected)
@@ -90,7 +94,8 @@ void ToggleIndicator(Clay_String id, bool selected)
 
 void ToggleRow(Clay_String label,
                bool selected,
-               const char * actionId)
+               const char * actionId,
+               silencer::ui::UiInteractionRegistry& interactions)
 {
 	CLAY({ .id = CLAY_SID(label),
 	       .layout = {
@@ -99,7 +104,7 @@ void ToggleRow(Clay_String label,
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
 		BankButton(label, BankButtonVariant::Chrome, {},
-		           BankButtonHandle{ nullptr, actionId });
+		           BankButtonHandle{ nullptr, actionId, &interactions });
 		CLAY({ .id = CLAY_SIDI(label, 1),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
@@ -120,7 +125,7 @@ void OptionsDisplayScreen::Build(ScreenContext & ctx)
 	saveClicked = false;
 	cancelClicked = false;
 	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(surface.w, surface.h);
+	RegisterWidgets(surface.w, surface.h, ctx.game.UiInteractions());
 }
 
 void OptionsDisplayScreen::Tick(ScreenContext & ctx)
@@ -153,7 +158,7 @@ void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
+void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
@@ -187,9 +192,9 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       } }) {
 				ToggleRow(CLAY_STRING("Fullscreen"), cfg.fullscreen,
-				          kActionFullscreen);
+				          kActionFullscreen, interactions);
 				ToggleRow(CLAY_STRING("Smooth Scaling"), cfg.scalefilter,
-				          kActionSmoothScaling);
+				          kActionSmoothScaling, interactions);
 			}
 			CLAY({ .id = CLAY_ID("OptionsDisplayActions"),
 			       .layout = {
@@ -198,13 +203,13 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
 				BankButton(CLAY_STRING("Save"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, kActionSave });
+				           BankButtonHandle{ nullptr, kActionSave, &interactions });
 				BankButton(CLAY_STRING("Cancel"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, kActionCancel });
+				           BankButtonHandle{ nullptr, kActionCancel, &interactions });
 			}
 		}
 	}
-	RegisterWidgets(dst.w, dst.h);
+	RegisterWidgets(dst.w, dst.h, interactions);
 }
 
 void OptionsDisplayScreen::Destroy(ScreenContext & ctx)

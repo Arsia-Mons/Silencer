@@ -1,6 +1,6 @@
 #pragma once
 
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "runtime/UiInputState.h"
 
 #include <vector>
@@ -10,12 +10,12 @@ namespace ui {
 
 class UiInputRouter {
 public:
-	explicit UiInputRouter(UiAutomationRegistry& registry);
+	explicit UiInputRouter(UiInteractionRegistry& registry);
 
 	std::vector<UiAction> Route(const UiInputState& input);
 
 private:
-	UiAutomationRegistry& registry_;
+	UiInteractionRegistry& registry_;
 };
 
 }  // namespace ui

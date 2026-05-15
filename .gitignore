@@ -55,4 +55,5 @@ __pycache__/
 
 clients/silencer/build_test/
 clients/silencer/installer/Output/
+clients/silencer/shaders/generated/*.dxil.h
 tools/refactor-baselines/

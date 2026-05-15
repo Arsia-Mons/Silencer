@@ -47,19 +47,19 @@ void ClientUiInput::QueueBindingKeyDown(int keyCode) {
 	QueueBindingInput(input);
 }
 
-void ClientUiInput::QueueAutomationAction(silencer::ui::UiAction action) {
-	silencer::ui::UiAutomationCommand command;
-	command.kind = silencer::ui::UiAutomationCommandKind::Action;
+void ClientUiInput::QueueControlAction(silencer::ui::UiAction action) {
+	silencer::ui::UiControlCommand command;
+	command.kind = silencer::ui::UiControlCommandKind::Action;
 	command.action = std::move(action);
-	automationCommands_.push_back(std::move(command));
+	controlCommands_.push_back(std::move(command));
 }
 
-void ClientUiInput::QueueAutomationInvokeAt(int x, int y) {
-	silencer::ui::UiAutomationCommand command;
-	command.kind = silencer::ui::UiAutomationCommandKind::InvokeAt;
+void ClientUiInput::QueueControlPointerPress(int x, int y) {
+	silencer::ui::UiControlCommand command;
+	command.kind = silencer::ui::UiControlCommandKind::PointerPress;
 	command.x = x;
 	command.y = y;
-	automationCommands_.push_back(command);
+	controlCommands_.push_back(command);
 }
 
 void ClientUiInput::QueuePointerWindowEvent(float windowX,
@@ -177,7 +177,7 @@ silencer::ui::UiInputState ClientUiInput::BuildFrame(int width,
 	input.textInput = textInput_;
 	input.navActions = navActions_;
 	input.bindingInputs = bindingInputs_;
-	input.automationCommands = automationCommands_;
+	input.controlCommands = controlCommands_;
 	lastFramePointerDown_ = input.pointer.down;
 	return input;
 }
@@ -189,7 +189,7 @@ void ClientUiInput::EndFrame() {
 	textInput_.clear();
 	navActions_.clear();
 	bindingInputs_.clear();
-	automationCommands_.clear();
+	controlCommands_.clear();
 	pointerPressed_ = false;
 	pointerReleased_ = false;
 }

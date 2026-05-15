@@ -224,7 +224,7 @@ buy / tech overlays at the in-game viewport.
 
 **Problem.** `UiInputState` carries pointer, wheel, gamepad nav, and now
 text input — but text and key dispatch still flow through
-`UiAutomationRegistry::dispatch` as compatibility hooks invoked from
+`UiInteractionRegistry::dispatch` as compatibility hooks invoked from
 screen callbacks. The architecture goal calls for one durable input
 contract: events into `UiInputState`, typed actions out.
 
@@ -249,7 +249,7 @@ struct UiInputState {
 
 `ClientUi::DispatchInput` (or a renamed peer in the runtime) walks
 `keyEvents` + `textInput` and routes them through the focus dispatcher in
-`UiAutomationRegistry`, emitting typed `UiAction`s exactly as the pointer
+`UiInteractionRegistry`, emitting typed `UiAction`s exactly as the pointer
 path does today. Screens stop implementing `OnTextInput`/`OnKey`
 compatibility hooks; those interfaces come off `Screen`. Anything currently
 calling them either reads from `UiInputState` directly (raw screens that

@@ -1,7 +1,7 @@
 #include "toggle.h"
 
 #include "clay_ui_payloads.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 
 #include <string>
 
@@ -44,15 +44,15 @@ AllocCustomData(silencer::clay_bridge::CustomKind kind, void * payload) {
 void RegisterToggleWidget(Clay_String id,
                           bool selected,
                           ToggleHandle handle) {
-	if(!handle.actionId || !*handle.actionId) return;
-	silencer::ui::automation::Widget widget;
+	if(!handle.interactions || !handle.actionId || !*handle.actionId) return;
+	silencer::ui::UiInteractable widget;
 	widget.id = handle.actionId;
 	widget.labelText = ToStd(id);
-	widget.kind = UiAutomationWidgetKind::Toggle;
+	widget.kind = UiInteractableKind::Toggle;
 	widget.selected = selected;
 	widget.clayId = CLAY_SID(id);
 	widget.hasClayId = true;
-	silencer::ui::automation::Register(widget);
+	handle.interactions->RegisterInteractable(widget);
 }
 
 }  // namespace

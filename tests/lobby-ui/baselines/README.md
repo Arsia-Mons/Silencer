@@ -53,9 +53,8 @@ MainMenu
                     walk into child interfaces — see capture.sh)
                       →  GameCreatePanel
                           └─ screenshot (gamecreate)
-                          └─ select map (selectbox uid=4, addressed
-                             by global object id via FindWidgetByLabel
-                             numeric-string path) + click "Create"
+                          └─ select map (stable interaction metadata)
+                             + click "Create"
                                 →  Uploading-map progress modal →
                                    dedicated `silencer -s` spawn →
                                    GameJoinPanel

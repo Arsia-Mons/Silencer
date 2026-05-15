@@ -9,7 +9,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_button.h"
 #include "primitives/bank_text.h"
 
@@ -74,25 +74,27 @@ MainMenuButtonLayout ComputeButtonLayout(int width, int height)
 void RegisterButton(const char * label,
                     const char * actionId,
                     int x,
-                    int y)
+                    int y,
+                    silencer::ui::UiInteractionRegistry& interactions)
 {
-	silencer::ui::automation::Widget w;
+	silencer::ui::UiInteractable w;
 	w.id = actionId;
 	w.labelText = label;
-	w.kind = silencer::ui::automation::WidgetKind::Button;
+	w.kind = silencer::ui::UiInteractableKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	silencer::ui::automation::Register(w);
+	interactions.RegisterInteractable(w);
 }
 
-void RegisterMainMenuButtons(const MainMenuButtonLayout & layout)
+void RegisterMainMenuButtons(const MainMenuButtonLayout & layout,
+                             silencer::ui::UiInteractionRegistry& interactions)
 {
-	RegisterButton("Tutorial", kActionTutorial, layout.x, layout.y);
+	RegisterButton("Tutorial", kActionTutorial, layout.x, layout.y, interactions);
 	RegisterButton("Connect To Lobby", kActionLobby, layout.x,
-	               layout.y + kMenuButtonH + kButtonGap);
+	               layout.y + kMenuButtonH + kButtonGap, interactions);
 	RegisterButton("Options", kActionOptions, layout.x,
-	               layout.y + (kMenuButtonH + kButtonGap) * 2);
+	               layout.y + (kMenuButtonH + kButtonGap) * 2, interactions);
 	RegisterButton("Exit", kActionExit, layout.x,
-	               layout.y + (kMenuButtonH + kButtonGap) * 3);
+	               layout.y + (kMenuButtonH + kButtonGap) * 3, interactions);
 }
 }
 
@@ -110,7 +112,8 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 	exitClicked = false;
 
 	const Surface & screenbuffer = ctx.game.GetScreenBuffer();
-	RegisterMainMenuButtons(ComputeButtonLayout(screenbuffer.w, screenbuffer.h));
+	RegisterMainMenuButtons(ComputeButtonLayout(screenbuffer.w, screenbuffer.h),
+	                        ctx.game.UiInteractions());
 }
 
 void MainMenuScreen::Tick(ScreenContext & ctx)
@@ -137,7 +140,7 @@ void MainMenuScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
+void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
@@ -197,18 +200,18 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 		           .attachTo = CLAY_ATTACH_TO_ROOT,
 		       } }) {
 			BankButton(CLAY_STRING("Tutorial"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionTutorial });
+			           BankButtonHandle{ nullptr, kActionTutorial, &interactions });
 			BankButton(CLAY_STRING("Connect To Lobby"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionLobby });
+			           BankButtonHandle{ nullptr, kActionLobby, &interactions });
 			BankButton(CLAY_STRING("Options"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionOptions });
+			           BankButtonHandle{ nullptr, kActionOptions, &interactions });
 			BankButton(CLAY_STRING("Exit"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionExit });
+			           BankButtonHandle{ nullptr, kActionExit, &interactions });
 		}
 	}
 
 
-	RegisterMainMenuButtons(buttons);
+	RegisterMainMenuButtons(buttons, interactions);
 }
 
 void MainMenuScreen::Destroy(ScreenContext & ctx)

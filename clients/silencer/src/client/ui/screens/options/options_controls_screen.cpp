@@ -11,7 +11,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 
 #include <SDL3/SDL.h>
 
@@ -181,12 +181,12 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 	return false;
 }
 
-void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime) {
+void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 	using namespace silencer::client_ui::options;
 
-	RegisterKeybindListWidgets(dst.w);
+	RegisterKeybindListWidgets(dst.w, interactions);
 
 	KeybindListView view;
 	view.presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
@@ -226,7 +226,7 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(7, 7) } }) {
-			BuildKeybindListBody(view);
+			BuildKeybindListBody(view, interactions);
 		}
 	}
 }

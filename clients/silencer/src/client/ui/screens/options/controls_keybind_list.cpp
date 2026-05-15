@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
 
 #include <cstdint>
@@ -47,7 +47,7 @@ std::string ToStd(Clay_String text) {
 	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
 }
 
-std::string AutomationLabel(Clay_String id, Clay_String text) {
+std::string InteractionLabel(Clay_String id, Clay_String text) {
 	std::string idText = ToStd(id);
 	if(idText == "PresetButton") return "Preset";
 	if(idText == "ScrollUp") return "Scroll Up";
@@ -57,13 +57,14 @@ std::string AutomationLabel(Clay_String id, Clay_String text) {
 
 void RegisterButton(const char * label,
                     const std::string & actionId,
-                    int x, int y, int w, int h) {
-	silencer::ui::automation::Widget widget;
+                    int x, int y, int w, int h,
+                    silencer::ui::UiInteractionRegistry& interactions) {
+	silencer::ui::UiInteractable widget;
 	widget.id = actionId;
 	widget.labelText = label;
-	widget.kind = silencer::ui::automation::WidgetKind::Button;
+	widget.kind = silencer::ui::UiInteractableKind::Button;
 	widget.x = x; widget.y = y; widget.w = w; widget.h = h;
-	silencer::ui::automation::Register(widget);
+	interactions.RegisterInteractable(widget);
 }
 
 void ButtonElement(Clay_String id,
@@ -72,15 +73,16 @@ void ButtonElement(Clay_String id,
                    uint16_t height,
                    uint16_t imageIndex,
                    BankTextVariant textVariant,
-                   const char * actionId) {
+                   const char * actionId,
+                   silencer::ui::UiInteractionRegistry& interactions) {
 	if(actionId && *actionId){
-		silencer::ui::automation::Widget widget;
+		silencer::ui::UiInteractable widget;
 		widget.id = actionId;
-		widget.labelText = AutomationLabel(id, text);
-		widget.kind = silencer::ui::automation::WidgetKind::Button;
+		widget.labelText = InteractionLabel(id, text);
+		widget.kind = silencer::ui::UiInteractableKind::Button;
 		widget.clayId = CLAY_SID(id);
 		widget.hasClayId = true;
-		silencer::ui::automation::Register(widget);
+		interactions.RegisterInteractable(widget);
 	}
 	CLAY({ .id = CLAY_SID(id),
 	       .layout = {
@@ -102,15 +104,16 @@ void TextButton(Clay_String id,
                 Clay_String text,
                 uint16_t width,
                 uint16_t height,
-                const char * actionId) {
+                const char * actionId,
+                silencer::ui::UiInteractionRegistry& interactions) {
 	if(actionId && *actionId){
-		silencer::ui::automation::Widget widget;
+		silencer::ui::UiInteractable widget;
 		widget.id = actionId;
-		widget.labelText = AutomationLabel(id, text);
-		widget.kind = silencer::ui::automation::WidgetKind::Button;
+		widget.labelText = InteractionLabel(id, text);
+		widget.kind = silencer::ui::UiInteractableKind::Button;
 		widget.clayId = CLAY_SID(id);
 		widget.hasClayId = true;
-		silencer::ui::automation::Register(widget);
+		interactions.RegisterInteractable(widget);
 	}
 	CLAY({ .id = CLAY_SID(id),
 	       .layout = {
@@ -129,53 +132,57 @@ void RowActionButton(Clay_String id,
                      const std::string & text,
                      int row,
                      int slot,
-                     bool rebinding) {
+                     bool rebinding,
+                     silencer::ui::UiInteractionRegistry& interactions) {
 	std::string display = rebinding ? "-" : text;
 	std::string actionId = std::string(slot == 0 ? kActionPrimaryPrefix : kActionSecondaryPrefix)
 	                     + std::to_string(row);
 	ButtonElement(id, FromStd(display), kKeyButtonW, kKeyButtonH, 28,
-	              BankTextVariant::Title, actionId.c_str());
+	              BankTextVariant::Title, actionId.c_str(), interactions);
 }
 
 void RowOperatorButton(Clay_String id,
                        const char * text,
-                       int row) {
+                       int row,
+                       silencer::ui::UiInteractionRegistry& interactions) {
 	std::string actionId = std::string(kActionOperatorPrefix) + std::to_string(row);
 	TextButton(id, FromCStr(text), kOperatorW, kKeyButtonH,
-	           actionId.c_str());
+	           actionId.c_str(), interactions);
 }
 
 }  // namespace
 
-void RegisterKeybindListWidgets(int surfaceW) {
+void RegisterKeybindListWidgets(int surfaceW,
+                                silencer::ui::UiInteractionRegistry& interactions) {
 	const int panelX = (surfaceW - kPanelW) / 2;
 	const int panelY = 34;
 	const int x = panelX + kPanelPadX;
 	int y = panelY + kPanelPadY + 34;
-	RegisterButton("Preset", kActionPreset, x + kActionNameW, y, 220, 33);
+	RegisterButton("Preset", kActionPreset, x + kActionNameW, y, 220, 33, interactions);
 	y += kRowH + kRowGap;
 	for(int i = 0; i < kKeybindListVisibleRows; i++){
 		const std::string row = std::to_string(i);
 		RegisterButton("Primary binding", std::string(kActionPrimaryPrefix) + row,
-		               x + kActionNameW, y + 4, kKeyButtonW, kKeyButtonH);
+		               x + kActionNameW, y + 4, kKeyButtonW, kKeyButtonH, interactions);
 		RegisterButton("Binding operator", std::string(kActionOperatorPrefix) + row,
 		               x + kActionNameW + kKeyButtonW + 12,
-		               y + 4, kOperatorW, kKeyButtonH);
+		               y + 4, kOperatorW, kKeyButtonH, interactions);
 		RegisterButton("Secondary binding",
 		               std::string(kActionSecondaryPrefix) + row,
 		               x + kActionNameW + kKeyButtonW + 12 + kOperatorW + 12,
-		               y + 4, kKeyButtonW, kKeyButtonH);
+		               y + 4, kKeyButtonW, kKeyButtonH, interactions);
 		y += kRowH + kRowGap;
 	}
 	RegisterButton("Scroll Up", kActionScrollUp,
-	               panelX + kPanelW - 42, panelY + 92, 24, 24);
+	               panelX + kPanelW - 42, panelY + 92, 24, 24, interactions);
 	RegisterButton("Scroll Down", kActionScrollDown,
-	               panelX + kPanelW - 42, panelY + 280, 24, 24);
-	RegisterButton("Save", kActionSave, panelX + 102, panelY + 338, 156, 21);
-	RegisterButton("Cancel", kActionCancel, panelX + 282, panelY + 338, 156, 21);
+	               panelX + kPanelW - 42, panelY + 280, 24, 24, interactions);
+	RegisterButton("Save", kActionSave, panelX + 102, panelY + 338, 156, 21, interactions);
+	RegisterButton("Cancel", kActionCancel, panelX + 282, panelY + 338, 156, 21, interactions);
 }
 
-void BuildKeybindListBody(const KeybindListView & view) {
+void BuildKeybindListBody(const KeybindListView & view,
+                          silencer::ui::UiInteractionRegistry& interactions) {
 	std::string primaryIds[kKeybindListVisibleRows];
 	std::string secondaryIds[kKeybindListVisibleRows];
 	std::string operatorIds[kKeybindListVisibleRows];
@@ -200,7 +207,7 @@ void BuildKeybindListBody(const KeybindListView & view) {
 			BankText(CLAY_STRING("Preset:"), BankTextVariant::Heading, {});
 		}
 		ButtonElement(CLAY_STRING("PresetButton"), FromStd(view.presetText), 220, 33,
-		              23, BankTextVariant::Title, kActionPreset);
+		              23, BankTextVariant::Title, kActionPreset, interactions);
 	}
 
 	CLAY({ .id = CLAY_ID("ControlsRows"),
@@ -226,11 +233,11 @@ void BuildKeybindListBody(const KeybindListView & view) {
 					BankText(FromStd(row.actionLabel), BankTextVariant::Heading, {});
 				}
 				RowActionButton(FromStd(primaryIds[i]),
-				                row.primaryLabel, i, 0, row.rebindingPrimary);
+				                row.primaryLabel, i, 0, row.rebindingPrimary, interactions);
 				RowOperatorButton(FromStd(operatorIds[i]),
-				                  row.operatorLabel.c_str(), i);
+				                  row.operatorLabel.c_str(), i, interactions);
 				RowActionButton(FromStd(secondaryIds[i]),
-				                row.secondaryLabel, i, 1, row.rebindingSecondary);
+				                row.secondaryLabel, i, 1, row.rebindingSecondary, interactions);
 			}
 		}
 	}
@@ -242,9 +249,9 @@ void BuildKeybindListBody(const KeybindListView & view) {
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
 		TextButton(CLAY_STRING("ScrollUp"), CLAY_STRING("Up"), 60, 24,
-		           kActionScrollUp);
+		           kActionScrollUp, interactions);
 		TextButton(CLAY_STRING("ScrollDown"), CLAY_STRING("Down"), 80, 24,
-		           kActionScrollDown);
+		           kActionScrollDown, interactions);
 	}
 
 	CLAY({ .id = CLAY_ID("ControlsActions"),
@@ -254,9 +261,9 @@ void BuildKeybindListBody(const KeybindListView & view) {
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
 		ButtonElement(CLAY_STRING("Save"), CLAY_STRING("Save"), 156, 21, 24,
-		              BankTextVariant::Heading, kActionSave);
+		              BankTextVariant::Heading, kActionSave, interactions);
 		ButtonElement(CLAY_STRING("Cancel"), CLAY_STRING("Cancel"), 156, 21, 24,
-		              BankTextVariant::Heading, kActionCancel);
+		              BankTextVariant::Heading, kActionCancel, interactions);
 	}
 }
 

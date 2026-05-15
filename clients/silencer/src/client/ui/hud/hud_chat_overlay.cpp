@@ -6,7 +6,7 @@
 #include "surface.h"
 #include "ui/primitives/bank_text.h"
 #include "ui/primitives/box.h"
-#include "ui/runtime/UiAutomationRegistry.h"
+#include "ui/runtime/UiInteractionRegistry.h"
 
 #include <SDL3/SDL_timer.h>
 
@@ -16,7 +16,9 @@
 namespace silencer {
 namespace client_ui {
 
-void BuildChatOverlay(const HudView& view, Surface* surface) {
+void BuildChatOverlay(const HudView& view,
+                      Surface* surface,
+                      silencer::ui::UiInteractionRegistry& interactions) {
 	using namespace silencer::ui::primitives;
 
 	const PlayerHudView& player = view.viewedPlayer;
@@ -43,29 +45,29 @@ void BuildChatOverlay(const HudView& view, Surface* surface) {
 	int panelH = 22 + ((int)lines.size() * 10);
 	if(panelH < 42) panelH = 42;
 	if(player.chatActive){
-		silencer::ui::automation::Widget chat;
+		silencer::ui::UiInteractable chat;
 		chat.id = "ingame.chat";
 		chat.labelText = "In-game chat";
-		chat.kind = silencer::ui::automation::WidgetKind::TextInput;
+		chat.kind = silencer::ui::UiInteractableKind::TextInput;
 		chat.uid = 9000;
 		chat.value = player.chatText;
 		chat.maxLength = player.chatTextCapacity - 1;
 		chat.clayId = CLAY_ID("InGameChatPanel");
 		chat.hasClayId = true;
 		chat.cancelOnEscape = true;
-		silencer::ui::automation::Register(chat);
+		interactions.RegisterInteractable(chat);
 
-		silencer::ui::automation::Widget channel;
+		silencer::ui::UiInteractable channel;
 		channel.id = "ingame.chat.channel";
 		channel.labelText = player.chatWithTeam ? "Team chat" : "All chat";
-		channel.kind = silencer::ui::automation::WidgetKind::Toggle;
+		channel.kind = silencer::ui::UiInteractableKind::Toggle;
 		channel.selected = player.chatWithTeam;
 		channel.clayId = CLAY_ID("InGameChatPanel");
 		channel.hasClayId = true;
-		silencer::ui::automation::Register(channel);
+		interactions.RegisterInteractable(channel);
 
-		if(!silencer::ui::automation::HasFocus()){
-			silencer::ui::automation::FocusWidgetById("ingame.chat");
+		if(!interactions.HasFocus()){
+			interactions.FocusInteractableById("ingame.chat");
 		}
 	}
 

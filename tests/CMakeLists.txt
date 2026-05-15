@@ -11,7 +11,7 @@ set(TEST_SRC
     ui_architecture_test.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/clay_init.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/ClayService.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiAutomationRegistry.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiInteractionRegistry.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiFrameContext.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiInputRouter.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiTextPolicy.cpp

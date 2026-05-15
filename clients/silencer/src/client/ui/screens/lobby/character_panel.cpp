@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/toggle.h"
 
@@ -113,7 +113,8 @@ bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
 
 void BuildCharacterPanelTree(CharacterPanelState & state,
                              World & world,
-                             Resources & resources) {
+                             Resources & resources,
+                             silencer::ui::UiInteractionRegistry& interactions) {
 	// Refresh stat strings each frame. The legacy panel gated this behind
 	// `agencychanged` because Overlay objects retained their text from
 	// frame to frame; Clay rebuilds every frame from scratch, so we
@@ -190,7 +191,8 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 				                   .selectedBrightness   = 128,
 				                   .unselectedBrightness = 32 },
 				       ToggleHandle{ .hoveredOut = nullptr,
-				                     .actionId   = def.actionId });
+				                     .actionId   = def.actionId,
+				                     .interactions = &interactions });
 
 				// Inspector hit rect uses the legacy on-screen coords so
 				// label-keyed CLI clicks keep working without depending on
@@ -198,15 +200,15 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 				// inspector dispatch is label-based; the rect is only used
 				// when geometric hit-testing is requested.
 				const int tx = 20 + i * 42;
-				silencer::ui::automation::Widget w;
+				silencer::ui::UiInteractable w;
 				w.id = def.actionId;
 				w.labelText = kAgencyLabels[i];
-				w.kind  = silencer::ui::automation::WidgetKind::Toggle;
+				w.kind  = silencer::ui::UiInteractableKind::Toggle;
 				w.x = tx; w.y = 90;
 				w.w = spriteW > 0 ? spriteW : (Uint16)16;
 				w.h = spriteH > 0 ? spriteH : (Uint16)16;
 				w.selected  = (state.selectedAgency == def.agency);
-				silencer::ui::automation::Register(w);
+				interactions.RegisterInteractable(w);
 			}
 		}
 

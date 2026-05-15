@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/box.h"
@@ -39,7 +39,8 @@ uint16_t LobbyTitleBarHeight(bool narrow, const std::string & mapName) {
 void BuildLobbyTitleBar(const std::string & version,
                         const std::string & mapName,
                         bool narrow,
-                        int surfaceW) {
+                        int surfaceW,
+                        silencer::ui::UiInteractionRegistry& interactions) {
 	const uint16_t titleH = LobbyTitleBarHeight(narrow, mapName);
 	CLAY(Box(BoxVariants::Chrome, {
 	         .id = CLAY_ID("LobbyTitleBar"),
@@ -104,7 +105,8 @@ void BuildLobbyTitleBar(const std::string & version,
 					           BankButtonVariant::Chrome,
 					           {},
 					           { .hoveredOut = nullptr,
-					             .actionId = kActionGoBack });
+					             .actionId = kActionGoBack,
+					             .interactions = &interactions });
 				}
 			}
 		};
@@ -129,14 +131,14 @@ void BuildLobbyTitleBar(const std::string & version,
 		}
 	}
 
-	silencer::ui::automation::Widget gb;
+	silencer::ui::UiInteractable gb;
 	gb.id = kActionGoBack;
 	gb.labelText = "Go Back";
-	gb.kind = silencer::ui::automation::WidgetKind::Button;
+	gb.kind = silencer::ui::UiInteractableKind::Button;
 	gb.x = std::max(0, surfaceW - (int)kRootPadX - 5 - 156);
 	gb.y = kRootPadTop + 4;
 	gb.w = 156; gb.h = 21;
-	silencer::ui::automation::Register(gb);
+	interactions.RegisterInteractable(gb);
 }
 
 }  // namespace silencer::client_ui::lobby

@@ -10,7 +10,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_button.h"
 #include "primitives/bank_text.h"
 
@@ -46,17 +46,22 @@ Clay_String FromStd(const std::string & s)
 void RegisterButton(const char * label,
                     const char * actionId,
                     int x,
-                    int y)
+                    int y,
+                    silencer::ui::UiInteractionRegistry& interactions)
 {
-	silencer::ui::automation::Widget w;
+	silencer::ui::UiInteractable w;
 	w.id = actionId;
 	w.labelText = label;
-	w.kind = silencer::ui::automation::WidgetKind::Button;
+	w.kind = silencer::ui::UiInteractableKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	silencer::ui::automation::Register(w);
+	interactions.RegisterInteractable(w);
 }
 
-void RegisterWidgets(int surfaceW, int surfaceH, Updater::State state, int retryCount)
+void RegisterWidgets(int surfaceW,
+                     int surfaceH,
+                     Updater::State state,
+                     int retryCount,
+                     silencer::ui::UiInteractionRegistry& interactions)
 {
 	const int dialogX = (surfaceW - kDialogW) / 2;
 	const int dialogY = (surfaceH - kDialogH) / 2;
@@ -64,14 +69,14 @@ void RegisterWidgets(int surfaceW, int surfaceH, Updater::State state, int retry
 	const int leftX = dialogX + (kDialogW - (156 * 2 + kButtonGap)) / 2;
 	const int rightX = leftX + 156 + kButtonGap;
 	if(state == Updater::PROMPTING){
-		RegisterButton("Update", kActionUpdate, leftX, buttonY);
+		RegisterButton("Update", kActionUpdate, leftX, buttonY, interactions);
 	}else if(state == Updater::FAILED && retryCount < 3){
-		RegisterButton("Retry", kActionRetry, leftX, buttonY);
+		RegisterButton("Retry", kActionRetry, leftX, buttonY, interactions);
 	}else if(state == Updater::FAILED){
-		RegisterButton("Download", kActionDownload, leftX, buttonY);
+		RegisterButton("Download", kActionDownload, leftX, buttonY, interactions);
 	}
 	if(state == Updater::PROMPTING || state == Updater::DOWNLOADING || state == Updater::FAILED){
-		RegisterButton("Cancel", kActionCancel, rightX, buttonY);
+		RegisterButton("Cancel", kActionCancel, rightX, buttonY, interactions);
 	}
 }
 
@@ -117,7 +122,8 @@ void UpdateScreen::Build(ScreenContext & ctx)
 	retryClicked = false;
 	downloadClicked = false;
 	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(surface.w, surface.h, ctx.updater.GetState(), ctx.updater.GetRetryCount());
+	RegisterWidgets(surface.w, surface.h, ctx.updater.GetState(), ctx.updater.GetRetryCount(),
+	                ctx.game.UiInteractions());
 }
 
 void UpdateScreen::Tick(ScreenContext & ctx)
@@ -175,7 +181,7 @@ void UpdateScreen::Tick(ScreenContext & ctx)
 	}
 }
 
-void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
+void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
@@ -215,22 +221,22 @@ void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 			       } }) {
 				if(ustate == Updater::PROMPTING){
 					BankButton(CLAY_STRING("Update"), BankButtonVariant::Chrome, {},
-					           BankButtonHandle{ nullptr, kActionUpdate });
+					           BankButtonHandle{ nullptr, kActionUpdate, &interactions });
 				}else if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3){
 					BankButton(CLAY_STRING("Retry"), BankButtonVariant::Chrome, {},
-					           BankButtonHandle{ nullptr, kActionRetry });
+					           BankButtonHandle{ nullptr, kActionRetry, &interactions });
 				}else if(ustate == Updater::FAILED){
 					BankButton(CLAY_STRING("Download"), BankButtonVariant::Chrome, {},
-					           BankButtonHandle{ nullptr, kActionDownload });
+					           BankButtonHandle{ nullptr, kActionDownload, &interactions });
 				}
 				if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
 					BankButton(CLAY_STRING("Cancel"), BankButtonVariant::Chrome, {},
-					           BankButtonHandle{ nullptr, kActionCancel });
+					           BankButtonHandle{ nullptr, kActionCancel, &interactions });
 				}
 			}
 		}
 	}
-	RegisterWidgets(dst.w, dst.h, ustate, ctx.updater.GetRetryCount());
+	RegisterWidgets(dst.w, dst.h, ustate, ctx.updater.GetRetryCount(), interactions);
 }
 
 void UpdateScreen::Destroy(ScreenContext & ctx)

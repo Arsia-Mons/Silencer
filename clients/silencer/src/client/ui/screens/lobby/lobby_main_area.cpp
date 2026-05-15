@@ -34,30 +34,32 @@ constexpr uint16_t kNarrowChatMinH = 88;
 void BuildRightUpperContents(LobbyMainAreaPanels & panels,
                              World & world,
                              Resources & resources,
-                             LobbyScreen & owner) {
+                             LobbyScreen & owner,
+                             silencer::ui::UiInteractionRegistry& interactions) {
 	if(panels.gameCreateActive){
-		BuildGameCreateUpperTree(panels.gameCreate, resources);
+		BuildGameCreateUpperTree(panels.gameCreate, resources, interactions);
 	}else if(panels.gameJoinActive){
-		BuildGameJoinUpperTree(panels.gameJoin, resources);
+		BuildGameJoinUpperTree(panels.gameJoin, resources, interactions);
 	}else if(panels.gameTechActive){
-		BuildGameTechUpperTree(panels.gameTech, world, resources, owner);
+		BuildGameTechUpperTree(panels.gameTech, world, resources, owner, interactions);
 	}else{
-		BuildGameSelectUpperTree(panels.gameSelect, resources);
+		BuildGameSelectUpperTree(panels.gameSelect, resources, interactions);
 	}
 }
 
 void BuildRightTallContents(LobbyMainAreaPanels & panels,
                             World & world,
                             Resources & resources,
-                            LobbyScreen & owner) {
+                            LobbyScreen & owner,
+                            silencer::ui::UiInteractionRegistry& interactions) {
 	if(panels.gameCreateActive){
-		BuildGameCreateTallTree(panels.gameCreate, resources);
+		BuildGameCreateTallTree(panels.gameCreate, resources, interactions);
 	}else if(panels.gameJoinActive){
-		BuildGameJoinTallTree(panels.gameJoin, resources);
+		BuildGameJoinTallTree(panels.gameJoin, resources, interactions);
 	}else if(panels.gameTechActive){
-		BuildGameTechTallTree(panels.gameTech, world, resources, owner);
+		BuildGameTechTallTree(panels.gameTech, world, resources, owner, interactions);
 	}else{
-		BuildGameSelectTallTree(panels.gameSelect, resources);
+		BuildGameSelectTallTree(panels.gameSelect, resources, interactions);
 	}
 }
 
@@ -65,7 +67,8 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
                      World & world,
                      Resources & resources,
                      LobbyScreen & owner,
-                     int narrowTallH) {
+                     int narrowTallH,
+                     silencer::ui::UiInteractionRegistry& interactions) {
 	CLAY(Box(BoxVariants::Chrome, {
 	         .id = CLAY_ID("LobbyCharacterBox"),
 	         .layout = {
@@ -75,7 +78,7 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 	         },
 	         .clip = { .horizontal = true, .vertical = true },
 	     })) {
-		BuildCharacterPanelTree(panels.character, world, resources);
+		BuildCharacterPanelTree(panels.character, world, resources, interactions);
 	}
 
 	CLAY(Box(BoxVariants::Chrome, {
@@ -87,7 +90,7 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 	         },
 	         .clip = { .horizontal = true, .vertical = true },
 	     })) {
-		BuildRightUpperContents(panels, world, resources, owner);
+		BuildRightUpperContents(panels, world, resources, owner, interactions);
 	}
 
 	CLAY(Box(BoxVariants::Chrome, {
@@ -99,7 +102,7 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 	         },
 	         .clip = { .horizontal = true, .vertical = true },
 	     })) {
-		BuildRightTallContents(panels, world, resources, owner);
+		BuildRightTallContents(panels, world, resources, owner, interactions);
 	}
 
 	CLAY(Box(BoxVariants::Chrome, {
@@ -111,14 +114,15 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 	         },
 	         .clip = { .horizontal = true, .vertical = true },
 	     })) {
-		BuildChatPanelTree(panels.chat, world, resources);
+		BuildChatPanelTree(panels.chat, world, resources, interactions);
 	}
 }
 
 void BuildWideBody(LobbyMainAreaPanels & panels,
                    World & world,
                    Resources & resources,
-                   LobbyScreen & owner) {
+                   LobbyScreen & owner,
+                   silencer::ui::UiInteractionRegistry& interactions) {
 	CLAY({ .id = CLAY_ID("LobbyLeftMiddleStack"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
@@ -146,7 +150,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 			         },
 			         .clip = { .horizontal = true, .vertical = true },
 			     })) {
-				BuildCharacterPanelTree(panels.character, world, resources);
+				BuildCharacterPanelTree(panels.character, world, resources, interactions);
 			}
 
 			CLAY(Box(BoxVariants::Chrome, {
@@ -158,7 +162,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 			         },
 			         .clip = { .horizontal = true, .vertical = true },
 			     })) {
-				BuildRightUpperContents(panels, world, resources, owner);
+				BuildRightUpperContents(panels, world, resources, owner, interactions);
 			}
 		}
 
@@ -171,7 +175,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 		         },
 		         .clip = { .horizontal = true, .vertical = true },
 		     })) {
-			BuildChatPanelTree(panels.chat, world, resources);
+			BuildChatPanelTree(panels.chat, world, resources, interactions);
 		}
 	}
 
@@ -184,7 +188,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 	         },
 	         .clip = { .horizontal = true, .vertical = true },
 	     })) {
-		BuildRightTallContents(panels, world, resources, owner);
+		BuildRightTallContents(panels, world, resources, owner, interactions);
 	}
 }
 
@@ -195,7 +199,8 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         Resources & resources,
                         LobbyScreen & owner,
                         bool narrow,
-                        int bodyH) {
+                        int bodyH,
+                        silencer::ui::UiInteractionRegistry& interactions) {
 	const int narrowTallFit = bodyH - ((int)kUpperH * 2)
 	                        - ((int)kRegionGap * 3) - (int)kNarrowChatMinH;
 	const int narrowTallH = std::max(0, std::min((int)kRightTallH, narrowTallFit));
@@ -209,11 +214,11 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
 	                                     : CLAY_LEFT_TO_RIGHT,
 	       },
 	       .clip = { .horizontal = true, .vertical = true },
-	     }) {
+	    }) {
 		if(narrow){
-			BuildNarrowBody(panels, world, resources, owner, narrowTallH);
+			BuildNarrowBody(panels, world, resources, owner, narrowTallH, interactions);
 		}else{
-			BuildWideBody(panels, world, resources, owner);
+			BuildWideBody(panels, world, resources, owner, interactions);
 		}
 	}
 }

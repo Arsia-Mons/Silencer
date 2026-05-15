@@ -93,7 +93,7 @@ clients/silencer/src/ui/
     CallbackStore.h/.cpp
     TextStorage.h/.cpp
     UiActionQueue.h
-    UiAutomationRegistry.h/.cpp
+    UiInteractionRegistry.h/.cpp
     UiIds.h
 
   design/

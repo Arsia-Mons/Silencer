@@ -48,7 +48,7 @@ public:
 TEST_CASE("ClayService uses the required central frame lifecycle order") {
 	RecordingClayBackend backend;
 	silencer::ui::ClayService service(backend);
-	silencer::ui::UiAutomationRegistry registry;
+	silencer::ui::UiInteractionRegistry registry;
 	silencer::ui::UiInputState input;
 	input.width = 1280;
 	input.height = 720;
@@ -89,14 +89,14 @@ TEST_CASE("ClientUi owns the frame lifecycle without demo-screen metadata") {
 	auto commands = clientUi.EndFrame();
 
 	REQUIRE(commands.size() == 1);
-	CHECK(clientUi.Automation().Elements().empty());
+	CHECK(clientUi.Interactions().Elements().empty());
 	CHECK(clientUi.DrainActions().empty());
 }
 
-TEST_CASE("UiAutomationRegistry supports id and case-insensitive label lookup") {
-	silencer::ui::UiAutomationRegistry registry;
+TEST_CASE("UiInteractionRegistry supports id and case-insensitive label lookup") {
+	silencer::ui::UiInteractionRegistry registry;
 	registry.BeginFrame();
-	registry.Register(silencer::ui::UiElementMetadata{
+	registry.Register(silencer::ui::UiElementSnapshot{
 		"main_menu.connect",
 		silencer::ui::UiElementKind::Button,
 		"Connect",
@@ -112,22 +112,22 @@ TEST_CASE("UiAutomationRegistry supports id and case-insensitive label lookup") 
 	CHECK(registry.FindByLabel("missing") == nullptr);
 }
 
-TEST_CASE("UiAutomationRegistry queues typed actions for interactive widgets") {
-	silencer::ui::UiAutomationRegistry registry;
+TEST_CASE("UiInteractionRegistry queues typed actions for interactive widgets") {
+	silencer::ui::UiInteractionRegistry registry;
 	registry.BeginFrame();
 
-	silencer::ui::UiAutomationWidget widget;
+	silencer::ui::UiInteractable widget;
 	widget.id = "main_menu.connect";
 	widget.labelText = "Connect";
-	widget.kind = silencer::ui::UiAutomationWidgetKind::Button;
+	widget.kind = silencer::ui::UiInteractableKind::Button;
 	widget.uid = 42;
 	widget.x = 10;
 	widget.y = 20;
 	widget.w = 80;
 	widget.h = 30;
-	registry.RegisterWidget(widget);
+	registry.RegisterInteractable(widget);
 
-	CHECK(registry.InvokeAt(12, 22));
+	CHECK(registry.PressAt(12, 22));
 
 	auto actions = registry.DrainActions();
 	REQUIRE(actions.size() == 1);
@@ -137,18 +137,18 @@ TEST_CASE("UiAutomationRegistry queues typed actions for interactive widgets") {
 	CHECK(registry.DrainActions().empty());
 }
 
-TEST_CASE("UiAutomationRegistry edits focused text through typed methods") {
-	silencer::ui::UiAutomationRegistry registry;
+TEST_CASE("UiInteractionRegistry edits focused text through typed methods") {
+	silencer::ui::UiInteractionRegistry registry;
 	registry.BeginFrame();
 
-	silencer::ui::UiAutomationWidget widget;
+	silencer::ui::UiInteractable widget;
 	widget.id = "profile.name";
 	widget.labelText = "Name";
-	widget.kind = silencer::ui::UiAutomationWidgetKind::TextInput;
+	widget.kind = silencer::ui::UiInteractableKind::TextInput;
 	widget.uid = 7;
 	widget.value = "ab";
 	widget.maxLength = 7;
-	registry.RegisterWidget(widget);
+	registry.RegisterInteractable(widget);
 
 	REQUIRE(registry.FocusTextInputByUid(7));
 	(void)registry.DrainActions();
@@ -184,7 +184,7 @@ TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
 	silencer::ui::UiAction action;
 	action.kind = silencer::ui::UiActionKind::Activate;
 	action.id = "main_menu.connect";
-	input.QueueAutomationAction(action);
+	input.QueueControlAction(action);
 
 	auto frame = input.BuildFrame(640, 480, 0.0f);
 	CHECK(frame.pointer.x == 160.0f);
@@ -197,8 +197,8 @@ TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
 	CHECK(frame.navActions[0] == silencer::ui::UiNavAction::Confirm);
 	REQUIRE(frame.bindingInputs.size() == 1);
 	CHECK(frame.bindingInputs[0].code == 44);
-	REQUIRE(frame.automationCommands.size() == 1);
-	CHECK(frame.automationCommands[0].action.id == "main_menu.connect");
+	REQUIRE(frame.controlCommands.size() == 1);
+	CHECK(frame.controlCommands[0].action.id == "main_menu.connect");
 
 	input.EndFrame();
 	frame = input.BuildFrame(640, 480, 1.0f / 60.0f);
@@ -208,29 +208,29 @@ TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
 	CHECK(frame.textInput.empty());
 	CHECK(frame.navActions.empty());
 	CHECK(frame.bindingInputs.empty());
-	CHECK(frame.automationCommands.empty());
+	CHECK(frame.controlCommands.empty());
 }
 
-TEST_CASE("UiInputRouter routes automation commands and binding capture through typed actions") {
-	silencer::ui::UiAutomationRegistry registry;
+TEST_CASE("UiInputRouter routes control commands and binding capture through typed actions") {
+	silencer::ui::UiInteractionRegistry registry;
 	registry.BeginFrame();
 
-	silencer::ui::UiAutomationWidget widget;
+	silencer::ui::UiInteractable widget;
 	widget.id = "main_menu.connect";
 	widget.labelText = "Connect";
-	widget.kind = silencer::ui::UiAutomationWidgetKind::Button;
+	widget.kind = silencer::ui::UiInteractableKind::Button;
 	widget.x = 10;
 	widget.y = 20;
 	widget.w = 80;
 	widget.h = 30;
-	registry.RegisterWidget(widget);
+	registry.RegisterInteractable(widget);
 
 	silencer::ui::UiInputState input;
-	silencer::ui::UiAutomationCommand click;
-	click.kind = silencer::ui::UiAutomationCommandKind::InvokeAt;
+	silencer::ui::UiControlCommand click;
+	click.kind = silencer::ui::UiControlCommandKind::PointerPress;
 	click.x = 12;
 	click.y = 22;
-	input.automationCommands.push_back(click);
+	input.controlCommands.push_back(click);
 
 	silencer::ui::UiBindingInput binding;
 	binding.kind = silencer::ui::UiBindingInputKind::KeyboardKeyDown;

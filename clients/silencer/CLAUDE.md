@@ -34,7 +34,7 @@ Rules:
 - Primitive frame arenas reset once in `ClientUi::BeginFrame`. Do not reset
   `BankTextBeginFrame`, `BankButtonBeginFrame`, `BoxBeginFrame`, etc. inside a
   screen, modal, HUD block, or overlay block.
-- Modal overlays clear automation metadata before their own `BuildUi`, so the
+- Modal overlays clear interaction metadata before their own `BuildUi`, so the
   top modal owns keyboard/CLI focus while lower visual layers can still render.
 - Keep `ScreenStack` as the real single-stack owner for screens and modal
   overlays. Add a separate modal stack only if real modal semantics are being
@@ -54,7 +54,7 @@ There is exactly one path from SDL events to UI screens:
    `Game::ResetUiFrameDeltas` clears the queues at end of frame.
 3. **Dispatch (single site):** `ClientUi::DispatchInput` hands `UiInputState`
    to `UiInputRouter::Route`, which translates pointer/text/nav/binding into
-   typed `UiAction`s queued on `UiAutomationRegistry`. Screens consume those
+   typed `UiAction`s queued on `UiInteractionRegistry`. Screens consume those
    actions in `Screen::HandleUiIntent` (per the existing virtual). Screens
    must NOT implement `OnTextInput` or `OnKey` virtuals — those don't exist.
 

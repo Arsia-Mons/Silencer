@@ -1,4 +1,4 @@
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 
 #include "runtime/UiTextPolicy.h"
 
@@ -32,51 +32,51 @@ bool LabelEquals(const char * a, const char * b) {
 	return *a == 0 && *b == 0;
 }
 
-const char * WidgetLabel(const UiAutomationWidget& widget) {
+const char * InteractableLabel(const UiInteractable& widget) {
 	return widget.labelText.empty() ? nullptr : widget.labelText.c_str();
 }
 
-std::string WidgetId(const UiAutomationWidget& widget) {
+std::string InteractableId(const UiInteractable& widget) {
 	if(!widget.id.empty()) return widget.id;
 	if(widget.uid >= 0) return std::to_string(widget.uid);
-	const char * label = WidgetLabel(widget);
+	const char * label = InteractableLabel(widget);
 	return label ? std::string(label) : std::string();
 }
 
-bool PointIn(const UiAutomationWidget& widget, int x, int y) {
+bool PointIn(const UiInteractable& widget, int x, int y) {
 	return x >= widget.x && y >= widget.y
 	    && x < widget.x + widget.w && y < widget.y + widget.h;
 }
 
-bool HasBounds(const UiAutomationWidget& widget) {
+bool HasBounds(const UiInteractable& widget) {
 	return widget.w > 0 && widget.h > 0;
 }
 
-bool IsInteractive(const UiAutomationWidget& widget) {
+bool IsInteractive(const UiInteractable& widget) {
 	if(widget.inactive) return false;
-	return widget.kind == UiAutomationWidgetKind::Button ||
-	       widget.kind == UiAutomationWidgetKind::Toggle ||
-	       widget.kind == UiAutomationWidgetKind::ListRow ||
-	       widget.kind == UiAutomationWidgetKind::TextInput;
+	return widget.kind == UiInteractableKind::Button ||
+	       widget.kind == UiInteractableKind::Toggle ||
+	       widget.kind == UiInteractableKind::ListRow ||
+	       widget.kind == UiInteractableKind::TextInput;
 }
 
-UiElementKind MetadataKind(UiAutomationWidgetKind kind) {
+UiElementKind MetadataKind(UiInteractableKind kind) {
 	switch(kind){
-		case UiAutomationWidgetKind::Button: return UiElementKind::Button;
-		case UiAutomationWidgetKind::Toggle: return UiElementKind::Button;
-		case UiAutomationWidgetKind::TextInput: return UiElementKind::TextField;
-		case UiAutomationWidgetKind::ListRow: return UiElementKind::ListItem;
+		case UiInteractableKind::Button: return UiElementKind::Button;
+		case UiInteractableKind::Toggle: return UiElementKind::Button;
+		case UiInteractableKind::TextInput: return UiElementKind::TextField;
+		case UiInteractableKind::ListRow: return UiElementKind::ListItem;
 	}
 	return UiElementKind::Container;
 }
 
-UiElementMetadata MetadataFromWidget(const UiAutomationWidget& widget, bool focused) {
-	UiElementMetadata metadata;
-	metadata.id = WidgetId(widget);
+UiElementSnapshot MetadataFromWidget(const UiInteractable& widget, bool focused) {
+	UiElementSnapshot metadata;
+	metadata.id = InteractableId(widget);
 	metadata.kind = MetadataKind(widget.kind);
-	const char * label = WidgetLabel(widget);
+	const char * label = InteractableLabel(widget);
 	if(label) metadata.label = label;
-	if(widget.kind == UiAutomationWidgetKind::TextInput){
+	if(widget.kind == UiInteractableKind::TextInput){
 		metadata.value = widget.isPassword
 			? std::string(widget.value.size(), '*')
 			: widget.value;
@@ -93,16 +93,16 @@ UiElementMetadata MetadataFromWidget(const UiAutomationWidget& widget, bool focu
 	return metadata;
 }
 
-float CenterX(const UiAutomationWidget& widget) {
+float CenterX(const UiInteractable& widget) {
 	return static_cast<float>(widget.x) + static_cast<float>(widget.w) * 0.5f;
 }
 
-float CenterY(const UiAutomationWidget& widget) {
+float CenterY(const UiInteractable& widget) {
 	return static_cast<float>(widget.y) + static_cast<float>(widget.h) * 0.5f;
 }
 
-bool IsDirectionalCandidate(const UiAutomationWidget& from,
-                            const UiAutomationWidget& to,
+bool IsDirectionalCandidate(const UiInteractable& from,
+                            const UiInteractable& to,
                             UiNavAction action,
                             float& primary,
                             float& secondary) {
@@ -137,21 +137,21 @@ bool IsDirectionalCandidate(const UiAutomationWidget& from,
 
 }  // namespace
 
-void UiAutomationRegistry::BeginFrame() {
+void UiInteractionRegistry::BeginFrame() {
 	elements_.clear();
-	widgets_.clear();
+	interactables_.clear();
 }
 
-void UiAutomationRegistry::Register(UiElementMetadata metadata) {
+void UiInteractionRegistry::Register(UiElementSnapshot metadata) {
 	elements_.push_back(std::move(metadata));
 }
 
-void UiAutomationRegistry::RegisterWidget(UiAutomationWidget widget) {
-	const std::string incomingId = WidgetId(widget);
-	UiAutomationWidget * existing = nullptr;
+void UiInteractionRegistry::RegisterInteractable(UiInteractable widget) {
+	const std::string incomingId = InteractableId(widget);
+	UiInteractable * existing = nullptr;
 	if(!incomingId.empty()){
-		for(auto& candidate : widgets_){
-			if(WidgetId(candidate) == incomingId){
+		for(auto& candidate : interactables_){
+			if(InteractableId(candidate) == incomingId){
 				existing = &candidate;
 				break;
 			}
@@ -183,40 +183,40 @@ void UiAutomationRegistry::RegisterWidget(UiAutomationWidget widget) {
 		existing->cancelOnEscape = widget.cancelOnEscape;
 	}else{
 		if(widget.id.empty()) widget.id = incomingId;
-		widgets_.push_back(std::move(widget));
+		interactables_.push_back(std::move(widget));
 	}
 
 	RefreshElementState();
 }
 
-const std::vector<UiElementMetadata>& UiAutomationRegistry::Elements() const {
+const std::vector<UiElementSnapshot>& UiInteractionRegistry::Elements() const {
 	return elements_;
 }
 
-const std::vector<UiAutomationWidget>& UiAutomationRegistry::Widgets() const {
-	return widgets_;
+const std::vector<UiInteractable>& UiInteractionRegistry::Interactables() const {
+	return interactables_;
 }
 
-const UiElementMetadata* UiAutomationRegistry::FindById(const std::string& id) const {
-	auto it = std::find_if(elements_.begin(), elements_.end(), [&](const UiElementMetadata& element) {
+const UiElementSnapshot* UiInteractionRegistry::FindById(const std::string& id) const {
+	auto it = std::find_if(elements_.begin(), elements_.end(), [&](const UiElementSnapshot& element) {
 		return element.id == id;
 	});
 	return it == elements_.end() ? nullptr : &*it;
 }
 
-const UiElementMetadata* UiAutomationRegistry::FindByLabel(const std::string& label) const {
-	auto it = std::find_if(elements_.begin(), elements_.end(), [&](const UiElementMetadata& element) {
+const UiElementSnapshot* UiInteractionRegistry::FindByLabel(const std::string& label) const {
+	auto it = std::find_if(elements_.begin(), elements_.end(), [&](const UiElementSnapshot& element) {
 		return EqualsIgnoreCase(element.label, label);
 	});
 	return it == elements_.end() ? nullptr : &*it;
 }
 
-const UiAutomationWidget* UiAutomationRegistry::FindWidgetByLabel(const char * label) const {
+const UiInteractable* UiInteractionRegistry::FindInteractableByLabel(const char * label) const {
 	if(!label || !*label) return nullptr;
-	const UiAutomationWidget * hit = nullptr;
+	const UiInteractable * hit = nullptr;
 	int count = 0;
-	for(const auto& widget : widgets_){
-		const char * widgetLabel = WidgetLabel(widget);
+	for(const auto& widget : interactables_){
+		const char * widgetLabel = InteractableLabel(widget);
 		if(widgetLabel && LabelEquals(widgetLabel, label)){
 			hit = &widget;
 			++count;
@@ -225,10 +225,10 @@ const UiAutomationWidget* UiAutomationRegistry::FindWidgetByLabel(const char * l
 	return count == 1 ? hit : nullptr;
 }
 
-const UiAutomationWidget* UiAutomationRegistry::FindWidgetByUid(int uid) const {
-	const UiAutomationWidget * hit = nullptr;
+const UiInteractable* UiInteractionRegistry::FindInteractableByUid(int uid) const {
+	const UiInteractable * hit = nullptr;
 	int count = 0;
-	for(const auto& widget : widgets_){
+	for(const auto& widget : interactables_){
 		if(widget.uid == uid){
 			hit = &widget;
 			++count;
@@ -237,59 +237,59 @@ const UiAutomationWidget* UiAutomationRegistry::FindWidgetByUid(int uid) const {
 	return count == 1 ? hit : nullptr;
 }
 
-const UiAutomationWidget* UiAutomationRegistry::FindWidgetById(const std::string& id) const {
-	for(const auto& widget : widgets_){
-		if(WidgetId(widget) == id) return &widget;
+const UiInteractable* UiInteractionRegistry::FindInteractableById(const std::string& id) const {
+	for(const auto& widget : interactables_){
+		if(InteractableId(widget) == id) return &widget;
 	}
 	return nullptr;
 }
 
-bool UiAutomationRegistry::MatchesFocus(const UiAutomationWidget& widget) const {
+bool UiInteractionRegistry::MatchesFocus(const UiInteractable& widget) const {
 	if(focusedUid_ >= 0 && widget.uid == focusedUid_) return true;
-	if(!focusedLabel_.empty() && WidgetId(widget) == focusedLabel_) return true;
-	const char * label = WidgetLabel(widget);
+	if(!focusedLabel_.empty() && InteractableId(widget) == focusedLabel_) return true;
+	const char * label = InteractableLabel(widget);
 	return focusedUid_ < 0 && !focusedLabel_.empty() && label
 	    && LabelEquals(label, focusedLabel_.c_str());
 }
 
-const UiAutomationWidget* UiAutomationRegistry::FocusedWidget() const {
-	for(const auto& widget : widgets_){
+const UiInteractable* UiInteractionRegistry::FocusedInteractable() const {
+	for(const auto& widget : interactables_){
 		if(MatchesFocus(widget)) return &widget;
 	}
 	return nullptr;
 }
 
-UiAutomationWidget* UiAutomationRegistry::FocusedWidget() {
-	for(auto& widget : widgets_){
+UiInteractable* UiInteractionRegistry::FocusedInteractable() {
+	for(auto& widget : interactables_){
 		if(MatchesFocus(widget)) return &widget;
 	}
 	return nullptr;
 }
 
-void UiAutomationRegistry::SetFocus(const UiAutomationWidget& widget) {
+void UiInteractionRegistry::SetFocus(const UiInteractable& widget) {
 	focusedUid_ = widget.uid;
-	focusedLabel_ = WidgetId(widget);
+	focusedLabel_ = InteractableId(widget);
 	RefreshElementState();
 }
 
-void UiAutomationRegistry::QueueAction(UiActionKind kind,
-                                       const UiAutomationWidget& widget,
+void UiInteractionRegistry::QueueAction(UiActionKind kind,
+                                       const UiInteractable& widget,
                                        const char * value) {
 	UiAction action;
 	action.kind = kind;
-	action.id = WidgetId(widget);
+	action.id = InteractableId(widget);
 	if(value) action.value = value;
 	else{
-		const char * label = WidgetLabel(widget);
+		const char * label = InteractableLabel(widget);
 		if(label) action.value = label;
 	}
 	action.index = widget.index;
 	actions_.Push(std::move(action));
 }
 
-bool UiAutomationRegistry::FocusTextInputAt(int x, int y) {
-	for(auto it = widgets_.rbegin(); it != widgets_.rend(); ++it){
-		if(it->kind == UiAutomationWidgetKind::TextInput &&
+bool UiInteractionRegistry::FocusTextInputAt(int x, int y) {
+	for(auto it = interactables_.rbegin(); it != interactables_.rend(); ++it){
+		if(it->kind == UiInteractableKind::TextInput &&
 		   !it->inactive && PointIn(*it, x, y)){
 			SetFocus(*it);
 			QueueAction(UiActionKind::Select, *it, it->value.c_str());
@@ -299,9 +299,9 @@ bool UiAutomationRegistry::FocusTextInputAt(int x, int y) {
 	return false;
 }
 
-bool UiAutomationRegistry::FocusTextInputByUid(int uid) {
-	for(const auto& widget : widgets_){
-		if(widget.kind == UiAutomationWidgetKind::TextInput &&
+bool UiInteractionRegistry::FocusTextInputByUid(int uid) {
+	for(const auto& widget : interactables_){
+		if(widget.kind == UiInteractableKind::TextInput &&
 		   widget.uid == uid && !widget.inactive){
 			SetFocus(widget);
 			QueueAction(UiActionKind::Select, widget, widget.value.c_str());
@@ -311,31 +311,31 @@ bool UiAutomationRegistry::FocusTextInputByUid(int uid) {
 	return false;
 }
 
-bool UiAutomationRegistry::FocusWidgetById(const std::string& id) {
-	const UiAutomationWidget * widget = FindWidgetById(id);
+bool UiInteractionRegistry::FocusInteractableById(const std::string& id) {
+	const UiInteractable * widget = FindInteractableById(id);
 	if(!widget || !IsInteractive(*widget)) return false;
 	SetFocus(*widget);
 	return true;
 }
 
-bool UiAutomationRegistry::IsTextInputFocused(int uid) const {
-	const UiAutomationWidget * widget = FocusedWidget();
+bool UiInteractionRegistry::IsTextInputFocused(int uid) const {
+	const UiInteractable * widget = FocusedInteractable();
 	return widget && widget->uid == uid;
 }
 
-bool UiAutomationRegistry::HasFocus() const {
-	return FocusedWidget() != nullptr;
+bool UiInteractionRegistry::HasFocus() const {
+	return FocusedInteractable() != nullptr;
 }
 
-void UiAutomationRegistry::ClearFocus() {
+void UiInteractionRegistry::ClearFocus() {
 	focusedUid_ = -1;
 	focusedLabel_.clear();
 	RefreshElementState();
 }
 
-bool UiAutomationRegistry::DispatchTextInput(char ascii) {
-	UiAutomationWidget * widget = FocusedWidget();
-	if(!widget || widget->kind != UiAutomationWidgetKind::TextInput || widget->inactive) return false;
+bool UiInteractionRegistry::DispatchTextInput(char ascii) {
+	UiInteractable * widget = FocusedInteractable();
+	if(!widget || widget->kind != UiInteractableKind::TextInput || widget->inactive) return false;
 	UiTextPolicy policy;
 	policy.numbersOnly = widget->numbersOnly;
 	policy.maxLength = widget->maxLength;
@@ -346,9 +346,9 @@ bool UiAutomationRegistry::DispatchTextInput(char ascii) {
 	return true;
 }
 
-bool UiAutomationRegistry::BackspaceFocusedText() {
-	UiAutomationWidget * widget = FocusedWidget();
-	if(!widget || widget->kind != UiAutomationWidgetKind::TextInput || widget->inactive){
+bool UiInteractionRegistry::BackspaceFocusedText() {
+	UiInteractable * widget = FocusedInteractable();
+	if(!widget || widget->kind != UiInteractableKind::TextInput || widget->inactive){
 		return false;
 	}
 	UiTextBackspace(widget->value);
@@ -357,18 +357,18 @@ bool UiAutomationRegistry::BackspaceFocusedText() {
 	return true;
 }
 
-bool UiAutomationRegistry::SubmitFocusedText() {
-	const UiAutomationWidget * widget = FocusedWidget();
-	if(widget && widget->kind == UiAutomationWidgetKind::TextInput && !widget->inactive){
+bool UiInteractionRegistry::SubmitFocusedText() {
+	const UiInteractable * widget = FocusedInteractable();
+	if(widget && widget->kind == UiInteractableKind::TextInput && !widget->inactive){
 		QueueAction(UiActionKind::SubmitText, *widget, widget->value.c_str());
 		return true;
 	}
 	return false;
 }
 
-bool UiAutomationRegistry::CancelFocused() {
-	const UiAutomationWidget * widget = FocusedWidget();
-	if(widget && widget->kind == UiAutomationWidgetKind::TextInput && !widget->inactive){
+bool UiInteractionRegistry::CancelFocused() {
+	const UiInteractable * widget = FocusedInteractable();
+	if(widget && widget->kind == UiInteractableKind::TextInput && !widget->inactive){
 		if(widget->cancelOnEscape) QueueAction(UiActionKind::Cancel, *widget, widget->value.c_str());
 		ClearFocus();
 		return true;
@@ -376,19 +376,19 @@ bool UiAutomationRegistry::CancelFocused() {
 	return false;
 }
 
-bool UiAutomationRegistry::InvokeAt(int x, int y) {
-	for(auto it = widgets_.rbegin(); it != widgets_.rend(); ++it){
+bool UiInteractionRegistry::PressAt(int x, int y) {
+	for(auto it = interactables_.rbegin(); it != interactables_.rend(); ++it){
 		if(IsInteractive(*it) && PointIn(*it, x, y)){
 			SetFocus(*it);
 			switch(it->kind){
-				case UiAutomationWidgetKind::Button:
-				case UiAutomationWidgetKind::Toggle:
+				case UiInteractableKind::Button:
+				case UiInteractableKind::Toggle:
 					QueueAction(UiActionKind::Activate, *it, nullptr);
 					return true;
-				case UiAutomationWidgetKind::ListRow:
+				case UiInteractableKind::ListRow:
 					QueueAction(UiActionKind::Select, *it, "pointer");
 					return true;
-				case UiAutomationWidgetKind::TextInput:
+				case UiInteractableKind::TextInput:
 					QueueAction(UiActionKind::Select, *it, it->value.c_str());
 					return true;
 			}
@@ -398,9 +398,9 @@ bool UiAutomationRegistry::InvokeAt(int x, int y) {
 	return false;
 }
 
-bool UiAutomationRegistry::FocusNextInteractive() {
-	std::vector<const UiAutomationWidget *> items;
-	for(const auto& widget : widgets_){
+bool UiInteractionRegistry::FocusNextInteractive() {
+	std::vector<const UiInteractable *> items;
+	for(const auto& widget : interactables_){
 		if(IsInteractive(widget)) items.push_back(&widget);
 	}
 	if(items.empty()) return false;
@@ -417,9 +417,9 @@ bool UiAutomationRegistry::FocusNextInteractive() {
 	return true;
 }
 
-bool UiAutomationRegistry::FocusPreviousInteractive() {
-	std::vector<const UiAutomationWidget *> items;
-	for(const auto& widget : widgets_){
+bool UiInteractionRegistry::FocusPreviousInteractive() {
+	std::vector<const UiInteractable *> items;
+	for(const auto& widget : interactables_){
 		if(IsInteractive(widget)) items.push_back(&widget);
 	}
 	if(items.empty()) return false;
@@ -437,18 +437,18 @@ bool UiAutomationRegistry::FocusPreviousInteractive() {
 	return true;
 }
 
-bool UiAutomationRegistry::FocusDirectional(UiNavAction action) {
-	const UiAutomationWidget * focused = FocusedWidget();
+bool UiInteractionRegistry::FocusDirectional(UiNavAction action) {
+	const UiInteractable * focused = FocusedInteractable();
 	if(!focused || !HasBounds(*focused)) {
 		if(action == UiNavAction::Down || action == UiNavAction::Right) return FocusNextInteractive();
 		if(action == UiNavAction::Up || action == UiNavAction::Left) return FocusPreviousInteractive();
 		return false;
 	}
 
-	const UiAutomationWidget * best = nullptr;
+	const UiInteractable * best = nullptr;
 	float bestPrimary = 0.0f;
 	float bestSecondary = 0.0f;
-	for(const auto& widget : widgets_){
+	for(const auto& widget : interactables_){
 		if(&widget == focused || !IsInteractive(widget) || !HasBounds(widget)) continue;
 		float primary = 0.0f;
 		float secondary = 0.0f;
@@ -472,34 +472,34 @@ bool UiAutomationRegistry::FocusDirectional(UiNavAction action) {
 	return true;
 }
 
-bool UiAutomationRegistry::ActivateFocused() {
-	const UiAutomationWidget * widget = FocusedWidget();
+bool UiInteractionRegistry::ActivateFocused() {
+	const UiInteractable * widget = FocusedInteractable();
 	if(!widget || widget->inactive) return false;
 	switch(widget->kind){
-		case UiAutomationWidgetKind::Button:
-		case UiAutomationWidgetKind::Toggle:
+		case UiInteractableKind::Button:
+		case UiInteractableKind::Toggle:
 			QueueAction(UiActionKind::Activate, *widget, nullptr);
 			return true;
-		case UiAutomationWidgetKind::ListRow:
+		case UiInteractableKind::ListRow:
 			QueueAction(UiActionKind::Select, *widget, "activate");
 			return true;
-		case UiAutomationWidgetKind::TextInput:
+		case UiInteractableKind::TextInput:
 			QueueAction(UiActionKind::Select, *widget, widget->value.c_str());
 			return true;
 	}
 	return false;
 }
 
-void UiAutomationRegistry::QueueAction(UiAction action) {
+void UiInteractionRegistry::QueueAction(UiAction action) {
 	actions_.Push(std::move(action));
 }
 
-std::vector<UiAction> UiAutomationRegistry::DrainActions() {
+std::vector<UiAction> UiInteractionRegistry::DrainActions() {
 	return actions_.Drain();
 }
 
-void UiAutomationRegistry::ResolveClayBoundsFromClay() {
-	for(auto& widget : widgets_){
+void UiInteractionRegistry::ResolveClayBoundsFromClay() {
+	for(auto& widget : interactables_){
 		if(!widget.hasClayId) continue;
 		Clay_ElementData data = Clay_GetElementData(widget.clayId);
 		if(!data.found) continue;
@@ -511,44 +511,13 @@ void UiAutomationRegistry::ResolveClayBoundsFromClay() {
 	RefreshElementState();
 }
 
-void UiAutomationRegistry::RefreshElementState() {
+void UiInteractionRegistry::RefreshElementState() {
 	elements_.clear();
-	for(const auto& widget : widgets_){
+	for(const auto& widget : interactables_){
 		elements_.push_back(MetadataFromWidget(widget, MatchesFocus(widget)));
 	}
 }
 
-UiAutomationRegistry& ActiveUiAutomationRegistry() {
-	static UiAutomationRegistry registry;
-	return registry;
-}
-
-namespace automation {
-
-void BeginFrame() { ActiveUiAutomationRegistry().BeginFrame(); }
-void Register(const Widget& widget) { ActiveUiAutomationRegistry().RegisterWidget(widget); }
-const std::vector<Widget>& All() { return ActiveUiAutomationRegistry().Widgets(); }
-const Widget* FindByLabel(const char * label) { return ActiveUiAutomationRegistry().FindWidgetByLabel(label); }
-const Widget* FindByUid(int uid) { return ActiveUiAutomationRegistry().FindWidgetByUid(uid); }
-bool FocusTextInputAt(int x, int y) { return ActiveUiAutomationRegistry().FocusTextInputAt(x, y); }
-bool FocusTextInputByUid(int uid) { return ActiveUiAutomationRegistry().FocusTextInputByUid(uid); }
-bool FocusWidgetById(const std::string& id) { return ActiveUiAutomationRegistry().FocusWidgetById(id); }
-bool IsTextInputFocused(int uid) { return ActiveUiAutomationRegistry().IsTextInputFocused(uid); }
-bool HasFocus() { return ActiveUiAutomationRegistry().HasFocus(); }
-void ClearFocus() { ActiveUiAutomationRegistry().ClearFocus(); }
-bool DispatchTextInput(char ascii) { return ActiveUiAutomationRegistry().DispatchTextInput(ascii); }
-bool BackspaceFocusedText() { return ActiveUiAutomationRegistry().BackspaceFocusedText(); }
-bool SubmitFocusedText() { return ActiveUiAutomationRegistry().SubmitFocusedText(); }
-bool CancelFocused() { return ActiveUiAutomationRegistry().CancelFocused(); }
-bool InvokeAt(int x, int y) { return ActiveUiAutomationRegistry().InvokeAt(x, y); }
-bool FocusNextInteractive() { return ActiveUiAutomationRegistry().FocusNextInteractive(); }
-bool FocusPreviousInteractive() { return ActiveUiAutomationRegistry().FocusPreviousInteractive(); }
-bool FocusDirectional(UiNavAction action) { return ActiveUiAutomationRegistry().FocusDirectional(action); }
-bool ActivateFocused() { return ActiveUiAutomationRegistry().ActivateFocused(); }
-void QueueAction(UiAction action) { ActiveUiAutomationRegistry().QueueAction(std::move(action)); }
-std::vector<UiAction> DrainActions() { return ActiveUiAutomationRegistry().DrainActions(); }
-
-}  // namespace automation
 
 }  // namespace ui
 }  // namespace silencer

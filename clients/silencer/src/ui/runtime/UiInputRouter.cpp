@@ -24,20 +24,20 @@ bool MovesSpatially(UiNavAction action) {
 
 }  // namespace
 
-UiInputRouter::UiInputRouter(UiAutomationRegistry& registry)
+UiInputRouter::UiInputRouter(UiInteractionRegistry& registry)
 	: registry_(registry) {}
 
 std::vector<UiAction> UiInputRouter::Route(const UiInputState& input) {
-	for(const UiAutomationCommand& command : input.automationCommands){
-		if(command.kind == UiAutomationCommandKind::InvokeAt){
-			registry_.InvokeAt(command.x, command.y);
+	for(const UiControlCommand& command : input.controlCommands){
+		if(command.kind == UiControlCommandKind::PointerPress){
+			registry_.PressAt(command.x, command.y);
 		}else{
 			registry_.QueueAction(command.action);
 		}
 	}
 
 	if(input.pointer.pressed){
-		registry_.InvokeAt(
+		registry_.PressAt(
 			static_cast<int>(input.pointer.x),
 			static_cast<int>(input.pointer.y));
 	}

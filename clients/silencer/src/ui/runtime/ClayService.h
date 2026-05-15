@@ -1,6 +1,6 @@
 #pragma once
 
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "runtime/UiInputState.h"
 
 #include <string>
@@ -26,14 +26,14 @@ public:
 
 struct ClayFrameState {
 	UiInputState input;
-	UiAutomationRegistry* automation = nullptr;
+	UiInteractionRegistry* interactions = nullptr;
 };
 
 class ClayService {
 public:
 	explicit ClayService(ClayFrameBackend& backend);
 
-	void BeginFrame(const UiInputState& input, UiAutomationRegistry& automation);
+	void BeginFrame(const UiInputState& input, UiInteractionRegistry& interactions);
 	std::vector<UiRenderCommand> EndFrame();
 	const ClayFrameState& Frame() const { return frame_; }
 

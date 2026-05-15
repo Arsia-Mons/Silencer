@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
@@ -79,7 +79,8 @@ int FillSlab(ScrollTextBoxLine * slab, const std::vector<ChatLine> & lines) {
 
 void BuildChatPanelTree(ChatPanelState & state,
                         World & world,
-                        Resources & resources) {
+                        Resources & resources,
+                        silencer::ui::UiInteractionRegistry& interactions) {
 	// The lobby shell supplies LobbyChatBox chrome. This component is only
 	// the chat content tree: channel header, scrollback/presence row, input.
 	(void)resources;
@@ -181,15 +182,15 @@ void BuildChatPanelTree(ChatPanelState & state,
 	}
 
 	{
-		silencer::ui::automation::Widget w;
+		silencer::ui::UiInteractable w;
 		w.id = kActionInput;
 		w.labelText = "Chat";
-		w.kind  = silencer::ui::automation::WidgetKind::TextInput;
+		w.kind  = silencer::ui::UiInteractableKind::TextInput;
 		w.x = kInspectorInputX; w.y = kInspectorInputY;
 		w.w = kInputW; w.h = kInputH;
 		w.value = state.inputBuffer;
 		w.maxLength = static_cast<int>(sizeof(state.inputBuffer)) - 1;
-		silencer::ui::automation::Register(w);
+		interactions.RegisterInteractable(w);
 	}
 }
 

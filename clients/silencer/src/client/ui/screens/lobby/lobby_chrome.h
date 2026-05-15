@@ -9,6 +9,10 @@
 #include <cstdint>
 #include <string>
 
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
+
 namespace silencer::client_ui::lobby {
 
 constexpr uint16_t kLobbyTitleBarH = 29;
@@ -23,7 +27,8 @@ uint16_t LobbyTitleBarHeight(bool narrow, const std::string & mapName);
 void BuildLobbyTitleBar(const std::string & version,
                         const std::string & mapName,
                         bool narrow,
-                        int surfaceW);
+                        int surfaceW,
+                        silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

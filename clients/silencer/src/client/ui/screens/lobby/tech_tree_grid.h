@@ -8,9 +8,15 @@
 class World;
 class LobbyScreen;
 
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
+
 namespace silencer::client_ui::lobby {
 
-void BuildTechTreeGrid(World & world, LobbyScreen & owner);
+void BuildTechTreeGrid(World & world,
+                       LobbyScreen & owner,
+                       silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

@@ -1,11 +1,12 @@
 #pragma once
 
 #include "ui/runtime/ClayService.h"
-#include "ui/runtime/UiAutomationRegistry.h"
+#include "ui/runtime/UiInteractionRegistry.h"
 #include "ui/runtime/UiFrameContext.h"
 #include "client/ui/navigation/ScreenStack.h"
 
 #include <memory>
+#include <string>
 #include <vector>
 
 class Screen;
@@ -24,8 +25,8 @@ public:
 	std::vector<silencer::ui::UiRenderCommand> EndFrame();
 	std::vector<silencer::ui::UiAction> DispatchInput(ScreenContext& ctx, const silencer::ui::UiInputState& input);
 	std::vector<silencer::ui::UiAction> DrainActions();
-	const silencer::ui::UiAutomationRegistry& Automation() const { return automation_; }
-	silencer::ui::UiAutomationRegistry& Automation() { return automation_; }
+	const silencer::ui::UiInteractionRegistry& Interactions() const { return interactions_; }
+	silencer::ui::UiInteractionRegistry& Interactions() { return interactions_; }
 
 	bool HasScreens() const { return !screens_.Empty(); }
 	Screen * TopScreen() const { return screens_.Top(); }
@@ -40,8 +41,9 @@ public:
 private:
 	silencer::ui::UiFrameContext frameCtx_;
 	silencer::ui::ClayService& clay_;
-	silencer::ui::UiAutomationRegistry& automation_;
+	silencer::ui::UiInteractionRegistry interactions_;
 	ScreenStack screens_;
+	std::string hoveredAudioInteractableId_;
 };
 
 }  // namespace client_ui

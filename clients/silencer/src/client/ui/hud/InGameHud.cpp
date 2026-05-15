@@ -18,7 +18,8 @@ namespace client_ui {
 // sprites, readouts, team strip, secret hack overlay, trace time, buy/tech
 // overlay, chat overlay, system-camera frame) and lives in its own TU.
 void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
-                      const HudView& view, Surface* surface) {
+                      const HudView& view, Surface* surface,
+                      silencer::ui::UiInteractionRegistry& interactions) {
 	if(!view.mapLoaded) return;
 	if(!view.localPlayer.valid) return;
 
@@ -57,11 +58,11 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 	if(tracetime > 0) BuildHudTraceTime(surface, tracetime);
 
 	if(view.buyTech.visible){
-		BuildBuyTechOverlay(view.buyTech, surface);
+		BuildBuyTechOverlay(view.buyTech, surface, interactions);
 	}
 
 	if(view.showChatTicks || player.chatActive){
-		BuildChatOverlay(view, surface);
+		BuildChatOverlay(view, surface, interactions);
 	}
 }
 

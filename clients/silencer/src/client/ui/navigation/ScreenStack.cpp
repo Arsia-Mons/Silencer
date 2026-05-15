@@ -1,6 +1,6 @@
 #include "client/ui/navigation/ScreenStack.h"
 
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "screen.h"
 
 #include <utility>
@@ -63,14 +63,14 @@ void ScreenStack::TickVisible(ScreenContext& ctx) {
 void ScreenStack::BuildVisible(ScreenContext& ctx,
                                Surface& dst,
                                float frametime,
-                               silencer::ui::UiAutomationRegistry& automation) {
+                               silencer::ui::UiInteractionRegistry& interactions) {
 	if(screens_.empty()) return;
 	const std::size_t start = VisibleStart();
 	for(std::size_t i = start; i < screens_.size(); ++i) {
 		if(i > start && screens_[i]->IsOverlay()) {
-			automation.BeginFrame();
+			interactions.BeginFrame();
 		}
-		screens_[i]->BuildUi(ctx, dst, frametime);
+		screens_[i]->BuildUi(ctx, dst, frametime, interactions);
 	}
 }
 

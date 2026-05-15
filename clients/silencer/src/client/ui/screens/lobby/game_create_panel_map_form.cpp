@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/scroll_list.h"
@@ -52,30 +52,33 @@ constexpr const char * kActionName      = "lobby.game_create.name";
 constexpr const char * kActionPassword  = "lobby.game_create.password";
 
 void RegisterButton(const char * label, const char * actionId,
-                    int x, int y, int w, int h) {
-	silencer::ui::automation::Widget reg;
+                    int x, int y, int w, int h,
+                    silencer::ui::UiInteractionRegistry& interactions) {
+	silencer::ui::UiInteractable reg;
 	reg.id        = actionId;
 	reg.labelText = label;
-	reg.kind      = silencer::ui::automation::WidgetKind::Button;
+	reg.kind      = silencer::ui::UiInteractableKind::Button;
 	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	silencer::ui::automation::Register(reg);
+	interactions.RegisterInteractable(reg);
 }
 
 void RegisterTextInput(const char * label, const char * actionId,
                        int x, int y, int w, int h,
-                       char * buf, int cap, bool isPassword = false) {
-	silencer::ui::automation::Widget reg;
+                       char * buf, int cap, bool isPassword,
+                       silencer::ui::UiInteractionRegistry& interactions) {
+	silencer::ui::UiInteractable reg;
 	reg.id            = actionId;
 	reg.labelText     = label;
-	reg.kind          = silencer::ui::automation::WidgetKind::TextInput;
+	reg.kind          = silencer::ui::UiInteractableKind::TextInput;
 	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
 	reg.value         = buf ? buf : "";
 	reg.maxLength     = cap > 0 ? cap - 1 : 0;
 	reg.isPassword    = isPassword;
-	silencer::ui::automation::Register(reg);
+	interactions.RegisterInteractable(reg);
 }
 
-void BuildMapList(GameCreatePanelState & state) {
+void BuildMapList(GameCreatePanelState & state,
+                  silencer::ui::UiInteractionRegistry& interactions) {
 	const int slotCount = std::min((int)state.maps.size(), kMaxMapRows);
 	for(int i = 0; i < slotCount; ++i){
 		const std::string & raw = state.maps[i];
@@ -96,22 +99,23 @@ void BuildMapList(GameCreatePanelState & state) {
 		           g_mapSlab, slotCount,
 		           state.mapSelectedIndex, state.mapScrollPos,
 		           listOpts,
-		           ScrollListHandle{ nullptr, kActionMapPrefix });
+		           ScrollListHandle{ nullptr, kActionMapPrefix, &interactions });
 	}
 	for(int i = 0; i < slotCount; ++i){
-		silencer::ui::automation::Widget reg;
+		silencer::ui::UiInteractable reg;
 		reg.id         = std::string(kActionMapPrefix) + "." + std::to_string(i);
 		reg.labelText  = g_mapSlab[i].chars ? g_mapSlab[i].chars : "";
-		reg.kind       = silencer::ui::automation::WidgetKind::ListRow;
+		reg.kind       = silencer::ui::UiInteractableKind::ListRow;
 		reg.x = kMapListX; reg.y = kMapListY + i * kMapListLineH;
 		reg.w = kMapListW; reg.h = kMapListLineH;
 		reg.index      = i;
 		reg.selected   = state.mapSelectedIndex == i;
-		silencer::ui::automation::Register(reg);
+		interactions.RegisterInteractable(reg);
 	}
 }
 
-void BuildNameAndPassword(GameCreatePanelState & state) {
+void BuildNameAndPassword(GameCreatePanelState & state,
+                          silencer::ui::UiInteractionRegistry& interactions) {
 	CLAY({ .id = CLAY_ID("GCrtNameLabelWrap") }) {
 		BankText(CLAY_STRING("Game name:"),
 		         BankTextVariant::Heading, {});
@@ -129,7 +133,7 @@ void BuildNameAndPassword(GameCreatePanelState & state) {
 	}
 	RegisterTextInput("Game name", kActionName,
 	                  kNameInputX, kNameInputY, kNameInputW, kNameInputH,
-	                  state.name, (int)sizeof(state.name));
+	                  state.name, (int)sizeof(state.name), false, interactions);
 
 	CLAY({ .id = CLAY_ID("GCrtPwLabelWrap") }) {
 		BankText(CLAY_STRING("Password (optional):"),
@@ -142,13 +146,14 @@ void BuildNameAndPassword(GameCreatePanelState & state) {
 	}
 	RegisterTextInput("Password", kActionPassword,
 	                  kPwInputX, kPwInputY, kPwInputW, kPwInputH,
-	                  state.password, (int)sizeof(state.password), true);
+	                  state.password, (int)sizeof(state.password), true, interactions);
 }
 
 }  // namespace
 
 void BuildGameCreateTallTree(GameCreatePanelState & state,
-                             Resources & resources) {
+                             Resources & resources,
+                             silencer::ui::UiInteractionRegistry& interactions) {
 	(void)resources;
 
 	CLAY({ .id = CLAY_ID("GCrtTallContent"),
@@ -163,16 +168,16 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 			         BankTextVariant::Heading, {});
 		}
 
-		BuildMapList(state);
-		BuildNameAndPassword(state);
+		BuildMapList(state, interactions);
+		BuildNameAndPassword(state, interactions);
 
 		CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
 		       .layout = { .childAlignment = { .x = CLAY_ALIGN_X_CENTER } } }) {
 			BankButton(CLAY_STRING("Create"),
 			           BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionCreate });
+			           BankButtonHandle{ nullptr, kActionCreate, &interactions });
 		}
-		RegisterButton("Create", kActionCreate, kCreateBtnX, kCreateBtnY, 156, 21);
+		RegisterButton("Create", kActionCreate, kCreateBtnX, kCreateBtnY, 156, 21, interactions);
 	}
 }
 

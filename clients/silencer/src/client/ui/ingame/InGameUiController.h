@@ -8,6 +8,9 @@
 class World;
 
 namespace silencer {
+namespace ui {
+class UiInteractionRegistry;
+}
 namespace client_ui {
 
 enum class InGameUiControlMode {
@@ -41,7 +44,9 @@ public:
 
 	bool HasInputTarget(int localPeerId);
 	void UpdateOverlayState(int localPeerId);
-	bool ApplyActions(int localPeerId, const std::vector<silencer::ui::UiAction>& actions);
+	bool ApplyActions(int localPeerId,
+	                  const std::vector<silencer::ui::UiAction>& actions,
+	                  silencer::ui::UiInteractionRegistry& interactions);
 	InGameUiControlResult ConfigureForControl(InGameUiControlMode mode);
 
 private:

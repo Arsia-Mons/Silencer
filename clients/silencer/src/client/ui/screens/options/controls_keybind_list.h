@@ -5,7 +5,7 @@
 //   * The action / preset / save / cancel / scroll button primitives.
 //   * The visible keybind row composition (action label + primary button +
 //     OR/AND operator button + secondary button).
-//   * Automation-widget registration for the visible row buttons.
+//   * Interaction registration for the visible row buttons.
 //
 // The panel chrome (root background, "Configure Controls" title) lives in the
 // screen file; this header emits the panel-interior rows + the bottom action
@@ -15,6 +15,10 @@
 
 class Surface;
 class OptionsControlsScreen;
+
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
 
 namespace silencer::client_ui::options {
 
@@ -35,14 +39,16 @@ struct KeybindListView {
 	int visibleRowCount = 0;
 };
 
-// Registers automation hit-rects for the preset / row buttons / scroll /
+// Registers interaction hit-rects for the preset / row buttons / scroll /
 // save / cancel buttons at their legacy screen positions.
-void RegisterKeybindListWidgets(int surfaceW);
+void RegisterKeybindListWidgets(int surfaceW,
+                                silencer::ui::UiInteractionRegistry& interactions);
 
 // Emits the keybind-list panel interior (preset row + visible rows + scroll
 // row + save/cancel row) into the current Clay frame. The caller wraps in the
 // panel background.
-void BuildKeybindListBody(const KeybindListView & view);
+void BuildKeybindListBody(const KeybindListView & view,
+                          silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::options
 

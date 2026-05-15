@@ -8,14 +8,16 @@
 #include "surface.h"
 #include "ui/primitives/bank_text.h"
 #include "ui/primitives/box.h"
-#include "ui/runtime/UiAutomationRegistry.h"
+#include "ui/runtime/UiInteractionRegistry.h"
 
 #include <string>
 
 namespace silencer {
 namespace client_ui {
 
-void BuildBuyTechOverlay(const BuyTechOverlayView& view, Surface* surface) {
+void BuildBuyTechOverlay(const BuyTechOverlayView& view,
+                         Surface* surface,
+                         silencer::ui::UiInteractionRegistry& interactions) {
 	if(view.rows.empty()) return;
 
 	using namespace silencer::ui::primitives;
@@ -39,17 +41,17 @@ void BuildBuyTechOverlay(const BuyTechOverlayView& view, Surface* surface) {
 			for(unsigned int i = 0; i < view.rows.size(); ++i) {
 				const BuyTechRowView& row = view.rows[i];
 				const Clay_ElementId rowClayId = CLAY_IDI("InGameBuyTechRow", row.index);
-				silencer::ui::automation::Widget widget;
+				silencer::ui::UiInteractable widget;
 				widget.id = "ingame.buytech.row." + std::to_string(row.index);
 				widget.labelText = row.name;
-				widget.kind = silencer::ui::automation::WidgetKind::ListRow;
+				widget.kind = silencer::ui::UiInteractableKind::ListRow;
 				widget.index = row.index;
 				widget.selected = row.selected;
 				widget.clayId = rowClayId;
 				widget.hasClayId = true;
-				silencer::ui::automation::Register(widget);
+				interactions.RegisterInteractable(widget);
 				if(row.selected){
-					silencer::ui::automation::FocusWidgetById(widget.id);
+					interactions.FocusInteractableById(widget.id);
 				}
 				CLAY({ .id = CLAY_IDI("InGameBuyTechRow", row.index),
 				       .layout = {

@@ -2,7 +2,7 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "runtime/UiAutomationRegistry.h"
+#include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
 #include "primitives/bank_button.h"
 #include "primitives/scroll_list.h"
@@ -76,13 +76,17 @@ Clay_String StaticId(const char * s) {
 	return Clay_String{ true, static_cast<int32_t>(strlen(s)), s };
 }
 
-void RegisterButton(const char * label, const char * actionId, int x, int y) {
-	silencer::ui::automation::Widget w;
+void RegisterButton(silencer::ui::UiInteractionRegistry& interactions,
+                    const char * label,
+                    const char * actionId,
+                    int x,
+                    int y) {
+	silencer::ui::UiInteractable w;
 	w.id = actionId;
 	w.labelText = label;
-	w.kind  = silencer::ui::automation::WidgetKind::Button;
+	w.kind  = silencer::ui::UiInteractableKind::Button;
 	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	silencer::ui::automation::Register(w);
+	interactions.RegisterInteractable(w);
 }
 
 void BuildGameSelectInfoBlock(const GameSelectPanelState & state) {
@@ -118,7 +122,8 @@ void BuildGameSelectInfoBlock(const GameSelectPanelState & state) {
 	}
 }
 
-void BuildGameSelectList(const GameSelectPanelState & state) {
+void BuildGameSelectList(const GameSelectPanelState & state,
+                         silencer::ui::UiInteractionRegistry& interactions) {
 	const int rowCount = static_cast<int>(state.rows.size());
 	const int slotCount = (rowCount < kMaxRows) ? rowCount : kMaxRows;
 	for(int i = 0; i < slotCount; ++i){
@@ -143,23 +148,25 @@ void BuildGameSelectList(const GameSelectPanelState & state) {
 		           state.scrollPos,
 		           listOpts,
 		           ScrollListHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   kActionRowPrefix });
+		                             /*actionId*/   kActionRowPrefix,
+		                             /*interactions*/ &interactions });
 	}
 
 	for(int i = 0; i < slotCount; ++i){
-		silencer::ui::automation::Widget w;
+		silencer::ui::UiInteractable w;
 		w.id = std::string(kActionRowPrefix) + "." + std::to_string(i);
 		w.labelText = state.rows[i].name;
-		w.kind  = silencer::ui::automation::WidgetKind::ListRow;
+		w.kind  = silencer::ui::UiInteractableKind::ListRow;
 		w.x = kListX; w.y = kListY + i * kListLineH;
 		w.w = kListW; w.h = kListLineH;
 		w.index = i;
 		w.selected   = (state.selectedIndex == i);
-		silencer::ui::automation::Register(w);
+		interactions.RegisterInteractable(w);
 	}
 }
 
-void BuildGameSelectActionButtons(const GameSelectPanelState & state) {
+void BuildGameSelectActionButtons(const GameSelectPanelState & state,
+                                  silencer::ui::UiInteractionRegistry& interactions) {
 	// Spectate button — fixed-height slot so the Join slot below sits at a
 	// stable y regardless of visibility.
 	CLAY({ .id = CLAY_ID("GSelBtnSpectateWrap"),
@@ -174,11 +181,12 @@ void BuildGameSelectActionButtons(const GameSelectPanelState & state) {
 			           BankButtonVariant::Chrome,
 			           BankButtonOpts{},
 			           BankButtonHandle{ /*hoveredOut*/ nullptr,
-			                             /*actionId*/   kActionSpectate });
+			                             /*actionId*/   kActionSpectate,
+			                             /*interactions*/ &interactions });
 		}
 	}
 	if(state.spectateVisible){
-		RegisterButton("Spectate", kActionSpectate, kBtnSpectateX, kBtnSpectateY);
+		RegisterButton(interactions, "Spectate", kActionSpectate, kBtnSpectateX, kBtnSpectateY);
 	}
 
 	// Join button.
@@ -192,18 +200,20 @@ void BuildGameSelectActionButtons(const GameSelectPanelState & state) {
 			           BankButtonVariant::Chrome,
 			           BankButtonOpts{},
 			           BankButtonHandle{ /*hoveredOut*/ nullptr,
-			                             /*actionId*/   kActionJoin });
+			                             /*actionId*/   kActionJoin,
+			                             /*interactions*/ &interactions });
 		}
 	}
 	if(state.joinVisible){
-		RegisterButton("Join Game", kActionJoin, kBtnJoinX, kBtnJoinY);
+		RegisterButton(interactions, "Join Game", kActionJoin, kBtnJoinX, kBtnJoinY);
 	}
 }
 
 }  // namespace
 
 void BuildGameSelectUpperTree(GameSelectPanelState & state,
-                              Resources & resources) {
+                              Resources & resources,
+                              silencer::ui::UiInteractionRegistry& interactions) {
 	(void)state;
 	(void)resources;
 
@@ -215,13 +225,15 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   kActionCreate });
+		                             /*actionId*/   kActionCreate,
+		                             /*interactions*/ &interactions });
 	}
-	RegisterButton("Create Game", kActionCreate, kBtnCreateX, kBtnCreateY);
+	RegisterButton(interactions, "Create Game", kActionCreate, kBtnCreateX, kBtnCreateY);
 }
 
 void BuildGameSelectTallTree(GameSelectPanelState & state,
-                             Resources & resources) {
+                             Resources & resources,
+                             silencer::ui::UiInteractionRegistry& interactions) {
 	(void)resources;
 
 	// "Active Games" heading at top of Tall box.
@@ -233,9 +245,9 @@ void BuildGameSelectTallTree(GameSelectPanelState & state,
 		         {});
 	}
 
-	BuildGameSelectList(state);
+	BuildGameSelectList(state, interactions);
 	BuildGameSelectInfoBlock(state);
-	BuildGameSelectActionButtons(state);
+	BuildGameSelectActionButtons(state, interactions);
 }
 
 }  // namespace silencer::client_ui::lobby

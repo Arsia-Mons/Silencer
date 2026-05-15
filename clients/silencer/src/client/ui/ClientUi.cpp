@@ -1,24 +1,79 @@
 #include "client/ui/ClientUi.h"
 
+#include "audio.h"
 #include "client/ui/hud/HudPayloadArena.h"
+#include "gasloader.h"
 #include "screen.h"
 #include "screen_context.h"
 #include "runtime/UiInputRouter.h"
+#include "world.h"
 
 #include <utility>
 
 namespace silencer {
 namespace client_ui {
 
+namespace {
+
+bool IsAudibleInteractable(const silencer::ui::UiInteractable& widget) {
+	if(widget.inactive) return false;
+	return widget.kind == silencer::ui::UiInteractableKind::Button ||
+	       widget.kind == silencer::ui::UiInteractableKind::Toggle;
+}
+
+bool PointIn(const silencer::ui::UiInteractable& widget, int x, int y) {
+	return x >= widget.x && y >= widget.y
+	    && x < widget.x + widget.w && y < widget.y + widget.h;
+}
+
+std::string InteractableAudioId(const silencer::ui::UiInteractable& widget) {
+	if(!widget.id.empty()) return widget.id;
+	if(widget.uid >= 0) return std::to_string(widget.uid);
+	return widget.labelText;
+}
+
+const silencer::ui::UiInteractable * HitAudibleInteractable(
+	const silencer::ui::UiInteractionRegistry& interactions,
+	const silencer::ui::UiInputState& input) {
+	const int x = static_cast<int>(input.pointer.x);
+	const int y = static_cast<int>(input.pointer.y);
+	const auto& widgets = interactions.Interactables();
+	for(auto it = widgets.rbegin(); it != widgets.rend(); ++it){
+		if(IsAudibleInteractable(*it) && PointIn(*it, x, y)) return &*it;
+	}
+	return nullptr;
+}
+
+bool ActionTargetsAudibleInteractable(const silencer::ui::UiInteractionRegistry& interactions,
+                                      const silencer::ui::UiAction& action) {
+	if(action.kind != silencer::ui::UiActionKind::Activate &&
+	   action.kind != silencer::ui::UiActionKind::Navigate){
+		return false;
+	}
+	const auto * widget = interactions.FindInteractableById(action.id);
+	return widget && IsAudibleInteractable(*widget);
+}
+
+void PlayMenuButtonSound(ScreenContext& ctx) {
+	Audio& audio = Audio::GetInstance();
+	if(!audio.enabled) return;
+	const std::string& sound = GASLoader::Get().player.soundUIClick;
+	auto it = ctx.world.resources.soundbank.find(sound);
+	if(it == ctx.world.resources.soundbank.end() || !it->second) return;
+	audio.Play(it->second);
+}
+
+}  // namespace
+
 ClientUi::ClientUi(silencer::ui::ClayService& clay)
-	: clay_(clay), automation_(silencer::ui::ActiveUiAutomationRegistry()) {}
+	: clay_(clay) {}
 
 ClientUi::~ClientUi() = default;
 
 void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
 	frameCtx_.BeginFrame();
 	silencer::client_ui::HudPayloadBeginFrame();
-	clay_.BeginFrame(input, automation_);
+	clay_.BeginFrame(input, interactions_);
 }
 
 std::vector<silencer::ui::UiRenderCommand> ClientUi::EndFrame() {
@@ -29,8 +84,23 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 	ScreenContext& ctx,
 	const silencer::ui::UiInputState& input) {
 	Screen * top = screens_.Top();
-	silencer::ui::UiInputRouter router(automation_);
+	silencer::ui::UiInputRouter router(interactions_);
 	std::vector<silencer::ui::UiAction> actions = router.Route(input);
+	bool playedFeedback = false;
+	const silencer::ui::UiInteractable * hovered =
+		HitAudibleInteractable(interactions_, input);
+	std::string hoveredId = hovered ? InteractableAudioId(*hovered) : std::string();
+	if(!hoveredId.empty() && hoveredId != hoveredAudioInteractableId_){
+		PlayMenuButtonSound(ctx);
+		playedFeedback = true;
+	}
+	hoveredAudioInteractableId_ = hoveredId;
+	for(const silencer::ui::UiAction& action : actions){
+		if(!playedFeedback && ActionTargetsAudibleInteractable(interactions_, action)){
+			PlayMenuButtonSound(ctx);
+			playedFeedback = true;
+		}
+	}
 	if(!top) return actions;
 	std::vector<silencer::ui::UiAction> unhandled;
 	for(const silencer::ui::UiAction& action : actions){
@@ -46,7 +116,7 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 }
 
 std::vector<silencer::ui::UiAction> ClientUi::DrainActions() {
-	return automation_.DrainActions();
+	return interactions_.DrainActions();
 }
 
 void ClientUi::PushScreen(std::unique_ptr<Screen> screen, ScreenContext& ctx) {
@@ -74,7 +144,7 @@ void ClientUi::TickVisibleScreens(ScreenContext& ctx) {
 }
 
 void ClientUi::BuildVisibleScreens(ScreenContext& ctx, Surface& dst, float frametime) {
-	screens_.BuildVisible(ctx, dst, frametime, automation_);
+	screens_.BuildVisible(ctx, dst, frametime, interactions_);
 }
 
 }  // namespace client_ui

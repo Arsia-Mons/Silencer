@@ -85,7 +85,7 @@ void LobbyScreen::ShowGameTech(ScreenContext & ctx)
 	gameCreateActive = false;
 }
 
-void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
+void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
 	using namespace silencer::clay_bridge;
@@ -104,7 +104,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 	           .childGap = kRegionGap,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
-		BuildLobbyTitleBar(version, mapName, narrow, dst.w);
+		BuildLobbyTitleBar(version, mapName, narrow, dst.w, interactions);
 
 		LobbyMainAreaPanels panels{
 			characterState,
@@ -118,7 +118,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime)
 			gameTechActive,
 		};
 		BuildLobbyMainArea(panels, ctx.world, ctx.world.resources, *this,
-		                   narrow, bodyH);
+		                   narrow, bodyH, interactions);
 	}
 }
 

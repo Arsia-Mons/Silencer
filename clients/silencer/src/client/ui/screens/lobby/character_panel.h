@@ -15,6 +15,10 @@
 class World;
 class Resources;
 
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
+
 namespace silencer::client_ui::lobby {
 
 struct CharacterPanelState {
@@ -40,7 +44,8 @@ bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
 // after BankTextBeginFrame() + ToggleBeginFrame() have been invoked.
 void BuildCharacterPanelTree(CharacterPanelState & state,
                              World & world,
-                             Resources & resources);
+                             Resources & resources,
+                             silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

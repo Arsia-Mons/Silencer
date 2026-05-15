@@ -21,6 +21,10 @@ class Resources;
 class ScreenContext;
 class LobbyScreen;
 
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
+
 namespace silencer::client_ui::lobby {
 
 struct GameCreatePanelState {
@@ -75,7 +79,8 @@ bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
 // BeginFrame requirements: BankTextBeginFrame, BankButtonBeginFrame,
 // TextInputBeginFrame.
 void BuildGameCreateUpperTree(GameCreatePanelState & state,
-                              Resources & resources);
+                              Resources & resources,
+                              silencer::ui::UiInteractionRegistry& interactions);
 
 // Emits the tall-pane subtree ("Select Map" heading + map list + game-name +
 // password inputs + Create button). Called inside the LobbyRightTallBox CLAY
@@ -83,7 +88,8 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 // BeginFrame requirements: BankTextBeginFrame, BankButtonBeginFrame,
 // ScrollListBeginFrame, TextInputBeginFrame.
 void BuildGameCreateTallTree(GameCreatePanelState & state,
-                             Resources & resources);
+                             Resources & resources,
+                             silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby
 

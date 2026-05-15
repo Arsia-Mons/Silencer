@@ -268,7 +268,7 @@ class ClientUi {
 private:
 	silencer::ui::UiFrameContext frameCtx_;
 	silencer::ui::ClayService& clay_;
-	silencer::ui::UiAutomationRegistry& automation_;
+	silencer::ui::UiInteractionRegistry interactions_;
 	ScreenStack screens_;
 };
 ```
@@ -377,7 +377,7 @@ EOF
 - `clients/silencer/src/world/world.h` — remove `friend class silencer::client_ui::InGameUiController;` (line 171). Track downstream compiler errors and address by promoting the minimal needed pieces to a public API.
 - `clients/silencer/src/game/game.cpp` — call `BuildHudView` in `RenderClientUiFrame` before HUD build, thread the view through `BuildVisibleClientUi`.
 - `clients/silencer/src/client/ui/ClientUi.h/.cpp` and `ScreenStack.h/.cpp` — accept the `HudView` and forward it to `Screen::BuildUi` callees as part of `ScreenContext`, OR introduce a focused `HudBuildContext` consumed by HUD/overlay builders only. Pick the approach that minimizes screen-side churn.
-- `clients/silencer/src/client/ui/hud/InGameHud.cpp` — take `const HudView&`, drop `world.h`, `player.h`, `team.h`, `lobby.h`, `terminal.h`, `detonator.h`, `basedoor.h`, `buyableitem.h`, `objecttypes.h`, `user.h`, `camera.h` includes. Keep `surface.h`, `render/renderer.h`, `render/clay_ui_payloads.h`, `clay/clay.h`, `ui/primitives/*`, `ui/runtime/UiAutomationRegistry.h`, `client/ui/hud/HudPayloadArena.h`.
+- `clients/silencer/src/client/ui/hud/InGameHud.cpp` — take `const HudView&`, drop `world.h`, `player.h`, `team.h`, `lobby.h`, `terminal.h`, `detonator.h`, `basedoor.h`, `buyableitem.h`, `objecttypes.h`, `user.h`, `camera.h` includes. Keep `surface.h`, `render/renderer.h`, `render/clay_ui_payloads.h`, `clay/clay.h`, `ui/primitives/*`, `ui/runtime/UiInteractionRegistry.h`, `client/ui/hud/HudPayloadArena.h`.
 - `clients/silencer/src/client/ui/hud/InGameOverlays.cpp` — same treatment.
 - `clients/silencer/src/client/ui/ingame/InGameUiController.h/.cpp` — re-route any code that used friend access. Use the public surface; if a piece of state truly has no public reader, add a narrow `World::Get<Thing>()` public method rather than re-granting friendship.
 
@@ -605,14 +605,14 @@ For unit `hud_status_bars` (then minimap, then player list, then team emblems, t
     #include "client/ui/views/HudView.h"
     class Surface;
     namespace silencer { namespace ui {
-      class UiAutomationRegistry;
+      class UiInteractionRegistry;
     } }
 
     namespace silencer {
     namespace client_ui {
 
     void BuildHudStatusBars(const HudView& view,
-                            silencer::ui::UiAutomationRegistry& automation,
+                            silencer::ui::UiInteractionRegistry& interactions,
                             Surface& dst);
 
     }  // namespace client_ui
@@ -709,7 +709,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - `clients/silencer/src/ui/runtime/UiInputState.h` — add `keyEvents` vector.
 - `clients/silencer/src/game/events.cpp` — populate `keyEvents` from SDL key events.
 - `clients/silencer/src/game/game.cpp` — pass `keyEvents` through `preparedUiInput`, ensure they reset each frame in `ResetUiFrameDeltas`.
-- `clients/silencer/src/ui/runtime/UiAutomationRegistry.h/.cpp` — accept the new event channel; dispatch key/text through it the same way pointer is.
+- `clients/silencer/src/ui/runtime/UiInteractionRegistry.h/.cpp` — accept the new event channel; dispatch key/text through it the same way pointer is.
 - `clients/silencer/src/client/ui/ClientUi.cpp` — extend `DispatchInput` to drain key + text events through the registry, emit typed `UiAction`s.
 - `clients/silencer/src/client/ui/screens/screen.h` — drop `OnTextInput`/`OnKey` compatibility hooks (if present).
 - Every screen implementing those hooks — migrate logic onto the typed-action consumer path, OR if a screen really needs raw scancodes (keybind capture is the obvious case), have it pull from `UiInputState::keyEvents` directly.
@@ -746,7 +746,7 @@ struct UiInputState {
 
 In `clients/silencer/src/game/events.cpp`, the existing `SDL_EVENT_KEY_DOWN`/`SDL_EVENT_KEY_UP` handlers push a `UiKeyEvent` onto `clientUiInput`'s pending list. Reset in `ResetUiFrameDeltas` (already exists in `game.cpp:422`).
 
-- [ ] **5.4 — Add typed-key dispatch to `UiAutomationRegistry`**
+- [ ] **5.4 — Add typed-key dispatch to `UiInteractionRegistry`**
 
 The registry already has `dispatch` for focus/key/text. Refactor so its public surface accepts a `const UiInputState&` and emits typed `UiAction`s instead of running screen callbacks directly. The screen callback hooks become internal implementation: the registry routes a key event to the focused widget, the widget emits a `UiAction`, and the action is drained alongside pointer-derived actions.
 
@@ -782,7 +782,7 @@ Route keyboard/text input through UiInputState typed actions
 
 Screens no longer implement OnTextInput/OnKey compatibility hooks. The
 runtime collects key events into UiInputState alongside pointer/wheel,
-UiAutomationRegistry dispatches them to focused widgets, and ClientUi
+UiInteractionRegistry dispatches them to focused widgets, and ClientUi
 drains the resulting typed UiActions. Keybind capture in
 options_controls reads raw scancodes from UiInputState directly.
 
