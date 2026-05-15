@@ -84,6 +84,28 @@ void Civilian::InitBT(){
 		else                    mirrored = !mirrored;
 		return BTResult::Success;
 	};
+
+	btctx_.actions["SetSpeed"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.props) return BTResult::Failure;
+		int spd = ctx.props->value("speed", -1);
+		if (spd < 0) return BTResult::Failure;
+		speed = (Uint8)spd;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ApplyVelocity"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.props) return BTResult::Failure;
+		if (ctx.props->contains("xv")) xv = (Sint8)ctx.props->value("xv", 0);
+		if (ctx.props->contains("yv")) yv = (Sint8)ctx.props->value("yv", 0);
+		return BTResult::Success;
+	};
+
+	btctx_.actions["CheckGround"] = [this](BTContext& ctx) -> BTResult {
+		std::string key = ctx.props ? ctx.props->value("key", std::string{"on_ground"}) : "on_ground";
+		bool grounded = (yv == 0);
+		ctx.bbSet(key, grounded);
+		return grounded ? BTResult::Success : BTResult::Failure;
+	};
 }
 
 void Civilian::Serialize(bool write, Serializer & data, Serializer * old){
@@ -159,6 +181,24 @@ void Civilian::Tick(World & world){
 				if(!bt_) InitBT();
 				if(bt_){
 					btctx_.dt = 10.0f / GASLoader::Get().gameengine.ticksPerSecond;
+					btctx_.userData = &world;
+					btctx_.bbSet("health_pct", GetMaxHealth() > 0 ? (float)GetHealth() / (float)GetMaxHealth() : 0.0f);
+					btctx_.bbSet("on_ladder", false);
+					{
+						const char* sn = "unknown";
+						switch(state){
+							case NEW:           sn = "new"; break;
+							case STANDING:      sn = "standing"; break;
+							case WALKING:       sn = "walking"; break;
+							case RUNNING:       sn = "running"; break;
+							case DYINGFORWARD:  sn = "dyingforward"; break;
+							case DYINGBACKWARD: sn = "dyingbackward"; break;
+							case DYINGEXPLODE:  sn = "dyingexplode"; break;
+							case DEAD:          sn = "dead"; break;
+						}
+						btctx_.bbSet("state_name", std::string{sn});
+					}
+					btctx_.bbSet("dist_to_target", -1);
 					btctx_.bbSet("threat_nearby", Look(world));
 					bt_->tick(btctx_);
 				}else{

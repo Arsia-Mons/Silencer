@@ -423,6 +423,54 @@ void Guard::InitBT(){
 		else                    mirrored = !mirrored;
 		return BTResult::Success;
 	};
+
+	btctx_.actions["SetSpeed"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.props) return BTResult::Failure;
+		int spd = ctx.props->value("speed", -1);
+		if (spd < 0) return BTResult::Failure;
+		speed = (Uint8)spd;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ApplyVelocity"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.props) return BTResult::Failure;
+		if (ctx.props->contains("xv")) xv = (Sint8)ctx.props->value("xv", 0);
+		if (ctx.props->contains("yv")) yv = (Sint8)ctx.props->value("yv", 0);
+		return BTResult::Success;
+	};
+
+	btctx_.actions["SpawnProjectile"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.props || !ctx.userData) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		int dir = ctx.props->value("direction", 0);
+		Fire(world, (Uint8)dir);
+		return BTResult::Success;
+	};
+
+	btctx_.actions["CheckGround"] = [this](BTContext& ctx) -> BTResult {
+		std::string key = ctx.props ? ctx.props->value("key", std::string{"on_ground"}) : "on_ground";
+		bool grounded = (yv == 0);
+		ctx.bbSet(key, grounded);
+		return grounded ? BTResult::Success : BTResult::Failure;
+	};
+
+	// Raycast: fire a horizontal ray in the facing direction; write hit bool to blackboard key.
+	// Props: range (int, px, default 200), result_key (string, default "ray_hit")
+	btctx_.actions["Raycast"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.userData) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		std::string key = ctx.props ? ctx.props->value("result_key", std::string{"ray_hit"}) : "ray_hit";
+		int range = ctx.props ? ctx.props->value("range", 200) : 200;
+		int d = mirrored ? -1 : 1;
+		std::vector<Uint8> types;
+		types.push_back(ObjectTypes::PLAYER);
+		types.push_back(ObjectTypes::ROBOT);
+		types.push_back(ObjectTypes::FIXEDCANNON);
+		std::vector<Object*> hits = world.TestAABB(x, y - 55, x + d * range, y - 55, types);
+		bool did_hit = !hits.empty();
+		ctx.bbSet(key, did_hit);
+		return did_hit ? BTResult::Success : BTResult::Failure;
+	};
 }
 
 void Guard::Serialize(bool write, Serializer & data, Serializer * old){
@@ -464,6 +512,42 @@ void Guard::Tick(World & world){
 			btctx_.userData = &world;
 			btctx_.bbSet("patrol", (bool)patrol);
 			btctx_.bbSet("target_seen", false);
+			btctx_.bbSet("health_pct", maxhealth > 0 ? (float)health / (float)maxhealth : 0.0f);
+			btctx_.bbSet("on_ladder", (bool)(state == LADDER));
+			{
+				const char* sn = "unknown";
+				switch(state){
+					case NEW:             sn = "new"; break;
+					case STANDING:        sn = "standing"; break;
+					case CROUCHING:       sn = "crouching"; break;
+					case CROUCHED:        sn = "crouched"; break;
+					case SHOOTCROUCHED:   sn = "shootcrouched"; break;
+					case UNCROUCHING:     sn = "uncrouching"; break;
+					case LOOKING:         sn = "looking"; break;
+					case WALKING:         sn = "walking"; break;
+					case SHOOTSTANDING:   sn = "shootstanding"; break;
+					case SHOOTUP:         sn = "shootup"; break;
+					case SHOOTDOWN:       sn = "shootdown"; break;
+					case SHOOTUPANGLE:    sn = "shootupangle"; break;
+					case SHOOTDOWNANGLE:  sn = "shootdownangle"; break;
+					case SHOOTLADDERUP:   sn = "shootladderup"; break;
+					case SHOOTLADDERDOWN: sn = "shootladderdown"; break;
+					case LADDER:          sn = "ladder"; break;
+					case HIT:             sn = "hit"; break;
+					case DYING:           sn = "dying"; break;
+					case DYINGEXPLODE:    sn = "dyingexplode"; break;
+					case DEAD:            sn = "dead"; break;
+				}
+				btctx_.bbSet("state_name", std::string{sn});
+			}
+			{
+				int dist = -1;
+				if (chasing != 0) {
+					Object* obj = world.GetObjectFromId(chasing);
+					if (obj) dist = (int)abs(signed(x) - signed(obj->x));
+				}
+				btctx_.bbSet("dist_to_target", dist);
+			}
 			bt_->tick(btctx_);
 		} else {
 		do{
