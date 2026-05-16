@@ -133,7 +133,8 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 				                        0,
 				                        main_menu_screen_detail::kLogoNudgeY,
 				                        0 },
-				           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+				           .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
+				                               .y = CLAY_ALIGN_Y_CENTER },
 				       } }) {
 					logo.Build(ctx.world.resources);
 				}
