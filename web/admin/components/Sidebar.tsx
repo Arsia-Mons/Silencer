@@ -42,7 +42,7 @@ export default function Sidebar({ wsConnected }: Props) {
   const visibleNav = NAV.filter(n => rank >= n.minRank);
 
   return (
-    <aside className="w-56 min-h-screen bg-game-bgCard border-r border-game-border flex flex-col">
+    <aside className="w-56 sticky top-0 h-screen bg-game-bgCard border-r border-game-border flex flex-col flex-shrink-0 overflow-y-auto">
       {/* Logo */}
       <div className="px-4 py-5 border-b border-game-border">
         <img src="/logo.png" alt="Silencer" className="h-10 w-auto mb-1" />

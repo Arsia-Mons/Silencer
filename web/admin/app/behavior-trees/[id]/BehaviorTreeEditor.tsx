@@ -5,9 +5,12 @@ import ReactFlow, {
   Background,
   Controls,
   Handle,
+  MiniMap,
   Position,
   useEdgesState,
   useNodesState,
+  useReactFlow,
+  ReactFlowProvider,
   type Connection,
   type Edge,
   type Node,
@@ -15,6 +18,7 @@ import ReactFlow, {
 } from 'reactflow';
 import dagre from 'dagre';
 import type { BehaviorTree, BTNode, BTNodeType, BBKey } from '../../../lib/api';
+import { API, apiFetch } from '../../../lib/api';
 
 // ── Node colours by type ──────────────────────────────────────────────────────
 const TYPE_COLOR: Record<string, string> = {
@@ -107,7 +111,7 @@ function uid() {
 function nodeSubtitle(node: BTNode): string {
   if (node.type === 'Condition') {
     const p = node.props;
-    return `${p.key} ${p.op} ${JSON.stringify(p.value)}`;
+    return `${p.key} ${p.op ?? '=='} ${JSON.stringify(p.value)}`;
   }
   if (node.type === 'Leaf') return String(node.props.action ?? '');
   if (node.type === 'Cooldown') return `${node.props.duration ?? '?'}s`;
@@ -153,24 +157,104 @@ const PALETTE: { group: string; types: BTNodeType[] }[] = [
   { group: 'LEAF',      types: ['Leaf', 'Condition', 'Wait'] },
 ];
 
-const LEAF_ACTIONS = [
-  'Patrol', 'Stand', 'Look',
-  'ShootStanding', 'ShootCrouched', 'ShootUp', 'ShootDown', 'ShootUpAngle', 'ShootDownAngle',
-  'Crouch', 'Uncrouch',
-  'ClimbLadder', 'Alert', 'Melee',
-  'Run', 'Wander', 'Sleep', 'Idle',
+// ── Leaf action lists per NPC type ───────────────────────────────────────────
+const GENERIC_ACTIONS = ['SetBlackboard', 'RandomChance', 'PlayAnim', 'EmitSound', 'SetFacing'];
+
+const NPC_ACTIONS: Record<string, string[]> = {
+  guard:    ['Look0', 'Look1', 'Look2', 'Look3', 'Look4', 'Look5', 'UncrouchIdle', 'Chase', 'Patrol', 'SearchAndReturn', 'Stand', ...GENERIC_ACTIONS],
+  civilian: ['Run', 'Wander', 'WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'ReturnToSpawn', ...GENERIC_ACTIONS],
+  robot:    ['WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'Patrol', 'ReturnToSpawn', ...GENERIC_ACTIONS],
+};
+
+// All actions merged for unknown NPC types
+const ALL_ACTIONS = [...new Set([...Object.values(NPC_ACTIONS).flat()])].sort();
+
+const ACTION_DESC: Record<string, string> = {
+  // Guard
+  Look0: 'Scan & shoot: forward (standing)',
+  Look1: 'Scan & shoot: low (crouched)',
+  Look2: 'Scan & shoot: upward',
+  Look3: 'Scan & shoot: downward',
+  Look4: 'Scan & shoot: up-angle',
+  Look5: 'Scan & shoot: down-angle',
+  UncrouchIdle: 'Stand up from crouch and idle',
+  Chase: 'Run toward last known player position',
+  Patrol: 'Walk patrol route; stop to look around periodically',
+  SearchAndReturn: 'Search last known position then return to spawn',
+  Stand: 'Stand in place (idle)',
+  // Civilian
+  Run: 'Flee from threat at run speed',
+  Wander: 'Wander randomly within spawn area',
+  WakeUp: 'Play wake-up animation then become active',
+  LookForward: 'Look straight ahead (idle animation)',
+  LookSides: 'Look side to side (alert animation)',
+  MeleeCheck: 'Check if player is in melee range; attack if so',
+  ReturnToSpawn: 'Walk back to spawn point',
+  // Generic leaves
+  PlayAnim: 'Play a sprite bank animation (bank, frames, loop)',
+  EmitSound: 'Play a named sound from the world soundbank',
+  SetFacing: 'Set entity facing direction (left / right / flip)',
+  SetBlackboard: 'Write a constant value to a blackboard key',
+  RandomChance: 'Succeed with probability = chance (0.0–1.0)',
+};
+
+const LOOK_DIRECTIONS: { value: number; label: string }[] = [
+  { value: 0, label: '0 — Forward (standing)' },
+  { value: 1, label: '1 — Low (crouched)' },
+  { value: 2, label: '2 — Up' },
+  { value: 3, label: '3 — Down' },
+  { value: 4, label: '4 — Up-angle' },
+  { value: 5, label: '5 — Down-angle' },
 ];
+
+// Semantics shown in the inspector when a composite/decorator/leaf is selected.
+const NODE_DESC: Record<string, string> = {
+  Selector:       'Tries children left→right. Returns Success on the first child that succeeds, Failure if all fail. Reactive: re-evaluates from child[0] every tick.',
+  Sequence:       'Runs children left→right. Returns Failure on the first child that fails, Success only when all children succeed.',
+  Parallel:       'Ticks all children every tick simultaneously. Returns Success when all succeed, Failure when any fail.',
+  RandomSelector: 'Like Selector but shuffles children order each tick.',
+  Inverter:       'Inverts child result: Success↔Failure. Running passes through.',
+  Cooldown:       'Blocks child for DURATION seconds after the child returns Success.',
+  Repeat:         'Re-runs child COUNT times (0 = infinite). Returns Failure if child ever fails.',
+  Timeout:        'Runs child; if it is still Running after DURATION seconds, returns Failure.',
+  ForceSuccess:   'Runs child; always returns Success regardless of child result.',
+  Wait:           'Returns Running for DURATION seconds, then Success.',
+  Leaf:           'Dispatches to a named C++ action handler. Look0–Look5 scan + shoot in direction 0–5 (Forward/Low/Up/Down/UpAngle/DownAngle).',
+  Condition:      'Reads a blackboard key and compares it to a literal value. Returns Success if the comparison is true.',
+};
 
 // ── Main editor ───────────────────────────────────────────────────────────────
 interface Props { bt: BehaviorTree; onChange: (bt: BehaviorTree) => void; }
 
-export default function BehaviorTreeEditor({ bt, onChange }: Props) {
+export default function BehaviorTreeEditor(props: Props) {
+  return <ReactFlowProvider><BehaviorTreeEditorInner {...props} /></ReactFlowProvider>;
+}
+
+function BehaviorTreeEditorInner({ bt, onChange }: Props) {
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
+  const rfEdgesRef = useRef(rfEdges);
+  rfEdgesRef.current = rfEdges;
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [validateMsg, setValidateMsg] = useState<string | null>(null);
   const btRef = useRef(bt);
   btRef.current = bt;
+
+  const rfInstance = useReactFlow();
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const historyRef = useRef<BehaviorTree[]>([]);
+  const historyIdxRef = useRef(-1);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const leafActions = useMemo(() => NPC_ACTIONS[bt.id.toLowerCase()] ?? ALL_ACTIONS, [bt.id]);
+
+  // Asset catalogs for PlayAnim / EmitSound dropdowns
+  const [spriteBanks, setSpriteBanks] = useState<{ bank: number; frames: number }[]>([]);
+  const [soundNames, setSoundNames] = useState<string[]>([]);
+  useEffect(() => {
+    fetch(`${API}/sprites`).then(r => r.json()).then((d: { bank: number; frames: number }[]) => setSpriteBanks(d)).catch(() => {});
+    apiFetch('/sounds').then((d) => setSoundNames((d as { name: string }[]).map(s => s.name).sort())).catch(() => {});
+  }, []);
 
   // Sync BT → ReactFlow
   useEffect(() => {
@@ -179,12 +263,88 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     setRfEdges(edges);
   }, [bt.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    historyRef.current = [bt];
+    historyIdxRef.current = 0;
+    setCanUndo(false);
+    setCanRedo(false);
+  }, [bt.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undoRef.current(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); redoRef.current(); }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function pushToHistory(newBt: BehaviorTree) {
+    historyRef.current = [...historyRef.current.slice(0, historyIdxRef.current + 1), newBt].slice(-50);
+    historyIdxRef.current = historyRef.current.length - 1;
+    setCanUndo(historyIdxRef.current > 0);
+    setCanRedo(false);
+  }
+
+  function undo() {
+    if (historyIdxRef.current <= 0) return;
+    historyIdxRef.current -= 1;
+    const prev = historyRef.current[historyIdxRef.current];
+    setCanUndo(historyIdxRef.current > 0);
+    setCanRedo(true);
+    onChange(prev);
+    const { nodes, edges } = btToFlow(prev);
+    setRfNodes(nodes);
+    setRfEdges(edges);
+  }
+
+  function redo() {
+    if (historyIdxRef.current >= historyRef.current.length - 1) return;
+    historyIdxRef.current += 1;
+    const next = historyRef.current[historyIdxRef.current];
+    setCanUndo(true);
+    setCanRedo(historyIdxRef.current < historyRef.current.length - 1);
+    onChange(next);
+    const { nodes, edges } = btToFlow(next);
+    setRfNodes(nodes);
+    setRfEdges(edges);
+  }
+
+  // Stable refs so the keydown listener always calls the latest undo/redo
+  const undoRef = useRef(undo);
+  const redoRef = useRef(redo);
+  undoRef.current = undo;
+  redoRef.current = redo;
+
+  // When ReactFlow removes edges (user clicks edge → Delete), sync children arrays in BT data.
+  const handleEdgesChange = useCallback((changes: Parameters<typeof onEdgesChange>[0]) => {
+    onEdgesChange(changes);
+    const removals = changes.filter(c => c.type === 'remove');
+    if (removals.length === 0) return;
+    const edgeMap = new Map(rfEdgesRef.current.map(e => [e.id, e]));
+    const cur = btRef.current;
+    const nodes = { ...cur.nodes };
+    for (const rm of removals) {
+      const edge = edgeMap.get((rm as { id: string }).id);
+      if (!edge) continue;
+      const { source, target } = edge;
+      if (nodes[source]) {
+        nodes[source] = { ...nodes[source], children: nodes[source].children.filter(c => c !== target) };
+      }
+    }
+    pushToHistory({ ...cur, nodes });
+    onChange({ ...cur, nodes });
+  }, [onEdgesChange, onChange]);
+
   const onConnect = useCallback((params: Connection) => {
     if (!params.source || !params.target) return;
     const cur = btRef.current;
     const parentNode = cur.nodes[params.source];
     if (!parentNode) return;
     if (parentNode.children.includes(params.target)) return; // already connected
+
+    // Leaf, Condition, Wait cannot have children
+    if (['Leaf', 'Condition', 'Wait'].includes(parentNode.type)) return;
 
     const isDecorator = ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'].includes(parentNode.type);
     if (isDecorator && parentNode.children.length >= 1) return;
@@ -196,8 +356,16 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
         [params.source]: { ...parentNode, children: [...parentNode.children, params.target] },
       },
     };
+    pushToHistory(updated);
     onChange(updated);
-    setRfEdges(es => addEdge({ ...params, type: 'smoothstep', style: { stroke: '#4a5568', strokeWidth: 2 } }, es));
+    setRfEdges(es => addEdge({
+      ...params,
+      type: 'smoothstep',
+      style: { stroke: '#4a5568', strokeWidth: 2 },
+      label: String(parentNode.children.length + 1),
+      labelStyle: { fill: '#718096', fontSize: 10 },
+      labelBgStyle: { fill: '#0d1117' },
+    }, es));
   }, [onChange]);
 
   function autoLayout() {
@@ -205,7 +373,9 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     setRfNodes(laid);
     const positions: Record<string, { x: number; y: number }> = {};
     laid.forEach(n => { positions[n.id] = n.position; });
-    onChange({ ...btRef.current, positions });
+    const newBt = { ...btRef.current, positions };
+    pushToHistory(newBt);
+    onChange(newBt);
   }
 
   function validate(): string | null {
@@ -237,15 +407,17 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     return dfs(cur.rootId);
   }
 
-  function addNode(type: BTNodeType) {
+  function addNodeAt(type: BTNodeType, position: { x: number; y: number }) {
     const id = `${type.toLowerCase()}_${uid()}`;
     const node: BTNode = { type, label: type, children: [], props: {} };
-    onChange({ ...btRef.current, nodes: { ...btRef.current.nodes, [id]: node } });
-    setRfNodes(ns => [...ns, {
-      id, type: 'btNode',
-      position: { x: 100 + Math.random() * 200, y: 100 + Math.random() * 200 },
-      data: { type, label: type, subtitle: '' },
-    }]);
+    const updated = { ...btRef.current, nodes: { ...btRef.current.nodes, [id]: node }, positions: { ...btRef.current.positions, [id]: position } };
+    pushToHistory(updated);
+    onChange(updated);
+    setRfNodes(ns => [...ns, { id, type: 'btNode', position, data: { type, label: type, subtitle: '' } }]);
+  }
+
+  function addNode(type: BTNodeType) {
+    addNodeAt(type, { x: 100 + Math.random() * 300, y: 100 + Math.random() * 300 });
   }
 
   function deleteSelectedNode() {
@@ -258,10 +430,34 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     for (const n of Object.values(nodes)) {
       n.children = n.children.filter((c: string) => c !== selectedNodeId);
     }
+    pushToHistory({ ...cur, nodes });
     onChange({ ...cur, nodes });
     setRfNodes(ns => ns.filter(n => n.id !== selectedNodeId));
     setRfEdges(es => es.filter(e => e.source !== selectedNodeId && e.target !== selectedNodeId));
     setSelectedNodeId(null);
+  }
+
+  function duplicateSelectedNode() {
+    if (!selectedNodeId) return;
+    const cur = btRef.current;
+    const src = cur.nodes[selectedNodeId];
+    if (!src) return;
+    const newId = `${src.type.toLowerCase()}_${uid()}`;
+    const srcPos = cur.positions?.[selectedNodeId] ?? { x: 100, y: 100 };
+    const newPos = { x: srcPos.x + 40, y: srcPos.y + 40 };
+    const newNode: BTNode = { ...src, children: [] }; // no children copy
+    const updated: BehaviorTree = {
+      ...cur,
+      nodes: { ...cur.nodes, [newId]: newNode },
+      positions: { ...cur.positions, [newId]: newPos },
+    };
+    pushToHistory(updated);
+    onChange(updated);
+    setRfNodes(ns => [...ns, {
+      id: newId, type: 'btNode', position: newPos,
+      data: { type: src.type, label: src.label, subtitle: nodeSubtitle(src) },
+    }]);
+    setSelectedNodeId(newId);
   }
 
   const selectedNode = selectedNodeId ? bt.nodes[selectedNodeId] : null;
@@ -273,6 +469,7 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
       ...cur,
       nodes: { ...cur.nodes, [selectedNodeId]: { ...cur.nodes[selectedNodeId], ...patch } },
     };
+    pushToHistory(updated);
     onChange(updated);
     setRfNodes(ns => ns.map(n => n.id === selectedNodeId
       ? { ...n, data: { ...n.data, label: patch.label ?? n.data.label, subtitle: nodeSubtitle(updated.nodes[selectedNodeId]) } }
@@ -291,7 +488,9 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
     // Auto-generate a unique key name
     let n = cur.blackboard.length + 1;
     while (cur.blackboard.some(k => k.key === `key_${n}`)) n++;
-    onChange({ ...cur, blackboard: [...cur.blackboard, { key: `key_${n}`, type: 'bool', default: false }] });
+    const newBt = { ...cur, blackboard: [...cur.blackboard, { key: `key_${n}`, type: 'bool' as const, default: false }] };
+    pushToHistory(newBt);
+    onChange(newBt);
   }
 
   function updateBBKey(idx: number, patch: Partial<BBKey>) {
@@ -301,11 +500,15 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
       patch.default = patch.type === 'bool' ? false : patch.type === 'string' ? '' : 0;
     }
     bb[idx] = { ...bb[idx], ...patch };
-    onChange({ ...bt, blackboard: bb });
+    const newBt = { ...bt, blackboard: bb };
+    pushToHistory(newBt);
+    onChange(newBt);
   }
 
   function removeBBKey(idx: number) {
-    onChange({ ...bt, blackboard: bt.blackboard.filter((_, i) => i !== idx) });
+    const newBt = { ...bt, blackboard: bt.blackboard.filter((_, i) => i !== idx) };
+    pushToHistory(newBt);
+    onChange(newBt);
   }
 
   // How many Condition nodes reference a given blackboard key
@@ -333,7 +536,13 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
           <div key={group} style={{ marginBottom: 12 }}>
             <div style={{ color: '#4a5568', fontSize: 9, letterSpacing: 2, marginBottom: 4 }}>{group}</div>
             {types.map(t => (
-              <button key={t} onClick={() => addNode(t)}
+              <button key={t}
+                draggable
+                onDragStart={e => {
+                  e.dataTransfer.setData('application/bt-node-type', t);
+                  e.dataTransfer.effectAllowed = 'copy';
+                }}
+                onClick={() => addNode(t)}
                 style={{
                   display: 'block', width: '100%', marginBottom: 4, padding: '5px 8px',
                   background: '#161b22', border: `1px solid ${TYPE_COLOR[t]}44`,
@@ -353,6 +562,16 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
             style={{ display: 'block', width: '100%', padding: '5px 8px', background: '#161b22', border: '1px solid #2d3748', color: '#a0aec0', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: 1, marginBottom: 4 }}>
             AUTO LAYOUT
           </button>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+            <button onClick={undo} disabled={!canUndo}
+              style={{ flex: 1, padding: '5px 4px', background: '#161b22', border: '1px solid #2d3748', color: canUndo ? '#a0aec0' : '#2d3748', fontSize: 10, fontFamily: 'monospace', cursor: canUndo ? 'pointer' : 'default', letterSpacing: 1 }}>
+              ↩ UNDO
+            </button>
+            <button onClick={redo} disabled={!canRedo}
+              style={{ flex: 1, padding: '5px 4px', background: '#161b22', border: '1px solid #2d3748', color: canRedo ? '#a0aec0' : '#2d3748', fontSize: 10, fontFamily: 'monospace', cursor: canRedo ? 'pointer' : 'default', letterSpacing: 1 }}>
+              ↪ REDO
+            </button>
+          </div>
           <button
             onClick={() => { const e = validate(); setValidateMsg(e ?? '✓ Valid'); }}
             style={{ display: 'block', width: '100%', padding: '5px 8px', background: '#161b22', border: '1px solid #2d3748', color: '#a0aec0', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: 1 }}>
@@ -362,6 +581,12 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
             <div style={{ marginTop: 6, fontSize: 10, color: validateMsg.startsWith('✓') ? '#22c55e' : '#f87171', wordBreak: 'break-word' }}>
               {validateMsg}
             </div>
+          )}
+          {selectedNodeId && (
+            <button onClick={duplicateSelectedNode}
+              style={{ display: 'block', width: '100%', marginTop: 8, padding: '5px 8px', background: '#0d1a2a', border: '1px solid #1e3a5f', color: '#60a5fa', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: 1 }}>
+              ⎘ DUPLICATE
+            </button>
           )}
           {selectedNodeId && selectedNodeId !== bt.rootId && (
             <button onClick={deleteSelectedNode}
@@ -373,23 +598,63 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
       </div>
 
       {/* Canvas */}
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div
+        ref={reactFlowWrapper}
+        style={{ flex: 1, position: 'relative' }}
+        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+        onDrop={e => {
+          e.preventDefault();
+          const type = e.dataTransfer.getData('application/bt-node-type') as BTNodeType;
+          if (!type) return;
+          const bounds = reactFlowWrapper.current!.getBoundingClientRect();
+          const pos = rfInstance.project({ x: e.clientX - bounds.left, y: e.clientY - bounds.top });
+          addNodeAt(type, pos);
+        }}
+      >
         <ReactFlow
           nodes={rfNodes}
           edges={rfEdges}
           onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
           nodeTypes={NODE_TYPES}
           onNodeClick={(_, n) => setSelectedNodeId(n.id)}
           onPaneClick={() => setSelectedNodeId(null)}
           onNodeDragStop={(_, n) => {
-            onChange({ ...btRef.current, positions: { ...btRef.current.positions, [n.id]: n.position } });
+            const cur = btRef.current;
+            const updatedPositions = { ...cur.positions, [n.id]: n.position };
+            // Re-sort parent's children by x position so dragging left/right changes execution order
+            const parentEntry = Object.entries(cur.nodes).find(([, node]) =>
+              ['Selector', 'Sequence', 'Parallel', 'RandomSelector'].includes(node.type) && node.children.includes(n.id)
+            );
+            let updatedNodes = cur.nodes;
+            if (parentEntry) {
+              const [parentId, parent] = parentEntry;
+              const getX = (id: string) => {
+                const pos = updatedPositions[id] ?? rfNodes.find(rn => rn.id === id)?.position;
+                return pos?.x ?? 0;
+              };
+              const sortedChildren = [...parent.children].sort((a, b) => getX(a) - getX(b));
+              updatedNodes = { ...cur.nodes, [parentId]: { ...parent, children: sortedChildren } };
+              // Relabel edges from this parent to reflect new child order
+              setRfEdges(es => es.map(e => {
+                if (e.source !== parentId) return e;
+                const newIdx = sortedChildren.indexOf(e.target);
+                return newIdx === -1 ? e : { ...e, label: String(newIdx + 1) };
+              }));
+            }
+            pushToHistory({ ...cur, nodes: updatedNodes, positions: updatedPositions });
+            onChange({ ...cur, nodes: updatedNodes, positions: updatedPositions });
           }}
           fitView
         >
           <Background color="#1a1f2e" gap={20} />
           <Controls style={{ background: '#161b22', border: '1px solid #2d3748' }} />
+          <MiniMap
+            nodeColor={n => TYPE_COLOR[(n.data as { type: string }).type] ?? '#718096'}
+            style={{ background: '#0d1117', border: '1px solid #2d3748' }}
+            maskColor="rgba(0,0,0,0.7)"
+          />
         </ReactFlow>
       </div>
 
@@ -398,9 +663,57 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
         {/* Node config */}
         {selectedNode ? (
           <div style={{ padding: '12px 10px', borderBottom: '1px solid #2d3748' }}>
-            <div style={{ color: TYPE_COLOR[selectedNode.type], fontSize: 10, letterSpacing: 2, marginBottom: 8 }}>
-              {selectedNode.type.toUpperCase()}
+            <div style={{ color: TYPE_COLOR[selectedNode.type], fontSize: 10, letterSpacing: 2, marginBottom: 4 }}>
+              {TYPE_SYMBOL[selectedNode.type]} {selectedNode.type.toUpperCase()}
             </div>
+
+            {/* Semantic description */}
+            {NODE_DESC[selectedNode.type] && (
+              <div style={{ color: '#4a5568', fontSize: 9, lineHeight: 1.5, marginBottom: 8, fontFamily: 'monospace' }}>
+                {NODE_DESC[selectedNode.type]}
+              </div>
+            )}
+
+            {/* Children ordered list for composites */}
+            {['Selector','Sequence','Parallel','RandomSelector'].includes(selectedNode.type) && selectedNode.children.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#718096', fontSize: 10, letterSpacing: 1, marginBottom: 4 }}>
+                  CHILDREN ({selectedNode.children.length}) — order matters
+                </div>
+                {selectedNode.children.map((cid, i) => {
+                  const childNode = bt.nodes[cid];
+                  return (
+                    <div key={cid} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 3 }}>
+                      <span style={{ color: '#4a5568', fontSize: 9, fontFamily: 'monospace', minWidth: 14 }}>{i + 1}.</span>
+                      <span style={{ flex: 1, color: '#a0aec0', fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {childNode?.label ?? cid}
+                      </span>
+                      <button
+                        disabled={i === 0}
+                        onClick={() => {
+                          const kids = [...selectedNode.children];
+                          [kids[i - 1], kids[i]] = [kids[i], kids[i - 1]];
+                          updateSelectedNode({ children: kids });
+                        }}
+                        style={{ background: 'none', border: '1px solid #2d3748', color: i === 0 ? '#2d3748' : '#718096', fontSize: 10, cursor: i === 0 ? 'default' : 'pointer', padding: '1px 4px', lineHeight: 1, flexShrink: 0 }}>
+                        ↑
+                      </button>
+                      <button
+                        disabled={i === selectedNode.children.length - 1}
+                        onClick={() => {
+                          const kids = [...selectedNode.children];
+                          [kids[i], kids[i + 1]] = [kids[i + 1], kids[i]];
+                          updateSelectedNode({ children: kids });
+                        }}
+                        style={{ background: 'none', border: '1px solid #2d3748', color: i === selectedNode.children.length - 1 ? '#2d3748' : '#718096', fontSize: 10, cursor: i === selectedNode.children.length - 1 ? 'default' : 'pointer', padding: '1px 4px', lineHeight: 1, flexShrink: 0 }}>
+                        ↓
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>LABEL</label>
             <input value={selectedNode.label} onChange={e => updateSelectedNode({ label: e.target.value })}
               style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
@@ -409,9 +722,151 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
               <>
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>ACTION</label>
                 <select value={String(selectedNode.props.action ?? '')} onChange={e => updateProp('action', e.target.value)}
-                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
-                  {LEAF_ACTIONS.map(a => <option key={a} value={a}>{a}</option>)}
+                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
+                  <option value="">— select action —</option>
+                  {leafActions.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
+                {String(selectedNode.props.action ?? '') && ACTION_DESC[String(selectedNode.props.action ?? '')] && (
+                  <div style={{ color: '#4a5568', fontSize: 9, fontFamily: 'monospace', lineHeight: 1.5, marginBottom: 8, fontStyle: 'italic' }}>
+                    {ACTION_DESC[String(selectedNode.props.action ?? '')]}
+                  </div>
+                )}
+
+                {/* Generic extra props (all props except action) */}
+                {(() => {
+                  const action = String(selectedNode.props.action ?? '');
+                  // Known props handled by dedicated UI below — exclude from generic editor
+                  const knownProps: Record<string, string[]> = {
+                    PlayAnim:      ['bank', 'frames', 'loop'],
+                    EmitSound:     ['sound', 'volume'],
+                    SetFacing:     ['dir'],
+                    RandomChance:  ['chance'],
+                    SetBlackboard: ['key', 'value'],
+                  };
+                  const reserved = new Set(['action', ...(knownProps[action] ?? [])]);
+                  const extraKeys = Object.keys(selectedNode.props).filter(k => !reserved.has(k));
+
+                  return (
+                    <>
+                      {/* PlayAnim knobs */}
+                      {action === 'PlayAnim' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>BANK</label>
+                        <select value={Number(selectedNode.props.bank ?? 0)}
+                          onChange={e => {
+                            const bank = parseInt(e.target.value);
+                            const entry = spriteBanks.find(b => b.bank === bank);
+                            updateProp('bank', bank);
+                            if (entry) updateProp('frames', entry.frames);
+                          }}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
+                          <option value={0}>— select bank —</option>
+                          {spriteBanks.map(b => (
+                            <option key={b.bank} value={b.bank}>Bank {b.bank} ({b.frames} frames)</option>
+                          ))}
+                        </select>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>FRAMES (auto-filled from bank)</label>
+                        <input type="number" min={1} step={1} value={Number(selectedNode.props.frames ?? 1)}
+                          onChange={e => updateProp('frames', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>LOOP</label>
+                        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                          {[true, false].map(v => {
+                            const cur = selectedNode.props.loop !== false;
+                            const active = v ? cur : !cur;
+                            return (
+                              <button key={String(v)} onClick={() => updateProp('loop', v)}
+                                style={{ flex: 1, padding: '4px 0', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer',
+                                  background: active ? '#14532d' : '#161b22',
+                                  border: `1px solid ${active ? '#22c55e' : '#2d3748'}`,
+                                  color: active ? '#22c55e' : '#4a5568' }}>
+                                {String(v)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {Number(selectedNode.props.bank ?? 0) > 0 && (
+                          <div style={{ marginBottom: 8, textAlign: 'center' }}>
+                            <img
+                              src={`${API}/sprites/${selectedNode.props.bank}/0`}
+                              alt={`bank ${selectedNode.props.bank} frame 0`}
+                              style={{ maxWidth: '100%', imageRendering: 'pixelated', border: '1px solid #2d3748', background: '#161b22' }}
+                            />
+                          </div>
+                        )}
+                      </>)}
+
+                      {/* EmitSound knobs */}
+                      {action === 'EmitSound' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>SOUND</label>
+                        <select value={String(selectedNode.props.sound ?? '')} onChange={e => updateProp('sound', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
+                          <option value="">— select sound —</option>
+                          {soundNames.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>VOLUME (0–128)</label>
+                        <input type="number" min={0} max={128} step={1} value={Number(selectedNode.props.volume ?? 100)}
+                          onChange={e => updateProp('volume', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* SetFacing knobs */}
+                      {action === 'SetFacing' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>DIRECTION</label>
+                        <select value={String(selectedNode.props.dir ?? 'flip')} onChange={e => updateProp('dir', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                          {['flip', 'left', 'right'].map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                      </>)}
+
+                      {/* RandomChance knobs */}
+                      {action === 'RandomChance' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>CHANCE (0.0–1.0)</label>
+                        <input type="number" min={0} max={1} step={0.05} value={Number(selectedNode.props.chance ?? 0.5)}
+                          onChange={e => updateProp('chance', parseFloat(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* SetBlackboard knobs */}
+                      {action === 'SetBlackboard' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>KEY</label>
+                        <select value={String(selectedNode.props.key ?? '')} onChange={e => updateProp('key', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
+                          <option value="">— select key —</option>
+                          {bt.blackboard.map(k => <option key={k.key} value={k.key}>{k.key} ({k.type})</option>)}
+                        </select>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>VALUE</label>
+                        <input value={String(selectedNode.props.value ?? '')}
+                          onChange={e => {
+                            const raw = e.target.value;
+                            const bb = bt.blackboard.find(k => k.key === selectedNode.props.key);
+                            const v = bb?.type === 'bool' ? (raw === 'true') : bb?.type === 'int' ? parseInt(raw) : bb?.type === 'float' ? parseFloat(raw) : raw;
+                            updateProp('value', isNaN(v as number) ? raw : v);
+                          }}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* Remaining unknown props */}
+                      {extraKeys.length > 0 && (
+                        <>
+                          <div style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, marginBottom: 4 }}>EXTRA PROPS</div>
+                          {extraKeys.map(k => (
+                            <div key={k} style={{ display: 'flex', gap: 4, marginBottom: 4, alignItems: 'center' }}>
+                              <span style={{ color: '#718096', fontSize: 9, fontFamily: 'monospace', flexShrink: 0, minWidth: 60, overflow: 'hidden', textOverflow: 'ellipsis' }}>{k}</span>
+                              <input value={String(selectedNode.props[k])}
+                                onChange={e => updateProp(k, isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value))}
+                                style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '3px 5px', fontSize: 10, fontFamily: 'monospace', minWidth: 0 }} />
+                              <button onClick={() => {
+                                const p = { ...selectedNode.props };
+                                delete p[k];
+                                updateSelectedNode({ props: p });
+                              }} style={{ background: 'none', border: 'none', color: '#4a5568', cursor: 'pointer', fontSize: 12, padding: '0 2px', flexShrink: 0 }}>✕</button>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
               </>
             )}
 
@@ -424,10 +879,21 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
                   {bt.blackboard.map(k => <option key={k.key} value={k.key}>{k.key}</option>)}
                 </select>
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>OPERATOR</label>
-                <select value={String(selectedNode.props.op ?? '==')} onChange={e => updateProp('op', e.target.value)}
-                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
-                  {['==', '!=', '>', '<', '>=', '<='].map(op => <option key={op} value={op}>{op}</option>)}
-                </select>
+                {(() => {
+                  const bbEntry = bt.blackboard.find(k => k.key === selectedNode.props.key);
+                  const kType = bbEntry?.type ?? 'string';
+                  const ops = (kType === 'bool' || kType === 'string') ? ['==', '!='] : ['==', '!=', '>', '<', '>=', '<='];
+                  const currentOp = String(selectedNode.props.op ?? '==');
+                  if (!ops.includes(currentOp)) {
+                    setTimeout(() => updateProp('op', '=='), 0);
+                  }
+                  return (
+                    <select value={ops.includes(currentOp) ? currentOp : '=='} onChange={e => updateProp('op', e.target.value)}
+                      style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }}>
+                      {ops.map(op => <option key={op} value={op}>{op}</option>)}
+                    </select>
+                  );
+                })()}
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>VALUE</label>
                 {(() => {
                   const bbEntry = bt.blackboard.find(k => k.key === selectedNode.props.key);
@@ -495,10 +961,34 @@ export default function BehaviorTreeEditor({ bt, onChange }: Props) {
               </>
             )}
 
-            <div style={{ color: '#4a5568', fontSize: 10, letterSpacing: 1 }}>
+            {selectedNode.type === 'Parallel' && (
+              <>
+                <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>
+                  THRESHOLD (children that must succeed; 0 = all)
+                </label>
+                <input type="number" value={Number(selectedNode.props.threshold ?? 0)} min={0} step={1}
+                  onChange={e => updateProp('threshold', parseInt(e.target.value))}
+                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 2, boxSizing: 'border-box' }} />
+                <div style={{ color: '#4a5568', fontSize: 9, marginBottom: 8 }}>
+                  0 means all {selectedNode.children.length} children must succeed
+                </div>
+              </>
+            )}
+
+            <div style={{ color: '#4a5568', fontSize: 10, letterSpacing: 1, marginTop: 4 }}>
               ID: {selectedNodeId}
-              {selectedNodeId === bt.rootId && ' (root)'}
+              {selectedNodeId === bt.rootId && <span style={{ color: '#f59e0b', marginLeft: 4 }}>(root)</span>}
             </div>
+            {selectedNodeId !== bt.rootId && (
+              <button onClick={() => {
+                const newBt = { ...btRef.current, rootId: selectedNodeId! };
+                pushToHistory(newBt);
+                onChange(newBt);
+              }}
+                style={{ display: 'block', width: '100%', marginTop: 6, padding: '4px 8px', background: '#1c1400', border: '1px solid #78350f', color: '#f59e0b', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer', letterSpacing: 1 }}>
+                ★ SET AS ROOT
+              </button>
+            )}
           </div>
         ) : (
           <div style={{ padding: '12px 10px', borderBottom: '1px solid #2d3748', color: '#4a5568', fontSize: 10 }}>

@@ -28,11 +28,60 @@ Civilian::Civilian() : Object(ObjectTypes::CIVILIAN){
 void Civilian::InitBT(){
 	bt_ = BehaviorTreeLibrary::instance().get("civilian");
 	if(!bt_) return;
-	btctx_.actions["Run"] = [this](BTContext&) -> BTResult {
+	btctx_.actions["Run"] = [this](BTContext& ctx) -> BTResult {
+		if(ctx.props){
+			int bonus = ctx.props->value("speedBonus", -1);
+			if(bonus >= 0) ctx.bbSet("bt_run_speed_bonus", bonus);
+		}
 		if(state != RUNNING){ state = RUNNING; state_i = (Uint8)-1; }
 		return BTResult::Success;
 	};
-	btctx_.actions["Wander"] = [](BTContext&) -> BTResult {
+	btctx_.actions["Wander"] = [this](BTContext& ctx) -> BTResult {
+		if(ctx.props){
+			int spd = ctx.props->value("speed", -1);
+			if(spd >= 0) ctx.bbSet("bt_walk_speed", spd);
+		}
+		return BTResult::Success;
+	};
+
+	// ── Generic data-driven leaves ────────────────────────────────────────────
+	btctx_.actions["SetBlackboard"] = [](BTContext& ctx) -> BTResult {
+		if(!ctx.props || !ctx.props->contains("key") || !ctx.props->contains("value"))
+			return BTResult::Failure;
+		ctx.bbSet(ctx.props->value("key", std::string{}), (*ctx.props)["value"]);
+		return BTResult::Success;
+	};
+	btctx_.actions["RandomChance"] = [](BTContext& ctx) -> BTResult {
+		float chance = ctx.props ? ctx.props->value("chance", 0.5f) : 0.5f;
+		return ((float)rand() / (float)RAND_MAX) < chance ? BTResult::Success : BTResult::Failure;
+	};
+	btctx_.actions["PlayAnim"] = [this](BTContext& ctx) -> BTResult {
+		if(!ctx.props) return BTResult::Failure;
+		int bank   = ctx.props->value("bank",   0);
+		int frames = ctx.props->value("frames", 1);
+		bool loop  = ctx.props->value("loop",   true);
+		res_bank  = bank;
+		res_index = loop ? (state_i % std::max(frames, 1))
+		                 : std::min((int)state_i, std::max(frames - 1, 0));
+		if(!loop && state_i >= frames) return BTResult::Success;
+		return BTResult::Running;
+	};
+	btctx_.actions["EmitSound"] = [this](BTContext& ctx) -> BTResult {
+		if(!ctx.props) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		std::string snd = ctx.props->value("sound", std::string{});
+		int vol = ctx.props->value("volume", 100);
+		if(snd.empty()) return BTResult::Failure;
+		auto it = world.resources.soundbank.find(snd);
+		if(it == world.resources.soundbank.end()) return BTResult::Failure;
+		EmitSound(world, it->second, vol);
+		return BTResult::Success;
+	};
+	btctx_.actions["SetFacing"] = [this](BTContext& ctx) -> BTResult {
+		std::string dir = ctx.props ? ctx.props->value("dir", std::string{"flip"}) : "flip";
+		if(dir == "left")       mirrored = true;
+		else if(dir == "right") mirrored = false;
+		else                    mirrored = !mirrored;
 		return BTResult::Success;
 	};
 }
@@ -104,7 +153,7 @@ void Civilian::Tick(World & world){
 			if(DistanceToEnd(*this, world) <= world.minwalldistance){
 				mirrored = mirrored ? false : true;
 			}
-			xv = mirrored ? -speed : speed;
+			xv = (mirrored ? -1 : 1) * btctx_.bb<int>("bt_walk_speed", speed);
 			FollowGround(*this, world, xv);
 			if(state_i % 10 == 0){
 				if(!bt_) InitBT();
@@ -129,7 +178,7 @@ void Civilian::Tick(World & world){
 				break;
 			  }
 			}
-			{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("civilian"); int _bonus = _gd ? _gd->runSpeedBonus : 5; xv = (mirrored ? -1 : 1) * (_bonus + speed); }
+			{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("civilian"); int _bonus = btctx_.bb<int>("bt_run_speed_bonus", _gd ? _gd->runSpeedBonus : 5); xv = (mirrored ? -1 : 1) * (_bonus + speed); }
 			res_bank = 123;
 			res_index = state_i % 15;
 			// play per-frame sounds defined in actordefs/civilian.json

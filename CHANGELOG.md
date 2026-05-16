@@ -4,6 +4,19 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00051] — 2026-05-13
+
+### Game client
+
+#### AI — Complete behavior tree migration (#136, issue #15)
+
+- **Guard — 100% BT-only** — removed the ~560-line `if(!bt_)` legacy state machine fallback; the guard BT was already running (44 leaf actions covering all states) and the fallback was dead code. Guard now crashes fast if the BT file is missing rather than silently falling back.
+- **Guard — patrol ledge turnaround fix** — `minWallDistance=35 > guard speed (~5 px/tick)` caused the turnaround check to fire every tick while inside the edge zone, making the guard oscillate and appear stuck. Fixed with an edge-triggered flip: `mirrored` is flipped only on the first tick entering the zone (tracked via `ctx.state`), not on every tick.
+- **Civilian — `Uint8 state_i` overflow bug** — `state_i = -1` (a `Uint8`) produced 255; the RUNNING duration check (`255 >= 150`) passed immediately every tick, so RUNNING exited before any movement. Civilian now returns `Running` immediately on WALKING→RUNNING transition; `Tick`'s `state_i++` wraps 255→0 cleanly.
+- **Civilian — threat detection** — switched from projectile `TestAABB` (unreliable: projectiles have `requiresauthority=true` and don't exist on the client) to `Player::IsShooting()` (`weaponfirecool > 0`, set for ~7 ticks per shot).
+- **Civilian — flee direction locking** — flee direction is locked at trigger time for the full RUNNING duration; `DistanceToEnd` wall-bounce is the sole redirect, preventing direction oscillation against walls.
+- **Robot** — confirmed 100% BT-only; no changes needed.
+
 ## [v00050] — 2026-05-12
 
 ### Game client
