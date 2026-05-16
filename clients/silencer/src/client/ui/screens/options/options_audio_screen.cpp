@@ -8,6 +8,7 @@
 #include "config.h"
 #include "audio.h"
 
+#include "components/boolean_setting_row.h"
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -29,8 +30,6 @@ using silencer::ui::primitives::BankTextVariant;
 constexpr uint16_t kPanelW = 420;
 constexpr uint16_t kPanelPadX = 24;
 constexpr uint16_t kPanelPadY = 32;
-constexpr uint16_t kRowH = 33;
-constexpr uint16_t kIndicatorGap = 10;
 constexpr uint16_t kActionGap = 12;
 constexpr const char * kActionMusic = "options_audio.music";
 constexpr const char * kActionSave = "options_audio.save";
@@ -42,56 +41,6 @@ void ApplyMusicSetting(bool on)
 		Audio::GetInstance().ResumeMusic();
 	}else{
 		Audio::GetInstance().PauseMusic();
-	}
-}
-
-void ToggleIndicator(Clay_String id, bool selected)
-{
-	CLAY({ .id = CLAY_SIDI(id, 2),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIXED(16) },
-	           .childGap = kIndicatorGap,
-	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
-	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-	       } }) {
-		CLAY({ .id = CLAY_SIDI(id, 3),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(20), CLAY_SIZING_FIXED(16) },
-		       },
-		       .image = { .imageData = silencer::clay_bridge::PackImage(
-		                     6, selected ? 12 : 13) } }) {}
-		CLAY({ .id = CLAY_SIDI(id, 4),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(20), CLAY_SIZING_FIXED(16) },
-		       },
-		       .image = { .imageData = silencer::clay_bridge::PackImage(
-		                     6, selected ? 15 : 14) } }) {}
-	}
-}
-
-void ToggleRow(Clay_String id,
-               Clay_String buttonId,
-               Clay_String label,
-               bool selected,
-               const char * actionId,
-               silencer::ui::UiInteractionRegistry& interactions)
-{
-	CLAY({ .id = CLAY_SID(id),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kRowH) },
-	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
-	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-	       } }) {
-		Button(buttonId, label,
-		       ButtonOpts{ .variant = ButtonVariant::Oval, .size = ButtonSize::Lg },
-		       ButtonHandle{ nullptr, actionId, &interactions });
-		CLAY({ .id = CLAY_SIDI(id, 1),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
-		           .childAlignment = { CLAY_ALIGN_X_RIGHT, CLAY_ALIGN_Y_CENTER },
-		       } }) {
-			ToggleIndicator(id, selected);
-		}
 	}
 }
 } // namespace options_audio_screen_detail
@@ -154,7 +103,13 @@ void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
 			options_audio_screen_detail::BankText(CLAY_STRING("Audio Options"), options_audio_screen_detail::BankTextVariant::Title, {});
-			options_audio_screen_detail::ToggleRow(CLAY_STRING("OptionsAudioMusicRow"), CLAY_STRING("OptionsAudioMusicButton"), CLAY_STRING("Music"), cfg.music, options_audio_screen_detail::kActionMusic, interactions);
+			silencer::client_ui::options::BooleanSettingRow(
+				CLAY_STRING("OptionsAudioMusicRow"),
+				CLAY_STRING("OptionsAudioMusicButton"),
+				CLAY_STRING("Music"),
+				cfg.music,
+				options_audio_screen_detail::kActionMusic,
+				interactions);
 			CLAY({ .id = CLAY_ID("OptionsAudioActions"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
