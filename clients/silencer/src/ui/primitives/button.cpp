@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cstring>
 #include <string>
+#include <unordered_map>
 
 namespace silencer::ui::primitives {
 
@@ -27,6 +28,29 @@ int g_customDataCount = 0;
 constexpr int kStringArenaCapacity = 32768;
 char g_stringArena[kStringArenaCapacity];
 int g_stringArenaOffset = 0;
+
+enum class ButtonVisualMode : Uint8 {
+	Inactive,
+	Activating,
+	Active,
+	Deactivating,
+};
+
+struct ButtonVisualState {
+	ButtonVisualMode mode = ButtonVisualMode::Inactive;
+	int phase = 0;
+	int visiblePhase = 0;
+	float accumulatedSeconds = 0.0f;
+};
+
+struct ButtonVisualFrame {
+	int phase = 0;
+	Uint8 brightness = 128;
+};
+
+std::unordered_map<uint32_t, ButtonVisualState> g_visualStates;
+float g_visualDeltaSeconds = 1.0f / 24.0f;
+float g_visualStepSeconds = 1.0f / 24.0f;
 
 struct ButtonLines {
 	Clay_String lines[32];
@@ -161,6 +185,108 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 	return out;
 }
 
+int ClampPhase(int phase) {
+	if(phase < 0) return 0;
+	if(phase > 4) return 4;
+	return phase;
+}
+
+ButtonVisualFrame FrameForPhase(int phase) {
+	phase = ClampPhase(phase);
+	return ButtonVisualFrame{
+		phase,
+		static_cast<Uint8>(128 + phase * 2),
+	};
+}
+
+ButtonVisualFrame CurrentVisual(const ButtonVisualState& state) {
+	return FrameForPhase(state.visiblePhase);
+}
+
+ButtonVisualFrame AdvanceVisualState(ButtonVisualState& state, bool targeted) {
+	if(targeted){
+		if(state.mode == ButtonVisualMode::Inactive){
+			state.mode = ButtonVisualMode::Activating;
+			state.phase = 0;
+		}else if(state.mode == ButtonVisualMode::Deactivating){
+			state.mode = ButtonVisualMode::Activating;
+		}
+	}else{
+		if(state.mode == ButtonVisualMode::Active){
+			state.mode = ButtonVisualMode::Deactivating;
+			state.phase = 4;
+		}else if(state.mode == ButtonVisualMode::Activating){
+			state.mode = ButtonVisualMode::Deactivating;
+		}
+	}
+
+	int phase = 0;
+	switch(state.mode){
+		case ButtonVisualMode::Inactive:
+			phase = 0;
+			break;
+		case ButtonVisualMode::Activating:
+		case ButtonVisualMode::Deactivating:
+			phase = ClampPhase(state.phase);
+			break;
+		case ButtonVisualMode::Active:
+			phase = 4;
+			break;
+	}
+	state.visiblePhase = phase;
+
+	if(state.mode == ButtonVisualMode::Activating){
+		if(state.phase >= 4){
+			state.mode = ButtonVisualMode::Active;
+			state.phase = 4;
+		}else{
+			state.phase++;
+		}
+	}else if(state.mode == ButtonVisualMode::Deactivating){
+		if(state.phase <= 0){
+			state.mode = ButtonVisualMode::Inactive;
+			state.phase = 0;
+		}else{
+			state.phase--;
+		}
+	}
+
+	return FrameForPhase(phase);
+}
+
+bool IsStableForTarget(const ButtonVisualState& state, bool targeted) {
+	return (targeted && state.mode == ButtonVisualMode::Active) ||
+	       (!targeted && state.mode == ButtonVisualMode::Inactive);
+}
+
+ButtonVisualFrame StepVisualState(uint32_t clayId, bool targeted) {
+	ButtonVisualState& state = g_visualStates[clayId];
+	ButtonVisualFrame frame = CurrentVisual(state);
+	if(IsStableForTarget(state, targeted)){
+		state.accumulatedSeconds = 0.0f;
+		return frame;
+	}
+	state.accumulatedSeconds += std::max(0.0f, g_visualDeltaSeconds);
+	const float step = std::max(0.001f, g_visualStepSeconds);
+	while(state.accumulatedSeconds + 0.0001f >= step){
+		state.accumulatedSeconds -= step;
+		frame = AdvanceVisualState(state, targeted);
+	}
+	if(IsStableForTarget(state, targeted)){
+		state.accumulatedSeconds = 0.0f;
+	}
+	return frame;
+}
+
+Uint16 SpriteIndexForFrame(const ResolvedButton& resolved,
+                           const ButtonOpts& opts,
+                           int phase) {
+	if(opts.variant == ButtonVariant::Oval){
+		return static_cast<Uint16>(resolved.spriteIndex + ClampPhase(phase));
+	}
+	return resolved.spriteIndex;
+}
+
 void AddLine(ButtonLines& out, const char * text, int length) {
 	if(out.count >= static_cast<int>(sizeof(out.lines) / sizeof(out.lines[0]))) return;
 	if(length < 0) length = 0;
@@ -269,10 +395,10 @@ int ClampAutoWidth(int width, const ButtonOpts& opts) {
 	return width < 1 ? 1 : width;
 }
 
-void RegisterButtonWidget(Clay_String id,
-                          Clay_String label,
+void RegisterButtonWidget(Clay_String label,
                           const ButtonOpts& opts,
-                          ButtonHandle handle) {
+                          ButtonHandle handle,
+                          Clay_ElementId clayId) {
 	if(!handle.interactions || !handle.actionId || !*handle.actionId) return;
 	silencer::ui::UiInteractable widget;
 	widget.id = handle.actionId;
@@ -280,9 +406,16 @@ void RegisterButtonWidget(Clay_String id,
 	widget.kind = UiInteractableKind::Button;
 	widget.selected = opts.selected;
 	widget.inactive = opts.disabled;
-	widget.clayId = CLAY_SID(id);
+	widget.clayId = clayId;
 	widget.hasClayId = true;
 	handle.interactions->RegisterInteractable(widget);
+}
+
+bool IsButtonFocused(ButtonHandle handle) {
+	if(!handle.interactions || !handle.actionId || !*handle.actionId) return false;
+	const silencer::ui::UiElementSnapshot * snapshot =
+		handle.interactions->FindById(handle.actionId);
+	return snapshot && snapshot->focused && snapshot->enabled;
 }
 
 void EmitButtonText(const ButtonLines& lines,
@@ -299,11 +432,13 @@ void EmitButtonText(const ButtonLines& lines,
 
 }  // namespace
 
-void ButtonBeginFrame() {
+void ButtonBeginFrame(float animationDeltaSeconds, float animationStepSeconds) {
 	g_spritePayloadCount = 0;
 	g_nineSlicePayloadCount = 0;
 	g_customDataCount = 0;
 	g_stringArenaOffset = 0;
+	g_visualDeltaSeconds = std::max(0.0f, animationDeltaSeconds);
+	g_visualStepSeconds = std::max(0.001f, animationStepSeconds);
 }
 
 void Button(Clay_String id,
@@ -335,6 +470,7 @@ void Button(Clay_String id,
 
 	const float boxW = static_cast<float>(width);
 	const float boxH = static_cast<float>(height);
+	const Clay_ElementId clayId = CLAY_SID(stableId);
 
 	if(resolved.hasSprite){
 		void * payload = resolved.nineSlice
@@ -344,7 +480,7 @@ void Button(Clay_String id,
 			resolved.nineSlice ? silencer::clay_bridge::CustomKind::ButtonNineSlice
 			                   : silencer::clay_bridge::CustomKind::ButtonSprite,
 			payload);
-		CLAY({ .id = CLAY_SID(stableId),
+		CLAY({ .id = clayId,
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(boxW), CLAY_SIZING_FIXED(boxH) },
 		           .padding = { static_cast<uint16_t>(paddingX),
@@ -359,22 +495,32 @@ void Button(Clay_String id,
 		       },
 		       .custom = { .customData = ccd } }) {
 			bool hovered = ::Clay_Hovered() && !opts.disabled;
-			Uint8 brightness = hovered ? static_cast<Uint8>(136) : static_cast<Uint8>(128);
+			RegisterButtonWidget(stableLabel, opts, handle, clayId);
+			bool focused = !opts.disabled && IsButtonFocused(handle);
+			ButtonVisualFrame visual = StepVisualState(
+				clayId.id,
+				!opts.disabled && (hovered || focused));
+			Uint16 spriteIndex = SpriteIndexForFrame(resolved, opts, visual.phase);
 			if(resolved.nineSlice){
 				auto * p = reinterpret_cast<silencer::clay_bridge::ButtonNineSlicePayload *>(payload);
-				if(p) p->brightness = brightness;
+				if(p){
+					p->index = spriteIndex;
+					p->brightness = visual.brightness;
+				}
 			}else{
 				auto * p = reinterpret_cast<silencer::clay_bridge::ButtonSpritePayload *>(payload);
-				if(p) p->brightness = brightness;
+				if(p){
+					p->index = spriteIndex;
+					p->brightness = visual.brightness;
+				}
 			}
 			if(handle.hoveredOut) *handle.hoveredOut = hovered;
-			RegisterButtonWidget(stableId, stableLabel, opts, handle);
-			EmitButtonText(lines, resolved, opts.effectColor, brightness);
+			EmitButtonText(lines, resolved, opts.effectColor, visual.brightness);
 		}
 		return;
 	}
 
-	CLAY({ .id = CLAY_SID(stableId),
+	CLAY({ .id = clayId,
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(boxW), CLAY_SIZING_FIXED(boxH) },
 	           .padding = { static_cast<uint16_t>(paddingX + std::max(0, resolved.xNudge)),
@@ -388,10 +534,13 @@ void Button(Clay_String id,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		bool hovered = ::Clay_Hovered() && !opts.disabled;
-		Uint8 brightness = hovered ? static_cast<Uint8>(136) : static_cast<Uint8>(128);
+		RegisterButtonWidget(stableLabel, opts, handle, clayId);
+		bool focused = !opts.disabled && IsButtonFocused(handle);
+		ButtonVisualFrame visual = StepVisualState(
+			clayId.id,
+			!opts.disabled && (hovered || focused));
 		if(handle.hoveredOut) *handle.hoveredOut = hovered;
-		RegisterButtonWidget(stableId, stableLabel, opts, handle);
-		EmitButtonText(lines, resolved, opts.effectColor, brightness);
+		EmitButtonText(lines, resolved, opts.effectColor, visual.brightness);
 	}
 }
 

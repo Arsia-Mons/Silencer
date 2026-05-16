@@ -489,6 +489,15 @@ void Game::PrepareClientUiFrame(Surface& surface) {
 	float deltaTimeSeconds =
 		static_cast<float>(GASLoader::Get().gameengine.tickIntervalMs) / 1000.0f;
 	preparedUiInput = clientUiInput.BuildFrame(virtualW, virtualH, uiScale, deltaTimeSeconds);
+	Uint64 now = SDL_GetTicks();
+	float animationDeltaSeconds = 0.0f;
+	if(lastUiAnimationMs != 0 && now >= lastUiAnimationMs){
+		animationDeltaSeconds = static_cast<float>(now - lastUiAnimationMs) / 1000.0f;
+		if(animationDeltaSeconds > 0.25f) animationDeltaSeconds = 0.25f;
+	}
+	lastUiAnimationMs = now;
+	preparedUiInput.animationDeltaSeconds = animationDeltaSeconds;
+	preparedUiInput.animationStepSeconds = deltaTimeSeconds;
 	hasPreparedUiInput = true;
 }
 

@@ -41,6 +41,8 @@ struct UiInputState {
 	int height = 0;
 	int uiScale = 1;
 	float deltaTimeSeconds = 0.0f;
+	float animationDeltaSeconds = 1.0f / 24.0f;
+	float animationStepSeconds = 1.0f / 24.0f;
 	UiPointerState pointer;
 	std::string textInput;
 	std::vector<UiNavAction> navActions;

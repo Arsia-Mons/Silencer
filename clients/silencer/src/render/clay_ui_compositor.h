@@ -93,6 +93,17 @@ struct ButtonCheckResult {
 	int clicksFiredWhenHeld;    // Expect 0 — held frames don't re-fire the proxy.
 	int chromeBrightnessHover;  // Expect 136 — the CUSTOM payload's brightness when hovered.
 	int chromeBrightnessIdle;   // Expect 128 — the CUSTOM payload's brightness when not hovered.
+	int chromeSpriteIndexHover; // Expect 24 — Chrome keeps its legacy static face.
+	int ovalHoverSpriteIndices[5];    // Expect 7,8,9,10,11 while pointer-hover activates.
+	int ovalHoverBrightness[5];       // Expect 128,130,132,134,136 while activating.
+	int ovalUnhoverSpriteIndices[5];  // Expect 11,10,9,8,7 while deactivating.
+	int ovalUnhoverBrightness[5];     // Expect 136,134,132,130,128 while deactivating.
+	int ovalFocusSpriteIndex;  // Expect 11 after keyboard focus reaches the button.
+	int ovalFocusBrightness;   // Expect 136 after keyboard focus reaches the button.
+	int ovalWallClockPartialSpriteIndex; // Expect 7 before one legacy tick has elapsed.
+	int ovalWallClockPartialBrightness;  // Expect 128 before one legacy tick has elapsed.
+	int ovalWallClockNextSpriteIndex;    // Expect 8 after the next legacy tick.
+	int ovalWallClockNextBrightness;     // Expect 130 after the next legacy tick.
 	int compactWidth;
 	int compactHeight;
 	int autoShortWidth;

@@ -44,7 +44,8 @@ struct ButtonHandle {
 	UiInteractionRegistry * interactions = nullptr;
 };
 
-void ButtonBeginFrame();
+void ButtonBeginFrame(float animationDeltaSeconds = 1.0f / 24.0f,
+                      float animationStepSeconds = 1.0f / 24.0f);
 
 void Button(Clay_String id,
             Clay_String label,

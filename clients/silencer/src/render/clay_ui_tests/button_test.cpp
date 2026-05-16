@@ -13,6 +13,7 @@
 #include "surface.h"
 
 #include <cstring>
+#include <string>
 #include <vector>
 
 namespace silencer::clay_bridge {
@@ -69,6 +70,39 @@ const silencer::ui::UiInteractable * FindButton(
 	return interactions.FindInteractableById(id);
 }
 
+struct ButtonProbe {
+	Uint16 spriteIndex = 0;
+	Uint8 brightness = 0;
+};
+
+ButtonProbe FirstButtonProbe(::Clay_RenderCommandArray cmds) {
+	ButtonProbe out;
+	for(int i = 0; i < cmds.length; i++){
+		::Clay_RenderCommand * c = &cmds.internalArray[i];
+		if(c->commandType != CLAY_RENDER_COMMAND_TYPE_CUSTOM) continue;
+		const auto * ccd = reinterpret_cast<const ClayCustomData *>(
+			c->renderData.custom.customData);
+		if(!ccd) continue;
+		if(ccd->kind == CustomKind::ButtonSprite){
+			const auto * p = reinterpret_cast<const ButtonSpritePayload *>(ccd->payload);
+			if(p){
+				out.spriteIndex = p->index;
+				out.brightness = p->brightness;
+			}
+			break;
+		}
+		if(ccd->kind == CustomKind::ButtonNineSlice){
+			const auto * p = reinterpret_cast<const ButtonNineSlicePayload *>(ccd->payload);
+			if(p){
+				out.spriteIndex = p->index;
+				out.brightness = p->brightness;
+			}
+			break;
+		}
+	}
+	return out;
+}
+
 }  // namespace
 
 bool RunButtonTest(::Game & game,
@@ -109,20 +143,34 @@ bool RunButtonTest(::Game & game,
 bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	constexpr int W = 640;
 	constexpr int H = 480;
+	constexpr float kVisualStepSeconds = 1.0f / 24.0f;
 	EnsureInitialized(W, H);
 
 	int actionCount = 0;
-	silencer::ui::UiInteractionRegistry interactions;
+	const std::string chromeClayId = "ButtonCheckCreate";
+	const std::string chromeActionId = "test.button.create";
+	ButtonOpts chromeOpts{ .variant = ButtonVariant::Chrome,
+	                       .size = ButtonSize::Compact };
 
-	bool wasDown = false;
-	auto runOneFrame = [&](float px, float py, bool down) -> Uint8 {
+	auto runOneFrame = [&](silencer::ui::UiInteractionRegistry& interactions,
+	                       bool& wasDown,
+	                       const std::string& clayId,
+	                       const std::string& actionId,
+	                       ButtonOpts opts,
+	                       float px,
+	                       float py,
+	                       bool down,
+	                       int * widgetWidth = nullptr,
+	                       int * widgetHeight = nullptr,
+	                       float animationDeltaSeconds = 1.0f / 24.0f) -> ButtonProbe {
 		const bool pressed = down && !wasDown;
 		::Clay_SetPointerState(::Clay_Vector2{px, py}, down);
 		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 		::Clay_ResetMeasureTextCache();
 		interactions.BeginFrame();
 		silencer::ui::primitives::BankTextBeginFrame();
-		silencer::ui::primitives::ButtonBeginFrame();
+		silencer::ui::primitives::ButtonBeginFrame(animationDeltaSeconds,
+		                                           kVisualStepSeconds);
 
 		::Clay_BeginLayout();
 		CLAY({ .id = CLAY_ID("ButtonCheckRoot"),
@@ -131,18 +179,17 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 		           .padding = { 100, 0, 100, 0 },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
-			Button(CLAY_STRING("ButtonCheckCreate"),
+			Button(Clay_String{ false, static_cast<int32_t>(clayId.size()), clayId.c_str() },
 			       CLAY_STRING("Create Game"),
-			       ButtonOpts{ .variant = ButtonVariant::Chrome,
-			                   .size = ButtonSize::Compact },
-			       ButtonHandle{ nullptr, "test.button.create", &interactions });
+			       opts,
+			       ButtonHandle{ nullptr, actionId.c_str(), &interactions });
 		}
 		::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
 		interactions.ResolveClayBoundsFromClay();
-		const auto * widget = FindButton(interactions, "test.button.create");
+		const auto * widget = FindButton(interactions, actionId.c_str());
 		if(widget){
-			out.compactWidth = widget->w;
-			out.compactHeight = widget->h;
+			if(widgetWidth) *widgetWidth = widget->w;
+			if(widgetHeight) *widgetHeight = widget->h;
 		}
 
 		std::vector<silencer::ui::UiAction> actions;
@@ -161,36 +208,161 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 		}
 		for(const auto & action : actions){
 			if(action.kind == silencer::ui::UiActionKind::Activate &&
-			   action.id == "test.button.create"){
+			   action.id == chromeActionId){
 				actionCount++;
 			}
 		}
 		wasDown = down;
 
-		Uint8 brightness = 0;
-		for(int i = 0; i < cmds.length; i++){
-			::Clay_RenderCommand * c = &cmds.internalArray[i];
-			if(c->commandType != CLAY_RENDER_COMMAND_TYPE_CUSTOM) continue;
-			const auto * ccd = reinterpret_cast<const ClayCustomData *>(
-				c->renderData.custom.customData);
-			if(!ccd || ccd->kind != CustomKind::ButtonSprite) continue;
-			const auto * p = reinterpret_cast<const ButtonSpritePayload *>(ccd->payload);
-			if(p) brightness = p->brightness;
-			break;
-		}
-		return brightness;
+		return FirstButtonProbe(cmds);
 	};
 
-	Uint8 idleBrightness = runOneFrame(-1.0f, -1.0f, false);
+	silencer::ui::UiInteractionRegistry interactions;
+	bool wasDown = false;
+	ButtonProbe idleProbe = runOneFrame(interactions,
+	                                    wasDown,
+	                                    chromeClayId,
+	                                    chromeActionId,
+	                                    chromeOpts,
+	                                    -1.0f,
+	                                    -1.0f,
+	                                    false,
+	                                    &out.compactWidth,
+	                                    &out.compactHeight);
 	const float px = 178.0f;
 	const float py = 110.0f;
-	Uint8 hoverBrightness = runOneFrame(px, py, false);
+	ButtonProbe hoverProbe;
+	for(int i = 0; i < 5; ++i){
+		hoverProbe = runOneFrame(interactions,
+		                         wasDown,
+		                         chromeClayId,
+		                         chromeActionId,
+		                         chromeOpts,
+		                         px,
+		                         py,
+		                         false);
+	}
 	int clicksBeforePress = actionCount;
-	runOneFrame(px, py, true);
-	runOneFrame(px, py, true);
+	runOneFrame(interactions, wasDown, chromeClayId, chromeActionId, chromeOpts, px, py, true);
+	runOneFrame(interactions, wasDown, chromeClayId, chromeActionId, chromeOpts, px, py, true);
 	int clicksAfterPressWindow = actionCount;
-	runOneFrame(px, py, true);
+	runOneFrame(interactions, wasDown, chromeClayId, chromeActionId, chromeOpts, px, py, true);
 	int clicksAfterHeld = actionCount;
+
+	const std::string ovalClayId = "ButtonCheckOvalHover";
+	const std::string ovalActionId = "test.button.oval_hover";
+	ButtonOpts ovalOpts{ .variant = ButtonVariant::Oval,
+	                     .size = ButtonSize::Md };
+	silencer::ui::UiInteractionRegistry ovalInteractions;
+	bool ovalWasDown = false;
+	runOneFrame(ovalInteractions,
+	            ovalWasDown,
+	            ovalClayId,
+	            ovalActionId,
+	            ovalOpts,
+	            -1.0f,
+	            -1.0f,
+	            false);
+	for(int i = 0; i < 5; ++i){
+		ButtonProbe probe = runOneFrame(ovalInteractions,
+		                                ovalWasDown,
+		                                ovalClayId,
+		                                ovalActionId,
+		                                ovalOpts,
+		                                px,
+		                                py,
+		                                false);
+		out.ovalHoverSpriteIndices[i] = probe.spriteIndex;
+		out.ovalHoverBrightness[i] = probe.brightness;
+	}
+	for(int i = 0; i < 5; ++i){
+		ButtonProbe probe = runOneFrame(ovalInteractions,
+		                                ovalWasDown,
+		                                ovalClayId,
+		                                ovalActionId,
+		                                ovalOpts,
+		                                -1.0f,
+		                                -1.0f,
+		                                false);
+		out.ovalUnhoverSpriteIndices[i] = probe.spriteIndex;
+		out.ovalUnhoverBrightness[i] = probe.brightness;
+	}
+
+	const std::string focusClayId = "ButtonCheckOvalFocus";
+	const std::string focusActionId = "test.button.oval_focus";
+	silencer::ui::UiInteractionRegistry focusInteractions;
+	bool focusWasDown = false;
+	runOneFrame(focusInteractions,
+	            focusWasDown,
+	            focusClayId,
+	            focusActionId,
+	            ovalOpts,
+	            -1.0f,
+	            -1.0f,
+	            false);
+	silencer::ui::UiInputState focusInput;
+	focusInput.width = W;
+	focusInput.height = H;
+	focusInput.navActions.push_back(silencer::ui::UiNavAction::FocusNext);
+	silencer::ui::UiInputRouter focusRouter(focusInteractions);
+	focusRouter.Route(focusInput);
+	ButtonProbe focusProbe;
+	for(int i = 0; i < 5; ++i){
+		focusProbe = runOneFrame(focusInteractions,
+		                         focusWasDown,
+		                         focusClayId,
+		                         focusActionId,
+		                         ovalOpts,
+		                         -1.0f,
+		                         -1.0f,
+		                         false);
+	}
+
+	const std::string wallClockClayId = "ButtonCheckOvalWallClock";
+	const std::string wallClockActionId = "test.button.oval_wall_clock";
+	silencer::ui::UiInteractionRegistry wallClockInteractions;
+	bool wallClockWasDown = false;
+	runOneFrame(wallClockInteractions,
+	            wallClockWasDown,
+	            wallClockClayId,
+	            wallClockActionId,
+	            ovalOpts,
+	            -1.0f,
+	            -1.0f,
+	            false);
+	ButtonProbe partialClockProbe = runOneFrame(wallClockInteractions,
+	                                           wallClockWasDown,
+	                                           wallClockClayId,
+	                                           wallClockActionId,
+	                                           ovalOpts,
+	                                           px,
+	                                           py,
+	                                           false,
+	                                           nullptr,
+	                                           nullptr,
+	                                           kVisualStepSeconds * 0.5f);
+	runOneFrame(wallClockInteractions,
+	            wallClockWasDown,
+	            wallClockClayId,
+	            wallClockActionId,
+	            ovalOpts,
+	            px,
+	            py,
+	            false,
+	            nullptr,
+	            nullptr,
+	            kVisualStepSeconds * 0.5f);
+	ButtonProbe nextClockProbe = runOneFrame(wallClockInteractions,
+	                                        wallClockWasDown,
+	                                        wallClockClayId,
+	                                        wallClockActionId,
+	                                        ovalOpts,
+	                                        px,
+	                                        py,
+	                                        false,
+	                                        nullptr,
+	                                        nullptr,
+	                                        kVisualStepSeconds);
 
 	auto probeButton = [&](const char * id,
 	                       Clay_String label,
@@ -297,10 +469,41 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 		}
 	}
 
-	out.chromeBrightnessIdle = idleBrightness;
-	out.chromeBrightnessHover = hoverBrightness;
+	out.chromeBrightnessIdle = idleProbe.brightness;
+	out.chromeBrightnessHover = hoverProbe.brightness;
+	out.chromeSpriteIndexHover = hoverProbe.spriteIndex;
 	out.clicksFiredOnPress  = clicksAfterPressWindow - clicksBeforePress;
 	out.clicksFiredWhenHeld = clicksAfterHeld - clicksAfterPressWindow;
+	out.ovalFocusSpriteIndex = focusProbe.spriteIndex;
+	out.ovalFocusBrightness = focusProbe.brightness;
+	out.ovalWallClockPartialSpriteIndex = partialClockProbe.spriteIndex;
+	out.ovalWallClockPartialBrightness = partialClockProbe.brightness;
+	out.ovalWallClockNextSpriteIndex = nextClockProbe.spriteIndex;
+	out.ovalWallClockNextBrightness = nextClockProbe.brightness;
+
+	const int expectHoverIndices[5] = {7, 8, 9, 10, 11};
+	const int expectHoverBrightness[5] = {128, 130, 132, 134, 136};
+	const int expectUnhoverIndices[5] = {11, 10, 9, 8, 7};
+	const int expectUnhoverBrightness[5] = {136, 134, 132, 130, 128};
+	for(int i = 0; i < 5; ++i){
+		if(out.ovalHoverSpriteIndices[i] != expectHoverIndices[i] ||
+		   out.ovalHoverBrightness[i] != expectHoverBrightness[i] ||
+		   out.ovalUnhoverSpriteIndices[i] != expectUnhoverIndices[i] ||
+		   out.ovalUnhoverBrightness[i] != expectUnhoverBrightness[i]){
+			return false;
+		}
+	}
+	if(out.chromeBrightnessIdle != 128 ||
+	   out.chromeBrightnessHover != 136 ||
+	   out.chromeSpriteIndexHover != 24 ||
+	   out.ovalFocusSpriteIndex != 11 ||
+	   out.ovalFocusBrightness != 136 ||
+	   out.ovalWallClockPartialSpriteIndex != 7 ||
+	   out.ovalWallClockPartialBrightness != 128 ||
+	   out.ovalWallClockNextSpriteIndex != 8 ||
+	   out.ovalWallClockNextBrightness != 130){
+		return false;
+	}
 	if(ovalMdLongWidth != 196 ||
 	   ovalMdLongHeight != 33 ||
 	   ovalMdLongTextRows != 1 ||

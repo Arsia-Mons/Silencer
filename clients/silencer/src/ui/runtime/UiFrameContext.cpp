@@ -14,8 +14,8 @@ namespace ui {
 UiFrameContext::UiFrameContext() = default;
 UiFrameContext::~UiFrameContext() = default;
 
-void UiFrameContext::BeginFrame() {
-	silencer::ui::primitives::ButtonBeginFrame();
+void UiFrameContext::BeginFrame(float animationDeltaSeconds, float animationStepSeconds) {
+	silencer::ui::primitives::ButtonBeginFrame(animationDeltaSeconds, animationStepSeconds);
 	silencer::ui::primitives::BankTextBeginFrame();
 	silencer::ui::primitives::BoxBeginFrame();
 	silencer::ui::primitives::ScrollListBeginFrame();

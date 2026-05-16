@@ -393,6 +393,23 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["clicks_fired_when_held"] = res.clicksFiredWhenHeld;
 		r["chrome_brightness_hover"] = res.chromeBrightnessHover;
 		r["chrome_brightness_idle"] = res.chromeBrightnessIdle;
+		r["chrome_sprite_index_hover"] = res.chromeSpriteIndexHover;
+		r["oval_hover_sprite_indices"] = nlohmann::json::array();
+		r["oval_hover_brightness"] = nlohmann::json::array();
+		r["oval_unhover_sprite_indices"] = nlohmann::json::array();
+		r["oval_unhover_brightness"] = nlohmann::json::array();
+		for(int i = 0; i < 5; ++i){
+			r["oval_hover_sprite_indices"].push_back(res.ovalHoverSpriteIndices[i]);
+			r["oval_hover_brightness"].push_back(res.ovalHoverBrightness[i]);
+			r["oval_unhover_sprite_indices"].push_back(res.ovalUnhoverSpriteIndices[i]);
+			r["oval_unhover_brightness"].push_back(res.ovalUnhoverBrightness[i]);
+		}
+		r["oval_focus_sprite_index"] = res.ovalFocusSpriteIndex;
+		r["oval_focus_brightness"] = res.ovalFocusBrightness;
+		r["oval_wall_clock_partial_sprite_index"] = res.ovalWallClockPartialSpriteIndex;
+		r["oval_wall_clock_partial_brightness"] = res.ovalWallClockPartialBrightness;
+		r["oval_wall_clock_next_sprite_index"] = res.ovalWallClockNextSpriteIndex;
+		r["oval_wall_clock_next_brightness"] = res.ovalWallClockNextBrightness;
 		r["compact_width"] = res.compactWidth;
 		r["compact_height"] = res.compactHeight;
 		r["auto_short_width"] = res.autoShortWidth;

@@ -216,6 +216,7 @@ private:
 	silencer::client_ui::InGameUiController inGameUiController;
 	silencer::ui::UiInputState preparedUiInput;
 	bool hasPreparedUiInput = false;
+	Uint64 lastUiAnimationMs = 0;
 	int frames;
 	int fps;
 	Uint64 lasttick;

@@ -97,8 +97,8 @@ fi
 CHECK=$(cli --port "$PORT" clay_button_check)
 echo "check = $CHECK"
 # Extract fields with a tiny Bun one-liner — jq isn't required.
-read CLICK_PRESS CLICK_HELD HOVER_BR IDLE_BR COMPACT_W COMPACT_H AUTO_SHORT AUTO_LONG AUTO_MULTI_H <<EOF
-$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.clicks_fired_on_press,j.clicks_fired_when_held,j.chrome_brightness_hover,j.chrome_brightness_idle,j.compact_width,j.compact_height,j.auto_short_width,j.auto_long_width,j.auto_multiline_height].join(' '))" "$CHECK")
+read CLICK_PRESS CLICK_HELD HOVER_BR IDLE_BR CHROME_IDX OVAL_HOVER_IDX OVAL_HOVER_BR OVAL_UNHOVER_IDX OVAL_UNHOVER_BR OVAL_FOCUS_IDX OVAL_FOCUS_BR OVAL_WC_PARTIAL_IDX OVAL_WC_PARTIAL_BR OVAL_WC_NEXT_IDX OVAL_WC_NEXT_BR COMPACT_W COMPACT_H AUTO_SHORT AUTO_LONG AUTO_MULTI_H <<EOF
+$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.clicks_fired_on_press,j.clicks_fired_when_held,j.chrome_brightness_hover,j.chrome_brightness_idle,j.chrome_sprite_index_hover,j.oval_hover_sprite_indices.join(','),j.oval_hover_brightness.join(','),j.oval_unhover_sprite_indices.join(','),j.oval_unhover_brightness.join(','),j.oval_focus_sprite_index,j.oval_focus_brightness,j.oval_wall_clock_partial_sprite_index,j.oval_wall_clock_partial_brightness,j.oval_wall_clock_next_sprite_index,j.oval_wall_clock_next_brightness,j.compact_width,j.compact_height,j.auto_short_width,j.auto_long_width,j.auto_multiline_height].join(' '))" "$CHECK")
 EOF
 
 assert_eq() {
@@ -111,6 +111,17 @@ assert_eq() {
 }
 assert_eq "chrome_brightness_idle"  "$IDLE_BR"     "128"
 assert_eq "chrome_brightness_hover" "$HOVER_BR"    "136"
+assert_eq "chrome_sprite_index_hover" "$CHROME_IDX" "24"
+assert_eq "oval_hover_sprite_indices" "$OVAL_HOVER_IDX" "7,8,9,10,11"
+assert_eq "oval_hover_brightness" "$OVAL_HOVER_BR" "128,130,132,134,136"
+assert_eq "oval_unhover_sprite_indices" "$OVAL_UNHOVER_IDX" "11,10,9,8,7"
+assert_eq "oval_unhover_brightness" "$OVAL_UNHOVER_BR" "136,134,132,130,128"
+assert_eq "oval_focus_sprite_index" "$OVAL_FOCUS_IDX" "11"
+assert_eq "oval_focus_brightness" "$OVAL_FOCUS_BR" "136"
+assert_eq "oval_wall_clock_partial_sprite_index" "$OVAL_WC_PARTIAL_IDX" "7"
+assert_eq "oval_wall_clock_partial_brightness" "$OVAL_WC_PARTIAL_BR" "128"
+assert_eq "oval_wall_clock_next_sprite_index" "$OVAL_WC_NEXT_IDX" "8"
+assert_eq "oval_wall_clock_next_brightness" "$OVAL_WC_NEXT_BR" "130"
 assert_eq "clicks_fired_on_press"   "$CLICK_PRESS" "1"
 assert_eq "clicks_fired_when_held"  "$CLICK_HELD"  "0"
 assert_eq "compact_width"           "$COMPACT_W"   "156"

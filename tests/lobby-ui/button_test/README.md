@@ -11,12 +11,24 @@ Pass bar (render): **< 1.0% per variant** (prd P5).
 Additionally drives `clay_button_check` — a non-PNG control op that
 exercises Chrome+Compact against a 5-frame pointer-state timeline and
 returns counters for hover brightness, click dispatch, stable bounds, and
-responsive Oval+Auto sizing. Expected output:
+responsive Oval+Auto sizing. It also verifies the retained legacy active
+timeline for Oval pointer hover and keyboard focus. Expected output:
 
 | Field                       | Expected | Why |
 |-----------------------------|----------|---|
 | `chrome_brightness_idle`    | 128      | Neutral effectbrightness (legacy default). |
 | `chrome_brightness_hover`   | 136      | Legacy ACTIVE-state brightness 128 + (4 * 2). |
+| `chrome_sprite_index_hover` | 24       | Chrome keeps its static sprite face. |
+| `oval_hover_sprite_indices` | 7,8,9,10,11 | Legacy Oval activation frame sequence. |
+| `oval_hover_brightness`     | 128,130,132,134,136 | Legacy activation brightness ramp. |
+| `oval_unhover_sprite_indices` | 11,10,9,8,7 | Legacy Oval deactivation frame sequence. |
+| `oval_unhover_brightness`   | 136,134,132,130,128 | Legacy deactivation brightness ramp. |
+| `oval_focus_sprite_index`   | 11       | Keyboard focus reaches the same active Oval frame. |
+| `oval_focus_brightness`     | 136      | Keyboard focus reaches the same active brightness. |
+| `oval_wall_clock_partial_sprite_index` | 7 | A partial legacy tick does not jump the animation. |
+| `oval_wall_clock_partial_brightness` | 128 | A partial legacy tick keeps neutral brightness. |
+| `oval_wall_clock_next_sprite_index` | 8 | The next elapsed legacy tick advances one frame. |
+| `oval_wall_clock_next_brightness` | 130 | The next elapsed legacy tick advances one brightness step. |
 | `clicks_fired_on_press`     | 1        | One fire across press transition + dispatch. |
 | `clicks_fired_when_held`    | 0        | No re-fire on held frames after first dispatch. |
 | `compact_width`             | 156      | Chrome+Compact maps to the existing framed lobby button. |

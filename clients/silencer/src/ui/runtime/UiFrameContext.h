@@ -13,7 +13,8 @@ public:
 	UiFrameContext();
 	~UiFrameContext();
 
-	void BeginFrame();
+	void BeginFrame(float animationDeltaSeconds = 1.0f / 24.0f,
+	                float animationStepSeconds = 1.0f / 24.0f);
 };
 
 }  // namespace ui

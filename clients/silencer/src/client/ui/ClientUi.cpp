@@ -78,7 +78,7 @@ ClientUi::ClientUi(silencer::ui::ClayService& clay)
 ClientUi::~ClientUi() = default;
 
 void ClientUi::BeginFrame(const silencer::ui::UiInputState& input) {
-	frameCtx_.BeginFrame();
+	frameCtx_.BeginFrame(input.animationDeltaSeconds, input.animationStepSeconds);
 	silencer::client_ui::HudPayloadBeginFrame();
 	clay_.BeginFrame(input, interactions_);
 }
