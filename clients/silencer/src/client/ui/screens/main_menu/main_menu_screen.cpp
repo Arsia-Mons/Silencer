@@ -27,6 +27,9 @@ using silencer::ui::primitives::BankTextVariant;
 
 constexpr uint16_t kRootPadX = 40;
 constexpr uint16_t kRootPadY = 32;
+constexpr uint16_t kLogoPadX = 7;
+constexpr uint16_t kLogoNudgeY = 6;
+constexpr float kBrandColumnPercent = 0.625f;
 constexpr uint16_t kButtonGap = 12;
 constexpr int kMenuButtonW = 156;
 constexpr int kMenuButtonH = 21;
@@ -58,6 +61,7 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 	lobbyClicked = false;
 	optionsClicked = false;
 	exitClicked = false;
+	logo.Reset();
 }
 
 void MainMenuScreen::Tick(ScreenContext & ctx)
@@ -93,11 +97,8 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 	std::string version = "Silencer v";
 	version += ctx.world.GetVersion();
 
-	// Fully responsive layout: the root fills Clay's virtual canvas (the
-	// native surface / uiScale), the background covers it like a CSS
-	// background-image, and a flex row places the logo + version on the
-	// left and the button column centered on the right. No absolute
-	// pixel positions — it reflows at any resolution.
+	// Flex-first layout: legacy positions are expressed as column sizes,
+	// padding, and alignment so the menu still reflows with Clay.
 	CLAY({ .id = CLAY_ID("MainMenuRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
@@ -108,33 +109,39 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0),
 		                       CLAY_SIZING_GROW(0) },
-		           .padding = { main_menu_screen_detail::kRootPadX,
-		                        main_menu_screen_detail::kRootPadX,
+		           .padding = { 0,
+		                        0,
 		                        main_menu_screen_detail::kRootPadY,
 		                        main_menu_screen_detail::kRootPadY },
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
 			CLAY({ .id = CLAY_ID("MainMenuLeft"),
 			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0),
+			           .sizing = { CLAY_SIZING_PERCENT(main_menu_screen_detail::kBrandColumnPercent),
 			                       CLAY_SIZING_GROW(0) },
+			           .padding = { main_menu_screen_detail::kLogoPadX,
+			                        0,
+			                        0,
+			                        0 },
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       } }) {
-				// Width grows with the left column (never a rigid pixel
-				// width that could overflow a narrow/portrait canvas and
-				// push the button column off-screen); contain keeps the
-				// logo's aspect at any size.
-				CLAY({ .id = CLAY_ID("MainMenuLogo"),
+				CLAY({ .id = CLAY_ID("MainMenuLogoRegion"),
 				       .layout = {
 				           .sizing = { CLAY_SIZING_GROW(0),
-				                       CLAY_SIZING_FIXED(160) },
-				       },
-				       .image = { .imageData = PackImageContain(208, 60) } }) {}
+				                       CLAY_SIZING_GROW(0) },
+				           .padding = { 0,
+				                        0,
+				                        main_menu_screen_detail::kLogoNudgeY,
+				                        0 },
+				           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
+				       } }) {
+					logo.Build(ctx.world.resources);
+				}
 
 				CLAY({ .id = CLAY_ID("MainMenuVersion"),
 				       .layout = {
 				           .sizing = { CLAY_SIZING_GROW(0),
-				                       CLAY_SIZING_GROW(0) },
+				                       CLAY_SIZING_FIXED(14) },
 				           .childAlignment = { .y = CLAY_ALIGN_Y_BOTTOM },
 				       } }) {
 					main_menu_screen_detail::BankText(main_menu_screen_detail::FromStd(version), main_menu_screen_detail::BankTextVariant::BodySm, {});
@@ -145,6 +152,10 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 			       .layout = {
 			           .sizing = { CLAY_SIZING_GROW(0),
 			                       CLAY_SIZING_GROW(0) },
+			           .padding = { 0,
+			                        main_menu_screen_detail::kRootPadX,
+			                        0,
+			                        0 },
 			           .childAlignment = { .x = CLAY_ALIGN_X_RIGHT,
 			                               .y = CLAY_ALIGN_Y_CENTER },
 			       } }) {

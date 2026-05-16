@@ -1,6 +1,7 @@
 #ifndef MAIN_MENU_SCREEN_H
 #define MAIN_MENU_SCREEN_H
 
+#include "components/silencer_logo.h"
 #include "screen.h"
 
 class MainMenuScreen : public Screen
@@ -17,6 +18,7 @@ private:
 	bool lobbyClicked = false;
 	bool optionsClicked = false;
 	bool exitClicked = false;
+	silencer::client_ui::main_menu::SilencerLogo logo;
 };
 
 #endif

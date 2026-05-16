@@ -460,8 +460,8 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						Renderer::Rect dstrect{
 							srcrect.w,
 							srcrect.h,
-							static_cast<int>(c->boundingBox.x),
-							static_cast<int>(c->boundingBox.y),
+							static_cast<int>(c->boundingBox.x) + p->dstOffsetX,
+							static_cast<int>(c->boundingBox.y) + p->dstOffsetY,
 						};
 						int cx = dstrect.x, cy = dstrect.y, cw = dstrect.w, ch = dstrect.h;
 						if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) break;

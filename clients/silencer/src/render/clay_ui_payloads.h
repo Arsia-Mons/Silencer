@@ -76,6 +76,27 @@ struct SpritePayload {
 	Uint8  brightness;
 	Uint8  rampColor;
 	Uint8  rampPlus;
+	Sint16 dstOffsetX;
+	Sint16 dstOffsetY;
+
+	SpritePayload(Uint8 bank = 0, Uint16 index = 0,
+	              Sint16 srcX = 0, Sint16 srcY = 0,
+	              Sint16 srcW = 0, Sint16 srcH = 0,
+	              Uint8 effectColor = 0, Uint8 brightness = 128,
+	              Uint8 rampColor = 0, Uint8 rampPlus = 0,
+	              Sint16 dstOffsetX = 0, Sint16 dstOffsetY = 0)
+		: bank(bank),
+		  index(index),
+		  srcX(srcX),
+		  srcY(srcY),
+		  srcW(srcW),
+		  srcH(srcH),
+		  effectColor(effectColor),
+		  brightness(brightness),
+		  rampColor(rampColor),
+		  rampPlus(rampPlus),
+		  dstOffsetX(dstOffsetX),
+		  dstOffsetY(dstOffsetY) {}
 };
 
 struct TeamEmblemPayload {
