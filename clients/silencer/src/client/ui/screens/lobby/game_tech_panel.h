@@ -56,7 +56,7 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 // Emits the upper-pane subtree ("Back To Teams" button + 3 right-aligned
 // peer-name labels). Called inside the LobbyRightUpperBox CLAY block; flex
 // children only (no floating).
-// BeginFrame requirements: BankTextBeginFrame, BankButtonBeginFrame.
+// BeginFrame requirements: BankTextBeginFrame, ButtonBeginFrame.
 void BuildGameTechUpperTree(GameTechPanelState & state,
                             World & world,
                             Resources & resources,

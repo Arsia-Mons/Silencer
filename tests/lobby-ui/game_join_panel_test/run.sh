@@ -11,7 +11,7 @@
 #
 # Pass gate: clay vs fresh-legacy diff over the right pane rect
 # (x=235, y=60, w=405, h=395) is under 5.0%. Same rect as P14/P15 — covers
-# the right border chrome + the three stacked B156x21 buttons (Choose Tech /
+# the right border chrome + the three stacked Chrome+Compact buttons (Choose Tech /
 # Change Team / Ready).
 set -euo pipefail
 

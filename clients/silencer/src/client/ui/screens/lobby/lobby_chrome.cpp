@@ -4,10 +4,9 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 #include "primitives/box.h"
 
-#include <algorithm>
 #include <cstdint>
 #include <string>
 
@@ -17,8 +16,11 @@ namespace lobby_chrome_detail {
 
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::Box;
 namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 
@@ -41,6 +43,7 @@ void BuildLobbyTitleBar(const std::string & version,
                         bool narrow,
                         int surfaceW,
                         silencer::ui::UiInteractionRegistry& interactions) {
+	(void)surfaceW;
 	const uint16_t titleH = LobbyTitleBarHeight(narrow, mapName);
 	CLAY(lobby_chrome_detail::Box(lobby_chrome_detail::BoxVariants::Chrome, {
 	         .id = CLAY_ID("LobbyTitleBar"),
@@ -101,12 +104,10 @@ void BuildLobbyTitleBar(const std::string & version,
 				       } }) {}
 
 				CLAY({ .id = CLAY_ID("LobbyGoBackWrap") }) {
-					lobby_chrome_detail::BankButton(CLAY_STRING("Go Back"),
-					           lobby_chrome_detail::BankButtonVariant::Chrome,
-					           {},
-					           { .hoveredOut = nullptr,
-					             .actionId = lobby_chrome_detail::kActionGoBack,
-					             .interactions = &interactions });
+					lobby_chrome_detail::Button(CLAY_STRING("LobbyGoBackButton"), CLAY_STRING("Go Back"),
+					           lobby_chrome_detail::ButtonOpts{ .variant = lobby_chrome_detail::ButtonVariant::Chrome,
+					                                           .size = lobby_chrome_detail::ButtonSize::Compact },
+					           lobby_chrome_detail::ButtonHandle{ nullptr, lobby_chrome_detail::kActionGoBack, &interactions });
 				}
 			}
 		};
@@ -131,14 +132,6 @@ void BuildLobbyTitleBar(const std::string & version,
 		}
 	}
 
-	silencer::ui::UiInteractable gb;
-	gb.id = lobby_chrome_detail::kActionGoBack;
-	gb.labelText = "Go Back";
-	gb.kind = silencer::ui::UiInteractableKind::Button;
-	gb.x = std::max(0, surfaceW - (int)lobby_chrome_detail::kRootPadX - 5 - 156);
-	gb.y = lobby_chrome_detail::kRootPadTop + 4;
-	gb.w = 156; gb.h = 21;
-	interactions.RegisterInteractable(gb);
 }
 
 }  // namespace silencer::client_ui::lobby

@@ -279,6 +279,131 @@ void DispatchImage(::Resources & resources,
 	}
 }
 
+Surface * ResolveSprite(::Resources & resources, Uint8 bank, Uint16 index) {
+	const auto & banks = resources.spritebank;
+	if(bank >= banks.size()) return nullptr;
+	if(index >= banks[bank].size()) return nullptr;
+	Surface * src = banks[bank][index].get();
+	if(!src || src->w <= 0 || src->h <= 0) return nullptr;
+	return src;
+}
+
+bool BlitClipped(Surface * src,
+                 Renderer::Rect srcRect,
+                 Surface * dst,
+                 int x,
+                 int y) {
+	if(!src || !dst || srcRect.w <= 0 || srcRect.h <= 0) return false;
+	ClipRect clip;
+	if(!CurrentClip(dst->w, dst->h, clip)) return false;
+	int x1 = std::max(x, clip.x);
+	int y1 = std::max(y, clip.y);
+	int x2 = std::min(x + srcRect.w, clip.x + clip.w);
+	int y2 = std::min(y + srcRect.h, clip.y + clip.h);
+	if(x2 <= x1 || y2 <= y1) return false;
+
+	srcRect.x += x1 - x;
+	srcRect.y += y1 - y;
+	srcRect.w = x2 - x1;
+	srcRect.h = y2 - y1;
+	Renderer::Rect dstRect{srcRect.w, srcRect.h, x1, y1};
+	Renderer::BlitSurface(src, &srcRect, dst, &dstRect);
+	return true;
+}
+
+void TileClipped(Surface * src,
+                 Renderer::Rect srcRect,
+                 Surface * dst,
+                 int x,
+                 int y,
+                 int w,
+                 int h) {
+	if(!src || !dst || srcRect.w <= 0 || srcRect.h <= 0 || w <= 0 || h <= 0) return;
+	for(int ty = 0; ty < h; ty += srcRect.h){
+		int tileH = std::min(srcRect.h, h - ty);
+		for(int tx = 0; tx < w; tx += srcRect.w){
+			int tileW = std::min(srcRect.w, w - tx);
+			Renderer::Rect tileSrc{tileW, tileH, srcRect.x, srcRect.y};
+			BlitClipped(src, tileSrc, dst, x + tx, y + ty);
+		}
+	}
+}
+
+void DispatchButtonSprite(::Resources & resources,
+                          ::Renderer & renderer,
+                          Surface * dst,
+                          const ::Clay_BoundingBox & bb,
+                          const ButtonSpritePayload& payload) {
+	Surface * src = ResolveSprite(resources, payload.bank, payload.index);
+	if(!src) return;
+	Surface * work = src;
+	if(payload.brightness != 128){
+		work = renderer.CreateSurfaceCopy(src);
+		renderer.EffectBrightness(work, nullptr, payload.brightness);
+	}
+	Renderer::Rect srcRect{work->w, work->h, 0, 0};
+	BlitClipped(work, srcRect, dst,
+	            static_cast<int>(bb.x),
+	            static_cast<int>(bb.y));
+	if(work != src) delete work;
+}
+
+void DispatchButtonNineSlice(::Resources & resources,
+                             ::Renderer & renderer,
+                             Surface * dst,
+                             const ::Clay_BoundingBox & bb,
+                             const ButtonNineSlicePayload& payload) {
+	Surface * src = ResolveSprite(resources, payload.bank, payload.index);
+	if(!src) return;
+	int x = static_cast<int>(bb.x);
+	int y = static_cast<int>(bb.y);
+	int w = static_cast<int>(bb.width);
+	int h = static_cast<int>(bb.height);
+	if(w <= 0 || h <= 0) return;
+
+	Surface * work = src;
+	if(payload.brightness != 128){
+		work = renderer.CreateSurfaceCopy(src);
+		renderer.EffectBrightness(work, nullptr, payload.brightness);
+	}
+
+	const int srcLeft = std::min<int>(payload.leftCap, work->w / 2);
+	const int srcRight = std::min<int>(payload.rightCap, work->w - srcLeft);
+	const int srcTop = std::min<int>(payload.topCap, work->h / 2);
+	const int srcBottom = std::min<int>(payload.bottomCap, work->h - srcTop);
+	const int dstLeft = std::min(srcLeft, w / 2);
+	const int dstRight = std::min(srcRight, w - dstLeft);
+	const int dstTop = std::min(srcTop, h / 2);
+	const int dstBottom = std::min(srcBottom, h - dstTop);
+	const int dstMidW = w - dstLeft - dstRight;
+	const int dstMidH = h - dstTop - dstBottom;
+	const int srcMidW = std::max(1, work->w - srcLeft - srcRight);
+	const int srcMidH = std::max(1, work->h - srcTop - srcBottom);
+
+	// Fill and edges are tiled from the center bands; corners stay cropped.
+	TileClipped(work, Renderer::Rect{srcMidW, srcMidH, srcLeft, srcTop},
+	            dst, x + dstLeft, y + dstTop, dstMidW, dstMidH);
+	TileClipped(work, Renderer::Rect{srcMidW, dstTop, srcLeft, 0},
+	            dst, x + dstLeft, y, dstMidW, dstTop);
+	TileClipped(work, Renderer::Rect{srcMidW, dstBottom, srcLeft, work->h - dstBottom},
+	            dst, x + dstLeft, y + h - dstBottom, dstMidW, dstBottom);
+	TileClipped(work, Renderer::Rect{dstLeft, srcMidH, 0, srcTop},
+	            dst, x, y + dstTop, dstLeft, dstMidH);
+	TileClipped(work, Renderer::Rect{dstRight, srcMidH, work->w - dstRight, srcTop},
+	            dst, x + w - dstRight, y + dstTop, dstRight, dstMidH);
+
+	BlitClipped(work, Renderer::Rect{dstLeft, dstTop, 0, 0},
+	            dst, x, y);
+	BlitClipped(work, Renderer::Rect{dstRight, dstTop, work->w - dstRight, 0},
+	            dst, x + w - dstRight, y);
+	BlitClipped(work, Renderer::Rect{dstLeft, dstBottom, 0, work->h - dstBottom},
+	            dst, x, y + h - dstBottom);
+	BlitClipped(work, Renderer::Rect{dstRight, dstBottom, work->w - dstRight, work->h - dstBottom},
+	            dst, x + w - dstRight, y + h - dstBottom);
+
+	if(work != src) delete work;
+}
+
 void OutlineVisiblePixels(::Renderer & renderer,
                           Surface * source,
                           Surface * target,
@@ -384,29 +509,16 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 					c->renderData.custom.customData);
 				if(!ccd) break;
 				switch(ccd->kind){
-					case CustomKind::BankButtonChrome: {
-						const auto * p = reinterpret_cast<const BankButtonChromePayload *>(ccd->payload);
+					case CustomKind::ButtonSprite: {
+						const auto * p = reinterpret_cast<const ButtonSpritePayload *>(ccd->payload);
 						if(!p) break;
-						const auto & banks = resources.spritebank;
-						if(p->bank >= banks.size()) break;
-						if(p->index >= banks[p->bank].size()) break;
-						Surface * src = banks[p->bank][p->index].get();
-						if(!src) break;
-						int x = static_cast<int>(c->boundingBox.x);
-						int y = static_cast<int>(c->boundingBox.y);
-						int w = src->w;
-						int h = src->h;
-						int cx = x, cy = y, cw = w, ch = h;
-						if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) break;
-						Renderer::Rect dstrect{w, h, x, y};
-						if(p->brightness != 128){
-							Surface * copy = renderer.CreateSurfaceCopy(src);
-							renderer.EffectBrightness(copy, nullptr, p->brightness);
-							Renderer::BlitSurface(copy, nullptr, dst, &dstrect);
-							delete copy;
-						}else{
-							Renderer::BlitSurface(src, nullptr, dst, &dstrect);
-						}
+						DispatchButtonSprite(resources, renderer, dst, c->boundingBox, *p);
+						break;
+					}
+					case CustomKind::ButtonNineSlice: {
+						const auto * p = reinterpret_cast<const ButtonNineSlicePayload *>(ccd->payload);
+						if(!p) break;
+						DispatchButtonNineSlice(resources, renderer, dst, c->boundingBox, *p);
 						break;
 					}
 					case CustomKind::ToggleSprite: {

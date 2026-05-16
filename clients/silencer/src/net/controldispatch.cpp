@@ -355,33 +355,37 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	if(cmd.op == "clay_bank_button_test"){
+	if(cmd.op == "clay_button_test"){
 		std::string out = cmd.args.value("out", std::string());
 		std::string variant = cmd.args.value("variant", std::string("chrome"));
+		std::string size = cmd.args.value("size", std::string("compact"));
+		std::string label = cmd.args.value("label", std::string("default"));
 		if(out.empty()){
 			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_bank_button_test requires --out <path>"));
+				"clay_button_test requires --out <path>"));
 			return;
 		}
-		bool ok = silencer::clay_bridge::RunBankButtonTest(
-			game, variant.c_str(), out.c_str());
+		bool ok = silencer::clay_bridge::RunButtonTest(
+			game, variant.c_str(), size.c_str(), label.c_str(), out.c_str());
 		if(!ok){
 			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"bank_button test render failed (PNG write): " + out));
+				"button test render failed (PNG write): " + out));
 			return;
 		}
 		nlohmann::json r;
 		r["path"] = out;
 		r["variant"] = variant;
+		r["size"] = size;
+		r["label"] = label;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	if(cmd.op == "clay_bank_button_check"){
-		silencer::clay_bridge::BankButtonCheckResult res{};
-		bool ok = silencer::clay_bridge::RunBankButtonCheck(game, res);
+	if(cmd.op == "clay_button_check"){
+		silencer::clay_bridge::ButtonCheckResult res{};
+		bool ok = silencer::clay_bridge::RunButtonCheck(game, res);
 		if(!ok){
 			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"bank_button check failed"));
+				"button check failed"));
 			return;
 		}
 		nlohmann::json r;
@@ -389,6 +393,11 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["clicks_fired_when_held"] = res.clicksFiredWhenHeld;
 		r["chrome_brightness_hover"] = res.chromeBrightnessHover;
 		r["chrome_brightness_idle"] = res.chromeBrightnessIdle;
+		r["compact_width"] = res.compactWidth;
+		r["compact_height"] = res.compactHeight;
+		r["auto_short_width"] = res.autoShortWidth;
+		r["auto_long_width"] = res.autoLongWidth;
+		r["auto_multiline_height"] = res.autoMultilineHeight;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}

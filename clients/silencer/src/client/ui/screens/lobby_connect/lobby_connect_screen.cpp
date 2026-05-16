@@ -15,6 +15,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
+#include "primitives/button.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
 
@@ -29,6 +30,11 @@ namespace lobby_connect_screen_detail
 {
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::ScrollTextBox;
 using silencer::ui::primitives::ScrollTextBoxLine;
 using silencer::ui::primitives::ScrollTextBoxOpts;
@@ -52,7 +58,6 @@ constexpr uint16_t kInputW = 180;
 constexpr uint16_t kInputH = 14;
 constexpr uint16_t kFormGap = 7;
 constexpr uint16_t kButtonGap = 5;
-constexpr uint16_t kButtonW = 52;
 constexpr uint16_t kButtonH = 21;
 constexpr int kMaxLogLines = 128;
 constexpr const char * kActionUsername = "lobby_connect.username";
@@ -71,11 +76,6 @@ Clay_String FromStd(const std::string & s)
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
 }
 
-std::string ToStd(Clay_String text)
-{
-	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
-}
-
 void CopyUiText(char * dst, int dstLen, const std::string & value)
 {
 	if(!dst || dstLen <= 0) return;
@@ -83,31 +83,6 @@ void CopyUiText(char * dst, int dstLen, const std::string & value)
 	if(n > dstLen - 1) n = dstLen - 1;
 	std::memcpy(dst, value.data(), n);
 	dst[n] = '\0';
-}
-
-void SmallButton(Clay_String label,
-                 const char * actionId,
-                 silencer::ui::UiInteractionRegistry& interactions)
-{
-	silencer::ui::UiInteractable widget;
-	widget.id = actionId;
-	widget.labelText = ToStd(label);
-	widget.kind = silencer::ui::UiInteractableKind::Button;
-	widget.clayId = CLAY_SID(label);
-	widget.hasClayId = true;
-	interactions.RegisterInteractable(widget);
-	CLAY({ .id = CLAY_SID(label),
-	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(kButtonW),
-	                       CLAY_SIZING_FIXED(kButtonH) },
-	           .padding = { 0, 0, 8, 0 },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
-	       } }) {
-		bool hovered = ::Clay_Hovered();
-		BankText(label, BankTextVariant::BodySm,
-		         { .brightness = hovered ? static_cast<Uint8>(136)
-		                                  : static_cast<Uint8>(128) });
-	}
 }
 
 void RegisterInput(const char * label,
@@ -426,8 +401,14 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 			           .childGap = lobby_connect_screen_detail::kButtonGap,
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				lobby_connect_screen_detail::SmallButton(CLAY_STRING("Login"), lobby_connect_screen_detail::kActionLogin, interactions);
-				lobby_connect_screen_detail::SmallButton(CLAY_STRING("Cancel"), lobby_connect_screen_detail::kActionCancel, interactions);
+				lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectLoginButton"), CLAY_STRING("Login"),
+					lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Text,
+					                                         .size = lobby_connect_screen_detail::ButtonSize::Compact },
+					lobby_connect_screen_detail::ButtonHandle{ nullptr, lobby_connect_screen_detail::kActionLogin, &interactions });
+				lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectCancelButton"), CLAY_STRING("Cancel"),
+					lobby_connect_screen_detail::ButtonOpts{ .variant = lobby_connect_screen_detail::ButtonVariant::Text,
+					                                         .size = lobby_connect_screen_detail::ButtonSize::Compact },
+					lobby_connect_screen_detail::ButtonHandle{ nullptr, lobby_connect_screen_detail::kActionCancel, &interactions });
 			}
 		}
 	}

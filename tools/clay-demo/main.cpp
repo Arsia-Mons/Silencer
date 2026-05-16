@@ -19,7 +19,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 #include "primitives/bank_text.h"
 #include "primitives/box.h"
 #include "primitives/label_value_row.h"
@@ -41,7 +41,7 @@ namespace {
 
 void BeginAllFrames() {
 	prim::BankTextBeginFrame();
-	prim::BankButtonBeginFrame();
+	prim::ButtonBeginFrame();
 	prim::ToggleBeginFrame();
 	prim::ScrollListBeginFrame();
 	prim::ScrollTextBoxBeginFrame();
@@ -164,15 +164,18 @@ void BuildDemoTree() {
 			                   .padding = CLAY_PADDING_ALL(0),
 			                   .childGap = 6,
 			                   .layoutDirection = CLAY_LEFT_TO_RIGHT } }) {
-				prim::BankButton(CLAY_STRING("Create Game"),
-				                 prim::BankButtonVariant::Chrome,
-				                 {},
-				                 { /*hoveredOut*/ nullptr,
-				                   /*actionId  */ "clay_demo.create_game",
-				                   /*interactions*/ &interactions });
-				prim::BankButton(CLAY_STRING("Security"),
-				                 prim::BankButtonVariant::Inline,
-				                 { .effectColor = 152 });
+				prim::Button(CLAY_STRING("ClayDemoCreateButton"),
+				             CLAY_STRING("Create Game"),
+				             { .variant = prim::ButtonVariant::Chrome,
+				               .size = prim::ButtonSize::Compact },
+				             { /*hoveredOut*/ nullptr,
+				               /*actionId  */ "clay_demo.create_game",
+				               /*interactions*/ &interactions });
+				prim::Button(CLAY_STRING("ClayDemoSecurityButton"),
+				             CLAY_STRING("Security"),
+				             { .variant = prim::ButtonVariant::Text,
+				               .size = prim::ButtonSize::Auto,
+				               .effectColor = 152 });
 			}
 
 			// Checkbox + Toggle row.
@@ -181,16 +184,18 @@ void BuildDemoTree() {
 			                   .padding = CLAY_PADDING_ALL(0),
 			                   .childGap = 12,
 			                   .layoutDirection = CLAY_LEFT_TO_RIGHT } }) {
-				prim::BankButton(CLAY_STRING("CheckEnabled"),
-				                 prim::BankButtonVariant::Checkbox,
-				                 { .selected = true });
-				prim::BankButton(CLAY_STRING("CheckDisabled"),
-				                 prim::BankButtonVariant::Checkbox,
-				                 { .selected = false });
 				// Bank 7 idx 18 is the legacy "checkbox on" sprite — a safe
 				// 13x13 sprite to use here without needing the agency-icon
 				// bank. We render it via Toggle to exercise the CUSTOM
 				// ToggleSprite dispatch path with EffectBrightness.
+				prim::Toggle(CLAY_STRING("CheckEnabled"),
+				             /*bank=*/7, /*index=*/18,
+				             /*selected=*/true,
+				             { .width = 13, .height = 13 });
+				prim::Toggle(CLAY_STRING("CheckDisabled"),
+				             /*bank=*/7, /*index=*/19,
+				             /*selected=*/false,
+				             { .width = 13, .height = 13 });
 				prim::Toggle(CLAY_STRING("ToggleA"),
 				             /*bank=*/7, /*index=*/18,
 				             /*selected=*/true,

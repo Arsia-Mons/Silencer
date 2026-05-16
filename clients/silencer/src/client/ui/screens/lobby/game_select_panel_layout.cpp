@@ -4,7 +4,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 #include "primitives/scroll_list.h"
 
 #include <cstdint>
@@ -12,10 +12,11 @@
 
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonOpts;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::ScrollList;
 using silencer::ui::primitives::ScrollListHandle;
 using silencer::ui::primitives::ScrollListOpts;
@@ -24,19 +25,12 @@ namespace silencer::client_ui::lobby {
 
 namespace game_select_panel_layout_detail {
 
-// Legacy on-screen coords kept ONLY for inspector hit-rect registration —
-// dispatch is label-based; the rect is a fallback for geometric hit-testing.
+// Legacy list coords kept ONLY for inspector hit-rect registration.
 constexpr int    kListX        = 407;
 constexpr int    kListY        = 89;
 constexpr Uint16 kListW        = 214;
 constexpr Uint16 kListH        = 265;
 constexpr Uint8  kListLineH    = 14;
-constexpr int    kBtnJoinX     = 436;
-constexpr int    kBtnJoinY     = 430;
-constexpr int    kBtnSpectateX = 436;
-constexpr int    kBtnSpectateY = 408;
-constexpr int    kBtnCreateX   = 242;
-constexpr int    kBtnCreateY   = 68;
 
 constexpr Uint8  kScrollbarBank = 7;
 
@@ -74,19 +68,6 @@ Clay_String FromStd(const std::string & s) {
 
 Clay_String StaticId(const char * s) {
 	return Clay_String{ true, static_cast<int32_t>(strlen(s)), s };
-}
-
-void RegisterButton(silencer::ui::UiInteractionRegistry& interactions,
-                    const char * label,
-                    const char * actionId,
-                    int x,
-                    int y) {
-	silencer::ui::UiInteractable w;
-	w.id = actionId;
-	w.labelText = label;
-	w.kind  = silencer::ui::UiInteractableKind::Button;
-	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	interactions.RegisterInteractable(w);
 }
 
 void BuildGameSelectInfoBlock(const GameSelectPanelState & state) {
@@ -177,16 +158,13 @@ void BuildGameSelectActionButtons(const GameSelectPanelState & state,
 	                        kTallSpectatePadTop, 0 },
 	       } }) {
 		if(state.spectateVisible){
-			BankButton(CLAY_STRING("Spectate"),
-			           BankButtonVariant::Chrome,
-			           BankButtonOpts{},
-			           BankButtonHandle{ /*hoveredOut*/ nullptr,
+			Button(CLAY_STRING("GameSelectSpectateButton"), CLAY_STRING("Spectate"),
+			           ButtonOpts{ .variant = ButtonVariant::Chrome,
+			                       .size = ButtonSize::Compact },
+			           ButtonHandle{ /*hoveredOut*/ nullptr,
 			                             /*actionId*/   kActionSpectate,
 			                             /*interactions*/ &interactions });
 		}
-	}
-	if(state.spectateVisible){
-		RegisterButton(interactions, "Spectate", kActionSpectate, kBtnSpectateX, kBtnSpectateY);
 	}
 
 	// Join button.
@@ -196,16 +174,13 @@ void BuildGameSelectActionButtons(const GameSelectPanelState & state,
 	                        kTallJoinPadTop, 0 },
 	       } }) {
 		if(state.joinVisible){
-			BankButton(CLAY_STRING("Join Game"),
-			           BankButtonVariant::Chrome,
-			           BankButtonOpts{},
-			           BankButtonHandle{ /*hoveredOut*/ nullptr,
+			Button(CLAY_STRING("GameSelectJoinButton"), CLAY_STRING("Join Game"),
+			           ButtonOpts{ .variant = ButtonVariant::Chrome,
+			                       .size = ButtonSize::Compact },
+			           ButtonHandle{ /*hoveredOut*/ nullptr,
 			                             /*actionId*/   kActionJoin,
 			                             /*interactions*/ &interactions });
 		}
-	}
-	if(state.joinVisible){
-		RegisterButton(interactions, "Join Game", kActionJoin, kBtnJoinX, kBtnJoinY);
 	}
 }
 
@@ -221,14 +196,13 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
 	CLAY({ .id = CLAY_ID("GSelBtnCreateWrap"),
 	       .layout = { .padding = { game_select_panel_layout_detail::kUpperBtnPadLeft, 0,
 	                                game_select_panel_layout_detail::kUpperBtnPadTop,  0 } } }) {
-		BankButton(CLAY_STRING("Create Game"),
-		           BankButtonVariant::Chrome,
-		           BankButtonOpts{},
-		           BankButtonHandle{ /*hoveredOut*/ nullptr,
+		Button(CLAY_STRING("GameSelectCreateButton"), CLAY_STRING("Create Game"),
+		           ButtonOpts{ .variant = ButtonVariant::Chrome,
+		                       .size = ButtonSize::Compact },
+		           ButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*actionId*/   game_select_panel_layout_detail::kActionCreate,
 		                             /*interactions*/ &interactions });
 	}
-	game_select_panel_layout_detail::RegisterButton(interactions, "Create Game", game_select_panel_layout_detail::kActionCreate, game_select_panel_layout_detail::kBtnCreateX, game_select_panel_layout_detail::kBtnCreateY);
 }
 
 void BuildGameSelectTallTree(GameSelectPanelState & state,

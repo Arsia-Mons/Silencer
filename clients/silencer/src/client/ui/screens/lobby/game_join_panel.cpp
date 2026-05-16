@@ -3,7 +3,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 
 #include "lobby_screen.h"
 #include "screen_context.h"
@@ -11,25 +11,15 @@
 #include "world.h"
 #include "resources.h"
 
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonOpts;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 
 namespace silencer::client_ui::lobby {
 
 namespace game_join_panel_detail {
-
-// Legacy on-screen coords kept ONLY for inspector hit-rect registration —
-// dispatch is label-based; the rect is a fallback for geometric hit-testing.
-constexpr int kBtnTechX  = 242;
-constexpr int kBtnTechY  = 68;
-constexpr int kBtnTeamX  = 242;
-constexpr int kBtnTeamY  = 100;
-constexpr int kBtnReadyX = 242;
-constexpr int kBtnReadyY = 160;
-constexpr int kBtnW      = 156;
-constexpr int kBtnH      = 21;
 
 // LobbyRightUpperBox interior layout knobs. Box at (238, 64, 160, 121) with
 // 1-px stroke → interior origin (239, 65). Buttons land at:
@@ -53,19 +43,6 @@ Clay_String FromStd(const std::string & s) {
 	cs.length = static_cast<int32_t>(s.size());
 	cs.chars  = s.c_str();
 	return cs;
-}
-
-void RegisterButton(silencer::ui::UiInteractionRegistry& interactions,
-                    const char * label,
-                    const char * actionId,
-                    int x,
-                    int y) {
-	silencer::ui::UiInteractable w;
-	w.id = actionId;
-	w.labelText = label;
-	w.kind  = silencer::ui::UiInteractableKind::Button;
-	w.x = x; w.y = y; w.w = kBtnW; w.h = kBtnH;
-	interactions.RegisterInteractable(w);
 }
 
 }  // namespace game_join_panel_detail
@@ -125,44 +102,34 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 	// Choose Tech (top button).
 	CLAY({ .id = CLAY_ID("GJoinBtnTechWrap"),
 	       .layout = { .padding = { game_join_panel_detail::kBtnPadLeft, 0, game_join_panel_detail::kBtnTechPadTop, 0 } } }) {
-		BankButton(CLAY_STRING("Choose Tech"),
-		           BankButtonVariant::Chrome,
-		           BankButtonOpts{},
-		           BankButtonHandle{ /*hoveredOut*/ nullptr,
+		Button(CLAY_STRING("GameJoinChooseTechButton"), CLAY_STRING("Choose Tech"),
+		           ButtonOpts{ .variant = ButtonVariant::Chrome,
+		                       .size = ButtonSize::Compact },
+		           ButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*actionId*/   game_join_panel_detail::kActionTech,
 		                             /*interactions*/ &interactions });
 	}
-	game_join_panel_detail::RegisterButton(interactions, "Choose Tech", game_join_panel_detail::kActionTech, game_join_panel_detail::kBtnTechX, game_join_panel_detail::kBtnTechY);
 
 	// Change Team (middle button).
 	CLAY({ .id = CLAY_ID("GJoinBtnTeamWrap"),
 	       .layout = { .padding = { game_join_panel_detail::kBtnPadLeft, 0, game_join_panel_detail::kBtnTeamPadTop, 0 } } }) {
-		BankButton(CLAY_STRING("Change Team"),
-		           BankButtonVariant::Chrome,
-		           BankButtonOpts{},
-		           BankButtonHandle{ /*hoveredOut*/ nullptr,
+		Button(CLAY_STRING("GameJoinChangeTeamButton"), CLAY_STRING("Change Team"),
+		           ButtonOpts{ .variant = ButtonVariant::Chrome,
+		                       .size = ButtonSize::Compact },
+		           ButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*actionId*/   game_join_panel_detail::kActionTeam,
 		                             /*interactions*/ &interactions });
 	}
-	game_join_panel_detail::RegisterButton(interactions, "Change Team", game_join_panel_detail::kActionTeam, game_join_panel_detail::kBtnTeamX, game_join_panel_detail::kBtnTeamY);
 
 	// Ready / Waiting... (bottom button). Label flips per Tick.
 	CLAY({ .id = CLAY_ID("GJoinBtnReadyWrap"),
 	       .layout = { .padding = { game_join_panel_detail::kBtnPadLeft, 0, game_join_panel_detail::kBtnReadyPadTop, 0 } } }) {
-		BankButton(game_join_panel_detail::FromStd(state.readyLabel),
-		           BankButtonVariant::Chrome,
-		           BankButtonOpts{},
-		           BankButtonHandle{ /*hoveredOut*/ nullptr,
+		Button(CLAY_STRING("GameJoinReadyButton"), game_join_panel_detail::FromStd(state.readyLabel),
+		           ButtonOpts{ .variant = ButtonVariant::Chrome,
+		                       .size = ButtonSize::Compact },
+		           ButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*actionId*/   game_join_panel_detail::kActionReady,
 		                             /*interactions*/ &interactions });
-	}
-	{
-		silencer::ui::UiInteractable w;
-		w.id = game_join_panel_detail::kActionReady;
-		w.labelText = state.readyLabel;
-		w.kind  = silencer::ui::UiInteractableKind::Button;
-		w.x = game_join_panel_detail::kBtnReadyX; w.y = game_join_panel_detail::kBtnReadyY; w.w = game_join_panel_detail::kBtnW; w.h = game_join_panel_detail::kBtnH;
-		interactions.RegisterInteractable(w);
 	}
 }
 

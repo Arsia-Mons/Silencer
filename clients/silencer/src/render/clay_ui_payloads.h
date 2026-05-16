@@ -38,7 +38,8 @@ struct BankTextDrawData {
 // CUSTOM render command payload. Tag the kind so the compositor can dispatch.
 enum class CustomKind : Uint8 {
 	None = 0,
-	BankButtonChrome,
+	ButtonSprite,
+	ButtonNineSlice,
 	ToggleSprite,
 	ScrollBar,
 	TextInput,
@@ -52,10 +53,20 @@ struct ClayCustomData {
 	void * payload;
 };
 
-struct BankButtonChromePayload {
+struct ButtonSpritePayload {
 	Uint8  bank;
 	Uint16 index;
 	Uint8  brightness;
+};
+
+struct ButtonNineSlicePayload {
+	Uint8  bank;
+	Uint16 index;
+	Uint8  brightness;
+	Uint8  leftCap;
+	Uint8  rightCap;
+	Uint8  topCap;
+	Uint8  bottomCap;
 };
 
 struct TogglePayload {

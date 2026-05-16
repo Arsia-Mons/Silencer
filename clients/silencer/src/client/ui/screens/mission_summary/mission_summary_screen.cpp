@@ -13,7 +13,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 #include "primitives/bank_text.h"
 #include "primitives/scroll_text_box.h"
 
@@ -25,10 +25,11 @@
 
 namespace mission_summary_screen_detail
 {
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonBeginFrame;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextBeginFrame;
 using silencer::ui::primitives::BankTextVariant;
@@ -203,14 +204,24 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 				           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				       } }) {
-					mission_summary_screen_detail::BankButton(CLAY_STRING("Up"), mission_summary_screen_detail::BankButtonVariant::Inline, {},
-					           mission_summary_screen_detail::BankButtonHandle{ nullptr, mission_summary_screen_detail::kActionScrollUp, &interactions });
-					mission_summary_screen_detail::BankButton(CLAY_STRING("Down"), mission_summary_screen_detail::BankButtonVariant::Inline, {},
-					           mission_summary_screen_detail::BankButtonHandle{ nullptr, mission_summary_screen_detail::kActionScrollDown, &interactions });
+					mission_summary_screen_detail::Button(CLAY_STRING("MissionSummaryScrollUpButton"), CLAY_STRING("Up"),
+					           mission_summary_screen_detail::ButtonOpts{ .variant = mission_summary_screen_detail::ButtonVariant::Ghost,
+					                                                  .size = mission_summary_screen_detail::ButtonSize::Auto,
+					                                                  .minWidth = 34,
+					                                                  .paddingY = 4 },
+					           mission_summary_screen_detail::ButtonHandle{ nullptr, mission_summary_screen_detail::kActionScrollUp, &interactions });
+					mission_summary_screen_detail::Button(CLAY_STRING("MissionSummaryScrollDownButton"), CLAY_STRING("Down"),
+					           mission_summary_screen_detail::ButtonOpts{ .variant = mission_summary_screen_detail::ButtonVariant::Ghost,
+					                                                  .size = mission_summary_screen_detail::ButtonSize::Auto,
+					                                                  .minWidth = 48,
+					                                                  .paddingY = 4 },
+					           mission_summary_screen_detail::ButtonHandle{ nullptr, mission_summary_screen_detail::kActionScrollDown, &interactions });
 				}
 			}
-			mission_summary_screen_detail::BankButton(CLAY_STRING("Done"), mission_summary_screen_detail::BankButtonVariant::Chrome, {},
-			           mission_summary_screen_detail::BankButtonHandle{ nullptr, mission_summary_screen_detail::kActionDone, &interactions });
+			mission_summary_screen_detail::Button(CLAY_STRING("MissionSummaryDoneButton"), CLAY_STRING("Done"),
+			           mission_summary_screen_detail::ButtonOpts{ .variant = mission_summary_screen_detail::ButtonVariant::Chrome,
+			                                                   .size = mission_summary_screen_detail::ButtonSize::Compact },
+			           mission_summary_screen_detail::ButtonHandle{ nullptr, mission_summary_screen_detail::kActionDone, &interactions });
 		}
 		CLAY({ .id = CLAY_ID("MissionSummaryUpgrades"),
 		       .layout = {
@@ -247,8 +258,13 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 				}
 				if(upgradesAvailable[i]){
 					std::string actionId = std::string(mission_summary_screen_detail::kActionUpgradePrefix) + std::to_string(i);
-					mission_summary_screen_detail::BankButton(mission_summary_screen_detail::FromCStr(mission_summary_screen_detail::kUpgradeLabels[i]), mission_summary_screen_detail::BankButtonVariant::Chrome, {},
-					           mission_summary_screen_detail::BankButtonHandle{ nullptr, actionId.c_str(), &interactions });
+					std::string buttonId = "MissionSummaryUpgradeButton" + std::to_string(i);
+					mission_summary_screen_detail::Button(mission_summary_screen_detail::FromStd(buttonId),
+					           mission_summary_screen_detail::FromCStr(mission_summary_screen_detail::kUpgradeLabels[i]),
+					           mission_summary_screen_detail::ButtonOpts{ .variant = mission_summary_screen_detail::ButtonVariant::Oval,
+					                                                   .size = mission_summary_screen_detail::ButtonSize::Auto,
+					                                                   .minWidth = 156 },
+					           mission_summary_screen_detail::ButtonHandle{ nullptr, actionId.c_str(), &interactions });
 				}
 			}
 		}

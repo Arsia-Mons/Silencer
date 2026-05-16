@@ -5,7 +5,7 @@
 //   * The action / preset / save / cancel / scroll button primitives.
 //   * The visible keybind row composition (action label + primary button +
 //     OR/AND operator button + secondary button).
-//   * Interaction registration for the visible row buttons.
+//   * Button interaction registration through the shared Button primitive.
 //
 // The panel chrome (root background, "Configure Controls" title) lives in the
 // screen file; this header emits the panel-interior rows + the bottom action
@@ -38,11 +38,6 @@ struct KeybindListView {
 	KeybindRowView rows[kKeybindListVisibleRows];
 	int visibleRowCount = 0;
 };
-
-// Registers interaction hit-rects for the preset / row buttons / scroll /
-// save / cancel buttons at their legacy screen positions.
-void RegisterKeybindListWidgets(int surfaceW,
-                                silencer::ui::UiInteractionRegistry& interactions);
 
 // Emits the keybind-list panel interior (preset row + visible rows + scroll
 // row + save/cancel row) into the current Clay frame. The caller wraps in the

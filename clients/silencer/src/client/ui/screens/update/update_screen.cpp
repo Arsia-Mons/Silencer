@@ -11,7 +11,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 #include "primitives/bank_text.h"
 
 #include <SDL3/SDL.h>
@@ -22,9 +22,11 @@
 
 namespace update_screen_detail
 {
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
 
@@ -181,18 +183,26 @@ void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
 				if(ustate == Updater::PROMPTING){
-					update_screen_detail::BankButton(CLAY_STRING("Update"), update_screen_detail::BankButtonVariant::Chrome, {},
-					           update_screen_detail::BankButtonHandle{ nullptr, update_screen_detail::kActionUpdate, &interactions });
+					update_screen_detail::Button(CLAY_STRING("UpdateConsentButton"), CLAY_STRING("Update"),
+					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
+					                                             .size = update_screen_detail::ButtonSize::Compact },
+					           update_screen_detail::ButtonHandle{ nullptr, update_screen_detail::kActionUpdate, &interactions });
 				}else if(ustate == Updater::FAILED && ctx.updater.GetRetryCount() < 3){
-					update_screen_detail::BankButton(CLAY_STRING("Retry"), update_screen_detail::BankButtonVariant::Chrome, {},
-					           update_screen_detail::BankButtonHandle{ nullptr, update_screen_detail::kActionRetry, &interactions });
+					update_screen_detail::Button(CLAY_STRING("UpdateRetryButton"), CLAY_STRING("Retry"),
+					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
+					                                             .size = update_screen_detail::ButtonSize::Compact },
+					           update_screen_detail::ButtonHandle{ nullptr, update_screen_detail::kActionRetry, &interactions });
 				}else if(ustate == Updater::FAILED){
-					update_screen_detail::BankButton(CLAY_STRING("Download"), update_screen_detail::BankButtonVariant::Chrome, {},
-					           update_screen_detail::BankButtonHandle{ nullptr, update_screen_detail::kActionDownload, &interactions });
+					update_screen_detail::Button(CLAY_STRING("UpdateDownloadButton"), CLAY_STRING("Download"),
+					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
+					                                             .size = update_screen_detail::ButtonSize::Compact },
+					           update_screen_detail::ButtonHandle{ nullptr, update_screen_detail::kActionDownload, &interactions });
 				}
 				if(ustate == Updater::PROMPTING || ustate == Updater::DOWNLOADING || ustate == Updater::FAILED){
-					update_screen_detail::BankButton(CLAY_STRING("Cancel"), update_screen_detail::BankButtonVariant::Chrome, {},
-					           update_screen_detail::BankButtonHandle{ nullptr, update_screen_detail::kActionCancel, &interactions });
+					update_screen_detail::Button(CLAY_STRING("UpdateCancelButton"), CLAY_STRING("Cancel"),
+					           update_screen_detail::ButtonOpts{ .variant = update_screen_detail::ButtonVariant::Chrome,
+					                                             .size = update_screen_detail::ButtonSize::Compact },
+					           update_screen_detail::ButtonHandle{ nullptr, update_screen_detail::kActionCancel, &interactions });
 				}
 			}
 		}

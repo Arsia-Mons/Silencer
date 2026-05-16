@@ -4,7 +4,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 #include "primitives/text_input.h"
 
 #include <cstdint>
@@ -13,9 +13,11 @@
 
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::TextInput;
 using silencer::ui::primitives::TextInputHandle;
 using silencer::ui::primitives::TextInputOpts;
@@ -24,11 +26,7 @@ namespace silencer::client_ui::lobby {
 
 namespace game_create_panel_options_detail {
 
-// Legacy on-screen coords kept ONLY for inspector hit-rect registration.
-constexpr int    kYSpace    = 14;
 constexpr int    kRowHeight = 14;
-constexpr int    kValueX    = 323;
-constexpr int    kFormTop   = 87;
 
 constexpr uint16_t kPanelPad      = 6;
 constexpr uint16_t kFormRowH      = 14;
@@ -59,18 +57,6 @@ const char * SecurityLabel(Uint8 idx) {
 	}
 }
 
-void RegisterButton(const char * label, const char * actionId,
-                    int x, int y, int w, int h, bool selected,
-                    silencer::ui::UiInteractionRegistry& interactions) {
-	silencer::ui::UiInteractable reg;
-	reg.id        = actionId;
-	reg.labelText = label;
-	reg.kind      = silencer::ui::UiInteractableKind::Button;
-	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	reg.selected  = selected;
-	interactions.RegisterInteractable(reg);
-}
-
 void BuildOptionRow(GameCreatePanelState & state, int i,
                     const char * rowId, const char * label,
                     const char * id, const char * actionId,
@@ -93,18 +79,20 @@ void BuildOptionRow(GameCreatePanelState & state, int i,
 			BankText(FromCStr(label), BankTextVariant::Body, {});
 		}
 		if(i == 0){
-			BankButton(FromCStr(SecurityLabel(state.securityIndex)),
-			           BankButtonVariant::Inline, {},
-			           BankButtonHandle{ nullptr, kActionSecurity, &interactions });
-			RegisterButton("Security", kActionSecurity,
-			               kValueX, kFormTop + 2, 60, kRowHeight, false, interactions);
+			Button(CLAY_STRING("GameCreateSecurityButton"), FromCStr(SecurityLabel(state.securityIndex)),
+			       ButtonOpts{ .variant = ButtonVariant::Text,
+			                   .size = ButtonSize::Auto,
+			                   .minWidth = 60,
+			                   .paddingY = 2 },
+			       ButtonHandle{ nullptr, kActionSecurity, &interactions });
 		}else if(i == 5){
-			BankButton(FromCStr(state.spectatable ? "Yes" : "No"),
-			           BankButtonVariant::Inline, {},
-			           BankButtonHandle{ nullptr, kActionSpectatable, &interactions });
-			RegisterButton("Spectatable", kActionSpectatable,
-			               kValueX, kFormTop + 5*kYSpace + 2, 30, kRowHeight,
-			               state.spectatable, interactions);
+			Button(CLAY_STRING("GameCreateSpectatableButton"), FromCStr(state.spectatable ? "Yes" : "No"),
+			       ButtonOpts{ .variant = ButtonVariant::Text,
+			                   .size = ButtonSize::Auto,
+			                   .selected = state.spectatable,
+			                   .minWidth = 30,
+			                   .paddingY = 2 },
+			       ButtonHandle{ nullptr, kActionSpectatable, &interactions });
 		}else{
 			TextInputOpts opts;
 			opts.widthPx     = 20;

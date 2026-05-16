@@ -3,7 +3,7 @@
 namespace silencer {
 namespace ui {
 
-// Owns the per-frame reset of every UI-runtime arena (BankText, BankButton,
+// Owns the per-frame reset of every UI-runtime arena (BankText, Button,
 // Box, ScrollList, ScrollTextBox, Toggle, TextInput). Production code calls
 // BeginFrame() exactly once per Clay layout, before any primitive
 // declaration. The individual *BeginFrame() functions remain exported so

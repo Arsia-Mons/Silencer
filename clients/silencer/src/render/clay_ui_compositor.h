@@ -76,24 +76,30 @@ bool RunSmoke(::Game & game, const char * outPath);
 // control op. Implementation in bank_text_test.cpp.
 bool RunBankTextTest(::Game & game, const char * outPath);
 
-// P5 BankButton primitive unit test. Renders one of three variants
-// (Chrome / Inline / Checkbox) into a fresh 640x480 Surface and writes it
-// to `outPath`. `variant` is one of "chrome", "inline", "checkbox" — any
-// other value selects "chrome". Invoked by the `clay_bank_button_test`
-// control op. Implementation in bank_button_test.cpp.
-bool RunBankButtonTest(::Game & game, const char * variant, const char * outPath);
+// Button primitive render test. Renders one variant+size combination into a
+// fresh 640x480 Surface and writes it to `outPath`. Invoked by the
+// `clay_button_test` control op. Implementation in button_test.cpp.
+bool RunButtonTest(::Game & game,
+                   const char * variant,
+                   const char * size,
+                   const char * label,
+                   const char * outPath);
 
-// P5 BankButton hover/click parity check. Runs the click + hover logic in
-// the BankButton::Chrome variant against a deterministic pointer-state
-// timeline and reports the results as raw counters in the output struct.
-// No PNG is produced — this complements the render-parity test op.
-struct BankButtonCheckResult {
+// Button hover/click parity check. Runs click + hover logic against a
+// deterministic pointer-state timeline and reports raw counters plus a few
+// sizing probes in the output struct. No PNG is produced.
+struct ButtonCheckResult {
 	int clicksFiredOnPress;     // Expect 1 action on the press edge.
 	int clicksFiredWhenHeld;    // Expect 0 — held frames don't re-fire the proxy.
 	int chromeBrightnessHover;  // Expect 136 — the CUSTOM payload's brightness when hovered.
 	int chromeBrightnessIdle;   // Expect 128 — the CUSTOM payload's brightness when not hovered.
+	int compactWidth;
+	int compactHeight;
+	int autoShortWidth;
+	int autoLongWidth;
+	int autoMultilineHeight;
 };
-bool RunBankButtonCheck(::Game & game, BankButtonCheckResult & out);
+bool RunButtonCheck(::Game & game, ButtonCheckResult & out);
 
 // P6 Toggle primitive unit test. Renders one Toggle (bank 181 idx 0,
 // effectColor=112) with the given selected state into a 640x480 Surface

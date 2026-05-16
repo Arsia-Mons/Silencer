@@ -10,7 +10,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 #include "primitives/bank_text.h"
 
 #include <SDL3/SDL.h>
@@ -19,9 +19,11 @@
 
 namespace main_menu_screen_detail
 {
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
 
@@ -31,8 +33,8 @@ constexpr uint16_t kLogoPadX = 7;
 constexpr uint16_t kLogoNudgeY = 6;
 constexpr float kBrandColumnPercent = 0.625f;
 constexpr uint16_t kButtonGap = 12;
-constexpr int kMenuButtonW = 156;
-constexpr int kMenuButtonH = 21;
+constexpr int kMenuButtonW = 196;
+constexpr int kMenuButtonH = 33;
 constexpr int kMenuButtonCount = 4;
 constexpr int kMenuButtonTotalH =
 	kMenuButtonCount * kMenuButtonH + (kMenuButtonCount - 1) * kButtonGap;
@@ -167,14 +169,22 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 				           .childGap = main_menu_screen_detail::kButtonGap,
 				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				       } }) {
-					main_menu_screen_detail::BankButton(CLAY_STRING("Tutorial"), main_menu_screen_detail::BankButtonVariant::Chrome, {},
-					           main_menu_screen_detail::BankButtonHandle{ nullptr, main_menu_screen_detail::kActionTutorial, &interactions });
-					main_menu_screen_detail::BankButton(CLAY_STRING("Connect To Lobby"), main_menu_screen_detail::BankButtonVariant::Chrome, {},
-					           main_menu_screen_detail::BankButtonHandle{ nullptr, main_menu_screen_detail::kActionLobby, &interactions });
-					main_menu_screen_detail::BankButton(CLAY_STRING("Options"), main_menu_screen_detail::BankButtonVariant::Chrome, {},
-					           main_menu_screen_detail::BankButtonHandle{ nullptr, main_menu_screen_detail::kActionOptions, &interactions });
-					main_menu_screen_detail::BankButton(CLAY_STRING("Exit"), main_menu_screen_detail::BankButtonVariant::Chrome, {},
-					           main_menu_screen_detail::BankButtonHandle{ nullptr, main_menu_screen_detail::kActionExit, &interactions });
+					main_menu_screen_detail::Button(CLAY_STRING("MainMenuTutorialButton"), CLAY_STRING("Tutorial"),
+					           main_menu_screen_detail::ButtonOpts{ .variant = main_menu_screen_detail::ButtonVariant::Oval,
+					                                               .size = main_menu_screen_detail::ButtonSize::Md },
+					           main_menu_screen_detail::ButtonHandle{ nullptr, main_menu_screen_detail::kActionTutorial, &interactions });
+					main_menu_screen_detail::Button(CLAY_STRING("MainMenuLobbyButton"), CLAY_STRING("Connect To Lobby"),
+					           main_menu_screen_detail::ButtonOpts{ .variant = main_menu_screen_detail::ButtonVariant::Oval,
+					                                               .size = main_menu_screen_detail::ButtonSize::Md },
+					           main_menu_screen_detail::ButtonHandle{ nullptr, main_menu_screen_detail::kActionLobby, &interactions });
+					main_menu_screen_detail::Button(CLAY_STRING("MainMenuOptionsButton"), CLAY_STRING("Options"),
+					           main_menu_screen_detail::ButtonOpts{ .variant = main_menu_screen_detail::ButtonVariant::Oval,
+					                                               .size = main_menu_screen_detail::ButtonSize::Md },
+					           main_menu_screen_detail::ButtonHandle{ nullptr, main_menu_screen_detail::kActionOptions, &interactions });
+					main_menu_screen_detail::Button(CLAY_STRING("MainMenuExitButton"), CLAY_STRING("Exit"),
+					           main_menu_screen_detail::ButtonOpts{ .variant = main_menu_screen_detail::ButtonVariant::Oval,
+					                                               .size = main_menu_screen_detail::ButtonSize::Md },
+					           main_menu_screen_detail::ButtonHandle{ nullptr, main_menu_screen_detail::kActionExit, &interactions });
 				}
 			}
 		}

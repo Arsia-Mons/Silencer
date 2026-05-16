@@ -85,7 +85,7 @@ bool RunToggleTest(::Game & game, const char * stateName, const char * outPath) 
 // other two should be 32). Presses inside toggle 1's bbox and verifies
 // exactly its typed action is emitted.
 //
-// Timeline mirrors RunBankButtonCheck: 5 frames, hover -> press -> press
+// Timeline mirrors RunButtonCheck: 5 frames, hover -> press -> press
 // dispatch -> held. The registry/router contract is exactly one action per
 // press edge.
 bool RunToggleCheck(::Game & game, ToggleCheckResult & out) {

@@ -1,15 +1,17 @@
-# bank_button_test — P5 unit test for the BankButton primitive
+# button_test — P5 unit test for the Button primitive
 
-Drives `clay_bank_button_test --variant <chrome|inline|checkbox>` three
-times, each capturing a 640x480 PNG of a single `BankButton` rendered
-through the Clay → SDL3 bridge into a fresh `Surface`, and pixdiffs each
-against the committed `reference_<variant>.png`.
+Drives `clay_button_test --variant <oval|chrome|text|ghost> --size
+<sm|md|lg|compact|auto>` across the public Button mappings, each
+capturing a 640x480 PNG of a single `Button` rendered through the Clay
+→ SDL3 bridge into a fresh `Surface`. Committed references are pixdiffed;
+new mappings without references are still captured as render smoke probes.
 
 Pass bar (render): **< 1.0% per variant** (prd P5).
 
-Additionally drives `clay_bank_button_check` — a non-PNG control op that
-exercises the Chrome variant against a 5-frame pointer-state timeline and
-returns counters for hover brightness + click dispatch. Expected output:
+Additionally drives `clay_button_check` — a non-PNG control op that
+exercises Chrome+Compact against a 5-frame pointer-state timeline and
+returns counters for hover brightness, click dispatch, stable bounds, and
+responsive Oval+Auto sizing. Expected output:
 
 | Field                       | Expected | Why |
 |-----------------------------|----------|---|
@@ -17,17 +19,19 @@ returns counters for hover brightness + click dispatch. Expected output:
 | `chrome_brightness_hover`   | 136      | Legacy ACTIVE-state brightness 128 + (4 * 2). |
 | `clicks_fired_on_press`     | 1        | One fire across press transition + dispatch. |
 | `clicks_fired_when_held`    | 0        | No re-fire on held frames after first dispatch. |
+| `compact_width`             | 156      | Chrome+Compact maps to the existing framed lobby button. |
+| `compact_height`            | 21       | Chrome+Compact keeps the existing hit height. |
 
 ## Usage
 
 ```bash
-bash tests/lobby-ui/bank_button_test/run.sh
+bash tests/lobby-ui/button_test/run.sh
 ```
 
 To regenerate baselines after a deliberate change to the test scene:
 
 ```bash
-REGEN=1 bash tests/lobby-ui/bank_button_test/run.sh
+REGEN=1 bash tests/lobby-ui/button_test/run.sh
 ```
 
 ## Why three separate ops, not one combined frame

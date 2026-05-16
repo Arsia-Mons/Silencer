@@ -2,9 +2,9 @@
 #define SILENCER_CLIENT_UI_LOBBY_GAME_CREATE_PANEL_H
 
 // Screen-side lobby GameCreatePanel: the game-options form on the right pane.
-// Composes Panel + LabelValueRow + TextInput + BankButton::Inline
+// Composes Panel + LabelValueRow + TextInput + Button::Inline
 // (security/spectatable cyclers) + ScrollList (map list) +
-// BankButton::Chrome (Create).
+// Button::Chrome (Create).
 //
 // Domain glue (CreateGame kickoff, Config persistence, async map upload)
 // lives in the screen-side GameCreatePanelTick. Primitives stay screen-
@@ -76,7 +76,7 @@ bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
 // Emits the upper-pane subtree ("Game Options" heading + 6-row form: security
 // cycler, min/max level, max players, max teams, spectatable). Called inside
 // the LobbyRightUpperBox CLAY block; flex children only (no floating).
-// BeginFrame requirements: BankTextBeginFrame, BankButtonBeginFrame,
+// BeginFrame requirements: BankTextBeginFrame, ButtonBeginFrame,
 // TextInputBeginFrame.
 void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Resources & resources,
@@ -85,7 +85,7 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 // Emits the tall-pane subtree ("Select Map" heading + map list + game-name +
 // password inputs + Create button). Called inside the LobbyRightTallBox CLAY
 // block; flex children only.
-// BeginFrame requirements: BankTextBeginFrame, BankButtonBeginFrame,
+// BeginFrame requirements: BankTextBeginFrame, ButtonBeginFrame,
 // ScrollListBeginFrame, TextInputBeginFrame.
 void BuildGameCreateTallTree(GameCreatePanelState & state,
                              Resources & resources,

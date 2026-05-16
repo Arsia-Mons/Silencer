@@ -11,7 +11,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 #include "primitives/bank_text.h"
 
 #include <SDL3/SDL.h>
@@ -19,9 +19,11 @@
 
 namespace options_display_screen_detail
 {
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
 
@@ -61,25 +63,28 @@ void ToggleIndicator(Clay_String id, bool selected)
 	}
 }
 
-void ToggleRow(Clay_String label,
+void ToggleRow(Clay_String id,
+               Clay_String buttonId,
+               Clay_String label,
                bool selected,
                const char * actionId,
                silencer::ui::UiInteractionRegistry& interactions)
 {
-	CLAY({ .id = CLAY_SID(label),
+	CLAY({ .id = CLAY_SID(id),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kRowH) },
 	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
-		BankButton(label, BankButtonVariant::Chrome, {},
-		           BankButtonHandle{ nullptr, actionId, &interactions });
-		CLAY({ .id = CLAY_SIDI(label, 1),
+		Button(buttonId, label,
+		       ButtonOpts{ .variant = ButtonVariant::Oval, .size = ButtonSize::Lg },
+		       ButtonHandle{ nullptr, actionId, &interactions });
+		CLAY({ .id = CLAY_SIDI(id, 1),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
 		           .childAlignment = { CLAY_ALIGN_X_RIGHT, CLAY_ALIGN_Y_CENTER },
 		       } }) {
-			ToggleIndicator(label, selected);
+			ToggleIndicator(id, selected);
 		}
 	}
 }
@@ -157,9 +162,9 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 			           .childGap = options_display_screen_detail::kRowGap,
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       } }) {
-				options_display_screen_detail::ToggleRow(CLAY_STRING("Fullscreen"), cfg.fullscreen,
+				options_display_screen_detail::ToggleRow(CLAY_STRING("OptionsDisplayFullscreenRow"), CLAY_STRING("OptionsDisplayFullscreenButton"), CLAY_STRING("Fullscreen"), cfg.fullscreen,
 				          options_display_screen_detail::kActionFullscreen, interactions);
-				options_display_screen_detail::ToggleRow(CLAY_STRING("Smooth Scaling"), cfg.scalefilter,
+				options_display_screen_detail::ToggleRow(CLAY_STRING("OptionsDisplaySmoothScalingRow"), CLAY_STRING("OptionsDisplaySmoothScalingButton"), CLAY_STRING("Smooth Scaling"), cfg.scalefilter,
 				          options_display_screen_detail::kActionSmoothScaling, interactions);
 			}
 			CLAY({ .id = CLAY_ID("OptionsDisplayActions"),
@@ -168,10 +173,14 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 			           .childGap = options_display_screen_detail::kActionGap,
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				options_display_screen_detail::BankButton(CLAY_STRING("Save"), options_display_screen_detail::BankButtonVariant::Chrome, {},
-				           options_display_screen_detail::BankButtonHandle{ nullptr, options_display_screen_detail::kActionSave, &interactions });
-				options_display_screen_detail::BankButton(CLAY_STRING("Cancel"), options_display_screen_detail::BankButtonVariant::Chrome, {},
-				           options_display_screen_detail::BankButtonHandle{ nullptr, options_display_screen_detail::kActionCancel, &interactions });
+				options_display_screen_detail::Button(CLAY_STRING("OptionsDisplaySaveButton"), CLAY_STRING("Save"),
+				           options_display_screen_detail::ButtonOpts{ .variant = options_display_screen_detail::ButtonVariant::Oval,
+				                                                      .size = options_display_screen_detail::ButtonSize::Md },
+				           options_display_screen_detail::ButtonHandle{ nullptr, options_display_screen_detail::kActionSave, &interactions });
+				options_display_screen_detail::Button(CLAY_STRING("OptionsDisplayCancelButton"), CLAY_STRING("Cancel"),
+				           options_display_screen_detail::ButtonOpts{ .variant = options_display_screen_detail::ButtonVariant::Oval,
+				                                                      .size = options_display_screen_detail::ButtonSize::Md },
+				           options_display_screen_detail::ButtonHandle{ nullptr, options_display_screen_detail::kActionCancel, &interactions });
 			}
 		}
 	}

@@ -8,7 +8,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 #include "primitives/bank_text.h"
 #include "primitives/text_input.h"
 
@@ -18,9 +18,11 @@
 
 namespace password_modal_detail
 {
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
 
@@ -121,8 +123,10 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 				  .showCaret = focused && blink },
 				{ nullptr, password_modal_detail::kActionPassword, "Password",
 				  &interactions, password_modal_detail::kPasswordUid, 20 });
-			password_modal_detail::BankButton(CLAY_STRING("OK"), password_modal_detail::BankButtonVariant::Chrome, {},
-			           password_modal_detail::BankButtonHandle{ nullptr, password_modal_detail::kActionOk, &interactions });
+			password_modal_detail::Button(CLAY_STRING("PasswordModalOkButton"), CLAY_STRING("OK"),
+			           password_modal_detail::ButtonOpts{ .variant = password_modal_detail::ButtonVariant::Chrome,
+			                                             .size = password_modal_detail::ButtonSize::Compact },
+			           password_modal_detail::ButtonHandle{ nullptr, password_modal_detail::kActionOk, &interactions });
 		}
 	}
 

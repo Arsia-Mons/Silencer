@@ -4,7 +4,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 #include "primitives/scroll_list.h"
 #include "primitives/text_input.h"
 
@@ -15,9 +15,11 @@
 
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::ScrollList;
 using silencer::ui::primitives::ScrollListHandle;
 using silencer::ui::primitives::ScrollListOpts;
@@ -38,7 +40,6 @@ constexpr Uint8  kMapListLineH = 14;
 constexpr Uint8  kScrollbarBank = 7;
 constexpr Uint16 kNameInputW = 210, kNameInputH = 14;
 constexpr Uint16 kPwInputW   = 210, kPwInputH   = 14;
-constexpr int    kCreateBtnX = 436, kCreateBtnY = 430;
 
 constexpr uint16_t kPanelPad       = 6;
 constexpr uint16_t kTallSectionGap = 4;
@@ -49,17 +50,6 @@ constexpr const char * kActionCreate    = "lobby.game_create.create";
 constexpr const char * kActionMapPrefix = "lobby.game_create.map";
 constexpr const char * kActionName      = "lobby.game_create.name";
 constexpr const char * kActionPassword  = "lobby.game_create.password";
-
-void RegisterButton(const char * label, const char * actionId,
-                    int x, int y, int w, int h,
-                    silencer::ui::UiInteractionRegistry& interactions) {
-	silencer::ui::UiInteractable reg;
-	reg.id        = actionId;
-	reg.labelText = label;
-	reg.kind      = silencer::ui::UiInteractableKind::Button;
-	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	interactions.RegisterInteractable(reg);
-}
 
 void BuildMapList(GameCreatePanelState & state,
                   silencer::ui::UiInteractionRegistry& interactions) {
@@ -157,11 +147,11 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 
 		CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
 		       .layout = { .childAlignment = { .x = CLAY_ALIGN_X_CENTER } } }) {
-			BankButton(CLAY_STRING("Create"),
-			           BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, game_create_panel_map_form_detail::kActionCreate, &interactions });
+			Button(CLAY_STRING("GameCreateCreateButton"), CLAY_STRING("Create"),
+			       ButtonOpts{ .variant = ButtonVariant::Chrome,
+			                   .size = ButtonSize::Compact },
+			       ButtonHandle{ nullptr, game_create_panel_map_form_detail::kActionCreate, &interactions });
 		}
-		game_create_panel_map_form_detail::RegisterButton("Create", game_create_panel_map_form_detail::kActionCreate, game_create_panel_map_form_detail::kCreateBtnX, game_create_panel_map_form_detail::kCreateBtnY, 156, 21, interactions);
 	}
 }
 

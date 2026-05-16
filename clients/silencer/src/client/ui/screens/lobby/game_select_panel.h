@@ -3,7 +3,7 @@
 
 // Screen-side lobby GameSelectPanel: the always-on right-side games list
 // surface (active when no Create/Join/Tech panel is up). Composes ScrollList
-// + BankText + BankButton primitives and owns the per-frame info-block
+// + BankText + Button primitives and owns the per-frame info-block
 // strings + the Join/Spectate/Create button click flags. Domain glue
 // (JoinGame / SpectateGame / level checks / password modal / ShowGameCreate)
 // lives here in the screen; primitives stay screen-agnostic.
@@ -82,7 +82,7 @@ bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
 
 // Emits the upper-pane subtree (Create Game button). Must be called inside
 // the LobbyRightUpperBox CLAY block; emits flex children only (no floating).
-// BeginFrame requirements: BankButtonBeginFrame.
+// BeginFrame requirements: ButtonBeginFrame.
 void BuildGameSelectUpperTree(GameSelectPanelState & state,
                               Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions);
@@ -90,7 +90,7 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
 // Emits the tall-pane subtree ("Active Games" header + games list +
 // info-block + Spectate/Join buttons). Must be called inside the
 // LobbyRightTallBox CLAY block; emits flex children only.
-// BeginFrame requirements: BankTextBeginFrame, BankButtonBeginFrame,
+// BeginFrame requirements: BankTextBeginFrame, ButtonBeginFrame,
 // ScrollListBeginFrame.
 void BuildGameSelectTallTree(GameSelectPanelState & state,
                              Resources & resources,

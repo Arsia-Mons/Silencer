@@ -4,7 +4,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/bank_text.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 
 #include "lobby_screen.h"
 #include "screen_context.h"
@@ -25,18 +25,16 @@
 
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonOpts;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 
 namespace silencer::client_ui::lobby {
 
 namespace game_tech_panel_detail {
 
-// Legacy on-screen coords retained ONLY for inspector hit-rect registration.
-constexpr int kBtnBackX  = 242;
-constexpr int kBtnBackY  = 68;
 constexpr const char * kActionBack = "lobby.game_tech.back";
 constexpr const char * kActionTogglePrefix = "lobby.game_tech.toggle.";
 constexpr const char * kActionDescriptionPrefix = "lobby.game_tech.description.";
@@ -192,19 +190,13 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 	CLAY({ .id = CLAY_ID("GTechBackWrap"),
 	       .layout = { .padding = { game_tech_panel_detail::kUpperBackPadLeft, 0,
 	                                game_tech_panel_detail::kUpperBackPadTop,  0 } } }) {
-		BankButton(CLAY_STRING("Back To Teams"),
-		           BankButtonVariant::Chrome,
-		           BankButtonOpts{},
-		           BankButtonHandle{ /*hoveredOut*/ nullptr,
+		Button(CLAY_STRING("GameTechBackButton"), CLAY_STRING("Back To Teams"),
+		           ButtonOpts{ .variant = ButtonVariant::Chrome,
+		                       .size = ButtonSize::Compact },
+		           ButtonHandle{ /*hoveredOut*/ nullptr,
 		                             /*actionId*/   game_tech_panel_detail::kActionBack,
 		                             /*interactions*/ &interactions });
 	}
-	silencer::ui::UiInteractable w;
-	w.id = game_tech_panel_detail::kActionBack;
-	w.labelText = "Back To Teams";
-	w.kind  = silencer::ui::UiInteractableKind::Button;
-	w.x = game_tech_panel_detail::kBtnBackX; w.y = game_tech_panel_detail::kBtnBackY; w.w = 156; w.h = 21;
-	interactions.RegisterInteractable(w);
 
 	// Peer name labels — right-aligned column. ALIGN_X_RIGHT inside a
 	// grow-width wrapper aligns each name to the wrapper's right edge.

@@ -8,16 +8,18 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_button.h"
+#include "primitives/button.h"
 #include "primitives/bank_text.h"
 
 #include <SDL3/SDL.h>
 
 namespace message_modal_detail
 {
-using silencer::ui::primitives::BankButton;
-using silencer::ui::primitives::BankButtonHandle;
-using silencer::ui::primitives::BankButtonVariant;
+using silencer::ui::primitives::Button;
+using silencer::ui::primitives::ButtonHandle;
+using silencer::ui::primitives::ButtonOpts;
+using silencer::ui::primitives::ButtonSize;
+using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
 
@@ -90,8 +92,10 @@ void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 		       .image = { .imageData = PackImage(40, 4) } }) {
 			message_modal_detail::BankText(message_modal_detail::FromStd(message), message_modal_detail::BankTextVariant::Heading, {});
 			if(hasOk){
-				message_modal_detail::BankButton(CLAY_STRING("OK"), message_modal_detail::BankButtonVariant::Chrome, {},
-				           message_modal_detail::BankButtonHandle{ nullptr, message_modal_detail::kActionOk, &interactions });
+				message_modal_detail::Button(CLAY_STRING("MessageModalOkButton"), CLAY_STRING("OK"),
+				           message_modal_detail::ButtonOpts{ .variant = message_modal_detail::ButtonVariant::Chrome,
+				                                             .size = message_modal_detail::ButtonSize::Compact },
+				           message_modal_detail::ButtonHandle{ nullptr, message_modal_detail::kActionOk, &interactions });
 			}
 		}
 	}
