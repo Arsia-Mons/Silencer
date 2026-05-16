@@ -71,6 +71,7 @@ Game::Game() : renderer(world), screenbuffer(640, 480), worldSurface(640, 480),
 	state = MAINMENU;
 	stateisnew = true;
 	fade_i = 0;
+	fadeStartMs = 0;
 	sharedstate = 0;
 	currentlobbygameid = 0;
 	lastannouncedgameid = 0;
@@ -308,6 +309,7 @@ bool Game::Load(char * cmdline){
 	world.LoadBuyableItems();
 	printf("Resources loaded\n");
 	lasttick = SDL_GetTicks();
+	RestartPaletteFade();
 	if(controlPort > 0){
 		auto drainPendingWaits = [this](){
 			for(auto& w : pendingWaits){
@@ -497,7 +499,7 @@ void Game::PrepareClientUiFrame(Surface& surface) {
 	}
 	lastUiAnimationMs = now;
 	preparedUiInput.animationDeltaSeconds = animationDeltaSeconds;
-	preparedUiInput.animationStepSeconds = deltaTimeSeconds;
+	preparedUiInput.animationStepSeconds = LegacyUiAnimationStepSeconds();
 	hasPreparedUiInput = true;
 }
 
@@ -574,11 +576,13 @@ void Game::RenderClientUiFrame(Surface& surface, float frametime) {
 	BuildVisibleClientUi(surface, frametime);
 	Clay_RenderCommandArray cmds = EndClientUiFrame();
 	silencer::clay_bridge::Render(*this, &surface, cmds);
-	std::vector<silencer::ui::UiAction> unhandledUiActions =
-		clientUi.DispatchInput(screenContext, preparedUiInput);
-	if(!clientUi.HasScreens() && world.map.loaded){
-		inGameUiController.ApplyActions(
-			world.localpeerid, unhandledUiActions, clientUi.Interactions());
+	if(state != FADEOUT){
+		std::vector<silencer::ui::UiAction> unhandledUiActions =
+			clientUi.DispatchInput(screenContext, preparedUiInput);
+		if(!clientUi.HasScreens() && world.map.loaded){
+			inGameUiController.ApplyActions(
+				world.localpeerid, unhandledUiActions, clientUi.Interactions());
+		}
 	}
 }
 
@@ -627,6 +631,54 @@ void Game::SetColors(SDL_Color * colors){
 	if(renderdevice){
 		renderdevice->SetPalette(colors, 256);
 	}
+}
+
+void Game::RestartPaletteFade(){
+	fadeStartMs = SDL_GetTicks();
+	fade_i = 0;
+}
+
+float Game::LegacyUiAnimationStepSeconds() const {
+	const int hz = GASLoader::Get().gameengine.ticksPerSecond > 0
+		? GASLoader::Get().gameengine.ticksPerSecond
+		: 24;
+	return 1.0f / static_cast<float>(hz);
+}
+
+Uint8 Game::PaletteFadePhaseFromClock() const {
+	if(fadeStartMs == 0) return fade_i;
+	Uint64 now = SDL_GetTicks();
+	float elapsedSeconds = 0.0f;
+	if(now >= fadeStartMs){
+		elapsedSeconds = static_cast<float>(now - fadeStartMs) / 1000.0f;
+	}
+	int phase = static_cast<int>(elapsedSeconds / LegacyUiAnimationStepSeconds());
+	if(phase < 0) phase = 0;
+	if(phase > 16) phase = 16;
+	return static_cast<Uint8>(phase);
+}
+
+bool Game::PaletteFadeFinished() const {
+	return PaletteFadePhaseFromClock() >= 16;
+}
+
+void Game::ApplyPaletteFade(bool fadeOut){
+	fade_i = PaletteFadePhaseFromClock();
+	int phase = fade_i;
+	if(phase > 15) phase = 15;
+	if(fadeOut){
+		SDL_Color * fadedpalette =
+			renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), (15 - phase) * 8);
+		SetColors(fadedpalette);
+		return;
+	}
+	if(phase >= 15){
+		SetColors(renderer.palette.GetColors());
+		return;
+	}
+	SDL_Color * fadedpalette =
+		renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), phase * 8);
+	SetColors(fadedpalette);
 }
 
 Uint32 Game::TimerCallback(void * userdata, SDL_TimerID timerID, Uint32 interval){
@@ -800,10 +852,6 @@ bool Game::Loop(void){
 				ambienceMixer.oldambiencelevel = newambiencelevel;
 			}
 		}
-		fade_i++;
-		if(fade_i >= 16){
-			fade_i = 16;
-		}
 		lasttick += wait;
 	}
 	// Tick multi-frame waits AFTER the sim loop so wait_frames --n 1 and
@@ -883,7 +931,9 @@ bool Game::Loop(void){
 
 bool Game::Tick(void){
 	clientUi.ClearScreensIfRequested(screenContext);
-	clientUi.TickVisibleScreens(screenContext);
+	if(state != FADEOUT){
+		clientUi.TickVisibleScreens(screenContext);
+	}
 	inGameUiController.UpdateOverlayState(world.localpeerid);
 	if(!world.dedicatedserver.active){
 		if(world.lobby.state == Lobby::AUTHENTICATED){
@@ -1099,13 +1149,7 @@ bool Game::Tick(void){
 		case REPLAYGAME: TickReplayGame(); break;
 	}
 	if(fade_i < 16 && state != FADEOUT){
-		// Fade IN the palette
-		SDL_Color * fadedpalette = renderer.palette.CopyWithBrightness(renderer.palette.GetColors(), (fade_i) * 8);
-		if(fade_i == 15){
-			SetColors(renderer.palette.GetColors());
-		}else{
-			SetColors(fadedpalette);
-		}
+		ApplyPaletteFade(false);
 	}
 	if(!nextstateprocessed){
 		nextstateprocessed = true;
@@ -1118,14 +1162,12 @@ bool Game::Tick(void){
 void Game::GoToState(Uint8 newstate){
 	nextstate = newstate;
 	state = FADEOUT;
-	fade_i = 0;
+	RestartPaletteFade();
 	stateisnew = true;
 	nextstateprocessed = false;
-	// Defer the teardown so the active screen's Tick (which may have called
-	// GoToState in response to a button click) can return safely before its
-	// destructor runs.
-	clientUi.RequestClearScreens();
-	clientUi.Interactions().BeginFrame();
+	// Keep the outgoing Clay screen mounted until TickFadeOut reaches black.
+	// Legacy retained its world UI objects across FADEOUT, so there were still
+	// pixels for the palette fade to dim before the next state rebuilt UI.
 }
 
 bool Game::GoBack(void){

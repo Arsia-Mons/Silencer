@@ -177,6 +177,11 @@ private:
 	void ShowDeployMessage(void);
 	void GiveDefaultItems(Player & player);
 	void GoToState(Uint8 newstate);
+	void RestartPaletteFade();
+	float LegacyUiAnimationStepSeconds() const;
+	Uint8 PaletteFadePhaseFromClock() const;
+	bool PaletteFadeFinished() const;
+	void ApplyPaletteFade(bool fadeOut);
 	void PrepareClientUiFrame(Surface& surface);
 	void BeginPreparedClientUiFrame();
 	Clay_RenderCommandArray EndClientUiFrame();
@@ -197,6 +202,7 @@ private:
 	Uint8 state;
 	Uint8 nextstate;
 	Uint8 fade_i;
+	Uint64 fadeStartMs;
 	bool stateisnew;
 	bool nextstateprocessed;
 	class World world;
