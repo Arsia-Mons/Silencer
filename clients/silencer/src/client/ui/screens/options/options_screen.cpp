@@ -22,7 +22,8 @@ using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
 
-constexpr uint16_t kButtonGap = 12;
+// Legacy options buttons used a 52px vertical pitch; Oval/Md buttons are 33px tall.
+constexpr uint16_t kButtonGap = 19;
 constexpr const char * kActionControls = "options.controls";
 constexpr const char * kActionDisplay = "options.display";
 constexpr const char * kActionAudio = "options.audio";
