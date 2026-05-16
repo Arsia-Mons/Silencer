@@ -4,10 +4,29 @@ Multiplayer 2D action game (SDL3/C++14). The same binary runs as the
 local client and, when launched with `-s`, as a headless dedicated
 server spawned by the Go lobby in `services/lobby/`.
 
-Build with the local `CMakeLists.txt` (`cmake -B build && cmake --build build`)
-— see top-level `README.md` for platform notes and the
-`-DSILENCER_LOBBY_*` knobs in *Gotchas* below. Source layout under
-`src/` is flat: ~158 files, `.cpp` paired with `.h`, no subdirectories.
+## Building
+
+Build/configure the client **only** through the wrapper — never invoke
+`cmake`/`cl`/`ninja` directly, and never use CLion's bundled MinGW
+(this codebase is MSVC-only; MinGW cannot link it):
+
+- Windows: `clients/silencer/build.ps1 [win-ninja|win-ninja-release|win-ninja-unity]`
+- macOS/Linux: `clients/silencer/build.sh [win-ninja|win-ninja-release|win-ninja-unity]`
+
+Default preset is `win-ninja` (Debug → `build/`). Pass `-Clean`
+(`--clean` on `.sh`) to wipe the CMake cache (keeps `vcpkg_installed`)
+— the correct recovery from a poisoned cache; do not hand-roll
+`rm`/reconfigure loops. The wrapper pins the newest installed Visual
+Studio via `vswhere`, resolves `VCPKG_ROOT` (process env → persisted
+User env → hard error), refuses to run under a concurrent build or a
+running `Silencer` (which locks the link target), and takes a build
+lock so CLion / CLI agents / parallel agents can't corrupt the shared
+CMake cache by configuring concurrently. Idle CLion is fine; don't run
+an IDE build concurrently with a wrapper build into the same dir.
+Lobby host/version are compile-time `-D` knobs (see *Gotchas*).
+
+Source layout under `src/` is flat: ~158 files, `.cpp` paired with
+`.h`, no subdirectories.
 
 ## Object hierarchy
 
