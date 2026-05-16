@@ -17,14 +17,14 @@
 #include <cstdint>
 #include <string>
 
-namespace {
+namespace lobby_screen_detail {
 
 constexpr uint16_t kRootPadX = 10;
 constexpr uint16_t kRootPadTop = 25;
 constexpr uint16_t kRootPadBottom = 25;
 constexpr uint16_t kRegionGap = 10;
 
-}  // namespace
+}  // namespace lobby_screen_detail
 
 LobbyScreen::LobbyScreen() = default;
 LobbyScreen::~LobbyScreen() = default;
@@ -93,15 +93,15 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 
 	const bool narrow = LobbyUseNarrowLayout(dst.w);
 	const uint16_t titleBarH = LobbyTitleBarHeight(narrow, mapName);
-	const int bodyH = std::max(0, dst.h - (int)kRootPadTop - (int)kRootPadBottom
-	                              - (int)titleBarH - (int)kRegionGap);
+	const int bodyH = std::max(0, dst.h - (int)lobby_screen_detail::kRootPadTop - (int)lobby_screen_detail::kRootPadBottom
+	                              - (int)titleBarH - (int)lobby_screen_detail::kRegionGap);
 
 	CLAY({ .id = CLAY_ID("LobbyRoot"),
 	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
-	                       CLAY_SIZING_FIXED((float)dst.h) },
-	           .padding = { kRootPadX, kRootPadX, kRootPadTop, kRootPadBottom },
-	           .childGap = kRegionGap,
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_GROW(0) },
+	           .padding = { lobby_screen_detail::kRootPadX, lobby_screen_detail::kRootPadX, lobby_screen_detail::kRootPadTop, lobby_screen_detail::kRootPadBottom },
+	           .childGap = lobby_screen_detail::kRegionGap,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		BuildLobbyTitleBar(version, mapName, narrow, dst.w, interactions);

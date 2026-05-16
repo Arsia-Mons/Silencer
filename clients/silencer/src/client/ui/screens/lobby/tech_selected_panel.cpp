@@ -14,7 +14,7 @@ using silencer::ui::primitives::BankTextVariant;
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace tech_selected_panel_detail {
 
 constexpr int kDescLH = 10;
 constexpr uint16_t kTallTechNamePadTop = 16;
@@ -30,7 +30,7 @@ Clay_String FromStd(const std::string & s) {
 	return cs;
 }
 
-}  // namespace
+}  // namespace tech_selected_panel_detail
 
 void BuildTechSelectedPanel(const GameTechPanelState & state) {
 	// Centered tech-name heading. ALIGN_X_CENTER in a grow wrapper sized to
@@ -39,11 +39,11 @@ void BuildTechSelectedPanel(const GameTechPanelState & state) {
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
 	                       CLAY_SIZING_FIXED(15) },
-	           .padding = { 0, 0, kTallTechNamePadTop, 0 },
+	           .padding = { 0, 0, tech_selected_panel_detail::kTallTechNamePadTop, 0 },
 	           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
 	       } }) {
 		if(!state.techNameStr.empty()){
-			BankText(FromStd(state.techNameStr),
+			BankText(tech_selected_panel_detail::FromStd(state.techNameStr),
 			         BankTextVariant::Heading, {});
 		}
 	}
@@ -51,9 +51,9 @@ void BuildTechSelectedPanel(const GameTechPanelState & state) {
 	// 8 description lines.
 	CLAY({ .id = CLAY_ID("GTechDescWrap"),
 	       .layout = {
-	           .padding = { kTallDescPadLeft, 0,
-	                        kTallDescPadTop,  0 },
-	           .childGap = kTallDescRowGap,
+	           .padding = { tech_selected_panel_detail::kTallDescPadLeft, 0,
+	                        tech_selected_panel_detail::kTallDescPadTop,  0 },
+	           .childGap = tech_selected_panel_detail::kTallDescRowGap,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		for(int i = 0; i < 8; ++i){
@@ -61,10 +61,10 @@ void BuildTechSelectedPanel(const GameTechPanelState & state) {
 			                       static_cast<uint32_t>(i)),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_FIXED(kDescLH) },
+			                       CLAY_SIZING_FIXED(tech_selected_panel_detail::kDescLH) },
 			       } }) {
 				if(!state.techDescLines[i].empty()){
-					BankText(FromStd(state.techDescLines[i]),
+					BankText(tech_selected_panel_detail::FromStd(state.techDescLines[i]),
 					         BankTextVariant::Body,
 					         { .effectColor = 129,
 					           .brightness  = static_cast<Uint8>(128 + 16),

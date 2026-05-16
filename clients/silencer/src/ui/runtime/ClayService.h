@@ -18,6 +18,7 @@ public:
 	virtual ~ClayFrameBackend() = default;
 	virtual void SetCurrentContext() = 0;
 	virtual void SetLayoutDimensions(int width, int height) = 0;
+	virtual void SetUiScale(int scale) = 0;
 	virtual void SetPointerState(float x, float y, bool down) = 0;
 	virtual void UpdateScrollContainers(float wheelX, float wheelY, float deltaTimeSeconds) = 0;
 	virtual void BeginLayout() = 0;

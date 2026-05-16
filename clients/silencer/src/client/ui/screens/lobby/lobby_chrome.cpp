@@ -13,7 +13,7 @@
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace lobby_chrome_detail {
 
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
@@ -26,7 +26,7 @@ constexpr uint16_t kRootPadX = 10;
 constexpr uint16_t kRootPadTop = 25;
 constexpr const char * kActionGoBack = "lobby.go_back";
 
-}  // namespace
+}  // namespace lobby_chrome_detail
 
 bool LobbyUseNarrowLayout(int surfaceW) {
 	return surfaceW < kLobbyNarrowBreakpointW;
@@ -42,7 +42,7 @@ void BuildLobbyTitleBar(const std::string & version,
                         int surfaceW,
                         silencer::ui::UiInteractionRegistry& interactions) {
 	const uint16_t titleH = LobbyTitleBarHeight(narrow, mapName);
-	CLAY(Box(BoxVariants::Chrome, {
+	CLAY(lobby_chrome_detail::Box(lobby_chrome_detail::BoxVariants::Chrome, {
 	         .id = CLAY_ID("LobbyTitleBar"),
 		         .layout = {
 		             .sizing = { CLAY_SIZING_GROW(0),
@@ -65,8 +65,8 @@ void BuildLobbyTitleBar(const std::string & version,
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
 				CLAY({ .id = CLAY_ID("LobbyTitle") }) {
-					BankText(CLAY_STRING("Silencer"),
-					         BankTextVariant::Title,
+					lobby_chrome_detail::BankText(CLAY_STRING("Silencer"),
+					         lobby_chrome_detail::BankTextVariant::Title,
 					         { .effectColor = 152 });
 				}
 
@@ -75,8 +75,8 @@ void BuildLobbyTitleBar(const std::string & version,
 				verstr.length = (int32_t)version.size();
 				verstr.chars  = version.c_str();
 				CLAY({ .id = CLAY_ID("LobbyVer") }) {
-					BankText(verstr,
-					         BankTextVariant::Body,
+					lobby_chrome_detail::BankText(verstr,
+					         lobby_chrome_detail::BankTextVariant::Body,
 					         { .effectColor = 189 });
 				}
 
@@ -86,8 +86,8 @@ void BuildLobbyTitleBar(const std::string & version,
 					mstr.length = (int32_t)mapName.size();
 					mstr.chars  = mapName.c_str();
 					CLAY({ .id = CLAY_ID("LobbyMapName") }) {
-						BankText(mstr,
-						         BankTextVariant::Title,
+						lobby_chrome_detail::BankText(mstr,
+						         lobby_chrome_detail::BankTextVariant::Title,
 						         { .effectColor = 129,
 						           .brightness  = 160,
 						           .colorRamp   = true });
@@ -101,11 +101,11 @@ void BuildLobbyTitleBar(const std::string & version,
 				       } }) {}
 
 				CLAY({ .id = CLAY_ID("LobbyGoBackWrap") }) {
-					BankButton(CLAY_STRING("Go Back"),
-					           BankButtonVariant::Chrome,
+					lobby_chrome_detail::BankButton(CLAY_STRING("Go Back"),
+					           lobby_chrome_detail::BankButtonVariant::Chrome,
 					           {},
 					           { .hoveredOut = nullptr,
-					             .actionId = kActionGoBack,
+					             .actionId = lobby_chrome_detail::kActionGoBack,
 					             .interactions = &interactions });
 				}
 			}
@@ -122,8 +122,8 @@ void BuildLobbyTitleBar(const std::string & version,
 			           .sizing = { CLAY_SIZING_GROW(0),
 			                       CLAY_SIZING_FIXED(15) },
 			       } }) {
-				BankText(mstr,
-				         BankTextVariant::Title,
+				lobby_chrome_detail::BankText(mstr,
+				         lobby_chrome_detail::BankTextVariant::Title,
 				         { .effectColor = 129,
 				           .brightness  = 160,
 				           .colorRamp   = true });
@@ -132,11 +132,11 @@ void BuildLobbyTitleBar(const std::string & version,
 	}
 
 	silencer::ui::UiInteractable gb;
-	gb.id = kActionGoBack;
+	gb.id = lobby_chrome_detail::kActionGoBack;
 	gb.labelText = "Go Back";
 	gb.kind = silencer::ui::UiInteractableKind::Button;
-	gb.x = std::max(0, surfaceW - (int)kRootPadX - 5 - 156);
-	gb.y = kRootPadTop + 4;
+	gb.x = std::max(0, surfaceW - (int)lobby_chrome_detail::kRootPadX - 5 - 156);
+	gb.y = lobby_chrome_detail::kRootPadTop + 4;
 	gb.w = 156; gb.h = 21;
 	interactions.RegisterInteractable(gb);
 }

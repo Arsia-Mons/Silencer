@@ -17,6 +17,10 @@ void ClayBridgeFrameBackend::SetLayoutDimensions(int width, int height) {
 	silencer::clay_bridge::EnsureInitialized(width, height);
 }
 
+void ClayBridgeFrameBackend::SetUiScale(int scale) {
+	silencer::clay_bridge::SetUiScale(scale);
+}
+
 void ClayBridgeFrameBackend::SetPointerState(float x, float y, bool down) {
 	Clay_SetPointerState(Clay_Vector2{ x, y }, down);
 }

@@ -203,6 +203,10 @@ private:
 	RenderDevice * renderdevice;
 	SDL_Color palettecolors[256]; // CPU copy — for ffmpeg replay pixel export
 	Surface screenbuffer;
+	// The game world always renders at the legacy 640x480 and is then
+	// nearest-upscaled into screenbuffer, so the pixel-art look is kept at
+	// any window size while the Clay UI composites crisp on top.
+	Surface worldSurface;
 	silencer::client_ui::ClayBridgeFrameBackend uiClayBackend;
 	silencer::ui::ClayService uiClayService;
 	silencer::client_ui::ClientUi clientUi;

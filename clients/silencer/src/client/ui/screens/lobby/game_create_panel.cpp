@@ -21,7 +21,7 @@
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace game_create_panel_detail {
 
 constexpr const char * kActionSecurity = "lobby.game_create.security";
 constexpr const char * kActionSpectatable = "lobby.game_create.spectatable";
@@ -72,14 +72,14 @@ void BuildMapList(GameCreatePanelState & state, ScreenContext & ctx) {
 	}
 }
 
-}  // namespace
+}  // namespace game_create_panel_detail
 
 void GameCreatePanelInit(GameCreatePanelState & state, ScreenContext & ctx) {
 	state = GameCreatePanelState{};
 	state.spectatable = Config::GetInstance().lastspectatable;
 	std::strncpy(state.name, Config::GetInstance().defaultgamename, sizeof(state.name) - 1);
 	state.name[sizeof(state.name) - 1] = '\0';
-	BuildMapList(state, ctx);
+	game_create_panel_detail::BuildMapList(state, ctx);
 	ctx.mapDownloader.selectedmap = -1;
 	ctx.game.creategameclicked = false;
 }
@@ -214,48 +214,48 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
                                    const silencer::ui::UiAction & action) {
 	if(action.kind == silencer::ui::UiActionKind::SetText){
-		if(action.id == kActionMinLevel){
-			CopyUiText(state.minLevel, static_cast<int>(sizeof(state.minLevel)), action.value);
+		if(action.id == game_create_panel_detail::kActionMinLevel){
+			game_create_panel_detail::CopyUiText(state.minLevel, static_cast<int>(sizeof(state.minLevel)), action.value);
 			return true;
 		}
-		if(action.id == kActionMaxLevel){
-			CopyUiText(state.maxLevel, static_cast<int>(sizeof(state.maxLevel)), action.value);
+		if(action.id == game_create_panel_detail::kActionMaxLevel){
+			game_create_panel_detail::CopyUiText(state.maxLevel, static_cast<int>(sizeof(state.maxLevel)), action.value);
 			return true;
 		}
-		if(action.id == kActionMaxPlayers){
-			CopyUiText(state.maxPlayers, static_cast<int>(sizeof(state.maxPlayers)), action.value);
+		if(action.id == game_create_panel_detail::kActionMaxPlayers){
+			game_create_panel_detail::CopyUiText(state.maxPlayers, static_cast<int>(sizeof(state.maxPlayers)), action.value);
 			return true;
 		}
-		if(action.id == kActionMaxTeams){
-			CopyUiText(state.maxTeams, static_cast<int>(sizeof(state.maxTeams)), action.value);
+		if(action.id == game_create_panel_detail::kActionMaxTeams){
+			game_create_panel_detail::CopyUiText(state.maxTeams, static_cast<int>(sizeof(state.maxTeams)), action.value);
 			return true;
 		}
-		if(action.id == kActionName){
-			CopyUiText(state.name, static_cast<int>(sizeof(state.name)), action.value);
+		if(action.id == game_create_panel_detail::kActionName){
+			game_create_panel_detail::CopyUiText(state.name, static_cast<int>(sizeof(state.name)), action.value);
 			return true;
 		}
-		if(action.id == kActionPassword){
-			CopyUiText(state.password, static_cast<int>(sizeof(state.password)), action.value);
+		if(action.id == game_create_panel_detail::kActionPassword){
+			game_create_panel_detail::CopyUiText(state.password, static_cast<int>(sizeof(state.password)), action.value);
 			return true;
 		}
 		return false;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Activate){
-		if(action.id == kActionSecurity){
+		if(action.id == game_create_panel_detail::kActionSecurity){
 			state.securityClicked = true;
 			return true;
 		}
-		if(action.id == kActionSpectatable){
+		if(action.id == game_create_panel_detail::kActionSpectatable){
 			state.spectatableClicked = true;
 			return true;
 		}
-		if(action.id == kActionCreate){
+		if(action.id == game_create_panel_detail::kActionCreate){
 			state.createClicked = true;
 			return true;
 		}
 	}
 	if(action.kind == silencer::ui::UiActionKind::Select &&
-	   StartsWith(action.id, kActionMapPrefix)){
+	   game_create_panel_detail::StartsWith(action.id, game_create_panel_detail::kActionMapPrefix)){
 		state.mapRowClickedIndex = action.index;
 		return true;
 	}

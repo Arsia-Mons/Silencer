@@ -12,6 +12,7 @@ void ClayService::BeginFrame(const UiInputState& input, UiInteractionRegistry& i
 
 	backend_.SetCurrentContext();
 	backend_.SetLayoutDimensions(input.width, input.height);
+	backend_.SetUiScale(input.uiScale);
 	backend_.SetPointerState(input.pointer.x, input.pointer.y, input.pointer.down);
 	backend_.UpdateScrollContainers(input.pointer.wheelX, input.pointer.wheelY, input.deltaTimeSeconds);
 	backend_.BeginLayout();

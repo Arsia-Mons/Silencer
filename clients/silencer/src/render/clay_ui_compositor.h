@@ -42,6 +42,13 @@ namespace silencer::clay_bridge {
 // Safe to call from any per-frame Tick before BeginLayout.
 void EnsureInitialized(int width, int height);
 
+// Integer magnification applied to bitmap glyph/sprite/chrome draws so a
+// virtual-resolution Clay layout fills a larger native surface. Default 1
+// (no magnification). Set once per frame before Render(); persists until
+// changed. UiScale() exposes the current value to the dispatch paths.
+void SetUiScale(int scale);
+int  UiScale();
+
 // Walks `cmds` and dispatches each command to the matching Renderer
 // primitive, writing into `dst`. Resources supplies sprite-bank lookups
 // (IMAGE / CUSTOM dispatch); Renderer supplies the actual draw routines

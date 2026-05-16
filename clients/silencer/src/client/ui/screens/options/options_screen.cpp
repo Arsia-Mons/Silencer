@@ -14,7 +14,7 @@
 
 #include <SDL3/SDL.h>
 
-namespace {
+namespace options_screen_detail {
 
 using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonHandle;
@@ -26,29 +26,7 @@ constexpr const char * kActionDisplay = "options.display";
 constexpr const char * kActionAudio = "options.audio";
 constexpr const char * kActionBack = "options.back";
 
-void RegisterButton(const char * label,
-                    const char * actionId,
-                    int x,
-                    int y,
-                    silencer::ui::UiInteractionRegistry& interactions)
-{
-	silencer::ui::UiInteractable w;
-	w.id = actionId;
-	w.labelText = label;
-	w.kind = silencer::ui::UiInteractableKind::Button;
-	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	interactions.RegisterInteractable(w);
-}
-
-void RegisterOptionsButtons(silencer::ui::UiInteractionRegistry& interactions)
-{
-	RegisterButton("Controls", kActionControls, 242, 160, interactions);
-	RegisterButton("Display", kActionDisplay, 242, 193, interactions);
-	RegisterButton("Audio", kActionAudio, 242, 226, interactions);
-	RegisterButton("Go Back", kActionBack, 242, 259, interactions);
-}
-
-}  // namespace
+}  // namespace options_screen_detail
 
 void OptionsScreen::Build(ScreenContext & ctx)
 {
@@ -61,8 +39,6 @@ void OptionsScreen::Build(ScreenContext & ctx)
 	controlsClicked = false;
 	displayClicked = false;
 	audioClicked = false;
-
-	RegisterOptionsButtons(ctx.game.UiInteractions());
 }
 
 void OptionsScreen::Tick(ScreenContext & ctx)
@@ -92,14 +68,13 @@ void OptionsScreen::Tick(ScreenContext & ctx)
 void OptionsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
+	(void)dst;
 	using namespace silencer::clay_bridge;
-
-
 
 	CLAY({ .id = CLAY_ID("OptionsRoot"),
 	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
-	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_GROW(0) },
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 	       },
 	       .image = { .imageData = PackImage(6, 0) } }) {
@@ -107,21 +82,19 @@ void OptionsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(156),
 		                       CLAY_SIZING_FIT(0) },
-		           .childGap = kButtonGap,
+		           .childGap = options_screen_detail::kButtonGap,
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
-			BankButton(CLAY_STRING("Controls"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionControls, &interactions });
-			BankButton(CLAY_STRING("Display"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionDisplay, &interactions });
-			BankButton(CLAY_STRING("Audio"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionAudio, &interactions });
-			BankButton(CLAY_STRING("Go Back"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionBack, &interactions });
+			options_screen_detail::BankButton(CLAY_STRING("Controls"), options_screen_detail::BankButtonVariant::Chrome, {},
+			           options_screen_detail::BankButtonHandle{ nullptr, options_screen_detail::kActionControls, &interactions });
+			options_screen_detail::BankButton(CLAY_STRING("Display"), options_screen_detail::BankButtonVariant::Chrome, {},
+			           options_screen_detail::BankButtonHandle{ nullptr, options_screen_detail::kActionDisplay, &interactions });
+			options_screen_detail::BankButton(CLAY_STRING("Audio"), options_screen_detail::BankButtonVariant::Chrome, {},
+			           options_screen_detail::BankButtonHandle{ nullptr, options_screen_detail::kActionAudio, &interactions });
+			options_screen_detail::BankButton(CLAY_STRING("Go Back"), options_screen_detail::BankButtonVariant::Chrome, {},
+			           options_screen_detail::BankButtonHandle{ nullptr, options_screen_detail::kActionBack, &interactions });
 		}
 	}
-
-	RegisterOptionsButtons(interactions);
 }
 
 void OptionsScreen::Destroy(ScreenContext & ctx)
@@ -136,19 +109,19 @@ bool OptionsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAc
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == kActionControls){
+	if(action.id == options_screen_detail::kActionControls){
 		controlsClicked = true;
 		return true;
 	}
-	if(action.id == kActionDisplay){
+	if(action.id == options_screen_detail::kActionDisplay){
 		displayClicked = true;
 		return true;
 	}
-	if(action.id == kActionAudio){
+	if(action.id == options_screen_detail::kActionAudio){
 		audioClicked = true;
 		return true;
 	}
-	if(action.id == kActionBack){
+	if(action.id == options_screen_detail::kActionBack){
 		goBackClicked = true;
 		return true;
 	}

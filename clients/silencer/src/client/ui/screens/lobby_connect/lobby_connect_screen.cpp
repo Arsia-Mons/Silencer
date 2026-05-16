@@ -25,7 +25,7 @@
 #include <cstdint>
 #include <string>
 
-namespace
+namespace lobby_connect_screen_detail
 {
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
@@ -37,10 +37,6 @@ using silencer::ui::primitives::ScrollTextBoxOrigin;
 // Prefixed to dodge anonymous-namespace collisions when SILENCER_UNITY_BUILD
 // merges this TU with sibling screen .cpp files (other screens already use
 // their own LBY_*-style prefixes).
-enum LobbyConnectButton : Uint8 {
-	LBY_BTN_LOGIN  = 0,
-	LBY_BTN_CANCEL = 1,
-};
 enum LobbyConnectInput : Uint8 {
 	LBY_INPUT_USERNAME = 1,
 	LBY_INPUT_PASSWORD = 2,
@@ -114,22 +110,6 @@ void SmallButton(Clay_String label,
 	}
 }
 
-void RegisterButton(const char * label,
-                    const char * actionId,
-                    int uid,
-                    int x,
-                    int y,
-                    silencer::ui::UiInteractionRegistry& interactions)
-{
-	silencer::ui::UiInteractable w;
-	w.id = actionId;
-	w.labelText = label;
-	w.kind = silencer::ui::UiInteractableKind::Button;
-	w.uid = uid;
-	w.x = x; w.y = y; w.w = kButtonW; w.h = kButtonH;
-	interactions.RegisterInteractable(w);
-}
-
 void RegisterInput(const char * label,
                    const char * actionId,
                    int uid,
@@ -169,16 +149,11 @@ void RegisterWidgets(LobbyConnectScreen * screen,
 	const int inputX = formX + 85;
 	const int usernameY = formY + 3;
 	const int passwordY = formY + 20 + kFormGap + 3;
-	const int buttonsX = panelX + (kPanelW - (kButtonW * 2 + kButtonGap)) / 2;
-	const int buttonsY = formY + 20 + kFormGap + 20 + 14;
 
 	RegisterInput("Username", kActionUsername, LBY_INPUT_USERNAME, inputX, usernameY,
 	              username, 17, false, inactive, interactions);
 	RegisterInput("Password", kActionPassword, LBY_INPUT_PASSWORD, inputX, passwordY,
 	              password, 29, true, inactive, interactions);
-	RegisterButton("Login", kActionLogin, LBY_BTN_LOGIN, buttonsX, buttonsY, interactions);
-	RegisterButton("Cancel", kActionCancel, LBY_BTN_CANCEL, buttonsX + kButtonW + kButtonGap,
-	               buttonsY, interactions);
 }
 
 int FillLogSlab(const std::vector<std::string> & lines)
@@ -197,7 +172,7 @@ int FillLogSlab(const std::vector<std::string> & lines)
 	}
 	return count;
 }
-}
+} // namespace lobby_connect_screen_detail
 
 void LobbyConnectScreen::Build(ScreenContext & ctx)
 {
@@ -210,9 +185,9 @@ void LobbyConnectScreen::Build(ScreenContext & ctx)
 	password[0] = '\0';
 
 	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(this, username, password, surface.w, surface.h, false,
+	lobby_connect_screen_detail::RegisterWidgets(this, username, password, surface.w, surface.h, false,
 	                ctx.game.UiInteractions());
-	ctx.game.UiInteractions().FocusTextInputByUid(LBY_INPUT_USERNAME);
+	ctx.game.UiInteractions().FocusTextInputByUid(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 }
 
 void LobbyConnectScreen::Tick(ScreenContext & ctx)
@@ -348,50 +323,50 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 	(void)frametime;
 	using namespace silencer::clay_bridge;
 
-	int lineCount = FillLogSlab(logLines);
+	int lineCount = lobby_connect_screen_detail::FillLogSlab(logLines);
 	Uint16 scroll = 0;
-	const int visibleLines = kLogH / 11;
+	const int visibleLines = lobby_connect_screen_detail::kLogH / 11;
 	if(lineCount > visibleLines){
 		scroll = static_cast<Uint16>(lineCount - visibleLines);
 	}
 	bool inactive = ctx.world.lobby.state == Lobby::AUTHSENT;
 	const bool usernameFocused =
-		interactions.IsTextInputFocused(LBY_INPUT_USERNAME);
+		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 	const bool passwordFocused =
-		interactions.IsTextInputFocused(LBY_INPUT_PASSWORD);
+		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_PASSWORD);
 	const bool blink = ((SDL_GetTicks() / 250) % 2) == 0;
 
 	CLAY({ .id = CLAY_ID("LobbyConnectRoot"),
 	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
-	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_GROW(0) },
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 	       } }) {
 		CLAY({ .id = CLAY_ID("LobbyConnectPanel"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kPanelW),
-		                       CLAY_SIZING_FIXED(kPanelH) },
-		           .padding = { kPanelPadX, kPanelPadX,
-		                        kPanelPadY, kPanelPadY },
+		           .sizing = { CLAY_SIZING_FIXED(lobby_connect_screen_detail::kPanelW),
+		                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kPanelH) },
+		           .padding = { lobby_connect_screen_detail::kPanelPadX, lobby_connect_screen_detail::kPanelPadX,
+		                        lobby_connect_screen_detail::kPanelPadY, lobby_connect_screen_detail::kPanelPadY },
 		           .childGap = 14,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(7, 2) } }) {
-			ScrollTextBox(CLAY_STRING("LobbyConnectLog"),
-			              g_logSlab,
+			lobby_connect_screen_detail::ScrollTextBox(CLAY_STRING("LobbyConnectLog"),
+			              lobby_connect_screen_detail::g_logSlab,
 			              lineCount,
 			              scroll,
-			              { .width = kLogW,
-			                .height = kLogH,
+			              { .width = lobby_connect_screen_detail::kLogW,
+			                .height = lobby_connect_screen_detail::kLogH,
 			                .lineHeight = 11,
-			                .textVariant = BankTextVariant::Body,
-			                .origin = ScrollTextBoxOrigin::TopDown });
+			                .textVariant = lobby_connect_screen_detail::BankTextVariant::Body,
+			                .origin = lobby_connect_screen_detail::ScrollTextBoxOrigin::TopDown });
 
 			CLAY({ .id = CLAY_ID("LobbyConnectForm"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIXED(270), CLAY_SIZING_FIT(0) },
-			           .childGap = kFormGap,
+			           .childGap = lobby_connect_screen_detail::kFormGap,
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       } }) {
 				CLAY({ .id = CLAY_ID("LobbyConnectUsernameRow"),
@@ -408,14 +383,14 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 					           .sizing = { CLAY_SIZING_GROW(0),
 					                       CLAY_SIZING_FIT(0) },
 					       } }) {
-						BankText(CLAY_STRING("Username"),
-						         BankTextVariant::Heading, {});
+						lobby_connect_screen_detail::BankText(CLAY_STRING("Username"),
+						         lobby_connect_screen_detail::BankTextVariant::Heading, {});
 					}
 					silencer::ui::primitives::TextInput(
 						CLAY_STRING("LobbyConnectUsernameInput"),
 						username,
-						{ .widthPx = kInputW,
-						  .heightPx = kInputH,
+						{ .widthPx = lobby_connect_screen_detail::kInputW,
+						  .heightPx = lobby_connect_screen_detail::kInputH,
 						  .fontBank = 133,
 						  .fontWidth = 6,
 						  .inactive = inactive,
@@ -436,14 +411,14 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 					           .sizing = { CLAY_SIZING_GROW(0),
 					                       CLAY_SIZING_FIT(0) },
 					       } }) {
-						BankText(CLAY_STRING("Password"),
-						         BankTextVariant::Heading, {});
+						lobby_connect_screen_detail::BankText(CLAY_STRING("Password"),
+						         lobby_connect_screen_detail::BankTextVariant::Heading, {});
 					}
 					silencer::ui::primitives::TextInput(
 						CLAY_STRING("LobbyConnectPasswordInput"),
 						password,
-						{ .widthPx = kInputW,
-						  .heightPx = kInputH,
+						{ .widthPx = lobby_connect_screen_detail::kInputW,
+						  .heightPx = lobby_connect_screen_detail::kInputH,
 						  .fontBank = 133,
 						  .fontWidth = 6,
 						  .password = true,
@@ -454,17 +429,17 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 
 			CLAY({ .id = CLAY_ID("LobbyConnectButtons"),
 			       .layout = {
-			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIXED(kButtonH) },
-			           .childGap = kButtonGap,
+			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonH) },
+			           .childGap = lobby_connect_screen_detail::kButtonGap,
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				SmallButton(CLAY_STRING("Login"), kActionLogin, interactions);
-				SmallButton(CLAY_STRING("Cancel"), kActionCancel, interactions);
+				lobby_connect_screen_detail::SmallButton(CLAY_STRING("Login"), lobby_connect_screen_detail::kActionLogin, interactions);
+				lobby_connect_screen_detail::SmallButton(CLAY_STRING("Cancel"), lobby_connect_screen_detail::kActionCancel, interactions);
 			}
 		}
 	}
 
-	RegisterWidgets(this, username, password, dst.w, dst.h, inactive, interactions);
+	lobby_connect_screen_detail::RegisterWidgets(this, username, password, dst.w, dst.h, inactive, interactions);
 }
 
 void LobbyConnectScreen::Destroy(ScreenContext & ctx)
@@ -476,31 +451,31 @@ bool LobbyConnectScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui:
 {
 	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::SetText){
-		if(action.id == kActionUsername){
-			CopyUiText(username, static_cast<int>(sizeof(username)), action.value);
+		if(action.id == lobby_connect_screen_detail::kActionUsername){
+			lobby_connect_screen_detail::CopyUiText(username, static_cast<int>(sizeof(username)), action.value);
 			return true;
 		}
-		if(action.id == kActionPassword){
-			CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
+		if(action.id == lobby_connect_screen_detail::kActionPassword){
+			lobby_connect_screen_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
 			return true;
 		}
 		return false;
 	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText &&
-	   (action.id == kActionUsername || action.id == kActionPassword)){
-		if(action.id == kActionUsername){
-			CopyUiText(username, static_cast<int>(sizeof(username)), action.value);
+	   (action.id == lobby_connect_screen_detail::kActionUsername || action.id == lobby_connect_screen_detail::kActionPassword)){
+		if(action.id == lobby_connect_screen_detail::kActionUsername){
+			lobby_connect_screen_detail::CopyUiText(username, static_cast<int>(sizeof(username)), action.value);
 		}else{
-			CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
+			lobby_connect_screen_detail::CopyUiText(password, static_cast<int>(sizeof(password)), action.value);
 		}
 		loginClicked = true;
 		return true;
 	}
-	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == kActionLogin){
+	if(action.kind == silencer::ui::UiActionKind::Activate && action.id == lobby_connect_screen_detail::kActionLogin){
 		loginClicked = true;
 		return true;
 	}
-	if((action.kind == silencer::ui::UiActionKind::Activate && action.id == kActionCancel) ||
+	if((action.kind == silencer::ui::UiActionKind::Activate && action.id == lobby_connect_screen_detail::kActionCancel) ||
 	   action.kind == silencer::ui::UiActionKind::Cancel){
 		cancelClicked = true;
 		return true;

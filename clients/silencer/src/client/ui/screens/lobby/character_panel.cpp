@@ -25,7 +25,7 @@ using silencer::ui::primitives::ToggleOpts;
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace character_panel_detail {
 
 // Five (id, sprite-index, agency-enum) tuples. The element IDs and sprite
 // indices are 1:1 with the legacy CharacterPanel's CHR_TGL_* uids /
@@ -81,7 +81,7 @@ constexpr uint16_t kToggleGap      = 26;
 constexpr uint16_t kStatsPadTop    = 10;
 constexpr int kStatsChildGap    = 2;
 
-}  // namespace
+}  // namespace character_panel_detail
 
 void CharacterPanelInit(CharacterPanelState & state) {
 	state.selectedAgency = Config::GetInstance().defaultagency;
@@ -102,7 +102,7 @@ void CharacterPanelTick(CharacterPanelState & state, World & world) {
 bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
                                   const silencer::ui::UiAction & action) {
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	for(const AgencyDef & def : kAgencies){
+	for(const character_panel_detail::AgencyDef & def : character_panel_detail::kAgencies){
 		if(action.id == def.actionId){
 			state.selectedAgency = def.agency;
 			return true;
@@ -122,7 +122,7 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 	// concatenations.
 	const Uint8 a = state.selectedAgency;
 	const char * uname = world.lobby.GetLocalUsername();
-	g_stats.username = uname ? uname : "";
+	character_panel_detail::g_stats.username = uname ? uname : "";
 
 	User * user = world.lobby.GetUserInfo(world.lobby.accountid);
 	if(user && !user->retrieving){
@@ -131,18 +131,18 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 		// legacy formula exactly.
 		const int lvl = user->agency[a].level;
 		const int remaining = 100 * (lvl + 1) - static_cast<int>(user->agency[a].xptonextlevel);
-		g_stats.level  = "LEVEL: "             + std::to_string(lvl);
-		g_stats.wins   = "WINS: "              + std::to_string(user->agency[a].wins);
-		g_stats.losses = "LOSSES: "            + std::to_string(user->agency[a].losses);
-		g_stats.xp     = "XP TO NEXT LEVEL: "  + std::to_string(remaining);
+		character_panel_detail::g_stats.level  = "LEVEL: "             + std::to_string(lvl);
+		character_panel_detail::g_stats.wins   = "WINS: "              + std::to_string(user->agency[a].wins);
+		character_panel_detail::g_stats.losses = "LOSSES: "            + std::to_string(user->agency[a].losses);
+		character_panel_detail::g_stats.xp     = "XP TO NEXT LEVEL: "  + std::to_string(remaining);
 	}else{
 		// User info not yet retrieved. Render empty stats — the legacy
 		// behavior was to leave Overlay::text empty until the lobby
 		// replied, which renders nothing.
-		g_stats.level.clear();
-		g_stats.wins.clear();
-		g_stats.losses.clear();
-		g_stats.xp.clear();
+		character_panel_detail::g_stats.level.clear();
+		character_panel_detail::g_stats.wins.clear();
+		character_panel_detail::g_stats.losses.clear();
+		character_panel_detail::g_stats.xp.clear();
 	}
 
 	// The parent LobbyCharacterBox is supplied by the lobby shell. This
@@ -151,13 +151,13 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 	CLAY({ .id = CLAY_ID("CharacterPanelContent"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
-	           .padding = { kPanelPad, kPanelPad, kPanelPad, kPanelPad },
+	           .padding = { character_panel_detail::kPanelPad, character_panel_detail::kPanelPad, character_panel_detail::kPanelPad, character_panel_detail::kPanelPad },
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 
 		// Username header — bank 134 / w8 / eff=200. Lands at content y=71.
 		CLAY({ .id = CLAY_ID("CharUserWrap") }) {
-			BankText(FromStd(g_stats.username),
+			BankText(character_panel_detail::FromStd(character_panel_detail::g_stats.username),
 			         BankTextVariant::Heading,
 			         { .effectColor = 200 });
 		}
@@ -168,11 +168,11 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 		CLAY({ .id = CLAY_ID("CharToggleRow"),
 		       .layout = {
 		           .padding = { 0, 0, 4, 0 },
-		           .childGap = kToggleGap,
+		           .childGap = character_panel_detail::kToggleGap,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
 			for(int i = 0; i < 5; ++i){
-				const AgencyDef & def = kAgencies[i];
+				const character_panel_detail::AgencyDef & def = character_panel_detail::kAgencies[i];
 				const Uint16 spriteW = resources.spritewidth[181][def.spriteIndex];
 				const Uint16 spriteH = resources.spriteheight[181][def.spriteIndex];
 
@@ -202,7 +202,7 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 				const int tx = 20 + i * 42;
 				silencer::ui::UiInteractable w;
 				w.id = def.actionId;
-				w.labelText = kAgencyLabels[i];
+				w.labelText = character_panel_detail::kAgencyLabels[i];
 				w.kind  = silencer::ui::UiInteractableKind::Toggle;
 				w.x = tx; w.y = 90;
 				w.w = spriteW > 0 ? spriteW : (Uint16)16;
@@ -216,15 +216,15 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 		// brightness 160 (128+32), ramp on.
 		CLAY({ .id = CLAY_ID("CharStats"),
 		       .layout = {
-		           .padding = { 0, 0, kStatsPadTop, 0 },
-		           .childGap = (uint16_t)kStatsChildGap,
+		           .padding = { 0, 0, character_panel_detail::kStatsPadTop, 0 },
+		           .childGap = (uint16_t)character_panel_detail::kStatsChildGap,
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
 			const struct { const std::string * txt; const char * id; } kStatsRows[4] = {
-				{ &g_stats.level,  "CharStatLvl" },
-				{ &g_stats.wins,   "CharStatWin" },
-				{ &g_stats.losses, "CharStatLoss" },
-				{ &g_stats.xp,     "CharStatXp" },
+				{ &character_panel_detail::g_stats.level,  "CharStatLvl" },
+				{ &character_panel_detail::g_stats.wins,   "CharStatWin" },
+				{ &character_panel_detail::g_stats.losses, "CharStatLoss" },
+				{ &character_panel_detail::g_stats.xp,     "CharStatXp" },
 			};
 			for(int i = 0; i < 4; ++i){
 				if(kStatsRows[i].txt->empty()) continue;
@@ -233,9 +233,9 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 				wrapId.length = static_cast<int32_t>(strlen(kStatsRows[i].id));
 				wrapId.chars  = kStatsRows[i].id;
 				CLAY({ .id = CLAY_SID(wrapId) }) {
-					BankText(FromStd(*kStatsRows[i].txt),
+					BankText(character_panel_detail::FromStd(*kStatsRows[i].txt),
 					         BankTextVariant::BodySm,
-					         kStatsOpts);
+					         character_panel_detail::kStatsOpts);
 				}
 			}
 		}

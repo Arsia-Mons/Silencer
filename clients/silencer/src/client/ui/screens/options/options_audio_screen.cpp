@@ -16,7 +16,7 @@
 
 #include <SDL3/SDL.h>
 
-namespace
+namespace options_audio_screen_detail
 {
 using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonHandle;
@@ -41,34 +41,6 @@ void ApplyMusicSetting(bool on)
 	}else{
 		Audio::GetInstance().PauseMusic();
 	}
-}
-
-void RegisterButton(const char * label,
-                    const char * actionId,
-                    int x,
-                    int y,
-                    silencer::ui::UiInteractionRegistry& interactions)
-{
-	silencer::ui::UiInteractable w;
-	w.id = actionId;
-	w.labelText = label;
-	w.kind = silencer::ui::UiInteractableKind::Button;
-	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	interactions.RegisterInteractable(w);
-}
-
-void RegisterWidgets(int surfaceW,
-                     int /*surfaceH*/,
-                     silencer::ui::UiInteractionRegistry& interactions)
-{
-	const int panelX = (surfaceW - kPanelW) / 2;
-	const int panelY = 80;
-	const int rowX = panelX + kPanelPadX;
-	const int rowY = panelY + kPanelPadY + 42;
-	const int actionY = rowY + kRowH + 30;
-	RegisterButton("Music", kActionMusic, rowX, rowY + 6, interactions);
-	RegisterButton("Save", kActionSave, panelX + 48, actionY, interactions);
-	RegisterButton("Cancel", kActionCancel, panelX + 216, actionY, interactions);
 }
 
 void ToggleIndicator(Clay_String id, bool selected)
@@ -117,7 +89,7 @@ void ToggleRow(Clay_String label,
 		}
 	}
 }
-}
+} // namespace options_audio_screen_detail
 
 void OptionsAudioScreen::Build(ScreenContext & ctx)
 {
@@ -126,8 +98,6 @@ void OptionsAudioScreen::Build(ScreenContext & ctx)
 	musicClicked = false;
 	saveClicked = false;
 	cancelClicked = false;
-	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(surface.w, surface.h, ctx.game.UiInteractions());
 }
 
 void OptionsAudioScreen::Tick(ScreenContext & ctx)
@@ -136,7 +106,7 @@ void OptionsAudioScreen::Tick(ScreenContext & ctx)
 		musicClicked = false;
 		Config & cfg = Config::GetInstance();
 		cfg.music = !cfg.music;
-		ApplyMusicSetting(cfg.music);
+		options_audio_screen_detail::ApplyMusicSetting(cfg.music);
 	}
 	if(saveClicked){
 		saveClicked = false;
@@ -148,7 +118,7 @@ void OptionsAudioScreen::Tick(ScreenContext & ctx)
 		cancelClicked = false;
 		Config & cfg = Config::GetInstance();
 		cfg.Load();
-		ApplyMusicSetting(cfg.music);
+		options_audio_screen_detail::ApplyMusicSetting(cfg.music);
 		ctx.GoToState(GameState::OPTIONS);
 	}
 }
@@ -156,45 +126,43 @@ void OptionsAudioScreen::Tick(ScreenContext & ctx)
 void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
+	(void)dst;
 	using namespace silencer::clay_bridge;
-
-
 
 	Config & cfg = Config::GetInstance();
 	CLAY({ .id = CLAY_ID("OptionsAudioRoot"),
 	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
-	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_GROW(0) },
 	           .padding = { 0, 0, 80, 0 },
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 	       },
 	       .image = { .imageData = PackImage(6, 0) } }) {
 		CLAY({ .id = CLAY_ID("OptionsAudioPanel"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kPanelW),
+		           .sizing = { CLAY_SIZING_FIXED(options_audio_screen_detail::kPanelW),
 		                       CLAY_SIZING_FIT(0) },
-		           .padding = { kPanelPadX, kPanelPadX,
-		                        kPanelPadY, kPanelPadY },
+		           .padding = { options_audio_screen_detail::kPanelPadX, options_audio_screen_detail::kPanelPadX,
+		                        options_audio_screen_detail::kPanelPadY, options_audio_screen_detail::kPanelPadY },
 		           .childGap = 22,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
-			BankText(CLAY_STRING("Audio Options"), BankTextVariant::Title, {});
-			ToggleRow(CLAY_STRING("Music"), cfg.music, kActionMusic, interactions);
+			options_audio_screen_detail::BankText(CLAY_STRING("Audio Options"), options_audio_screen_detail::BankTextVariant::Title, {});
+			options_audio_screen_detail::ToggleRow(CLAY_STRING("Music"), cfg.music, options_audio_screen_detail::kActionMusic, interactions);
 			CLAY({ .id = CLAY_ID("OptionsAudioActions"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
-			           .childGap = kActionGap,
+			           .childGap = options_audio_screen_detail::kActionGap,
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				BankButton(CLAY_STRING("Save"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, kActionSave, &interactions });
-				BankButton(CLAY_STRING("Cancel"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, kActionCancel, &interactions });
+				options_audio_screen_detail::BankButton(CLAY_STRING("Save"), options_audio_screen_detail::BankButtonVariant::Chrome, {},
+				           options_audio_screen_detail::BankButtonHandle{ nullptr, options_audio_screen_detail::kActionSave, &interactions });
+				options_audio_screen_detail::BankButton(CLAY_STRING("Cancel"), options_audio_screen_detail::BankButtonVariant::Chrome, {},
+				           options_audio_screen_detail::BankButtonHandle{ nullptr, options_audio_screen_detail::kActionCancel, &interactions });
 			}
 		}
 	}
-	RegisterWidgets(dst.w, dst.h, interactions);
 }
 
 void OptionsAudioScreen::Destroy(ScreenContext & ctx)
@@ -210,15 +178,15 @@ bool OptionsAudioScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui:
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == kActionMusic){
+	if(action.id == options_audio_screen_detail::kActionMusic){
 		musicClicked = true;
 		return true;
 	}
-	if(action.id == kActionSave){
+	if(action.id == options_audio_screen_detail::kActionSave){
 		saveClicked = true;
 		return true;
 	}
-	if(action.id == kActionCancel){
+	if(action.id == options_audio_screen_detail::kActionCancel){
 		cancelClicked = true;
 		return true;
 	}

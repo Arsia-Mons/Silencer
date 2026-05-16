@@ -22,7 +22,7 @@
 namespace silencer {
 namespace client_ui {
 
-namespace {
+namespace hudview_detail {
 
 void PopulatePlayerFields(PlayerHudView& view, ::Player* player) {
 	view.valid = true;
@@ -236,7 +236,7 @@ void PopulateBuyTech(HudView& out, ::World& world, ::Player* player) {
 	}
 }
 
-}  // namespace
+}  // namespace hudview_detail
 
 HudView BuildHudView(const ::World& worldConst) {
 	HudView view;
@@ -294,21 +294,21 @@ HudView BuildHudView(const ::World& worldConst) {
 
 	// Players
 	::Player* localplayer = world.GetPeerPlayer(world.GetLocalPeerId());
-	if(localplayer) PopulatePlayerFields(view.localPlayer, localplayer);
+	if(localplayer) hudview_detail::PopulatePlayerFields(view.localPlayer, localplayer);
 
-	::Player* viewedplayer = ResolveViewedPlayer(world);
+	::Player* viewedplayer = hudview_detail::ResolveViewedPlayer(world);
 	if(viewedplayer){
-		PopulatePlayerFields(view.viewedPlayer, viewedplayer);
+		hudview_detail::PopulatePlayerFields(view.viewedPlayer, viewedplayer);
 		view.viewedPlayer.inOwnBase = viewedplayer->InOwnBase(world);
 		view.viewedPlayer.virusInventoryCount =
 			viewedplayer->InventoryItemCount(::Player::INV_VIRUS);
 	}
 
 	// Teams strip + player-list rows
-	PopulateTeams(view, world);
+	hudview_detail::PopulateTeams(view, world);
 
 	// Buy/Tech overlay derived from viewed player.
-	PopulateBuyTech(view, world, viewedplayer);
+	hudview_detail::PopulateBuyTech(view, world, viewedplayer);
 
 	return view;
 }

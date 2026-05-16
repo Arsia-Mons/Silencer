@@ -15,7 +15,7 @@
 namespace silencer {
 namespace client_ui {
 
-namespace {
+namespace ingameuicontroller_detail {
 
 bool StartsWith(const std::string& value, const char * prefix) {
 	return value.compare(0, std::strlen(prefix), prefix) == 0;
@@ -74,7 +74,7 @@ void ActivateBuyTechSelection(Player& player, World& world) {
 	}
 }
 
-}  // namespace
+}  // namespace ingameuicontroller_detail
 
 InGameUiController::InGameUiController(World& world) : world_(world) {}
 
@@ -154,14 +154,14 @@ bool InGameUiController::ApplyActions(
 		}
 
 		if((localplayer->isbuying || localplayer->techstationactive) &&
-		   StartsWith(action.id, "ingame.buytech.row.")){
+		   ingameuicontroller_detail::StartsWith(action.id, "ingame.buytech.row.")){
 			handled = true;
 			if(action.index >= 0){
-				SelectBuyTechRow(*localplayer, world_, action.index);
+				ingameuicontroller_detail::SelectBuyTechRow(*localplayer, world_, action.index);
 			}
 			if(action.kind == silencer::ui::UiActionKind::Select &&
 			   action.value != "focus_next" && action.value != "focus_previous"){
-				ActivateBuyTechSelection(*localplayer, world_);
+				ingameuicontroller_detail::ActivateBuyTechSelection(*localplayer, world_);
 			}
 			continue;
 		}

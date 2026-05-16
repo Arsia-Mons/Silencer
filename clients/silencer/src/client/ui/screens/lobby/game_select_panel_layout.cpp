@@ -22,7 +22,7 @@ using silencer::ui::primitives::ScrollListOpts;
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace game_select_panel_layout_detail {
 
 // Legacy on-screen coords kept ONLY for inspector hit-rect registration —
 // dispatch is label-based; the rect is a fallback for geometric hit-testing.
@@ -209,7 +209,7 @@ void BuildGameSelectActionButtons(const GameSelectPanelState & state,
 	}
 }
 
-}  // namespace
+}  // namespace game_select_panel_layout_detail
 
 void BuildGameSelectUpperTree(GameSelectPanelState & state,
                               Resources & resources,
@@ -219,16 +219,16 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
 
 	// Create Game button — single flex child of the Upper box.
 	CLAY({ .id = CLAY_ID("GSelBtnCreateWrap"),
-	       .layout = { .padding = { kUpperBtnPadLeft, 0,
-	                                kUpperBtnPadTop,  0 } } }) {
+	       .layout = { .padding = { game_select_panel_layout_detail::kUpperBtnPadLeft, 0,
+	                                game_select_panel_layout_detail::kUpperBtnPadTop,  0 } } }) {
 		BankButton(CLAY_STRING("Create Game"),
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   kActionCreate,
+		                             /*actionId*/   game_select_panel_layout_detail::kActionCreate,
 		                             /*interactions*/ &interactions });
 	}
-	RegisterButton(interactions, "Create Game", kActionCreate, kBtnCreateX, kBtnCreateY);
+	game_select_panel_layout_detail::RegisterButton(interactions, "Create Game", game_select_panel_layout_detail::kActionCreate, game_select_panel_layout_detail::kBtnCreateX, game_select_panel_layout_detail::kBtnCreateY);
 }
 
 void BuildGameSelectTallTree(GameSelectPanelState & state,
@@ -238,16 +238,16 @@ void BuildGameSelectTallTree(GameSelectPanelState & state,
 
 	// "Active Games" heading at top of Tall box.
 	CLAY({ .id = CLAY_ID("GSelHeaderWrap"),
-	       .layout = { .padding = { kTallHeadingPadLeft, 0,
-	                                kTallHeadingPadTop,  0 } } }) {
+	       .layout = { .padding = { game_select_panel_layout_detail::kTallHeadingPadLeft, 0,
+	                                game_select_panel_layout_detail::kTallHeadingPadTop,  0 } } }) {
 		BankText(CLAY_STRING("Active Games"),
 		         BankTextVariant::Heading,
 		         {});
 	}
 
-	BuildGameSelectList(state, interactions);
-	BuildGameSelectInfoBlock(state);
-	BuildGameSelectActionButtons(state, interactions);
+	game_select_panel_layout_detail::BuildGameSelectList(state, interactions);
+	game_select_panel_layout_detail::BuildGameSelectInfoBlock(state);
+	game_select_panel_layout_detail::BuildGameSelectActionButtons(state, interactions);
 }
 
 }  // namespace silencer::client_ui::lobby

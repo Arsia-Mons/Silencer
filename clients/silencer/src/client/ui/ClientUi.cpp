@@ -13,7 +13,7 @@
 namespace silencer {
 namespace client_ui {
 
-namespace {
+namespace clientui_detail {
 
 bool IsAudibleInteractable(const silencer::ui::UiInteractable& widget) {
 	if(widget.inactive) return false;
@@ -63,7 +63,7 @@ void PlayMenuButtonSound(ScreenContext& ctx) {
 	audio.Play(it->second);
 }
 
-}  // namespace
+}  // namespace clientui_detail
 
 ClientUi::ClientUi(silencer::ui::ClayService& clay)
 	: clay_(clay) {}
@@ -88,16 +88,16 @@ std::vector<silencer::ui::UiAction> ClientUi::DispatchInput(
 	std::vector<silencer::ui::UiAction> actions = router.Route(input);
 	bool playedFeedback = false;
 	const silencer::ui::UiInteractable * hovered =
-		HitAudibleInteractable(interactions_, input);
-	std::string hoveredId = hovered ? InteractableAudioId(*hovered) : std::string();
+		clientui_detail::HitAudibleInteractable(interactions_, input);
+	std::string hoveredId = hovered ? clientui_detail::InteractableAudioId(*hovered) : std::string();
 	if(!hoveredId.empty() && hoveredId != hoveredAudioInteractableId_){
-		PlayMenuButtonSound(ctx);
+		clientui_detail::PlayMenuButtonSound(ctx);
 		playedFeedback = true;
 	}
 	hoveredAudioInteractableId_ = hoveredId;
 	for(const silencer::ui::UiAction& action : actions){
-		if(!playedFeedback && ActionTargetsAudibleInteractable(interactions_, action)){
-			PlayMenuButtonSound(ctx);
+		if(!playedFeedback && clientui_detail::ActionTargetsAudibleInteractable(interactions_, action)){
+			clientui_detail::PlayMenuButtonSound(ctx);
 			playedFeedback = true;
 		}
 	}

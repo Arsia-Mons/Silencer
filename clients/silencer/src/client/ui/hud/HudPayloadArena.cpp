@@ -3,7 +3,7 @@
 namespace silencer {
 namespace client_ui {
 
-namespace {
+namespace hudpayloadarena_detail {
 constexpr int kSpritePayloadCapacity = 512;
 silencer::clay_bridge::SpritePayload  g_spritePayloads[kSpritePayloadCapacity];
 silencer::clay_bridge::ClayCustomData g_spriteCustomData[kSpritePayloadCapacity];
@@ -13,33 +13,33 @@ constexpr int kTeamEmblemPayloadCapacity = 64;
 silencer::clay_bridge::TeamEmblemPayload g_teamEmblemPayloads[kTeamEmblemPayloadCapacity];
 silencer::clay_bridge::ClayCustomData    g_teamEmblemCustomData[kTeamEmblemPayloadCapacity];
 int g_teamEmblemPayloadCount = 0;
-}  // namespace
+}  // namespace hudpayloadarena_detail
 
 void HudPayloadBeginFrame() {
-	g_spritePayloadCount = 0;
-	g_teamEmblemPayloadCount = 0;
+	hudpayloadarena_detail::g_spritePayloadCount = 0;
+	hudpayloadarena_detail::g_teamEmblemPayloadCount = 0;
 }
 
 silencer::clay_bridge::ClayCustomData* AllocSpriteCustomData(
 	silencer::clay_bridge::SpritePayload payload) {
-	if(g_spritePayloadCount >= kSpritePayloadCapacity) return nullptr;
-	g_spritePayloads[g_spritePayloadCount] = payload;
-	g_spriteCustomData[g_spritePayloadCount] = {
+	if(hudpayloadarena_detail::g_spritePayloadCount >= hudpayloadarena_detail::kSpritePayloadCapacity) return nullptr;
+	hudpayloadarena_detail::g_spritePayloads[hudpayloadarena_detail::g_spritePayloadCount] = payload;
+	hudpayloadarena_detail::g_spriteCustomData[hudpayloadarena_detail::g_spritePayloadCount] = {
 		silencer::clay_bridge::CustomKind::Sprite,
-		&g_spritePayloads[g_spritePayloadCount],
+		&hudpayloadarena_detail::g_spritePayloads[hudpayloadarena_detail::g_spritePayloadCount],
 	};
-	return &g_spriteCustomData[g_spritePayloadCount++];
+	return &hudpayloadarena_detail::g_spriteCustomData[hudpayloadarena_detail::g_spritePayloadCount++];
 }
 
 silencer::clay_bridge::ClayCustomData* AllocTeamEmblemCustomData(
 	silencer::clay_bridge::TeamEmblemPayload payload) {
-	if(g_teamEmblemPayloadCount >= kTeamEmblemPayloadCapacity) return nullptr;
-	g_teamEmblemPayloads[g_teamEmblemPayloadCount] = payload;
-	g_teamEmblemCustomData[g_teamEmblemPayloadCount] = {
+	if(hudpayloadarena_detail::g_teamEmblemPayloadCount >= hudpayloadarena_detail::kTeamEmblemPayloadCapacity) return nullptr;
+	hudpayloadarena_detail::g_teamEmblemPayloads[hudpayloadarena_detail::g_teamEmblemPayloadCount] = payload;
+	hudpayloadarena_detail::g_teamEmblemCustomData[hudpayloadarena_detail::g_teamEmblemPayloadCount] = {
 		silencer::clay_bridge::CustomKind::TeamEmblem,
-		&g_teamEmblemPayloads[g_teamEmblemPayloadCount],
+		&hudpayloadarena_detail::g_teamEmblemPayloads[hudpayloadarena_detail::g_teamEmblemPayloadCount],
 	};
-	return &g_teamEmblemCustomData[g_teamEmblemPayloadCount++];
+	return &hudpayloadarena_detail::g_teamEmblemCustomData[hudpayloadarena_detail::g_teamEmblemPayloadCount++];
 }
 
 }  // namespace client_ui

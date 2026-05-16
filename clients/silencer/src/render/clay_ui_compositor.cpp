@@ -26,6 +26,10 @@ void * g_arenaMemory = nullptr;
 int g_lastW = -1;
 int g_lastH = -1;
 
+// Integer magnification for bitmap glyph/sprite/chrome draws. 1 == native
+// (no magnification). Updated via SetUiScale() before each Render().
+int g_uiScale = 1;
+
 // Per-bank text height. Mirrors the Overlay::MouseInside switch
 // (overlay.cpp:99). Banks 132 (TinyText), 133 (Body), 134 (Heading),
 // 135 (Title), 136 reserved.
@@ -86,10 +90,11 @@ bool ClipDrawRect(int dstW, int dstH,
 	return true;
 }
 
-void UnpackImage(void * p, Uint8 & bank, Uint16 & index) {
+void UnpackImage(void * p, Uint8 & bank, Uint16 & index, bool & contain) {
 	std::uintptr_t v = reinterpret_cast<std::uintptr_t>(p);
-	bank  = static_cast<Uint8>((v >> 16) & 0xFFu);
-	index = static_cast<Uint16>(v & 0xFFFFu);
+	bank    = static_cast<Uint8>((v >> 16) & 0xFFu);
+	index   = static_cast<Uint16>(v & 0xFFFFu);
+	contain = (v & kImageContainBit) != 0;
 }
 
 // Construct a "low-nibble alpha" src palette index for the alphaed LUT.
@@ -232,26 +237,46 @@ void DispatchImage(::Resources & resources,
                    const ::Clay_ImageRenderData & data) {
 	Uint8 bank;
 	Uint16 index;
-	UnpackImage(data.imageData, bank, index);
+	bool contain;
+	UnpackImage(data.imageData, bank, index, contain);
 	const auto & banks = resources.spritebank;
 	if(bank >= banks.size()) return;
 	if(index >= banks[bank].size()) return;
 	Surface * src = banks[bank][index].get();
 	if(!src) return;
-	// Blit at the bbox top-left using the sprite's natural size. Layout is
-	// expected to size the element to match the sprite; mismatches would
-	// require a scaled blit which the existing pipeline doesn't support.
-	int x = static_cast<int>(bb.x);
-	int y = static_cast<int>(bb.y);
-	int w = src->w;
-	int h = src->h;
-	// Only do a coarse outside-clip cull — BlitSurfaceUpper already clamps
-	// per-pixel against `dst`'s bounds. Sub-rect clipping during scissor
-	// is a P11+ concern (smoke test has no scissor).
-	int cx = x, cy = y, cw = w, ch = h;
-	if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) return;
-	Renderer::Rect dstrect{w, h, x, y};
-	Renderer::BlitSurface(src, nullptr, dst, &dstrect);
+	if(src->w <= 0 || src->h <= 0) return;
+	int bx = static_cast<int>(bb.x);
+	int by = static_cast<int>(bb.y);
+	int bw = static_cast<int>(bb.width);
+	int bh = static_cast<int>(bb.height);
+	if(bw <= 0 || bh <= 0) return;
+	// Fit the sprite into its element box like CSS background-size. cover:
+	// scale to fill, preserve aspect, crop overflow. contain: scale to fit
+	// inside, preserve aspect, letterbox. Nearest sampling keeps pixel art
+	// crisp (the magnify pass upstream applies the integer uiScale on top).
+	float sxScale = static_cast<float>(bw) / static_cast<float>(src->w);
+	float syScale = static_cast<float>(bh) / static_cast<float>(src->h);
+	float scale = contain ? std::min(sxScale, syScale)
+	                      : std::max(sxScale, syScale);
+	if(scale <= 0.0f) return;
+	int drawW = std::max(1, static_cast<int>(src->w * scale + 0.5f));
+	int drawH = std::max(1, static_cast<int>(src->h * scale + 0.5f));
+	int ox = bx + (bw - drawW) / 2;
+	int oy = by + (bh - drawH) / 2;
+	// Visible region = element box clipped to the scissor stack + surface.
+	int rx = bx, ry = by, rw = bw, rh = bh;
+	if(!ClipDrawRect(dst->w, dst->h, rx, ry, rw, rh)) return;
+	float invScale = 1.0f / scale;
+	for(int py = ry; py < ry + rh; py++){
+		int syi = static_cast<int>((py - oy) * invScale);
+		if(syi < 0 || syi >= src->h) continue;
+		for(int px = rx; px < rx + rw; px++){
+			int sxi = static_cast<int>((px - ox) * invScale);
+			if(sxi < 0 || sxi >= src->w) continue;
+			Uint8 col = Renderer::GetPixel(src, sxi, syi);
+			if(col) Renderer::SetPixel(dst, px, py, col);
+		}
+	}
 }
 
 void OutlineVisiblePixels(::Renderer & renderer, Surface * surface, Uint8 color) {
@@ -306,8 +331,16 @@ void EnsureInitialized(int width, int height) {
 	// pressed, held, released, and wheel behavior correctly.
 }
 
-void Render(::Resources & resources, ::Renderer & renderer,
-            Surface * dst, ::Clay_RenderCommandArray cmds) {
+void SetUiScale(int scale) {
+	g_uiScale = scale > 0 ? scale : 1;
+}
+
+int UiScale() {
+	return g_uiScale;
+}
+
+void RenderInto(::Resources & resources, ::Renderer & renderer,
+                Surface * dst, ::Clay_RenderCommandArray cmds) {
 	g_clipStack.clear();
 	if(!dst) return;
 	for(int i = 0; i < cmds.length; i++){
@@ -750,6 +783,56 @@ void Render(::Resources & resources, ::Renderer & renderer,
 			}
 			default:
 				break;
+		}
+	}
+}
+
+// Clay lays out in a virtual coordinate space (the native surface size
+// divided by uiScale). At uiScale 1 we draw straight into `dst` — byte-
+// identical to the pre-scale path. At uiScale > 1 we render the command
+// stream into a virtual-size scratch surface (every dispatch path, scissor,
+// sprite-offset and alpha-LUT computation stays in virtual units exactly as
+// authored) and then nearest-magnify that scratch into the native surface,
+// so bitmap text/chrome scale up as crisp integer-multiplied pixel art.
+void Render(::Resources & resources, ::Renderer & renderer,
+            Surface * dst, ::Clay_RenderCommandArray cmds) {
+	if(!dst) return;
+	int s = g_uiScale;
+	if(s <= 1){
+		RenderInto(resources, renderer, dst, cmds);
+		return;
+	}
+	// Scratch is sized to the dimensions Clay actually laid out at (set by
+	// EnsureInitialized). For menus that equals dst/s; in-game the HUD lays
+	// out in a fixed 640x480 space that does NOT equal dst/s, so derive the
+	// scratch size from the layout, never from dst/s.
+	int vw = (g_lastW > 0) ? g_lastW : dst->w / s;
+	int vh = (g_lastH > 0) ? g_lastH : dst->h / s;
+	if(vw < 1) vw = 1;
+	if(vh < 1) vh = 1;
+	// Reused across frames; only reallocates when the virtual size changes.
+	static Surface scratch;
+	if(scratch.w != vw || scratch.h != vh){
+		scratch.Resize(vw, vh, 0);
+	}else{
+		scratch.Clear(0);
+	}
+	RenderInto(resources, renderer, &scratch, cmds);
+	const Uint8 * sp = scratch.pixels.data();
+	Uint8 * dp = dst->pixels.data();
+	for(int dy = 0; dy < dst->h; dy++){
+		int sy = dy / s;
+		if(sy >= vh) sy = vh - 1;
+		const Uint8 * srow = sp + sy * vw;
+		Uint8 * drow = dp + dy * dst->w;
+		for(int dx = 0; dx < dst->w; dx++){
+			int sx = dx / s;
+			if(sx >= vw) sx = vw - 1;
+			// Skip transparent (index 0): compose the UI layer over whatever
+			// is already in dst (the upscaled world in-game, black in menus)
+			// instead of overwriting it.
+			Uint8 c = srow[sx];
+			if(c) drow[dx] = c;
 		}
 	}
 }

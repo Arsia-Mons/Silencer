@@ -17,7 +17,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
 
-namespace
+namespace options_display_screen_detail
 {
 using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonHandle;
@@ -36,37 +36,6 @@ constexpr const char * kActionFullscreen = "options_display.fullscreen";
 constexpr const char * kActionSmoothScaling = "options_display.smooth_scaling";
 constexpr const char * kActionSave = "options_display.save";
 constexpr const char * kActionCancel = "options_display.cancel";
-
-void RegisterButton(const char * label,
-                    const char * actionId,
-                    int x,
-                    int y,
-                    silencer::ui::UiInteractionRegistry& interactions)
-{
-	silencer::ui::UiInteractable w;
-	w.id = actionId;
-	w.labelText = label;
-	w.kind = silencer::ui::UiInteractableKind::Button;
-	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	interactions.RegisterInteractable(w);
-}
-
-void RegisterWidgets(int surfaceW,
-                     int surfaceH,
-                     silencer::ui::UiInteractionRegistry& interactions)
-{
-	const int panelX = (surfaceW - kPanelW) / 2;
-	const int panelY = 80;
-	const int rowX = panelX + kPanelPadX;
-	const int rowY = panelY + kPanelPadY + 42;
-	const int actionY = rowY + (kRowH + kRowGap) * 2 + 8;
-	RegisterButton("Fullscreen", kActionFullscreen, rowX, rowY + 6, interactions);
-	RegisterButton("Smooth Scaling", kActionSmoothScaling,
-	               rowX, rowY + kRowH + kRowGap + 6, interactions);
-	RegisterButton("Save", kActionSave, panelX + 48, actionY, interactions);
-	RegisterButton("Cancel", kActionCancel, panelX + 216, actionY, interactions);
-	(void)surfaceH;
-}
 
 void ToggleIndicator(Clay_String id, bool selected)
 {
@@ -114,7 +83,7 @@ void ToggleRow(Clay_String label,
 		}
 	}
 }
-}
+} // namespace options_display_screen_detail
 
 void OptionsDisplayScreen::Build(ScreenContext & ctx)
 {
@@ -124,8 +93,6 @@ void OptionsDisplayScreen::Build(ScreenContext & ctx)
 	smoothScalingClicked = false;
 	saveClicked = false;
 	cancelClicked = false;
-	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(surface.w, surface.h, ctx.game.UiInteractions());
 }
 
 void OptionsDisplayScreen::Tick(ScreenContext & ctx)
@@ -161,55 +128,53 @@ void OptionsDisplayScreen::Tick(ScreenContext & ctx)
 void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
+	(void)dst;
 	using namespace silencer::clay_bridge;
-
-
 
 	Config & cfg = Config::GetInstance();
 	CLAY({ .id = CLAY_ID("OptionsDisplayRoot"),
 	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
-	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_GROW(0) },
 	           .padding = { 0, 0, 80, 0 },
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 	       },
 	       .image = { .imageData = PackImage(6, 0) } }) {
 		CLAY({ .id = CLAY_ID("OptionsDisplayPanel"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kPanelW),
+		           .sizing = { CLAY_SIZING_FIXED(options_display_screen_detail::kPanelW),
 		                       CLAY_SIZING_FIT(0) },
-		           .padding = { kPanelPadX, kPanelPadX,
-		                        kPanelPadY, kPanelPadY },
+		           .padding = { options_display_screen_detail::kPanelPadX, options_display_screen_detail::kPanelPadX,
+		                        options_display_screen_detail::kPanelPadY, options_display_screen_detail::kPanelPadY },
 		           .childGap = 22,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
-			BankText(CLAY_STRING("Display Options"), BankTextVariant::Title, {});
+			options_display_screen_detail::BankText(CLAY_STRING("Display Options"), options_display_screen_detail::BankTextVariant::Title, {});
 			CLAY({ .id = CLAY_ID("OptionsDisplayRows"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
-			           .childGap = kRowGap,
+			           .childGap = options_display_screen_detail::kRowGap,
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       } }) {
-				ToggleRow(CLAY_STRING("Fullscreen"), cfg.fullscreen,
-				          kActionFullscreen, interactions);
-				ToggleRow(CLAY_STRING("Smooth Scaling"), cfg.scalefilter,
-				          kActionSmoothScaling, interactions);
+				options_display_screen_detail::ToggleRow(CLAY_STRING("Fullscreen"), cfg.fullscreen,
+				          options_display_screen_detail::kActionFullscreen, interactions);
+				options_display_screen_detail::ToggleRow(CLAY_STRING("Smooth Scaling"), cfg.scalefilter,
+				          options_display_screen_detail::kActionSmoothScaling, interactions);
 			}
 			CLAY({ .id = CLAY_ID("OptionsDisplayActions"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
-			           .childGap = kActionGap,
+			           .childGap = options_display_screen_detail::kActionGap,
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				BankButton(CLAY_STRING("Save"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, kActionSave, &interactions });
-				BankButton(CLAY_STRING("Cancel"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, kActionCancel, &interactions });
+				options_display_screen_detail::BankButton(CLAY_STRING("Save"), options_display_screen_detail::BankButtonVariant::Chrome, {},
+				           options_display_screen_detail::BankButtonHandle{ nullptr, options_display_screen_detail::kActionSave, &interactions });
+				options_display_screen_detail::BankButton(CLAY_STRING("Cancel"), options_display_screen_detail::BankButtonVariant::Chrome, {},
+				           options_display_screen_detail::BankButtonHandle{ nullptr, options_display_screen_detail::kActionCancel, &interactions });
 			}
 		}
 	}
-	RegisterWidgets(dst.w, dst.h, interactions);
 }
 
 void OptionsDisplayScreen::Destroy(ScreenContext & ctx)
@@ -225,19 +190,19 @@ bool OptionsDisplayScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == kActionFullscreen){
+	if(action.id == options_display_screen_detail::kActionFullscreen){
 		fullscreenClicked = true;
 		return true;
 	}
-	if(action.id == kActionSmoothScaling){
+	if(action.id == options_display_screen_detail::kActionSmoothScaling){
 		smoothScalingClicked = true;
 		return true;
 	}
-	if(action.id == kActionSave){
+	if(action.id == options_display_screen_detail::kActionSave){
 		saveClicked = true;
 		return true;
 	}
-	if(action.id == kActionCancel){
+	if(action.id == options_display_screen_detail::kActionCancel){
 		cancelClicked = true;
 		return true;
 	}

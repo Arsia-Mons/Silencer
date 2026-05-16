@@ -33,8 +33,13 @@ struct UiPointerState {
 };
 
 struct UiInputState {
+	// width/height are the VIRTUAL layout dimensions Clay lays out against
+	// (the native surface size divided by uiScale). uiScale is the integer
+	// magnification the compositor applies to bitmap glyph/sprite/chrome
+	// draws so a virtual-resolution layout fills the larger native surface.
 	int width = 0;
 	int height = 0;
+	int uiScale = 1;
 	float deltaTimeSeconds = 0.0f;
 	UiPointerState pointer;
 	std::string textInput;

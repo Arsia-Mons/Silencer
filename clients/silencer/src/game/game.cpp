@@ -58,7 +58,7 @@ using namespace GameState;
 #define SILENCER_MAP_API_URL "http://127.0.0.1:8080"
 #endif
 
-Game::Game() : renderer(world), screenbuffer(640, 480),
+Game::Game() : renderer(world), screenbuffer(640, 480), worldSurface(640, 480),
                uiClayService(uiClayBackend),
                clientUi(uiClayService),
                inGameUiController(world),
@@ -351,6 +351,27 @@ bool Game::SetupRenderDevice(void){
 	return true;
 }
 
+// Nearest-neighbour stretch of the fixed-size world surface across the whole
+// (native-resolution) screenbuffer. Full overwrite — the world is the bottom
+// layer; the Clay UI composites on top afterwards. Nearest keeps the legacy
+// pixel-art look at any window size.
+static void NearestUpscaleFill(const Surface & src, Surface & dst){
+	if(src.w <= 0 || src.h <= 0 || dst.w <= 0 || dst.h <= 0) return;
+	const Uint8 * sp = src.pixels.data();
+	Uint8 * dp = dst.pixels.data();
+	for(int dy = 0; dy < dst.h; dy++){
+		int sy = dy * src.h / dst.h;
+		if(sy >= src.h) sy = src.h - 1;
+		const Uint8 * srow = sp + sy * src.w;
+		Uint8 * drow = dp + dy * dst.w;
+		for(int dx = 0; dx < dst.w; dx++){
+			int sx = dx * src.w / dst.w;
+			if(sx >= src.w) sx = src.w - 1;
+			drow[dx] = srow[sx];
+		}
+	}
+}
+
 bool Game::ResizeRenderSurface(int width, int height){
 	if(width < 1 || height < 1) return false;
 	screenbuffer.Resize(width, height, 0);
@@ -366,6 +387,28 @@ bool Game::HasUiInputTarget() {
 }
 
 void Game::PrepareClientUiFrame(Surface& surface) {
+	// UI magnification factor: the largest integer that keeps the virtual
+	// canvas at least the legacy 640x480 design size. Bitmap glyph/sprite/
+	// chrome draws are integer-scaled by this in the Clay compositor so
+	// pixel art stays crisp.
+	int scaleX = surface.w / 640;
+	int scaleY = surface.h / 480;
+	int uiScale = scaleX < scaleY ? scaleX : scaleY;
+	if(uiScale < 1) uiScale = 1;
+	int virtualW;
+	int virtualH;
+	if(world.map.loaded){
+		// In-game: the HUD/overlays are authored against a fixed 640x480
+		// space and scale up as one crisp pixel-art layer composited over
+		// the (separately upscaled) world.
+		virtualW = 640;
+		virtualH = 480;
+	}else{
+		// Menus reflow responsively — Clay lays out at the native surface
+		// size divided by uiScale.
+		virtualW = surface.w / uiScale;
+		virtualH = surface.h / uiScale;
+	}
 	float mx = static_cast<float>(world.localinput.mousex);
 	float my = static_cast<float>(world.localinput.mousey);
 	bool down = world.localinput.mousedown;
@@ -375,13 +418,13 @@ void Game::PrepareClientUiFrame(Surface& surface) {
 		int windowW = 0;
 		int windowH = 0;
 		SDL_GetWindowSize(window, &windowW, &windowH);
-		clientUiInput.SetPolledWindowPointer(mx, my, down, windowW, windowH, surface.w, surface.h);
+		clientUiInput.SetPolledWindowPointer(mx, my, down, windowW, windowH, virtualW, virtualH);
 	}else{
 		clientUiInput.SetPolledSurfacePointer(mx, my, down);
 	}
 	float deltaTimeSeconds =
 		static_cast<float>(GASLoader::Get().gameengine.tickIntervalMs) / 1000.0f;
-	preparedUiInput = clientUiInput.BuildFrame(surface.w, surface.h, deltaTimeSeconds);
+	preparedUiInput = clientUiInput.BuildFrame(virtualW, virtualH, uiScale, deltaTimeSeconds);
 	hasPreparedUiInput = true;
 }
 
@@ -401,10 +444,9 @@ Clay_RenderCommandArray Game::EndClientUiFrame() {
 void Game::BuildVisibleClientUi(Surface& surface, float frametime) {
 	clientUi.BuildVisibleScreens(screenContext, surface, frametime);
 	if(world.map.loaded){
-		// Drive the system-camera insets + minimap blit from Game (renderer
-		// owns world/pixel drawing; HUD owns Clay layout only). Then build
-		// the HUD/overlay Clay declarations from the snapshot view.
-		DrawInGameWorldInsets(surface, frametime);
+		// HUD owns Clay layout only; the system-camera insets + minimap are
+		// world pixels drawn into the world surface by the render loop.
+		// Build the HUD/overlay Clay declarations from the snapshot view.
 		silencer::client_ui::HudView hudView =
 			silencer::client_ui::BuildHudView(world);
 		silencer::client_ui::BuildInGameHudUi(
@@ -698,10 +740,21 @@ bool Game::Loop(void){
 	ControlDispatch::TickWaits(*this);
 	world.DoNetwork();
 	if(!world.dedicatedserver.active){
-		screenbuffer.Clear(0);
 		world.DoNetwork();
 		float ft = 1 - (float(tickcheck - lasttick) / wait);
-		renderer.Draw(&screenbuffer, ft);
+		if(world.map.loaded){
+			// In-game: the world (incl. minimap/system-camera insets)
+			// renders at the legacy fixed size, then is nearest-upscaled
+			// to fill the native screenbuffer; the Clay HUD composites on
+			// top in RenderClientUiFrame.
+			worldSurface.Clear(0);
+			renderer.Draw(&worldSurface, ft);
+			DrawInGameWorldInsets(worldSurface, ft);
+			NearestUpscaleFill(worldSurface, screenbuffer);
+		}else{
+			screenbuffer.Clear(0);
+			renderer.Draw(&screenbuffer, ft);
+		}
 		RenderClientUiFrame(screenbuffer, ft);
 #ifdef POSIX
 		if(world.replay.IsPlaying() && world.replay.ffmpeg && world.replay.ffmpegvideo && deploymessageshown){

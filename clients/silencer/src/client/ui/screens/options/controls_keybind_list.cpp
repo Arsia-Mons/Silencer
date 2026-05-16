@@ -11,7 +11,7 @@
 
 namespace silencer::client_ui::options {
 
-namespace {
+namespace controls_keybind_list_detail {
 
 using silencer::ui::primitives::BankText;
 using silencer::ui::primitives::BankTextVariant;
@@ -150,35 +150,35 @@ void RowOperatorButton(Clay_String id,
 	           actionId.c_str(), interactions);
 }
 
-}  // namespace
+}  // namespace controls_keybind_list_detail
 
 void RegisterKeybindListWidgets(int surfaceW,
                                 silencer::ui::UiInteractionRegistry& interactions) {
-	const int panelX = (surfaceW - kPanelW) / 2;
+	const int panelX = (surfaceW - controls_keybind_list_detail::kPanelW) / 2;
 	const int panelY = 34;
-	const int x = panelX + kPanelPadX;
-	int y = panelY + kPanelPadY + 34;
-	RegisterButton("Preset", kActionPreset, x + kActionNameW, y, 220, 33, interactions);
-	y += kRowH + kRowGap;
+	const int x = panelX + controls_keybind_list_detail::kPanelPadX;
+	int y = panelY + controls_keybind_list_detail::kPanelPadY + 34;
+	controls_keybind_list_detail::RegisterButton("Preset", controls_keybind_list_detail::kActionPreset, x + controls_keybind_list_detail::kActionNameW, y, 220, 33, interactions);
+	y += controls_keybind_list_detail::kRowH + controls_keybind_list_detail::kRowGap;
 	for(int i = 0; i < kKeybindListVisibleRows; i++){
 		const std::string row = std::to_string(i);
-		RegisterButton("Primary binding", std::string(kActionPrimaryPrefix) + row,
-		               x + kActionNameW, y + 4, kKeyButtonW, kKeyButtonH, interactions);
-		RegisterButton("Binding operator", std::string(kActionOperatorPrefix) + row,
-		               x + kActionNameW + kKeyButtonW + 12,
-		               y + 4, kOperatorW, kKeyButtonH, interactions);
-		RegisterButton("Secondary binding",
-		               std::string(kActionSecondaryPrefix) + row,
-		               x + kActionNameW + kKeyButtonW + 12 + kOperatorW + 12,
-		               y + 4, kKeyButtonW, kKeyButtonH, interactions);
-		y += kRowH + kRowGap;
+		controls_keybind_list_detail::RegisterButton("Primary binding", std::string(controls_keybind_list_detail::kActionPrimaryPrefix) + row,
+		               x + controls_keybind_list_detail::kActionNameW, y + 4, controls_keybind_list_detail::kKeyButtonW, controls_keybind_list_detail::kKeyButtonH, interactions);
+		controls_keybind_list_detail::RegisterButton("Binding operator", std::string(controls_keybind_list_detail::kActionOperatorPrefix) + row,
+		               x + controls_keybind_list_detail::kActionNameW + controls_keybind_list_detail::kKeyButtonW + 12,
+		               y + 4, controls_keybind_list_detail::kOperatorW, controls_keybind_list_detail::kKeyButtonH, interactions);
+		controls_keybind_list_detail::RegisterButton("Secondary binding",
+		               std::string(controls_keybind_list_detail::kActionSecondaryPrefix) + row,
+		               x + controls_keybind_list_detail::kActionNameW + controls_keybind_list_detail::kKeyButtonW + 12 + controls_keybind_list_detail::kOperatorW + 12,
+		               y + 4, controls_keybind_list_detail::kKeyButtonW, controls_keybind_list_detail::kKeyButtonH, interactions);
+		y += controls_keybind_list_detail::kRowH + controls_keybind_list_detail::kRowGap;
 	}
-	RegisterButton("Scroll Up", kActionScrollUp,
-	               panelX + kPanelW - 42, panelY + 92, 24, 24, interactions);
-	RegisterButton("Scroll Down", kActionScrollDown,
-	               panelX + kPanelW - 42, panelY + 280, 24, 24, interactions);
-	RegisterButton("Save", kActionSave, panelX + 102, panelY + 338, 156, 21, interactions);
-	RegisterButton("Cancel", kActionCancel, panelX + 282, panelY + 338, 156, 21, interactions);
+	controls_keybind_list_detail::RegisterButton("Scroll Up", controls_keybind_list_detail::kActionScrollUp,
+	               panelX + controls_keybind_list_detail::kPanelW - 42, panelY + 92, 24, 24, interactions);
+	controls_keybind_list_detail::RegisterButton("Scroll Down", controls_keybind_list_detail::kActionScrollDown,
+	               panelX + controls_keybind_list_detail::kPanelW - 42, panelY + 280, 24, 24, interactions);
+	controls_keybind_list_detail::RegisterButton("Save", controls_keybind_list_detail::kActionSave, panelX + 102, panelY + 338, 156, 21, interactions);
+	controls_keybind_list_detail::RegisterButton("Cancel", controls_keybind_list_detail::kActionCancel, panelX + 282, panelY + 338, 156, 21, interactions);
 }
 
 void BuildKeybindListBody(const KeybindListView & view,
@@ -192,51 +192,51 @@ void BuildKeybindListBody(const KeybindListView & view,
 		operatorIds[i] = "Operator" + std::to_string(i);
 	}
 
-	BankText(CLAY_STRING("Configure Controls"), BankTextVariant::Title, {});
+	controls_keybind_list_detail::BankText(CLAY_STRING("Configure Controls"), controls_keybind_list_detail::BankTextVariant::Title, {});
 	CLAY({ .id = CLAY_ID("ControlsPresetRow"),
 	       .layout = {
-	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kRowH) },
+	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(controls_keybind_list_detail::kRowH) },
 	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
 		CLAY({ .id = CLAY_ID("PresetLabel"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kActionNameW),
+		           .sizing = { CLAY_SIZING_FIXED(controls_keybind_list_detail::kActionNameW),
 		                       CLAY_SIZING_FIT(0) },
 		       } }) {
-			BankText(CLAY_STRING("Preset:"), BankTextVariant::Heading, {});
+			controls_keybind_list_detail::BankText(CLAY_STRING("Preset:"), controls_keybind_list_detail::BankTextVariant::Heading, {});
 		}
-		ButtonElement(CLAY_STRING("PresetButton"), FromStd(view.presetText), 220, 33,
-		              23, BankTextVariant::Title, kActionPreset, interactions);
+		controls_keybind_list_detail::ButtonElement(CLAY_STRING("PresetButton"), controls_keybind_list_detail::FromStd(view.presetText), 220, 33,
+		              23, controls_keybind_list_detail::BankTextVariant::Title, controls_keybind_list_detail::kActionPreset, interactions);
 	}
 
 	CLAY({ .id = CLAY_ID("ControlsRows"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
-	           .childGap = kRowGap,
+	           .childGap = controls_keybind_list_detail::kRowGap,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		for(int i = 0; i < view.visibleRowCount; i++){
 			const KeybindRowView & row = view.rows[i];
 			CLAY({ .id = CLAY_IDI("ControlsRow", (uint32_t)i),
 			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(kRowH) },
+			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(controls_keybind_list_detail::kRowH) },
 			           .childGap = 12,
 			           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
 				CLAY({ .id = CLAY_IDI("ControlsAction", (uint32_t)i),
 				       .layout = {
-				           .sizing = { CLAY_SIZING_FIXED(kActionNameW),
+				           .sizing = { CLAY_SIZING_FIXED(controls_keybind_list_detail::kActionNameW),
 				                       CLAY_SIZING_FIT(0) },
 				       } }) {
-					BankText(FromStd(row.actionLabel), BankTextVariant::Heading, {});
+					controls_keybind_list_detail::BankText(controls_keybind_list_detail::FromStd(row.actionLabel), controls_keybind_list_detail::BankTextVariant::Heading, {});
 				}
-				RowActionButton(FromStd(primaryIds[i]),
+				controls_keybind_list_detail::RowActionButton(controls_keybind_list_detail::FromStd(primaryIds[i]),
 				                row.primaryLabel, i, 0, row.rebindingPrimary, interactions);
-				RowOperatorButton(FromStd(operatorIds[i]),
+				controls_keybind_list_detail::RowOperatorButton(controls_keybind_list_detail::FromStd(operatorIds[i]),
 				                  row.operatorLabel.c_str(), i, interactions);
-				RowActionButton(FromStd(secondaryIds[i]),
+				controls_keybind_list_detail::RowActionButton(controls_keybind_list_detail::FromStd(secondaryIds[i]),
 				                row.secondaryLabel, i, 1, row.rebindingSecondary, interactions);
 			}
 		}
@@ -248,22 +248,22 @@ void BuildKeybindListBody(const KeybindListView & view,
 	           .childGap = 20,
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
-		TextButton(CLAY_STRING("ScrollUp"), CLAY_STRING("Up"), 60, 24,
-		           kActionScrollUp, interactions);
-		TextButton(CLAY_STRING("ScrollDown"), CLAY_STRING("Down"), 80, 24,
-		           kActionScrollDown, interactions);
+		controls_keybind_list_detail::TextButton(CLAY_STRING("ScrollUp"), CLAY_STRING("Up"), 60, 24,
+		           controls_keybind_list_detail::kActionScrollUp, interactions);
+		controls_keybind_list_detail::TextButton(CLAY_STRING("ScrollDown"), CLAY_STRING("Down"), 80, 24,
+		           controls_keybind_list_detail::kActionScrollDown, interactions);
 	}
 
 	CLAY({ .id = CLAY_ID("ControlsActions"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
-	           .childGap = kActionGap,
+	           .childGap = controls_keybind_list_detail::kActionGap,
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
-		ButtonElement(CLAY_STRING("Save"), CLAY_STRING("Save"), 156, 21, 24,
-		              BankTextVariant::Heading, kActionSave, interactions);
-		ButtonElement(CLAY_STRING("Cancel"), CLAY_STRING("Cancel"), 156, 21, 24,
-		              BankTextVariant::Heading, kActionCancel, interactions);
+		controls_keybind_list_detail::ButtonElement(CLAY_STRING("Save"), CLAY_STRING("Save"), 156, 21, 24,
+		              controls_keybind_list_detail::BankTextVariant::Heading, controls_keybind_list_detail::kActionSave, interactions);
+		controls_keybind_list_detail::ButtonElement(CLAY_STRING("Cancel"), CLAY_STRING("Cancel"), 156, 21, 24,
+		              controls_keybind_list_detail::BankTextVariant::Heading, controls_keybind_list_detail::kActionCancel, interactions);
 	}
 }
 

@@ -21,7 +21,7 @@ using silencer::ui::primitives::BankText;
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace chat_panel_layout_detail {
 
 // Chat panel widget dimensions — preserved from the legacy chat_panel.cpp
 // Build. The X/Y origins are now DERIVED from the LobbyChatBox flex layout;
@@ -75,7 +75,7 @@ int FillSlab(ScrollTextBoxLine * slab, const std::vector<ChatLine> & lines) {
 	return count;
 }
 
-}  // namespace
+}  // namespace chat_panel_layout_detail
 
 void BuildChatPanelTree(ChatPanelState & state,
                         World & world,
@@ -89,39 +89,39 @@ void BuildChatPanelTree(ChatPanelState & state,
 	// Prepare slabs + opts BEFORE the CLAY block so the inside of the
 	// CLAY block stays focused on the layout structure.
 	ScrollTextBoxOpts chatOpts;
-	chatOpts.width               = kChatW;
-	chatOpts.height              = kChatH;
-	chatOpts.lineHeight          = kLineHeight;
+	chatOpts.width               = chat_panel_layout_detail::kChatW;
+	chatOpts.height              = chat_panel_layout_detail::kChatH;
+	chatOpts.lineHeight          = chat_panel_layout_detail::kLineHeight;
 	chatOpts.textVariant         = BankTextVariant::Body;  // bank 133 w6
 	chatOpts.origin              = ScrollTextBoxOrigin::BottomUp;
 	chatOpts.showScrollbar       = false;
-	chatOpts.scrollbarBank       = kScrollbarBank;
+	chatOpts.scrollbarBank       = chat_panel_layout_detail::kScrollbarBank;
 	chatOpts.scrollbarTrackIndex = 12;
 	chatOpts.scrollbarThumbIndex = 13;
 	chatOpts.scrollbarWidth      = 0;
 	chatOpts.scrollbarGap        = 0;
 
-	const int chatN = FillSlab(g_chatSlab, state.chatLines);
+	const int chatN = chat_panel_layout_detail::FillSlab(chat_panel_layout_detail::g_chatSlab, state.chatLines);
 
 	ScrollTextBoxOpts presOpts;
-	presOpts.width        = kPresW;
-	presOpts.height       = kPresH;
-	presOpts.lineHeight   = kLineHeight;
+	presOpts.width        = chat_panel_layout_detail::kPresW;
+	presOpts.height       = chat_panel_layout_detail::kPresH;
+	presOpts.lineHeight   = chat_panel_layout_detail::kLineHeight;
 	presOpts.textVariant  = BankTextVariant::Body;
 	presOpts.origin       = ScrollTextBoxOrigin::TopDown;
 	presOpts.showScrollbar = false;
 
-	const int presN = FillSlab(g_presSlab, state.presenceLines);
+	const int presN = chat_panel_layout_detail::FillSlab(chat_panel_layout_detail::g_presSlab, state.presenceLines);
 
 	// `showCaret=false` mirrors the legacy steady state where the chat
 	// interface is not the active interface (gameSelect/etc. are), so
 	// `interface.cpp`'s "showcaret = (activeobject == textinput->id)"
 	// resolves to false.
 	TextInputOpts inOpts;
-	inOpts.widthPx     = kInputW;
-	inOpts.heightPx    = kInputH;
+	inOpts.widthPx     = chat_panel_layout_detail::kInputW;
+	inOpts.heightPx    = chat_panel_layout_detail::kInputH;
 	inOpts.fontBank    = 133;
-	inOpts.fontWidth   = kFontWidth;
+	inOpts.fontWidth   = chat_panel_layout_detail::kFontWidth;
 	inOpts.brightness  = 128;
 	inOpts.showCaret   = false;
 	inOpts.inactive    = false;
@@ -129,7 +129,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 	CLAY({ .id = CLAY_ID("ChatPanelContent"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
-	           .padding = { kPanelPad, kPanelPad, kPanelPad, kPanelPad },
+	           .padding = { chat_panel_layout_detail::kPanelPad, chat_panel_layout_detail::kPanelPad, chat_panel_layout_detail::kPanelPad, chat_panel_layout_detail::kPanelPad },
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 
@@ -138,10 +138,10 @@ void BuildChatPanelTree(ChatPanelState & state,
 		CLAY({ .id = CLAY_ID("ChatChannelWrap"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_FIXED((float)kChannelWrapH) },
+		                       CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kChannelWrapH) },
 		       } }) {
 			if(!state.channel.empty()){
-				BankText(FromStd(state.channel),
+				BankText(chat_panel_layout_detail::FromStd(state.channel),
 				         BankTextVariant::Heading,
 				         {});
 			}
@@ -150,19 +150,19 @@ void BuildChatPanelTree(ChatPanelState & state,
 		// Body row — chat scrollback + presence list side-by-side.
 		CLAY({ .id = CLAY_ID("ChatBodyRow"),
 		       .layout = {
-		           .childGap = kBodyChildGap,
+		           .childGap = chat_panel_layout_detail::kBodyChildGap,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
 			CLAY({ .id = CLAY_ID("ChatBoxWrap") }) {
 				ScrollTextBox(CLAY_STRING("ChatBox"),
-				              g_chatSlab,
+				              chat_panel_layout_detail::g_chatSlab,
 				              chatN,
 				              state.chatScrollPos,
 				              chatOpts);
 			}
 			CLAY({ .id = CLAY_ID("ChatPresWrap") }) {
 				ScrollTextBox(CLAY_STRING("ChatPresence"),
-				              g_presSlab,
+				              chat_panel_layout_detail::g_presSlab,
 				              presN,
 				              state.presenceScrollPos,
 				              presOpts);
@@ -172,7 +172,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 		// Input row.
 		CLAY({ .id = CLAY_ID("ChatInputWrap"),
 		       .layout = {
-		           .padding = { 0, 0, kInputPadTop, 0 },
+		           .padding = { 0, 0, chat_panel_layout_detail::kInputPadTop, 0 },
 		       } }) {
 			TextInput(CLAY_STRING("ChatInput"),
 			          state.inputBuffer,
@@ -183,11 +183,11 @@ void BuildChatPanelTree(ChatPanelState & state,
 
 	{
 		silencer::ui::UiInteractable w;
-		w.id = kActionInput;
+		w.id = chat_panel_layout_detail::kActionInput;
 		w.labelText = "Chat";
 		w.kind  = silencer::ui::UiInteractableKind::TextInput;
-		w.x = kInspectorInputX; w.y = kInspectorInputY;
-		w.w = kInputW; w.h = kInputH;
+		w.x = chat_panel_layout_detail::kInspectorInputX; w.y = chat_panel_layout_detail::kInspectorInputY;
+		w.w = chat_panel_layout_detail::kInputW; w.h = chat_panel_layout_detail::kInputH;
 		w.value = state.inputBuffer;
 		w.maxLength = static_cast<int>(sizeof(state.inputBuffer)) - 1;
 		interactions.RegisterInteractable(w);

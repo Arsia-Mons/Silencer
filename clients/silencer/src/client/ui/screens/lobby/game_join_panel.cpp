@@ -18,7 +18,7 @@ using silencer::ui::primitives::BankButtonVariant;
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace game_join_panel_detail {
 
 // Legacy on-screen coords kept ONLY for inspector hit-rect registration —
 // dispatch is label-based; the rect is a fallback for geometric hit-testing.
@@ -68,7 +68,7 @@ void RegisterButton(silencer::ui::UiInteractionRegistry& interactions,
 	interactions.RegisterInteractable(w);
 }
 
-}  // namespace
+}  // namespace game_join_panel_detail
 
 void GameJoinPanelInit(GameJoinPanelState & state) {
 	state = GameJoinPanelState{};
@@ -102,15 +102,15 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
                                  const silencer::ui::UiAction & action) {
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == kActionTech){
+	if(action.id == game_join_panel_detail::kActionTech){
 		state.techClicked = true;
 		return true;
 	}
-	if(action.id == kActionTeam){
+	if(action.id == game_join_panel_detail::kActionTeam){
 		state.teamClicked = true;
 		return true;
 	}
-	if(action.id == kActionReady){
+	if(action.id == game_join_panel_detail::kActionReady){
 		state.readyClicked = true;
 		return true;
 	}
@@ -124,44 +124,44 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 
 	// Choose Tech (top button).
 	CLAY({ .id = CLAY_ID("GJoinBtnTechWrap"),
-	       .layout = { .padding = { kBtnPadLeft, 0, kBtnTechPadTop, 0 } } }) {
+	       .layout = { .padding = { game_join_panel_detail::kBtnPadLeft, 0, game_join_panel_detail::kBtnTechPadTop, 0 } } }) {
 		BankButton(CLAY_STRING("Choose Tech"),
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   kActionTech,
+		                             /*actionId*/   game_join_panel_detail::kActionTech,
 		                             /*interactions*/ &interactions });
 	}
-	RegisterButton(interactions, "Choose Tech", kActionTech, kBtnTechX, kBtnTechY);
+	game_join_panel_detail::RegisterButton(interactions, "Choose Tech", game_join_panel_detail::kActionTech, game_join_panel_detail::kBtnTechX, game_join_panel_detail::kBtnTechY);
 
 	// Change Team (middle button).
 	CLAY({ .id = CLAY_ID("GJoinBtnTeamWrap"),
-	       .layout = { .padding = { kBtnPadLeft, 0, kBtnTeamPadTop, 0 } } }) {
+	       .layout = { .padding = { game_join_panel_detail::kBtnPadLeft, 0, game_join_panel_detail::kBtnTeamPadTop, 0 } } }) {
 		BankButton(CLAY_STRING("Change Team"),
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   kActionTeam,
+		                             /*actionId*/   game_join_panel_detail::kActionTeam,
 		                             /*interactions*/ &interactions });
 	}
-	RegisterButton(interactions, "Change Team", kActionTeam, kBtnTeamX, kBtnTeamY);
+	game_join_panel_detail::RegisterButton(interactions, "Change Team", game_join_panel_detail::kActionTeam, game_join_panel_detail::kBtnTeamX, game_join_panel_detail::kBtnTeamY);
 
 	// Ready / Waiting... (bottom button). Label flips per Tick.
 	CLAY({ .id = CLAY_ID("GJoinBtnReadyWrap"),
-	       .layout = { .padding = { kBtnPadLeft, 0, kBtnReadyPadTop, 0 } } }) {
-		BankButton(FromStd(state.readyLabel),
+	       .layout = { .padding = { game_join_panel_detail::kBtnPadLeft, 0, game_join_panel_detail::kBtnReadyPadTop, 0 } } }) {
+		BankButton(game_join_panel_detail::FromStd(state.readyLabel),
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   kActionReady,
+		                             /*actionId*/   game_join_panel_detail::kActionReady,
 		                             /*interactions*/ &interactions });
 	}
 	{
 		silencer::ui::UiInteractable w;
-		w.id = kActionReady;
+		w.id = game_join_panel_detail::kActionReady;
 		w.labelText = state.readyLabel;
 		w.kind  = silencer::ui::UiInteractableKind::Button;
-		w.x = kBtnReadyX; w.y = kBtnReadyY; w.w = kBtnW; w.h = kBtnH;
+		w.x = game_join_panel_detail::kBtnReadyX; w.y = game_join_panel_detail::kBtnReadyY; w.w = game_join_panel_detail::kBtnW; w.h = game_join_panel_detail::kBtnH;
 		interactions.RegisterInteractable(w);
 	}
 }

@@ -11,6 +11,7 @@ class ClayBridgeFrameBackend : public silencer::ui::ClayFrameBackend {
 public:
 	void SetCurrentContext() override;
 	void SetLayoutDimensions(int width, int height) override;
+	void SetUiScale(int scale) override;
 	void SetPointerState(float x, float y, bool down) override;
 	void UpdateScrollContainers(float wheelX, float wheelY, float deltaTimeSeconds) override;
 	void BeginLayout() override;

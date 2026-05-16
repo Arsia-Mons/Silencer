@@ -15,10 +15,9 @@
 
 #include <SDL3/SDL.h>
 
-#include <algorithm>
 #include <string>
 
-namespace
+namespace main_menu_screen_detail
 {
 using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonHandle;
@@ -39,64 +38,11 @@ constexpr const char * kActionLobby = "main_menu.lobby";
 constexpr const char * kActionOptions = "main_menu.options";
 constexpr const char * kActionExit = "main_menu.exit";
 
-struct MainMenuButtonLayout
-{
-	int x = 0;
-	int y = 0;
-};
-
 Clay_String FromStd(const std::string & s)
 {
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
 }
-
-MainMenuButtonLayout ComputeButtonLayout(int width, int height)
-{
-	int maxX = std::max(0, width - kMenuButtonW - 8);
-	int maxY = std::max(0, height - kMenuButtonTotalH - 24);
-	bool narrow = width < 560;
-
-	MainMenuButtonLayout layout;
-	if(narrow){
-		layout.x = (width - kMenuButtonW) / 2;
-		layout.y = (height - kMenuButtonTotalH) / 2;
-		layout.y = std::max(layout.y, 184);
-	}else{
-		layout.x = static_cast<int>(width * 0.62f);
-		layout.y = (height - kMenuButtonTotalH) / 2;
-	}
-
-	layout.x = std::max(8, std::min(layout.x, maxX));
-	layout.y = std::max(24, std::min(layout.y, maxY));
-	return layout;
-}
-
-void RegisterButton(const char * label,
-                    const char * actionId,
-                    int x,
-                    int y,
-                    silencer::ui::UiInteractionRegistry& interactions)
-{
-	silencer::ui::UiInteractable w;
-	w.id = actionId;
-	w.labelText = label;
-	w.kind = silencer::ui::UiInteractableKind::Button;
-	w.x = x; w.y = y; w.w = 156; w.h = 21;
-	interactions.RegisterInteractable(w);
-}
-
-void RegisterMainMenuButtons(const MainMenuButtonLayout & layout,
-                             silencer::ui::UiInteractionRegistry& interactions)
-{
-	RegisterButton("Tutorial", kActionTutorial, layout.x, layout.y, interactions);
-	RegisterButton("Connect To Lobby", kActionLobby, layout.x,
-	               layout.y + kMenuButtonH + kButtonGap, interactions);
-	RegisterButton("Options", kActionOptions, layout.x,
-	               layout.y + (kMenuButtonH + kButtonGap) * 2, interactions);
-	RegisterButton("Exit", kActionExit, layout.x,
-	               layout.y + (kMenuButtonH + kButtonGap) * 3, interactions);
-}
-}
+} // namespace main_menu_screen_detail
 
 void MainMenuScreen::Build(ScreenContext & ctx)
 {
@@ -104,16 +50,14 @@ void MainMenuScreen::Build(ScreenContext & ctx)
 	ctx.renderer.camera.SetPosition(320, 240);
 
 	// Clay owns every visible main-menu element. No retained Interface/Object
-	// widget graph is built for this screen.
+	// widget graph is built for this screen. Button hit-test bounds are
+	// resolved from Clay's real layout (ResolveClayBoundsFromClay), so no
+	// absolute coordinates are registered here.
 
 	tutorialClicked = false;
 	lobbyClicked = false;
 	optionsClicked = false;
 	exitClicked = false;
-
-	const Surface & screenbuffer = ctx.game.GetScreenBuffer();
-	RegisterMainMenuButtons(ComputeButtonLayout(screenbuffer.w, screenbuffer.h),
-	                        ctx.game.UiInteractions());
 }
 
 void MainMenuScreen::Tick(ScreenContext & ctx)
@@ -143,26 +87,32 @@ void MainMenuScreen::Tick(ScreenContext & ctx)
 void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
+	(void)dst;
 	using namespace silencer::clay_bridge;
-
-
 
 	std::string version = "Silencer v";
 	version += ctx.world.GetVersion();
-	const MainMenuButtonLayout buttons = ComputeButtonLayout(dst.w, dst.h);
 
+	// Fully responsive layout: the root fills Clay's virtual canvas (the
+	// native surface / uiScale), the background covers it like a CSS
+	// background-image, and a flex row places the logo + version on the
+	// left and the button column centered on the right. No absolute
+	// pixel positions — it reflows at any resolution.
 	CLAY({ .id = CLAY_ID("MainMenuRoot"),
 	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
-	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_GROW(0) },
 	       },
 	       .image = { .imageData = PackImage(6, 0) } }) {
 		CLAY({ .id = CLAY_ID("MainMenuChrome"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0),
 		                       CLAY_SIZING_GROW(0) },
-		           .padding = { kRootPadX, kRootPadX, kRootPadY, kRootPadY },
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		           .padding = { main_menu_screen_detail::kRootPadX,
+		                        main_menu_screen_detail::kRootPadX,
+		                        main_menu_screen_detail::kRootPadY,
+		                        main_menu_screen_detail::kRootPadY },
+		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
 			CLAY({ .id = CLAY_ID("MainMenuLeft"),
 			       .layout = {
@@ -170,12 +120,16 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 			                       CLAY_SIZING_GROW(0) },
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       } }) {
+				// Width grows with the left column (never a rigid pixel
+				// width that could overflow a narrow/portrait canvas and
+				// push the button column off-screen); contain keeps the
+				// logo's aspect at any size.
 				CLAY({ .id = CLAY_ID("MainMenuLogo"),
 				       .layout = {
-				           .sizing = { CLAY_SIZING_FIXED(360),
+				           .sizing = { CLAY_SIZING_GROW(0),
 				                       CLAY_SIZING_FIXED(160) },
 				       },
-				       .image = { .imageData = PackImage(208, 60) } }) {}
+				       .image = { .imageData = PackImageContain(208, 60) } }) {}
 
 				CLAY({ .id = CLAY_ID("MainMenuVersion"),
 				       .layout = {
@@ -183,35 +137,36 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 				                       CLAY_SIZING_GROW(0) },
 				           .childAlignment = { .y = CLAY_ALIGN_Y_BOTTOM },
 				       } }) {
-					BankText(FromStd(version), BankTextVariant::BodySm, {});
+					main_menu_screen_detail::BankText(main_menu_screen_detail::FromStd(version), main_menu_screen_detail::BankTextVariant::BodySm, {});
+				}
+			}
+
+			CLAY({ .id = CLAY_ID("MainMenuRight"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_GROW(0) },
+			           .childAlignment = { .x = CLAY_ALIGN_X_RIGHT,
+			                               .y = CLAY_ALIGN_Y_CENTER },
+			       } }) {
+				CLAY({ .id = CLAY_ID("MainMenuButtons"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_FIXED(main_menu_screen_detail::kMenuButtonW),
+				                       CLAY_SIZING_FIXED(main_menu_screen_detail::kMenuButtonTotalH) },
+				           .childGap = main_menu_screen_detail::kButtonGap,
+				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+				       } }) {
+					main_menu_screen_detail::BankButton(CLAY_STRING("Tutorial"), main_menu_screen_detail::BankButtonVariant::Chrome, {},
+					           main_menu_screen_detail::BankButtonHandle{ nullptr, main_menu_screen_detail::kActionTutorial, &interactions });
+					main_menu_screen_detail::BankButton(CLAY_STRING("Connect To Lobby"), main_menu_screen_detail::BankButtonVariant::Chrome, {},
+					           main_menu_screen_detail::BankButtonHandle{ nullptr, main_menu_screen_detail::kActionLobby, &interactions });
+					main_menu_screen_detail::BankButton(CLAY_STRING("Options"), main_menu_screen_detail::BankButtonVariant::Chrome, {},
+					           main_menu_screen_detail::BankButtonHandle{ nullptr, main_menu_screen_detail::kActionOptions, &interactions });
+					main_menu_screen_detail::BankButton(CLAY_STRING("Exit"), main_menu_screen_detail::BankButtonVariant::Chrome, {},
+					           main_menu_screen_detail::BankButtonHandle{ nullptr, main_menu_screen_detail::kActionExit, &interactions });
 				}
 			}
 		}
-
-		CLAY({ .id = CLAY_ID("MainMenuButtons"),
-		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kMenuButtonW),
-		                       CLAY_SIZING_FIXED(kMenuButtonTotalH) },
-		           .childGap = kButtonGap,
-		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		       },
-		       .floating = {
-		           .offset = { (float)buttons.x, (float)buttons.y },
-		           .attachTo = CLAY_ATTACH_TO_ROOT,
-		       } }) {
-			BankButton(CLAY_STRING("Tutorial"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionTutorial, &interactions });
-			BankButton(CLAY_STRING("Connect To Lobby"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionLobby, &interactions });
-			BankButton(CLAY_STRING("Options"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionOptions, &interactions });
-			BankButton(CLAY_STRING("Exit"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionExit, &interactions });
-		}
 	}
-
-
-	RegisterMainMenuButtons(buttons, interactions);
 }
 
 void MainMenuScreen::Destroy(ScreenContext & ctx)
@@ -226,19 +181,19 @@ bool MainMenuScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiA
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == kActionTutorial){
+	if(action.id == main_menu_screen_detail::kActionTutorial){
 		tutorialClicked = true;
 		return true;
 	}
-	if(action.id == kActionLobby){
+	if(action.id == main_menu_screen_detail::kActionLobby){
 		lobbyClicked = true;
 		return true;
 	}
-	if(action.id == kActionOptions){
+	if(action.id == main_menu_screen_detail::kActionOptions){
 		optionsClicked = true;
 		return true;
 	}
-	if(action.id == kActionExit){
+	if(action.id == main_menu_screen_detail::kActionExit){
 		exitClicked = true;
 		return true;
 	}

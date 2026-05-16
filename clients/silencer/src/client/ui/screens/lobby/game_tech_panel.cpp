@@ -32,7 +32,7 @@ using silencer::ui::primitives::BankButtonVariant;
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace game_tech_panel_detail {
 
 // Legacy on-screen coords retained ONLY for inspector hit-rect registration.
 constexpr int kBtnBackX  = 242;
@@ -70,7 +70,7 @@ int SuffixInt(const std::string & value, const char * prefix) {
 	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
-}  // namespace
+}  // namespace game_tech_panel_detail
 
 void GameTechPanelInit(GameTechPanelState & state) {
 	state = GameTechPanelState{};
@@ -162,16 +162,16 @@ void GameTechPanelTick(GameTechPanelState & state,
 bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
                                  const silencer::ui::UiAction & action) {
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == kActionBack){
+	if(action.id == game_tech_panel_detail::kActionBack){
 		state.backClicked = true;
 		return true;
 	}
-	int index = SuffixInt(action.id, kActionTogglePrefix);
+	int index = game_tech_panel_detail::SuffixInt(action.id, game_tech_panel_detail::kActionTogglePrefix);
 	if(index >= 0){
 		state.toggleClickedItemIndex = index;
 		return true;
 	}
-	index = SuffixInt(action.id, kActionDescriptionPrefix);
+	index = game_tech_panel_detail::SuffixInt(action.id, game_tech_panel_detail::kActionDescriptionPrefix);
 	if(index >= 0){
 		state.descClickedItemIndex = index;
 		return true;
@@ -190,29 +190,29 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 
 	// Back To Teams button.
 	CLAY({ .id = CLAY_ID("GTechBackWrap"),
-	       .layout = { .padding = { kUpperBackPadLeft, 0,
-	                                kUpperBackPadTop,  0 } } }) {
+	       .layout = { .padding = { game_tech_panel_detail::kUpperBackPadLeft, 0,
+	                                game_tech_panel_detail::kUpperBackPadTop,  0 } } }) {
 		BankButton(CLAY_STRING("Back To Teams"),
 		           BankButtonVariant::Chrome,
 		           BankButtonOpts{},
 		           BankButtonHandle{ /*hoveredOut*/ nullptr,
-		                             /*actionId*/   kActionBack,
+		                             /*actionId*/   game_tech_panel_detail::kActionBack,
 		                             /*interactions*/ &interactions });
 	}
 	silencer::ui::UiInteractable w;
-	w.id = kActionBack;
+	w.id = game_tech_panel_detail::kActionBack;
 	w.labelText = "Back To Teams";
 	w.kind  = silencer::ui::UiInteractableKind::Button;
-	w.x = kBtnBackX; w.y = kBtnBackY; w.w = 156; w.h = 21;
+	w.x = game_tech_panel_detail::kBtnBackX; w.y = game_tech_panel_detail::kBtnBackY; w.w = 156; w.h = 21;
 	interactions.RegisterInteractable(w);
 
 	// Peer name labels — right-aligned column. ALIGN_X_RIGHT inside a
 	// grow-width wrapper aligns each name to the wrapper's right edge.
 	CLAY({ .id = CLAY_ID("GTechPeerNames"),
 	       .layout = {
-	           .padding = { kUpperPeerColPadLeft, 4,
-	                        kUpperPeerColPadTop, 0 },
-	           .childGap = kUpperPeerRowGap,
+	           .padding = { game_tech_panel_detail::kUpperPeerColPadLeft, 4,
+	                        game_tech_panel_detail::kUpperPeerColPadTop, 0 },
+	           .childGap = game_tech_panel_detail::kUpperPeerRowGap,
 	           .childAlignment = { .x = CLAY_ALIGN_X_RIGHT },
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
@@ -225,7 +225,7 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 			wid.chars  = idBuf;
 			CLAY({ .id = CLAY_SID(wid) }) {
 				if(!state.peerNameStrs[i].empty()){
-					BankText(FromStd(state.peerNameStrs[i]),
+					BankText(game_tech_panel_detail::FromStd(state.peerNameStrs[i]),
 					         BankTextVariant::Body, {});
 				}
 			}
@@ -242,10 +242,10 @@ void BuildGameTechTallTree(GameTechPanelState & state,
 
 	// "Tech slots left: N" — bank 133/w6/eff=129/brightness=144/colorRamp.
 	CLAY({ .id = CLAY_ID("GTechSlotsWrap"),
-	       .layout = { .padding = { kTallSlotsPadLeft, 0,
-	                                kTallSlotsPadTop, 0 } } }) {
+	       .layout = { .padding = { game_tech_panel_detail::kTallSlotsPadLeft, 0,
+	                                game_tech_panel_detail::kTallSlotsPadTop, 0 } } }) {
 		if(!state.slotsLeftStr.empty()){
-			BankText(FromStd(state.slotsLeftStr),
+			BankText(game_tech_panel_detail::FromStd(state.slotsLeftStr),
 			         BankTextVariant::Body,
 			         { .effectColor = 129,
 			           .brightness  = static_cast<Uint8>(128 + 16),

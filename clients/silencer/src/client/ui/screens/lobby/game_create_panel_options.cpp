@@ -21,7 +21,7 @@ using silencer::ui::primitives::TextInputOpts;
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace game_create_panel_options_detail {
 
 // Legacy on-screen coords kept ONLY for inspector hit-rect registration.
 constexpr int    kYSpace    = 14;
@@ -136,7 +136,7 @@ void BuildOptionRow(GameCreatePanelState & state, int i,
 	}
 }
 
-}  // namespace
+}  // namespace game_create_panel_options_detail
 
 void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Resources & resources,
@@ -146,8 +146,8 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 	CLAY({ .id = CLAY_ID("GCrtOptionsContent"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
-	           .padding = { kPanelPad, kPanelPad, kPanelPad, kPanelPad },
-	           .childGap = kFormRowGap,
+	           .padding = { game_create_panel_options_detail::kPanelPad, game_create_panel_options_detail::kPanelPad, game_create_panel_options_detail::kPanelPad, game_create_panel_options_detail::kPanelPad },
+	           .childGap = game_create_panel_options_detail::kFormRowGap,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		CLAY({ .id = CLAY_ID("GCrtOptionsTitleWrap") }) {
@@ -167,15 +167,15 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 
 		struct NumInput { const char * id; const char * label; const char * actionId; char * buf; int cap; };
 		NumInput kTextInputs[4] = {
-			{ "GCrtMinLevel",   "Min Level",   kActionMinLevel,   state.minLevel,   (int)sizeof(state.minLevel)   },
-			{ "GCrtMaxLevel",   "Max Level",   kActionMaxLevel,   state.maxLevel,   (int)sizeof(state.maxLevel)   },
-			{ "GCrtMaxPlayers", "Max Players", kActionMaxPlayers, state.maxPlayers, (int)sizeof(state.maxPlayers) },
-			{ "GCrtMaxTeams",   "Max Teams",   kActionMaxTeams,   state.maxTeams,   (int)sizeof(state.maxTeams)   },
+			{ "GCrtMinLevel",   "Min Level",   game_create_panel_options_detail::kActionMinLevel,   state.minLevel,   (int)sizeof(state.minLevel)   },
+			{ "GCrtMaxLevel",   "Max Level",   game_create_panel_options_detail::kActionMaxLevel,   state.maxLevel,   (int)sizeof(state.maxLevel)   },
+			{ "GCrtMaxPlayers", "Max Players", game_create_panel_options_detail::kActionMaxPlayers, state.maxPlayers, (int)sizeof(state.maxPlayers) },
+			{ "GCrtMaxTeams",   "Max Teams",   game_create_panel_options_detail::kActionMaxTeams,   state.maxTeams,   (int)sizeof(state.maxTeams)   },
 		};
 
 		for(int i = 0; i < 6; ++i){
 			const NumInput * ti = (i >= 1 && i <= 4) ? &kTextInputs[i - 1] : nullptr;
-			BuildOptionRow(state, i,
+			game_create_panel_options_detail::BuildOptionRow(state, i,
 			               kLabels[i].id, kLabels[i].label,
 			               ti ? ti->id : "",
 			               ti ? ti->actionId : "",

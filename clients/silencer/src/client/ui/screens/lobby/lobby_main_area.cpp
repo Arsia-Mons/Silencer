@@ -19,7 +19,7 @@
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace lobby_main_area_detail {
 
 using silencer::ui::primitives::Box;
 namespace BoxVariants = silencer::ui::primitives::BoxVariants;
@@ -192,7 +192,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 	}
 }
 
-}  // namespace
+}  // namespace lobby_main_area_detail
 
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         World & world,
@@ -201,24 +201,24 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         bool narrow,
                         int bodyH,
                         silencer::ui::UiInteractionRegistry& interactions) {
-	const int narrowTallFit = bodyH - ((int)kUpperH * 2)
-	                        - ((int)kRegionGap * 3) - (int)kNarrowChatMinH;
-	const int narrowTallH = std::max(0, std::min((int)kRightTallH, narrowTallFit));
+	const int narrowTallFit = bodyH - ((int)lobby_main_area_detail::kUpperH * 2)
+	                        - ((int)lobby_main_area_detail::kRegionGap * 3) - (int)lobby_main_area_detail::kNarrowChatMinH;
+	const int narrowTallH = std::max(0, std::min((int)lobby_main_area_detail::kRightTallH, narrowTallFit));
 
 	CLAY({ .id = CLAY_ID("LobbyBody"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
 	                       CLAY_SIZING_GROW(0) },
-	           .childGap = kRegionGap,
+	           .childGap = lobby_main_area_detail::kRegionGap,
 	           .layoutDirection = narrow ? CLAY_TOP_TO_BOTTOM
 	                                     : CLAY_LEFT_TO_RIGHT,
 	       },
 	       .clip = { .horizontal = true, .vertical = true },
 	    }) {
 		if(narrow){
-			BuildNarrowBody(panels, world, resources, owner, narrowTallH, interactions);
+			lobby_main_area_detail::BuildNarrowBody(panels, world, resources, owner, narrowTallH, interactions);
 		}else{
-			BuildWideBody(panels, world, resources, owner, interactions);
+			lobby_main_area_detail::BuildWideBody(panels, world, resources, owner, interactions);
 		}
 	}
 }

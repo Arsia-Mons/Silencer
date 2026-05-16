@@ -26,7 +26,7 @@ using silencer::ui::primitives::ToggleOpts;
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace tech_tree_grid_detail {
 
 constexpr int kRowH      = 13;
 constexpr int kLocalCol  = 3;
@@ -58,7 +58,7 @@ Clay_String FromStd(const std::string & s) {
 	return cs;
 }
 
-}  // namespace
+}  // namespace tech_tree_grid_detail
 
 void BuildTechTreeGrid(World & world,
                        LobbyScreen & owner,
@@ -68,9 +68,9 @@ void BuildTechTreeGrid(World & world,
 
 	CLAY({ .id = CLAY_ID("GTechGridWrap"),
 	       .layout = {
-	           .padding = { kTallGridPadLeft, 0,
-	                        kTallGridPadTop,  0 },
-	           .childGap = kTallGridColGap,
+	           .padding = { tech_tree_grid_detail::kTallGridPadLeft, 0,
+	                        tech_tree_grid_detail::kTallGridPadTop,  0 },
+	           .childGap = tech_tree_grid_detail::kTallGridColGap,
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
 		if(team){
@@ -85,7 +85,7 @@ void BuildTechTreeGrid(World & world,
 			for(int i = 0; i < 4; i++){
 				const bool isLocal = (team->peers[i] == localid);
 				const bool draw    = (i < team->numpeers);
-				const int  col     = isLocal ? kLocalCol : peerindex;
+				const int  col     = isLocal ? tech_tree_grid_detail::kLocalCol : peerindex;
 				if(!isLocal) peerindex++;
 				if(col >= 0 && col < 4){
 					cols[col].peerSlot = i;
@@ -137,44 +137,44 @@ void BuildTechTreeGrid(World & world,
 							            || (peer && (peer->techchoices & item->techchoice));
 						}
 						const Uint8 brightness = ca.isLocal && interactable ? 128 : 64;
-						const Uint8 boxIdx = selected ? kCheckboxOn : kCheckboxOff;
+						const Uint8 boxIdx = selected ? tech_tree_grid_detail::kCheckboxOn : tech_tree_grid_detail::kCheckboxOff;
 
 						ToggleOpts tOpts{};
-						tOpts.width  = kCheckboxW;
-						tOpts.height = kCheckboxH;
+						tOpts.width  = tech_tree_grid_detail::kCheckboxW;
+						tOpts.height = tech_tree_grid_detail::kCheckboxH;
 						tOpts.effectColor = 0;
 						tOpts.selectedBrightness   = brightness;
 						tOpts.unselectedBrightness = brightness;
 
-						if(ca.isLocal && localAdapter < kMaxRows){
-							std::snprintf(g_localToggleIdBuf[localAdapter],
-							              sizeof(g_localToggleIdBuf[localAdapter]),
+						if(ca.isLocal && localAdapter < tech_tree_grid_detail::kMaxRows){
+							std::snprintf(tech_tree_grid_detail::g_localToggleIdBuf[localAdapter],
+							              sizeof(tech_tree_grid_detail::g_localToggleIdBuf[localAdapter]),
 							              "GTechBoxL%d", static_cast<int>(bIdx));
 							Clay_String innerId;
 							innerId.isStaticallyAllocated = false;
-							innerId.length = (int32_t)std::strlen(g_localToggleIdBuf[localAdapter]);
-							innerId.chars  = g_localToggleIdBuf[localAdapter];
+							innerId.length = (int32_t)std::strlen(tech_tree_grid_detail::g_localToggleIdBuf[localAdapter]);
+							innerId.chars  = tech_tree_grid_detail::g_localToggleIdBuf[localAdapter];
 							std::string actionId =
-								std::string(kActionTogglePrefix) + std::to_string(static_cast<int>(bIdx));
+								std::string(tech_tree_grid_detail::kActionTogglePrefix) + std::to_string(static_cast<int>(bIdx));
 							Toggle(innerId,
-							       kCheckboxBank, boxIdx, selected, tOpts,
+							       tech_tree_grid_detail::kCheckboxBank, boxIdx, selected, tOpts,
 							       ToggleHandle{ /*hoveredOut*/ nullptr,
 							                     /*actionId*/   actionId.c_str(),
 							                     /*interactions*/ &interactions });
 							localAdapter++;
 						}else{
-							const int slot = (col * kMaxRows) + static_cast<int>(bIdx);
-							if(slot >= 0 && slot < static_cast<int>(sizeof(g_remoteToggleIdBuf)
-							                                       / sizeof(g_remoteToggleIdBuf[0]))){
-								std::snprintf(g_remoteToggleIdBuf[slot],
-								              sizeof(g_remoteToggleIdBuf[slot]),
+							const int slot = (col * tech_tree_grid_detail::kMaxRows) + static_cast<int>(bIdx);
+							if(slot >= 0 && slot < static_cast<int>(sizeof(tech_tree_grid_detail::g_remoteToggleIdBuf)
+							                                       / sizeof(tech_tree_grid_detail::g_remoteToggleIdBuf[0]))){
+								std::snprintf(tech_tree_grid_detail::g_remoteToggleIdBuf[slot],
+								              sizeof(tech_tree_grid_detail::g_remoteToggleIdBuf[slot]),
 								              "GTBR%d_%d", col, static_cast<int>(bIdx));
 								Clay_String innerId;
 								innerId.isStaticallyAllocated = false;
-								innerId.length = (int32_t)std::strlen(g_remoteToggleIdBuf[slot]);
-								innerId.chars  = g_remoteToggleIdBuf[slot];
+								innerId.length = (int32_t)std::strlen(tech_tree_grid_detail::g_remoteToggleIdBuf[slot]);
+								innerId.chars  = tech_tree_grid_detail::g_remoteToggleIdBuf[slot];
 								Toggle(innerId,
-								       kCheckboxBank, boxIdx, selected, tOpts,
+								       tech_tree_grid_detail::kCheckboxBank, boxIdx, selected, tOpts,
 								       ToggleHandle{});
 							}
 						}
@@ -185,8 +185,8 @@ void BuildTechTreeGrid(World & world,
 			// Local-peer tech-name label column.
 			CLAY({ .id = CLAY_ID("GTechLocalLabels"),
 			       .layout = {
-			           .padding = { kTallLabelColGap, 0,
-			                        kTallLabelRowPadTop, 0 },
+			           .padding = { tech_tree_grid_detail::kTallLabelColGap, 0,
+			                        tech_tree_grid_detail::kTallLabelRowPadTop, 0 },
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       } }) {
 				const int localColSlot = 3;
@@ -212,15 +212,15 @@ void BuildTechTreeGrid(World & world,
 						                 || (peer && (peer->techchoices & item->techchoice));
 						const Uint8 brightness = interactable ? 128 : 64;
 
-						if(rowLabelSlot < kMaxRows){
-							g_rowLabels[rowLabelSlot] = item->name;
-							g_rowLabels[rowLabelSlot] += " (";
-							g_rowLabels[rowLabelSlot] += std::to_string(item->techslots);
-							g_rowLabels[rowLabelSlot] += ")";
+						if(rowLabelSlot < tech_tree_grid_detail::kMaxRows){
+							tech_tree_grid_detail::g_rowLabels[rowLabelSlot] = item->name;
+							tech_tree_grid_detail::g_rowLabels[rowLabelSlot] += " (";
+							tech_tree_grid_detail::g_rowLabels[rowLabelSlot] += std::to_string(item->techslots);
+							tech_tree_grid_detail::g_rowLabels[rowLabelSlot] += ")";
 
 							silencer::ui::UiInteractable desc;
-							desc.id = std::string(kActionDescriptionPrefix) + std::to_string(static_cast<int>(bIdx));
-							desc.labelText = g_rowLabels[rowLabelSlot];
+							desc.id = std::string(tech_tree_grid_detail::kActionDescriptionPrefix) + std::to_string(static_cast<int>(bIdx));
+							desc.labelText = tech_tree_grid_detail::g_rowLabels[rowLabelSlot];
 							desc.kind = silencer::ui::UiInteractableKind::Button;
 							desc.clayId = CLAY_SIDI(CLAY_STRING("GTechRowLbl"),
 							                         static_cast<uint32_t>(bIdx));
@@ -231,9 +231,9 @@ void BuildTechTreeGrid(World & world,
 							                       static_cast<uint32_t>(bIdx)),
 							       .layout = {
 							           .sizing = { CLAY_SIZING_GROW(0),
-							                       CLAY_SIZING_FIXED(kRowH) },
+							                       CLAY_SIZING_FIXED(tech_tree_grid_detail::kRowH) },
 							       } }) {
-								BankText(FromStd(g_rowLabels[rowLabelSlot]),
+								BankText(tech_tree_grid_detail::FromStd(tech_tree_grid_detail::g_rowLabels[rowLabelSlot]),
 								         BankTextVariant::Body,
 								         { .brightness = brightness });
 							}

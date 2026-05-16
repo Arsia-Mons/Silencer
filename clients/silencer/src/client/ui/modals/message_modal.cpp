@@ -13,7 +13,7 @@
 
 #include <SDL3/SDL.h>
 
-namespace
+namespace message_modal_detail
 {
 using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonHandle;
@@ -31,27 +31,7 @@ Clay_String FromStd(const std::string & s)
 {
 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
 }
-
-void RegisterWidgets(MessageModal * modal,
-                     int surfaceW,
-                     int surfaceH,
-                     bool hasOk,
-                     silencer::ui::UiInteractionRegistry& interactions)
-{
-	(void)modal;
-	if(!hasOk) return;
-	const int dialogX = (surfaceW - kDialogW) / 2;
-	const int dialogY = (surfaceH - kDialogH) / 2;
-	silencer::ui::UiInteractable w;
-	w.id = kActionOk;
-	w.labelText = "OK";
-	w.kind = silencer::ui::UiInteractableKind::Button;
-	w.x = dialogX + (kDialogW - 156) / 2;
-	w.y = dialogY + kDialogH - kDialogPadY - 21;
-	w.w = 156; w.h = 21;
-	interactions.RegisterInteractable(w);
-}
-}
+} // namespace message_modal_detail
 
 MessageModal::MessageModal(std::string message_, std::function<void()> onClose_)
     : message(std::move(message_)), hasOk(true), onClose(std::move(onClose_))
@@ -72,8 +52,6 @@ void MessageModal::Build(ScreenContext & ctx)
 {
 	(void)ctx;
 	okClicked = false;
-	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(this, surface.w, surface.h, hasOk, ctx.game.UiInteractions());
 }
 
 void MessageModal::Tick(ScreenContext & ctx)
@@ -88,35 +66,35 @@ void MessageModal::Tick(ScreenContext & ctx)
 void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
+	(void)dst;
 	using namespace silencer::clay_bridge;
 
 
 
 	CLAY({ .id = CLAY_ID("MessageModalRoot"),
 	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
-	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_GROW(0) },
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 	       } }) {
 		CLAY({ .id = CLAY_ID("MessageModalDialog"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kDialogW),
-		                       CLAY_SIZING_FIXED(kDialogH) },
-		           .padding = { kDialogPadX, kDialogPadX,
-		                        kDialogPadY, kDialogPadY },
+		           .sizing = { CLAY_SIZING_FIXED(message_modal_detail::kDialogW),
+		                       CLAY_SIZING_FIXED(message_modal_detail::kDialogH) },
+		           .padding = { message_modal_detail::kDialogPadX, message_modal_detail::kDialogPadX,
+		                        message_modal_detail::kDialogPadY, message_modal_detail::kDialogPadY },
 		           .childGap = 18,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(40, 4) } }) {
-			BankText(FromStd(message), BankTextVariant::Heading, {});
+			message_modal_detail::BankText(message_modal_detail::FromStd(message), message_modal_detail::BankTextVariant::Heading, {});
 			if(hasOk){
-				BankButton(CLAY_STRING("OK"), BankButtonVariant::Chrome, {},
-				           BankButtonHandle{ nullptr, kActionOk, &interactions });
+				message_modal_detail::BankButton(CLAY_STRING("OK"), message_modal_detail::BankButtonVariant::Chrome, {},
+				           message_modal_detail::BankButtonHandle{ nullptr, message_modal_detail::kActionOk, &interactions });
 			}
 		}
 	}
-	RegisterWidgets(this, dst.w, dst.h, hasOk, interactions);
 }
 
 void MessageModal::Destroy(ScreenContext & ctx)
@@ -129,7 +107,7 @@ bool MessageModal::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiAct
 	(void)ctx;
 	if(!hasOk) return false;
 	if(action.kind == silencer::ui::UiActionKind::Cancel ||
-	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == kActionOk)){
+	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == message_modal_detail::kActionOk)){
 		okClicked = true;
 		return true;
 	}

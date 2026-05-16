@@ -13,7 +13,7 @@ using silencer::ui::primitives::ScrollTextBoxAutoScroll;
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace chat_panel_detail {
 
 // Mirror of the Build-side chat scrollback height + line height — needed
 // only by the auto-scroll computation here, NOT for any layout. The
@@ -83,7 +83,7 @@ void CopyUiText(char * dst, int dstLen, const std::string & value)
 	dst[n] = '\0';
 }
 
-}  // namespace
+}  // namespace chat_panel_detail
 
 void ChatPanelInit(ChatPanelState & state) {
 	state.chatLines.clear();
@@ -109,7 +109,7 @@ void ChatPanelTick(ChatPanelState & state, World & world) {
 
 	// Presence — rebuild on change or first pass before gamesprocessed.
 	if(world.lobby.presencechanged || !world.lobby.gamesprocessed){
-		RebuildPresence(state, world);
+		chat_panel_detail::RebuildPresence(state, world);
 		world.lobby.presencechanged = false;
 	}
 
@@ -134,7 +134,7 @@ void ChatPanelTick(ChatPanelState & state, World & world) {
 
 		state.chatScrollPos = ScrollTextBoxAutoScroll(
 			state.chatScrollPos, prevCount, newCount,
-			kLineHeight, kChatH);
+			chat_panel_detail::kLineHeight, chat_panel_detail::kChatH);
 
 		world.lobby.chatmessages.pop_front();
 	}
@@ -143,13 +143,13 @@ void ChatPanelTick(ChatPanelState & state, World & world) {
 bool ChatPanelHandleUiIntent(ChatPanelState & state,
                              World & world,
                              const silencer::ui::UiAction & action) {
-	if(action.id != kActionInput) return false;
+	if(action.id != chat_panel_detail::kActionInput) return false;
 	if(action.kind == silencer::ui::UiActionKind::SetText){
-		CopyUiText(state.inputBuffer, static_cast<int>(sizeof(state.inputBuffer)), action.value);
+		chat_panel_detail::CopyUiText(state.inputBuffer, static_cast<int>(sizeof(state.inputBuffer)), action.value);
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::SubmitText){
-		CopyUiText(state.inputBuffer, static_cast<int>(sizeof(state.inputBuffer)), action.value);
+		chat_panel_detail::CopyUiText(state.inputBuffer, static_cast<int>(sizeof(state.inputBuffer)), action.value);
 		if(std::strlen(state.inputBuffer) > 0){
 			world.lobby.SendChat(world.lobby.channel, state.inputBuffer);
 			state.inputBuffer[0] = '\0';

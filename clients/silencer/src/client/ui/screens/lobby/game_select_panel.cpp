@@ -16,7 +16,7 @@
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace game_select_panel_detail {
 
 constexpr Uint16 kListH     = 265;
 constexpr Uint8  kListLineH = 14;
@@ -186,7 +186,7 @@ void HandleSpectateClick(GameSelectPanelState & state, World & world, ScreenCont
 	}
 }
 
-}  // namespace
+}  // namespace game_select_panel_detail
 
 void GameSelectPanelInit(GameSelectPanelState & state) {
 	state.rows.clear();
@@ -210,7 +210,7 @@ void GameSelectPanelTick(GameSelectPanelState & state,
                          ScreenContext & ctx,
                          LobbyScreen & owner) {
 	if(!world.lobby.gamesprocessed){
-		RebuildRows(state, world);
+		game_select_panel_detail::RebuildRows(state, world);
 		world.lobby.gamesprocessed = true;
 	}
 
@@ -219,7 +219,7 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 		state.rowClickedIndex = -1;
 	}
 
-	RecomputeInfoBlock(state, world);
+	game_select_panel_detail::RecomputeInfoBlock(state, world);
 
 	if(state.createClicked){
 		state.createClicked = false;
@@ -228,32 +228,32 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 	}
 	if(state.joinClicked){
 		state.joinClicked = false;
-		HandleJoinClick(state, world, ctx);
+		game_select_panel_detail::HandleJoinClick(state, world, ctx);
 	}
 	if(state.spectateClicked){
 		state.spectateClicked = false;
-		HandleSpectateClick(state, world, ctx);
+		game_select_panel_detail::HandleSpectateClick(state, world, ctx);
 	}
 }
 
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
                                    const silencer::ui::UiAction & action) {
 	if(action.kind == silencer::ui::UiActionKind::Activate){
-		if(action.id == kActionCreate){
+		if(action.id == game_select_panel_detail::kActionCreate){
 			state.createClicked = true;
 			return true;
 		}
-		if(action.id == kActionJoin){
+		if(action.id == game_select_panel_detail::kActionJoin){
 			state.joinClicked = true;
 			return true;
 		}
-		if(action.id == kActionSpectate){
+		if(action.id == game_select_panel_detail::kActionSpectate){
 			state.spectateClicked = true;
 			return true;
 		}
 	}
 	if(action.kind == silencer::ui::UiActionKind::Select &&
-	   StartsWith(action.id, kActionRowPrefix)){
+	   game_select_panel_detail::StartsWith(action.id, game_select_panel_detail::kActionRowPrefix)){
 		state.rowClickedIndex = action.index;
 		return true;
 	}

@@ -20,7 +20,7 @@
 #include <cstring>
 #include <string>
 
-namespace {
+namespace options_controls_screen_detail {
 
 constexpr int REBIND_TIMEOUT_TICKS = 72;
 constexpr uint16_t kPanelW = 540;
@@ -49,7 +49,7 @@ int SuffixInt(const std::string & value, const char * prefix) {
 	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
-}  // namespace
+}  // namespace options_controls_screen_detail
 
 int OptionsControlsScreen::MaxScroll() const {
 	int max = (int)Action::Count - silencer::client_ui::options::kKeybindListVisibleRows;
@@ -106,7 +106,7 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 			optionscontrolstick = ctx.world.tickcount;
 		}
 		if(rebindRow >= 0 &&
-		   ctx.world.tickcount - optionscontrolstick > REBIND_TIMEOUT_TICKS){
+		   ctx.world.tickcount - optionscontrolstick > options_controls_screen_detail::REBIND_TIMEOUT_TICKS){
 			FinishKeyboardRebind(ctx, rebindRow, rebindSlot, SDL_SCANCODE_UNKNOWN);
 		}
 	}else{
@@ -115,7 +115,7 @@ void OptionsControlsScreen::Tick(ScreenContext & ctx) {
 	if(saveClicked){
 		saveClicked = false;
 		const std::string active = Config::GetInstance().active_keybind_profile;
-		if(!IsBuiltinKeybindProfile(active)){
+		if(!options_controls_screen_detail::IsBuiltinKeybindProfile(active)){
 			ctx.keymap.SaveFile(WritableProfilePath(active));
 		}
 		Config::GetInstance().Save();
@@ -143,37 +143,37 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == kActionPreset){
+	if(action.id == options_controls_screen_detail::kActionPreset){
 		presetClicked = true;
 		return true;
 	}
-	if(action.id == kActionSave){
+	if(action.id == options_controls_screen_detail::kActionSave){
 		saveClicked = true;
 		return true;
 	}
-	if(action.id == kActionCancel){
+	if(action.id == options_controls_screen_detail::kActionCancel){
 		cancelClicked = true;
 		return true;
 	}
-	if(action.id == kActionScrollUp){
+	if(action.id == options_controls_screen_detail::kActionScrollUp){
 		scrollDelta--;
 		return true;
 	}
-	if(action.id == kActionScrollDown){
+	if(action.id == options_controls_screen_detail::kActionScrollDown){
 		scrollDelta++;
 		return true;
 	}
-	int row = SuffixInt(action.id, kActionPrimaryPrefix);
+	int row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionPrimaryPrefix);
 	if(row >= 0){
 		BeginRebindFromVisibleRow(row, 0);
 		return true;
 	}
-	row = SuffixInt(action.id, kActionSecondaryPrefix);
+	row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionSecondaryPrefix);
 	if(row >= 0){
 		BeginRebindFromVisibleRow(row, 1);
 		return true;
 	}
-	row = SuffixInt(action.id, kActionOperatorPrefix);
+	row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionOperatorPrefix);
 	if(row >= 0){
 		ToggleOperatorFromVisibleRow(row);
 		return true;
@@ -183,10 +183,9 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 
 void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) {
 	(void)frametime;
+	(void)dst;
 	using namespace silencer::clay_bridge;
 	using namespace silencer::client_ui::options;
-
-	RegisterKeybindListWidgets(dst.w, interactions);
 
 	KeybindListView view;
 	view.presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
@@ -209,18 +208,18 @@ void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fr
 
 	CLAY({ .id = CLAY_ID("OptionsControlsRoot"),
 	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
-	                       CLAY_SIZING_FIXED((float)dst.h) },
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_GROW(0) },
 	           .padding = { 0, 0, 34, 0 },
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 	       },
 	       .image = { .imageData = PackImage(6, 0) } }) {
 		CLAY({ .id = CLAY_ID("OptionsControlsPanel"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kPanelW),
+		           .sizing = { CLAY_SIZING_FIXED(options_controls_screen_detail::kPanelW),
 		                       CLAY_SIZING_FIT(0) },
-		           .padding = { kPanelPadX, kPanelPadX,
-		                        kPanelPadY, kPanelPadY },
+		           .padding = { options_controls_screen_detail::kPanelPadX, options_controls_screen_detail::kPanelPadX,
+		                        options_controls_screen_detail::kPanelPadY, options_controls_screen_detail::kPanelPadY },
 		           .childGap = 12,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,

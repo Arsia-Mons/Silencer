@@ -162,10 +162,12 @@ void ClientUiInput::CaptureGamepadBindingEdges(uint32_t buttons,
 
 silencer::ui::UiInputState ClientUiInput::BuildFrame(int width,
                                                      int height,
+                                                     int uiScale,
                                                      float deltaTimeSeconds) {
 	silencer::ui::UiInputState input;
 	input.width = width;
 	input.height = height;
+	input.uiScale = uiScale > 0 ? uiScale : 1;
 	input.deltaTimeSeconds = deltaTimeSeconds > 0.0f ? deltaTimeSeconds : 1.0f / 60.0f;
 	input.pointer.x = havePointerPosition_ ? pointerX_ : 0.0f;
 	input.pointer.y = havePointerPosition_ ? pointerY_ : 0.0f;

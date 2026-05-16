@@ -23,7 +23,7 @@
 #include <cstdio>
 #include <cstring>
 
-namespace
+namespace mission_summary_screen_detail
 {
 using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonBeginFrame;
@@ -91,44 +91,6 @@ int SuffixInt(const std::string & value, const char * prefix)
 	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
-void RegisterButton(const char * label,
-                    const std::string & actionId,
-                    int x,
-                    int y,
-                    int w,
-                    int h,
-                    silencer::ui::UiInteractionRegistry& interactions)
-{
-	silencer::ui::UiInteractable widget;
-	widget.id = actionId;
-	widget.labelText = label;
-	widget.kind = silencer::ui::UiInteractableKind::Button;
-	widget.x = x; widget.y = y; widget.w = w; widget.h = h;
-	interactions.RegisterInteractable(widget);
-}
-
-void RegisterWidgets(MissionSummaryScreen * screen,
-                     int surfaceW,
-                     int surfaceH,
-                     const std::array<bool, 6> & upgrades,
-                     silencer::ui::UiInteractionRegistry& interactions)
-{
-	const int rootX = (surfaceW - (kLeftW + kRightW + 42)) / 2;
-	const int rootY = kRootPadY;
-	(void)screen;
-	RegisterButton("Done", kActionDone, rootX + 34, rootY + 360, 156, 21, interactions);
-	RegisterButton("Scroll Up", kActionScrollUp, rootX + 202, rootY + 86, 28, 24, interactions);
-	RegisterButton("Scroll Down", kActionScrollDown, rootX + 202, rootY + 330, 28, 24, interactions);
-	for(int i = 0; i < 6; i++){
-		if(!upgrades[i]) continue;
-		RegisterButton(kUpgradeLabels[i],
-		               std::string(kActionUpgradePrefix) + std::to_string(i),
-		               rootX + kLeftW + 56, rootY + 108 + i * 46, 156, 21,
-		               interactions);
-	}
-	(void)surfaceH;
-}
-
 int FillSummarySlab(const std::vector<std::string> & lines)
 {
 	int count = static_cast<int>(lines.size());
@@ -141,7 +103,7 @@ int FillSummarySlab(const std::vector<std::string> & lines)
 	}
 	return count;
 }
-}
+} // namespace mission_summary_screen_detail
 
 void MissionSummaryScreen::Build(ScreenContext & ctx)
 {
@@ -153,16 +115,13 @@ void MissionSummaryScreen::Build(ScreenContext & ctx)
 	scrollDelta = 0;
 	scrollPosition = 0;
 	Refresh(ctx);
-	const Surface& surface = ctx.game.GetScreenBuffer();
-	RegisterWidgets(this, surface.w, surface.h, upgradesAvailable,
-	                ctx.game.UiInteractions());
 }
 
 void MissionSummaryScreen::Tick(ScreenContext & ctx)
 {
 	World & world = ctx.world;
 	if(scrollDelta != 0){
-		int maxScroll = static_cast<int>(summaryLines.size()) - (kSummaryH / kLineH);
+		int maxScroll = static_cast<int>(summaryLines.size()) - (mission_summary_screen_detail::kSummaryH / mission_summary_screen_detail::kLineH);
 		if(maxScroll < 0) maxScroll = 0;
 		scrollPosition = std::max(0, std::min(maxScroll, scrollPosition + scrollDelta));
 		scrollDelta = 0;
@@ -196,16 +155,17 @@ void MissionSummaryScreen::Tick(ScreenContext & ctx)
 void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
+	(void)dst;
 	using namespace silencer::clay_bridge;
 
-	int lineCount = FillSummarySlab(summaryLines);
+	int lineCount = mission_summary_screen_detail::FillSummarySlab(summaryLines);
 	std::string xp = "+ " + std::to_string(experience) + " XP";
 
 	CLAY({ .id = CLAY_ID("MissionSummaryRoot"),
 	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED((float)dst.w),
-	                       CLAY_SIZING_FIXED((float)dst.h) },
-	           .padding = { kRootPadX, kRootPadX, kRootPadY, kRootPadY },
+	           .sizing = { CLAY_SIZING_GROW(0),
+	                       CLAY_SIZING_GROW(0) },
+	           .padding = { mission_summary_screen_detail::kRootPadX, mission_summary_screen_detail::kRootPadX, mission_summary_screen_detail::kRootPadY, mission_summary_screen_detail::kRootPadY },
 	           .childGap = 42,
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -213,7 +173,7 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 	       .image = { .imageData = PackImage(6, 0) } }) {
 		CLAY({ .id = CLAY_ID("MissionSummaryPanel"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kLeftW),
+		           .sizing = { CLAY_SIZING_FIXED(mission_summary_screen_detail::kLeftW),
 		                       CLAY_SIZING_FIXED(390) },
 		           .padding = { 26, 20, 20, 20 },
 		           .childGap = 12,
@@ -221,50 +181,50 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(7, 5) } }) {
-			BankText(CLAY_STRING("Mission Summary"), BankTextVariant::Title, {});
+			mission_summary_screen_detail::BankText(CLAY_STRING("Mission Summary"), mission_summary_screen_detail::BankTextVariant::Title, {});
 			CLAY({ .id = CLAY_ID("MissionSummaryStatsRow"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
 			           .childGap = 10,
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				ScrollTextBox(CLAY_STRING("MissionSummaryStats"),
-				              g_summarySlab, lineCount,
+				mission_summary_screen_detail::ScrollTextBox(CLAY_STRING("MissionSummaryStats"),
+				              mission_summary_screen_detail::g_summarySlab, lineCount,
 				              static_cast<Uint16>(scrollPosition),
-				              { .width = kSummaryW,
-				                .height = kSummaryH,
-				                .lineHeight = kLineH,
-				                .textVariant = BankTextVariant::Body,
-				                .origin = ScrollTextBoxOrigin::TopDown });
+				              { .width = mission_summary_screen_detail::kSummaryW,
+				                .height = mission_summary_screen_detail::kSummaryH,
+				                .lineHeight = mission_summary_screen_detail::kLineH,
+				                .textVariant = mission_summary_screen_detail::BankTextVariant::Body,
+				                .origin = mission_summary_screen_detail::ScrollTextBoxOrigin::TopDown });
 				CLAY({ .id = CLAY_ID("MissionSummaryScrollControls"),
 				       .layout = {
-				           .sizing = { CLAY_SIZING_FIXED(34), CLAY_SIZING_FIXED(kSummaryH) },
+				           .sizing = { CLAY_SIZING_FIXED(34), CLAY_SIZING_FIXED(mission_summary_screen_detail::kSummaryH) },
 				           .childGap = 20,
 				           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				       } }) {
-					BankButton(CLAY_STRING("Up"), BankButtonVariant::Inline, {},
-					           BankButtonHandle{ nullptr, kActionScrollUp, &interactions });
-					BankButton(CLAY_STRING("Down"), BankButtonVariant::Inline, {},
-					           BankButtonHandle{ nullptr, kActionScrollDown, &interactions });
+					mission_summary_screen_detail::BankButton(CLAY_STRING("Up"), mission_summary_screen_detail::BankButtonVariant::Inline, {},
+					           mission_summary_screen_detail::BankButtonHandle{ nullptr, mission_summary_screen_detail::kActionScrollUp, &interactions });
+					mission_summary_screen_detail::BankButton(CLAY_STRING("Down"), mission_summary_screen_detail::BankButtonVariant::Inline, {},
+					           mission_summary_screen_detail::BankButtonHandle{ nullptr, mission_summary_screen_detail::kActionScrollDown, &interactions });
 				}
 			}
-			BankButton(CLAY_STRING("Done"), BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionDone, &interactions });
+			mission_summary_screen_detail::BankButton(CLAY_STRING("Done"), mission_summary_screen_detail::BankButtonVariant::Chrome, {},
+			           mission_summary_screen_detail::BankButtonHandle{ nullptr, mission_summary_screen_detail::kActionDone, &interactions });
 		}
 		CLAY({ .id = CLAY_ID("MissionSummaryUpgrades"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(kRightW),
+		           .sizing = { CLAY_SIZING_FIXED(mission_summary_screen_detail::kRightW),
 		                       CLAY_SIZING_FIXED(390) },
 		           .padding = { 12, 12, 6, 0 },
 		           .childGap = 16,
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
-			BankText(FromStd(xp), BankTextVariant::Title, {});
+			mission_summary_screen_detail::BankText(mission_summary_screen_detail::FromStd(xp), mission_summary_screen_detail::BankTextVariant::Title, {});
 			if(upgradeBanner){
-				BankText(CLAY_STRING("*NEW UPGRADE AVAILABLE*"),
-				         BankTextVariant::Body,
+				mission_summary_screen_detail::BankText(CLAY_STRING("*NEW UPGRADE AVAILABLE*"),
+				         mission_summary_screen_detail::BankTextVariant::Body,
 				         { .effectColor = 129, .brightness = static_cast<Uint8>(160),
 				           .colorRamp = true });
 			}
@@ -280,20 +240,19 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 					       .layout = {
 					           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
 					       } }) {
-						BankText(FromCStr(kLevelLabels[i]), BankTextVariant::Body, {});
+						mission_summary_screen_detail::BankText(mission_summary_screen_detail::FromCStr(mission_summary_screen_detail::kLevelLabels[i]), mission_summary_screen_detail::BankTextVariant::Body, {});
 					}
 					std::string level = std::to_string(levels[i]);
-					BankText(FromStd(level), BankTextVariant::Body, {});
+					mission_summary_screen_detail::BankText(mission_summary_screen_detail::FromStd(level), mission_summary_screen_detail::BankTextVariant::Body, {});
 				}
 				if(upgradesAvailable[i]){
-					std::string actionId = std::string(kActionUpgradePrefix) + std::to_string(i);
-					BankButton(FromCStr(kUpgradeLabels[i]), BankButtonVariant::Chrome, {},
-					           BankButtonHandle{ nullptr, actionId.c_str(), &interactions });
+					std::string actionId = std::string(mission_summary_screen_detail::kActionUpgradePrefix) + std::to_string(i);
+					mission_summary_screen_detail::BankButton(mission_summary_screen_detail::FromCStr(mission_summary_screen_detail::kUpgradeLabels[i]), mission_summary_screen_detail::BankButtonVariant::Chrome, {},
+					           mission_summary_screen_detail::BankButtonHandle{ nullptr, actionId.c_str(), &interactions });
 				}
 			}
 		}
 	}
-	RegisterWidgets(this, dst.w, dst.h, upgradesAvailable, interactions);
 }
 
 void MissionSummaryScreen::Destroy(ScreenContext & ctx)
@@ -305,20 +264,20 @@ bool MissionSummaryScreen::HandleUiIntent(ScreenContext & ctx, const silencer::u
 {
 	(void)ctx;
 	if(action.kind == silencer::ui::UiActionKind::Cancel ||
-	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == kActionDone)){
+	   (action.kind == silencer::ui::UiActionKind::Activate && action.id == mission_summary_screen_detail::kActionDone)){
 		doneClicked = true;
 		return true;
 	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
-	if(action.id == kActionScrollUp){
+	if(action.id == mission_summary_screen_detail::kActionScrollUp){
 		scrollDelta--;
 		return true;
 	}
-	if(action.id == kActionScrollDown){
+	if(action.id == mission_summary_screen_detail::kActionScrollDown){
 		scrollDelta++;
 		return true;
 	}
-	int upgrade = SuffixInt(action.id, kActionUpgradePrefix);
+	int upgrade = mission_summary_screen_detail::SuffixInt(action.id, mission_summary_screen_detail::kActionUpgradePrefix);
 	if(upgrade >= 0 && upgrade < 6){
 		upgradeClicked = upgrade;
 		return true;
@@ -416,7 +375,7 @@ void MissionSummaryScreen::Refresh(ScreenContext & ctx)
 		upgradesAvailable[4] = ag.hacking < ag.maxhacking;
 		upgradesAvailable[5] = ag.contacts < ag.maxcontacts;
 	}
-	int maxScroll = static_cast<int>(summaryLines.size()) - (kSummaryH / kLineH);
+	int maxScroll = static_cast<int>(summaryLines.size()) - (mission_summary_screen_detail::kSummaryH / mission_summary_screen_detail::kLineH);
 	if(maxScroll < 0) maxScroll = 0;
 	scrollPosition = std::max(0, std::min(maxScroll, scrollPosition));
 }
@@ -426,7 +385,7 @@ void MissionSummaryScreen::AddSummaryLine(const char * name, Uint32 value, bool 
 	char string[256];
 	char valuetext[64];
 	snprintf(valuetext, sizeof(valuetext), "%d%s", value, percentage ? "%" : " ");
-	int maxchars = kSummaryW / 6;
+	int maxchars = mission_summary_screen_detail::kSummaryW / 6;
 	int used = static_cast<int>(std::strlen(name) + std::strlen(valuetext));
 	snprintf(string, sizeof(string), "%s", name);
 	for(int i = 0; i < maxchars - used; i++) strncat(string, " ", sizeof(string) - std::strlen(string) - 1);

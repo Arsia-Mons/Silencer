@@ -40,7 +40,7 @@ public:
 	                                int axisCount,
 	                                int16_t axisDeadzone);
 
-	silencer::ui::UiInputState BuildFrame(int width, int height, float deltaTimeSeconds);
+	silencer::ui::UiInputState BuildFrame(int width, int height, int uiScale, float deltaTimeSeconds);
 	void EndFrame();
 
 private:

@@ -26,7 +26,7 @@ using silencer::ui::primitives::TextInputOpts;
 
 namespace silencer::client_ui::lobby {
 
-namespace {
+namespace game_create_panel_map_form_detail {
 
 // Legacy on-screen coords kept ONLY for inspector hit-rect registration.
 constexpr int    kMapListX     = 407;
@@ -149,7 +149,7 @@ void BuildNameAndPassword(GameCreatePanelState & state,
 	                  state.password, (int)sizeof(state.password), true, interactions);
 }
 
-}  // namespace
+}  // namespace game_create_panel_map_form_detail
 
 void BuildGameCreateTallTree(GameCreatePanelState & state,
                              Resources & resources,
@@ -159,8 +159,8 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 	CLAY({ .id = CLAY_ID("GCrtTallContent"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
-	           .padding = { kPanelPad, kPanelPad, kPanelPad, kPanelPad },
-	           .childGap = kTallSectionGap,
+	           .padding = { game_create_panel_map_form_detail::kPanelPad, game_create_panel_map_form_detail::kPanelPad, game_create_panel_map_form_detail::kPanelPad, game_create_panel_map_form_detail::kPanelPad },
+	           .childGap = game_create_panel_map_form_detail::kTallSectionGap,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		CLAY({ .id = CLAY_ID("GCrtSelectMapTitleWrap") }) {
@@ -168,16 +168,16 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 			         BankTextVariant::Heading, {});
 		}
 
-		BuildMapList(state, interactions);
-		BuildNameAndPassword(state, interactions);
+		game_create_panel_map_form_detail::BuildMapList(state, interactions);
+		game_create_panel_map_form_detail::BuildNameAndPassword(state, interactions);
 
 		CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
 		       .layout = { .childAlignment = { .x = CLAY_ALIGN_X_CENTER } } }) {
 			BankButton(CLAY_STRING("Create"),
 			           BankButtonVariant::Chrome, {},
-			           BankButtonHandle{ nullptr, kActionCreate, &interactions });
+			           BankButtonHandle{ nullptr, game_create_panel_map_form_detail::kActionCreate, &interactions });
 		}
-		RegisterButton("Create", kActionCreate, kCreateBtnX, kCreateBtnY, 156, 21, interactions);
+		game_create_panel_map_form_detail::RegisterButton("Create", game_create_panel_map_form_detail::kActionCreate, game_create_panel_map_form_detail::kCreateBtnX, game_create_panel_map_form_detail::kCreateBtnY, 156, 21, interactions);
 	}
 }
 

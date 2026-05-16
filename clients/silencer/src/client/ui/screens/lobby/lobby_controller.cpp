@@ -17,7 +17,7 @@
 #include <memory>
 #include <string>
 
-namespace {
+namespace lobby_controller_detail {
 
 constexpr const char * kActionGoBack = "lobby.go_back";
 
@@ -40,7 +40,7 @@ void DismissProgressModal(ScreenContext & ctx)
 	if(TopAsProgressModal(ctx)) ctx.PopScreen();
 }
 
-}  // namespace
+}  // namespace lobby_controller_detail
 
 void LobbyScreen::Tick(ScreenContext & ctx)
 {
@@ -93,11 +93,11 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			}
 			if(world.state == World::IDLE){
 				game.joininggame = false;
-				DismissProgressModal(ctx);
+				lobby_controller_detail::DismissProgressModal(ctx);
 				ctx.ShowMessage("Unable to join game");
 			}
 		}
-		if(MessageModal * progress = TopAsProgressModal(ctx)){
+		if(MessageModal * progress = lobby_controller_detail::TopAsProgressModal(ctx)){
 			std::string text = (mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 1)
 				? "Uploading map" : "Creating game";
 			int dots = (world.tickcount / 4) % 6;
@@ -105,7 +105,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 			for(int i = 0; i < dots; i++) text += ".";
 			progress->SetText(ctx, text);
 		}
-		if(TopAsProgressModal(ctx) && world.lobby.creategamestatus != 100 &&
+		if(lobby_controller_detail::TopAsProgressModal(ctx) && world.lobby.creategamestatus != 100 &&
 		   mapDownloader.mapUploadState.load(std::memory_order_relaxed) == 0 &&
 		   (world.state == World::CONNECTED || world.state == World::IDLE)){
 			ctx.PopScreen();
@@ -137,7 +137,7 @@ void LobbyScreen::Tick(ScreenContext & ctx)
 	// Disconnect-from-game modal — fires on the joined-game surface
 	// (gameJoinActive || gameTechActive) when the world drops out of
 	// CONNECTED.
-	if(world.state != World::CONNECTED && !TopIsModal(ctx)){
+	if(world.state != World::CONNECTED && !lobby_controller_detail::TopIsModal(ctx)){
 		if(gameJoinActive || gameTechActive){
 			Game * gamePtr = &game;
 			ctx.ShowMessage("Disconnected from game", [gamePtr]() { gamePtr->GoBack(); });
@@ -169,7 +169,7 @@ bool LobbyScreen::HandleUiIntent(ScreenContext & ctx, const silencer::ui::UiActi
 		return true;
 	}
 	if(action.kind == silencer::ui::UiActionKind::Activate &&
-	   action.id == kActionGoBack){
+	   action.id == lobby_controller_detail::kActionGoBack){
 		goBackClicked = true;
 		return true;
 	}

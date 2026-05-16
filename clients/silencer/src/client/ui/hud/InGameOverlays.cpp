@@ -16,7 +16,7 @@
 namespace silencer {
 namespace client_ui {
 
-namespace {
+namespace ingameoverlays_detail {
 
 Clay_String StringFromStd(const std::string& text) {
 	return Clay_String{
@@ -232,19 +232,19 @@ void DrawQuitPrompt(const HudView& /*view*/, Surface* surface) {
 	}
 }
 
-}  // namespace
+}  // namespace ingameoverlays_detail
 
 void BuildInGameOverlaysUi(Renderer& /*renderer*/, const Resources& /*resources*/,
                            const HudView& view, Surface* surface) {
 	if(!view.mapLoaded) return;
-	DrawStatus(view, surface);
-	DrawTopMessage(view, surface);
-	DrawMessage(view, surface);
+	ingameoverlays_detail::DrawStatus(view, surface);
+	ingameoverlays_detail::DrawTopMessage(view, surface);
+	ingameoverlays_detail::DrawMessage(view, surface);
 	if(view.showPlayerList){
 		BuildPlayerListOverlay(view, surface);
 	}
 	if(view.quitState == 1 || view.quitState == 2){
-		DrawQuitPrompt(view, surface);
+		ingameoverlays_detail::DrawQuitPrompt(view, surface);
 	}
 }
 

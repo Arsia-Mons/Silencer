@@ -12,7 +12,7 @@
 namespace silencer {
 namespace client_ui {
 
-namespace {
+namespace hud_player_list_overlay_detail {
 
 Clay_String StringFromStd(const std::string& text) {
 	return Clay_String{
@@ -22,7 +22,7 @@ Clay_String StringFromStd(const std::string& text) {
 	};
 }
 
-}  // namespace
+}  // namespace hud_player_list_overlay_detail
 
 void BuildPlayerListOverlay(const HudView& view, Surface* surface) {
 	if(view.teams.empty()) return;
@@ -88,11 +88,11 @@ void BuildPlayerListOverlay(const HudView& view, Surface* surface) {
 							       } }) {
 								CLAY({ .id = CLAY_IDI("PlayerListPeerName", (teamIndex * 8) + peerIndex),
 								       .layout = { .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) } } }) {
-									BankText(StringFromStd(peer.displayName), BankTextVariant::Body);
+									BankText(hud_player_list_overlay_detail::StringFromStd(peer.displayName), BankTextVariant::Body);
 								}
 								CLAY({ .id = CLAY_IDI("PlayerListPeerStats", (teamIndex * 8) + peerIndex),
 								       .layout = { .sizing = { CLAY_SIZING_FIXED((float)((statsString.size() + 1) * 6)), CLAY_SIZING_FIT(0) } } }) {
-									BankText(StringFromStd(statsString), BankTextVariant::Body);
+									BankText(hud_player_list_overlay_detail::StringFromStd(statsString), BankTextVariant::Body);
 								}
 							}
 						}

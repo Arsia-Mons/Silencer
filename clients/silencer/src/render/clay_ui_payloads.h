@@ -8,11 +8,22 @@
 namespace silencer::clay_bridge {
 
 // Pack a (bank, index) pair into a void* for Clay_ImageElementConfig.imageData.
-// Bank fits in the high 16 bits, index in the low 16. The compositor decodes
-// the pair when dispatching IMAGE commands.
+// Bank occupies bits 16..23, index bits 0..15. Bit 24 selects how the
+// compositor fits the sprite into its element box: clear = cover (scale to
+// fill the box, preserving aspect, cropping overflow — CSS background-size:
+// cover, for full-bleed backgrounds); set = contain (scale to fit inside the
+// box, preserving aspect, no crop — for discrete graphics like the logo).
+constexpr std::uintptr_t kImageContainBit = static_cast<std::uintptr_t>(1) << 24;
+
 inline void * PackImage(Uint8 bank, Uint16 index) {
 	std::uintptr_t v = (static_cast<std::uintptr_t>(bank) << 16) |
 	                   static_cast<std::uintptr_t>(index);
+	return reinterpret_cast<void *>(v);
+}
+
+inline void * PackImageContain(Uint8 bank, Uint16 index) {
+	std::uintptr_t v = (static_cast<std::uintptr_t>(bank) << 16) |
+	                   static_cast<std::uintptr_t>(index) | kImageContainBit;
 	return reinterpret_cast<void *>(v);
 }
 
