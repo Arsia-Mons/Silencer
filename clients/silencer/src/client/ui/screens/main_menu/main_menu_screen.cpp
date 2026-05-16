@@ -30,6 +30,8 @@ using silencer::ui::primitives::BankTextVariant;
 constexpr uint16_t kRootPadY = 32;
 constexpr uint16_t kLogoPadX = 7;
 constexpr uint16_t kLogoNudgeY = 6;
+constexpr uint16_t kLogoGroupWidth = 350;
+constexpr uint16_t kActionGroupWidth = 290;
 constexpr uint16_t kVersionFooterX = 10;
 constexpr uint16_t kVersionFooterTopFromBottom = 17;
 constexpr uint16_t kLegacyActionGap = 34;
@@ -209,39 +211,48 @@ void MainMenuScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime
 		                        0,
 		                        main_menu_screen_detail::kRootPadY,
 		                        main_menu_screen_detail::kRootPadY },
-		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
 		       } }) {
-			CLAY({ .id = CLAY_ID("MainMenuLeft"),
+			CLAY({ .id = CLAY_ID("MainMenuComposition"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIT(0),
 			                       CLAY_SIZING_GROW(0) },
-			           .padding = { main_menu_screen_detail::kLogoPadX,
-			                        0,
-			                        0,
-			                        0 },
-			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
-				CLAY({ .id = CLAY_ID("MainMenuLogoRegion"),
+				CLAY({ .id = CLAY_ID("MainMenuLogoGroup"),
 				       .layout = {
-				           .sizing = { CLAY_SIZING_GROW(0),
+				           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(
+				                           main_menu_screen_detail::kLogoGroupWidth)),
 				                       CLAY_SIZING_GROW(0) },
-				           .padding = { 0,
+				           .padding = { main_menu_screen_detail::kLogoPadX,
 				                        0,
-				                        main_menu_screen_detail::kLogoNudgeY,
+				                        0,
 				                        0 },
-				           .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
-				                               .y = CLAY_ALIGN_Y_CENTER },
+				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				       } }) {
-					logo.Build(ctx.world.resources);
+					CLAY({ .id = CLAY_ID("MainMenuLogoRegion"),
+					       .layout = {
+					           .sizing = { CLAY_SIZING_GROW(0),
+					                       CLAY_SIZING_GROW(0) },
+					           .padding = { 0,
+					                        0,
+					                        main_menu_screen_detail::kLogoNudgeY,
+					                        0 },
+					           .childAlignment = { .x = CLAY_ALIGN_X_CENTER,
+					                               .y = CLAY_ALIGN_Y_CENTER },
+					       } }) {
+						logo.Build(ctx.world.resources);
+					}
 				}
-			}
 
-			CLAY({ .id = CLAY_ID("MainMenuRight"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_GROW(0) },
-			       } }) {
-				main_menu_screen_detail::MainMenuActionStack(interactions);
+				CLAY({ .id = CLAY_ID("MainMenuActionGroup"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(
+				                           main_menu_screen_detail::kActionGroupWidth)),
+				                       CLAY_SIZING_GROW(0) },
+				       } }) {
+					main_menu_screen_detail::MainMenuActionStack(interactions);
+				}
 			}
 		}
 

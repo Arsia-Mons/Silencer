@@ -14,6 +14,7 @@ cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 OUT_DIR="$(mktemp -d)"
 SMALL_INSPECT="$OUT_DIR/inspect-640x480.json"
 LARGE_INSPECT="$OUT_DIR/inspect-960x720.json"
+WIDE_SHORT_INSPECT="$OUT_DIR/inspect-1920x480.json"
 
 check_layout() {
   local width="$1" height="$2" inspect_out="$3" screenshot_out="$4"
@@ -199,16 +200,25 @@ check_layout() {
 
 check_layout 640 480 "$SMALL_INSPECT" "$OUT_DIR/main-640x480.png"
 check_layout 960 720 "$LARGE_INSPECT" "$OUT_DIR/main-960x720.png"
+check_layout 1920 480 "$WIDE_SHORT_INSPECT" "$OUT_DIR/main-1920x480.png"
 
 bun -e '
 const small = JSON.parse(await Bun.file(process.argv[1]).text()).widgets;
 const large = JSON.parse(await Bun.file(process.argv[2]).text()).widgets;
+const wideShort = JSON.parse(await Bun.file(process.argv[3]).text()).widgets;
 const widget = (widgets, label) => widgets.find((w) => w.label === label && w.kind === "button");
 const smallConnect = widget(small, "Connect To Lobby");
 const largeConnect = widget(large, "Connect To Lobby");
+const wideShortConnect = widget(wideShort, "Connect To Lobby");
 const smallTutorial = widget(small, "Tutorial");
 const largeTutorial = widget(large, "Tutorial");
-if (!smallConnect || !largeConnect || !smallTutorial || !largeTutorial) {
+const smallOptions = widget(small, "Options");
+const smallExit = widget(small, "Exit");
+const wideShortTutorial = widget(wideShort, "Tutorial");
+const wideShortOptions = widget(wideShort, "Options");
+const wideShortExit = widget(wideShort, "Exit");
+if (!smallConnect || !largeConnect || !wideShortConnect || !smallTutorial || !largeTutorial ||
+    !smallOptions || !smallExit || !wideShortTutorial || !wideShortOptions || !wideShortExit) {
   console.error("missing comparison widgets");
   process.exit(1);
 }
@@ -220,6 +230,25 @@ if (largeTutorial.y <= smallTutorial.y + 50) {
   console.error(`large layout did not stay vertically centered in viewport: small=${smallTutorial.y}, large=${largeTutorial.y}`);
   process.exit(1);
 }
-' "$SMALL_INSPECT" "$LARGE_INSPECT"
+
+const wideShortShift = (1920 - 640) / 2;
+const wideShortExpected = [
+  [wideShortTutorial, smallTutorial.x + wideShortShift, smallTutorial.y],
+  [wideShortConnect, smallConnect.x + wideShortShift, smallConnect.y],
+  [wideShortOptions, smallOptions.x + wideShortShift, smallOptions.y],
+  [wideShortExit, smallExit.x + wideShortShift, smallExit.y],
+];
+for (const [button, expectedX, expectedY] of wideShortExpected) {
+  if (button.x !== expectedX || button.y !== expectedY) {
+    console.error(`wide-short centered composition mismatch for ${button.label}: expected ${expectedX},${expectedY}, got ${button.x},${button.y}`);
+    process.exit(1);
+  }
+}
+const farRightInset = 1920 - (wideShortConnect.x + wideShortConnect.w);
+if (farRightInset < 500) {
+  console.error(`wide-short button stack is still pinned near the far right edge: rightInset=${farRightInset}`);
+  process.exit(1);
+}
+' "$SMALL_INSPECT" "$LARGE_INSPECT" "$WIDE_SHORT_INSPECT"
 
 echo "PASS 21_main_menu_layout ($OUT_DIR)"
