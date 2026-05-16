@@ -457,8 +457,8 @@ bool UiInteractionRegistry::FocusDirectional(UiNavAction action) {
 		float primary = 0.0f;
 		float secondary = 0.0f;
 		if(!registry_detail::IsDirectionalCandidate(*focused, widget, action, primary, secondary)) continue;
-		if(!best || secondary < bestSecondary ||
-		   (secondary == bestSecondary && primary < bestPrimary)){
+		if(!best || primary < bestPrimary ||
+		   (primary == bestPrimary && secondary < bestSecondary)){
 			best = &widget;
 			bestPrimary = primary;
 			bestSecondary = secondary;

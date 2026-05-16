@@ -4,6 +4,8 @@
 #include "components/silencer_logo.h"
 #include "screen.h"
 
+#include <string>
+
 class MainMenuScreen : public Screen
 {
 public:
@@ -18,6 +20,7 @@ private:
 	bool lobbyClicked = false;
 	bool optionsClicked = false;
 	bool exitClicked = false;
+	std::string versionText_;
 	silencer::client_ui::main_menu::SilencerLogo logo;
 };
 
