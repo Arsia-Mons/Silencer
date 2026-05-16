@@ -4,11 +4,30 @@ Multiplayer 2D action game (SDL3/C++14). The same binary runs as the
 local client and, when launched with `-s`, as a headless dedicated
 server spawned by the Go lobby in `services/lobby/`.
 
-Build with the local `CMakeLists.txt` (`cmake -B build && cmake --build build`)
-— see top-level `README.md` for platform notes and the
-`-DSILENCER_LOBBY_*` knobs in *Gotchas* below. Source under `src/` is now
-organized by concern (`game/`, `render/`, `client/ui/`, `ui/`, etc.); keep new
-files in the owning concern instead of reviving the old flat layout.
+## Building
+
+Build/configure the client **only** through the wrapper — never invoke
+`cmake`/`cl`/`ninja` directly, and never use CLion's bundled MinGW
+(this codebase is MSVC-only; MinGW cannot link it):
+
+- Windows: `clients/silencer/build.ps1 [win-ninja|win-ninja-release|win-ninja-unity]`
+- macOS/Linux: `clients/silencer/build.sh [win-ninja|win-ninja-release|win-ninja-unity]`
+
+Default preset is `win-ninja` (Debug → `build/`). Pass `-Clean`
+(`--clean` on `.sh`) to wipe the CMake cache (keeps `vcpkg_installed`)
+— the correct recovery from a poisoned cache; do not hand-roll
+`rm`/reconfigure loops. The wrapper pins the newest installed Visual
+Studio via `vswhere`, resolves `VCPKG_ROOT` (process env → persisted
+User env → hard error), and takes a build lock so CLion, CLI agents,
+and parallel agents can't corrupt the shared CMake cache by
+configuring concurrently. Idle CLion is fine; just don't run an IDE
+build at the same time as a wrapper build into the same dir — CLion
+may keep its `win-ninja` preset profile (same toolchain). Lobby
+host/version are compile-time `-D` knobs (see *Gotchas*).
+
+Source under `src/` is organized by concern (`game/`, `render/`,
+`client/ui/`, `ui/`, etc.); keep new files in the owning concern
+instead of reviving the old flat layout.
 
 ## Client UI dogma
 
@@ -31,14 +50,45 @@ Rules:
   `Renderer`.
 - `Renderer` owns world/pixel drawing primitives only. It must not own Clay
   layout or UI screen/HUD composition.
-- Primitive frame arenas reset once in `ClientUi::BeginFrame`. Do not reset
-  `BankTextBeginFrame`, `BankButtonBeginFrame`, `BoxBeginFrame`, etc. inside a
-  screen, modal, HUD block, or overlay block.
+- Primitive frame arenas reset once in `ClientUi::BeginFrame`. A primitive's
+  per-frame begin-frame reset must not be called inside a screen, modal, HUD
+  block, or overlay block.
 - Modal overlays clear interaction metadata before their own `BuildUi`, so the
   top modal owns keyboard/CLI focus while lower visual layers can still render.
 - Keep `ScreenStack` as the real single-stack owner for screens and modal
   overlays. Add a separate modal stack only if real modal semantics are being
   extracted, not as a placeholder.
+
+### UI primitive API contract
+
+These rules port shadcn's surfaced best practices onto Clay: a default style
+plus named `variant`s that encode the design system's identity, `size` for
+scale/fit, composition over per-call configuration. Treat shadcn as the north
+star for *why* an API shape is good — matching shadcn's exact API is
+explicitly a non-goal.
+
+- Primitives expose a **variant + size** API. `variant` names the visual
+  treatment (the design system's identity); `size` names scale/fit behavior.
+  Callers pass `{variant, size}` — never a palette index, sprite bank, or a
+  `B196x33`-style sprite code. Sprite-bank terms are private implementation
+  detail and must not appear in any public signature, enum, or doc comment.
+- Responsive/auto sizing is a `size` value backed by the nine-slice
+  custom-payload compositor path (`CustomKind::*`), never a new per-consumer
+  preset.
+- Public primitive names are plain nouns: `Button`, `Text`, `TextInput`,
+  `Checkbox`, `Toggle`, `Panel`. Runtime/service types that name a subsystem
+  keep their `Ui` prefix (`UiInteractionRegistry`, `UiInputState`,
+  `UiInputRouter`).
+- One primitive owns one visual/interaction concern. Checkbox/toggle state
+  belongs to `Checkbox`/`Toggle`, not a `Button` mode — don't overload a
+  primitive with a second widget's behavior.
+- Every declared element needs an explicit, stable Clay ID. A visible label
+  must never double as its ID. Dynamic label text must be copied into the
+  per-frame primitive arena before Clay renders it; Clay does not own the
+  string's lifetime.
+- When an all-params primitive grows callsites that all pass the same values,
+  add a named variant — not another required param. The rule is "no hidden
+  lobby coupling," not "no defaults ever."
 
 ### Input contract
 
