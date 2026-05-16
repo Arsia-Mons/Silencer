@@ -150,3 +150,61 @@ only non-`Object` inheritance edge in the codebase).
 | Top-level | `game.{h,cpp}`, `main.cpp` |
 | Third-party (vendored) | `zlib/` |
 
+## Actor definition system (`actordef.{h,cpp}`)
+
+Actordefs are JSON files in `shared/assets/actordefs/<id>.json`. They
+define per-NPC animation sequences, per-frame hurtboxes, and per-frame
+sounds — everything that used to be hardcoded in the NPC `.cpp` files.
+
+**Key types** (authoritative in `actordef.h`):
+- `FrameDef` — one sprite frame: `bank`, `index`, `duration` (ticks),
+  `hurtbox` (`x1/y1/x2/y2` relative to feet), `sound` (filename),
+  `soundVolume` (0 = default 128).
+- `AnimSequence` — ordered list of `FrameDef`s + `loop` flag.
+- `ActorDef` — keyed map of sequence name → `AnimSequence`.
+
+**Playing sounds from actordefs** — two helpers on `AnimSequence`:
+- `GetFrameSound(state_i, …)` — use when the state machine accumulates
+  ticks (correct for tick-duration-based states).
+- `GetFrameSoundByIndex(frameIdx, …)` — use when
+  `res_index = state_i % N` (sprite frame index driven, not
+  tick-accumulated). Guards and civilians use this path.
+
+**Client reload** — `LoadActorDefs()` in `actordef.cpp` reads all
+`*.json` files via `GLOB_RECURSE`, called on each map load (async
+fetch from the admin API via `adminapiurl`). Adding or removing
+actordef files requires re-running the build wrapper so the GLOB file
+list regenerates.
+
+**Per-weapon guard actordefs** — `guard-blaster.json`,
+`guard-laser.json`, `guard-rocket.json` replace the old single
+`guard.json`. `ActorDefName(weapon)` in `guard.cpp` maps the weapon
+integer (0/1/2/3) to the correct file name.
+
+## Behavior tree system (`behaviortree.{h,cpp}`)
+
+Tick-based interpreter. Trees are loaded from
+`shared/assets/behaviortrees/<id>.json` and shared across all
+instances of a given NPC type. Per-instance state lives in
+`BTContext`.
+
+**Node types** (authoritative list in `behaviortree.cpp`):
+`Selector`, `Sequence`, `Parallel`, `RandomSelector`, `Inverter`,
+`Cooldown`, `Repeat`, `Timeout`, `ForceSuccess`, `Wait`, `Leaf`
+(dispatches to a named C++ lambda), `Condition` (compares a
+blackboard key to a literal value).
+
+**Blackboard** — `unordered_map<string, json>` on `BTContext`. Leaf
+lambdas read/write it via `ctx.bb<T>(key, default)` /
+`ctx.bbSet(key, val)`.
+
+**Wiring an NPC:**
+1. Create `shared/assets/behaviortrees/<npc>.json` (edit in the admin
+   BT editor).
+2. In the NPC's `.cpp` constructor, call `bt_.Load("npc_id")` and
+   register action lambdas with
+   `bt_.Register("ActionName", [](BTContext& ctx) { … })`.
+3. In the tick function, call `bt_.Tick(ctx_)` once per frame.
+
+**Currently wired:** `guard.cpp`, `robot.cpp`, `civilian.cpp`.
+
