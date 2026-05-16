@@ -1699,7 +1699,7 @@ void Renderer::DrawRainPuddles(Surface * surface, Camera & camera){
 	}
 }
 
-inline void Renderer::SetPixel(Surface * surface, unsigned int x, unsigned int y, Uint8 color){
+void Renderer::SetPixel(Surface * surface, unsigned int x, unsigned int y, Uint8 color){
 	unsigned int surfacew = surface->w;
     if(x >= surfacew){
 		return;
@@ -1710,7 +1710,7 @@ inline void Renderer::SetPixel(Surface * surface, unsigned int x, unsigned int y
 	((Uint8 *)surface->pixels.data())[x + (y * surfacew)] = color;
 }
 
-inline Uint8 Renderer::GetPixel(Surface * surface, unsigned int x, unsigned int y){
+Uint8 Renderer::GetPixel(Surface * surface, unsigned int x, unsigned int y){
 	unsigned int surfacew = surface->w;
 	if(x >= surfacew){
 		return 0;

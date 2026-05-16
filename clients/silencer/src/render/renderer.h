@@ -31,8 +31,8 @@ public:
 	void DrawShadow(Surface * surface, Camera & camera, Object * object);
 	void DrawRain(Surface * surface, Camera & camera, float frametime = 0);
 	void DrawRainPuddles(Surface * surface, Camera & camera);
-	static inline void SetPixel(Surface * surface, unsigned int x, unsigned int y, Uint8 color);
-	static inline Uint8 GetPixel(Surface * surface, unsigned int x, unsigned int y);
+	static void SetPixel(Surface * surface, unsigned int x, unsigned int y, Uint8 color);
+	static Uint8 GetPixel(Surface * surface, unsigned int x, unsigned int y);
 	void DrawDebug(Surface * surface);
 	static void DrawScaled(Surface * src, Rect * srcrect, Surface *dst, Rect * dstrect, int factor = 2);
 	static void DrawCheckered(Surface * src, Rect * srcrect, Surface * dst, Rect * dstrect);
