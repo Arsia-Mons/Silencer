@@ -64,6 +64,10 @@ struct UiInteractable {
 	bool cancelOnEscape = false;
 };
 
+const char * UiInteractableLabel(const UiInteractable& widget);
+bool UiInteractableMatchesLabel(const UiInteractable& widget, const char * label);
+bool UiInteractableIsInteractive(const UiInteractable& widget);
+
 class UiInteractionRegistry {
 public:
 	void BeginFrame();

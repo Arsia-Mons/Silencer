@@ -88,6 +88,8 @@ public:
 	const silencer::ui::UiInteractionRegistry& UiInteractions() const { return clientUi.Interactions(); }
 	silencer::client_ui::InGameUiController& InGameUi() { return inGameUiController; }
 	bool ResizeRenderSurface(int width, int height);
+	bool ResizeRenderSurfacePixels(int width, int height);
+	bool SyncRenderSurfaceToWindowPixels();
 	bool IsLiveMultiplayer() const;
 	bool GoBack(void);
 	struct PendingWait {
@@ -204,8 +206,8 @@ private:
 	SDL_Color palettecolors[256]; // CPU copy — for ffmpeg replay pixel export
 	Surface screenbuffer;
 	// The game world always renders at the legacy 640x480 and is then
-	// nearest-upscaled into screenbuffer, so the pixel-art look is kept at
-	// any window size while the Clay UI composites crisp on top.
+	// nearest-upscaled into a centered, aspect-correct region of screenbuffer,
+	// so pixel art stays square while the Clay UI composites crisp on top.
 	Surface worldSurface;
 	silencer::client_ui::ClayBridgeFrameBackend uiClayBackend;
 	silencer::ui::ClayService uiClayService;
@@ -224,7 +226,7 @@ private:
 	Uint8 lastannouncedstatus;
 	bool deploymessageshown;
 	int quitscancode;
-	bool interfaceenterfix;
+	bool chatEnterDebounce;
 	bool fullscreentoggled;
 	char * replayfile;
 	ControlServer controlserver;

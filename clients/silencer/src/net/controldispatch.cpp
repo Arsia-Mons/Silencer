@@ -15,7 +15,6 @@
 #include "lobby_screen.h"
 #endif
 #include "screen_context.h"
-#include <cctype>
 #include <cstring>
 #include <cstdio>
 #include <fstream>
@@ -184,20 +183,6 @@ static nlohmann::json WorldSummaryToJson(const Game::WorldSummary& summary){
 	return r;
 }
 
-static bool LabelEquals(const char * a, const char * b){
-	if(!a || !b) return false;
-	while(*a && *b){
-		if(std::tolower((unsigned char)*a) != std::tolower((unsigned char)*b)) return false;
-		++a;
-		++b;
-	}
-	return *a == '\0' && *b == '\0';
-}
-
-static const char * InteractableLabel(const silencer::ui::UiInteractable& widget){
-	return widget.labelText.empty() ? nullptr : widget.labelText.c_str();
-}
-
 static const silencer::ui::UiInteractable * FindInteractableTarget(
 	const silencer::ui::UiInteractionRegistry& interactions,
 	const std::string & target){
@@ -205,8 +190,8 @@ static const silencer::ui::UiInteractable * FindInteractableTarget(
 	int count = 0;
 	for(const auto & candidate : interactions.Interactables()){
 		bool matches = candidate.id == target;
-		const char * label = InteractableLabel(candidate);
-		if(!matches && label) matches = LabelEquals(label, target.c_str());
+		if(!matches) matches =
+			silencer::ui::UiInteractableMatchesLabel(candidate, target.c_str());
 		if(!matches && candidate.uid >= 0) matches = std::to_string(candidate.uid) == target;
 		if(matches){
 			hit = &candidate;
@@ -221,22 +206,14 @@ static bool PointInInteractable(const silencer::ui::UiInteractable& widget, int 
 	    && x < widget.x + widget.w && y < widget.y + widget.h;
 }
 
-static bool IsInteractive(const silencer::ui::UiInteractable& widget){
-	using K = silencer::ui::UiInteractableKind;
-	return !widget.inactive &&
-	       (widget.kind == K::Button ||
-	        widget.kind == K::Toggle ||
-	        widget.kind == K::ListRow ||
-	        widget.kind == K::TextInput);
-}
-
 static const silencer::ui::UiInteractable * FindInteractableAt(
 	const silencer::ui::UiInteractionRegistry& interactions,
 	int x,
 	int y){
 	const auto & widgets = interactions.Interactables();
 	for(auto it = widgets.rbegin(); it != widgets.rend(); ++it){
-		if(IsInteractive(*it) && PointInInteractable(*it, x, y)) return &*it;
+		if(silencer::ui::UiInteractableIsInteractive(*it) &&
+		   PointInInteractable(*it, x, y)) return &*it;
 	}
 	return nullptr;
 }
@@ -250,7 +227,9 @@ static void QueueInteractableAction(Game& game,
 	action.kind = kind;
 	action.id = !widget.id.empty()
 		? widget.id
-		: (InteractableLabel(widget) ? std::string(InteractableLabel(widget)) : std::string());
+		: (silencer::ui::UiInteractableLabel(widget)
+			? std::string(silencer::ui::UiInteractableLabel(widget))
+			: std::string());
 	action.value = value;
 	action.index = widget.index;
 	action.amount = amount;
@@ -717,7 +696,8 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			if(!cw.id.empty()) w["id"] = cw.id;
 			w["x"] = cw.x; w["y"] = cw.y;
 			w["w"] = cw.w; w["h"] = cw.h;
-			if(InteractableLabel(cw)) w["label"] = InteractableLabel(cw);
+			if(silencer::ui::UiInteractableLabel(cw))
+				w["label"] = silencer::ui::UiInteractableLabel(cw);
 			if(cw.uid >= 0) w["uid"] = cw.uid;
 			using K = silencer::ui::UiInteractableKind;
 			switch(cw.kind){
@@ -805,16 +785,18 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		if(cw){
 			using K = silencer::ui::UiInteractableKind;
 			if(cw->kind == K::Button || cw->kind == K::Toggle){
+				const char * label = silencer::ui::UiInteractableLabel(*cw);
 				QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::Activate,
-				                  InteractableLabel(*cw) ? InteractableLabel(*cw) : "");
+				                  label ? label : "");
 				nlohmann::json r;
 				r["source"] = "clay";
 				cmd.reply->set_value(OkResult(cmd.id, r));
 				return;
 			}
 			if(cw->kind == K::ListRow){
+				const char * label = silencer::ui::UiInteractableLabel(*cw);
 				QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::Select,
-				                  InteractableLabel(*cw) ? InteractableLabel(*cw) : "");
+				                  label ? label : "");
 				nlohmann::json r;
 				r["source"] = "clay";
 				r["row_index"] = cw->index;
@@ -852,9 +834,9 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 	if(cmd.op == "set_text"){
 		std::string text = cmd.args.value("text", std::string());
 		const auto * cw = static_cast<const silencer::ui::UiInteractable *>(nullptr);
+		int count = 0;
 		if(cmd.args.contains("uid")){
 			int uid = cmd.args["uid"].get<int>();
-			int count = 0;
 			for(const auto & candidate : game.UiInteractions().Interactables()){
 				if(candidate.uid == uid
 				   && candidate.kind == silencer::ui::UiInteractableKind::TextInput){
@@ -865,7 +847,14 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			if(count != 1) cw = nullptr;
 		}else if(cmd.args.contains("label")){
 			std::string label = cmd.args["label"].get<std::string>();
-			cw = game.UiInteractions().FindInteractableByLabel(label.c_str());
+			for(const auto & candidate : game.UiInteractions().Interactables()){
+				if(candidate.kind == silencer::ui::UiInteractableKind::TextInput
+				   && silencer::ui::UiInteractableMatchesLabel(candidate, label.c_str())){
+					cw = &candidate;
+					count++;
+				}
+			}
+			if(count != 1) cw = nullptr;
 		}
 		if(cw){
 			if(cw->kind == silencer::ui::UiInteractableKind::TextInput){
@@ -885,6 +874,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		}
 		if(cmd.args.contains("label")){
 			std::string label = cmd.args["label"].get<std::string>();
+			if(count > 1){
+				cmd.reply->set_value(Err(cmd.id, "AMBIGUOUS_TARGET", label));
+				return;
+			}
 			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", label));
 			return;
 		}
@@ -916,7 +909,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			std::string label = cmd.args["label"].get<std::string>();
 			for(const auto & candidate : widgets){
 				if(candidate.kind == silencer::ui::UiInteractableKind::ListRow
-				   && LabelEquals(InteractableLabel(candidate), label.c_str())){
+				   && silencer::ui::UiInteractableMatchesLabel(candidate, label.c_str())){
 					hit = &candidate;
 					count++;
 				}
@@ -925,7 +918,7 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			std::string text = cmd.args["text"].get<std::string>();
 			for(const auto & candidate : widgets){
 				if(candidate.kind == silencer::ui::UiInteractableKind::ListRow
-				   && LabelEquals(InteractableLabel(candidate), text.c_str())){
+				   && silencer::ui::UiInteractableMatchesLabel(candidate, text.c_str())){
 					hit = &candidate;
 					count++;
 				}
@@ -936,16 +929,18 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 		if(count != 1 || !hit){
-			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND",
+			cmd.reply->set_value(Err(cmd.id,
+				count > 1 ? "AMBIGUOUS_TARGET" : "WIDGET_NOT_FOUND",
 				"no unique clay list row matches select target"));
 			return;
 		}
+		const char * hitLabel = silencer::ui::UiInteractableLabel(*hit);
 		QueueInteractableAction(game, *hit, silencer::ui::UiActionKind::Select,
-		                  InteractableLabel(*hit) ? InteractableLabel(*hit) : "");
+		                  hitLabel ? hitLabel : "");
 		nlohmann::json r;
 		r["source"] = "clay";
 		r["row_index"] = hit->index;
-		if(InteractableLabel(*hit)) r["label"] = InteractableLabel(*hit);
+		if(hitLabel) r["label"] = hitLabel;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
@@ -968,9 +963,10 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 				"scroll target is not a Clay scroll button"));
 			return;
 		}
+		const char * actionValue = silencer::ui::UiInteractableLabel(*cw);
 		for(int i = 0; i < amount; ++i){
 			QueueInteractableAction(game, *cw, silencer::ui::UiActionKind::Activate,
-			                  InteractableLabel(*cw) ? InteractableLabel(*cw) : "");
+			                  actionValue ? actionValue : "");
 		}
 		nlohmann::json r;
 		r["source"] = "clay";

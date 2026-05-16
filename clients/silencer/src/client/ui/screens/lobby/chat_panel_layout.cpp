@@ -41,9 +41,6 @@ constexpr uint16_t kPanelPad       = 6;
 constexpr uint16_t kChannelWrapH   = 20;
 constexpr uint16_t kBodyChildGap   = 6;
 constexpr uint16_t kInputPadTop    = 10;
-// Legacy on-screen coords kept ONLY for inspector hit-rect registration.
-constexpr int kInspectorInputX   = 18;
-constexpr int kInspectorInputY   = 437;
 constexpr const char * kActionInput = "lobby.chat.input";
 
 // Per-frame Clay_String / ScrollTextBoxLine slabs. The std::strings owned
@@ -177,20 +174,10 @@ void BuildChatPanelTree(ChatPanelState & state,
 			TextInput(CLAY_STRING("ChatInput"),
 			          state.inputBuffer,
 			          inOpts,
-			          TextInputHandle{ /*hoveredOut*/ nullptr });
+			          TextInputHandle{ nullptr, chat_panel_layout_detail::kActionInput,
+			                           "Chat", &interactions, -1,
+			                           static_cast<int>(sizeof(state.inputBuffer)) - 1 });
 		}
-	}
-
-	{
-		silencer::ui::UiInteractable w;
-		w.id = chat_panel_layout_detail::kActionInput;
-		w.labelText = "Chat";
-		w.kind  = silencer::ui::UiInteractableKind::TextInput;
-		w.x = chat_panel_layout_detail::kInspectorInputX; w.y = chat_panel_layout_detail::kInspectorInputY;
-		w.w = chat_panel_layout_detail::kInputW; w.h = chat_panel_layout_detail::kInputH;
-		w.value = state.inputBuffer;
-		w.maxLength = static_cast<int>(sizeof(state.inputBuffer)) - 1;
-		interactions.RegisterInteractable(w);
 	}
 }
 

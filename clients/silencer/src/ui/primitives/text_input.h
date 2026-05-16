@@ -19,9 +19,8 @@
 //
 // `password` masks the rendered glyphs to '*'. `inactive` overrides
 // `brightness` to 64 (matches legacy effectbrightness handling) and
-// suppresses the caret. `numbersOnly` is documented here but is purely
-// a screen-side input-filter hint — the primitive ignores it for
-// rendering. Enter handling is screen/controller-owned through
+// suppresses the caret. `numbersOnly` is a registry input-filter hint; the
+// primitive ignores it for rendering. Enter handling is screen/controller-owned through
 // UiInteractionRegistry; the primitive itself does not route SDL events.
 //
 // Memory: each call may allocate a small per-frame TextInputPayload + a
@@ -31,6 +30,10 @@
 
 #include "clay/clay.h"
 #include "shared.h"
+
+namespace silencer::ui {
+class UiInteractionRegistry;
+}
 
 namespace silencer::ui::primitives {
 
@@ -49,7 +52,13 @@ struct TextInputOpts {
 };
 
 struct TextInputHandle {
-	bool *           hoveredOut;  // Optional. Written each frame if non-null.
+	bool * hoveredOut = nullptr;  // Optional. Written each frame if non-null.
+	const char * actionId = nullptr;
+	const char * label = nullptr;
+	UiInteractionRegistry * interactions = nullptr;
+	int uid = -1;
+	int maxLength = 0;
+	bool cancelOnEscape = false;
 };
 
 // Resets the per-frame payload + custom-data + mask-buffer arenas. Call

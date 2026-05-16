@@ -22,6 +22,7 @@ using silencer::ui::primitives::ScrollList;
 using silencer::ui::primitives::ScrollListHandle;
 using silencer::ui::primitives::ScrollListOpts;
 using silencer::ui::primitives::TextInput;
+using silencer::ui::primitives::TextInputHandle;
 using silencer::ui::primitives::TextInputOpts;
 
 namespace silencer::client_ui::lobby {
@@ -35,9 +36,7 @@ constexpr Uint16 kMapListW     = 214;
 constexpr Uint16 kMapListH     = 265;
 constexpr Uint8  kMapListLineH = 14;
 constexpr Uint8  kScrollbarBank = 7;
-constexpr int    kNameInputX = 410, kNameInputY = 375;
 constexpr Uint16 kNameInputW = 210, kNameInputH = 14;
-constexpr int    kPwInputX   = 410, kPwInputY   = 405;
 constexpr Uint16 kPwInputW   = 210, kPwInputH   = 14;
 constexpr int    kCreateBtnX = 436, kCreateBtnY = 430;
 
@@ -59,21 +58,6 @@ void RegisterButton(const char * label, const char * actionId,
 	reg.labelText = label;
 	reg.kind      = silencer::ui::UiInteractableKind::Button;
 	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	interactions.RegisterInteractable(reg);
-}
-
-void RegisterTextInput(const char * label, const char * actionId,
-                       int x, int y, int w, int h,
-                       char * buf, int cap, bool isPassword,
-                       silencer::ui::UiInteractionRegistry& interactions) {
-	silencer::ui::UiInteractable reg;
-	reg.id            = actionId;
-	reg.labelText     = label;
-	reg.kind          = silencer::ui::UiInteractableKind::TextInput;
-	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	reg.value         = buf ? buf : "";
-	reg.maxLength     = cap > 0 ? cap - 1 : 0;
-	reg.isPassword    = isPassword;
 	interactions.RegisterInteractable(reg);
 }
 
@@ -129,11 +113,11 @@ void BuildNameAndPassword(GameCreatePanelState & state,
 	bodyInput.showCaret  = false;
 	CLAY({ .id = CLAY_ID("GCrtNameInputWrap") }) {
 		TextInput(CLAY_STRING("GCrtNameInput"),
-		          state.name, bodyInput, {});
+		          state.name, bodyInput,
+		          TextInputHandle{ nullptr, kActionName, "Game name",
+		                           &interactions, -1,
+		                           static_cast<int>(sizeof(state.name)) - 1 });
 	}
-	RegisterTextInput("Game name", kActionName,
-	                  kNameInputX, kNameInputY, kNameInputW, kNameInputH,
-	                  state.name, (int)sizeof(state.name), false, interactions);
 
 	CLAY({ .id = CLAY_ID("GCrtPwLabelWrap") }) {
 		BankText(CLAY_STRING("Password (optional):"),
@@ -142,11 +126,11 @@ void BuildNameAndPassword(GameCreatePanelState & state,
 	bodyInput.password = true;
 	CLAY({ .id = CLAY_ID("GCrtPwInputWrap") }) {
 		TextInput(CLAY_STRING("GCrtPwInput"),
-		          state.password, bodyInput, {});
+		          state.password, bodyInput,
+		          TextInputHandle{ nullptr, kActionPassword, "Password",
+		                           &interactions, -1,
+		                           static_cast<int>(sizeof(state.password)) - 1 });
 	}
-	RegisterTextInput("Password", kActionPassword,
-	                  kPwInputX, kPwInputY, kPwInputW, kPwInputH,
-	                  state.password, (int)sizeof(state.password), true, interactions);
 }
 
 }  // namespace game_create_panel_map_form_detail

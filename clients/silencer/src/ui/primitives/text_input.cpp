@@ -1,8 +1,10 @@
 #include "text_input.h"
 
 #include "clay_ui_payloads.h"
+#include "runtime/UiInteractionRegistry.h"
 
 #include <cstring>
+#include <string>
 
 namespace silencer::ui::primitives {
 
@@ -40,6 +42,31 @@ AllocCustomData(silencer::clay_bridge::CustomKind kind, void * payload) {
 char * AllocMaskBuffer() {
 	if(g_maskBufferIndex >= kMaskBufferCount) return nullptr;
 	return g_maskBuffers[g_maskBufferIndex++];
+}
+
+std::string ToStd(Clay_String text) {
+	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
+}
+
+void RegisterTextInputWidget(Clay_String clayId,
+                             const char * value,
+                             const TextInputOpts& opts,
+                             const TextInputHandle& handle) {
+	if(!handle.interactions) return;
+	silencer::ui::UiInteractable widget;
+	widget.id = (handle.actionId && *handle.actionId) ? handle.actionId : ToStd(clayId);
+	widget.labelText = handle.label ? handle.label : "";
+	widget.kind = silencer::ui::UiInteractableKind::TextInput;
+	widget.uid = handle.uid;
+	widget.clayId = CLAY_SID(clayId);
+	widget.hasClayId = true;
+	widget.value = value ? value : "";
+	widget.maxLength = handle.maxLength;
+	widget.isPassword = opts.password;
+	widget.inactive = opts.inactive;
+	widget.numbersOnly = opts.numbersOnly;
+	widget.cancelOnEscape = handle.cancelOnEscape;
+	handle.interactions->RegisterInteractable(widget);
 }
 
 }  // namespace
@@ -97,6 +124,7 @@ void TextInput(Clay_String id,
 	       .custom = { .customData = ccd } }) {
 		bool hovered = ::Clay_Hovered();
 		if(handle.hoveredOut) *handle.hoveredOut = hovered;
+		RegisterTextInputWidget(id, src, opts, handle);
 	}
 }
 

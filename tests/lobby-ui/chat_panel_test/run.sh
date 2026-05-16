@@ -2,10 +2,8 @@
 # P13 — verifies the migrated ChatPanel matches the legacy ChatPanel.
 #
 # Same verification shape as character_panel_test/run.sh (P12) — migrated UI vs
-# FRESH same-run legacy, step-based determinism. The committed
-# tests/lobby-ui/baselines/chat.png is non-reproducible (see P11-retry
-# entry in progress.txt) so we use a same-run legacy capture as the
-# "before" reference.
+# FRESH same-run legacy, step-based determinism. There is intentionally no
+# committed chat-panel baseline because the earlier one was non-reproducible.
 #
 # Pass gate: clay vs fresh-legacy diff over the chat-panel rect
 # (x=10, y=195, w=378, h=260) is under 5.0%. Rect covers the channel
@@ -15,7 +13,6 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 OUT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BASELINE="$REPO_ROOT/tests/lobby-ui/baselines/chat.png"
 PIXDIFF="$REPO_ROOT/tools/pixdiff/build/pixdiff"
 
 if [ -x "$REPO_ROOT/build/Silencer.app/Contents/MacOS/Silencer" ]; then
@@ -28,7 +25,6 @@ fi
 LOBBY_BIN="$REPO_ROOT/services/lobby/lobby"
 [ -x "$LOBBY_BIN" ] || { echo "lobby binary missing at $LOBBY_BIN" >&2; exit 1; }
 [ -x "$PIXDIFF" ] || { echo "pixdiff binary missing at $PIXDIFF" >&2; exit 1; }
-[ -f "$BASELINE" ] || { echo "baseline missing at $BASELINE" >&2; exit 1; }
 
 TMP=$(mktemp -d)
 LOBBY_LOG="$TMP/lobby.log"
@@ -163,11 +159,6 @@ cli --port "$UI_CTRL" screenshot --out "$UI_SHOT" >/dev/null
 # Chat panel rect: channel header (15,200) + chat box (19,220,242x207) +
 # presence (267,220,110x207) + input (18,437,360x14). Slightly padded.
 CROP="10,195,378,260"
-
-BASELINE_LEGACY_DIFF=$("$PIXDIFF" --crop "$CROP" "$BASELINE" "$LEGACY_SHOT" 2>/dev/null || echo "n/a")
-BASELINE_UI_DIFF=$("$PIXDIFF" --crop "$CROP" "$BASELINE" "$UI_SHOT" 2>/dev/null || echo "n/a")
-echo "informational: legacy vs committed baseline (crop $CROP) = ${BASELINE_LEGACY_DIFF}%"
-echo "informational: ui     vs committed baseline (crop $CROP) = ${BASELINE_UI_DIFF}%"
 
 DIFF=$("$PIXDIFF" --crop "$CROP" "$LEGACY_SHOT" "$UI_SHOT")
 echo "pixdiff (migrated ui vs fresh legacy, crop $CROP) = ${DIFF}%"

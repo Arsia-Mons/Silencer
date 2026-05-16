@@ -17,6 +17,7 @@ using silencer::ui::primitives::BankButton;
 using silencer::ui::primitives::BankButtonHandle;
 using silencer::ui::primitives::BankButtonVariant;
 using silencer::ui::primitives::TextInput;
+using silencer::ui::primitives::TextInputHandle;
 using silencer::ui::primitives::TextInputOpts;
 
 namespace silencer::client_ui::lobby {
@@ -70,20 +71,6 @@ void RegisterButton(const char * label, const char * actionId,
 	interactions.RegisterInteractable(reg);
 }
 
-void RegisterTextInput(const char * label, const char * actionId,
-                       int x, int y, int w, int h,
-                       char * buf, int cap,
-                       silencer::ui::UiInteractionRegistry& interactions) {
-	silencer::ui::UiInteractable reg;
-	reg.id            = actionId;
-	reg.labelText     = label;
-	reg.kind          = silencer::ui::UiInteractableKind::TextInput;
-	reg.x = x; reg.y = y; reg.w = w; reg.h = h;
-	reg.value         = buf ? buf : "";
-	reg.maxLength     = cap > 0 ? cap - 1 : 0;
-	interactions.RegisterInteractable(reg);
-}
-
 void BuildOptionRow(GameCreatePanelState & state, int i,
                     const char * rowId, const char * label,
                     const char * id, const char * actionId,
@@ -129,9 +116,9 @@ void BuildOptionRow(GameCreatePanelState & state, int i,
 			opts.showCaret   = false;
 			std::string idStr = std::string("Input_") + id;
 			TextInput(Clay_String{ false, (int32_t)idStr.size(), idStr.c_str() },
-			          buf, opts, {});
-			const int y = kFormTop + i * kYSpace + 2;
-			RegisterTextInput(label, actionId, kValueX, y, 20, kRowHeight, buf, cap, interactions);
+			          buf, opts,
+			          TextInputHandle{ nullptr, actionId, label, &interactions,
+			                           -1, cap > 0 ? cap - 1 : 0 });
 		}
 	}
 }

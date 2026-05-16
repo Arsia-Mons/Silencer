@@ -178,9 +178,9 @@ struct HudView {
 	Uint8                              quitState = 0;
 };
 
-// Build the per-frame HudView from gameplay state. Reads only public surface;
+// Build the per-frame HudView from gameplay state. Uses only public surface;
 // no friend grant required.
-HudView BuildHudView(const ::World& world);
+HudView BuildHudView(::World& world);
 
 }  // namespace client_ui
 }  // namespace silencer

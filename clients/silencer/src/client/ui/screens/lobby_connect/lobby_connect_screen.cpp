@@ -113,8 +113,6 @@ void SmallButton(Clay_String label,
 void RegisterInput(const char * label,
                    const char * actionId,
                    int uid,
-                   int x,
-                   int y,
                    char * buffer,
                    int bufferLen,
                    bool password,
@@ -126,7 +124,6 @@ void RegisterInput(const char * label,
 	w.labelText = label;
 	w.kind = silencer::ui::UiInteractableKind::TextInput;
 	w.uid = uid;
-	w.x = x; w.y = y; w.w = kInputW; w.h = kInputH;
 	w.value = buffer ? buffer : "";
 	w.maxLength = bufferLen > 0 ? bufferLen - 1 : 0;
 	w.isPassword = password;
@@ -137,22 +134,13 @@ void RegisterInput(const char * label,
 void RegisterWidgets(LobbyConnectScreen * screen,
                      char * username,
                      char * password,
-                     int surfaceW,
-                     int surfaceH,
                      bool inactive,
                      silencer::ui::UiInteractionRegistry& interactions)
 {
-	const int panelX = (surfaceW - kPanelW) / 2;
-	const int panelY = (surfaceH - kPanelH) / 2;
-	const int formX = panelX + kPanelPadX;
-	const int formY = panelY + kPanelPadY + kLogH + 14;
-	const int inputX = formX + 85;
-	const int usernameY = formY + 3;
-	const int passwordY = formY + 20 + kFormGap + 3;
-
-	RegisterInput("Username", kActionUsername, LBY_INPUT_USERNAME, inputX, usernameY,
+	(void)screen;
+	RegisterInput("Username", kActionUsername, LBY_INPUT_USERNAME,
 	              username, 17, false, inactive, interactions);
-	RegisterInput("Password", kActionPassword, LBY_INPUT_PASSWORD, inputX, passwordY,
+	RegisterInput("Password", kActionPassword, LBY_INPUT_PASSWORD,
 	              password, 29, true, inactive, interactions);
 }
 
@@ -184,8 +172,7 @@ void LobbyConnectScreen::Build(ScreenContext & ctx)
 	username[0] = '\0';
 	password[0] = '\0';
 
-	const Surface& surface = ctx.game.GetScreenBuffer();
-	lobby_connect_screen_detail::RegisterWidgets(this, username, password, surface.w, surface.h, false,
+	lobby_connect_screen_detail::RegisterWidgets(this, username, password, false,
 	                ctx.game.UiInteractions());
 	ctx.game.UiInteractions().FocusTextInputByUid(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 }
@@ -394,7 +381,10 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 						  .fontBank = 133,
 						  .fontWidth = 6,
 						  .inactive = inactive,
-						  .showCaret = usernameFocused && blink });
+						  .showCaret = usernameFocused && blink },
+						{ nullptr, lobby_connect_screen_detail::kActionUsername,
+						  "Username", &interactions,
+						  lobby_connect_screen_detail::LBY_INPUT_USERNAME, 16 });
 				}
 
 				CLAY({ .id = CLAY_ID("LobbyConnectPasswordRow"),
@@ -423,7 +413,10 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 						  .fontWidth = 6,
 						  .password = true,
 						  .inactive = inactive,
-						  .showCaret = passwordFocused && blink });
+						  .showCaret = passwordFocused && blink },
+						{ nullptr, lobby_connect_screen_detail::kActionPassword,
+						  "Password", &interactions,
+						  lobby_connect_screen_detail::LBY_INPUT_PASSWORD, 28 });
 				}
 			}
 
@@ -439,7 +432,7 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		}
 	}
 
-	lobby_connect_screen_detail::RegisterWidgets(this, username, password, dst.w, dst.h, inactive, interactions);
+	lobby_connect_screen_detail::RegisterWidgets(this, username, password, inactive, interactions);
 }
 
 void LobbyConnectScreen::Destroy(ScreenContext & ctx)

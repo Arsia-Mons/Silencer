@@ -279,23 +279,21 @@ void DispatchImage(::Resources & resources,
 	}
 }
 
-void OutlineVisiblePixels(::Renderer & renderer, Surface * surface, Uint8 color) {
-	int sw = surface->w;
-	int sh = surface->h;
-	std::vector<Uint8> original(sw * sh);
+void OutlineVisiblePixels(::Renderer & renderer,
+                          Surface * source,
+                          Surface * target,
+                          Uint8 color) {
+	if(!source || !target) return;
+	int sw = std::min(source->w, target->w);
+	int sh = std::min(source->h, target->h);
 	for(int py = 0; py < sh; py++){
 		for(int px = 0; px < sw; px++){
-			original[py * sw + px] = renderer.GetPixel(surface, px, py);
-		}
-	}
-	for(int py = 0; py < sh; py++){
-		for(int px = 0; px < sw; px++){
-			if(original[py * sw + px]) continue;
-			if((px > 0 && original[py * sw + px - 1]) ||
-			   (px < sw - 1 && original[py * sw + px + 1]) ||
-			   (py > 0 && original[(py - 1) * sw + px]) ||
-			   (py < sh - 1 && original[(py + 1) * sw + px])){
-				renderer.SetPixel(surface, px, py, color);
+			if(renderer.GetPixel(source, px, py)) continue;
+			if((px > 0 && renderer.GetPixel(source, px - 1, py)) ||
+			   (px < sw - 1 && renderer.GetPixel(source, px + 1, py)) ||
+			   (py > 0 && renderer.GetPixel(source, px, py - 1)) ||
+			   (py < sh - 1 && renderer.GetPixel(source, px, py + 1))){
+				renderer.SetPixel(target, px, py, color);
 			}
 		}
 	}
@@ -505,7 +503,7 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) break;
 						Surface * copy = renderer.CreateSurfaceCopy(src);
 						renderer.EffectTeamColor(copy, nullptr, p->teamColor, false, true);
-						OutlineVisiblePixels(renderer, copy, p->outlineColor);
+						OutlineVisiblePixels(renderer, src, copy, p->outlineColor);
 						Renderer::Rect dstrect{w, h, x, y};
 						if(p->scaled){
 							Renderer::DrawScaled(copy, nullptr, dst, &dstrect);
@@ -792,8 +790,9 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 // identical to the pre-scale path. At uiScale > 1 we render the command
 // stream into a virtual-size scratch surface (every dispatch path, scissor,
 // sprite-offset and alpha-LUT computation stays in virtual units exactly as
-// authored) and then nearest-magnify that scratch into the native surface,
-// so bitmap text/chrome scale up as crisp integer-multiplied pixel art.
+// authored) and then nearest-magnify that scratch into a centered region of
+// the native surface, so bitmap text/chrome scale up as crisp
+// integer-multiplied pixel art without smearing the letterbox margin.
 void Render(::Resources & resources, ::Renderer & renderer,
             Surface * dst, ::Clay_RenderCommandArray cmds) {
 	if(!dst) return;
@@ -820,12 +819,18 @@ void Render(::Resources & resources, ::Renderer & renderer,
 	RenderInto(resources, renderer, &scratch, cmds);
 	const Uint8 * sp = scratch.pixels.data();
 	Uint8 * dp = dst->pixels.data();
-	for(int dy = 0; dy < dst->h; dy++){
+	int scaledW = vw * s;
+	int scaledH = vh * s;
+	int offsetX = scaledW < dst->w ? (dst->w - scaledW) / 2 : 0;
+	int offsetY = scaledH < dst->h ? (dst->h - scaledH) / 2 : 0;
+	int drawW = std::min(scaledW, dst->w - offsetX);
+	int drawH = std::min(scaledH, dst->h - offsetY);
+	for(int dy = 0; dy < drawH; dy++){
 		int sy = dy / s;
 		if(sy >= vh) sy = vh - 1;
 		const Uint8 * srow = sp + sy * vw;
-		Uint8 * drow = dp + dy * dst->w;
-		for(int dx = 0; dx < dst->w; dx++){
+		Uint8 * drow = dp + (offsetY + dy) * dst->w + offsetX;
+		for(int dx = 0; dx < drawW; dx++){
 			int sx = dx / s;
 			if(sx >= vw) sx = vw - 1;
 			// Skip transparent (index 0): compose the UI layer over whatever

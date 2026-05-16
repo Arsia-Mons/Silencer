@@ -95,21 +95,21 @@ void Game::UpdateInputState(Input & input){
 			}
 		}
 		if(!world.replay.IsPlaying()){
-			if(interfaceenterfix && !keystate[SDL_SCANCODE_RETURN]){
-				interfaceenterfix = false;
+			if(chatEnterDebounce && !keystate[SDL_SCANCODE_RETURN]){
+				chatEnterDebounce = false;
 			}
-			if(localplayer->chatActive || interfaceenterfix){
+			if(localplayer->chatActive || chatEnterDebounce){
 				Input zeroinput;
 				input = zeroinput;
-				interfaceenterfix = true;
+				chatEnterDebounce = true;
 			}
-			if(localplayer->isbuying || localplayer->techstationactive || interfaceenterfix){
+			if(localplayer->isbuying || localplayer->techstationactive || chatEnterDebounce){
 				Input zeroinput;
 				zeroinput.keyactivate = input.keyactivate;
 				zeroinput.keymoveleft = input.keymoveleft;
 				zeroinput.keymoveright = input.keymoveright;
 				input = zeroinput;
-				interfaceenterfix = true;
+				chatEnterDebounce = true;
 			}
 		}
 	}
@@ -173,11 +173,12 @@ bool Game::HandleSDLEvents(void){
 	SDL_Event event;
 	while(SDL_PollEvent(&event) > 0){
 		switch(event.type){
-			case SDL_EVENT_WINDOW_RESIZED:{
-				// SDL3 GPU swapchain resizes automatically.
-				int w = 0, h = 0;
-				SDL_GetWindowSize(window, &w, &h);
-				ResizeRenderSurface(w, h);
+			case SDL_EVENT_WINDOW_RESIZED:
+			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:{
+				// SDL3 GPU swapchain resizes automatically; the CPU
+				// framebuffer must follow the drawable pixel size, not the
+				// logical window-coordinate size, on HiDPI displays.
+				SyncRenderSurfaceToWindowPixels();
 			}break;
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:{
 				if(!world.replay.IsPlaying()){

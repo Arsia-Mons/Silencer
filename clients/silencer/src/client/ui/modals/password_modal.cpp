@@ -41,34 +41,20 @@ void CopyUiText(char * dst, int dstLen, const std::string & value)
 	dst[n] = '\0';
 }
 
-// The TextInput primitive does not self-register an interactable (unlike
-// BankButton), so the password field's registration must stay — it carries
-// the uid/value/isPassword wiring used for focus, typing, submit and CLI
-// inspect. (Absolute geometry is imperfect at uiScale > 1; a follow-up is
-// to make TextInput self-register its Clay bounds like BankButton.)
 void RegisterWidgets(PasswordModal * modal,
                      char * buffer,
-                     int surfaceW,
-                     int surfaceH,
                      silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)modal;
-	const int dialogX = (surfaceW - kDialogW) / 2;
-	const int dialogY = (surfaceH - kDialogH) / 2;
 	silencer::ui::UiInteractable input;
 	input.id = kActionPassword;
 	input.labelText = "Password";
 	input.kind = silencer::ui::UiInteractableKind::TextInput;
 	input.uid = kPasswordUid;
-	input.x = dialogX + (kDialogW - kInputW) / 2;
-	input.y = dialogY + 64;
-	input.w = kInputW;
-	input.h = kInputH;
 	input.value = buffer ? buffer : "";
 	input.maxLength = 20;
 	input.isPassword = true;
 	interactions.RegisterInteractable(input);
-	(void)surfaceH;
 }
 } // namespace password_modal_detail
 
@@ -82,8 +68,7 @@ void PasswordModal::Build(ScreenContext & ctx)
 	(void)ctx;
 	okClicked = false;
 	password[0] = '\0';
-	const Surface& surface = ctx.game.GetScreenBuffer();
-	password_modal_detail::RegisterWidgets(this, password, surface.w, surface.h, ctx.game.UiInteractions());
+	password_modal_detail::RegisterWidgets(this, password, ctx.game.UiInteractions());
 	ctx.game.UiInteractions().FocusTextInputByUid(password_modal_detail::kPasswordUid);
 }
 
@@ -133,13 +118,15 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 				  .fontBank = 135,
 				  .fontWidth = 11,
 				  .password = true,
-				  .showCaret = focused && blink });
+				  .showCaret = focused && blink },
+				{ nullptr, password_modal_detail::kActionPassword, "Password",
+				  &interactions, password_modal_detail::kPasswordUid, 20 });
 			password_modal_detail::BankButton(CLAY_STRING("OK"), password_modal_detail::BankButtonVariant::Chrome, {},
 			           password_modal_detail::BankButtonHandle{ nullptr, password_modal_detail::kActionOk, &interactions });
 		}
 	}
 
-	password_modal_detail::RegisterWidgets(this, password, dst.w, dst.h, interactions);
+	password_modal_detail::RegisterWidgets(this, password, interactions);
 }
 
 void PasswordModal::Destroy(ScreenContext & ctx)

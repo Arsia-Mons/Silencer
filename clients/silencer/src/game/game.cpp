@@ -90,6 +90,7 @@ Game::Game() : renderer(world), screenbuffer(640, 480), worldSurface(640, 480),
 #else
 	quitscancode = SDL_SCANCODE_ESCAPE;
 #endif
+	chatEnterDebounce = false;
 	fullscreentoggled = false;
 	replayfile = 0;
 	controlPort = 0;
@@ -280,8 +281,11 @@ bool Game::Load(char * cmdline){
 			//SDL_EnableUNICODE(true);
 			//SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 			//screen = SDL_SetVideoMode(640, 480, 8, SDL_DOUBLEBUF | SDL_SWSURFACE);
-			window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h, SDL_WINDOW_RESIZABLE | (Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
+			window = SDL_CreateWindow("Silencer", screenbuffer.w, screenbuffer.h,
+				SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY |
+				(Config::GetInstance().fullscreen ? SDL_WINDOW_FULLSCREEN : 0));
 			SDL_StartTextInput(window);
+			SyncRenderSurfaceToWindowPixels();
 			if(!SetupRenderDevice()){
 				printf("Could not initialize GPU render device\n");
 				return false;
@@ -351,34 +355,84 @@ bool Game::SetupRenderDevice(void){
 	return true;
 }
 
-// Nearest-neighbour stretch of the fixed-size world surface across the whole
-// (native-resolution) screenbuffer. Full overwrite — the world is the bottom
-// layer; the Clay UI composites on top afterwards. Nearest keeps the legacy
-// pixel-art look at any window size.
+static int UiScaleForSurface(int width, int height) {
+	int scaleX = width / 640;
+	int scaleY = height / 480;
+	int uiScale = scaleX < scaleY ? scaleX : scaleY;
+	return uiScale > 0 ? uiScale : 1;
+}
+
+static void CenteredLayoutOffset(int surfaceW, int surfaceH,
+                                 int virtualW, int virtualH,
+                                 int scale, int& offsetX, int& offsetY) {
+	int scaledW = virtualW * scale;
+	int scaledH = virtualH * scale;
+	offsetX = scaledW < surfaceW ? (surfaceW - scaledW) / 2 : 0;
+	offsetY = scaledH < surfaceH ? (surfaceH - scaledH) / 2 : 0;
+}
+
+// Nearest-neighbour copy of the fixed-size world surface into a centered,
+// aspect-correct region of the native screenbuffer. Full overwrite — the
+// world is the bottom layer; the Clay UI composites on top afterwards.
+// Integer upscales keep pixels square; sub-640x480 windows fall back to a
+// uniform nearest fit because no positive integer scale can fit.
 static void NearestUpscaleFill(const Surface & src, Surface & dst){
-	if(src.w <= 0 || src.h <= 0 || dst.w <= 0 || dst.h <= 0) return;
+	if(dst.w <= 0 || dst.h <= 0) return;
+	dst.Clear(0);
+	if(src.w <= 0 || src.h <= 0) return;
+	int scale = UiScaleForSurface(dst.w, dst.h);
+	int drawW = src.w * scale;
+	int drawH = src.h * scale;
+	if(drawW > dst.w || drawH > dst.h){
+		float sx = static_cast<float>(dst.w) / static_cast<float>(src.w);
+		float sy = static_cast<float>(dst.h) / static_cast<float>(src.h);
+		float fit = sx < sy ? sx : sy;
+		if(fit <= 0.0f) return;
+		drawW = static_cast<int>(static_cast<float>(src.w) * fit);
+		drawH = static_cast<int>(static_cast<float>(src.h) * fit);
+		if(drawW < 1) drawW = 1;
+		if(drawH < 1) drawH = 1;
+	}
+	int offsetX = (dst.w - drawW) / 2;
+	int offsetY = (dst.h - drawH) / 2;
 	const Uint8 * sp = src.pixels.data();
 	Uint8 * dp = dst.pixels.data();
-	for(int dy = 0; dy < dst.h; dy++){
-		int sy = dy * src.h / dst.h;
+	for(int dy = 0; dy < drawH; dy++){
+		int sy = dy * src.h / drawH;
 		if(sy >= src.h) sy = src.h - 1;
 		const Uint8 * srow = sp + sy * src.w;
-		Uint8 * drow = dp + dy * dst.w;
-		for(int dx = 0; dx < dst.w; dx++){
-			int sx = dx * src.w / dst.w;
+		Uint8 * drow = dp + (offsetY + dy) * dst.w + offsetX;
+		for(int dx = 0; dx < drawW; dx++){
+			int sx = dx * src.w / drawW;
 			if(sx >= src.w) sx = src.w - 1;
 			drow[dx] = srow[sx];
 		}
 	}
 }
 
-bool Game::ResizeRenderSurface(int width, int height){
+bool Game::ResizeRenderSurfacePixels(int width, int height){
 	if(width < 1 || height < 1) return false;
 	screenbuffer.Resize(width, height, 0);
+	return true;
+}
+
+bool Game::SyncRenderSurfaceToWindowPixels(){
+	if(!window) return false;
+	int width = 0;
+	int height = 0;
+	if(!SDL_GetWindowSizeInPixels(window, &width, &height) || width < 1 || height < 1){
+		SDL_GetWindowSize(window, &width, &height);
+	}
+	return ResizeRenderSurfacePixels(width, height);
+}
+
+bool Game::ResizeRenderSurface(int width, int height){
+	if(width < 1 || height < 1) return false;
 	if(window){
 		SDL_SetWindowSize(window, width, height);
+		return SyncRenderSurfaceToWindowPixels();
 	}
-	return true;
+	return ResizeRenderSurfacePixels(width, height);
 }
 
 bool Game::HasUiInputTarget() {
@@ -391,10 +445,7 @@ void Game::PrepareClientUiFrame(Surface& surface) {
 	// canvas at least the legacy 640x480 design size. Bitmap glyph/sprite/
 	// chrome draws are integer-scaled by this in the Clay compositor so
 	// pixel art stays crisp.
-	int scaleX = surface.w / 640;
-	int scaleY = surface.h / 480;
-	int uiScale = scaleX < scaleY ? scaleX : scaleY;
-	if(uiScale < 1) uiScale = 1;
+	int uiScale = UiScaleForSurface(surface.w, surface.h);
 	int virtualW;
 	int virtualH;
 	if(world.map.loaded){
@@ -418,7 +469,20 @@ void Game::PrepareClientUiFrame(Surface& surface) {
 		int windowW = 0;
 		int windowH = 0;
 		SDL_GetWindowSize(window, &windowW, &windowH);
-		clientUiInput.SetPolledWindowPointer(mx, my, down, windowW, windowH, virtualW, virtualH);
+		float pixelX = mx;
+		float pixelY = my;
+		if(windowW > 0 && windowH > 0 && surface.w > 0 && surface.h > 0){
+			pixelX = (mx / static_cast<float>(windowW)) * static_cast<float>(surface.w);
+			pixelY = (my / static_cast<float>(windowH)) * static_cast<float>(surface.h);
+		}
+		int offsetX = 0;
+		int offsetY = 0;
+		CenteredLayoutOffset(surface.w, surface.h, virtualW, virtualH,
+		                     uiScale, offsetX, offsetY);
+		clientUiInput.SetPolledSurfacePointer(
+			(pixelX - static_cast<float>(offsetX)) / static_cast<float>(uiScale),
+			(pixelY - static_cast<float>(offsetY)) / static_cast<float>(uiScale),
+			down);
 	}else{
 		clientUiInput.SetPolledSurfacePointer(mx, my, down);
 	}
@@ -745,8 +809,8 @@ bool Game::Loop(void){
 		if(world.map.loaded){
 			// In-game: the world (incl. minimap/system-camera insets)
 			// renders at the legacy fixed size, then is nearest-upscaled
-			// to fill the native screenbuffer; the Clay HUD composites on
-			// top in RenderClientUiFrame.
+			// into the same centered integer-scale region used by the Clay
+			// HUD in RenderClientUiFrame.
 			worldSurface.Clear(0);
 			renderer.Draw(&worldSurface, ft);
 			DrawInGameWorldInsets(worldSurface, ft);

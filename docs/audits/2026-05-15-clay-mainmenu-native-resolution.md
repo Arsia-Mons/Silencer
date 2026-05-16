@@ -1,20 +1,35 @@
 # Clay UI does not scale to native display resolution — main menu
 
-**Status:** finding, handed off for investigation (not fixed)
-**Branch:** `hv/clay-ui-migration` at `1625f0f`
+**Status:** resolved on `hv/clay-ui-migration` after review follow-up
+**Branch:** `hv/clay-ui-migration` (finding captured at `1625f0f`)
 **Baseline compared:** `origin/main` (`b934bf7`)
 **Captured on:** primary display 2560×1440 (the desktop's native resolution)
 **Relates to:** `docs/audits/2026-05-14-clay-ui-visual-regression.md`
 (this extends that audit's "button-shape divergence" with a more
 serious resolution-scaling regression)
 
-## One-line
+## Resolution
 
-At the desktop's native 2560×1440, the Clay-migrated main menu does
-not lay out to the viewport: background art is pinned at native asset
-pixel size in the top-left, ~85% of the screen is empty, and the
-button column is a tiny fixed 156×120 px block. Legacy `origin/main`
-fills the screen correctly at the same display.
+The responsive follow-up renders the UI in a compositor-owned virtual
+coordinate space, magnifies it into a centered native-pixel region, and maps
+pointer input through the same pixel-size/offset transform. In-game world
+rendering now uses the same centered uniform scale as the HUD, and window
+resize handling follows `SDL_GetWindowSizeInPixels()` /
+`SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED` for HiDPI drawables.
+
+The legacy `Config::scalefilter` final-present toggle is no longer the
+mechanism that scales the in-game world after the responsive compositor owns a
+native-size paletted frame. The current path intentionally uses nearest
+sampling in the CPU compositor so world pixels, bank fonts, and HUD chrome
+share one square-pixel scale.
+
+## Original Finding
+
+At the desktop's native 2560×1440, the Clay-migrated main menu did not lay out
+to the viewport: background art was pinned at native asset pixel size in the
+top-left, ~85% of the screen was empty, and the button column was a tiny fixed
+156×120 px block. Legacy `origin/main` filled the screen correctly at the same
+display.
 
 ## Evidence
 
@@ -165,13 +180,13 @@ interactions").
 
 ---
 
-# Investigation findings (2026-05-15) — handoff resolved, still no fix
+# Investigation findings (2026-05-15) — superseded by PR fixes
 
 Investigated at `1625f0f`, non-unity `clients/silencer/build-release`
-(confirmed in sync with HEAD). Evidence added under
-`2026-05-15-clay-mainmenu-native-resolution/investigation/` (11 native
-2560×1440 captures). This section answers the three open questions and
-records one severity upgrade. **No code changed.**
+(confirmed in sync with HEAD). This section recorded the native 2560×1440
+capture findings that drove the responsive follow-up. The temporary PNG
+captures were removed from the repo after review because they were
+debugging evidence, not stable test baselines.
 
 ## Severity upgrade: this is a default-config, user-facing regression
 
@@ -344,13 +359,10 @@ in the same class of failure (relevant to Option B's true blast radius).
 
 ## Reproduction note (extends the doc's repro)
 
-The OS-agnostic capture script used is committed alongside the evidence
-at `2026-05-15-clay-mainmenu-native-resolution/investigation/capture_native.sh`.
-It forces `SILENCER_BIN` to the non-unity `build-release` binary —
-necessary because `tests/cli-agent/e2e/lib.sh` auto-detects
-`clients/silencer/build/` (Debug) or `build-unity/` (broken) first.
-Substitute the target display's native resolution for 2560×1440; this
-machine's primary display is 2560×1440.
+Use the CLI `resize` and `screenshot` ops from `tests/cli-agent/e2e/lib.sh`
+to regenerate native-resolution captures when needed. Substitute the target
+display's native resolution for 2560×1440; the original investigation
+machine's primary display was 2560×1440.
 
 ---
 
