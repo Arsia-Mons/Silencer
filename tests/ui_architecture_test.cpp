@@ -15,6 +15,7 @@ public:
 	std::vector<std::string> calls;
 	int width = 0;
 	int height = 0;
+	int uiScale = 0;
 	float pointerX = 0.0f;
 	float pointerY = 0.0f;
 	bool pointerDown = false;
@@ -25,6 +26,10 @@ public:
 		width = w;
 		height = h;
 		calls.push_back("SetLayoutDimensions");
+	}
+	void SetUiScale(int scale) override {
+		uiScale = scale;
+		calls.push_back("SetUiScale");
 	}
 	void SetPointerState(float x, float y, bool down) override {
 		pointerX = x;
@@ -52,6 +57,7 @@ TEST_CASE("ClayService uses the required central frame lifecycle order") {
 	silencer::ui::UiInputState input;
 	input.width = 1280;
 	input.height = 720;
+	input.uiScale = 2;
 	input.deltaTimeSeconds = 1.0f / 60.0f;
 	input.pointer.x = 33.0f;
 	input.pointer.y = 44.0f;
@@ -64,17 +70,19 @@ TEST_CASE("ClayService uses the required central frame lifecycle order") {
 	REQUIRE(commands.size() == 1);
 	CHECK(backend.width == 1280);
 	CHECK(backend.height == 720);
+	CHECK(backend.uiScale == 2);
 	CHECK(backend.pointerX == 33.0f);
 	CHECK(backend.pointerY == 44.0f);
 	CHECK(backend.pointerDown);
 	CHECK(backend.scrollY == -2.0f);
-	REQUIRE(backend.calls.size() == 6);
+	REQUIRE(backend.calls.size() == 7);
 	CHECK(backend.calls[0] == "SetCurrentContext");
 	CHECK(backend.calls[1] == "SetLayoutDimensions");
-	CHECK(backend.calls[2] == "SetPointerState");
-	CHECK(backend.calls[3] == "UpdateScrollContainers");
-	CHECK(backend.calls[4] == "BeginLayout");
-	CHECK(backend.calls[5] == "EndLayout");
+	CHECK(backend.calls[2] == "SetUiScale");
+	CHECK(backend.calls[3] == "SetPointerState");
+	CHECK(backend.calls[4] == "UpdateScrollContainers");
+	CHECK(backend.calls[5] == "BeginLayout");
+	CHECK(backend.calls[6] == "EndLayout");
 }
 
 TEST_CASE("ClientUi owns the frame lifecycle without demo-screen metadata") {
@@ -186,7 +194,8 @@ TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
 	action.id = "main_menu.connect";
 	input.QueueControlAction(action);
 
-	auto frame = input.BuildFrame(640, 480, 0.0f);
+	auto frame = input.BuildFrame(640, 480, 1, 0.0f);
+	CHECK(frame.uiScale == 1);
 	CHECK(frame.pointer.x == 160.0f);
 	CHECK(frame.pointer.y == 120.0f);
 	CHECK(frame.pointer.down);
@@ -201,7 +210,8 @@ TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
 	CHECK(frame.controlCommands[0].action.id == "main_menu.connect");
 
 	input.EndFrame();
-	frame = input.BuildFrame(640, 480, 1.0f / 60.0f);
+	frame = input.BuildFrame(640, 480, 2, 1.0f / 60.0f);
+	CHECK(frame.uiScale == 2);
 	CHECK(frame.pointer.down);
 	CHECK(!frame.pointer.pressed);
 	CHECK(frame.pointer.wheelY == 0.0f);

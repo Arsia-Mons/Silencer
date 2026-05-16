@@ -1,12 +1,15 @@
 #include "client/ui/ClientUi.h"
 
-#include "audio.h"
 #include "client/ui/hud/HudPayloadArena.h"
-#include "gasloader.h"
 #include "screen.h"
 #include "screen_context.h"
 #include "runtime/UiInputRouter.h"
+
+#ifndef SILENCER_TEST_BUILD
+#include "audio.h"
+#include "gasloader.h"
 #include "world.h"
+#endif
 
 #include <utility>
 
@@ -55,12 +58,16 @@ bool ActionTargetsAudibleInteractable(const silencer::ui::UiInteractionRegistry&
 }
 
 void PlayMenuButtonSound(ScreenContext& ctx) {
+#ifdef SILENCER_TEST_BUILD
+	(void)ctx;
+#else
 	Audio& audio = Audio::GetInstance();
 	if(!audio.enabled) return;
 	const std::string& sound = GASLoader::Get().player.soundUIClick;
 	auto it = ctx.world.resources.soundbank.find(sound);
 	if(it == ctx.world.resources.soundbank.end() || !it->second) return;
 	audio.Play(it->second);
+#endif
 }
 
 }  // namespace clientui_detail

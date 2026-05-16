@@ -28,6 +28,7 @@
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
 #include "primitives/toggle.h"
+#include "runtime/UiInteractionRegistry.h"
 
 #include "renderer.h"
 #include "resources.h"
@@ -37,9 +38,6 @@
 namespace prim = silencer::ui::primitives;
 
 namespace {
-
-void NoOpClickFn(void * /*user*/) {}
-void NoOpRowSelect(void * /*user*/, int /*index*/) {}
 
 void BeginAllFrames() {
 	prim::BankTextBeginFrame();
@@ -85,6 +83,8 @@ const char kPasswordBuffer[] = "secret";
 
 void BuildDemoTree() {
 	BeginAllFrames();
+	silencer::ui::UiInteractionRegistry interactions;
+	interactions.BeginFrame();
 	::Clay_BeginLayout();
 
 	CLAY({ .id      = CLAY_ID("DemoRoot"),
@@ -168,8 +168,8 @@ void BuildDemoTree() {
 				                 prim::BankButtonVariant::Chrome,
 				                 {},
 				                 { /*hoveredOut*/ nullptr,
-				                   /*onClick   */ &NoOpClickFn,
-				                   /*user      */ nullptr });
+				                   /*actionId  */ "clay_demo.create_game",
+				                   /*interactions*/ &interactions });
 				prim::BankButton(CLAY_STRING("Security"),
 				                 prim::BankButtonVariant::Inline,
 				                 { .effectColor = 152 });
@@ -244,8 +244,8 @@ void BuildDemoTree() {
 			                   .textEffectColor = 156,
 			                   .scrollbarBank = 7 },
 			                 { /*hoveredOut*/ nullptr,
-			                   /*onSelect  */ &NoOpRowSelect,
-			                   /*user      */ nullptr });
+			                   /*actionId  */ "clay_demo.map",
+			                   /*interactions*/ &interactions });
 
 			// ScrollTextBox — 5-line chat, bottom-anchored.
 			prim::ScrollTextBox(CLAY_STRING("ChatBox"),
