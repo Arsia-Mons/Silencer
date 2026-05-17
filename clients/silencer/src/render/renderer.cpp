@@ -15,6 +15,7 @@
 #include "civilian.h"
 #include "guard.h"
 #include "robot.h"
+#include "magistrate.h"
 #include "terminal.h"
 #include "healmachine.h"
 #include "creditmachine.h"
@@ -517,6 +518,18 @@ void Renderer::DrawWorld(Surface * surface, Camera & camera, bool drawminimap, b
 								if(guard->res_bank == 61 && guard->res_index == 7){
 									lightingsurfacebank = 220;
 									lightingsurfaceindex = 0;
+								}
+							}break;
+							case ObjectTypes::MAGISTRATE:{
+								Magistrate * mag = static_cast<Magistrate *>(object);
+								effectsurface = CreateSurfaceCopy(src);
+								if(mag->state_hit){
+									EffectHit(effectsurface, 0, mag->hitx, mag->hity, mag->state_hit);
+								}
+								if(mag->state_warp){
+									EffectWarp(effectsurface, 0, mag->state_warp);
+								}else{
+									DrawShadow(surface, camera, object);
 								}
 							}break;
 							case ObjectTypes::ROBOT:{

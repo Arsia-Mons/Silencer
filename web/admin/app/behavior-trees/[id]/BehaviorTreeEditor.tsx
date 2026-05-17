@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   addEdge,
   Background,
@@ -34,6 +34,7 @@ const TYPE_COLOR: Record<string, string> = {
   Wait:           '#94a3b8', // slate
   Leaf:           '#22c55e', // green
   Condition:      '#f97316', // orange
+  SubTree:        '#a78bfa', // violet
 };
 
 const TYPE_SYMBOL: Record<string, string> = {
@@ -49,11 +50,17 @@ const TYPE_SYMBOL: Record<string, string> = {
   Wait:           '◷',
   Leaf:           '▶',
   Condition:      '◆',
+  SubTree:        '⬡',
 };
 
 // ── Custom node ───────────────────────────────────────────────────────────────
+// liveResult: 0=Success, 1=Failure, 2=Running, undefined=not visited
 function BTNodeComponent({ data, selected }: NodeProps) {
   const color = TYPE_COLOR[data.type] ?? '#6b7280';
+  const lr: number | undefined = (data as { liveResult?: number }).liveResult;
+  const liveColor  = lr === 0 ? '#22c55e' : lr === 1 ? '#ef4444' : lr === 2 ? '#f59e0b' : undefined;
+  const borderColor = selected ? color : liveColor ?? '#2d3748';
+  const isRunning   = lr === 2;
   return (
     <>
       <style>{`
@@ -61,21 +68,28 @@ function BTNodeComponent({ data, selected }: NodeProps) {
           0%,100% { box-shadow: 0 0 0 0 ${color}66; }
           50%      { box-shadow: 0 0 0 6px ${color}00; }
         }
+        @keyframes btRunning {
+          0%,100% { box-shadow: 0 0 0 0 #f59e0b88; }
+          50%      { box-shadow: 0 0 0 8px #f59e0b00; }
+        }
       `}</style>
       <Handle type="target" position={Position.Top} style={{ background: color, border: 'none', width: 8, height: 8 }} />
       <div style={{
-        background: '#0d1117',
-        border: `2px solid ${selected ? color : '#2d3748'}`,
+        background: liveColor ? `${liveColor}11` : '#0d1117',
+        border: `2px solid ${borderColor}`,
         borderRadius: 6,
         padding: '6px 12px',
         minWidth: 120,
         textAlign: 'center',
         cursor: 'pointer',
-        animation: selected ? 'btPulse 1.2s ease-in-out infinite' : 'none',
-        transition: 'border-color 0.15s',
+        animation: isRunning ? 'btRunning 0.8s ease-in-out infinite' : selected ? 'btPulse 1.2s ease-in-out infinite' : 'none',
+        transition: 'border-color 0.1s, background 0.1s',
       }}>
         <div style={{ color, fontSize: 11, fontWeight: 700, letterSpacing: 2, marginBottom: 2 }}>
           {TYPE_SYMBOL[data.type]} {data.type.toUpperCase()}
+          {liveColor && <span style={{ marginLeft: 5, fontSize: 9, color: liveColor, verticalAlign: 'middle' }}>
+            {lr === 0 ? '✓' : lr === 1 ? '✗' : '…'}
+          </span>}
         </div>
         <div style={{ color: '#e2e8f0', fontSize: 12, fontFamily: 'monospace' }}>{data.label}</div>
         {data.subtitle && (
@@ -88,6 +102,100 @@ function BTNodeComponent({ data, selected }: NodeProps) {
 }
 
 const NODE_TYPES = { btNode: BTNodeComponent };
+
+// ── Floating / dockable panel ─────────────────────────────────────────────────
+function FloatingPanel({ title, children, onDock }: {
+  title: string;
+  children: React.ReactNode;
+  onDock: () => void;
+}) {
+  const [pos, setPos] = useState({ x: 800, y: 60 });
+  const [size, setSize] = useState({ w: 280, h: 400 });
+  const dragging = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+  const resizing = useRef<{ sx: number; sy: number; ow: number; oh: number } | null>(null);
+
+  // Place near right edge on first render
+  const initialised = useRef(false);
+  useEffect(() => {
+    if (initialised.current) return;
+    initialised.current = true;
+    setPos({ x: Math.max(0, window.innerWidth - 320), y: 60 });
+  }, []);
+
+  return (
+    <div style={{
+      position: 'fixed', left: pos.x, top: pos.y, width: size.w, height: size.h,
+      background: '#0d1117', border: '1px solid #4a5568',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.7)', zIndex: 1000,
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Drag handle / title bar */}
+      <div
+        style={{
+          background: '#161b22', borderBottom: '1px solid #2d3748', padding: '5px 8px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          cursor: 'grab', userSelect: 'none', flexShrink: 0,
+        }}
+        onMouseDown={e => {
+          e.preventDefault();
+          dragging.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y };
+          const onMove = (me: MouseEvent) => {
+            if (!dragging.current) return;
+            setPos({
+              x: Math.max(0, dragging.current.ox + me.clientX - dragging.current.sx),
+              y: Math.max(0, dragging.current.oy + me.clientY - dragging.current.sy),
+            });
+          };
+          const onUp = (me: MouseEvent) => {
+            dragging.current = null;
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            // Auto-dock when dragged into the right panel area
+            if (me.clientX > window.innerWidth - 240) onDock();
+          };
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        }}
+      >
+        <span style={{ color: '#a0aec0', fontSize: 10, letterSpacing: 2, fontFamily: 'monospace' }}>⠿ {title}</span>
+        <button
+          onClick={onDock}
+          title="Dock to side panel (or drag here)"
+          style={{ background: 'none', border: '1px solid #4a5568', color: '#a0aec0', cursor: 'pointer', fontSize: 10, padding: '1px 7px', lineHeight: '14px', fontFamily: 'monospace' }}
+        >
+          ⊣ dock
+        </button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>{children}</div>
+      {/* Resize grip */}
+      <div
+        title="Resize"
+        style={{
+          position: 'absolute', right: 0, bottom: 0, width: 14, height: 14,
+          cursor: 'se-resize', background: 'linear-gradient(135deg, transparent 50%, #4a5568 50%)',
+        }}
+        onMouseDown={e => {
+          e.stopPropagation();
+          resizing.current = { sx: e.clientX, sy: e.clientY, ow: size.w, oh: size.h };
+          const onMove = (me: MouseEvent) => {
+            if (!resizing.current) return;
+            setSize({
+              w: Math.max(200, resizing.current.ow + me.clientX - resizing.current.sx),
+              h: Math.max(150, resizing.current.oh + me.clientY - resizing.current.sy),
+            });
+          };
+          const onUp = () => {
+            resizing.current = null;
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+          };
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        }}
+      />
+    </div>
+  );
+}
 
 // ── Dagre layout (top-down) ───────────────────────────────────────────────────
 function applyDagre(nodes: Node[], edges: Edge[]): Node[] {
@@ -114,6 +222,7 @@ function nodeSubtitle(node: BTNode): string {
     return `${p.key} ${p.op ?? '=='} ${JSON.stringify(p.value)}`;
   }
   if (node.type === 'Leaf') return String(node.props.action ?? '');
+  if (node.type === 'SubTree') return String(node.props.tree_id ?? '?');
   if (node.type === 'Cooldown') return `${node.props.duration ?? '?'}s`;
   if (node.type === 'Repeat') return `×${node.props.count ?? '∞'}`;
   if (node.type === 'Timeout') return `timeout ${node.props.duration ?? '?'}s`;
@@ -154,34 +263,73 @@ function btToFlow(bt: BehaviorTree): { nodes: Node[]; edges: Edge[] } {
 const PALETTE: { group: string; types: BTNodeType[] }[] = [
   { group: 'COMPOSITE', types: ['Selector', 'Sequence', 'Parallel', 'RandomSelector'] },
   { group: 'DECORATOR', types: ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'] },
-  { group: 'LEAF',      types: ['Leaf', 'Condition', 'Wait'] },
+  { group: 'LEAF',      types: ['Leaf', 'Condition', 'Wait', 'SubTree'] },
 ];
 
 // ── Leaf action lists per NPC type ───────────────────────────────────────────
-const GENERIC_ACTIONS = ['SetBlackboard', 'RandomChance', 'PlayAnim', 'EmitSound', 'SetFacing'];
+const GENERIC_ACTIONS = ['SetBlackboard', 'RandomChance', 'PlayAnim', 'EmitSound', 'SetFacing', 'SetSpeed', 'ApplyVelocity', 'CheckGround'];
 
 const NPC_ACTIONS: Record<string, string[]> = {
-  guard:    ['Look0', 'Look1', 'Look2', 'Look3', 'Look4', 'Look5', 'UncrouchIdle', 'Chase', 'Patrol', 'SearchAndReturn', 'Stand', ...GENERIC_ACTIONS],
+  guard: [
+    // Scan + shoot leaves
+    'Look0', 'Look1', 'Look2', 'Look3', 'Look4', 'Look5',
+    'Scan',
+    // Standalone shoot leaves
+    'ShootStanding', 'ShootCrouched',
+    'ShootUp', 'ShootDown', 'ShootUpAngle', 'ShootDownAngle',
+    'ShootLadderUp', 'ShootLadderDown',
+    // Movement / posture
+    'Crouch', 'Uncrouch', 'UncrouchIdle',
+    'ClimbLadder', 'Chase', 'Patrol', 'SearchAndReturn', 'Stand',
+    // Attack
+    'SpawnProjectile', 'Raycast',
+    ...GENERIC_ACTIONS,
+  ],
   civilian: ['Run', 'Wander', 'WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'ReturnToSpawn', ...GENERIC_ACTIONS],
   robot:    ['WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'Patrol', 'ReturnToSpawn', ...GENERIC_ACTIONS],
+  magistrate: [
+    'CheckActivation',
+    'EmitSpawnSound', 'EmitDeathSound',
+    'Walk', 'TurnAround', 'Stand',
+    'SpawnDeathGuards', 'DeathFade',
+    ...GENERIC_ACTIONS,
+  ],
 };
 
 // All actions merged for unknown NPC types
 const ALL_ACTIONS = [...new Set([...Object.values(NPC_ACTIONS).flat()])].sort();
 
 const ACTION_DESC: Record<string, string> = {
-  // Guard
+  // Guard — scan + shoot combos
   Look0: 'Scan & shoot: forward (standing)',
   Look1: 'Scan & shoot: low (crouched)',
   Look2: 'Scan & shoot: upward',
   Look3: 'Scan & shoot: downward',
   Look4: 'Scan & shoot: up-angle',
   Look5: 'Scan & shoot: down-angle',
-  UncrouchIdle: 'Stand up from crouch and idle',
-  Chase: 'Run toward last known player position',
-  Patrol: 'Walk patrol route; stop to look around periodically',
-  SearchAndReturn: 'Search last known position then return to spawn',
-  Stand: 'Stand in place (idle)',
+  Scan: 'Scan all 6 directions; set target_seen + chasing if any hit (no shoot transition)',
+  // Guard — standalone shoot leaves (props: none; require cooldown ready)
+  ShootStanding:  'Fire forward from standing; Failure if cooldown not ready',
+  ShootCrouched:  'Fire from crouch; must already be crouched; Failure if cooldown not ready',
+  ShootUp:        'Fire upward from standing; Failure if cooldown not ready',
+  ShootDown:      'Fire downward from standing; Failure if cooldown not ready',
+  ShootUpAngle:   'Fire at upward angle from standing; Failure if cooldown not ready',
+  ShootDownAngle: 'Fire at downward angle from standing; Failure if cooldown not ready',
+  ShootLadderUp:  'Fire upward while on a ladder; Failure if not on ladder or cooldown not ready',
+  ShootLadderDown:'Fire downward while on a ladder; Failure if not on ladder or cooldown not ready',
+  // Guard — posture
+  Crouch:        'Transition to crouched; Running while crouching, Success when fully crouched',
+  Uncrouch:      'Stand up from crouch; Running while uncrouching, Success when upright',
+  UncrouchIdle:  'Stand up from crouch only when target_seen is false',
+  // Guard — movement
+  ClimbLadder:    'Snap to nearby ladder and climb. Props: direction = toward_target | toward_origin | up | down',
+  Chase:          'Walk horizontally toward last known target (patrol guards only)',
+  Patrol:         'Walk patrol route; stop to look around periodically',
+  SearchAndReturn:'Search last known position then return to spawn',
+  Stand:          'Stand in place for "duration" ticks (default 60). Returns Running then Success',
+  // Guard — attack
+  SpawnProjectile: 'Fire a projectile in direction 0–5 (same directions as Look0–5)',
+  Raycast: 'Cast a horizontal ray in facing direction; write hit bool to result_key',
   // Civilian
   Run: 'Flee from threat at run speed',
   Wander: 'Wander randomly within spawn area',
@@ -190,12 +338,22 @@ const ACTION_DESC: Record<string, string> = {
   LookSides: 'Look side to side (alert animation)',
   MeleeCheck: 'Check if player is in melee range; attack if so',
   ReturnToSpawn: 'Walk back to spawn point',
-  // Generic leaves
+  // Magistrate-specific
+  CheckActivation: 'Succeed once activationTicks elapsed or secretTriggerN secrets beamed; Running otherwise',
+  EmitSpawnSound:  'Play the magistrate spawn sound globally (once). Reads "sound" prop; falls back to GAS soundActivate',
+  EmitDeathSound:  'Play the magistrate death sound globally (once). Reads "sound" prop; falls back to GAS soundDeath',
+  Walk:            'Walk in current facing direction; auto-turns at platform edges (Civilian pattern). Always Running',
+  TurnAround:      'Flip facing direction immediately. Always Success',
+  SpawnDeathGuards:'Spawn death guards/robots at death position (authority only, idempotent). Always Success',
+  DeathFade:       'Fade out over "duration" ticks then set state=DEAD. Running while playing, Success when done',
   PlayAnim: 'Play a sprite bank animation (bank, frames, loop)',
   EmitSound: 'Play a named sound from the world soundbank',
   SetFacing: 'Set entity facing direction (left / right / flip)',
   SetBlackboard: 'Write a constant value to a blackboard key',
   RandomChance: 'Succeed with probability = chance (0.0–1.0)',
+  SetSpeed: 'Override movement speed (Uint8); affects patrol and chase velocity',
+  ApplyVelocity: 'Directly set xv and/or yv on the actor this tick',
+  CheckGround: 'Write grounded state (yv==0) to blackboard key; succeeds if grounded',
 };
 
 const LOOK_DIRECTIONS: { value: number; label: string }[] = [
@@ -212,7 +370,7 @@ const NODE_DESC: Record<string, string> = {
   Selector:       'Tries children left→right. Returns Success on the first child that succeeds, Failure if all fail. Reactive: re-evaluates from child[0] every tick.',
   Sequence:       'Runs children left→right. Returns Failure on the first child that fails, Success only when all children succeed.',
   Parallel:       'Ticks all children every tick simultaneously. Returns Success when all succeed, Failure when any fail.',
-  RandomSelector: 'Like Selector but shuffles children order each tick.',
+  RandomSelector: 'Like Selector but picks one child randomly each tick. If a "weights" array prop is set, children are sampled proportionally by weight.',
   Inverter:       'Inverts child result: Success↔Failure. Running passes through.',
   Cooldown:       'Blocks child for DURATION seconds after the child returns Success.',
   Repeat:         'Re-runs child COUNT times (0 = infinite). Returns Failure if child ever fails.',
@@ -221,6 +379,7 @@ const NODE_DESC: Record<string, string> = {
   Wait:           'Returns Running for DURATION seconds, then Success.',
   Leaf:           'Dispatches to a named C++ action handler. Look0–Look5 scan + shoot in direction 0–5 (Forward/Low/Up/Down/UpAngle/DownAngle).',
   Condition:      'Reads a blackboard key and compares it to a literal value. Returns Success if the comparison is true.',
+  SubTree:        'Ticks another behavior tree by ID (from shared/assets/behaviortrees/). Props: tree_id — the filename stem of the target tree.',
 };
 
 // ── Main editor ───────────────────────────────────────────────────────────────
@@ -255,6 +414,80 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     fetch(`${API}/sprites`).then(r => r.json()).then((d: { bank: number; frames: number }[]) => setSpriteBanks(d)).catch(() => {});
     apiFetch('/sounds').then((d) => setSoundNames((d as { name: string }[]).map(s => s.name).sort())).catch(() => {});
   }, []);
+
+  // Live blackboard + node results from game via ws://localhost:9339
+  type LiveMsg = { type: string; id: number; blackboard: Record<string, unknown>; nodeResults: Record<string, number> };
+  const [liveActors, setLiveActors] = useState<Record<string, LiveMsg>>({});
+  const [selectedActor, setSelectedActor] = useState<string>('');
+  const [wsConnected, setWsConnected] = useState(false);
+  const liveActorsRef = useRef<Record<string, LiveMsg>>({});
+
+  // Apply node results from the selected actor onto the ReactFlow canvas
+  const selectedActorRef = useRef('');
+
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let dead = false;
+    let flushTimer: ReturnType<typeof setInterval>;
+
+    function connect() {
+      if (dead) return;
+      try {
+        ws = new WebSocket('ws://localhost:9339');
+        ws.onopen  = () => { setWsConnected(true); flushTimer = setInterval(flush, 100); };
+        ws.onclose = () => {
+          setWsConnected(false);
+          clearInterval(flushTimer);
+          liveActorsRef.current = {};
+          setLiveActors({});
+          selectedActorRef.current = '';
+          setSelectedActor('');
+          setRfNodes(prev => prev.map(n => ({ ...n, data: { ...n.data, liveResult: undefined } })));
+          if (!dead) setTimeout(connect, 2000);
+        };
+        ws.onerror = () => ws?.close();
+        ws.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data as string) as LiveMsg;
+            const key = `${msg.type}#${msg.id}`;
+            liveActorsRef.current[key] = msg;
+          } catch { /* ignore */ }
+        };
+      } catch { /* WS not available */ }
+    }
+
+    function flush() {
+      const actors = liveActorsRef.current;
+      // Pick actor: keep current if still alive, else first available
+      let key = selectedActorRef.current;
+      if (!key || !actors[key]) key = Object.keys(actors)[0] ?? '';
+      if (key !== selectedActorRef.current) {
+        selectedActorRef.current = key;
+        setSelectedActor(key);
+      }
+      setLiveActors({ ...actors });
+      // Apply node result colors directly to canvas
+      const msg = key ? actors[key] : null;
+      setRfNodes(prev => prev.map(n => ({
+        ...n,
+        data: { ...n.data, liveResult: msg ? msg.nodeResults[n.id] : undefined },
+      })));
+    }
+
+    connect();
+    return () => { dead = true; ws?.close(); clearInterval(flushTimer); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-apply when user manually switches actor
+  function switchActor(key: string) {
+    selectedActorRef.current = key;
+    setSelectedActor(key);
+    const msg = liveActorsRef.current[key];
+    setRfNodes(prev => prev.map(n => ({
+      ...n,
+      data: { ...n.data, liveResult: msg ? msg.nodeResults[n.id] : undefined },
+    })));
+  }
 
   // Sync BT → ReactFlow
   useEffect(() => {
@@ -343,8 +576,8 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     if (!parentNode) return;
     if (parentNode.children.includes(params.target)) return; // already connected
 
-    // Leaf, Condition, Wait cannot have children
-    if (['Leaf', 'Condition', 'Wait'].includes(parentNode.type)) return;
+    // Leaf, Condition, Wait, SubTree cannot have children
+    if (['Leaf', 'Condition', 'Wait', 'SubTree'].includes(parentNode.type)) return;
 
     const isDecorator = ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'].includes(parentNode.type);
     if (isDecorator && parentNode.children.length >= 1) return;
@@ -385,7 +618,7 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
     for (const [pid, node] of Object.entries(cur.nodes)) {
       const isDecorator = ['Inverter', 'Cooldown', 'Repeat', 'Timeout', 'ForceSuccess'].includes(node.type);
       if (isDecorator && node.children.length !== 1) return `Decorator "${pid}" must have exactly 1 child`;
-      const isLeaf = ['Leaf', 'Condition', 'Wait'].includes(node.type);
+      const isLeaf = ['Leaf', 'Condition', 'Wait', 'SubTree'].includes(node.type);
       if (isLeaf && node.children.length > 0) return `${node.type} "${pid}" must have 0 children`;
       for (const cid of node.children) {
         parentCount[cid] = (parentCount[cid] ?? 0) + 1;
@@ -527,7 +760,141 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
   const bbKeyNames = bt.blackboard.map(k => k.key);
   const bbDupes = new Set(bbKeyNames.filter((k, i) => bbKeyNames.indexOf(k) !== i));
 
+  const [bbFloating, setBBFloating] = useState(false);
+  const [liveBBFloating, setLiveBBFloating] = useState(false);
+
+  // ── Shared JSX fragments (used in both docked and floating render paths) ──
+  const bbKeysList = (
+    <>
+      {bt.blackboard.length === 0 && (
+        <div style={{ color: '#4a5568', fontSize: 10, padding: '8px 0' }}>No keys — add one above</div>
+      )}
+      {bt.blackboard.map((k, i) => {
+        const typeColor = BB_TYPE_COLOR[k.type] ?? '#718096';
+        const isDupe = bbDupes.has(k.key);
+        const usedBy = bbUsedBy(k.key);
+        return (
+          <div key={i} style={{
+            marginBottom: 8, padding: '8px', background: '#0d1117',
+            border: `1px solid ${isDupe ? '#ef4444' : '#2d3748'}`,
+            borderLeft: `3px solid ${typeColor}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+              <input
+                value={k.key}
+                onChange={e => updateBBKey(i, { key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })}
+                placeholder="key_name"
+                style={{
+                  flex: 1, background: 'none', border: 'none', borderBottom: `1px solid ${isDupe ? '#ef4444' : '#2d3748'}`,
+                  color: isDupe ? '#ef4444' : '#e2e8f0', fontSize: 12, fontFamily: 'monospace',
+                  padding: '1px 0', minWidth: 0, outline: 'none',
+                }}
+              />
+              <button onClick={() => removeBBKey(i)}
+                style={{ background: 'none', border: 'none', color: '#4a5568', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
+                title="Remove key">✕</button>
+            </div>
+            {isDupe && <div style={{ color: '#ef4444', fontSize: 9, marginBottom: 4 }}>⚠ duplicate key name</div>}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, flexShrink: 0 }}>TYPE</span>
+              <div style={{ display: 'flex', gap: 2, flex: 1 }}>
+                {(['bool', 'int', 'float', 'string'] as BBKey['type'][]).map(t => (
+                  <button key={t} onClick={() => updateBBKey(i, { type: t })}
+                    style={{
+                      flex: 1, padding: '2px 0', fontSize: 9, fontFamily: 'monospace', cursor: 'pointer',
+                      background: k.type === t ? `${BB_TYPE_COLOR[t]}22` : 'transparent',
+                      border: `1px solid ${k.type === t ? BB_TYPE_COLOR[t] : '#2d3748'}`,
+                      color: k.type === t ? BB_TYPE_COLOR[t] : '#4a5568',
+                      letterSpacing: 0,
+                    }}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, flexShrink: 0 }}>DEFAULT</span>
+              {k.type === 'bool' ? (
+                <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+                  {[true, false].map(v => (
+                    <button key={String(v)} onClick={() => updateBBKey(i, { default: v })}
+                      style={{
+                        flex: 1, padding: '2px 0', fontSize: 9, fontFamily: 'monospace', cursor: 'pointer',
+                        background: k.default === v ? (v ? '#14532d' : '#450a0a') : 'transparent',
+                        border: `1px solid ${k.default === v ? (v ? '#22c55e' : '#ef4444') : '#2d3748'}`,
+                        color: k.default === v ? (v ? '#22c55e' : '#f87171') : '#4a5568',
+                      }}>
+                      {String(v)}
+                    </button>
+                  ))}
+                </div>
+              ) : k.type === 'int' ? (
+                <input type="number" step={1} value={Number(k.default ?? 0)}
+                  onChange={e => updateBBKey(i, { default: parseInt(e.target.value) })}
+                  style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
+              ) : k.type === 'float' ? (
+                <input type="number" step={0.1} value={Number(k.default ?? 0)}
+                  onChange={e => updateBBKey(i, { default: parseFloat(e.target.value) })}
+                  style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
+              ) : (
+                <input value={String(k.default ?? '')}
+                  onChange={e => updateBBKey(i, { default: e.target.value })}
+                  style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
+              )}
+            </div>
+            {usedBy > 0 && (
+              <div style={{ marginTop: 5, fontSize: 9, color: typeColor, letterSpacing: 0.5 }}>
+                ↳ used by {usedBy} condition{usedBy > 1 ? 's' : ''}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+
+  const liveBBContent = (
+    <>
+      {!wsConnected && (
+        <div style={{ color: '#4a5568', fontSize: 9 }}>
+          Start the game to stream live blackboard data.
+        </div>
+      )}
+      {wsConnected && Object.keys(liveActors).length === 0 && (
+        <div style={{ color: '#4a5568', fontSize: 9 }}>Connected — waiting for first tick…</div>
+      )}
+      {Object.keys(liveActors).length > 0 && (
+        <>
+          <select value={selectedActor} onChange={e => switchActor(e.target.value)}
+            style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+            {Object.keys(liveActors).sort().map(k => (
+              <option key={k} value={k}>{k}</option>
+            ))}
+          </select>
+          {liveActors[selectedActor] && (
+            <>
+              <div style={{ color: '#4a5568', fontSize: 9, marginBottom: 6, letterSpacing: 1 }}>
+                <span style={{ color: '#22c55e' }}>■</span> success&nbsp;&nbsp;
+                <span style={{ color: '#ef4444' }}>■</span> failure&nbsp;&nbsp;
+                <span style={{ color: '#f59e0b' }}>■</span> running
+              </div>
+              {Object.entries(liveActors[selectedActor].blackboard).sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 4 }}>
+                  <span style={{ color: '#718096', fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0, maxWidth: '55%' }}>{k}</span>
+                  <span style={{ color: '#e2e8f0', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {JSON.stringify(v)}
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+        </>
+      )}
+    </>
+  );
+
   return (
+    <>
     <div style={{ display: 'flex', height: '100%', background: '#0d1117' }}>
       {/* Left palette */}
       <div style={{ width: 160, borderRight: '1px solid #2d3748', padding: '12px 8px', overflowY: 'auto', flexShrink: 0 }}>
@@ -737,11 +1104,18 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                   const action = String(selectedNode.props.action ?? '');
                   // Known props handled by dedicated UI below — exclude from generic editor
                   const knownProps: Record<string, string[]> = {
-                    PlayAnim:      ['bank', 'frames', 'loop'],
-                    EmitSound:     ['sound', 'volume'],
-                    SetFacing:     ['dir'],
-                    RandomChance:  ['chance'],
-                    SetBlackboard: ['key', 'value'],
+                    PlayAnim:        ['bank', 'frames', 'loop'],
+                    EmitSound:       ['sound', 'volume', 'global'],
+                    EmitSpawnSound:  ['sound'],
+                    EmitDeathSound:  ['sound'],
+                    SetFacing:       ['dir'],
+                    RandomChance:    ['chance'],
+                    SetBlackboard:   ['key', 'value'],
+                    SetSpeed:        ['speed'],
+                    ApplyVelocity:   ['xv', 'yv'],
+                    SpawnProjectile: ['direction'],
+                    CheckGround:     ['key'],
+                    Raycast:         ['range', 'result_key'],
                   };
                   const reserved = new Set(['action', ...(knownProps[action] ?? [])]);
                   const extraKeys = Object.keys(selectedNode.props).filter(k => !reserved.has(k));
@@ -806,7 +1180,32 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                         <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>VOLUME (0–128)</label>
                         <input type="number" min={0} max={128} step={1} value={Number(selectedNode.props.volume ?? 100)}
                           onChange={e => updateProp('volume', parseInt(e.target.value))}
-                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>GLOBAL (no distance attenuation)</label>
+                        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                          {[false, true].map(v => {
+                            const active = (selectedNode.props.global === true) === v;
+                            return (
+                              <button key={String(v)} onClick={() => updateProp('global', v)}
+                                style={{ flex: 1, padding: '4px 0', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer',
+                                  background: active ? '#14532d' : '#161b22',
+                                  border: `1px solid ${active ? '#22c55e' : '#2d3748'}`,
+                                  color: active ? '#22c55e' : '#4a5568' }}>
+                                {v ? 'global' : 'spatial'}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>)}
+
+                      {/* EmitSpawnSound / EmitDeathSound knobs — sound dropdown only */}
+                      {(action === 'EmitSpawnSound' || action === 'EmitDeathSound') && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>SOUND</label>
+                        <select value={String(selectedNode.props.sound ?? '')} onChange={e => updateProp('sound', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                          <option value="">— select sound —</option>
+                          {soundNames.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
                       </>)}
 
                       {/* SetFacing knobs */}
@@ -845,6 +1244,58 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                           style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
                       </>)}
 
+                      {/* SetSpeed knobs */}
+                      {action === 'SetSpeed' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>SPEED</label>
+                        <input type="number" min={1} max={20} step={1} value={Number(selectedNode.props.speed ?? 5)}
+                          onChange={e => updateProp('speed', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* ApplyVelocity knobs */}
+                      {action === 'ApplyVelocity' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>XV</label>
+                        <input type="number" min={-20} max={20} step={1} value={Number(selectedNode.props.xv ?? 0)}
+                          onChange={e => updateProp('xv', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>YV</label>
+                        <input type="number" min={-20} max={20} step={1} value={Number(selectedNode.props.yv ?? 0)}
+                          onChange={e => updateProp('yv', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* SpawnProjectile knobs */}
+                      {action === 'SpawnProjectile' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>DIRECTION</label>
+                        <select value={Number(selectedNode.props.direction ?? 0)} onChange={e => updateProp('direction', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                          <option value={0}>0 — Forward (standing)</option>
+                          <option value={1}>1 — Low (crouched)</option>
+                          <option value={2}>2 — Up</option>
+                          <option value={3}>3 — Down</option>
+                          <option value={4}>4 — Up-angle</option>
+                          <option value={5}>5 — Down-angle</option>
+                        </select>
+                      </>)}
+
+                      {/* CheckGround knobs */}
+                      {action === 'CheckGround' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>RESULT KEY</label>
+                        <input value={String(selectedNode.props.key ?? 'on_ground')} onChange={e => updateProp('key', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
+                      {/* Raycast knobs */}
+                      {action === 'Raycast' && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>RANGE (px)</label>
+                        <input type="number" min={10} max={1000} step={10} value={Number(selectedNode.props.range ?? 200)}
+                          onChange={e => updateProp('range', parseInt(e.target.value))}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>RESULT KEY</label>
+                        <input value={String(selectedNode.props.result_key ?? 'ray_hit')} onChange={e => updateProp('result_key', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                      </>)}
+
                       {/* Remaining unknown props */}
                       {extraKeys.length > 0 && (
                         <>
@@ -878,6 +1329,9 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                   <option value="">— select key —</option>
                   {bt.blackboard.map(k => <option key={k.key} value={k.key}>{k.key}</option>)}
                 </select>
+                <div style={{ color: '#4a5568', fontSize: 9, fontFamily: 'monospace', lineHeight: 1.6, marginBottom: 6 }}>
+                  AUTO (written each tick): health_pct · dist_to_target · on_ladder · has_target · at_ladder · state_name · on_ground (CheckGround)
+                </div>
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>OPERATOR</label>
                 {(() => {
                   const bbEntry = bt.blackboard.find(k => k.key === selectedNode.props.key);
@@ -975,6 +1429,60 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
               </>
             )}
 
+            {selectedNode.type === 'SubTree' && (
+              <>
+                <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>TREE ID</label>
+                <input type="text" value={String(selectedNode.props.tree_id ?? '')}
+                  onChange={e => updateProp('tree_id', e.target.value)}
+                  placeholder="e.g. guard-rocket"
+                  style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                <div style={{ color: '#4a5568', fontSize: 9, marginBottom: 8 }}>
+                  Filename stem of the target tree in shared/assets/behaviortrees/
+                </div>
+              </>
+            )}
+
+            {selectedNode.type === 'RandomSelector' && selectedNode.children.length > 0 && (
+              <>
+                <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>
+                  WEIGHTS (one per child; leave blank for uniform)
+                </label>
+                {selectedNode.children.map((childId, i) => {
+                  const weights: Array<number | null> = Array.isArray(selectedNode.props.weights)
+                    ? (selectedNode.props.weights as Array<number | null>)
+                    : [];
+                  const w = weights[i] ?? null;
+                  return (
+                    <div key={childId} style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 2 }}>
+                      <span style={{ color: '#4a5568', fontSize: 9, width: 60, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        child {i + 1}
+                      </span>
+                      <input type="number" min={0} step={0.1} value={w === null ? '' : w}
+                        placeholder="1"
+                        onChange={e => {
+                          const next: (number | null)[] = Array.isArray(selectedNode.props.weights)
+                            ? [...(selectedNode.props.weights as number[])]
+                            : new Array(selectedNode.children.length).fill(null);
+                          while (next.length < selectedNode.children.length) next.push(null);
+                          const v = e.target.value === '' ? null : parseFloat(e.target.value);
+                          next[i] = v;
+                          const allNull = next.every(x => x === null);
+                          if (allNull) {
+                            updateProp('weights', undefined);
+                          } else {
+                            updateProp('weights', next.map(x => x ?? 1));
+                          }
+                        }}
+                        style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '3px 5px', fontSize: 11, fontFamily: 'monospace', boxSizing: 'border-box' }} />
+                    </div>
+                  );
+                })}
+                <div style={{ color: '#4a5568', fontSize: 9, marginTop: 4, marginBottom: 8 }}>
+                  With weights: ONE child is sampled per tick (weighted random). Without: all children tried in random order.
+                </div>
+              </>
+            )}
+
             <div style={{ color: '#4a5568', fontSize: 10, letterSpacing: 1, marginTop: 4 }}>
               ID: {selectedNodeId}
               {selectedNodeId === bt.rootId && <span style={{ color: '#f59e0b', marginLeft: 4 }}>(root)</span>}
@@ -996,7 +1504,57 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
           </div>
         )}
 
-        {/* Blackboard editor */}
+        {/* Blackboard editor — docked */}
+        {!bbFloating && (
+          <div style={{ padding: '12px 10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ color: '#718096', fontSize: 10, letterSpacing: 2 }}>
+                BLACKBOARD
+                {bt.blackboard.length > 0 && (
+                  <span style={{ marginLeft: 6, color: '#4a5568' }}>({bt.blackboard.length})</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <button onClick={() => setBBFloating(true)} title="Pop out as floating panel"
+                  style={{ background: 'none', border: '1px solid #2d3748', color: '#4a5568', fontSize: 11, padding: '1px 5px', cursor: 'pointer', fontFamily: 'monospace', lineHeight: '14px' }}>
+                  ⊢
+                </button>
+                <button onClick={addBBKey}
+                  style={{ background: 'none', border: '1px solid #2d3748', color: '#a0aec0', fontSize: 10, padding: '2px 8px', cursor: 'pointer', fontFamily: 'monospace', letterSpacing: 1 }}>
+                  + KEY
+                </button>
+              </div>
+            </div>
+            {bbKeysList}
+          </div>
+        )}
+
+        {/* Live blackboard — docked */}
+        {!liveBBFloating && (
+          <div style={{ padding: '12px 10px', borderTop: '1px solid #2d3748' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ color: '#718096', fontSize: 10, letterSpacing: 2 }}>LIVE BLACKBOARD</div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: wsConnected ? '#22c55e' : '#4a5568',
+                  boxShadow: wsConnected ? '0 0 4px #22c55e' : 'none',
+                }} title={wsConnected ? 'connected' : 'waiting for game on port 9339'} />
+                <button onClick={() => setLiveBBFloating(true)} title="Pop out as floating panel"
+                  style={{ background: 'none', border: '1px solid #2d3748', color: '#4a5568', fontSize: 11, padding: '1px 5px', cursor: 'pointer', fontFamily: 'monospace', lineHeight: '14px' }}>
+                  ⊢
+                </button>
+              </div>
+            </div>
+            {liveBBContent}
+          </div>
+        )}
+      </div>
+    </div>
+
+    {/* Floating blackboard panel */}
+    {bbFloating && (
+      <FloatingPanel title="BLACKBOARD" onDock={() => setBBFloating(false)}>
         <div style={{ padding: '12px 10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ color: '#718096', fontSize: 10, letterSpacing: 2 }}>
@@ -1010,98 +1568,27 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
               + KEY
             </button>
           </div>
-          {bt.blackboard.length === 0 && (
-            <div style={{ color: '#4a5568', fontSize: 10, padding: '8px 0' }}>No keys — add one above</div>
-          )}
-          {bt.blackboard.map((k, i) => {
-            const typeColor = BB_TYPE_COLOR[k.type] ?? '#718096';
-            const isDupe = bbDupes.has(k.key);
-            const usedBy = bbUsedBy(k.key);
-            return (
-              <div key={i} style={{
-                marginBottom: 8, padding: '8px', background: '#0d1117',
-                border: `1px solid ${isDupe ? '#ef4444' : '#2d3748'}`,
-                borderLeft: `3px solid ${typeColor}`,
-              }}>
-                {/* Row 1: key name + delete */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-                  <input
-                    value={k.key}
-                    onChange={e => updateBBKey(i, { key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })}
-                    placeholder="key_name"
-                    style={{
-                      flex: 1, background: 'none', border: 'none', borderBottom: `1px solid ${isDupe ? '#ef4444' : '#2d3748'}`,
-                      color: isDupe ? '#ef4444' : '#e2e8f0', fontSize: 12, fontFamily: 'monospace',
-                      padding: '1px 0', minWidth: 0, outline: 'none',
-                    }}
-                  />
-                  <button onClick={() => removeBBKey(i)}
-                    style={{ background: 'none', border: 'none', color: '#4a5568', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
-                    title="Remove key">✕</button>
-                </div>
-                {isDupe && (
-                  <div style={{ color: '#ef4444', fontSize: 9, marginBottom: 4 }}>⚠ duplicate key name</div>
-                )}
-                {/* Row 2: type select */}
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, flexShrink: 0 }}>TYPE</span>
-                  <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-                    {(['bool', 'int', 'float', 'string'] as BBKey['type'][]).map(t => (
-                      <button key={t} onClick={() => updateBBKey(i, { type: t })}
-                        style={{
-                          flex: 1, padding: '2px 0', fontSize: 9, fontFamily: 'monospace', cursor: 'pointer',
-                          background: k.type === t ? `${BB_TYPE_COLOR[t]}22` : 'transparent',
-                          border: `1px solid ${k.type === t ? BB_TYPE_COLOR[t] : '#2d3748'}`,
-                          color: k.type === t ? BB_TYPE_COLOR[t] : '#4a5568',
-                          letterSpacing: 0,
-                        }}>
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {/* Row 3: default value */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, flexShrink: 0 }}>DEFAULT</span>
-                  {k.type === 'bool' ? (
-                    <div style={{ display: 'flex', gap: 3, flex: 1 }}>
-                      {[true, false].map(v => (
-                        <button key={String(v)} onClick={() => updateBBKey(i, { default: v })}
-                          style={{
-                            flex: 1, padding: '2px 0', fontSize: 9, fontFamily: 'monospace', cursor: 'pointer',
-                            background: k.default === v ? (v ? '#14532d' : '#450a0a') : 'transparent',
-                            border: `1px solid ${k.default === v ? (v ? '#22c55e' : '#ef4444') : '#2d3748'}`,
-                            color: k.default === v ? (v ? '#22c55e' : '#f87171') : '#4a5568',
-                          }}>
-                          {String(v)}
-                        </button>
-                      ))}
-                    </div>
-                  ) : k.type === 'int' ? (
-                    <input type="number" step={1} value={Number(k.default ?? 0)}
-                      onChange={e => updateBBKey(i, { default: parseInt(e.target.value) })}
-                      style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
-                  ) : k.type === 'float' ? (
-                    <input type="number" step={0.1} value={Number(k.default ?? 0)}
-                      onChange={e => updateBBKey(i, { default: parseFloat(e.target.value) })}
-                      style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
-                  ) : (
-                    <input value={String(k.default ?? '')}
-                      onChange={e => updateBBKey(i, { default: e.target.value })}
-                      style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
-                  )}
-                </div>
-                {/* Row 4: usage */}
-                {usedBy > 0 && (
-                  <div style={{ marginTop: 5, fontSize: 9, color: typeColor, letterSpacing: 0.5 }}>
-                    ↳ used by {usedBy} condition{usedBy > 1 ? 's' : ''}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {bbKeysList}
         </div>
-      </div>
-    </div>
+      </FloatingPanel>
+    )}
+
+    {/* Floating live blackboard panel */}
+    {liveBBFloating && (
+      <FloatingPanel title="LIVE BLACKBOARD" onDock={() => setLiveBBFloating(false)}>
+        <div style={{ padding: '12px 10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ color: '#718096', fontSize: 10, letterSpacing: 2 }}>LIVE BLACKBOARD</div>
+            <div style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: wsConnected ? '#22c55e' : '#4a5568',
+              boxShadow: wsConnected ? '0 0 4px #22c55e' : 'none',
+            }} title={wsConnected ? 'connected' : 'waiting for game on port 9339'} />
+          </div>
+          {liveBBContent}
+        </div>
+      </FloatingPanel>
+    )}
+    </>
   );
 }

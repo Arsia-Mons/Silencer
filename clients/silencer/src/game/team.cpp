@@ -70,6 +70,7 @@ void Team::Tick(World & world){
 	}
 	if(secretdelivered){
 		secrets++;
+		world.secretsBeamed++;
 		world.SendSound(GASLoader::Get().player.soundTeamHQ.c_str());
 		Player * player = static_cast<Player *>(world.GetObjectFromId(secretdelivered));
 		if(player){

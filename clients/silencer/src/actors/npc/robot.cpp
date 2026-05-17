@@ -1,4 +1,5 @@
 #include "robot.h"
+#include "btdebug.h"
 #include "rocketprojectile.h"
 #include "plasmaprojectile.h"
 #include "player.h"
@@ -24,6 +25,7 @@ Robot::Robot() : Object(ObjectTypes::ROBOT){
 	{ const EnemyDef* _rd = GASLoader::Get().GetEnemyDef("robot");
 	  snapshotinterval = _rd ? _rd->snapshotInterval : 48; }
 	respawnseconds = r ? r->respawnSeconds : 45;
+	speed = r ? r->speed : 4;
 	virusplanter = 0;
 	damaging = 0;
 	soundchannel = -1;
@@ -32,7 +34,9 @@ Robot::Robot() : Object(ObjectTypes::ROBOT){
 }
 
 void Robot::InitBT() {
-	bt_ = BehaviorTreeLibrary::instance().get("robot");
+	const EnemyDef* r = GASLoader::Get().GetEnemyDef("robot");
+	std::string treeId = (r && !r->behaviorTree.empty()) ? r->behaviorTree : "robot";
+	bt_ = BehaviorTreeLibrary::instance().get(treeId);
 	if (!bt_) return;
 
 	// WakeUp: only fires from ASLEEP — look both sides, awaken if target found.
@@ -113,7 +117,7 @@ void Robot::InitBT() {
 	btctx_.actions["Patrol"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		World& world = *static_cast<World*>(ctx.userData);
-		{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); xv = mirrored ? -(_gd ? _gd->speed : 4) : (_gd ? _gd->speed : 4); }
+		xv = mirrored ? -(Sint8)speed : (Sint8)speed;
 		FollowGround(*this, world, xv);
 		if (DistanceToEnd(*this, world) <= world.minwalldistance) mirrored = !mirrored;
 		return BTResult::Success;
@@ -121,6 +125,7 @@ void Robot::InitBT() {
 
 	// ReturnToSpawn: after search phase (!patrol, searchTicks from GAS), walk back to spawn and sleep.
 	// If a target is spotted en-route, reset the search timer and resume hunting.
+	// Drives its own movement (returns Running) so Patrol's wall-flip can't override our facing.
 	btctx_.actions["ReturnToSpawn"] = [this](BTContext& ctx) -> BTResult {
 		if (state != WALKING) return BTResult::Failure;
 		if (patrol) return BTResult::Failure;
@@ -131,14 +136,17 @@ void Robot::InitBT() {
 			bt_walk_ticks_ = 0; // target spotted — reset and keep hunting
 			return BTResult::Failure;
 		}
-		// Orient toward spawn and let Patrol move us there
 		mirrored = (signed(originalx) < signed(x));
-		if (abs(signed(x) - signed(originalx)) <= (GASLoader::Get().GetEnemyDef("robot") ? GASLoader::Get().GetEnemyDef("robot")->returnProximity : 20)) {
+		if (abs(signed(x) - signed(originalx)) <= (_rd ? _rd->returnProximity : 20)) {
 			state = SLEEPING;
 			state_i = -1;
 			return BTResult::Success;
 		}
-		return BTResult::Failure; // not at spawn yet — Patrol will move us
+		// Move toward spawn directly — don't fall through to Patrol which would
+		// flip mirrored at platform edges and send the robot the wrong way.
+		xv = mirrored ? -(Sint8)speed : (Sint8)speed;
+		FollowGround(*this, world, xv);
+		return BTResult::Running;
 	};
 
 	// ── Generic data-driven leaves ────────────────────────────────────────────
@@ -181,6 +189,28 @@ void Robot::InitBT() {
 		else                    mirrored = !mirrored;
 		return BTResult::Success;
 	};
+
+	btctx_.actions["SetSpeed"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.props) return BTResult::Failure;
+		int spd = ctx.props->value("speed", -1);
+		if (spd < 0) return BTResult::Failure;
+		speed = (Uint8)spd;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ApplyVelocity"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.props) return BTResult::Failure;
+		if (ctx.props->contains("xv")) xv = (Sint8)ctx.props->value("xv", 0);
+		if (ctx.props->contains("yv")) yv = (Sint8)ctx.props->value("yv", 0);
+		return BTResult::Success;
+	};
+
+	btctx_.actions["CheckGround"] = [this](BTContext& ctx) -> BTResult {
+		std::string key = ctx.props ? ctx.props->value("key", std::string{"on_ground"}) : "on_ground";
+		bool grounded = (yv == 0);
+		ctx.bbSet(key, grounded);
+		return grounded ? BTResult::Success : BTResult::Failure;
+	};
 }
 
 void Robot::Serialize(bool write, Serializer & data, Serializer * old){
@@ -191,6 +221,8 @@ void Robot::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, virusplanter, old);
 	data.Serialize(write, patrol, old);
 	data.Serialize(write, shootcooldown, old);
+	data.Serialize(write, originalx, old);
+	data.Serialize(write, originaly, old);
 }
 
 void Robot::Tick(World & world){
@@ -326,7 +358,7 @@ void Robot::Tick(World & world){
 						{ const EnemyDef* rd = GASLoader::Get().GetEnemyDef("robot"); EmitSound(world, world.resources.soundbank[(rd && !rd->soundFire.empty()) ? rd->soundFire : "!laserew.wav"], 64); }
 					}
 				}
-				{ const EnemyDef* _gd = GASLoader::Get().GetEnemyDef("robot"); xv = mirrored ? -(_gd ? _gd->speed : 4) : (_gd ? _gd->speed : 4); }
+				xv = mirrored ? -(Sint8)speed : (Sint8)speed;
 				FollowGround(*this, world, xv);
 				if(DistanceToEnd(*this, world) <= world.minwalldistance){
 					mirrored = mirrored ? false : true;
@@ -459,7 +491,25 @@ void Robot::Tick(World & world){
 	if (bt_ && (state == ASLEEP || state == WALKING)) {
 		btctx_.userData = &world;
 		btctx_.bbSet("patrol", (bool)patrol);
+		btctx_.bbSet("health_pct", maxhealth > 0 ? (float)health / (float)maxhealth : 0.0f);
+		btctx_.bbSet("on_ladder", false);
+		{
+			const char* sn = "unknown";
+			switch(state){
+				case NEW:       sn = "new"; break;
+				case SLEEPING:  sn = "sleeping"; break;
+				case ASLEEP:    sn = "asleep"; break;
+				case AWAKENING: sn = "awakening"; break;
+				case WALKING:   sn = "walking"; break;
+				case SHOOTING:  sn = "shooting"; break;
+				case DYING:     sn = "dying"; break;
+				case DEAD:      sn = "dead"; break;
+			}
+			btctx_.bbSet("state_name", std::string{sn});
+		}
+		btctx_.bbSet("dist_to_target", -1);
 		bt_->tick(btctx_);
+		BTDebug::broadcast("robot", id, btctx_.blackboard, btctx_.nodeResults);
 	}
 
 	if(damaging){

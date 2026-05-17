@@ -32,6 +32,7 @@ private:
 	Uint8 respawnseconds;
 	Uint8 shootcooldown;
 	int soundchannel;
+	Uint8 speed;
 	const BehaviorTree* bt_ = nullptr;
 	BTContext btctx_;
 	int bt_walk_ticks_ = 0; // non-serialized patrol timer for BT (state_i is Uint8, too small)

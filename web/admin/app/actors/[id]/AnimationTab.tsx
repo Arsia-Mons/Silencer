@@ -4,17 +4,38 @@
  * C4: Live preview canvas at game speed (60fps rAF loop)
  */
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { getSpriteFrames, type FrameMeta, type ActorDef } from '../../../lib/api';
+import { apiFetch, getSpriteFrames, type FrameMeta, type ActorDef } from '../../../lib/api';
+import { decodeAdpcmWav } from '../../../lib/adpcm';
+
+const audioCtxRef = { current: null as AudioContext | null };
+function getAudioCtx(): AudioContext {
+  if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+  return audioCtxRef.current;
+}
+
+async function playSound(name: string, volume: number) {
+  const r = await fetch(`/api/sounds/${encodeURIComponent(name)}/play`);
+  if (!r.ok) return;
+  const buf = await r.arrayBuffer();
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') await ctx.resume();
+  const decoded = await decodeAdpcmWav(buf, ctx);
+  const gain = ctx.createGain();
+  gain.gain.value = Math.min(1, volume / 128);
+  const src = ctx.createBufferSource();
+  src.buffer = decoded;
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(0);
+}
 
 function useSounds(): string[] {
   const [sounds, setSounds] = useState<string[]>([]);
   useEffect(() => {
-    const token = localStorage.getItem('zs_token') ?? '';
-    fetch('/api/sounds', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    apiFetch('/sounds')
       .then(data => {
         if (Array.isArray(data)) {
-          setSounds(data.map((s: unknown) => (s && typeof s === 'object' && 'name' in s ? String((s as {name: unknown}).name) : String(s))).filter(Boolean));
+          setSounds((data as unknown[]).map(s => s && typeof s === 'object' && 'name' in s ? String((s as {name: unknown}).name) : String(s)).filter(Boolean));
         }
       })
       .catch(() => {});
@@ -41,10 +62,11 @@ function getSequences(def: ActorDef): Sequences {
   return (def.sequences as Sequences) ?? {};
 }
 
-/** Draw a sprite frame onto a canvas via <img> proxy URL. */
+/** Sprite image cache — async load, sync get. */
 function useImageCache() {
   const cache = useRef<Map<string, HTMLImageElement>>(new Map());
-  return useCallback((bank: number, frame: number): Promise<HTMLImageElement> => {
+
+  const loadImg = useCallback((bank: number, frame: number): Promise<HTMLImageElement> => {
     const key = `${bank}:${frame}`;
     if (cache.current.has(key)) return Promise.resolve(cache.current.get(key)!);
     return new Promise((resolve, reject) => {
@@ -55,26 +77,32 @@ function useImageCache() {
       img.src = `/api/sprites/${bank}/${frame}?_t=${token.slice(-8)}`;
     });
   }, []);
+
+  const getImg = useCallback((bank: number, frame: number): HTMLImageElement | null =>
+    cache.current.get(`${bank}:${frame}`) ?? null, []);
+
+  return { loadImg, getImg };
 }
 
 const CANVAS_PAD = 24; // px padding around the scaled sprite
 const CANVAS_MIN = 120;
 
-/** Live preview canvas that plays a sequence at 60fps, auto-sized to the sprite. */
-function PreviewCanvas({ sequence, scale }: { sequence: AnimSequence | null; scale: number }) {
+/** Live preview canvas that plays a sequence at game speed (60 ticks/s), auto-sized to the sprite. */
+function PreviewCanvas({ sequence, scale, speed }: { sequence: AnimSequence | null; scale: number; speed: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
-  const loadImg   = useImageCache();
-  const stateRef  = useRef({ tick: 0, frameIdx: 0 });
+  const { loadImg, getImg } = useImageCache();
+  // Keep speed in a ref so changes don't restart the loop.
+  const speedRef = useRef(speed);
+  useEffect(() => { speedRef.current = speed; }, [speed]);
   const [canvasSize, setCanvasSize] = useState({ w: CANVAS_MIN, h: CANVAS_MIN });
 
-  // Measure max natural sprite size across all frames in the sequence
+  // Preload all frames and measure max sprite size.
   useEffect(() => {
     if (!sequence || sequence.frames.length === 0) {
       setCanvasSize({ w: CANVAS_MIN, h: CANVAS_MIN });
       return;
     }
-    // Deduplicate bank:index pairs
     const unique = [...new Map(sequence.frames.map(f => [`${f.bank}:${f.index}`, f])).values()];
     Promise.all(unique.map(f => loadImg(f.bank, f.index).catch(() => null)))
       .then(imgs => {
@@ -98,52 +126,80 @@ function PreviewCanvas({ sequence, scale }: { sequence: AnimSequence | null; sca
       return;
     }
 
-    let lastTs = 0;
-    const TICK_MS = 1000 / 60;
+    // Synchronous loop — no async/await so there's no risk of stale callbacks
+    // surviving a cleanup and doubling the tick rate.
+    let cancelled = false;
+    let lastTs = -1;
+    let tick = 0;
+    let frameIdx = 0;
+    let prevFrameIdx = -1;
 
-    async function loop(ts: number) {
+    function drawCurrent() {
+      const f = sequence!.frames[frameIdx];
+      if (!f) return;
+      const img = getImg(f.bank, f.index);
+      if (!img) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#111';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 1;
+      for (let gx = 0; gx < canvas.width; gx += 16) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, canvas.height); ctx.stroke(); }
+      for (let gy = 0; gy < canvas.height; gy += 16) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(canvas.width, gy); ctx.stroke(); }
+      const x = Math.floor((canvas.width  - img.width  * scale) / 2);
+      const y = Math.floor((canvas.height - img.height * scale) / 2);
+      (ctx as CanvasRenderingContext2D & { imageSmoothingEnabled: boolean }).imageSmoothingEnabled = false;
+      ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+    }
+
+    function loop(ts: number) {
+      if (cancelled) return;
+
+      if (lastTs < 0) lastTs = ts;
       const dt = ts - lastTs;
-      if (dt >= TICK_MS) {
-        lastTs = ts - (dt % TICK_MS);
-        const s = stateRef.current;
-        const f = sequence!.frames[s.frameIdx];
-        if (!f) { s.frameIdx = 0; s.tick = 0; }
-        else {
-          s.tick++;
-          if (s.tick >= f.duration) {
-            s.tick = 0;
-            s.frameIdx++;
-            if (s.frameIdx >= sequence!.frames.length) {
-              s.frameIdx = sequence!.loop ? 0 : sequence!.frames.length - 1;
+      const effectiveTICK_MS = (1000 / 60) / speedRef.current;
+      const tickCount = Math.floor(dt / effectiveTICK_MS);
+
+      if (tickCount > 0) {
+        lastTs += tickCount * effectiveTICK_MS;
+
+        // Advance ticks; detect every frame entry so sounds don't get skipped
+        // during catch-up (e.g. after tab switch).
+        for (let t = 0; t < tickCount; t++) {
+          const f = sequence!.frames[frameIdx];
+          if (!f) { frameIdx = 0; tick = 0; break; }
+          tick++;
+          if (tick >= f.duration) {
+            tick = 0;
+            frameIdx++;
+            if (frameIdx >= sequence!.frames.length) {
+              frameIdx = sequence!.loop ? 0 : sequence!.frames.length - 1;
+            }
+            // Entered a new frame — fire its sound.
+            if (frameIdx !== prevFrameIdx) {
+              prevFrameIdx = frameIdx;
+              const nf = sequence!.frames[frameIdx];
+              if (nf?.sound) playSound(nf.sound, nf.soundVolume ?? 128);
             }
           }
-          try {
-            const img = await loadImg(f.bank, f.index);
-            const canvas = canvasRef.current;
-            if (canvas) {
-              const ctx = canvas.getContext('2d')!;
-              // Grid background (matches hitbox tab)
-              ctx.fillStyle = '#111';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.strokeStyle = '#222';
-              ctx.lineWidth = 1;
-              for (let gx = 0; gx < canvas.width; gx += 16) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, canvas.height); ctx.stroke(); }
-              for (let gy = 0; gy < canvas.height; gy += 16) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(canvas.width, gy); ctx.stroke(); }
-              const x = Math.floor((canvas.width  - img.width  * scale) / 2);
-              const y = Math.floor((canvas.height - img.height * scale) / 2);
-              (ctx as CanvasRenderingContext2D & { imageSmoothingEnabled: boolean }).imageSmoothingEnabled = false;
-              ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-            }
-          } catch { /* skip frame */ }
         }
+
+        drawCurrent();
       }
+
       rafRef.current = requestAnimationFrame(loop);
     }
 
-    stateRef.current = { tick: 0, frameIdx: 0 };
+    // Play frame-0 sound immediately if it has one.
+    const f0 = sequence.frames[0];
+    if (f0?.sound) playSound(f0.sound, f0.soundVolume ?? 128);
+    prevFrameIdx = 0;
+
     rafRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [sequence, loadImg, canvasSize, scale]);
+    return () => { cancelled = true; cancelAnimationFrame(rafRef.current); };
+  }, [sequence, getImg, canvasSize, scale]);
 
   return (
     <canvas
@@ -193,7 +249,7 @@ function SoundPicker({ value, volume, sounds, onChange }: {
           type="button"
           title="Preview sound"
           className="text-game-textDim hover:text-game-primary text-xs px-1"
-          onClick={() => { const a = new Audio(`/sounds/${value}`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
+          onClick={() => playSound(value, volume ?? 128)}
         >▶</button>
       )}
       {open && (
@@ -223,7 +279,7 @@ function SoundPicker({ value, volume, sounds, onChange }: {
                   type="button"
                   title="Preview"
                   className="px-2 text-game-textDim hover:text-game-primary text-xs"
-                  onClick={() => { const a = new Audio(`/sounds/${s}`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
+                  onClick={() => playSound(s, volume ?? 128)}
                 >▶</button>
               </div>
             ))}
@@ -313,6 +369,7 @@ export default function AnimationTab({
   );
   const [newSeqName, setNewSeqName] = useState('');
   const [scale, setScale] = useState(1);
+  const [speed, setSpeed] = useState(1);
 
   const seq = selectedSeq ? sequences[selectedSeq] : null;
 
@@ -471,7 +528,22 @@ export default function AnimationTab({
                     >{s}×</button>
                   ))}
                 </div>
-                <PreviewCanvas sequence={seq} scale={scale} />
+                <div className="flex items-center gap-2 w-full">
+                  <span className="text-xs text-game-textDim shrink-0">SPEED</span>
+                  <input
+                    type="range" min={0.1} max={2} step={0.05}
+                    value={speed}
+                    onChange={e => setSpeed(+e.target.value)}
+                    className="flex-1 accent-game-primary h-1"
+                  />
+                  <button
+                    type="button"
+                    className="text-xs font-mono text-game-textDim hover:text-game-text w-10 text-right shrink-0"
+                    title="Reset to 1×"
+                    onClick={() => setSpeed(1)}
+                  >{speed.toFixed(2)}×</button>
+                </div>
+                <PreviewCanvas sequence={seq} scale={scale} speed={speed} />
               </div>
             </div>
 

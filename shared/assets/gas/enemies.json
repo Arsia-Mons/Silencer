@@ -332,6 +332,18 @@
       "runDurationTicks": 150,
       "deadRespawnTicks": 100,
       "_note": "Civilian health is not set in constructor \u2014 Object base default applies."
+    },
+    {
+      "id": "magistrate",
+      "health": 150,
+      "shield": 0,
+      "speed": 3,
+      "respawnSeconds": 0,
+      "soundActivate": "mgbegin.wav",
+      "soundDeath": "mgend.wav",
+      "snapshotInterval": 60,
+      "warpTeleportTick": 12,
+      "activationTicks": 60
     }
   ]
 }

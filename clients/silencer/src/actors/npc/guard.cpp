@@ -1,4 +1,5 @@
 #include "guard.h"
+#include "btdebug.h"
 #include "projectile.h"
 #include "bodypart.h"
 #include "player.h"
@@ -46,7 +47,9 @@ Guard::Guard() : Object(ObjectTypes::GUARD){
 }
 
 void Guard::InitBT(){
-	bt_ = BehaviorTreeLibrary::instance().get("guard");
+	const EnemyDef* r = GASLoader::Get().GetEnemyDef("guard-blaster");
+	std::string treeId = (r && !r->behaviorTree.empty()) ? r->behaviorTree : "guard";
+	bt_ = BehaviorTreeLibrary::instance().get(treeId);
 	if(!bt_) return;
 
 	// Shared helper: update chasing id + play alert sound on first detection.
@@ -191,6 +194,56 @@ void Guard::InitBT(){
 		return BTResult::Failure;
 	};
 
+	// ClimbLadder: snap to a nearby ladder and climb toward a target y position.
+	// Props: direction = "toward_target" | "toward_origin" | "up" | "down"  (default: "toward_target")
+	// Returns Running while climbing, Failure if no climbable ladder is found.
+	btctx_.actions["ClimbLadder"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(state == LADDER) return BTResult::Running;
+		if(state != WALKING && state != STANDING) return BTResult::Failure;
+		if(bt_ladder_cooldown_ > 0) return BTResult::Failure;
+
+		std::string dir = ctx.props ? ctx.props->value("direction", std::string{"toward_target"}) : "toward_target";
+		int target_y = y;
+		if(dir == "toward_target"){
+			if(!chasing) return BTResult::Failure;
+			Object* obj = world.GetObjectFromId(chasing);
+			if(!obj) return BTResult::Failure;
+			target_y = obj->y;
+		} else if(dir == "toward_origin"){
+			target_y = originaly;
+		} else if(dir == "up"){
+			target_y = y - 9999;
+		} else if(dir == "down"){
+			target_y = y + 9999;
+		}
+
+		const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster");
+		int threshold  = gd ? gd->ladderYThreshold  : 48;
+		int tolerance  = gd ? gd->ladderXTolerance  : 8;
+		int climbspeed = gd ? gd->ladderClimbSpeed  : 5;
+		int cooldown   = gd ? gd->ladderCooldown    : 120;
+
+		int ydiff = signed(target_y) - signed(y);
+		if(dir != "up" && dir != "down" && abs(ydiff) <= threshold) return BTResult::Failure;
+
+		Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
+		if(!ladder) return BTResult::Failure;
+		Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+		if(abs(signed(center) - signed(x)) > tolerance) return BTResult::Failure;
+
+		if(ydiff < 0 && signed(ladder->y1) < signed(y)){
+			x = center; yv = -climbspeed; state = LADDER; state_i = 0;
+			bt_ladder_cooldown_ = cooldown;
+			return BTResult::Running;
+		} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
+			x = center; yv = climbspeed; state = LADDER; state_i = 0;
+			bt_ladder_cooldown_ = cooldown;
+			return BTResult::Running;
+		}
+		return BTResult::Failure;
+	};
+
 	// Chase: walk toward the chasing target. Only when patrol=true.
 	btctx_.actions["Chase"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
@@ -210,18 +263,6 @@ void Guard::InitBT(){
 				mirrored = (obj->x < x);
 			} else {
 				state = WALKING;
-			}
-			Platform* ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
-			if(ladder){
-				Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-				if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
-					if(ladder->y2 == obj->y && y != obj->y && ladder->y2 > y){
-						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = _gls ? _gls->ladderClimbSpeed : 5; state = LADDER; state_i = 0; }
-					}
-					if(ladder->y1 == obj->y && y != obj->y && ladder->y1 < y){
-						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = -(_gls ? _gls->ladderClimbSpeed : 5); state = LADDER; state_i = 0; }
-					}
-				}
 			}
 		}
 		return BTResult::Running;
@@ -289,27 +330,6 @@ void Guard::InitBT(){
 							return BTResult::Running;
 						}
 					}
-					// Climb ladder toward target if on a meaningfully different level
-					int ydiff = signed(obj->y) - signed(y);
-					{ const EnemyDef* _gg = GASLoader::Get().GetEnemyDef("guard-blaster");
-					if(abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
-						Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
-						if(ladder && state == WALKING){
-							Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-							if(abs(signed(center) - signed(x)) <= (_gg?_gg->ladderXTolerance:8)){
-								if(ydiff < 0 && signed(ladder->y1) < signed(y)){
-									// player above, ladder goes up
-									x = center; yv = -(_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
-									{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
-								} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
-									// player below, ladder goes down
-									x = center; yv = (_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
-									{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
-								}
-							}
-						}
-					}
-					} // _gg scope
 				} else {
 					chasing = 0; // target gone or dead
 				}
@@ -339,23 +359,6 @@ void Guard::InitBT(){
 				state_i = -1;
 				mirrored = originalmirrored;
 				return BTResult::Success;
-			}
-			// Climb ladders back to original level
-			int ydiff = signed(originaly) - signed(y);
-			if(abs(ydiff) > (_ggr?_ggr->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
-				Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
-				if(ladder && state == WALKING){
-					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-					if(abs(signed(center) - signed(x)) <= (_ggr?_ggr->ladderXTolerance:8)){
-						if(ydiff < 0 && signed(ladder->y1) < signed(y)){
-							x = center; yv = -(_ggr ? _ggr->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
-							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
-						} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
-							x = center; yv = (_ggr ? _ggr->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
-							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
-						}
-					}
-				}
 			}
 		}
 		} // _ggr scope
@@ -423,6 +426,154 @@ void Guard::InitBT(){
 		else                    mirrored = !mirrored;
 		return BTResult::Success;
 	};
+
+	btctx_.actions["SetSpeed"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.props) return BTResult::Failure;
+		int spd = ctx.props->value("speed", -1);
+		if (spd < 0) return BTResult::Failure;
+		speed = (Uint8)spd;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ApplyVelocity"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.props) return BTResult::Failure;
+		if (ctx.props->contains("xv")) xv = (Sint8)ctx.props->value("xv", 0);
+		if (ctx.props->contains("yv")) yv = (Sint8)ctx.props->value("yv", 0);
+		return BTResult::Success;
+	};
+
+	btctx_.actions["SpawnProjectile"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.props || !ctx.userData) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		if (!CooledDown(world)) return BTResult::Failure;
+		int dir = ctx.props->value("direction", 0);
+		Fire(world, (Uint8)dir);
+		return BTResult::Success;
+	};
+
+	btctx_.actions["CheckGround"] = [this](BTContext& ctx) -> BTResult {
+		std::string key = ctx.props ? ctx.props->value("key", std::string{"on_ground"}) : "on_ground";
+		bool grounded = (yv == 0);
+		ctx.bbSet(key, grounded);
+		return grounded ? BTResult::Success : BTResult::Failure;
+	};
+
+	// Raycast: fire a horizontal ray in the facing direction; write hit bool to blackboard key.
+	// Props: range (int, px, default 200), result_key (string, default "ray_hit")
+	btctx_.actions["Raycast"] = [this](BTContext& ctx) -> BTResult {
+		if (!ctx.userData) return BTResult::Failure;
+		World& world = *static_cast<World*>(ctx.userData);
+		std::string key = ctx.props ? ctx.props->value("result_key", std::string{"ray_hit"}) : "ray_hit";
+		int range = ctx.props ? ctx.props->value("range", 200) : 200;
+		int d = mirrored ? -1 : 1;
+		std::vector<Uint8> types;
+		types.push_back(ObjectTypes::PLAYER);
+		types.push_back(ObjectTypes::ROBOT);
+		types.push_back(ObjectTypes::FIXEDCANNON);
+		std::vector<Object*> hits = world.TestAABB(x, y - 55, x + d * range, y - 55, types);
+		bool did_hit = !hits.empty();
+		ctx.bbSet(key, did_hit);
+		return did_hit ? BTResult::Success : BTResult::Failure;
+	};
+
+	// Scan: fire all 6 look rays without shooting; set target_seen + chasing if any hit.
+	btctx_.actions["Scan"] = [this, updateChasing](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		for(int d = 0; d < 6; d++){
+			Object* f = Look(world, d);
+			if(f){
+				ctx.bbSet("target_seen", true);
+				updateChasing(f, world);
+				return BTResult::Success;
+			}
+		}
+		return BTResult::Failure;
+	};
+
+	// Crouch: transition to crouched state.
+	// Returns Running while transitioning, Success when fully crouched.
+	btctx_.actions["Crouch"] = [this](BTContext&) -> BTResult {
+		if(state == CROUCHED) return BTResult::Success;
+		if(state == CROUCHING) return BTResult::Running;
+		if(state == WALKING || state == STANDING || state == LOOKING){
+			state = CROUCHING; state_i = 0;
+			return BTResult::Running;
+		}
+		return BTResult::Failure;
+	};
+
+	// Uncrouch: stand up from crouch. Returns Running while transitioning, Success when upright.
+	btctx_.actions["Uncrouch"] = [this](BTContext&) -> BTResult {
+		if(state == CROUCHED || state == CROUCHING){ state = UNCROUCHING; state_i = 0; return BTResult::Running; }
+		if(state == UNCROUCHING) return BTResult::Running;
+		return BTResult::Success;
+	};
+
+	// Standalone shoot leaves — enter the named shoot state if cooldown is ready.
+	// All return Failure on cooldown, Success when the state is entered.
+	btctx_.actions["ShootStanding"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != WALKING && state != STANDING && state != LOOKING) return BTResult::Failure;
+		state = SHOOTSTANDING; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootCrouched"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != CROUCHED) return BTResult::Failure;
+		state = SHOOTCROUCHED; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootUp"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != WALKING && state != STANDING && state != LOOKING) return BTResult::Failure;
+		state = SHOOTUP; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootDown"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != WALKING && state != STANDING && state != LOOKING) return BTResult::Failure;
+		state = SHOOTDOWN; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootUpAngle"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != WALKING && state != STANDING && state != LOOKING) return BTResult::Failure;
+		state = SHOOTUPANGLE; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootDownAngle"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != WALKING && state != STANDING && state != LOOKING) return BTResult::Failure;
+		state = SHOOTDOWNANGLE; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootLadderUp"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != LADDER) return BTResult::Failure;
+		state = SHOOTLADDERUP; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootLadderDown"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != LADDER) return BTResult::Failure;
+		state = SHOOTLADDERDOWN; state_i = 0;
+		return BTResult::Success;
+	};
 }
 
 void Guard::Serialize(bool write, Serializer & data, Serializer * old){
@@ -432,6 +583,8 @@ void Guard::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, chasing, old);
 	data.Serialize(write, weapon, old);
 	data.Serialize(write, patrol, old);
+	data.Serialize(write, originalx, old);
+	data.Serialize(write, originaly, old);
 }
 
 void Guard::Tick(World & world){
@@ -464,7 +617,49 @@ void Guard::Tick(World & world){
 			btctx_.userData = &world;
 			btctx_.bbSet("patrol", (bool)patrol);
 			btctx_.bbSet("target_seen", false);
+			btctx_.bbSet("health_pct", maxhealth > 0 ? (float)health / (float)maxhealth : 0.0f);
+			btctx_.bbSet("on_ladder", (bool)(state == LADDER));
+			btctx_.bbSet("has_target", (bool)(chasing != 0));
+			{
+				Platform* nl = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
+				btctx_.bbSet("at_ladder", (bool)(nl != nullptr));
+			}
+			{
+				const char* sn = "unknown";
+				switch(state){
+					case NEW:             sn = "new"; break;
+					case STANDING:        sn = "standing"; break;
+					case CROUCHING:       sn = "crouching"; break;
+					case CROUCHED:        sn = "crouched"; break;
+					case SHOOTCROUCHED:   sn = "shootcrouched"; break;
+					case UNCROUCHING:     sn = "uncrouching"; break;
+					case LOOKING:         sn = "looking"; break;
+					case WALKING:         sn = "walking"; break;
+					case SHOOTSTANDING:   sn = "shootstanding"; break;
+					case SHOOTUP:         sn = "shootup"; break;
+					case SHOOTDOWN:       sn = "shootdown"; break;
+					case SHOOTUPANGLE:    sn = "shootupangle"; break;
+					case SHOOTDOWNANGLE:  sn = "shootdownangle"; break;
+					case SHOOTLADDERUP:   sn = "shootladderup"; break;
+					case SHOOTLADDERDOWN: sn = "shootladderdown"; break;
+					case LADDER:          sn = "ladder"; break;
+					case HIT:             sn = "hit"; break;
+					case DYING:           sn = "dying"; break;
+					case DYINGEXPLODE:    sn = "dyingexplode"; break;
+					case DEAD:            sn = "dead"; break;
+				}
+				btctx_.bbSet("state_name", std::string{sn});
+			}
+			{
+				int dist = -1;
+				if (chasing != 0) {
+					Object* obj = world.GetObjectFromId(chasing);
+					if (obj) dist = (int)abs(signed(x) - signed(obj->x));
+				}
+				btctx_.bbSet("dist_to_target", dist);
+			}
 			bt_->tick(btctx_);
+			BTDebug::broadcast("guard", id, btctx_.blackboard, btctx_.nodeResults);
 		} else {
 		do{
 			if((found = Look(world, 0))){
