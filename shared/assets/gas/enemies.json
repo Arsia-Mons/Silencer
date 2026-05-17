@@ -342,7 +342,8 @@
       "soundActivate": "mgbegin",
       "soundDeath": "mgend",
       "snapshotInterval": 60,
-      "warpTeleportTick": 12
+      "warpTeleportTick": 12,
+      "activationTicks": 60
     }
   ]
 }

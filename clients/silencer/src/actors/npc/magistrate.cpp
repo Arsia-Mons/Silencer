@@ -28,7 +28,7 @@ Magistrate::Magistrate() : Object(ObjectTypes::MAGISTRATE){
 	isbipedal   = true;
 	isphysical  = true;
 
-	activationTicks  = 7200; // 2 minutes at 60fps
+	activationTicks  = m ? m->activationTicks : 7200; // 2 minutes at 60fps
 	secretTriggerN   = 2;
 	deathSpawnCount  = 3;
 	deathSpawnType   = 0;
