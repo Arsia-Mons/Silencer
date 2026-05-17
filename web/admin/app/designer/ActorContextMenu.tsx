@@ -49,6 +49,8 @@ interface MagistrateFieldState {
   radius: string;
   securityid: string;
   entries: Array<{ type: number; count: number }>;
+  activationSecs: string;  // 0 = use GAS default; stored as ticks (×60) in bits 8-23 of actor.type
+  secretTriggerN: string;  // 0 = disabled; stored in bits 24-31 of actor.type
 }
 
 // Light actor (id=71) actortype bitfield helpers
@@ -128,10 +130,12 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
   // Magistrate-specific decoded state
   // actor.type bits 0-7 = radius; actor.matchid = 4 packed spawn entries
   const [magistrateFields, setMagistrateFields] = useState<MagistrateFieldState>({
-    facing:    String(actor.direction ?? 0),
-    radius:    String((actor.type ?? 0) & 0xFF || 64),
-    securityid: String(actor.securityid ?? 0),
-    entries:   decodeMagistrateEntries(actor.matchid ?? 0),
+    facing:         String(actor.direction ?? 0),
+    radius:         String((actor.type ?? 0) & 0xFF || 64),
+    securityid:     String(actor.securityid ?? 0),
+    entries:        decodeMagistrateEntries(actor.matchid ?? 0),
+    activationSecs: String((((actor.type ?? 0) >>> 8) & 0xFFFF) / 60 | 0),
+    secretTriggerN: String(((actor.type ?? 0) >>> 24) & 0xFF),
   });
 
   // Light-specific decoded state
@@ -173,11 +177,16 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
         direction: lightFields.direction,
       });
     } else if (isMagistrate) {
-      const radius = Math.min(255, Math.max(8, parseInt(magistrateFields.radius, 10) || 64));
+      const radius       = Math.min(255, Math.max(8, parseInt(magistrateFields.radius, 10) || 64));
+      const actSecs      = Math.min(65535 / 60 | 0, Math.max(0, parseInt(magistrateFields.activationSecs, 10) || 0));
+      const actTicks     = actSecs * 60;
+      const secretN      = Math.min(255, Math.max(0, parseInt(magistrateFields.secretTriggerN, 10) || 0));
+      // Pack: bits 0-7 = radius, bits 8-23 = activationTicks, bits 24-31 = secretTriggerN
+      const packedType   = (radius & 0xFF) | ((actTicks & 0xFFFF) << 8) | ((secretN & 0xFF) << 24);
       onUpdate(actorIdx, {
-        type:      radius,
-        direction: parseInt(magistrateFields.facing, 10) || 0,
-        matchid:   encodeMagistrateEntries(magistrateFields.entries),
+        type:       packedType >>> 0,
+        direction:  parseInt(magistrateFields.facing, 10) || 0,
+        matchid:    encodeMagistrateEntries(magistrateFields.entries),
         securityid: parseInt(magistrateFields.securityid, 10) || 0,
       });
     } else {
@@ -353,6 +362,21 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
               <div className={lbl}>Radius (px)</div>
               <input type="number" min={8} max={255} value={magistrateFields.radius}
                 onChange={e => setMagistrateFields(f => ({ ...f, radius: e.target.value }))} className={inp} />
+            </div>
+          </div>
+          <div className="border-t border-[#1a3a1a] pt-1.5 mt-1.5 mb-1">
+            <div className="text-[#5a8a5a] text-[10px] uppercase tracking-wide mb-1">Activation conditions</div>
+            <div className="mb-1.5">
+              <div className={lbl}>Activation delay (seconds, 0 = GAS default)</div>
+              <input type="number" min={0} max={1092} value={magistrateFields.activationSecs}
+                onChange={e => setMagistrateFields(f => ({ ...f, activationSecs: e.target.value }))} className={inp}
+                placeholder="0 = use GAS default" />
+            </div>
+            <div className="mb-1.5">
+              <div className={lbl}>Secrets to activate (0 = disabled)</div>
+              <input type="number" min={0} max={255} value={magistrateFields.secretTriggerN}
+                onChange={e => setMagistrateFields(f => ({ ...f, secretTriggerN: e.target.value }))} className={inp}
+                placeholder="0 = disabled" />
             </div>
           </div>
           <div className="mb-1.5">

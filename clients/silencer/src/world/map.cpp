@@ -712,10 +712,14 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 								magistrate->originalx = magistrate->x;
 								magistrate->originaly = magistrate->y;
 								magistrate->originalmirrored = magistrate->mirrored;
-								// actor.type bits 0-7 = radius; actor.matchid = 4 packed spawn entries
-								Uint8 radius = (Uint8)(actortype & 0xFF);
-								magistrate->deathSpawnRadius  = radius ? radius : 64;
-								magistrate->deathSpawnEntries = actormatchid ? actormatchid : 0x03; // default: 3 blaster guards
+								// actor.type bits 0-7 = radius; bits 8-23 = activationTicks (0=GAS default); bits 24-31 = secretTriggerN
+									Uint8  radius         = (Uint8)(actortype & 0xFF);
+									Uint16 activationTicks = (Uint16)((actortype >> 8) & 0xFFFF);
+									Uint8  secretTriggerN  = (Uint8)((actortype >> 24) & 0xFF);
+									magistrate->deathSpawnRadius  = radius ? radius : 64;
+									magistrate->deathSpawnEntries = actormatchid ? actormatchid : 0x03;
+									if(activationTicks) magistrate->activationTicks = activationTicks;
+									magistrate->secretTriggerN = secretTriggerN;
 							}
 						}
 					}break;
