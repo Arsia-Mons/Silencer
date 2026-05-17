@@ -22,10 +22,10 @@ before relying on the skill's content.
 
 - `cli/` — drive the Silencer game via the CLI agent control channel for
   end-to-end UI testing. Harness path: `.claude/skills/using-silencer-cli`.
-- `silencer-ui/` — surviving the Silencer client UI subsystem (widget
-  required-fields, anchor-offset coords, polled `clicked` flags,
-  `objects`/`tabobjects` lists, `Destroy` cleanup, in-game popups in
-  `Player::Tick`). Harness path: `.claude/skills/editing-silencer-ui`.
+- `clay-ui-integration/` — design, implement, or audit the current Clay-backed
+  Silencer UI with correct `ClientUi`/`ClayService` lifecycle, responsive
+  primitives, `UiInteractionRegistry` actions, stable IDs, render dispatch, and
+  runtime verification.
 - `visual-regression-journeys/` — capture every reachable UI surface on the
   current branch and a baseline git ref, build side-by-side composites, and
   diff. Catches regressions invisible to unit tests, E2E scripts, and

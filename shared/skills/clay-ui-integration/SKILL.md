@@ -111,3 +111,10 @@ Before calling a Clay UI change correct, verify the relevant surface:
 - Run targeted primitive/control tests such as `tests/lobby-ui/button_test/run.sh` when primitive behavior changes.
 - Run `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` when ownership boundaries change.
 - Use runtime screenshots or the control socket when layout, clipping, interaction, audio feedback, or visual behavior is at risk.
+
+Compile success is not enough for UI work. A change can build cleanly while
+rendering at the wrong bounds, dropping input, hiding focus, or leaking state
+between screens. When behavior or layout matters, drive the real binary through
+`shared/skills/cli/SKILL.md`: inspect registered widgets, click or type through
+the control socket, wait for the expected state transition, and capture a
+screenshot for visual confirmation.
