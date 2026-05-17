@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "id": "magistrate",
+  "blackboard": [],
+  "rootId": "root",
+  "nodes": {
+    "root": {
+      "type": "Leaf",
+      "label": "Patrol",
+      "children": [],
+      "props": { "action": "Patrol" }
+    }
+  },
+  "positions": {}
+}

@@ -287,6 +287,7 @@ const NPC_ACTIONS: Record<string, string[]> = {
   ],
   civilian: ['Run', 'Wander', 'WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'ReturnToSpawn', ...GENERIC_ACTIONS],
   robot:    ['WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'Patrol', 'ReturnToSpawn', ...GENERIC_ACTIONS],
+  magistrate: ['Patrol', ...GENERIC_ACTIONS],
 };
 
 // All actions merged for unknown NPC types

@@ -3,6 +3,7 @@
 
 #include "shared.h"
 #include "object.h"
+#include "behaviortree.h"
 
 class Magistrate : public Object
 {
@@ -23,12 +24,16 @@ public:
 	bool   originalmirrored;
 
 private:
+	void InitBT();
 	void SpawnDeathActors(World & world);
 
 	enum { DORMANT, NEW, STANDING, WALKING, DYING, DEAD };
 	Uint8  state, state_i;
 	Uint16 maxhealth, maxshield;
 	Uint8  speed;
+
+	const BehaviorTree* bt_;
+	BTContext            btctx_;
 };
 
 #endif
