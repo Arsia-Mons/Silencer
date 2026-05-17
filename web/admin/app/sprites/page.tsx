@@ -518,6 +518,39 @@ function SpritesPageInner() {
   const [tileSrcW, setTileSrcW] = useState('');
   const [tileSrcH, setTileSrcH] = useState('');
 
+  function detectFrameSize(imgW: number, imgH: number): { w: number; h: number } {
+    function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
+    const g = gcd(imgW, imgH);
+    // Build candidate set: multiples of GCD that fit in [8..256] and divide both dims evenly
+    const candidates: Array<{ w: number; h: number; score: number }> = [];
+    for (let m = 1; m * g <= Math.max(imgW, imgH); m++) {
+      const fw = m * g, fh = m * g; // square candidates
+      if (fw > 256 || fh > 256) break;
+      if (fw < 8 || fh < 8) continue;
+      if (fw % 4 !== 0) continue;
+      if (imgW % fw !== 0 || imgH % fh !== 0) continue;
+      const frames = (imgW / fw) * (imgH / fh);
+      if (frames < 2) continue; // single-frame sheet isn't really a sheet
+      const isPow2 = (fw & (fw - 1)) === 0 ? 1 : 0;
+      candidates.push({ w: fw, h: fh, score: fw * fh + isPow2 * 32 });
+    }
+    // Also try non-square: rows of GCD height, columns independently
+    const wDivisors = Array.from({ length: imgW }, (_, i) => i + 1).filter(d => imgW % d === 0 && d >= 8 && d <= 256 && d % 4 === 0);
+    const hDivisors = Array.from({ length: imgH }, (_, i) => i + 1).filter(d => imgH % d === 0 && d >= 8 && d <= 256);
+    for (const fw of wDivisors) {
+      for (const fh of hDivisors) {
+        const frames = (imgW / fw) * (imgH / fh);
+        if (frames < 2) continue;
+        const squareness = 1 - Math.abs(fw - fh) / Math.max(fw, fh);
+        const isPow2 = (fw & (fw - 1)) === 0 && (fh & (fh - 1)) === 0 ? 1 : 0;
+        candidates.push({ w: fw, h: fh, score: squareness * 64 + fw * fh * 0.5 + isPow2 * 16 });
+      }
+    }
+    if (candidates.length === 0) return { w: imgW, h: imgH };
+    candidates.sort((a, b) => b.score - a.score);
+    return { w: candidates[0].w, h: candidates[0].h };
+  }
+
   function handleImportSheet(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || selectedBank === null) return;
@@ -527,20 +560,33 @@ function SpritesPageInner() {
       URL.revokeObjectURL(url);
 
       // For tiles: source size from inputs (required), output always 64×64.
-      // For sprites: use inputs → existing frame → full image.
+      // For sprites: use inputs → existing frame → auto-detect from image.
       const existingFrame = currentBank?.frames[0];
       let srcW: number, srcH: number, outW: number, outH: number;
       if (tab === 'tiles') {
-        srcW = parseInt(tileSrcW, 10);
-        srcH = parseInt(tileSrcH, 10);
-        if (isNaN(srcW) || srcW <= 0 || isNaN(srcH) || srcH <= 0) {
-          setError('Enter the source tile size (W × H) in the PNG before importing.');
-          return;
+        let tw = parseInt(tileSrcW, 10);
+        let th = parseInt(tileSrcH, 10);
+        if (isNaN(tw) || tw <= 0 || isNaN(th) || th <= 0) {
+          const detected = detectFrameSize(img.width, img.height);
+          tw = detected.w; th = detected.h;
+          setTileSrcW(String(tw));
+          setTileSrcH(String(th));
         }
+        srcW = tw; srcH = th;
         outW = 64; outH = 64;
       } else {
-        srcW = parseInt(sheetW, 10) || existingFrame?.header.width || img.width;
-        srcH = parseInt(sheetH, 10) || existingFrame?.header.height || img.height;
+        const inputW = parseInt(sheetW, 10);
+        const inputH = parseInt(sheetH, 10);
+        if (!isNaN(inputW) && inputW > 0 && !isNaN(inputH) && inputH > 0) {
+          srcW = inputW; srcH = inputH;
+        } else if (existingFrame) {
+          srcW = existingFrame.header.width; srcH = existingFrame.header.height;
+        } else {
+          const detected = detectFrameSize(img.width, img.height);
+          srcW = detected.w; srcH = detected.h;
+          setSheetW(String(srcW));
+          setSheetH(String(srcH));
+        }
         outW = srcW; outH = srcH;
       }
 
@@ -1033,15 +1079,17 @@ function SpritesPageInner() {
                         sheetInputRef.current?.click();
                       }}
                       className="flex-1 px-2 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors"
-                      title="Leave W/H blank to auto-detect from existing frames or full image size"
+                      title="Leave W/H blank to auto-detect frame size from image"
                     >
                       + SHEET
                     </button>
                   </div>
                 )}
-                {tab === 'sprites' && currentBank?.frames[0] && !sheetW && !sheetH && (
+                {tab === 'sprites' && !sheetW && !sheetH && (
                   <p className="text-[10px] text-[#4a7a4a] font-mono">
-                    auto {currentBank.frames[0].header.width}×{currentBank.frames[0].header.height} from bank
+                    {currentBank?.frames[0]
+                      ? `auto ${currentBank.frames[0].header.width}×${currentBank.frames[0].header.height} from bank`
+                      : 'auto-detect frame size from image'}
                   </p>
                 )}
                 {tab === 'tiles' && (
@@ -1068,13 +1116,13 @@ function SpritesPageInner() {
                           sheetInputRef.current?.click();
                         }}
                         className="flex-1 px-2 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors"
-                        title="Source tile size in the PNG — scaled to 64×64 on import"
+                        title="Source tile size in the PNG — scaled to 64×64 on import. Leave blank to auto-detect."
                       >
                         + SHEET→64
                       </button>
                     </div>
                     <p className="text-[10px] text-[#4a7a4a] font-mono">
-                      enter source tile size in PNG; each tile scales to 64×64
+                      {tileSrcW && tileSrcH ? `${tileSrcW}×${tileSrcH} → 64×64` : 'leave blank to auto-detect; scales to 64×64'}
                     </p>
                   </div>
                 )}
