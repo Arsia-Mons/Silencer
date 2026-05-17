@@ -270,7 +270,21 @@ const PALETTE: { group: string; types: BTNodeType[] }[] = [
 const GENERIC_ACTIONS = ['SetBlackboard', 'RandomChance', 'PlayAnim', 'EmitSound', 'SetFacing', 'SetSpeed', 'ApplyVelocity', 'CheckGround'];
 
 const NPC_ACTIONS: Record<string, string[]> = {
-  guard:    ['Look0', 'Look1', 'Look2', 'Look3', 'Look4', 'Look5', 'UncrouchIdle', 'Chase', 'Patrol', 'SearchAndReturn', 'Stand', 'SpawnProjectile', 'Raycast', ...GENERIC_ACTIONS],
+  guard: [
+    // Scan + shoot leaves
+    'Look0', 'Look1', 'Look2', 'Look3', 'Look4', 'Look5',
+    'Scan',
+    // Standalone shoot leaves
+    'ShootStanding', 'ShootCrouched',
+    'ShootUp', 'ShootDown', 'ShootUpAngle', 'ShootDownAngle',
+    'ShootLadderUp', 'ShootLadderDown',
+    // Movement / posture
+    'Crouch', 'Uncrouch', 'UncrouchIdle',
+    'ClimbLadder', 'Chase', 'Patrol', 'SearchAndReturn', 'Stand',
+    // Attack
+    'SpawnProjectile', 'Raycast',
+    ...GENERIC_ACTIONS,
+  ],
   civilian: ['Run', 'Wander', 'WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'ReturnToSpawn', ...GENERIC_ACTIONS],
   robot:    ['WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'Patrol', 'ReturnToSpawn', ...GENERIC_ACTIONS],
 };
@@ -279,18 +293,36 @@ const NPC_ACTIONS: Record<string, string[]> = {
 const ALL_ACTIONS = [...new Set([...Object.values(NPC_ACTIONS).flat()])].sort();
 
 const ACTION_DESC: Record<string, string> = {
-  // Guard
+  // Guard — scan + shoot combos
   Look0: 'Scan & shoot: forward (standing)',
   Look1: 'Scan & shoot: low (crouched)',
   Look2: 'Scan & shoot: upward',
   Look3: 'Scan & shoot: downward',
   Look4: 'Scan & shoot: up-angle',
   Look5: 'Scan & shoot: down-angle',
-  UncrouchIdle: 'Stand up from crouch and idle',
-  Chase: 'Run toward last known player position',
-  Patrol: 'Walk patrol route; stop to look around periodically',
-  SearchAndReturn: 'Search last known position then return to spawn',
-  Stand: 'Stand in place (idle)',
+  Scan: 'Scan all 6 directions; set target_seen + chasing if any hit (no shoot transition)',
+  // Guard — standalone shoot leaves (props: none; require cooldown ready)
+  ShootStanding:  'Fire forward from standing; Failure if cooldown not ready',
+  ShootCrouched:  'Fire from crouch; must already be crouched; Failure if cooldown not ready',
+  ShootUp:        'Fire upward from standing; Failure if cooldown not ready',
+  ShootDown:      'Fire downward from standing; Failure if cooldown not ready',
+  ShootUpAngle:   'Fire at upward angle from standing; Failure if cooldown not ready',
+  ShootDownAngle: 'Fire at downward angle from standing; Failure if cooldown not ready',
+  ShootLadderUp:  'Fire upward while on a ladder; Failure if not on ladder or cooldown not ready',
+  ShootLadderDown:'Fire downward while on a ladder; Failure if not on ladder or cooldown not ready',
+  // Guard — posture
+  Crouch:        'Transition to crouched; Running while crouching, Success when fully crouched',
+  Uncrouch:      'Stand up from crouch; Running while uncrouching, Success when upright',
+  UncrouchIdle:  'Stand up from crouch only when target_seen is false',
+  // Guard — movement
+  ClimbLadder:    'Snap to nearby ladder and climb. Props: direction = toward_target | toward_origin | up | down',
+  Chase:          'Walk horizontally toward last known target (patrol guards only)',
+  Patrol:         'Walk patrol route; stop to look around periodically',
+  SearchAndReturn:'Search last known position then return to spawn',
+  Stand:          'Stand in place (idle)',
+  // Guard — attack
+  SpawnProjectile: 'Fire a projectile in direction 0–5 (same directions as Look0–5)',
+  Raycast: 'Cast a horizontal ray in facing direction; write hit bool to result_key',
   // Civilian
   Run: 'Flee from threat at run speed',
   Wander: 'Wander randomly within spawn area',
@@ -308,9 +340,6 @@ const ACTION_DESC: Record<string, string> = {
   SetSpeed: 'Override movement speed (Uint8); affects patrol and chase velocity',
   ApplyVelocity: 'Directly set xv and/or yv on the actor this tick',
   CheckGround: 'Write grounded state (yv==0) to blackboard key; succeeds if grounded',
-  // Guard-only
-  SpawnProjectile: 'Fire a projectile in direction 0–5 (same directions as Look0–5)',
-  Raycast: 'Cast a horizontal ray in facing direction; write hit bool to result_key',
 };
 
 const LOOK_DIRECTIONS: { value: number; label: string }[] = [
@@ -1260,7 +1289,7 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                   {bt.blackboard.map(k => <option key={k.key} value={k.key}>{k.key}</option>)}
                 </select>
                 <div style={{ color: '#4a5568', fontSize: 9, fontFamily: 'monospace', lineHeight: 1.6, marginBottom: 6 }}>
-                  AUTO (written each tick): health_pct · dist_to_target · on_ladder · state_name · on_ground (CheckGround)
+                  AUTO (written each tick): health_pct · dist_to_target · on_ladder · has_target · at_ladder · state_name · on_ground (CheckGround)
                 </div>
                 <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>OPERATOR</label>
                 {(() => {

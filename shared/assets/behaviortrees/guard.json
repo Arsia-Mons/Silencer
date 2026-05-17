@@ -5,6 +5,9 @@
   "blackboard": [
     { "key": "patrol",          "type": "bool",   "default": true  },
     { "key": "target_seen",     "type": "bool",   "default": false },
+    { "key": "has_target",      "type": "bool",   "default": false },
+    { "key": "at_ladder",       "type": "bool",   "default": false },
+    { "key": "on_ladder",       "type": "bool",   "default": false },
     { "key": "health_pct",      "type": "float",  "default": 1.0   },
     { "key": "dist_to_target",  "type": "int",    "default": -1    },
     { "key": "close_shot_hit",  "type": "bool",   "default": false }
@@ -18,6 +21,7 @@
         "seq_close_shot",
         "sel_combat",
         "leaf_uncrouch",
+        "leaf_climbladder",
         "leaf_chase",
         "leaf_searchreturn",
         "seq_patrol",
@@ -84,6 +88,7 @@
     "leaf_look5": { "type": "Leaf", "label": "Look(5) down-angle", "children": [], "props": { "action": "Look5" } },
 
     "leaf_uncrouch":     { "type": "Leaf", "label": "Uncrouch if idle",      "children": [], "props": { "action": "UncrouchIdle"   } },
+    "leaf_climbladder":  { "type": "Leaf", "label": "Climb ladder to target", "children": [], "props": { "action": "ClimbLadder", "direction": "toward_target" } },
     "leaf_chase":        { "type": "Leaf", "label": "Chase target (patrol)", "children": [], "props": { "action": "Chase"           } },
     "leaf_searchreturn": { "type": "Leaf", "label": "Search then return",    "children": [], "props": { "action": "SearchAndReturn" } },
 

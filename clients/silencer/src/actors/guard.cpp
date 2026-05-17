@@ -194,11 +194,61 @@ void Guard::InitBT(){
 		return BTResult::Failure;
 	};
 
-	// Chase: walk toward the chasing target. Only when patrol=true.
+	// ClimbLadder: snap to a nearby ladder and climb toward a target y position.
+	// Props: direction = "toward_target" | "toward_origin" | "up" | "down"  (default: "toward_target")
+	// Returns Running while climbing, Failure if no climbable ladder is found.
+	btctx_.actions["ClimbLadder"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(state == LADDER) return BTResult::Running;
+		if(state != WALKING && state != STANDING) return BTResult::Failure;
+		if(bt_ladder_cooldown_ > 0) return BTResult::Failure;
+
+		std::string dir = ctx.props ? ctx.props->value("direction", std::string{"toward_target"}) : "toward_target";
+		int target_y = y;
+		if(dir == "toward_target"){
+			if(!chasing) return BTResult::Failure;
+			Object* obj = world.GetObjectFromId(chasing);
+			if(!obj) return BTResult::Failure;
+			target_y = obj->y;
+		} else if(dir == "toward_origin"){
+			target_y = originaly;
+		} else if(dir == "up"){
+			target_y = y - 9999;
+		} else if(dir == "down"){
+			target_y = y + 9999;
+		}
+
+		const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster");
+		int threshold  = gd ? gd->ladderYThreshold  : 48;
+		int tolerance  = gd ? gd->ladderXTolerance  : 8;
+		int climbspeed = gd ? gd->ladderClimbSpeed  : 5;
+		int cooldown   = gd ? gd->ladderCooldown    : 120;
+
+		int ydiff = signed(target_y) - signed(y);
+		if(dir != "up" && dir != "down" && abs(ydiff) <= threshold) return BTResult::Failure;
+
+		Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
+		if(!ladder) return BTResult::Failure;
+		Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+		if(abs(signed(center) - signed(x)) > tolerance) return BTResult::Failure;
+
+		if(ydiff < 0 && signed(ladder->y1) < signed(y)){
+			x = center; yv = -climbspeed; state = LADDER; state_i = 0;
+			bt_ladder_cooldown_ = cooldown;
+			return BTResult::Running;
+		} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
+			x = center; yv = climbspeed; state = LADDER; state_i = 0;
+			bt_ladder_cooldown_ = cooldown;
+			return BTResult::Running;
+		}
+		return BTResult::Failure;
+	};
+
+	// Chase: walk horizontally toward the chasing target. Only when patrol=true.
 	btctx_.actions["Chase"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
 		if(!chasing) return BTResult::Failure;
-		if(!patrol) return BTResult::Failure; // stay at post
+		if(!patrol) return BTResult::Failure;
 		Object* obj = world.GetObjectFromId(chasing);
 		if(!obj){ chasing = 0; return BTResult::Failure; }
 		if(obj->type == ObjectTypes::PLAYER){
@@ -213,18 +263,6 @@ void Guard::InitBT(){
 				mirrored = (obj->x < x);
 			} else {
 				state = WALKING;
-			}
-			Platform* ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
-			if(ladder){
-				Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-				if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
-					if(ladder->y2 == obj->y && y != obj->y && ladder->y2 > y){
-						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = _gls ? _gls->ladderClimbSpeed : 5; state = LADDER; state_i = 0; }
-					}
-					if(ladder->y1 == obj->y && y != obj->y && ladder->y1 < y){
-						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = -(_gls ? _gls->ladderClimbSpeed : 5); state = LADDER; state_i = 0; }
-					}
-				}
 			}
 		}
 		return BTResult::Running;
@@ -475,6 +513,105 @@ void Guard::InitBT(){
 		ctx.bbSet(key, did_hit);
 		return did_hit ? BTResult::Success : BTResult::Failure;
 	};
+
+	// Scan: fire all 6 look rays without shooting; set target_seen + chasing if any hit.
+	btctx_.actions["Scan"] = [this, updateChasing](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		for(int d = 0; d < 6; d++){
+			Object* f = Look(world, d);
+			if(f){
+				ctx.bbSet("target_seen", true);
+				updateChasing(f, world);
+				return BTResult::Success;
+			}
+		}
+		return BTResult::Failure;
+	};
+
+	// Crouch: transition to crouched state.
+	// Returns Running while transitioning, Success when fully crouched.
+	btctx_.actions["Crouch"] = [this](BTContext&) -> BTResult {
+		if(state == CROUCHED) return BTResult::Success;
+		if(state == CROUCHING) return BTResult::Running;
+		if(state == WALKING || state == STANDING || state == LOOKING){
+			state = CROUCHING; state_i = 0;
+			return BTResult::Running;
+		}
+		return BTResult::Failure;
+	};
+
+	// Uncrouch: stand up from crouch. Returns Running while transitioning, Success when upright.
+	btctx_.actions["Uncrouch"] = [this](BTContext&) -> BTResult {
+		if(state == CROUCHED || state == CROUCHING){ state = UNCROUCHING; state_i = 0; return BTResult::Running; }
+		if(state == UNCROUCHING) return BTResult::Running;
+		return BTResult::Success;
+	};
+
+	// Standalone shoot leaves — enter the named shoot state if cooldown is ready.
+	// All return Failure on cooldown, Success when the state is entered.
+	btctx_.actions["ShootStanding"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != WALKING && state != STANDING && state != LOOKING) return BTResult::Failure;
+		state = SHOOTSTANDING; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootCrouched"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != CROUCHED) return BTResult::Failure;
+		state = SHOOTCROUCHED; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootUp"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != WALKING && state != STANDING && state != LOOKING) return BTResult::Failure;
+		state = SHOOTUP; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootDown"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != WALKING && state != STANDING && state != LOOKING) return BTResult::Failure;
+		state = SHOOTDOWN; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootUpAngle"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != WALKING && state != STANDING && state != LOOKING) return BTResult::Failure;
+		state = SHOOTUPANGLE; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootDownAngle"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != WALKING && state != STANDING && state != LOOKING) return BTResult::Failure;
+		state = SHOOTDOWNANGLE; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootLadderUp"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != LADDER) return BTResult::Failure;
+		state = SHOOTLADDERUP; state_i = 0;
+		return BTResult::Success;
+	};
+
+	btctx_.actions["ShootLadderDown"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(!CooledDown(world)) return BTResult::Failure;
+		if(state != LADDER) return BTResult::Failure;
+		state = SHOOTLADDERDOWN; state_i = 0;
+		return BTResult::Success;
+	};
 }
 
 void Guard::Serialize(bool write, Serializer & data, Serializer * old){
@@ -520,6 +657,11 @@ void Guard::Tick(World & world){
 			btctx_.bbSet("target_seen", false);
 			btctx_.bbSet("health_pct", maxhealth > 0 ? (float)health / (float)maxhealth : 0.0f);
 			btctx_.bbSet("on_ladder", (bool)(state == LADDER));
+			btctx_.bbSet("has_target", (bool)(chasing != 0));
+			{
+				Platform* nl = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
+				btctx_.bbSet("at_ladder", (bool)(nl != nullptr));
+			}
 			{
 				const char* sn = "unknown";
 				switch(state){
