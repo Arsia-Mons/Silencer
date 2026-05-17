@@ -2,15 +2,16 @@
 
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 
 #include "game_tech_panel.h"
 
 #include <cstdint>
 #include <string>
 
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextEffect;
+using silencer::ui::primitives::TextSize;
 
 namespace silencer::client_ui::lobby {
 
@@ -43,8 +44,8 @@ void BuildTechSelectedPanel(const GameTechPanelState & state) {
 	           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
 	       } }) {
 		if(!state.techNameStr.empty()){
-			BankText(tech_selected_panel_detail::FromStd(state.techNameStr),
-			         BankTextVariant::Heading, {});
+			Text(tech_selected_panel_detail::FromStd(state.techNameStr),
+			     { .size = TextSize::Heading });
 		}
 	}
 
@@ -64,11 +65,10 @@ void BuildTechSelectedPanel(const GameTechPanelState & state) {
 			                       CLAY_SIZING_FIXED(tech_selected_panel_detail::kDescLH) },
 			       } }) {
 				if(!state.techDescLines[i].empty()){
-					BankText(tech_selected_panel_detail::FromStd(state.techDescLines[i]),
-					         BankTextVariant::Body,
-					         { .effectColor = 129,
-					           .brightness  = static_cast<Uint8>(128 + 16),
-					           .colorRamp   = true });
+					Text(tech_selected_panel_detail::FromStd(state.techDescLines[i]),
+					     { .size = TextSize::Body,
+					       .effect = TextEffect::LegacyPalette(
+							   129, static_cast<Uint8>(128 + 16), true) });
 				}
 			}
 		}

@@ -3,7 +3,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/toggle.h"
 
 #include "lobby_screen.h"
@@ -18,8 +18,9 @@
 #include <cstring>
 #include <string>
 
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextEffect;
+using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::Toggle;
 using silencer::ui::primitives::ToggleHandle;
 using silencer::ui::primitives::ToggleOpts;
@@ -233,9 +234,9 @@ void BuildTechTreeGrid(World & world,
 							           .sizing = { CLAY_SIZING_GROW(0),
 							                       CLAY_SIZING_FIXED(tech_tree_grid_detail::kRowH) },
 							       } }) {
-								BankText(tech_tree_grid_detail::FromStd(tech_tree_grid_detail::g_rowLabels[rowLabelSlot]),
-								         BankTextVariant::Body,
-								         { .brightness = brightness });
+								Text(tech_tree_grid_detail::FromStd(tech_tree_grid_detail::g_rowLabels[rowLabelSlot]),
+								     { .size = TextSize::Body,
+								       .effect = TextEffect::LegacyPalette(0, brightness) });
 							}
 							rowLabelSlot++;
 						}

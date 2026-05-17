@@ -6,32 +6,25 @@
 // Emits one LEFT_TO_RIGHT CLAY block sized to (opts.width × opts.height)
 // containing:
 //
-//   • A fixed-width label column (BankText at `opts.variant`).
-//   • A growing value column (BankText at `opts.variant`).
+//   • A fixed-width label column.
+//   • A growing value column.
 //
 // The primitive is screen-agnostic: the caller supplies both strings and
-// the visual knobs. Variants are an explicit enum reused from BankText. No
-// lobby/world/Config references; no internal state. Allocations for any
-// non-default brightness / colorRamp / drawAlpha go through BankText's own
-// per-frame arena — the caller MUST already have invoked
-// BankTextBeginFrame() before Clay_BeginLayout. LabelValueRow has no arena
-// of its own.
+// text style. No lobby/world/Config references; no internal state.
 
 #include "clay/clay.h"
 #include "shared.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 
 namespace silencer::ui::primitives {
 
 struct LabelValueRowOpts {
 	Uint16          width;                    // Total row width (px). Required — primitive carries no opinion on form size.
-	Uint16          height           = 14;    // Total row height (px). Sized for a single BankText cell.
+	Uint16          height           = 14;    // Total row height (px). Sized for a single text cell.
 	Uint16          labelWidth;               // Label column width (px). Required — caller sizes for its longest label. Value column fills (width - labelWidth).
-	BankTextVariant variant          = BankTextVariant::Body;
-	Uint8           labelEffectColor = 0;     // 0 = no tint.
-	Uint8           labelBrightness  = 128;
-	Uint8           valueEffectColor = 0;
-	Uint8           valueBrightness  = 128;
+	TextOpts        text = TextOpts{};
+	TextEffect      labelEffect = TextEffect::Default();
+	TextEffect      valueEffect = TextEffect::Default();
 };
 
 // Emits one LabelValueRow subtree. Must be called inside an open CLAY

@@ -52,7 +52,7 @@ bool ChatPanelHandleUiIntent(ChatPanelState & state,
                              const silencer::ui::UiAction & action);
 
 // Emits the panel subtree. Must be called inside an open Clay layout pass
-// AFTER BankTextBeginFrame() + ScrollTextBoxBeginFrame() + TextInputBeginFrame().
+// AFTER TextBeginFrame() + ScrollTextBoxBeginFrame() + TextInputBeginFrame().
 void BuildChatPanelTree(ChatPanelState & state,
                         World & world,
                         Resources & resources,

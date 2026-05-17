@@ -14,7 +14,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/button.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
@@ -26,8 +26,9 @@
 
 namespace lobby_connect_screen_detail
 {
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextEffect;
+using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
@@ -132,8 +133,7 @@ int FillLogSlab(const std::vector<std::string> & lines)
 	int count = 0;
 	for(int i = start; i < static_cast<int>(lines.size()); i++){
 		g_logSlab[count].text = FromStd(lines[i]);
-		g_logSlab[count].effectColor = 0;
-		g_logSlab[count].brightness = 128;
+		g_logSlab[count].effect = TextEffect::Default();
 		g_logSlab[count].indent = 0;
 		count++;
 	}
@@ -339,7 +339,7 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 				              { .width = lobby_connect_screen_detail::kLogW,
 				                .height = lobby_connect_screen_detail::kLogH,
 				                .lineHeight = 11,
-				                .textVariant = lobby_connect_screen_detail::BankTextVariant::Body,
+				                .text = { .size = lobby_connect_screen_detail::TextSize::Body },
 				                .origin = lobby_connect_screen_detail::ScrollTextBoxOrigin::TopDown });
 			}
 
@@ -380,16 +380,16 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 					                               CLAY_ALIGN_Y_CENTER },
 					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					       } }) {
-						lobby_connect_screen_detail::BankText(CLAY_STRING("Username"),
-						         lobby_connect_screen_detail::BankTextVariant::Heading, {});
+						lobby_connect_screen_detail::Text(
+							CLAY_STRING("Username"),
+							{ .size = lobby_connect_screen_detail::TextSize::Heading });
 					}
 					silencer::ui::primitives::TextInput(
 						CLAY_STRING("LobbyConnectUsernameInput"),
 						username,
 						{ .widthPx = lobby_connect_screen_detail::kInputW,
 						  .heightPx = lobby_connect_screen_detail::kFormRowH,
-						  .fontBank = 133,
-						  .fontWidth = 6,
+						  .textSize = lobby_connect_screen_detail::TextSize::Body,
 						  .inactive = inactive,
 						  .showCaret = usernameFocused && blink,
 						  .contentInsetX = lobby_connect_screen_detail::kInputInsetX },
@@ -417,16 +417,16 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 					                               CLAY_ALIGN_Y_CENTER },
 					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					       } }) {
-						lobby_connect_screen_detail::BankText(CLAY_STRING("Password"),
-						         lobby_connect_screen_detail::BankTextVariant::Heading, {});
+						lobby_connect_screen_detail::Text(
+							CLAY_STRING("Password"),
+							{ .size = lobby_connect_screen_detail::TextSize::Heading });
 					}
 					silencer::ui::primitives::TextInput(
 						CLAY_STRING("LobbyConnectPasswordInput"),
 						password,
 						{ .widthPx = lobby_connect_screen_detail::kInputW,
 						  .heightPx = lobby_connect_screen_detail::kFormRowH,
-						  .fontBank = 133,
-						  .fontWidth = 6,
+						  .textSize = lobby_connect_screen_detail::TextSize::Body,
 						  .password = true,
 						  .inactive = inactive,
 						  .showCaret = passwordFocused && blink,

@@ -11,7 +11,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/button.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 
 #include <SDL3/SDL.h>
 
@@ -24,8 +24,8 @@ using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextSize;
 
 constexpr uint16_t kRootPadY = 32;
 constexpr uint16_t kLogoPadX = 7;
@@ -60,13 +60,7 @@ ButtonOpts MainMenuActionButtonOpts()
 
 void MainMenuVersionText(Clay_String text)
 {
-	CLAY_TEXT(text,
-	          CLAY_TEXT_CONFIG({
-	              .userData  = nullptr,
-	              .textColor = { 0.0f, 0.0f, 0.0f, 255.0f },
-	              .fontId    = 133,
-	              .fontSize  = 11,
-	          }));
+	Text(text, { .size = TextSize::Footer });
 }
 
 void MainMenuActionRow(Clay_String rowId,

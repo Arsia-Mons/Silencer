@@ -53,7 +53,7 @@ bool RunScrollListTest(::Game & game, const char * outPath) {
 	const int H = 480;
 	EnsureInitialized(W, H);
 	silencer::ui::primitives::ScrollListBeginFrame();
-	silencer::ui::primitives::BankTextBeginFrame();
+	silencer::ui::primitives::TextBeginFrame();
 	BuildItems();
 
 	::Clay_BeginLayout();
@@ -104,7 +104,7 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 		::Clay_ResetMeasureTextCache();
 		interactions.BeginFrame();
 		silencer::ui::primitives::ScrollListBeginFrame();
-		silencer::ui::primitives::BankTextBeginFrame();
+		silencer::ui::primitives::TextBeginFrame();
 
 		::Clay_BeginLayout();
 		CLAY({ .id = CLAY_ID("ScrollListCheckRoot"),
@@ -181,7 +181,7 @@ bool RunScrollListCheck(::Game & game, ScrollListCheckResult & out) {
 		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 		::Clay_ResetMeasureTextCache();
 		silencer::ui::primitives::ScrollListBeginFrame();
-		silencer::ui::primitives::BankTextBeginFrame();
+		silencer::ui::primitives::TextBeginFrame();
 
 		::Clay_BeginLayout();
 		CLAY({ .id = CLAY_ID("ScrollListOverflowCheckRoot"),

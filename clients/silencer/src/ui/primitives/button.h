@@ -2,6 +2,7 @@
 #define SILENCER_UI_PRIMITIVES_BUTTON_H
 
 #include "clay/clay.h"
+#include "primitives/text.h"
 #include "shared.h"
 
 namespace silencer::ui {
@@ -30,7 +31,7 @@ struct ButtonOpts {
 	ButtonSize size = ButtonSize::Md;
 	bool disabled = false;
 	bool selected = false;
-	Uint8 effectColor = 0;
+	TextEffect textEffect = TextEffect::Default();
 	int minWidth = 0;
 	int maxWidth = 0;
 	int paddingX = 0;

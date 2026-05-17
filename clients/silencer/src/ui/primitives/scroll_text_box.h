@@ -14,15 +14,14 @@
 // ScrollTextBoxBeginFrame() once per layout pass before Clay_BeginLayout.
 
 #include "clay/clay.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "shared.h"
 
 namespace silencer::ui::primitives {
 
 struct ScrollTextBoxLine {
 	Clay_String text;
-	Uint8       effectColor;  // palette idx; 0 = neutral.
-	Uint8       brightness;   // 128 = neutral (legacy default).
+	TextEffect  effect;
 	Uint16      indent;       // px x-offset within the row (0 = flush left).
 };
 
@@ -39,7 +38,7 @@ struct ScrollTextBoxOpts {
 	Uint16 height     = 100;
 	Uint8  lineHeight = 11;  // legacy TextBox::lineheight default.
 
-	BankTextVariant     textVariant = BankTextVariant::Body;  // bank 133, cell w=6.
+	TextOpts            text = TextOpts{};
 	ScrollTextBoxOrigin origin      = ScrollTextBoxOrigin::TopDown;
 
 	// Optional sprite-rendered scrollbar on the right. When `showScrollbar`

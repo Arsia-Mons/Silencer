@@ -13,7 +13,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/button.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 
 #include <SDL3/SDL.h>
 
@@ -24,8 +24,8 @@ using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextSize;
 
 constexpr uint16_t kPanelW = 420;
 constexpr uint16_t kPanelPadX = 24;
@@ -102,7 +102,8 @@ void OptionsAudioScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
-			options_audio_screen_detail::BankText(CLAY_STRING("Audio Options"), options_audio_screen_detail::BankTextVariant::Title, {});
+			options_audio_screen_detail::Text(CLAY_STRING("Audio Options"),
+			                                  { .size = options_audio_screen_detail::TextSize::Title });
 			silencer::client_ui::options::BooleanSettingRow(
 				CLAY_STRING("OptionsAudioMusicRow"),
 				CLAY_STRING("OptionsAudioMusicButton"),

@@ -5,6 +5,8 @@
 #include "renderer.h"
 #include "resources.h"
 #include "surface.h"
+#include "ui/primitives/text.h"
+#include "ui/primitives/text_internal.h"
 #include "world.h"
 
 #include <algorithm>
@@ -32,11 +34,10 @@ int g_uiScale = 1;
 
 const Resources * g_textMeasureResources = nullptr;
 
-// Per-bank text height. Mirrors the Overlay::MouseInside switch
-// (overlay.cpp:99). Banks 132 (TinyText), 133 (Body), 134 (Heading),
-// 135 (Title), 136 reserved.
-Uint16 BankTextHeight(uint16_t bank) {
-	switch(bank){
+// Fallback for adapter tests or debug text that still arrives as raw Clay
+// text config instead of the Text primitive.
+Uint16 FallbackLineHeightForClayFont(uint16_t fontId) {
+	switch(fontId){
 		case 132: return 7;
 		case 133: return 11;
 		case 134: return 15;
@@ -48,8 +49,8 @@ Uint16 BankTextHeight(uint16_t bank) {
 
 bool UsesInkMetrics(void * userData) {
 	if(!userData) return false;
-	const BankTextDrawData * extra =
-		reinterpret_cast<const BankTextDrawData *>(userData);
+	const TextDrawData * extra =
+		reinterpret_cast<const TextDrawData *>(userData);
 	return extra && extra->measureInk;
 }
 
@@ -119,10 +120,13 @@ TextInkMetrics MeasureInkBounds(const Resources * resources,
 	return out;
 }
 
-::Clay_Dimensions MeasureBankText(::Clay_StringSlice text,
-                                  ::Clay_TextElementConfig * config,
-                                  void * /*userData*/) {
+::Clay_Dimensions MeasureTextCommand(::Clay_StringSlice text,
+                                     ::Clay_TextElementConfig * config,
+                                     void * /*userData*/) {
 	::Clay_Dimensions out;
+	const uint16_t lineHeight = config->lineHeight
+		? config->lineHeight
+		: FallbackLineHeightForClayFont(config->fontId);
 	TextInkMetrics ink = UsesInkMetrics(config->userData)
 		? MeasureInkBounds(g_textMeasureResources,
 		                    text.chars,
@@ -133,7 +137,7 @@ TextInkMetrics MeasureInkBounds(const Resources * resources,
 	out.width  = ink.hasInk
 		? static_cast<float>(ink.width)
 		: static_cast<float>(text.length * config->fontSize);
-	out.height = static_cast<float>(BankTextHeight(config->fontId));
+	out.height = static_cast<float>(lineHeight);
 	return out;
 }
 
@@ -308,8 +312,8 @@ void DispatchText(::Resources & resources,
 	bool colorRamp = false;
 	bool alpha = false;
 	if(userData){
-		const BankTextDrawData * extra =
-			reinterpret_cast<const BankTextDrawData *>(userData);
+		const TextDrawData * extra =
+			reinterpret_cast<const TextDrawData *>(userData);
 		brightness = extra->brightness;
 		colorRamp  = extra->colorRamp;
 		alpha      = extra->drawAlpha;
@@ -543,7 +547,7 @@ void EnsureInitialized(int width, int height) {
 		::Clay_Dimensions dims{static_cast<float>(width),
 		                       static_cast<float>(height)};
 		g_context = ::Clay_Initialize(arena, dims, handler);
-		::Clay_SetMeasureTextFunction(MeasureBankText, nullptr);
+		::Clay_SetMeasureTextFunction(MeasureTextCommand, nullptr);
 		g_initialized = true;
 		g_lastW = width;
 		g_lastH = height;
@@ -969,23 +973,25 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						const auto * p = reinterpret_cast<const TextInputPayload *>(ccd->payload);
 						if(!p) break;
 						if(!p->text) break;
+						const auto style = silencer::ui::primitives::text_internal::ResolveTextRenderStyle(
+							static_cast<silencer::ui::primitives::TextSize>(p->textSize));
 						int x = static_cast<int>(c->boundingBox.x);
 						int y = static_cast<int>(c->boundingBox.y);
 						// DrawText at (x, y), then caret bar at
-						// (x + textLen*fontWidth, y - 1) if showCaret.
+						// (x + textLen*advance, y - 1) if showCaret.
 						renderer.DrawText(dst,
 						                  static_cast<Uint16>(x),
 						                  static_cast<Uint16>(y),
 						                  p->text,
-						                  p->bank,
-						                  p->fontWidth,
+						                  static_cast<Uint8>(style.bank),
+						                  static_cast<Uint8>(style.advance),
 						                  /*centered=*/false,
 						                  p->effectColor,
 						                  p->brightness,
 						                  /*colorRamp=*/false);
 						if(p->showCaret){
 							int cx = x + static_cast<int>(p->textLen) *
-							             static_cast<int>(p->fontWidth);
+							             static_cast<int>(style.advance);
 							int cy = y - 1;
 							int cw = 1;
 							int ch = static_cast<int>(p->caretHeight);

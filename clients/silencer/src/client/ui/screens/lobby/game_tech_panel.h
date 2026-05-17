@@ -56,7 +56,7 @@ bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
 // Emits the upper-pane subtree ("Back To Teams" button + 3 right-aligned
 // peer-name labels). Called inside the LobbyRightUpperBox CLAY block; flex
 // children only (no floating).
-// BeginFrame requirements: BankTextBeginFrame, ButtonBeginFrame.
+// BeginFrame requirements: TextBeginFrame, ButtonBeginFrame.
 void BuildGameTechUpperTree(GameTechPanelState & state,
                             World & world,
                             Resources & resources,
@@ -66,7 +66,7 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 // Emits the tall-pane subtree (slots-left text + 4-column tech-choice grid +
 // centered tech-name heading + 8 description lines). Called inside the
 // LobbyRightTallBox CLAY block; flex children only.
-// BeginFrame requirements: BankTextBeginFrame, ToggleBeginFrame.
+// BeginFrame requirements: TextBeginFrame, ToggleBeginFrame.
 void BuildGameTechTallTree(GameTechPanelState & state,
                            World & world,
                            Resources & resources,

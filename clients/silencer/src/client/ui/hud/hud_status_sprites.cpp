@@ -8,6 +8,7 @@
 #include "render/renderer.h"
 #include "resources.h"
 #include "surface.h"
+#include "ui/primitives/text.h"
 
 #include <vector>
 
@@ -99,8 +100,11 @@ Uint8 BuildHudStatusSprites(const PlayerHudView& player, Surface* surface,
 		inventoryLetter[i] = Renderer::InvIdToLetter(player.inventoryItems[i]);
 		inventoryBrightness[i] = player.currentInventoryItem == i ? 128 : 32;
 	}
-	silencer::clay_bridge::BankTextDrawData letterData[4];
-	for(int i = 0; i < 4; ++i) letterData[i] = { inventoryBrightness[i], false, false };
+	silencer::ui::primitives::TextEffect letterEffects[4];
+	for(int i = 0; i < 4; ++i) {
+		letterEffects[i] = silencer::ui::primitives::TextEffect::LegacyPalette(
+			0, inventoryBrightness[i]);
+	}
 
 	CLAY({ .id = CLAY_ID("InGameHudStatusSpritesRoot"),
 	       .layout = {
@@ -160,12 +164,10 @@ Uint8 BuildHudStatusSprites(const PlayerHudView& player, Surface* surface,
 				       .attachTo = CLAY_ATTACH_TO_ROOT,
 			       },
 			}) {
-				CLAY_TEXT(ClayStringFromCString(inventoryLetter[i]), CLAY_TEXT_CONFIG({
-					.userData = &letterData[i],
-					.textColor = { 0, 0, 0, 255 },
-					.fontId = 132,
-					.fontSize = 4,
-				}));
+				silencer::ui::primitives::Text(
+					ClayStringFromCString(inventoryLetter[i]),
+					{ .size = silencer::ui::primitives::TextSize::Tiny,
+					  .effect = letterEffects[i] });
 			}
 		}
 	}

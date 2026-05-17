@@ -31,9 +31,7 @@ void Panel(Clay_String id,
 	       },
 	       .image = { .imageData = imageData } }) {
 		if(opts.title.length > 0){
-			BankText(opts.title, opts.titleVariant,
-			         { .effectColor = opts.titleEffectColor,
-			           .brightness  = opts.titleBrightness });
+			Text(opts.title, opts.titleStyle);
 		}
 	}
 }

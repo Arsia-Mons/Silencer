@@ -1,6 +1,7 @@
 #include "text_input.h"
 
 #include "clay_ui_payloads.h"
+#include "primitives/text_internal.h"
 #include "runtime/UiInteractionRegistry.h"
 
 #include <algorithm>
@@ -47,19 +48,6 @@ char * AllocMaskBuffer() {
 
 std::string ToStd(Clay_String text) {
 	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
-}
-
-uint16_t TextHeightForBank(Uint8 bank) {
-	switch(bank){
-		case 135:
-		case 136:
-			return 19;
-		case 134:
-			return 15;
-		case 133:
-		default:
-			return 11;
-	}
 }
 
 void RegisterTextInputWidget(Clay_String clayId,
@@ -109,19 +97,19 @@ void TextInput(Clay_String id,
 		}
 	}
 
-	Uint8 brightness = opts.inactive ? static_cast<Uint8>(64) : opts.brightness;
+	TextEffect effect = ResolveTextEffect(TextTone::Default, opts.effect);
+	Uint8 brightness = opts.inactive ? static_cast<Uint8>(64) : effect.Brightness();
 	bool  showCaret  = !opts.inactive && opts.showCaret;
 	Uint8 caretHeight =
 		static_cast<Uint8>(std::min(static_cast<int>(opts.heightPx) * 4 / 5,
-		                            static_cast<int>(TextHeightForBank(opts.fontBank))));
+		                            static_cast<int>(TextLineHeight(opts.textSize))));
 
 	auto * payload = AllocPayload();
 	if(payload){
 		payload->text        = displayText;
 		payload->textLen     = static_cast<Uint16>(srcLen);
-		payload->bank        = opts.fontBank;
-		payload->fontWidth   = opts.fontWidth;
-		payload->effectColor = opts.effectColor;
+		payload->textSize    = static_cast<Uint8>(opts.textSize);
+		payload->effectColor = effect.EffectColor();
 		payload->brightness  = brightness;
 		payload->caretColor  = opts.caretColor;
 		payload->caretHeight = caretHeight;
@@ -146,7 +134,7 @@ void TextInput(Clay_String id,
 		RegisterTextInputWidget(id, src, opts, handle);
 		const float textW = static_cast<float>(
 			std::max(1, static_cast<int>(opts.widthPx) - static_cast<int>(contentInsetX)));
-		const float textH = static_cast<float>(TextHeightForBank(opts.fontBank));
+		const float textH = static_cast<float>(TextLineHeight(opts.textSize));
 		CLAY({ .id = CLAY_SIDI(id, 1),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(textW), CLAY_SIZING_FIXED(textH) },

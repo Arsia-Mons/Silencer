@@ -35,9 +35,9 @@ inline void * PackImageStretch(Uint8 bank, Uint16 index) {
 	return reinterpret_cast<void *>(v);
 }
 
-// Optional userData payload for CLAY_TEXT: extra bank-text effects beyond the
+// Optional userData payload for Clay TEXT commands: extra effects beyond the
 // textColor tint Clay already passes through.
-struct BankTextDrawData {
+struct TextDrawData {
 	Uint8 brightness;     // 128 = neutral.
 	bool colorRamp;       // True -> EffectRampColor instead of EffectColor.
 	bool drawAlpha;       // True -> DrawAlphaed glyph blit.
@@ -138,8 +138,7 @@ struct ScrollBarPayload {
 struct TextInputPayload {
 	const char * text;
 	Uint16       textLen;
-	Uint8        bank;
-	Uint8        fontWidth;
+	Uint8        textSize;
 	Uint8        effectColor;
 	Uint8        brightness;
 	Uint8        caretColor;

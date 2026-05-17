@@ -9,7 +9,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/button.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 
 #include <SDL3/SDL.h>
 
@@ -20,8 +20,8 @@ using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextSize;
 
 constexpr uint16_t kDialogW = 352;
 constexpr uint16_t kDialogH = 178;
@@ -90,7 +90,8 @@ void MessageModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(40, 4) } }) {
-			message_modal_detail::BankText(message_modal_detail::FromStd(message), message_modal_detail::BankTextVariant::Heading, {});
+			message_modal_detail::Text(message_modal_detail::FromStd(message),
+			                           { .size = message_modal_detail::TextSize::Heading });
 			if(hasOk){
 				message_modal_detail::Button(CLAY_STRING("MessageModalOkButton"), CLAY_STRING("OK"),
 				           message_modal_detail::ButtonOpts{ .variant = message_modal_detail::ButtonVariant::Chrome,

@@ -1,11 +1,11 @@
 #ifndef SILENCER_UI_CLAY_PRIMITIVES_TEXT_INPUT_H
 #define SILENCER_UI_CLAY_PRIMITIVES_TEXT_INPUT_H
 
-// Screen-agnostic Clay primitive for paletted bank-font text input fields.
+// Screen-agnostic Clay primitive for paletted text input fields.
 //
 // The outer Clay element owns the clickable field bounds. The rendered text is
 // an inner custom element, horizontally inset by `contentInsetX` and vertically
-// centered for the selected font bank. The caret is positioned relative to that
+// centered for the selected text size. The caret is positioned relative to that
 // rendered text origin.
 //
 // The primitive owns no state and references no lobby/world/Config:
@@ -30,6 +30,7 @@
 // per layout pass before `Clay_BeginLayout` to reset them.
 
 #include "clay/clay.h"
+#include "primitives/text.h"
 #include "shared.h"
 
 namespace silencer::ui {
@@ -41,13 +42,11 @@ namespace silencer::ui::primitives {
 struct TextInputOpts {
 	Uint16 widthPx     = 90;    // bbox width (legacy `width`).
 	Uint16 heightPx    = 19;    // bbox height (legacy `height`).
-	Uint8  fontBank;            // caller-supplied; the primitive doesn't
-	Uint8  fontWidth;           // know which bank/cell width is canonical.
+	TextSize textSize   = TextSize::Body;
 	bool   password    = false; // render text as '*' chars.
 	bool   numbersOnly = false; // screen-side input filter hint; primitive ignores.
 	bool   inactive    = false; // dims to brightness 64; suppresses caret.
-	Uint8  effectColor = 0;     // text tint palette index.
-	Uint8  brightness  = 128;   // legacy default.
+	TextEffect effect   = TextEffect::Default();
 	Uint8  caretColor  = 140;   // legacy default.
 	bool   showCaret   = false; // caller pre-resolves blink AND focus.
 	Uint16 contentInsetX = 0;   // left inset from clickable field to text.

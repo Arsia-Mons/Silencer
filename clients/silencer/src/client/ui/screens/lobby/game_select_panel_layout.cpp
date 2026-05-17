@@ -3,15 +3,15 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/button.h"
 #include "primitives/scroll_list.h"
 
 #include <cstdint>
 #include <cstring>
 
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
@@ -94,9 +94,8 @@ void BuildGameSelectInfoBlock(const GameSelectPanelState & state) {
 			                       CLAY_SIZING_FIXED(kTallInfoRowH) },
 			       } }) {
 				if(!kInfoRows[i].txt->empty()){
-					BankText(FromStd(*kInfoRows[i].txt),
-					         BankTextVariant::Body,
-					         {});
+					Text(FromStd(*kInfoRows[i].txt),
+					     { .size = TextSize::Body });
 				}
 			}
 		}
@@ -116,7 +115,7 @@ void BuildGameSelectList(const GameSelectPanelState & state,
 	listOpts.height         = kListH;
 	listOpts.lineHeight     = kListLineH;
 	listOpts.highlightColor = 180;
-	listOpts.textVariant    = BankTextVariant::Body;
+	listOpts.text.size      = TextSize::Body;
 	listOpts.scrollbarBank  = kScrollbarBank;
 
 	CLAY({ .id = CLAY_ID("GSelListWrap"),
@@ -214,9 +213,8 @@ void BuildGameSelectTallTree(GameSelectPanelState & state,
 	CLAY({ .id = CLAY_ID("GSelHeaderWrap"),
 	       .layout = { .padding = { game_select_panel_layout_detail::kTallHeadingPadLeft, 0,
 	                                game_select_panel_layout_detail::kTallHeadingPadTop,  0 } } }) {
-		BankText(CLAY_STRING("Active Games"),
-		         BankTextVariant::Heading,
-		         {});
+		Text(CLAY_STRING("Active Games"),
+		     { .size = TextSize::Heading });
 	}
 
 	game_select_panel_layout_detail::BuildGameSelectList(state, interactions);

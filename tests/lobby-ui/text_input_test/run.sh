@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # P9 TextInput primitive unit test — drives `clay_text_input_test` once
-# (one focused TextInput with caret, bank 135 fontWidth 9, text
+# (one focused TextInput with caret, FieldLarge text size, text
 # "Player1") and pixdiffs the resulting PNG against the committed
 # reference. Then drives `clay_text_input_check` once for the
 # typed-submit + password-mask checks.

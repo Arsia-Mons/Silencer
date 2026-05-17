@@ -12,7 +12,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/button.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 
 #include <SDL3/SDL.h>
 
@@ -27,8 +27,8 @@ using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextSize;
 
 constexpr uint16_t kDialogW = 352;
 constexpr uint16_t kDialogH = 178;
@@ -172,9 +172,11 @@ void UpdateScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, 
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(40, 4) } }) {
-			update_screen_detail::BankText(update_screen_detail::FromStd(status), update_screen_detail::BankTextVariant::Heading, {});
+			update_screen_detail::Text(update_screen_detail::FromStd(status),
+			                           { .size = update_screen_detail::TextSize::Heading });
 			if(!progress.empty()){
-				update_screen_detail::BankText(update_screen_detail::FromStd(progress), update_screen_detail::BankTextVariant::Heading, {});
+				update_screen_detail::Text(update_screen_detail::FromStd(progress),
+				                           { .size = update_screen_detail::TextSize::Heading });
 			}
 			CLAY({ .id = CLAY_ID("UpdateActions"),
 			       .layout = {

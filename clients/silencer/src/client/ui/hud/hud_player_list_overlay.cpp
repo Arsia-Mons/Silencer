@@ -3,7 +3,7 @@
 #include "clay/clay.h"
 #include "client/ui/hud/HudPayloadArena.h"
 #include "client/ui/views/HudView.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "surface.h"
 
 #include <cstdio>
@@ -88,11 +88,13 @@ void BuildPlayerListOverlay(const HudView& view, Surface* surface) {
 							       } }) {
 								CLAY({ .id = CLAY_IDI("PlayerListPeerName", (teamIndex * 8) + peerIndex),
 								       .layout = { .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) } } }) {
-									BankText(hud_player_list_overlay_detail::StringFromStd(peer.displayName), BankTextVariant::Body);
+									Text(hud_player_list_overlay_detail::StringFromStd(peer.displayName),
+									     { .size = TextSize::Body });
 								}
 								CLAY({ .id = CLAY_IDI("PlayerListPeerStats", (teamIndex * 8) + peerIndex),
 								       .layout = { .sizing = { CLAY_SIZING_FIXED((float)((statsString.size() + 1) * 6)), CLAY_SIZING_FIT(0) } } }) {
-									BankText(hud_player_list_overlay_detail::StringFromStd(statsString), BankTextVariant::Body);
+									Text(hud_player_list_overlay_detail::StringFromStd(statsString),
+									     { .size = TextSize::Body });
 								}
 							}
 						}

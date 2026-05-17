@@ -24,9 +24,9 @@ void LabelValueRow(Clay_String id,
 		           .sizing = { CLAY_SIZING_FIXED(labelW),
 		                       CLAY_SIZING_FIXED(rowH) },
 		       } }) {
-			BankText(label, opts.variant,
-			         { .effectColor = opts.labelEffectColor,
-			           .brightness  = opts.labelBrightness });
+			TextOpts labelText = opts.text;
+			if(opts.labelEffect.HasOverride()) labelText.effect = opts.labelEffect;
+			Text(label, labelText);
 		}
 		// Value column.
 		CLAY({ .id = CLAY_SIDI(id, 2),
@@ -34,9 +34,9 @@ void LabelValueRow(Clay_String id,
 		           .sizing = { CLAY_SIZING_FIXED(valueW),
 		                       CLAY_SIZING_FIXED(rowH) },
 		       } }) {
-			BankText(value, opts.variant,
-			         { .effectColor = opts.valueEffectColor,
-			           .brightness  = opts.valueBrightness });
+			TextOpts valueText = opts.text;
+			if(opts.valueEffect.HasOverride()) valueText.effect = opts.valueEffect;
+			Text(value, valueText);
 		}
 	}
 }

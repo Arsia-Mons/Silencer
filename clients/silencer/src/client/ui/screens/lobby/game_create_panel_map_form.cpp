@@ -3,7 +3,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/button.h"
 #include "primitives/scroll_list.h"
 #include "primitives/text_input.h"
@@ -13,8 +13,8 @@
 #include <cstring>
 #include <string>
 
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
@@ -66,7 +66,7 @@ void BuildMapList(GameCreatePanelState & state,
 	listOpts.height         = kMapListH;
 	listOpts.lineHeight     = kMapListLineH;
 	listOpts.highlightColor = 180;
-	listOpts.textVariant    = BankTextVariant::Body;
+	listOpts.text.size      = TextSize::Body;
 	listOpts.scrollbarBank  = kScrollbarBank;
 	CLAY({ .id = CLAY_ID("GCrtMapListWrap") }) {
 		ScrollList(CLAY_STRING("GCrtMapList"),
@@ -91,15 +91,13 @@ void BuildMapList(GameCreatePanelState & state,
 void BuildNameAndPassword(GameCreatePanelState & state,
                           silencer::ui::UiInteractionRegistry& interactions) {
 	CLAY({ .id = CLAY_ID("GCrtNameLabelWrap") }) {
-		BankText(CLAY_STRING("Game name:"),
-		         BankTextVariant::Heading, {});
+		Text(CLAY_STRING("Game name:"),
+		     { .size = TextSize::Heading });
 	}
 	TextInputOpts bodyInput;
 	bodyInput.widthPx    = kNameInputW;
 	bodyInput.heightPx   = kNameInputH;
-	bodyInput.fontBank   = 133;
-	bodyInput.fontWidth  = 6;
-	bodyInput.brightness = 128;
+	bodyInput.textSize   = TextSize::Body;
 	bodyInput.showCaret  = false;
 	CLAY({ .id = CLAY_ID("GCrtNameInputWrap") }) {
 		TextInput(CLAY_STRING("GCrtNameInput"),
@@ -110,8 +108,8 @@ void BuildNameAndPassword(GameCreatePanelState & state,
 	}
 
 	CLAY({ .id = CLAY_ID("GCrtPwLabelWrap") }) {
-		BankText(CLAY_STRING("Password (optional):"),
-		         BankTextVariant::Heading, {});
+		Text(CLAY_STRING("Password (optional):"),
+		     { .size = TextSize::Heading });
 	}
 	bodyInput.password = true;
 	CLAY({ .id = CLAY_ID("GCrtPwInputWrap") }) {
@@ -138,8 +136,8 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		CLAY({ .id = CLAY_ID("GCrtSelectMapTitleWrap") }) {
-			BankText(CLAY_STRING("Select Map"),
-			         BankTextVariant::Heading, {});
+			Text(CLAY_STRING("Select Map"),
+			     { .size = TextSize::Heading });
 		}
 
 		game_create_panel_map_form_detail::BuildMapList(state, interactions);

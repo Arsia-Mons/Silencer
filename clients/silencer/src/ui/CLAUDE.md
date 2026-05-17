@@ -16,7 +16,7 @@ This is mid-migration toward good flexbox layout, Clay lifecycle, and shadcn-sty
 ## Primitive API
 
 - Target public primitives are plain nouns: `Button`, `TextInput`, `Toggle`, `Panel`, `Text`. Runtime/service types keep the `Ui` prefix: `UiInteractionRegistry`, `UiInputState`, `UiInputRouter`, `UiFrameContext`.
-- Mid-migration note: `BankText` and sprite-backed `Panel` still expose bank/palette details. Treat that surface as migration debt; do not copy it into new primitives, and hide it behind variants/sizes when touching the API.
+- Text consumers use the `Text` primitive plus semantic `TextSize` metrics. Keep sprite-bank and Clay font fields behind the text primitive/compositor boundary.
 - Primitive APIs follow shadcn's core shape, not its exact implementation: `variant + size`, composition, and named defaults. Repeated call-site option bundles should become named variants or sizes.
 - New or cleaned-up primitive APIs must not expose palette indices, sprite banks, legacy `B196x33`-style codes, or one-consumer presets in public signatures, enums, or docs.
 - One primitive owns one concern. Checkbox/toggle state belongs to checkbox/toggle primitives, not a `Button` mode.

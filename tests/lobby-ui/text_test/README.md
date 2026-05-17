@@ -1,19 +1,20 @@
-# P4 BankText primitive unit test
+# P4 Text primitive unit test
 
-Pixdiff test for the `BankText` Clay primitive
-(`clients/silencer/src/ui/primitives/bank_text.{h,cpp}`).
+Pixdiff test for the `Text` Clay primitive
+(`clients/silencer/src/ui/primitives/text.{h,cpp}`).
 
 ## What it does
 
 `run.sh` boots the headless silencer binary, fires the
-`clay_bank_text_test` control op, and pixdiffs the resulting PNG against
+`clay_text_test` control op, and pixdiffs the resulting PNG against
 the committed `reference.png`.
 
 The scene is a 640x480 root container with `padding = { 15, 0, 32, 0 }`
-hosting a single `BankText` call:
+hosting a single `Text` call:
 
 ```
-BankText("Silencer", BankTextVariant::Title, { .effectColor = 152 })
+Text("Silencer", { .size = TextSize::Title,
+                   .effect = TextEffect::LegacyPalette(152) })
 ```
 
 Title variant → bank 135, cell width 11. EffectColor 152 is the lobby
@@ -29,7 +30,7 @@ call shape: `bank=135 width=11 tint=152 brightness=128 ramp=false`).
 ## Run
 
 ```bash
-bash tests/lobby-ui/bank_text_test/run.sh
+bash tests/lobby-ui/text_test/run.sh
 ```
 
 Override `SILENCER_BIN` if the worktree binary isn't at
@@ -41,7 +42,7 @@ Only when the primitive's render contract changes (e.g., a variant's
 bank/width preset is intentionally tweaked):
 
 ```bash
-REGEN=1 bash tests/lobby-ui/bank_text_test/run.sh
+REGEN=1 bash tests/lobby-ui/text_test/run.sh
 ```
 
 Do NOT use `REGEN=1` to silence a failing pixdiff — fix the rendering

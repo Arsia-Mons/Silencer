@@ -6,8 +6,8 @@
 #include "client/ui/views/HudView.h"
 #include "render/clay_ui_payloads.h"
 #include "surface.h"
-#include "ui/primitives/bank_text.h"
 #include "ui/primitives/box.h"
+#include "ui/primitives/text.h"
 #include "ui/runtime/UiInteractionRegistry.h"
 
 #include <string>
@@ -77,16 +77,18 @@ void BuildBuyTechOverlay(const BuyTechOverlayView& view,
 					       .layout = {
 						       .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
 					       } }) {
-						BankText(ClayStringFromStd(row.name), BankTextVariant::Heading,
-						         { .brightness = row.brightness });
+						Text(ClayStringFromStd(row.name),
+						     { .size = TextSize::Heading,
+						       .effect = TextEffect::LegacyPalette(0, row.brightness) });
 					}
 					CLAY({ .id = CLAY_IDI("InGameBuyTechPrice", i),
 					       .layout = {
 						       .sizing = { CLAY_SIZING_FIXED(48), CLAY_SIZING_FIT(0) },
 						       .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 					       } }) {
-						BankText(ClayStringFromStd(row.price), BankTextVariant::Heading,
-						         { .brightness = row.brightness });
+						Text(ClayStringFromStd(row.price),
+						     { .size = TextSize::Heading,
+						       .effect = TextEffect::LegacyPalette(0, row.brightness) });
 					}
 				}
 			}
@@ -95,7 +97,7 @@ void BuildBuyTechOverlay(const BuyTechOverlayView& view,
 				       .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
 				       .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 			       } }) {
-				BankText(ClayStringFromStd(view.footer), BankTextVariant::Heading);
+				Text(ClayStringFromStd(view.footer), { .size = TextSize::Heading });
 			}
 		}
 	}

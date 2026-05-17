@@ -3,13 +3,14 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
 
 #include <cstdint>
 
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::TextSize;
+using silencer::ui::primitives::TextEffect;
 using silencer::ui::primitives::ScrollTextBox;
 using silencer::ui::primitives::ScrollTextBoxLine;
 using silencer::ui::primitives::ScrollTextBoxOpts;
@@ -17,7 +18,7 @@ using silencer::ui::primitives::ScrollTextBoxOrigin;
 using silencer::ui::primitives::TextInput;
 using silencer::ui::primitives::TextInputOpts;
 using silencer::ui::primitives::TextInputHandle;
-using silencer::ui::primitives::BankText;
+using silencer::ui::primitives::Text;
 
 namespace silencer::client_ui::lobby {
 
@@ -31,7 +32,6 @@ constexpr Uint16 kChatH        = 207;
 constexpr Uint16 kPresW        = 110;
 constexpr Uint16 kPresH        = 207;
 constexpr Uint8  kLineHeight   = 11;
-constexpr Uint8  kFontWidth    = 6;
 constexpr Uint16 kInputW       = 360;
 constexpr Uint16 kInputH       = 14;
 // Sprite bank that holds the lobby's scrollbar track/thumb cells.
@@ -65,8 +65,7 @@ int FillSlab(ScrollTextBoxLine * slab, const std::vector<ChatLine> & lines) {
 	for(int i = 0; i < count; i++){
 		const ChatLine & ln = lines[i];
 		slab[i].text        = FromStd(ln.text);
-		slab[i].effectColor = ln.color;
-		slab[i].brightness  = ln.brightness;
+		slab[i].effect      = TextEffect::LegacyPalette(ln.color, ln.brightness);
 		slab[i].indent      = ln.indent;
 	}
 	return count;
@@ -89,7 +88,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 	chatOpts.width               = chat_panel_layout_detail::kChatW;
 	chatOpts.height              = chat_panel_layout_detail::kChatH;
 	chatOpts.lineHeight          = chat_panel_layout_detail::kLineHeight;
-	chatOpts.textVariant         = BankTextVariant::Body;  // bank 133 w6
+	chatOpts.text.size           = TextSize::Body;
 	chatOpts.origin              = ScrollTextBoxOrigin::BottomUp;
 	chatOpts.showScrollbar       = false;
 	chatOpts.scrollbarBank       = chat_panel_layout_detail::kScrollbarBank;
@@ -104,7 +103,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 	presOpts.width        = chat_panel_layout_detail::kPresW;
 	presOpts.height       = chat_panel_layout_detail::kPresH;
 	presOpts.lineHeight   = chat_panel_layout_detail::kLineHeight;
-	presOpts.textVariant  = BankTextVariant::Body;
+	presOpts.text.size    = TextSize::Body;
 	presOpts.origin       = ScrollTextBoxOrigin::TopDown;
 	presOpts.showScrollbar = false;
 
@@ -117,9 +116,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 	TextInputOpts inOpts;
 	inOpts.widthPx     = chat_panel_layout_detail::kInputW;
 	inOpts.heightPx    = chat_panel_layout_detail::kInputH;
-	inOpts.fontBank    = 133;
-	inOpts.fontWidth   = chat_panel_layout_detail::kFontWidth;
-	inOpts.brightness  = 128;
+	inOpts.textSize    = TextSize::Body;
 	inOpts.showCaret   = false;
 	inOpts.inactive    = false;
 
@@ -138,9 +135,8 @@ void BuildChatPanelTree(ChatPanelState & state,
 		                       CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kChannelWrapH) },
 		       } }) {
 			if(!state.channel.empty()){
-				BankText(chat_panel_layout_detail::FromStd(state.channel),
-				         BankTextVariant::Heading,
-				         {});
+				Text(chat_panel_layout_detail::FromStd(state.channel),
+				     { .size = TextSize::Heading });
 			}
 		}
 

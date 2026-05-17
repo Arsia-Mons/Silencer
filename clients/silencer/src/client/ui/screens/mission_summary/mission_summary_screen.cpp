@@ -14,7 +14,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/button.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/scroll_text_box.h"
 
 #include <SDL3/SDL.h>
@@ -30,9 +30,10 @@ using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextBeginFrame;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextBeginFrame;
+using silencer::ui::primitives::TextEffect;
+using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::ScrollTextBox;
 using silencer::ui::primitives::ScrollTextBoxBeginFrame;
 using silencer::ui::primitives::ScrollTextBoxLine;
@@ -98,8 +99,7 @@ int FillSummarySlab(const std::vector<std::string> & lines)
 	if(count > kMaxSummaryLines) count = kMaxSummaryLines;
 	for(int i = 0; i < count; i++){
 		g_summarySlab[i].text = FromStd(lines[i]);
-		g_summarySlab[i].effectColor = 0;
-		g_summarySlab[i].brightness = 128;
+		g_summarySlab[i].effect = TextEffect::Default();
 		g_summarySlab[i].indent = 0;
 	}
 	return count;
@@ -182,7 +182,8 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(7, 5) } }) {
-			mission_summary_screen_detail::BankText(CLAY_STRING("Mission Summary"), mission_summary_screen_detail::BankTextVariant::Title, {});
+			mission_summary_screen_detail::Text(CLAY_STRING("Mission Summary"),
+			                                    { .size = mission_summary_screen_detail::TextSize::Title });
 			CLAY({ .id = CLAY_ID("MissionSummaryStatsRow"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
@@ -195,7 +196,7 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 				              { .width = mission_summary_screen_detail::kSummaryW,
 				                .height = mission_summary_screen_detail::kSummaryH,
 				                .lineHeight = mission_summary_screen_detail::kLineH,
-				                .textVariant = mission_summary_screen_detail::BankTextVariant::Body,
+				                .text = { .size = mission_summary_screen_detail::TextSize::Body },
 				                .origin = mission_summary_screen_detail::ScrollTextBoxOrigin::TopDown });
 				CLAY({ .id = CLAY_ID("MissionSummaryScrollControls"),
 				       .layout = {
@@ -232,12 +233,13 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
-			mission_summary_screen_detail::BankText(mission_summary_screen_detail::FromStd(xp), mission_summary_screen_detail::BankTextVariant::Title, {});
+			mission_summary_screen_detail::Text(mission_summary_screen_detail::FromStd(xp),
+			                                    { .size = mission_summary_screen_detail::TextSize::Title });
 			if(upgradeBanner){
-				mission_summary_screen_detail::BankText(CLAY_STRING("*NEW UPGRADE AVAILABLE*"),
-				         mission_summary_screen_detail::BankTextVariant::Body,
-				         { .effectColor = 129, .brightness = static_cast<Uint8>(160),
-				           .colorRamp = true });
+				mission_summary_screen_detail::Text(CLAY_STRING("*NEW UPGRADE AVAILABLE*"),
+				         { .size = mission_summary_screen_detail::TextSize::Body,
+				           .effect = mission_summary_screen_detail::TextEffect::LegacyPalette(
+							   129, static_cast<Uint8>(160), true) });
 			}
 			for(int i = 0; i < 6; i++){
 				CLAY({ .id = CLAY_IDI("UpgradeRow", (uint32_t)i),
@@ -251,10 +253,14 @@ void MissionSummaryScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 					       .layout = {
 					           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
 					       } }) {
-						mission_summary_screen_detail::BankText(mission_summary_screen_detail::FromCStr(mission_summary_screen_detail::kLevelLabels[i]), mission_summary_screen_detail::BankTextVariant::Body, {});
+						mission_summary_screen_detail::Text(
+							mission_summary_screen_detail::FromCStr(mission_summary_screen_detail::kLevelLabels[i]),
+							{ .size = mission_summary_screen_detail::TextSize::Body });
 					}
 					std::string level = std::to_string(levels[i]);
-					mission_summary_screen_detail::BankText(mission_summary_screen_detail::FromStd(level), mission_summary_screen_detail::BankTextVariant::Body, {});
+					mission_summary_screen_detail::Text(
+						mission_summary_screen_detail::FromStd(level),
+						{ .size = mission_summary_screen_detail::TextSize::Body });
 				}
 				if(upgradesAvailable[i]){
 					std::string actionId = std::string(mission_summary_screen_detail::kActionUpgradePrefix) + std::to_string(i);

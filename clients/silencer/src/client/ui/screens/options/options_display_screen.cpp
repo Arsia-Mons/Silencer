@@ -13,7 +13,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/button.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
@@ -25,8 +25,8 @@ using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextSize;
 
 constexpr uint16_t kPanelW = 420;
 constexpr uint16_t kPanelPadX = 24;
@@ -104,7 +104,8 @@ void OptionsDisplayScreen::BuildUi(ScreenContext & ctx, Surface & dst, float fra
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       } }) {
-			options_display_screen_detail::BankText(CLAY_STRING("Display Options"), options_display_screen_detail::BankTextVariant::Title, {});
+			options_display_screen_detail::Text(CLAY_STRING("Display Options"),
+			                                    { .size = options_display_screen_detail::TextSize::Title });
 			CLAY({ .id = CLAY_ID("OptionsDisplayRows"),
 			       .layout = {
 			           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },

@@ -8,7 +8,7 @@
 
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/label_value_row.h"
 
 #include "game.h"
@@ -22,7 +22,7 @@ bool RunLabelValueRowTest(::Game & game, const char * outPath) {
 	const int W = 640;
 	const int H = 480;
 	EnsureInitialized(W, H);
-	silencer::ui::primitives::BankTextBeginFrame();
+	silencer::ui::primitives::TextBeginFrame();
 
 	::Clay_BeginLayout();
 
@@ -38,19 +38,19 @@ bool RunLabelValueRowTest(::Game & game, const char * outPath) {
 			CLAY_STRING("Security:"),
 			CLAY_STRING("Public"),
 			{ .width = 156, .height = 14, .labelWidth = 76,
-			  .variant = silencer::ui::primitives::BankTextVariant::Body });
+			  .text = { .size = silencer::ui::primitives::TextSize::Body } });
 		silencer::ui::primitives::LabelValueRow(
 			CLAY_STRING("row_spectatable"),
 			CLAY_STRING("Spectatable:"),
 			CLAY_STRING("Yes"),
 			{ .width = 156, .height = 14, .labelWidth = 76,
-			  .variant = silencer::ui::primitives::BankTextVariant::Body });
+			  .text = { .size = silencer::ui::primitives::TextSize::Body } });
 		silencer::ui::primitives::LabelValueRow(
 			CLAY_STRING("row_password"),
 			CLAY_STRING("Password:"),
 			CLAY_STRING(""),
 			{ .width = 156, .height = 14, .labelWidth = 76,
-			  .variant = silencer::ui::primitives::BankTextVariant::Body });
+			  .text = { .size = silencer::ui::primitives::TextSize::Body } });
 	}
 
 	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();

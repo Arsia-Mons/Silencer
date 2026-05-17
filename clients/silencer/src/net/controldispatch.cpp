@@ -180,6 +180,12 @@ static nlohmann::json WorldSummaryToJson(const Game::WorldSummary& summary){
 	}
 	r["players"] = players;
 	r["objects_count"] = summary.objectsCount;
+	r["message_text"] = summary.messageText;
+	r["message_progress"] = summary.messageProgress;
+	r["message_type"] = summary.messageType;
+	r["message_time"] = summary.messageTime;
+	r["topmessage_text"] = summary.topMessageText;
+	r["topmessage_progress"] = summary.topMessageProgress;
 	return r;
 }
 
@@ -337,17 +343,17 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}
-	if(cmd.op == "clay_bank_text_test"){
+	if(cmd.op == "clay_text_test"){
 		std::string out = cmd.args.value("out", std::string());
 		if(out.empty()){
 			cmd.reply->set_value(Err(cmd.id, "BAD_ARGS",
-				"clay_bank_text_test requires --out <path>"));
+				"clay_text_test requires --out <path>"));
 			return;
 		}
-		bool ok = silencer::clay_bridge::RunBankTextTest(game, out.c_str());
+		bool ok = silencer::clay_bridge::RunTextTest(game, out.c_str());
 		if(!ok){
 			cmd.reply->set_value(Err(cmd.id, "INTERNAL",
-				"bank_text test render failed (PNG write): " + out));
+				"text test render failed (PNG write): " + out));
 			return;
 		}
 		nlohmann::json r;

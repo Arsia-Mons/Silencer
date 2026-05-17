@@ -12,7 +12,7 @@
 
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/panel.h"
 
 #include "game.h"
@@ -36,7 +36,7 @@ bool RunPanelTest(::Game & game, const char * variant, const char * outPath) {
 	const int W = 640;
 	const int H = 480;
 	EnsureInitialized(W, H);
-	silencer::ui::primitives::BankTextBeginFrame();
+	silencer::ui::primitives::TextBeginFrame();
 
 	const bool bare = VariantIsBare(variant);
 	const int padLeft = bare ? 15  : 403;
@@ -68,7 +68,7 @@ bool RunPanelTest(::Game & game, const char * variant, const char * outPath) {
 			  .chromeBank   = 7,  // Legacy lobby right-pane chrome.
 			  .chromeIndex  = 8,
 			  .title        = title,
-			  .titleVariant = silencer::ui::primitives::BankTextVariant::Heading,
+			  .titleStyle   = { .size = silencer::ui::primitives::TextSize::Heading },
 			  .titlePadLeft = 2,
 			  .titlePadTop  = 0 });
 	}

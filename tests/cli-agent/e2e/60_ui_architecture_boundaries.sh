@@ -88,6 +88,13 @@ fail_if_match \
   "$REPO_ROOT/clients/silencer/src/render/renderer.h"
 
 fail_if_match \
+  "CLAY_TEXT|[.]font(Id|Size)|fontBank|fontWidth|BankText|bank_text|TextCellWidthFor|TextHeightForBank|MeasureBankText|Renderer::DrawText|\\bDrawText[[:space:]]*\\(" \
+  "$REPO_ROOT/clients/silencer/src/client/ui" \
+  "$REPO_ROOT/clients/silencer/src/ui/primitives" \
+  --glob '!**/text.cpp' \
+  --glob '!**/text_internal.h'
+
+fail_if_match \
   "BeginClayFrame|BeginClayLayout|EndClayFrame" \
   "$REPO_ROOT/clients/silencer/src/client/ui" \
   "$REPO_ROOT/clients/silencer/src/game"

@@ -3,7 +3,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/button.h"
 #include "primitives/box.h"
 
@@ -14,8 +14,9 @@ namespace silencer::client_ui::lobby {
 
 namespace lobby_chrome_detail {
 
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextEffect;
+using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
@@ -68,9 +69,9 @@ void BuildLobbyTitleBar(const std::string & version,
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
 				CLAY({ .id = CLAY_ID("LobbyTitle") }) {
-					lobby_chrome_detail::BankText(CLAY_STRING("Silencer"),
-					         lobby_chrome_detail::BankTextVariant::Title,
-					         { .effectColor = 152 });
+					lobby_chrome_detail::Text(CLAY_STRING("Silencer"),
+					     { .size = lobby_chrome_detail::TextSize::Title,
+					       .effect = lobby_chrome_detail::TextEffect::LegacyPalette(152) });
 				}
 
 				Clay_String verstr;
@@ -78,9 +79,9 @@ void BuildLobbyTitleBar(const std::string & version,
 				verstr.length = (int32_t)version.size();
 				verstr.chars  = version.c_str();
 				CLAY({ .id = CLAY_ID("LobbyVer") }) {
-					lobby_chrome_detail::BankText(verstr,
-					         lobby_chrome_detail::BankTextVariant::Body,
-					         { .effectColor = 189 });
+					lobby_chrome_detail::Text(verstr,
+					     { .size = lobby_chrome_detail::TextSize::Body,
+					       .effect = lobby_chrome_detail::TextEffect::LegacyPalette(189) });
 				}
 
 				if(!narrow && !mapName.empty()){
@@ -89,11 +90,10 @@ void BuildLobbyTitleBar(const std::string & version,
 					mstr.length = (int32_t)mapName.size();
 					mstr.chars  = mapName.c_str();
 					CLAY({ .id = CLAY_ID("LobbyMapName") }) {
-						lobby_chrome_detail::BankText(mstr,
-						         lobby_chrome_detail::BankTextVariant::Title,
-						         { .effectColor = 129,
-						           .brightness  = 160,
-						           .colorRamp   = true });
+						lobby_chrome_detail::Text(mstr,
+						     { .size = lobby_chrome_detail::TextSize::Title,
+						       .effect = lobby_chrome_detail::TextEffect::LegacyPalette(
+								   129, 160, true) });
 					}
 				}
 
@@ -123,11 +123,10 @@ void BuildLobbyTitleBar(const std::string & version,
 			           .sizing = { CLAY_SIZING_GROW(0),
 			                       CLAY_SIZING_FIXED(15) },
 			       } }) {
-				lobby_chrome_detail::BankText(mstr,
-				         lobby_chrome_detail::BankTextVariant::Title,
-				         { .effectColor = 129,
-				           .brightness  = 160,
-				           .colorRamp   = true });
+				lobby_chrome_detail::Text(mstr,
+				     { .size = lobby_chrome_detail::TextSize::Title,
+				       .effect = lobby_chrome_detail::TextEffect::LegacyPalette(
+						   129, 160, true) });
 			}
 		}
 	}

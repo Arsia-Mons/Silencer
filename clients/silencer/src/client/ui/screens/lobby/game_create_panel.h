@@ -76,7 +76,7 @@ bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
 // Emits the upper-pane subtree ("Game Options" heading + 6-row form: security
 // cycler, min/max level, max players, max teams, spectatable). Called inside
 // the LobbyRightUpperBox CLAY block; flex children only (no floating).
-// BeginFrame requirements: BankTextBeginFrame, ButtonBeginFrame,
+// BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
 // TextInputBeginFrame.
 void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Resources & resources,
@@ -85,7 +85,7 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 // Emits the tall-pane subtree ("Select Map" heading + map list + game-name +
 // password inputs + Create button). Called inside the LobbyRightTallBox CLAY
 // block; flex children only.
-// BeginFrame requirements: BankTextBeginFrame, ButtonBeginFrame,
+// BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
 // ScrollListBeginFrame, TextInputBeginFrame.
 void BuildGameCreateTallTree(GameCreatePanelState & state,
                              Resources & resources,

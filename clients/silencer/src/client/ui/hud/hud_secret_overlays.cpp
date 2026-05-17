@@ -7,6 +7,7 @@
 #include "render/clay_ui_payloads.h"
 #include "resources.h"
 #include "surface.h"
+#include "ui/primitives/text.h"
 
 #include <string>
 #include <vector>
@@ -75,8 +76,7 @@ void BuildHudSecretProgress(const PlayerHudView& player, Surface* surface,
 		"Guv Net", "OS", "Protocol", "Cypher Lock 1", "Cypher Lock 2",
 		"Cypher Lock 3", "Header", "Schedule", "Location",
 	};
-	silencer::clay_bridge::BankTextDrawData textData[9];
-	Uint8 color[9];
+	silencer::ui::primitives::TextEffect textEffects[9];
 	Uint8 effectColor = 0;
 	Uint8 brightness = 136;
 	for(int i = 0; i < 9; ++i) {
@@ -87,8 +87,8 @@ void BuildHudSecretProgress(const PlayerHudView& player, Surface* surface,
 			effectColor = 114;
 			brightness = 96;
 		}
-		color[i] = effectColor;
-		textData[i] = { brightness, false, false };
+		textEffects[i] = silencer::ui::primitives::TextEffect::LegacyPalette(
+			effectColor, brightness);
 	}
 
 	CLAY({ .id = CLAY_ID("InGameHudSecretRoot"),
@@ -105,12 +105,10 @@ void BuildHudSecretProgress(const PlayerHudView& player, Surface* surface,
 				       .attachTo = CLAY_ATTACH_TO_ROOT,
 			       },
 			}) {
-				CLAY_TEXT(ClayStringFromCString(names[i]), CLAY_TEXT_CONFIG({
-					.userData = &textData[i],
-					.textColor = { (float)color[i], 0, 0, 255 },
-					.fontId = 133,
-					.fontSize = 6,
-				}));
+				silencer::ui::primitives::Text(
+					ClayStringFromCString(names[i]),
+					{ .size = silencer::ui::primitives::TextSize::Body,
+					  .effect = textEffects[i] });
 			}
 		}
 	}

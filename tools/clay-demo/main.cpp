@@ -20,12 +20,12 @@
 #include "clay_ui_compositor.h"
 
 #include "primitives/button.h"
-#include "primitives/bank_text.h"
 #include "primitives/box.h"
 #include "primitives/label_value_row.h"
 #include "primitives/panel.h"
 #include "primitives/scroll_list.h"
 #include "primitives/scroll_text_box.h"
+#include "primitives/text.h"
 #include "primitives/text_input.h"
 #include "primitives/toggle.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -40,7 +40,7 @@ namespace prim = silencer::ui::primitives;
 namespace {
 
 void BeginAllFrames() {
-	prim::BankTextBeginFrame();
+	prim::TextBeginFrame();
 	prim::ButtonBeginFrame();
 	prim::ToggleBeginFrame();
 	prim::ScrollListBeginFrame();
@@ -70,11 +70,11 @@ const ::Clay_String kMapItems[] = {
 const int kMapCount = sizeof(kMapItems) / sizeof(kMapItems[0]);
 
 const prim::ScrollTextBoxLine kChatLines[] = {
-	{ { false, 22, "[Player1] hello world!" },  152, 128, 0 },
-	{ { false, 17, "[Player2] hi there" },      152, 128, 0 },
-	{ { false, 17, "[Player1] map vote?" },     152, 128, 0 },
-	{ { false, 23, "[Player3] +1 industrial" }, 152, 128, 0 },
-	{ { false, 24, "[Player2] sgtm, joining" }, 152, 128, 0 },
+	{ { false, 22, "[Player1] hello world!" },  prim::TextEffect::LegacyPalette(152), 0 },
+	{ { false, 17, "[Player2] hi there" },      prim::TextEffect::LegacyPalette(152), 0 },
+	{ { false, 17, "[Player1] map vote?" },     prim::TextEffect::LegacyPalette(152), 0 },
+	{ { false, 23, "[Player3] +1 industrial" }, prim::TextEffect::LegacyPalette(152), 0 },
+	{ { false, 24, "[Player2] sgtm, joining" }, prim::TextEffect::LegacyPalette(152), 0 },
 };
 const int kChatLineCount = sizeof(kChatLines) / sizeof(kChatLines[0]);
 
@@ -94,7 +94,7 @@ void BuildDemoTree() {
 	                    .layoutDirection = CLAY_LEFT_TO_RIGHT },
 	       .backgroundColor = { 0, 0, 0, 255 } }) {
 		// LEFT COLUMN — Panel(LeftBare) demonstrating header text,
-		// LabelValueRow, Box(Plain), BankText all 4 variants.
+		// LabelValueRow, Box(Plain), Text sizes.
 		CLAY({ .id     = CLAY_ID("LeftCol"),
 		       .layout = { .sizing  = { CLAY_SIZING_FIXED(280), CLAY_SIZING_FIXED(464) },
 		                   .padding = CLAY_PADDING_ALL(0),
@@ -105,11 +105,11 @@ void BuildDemoTree() {
 			            { .width  = 280,
 			              .height = 220,
 			              .title  = CLAY_STRING("Primitives"),
-			              .titleVariant = prim::BankTextVariant::Heading,
+			              .titleStyle = { .size = prim::TextSize::Heading },
 			              .titlePadLeft = 8,
 			              .titlePadTop  = 4 });
 
-			// Box(Plain)-style demo block — small bordered rect with body text.
+			// Box(Plain)-style demo block with semantic text sizes.
 			CLAY(prim::Box(prim::BoxStrokeStyle{ /*strokeColor=*/220, /*strokeWidth=*/1 }, {
 			         .id     = CLAY_ID("BoxPlainDemo"),
 			         .layout = { .sizing = { CLAY_SIZING_FIXED(264), CLAY_SIZING_FIXED(74) },
@@ -117,18 +117,18 @@ void BuildDemoTree() {
 			                     .childGap = 3,
 			                     .layoutDirection = CLAY_TOP_TO_BOTTOM },
 			     })) {
-				prim::BankText(CLAY_STRING("Title variant"),
-				               prim::BankTextVariant::Title,
-				               { .effectColor = 152 });
-				prim::BankText(CLAY_STRING("Heading variant"),
-				               prim::BankTextVariant::Heading,
-				               { .effectColor = 152 });
-				prim::BankText(CLAY_STRING("Body variant"),
-				               prim::BankTextVariant::Body,
-				               { .effectColor = 152 });
-				prim::BankText(CLAY_STRING("BodySm variant"),
-				               prim::BankTextVariant::BodySm,
-				               { .effectColor = 152 });
+				prim::Text(CLAY_STRING("Title size"),
+				           { .size = prim::TextSize::Title,
+				             .effect = prim::TextEffect::LegacyPalette(152) });
+				prim::Text(CLAY_STRING("Heading size"),
+				           { .size = prim::TextSize::Heading,
+				             .effect = prim::TextEffect::LegacyPalette(152) });
+				prim::Text(CLAY_STRING("Body size"),
+				           { .size = prim::TextSize::Body,
+				             .effect = prim::TextEffect::LegacyPalette(152) });
+				prim::Text(CLAY_STRING("BodySm size"),
+				           { .size = prim::TextSize::BodySm,
+				             .effect = prim::TextEffect::LegacyPalette(152) });
 			}
 
 			// LabelValueRow x3 — form rhythm demonstration.
@@ -136,20 +136,20 @@ void BuildDemoTree() {
 			                    CLAY_STRING("Map:"),
 			                    CLAY_STRING("industrial"),
 			                    { .width = 264, .labelWidth = 72,
-			                      .labelEffectColor = 152,
-			                      .valueEffectColor = 156 });
+			                      .labelEffect = prim::TextEffect::LegacyPalette(152),
+			                      .valueEffect = prim::TextEffect::LegacyPalette(156) });
 			prim::LabelValueRow(CLAY_STRING("LVR2"),
 			                    CLAY_STRING("Players:"),
 			                    CLAY_STRING("4 / 16"),
 			                    { .width = 264, .labelWidth = 72,
-			                      .labelEffectColor = 152,
-			                      .valueEffectColor = 156 });
+			                      .labelEffect = prim::TextEffect::LegacyPalette(152),
+			                      .valueEffect = prim::TextEffect::LegacyPalette(156) });
 			prim::LabelValueRow(CLAY_STRING("LVR3"),
 			                    CLAY_STRING("Security:"),
 			                    CLAY_STRING("Normal"),
 			                    { .width = 264, .labelWidth = 72,
-			                      .labelEffectColor = 152,
-			                      .valueEffectColor = 156 });
+			                      .labelEffect = prim::TextEffect::LegacyPalette(152),
+			                      .valueEffect = prim::TextEffect::LegacyPalette(156) });
 		}
 
 		// RIGHT COLUMN — Panel(RightChrome) plus interactive primitives.
@@ -175,7 +175,7 @@ void BuildDemoTree() {
 				             CLAY_STRING("Security"),
 				             { .variant = prim::ButtonVariant::Text,
 				               .size = prim::ButtonSize::Auto,
-				               .effectColor = 152 });
+				               .textEffect = prim::TextEffect::LegacyPalette(152) });
 			}
 
 			// Checkbox + Toggle row.
@@ -216,28 +216,26 @@ void BuildDemoTree() {
 			                   .padding = CLAY_PADDING_ALL(0),
 			                   .childGap = 8,
 			                   .layoutDirection = CLAY_LEFT_TO_RIGHT } }) {
-				prim::BankText(CLAY_STRING("Name:"),
-				               prim::BankTextVariant::Body,
-				               { .effectColor = 152 });
+				prim::Text(CLAY_STRING("Name:"),
+				           { .size = prim::TextSize::Body,
+				             .effect = prim::TextEffect::LegacyPalette(152) });
 				prim::TextInput(CLAY_STRING("NameInput"),
 				                kEditedName,
 				                { .widthPx = 90,
 				                  .heightPx = 19,
-				                  .fontBank = 135,
-				                  .fontWidth = 9,
-				                  .effectColor = 156,
+				                  .textSize = prim::TextSize::FieldLarge,
+				                  .effect = prim::TextEffect::LegacyPalette(156),
 				                  .showCaret = true });
-				prim::BankText(CLAY_STRING("Pass:"),
-				               prim::BankTextVariant::Body,
-				               { .effectColor = 152 });
+				prim::Text(CLAY_STRING("Pass:"),
+				           { .size = prim::TextSize::Body,
+				             .effect = prim::TextEffect::LegacyPalette(152) });
 				prim::TextInput(CLAY_STRING("PassInput"),
 				                kPasswordBuffer,
 				                { .widthPx = 80,
 				                  .heightPx = 19,
-				                  .fontBank = 135,
-				                  .fontWidth = 9,
+				                  .textSize = prim::TextSize::FieldLarge,
 				                  .password = true,
-				                  .effectColor = 156 });
+				                  .effect = prim::TextEffect::LegacyPalette(156) });
 			}
 
 			// ScrollList — 16-item list, selected mid-row.
@@ -246,7 +244,7 @@ void BuildDemoTree() {
 			                 /*selectedIndex*/ 4,
 			                 /*scrollPosition*/ 2,
 			                 { .width = 200, .height = 130,
-			                   .textEffectColor = 156,
+			                   .text = { .effect = prim::TextEffect::LegacyPalette(156) },
 			                   .scrollbarBank = 7 },
 			                 { /*hoveredOut*/ nullptr,
 			                   /*actionId  */ "clay_demo.map",
@@ -269,7 +267,8 @@ void BuildDemoTree() {
 				              .chromeBank  = 7,  // Legacy lobby right-pane chrome.
 				              .chromeIndex = 8,
 				              .title  = CLAY_STRING("RightChrome"),
-				              .titleEffectColor = 152,
+				              .titleStyle = { .size = prim::TextSize::Heading,
+				                              .effect = prim::TextEffect::LegacyPalette(152) },
 				              .titlePadLeft = 8,
 				              .titlePadTop  = 4 });
 			}

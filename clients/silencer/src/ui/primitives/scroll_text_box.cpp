@@ -133,9 +133,9 @@ void ScrollTextBox(Clay_String id,
 					                       CLAY_SIZING_FIXED(rowH) },
 					           .padding = { ln.indent, 0, 0, 0 },
 					       } }) {
-						BankText(ln.text, opts.textVariant,
-						         { .effectColor = ln.effectColor,
-						           .brightness  = ln.brightness });
+						TextOpts textOpts = opts.text;
+						if(ln.effect.HasOverride()) textOpts.effect = ln.effect;
+						Text(ln.text, textOpts);
 					}
 				}
 			}

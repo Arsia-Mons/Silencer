@@ -13,10 +13,9 @@
 //   • RECTANGLE color: render command's backgroundColor.r is interpreted as a
 //     palette index (Uint8). Other channels ignored.
 //   • BORDER color: same. Width applied per side.
-//   • TEXT: textConfig.fontId  → bank (135 Title, 134 Heading, 133 Body, 132 Tiny).
-//           textConfig.fontSize → cell width (monospaced bank fonts).
-//           textColor.r        → palette index for the EffectColor tint.
-//           userData (optional) → BankTextDrawData* with brightness / colorRamp / metrics.
+//   • TEXT: textConfig font fields are produced by the Text primitive's
+//           internal resolver. textColor.r is the paletted tint bridge.
+//           userData (optional) → TextDrawData* with brightness / colorRamp / metrics.
 //   • IMAGE: imageConfig.imageData = PackImage*(). The bridge looks up
 //     world.resources.spritebank[bank][index] and fits it into the bbox using
 //     the packed cover / contain / stretch mode.
@@ -37,7 +36,7 @@ class Renderer;
 
 namespace silencer::clay_bridge {
 
-// Lazily allocates Clay's arena and registers the bank-text MeasureText
+// Lazily allocates Clay's arena and registers the UI text MeasureText
 // callback on first call. Subsequent calls only update layout dimensions.
 // Safe to call from any per-frame Tick before BeginLayout.
 void EnsureInitialized(int width, int height);
@@ -49,7 +48,7 @@ void EnsureInitialized(int width, int height);
 void SetUiScale(int scale);
 int  UiScale();
 
-// Optional resource context used by BankText's ink-metric measurement path.
+// Optional resource context used by Text's ink-metric measurement path.
 // Set before Clay_BeginLayout when screens may emit text that asks to be
 // measured by visible glyph bounds instead of fixed cursor advance.
 void SetTextMeasureResources(const Resources * resources);
@@ -74,12 +73,12 @@ void Render(::Game & game, Surface * dst, ::Clay_RenderCommandArray cmds);
 // clay_smoke.cpp and is invoked by the `clay_bridge_smoke` control op.
 bool RunSmoke(::Game & game, const char * outPath);
 
-// P4 BankText primitive unit test. Renders the lobby title (the literal
-// string "Silencer") via the BankText primitive at (15, 32) using the
-// Title variant + effectColor=152, through the bridge into a fresh 640x480
-// Surface, and writes it to `outPath`. Invoked by the `clay_bank_text_test`
-// control op. Implementation in bank_text_test.cpp.
-bool RunBankTextTest(::Game & game, const char * outPath);
+// P4 Text primitive unit test. Renders the lobby title (the literal
+// string "Silencer") via the Text primitive at (15, 32) using the
+// Title size + accent tone, through the bridge into a fresh 640x480
+// Surface, and writes it to `outPath`. Invoked by the `clay_text_test`
+// control op. Implementation in text_test.cpp.
+bool RunTextTest(::Game & game, const char * outPath);
 
 // Button primitive render test. Renders one variant+size combination into a
 // fresh 640x480 Surface and writes it to `outPath`. Invoked by the
@@ -189,7 +188,7 @@ struct ScrollTextBoxCheckResult {
 bool RunScrollTextBoxCheck(::Game & game, ScrollTextBoxCheckResult & out);
 
 // P9 TextInput primitive unit test. Renders one focused TextInput
-// (text "Player1", caret visible, bank 135 fontWidth 9) into a 640x480
+// (text "Player1", caret visible, title-sized text) into a 640x480
 // Surface and writes it to `outPath`. Invoked by the
 // `clay_text_input_test` control op. Implementation in
 // text_input_test.cpp.

@@ -3,7 +3,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/button.h"
 
 #include <cstdint>
@@ -16,8 +16,8 @@ namespace silencer::client_ui::options {
 
 namespace controls_keybind_list_detail {
 
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
@@ -52,12 +52,7 @@ Clay_String FromStd(const std::string & s) {
 }
 
 void TitleText(Clay_String text) {
-	CLAY_TEXT(text,
-	          CLAY_TEXT_CONFIG({
-	              .textColor = { 0.0f, 0.0f, 0.0f, 255.0f },
-	              .fontId = 135,
-	              .fontSize = 12,
-	          }));
+	Text(text, { .size = TextSize::ScreenTitle });
 }
 
 void RegisterRowsScrollArea(Clay_ElementId clayId,
@@ -162,7 +157,9 @@ void BuildKeybindListBody(const KeybindListView & view,
 			           .sizing = { CLAY_SIZING_FIXED(controls_keybind_list_detail::kActionNameW),
 			                       CLAY_SIZING_FIT(0) },
 			       } }) {
-				controls_keybind_list_detail::BankText(CLAY_STRING("Preset:"), controls_keybind_list_detail::BankTextVariant::Heading, {});
+				controls_keybind_list_detail::Text(
+					CLAY_STRING("Preset:"),
+					{ .size = controls_keybind_list_detail::TextSize::Heading });
 			}
 			controls_keybind_list_detail::Button(CLAY_STRING("ControlsPresetButton"),
 			              controls_keybind_list_detail::FromStd(view.presetText),
@@ -194,7 +191,9 @@ void BuildKeybindListBody(const KeybindListView & view,
 					           .sizing = { CLAY_SIZING_FIXED(controls_keybind_list_detail::kActionNameW),
 					                       CLAY_SIZING_FIT(0) },
 					       } }) {
-						controls_keybind_list_detail::BankText(controls_keybind_list_detail::FromStd(row.actionLabel), controls_keybind_list_detail::BankTextVariant::Heading, {});
+						controls_keybind_list_detail::Text(
+							controls_keybind_list_detail::FromStd(row.actionLabel),
+							{ .size = controls_keybind_list_detail::TextSize::Heading });
 					}
 					controls_keybind_list_detail::RowActionButton(controls_keybind_list_detail::FromStd(primaryIds[i]),
 					                row.primaryLabel, i, 0, row.rebindingPrimary, interactions);

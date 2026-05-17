@@ -9,7 +9,7 @@
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/button.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/text_input.h"
 
 #include <cstring>
@@ -21,8 +21,8 @@ using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
 using silencer::ui::primitives::ButtonSize;
 using silencer::ui::primitives::ButtonVariant;
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextSize;
 
 constexpr uint16_t kDialogW = 352;
 constexpr uint16_t kDialogH = 148;
@@ -108,15 +108,14 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(40, 2) } }) {
-			password_modal_detail::BankText(CLAY_STRING("This game requires a password"),
-			         password_modal_detail::BankTextVariant::Heading, {});
+			password_modal_detail::Text(CLAY_STRING("This game requires a password"),
+			         { .size = password_modal_detail::TextSize::Heading });
 			silencer::ui::primitives::TextInput(
 				CLAY_STRING("PasswordInput"),
 				password,
 				{ .widthPx = password_modal_detail::kInputW,
 				  .heightPx = password_modal_detail::kInputH,
-				  .fontBank = 135,
-				  .fontWidth = 11,
+				  .textSize = password_modal_detail::TextSize::Title,
 				  .password = true,
 				  .showCaret = focused && blink },
 				{ nullptr, password_modal_detail::kActionPassword, "Password",

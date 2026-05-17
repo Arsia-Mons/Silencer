@@ -3,7 +3,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/button.h"
 #include "primitives/text_input.h"
 
@@ -11,8 +11,8 @@
 #include <cstring>
 #include <string>
 
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
@@ -76,7 +76,7 @@ void BuildOptionRow(GameCreatePanelState & state, int i,
 		                       CLAY_SIZING_FIXED(kFormRowH) },
 		           .childAlignment = { .y = CLAY_ALIGN_Y_CENTER },
 		       } }) {
-			BankText(FromCStr(label), BankTextVariant::Body, {});
+			Text(FromCStr(label), { .size = TextSize::Body });
 		}
 		if(i == 0){
 			Button(CLAY_STRING("GameCreateSecurityButton"), FromCStr(SecurityLabel(state.securityIndex)),
@@ -97,9 +97,7 @@ void BuildOptionRow(GameCreatePanelState & state, int i,
 			TextInputOpts opts;
 			opts.widthPx     = 20;
 			opts.heightPx    = kRowHeight;
-			opts.fontBank    = 133;
-			opts.fontWidth   = 6;
-			opts.brightness  = 128;
+			opts.textSize    = TextSize::Body;
 			opts.numbersOnly = true;
 			opts.showCaret   = false;
 			std::string idStr = std::string("Input_") + id;
@@ -126,8 +124,8 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		CLAY({ .id = CLAY_ID("GCrtOptionsTitleWrap") }) {
-			BankText(CLAY_STRING("Game Options"),
-			         BankTextVariant::Heading, {});
+			Text(CLAY_STRING("Game Options"),
+			     { .size = TextSize::Heading });
 		}
 
 		struct LabelRow { const char * label; const char * id; };

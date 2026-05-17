@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# P4 BankText primitive unit test — drives the `clay_bank_text_test` control
-# op, which renders "Silencer" via the BankText(Title, effectColor=152)
+# P4 Text primitive unit test — drives the `clay_text_test` control
+# op, which renders "Silencer" via Text(Title, LegacyPalette(152))
 # primitive at (15, 32), dumps a 640x480 PNG, and pixdiffs it against the
 # committed reference. Pass bar: < 0.5%.
 #
-# Usage:   bash tests/lobby-ui/bank_text_test/run.sh
+# Usage:   bash tests/lobby-ui/text_test/run.sh
 # Updates: rerun with REGEN=1 to overwrite reference.png from the live binary.
 
 set -euo pipefail
@@ -14,7 +14,7 @@ REPO="$(cd "$HERE/../../.." && pwd)"
 . "$REPO/tests/cli-agent/e2e/lib.sh"
 
 REF="$HERE/reference.png"
-OUT="${TMPDIR:-/tmp}/bank_text_test.$$.png"
+OUT="${TMPDIR:-/tmp}/text_test.$$.png"
 PIXDIFF="$REPO/tools/pixdiff/build/pixdiff"
 
 if [ ! -x "$PIXDIFF" ]; then
@@ -28,7 +28,7 @@ trap 'stop_silencer "$PID" "$PORT"; rm -f "$OUT"' EXIT
 wait_alive "$PORT"
 
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
-cli --port "$PORT" clay_bank_text_test --out "$OUT" >/dev/null
+cli --port "$PORT" clay_text_test --out "$OUT" >/dev/null
 
 if [ "${REGEN:-0}" = "1" ]; then
   cp "$OUT" "$REF"
@@ -48,4 +48,4 @@ awk -v d="$DIFF" 'BEGIN { exit (d + 0 < 0.5) ? 0 : 1 }' || {
   exit 1
 }
 
-echo "PASS bank_text_test"
+echo "PASS text_test"

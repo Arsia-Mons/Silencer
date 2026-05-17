@@ -1,7 +1,7 @@
 // P9 unit test scenes for the TextInput primitive.
 //
 // `RunTextInputTest(outPath)` renders one focused TextInput (text
-// "Player1", caret visible, bank 135 fontWidth 9, brightness 128) into
+// "Player1", caret visible, title-sized text) into
 // a 640x480 Surface and writes a PNG. The committed reference at
 // tests/lobby-ui/text_input_test/reference.png is the pinned baseline.
 //
@@ -47,8 +47,7 @@ bool RunTextInputTest(::Game & game, const char * outPath) {
 			"Player1",
 			{ .widthPx = 90,
 			  .heightPx = 19,
-			  .fontBank = 135,
-			  .fontWidth = 9,
+			  .textSize = silencer::ui::primitives::TextSize::FieldLarge,
 			  .showCaret = true });
 	}
 
@@ -109,7 +108,8 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 		silencer::ui::primitives::TextInput(
 			CLAY_STRING("pw_input"),
 			"hunter12",
-			{ .fontBank = 135, .fontWidth = 9, .password = true });
+			{ .textSize = silencer::ui::primitives::TextSize::FieldLarge,
+			  .password = true });
 	}
 	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
 

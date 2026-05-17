@@ -15,8 +15,8 @@
 //                 panel's decorative frame. Callers MUST specify
 //                 `chromeBank` and `chromeIndex`; there is no default.
 //
-// In both variants, if `opts.title.length > 0` the primitive emits a
-// BankText (default variant Heading) inside the panel at
+// In both variants, if `opts.title.length > 0` the primitive emits text
+// inside the panel at
 // (opts.titlePadLeft, opts.titlePadTop) padding offset from the top-left.
 //
 // The primitive owns no state and references no lobby/world/Config. State
@@ -25,14 +25,11 @@
 // parameters with no built-in defaults — defaults would silently bake a
 // specific screen's aesthetic into "the panel primitive."
 //
-// Memory: no per-frame arena. The title goes through BankText's own arena
-// (if non-default brightness/colorRamp is used), so callers MUST have
-// invoked BankTextBeginFrame() before Clay_BeginLayout if they pass a
-// title with non-default opts.
+// Memory: no per-frame arena. The title goes through Text's own frame arena.
 
 #include "clay/clay.h"
 #include "shared.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 
 namespace silencer::ui::primitives {
 
@@ -53,9 +50,7 @@ struct PanelOpts {
 	Uint16          chromeIndex  = 0;
 	// Title — empty string means no title is emitted (generic default).
 	Clay_String     title        = { false, 0, nullptr };
-	BankTextVariant titleVariant = BankTextVariant::Heading;
-	Uint8           titleEffectColor = 0;   // generic — 0 = no effect color.
-	Uint8           titleBrightness  = 128; // generic — BankText neutral.
+	TextOpts        titleStyle   = { .size = TextSize::Heading };
 	Uint16          titlePadLeft = 0;       // generic — caller positions title.
 	Uint16          titlePadTop  = 0;       // generic — caller positions title.
 };

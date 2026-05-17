@@ -3,10 +3,10 @@
 #include "client/ui/hud/hud_player_list_overlay.h"
 #include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
-#include "render/clay_ui_payloads.h"
 #include "render/renderer.h"
 #include "resources.h"
 #include "surface.h"
+#include "ui/primitives/text.h"
 
 #include <cstdio>
 #include <cstring>
@@ -17,6 +17,12 @@ namespace silencer {
 namespace client_ui {
 
 namespace ingameoverlays_detail {
+
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextAdvance;
+using silencer::ui::primitives::TextEffect;
+using silencer::ui::primitives::TextLineHeight;
+using silencer::ui::primitives::TextSize;
 
 Clay_String StringFromStd(const std::string& text) {
 	return Clay_String{
@@ -65,10 +71,9 @@ void DrawMessage(const HudView& view, Surface* surface) {
 		std::string text;
 		int x;
 		int y;
-		Uint8 bank;
-		Uint8 width;
+		TextSize size;
 		Uint8 color;
-		silencer::clay_bridge::BankTextDrawData draw;
+		TextEffect effect;
 	};
 	std::vector<MessageGlyph> glyphs;
 	const char* text = msg.message.c_str();
@@ -79,11 +84,10 @@ void DrawMessage(const HudView& view, Surface* surface) {
 	if(newline) linelength = (int)(newline - text);
 	int liney = 60;
 	Uint8 color = 208;
-	int textwidth = 11;
-	int textbank = 135;
+	TextSize textSize = TextSize::Title;
 	int lineheight = 20;
 	switch(msg.messagetype) {
-		case 1: color = 128; liney = 190; textbank = 134; textwidth = 10; break;
+		case 1: color = 128; liney = 190; textSize = TextSize::MessageHeading; break;
 		case 2: color = 128; break;
 		case 3: color = 192; break;
 		case 4: color = 153; break;
@@ -108,17 +112,18 @@ void DrawMessage(const HudView& view, Surface* surface) {
 		char temp[2] = { text[i], 0 };
 		if(msg.messagetype >= 10) {
 			if(line == 0) {
-				textbank = 136;
-				textwidth = 25;
+				textSize = TextSize::MessageTitle;
 			}else{
-				textwidth = 13;
-				textbank = 135;
+				textSize = TextSize::MessageSubtitle;
 			}
 		}
 		Uint8 brightness2 = (int(brightness) - 64) < 8 ? 8 : brightness - 64;
-		const int x = ((surface->w - (linelength * textwidth)) / 2) + (textwidth * (linelength - nextline));
-		glyphs.push_back({temp, x + 1, liney + 1, (Uint8)textbank, (Uint8)textwidth, color, {brightness2, false, false}});
-		glyphs.push_back({temp, x, liney, (Uint8)textbank, (Uint8)textwidth, color, {brightness, false, false}});
+		const int advance = TextAdvance(textSize);
+		const int x = ((surface->w - (linelength * advance)) / 2) + (advance * (linelength - nextline));
+		glyphs.push_back({temp, x + 1, liney + 1, textSize, color,
+		                 TextEffect::LegacyPalette(color, brightness2)});
+		glyphs.push_back({temp, x, liney, textSize, color,
+		                 TextEffect::LegacyPalette(color, brightness)});
 		nextline--;
 		if(nextline < 0) {
 			linelength = (int)std::strlen(&text[i + 1]);
@@ -134,13 +139,13 @@ void DrawMessage(const HudView& view, Surface* surface) {
 	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		for(size_t i = 0; i < glyphs.size(); ++i) {
 			MessageGlyph& glyph = glyphs[i];
-			CLAY(FloatingTextElementI("InGameMessageGlyph", (uint32_t)i, glyph.x, glyph.y, glyph.width, 20)) {
-				CLAY_TEXT(StringFromStd(glyph.text), CLAY_TEXT_CONFIG({
-					.userData = &glyph.draw,
-					.textColor = { (float)glyph.color, 0, 0, 255 },
-					.fontId = glyph.bank,
-					.fontSize = glyph.width,
-				}));
+			CLAY(FloatingTextElementI("InGameMessageGlyph", (uint32_t)i,
+			                          glyph.x, glyph.y,
+			                          TextAdvance(glyph.size),
+			                          TextLineHeight(glyph.size))) {
+				Text(StringFromStd(glyph.text),
+				     { .size = glyph.size,
+				       .effect = glyph.effect });
 			}
 		}
 	}
@@ -152,7 +157,7 @@ void DrawStatus(const HudView& view, Surface* surface) {
 		int x;
 		int y;
 		Uint8 color;
-		silencer::clay_bridge::BankTextDrawData draw;
+		TextEffect effect;
 	};
 	std::vector<StatusLine> lines;
 	lines.reserve(view.statusMessages.size() * 2);
@@ -161,9 +166,11 @@ void DrawStatus(const HudView& view, Surface* surface) {
 		Uint8 brightness = 128;
 		if(src.time <= 16) brightness -= (16 - src.time) * 8;
 		Uint8 brightness2 = (int(brightness) - 64) < 8 ? 8 : brightness - 64;
-		const int x = (surface->w - ((int)src.text.size() * 7)) / 2;
-		lines.push_back({src.text, x + 1, 370 + liney + 1, src.color, {brightness2, false, false}});
-		lines.push_back({src.text, x, 370 + liney, src.color, {brightness, false, false}});
+		const int x = (surface->w - ((int)src.text.size() * TextAdvance(TextSize::BodySm))) / 2;
+		lines.push_back({src.text, x + 1, 370 + liney + 1, src.color,
+		                TextEffect::LegacyPalette(src.color, brightness2)});
+		lines.push_back({src.text, x, 370 + liney, src.color,
+		                TextEffect::LegacyPalette(src.color, brightness)});
 		liney -= 10;
 	}
 	if(lines.empty()) return;
@@ -171,13 +178,12 @@ void DrawStatus(const HudView& view, Surface* surface) {
 	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		for(size_t i = 0; i < lines.size(); ++i) {
 			StatusLine& line = lines[i];
-			CLAY(FloatingTextElementI("InGameStatusLine", (uint32_t)i, line.x, line.y, (int)line.text.size() * 7, 12)) {
-				CLAY_TEXT(StringFromStd(line.text), CLAY_TEXT_CONFIG({
-					.userData = &line.draw,
-					.textColor = { (float)line.color, 0, 0, 255 },
-					.fontId = 133,
-					.fontSize = 7,
-				}));
+			CLAY(FloatingTextElementI("InGameStatusLine", (uint32_t)i, line.x, line.y,
+			                          (int)line.text.size() * TextAdvance(TextSize::BodySm),
+			                          TextLineHeight(TextSize::BodySm))) {
+				Text(StringFromStd(line.text),
+				     { .size = TextSize::BodySm,
+				       .effect = line.effect });
 			}
 		}
 	}
@@ -204,11 +210,7 @@ void DrawTopMessage(const HudView& view, Surface* surface) {
 	CLAY({ .id = CLAY_ID("InGameTopMessageRoot"),
 	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		CLAY(FloatingTextElement("InGameTopMessage", 200, 10, 245, 12)) {
-			CLAY_TEXT(StringFromStd(topText), CLAY_TEXT_CONFIG({
-				.textColor = { 0, 0, 0, 255 },
-				.fontId = 133,
-				.fontSize = 7,
-			}));
+			Text(StringFromStd(topText), { .size = TextSize::BodySm });
 		}
 	}
 }
@@ -219,15 +221,14 @@ void DrawQuitPrompt(const HudView& /*view*/, Surface* surface) {
 #else
 	std::string text = "Hit Enter To Quit";
 #endif
-	const int width = (int)text.size() * 16;
+	const int width = (int)text.size() * TextAdvance(TextSize::Prompt);
 	CLAY({ .id = CLAY_ID("QuitPromptRoot"),
 	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
-		CLAY(FloatingTextElement("QuitPromptText", (surface->w - width) / 2, 200, width, 24)) {
-			CLAY_TEXT(StringFromStd(text), CLAY_TEXT_CONFIG({
-				.textColor = { 202, 0, 0, 255 },
-				.fontId = 136,
-				.fontSize = 16,
-			}));
+		CLAY(FloatingTextElement("QuitPromptText", (surface->w - width) / 2, 200,
+		                         width, TextLineHeight(TextSize::Prompt))) {
+			Text(StringFromStd(text),
+			     { .size = TextSize::Prompt,
+			       .effect = TextEffect::LegacyPalette(202) });
 		}
 	}
 }

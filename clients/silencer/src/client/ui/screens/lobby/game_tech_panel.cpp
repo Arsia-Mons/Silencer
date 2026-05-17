@@ -3,7 +3,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/button.h"
 
 #include "lobby_screen.h"
@@ -23,8 +23,9 @@
 #include <cstring>
 #include <string>
 
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextEffect;
+using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
@@ -217,8 +218,8 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
 			wid.chars  = idBuf;
 			CLAY({ .id = CLAY_SID(wid) }) {
 				if(!state.peerNameStrs[i].empty()){
-					BankText(game_tech_panel_detail::FromStd(state.peerNameStrs[i]),
-					         BankTextVariant::Body, {});
+					Text(game_tech_panel_detail::FromStd(state.peerNameStrs[i]),
+					     { .size = TextSize::Body });
 				}
 			}
 		}
@@ -237,11 +238,10 @@ void BuildGameTechTallTree(GameTechPanelState & state,
 	       .layout = { .padding = { game_tech_panel_detail::kTallSlotsPadLeft, 0,
 	                                game_tech_panel_detail::kTallSlotsPadTop, 0 } } }) {
 		if(!state.slotsLeftStr.empty()){
-			BankText(game_tech_panel_detail::FromStd(state.slotsLeftStr),
-			         BankTextVariant::Body,
-			         { .effectColor = 129,
-			           .brightness  = static_cast<Uint8>(128 + 16),
-			           .colorRamp   = true });
+			Text(game_tech_panel_detail::FromStd(state.slotsLeftStr),
+			     { .size = TextSize::Body,
+			       .effect = TextEffect::LegacyPalette(
+					   129, static_cast<Uint8>(128 + 16), true) });
 		}
 	}
 

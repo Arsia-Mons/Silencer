@@ -1,7 +1,8 @@
 #include "button.h"
 
-#include "bank_text.h"
 #include "clay_ui_payloads.h"
+#include "primitives/text.h"
+#include "primitives/text_internal.h"
 #include "runtime/UiInteractionRegistry.h"
 
 #include <algorithm>
@@ -65,9 +66,8 @@ struct ResolvedButton {
 	Uint16 spriteIndex = 0;
 	int fixedWidth = 0;
 	int fixedHeight = 0;
-	BankTextVariant textVariant = BankTextVariant::BodySm;
-	int cellWidth = 7;
-	int textHeight = 11;
+	TextSize textSize = TextSize::BodySm;
+	TextMetrics textMetrics = ResolveTextMetrics(TextSize::BodySm);
 	int yOffset = 0;
 	int visualTextPaddingTop = 0;
 	int defaultPaddingX = 0;
@@ -100,27 +100,6 @@ std::string ToStd(Clay_String text) {
 	return std::string(text.chars ? text.chars : "", static_cast<size_t>(std::max(0, text.length)));
 }
 
-int TextHeightFor(BankTextVariant variant) {
-	switch(variant){
-		case BankTextVariant::Title: return 19;
-		case BankTextVariant::Heading: return 15;
-		case BankTextVariant::Body:
-		case BankTextVariant::BodySm:
-			return 11;
-	}
-	return 11;
-}
-
-int TextCellWidthFor(BankTextVariant variant) {
-	switch(variant){
-		case BankTextVariant::Title: return 11;
-		case BankTextVariant::Heading: return 8;
-		case BankTextVariant::Body: return 6;
-		case BankTextVariant::BodySm: return 7;
-	}
-	return 7;
-}
-
 ResolvedButton ResolveButton(const ButtonOpts& opts) {
 	ResolvedButton out;
 	switch(opts.variant){
@@ -130,7 +109,7 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 			out.spriteIndex = 7;
 			out.fixedWidth = 196;
 			out.fixedHeight = 33;
-			out.textVariant = BankTextVariant::Title;
+			out.textSize = TextSize::Title;
 			out.yOffset = 8;
 			switch(opts.size){
 				case ButtonSize::Sm:
@@ -161,11 +140,11 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 			out.spriteIndex = 24;
 			out.fixedWidth = 156;
 			out.fixedHeight = 21;
-			out.textVariant = BankTextVariant::Heading;
+			out.textSize = TextSize::Heading;
 			out.yOffset = 4;
 			break;
 		case ButtonVariant::Text:
-			out.textVariant = BankTextVariant::BodySm;
+			out.textSize = TextSize::BodySm;
 			out.defaultPaddingX = 0;
 			out.defaultPaddingY = 0;
 			out.measureTextInk = true;
@@ -180,13 +159,12 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 			}
 			break;
 		case ButtonVariant::Ghost:
-			out.textVariant = BankTextVariant::Heading;
+			out.textSize = TextSize::Heading;
 			out.defaultPaddingX = 0;
 			out.defaultPaddingY = 0;
 			break;
 	}
-	out.cellWidth = TextCellWidthFor(out.textVariant);
-	out.textHeight = TextHeightFor(out.textVariant);
+	out.textMetrics = ResolveTextMetrics(out.textSize);
 	return out;
 }
 
@@ -425,14 +403,22 @@ bool IsButtonFocused(ButtonHandle handle) {
 
 void EmitButtonText(const ButtonLines& lines,
                     const ResolvedButton& resolved,
-                    Uint8 effectColor,
+                    TextEffect baseEffect,
                     Uint8 brightness) {
+	const TextEffect resolvedEffect = ResolveTextEffect(TextTone::Default, baseEffect);
+	const TextEffect frameEffect = TextEffect::LegacyPalette(
+		resolvedEffect.EffectColor(),
+		brightness,
+		resolvedEffect.ColorRamp(),
+		resolvedEffect.DrawAlpha());
 	for(int i = 0; i < lines.count; ++i){
-		BankText(lines.lines[i],
-		         resolved.textVariant,
-		         { .effectColor = effectColor,
-		           .brightness = brightness,
-		           .measureInk = resolved.measureTextInk });
+		text_internal::TextWithInternalOptions(
+			lines.lines[i],
+			TextOpts{
+				.size = resolved.textSize,
+				.effect = frameEffect,
+			},
+			text_internal::InternalTextOpts{ .measureInk = resolved.measureTextInk });
 	}
 }
 
@@ -460,12 +446,12 @@ void Button(Clay_String id,
 	int maxTextWidth = 0;
 	if(opts.wrapText && opts.maxWidth > 0){
 		maxTextWidth = opts.maxWidth - paddingX * 2;
-		if(maxTextWidth < resolved.cellWidth) maxTextWidth = resolved.cellWidth;
+		if(maxTextWidth < resolved.textMetrics.advance) maxTextWidth = resolved.textMetrics.advance;
 	}
-	ButtonLines lines = BuildLines(stableLabel, opts.wrapText, maxTextWidth, resolved.cellWidth);
+	ButtonLines lines = BuildLines(stableLabel, opts.wrapText, maxTextWidth, resolved.textMetrics.advance);
 
-	const int contentWidth = lines.maxChars * resolved.cellWidth;
-	const int contentHeight = std::max(1, lines.count) * resolved.textHeight;
+	const int contentWidth = lines.maxChars * resolved.textMetrics.advance;
+	const int contentHeight = std::max(1, lines.count) * resolved.textMetrics.lineHeight;
 	int width = resolved.fixedWidth > 0 ? resolved.fixedWidth
 	                                    : contentWidth + paddingX * 2;
 	int height = resolved.fixedHeight > 0 ? resolved.fixedHeight
@@ -521,7 +507,7 @@ void Button(Clay_String id,
 				}
 			}
 			if(handle.hoveredOut) *handle.hoveredOut = hovered;
-			EmitButtonText(lines, resolved, opts.effectColor, visual.brightness);
+			EmitButtonText(lines, resolved, opts.textEffect, visual.brightness);
 		}
 		return;
 	}
@@ -545,7 +531,7 @@ void Button(Clay_String id,
 			clayId.id,
 			!opts.disabled && (hovered || focused));
 		if(handle.hoveredOut) *handle.hoveredOut = hovered;
-		EmitButtonText(lines, resolved, opts.effectColor, visual.brightness);
+		EmitButtonText(lines, resolved, opts.textEffect, visual.brightness);
 	}
 }
 

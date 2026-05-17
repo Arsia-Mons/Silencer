@@ -123,8 +123,7 @@ void ScrollList(Clay_String id,
 				       .backgroundColor = { static_cast<float>(bgIdx),
 				                            0.0f, 0.0f, 255.0f } }) {
 					RegisterRowWidget(id, items[i], i, isSelected, handle);
-					BankText(items[i], opts.textVariant,
-					         { .effectColor = opts.textEffectColor });
+					Text(items[i], opts.text);
 				}
 			}
 		}

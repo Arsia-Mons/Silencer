@@ -3,7 +3,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/toggle.h"
 
 #include "config.h"
@@ -16,9 +16,10 @@
 #include <cstdio>
 #include <string>
 
-using silencer::ui::primitives::BankText;
-using silencer::ui::primitives::BankTextOpts;
-using silencer::ui::primitives::BankTextVariant;
+using silencer::ui::primitives::Text;
+using silencer::ui::primitives::TextEffect;
+using silencer::ui::primitives::TextOpts;
+using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::Toggle;
 using silencer::ui::primitives::ToggleHandle;
 using silencer::ui::primitives::ToggleOpts;
@@ -69,12 +70,10 @@ Clay_String FromStd(const std::string & s) {
 	return cs;
 }
 
-// Body text appearance for the four stats lines — matches legacy
-// `leveltext` etc.: bank 133, w7, eff=129, brightness=160 (128+32), ramp.
-constexpr BankTextOpts kStatsOpts{ /*effectColor*/ 129,
-                                   /*brightness*/  160,
-                                   /*colorRamp*/   true,
-                                   /*drawAlpha*/   false };
+const TextOpts kStatsOpts{
+	.size = TextSize::BodySm,
+	.effect = TextEffect::LegacyPalette(129, 160, true),
+};
 
 constexpr uint16_t kPanelPad       = 6;
 constexpr uint16_t kToggleGap      = 26;
@@ -157,9 +156,9 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 
 		// Username header — bank 134 / w8 / eff=200. Lands at content y=71.
 		CLAY({ .id = CLAY_ID("CharUserWrap") }) {
-			BankText(character_panel_detail::FromStd(character_panel_detail::g_stats.username),
-			         BankTextVariant::Heading,
-			         { .effectColor = 200 });
+			Text(character_panel_detail::FromStd(character_panel_detail::g_stats.username),
+			     { .size = TextSize::Heading,
+			       .effect = TextEffect::LegacyPalette(200) });
 		}
 
 		// Five agency toggles in a horizontal strip. The toggles have
@@ -233,8 +232,7 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 				wrapId.length = static_cast<int32_t>(strlen(kStatsRows[i].id));
 				wrapId.chars  = kStatsRows[i].id;
 				CLAY({ .id = CLAY_SID(wrapId) }) {
-					BankText(character_panel_detail::FromStd(*kStatsRows[i].txt),
-					         BankTextVariant::BodySm,
+					Text(character_panel_detail::FromStd(*kStatsRows[i].txt),
 					         character_panel_detail::kStatsOpts);
 				}
 			}

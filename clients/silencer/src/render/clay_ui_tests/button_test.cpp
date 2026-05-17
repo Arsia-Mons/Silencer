@@ -2,7 +2,7 @@
 
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/button.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "runtime/UiInputRouter.h"
@@ -115,7 +115,7 @@ bool RunButtonTest(::Game & game,
 	const int H = 480;
 	SetTextMeasureResources(&game.GetWorld().resources);
 	EnsureInitialized(W, H);
-	silencer::ui::primitives::BankTextBeginFrame();
+	silencer::ui::primitives::TextBeginFrame();
 	silencer::ui::primitives::ButtonBeginFrame();
 
 	const ButtonVariant variant = ParseVariant(variantName);
@@ -171,7 +171,7 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 		::Clay_ResetMeasureTextCache();
 		interactions.BeginFrame();
-		silencer::ui::primitives::BankTextBeginFrame();
+		silencer::ui::primitives::TextBeginFrame();
 		silencer::ui::primitives::ButtonBeginFrame(animationDeltaSeconds,
 		                                           kVisualStepSeconds);
 
@@ -375,7 +375,7 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 		::Clay_SetPointerState(::Clay_Vector2{-1.0f, -1.0f}, false);
 		::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 		interactions.BeginFrame();
-		silencer::ui::primitives::BankTextBeginFrame();
+		silencer::ui::primitives::TextBeginFrame();
 		silencer::ui::primitives::ButtonBeginFrame();
 		::Clay_BeginLayout();
 		CLAY({ .id = CLAY_ID("ButtonAutoProbeRoot"),
@@ -435,7 +435,7 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	::Clay_SetPointerState(::Clay_Vector2{-1.0f, -1.0f}, false);
 	::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 	interactions.BeginFrame();
-	silencer::ui::primitives::BankTextBeginFrame();
+	silencer::ui::primitives::TextBeginFrame();
 	silencer::ui::primitives::ButtonBeginFrame();
 	::Clay_BeginLayout();
 	CLAY({ .id = CLAY_ID("ButtonTextCompactProbeRoot"),
@@ -481,7 +481,7 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	::Clay_SetPointerState(::Clay_Vector2{-1.0f, -1.0f}, false);
 	::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
 	interactions.BeginFrame();
-	silencer::ui::primitives::BankTextBeginFrame();
+	silencer::ui::primitives::TextBeginFrame();
 	silencer::ui::primitives::ButtonBeginFrame();
 	::Clay_BeginLayout();
 	CLAY({ .id = CLAY_ID("ButtonFixedProbeRoot"),

@@ -14,7 +14,7 @@
 
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "primitives/scroll_text_box.h"
 
 #include "game.h"
@@ -45,8 +45,9 @@ void BuildLines(int count) {
 		g_lines[i].text.length = static_cast<int32_t>(std::strlen(g_lineText[i]));
 		g_lines[i].text.isStaticallyAllocated = false;
 		// Two alternating colors so per-line color routing is exercised.
-		g_lines[i].effectColor = (i & 1) ? 0 : 112;
-		g_lines[i].brightness  = (i & 1) ? 128 : 160;
+		g_lines[i].effect = (i & 1)
+			? silencer::ui::primitives::TextEffect::Default()
+			: silencer::ui::primitives::TextEffect::LegacyPalette(112, 160);
 		g_lines[i].indent      = 0;
 	}
 }
@@ -58,7 +59,7 @@ bool RunScrollTextBoxTest(::Game & game, const char * outPath) {
 	const int H = 480;
 	EnsureInitialized(W, H);
 	silencer::ui::primitives::ScrollTextBoxBeginFrame();
-	silencer::ui::primitives::BankTextBeginFrame();
+	silencer::ui::primitives::TextBeginFrame();
 	BuildLines(6);
 
 	::Clay_BeginLayout();
@@ -77,7 +78,7 @@ bool RunScrollTextBoxTest(::Game & game, const char * outPath) {
 			{ .width = 200,
 			  .height = 66,            // 6 rows * 11 px = exactly fits.
 			  .lineHeight = 11,
-			  .textVariant = silencer::ui::primitives::BankTextVariant::Body,
+			  .text = { .size = silencer::ui::primitives::TextSize::Body },
 			  .origin = ScrollTextBoxOrigin::TopDown });
 	}
 

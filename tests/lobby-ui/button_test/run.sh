@@ -18,7 +18,7 @@ REPO="$(cd "$HERE/../../.." && pwd)"
 # this worktree the canonical build sits at the worktree-root `build/`, so
 # we MUST set SILENCER_BIN BEFORE sourcing lib.sh — otherwise lib.sh picks
 # up a stale sibling binary (see progress.txt iteration 2026-05-11T??:??Z
-# bank_text_test).
+# text_test).
 if [ -z "${SILENCER_BIN:-}" ]; then
   if [ -x "$REPO/build/Silencer.app/Contents/MacOS/Silencer" ]; then
     export SILENCER_BIN="$REPO/build/Silencer.app/Contents/MacOS/Silencer"

@@ -48,7 +48,7 @@ Use floating/absolute layout only for true overlays, popovers, HUD chrome, or co
 
 Generic primitives live under `src/ui/primitives`; Silencer-specific composition lives under `src/client/ui`.
 
-Target public primitives are plain nouns such as `Button`, `TextInput`, `Toggle`, `Panel`, and `Text`. Runtime/service types keep the `Ui` prefix. Existing `BankText` and sprite-backed primitive options still expose legacy bank/palette details; do not spread that surface into new or cleaned-up APIs.
+Target public primitives are plain nouns such as `Button`, `TextInput`, `Toggle`, `Panel`, and `Text`. Runtime/service types keep the `Ui` prefix. Text primitives expose semantic size/tone/effect intent; sprite banks, font IDs, and cell widths stay behind the text/compositor boundary.
 
 Prefer shadcn-style API shape over raw knobs: `variant + size`, composition, and named defaults. If several call sites repeat padding, min/max width, wrapping, or effect-color values, make a named variant or size instead of normalizing the escape hatch.
 

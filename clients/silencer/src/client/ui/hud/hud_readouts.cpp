@@ -3,8 +3,8 @@
 #include "clay/clay.h"
 #include "client/ui/hud/HudClayHelpers.h"
 #include "client/ui/views/HudView.h"
-#include "render/clay_ui_payloads.h"
 #include "surface.h"
+#include "ui/primitives/text.h"
 
 #include <string>
 
@@ -33,38 +33,27 @@ void BuildHudReadouts(const PlayerHudView& player, Surface* surface, Uint8 curre
 		}
 	}
 
-	auto string = [](const std::string& text) {
-		return Clay_String{
-			.isStaticallyAllocated = false,
-			.length = static_cast<int32_t>(text.size()),
-			.chars = text.c_str(),
-		};
-	};
+	using silencer::ui::primitives::Text;
+	using silencer::ui::primitives::TextEffect;
+	using silencer::ui::primitives::TextSize;
 	auto emitText = [&](const char* id, int x, int y, int w, int h,
-	                    const std::string& text, Uint8 bank, Uint8 width,
+	                    const std::string& text, TextSize size,
 	                    Uint8 color) {
 		if(text.empty()) return;
 		CLAY(HudFloatingElement(id, x, y, w, h)) {
-			CLAY_TEXT(string(text), CLAY_TEXT_CONFIG({
-				.userData = nullptr,
-				.textColor = { (float)color, 0, 0, 255 },
-				.fontId = bank,
-				.fontSize = width,
-			}));
+			Text(ClayStringFromStd(text),
+			     { .size = size,
+			       .effect = TextEffect::LegacyPalette(color) });
 		}
 	};
-	silencer::clay_bridge::BankTextDrawData alphaText{128, false, true};
 	auto emitAlphaText = [&](const char* id, int x, int y, int w, int h,
-	                         const std::string& text, Uint8 bank, Uint8 width,
+	                         const std::string& text, TextSize size,
 	                         Uint8 color) {
 		if(text.empty()) return;
 		CLAY(HudFloatingElement(id, x, y, w, h)) {
-			CLAY_TEXT(string(text), CLAY_TEXT_CONFIG({
-				.userData = &alphaText,
-				.textColor = { (float)color, 0, 0, 255 },
-				.fontId = bank,
-				.fontSize = width,
-			}));
+			Text(ClayStringFromStd(text),
+			     { .size = size,
+			       .effect = TextEffect::LegacyPalette(color, 128, false, true) });
 		}
 	};
 
@@ -72,37 +61,34 @@ void BuildHudReadouts(const PlayerHudView& player, Surface* surface, Uint8 curre
 	       .layout = {
 		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
 	       } }) {
-		emitAlphaText("HudCurrentAmmo", 117, 457, 40, 18, currentAmmo, 135, 12, 0);
-		emitText("HudBlasterAmmo", 4, 414, 20, 8, blasterAmmo, 132, 4, 0);
-		emitText("HudLaserAmmo", 4, 428, 20, 8, laserAmmo, 132, 4, 0);
-		emitText("HudRocketAmmo", 4, 442, 20, 8, rocketAmmo, 132, 4, 0);
-		emitText("HudFlamerAmmo", 4, 456, 20, 8, flamerAmmo, 132, 4, 0);
-		emitText("HudCredits", 572, 456, 60, 18, credits, 135, 12, 202);
-		emitText("HudHealth", 152, 463, 26, 8, health, 132, 4, 161);
-		emitText("HudShield", 475, 463, 26, 8, shield, 132, 4, 202);
+		emitAlphaText("HudCurrentAmmo", 117, 457, 40, 18, currentAmmo, TextSize::HudCounter, 0);
+		emitText("HudBlasterAmmo", 4, 414, 20, 8, blasterAmmo, TextSize::Tiny, 0);
+		emitText("HudLaserAmmo", 4, 428, 20, 8, laserAmmo, TextSize::Tiny, 0);
+		emitText("HudRocketAmmo", 4, 442, 20, 8, rocketAmmo, TextSize::Tiny, 0);
+		emitText("HudFlamerAmmo", 4, 456, 20, 8, flamerAmmo, TextSize::Tiny, 0);
+		emitText("HudCredits", 572, 456, 60, 18, credits, TextSize::HudCounter, 202);
+		emitText("HudHealth", 152, 463, 26, 8, health, TextSize::Tiny, 161);
+		emitText("HudShield", 475, 463, 26, 8, shield, TextSize::Tiny, 202);
 		const int xoffsets[] = {612, 584, 556, 528};
 		const int yoffsets[] = {13, 13, 11, 7};
-		emitText("HudInventoryCount0", xoffsets[0] + 20, yoffsets[0] + 20, 32, 10, inventoryCounts[0], 132, 6, 0);
-		emitText("HudInventoryCount1", xoffsets[1] + 20, yoffsets[1] + 20, 32, 10, inventoryCounts[1], 132, 6, 0);
-		emitText("HudInventoryCount2", xoffsets[2] + 20, yoffsets[2] + 20, 32, 10, inventoryCounts[2], 132, 6, 0);
-		emitText("HudInventoryCount3", xoffsets[3] + 20, yoffsets[3] + 20, 32, 10, inventoryCounts[3], 132, 6, 0);
+		emitText("HudInventoryCount0", xoffsets[0] + 20, yoffsets[0] + 20, 32, 10, inventoryCounts[0], TextSize::TinyCounter, 0);
+		emitText("HudInventoryCount1", xoffsets[1] + 20, yoffsets[1] + 20, 32, 10, inventoryCounts[1], TextSize::TinyCounter, 0);
+		emitText("HudInventoryCount2", xoffsets[2] + 20, yoffsets[2] + 20, 32, 10, inventoryCounts[2], TextSize::TinyCounter, 0);
+		emitText("HudInventoryCount3", xoffsets[3] + 20, yoffsets[3] + 20, 32, 10, inventoryCounts[3], TextSize::TinyCounter, 0);
 	}
 }
 
 void BuildHudTraceTime(Surface* surface, Uint8 tracetime) {
 	std::string text = "Government Trace Time: " + std::to_string(tracetime);
-	silencer::clay_bridge::BankTextDrawData textData{136, false, false};
 	CLAY({ .id = CLAY_ID("InGameHudTraceRoot"),
 	       .layout = {
 		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
 	       } }) {
 		CLAY(HudFloatingElement("HudTraceTime", 20, 350, 180, 12)) {
-			CLAY_TEXT(ClayStringFromStd(text), CLAY_TEXT_CONFIG({
-				.userData = &textData,
-				.textColor = { 0, 0, 0, 255 },
-				.fontId = 133,
-				.fontSize = 6,
-			}));
+			silencer::ui::primitives::Text(
+				ClayStringFromStd(text),
+				{ .size = silencer::ui::primitives::TextSize::Body,
+				  .effect = silencer::ui::primitives::TextEffect::LegacyPalette(0, 136) });
 		}
 	}
 }

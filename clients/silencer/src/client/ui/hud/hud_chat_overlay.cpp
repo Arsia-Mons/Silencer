@@ -4,7 +4,7 @@
 #include "client/ui/hud/HudClayHelpers.h"
 #include "client/ui/views/HudView.h"
 #include "surface.h"
-#include "ui/primitives/bank_text.h"
+#include "ui/primitives/text.h"
 #include "ui/primitives/box.h"
 #include "ui/runtime/UiInteractionRegistry.h"
 
@@ -91,8 +91,9 @@ void BuildChatOverlay(const HudView& view,
 		})) {
 			for(int i = 0; i < (int)lines.size(); i++) {
 				Uint8 brightness = (player.chatActive && i == (int)lines.size() - 1) ? 128 : 136;
-				BankText(ClayStringFromStd(lines[i]), BankTextVariant::Body,
-				         { .brightness = brightness });
+				Text(ClayStringFromStd(lines[i]),
+				     { .size = TextSize::Body,
+				       .effect = TextEffect::LegacyPalette(0, brightness) });
 			}
 		}
 	}

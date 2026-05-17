@@ -14,7 +14,7 @@
 // ScrollListBeginFrame() once per layout pass before Clay_BeginLayout.
 
 #include "clay/clay.h"
-#include "primitives/bank_text.h"
+#include "primitives/text.h"
 #include "shared.h"
 
 namespace silencer::ui {
@@ -32,10 +32,7 @@ struct ScrollListOpts {
 	// Selection highlight palette index for the row's full-width bar.
 	Uint8  highlightColor = 180;  // generic
 
-	// Text style. Body variant + no tint are the generic BankText defaults;
-	// override per use site as needed.
-	BankTextVariant textVariant     = BankTextVariant::Body;  // generic
-	Uint8           textEffectColor = 0;
+	TextOpts text = TextOpts{};
 
 	// Scrollbar sprite + sizing. The primitive has no opinion on which sprite
 	// bank carries the scrollbar art — the caller must spell it.

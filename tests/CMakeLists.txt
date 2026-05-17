@@ -16,7 +16,7 @@ set(TEST_SRC
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiInputRouter.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/runtime/UiTextPolicy.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/button.cpp
-    ${CMAKE_SOURCE_DIR}/src/ui/primitives/bank_text.cpp
+    ${CMAKE_SOURCE_DIR}/src/ui/primitives/text.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/box.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/scroll_list.cpp
     ${CMAKE_SOURCE_DIR}/src/ui/primitives/scroll_text_box.cpp

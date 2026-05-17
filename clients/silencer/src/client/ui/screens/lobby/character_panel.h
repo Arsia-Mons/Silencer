@@ -1,7 +1,7 @@
 #ifndef SILENCER_CLIENT_UI_LOBBY_CHARACTER_PANEL_H
 #define SILENCER_CLIENT_UI_LOBBY_CHARACTER_PANEL_H
 
-// Screen-side lobby CharacterPanel. Composes the Toggle + BankText primitives
+// Screen-side lobby CharacterPanel. Composes the Toggle + Text primitives
 // into the legacy character box layout (username header, 5 agency toggles,
 // LEVEL / WINS / LOSSES / XP readouts).
 //
@@ -41,7 +41,7 @@ bool CharacterPanelHandleUiIntent(CharacterPanelState & state,
                                   const silencer::ui::UiAction & action);
 
 // Emit the panel subtree. Must be called inside an open Clay layout pass,
-// after BankTextBeginFrame() + ToggleBeginFrame() have been invoked.
+// after TextBeginFrame() + ToggleBeginFrame() have been invoked.
 void BuildCharacterPanelTree(CharacterPanelState & state,
                              World & world,
                              Resources & resources,
