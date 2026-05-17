@@ -37,7 +37,7 @@
       "type": "Leaf",
       "label": "Play spawn sound",
       "children": [],
-      "props": { "action": "EmitSpawnSound" }
+      "props": { "action": "EmitSpawnSound", "sound": "mgbegin" }
     },
 
     "seq_dying": {
@@ -54,9 +54,9 @@
     },
     "leaf_death_sound": {
       "type": "Leaf",
-      "label": "Play death sound (once)",
+      "label": "Play death sound",
       "children": [],
-      "props": { "action": "EmitDeathSound" }
+      "props": { "action": "EmitDeathSound", "sound": "mgend" }
     },
     "leaf_spawn_guards": {
       "type": "Leaf",

@@ -63,14 +63,19 @@ void Magistrate::InitBT(){
 		return BTResult::Running;
 	};
 
-	// Plays the spawn sound once (idempotent via BB flag). Always Success.
+	// Plays the spawn sound once (idempotent via BB flag).
+	// Reads sound name from props "sound"; falls back to GAS soundActivate. Always Success.
 	btctx_.actions["EmitSpawnSound"] = [this](BTContext& ctx) -> BTResult {
 		if(!ctx.bb("_spawn_sound_fired", false)){
 			ctx.bbSet("_spawn_sound_fired", true);
 			World& world = *static_cast<World*>(ctx.userData);
-			const EnemyDef* md = GASLoader::Get().GetEnemyDef("magistrate");
-			if(md && !md->soundActivate.empty())
-				EmitSound(world, world.resources.soundbank[md->soundActivate], 128);
+			std::string snd = ctx.props ? ctx.props->value("sound", std::string{}) : std::string{};
+			if(snd.empty()){
+				const EnemyDef* md = GASLoader::Get().GetEnemyDef("magistrate");
+				if(md) snd = md->soundActivate;
+			}
+			if(!snd.empty())
+				EmitSound(world, world.resources.soundbank[snd], 128);
 		}
 		return BTResult::Success;
 	};
@@ -117,14 +122,18 @@ void Magistrate::InitBT(){
 	};
 
 	// ── Death leaves ──────────────────────────────────────────────────────────
-	// Play the death sound once. Idempotent; always Success.
+	// Play the death sound once. Reads "sound" from props; falls back to GAS soundDeath. Always Success.
 	btctx_.actions["EmitDeathSound"] = [this](BTContext& ctx) -> BTResult {
 		if(!deathSoundFired_){
 			deathSoundFired_ = true;
 			World& world = *static_cast<World*>(ctx.userData);
-			const EnemyDef* md = GASLoader::Get().GetEnemyDef("magistrate");
-			if(md && !md->soundDeath.empty())
-				EmitSound(world, world.resources.soundbank[md->soundDeath], 128);
+			std::string snd = ctx.props ? ctx.props->value("sound", std::string{}) : std::string{};
+			if(snd.empty()){
+				const EnemyDef* md = GASLoader::Get().GetEnemyDef("magistrate");
+				if(md) snd = md->soundDeath;
+			}
+			if(!snd.empty())
+				EmitSound(world, world.resources.soundbank[snd], 128);
 		}
 		return BTResult::Success;
 	};
