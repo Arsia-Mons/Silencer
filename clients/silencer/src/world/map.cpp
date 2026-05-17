@@ -712,9 +712,14 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 							magistrate->originalx = magistrate->x;
 							magistrate->originaly = magistrate->y;
 							magistrate->originalmirrored = magistrate->mirrored;
+								magistrate->deathSpawnType   = (Uint8)(actortype & 0xFF);
+								magistrate->deathSpawnCount  = (Uint8)(actormatchid & 0xFF);
+								magistrate->deathSpawnRadius = (Uint8)((actormatchid >> 8) & 0xFF);
+								if(!magistrate->deathSpawnCount)  magistrate->deathSpawnCount  = 3;
+								if(!magistrate->deathSpawnRadius) magistrate->deathSpawnRadius = 64;
+							}
 						}
-					}
-				}break;
+					}break;
 		}
 		// Apply destructible / collectible flags packed into actorunknown
 		// bit 0: destructible, bit 1: collectible, bits 8-15: max health (0 = default 100)

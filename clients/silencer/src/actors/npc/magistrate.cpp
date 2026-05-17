@@ -233,7 +233,8 @@ void Magistrate::SpawnDeathActors(World & world){
 		Sint16 oy = y;
 
 		Object * obj = nullptr;
-		if(deathSpawnType == 1){
+		// type 0=guard-blaster, 1=guard-laser, 2=guard-rocket, 3=robot
+		if(deathSpawnType == 3){
 			obj = world.CreateObject(ObjectTypes::ROBOT);
 		}else{
 			obj = world.CreateObject(ObjectTypes::GUARD);
@@ -244,8 +245,9 @@ void Magistrate::SpawnDeathActors(World & world){
 		obj->y        = oy;
 		obj->mirrored = (world.Random() % 2) == 0;
 
-		if(deathSpawnType == 0){
+		if(deathSpawnType <= 2){
 			Guard* g = static_cast<Guard*>(obj);
+			g->weapon           = deathSpawnType;  // 0=blaster, 1=laser, 2=rocket
 			g->patrol           = true;
 			g->originalx        = ox;
 			g->originaly        = oy;

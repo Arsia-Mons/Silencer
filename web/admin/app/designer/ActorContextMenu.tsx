@@ -12,6 +12,24 @@ const DIRECTION_LABELS: Record<number, string> = {
   4:'Left', 5:'Up-Left', 6:'Up', 7:'Up-Right',
 };
 
+// Magistrate actor id
+const MAGISTRATE_ID = 72;
+// type 0=guard-blaster, 1=guard-laser, 2=guard-rocket, 3=robot
+const MAGISTRATE_SPAWN_TYPES: Record<number, string> = {
+  0: 'Guard (Blaster)',
+  1: 'Guard (Laser)',
+  2: 'Guard (Rocket)',
+  3: 'Robot',
+};
+
+interface MagistrateFieldState {
+  facing: string;       // direction: 0=Right, 1=Left
+  spawnType: number;    // actor.type: 0-3
+  spawnCount: string;   // actor.matchid bits 0-7
+  spawnRadius: string;  // actor.matchid bits 8-15
+  securityid: string;
+}
+
 // Light actor (id=71) actortype bitfield helpers
 // bits 0-1: size, bit 2: shape, bits 3-4: animation, bits 5-6: pulse speed, bits 8-15: colorR, bits 16-23: colorG, bits 24-31: colorB
 // actor.direction (separate field): spot direction 0-7 (E,NE,N,NW,W,SW,S,SE)
@@ -69,11 +87,12 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
   const def = ACTOR_DEFS.find(d => d.id === actor.id) ?? { label: `Unknown (${actor.id})`, color: '#6b7280' };
   const { lights, load: loadLights } = useLightsStore();
   const isLight = actor.id === 71;
+  const isMagistrate = actor.id === MAGISTRATE_ID;
 
   useEffect(() => { if (isLight) loadLights(); }, [isLight, loadLights]);
 
   // For non-light actors, build type hint label from static hints catalogue
-  const typeHint = !isLight ? ACTOR_TYPE_HINTS[actor.id] : undefined;
+  const typeHint = !isLight && !isMagistrate ? ACTOR_TYPE_HINTS[actor.id] : undefined;
 
   const [fields, setFields] = useState<FieldState>({
     type:         String(actor.type ?? 0),
@@ -83,6 +102,16 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
     destructible: !!(actor.unknown & 1),
     collectible:  !!(actor.unknown & 2),
     health:       String(((actor.unknown ?? 0) >> 8) & 0xFF || 100),
+  });
+
+  // Magistrate-specific decoded state
+  // actor.type = deathSpawnType (0-3), actor.matchid bits 0-7 = count, bits 8-15 = radius
+  const [magistrateFields, setMagistrateFields] = useState<MagistrateFieldState>({
+    facing:      String(actor.direction ?? 0),
+    spawnType:   (actor.type ?? 0) & 0xFF,
+    spawnCount:  String((actor.matchid ?? 0) & 0xFF || 3),
+    spawnRadius: String(((actor.matchid ?? 0) >> 8) & 0xFF || 64),
+    securityid:  String(actor.securityid ?? 0),
   });
 
   // Light-specific decoded state
@@ -122,6 +151,15 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
       onUpdate(actorIdx, {
         type: encodeLightType(lightFields.size, lightFields.shape, lightFields.anim, lightFields.pulseSpeed, lightFields.dynShadows, r, g, b),
         direction: lightFields.direction,
+      });
+    } else if (isMagistrate) {
+      const count  = Math.min(20, Math.max(1, parseInt(magistrateFields.spawnCount,  10) || 3));
+      const radius = Math.min(255, Math.max(8, parseInt(magistrateFields.spawnRadius, 10) || 64));
+      onUpdate(actorIdx, {
+        type:      magistrateFields.spawnType,
+        direction: parseInt(magistrateFields.facing, 10) || 0,
+        matchid:   (count & 0xFF) | ((radius & 0xFF) << 8),
+        securityid: parseInt(magistrateFields.securityid, 10) || 0,
       });
     } else {
       const hp = Math.min(255, Math.max(1, parseInt(fields.health, 10) || 100));
@@ -239,6 +277,51 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
             {!lightColorEnabled && (
               <div className="text-[#3a6a3a] text-[10px] mt-0.5">Neutral white light (no tint)</div>
             )}
+          </div>
+        </>
+      ) : isMagistrate ? (
+        <>
+          <div className="mb-1.5">
+            <div className={lbl}>Facing</div>
+            <select value={magistrateFields.facing} onChange={e => setMagistrateFields(f => ({ ...f, facing: e.target.value }))} className={inp + ' cursor-pointer'}>
+              <option value="0">0 — Right</option>
+              <option value="1">1 — Left</option>
+            </select>
+          </div>
+          <div className="border-t border-[#1a3a1a] pt-1.5 mt-1.5 mb-1">
+            <div className="text-[#5a8a5a] text-[10px] uppercase tracking-wide mb-1">Death spawn</div>
+            <div className="mb-1.5">
+              <div className={lbl}>Spawn type</div>
+              <select value={magistrateFields.spawnType} onChange={e => setMagistrateFields(f => ({ ...f, spawnType: Number(e.target.value) }))} className={inp + ' cursor-pointer'}>
+                {Object.entries(MAGISTRATE_SPAWN_TYPES).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <div className={lbl}>Count (1–20)</div>
+                <input type="number" min={1} max={20} value={magistrateFields.spawnCount}
+                  onChange={e => setMagistrateFields(f => ({ ...f, spawnCount: e.target.value }))} className={inp} />
+              </div>
+              <div className="flex-1">
+                <div className={lbl}>Radius (px)</div>
+                <input type="number" min={8} max={255} value={magistrateFields.spawnRadius}
+                  onChange={e => setMagistrateFields(f => ({ ...f, spawnRadius: e.target.value }))} className={inp} />
+              </div>
+            </div>
+          </div>
+          <div className="mb-1.5">
+            <div className={lbl}>Security ID — spawn condition</div>
+            <select value={magistrateFields.securityid} onChange={e => setMagistrateFields(f => ({ ...f, securityid: e.target.value }))} className={inp + ' cursor-pointer'}>
+              <option value="0">0 — Always spawn</option>
+              <option value="1">1 — Low security only</option>
+              <option value="2">2 — Medium security only</option>
+              <option value="3">3 — Low or Medium</option>
+              <option value="4">4 — High security only</option>
+              <option value="5">5 — Low or High</option>
+              <option value="6">6 — Medium or High</option>
+            </select>
           </div>
         </>
       ) : (
