@@ -31,6 +31,20 @@ Each component owns its own `CLAUDE.md` with build/run/test/gotchas:
 > Layout migration in progress. See
 > [docs/plans/2026-04-25-monorepo-restructure.md](docs/plans/2026-04-25-monorepo-restructure.md).
 
+## Git workflow
+
+**Never push directly to `main`.** Every change — no matter how small —
+follows the issue → branch → PR → squash-merge cycle:
+
+1. `gh issue create` — open an issue and note the number.
+2. `git checkout -b feat/issue-N-desc` — branch off `main`.
+3. Do the work and push the branch.
+4. `gh pr create --body "Closes #N ..."` — open a PR (draft while in progress).
+5. `gh pr merge N --squash --admin` — squash-merge when ready.
+6. Close the issue; update `CHANGELOG.md` and tag if releasing.
+
+Full details: [docs/git-workflow.md](docs/git-workflow.md)
+
 ## Universal rules
 
 1. **JavaScript = Bun + TypeScript + oxfmt.** No `node`,
@@ -74,6 +88,7 @@ the repo root, never inside a sub-package.
 
 ## More
 
+- Git workflow: [docs/git-workflow.md](docs/git-workflow.md)
 - Writing CLAUDE.md well: [docs/writing-a-good-claude-md.md](docs/writing-a-good-claude-md.md)
 - Production setup: `docs/production.md`
 - UI design system + asset formats: `docs/design-system.md`
