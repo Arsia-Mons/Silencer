@@ -16,58 +16,142 @@ namespace silencer::client_ui::lobby {
 
 namespace chat_panel_detail {
 
-// Mirror of the Build-side chat scrollback height + line height — needed
-// only by the auto-scroll computation here, NOT for any layout. The
-// authoritative copies live in chat_panel_layout.cpp.
-constexpr Uint16 kChatH      = 207;
 constexpr Uint8  kLineHeight = 11;
-constexpr int    kChatMaxChars = 242 / 6;
-constexpr int    kPresenceMaxChars = 110 / 6;
+constexpr Uint16 kRootPadX = 5;
+constexpr Uint16 kRootPadTop = 5;
+constexpr Uint16 kRootPadBottom = 5;
+constexpr Uint16 kChannelH = 16;
+constexpr Uint16 kMainGap = 4;
+constexpr Uint16 kInputBorderH = 17;
+constexpr Uint16 kInputH = 14;
+constexpr Uint16 kBodyGap = 6;
+constexpr Uint16 kBodyPadLeft = 4;
+constexpr Uint16 kBodyPadRight = 4;
+constexpr Uint16 kBodyPadTop = 4;
+constexpr Uint16 kBodyPadBottom = 2;
+constexpr Uint16 kInputPadX = 3;
+constexpr Uint16 kScrollbarReserve = 8;
+constexpr Uint16 kTextAdvance = 6;
+constexpr Uint16 kMinChatWidth = 60;
+constexpr Uint16 kMinPresenceWidth = 72;
+constexpr Uint16 kMaxPresenceWidth = 160;
+constexpr int    kPresenceRatioNum = 110;
+constexpr int    kPresenceRatioDen = 358;
+constexpr size_t kMaxStoredEntries = 256;
 constexpr size_t kMaxStoredLines = 256;
 
 constexpr const char * kActionInput = "lobby.chat.input";
 
-void PushLine(std::vector<ChatLine> & lines,
-              std::string text,
-              Uint8 color,
-              Uint8 brightness) {
-	if(lines.size() >= kMaxStoredLines){
-		lines.erase(lines.begin());
-	}
-	ChatLine line;
-	line.text       = std::move(text);
-	line.color      = color;
-	line.brightness = brightness;
-	line.indent     = 0;
-	lines.push_back(std::move(line));
+int MaxScrollForLineCount(int lineCount,
+                          Uint8 lineHeight,
+                          Uint16 height) {
+	if(lineHeight == 0) return 0;
+	const int visibleLines = height / lineHeight;
+	const int maxScroll = lineCount - visibleLines;
+	return maxScroll > 0 ? maxScroll : 0;
 }
 
-void AddWrappedText(std::vector<ChatLine> & lines,
-                    const char * text,
-                    Uint8 color,
-                    Uint8 brightness,
-                    int maxChars,
-                    int continuationIndentSpaces) {
-	if(!text) return;
+bool IsPinnedToBottom(Uint16 scrollPosition,
+                      int lineCount,
+                      Uint16 height) {
+	return static_cast<int>(scrollPosition) >=
+	       MaxScrollForLineCount(lineCount, kLineHeight, height);
+}
+
+void PushEntry(std::vector<ChatEntry> & entries,
+               std::string text,
+               Uint8 color,
+               Uint8 brightness,
+               Uint8 continuationIndentSpaces) {
+	if(entries.size() >= kMaxStoredEntries){
+		entries.erase(entries.begin());
+	}
+	ChatEntry entry;
+	entry.text = std::move(text);
+	entry.color = color;
+	entry.brightness = brightness;
+	entry.continuationIndentSpaces = continuationIndentSpaces;
+	entries.push_back(std::move(entry));
+}
+
+void AppendWrappedEntry(std::vector<ChatLine> & lines,
+                        const ChatEntry & entry,
+                        int maxChars) {
+	if(entry.text.empty()) return;
 	char breakchar[10];
 	std::strcpy(breakchar, "\n");
-	for(int i = 0; i < continuationIndentSpaces && i < 8; i++){
+	for(int i = 0; i < entry.continuationIndentSpaces && i < 8; i++){
 		std::strcat(breakchar, " ");
 	}
-	char * wrapped = silencer::ui::WordWrapText(text, maxChars, breakchar);
+	char * wrapped = silencer::ui::WordWrapText(
+		entry.text.c_str(),
+		maxChars > 0 ? maxChars : 1,
+		breakchar);
 	if(!wrapped) return;
 	char * line = std::strtok(wrapped, "\n");
 	while(line){
-		PushLine(lines, line, color, brightness);
+		ChatLine wrappedLine;
+		wrappedLine.text = line;
+		wrappedLine.color = entry.color;
+		wrappedLine.brightness = entry.brightness;
+		wrappedLine.indent = 0;
+		lines.push_back(std::move(wrappedLine));
 		line = std::strtok(nullptr, "\n");
 	}
 	delete[] wrapped;
 }
 
-// Rebuild presenceLines from world.lobby.presence — mirrors the legacy
-// rebuild block in chat_panel.cpp.
-void RebuildPresence(ChatPanelState & state, World & world) {
-	state.presenceLines.clear();
+void TrimWrappedLines(std::vector<ChatLine> & lines) {
+	if(lines.size() > kMaxStoredLines){
+		lines.erase(lines.begin(), lines.begin() + (lines.size() - kMaxStoredLines));
+	}
+}
+
+void RebuildWrappedLines(std::vector<ChatLine> & lines,
+                         const std::vector<ChatEntry> & entries,
+                         int maxChars) {
+	lines.clear();
+	lines.reserve(entries.size());
+	for(const ChatEntry & entry : entries){
+		AppendWrappedEntry(lines, entry, maxChars);
+	}
+	TrimWrappedLines(lines);
+}
+
+void RefreshChatLines(ChatPanelState & state) {
+	const bool pinnedToBottom =
+		IsPinnedToBottom(state.chatScrollPos,
+		                 static_cast<int>(state.chatLines.size()),
+		                 state.chatViewportHeight);
+	RebuildWrappedLines(state.chatLines, state.chatEntries, state.chatWrapChars);
+	const int newMax = MaxScrollForLineCount(
+		static_cast<int>(state.chatLines.size()),
+		kLineHeight,
+		state.chatViewportHeight);
+	if(pinnedToBottom){
+		state.chatScrollPos = static_cast<Uint16>(newMax);
+	}else if(static_cast<int>(state.chatScrollPos) > newMax){
+		state.chatScrollPos = static_cast<Uint16>(newMax);
+	}
+	state.chatWrapDirty = false;
+}
+
+void RefreshPresenceLines(ChatPanelState & state) {
+	RebuildWrappedLines(state.presenceLines,
+	                    state.presenceEntries,
+	                    state.presenceWrapChars);
+	const int newMax = MaxScrollForLineCount(
+		static_cast<int>(state.presenceLines.size()),
+		kLineHeight,
+		state.chatViewportHeight);
+	if(static_cast<int>(state.presenceScrollPos) > newMax){
+		state.presenceScrollPos = static_cast<Uint16>(newMax);
+	}
+	state.presenceWrapDirty = false;
+}
+
+void RebuildPresenceEntries(ChatPanelState & state, World & world) {
+	state.presenceEntries.clear();
 	state.presenceScrollPos = 0;
 
 	struct Row { Uint8 group; std::string label; };
@@ -98,13 +182,12 @@ void RebuildPresence(ChatPanelState & state, World & world) {
 		if(r.group != lastgroup){
 			const char * header = (r.group == 0) ? "In Lobby"
 			                    : (r.group == 1) ? "Pregame" : "Playing";
-			AddWrappedText(state.presenceLines, header, 0, 128 + 32,
-			               kPresenceMaxChars, 0);
+			PushEntry(state.presenceEntries, header, 0, 128 + 32, 0);
 			lastgroup = r.group;
 		}
-		AddWrappedText(state.presenceLines, r.label.c_str(), 0, 128,
-		               kPresenceMaxChars, 2);
+		PushEntry(state.presenceEntries, r.label, 0, 128, 2);
 	}
+	state.presenceWrapDirty = true;
 }
 
 void CopyUiText(char * dst, int dstLen, const std::string & value)
@@ -118,20 +201,116 @@ void CopyUiText(char * dst, int dstLen, const std::string & value)
 
 }  // namespace chat_panel_detail
 
+ChatPanelLayoutMetrics ResolveChatPanelLayout(Uint16 panelWidth,
+                                              Uint16 panelHeight) {
+	ChatPanelLayoutMetrics metrics;
+	const int contentW = std::max(
+		0,
+		static_cast<int>(panelWidth) - static_cast<int>(chat_panel_detail::kRootPadX) * 2);
+	const int contentH = std::max(
+		0,
+		static_cast<int>(panelHeight)
+			- static_cast<int>(chat_panel_detail::kRootPadTop)
+			- static_cast<int>(chat_panel_detail::kRootPadBottom));
+	const int mainBorderH = std::max(
+		0,
+		contentH
+			- static_cast<int>(chat_panel_detail::kChannelH)
+			- static_cast<int>(chat_panel_detail::kMainGap)
+			- static_cast<int>(chat_panel_detail::kInputBorderH));
+	const int bodyW = std::max(
+		0,
+		contentW
+			- static_cast<int>(chat_panel_detail::kBodyPadLeft)
+			- static_cast<int>(chat_panel_detail::kBodyPadRight));
+	const int bodyH = std::max(
+		0,
+		mainBorderH
+			- static_cast<int>(chat_panel_detail::kBodyPadTop)
+			- static_cast<int>(chat_panel_detail::kBodyPadBottom));
+
+	int presenceW = 0;
+	if(bodyW > static_cast<int>(chat_panel_detail::kBodyGap)
+	            + static_cast<int>(chat_panel_detail::kMinChatWidth)){
+		const int scaledPresence =
+			(bodyW * chat_panel_detail::kPresenceRatioNum
+			 + chat_panel_detail::kPresenceRatioDen / 2)
+			/ chat_panel_detail::kPresenceRatioDen;
+		const int maxPresence = std::max(
+			0,
+			bodyW - static_cast<int>(chat_panel_detail::kBodyGap)
+			      - static_cast<int>(chat_panel_detail::kMinChatWidth));
+		presenceW = std::max<int>(chat_panel_detail::kMinPresenceWidth, scaledPresence);
+		if(presenceW > static_cast<int>(chat_panel_detail::kMaxPresenceWidth)){
+			presenceW = chat_panel_detail::kMaxPresenceWidth;
+		}
+		if(presenceW > maxPresence){
+			presenceW = maxPresence;
+		}
+	}
+	const int bodyGap = presenceW > 0 ? static_cast<int>(chat_panel_detail::kBodyGap) : 0;
+	const int chatW = std::max(0, bodyW - bodyGap - presenceW);
+
+	metrics.mainBorderWidth = static_cast<Uint16>(contentW);
+	metrics.mainBorderHeight = static_cast<Uint16>(mainBorderH);
+	metrics.chatWidth = static_cast<Uint16>(chatW);
+	metrics.chatHeight = static_cast<Uint16>(bodyH);
+	metrics.presenceWidth = static_cast<Uint16>(presenceW);
+	metrics.presenceHeight = static_cast<Uint16>(bodyH);
+	metrics.inputWidth = static_cast<Uint16>(std::max(
+		0,
+		contentW - static_cast<int>(chat_panel_detail::kInputPadX) * 2));
+	metrics.inputHeight = chat_panel_detail::kInputH;
+	metrics.chatWrapChars = static_cast<Uint16>(std::max(
+		1,
+		(std::max(1, chatW - static_cast<int>(chat_panel_detail::kScrollbarReserve)))
+			/ static_cast<int>(chat_panel_detail::kTextAdvance)));
+	metrics.presenceWrapChars = static_cast<Uint16>(std::max(
+		1,
+		std::max(1, presenceW) / static_cast<int>(chat_panel_detail::kTextAdvance)));
+	return metrics;
+}
+
+void ChatPanelSyncLayout(ChatPanelState & state,
+                         Uint16 panelWidth,
+                         Uint16 panelHeight) {
+	const ChatPanelLayoutMetrics metrics =
+		ResolveChatPanelLayout(panelWidth, panelHeight);
+	const bool chatLayoutChanged =
+		state.chatWrapChars != metrics.chatWrapChars
+		|| state.chatViewportHeight != metrics.chatHeight;
+	const bool presenceLayoutChanged =
+		state.presenceWrapChars != metrics.presenceWrapChars;
+
+	state.chatWrapChars = metrics.chatWrapChars;
+	state.presenceWrapChars = metrics.presenceWrapChars;
+	state.chatViewportHeight = metrics.chatHeight;
+
+	if(chatLayoutChanged || state.chatWrapDirty){
+		chat_panel_detail::RefreshChatLines(state);
+	}
+	if(presenceLayoutChanged || state.presenceWrapDirty){
+		chat_panel_detail::RefreshPresenceLines(state);
+	}
+}
+
 void ChatPanelInit(ChatPanelState & state) {
+	state.chatEntries.clear();
+	state.presenceEntries.clear();
 	state.chatLines.clear();
 	state.presenceLines.clear();
 	state.chatScrollPos = 0;
 	state.presenceScrollPos = 0;
+	state.chatWrapChars = 0;
+	state.presenceWrapChars = 0;
+	state.chatViewportHeight = 0;
+	state.chatWrapDirty = true;
+	state.presenceWrapDirty = true;
 	state.channel.clear();
 	state.inputBuffer[0] = '\0';
 }
 
 void ChatPanelTick(ChatPanelState & state, World & world) {
-	// Channel name — legacy ChatPanel::Tick captures the lobby's first
-	// channel name and snapshots it into `lastchannel` so GoBack can
-	// rejoin. Mirror that here so we don't break the GoBack-rejoin path
-	// when the legacy chat panel isn't built.
 	if(world.lobby.channelchanged){
 		if(world.lobby.lastchannel[0] == '\0'){
 			strcpy(world.lobby.lastchannel, world.lobby.channel);
@@ -140,33 +319,42 @@ void ChatPanelTick(ChatPanelState & state, World & world) {
 		world.lobby.channelchanged = false;
 	}
 
-	// Presence — rebuild on change or first pass before gamesprocessed.
 	if(world.lobby.presencechanged || !world.lobby.gamesprocessed){
-		chat_panel_detail::RebuildPresence(state, world);
+		chat_panel_detail::RebuildPresenceEntries(state, world);
+		if(state.presenceWrapChars > 0){
+			chat_panel_detail::RefreshPresenceLines(state);
+		}
 		world.lobby.presencechanged = false;
 	}
 
-	// Chat messages — drain into chatLines. Auto-scroll if we were
-	// already pinned to the bottom. Use the ScrollTextBoxAutoScroll
-	// helper for the canonical "stay pinned to bottom" computation.
+	bool chatChanged = false;
 	while(!world.lobby.chatmessages.empty()){
 		auto message = world.lobby.chatmessages.front();
 		const char * msgtext = message.data();
-		size_t msglen        = strlen(msgtext);
-		Uint8 color          = static_cast<Uint8>(message[msglen + 1]);
-		Uint8 brightness     = static_cast<Uint8>(message[msglen + 2]);
+		size_t msglen = std::strlen(msgtext);
+		Uint8 color = static_cast<Uint8>(message[msglen + 1]);
+		Uint8 brightness = static_cast<Uint8>(message[msglen + 2]);
 
-		const int prevCount = static_cast<int>(state.chatLines.size());
-		chat_panel_detail::AddWrappedText(
-			state.chatLines, msgtext, color, brightness,
-			chat_panel_detail::kChatMaxChars, 2);
-		const int newCount = static_cast<int>(state.chatLines.size());
-
-		state.chatScrollPos = ScrollTextBoxAutoScroll(
-			state.chatScrollPos, prevCount, newCount,
-			chat_panel_detail::kLineHeight, chat_panel_detail::kChatH);
-
+		chat_panel_detail::PushEntry(
+			state.chatEntries,
+			msgtext ? std::string(msgtext) : std::string(),
+			color,
+			brightness,
+			2);
+		state.chatWrapDirty = true;
+		chatChanged = true;
 		world.lobby.chatmessages.pop_front();
+	}
+	if(chatChanged && state.chatWrapChars > 0){
+		const int prevCount = static_cast<int>(state.chatLines.size());
+		chat_panel_detail::RefreshChatLines(state);
+		const int newCount = static_cast<int>(state.chatLines.size());
+		state.chatScrollPos = ScrollTextBoxAutoScroll(
+			state.chatScrollPos,
+			prevCount,
+			newCount,
+			chat_panel_detail::kLineHeight,
+			state.chatViewportHeight);
 	}
 }
 
