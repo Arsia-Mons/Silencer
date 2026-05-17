@@ -77,6 +77,12 @@ public:
 		std::vector<WorldPeerSummary> peerList;
 		std::vector<WorldPlayerSummary> players;
 		int objectsCount = 0;
+		std::string messageText;
+		int messageProgress = 0;
+		int messageType = 0;
+		int messageTime = 0;
+		std::string topMessageText;
+		int topMessageProgress = 0;
 	};
 	WorldSummary GetWorldSummary();
 	const Surface& GetScreenBuffer() const { return screenbuffer; }
@@ -211,10 +217,6 @@ private:
 	RenderDevice * renderdevice;
 	SDL_Color palettecolors[256]; // CPU copy — for ffmpeg replay pixel export
 	Surface screenbuffer;
-	// The game world always renders at the legacy 640x480 and is then
-	// nearest-upscaled into a centered, aspect-correct region of screenbuffer,
-	// so pixel art stays square while the Clay UI composites crisp on top.
-	Surface worldSurface;
 	silencer::client_ui::ClayBridgeFrameBackend uiClayBackend;
 	silencer::ui::ClayService uiClayService;
 	silencer::client_ui::ClientUi clientUi;

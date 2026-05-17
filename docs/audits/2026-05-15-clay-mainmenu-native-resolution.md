@@ -10,18 +10,22 @@ serious resolution-scaling regression)
 
 ## Resolution
 
-The responsive follow-up renders the UI in a compositor-owned virtual
-coordinate space, magnifies it into a centered native-pixel region, and maps
-pointer input through the same pixel-size/offset transform. In-game world
-rendering now uses the same centered uniform scale as the HUD, and window
-resize handling follows `SDL_GetWindowSizeInPixels()` /
+The responsive follow-up renders menu UI in a compositor-owned virtual
+coordinate space, magnifies it into a native-pixel region, and maps pointer
+input through the same pixel-size/offset transform. Window resize handling
+follows `SDL_GetWindowSizeInPixels()` /
 `SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED` for HiDPI drawables.
 
-The legacy `Config::scalefilter` final-present toggle is no longer the
-mechanism that scales the in-game world after the responsive compositor owns a
-native-size paletted frame. The current path intentionally uses nearest
-sampling in the CPU compositor so world pixels, bank fonts, and HUD chrome
-share one square-pixel scale.
+In-game rendering is intentionally back on the `origin/main` presentation
+model: build one 640×480 paletted frame, including Clay HUD/overlays, then let
+the render backend stretch that frame to the swapchain. A short-lived native
+CPU upscale/composite path made fullscreen expensive and, after review
+feedback, centered/aspect-corrected the world instead of filling the screen.
+That path was removed on 2026-05-16.
+
+The legacy `Config::scalefilter` final-present toggle remains the in-game
+scaling mechanism. Menu surfaces can still render at native size because they
+are not the hot gameplay frame path.
 
 ## Original Finding
 
@@ -374,10 +378,10 @@ ODR break was also fixed). Evidence: `2026-05-15-clay-mainmenu-native-resolution
 
 ## Direction taken (user-confirmed)
 
-Hybrid of the two forks: the **game world stays the legacy fixed
-640×480 and is nearest-upscaled** to the native surface (retro
-pixel-art look preserved — Option A for gameplay), while the **Clay UI
-is truly responsive at native resolution** (Option B for UI), with
+Hybrid of the two forks: **menus use responsive Clay at native
+resolution** (Option B for menu UI), while **gameplay stays the legacy
+fixed 640×480 frame and is stretched by the render backend** (Option A
+for gameplay). Menu UI keeps
 bitmap text/chrome integer-magnified (no new font system) and
 background images cover/contain-scaled like CSS `background-size`.
 
@@ -394,9 +398,10 @@ background images cover/contain-scaled like CSS `background-size`.
   absolute-coordinate registrations removed — Clay self-resolves hit
   bounds; `DispatchImage` now cover/contain-fits its element box;
   `PackImageContain` added for discrete graphics like the logo).
-- In-game: world renders at 640×480 (incl. minimap/system insets) and
-  is nearest-upscaled into the native screenbuffer; the HUD lays out in
-  a fixed 640×480 virtual space and composites on top.
+- In-game: world, minimap/system insets, and HUD/overlays render into the
+  single legacy 640×480 screenbuffer; the backend final-present pass stretches
+  that frame to the window, matching `origin/main` and avoiding fullscreen CPU
+  framebuffer work.
 - Pointer input maps into the active virtual space (verified: a
   `click` at 2560×1440 routes via Clay-resolved bounds and transitions
   state).
@@ -409,10 +414,12 @@ background images cover/contain-scaled like CSS `background-size`.
 | Options / Audio / Display | Full-screen, centered, scaled — fixed |
 | Options→Controls | Panel/scrollbar/buttons responsive+scaled (the garbled keybind labels are the **separate pre-existing string-arena bug** from the 2026-05-14 audit — orthogonal, not this fix) |
 | Update dialog | Centered, legible — fixed |
-| In-game (Tutorial) | World fills screen as upscaled pixel-art; HUD composited crisp on top; world not erased |
+| In-game (Tutorial) | World fills screen through backend upscale; HUD overlays remain on the same 640×480 gameplay frame; world not erased |
 
 640×480 (menus and in-game) is byte-faithful to the legacy look
-(`uiScale==1` takes the original direct-render path).
+(`uiScale==1` takes the original direct-render path). Fullscreen gameplay uses
+the same final-present stretch as `origin/main`, including the configured
+nearest/bilinear scale filter.
 
 ## Not done (deliberate, out of scope)
 

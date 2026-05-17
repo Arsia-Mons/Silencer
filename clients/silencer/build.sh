@@ -2,9 +2,11 @@
 # Canonical Silencer client build entry point (macOS/Linux).
 #
 # Mirror of build.ps1: all agents and humans build/configure the client
-# ONLY through this script. It resolves VCPKG_ROOT and serializes
-# against concurrent builds so parallel agents / an IDE can't corrupt
-# the shared CMake cache by configuring at the same time.
+# ONLY through this script. It uses VCPKG_ROOT when provided, otherwise
+# preserves the historical macOS/Linux CMake path that discovers deps from
+# the host system. It also serializes against concurrent builds so parallel
+# agents / an IDE can't corrupt the shared CMake cache by configuring at the
+# same time.
 #
 # Usage:  ./build.sh [win-ninja|win-ninja-release|win-ninja-unity] [--clean]
 #   default preset : win-ninja (Debug)
@@ -12,6 +14,8 @@
 set -euo pipefail
 
 fail() { echo "build.sh: $*" >&2; exit 1; }
+
+command -v cmake >/dev/null 2>&1 || fail "cmake is not on PATH"
 
 preset="win-ninja"
 if [ "${1:-}" ] && [ "${1#-}" = "${1:-}" ]; then preset="$1"; fi
@@ -26,10 +30,14 @@ case "$preset" in
     *) fail "unknown preset '$preset' (use win-ninja | win-ninja-release | win-ninja-unity)" ;;
 esac
 
-# --- VCPKG_ROOT (exported in your shell profile on macOS/Linux) ---
-: "${VCPKG_ROOT:?build.sh: VCPKG_ROOT is not set — export it to your vcpkg checkout}"
-[ -f "$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" ] \
-    || fail "VCPKG_ROOT=$VCPKG_ROOT has no scripts/buildsystems/vcpkg.cmake"
+# --- Optional vcpkg toolchain (macOS/Linux can also use system packages) ---
+toolchain=()
+if [ -n "${VCPKG_ROOT:-}" ]; then
+    vcpkg_toolchain="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+    [ -f "$vcpkg_toolchain" ] \
+        || fail "VCPKG_ROOT=$VCPKG_ROOT has no scripts/buildsystems/vcpkg.cmake"
+    toolchain=(-DCMAKE_TOOLCHAIN_FILE="$vcpkg_toolchain")
+fi
 
 # --- Abort if a build is actively running (idle IDE is fine) ---
 for p in cmake ninja cc1plus clang; do
@@ -66,11 +74,15 @@ fi
 gen=()
 command -v ninja >/dev/null 2>&1 && gen=(-G Ninja)
 
-echo "build.sh: VCPKG_ROOT = $VCPKG_ROOT"
 echo "build.sh: $preset -> $bdir"
+if [ "${#toolchain[@]}" -gt 0 ]; then
+    echo "build.sh: using vcpkg toolchain from VCPKG_ROOT=$VCPKG_ROOT"
+else
+    echo "build.sh: VCPKG_ROOT not set; using system CMake/package discovery"
+fi
 cmake -S "$script_dir" -B "$bdir" "${gen[@]}" \
     -DCMAKE_BUILD_TYPE="$btype" \
     -DSILENCER_UNITY_BUILD="$unity" \
-    -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
-cmake --build "$bdir"
+    ${toolchain+"${toolchain[@]}"}
+cmake --build "$bdir" --parallel
 echo "build.sh: OK ($preset)"

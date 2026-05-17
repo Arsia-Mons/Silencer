@@ -58,7 +58,7 @@ using namespace GameState;
 #define SILENCER_MAP_API_URL "http://127.0.0.1:8080"
 #endif
 
-Game::Game() : renderer(world), screenbuffer(640, 480), worldSurface(640, 480),
+Game::Game() : renderer(world), screenbuffer(640, 480),
                uiClayService(uiClayBackend),
                clientUi(uiClayService),
                inGameUiController(world),
@@ -357,9 +357,12 @@ bool Game::SetupRenderDevice(void){
 	return true;
 }
 
+static const int kLegacyRenderWidth = 640;
+static const int kLegacyRenderHeight = 480;
+
 static int UiScaleForSurface(int width, int height) {
-	int scaleX = width / 640;
-	int scaleY = height / 480;
+	int scaleX = width / kLegacyRenderWidth;
+	int scaleY = height / kLegacyRenderHeight;
 	int uiScale = scaleX < scaleY ? scaleX : scaleY;
 	return uiScale > 0 ? uiScale : 1;
 }
@@ -373,52 +376,17 @@ static void CenteredLayoutOffset(int surfaceW, int surfaceH,
 	offsetY = scaledH < surfaceH ? (surfaceH - scaledH) / 2 : 0;
 }
 
-// Nearest-neighbour copy of the fixed-size world surface into a centered,
-// aspect-correct region of the native screenbuffer. Full overwrite — the
-// world is the bottom layer; the Clay UI composites on top afterwards.
-// Integer upscales keep pixels square; sub-640x480 windows fall back to a
-// uniform nearest fit because no positive integer scale can fit.
-static void NearestUpscaleFill(const Surface & src, Surface & dst){
-	if(dst.w <= 0 || dst.h <= 0) return;
-	dst.Clear(0);
-	if(src.w <= 0 || src.h <= 0) return;
-	int scale = UiScaleForSurface(dst.w, dst.h);
-	int drawW = src.w * scale;
-	int drawH = src.h * scale;
-	if(drawW > dst.w || drawH > dst.h){
-		float sx = static_cast<float>(dst.w) / static_cast<float>(src.w);
-		float sy = static_cast<float>(dst.h) / static_cast<float>(src.h);
-		float fit = sx < sy ? sx : sy;
-		if(fit <= 0.0f) return;
-		drawW = static_cast<int>(static_cast<float>(src.w) * fit);
-		drawH = static_cast<int>(static_cast<float>(src.h) * fit);
-		if(drawW < 1) drawW = 1;
-		if(drawH < 1) drawH = 1;
-	}
-	int offsetX = (dst.w - drawW) / 2;
-	int offsetY = (dst.h - drawH) / 2;
-	const Uint8 * sp = src.pixels.data();
-	Uint8 * dp = dst.pixels.data();
-	for(int dy = 0; dy < drawH; dy++){
-		int sy = dy * src.h / drawH;
-		if(sy >= src.h) sy = src.h - 1;
-		const Uint8 * srow = sp + sy * src.w;
-		Uint8 * drow = dp + (offsetY + dy) * dst.w + offsetX;
-		for(int dx = 0; dx < drawW; dx++){
-			int sx = dx * src.w / drawW;
-			if(sx >= src.w) sx = src.w - 1;
-			drow[dx] = srow[sx];
-		}
-	}
-}
-
 bool Game::ResizeRenderSurfacePixels(int width, int height){
 	if(width < 1 || height < 1) return false;
+	if(screenbuffer.w == width && screenbuffer.h == height) return true;
 	screenbuffer.Resize(width, height, 0);
 	return true;
 }
 
 bool Game::SyncRenderSurfaceToWindowPixels(){
+	if(world.map.loaded){
+		return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+	}
 	if(!window) return false;
 	int width = 0;
 	int height = 0;
@@ -432,7 +400,13 @@ bool Game::ResizeRenderSurface(int width, int height){
 	if(width < 1 || height < 1) return false;
 	if(window){
 		SDL_SetWindowSize(window, width, height);
+		if(world.map.loaded){
+			return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+		}
 		return SyncRenderSurfaceToWindowPixels();
+	}
+	if(world.map.loaded){
+		return ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
 	}
 	return ResizeRenderSurfacePixels(width, height);
 }
@@ -451,11 +425,11 @@ void Game::PrepareClientUiFrame(Surface& surface) {
 	int virtualW;
 	int virtualH;
 	if(world.map.loaded){
-		// In-game: the HUD/overlays are authored against a fixed 640x480
-		// space and scale up as one crisp pixel-art layer composited over
-		// the (separately upscaled) world.
-		virtualW = 640;
-		virtualH = 480;
+		// In-game: the whole frame is authored at the legacy 640x480 size.
+		// The render backend stretches that final frame to the swapchain,
+		// preserving origin/main's presentation behavior and frame cost.
+		virtualW = kLegacyRenderWidth;
+		virtualH = kLegacyRenderHeight;
 	}else{
 		// Menus reflow responsively — Clay lays out at the native surface
 		// size divided by uiScale.
@@ -865,15 +839,15 @@ bool Game::Loop(void){
 		world.DoNetwork();
 		float ft = 1 - (float(tickcheck - lasttick) / wait);
 		if(world.map.loaded){
-			// In-game: the world (incl. minimap/system-camera insets)
-			// renders at the legacy fixed size, then is nearest-upscaled
-			// into the same centered integer-scale region used by the Clay
-			// HUD in RenderClientUiFrame.
-			worldSurface.Clear(0);
-			renderer.Draw(&worldSurface, ft);
-			DrawInGameWorldInsets(worldSurface, ft);
-			NearestUpscaleFill(worldSurface, screenbuffer);
+			// origin/main rendered one 640x480 paletted frame and let the GPU
+			// present pass stretch it to the window. Keep that path for
+			// gameplay; native-sized CPU frames are too expensive fullscreen.
+			ResizeRenderSurfacePixels(kLegacyRenderWidth, kLegacyRenderHeight);
+			screenbuffer.Clear(0);
+			renderer.Draw(&screenbuffer, ft);
+			DrawInGameWorldInsets(screenbuffer, ft);
 		}else{
+			if(window) SyncRenderSurfaceToWindowPixels();
 			screenbuffer.Clear(0);
 			renderer.Draw(&screenbuffer, ft);
 		}
@@ -1321,6 +1295,12 @@ Game::WorldSummary Game::GetWorldSummary(){
 	summary.isLocalObserver = world.IsLocalObserver();
 	summary.spectatorInitialized = world.spectator.initialized;
 	summary.spectatorFreecam = world.spectator.freecam;
+	summary.messageText = world.GetMessageText();
+	summary.messageProgress = static_cast<int>(world.GetMessageProgress());
+	summary.messageType = static_cast<int>(world.GetMessageType());
+	summary.messageTime = static_cast<int>(world.GetMessageTime());
+	summary.topMessageText = world.GetTopMessageText();
+	summary.topMessageProgress = static_cast<int>(world.GetTopMessageProgress());
 	for(unsigned int i = 0; i < world.maxpeers; i++){
 		Peer * p = world.peerlist[i];
 		if(!p) continue;

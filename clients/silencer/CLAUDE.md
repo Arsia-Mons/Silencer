@@ -16,14 +16,17 @@ Build/configure the client **only** through the wrapper — never invoke
 Default preset is `win-ninja` (Debug → `build/`). Pass `-Clean`
 (`--clean` on `.sh`) to wipe the CMake cache (keeps `vcpkg_installed`)
 — the correct recovery from a poisoned cache; do not hand-roll
-`rm`/reconfigure loops. The wrapper pins the newest installed Visual
-Studio via `vswhere`, resolves `VCPKG_ROOT` (process env → persisted
-User env → hard error), and takes a build lock so CLion, CLI agents,
-and parallel agents can't corrupt the shared CMake cache by
-configuring concurrently. Idle CLion is fine; just don't run an IDE
-build at the same time as a wrapper build into the same dir — CLion
-may keep its `win-ninja` preset profile (same toolchain). Lobby
-host/version are compile-time `-D` knobs (see *Gotchas*).
+`rm`/reconfigure loops. The Windows wrapper pins the newest installed
+Visual Studio via `vswhere` and resolves `VCPKG_ROOT` (process env →
+persisted User env → hard error). The macOS/Linux wrapper uses
+`VCPKG_ROOT` when it is exported and valid; otherwise it follows the
+historical CMake path and lets CMake/pkg-config find system packages
+(Homebrew/apt). Both wrappers take a build lock so CLion, CLI agents,
+and parallel agents can't corrupt the shared CMake cache by configuring
+concurrently. Idle CLion is fine; just don't run an IDE build at the
+same time as a wrapper build into the same dir — CLion may keep its
+`win-ninja` preset profile (same toolchain). Lobby host/version are
+compile-time `-D` knobs (see *Gotchas*).
 
 Source under `src/` is organized by concern (`game/`, `render/`,
 `client/ui/`, `ui/`, etc.); keep new files in the owning concern
