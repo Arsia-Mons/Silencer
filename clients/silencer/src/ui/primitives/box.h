@@ -53,18 +53,6 @@ constexpr Uint8 Left   = 1 << 3;
 constexpr Uint8 All    = Top | Right | Bottom | Left;
 }  // namespace BoxSides
 
-// Corner ownership for the halo/stroke stack where a horizontal and
-// vertical side meet. `Auto` keeps the classic stepped rectangular
-// corner. `Horizontal` gives the full corner stack to the horizontal
-// run; `Vertical` gives it to the vertical run. This is only needed for
-// multi-Box compositions whose shared topology is not a closed
-// rectangle (for example the lobby's stepped right pane).
-enum class BoxCornerMode : Uint8 {
-	Auto       = 0,
-	Horizontal = 1,
-	Vertical   = 2,
-};
-
 // Stroke style for a Box. Use one of the `BoxVariants` named constants
 // for design-system identity; construct directly only for one-off
 // scenes (tests, demos) where no variant fits. For compositions that
@@ -95,10 +83,6 @@ struct BoxStrokeStyle {
 	Uint8 innerHaloWidth   = 0;
 	Uint8 haloOpacity      = 255;
 	Uint8 sides            = BoxSides::All;
-	BoxCornerMode topLeftCorner     = BoxCornerMode::Auto;
-	BoxCornerMode topRightCorner    = BoxCornerMode::Auto;
-	BoxCornerMode bottomRightCorner = BoxCornerMode::Auto;
-	BoxCornerMode bottomLeftCorner  = BoxCornerMode::Auto;
 };
 
 namespace BoxVariants {
