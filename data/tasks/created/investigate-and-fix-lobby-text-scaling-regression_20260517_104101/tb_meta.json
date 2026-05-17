@@ -1,0 +1,28 @@
+{
+  "task_id": "investigate-and-fix-lobby-text-scaling-regression_20260517_104101",
+  "metadata": {
+    "title": "Investigate and fix lobby text scaling regression",
+    "tags": [
+      "client",
+      "ui",
+      "bugfix",
+      "verified"
+    ]
+  },
+  "repo": {
+    "git_url": "git@github.com:Arsia-Mons/Silencer.git",
+    "branch": "hv/clay-ui-migration",
+    "start_commit_sha": "36e13a48952499c8acec73f55d7fa0a5003e815b",
+    "end_commit_sha": "c6e6d22452b90f44efafa5bee2709e1c6f49c06a",
+    "subdir": "",
+    "sparse_checkout": []
+  },
+  "lm": {
+    "instructions": ""
+  },
+  "evaluation": {
+    "content_rubric": [],
+    "location_rubric": [],
+    "clarity_rubric": []
+  }
+}
