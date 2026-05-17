@@ -4,9 +4,10 @@
 // Screen-agnostic Clay primitive for paletted text input fields.
 //
 // The outer Clay element owns the clickable field bounds. The rendered text is
-// an inner custom element inset by `contentInsetX` / `contentInsetY`. When the
-// value exceeds the field width, the primitive automatically shows the tail so
-// the caret stays visible and older content is hidden on the left.
+// an inner custom element inset horizontally by `contentInsetX`, vertically
+// centered inside the field, and automatically tailed when the value exceeds
+// the field width so the caret stays visible and older content is hidden on
+// the left.
 //
 // The primitive owns no state and references no lobby/world/Config:
 //
@@ -48,7 +49,6 @@ struct TextInputOpts {
 	Uint8  caretColor  = 140;   // legacy default.
 	bool   showCaret   = false; // caller pre-resolves blink AND focus.
 	Uint16 contentInsetX = 0;   // left inset from clickable field to text.
-	Uint16 contentInsetY = 0;   // top inset from clickable field to text.
 };
 
 struct TextInputHandle {

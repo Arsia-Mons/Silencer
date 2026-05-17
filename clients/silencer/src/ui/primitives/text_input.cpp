@@ -139,11 +139,10 @@ void TextInput(Clay_String id,
 	const float w = static_cast<float>(opts.widthPx);
 	const float h = static_cast<float>(opts.heightPx);
 	const uint16_t contentInsetX = std::min(opts.contentInsetX, opts.widthPx);
-	const uint16_t contentInsetY = std::min(opts.contentInsetY, opts.heightPx);
 	CLAY({ .id = CLAY_SID(id),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(w), CLAY_SIZING_FIXED(h) },
-	           .padding = { contentInsetX, 0, contentInsetY, 0 },
+	           .padding = { contentInsetX, 0, 0, 0 },
 	           .childGap = 0,
 	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP },
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
@@ -153,7 +152,9 @@ void TextInput(Clay_String id,
 		RegisterTextInputWidget(id, src, opts, handle);
 		const float textW = static_cast<float>(
 			std::max(1, static_cast<int>(opts.widthPx) - static_cast<int>(contentInsetX)));
-		const float textH = static_cast<float>(style.lineHeight);
+		const float textH = static_cast<float>(std::max(
+			1,
+			static_cast<int>(opts.heightPx)));
 		CLAY({ .id = CLAY_SIDI(id, 1),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(textW), CLAY_SIZING_FIXED(textH) },

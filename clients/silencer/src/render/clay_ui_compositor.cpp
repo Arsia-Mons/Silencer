@@ -63,6 +63,9 @@ struct TextInkMetrics {
 	int minX = 0;
 	int maxX = 0;
 	int width = 0;
+	int minY = 0;
+	int maxY = 0;
+	int height = 0;
 };
 
 TextInkMetrics MeasureInkBounds(const Resources * resources,
@@ -98,11 +101,15 @@ TextInkMetrics MeasureInkBounds(const Resources * resources,
 		}
 		int glyphMinX = glyph->w;
 		int glyphMaxX = -1;
+		int glyphMinY = glyph->h;
+		int glyphMaxY = -1;
 		for(int y = 0; y < glyph->h; ++y){
 			for(int x = 0; x < glyph->w; ++x){
 				if(Renderer::GetPixel(glyph, x, y) == 0) continue;
 				if(x < glyphMinX) glyphMinX = x;
 				if(x > glyphMaxX) glyphMaxX = x;
+				if(y < glyphMinY) glyphMinY = y;
+				if(y > glyphMaxY) glyphMaxY = y;
 			}
 		}
 		if(glyphMaxX >= glyphMinX){
@@ -110,12 +117,15 @@ TextInkMetrics MeasureInkBounds(const Resources * resources,
 			int inkMax = pen + glyphMaxX + 1;
 			if(!out.hasInk || inkMin < out.minX) out.minX = inkMin;
 			if(!out.hasInk || inkMax > out.maxX) out.maxX = inkMax;
+			if(!out.hasInk || glyphMinY < out.minY) out.minY = glyphMinY;
+			if(!out.hasInk || glyphMaxY + 1 > out.maxY) out.maxY = glyphMaxY + 1;
 			out.hasInk = true;
 		}
 		pen += advance;
 	}
 	if(out.hasInk){
 		out.width = out.maxX - out.minX;
+		out.height = out.maxY - out.minY;
 	}
 	return out;
 }
@@ -997,8 +1007,18 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 							static_cast<silencer::ui::primitives::TextSize>(p->textSize));
 						int x = static_cast<int>(c->boundingBox.x);
 						int y = static_cast<int>(c->boundingBox.y);
-						// DrawText at (x, y), then caret bar at
-						// (x + textLen*advance, y - 1) if showCaret.
+						int boxH = static_cast<int>(c->boundingBox.height);
+						TextInkMetrics ink = MeasureInkBounds(
+							g_textMeasureResources,
+							p->text,
+							static_cast<int32_t>(p->textLen),
+							style.bank,
+							style.advance);
+						if(ink.hasInk && ink.height > 0){
+							y += std::max(0, (boxH - ink.height) / 2) - ink.minY;
+						}else{
+							y += std::max(0, (boxH - static_cast<int>(style.lineHeight)) / 2);
+						}
 						renderer.DrawText(dst,
 						                  static_cast<Uint16>(x),
 						                  static_cast<Uint16>(y),
