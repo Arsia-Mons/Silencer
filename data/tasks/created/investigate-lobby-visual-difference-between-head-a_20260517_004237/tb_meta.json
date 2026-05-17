@@ -1,0 +1,27 @@
+{
+  "task_id": "investigate-lobby-visual-difference-between-head-a_20260517_004237",
+  "metadata": {
+    "title": "Investigate lobby visual difference between HEAD and origin/main",
+    "tags": [
+      "investigation",
+      "no-code-change",
+      "clients/silencer"
+    ]
+  },
+  "repo": {
+    "git_url": "git@github.com:Arsia-Mons/Silencer.git",
+    "branch": "hv/clay-ui-migration",
+    "start_commit_sha": "4d90842fd6af7db33e84a30f367a81489c618c24",
+    "end_commit_sha": "caae38dc84839585630967d620556d98bf18c469",
+    "subdir": "",
+    "sparse_checkout": []
+  },
+  "lm": {
+    "instructions": ""
+  },
+  "evaluation": {
+    "content_rubric": [],
+    "location_rubric": [],
+    "clarity_rubric": []
+  }
+}
