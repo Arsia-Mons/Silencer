@@ -264,18 +264,6 @@ void Guard::InitBT(){
 			} else {
 				state = WALKING;
 			}
-			Platform* ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
-			if(ladder){
-				Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-				if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
-					if(ladder->y2 == obj->y && y != obj->y && ladder->y2 > y){
-						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = _gls ? _gls->ladderClimbSpeed : 5; state = LADDER; state_i = 0; }
-					}
-					if(ladder->y1 == obj->y && y != obj->y && ladder->y1 < y){
-						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = -(_gls ? _gls->ladderClimbSpeed : 5); state = LADDER; state_i = 0; }
-					}
-				}
-			}
 		}
 		return BTResult::Running;
 	};
@@ -342,27 +330,6 @@ void Guard::InitBT(){
 							return BTResult::Running;
 						}
 					}
-					// Climb ladder toward target if on a meaningfully different level
-					int ydiff = signed(obj->y) - signed(y);
-					{ const EnemyDef* _gg = GASLoader::Get().GetEnemyDef("guard-blaster");
-					if(abs(ydiff) > (_gg?_gg->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
-						Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
-						if(ladder && state == WALKING){
-							Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-							if(abs(signed(center) - signed(x)) <= (_gg?_gg->ladderXTolerance:8)){
-								if(ydiff < 0 && signed(ladder->y1) < signed(y)){
-									// player above, ladder goes up
-									x = center; yv = -(_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
-									{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
-								} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
-									// player below, ladder goes down
-									x = center; yv = (_gg ? _gg->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
-									{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
-								}
-							}
-						}
-					}
-					} // _gg scope
 				} else {
 					chasing = 0; // target gone or dead
 				}
@@ -392,23 +359,6 @@ void Guard::InitBT(){
 				state_i = -1;
 				mirrored = originalmirrored;
 				return BTResult::Success;
-			}
-			// Climb ladders back to original level
-			int ydiff = signed(originaly) - signed(y);
-			if(abs(ydiff) > (_ggr?_ggr->ladderYThreshold:48) && bt_ladder_cooldown_ == 0){
-				Platform* ladder = world.map.TestAABB(x - 8, y, x + 8, y, Platform::LADDER);
-				if(ladder && state == WALKING){
-					Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
-					if(abs(signed(center) - signed(x)) <= (_ggr?_ggr->ladderXTolerance:8)){
-						if(ydiff < 0 && signed(ladder->y1) < signed(y)){
-							x = center; yv = -(_ggr ? _ggr->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
-							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
-						} else if(ydiff > 0 && signed(ladder->y2) > signed(y)){
-							x = center; yv = (_ggr ? _ggr->ladderClimbSpeed : 5); state = LADDER; state_i = 0;
-							{ const EnemyDef* gd = GASLoader::Get().GetEnemyDef("guard-blaster"); bt_ladder_cooldown_ = gd ? gd->ladderCooldown : 120; }
-						}
-					}
-				}
 			}
 		}
 		} // _ggr scope

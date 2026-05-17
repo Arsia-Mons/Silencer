@@ -21,6 +21,8 @@
         "seq_close_shot",
         "sel_combat",
         "leaf_uncrouch",
+        "leaf_climbladder_target",
+        "seq_climbladder_origin",
         "leaf_chase",
         "leaf_searchreturn",
         "seq_patrol",
@@ -86,8 +88,12 @@
     "leaf_look4": { "type": "Leaf", "label": "Look(4) up-angle",   "children": [], "props": { "action": "Look4" } },
     "leaf_look5": { "type": "Leaf", "label": "Look(5) down-angle", "children": [], "props": { "action": "Look5" } },
 
-    "leaf_uncrouch":     { "type": "Leaf", "label": "Uncrouch if idle",      "children": [], "props": { "action": "UncrouchIdle"   } },
-    "leaf_chase":        { "type": "Leaf", "label": "Chase target (patrol)", "children": [], "props": { "action": "Chase"           } },
+    "leaf_uncrouch":          { "type": "Leaf",      "label": "Uncrouch if idle",              "children": [], "props": { "action": "UncrouchIdle" } },
+    "leaf_climbladder_target":{ "type": "Leaf",      "label": "Climb ladder → target",         "children": [], "props": { "action": "ClimbLadder", "direction": "toward_target" } },
+    "seq_climbladder_origin": { "type": "Sequence",  "label": "Climb ladder → origin (no target)", "children": ["cond_no_target", "leaf_climbladder_origin"], "props": {} },
+    "cond_no_target":         { "type": "Condition", "label": "has_target == false?",           "children": [], "props": { "key": "has_target", "op": "==", "value": false } },
+    "leaf_climbladder_origin":{ "type": "Leaf",      "label": "Climb ladder → origin",         "children": [], "props": { "action": "ClimbLadder", "direction": "toward_origin" } },
+    "leaf_chase":             { "type": "Leaf",      "label": "Chase target (patrol)",          "children": [], "props": { "action": "Chase" } },
     "leaf_searchreturn": { "type": "Leaf", "label": "Search then return",    "children": [], "props": { "action": "SearchAndReturn" } },
 
     "seq_patrol": {
