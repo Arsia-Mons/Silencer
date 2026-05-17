@@ -112,7 +112,7 @@
       "children": [],
       "props": {
         "action": "DeathFade",
-        "duration": 10
+        "duration": 120
       }
     },
     "seq_flee": {

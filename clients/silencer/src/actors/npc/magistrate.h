@@ -36,9 +36,12 @@ private:
 	const BehaviorTree* bt_;
 	BTContext            btctx_;
 
-	bool spawnSoundFired_  = false;
-	bool deathSoundFired_  = false;
-	bool deathActorsFired_ = false;
+	bool spawnSoundFired_   = false;
+	bool deathSoundFired_   = false;
+	bool deathActorsFired_  = false;
+	bool prevDraw_          = false; // track draw transition for client-side spawn sound
+	bool healthAlive_       = false; // true once we've seen health > 0, for death sound fallback
+	bool hitwall_           = false; // set by WALKING physics when FollowGround fails
 };
 
 #endif

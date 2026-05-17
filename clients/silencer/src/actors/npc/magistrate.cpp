@@ -80,12 +80,12 @@ void Magistrate::InitBT(){
 	};
 
 	// ── Movement ──────────────────────────────────────────────────────────────
-	// Walk in current facing direction. Returns Running while clear, Failure at wall.
+	// Walk in current facing direction. Returns Running while clear, Failure on actual wall collision.
+	// hitwall_ is set to true by the WALKING physics case when FollowGround can't advance.
 	btctx_.actions["Walk"] = [this](BTContext& ctx) -> BTResult {
-		World& world = *static_cast<World*>(ctx.userData);
-		if(state != WALKING){ state = WALKING; state_i = 0; }
-		if(DistanceToEnd(*this, world) <= world.minwalldistance)
-			return BTResult::Failure;
+		(void)ctx;
+		if(state != WALKING){ state = WALKING; state_i = 0; hitwall_ = false; }
+		if(hitwall_){ hitwall_ = false; return BTResult::Failure; }
 		return BTResult::Running;
 	};
 
@@ -304,6 +304,26 @@ void Magistrate::Tick(World & world){
 		return;
 	}
 
+	// Client-side sound fallbacks — detect state transitions via serialized fields.
+	// Spawn sound: draw false→true means Magistrate just became active.
+	if(!spawnSoundFired_ && draw && !prevDraw_){
+		spawnSoundFired_ = true;
+		const EnemyDef* md = GASLoader::Get().GetEnemyDef("magistrate");
+		std::string snd = md ? md->soundActivate : std::string{};
+		if(!snd.empty())
+			EmitGlobalSound(world, world.resources.soundbank[snd], 128);
+	}
+	prevDraw_ = draw;
+	// Death sound: health drops from >0 to 0 (reliable even across 60-tick snapshots).
+	if(health > 0) healthAlive_ = true;
+	if(!deathSoundFired_ && healthAlive_ && health == 0){
+		deathSoundFired_ = true;
+		const EnemyDef* md = GASLoader::Get().GetEnemyDef("magistrate");
+		std::string snd = md ? md->soundDeath : std::string{};
+		if(!snd.empty())
+			EmitGlobalSound(world, world.resources.soundbank[snd], 128);
+	}
+
 	// Init BT once (runs for DORMANT, STANDING, WALKING, DYING)
 	if(!bt_) InitBT();
 
@@ -330,7 +350,7 @@ void Magistrate::Tick(World & world){
 			xv        = mirrored ? -(Sint8)speed : (Sint8)speed;
 			res_bank  = 207;
 			res_index = state_i % 21;
-			FollowGround(*this, world, xv);
+			if(!FollowGround(*this, world, xv)) hitwall_ = true;
 			{
 				auto it = world.resources.actordefs.find("magistrate");
 				if(it != world.resources.actordefs.end()){
