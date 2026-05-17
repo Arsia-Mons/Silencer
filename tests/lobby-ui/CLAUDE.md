@@ -7,18 +7,18 @@ runner only executes `tests/cli-agent/e2e/[0-9]*_*.sh`.
 Prerequisites:
 
 ```
-cmake --build build --target silencer
+clients/silencer/build.sh win-ninja
 cmake --build tools/pixdiff/build
-cd services/lobby && go build
+(cd services/lobby && go build)
 ```
 
 Run individual harnesses from this directory, for example:
 
 ```
-tests/lobby-ui/game_create_panel_test/run.sh
+tests/lobby-ui/lobby_stepped_pane_test/run.sh
 tests/lobby-ui/text_input_test/run.sh
 ```
 
-The panel harnesses write fresh `legacy.png` / `screenshot.png` captures into
-their own directories. Treat those as generated output and do not commit them
-unless a script explicitly documents the file as a stable reference baseline.
+The stepped-pane harness writes a fresh `screenshot.png` beside its committed
+`reference.png`. Treat `screenshot.png` as generated output and only update
+`reference.png` intentionally via the script's documented `REGEN=1` flow.

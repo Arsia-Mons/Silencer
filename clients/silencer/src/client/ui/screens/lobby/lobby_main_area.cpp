@@ -23,6 +23,8 @@ namespace silencer::client_ui::lobby {
 namespace lobby_main_area_detail {
 
 using silencer::ui::primitives::Box;
+using silencer::ui::primitives::BoxStrokeStyle;
+namespace BoxSides = silencer::ui::primitives::BoxSides;
 namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 
 constexpr int kLegacyBodyW = 620;
@@ -56,6 +58,24 @@ int RoundRatio(int actual,
 	if(denominator <= 0) return 0;
 	return static_cast<int>(
 		(static_cast<long long>(actual) * numerator + denominator / 2) / denominator);
+}
+
+BoxStrokeStyle OpenRightChrome() {
+	BoxStrokeStyle style = BoxVariants::Chrome;
+	style.sides = static_cast<Uint8>(BoxSides::Top | BoxSides::Bottom | BoxSides::Left);
+	return style;
+}
+
+BoxStrokeStyle OpenLeftChrome() {
+	BoxStrokeStyle style = BoxVariants::Chrome;
+	style.sides = static_cast<Uint8>(BoxSides::Top | BoxSides::Bottom | BoxSides::Right);
+	return style;
+}
+
+BoxStrokeStyle RightEdgeChrome() {
+	BoxStrokeStyle style = BoxVariants::Chrome;
+	style.sides = BoxSides::Right;
+	return style;
 }
 
 struct LobbySteppedPaneLayout {
@@ -206,7 +226,7 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 					BuildCharacterPanelTree(panels.character, world, resources, interactions);
 				}
 
-				CLAY(Box(BoxVariants::Chrome, {
+				CLAY(Box(OpenRightChrome(), {
 				         .id = CLAY_ID("LobbyRightUpperBox"),
 				         .layout = {
 				             .sizing = { CLAY_SIZING_FIXED((float)layout.rightUpperW),
@@ -223,9 +243,9 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				CLAY({ .id = CLAY_ID("LobbyElbowGapRow"),
 				       .layout = {
 				           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_FIXED((float)layout.regionGap) },
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			       },
+				                       CLAY_SIZING_FIXED((float)layout.regionGap) },
+				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+				       },
 				    }) {
 					CLAY({ .id = CLAY_ID("LobbyElbowGapFill"),
 					       .layout = {
@@ -234,13 +254,13 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 					       },
 					    }) {
 					}
-					CLAY({ .id = CLAY_ID("LobbyElbowGapSpacer"),
-					       .layout = {
-					           .sizing = { CLAY_SIZING_FIXED((float)layout.regionGap),
-					                       CLAY_SIZING_GROW(0) },
-					       },
-					    }) {
-					}
+					CLAY(Box(RightEdgeChrome(), {
+					         .id = CLAY_ID("LobbyElbowGapSeam"),
+					         .layout = {
+					             .sizing = { CLAY_SIZING_FIXED((float)layout.regionGap),
+					                         CLAY_SIZING_GROW(0) },
+					         },
+					     })) {}
 				}
 
 			CLAY({ .id = CLAY_ID("LobbyLowerRow"),
@@ -267,26 +287,26 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 					                   static_cast<Uint16>(std::max(0, layout.chatH)),
 					                   interactions);
 				}
-					CLAY({ .id = CLAY_ID("LobbyChatTallGap"),
-					       .layout = {
-					           .sizing = { CLAY_SIZING_FIXED((float)layout.regionGap),
-					                       CLAY_SIZING_GROW(0) },
-					       },
-					    }) {
-					}
+				CLAY(Box(RightEdgeChrome(), {
+				         .id = CLAY_ID("LobbyChatTallSeam"),
+				         .layout = {
+				             .sizing = { CLAY_SIZING_FIXED((float)layout.regionGap),
+				                         CLAY_SIZING_GROW(0) },
+				         },
+				     })) {}
 				}
 			}
 
-			CLAY(Box(BoxVariants::Chrome, {
+			CLAY(Box(OpenLeftChrome(), {
 			         .id = CLAY_ID("LobbyRightTallBox"),
 			         .layout = {
 			             .sizing = { CLAY_SIZING_FIXED((float)layout.rightTallW),
-		                         CLAY_SIZING_GROW(0) },
-		             .layoutDirection = CLAY_TOP_TO_BOTTOM,
-		         },
-		         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
-		         .clip = { .horizontal = true, .vertical = true },
-		     })) {
+			                         CLAY_SIZING_GROW(0) },
+			             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+			         },
+			         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
+			         .clip = { .horizontal = true, .vertical = true },
+			     })) {
 			BuildRightTallContents(panels, ctx, owner, layout, interactions);
 		}
 	}

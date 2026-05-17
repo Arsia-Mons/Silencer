@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Captures the seven lobby Clay baselines by driving headless Silencer through
-# the CLI. Outputs into the script's directory.
+# Captures the remaining legacy-parity lobby baselines by driving headless
+# Silencer through the CLI. Outputs into the script's directory.
 #
 # Requires:
 #   - clients/silencer/build/Silencer.app (or platform equivalent)
@@ -122,32 +122,12 @@ wait_for_widget "Create Game"
 # Let the lobby pump a few frames so panel content stabilizes.
 cli --port "$CTRL_PORT" wait_frames --n 30 >/dev/null
 
-# Default lobby right-pane is GameSelect. The full-frame screenshot
-# covers title chrome + character + chat + gameselect at once; each
-# panel-specific baseline crops the same source frame at a known
-# region (panel coordinates are immutable across builds).
+# The full-frame screenshot covers the title chrome and character panel at once.
 cli --port "$CTRL_PORT" screenshot --out "$OUT_DIR/title_chrome.png" >/dev/null
 cp "$OUT_DIR/title_chrome.png" "$OUT_DIR/character.png"
-cp "$OUT_DIR/title_chrome.png" "$OUT_DIR/chat.png"
-cp "$OUT_DIR/title_chrome.png" "$OUT_DIR/gameselect.png"
-
-# Show GameCreatePanel.
-cli --port "$CTRL_PORT" lobby_show_panel --panel create >/dev/null
-cli --port "$CTRL_PORT" wait_frames --n 10 >/dev/null
-cli --port "$CTRL_PORT" screenshot --out "$OUT_DIR/gamecreate.png" >/dev/null
-
-# Show GameJoinPanel.
-cli --port "$CTRL_PORT" lobby_show_panel --panel join >/dev/null
-cli --port "$CTRL_PORT" wait_frames --n 10 >/dev/null
-cli --port "$CTRL_PORT" screenshot --out "$OUT_DIR/gamejoin.png" >/dev/null
-
-# Show GameTechPanel.
-cli --port "$CTRL_PORT" lobby_show_panel --panel tech >/dev/null
-cli --port "$CTRL_PORT" wait_frames --n 15 >/dev/null
-cli --port "$CTRL_PORT" screenshot --out "$OUT_DIR/gametech.png" >/dev/null
 
 echo "captured baselines:"
-for f in title_chrome character chat gameselect gamecreate gamejoin gametech; do
+for f in title_chrome character; do
   if [ -s "$OUT_DIR/$f.png" ]; then
     size=$(stat -f '%z' "$OUT_DIR/$f.png" 2>/dev/null || stat -c '%s' "$OUT_DIR/$f.png")
     echo "  $f.png ($size bytes)"
