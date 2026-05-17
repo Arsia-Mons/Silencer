@@ -28,9 +28,9 @@ void * g_arenaMemory = nullptr;
 int g_lastW = -1;
 int g_lastH = -1;
 
-// Integer magnification for bitmap glyph/sprite/chrome draws. 1 == native
+// Magnification for bitmap glyph/sprite/chrome draws. 1 == native
 // (no magnification). Updated via SetUiScale() before each Render().
-int g_uiScale = 1;
+float g_uiScale = 1.0f;
 
 const Resources * g_textMeasureResources = nullptr;
 
@@ -355,8 +355,8 @@ void DispatchImage(::Resources & resources,
 	// Fit the sprite into its element box like CSS background-size. cover:
 	// scale to fill, preserve aspect, crop overflow. contain: scale to fit
 	// inside, preserve aspect, letterbox. stretch: fill both axes and allow
-	// aspect distortion. Nearest sampling keeps pixel art crisp (the magnify
-	// pass upstream applies the integer uiScale on top).
+	// aspect distortion. Nearest sampling keeps pixel art crisp; the
+	// compositor's later uiScale pass applies any whole-frame menu magnify.
 	float sxScale = static_cast<float>(bw) / static_cast<float>(src->w);
 	float syScale = static_cast<float>(bh) / static_cast<float>(src->h);
 	float scale = fit == ImageFit::Contain ? std::min(sxScale, syScale)
@@ -565,11 +565,11 @@ void EnsureInitialized(int width, int height) {
 	// pressed, held, released, and wheel behavior correctly.
 }
 
-void SetUiScale(int scale) {
-	g_uiScale = scale > 0 ? scale : 1;
+void SetUiScale(float scale) {
+	g_uiScale = scale > 0.0f ? scale : 1.0f;
 }
 
-int UiScale() {
+float UiScale() {
 	return g_uiScale;
 }
 
@@ -1039,14 +1039,15 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 // identical to the pre-scale path. At uiScale > 1 we render the command
 // stream into a virtual-size scratch surface (every dispatch path, scissor,
 // sprite-offset and alpha-LUT computation stays in virtual units exactly as
-// authored) and then nearest-magnify that scratch into a centered region of
-// the native surface, so bitmap text/chrome scale up as crisp
-// integer-multiplied pixel art without smearing the letterbox margin.
+// authored) and then nearest-scale that scratch into a centered region of
+// the native surface. Integer menu sizes still land on exact pixel repeats;
+// non-integer menu sizes trade some pixel regularity for smooth resize
+// behavior instead of abrupt 1x/2x jumps.
 void Render(::Resources & resources, ::Renderer & renderer,
             Surface * dst, ::Clay_RenderCommandArray cmds) {
 	if(!dst) return;
-	int s = g_uiScale;
-	if(s <= 1){
+	float s = g_uiScale;
+	if(s <= 1.0f){
 		RenderInto(resources, renderer, dst, cmds);
 		return;
 	}
@@ -1054,8 +1055,8 @@ void Render(::Resources & resources, ::Renderer & renderer,
 	// EnsureInitialized). For menus that equals dst/s; in-game the HUD lays
 	// out in a fixed 640x480 space that does NOT equal dst/s, so derive the
 	// scratch size from the layout, never from dst/s.
-	int vw = (g_lastW > 0) ? g_lastW : dst->w / s;
-	int vh = (g_lastH > 0) ? g_lastH : dst->h / s;
+	int vw = (g_lastW > 0) ? g_lastW : std::max(1, static_cast<int>(dst->w / s));
+	int vh = (g_lastH > 0) ? g_lastH : std::max(1, static_cast<int>(dst->h / s));
 	if(vw < 1) vw = 1;
 	if(vh < 1) vh = 1;
 	// Reused across frames; only reallocates when the virtual size changes.
@@ -1068,19 +1069,19 @@ void Render(::Resources & resources, ::Renderer & renderer,
 	RenderInto(resources, renderer, &scratch, cmds);
 	const Uint8 * sp = scratch.pixels.data();
 	Uint8 * dp = dst->pixels.data();
-	int scaledW = vw * s;
-	int scaledH = vh * s;
+	int scaledW = static_cast<int>(vw * s + 0.5f);
+	int scaledH = static_cast<int>(vh * s + 0.5f);
 	int offsetX = scaledW < dst->w ? (dst->w - scaledW) / 2 : 0;
 	int offsetY = scaledH < dst->h ? (dst->h - scaledH) / 2 : 0;
 	int drawW = std::min(scaledW, dst->w - offsetX);
 	int drawH = std::min(scaledH, dst->h - offsetY);
 	for(int dy = 0; dy < drawH; dy++){
-		int sy = dy / s;
+		int sy = static_cast<int>(dy / s);
 		if(sy >= vh) sy = vh - 1;
 		const Uint8 * srow = sp + sy * vw;
 		Uint8 * drow = dp + (offsetY + dy) * dst->w + offsetX;
 		for(int dx = 0; dx < drawW; dx++){
-			int sx = dx / s;
+			int sx = static_cast<int>(dx / s);
 			if(sx >= vw) sx = vw - 1;
 			// Skip transparent (index 0): compose the UI layer over whatever
 			// is already in dst (the upscaled world in-game, black in menus)

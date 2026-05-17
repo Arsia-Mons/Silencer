@@ -17,7 +17,7 @@ void ClayBridgeFrameBackend::SetLayoutDimensions(int width, int height) {
 	silencer::clay_bridge::EnsureInitialized(width, height);
 }
 
-void ClayBridgeFrameBackend::SetUiScale(int scale) {
+void ClayBridgeFrameBackend::SetUiScale(float scale) {
 	silencer::clay_bridge::SetUiScale(scale);
 }
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Regression: menu UI scale should not collapse from 2x to 1x when a
-# desktop-sized window narrows just below 1280px. Menus reflow in virtual
-# space, so the shared resize path should keep 2x bitmap text/chrome at
-# 1279x720 and still route pointer clicks through the scaled layout.
+# Regression: menu UI scale should follow the continuous menu sizing rule
+# instead of snapping between whole-number steps as a desktop window is
+# resized. Menus still route pointer clicks through the scaled virtual
+# layout, but the reported ui_scale should now match
+# max(1, min(width / 640, height / 480)).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -16,7 +17,7 @@ wait_alive "$PORT"
 cli --port "$PORT" wait_for_state --state MAINMENU --timeout-ms 15000 >/dev/null
 
 check_resize() {
-  local width="$1" height="$2" expected_scale="$3"
+  local width="$1" height="$2"
   local state_out inspect_out
   state_out="$(mktemp)"
   inspect_out="$(mktemp)"
@@ -30,11 +31,13 @@ check_resize() {
   click_target="$(bun -e '
   const statePath = process.argv[1];
   const inspectPath = process.argv[2];
-  const expectedScale = Number(process.argv[3]);
+  const width = Number(process.argv[3]);
+  const height = Number(process.argv[4]);
+  const expectedScale = Math.max(1, Math.min(width / 640, height / 480));
   const state = JSON.parse(await Bun.file(statePath).text());
   const inspect = JSON.parse(await Bun.file(inspectPath).text());
-  if (state.ui_scale !== expectedScale) {
-    console.error(`expected ui_scale=${expectedScale}, got ${state.ui_scale}`);
+  if (Math.abs(state.ui_scale - expectedScale) > 0.02) {
+    console.error(`expected ui_scale≈${expectedScale}, got ${state.ui_scale}`);
     process.exit(1);
   }
   if (state.ui_width <= 0 || state.ui_height <= 0) {
@@ -51,7 +54,7 @@ check_resize() {
     process.exit(1);
   }
   console.log(`${Math.floor(options.x + options.w / 2)} ${Math.floor(options.y + options.h / 2)}`);
-  ' "$state_out" "$inspect_out" "$expected_scale")"
+  ' "$state_out" "$inspect_out" "$width" "$height")"
 
   local x y
   read -r x y <<< "$click_target"
@@ -63,7 +66,8 @@ check_resize() {
   rm -f "$state_out" "$inspect_out"
 }
 
-check_resize 1279 720 2
-check_resize 959 719 1
+check_resize 1279 720
+check_resize 959 719
+check_resize 640 480
 
 echo "PASS 52_menu_ui_scale_resize"

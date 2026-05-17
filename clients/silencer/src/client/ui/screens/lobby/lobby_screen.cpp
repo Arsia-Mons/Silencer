@@ -5,6 +5,7 @@
 #include "lobby_main_area.h"
 
 #include "screen_context.h"
+#include "game.h"
 #include "world.h"
 #include "renderer.h"
 #include "surface.h"
@@ -20,10 +21,24 @@
 
 namespace lobby_screen_detail {
 
-constexpr uint16_t kRootPadX = 10;
-constexpr uint16_t kRootPadTop = 25;
-constexpr uint16_t kRootPadBottom = 25;
-constexpr uint16_t kRegionGap = 10;
+constexpr int kLegacyLayoutW = 640;
+constexpr int kLegacyLayoutH = 480;
+
+int ClampInt(int value, int lo, int hi) {
+	if(value < lo) return lo;
+	if(value > hi) return hi;
+	return value;
+}
+
+int ScaleLegacyPx(int base,
+                  int actual,
+                  int legacy,
+                  int minValue,
+                  int maxValue) {
+	if(legacy <= 0) return ClampInt(base, minValue, maxValue);
+	const int scaled = static_cast<int>((static_cast<long long>(base) * actual + legacy / 2) / legacy);
+	return ClampInt(scaled, minValue, maxValue);
+}
 
 }  // namespace lobby_screen_detail
 
@@ -89,28 +104,37 @@ void LobbyScreen::ShowGameTech(ScreenContext & ctx)
 void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions)
 {
 	(void)frametime;
-	using namespace silencer::clay_bridge;
+	(void)dst;
 	using namespace silencer::client_ui::lobby;
 
-	const int uiScale = std::max(1, UiScale());
-	const int layoutWidth = std::max(1, dst.w / uiScale);
-	const int layoutHeight = std::max(1, dst.h / uiScale);
-	const bool narrow = LobbyUseNarrowLayout(layoutWidth);
-	const uint16_t titleBarH = LobbyTitleBarHeight(narrow, mapName);
-	const int bodyW = std::max(0, layoutWidth - (int)lobby_screen_detail::kRootPadX * 2);
-	const int bodyH = std::max(0, layoutHeight - (int)lobby_screen_detail::kRootPadTop - (int)lobby_screen_detail::kRootPadBottom
-	                              - (int)titleBarH - (int)lobby_screen_detail::kRegionGap);
+	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
+	const int layoutWidth = std::max(1, input.width);
+	const int layoutHeight = std::max(1, input.height);
+	const int rootPadX = lobby_screen_detail::ScaleLegacyPx(
+		10, layoutWidth, lobby_screen_detail::kLegacyLayoutW, 8, 18);
+	const int rootPadTop = lobby_screen_detail::ScaleLegacyPx(
+		25, layoutHeight, lobby_screen_detail::kLegacyLayoutH, 18, 28);
+	const int rootPadBottom = rootPadTop;
+	const int regionGap = lobby_screen_detail::ScaleLegacyPx(
+		10, layoutWidth, lobby_screen_detail::kLegacyLayoutW, 8, 16);
+	const uint16_t titleBarH = LobbyTitleBarHeight();
+	const int bodyW = std::max(0, layoutWidth - rootPadX * 2);
+	const int bodyH = std::max(0, layoutHeight - rootPadTop - rootPadBottom
+	                              - (int)titleBarH - regionGap);
 
 	CLAY({ .id = CLAY_ID("LobbyRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
 	                       CLAY_SIZING_GROW(0) },
-	           .padding = { lobby_screen_detail::kRootPadX, lobby_screen_detail::kRootPadX, lobby_screen_detail::kRootPadTop, lobby_screen_detail::kRootPadBottom },
-	           .childGap = lobby_screen_detail::kRegionGap,
+	           .padding = { static_cast<uint16_t>(rootPadX),
+	                        static_cast<uint16_t>(rootPadX),
+	                        static_cast<uint16_t>(rootPadTop),
+	                        static_cast<uint16_t>(rootPadBottom) },
+	           .childGap = static_cast<uint16_t>(regionGap),
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       },
-	       .image = { .imageData = PackImageStretch(7, 1) } }) {
-		BuildLobbyTitleBar(version, mapName, narrow, layoutWidth, interactions);
+	       .image = { .imageData = silencer::clay_bridge::PackImageStretch(7, 1) } }) {
+		BuildLobbyTitleBar(version, mapName, layoutWidth, interactions);
 
 		LobbyMainAreaPanels panels{
 			characterState,
@@ -123,7 +147,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			gameJoinActive,
 			gameTechActive,
 		};
-		BuildLobbyMainArea(panels, ctx, *this, narrow, bodyW, bodyH, interactions);
+		BuildLobbyMainArea(panels, ctx, *this, bodyW, bodyH, regionGap, interactions);
 		if(gameCreateActive){
 			BuildGameCreatePreviewOverlay(gameCreateState, ctx);
 		}

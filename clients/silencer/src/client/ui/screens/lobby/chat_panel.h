@@ -39,6 +39,20 @@ struct ChatLine {
 };
 
 struct ChatPanelLayoutMetrics {
+	Uint16 rootPadX = 5;
+	Uint16 rootPadTop = 5;
+	Uint16 rootPadBottom = 5;
+	Uint16 channelHeight = 16;
+	Uint16 mainGap = 4;
+	Uint16 bodyGap = 6;
+	Uint16 bodyPadLeft = 4;
+	Uint16 bodyPadRight = 4;
+	Uint16 bodyPadTop = 4;
+	Uint16 bodyPadBottom = 2;
+	Uint16 inputBorderHeight = 17;
+	Uint16 inputPadX = 3;
+	Uint16 inputPadTop = 1;
+	Uint16 inputPadBottom = 2;
 	Uint16 mainBorderWidth = 0;
 	Uint16 mainBorderHeight = 0;
 	Uint16 chatWidth = 0;

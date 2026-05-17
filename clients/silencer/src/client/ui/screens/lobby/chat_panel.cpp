@@ -17,30 +17,46 @@ namespace silencer::client_ui::lobby {
 namespace chat_panel_detail {
 
 constexpr Uint8  kLineHeight = 11;
-constexpr Uint16 kRootPadX = 5;
-constexpr Uint16 kRootPadTop = 5;
-constexpr Uint16 kRootPadBottom = 5;
-constexpr Uint16 kChannelH = 16;
-constexpr Uint16 kMainGap = 4;
-constexpr Uint16 kInputBorderH = 17;
 constexpr Uint16 kInputH = 14;
-constexpr Uint16 kBodyGap = 6;
-constexpr Uint16 kBodyPadLeft = 4;
-constexpr Uint16 kBodyPadRight = 4;
-constexpr Uint16 kBodyPadTop = 4;
-constexpr Uint16 kBodyPadBottom = 2;
-constexpr Uint16 kInputPadX = 3;
 constexpr Uint16 kScrollbarReserve = 8;
 constexpr Uint16 kTextAdvance = 6;
 constexpr Uint16 kMinChatWidth = 60;
 constexpr Uint16 kMinPresenceWidth = 72;
-constexpr Uint16 kMaxPresenceWidth = 160;
+constexpr Uint16 kMaxPresenceWidth = 220;
 constexpr int    kPresenceRatioNum = 110;
 constexpr int    kPresenceRatioDen = 358;
 constexpr size_t kMaxStoredEntries = 256;
 constexpr size_t kMaxStoredLines = 256;
 
 constexpr const char * kActionInput = "lobby.chat.input";
+
+int ClampInt(int value, int lo, int hi) {
+	if(value < lo) return lo;
+	if(value > hi) return hi;
+	return value;
+}
+
+int ScaleWidthPx(int base,
+                 Uint16 panelWidth,
+                 int legacyWidth,
+                 int minValue,
+                 int maxValue) {
+	const int scaled = static_cast<int>(
+		(static_cast<long long>(base) * std::max<int>(panelWidth, 1) + legacyWidth / 2)
+		/ legacyWidth);
+	return ClampInt(scaled, minValue, maxValue);
+}
+
+int ScaleHeightPx(int base,
+                  Uint16 panelHeight,
+                  int legacyHeight,
+                  int minValue,
+                  int maxValue) {
+	const int scaled = static_cast<int>(
+		(static_cast<long long>(base) * std::max<int>(panelHeight, 1) + legacyHeight / 2)
+		/ legacyHeight);
+	return ClampInt(scaled, minValue, maxValue);
+}
 
 int MaxScrollForLineCount(int lineCount,
                           Uint8 lineHeight,
@@ -204,33 +220,59 @@ void CopyUiText(char * dst, int dstLen, const std::string & value)
 ChatPanelLayoutMetrics ResolveChatPanelLayout(Uint16 panelWidth,
                                               Uint16 panelHeight) {
 	ChatPanelLayoutMetrics metrics;
+	metrics.rootPadX = static_cast<Uint16>(
+		chat_panel_detail::ScaleWidthPx(5, panelWidth, 378, 5, 12));
+	metrics.rootPadTop = static_cast<Uint16>(
+		chat_panel_detail::ScaleHeightPx(5, panelHeight, 260, 4, 8));
+	metrics.rootPadBottom = metrics.rootPadTop;
+	metrics.channelHeight = static_cast<Uint16>(
+		chat_panel_detail::ScaleHeightPx(16, panelHeight, 260, 16, 22));
+	metrics.mainGap = static_cast<Uint16>(
+		chat_panel_detail::ScaleHeightPx(4, panelHeight, 260, 3, 7));
+	metrics.bodyGap = static_cast<Uint16>(
+		chat_panel_detail::ScaleWidthPx(6, panelWidth, 378, 6, 14));
+	metrics.bodyPadLeft = static_cast<Uint16>(
+		chat_panel_detail::ScaleWidthPx(4, panelWidth, 378, 4, 10));
+	metrics.bodyPadRight = metrics.bodyPadLeft;
+	metrics.bodyPadTop = static_cast<Uint16>(
+		chat_panel_detail::ScaleHeightPx(4, panelHeight, 260, 3, 8));
+	metrics.bodyPadBottom = static_cast<Uint16>(
+		chat_panel_detail::ScaleHeightPx(2, panelHeight, 260, 2, 5));
+	metrics.inputBorderHeight = static_cast<Uint16>(
+		chat_panel_detail::ScaleHeightPx(17, panelHeight, 260, 17, 24));
+	metrics.inputPadX = static_cast<Uint16>(
+		chat_panel_detail::ScaleWidthPx(3, panelWidth, 378, 3, 8));
+	metrics.inputPadTop = static_cast<Uint16>(
+		chat_panel_detail::ScaleHeightPx(1, panelHeight, 260, 1, 3));
+	metrics.inputPadBottom = static_cast<Uint16>(
+		chat_panel_detail::ScaleHeightPx(2, panelHeight, 260, 2, 4));
 	const int contentW = std::max(
 		0,
-		static_cast<int>(panelWidth) - static_cast<int>(chat_panel_detail::kRootPadX) * 2);
+		static_cast<int>(panelWidth) - static_cast<int>(metrics.rootPadX) * 2);
 	const int contentH = std::max(
 		0,
 		static_cast<int>(panelHeight)
-			- static_cast<int>(chat_panel_detail::kRootPadTop)
-			- static_cast<int>(chat_panel_detail::kRootPadBottom));
+			- static_cast<int>(metrics.rootPadTop)
+			- static_cast<int>(metrics.rootPadBottom));
 	const int mainBorderH = std::max(
 		0,
 		contentH
-			- static_cast<int>(chat_panel_detail::kChannelH)
-			- static_cast<int>(chat_panel_detail::kMainGap)
-			- static_cast<int>(chat_panel_detail::kInputBorderH));
+			- static_cast<int>(metrics.channelHeight)
+			- static_cast<int>(metrics.mainGap)
+			- static_cast<int>(metrics.inputBorderHeight));
 	const int bodyW = std::max(
 		0,
 		contentW
-			- static_cast<int>(chat_panel_detail::kBodyPadLeft)
-			- static_cast<int>(chat_panel_detail::kBodyPadRight));
+			- static_cast<int>(metrics.bodyPadLeft)
+			- static_cast<int>(metrics.bodyPadRight));
 	const int bodyH = std::max(
 		0,
 		mainBorderH
-			- static_cast<int>(chat_panel_detail::kBodyPadTop)
-			- static_cast<int>(chat_panel_detail::kBodyPadBottom));
+			- static_cast<int>(metrics.bodyPadTop)
+			- static_cast<int>(metrics.bodyPadBottom));
 
 	int presenceW = 0;
-	if(bodyW > static_cast<int>(chat_panel_detail::kBodyGap)
+	if(bodyW > static_cast<int>(metrics.bodyGap)
 	            + static_cast<int>(chat_panel_detail::kMinChatWidth)){
 		const int scaledPresence =
 			(bodyW * chat_panel_detail::kPresenceRatioNum
@@ -238,7 +280,7 @@ ChatPanelLayoutMetrics ResolveChatPanelLayout(Uint16 panelWidth,
 			/ chat_panel_detail::kPresenceRatioDen;
 		const int maxPresence = std::max(
 			0,
-			bodyW - static_cast<int>(chat_panel_detail::kBodyGap)
+			bodyW - static_cast<int>(metrics.bodyGap)
 			      - static_cast<int>(chat_panel_detail::kMinChatWidth));
 		presenceW = std::max<int>(chat_panel_detail::kMinPresenceWidth, scaledPresence);
 		if(presenceW > static_cast<int>(chat_panel_detail::kMaxPresenceWidth)){
@@ -248,7 +290,7 @@ ChatPanelLayoutMetrics ResolveChatPanelLayout(Uint16 panelWidth,
 			presenceW = maxPresence;
 		}
 	}
-	const int bodyGap = presenceW > 0 ? static_cast<int>(chat_panel_detail::kBodyGap) : 0;
+	const int bodyGap = presenceW > 0 ? static_cast<int>(metrics.bodyGap) : 0;
 	const int chatW = std::max(0, bodyW - bodyGap - presenceW);
 
 	metrics.mainBorderWidth = static_cast<Uint16>(contentW);
@@ -259,8 +301,12 @@ ChatPanelLayoutMetrics ResolveChatPanelLayout(Uint16 panelWidth,
 	metrics.presenceHeight = static_cast<Uint16>(bodyH);
 	metrics.inputWidth = static_cast<Uint16>(std::max(
 		0,
-		contentW - static_cast<int>(chat_panel_detail::kInputPadX) * 2));
-	metrics.inputHeight = chat_panel_detail::kInputH;
+		contentW - static_cast<int>(metrics.inputPadX) * 2));
+	metrics.inputHeight = static_cast<Uint16>(std::max(
+		static_cast<int>(chat_panel_detail::kInputH),
+		static_cast<int>(metrics.inputBorderHeight)
+			- static_cast<int>(metrics.inputPadTop)
+			- static_cast<int>(metrics.inputPadBottom)));
 	metrics.chatWrapChars = static_cast<Uint16>(std::max(
 		1,
 		(std::max(1, chatW - static_cast<int>(chat_panel_detail::kScrollbarReserve)))

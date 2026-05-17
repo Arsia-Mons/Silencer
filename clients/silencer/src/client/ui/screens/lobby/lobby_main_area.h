@@ -35,14 +35,14 @@ struct LobbyMainAreaPanels {
 	bool gameTechActive;
 };
 
-// Emits the LobbyBody subtree (narrow stack OR wide left/middle/right
-// columns) into the current Clay frame.
+// Emits the LobbyBody subtree (character + chat + right control column)
+// into the current Clay frame.
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         ScreenContext & ctx,
                         LobbyScreen & owner,
-                        bool narrow,
                         int bodyW,
                         int bodyH,
+                        int regionGap,
                         silencer::ui::UiInteractionRegistry& interactions);
 
 }  // namespace silencer::client_ui::lobby

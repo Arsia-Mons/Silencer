@@ -30,20 +30,6 @@ namespace silencer::client_ui::lobby {
 namespace chat_panel_layout_detail {
 
 constexpr Uint8  kLineHeight = 11;
-constexpr Uint16 kRootPadX = 5;
-constexpr Uint16 kRootPadTop = 5;
-constexpr Uint16 kRootPadBottom = 5;
-constexpr Uint16 kChannelWrapH = 16;
-constexpr Uint16 kMainGap = 4;
-constexpr Uint16 kBodyGap = 6;
-constexpr Uint16 kBodyPadLeft = 4;
-constexpr Uint16 kBodyPadRight = 4;
-constexpr Uint16 kBodyPadTop = 4;
-constexpr Uint16 kBodyPadBottom = 2;
-constexpr Uint16 kInputBorderH = 17;
-constexpr Uint16 kInputPadX = 3;
-constexpr Uint16 kInputPadTop = 1;
-constexpr Uint16 kInputPadBottom = 2;
 constexpr int    kChatInputUid = 1;
 constexpr Uint8  kScrollbarBank = 7;
 constexpr const char * kActionInput = "lobby.chat.input";
@@ -129,16 +115,16 @@ void BuildChatPanelTree(ChatPanelState & state,
 	CLAY({ .id = CLAY_ID("ChatPanelContent"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
-	           .padding = { chat_panel_layout_detail::kRootPadX,
-	                        chat_panel_layout_detail::kRootPadX,
-	                        chat_panel_layout_detail::kRootPadTop,
-	                        chat_panel_layout_detail::kRootPadBottom },
+	           .padding = { metrics.rootPadX,
+	                        metrics.rootPadX,
+	                        metrics.rootPadTop,
+	                        metrics.rootPadBottom },
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		CLAY({ .id = CLAY_ID("ChatChannelRow"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kChannelWrapH) },
+		                       CLAY_SIZING_FIXED((float)metrics.channelHeight) },
 		       } }) {
 			if(!state.channel.empty()){
 				Text(chat_panel_layout_detail::FromStd(state.channel),
@@ -151,11 +137,11 @@ void BuildChatPanelTree(ChatPanelState & state,
 		         .layout = {
 		             .sizing = { CLAY_SIZING_GROW(0),
 		                         CLAY_SIZING_GROW(0) },
-		             .padding = { chat_panel_layout_detail::kBodyPadLeft,
-		                          chat_panel_layout_detail::kBodyPadRight,
-		                          chat_panel_layout_detail::kBodyPadTop,
-		                          chat_panel_layout_detail::kBodyPadBottom },
-		             .childGap = chat_panel_layout_detail::kBodyGap,
+		             .padding = { metrics.bodyPadLeft,
+		                          metrics.bodyPadRight,
+		                          metrics.bodyPadTop,
+		                          metrics.bodyPadBottom },
+		             .childGap = metrics.bodyGap,
 		             .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		         },
 		     })) {
@@ -180,18 +166,18 @@ void BuildChatPanelTree(ChatPanelState & state,
 		CLAY({ .id = CLAY_ID("ChatInputGap"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0),
-		                       CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kMainGap) },
+		                       CLAY_SIZING_FIXED((float)metrics.mainGap) },
 		       } }) {}
 
 		CLAY(Box(BoxVariants::Plain, {
 		         .id = CLAY_ID("ChatInputBorder"),
 		         .layout = {
 		             .sizing = { CLAY_SIZING_GROW(0),
-		                         CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kInputBorderH) },
-		             .padding = { chat_panel_layout_detail::kInputPadX,
-		                          chat_panel_layout_detail::kInputPadX,
-		                          chat_panel_layout_detail::kInputPadTop,
-		                          chat_panel_layout_detail::kInputPadBottom },
+		                         CLAY_SIZING_FIXED((float)metrics.inputBorderHeight) },
+		             .padding = { metrics.inputPadX,
+		                          metrics.inputPadX,
+		                          metrics.inputPadTop,
+		                          metrics.inputPadBottom },
 		             .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
 		         },
 		     })) {

@@ -34,12 +34,12 @@ struct UiPointerState {
 
 struct UiInputState {
 	// width/height are the VIRTUAL layout dimensions Clay lays out against
-	// (the native surface size divided by uiScale). uiScale is the integer
-	// magnification the compositor applies to bitmap glyph/sprite/chrome
-	// draws so a virtual-resolution layout fills the larger native surface.
+	// (the native surface size divided by uiScale). uiScale is the compositor
+	// magnification the bitmap UI render path applies when it copies that
+	// virtual layout back into the larger native surface.
 	int width = 0;
 	int height = 0;
-	int uiScale = 1;
+	float uiScale = 1.0f;
 	float deltaTimeSeconds = 0.0f;
 	float animationDeltaSeconds = 1.0f / 24.0f;
 	float animationStepSeconds = 1.0f / 24.0f;

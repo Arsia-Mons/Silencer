@@ -360,29 +360,30 @@ bool Game::SetupRenderDevice(void){
 static const int kLegacyRenderWidth = 640;
 static const int kLegacyRenderHeight = 480;
 
-static int GameplayUiScaleForSurface(int width, int height) {
+static float GameplayUiScaleForSurface(int width, int height) {
 	int scaleX = width / kLegacyRenderWidth;
 	int scaleY = height / kLegacyRenderHeight;
 	int uiScale = scaleX < scaleY ? scaleX : scaleY;
-	return uiScale > 0 ? uiScale : 1;
+	return static_cast<float>(uiScale > 0 ? uiScale : 1);
 }
 
-static int MenuUiScaleForSurface(int width, int height) {
-	// Menus reflow responsively, so they do not need the strict "largest
-	// integer that still fits a 640x480 canvas" rule gameplay uses. Round to
-	// the nearest legacy scale instead so shrinking a desktop window across a
-	// 640px/480px multiple does not suddenly halve bitmap text/chrome size.
-	int scaleX = (width + (kLegacyRenderWidth / 2)) / kLegacyRenderWidth;
-	int scaleY = (height + (kLegacyRenderHeight / 2)) / kLegacyRenderHeight;
-	int uiScale = scaleX < scaleY ? scaleX : scaleY;
-	return uiScale > 0 ? uiScale : 1;
+static float MenuUiScaleForSurface(int width, int height) {
+	// Menus keep the legacy 640x480 design density as a lower bound, but the
+	// scale changes continuously instead of snapping between integer steps.
+	// That preserves readable bitmap text/chrome while avoiding the abrupt
+	// "everything halves" jump as a desktop window crosses a 640px/480px
+	// multiple.
+	float scaleX = static_cast<float>(width) / static_cast<float>(kLegacyRenderWidth);
+	float scaleY = static_cast<float>(height) / static_cast<float>(kLegacyRenderHeight);
+	float uiScale = scaleX < scaleY ? scaleX : scaleY;
+	return uiScale > 1.0f ? uiScale : 1.0f;
 }
 
 static void CenteredLayoutOffset(int surfaceW, int surfaceH,
                                  int virtualW, int virtualH,
-                                 int scale, int& offsetX, int& offsetY) {
-	int scaledW = virtualW * scale;
-	int scaledH = virtualH * scale;
+                                 float scale, int& offsetX, int& offsetY) {
+	int scaledW = static_cast<int>(virtualW * scale + 0.5f);
+	int scaledH = static_cast<int>(virtualH * scale + 0.5f);
 	offsetX = scaledW < surfaceW ? (surfaceW - scaledW) / 2 : 0;
 	offsetY = scaledH < surfaceH ? (surfaceH - scaledH) / 2 : 0;
 }
@@ -429,10 +430,10 @@ bool Game::HasUiInputTarget() {
 
 void Game::PrepareClientUiFrame(Surface& surface) {
 	// UI magnification factor: gameplay keeps the strict legacy 640x480 fit,
-	// while menus can round to the nearest legacy scale because Clay reflows
-	// responsively in virtual space. Bitmap glyph/sprite/chrome draws remain
-	// integer-scaled in the compositor so pixel art stays crisp.
-	int uiScale = world.map.loaded
+	// while menus use a continuous scale so bitmap UI density changes smoothly
+	// as the window resizes. Clay still lays out in virtual space; the
+	// compositor scales the authored pixels back up into the native surface.
+	float uiScale = world.map.loaded
 		? GameplayUiScaleForSurface(surface.w, surface.h)
 		: MenuUiScaleForSurface(surface.w, surface.h);
 	int virtualW;
@@ -446,8 +447,8 @@ void Game::PrepareClientUiFrame(Surface& surface) {
 	}else{
 		// Menus reflow responsively — Clay lays out at the native surface
 		// size divided by uiScale.
-		virtualW = surface.w / uiScale;
-		virtualH = surface.h / uiScale;
+		virtualW = std::max(1, static_cast<int>(surface.w / uiScale));
+		virtualH = std::max(1, static_cast<int>(surface.h / uiScale));
 	}
 	float mx = static_cast<float>(world.localinput.mousex);
 	float my = static_cast<float>(world.localinput.mousey);

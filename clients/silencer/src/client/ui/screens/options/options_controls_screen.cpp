@@ -201,12 +201,13 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 
 void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) {
 	(void)frametime;
+	(void)dst;
 	using namespace silencer::clay_bridge;
 	using namespace silencer::client_ui::options;
 
-	const int uiScale = std::max(1, UiScale());
-	const int layoutWidth = dst.w / uiScale;
-	const int layoutHeight = dst.h / uiScale;
+	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
+	const int layoutWidth = std::max(1, input.width);
+	const int layoutHeight = std::max(1, input.height);
 	const int framePadLeft = options_controls_screen_detail::ScaleLegacyPx(
 		options_controls_screen_detail::kFrameMarginLeft,
 		layoutWidth,
