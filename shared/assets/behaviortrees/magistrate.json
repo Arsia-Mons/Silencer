@@ -18,7 +18,7 @@
     "seq_dormant": {
       "type": "Sequence",
       "label": "Dormant — wait for activation",
-      "children": ["cond_dormant", "leaf_activate"],
+      "children": ["cond_dormant", "leaf_activate", "leaf_spawn_sound"],
       "props": {}
     },
     "cond_dormant": {
@@ -32,6 +32,12 @@
       "label": "CheckActivation",
       "children": [],
       "props": { "action": "CheckActivation" }
+    },
+    "leaf_spawn_sound": {
+      "type": "Leaf",
+      "label": "Play spawn sound",
+      "children": [],
+      "props": { "action": "EmitSpawnSound" }
     },
 
     "seq_dying": {

@@ -47,22 +47,32 @@ void Magistrate::InitBT(){
 	if(!bt_) return;
 
 	// ── Activation ────────────────────────────────────────────────────────────
-	// Checks timer/secret trigger; transitions DORMANT→NEW, plays spawn sound.
-	// Always returns Running (sits inside a Condition(is_dormant) Sequence).
+	// Waits for timer or secret trigger; transitions DORMANT→NEW.
+	// Returns Running while waiting, Success on the tick it activates.
 	btctx_.actions["CheckActivation"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
 		bool timerFired  = world.tickcount >= activationTicks;
 		bool secretFired = secretTriggerN > 0 && world.secretsBeamed >= (int)secretTriggerN;
 		if(timerFired || secretFired){
-			const EnemyDef* md = GASLoader::Get().GetEnemyDef("magistrate");
-			if(md && !md->soundActivate.empty())
-				EmitSound(world, world.resources.soundbank[md->soundActivate], 128);
 			draw       = true;
 			collidable = true;
 			state      = NEW;
 			state_i    = 0;
+			return BTResult::Success; // lets the next sibling (EmitSpawnSound) run this tick
 		}
 		return BTResult::Running;
+	};
+
+	// Plays the spawn sound once (idempotent via BB flag). Always Success.
+	btctx_.actions["EmitSpawnSound"] = [this](BTContext& ctx) -> BTResult {
+		if(!ctx.bb("_spawn_sound_fired", false)){
+			ctx.bbSet("_spawn_sound_fired", true);
+			World& world = *static_cast<World*>(ctx.userData);
+			const EnemyDef* md = GASLoader::Get().GetEnemyDef("magistrate");
+			if(md && !md->soundActivate.empty())
+				EmitSound(world, world.resources.soundbank[md->soundActivate], 128);
+		}
+		return BTResult::Success;
 	};
 
 	// ── Movement ──────────────────────────────────────────────────────────────
