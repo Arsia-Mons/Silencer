@@ -287,7 +287,13 @@ const NPC_ACTIONS: Record<string, string[]> = {
   ],
   civilian: ['Run', 'Wander', 'WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'ReturnToSpawn', ...GENERIC_ACTIONS],
   robot:    ['WakeUp', 'LookForward', 'LookSides', 'MeleeCheck', 'Patrol', 'ReturnToSpawn', ...GENERIC_ACTIONS],
-  magistrate: ['Patrol', ...GENERIC_ACTIONS],
+  magistrate: [
+    'CheckActivation',
+    'EmitSpawnSound', 'EmitDeathSound',
+    'Walk', 'TurnAround', 'Stand',
+    'SpawnDeathGuards', 'DeathFade',
+    ...GENERIC_ACTIONS,
+  ],
 };
 
 // All actions merged for unknown NPC types
@@ -332,7 +338,15 @@ const ACTION_DESC: Record<string, string> = {
   LookSides: 'Look side to side (alert animation)',
   MeleeCheck: 'Check if player is in melee range; attack if so',
   ReturnToSpawn: 'Walk back to spawn point',
-  // Generic leaves
+  // Magistrate-specific
+  CheckActivation: 'Succeed once activationTicks elapsed or secretTriggerN secrets beamed; Running otherwise',
+  EmitSpawnSound:  'Play the magistrate spawn sound globally (once). Reads "sound" prop; falls back to GAS soundActivate',
+  EmitDeathSound:  'Play the magistrate death sound globally (once). Reads "sound" prop; falls back to GAS soundDeath',
+  Walk:            'Walk in current facing direction; auto-turns at platform edges (Civilian pattern). Always Running',
+  TurnAround:      'Flip facing direction immediately. Always Success',
+  Stand:           'Stand in place for "duration" ticks (default 60). Returns Running then Success',
+  SpawnDeathGuards:'Spawn death guards/robots at death position (authority only, idempotent). Always Success',
+  DeathFade:       'Fade out over "duration" ticks then set state=DEAD. Running while playing, Success when done',
   PlayAnim: 'Play a sprite bank animation (bank, frames, loop)',
   EmitSound: 'Play a named sound from the world soundbank',
   SetFacing: 'Set entity facing direction (left / right / flip)',
