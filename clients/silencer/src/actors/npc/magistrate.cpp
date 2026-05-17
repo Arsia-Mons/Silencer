@@ -30,9 +30,8 @@ Magistrate::Magistrate() : Object(ObjectTypes::MAGISTRATE){
 
 	activationTicks  = m ? m->activationTicks : 7200; // 2 minutes at 60fps
 	secretTriggerN   = 2;
-	deathSpawnCount  = 3;
-	deathSpawnType   = 0;
-	deathSpawnRadius = 64;
+	deathSpawnEntries = 0x03; // default: 3 blaster guards
+	deathSpawnRadius  = 64;
 
 	originalx        = 0;
 	originaly        = 0;
@@ -217,9 +216,8 @@ void Magistrate::Serialize(bool write, Serializer & data, Serializer * old){
 	data.Serialize(write, state_i,         old);
 	data.Serialize(write, activationTicks, old);
 	data.Serialize(write, secretTriggerN,  old);
-	data.Serialize(write, deathSpawnCount, old);
-	data.Serialize(write, deathSpawnType,  old);
-	data.Serialize(write, deathSpawnRadius,old);
+	data.Serialize(write, deathSpawnEntries, old);
+	data.Serialize(write, deathSpawnRadius,  old);
 	data.Serialize(write, originalx,       old);
 	data.Serialize(write, originaly,       old);
 	data.Serialize(write, originalmirrored,old);
@@ -228,30 +226,35 @@ void Magistrate::Serialize(bool write, Serializer & data, Serializer * old){
 void Magistrate::SpawnDeathActors(World & world){
 	if(!world.IsAuthority()) return;
 
-	for(int i = 0; i < deathSpawnCount; i++){
-		Sint16 ox = x + (Sint16)((world.Random() % (deathSpawnRadius * 2 + 1)) - deathSpawnRadius);
-		Sint16 oy = y;
+	for(int slot = 0; slot < 4; slot++){
+		Uint8 entry = (deathSpawnEntries >> (slot * 8)) & 0xFF;
+		int count = entry & 0x0F;
+		int type  = (entry >> 4) & 0x0F;
+		if(count == 0) continue;
 
-		Object * obj = nullptr;
-		// type 0=guard-blaster, 1=guard-laser, 2=guard-rocket, 3=robot
-		if(deathSpawnType == 3){
-			obj = world.CreateObject(ObjectTypes::ROBOT);
-		}else{
-			obj = world.CreateObject(ObjectTypes::GUARD);
-		}
-		if(!obj) continue;
+		for(int i = 0; i < count; i++){
+			Sint16 ox = x + (Sint16)((world.Random() % (deathSpawnRadius * 2 + 1)) - deathSpawnRadius);
 
-		obj->x        = ox;
-		obj->y        = oy;
-		obj->mirrored = (world.Random() % 2) == 0;
+			Object * obj = nullptr;
+			if(type == 3){
+				obj = world.CreateObject(ObjectTypes::ROBOT);
+			}else{
+				obj = world.CreateObject(ObjectTypes::GUARD);
+			}
+			if(!obj) continue;
 
-		if(deathSpawnType <= 2){
-			Guard* g = static_cast<Guard*>(obj);
-			g->weapon           = deathSpawnType;  // 0=blaster, 1=laser, 2=rocket
-			g->patrol           = true;
-			g->originalx        = ox;
-			g->originaly        = oy;
-			g->originalmirrored = obj->mirrored;
+			obj->x        = ox;
+			obj->y        = y;
+			obj->mirrored = (world.Random() % 2) == 0;
+
+			if(type <= 2){
+				Guard* g = static_cast<Guard*>(obj);
+				g->weapon           = (Uint8)type; // 0=blaster, 1=laser, 2=rocket
+				g->patrol           = true;
+				g->originalx        = ox;
+				g->originaly        = y;
+				g->originalmirrored = obj->mirrored;
+			}
 		}
 	}
 }

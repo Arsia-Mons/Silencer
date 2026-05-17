@@ -22,12 +22,33 @@ const MAGISTRATE_SPAWN_TYPES: Record<number, string> = {
   3: 'Robot',
 };
 
+// Decode 4 packed spawn entries from a Uint32.
+// Each byte: high nibble = type (0-3), low nibble = count (1-15; 0=unused).
+function decodeMagistrateEntries(matchid: number): Array<{ type: number; count: number }> {
+  const out: Array<{ type: number; count: number }> = [];
+  for(let slot = 0; slot < 4; slot++){
+    const byte = (matchid >>> (slot * 8)) & 0xFF;
+    const count = byte & 0x0F;
+    const type  = (byte >>> 4) & 0x0F;
+    if(count > 0) out.push({ type, count });
+  }
+  return out.length > 0 ? out : [{ type: 0, count: 3 }]; // default 3 blasters
+}
+function encodeMagistrateEntries(entries: Array<{ type: number; count: number }>): number {
+  let v = 0;
+  for(let i = 0; i < Math.min(entries.length, 4); i++){
+    const count = Math.min(15, Math.max(1, entries[i].count));
+    const type  = entries[i].type & 0x0F;
+    v |= ((type << 4) | count) << (i * 8);
+  }
+  return v >>> 0;
+}
+
 interface MagistrateFieldState {
-  facing: string;       // direction: 0=Right, 1=Left
-  spawnType: number;    // actor.type: 0-3
-  spawnCount: string;   // actor.matchid bits 0-7
-  spawnRadius: string;  // actor.matchid bits 8-15
+  facing: string;
+  radius: string;
   securityid: string;
+  entries: Array<{ type: number; count: number }>;
 }
 
 // Light actor (id=71) actortype bitfield helpers
@@ -105,13 +126,12 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
   });
 
   // Magistrate-specific decoded state
-  // actor.type = deathSpawnType (0-3), actor.matchid bits 0-7 = count, bits 8-15 = radius
+  // actor.type bits 0-7 = radius; actor.matchid = 4 packed spawn entries
   const [magistrateFields, setMagistrateFields] = useState<MagistrateFieldState>({
-    facing:      String(actor.direction ?? 0),
-    spawnType:   (actor.type ?? 0) & 0xFF,
-    spawnCount:  String((actor.matchid ?? 0) & 0xFF || 3),
-    spawnRadius: String(((actor.matchid ?? 0) >> 8) & 0xFF || 64),
-    securityid:  String(actor.securityid ?? 0),
+    facing:    String(actor.direction ?? 0),
+    radius:    String((actor.type ?? 0) & 0xFF || 64),
+    securityid: String(actor.securityid ?? 0),
+    entries:   decodeMagistrateEntries(actor.matchid ?? 0),
   });
 
   // Light-specific decoded state
@@ -153,12 +173,11 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
         direction: lightFields.direction,
       });
     } else if (isMagistrate) {
-      const count  = Math.min(20, Math.max(1, parseInt(magistrateFields.spawnCount,  10) || 3));
-      const radius = Math.min(255, Math.max(8, parseInt(magistrateFields.spawnRadius, 10) || 64));
+      const radius = Math.min(255, Math.max(8, parseInt(magistrateFields.radius, 10) || 64));
       onUpdate(actorIdx, {
-        type:      magistrateFields.spawnType,
+        type:      radius,
         direction: parseInt(magistrateFields.facing, 10) || 0,
-        matchid:   (count & 0xFF) | ((radius & 0xFF) << 8),
+        matchid:   encodeMagistrateEntries(magistrateFields.entries),
         securityid: parseInt(magistrateFields.securityid, 10) || 0,
       });
     } else {
@@ -289,26 +308,51 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
             </select>
           </div>
           <div className="border-t border-[#1a3a1a] pt-1.5 mt-1.5 mb-1">
-            <div className="text-[#5a8a5a] text-[10px] uppercase tracking-wide mb-1">Death spawn</div>
-            <div className="mb-1.5">
-              <div className={lbl}>Spawn type</div>
-              <select value={magistrateFields.spawnType} onChange={e => setMagistrateFields(f => ({ ...f, spawnType: Number(e.target.value) }))} className={inp + ' cursor-pointer'}>
-                {Object.entries(MAGISTRATE_SPAWN_TYPES).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
+            <div className="flex items-center mb-1">
+              <span className="text-[#5a8a5a] text-[10px] uppercase tracking-wide">Death spawn</span>
+              {magistrateFields.entries.length < 4 && (
+                <button
+                  onClick={() => setMagistrateFields(f => ({ ...f, entries: [...f.entries, { type: 0, count: 1 }] }))}
+                  className="ml-auto text-[#4a8a4a] hover:text-[#c0f0c0] text-[10px] font-mono border border-[#2a4a2a] hover:border-[#4a8a4a] px-1.5 rounded"
+                >+ Add</button>
+              )}
             </div>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <div className={lbl}>Count (1–20)</div>
-                <input type="number" min={1} max={20} value={magistrateFields.spawnCount}
-                  onChange={e => setMagistrateFields(f => ({ ...f, spawnCount: e.target.value }))} className={inp} />
+            {magistrateFields.entries.map((entry, idx) => (
+              <div key={idx} className="flex items-center gap-1 mb-1">
+                <select
+                  value={entry.type}
+                  onChange={e => setMagistrateFields(f => {
+                    const entries = [...f.entries];
+                    entries[idx] = { ...entries[idx], type: Number(e.target.value) };
+                    return { ...f, entries };
+                  })}
+                  className="flex-1 bg-[#0a0a18] border border-[#1a2e1a] text-[#c0f0c0] text-[10px] px-1 py-0.5 rounded font-mono cursor-pointer"
+                >
+                  {Object.entries(MAGISTRATE_SPAWN_TYPES).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+                <input
+                  type="number" min={1} max={15} value={entry.count}
+                  onChange={e => setMagistrateFields(f => {
+                    const entries = [...f.entries];
+                    entries[idx] = { ...entries[idx], count: parseInt(e.target.value, 10) || 1 };
+                    return { ...f, entries };
+                  })}
+                  className="w-10 bg-[#0a0a18] border border-[#1a2e1a] text-[#c0f0c0] text-[10px] px-1 py-0.5 rounded font-mono text-center"
+                  title="Count (1–15)"
+                />
+                <button
+                  onClick={() => setMagistrateFields(f => ({ ...f, entries: f.entries.filter((_, i) => i !== idx) }))}
+                  className="text-[#5a3a3a] hover:text-[#f08080] text-[10px] font-mono px-1"
+                  title="Remove"
+                >✕</button>
               </div>
-              <div className="flex-1">
-                <div className={lbl}>Radius (px)</div>
-                <input type="number" min={8} max={255} value={magistrateFields.spawnRadius}
-                  onChange={e => setMagistrateFields(f => ({ ...f, spawnRadius: e.target.value }))} className={inp} />
-              </div>
+            ))}
+            <div className="mt-1">
+              <div className={lbl}>Radius (px)</div>
+              <input type="number" min={8} max={255} value={magistrateFields.radius}
+                onChange={e => setMagistrateFields(f => ({ ...f, radius: e.target.value }))} className={inp} />
             </div>
           </div>
           <div className="mb-1.5">

@@ -702,21 +702,20 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 				}
 			}break;
 				case 72:{
-					// magistrate boss NPC
-					if(world.SecurityIDCanSpawn(actorsecurityid)){
-						Magistrate * magistrate = (Magistrate *)world.CreateObject(ObjectTypes::MAGISTRATE);
-						if(magistrate){
-							magistrate->x = actorx;
-							magistrate->y = actory;
-							magistrate->mirrored = actordirection ? true : false;
-							magistrate->originalx = magistrate->x;
-							magistrate->originaly = magistrate->y;
-							magistrate->originalmirrored = magistrate->mirrored;
-								magistrate->deathSpawnType   = (Uint8)(actortype & 0xFF);
-								magistrate->deathSpawnCount  = (Uint8)(actormatchid & 0xFF);
-								magistrate->deathSpawnRadius = (Uint8)((actormatchid >> 8) & 0xFF);
-								if(!magistrate->deathSpawnCount)  magistrate->deathSpawnCount  = 3;
-								if(!magistrate->deathSpawnRadius) magistrate->deathSpawnRadius = 64;
+						// magistrate boss NPC
+						if(world.SecurityIDCanSpawn(actorsecurityid)){
+							Magistrate * magistrate = (Magistrate *)world.CreateObject(ObjectTypes::MAGISTRATE);
+							if(magistrate){
+								magistrate->x = actorx;
+								magistrate->y = actory;
+								magistrate->mirrored = actordirection ? true : false;
+								magistrate->originalx = magistrate->x;
+								magistrate->originaly = magistrate->y;
+								magistrate->originalmirrored = magistrate->mirrored;
+								// actor.type bits 0-7 = radius; actor.matchid = 4 packed spawn entries
+								Uint8 radius = (Uint8)(actortype & 0xFF);
+								magistrate->deathSpawnRadius  = radius ? radius : 64;
+								magistrate->deathSpawnEntries = actormatchid ? actormatchid : 0x03; // default: 3 blaster guards
 							}
 						}
 					}break;
