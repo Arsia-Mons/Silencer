@@ -161,9 +161,7 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 	}
 	if(action.kind == silencer::ui::UiActionKind::Scroll){
 		if(action.id.empty() || action.id == kKeybindListScrollId){
-			int amount = action.amount;
-			if(action.value == "wheel") amount = -amount;
-			scrollDelta += amount;
+			scrollDelta += action.amount;
 			return true;
 		}
 		return false;

@@ -92,13 +92,24 @@ struct LobbySteppedPaneLayout {
 
 LobbySteppedPaneLayout ResolveSteppedPaneLayout(int bodyW,
                                                 int bodyH,
-                                                int regionGap) {
+                                                int regionGap,
+                                                bool gameCreateActive) {
 	LobbySteppedPaneLayout out;
 	out.regionGap = regionGap;
 	out.upperH = ClampInt(RoundRatio(bodyH, 121, kLegacyBodyH), 84, 156);
+	const int hardMaxUpperH = std::max(0, bodyH - regionGap);
+	if(out.upperH > hardMaxUpperH){
+		out.upperH = hardMaxUpperH;
+	}
 	int maxUpperH = std::max(0, bodyH - regionGap - kMinLowerLeftH);
 	if(maxUpperH > 0 && out.upperH > maxUpperH){
 		out.upperH = maxUpperH;
+	}
+	if(gameCreateActive && maxUpperH > 0){
+		const int preferredUpperH = std::min(GameCreateUpperPreferredHeight(), maxUpperH);
+		if(preferredUpperH > out.upperH){
+			out.upperH = preferredUpperH;
+		}
 	}
 
 	int desiredRightTallW =
@@ -134,11 +145,17 @@ LobbySteppedPaneLayout ResolveSteppedPaneLayout(int bodyW,
 void BuildRightUpperContents(LobbyMainAreaPanels & panels,
                              ScreenContext & ctx,
                              LobbyScreen & owner,
+                             const LobbySteppedPaneLayout & layout,
                              silencer::ui::UiInteractionRegistry& interactions) {
 	World & world = ctx.world;
 	Resources & resources = world.resources;
 	if(panels.gameCreateActive){
-		BuildGameCreateUpperTree(panels.gameCreate, resources, interactions);
+		BuildGameCreateUpperTree(
+			panels.gameCreate,
+			static_cast<Uint16>(std::max(0, layout.rightUpperW)),
+			static_cast<Uint16>(std::max(0, layout.upperH)),
+			resources,
+			interactions);
 	}else if(panels.gameJoinActive){
 		BuildGameJoinUpperTree(panels.gameJoin, resources, interactions);
 	}else if(panels.gameTechActive){
@@ -233,7 +250,7 @@ void BuildLobbySteppedPane(LobbyMainAreaPanels & panels,
 				         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 				         .clip = { .horizontal = true, .vertical = true },
 				     })) {
-					BuildRightUpperContents(panels, ctx, owner, interactions);
+					BuildRightUpperContents(panels, ctx, owner, layout, interactions);
 				}
 			}
 
@@ -321,7 +338,8 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         int regionGap,
                         silencer::ui::UiInteractionRegistry& interactions) {
 	const lobby_main_area_detail::LobbySteppedPaneLayout layout =
-		lobby_main_area_detail::ResolveSteppedPaneLayout(bodyW, bodyH, regionGap);
+		lobby_main_area_detail::ResolveSteppedPaneLayout(
+			bodyW, bodyH, regionGap, panels.gameCreateActive);
 	lobby_main_area_detail::BuildLobbySteppedPane(
 		panels,
 		ctx,

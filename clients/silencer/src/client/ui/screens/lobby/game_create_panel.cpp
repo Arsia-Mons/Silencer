@@ -33,6 +33,7 @@ constexpr const char * kActionMaxPlayers = "lobby.game_create.max_players";
 constexpr const char * kActionMaxTeams = "lobby.game_create.max_teams";
 constexpr const char * kActionName = "lobby.game_create.name";
 constexpr const char * kActionPassword = "lobby.game_create.password";
+constexpr const char * kActionOptionsScroll = kGameCreateOptionsScrollId;
 
 bool StartsWith(const std::string & value, const char * prefix) {
 	const size_t n = std::strlen(prefix);
@@ -213,6 +214,13 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
                                    const silencer::ui::UiAction & action) {
+	if(action.kind == silencer::ui::UiActionKind::Scroll){
+		if(action.id.empty() || action.id == game_create_panel_detail::kActionOptionsScroll){
+			state.optionsScrollDelta += action.amount;
+			return true;
+		}
+		return false;
+	}
 	if(action.kind == silencer::ui::UiActionKind::SetText){
 		if(action.id == game_create_panel_detail::kActionMinLevel){
 			game_create_panel_detail::CopyUiText(state.minLevel, static_cast<int>(sizeof(state.minLevel)), action.value);

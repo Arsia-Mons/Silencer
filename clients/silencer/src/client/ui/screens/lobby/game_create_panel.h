@@ -28,6 +28,9 @@ class UiInteractionRegistry;
 
 namespace silencer::client_ui::lobby {
 
+constexpr const char * kGameCreateOptionsScrollId = "lobby.game_create.options";
+constexpr const char * kGameCreateOptionsScrollLabel = "Game Options Form";
+
 struct GameCreatePanelState {
 	// Form fields — buffers sized to match the legacy TextInput maxchars.
 	char name[36]      = {0};   // legacy maxchars = 35.
@@ -54,6 +57,13 @@ struct GameCreatePanelState {
 	bool spectatableClicked = false;
 	bool createClicked      = false;
 	int  mapRowClickedIndex = -1;
+
+	// Upper "Game Options" viewport state. The panel owns the visible-row
+	// window and applies wheel/control-socket scroll in row units.
+	Uint16 optionsScrollPosition = 0;
+	int    optionsScrollDelta = 0;
+	Uint16 optionsMaxScroll = 0;
+	Uint8  optionsVisibleRows = 0;
 
 	// Hover-preview cache for local map rows in the Create flow.
 	bool hoverPreviewVisible = false;
@@ -83,6 +93,10 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
                                    const silencer::ui::UiAction & action);
 
+// Preferred content-driven height for the upper options panel when the lobby
+// stepped layout has room to let it fit without scrolling.
+int GameCreateUpperPreferredHeight();
+
 // Emits the upper stepped-pane subtree ("Game Options" heading + 6-row form:
 // security cycler, min/max level, max players, max teams, spectatable).
 // Called inside the LobbyRightUpperBox CLAY block; flex children only (no
@@ -90,6 +104,8 @@ bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
 // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
 // TextInputBeginFrame.
 void BuildGameCreateUpperTree(GameCreatePanelState & state,
+                              Uint16 panelWidth,
+                              Uint16 panelHeight,
                               Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions);
 

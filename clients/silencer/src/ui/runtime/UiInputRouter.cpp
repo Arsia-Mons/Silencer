@@ -58,7 +58,9 @@ std::vector<UiAction> UiInputRouter::Route(const UiInputState& input) {
 		UiAction action;
 		action.kind = UiActionKind::Scroll;
 		action.value = "wheel";
-		action.amount = static_cast<int>(input.pointer.wheelY);
+		// Positive scroll amounts always mean "advance downward through the
+		// content", regardless of the physical input source.
+		action.amount = -static_cast<int>(input.pointer.wheelY);
 		registry_.QueueAction(action);
 	}
 

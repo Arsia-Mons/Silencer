@@ -1,0 +1,27 @@
+{
+  "task_id": "plan-fix-for-overflowing-game-options-menu_20260517_155032",
+  "metadata": {
+    "title": "Plan fix for overflowing game options menu",
+    "tags": [
+      "ui",
+      "planning",
+      "client"
+    ]
+  },
+  "repo": {
+    "git_url": "git@github.com:Arsia-Mons/Silencer.git",
+    "branch": "hv/clay-ui-migration",
+    "start_commit_sha": "cbcdcdf8ffccc53ac4003e47113b63c95d758b68",
+    "end_commit_sha": "dda84299c94b7cd0f1417508124e6c7a3c668143",
+    "subdir": "",
+    "sparse_checkout": []
+  },
+  "lm": {
+    "instructions": ""
+  },
+  "evaluation": {
+    "content_rubric": [],
+    "location_rubric": [],
+    "clarity_rubric": []
+  }
+}

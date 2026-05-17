@@ -888,15 +888,15 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						// given concentric `inset` from the bbox edge.
 						// Closed rectangles keep the classic stepped
 						// corner ownership: horizontal bands inset around
-						// both active verticals, and vertical bands inset
-						// around both active horizontals.
+						// active verticals, and vertical bands inset
+						// around active horizontals.
 						//
-						// Open-sided chrome (one vertical side suppressed
-						// or one horizontal side suppressed) instead lets
-						// the parallel band run flush to the open edge.
-						// That keeps shelf ends and stitched elbows
-						// visually contiguous when the lobby composes its
-						// L-shape from adjacent rectangular Boxes.
+						// The lobby's stepped right pane has one special
+						// problematic corner: the lower-left corner of the
+						// upper shelf (`Top|Bottom|Left`, right suppressed).
+						// That corner wants the bottom run to stay
+						// continuous, but without double-painting the halo
+						// stack. Handle that one corner explicitly here.
 						// Fill a stripe at (x, y, w, h) with `color`. When
 						// `opacity` is 255 it's a solid fill; otherwise blend
 						// the color against the underlying pixel so the same
@@ -950,47 +950,72 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 								}
 							}
 						};
+						auto effectiveBandThickness = [&](int thickness){
+							int t = thickness;
+							if(t < 1) return 0;
+							if(t * 2 > bw) t = bw / 2;
+							if(t * 2 > bh) t = bh / 2;
+							return t > 0 ? t : 0;
+						};
+						const int totalBandDepth =
+							effectiveBandThickness(p->outerHaloWidth) +
+							effectiveBandThickness(p->strokeWidth) +
+							effectiveBandThickness(p->innerHaloWidth);
+						const bool openRightBottomLeftCorner =
+							sLeft && !sRight && sBottom;
 						auto drawRing = [&](int inset, int thickness, Uint8 color, Uint8 opacity){
 							int t = thickness;
 							if(t < 1) return;
 							if(t * 2 > bw) t = bw / 2;
 							if(t * 2 > bh) t = bh / 2;
 							if(t < 1) return;
-							const bool insetHorizontalCorners = sLeft && sRight;
-							const bool insetVerticalCorners = sTop && sBottom;
-							int leftInset   = (sLeft && insetHorizontalCorners) ? inset : 0;
-							int rightInset  = (sRight && insetHorizontalCorners) ? inset : 0;
-							int topInset    = (sTop && insetVerticalCorners) ? inset : 0;
-							int bottomInset = (sBottom && insetVerticalCorners) ? inset : 0;
+							int topLeftTrim = sLeft ? inset : 0;
+							int topRightTrim = sRight ? inset : 0;
+							int bottomLeftTrim = sLeft ? inset : 0;
+							int bottomRightTrim = sRight ? inset : 0;
+							const int fullStackTrim = std::max(0, totalBandDepth - t);
+							if(openRightBottomLeftCorner){
+								bottomLeftTrim = 0;
+							}
+							int leftTopTrim = sTop ? inset : 0;
+							int leftBottomTrim = sBottom ? inset : 0;
+							if(openRightBottomLeftCorner){
+								leftBottomTrim = fullStackTrim;
+							}
+							int rightTopTrim = sTop ? inset : 0;
+							int rightBottomTrim = sBottom ? inset : 0;
 							// Top stripe.
 							if(sTop){
-								int x = bx + leftInset;
+								int x = bx + topLeftTrim;
 								int y = by + inset;
-								int w = bw - leftInset - rightInset;
+								int w = bw - topLeftTrim - topRightTrim;
 								fillStripe(x, y, w, t, color, opacity);
 							}
 							// Bottom stripe.
 							if(sBottom){
-								int x = bx + leftInset;
+								int x = bx + bottomLeftTrim;
 								int y = by + bh - inset - t;
-								int w = bw - leftInset - rightInset;
+								int w = bw - bottomLeftTrim - bottomRightTrim;
 								fillStripe(x, y, w, t, color, opacity);
 							}
-							// Vertical edges. Closed rectangles carve out
-							// the top/bottom corner cells for the horizontal
-							// stripes. Open-sided caps stay flush so the
-							// visible path remains continuous at stitched
-							// joins.
-							int vy0 = by + topInset    + (sTop    ? t : 0);
-							int vy1 = by + bh - bottomInset - (sBottom ? t : 0);
-							int vh  = vy1 - vy0;
-							if(sLeft && vh > 0){
+							// Vertical edges. Closed rectangles keep the
+							// classic stepped ownership. The upper-shelf
+							// bottom-left corner in the lobby instead hands
+							// the whole lower stack to the bottom run so the
+							// elbow stays continuous without brightening.
+							int leftVy0 = by + leftTopTrim + (sTop ? t : 0);
+							int leftVy1 = by + bh - leftBottomTrim - (sBottom ? t : 0);
+							int leftVh  = leftVy1 - leftVy0;
+							if(sLeft && leftVh > 0){
 								int x = bx + inset;
-								fillStripe(x, vy0, t, vh, color, opacity);
+								fillStripe(x, leftVy0, t, leftVh, color, opacity);
 							}
-							if(sRight && vh > 0){
+							int rightVy0 = by + rightTopTrim + (sTop ? t : 0);
+							int rightVy1 = by + bh - rightBottomTrim - (sBottom ? t : 0);
+							int rightVh  = rightVy1 - rightVy0;
+							if(sRight && rightVh > 0){
 								int x = bx + bw - inset - t;
-								fillStripe(x, vy0, t, vh, color, opacity);
+								fillStripe(x, rightVy0, t, rightVh, color, opacity);
 							}
 						};
 						int inset = 0;
