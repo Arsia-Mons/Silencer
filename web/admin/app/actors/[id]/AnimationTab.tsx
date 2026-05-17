@@ -88,10 +88,13 @@ const CANVAS_PAD = 24; // px padding around the scaled sprite
 const CANVAS_MIN = 120;
 
 /** Live preview canvas that plays a sequence at game speed (60 ticks/s), auto-sized to the sprite. */
-function PreviewCanvas({ sequence, scale }: { sequence: AnimSequence | null; scale: number }) {
+function PreviewCanvas({ sequence, scale, speed }: { sequence: AnimSequence | null; scale: number; speed: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
   const { loadImg, getImg } = useImageCache();
+  // Keep speed in a ref so changes don't restart the loop.
+  const speedRef = useRef(speed);
+  useEffect(() => { speedRef.current = speed; }, [speed]);
   const [canvasSize, setCanvasSize] = useState({ w: CANVAS_MIN, h: CANVAS_MIN });
 
   // Preload all frames and measure max sprite size.
@@ -130,7 +133,6 @@ function PreviewCanvas({ sequence, scale }: { sequence: AnimSequence | null; sca
     let tick = 0;
     let frameIdx = 0;
     let prevFrameIdx = -1;
-    const TICK_MS = 1000 / 60;
 
     function drawCurrent() {
       const f = sequence!.frames[frameIdx];
@@ -157,10 +159,11 @@ function PreviewCanvas({ sequence, scale }: { sequence: AnimSequence | null; sca
 
       if (lastTs < 0) lastTs = ts;
       const dt = ts - lastTs;
-      const tickCount = Math.floor(dt / TICK_MS);
+      const effectiveTICK_MS = (1000 / 60) / speedRef.current;
+      const tickCount = Math.floor(dt / effectiveTICK_MS);
 
       if (tickCount > 0) {
-        lastTs += tickCount * TICK_MS;
+        lastTs += tickCount * effectiveTICK_MS;
 
         // Advance ticks; detect every frame entry so sounds don't get skipped
         // during catch-up (e.g. after tab switch).
@@ -366,6 +369,7 @@ export default function AnimationTab({
   );
   const [newSeqName, setNewSeqName] = useState('');
   const [scale, setScale] = useState(1);
+  const [speed, setSpeed] = useState(1);
 
   const seq = selectedSeq ? sequences[selectedSeq] : null;
 
@@ -524,7 +528,22 @@ export default function AnimationTab({
                     >{s}×</button>
                   ))}
                 </div>
-                <PreviewCanvas sequence={seq} scale={scale} />
+                <div className="flex items-center gap-2 w-full">
+                  <span className="text-xs text-game-textDim shrink-0">SPEED</span>
+                  <input
+                    type="range" min={0.1} max={2} step={0.05}
+                    value={speed}
+                    onChange={e => setSpeed(+e.target.value)}
+                    className="flex-1 accent-game-primary h-1"
+                  />
+                  <button
+                    type="button"
+                    className="text-xs font-mono text-game-textDim hover:text-game-text w-10 text-right shrink-0"
+                    title="Reset to 1×"
+                    onClick={() => setSpeed(1)}
+                  >{speed.toFixed(2)}×</button>
+                </div>
+                <PreviewCanvas sequence={seq} scale={scale} speed={speed} />
               </div>
             </div>
 
