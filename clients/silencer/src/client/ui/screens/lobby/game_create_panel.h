@@ -99,6 +99,8 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 // ScrollListBeginFrame, TextInputBeginFrame.
 void BuildGameCreateTallTree(GameCreatePanelState & state,
                              ScreenContext & ctx,
+                             Uint16 panelWidth,
+                             Uint16 panelHeight,
                              Resources & resources,
                              silencer::ui::UiInteractionRegistry& interactions);
 

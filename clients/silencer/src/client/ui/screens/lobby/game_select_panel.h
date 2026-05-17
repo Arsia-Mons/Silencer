@@ -93,6 +93,8 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
 // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
 // ScrollListBeginFrame.
 void BuildGameSelectTallTree(GameSelectPanelState & state,
+                             Uint16 panelWidth,
+                             Uint16 panelHeight,
                              Resources & resources,
                              silencer::ui::UiInteractionRegistry& interactions);
 

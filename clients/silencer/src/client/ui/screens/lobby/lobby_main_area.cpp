@@ -58,6 +58,7 @@ struct LobbyBodyMetrics {
 	int characterW = kCharacterW;
 	int upperH = kUpperH;
 	int rightTallW = kRightTallW;
+	int rightTallH = kLegacyBodyH;
 	int leftColumnW = kLegacyLeftColumnW;
 	int chatH = kLegacyBodyH - kUpperH - 10;
 };
@@ -82,6 +83,7 @@ LobbyBodyMetrics ResolveWideMetrics(int bodyW,
 		desiredRightTallW = 170;
 	}
 	out.rightTallW = desiredRightTallW;
+	out.rightTallH = std::max(0, bodyH);
 	out.leftColumnW = std::max(0, bodyW - out.rightTallW - regionGap);
 	out.chatH = std::max(0, bodyH - out.upperH - regionGap);
 
@@ -116,17 +118,29 @@ void BuildRightUpperContents(LobbyMainAreaPanels & panels,
 void BuildRightTallContents(LobbyMainAreaPanels & panels,
                             ScreenContext & ctx,
                             LobbyScreen & owner,
+                            const LobbyBodyMetrics & metrics,
                             silencer::ui::UiInteractionRegistry& interactions) {
 	World & world = ctx.world;
 	Resources & resources = world.resources;
 	if(panels.gameCreateActive){
-		BuildGameCreateTallTree(panels.gameCreate, ctx, resources, interactions);
+		BuildGameCreateTallTree(
+			panels.gameCreate,
+			ctx,
+			static_cast<Uint16>(std::max(0, metrics.rightTallW)),
+			static_cast<Uint16>(std::max(0, metrics.rightTallH)),
+			resources,
+			interactions);
 	}else if(panels.gameJoinActive){
 		BuildGameJoinTallTree(panels.gameJoin, resources, interactions);
 	}else if(panels.gameTechActive){
 		BuildGameTechTallTree(panels.gameTech, world, resources, owner, interactions);
 	}else{
-		BuildGameSelectTallTree(panels.gameSelect, resources, interactions);
+		BuildGameSelectTallTree(
+			panels.gameSelect,
+			static_cast<Uint16>(std::max(0, metrics.rightTallW)),
+			static_cast<Uint16>(std::max(0, metrics.rightTallH)),
+			resources,
+			interactions);
 	}
 }
 
@@ -209,7 +223,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 		         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 		         .clip = { .horizontal = true, .vertical = true },
 	     })) {
-		BuildRightTallContents(panels, ctx, owner, interactions);
+		BuildRightTallContents(panels, ctx, owner, metrics, interactions);
 	}
 }
 

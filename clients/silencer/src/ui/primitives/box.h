@@ -106,6 +106,13 @@ constexpr BoxStrokeStyle Plain{
 	0, 0, 0, 0,
 };
 
+// Single 1-px stroke at idx 220, no halo. Matches the lobby's inner
+// form/list outlines such as Game Options and Select Map.
+constexpr BoxStrokeStyle Inset{
+	/*strokeColor=*/220, /*strokeWidth=*/1,
+	0, 0, 0, 0,
+};
+
 // No stroke at all. Use when only fill or layout is wanted from Box.
 constexpr BoxStrokeStyle None{};
 

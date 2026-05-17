@@ -3,6 +3,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
+#include "primitives/box.h"
 #include "primitives/text.h"
 #include "primitives/button.h"
 #include "primitives/text_input.h"
@@ -13,6 +14,7 @@
 
 using silencer::ui::primitives::Text;
 using silencer::ui::primitives::TextSize;
+using silencer::ui::primitives::Box;
 using silencer::ui::primitives::Button;
 using silencer::ui::primitives::ButtonHandle;
 using silencer::ui::primitives::ButtonOpts;
@@ -21,6 +23,7 @@ using silencer::ui::primitives::ButtonVariant;
 using silencer::ui::primitives::TextInput;
 using silencer::ui::primitives::TextInputHandle;
 using silencer::ui::primitives::TextInputOpts;
+namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 
 namespace silencer::client_ui::lobby {
 
@@ -29,6 +32,9 @@ namespace game_create_panel_options_detail {
 constexpr int    kRowHeight = 14;
 
 constexpr uint16_t kPanelPad      = 6;
+constexpr uint16_t kFormPadLeft   = 4;
+constexpr uint16_t kFormPadTop    = 2;
+constexpr uint16_t kFormPadBottom = 2;
 constexpr uint16_t kFormRowH      = 14;
 constexpr uint16_t kFormRowGap    = 3;
 constexpr uint16_t kFormColumnGap = 6;
@@ -128,33 +134,47 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 			     { .size = TextSize::Heading });
 		}
 
-		struct LabelRow { const char * label; const char * id; };
-		constexpr LabelRow kLabels[6] = {
-			{ "Security:",    "GCrtRowSec"   },
-			{ "Min Level:",   "GCrtRowMinL"  },
-			{ "Max Level:",   "GCrtRowMaxL"  },
-			{ "Max Players:", "GCrtRowMaxP"  },
-			{ "Max Teams:",   "GCrtRowMaxT"  },
-			{ "Spectatable:", "GCrtRowSpect" },
-		};
+		CLAY(Box(BoxVariants::Inset, {
+		         .id = CLAY_ID("GCrtOptionsFormBorder"),
+		         .layout = {
+		             .sizing = { CLAY_SIZING_GROW(0),
+		                         CLAY_SIZING_FIT(0) },
+		             .padding = { game_create_panel_options_detail::kFormPadLeft,
+		                          game_create_panel_options_detail::kFormPadLeft,
+		                          game_create_panel_options_detail::kFormPadTop,
+		                          game_create_panel_options_detail::kFormPadBottom },
+		             .childGap = game_create_panel_options_detail::kFormRowGap,
+		             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+		         },
+		     })) {
+			struct LabelRow { const char * label; const char * id; };
+			constexpr LabelRow kLabels[6] = {
+				{ "Security:",    "GCrtRowSec"   },
+				{ "Min Level:",   "GCrtRowMinL"  },
+				{ "Max Level:",   "GCrtRowMaxL"  },
+				{ "Max Players:", "GCrtRowMaxP"  },
+				{ "Max Teams:",   "GCrtRowMaxT"  },
+				{ "Spectatable:", "GCrtRowSpect" },
+			};
 
-		struct NumInput { const char * id; const char * label; const char * actionId; char * buf; int cap; };
-		NumInput kTextInputs[4] = {
-			{ "GCrtMinLevel",   "Min Level",   game_create_panel_options_detail::kActionMinLevel,   state.minLevel,   (int)sizeof(state.minLevel)   },
-			{ "GCrtMaxLevel",   "Max Level",   game_create_panel_options_detail::kActionMaxLevel,   state.maxLevel,   (int)sizeof(state.maxLevel)   },
-			{ "GCrtMaxPlayers", "Max Players", game_create_panel_options_detail::kActionMaxPlayers, state.maxPlayers, (int)sizeof(state.maxPlayers) },
-			{ "GCrtMaxTeams",   "Max Teams",   game_create_panel_options_detail::kActionMaxTeams,   state.maxTeams,   (int)sizeof(state.maxTeams)   },
-		};
+			struct NumInput { const char * id; const char * label; const char * actionId; char * buf; int cap; };
+			NumInput kTextInputs[4] = {
+				{ "GCrtMinLevel",   "Min Level",   game_create_panel_options_detail::kActionMinLevel,   state.minLevel,   (int)sizeof(state.minLevel)   },
+				{ "GCrtMaxLevel",   "Max Level",   game_create_panel_options_detail::kActionMaxLevel,   state.maxLevel,   (int)sizeof(state.maxLevel)   },
+				{ "GCrtMaxPlayers", "Max Players", game_create_panel_options_detail::kActionMaxPlayers, state.maxPlayers, (int)sizeof(state.maxPlayers) },
+				{ "GCrtMaxTeams",   "Max Teams",   game_create_panel_options_detail::kActionMaxTeams,   state.maxTeams,   (int)sizeof(state.maxTeams)   },
+			};
 
-		for(int i = 0; i < 6; ++i){
-			const NumInput * ti = (i >= 1 && i <= 4) ? &kTextInputs[i - 1] : nullptr;
-			game_create_panel_options_detail::BuildOptionRow(state, i,
-			               kLabels[i].id, kLabels[i].label,
-			               ti ? ti->id : "",
-			               ti ? ti->actionId : "",
-			               ti ? ti->buf : nullptr,
-			               ti ? ti->cap : 0,
-			               interactions);
+			for(int i = 0; i < 6; ++i){
+				const NumInput * ti = (i >= 1 && i <= 4) ? &kTextInputs[i - 1] : nullptr;
+				game_create_panel_options_detail::BuildOptionRow(state, i,
+				               kLabels[i].id, kLabels[i].label,
+				               ti ? ti->id : "",
+				               ti ? ti->actionId : "",
+				               ti ? ti->buf : nullptr,
+				               ti ? ti->cap : 0,
+				               interactions);
+			}
 		}
 	}
 }
