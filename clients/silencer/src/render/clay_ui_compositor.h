@@ -232,11 +232,11 @@ bool RunPanelTest(::Game & game, const char * variant, const char * outPath);
 // `clay_box_test` control op. Implementation in box_test.cpp.
 bool RunBoxTest(::Game & game, const char * outPath);
 
-// C0c Box halo render test. Renders a single Box with the lobby's
-// canonical halo params (primary stroke + outer + inner halos) against a
-// flat black background into a 640x480 Surface and writes it to `outPath`.
-// Invoked by the `clay_box_halo_test` control op. Implementation in
-// box_halo_test.cpp.
+// C0c Box halo render test. Renders a small gallery of halo-bearing Box
+// cases — a closed chrome rect plus the lobby's open-sided shelf/elbow
+// compositions — against a flat black background into a 640x480 Surface
+// and writes it to `outPath`. Invoked by the `clay_box_halo_test`
+// control op. Implementation in box_halo_test.cpp.
 bool RunBoxHaloTest(::Game & game, const char * outPath);
 
 // C0d Box vs legacy chat-box parity scene. Renders a single Box at the

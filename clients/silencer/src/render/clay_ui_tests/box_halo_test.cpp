@@ -1,15 +1,13 @@
 // C0c unit test scene for the Box primitive's multi-tone stroke halo path.
 //
-// `RunBoxHaloTest(outPath)` renders a single Box with the canonical lobby
-// chrome halo params (primary stroke + 1-px outer + 1-px inner halos)
-// against a flat black background into a 640x480 Surface. This is the
-// visual proof-of-concept for replacing the legacy BG sprite's
-// bright-stroke-bracketed-by-dark-green look with a procedural BoxStroke.
+// `RunBoxHaloTest(outPath)` renders a small gallery of halo-bearing Box
+// variants against a flat black background into a 640x480 Surface:
+// a closed rectangle, the lobby's open-right and open-left shelf shapes,
+// and a stitched stepped composition that mirrors the lobby's inner elbow.
 //
-// The Box is centered, sized 400x300, no fill — so only the 3-px-thick
-// halo stroke chrome shows. Pixdiff bar against the committed reference
-// is < 1.0% (per the C0c pass_check; the visual is exactly the chrome
-// signature, not pixel-locked to a baked sprite).
+// This is the visual regression guard for shared halo raster behavior:
+// open-sided shelves must keep their lower corners visually contiguous,
+// while the canonical closed-rectangle chrome remains unchanged.
 
 #include "clay_ui_compositor.h"
 #include "clay/clay.h"
@@ -22,6 +20,32 @@
 
 namespace silencer::clay_bridge {
 
+namespace {
+
+using silencer::ui::primitives::BoxStrokeStyle;
+namespace BoxSides = silencer::ui::primitives::BoxSides;
+namespace BoxVariants = silencer::ui::primitives::BoxVariants;
+
+BoxStrokeStyle OpenRightChrome() {
+	BoxStrokeStyle style = BoxVariants::Chrome;
+	style.sides = static_cast<Uint8>(BoxSides::Top | BoxSides::Bottom | BoxSides::Left);
+	return style;
+}
+
+BoxStrokeStyle OpenLeftChrome() {
+	BoxStrokeStyle style = BoxVariants::Chrome;
+	style.sides = static_cast<Uint8>(BoxSides::Top | BoxSides::Bottom | BoxSides::Right);
+	return style;
+}
+
+BoxStrokeStyle RightEdgeChrome() {
+	BoxStrokeStyle style = BoxVariants::Chrome;
+	style.sides = BoxSides::Right;
+	return style;
+}
+
+}  // namespace
+
 bool RunBoxHaloTest(::Game & game, const char * outPath) {
 	const int W = 640;
 	const int H = 480;
@@ -29,7 +53,6 @@ bool RunBoxHaloTest(::Game & game, const char * outPath) {
 
 	using silencer::ui::primitives::Box;
 	using silencer::ui::primitives::BoxBeginFrame;
-	namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 
 	BoxBeginFrame();
 	::Clay_BeginLayout();
@@ -37,15 +60,108 @@ bool RunBoxHaloTest(::Game & game, const char * outPath) {
 	CLAY({ .id = CLAY_ID("BoxHaloRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
-	           .padding = { /*left=*/120, /*right=*/120,
-	                        /*top=*/90,   /*bottom=*/90 },
+	           .padding = { /*left=*/30, /*right=*/30,
+	                        /*top=*/30,  /*bottom=*/30 },
+	           .childGap = 30,
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
-		CLAY(Box(BoxVariants::Chrome, {
-		         .id = CLAY_ID("HaloBox"),
-		         .layout = {
-		             .sizing = { CLAY_SIZING_FIXED(400), CLAY_SIZING_FIXED(300) },
-		         },
-		     })) {}
+		CLAY({ .id = CLAY_ID("BoxHaloRow"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(130) },
+		           .childGap = 20,
+		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+		       } }) {
+			CLAY(Box(BoxVariants::Chrome, {
+			         .id = CLAY_ID("HaloBoxClosed"),
+			         .layout = {
+			             .sizing = { CLAY_SIZING_FIXED(180), CLAY_SIZING_FIXED(130) },
+			         },
+			     })) {}
+			CLAY(Box(OpenRightChrome(), {
+			         .id = CLAY_ID("HaloBoxOpenRight"),
+			         .layout = {
+			             .sizing = { CLAY_SIZING_FIXED(180), CLAY_SIZING_FIXED(130) },
+			         },
+			     })) {}
+			CLAY(Box(OpenLeftChrome(), {
+			         .id = CLAY_ID("HaloBoxOpenLeft"),
+			         .layout = {
+			             .sizing = { CLAY_SIZING_FIXED(180), CLAY_SIZING_FIXED(130) },
+			         },
+			     })) {}
+		}
+
+		CLAY({ .id = CLAY_ID("BoxHaloSteppedWrap"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(400), CLAY_SIZING_FIXED(230) },
+		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+		       } }) {
+			CLAY({ .id = CLAY_ID("BoxHaloLeftStack"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_FIXED(250), CLAY_SIZING_GROW(0) },
+			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+			       } }) {
+				CLAY({ .id = CLAY_ID("BoxHaloUpperRow"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(85) },
+				           .childGap = 10,
+				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+				       } }) {
+					CLAY(Box(BoxVariants::Chrome, {
+					         .id = CLAY_ID("HaloCharacterBox"),
+					         .layout = {
+					             .sizing = { CLAY_SIZING_FIXED(105), CLAY_SIZING_GROW(0) },
+					         },
+					     })) {}
+					CLAY(Box(OpenRightChrome(), {
+					         .id = CLAY_ID("HaloUpperShelf"),
+					         .layout = {
+					             .sizing = { CLAY_SIZING_FIXED(135), CLAY_SIZING_GROW(0) },
+					         },
+					     })) {}
+				}
+				CLAY({ .id = CLAY_ID("BoxHaloElbowGapRow"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(10) },
+				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+				       } }) {
+					CLAY({ .id = CLAY_ID("BoxHaloElbowGapFill"),
+					       .layout = {
+					           .sizing = { CLAY_SIZING_FIXED(240), CLAY_SIZING_GROW(0) },
+					       } }) {}
+					CLAY(Box(RightEdgeChrome(), {
+					         .id = CLAY_ID("BoxHaloElbowGapSeam"),
+					         .layout = {
+					             .sizing = { CLAY_SIZING_FIXED(10), CLAY_SIZING_GROW(0) },
+					         },
+					     })) {}
+				}
+				CLAY({ .id = CLAY_ID("BoxHaloLowerRow"),
+				       .layout = {
+				           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
+				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+				       } }) {
+					CLAY(Box(BoxVariants::Chrome, {
+					         .id = CLAY_ID("HaloChatBox"),
+					         .layout = {
+					             .sizing = { CLAY_SIZING_FIXED(240), CLAY_SIZING_GROW(0) },
+					         },
+					     })) {}
+					CLAY(Box(RightEdgeChrome(), {
+					         .id = CLAY_ID("BoxHaloLowerGapSeam"),
+					         .layout = {
+					             .sizing = { CLAY_SIZING_FIXED(10), CLAY_SIZING_GROW(0) },
+					         },
+					     })) {}
+				}
+			}
+			CLAY(Box(OpenLeftChrome(), {
+			         .id = CLAY_ID("HaloTallBox"),
+			         .layout = {
+			             .sizing = { CLAY_SIZING_FIXED(150), CLAY_SIZING_GROW(0) },
+			         },
+			     })) {}
+		}
 	}
 
 	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();

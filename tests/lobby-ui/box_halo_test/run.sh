@@ -2,8 +2,8 @@
 # C0c Box halo render test — drives `clay_box_halo_test` and pixdiffs
 # the resulting PNG against the committed reference.
 #
-# Renders a single Box with the canonical lobby chrome halo params
-# (primary stroke + 1-px outer + 1-px inner halos) against flat black.
+# Renders a small halo gallery: one closed chrome rect plus the open-sided
+# shelf/elbow shapes used by the lobby's stepped right pane.
 #
 # Pass bar: < 1.0% pixdiff vs reference.png.
 #
