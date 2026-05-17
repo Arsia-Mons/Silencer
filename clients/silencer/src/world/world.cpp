@@ -14,6 +14,7 @@
 #include "interface.h"
 #include "bodypart.h"
 #include "gasloader.h"
+#include "gamestateobject.h"
 #include <algorithm>
 
 #define DELTAENABLED 1
@@ -80,12 +81,15 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	spectator.camvy = 0;
 	spectator.holdshowallnames = false;
 	spectator.initialized = false;
+	gameMode = GameModeFactory(GAMEMODE_DATA_RETRIEVAL);
 }
 
 World::~World(){
 	Disconnect();
     shutdown(sockethandle, SHUT_RDWR);
     closesocket(sockethandle);
+	delete gameMode;
+	gameMode = nullptr;
 	for(std::vector<BuyableItem *>::iterator it = buyableitems.begin(); it != buyableitems.end(); it++){
 		delete (*it);
 	}
@@ -130,6 +134,14 @@ void World::Tick(void){
 		DestroyMarkedObjects();
 	}else{
 		TickObjects();
+		if(gameMode){
+			gameMode->Tick(*this);
+		}
+		// Create the replicated match-state object once per match on authority.
+		if(gameplaystate == INGAME && objectsbytype[ObjectTypes::GAMESTATEOBJ].empty()){
+			GameStateObject* gso = (GameStateObject*)CreateObject(ObjectTypes::GAMESTATEOBJ);
+			gso->modeId = gameMode ? gameMode->Id() : GAMEMODE_DATA_RETRIEVAL;
+		}
 		for(int i = 0; i < maxpeers; i++){
 			Peer * peer = peerlist[i];
 			if(peer){

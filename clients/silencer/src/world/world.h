@@ -21,6 +21,7 @@
 #include "buyableitem.h"
 #include "replay.h"
 #include "TriggerGraph.h"
+#include "gamemode.h"
 
 class World
 {
@@ -69,6 +70,7 @@ public:
 	bool IsConnected() const;
 	bool IsIdle() const;
 	bool IsLocalObserver(void);
+	Uint16 GetWinningTeamId() const { return winningteamid; }
 	void Illuminate(void);
 	void ShowMessage(const char * message, Uint8 time = 255, Uint8 type = 0, bool networked = false, Peer * peer = 0);
 	void ShowStatus(const char * status, Uint8 color = 0, bool networked = false, Peer * peer = 0);
@@ -132,7 +134,8 @@ public:
 	bool input_locked = false; // set by LOCK_INPUT action, cleared by UNLOCK_INPUT
 	bool player_spawn_emitted = false;
 	int secretsBeamed = 0;  // total secrets successfully delivered to base (authority-side counter)
-	
+	GameMode* gameMode = nullptr;  // authority-only; owns current match mode logic
+
 	friend class Renderer;
 	friend class Game;
 	friend class MapDownloader;
@@ -146,6 +149,7 @@ public:
 	friend class SurveillanceMonitor;
 	friend class Magistrate;
 	friend class Vanta;
+	friend class GameStateObject;
 	friend class Warper;
 	friend class Grenade;
 	friend class BaseDoor;
