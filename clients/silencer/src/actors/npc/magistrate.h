@@ -34,6 +34,9 @@ private:
 
 	const BehaviorTree* bt_;
 	BTContext            btctx_;
+
+	bool deathSoundFired_  = false;
+	bool deathActorsFired_ = false;
 };
 
 #endif

@@ -2,15 +2,16 @@
   "version": 1,
   "id": "magistrate",
   "blackboard": [
-    { "key": "is_dormant",  "type": "bool",  "default": true },
-    { "key": "health_pct",  "type": "float", "default": 1.0  }
+    { "key": "is_dormant",  "type": "bool",  "default": true  },
+    { "key": "is_dying",    "type": "bool",  "default": false },
+    { "key": "health_pct",  "type": "float", "default": 1.0   }
   ],
   "rootId": "root",
   "nodes": {
     "root": {
       "type": "Selector",
       "label": "Magistrate AI",
-      "children": ["seq_dormant", "seq_flee", "seq_patrol"],
+      "children": ["seq_dormant", "seq_dying", "seq_flee", "seq_patrol"],
       "props": {}
     },
 
@@ -31,6 +32,37 @@
       "label": "CheckActivation",
       "children": [],
       "props": { "action": "CheckActivation" }
+    },
+
+    "seq_dying": {
+      "type": "Sequence",
+      "label": "Death sequence",
+      "children": ["cond_dying", "leaf_death_sound", "leaf_spawn_guards", "leaf_death_fade"],
+      "props": {}
+    },
+    "cond_dying": {
+      "type": "Condition",
+      "label": "is_dying == true?",
+      "children": [],
+      "props": { "key": "is_dying", "op": "==", "value": true }
+    },
+    "leaf_death_sound": {
+      "type": "Leaf",
+      "label": "Play death sound (once)",
+      "children": [],
+      "props": { "action": "EmitDeathSound" }
+    },
+    "leaf_spawn_guards": {
+      "type": "Leaf",
+      "label": "Spawn death guards/robots (once)",
+      "children": [],
+      "props": { "action": "SpawnDeathGuards" }
+    },
+    "leaf_death_fade": {
+      "type": "Leaf",
+      "label": "Death fade (10 ticks)",
+      "children": [],
+      "props": { "action": "DeathFade", "duration": 10 }
     },
 
     "seq_flee": {

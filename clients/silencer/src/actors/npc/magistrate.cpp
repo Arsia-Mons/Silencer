@@ -106,6 +106,45 @@ void Magistrate::InitBT(){
 		return BTResult::Running;
 	};
 
+	// ── Death leaves ──────────────────────────────────────────────────────────
+	// Play the death sound once. Idempotent; always Success.
+	btctx_.actions["EmitDeathSound"] = [this](BTContext& ctx) -> BTResult {
+		if(!deathSoundFired_){
+			deathSoundFired_ = true;
+			World& world = *static_cast<World*>(ctx.userData);
+			const EnemyDef* md = GASLoader::Get().GetEnemyDef("magistrate");
+			if(md && !md->soundDeath.empty())
+				EmitSound(world, world.resources.soundbank[md->soundDeath], 128);
+		}
+		return BTResult::Success;
+	};
+
+	// Spawn guards/robots at death position. Idempotent; always Success.
+	btctx_.actions["SpawnDeathGuards"] = [this](BTContext& ctx) -> BTResult {
+		if(!deathActorsFired_){
+			deathActorsFired_ = true;
+			World& world = *static_cast<World*>(ctx.userData);
+			SpawnDeathActors(world);
+		}
+		return BTResult::Success;
+	};
+
+	// Death fade-out. Runs for `duration` ticks then sets state=DEAD and hides.
+	// Returns Running while playing, Success when done.
+	btctx_.actions["DeathFade"] = [this](BTContext& ctx) -> BTResult {
+		int duration = ctx.props ? ctx.props->value("duration", 10) : 10;
+		collidable = false;
+		res_bank   = 207;
+		res_index  = 0;
+		if(state_i >= duration){
+			draw  = false;
+			state = DEAD;
+			state_i = 0;
+			return BTResult::Success;
+		}
+		return BTResult::Running;
+	};
+
 	// ── Generic data-driven leaves ────────────────────────────────────────────
 	btctx_.actions["SetBlackboard"] = [](BTContext& ctx) -> BTResult {
 		if(!ctx.props || !ctx.props->contains("key") || !ctx.props->contains("value"))
@@ -200,26 +239,7 @@ void Magistrate::Tick(World & world){
 	Hittable::Tick(*this, world);
 	Bipedal::Tick(*this, world);
 
-	const EnemyDef* m = GASLoader::Get().GetEnemyDef("magistrate");
-
-	// DYING / DEAD: handled entirely in C++ — BT is not involved
-	if(state == DYING){
-		collidable = false;
-		if(state_i == 0){
-			if(m && !m->soundDeath.empty())
-				EmitSound(world, world.resources.soundbank[m->soundDeath], 128);
-			SpawnDeathActors(world);
-		}
-		res_bank  = 207;
-		res_index = 0;
-		if(state_i >= 10){
-			draw  = false;
-			state = DEAD;
-			state_i = -1;
-		}
-		state_i++;
-		return;
-	}
+	// DEAD: nothing left to do
 	if(state == DEAD){
 		draw       = false;
 		collidable = false;
@@ -253,13 +273,14 @@ void Magistrate::Tick(World & world){
 		return;
 	}
 
-	// Init BT once (runs for DORMANT, STANDING, WALKING)
+	// Init BT once (runs for DORMANT, STANDING, WALKING, DYING)
 	if(!bt_) InitBT();
 
-	// Tick BT — writes BB keys then lets the tree drive state transitions
+	// Tick BT — writes BB keys, then tree drives all behavior
 	if(bt_){
 		btctx_.userData = &world;
 		btctx_.bbSet("is_dormant", state == DORMANT);
+		btctx_.bbSet("is_dying",   state == DYING);
 		btctx_.bbSet("health_pct", maxhealth > 0 ? (float)health / (float)maxhealth : 0.0f);
 		bt_->tick(btctx_);
 	}
@@ -279,6 +300,11 @@ void Magistrate::Tick(World & world){
 			res_bank  = 207;
 			res_index = state_i % 21;
 			FollowGround(*this, world, xv);
+			break;
+		case DYING:
+			collidable = false;
+			res_bank   = 207;
+			res_index  = 0;
 			break;
 		default:
 			break;
