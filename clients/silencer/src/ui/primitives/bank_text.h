@@ -46,6 +46,7 @@ struct BankTextOpts {
 	Uint8 brightness  = 128;  // 128 = neutral (legacy Overlay default).
 	bool  colorRamp   = false;
 	bool  drawAlpha   = false;
+	bool  measureInk  = false; // Use visible glyph bounds for layout.
 };
 
 // Resets the per-frame BankTextDrawData arena. Call once before each

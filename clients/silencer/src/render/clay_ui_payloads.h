@@ -41,6 +41,7 @@ struct BankTextDrawData {
 	Uint8 brightness;     // 128 = neutral.
 	bool colorRamp;       // True -> EffectRampColor instead of EffectColor.
 	bool drawAlpha;       // True -> DrawAlphaed glyph blit.
+	bool measureInk;      // True -> Clay layout uses visible glyph bounds.
 };
 
 // CUSTOM render command payload. Tag the kind so the compositor can dispatch.

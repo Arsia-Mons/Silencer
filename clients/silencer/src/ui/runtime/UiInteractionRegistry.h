@@ -115,6 +115,7 @@ private:
 	std::vector<UiInteractable> interactables_;
 	UiActionQueue actions_;
 	int focusedUid_ = -1;
+	UiInteractableKind focusedKind_ = UiInteractableKind::Button;
 	std::string focusedLabel_;
 };
 

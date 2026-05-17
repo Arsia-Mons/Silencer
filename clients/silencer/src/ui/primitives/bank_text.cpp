@@ -22,7 +22,7 @@ VariantConfig ConfigFor(BankTextVariant v) {
 }
 
 bool OptsAreDefault(const BankTextOpts & o) {
-	return o.brightness == 128 && !o.colorRamp && !o.drawAlpha;
+	return o.brightness == 128 && !o.colorRamp && !o.drawAlpha && !o.measureInk;
 }
 
 // Per-frame arena for BankTextDrawData userData payloads. Allocations stay
@@ -38,6 +38,7 @@ silencer::clay_bridge::BankTextDrawData * AllocUserData(const BankTextOpts & o) 
 	slot->brightness = o.brightness;
 	slot->colorRamp  = o.colorRamp;
 	slot->drawAlpha  = o.drawAlpha;
+	slot->measureInk = o.measureInk;
 	return slot;
 }
 

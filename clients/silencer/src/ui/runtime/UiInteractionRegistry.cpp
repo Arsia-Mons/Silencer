@@ -273,6 +273,7 @@ UiInteractable* UiInteractionRegistry::FocusedInteractable() {
 
 void UiInteractionRegistry::SetFocus(const UiInteractable& widget) {
 	focusedUid_ = widget.uid;
+	focusedKind_ = widget.kind;
 	focusedLabel_ = registry_detail::InteractableId(widget);
 	RefreshElementState();
 }
@@ -325,7 +326,8 @@ bool UiInteractionRegistry::FocusInteractableById(const std::string& id) {
 
 bool UiInteractionRegistry::IsTextInputFocused(int uid) const {
 	const UiInteractable * widget = FocusedInteractable();
-	return widget && widget->uid == uid;
+	if(widget) return widget->kind == UiInteractableKind::TextInput && widget->uid == uid;
+	return focusedKind_ == UiInteractableKind::TextInput && focusedUid_ == uid;
 }
 
 bool UiInteractionRegistry::HasFocus() const {
@@ -334,6 +336,7 @@ bool UiInteractionRegistry::HasFocus() const {
 
 void UiInteractionRegistry::ClearFocus() {
 	focusedUid_ = -1;
+	focusedKind_ = UiInteractableKind::Button;
 	focusedLabel_.clear();
 	RefreshElementState();
 }

@@ -30,6 +30,8 @@ int g_lastH = -1;
 // (no magnification). Updated via SetUiScale() before each Render().
 int g_uiScale = 1;
 
+const Resources * g_textMeasureResources = nullptr;
+
 // Per-bank text height. Mirrors the Overlay::MouseInside switch
 // (overlay.cpp:99). Banks 132 (TinyText), 133 (Body), 134 (Heading),
 // 135 (Title), 136 reserved.
@@ -44,14 +46,93 @@ Uint16 BankTextHeight(uint16_t bank) {
 	}
 }
 
+bool UsesInkMetrics(void * userData) {
+	if(!userData) return false;
+	const BankTextDrawData * extra =
+		reinterpret_cast<const BankTextDrawData *>(userData);
+	return extra && extra->measureInk;
+}
+
+int GlyphOffsetForBank(Uint16 bank) {
+	return bank == 132 ? 34 : 33;
+}
+
+struct TextInkMetrics {
+	bool hasInk = false;
+	int minX = 0;
+	int maxX = 0;
+	int width = 0;
+};
+
+TextInkMetrics MeasureInkBounds(const Resources * resources,
+                                const char * chars,
+                                int32_t length,
+                                Uint16 bank,
+                                Uint16 advance) {
+	TextInkMetrics out;
+	if(!resources || !chars || length <= 0 || advance == 0){
+		return out;
+	}
+	if(bank >= resources->spritebank.size()){
+		return out;
+	}
+	const auto& glyphs = resources->spritebank[bank];
+	const int ioffset = GlyphOffsetForBank(bank);
+	int pen = 0;
+	for(int32_t i = 0; i < length; ++i){
+		unsigned char ch = static_cast<unsigned char>(chars[i]);
+		if(ch == ' ' || ch == 0xA0){
+			pen += advance;
+			continue;
+		}
+		int glyphIndex = static_cast<int>(ch) - ioffset;
+		if(glyphIndex < 0 || glyphIndex >= static_cast<int>(glyphs.size())){
+			pen += advance;
+			continue;
+		}
+		Surface * glyph = glyphs[glyphIndex].get();
+		if(!glyph || glyph->w <= 0 || glyph->h <= 0){
+			pen += advance;
+			continue;
+		}
+		int glyphMinX = glyph->w;
+		int glyphMaxX = -1;
+		for(int y = 0; y < glyph->h; ++y){
+			for(int x = 0; x < glyph->w; ++x){
+				if(Renderer::GetPixel(glyph, x, y) == 0) continue;
+				if(x < glyphMinX) glyphMinX = x;
+				if(x > glyphMaxX) glyphMaxX = x;
+			}
+		}
+		if(glyphMaxX >= glyphMinX){
+			int inkMin = pen + glyphMinX;
+			int inkMax = pen + glyphMaxX + 1;
+			if(!out.hasInk || inkMin < out.minX) out.minX = inkMin;
+			if(!out.hasInk || inkMax > out.maxX) out.maxX = inkMax;
+			out.hasInk = true;
+		}
+		pen += advance;
+	}
+	if(out.hasInk){
+		out.width = out.maxX - out.minX;
+	}
+	return out;
+}
+
 ::Clay_Dimensions MeasureBankText(::Clay_StringSlice text,
                                   ::Clay_TextElementConfig * config,
                                   void * /*userData*/) {
-	// Bank fonts are monospaced — the existing DrawText path advances by a
-	// fixed `width` per character, regardless of glyph. So we just scale by
-	// length here. fontSize == cell width in pixels.
 	::Clay_Dimensions out;
-	out.width  = static_cast<float>(text.length * config->fontSize);
+	TextInkMetrics ink = UsesInkMetrics(config->userData)
+		? MeasureInkBounds(g_textMeasureResources,
+		                    text.chars,
+		                    text.length,
+		                    config->fontId,
+		                    config->fontSize)
+		: TextInkMetrics{};
+	out.width  = ink.hasInk
+		? static_cast<float>(ink.width)
+		: static_cast<float>(text.length * config->fontSize);
 	out.height = static_cast<float>(BankTextHeight(config->fontId));
 	return out;
 }
@@ -199,7 +280,8 @@ void DispatchBorder(Surface * dst,
 	}
 }
 
-void DispatchText(::Renderer & renderer,
+void DispatchText(::Resources & resources,
+                  ::Renderer & renderer,
                   Surface * dst,
                   const ::Clay_BoundingBox & bb,
                   const ::Clay_TextRenderData & data,
@@ -235,6 +317,14 @@ void DispatchText(::Renderer & renderer,
 	Uint8 bank   = static_cast<Uint8>(data.fontId);
 	Uint8 width  = static_cast<Uint8>(data.fontSize);
 	Uint8 color  = static_cast<Uint8>(data.textColor.r);
+	TextInkMetrics ink = UsesInkMetrics(userData)
+		? MeasureInkBounds(&resources,
+		                    data.stringContents.chars,
+		                    data.stringContents.length,
+		                    data.fontId,
+		                    data.fontSize)
+		: TextInkMetrics{};
+	if(ink.hasInk) x -= ink.minX;
 	renderer.DrawText(dst, static_cast<Uint16>(x), static_cast<Uint16>(y),
 	                  buf, bank, width, alpha, color, brightness, colorRamp);
 }
@@ -479,6 +569,10 @@ int UiScale() {
 	return g_uiScale;
 }
 
+void SetTextMeasureResources(const Resources * resources) {
+	g_textMeasureResources = resources;
+}
+
 void RenderInto(::Resources & resources, ::Renderer & renderer,
                 Surface * dst, ::Clay_RenderCommandArray cmds) {
 	g_clipStack.clear();
@@ -494,7 +588,7 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 				DispatchBorder(dst, c->boundingBox, c->renderData.border);
 				break;
 			case CLAY_RENDER_COMMAND_TYPE_TEXT:
-				DispatchText(renderer, dst, c->boundingBox,
+				DispatchText(resources, renderer, dst, c->boundingBox,
 				             c->renderData.text, c->userData);
 				break;
 			case CLAY_RENDER_COMMAND_TYPE_IMAGE:

@@ -33,6 +33,11 @@ timeline for Oval pointer hover and keyboard focus. Expected output:
 | `clicks_fired_when_held`    | 0        | No re-fire on held frames after first dispatch. |
 | `compact_width`             | 156      | Chrome+Compact maps to the existing framed lobby button. |
 | `compact_height`            | 21       | Chrome+Compact keeps the existing hit height. |
+| `text_compact_width`        | 52       | Text+Compact maps to the B52x21 lobby-connect button width. |
+| `text_compact_height`       | 21       | Text+Compact keeps the B52x21 button height. |
+| `text_compact_text_x_offset` | balanced | Text+Compact centers the measured "Login" ink box in the 52px button. |
+| `text_compact_text_width` | measured | Visible bank-glyph ink width for the "Login" label. |
+| `text_compact_text_y_offset` | 8       | B52x21 label uses the documented legacy y offset. |
 
 ## Usage
 

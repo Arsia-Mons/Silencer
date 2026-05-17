@@ -97,8 +97,8 @@ fi
 CHECK=$(cli --port "$PORT" clay_button_check)
 echo "check = $CHECK"
 # Extract fields with a tiny Bun one-liner — jq isn't required.
-read CLICK_PRESS CLICK_HELD HOVER_BR IDLE_BR CHROME_IDX OVAL_HOVER_IDX OVAL_HOVER_BR OVAL_UNHOVER_IDX OVAL_UNHOVER_BR OVAL_FOCUS_IDX OVAL_FOCUS_BR OVAL_WC_PARTIAL_IDX OVAL_WC_PARTIAL_BR OVAL_WC_NEXT_IDX OVAL_WC_NEXT_BR COMPACT_W COMPACT_H AUTO_SHORT AUTO_LONG AUTO_MULTI_H <<EOF
-$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.clicks_fired_on_press,j.clicks_fired_when_held,j.chrome_brightness_hover,j.chrome_brightness_idle,j.chrome_sprite_index_hover,j.oval_hover_sprite_indices.join(','),j.oval_hover_brightness.join(','),j.oval_unhover_sprite_indices.join(','),j.oval_unhover_brightness.join(','),j.oval_focus_sprite_index,j.oval_focus_brightness,j.oval_wall_clock_partial_sprite_index,j.oval_wall_clock_partial_brightness,j.oval_wall_clock_next_sprite_index,j.oval_wall_clock_next_brightness,j.compact_width,j.compact_height,j.auto_short_width,j.auto_long_width,j.auto_multiline_height].join(' '))" "$CHECK")
+read CLICK_PRESS CLICK_HELD HOVER_BR IDLE_BR CHROME_IDX OVAL_HOVER_IDX OVAL_HOVER_BR OVAL_UNHOVER_IDX OVAL_UNHOVER_BR OVAL_FOCUS_IDX OVAL_FOCUS_BR OVAL_WC_PARTIAL_IDX OVAL_WC_PARTIAL_BR OVAL_WC_NEXT_IDX OVAL_WC_NEXT_BR COMPACT_W COMPACT_H TEXT_COMPACT_W TEXT_COMPACT_H TEXT_COMPACT_XOFF TEXT_COMPACT_TEXT_W TEXT_COMPACT_YOFF AUTO_SHORT AUTO_LONG AUTO_MULTI_H <<EOF
+$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.clicks_fired_on_press,j.clicks_fired_when_held,j.chrome_brightness_hover,j.chrome_brightness_idle,j.chrome_sprite_index_hover,j.oval_hover_sprite_indices.join(','),j.oval_hover_brightness.join(','),j.oval_unhover_sprite_indices.join(','),j.oval_unhover_brightness.join(','),j.oval_focus_sprite_index,j.oval_focus_brightness,j.oval_wall_clock_partial_sprite_index,j.oval_wall_clock_partial_brightness,j.oval_wall_clock_next_sprite_index,j.oval_wall_clock_next_brightness,j.compact_width,j.compact_height,j.text_compact_width,j.text_compact_height,j.text_compact_text_x_offset,j.text_compact_text_width,j.text_compact_text_y_offset,j.auto_short_width,j.auto_long_width,j.auto_multiline_height].join(' '))" "$CHECK")
 EOF
 
 assert_eq() {
@@ -126,6 +126,16 @@ assert_eq "clicks_fired_on_press"   "$CLICK_PRESS" "1"
 assert_eq "clicks_fired_when_held"  "$CLICK_HELD"  "0"
 assert_eq "compact_width"           "$COMPACT_W"   "156"
 assert_eq "compact_height"          "$COMPACT_H"   "21"
+assert_eq "text_compact_width"       "$TEXT_COMPACT_W" "52"
+assert_eq "text_compact_height"      "$TEXT_COMPACT_H" "21"
+assert_eq "text_compact_text_y_offset" "$TEXT_COMPACT_YOFF" "8"
+TEXT_COMPACT_RIGHT=$((TEXT_COMPACT_W - TEXT_COMPACT_XOFF - TEXT_COMPACT_TEXT_W))
+if [ "$TEXT_COMPACT_XOFF" -lt 0 ] || [ "$TEXT_COMPACT_RIGHT" -lt 0 ] || [ $(( TEXT_COMPACT_XOFF > TEXT_COMPACT_RIGHT ? TEXT_COMPACT_XOFF - TEXT_COMPACT_RIGHT : TEXT_COMPACT_RIGHT - TEXT_COMPACT_XOFF )) -gt 1 ]; then
+  echo "FAIL: text_compact horizontal ink centering left=$TEXT_COMPACT_XOFF right=$TEXT_COMPACT_RIGHT width=$TEXT_COMPACT_TEXT_W" >&2
+  FAILED=1
+else
+  echo "PASS: text_compact horizontal ink centering left=$TEXT_COMPACT_XOFF right=$TEXT_COMPACT_RIGHT width=$TEXT_COMPACT_TEXT_W"
+fi
 if ! awk -v s="$AUTO_SHORT" -v l="$AUTO_LONG" 'BEGIN { exit (l > s) ? 0 : 1 }'; then
   echo "FAIL: auto_long_width expected greater than auto_short_width, got $AUTO_LONG <= $AUTO_SHORT" >&2
   FAILED=1

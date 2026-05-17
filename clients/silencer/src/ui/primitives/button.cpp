@@ -69,10 +69,10 @@ struct ResolvedButton {
 	int cellWidth = 7;
 	int textHeight = 11;
 	int yOffset = 0;
-	int xNudge = 0;
 	int visualTextPaddingTop = 0;
 	int defaultPaddingX = 0;
 	int defaultPaddingY = 0;
+	bool measureTextInk = false;
 };
 
 Clay_String EmptyString() {
@@ -168,15 +168,15 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 			out.textVariant = BankTextVariant::BodySm;
 			out.defaultPaddingX = 0;
 			out.defaultPaddingY = 0;
+			out.measureTextInk = true;
 			if(opts.size == ButtonSize::Compact){
 				out.fixedWidth = 52;
 				out.fixedHeight = 21;
-				out.xNudge = 1;
-				// Bank 133's visible ink sits high inside its measured
-				// line box. Compact text buttons use baked 21px wells, so
-				// bias the Clay content area slightly down here instead of
-				// nudging each screen's button row.
-				out.visualTextPaddingTop = 2;
+				// B52x21 text-only buttons draw at y + 8 in the legacy
+				// renderer. Clay centers the measured 11px bank-133 line box,
+				// so bias the content area until the emitted text bbox lands
+				// on that same 8px offset.
+				out.visualTextPaddingTop = 6;
 			}
 			break;
 		case ButtonVariant::Ghost:
@@ -431,7 +431,8 @@ void EmitButtonText(const ButtonLines& lines,
 		BankText(lines.lines[i],
 		         resolved.textVariant,
 		         { .effectColor = effectColor,
-		           .brightness = brightness });
+		           .brightness = brightness,
+		           .measureInk = resolved.measureTextInk });
 	}
 }
 
@@ -528,7 +529,7 @@ void Button(Clay_String id,
 	CLAY({ .id = clayId,
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(boxW), CLAY_SIZING_FIXED(boxH) },
-	           .padding = { static_cast<uint16_t>(paddingX + std::max(0, resolved.xNudge)),
+	           .padding = { static_cast<uint16_t>(paddingX),
 	                        static_cast<uint16_t>(paddingX),
 	                        static_cast<uint16_t>(paddingY + resolved.visualTextPaddingTop),
 	                        static_cast<uint16_t>(paddingY) },

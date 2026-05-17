@@ -181,6 +181,29 @@ TEST_CASE("UiInteractionRegistry edits focused text through typed methods") {
 	CHECK(actions[0].value == "ab");
 }
 
+TEST_CASE("UiInteractionRegistry reports retained text focus during frame declaration") {
+	silencer::ui::UiInteractionRegistry registry;
+	registry.BeginFrame();
+
+	silencer::ui::UiInteractable widget;
+	widget.id = "profile.name";
+	widget.labelText = "Name";
+	widget.kind = silencer::ui::UiInteractableKind::TextInput;
+	widget.uid = 7;
+	widget.value = "ab";
+	registry.RegisterInteractable(widget);
+
+	REQUIRE(registry.FocusTextInputByUid(7));
+	(void)registry.DrainActions();
+
+	registry.BeginFrame();
+	CHECK(registry.IsTextInputFocused(7));
+	CHECK_FALSE(registry.IsTextInputFocused(8));
+
+	registry.RegisterInteractable(widget);
+	CHECK(registry.IsTextInputFocused(7));
+}
+
 TEST_CASE("ClientUiInput normalizes pointer and drains frame-local inputs") {
 	silencer::client_ui::ClientUiInput input;
 	input.QueuePointerWindowEvent(50.0f, 25.0f, 200, 100, 640, 480, true, false);

@@ -507,6 +507,7 @@ void Game::BeginPreparedClientUiFrame() {
 	if(!hasPreparedUiInput) {
 		PrepareClientUiFrame(screenbuffer);
 	}
+	silencer::clay_bridge::SetTextMeasureResources(&world.resources);
 	clientUi.BeginFrame(preparedUiInput);
 }
 

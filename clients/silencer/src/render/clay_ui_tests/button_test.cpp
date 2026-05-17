@@ -13,6 +13,7 @@
 #include "surface.h"
 
 #include <cstring>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -112,6 +113,7 @@ bool RunButtonTest(::Game & game,
                    const char * outPath) {
 	const int W = 640;
 	const int H = 480;
+	SetTextMeasureResources(&game.GetWorld().resources);
 	EnsureInitialized(W, H);
 	silencer::ui::primitives::BankTextBeginFrame();
 	silencer::ui::primitives::ButtonBeginFrame();
@@ -144,6 +146,7 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	constexpr int W = 640;
 	constexpr int H = 480;
 	constexpr float kVisualStepSeconds = 1.0f / 24.0f;
+	SetTextMeasureResources(&game.GetWorld().resources);
 	EnsureInitialized(W, H);
 
 	int actionCount = 0;
@@ -427,6 +430,50 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	            multilineW,
 	            out.autoMultilineHeight);
 
+	int textCompactTextRows = 0;
+	bool textCompactTextOffsetMatches = false;
+	::Clay_SetPointerState(::Clay_Vector2{-1.0f, -1.0f}, false);
+	::Clay_UpdateScrollContainers(false, ::Clay_Vector2{0, 0}, 0.0f);
+	interactions.BeginFrame();
+	silencer::ui::primitives::BankTextBeginFrame();
+	silencer::ui::primitives::ButtonBeginFrame();
+	::Clay_BeginLayout();
+	CLAY({ .id = CLAY_ID("ButtonTextCompactProbeRoot"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
+	           .padding = { 40, 0, 40, 0 },
+	       } }) {
+		Button(CLAY_STRING("test.button.text_compact"),
+		       CLAY_STRING("Login"),
+		       ButtonOpts{ .variant = ButtonVariant::Text,
+		                   .size = ButtonSize::Compact },
+		       ButtonHandle{ nullptr, "test.button.text_compact", &interactions });
+	}
+	::Clay_RenderCommandArray textCompactCmds = ::Clay_EndLayout();
+	interactions.ResolveClayBoundsFromClay();
+	const auto * textCompactWidget = FindButton(interactions, "test.button.text_compact");
+	if(textCompactWidget){
+		out.textCompactWidth = textCompactWidget->w;
+		out.textCompactHeight = textCompactWidget->h;
+		for(int i = 0; i < textCompactCmds.length; i++){
+			::Clay_RenderCommand * c = &textCompactCmds.internalArray[i];
+			if(c->commandType != CLAY_RENDER_COMMAND_TYPE_TEXT) continue;
+			textCompactTextRows++;
+			out.textCompactTextXOffset =
+				static_cast<int>(c->boundingBox.x) - textCompactWidget->x;
+			out.textCompactTextWidth = static_cast<int>(c->boundingBox.width);
+			out.textCompactTextYOffset =
+				static_cast<int>(c->boundingBox.y) - textCompactWidget->y;
+		}
+		const int textRightGap = textCompactWidget->w -
+		                         out.textCompactTextXOffset -
+		                         out.textCompactTextWidth;
+		textCompactTextOffsetMatches =
+			textCompactTextRows == 1 &&
+			std::abs(out.textCompactTextXOffset - textRightGap) <= 1 &&
+			out.textCompactTextYOffset == 8;
+	}
+
 	int ovalMdLongWidth = 0;
 	int ovalMdLongHeight = 0;
 	int ovalMdLongTextRows = 0;
@@ -508,6 +555,11 @@ bool RunButtonCheck(::Game & game, ButtonCheckResult & out) {
 	   ovalMdLongHeight != 33 ||
 	   ovalMdLongTextRows != 1 ||
 	   !ovalMdLongTextWithinBounds){
+		return false;
+	}
+	if(out.textCompactWidth != 52 ||
+	   out.textCompactHeight != 21 ||
+	   !textCompactTextOffsetMatches){
 		return false;
 	}
 	return true;

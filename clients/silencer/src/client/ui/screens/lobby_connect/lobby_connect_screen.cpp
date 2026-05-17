@@ -57,7 +57,6 @@ constexpr uint16_t kFormRowY = 195;
 constexpr uint16_t kFormRowH = 21;
 constexpr uint16_t kFormRowGap = 6;
 constexpr uint16_t kLabelW = 86;
-constexpr uint16_t kLabelPadX = 8;
 constexpr uint16_t kInputW = 183;
 constexpr uint16_t kInputInsetX = 7;
 constexpr uint16_t kButtonRowX = 86;
@@ -376,9 +375,8 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 					       .layout = {
 					           .sizing = { CLAY_SIZING_FIXED(lobby_connect_screen_detail::kLabelW),
 					                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowH) },
-					           .padding = { lobby_connect_screen_detail::kLabelPadX, 0, 0, 0 },
 					           .childGap = 0,
-					           .childAlignment = { CLAY_ALIGN_X_LEFT,
+					           .childAlignment = { CLAY_ALIGN_X_CENTER,
 					                               CLAY_ALIGN_Y_CENTER },
 					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					       } }) {
@@ -414,9 +412,8 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 					       .layout = {
 					           .sizing = { CLAY_SIZING_FIXED(lobby_connect_screen_detail::kLabelW),
 					                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowH) },
-					           .padding = { lobby_connect_screen_detail::kLabelPadX, 0, 0, 0 },
 					           .childGap = 0,
-					           .childAlignment = { CLAY_ALIGN_X_LEFT,
+					           .childAlignment = { CLAY_ALIGN_X_CENTER,
 					                               CLAY_ALIGN_Y_CENTER },
 					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					       } }) {

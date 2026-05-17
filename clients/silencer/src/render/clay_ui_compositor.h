@@ -16,7 +16,7 @@
 //   • TEXT: textConfig.fontId  → bank (135 Title, 134 Heading, 133 Body, 132 Tiny).
 //           textConfig.fontSize → cell width (monospaced bank fonts).
 //           textColor.r        → palette index for the EffectColor tint.
-//           userData (optional) → BankTextDrawData* with brightness / colorRamp.
+//           userData (optional) → BankTextDrawData* with brightness / colorRamp / metrics.
 //   • IMAGE: imageConfig.imageData = PackImage*(). The bridge looks up
 //     world.resources.spritebank[bank][index] and fits it into the bbox using
 //     the packed cover / contain / stretch mode.
@@ -48,6 +48,11 @@ void EnsureInitialized(int width, int height);
 // changed. UiScale() exposes the current value to the dispatch paths.
 void SetUiScale(int scale);
 int  UiScale();
+
+// Optional resource context used by BankText's ink-metric measurement path.
+// Set before Clay_BeginLayout when screens may emit text that asks to be
+// measured by visible glyph bounds instead of fixed cursor advance.
+void SetTextMeasureResources(const Resources * resources);
 
 // Walks `cmds` and dispatches each command to the matching Renderer
 // primitive, writing into `dst`. Resources supplies sprite-bank lookups
@@ -106,6 +111,11 @@ struct ButtonCheckResult {
 	int ovalWallClockNextBrightness;     // Expect 130 after the next legacy tick.
 	int compactWidth;
 	int compactHeight;
+	int textCompactWidth;
+	int textCompactHeight;
+	int textCompactTextXOffset;
+	int textCompactTextWidth;
+	int textCompactTextYOffset; // Expect 8 for B52x21 legacy label yoff.
 	int autoShortWidth;
 	int autoLongWidth;
 	int autoMultilineHeight;
