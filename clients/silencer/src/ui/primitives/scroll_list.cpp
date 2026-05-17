@@ -120,6 +120,10 @@ void ScrollList(Clay_String id,
 				       .layout = {
 				           .sizing = { CLAY_SIZING_FIXED(rowsW),
 				                       CLAY_SIZING_FIXED(rowH) },
+				           // Center the text line within the fixed legacy row slot
+				           // so lobby list items don't ride too high.
+				           .childAlignment = { CLAY_ALIGN_X_LEFT,
+				                               CLAY_ALIGN_Y_CENTER },
 				       },
 				       .backgroundColor = { static_cast<float>(bgIdx),
 				                            0.0f, 0.0f, 255.0f } }) {
