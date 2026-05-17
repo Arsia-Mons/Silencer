@@ -75,6 +75,7 @@ void ScrollList(Clay_String id,
                 Uint16 scrollPosition,
                 ScrollListOpts opts,
                 ScrollListHandle handle) {
+	if(handle.hoveredIndexOut) *handle.hoveredIndexOut = -1;
 	const int visibleLines = (opts.lineHeight > 0)
 		? (opts.height / opts.lineHeight)
 		: 0;
@@ -122,6 +123,9 @@ void ScrollList(Clay_String id,
 				       },
 				       .backgroundColor = { static_cast<float>(bgIdx),
 				                            0.0f, 0.0f, 255.0f } }) {
+					if(handle.hoveredIndexOut && ::Clay_Hovered()){
+						*handle.hoveredIndexOut = i;
+					}
 					RegisterRowWidget(id, items[i], i, isSelected, handle);
 					Text(items[i], opts.text);
 				}

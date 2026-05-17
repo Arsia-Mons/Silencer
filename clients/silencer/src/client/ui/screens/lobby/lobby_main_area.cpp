@@ -12,6 +12,7 @@
 #include "game_tech_panel.h"
 #include "lobby_screen.h"
 
+#include "screen_context.h"
 #include "world.h"
 
 #include <algorithm>
@@ -35,10 +36,11 @@ constexpr uint8_t kPanelFillColor = 74;
 constexpr uint8_t kPanelFillOpacity = 128;
 
 void BuildRightUpperContents(LobbyMainAreaPanels & panels,
-                             World & world,
-                             Resources & resources,
+                             ScreenContext & ctx,
                              LobbyScreen & owner,
                              silencer::ui::UiInteractionRegistry& interactions) {
+	World & world = ctx.world;
+	Resources & resources = world.resources;
 	if(panels.gameCreateActive){
 		BuildGameCreateUpperTree(panels.gameCreate, resources, interactions);
 	}else if(panels.gameJoinActive){
@@ -51,12 +53,13 @@ void BuildRightUpperContents(LobbyMainAreaPanels & panels,
 }
 
 void BuildRightTallContents(LobbyMainAreaPanels & panels,
-                            World & world,
-                            Resources & resources,
+                            ScreenContext & ctx,
                             LobbyScreen & owner,
                             silencer::ui::UiInteractionRegistry& interactions) {
+	World & world = ctx.world;
+	Resources & resources = world.resources;
 	if(panels.gameCreateActive){
-		BuildGameCreateTallTree(panels.gameCreate, resources, interactions);
+		BuildGameCreateTallTree(panels.gameCreate, ctx, resources, interactions);
 	}else if(panels.gameJoinActive){
 		BuildGameJoinTallTree(panels.gameJoin, resources, interactions);
 	}else if(panels.gameTechActive){
@@ -67,11 +70,12 @@ void BuildRightTallContents(LobbyMainAreaPanels & panels,
 }
 
 void BuildNarrowBody(LobbyMainAreaPanels & panels,
-                     World & world,
-                     Resources & resources,
+                     ScreenContext & ctx,
                      LobbyScreen & owner,
                      int narrowTallH,
                      silencer::ui::UiInteractionRegistry& interactions) {
+	World & world = ctx.world;
+	Resources & resources = world.resources;
 	CLAY(Box(BoxVariants::Chrome, {
 	         .id = CLAY_ID("LobbyCharacterBox"),
 	         .layout = {
@@ -92,10 +96,10 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 	                         CLAY_SIZING_FIXED(kUpperH) },
 	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	         },
-	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
-	         .clip = { .horizontal = true, .vertical = true },
+		         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
+		         .clip = { .horizontal = true, .vertical = true },
 	     })) {
-		BuildRightUpperContents(panels, world, resources, owner, interactions);
+		BuildRightUpperContents(panels, ctx, owner, interactions);
 	}
 
 	CLAY(Box(BoxVariants::Chrome, {
@@ -105,10 +109,10 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 	                         CLAY_SIZING_FIXED((float)narrowTallH) },
 	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	         },
-	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
-	         .clip = { .horizontal = true, .vertical = true },
+		         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
+		         .clip = { .horizontal = true, .vertical = true },
 	     })) {
-		BuildRightTallContents(panels, world, resources, owner, interactions);
+		BuildRightTallContents(panels, ctx, owner, interactions);
 	}
 
 	CLAY(Box(BoxVariants::Chrome, {
@@ -126,10 +130,11 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 }
 
 void BuildWideBody(LobbyMainAreaPanels & panels,
-                   World & world,
-                   Resources & resources,
+                   ScreenContext & ctx,
                    LobbyScreen & owner,
                    silencer::ui::UiInteractionRegistry& interactions) {
+	World & world = ctx.world;
+	Resources & resources = world.resources;
 	CLAY({ .id = CLAY_ID("LobbyLeftMiddleStack"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
@@ -169,7 +174,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 			         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 			         .clip = { .horizontal = true, .vertical = true },
 			     })) {
-				BuildRightUpperContents(panels, world, resources, owner, interactions);
+				BuildRightUpperContents(panels, ctx, owner, interactions);
 			}
 		}
 
@@ -194,18 +199,17 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 	                         CLAY_SIZING_GROW(0) },
 	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	         },
-	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
-	         .clip = { .horizontal = true, .vertical = true },
+		         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
+		         .clip = { .horizontal = true, .vertical = true },
 	     })) {
-		BuildRightTallContents(panels, world, resources, owner, interactions);
+		BuildRightTallContents(panels, ctx, owner, interactions);
 	}
 }
 
 }  // namespace lobby_main_area_detail
 
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
-                        World & world,
-                        Resources & resources,
+                        ScreenContext & ctx,
                         LobbyScreen & owner,
                         bool narrow,
                         int bodyH,
@@ -224,9 +228,9 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
 	       },
 	    }) {
 		if(narrow){
-			lobby_main_area_detail::BuildNarrowBody(panels, world, resources, owner, narrowTallH, interactions);
+			lobby_main_area_detail::BuildNarrowBody(panels, ctx, owner, narrowTallH, interactions);
 		}else{
-			lobby_main_area_detail::BuildWideBody(panels, world, resources, owner, interactions);
+			lobby_main_area_detail::BuildWideBody(panels, ctx, owner, interactions);
 		}
 	}
 }

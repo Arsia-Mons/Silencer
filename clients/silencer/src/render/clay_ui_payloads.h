@@ -55,6 +55,7 @@ enum class CustomKind : Uint8 {
 	BoxStroke,
 	Sprite,
 	TeamEmblem,
+	Surface,
 };
 
 struct ClayCustomData {
@@ -117,6 +118,12 @@ struct SpritePayload {
 		  rampPlus(rampPlus),
 		  dstOffsetX(dstOffsetX),
 		  dstOffsetY(dstOffsetY) {}
+};
+
+struct SurfacePayload {
+	const Uint8 * pixels = nullptr;
+	Uint16 width = 0;
+	Uint16 height = 0;
 };
 
 struct TeamEmblemPayload {

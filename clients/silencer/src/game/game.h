@@ -90,6 +90,7 @@ public:
 	Renderer& GetRenderer() { return renderer; }
 	silencer::client_ui::ClientUiInput& UiInput() { return clientUiInput; }
 	const silencer::client_ui::ClientUiInput& UiInput() const { return clientUiInput; }
+	const silencer::ui::UiInputState& CurrentUiInput() const { return preparedUiInput; }
 	silencer::ui::UiInteractionRegistry& UiInteractions() { return clientUi.Interactions(); }
 	const silencer::ui::UiInteractionRegistry& UiInteractions() const { return clientUi.Interactions(); }
 	silencer::client_ui::InGameUiController& InGameUi() { return inGameUiController; }

@@ -1,5 +1,10 @@
 #include "game_create_panel.h"
 
+#include "game.h"
+#include "screen_context.h"
+#include "map.h"
+#include "text_wrap.h"
+
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
@@ -40,9 +45,14 @@ constexpr Uint8  kMapListLineH = 14;
 constexpr Uint8  kScrollbarBank = 7;
 constexpr Uint16 kNameInputW = 210, kNameInputH = 14;
 constexpr Uint16 kPwInputW   = 210, kPwInputH   = 14;
+constexpr Uint16 kPreviewW   = 172, kPreviewH   = 62;
 
 constexpr uint16_t kPanelPad       = 6;
 constexpr uint16_t kTallSectionGap = 4;
+constexpr uint16_t kPreviewGap     = 5;
+constexpr int kPreviewOffsetX      = -185;
+constexpr int kPreviewOffsetY      = -30;
+constexpr size_t kPreviewNameChars = 29;
 
 constexpr int kMaxMapRows = 1024;
 Clay_String g_mapSlab[kMaxMapRows];
@@ -51,7 +61,177 @@ constexpr const char * kActionMapPrefix = "lobby.game_create.map";
 constexpr const char * kActionName      = "lobby.game_create.name";
 constexpr const char * kActionPassword  = "lobby.game_create.password";
 
+Clay_String FromStd(const std::string & s) {
+	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
+}
+
+std::string Basename(const std::string & path) {
+	const size_t slash = path.find_last_of("/\\");
+	return slash == std::string::npos ? path : path.substr(slash + 1);
+}
+
+void ResetHoverPreview(GameCreatePanelState & state) {
+	state.hoverPreviewVisible = false;
+	state.hoverPreviewMapIndex = -1;
+	state.hoverPreviewName.clear();
+	state.hoverPreviewDescription.clear();
+	state.hoverPreviewPixels.clear();
+	state.hoverPreviewSurface = {};
+	state.hoverPreviewCustomData = {};
+}
+
+void HideHoverPreview(GameCreatePanelState & state) {
+	state.hoverPreviewVisible = false;
+}
+
+void LoadHoverPreview(GameCreatePanelState & state,
+                      ScreenContext & ctx,
+                      int hoveredIndex) {
+	if(hoveredIndex < 0 || hoveredIndex >= static_cast<int>(state.maps.size())){
+		ResetHoverPreview(state);
+		return;
+	}
+
+	const std::string & mapLabel = state.maps[hoveredIndex];
+	if(ctx.mapDownloader.servermaps.count(mapLabel) > 0){
+		ResetHoverPreview(state);
+		return;
+	}
+	if(state.hoverPreviewMapIndex == hoveredIndex && !state.hoverPreviewPixels.empty()){
+		state.hoverPreviewVisible = true;
+		return;
+	}
+
+	ResetHoverPreview(state);
+
+	const std::string filename = ctx.mapDownloader.FindMap(mapLabel.c_str());
+	if(filename.empty()) return;
+
+	SDL_IOStream * file = SDL_IOFromFile(filename.c_str(), "rb");
+	if(!file) return;
+
+	Map::Header header;
+	const bool loaded = Map::LoadHeader(file, header);
+	SDL_CloseIO(file);
+	if(!loaded) return;
+
+	state.hoverPreviewPixels.resize(static_cast<size_t>(kPreviewW) * kPreviewH);
+	if(!Map::UncompressMinimap(
+		reinterpret_cast<Uint8 (*)[kPreviewW * kPreviewH]>(state.hoverPreviewPixels.data()),
+		header.minimapcompressed,
+		header.minimapcompressedsize)) {
+		ResetHoverPreview(state);
+		return;
+	}
+
+	state.hoverPreviewName = Basename(filename);
+	if(state.hoverPreviewName.size() > kPreviewNameChars){
+		state.hoverPreviewName.resize(kPreviewNameChars);
+	}
+
+	char * wrapped = silencer::ui::WordWrapText(header.description, kPreviewNameChars);
+	if(wrapped){
+		state.hoverPreviewDescription = wrapped;
+		delete[] wrapped;
+	}
+
+	state.hoverPreviewSurface.pixels = state.hoverPreviewPixels.data();
+	state.hoverPreviewSurface.width = kPreviewW;
+	state.hoverPreviewSurface.height = kPreviewH;
+	state.hoverPreviewCustomData.kind = silencer::clay_bridge::CustomKind::Surface;
+	state.hoverPreviewCustomData.payload = &state.hoverPreviewSurface;
+	state.hoverPreviewMapIndex = hoveredIndex;
+	state.hoverPreviewVisible = true;
+}
+
+void UpdateHoverPreview(GameCreatePanelState & state,
+                        ScreenContext & ctx,
+                        int hoveredIndex) {
+	if(hoveredIndex < 0){
+		HideHoverPreview(state);
+		return;
+	}
+	LoadHoverPreview(state, ctx, hoveredIndex);
+}
+
+int CountPreviewLines(const std::string & text) {
+	if(text.empty()) return 0;
+	int lines = 1;
+	for(char c : text){
+		if(c == '\n') ++lines;
+	}
+	return lines;
+}
+
+void BuildHoverPreviewOverlay(GameCreatePanelState & state,
+                              ScreenContext & ctx) {
+	if(!state.hoverPreviewVisible || state.hoverPreviewPixels.empty()) return;
+
+	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
+	const int lineHeight = silencer::ui::primitives::TextLineHeight(TextSize::BodySm);
+	const int descLines = CountPreviewLines(state.hoverPreviewDescription);
+	const int previewHeight = lineHeight + kPreviewGap + kPreviewH
+		+ (descLines > 0 ? kPreviewGap + (descLines * lineHeight) : 0);
+	const int maxX = std::max(0, input.width - static_cast<int>(kPreviewW));
+	const int maxY = std::max(0, input.height - previewHeight);
+	int previewX = static_cast<int>(input.pointer.x) + kPreviewOffsetX;
+	int previewY = static_cast<int>(input.pointer.y) + kPreviewOffsetY;
+	if(previewX < 0) previewX = 0;
+	if(previewX > maxX) previewX = maxX;
+	if(previewY < 0) previewY = 0;
+	if(previewY > maxY) previewY = maxY;
+
+	const silencer::ui::primitives::TextEffect previewEffect =
+		silencer::ui::primitives::TextEffect::LegacyPalette(129, 128 + 32, true);
+
+	CLAY({ .id = CLAY_ID("GCrtMapPreview"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
+	                       CLAY_SIZING_FIT(0) },
+	           .childGap = kPreviewGap,
+	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+	       },
+	       .floating = {
+	           .offset = { static_cast<float>(previewX), static_cast<float>(previewY) },
+	           .zIndex = 2,
+	           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
+	           .attachTo = CLAY_ATTACH_TO_ROOT,
+	       } }) {
+		CLAY({ .id = CLAY_ID("GCrtMapPreviewName"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
+		                       CLAY_SIZING_FIT(0) },
+		       } }) {
+			Text(FromStd(state.hoverPreviewName),
+			     { .size = TextSize::BodySm,
+			       .wrap = silencer::ui::primitives::TextWrap::None,
+			       .effect = previewEffect });
+		}
+
+		CLAY({ .id = CLAY_ID("GCrtMapPreviewMinimap"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
+		                       CLAY_SIZING_FIXED(static_cast<float>(kPreviewH)) },
+		       },
+		       .custom = { .customData = &state.hoverPreviewCustomData } }) {}
+
+		if(!state.hoverPreviewDescription.empty()){
+			CLAY({ .id = CLAY_ID("GCrtMapPreviewDesc"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
+			                       CLAY_SIZING_FIT(0) },
+			       } }) {
+				Text(FromStd(state.hoverPreviewDescription),
+				     { .size = TextSize::BodySm,
+				       .wrap = silencer::ui::primitives::TextWrap::Newlines,
+				       .effect = previewEffect });
+			}
+		}
+	}
+}
+
 void BuildMapList(GameCreatePanelState & state,
+                  ScreenContext & ctx,
                   silencer::ui::UiInteractionRegistry& interactions) {
 	const int slotCount = std::min((int)state.maps.size(), kMaxMapRows);
 	for(int i = 0; i < slotCount; ++i){
@@ -68,13 +248,15 @@ void BuildMapList(GameCreatePanelState & state,
 	listOpts.highlightColor = 180;
 	listOpts.text.size      = TextSize::Body;
 	listOpts.scrollbarBank  = kScrollbarBank;
+	int hoveredIndex = -1;
 	CLAY({ .id = CLAY_ID("GCrtMapListWrap") }) {
 		ScrollList(CLAY_STRING("GCrtMapList"),
 		           g_mapSlab, slotCount,
 		           state.mapSelectedIndex, state.mapScrollPos,
 		           listOpts,
-		           ScrollListHandle{ nullptr, kActionMapPrefix, &interactions });
+		           ScrollListHandle{ nullptr, kActionMapPrefix, &interactions, &hoveredIndex });
 	}
+	UpdateHoverPreview(state, ctx, hoveredIndex);
 	for(int i = 0; i < slotCount; ++i){
 		silencer::ui::UiInteractable reg;
 		reg.id         = std::string(kActionMapPrefix) + "." + std::to_string(i);
@@ -124,6 +306,7 @@ void BuildNameAndPassword(GameCreatePanelState & state,
 }  // namespace game_create_panel_map_form_detail
 
 void BuildGameCreateTallTree(GameCreatePanelState & state,
+                             ScreenContext & ctx,
                              Resources & resources,
                              silencer::ui::UiInteractionRegistry& interactions) {
 	(void)resources;
@@ -140,7 +323,7 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 			     { .size = TextSize::Heading });
 		}
 
-		game_create_panel_map_form_detail::BuildMapList(state, interactions);
+		game_create_panel_map_form_detail::BuildMapList(state, ctx, interactions);
 		game_create_panel_map_form_detail::BuildNameAndPassword(state, interactions);
 
 		CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
@@ -151,6 +334,11 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
 			       ButtonHandle{ nullptr, game_create_panel_map_form_detail::kActionCreate, &interactions });
 		}
 	}
+}
+
+void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,
+                                   ScreenContext & ctx) {
+	game_create_panel_map_form_detail::BuildHoverPreviewOverlay(state, ctx);
 }
 
 }  // namespace silencer::client_ui::lobby

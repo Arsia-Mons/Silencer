@@ -1,5 +1,6 @@
 #include "lobby_screen.h"
 
+#include "game_create_panel.h"
 #include "lobby_chrome.h"
 #include "lobby_main_area.h"
 
@@ -118,8 +119,10 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			gameJoinActive,
 			gameTechActive,
 		};
-		BuildLobbyMainArea(panels, ctx.world, ctx.world.resources, *this,
-		                   narrow, bodyH, interactions);
+		BuildLobbyMainArea(panels, ctx, *this, narrow, bodyH, interactions);
+		if(gameCreateActive){
+			BuildGameCreatePreviewOverlay(gameCreateState, ctx);
+		}
 	}
 }
 

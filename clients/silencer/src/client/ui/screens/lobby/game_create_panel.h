@@ -11,6 +11,7 @@
 // agnostic.
 
 #include "shared.h"
+#include "clay_ui_payloads.h"
 #include "runtime/UiActionQueue.h"
 
 #include <string>
@@ -53,6 +54,15 @@ struct GameCreatePanelState {
 	bool spectatableClicked = false;
 	bool createClicked      = false;
 	int  mapRowClickedIndex = -1;
+
+	// Hover-preview cache for local map rows in the Create flow.
+	bool hoverPreviewVisible = false;
+	int  hoverPreviewMapIndex = -1;
+	std::string hoverPreviewName;
+	std::string hoverPreviewDescription;
+	std::vector<Uint8> hoverPreviewPixels;
+	silencer::clay_bridge::SurfacePayload hoverPreviewSurface{};
+	silencer::clay_bridge::ClayCustomData hoverPreviewCustomData{};
 };
 
 // Hydrate state from Config (defaultgamename, lastspectatable) and rebuild
@@ -88,8 +98,12 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
 // ScrollListBeginFrame, TextInputBeginFrame.
 void BuildGameCreateTallTree(GameCreatePanelState & state,
+                             ScreenContext & ctx,
                              Resources & resources,
                              silencer::ui::UiInteractionRegistry& interactions);
+
+void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,
+                                   ScreenContext & ctx);
 
 }  // namespace silencer::client_ui::lobby
 

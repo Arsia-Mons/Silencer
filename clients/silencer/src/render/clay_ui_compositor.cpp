@@ -740,6 +740,26 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						delete copy;
 						break;
 					}
+					case CustomKind::Surface: {
+						const auto * p = reinterpret_cast<const SurfacePayload *>(ccd->payload);
+						if(!p || !p->pixels || p->width == 0 || p->height == 0) break;
+						int x = static_cast<int>(c->boundingBox.x);
+						int y = static_cast<int>(c->boundingBox.y);
+						int w = static_cast<int>(c->boundingBox.width);
+						int h = static_cast<int>(c->boundingBox.height);
+						if(w <= 0) w = p->width;
+						if(h <= 0) h = p->height;
+						int cx = x, cy = y, cw = w, ch = h;
+						if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) break;
+						Surface srcsurface;
+						srcsurface.w = p->width;
+						srcsurface.h = p->height;
+						srcsurface.pixels.assign(
+							p->pixels, p->pixels + (static_cast<size_t>(p->width) * p->height));
+						Renderer::Rect dstrect{w, h, x, y};
+						Renderer::BlitSurface(&srcsurface, nullptr, dst, &dstrect);
+						break;
+					}
 					case CustomKind::ScrollBar: {
 						const auto * p = reinterpret_cast<const ScrollBarPayload *>(ccd->payload);
 						if(!p) break;

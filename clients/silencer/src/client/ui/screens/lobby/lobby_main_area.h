@@ -8,6 +8,7 @@
 class World;
 class Resources;
 class LobbyScreen;
+class ScreenContext;
 
 namespace silencer::ui {
 class UiInteractionRegistry;
@@ -37,8 +38,7 @@ struct LobbyMainAreaPanels {
 // Emits the LobbyBody subtree (narrow stack OR wide left/middle/right
 // columns) into the current Clay frame.
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
-                        World & world,
-                        Resources & resources,
+                        ScreenContext & ctx,
                         LobbyScreen & owner,
                         bool narrow,
                         int bodyH,
