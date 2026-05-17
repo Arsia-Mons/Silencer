@@ -76,7 +76,6 @@ const TextOpts kStatsOpts{
 };
 
 constexpr uint16_t kPanelPad       = 6;
-constexpr uint16_t kToggleGap      = 26;
 constexpr uint16_t kStatsPadTop    = 10;
 constexpr int kStatsChildGap    = 2;
 
@@ -154,23 +153,36 @@ void BuildCharacterPanelTree(CharacterPanelState & state,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 
-		// Username header — bank 134 / w8 / eff=200. Lands at content y=71.
+		// Username header. The legacy palette index 200 renders a dark
+		// blue that is illegible against the lobby's dark background (the
+		// name looked missing). Use the same readable green ramp the
+		// adjacent LEVEL/WINS/LOSSES/XP stats use, kept at the larger
+		// Heading size so it still reads as the panel's title.
 		CLAY({ .id = CLAY_ID("CharUserWrap") }) {
 			Text(character_panel_detail::FromStd(character_panel_detail::g_stats.username),
 			     { .size = TextSize::Heading,
-			       .effect = TextEffect::LegacyPalette(200) });
+			       .effect = TextEffect::LegacyPalette(129, 160, true) });
 		}
 
-		// Five agency toggles in a horizontal strip. The toggles have
-		// intrinsic sprite sizes; the row uses gap/alignment instead of
-		// absolute screen positions.
+		// Five agency toggles in a horizontal strip. The row fills the
+		// fixed-width character box and a flexible spacer between each
+		// toggle distributes the slack evenly, so all five fit regardless
+		// of their intrinsic sprite widths (a fixed childGap overflowed
+		// the clipped box and dropped the last agency).
 		CLAY({ .id = CLAY_ID("CharToggleRow"),
 		       .layout = {
+		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) },
 		           .padding = { 0, 0, 4, 0 },
-		           .childGap = character_panel_detail::kToggleGap,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
 			for(int i = 0; i < 5; ++i){
+				if(i > 0){
+					CLAY({ .id = CLAY_IDI("CharToggleGap", i),
+					       .layout = {
+					           .sizing = { CLAY_SIZING_GROW(0),
+					                       CLAY_SIZING_FIXED(0) },
+					       } }) {}
+				}
 				const character_panel_detail::AgencyDef & def = character_panel_detail::kAgencies[i];
 				const Uint16 spriteW = resources.spritewidth[181][def.spriteIndex];
 				const Uint16 spriteH = resources.spriteheight[181][def.spriteIndex];

@@ -20,8 +20,10 @@ namespace clientui_detail {
 
 bool IsAudibleInteractable(const silencer::ui::UiInteractable& widget) {
 	if(widget.inactive) return false;
-	return widget.kind == silencer::ui::UiInteractableKind::Button ||
-	       widget.kind == silencer::ui::UiInteractableKind::Toggle;
+	// Only buttons emit hover/activate audio. Legacy toggles (e.g. the
+	// lobby agency icons) were silent on both hover and click; treating
+	// them as audible was a migration regression.
+	return widget.kind == silencer::ui::UiInteractableKind::Button;
 }
 
 bool PointIn(const silencer::ui::UiInteractable& widget, int x, int y) {
