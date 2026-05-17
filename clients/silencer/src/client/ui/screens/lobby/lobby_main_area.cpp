@@ -23,6 +23,7 @@ namespace silencer::client_ui::lobby {
 namespace lobby_main_area_detail {
 
 using silencer::ui::primitives::Box;
+using silencer::ui::primitives::BoxCornerMode;
 using silencer::ui::primitives::BoxStrokeStyle;
 namespace BoxSides = silencer::ui::primitives::BoxSides;
 namespace BoxVariants = silencer::ui::primitives::BoxVariants;
@@ -63,6 +64,7 @@ int RoundRatio(int actual,
 BoxStrokeStyle OpenRightChrome() {
 	BoxStrokeStyle style = BoxVariants::Chrome;
 	style.sides = static_cast<Uint8>(BoxSides::Top | BoxSides::Bottom | BoxSides::Left);
+	style.bottomLeftCorner = BoxCornerMode::Horizontal;
 	return style;
 }
 

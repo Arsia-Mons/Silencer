@@ -884,19 +884,34 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						bool sRight  = (sides & 0x2) != 0;
 						bool sBottom = (sides & 0x4) != 0;
 						bool sLeft   = (sides & 0x8) != 0;
+						enum class CornerMode : Uint8 {
+							Auto = 0,
+							Horizontal = 1,
+							Vertical = 2,
+						};
+						auto decodeCornerMode = [](Uint8 raw){
+							switch(raw){
+								case 1: return CornerMode::Horizontal;
+								case 2: return CornerMode::Vertical;
+								default: return CornerMode::Auto;
+							}
+						};
+						const CornerMode topLeftCorner =
+							decodeCornerMode(p->topLeftCorner);
+						const CornerMode topRightCorner =
+							decodeCornerMode(p->topRightCorner);
+						const CornerMode bottomRightCorner =
+							decodeCornerMode(p->bottomRightCorner);
+						const CornerMode bottomLeftCorner =
+							decodeCornerMode(p->bottomLeftCorner);
 						// Draw the active sides of a 1-band ring at the
 						// given concentric `inset` from the bbox edge.
 						// Closed rectangles keep the classic stepped
 						// corner ownership: horizontal bands inset around
 						// active verticals, and vertical bands inset
-						// around active horizontals.
-						//
-						// The lobby's stepped right pane has one special
-						// problematic corner: the lower-left corner of the
-						// upper shelf (`Top|Bottom|Left`, right suppressed).
-						// That corner wants the bottom run to stay
-						// continuous, but without double-painting the halo
-						// stack. Handle that one corner explicitly here.
+						// around active horizontals. Per-corner ownership
+						// can instead hand the full stack to the horizontal
+						// or vertical run for multi-Box compositions.
 						// Fill a stripe at (x, y, w, h) with `color`. When
 						// `opacity` is 255 it's a solid fill; otherwise blend
 						// the color against the underlying pixel so the same
@@ -961,29 +976,36 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 							effectiveBandThickness(p->outerHaloWidth) +
 							effectiveBandThickness(p->strokeWidth) +
 							effectiveBandThickness(p->innerHaloWidth);
-						const bool openRightBottomLeftCorner =
-							sLeft && !sRight && sBottom;
 						auto drawRing = [&](int inset, int thickness, Uint8 color, Uint8 opacity){
 							int t = thickness;
 							if(t < 1) return;
 							if(t * 2 > bw) t = bw / 2;
 							if(t * 2 > bh) t = bh / 2;
 							if(t < 1) return;
-							int topLeftTrim = sLeft ? inset : 0;
-							int topRightTrim = sRight ? inset : 0;
-							int bottomLeftTrim = sLeft ? inset : 0;
-							int bottomRightTrim = sRight ? inset : 0;
-							const int fullStackTrim = std::max(0, totalBandDepth - t);
-							if(openRightBottomLeftCorner){
-								bottomLeftTrim = 0;
-							}
-							int leftTopTrim = sTop ? inset : 0;
-							int leftBottomTrim = sBottom ? inset : 0;
-							if(openRightBottomLeftCorner){
-								leftBottomTrim = fullStackTrim;
-							}
-							int rightTopTrim = sTop ? inset : 0;
-							int rightBottomTrim = sBottom ? inset : 0;
+							auto horizontalTrim = [&](bool adjacentVertical, CornerMode mode){
+								if(!adjacentVertical) return 0;
+								switch(mode){
+									case CornerMode::Horizontal: return 0;
+									case CornerMode::Vertical: return totalBandDepth;
+									default: return inset;
+								}
+							};
+							auto verticalTrim = [&](bool adjacentHorizontal, CornerMode mode){
+								if(!adjacentHorizontal) return 0;
+								switch(mode){
+									case CornerMode::Horizontal: return totalBandDepth;
+									case CornerMode::Vertical: return 0;
+									default: return inset + t;
+								}
+							};
+							int topLeftTrim = horizontalTrim(sLeft, topLeftCorner);
+							int topRightTrim = horizontalTrim(sRight, topRightCorner);
+							int bottomLeftTrim = horizontalTrim(sLeft, bottomLeftCorner);
+							int bottomRightTrim = horizontalTrim(sRight, bottomRightCorner);
+							int leftTopTrim = verticalTrim(sTop, topLeftCorner);
+							int leftBottomTrim = verticalTrim(sBottom, bottomLeftCorner);
+							int rightTopTrim = verticalTrim(sTop, topRightCorner);
+							int rightBottomTrim = verticalTrim(sBottom, bottomRightCorner);
 							// Top stripe.
 							if(sTop){
 								int x = bx + topLeftTrim;
@@ -998,20 +1020,18 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 								int w = bw - bottomLeftTrim - bottomRightTrim;
 								fillStripe(x, y, w, t, color, opacity);
 							}
-							// Vertical edges. Closed rectangles keep the
-							// classic stepped ownership. The upper-shelf
-							// bottom-left corner in the lobby instead hands
-							// the whole lower stack to the bottom run so the
-							// elbow stays continuous without brightening.
-							int leftVy0 = by + leftTopTrim + (sTop ? t : 0);
-							int leftVy1 = by + bh - leftBottomTrim - (sBottom ? t : 0);
+							// Vertical edges consume the remaining span after
+							// per-corner ownership has reserved its share of
+							// the stack.
+							int leftVy0 = by + leftTopTrim;
+							int leftVy1 = by + bh - leftBottomTrim;
 							int leftVh  = leftVy1 - leftVy0;
 							if(sLeft && leftVh > 0){
 								int x = bx + inset;
 								fillStripe(x, leftVy0, t, leftVh, color, opacity);
 							}
-							int rightVy0 = by + rightTopTrim + (sTop ? t : 0);
-							int rightVy1 = by + bh - rightBottomTrim - (sBottom ? t : 0);
+							int rightVy0 = by + rightTopTrim;
+							int rightVy1 = by + bh - rightBottomTrim;
 							int rightVh  = rightVy1 - rightVy0;
 							if(sRight && rightVh > 0){
 								int x = bx + bw - inset - t;

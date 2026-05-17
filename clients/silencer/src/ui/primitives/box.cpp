@@ -26,6 +26,10 @@ AllocPayload(const BoxStrokeStyle & s) {
 	p->innerHaloWidth = s.innerHaloWidth;
 	p->haloOpacity    = s.haloOpacity;
 	p->sides          = s.sides;
+	p->topLeftCorner = static_cast<Uint8>(s.topLeftCorner);
+	p->topRightCorner = static_cast<Uint8>(s.topRightCorner);
+	p->bottomRightCorner = static_cast<Uint8>(s.bottomRightCorner);
+	p->bottomLeftCorner = static_cast<Uint8>(s.bottomLeftCorner);
 	return p;
 }
 

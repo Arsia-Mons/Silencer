@@ -23,12 +23,14 @@ namespace silencer::clay_bridge {
 namespace {
 
 using silencer::ui::primitives::BoxStrokeStyle;
+using silencer::ui::primitives::BoxCornerMode;
 namespace BoxSides = silencer::ui::primitives::BoxSides;
 namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 
 BoxStrokeStyle OpenRightChrome() {
 	BoxStrokeStyle style = BoxVariants::Chrome;
 	style.sides = static_cast<Uint8>(BoxSides::Top | BoxSides::Bottom | BoxSides::Left);
+	style.bottomLeftCorner = BoxCornerMode::Horizontal;
 	return style;
 }
 

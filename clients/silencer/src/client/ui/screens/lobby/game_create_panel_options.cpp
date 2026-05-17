@@ -63,6 +63,7 @@ constexpr const char * kActionMaxTeams    = "lobby.game_create.max_teams";
 
 struct UpperLayout {
 	Uint16 titleHeight = 0;
+	Uint16 viewportHeight = 0;
 	Uint16 valueColumnWidth = 0;
 	Uint16 scrollMax = 0;
 	Uint8 visibleRows = 0;
@@ -142,6 +143,7 @@ UpperLayout ResolveUpperLayout(Uint16 panelWidth,
 	const int viewportH = std::max(
 		0,
 		borderH - static_cast<int>(kFormPadTop) - static_cast<int>(kFormPadBottom));
+	out.viewportHeight = static_cast<Uint16>(viewportH);
 
 	if(viewportH > 0){
 		int visibleRows = (viewportH + static_cast<int>(kFormRowGap))
@@ -312,7 +314,7 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 			CLAY({ .id = viewportId,
 			       .layout = {
 			           .sizing = { CLAY_SIZING_GROW(0),
-			                       CLAY_SIZING_GROW(0) },
+			                       CLAY_SIZING_FIXED(static_cast<float>(layout.viewportHeight)) },
 			           .childGap = game_create_panel_options_detail::kFormRowGap,
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       },
@@ -383,7 +385,7 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 				               CLAY_SIZING_FIXED(
 				                   static_cast<float>(
 				                       game_create_panel_options_detail::kScrollbarWidth)),
-				               CLAY_SIZING_GROW(0),
+				               CLAY_SIZING_FIXED(static_cast<float>(layout.viewportHeight)),
 				           },
 				       },
 				       .custom = { .customData = customData } }) {}

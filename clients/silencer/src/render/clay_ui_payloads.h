@@ -162,6 +162,10 @@ struct BoxStrokePayload {
 	Uint8 innerHaloWidth;
 	Uint8 haloOpacity;
 	Uint8 sides;
+	Uint8 topLeftCorner;
+	Uint8 topRightCorner;
+	Uint8 bottomRightCorner;
+	Uint8 bottomLeftCorner;
 };
 
 }  // namespace silencer::clay_bridge
