@@ -30,6 +30,9 @@ constexpr uint16_t kUpperH = 121;
 constexpr uint16_t kRightTallW = 232;
 constexpr uint16_t kRightTallH = 391;
 constexpr uint16_t kNarrowChatMinH = 88;
+// Matches the old lobby BG's baked panel fill through the palette alpha LUT.
+constexpr uint8_t kPanelFillColor = 74;
+constexpr uint8_t kPanelFillOpacity = 128;
 
 void BuildRightUpperContents(LobbyMainAreaPanels & panels,
                              World & world,
@@ -76,6 +79,7 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 	                         CLAY_SIZING_FIXED(kUpperH) },
 	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	         },
+	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 	         .clip = { .horizontal = true, .vertical = true },
 	     })) {
 		BuildCharacterPanelTree(panels.character, world, resources, interactions);
@@ -88,6 +92,7 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 	                         CLAY_SIZING_FIXED(kUpperH) },
 	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	         },
+	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 	         .clip = { .horizontal = true, .vertical = true },
 	     })) {
 		BuildRightUpperContents(panels, world, resources, owner, interactions);
@@ -100,6 +105,7 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 	                         CLAY_SIZING_FIXED((float)narrowTallH) },
 	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	         },
+	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 	         .clip = { .horizontal = true, .vertical = true },
 	     })) {
 		BuildRightTallContents(panels, world, resources, owner, interactions);
@@ -112,6 +118,7 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 	                         CLAY_SIZING_GROW(0) },
 	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	         },
+	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 	         .clip = { .horizontal = true, .vertical = true },
 	     })) {
 		BuildChatPanelTree(panels.chat, world, resources, interactions);
@@ -130,7 +137,6 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 	           .childGap = kRegionGap,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       },
-	       .clip = { .horizontal = true, .vertical = true },
 	     }) {
 		CLAY({ .id = CLAY_ID("LobbyUpperRow"),
 		       .layout = {
@@ -139,7 +145,6 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 		           .childGap = kRegionGap,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       },
-		       .clip = { .horizontal = true, .vertical = true },
 		     }) {
 			CLAY(Box(BoxVariants::Chrome, {
 			         .id = CLAY_ID("LobbyCharacterBox"),
@@ -148,6 +153,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 			                         CLAY_SIZING_GROW(0) },
 			             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			         },
+			         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 			         .clip = { .horizontal = true, .vertical = true },
 			     })) {
 				BuildCharacterPanelTree(panels.character, world, resources, interactions);
@@ -160,6 +166,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 			                         CLAY_SIZING_GROW(0) },
 			             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			         },
+			         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 			         .clip = { .horizontal = true, .vertical = true },
 			     })) {
 				BuildRightUpperContents(panels, world, resources, owner, interactions);
@@ -173,6 +180,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 		                         CLAY_SIZING_GROW(0) },
 		             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		         },
+		         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 		         .clip = { .horizontal = true, .vertical = true },
 		     })) {
 			BuildChatPanelTree(panels.chat, world, resources, interactions);
@@ -186,6 +194,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 	                         CLAY_SIZING_GROW(0) },
 	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	         },
+	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 	         .clip = { .horizontal = true, .vertical = true },
 	     })) {
 		BuildRightTallContents(panels, world, resources, owner, interactions);
@@ -213,7 +222,6 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
 	           .layoutDirection = narrow ? CLAY_TOP_TO_BOTTOM
 	                                     : CLAY_LEFT_TO_RIGHT,
 	       },
-	       .clip = { .horizontal = true, .vertical = true },
 	    }) {
 		if(narrow){
 			lobby_main_area_detail::BuildNarrowBody(panels, world, resources, owner, narrowTallH, interactions);

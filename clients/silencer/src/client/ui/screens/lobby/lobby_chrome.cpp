@@ -28,6 +28,8 @@ namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 constexpr uint16_t kRootPadX = 10;
 constexpr uint16_t kRootPadTop = 25;
 constexpr const char * kActionGoBack = "lobby.go_back";
+constexpr uint8_t kPanelFillColor = 74;
+constexpr uint8_t kPanelFillOpacity = 128;
 
 }  // namespace lobby_chrome_detail
 
@@ -58,6 +60,8 @@ void BuildLobbyTitleBar(const std::string & version,
 	             .layoutDirection = narrow ? CLAY_TOP_TO_BOTTOM
 	                                       : CLAY_LEFT_TO_RIGHT,
 	         },
+	         .backgroundColor = { lobby_chrome_detail::kPanelFillColor, 0, 0,
+	                              lobby_chrome_detail::kPanelFillOpacity },
 	     })) {
 		auto buildTitleRow = [&]() {
 			CLAY({ .id = CLAY_ID("LobbyTitleRow"),

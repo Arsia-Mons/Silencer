@@ -103,7 +103,8 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	           .padding = { lobby_screen_detail::kRootPadX, lobby_screen_detail::kRootPadX, lobby_screen_detail::kRootPadTop, lobby_screen_detail::kRootPadBottom },
 	           .childGap = lobby_screen_detail::kRegionGap,
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	       } }) {
+	       },
+	       .image = { .imageData = PackImageStretch(7, 1) } }) {
 		BuildLobbyTitleBar(version, mapName, narrow, dst.w, interactions);
 
 		LobbyMainAreaPanels panels{
