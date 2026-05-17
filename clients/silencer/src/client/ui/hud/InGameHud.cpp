@@ -58,7 +58,7 @@ void BuildInGameHudUi(Renderer& renderer, const Resources& resources,
 	if(tracetime > 0) BuildHudTraceTime(surface, tracetime);
 
 	if(view.buyTech.visible){
-		BuildBuyTechOverlay(view.buyTech, surface, interactions);
+		BuildBuyTechOverlay(view.buyTech, resources, surface, interactions);
 	}
 
 	if(view.showChatTicks || player.chatActive){

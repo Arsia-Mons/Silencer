@@ -72,10 +72,14 @@ void ScrollTextBox(Clay_String id,
 	if(scrollMax < 0) scrollMax = 0;
 	if(scrollPosition > scrollMax) scrollPosition = static_cast<Uint16>(scrollMax);
 
+	// Mirror the legacy chat textbox + scrollbar pairing: callers opt into
+	// scrollbar support, but the chrome only appears once content actually
+	// overflows the box.
+	const bool drawSb = opts.showScrollbar && scrollMax > 0;
 	const float rootW = static_cast<float>(opts.width);
 	const float rootH = static_cast<float>(opts.height);
-	const float sbW   = opts.showScrollbar ? static_cast<float>(opts.scrollbarWidth) : 0.0f;
-	const float gap   = opts.showScrollbar ? static_cast<float>(opts.scrollbarGap) : 0.0f;
+	const float sbW   = drawSb ? static_cast<float>(opts.scrollbarWidth) : 0.0f;
+	const float gap   = drawSb ? static_cast<float>(opts.scrollbarGap) : 0.0f;
 	float rowsW       = rootW - sbW - gap;
 	if(rowsW < 0.0f) rowsW = 0.0f;
 	const float rowH  = static_cast<float>(opts.lineHeight);
@@ -142,7 +146,7 @@ void ScrollTextBox(Clay_String id,
 		}
 
 		// Optional scrollbar.
-		if(opts.showScrollbar){
+		if(drawSb){
 			auto * payload = AllocScrollBarPayload(
 				opts.scrollbarBank,
 				opts.scrollbarTrackIndex,
