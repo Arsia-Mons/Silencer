@@ -92,9 +92,13 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	using namespace silencer::clay_bridge;
 	using namespace silencer::client_ui::lobby;
 
-	const bool narrow = LobbyUseNarrowLayout(dst.w);
+	const int uiScale = std::max(1, UiScale());
+	const int layoutWidth = std::max(1, dst.w / uiScale);
+	const int layoutHeight = std::max(1, dst.h / uiScale);
+	const bool narrow = LobbyUseNarrowLayout(layoutWidth);
 	const uint16_t titleBarH = LobbyTitleBarHeight(narrow, mapName);
-	const int bodyH = std::max(0, dst.h - (int)lobby_screen_detail::kRootPadTop - (int)lobby_screen_detail::kRootPadBottom
+	const int bodyW = std::max(0, layoutWidth - (int)lobby_screen_detail::kRootPadX * 2);
+	const int bodyH = std::max(0, layoutHeight - (int)lobby_screen_detail::kRootPadTop - (int)lobby_screen_detail::kRootPadBottom
 	                              - (int)titleBarH - (int)lobby_screen_detail::kRegionGap);
 
 	CLAY({ .id = CLAY_ID("LobbyRoot"),
@@ -106,7 +110,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       },
 	       .image = { .imageData = PackImageStretch(7, 1) } }) {
-		BuildLobbyTitleBar(version, mapName, narrow, dst.w, interactions);
+		BuildLobbyTitleBar(version, mapName, narrow, layoutWidth, interactions);
 
 		LobbyMainAreaPanels panels{
 			characterState,
@@ -119,7 +123,7 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
 			gameJoinActive,
 			gameTechActive,
 		};
-		BuildLobbyMainArea(panels, ctx, *this, narrow, bodyH, interactions);
+		BuildLobbyMainArea(panels, ctx, *this, narrow, bodyW, bodyH, interactions);
 		if(gameCreateActive){
 			BuildGameCreatePreviewOverlay(gameCreateState, ctx);
 		}

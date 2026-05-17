@@ -41,6 +41,7 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         ScreenContext & ctx,
                         LobbyScreen & owner,
                         bool narrow,
+                        int bodyW,
                         int bodyH,
                         silencer::ui::UiInteractionRegistry& interactions);
 

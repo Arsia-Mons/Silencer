@@ -72,6 +72,8 @@ void BuildRightTallContents(LobbyMainAreaPanels & panels,
 void BuildNarrowBody(LobbyMainAreaPanels & panels,
                      ScreenContext & ctx,
                      LobbyScreen & owner,
+                     int bodyW,
+                     int chatH,
                      int narrowTallH,
                      silencer::ui::UiInteractionRegistry& interactions) {
 	World & world = ctx.world;
@@ -125,13 +127,20 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
 	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 	         .clip = { .horizontal = true, .vertical = true },
 	     })) {
-		BuildChatPanelTree(panels.chat, world, resources, interactions);
+		BuildChatPanelTree(panels.chat,
+		                   world,
+		                   resources,
+		                   static_cast<Uint16>(std::max(0, bodyW)),
+		                   static_cast<Uint16>(std::max(0, chatH)),
+		                   interactions);
 	}
 }
 
 void BuildWideBody(LobbyMainAreaPanels & panels,
                    ScreenContext & ctx,
                    LobbyScreen & owner,
+                   int chatW,
+                   int chatH,
                    silencer::ui::UiInteractionRegistry& interactions) {
 	World & world = ctx.world;
 	Resources & resources = world.resources;
@@ -188,7 +197,12 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
 		         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
 		         .clip = { .horizontal = true, .vertical = true },
 		     })) {
-			BuildChatPanelTree(panels.chat, world, resources, interactions);
+			BuildChatPanelTree(panels.chat,
+			                   world,
+			                   resources,
+			                   static_cast<Uint16>(std::max(0, chatW)),
+			                   static_cast<Uint16>(std::max(0, chatH)),
+			                   interactions);
 		}
 	}
 
@@ -212,11 +226,28 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         ScreenContext & ctx,
                         LobbyScreen & owner,
                         bool narrow,
+                        int bodyW,
                         int bodyH,
                         silencer::ui::UiInteractionRegistry& interactions) {
 	const int narrowTallFit = bodyH - ((int)lobby_main_area_detail::kUpperH * 2)
 	                        - ((int)lobby_main_area_detail::kRegionGap * 3) - (int)lobby_main_area_detail::kNarrowChatMinH;
 	const int narrowTallH = std::max(0, std::min((int)lobby_main_area_detail::kRightTallH, narrowTallFit));
+	const int narrowChatH = std::max(
+		0,
+		bodyH
+			- ((int)lobby_main_area_detail::kUpperH * 2)
+			- narrowTallH
+			- ((int)lobby_main_area_detail::kRegionGap * 3));
+	const int wideChatW = std::max(
+		0,
+		bodyW
+			- (int)lobby_main_area_detail::kRightTallW
+			- (int)lobby_main_area_detail::kRegionGap);
+	const int wideChatH = std::max(
+		0,
+		bodyH
+			- (int)lobby_main_area_detail::kUpperH
+			- (int)lobby_main_area_detail::kRegionGap);
 
 	CLAY({ .id = CLAY_ID("LobbyBody"),
 	       .layout = {
@@ -228,9 +259,22 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
 	       },
 	    }) {
 		if(narrow){
-			lobby_main_area_detail::BuildNarrowBody(panels, ctx, owner, narrowTallH, interactions);
+			lobby_main_area_detail::BuildNarrowBody(
+				panels,
+				ctx,
+				owner,
+				bodyW,
+				narrowChatH,
+				narrowTallH,
+				interactions);
 		}else{
-			lobby_main_area_detail::BuildWideBody(panels, ctx, owner, interactions);
+			lobby_main_area_detail::BuildWideBody(
+				panels,
+				ctx,
+				owner,
+				wideChatW,
+				wideChatH,
+				interactions);
 		}
 	}
 }
