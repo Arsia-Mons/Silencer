@@ -1092,7 +1092,9 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                   // Known props handled by dedicated UI below — exclude from generic editor
                   const knownProps: Record<string, string[]> = {
                     PlayAnim:        ['bank', 'frames', 'loop'],
-                    EmitSound:       ['sound', 'volume'],
+                    EmitSound:       ['sound', 'volume', 'global'],
+                    EmitSpawnSound:  ['sound'],
+                    EmitDeathSound:  ['sound'],
                     SetFacing:       ['dir'],
                     RandomChance:    ['chance'],
                     SetBlackboard:   ['key', 'value'],
@@ -1165,7 +1167,32 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
                         <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>VOLUME (0–128)</label>
                         <input type="number" min={0} max={128} step={1} value={Number(selectedNode.props.volume ?? 100)}
                           onChange={e => updateProp('volume', parseInt(e.target.value))}
-                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }} />
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 4, boxSizing: 'border-box' }} />
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>GLOBAL (no distance attenuation)</label>
+                        <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                          {[false, true].map(v => {
+                            const active = (selectedNode.props.global === true) === v;
+                            return (
+                              <button key={String(v)} onClick={() => updateProp('global', v)}
+                                style={{ flex: 1, padding: '4px 0', fontSize: 10, fontFamily: 'monospace', cursor: 'pointer',
+                                  background: active ? '#14532d' : '#161b22',
+                                  border: `1px solid ${active ? '#22c55e' : '#2d3748'}`,
+                                  color: active ? '#22c55e' : '#4a5568' }}>
+                                {v ? 'global' : 'spatial'}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </>)}
+
+                      {/* EmitSpawnSound / EmitDeathSound knobs — sound dropdown only */}
+                      {(action === 'EmitSpawnSound' || action === 'EmitDeathSound') && (<>
+                        <label style={{ color: '#718096', fontSize: 10, display: 'block', marginBottom: 2 }}>SOUND</label>
+                        <select value={String(selectedNode.props.sound ?? '')} onChange={e => updateProp('sound', e.target.value)}
+                          style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '4px 6px', fontSize: 11, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+                          <option value="">— select sound —</option>
+                          {soundNames.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
                       </>)}
 
                       {/* SetFacing knobs */}

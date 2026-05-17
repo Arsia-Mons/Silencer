@@ -190,8 +190,11 @@ void Magistrate::InitBT(){
 		World& world = *static_cast<World*>(ctx.userData);
 		std::string snd = ctx.props->value("sound", std::string{});
 		int vol = ctx.props->value("volume", 100);
+		bool global = ctx.props->value("global", false);
 		if(snd.empty()) return BTResult::Failure;
-		EmitSound(world, world.resources.soundbank[snd], vol);
+		Mix_Chunk* chunk = world.resources.soundbank[snd];
+		if(global) EmitGlobalSound(world, chunk, (Uint8)vol);
+		else        EmitSound(world, chunk, (Uint8)vol);
 		return BTResult::Success;
 	};
 	btctx_.actions["SetFacing"] = [this](BTContext& ctx) -> BTResult {

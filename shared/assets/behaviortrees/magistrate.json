@@ -65,7 +65,7 @@
       "children": [],
       "props": {
         "action": "EmitSpawnSound",
-        "sound": "mgbegin"
+        "sound": "mgbegin.wav"
       }
     },
     "seq_dying": {
@@ -95,7 +95,7 @@
       "children": [],
       "props": {
         "action": "EmitDeathSound",
-        "sound": "mgend"
+        "sound": "mgend.wav"
       }
     },
     "leaf_spawn_guards": {
