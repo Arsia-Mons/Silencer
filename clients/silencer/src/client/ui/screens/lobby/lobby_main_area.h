@@ -1,9 +1,9 @@
 #ifndef SILENCER_CLIENT_UI_LOBBY_MAIN_AREA_H
 #define SILENCER_CLIENT_UI_LOBBY_MAIN_AREA_H
 
-// Lobby body: character + chat (always on) + the panel-switching right
-// column (GameSelect / GameCreate / GameJoin / GameTech). Composes into
-// LobbyRoot beneath the title bar.
+// Lobby body: character + chat (always on) plus the stepped right pane
+// (upper shelf + tall column) that swaps between GameSelect / GameCreate /
+// GameJoin / GameTech. Composes into LobbyRoot beneath the title bar.
 
 class World;
 class Resources;
@@ -35,8 +35,8 @@ struct LobbyMainAreaPanels {
 	bool gameTechActive;
 };
 
-// Emits the LobbyBody subtree (character + chat + right control column)
-// into the current Clay frame.
+// Emits the LobbyBody subtree (character + chat + stepped right pane) into
+// the current Clay frame.
 void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         ScreenContext & ctx,
                         LobbyScreen & owner,

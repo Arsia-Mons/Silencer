@@ -33,11 +33,11 @@ constexpr Uint8  kListLineH    = 14;
 
 constexpr Uint8  kScrollbarBank = 7;
 
-// LobbyRightUpperBox interior layout knobs.
+// Upper stepped-pane slot interior layout knobs.
 constexpr uint16_t kUpperBtnPadLeft = 4;
 constexpr uint16_t kUpperBtnPadTop  = 4;
 
-// LobbyRightTallBox interior layout knobs.
+// Tall stepped-pane slot interior layout knobs.
 constexpr uint16_t kTallHeadingPadLeft = 7;
 constexpr uint16_t kTallHeadingPadTop  = 6;
 constexpr uint16_t kTallListPadLeft    = 9;

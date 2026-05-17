@@ -21,14 +21,8 @@ namespace silencer::client_ui::lobby {
 
 namespace game_join_panel_detail {
 
-// LobbyRightUpperBox interior layout knobs. Box at (238, 64, 160, 121) with
-// 1-px stroke → interior origin (239, 65). Buttons land at:
-//   Tech:  (242, 68)  → padLeft=3, padTop=3
-//   Team:  (242, 100) → padTop = 100 - (65+3+21) = 11
-//   Ready: (242, 160) → padTop = 160 - (65+3+21+11+21) = 39
-// All TOP_TO_BOTTOM wrappers carry padLeft=3 to align under the box's left
-// stroke. Last button bottom y = 160+21 = 181, box bottom stroke at y=184 →
-// 3 px clearance.
+// Upper stepped-pane slot interior layout knobs. The padding preserves the
+// legacy three-button vertical rhythm inside the shallow top shelf.
 constexpr uint16_t kBtnPadLeft   = 3;
 constexpr uint16_t kBtnTechPadTop  = 3;
 constexpr uint16_t kBtnTeamPadTop  = 11;
@@ -136,9 +130,9 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
 void BuildGameJoinTallTree(GameJoinPanelState & state,
                            Resources & resources,
                            silencer::ui::UiInteractionRegistry& interactions) {
-	// GameJoin has no tall-pane content — the legacy panel only emitted the
-	// 3 stacked buttons in the upper area. The LobbyRightTallBox renders as
-	// empty chrome (just the 1-px stroke) when GameJoin is active.
+	// GameJoin has no tall-slot content — the legacy panel only emitted the
+	// three stacked buttons in the upper shelf. The LobbyRightTallBox renders
+	// as empty chrome when GameJoin is active.
 	(void)state;
 	(void)resources;
 	(void)interactions;

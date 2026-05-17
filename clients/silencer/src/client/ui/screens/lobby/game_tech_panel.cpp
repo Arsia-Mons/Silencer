@@ -40,14 +40,14 @@ constexpr const char * kActionBack = "lobby.game_tech.back";
 constexpr const char * kActionTogglePrefix = "lobby.game_tech.toggle.";
 constexpr const char * kActionDescriptionPrefix = "lobby.game_tech.description.";
 
-// LobbyRightUpperBox interior layout knobs. Box at (238, 64, 160x121).
+// Upper stepped-pane slot interior layout knobs.
 constexpr uint16_t kUpperBackPadLeft = 4;
 constexpr uint16_t kUpperBackPadTop  = 4;
 constexpr uint16_t kUpperPeerColPadLeft = 4;
 constexpr uint16_t kUpperPeerColPadTop  = 7;
 constexpr uint16_t kUpperPeerRowGap     = 5;
 
-// LobbyRightTallBox interior layout knobs. Box at (398, 64, 232x391).
+// Tall stepped-pane slot interior layout knobs.
 constexpr uint16_t kTallSlotsPadLeft   = 57;
 constexpr uint16_t kTallSlotsPadTop    = 36;
 

@@ -886,13 +886,17 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 						bool sLeft   = (sides & 0x8) != 0;
 						// Draw the active sides of a 1-band ring at the
 						// given concentric `inset` from the bbox edge.
-						// Inset is asymmetric: bands only inset on sides
-						// that have a perpendicular stripe to make room
-						// for. A suppressed side lets the parallel
-						// stripe extend to the bbox edge, so adjacent
-						// rectangular Boxes meeting at a shared edge
-						// (e.g. the lobby right-pane L-shape) join with
-						// no gap and no overlap.
+						// Closed rectangles keep the classic stepped
+						// corner ownership: horizontal bands inset around
+						// both active verticals, and vertical bands inset
+						// around both active horizontals.
+						//
+						// Open-sided chrome (one vertical side suppressed
+						// or one horizontal side suppressed) instead lets
+						// the parallel band run flush to the open edge.
+						// That keeps shelf ends and stitched elbows
+						// visually contiguous when the lobby composes its
+						// L-shape from adjacent rectangular Boxes.
 						// Fill a stripe at (x, y, w, h) with `color`. When
 						// `opacity` is 255 it's a solid fill; otherwise blend
 						// the color against the underlying pixel so the same
@@ -952,10 +956,12 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 							if(t * 2 > bw) t = bw / 2;
 							if(t * 2 > bh) t = bh / 2;
 							if(t < 1) return;
-							int leftInset   = sLeft   ? inset : 0;
-							int rightInset  = sRight  ? inset : 0;
-							int topInset    = sTop    ? inset : 0;
-							int bottomInset = sBottom ? inset : 0;
+							const bool insetHorizontalCorners = sLeft && sRight;
+							const bool insetVerticalCorners = sTop && sBottom;
+							int leftInset   = (sLeft && insetHorizontalCorners) ? inset : 0;
+							int rightInset  = (sRight && insetHorizontalCorners) ? inset : 0;
+							int topInset    = (sTop && insetVerticalCorners) ? inset : 0;
+							int bottomInset = (sBottom && insetVerticalCorners) ? inset : 0;
 							// Top stripe.
 							if(sTop){
 								int x = bx + leftInset;
@@ -970,9 +976,11 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
 								int w = bw - leftInset - rightInset;
 								fillStripe(x, y, w, t, color, opacity);
 							}
-							// Vertical edges. y range skips cells owned by
-							// active perpendicular sides; suppressed sides
-							// don't subtract anything.
+							// Vertical edges. Closed rectangles carve out
+							// the top/bottom corner cells for the horizontal
+							// stripes. Open-sided caps stay flush so the
+							// visible path remains continuous at stitched
+							// joins.
 							int vy0 = by + topInset    + (sTop    ? t : 0);
 							int vy1 = by + bh - bottomInset - (sBottom ? t : 0);
 							int vh  = vy1 - vy0;

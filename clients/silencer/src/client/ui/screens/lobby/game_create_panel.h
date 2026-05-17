@@ -83,18 +83,19 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
                                    const silencer::ui::UiAction & action);
 
-// Emits the upper-pane subtree ("Game Options" heading + 6-row form: security
-// cycler, min/max level, max players, max teams, spectatable). Called inside
-// the LobbyRightUpperBox CLAY block; flex children only (no floating).
+// Emits the upper stepped-pane subtree ("Game Options" heading + 6-row form:
+// security cycler, min/max level, max players, max teams, spectatable).
+// Called inside the LobbyRightUpperBox CLAY block; flex children only (no
+// floating).
 // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
 // TextInputBeginFrame.
 void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions);
 
-// Emits the tall-pane subtree ("Select Map" heading + map list + game-name +
-// password inputs + Create button). Called inside the LobbyRightTallBox CLAY
-// block; flex children only.
+// Emits the tall stepped-pane subtree ("Select Map" heading + map list +
+// game-name + password inputs + Create button). Called inside the
+// LobbyRightTallBox CLAY block; flex children only.
 // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
 // ScrollListBeginFrame, TextInputBeginFrame.
 void BuildGameCreateTallTree(GameCreatePanelState & state,

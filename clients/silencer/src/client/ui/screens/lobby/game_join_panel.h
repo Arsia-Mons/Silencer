@@ -52,17 +52,17 @@ void GameJoinPanelTick(GameJoinPanelState & state,
 bool GameJoinPanelHandleUiIntent(GameJoinPanelState & state,
                                  const silencer::ui::UiAction & action);
 
-// Emits the upper-pane subtree (Choose Tech / Change Team / Ready buttons,
-// stacked vertically). Must be called inside the LobbyRightUpperBox CLAY
-// block; emits flex children only (no floating). Caller's BeginFrame
+// Emits the upper stepped-pane subtree (Choose Tech / Change Team / Ready
+// buttons, stacked vertically). Must be called inside the LobbyRightUpperBox
+// CLAY block; emits flex children only (no floating). Caller's BeginFrame
 // requirements: ButtonBeginFrame.
 void BuildGameJoinUpperTree(GameJoinPanelState & state,
                             Resources & resources,
                             silencer::ui::UiInteractionRegistry& interactions);
 
-// Emits the tall-pane subtree (currently empty for GameJoin — the variant
-// has no tall-area content). Must be called inside the LobbyRightTallBox
-// CLAY block.
+// Emits the tall stepped-pane subtree (currently empty for GameJoin — the
+// variant has no tall-area content). Must be called inside the
+// LobbyRightTallBox CLAY block.
 void BuildGameJoinTallTree(GameJoinPanelState & state,
                            Resources & resources,
                            silencer::ui::UiInteractionRegistry& interactions);

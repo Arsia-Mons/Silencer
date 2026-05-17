@@ -53,9 +53,9 @@ void GameTechPanelTick(GameTechPanelState & state,
 bool GameTechPanelHandleUiIntent(GameTechPanelState & state,
                                  const silencer::ui::UiAction & action);
 
-// Emits the upper-pane subtree ("Back To Teams" button + 3 right-aligned
-// peer-name labels). Called inside the LobbyRightUpperBox CLAY block; flex
-// children only (no floating).
+// Emits the upper stepped-pane subtree ("Back To Teams" button + 3
+// right-aligned peer-name labels). Called inside the LobbyRightUpperBox CLAY
+// block; flex children only (no floating).
 // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame.
 void BuildGameTechUpperTree(GameTechPanelState & state,
                             World & world,
@@ -63,9 +63,9 @@ void BuildGameTechUpperTree(GameTechPanelState & state,
                             LobbyScreen & owner,
                             silencer::ui::UiInteractionRegistry& interactions);
 
-// Emits the tall-pane subtree (slots-left text + 4-column tech-choice grid +
-// centered tech-name heading + 8 description lines). Called inside the
-// LobbyRightTallBox CLAY block; flex children only.
+// Emits the tall stepped-pane subtree (slots-left text + 4-column tech-choice
+// grid + centered tech-name heading + 8 description lines). Called inside
+// the LobbyRightTallBox CLAY block; flex children only.
 // BeginFrame requirements: TextBeginFrame, ToggleBeginFrame.
 void BuildGameTechTallTree(GameTechPanelState & state,
                            World & world,

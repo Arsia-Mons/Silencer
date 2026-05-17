@@ -114,7 +114,7 @@ else
 fi
 cmake -S "$script_dir" -B "$bdir" "${gen[@]}" \
     -DCMAKE_BUILD_TYPE="$btype" \
-    -DSILENCER_VERSION=00051 \
+    -DSILENCER_VERSION=00052 \
     -DSILENCER_UNITY_BUILD="$unity" \
     ${toolchain+"${toolchain[@]}"}
 cmake --build "$bdir" --parallel

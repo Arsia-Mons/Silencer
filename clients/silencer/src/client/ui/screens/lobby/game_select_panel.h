@@ -80,14 +80,15 @@ void GameSelectPanelTick(GameSelectPanelState & state,
 bool GameSelectPanelHandleUiIntent(GameSelectPanelState & state,
                                    const silencer::ui::UiAction & action);
 
-// Emits the upper-pane subtree (Create Game button). Must be called inside
-// the LobbyRightUpperBox CLAY block; emits flex children only (no floating).
+// Emits the upper stepped-pane subtree (Create Game button). Must be called
+// inside the LobbyRightUpperBox CLAY block; emits flex children only (no
+// floating).
 // BeginFrame requirements: ButtonBeginFrame.
 void BuildGameSelectUpperTree(GameSelectPanelState & state,
                               Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions);
 
-// Emits the tall-pane subtree ("Active Games" header + games list +
+// Emits the tall stepped-pane subtree ("Active Games" header + games list +
 // info-block + Spectate/Join buttons). Must be called inside the
 // LobbyRightTallBox CLAY block; emits flex children only.
 // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
