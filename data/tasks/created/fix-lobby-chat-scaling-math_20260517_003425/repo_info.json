@@ -1,0 +1,20 @@
+{
+  "remote_urls": [
+    "git@github.com:Arsia-Mons/Silencer.git"
+  ],
+  "branch": "hv/clay-ui-migration",
+  "start_commit": "85db49b1e2bdbe9311816accf978a243cba27fd4",
+  "end_commit": "d05dd05707f3cd3874b4cc44926ad78df65f256f",
+  "touched_files": [
+    "clients/silencer/src/client/ui/screens/lobby/game_create_panel.h",
+    "clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp",
+    "clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp",
+    "clients/silencer/src/client/ui/screens/lobby/lobby_main_area.h",
+    "clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp",
+    "clients/silencer/src/game/game.h",
+    "clients/silencer/src/render/clay_ui_compositor.cpp",
+    "clients/silencer/src/render/clay_ui_payloads.h",
+    "clients/silencer/src/ui/primitives/scroll_list.cpp",
+    "clients/silencer/src/ui/primitives/scroll_list.h"
+  ]
+}

@@ -1,0 +1,586 @@
+diff --git a/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h b/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h
+index b5dbdda..aab91d8 100644
+--- a/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h
++++ b/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h
+@@ -11,6 +11,7 @@
+ // agnostic.
+ 
+ #include "shared.h"
++#include "clay_ui_payloads.h"
+ #include "runtime/UiActionQueue.h"
+ 
+ #include <string>
+@@ -53,6 +54,15 @@ struct GameCreatePanelState {
+ 	bool spectatableClicked = false;
+ 	bool createClicked      = false;
+ 	int  mapRowClickedIndex = -1;
++
++	// Hover-preview cache for local map rows in the Create flow.
++	bool hoverPreviewVisible = false;
++	int  hoverPreviewMapIndex = -1;
++	std::string hoverPreviewName;
++	std::string hoverPreviewDescription;
++	std::vector<Uint8> hoverPreviewPixels;
++	silencer::clay_bridge::SurfacePayload hoverPreviewSurface{};
++	silencer::clay_bridge::ClayCustomData hoverPreviewCustomData{};
+ };
+ 
+ // Hydrate state from Config (defaultgamename, lastspectatable) and rebuild
+@@ -88,9 +98,13 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
+ // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
+ // ScrollListBeginFrame, TextInputBeginFrame.
+ void BuildGameCreateTallTree(GameCreatePanelState & state,
++                             ScreenContext & ctx,
+                              Resources & resources,
+                              silencer::ui::UiInteractionRegistry& interactions);
+ 
++void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,
++                                   ScreenContext & ctx);
++
+ }  // namespace silencer::client_ui::lobby
+ 
+ #endif
+diff --git a/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp b/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp
+index 59d67e4..cb9cd9b 100644
+--- a/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp
++++ b/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp
+@@ -1,5 +1,10 @@
+ #include "game_create_panel.h"
+ 
++#include "game.h"
++#include "screen_context.h"
++#include "map.h"
++#include "text_wrap.h"
++
+ #include "clay/clay.h"
+ #include "clay_ui_compositor.h"
+ #include "runtime/UiInteractionRegistry.h"
+@@ -40,9 +45,14 @@ constexpr Uint8  kMapListLineH = 14;
+ constexpr Uint8  kScrollbarBank = 7;
+ constexpr Uint16 kNameInputW = 210, kNameInputH = 14;
+ constexpr Uint16 kPwInputW   = 210, kPwInputH   = 14;
++constexpr Uint16 kPreviewW   = 172, kPreviewH   = 62;
+ 
+ constexpr uint16_t kPanelPad       = 6;
+ constexpr uint16_t kTallSectionGap = 4;
++constexpr uint16_t kPreviewGap     = 5;
++constexpr int kPreviewOffsetX      = -185;
++constexpr int kPreviewOffsetY      = -30;
++constexpr size_t kPreviewNameChars = 29;
+ 
+ constexpr int kMaxMapRows = 1024;
+ Clay_String g_mapSlab[kMaxMapRows];
+@@ -51,7 +61,177 @@ constexpr const char * kActionMapPrefix = "lobby.game_create.map";
+ constexpr const char * kActionName      = "lobby.game_create.name";
+ constexpr const char * kActionPassword  = "lobby.game_create.password";
+ 
++Clay_String FromStd(const std::string & s) {
++	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
++}
++
++std::string Basename(const std::string & path) {
++	const size_t slash = path.find_last_of("/\\");
++	return slash == std::string::npos ? path : path.substr(slash + 1);
++}
++
++void ResetHoverPreview(GameCreatePanelState & state) {
++	state.hoverPreviewVisible = false;
++	state.hoverPreviewMapIndex = -1;
++	state.hoverPreviewName.clear();
++	state.hoverPreviewDescription.clear();
++	state.hoverPreviewPixels.clear();
++	state.hoverPreviewSurface = {};
++	state.hoverPreviewCustomData = {};
++}
++
++void HideHoverPreview(GameCreatePanelState & state) {
++	state.hoverPreviewVisible = false;
++}
++
++void LoadHoverPreview(GameCreatePanelState & state,
++                      ScreenContext & ctx,
++                      int hoveredIndex) {
++	if(hoveredIndex < 0 || hoveredIndex >= static_cast<int>(state.maps.size())){
++		ResetHoverPreview(state);
++		return;
++	}
++
++	const std::string & mapLabel = state.maps[hoveredIndex];
++	if(ctx.mapDownloader.servermaps.count(mapLabel) > 0){
++		ResetHoverPreview(state);
++		return;
++	}
++	if(state.hoverPreviewMapIndex == hoveredIndex && !state.hoverPreviewPixels.empty()){
++		state.hoverPreviewVisible = true;
++		return;
++	}
++
++	ResetHoverPreview(state);
++
++	const std::string filename = ctx.mapDownloader.FindMap(mapLabel.c_str());
++	if(filename.empty()) return;
++
++	SDL_IOStream * file = SDL_IOFromFile(filename.c_str(), "rb");
++	if(!file) return;
++
++	Map::Header header;
++	const bool loaded = Map::LoadHeader(file, header);
++	SDL_CloseIO(file);
++	if(!loaded) return;
++
++	state.hoverPreviewPixels.resize(static_cast<size_t>(kPreviewW) * kPreviewH);
++	if(!Map::UncompressMinimap(
++		reinterpret_cast<Uint8 (*)[kPreviewW * kPreviewH]>(state.hoverPreviewPixels.data()),
++		header.minimapcompressed,
++		header.minimapcompressedsize)) {
++		ResetHoverPreview(state);
++		return;
++	}
++
++	state.hoverPreviewName = Basename(filename);
++	if(state.hoverPreviewName.size() > kPreviewNameChars){
++		state.hoverPreviewName.resize(kPreviewNameChars);
++	}
++
++	char * wrapped = silencer::ui::WordWrapText(header.description, kPreviewNameChars);
++	if(wrapped){
++		state.hoverPreviewDescription = wrapped;
++		delete[] wrapped;
++	}
++
++	state.hoverPreviewSurface.pixels = state.hoverPreviewPixels.data();
++	state.hoverPreviewSurface.width = kPreviewW;
++	state.hoverPreviewSurface.height = kPreviewH;
++	state.hoverPreviewCustomData.kind = silencer::clay_bridge::CustomKind::Surface;
++	state.hoverPreviewCustomData.payload = &state.hoverPreviewSurface;
++	state.hoverPreviewMapIndex = hoveredIndex;
++	state.hoverPreviewVisible = true;
++}
++
++void UpdateHoverPreview(GameCreatePanelState & state,
++                        ScreenContext & ctx,
++                        int hoveredIndex) {
++	if(hoveredIndex < 0){
++		HideHoverPreview(state);
++		return;
++	}
++	LoadHoverPreview(state, ctx, hoveredIndex);
++}
++
++int CountPreviewLines(const std::string & text) {
++	if(text.empty()) return 0;
++	int lines = 1;
++	for(char c : text){
++		if(c == '\n') ++lines;
++	}
++	return lines;
++}
++
++void BuildHoverPreviewOverlay(GameCreatePanelState & state,
++                              ScreenContext & ctx) {
++	if(!state.hoverPreviewVisible || state.hoverPreviewPixels.empty()) return;
++
++	const silencer::ui::UiInputState & input = ctx.game.CurrentUiInput();
++	const int lineHeight = silencer::ui::primitives::TextLineHeight(TextSize::BodySm);
++	const int descLines = CountPreviewLines(state.hoverPreviewDescription);
++	const int previewHeight = lineHeight + kPreviewGap + kPreviewH
++		+ (descLines > 0 ? kPreviewGap + (descLines * lineHeight) : 0);
++	const int maxX = std::max(0, input.width - static_cast<int>(kPreviewW));
++	const int maxY = std::max(0, input.height - previewHeight);
++	int previewX = static_cast<int>(input.pointer.x) + kPreviewOffsetX;
++	int previewY = static_cast<int>(input.pointer.y) + kPreviewOffsetY;
++	if(previewX < 0) previewX = 0;
++	if(previewX > maxX) previewX = maxX;
++	if(previewY < 0) previewY = 0;
++	if(previewY > maxY) previewY = maxY;
++
++	const silencer::ui::primitives::TextEffect previewEffect =
++		silencer::ui::primitives::TextEffect::LegacyPalette(129, 128 + 32, true);
++
++	CLAY({ .id = CLAY_ID("GCrtMapPreview"),
++	       .layout = {
++	           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
++	                       CLAY_SIZING_FIT(0) },
++	           .childGap = kPreviewGap,
++	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
++	       },
++	       .floating = {
++	           .offset = { static_cast<float>(previewX), static_cast<float>(previewY) },
++	           .zIndex = 2,
++	           .pointerCaptureMode = CLAY_POINTER_CAPTURE_MODE_PASSTHROUGH,
++	           .attachTo = CLAY_ATTACH_TO_ROOT,
++	       } }) {
++		CLAY({ .id = CLAY_ID("GCrtMapPreviewName"),
++		       .layout = {
++		           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
++		                       CLAY_SIZING_FIT(0) },
++		       } }) {
++			Text(FromStd(state.hoverPreviewName),
++			     { .size = TextSize::BodySm,
++			       .wrap = silencer::ui::primitives::TextWrap::None,
++			       .effect = previewEffect });
++		}
++
++		CLAY({ .id = CLAY_ID("GCrtMapPreviewMinimap"),
++		       .layout = {
++		           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
++		                       CLAY_SIZING_FIXED(static_cast<float>(kPreviewH)) },
++		       },
++		       .custom = { .customData = &state.hoverPreviewCustomData } }) {}
++
++		if(!state.hoverPreviewDescription.empty()){
++			CLAY({ .id = CLAY_ID("GCrtMapPreviewDesc"),
++			       .layout = {
++			           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(kPreviewW)),
++			                       CLAY_SIZING_FIT(0) },
++			       } }) {
++				Text(FromStd(state.hoverPreviewDescription),
++				     { .size = TextSize::BodySm,
++				       .wrap = silencer::ui::primitives::TextWrap::Newlines,
++				       .effect = previewEffect });
++			}
++		}
++	}
++}
++
+ void BuildMapList(GameCreatePanelState & state,
++                  ScreenContext & ctx,
+                   silencer::ui::UiInteractionRegistry& interactions) {
+ 	const int slotCount = std::min((int)state.maps.size(), kMaxMapRows);
+ 	for(int i = 0; i < slotCount; ++i){
+@@ -68,13 +248,15 @@ void BuildMapList(GameCreatePanelState & state,
+ 	listOpts.highlightColor = 180;
+ 	listOpts.text.size      = TextSize::Body;
+ 	listOpts.scrollbarBank  = kScrollbarBank;
++	int hoveredIndex = -1;
+ 	CLAY({ .id = CLAY_ID("GCrtMapListWrap") }) {
+ 		ScrollList(CLAY_STRING("GCrtMapList"),
+ 		           g_mapSlab, slotCount,
+ 		           state.mapSelectedIndex, state.mapScrollPos,
+ 		           listOpts,
+-		           ScrollListHandle{ nullptr, kActionMapPrefix, &interactions });
++		           ScrollListHandle{ nullptr, kActionMapPrefix, &interactions, &hoveredIndex });
+ 	}
++	UpdateHoverPreview(state, ctx, hoveredIndex);
+ 	for(int i = 0; i < slotCount; ++i){
+ 		silencer::ui::UiInteractable reg;
+ 		reg.id         = std::string(kActionMapPrefix) + "." + std::to_string(i);
+@@ -124,6 +306,7 @@ void BuildNameAndPassword(GameCreatePanelState & state,
+ }  // namespace game_create_panel_map_form_detail
+ 
+ void BuildGameCreateTallTree(GameCreatePanelState & state,
++                             ScreenContext & ctx,
+                              Resources & resources,
+                              silencer::ui::UiInteractionRegistry& interactions) {
+ 	(void)resources;
+@@ -140,7 +323,7 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
+ 			     { .size = TextSize::Heading });
+ 		}
+ 
+-		game_create_panel_map_form_detail::BuildMapList(state, interactions);
++		game_create_panel_map_form_detail::BuildMapList(state, ctx, interactions);
+ 		game_create_panel_map_form_detail::BuildNameAndPassword(state, interactions);
+ 
+ 		CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
+@@ -153,4 +336,9 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
+ 	}
+ }
+ 
++void BuildGameCreatePreviewOverlay(GameCreatePanelState & state,
++                                   ScreenContext & ctx) {
++	game_create_panel_map_form_detail::BuildHoverPreviewOverlay(state, ctx);
++}
++
+ }  // namespace silencer::client_ui::lobby
+diff --git a/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp b/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp
+index a37a765..ef1fec6 100644
+--- a/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp
++++ b/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp
+@@ -12,6 +12,7 @@
+ #include "game_tech_panel.h"
+ #include "lobby_screen.h"
+ 
++#include "screen_context.h"
+ #include "world.h"
+ 
+ #include <algorithm>
+@@ -35,10 +36,11 @@ constexpr uint8_t kPanelFillColor = 74;
+ constexpr uint8_t kPanelFillOpacity = 128;
+ 
+ void BuildRightUpperContents(LobbyMainAreaPanels & panels,
+-                             World & world,
+-                             Resources & resources,
++                             ScreenContext & ctx,
+                              LobbyScreen & owner,
+                              silencer::ui::UiInteractionRegistry& interactions) {
++	World & world = ctx.world;
++	Resources & resources = world.resources;
+ 	if(panels.gameCreateActive){
+ 		BuildGameCreateUpperTree(panels.gameCreate, resources, interactions);
+ 	}else if(panels.gameJoinActive){
+@@ -51,12 +53,13 @@ void BuildRightUpperContents(LobbyMainAreaPanels & panels,
+ }
+ 
+ void BuildRightTallContents(LobbyMainAreaPanels & panels,
+-                            World & world,
+-                            Resources & resources,
++                            ScreenContext & ctx,
+                             LobbyScreen & owner,
+                             silencer::ui::UiInteractionRegistry& interactions) {
++	World & world = ctx.world;
++	Resources & resources = world.resources;
+ 	if(panels.gameCreateActive){
+-		BuildGameCreateTallTree(panels.gameCreate, resources, interactions);
++		BuildGameCreateTallTree(panels.gameCreate, ctx, resources, interactions);
+ 	}else if(panels.gameJoinActive){
+ 		BuildGameJoinTallTree(panels.gameJoin, resources, interactions);
+ 	}else if(panels.gameTechActive){
+@@ -67,11 +70,12 @@ void BuildRightTallContents(LobbyMainAreaPanels & panels,
+ }
+ 
+ void BuildNarrowBody(LobbyMainAreaPanels & panels,
+-                     World & world,
+-                     Resources & resources,
++                     ScreenContext & ctx,
+                      LobbyScreen & owner,
+                      int narrowTallH,
+                      silencer::ui::UiInteractionRegistry& interactions) {
++	World & world = ctx.world;
++	Resources & resources = world.resources;
+ 	CLAY(Box(BoxVariants::Chrome, {
+ 	         .id = CLAY_ID("LobbyCharacterBox"),
+ 	         .layout = {
+@@ -92,10 +96,10 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
+ 	                         CLAY_SIZING_FIXED(kUpperH) },
+ 	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+ 	         },
+-	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
+-	         .clip = { .horizontal = true, .vertical = true },
++		         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
++		         .clip = { .horizontal = true, .vertical = true },
+ 	     })) {
+-		BuildRightUpperContents(panels, world, resources, owner, interactions);
++		BuildRightUpperContents(panels, ctx, owner, interactions);
+ 	}
+ 
+ 	CLAY(Box(BoxVariants::Chrome, {
+@@ -105,10 +109,10 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
+ 	                         CLAY_SIZING_FIXED((float)narrowTallH) },
+ 	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+ 	         },
+-	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
+-	         .clip = { .horizontal = true, .vertical = true },
++		         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
++		         .clip = { .horizontal = true, .vertical = true },
+ 	     })) {
+-		BuildRightTallContents(panels, world, resources, owner, interactions);
++		BuildRightTallContents(panels, ctx, owner, interactions);
+ 	}
+ 
+ 	CLAY(Box(BoxVariants::Chrome, {
+@@ -126,10 +130,11 @@ void BuildNarrowBody(LobbyMainAreaPanels & panels,
+ }
+ 
+ void BuildWideBody(LobbyMainAreaPanels & panels,
+-                   World & world,
+-                   Resources & resources,
++                   ScreenContext & ctx,
+                    LobbyScreen & owner,
+                    silencer::ui::UiInteractionRegistry& interactions) {
++	World & world = ctx.world;
++	Resources & resources = world.resources;
+ 	CLAY({ .id = CLAY_ID("LobbyLeftMiddleStack"),
+ 	       .layout = {
+ 	           .sizing = { CLAY_SIZING_GROW(0),
+@@ -169,7 +174,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
+ 			         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
+ 			         .clip = { .horizontal = true, .vertical = true },
+ 			     })) {
+-				BuildRightUpperContents(panels, world, resources, owner, interactions);
++				BuildRightUpperContents(panels, ctx, owner, interactions);
+ 			}
+ 		}
+ 
+@@ -194,18 +199,17 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
+ 	                         CLAY_SIZING_GROW(0) },
+ 	             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+ 	         },
+-	         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
+-	         .clip = { .horizontal = true, .vertical = true },
++		         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
++		         .clip = { .horizontal = true, .vertical = true },
+ 	     })) {
+-		BuildRightTallContents(panels, world, resources, owner, interactions);
++		BuildRightTallContents(panels, ctx, owner, interactions);
+ 	}
+ }
+ 
+ }  // namespace lobby_main_area_detail
+ 
+ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
+-                        World & world,
+-                        Resources & resources,
++                        ScreenContext & ctx,
+                         LobbyScreen & owner,
+                         bool narrow,
+                         int bodyH,
+@@ -224,9 +228,9 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
+ 	       },
+ 	    }) {
+ 		if(narrow){
+-			lobby_main_area_detail::BuildNarrowBody(panels, world, resources, owner, narrowTallH, interactions);
++			lobby_main_area_detail::BuildNarrowBody(panels, ctx, owner, narrowTallH, interactions);
+ 		}else{
+-			lobby_main_area_detail::BuildWideBody(panels, world, resources, owner, interactions);
++			lobby_main_area_detail::BuildWideBody(panels, ctx, owner, interactions);
+ 		}
+ 	}
+ }
+diff --git a/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.h b/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.h
+index 331ee79..9f82ca8 100644
+--- a/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.h
++++ b/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.h
+@@ -8,6 +8,7 @@
+ class World;
+ class Resources;
+ class LobbyScreen;
++class ScreenContext;
+ 
+ namespace silencer::ui {
+ class UiInteractionRegistry;
+@@ -37,8 +38,7 @@ struct LobbyMainAreaPanels {
+ // Emits the LobbyBody subtree (narrow stack OR wide left/middle/right
+ // columns) into the current Clay frame.
+ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
+-                        World & world,
+-                        Resources & resources,
++                        ScreenContext & ctx,
+                         LobbyScreen & owner,
+                         bool narrow,
+                         int bodyH,
+diff --git a/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp b/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp
+index c6cfa28..4c191f1 100644
+--- a/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp
++++ b/clients/silencer/src/client/ui/screens/lobby/lobby_screen.cpp
+@@ -1,5 +1,6 @@
+ #include "lobby_screen.h"
+ 
++#include "game_create_panel.h"
+ #include "lobby_chrome.h"
+ #include "lobby_main_area.h"
+ 
+@@ -118,8 +119,10 @@ void LobbyScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, s
+ 			gameJoinActive,
+ 			gameTechActive,
+ 		};
+-		BuildLobbyMainArea(panels, ctx.world, ctx.world.resources, *this,
+-		                   narrow, bodyH, interactions);
++		BuildLobbyMainArea(panels, ctx, *this, narrow, bodyH, interactions);
++		if(gameCreateActive){
++			BuildGameCreatePreviewOverlay(gameCreateState, ctx);
++		}
+ 	}
+ }
+ 
+diff --git a/clients/silencer/src/game/game.h b/clients/silencer/src/game/game.h
+index ea17902..47450f9 100755
+--- a/clients/silencer/src/game/game.h
++++ b/clients/silencer/src/game/game.h
+@@ -90,6 +90,7 @@ public:
+ 	Renderer& GetRenderer() { return renderer; }
+ 	silencer::client_ui::ClientUiInput& UiInput() { return clientUiInput; }
+ 	const silencer::client_ui::ClientUiInput& UiInput() const { return clientUiInput; }
++	const silencer::ui::UiInputState& CurrentUiInput() const { return preparedUiInput; }
+ 	silencer::ui::UiInteractionRegistry& UiInteractions() { return clientUi.Interactions(); }
+ 	const silencer::ui::UiInteractionRegistry& UiInteractions() const { return clientUi.Interactions(); }
+ 	silencer::client_ui::InGameUiController& InGameUi() { return inGameUiController; }
+diff --git a/clients/silencer/src/render/clay_ui_compositor.cpp b/clients/silencer/src/render/clay_ui_compositor.cpp
+index c2c3da3..d3bb27f 100644
+--- a/clients/silencer/src/render/clay_ui_compositor.cpp
++++ b/clients/silencer/src/render/clay_ui_compositor.cpp
+@@ -740,6 +740,26 @@ void RenderInto(::Resources & resources, ::Renderer & renderer,
+ 						delete copy;
+ 						break;
+ 					}
++					case CustomKind::Surface: {
++						const auto * p = reinterpret_cast<const SurfacePayload *>(ccd->payload);
++						if(!p || !p->pixels || p->width == 0 || p->height == 0) break;
++						int x = static_cast<int>(c->boundingBox.x);
++						int y = static_cast<int>(c->boundingBox.y);
++						int w = static_cast<int>(c->boundingBox.width);
++						int h = static_cast<int>(c->boundingBox.height);
++						if(w <= 0) w = p->width;
++						if(h <= 0) h = p->height;
++						int cx = x, cy = y, cw = w, ch = h;
++						if(!ClipDrawRect(dst->w, dst->h, cx, cy, cw, ch)) break;
++						Surface srcsurface;
++						srcsurface.w = p->width;
++						srcsurface.h = p->height;
++						srcsurface.pixels.assign(
++							p->pixels, p->pixels + (static_cast<size_t>(p->width) * p->height));
++						Renderer::Rect dstrect{w, h, x, y};
++						Renderer::BlitSurface(&srcsurface, nullptr, dst, &dstrect);
++						break;
++					}
+ 					case CustomKind::ScrollBar: {
+ 						const auto * p = reinterpret_cast<const ScrollBarPayload *>(ccd->payload);
+ 						if(!p) break;
+diff --git a/clients/silencer/src/render/clay_ui_payloads.h b/clients/silencer/src/render/clay_ui_payloads.h
+index 28a35ae..c843c33 100644
+--- a/clients/silencer/src/render/clay_ui_payloads.h
++++ b/clients/silencer/src/render/clay_ui_payloads.h
+@@ -55,6 +55,7 @@ enum class CustomKind : Uint8 {
+ 	BoxStroke,
+ 	Sprite,
+ 	TeamEmblem,
++	Surface,
+ };
+ 
+ struct ClayCustomData {
+@@ -119,6 +120,12 @@ struct SpritePayload {
+ 		  dstOffsetY(dstOffsetY) {}
+ };
+ 
++struct SurfacePayload {
++	const Uint8 * pixels = nullptr;
++	Uint16 width = 0;
++	Uint16 height = 0;
++};
++
+ struct TeamEmblemPayload {
+ 	Uint8  bank;
+ 	Uint16 index;
+diff --git a/clients/silencer/src/ui/primitives/scroll_list.cpp b/clients/silencer/src/ui/primitives/scroll_list.cpp
+index a10b3ac..2af456b 100644
+--- a/clients/silencer/src/ui/primitives/scroll_list.cpp
++++ b/clients/silencer/src/ui/primitives/scroll_list.cpp
+@@ -75,6 +75,7 @@ void ScrollList(Clay_String id,
+                 Uint16 scrollPosition,
+                 ScrollListOpts opts,
+                 ScrollListHandle handle) {
++	if(handle.hoveredIndexOut) *handle.hoveredIndexOut = -1;
+ 	const int visibleLines = (opts.lineHeight > 0)
+ 		? (opts.height / opts.lineHeight)
+ 		: 0;
+@@ -122,6 +123,9 @@ void ScrollList(Clay_String id,
+ 				       },
+ 				       .backgroundColor = { static_cast<float>(bgIdx),
+ 				                            0.0f, 0.0f, 255.0f } }) {
++					if(handle.hoveredIndexOut && ::Clay_Hovered()){
++						*handle.hoveredIndexOut = i;
++					}
+ 					RegisterRowWidget(id, items[i], i, isSelected, handle);
+ 					Text(items[i], opts.text);
+ 				}
+diff --git a/clients/silencer/src/ui/primitives/scroll_list.h b/clients/silencer/src/ui/primitives/scroll_list.h
+index ce8c400..ec6c415 100644
+--- a/clients/silencer/src/ui/primitives/scroll_list.h
++++ b/clients/silencer/src/ui/primitives/scroll_list.h
+@@ -47,6 +47,7 @@ struct ScrollListHandle {
+ 	bool *      hoveredOut;    // Optional. Written each frame if non-null.
+ 	const char * actionId;     // Optional row action ID prefix registered for input routing.
+ 	UiInteractionRegistry * interactions;  // Required when actionId is set.
++	int * hoveredIndexOut = nullptr;  // Optional. Hovered absolute row index.
+ };
+ 
+ // Resets the per-frame click-adapter + payload arenas. Call once before
