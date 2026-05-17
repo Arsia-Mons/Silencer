@@ -108,6 +108,11 @@ void BuildTechTreeGrid(World & world,
 
 				CLAY({ .id = CLAY_SID(colId),
 				       .layout = {
+				           // Keep the legacy 13px checkbox lane even when a
+				           // remote peer slot is empty so the local tech-name
+				           // column stays anchored under the slots heading.
+				           .sizing = { CLAY_SIZING_FIXED(tech_tree_grid_detail::kCheckboxW),
+				                       CLAY_SIZING_FIT(0) },
 				           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 				       } }) {
 					if(!cols[col].draw) continue;
