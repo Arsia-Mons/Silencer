@@ -82,6 +82,7 @@ export const ACTOR_DEFS: ActorDefEntry[] = [
   { id: 70, label: 'Credit Machine',  icon: 'CR', color: '#f59e0b', bank: 80,   frame: 0 },
   { id: 71, label: 'Light',           icon: 'LT', color: '#fde68a', bank: 222,  frame: 0 },
   { id: 72, label: 'Magistrate',      icon: 'MG', color: '#dc2626', bank: 207,  frame: 0 },
+  { id: 73, label: 'Vanta',           icon: 'VN', color: '#7c3aed', bank: 234,  frame: 0 },
 ];
 
 export const ACTOR_TYPE_HINTS: Record<number, ActorTypeHint> = {

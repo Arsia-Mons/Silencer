@@ -145,6 +145,7 @@ public:
 	friend class DedicatedServer;
 	friend class SurveillanceMonitor;
 	friend class Magistrate;
+	friend class Vanta;
 	friend class Warper;
 	friend class Grenade;
 	friend class BaseDoor;

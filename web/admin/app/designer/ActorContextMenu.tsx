@@ -14,6 +14,8 @@ const DIRECTION_LABELS: Record<number, string> = {
 
 // Magistrate actor id
 const MAGISTRATE_ID = 72;
+// Vanta actor id
+const VANTA_ID = 73;
 // type 0=guard-blaster, 1=guard-laser, 2=guard-rocket, 3=robot
 const MAGISTRATE_SPAWN_TYPES: Record<number, string> = {
   0: 'Guard (Blaster)',
@@ -111,11 +113,13 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
   const { lights, load: loadLights } = useLightsStore();
   const isLight = actor.id === 71;
   const isMagistrate = actor.id === MAGISTRATE_ID;
+  const isVanta = actor.id === VANTA_ID;
+  const isMagistrateClass = isMagistrate || isVanta;
 
   useEffect(() => { if (isLight) loadLights(); }, [isLight, loadLights]);
 
   // For non-light actors, build type hint label from static hints catalogue
-  const typeHint = !isLight && !isMagistrate ? ACTOR_TYPE_HINTS[actor.id] : undefined;
+  const typeHint = !isLight && !isMagistrateClass ? ACTOR_TYPE_HINTS[actor.id] : undefined;
 
   const [fields, setFields] = useState<FieldState>({
     type:         String(actor.type ?? 0),
@@ -176,7 +180,7 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
         type: encodeLightType(lightFields.size, lightFields.shape, lightFields.anim, lightFields.pulseSpeed, lightFields.dynShadows, r, g, b),
         direction: lightFields.direction,
       });
-    } else if (isMagistrate) {
+    } else if (isMagistrateClass) {
       const radius       = Math.min(255, Math.max(8, parseInt(magistrateFields.radius, 10) || 64));
       const actSecs      = Math.min(65535 / 60 | 0, Math.max(0, parseInt(magistrateFields.activationSecs, 10) || 0));
       const actTicks     = actSecs * 60;
@@ -307,7 +311,7 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
             )}
           </div>
         </>
-      ) : isMagistrate ? (
+      ) : isMagistrateClass ? (
         <>
           <div className="mb-1.5">
             <div className={lbl}>Facing</div>
