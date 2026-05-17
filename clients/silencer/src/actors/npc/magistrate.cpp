@@ -80,12 +80,13 @@ void Magistrate::InitBT(){
 	};
 
 	// ── Movement ──────────────────────────────────────────────────────────────
-	// Walk in current facing direction. Returns Running while clear, Failure on actual wall collision.
-	// hitwall_ is set to true by the WALKING physics case when FollowGround can't advance.
+	// Walk in current facing direction. Turns around automatically at platform edges
+	// (same as Civilian) — always returns Running so the BT stays in this leaf.
 	btctx_.actions["Walk"] = [this](BTContext& ctx) -> BTResult {
-		(void)ctx;
-		if(state != WALKING){ state = WALKING; state_i = 0; hitwall_ = false; }
-		if(hitwall_){ hitwall_ = false; return BTResult::Failure; }
+		World& world = *static_cast<World*>(ctx.userData);
+		if(state != WALKING){ state = WALKING; state_i = 0; }
+		if(DistanceToEnd(*this, world) <= world.minwalldistance)
+			mirrored = !mirrored;
 		return BTResult::Running;
 	};
 
@@ -353,7 +354,7 @@ void Magistrate::Tick(World & world){
 			xv        = mirrored ? -(Sint8)speed : (Sint8)speed;
 			res_bank  = 207;
 			res_index = state_i % 21;
-			if(!FollowGround(*this, world, xv)) hitwall_ = true;
+			FollowGround(*this, world, xv);
 			{
 				auto it = world.resources.actordefs.find("magistrate");
 				if(it != world.resources.actordefs.end()){
