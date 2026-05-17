@@ -27,6 +27,9 @@ void BuildBuyTechOverlay(const BuyTechOverlayView& view,
 		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
 		       .padding = { 0, 0, 120, 0 },
 		       .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+	       },
+	       .floating = {
+		       .attachTo = CLAY_ATTACH_TO_ROOT,
 	       } }) {
 		CLAY(Box(BoxVariants::Chrome, {
 		       .id = CLAY_ID("InGameBuyTechPanel"),

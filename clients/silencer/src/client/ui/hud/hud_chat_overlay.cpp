@@ -78,6 +78,9 @@ void BuildChatOverlay(const HudView& view,
 	           .padding = { 0, 9, 0, 160 },
 	           .childAlignment = { CLAY_ALIGN_X_RIGHT, CLAY_ALIGN_Y_BOTTOM },
 	       },
+	       .floating = {
+	           .attachTo = CLAY_ATTACH_TO_ROOT,
+	       },
 	}) {
 		CLAY(Box(BoxVariants::Chrome, {
 		       .id = CLAY_ID("InGameChatPanel"),

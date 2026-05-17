@@ -28,6 +28,9 @@ void BuildPlayerListOverlay(const HudView& view, Surface* surface) {
 		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
 		       .padding = { 50, 50, 50, 0 },
 		       .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+	       },
+	       .floating = {
+		       .attachTo = CLAY_ATTACH_TO_ROOT,
 	       } }) {
 		CLAY({ .id = CLAY_ID("PlayerListPanel"),
 		       .layout = {
