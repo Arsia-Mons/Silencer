@@ -706,6 +706,9 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["state"] = Game::StateName(game.GetState());
 		r["frame"] = game.GetFrameCount();
 		r["paused"] = game.paused;
+		r["ui_width"] = game.CurrentUiInput().width;
+		r["ui_height"] = game.CurrentUiInput().height;
+		r["ui_scale"] = game.CurrentUiInput().uiScale;
 		// Expose the lobby connection sub-state so test scripts can wait for
 		// AUTHENTICATING before dispatching a Login click — the LobbyConnect
 		// state machine progresses asynchronously through Connect/version

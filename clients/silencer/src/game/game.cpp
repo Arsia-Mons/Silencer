@@ -360,9 +360,20 @@ bool Game::SetupRenderDevice(void){
 static const int kLegacyRenderWidth = 640;
 static const int kLegacyRenderHeight = 480;
 
-static int UiScaleForSurface(int width, int height) {
+static int GameplayUiScaleForSurface(int width, int height) {
 	int scaleX = width / kLegacyRenderWidth;
 	int scaleY = height / kLegacyRenderHeight;
+	int uiScale = scaleX < scaleY ? scaleX : scaleY;
+	return uiScale > 0 ? uiScale : 1;
+}
+
+static int MenuUiScaleForSurface(int width, int height) {
+	// Menus reflow responsively, so they do not need the strict "largest
+	// integer that still fits a 640x480 canvas" rule gameplay uses. Round to
+	// the nearest legacy scale instead so shrinking a desktop window across a
+	// 640px/480px multiple does not suddenly halve bitmap text/chrome size.
+	int scaleX = (width + (kLegacyRenderWidth / 2)) / kLegacyRenderWidth;
+	int scaleY = (height + (kLegacyRenderHeight / 2)) / kLegacyRenderHeight;
 	int uiScale = scaleX < scaleY ? scaleX : scaleY;
 	return uiScale > 0 ? uiScale : 1;
 }
@@ -417,11 +428,13 @@ bool Game::HasUiInputTarget() {
 }
 
 void Game::PrepareClientUiFrame(Surface& surface) {
-	// UI magnification factor: the largest integer that keeps the virtual
-	// canvas at least the legacy 640x480 design size. Bitmap glyph/sprite/
-	// chrome draws are integer-scaled by this in the Clay compositor so
-	// pixel art stays crisp.
-	int uiScale = UiScaleForSurface(surface.w, surface.h);
+	// UI magnification factor: gameplay keeps the strict legacy 640x480 fit,
+	// while menus can round to the nearest legacy scale because Clay reflows
+	// responsively in virtual space. Bitmap glyph/sprite/chrome draws remain
+	// integer-scaled in the compositor so pixel art stays crisp.
+	int uiScale = world.map.loaded
+		? GameplayUiScaleForSurface(surface.w, surface.h)
+		: MenuUiScaleForSurface(surface.w, surface.h);
 	int virtualW;
 	int virtualH;
 	if(world.map.loaded){
