@@ -339,8 +339,8 @@
       "shield": 0,
       "speed": 3,
       "respawnSeconds": 0,
-      "soundActivate": "mgbegin",
-      "soundDeath": "mgend",
+      "soundActivate": "mgbegin.wav",
+      "soundDeath": "mgend.wav",
       "snapshotInterval": 60,
       "warpTeleportTick": 12,
       "activationTicks": 60

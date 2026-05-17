@@ -66,8 +66,8 @@ void Magistrate::InitBT(){
 	// Plays the spawn sound once (idempotent via BB flag).
 	// Reads sound name from props "sound"; falls back to GAS soundActivate. Always Success.
 	btctx_.actions["EmitSpawnSound"] = [this](BTContext& ctx) -> BTResult {
-		if(!ctx.bb("_spawn_sound_fired", false)){
-			ctx.bbSet("_spawn_sound_fired", true);
+		if(!spawnSoundFired_){
+			spawnSoundFired_ = true;
 			World& world = *static_cast<World*>(ctx.userData);
 			std::string snd = ctx.props ? ctx.props->value("sound", std::string{}) : std::string{};
 			if(snd.empty()){
@@ -285,6 +285,13 @@ void Magistrate::Tick(World & world){
 			}
 			x = xe;
 			y = ye;
+		}
+		if(state == STANDING && !spawnSoundFired_){
+			spawnSoundFired_ = true;
+			const EnemyDef* md = GASLoader::Get().GetEnemyDef("magistrate");
+			std::string snd = md ? md->soundActivate : std::string{};
+			if(!snd.empty())
+				EmitGlobalSound(world, world.resources.soundbank[snd], 128);
 		}
 		res_bank  = 207;
 		res_index = 0;
