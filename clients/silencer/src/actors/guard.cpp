@@ -244,11 +244,11 @@ void Guard::InitBT(){
 		return BTResult::Failure;
 	};
 
-	// Chase: walk horizontally toward the chasing target. Only when patrol=true.
+	// Chase: walk toward the chasing target. Only when patrol=true.
 	btctx_.actions["Chase"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
 		if(!chasing) return BTResult::Failure;
-		if(!patrol) return BTResult::Failure;
+		if(!patrol) return BTResult::Failure; // stay at post
 		Object* obj = world.GetObjectFromId(chasing);
 		if(!obj){ chasing = 0; return BTResult::Failure; }
 		if(obj->type == ObjectTypes::PLAYER){
@@ -263,6 +263,18 @@ void Guard::InitBT(){
 				mirrored = (obj->x < x);
 			} else {
 				state = WALKING;
+			}
+			Platform* ladder = world.map.TestAABB(x - abs(xv), y, x + abs(xv), y, Platform::LADDER);
+			if(ladder){
+				Uint32 center = ((ladder->x2 - ladder->x1) / 2) + ladder->x1;
+				if(abs(signed(center) - x) <= abs(ceil(float(xv)))){
+					if(ladder->y2 == obj->y && y != obj->y && ladder->y2 > y){
+						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = _gls ? _gls->ladderClimbSpeed : 5; state = LADDER; state_i = 0; }
+					}
+					if(ladder->y1 == obj->y && y != obj->y && ladder->y1 < y){
+						{ const EnemyDef* _gls = GASLoader::Get().GetEnemyDef("guard-blaster"); x = center; yv = -(_gls ? _gls->ladderClimbSpeed : 5); state = LADDER; state_i = 0; }
+					}
+				}
 			}
 		}
 		return BTResult::Running;
