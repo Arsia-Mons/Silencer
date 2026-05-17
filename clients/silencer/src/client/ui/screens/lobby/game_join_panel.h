@@ -2,9 +2,10 @@
 #define SILENCER_CLIENT_UI_LOBBY_GAME_JOIN_PANEL_H
 
 // Screen-side lobby GameJoinPanel: three stacked Chrome+Compact buttons
-// (Choose Tech / Change Team / Ready) on the right pane. The Ready button
-// label flips to "Waiting..." while the host is still waiting for peers to
-// finish downloading the map.
+// (Choose Tech / Change Team / Ready) on the upper right pane plus the
+// joined-game roster in the tall pane. The Ready button label flips to
+// "Waiting..." while the host is still waiting for peers to finish
+// downloading the map.
 //
 // Domain glue (SendReady, ChangeTeam, ShowGameTech) lives in the screen-side
 // GameJoinPanelTick. Primitives stay screen-agnostic.
@@ -13,6 +14,7 @@
 #include "runtime/UiActionQueue.h"
 
 #include <string>
+#include <vector>
 
 class World;
 class Resources;
@@ -24,6 +26,16 @@ class UiInteractionRegistry;
 }
 
 namespace silencer::client_ui::lobby {
+
+struct GameJoinRosterRow {
+	bool ready = false;
+	Uint8 agency = 0;
+	Uint8 teamNumber = 0;
+	Uint8 peerSlot = 0;
+	bool drawEmblem = false;
+	std::string name;
+	std::string level;
+};
 
 struct GameJoinPanelState {
 	// Per-frame click flags. Set by typed widget intents; consumed once
@@ -37,6 +49,10 @@ struct GameJoinPanelState {
 	// Pointer-stable across Build calls because it's std::string-owned
 	// on the screen.
 	std::string readyLabel = "Ready";
+
+	// Joined-game roster shown in the tall pane. Rebuilt every Tick from
+	// the connected world's current team/peer state.
+	std::vector<GameJoinRosterRow> rosterRows;
 };
 
 void GameJoinPanelInit(GameJoinPanelState & state);
@@ -60,9 +76,8 @@ void BuildGameJoinUpperTree(GameJoinPanelState & state,
                             Resources & resources,
                             silencer::ui::UiInteractionRegistry& interactions);
 
-// Emits the tall stepped-pane subtree (currently empty for GameJoin — the
-// variant has no tall-area content). Must be called inside the
-// LobbyRightTallBox CLAY block.
+// Emits the tall stepped-pane subtree (joined-game roster). Must be called
+// inside the LobbyRightTallBox CLAY block.
 void BuildGameJoinTallTree(GameJoinPanelState & state,
                            Resources & resources,
                            silencer::ui::UiInteractionRegistry& interactions);
