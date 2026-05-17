@@ -1,6 +1,7 @@
 #include "client/ui/hud/hud_player_list_overlay.h"
 
 #include "clay/clay.h"
+#include "client/ui/hud/HudClayHelpers.h"
 #include "client/ui/hud/HudPayloadArena.h"
 #include "client/ui/views/HudView.h"
 #include "primitives/text.h"
@@ -11,18 +12,6 @@
 
 namespace silencer {
 namespace client_ui {
-
-namespace hud_player_list_overlay_detail {
-
-Clay_String StringFromStd(const std::string& text) {
-	return Clay_String{
-		.isStaticallyAllocated = false,
-		.length = static_cast<int32_t>(text.size()),
-		.chars = text.c_str(),
-	};
-}
-
-}  // namespace hud_player_list_overlay_detail
 
 void BuildPlayerListOverlay(const HudView& view, Surface* surface) {
 	if(view.teams.empty()) return;
@@ -87,13 +76,13 @@ void BuildPlayerListOverlay(const HudView& view, Surface* surface) {
 								       .layoutDirection = CLAY_LEFT_TO_RIGHT,
 							       } }) {
 								CLAY({ .id = CLAY_IDI("PlayerListPeerName", (teamIndex * 8) + peerIndex),
-								       .layout = { .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) } } }) {
-									Text(hud_player_list_overlay_detail::StringFromStd(peer.displayName),
+							       .layout = { .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIT(0) } } }) {
+									Text(ClayStringFromStd(peer.displayName),
 									     { .size = TextSize::Body });
 								}
 								CLAY({ .id = CLAY_IDI("PlayerListPeerStats", (teamIndex * 8) + peerIndex),
 								       .layout = { .sizing = { CLAY_SIZING_FIXED((float)((statsString.size() + 1) * 6)), CLAY_SIZING_FIT(0) } } }) {
-									Text(hud_player_list_overlay_detail::StringFromStd(statsString),
+									Text(ClayStringFromStd(statsString),
 									     { .size = TextSize::Body });
 								}
 							}

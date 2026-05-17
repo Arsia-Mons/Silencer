@@ -1,5 +1,6 @@
 #include "client/ui/hud/InGameOverlays.h"
 
+#include "client/ui/hud/HudClayHelpers.h"
 #include "client/ui/hud/hud_player_list_overlay.h"
 #include "client/ui/views/HudView.h"
 #include "clay_ui_compositor.h"
@@ -23,14 +24,6 @@ using silencer::ui::primitives::TextAdvance;
 using silencer::ui::primitives::TextEffect;
 using silencer::ui::primitives::TextLineHeight;
 using silencer::ui::primitives::TextSize;
-
-Clay_String StringFromStd(const std::string& text) {
-	return Clay_String{
-		.isStaticallyAllocated = false,
-		.length = static_cast<int32_t>(text.size()),
-		.chars = text.c_str(),
-	};
-}
 
 Clay_ElementDeclaration FloatingTextElement(const char* id, int x, int y, int w, int h) {
 	Clay_String idString{
@@ -143,7 +136,7 @@ void DrawMessage(const HudView& view, Surface* surface) {
 			                          glyph.x, glyph.y,
 			                          TextAdvance(glyph.size),
 			                          TextLineHeight(glyph.size))) {
-				Text(StringFromStd(glyph.text),
+				Text(ClayStringFromStd(glyph.text),
 				     { .size = glyph.size,
 				       .effect = glyph.effect });
 			}
@@ -181,7 +174,7 @@ void DrawStatus(const HudView& view, Surface* surface) {
 			CLAY(FloatingTextElementI("InGameStatusLine", (uint32_t)i, line.x, line.y,
 			                          (int)line.text.size() * TextAdvance(TextSize::BodySm),
 			                          TextLineHeight(TextSize::BodySm))) {
-				Text(StringFromStd(line.text),
+				Text(ClayStringFromStd(line.text),
 				     { .size = TextSize::BodySm,
 				       .effect = line.effect });
 			}
@@ -210,7 +203,7 @@ void DrawTopMessage(const HudView& view, Surface* surface) {
 	CLAY({ .id = CLAY_ID("InGameTopMessageRoot"),
 	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		CLAY(FloatingTextElement("InGameTopMessage", 200, 10, 245, 12)) {
-			Text(StringFromStd(topText), { .size = TextSize::BodySm });
+			Text(ClayStringFromStd(topText), { .size = TextSize::BodySm });
 		}
 	}
 }
@@ -226,7 +219,7 @@ void DrawQuitPrompt(const HudView& /*view*/, Surface* surface) {
 	       .layout = { .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) } } }) {
 		CLAY(FloatingTextElement("QuitPromptText", (surface->w - width) / 2, 200,
 		                         width, TextLineHeight(TextSize::Prompt))) {
-			Text(StringFromStd(text),
+			Text(ClayStringFromStd(text),
 			     { .size = TextSize::Prompt,
 			       .effect = TextEffect::LegacyPalette(202) });
 		}

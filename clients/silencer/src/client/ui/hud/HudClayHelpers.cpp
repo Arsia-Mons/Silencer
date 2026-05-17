@@ -1,5 +1,6 @@
 #include "client/ui/hud/HudClayHelpers.h"
 
+#include "client/ui/hud/HudPayloadArena.h"
 #include "resources.h"
 #include "surface.h"
 
@@ -9,11 +10,7 @@ namespace silencer {
 namespace client_ui {
 
 Clay_String ClayStringFromStd(const std::string& text) {
-	return Clay_String{
-		.isStaticallyAllocated = false,
-		.length = static_cast<int32_t>(text.size()),
-		.chars = text.c_str(),
-	};
+	return AllocHudString(text);
 }
 
 Clay_String ClayStringFromCString(const char* text) {
