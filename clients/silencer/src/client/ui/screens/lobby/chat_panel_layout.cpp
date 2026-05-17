@@ -3,6 +3,7 @@
 #include "clay/clay.h"
 #include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
+#include "primitives/box.h"
 #include "primitives/text.h"
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
@@ -21,7 +22,8 @@ using silencer::ui::primitives::TextInput;
 using silencer::ui::primitives::TextInputOpts;
 using silencer::ui::primitives::TextInputHandle;
 using silencer::ui::primitives::Text;
-using silencer::clay_bridge::PackImage;
+using silencer::ui::primitives::Box;
+namespace BoxVariants = silencer::ui::primitives::BoxVariants;
 
 namespace silencer::client_ui::lobby {
 
@@ -29,9 +31,8 @@ namespace chat_panel_layout_detail {
 
 // Legacy ChatInterface geometry inside the chat-box outer frame. The
 // surrounding LobbyChatBox already matches the outer 378x260 chrome;
-// this component recreates the inner 368x234 chat interface within it.
-constexpr Uint16 kInterfaceW    = 368;
-constexpr Uint16 kInterfaceH    = 234;
+// this component recreates the original inner border rectangles and
+// content offsets within it.
 constexpr Uint16 kChatW        = 242;
 constexpr Uint16 kChatH        = 207;
 constexpr Uint16 kPresW        = 110;
@@ -39,18 +40,23 @@ constexpr Uint16 kPresH        = 207;
 constexpr Uint8  kLineHeight   = 11;
 constexpr Uint16 kInputW       = 360;
 constexpr Uint16 kInputH       = 14;
-constexpr Uint16 kRootPadLeft   = 5;
-constexpr Uint16 kRootPadTop    = 5;
+constexpr Uint16 kChannelX      = 5;
+constexpr Uint16 kChannelY      = 5;
 constexpr Uint16 kChannelWrapH  = 16;
-constexpr Uint16 kBodyOffsetX   = 4;
-constexpr Uint16 kBodyOffsetY   = 4;
+constexpr Uint16 kChatBorderX   = 5;
+constexpr Uint16 kChatBorderY   = 21;
+constexpr Uint16 kChatBorderW   = 368;
+constexpr Uint16 kChatBorderH   = 213;
+constexpr Uint16 kBodyOffsetX   = 9;
+constexpr Uint16 kBodyOffsetY   = 25;
 constexpr Uint16 kBodyGap       = 6;
-constexpr Uint16 kInputOffsetX  = 3;
-constexpr Uint16 kInputOffsetY  = 221;
+constexpr Uint16 kInputBorderX  = 5;
+constexpr Uint16 kInputBorderY  = 238;
+constexpr Uint16 kInputBorderW  = 368;
+constexpr Uint16 kInputBorderH  = 17;
+constexpr Uint16 kInputOffsetX  = 8;
+constexpr Uint16 kInputOffsetY  = 242;
 constexpr Uint16 kBodyW         = kChatW + kBodyGap + kPresW;
-constexpr Uint8  kChromeBank    = 7;
-constexpr Uint16 kChatBorderIdx = 11;
-constexpr Uint16 kInputBorderIdx = 14;
 constexpr int    kChatInputUid  = 1;
 // Sprite bank that holds the lobby's scrollbar track/thumb cells.
 constexpr Uint8  kScrollbarBank = 7;
@@ -135,16 +141,18 @@ void BuildChatPanelTree(ChatPanelState & state,
 	CLAY({ .id = CLAY_ID("ChatPanelContent"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
-	           .padding = { chat_panel_layout_detail::kRootPadLeft, 0,
-	                        chat_panel_layout_detail::kRootPadTop, 0 },
-	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
-	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP },
 	       } }) {
-
 		CLAY({ .id = CLAY_ID("ChatChannelWrap"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIT(0),
 		                       CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kChannelWrapH) },
+		       },
+		       .floating = {
+		           .offset = { (int16_t)chat_panel_layout_detail::kChannelX,
+		                       (int16_t)chat_panel_layout_detail::kChannelY },
+		           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
+		                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+		           .attachTo = CLAY_ATTACH_TO_PARENT,
 		       } }) {
 			if(!state.channel.empty()){
 				Text(chat_panel_layout_detail::FromStd(state.channel),
@@ -152,77 +160,85 @@ void BuildChatPanelTree(ChatPanelState & state,
 			}
 		}
 
-		CLAY({ .id = CLAY_ID("ChatInterfaceChrome"),
+		CLAY(Box(BoxVariants::Plain, {
+		         .id = CLAY_ID("ChatMainBorder"),
+		         .layout = {
+		             .sizing = { CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kChatBorderW),
+		                         CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kChatBorderH) },
+		         },
+		         .floating = {
+		             .offset = { (int16_t)chat_panel_layout_detail::kChatBorderX,
+		                         (int16_t)chat_panel_layout_detail::kChatBorderY },
+		             .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
+		                               .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+		             .attachTo = CLAY_ATTACH_TO_PARENT,
+		         },
+		     })) {}
+
+		CLAY(Box(BoxVariants::Plain, {
+		         .id = CLAY_ID("ChatInputBorder"),
+		         .layout = {
+		             .sizing = { CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kInputBorderW),
+		                         CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kInputBorderH) },
+		         },
+		         .floating = {
+		             .offset = { (int16_t)chat_panel_layout_detail::kInputBorderX,
+		                         (int16_t)chat_panel_layout_detail::kInputBorderY },
+		             .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
+		                               .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+		             .attachTo = CLAY_ATTACH_TO_PARENT,
+		         },
+		     })) {}
+
+		CLAY({ .id = CLAY_ID("ChatBodyRow"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kInterfaceW),
-		                       CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kInterfaceH) },
+		           .sizing = { CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kBodyW),
+		                       CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kChatH) },
+		           .childGap = chat_panel_layout_detail::kBodyGap,
+		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       },
-		       .image = { .imageData = PackImage(chat_panel_layout_detail::kChromeBank,
-		                                        chat_panel_layout_detail::kChatBorderIdx) } }) {
-			CLAY({ .id = CLAY_ID("ChatInputBorderOverlay"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kInterfaceW),
-			                       CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kInterfaceH) },
-			       },
-			       .floating = {
-			           .offset = { 0, 0 },
-			           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-			                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-			           .attachTo = CLAY_ATTACH_TO_PARENT,
-			       },
-			       .image = { .imageData = PackImage(chat_panel_layout_detail::kChromeBank,
-			                                        chat_panel_layout_detail::kInputBorderIdx) } }) {}
-
-			CLAY({ .id = CLAY_ID("ChatBodyRow"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kBodyW),
-			                       CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kChatH) },
-			           .childGap = chat_panel_layout_detail::kBodyGap,
-			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
-			       },
 		       .floating = {
-			           .offset = { (int16_t)chat_panel_layout_detail::kBodyOffsetX,
-			                       (int16_t)chat_panel_layout_detail::kBodyOffsetY },
-			           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-			                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-			           .attachTo = CLAY_ATTACH_TO_PARENT,
-			       } }) {
-				CLAY({ .id = CLAY_ID("ChatBoxWrap") }) {
-					ScrollTextBox(CLAY_STRING("ChatBox"),
-					              chat_panel_layout_detail::g_chatSlab,
-					              chatN,
-					              state.chatScrollPos,
-					              chatOpts);
-				}
-				CLAY({ .id = CLAY_ID("ChatPresWrap") }) {
-					ScrollTextBox(CLAY_STRING("ChatPresence"),
-					              chat_panel_layout_detail::g_presSlab,
-					              presN,
-					              state.presenceScrollPos,
-					              presOpts);
-				}
+		           .offset = { (int16_t)chat_panel_layout_detail::kBodyOffsetX,
+		                       (int16_t)chat_panel_layout_detail::kBodyOffsetY },
+		           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
+		                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+		           .attachTo = CLAY_ATTACH_TO_PARENT,
+		       } }) {
+			CLAY({ .id = CLAY_ID("ChatBoxWrap") }) {
+				ScrollTextBox(CLAY_STRING("ChatBox"),
+				              chat_panel_layout_detail::g_chatSlab,
+				              chatN,
+				              state.chatScrollPos,
+				              chatOpts);
 			}
+			CLAY({ .id = CLAY_ID("ChatPresWrap") }) {
+				ScrollTextBox(CLAY_STRING("ChatPresence"),
+				              chat_panel_layout_detail::g_presSlab,
+				              presN,
+				              state.presenceScrollPos,
+				              presOpts);
+			}
+		}
 
-			CLAY({ .id = CLAY_ID("ChatInputWrap"),
-			       .layout = {
-			           .sizing = { CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kInputW),
-			                       CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kInputH) },
-			       },
-			       .floating = {
-			           .offset = { (int16_t)chat_panel_layout_detail::kInputOffsetX,
-			                       (int16_t)chat_panel_layout_detail::kInputOffsetY },
-			           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
-			                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
-			           .attachTo = CLAY_ATTACH_TO_PARENT,
-			       } }) {
-				TextInput(CLAY_STRING("ChatInput"),
-				          state.inputBuffer,
-				          inOpts,
-				          TextInputHandle{ nullptr, chat_panel_layout_detail::kActionInput,
-				                           "Chat", &interactions,
-				                           chat_panel_layout_detail::kChatInputUid,
-				                           static_cast<int>(sizeof(state.inputBuffer)) - 1 });
-			}
+		CLAY({ .id = CLAY_ID("ChatInputWrap"),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kInputW),
+		                       CLAY_SIZING_FIXED((float)chat_panel_layout_detail::kInputH) },
+		       },
+		       .floating = {
+		           .offset = { (int16_t)chat_panel_layout_detail::kInputOffsetX,
+		                       (int16_t)chat_panel_layout_detail::kInputOffsetY },
+		           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
+		                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
+		           .attachTo = CLAY_ATTACH_TO_PARENT,
+		       } }) {
+			TextInput(CLAY_STRING("ChatInput"),
+			          state.inputBuffer,
+			          inOpts,
+			          TextInputHandle{ nullptr, chat_panel_layout_detail::kActionInput,
+			                           "Chat", &interactions,
+			                           chat_panel_layout_detail::kChatInputUid,
+			                           static_cast<int>(sizeof(state.inputBuffer)) - 1 });
 		}
 	}
 }
