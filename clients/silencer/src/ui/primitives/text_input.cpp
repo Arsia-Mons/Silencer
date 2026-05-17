@@ -87,12 +87,30 @@ void TextInput(Clay_String id,
 	int srcLen = static_cast<int>(std::strlen(src));
 	if(srcLen > kMaskBufferLen - 1) srcLen = kMaskBufferLen - 1;
 
-	const char * displayText = src;
+	const auto style = text_internal::ResolveTextRenderStyle(opts.textSize);
+	const int visibleWidthPx = std::max(
+		0,
+		static_cast<int>(opts.widthPx) - static_cast<int>(opts.contentInsetX));
+	int visibleChars = visibleWidthPx > 0
+		? visibleWidthPx / std::max(1, static_cast<int>(style.advance))
+		: 0;
+	if(visibleChars <= 0 && visibleWidthPx > 0){
+		visibleChars = 1;
+	}
+	if(visibleChars > srcLen){
+		visibleChars = srcLen;
+	}
+	const int scrollChars = (visibleChars > 0 && srcLen > visibleChars)
+		? (srcLen - visibleChars)
+		: 0;
+	const int displayLen = srcLen - scrollChars;
+
+	const char * displayText = src + scrollChars;
 	if(opts.password){
 		char * buf = AllocMaskBuffer();
 		if(buf){
-			for(int i = 0; i < srcLen; i++) buf[i] = '*';
-			buf[srcLen] = '\0';
+			for(int i = 0; i < displayLen; i++) buf[i] = '*';
+			buf[displayLen] = '\0';
 			displayText = buf;
 		}
 	}
@@ -107,7 +125,7 @@ void TextInput(Clay_String id,
 	auto * payload = AllocPayload();
 	if(payload){
 		payload->text        = displayText;
-		payload->textLen     = static_cast<Uint16>(srcLen);
+		payload->textLen     = static_cast<Uint16>(displayLen);
 		payload->textSize    = static_cast<Uint8>(opts.textSize);
 		payload->effectColor = effect.EffectColor();
 		payload->brightness  = brightness;
@@ -121,12 +139,13 @@ void TextInput(Clay_String id,
 	const float w = static_cast<float>(opts.widthPx);
 	const float h = static_cast<float>(opts.heightPx);
 	const uint16_t contentInsetX = std::min(opts.contentInsetX, opts.widthPx);
+	const uint16_t contentInsetY = std::min(opts.contentInsetY, opts.heightPx);
 	CLAY({ .id = CLAY_SID(id),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(w), CLAY_SIZING_FIXED(h) },
-	           .padding = { contentInsetX, 0, 0, 0 },
+	           .padding = { contentInsetX, 0, contentInsetY, 0 },
 	           .childGap = 0,
-	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP },
 	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 	       } }) {
 		bool hovered = ::Clay_Hovered();
@@ -134,7 +153,7 @@ void TextInput(Clay_String id,
 		RegisterTextInputWidget(id, src, opts, handle);
 		const float textW = static_cast<float>(
 			std::max(1, static_cast<int>(opts.widthPx) - static_cast<int>(contentInsetX)));
-		const float textH = static_cast<float>(TextLineHeight(opts.textSize));
+		const float textH = static_cast<float>(style.lineHeight);
 		CLAY({ .id = CLAY_SIDI(id, 1),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(textW), CLAY_SIZING_FIXED(textH) },

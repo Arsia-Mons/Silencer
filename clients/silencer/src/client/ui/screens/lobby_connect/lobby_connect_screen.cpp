@@ -60,6 +60,7 @@ constexpr uint16_t kFormRowGap = 6;
 constexpr uint16_t kLabelW = 86;
 constexpr uint16_t kInputW = 183;
 constexpr uint16_t kInputInsetX = 7;
+constexpr uint16_t kInputInsetY = 2;
 constexpr uint16_t kButtonRowX = 86;
 constexpr uint16_t kButtonRowY = 246;
 constexpr uint16_t kButtonGap = 5;
@@ -392,7 +393,8 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 						  .textSize = lobby_connect_screen_detail::TextSize::Body,
 						  .inactive = inactive,
 						  .showCaret = usernameFocused && blink,
-						  .contentInsetX = lobby_connect_screen_detail::kInputInsetX },
+						  .contentInsetX = lobby_connect_screen_detail::kInputInsetX,
+						  .contentInsetY = lobby_connect_screen_detail::kInputInsetY },
 						{ nullptr, lobby_connect_screen_detail::kActionUsername,
 						  "Username", &interactions,
 						  lobby_connect_screen_detail::LBY_INPUT_USERNAME, 16 });
@@ -430,7 +432,8 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 						  .password = true,
 						  .inactive = inactive,
 						  .showCaret = passwordFocused && blink,
-						  .contentInsetX = lobby_connect_screen_detail::kInputInsetX },
+						  .contentInsetX = lobby_connect_screen_detail::kInputInsetX,
+						  .contentInsetY = lobby_connect_screen_detail::kInputInsetY },
 						{ nullptr, lobby_connect_screen_detail::kActionPassword,
 						  "Password", &interactions,
 						  lobby_connect_screen_detail::LBY_INPUT_PASSWORD, 28 });

@@ -568,6 +568,8 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 		r["submit_actions_for_enter"] = res.submitActionsForEnter;
 		r["submit_actions_for_text"] = res.submitActionsForText;
 		r["password_mask_applied_len"] = res.passwordMaskAppliedLen;
+		r["overflow_tail_applied_len"] = res.overflowTailAppliedLen;
+		r["overflow_tail_matches"] = res.overflowTailMatches;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
 	}

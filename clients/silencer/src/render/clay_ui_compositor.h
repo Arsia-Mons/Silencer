@@ -201,6 +201,8 @@ struct TextInputCheckResult {
 	int submitActionsForEnter;  // Expect 1.
 	int submitActionsForText;   // Expect 0.
 	int passwordMaskAppliedLen;  // Expect 8 — emitted text length for password variant.
+	int overflowTailAppliedLen;  // Expect 4 for the narrow overflow fixture.
+	int overflowTailMatches;     // Expect 1 when the visible tail is "wxyz".
 };
 bool RunTextInputCheck(::Game & game, TextInputCheckResult & out);
 

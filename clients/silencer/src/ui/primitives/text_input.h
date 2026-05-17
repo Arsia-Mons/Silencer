@@ -4,9 +4,9 @@
 // Screen-agnostic Clay primitive for paletted text input fields.
 //
 // The outer Clay element owns the clickable field bounds. The rendered text is
-// an inner custom element, horizontally inset by `contentInsetX` and vertically
-// centered for the selected text size. The caret is positioned relative to that
-// rendered text origin.
+// an inner custom element inset by `contentInsetX` / `contentInsetY`. When the
+// value exceeds the field width, the primitive automatically shows the tail so
+// the caret stays visible and older content is hidden on the left.
 //
 // The primitive owns no state and references no lobby/world/Config:
 //
@@ -15,8 +15,6 @@
 //   • The caller pre-resolves `showCaret` (focus AND blink phase). The
 //     legacy renderer blinks on `state_i % 32 < 16` — that's
 //     screen-side bookkeeping now.
-//   • The caller pre-slices `text` for horizontal scrolling — pass
-//     `buffer + scrolled` if you've implemented scroll-on-overflow.
 //
 // `password` masks the rendered glyphs to '*'. `inactive` overrides
 // `brightness` to 64 (matches legacy effectbrightness handling) and
@@ -50,6 +48,7 @@ struct TextInputOpts {
 	Uint8  caretColor  = 140;   // legacy default.
 	bool   showCaret   = false; // caller pre-resolves blink AND focus.
 	Uint16 contentInsetX = 0;   // left inset from clickable field to text.
+	Uint16 contentInsetY = 0;   // top inset from clickable field to text.
 };
 
 struct TextInputHandle {

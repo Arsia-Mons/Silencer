@@ -114,6 +114,8 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 	::Clay_RenderCommandArray cmds = ::Clay_EndLayout();
 
 	out.passwordMaskAppliedLen = 0;
+	out.overflowTailAppliedLen = 0;
+	out.overflowTailMatches = 0;
 	for(int i = 0; i < cmds.length; i++){
 		::Clay_RenderCommand * c = &cmds.internalArray[i];
 		if(c->commandType != CLAY_RENDER_COMMAND_TYPE_CUSTOM) continue;
@@ -130,6 +132,40 @@ bool RunTextInputCheck(::Game & game, TextInputCheckResult & out) {
 				break;
 			}
 		}
+		break;
+	}
+
+	// Overflow tailing — a narrow field should keep the rightmost visible
+	// chars instead of rendering from column 0 and spilling to the right.
+	silencer::ui::primitives::TextInputBeginFrame();
+	::Clay_BeginLayout();
+	CLAY({ .id = CLAY_ID("TextInputOverflowRoot"),
+	       .layout = {
+	           .sizing = { CLAY_SIZING_FIXED(W), CLAY_SIZING_FIXED(H) },
+	       } }) {
+		silencer::ui::primitives::TextInput(
+			CLAY_STRING("overflow_input"),
+			"abcdefghijklmnopqrstuvwxyz",
+			{ .widthPx = 24,
+			  .heightPx = 14,
+			  .textSize = silencer::ui::primitives::TextSize::Body });
+	}
+	cmds = ::Clay_EndLayout();
+
+	for(int i = 0; i < cmds.length; i++){
+		::Clay_RenderCommand * c = &cmds.internalArray[i];
+		if(c->commandType != CLAY_RENDER_COMMAND_TYPE_CUSTOM) continue;
+		const auto * ccd = reinterpret_cast<const ClayCustomData *>(
+			c->renderData.custom.customData);
+		if(!ccd || ccd->kind != CustomKind::TextInput) continue;
+		const auto * p = reinterpret_cast<const TextInputPayload *>(ccd->payload);
+		if(!p || !p->text) continue;
+		out.overflowTailAppliedLen = static_cast<int>(p->textLen);
+		out.overflowTailMatches =
+			(out.overflowTailAppliedLen == 4
+			 && std::strncmp(p->text, "wxyz", 4) == 0)
+				? 1
+				: 0;
 		break;
 	}
 

@@ -8,7 +8,9 @@
 # Pass bar (render):     < 1.0% pixdiff vs reference.png.
 # Pass bar (behavioral): submit_actions_for_enter==1,
 #                        submit_actions_for_text==0,
-#                        password_mask_applied_len==8.
+#                        password_mask_applied_len==8,
+#                        overflow_tail_applied_len==4,
+#                        overflow_tail_matches==1.
 #
 # Usage:   bash tests/lobby-ui/text_input_test/run.sh
 # Updates: rerun with REGEN=1 to overwrite reference.png from the live
@@ -72,8 +74,8 @@ fi
 # Typed-submit + password-mask check (no PNG; pure JSON).
 CHECK=$(cli --port "$PORT" clay_text_input_check)
 echo "check = $CHECK"
-read ENTER_SUBMITS TEXT_SUBMITS PW_LEN <<EOF
-$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.submit_actions_for_enter,j.submit_actions_for_text,j.password_mask_applied_len].join(' '))" "$CHECK")
+read ENTER_SUBMITS TEXT_SUBMITS PW_LEN TAIL_LEN TAIL_OK <<EOF
+$(bun -e "const j=JSON.parse(process.argv[1]); console.log([j.submit_actions_for_enter,j.submit_actions_for_text,j.password_mask_applied_len,j.overflow_tail_applied_len,j.overflow_tail_matches].join(' '))" "$CHECK")
 EOF
 
 assert_eq() {
@@ -87,6 +89,8 @@ assert_eq() {
 assert_eq "submit_actions_for_enter" "$ENTER_SUBMITS" "1"
 assert_eq "submit_actions_for_text"  "$TEXT_SUBMITS"  "0"
 assert_eq "password_mask_applied_len"  "$PW_LEN"    "8"
+assert_eq "overflow_tail_applied_len" "$TAIL_LEN" "4"
+assert_eq "overflow_tail_matches" "$TAIL_OK" "1"
 
 if [ "$FAILED" != "0" ]; then
   exit 1
