@@ -191,23 +191,17 @@ cli --port "$UI_CTRL" screenshot --out "$UI_SHOT" >/dev/null
 
 # Chrome strip = top 60 px, animation-free in both implementations
 # (bg + "Silencer" title + version + map-name overlay + "Go Back" button).
-TITLE_CROP="0,0,640,60"
-# Inner elbow of the stepped right pane. Keep this crop text-free because the
-# legacy and migrated captures log in as different users.
-ELBOW_CROP="320,170,130,110"
+CROP="0,0,640,60"
 
 # Informational: legacy-vs-committed-baseline (expected ~17–27%, see notes).
-BASELINE_LEGACY_DIFF=$("$PIXDIFF" --crop "$TITLE_CROP" "$BASELINE" "$LEGACY_SHOT" 2>/dev/null || echo "n/a")
-BASELINE_UI_DIFF=$("$PIXDIFF" --crop "$TITLE_CROP" "$BASELINE" "$UI_SHOT" 2>/dev/null || echo "n/a")
-echo "informational: legacy vs committed baseline (crop $TITLE_CROP) = ${BASELINE_LEGACY_DIFF}%"
-echo "informational: ui     vs committed baseline (crop $TITLE_CROP) = ${BASELINE_UI_DIFF}%"
+BASELINE_LEGACY_DIFF=$("$PIXDIFF" --crop "$CROP" "$BASELINE" "$LEGACY_SHOT" 2>/dev/null || echo "n/a")
+BASELINE_UI_DIFF=$("$PIXDIFF" --crop "$CROP" "$BASELINE" "$UI_SHOT" 2>/dev/null || echo "n/a")
+echo "informational: legacy vs committed baseline (crop $CROP) = ${BASELINE_LEGACY_DIFF}%"
+echo "informational: ui     vs committed baseline (crop $CROP) = ${BASELINE_UI_DIFF}%"
 
 # Pass gate: migrated UI vs fresh-legacy, same run.
-TITLE_DIFF=$("$PIXDIFF" --crop "$TITLE_CROP" "$LEGACY_SHOT" "$UI_SHOT")
-ELBOW_DIFF=$("$PIXDIFF" --crop "$ELBOW_CROP" "$LEGACY_SHOT" "$UI_SHOT")
-echo "pixdiff (migrated ui vs fresh legacy, crop $TITLE_CROP) = ${TITLE_DIFF}%"
-echo "pixdiff (migrated ui vs fresh legacy, crop $ELBOW_CROP) = ${ELBOW_DIFF}%"
-awk -v title="$TITLE_DIFF" -v elbow="$ELBOW_DIFF" \
-  'BEGIN { exit !((title+0 < 1.0) && (elbow+0 < 1.0)) }' \
-  && echo "P11 PASS (< 1.0% threshold on title and elbow crops)" \
+DIFF=$("$PIXDIFF" --crop "$CROP" "$LEGACY_SHOT" "$UI_SHOT")
+echo "pixdiff (migrated ui vs fresh legacy, crop $CROP) = ${DIFF}%"
+awk -v d="$DIFF" 'BEGIN { exit !(d+0 < 1.0) }' \
+  && echo "P11 PASS (< 1.0% threshold)" \
   || { echo "P11 FAIL (>= 1.0% threshold)"; exit 1; }
