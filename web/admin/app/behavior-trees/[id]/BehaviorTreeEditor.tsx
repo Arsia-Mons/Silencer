@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   addEdge,
   Background,
@@ -102,6 +102,100 @@ function BTNodeComponent({ data, selected }: NodeProps) {
 }
 
 const NODE_TYPES = { btNode: BTNodeComponent };
+
+// ── Floating / dockable panel ─────────────────────────────────────────────────
+function FloatingPanel({ title, children, onDock }: {
+  title: string;
+  children: React.ReactNode;
+  onDock: () => void;
+}) {
+  const [pos, setPos] = useState({ x: 800, y: 60 });
+  const [size, setSize] = useState({ w: 280, h: 400 });
+  const dragging = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+  const resizing = useRef<{ sx: number; sy: number; ow: number; oh: number } | null>(null);
+
+  // Place near right edge on first render
+  const initialised = useRef(false);
+  useEffect(() => {
+    if (initialised.current) return;
+    initialised.current = true;
+    setPos({ x: Math.max(0, window.innerWidth - 320), y: 60 });
+  }, []);
+
+  return (
+    <div style={{
+      position: 'fixed', left: pos.x, top: pos.y, width: size.w, height: size.h,
+      background: '#0d1117', border: '1px solid #4a5568',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.7)', zIndex: 1000,
+      display: 'flex', flexDirection: 'column',
+    }}>
+      {/* Drag handle / title bar */}
+      <div
+        style={{
+          background: '#161b22', borderBottom: '1px solid #2d3748', padding: '5px 8px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          cursor: 'grab', userSelect: 'none', flexShrink: 0,
+        }}
+        onMouseDown={e => {
+          e.preventDefault();
+          dragging.current = { sx: e.clientX, sy: e.clientY, ox: pos.x, oy: pos.y };
+          const onMove = (me: MouseEvent) => {
+            if (!dragging.current) return;
+            setPos({
+              x: Math.max(0, dragging.current.ox + me.clientX - dragging.current.sx),
+              y: Math.max(0, dragging.current.oy + me.clientY - dragging.current.sy),
+            });
+          };
+          const onUp = (me: MouseEvent) => {
+            dragging.current = null;
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            // Auto-dock when dragged into the right panel area
+            if (me.clientX > window.innerWidth - 240) onDock();
+          };
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        }}
+      >
+        <span style={{ color: '#a0aec0', fontSize: 10, letterSpacing: 2, fontFamily: 'monospace' }}>⠿ {title}</span>
+        <button
+          onClick={onDock}
+          title="Dock to side panel (or drag here)"
+          style={{ background: 'none', border: '1px solid #4a5568', color: '#a0aec0', cursor: 'pointer', fontSize: 10, padding: '1px 7px', lineHeight: '14px', fontFamily: 'monospace' }}
+        >
+          ⊣ dock
+        </button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>{children}</div>
+      {/* Resize grip */}
+      <div
+        title="Resize"
+        style={{
+          position: 'absolute', right: 0, bottom: 0, width: 14, height: 14,
+          cursor: 'se-resize', background: 'linear-gradient(135deg, transparent 50%, #4a5568 50%)',
+        }}
+        onMouseDown={e => {
+          e.stopPropagation();
+          resizing.current = { sx: e.clientX, sy: e.clientY, ow: size.w, oh: size.h };
+          const onMove = (me: MouseEvent) => {
+            if (!resizing.current) return;
+            setSize({
+              w: Math.max(200, resizing.current.ow + me.clientX - resizing.current.sx),
+              h: Math.max(150, resizing.current.oh + me.clientY - resizing.current.sy),
+            });
+          };
+          const onUp = () => {
+            resizing.current = null;
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+          };
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
+        }}
+      />
+    </div>
+  );
+}
 
 // ── Dagre layout (top-down) ───────────────────────────────────────────────────
 function applyDagre(nodes: Node[], edges: Edge[]): Node[] {
@@ -623,7 +717,141 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
   const bbKeyNames = bt.blackboard.map(k => k.key);
   const bbDupes = new Set(bbKeyNames.filter((k, i) => bbKeyNames.indexOf(k) !== i));
 
+  const [bbFloating, setBBFloating] = useState(false);
+  const [liveBBFloating, setLiveBBFloating] = useState(false);
+
+  // ── Shared JSX fragments (used in both docked and floating render paths) ──
+  const bbKeysList = (
+    <>
+      {bt.blackboard.length === 0 && (
+        <div style={{ color: '#4a5568', fontSize: 10, padding: '8px 0' }}>No keys — add one above</div>
+      )}
+      {bt.blackboard.map((k, i) => {
+        const typeColor = BB_TYPE_COLOR[k.type] ?? '#718096';
+        const isDupe = bbDupes.has(k.key);
+        const usedBy = bbUsedBy(k.key);
+        return (
+          <div key={i} style={{
+            marginBottom: 8, padding: '8px', background: '#0d1117',
+            border: `1px solid ${isDupe ? '#ef4444' : '#2d3748'}`,
+            borderLeft: `3px solid ${typeColor}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+              <input
+                value={k.key}
+                onChange={e => updateBBKey(i, { key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })}
+                placeholder="key_name"
+                style={{
+                  flex: 1, background: 'none', border: 'none', borderBottom: `1px solid ${isDupe ? '#ef4444' : '#2d3748'}`,
+                  color: isDupe ? '#ef4444' : '#e2e8f0', fontSize: 12, fontFamily: 'monospace',
+                  padding: '1px 0', minWidth: 0, outline: 'none',
+                }}
+              />
+              <button onClick={() => removeBBKey(i)}
+                style={{ background: 'none', border: 'none', color: '#4a5568', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
+                title="Remove key">✕</button>
+            </div>
+            {isDupe && <div style={{ color: '#ef4444', fontSize: 9, marginBottom: 4 }}>⚠ duplicate key name</div>}
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, flexShrink: 0 }}>TYPE</span>
+              <div style={{ display: 'flex', gap: 2, flex: 1 }}>
+                {(['bool', 'int', 'float', 'string'] as BBKey['type'][]).map(t => (
+                  <button key={t} onClick={() => updateBBKey(i, { type: t })}
+                    style={{
+                      flex: 1, padding: '2px 0', fontSize: 9, fontFamily: 'monospace', cursor: 'pointer',
+                      background: k.type === t ? `${BB_TYPE_COLOR[t]}22` : 'transparent',
+                      border: `1px solid ${k.type === t ? BB_TYPE_COLOR[t] : '#2d3748'}`,
+                      color: k.type === t ? BB_TYPE_COLOR[t] : '#4a5568',
+                      letterSpacing: 0,
+                    }}>
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, flexShrink: 0 }}>DEFAULT</span>
+              {k.type === 'bool' ? (
+                <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+                  {[true, false].map(v => (
+                    <button key={String(v)} onClick={() => updateBBKey(i, { default: v })}
+                      style={{
+                        flex: 1, padding: '2px 0', fontSize: 9, fontFamily: 'monospace', cursor: 'pointer',
+                        background: k.default === v ? (v ? '#14532d' : '#450a0a') : 'transparent',
+                        border: `1px solid ${k.default === v ? (v ? '#22c55e' : '#ef4444') : '#2d3748'}`,
+                        color: k.default === v ? (v ? '#22c55e' : '#f87171') : '#4a5568',
+                      }}>
+                      {String(v)}
+                    </button>
+                  ))}
+                </div>
+              ) : k.type === 'int' ? (
+                <input type="number" step={1} value={Number(k.default ?? 0)}
+                  onChange={e => updateBBKey(i, { default: parseInt(e.target.value) })}
+                  style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
+              ) : k.type === 'float' ? (
+                <input type="number" step={0.1} value={Number(k.default ?? 0)}
+                  onChange={e => updateBBKey(i, { default: parseFloat(e.target.value) })}
+                  style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
+              ) : (
+                <input value={String(k.default ?? '')}
+                  onChange={e => updateBBKey(i, { default: e.target.value })}
+                  style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
+              )}
+            </div>
+            {usedBy > 0 && (
+              <div style={{ marginTop: 5, fontSize: 9, color: typeColor, letterSpacing: 0.5 }}>
+                ↳ used by {usedBy} condition{usedBy > 1 ? 's' : ''}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+
+  const liveBBContent = (
+    <>
+      {!wsConnected && (
+        <div style={{ color: '#4a5568', fontSize: 9 }}>
+          Start the game to stream live blackboard data.
+        </div>
+      )}
+      {wsConnected && Object.keys(liveActors).length === 0 && (
+        <div style={{ color: '#4a5568', fontSize: 9 }}>Connected — waiting for first tick…</div>
+      )}
+      {Object.keys(liveActors).length > 0 && (
+        <>
+          <select value={selectedActor} onChange={e => switchActor(e.target.value)}
+            style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
+            {Object.keys(liveActors).sort().map(k => (
+              <option key={k} value={k}>{k}</option>
+            ))}
+          </select>
+          {liveActors[selectedActor] && (
+            <>
+              <div style={{ color: '#4a5568', fontSize: 9, marginBottom: 6, letterSpacing: 1 }}>
+                <span style={{ color: '#22c55e' }}>■</span> success&nbsp;&nbsp;
+                <span style={{ color: '#ef4444' }}>■</span> failure&nbsp;&nbsp;
+                <span style={{ color: '#f59e0b' }}>■</span> running
+              </div>
+              {Object.entries(liveActors[selectedActor].blackboard).sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => (
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 4 }}>
+                  <span style={{ color: '#718096', fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0, maxWidth: '55%' }}>{k}</span>
+                  <span style={{ color: '#e2e8f0', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {JSON.stringify(v)}
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+        </>
+      )}
+    </>
+  );
+
   return (
+    <>
     <div style={{ display: 'flex', height: '100%', background: '#0d1117' }}>
       {/* Left palette */}
       <div style={{ width: 160, borderRight: '1px solid #2d3748', padding: '12px 8px', overflowY: 'auto', flexShrink: 0 }}>
@@ -1206,7 +1434,57 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
           </div>
         )}
 
-        {/* Blackboard editor */}
+        {/* Blackboard editor — docked */}
+        {!bbFloating && (
+          <div style={{ padding: '12px 10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ color: '#718096', fontSize: 10, letterSpacing: 2 }}>
+                BLACKBOARD
+                {bt.blackboard.length > 0 && (
+                  <span style={{ marginLeft: 6, color: '#4a5568' }}>({bt.blackboard.length})</span>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                <button onClick={() => setBBFloating(true)} title="Pop out as floating panel"
+                  style={{ background: 'none', border: '1px solid #2d3748', color: '#4a5568', fontSize: 11, padding: '1px 5px', cursor: 'pointer', fontFamily: 'monospace', lineHeight: '14px' }}>
+                  ⊢
+                </button>
+                <button onClick={addBBKey}
+                  style={{ background: 'none', border: '1px solid #2d3748', color: '#a0aec0', fontSize: 10, padding: '2px 8px', cursor: 'pointer', fontFamily: 'monospace', letterSpacing: 1 }}>
+                  + KEY
+                </button>
+              </div>
+            </div>
+            {bbKeysList}
+          </div>
+        )}
+
+        {/* Live blackboard — docked */}
+        {!liveBBFloating && (
+          <div style={{ padding: '12px 10px', borderTop: '1px solid #2d3748' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ color: '#718096', fontSize: 10, letterSpacing: 2 }}>LIVE BLACKBOARD</div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  background: wsConnected ? '#22c55e' : '#4a5568',
+                  boxShadow: wsConnected ? '0 0 4px #22c55e' : 'none',
+                }} title={wsConnected ? 'connected' : 'waiting for game on port 9339'} />
+                <button onClick={() => setLiveBBFloating(true)} title="Pop out as floating panel"
+                  style={{ background: 'none', border: '1px solid #2d3748', color: '#4a5568', fontSize: 11, padding: '1px 5px', cursor: 'pointer', fontFamily: 'monospace', lineHeight: '14px' }}>
+                  ⊢
+                </button>
+              </div>
+            </div>
+            {liveBBContent}
+          </div>
+        )}
+      </div>
+    </div>
+
+    {/* Floating blackboard panel */}
+    {bbFloating && (
+      <FloatingPanel title="BLACKBOARD" onDock={() => setBBFloating(false)}>
         <div style={{ padding: '12px 10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ color: '#718096', fontSize: 10, letterSpacing: 2 }}>
@@ -1220,101 +1498,15 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
               + KEY
             </button>
           </div>
-          {bt.blackboard.length === 0 && (
-            <div style={{ color: '#4a5568', fontSize: 10, padding: '8px 0' }}>No keys — add one above</div>
-          )}
-          {bt.blackboard.map((k, i) => {
-            const typeColor = BB_TYPE_COLOR[k.type] ?? '#718096';
-            const isDupe = bbDupes.has(k.key);
-            const usedBy = bbUsedBy(k.key);
-            return (
-              <div key={i} style={{
-                marginBottom: 8, padding: '8px', background: '#0d1117',
-                border: `1px solid ${isDupe ? '#ef4444' : '#2d3748'}`,
-                borderLeft: `3px solid ${typeColor}`,
-              }}>
-                {/* Row 1: key name + delete */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-                  <input
-                    value={k.key}
-                    onChange={e => updateBBKey(i, { key: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })}
-                    placeholder="key_name"
-                    style={{
-                      flex: 1, background: 'none', border: 'none', borderBottom: `1px solid ${isDupe ? '#ef4444' : '#2d3748'}`,
-                      color: isDupe ? '#ef4444' : '#e2e8f0', fontSize: 12, fontFamily: 'monospace',
-                      padding: '1px 0', minWidth: 0, outline: 'none',
-                    }}
-                  />
-                  <button onClick={() => removeBBKey(i)}
-                    style={{ background: 'none', border: 'none', color: '#4a5568', cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1, flexShrink: 0 }}
-                    title="Remove key">✕</button>
-                </div>
-                {isDupe && (
-                  <div style={{ color: '#ef4444', fontSize: 9, marginBottom: 4 }}>⚠ duplicate key name</div>
-                )}
-                {/* Row 2: type select */}
-                <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 6 }}>
-                  <span style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, flexShrink: 0 }}>TYPE</span>
-                  <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-                    {(['bool', 'int', 'float', 'string'] as BBKey['type'][]).map(t => (
-                      <button key={t} onClick={() => updateBBKey(i, { type: t })}
-                        style={{
-                          flex: 1, padding: '2px 0', fontSize: 9, fontFamily: 'monospace', cursor: 'pointer',
-                          background: k.type === t ? `${BB_TYPE_COLOR[t]}22` : 'transparent',
-                          border: `1px solid ${k.type === t ? BB_TYPE_COLOR[t] : '#2d3748'}`,
-                          color: k.type === t ? BB_TYPE_COLOR[t] : '#4a5568',
-                          letterSpacing: 0,
-                        }}>
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {/* Row 3: default value */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ color: '#4a5568', fontSize: 9, letterSpacing: 1, flexShrink: 0 }}>DEFAULT</span>
-                  {k.type === 'bool' ? (
-                    <div style={{ display: 'flex', gap: 3, flex: 1 }}>
-                      {[true, false].map(v => (
-                        <button key={String(v)} onClick={() => updateBBKey(i, { default: v })}
-                          style={{
-                            flex: 1, padding: '2px 0', fontSize: 9, fontFamily: 'monospace', cursor: 'pointer',
-                            background: k.default === v ? (v ? '#14532d' : '#450a0a') : 'transparent',
-                            border: `1px solid ${k.default === v ? (v ? '#22c55e' : '#ef4444') : '#2d3748'}`,
-                            color: k.default === v ? (v ? '#22c55e' : '#f87171') : '#4a5568',
-                          }}>
-                          {String(v)}
-                        </button>
-                      ))}
-                    </div>
-                  ) : k.type === 'int' ? (
-                    <input type="number" step={1} value={Number(k.default ?? 0)}
-                      onChange={e => updateBBKey(i, { default: parseInt(e.target.value) })}
-                      style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
-                  ) : k.type === 'float' ? (
-                    <input type="number" step={0.1} value={Number(k.default ?? 0)}
-                      onChange={e => updateBBKey(i, { default: parseFloat(e.target.value) })}
-                      style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
-                  ) : (
-                    <input value={String(k.default ?? '')}
-                      onChange={e => updateBBKey(i, { default: e.target.value })}
-                      style={{ flex: 1, background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '2px 4px', fontSize: 10, fontFamily: 'monospace' }} />
-                  )}
-                </div>
-                {/* Row 4: usage */}
-                {usedBy > 0 && (
-                  <div style={{ marginTop: 5, fontSize: 9, color: typeColor, letterSpacing: 0.5 }}>
-                    ↳ used by {usedBy} condition{usedBy > 1 ? 's' : ''}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {bbKeysList}
         </div>
-      </div>
+      </FloatingPanel>
+    )}
 
-        {/* Live blackboard (ws://localhost:9339) */}
-        <div style={{ padding: '12px 10px', borderTop: '1px solid #2d3748' }}>
+    {/* Floating live blackboard panel */}
+    {liveBBFloating && (
+      <FloatingPanel title="LIVE BLACKBOARD" onDock={() => setLiveBBFloating(false)}>
+        <div style={{ padding: '12px 10px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ color: '#718096', fontSize: 10, letterSpacing: 2 }}>LIVE BLACKBOARD</div>
             <div style={{
@@ -1323,42 +1515,10 @@ function BehaviorTreeEditorInner({ bt, onChange }: Props) {
               boxShadow: wsConnected ? '0 0 4px #22c55e' : 'none',
             }} title={wsConnected ? 'connected' : 'waiting for game on port 9339'} />
           </div>
-          {!wsConnected && (
-            <div style={{ color: '#4a5568', fontSize: 9 }}>
-              Start the game to stream live blackboard data.
-            </div>
-          )}
-          {wsConnected && Object.keys(liveActors).length === 0 && (
-            <div style={{ color: '#4a5568', fontSize: 9 }}>Connected — waiting for first tick…</div>
-          )}
-          {Object.keys(liveActors).length > 0 && (
-            <>
-              <select value={selectedActor} onChange={e => switchActor(e.target.value)}
-                style={{ width: '100%', background: '#161b22', border: '1px solid #2d3748', color: '#e2e8f0', padding: '3px 6px', fontSize: 10, fontFamily: 'monospace', marginBottom: 8, boxSizing: 'border-box' }}>
-                {Object.keys(liveActors).sort().map(k => (
-                  <option key={k} value={k}>{k}</option>
-                ))}
-              </select>
-              {liveActors[selectedActor] && (
-                <>
-                  <div style={{ color: '#4a5568', fontSize: 9, marginBottom: 6, letterSpacing: 1 }}>
-                    <span style={{ color: '#22c55e' }}>■</span> success&nbsp;&nbsp;
-                    <span style={{ color: '#ef4444' }}>■</span> failure&nbsp;&nbsp;
-                    <span style={{ color: '#f59e0b' }}>■</span> running
-                  </div>
-                  {Object.entries(liveActors[selectedActor].blackboard).sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => (
-                    <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 4 }}>
-                      <span style={{ color: '#718096', fontSize: 10, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0, maxWidth: '55%' }}>{k}</span>
-                      <span style={{ color: '#e2e8f0', fontSize: 10, fontFamily: 'monospace', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {JSON.stringify(v)}
-                      </span>
-                    </div>
-                  ))}
-                </>
-              )}
-            </>
-          )}
+          {liveBBContent}
         </div>
-    </div>
+      </FloatingPanel>
+    )}
+    </>
   );
 }
