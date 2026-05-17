@@ -18,6 +18,7 @@
 #include "overlay.h"
 #include "team.h"
 #include "warper.h"
+#include "magistrate.h"
 #include "gasloader.h"
 #include "walldefense.h"
 #include "pickup.h"
@@ -700,6 +701,20 @@ bool Map::LoadFile(const char * filename, World & world, Team * team){
 					overlay->y = actory;
 				}
 			}break;
+				case 72:{
+					// magistrate boss NPC
+					if(world.SecurityIDCanSpawn(actorsecurityid)){
+						Magistrate * magistrate = (Magistrate *)world.CreateObject(ObjectTypes::MAGISTRATE);
+						if(magistrate){
+							magistrate->x = actorx;
+							magistrate->y = actory;
+							magistrate->mirrored = actordirection ? true : false;
+							magistrate->originalx = magistrate->x;
+							magistrate->originaly = magistrate->y;
+							magistrate->originalmirrored = magistrate->mirrored;
+						}
+					}
+				}break;
 		}
 		// Apply destructible / collectible flags packed into actorunknown
 		// bit 0: destructible, bit 1: collectible, bits 8-15: max health (0 = default 100)
