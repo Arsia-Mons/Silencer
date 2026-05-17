@@ -1,15 +1,100 @@
 {
   "version": 1,
   "id": "magistrate",
-  "blackboard": [],
+  "blackboard": [
+    { "key": "is_dormant",  "type": "bool",  "default": true },
+    { "key": "health_pct",  "type": "float", "default": 1.0  }
+  ],
   "rootId": "root",
   "nodes": {
     "root": {
-      "type": "Leaf",
-      "label": "Patrol",
+      "type": "Selector",
+      "label": "Magistrate AI",
+      "children": ["seq_dormant", "seq_flee", "seq_patrol"],
+      "props": {}
+    },
+
+    "seq_dormant": {
+      "type": "Sequence",
+      "label": "Dormant — wait for activation",
+      "children": ["cond_dormant", "leaf_activate"],
+      "props": {}
+    },
+    "cond_dormant": {
+      "type": "Condition",
+      "label": "is_dormant == true?",
       "children": [],
-      "props": { "action": "Patrol" }
+      "props": { "key": "is_dormant", "op": "==", "value": true }
+    },
+    "leaf_activate": {
+      "type": "Leaf",
+      "label": "CheckActivation",
+      "children": [],
+      "props": { "action": "CheckActivation" }
+    },
+
+    "seq_flee": {
+      "type": "Sequence",
+      "label": "Low-health flee",
+      "children": ["cond_low_hp", "leaf_flee_speed", "leaf_flee_walk", "leaf_flee_turn"],
+      "props": {}
+    },
+    "cond_low_hp": {
+      "type": "Condition",
+      "label": "health_pct < 0.4?",
+      "children": [],
+      "props": { "key": "health_pct", "op": "<", "value": 0.4 }
+    },
+    "leaf_flee_speed": {
+      "type": "Leaf",
+      "label": "Speed up (flee)",
+      "children": [],
+      "props": { "action": "SetSpeed", "speed": 6 }
+    },
+    "leaf_flee_walk": {
+      "type": "Leaf",
+      "label": "Walk (flee)",
+      "children": [],
+      "props": { "action": "Walk" }
+    },
+    "leaf_flee_turn": {
+      "type": "Leaf",
+      "label": "Turn around (flee)",
+      "children": [],
+      "props": { "action": "TurnAround" }
+    },
+
+    "seq_patrol": {
+      "type": "Sequence",
+      "label": "Normal patrol",
+      "children": ["leaf_patrol_speed", "leaf_patrol_walk", "leaf_patrol_turn", "leaf_patrol_stand"],
+      "props": {}
+    },
+    "leaf_patrol_speed": {
+      "type": "Leaf",
+      "label": "Set patrol speed",
+      "children": [],
+      "props": { "action": "SetSpeed", "speed": 3 }
+    },
+    "leaf_patrol_walk": {
+      "type": "Leaf",
+      "label": "Walk",
+      "children": [],
+      "props": { "action": "Walk" }
+    },
+    "leaf_patrol_turn": {
+      "type": "Leaf",
+      "label": "Turn around",
+      "children": [],
+      "props": { "action": "TurnAround" }
+    },
+    "leaf_patrol_stand": {
+      "type": "Leaf",
+      "label": "Pause at wall (30 ticks)",
+      "children": [],
+      "props": { "action": "Stand", "duration": 30 }
     }
   },
   "positions": {}
 }
+

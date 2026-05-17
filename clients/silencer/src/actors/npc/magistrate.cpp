@@ -46,6 +46,51 @@ void Magistrate::InitBT(){
 	bt_ = BehaviorTreeLibrary::instance().get(treeId);
 	if(!bt_) return;
 
+	// ── Activation ────────────────────────────────────────────────────────────
+	// Checks timer/secret trigger; transitions DORMANT→NEW, plays spawn sound.
+	// Always returns Running (sits inside a Condition(is_dormant) Sequence).
+	btctx_.actions["CheckActivation"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		bool timerFired  = world.tickcount >= activationTicks;
+		bool secretFired = secretTriggerN > 0 && world.secretsBeamed >= (int)secretTriggerN;
+		if(timerFired || secretFired){
+			const EnemyDef* md = GASLoader::Get().GetEnemyDef("magistrate");
+			if(md && !md->soundActivate.empty())
+				EmitSound(world, world.resources.soundbank[md->soundActivate], 128);
+			draw       = true;
+			collidable = true;
+			state      = NEW;
+			state_i    = 0;
+		}
+		return BTResult::Running;
+	};
+
+	// ── Movement ──────────────────────────────────────────────────────────────
+	// Walk in current facing direction. Returns Running while clear, Failure at wall.
+	btctx_.actions["Walk"] = [this](BTContext& ctx) -> BTResult {
+		World& world = *static_cast<World*>(ctx.userData);
+		if(state != WALKING){ state = WALKING; state_i = 0; }
+		if(DistanceToEnd(*this, world) <= world.minwalldistance)
+			return BTResult::Failure;
+		return BTResult::Running;
+	};
+
+	// Stand in place for `duration` ticks (default 60). Returns Running then Success.
+	btctx_.actions["Stand"] = [this](BTContext& ctx) -> BTResult {
+		int duration = ctx.props ? ctx.props->value("duration", 60) : 60;
+		if(state != STANDING){ state = STANDING; state_i = 0; }
+		if(state_i >= duration) return BTResult::Success;
+		return BTResult::Running;
+	};
+
+	// Flip facing direction immediately. Always Success.
+	btctx_.actions["TurnAround"] = [this](BTContext& ctx) -> BTResult {
+		(void)ctx;
+		mirrored = !mirrored;
+		return BTResult::Success;
+	};
+
+	// Legacy composite patrol leaf (kept for backwards-compat with older saved trees).
 	btctx_.actions["Patrol"] = [this](BTContext& ctx) -> BTResult {
 		World& world = *static_cast<World*>(ctx.userData);
 		if(state == STANDING){
@@ -61,7 +106,7 @@ void Magistrate::InitBT(){
 		return BTResult::Running;
 	};
 
-	// Generic data-driven leaves (shared with civilian/guard)
+	// ── Generic data-driven leaves ────────────────────────────────────────────
 	btctx_.actions["SetBlackboard"] = [](BTContext& ctx) -> BTResult {
 		if(!ctx.props || !ctx.props->contains("key") || !ctx.props->contains("value"))
 			return BTResult::Failure;
@@ -157,37 +202,19 @@ void Magistrate::Tick(World & world){
 
 	const EnemyDef* m = GASLoader::Get().GetEnemyDef("magistrate");
 
-	// DORMANT: wait for timer or secret trigger; skip BT entirely
-	if(state == DORMANT){
-		bool timerFired  = world.tickcount >= activationTicks;
-		bool secretFired = secretTriggerN > 0 && world.secretsBeamed >= (int)secretTriggerN;
-		if(timerFired || secretFired){
-			draw       = true;
-			collidable = true;
-			state      = NEW;
-			state_i    = -1;
-			if(m && !m->soundActivate.empty()){
-				EmitSound(world, world.resources.soundbank[m->soundActivate], 128);
-			}
-		}
-		state_i++;
-		return;
-	}
-
-	// DYING / DEAD: handle death sequence; skip BT
+	// DYING / DEAD: handled entirely in C++ — BT is not involved
 	if(state == DYING){
 		collidable = false;
 		if(state_i == 0){
-			if(m && !m->soundDeath.empty()){
+			if(m && !m->soundDeath.empty())
 				EmitSound(world, world.resources.soundbank[m->soundDeath], 128);
-			}
 			SpawnDeathActors(world);
 		}
 		res_bank  = 207;
 		res_index = 0;
 		if(state_i >= 10){
-			draw    = false;
-			state   = DEAD;
+			draw  = false;
+			state = DEAD;
 			state_i = -1;
 		}
 		state_i++;
@@ -200,13 +227,13 @@ void Magistrate::Tick(World & world){
 		return;
 	}
 
-	// NEW: land on a platform then hand off to BT
+	// NEW: drop to platform, then transition to STANDING for BT to take over
 	if(state == NEW){
 		currentplatformid = 0;
 		if(FindCurrentPlatform(*this, world)){
 			state   = STANDING;
 			state_i = -1;
-		}else{
+		} else {
 			yv += world.gravity;
 			if(yv > world.maxyvelocity) yv = world.maxyvelocity;
 			int xe = x, ye = y + yv;
@@ -226,30 +253,35 @@ void Magistrate::Tick(World & world){
 		return;
 	}
 
-	// Init BT on first active tick
+	// Init BT once (runs for DORMANT, STANDING, WALKING)
 	if(!bt_) InitBT();
 
-	// Tick the BT
+	// Tick BT — writes BB keys then lets the tree drive state transitions
 	if(bt_){
 		btctx_.userData = &world;
+		btctx_.bbSet("is_dormant", state == DORMANT);
+		btctx_.bbSet("health_pct", maxhealth > 0 ? (float)health / (float)maxhealth : 0.0f);
 		bt_->tick(btctx_);
 	}
 
-	// State machine: animation + physics (BT sets state transitions via leaf actions)
+	// Animation + physics — BT leaves set state/xv; this applies them
 	switch(state){
-		case STANDING:{
-			yv       = 0;
-			xv       = 0;
+		case DORMANT:
+			break;
+		case STANDING:
+			yv        = 0;
+			xv        = 0;
 			res_bank  = 207;
 			res_index = 0;
-		}break;
-
-		case WALKING:{
+			break;
+		case WALKING:
 			xv        = mirrored ? -(Sint8)speed : (Sint8)speed;
 			res_bank  = 207;
 			res_index = state_i % 21;
 			FollowGround(*this, world, xv);
-		}break;
+			break;
+		default:
+			break;
 	}
 
 	state_i++;
