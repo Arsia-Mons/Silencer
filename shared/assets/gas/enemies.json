@@ -344,6 +344,18 @@
       "snapshotInterval": 60,
       "warpTeleportTick": 12,
       "activationTicks": 60
+    },
+    {
+      "id": "vanta",
+      "health": 200,
+      "shield": 0,
+      "speed": 3,
+      "respawnSeconds": 0,
+      "soundActivate": "",
+      "soundDeath": "",
+      "snapshotInterval": 60,
+      "warpTeleportTick": 12,
+      "activationTicks": 60
     }
   ]
 }

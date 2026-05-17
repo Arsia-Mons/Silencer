@@ -1,0 +1,235 @@
+{
+  "version": 1,
+  "id": "vanta",
+  "blackboard": [
+    {
+      "key": "is_dormant",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "is_dying",
+      "type": "bool",
+      "default": false
+    },
+    {
+      "key": "health_pct",
+      "type": "float",
+      "default": 1.0
+    }
+  ],
+  "rootId": "root",
+  "nodes": {
+    "root": {
+      "type": "Selector",
+      "label": "Magistrate AI",
+      "children": [
+        "seq_dormant",
+        "seq_dying",
+        "seq_flee",
+        "seq_patrol"
+      ],
+      "props": {}
+    },
+    "seq_dormant": {
+      "type": "Sequence",
+      "label": "Dormant \u2014 wait for activation",
+      "children": [
+        "cond_dormant",
+        "leaf_activate",
+        "leaf_spawn_sound"
+      ],
+      "props": {}
+    },
+    "cond_dormant": {
+      "type": "Condition",
+      "label": "is_dormant == true?",
+      "children": [],
+      "props": {
+        "key": "is_dormant",
+        "op": "==",
+        "value": true
+      }
+    },
+    "leaf_activate": {
+      "type": "Leaf",
+      "label": "CheckActivation",
+      "children": [],
+      "props": {
+        "action": "CheckActivation"
+      }
+    },
+    "leaf_spawn_sound": {
+      "type": "Leaf",
+      "label": "Play spawn sound",
+      "children": [],
+      "props": {
+        "action": "EmitSpawnSound",
+        "sound": "mgbegin.wav"
+      }
+    },
+    "seq_dying": {
+      "type": "Sequence",
+      "label": "Death sequence",
+      "children": [
+        "cond_dying",
+        "leaf_death_sound",
+        "leaf_spawn_guards",
+        "leaf_death_fade"
+      ],
+      "props": {}
+    },
+    "cond_dying": {
+      "type": "Condition",
+      "label": "is_dying == true?",
+      "children": [],
+      "props": {
+        "key": "is_dying",
+        "op": "==",
+        "value": true
+      }
+    },
+    "leaf_death_sound": {
+      "type": "Leaf",
+      "label": "Play death sound",
+      "children": [],
+      "props": {
+        "action": "EmitDeathSound",
+        "sound": "mgend.wav"
+      }
+    },
+    "leaf_spawn_guards": {
+      "type": "Leaf",
+      "label": "Spawn death guards/robots (once)",
+      "children": [],
+      "props": {
+        "action": "SpawnDeathGuards"
+      }
+    },
+    "leaf_death_fade": {
+      "type": "Leaf",
+      "label": "Death fade (10 ticks)",
+      "children": [],
+      "props": {
+        "action": "DeathFade",
+        "duration": 120
+      }
+    },
+    "seq_flee": {
+      "type": "Sequence",
+      "label": "Low-health flee",
+      "children": [
+        "cond_low_hp",
+        "leaf_flee_speed",
+        "sel_flee_walk_or_turn"
+      ],
+      "props": {}
+    },
+    "cond_low_hp": {
+      "type": "Condition",
+      "label": "health_pct < 0.4?",
+      "children": [],
+      "props": {
+        "key": "health_pct",
+        "op": "<",
+        "value": 0.4
+      }
+    },
+    "leaf_flee_speed": {
+      "type": "Leaf",
+      "label": "Speed up (flee)",
+      "children": [],
+      "props": {
+        "action": "SetSpeed",
+        "speed": 6
+      }
+    },
+    "leaf_flee_walk": {
+      "type": "Leaf",
+      "label": "Walk (flee)",
+      "children": [],
+      "props": {
+        "action": "Walk"
+      }
+    },
+    "leaf_flee_turn": {
+      "type": "Leaf",
+      "label": "Turn around (flee)",
+      "children": [],
+      "props": {
+        "action": "TurnAround"
+      }
+    },
+    "seq_patrol": {
+      "type": "Sequence",
+      "label": "Normal patrol",
+      "children": [
+        "leaf_patrol_speed",
+        "sel_walk_or_turn"
+      ],
+      "props": {}
+    },
+    "leaf_patrol_speed": {
+      "type": "Leaf",
+      "label": "Set patrol speed",
+      "children": [],
+      "props": {
+        "action": "SetSpeed",
+        "speed": 3
+      }
+    },
+    "leaf_patrol_walk": {
+      "type": "Leaf",
+      "label": "Walk",
+      "children": [],
+      "props": {
+        "action": "Walk"
+      }
+    },
+    "leaf_patrol_turn": {
+      "type": "Leaf",
+      "label": "Turn around",
+      "children": [],
+      "props": {
+        "action": "TurnAround"
+      }
+    },
+    "leaf_patrol_stand": {
+      "type": "Leaf",
+      "label": "Pause at wall (30 ticks)",
+      "children": [],
+      "props": {
+        "action": "Stand",
+        "duration": 30
+      }
+    },
+    "sel_walk_or_turn": {
+      "type": "Selector",
+      "label": "Walk or turn at wall",
+      "children": [
+        "leaf_patrol_walk",
+        "seq_turn_stand"
+      ],
+      "props": {}
+    },
+    "seq_turn_stand": {
+      "type": "Sequence",
+      "label": "Turn and pause at wall",
+      "children": [
+        "leaf_patrol_turn",
+        "leaf_patrol_stand"
+      ],
+      "props": {}
+    },
+    "sel_flee_walk_or_turn": {
+      "type": "Selector",
+      "label": "Flee walk or turn",
+      "children": [
+        "leaf_flee_walk",
+        "leaf_flee_turn"
+      ],
+      "props": {}
+    }
+  },
+  "positions": {}
+}

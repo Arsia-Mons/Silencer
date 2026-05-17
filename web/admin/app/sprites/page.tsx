@@ -122,7 +122,53 @@ function Thumbnail({
   );
 }
 
-// ── Full-size frame canvas ────────────────────────────────────────────────────
+// ── Sheet import preview canvas ───────────────────────────────────────────────
+
+function SheetPreviewCanvas({
+  img,
+  frameW,
+  frameH,
+}: {
+  img: HTMLImageElement;
+  frameW: number;
+  frameH: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const scale = Math.min(1, 520 / img.width, 360 / img.height);
+    const dw = Math.round(img.width * scale);
+    const dh = Math.round(img.height * scale);
+    canvas.width = dw;
+    canvas.height = dh;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, 0, 0, dw, dh);
+    if (frameW > 0 && frameH > 0) {
+      ctx.strokeStyle = 'rgba(0,163,40,0.75)';
+      ctx.lineWidth = 1;
+      const fw = frameW * scale;
+      const fh = frameH * scale;
+      for (let x = fw; x < dw - 0.5; x += fw) {
+        ctx.beginPath(); ctx.moveTo(Math.round(x) + 0.5, 0); ctx.lineTo(Math.round(x) + 0.5, dh); ctx.stroke();
+      }
+      for (let y = fh; y < dh - 0.5; y += fh) {
+        ctx.beginPath(); ctx.moveTo(0, Math.round(y) + 0.5); ctx.lineTo(dw, Math.round(y) + 0.5); ctx.stroke();
+      }
+    }
+  }, [img, frameW, frameH]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="rounded border border-[#1a2e1a] max-w-full"
+      style={{ imageRendering: 'pixelated', background: '#050a05' }}
+    />
+  );
+}
 
 function FrameCanvas({
   frame,
@@ -325,7 +371,14 @@ function SpritesPageInner() {
       if (!tabAssets) return;
       if (decodedBanks.has(idx)) return;
       const buf = tabAssets.bankFiles.get(idx);
-      if (!buf) return;
+      if (!buf) {
+        setError(
+          `BIN file for bank ${String(idx).padStart(3, '0')} was not found in the opened folder ` +
+          `(expected ${BIN_PREFIX[tab]}${String(idx).padStart(3, '0')}.BIN inside ${DIR_NAME[tab]}/). ` +
+          `Use [ ↑ LOAD BIN ] in the bank panel to load it directly.`
+        );
+        return;
+      }
       const numFrames = tabAssets.frameCounts[idx] ?? 0;
       try {
         const bank = tab === 'tiles'
@@ -338,6 +391,70 @@ function SpritesPageInner() {
     },
     [tabAssets, decodedBanks, tab],
   );
+
+  // ── Load a single BIN file for the currently-selected bank ───────────────
+  const loadBinInputRef = useRef<HTMLInputElement>(null);
+
+  function handleLoadSingleBin(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !folder) return;
+
+    // Parse bank index from filename (e.g. SPR_050.BIN → 50)
+    const fname = file.name.toUpperCase();
+    const prefix = BIN_PREFIX[tab];
+    let bankIdx: number | null = null;
+    if (fname.startsWith(prefix) && fname.endsWith('.BIN')) {
+      const n = parseInt(fname.slice(prefix.length, fname.length - 4), 10);
+      if (!isNaN(n) && n >= 0 && n <= 255) bankIdx = n;
+    }
+    if (bankIdx === null) {
+      setError(`Filename must be ${prefix}NNN.BIN (e.g. ${prefix}050.BIN). Got: ${file.name}`);
+      return;
+    }
+
+    const targetIdx = bankIdx;
+    file.arrayBuffer().then(buf => {
+      // Inject into bankFiles and re-decode
+      setFolder(f => {
+        if (!f) return f;
+        const tabData = f[tab];
+        if (!tabData) return f;
+        const newBankFiles = new Map(tabData.bankFiles);
+        newBankFiles.set(targetIdx, buf);
+        // Also update frameCounts from the BIN if the bank wasn't in the DAT
+        const newFrameCounts = [...tabData.frameCounts];
+        const numFrames = newFrameCounts[targetIdx] ?? 0;
+        const updated = { ...tabData, bankFiles: newBankFiles };
+        const newFolder = { ...f, [tab]: updated };
+
+        // Also update assetsStore so a navigation doesn't lose it
+        const stored = assetsStore.get();
+        if (stored) {
+          const storedTab = stored[tab];
+          if (storedTab) {
+            const newStoredBankFiles = new Map(storedTab.bankFiles);
+            newStoredBankFiles.set(targetIdx, buf);
+            assetsStore.set({ ...stored, [tab]: { ...storedTab, bankFiles: newStoredBankFiles } });
+          }
+        }
+
+        // Decode immediately
+        try {
+          const bank = tab === 'tiles'
+            ? decodeTileBank(targetIdx, buf, numFrames)
+            : decodeBank(targetIdx, buf, numFrames);
+          setDecodedBanks(prev => new Map(prev).set(targetIdx, bank));
+          setSelectedBank(targetIdx);
+          setError('');
+        } catch (err) {
+          setError(`Failed to decode bank ${targetIdx}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        return newFolder;
+      });
+    });
+  }
 
   // ── Keyboard navigation through bank list ────────────────────────────────
   useEffect(() => {
@@ -517,138 +634,177 @@ function SpritesPageInner() {
   // Source tile size in the PNG (for tiles tab — may differ from 64×64 game size)
   const [tileSrcW, setTileSrcW] = useState('');
   const [tileSrcH, setTileSrcH] = useState('');
+  // Preview modal state — set when a file is picked, cleared after import/cancel
+  const [sheetPreview, setSheetPreview] = useState<{
+    img: HTMLImageElement;
+    imgW: number;
+    imgH: number;
+    bankIdx: number;
+  } | null>(null);
+
+  // Bank-wide resize
+  const [resizeW, setResizeW] = useState('');
+  const [resizeH, setResizeH] = useState('');
 
   function detectFrameSize(imgW: number, imgH: number): { w: number; h: number } {
-    function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
-    const g = gcd(imgW, imgH);
-    // Build candidate set: multiples of GCD that fit in [8..256] and divide both dims evenly
-    const candidates: Array<{ w: number; h: number; score: number }> = [];
-    for (let m = 1; m * g <= Math.max(imgW, imgH); m++) {
-      const fw = m * g, fh = m * g; // square candidates
-      if (fw > 256 || fh > 256) break;
-      if (fw < 8 || fh < 8) continue;
-      if (fw % 4 !== 0) continue;
-      if (imgW % fw !== 0 || imgH % fh !== 0) continue;
-      const frames = (imgW / fw) * (imgH / fh);
-      if (frames < 2) continue; // single-frame sheet isn't really a sheet
-      const isPow2 = (fw & (fw - 1)) === 0 ? 1 : 0;
-      candidates.push({ w: fw, h: fh, score: fw * fh + isPow2 * 32 });
-    }
-    // Also try non-square: rows of GCD height, columns independently
-    const wDivisors = Array.from({ length: imgW }, (_, i) => i + 1).filter(d => imgW % d === 0 && d >= 8 && d <= 256 && d % 4 === 0);
-    const hDivisors = Array.from({ length: imgH }, (_, i) => i + 1).filter(d => imgH % d === 0 && d >= 8 && d <= 256);
+    const wDivisors = [];
+    for (let d = 8; d <= Math.min(imgW, 256); d += 4) if (imgW % d === 0) wDivisors.push(d);
+    const hDivisors = [];
+    for (let d = 8; d <= Math.min(imgH, 256); d++) if (imgH % d === 0) hDivisors.push(d);
+    let best: { w: number; h: number; score: number } | null = null;
     for (const fw of wDivisors) {
       for (const fh of hDivisors) {
-        const frames = (imgW / fw) * (imgH / fh);
+        const cols = imgW / fw, rows = imgH / fh;
+        const frames = cols * rows;
         if (frames < 2) continue;
+        // Prefer square-ish frames, moderate frame count (4–32), power-of-2
         const squareness = 1 - Math.abs(fw - fh) / Math.max(fw, fh);
-        const isPow2 = (fw & (fw - 1)) === 0 && (fh & (fh - 1)) === 0 ? 1 : 0;
-        candidates.push({ w: fw, h: fh, score: squareness * 64 + fw * fh * 0.5 + isPow2 * 16 });
+        const countScore = frames >= 4 && frames <= 32 ? 1 : 0.3;
+        const isPow2 = ((fw & (fw - 1)) === 0 && (fh & (fh - 1)) === 0) ? 1 : 0;
+        const score = squareness * 4 + countScore * 3 + isPow2 * 2 + (fw * fh) / 1000;
+        if (!best || score > best.score) best = { w: fw, h: fh, score };
       }
     }
-    if (candidates.length === 0) return { w: imgW, h: imgH };
-    candidates.sort((a, b) => b.score - a.score);
-    return { w: candidates[0].w, h: candidates[0].h };
+    return best ?? { w: imgW, h: imgH };
   }
 
+  // Step 1: file picked → load image → open preview modal
   function handleImportSheet(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file || selectedBank === null) return;
+    const bankIdx = selectedBank;
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(url);
-
-      // For tiles: source size from inputs (required), output always 64×64.
-      // For sprites: use inputs → existing frame → auto-detect from image.
       const existingFrame = currentBank?.frames[0];
-      let srcW: number, srcH: number, outW: number, outH: number;
-      if (tab === 'tiles') {
-        let tw = parseInt(tileSrcW, 10);
-        let th = parseInt(tileSrcH, 10);
-        if (isNaN(tw) || tw <= 0 || isNaN(th) || th <= 0) {
-          const detected = detectFrameSize(img.width, img.height);
-          tw = detected.w; th = detected.h;
-          setTileSrcW(String(tw));
-          setTileSrcH(String(th));
-        }
-        srcW = tw; srcH = th;
-        outW = 64; outH = 64;
-      } else {
-        const inputW = parseInt(sheetW, 10);
-        const inputH = parseInt(sheetH, 10);
-        if (!isNaN(inputW) && inputW > 0 && !isNaN(inputH) && inputH > 0) {
-          srcW = inputW; srcH = inputH;
-        } else if (existingFrame) {
-          srcW = existingFrame.header.width; srcH = existingFrame.header.height;
-        } else {
-          const detected = detectFrameSize(img.width, img.height);
-          srcW = detected.w; srcH = detected.h;
-          setSheetW(String(srcW));
-          setSheetH(String(srcH));
-        }
-        outW = srcW; outH = srcH;
-      }
-
-      if (outW % 4 !== 0) { setError(`Output width (${outW}) must be a multiple of 4.`); return; }
-      const cols = Math.floor(img.width / srcW);
-      const rows = Math.floor(img.height / srcH);
-      if (cols === 0 || rows === 0) { setError('Image smaller than one tile.'); return; }
-
-      // Source canvas — draw full image once
-      const srcCvs = document.createElement('canvas');
-      srcCvs.width = img.width; srcCvs.height = img.height;
-      const srcCtx = srcCvs.getContext('2d');
-      if (!srcCtx) return;
-      srcCtx.drawImage(img, 0, 0);
-
-      // Output canvas — reused per frame, scales src region → outW×outH
-      const outCvs = document.createElement('canvas');
-      outCvs.width = outW; outCvs.height = outH;
-      const outCtx = outCvs.getContext('2d');
-      if (!outCtx) return;
-
-      const newFrames: DecodedFrame[] = [];
-      for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-          outCtx.clearRect(0, 0, outW, outH);
-          outCtx.drawImage(srcCvs, col * srcW, row * srcH, srcW, srcH, 0, 0, outW, outH);
-          const imageData = outCtx.getImageData(0, 0, outW, outH);
-          try {
-            const indexed = quantizeToPalette(imageData, palette);
-            newFrames.push({
-              header: {
-                width: outW,
-                height: outH,
-                offsetX: 0,
-                offsetY: 0,
-                compSize: 0,
-                mode: 0,
-                headerBytes: new Uint8Array(344),
-              },
-              indexedPixels: indexed,
-              dirty: true,
-            });
-          } catch (err) {
-            setError(err instanceof Error ? err.message : String(err));
-            return;
+      if (tab === 'sprites') {
+        if (!sheetW || !sheetH) {
+          if (existingFrame) {
+            setSheetW(String(existingFrame.header.width));
+            setSheetH(String(existingFrame.header.height));
+          } else {
+            const d = detectFrameSize(img.width, img.height);
+            setSheetW(String(d.w));
+            setSheetH(String(d.h));
           }
         }
+      } else {
+        if (!tileSrcW || !tileSrcH) {
+          const d = detectFrameSize(img.width, img.height);
+          setTileSrcW(String(d.w));
+          setTileSrcH(String(d.h));
+        }
       }
-      setDecodedBanks(prev => {
-        const m = new Map(prev);
-        const bank = m.get(selectedBank);
-        const frames = bank ? [...bank.frames, ...newFrames] : newFrames;
-        m.set(selectedBank, { bankIndex: selectedBank, frames, dirty: true });
-        return m;
-      });
-      const newCounts = [...(tabAssets?.frameCounts ?? new Array(256).fill(0))];
-      newCounts[selectedBank] = (newCounts[selectedBank] ?? 0) + newFrames.length;
-      setFolder(f => f && tabAssets ? { ...f, [tab]: { ...tabAssets, frameCounts: newCounts } } : f);
-      setDirtyDat(true);
+      setSheetPreview({ img, imgW: img.width, imgH: img.height, bankIdx });
     };
     img.src = url;
-    e.target.value = '';
+  }
+
+  // Step 2: user confirms in modal → slice frames
+  function commitSheetImport() {
+    if (!sheetPreview || !palette) return;
+    const { img, bankIdx } = sheetPreview;
+
+    let srcW: number, srcH: number, outW: number, outH: number;
+    if (tab === 'tiles') {
+      srcW = parseInt(tileSrcW, 10);
+      srcH = parseInt(tileSrcH, 10);
+      if (!srcW || !srcH) { setError('Enter source tile size.'); return; }
+      outW = 64; outH = 64;
+    } else {
+      srcW = parseInt(sheetW, 10) || img.width;
+      srcH = parseInt(sheetH, 10) || img.height;
+      outW = srcW; outH = srcH;
+    }
+
+    if (outW % 4 !== 0) { setError(`Width (${outW}) must be a multiple of 4.`); return; }
+    const cols = Math.floor(img.width / srcW);
+    const rows = Math.floor(img.height / srcH);
+    if (cols === 0 || rows === 0) { setError('Image smaller than one frame.'); return; }
+
+    const srcCvs = document.createElement('canvas');
+    srcCvs.width = img.width; srcCvs.height = img.height;
+    srcCvs.getContext('2d')!.drawImage(img, 0, 0);
+
+    const outCvs = document.createElement('canvas');
+    outCvs.width = outW; outCvs.height = outH;
+    const outCtx = outCvs.getContext('2d')!;
+
+    const newFrames: DecodedFrame[] = [];
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        outCtx.clearRect(0, 0, outW, outH);
+        outCtx.drawImage(srcCvs, col * srcW, row * srcH, srcW, srcH, 0, 0, outW, outH);
+        try {
+          newFrames.push({
+            header: { width: outW, height: outH, offsetX: 0, offsetY: 0, compSize: 0, mode: 0, headerBytes: new Uint8Array(344) },
+            indexedPixels: quantizeToPalette(outCtx.getImageData(0, 0, outW, outH), palette),
+            dirty: true,
+          });
+        } catch (err) {
+          setError(err instanceof Error ? err.message : String(err));
+          return;
+        }
+      }
+    }
+
+    setDecodedBanks(prev => {
+      const m = new Map(prev);
+      const bank = m.get(bankIdx);
+      const frames = bank ? [...bank.frames, ...newFrames] : newFrames;
+      m.set(bankIdx, { bankIndex: bankIdx, frames, dirty: true });
+      return m;
+    });
+    const newCounts = [...(tabAssets?.frameCounts ?? new Array(256).fill(0))];
+    newCounts[bankIdx] = (newCounts[bankIdx] ?? 0) + newFrames.length;
+    setFolder(f => f && tabAssets ? { ...f, [tab]: { ...tabAssets, frameCounts: newCounts } } : f);
+    setDirtyDat(true);
+    setSheetPreview(null);
+  }
+
+  // Bank-wide resize: resample all frames to resizeW × resizeH
+  function handleResizeAll() {
+    if (!currentBank || selectedBank === null || !palette) return;
+    const tw = parseInt(resizeW, 10);
+    const th = parseInt(resizeH, 10);
+    if (!tw || !th) { setError('Enter target W and H for resize.'); return; }
+    if (tw % 4 !== 0) { setError(`Width (${tw}) must be a multiple of 4.`); return; }
+
+    const outCvs = document.createElement('canvas');
+    outCvs.width = tw; outCvs.height = th;
+    const outCtx = outCvs.getContext('2d')!;
+    const tmpCvs = document.createElement('canvas');
+    const tmpCtx = tmpCvs.getContext('2d')!;
+
+    const resized: DecodedFrame[] = [];
+    for (const frame of currentBank.frames) {
+      const imgData = frameToImageData(frame, palette);
+      tmpCvs.width = frame.header.width; tmpCvs.height = frame.header.height;
+      tmpCtx.putImageData(imgData, 0, 0);
+      outCtx.clearRect(0, 0, tw, th);
+      outCtx.imageSmoothingEnabled = false;
+      outCtx.drawImage(tmpCvs, 0, 0, tw, th);
+      try {
+        resized.push({
+          header: { ...frame.header, width: tw, height: th },
+          indexedPixels: quantizeToPalette(outCtx.getImageData(0, 0, tw, th), palette),
+          dirty: true,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        return;
+      }
+    }
+
+    setDecodedBanks(prev => {
+      const m = new Map(prev);
+      m.set(selectedBank, { bankIndex: selectedBank, frames: resized, dirty: true });
+      return m;
+    });
+    setSelectedFrame(null);
+    setDirtyDat(true);
   }
 
   // ── Reorder frame (drag-and-drop) ─────────────────────────────────────────
@@ -799,6 +955,7 @@ function SpritesPageInner() {
       />
       <input ref={pngInputRef} type="file" accept="image/png" className="hidden" onChange={handleImportPng} />
       <input ref={sheetInputRef} type="file" accept="image/png" className="hidden" onChange={handleImportSheet} />
+      <input ref={loadBinInputRef} type="file" accept=".bin,.BIN" className="hidden" onChange={handleLoadSingleBin} />
 
       <main className="flex-1 flex flex-col min-w-0">
         {/* ── Header ── */}
@@ -951,6 +1108,14 @@ function SpritesPageInner() {
                   className="px-3 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors disabled:opacity-30"
                 >
                   ↓ .BIN
+                </button>
+                <button
+                  onClick={() => loadBinInputRef.current?.click()}
+                  disabled={!folder}
+                  title={`Load a ${BIN_PREFIX[tab]}NNN.BIN file — auto-detects bank index from filename`}
+                  className="px-3 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors disabled:opacity-30"
+                >
+                  ↑ .BIN
                 </button>
                 <button
                   onClick={handleDownloadDat}
@@ -1128,6 +1293,35 @@ function SpritesPageInner() {
                 )}
               </div>
 
+              {/* Bank-wide resize */}
+              {tab === 'sprites' && currentBank && currentBank.frames.length > 0 && (
+                <div className="px-4 py-3 border-b border-[#1a2e1a] flex flex-col gap-2">
+                  <div className="text-[10px] font-mono text-[#4a7a4a] uppercase tracking-wide">Resize all frames</div>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="number" min={4} max={512} value={resizeW}
+                      placeholder={String(currentBank.frames[0]?.header.width ?? 'W')}
+                      onChange={e => setResizeW(e.target.value)}
+                      className="w-14 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded"
+                    />
+                    <span className="text-[#4a7a4a] text-xs">×</span>
+                    <input
+                      type="number" min={1} max={512} value={resizeH}
+                      placeholder={String(currentBank.frames[0]?.header.height ?? 'H')}
+                      onChange={e => setResizeH(e.target.value)}
+                      className="w-14 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded"
+                    />
+                    <button
+                      onClick={handleResizeAll}
+                      className="flex-1 px-2 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#f59e0b] hover:text-[#f59e0b] transition-colors"
+                      title="Resample all frames in this bank to new dimensions"
+                    >
+                      RESIZE ALL
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {currentFrame ? (
                 <div className="flex flex-col gap-4 p-4">
                   {/* Canvas preview */}
@@ -1197,6 +1391,78 @@ function SpritesPageInner() {
           </div>
         )}
       </main>
+
+      {/* ── Sheet import preview modal ── */}
+      {sheetPreview && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#0a0f0a] border border-[#2a4a2a] rounded-lg flex flex-col gap-3 p-5 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-sm text-[#00a328]">CONFIRM FRAME SIZE</span>
+              <button onClick={() => setSheetPreview(null)} className="text-[#4a7a4a] hover:text-[#c94b4b] font-mono text-sm">✕</button>
+            </div>
+
+            {/* Grid preview */}
+            <div className="flex justify-center">
+              <SheetPreviewCanvas
+                img={sheetPreview.img}
+                frameW={parseInt(tab === 'tiles' ? tileSrcW : sheetW, 10) || 1}
+                frameH={parseInt(tab === 'tiles' ? tileSrcH : sheetH, 10) || 1}
+              />
+            </div>
+
+            {/* Size inputs + frame count */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <input
+                  type="number" min={4} max={512}
+                  value={tab === 'tiles' ? tileSrcW : sheetW}
+                  onChange={e => tab === 'tiles' ? setTileSrcW(e.target.value) : setSheetW(e.target.value)}
+                  className="w-16 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded"
+                  placeholder="W"
+                />
+                <span className="text-[#4a7a4a] text-xs">×</span>
+                <input
+                  type="number" min={1} max={512}
+                  value={tab === 'tiles' ? tileSrcH : sheetH}
+                  onChange={e => tab === 'tiles' ? setTileSrcH(e.target.value) : setSheetH(e.target.value)}
+                  className="w-16 bg-[#080f08] border border-[#1a2e1a] text-[#d1fad7] text-xs font-mono px-2 py-1 rounded"
+                  placeholder="H"
+                />
+              </div>
+              {(() => {
+                const fw = parseInt(tab === 'tiles' ? tileSrcW : sheetW, 10);
+                const fh = parseInt(tab === 'tiles' ? tileSrcH : sheetH, 10);
+                if (fw > 0 && fh > 0) {
+                  const cols = Math.floor(sheetPreview.imgW / fw);
+                  const rows = Math.floor(sheetPreview.imgH / fh);
+                  return (
+                    <span className="text-[10px] font-mono text-[#7aaa7a]">
+                      {cols} × {rows} = {cols * rows} frames
+                      {tab === 'tiles' && ' → 64×64'}
+                    </span>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={commitSheetImport}
+                className="flex-1 px-3 py-2 text-xs font-mono border border-[#00a328] text-[#00a328] rounded hover:bg-[#00a328]/10 transition-colors"
+              >
+                IMPORT
+              </button>
+              <button
+                onClick={() => setSheetPreview(null)}
+                className="px-3 py-2 text-xs font-mono border border-[#1a2e1a] text-[#4a7a4a] rounded hover:border-[#c94b4b] hover:text-[#c94b4b] transition-colors"
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

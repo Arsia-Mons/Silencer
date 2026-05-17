@@ -294,6 +294,13 @@ const NPC_ACTIONS: Record<string, string[]> = {
     'SpawnDeathGuards', 'DeathFade',
     ...GENERIC_ACTIONS,
   ],
+  vanta: [
+    'CheckActivation',
+    'EmitSpawnSound', 'EmitDeathSound',
+    'Walk', 'TurnAround', 'Stand',
+    'SpawnDeathGuards', 'DeathFade',
+    ...GENERIC_ACTIONS,
+  ],
 };
 
 // All actions merged for unknown NPC types
