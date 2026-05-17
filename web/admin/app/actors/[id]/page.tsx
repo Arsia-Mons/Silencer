@@ -5,6 +5,9 @@
  * C4: Live preview canvas (60fps playback)
  * C5: Hitbox editor (per-frame AABB drawing)
  * C7: Actor properties + export/save
+ *
+ * Loads actordef from the admin-api (GET /actors/:id, public).
+ * Saves back to server disk via PUT /actors/:id (admin auth required).
  */
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -12,10 +15,8 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../lib/auth';
 import { useWsConnected } from '../../../lib/socket';
 import Sidebar from '../../../components/Sidebar';
-import { type ActorDef } from '../../../lib/api';
-import {
-  readFromStore, writeToStore, downloadJson, getFolderName,
-} from '../../../lib/actor-store';
+import { getActor, saveActor, type ActorDef } from '../../../lib/api';
+import { downloadJson } from '../../../lib/actor-store';
 import AnimationTab from './AnimationTab';
 import HitboxTab from './HitboxTab';
 import PropsTab from './PropsTab';
@@ -35,7 +36,6 @@ function ActorEditorInner() {
   const [dirty, setDirty]   = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
-  const folderName = getFolderName();
 
   const rawTab = searchParams.get('tab') as Tab | null;
   const tab: Tab = rawTab && VALID_TABS.includes(rawTab) ? rawTab : 'animation';
@@ -47,12 +47,9 @@ function ActorEditorInner() {
   }
 
   useEffect(() => {
-    const stored = readFromStore(id);
-    if (stored) {
-      setDef(stored);
-    } else {
-      setError('Actor not found in loaded folder. Go back and open the actordefs folder first.');
-    }
+    getActor(id)
+      .then(data => setDef(data))
+      .catch(() => setError(`Actor "${id}" not found.`));
   }, [id]);
 
   function updateDef(patch: Partial<ActorDef>) {
@@ -63,9 +60,9 @@ function ActorEditorInner() {
   async function handleSave() {
     if (!def) return;
     setSaving(true);
+    setError('');
     try {
-      writeToStore(id, def);
-      await downloadJson(id, def);
+      await saveActor(id, def);
       setDirty(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -88,13 +85,16 @@ function ActorEditorInner() {
         <div className="flex items-center gap-4 px-8 py-4 border-b border-game-border">
           <Link href="/actors" className="text-game-textDim hover:text-game-text text-sm">← ACTORS</Link>
           <h1 className="text-xl font-bold tracking-widest text-game-primary font-mono flex-1">{id}</h1>
-          {folderName && (
-            <span className="text-xs text-game-warning tracking-wider border border-game-warning/40 px-2 py-1">
-              📁 {folderName}
-            </span>
-          )}
           {dirty && <span className="text-game-warning text-xs tracking-widest">UNSAVED CHANGES</span>}
           {error && <span className="text-game-danger text-xs">{error}</span>}
+          {def && (
+            <button
+              onClick={() => downloadJson(id, def)}
+              className="px-3 py-2 border border-game-border text-game-textDim hover:text-game-text text-xs tracking-wider"
+            >
+              ↓ EXPORT
+            </button>
+          )}
           <button
             onClick={handleSave}
             disabled={saving || !dirty}
@@ -123,7 +123,7 @@ function ActorEditorInner() {
 
         <div className="flex flex-1 min-h-0 overflow-auto">
           {!def ? (
-            <div className="p-8 text-game-textDim text-sm">Loading…</div>
+            <div className="p-8 text-game-textDim text-sm">{error || 'Loading…'}</div>
           ) : tab === 'animation' ? (
             <AnimationTab actorId={id} def={def} onChange={updateDef} />
           ) : tab === 'hitbox' ? (

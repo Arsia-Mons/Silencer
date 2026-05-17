@@ -4,17 +4,15 @@
  * C4: Live preview canvas at game speed (60fps rAF loop)
  */
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { getSpriteFrames, type FrameMeta, type ActorDef } from '../../../lib/api';
+import { apiFetch, getSpriteFrames, type FrameMeta, type ActorDef } from '../../../lib/api';
 
 function useSounds(): string[] {
   const [sounds, setSounds] = useState<string[]>([]);
   useEffect(() => {
-    const token = localStorage.getItem('zs_token') ?? '';
-    fetch('/api/sounds', { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+    apiFetch('/sounds')
       .then(data => {
         if (Array.isArray(data)) {
-          setSounds(data.map((s: unknown) => (s && typeof s === 'object' && 'name' in s ? String((s as {name: unknown}).name) : String(s))).filter(Boolean));
+          setSounds((data as unknown[]).map(s => s && typeof s === 'object' && 'name' in s ? String((s as {name: unknown}).name) : String(s)).filter(Boolean));
         }
       })
       .catch(() => {});
