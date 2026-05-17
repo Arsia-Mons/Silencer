@@ -34,8 +34,9 @@ instead of reviving the old flat layout.
 `ClientUi` is the only production owner of visible UI composition and
 screen/modal navigation. `Game::RenderClientUiFrame` collects the
 `UiInputState`, begins one `ClientUi`/`ClayService` frame, asks active screens,
-modals, HUD, and overlays to declare UI, ends the frame once, drains actions,
-and renders one command stream through the Clay compositor. Navigation mechanics
+modals, HUD, and overlays to declare UI, ends the frame once, renders one
+command stream through the Clay compositor, then dispatches typed UI actions.
+Navigation mechanics
 live in `src/client/ui/navigation/ScreenStack`; `Game` may request transitions
 but must not store or traverse the stack itself.
 

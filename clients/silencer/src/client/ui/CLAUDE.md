@@ -17,9 +17,9 @@ This UI is actively migrating toward good flexbox layout, Clay lifecycle, and sh
 
 ## Primitive API
 
-- Public primitives are plain nouns: `Button`, `TextInput`, `Toggle`, `Panel`. Runtime/service types keep the `Ui` prefix: `UiInteractionRegistry`, `UiInputState`, `UiInputRouter`.
+- Target public primitives are plain nouns: `Button`, `TextInput`, `Toggle`, `Panel`. Runtime/service types keep the `Ui` prefix: `UiInteractionRegistry`, `UiInputState`, `UiInputRouter`.
 - Public primitive API follows shadcn's core shape, not its exact implementation: `variant + size`, composition, and named defaults. `variant` names the visual treatment; `size` names scale or fit behavior.
-- Do not expose palette indices, sprite banks, or legacy `B196x33`-style codes in public primitive signatures, enums, or comments.
+- Existing bridge primitives may still expose bank/palette details. Do not spread that into new or cleaned-up primitive signatures, enums, or comments.
 - If many call sites pass the same option values, grow a named variant or size. Do not let padding, min/max width, wrap, or effect-color escape hatches become the normal API.
 - One primitive owns one concern. Checkbox/toggle state belongs to checkbox/toggle primitives, not a `Button` mode.
 - Every interactive, animated, scrollable, custom-rendered, tested, or automation-visible element needs an explicit stable Clay ID. A visible label must never double as the element ID.
@@ -29,7 +29,7 @@ This UI is actively migrating toward good flexbox layout, Clay lifecycle, and sh
 
 - Normalize input once at the platform boundary. The same coordinate space must feed `Clay_SetLayoutDimensions`, pointer state, registry hit testing, and compositor output.
 - Queue state changes as typed `UiAction`s and handle them after layout. Do not mutate screen stacks, world state, or domain state from inside a Clay declaration block.
-- UI feedback should be declared by the widget/primitive and executed by the client layer from normalized transitions such as pointer enter, focus enter, press, release, and activate. Avoid global guesses in `ClientUi` like "all buttons make this sound."
+- Target UI feedback is declared by the widget/primitive and executed by the client layer from normalized transitions such as pointer enter, focus enter, press, release, and activate. Existing `ClientUi` button/toggle audio inference is migration debt; do not extend it.
 
 ## Verification
 

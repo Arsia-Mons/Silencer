@@ -1,60 +1,58 @@
-# Clay References
+# Silencer Clay References
 
-Use these sources for implementation details. Prefer official repository files over third-party summaries when they disagree.
+Use local Silencer sources first. Upstream Clay files are useful for research, but this checkout can lag or differ from upstream `main`.
 
-## Official Sources
+## Local Sources
 
-- Clay README: https://github.com/nicbarker/clay/blob/main/README.md  
-  Use for the public lifecycle, conceptual model, IDs, pointer interaction, scrolling, custom elements, retained rendering notes, debug tools, multiple contexts, and API overview.
+- `clients/silencer/third_party/clay/clay.h`
+  Final source of truth for the Clay API available to Silencer. Check this before copying upstream examples. This checkout currently uses the single-declaration `CLAY({ .id = ... })` form, `CLAY_TEXT(text, CLAY_TEXT_CONFIG(...))`, and `Clay_OnHover(..., intptr_t userData)`.
 
-- `clay.h`: https://github.com/nicbarker/clay/blob/main/clay.h  
-  Use as the final source of truth for public structs, enums, function signatures, render command types, pointer states, scroll data, compile-time options, and error types.
+- `clients/silencer/src/ui/CLAUDE.md`
+  Generic UI runtime/primitives boundaries, primitive API direction, Clay discipline, and verification expectations.
 
-- SDL3 simple demo: https://github.com/nicbarker/clay/tree/main/examples/SDL3-simple-demo  
-  Use for a compact end-to-end integration: SDL setup, text measurement through SDL_ttf, Clay initialization, frame update, layout declaration, and command rendering.
+- `clients/silencer/src/client/ui/CLAUDE.md`
+  Client UI ownership: `ClientUi`, screens, modals, HUD, navigation, input, action dispatch, and feedback policy.
 
-- SDL3 renderer: https://github.com/nicbarker/clay/blob/main/renderers/SDL3/clay_renderer_SDL3.c  
-  Use for an SDL renderer dispatch example covering rectangles, text, borders, scissor clipping, and images.
+- `clients/silencer/src/ui/runtime/ClayService.h` / `.cpp`
+  Production Clay frame lifecycle and where pointer state, scroll updates, layout begin/end, and bounds resolution happen.
 
-- Raylib sidebar scrolling example: https://github.com/nicbarker/clay/tree/main/examples/raylib-sidebar-scrolling-container  
+- `clients/silencer/src/client/ui/ClientUi.h` / `.cpp`
+  Production UI frame owner, frame arena reset point, screen stack bridge, input dispatch, and current feedback debt.
+
+- `clients/silencer/src/render/clay_ui_compositor.*` and `clients/silencer/src/render/clay_ui_payloads.h`
+  Renderer command dispatch, text measurement, sprite/palette payloads, image data packing, custom command handling, clipping, and render tests.
+
+- `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh`
+  Executable boundary checks for legacy UI paths, raw event consumption, lifecycle ownership, renderer ownership, and deprecated action patterns.
+
+## Upstream Sources
+
+- Clay README: https://github.com/nicbarker/clay/blob/main/README.md
+  Use for the conceptual model, lifecycle overview, IDs, pointer interaction, scrolling, custom elements, debug tools, multiple contexts, and API overview. Verify signatures against the vendored Silencer header.
+
+- Upstream `clay.h`: https://github.com/nicbarker/clay/blob/main/clay.h
+  Use to understand API direction and drift. Do not treat upstream `main` as authoritative for Silencer unless the vendored header has been updated.
+
+- SDL3 simple demo: https://github.com/nicbarker/clay/tree/main/examples/SDL3-simple-demo
+  Use for an end-to-end SDL integration pattern: setup, text measurement, initialization, frame update, layout declaration, and command rendering.
+
+- SDL3 renderer: https://github.com/nicbarker/clay/blob/main/renderers/SDL3/clay_renderer_SDL3.c
+  Use for SDL renderer dispatch examples covering rectangles, text, borders, scissor clipping, and images. Silencer's compositor may intentionally differ for bank sprites and palette effects.
+
+- Raylib sidebar scrolling example: https://github.com/nicbarker/clay/tree/main/examples/raylib-sidebar-scrolling-container
   Use for pointer callbacks, scroll containers, custom scrollbar data, and a complete frame loop in a different renderer.
 
-- Raylib renderer: https://github.com/nicbarker/clay/blob/main/renderers/raylib/clay_renderer_raylib.c  
-  Use when your renderer needs null-terminated strings, glyph-based measurement, scissor mapping, image rendering through `imageData`, or `CUSTOM` command handling examples.
-
-- Official website WASM example: https://github.com/nicbarker/clay/blob/main/examples/clay-official-website/main.c  
-  Use for a strong browser/WASM lifecycle: exported frame update receives window size, pointer, wheel, touch, key, and delta time; then updates layout dimensions, pointer state, scroll containers, custom scrollbars, debug mode, and returns render commands.
-
-- Canvas2D web renderer: https://github.com/nicbarker/clay/blob/main/renderers/web/canvas2d/clay-canvas2d-renderer.html  
-  Use for command decoding from WASM memory, Canvas text measurement, font loading before init, image caching, and `save`/`clip`/`restore` scissor handling.
-
-- HTML web renderer: https://github.com/nicbarker/clay/blob/main/renderers/web/html/clay-html-renderer.html  
-  Use for retained-mode rendering. It maps stable Clay command IDs to cached DOM elements and diffs command/config data to update persistent objects.
-
-- Renderer directory: https://github.com/nicbarker/clay/tree/main/renderers  
+- Renderer directory: https://github.com/nicbarker/clay/tree/main/renderers
   Use to compare backend patterns across SDL, Raylib, Sokol, web, terminal, Cairo, Win32 GDI, Playdate, and other renderers.
-
-- Examples directory: https://github.com/nicbarker/clay/tree/main/examples  
-  Use to find working patterns for transitions, scrolling, video/custom rendering, WebAssembly, PDF, Sokol, SDL, and Raylib integrations.
-
-## Useful Third-Party Indexes
-
-- DeepWiki renderer overview: https://deepwiki.com/nicbarker/clay/5-renderers  
-  Use for quick navigation across renderer files and the common render-command dispatch pattern. Verify details against the official GitHub files.
-
-- DeepWiki input handling: https://deepwiki.com/nicbarker/clay/4.4-input-handling  
-  Use as a quick explanation of pointer state, `Clay_OnHover`, `Clay_UpdateScrollContainers`, and `Clay_GetScrollContainerData`. Verify details against README and `clay.h`.
-
-- DeepWiki API reference: https://deepwiki.com/nicbarker/clay/4-api-reference  
-  Use for quick lookup and source pointers. Verify signatures against `clay.h`.
 
 ## Implementation Lessons
 
-- Clay does not own the event loop. Your app collects input and calls Clay APIs in the correct order.
-- Clay does not own rendering. Your renderer consumes `Clay_RenderCommandArray`.
-- Text measurement is a contract between Clay and your renderer. Wrong measurement creates wrong layout.
+- Clay does not own the event loop. Silencer normalizes input into `UiInputState`.
+- Clay does not own screen navigation. `ClientUi` and `ScreenStack` do.
+- Clay does not own rendering. The compositor consumes `Clay_RenderCommandArray`.
+- Text measurement is a contract between Clay and the compositor. Wrong measurement creates wrong layout.
 - Pointer state must be continuous. Do not synthesize false releases between frames.
-- Scroll updates require pointer state, scroll delta, and delta time before layout.
-- Stable IDs matter for interaction, queries, transitions, debug tooling, retained rendering, and automation.
+- Good Silencer UI layout is flexbox-style constraints, not copied legacy coordinates.
+- Stable IDs matter for interaction, bounds queries, focus, transitions, tests, debug tooling, retained rendering, and automation.
 - Custom render data is just a pointer. Own its lifetime explicitly.
 - Debug tools are render commands; if debug UI is broken, the renderer is often incomplete.

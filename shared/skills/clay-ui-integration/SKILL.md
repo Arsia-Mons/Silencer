@@ -1,162 +1,113 @@
 ---
 name: clay-ui-integration
-description: Use when designing, implementing, or auditing an application integration of nicbarker/clay, the renderer-agnostic C UI layout library. Applies to SDL, Raylib, Sokol, WebAssembly, custom engines, game UI, tools, or any code that must wire Clay lifecycle, input, scrolling, text measurement, IDs, render command dispatch, debug tooling, custom elements, or multiple contexts correctly.
+description: Use when designing, implementing, or auditing Silencer's Clay UI integration in clients/silencer. Applies to C++/SDL3 work involving Clay lifecycle, flexbox-style layout, responsive primitives, input normalization, UiInteractionRegistry, ClientUi, render command dispatch, custom payloads, text measurement, IDs, scrolling, or UI architecture boundaries.
 ---
 
-# Clay UI Integration
+# Silencer Clay UI Integration
+
+## Sources Of Truth
+
+For Silencer work, read local repo sources before upstream examples:
+
+- `clients/silencer/src/ui/CLAUDE.md` for generic runtime/primitives boundaries.
+- `clients/silencer/src/client/ui/CLAUDE.md` for screens, HUD, navigation, input, and feedback ownership.
+- `clients/silencer/third_party/clay/clay.h` for the exact Clay API version in this repo.
+- `clients/silencer/src/ui/runtime/ClayService.*` and `clients/silencer/src/client/ui/ClientUi.*` for the production frame path.
+
+Read [references/sources.md](references/sources.md) only when you need deeper Clay references or upstream comparisons. Upstream `main` is useful research, not the API contract for this checkout.
 
 ## Core Model
 
-Treat Clay as a frame-based layout and interaction system that produces render commands. It is not a windowing layer, event loop, renderer, widget toolkit, or application state manager.
+Clay is a frame-based flex layout and render-command generator. It is not the event loop, screen stack, renderer, widget toolkit, application state owner, or audio/feedback policy owner.
 
-Own these responsibilities outside Clay:
+Silencer owns those responsibilities around Clay:
 
-- Window/display size and coordinate normalization.
-- Raw device input collection.
-- Text input, keyboard/gamepad focus, accessibility, and automation metadata.
-- Application state mutations and navigation.
-- Rendering backend, texture/font resources, clipping, and draw ordering.
+- `ClientUi` owns one visible UI frame and screen/modal navigation.
+- `ClayService` owns the production Clay frame lifecycle.
+- `UiInteractionRegistry` owns semantic metadata, focus, text editing, pointer hit testing, keyboard/gamepad navigation, automation, and typed actions.
+- The compositor/render layer owns sprite banks, palette effects, clipping, text drawing, and custom payload dispatch.
 
-Use Clay for:
+Screens, modals, HUD, overlays, and primitives declare UI into the current frame. They must not begin/end Clay layout, set pointer state, update scroll containers, render commands, or mutate domain state from inside Clay declaration.
 
-- Declaring the UI tree every frame.
-- Computing responsive layout, text wrapping, clipping, scrolling offsets, hover state, and render commands.
-- Emitting renderer-agnostic primitives: rectangle, border, text, image, custom, scissor.
+## Layout Principles
 
-## Required Lifecycle
+Root new UI work in good flexbox layout, not legacy coordinates.
 
-Initialize once after you know the first layout dimensions and have a text measurement implementation:
+Use Clay sizing, grow/fit/fixed constraints, padding, gaps, child alignment, clipping, and stable containers to express the layout. Translate legacy screenshots or UI intent into relationships and constraints, not copied x/y offsets.
 
-```c
-uint64_t size = Clay_MinMemorySize();
-Clay_Arena arena = Clay_CreateArenaWithCapacityAndMemory(size, memory);
-Clay_Context *ctx = Clay_Initialize(arena, dimensions, errorHandler);
-Clay_SetMeasureTextFunction(MeasureText, userData);
-```
+Treat these as migration debt unless there is a narrow renderer or asset reason:
 
-Run this sequence once per UI frame, before rendering:
+- Absolute coordinates and root-attached floating elements for ordinary layout.
+- Sprite-offset nudges, hand-measured widths, and magic gap stacks.
+- Repeated option bundles instead of named `variant` / `size` choices.
+- Public primitive APIs that expose sprite banks, palette indices, or one-screen presets.
 
-```c
-Clay_SetCurrentContext(ctx);                 // if more than one context exists
-Clay_SetLayoutDimensions(dimensions);        // update on resize, safe every frame
-Clay_SetPointerState(pointerPosition, down); // continuous current state
-Clay_UpdateScrollContainers(enableDrag, scrollDelta, deltaTime);
+Use floating/absolute layout only for true overlays, popovers, HUD chrome, or compatibility seams that cannot yet be expressed as normal layout. Keep the reason local and remove it when the surrounding layout becomes flexible.
 
-Clay_BeginLayout();
-// Declare the complete UI tree here.
-Clay_RenderCommandArray commands = Clay_EndLayout();
-RenderClayCommands(commands);
-```
+## Primitive API
 
-Do not reset pointer state to "not down" just to make frames deterministic. Clay needs continuity to distinguish pressed-this-frame, held, and released states.
+Generic primitives live under `src/ui/primitives`; Silencer-specific composition lives under `src/client/ui`.
 
-## Input Integration
+Target public primitives are plain nouns such as `Button`, `TextInput`, `Toggle`, `Panel`, and `Text`. Runtime/service types keep the `Ui` prefix. Existing `BankText` and sprite-backed primitive options still expose legacy bank/palette details; do not spread that surface into new or cleaned-up APIs.
 
-Normalize input once at the platform boundary, then feed Clay the UI-space pointer state every frame. Use the same coordinate space for `Clay_SetLayoutDimensions`, pointer position, hit testing, and rendering.
+Prefer shadcn-style API shape over raw knobs: `variant + size`, composition, and named defaults. If several call sites repeat padding, min/max width, wrapping, or effect-color values, make a named variant or size instead of normalizing the escape hatch.
 
-Pass scroll wheel/trackpad deltas to `Clay_UpdateScrollContainers` before `Clay_BeginLayout`; otherwise scroll containers lag or do not move. If the app owns scrolling itself, provide offsets through `.clip.childOffset` and treat Clay's scroll API as optional.
+Screen-specific components stay under the owning screen directory. Promote a component only after real reuse exists.
 
-Use `Clay_Hovered()` only during declaration of the currently open element. Use `Clay_OnHover()` for pointer callbacks:
+## Lifecycle
 
-```c
-void OnButton(Clay_ElementId id, Clay_PointerData data, void *user) {
-    if (data.state == CLAY_POINTER_DATA_PRESSED_THIS_FRAME) {
-        QueueUiAction(user);
-    }
-}
+Production code should go through `ClientUi` / `ClayService`, not direct Clay lifecycle calls from screens or primitives.
 
-CLAY(CLAY_ID("SaveButton"), buttonStyle) {
-    Clay_OnHover(OnButton, user);
-    CLAY_TEXT(CLAY_STRING("Save"), textConfig);
-}
-```
+The production frame order is:
 
-For app state changes, queue typed intents and drain them after layout. Avoid destroying screens, reallocating layout-owned memory, or mutating domain state directly from inside the layout pass.
+1. Normalize input at the platform boundary into `UiInputState`.
+2. `ClientUi::BeginFrame` resets frame arenas and starts `ClayService`.
+3. Visible layers declare the complete UI tree.
+4. `ClientUi::EndFrame` ends Clay layout and resolves Clay bounds into `UiInteractionRegistry`.
+5. The Clay compositor renders commands.
+6. The client layer dispatches typed UI actions.
 
-Clay does not provide full keyboard/gamepad focus or text editing policy. Build a small UI input layer that maps text input, focus traversal, confirm/cancel, and automation actions onto stable element IDs or your own component registry.
+For tests or adapter code that call Clay directly, match the vendored API in `clients/silencer/third_party/clay/clay.h`; this checkout uses the single-declaration `CLAY({ .id = ... })` form and `CLAY_TEXT(text, CLAY_TEXT_CONFIG(...))`.
 
-## IDs And Stability
+Do not synthesize false pointer releases between frames. Clay and `UiInteractionRegistry` both depend on a continuous pointer timeline.
 
-Give interactive, animated, scrollable, floating, retained-rendered, or debugged elements stable unique IDs.
+## Input And Actions
 
-Use:
+Normalize input once, before UI code sees it. The same coordinate space must feed layout dimensions, pointer state, registry hit testing, and compositor output.
 
-- `CLAY_ID("Name")` for static singleton elements.
-- `CLAY_IDI("Row", stableIndexOrId)` for repeated elements.
-- Local ID macros when composing reusable components that may appear multiple times under different parents.
+In Silencer, prefer stable element registration plus `UiInteractionRegistry` typed actions over ad hoc `Clay_OnHover` callbacks for application behavior. If adapter/test code uses `Clay_OnHover`, use the vendored signature (`intptr_t userData`) and queue work for after layout.
 
-Avoid duplicate IDs. Avoid using `CLAY_AUTO_ID()` for elements that need transitions, external queries, stable automation, retained rendering, or callback routing.
+UI feedback should be declared by the primitive/widget and executed by the client layer from normalized transitions. Existing `ClientUi` button/toggle audio inference is migration debt; do not extend it.
 
-## Text Measurement
+## IDs And Lifetime
 
-Clay is renderer-agnostic and must be given a measurement function. The function must match the renderer's actual text drawing behavior closely enough for wrapping and sizing to be correct.
+Every interactive, animated, scrollable, custom-rendered, tested, or automation-visible element needs an explicit stable Clay ID. A visible label must never double as the element ID.
 
-Rules:
+Use literal IDs for singleton elements, indexed IDs for repeated rows, and local/dynamic ID helpers when composing reusable components under different parents. Avoid duplicate IDs and avoid anonymous elements where transitions, focus, automation, retained rendering, or debug queries matter.
 
-- `Clay_StringSlice` is not guaranteed to be null-terminated.
-- Respect `fontId`, `fontSize`, and any supported spacing/wrapping options your renderer uses.
-- Cache in your renderer layer if measurement is expensive.
-- Call `Clay_ResetMeasureTextCache()` only when font metrics or relevant measurement behavior changes.
+Clay does not copy arbitrary string or payload memory. Dynamic strings, text slices, image data, text `userData`, and custom payloads must live until after render command consumption. Use Silencer's per-frame primitive arenas through `UiFrameContext`; do not reset them inside screens, modals, HUD blocks, or overlays.
 
 ## Rendering Backend
 
-Render by iterating `Clay_RenderCommandArray` and dispatching on `commandType`.
+Render by iterating `Clay_RenderCommandArray` and dispatching all command types the vendored Clay can emit: rectangle, border, text, image, custom, and scissor start/end.
 
-Your backend must handle:
+Keep renderer-specific work behind the compositor and payload bridge. UI screens and ordinary primitives should not call SDL, `Renderer`, or `Surface` APIs directly unless they are the adapter layer.
 
-- `RECTANGLE`: fills, colors, corner radii if supported.
-- `BORDER`: per-side widths and corner behavior.
-- `TEXT`: font lookup, text color, clipping, non-null-terminated slices.
-- `IMAGE`: application-owned texture/image pointer and sizing policy.
-- `CUSTOM`: tagged application payloads for primitives Clay does not know about.
-- `SCISSOR_START` / `SCISSOR_END`: clip stack or equivalent renderer clipping.
+Custom payloads are just pointers. Tag payload types, own lifetime explicitly, and keep sprite-bank details inside payloads or existing bridge primitives rather than new public primitive APIs.
 
-Keep Clay-specific renderer code behind one boundary. UI screens/components should not call SDL, Raylib, GPU APIs, or renderer internals directly unless they are renderer adapter code.
+## Text And Scrolling
 
-## Custom Elements
+Text measurement must match actual rendering. In Silencer, bank-text measurement and rendering are a contract with the Clay compositor; do not add layout assumptions that the renderer cannot reproduce.
 
-Use `.custom.customData` for application-specific render primitives such as video, 3D previews, rich sprites, platform-native controls, or custom chrome. Store payloads in memory that remains valid until after render command consumption.
+Do not call `Clay_ResetMeasureTextCache` from screens or primitives. The frame backend owns that policy for this checkout.
 
-Use frame arenas for transient payloads:
+For scrollable UI, choose one owner. If Clay owns scrolling, feed pointer state and wheel deltas before layout and use `.clip.childOffset`. If screen state owns scrolling, route scroll as typed `UiAction`s and keep row/line offsets in screen state.
 
-```c
-MyCustomPayload *p = FrameAlloc(sizeof(*p));
-*p = payload;
-CLAY(CLAY_ID("Preview"), { .custom = { .customData = p } }) {}
-```
+## Verification
 
-Tag payload types so the renderer can dispatch safely.
+Before calling a Clay UI change correct, verify the relevant surface:
 
-## Scrolling
-
-For Clay-managed scrolling:
-
-1. Call `Clay_SetPointerState`.
-2. Call `Clay_UpdateScrollContainers(enableDrag, scrollDelta, deltaTime)`.
-3. Configure the container with `.clip`.
-4. Use `Clay_GetScrollOffset()` as `.clip.childOffset`.
-
-For custom scrollbars or external scroll state, query `Clay_GetScrollContainerData()` after layout or manage `.childOffset` yourself.
-
-## Multiple Contexts
-
-Use one context unless there is a concrete reason to isolate independent UI instances. If using multiple contexts, store each `Clay_Context*`, call `Clay_SetCurrentContext()` before all Clay API calls for that instance, and never render/use contexts concurrently across threads.
-
-## Verification Checklist
-
-Before calling a Clay integration correct, verify:
-
-- Pointer coordinates, layout dimensions, hit testing, and render output use one coordinate space.
-- Pressed/held/released callbacks behave correctly across multiple frames.
-- Wheel/trackpad scrolling and drag scrolling work without a one-frame delay.
-- Text measurement matches actual rendering.
-- Window resize updates layout dimensions before layout.
-- Scissor commands clip all affected command types.
-- IDs are unique and stable in loops, transitions, floating elements, and automation.
-- Custom payload memory lives until render is complete.
-- Application state mutations happen outside the layout declaration pass.
-- Debug mode renders correctly through the same backend.
-
-## References
-
-Read [references/sources.md](references/sources.md) when you need source links, example files, or deeper implementation notes.
+- Build through `clients/silencer/build.ps1` or `clients/silencer/build.sh`.
+- Run targeted primitive/control tests such as `tests/lobby-ui/button_test/run.sh` when primitive behavior changes.
+- Run `tests/cli-agent/e2e/60_ui_architecture_boundaries.sh` when ownership boundaries change.
+- Use runtime screenshots or the control socket when layout, clipping, interaction, audio feedback, or visual behavior is at risk.

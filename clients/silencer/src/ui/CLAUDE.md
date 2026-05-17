@@ -11,14 +11,14 @@ This is mid-migration toward good flexbox layout, Clay lifecycle, and shadcn-sty
 - Do not include or depend on `Game`, `World`, `ScreenContext`, concrete screens, audio, SDL event loops, `Renderer`, or `Surface` from this layer. Use narrow runtime state, primitive options, and custom payload contracts instead.
 - `ClayService` owns production Clay frame lifecycle. Primitives declare Clay inside an existing frame; they do not begin/end layout, set pointer state, update scroll containers, or render command streams.
 - `UiInteractionRegistry` owns semantic metadata, focus, text editing, pointer hit testing, keyboard/gamepad navigation, automation, and typed action queuing. Clay still owns layout and final bounds.
-- Custom render payloads are the renderer bridge. They may carry sprite-bank details internally, but public primitive APIs must not.
+- Custom render payloads are the renderer bridge. Keep sprite-bank details inside payloads or existing bridge primitives; do not leak them into new public primitive APIs.
 
 ## Primitive API
 
-- Public primitives are plain nouns: `Button`, `TextInput`, `Toggle`, `Panel`, `Text`. Runtime/service types keep the `Ui` prefix: `UiInteractionRegistry`, `UiInputState`, `UiInputRouter`, `UiFrameContext`.
-- Mid-migration note: existing primitive names may still contain `Bank` or `Ui`. Treat that as migration debt unless the type is truly a runtime/service type. Do not introduce new `Bank*` or `Ui*` primitive names; rename opportunistically when touching surrounding code.
+- Target public primitives are plain nouns: `Button`, `TextInput`, `Toggle`, `Panel`, `Text`. Runtime/service types keep the `Ui` prefix: `UiInteractionRegistry`, `UiInputState`, `UiInputRouter`, `UiFrameContext`.
+- Mid-migration note: `BankText` and sprite-backed `Panel` still expose bank/palette details. Treat that surface as migration debt; do not copy it into new primitives, and hide it behind variants/sizes when touching the API.
 - Primitive APIs follow shadcn's core shape, not its exact implementation: `variant + size`, composition, and named defaults. Repeated call-site option bundles should become named variants or sizes.
-- Do not expose palette indices, sprite banks, legacy `B196x33`-style codes, or one-consumer presets in public signatures, enums, or docs.
+- New or cleaned-up primitive APIs must not expose palette indices, sprite banks, legacy `B196x33`-style codes, or one-consumer presets in public signatures, enums, or docs.
 - One primitive owns one concern. Checkbox/toggle state belongs to checkbox/toggle primitives, not a `Button` mode.
 
 ## Clay Discipline
