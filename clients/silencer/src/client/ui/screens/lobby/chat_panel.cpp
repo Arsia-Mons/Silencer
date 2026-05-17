@@ -4,6 +4,7 @@
 
 #include "lobby.h"
 #include "lobbygame.h"
+#include "text_wrap.h"
 #include "world.h"
 
 #include <algorithm>
@@ -20,8 +21,48 @@ namespace chat_panel_detail {
 // authoritative copies live in chat_panel_layout.cpp.
 constexpr Uint16 kChatH      = 207;
 constexpr Uint8  kLineHeight = 11;
+constexpr int    kChatMaxChars = 242 / 6;
+constexpr int    kPresenceMaxChars = 110 / 6;
+constexpr size_t kMaxStoredLines = 256;
 
 constexpr const char * kActionInput = "lobby.chat.input";
+
+void PushLine(std::vector<ChatLine> & lines,
+              std::string text,
+              Uint8 color,
+              Uint8 brightness) {
+	if(lines.size() >= kMaxStoredLines){
+		lines.erase(lines.begin());
+	}
+	ChatLine line;
+	line.text       = std::move(text);
+	line.color      = color;
+	line.brightness = brightness;
+	line.indent     = 0;
+	lines.push_back(std::move(line));
+}
+
+void AddWrappedText(std::vector<ChatLine> & lines,
+                    const char * text,
+                    Uint8 color,
+                    Uint8 brightness,
+                    int maxChars,
+                    int continuationIndentSpaces) {
+	if(!text) return;
+	char breakchar[10];
+	std::strcpy(breakchar, "\n");
+	for(int i = 0; i < continuationIndentSpaces && i < 8; i++){
+		std::strcat(breakchar, " ");
+	}
+	char * wrapped = silencer::ui::WordWrapText(text, maxChars, breakchar);
+	if(!wrapped) return;
+	char * line = std::strtok(wrapped, "\n");
+	while(line){
+		PushLine(lines, line, color, brightness);
+		line = std::strtok(nullptr, "\n");
+	}
+	delete[] wrapped;
+}
 
 // Rebuild presenceLines from world.lobby.presence — mirrors the legacy
 // rebuild block in chat_panel.cpp.
@@ -57,20 +98,12 @@ void RebuildPresence(ChatPanelState & state, World & world) {
 		if(r.group != lastgroup){
 			const char * header = (r.group == 0) ? "In Lobby"
 			                    : (r.group == 1) ? "Pregame" : "Playing";
-			ChatLine h;
-			h.text       = header;
-			h.color      = 0;
-			h.brightness = 128 + 32;
-			h.indent     = 0;
-			state.presenceLines.push_back(std::move(h));
+			AddWrappedText(state.presenceLines, header, 0, 128 + 32,
+			               kPresenceMaxChars, 0);
 			lastgroup = r.group;
 		}
-		ChatLine nm;
-		nm.text       = r.label;
-		nm.color      = 0;
-		nm.brightness = 128;
-		nm.indent     = 2;
-		state.presenceLines.push_back(std::move(nm));
+		AddWrappedText(state.presenceLines, r.label.c_str(), 0, 128,
+		               kPresenceMaxChars, 2);
 	}
 }
 
@@ -124,12 +157,9 @@ void ChatPanelTick(ChatPanelState & state, World & world) {
 		Uint8 brightness     = static_cast<Uint8>(message[msglen + 2]);
 
 		const int prevCount = static_cast<int>(state.chatLines.size());
-		ChatLine cl;
-		cl.text       = msgtext;
-		cl.color      = color;
-		cl.brightness = brightness;
-		cl.indent     = 2;
-		state.chatLines.push_back(std::move(cl));
+		chat_panel_detail::AddWrappedText(
+			state.chatLines, msgtext, color, brightness,
+			chat_panel_detail::kChatMaxChars, 2);
 		const int newCount = static_cast<int>(state.chatLines.size());
 
 		state.chatScrollPos = ScrollTextBoxAutoScroll(

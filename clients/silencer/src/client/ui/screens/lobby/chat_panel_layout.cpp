@@ -14,6 +14,7 @@
 
 using silencer::ui::primitives::TextSize;
 using silencer::ui::primitives::TextEffect;
+using silencer::ui::primitives::TextWrap;
 using silencer::ui::primitives::ScrollTextBox;
 using silencer::ui::primitives::ScrollTextBoxLine;
 using silencer::ui::primitives::ScrollTextBoxOpts;
@@ -108,6 +109,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 	chatOpts.height              = chat_panel_layout_detail::kChatH;
 	chatOpts.lineHeight          = chat_panel_layout_detail::kLineHeight;
 	chatOpts.text.size           = TextSize::Body;
+	chatOpts.text.wrap           = TextWrap::None;
 	chatOpts.origin              = ScrollTextBoxOrigin::BottomUp;
 	chatOpts.showScrollbar       = true;
 	chatOpts.scrollbarBank       = chat_panel_layout_detail::kScrollbarBank;
@@ -123,6 +125,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 	presOpts.height       = chat_panel_layout_detail::kPresH;
 	presOpts.lineHeight   = chat_panel_layout_detail::kLineHeight;
 	presOpts.text.size    = TextSize::Body;
+	presOpts.text.wrap    = TextWrap::None;
 	presOpts.origin       = ScrollTextBoxOrigin::TopDown;
 	presOpts.showScrollbar = false;
 
@@ -153,6 +156,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 		           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
 		                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
 		           .attachTo = CLAY_ATTACH_TO_PARENT,
+		           .clipTo = CLAY_CLIP_TO_ATTACHED_PARENT,
 		       } }) {
 			if(!state.channel.empty()){
 				Text(chat_panel_layout_detail::FromStd(state.channel),
@@ -172,6 +176,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 		             .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
 		                               .parent = CLAY_ATTACH_POINT_LEFT_TOP },
 		             .attachTo = CLAY_ATTACH_TO_PARENT,
+		             .clipTo = CLAY_CLIP_TO_ATTACHED_PARENT,
 		         },
 		     })) {}
 
@@ -187,6 +192,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 		             .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
 		                               .parent = CLAY_ATTACH_POINT_LEFT_TOP },
 		             .attachTo = CLAY_ATTACH_TO_PARENT,
+		             .clipTo = CLAY_CLIP_TO_ATTACHED_PARENT,
 		         },
 		     })) {}
 
@@ -203,6 +209,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 		           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
 		                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
 		           .attachTo = CLAY_ATTACH_TO_PARENT,
+		           .clipTo = CLAY_CLIP_TO_ATTACHED_PARENT,
 		       } }) {
 			CLAY({ .id = CLAY_ID("ChatBoxWrap") }) {
 				ScrollTextBox(CLAY_STRING("ChatBox"),
@@ -231,6 +238,7 @@ void BuildChatPanelTree(ChatPanelState & state,
 		           .attachPoints = { .element = CLAY_ATTACH_POINT_LEFT_TOP,
 		                             .parent = CLAY_ATTACH_POINT_LEFT_TOP },
 		           .attachTo = CLAY_ATTACH_TO_PARENT,
+		           .clipTo = CLAY_CLIP_TO_ATTACHED_PARENT,
 		       } }) {
 			TextInput(CLAY_STRING("ChatInput"),
 			          state.inputBuffer,
