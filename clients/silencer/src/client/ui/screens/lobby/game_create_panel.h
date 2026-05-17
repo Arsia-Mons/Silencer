@@ -93,10 +93,6 @@ void GameCreatePanelTick(GameCreatePanelState & state,
 bool GameCreatePanelHandleUiIntent(GameCreatePanelState & state,
                                    const silencer::ui::UiAction & action);
 
-// Preferred content-driven height for the upper options panel when the lobby
-// stepped layout has room to let it fit without scrolling.
-int GameCreateUpperPreferredHeight();
-
 // Emits the upper stepped-pane subtree ("Game Options" heading + 6-row form:
 // security cycler, min/max level, max players, max teams, spectatable).
 // Called inside the LobbyRightUpperBox CLAY block; flex children only (no

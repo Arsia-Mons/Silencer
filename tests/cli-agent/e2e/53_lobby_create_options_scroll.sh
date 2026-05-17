@@ -172,11 +172,12 @@ console.log([
   Math.max(1, Math.ceil(scroll.h)),
 ].join(","));
 ')"
+tight_h="${scroll_crop##*,}"
 
 before="$OUT_DIR/options-before.png"
 after="$OUT_DIR/options-after.png"
 cli --port "$CTRL_PORT" screenshot --out "$before" >/dev/null
-cli --port "$CTRL_PORT" scroll --label "Game Options Form" --amount 1 >/dev/null
+cli --port "$CTRL_PORT" scroll --label "Game Options Form" --amount 10 >/dev/null
 cli --port "$CTRL_PORT" wait_frames --n 2 >/dev/null
 cli --port "$CTRL_PORT" screenshot --out "$after" >/dev/null
 
@@ -207,24 +208,18 @@ cli --port "$CTRL_PORT" wait_frames --n 3 >/dev/null
 cli --port "$CTRL_PORT" inspect | bun -e '
 const text = await new Response(Bun.stdin.stream()).text();
 const response = JSON.parse(text);
-const widgets = response.widgets ?? [];
 const elements = response.elements ?? [];
-const hasSecurity = widgets.some((w) => w.id === "lobby.game_create.security");
-const hasSpectatable = widgets.some((w) => w.id === "lobby.game_create.spectatable");
-if (!hasSecurity || !hasSpectatable) {
-  console.error("large viewport should show the full game options form");
-  process.exit(1);
-}
 const scroll = elements.find((e) =>
   e.source === "clay" &&
   e.kind === "container" &&
   e.label === "Game Options Form" &&
   e.value === "scroll"
 );
-if (!scroll || scroll.h < 80) {
-  console.error(`expected game options viewport to stay present and grow, got ${scroll?.h}`);
+const tightH = Number(process.argv[1]);
+if (!scroll || !(scroll.h > tightH)) {
+  console.error(`expected game options viewport to grow from ${tightH}, got ${scroll?.h}`);
   process.exit(1);
 }
-'
+' "$tight_h"
 
 echo "PASS 53_lobby_create_options_scroll ($OUT_DIR)"

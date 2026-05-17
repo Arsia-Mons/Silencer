@@ -92,24 +92,13 @@ struct LobbySteppedPaneLayout {
 
 LobbySteppedPaneLayout ResolveSteppedPaneLayout(int bodyW,
                                                 int bodyH,
-                                                int regionGap,
-                                                bool gameCreateActive) {
+                                                int regionGap) {
 	LobbySteppedPaneLayout out;
 	out.regionGap = regionGap;
 	out.upperH = ClampInt(RoundRatio(bodyH, 121, kLegacyBodyH), 84, 156);
-	const int hardMaxUpperH = std::max(0, bodyH - regionGap);
-	if(out.upperH > hardMaxUpperH){
-		out.upperH = hardMaxUpperH;
-	}
 	int maxUpperH = std::max(0, bodyH - regionGap - kMinLowerLeftH);
 	if(maxUpperH > 0 && out.upperH > maxUpperH){
 		out.upperH = maxUpperH;
-	}
-	if(gameCreateActive && maxUpperH > 0){
-		const int preferredUpperH = std::min(GameCreateUpperPreferredHeight(), maxUpperH);
-		if(preferredUpperH > out.upperH){
-			out.upperH = preferredUpperH;
-		}
 	}
 
 	int desiredRightTallW =
@@ -338,8 +327,7 @@ void BuildLobbyMainArea(LobbyMainAreaPanels & panels,
                         int regionGap,
                         silencer::ui::UiInteractionRegistry& interactions) {
 	const lobby_main_area_detail::LobbySteppedPaneLayout layout =
-		lobby_main_area_detail::ResolveSteppedPaneLayout(
-			bodyW, bodyH, regionGap, panels.gameCreateActive);
+		lobby_main_area_detail::ResolveSteppedPaneLayout(bodyW, bodyH, regionGap);
 	lobby_main_area_detail::BuildLobbySteppedPane(
 		panels,
 		ctx,

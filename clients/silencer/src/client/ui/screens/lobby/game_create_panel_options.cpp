@@ -261,18 +261,6 @@ void BuildOptionRow(GameCreatePanelState & state,
 
 }  // namespace game_create_panel_options_detail
 
-int GameCreateUpperPreferredHeight() {
-	return static_cast<int>(game_create_panel_options_detail::kPanelPad) * 2
-	     + silencer::ui::primitives::TextLineHeight(TextSize::Heading)
-	     + static_cast<int>(game_create_panel_options_detail::kFormRowGap)
-	     + static_cast<int>(game_create_panel_options_detail::kFormPadTop)
-	     + static_cast<int>(game_create_panel_options_detail::kFormPadBottom)
-	     + static_cast<int>(game_create_panel_options_detail::kFormRowH)
-	         * game_create_panel_options_detail::kOptionRowCount
-	     + static_cast<int>(game_create_panel_options_detail::kFormRowGap)
-	         * (game_create_panel_options_detail::kOptionRowCount - 1);
-}
-
 void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Uint16 panelWidth,
                               Uint16 panelHeight,
