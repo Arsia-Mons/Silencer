@@ -15,6 +15,17 @@ set -euo pipefail
 
 fail() { echo "build.sh: $*" >&2; exit 1; }
 
+probe_bundle_writability() {
+    local bundle="$1"
+    local probe="$bundle/Contents/.silencer-write-test"
+    [ -d "$bundle/Contents" ] || return 0
+    if touch "$probe" 2>/dev/null; then
+        rm -f "$probe"
+        return 0
+    fi
+    return 1
+}
+
 command -v cmake >/dev/null 2>&1 || fail "cmake is not on PATH"
 
 preset="win-ninja"
@@ -72,7 +83,28 @@ if [ "$clean" = 1 ]; then
 fi
 
 gen=()
-command -v ninja >/dev/null 2>&1 && gen=(-G Ninja)
+requested_generator=""
+if command -v ninja >/dev/null 2>&1; then
+    requested_generator="Ninja"
+    gen=(-G "$requested_generator")
+fi
+
+if [ -n "$requested_generator" ] && [ -f "$bdir/CMakeCache.txt" ]; then
+    cached_generator="$(sed -n 's/^CMAKE_GENERATOR:INTERNAL=//p' "$bdir/CMakeCache.txt" | head -n 1)"
+    if [ -n "$cached_generator" ] && [ "$cached_generator" != "$requested_generator" ]; then
+        fail "$bdir was previously configured with generator '$cached_generator', but this wrapper wants '$requested_generator'; rerun with --clean"
+    fi
+fi
+
+bundle_dir="$bdir/Silencer.app"
+if [ "$(uname -s)" = "Darwin" ] && ! probe_bundle_writability "$bundle_dir"; then
+    if [ "$clean" = 1 ]; then
+        echo "build.sh: removing stale app bundle in $bundle_dir (macOS blocked writes inside it)"
+        rm -rf "$bundle_dir"
+    else
+        fail "existing app bundle $bundle_dir is not writable (macOS blocked Info.plist updates); rerun with --clean to rebuild it"
+    fi
+fi
 
 echo "build.sh: $preset -> $bdir"
 if [ "${#toolchain[@]}" -gt 0 ]; then
