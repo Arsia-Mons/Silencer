@@ -424,8 +424,8 @@ function getActordefRefs() {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-// GET /sounds — list all sounds
-router.get('/', requireAuth, (req, res) => {
+// GET /sounds — list all sounds (public: audio asset names aren't sensitive)
+router.get('/', (req, res) => {
   const { sounds } = parseSoundBin();
   const deletions = new Set(getDeletions());
   const staged = getStagedFiles();
@@ -460,7 +460,7 @@ router.get('/', requireAuth, (req, res) => {
 
 // GET /sounds/:name/play — serve IMA ADPCM WAV for browser playback
 // The client decodes via Web Audio API (AudioContext.decodeAudioData), no server-side ffmpeg needed.
-router.get('/:name/play', requireAuth, (req, res) => {
+router.get('/:name/play', (req, res) => {
   const name = req.params.name;
 
   // Check staging first (staged files are already standard WAV)

@@ -193,7 +193,7 @@ function SoundPicker({ value, volume, sounds, onChange }: {
           type="button"
           title="Preview sound"
           className="text-game-textDim hover:text-game-primary text-xs px-1"
-          onClick={() => { const a = new Audio(`/sounds/${value}`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
+          onClick={() => { const a = new Audio(`/api/sounds/${value}/play`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
         >▶</button>
       )}
       {open && (
@@ -223,7 +223,7 @@ function SoundPicker({ value, volume, sounds, onChange }: {
                   type="button"
                   title="Preview"
                   className="px-2 text-game-textDim hover:text-game-primary text-xs"
-                  onClick={() => { const a = new Audio(`/sounds/${s}`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
+                  onClick={() => { const a = new Audio(`/api/sounds/${s}/play`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
                 >▶</button>
               </div>
             ))}
