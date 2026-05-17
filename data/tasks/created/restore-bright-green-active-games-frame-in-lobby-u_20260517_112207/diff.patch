@@ -1,0 +1,769 @@
+diff --git a/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h b/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h
+index aab91d8..03e0888 100644
+--- a/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h
++++ b/clients/silencer/src/client/ui/screens/lobby/game_create_panel.h
+@@ -99,6 +99,8 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
+ // ScrollListBeginFrame, TextInputBeginFrame.
+ void BuildGameCreateTallTree(GameCreatePanelState & state,
+                              ScreenContext & ctx,
++                             Uint16 panelWidth,
++                             Uint16 panelHeight,
+                              Resources & resources,
+                              silencer::ui::UiInteractionRegistry& interactions);
+ 
+diff --git a/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp b/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp
+index cb9cd9b..fd4a106 100644
+--- a/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp
++++ b/clients/silencer/src/client/ui/screens/lobby/game_create_panel_map_form.cpp
+@@ -8,6 +8,7 @@
+ #include "clay/clay.h"
+ #include "clay_ui_compositor.h"
+ #include "runtime/UiInteractionRegistry.h"
++#include "primitives/box.h"
+ #include "primitives/text.h"
+ #include "primitives/button.h"
+ #include "primitives/scroll_list.h"
+@@ -20,6 +21,7 @@
+ 
+ using silencer::ui::primitives::Text;
+ using silencer::ui::primitives::TextSize;
++using silencer::ui::primitives::Box;
+ using silencer::ui::primitives::Button;
+ using silencer::ui::primitives::ButtonHandle;
+ using silencer::ui::primitives::ButtonOpts;
+@@ -31,24 +33,22 @@ using silencer::ui::primitives::ScrollListOpts;
+ using silencer::ui::primitives::TextInput;
+ using silencer::ui::primitives::TextInputHandle;
+ using silencer::ui::primitives::TextInputOpts;
++namespace BoxVariants = silencer::ui::primitives::BoxVariants;
+ 
+ namespace silencer::client_ui::lobby {
+ 
+ namespace game_create_panel_map_form_detail {
+ 
+-// Legacy on-screen coords kept ONLY for inspector hit-rect registration.
+-constexpr int    kMapListX     = 407;
+-constexpr int    kMapListY     = 89;
+-constexpr Uint16 kMapListW     = 214;
+-constexpr Uint16 kMapListH     = 265;
+ constexpr Uint8  kMapListLineH = 14;
+ constexpr Uint8  kScrollbarBank = 7;
+-constexpr Uint16 kNameInputW = 210, kNameInputH = 14;
+-constexpr Uint16 kPwInputW   = 210, kPwInputH   = 14;
++constexpr Uint16 kInputH     = 14;
++constexpr Uint16 kButtonH    = 21;
+ constexpr Uint16 kPreviewW   = 172, kPreviewH   = 62;
+ 
+ constexpr uint16_t kPanelPad       = 6;
+ constexpr uint16_t kTallSectionGap = 4;
++constexpr uint16_t kFooterGap      = 4;
++constexpr uint16_t kListBorderPad  = 1;
+ constexpr uint16_t kPreviewGap     = 5;
+ constexpr int kPreviewOffsetX      = -185;
+ constexpr int kPreviewOffsetY      = -30;
+@@ -61,6 +61,14 @@ constexpr const char * kActionMapPrefix = "lobby.game_create.map";
+ constexpr const char * kActionName      = "lobby.game_create.name";
+ constexpr const char * kActionPassword  = "lobby.game_create.password";
+ 
++struct GameCreateTallLayout {
++	Uint16 listBoxWidth  = 0;
++	Uint16 listBoxHeight = 0;
++	Uint16 listWidth  = 0;
++	Uint16 listHeight = 0;
++	Uint16 inputWidth = 0;
++};
++
+ Clay_String FromStd(const std::string & s) {
+ 	return Clay_String{ false, static_cast<int32_t>(s.size()), s.c_str() };
+ }
+@@ -230,8 +238,39 @@ void BuildHoverPreviewOverlay(GameCreatePanelState & state,
+ 	}
+ }
+ 
++GameCreateTallLayout ResolveTallLayout(Uint16 panelWidth,
++                                       Uint16 panelHeight) {
++	GameCreateTallLayout out;
++	const int contentW = std::max(
++		0,
++		static_cast<int>(panelWidth) - static_cast<int>(kPanelPad) * 2);
++	const int contentH = std::max(
++		0,
++		static_cast<int>(panelHeight) - static_cast<int>(kPanelPad) * 2);
++	const int headingH = silencer::ui::primitives::TextLineHeight(TextSize::Heading);
++	const int footerH =
++		headingH + kFooterGap + kInputH
++		+ kFooterGap + headingH + kFooterGap + kInputH
++		+ kFooterGap + kButtonH;
++	const int listH = std::max(
++		0,
++		contentH - headingH - static_cast<int>(kTallSectionGap)
++		       - footerH - static_cast<int>(kTallSectionGap));
++	out.listBoxWidth = static_cast<Uint16>(contentW);
++	out.listBoxHeight = static_cast<Uint16>(listH);
++	out.listWidth = static_cast<Uint16>(std::max(
++		0,
++		contentW - static_cast<int>(kListBorderPad) * 2));
++	out.listHeight = static_cast<Uint16>(std::max(
++		0,
++		listH - static_cast<int>(kListBorderPad) * 2));
++	out.inputWidth = static_cast<Uint16>(contentW);
++	return out;
++}
++
+ void BuildMapList(GameCreatePanelState & state,
+                   ScreenContext & ctx,
++                  const GameCreateTallLayout & layout,
+                   silencer::ui::UiInteractionRegistry& interactions) {
+ 	const int slotCount = std::min((int)state.maps.size(), kMaxMapRows);
+ 	for(int i = 0; i < slotCount; ++i){
+@@ -242,14 +281,22 @@ void BuildMapList(GameCreatePanelState & state,
+ 		g_mapSlab[i] = Clay_String{ false, (int32_t)len, txt };
+ 	}
+ 	ScrollListOpts listOpts;
+-	listOpts.width          = kMapListW;
+-	listOpts.height         = kMapListH;
++	listOpts.width          = layout.listWidth;
++	listOpts.height         = layout.listHeight;
+ 	listOpts.lineHeight     = kMapListLineH;
+ 	listOpts.highlightColor = 180;
+ 	listOpts.text.size      = TextSize::Body;
+ 	listOpts.scrollbarBank  = kScrollbarBank;
+ 	int hoveredIndex = -1;
+-	CLAY({ .id = CLAY_ID("GCrtMapListWrap") }) {
++	CLAY(Box(BoxVariants::Inset, {
++	         .id = CLAY_ID("GCrtMapListBorder"),
++	         .layout = {
++	             .sizing = { CLAY_SIZING_FIXED(static_cast<float>(layout.listBoxWidth)),
++	                         CLAY_SIZING_FIXED(static_cast<float>(layout.listBoxHeight)) },
++	             .padding = { kListBorderPad, kListBorderPad,
++	                          kListBorderPad, kListBorderPad },
++	         },
++	     })) {
+ 		ScrollList(CLAY_STRING("GCrtMapList"),
+ 		           g_mapSlab, slotCount,
+ 		           state.mapSelectedIndex, state.mapScrollPos,
+@@ -257,49 +304,56 @@ void BuildMapList(GameCreatePanelState & state,
+ 		           ScrollListHandle{ nullptr, kActionMapPrefix, &interactions, &hoveredIndex });
+ 	}
+ 	UpdateHoverPreview(state, ctx, hoveredIndex);
+-	for(int i = 0; i < slotCount; ++i){
+-		silencer::ui::UiInteractable reg;
+-		reg.id         = std::string(kActionMapPrefix) + "." + std::to_string(i);
+-		reg.labelText  = g_mapSlab[i].chars ? g_mapSlab[i].chars : "";
+-		reg.kind       = silencer::ui::UiInteractableKind::ListRow;
+-		reg.x = kMapListX; reg.y = kMapListY + i * kMapListLineH;
+-		reg.w = kMapListW; reg.h = kMapListLineH;
+-		reg.index      = i;
+-		reg.selected   = state.mapSelectedIndex == i;
+-		interactions.RegisterInteractable(reg);
+-	}
+ }
+ 
+ void BuildNameAndPassword(GameCreatePanelState & state,
++                          const GameCreateTallLayout & layout,
+                           silencer::ui::UiInteractionRegistry& interactions) {
+-	CLAY({ .id = CLAY_ID("GCrtNameLabelWrap") }) {
+-		Text(CLAY_STRING("Game name:"),
+-		     { .size = TextSize::Heading });
+-	}
+-	TextInputOpts bodyInput;
+-	bodyInput.widthPx    = kNameInputW;
+-	bodyInput.heightPx   = kNameInputH;
+-	bodyInput.textSize   = TextSize::Body;
+-	bodyInput.showCaret  = false;
+-	CLAY({ .id = CLAY_ID("GCrtNameInputWrap") }) {
+-		TextInput(CLAY_STRING("GCrtNameInput"),
+-		          state.name, bodyInput,
+-		          TextInputHandle{ nullptr, kActionName, "Game name",
+-		                           &interactions, -1,
+-		                           static_cast<int>(sizeof(state.name)) - 1 });
+-	}
++	TextInputOpts inputOpts;
++	inputOpts.widthPx   = layout.inputWidth;
++	inputOpts.heightPx  = kInputH;
++	inputOpts.textSize  = TextSize::Body;
++	inputOpts.showCaret = false;
+ 
+-	CLAY({ .id = CLAY_ID("GCrtPwLabelWrap") }) {
+-		Text(CLAY_STRING("Password (optional):"),
+-		     { .size = TextSize::Heading });
+-	}
+-	bodyInput.password = true;
+-	CLAY({ .id = CLAY_ID("GCrtPwInputWrap") }) {
+-		TextInput(CLAY_STRING("GCrtPwInput"),
+-		          state.password, bodyInput,
+-		          TextInputHandle{ nullptr, kActionPassword, "Password",
+-		                           &interactions, -1,
+-		                           static_cast<int>(sizeof(state.password)) - 1 });
++	CLAY({ .id = CLAY_ID("GCrtFooter"),
++	       .layout = {
++	           .childGap = kFooterGap,
++	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
++	       } }) {
++		CLAY({ .id = CLAY_ID("GCrtNameLabelWrap") }) {
++			Text(CLAY_STRING("Game name:"),
++			     { .size = TextSize::Heading });
++		}
++		CLAY({ .id = CLAY_ID("GCrtNameInputWrap") }) {
++			TextInput(CLAY_STRING("GCrtNameInput"),
++			          state.name, inputOpts,
++			          TextInputHandle{ nullptr, kActionName, "Game name",
++			                           &interactions, -1,
++			                           static_cast<int>(sizeof(state.name)) - 1 });
++		}
++
++		CLAY({ .id = CLAY_ID("GCrtPwLabelWrap") }) {
++			Text(CLAY_STRING("Password (optional):"),
++			     { .size = TextSize::Heading });
++		}
++		inputOpts.password = true;
++		CLAY({ .id = CLAY_ID("GCrtPwInputWrap") }) {
++			TextInput(CLAY_STRING("GCrtPwInput"),
++			          state.password, inputOpts,
++			          TextInputHandle{ nullptr, kActionPassword, "Password",
++			                           &interactions, -1,
++			                           static_cast<int>(sizeof(state.password)) - 1 });
++		}
++
++		CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
++		       .layout = {
++		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
++		       } }) {
++			Button(CLAY_STRING("GameCreateCreateButton"), CLAY_STRING("Create"),
++			       ButtonOpts{ .variant = ButtonVariant::Chrome,
++			                   .size = ButtonSize::Compact },
++			       ButtonHandle{ nullptr, kActionCreate, &interactions });
++		}
+ 	}
+ }
+ 
+@@ -307,9 +361,13 @@ void BuildNameAndPassword(GameCreatePanelState & state,
+ 
+ void BuildGameCreateTallTree(GameCreatePanelState & state,
+                              ScreenContext & ctx,
++                             Uint16 panelWidth,
++                             Uint16 panelHeight,
+                              Resources & resources,
+                              silencer::ui::UiInteractionRegistry& interactions) {
+ 	(void)resources;
++	const game_create_panel_map_form_detail::GameCreateTallLayout layout =
++		game_create_panel_map_form_detail::ResolveTallLayout(panelWidth, panelHeight);
+ 
+ 	CLAY({ .id = CLAY_ID("GCrtTallContent"),
+ 	       .layout = {
+@@ -323,16 +381,8 @@ void BuildGameCreateTallTree(GameCreatePanelState & state,
+ 			     { .size = TextSize::Heading });
+ 		}
+ 
+-		game_create_panel_map_form_detail::BuildMapList(state, ctx, interactions);
+-		game_create_panel_map_form_detail::BuildNameAndPassword(state, interactions);
+-
+-		CLAY({ .id = CLAY_ID("GCrtCreateBtnWrap"),
+-		       .layout = { .childAlignment = { .x = CLAY_ALIGN_X_CENTER } } }) {
+-			Button(CLAY_STRING("GameCreateCreateButton"), CLAY_STRING("Create"),
+-			       ButtonOpts{ .variant = ButtonVariant::Chrome,
+-			                   .size = ButtonSize::Compact },
+-			       ButtonHandle{ nullptr, game_create_panel_map_form_detail::kActionCreate, &interactions });
+-		}
++		game_create_panel_map_form_detail::BuildMapList(state, ctx, layout, interactions);
++		game_create_panel_map_form_detail::BuildNameAndPassword(state, layout, interactions);
+ 	}
+ }
+ 
+diff --git a/clients/silencer/src/client/ui/screens/lobby/game_create_panel_options.cpp b/clients/silencer/src/client/ui/screens/lobby/game_create_panel_options.cpp
+index 700efd5..b0d42ad 100644
+--- a/clients/silencer/src/client/ui/screens/lobby/game_create_panel_options.cpp
++++ b/clients/silencer/src/client/ui/screens/lobby/game_create_panel_options.cpp
+@@ -3,6 +3,7 @@
+ #include "clay/clay.h"
+ #include "clay_ui_compositor.h"
+ #include "runtime/UiInteractionRegistry.h"
++#include "primitives/box.h"
+ #include "primitives/text.h"
+ #include "primitives/button.h"
+ #include "primitives/text_input.h"
+@@ -13,6 +14,7 @@
+ 
+ using silencer::ui::primitives::Text;
+ using silencer::ui::primitives::TextSize;
++using silencer::ui::primitives::Box;
+ using silencer::ui::primitives::Button;
+ using silencer::ui::primitives::ButtonHandle;
+ using silencer::ui::primitives::ButtonOpts;
+@@ -21,6 +23,7 @@ using silencer::ui::primitives::ButtonVariant;
+ using silencer::ui::primitives::TextInput;
+ using silencer::ui::primitives::TextInputHandle;
+ using silencer::ui::primitives::TextInputOpts;
++namespace BoxVariants = silencer::ui::primitives::BoxVariants;
+ 
+ namespace silencer::client_ui::lobby {
+ 
+@@ -29,6 +32,9 @@ namespace game_create_panel_options_detail {
+ constexpr int    kRowHeight = 14;
+ 
+ constexpr uint16_t kPanelPad      = 6;
++constexpr uint16_t kFormPadLeft   = 4;
++constexpr uint16_t kFormPadTop    = 2;
++constexpr uint16_t kFormPadBottom = 2;
+ constexpr uint16_t kFormRowH      = 14;
+ constexpr uint16_t kFormRowGap    = 3;
+ constexpr uint16_t kFormColumnGap = 6;
+@@ -128,33 +134,47 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
+ 			     { .size = TextSize::Heading });
+ 		}
+ 
+-		struct LabelRow { const char * label; const char * id; };
+-		constexpr LabelRow kLabels[6] = {
+-			{ "Security:",    "GCrtRowSec"   },
+-			{ "Min Level:",   "GCrtRowMinL"  },
+-			{ "Max Level:",   "GCrtRowMaxL"  },
+-			{ "Max Players:", "GCrtRowMaxP"  },
+-			{ "Max Teams:",   "GCrtRowMaxT"  },
+-			{ "Spectatable:", "GCrtRowSpect" },
+-		};
+-
+-		struct NumInput { const char * id; const char * label; const char * actionId; char * buf; int cap; };
+-		NumInput kTextInputs[4] = {
+-			{ "GCrtMinLevel",   "Min Level",   game_create_panel_options_detail::kActionMinLevel,   state.minLevel,   (int)sizeof(state.minLevel)   },
+-			{ "GCrtMaxLevel",   "Max Level",   game_create_panel_options_detail::kActionMaxLevel,   state.maxLevel,   (int)sizeof(state.maxLevel)   },
+-			{ "GCrtMaxPlayers", "Max Players", game_create_panel_options_detail::kActionMaxPlayers, state.maxPlayers, (int)sizeof(state.maxPlayers) },
+-			{ "GCrtMaxTeams",   "Max Teams",   game_create_panel_options_detail::kActionMaxTeams,   state.maxTeams,   (int)sizeof(state.maxTeams)   },
+-		};
+-
+-		for(int i = 0; i < 6; ++i){
+-			const NumInput * ti = (i >= 1 && i <= 4) ? &kTextInputs[i - 1] : nullptr;
+-			game_create_panel_options_detail::BuildOptionRow(state, i,
+-			               kLabels[i].id, kLabels[i].label,
+-			               ti ? ti->id : "",
+-			               ti ? ti->actionId : "",
+-			               ti ? ti->buf : nullptr,
+-			               ti ? ti->cap : 0,
+-			               interactions);
++		CLAY(Box(BoxVariants::Inset, {
++		         .id = CLAY_ID("GCrtOptionsFormBorder"),
++		         .layout = {
++		             .sizing = { CLAY_SIZING_GROW(0),
++		                         CLAY_SIZING_FIT(0) },
++		             .padding = { game_create_panel_options_detail::kFormPadLeft,
++		                          game_create_panel_options_detail::kFormPadLeft,
++		                          game_create_panel_options_detail::kFormPadTop,
++		                          game_create_panel_options_detail::kFormPadBottom },
++		             .childGap = game_create_panel_options_detail::kFormRowGap,
++		             .layoutDirection = CLAY_TOP_TO_BOTTOM,
++		         },
++		     })) {
++			struct LabelRow { const char * label; const char * id; };
++			constexpr LabelRow kLabels[6] = {
++				{ "Security:",    "GCrtRowSec"   },
++				{ "Min Level:",   "GCrtRowMinL"  },
++				{ "Max Level:",   "GCrtRowMaxL"  },
++				{ "Max Players:", "GCrtRowMaxP"  },
++				{ "Max Teams:",   "GCrtRowMaxT"  },
++				{ "Spectatable:", "GCrtRowSpect" },
++			};
++
++			struct NumInput { const char * id; const char * label; const char * actionId; char * buf; int cap; };
++			NumInput kTextInputs[4] = {
++				{ "GCrtMinLevel",   "Min Level",   game_create_panel_options_detail::kActionMinLevel,   state.minLevel,   (int)sizeof(state.minLevel)   },
++				{ "GCrtMaxLevel",   "Max Level",   game_create_panel_options_detail::kActionMaxLevel,   state.maxLevel,   (int)sizeof(state.maxLevel)   },
++				{ "GCrtMaxPlayers", "Max Players", game_create_panel_options_detail::kActionMaxPlayers, state.maxPlayers, (int)sizeof(state.maxPlayers) },
++				{ "GCrtMaxTeams",   "Max Teams",   game_create_panel_options_detail::kActionMaxTeams,   state.maxTeams,   (int)sizeof(state.maxTeams)   },
++			};
++
++			for(int i = 0; i < 6; ++i){
++				const NumInput * ti = (i >= 1 && i <= 4) ? &kTextInputs[i - 1] : nullptr;
++				game_create_panel_options_detail::BuildOptionRow(state, i,
++				               kLabels[i].id, kLabels[i].label,
++				               ti ? ti->id : "",
++				               ti ? ti->actionId : "",
++				               ti ? ti->buf : nullptr,
++				               ti ? ti->cap : 0,
++				               interactions);
++			}
+ 		}
+ 	}
+ }
+diff --git a/clients/silencer/src/client/ui/screens/lobby/game_select_panel.h b/clients/silencer/src/client/ui/screens/lobby/game_select_panel.h
+index 8799197..e0a3e70 100644
+--- a/clients/silencer/src/client/ui/screens/lobby/game_select_panel.h
++++ b/clients/silencer/src/client/ui/screens/lobby/game_select_panel.h
+@@ -93,6 +93,8 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
+ // BeginFrame requirements: TextBeginFrame, ButtonBeginFrame,
+ // ScrollListBeginFrame.
+ void BuildGameSelectTallTree(GameSelectPanelState & state,
++                             Uint16 panelWidth,
++                             Uint16 panelHeight,
+                              Resources & resources,
+                              silencer::ui::UiInteractionRegistry& interactions);
+ 
+diff --git a/clients/silencer/src/client/ui/screens/lobby/game_select_panel_layout.cpp b/clients/silencer/src/client/ui/screens/lobby/game_select_panel_layout.cpp
+index 655e350..9c3e900 100644
+--- a/clients/silencer/src/client/ui/screens/lobby/game_select_panel_layout.cpp
++++ b/clients/silencer/src/client/ui/screens/lobby/game_select_panel_layout.cpp
+@@ -3,15 +3,18 @@
+ #include "clay/clay.h"
+ #include "clay_ui_compositor.h"
+ #include "runtime/UiInteractionRegistry.h"
++#include "primitives/box.h"
+ #include "primitives/text.h"
+ #include "primitives/button.h"
+ #include "primitives/scroll_list.h"
+ 
++#include <algorithm>
+ #include <cstdint>
+ #include <cstring>
+ 
+ using silencer::ui::primitives::Text;
+ using silencer::ui::primitives::TextSize;
++using silencer::ui::primitives::Box;
+ using silencer::ui::primitives::Button;
+ using silencer::ui::primitives::ButtonHandle;
+ using silencer::ui::primitives::ButtonOpts;
+@@ -20,16 +23,12 @@ using silencer::ui::primitives::ButtonVariant;
+ using silencer::ui::primitives::ScrollList;
+ using silencer::ui::primitives::ScrollListHandle;
+ using silencer::ui::primitives::ScrollListOpts;
++namespace BoxVariants = silencer::ui::primitives::BoxVariants;
+ 
+ namespace silencer::client_ui::lobby {
+ 
+ namespace game_select_panel_layout_detail {
+ 
+-// Legacy list coords kept ONLY for inspector hit-rect registration.
+-constexpr int    kListX        = 407;
+-constexpr int    kListY        = 89;
+-constexpr Uint16 kListW        = 214;
+-constexpr Uint16 kListH        = 265;
+ constexpr Uint8  kListLineH    = 14;
+ 
+ constexpr Uint8  kScrollbarBank = 7;
+@@ -43,13 +42,13 @@ constexpr uint16_t kTallHeadingPadLeft = 7;
+ constexpr uint16_t kTallHeadingPadTop  = 6;
+ constexpr uint16_t kTallListPadLeft    = 9;
+ constexpr uint16_t kTallListPadTop     = 4;
+-constexpr uint16_t kTallInfoBlockPadTop  = 4;
+-constexpr uint16_t kTallInfoPadLeft      = 7;
+-constexpr uint16_t kTallInfoRowH         = 12;
+-constexpr uint16_t kTallButtonPadLeft = 38;
+-constexpr uint16_t kTallButtonRowH    = 21;
+-constexpr uint16_t kTallSpectatePadTop = 2;
+-constexpr uint16_t kTallJoinPadTop     = 1;
++constexpr uint16_t kTallListBorderPad  = 1;
++constexpr uint16_t kTallFooterPadTop   = 4;
++constexpr uint16_t kTallFooterGap      = 4;
++constexpr uint16_t kTallInfoPadLeft    = 7;
++constexpr uint16_t kTallInfoRowH       = 12;
++constexpr uint16_t kTallButtonRowH     = 21;
++constexpr uint16_t kTallButtonGap      = 2;
+ 
+ constexpr int kMaxRows = 256;
+ Clay_String g_itemSlab[kMaxRows];
+@@ -58,6 +57,13 @@ constexpr const char * kActionJoin = "lobby.game_select.join";
+ constexpr const char * kActionSpectate = "lobby.game_select.spectate";
+ constexpr const char * kActionRowPrefix = "lobby.game_select.row";
+ 
++struct GameSelectTallLayout {
++	Uint16 listBoxWidth  = 0;
++	Uint16 listBoxHeight = 0;
++	Uint16 listWidth  = 0;
++	Uint16 listHeight = 0;
++};
++
+ Clay_String FromStd(const std::string & s) {
+ 	Clay_String cs;
+ 	cs.isStaticallyAllocated = false;
+@@ -70,14 +76,42 @@ Clay_String StaticId(const char * s) {
+ 	return Clay_String{ true, static_cast<int32_t>(strlen(s)), s };
+ }
+ 
++GameSelectTallLayout ResolveTallLayout(Uint16 panelWidth,
++                                       Uint16 panelHeight) {
++	GameSelectTallLayout out;
++	const int headingH = silencer::ui::primitives::TextLineHeight(TextSize::Heading);
++	const int titleWrapH = static_cast<int>(kTallHeadingPadTop) + headingH;
++	const int infoH = 5 * static_cast<int>(kTallInfoRowH);
++	const int footerH =
++		static_cast<int>(kTallFooterPadTop)
++		+ infoH
++		+ static_cast<int>(kTallFooterGap)
++		+ static_cast<int>(kTallButtonRowH)
++		+ static_cast<int>(kTallButtonGap)
++		+ static_cast<int>(kTallButtonRowH);
++	out.listBoxWidth = static_cast<Uint16>(std::max(
++		0,
++		static_cast<int>(panelWidth) - static_cast<int>(kTallListPadLeft) * 2));
++	out.listBoxHeight = static_cast<Uint16>(std::max(
++		0,
++		static_cast<int>(panelHeight) - titleWrapH
++		       - static_cast<int>(kTallListPadTop) - footerH));
++	out.listWidth = static_cast<Uint16>(std::max(
++		0,
++		static_cast<int>(out.listBoxWidth) - static_cast<int>(kTallListBorderPad) * 2));
++	out.listHeight = static_cast<Uint16>(std::max(
++		0,
++		static_cast<int>(out.listBoxHeight) - static_cast<int>(kTallListBorderPad) * 2));
++	return out;
++}
++
+ void BuildGameSelectInfoBlock(const GameSelectPanelState & state) {
+ 	// Info-block group: 5 fixed-height row slots stacked TOP_TO_BOTTOM.
+ 	// Each slot is height=12 so the layout doesn't reflow when text appears
+-	// or disappears. The first slot pads down from the list bottom.
++	// or disappears.
+ 	CLAY({ .id = CLAY_ID("GSelInfoBlock"),
+ 	       .layout = {
+-	           .padding = { kTallInfoPadLeft, 0,
+-	                        kTallInfoBlockPadTop, 0 },
++	           .padding = { kTallInfoPadLeft, 0, 0, 0 },
+ 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+ 	       } }) {
+ 		const struct { const std::string * txt; const char * id; } kInfoRows[5] = {
+@@ -103,6 +137,7 @@ void BuildGameSelectInfoBlock(const GameSelectPanelState & state) {
+ }
+ 
+ void BuildGameSelectList(const GameSelectPanelState & state,
++                         const GameSelectTallLayout & layout,
+                          silencer::ui::UiInteractionRegistry& interactions) {
+ 	const int rowCount = static_cast<int>(state.rows.size());
+ 	const int slotCount = (rowCount < kMaxRows) ? rowCount : kMaxRows;
+@@ -111,8 +146,8 @@ void BuildGameSelectList(const GameSelectPanelState & state,
+ 	}
+ 
+ 	ScrollListOpts listOpts;
+-	listOpts.width          = kListW;
+-	listOpts.height         = kListH;
++	listOpts.width          = layout.listWidth;
++	listOpts.height         = layout.listHeight;
+ 	listOpts.lineHeight     = kListLineH;
+ 	listOpts.highlightColor = 180;
+ 	listOpts.text.size      = TextSize::Body;
+@@ -121,64 +156,67 @@ void BuildGameSelectList(const GameSelectPanelState & state,
+ 	CLAY({ .id = CLAY_ID("GSelListWrap"),
+ 	       .layout = { .padding = { kTallListPadLeft, 0,
+ 	                                kTallListPadTop,  0 } } }) {
+-		ScrollList(CLAY_STRING("GSelList"),
+-		           g_itemSlab,
+-		           slotCount,
+-		           state.selectedIndex,
+-		           state.scrollPos,
+-		           listOpts,
+-		           ScrollListHandle{ /*hoveredOut*/ nullptr,
+-		                             /*actionId*/   kActionRowPrefix,
+-		                             /*interactions*/ &interactions });
+-	}
+-
+-	for(int i = 0; i < slotCount; ++i){
+-		silencer::ui::UiInteractable w;
+-		w.id = std::string(kActionRowPrefix) + "." + std::to_string(i);
+-		w.labelText = state.rows[i].name;
+-		w.kind  = silencer::ui::UiInteractableKind::ListRow;
+-		w.x = kListX; w.y = kListY + i * kListLineH;
+-		w.w = kListW; w.h = kListLineH;
+-		w.index = i;
+-		w.selected   = (state.selectedIndex == i);
+-		interactions.RegisterInteractable(w);
++		CLAY(Box(BoxVariants::Inset, {
++		         .id = CLAY_ID("GSelListBorder"),
++		         .layout = {
++		             .sizing = { CLAY_SIZING_FIXED(static_cast<float>(layout.listBoxWidth)),
++		                         CLAY_SIZING_FIXED(static_cast<float>(layout.listBoxHeight)) },
++		             .padding = { kTallListBorderPad, kTallListBorderPad,
++		                          kTallListBorderPad, kTallListBorderPad },
++		         },
++		     })) {
++			ScrollList(CLAY_STRING("GSelList"),
++			           g_itemSlab,
++			           slotCount,
++			           state.selectedIndex,
++			           state.scrollPos,
++			           listOpts,
++			           ScrollListHandle{ /*hoveredOut*/ nullptr,
++			                             /*actionId*/   kActionRowPrefix,
++			                             /*interactions*/ &interactions });
++		}
+ 	}
+ }
+ 
+ void BuildGameSelectActionButtons(const GameSelectPanelState & state,
+                                   silencer::ui::UiInteractionRegistry& interactions) {
+-	// Spectate button — fixed-height slot so the Join slot below sits at a
+-	// stable y regardless of visibility.
+-	CLAY({ .id = CLAY_ID("GSelBtnSpectateWrap"),
++	CLAY({ .id = CLAY_ID("GSelButtons"),
+ 	       .layout = {
+-	           .sizing = { CLAY_SIZING_GROW(0),
+-	                       CLAY_SIZING_FIXED(kTallButtonRowH) },
+-	           .padding = { kTallButtonPadLeft, 0,
+-	                        kTallSpectatePadTop, 0 },
++	           .childGap = kTallButtonGap,
++	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
+ 	       } }) {
+-		if(state.spectateVisible){
+-			Button(CLAY_STRING("GameSelectSpectateButton"), CLAY_STRING("Spectate"),
+-			           ButtonOpts{ .variant = ButtonVariant::Chrome,
+-			                       .size = ButtonSize::Compact },
+-			           ButtonHandle{ /*hoveredOut*/ nullptr,
+-			                             /*actionId*/   kActionSpectate,
+-			                             /*interactions*/ &interactions });
++		// Fixed-height slots keep the footer stable regardless of which
++		// actions are available for the current selection.
++		CLAY({ .id = CLAY_ID("GSelBtnSpectateWrap"),
++		       .layout = {
++		           .sizing = { CLAY_SIZING_GROW(0),
++		                       CLAY_SIZING_FIXED(kTallButtonRowH) },
++		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
++		       } }) {
++			if(state.spectateVisible){
++				Button(CLAY_STRING("GameSelectSpectateButton"), CLAY_STRING("Spectate"),
++				           ButtonOpts{ .variant = ButtonVariant::Chrome,
++				                       .size = ButtonSize::Compact },
++				           ButtonHandle{ /*hoveredOut*/ nullptr,
++				                             /*actionId*/   kActionSpectate,
++				                             /*interactions*/ &interactions });
++			}
+ 		}
+-	}
+ 
+-	// Join button.
+-	CLAY({ .id = CLAY_ID("GSelBtnJoinWrap"),
+-	       .layout = {
+-	           .padding = { kTallButtonPadLeft, 0,
+-	                        kTallJoinPadTop, 0 },
+-	       } }) {
+-		if(state.joinVisible){
+-			Button(CLAY_STRING("GameSelectJoinButton"), CLAY_STRING("Join Game"),
+-			           ButtonOpts{ .variant = ButtonVariant::Chrome,
+-			                       .size = ButtonSize::Compact },
+-			           ButtonHandle{ /*hoveredOut*/ nullptr,
+-			                             /*actionId*/   kActionJoin,
+-			                             /*interactions*/ &interactions });
++		CLAY({ .id = CLAY_ID("GSelBtnJoinWrap"),
++		       .layout = {
++		           .sizing = { CLAY_SIZING_GROW(0),
++		                       CLAY_SIZING_FIXED(kTallButtonRowH) },
++		           .childAlignment = { .x = CLAY_ALIGN_X_CENTER },
++		       } }) {
++			if(state.joinVisible){
++				Button(CLAY_STRING("GameSelectJoinButton"), CLAY_STRING("Join Game"),
++				           ButtonOpts{ .variant = ButtonVariant::Chrome,
++				                       .size = ButtonSize::Compact },
++				           ButtonHandle{ /*hoveredOut*/ nullptr,
++				                             /*actionId*/   kActionJoin,
++				                             /*interactions*/ &interactions });
++			}
+ 		}
+ 	}
+ }
+@@ -205,9 +243,13 @@ void BuildGameSelectUpperTree(GameSelectPanelState & state,
+ }
+ 
+ void BuildGameSelectTallTree(GameSelectPanelState & state,
++                             Uint16 panelWidth,
++                             Uint16 panelHeight,
+                              Resources & resources,
+                              silencer::ui::UiInteractionRegistry& interactions) {
+ 	(void)resources;
++	const game_select_panel_layout_detail::GameSelectTallLayout layout =
++		game_select_panel_layout_detail::ResolveTallLayout(panelWidth, panelHeight);
+ 
+ 	// "Active Games" heading at top of Tall box.
+ 	CLAY({ .id = CLAY_ID("GSelHeaderWrap"),
+@@ -217,9 +259,16 @@ void BuildGameSelectTallTree(GameSelectPanelState & state,
+ 		     { .size = TextSize::Heading });
+ 	}
+ 
+-	game_select_panel_layout_detail::BuildGameSelectList(state, interactions);
+-	game_select_panel_layout_detail::BuildGameSelectInfoBlock(state);
+-	game_select_panel_layout_detail::BuildGameSelectActionButtons(state, interactions);
++	game_select_panel_layout_detail::BuildGameSelectList(state, layout, interactions);
++	CLAY({ .id = CLAY_ID("GSelFooter"),
++	       .layout = {
++	           .padding = { 0, 0, game_select_panel_layout_detail::kTallFooterPadTop, 0 },
++	           .childGap = game_select_panel_layout_detail::kTallFooterGap,
++	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
++	       } }) {
++		game_select_panel_layout_detail::BuildGameSelectInfoBlock(state);
++		game_select_panel_layout_detail::BuildGameSelectActionButtons(state, interactions);
++	}
+ }
+ 
+ }  // namespace silencer::client_ui::lobby
+diff --git a/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp b/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp
+index 9d8df97..fd2b7d1 100644
+--- a/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp
++++ b/clients/silencer/src/client/ui/screens/lobby/lobby_main_area.cpp
+@@ -58,6 +58,7 @@ struct LobbyBodyMetrics {
+ 	int characterW = kCharacterW;
+ 	int upperH = kUpperH;
+ 	int rightTallW = kRightTallW;
++	int rightTallH = kLegacyBodyH;
+ 	int leftColumnW = kLegacyLeftColumnW;
+ 	int chatH = kLegacyBodyH - kUpperH - 10;
+ };
+@@ -82,6 +83,7 @@ LobbyBodyMetrics ResolveWideMetrics(int bodyW,
+ 		desiredRightTallW = 170;
+ 	}
+ 	out.rightTallW = desiredRightTallW;
++	out.rightTallH = std::max(0, bodyH);
+ 	out.leftColumnW = std::max(0, bodyW - out.rightTallW - regionGap);
+ 	out.chatH = std::max(0, bodyH - out.upperH - regionGap);
+ 
+@@ -116,17 +118,29 @@ void BuildRightUpperContents(LobbyMainAreaPanels & panels,
+ void BuildRightTallContents(LobbyMainAreaPanels & panels,
+                             ScreenContext & ctx,
+                             LobbyScreen & owner,
++                            const LobbyBodyMetrics & metrics,
+                             silencer::ui::UiInteractionRegistry& interactions) {
+ 	World & world = ctx.world;
+ 	Resources & resources = world.resources;
+ 	if(panels.gameCreateActive){
+-		BuildGameCreateTallTree(panels.gameCreate, ctx, resources, interactions);
++		BuildGameCreateTallTree(
++			panels.gameCreate,
++			ctx,
++			static_cast<Uint16>(std::max(0, metrics.rightTallW)),
++			static_cast<Uint16>(std::max(0, metrics.rightTallH)),
++			resources,
++			interactions);
+ 	}else if(panels.gameJoinActive){
+ 		BuildGameJoinTallTree(panels.gameJoin, resources, interactions);
+ 	}else if(panels.gameTechActive){
+ 		BuildGameTechTallTree(panels.gameTech, world, resources, owner, interactions);
+ 	}else{
+-		BuildGameSelectTallTree(panels.gameSelect, resources, interactions);
++		BuildGameSelectTallTree(
++			panels.gameSelect,
++			static_cast<Uint16>(std::max(0, metrics.rightTallW)),
++			static_cast<Uint16>(std::max(0, metrics.rightTallH)),
++			resources,
++			interactions);
+ 	}
+ }
+ 
+@@ -209,7 +223,7 @@ void BuildWideBody(LobbyMainAreaPanels & panels,
+ 		         .backgroundColor = { kPanelFillColor, 0, 0, kPanelFillOpacity },
+ 		         .clip = { .horizontal = true, .vertical = true },
+ 	     })) {
+-		BuildRightTallContents(panels, ctx, owner, interactions);
++		BuildRightTallContents(panels, ctx, owner, metrics, interactions);
+ 	}
+ }
+ 
+diff --git a/clients/silencer/src/ui/primitives/box.h b/clients/silencer/src/ui/primitives/box.h
+index 851c902..aaf6898 100644
+--- a/clients/silencer/src/ui/primitives/box.h
++++ b/clients/silencer/src/ui/primitives/box.h
+@@ -106,6 +106,13 @@ constexpr BoxStrokeStyle Plain{
+ 	0, 0, 0, 0,
+ };
+ 
++// Single 1-px stroke at idx 220, no halo. Matches the lobby's inner
++// form/list outlines such as Game Options and Select Map.
++constexpr BoxStrokeStyle Inset{
++	/*strokeColor=*/220, /*strokeWidth=*/1,
++	0, 0, 0, 0,
++};
++
+ // No stroke at all. Use when only fill or layout is wanted from Box.
+ constexpr BoxStrokeStyle None{};
+ 
