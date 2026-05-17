@@ -4,7 +4,30 @@
  * C4: Live preview canvas at game speed (60fps rAF loop)
  */
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { API, apiFetch, getSpriteFrames, type FrameMeta, type ActorDef } from '../../../lib/api';
+import { apiFetch, getSpriteFrames, type FrameMeta, type ActorDef } from '../../../lib/api';
+import { decodeAdpcmWav } from '../../../lib/adpcm';
+
+const audioCtxRef = { current: null as AudioContext | null };
+function getAudioCtx(): AudioContext {
+  if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
+  return audioCtxRef.current;
+}
+
+async function playSound(name: string, volume: number) {
+  const r = await fetch(`/api/sounds/${encodeURIComponent(name)}/play`);
+  if (!r.ok) return;
+  const buf = await r.arrayBuffer();
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') await ctx.resume();
+  const decoded = await decodeAdpcmWav(buf, ctx);
+  const gain = ctx.createGain();
+  gain.gain.value = Math.min(1, volume / 128);
+  const src = ctx.createBufferSource();
+  src.buffer = decoded;
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  src.start(0);
+}
 
 function useSounds(): string[] {
   const [sounds, setSounds] = useState<string[]>([]);
@@ -191,7 +214,7 @@ function SoundPicker({ value, volume, sounds, onChange }: {
           type="button"
           title="Preview sound"
           className="text-game-textDim hover:text-game-primary text-xs px-1"
-          onClick={() => { const a = new Audio(`${API}/sounds/${value}/play`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
+          onClick={() => playSound(value, volume ?? 128)}
         >▶</button>
       )}
       {open && (
@@ -221,7 +244,7 @@ function SoundPicker({ value, volume, sounds, onChange }: {
                   type="button"
                   title="Preview"
                   className="px-2 text-game-textDim hover:text-game-primary text-xs"
-                  onClick={() => { const a = new Audio(`${API}/sounds/${s}/play`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
+                  onClick={() => playSound(s, volume ?? 128)}
                 >▶</button>
               </div>
             ))}

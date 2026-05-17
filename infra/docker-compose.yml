@@ -113,6 +113,7 @@ services:
       - admin-api
     environment:
       PORT: "24000"
+      ADMIN_API_URL: "http://admin-api:24080"
     restart: unless-stopped
 
 volumes:
