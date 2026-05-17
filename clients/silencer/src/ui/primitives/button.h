@@ -31,6 +31,7 @@ struct ButtonOpts {
 	ButtonSize size = ButtonSize::Md;
 	bool disabled = false;
 	bool selected = false;
+	bool alignLeft = false;
 	TextEffect textEffect = TextEffect::Default();
 	int minWidth = 0;
 	int maxWidth = 0;

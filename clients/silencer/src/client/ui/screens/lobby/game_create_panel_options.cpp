@@ -235,7 +235,7 @@ void BuildOptionRow(GameCreatePanelState & state,
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(valueColumnWidth)),
 		                       CLAY_SIZING_FIXED(kFormRowH) },
-		           .childAlignment = { .x = CLAY_ALIGN_X_RIGHT,
+		           .childAlignment = { .x = CLAY_ALIGN_X_LEFT,
 		                               .y = CLAY_ALIGN_Y_CENTER },
 		       } }) {
 			if(i == 0){
@@ -243,7 +243,8 @@ void BuildOptionRow(GameCreatePanelState & state,
 				       FromCStr(SecurityLabel(state.securityIndex)),
 				       ButtonOpts{ .variant = ButtonVariant::Text,
 				                   .size = ButtonSize::Auto,
-				                   .minWidth = std::min<int>(valueColumnWidth, 60),
+				                   .alignLeft = true,
+				                   .minWidth = valueColumnWidth,
 				                   .paddingY = 2 },
 				       ButtonHandle{ nullptr, kActionSecurity, &interactions });
 			}else if(i == 5){
@@ -252,7 +253,8 @@ void BuildOptionRow(GameCreatePanelState & state,
 				       ButtonOpts{ .variant = ButtonVariant::Text,
 				                   .size = ButtonSize::Auto,
 				                   .selected = state.spectatable,
-				                   .minWidth = std::min<int>(valueColumnWidth, 30),
+				                   .alignLeft = true,
+				                   .minWidth = valueColumnWidth,
 				                   .paddingY = 2 },
 				       ButtonHandle{ nullptr, kActionSpectatable, &interactions });
 			}else{

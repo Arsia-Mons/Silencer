@@ -463,6 +463,9 @@ void Button(Clay_String id,
 	const float boxW = static_cast<float>(width);
 	const float boxH = static_cast<float>(height);
 	const Clay_ElementId clayId = CLAY_SID(stableId);
+	const Clay_LayoutAlignmentX alignX = opts.alignLeft
+		? CLAY_ALIGN_X_LEFT
+		: CLAY_ALIGN_X_CENTER;
 
 	if(resolved.hasSprite){
 		void * payload = resolved.nineSlice
@@ -480,7 +483,7 @@ void Button(Clay_String id,
 		                        static_cast<uint16_t>(resolved.nineSlice ? paddingY : resolved.yOffset),
 		                        static_cast<uint16_t>(paddingY) },
 		           .childGap = 0,
-		           .childAlignment = { CLAY_ALIGN_X_CENTER,
+		           .childAlignment = { alignX,
 		                               resolved.nineSlice ? CLAY_ALIGN_Y_CENTER
 		                                                  : CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
@@ -520,7 +523,7 @@ void Button(Clay_String id,
 	                        static_cast<uint16_t>(paddingY + resolved.visualTextPaddingTop),
 	                        static_cast<uint16_t>(paddingY) },
 	           .childGap = 0,
-	           .childAlignment = { CLAY_ALIGN_X_CENTER,
+	           .childAlignment = { alignX,
 	                               CLAY_ALIGN_Y_CENTER },
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
