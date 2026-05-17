@@ -4,7 +4,7 @@
  * C4: Live preview canvas at game speed (60fps rAF loop)
  */
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { apiFetch, getSpriteFrames, type FrameMeta, type ActorDef } from '../../../lib/api';
+import { API, apiFetch, getSpriteFrames, type FrameMeta, type ActorDef } from '../../../lib/api';
 
 function useSounds(): string[] {
   const [sounds, setSounds] = useState<string[]>([]);
@@ -191,7 +191,7 @@ function SoundPicker({ value, volume, sounds, onChange }: {
           type="button"
           title="Preview sound"
           className="text-game-textDim hover:text-game-primary text-xs px-1"
-          onClick={() => { const a = new Audio(`/api/sounds/${value}/play`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
+          onClick={() => { const a = new Audio(`${API}/sounds/${value}/play`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
         >▶</button>
       )}
       {open && (
@@ -221,7 +221,7 @@ function SoundPicker({ value, volume, sounds, onChange }: {
                   type="button"
                   title="Preview"
                   className="px-2 text-game-textDim hover:text-game-primary text-xs"
-                  onClick={() => { const a = new Audio(`/api/sounds/${s}/play`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
+                  onClick={() => { const a = new Audio(`${API}/sounds/${s}/play`); a.volume = Math.min(1, (volume ?? 128) / 128); a.play().catch(() => {}); }}
                 >▶</button>
               </div>
             ))}
