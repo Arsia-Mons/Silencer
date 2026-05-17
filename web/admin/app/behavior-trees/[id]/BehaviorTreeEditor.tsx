@@ -326,7 +326,7 @@ const ACTION_DESC: Record<string, string> = {
   Chase:          'Walk horizontally toward last known target (patrol guards only)',
   Patrol:         'Walk patrol route; stop to look around periodically',
   SearchAndReturn:'Search last known position then return to spawn',
-  Stand:          'Stand in place (idle)',
+  Stand:          'Stand in place for "duration" ticks (default 60). Returns Running then Success',
   // Guard — attack
   SpawnProjectile: 'Fire a projectile in direction 0–5 (same directions as Look0–5)',
   Raycast: 'Cast a horizontal ray in facing direction; write hit bool to result_key',
@@ -344,7 +344,6 @@ const ACTION_DESC: Record<string, string> = {
   EmitDeathSound:  'Play the magistrate death sound globally (once). Reads "sound" prop; falls back to GAS soundDeath',
   Walk:            'Walk in current facing direction; auto-turns at platform edges (Civilian pattern). Always Running',
   TurnAround:      'Flip facing direction immediately. Always Success',
-  Stand:           'Stand in place for "duration" ticks (default 60). Returns Running then Success',
   SpawnDeathGuards:'Spawn death guards/robots at death position (authority only, idempotent). Always Success',
   DeathFade:       'Fade out over "duration" ticks then set state=DEAD. Running while playing, Success when done',
   PlayAnim: 'Play a sprite bank animation (bank, frames, loop)',
