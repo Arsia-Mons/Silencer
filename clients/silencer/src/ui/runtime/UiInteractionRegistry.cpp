@@ -143,11 +143,13 @@ bool UiInteractableIsInteractive(const UiInteractable& widget) {
 
 void UiInteractionRegistry::BeginFrame() {
 	elements_.clear();
+	registeredElements_.clear();
 	interactables_.clear();
 }
 
 void UiInteractionRegistry::Register(UiElementSnapshot metadata) {
-	elements_.push_back(std::move(metadata));
+	registeredElements_.push_back(std::move(metadata));
+	RefreshElementState();
 }
 
 void UiInteractionRegistry::RegisterInteractable(UiInteractable widget) {
@@ -503,6 +505,17 @@ std::vector<UiAction> UiInteractionRegistry::DrainActions() {
 }
 
 void UiInteractionRegistry::ResolveClayBoundsFromClay() {
+	for(auto& element : registeredElements_){
+		if(!element.hasClayId) continue;
+		Clay_ElementData data = Clay_GetElementData(element.clayId);
+		if(!data.found) continue;
+		element.bounds = UiRect{
+			data.boundingBox.x,
+			data.boundingBox.y,
+			data.boundingBox.width,
+			data.boundingBox.height,
+		};
+	}
 	for(auto& widget : interactables_){
 		if(!widget.hasClayId) continue;
 		Clay_ElementData data = Clay_GetElementData(widget.clayId);
@@ -516,7 +529,7 @@ void UiInteractionRegistry::ResolveClayBoundsFromClay() {
 }
 
 void UiInteractionRegistry::RefreshElementState() {
-	elements_.clear();
+	elements_ = registeredElements_;
 	for(const auto& widget : interactables_){
 		elements_.push_back(registry_detail::MetadataFromWidget(widget, MatchesFocus(widget)));
 	}

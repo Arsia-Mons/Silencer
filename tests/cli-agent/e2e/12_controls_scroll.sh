@@ -23,11 +23,24 @@ cli --port "$PORT" inspect | bun -e '
 const text = await new Response(Bun.stdin.stream()).text();
 const response = JSON.parse(text);
 const widgets = response.widgets ?? [];
-for (const label of ["Preset", "Scroll Down", "Cancel"]) {
-  if (!widgets.some((w) => w.source === "clay" && w.label === label)) {
-    console.error(`missing Clay widget: ${label}`);
+for (const id of ["options_controls.preset", "options_controls.cancel"]) {
+  if (!widgets.some((w) => w.source === "clay" && w.id === id)) {
+    console.error(`missing Clay widget: ${id}`);
     process.exit(1);
   }
+}
+const elements = response.elements ?? [];
+const list = elements.find((e) =>
+  e.source === "clay" &&
+  e.kind === "container" &&
+  e.label === "Controls List" &&
+  e.value === "scroll" &&
+  e.w > 0 &&
+  e.h > 0
+);
+if (!list) {
+  console.error("missing controls list scroll element");
+  process.exit(1);
 }
 '
 
@@ -60,7 +73,7 @@ if (!bindings.includes("KEY:X")) {
 before="$OUT_DIR/controls-before.png"
 after="$OUT_DIR/controls-after.png"
 cli --port "$PORT" screenshot --out "$before" >/dev/null
-cli --port "$PORT" scroll --label "Scroll Down" --amount 3 >/dev/null
+cli --port "$PORT" scroll --label "Controls List" --amount 3 >/dev/null
 cli --port "$PORT" wait_frames --n 2 >/dev/null
 cli --port "$PORT" screenshot --out "$after" >/dev/null
 
@@ -72,6 +85,33 @@ if (!Number.isFinite(diff) || diff <= 0.01) {
   process.exit(1);
 }
 ' "$diff"
+
+cli --port "$PORT" resize --w 1600 --h 1200 >/dev/null
+cli --port "$PORT" wait_frames --n 3 >/dev/null
+cli --port "$PORT" inspect | bun -e '
+const text = await new Response(Bun.stdin.stream()).text();
+const response = JSON.parse(text);
+const widgets = response.widgets ?? [];
+const rows = widgets.filter((w) =>
+  w.source === "clay" &&
+  typeof w.id === "string" &&
+  w.id.startsWith("options_controls.primary.")
+).length;
+if (rows <= 5) {
+  console.error(`expected large viewport to show more than 5 rows, got ${rows}`);
+  process.exit(1);
+}
+const list = (response.elements ?? []).find((e) =>
+  e.source === "clay" &&
+  e.kind === "container" &&
+  e.label === "Controls List" &&
+  e.value === "scroll"
+);
+if (!list || list.h <= 254) {
+  console.error(`expected controls list viewport to grow, got ${list?.h}`);
+  process.exit(1);
+}
+'
 
 cli --port "$PORT" click --label CANCEL >/dev/null
 cli --port "$PORT" wait_for_state --state OPTIONS --timeout-ms 5000 >/dev/null

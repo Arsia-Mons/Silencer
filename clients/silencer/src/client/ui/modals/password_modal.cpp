@@ -12,8 +12,6 @@
 #include "primitives/bank_text.h"
 #include "primitives/text_input.h"
 
-#include <SDL3/SDL.h>
-
 #include <cstring>
 
 namespace password_modal_detail
@@ -92,7 +90,7 @@ void PasswordModal::BuildUi(ScreenContext & ctx, Surface & dst, float frametime,
 
 
 	bool focused = interactions.IsTextInputFocused(password_modal_detail::kPasswordUid);
-	bool blink = ((SDL_GetTicks() / 250) % 2) == 0;
+	bool blink = (ctx.renderer.GetHudAnimationPhase() % 32) < 16;
 
 	CLAY({ .id = CLAY_ID("PasswordModalRoot"),
 	       .layout = {

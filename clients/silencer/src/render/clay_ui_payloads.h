@@ -13,7 +13,9 @@ namespace silencer::clay_bridge {
 // fill the box, preserving aspect, cropping overflow — CSS background-size:
 // cover, for full-bleed backgrounds); set = contain (scale to fit inside the
 // box, preserving aspect, no crop — for discrete graphics like the logo).
+// Bit 25 selects stretch: scale x/y independently to fill the element box.
 constexpr std::uintptr_t kImageContainBit = static_cast<std::uintptr_t>(1) << 24;
+constexpr std::uintptr_t kImageStretchBit = static_cast<std::uintptr_t>(1) << 25;
 
 inline void * PackImage(Uint8 bank, Uint16 index) {
 	std::uintptr_t v = (static_cast<std::uintptr_t>(bank) << 16) |
@@ -24,6 +26,12 @@ inline void * PackImage(Uint8 bank, Uint16 index) {
 inline void * PackImageContain(Uint8 bank, Uint16 index) {
 	std::uintptr_t v = (static_cast<std::uintptr_t>(bank) << 16) |
 	                   static_cast<std::uintptr_t>(index) | kImageContainBit;
+	return reinterpret_cast<void *>(v);
+}
+
+inline void * PackImageStretch(Uint8 bank, Uint16 index) {
+	std::uintptr_t v = (static_cast<std::uintptr_t>(bank) << 16) |
+	                   static_cast<std::uintptr_t>(index) | kImageStretchBit;
 	return reinterpret_cast<void *>(v);
 }
 

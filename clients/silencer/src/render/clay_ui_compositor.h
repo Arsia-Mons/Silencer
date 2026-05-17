@@ -17,9 +17,9 @@
 //           textConfig.fontSize → cell width (monospaced bank fonts).
 //           textColor.r        → palette index for the EffectColor tint.
 //           userData (optional) → BankTextDrawData* with brightness / colorRamp.
-//   • IMAGE: imageConfig.imageData = PackImage(bank, index). The bridge looks
-//     up world.resources.spritebank[bank][index] and blits it at the
-//     bbox top-left using the sprite's natural width/height.
+//   • IMAGE: imageConfig.imageData = PackImage*(). The bridge looks up
+//     world.resources.spritebank[bank][index] and fits it into the bbox using
+//     the packed cover / contain / stretch mode.
 //   • SCISSOR_START/END: maintained as a clip-rect stack. Subsequent draws
 //     are intersected with the top of the stack before being submitted.
 //   • CUSTOM: customData = ClayCustomData* with a kind enum the bridge

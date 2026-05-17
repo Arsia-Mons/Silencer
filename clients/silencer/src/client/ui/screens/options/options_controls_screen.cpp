@@ -23,14 +23,22 @@
 namespace options_controls_screen_detail {
 
 constexpr int REBIND_TIMEOUT_TICKS = 72;
-constexpr uint16_t kPanelW = 540;
-constexpr uint16_t kPanelPadX = 20;
-constexpr uint16_t kPanelPadY = 24;
+constexpr int kLegacyViewportW = 640;
+constexpr int kLegacyViewportH = 480;
+constexpr int kFrameMarginLeft = 5;
+constexpr int kFrameMarginRight = 7;
+constexpr int kFrameMarginTop = 6;
+constexpr int kFrameMarginBottom = 20;
+constexpr int kTitleTextY = 14;
+constexpr int kActionRowH = 33;
+constexpr int kActionTopY = 405;
+constexpr uint16_t kPanelMinW = 560;
+constexpr uint16_t kPanelMinH = 420;
+constexpr uint16_t kPanelPadX = 48;
+constexpr uint16_t kPanelPadTop = 70;
 constexpr const char * kActionPreset = "options_controls.preset";
 constexpr const char * kActionSave = "options_controls.save";
 constexpr const char * kActionCancel = "options_controls.cancel";
-constexpr const char * kActionScrollUp = "options_controls.scroll_up";
-constexpr const char * kActionScrollDown = "options_controls.scroll_down";
 constexpr const char * kActionPrimaryPrefix = "options_controls.primary.";
 constexpr const char * kActionSecondaryPrefix = "options_controls.secondary.";
 constexpr const char * kActionOperatorPrefix = "options_controls.operator.";
@@ -49,10 +57,19 @@ int SuffixInt(const std::string & value, const char * prefix) {
 	return std::atoi(value.c_str() + std::strlen(prefix));
 }
 
+int ScaleLegacyPx(int value, int current, int legacy) {
+	return std::max(0, (value * current + legacy / 2) / legacy);
+}
+
+int ScaleLegacyButtonTop(int top, int height, int current, int legacy) {
+	const int centerTwice = top * 2 + height;
+	return std::max(0, (centerTwice * current - height * legacy + legacy) / (legacy * 2));
+}
+
 }  // namespace options_controls_screen_detail
 
 int OptionsControlsScreen::MaxScroll() const {
-	int max = (int)Action::Count - silencer::client_ui::options::kKeybindListVisibleRows;
+	int max = (int)Action::Count - visibleRowCapacity_;
 	return max < 0 ? 0 : max;
 }
 
@@ -142,6 +159,15 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 		cancelClicked = true;
 		return true;
 	}
+	if(action.kind == silencer::ui::UiActionKind::Scroll){
+		if(action.id.empty() || action.id == kKeybindListScrollId){
+			int amount = action.amount;
+			if(action.value == "wheel") amount = -amount;
+			scrollDelta += amount;
+			return true;
+		}
+		return false;
+	}
 	if(action.kind != silencer::ui::UiActionKind::Activate) return false;
 	if(action.id == options_controls_screen_detail::kActionPreset){
 		presetClicked = true;
@@ -153,14 +179,6 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 	}
 	if(action.id == options_controls_screen_detail::kActionCancel){
 		cancelClicked = true;
-		return true;
-	}
-	if(action.id == options_controls_screen_detail::kActionScrollUp){
-		scrollDelta--;
-		return true;
-	}
-	if(action.id == options_controls_screen_detail::kActionScrollDown){
-		scrollDelta++;
 		return true;
 	}
 	int row = options_controls_screen_detail::SuffixInt(action.id, options_controls_screen_detail::kActionPrimaryPrefix);
@@ -183,49 +201,97 @@ bool OptionsControlsScreen::HandleUiIntent(ScreenContext & ctx, const silencer::
 
 void OptionsControlsScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frametime, silencer::ui::UiInteractionRegistry& interactions) {
 	(void)frametime;
-	(void)dst;
 	using namespace silencer::clay_bridge;
 	using namespace silencer::client_ui::options;
 
-	KeybindListView view;
-	view.presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
-	                : !ctx.keymap.name.empty() ? ctx.keymap.name
-	                : std::string(Config::GetInstance().active_keybind_profile);
-	for(int i = 0; i < kKeybindListVisibleRows; i++){
+	const int uiScale = std::max(1, UiScale());
+	const int layoutWidth = dst.w / uiScale;
+	const int layoutHeight = dst.h / uiScale;
+	const int framePadLeft = options_controls_screen_detail::ScaleLegacyPx(
+		options_controls_screen_detail::kFrameMarginLeft,
+		layoutWidth,
+		options_controls_screen_detail::kLegacyViewportW);
+	const int framePadRight = options_controls_screen_detail::ScaleLegacyPx(
+		options_controls_screen_detail::kFrameMarginRight,
+		layoutWidth,
+		options_controls_screen_detail::kLegacyViewportW);
+	const int framePadTop = options_controls_screen_detail::ScaleLegacyPx(
+		options_controls_screen_detail::kFrameMarginTop,
+		layoutHeight,
+		options_controls_screen_detail::kLegacyViewportH);
+	const int framePadBottom = options_controls_screen_detail::ScaleLegacyPx(
+		options_controls_screen_detail::kFrameMarginBottom,
+		layoutHeight,
+		options_controls_screen_detail::kLegacyViewportH);
+	const int panelHeight = std::max<int>(
+		options_controls_screen_detail::kPanelMinH,
+		layoutHeight - framePadTop - framePadBottom);
+	const int panelBottom = framePadTop + panelHeight;
+	const int actionTop = options_controls_screen_detail::ScaleLegacyButtonTop(
+		options_controls_screen_detail::kActionTopY,
+		options_controls_screen_detail::kActionRowH,
+		layoutHeight,
+		options_controls_screen_detail::kLegacyViewportH);
+	const int panelPadBottom = std::max(
+		0,
+		panelBottom - actionTop - options_controls_screen_detail::kActionRowH);
+	const int contentHeight = panelHeight
+	                        - options_controls_screen_detail::kPanelPadTop
+	                        - panelPadBottom;
+	visibleRowCapacity_ = std::min<int>(
+		(int)Action::Count,
+		KeybindListVisibleRowsForContentHeight(contentHeight));
+	scrollPosition = std::max(0, std::min(MaxScroll(), scrollPosition));
+
+	keybindListView_ = KeybindListView{};
+	keybindListView_.presetText = !ctx.keymap.label.empty() ? ctx.keymap.label
+	                            : !ctx.keymap.name.empty() ? ctx.keymap.name
+	                            : std::string(Config::GetInstance().active_keybind_profile);
+	keybindListView_.titleOffsetY = static_cast<float>(
+		std::max(0,
+		         options_controls_screen_detail::ScaleLegacyPx(
+		             options_controls_screen_detail::kTitleTextY,
+		             layoutHeight,
+		             options_controls_screen_detail::kLegacyViewportH)
+		         - framePadTop));
+	keybindListView_.rows.resize(static_cast<size_t>(visibleRowCapacity_));
+	for(int i = 0; i < visibleRowCapacity_; i++){
 		int row = scrollPosition + i;
 		if(row >= (int)Action::Count) break;
 		Action action = ACTION_TABLE[row].action;
 		LegacyBindingView v = ViewLegacy(ctx.keymap, action);
-		KeybindRowView & out = view.rows[i];
+		KeybindRowView & out = keybindListView_.rows[i];
 		out.actionLabel = std::string(GetActionInfo(action).label) + ":";
 		out.primaryLabel = GetBindingLabel(ctx, action, 0);
 		out.secondaryLabel = GetBindingLabel(ctx, action, 1);
 		out.operatorLabel = v.and_ ? "AND" : "OR";
 		out.rebindingPrimary = (rebindRow == row && rebindSlot == 0);
 		out.rebindingSecondary = (rebindRow == row && rebindSlot == 1);
-		view.visibleRowCount = i + 1;
+		keybindListView_.visibleRowCount = i + 1;
 	}
 
 	CLAY({ .id = CLAY_ID("OptionsControlsRoot"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_GROW(0),
 	                       CLAY_SIZING_GROW(0) },
-	           .padding = { 0, 0, 34, 0 },
-	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+	           .padding = { static_cast<uint16_t>(framePadLeft),
+	                        static_cast<uint16_t>(framePadRight),
+	                        static_cast<uint16_t>(framePadTop),
+	                        static_cast<uint16_t>(framePadBottom) },
+	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_CENTER },
 	       },
-	       .image = { .imageData = PackImage(6, 0) } }) {
+	       .image = { .imageData = PackImageStretch(6, 0) } }) {
 		CLAY({ .id = CLAY_ID("OptionsControlsPanel"),
 		       .layout = {
-		           .sizing = { CLAY_SIZING_FIXED(options_controls_screen_detail::kPanelW),
-		                       CLAY_SIZING_FIT(0) },
+		           .sizing = { CLAY_SIZING_GROW(options_controls_screen_detail::kPanelMinW),
+		                       CLAY_SIZING_GROW(options_controls_screen_detail::kPanelMinH) },
 		           .padding = { options_controls_screen_detail::kPanelPadX, options_controls_screen_detail::kPanelPadX,
-		                        options_controls_screen_detail::kPanelPadY, options_controls_screen_detail::kPanelPadY },
-		           .childGap = 12,
+		                        options_controls_screen_detail::kPanelPadTop, static_cast<uint16_t>(panelPadBottom) },
 		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
-		       .image = { .imageData = PackImage(7, 7) } }) {
-			BuildKeybindListBody(view, interactions);
+		       .image = { .imageData = PackImageStretch(7, 7) } }) {
+			BuildKeybindListBody(keybindListView_, interactions);
 		}
 	}
 }

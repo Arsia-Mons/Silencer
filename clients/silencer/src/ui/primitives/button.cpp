@@ -70,6 +70,7 @@ struct ResolvedButton {
 	int textHeight = 11;
 	int yOffset = 0;
 	int xNudge = 0;
+	int visualTextPaddingTop = 0;
 	int defaultPaddingX = 0;
 	int defaultPaddingY = 0;
 };
@@ -170,8 +171,12 @@ ResolvedButton ResolveButton(const ButtonOpts& opts) {
 			if(opts.size == ButtonSize::Compact){
 				out.fixedWidth = 52;
 				out.fixedHeight = 21;
-				out.yOffset = 8;
 				out.xNudge = 1;
+				// Bank 133's visible ink sits high inside its measured
+				// line box. Compact text buttons use baked 21px wells, so
+				// bias the Clay content area slightly down here instead of
+				// nudging each screen's button row.
+				out.visualTextPaddingTop = 2;
 			}
 			break;
 		case ButtonVariant::Ghost:
@@ -525,12 +530,11 @@ void Button(Clay_String id,
 	           .sizing = { CLAY_SIZING_FIXED(boxW), CLAY_SIZING_FIXED(boxH) },
 	           .padding = { static_cast<uint16_t>(paddingX + std::max(0, resolved.xNudge)),
 	                        static_cast<uint16_t>(paddingX),
-	                        static_cast<uint16_t>(resolved.fixedHeight > 0 ? resolved.yOffset : paddingY),
+	                        static_cast<uint16_t>(paddingY + resolved.visualTextPaddingTop),
 	                        static_cast<uint16_t>(paddingY) },
 	           .childGap = 0,
 	           .childAlignment = { CLAY_ALIGN_X_CENTER,
-	                               resolved.fixedHeight > 0 ? CLAY_ALIGN_Y_TOP
-	                                                        : CLAY_ALIGN_Y_CENTER },
+	                               CLAY_ALIGN_Y_CENTER },
 	           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 	       } }) {
 		bool hovered = ::Clay_Hovered() && !opts.disabled;

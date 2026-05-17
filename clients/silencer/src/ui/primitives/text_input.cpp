@@ -3,6 +3,7 @@
 #include "clay_ui_payloads.h"
 #include "runtime/UiInteractionRegistry.h"
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 
@@ -46,6 +47,19 @@ char * AllocMaskBuffer() {
 
 std::string ToStd(Clay_String text) {
 	return std::string(text.chars ? text.chars : "", static_cast<size_t>(text.length));
+}
+
+uint16_t TextHeightForBank(Uint8 bank) {
+	switch(bank){
+		case 135:
+		case 136:
+			return 19;
+		case 134:
+			return 15;
+		case 133:
+		default:
+			return 11;
+	}
 }
 
 void RegisterTextInputWidget(Clay_String clayId,
@@ -98,7 +112,8 @@ void TextInput(Clay_String id,
 	Uint8 brightness = opts.inactive ? static_cast<Uint8>(64) : opts.brightness;
 	bool  showCaret  = !opts.inactive && opts.showCaret;
 	Uint8 caretHeight =
-		static_cast<Uint8>(static_cast<int>(opts.heightPx) * 4 / 5);  // h * 0.8
+		static_cast<Uint8>(std::min(static_cast<int>(opts.heightPx) * 4 / 5,
+		                            static_cast<int>(TextHeightForBank(opts.fontBank))));
 
 	auto * payload = AllocPayload();
 	if(payload){
@@ -117,14 +132,26 @@ void TextInput(Clay_String id,
 
 	const float w = static_cast<float>(opts.widthPx);
 	const float h = static_cast<float>(opts.heightPx);
+	const uint16_t contentInsetX = std::min(opts.contentInsetX, opts.widthPx);
 	CLAY({ .id = CLAY_SID(id),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIXED(w), CLAY_SIZING_FIXED(h) },
-	       },
-	       .custom = { .customData = ccd } }) {
+	           .padding = { contentInsetX, 0, 0, 0 },
+	           .childGap = 0,
+	           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
+	           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+	       } }) {
 		bool hovered = ::Clay_Hovered();
 		if(handle.hoveredOut) *handle.hoveredOut = hovered;
 		RegisterTextInputWidget(id, src, opts, handle);
+		const float textW = static_cast<float>(
+			std::max(1, static_cast<int>(opts.widthPx) - static_cast<int>(contentInsetX)));
+		const float textH = static_cast<float>(TextHeightForBank(opts.fontBank));
+		CLAY({ .id = CLAY_SIDI(id, 1),
+		       .layout = {
+		           .sizing = { CLAY_SIZING_FIXED(textW), CLAY_SIZING_FIXED(textH) },
+		       },
+		       .custom = { .customData = ccd } }) {}
 	}
 }
 

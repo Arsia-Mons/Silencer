@@ -3,9 +3,10 @@
 
 // Screen-agnostic Clay primitive for paletted bank-font text input fields.
 //
-// Pixel-identical visual to the legacy `TextInput` widget: DrawText at the
-// bbox top-left + an optional 1-px vertical caret bar at
-// (textLen * fontWidth, -1) of the bbox.
+// The outer Clay element owns the clickable field bounds. The rendered text is
+// an inner custom element, horizontally inset by `contentInsetX` and vertically
+// centered for the selected font bank. The caret is positioned relative to that
+// rendered text origin.
 //
 // The primitive owns no state and references no lobby/world/Config:
 //
@@ -49,6 +50,7 @@ struct TextInputOpts {
 	Uint8  brightness  = 128;   // legacy default.
 	Uint8  caretColor  = 140;   // legacy default.
 	bool   showCaret   = false; // caller pre-resolves blink AND focus.
+	Uint16 contentInsetX = 0;   // left inset from clickable field to text.
 };
 
 struct TextInputHandle {

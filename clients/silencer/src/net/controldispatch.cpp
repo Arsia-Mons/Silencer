@@ -748,12 +748,44 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			}
 			widgets.push_back(std::move(w));
 		}
-		if(widgets.empty()){
+		nlohmann::json elements = nlohmann::json::array();
+		for(const auto & element : game.UiInteractions().Elements()){
+			if(!element.id.empty() &&
+			   game.UiInteractions().FindInteractableById(element.id)){
+				continue;
+			}
+			nlohmann::json e;
+			e["source"] = "clay";
+			if(!element.id.empty()) e["id"] = element.id;
+			if(!element.label.empty()) e["label"] = element.label;
+			if(!element.value.empty()) e["value"] = element.value;
+			e["x"] = element.bounds.x;
+			e["y"] = element.bounds.y;
+			e["w"] = element.bounds.width;
+			e["h"] = element.bounds.height;
+			e["enabled"] = element.enabled;
+			e["focused"] = element.focused;
+			e["selected"] = element.selected;
+			using EK = silencer::ui::UiElementKind;
+			switch(element.kind){
+				case EK::Container: e["kind"] = "container"; break;
+				case EK::Button: e["kind"] = "button"; break;
+				case EK::Text: e["kind"] = "text"; break;
+				case EK::TextField: e["kind"] = "textfield"; break;
+				case EK::ListItem: e["kind"] = "listitem"; break;
+				case EK::Tab: e["kind"] = "tab"; break;
+				case EK::Slider: e["kind"] = "slider"; break;
+				case EK::Progress: e["kind"] = "progress"; break;
+			}
+			elements.push_back(std::move(e));
+		}
+		if(widgets.empty() && elements.empty()){
 			cmd.reply->set_value(Err(cmd.id, "WRONG_STATE", "no clay widgets"));
 			return;
 		}
 		nlohmann::json r;
 		r["widgets"] = widgets;
+		r["elements"] = elements;
 		r["interface_id"] = 0;
 		cmd.reply->set_value(OkResult(cmd.id, r));
 		return;
@@ -979,6 +1011,22 @@ void HandleImmediate(Game& game, ControlCommand& cmd) {
 			return;
 		}
 		if(amount < 1) amount = 1;
+		const auto * element = game.UiInteractions().FindByLabel(label);
+		if(element && element->value == "scroll"){
+			silencer::ui::UiAction action;
+			action.kind = silencer::ui::UiActionKind::Scroll;
+			action.id = element->id;
+			action.value = "control";
+			action.amount = amount;
+			game.UiInput().QueueControlAction(std::move(action));
+			nlohmann::json r;
+			r["source"] = "clay";
+			r["target"] = "element";
+			r["label"] = label;
+			r["amount"] = amount;
+			cmd.reply->set_value(OkResult(cmd.id, r));
+			return;
+		}
 		const auto * cw = game.UiInteractions().FindInteractableByLabel(label.c_str());
 		if(!cw){
 			cmd.reply->set_value(Err(cmd.id, "WIDGET_NOT_FOUND", label));

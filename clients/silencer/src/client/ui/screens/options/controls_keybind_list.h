@@ -1,17 +1,11 @@
 #ifndef SILENCER_CLIENT_UI_OPTIONS_CONTROLS_KEYBIND_LIST_H
 #define SILENCER_CLIENT_UI_OPTIONS_CONTROLS_KEYBIND_LIST_H
 
-// Options→Controls keybind-list UI. Owns:
-//   * The action / preset / save / cancel / scroll button primitives.
-//   * The visible keybind row composition (action label + primary button +
-//     OR/AND operator button + secondary button).
-//   * Button interaction registration through the shared Button primitive.
-//
-// The panel chrome (root background, "Configure Controls" title) lives in the
-// screen file; this header emits the panel-interior rows + the bottom action
-// row.
+// Options→Controls keybind-list UI. Owns the screen-local panel content:
+// title, preset row, keybind rows, scroll-area metadata, and Save / Cancel.
 
 #include <string>
+#include <vector>
 
 class Surface;
 class OptionsControlsScreen;
@@ -22,7 +16,9 @@ class UiInteractionRegistry;
 
 namespace silencer::client_ui::options {
 
-constexpr int kKeybindListVisibleRows = 5;
+constexpr int kKeybindListMinVisibleRows = 5;
+constexpr const char * kKeybindListScrollId = "options_controls.list";
+constexpr const char * kKeybindListScrollLabel = "Controls List";
 
 struct KeybindRowView {
 	std::string actionLabel;
@@ -35,13 +31,15 @@ struct KeybindRowView {
 
 struct KeybindListView {
 	std::string presetText;
-	KeybindRowView rows[kKeybindListVisibleRows];
+	std::vector<KeybindRowView> rows;
 	int visibleRowCount = 0;
+	float titleOffsetY = 8.0f;
 };
 
-// Emits the keybind-list panel interior (preset row + visible rows + scroll
-// row + save/cancel row) into the current Clay frame. The caller wraps in the
-// panel background.
+int KeybindListVisibleRowsForContentHeight(int contentHeight);
+
+// Emits the keybind-list panel interior into the current Clay frame. The
+// caller wraps in the scalable panel chrome.
 void BuildKeybindListBody(const KeybindListView & view,
                           silencer::ui::UiInteractionRegistry& interactions);
 

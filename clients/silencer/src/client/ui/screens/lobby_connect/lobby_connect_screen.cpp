@@ -19,8 +19,6 @@
 #include "primitives/scroll_text_box.h"
 #include "primitives/text_input.h"
 
-#include <SDL3/SDL.h>
-
 #include <algorithm>
 #include <cstring>
 #include <cstdint>
@@ -48,15 +46,22 @@ enum LobbyConnectInput : Uint8 {
 	LBY_INPUT_PASSWORD = 2,
 };
 
-constexpr uint16_t kPanelW = 280;
-constexpr uint16_t kPanelH = 270;
-constexpr uint16_t kPanelPadX = 5;
-constexpr uint16_t kPanelPadY = 5;
+constexpr uint16_t kPanelW = 284;
+constexpr uint16_t kPanelH = 277;
 constexpr uint16_t kLogW = 250;
 constexpr uint16_t kLogH = 170;
-constexpr uint16_t kInputW = 180;
-constexpr uint16_t kInputH = 14;
-constexpr uint16_t kFormGap = 7;
+constexpr uint16_t kLogX = 7;
+constexpr uint16_t kLogY = 8;
+constexpr uint16_t kFormRowX = 4;
+constexpr uint16_t kFormRowY = 195;
+constexpr uint16_t kFormRowH = 21;
+constexpr uint16_t kFormRowGap = 6;
+constexpr uint16_t kLabelW = 86;
+constexpr uint16_t kLabelPadX = 8;
+constexpr uint16_t kInputW = 183;
+constexpr uint16_t kInputInsetX = 7;
+constexpr uint16_t kButtonRowX = 86;
+constexpr uint16_t kButtonRowY = 246;
 constexpr uint16_t kButtonGap = 5;
 constexpr uint16_t kButtonH = 21;
 constexpr int kMaxLogLines = 128;
@@ -296,7 +301,7 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_USERNAME);
 	const bool passwordFocused =
 		interactions.IsTextInputFocused(lobby_connect_screen_detail::LBY_INPUT_PASSWORD);
-	const bool blink = ((SDL_GetTicks() / 250) % 2) == 0;
+	const bool blink = (ctx.renderer.GetHudAnimationPhase() % 32) < 16;
 
 	CLAY({ .id = CLAY_ID("LobbyConnectRoot"),
 	       .layout = {
@@ -308,42 +313,74 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIXED(lobby_connect_screen_detail::kPanelW),
 		                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kPanelH) },
-		           .padding = { lobby_connect_screen_detail::kPanelPadX, lobby_connect_screen_detail::kPanelPadX,
-		                        lobby_connect_screen_detail::kPanelPadY, lobby_connect_screen_detail::kPanelPadY },
-		           .childGap = 14,
-		           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
+		           .childGap = 0,
+		           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP },
 		           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 		       },
 		       .image = { .imageData = PackImage(7, 2) } }) {
-			lobby_connect_screen_detail::ScrollTextBox(CLAY_STRING("LobbyConnectLog"),
-			              lobby_connect_screen_detail::g_logSlab,
-			              lineCount,
-			              scroll,
-			              { .width = lobby_connect_screen_detail::kLogW,
-			                .height = lobby_connect_screen_detail::kLogH,
-			                .lineHeight = 11,
-			                .textVariant = lobby_connect_screen_detail::BankTextVariant::Body,
-			                .origin = lobby_connect_screen_detail::ScrollTextBoxOrigin::TopDown });
+			CLAY({ .id = CLAY_ID("LobbyConnectLogSlot"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kLogY) },
+			       } }) {}
+
+			CLAY({ .id = CLAY_ID("LobbyConnectLogRow"),
+			       .layout = {
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kLogH) },
+			           .padding = { lobby_connect_screen_detail::kLogX, 0, 0, 0 },
+			           .childGap = 0,
+			           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_TOP },
+			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
+			       } }) {
+				lobby_connect_screen_detail::ScrollTextBox(CLAY_STRING("LobbyConnectLog"),
+				              lobby_connect_screen_detail::g_logSlab,
+				              lineCount,
+				              scroll,
+				              { .width = lobby_connect_screen_detail::kLogW,
+				                .height = lobby_connect_screen_detail::kLogH,
+				                .lineHeight = 11,
+				                .textVariant = lobby_connect_screen_detail::BankTextVariant::Body,
+				                .origin = lobby_connect_screen_detail::ScrollTextBoxOrigin::TopDown });
+			}
+
+			CLAY({ .id = CLAY_ID("LobbyConnectPreFormGap"),
+			       .layout = {
+			           .sizing = {
+			               CLAY_SIZING_GROW(0),
+			               CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowY -
+			                                  lobby_connect_screen_detail::kLogY -
+			                                  lobby_connect_screen_detail::kLogH) },
+			       } }) {
+			}
 
 			CLAY({ .id = CLAY_ID("LobbyConnectForm"),
 			       .layout = {
-			           .sizing = { CLAY_SIZING_FIXED(270), CLAY_SIZING_FIT(0) },
-			           .childGap = lobby_connect_screen_detail::kFormGap,
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_FIXED((lobby_connect_screen_detail::kFormRowH * 2) +
+			                                         lobby_connect_screen_detail::kFormRowGap) },
+			           .childGap = lobby_connect_screen_detail::kFormRowGap,
 			           .layoutDirection = CLAY_TOP_TO_BOTTOM,
 			       } }) {
 				CLAY({ .id = CLAY_ID("LobbyConnectUsernameRow"),
 				       .layout = {
 				           .sizing = { CLAY_SIZING_GROW(0),
-				                       CLAY_SIZING_FIXED(20) },
-				           .childGap = 12,
+				                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowH) },
+				           .padding = { lobby_connect_screen_detail::kFormRowX, 0, 0, 0 },
+				           .childGap = 0,
 				           .childAlignment = { CLAY_ALIGN_X_LEFT,
 				                               CLAY_ALIGN_Y_CENTER },
 				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 				       } }) {
 					CLAY({ .id = CLAY_ID("LobbyConnectUsernameLabel"),
 					       .layout = {
-					           .sizing = { CLAY_SIZING_GROW(0),
-					                       CLAY_SIZING_FIT(0) },
+					           .sizing = { CLAY_SIZING_FIXED(lobby_connect_screen_detail::kLabelW),
+					                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowH) },
+					           .padding = { lobby_connect_screen_detail::kLabelPadX, 0, 0, 0 },
+					           .childGap = 0,
+					           .childAlignment = { CLAY_ALIGN_X_LEFT,
+					                               CLAY_ALIGN_Y_CENTER },
+					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					       } }) {
 						lobby_connect_screen_detail::BankText(CLAY_STRING("Username"),
 						         lobby_connect_screen_detail::BankTextVariant::Heading, {});
@@ -352,11 +389,12 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 						CLAY_STRING("LobbyConnectUsernameInput"),
 						username,
 						{ .widthPx = lobby_connect_screen_detail::kInputW,
-						  .heightPx = lobby_connect_screen_detail::kInputH,
+						  .heightPx = lobby_connect_screen_detail::kFormRowH,
 						  .fontBank = 133,
 						  .fontWidth = 6,
 						  .inactive = inactive,
-						  .showCaret = usernameFocused && blink },
+						  .showCaret = usernameFocused && blink,
+						  .contentInsetX = lobby_connect_screen_detail::kInputInsetX },
 						{ nullptr, lobby_connect_screen_detail::kActionUsername,
 						  "Username", &interactions,
 						  lobby_connect_screen_detail::LBY_INPUT_USERNAME, 16 });
@@ -365,16 +403,22 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 				CLAY({ .id = CLAY_ID("LobbyConnectPasswordRow"),
 				       .layout = {
 				           .sizing = { CLAY_SIZING_GROW(0),
-				                       CLAY_SIZING_FIXED(20) },
-				           .childGap = 12,
+				                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowH) },
+				           .padding = { lobby_connect_screen_detail::kFormRowX, 0, 0, 0 },
+				           .childGap = 0,
 				           .childAlignment = { CLAY_ALIGN_X_LEFT,
 				                               CLAY_ALIGN_Y_CENTER },
 				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 				       } }) {
 					CLAY({ .id = CLAY_ID("LobbyConnectPasswordLabel"),
 					       .layout = {
-					           .sizing = { CLAY_SIZING_GROW(0),
-					                       CLAY_SIZING_FIT(0) },
+					           .sizing = { CLAY_SIZING_FIXED(lobby_connect_screen_detail::kLabelW),
+					                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kFormRowH) },
+					           .padding = { lobby_connect_screen_detail::kLabelPadX, 0, 0, 0 },
+					           .childGap = 0,
+					           .childAlignment = { CLAY_ALIGN_X_LEFT,
+					                               CLAY_ALIGN_Y_CENTER },
+					           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 					       } }) {
 						lobby_connect_screen_detail::BankText(CLAY_STRING("Password"),
 						         lobby_connect_screen_detail::BankTextVariant::Heading, {});
@@ -383,22 +427,37 @@ void LobbyConnectScreen::BuildUi(ScreenContext & ctx, Surface & dst, float frame
 						CLAY_STRING("LobbyConnectPasswordInput"),
 						password,
 						{ .widthPx = lobby_connect_screen_detail::kInputW,
-						  .heightPx = lobby_connect_screen_detail::kInputH,
+						  .heightPx = lobby_connect_screen_detail::kFormRowH,
 						  .fontBank = 133,
 						  .fontWidth = 6,
 						  .password = true,
 						  .inactive = inactive,
-						  .showCaret = passwordFocused && blink },
+						  .showCaret = passwordFocused && blink,
+						  .contentInsetX = lobby_connect_screen_detail::kInputInsetX },
 						{ nullptr, lobby_connect_screen_detail::kActionPassword,
 						  "Password", &interactions,
 						  lobby_connect_screen_detail::LBY_INPUT_PASSWORD, 28 });
 				}
 			}
 
+			CLAY({ .id = CLAY_ID("LobbyConnectPreButtonGap"),
+			       .layout = {
+			           .sizing = {
+			               CLAY_SIZING_GROW(0),
+			               CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonRowY -
+			                                  lobby_connect_screen_detail::kFormRowY -
+			                                  (lobby_connect_screen_detail::kFormRowH * 2) -
+			                                  lobby_connect_screen_detail::kFormRowGap) },
+			       } }) {
+			}
+
 			CLAY({ .id = CLAY_ID("LobbyConnectButtons"),
 			       .layout = {
-			           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonH) },
+			           .sizing = { CLAY_SIZING_GROW(0),
+			                       CLAY_SIZING_FIXED(lobby_connect_screen_detail::kButtonH) },
+			           .padding = { lobby_connect_screen_detail::kButtonRowX, 0, 0, 0 },
 			           .childGap = lobby_connect_screen_detail::kButtonGap,
+			           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
 			           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 			       } }) {
 				lobby_connect_screen_detail::Button(CLAY_STRING("LobbyConnectLoginButton"), CLAY_STRING("Login"),

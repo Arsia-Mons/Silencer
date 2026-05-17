@@ -1,6 +1,7 @@
 #ifndef OPTIONS_CONTROLS_SCREEN_H
 #define OPTIONS_CONTROLS_SCREEN_H
 
+#include "controls_keybind_list.h"
 #include "screen.h"
 #include "keybinds.h"
 
@@ -35,6 +36,8 @@ private:
 	bool cancelClicked = false;
 	int scrollDelta = 0;
 	int operatorClickedRow = -1;
+	int visibleRowCapacity_ = silencer::client_ui::options::kKeybindListMinVisibleRows;
+	silencer::client_ui::options::KeybindListView keybindListView_;
 };
 
 #endif

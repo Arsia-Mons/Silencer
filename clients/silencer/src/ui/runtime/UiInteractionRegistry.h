@@ -41,6 +41,8 @@ struct UiElementSnapshot {
 	std::string label;
 	std::string value;
 	UiRect bounds;
+	Clay_ElementId clayId{};
+	bool hasClayId = false;
 	bool enabled = true;
 	bool focused = false;
 	bool selected = false;
@@ -109,6 +111,7 @@ private:
 	void RefreshElementState();
 
 	std::vector<UiElementSnapshot> elements_;
+	std::vector<UiElementSnapshot> registeredElements_;
 	std::vector<UiInteractable> interactables_;
 	UiActionQueue actions_;
 	int focusedUid_ = -1;

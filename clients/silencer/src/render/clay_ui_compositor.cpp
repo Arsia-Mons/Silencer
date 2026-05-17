@@ -90,11 +90,19 @@ bool ClipDrawRect(int dstW, int dstH,
 	return true;
 }
 
-void UnpackImage(void * p, Uint8 & bank, Uint16 & index, bool & contain) {
+enum class ImageFit : Uint8 {
+	Cover,
+	Contain,
+	Stretch,
+};
+
+void UnpackImage(void * p, Uint8 & bank, Uint16 & index, ImageFit & fit) {
 	std::uintptr_t v = reinterpret_cast<std::uintptr_t>(p);
 	bank    = static_cast<Uint8>((v >> 16) & 0xFFu);
 	index   = static_cast<Uint16>(v & 0xFFFFu);
-	contain = (v & kImageContainBit) != 0;
+	fit = (v & kImageStretchBit) != 0 ? ImageFit::Stretch
+	    : (v & kImageContainBit) != 0 ? ImageFit::Contain
+	                                  : ImageFit::Cover;
 }
 
 // Construct a "low-nibble alpha" src palette index for the alphaed LUT.
@@ -237,8 +245,8 @@ void DispatchImage(::Resources & resources,
                    const ::Clay_ImageRenderData & data) {
 	Uint8 bank;
 	Uint16 index;
-	bool contain;
-	UnpackImage(data.imageData, bank, index, contain);
+	ImageFit fit;
+	UnpackImage(data.imageData, bank, index, fit);
 	const auto & banks = resources.spritebank;
 	if(bank >= banks.size()) return;
 	if(index >= banks[bank].size()) return;
@@ -252,26 +260,35 @@ void DispatchImage(::Resources & resources,
 	if(bw <= 0 || bh <= 0) return;
 	// Fit the sprite into its element box like CSS background-size. cover:
 	// scale to fill, preserve aspect, crop overflow. contain: scale to fit
-	// inside, preserve aspect, letterbox. Nearest sampling keeps pixel art
-	// crisp (the magnify pass upstream applies the integer uiScale on top).
+	// inside, preserve aspect, letterbox. stretch: fill both axes and allow
+	// aspect distortion. Nearest sampling keeps pixel art crisp (the magnify
+	// pass upstream applies the integer uiScale on top).
 	float sxScale = static_cast<float>(bw) / static_cast<float>(src->w);
 	float syScale = static_cast<float>(bh) / static_cast<float>(src->h);
-	float scale = contain ? std::min(sxScale, syScale)
-	                      : std::max(sxScale, syScale);
-	if(scale <= 0.0f) return;
-	int drawW = std::max(1, static_cast<int>(src->w * scale + 0.5f));
-	int drawH = std::max(1, static_cast<int>(src->h * scale + 0.5f));
+	float scale = fit == ImageFit::Contain ? std::min(sxScale, syScale)
+	            : fit == ImageFit::Cover   ? std::max(sxScale, syScale)
+	                                       : 1.0f;
+	if(scale <= 0.0f || sxScale <= 0.0f || syScale <= 0.0f) return;
+	int drawW = fit == ImageFit::Stretch
+	          ? bw
+	          : std::max(1, static_cast<int>(src->w * scale + 0.5f));
+	int drawH = fit == ImageFit::Stretch
+	          ? bh
+	          : std::max(1, static_cast<int>(src->h * scale + 0.5f));
 	int ox = bx + (bw - drawW) / 2;
 	int oy = by + (bh - drawH) / 2;
 	// Visible region = element box clipped to the scissor stack + surface.
 	int rx = bx, ry = by, rw = bw, rh = bh;
 	if(!ClipDrawRect(dst->w, dst->h, rx, ry, rw, rh)) return;
-	float invScale = 1.0f / scale;
 	for(int py = ry; py < ry + rh; py++){
-		int syi = static_cast<int>((py - oy) * invScale);
+		int syi = fit == ImageFit::Stretch
+		        ? static_cast<int>((py - by) / syScale)
+		        : static_cast<int>((py - oy) / scale);
 		if(syi < 0 || syi >= src->h) continue;
 		for(int px = rx; px < rx + rw; px++){
-			int sxi = static_cast<int>((px - ox) * invScale);
+			int sxi = fit == ImageFit::Stretch
+			        ? static_cast<int>((px - bx) / sxScale)
+			        : static_cast<int>((px - ox) / scale);
 			if(sxi < 0 || sxi >= src->w) continue;
 			Uint8 col = Renderer::GetPixel(src, sxi, syi);
 			if(col) Renderer::SetPixel(dst, px, py, col);
