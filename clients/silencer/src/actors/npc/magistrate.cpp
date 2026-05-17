@@ -75,7 +75,7 @@ void Magistrate::InitBT(){
 				if(md) snd = md->soundActivate;
 			}
 			if(!snd.empty())
-				EmitSound(world, world.resources.soundbank[snd], 128);
+				EmitGlobalSound(world, world.resources.soundbank[snd], 128);
 		}
 		return BTResult::Success;
 	};
@@ -133,7 +133,7 @@ void Magistrate::InitBT(){
 				if(md) snd = md->soundDeath;
 			}
 			if(!snd.empty())
-				EmitSound(world, world.resources.soundbank[snd], 128);
+				EmitGlobalSound(world, world.resources.soundbank[snd], 128);
 		}
 		return BTResult::Success;
 	};

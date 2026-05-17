@@ -23,6 +23,8 @@ public:
 	virtual void HandleInput(Input & input);
 	virtual void HandleDisconnect(World & world, Uint8 peerid);
 	int EmitSound(class World & world, Mix_Chunk * chunk, Uint8 volume = 128, bool loop = false);
+	// Play sound at full volume globally (no distance/occlusion attenuation).
+	int EmitGlobalSound(class World & world, Mix_Chunk * chunk, Uint8 volume = 128);
 	bool requiresauthority;
 	bool requiresmaptobeloaded;
 	Uint8 type;

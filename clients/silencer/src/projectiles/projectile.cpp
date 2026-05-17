@@ -3,6 +3,7 @@
 #include "walldefense.h"
 #include "player.h"
 #include "robot.h"
+#include "magistrate.h"
 #include "fixedcannon.h"
 #include "flamerprojectile.h"
 #include "flareprojectile.h"
@@ -57,6 +58,7 @@ bool Projectile::TestCollision(Object & object, World & world, Platform ** colli
 		types.push_back(ObjectTypes::CIVILIAN);
 		types.push_back(ObjectTypes::GUARD);
 		types.push_back(ObjectTypes::ROBOT);
+		types.push_back(ObjectTypes::MAGISTRATE);
 		types.push_back(ObjectTypes::FIXEDCANNON);
 		types.push_back(ObjectTypes::TECHSTATION);
 		if(object.type != ObjectTypes::WALLPROJECTILE){
