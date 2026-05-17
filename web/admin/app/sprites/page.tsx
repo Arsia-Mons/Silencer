@@ -371,7 +371,14 @@ function SpritesPageInner() {
       if (!tabAssets) return;
       if (decodedBanks.has(idx)) return;
       const buf = tabAssets.bankFiles.get(idx);
-      if (!buf) return;
+      if (!buf) {
+        setError(
+          `BIN file for bank ${String(idx).padStart(3, '0')} was not found in the opened folder ` +
+          `(expected ${BIN_PREFIX[tab]}${String(idx).padStart(3, '0')}.BIN inside ${DIR_NAME[tab]}/). ` +
+          `Use [ ↑ LOAD BIN ] in the bank panel to load it directly.`
+        );
+        return;
+      }
       const numFrames = tabAssets.frameCounts[idx] ?? 0;
       try {
         const bank = tab === 'tiles'
@@ -384,6 +391,70 @@ function SpritesPageInner() {
     },
     [tabAssets, decodedBanks, tab],
   );
+
+  // ── Load a single BIN file for the currently-selected bank ───────────────
+  const loadBinInputRef = useRef<HTMLInputElement>(null);
+
+  function handleLoadSingleBin(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !folder) return;
+
+    // Parse bank index from filename (e.g. SPR_050.BIN → 50)
+    const fname = file.name.toUpperCase();
+    const prefix = BIN_PREFIX[tab];
+    let bankIdx: number | null = null;
+    if (fname.startsWith(prefix) && fname.endsWith('.BIN')) {
+      const n = parseInt(fname.slice(prefix.length, fname.length - 4), 10);
+      if (!isNaN(n) && n >= 0 && n <= 255) bankIdx = n;
+    }
+    if (bankIdx === null) {
+      setError(`Filename must be ${prefix}NNN.BIN (e.g. ${prefix}050.BIN). Got: ${file.name}`);
+      return;
+    }
+
+    const targetIdx = bankIdx;
+    file.arrayBuffer().then(buf => {
+      // Inject into bankFiles and re-decode
+      setFolder(f => {
+        if (!f) return f;
+        const tabData = f[tab];
+        if (!tabData) return f;
+        const newBankFiles = new Map(tabData.bankFiles);
+        newBankFiles.set(targetIdx, buf);
+        // Also update frameCounts from the BIN if the bank wasn't in the DAT
+        const newFrameCounts = [...tabData.frameCounts];
+        const numFrames = newFrameCounts[targetIdx] ?? 0;
+        const updated = { ...tabData, bankFiles: newBankFiles };
+        const newFolder = { ...f, [tab]: updated };
+
+        // Also update assetsStore so a navigation doesn't lose it
+        const stored = assetsStore.get();
+        if (stored) {
+          const storedTab = stored[tab];
+          if (storedTab) {
+            const newStoredBankFiles = new Map(storedTab.bankFiles);
+            newStoredBankFiles.set(targetIdx, buf);
+            assetsStore.set({ ...stored, [tab]: { ...storedTab, bankFiles: newStoredBankFiles } });
+          }
+        }
+
+        // Decode immediately
+        try {
+          const bank = tab === 'tiles'
+            ? decodeTileBank(targetIdx, buf, numFrames)
+            : decodeBank(targetIdx, buf, numFrames);
+          setDecodedBanks(prev => new Map(prev).set(targetIdx, bank));
+          setSelectedBank(targetIdx);
+          setError('');
+        } catch (err) {
+          setError(`Failed to decode bank ${targetIdx}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+
+        return newFolder;
+      });
+    });
+  }
 
   // ── Keyboard navigation through bank list ────────────────────────────────
   useEffect(() => {
@@ -884,6 +955,7 @@ function SpritesPageInner() {
       />
       <input ref={pngInputRef} type="file" accept="image/png" className="hidden" onChange={handleImportPng} />
       <input ref={sheetInputRef} type="file" accept="image/png" className="hidden" onChange={handleImportSheet} />
+      <input ref={loadBinInputRef} type="file" accept=".bin,.BIN" className="hidden" onChange={handleLoadSingleBin} />
 
       <main className="flex-1 flex flex-col min-w-0">
         {/* ── Header ── */}
@@ -1036,6 +1108,14 @@ function SpritesPageInner() {
                   className="px-3 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors disabled:opacity-30"
                 >
                   ↓ .BIN
+                </button>
+                <button
+                  onClick={() => loadBinInputRef.current?.click()}
+                  disabled={!folder}
+                  title={`Load a ${BIN_PREFIX[tab]}NNN.BIN file — auto-detects bank index from filename`}
+                  className="px-3 py-1 text-xs font-mono border border-[#1a2e1a] rounded hover:border-[#00a328] hover:text-[#00a328] transition-colors disabled:opacity-30"
+                >
+                  ↑ .BIN
                 </button>
                 <button
                   onClick={handleDownloadDat}
