@@ -1,7 +1,6 @@
 #include "game_create_panel.h"
 
 #include "clay/clay.h"
-#include "clay_ui_compositor.h"
 #include "runtime/UiInteractionRegistry.h"
 #include "primitives/box.h"
 #include "primitives/text.h"
@@ -30,13 +29,6 @@ namespace silencer::client_ui::lobby {
 
 namespace game_create_panel_options_detail {
 
-constexpr int kPayloadCapacity = 2;
-silencer::clay_bridge::ScrollBarPayload g_scrollbarPayloads[kPayloadCapacity];
-int g_scrollbarPayloadCount = 0;
-
-silencer::clay_bridge::ClayCustomData g_customData[kPayloadCapacity];
-int g_customDataCount = 0;
-
 constexpr int kOptionRowCount = 6;
 
 constexpr uint16_t kPanelPad         = 6;
@@ -47,12 +39,11 @@ constexpr uint16_t kFormRowH         = 14;
 constexpr uint16_t kFormRowGap       = 3;
 constexpr uint16_t kFormColumnGap    = 6;
 constexpr uint16_t kScrollbarWidth   = 8;
-constexpr uint16_t kScrollbarGap     = 0;
+constexpr uint16_t kScrollbarGap     = 2;
 constexpr uint16_t kValueColumnMinW  = 30;
 constexpr uint16_t kValueColumnMaxW  = 72;
-constexpr Uint8    kScrollbarBank    = 7;
-constexpr Uint16   kScrollbarTrackIx = 9;
-constexpr Uint16   kScrollbarThumbIx = 10;
+constexpr uint16_t kScrollbarTrackPad = 1;
+constexpr uint16_t kScrollbarThumbMinH = 12;
 
 constexpr const char * kActionSecurity    = "lobby.game_create.security";
 constexpr const char * kActionSpectatable = "lobby.game_create.spectatable";
@@ -70,6 +61,12 @@ struct UpperLayout {
 	bool showScrollbar = false;
 };
 
+struct ScrollbarLayout {
+	Uint16 topSpacer = 0;
+	Uint16 thumbHeight = 0;
+	Uint16 bottomSpacer = 0;
+};
+
 Clay_String FromCStr(const char * s) {
 	return Clay_String{ false, static_cast<int32_t>(std::strlen(s)), s };
 }
@@ -85,33 +82,6 @@ const char * SecurityLabel(Uint8 idx) {
 		case 3:  return "High";
 		default: return "Medium";
 	}
-}
-
-silencer::clay_bridge::ScrollBarPayload *
-AllocScrollBarPayload(Uint8 bank, Uint16 trackIdx, Uint16 thumbIdx,
-                      Uint16 scrollPosition, Uint16 scrollMax) {
-	if(g_scrollbarPayloadCount >= kPayloadCapacity) return nullptr;
-	auto * payload = &g_scrollbarPayloads[g_scrollbarPayloadCount++];
-	payload->bank = bank;
-	payload->trackIndex = trackIdx;
-	payload->thumbIndex = thumbIdx;
-	payload->scrollPosition = scrollPosition;
-	payload->scrollMax = scrollMax;
-	return payload;
-}
-
-silencer::clay_bridge::ClayCustomData *
-AllocCustomData(silencer::clay_bridge::CustomKind kind, void * payload) {
-	if(g_customDataCount >= kPayloadCapacity) return nullptr;
-	auto * custom = &g_customData[g_customDataCount++];
-	custom->kind = kind;
-	custom->payload = payload;
-	return custom;
-}
-
-void ResetFramePayloads() {
-	g_scrollbarPayloadCount = 0;
-	g_customDataCount = 0;
 }
 
 void RegisterOptionsScrollArea(Clay_ElementId clayId,
@@ -159,16 +129,21 @@ UpperLayout ResolveUpperLayout(Uint16 panelWidth,
 	out.showScrollbar = out.scrollMax > 0;
 
 	int valueColumnWidth = 0;
-	if(contentW > 0){
-		valueColumnWidth = contentW / 3;
+	int formContentW = contentW;
+	if(out.showScrollbar){
+		formContentW -= static_cast<int>(kScrollbarWidth) + static_cast<int>(kScrollbarGap);
+		if(formContentW < 0) formContentW = 0;
+	}
+	if(formContentW > 0){
+		valueColumnWidth = formContentW / 3;
 		if(valueColumnWidth < static_cast<int>(kValueColumnMinW)){
 			valueColumnWidth = kValueColumnMinW;
 		}
 		if(valueColumnWidth > static_cast<int>(kValueColumnMaxW)){
 			valueColumnWidth = kValueColumnMaxW;
 		}
-		if(valueColumnWidth > contentW){
-			valueColumnWidth = contentW;
+		if(valueColumnWidth > formContentW){
+			valueColumnWidth = formContentW;
 		}
 	}
 	out.valueColumnWidth = static_cast<Uint16>(valueColumnWidth);
@@ -190,6 +165,43 @@ void ClampOptionsScroll(GameCreatePanelState & state,
 	if(state.optionsScrollPosition > layout.scrollMax){
 		state.optionsScrollPosition = layout.scrollMax;
 	}
+}
+
+ScrollbarLayout ResolveScrollbarLayout(const UpperLayout & layout,
+                                       const GameCreatePanelState & state) {
+	ScrollbarLayout out;
+	if(!layout.showScrollbar || layout.viewportHeight <= kScrollbarTrackPad * 2){
+		return out;
+	}
+	const int trackHeight = static_cast<int>(layout.viewportHeight)
+	                      - static_cast<int>(kScrollbarTrackPad) * 2;
+	if(trackHeight <= 0){
+		return out;
+	}
+
+	int thumbHeight = (trackHeight * static_cast<int>(layout.visibleRows))
+	                / kOptionRowCount;
+	if(thumbHeight < static_cast<int>(kScrollbarThumbMinH)){
+		thumbHeight = std::min(trackHeight, static_cast<int>(kScrollbarThumbMinH));
+	}
+	if(thumbHeight > trackHeight){
+		thumbHeight = trackHeight;
+	}
+
+	const int travel = trackHeight - thumbHeight;
+	int topSpacer = 0;
+	if(layout.scrollMax > 0 && travel > 0){
+		topSpacer = (travel * static_cast<int>(state.optionsScrollPosition)
+		            + static_cast<int>(layout.scrollMax) / 2)
+		         / static_cast<int>(layout.scrollMax);
+	}
+	if(topSpacer < 0) topSpacer = 0;
+	if(topSpacer > travel) topSpacer = travel;
+
+	out.topSpacer = static_cast<Uint16>(topSpacer);
+	out.thumbHeight = static_cast<Uint16>(thumbHeight);
+	out.bottomSpacer = static_cast<Uint16>(travel - topSpacer);
+	return out;
 }
 
 void BuildOptionRow(GameCreatePanelState & state,
@@ -269,7 +281,6 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
                               Resources & resources,
                               silencer::ui::UiInteractionRegistry& interactions) {
 	(void)resources;
-	game_create_panel_options_detail::ResetFramePayloads();
 	const auto layout = game_create_panel_options_detail::ResolveUpperLayout(
 		panelWidth, panelHeight);
 	game_create_panel_options_detail::ClampOptionsScroll(state, layout);
@@ -370,25 +381,60 @@ void BuildGameCreateUpperTree(GameCreatePanelState & state,
 			}
 
 			if(layout.showScrollbar){
-				auto * payload = game_create_panel_options_detail::AllocScrollBarPayload(
-					game_create_panel_options_detail::kScrollbarBank,
-					game_create_panel_options_detail::kScrollbarTrackIx,
-					game_create_panel_options_detail::kScrollbarThumbIx,
-					state.optionsScrollPosition,
-					layout.scrollMax);
-				auto * customData = game_create_panel_options_detail::AllocCustomData(
-					silencer::clay_bridge::CustomKind::ScrollBar,
-					payload);
-				CLAY({ .id = CLAY_ID("GCrtOptionsScrollbar"),
-				       .layout = {
-				           .sizing = {
-				               CLAY_SIZING_FIXED(
-				                   static_cast<float>(
-				                       game_create_panel_options_detail::kScrollbarWidth)),
-				               CLAY_SIZING_FIXED(static_cast<float>(layout.viewportHeight)),
-				           },
-				       },
-				       .custom = { .customData = customData } }) {}
+				const auto scrollbarLayout =
+					game_create_panel_options_detail::ResolveScrollbarLayout(layout, state);
+				CLAY(Box(BoxVariants::Inset, {
+				         .id = CLAY_ID("GCrtOptionsScrollbarTrack"),
+				         .layout = {
+				             .sizing = {
+				                 CLAY_SIZING_FIXED(
+				                     static_cast<float>(
+				                         game_create_panel_options_detail::kScrollbarWidth)),
+				                 CLAY_SIZING_FIXED(static_cast<float>(layout.viewportHeight)),
+				             },
+				             .padding = {
+				                 game_create_panel_options_detail::kScrollbarTrackPad,
+				                 game_create_panel_options_detail::kScrollbarTrackPad,
+				                 game_create_panel_options_detail::kScrollbarTrackPad,
+				                 game_create_panel_options_detail::kScrollbarTrackPad,
+				             },
+				             .layoutDirection = CLAY_TOP_TO_BOTTOM,
+				         },
+				     })) {
+					if(scrollbarLayout.topSpacer > 0){
+						CLAY({ .id = CLAY_ID("GCrtOptionsScrollbarTopSpacer"),
+						       .layout = {
+						           .sizing = {
+						               CLAY_SIZING_GROW(0),
+						               CLAY_SIZING_FIXED(
+						                   static_cast<float>(scrollbarLayout.topSpacer)),
+						           },
+						       } }) {}
+					}
+
+					CLAY(Box(BoxVariants::Plain, {
+					         .id = CLAY_ID("GCrtOptionsScrollbarThumb"),
+					         .layout = {
+					             .sizing = {
+					                 CLAY_SIZING_GROW(0),
+					                 CLAY_SIZING_FIXED(
+					                     static_cast<float>(scrollbarLayout.thumbHeight)),
+					             },
+					         },
+					         .backgroundColor = { 216, 0, 0, 255 },
+					     })) {}
+
+					if(scrollbarLayout.bottomSpacer > 0){
+						CLAY({ .id = CLAY_ID("GCrtOptionsScrollbarBottomSpacer"),
+						       .layout = {
+						           .sizing = {
+						               CLAY_SIZING_GROW(0),
+						               CLAY_SIZING_FIXED(
+						                   static_cast<float>(scrollbarLayout.bottomSpacer)),
+						           },
+						       } }) {}
+					}
+				}
 			}
 		}
 	}
