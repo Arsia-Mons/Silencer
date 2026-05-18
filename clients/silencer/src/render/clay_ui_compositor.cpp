@@ -338,7 +338,18 @@ void DispatchText(::Resources & resources,
 		                    data.fontId,
 		                    data.fontSize)
 		: TextInkMetrics{};
-	if(ink.hasInk) x -= ink.minX;
+	if(ink.hasInk){
+		// Pull the first glyph's leading blank columns flush to bb.x and
+		// optically center the visible ink within the line box instead of
+		// top-aligning it (the bitmap font reserves descender space, so a
+		// line of caps would otherwise sit high). Mirrors the TextInput
+		// custom-payload path.
+		x -= ink.minX;
+		if(ink.height > 0){
+			y += std::max(0, (static_cast<int>(bb.height) - ink.height) / 2)
+			     - ink.minY;
+		}
+	}
 	renderer.DrawText(dst, static_cast<Uint16>(x), static_cast<Uint16>(y),
 	                  buf, bank, width, alpha, color, brightness, colorRamp);
 }
