@@ -23,6 +23,7 @@
 
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
+#include <sys/xattr.h>
 #endif
 
 namespace {
@@ -236,6 +237,27 @@ std::string FindSingleTopDir(const std::string &dir) {
     return (count == 1 && is_dir) ? name : std::string();
 #endif
 }
+
+#ifdef __APPLE__
+void StripQuarantineRecursive(const std::string &path) {
+    if (removexattr(path.c_str(), "com.apple.quarantine", 0) != 0 &&
+        errno != ENOATTR && errno != ENOTSUP && errno != ENOENT) {
+        Logf("removexattr(quarantine) failed on %s: %s",
+            path.c_str(), strerror(errno));
+    }
+    struct stat st;
+    if (lstat(path.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) return;
+    DIR *d = opendir(path.c_str());
+    if (!d) return;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        std::string n = e->d_name;
+        if (n == "." || n == "..") continue;
+        StripQuarantineRecursive(path + "/" + n);
+    }
+    closedir(d);
+}
+#endif
 
 #ifdef _WIN32
 // Retries on AV-induced failures (Defender opens scanned files without
@@ -552,6 +574,12 @@ bool Launch(const std::string &zippath) {
         Logf("no Frameworks/ at %s; assuming dev build with absolute dylib paths",
             src_fw.c_str());
     }
+    // Finder tags first-run downloads with com.apple.quarantine. Stage-2 is
+    // created at runtime under /tmp and may inherit that xattr, which makes
+    // Gatekeeper treat it as a freshly downloaded helper and can yield
+    // "silencer-stage2 is damaged". It's generated from our already-running
+    // binary, so clear quarantine before exec.
+    StripQuarantineRecursive(stage2_bundle);
 #else
     std::string temp = tempdir + "/silencer-stage2";
     if (!CopyFile_(self, temp)) {
