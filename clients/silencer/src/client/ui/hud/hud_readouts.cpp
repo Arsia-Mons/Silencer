@@ -38,9 +38,18 @@ void BuildHudReadouts(const PlayerHudView& player, Surface* surface, Uint8 curre
 	using silencer::ui::primitives::TextSize;
 	auto emitText = [&](const char* id, int x, int y, int w, int h,
 	                    const std::string& text, TextSize size,
-	                    Uint8 color) {
+	                    Uint8 color,
+	                    Clay_LayoutAlignmentX alignX = CLAY_ALIGN_X_LEFT) {
 		if(text.empty()) return;
-		CLAY(HudFloatingElement(id, x, y, w, h)) {
+		CLAY({ .id = Clay_GetElementId(ClayStringFromCString(id)),
+		       .layout = {
+			       .sizing = { CLAY_SIZING_FIXED((float)w), CLAY_SIZING_FIXED((float)h) },
+			       .childAlignment = { alignX, CLAY_ALIGN_Y_TOP },
+		       },
+		       .floating = {
+			       .offset = { (float)x, (float)y },
+			       .attachTo = CLAY_ATTACH_TO_ROOT,
+		       } }) {
 			Text(ClayStringFromStd(text),
 			     { .size = size,
 			       .effect = TextEffect::LegacyPalette(color) });
@@ -62,13 +71,13 @@ void BuildHudReadouts(const PlayerHudView& player, Surface* surface, Uint8 curre
 		       .sizing = { CLAY_SIZING_FIXED((float)surface->w), CLAY_SIZING_FIXED((float)surface->h) },
 	       } }) {
 		emitAlphaText("HudCurrentAmmo", 117, 457, 40, 18, currentAmmo, TextSize::HudCounter, 0);
-		emitText("HudBlasterAmmo", 4, 414, 20, 8, blasterAmmo, TextSize::Tiny, 0);
-		emitText("HudLaserAmmo", 4, 428, 20, 8, laserAmmo, TextSize::Tiny, 0);
-		emitText("HudRocketAmmo", 4, 442, 20, 8, rocketAmmo, TextSize::Tiny, 0);
-		emitText("HudFlamerAmmo", 4, 456, 20, 8, flamerAmmo, TextSize::Tiny, 0);
+		emitText("HudBlasterAmmo", 0, 414, 20, 8, blasterAmmo, TextSize::Tiny, 0, CLAY_ALIGN_X_CENTER);
+		emitText("HudLaserAmmo", 0, 428, 20, 8, laserAmmo, TextSize::Tiny, 0, CLAY_ALIGN_X_CENTER);
+		emitText("HudRocketAmmo", 0, 442, 20, 8, rocketAmmo, TextSize::Tiny, 0, CLAY_ALIGN_X_CENTER);
+		emitText("HudFlamerAmmo", 0, 456, 20, 8, flamerAmmo, TextSize::Tiny, 0, CLAY_ALIGN_X_CENTER);
 		emitText("HudCredits", 572, 456, 60, 18, credits, TextSize::HudCounter, 202);
-		emitText("HudHealth", 152, 463, 26, 8, health, TextSize::Tiny, 161);
-		emitText("HudShield", 475, 463, 26, 8, shield, TextSize::Tiny, 202);
+		emitText("HudHealth", 145, 463, 26, 8, health, TextSize::Tiny, 161, CLAY_ALIGN_X_CENTER);
+		emitText("HudShield", 468, 463, 26, 8, shield, TextSize::Tiny, 202, CLAY_ALIGN_X_CENTER);
 		const int xoffsets[] = {612, 584, 556, 528};
 		const int yoffsets[] = {13, 13, 11, 7};
 		emitText("HudInventoryCount0", xoffsets[0] + 20, yoffsets[0] + 20, 32, 10, inventoryCounts[0], TextSize::TinyCounter, 0);

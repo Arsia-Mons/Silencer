@@ -269,14 +269,14 @@ void BuildGameJoinTallTree(GameJoinPanelState & state,
 			           .sizing = { CLAY_SIZING_FIXED(static_cast<float>(readyW)),
 			                       CLAY_SIZING_FIXED(static_cast<float>(readyH)) },
 			       },
+			       .image = { .imageData = silencer::clay_bridge::PackImage(7, readyIndex) },
 			       .floating = {
 			           .offset = {
 			               static_cast<float>(game_join_panel_detail::kRosterReadyAnchorX - readyOffsetX),
 			               static_cast<float>(game_join_panel_detail::kRosterReadyAnchorY + rowYOffset - readyOffsetY),
 			           },
 			           .attachTo = CLAY_ATTACH_TO_PARENT,
-			       },
-			       .image = { .imageData = silencer::clay_bridge::PackImage(7, readyIndex) } }) {}
+			       } }) {}
 
 			CLAY({ .id = CLAY_IDI("GameJoinRosterNameWrap", static_cast<int>(i)),
 			       .layout = {

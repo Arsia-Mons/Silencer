@@ -30,22 +30,28 @@ Uint8 BuildHudStatusSprites(const PlayerHudView& player, Surface* surface,
 	                     Uint8 brightness = 128) {
 		sprites.push_back(SpriteSpec{id, x, y, bank, index, srcX, srcY, srcW, srcH, brightness});
 	};
+	auto addSpriteSlice = [&](const char* id, int x, int y, Uint8 bank, Uint16 index,
+	                          int srcX, int srcY, int srcW, int srcH,
+	                          Uint8 brightness = 128) {
+		if(srcW <= 0 || srcH <= 0) return;
+		addSprite(id, x, y, bank, index, srcX, srcY, srcW, srcH, brightness);
+	};
 
 	addSprite("HudMinimapFrame", SpriteX(resources, 94, 0), SpriteY(resources, 94, 0), 94, 0);
 	if(player.fuelLow) addSprite("HudFuelLow", SpriteX(resources, 95, 8), SpriteY(resources, 95, 8), 95, 8);
 	int fuelW = player.maxFuel > 0
 		? (int)(((float)player.fuel / player.maxFuel) * SpriteWidth(resources, 95, 6))
 		: 0;
-	addSprite("HudFuelBar", SpriteX(resources, 95, 6), SpriteY(resources, 95, 6), 95, 6,
-	          0, 0, fuelW, SpriteHeight(resources, 95, 6));
+	addSpriteSlice("HudFuelBar", SpriteX(resources, 95, 6), SpriteY(resources, 95, 6), 95, 6,
+	               0, 0, fuelW, SpriteHeight(resources, 95, 6));
 	addSprite("HudFuelMask", SpriteX(resources, 95, 5), SpriteY(resources, 95, 5), 95, 5);
 
 	int healthH = SpriteHeight(resources, 95, 0);
 	int healthY = player.maxHealth > 0
 		? healthH - (int)(((float)player.health / player.maxHealth) * healthH)
 		: healthH;
-	addSprite("HudHealthBar", SpriteX(resources, 95, 0), SpriteY(resources, 95, 0) + healthY, 95, 0,
-	          0, healthY, SpriteWidth(resources, 95, 0), healthH - healthY);
+	addSpriteSlice("HudHealthBar", SpriteX(resources, 95, 0), SpriteY(resources, 95, 0) + healthY, 95, 0,
+	               0, healthY, SpriteWidth(resources, 95, 0), healthH - healthY);
 
 	int shieldH = SpriteHeight(resources, 95, 1);
 	int shieldY = player.maxShield > 0
@@ -59,15 +65,15 @@ Uint8 BuildHudStatusSprites(const PlayerHudView& player, Surface* surface,
 		if(phase % (time * 2) < time) shieldBrightness += (phase % time) * 2;
 		else shieldBrightness += (time - (phase % time)) * 2;
 	}
-	addSprite("HudShieldBar", SpriteX(resources, 95, 1), SpriteY(resources, 95, 1) + shieldY, 95, 1,
-	          0, shieldY, SpriteWidth(resources, 95, 1), shieldH - shieldY, shieldBrightness);
+	addSpriteSlice("HudShieldBar", SpriteX(resources, 95, 1), SpriteY(resources, 95, 1) + shieldY, 95, 1,
+	               0, shieldY, SpriteWidth(resources, 95, 1), shieldH - shieldY, shieldBrightness);
 
 	if(player.poisonedBy) addSprite("HudPoisoned", 183, 453, 97, 5);
 	int filesW = player.maxFiles > 0
 		? (int)(((float)player.files / player.maxFiles) * SpriteWidth(resources, 95, 7))
 		: 0;
-	addSprite("HudFilesBar", SpriteX(resources, 95, 7), SpriteY(resources, 95, 7), 95, 7,
-	          0, 0, filesW, SpriteHeight(resources, 95, 7));
+	addSpriteSlice("HudFilesBar", SpriteX(resources, 95, 7), SpriteY(resources, 95, 7), 95, 7,
+	               0, 0, filesW, SpriteHeight(resources, 95, 7));
 
 	Uint16 weaponFace = 1;
 	Uint16 weaponGlow = 5;

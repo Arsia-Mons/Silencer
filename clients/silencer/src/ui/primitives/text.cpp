@@ -3,6 +3,9 @@
 #include "clay_ui_payloads.h"
 #include "primitives/text_internal.h"
 
+#include <algorithm>
+#include <cstring>
+
 namespace silencer::ui::primitives {
 
 namespace {
@@ -10,6 +13,10 @@ namespace {
 constexpr int kTextUserDataCapacity = 1024;
 silencer::clay_bridge::TextDrawData g_userDataArena[kTextUserDataCapacity];
 int g_userDataCount = 0;
+
+constexpr int kStringArenaCapacity = 32768;
+char g_stringArena[kStringArenaCapacity];
+int g_stringArenaOffset = 0;
 
 Clay_TextElementConfigWrapMode ClayWrapMode(TextWrap wrap) {
 	switch(wrap){
@@ -37,6 +44,22 @@ bool DrawDataIsDefault(TextEffect effect,
 	       !internalOpts.measureInk;
 }
 
+Clay_String CopyString(Clay_String text) {
+	int length = std::max(0, static_cast<int>(text.length));
+	if(!text.chars || length <= 0){
+		static const char kEmpty[] = "";
+		return Clay_String{ false, 0, kEmpty };
+	}
+	if(length + 1 > kStringArenaCapacity - g_stringArenaOffset){
+		return text;
+	}
+	char * dst = &g_stringArena[g_stringArenaOffset];
+	std::memcpy(dst, text.chars, static_cast<size_t>(length));
+	dst[length] = '\0';
+	g_stringArenaOffset += length + 1;
+	return Clay_String{ false, length, dst };
+}
+
 silencer::clay_bridge::TextDrawData *
 AllocUserData(TextEffect effect, text_internal::InternalTextOpts internalOpts) {
 	if(g_userDataCount >= kTextUserDataCapacity) return nullptr;
@@ -52,6 +75,7 @@ AllocUserData(TextEffect effect, text_internal::InternalTextOpts internalOpts) {
 
 void TextBeginFrame() {
 	g_userDataCount = 0;
+	g_stringArenaOffset = 0;
 }
 
 TextEffect ResolveTextEffect(TextTone tone, TextEffect effect) {
@@ -118,13 +142,14 @@ TextRenderStyle ResolveTextRenderStyle(TextSize size) {
 void TextWithInternalOptions(Clay_String text,
                              TextOpts opts,
                              InternalTextOpts internalOpts) {
+	Clay_String stableText = CopyString(text);
 	const TextRenderStyle style = ResolveTextRenderStyle(opts.size);
 	const TextEffect effect = ResolveTextEffect(opts.tone, opts.effect);
 	void * userData = DrawDataIsDefault(effect, internalOpts)
 		? nullptr
 		: static_cast<void *>(AllocUserData(effect, internalOpts));
 
-	CLAY_TEXT(text,
+	CLAY_TEXT(stableText,
 	          CLAY_TEXT_CONFIG({
 	              .userData = userData,
 	              .textColor = { static_cast<float>(effect.EffectColor()),
