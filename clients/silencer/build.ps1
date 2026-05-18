@@ -89,7 +89,7 @@ try {
     Write-Host "build.ps1: VS         = $vsPath" -ForegroundColor DarkGray
     Write-Host "build.ps1: VCPKG_ROOT = $vcpkgRoot" -ForegroundColor DarkGray
     Write-Host "build.ps1: $Preset -> $binaryDir" -ForegroundColor DarkGray
-    $inner = 'call "{0}" >nul && set "VCPKG_ROOT={1}" && cd /d "{2}" && cmake --preset {3} -DSILENCER_VERSION=00051 && cmake --build --preset {3}' -f $vcvars, $vcpkgRoot, $silencerDir, $Preset
+    $inner = 'call "{0}" >nul && set "VCPKG_ROOT={1}" && cd /d "{2}" && cmake --preset {3} && cmake --build --preset {3}' -f $vcvars, $vcpkgRoot, $silencerDir, $Preset
     & cmd /c $inner
     $code = $LASTEXITCODE
 }

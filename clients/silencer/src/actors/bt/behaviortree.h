@@ -63,6 +63,9 @@ struct BTContext {
     void bbSet(const std::string& key, json val) {
         blackboard[key] = std::move(val);
     }
+
+    // Live debug: result of each node in the last tick (0=Success,1=Failure,2=Running)
+    std::unordered_map<std::string, int> nodeResults;
 };
 
 // ── BehaviorTree ──────────────────────────────────────────────────────────────
@@ -101,6 +104,7 @@ private:
     BTResult tickWait(const Node& n, BTContext& ctx) const;
     BTResult tickLeaf(const Node& n, BTContext& ctx) const;
     BTResult tickCondition(const Node& n, BTContext& ctx) const;
+    BTResult tickSubTree(const Node& n, BTContext& ctx) const;
 };
 
 // ── BehaviorTreeLibrary ───────────────────────────────────────────────────────

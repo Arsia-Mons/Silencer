@@ -4,6 +4,39 @@ All notable changes to Silencer are documented here.
 
 ## [Unreleased]
 
+## [v00052] — 2026-05-17
+
+### Game client
+
+#### Magistrate boss NPC (#164)
+
+- **New NPC — Magistrate** — fully BT-driven boss enemy. Patrols on a platform using the Civilian wall-turn pattern (immediate `mirrored` flip at edge, always returns Running — no pause or stuck frames). Activates after a configurable delay, broadcasts a spawn sound on appearance, and broadcasts a death sound + spawns death guards when killed.
+- **Spawn / death sounds — all clients** — spawn sound plays on every client via draw-transition detection in `Tick()` (NEW state lasts 1 tick, too brief for snapshot delivery). Death sound plays via health-drop detection (`health > 0 → 0`). Both bypass distance attenuation with `EmitGlobalSound`.
+- **DeathFade duration** — extended from 10 → 120 ticks so the DYING state is reliably snapshotted by clients before the Magistrate is removed.
+- **Death guard spawning** — `SpawnDeathGuards` BT leaf is idempotent; safe to run multiple times during the extended DYING window.
+- **Sound keys fixed** — BT JSON `sound` props now use `.wav` extension (`mgbegin.wav`, `mgend.wav`) matching the soundbank key format.
+
+#### Behavior tree — Phase 2 & 3 (#164)
+
+- **`EmitSound` leaf — global broadcast** — new `global` prop; when true, sound plays at full volume on every client regardless of distance.
+- **`Walk` BT leaf** — Magistrate Walk leaf checks `DistanceToEnd` and flips `mirrored` inline each tick (Civilian pattern), always returning Running.
+
+### Admin web
+
+#### BT editor
+
+- **Magistrate action dropdown** — all 8 Magistrate-specific leaf actions (`Patrol`, `Walk`, `TurnAround`, `Stand`, `CheckActivation`, `EmitSpawnSound`, `EmitDeathSound`, `SpawnDeathGuards`, `DeathFade`) now appear in the ACTION selector with descriptions.
+- **`EmitSpawnSound` / `EmitDeathSound` inspector** — dedicated sound file dropdown prevents free-text key mistakes.
+- **`EmitSound` inspector** — global / spatial toggle added alongside the sound dropdown.
+
+#### Map designer
+
+- **Magistrate spawn conditions** — right-click context menu now exposes **Activation delay (seconds)** and **Secrets to activate** fields. Values are packed into unused high bits of `actor.type` (bits 8–23 = activationTicks, bits 24–31 = secretTriggerN); `0` in either field falls back to the GAS default.
+
+### Game client — bug fixes
+
+- **`map.cpp` case 72** — reads and applies per-actor `activationTicks` and `secretTriggerN` from the new packed encoding in `actor.type`.
+
 ## [v00051] — 2026-05-13
 
 ### Game client

@@ -32,6 +32,8 @@
 #include "fixedcannon.h"
 #include "grenade.h"
 #include "walldefense.h"
+#include "magistrate.h"
+#include "vanta.h"
 #include "baseexit.h"
 
 ObjectTypes::ObjectTypes(){
@@ -141,6 +143,12 @@ Object * ObjectTypes::CreateFromType(Uint8 type){
 		break;
 		case BASEEXIT:
 			return (Object *)new BaseExit();
+		break;
+		case MAGISTRATE:
+			return (Object *)new Magistrate();
+		break;
+		case VANTA:
+			return (Object *)new Vanta();
 		break;
 	}
 	return 0;

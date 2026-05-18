@@ -12,6 +12,49 @@ const DIRECTION_LABELS: Record<number, string> = {
   4:'Left', 5:'Up-Left', 6:'Up', 7:'Up-Right',
 };
 
+// Magistrate actor id
+const MAGISTRATE_ID = 72;
+// Vanta actor id
+const VANTA_ID = 73;
+// type 0=guard-blaster, 1=guard-laser, 2=guard-rocket, 3=robot
+const MAGISTRATE_SPAWN_TYPES: Record<number, string> = {
+  0: 'Guard (Blaster)',
+  1: 'Guard (Laser)',
+  2: 'Guard (Rocket)',
+  3: 'Robot',
+};
+
+// Decode 4 packed spawn entries from a Uint32.
+// Each byte: high nibble = type (0-3), low nibble = count (1-15; 0=unused).
+function decodeMagistrateEntries(matchid: number): Array<{ type: number; count: number }> {
+  const out: Array<{ type: number; count: number }> = [];
+  for(let slot = 0; slot < 4; slot++){
+    const byte = (matchid >>> (slot * 8)) & 0xFF;
+    const count = byte & 0x0F;
+    const type  = (byte >>> 4) & 0x0F;
+    if(count > 0) out.push({ type, count });
+  }
+  return out.length > 0 ? out : [{ type: 0, count: 3 }]; // default 3 blasters
+}
+function encodeMagistrateEntries(entries: Array<{ type: number; count: number }>): number {
+  let v = 0;
+  for(let i = 0; i < Math.min(entries.length, 4); i++){
+    const count = Math.min(15, Math.max(1, entries[i].count));
+    const type  = entries[i].type & 0x0F;
+    v |= ((type << 4) | count) << (i * 8);
+  }
+  return v >>> 0;
+}
+
+interface MagistrateFieldState {
+  facing: string;
+  radius: string;
+  securityid: string;
+  entries: Array<{ type: number; count: number }>;
+  activationSecs: string;  // 0 = use GAS default; stored as ticks (×60) in bits 8-23 of actor.type
+  secretTriggerN: string;  // 0 = disabled; stored in bits 24-31 of actor.type
+}
+
 // Light actor (id=71) actortype bitfield helpers
 // bits 0-1: size, bit 2: shape, bits 3-4: animation, bits 5-6: pulse speed, bits 8-15: colorR, bits 16-23: colorG, bits 24-31: colorB
 // actor.direction (separate field): spot direction 0-7 (E,NE,N,NW,W,SW,S,SE)
@@ -69,11 +112,14 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
   const def = ACTOR_DEFS.find(d => d.id === actor.id) ?? { label: `Unknown (${actor.id})`, color: '#6b7280' };
   const { lights, load: loadLights } = useLightsStore();
   const isLight = actor.id === 71;
+  const isMagistrate = actor.id === MAGISTRATE_ID;
+  const isVanta = actor.id === VANTA_ID;
+  const isMagistrateClass = isMagistrate || isVanta;
 
   useEffect(() => { if (isLight) loadLights(); }, [isLight, loadLights]);
 
   // For non-light actors, build type hint label from static hints catalogue
-  const typeHint = !isLight ? ACTOR_TYPE_HINTS[actor.id] : undefined;
+  const typeHint = !isLight && !isMagistrateClass ? ACTOR_TYPE_HINTS[actor.id] : undefined;
 
   const [fields, setFields] = useState<FieldState>({
     type:         String(actor.type ?? 0),
@@ -83,6 +129,17 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
     destructible: !!(actor.unknown & 1),
     collectible:  !!(actor.unknown & 2),
     health:       String(((actor.unknown ?? 0) >> 8) & 0xFF || 100),
+  });
+
+  // Magistrate-specific decoded state
+  // actor.type bits 0-7 = radius; actor.matchid = 4 packed spawn entries
+  const [magistrateFields, setMagistrateFields] = useState<MagistrateFieldState>({
+    facing:         String(actor.direction ?? 0),
+    radius:         String((actor.type ?? 0) & 0xFF || 64),
+    securityid:     String(actor.securityid ?? 0),
+    entries:        decodeMagistrateEntries(actor.matchid ?? 0),
+    activationSecs: String((((actor.type ?? 0) >>> 8) & 0xFFFF) / 60 | 0),
+    secretTriggerN: String(((actor.type ?? 0) >>> 24) & 0xFF),
   });
 
   // Light-specific decoded state
@@ -122,6 +179,19 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
       onUpdate(actorIdx, {
         type: encodeLightType(lightFields.size, lightFields.shape, lightFields.anim, lightFields.pulseSpeed, lightFields.dynShadows, r, g, b),
         direction: lightFields.direction,
+      });
+    } else if (isMagistrateClass) {
+      const radius       = Math.min(255, Math.max(8, parseInt(magistrateFields.radius, 10) || 64));
+      const actSecs      = Math.min(65535 / 60 | 0, Math.max(0, parseInt(magistrateFields.activationSecs, 10) || 0));
+      const actTicks     = actSecs * 60;
+      const secretN      = Math.min(255, Math.max(0, parseInt(magistrateFields.secretTriggerN, 10) || 0));
+      // Pack: bits 0-7 = radius, bits 8-23 = activationTicks, bits 24-31 = secretTriggerN
+      const packedType   = (radius & 0xFF) | ((actTicks & 0xFFFF) << 8) | ((secretN & 0xFF) << 24);
+      onUpdate(actorIdx, {
+        type:       packedType >>> 0,
+        direction:  parseInt(magistrateFields.facing, 10) || 0,
+        matchid:    encodeMagistrateEntries(magistrateFields.entries),
+        securityid: parseInt(magistrateFields.securityid, 10) || 0,
       });
     } else {
       const hp = Math.min(255, Math.max(1, parseInt(fields.health, 10) || 100));
@@ -239,6 +309,91 @@ export default function ActorContextMenu({ actor, actorIdx, screenX, screenY, on
             {!lightColorEnabled && (
               <div className="text-[#3a6a3a] text-[10px] mt-0.5">Neutral white light (no tint)</div>
             )}
+          </div>
+        </>
+      ) : isMagistrateClass ? (
+        <>
+          <div className="mb-1.5">
+            <div className={lbl}>Facing</div>
+            <select value={magistrateFields.facing} onChange={e => setMagistrateFields(f => ({ ...f, facing: e.target.value }))} className={inp + ' cursor-pointer'}>
+              <option value="0">0 — Right</option>
+              <option value="1">1 — Left</option>
+            </select>
+          </div>
+          <div className="border-t border-[#1a3a1a] pt-1.5 mt-1.5 mb-1">
+            <div className="flex items-center mb-1">
+              <span className="text-[#5a8a5a] text-[10px] uppercase tracking-wide">Death spawn</span>
+              {magistrateFields.entries.length < 4 && (
+                <button
+                  onClick={() => setMagistrateFields(f => ({ ...f, entries: [...f.entries, { type: 0, count: 1 }] }))}
+                  className="ml-auto text-[#4a8a4a] hover:text-[#c0f0c0] text-[10px] font-mono border border-[#2a4a2a] hover:border-[#4a8a4a] px-1.5 rounded"
+                >+ Add</button>
+              )}
+            </div>
+            {magistrateFields.entries.map((entry, idx) => (
+              <div key={idx} className="flex items-center gap-1 mb-1">
+                <select
+                  value={entry.type}
+                  onChange={e => setMagistrateFields(f => {
+                    const entries = [...f.entries];
+                    entries[idx] = { ...entries[idx], type: Number(e.target.value) };
+                    return { ...f, entries };
+                  })}
+                  className="flex-1 bg-[#0a0a18] border border-[#1a2e1a] text-[#c0f0c0] text-[10px] px-1 py-0.5 rounded font-mono cursor-pointer"
+                >
+                  {Object.entries(MAGISTRATE_SPAWN_TYPES).map(([v, l]) => (
+                    <option key={v} value={v}>{l}</option>
+                  ))}
+                </select>
+                <input
+                  type="number" min={1} max={15} value={entry.count}
+                  onChange={e => setMagistrateFields(f => {
+                    const entries = [...f.entries];
+                    entries[idx] = { ...entries[idx], count: parseInt(e.target.value, 10) || 1 };
+                    return { ...f, entries };
+                  })}
+                  className="w-10 bg-[#0a0a18] border border-[#1a2e1a] text-[#c0f0c0] text-[10px] px-1 py-0.5 rounded font-mono text-center"
+                  title="Count (1–15)"
+                />
+                <button
+                  onClick={() => setMagistrateFields(f => ({ ...f, entries: f.entries.filter((_, i) => i !== idx) }))}
+                  className="text-[#5a3a3a] hover:text-[#f08080] text-[10px] font-mono px-1"
+                  title="Remove"
+                >✕</button>
+              </div>
+            ))}
+            <div className="mt-1">
+              <div className={lbl}>Radius (px)</div>
+              <input type="number" min={8} max={255} value={magistrateFields.radius}
+                onChange={e => setMagistrateFields(f => ({ ...f, radius: e.target.value }))} className={inp} />
+            </div>
+          </div>
+          <div className="border-t border-[#1a3a1a] pt-1.5 mt-1.5 mb-1">
+            <div className="text-[#5a8a5a] text-[10px] uppercase tracking-wide mb-1">Activation conditions</div>
+            <div className="mb-1.5">
+              <div className={lbl}>Activation delay (seconds, 0 = GAS default)</div>
+              <input type="number" min={0} max={1092} value={magistrateFields.activationSecs}
+                onChange={e => setMagistrateFields(f => ({ ...f, activationSecs: e.target.value }))} className={inp}
+                placeholder="0 = use GAS default" />
+            </div>
+            <div className="mb-1.5">
+              <div className={lbl}>Secrets to activate (0 = disabled)</div>
+              <input type="number" min={0} max={255} value={magistrateFields.secretTriggerN}
+                onChange={e => setMagistrateFields(f => ({ ...f, secretTriggerN: e.target.value }))} className={inp}
+                placeholder="0 = disabled" />
+            </div>
+          </div>
+          <div className="mb-1.5">
+            <div className={lbl}>Security ID — spawn condition</div>
+            <select value={magistrateFields.securityid} onChange={e => setMagistrateFields(f => ({ ...f, securityid: e.target.value }))} className={inp + ' cursor-pointer'}>
+              <option value="0">0 — Always spawn</option>
+              <option value="1">1 — Low security only</option>
+              <option value="2">2 — Medium security only</option>
+              <option value="3">3 — Low or Medium</option>
+              <option value="4">4 — High security only</option>
+              <option value="5">5 — Low or High</option>
+              <option value="6">6 — Medium or High</option>
+            </select>
           </div>
         </>
       ) : (
