@@ -80,6 +80,31 @@ void DataRetrievalMode::OnSecretBeamReady(World& world, Team& team) {
 }
 
 void DataRetrievalMode::OnSecretDelivered(World& world, Team& team) {
+	// Award credits and show delivery message. team.secretdelivered holds the
+	// delivering player's object ID (cleared by Team::Tick after this call).
+	Player* deliverer = static_cast<Player*>(world.GetObjectFromId(team.secretdelivered));
+	if(deliverer){
+		deliverer->EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundTeamHeal], 48);
+		Peer* peer = deliverer->GetPeer(world);
+		if(peer){
+			User* user = world.lobby.GetUserInfo(peer->accountid);
+			bool stolen = deliverer->secretteamid != team.id;
+			int remaining = GASLoader::Get().player.secretsNeededToWin - team.secrets;
+			char text[128];
+			sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded %d credits",
+			        user->name, stolen ? "stolen secret" : "secret", remaining,
+			        GASLoader::Get().player.secretDeliveryCredits);
+			if(!world.intutorialmode){
+				world.ShowMessage(text, 128, 0, true);
+			}
+		}
+	}
+	for(int i = 0; i < team.numpeers; i++){
+		Player* p = world.GetPeerPlayer(team.peers[i]);
+		if(p) p->AddCredits(GASLoader::Get().player.secretDeliveryCredits);
+	}
+	world.Illuminate();
+
 	if(team.secrets < GASLoader::Get().player.secretsNeededToWin) return;
 	if(world.winningteamid) return;
 

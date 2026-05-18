@@ -72,31 +72,6 @@ void Team::Tick(World & world){
 		secrets++;
 		world.secretsBeamed++;
 		world.SendSound(GASLoader::Get().player.soundTeamHQ.c_str());
-		Player * player = static_cast<Player *>(world.GetObjectFromId(secretdelivered));
-		if(player){
-			player->EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundTeamHeal], 48);
-			Peer * peer = player->GetPeer(world);
-			if(peer){
-				User * user = world.lobby.GetUserInfo(peer->accountid);
-				bool stolen = false;
-				if(player->secretteamid != id){
-					stolen = true;
-				}
-				int remaining = GASLoader::Get().player.secretsNeededToWin - secrets;
-				char text[128];
-				sprintf(text, "%s returned a %s\n( %d remaining )\n\nTeam awarded %d credits", user->name, stolen ? "stolen secret" : "secret", remaining, GASLoader::Get().player.secretDeliveryCredits);
-				if(!world.intutorialmode){
-					world.ShowMessage(text, 128, 0, true);
-				}
-			}
-		}
-		for(int i = 0; i < numpeers; i++){
-			Player * player = world.GetPeerPlayer(peers[i]);
-			if(player){
-				player->AddCredits(GASLoader::Get().player.secretDeliveryCredits);
-			}
-		}
-		world.Illuminate();
 		if(world.gameMode){
 			world.gameMode->OnSecretDelivered(world, *this);
 		}
