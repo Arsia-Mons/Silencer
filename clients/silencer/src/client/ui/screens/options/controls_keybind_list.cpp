@@ -84,12 +84,13 @@ void RowActionButton(Clay_String id,
 void RowOperatorButton(Clay_String id,
                        const char * text,
                        int row,
+                       int minWidth,
                        silencer::ui::UiInteractionRegistry& interactions) {
 	std::string actionId = std::string(kActionOperatorPrefix) + std::to_string(row);
 	Button(id, FromCStr(text),
 	       ButtonOpts{ .variant = ButtonVariant::Ghost,
 	                   .size = ButtonSize::Auto,
-	                   .minWidth = kOperatorW,
+	                   .minWidth = minWidth,
 	                   .paddingY = 4 },
 	       ButtonHandle{ nullptr, actionId.c_str(), &interactions });
 }
@@ -126,6 +127,22 @@ void BuildKeybindListBody(const KeybindListView & view,
 		operatorIds[i] = "Operator" + std::to_string(i);
 	}
 
+	// Scale the hardcoded legacy-pixel horizontal metrics by the screen's
+	// horizontal scale so the interior tracks the panel width instead of
+	// overflowing it at small window sizes. Vertical metrics are untouched
+	// (row height/clip are owned by the #179 vertical fix).
+	const float hs = view.hScale;
+	auto S = [hs](int v) -> int {
+		int r = static_cast<int>(v * hs + 0.5f);
+		return r < 1 ? 1 : r;
+	};
+	const float    contentW    = static_cast<float>(S(controls_keybind_list_detail::kContentW));
+	const float    actionNameW = static_cast<float>(S(controls_keybind_list_detail::kActionNameW));
+	const int      operatorW   = S(controls_keybind_list_detail::kOperatorW);
+	const uint16_t columnGap   = static_cast<uint16_t>(S(controls_keybind_list_detail::kColumnGap));
+	const uint16_t actionGap   = static_cast<uint16_t>(S(controls_keybind_list_detail::kActionGap));
+	const uint16_t presetGap   = static_cast<uint16_t>(S(controls_keybind_list_detail::kPresetGap));
+
 	CLAY({ .id = CLAY_ID("ControlsTitle"),
 	       .layout = {
 	           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
@@ -144,7 +161,7 @@ void BuildKeybindListBody(const KeybindListView & view,
 
 	CLAY({ .id = CLAY_ID("ControlsContent"),
 	       .layout = {
-	           .sizing = { CLAY_SIZING_FIXED(controls_keybind_list_detail::kContentW),
+	           .sizing = { CLAY_SIZING_FIXED(contentW),
 	                       CLAY_SIZING_GROW(0) },
 	           .childGap = controls_keybind_list_detail::kSectionGap,
 	           .childAlignment = { CLAY_ALIGN_X_CENTER, CLAY_ALIGN_Y_TOP },
@@ -153,13 +170,13 @@ void BuildKeybindListBody(const KeybindListView & view,
 		CLAY({ .id = CLAY_ID("ControlsPresetRow"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(controls_keybind_list_detail::kPresetRowH) },
-		           .childGap = controls_keybind_list_detail::kPresetGap,
+		           .childGap = presetGap,
 		           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
 			CLAY({ .id = CLAY_ID("PresetLabel"),
 			       .layout = {
-			           .sizing = { CLAY_SIZING_FIXED(controls_keybind_list_detail::kActionNameW),
+			           .sizing = { CLAY_SIZING_FIXED(actionNameW),
 			                       CLAY_SIZING_FIT(0) },
 			       } }) {
 				controls_keybind_list_detail::Text(
@@ -187,13 +204,13 @@ void BuildKeybindListBody(const KeybindListView & view,
 				CLAY({ .id = CLAY_IDI("ControlsRow", (uint32_t)i),
 				       .layout = {
 				           .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(controls_keybind_list_detail::kRowH) },
-				           .childGap = controls_keybind_list_detail::kColumnGap,
+				           .childGap = columnGap,
 				           .childAlignment = { CLAY_ALIGN_X_LEFT, CLAY_ALIGN_Y_CENTER },
 				           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 				       } }) {
 					CLAY({ .id = CLAY_IDI("ControlsAction", (uint32_t)i),
 					       .layout = {
-					           .sizing = { CLAY_SIZING_FIXED(controls_keybind_list_detail::kActionNameW),
+					           .sizing = { CLAY_SIZING_FIXED(actionNameW),
 					                       CLAY_SIZING_FIT(0) },
 					       } }) {
 						controls_keybind_list_detail::Text(
@@ -203,7 +220,7 @@ void BuildKeybindListBody(const KeybindListView & view,
 					controls_keybind_list_detail::RowActionButton(controls_keybind_list_detail::FromStd(primaryIds[i]),
 					                row.primaryLabel, i, 0, row.rebindingPrimary, interactions);
 					controls_keybind_list_detail::RowOperatorButton(controls_keybind_list_detail::FromStd(operatorIds[i]),
-					                  row.operatorLabel.c_str(), i, interactions);
+					                  row.operatorLabel.c_str(), i, operatorW, interactions);
 					controls_keybind_list_detail::RowActionButton(controls_keybind_list_detail::FromStd(secondaryIds[i]),
 					                row.secondaryLabel, i, 1, row.rebindingSecondary, interactions);
 				}
@@ -218,7 +235,7 @@ void BuildKeybindListBody(const KeybindListView & view,
 		CLAY({ .id = CLAY_ID("ControlsActions"),
 		       .layout = {
 		           .sizing = { CLAY_SIZING_FIT(0), CLAY_SIZING_FIT(0) },
-		           .childGap = controls_keybind_list_detail::kActionGap,
+		           .childGap = actionGap,
 		           .layoutDirection = CLAY_LEFT_TO_RIGHT,
 		       } }) {
 			controls_keybind_list_detail::Button(CLAY_STRING("ControlsSaveButton"), CLAY_STRING("Save"),
