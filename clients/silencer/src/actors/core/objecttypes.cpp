@@ -35,6 +35,7 @@
 #include "magistrate.h"
 #include "vanta.h"
 #include "baseexit.h"
+#include "gamestateobject.h"
 
 ObjectTypes::ObjectTypes(){
 	memset(serializedsize, 0, sizeof(serializedsize));
@@ -149,6 +150,9 @@ Object * ObjectTypes::CreateFromType(Uint8 type){
 		break;
 		case VANTA:
 			return (Object *)new Vanta();
+		break;
+		case GAMESTATEOBJ:
+			return (Object *)new GameStateObject();
 		break;
 	}
 	return 0;

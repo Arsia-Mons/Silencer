@@ -13,6 +13,7 @@
 #include "basedoor.h"
 #include "bodypart.h"
 #include "gasloader.h"
+#include "gamestateobject.h"
 #include "text_wrap.h"
 #include <algorithm>
 
@@ -80,12 +81,15 @@ World::World(bool mode) : lobby(this), lagsimulator(&sockethandle), audio(Audio:
 	spectator.camvy = 0;
 	spectator.holdshowallnames = false;
 	spectator.initialized = false;
+	gameMode = GameModeFactory(GAMEMODE_DATA_RETRIEVAL);
 }
 
 World::~World(){
 	Disconnect();
     shutdown(sockethandle, SHUT_RDWR);
     closesocket(sockethandle);
+	delete gameMode;
+	gameMode = nullptr;
 	for(std::vector<BuyableItem *>::iterator it = buyableitems.begin(); it != buyableitems.end(); it++){
 		delete (*it);
 	}
@@ -130,6 +134,34 @@ void World::Tick(void){
 		DestroyMarkedObjects();
 	}else{
 		TickObjects();
+		if(gameMode){
+			gameMode->Tick(*this);
+		}
+		// Poll IsMatchOver + time limit each tick on authority.
+		if(gameMode && !winningteamid && gameplaystate == INGAME){
+			bool over = gameMode->IsMatchOver(*this);
+			if(!over){
+				const GameModeConfig* cfg = GASLoader::Get().GetGameModeConfig((int)gameMode->Id());
+				const int tps = GASLoader::Get().gameengine.ticksPerSecond;
+				if(cfg && cfg->timeLimitSecs > 0 && tps > 0 && (int)(tickcount / tps) >= cfg->timeLimitSecs){
+					over = true;
+				}
+			}
+			if(over){
+				winningteamid = gameMode->WinningTeamId(*this);
+				if(!winningteamid) winningteamid = 0xFFFF; // draw
+			}
+		}
+		// Fire OnMatchEnd exactly once when the match transitions to over.
+		if(gameMode && winningteamid && !matchEndCalled){
+			matchEndCalled = true;
+			gameMode->OnMatchEnd(*this);
+		}
+		// Create the replicated match-state object once per match on authority.
+		if(gameplaystate == INGAME && objectsbytype[ObjectTypes::GAMESTATEOBJ].empty()){
+			GameStateObject* gso = (GameStateObject*)CreateObject(ObjectTypes::GAMESTATEOBJ);
+			gso->modeId = gameMode ? gameMode->Id() : GAMEMODE_DATA_RETRIEVAL;
+		}
 		for(int i = 0; i < maxpeers; i++){
 			Peer * peer = peerlist[i];
 			if(peer){

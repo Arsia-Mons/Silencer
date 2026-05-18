@@ -408,7 +408,7 @@ func TestVector_NewGamePush_Encode(t *testing.T) {
 		MaxLevel:      99,
 		MaxPlayers:    24,
 		MaxTeams:      6,
-		Extra:         0,
+		ModeId:        0,
 		Port:          5000,
 	}
 	for i := 0; i < 20; i += 4 {

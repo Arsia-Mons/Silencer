@@ -1,5 +1,6 @@
 #include "game.h"
 #include "audio.h"
+#include "gamemode.h"
 #include "player.h"
 #include "team.h"
 #include "world.h"
@@ -72,6 +73,10 @@ if(/*!world.map.loaded && */stateisnew){
 	screenbuffer.Clear(0);
 	SetColors(renderer.palette.GetColors());
 	ambienceMixer.LoadRandomGameMusic();
+	// Activate the game mode specified by the lobby config.
+	delete world.gameMode;
+	world.gameMode = GameModeFactory((GameModeId)world.gameinfo.modeId);
+	world.gameMode->OnMatchStart(world);
 	stateisnew = false;
 }else{
 	if(ambienceMixer.FadedIn()){

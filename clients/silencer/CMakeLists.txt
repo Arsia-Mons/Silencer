@@ -164,6 +164,7 @@ target_include_directories(${SILENCER_TARGET} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/client/ui/screens/mission_summary"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/net"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/game"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/game/modes"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/updater"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/gas"
