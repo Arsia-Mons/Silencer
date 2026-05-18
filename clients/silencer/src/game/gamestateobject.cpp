@@ -10,8 +10,9 @@ void GameStateObject::Serialize(bool write, Serializer& data, Serializer* old) {
 	data.Serialize(write, (Uint8&)modeId,     old);
 	data.Serialize(write, matchPhase,          old);
 	data.Serialize(write, matchTimeSecs,       old);
-	data.Serialize(write, scoreA,              old);
-	data.Serialize(write, scoreB,              old);
+	for(int i = 0; i < 6; i++){
+		data.Serialize(write, score[i], old);
+	}
 }
 
 void GameStateObject::Tick(World& world) {

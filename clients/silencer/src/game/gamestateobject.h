@@ -15,10 +15,9 @@ public:
 	void Tick(World& world);
 
 	GameModeId modeId        = GAMEMODE_DATA_RETRIEVAL;
-	Uint8      matchPhase    = 0;  // reserved for future use
+	Uint8      matchPhase    = 0;  // 0=warmup 1=active 2=over
 	Uint16     matchTimeSecs = 0;  // elapsed match seconds
-	Uint16     scoreA        = 0;  // team A score
-	Uint16     scoreB        = 0;  // team B score
+	Uint16     score[6]      = {}; // per-team score (index = team slot, up to World::maxteams)
 };
 
 #endif
