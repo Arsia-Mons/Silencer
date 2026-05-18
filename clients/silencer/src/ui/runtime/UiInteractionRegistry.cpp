@@ -334,6 +334,11 @@ bool UiInteractionRegistry::HasFocus() const {
 	return FocusedInteractable() != nullptr;
 }
 
+bool UiInteractionRegistry::HasTextInputFocus() const {
+	const UiInteractable * w = FocusedInteractable();
+	return w && w->kind == UiInteractableKind::TextInput && !w->inactive;
+}
+
 void UiInteractionRegistry::ClearFocus() {
 	focusedUid_ = -1;
 	focusedKind_ = UiInteractableKind::Button;

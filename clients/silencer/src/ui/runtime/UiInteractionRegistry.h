@@ -88,6 +88,7 @@ public:
 	bool FocusInteractableById(const std::string& id);
 	bool IsTextInputFocused(int uid) const;
 	bool HasFocus() const;
+	bool HasTextInputFocus() const;
 	void ClearFocus();
 	bool DispatchTextInput(char ascii);
 	bool BackspaceFocusedText();
