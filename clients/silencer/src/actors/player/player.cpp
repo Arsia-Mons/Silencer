@@ -2775,10 +2775,10 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 	}*/
 	if(health == 0 && state != DYING && state != DEAD){
 		Peer * peer = GetPeer(world);
+		Object * owner = world.GetObjectFromId(projectile.ownerid);
 		if(peer){
 			const char * killedby = "?";
 			bool killedself = false;
-			Object * owner = world.GetObjectFromId(projectile.ownerid);
 			if(owner){
 				switch(owner->type){
 					case ObjectTypes::WALLDEFENSE:{
@@ -2857,6 +2857,28 @@ void Player::HandleHit(World & world, Uint8 x, Uint8 y, Object & projectile){
 		EmitSound(world, world.resources.soundbank[GASLoader::Get().player.soundGrunt]);
 
 		if (world.IsAuthority()) {
+			if(world.gameMode){
+				world.gameMode->OnPlayerDied(world, *this, owner);
+			}
+
+			// Check if the victim's entire team has been eliminated.
+			Team* victimTeam = world.GetPeerTeam(peer ? peer->id : 0);
+			if(victimTeam && world.gameMode){
+				bool teamAlive = false;
+				for(auto* obj : world.objectlist){
+					if(obj->type != ObjectTypes::PLAYER || obj->id == id) continue;
+					Player* p = static_cast<Player*>(obj);
+					if(world.GetPeerTeam(p->GetPeer(world) ? p->GetPeer(world)->id : 0) != victimTeam) continue;
+					if(p->state != DYING && p->state != DEAD){
+						teamAlive = true;
+						break;
+					}
+				}
+				if(!teamAlive){
+					world.gameMode->OnTeamEliminated(world, *victimTeam);
+				}
+			}
+
 			// Emit PLAYER_DIED so trigger scripts can respond.
 			GameEvent ev;
 			ev.type      = EventType::PLAYER_DIED;

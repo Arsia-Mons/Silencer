@@ -54,6 +54,11 @@ public:
 	// deliver item, plant bomb, etc.). Meaning is mode-defined.
 	virtual void OnObjectiveCaptured(World&, Team&) {}
 
+	// Called by Team::Tick when a secret has been beamed to a threshold
+	// and a terminal should be lit. Data Retrieval uses this to activate
+	// the beacon; other modes can ignore it.
+	virtual void OnSecretBeamReady(World&, Team&) {}
+
 	// Called once by World when winningteamid is first set (match over).
 	// Override to broadcast results, apply bonuses, record stats, etc.
 	virtual void OnMatchEnd(World&) {}

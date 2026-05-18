@@ -5,6 +5,7 @@
 #include "objecttypes.h"
 #include "player.h"
 #include "team.h"
+#include "terminal.h"
 #include "world.h"
 
 bool DataRetrievalMode::IsMatchOver(const World& w) const {
@@ -23,6 +24,44 @@ void DataRetrievalMode::UpdateScores(GameStateObject& gso, const World& w) const
 			gso.score[team->number] = team->secrets;
 		}
 	}
+}
+
+void DataRetrievalMode::OnSecretBeamReady(World& world, Team& team) {
+	if(!world.IsAuthority()) return;
+
+	std::vector<Terminal*> terminals;
+	for(auto* obj : world.objectlist){
+		if(obj->type != ObjectTypes::TERMINAL) continue;
+		Terminal* terminal = static_cast<Terminal*>(obj);
+		if(terminal->isbig &&
+		   terminal->state != Terminal::SECRETBEAMING &&
+		   terminal->state != Terminal::SECRETREADY){
+			terminals.push_back(terminal);
+		}
+	}
+	if(terminals.empty()) return;
+
+	Terminal* terminal = terminals[world.Random() % terminals.size()];
+	terminal->state = Terminal::SECRETBEAMING;
+	terminal->state_i = 0;
+	team.beamingterminalid = terminal->id;
+	const TerminalDef* td = GASLoader::Get().GetTerminalDef("big");
+	terminal->beamingtime = td ? td->beaconTimeSecs : 65;
+
+	char teamtext[256];
+	char enemytext[256];
+	sprintf(teamtext, "TOP SECRET LOCATION DETERMINED\n\nApproximate time : %d seconds", terminal->beamingtime);
+	sprintf(enemytext, "ENEMY BEAMING DETECTED\n\nTracking location on radar");
+	for(int i = 0; i < world.maxpeers; i++){
+		Peer* peer = world.peerlist[i];
+		if(!peer) continue;
+		if(world.GetPeerTeam(peer->id) == &team){
+			world.ShowMessage(teamtext, 128, 0, true, peer);
+		} else {
+			world.ShowMessage(enemytext, 128, 0, true, peer);
+		}
+	}
+	world.SendSound(GASLoader::Get().player.soundTeamHack.c_str());
 }
 
 void DataRetrievalMode::OnSecretDelivered(World& world, Team& team) {
