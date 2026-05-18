@@ -1,0 +1,26 @@
+diff --git a/clients/silencer/build.ps1 b/clients/silencer/build.ps1
+index 4b3d478..3d9486e 100644
+--- a/clients/silencer/build.ps1
++++ b/clients/silencer/build.ps1
+@@ -89,7 +89,7 @@ try {
+     Write-Host "build.ps1: VS         = $vsPath" -ForegroundColor DarkGray
+     Write-Host "build.ps1: VCPKG_ROOT = $vcpkgRoot" -ForegroundColor DarkGray
+     Write-Host "build.ps1: $Preset -> $binaryDir" -ForegroundColor DarkGray
+-    $inner = 'call "{0}" >nul && set "VCPKG_ROOT={1}" && cd /d "{2}" && cmake --preset {3} -DSILENCER_VERSION=00052 && cmake --build --preset {3}' -f $vcvars, $vcpkgRoot, $silencerDir, $Preset
++    $inner = 'call "{0}" >nul && set "VCPKG_ROOT={1}" && cd /d "{2}" && cmake --preset {3} -DSILENCER_VERSION=00051 && cmake --build --preset {3}' -f $vcvars, $vcpkgRoot, $silencerDir, $Preset
+     & cmd /c $inner
+     $code = $LASTEXITCODE
+ }
+diff --git a/clients/silencer/build.sh b/clients/silencer/build.sh
+index aa756cd..0e988d6 100755
+--- a/clients/silencer/build.sh
++++ b/clients/silencer/build.sh
+@@ -114,7 +114,7 @@ else
+ fi
+ cmake -S "$script_dir" -B "$bdir" "${gen[@]}" \
+     -DCMAKE_BUILD_TYPE="$btype" \
+-    -DSILENCER_VERSION=00052 \
++    -DSILENCER_VERSION=00051 \
+     -DSILENCER_UNITY_BUILD="$unity" \
+     ${toolchain+"${toolchain[@]}"}
+ cmake --build "$bdir" --parallel
